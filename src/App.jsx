@@ -534,12 +534,11 @@ function RestTimer({ seconds, accent }) {
 /* ─────────────────────────────────────────────────────────────────────────
    SET ROW
 ───────────────────────────────────────────────────────────────────────── */
-function SetRow({ exerciseId, setIndex, setDef, accent, logs, setLogs, deloadKgFactor=1, deloadMode=false }) {
+function SetRow({ exerciseId, setIndex, setDef, accent, logs, setLogs, deloadKgFactor=1, deloadMode=false, resetKey=0 }) {
   const key = `${exerciseId}_${setIndex}`;
   const prKey = `${key}_pr_override`;
   const today = todayStr();
   const history = logs[key] || [];
-  const lastEntry = history[history.length-1];
   const override = logs[prKey];
 
   const computedPR = useMemo(() => {
@@ -551,13 +550,21 @@ function SetRow({ exerciseId, setIndex, setDef, accent, logs, setLogs, deloadKgF
   const currentPR = override || computedPR;
   const suggestedKg = currentPR && deloadMode ? Math.round(currentPR.kg * deloadKgFactor * 2)/2 : null;
 
-  const [reps, setReps] = useState(lastEntry?.reps ?? "");
-  const [kg, setKg] = useState(lastEntry?.kg ?? "");
+  const [reps, setReps] = useState("");
+  const [kg, setKg] = useState("");
   const [feedback, setFeedback] = useState(null);
   const [editingPR, setEditingPR] = useState(false);
   const [editReps, setEditReps] = useState("");
   const [editKg, setEditKg] = useState("");
   const [saved, setSaved] = useState(false);
+
+  // Reset inputs when resetKey changes (day reset button)
+  useEffect(() => {
+    setReps("");
+    setKg("");
+    setFeedback(null);
+    setSaved(false);
+  }, [resetKey]);
 
   const handleSave = () => {
     const r=parseFloat(reps), k=parseFloat(kg);
@@ -566,7 +573,14 @@ function SetRow({ exerciseId, setIndex, setDef, accent, logs, setLogs, deloadKgF
     const newVol = vol(k,r);
     const entry = {date:today,reps:r,kg:k};
     const newHistory = [...history.filter(h=>h.date!==today), entry];
-    setLogs({...logs,[key]:newHistory});
+
+    // Auto-update PR override if this beats the current record
+    let newLogs = {...logs,[key]:newHistory};
+    if (!currentPR || newVol > prevVol) {
+      newLogs = {...newLogs, [prKey]: {kg:k, reps:r}};
+    }
+    setLogs(newLogs);
+
     setSaved(true); setTimeout(()=>setSaved(false),1200);
     if (!currentPR||newVol>prevVol) setFeedback({type:"pr",msg:"¡Nueva marca! 🔥"});
     else if (newVol===prevVol) setFeedback({type:"tie",msg:"Igualaste tu marca 💪"});
@@ -655,7 +669,7 @@ function SetRow({ exerciseId, setIndex, setDef, accent, logs, setLogs, deloadKgF
 /* ─────────────────────────────────────────────────────────────────────────
    EXERCISE CARD
 ───────────────────────────────────────────────────────────────────────── */
-function ExerciseCard({ exercise, accent, logs, setLogs, deloadSets, deloadMode }) {
+function ExerciseCard({ exercise, accent, logs, setLogs, deloadSets, deloadMode, resetKey=0 }) {
   const [open, setOpen] = useState(false);
   const hasHeavy = exercise.sets.some(s=>s.heavy);
   const setsToShow = deloadSets ? exercise.sets.slice(0, deloadSets) : exercise.sets;
@@ -684,7 +698,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, deloadSets, deloadMode 
           {setsToShow.map((s,i) => (
             <SetRow key={i} exerciseId={exercise.id} setIndex={i} setDef={s}
               accent={accent} logs={logs} setLogs={setLogs}
-              deloadKgFactor={0.75} deloadMode={deloadMode}/>
+              deloadKgFactor={0.75} deloadMode={deloadMode} resetKey={resetKey}/>
           ))}
           <div className="flex flex-col gap-2 pt-3">
             <RestTimer seconds={hasHeavy?REST_LONG:REST_SHORT} accent={accent}/>
@@ -702,7 +716,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, deloadSets, deloadMode 
 /* ─────────────────────────────────────────────────────────────────────────
    RESUMEN DEL DÍA
 ───────────────────────────────────────────────────────────────────────── */
-function DaySummary({ dayKey, logs }) {
+function DaySummary({ dayKey, logs, onResetDay }) {
   const day = ROUTINE[dayKey];
   const today = todayStr();
   let totalSets=0, doneToday=0, prsToday=0;
@@ -714,25 +728,45 @@ function DaySummary({ dayKey, logs }) {
       if (t) {
         doneToday++;
         let best = s.pr?{...s.pr}:null;
-        h.filter(x=>x.date!==today).forEach(x=>{if(!best||vol(x.kg,x.reps)>vol(best.kg,best.reps))best=x;});
+        const ov = logs[`${ex.id}_${i}_pr_override`];
+        if (ov) best=ov;
+        else h.filter(x=>x.date!==today).forEach(x=>{if(!best||vol(x.kg,x.reps)>vol(best.kg,best.reps))best=x;});
         if (!best||vol(t.kg,t.reps)>vol(best.kg,best.reps)) prsToday++;
       }
     });
   });
   const pct = totalSets ? Math.round((doneToday/totalSets)*100) : 0;
+  const [confirmReset, setConfirmReset] = useState(false);
 
   return (
-    <div className="grid grid-cols-3 gap-2">
-      {[
-        {val:`${pct}%`,label:"Completado",icon:<ListChecks size={12}/>,color:"text-white"},
-        {val:prsToday,label:"Marcas hoy",icon:<Trophy size={12}/>,color:"text-amber-400"},
-        {val:day.exercises.length,label:"Ejercicios",icon:<Dumbbell size={12}/>,color:"text-white"},
-      ].map(({val,label,icon,color})=>(
-        <div key={label} className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-3 text-center backdrop-blur-sm">
-          <p className={`text-2xl font-black ${color}`}>{val}</p>
-          <p className="text-[10px] text-slate-600 flex items-center justify-center gap-1 mt-0.5">{icon}{label}</p>
+    <div className="space-y-2">
+      <div className="grid grid-cols-3 gap-2">
+        {[
+          {val:`${pct}%`,label:"Completado",icon:<ListChecks size={12}/>,color:"text-white"},
+          {val:prsToday,label:"Marcas hoy",icon:<Trophy size={12}/>,color:"text-amber-400"},
+          {val:day.exercises.length,label:"Ejercicios",icon:<Dumbbell size={12}/>,color:"text-white"},
+        ].map(({val,label,icon,color})=>(
+          <div key={label} className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-3 text-center backdrop-blur-sm">
+            <p className={`text-2xl font-black ${color}`}>{val}</p>
+            <p className="text-[10px] text-slate-600 flex items-center justify-center gap-1 mt-0.5">{icon}{label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Reset del día */}
+      {!confirmReset ? (
+        <button onClick={()=>setConfirmReset(true)}
+          className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-slate-800/60 text-slate-600 hover:text-slate-400 hover:border-slate-700 transition text-xs font-medium active:scale-[0.98]">
+          <RotateCcw size={12}/> Resetear sesión de hoy
+        </button>
+      ) : (
+        <div className="flex gap-2 items-center bg-slate-900/60 border border-slate-700/50 rounded-xl px-3 py-2">
+          <p className="text-xs text-slate-400 flex-1">¿Borrar reps/kg de hoy? Los récords no cambian.</p>
+          <button onClick={()=>setConfirmReset(false)} className="px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-400 text-xs">No</button>
+          <button onClick={()=>{onResetDay();setConfirmReset(false);}}
+            className="px-2.5 py-1.5 rounded-lg bg-rose-500/80 text-white text-xs font-bold">Sí</button>
         </div>
-      ))}
+      )}
     </div>
   );
 }
@@ -823,10 +857,26 @@ function RoutineView({ logs, setLogs, cycleStart }) {
   const isDeload = weekInfo?.isDeload;
   const day = ROUTINE[activeDay];
 
-  // Deload: calcular series reducidas
-  const getDeloadSets = (ex) => {
-    const n = ex.sets.length;
-    return n <= 2 ? 1 : 2;
+  // resetKey per day: incrementing it triggers input clearing in all SetRows
+  const [resetKeys, setResetKeys] = useState({push:0,pull:0,legs:0,sarm:0});
+  const currentResetKey = resetKeys[activeDay];
+
+  const getDeloadSets = (ex) => ex.sets.length <= 2 ? 1 : 2;
+
+  const handleResetDay = () => {
+    const today = todayStr();
+    const newLogs = {...logs};
+    day.exercises.forEach(ex => {
+      ex.sets.forEach((_,i) => {
+        const key = `${ex.id}_${i}`;
+        if (newLogs[key]) {
+          newLogs[key] = newLogs[key].filter(h => h.date !== today);
+          if (newLogs[key].length === 0) delete newLogs[key];
+        }
+      });
+    });
+    setLogs(newLogs);
+    setResetKeys(prev => ({...prev, [activeDay]: prev[activeDay]+1}));
   };
 
   return (
@@ -856,14 +906,15 @@ function RoutineView({ logs, setLogs, cycleStart }) {
         ))}
       </div>
 
-      <DaySummary dayKey={activeDay} logs={logs}/>
+      <DaySummary dayKey={activeDay} logs={logs} onResetDay={handleResetDay}/>
       <p className="text-xs text-slate-500 leading-relaxed px-1">{day.description}</p>
       {day.isNew && <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs rounded-xl px-3 py-2">🆕 Empezás a registrar tus marcas desde hoy.</div>}
       {day.exercises.map(ex => (
         <ExerciseCard key={ex.id} exercise={ex} accent={day.color}
           logs={logs} setLogs={setLogs}
           deloadSets={isDeload ? getDeloadSets(ex) : null}
-          deloadMode={isDeload}/>
+          deloadMode={isDeload}
+          resetKey={currentResetKey}/>
       ))}
     </div>
   );
@@ -965,7 +1016,7 @@ const CustomTooltip = ({active,payload,label}) => {
   );
 };
 
-function ProgressView({ logs }) {
+function ProgressView({ logs, setLogs }) {
   const allExercises = useMemo(()=>DAY_ORDER.flatMap(dk=>
     ROUTINE[dk].exercises.map(e=>({id:e.id,name:e.name,day:ROUTINE[dk].label,color:ROUTINE[dk].color,sets:e.sets.length}))
   ),[]);
@@ -1001,6 +1052,8 @@ function ProgressView({ logs }) {
     return best;
   },[logs,allExercises]);
 
+  const [confirmResetProgress, setConfirmResetProgress] = useState(false);
+
   return (
     <div className="space-y-4">
       {/* Stats grid */}
@@ -1017,6 +1070,26 @@ function ProgressView({ logs }) {
           </div>
         ))}
       </div>
+
+      {/* Botón resetear progreso */}
+      {!confirmResetProgress ? (
+        <button onClick={()=>setConfirmResetProgress(true)}
+          className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-slate-800/60 text-slate-600 hover:text-rose-400 hover:border-rose-500/30 transition text-xs font-medium active:scale-[0.98]">
+          <Trash2 size={12}/> Resetear todo el historial de progreso
+        </button>
+      ) : (
+        <div className="flex gap-2 items-center bg-rose-950/30 border border-rose-500/20 rounded-xl px-3 py-2.5">
+          <p className="text-xs text-rose-300/80 flex-1">¿Borrar todo el historial? Los récords se mantienen.</p>
+          <button onClick={()=>setConfirmResetProgress(false)} className="px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-400 text-xs">No</button>
+          <button onClick={()=>{
+            // Keep only pr_override entries (records intact)
+            const newLogs = {};
+            Object.entries(logs).forEach(([k,v])=>{ if(k.endsWith("_pr_override")) newLogs[k]=v; });
+            setLogs(newLogs);
+            setConfirmResetProgress(false);
+          }} className="px-2.5 py-1.5 rounded-lg bg-rose-500 text-white text-xs font-bold">Sí, borrar</button>
+        </div>
+      )}
 
       {topEx.prs>0&&(
         <div className="bg-gradient-to-r from-amber-500/15 to-transparent border border-amber-500/20 rounded-2xl px-4 py-3 flex items-center gap-3">
@@ -1242,7 +1315,11 @@ function MaxSetupWizard({ logs, setLogs, onDone }) {
   const handleNext = () => {
     const v = values[current.key];
     if (v?.kg && v?.reps) {
-      const newLogs = {...logs, [current.key]: [{date:"2024-01-01",reps:parseFloat(v.reps),kg:parseFloat(v.kg)}]};
+      const prKey = `${current.key}_pr_override`;
+      const newLogs = {
+        ...logs,
+        [prKey]: { kg: parseFloat(v.kg), reps: parseFloat(v.reps) },
+      };
       setLogs(newLogs);
     }
     if (step >= allSets.length-1) onDone();
@@ -1449,7 +1526,7 @@ export default function App() {
       {/* CONTENIDO */}
       <main className="max-w-xl mx-auto px-4 py-4 pb-28 space-y-4">
         {tab==="rutina"&&<RoutineView logs={logs} setLogs={setLogs} cycleStart={cycleStart}/>}
-        {tab==="progreso"&&<ProgressView logs={logs}/>}
+        {tab==="progreso"&&<ProgressView logs={logs} setLogs={setLogs}/>}
         {tab==="descarga"&&<DeloadView logs={logs}/>}
         {tab==="perfil"&&(
           <ProfileView
