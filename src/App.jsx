@@ -28,7 +28,7 @@ const yt = (q) => `https://www.youtube.com/results?search_query=${encodeURICompo
 const ROUTINE = {
   push: {
     label: "PUSH", description: "Pecho · Hombro anterior · Tríceps",
-    color: "#F97316", grad: "from-orange-500/20 to-transparent",
+    color: "#14B8A6", grad: "from-teal-500/20 to-transparent",
     exercises: [
       { id:"press_banca", name:"Press Banca", muscle:"Pectoral", nota:"Hacer fuerza con las piernas.",
         video: yt("press banca técnica correcta"),
@@ -79,7 +79,7 @@ const ROUTINE = {
   },
   legs: {
     label: "PIERNAS", description: "Glúteo · Cuádriceps · Femoral · Aductores",
-    color: "#22C55E", grad: "from-green-500/20 to-transparent",
+    color: "#F97316", grad: "from-orange-500/20 to-transparent",
     isNew: true,
     exercises: [
       { id:"sentadilla_bulgara", name:"Sentadilla Búlgara", muscle:"Glúteo", nota:"Torso ligeramente inclinado adelante.",
@@ -995,9 +995,10 @@ function RoutineView({ logs, setLogs, cycleStart, settings }) {
 
       {/* Día sugerido por rotación — es solo una sugerencia, se puede cambiar libremente abajo */}
       {activeDay===suggestedDay && (
-        <p className="text-[11px] text-slate-500 px-1 -mb-2 flex items-center gap-1.5">
-          <RotateCcw size={11} className="text-slate-600"/> Según tu rotación, hoy te toca <span className="font-semibold" style={{color:day.color}}>{day.label}</span>
-        </p>
+        <div className="flex items-center gap-1.5 text-[11px] text-slate-500 bg-slate-900/40 border border-slate-800/40 rounded-xl px-3 py-2">
+          <RotateCcw size={12} className="text-slate-600 shrink-0"/>
+          <span>Según tu rotación, hoy te toca <span className="font-semibold" style={{color:day.color}}>{day.label}</span></span>
+        </div>
       )}
 
       {/* Day tabs */}
@@ -1006,7 +1007,7 @@ function RoutineView({ logs, setLogs, cycleStart, settings }) {
           <button key={k} onClick={()=>setActiveDay(k)}
             className="px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all active:scale-95 border"
             style={activeDay===k
-              ?{backgroundColor:ROUTINE[k].color,borderColor:ROUTINE[k].color,color:"#fff",boxShadow:`0 4px 14px -4px ${ROUTINE[k].color}66`}
+              ?{background:k==="push"?"linear-gradient(135deg,#14B8A6,#0E7490)":ROUTINE[k].color,borderColor:ROUTINE[k].color,color:"#fff",boxShadow:`0 4px 14px -4px ${ROUTINE[k].color}66`}
               :{borderColor:"#1e2035",color:"#475569"}}>
             {ROUTINE[k].label}
           </button>
@@ -1625,13 +1626,11 @@ function BottomBar({ tab, setTab, profileName }) {
         {tabs.map(({key,icon,label})=>(
           <button key={key} onClick={()=>setTab(key)}
             className="flex-1 flex flex-col items-center justify-center gap-1 py-3 transition-all active:scale-95">
-            <span className={`transition-all ${tab===key&&key!=="perfil" ? "text-teal-400" : key==="descarga"&&tab===key?"text-purple-400":"text-slate-600"}`}>
+            <span className={`transition-all ${tab===key ? "text-teal-400" : "text-slate-600"}`}>
               {icon}
             </span>
             <span className={`text-[9px] font-bold uppercase tracking-wider transition-all ${
-              tab===key
-                ? key==="descarga"?"text-purple-400":key==="perfil"?"text-teal-400":"text-teal-400"
-                : "text-slate-700"
+              tab===key ? "text-teal-400" : "text-slate-700"
             }`}>
               {label.length>8?label.slice(0,7)+"…":label}
             </span>
