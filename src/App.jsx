@@ -135,6 +135,19 @@ const ROUTINE = {
 };
 const DAY_ORDER = ["push","pull","legs","sarm"];
 
+/* Mapa inverso: key de set ("ejercicio_indice") -> día. Sirve para detectar
+   automáticamente qué día se entrenó último y sugerir el siguiente. */
+const KEY_TO_DAY = {};
+DAY_ORDER.forEach(dk => {
+  ROUTINE[dk].exercises.forEach(ex => {
+    ex.sets.forEach((_,i) => { KEY_TO_DAY[`${ex.id}_${i}`] = dk; });
+  });
+});
+
+/* Configuración por defecto de descanso y alertas (editable en Perfil) */
+const DEFAULT_SETTINGS = { alertType: "sound", restLong: REST_LONG, restShort: REST_SHORT };
+const STAGNATION_DAYS = 21; // ~3 semanas sin mejorar
+
 /* ─────────────────────────────────────────────────────────────────────────
    STORAGE — perfiles separados por dispositivo
 ───────────────────────────────────────────────────────────────────────── */
@@ -170,6 +183,52 @@ function saveCycleStart(d) { try { localStorage.setItem(CYCLE_START_KEY, d.toISO
 function todayStr() { return new Date().toISOString().slice(0,10); }
 function formatTime(s) { return `${Math.floor(s/60).toString().padStart(2,"0")}:${(s%60).toString().padStart(2,"0")}`; }
 function vol(kg,reps) { return (!kg||!reps) ? 0 : kg*reps; }
+
+/* 1RM estimado (fórmula de Epley): 1RM = kg * (1 + reps/30) */
+function estimate1RM(kg,reps) { return (!kg||!reps) ? 0 : Math.round(kg*(1+reps/30)*10)/10; }
+
+/* Techo del rango de reps, ej. "8-10" -> 10 */
+function repRangeTop(repRange) {
+  const parts = String(repRange).split("-");
+  return parseInt(parts[parts.length-1], 10);
+}
+
+/* Día sugerido según rotación Push→Pull→Piernas→Hombros, en base al último
+   día entrenado. No bloquea nada: es solo el día con el que abre la rutina. */
+function getSuggestedDay(logs) {
+  let lastDate = null;
+  Object.entries(logs).forEach(([k,v]) => {
+    if (k.endsWith("_pr_override") || !Array.isArray(v) || !KEY_TO_DAY[k]) return;
+    v.forEach(e => { if (!lastDate || e.date > lastDate) lastDate = e.date; });
+  });
+  if (!lastDate) return DAY_ORDER[0];
+  let lastDayKey = null;
+  Object.entries(logs).forEach(([k,v]) => {
+    if (k.endsWith("_pr_override") || !Array.isArray(v) || !KEY_TO_DAY[k]) return;
+    if (v.some(e => e.date === lastDate)) lastDayKey = KEY_TO_DAY[k];
+  });
+  if (!lastDayKey) return DAY_ORDER[0];
+  const idx = DAY_ORDER.indexOf(lastDayKey);
+  return DAY_ORDER[(idx+1) % DAY_ORDER.length];
+}
+
+/* Estancamiento: el ejercicio tiene al menos una serie entrenada hace
+   STAGNATION_DAYS o más días desde su última marca, sin haberla superado. */
+function getStagnationInfo(exercise, logs) {
+  let stagnant = false, maxGapDays = 0;
+  exercise.sets.forEach((s,i) => {
+    const key = `${exercise.id}_${i}`;
+    const hist = logs[key] || [];
+    if (hist.length === 0) return;
+    const overrideDate = logs[`${key}_pr_override`]?.date;
+    if (!overrideDate) return;
+    const lastTrainedDate = hist.reduce((max,h)=>h.date>max?h.date:max, hist[0].date);
+    const gapDays = Math.round((new Date(lastTrainedDate) - new Date(overrideDate)) / 86400000);
+    if (gapDays > maxGapDays) maxGapDays = gapDays;
+    if (gapDays >= STAGNATION_DAYS) stagnant = true;
+  });
+  return { stagnant, maxGapDays };
+}
 
 function getWeekInfo(cycleStart) {
   if (!cycleStart) return null;
@@ -216,7 +275,7 @@ function PinInput({ length = 4, onComplete, label = "Ingresá tu PIN", error, on
       {/* dots */}
       <div className="flex gap-4">
         {Array.from({length}).map((_,i) => (
-          <div key={i} className={`w-4 h-4 rounded-full border-2 transition-all duration-150 ${i < digits.length ? "bg-orange-500 border-orange-500 scale-110 shadow-[0_0_12px_-1px_rgba(249,115,22,0.7)]" : "border-slate-600 bg-transparent"}`} />
+          <div key={i} className={`w-4 h-4 rounded-full border-2 transition-all duration-150 ${i < digits.length ? "bg-teal-500 border-teal-500 scale-110 shadow-[0_0_12px_-1px_rgba(20,184,166,0.7)]" : "border-slate-600 bg-transparent"}`} />
         ))}
       </div>
 
@@ -335,11 +394,11 @@ function LoginScreen({ onLogin }) {
   if (phase === "pin") {
     return (
       <div className="min-h-screen bg-[#0a0a0f] flex flex-col items-center justify-center px-4 relative overflow-hidden">
-        <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-72 h-72 rounded-full bg-orange-500/10 blur-3xl pointer-events-none" />
+        <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-72 h-72 rounded-full bg-teal-500/10 blur-3xl pointer-events-none" />
         <div className="w-full max-w-xs relative">
           <div className="flex flex-col items-center mb-6">
-            <div className="w-14 h-14 rounded-2xl bg-orange-500/15 flex items-center justify-center mb-3 shadow-[0_0_30px_-8px_rgba(249,115,22,0.6)]">
-              <Flame className="text-orange-500" size={28} />
+            <div className="w-14 h-14 rounded-2xl bg-teal-500/15 flex items-center justify-center mb-3 shadow-[0_0_30px_-8px_rgba(20,184,166,0.6)]">
+              <Flame className="text-teal-500" size={28} />
             </div>
             <h2 className="text-xl font-bold text-white">{pendingProfile}</h2>
           </div>
@@ -352,7 +411,7 @@ function LoginScreen({ onLogin }) {
   if (phase === "register") {
     return (
       <div className="min-h-screen bg-[#0a0a0f] flex flex-col items-center justify-center px-4 py-8 relative overflow-hidden">
-        <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-72 h-72 rounded-full bg-orange-500/10 blur-3xl pointer-events-none" />
+        <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-72 h-72 rounded-full bg-teal-500/10 blur-3xl pointer-events-none" />
         <div className="w-full max-w-sm relative">
           <div className="flex items-center gap-3 mb-8">
             <button onClick={() => { setPhase("list"); setRegStep(1); setRegError(""); }}
@@ -365,7 +424,7 @@ function LoginScreen({ onLogin }) {
           {/* Steps */}
           <div className="flex gap-1.5 mb-6">
             {[1,2,3].map(s => (
-              <div key={s} className={`h-1 flex-1 rounded-full transition-all ${regStep >= s ? "bg-orange-500 shadow-[0_0_8px_-1px_rgba(249,115,22,0.8)]" : "bg-slate-800"}`} />
+              <div key={s} className={`h-1 flex-1 rounded-full transition-all ${regStep >= s ? "bg-teal-500 shadow-[0_0_8px_-1px_rgba(20,184,166,0.8)]" : "bg-slate-800"}`} />
             ))}
           </div>
 
@@ -376,14 +435,14 @@ function LoginScreen({ onLogin }) {
                   <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 block">Nombre</label>
                   <input type="text" placeholder="¿Cómo te llamás?" value={regName}
                     onChange={e => setRegName(e.target.value)}
-                    className="w-full bg-slate-900/80 border border-slate-700/50 rounded-2xl px-4 py-3.5 text-white focus:outline-none focus:border-orange-500/60 focus:ring-2 focus:ring-orange-500/15 text-sm transition"
+                    className="w-full bg-slate-900/80 border border-slate-700/50 rounded-2xl px-4 py-3.5 text-white focus:outline-none focus:border-teal-500/60 focus:ring-2 focus:ring-teal-500/15 text-sm transition"
                     autoFocus />
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 block">Email <span className="text-slate-600 normal-case">(opcional)</span></label>
                   <input type="email" placeholder="tu@email.com" value={regMail}
                     onChange={e => setRegMail(e.target.value)}
-                    className="w-full bg-slate-900/80 border border-slate-700/50 rounded-2xl px-4 py-3.5 text-white focus:outline-none focus:border-orange-500/60 focus:ring-2 focus:ring-orange-500/15 text-sm transition" />
+                    className="w-full bg-slate-900/80 border border-slate-700/50 rounded-2xl px-4 py-3.5 text-white focus:outline-none focus:border-teal-500/60 focus:ring-2 focus:ring-teal-500/15 text-sm transition" />
                 </div>
               </>
             )}
@@ -397,7 +456,7 @@ function LoginScreen({ onLogin }) {
                     Sin PIN
                   </button>
                   <button onClick={() => setRegStep(2.5)}
-                    className="flex-1 py-3.5 rounded-2xl bg-orange-500 text-white text-sm font-bold hover:bg-orange-400 transition shadow-lg shadow-orange-500/20">
+                    className="flex-1 py-3.5 rounded-2xl bg-teal-500 text-white text-sm font-bold hover:bg-teal-400 transition shadow-lg shadow-teal-500/20">
                     Con PIN
                   </button>
                 </div>
@@ -427,7 +486,7 @@ function LoginScreen({ onLogin }) {
 
           {(regStep === 1) && (
             <button onClick={handleRegister}
-              className="w-full mt-6 py-4 rounded-2xl bg-orange-500 text-white font-bold text-sm hover:bg-orange-400 active:scale-[0.98] transition-all shadow-lg shadow-orange-500/20">
+              className="w-full mt-6 py-4 rounded-2xl bg-teal-500 text-white font-bold text-sm hover:bg-teal-400 active:scale-[0.98] transition-all shadow-lg shadow-teal-500/20">
               Continuar →
             </button>
           )}
@@ -439,11 +498,11 @@ function LoginScreen({ onLogin }) {
   // Lista de perfiles
   return (
     <div className="min-h-screen bg-[#0a0a0f] flex flex-col items-center justify-center px-4 relative overflow-hidden">
-      <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-96 h-96 rounded-full bg-orange-500/10 blur-3xl pointer-events-none" />
+      <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-96 h-96 rounded-full bg-teal-500/10 blur-3xl pointer-events-none" />
       <div className="w-full max-w-sm relative">
         <div className="flex flex-col items-center mb-10">
-          <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-orange-500/30 to-orange-500/5 border border-orange-500/20 flex items-center justify-center mb-4 shadow-[0_0_40px_-10px_rgba(249,115,22,0.55)]">
-            <Flame className="text-orange-500" size={30} />
+          <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-teal-500/30 to-teal-500/5 border border-teal-500/20 flex items-center justify-center mb-4 shadow-[0_0_40px_-10px_rgba(20,184,166,0.55)]">
+            <Flame className="text-teal-500" size={30} />
           </div>
           <h1 className="text-2xl font-black text-white tracking-tight">Mi Rutina</h1>
           <p className="text-slate-500 text-sm mt-1">Seguimiento de cargas y progreso</p>
@@ -455,16 +514,16 @@ function LoginScreen({ onLogin }) {
             <div className="space-y-2">
               {profileList.map(name => (
                 <button key={name} onClick={() => tryLogin(name)}
-                  className="w-full flex items-center gap-3.5 bg-slate-900/60 border border-slate-800/60 hover:border-orange-500/30 hover:bg-slate-900/90 rounded-2xl px-4 py-3.5 transition-all active:scale-[0.98] text-left group shadow-md shadow-black/20">
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg font-black shrink-0 shadow-md shadow-orange-900/30"
-                    style={{ background: "linear-gradient(135deg,#F97316,#DC2626)", color: "white" }}>
+                  className="w-full flex items-center gap-3.5 bg-slate-900/60 border border-slate-800/60 hover:border-teal-500/30 hover:bg-slate-900/90 rounded-2xl px-4 py-3.5 transition-all active:scale-[0.98] text-left group shadow-md shadow-black/20">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg font-black shrink-0 shadow-md shadow-teal-900/30"
+                    style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)", color: "white" }}>
                     {name.charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-white font-semibold text-sm">{name}</p>
                     <p className="text-[11px] text-slate-500">{profiles[name].pin ? "🔒 Con PIN" : "Sin PIN"} · {profiles[name].deviceId === deviceId ? "Este dispositivo" : "Otro dispositivo"}</p>
                   </div>
-                  <ChevronRight size={16} className="text-slate-600 group-hover:text-orange-400 transition shrink-0" />
+                  <ChevronRight size={16} className="text-slate-600 group-hover:text-teal-400 transition shrink-0" />
                 </button>
               ))}
             </div>
@@ -472,7 +531,7 @@ function LoginScreen({ onLogin }) {
         )}
 
         <button onClick={() => setPhase("register")}
-          className="w-full py-4 rounded-2xl border border-dashed border-slate-700 text-slate-400 hover:text-white hover:border-orange-500/40 transition-all text-sm font-semibold flex items-center justify-center gap-2">
+          className="w-full py-4 rounded-2xl border border-dashed border-slate-700 text-slate-400 hover:text-white hover:border-teal-500/40 transition-all text-sm font-semibold flex items-center justify-center gap-2">
           + Crear perfil nuevo
         </button>
       </div>
@@ -483,19 +542,34 @@ function LoginScreen({ onLogin }) {
 /* ─────────────────────────────────────────────────────────────────────────
    TIMER DE DESCANSO
 ───────────────────────────────────────────────────────────────────────── */
-function RestTimer({ seconds, accent }) {
+function RestTimer({ seconds, accent, alertType = "sound" }) {
   const [remaining, setRemaining] = useState(seconds);
   const [running, setRunning] = useState(false);
   const ref = useRef();
 
-  useEffect(() => { setRemaining(seconds); }, [seconds]);
+  useEffect(() => { setRemaining(seconds); setRunning(false); }, [seconds]);
   useEffect(() => {
     if (running) {
       ref.current = setInterval(() => {
         setRemaining(r => {
           if (r <= 1) {
             clearInterval(ref.current); setRunning(false);
-            try { const a=new AudioContext(),o=a.createOscillator(); o.frequency.value=880; o.connect(a.destination); o.start(); setTimeout(()=>o.stop(),350); } catch {}
+            if (alertType !== "vibration") {
+              try {
+                const a = new AudioContext();
+                [0, 220].forEach(delay => {
+                  setTimeout(() => {
+                    const o = a.createOscillator(), g = a.createGain();
+                    o.frequency.value = 880; o.connect(g); g.connect(a.destination);
+                    g.gain.value = 0.2;
+                    o.start(); setTimeout(()=>o.stop(), 280);
+                  }, delay);
+                });
+              } catch {}
+            }
+            if (alertType !== "sound") {
+              try { navigator.vibrate?.([250,120,250,120,250]); } catch {}
+            }
             return 0;
           }
           return r - 1;
@@ -503,7 +577,7 @@ function RestTimer({ seconds, accent }) {
       }, 1000);
     }
     return () => clearInterval(ref.current);
-  }, [running]);
+  }, [running, alertType]);
 
   const pct = Math.max(0, Math.min(100, (remaining/seconds)*100));
   const r = 16, circ = 2*Math.PI*r;
@@ -529,7 +603,7 @@ function RestTimer({ seconds, accent }) {
           <RotateCcw size={16}/>
         </button>
       </div>
-      <span className="text-xs text-slate-500">{seconds===REST_LONG?"5 min":"3 min"} descanso</span>
+      <span className="text-xs text-slate-500">{formatTime(seconds)} descanso</span>
     </div>
   );
 }
@@ -580,14 +654,18 @@ function SetRow({ exerciseId, setIndex, setDef, accent, logs, setLogs, deloadKgF
     // Auto-update PR override if this beats the current record
     let newLogs = {...logs,[key]:newHistory};
     if (!currentPR || newVol > prevVol) {
-      newLogs = {...newLogs, [prKey]: {kg:k, reps:r}};
+      newLogs = {...newLogs, [prKey]: {kg:k, reps:r, date:today}};
     }
     setLogs(newLogs);
 
     setSaved(true); setTimeout(()=>setSaved(false),1200);
-    if (!currentPR||newVol>prevVol) setFeedback({type:"pr",msg:"¡Nueva marca! 🔥"});
-    else if (newVol===prevVol) setFeedback({type:"tie",msg:"Igualaste tu marca 💪"});
-    else setFeedback({type:"down",msg:`-${(((prevVol-newVol)/prevVol)*100).toFixed(0)}% vs récord`});
+    // Sugerencia de subir peso: solo si las reps SUPERAN el techo del rango,
+    // no si lo igualan. Es solo una mención, nunca se aplica sola.
+    const top = repRangeTop(setDef.repRange);
+    const suggestUp = r > top;
+    if (!currentPR||newVol>prevVol) setFeedback({type:"pr",msg:"¡Nueva marca! 🔥",suggestUp});
+    else if (newVol===prevVol) setFeedback({type:"tie",msg:"Igualaste tu marca 💪",suggestUp:false});
+    else setFeedback({type:"down",msg:`-${(((prevVol-newVol)/prevVol)*100).toFixed(0)}% vs récord`,suggestUp:false});
   };
 
   const savePR = () => {
@@ -612,6 +690,12 @@ function SetRow({ exerciseId, setIndex, setDef, accent, logs, setLogs, deloadKgF
         )}
       </div>
 
+      {feedback?.suggestUp && (
+        <div className="mb-2.5 -mt-1 text-[11px] text-teal-400 flex items-center gap-1.5">
+          <TrendingUp size={11}/> Superaste el rango de reps · probá +2.5kg la próxima sesión
+        </div>
+      )}
+
       {deloadMode && suggestedKg && (
         <div className="mb-2 text-[11px] text-purple-400 flex items-center gap-1.5">
           <Zap size={11}/> Descarga: {suggestedKg} kg sugerido (75%)
@@ -623,14 +707,14 @@ function SetRow({ exerciseId, setIndex, setDef, accent, logs, setLogs, deloadKgF
           <label className="text-[10px] text-slate-600 font-semibold uppercase tracking-wider mb-1.5 block">Reps</label>
           <input type="number" inputMode="decimal" placeholder="—" value={reps}
             onChange={e=>setReps(e.target.value)}
-            className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3.5 text-xl font-black text-center text-white focus:outline-none focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/10 transition"/>
+            className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3.5 text-xl font-black text-center text-white focus:outline-none focus:border-teal-500/50 focus:ring-2 focus:ring-teal-500/10 transition"/>
         </div>
         <div className="text-slate-700 text-lg pb-3">×</div>
         <div className="flex-1">
           <label className="text-[10px] text-slate-600 font-semibold uppercase tracking-wider mb-1.5 block">Kg</label>
           <input type="number" inputMode="decimal" placeholder="—" value={kg}
             onChange={e=>setKg(e.target.value)}
-            className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3.5 text-xl font-black text-center text-white focus:outline-none focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/10 transition"/>
+            className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3.5 text-xl font-black text-center text-white focus:outline-none focus:border-teal-500/50 focus:ring-2 focus:ring-teal-500/10 transition"/>
         </div>
         <button onClick={handleSave}
           className={`mb-0 p-3.5 rounded-xl transition-all active:scale-95 font-bold text-white flex items-center justify-center ${saved?"bg-emerald-500":"hover:opacity-90 shadow-md"}`}
@@ -672,10 +756,11 @@ function SetRow({ exerciseId, setIndex, setDef, accent, logs, setLogs, deloadKgF
 /* ─────────────────────────────────────────────────────────────────────────
    EXERCISE CARD
 ───────────────────────────────────────────────────────────────────────── */
-function ExerciseCard({ exercise, accent, logs, setLogs, deloadSets, deloadMode, resetKey=0 }) {
+function ExerciseCard({ exercise, accent, logs, setLogs, deloadSets, deloadMode, resetKey=0, settings=DEFAULT_SETTINGS }) {
   const [open, setOpen] = useState(false);
   const hasHeavy = exercise.sets.some(s=>s.heavy);
   const setsToShow = deloadSets ? exercise.sets.slice(0, deloadSets) : exercise.sets;
+  const { stagnant } = useMemo(()=>getStagnationInfo(exercise, logs), [exercise, logs]);
 
   return (
     <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl overflow-hidden backdrop-blur-sm shadow-md shadow-black/20">
@@ -689,6 +774,11 @@ function ExerciseCard({ exercise, accent, logs, setLogs, deloadSets, deloadMode,
               <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded-lg font-bold"
                 style={{backgroundColor:accent+"18",color:accent}}>{exercise.muscle}</span>
               {deloadMode && <span className="text-[10px] bg-purple-500/15 text-purple-400 rounded-lg px-1.5 py-0.5 font-bold">DESCARGA</span>}
+              {!deloadMode && stagnant && (
+                <span className="text-[10px] bg-rose-500/15 text-rose-400 rounded-lg px-1.5 py-0.5 font-bold flex items-center gap-1">
+                  <AlertTriangle size={9}/> ESTANCADO
+                </span>
+              )}
             </div>
             <p className="text-[11px] text-slate-500 mt-0.5">{exercise.nota}</p>
           </div>
@@ -698,13 +788,19 @@ function ExerciseCard({ exercise, accent, logs, setLogs, deloadSets, deloadMode,
 
       {open && (
         <div className="px-4 pb-4 pt-0">
+          {!deloadMode && stagnant && (
+            <div className="mb-3 text-[11px] text-rose-400/90 bg-rose-500/5 border border-rose-500/15 rounded-xl px-3 py-2 flex items-start gap-1.5">
+              <Info size={12} className="mt-0.5 shrink-0"/>
+              <span>Hace {STAGNATION_DAYS}+ días que no superás el récord en este ejercicio. Puede ser buen momento para cambiar reps, descanso o variante.</span>
+            </div>
+          )}
           {setsToShow.map((s,i) => (
             <SetRow key={i} exerciseId={exercise.id} setIndex={i} setDef={s}
               accent={accent} logs={logs} setLogs={setLogs}
               deloadKgFactor={0.75} deloadMode={deloadMode} resetKey={resetKey}/>
           ))}
           <div className="flex flex-col gap-2 pt-3">
-            <RestTimer seconds={hasHeavy?REST_LONG:REST_SHORT} accent={accent}/>
+            <RestTimer seconds={hasHeavy?settings.restLong:settings.restShort} accent={accent} alertType={settings.alertType}/>
             <a href={exercise.video} target="_blank" rel="noreferrer"
               className="flex items-center justify-center gap-2 py-3 rounded-xl border border-slate-800 text-slate-400 hover:border-slate-600 hover:text-white transition text-sm font-medium active:scale-[0.98]">
               ▶ Ver técnica en YouTube
@@ -811,7 +907,7 @@ function WeekCalendar({ cycleStart, logs }) {
           <h3 className="text-sm font-bold text-white">Ciclo actual</h3>
           <p className="text-[11px] text-slate-500">Ciclo #{weekInfo.cycleNumber} · Semana {weekInfo.weekInCycle} de {CYCLE_WEEKS}</p>
         </div>
-        <div className={`px-3 py-1.5 rounded-xl text-xs font-bold ${weekInfo.isDeload?"bg-purple-500/20 text-purple-400":"bg-orange-500/20 text-orange-400"}`}>
+        <div className={`px-3 py-1.5 rounded-xl text-xs font-bold ${weekInfo.isDeload?"bg-purple-500/20 text-purple-400":"bg-teal-500/20 text-teal-400"}`}>
           {weekInfo.isDeload?"DESCARGA":"ENTRENAMIENTO"}
         </div>
       </div>
@@ -826,7 +922,7 @@ function WeekCalendar({ cycleStart, logs }) {
                 ${isDeload
                   ? isCurrent?"bg-purple-500 ring-purple-500 text-white":"bg-purple-500/10 text-purple-600 border border-purple-500/20"
                   : trained>0
-                    ? isCurrent?"bg-orange-500 ring-orange-500 text-white":"bg-orange-500/20 text-orange-400 border border-orange-500/20"
+                    ? isCurrent?"bg-teal-500 ring-teal-500 text-white":"bg-teal-500/20 text-teal-400 border border-teal-500/20"
                     : isCurrent?"bg-slate-700 ring-slate-500 text-white":"bg-slate-800/50 text-slate-700 border border-slate-800"
                 }`}>
                 {isDeload ? "D" : week}
@@ -834,7 +930,7 @@ function WeekCalendar({ cycleStart, logs }) {
               {trained>0 && !isDeload && (
                 <div className="flex gap-0.5">
                   {Array.from({length:Math.min(trained,7)}).map((_,i)=>(
-                    <div key={i} className="w-1 h-1 rounded-full bg-orange-500/60"/>
+                    <div key={i} className="w-1 h-1 rounded-full bg-teal-500/60"/>
                   ))}
                 </div>
               )}
@@ -844,7 +940,7 @@ function WeekCalendar({ cycleStart, logs }) {
       </div>
 
       <div className="flex gap-4 mt-4 text-[10px] text-slate-600">
-        <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-md bg-orange-500/20 border border-orange-500/30"/><span>Entrenamiento</span></div>
+        <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-md bg-teal-500/20 border border-teal-500/30"/><span>Entrenamiento</span></div>
         <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-md bg-purple-500/20 border border-purple-500/30"/><span>Descarga</span></div>
       </div>
     </div>
@@ -854,8 +950,9 @@ function WeekCalendar({ cycleStart, logs }) {
 /* ─────────────────────────────────────────────────────────────────────────
    RUTINA VIEW
 ───────────────────────────────────────────────────────────────────────── */
-function RoutineView({ logs, setLogs, cycleStart }) {
-  const [activeDay, setActiveDay] = useState("push");
+function RoutineView({ logs, setLogs, cycleStart, settings }) {
+  const [activeDay, setActiveDay] = useState(() => getSuggestedDay(logs));
+  const suggestedDay = useMemo(() => getSuggestedDay(logs), []); // solo para el mensaje, no se recalcula al loguear
   const weekInfo = getWeekInfo(cycleStart);
   const isDeload = weekInfo?.isDeload;
   const day = ROUTINE[activeDay];
@@ -896,6 +993,13 @@ function RoutineView({ logs, setLogs, cycleStart }) {
         </div>
       )}
 
+      {/* Día sugerido por rotación — es solo una sugerencia, se puede cambiar libremente abajo */}
+      {activeDay===suggestedDay && (
+        <p className="text-[11px] text-slate-500 px-1 -mb-2 flex items-center gap-1.5">
+          <RotateCcw size={11} className="text-slate-600"/> Según tu rotación, hoy te toca <span className="font-semibold" style={{color:day.color}}>{day.label}</span>
+        </p>
+      )}
+
       {/* Day tabs */}
       <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-hide">
         {DAY_ORDER.map(k => (
@@ -917,7 +1021,8 @@ function RoutineView({ logs, setLogs, cycleStart }) {
           logs={logs} setLogs={setLogs}
           deloadSets={isDeload ? getDeloadSets(ex) : null}
           deloadMode={isDeload}
-          resetKey={currentResetKey}/>
+          resetKey={currentResetKey}
+          settings={settings}/>
       ))}
     </div>
   );
@@ -1037,9 +1142,10 @@ function ProgressView({ logs, setLogs }) {
 
   const [selId, setSelId] = useState(allExercises[0]?.id);
   const [selSet, setSelSet] = useState(0);
+  const [metric, setMetric] = useState("peso"); // "peso" (kg+vol) | "1rm" (1RM estimado)
   const selEx = allExercises.find(e=>e.id===selId);
   const history = (logs[`${selId}_${selSet}`]||[]).slice().sort((a,b)=>a.date>b.date?1:-1);
-  const chartData = history.map(h=>({date:h.date.slice(5),kg:h.kg,reps:h.reps,vol:vol(h.kg,h.reps)}));
+  const chartData = history.map(h=>({date:h.date.slice(5),kg:h.kg,reps:h.reps,vol:vol(h.kg,h.reps),e1rm:estimate1RM(h.kg,h.reps)}));
 
   // Mejor ejercicio (más PRs)
   const topEx = useMemo(()=>{
@@ -1057,42 +1163,27 @@ function ProgressView({ logs, setLogs }) {
 
   const [confirmResetProgress, setConfirmResetProgress] = useState(false);
 
+  const STAT_CARDS = [
+    {val:stats.totalVol.toLocaleString("es-AR"),label:"Kg × reps totales",icon:<BarChart3 size={14}/>,iconColor:"#14B8A6"},
+    {val:stats.streak,label:"Días seguidos 🔥",icon:<Flame size={14}/>,iconColor:"#F59E0B"},
+    {val:stats.daysTrained,label:"Días entrenados",icon:<Calendar size={14}/>,iconColor:"#14B8A6"},
+    {val:stats.totalSets,label:"Series cargadas",icon:<ListChecks size={14}/>,iconColor:"#14B8A6"},
+  ];
+
   return (
     <div className="space-y-4">
       {/* Stats grid */}
-      <div className="grid grid-cols-2 gap-2">
-        {[
-          {val:stats.totalVol.toLocaleString("es-AR"),label:"Kg × reps totales",color:"text-white"},
-          {val:stats.streak,label:"Días seguidos 🔥",color:"text-orange-400"},
-          {val:stats.daysTrained,label:"Días entrenados",color:"text-white"},
-          {val:stats.totalSets,label:"Series cargadas",color:"text-white"},
-        ].map(({val,label,color})=>(
+      <div className="grid grid-cols-2 gap-2.5">
+        {STAT_CARDS.map(({val,label,icon,iconColor})=>(
           <div key={label} className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 backdrop-blur-sm shadow-md shadow-black/20">
-            <p className={`text-2xl font-black ${color} tabular-nums`}>{val}</p>
-            <p className="text-[10px] text-slate-600 mt-0.5">{label}</p>
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center mb-2.5" style={{backgroundColor:iconColor+"18",color:iconColor}}>
+              {icon}
+            </div>
+            <p className="text-2xl font-black text-white tabular-nums leading-none">{val}</p>
+            <p className="text-[10px] text-slate-600 mt-1.5">{label}</p>
           </div>
         ))}
       </div>
-
-      {/* Botón resetear progreso */}
-      {!confirmResetProgress ? (
-        <button onClick={()=>setConfirmResetProgress(true)}
-          className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-slate-800/60 text-slate-600 hover:text-rose-400 hover:border-rose-500/30 transition text-xs font-medium active:scale-[0.98]">
-          <Trash2 size={12}/> Resetear todo el historial de progreso
-        </button>
-      ) : (
-        <div className="flex gap-2 items-center bg-rose-950/30 border border-rose-500/20 rounded-xl px-3 py-2.5">
-          <p className="text-xs text-rose-300/80 flex-1">¿Borrar todo el historial? Los récords se mantienen.</p>
-          <button onClick={()=>setConfirmResetProgress(false)} className="px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-400 text-xs">No</button>
-          <button onClick={()=>{
-            // Keep only pr_override entries (records intact)
-            const newLogs = {};
-            Object.entries(logs).forEach(([k,v])=>{ if(k.endsWith("_pr_override")) newLogs[k]=v; });
-            setLogs(newLogs);
-            setConfirmResetProgress(false);
-          }} className="px-2.5 py-1.5 rounded-lg bg-rose-500 text-white text-xs font-bold">Sí, borrar</button>
-        </div>
-      )}
 
       {topEx.prs>0&&(
         <div className="bg-gradient-to-r from-amber-500/15 to-transparent border border-amber-500/20 rounded-2xl px-4 py-3 flex items-center gap-3">
@@ -1106,7 +1197,17 @@ function ProgressView({ logs, setLogs }) {
 
       {/* Chart */}
       <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 backdrop-blur-sm shadow-md shadow-black/20 space-y-3">
-        <h3 className="text-sm font-bold text-white">Evolución por ejercicio</h3>
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="text-sm font-bold text-white">Evolución por ejercicio</h3>
+          <div className="flex bg-slate-950/60 rounded-xl p-0.5 border border-slate-800/60 shrink-0">
+            {[{k:"peso",l:"Peso"},{k:"1rm",l:"1RM est."}].map(opt=>(
+              <button key={opt.k} onClick={()=>setMetric(opt.k)}
+                className={`px-2.5 py-1.5 rounded-[10px] text-[10px] font-bold transition-all ${metric===opt.k?"bg-teal-500 text-white shadow-sm":"text-slate-500 hover:text-slate-300"}`}>
+                {opt.l}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="flex flex-col gap-2">
           <select value={selId} onChange={e=>{setSelId(e.target.value);setSelSet(0);}}
             className="bg-slate-800/80 border border-slate-700/50 rounded-xl px-3 py-3 text-sm text-white w-full">
@@ -1137,29 +1238,64 @@ function ProgressView({ logs, setLogs }) {
                       <stop offset="5%" stopColor="#A855F7" stopOpacity={0.3}/>
                       <stop offset="95%" stopColor="#A855F7" stopOpacity={0}/>
                     </linearGradient>
+                    <linearGradient id="g1rm" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#14B8A6" stopOpacity={0.35}/>
+                      <stop offset="95%" stopColor="#14B8A6" stopOpacity={0}/>
+                    </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1a1a2e"/>
                   <XAxis dataKey="date" stroke="#334155" fontSize={10}/>
                   <YAxis stroke="#334155" fontSize={10}/>
                   <Tooltip content={<CustomTooltip/>}/>
-                  <Area type="monotone" dataKey="kg" stroke={selEx?.color||"#F97316"} fill="url(#gKg)" strokeWidth={2} dot={{r:3,fill:selEx?.color}} name="Kg"/>
-                  <Area type="monotone" dataKey="vol" stroke="#A855F7" fill="url(#gVol)" strokeWidth={2} dot={{r:2,fill:"#A855F7"}} name="Volumen"/>
+                  {metric==="peso" ? (
+                    <>
+                      <Area type="monotone" dataKey="kg" stroke={selEx?.color||"#14B8A6"} fill="url(#gKg)" strokeWidth={2} dot={{r:3,fill:selEx?.color}} name="Kg"/>
+                      <Area type="monotone" dataKey="vol" stroke="#A855F7" fill="url(#gVol)" strokeWidth={2} dot={{r:2,fill:"#A855F7"}} name="Volumen"/>
+                    </>
+                  ) : (
+                    <Area type="monotone" dataKey="e1rm" stroke="#14B8A6" fill="url(#g1rm)" strokeWidth={2} dot={{r:3,fill:"#14B8A6"}} name="1RM est. (kg)"/>
+                  )}
                 </AreaChart>
               </ResponsiveContainer>
             </div>
+            {metric==="1rm" && (
+              <p className="text-[10px] text-slate-600 -mt-1">Estimado con la fórmula de Epley a partir de kg × reps. Es una referencia, no un máximo real probado.</p>
+            )}
             {chartData.length>=2&&(()=>{
               const f=chartData[0],l=chartData[chartData.length-1];
-              const diff=l.vol-f.vol, pct=f.vol?((diff/f.vol)*100).toFixed(1):0, pos=diff>=0;
+              const fVal = metric==="peso"?f.vol:f.e1rm, lVal = metric==="peso"?l.vol:l.e1rm;
+              const diff=lVal-fVal, pct=fVal?((diff/fVal)*100).toFixed(1):0, pos=diff>=0;
+              const metricLabel = metric==="peso" ? "de volumen" : "de 1RM estimado";
               return (
                 <div className={`flex items-center gap-2 rounded-xl px-3 py-2.5 text-xs font-semibold ${pos?"bg-emerald-500/10 text-emerald-400":"bg-rose-500/10 text-rose-400"}`}>
                   {pos?<TrendingUp size={14}/>:<TrendingDown size={14}/>}
-                  {pos?"Progreso":"Regresión"}: {pos?"+":""}{pct}% de volumen desde el primer registro
+                  {pos?"Progreso":"Regresión"}: {pos?"+":""}{pct}% {metricLabel} desde el primer registro
                 </div>
               );
             })()}
           </>
         )}
       </div>
+
+      {/* Botón resetear progreso */}
+      {!confirmResetProgress ? (
+        <button onClick={()=>setConfirmResetProgress(true)}
+          className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-slate-800/60 text-slate-600 hover:text-rose-400 hover:border-rose-500/30 transition text-xs font-medium active:scale-[0.98]">
+          <Trash2 size={12}/> Resetear todo el historial de progreso
+        </button>
+      ) : (
+        <div className="flex gap-2 items-center bg-rose-950/30 border border-rose-500/20 rounded-xl px-3 py-2.5">
+          <p className="text-xs text-rose-300/80 flex-1">¿Borrar todo el historial? Los récords se mantienen.</p>
+          <button onClick={()=>setConfirmResetProgress(false)} className="px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-400 text-xs">No</button>
+          <button onClick={()=>{
+            // Keep only pr_override entries (records intact)
+            const newLogs = {};
+            Object.entries(logs).forEach(([k,v])=>{ if(k.endsWith("_pr_override")) newLogs[k]=v; });
+            setLogs(newLogs);
+            setConfirmResetProgress(false);
+          }} className="px-2.5 py-1.5 rounded-lg bg-rose-500 text-white text-xs font-bold">Sí, borrar</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -1177,6 +1313,9 @@ function ProfileView({ profileName, profiles, onLogout, onDelete, onUpdateProfil
 
   const joinDate = profile?.joinedAt ? new Date(profile.joinedAt).toLocaleDateString("es-AR",{day:"numeric",month:"long",year:"numeric"}) : "—";
   const weekInfo = getWeekInfo(cycleStart);
+  const settings = profile?.settings || DEFAULT_SETTINGS;
+  const updateSettings = (patch) => onUpdateProfile({settings:{...settings,...patch}});
+  const adjustRest = (key,delta) => updateSettings({[key]: Math.min(600, Math.max(30, settings[key]+delta))});
 
   const handleDeleteConfirm = (pin) => {
     if (profile.pin && pin !== profile.pin) {
@@ -1193,8 +1332,8 @@ function ProfileView({ profileName, profiles, onLogout, onDelete, onUpdateProfil
     <div className="space-y-4">
       {/* Avatar + nombre */}
       <div className="bg-gradient-to-br from-slate-900 to-slate-900/50 border border-slate-800/50 rounded-2xl p-5 text-center shadow-md shadow-black/20">
-        <div className="w-20 h-20 rounded-3xl mx-auto flex items-center justify-center text-3xl font-black text-white mb-3 shadow-lg shadow-orange-900/30"
-          style={{background:"linear-gradient(135deg,#F97316,#DC2626)"}}>
+        <div className="w-20 h-20 rounded-3xl mx-auto flex items-center justify-center text-3xl font-black text-white mb-3 shadow-lg shadow-teal-900/30"
+          style={{background:"linear-gradient(135deg,#14B8A6,#0E7490)"}}>
           {initial}
         </div>
         <h2 className="text-xl font-black text-white">{profileName}</h2>
@@ -1223,11 +1362,11 @@ function ProfileView({ profileName, profiles, onLogout, onDelete, onUpdateProfil
         <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 space-y-3 shadow-md shadow-black/20">
           <input type="email" value={editMail} onChange={e=>setEditMail(e.target.value)}
             placeholder="tu@email.com"
-            className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-orange-500/50"/>
+            className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-teal-500/50"/>
           <div className="flex gap-2">
             <button onClick={()=>setEditing(false)} className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-400 text-sm font-semibold">Cancelar</button>
             <button onClick={()=>{onUpdateProfile({email:editMail});setEditing(false);}}
-              className="flex-1 py-3 rounded-xl bg-orange-500 text-white text-sm font-bold hover:bg-orange-400 transition shadow-lg shadow-orange-500/20">Guardar</button>
+              className="flex-1 py-3 rounded-xl bg-teal-500 text-white text-sm font-bold hover:bg-teal-400 transition shadow-lg shadow-teal-500/20">Guardar</button>
           </div>
         </div>
       ) : (
@@ -1264,10 +1403,45 @@ function ProfileView({ profileName, profiles, onLogout, onDelete, onUpdateProfil
             <button onClick={()=>{
               const val = document.getElementById("cycle-date-input").value;
               if(val){onSetCycleStart(new Date(val));setShowCycleSetup(false);}
-            }} className="flex-1 py-3 rounded-xl bg-orange-500 text-white text-sm font-bold hover:bg-orange-400 transition shadow-lg shadow-orange-500/20">Guardar</button>
+            }} className="flex-1 py-3 rounded-xl bg-teal-500 text-white text-sm font-bold hover:bg-teal-400 transition shadow-lg shadow-teal-500/20">Guardar</button>
           </div>
         </div>
       )}
+
+      {/* Preferencias de descanso */}
+      <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 backdrop-blur-sm shadow-md shadow-black/20 space-y-3.5">
+        <div>
+          <p className="text-sm font-bold text-white">Descanso entre series</p>
+          <p className="text-[11px] text-slate-500 mt-0.5">Cómo te avisamos y cuánto dura cada pausa</p>
+        </div>
+
+        <div>
+          <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Aviso al terminar</p>
+          <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
+            {[{k:"sound",l:"Sonido"},{k:"vibration",l:"Vibración"},{k:"both",l:"Ambos"}].map(opt=>(
+              <button key={opt.k} onClick={()=>updateSettings({alertType:opt.k})}
+                className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${settings.alertType===opt.k?"bg-teal-500 text-white shadow-sm":"text-slate-500 hover:text-slate-300"}`}>
+                {opt.l}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          {[{key:"restLong",label:"Ejercicios pesados"},{key:"restShort",label:"Resto"}].map(({key,label})=>(
+            <div key={key} className="bg-slate-950/40 rounded-xl p-3">
+              <p className="text-[10px] text-slate-500 mb-2">{label}</p>
+              <div className="flex items-center justify-between">
+                <button onClick={()=>adjustRest(key,-15)}
+                  className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95 transition">−</button>
+                <span className="text-sm font-black text-white tabular-nums">{formatTime(settings[key])}</span>
+                <button onClick={()=>adjustRest(key,15)}
+                  className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95 transition">+</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
 
       {/* Cerrar sesión */}
       <button onClick={onLogout}
@@ -1348,7 +1522,7 @@ function MaxSetupWizard({ logs, setLogs, onDone }) {
             <span className="text-xs text-slate-500">{step+1} / {allSets.length}</span>
           </div>
           <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
-            <div className="h-full rounded-full bg-gradient-to-r from-orange-500 to-orange-400 transition-all duration-300" style={{width:`${pct}%`}}/>
+            <div className="h-full rounded-full bg-gradient-to-r from-teal-500 to-teal-400 transition-all duration-300" style={{width:`${pct}%`}}/>
           </div>
           <div className="flex items-center justify-between mt-1.5">
             <p className="text-[10px] text-slate-600">Podés saltear ejercicios que no hayas hecho</p>
@@ -1397,7 +1571,7 @@ function MaxSetupWizard({ logs, setLogs, onDone }) {
                   <input type="number" inputMode="decimal" placeholder="—"
                     value={values[current.key]?.reps||""}
                     onChange={e=>setValues(v=>({...v,[current.key]:{...v[current.key],reps:e.target.value}}))}
-                    className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-3 py-4 text-2xl font-black text-center text-white focus:outline-none focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/10 transition"/>
+                    className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-3 py-4 text-2xl font-black text-center text-white focus:outline-none focus:border-teal-500/50 focus:ring-2 focus:ring-teal-500/10 transition"/>
                 </div>
                 <div className="text-slate-700 text-xl pb-2 flex items-end">×</div>
                 <div className="flex-1">
@@ -1405,7 +1579,7 @@ function MaxSetupWizard({ logs, setLogs, onDone }) {
                   <input type="number" inputMode="decimal" placeholder="—"
                     value={values[current.key]?.kg||""}
                     onChange={e=>setValues(v=>({...v,[current.key]:{...v[current.key],kg:e.target.value}}))}
-                    className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-3 py-4 text-2xl font-black text-center text-white focus:outline-none focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/10 transition"/>
+                    className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-3 py-4 text-2xl font-black text-center text-white focus:outline-none focus:border-teal-500/50 focus:ring-2 focus:ring-teal-500/10 transition"/>
                 </div>
               </div>
             </div>
@@ -1417,7 +1591,7 @@ function MaxSetupWizard({ logs, setLogs, onDone }) {
               Saltear
             </button>
             <button onClick={handleNext}
-              className="flex-1 py-3.5 rounded-2xl bg-orange-500 text-white text-sm font-bold hover:bg-orange-400 active:scale-[0.98] transition-all shadow-lg shadow-orange-500/20">
+              className="flex-1 py-3.5 rounded-2xl bg-teal-500 text-white text-sm font-bold hover:bg-teal-400 active:scale-[0.98] transition-all shadow-lg shadow-teal-500/20">
               {step<allSets.length-1 ? "Siguiente →" : "Listo ✓"}
             </button>
           </div>
@@ -1438,7 +1612,7 @@ function BottomBar({ tab, setTab, profileName }) {
     {key:"descarga",icon:<Zap size={22}/>,label:"Descarga"},
     {key:"perfil",icon:(
       <div className="w-7 h-7 rounded-xl flex items-center justify-center text-sm font-black text-white"
-        style={{background: tab==="perfil"?"linear-gradient(135deg,#F97316,#DC2626)":"transparent",
+        style={{background: tab==="perfil"?"linear-gradient(135deg,#14B8A6,#0E7490)":"transparent",
           border: tab==="perfil"?"none":"2px solid #334155",color:tab==="perfil"?"white":"#6B7280"}}>
         {initial}
       </div>
@@ -1451,12 +1625,12 @@ function BottomBar({ tab, setTab, profileName }) {
         {tabs.map(({key,icon,label})=>(
           <button key={key} onClick={()=>setTab(key)}
             className="flex-1 flex flex-col items-center justify-center gap-1 py-3 transition-all active:scale-95">
-            <span className={`transition-all ${tab===key&&key!=="perfil" ? "text-orange-400" : key==="descarga"&&tab===key?"text-purple-400":"text-slate-600"}`}>
+            <span className={`transition-all ${tab===key&&key!=="perfil" ? "text-teal-400" : key==="descarga"&&tab===key?"text-purple-400":"text-slate-600"}`}>
               {icon}
             </span>
             <span className={`text-[9px] font-bold uppercase tracking-wider transition-all ${
               tab===key
-                ? key==="descarga"?"text-purple-400":key==="perfil"?"text-orange-400":"text-orange-400"
+                ? key==="descarga"?"text-purple-400":key==="perfil"?"text-teal-400":"text-teal-400"
                 : "text-slate-700"
             }`}>
               {label.length>8?label.slice(0,7)+"…":label}
@@ -1546,8 +1720,8 @@ export default function App() {
       {/* HEADER */}
       <header className="sticky top-0 z-10 bg-[#0a0a0f]/90 backdrop-blur-xl border-b border-slate-800/40">
         <div className="max-w-xl mx-auto px-4 py-4 flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center text-base font-black text-white shrink-0 shadow-md shadow-orange-900/30"
-            style={{background:"linear-gradient(135deg,#F97316,#DC2626)"}}>
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center text-base font-black text-white shrink-0 shadow-md shadow-teal-900/30"
+            style={{background:"linear-gradient(135deg,#14B8A6,#0E7490)"}}>
             {activeProfile.charAt(0).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
@@ -1559,15 +1733,15 @@ export default function App() {
             </h1>
             <p className="text-[11px] text-slate-600 leading-tight">{activeProfile}</p>
           </div>
-          <div className="w-8 h-8 rounded-xl bg-orange-500/15 flex items-center justify-center">
-            <Flame size={16} className="text-orange-500"/>
+          <div className="w-8 h-8 rounded-xl bg-teal-500/15 flex items-center justify-center">
+            <Flame size={16} className="text-teal-500"/>
           </div>
         </div>
       </header>
 
       {/* CONTENIDO */}
       <main className="max-w-xl mx-auto px-4 py-4 pb-28 space-y-4">
-        {tab==="rutina"&&<RoutineView logs={logs} setLogs={setLogs} cycleStart={cycleStart}/>}
+        {tab==="rutina"&&<RoutineView logs={logs} setLogs={setLogs} cycleStart={cycleStart} settings={profile?.settings||DEFAULT_SETTINGS}/>}
         {tab==="progreso"&&<ProgressView logs={logs} setLogs={setLogs}/>}
         {tab==="descarga"&&<DeloadView logs={logs}/>}
         {tab==="perfil"&&(
