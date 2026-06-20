@@ -7,7 +7,7 @@ import {
   Play, Pause, RotateCcw, TrendingUp, TrendingDown, Dumbbell,
   ChevronDown, ChevronUp, Trophy, Flame, Save, Trash2, BarChart3,
   ListChecks, LogOut, X, Check, AlertTriangle, Calendar, Zap,
-  Mail, Clock, User, ChevronRight, Edit3, Info,
+  Mail, Clock, User, ChevronRight, Edit3, Info, SkipForward,
 } from "lucide-react";
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -216,7 +216,7 @@ function PinInput({ length = 4, onComplete, label = "Ingresá tu PIN", error, on
       {/* dots */}
       <div className="flex gap-4">
         {Array.from({length}).map((_,i) => (
-          <div key={i} className={`w-4 h-4 rounded-full border-2 transition-all duration-150 ${i < digits.length ? "bg-orange-500 border-orange-500 scale-110" : "border-slate-600 bg-transparent"}`} />
+          <div key={i} className={`w-4 h-4 rounded-full border-2 transition-all duration-150 ${i < digits.length ? "bg-orange-500 border-orange-500 scale-110 shadow-[0_0_12px_-1px_rgba(249,115,22,0.7)]" : "border-slate-600 bg-transparent"}`} />
         ))}
       </div>
 
@@ -226,7 +226,7 @@ function PinInput({ length = 4, onComplete, label = "Ingresá tu PIN", error, on
       <div className="grid grid-cols-3 gap-3 w-64">
         {[1,2,3,4,5,6,7,8,9].map(n => (
           <button key={n} onClick={() => tap(n)}
-            className="h-16 rounded-2xl bg-slate-800 hover:bg-slate-700 active:scale-95 active:bg-slate-600 text-xl font-semibold text-slate-100 transition-all">
+            className="h-16 rounded-2xl bg-slate-800 hover:bg-slate-700 active:scale-95 active:bg-slate-600 text-xl font-semibold text-slate-100 transition-all shadow-inner shadow-black/20">
             {n}
           </button>
         ))}
@@ -236,7 +236,7 @@ function PinInput({ length = 4, onComplete, label = "Ingresá tu PIN", error, on
           </button>
         ) : <div />}
         <button onClick={() => tap(0)}
-          className="h-16 rounded-2xl bg-slate-800 hover:bg-slate-700 active:scale-95 active:bg-slate-600 text-xl font-semibold text-slate-100 transition-all">
+          className="h-16 rounded-2xl bg-slate-800 hover:bg-slate-700 active:scale-95 active:bg-slate-600 text-xl font-semibold text-slate-100 transition-all shadow-inner shadow-black/20">
           0
         </button>
         <button onClick={del} className="h-16 rounded-2xl text-slate-400 hover:text-slate-200 active:scale-95 transition-all flex items-center justify-center">
@@ -334,10 +334,11 @@ function LoginScreen({ onLogin }) {
 
   if (phase === "pin") {
     return (
-      <div className="min-h-screen bg-[#0a0a0f] flex flex-col items-center justify-center px-4">
-        <div className="w-full max-w-xs">
+      <div className="min-h-screen bg-[#0a0a0f] flex flex-col items-center justify-center px-4 relative overflow-hidden">
+        <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-72 h-72 rounded-full bg-orange-500/10 blur-3xl pointer-events-none" />
+        <div className="w-full max-w-xs relative">
           <div className="flex flex-col items-center mb-6">
-            <div className="w-14 h-14 rounded-2xl bg-orange-500/15 flex items-center justify-center mb-3">
+            <div className="w-14 h-14 rounded-2xl bg-orange-500/15 flex items-center justify-center mb-3 shadow-[0_0_30px_-8px_rgba(249,115,22,0.6)]">
               <Flame className="text-orange-500" size={28} />
             </div>
             <h2 className="text-xl font-bold text-white">{pendingProfile}</h2>
@@ -350,8 +351,9 @@ function LoginScreen({ onLogin }) {
 
   if (phase === "register") {
     return (
-      <div className="min-h-screen bg-[#0a0a0f] flex flex-col items-center justify-center px-4 py-8">
-        <div className="w-full max-w-sm">
+      <div className="min-h-screen bg-[#0a0a0f] flex flex-col items-center justify-center px-4 py-8 relative overflow-hidden">
+        <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-72 h-72 rounded-full bg-orange-500/10 blur-3xl pointer-events-none" />
+        <div className="w-full max-w-sm relative">
           <div className="flex items-center gap-3 mb-8">
             <button onClick={() => { setPhase("list"); setRegStep(1); setRegError(""); }}
               className="text-slate-500 hover:text-slate-300 transition">
@@ -363,7 +365,7 @@ function LoginScreen({ onLogin }) {
           {/* Steps */}
           <div className="flex gap-1.5 mb-6">
             {[1,2,3].map(s => (
-              <div key={s} className={`h-1 flex-1 rounded-full transition-all ${regStep >= s ? "bg-orange-500" : "bg-slate-800"}`} />
+              <div key={s} className={`h-1 flex-1 rounded-full transition-all ${regStep >= s ? "bg-orange-500 shadow-[0_0_8px_-1px_rgba(249,115,22,0.8)]" : "bg-slate-800"}`} />
             ))}
           </div>
 
@@ -374,14 +376,14 @@ function LoginScreen({ onLogin }) {
                   <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 block">Nombre</label>
                   <input type="text" placeholder="¿Cómo te llamás?" value={regName}
                     onChange={e => setRegName(e.target.value)}
-                    className="w-full bg-slate-900/80 border border-slate-700/50 rounded-2xl px-4 py-3.5 text-white focus:outline-none focus:border-orange-500/60 text-sm transition"
+                    className="w-full bg-slate-900/80 border border-slate-700/50 rounded-2xl px-4 py-3.5 text-white focus:outline-none focus:border-orange-500/60 focus:ring-2 focus:ring-orange-500/15 text-sm transition"
                     autoFocus />
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 block">Email <span className="text-slate-600 normal-case">(opcional)</span></label>
                   <input type="email" placeholder="tu@email.com" value={regMail}
                     onChange={e => setRegMail(e.target.value)}
-                    className="w-full bg-slate-900/80 border border-slate-700/50 rounded-2xl px-4 py-3.5 text-white focus:outline-none focus:border-orange-500/60 text-sm transition" />
+                    className="w-full bg-slate-900/80 border border-slate-700/50 rounded-2xl px-4 py-3.5 text-white focus:outline-none focus:border-orange-500/60 focus:ring-2 focus:ring-orange-500/15 text-sm transition" />
                 </div>
               </>
             )}
@@ -395,7 +397,7 @@ function LoginScreen({ onLogin }) {
                     Sin PIN
                   </button>
                   <button onClick={() => setRegStep(2.5)}
-                    className="flex-1 py-3.5 rounded-2xl bg-orange-500 text-white text-sm font-bold hover:bg-orange-400 transition">
+                    className="flex-1 py-3.5 rounded-2xl bg-orange-500 text-white text-sm font-bold hover:bg-orange-400 transition shadow-lg shadow-orange-500/20">
                     Con PIN
                   </button>
                 </div>
@@ -425,7 +427,7 @@ function LoginScreen({ onLogin }) {
 
           {(regStep === 1) && (
             <button onClick={handleRegister}
-              className="w-full mt-6 py-4 rounded-2xl bg-orange-500 text-white font-bold text-sm hover:bg-orange-400 active:scale-[0.98] transition-all">
+              className="w-full mt-6 py-4 rounded-2xl bg-orange-500 text-white font-bold text-sm hover:bg-orange-400 active:scale-[0.98] transition-all shadow-lg shadow-orange-500/20">
               Continuar →
             </button>
           )}
@@ -436,10 +438,11 @@ function LoginScreen({ onLogin }) {
 
   // Lista de perfiles
   return (
-    <div className="min-h-screen bg-[#0a0a0f] flex flex-col items-center justify-center px-4">
-      <div className="w-full max-w-sm">
+    <div className="min-h-screen bg-[#0a0a0f] flex flex-col items-center justify-center px-4 relative overflow-hidden">
+      <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-96 h-96 rounded-full bg-orange-500/10 blur-3xl pointer-events-none" />
+      <div className="w-full max-w-sm relative">
         <div className="flex flex-col items-center mb-10">
-          <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-orange-500/30 to-orange-500/5 border border-orange-500/20 flex items-center justify-center mb-4">
+          <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-orange-500/30 to-orange-500/5 border border-orange-500/20 flex items-center justify-center mb-4 shadow-[0_0_40px_-10px_rgba(249,115,22,0.55)]">
             <Flame className="text-orange-500" size={30} />
           </div>
           <h1 className="text-2xl font-black text-white tracking-tight">Mi Rutina</h1>
@@ -452,8 +455,8 @@ function LoginScreen({ onLogin }) {
             <div className="space-y-2">
               {profileList.map(name => (
                 <button key={name} onClick={() => tryLogin(name)}
-                  className="w-full flex items-center gap-3.5 bg-slate-900/60 border border-slate-800/60 hover:border-slate-600/60 rounded-2xl px-4 py-3.5 transition-all active:scale-[0.98] text-left group">
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg font-black shrink-0"
+                  className="w-full flex items-center gap-3.5 bg-slate-900/60 border border-slate-800/60 hover:border-orange-500/30 hover:bg-slate-900/90 rounded-2xl px-4 py-3.5 transition-all active:scale-[0.98] text-left group shadow-md shadow-black/20">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg font-black shrink-0 shadow-md shadow-orange-900/30"
                     style={{ background: "linear-gradient(135deg,#F97316,#DC2626)", color: "white" }}>
                     {name.charAt(0).toUpperCase()}
                   </div>
@@ -461,7 +464,7 @@ function LoginScreen({ onLogin }) {
                     <p className="text-white font-semibold text-sm">{name}</p>
                     <p className="text-[11px] text-slate-500">{profiles[name].pin ? "🔒 Con PIN" : "Sin PIN"} · {profiles[name].deviceId === deviceId ? "Este dispositivo" : "Otro dispositivo"}</p>
                   </div>
-                  <ChevronRight size={16} className="text-slate-600 group-hover:text-slate-400 transition shrink-0" />
+                  <ChevronRight size={16} className="text-slate-600 group-hover:text-orange-400 transition shrink-0" />
                 </button>
               ))}
             </div>
@@ -469,7 +472,7 @@ function LoginScreen({ onLogin }) {
         )}
 
         <button onClick={() => setPhase("register")}
-          className="w-full py-4 rounded-2xl border border-dashed border-slate-700 text-slate-400 hover:text-white hover:border-slate-500 transition-all text-sm font-semibold flex items-center justify-center gap-2">
+          className="w-full py-4 rounded-2xl border border-dashed border-slate-700 text-slate-400 hover:text-white hover:border-orange-500/40 transition-all text-sm font-semibold flex items-center justify-center gap-2">
           + Crear perfil nuevo
         </button>
       </div>
@@ -620,18 +623,18 @@ function SetRow({ exerciseId, setIndex, setDef, accent, logs, setLogs, deloadKgF
           <label className="text-[10px] text-slate-600 font-semibold uppercase tracking-wider mb-1.5 block">Reps</label>
           <input type="number" inputMode="decimal" placeholder="—" value={reps}
             onChange={e=>setReps(e.target.value)}
-            className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3.5 text-xl font-black text-center text-white focus:outline-none focus:border-orange-500/50 transition"/>
+            className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3.5 text-xl font-black text-center text-white focus:outline-none focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/10 transition"/>
         </div>
         <div className="text-slate-700 text-lg pb-3">×</div>
         <div className="flex-1">
           <label className="text-[10px] text-slate-600 font-semibold uppercase tracking-wider mb-1.5 block">Kg</label>
           <input type="number" inputMode="decimal" placeholder="—" value={kg}
             onChange={e=>setKg(e.target.value)}
-            className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3.5 text-xl font-black text-center text-white focus:outline-none focus:border-orange-500/50 transition"/>
+            className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3.5 text-xl font-black text-center text-white focus:outline-none focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/10 transition"/>
         </div>
         <button onClick={handleSave}
-          className={`mb-0 p-3.5 rounded-xl transition-all active:scale-95 font-bold text-white flex items-center justify-center ${saved?"bg-emerald-500":"hover:opacity-90"}`}
-          style={!saved?{backgroundColor:accent}:{}}>
+          className={`mb-0 p-3.5 rounded-xl transition-all active:scale-95 font-bold text-white flex items-center justify-center ${saved?"bg-emerald-500":"hover:opacity-90 shadow-md"}`}
+          style={!saved?{backgroundColor:accent,boxShadow:`0 4px 14px -4px ${accent}55`}:{}}>
           {saved ? <Check size={18}/> : <Save size={18}/>}
         </button>
       </div>
@@ -675,11 +678,11 @@ function ExerciseCard({ exercise, accent, logs, setLogs, deloadSets, deloadMode,
   const setsToShow = deloadSets ? exercise.sets.slice(0, deloadSets) : exercise.sets;
 
   return (
-    <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl overflow-hidden backdrop-blur-sm">
+    <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl overflow-hidden backdrop-blur-sm shadow-md shadow-black/20">
       <button onClick={()=>setOpen(o=>!o)}
         className="w-full flex items-center justify-between px-4 py-4 hover:bg-slate-800/30 active:bg-slate-800/50 transition text-left">
         <div className="flex items-center gap-3">
-          <div className="w-2 h-8 rounded-full" style={{backgroundColor:accent}}/>
+          <div className="w-2 h-8 rounded-full" style={{backgroundColor:accent, boxShadow:`0 0 10px -2px ${accent}`}}/>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="font-bold text-white text-sm">{exercise.name}</h3>
@@ -746,7 +749,7 @@ function DaySummary({ dayKey, logs, onResetDay }) {
           {val:prsToday,label:"Marcas hoy",icon:<Trophy size={12}/>,color:"text-amber-400"},
           {val:day.exercises.length,label:"Ejercicios",icon:<Dumbbell size={12}/>,color:"text-white"},
         ].map(({val,label,icon,color})=>(
-          <div key={label} className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-3 text-center backdrop-blur-sm">
+          <div key={label} className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-3 text-center backdrop-blur-sm shadow-md shadow-black/20">
             <p className={`text-2xl font-black ${color}`}>{val}</p>
             <p className="text-[10px] text-slate-600 flex items-center justify-center gap-1 mt-0.5">{icon}{label}</p>
           </div>
@@ -802,7 +805,7 @@ function WeekCalendar({ cycleStart, logs }) {
   });
 
   return (
-    <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 backdrop-blur-sm">
+    <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 backdrop-blur-sm shadow-md shadow-black/20">
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-sm font-bold text-white">Ciclo actual</h3>
@@ -899,7 +902,7 @@ function RoutineView({ logs, setLogs, cycleStart }) {
           <button key={k} onClick={()=>setActiveDay(k)}
             className="px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all active:scale-95 border"
             style={activeDay===k
-              ?{backgroundColor:ROUTINE[k].color,borderColor:ROUTINE[k].color,color:"#fff"}
+              ?{backgroundColor:ROUTINE[k].color,borderColor:ROUTINE[k].color,color:"#fff",boxShadow:`0 4px 14px -4px ${ROUTINE[k].color}66`}
               :{borderColor:"#1e2035",color:"#475569"}}>
             {ROUTINE[k].label}
           </button>
@@ -961,7 +964,7 @@ function DeloadView({ logs }) {
                 const hasPR = bestPerSet.some(Boolean);
 
                 return (
-                  <div key={ex.id} className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-3.5 backdrop-blur-sm">
+                  <div key={ex.id} className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-3.5 backdrop-blur-sm shadow-md shadow-black/20">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="font-bold text-white text-sm">{ex.name}</span>
                       <span className="text-[10px] px-1.5 py-0.5 rounded-lg font-bold" style={{backgroundColor:day.color+"18",color:day.color}}>{ex.muscle}</span>
@@ -1064,7 +1067,7 @@ function ProgressView({ logs, setLogs }) {
           {val:stats.daysTrained,label:"Días entrenados",color:"text-white"},
           {val:stats.totalSets,label:"Series cargadas",color:"text-white"},
         ].map(({val,label,color})=>(
-          <div key={label} className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 backdrop-blur-sm">
+          <div key={label} className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 backdrop-blur-sm shadow-md shadow-black/20">
             <p className={`text-2xl font-black ${color} tabular-nums`}>{val}</p>
             <p className="text-[10px] text-slate-600 mt-0.5">{label}</p>
           </div>
@@ -1102,7 +1105,7 @@ function ProgressView({ logs, setLogs }) {
       )}
 
       {/* Chart */}
-      <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 backdrop-blur-sm space-y-3">
+      <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 backdrop-blur-sm shadow-md shadow-black/20 space-y-3">
         <h3 className="text-sm font-bold text-white">Evolución por ejercicio</h3>
         <div className="flex flex-col gap-2">
           <select value={selId} onChange={e=>{setSelId(e.target.value);setSelSet(0);}}
@@ -1189,8 +1192,8 @@ function ProfileView({ profileName, profiles, onLogout, onDelete, onUpdateProfil
   return (
     <div className="space-y-4">
       {/* Avatar + nombre */}
-      <div className="bg-gradient-to-br from-slate-900 to-slate-900/50 border border-slate-800/50 rounded-2xl p-5 text-center">
-        <div className="w-20 h-20 rounded-3xl mx-auto flex items-center justify-center text-3xl font-black text-white mb-3"
+      <div className="bg-gradient-to-br from-slate-900 to-slate-900/50 border border-slate-800/50 rounded-2xl p-5 text-center shadow-md shadow-black/20">
+        <div className="w-20 h-20 rounded-3xl mx-auto flex items-center justify-center text-3xl font-black text-white mb-3 shadow-lg shadow-orange-900/30"
           style={{background:"linear-gradient(135deg,#F97316,#DC2626)"}}>
           {initial}
         </div>
@@ -1200,7 +1203,7 @@ function ProfileView({ profileName, profiles, onLogout, onDelete, onUpdateProfil
       </div>
 
       {/* Info */}
-      <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl divide-y divide-slate-800/50 overflow-hidden backdrop-blur-sm">
+      <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl divide-y divide-slate-800/50 overflow-hidden backdrop-blur-sm shadow-md shadow-black/20">
         {[
           {icon:<Mail size={14}/>,label:"Email",val:profile?.email||"No configurado"},
           {icon:<Clock size={14}/>,label:"Unido el",val:joinDate},
@@ -1217,14 +1220,14 @@ function ProfileView({ profileName, profiles, onLogout, onDelete, onUpdateProfil
 
       {/* Editar email */}
       {editing ? (
-        <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 space-y-3">
+        <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 space-y-3 shadow-md shadow-black/20">
           <input type="email" value={editMail} onChange={e=>setEditMail(e.target.value)}
             placeholder="tu@email.com"
             className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-orange-500/50"/>
           <div className="flex gap-2">
             <button onClick={()=>setEditing(false)} className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-400 text-sm font-semibold">Cancelar</button>
             <button onClick={()=>{onUpdateProfile({email:editMail});setEditing(false);}}
-              className="flex-1 py-3 rounded-xl bg-orange-500 text-white text-sm font-bold hover:bg-orange-400 transition">Guardar</button>
+              className="flex-1 py-3 rounded-xl bg-orange-500 text-white text-sm font-bold hover:bg-orange-400 transition shadow-lg shadow-orange-500/20">Guardar</button>
           </div>
         </div>
       ) : (
@@ -1235,7 +1238,7 @@ function ProfileView({ profileName, profiles, onLogout, onDelete, onUpdateProfil
       )}
 
       {/* Inicio de ciclo */}
-      <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 backdrop-blur-sm">
+      <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 backdrop-blur-sm shadow-md shadow-black/20">
         <div className="flex items-center justify-between mb-2">
           <div>
             <p className="text-sm font-bold text-white">Inicio de ciclo</p>
@@ -1261,7 +1264,7 @@ function ProfileView({ profileName, profiles, onLogout, onDelete, onUpdateProfil
             <button onClick={()=>{
               const val = document.getElementById("cycle-date-input").value;
               if(val){onSetCycleStart(new Date(val));setShowCycleSetup(false);}
-            }} className="flex-1 py-3 rounded-xl bg-orange-500 text-white text-sm font-bold hover:bg-orange-400 transition">Guardar</button>
+            }} className="flex-1 py-3 rounded-xl bg-orange-500 text-white text-sm font-bold hover:bg-orange-400 transition shadow-lg shadow-orange-500/20">Guardar</button>
           </div>
         </div>
       )}
@@ -1272,24 +1275,29 @@ function ProfileView({ profileName, profiles, onLogout, onDelete, onUpdateProfil
         <LogOut size={14}/> Cambiar de perfil
       </button>
 
-      {/* Borrar */}
+      {/* Borrar perfil completo */}
       {!showDeletePin ? (
         <button onClick={()=>setShowDeletePin(true)}
           className="w-full flex items-center gap-2 justify-center py-3.5 rounded-2xl border border-rose-500/20 text-rose-500/70 hover:text-rose-400 hover:border-rose-500/40 transition text-sm font-semibold">
-          <Trash2 size={14}/> Borrar historial de {profileName}
+          <Trash2 size={14}/> Eliminar perfil de {profileName}
         </button>
       ) : (
         <div className="bg-rose-500/5 border border-rose-500/20 rounded-2xl p-4">
-          <p className="text-xs text-rose-400 font-semibold text-center mb-4">
-            {profile?.pin ? "Ingresá tu PIN para confirmar el borrado" : "¿Estás seguro? Esto no se puede deshacer."}
-          </p>
+          <div className="flex items-start gap-2.5 mb-4">
+            <AlertTriangle size={16} className="text-rose-400 mt-0.5 shrink-0"/>
+            <p className="text-xs text-rose-400 font-semibold">
+              {profile?.pin
+                ? "Esto borra el perfil, todos los récords y el historial de forma permanente. Ingresá tu PIN para confirmar."
+                : "Esto borra el perfil, todos los récords y el historial de forma permanente. No se puede deshacer."}
+            </p>
+          </div>
           {profile?.pin ? (
             <PinInput label="PIN para confirmar" onComplete={handleDeleteConfirm} error={deleteError}
               onCancel={()=>setShowDeletePin(false)}/>
           ) : (
             <div className="flex gap-2">
               <button onClick={()=>setShowDeletePin(false)} className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-400 text-sm font-semibold">Cancelar</button>
-              <button onClick={onDelete} className="flex-1 py-3 rounded-xl bg-rose-500 text-white text-sm font-bold hover:bg-rose-400 transition">Borrar todo</button>
+              <button onClick={onDelete} className="flex-1 py-3 rounded-xl bg-rose-500 text-white text-sm font-bold hover:bg-rose-400 transition">Eliminar perfil</button>
             </div>
           )}
         </div>
@@ -1310,6 +1318,7 @@ function MaxSetupWizard({ logs, setLogs, onDone }) {
 
   const [step, setStep] = useState(0);
   const [values, setValues] = useState({});
+  const [confirmSkipAll, setConfirmSkipAll] = useState(false);
   const current = allSets[step];
 
   const handleNext = () => {
@@ -1329,8 +1338,10 @@ function MaxSetupWizard({ logs, setLogs, onDone }) {
   const pct = Math.round((step/allSets.length)*100);
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] flex flex-col px-4 py-8">
-      <div className="max-w-sm mx-auto w-full flex-1 flex flex-col">
+    <div className="min-h-screen bg-[#0a0a0f] flex flex-col px-4 py-8 relative overflow-hidden">
+      <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-80 h-80 rounded-full blur-3xl pointer-events-none opacity-30"
+        style={{backgroundColor:current.dayColor}}/>
+      <div className="max-w-sm mx-auto w-full flex-1 flex flex-col relative">
         <div className="mb-6">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-bold text-white">Establecer marcas iniciales</h2>
@@ -1339,10 +1350,36 @@ function MaxSetupWizard({ logs, setLogs, onDone }) {
           <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
             <div className="h-full rounded-full bg-gradient-to-r from-orange-500 to-orange-400 transition-all duration-300" style={{width:`${pct}%`}}/>
           </div>
-          <p className="text-[10px] text-slate-600 mt-1.5">Podés saltear ejercicios que no hayas hecho</p>
+          <div className="flex items-center justify-between mt-1.5">
+            <p className="text-[10px] text-slate-600">Podés saltear ejercicios que no hayas hecho</p>
+            {!confirmSkipAll ? (
+              <button onClick={()=>setConfirmSkipAll(true)}
+                className="text-[10px] text-slate-500 hover:text-slate-300 font-semibold flex items-center gap-1 transition shrink-0">
+                <SkipForward size={11}/> Saltear todo
+              </button>
+            ) : null}
+          </div>
         </div>
 
-        <div className="bg-slate-900/60 border border-slate-800/50 rounded-2xl p-5 flex-1 flex flex-col justify-between">
+        {confirmSkipAll && (
+          <div className="bg-slate-900/80 border border-slate-700/50 rounded-2xl p-4 mb-4 space-y-3">
+            <p className="text-xs text-slate-300 leading-relaxed">
+              ¿Saltear toda la configuración de marcas iniciales? Vas a poder ingresarlas más adelante, ejercicio por ejercicio, desde la rutina.
+            </p>
+            <div className="flex gap-2">
+              <button onClick={()=>setConfirmSkipAll(false)}
+                className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-400 text-sm font-semibold">
+                Seguir cargando
+              </button>
+              <button onClick={onDone}
+                className="flex-1 py-3 rounded-xl bg-slate-700 text-white text-sm font-bold hover:bg-slate-600 transition">
+                Saltear todo
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="bg-slate-900/60 border border-slate-800/50 rounded-2xl p-5 flex-1 flex flex-col justify-between shadow-xl shadow-black/30">
           <div>
             <span className="text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-lg mb-3 inline-block"
               style={{backgroundColor:current.dayColor+"18",color:current.dayColor}}>
@@ -1360,7 +1397,7 @@ function MaxSetupWizard({ logs, setLogs, onDone }) {
                   <input type="number" inputMode="decimal" placeholder="—"
                     value={values[current.key]?.reps||""}
                     onChange={e=>setValues(v=>({...v,[current.key]:{...v[current.key],reps:e.target.value}}))}
-                    className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-3 py-4 text-2xl font-black text-center text-white focus:outline-none focus:border-orange-500/50 transition"/>
+                    className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-3 py-4 text-2xl font-black text-center text-white focus:outline-none focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/10 transition"/>
                 </div>
                 <div className="text-slate-700 text-xl pb-2 flex items-end">×</div>
                 <div className="flex-1">
@@ -1368,7 +1405,7 @@ function MaxSetupWizard({ logs, setLogs, onDone }) {
                   <input type="number" inputMode="decimal" placeholder="—"
                     value={values[current.key]?.kg||""}
                     onChange={e=>setValues(v=>({...v,[current.key]:{...v[current.key],kg:e.target.value}}))}
-                    className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-3 py-4 text-2xl font-black text-center text-white focus:outline-none focus:border-orange-500/50 transition"/>
+                    className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-3 py-4 text-2xl font-black text-center text-white focus:outline-none focus:border-orange-500/50 focus:ring-2 focus:ring-orange-500/10 transition"/>
                 </div>
               </div>
             </div>
@@ -1380,7 +1417,7 @@ function MaxSetupWizard({ logs, setLogs, onDone }) {
               Saltear
             </button>
             <button onClick={handleNext}
-              className="flex-1 py-3.5 rounded-2xl bg-orange-500 text-white text-sm font-bold hover:bg-orange-400 active:scale-[0.98] transition-all">
+              className="flex-1 py-3.5 rounded-2xl bg-orange-500 text-white text-sm font-bold hover:bg-orange-400 active:scale-[0.98] transition-all shadow-lg shadow-orange-500/20">
               {step<allSets.length-1 ? "Siguiente →" : "Listo ✓"}
             </button>
           </div>
@@ -1469,10 +1506,15 @@ export default function App() {
 
   const handleLogout = () => { saveActive(null); setActiveProfile(null); setShowWizard(false); };
 
+  // Elimina el perfil por completo: récords, historial y la cuenta misma.
   const handleDelete = () => {
-    const np = {...profiles, [activeProfile]: {...profiles[activeProfile], logs: {}, maxesSetup: false}};
+    const np = {...profiles};
+    delete np[activeProfile];
     setProfiles(np);
     saveProfiles(np);
+    saveActive(null);
+    setActiveProfile(null);
+    setShowWizard(false);
   };
 
   const handleUpdateProfile = (updates) => {
@@ -1504,7 +1546,7 @@ export default function App() {
       {/* HEADER */}
       <header className="sticky top-0 z-10 bg-[#0a0a0f]/90 backdrop-blur-xl border-b border-slate-800/40">
         <div className="max-w-xl mx-auto px-4 py-4 flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center text-base font-black text-white shrink-0"
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center text-base font-black text-white shrink-0 shadow-md shadow-orange-900/30"
             style={{background:"linear-gradient(135deg,#F97316,#DC2626)"}}>
             {activeProfile.charAt(0).toUpperCase()}
           </div>
