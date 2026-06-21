@@ -32,25 +32,25 @@ const ROUTINE = {
     exercises: [
       { id:"press_banca", name:"Press Banca", muscle:"Pectoral", nota:"Hacer fuerza con las piernas.",
         video: yt("press banca técnica correcta"),
-        sets:[{repRange:"3-5",pr:{reps:5,kg:115},heavy:true},{repRange:"3-5",pr:{reps:7,kg:110},heavy:true},{repRange:"8-10",pr:{reps:10,kg:100}}] },
+        sets:[{repRange:"3-5",pr:null,heavy:true},{repRange:"3-5",pr:null,heavy:true},{repRange:"8-10",pr:null}] },
       { id:"press_inclinado_smith", name:"Press Inclinado Smith", muscle:"Pectoral sup.", nota:"Codos bastante pegados.",
         video: yt("press inclinado smith técnica"),
-        sets:[{repRange:"8-10",pr:{reps:11,kg:90}},{repRange:"8-10",pr:{reps:9,kg:90}},{repRange:"8-10",pr:{reps:10,kg:85}}] },
+        sets:[{repRange:"8-10",pr:null},{repRange:"8-10",pr:null},{repRange:"8-10",pr:null}] },
       { id:"cruce_poleas", name:"Cruce de Poleas", muscle:"Pectoral", nota:"Énfasis en el estiramiento.",
         video: yt("cruce de poleas técnica pectoral"),
-        sets:[{repRange:"10-12",pr:{reps:13,kg:15}},{repRange:"10-12",pr:{reps:11,kg:15}}] },
+        sets:[{repRange:"10-12",pr:null},{repRange:"10-12",pr:null}] },
       { id:"vuelos_laterales_mancuerna", name:"Vuelos Laterales Mancuerna", muscle:"Deltoides lateral", nota:"Levantar un poco para adelante.",
         video: yt("vuelos laterales mancuerna técnica deltoides"),
-        sets:[{repRange:"12-15",pr:{reps:15,kg:13}},{repRange:"12-15",pr:{reps:16,kg:13}},{repRange:"12-15",pr:{reps:14,kg:10}},{repRange:"12-15",pr:{reps:13,kg:10}}] },
+        sets:[{repRange:"12-15",pr:null},{repRange:"12-15",pr:null},{repRange:"12-15",pr:null},{repRange:"12-15",pr:null}] },
       { id:"pec_dec_deltoides_push", name:"Pec Dec para Deltoides", muscle:"Deltoides post.", nota:"Unilateral.",
         video: yt("pec dec deltoides posterior técnica"),
-        sets:[{repRange:"12-15",pr:{reps:15,kg:32}},{repRange:"12-15",pr:{reps:12,kg:32}}] },
+        sets:[{repRange:"12-15",pr:null},{repRange:"12-15",pr:null}] },
       { id:"triceps_trasnuca_push", name:"Tríceps Trasnuca", muscle:"Tríceps", nota:"Pausa en el fondo, codos no van cerrados.",
         video: yt("triceps trasnuca técnica overhead extension"),
-        sets:[{repRange:"8-10",pr:{reps:10,kg:38}},{repRange:"8-10",pr:{reps:12,kg:32}}] },
+        sets:[{repRange:"8-10",pr:null},{repRange:"8-10",pr:null}] },
       { id:"triceps_polea_alta", name:"Tríceps Polea Alta", muscle:"Tríceps", nota:"El húmero no se mueve.",
         video: yt("tríceps polea alta técnica cable pushdown"),
-        sets:[{repRange:"8-10",pr:{reps:14,kg:38}},{repRange:"8-10",pr:{reps:12,kg:40}}] },
+        sets:[{repRange:"8-10",pr:null},{repRange:"8-10",pr:null}] },
     ],
   },
   pull: {
@@ -59,22 +59,22 @@ const ROUTINE = {
     exercises: [
       { id:"remo_ancho_maquina", name:"Remo Ancho Máquina", muscle:"Dorsal", nota:"No levantar los hombros.",
         video: yt("remo ancho máquina técnica espalda"),
-        sets:[{repRange:"4-6",pr:{reps:7,kg:86},heavy:true},{repRange:"4-6",pr:{reps:7,kg:79},heavy:true},{repRange:"8-10",pr:{reps:9,kg:66}}] },
+        sets:[{repRange:"4-6",pr:null,heavy:true},{repRange:"4-6",pr:null,heavy:true},{repRange:"8-10",pr:null}] },
       { id:"dorsalera", name:"Dorsalera Agarre Ancho", muscle:"Dorsal", nota:"No descolocar los hombros, pulgar en la marca.",
         video: yt("dorsalera lat pulldown agarre ancho técnica"),
-        sets:[{repRange:"8-10",pr:{reps:10,kg:66}},{repRange:"8-10",pr:{reps:8,kg:59}},{repRange:"8-10",pr:{reps:8,kg:52}}] },
+        sets:[{repRange:"8-10",pr:null},{repRange:"8-10",pr:null},{repRange:"8-10",pr:null}] },
       { id:"remo_unilateral", name:"Remo Unilateral", muscle:"Dorsal / oblicuos", nota:"Contraer los oblicuos, codo lo más abajo posible.",
         video: yt("remo unilateral mancuerna técnica espalda"),
-        sets:[{repRange:"8-10",pr:{reps:11,kg:25}},{repRange:"8-10",pr:{reps:9,kg:25}}] },
+        sets:[{repRange:"8-10",pr:null},{repRange:"8-10",pr:null}] },
       { id:"pull_over", name:"Pull Over", muscle:"Dorsal / serrato", nota:"Codos siempre un poco flexionados.",
         video: yt("pull over espalda técnica mancuerna"),
-        sets:[{repRange:"8-10",pr:{reps:8,kg:38}},{repRange:"8-10",pr:{reps:9,kg:32}},{repRange:"8-10",pr:{reps:9,kg:25}}] },
+        sets:[{repRange:"8-10",pr:null},{repRange:"8-10",pr:null},{repRange:"8-10",pr:null}] },
       { id:"face_pull", name:"Face Pull", muscle:"Deltoides post.", nota:"Polea a la altura de los ojos.",
         video: yt("face pull técnica deltoides posterior"),
-        sets:[{repRange:"15-20",pr:{reps:19,kg:18}},{repRange:"15-20",pr:{reps:16,kg:20}}] },
+        sets:[{repRange:"15-20",pr:null},{repRange:"15-20",pr:null}] },
       { id:"biceps_alternado_mancuerna", name:"Bíceps Alternado Mancuerna", muscle:"Bíceps", nota:"Mover un poco el húmero al final.",
         video: yt("curl alternado mancuerna técnica bíceps"),
-        sets:[{repRange:"8-10",pr:{reps:10,kg:18}},{repRange:"8-10",pr:{reps:9,kg:15}},{repRange:"8-10",pr:{reps:10,kg:15}},{repRange:"8-10",pr:{reps:12,kg:13}}] },
+        sets:[{repRange:"8-10",pr:null},{repRange:"8-10",pr:null},{repRange:"8-10",pr:null},{repRange:"8-10",pr:null}] },
     ],
   },
   legs: {
@@ -111,25 +111,25 @@ const ROUTINE = {
     exercises: [
       { id:"press_militar_smith", name:"Press Militar Smith", muscle:"Deltoides ant.", nota:"Codos adelante, banco 80-90°.",
         video: yt("press militar smith técnica hombros"),
-        sets:[{repRange:"4-6",pr:{reps:7,kg:95},heavy:true},{repRange:"4-6",pr:{reps:7,kg:95},heavy:true},{repRange:"8-10",pr:{reps:10,kg:85}}] },
+        sets:[{repRange:"4-6",pr:null,heavy:true},{repRange:"4-6",pr:null,heavy:true},{repRange:"8-10",pr:null}] },
       { id:"vuelos_laterales_maquina", name:"Vuelos Laterales Máquina", muscle:"Deltoides lateral", nota:"No hacer tanta fuerza con el agarre.",
         video: yt("vuelos laterales máquina deltoides técnica"),
-        sets:[{repRange:"12-15",pr:{reps:15,kg:52}},{repRange:"12-15",pr:{reps:11,kg:52}},{repRange:"12-15",pr:{reps:14,kg:45}},{repRange:"12-15",pr:{reps:15,kg:38}}] },
+        sets:[{repRange:"12-15",pr:null},{repRange:"12-15",pr:null},{repRange:"12-15",pr:null},{repRange:"12-15",pr:null}] },
       { id:"pec_dec_deltoides_sarm", name:"Pec Dec Deltoides Posterior", muscle:"Deltoides post.", nota:"Unilateral.",
         video: yt("pec dec deltoides posterior técnica"),
-        sets:[{repRange:"12-15",pr:{reps:11,kg:36}},{repRange:"12-15",pr:{reps:10,kg:36}}] },
+        sets:[{repRange:"12-15",pr:null},{repRange:"12-15",pr:null}] },
       { id:"biceps_martillo", name:"Bíceps Martillo", muscle:"Bíceps / braquial", nota:"Alternado.",
         video: yt("curl martillo bíceps técnica hammer curl"),
-        sets:[{repRange:"6-8",pr:{reps:8,kg:20}},{repRange:"6-8",pr:{reps:9,kg:18}},{repRange:"6-8",pr:{reps:8,kg:18}}] },
+        sets:[{repRange:"6-8",pr:null},{repRange:"6-8",pr:null},{repRange:"6-8",pr:null}] },
       { id:"biceps_banco_scott", name:"Bíceps Banco Scott", muscle:"Bíceps", nota:"Unilateral con mancuerna.",
         video: yt("curl banco scott técnica bíceps preacher curl"),
-        sets:[{repRange:"6-8",pr:{reps:9,kg:15}},{repRange:"6-8",pr:{reps:9,kg:15}},{repRange:"6-8",pr:{reps:8,kg:13}}] },
+        sets:[{repRange:"6-8",pr:null},{repRange:"6-8",pr:null},{repRange:"6-8",pr:null}] },
       { id:"biceps_banco_inclinado", name:"Bíceps Banco Inclinado", muscle:"Bíceps cab. larga", nota:"Alternado, 6 puntos arriba.",
         video: yt("curl banco inclinado bíceps técnica incline curl"),
-        sets:[{repRange:"8-10",pr:{reps:10,kg:13}},{repRange:"8-10",pr:{reps:12,kg:10}}] },
+        sets:[{repRange:"8-10",pr:null},{repRange:"8-10",pr:null}] },
       { id:"triceps_trasnuca_sarm", name:"Tríceps Trasnuca", muscle:"Tríceps", nota:"Pausa en el fondo.",
         video: yt("triceps trasnuca técnica overhead extension"),
-        sets:[{repRange:"8-10",pr:{reps:16,kg:38}},{repRange:"8-10",pr:{reps:12,kg:38}},{repRange:"8-10",pr:{reps:10,kg:38}}] },
+        sets:[{repRange:"8-10",pr:null},{repRange:"8-10",pr:null},{repRange:"8-10",pr:null}] },
     ],
   },
 };
@@ -144,9 +144,19 @@ DAY_ORDER.forEach(dk => {
   });
 });
 
-/* Configuración por defecto de descanso y alertas (editable en Perfil) */
-const DEFAULT_SETTINGS = { alertType: "sound", restLong: REST_LONG, restShort: REST_SHORT };
+/* Configuración por defecto de descanso, alertas y descarga (editable en Perfil) */
+const DEFAULT_SETTINGS = {
+  alertType: "sound", restLong: REST_LONG, restShort: REST_SHORT,
+  trainWeeks: TRAIN_WEEKS, deloadWeeks: DELOAD_WEEKS,
+  deloadPct: 0.75, deloadSetDivisor: 2,
+};
 const STAGNATION_DAYS = 21; // ~3 semanas sin mejorar
+
+/* Combina la config guardada del perfil con los valores por defecto, para
+   que perfiles viejos (creados antes de estas opciones) sigan funcionando. */
+function getProfileSettings(profile) {
+  return { ...DEFAULT_SETTINGS, ...(profile?.settings || {}) };
+}
 
 /* ─────────────────────────────────────────────────────────────────────────
    STORAGE — perfiles separados por dispositivo
@@ -230,14 +240,17 @@ function getStagnationInfo(exercise, logs) {
   return { stagnant, maxGapDays };
 }
 
-function getWeekInfo(cycleStart) {
+function getWeekInfo(cycleStart, settings = DEFAULT_SETTINGS) {
   if (!cycleStart) return null;
+  const trainWeeks = settings.trainWeeks ?? TRAIN_WEEKS;
+  const deloadWeeks = settings.deloadWeeks ?? DELOAD_WEEKS;
+  const cycleWeeks = trainWeeks + deloadWeeks;
   const now = new Date();
   const diffDays = Math.floor((now - cycleStart) / 86400000);
   const totalWeek = Math.floor(diffDays / 7);
-  const weekInCycle = (totalWeek % CYCLE_WEEKS) + 1;
-  const isDeload = weekInCycle > TRAIN_WEEKS;
-  return { totalWeek: totalWeek + 1, weekInCycle, isDeload, cycleNumber: Math.floor(totalWeek / CYCLE_WEEKS) + 1 };
+  const weekInCycle = (totalWeek % cycleWeeks) + 1;
+  const isDeload = weekInCycle > trainWeeks;
+  return { totalWeek: totalWeek + 1, weekInCycle, isDeload, cycleNumber: Math.floor(totalWeek / cycleWeeks) + 1, cycleWeeks, trainWeeks, deloadWeeks };
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
@@ -698,7 +711,7 @@ function SetRow({ exerciseId, setIndex, setDef, accent, logs, setLogs, deloadKgF
 
       {deloadMode && suggestedKg && (
         <div className="mb-2 text-[11px] text-purple-400 flex items-center gap-1.5">
-          <Zap size={11}/> Descarga: {suggestedKg} kg sugerido (75%)
+          <Zap size={11}/> Descarga: {suggestedKg} kg sugerido ({Math.round(deloadKgFactor*100)}%)
         </div>
       )}
 
@@ -797,7 +810,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, deloadSets, deloadMode,
           {setsToShow.map((s,i) => (
             <SetRow key={i} exerciseId={exercise.id} setIndex={i} setDef={s}
               accent={accent} logs={logs} setLogs={setLogs}
-              deloadKgFactor={0.75} deloadMode={deloadMode} resetKey={resetKey}/>
+              deloadKgFactor={settings.deloadPct} deloadMode={deloadMode} resetKey={resetKey}/>
           ))}
           <div className="flex flex-col gap-2 pt-3">
             <RestTimer seconds={hasHeavy?settings.restLong:settings.restShort} accent={accent} alertType={settings.alertType}/>
@@ -873,11 +886,11 @@ function DaySummary({ dayKey, logs, onResetDay }) {
 /* ─────────────────────────────────────────────────────────────────────────
    CALENDARIO SEMANAL (7 train + 1 deload)
 ───────────────────────────────────────────────────────────────────────── */
-function WeekCalendar({ cycleStart, logs }) {
-  const weekInfo = getWeekInfo(cycleStart);
+function WeekCalendar({ cycleStart, logs, settings = DEFAULT_SETTINGS }) {
+  const weekInfo = getWeekInfo(cycleStart, settings);
   if (!cycleStart || !weekInfo) return null;
+  const { cycleWeeks, trainWeeks } = weekInfo;
 
-  const weeks = Array.from({length: CYCLE_WEEKS}, (_,i) => i+1);
   const trainedDays = useMemo(() => {
     const s = new Set();
     Object.entries(logs).forEach(([k,v]) => {
@@ -888,7 +901,7 @@ function WeekCalendar({ cycleStart, logs }) {
   }, [logs]);
 
   // Semanas desde el inicio
-  const weekDots = Array.from({length: CYCLE_WEEKS}, (_,wi) => {
+  const weekDots = Array.from({length: cycleWeeks}, (_,wi) => {
     const weekStart = new Date(cycleStart);
     weekStart.setDate(weekStart.getDate() + wi*7);
     const days = Array.from({length:7}, (_,di) => {
@@ -897,7 +910,7 @@ function WeekCalendar({ cycleStart, logs }) {
       return d.toISOString().slice(0,10);
     });
     const trained = days.filter(d=>trainedDays.has(d)).length;
-    return { week: wi+1, days, trained, isDeload: wi+1 > TRAIN_WEEKS };
+    return { week: wi+1, days, trained, isDeload: wi+1 > trainWeeks };
   });
 
   return (
@@ -905,7 +918,7 @@ function WeekCalendar({ cycleStart, logs }) {
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-sm font-bold text-white">Ciclo actual</h3>
-          <p className="text-[11px] text-slate-500">Ciclo #{weekInfo.cycleNumber} · Semana {weekInfo.weekInCycle} de {CYCLE_WEEKS}</p>
+          <p className="text-[11px] text-slate-500">Ciclo #{weekInfo.cycleNumber} · Semana {weekInfo.weekInCycle} de {cycleWeeks}</p>
         </div>
         <div className={`px-3 py-1.5 rounded-xl text-xs font-bold ${weekInfo.isDeload?"bg-purple-500/20 text-purple-400":"bg-teal-500/20 text-teal-400"}`}>
           {weekInfo.isDeload?"DESCARGA":"ENTRENAMIENTO"}
@@ -953,7 +966,7 @@ function WeekCalendar({ cycleStart, logs }) {
 function RoutineView({ logs, setLogs, cycleStart, settings }) {
   const [activeDay, setActiveDay] = useState(() => getSuggestedDay(logs));
   const suggestedDay = useMemo(() => getSuggestedDay(logs), []); // solo para el mensaje, no se recalcula al loguear
-  const weekInfo = getWeekInfo(cycleStart);
+  const weekInfo = getWeekInfo(cycleStart, settings);
   const isDeload = weekInfo?.isDeload;
   const day = ROUTINE[activeDay];
 
@@ -961,7 +974,7 @@ function RoutineView({ logs, setLogs, cycleStart, settings }) {
   const [resetKeys, setResetKeys] = useState({push:0,pull:0,legs:0,sarm:0});
   const currentResetKey = resetKeys[activeDay];
 
-  const getDeloadSets = (ex) => ex.sets.length <= 2 ? 1 : 2;
+  const getDeloadSets = (ex) => Math.max(1, Math.ceil(ex.sets.length / settings.deloadSetDivisor));
 
   const handleResetDay = () => {
     const today = todayStr();
@@ -981,14 +994,14 @@ function RoutineView({ logs, setLogs, cycleStart, settings }) {
 
   return (
     <div className="space-y-4">
-      <WeekCalendar cycleStart={cycleStart} logs={logs}/>
+      <WeekCalendar cycleStart={cycleStart} logs={logs} settings={settings}/>
 
       {isDeload && (
         <div className="bg-purple-500/10 border border-purple-500/20 rounded-2xl px-4 py-3 flex items-start gap-3">
           <Zap size={16} className="text-purple-400 mt-0.5 shrink-0"/>
           <div>
             <p className="text-sm font-bold text-purple-300">Semana de descarga activa</p>
-            <p className="text-xs text-purple-500/80 mt-0.5">Series reducidas a la mitad · Cargas al 75% · Mismas repeticiones</p>
+            <p className="text-xs text-purple-500/80 mt-0.5">Series ÷{settings.deloadSetDivisor} · Cargas al {Math.round(settings.deloadPct*100)}% · Mismas repeticiones</p>
           </div>
         </div>
       )}
@@ -1032,8 +1045,10 @@ function RoutineView({ logs, setLogs, cycleStart, settings }) {
 /* ─────────────────────────────────────────────────────────────────────────
    PESTAÑA DESCARGA (cálculo)
 ───────────────────────────────────────────────────────────────────────── */
-function DeloadView({ logs }) {
+function DeloadView({ logs, settings = DEFAULT_SETTINGS }) {
   const allExercises = DAY_ORDER.flatMap(dk => ROUTINE[dk].exercises.map(e=>({...e,dayKey:dk,dayColor:ROUTINE[dk].color,dayLabel:ROUTINE[dk].label})));
+  const { trainWeeks, deloadWeeks, deloadPct, deloadSetDivisor } = settings;
+  const pctLabel = Math.round(deloadPct*100);
 
   return (
     <div className="space-y-4">
@@ -1043,7 +1058,7 @@ function DeloadView({ logs }) {
           <div>
             <h2 className="font-bold text-white text-sm">Semana de descarga</h2>
             <p className="text-xs text-purple-300/70 mt-1 leading-relaxed">
-              Cada 7 semanas de entrenamiento, 1 semana de descarga. Las cargas bajan al <strong className="text-purple-300">75%</strong> de tu récord, las series se reducen a la mitad y mantenés las repeticiones. Esto permite recuperación sin perder adaptaciones.
+              Cada {trainWeeks} semana{trainWeeks!==1?"s":""} de entrenamiento, {deloadWeeks} semana{deloadWeeks!==1?"s":""} de descarga. Las cargas bajan al <strong className="text-purple-300">{pctLabel}%</strong> de tu récord, las series se dividen entre {deloadSetDivisor} y mantenés las repeticiones. Esto permite recuperación sin perder adaptaciones.
             </p>
           </div>
         </div>
@@ -1058,7 +1073,7 @@ function DeloadView({ logs }) {
             </p>
             <div className="space-y-2">
               {day.exercises.map(ex => {
-                const deloadSets = ex.sets.length <= 2 ? 1 : 2;
+                const deloadSets = Math.max(1, Math.ceil(ex.sets.length / deloadSetDivisor));
                 const bestPerSet = ex.sets.map((s,i) => {
                   const h = logs[`${ex.id}_${i}`]||[];
                   let best = s.pr?{...s.pr}:null;
@@ -1082,7 +1097,7 @@ function DeloadView({ logs }) {
                       <div className="space-y-1.5">
                         {ex.sets.slice(0,deloadSets).map((s,i) => {
                           const best = bestPerSet[i];
-                          const deloadKg = best ? Math.round(best.kg*0.75*2)/2 : null;
+                          const deloadKg = best ? Math.round(best.kg*deloadPct*2)/2 : null;
                           return (
                             <div key={i} className="flex items-center justify-between bg-slate-800/40 rounded-xl px-3 py-2">
                               <span className="text-[11px] text-slate-500">S{i+1} · {s.repRange} reps</span>
@@ -1313,10 +1328,12 @@ function ProfileView({ profileName, profiles, onLogout, onDelete, onUpdateProfil
   const [showCycleSetup, setShowCycleSetup] = useState(false);
 
   const joinDate = profile?.joinedAt ? new Date(profile.joinedAt).toLocaleDateString("es-AR",{day:"numeric",month:"long",year:"numeric"}) : "—";
-  const weekInfo = getWeekInfo(cycleStart);
-  const settings = profile?.settings || DEFAULT_SETTINGS;
+  const settings = getProfileSettings(profile);
+  const weekInfo = getWeekInfo(cycleStart, settings);
   const updateSettings = (patch) => onUpdateProfile({settings:{...settings,...patch}});
   const adjustRest = (key,delta) => updateSettings({[key]: Math.min(600, Math.max(30, settings[key]+delta))});
+  const adjustSetting = (key,delta,min,max) => updateSettings({[key]: Math.min(max, Math.max(min, settings[key]+delta))});
+  const adjustDeloadPct = (delta) => updateSettings({deloadPct: Math.min(0.95, Math.max(0.5, Math.round((settings.deloadPct+delta)*100)/100))});
 
   const handleDeleteConfirm = (pin) => {
     if (profile.pin && pin !== profile.pin) {
@@ -1347,7 +1364,7 @@ function ProfileView({ profileName, profiles, onLogout, onDelete, onUpdateProfil
         {[
           {icon:<Mail size={14}/>,label:"Email",val:profile?.email||"No configurado"},
           {icon:<Clock size={14}/>,label:"Unido el",val:joinDate},
-          {icon:<Calendar size={14}/>,label:"Ciclo actual",val:weekInfo?`Ciclo #${weekInfo.cycleNumber} · Semana ${weekInfo.weekInCycle}/${CYCLE_WEEKS}`:"No iniciado"},
+          {icon:<Calendar size={14}/>,label:"Ciclo actual",val:weekInfo?`Ciclo #${weekInfo.cycleNumber} · Semana ${weekInfo.weekInCycle}/${weekInfo.cycleWeeks}`:"No iniciado"},
           {icon:<Zap size={14}/>,label:"Estado",val:weekInfo?(weekInfo.isDeload?"🟣 Semana de descarga":"🟠 Semana de entrenamiento"):"—"},
         ].map(({icon,label,val})=>(
           <div key={label} className="flex items-center gap-3 px-4 py-3.5">
@@ -1408,6 +1425,60 @@ function ProfileView({ profileName, profiles, onLogout, onDelete, onUpdateProfil
           </div>
         </div>
       )}
+
+      {/* Configuración de descarga */}
+      <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 backdrop-blur-sm shadow-md shadow-black/20 space-y-3.5">
+        <div>
+          <p className="text-sm font-bold text-white">Configuración de descarga</p>
+          <p className="text-[11px] text-slate-500 mt-0.5">Cada cuánto llega y cómo se reduce la carga</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          {[
+            {key:"trainWeeks",label:"Sem. entrenamiento",min:2,max:12},
+            {key:"deloadWeeks",label:"Sem. descarga",min:1,max:4},
+          ].map(({key,label,min,max})=>(
+            <div key={key} className="bg-slate-950/40 rounded-xl p-3">
+              <p className="text-[10px] text-slate-500 mb-2">{label}</p>
+              <div className="flex items-center justify-between">
+                <button onClick={()=>adjustSetting(key,-1,min,max)}
+                  className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95 transition">−</button>
+                <span className="text-sm font-black text-white tabular-nums">{settings[key]}</span>
+                <button onClick={()=>adjustSetting(key,1,min,max)}
+                  className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95 transition">+</button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="bg-slate-950/40 rounded-xl p-3">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[10px] text-slate-500">Carga en descarga</p>
+            <span className="text-[11px] font-bold text-purple-400 tabular-nums">{Math.round(settings.deloadPct*100)}%</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <button onClick={()=>adjustDeloadPct(-0.05)}
+              className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95 transition shrink-0">−</button>
+            <div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+              <div className="h-full bg-purple-500 rounded-full transition-all" style={{width:`${settings.deloadPct*100}%`}}/>
+            </div>
+            <button onClick={()=>adjustDeloadPct(0.05)}
+              className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95 transition shrink-0">+</button>
+          </div>
+        </div>
+
+        <div>
+          <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Reducción de series</p>
+          <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
+            {[{k:2,l:"Mitad"},{k:3,l:"Tercio"},{k:4,l:"Cuarto"}].map(opt=>(
+              <button key={opt.k} onClick={()=>updateSettings({deloadSetDivisor:opt.k})}
+                className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${settings.deloadSetDivisor===opt.k?"bg-purple-500 text-white shadow-sm":"text-slate-500 hover:text-slate-300"}`}>
+                {opt.l}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
 
       {/* Preferencias de descanso */}
       <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 backdrop-blur-sm shadow-md shadow-black/20 space-y-3.5">
@@ -1740,9 +1811,9 @@ export default function App() {
 
       {/* CONTENIDO */}
       <main className="max-w-xl mx-auto px-4 py-4 pb-28 space-y-4">
-        {tab==="rutina"&&<RoutineView logs={logs} setLogs={setLogs} cycleStart={cycleStart} settings={profile?.settings||DEFAULT_SETTINGS}/>}
+        {tab==="rutina"&&<RoutineView logs={logs} setLogs={setLogs} cycleStart={cycleStart} settings={getProfileSettings(profile)}/>}
         {tab==="progreso"&&<ProgressView logs={logs} setLogs={setLogs}/>}
-        {tab==="descarga"&&<DeloadView logs={logs}/>}
+        {tab==="descarga"&&<DeloadView logs={logs} settings={getProfileSettings(profile)}/>}
         {tab==="perfil"&&(
           <ProfileView
             profileName={activeProfile}
