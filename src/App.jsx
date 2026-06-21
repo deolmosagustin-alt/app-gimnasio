@@ -8,7 +8,7 @@ import {
   Play, Pause, RotateCcw, TrendingUp, TrendingDown, Dumbbell,
   ChevronDown, ChevronLeft, Trophy, Flame, Save, Trash2, BarChart3,
   ListChecks, LogOut, X, Check, AlertTriangle, Calendar, Zap,
-  Mail, Clock, User, ChevronRight, Edit3, Info,
+  Mail, Clock, ChevronRight, Edit3, Info,
   Target, Award, Activity, ArrowDown, HelpCircle, List, LayoutGrid,
 } from "lucide-react";
 
@@ -379,6 +379,19 @@ const ANIMATION_CSS = `
 .modal-pop-in { animation: modalPopIn 0.22s cubic-bezier(.2,.8,.3,1) both; }
 @keyframes gentleBounceIn { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
 .bounce-in { animation: gentleBounceIn 0.3s cubic-bezier(.34,1.56,.64,1) both; }
+
+/* Hide the default scrollbar everywhere — vertical page scroll and the
+   horizontal chip/card carousels (day tabs, exercise picker, etc.). Scrolling
+   still works perfectly, it's just visually invisible for a cleaner look. */
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+*::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
 `;
 
 function StyleInjector() {
@@ -586,32 +599,57 @@ function RestTimer({ seconds, accent, alertType = "sound" }) {
 }
 
 /* ============================================================================
-   HELP MODAL — tab-by-tab guide, opened from the (?) button in the header.
+   HELP MODAL — guided step-by-step tour, opened from the (?) button in the
+   header. Walks through every function of the app in order, with Anterior/
+   Siguiente controls. Starts on the step closest to the tab you were on.
 ============================================================================ */
-const HELP_CONTENT = {
-  rutina: { label: "Rutina", icon: <Dumbbell size={16} />, text: "Elegí el día que vas a entrenar (Push, Pull, Piernas u Hombros/Brazos) y registrá reps y kilos de cada serie. La app guarda tu récord de cada serie automáticamente y te avisa cuando lo superás. La pestaña te sugiere el día que sigue según el último que entrenaste." },
-  progreso: { label: "Progreso", icon: <BarChart3 size={16} />, text: "Acá ves cómo evoluciona cada ejercicio: gráficos de peso, volumen, 1RM estimado o esfuerzo (RPE) por serie, tu top 5 de marcas, el volumen acumulado por grupo muscular, y el historial completo de qué entrenaste cada día." },
-  descarga: { label: "Descarga", icon: <Zap size={16} />, text: "En la semana de descarga de tu ciclo, esta pestaña te muestra con cuánto peso y cuántas series entrenar (un porcentaje de tu récord y menos series), para bajar la fatiga sin perder lo ganado." },
-  perfil: { label: "Perfil", icon: <User size={16} />, text: "Configurá tus marcas iniciales por día, ajustá los tiempos de descanso y cómo te avisamos, la duración del ciclo de entrenamiento/descarga, y administrá o eliminá tu perfil." },
-};
+const HELP_STEPS = [
+  { tab: "rutina", icon: <Dumbbell size={18} />, title: "Elegí tu día", text: "En Rutina, arriba de todo elegís el día: Push, Pull, Piernas u Hombros/Brazos. La app te resalta uno como \"sugerido para hoy\" según el último tipo de día que entrenaste — no según el calendario." },
+  { tab: "rutina", icon: <Save size={18} />, title: "Registrá tus series", text: "Por cada serie ingresás reps y kg, y tocás el botón de guardar. Tu mejor marca (récord) de esa serie se calcula sola, y si la superás te avisa con un mensaje y un efecto de confetti." },
+  { tab: "rutina", icon: <Activity size={18} />, title: "Esfuerzo (RPE), opcional", text: "Debajo de cada serie podés tocar \"+ Registrar RPE\" para anotar qué tan dura te resultó, en una escala de 6 a 10. Es opcional, pero te ayuda a detectar fatiga acumulada con el tiempo." },
+  { tab: "rutina", icon: <Pause size={18} />, title: "Descanso entre series", text: "El temporizador de descanso te avisa (con sonido o vibración, según tu configuración) cuándo arrancar la próxima serie." },
+  { tab: "progreso", icon: <BarChart3 size={18} />, title: "Elegí qué ejercicio mirar", text: "En Progreso, la grilla de tarjetas reemplaza al selector de toda la vida: elegís el ejercicio y la serie, y abajo se grafica su evolución en peso, volumen, 1RM estimado o RPE." },
+  { tab: "progreso", icon: <Trophy size={18} />, title: "Tus mejores marcas", text: "La pestaña \"Top PRs\" te muestra tus 5 mejores ejercicios por 1RM estimado, y \"Músculo\" el volumen acumulado por grupo muscular." },
+  { tab: "progreso", icon: <Calendar size={18} />, title: "Historial de sesiones", text: "En \"Historial\" podés ver todo lo que entrenaste, en un calendario mensual con un punto de color por cada día entrenado, o en una lista con el detalle completo de cada sesión." },
+  { tab: "descarga", icon: <Zap size={18} />, title: "Semana de descarga", text: "Cuando tu ciclo llega a la semana de recuperación activa, esta pestaña te muestra con cuánto peso y cuántas series entrenar (un porcentaje de tu récord, con menos series), para bajar la fatiga sin perder lo ganado." },
+  { tab: "perfil", icon: <Target size={18} />, title: "Marcas iniciales", text: "En Perfil, \"Marcas iniciales\" te lleva al asistente para cargar tus pesos de partida por día — podés hacerlo de a uno, cuando quieras, no hace falta completarlo todo de una vez." },
+  { tab: "perfil", icon: <Clock size={18} />, title: "Ciclo y descansos", text: "También desde Perfil configurás la duración del ciclo de entrenamiento/descarga, el porcentaje de carga en la descarga, y los tiempos de descanso entre series." },
+  { tab: "perfil", icon: <RotateCcw size={18} />, title: "Tus datos están respaldados", text: "Además de guardarse en el dispositivo, tus registros se respaldan automáticamente en una segunda copia local. Si algo borra los datos del navegador, la app intenta recuperarlos sola al abrir de nuevo." },
+];
+
 function HelpModal({ initialTab, onClose }) {
-  const [sel, setSel] = useState(initialTab && HELP_CONTENT[initialTab] ? initialTab : "rutina");
-  const c = HELP_CONTENT[sel];
+  const startIdx = Math.max(0, HELP_STEPS.findIndex((s) => s.tab === initialTab));
+  const [i, setI] = useState(startIdx);
+  const step = HELP_STEPS[i];
+  const isFirst = i === 0, isLast = i === HELP_STEPS.length - 1;
+  const tabLabels = { rutina: "Rutina", progreso: "Progreso", descarga: "Descarga", perfil: "Perfil" };
   return (
     <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 modal-bg-in" onClick={onClose}>
       <div className="bg-slate-900 border border-slate-700/60 rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-base font-black text-white">Cómo funciona cada pestaña</h3>
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-[10px] font-black uppercase tracking-widest text-teal-400">{tabLabels[step.tab]}</span>
           <button onClick={onClose} className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition"><X size={18} /></button>
         </div>
-        <div className="flex gap-1.5 mb-4 overflow-x-auto">
-          {Object.keys(HELP_CONTENT).map((k) => (
-            <button key={k} onClick={() => setSel(k)} className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${sel === k ? "bg-teal-500 text-white" : "bg-slate-800/70 text-slate-500 hover:text-slate-300"}`}>{HELP_CONTENT[k].label}</button>
+        <div className="flex gap-1 mb-4">
+          {HELP_STEPS.map((_, idx) => (
+            <div key={idx} className="h-1 flex-1 rounded-full transition-colors" style={{ backgroundColor: idx <= i ? "#14B8A6" : "#1e293b" }} />
           ))}
         </div>
-        <div key={sel} className="flex items-start gap-3 tab-fade-in">
-          <div className="w-9 h-9 rounded-xl bg-teal-500/15 text-teal-400 flex items-center justify-center shrink-0">{c.icon}</div>
-          <p className="text-sm text-slate-300 leading-relaxed">{c.text}</p>
+        <div key={i} className="flex items-start gap-3 tab-fade-in min-h-[92px]">
+          <div className="w-9 h-9 rounded-xl bg-teal-500/15 text-teal-400 flex items-center justify-center shrink-0">{step.icon}</div>
+          <div>
+            <h3 className="text-sm font-black text-white mb-1">{step.title}</h3>
+            <p className="text-sm text-slate-300 leading-relaxed">{step.text}</p>
+          </div>
+        </div>
+        <div className="flex items-center justify-between mt-5">
+          <button onClick={() => setI((n) => Math.max(0, n - 1))} disabled={isFirst} className={`px-3.5 py-2 rounded-xl text-xs font-bold transition ${isFirst ? "text-slate-700" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>Atrás</button>
+          <span className="text-[10px] text-slate-600 font-medium">{i + 1} / {HELP_STEPS.length}</span>
+          {isLast ? (
+            <button onClick={onClose} className="px-4 py-2 rounded-xl text-xs font-black bg-teal-500 text-white transition active:scale-95">Listo</button>
+          ) : (
+            <button onClick={() => setI((n) => Math.min(HELP_STEPS.length - 1, n + 1))} className="px-4 py-2 rounded-xl text-xs font-black bg-teal-500 text-white transition active:scale-95">Siguiente</button>
+          )}
         </div>
       </div>
     </div>
@@ -1087,9 +1125,9 @@ function ProgressView({ logs, setLogs }) {
   const [selId, setSelId] = useState(allExercises[0]?.id);
   const [selSet, setSelSet] = useState(0);
   const [metric, setMetric] = useState("peso");
-  const [dayFilter, setDayFilter] = useState("all");
+  const [dayFilter, setDayFilter] = useState(DAY_ORDER[0]);
   const selEx = allExercises.find((e) => e.id === selId);
-  const filteredExercises = dayFilter === "all" ? allExercises : allExercises.filter((e) => e.dayKey === dayFilter);
+  const filteredExercises = allExercises.filter((e) => e.dayKey === dayFilter);
   const history = (logs[`${selId}_${selSet}`] || []).slice().sort((a, b) => (a.date > b.date ? 1 : -1));
   const chartData = history.map((h) => ({ date: h.date.slice(5), kg: h.kg, reps: h.reps, vol: vol(h.kg, h.reps), e1rm: estimate1RM(h.kg, h.reps), rpe: h.rpe ?? null }));
 
@@ -1116,15 +1154,26 @@ function ProgressView({ logs, setLogs }) {
 
   return (
     <div className="space-y-4">
+      <div className="relative overflow-hidden rounded-2xl border border-cyan-500/20 bg-gradient-to-br from-cyan-950/50 via-slate-900/80 to-slate-900/60 p-5">
+        <div className="absolute -top-8 -right-6 w-32 h-32 rounded-full bg-cyan-500/15 blur-2xl pointer-events-none" />
+        <div className="absolute -bottom-6 -left-6 w-28 h-28 rounded-full bg-teal-500/10 blur-2xl pointer-events-none" />
+        <div className="relative flex items-center gap-2 mb-1">
+          <Activity size={16} className="text-cyan-400" />
+          <span className="text-[11px] font-black uppercase tracking-widest text-cyan-400">Tu evolución</span>
+        </div>
+        <h2 className="relative text-xl font-black text-white leading-tight">Progreso</h2>
+        <p className="relative text-xs text-cyan-300/60 mt-1">Marcas, volumen y constancia a lo largo del tiempo</p>
+      </div>
+
       <div className="grid grid-cols-2 gap-2.5">
         {[
           { val: stats.daysTrained, label: "Días entrenados", sub: "desde el inicio", accent: "#14B8A6" },
           { val: stats.streak > 0 ? `${stats.streak}🔥` : "0", label: "Racha actual", sub: "días seguidos", accent: "#F59E0B" },
-          { val: stats.totalSets, label: "Series registradas", sub: "total histórico", accent: "#14B8A6" },
+          { val: stats.totalSets, label: "Series registradas", sub: "total histórico", accent: "#06B6D4" },
           { val: stats.totalVol > 999 ? `${(stats.totalVol / 1000).toFixed(1)}k` : stats.totalVol, label: "Kg × reps", sub: "volumen total", accent: "#A855F7" },
         ].map(({ val, label, sub, accent }) => (
-          <div key={label} className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 backdrop-blur-sm shadow-md shadow-black/20 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-16 h-16 rounded-full blur-2xl opacity-20 -translate-y-4 translate-x-4" style={{ backgroundColor: accent }} />
+          <div key={label} className="rounded-2xl p-4 backdrop-blur-sm shadow-md shadow-black/20 relative overflow-hidden border" style={{ backgroundColor: accent + "12", borderColor: accent + "30" }}>
+            <div className="absolute top-0 right-0 w-16 h-16 rounded-full blur-2xl opacity-25 -translate-y-4 translate-x-4" style={{ backgroundColor: accent }} />
             <p className="text-2xl font-black text-white tabular-nums leading-none relative">{val}</p>
             <p className="text-xs font-semibold text-white/80 mt-1 relative">{label}</p>
             <p className="text-[10px] text-slate-600 mt-0.5 relative">{sub}</p>
@@ -1132,7 +1181,7 @@ function ProgressView({ logs, setLogs }) {
         ))}
       </div>
 
-      <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 backdrop-blur-sm shadow-md shadow-black/20">
+      <div className="bg-cyan-500/[0.04] border border-cyan-500/15 rounded-2xl p-4 backdrop-blur-sm shadow-md shadow-black/20">
         <p className="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">Mejoras por día</p>
         <div className="flex gap-2">
           {DAY_ORDER.map((dk) => {
@@ -1167,8 +1216,7 @@ function ProgressView({ logs, setLogs }) {
                 </div>
               </div>
 
-              <div className="flex gap-1.5 overflow-x-auto">
-                <button onClick={() => setDayFilter("all")} className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all border shrink-0 ${dayFilter === "all" ? "bg-slate-700 border-slate-600 text-white" : "border-slate-800 text-slate-600"}`}>Todos</button>
+              <div className="flex gap-1.5 overflow-x-auto pb-1">
                 {DAY_ORDER.map((dk) => (
                   <button key={dk} onClick={() => { setDayFilter(dk); const first = allExercises.find((e) => e.dayKey === dk); if (first) { setSelId(first.id); setSelSet(0); } }}
                     className="px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all border shrink-0"
