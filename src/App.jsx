@@ -624,7 +624,343 @@ function RestTimer({ seconds, accent, alertType = "sound" }) {
      b) automáticamente la primera vez que un perfil nuevo termina (o
         saltea) el asistente de marcas iniciales — funcionando como
         onboarding completo de la app.
+
+   Cada paso puede declarar un "demo": una mini previsualización VIVA de la
+   parte de la app de la que se está hablando (no es una captura ni un ícono,
+   es el componente real corriendo en una sandbox aislada, con sus propios
+   datos de ejemplo). Esto reemplaza la explicación puramente textual por
+   "mostrar mientras se explica".
 ============================================================================ */
+
+// Ejercicio y acento usados como "modelo" para las demos de la pestaña Rutina.
+const DEMO_EXERCISE = EXERCISE_BY_ID["press_banca"];
+const DEMO_ACCENT = ROUTINE.push.color;
+
+// Serie de datos de ejemplo para la demo del gráfico de evolución (Progreso).
+const DEMO_CHART_DATA = [
+  { date: "04-05", kg: 70, vol: 700, e1rm: 86 },
+  { date: "11-05", kg: 72.5, vol: 725, e1rm: 89 },
+  { date: "18-05", kg: 72.5, vol: 762, e1rm: 91 },
+  { date: "25-05", kg: 75, vol: 750, e1rm: 92 },
+  { date: "01-06", kg: 77.5, vol: 775, e1rm: 95 },
+  { date: "08-06", kg: 80, vol: 800, e1rm: 98 },
+];
+
+/* ---- Demo en vivo: pestaña Rutina (día, panel, tarjeta de ejercicio, reset) ---- */
+function RutinaDemo({ view }) {
+  const [demoDay, setDemoDay] = useState("push");
+  const [demoLogs, setDemoLogs] = useState({});
+  const [confirmReset, setConfirmReset] = useState(false);
+
+  if (view === "daypicker") {
+    return (
+      <div>
+        <div className="flex gap-1.5 overflow-x-auto pb-1">
+          {DAY_ORDER.map((k) => (
+            <button key={k} onClick={() => setDemoDay(k)} className="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all active:scale-95 border"
+              style={demoDay === k ? { background: ROUTINE[k].color, borderColor: ROUTINE[k].color, color: "#fff" } : { borderColor: "#1e2035", color: "#475569" }}>
+              {ROUTINE[k].label}
+            </button>
+          ))}
+        </div>
+        <p className="text-[10px] text-slate-600 mt-2">Elegiste <span className="font-bold" style={{ color: ROUTINE[demoDay].color }}>{ROUTINE[demoDay].label}</span> — así de simple cambia el día.</p>
+      </div>
+    );
+  }
+
+  if (view === "panel") {
+    const day = ROUTINE[demoDay];
+    const totalSets = day.exercises.reduce((a, e) => a + e.sets.length, 0);
+    return (
+      <div className="relative overflow-hidden rounded-2xl border p-4" style={{ borderColor: day.color + "30", background: `linear-gradient(135deg, ${day.color}1c, transparent 70%)` }}>
+        <div className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg mb-2" style={{ backgroundColor: day.color + "22", color: day.color }}>
+          <RotateCcw size={10} /> Sugerido para hoy
+        </div>
+        <h3 className="text-lg font-black text-white leading-tight">{day.label}</h3>
+        <p className="text-[11px] text-slate-400 mt-0.5">{day.description}</p>
+        <div className="grid grid-cols-3 gap-2 mt-3">
+          <div className="bg-black/20 rounded-xl p-2 text-center"><p className="text-base font-black text-white tabular-nums">43%</p><p className="text-[9px] text-slate-500 mt-0.5">Hoy</p></div>
+          <div className="bg-black/20 rounded-xl p-2 text-center"><p className="text-base font-black text-white tabular-nums">{day.exercises.length}</p><p className="text-[9px] text-slate-500 mt-0.5">Ejercicios</p></div>
+          <div className="bg-black/20 rounded-xl p-2 text-center"><p className="text-base font-black text-white tabular-nums">{totalSets}</p><p className="text-[9px] text-slate-500 mt-0.5">Series</p></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (view === "reset") {
+    return (
+      <div>
+        {!confirmReset ? (
+          <button onClick={() => setConfirmReset(true)} className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-slate-700 text-slate-400 hover:text-slate-200 transition text-[11px] font-medium"><RotateCcw size={11} /> Resetear sesión de hoy</button>
+        ) : (
+          <div className="flex gap-2 items-center bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 bounce-in">
+            <p className="text-[11px] text-slate-400 flex-1">¿Borrar reps/kg de hoy? Los récords no cambian.</p>
+            <button onClick={() => setConfirmReset(false)} className="px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-400 text-xs">No</button>
+            <button onClick={() => setConfirmReset(false)} className="px-2.5 py-1.5 rounded-lg bg-rose-500/80 text-white text-xs font-bold">Sí</button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // "card-closed" y "card-open" — la tarjeta real de ejercicio, funcionando.
+  const forceOpen = view === "card-open";
+  return (
+    <ExerciseCard
+      exercise={DEMO_EXERCISE}
+      accent={DEMO_ACCENT}
+      logs={demoLogs}
+      setLogs={setDemoLogs}
+      deloadSets={null}
+      deloadMode={false}
+      resetKey={0}
+      settings={DEFAULT_SETTINGS}
+      forceOpen={forceOpen}
+    />
+  );
+}
+
+/* ---- Demo en vivo: pestaña Progreso (stats, gráfico, PRs, músculo, historial) ---- */
+function ProgresoDemo({ view }) {
+  const [metric, setMetric] = useState("peso");
+
+  if (view === "stats") {
+    const tiles = [
+      { val: 34, label: "Días entrenados", accent: "#14B8A6" },
+      { val: "6🔥", label: "Racha actual", accent: "#F59E0B" },
+      { val: 187, label: "Series registradas", accent: "#06B6D4" },
+      { val: "12.4k", label: "Kg × reps", accent: "#A855F7" },
+    ];
+    return (
+      <div className="grid grid-cols-2 gap-2">
+        {tiles.map(({ val, label, accent }) => (
+          <div key={label} className="rounded-xl p-3 border" style={{ backgroundColor: accent + "12", borderColor: accent + "30" }}>
+            <p className="text-lg font-black text-white leading-none tabular-nums">{val}</p>
+            <p className="text-[10px] font-semibold text-white/80 mt-1">{label}</p>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (view === "daycounts") {
+    const counts = { push: 5, pull: 4, legs: 3, sarm: 6 };
+    return (
+      <div className="flex gap-2">
+        {DAY_ORDER.map((dk) => { const d = ROUTINE[dk]; return (
+          <div key={dk} className="flex-1 bg-slate-800/40 rounded-xl p-2.5 text-center border border-slate-800/60">
+            <div className="w-7 h-7 rounded-lg mx-auto flex items-center justify-center mb-1 text-[10px] font-black" style={{ backgroundColor: d.color + "18", color: d.color }}>{d.label.slice(0, 1)}</div>
+            <p className="text-sm font-black text-white">{counts[dk]}</p>
+            <p className="text-[8px] text-slate-600 leading-tight">series<br />mejoradas</p>
+          </div>
+        ); })}
+      </div>
+    );
+  }
+
+  if (view === "chart") {
+    const dataKey = metric === "peso" ? "kg" : metric === "vol" ? "vol" : "e1rm";
+    const label = metric === "peso" ? "Kg" : metric === "vol" ? "Volumen" : "1RM est.";
+    return (
+      <div>
+        <div className="flex justify-end mb-2">
+          <div className="flex bg-slate-950/60 rounded-xl p-0.5 border border-slate-800/60">
+            {[{ k: "peso", l: "Kg" }, { k: "vol", l: "Vol" }, { k: "1rm", l: "1RM" }].map((opt) => (
+              <button key={opt.k} onClick={() => setMetric(opt.k)} className={`px-2.5 py-1 rounded-[8px] text-[10px] font-bold transition-all ${metric === opt.k ? "bg-teal-500 text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
+            ))}
+          </div>
+        </div>
+        <div className="h-32">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={DEMO_CHART_DATA} margin={{ top: 5, right: 0, left: -25, bottom: 0 }}>
+              <defs>
+                <linearGradient id="gDemoChart" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#14B8A6" stopOpacity={0.35} /><stop offset="95%" stopColor="#14B8A6" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#1a1a2e" />
+              <XAxis dataKey="date" stroke="#334155" fontSize={9} />
+              <YAxis stroke="#334155" fontSize={9} />
+              <Tooltip content={<CustomTooltip />} />
+              <Area type="monotone" dataKey={dataKey} stroke="#14B8A6" fill="url(#gDemoChart)" strokeWidth={2} dot={{ r: 2.5, fill: "#14B8A6", strokeWidth: 0 }} name={label} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    );
+  }
+
+  if (view === "prs") {
+    const items = [
+      { medal: "🥇", name: "Press Banca", day: "PUSH", val: "98kg", sub: "5×80kg" },
+      { medal: "🥈", name: "Sentadilla Búlgara", day: "PIERNAS", val: "91kg", sub: "8×72.5kg" },
+      { medal: "🥉", name: "Dorsalera Agarre Ancho", day: "PULL", val: "84kg", sub: "8×65kg" },
+    ];
+    return (
+      <div className="space-y-2">
+        {items.map((it) => (
+          <div key={it.name} className="flex items-center gap-2.5 bg-slate-800/40 rounded-xl px-3 py-2 border border-slate-800/40">
+            <span className="text-base shrink-0 w-6 text-center">{it.medal}</span>
+            <div className="flex-1 min-w-0"><p className="text-xs font-bold text-white truncate">{it.name}</p><p className="text-[9px] font-bold text-teal-500">{it.day}</p></div>
+            <div className="text-right shrink-0"><p className="text-xs font-black text-white">{it.val}</p><p className="text-[9px] text-slate-500">{it.sub}</p></div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (view === "muscle") {
+    const items = [{ name: "Pectoral", val: 100, color: "#14B8A6" }, { name: "Dorsal", val: 82, color: "#3B82F6" }, { name: "Cuádriceps", val: 64, color: "#F97316" }];
+    return (
+      <div className="space-y-2.5">
+        {items.map(({ name, val, color }) => (
+          <div key={name}>
+            <div className="flex items-center justify-between mb-1"><span className="text-[11px] font-bold text-slate-300">{name}</span><span className="text-[11px] font-black" style={{ color }}>{val.toLocaleString("es-AR")}</span></div>
+            <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden"><div className="h-full rounded-full" style={{ width: `${val}%`, backgroundColor: color }} /></div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (view === "calendar") {
+    const now = new Date();
+    const weeks = getMonthMatrix(now.getFullYear(), now.getMonth());
+    const trainedSample = new Set([3, 5, 9, 12, 16, 19, 23].map((d) => new Date(now.getFullYear(), now.getMonth(), d).toISOString().slice(0, 10)));
+    return (
+      <div>
+        <div className="grid grid-cols-7 gap-1 mb-1">{WEEKDAY_LABELS.map((l, i) => <div key={i} className="text-center text-[8px] font-bold text-slate-600">{l}</div>)}</div>
+        <div className="grid grid-cols-7 gap-1">
+          {weeks.flat().map((d, i) => {
+            if (!d) return <div key={i} />;
+            const trained = trainedSample.has(d);
+            const dayNum = parseInt(d.slice(8, 10), 10);
+            return <div key={i} className={`aspect-square rounded-md flex items-center justify-center text-[9px] font-bold ${trained ? "bg-slate-700/80 text-slate-200" : "text-slate-700"}`}>{dayNum}</div>;
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  // "resetall"
+  return <div className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-slate-700 text-slate-500 text-[11px] font-medium"><Trash2 size={11} /> Resetear todo el historial</div>;
+}
+
+/* ---- Demo en vivo: pestaña Descarga ---- */
+function DescargaDemo({ view }) {
+  if (view === "header") {
+    return (
+      <div className="flex items-center justify-between bg-purple-500/10 border border-purple-500/20 rounded-xl px-3.5 py-3">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-widest text-purple-400">Semana de descarga</p>
+          <p className="text-[11px] text-purple-300/70 mt-0.5">Menos carga · Menos series</p>
+        </div>
+        <div className="w-11 h-11 rounded-xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center shrink-0">
+          <span className="text-base font-black text-purple-300">75%</span>
+        </div>
+      </div>
+    );
+  }
+
+  // "suggested"
+  return (
+    <div className="bg-slate-900/60 border border-slate-800/50 rounded-xl px-3.5 py-3">
+      <div className="flex items-center gap-2 mb-2.5"><span className="text-xs font-bold text-white">Press Banca</span><span className="text-[9px] px-1.5 py-0.5 rounded-lg font-bold bg-teal-500/18 text-teal-400">Pectoral</span></div>
+      <div className="flex items-center gap-3">
+        <span className="text-[10px] font-black text-slate-600 w-5 shrink-0">S1</span>
+        <span className="text-[10px] text-slate-600 bg-slate-800/60 rounded-lg px-2 py-1 shrink-0">3-5 reps</span>
+        <div className="flex items-center gap-2 flex-1 justify-end">
+          <span className="text-[11px] text-slate-600 line-through">5×100kg</span>
+          <div className="flex items-center gap-1"><ArrowDown size={10} className="text-purple-400" /><span className="text-sm font-black text-purple-300">5×75kg</span></div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---- Demo en vivo: pestaña Perfil ---- */
+function PerfilDemo({ view }) {
+  const [trainW, setTrainW] = useState(7);
+  const [alertType, setAlertType] = useState("sound");
+
+  if (view === "datos") {
+    return (
+      <div className="bg-slate-900/60 border border-slate-800/50 rounded-xl divide-y divide-slate-800/50 overflow-hidden">
+        {[{ icon: <Mail size={12} />, label: "Email", val: "ej@mail.com" }, { icon: <Clock size={12} />, label: "Unido el", val: "12 marzo 2026" }].map(({ icon, label, val }) => (
+          <div key={label} className="flex items-center gap-2.5 px-3 py-2.5"><span className="text-slate-600">{icon}</span><span className="text-slate-500 text-[11px] flex-1">{label}</span><span className="text-slate-300 text-[11px] font-medium">{val}</span></div>
+        ))}
+      </div>
+    );
+  }
+
+  if (view === "marcas") {
+    return (
+      <div className="flex items-center gap-3 bg-slate-900/60 border border-slate-800/50 rounded-xl px-3.5 py-3">
+        <div className="w-8 h-8 rounded-lg bg-teal-500/15 text-teal-400 flex items-center justify-center shrink-0"><Target size={14} /></div>
+        <div className="flex-1"><p className="text-xs font-bold text-white">Marcas iniciales</p><p className="text-[10px] text-slate-500">2/4 días configurados</p></div>
+        <ChevronRight size={14} className="text-slate-600 shrink-0" />
+      </div>
+    );
+  }
+
+  if (view === "ciclo") {
+    return (
+      <div className="flex items-center justify-between bg-slate-900/60 border border-slate-800/50 rounded-xl px-3.5 py-3">
+        <div><p className="text-xs font-bold text-white">Inicio de ciclo</p><p className="text-[10px] text-slate-500 mt-0.5">Iniciado el 02/05/2026</p></div>
+        <span className="px-3 py-1.5 rounded-xl bg-slate-800 text-slate-300 text-[10px] font-semibold shrink-0">Cambiar</span>
+      </div>
+    );
+  }
+
+  if (view === "configdescarga") {
+    return (
+      <div className="bg-slate-950/40 rounded-xl p-3 max-w-[160px]">
+        <p className="text-[10px] text-slate-500 mb-2">Sem. entrenamiento</p>
+        <div className="flex items-center justify-between">
+          <button onClick={() => setTrainW((n) => Math.max(2, n - 1))} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95">−</button>
+          <span className="text-sm font-black text-white tabular-nums">{trainW}</span>
+          <button onClick={() => setTrainW((n) => Math.min(12, n + 1))} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95">+</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (view === "descanso") {
+    return (
+      <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
+        {[{ k: "sound", l: "Sonido" }, { k: "vibration", l: "Vibración" }, { k: "both", l: "Ambos" }].map((opt) => (
+          <button key={opt.k} onClick={() => setAlertType(opt.k)} className={`flex-1 py-2 rounded-lg text-[10px] font-bold transition-all ${alertType === opt.k ? "bg-teal-500 text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
+        ))}
+      </div>
+    );
+  }
+
+  if (view === "backup") {
+    return (
+      <div className="flex items-center gap-2.5 bg-slate-900/40 border border-slate-800/40 rounded-xl px-3.5 py-3">
+        <ShieldCheck size={14} className="text-slate-500 shrink-0" />
+        <p className="text-[10px] text-slate-500">Copia de seguridad automática activa</p>
+      </div>
+    );
+  }
+
+  // "logout"
+  return (
+    <div className="space-y-2">
+      <div className="w-full flex items-center gap-2 justify-center py-2.5 rounded-xl border border-slate-700 text-slate-400 text-[11px] font-semibold"><LogOut size={12} /> Cambiar de perfil</div>
+      <div className="w-full flex items-center gap-2 justify-center py-2.5 rounded-xl border border-rose-500/20 text-rose-500/70 text-[11px] font-semibold"><Trash2 size={12} /> Eliminar perfil</div>
+    </div>
+  );
+}
+
+function DemoPreview({ kind, view }) {
+  if (kind === "rutina") return <RutinaDemo view={view} />;
+  if (kind === "progreso") return <ProgresoDemo view={view} />;
+  if (kind === "descarga") return <DescargaDemo view={view} />;
+  if (kind === "perfil") return <PerfilDemo view={view} />;
+  return null;
+}
+
 const HELP_CHAPTERS = [
   {
     key: "_intro",
@@ -635,7 +971,7 @@ const HELP_CHAPTERS = [
       {
         icon: <Flame size={20} />,
         title: "¡Bienvenido a Mi Rutina!",
-        text: "Esta app te ayuda a registrar tus entrenamientos, ver cómo progresan tus marcas con el tiempo, y saber cuándo te toca bajar la intensidad. Te mostramos rápido cómo funciona cada parte — podés saltear el recorrido en cualquier momento tocando la X.",
+        text: "Esta app te ayuda a registrar tus entrenamientos, ver cómo progresan tus marcas con el tiempo, y saber cuándo te toca bajar la intensidad. Te mostramos rápido cómo funciona cada parte — y vas a poder probar cada función en vivo a medida que la explicamos. Podés saltear el recorrido en cualquier momento tocando la X.",
       },
       {
         icon: <Layers size={20} />,
@@ -659,41 +995,49 @@ const HELP_CHAPTERS = [
         icon: <Calendar size={20} />,
         title: "Elegí tu día",
         text: "Arriba de todo elegís el día: Push, Pull, Piernas u Hombros/Brazos. La app resalta uno como \"sugerido para hoy\" según el último tipo de día que entrenaste — no según el calendario.",
+        demo: { kind: "rutina", view: "daypicker", caption: "Tocá un día y mirá cómo cambia" },
       },
       {
         icon: <ListChecks size={20} />,
         title: "Panel del día",
         text: "El panel de arriba muestra cuánto llevás completado hoy (%), cuántos ejercicios tiene el día y cuántas series en total. Si tu ciclo está en semana de descarga, te lo avisa ahí mismo.",
+        demo: { kind: "rutina", view: "panel" },
       },
       {
         icon: <ChevronDown size={20} />,
         title: "Tarjetas de ejercicio",
         text: "Cada ejercicio es una tarjeta: tocala para desplegarla y ver sus series, la nota técnica y el video. Si lleva 21+ días sin superar el récord, te avisa que está \"estancado\".",
+        demo: { kind: "rutina", view: "card-closed", caption: "Tocá la tarjeta para desplegarla" },
       },
       {
         icon: <Save size={20} />,
         title: "Registrá tus series",
         text: "Por cada serie ingresás reps y kg, y tocás el botón de guardar. Tu mejor marca (récord) de esa serie se calcula sola, y si la superás te avisa con un mensaje y un efecto de confetti.",
+        demo: { kind: "rutina", view: "card-open", caption: "Probá: ingresá reps y kg, y tocá Guardar" },
       },
       {
         icon: <Activity size={20} />,
         title: "Esfuerzo (RPE), opcional",
         text: "Debajo de cada serie podés tocar \"+ Registrar RPE\" para anotar qué tan dura te resultó, en una escala de 6 a 10. Es opcional, pero ayuda a detectar fatiga acumulada con el tiempo.",
+        demo: { kind: "rutina", view: "card-open", caption: "Tocá \"+ Registrar RPE\" debajo de una serie" },
       },
       {
         icon: <Pause size={20} />,
         title: "Descanso entre series",
         text: "El temporizador de descanso te avisa (con sonido, vibración o ambos, según lo que elijas en Perfil) cuándo arrancar la próxima serie. Podés pausarlo o reiniciarlo con los botones de al lado.",
+        demo: { kind: "rutina", view: "card-open", caption: "El cronómetro está debajo de las series — probá pausarlo" },
       },
       {
         icon: <Video size={20} />,
         title: "Ver la técnica",
         text: "Al final de cada ejercicio desplegado tenés un botón para ver un video de la técnica correcta en YouTube.",
+        demo: { kind: "rutina", view: "card-open", caption: "El botón de YouTube está al final de la tarjeta" },
       },
       {
         icon: <RotateCcw size={20} />,
         title: "Resetear el día",
         text: "Si te equivocaste registrando algo, \"Resetear sesión de hoy\" borra solo los datos de hoy en ese día de rutina — tus récords no se tocan.",
+        demo: { kind: "rutina", view: "reset", caption: "Tocá el botón para ver cómo pide confirmación" },
       },
     ],
   },
@@ -712,36 +1056,43 @@ const HELP_CHAPTERS = [
         icon: <Flame size={20} />,
         title: "Estadísticas generales",
         text: "Arriba ves tus días entrenados, tu racha actual de días seguidos, el total de series registradas y el volumen total (kg × reps) acumulado.",
+        demo: { kind: "progreso", view: "stats" },
       },
       {
         icon: <TrendingUp size={20} />,
         title: "Mejoras por día",
         text: "Te muestra cuántas series mejoraste (superaste tu primer registro) en cada tipo de día: Push, Pull, Piernas y Hombros/Brazos.",
+        demo: { kind: "progreso", view: "daycounts" },
       },
       {
         icon: <BarChart3 size={20} />,
         title: "Gráfico de evolución",
         text: "Elegí el día y el ejercicio con las tarjetas, la serie con los botones S1/S2/etc., y mirá su evolución en Kg, Volumen, 1RM estimado o RPE con los botones de arriba del gráfico.",
+        demo: { kind: "progreso", view: "chart", caption: "Probá cambiar entre Kg, Vol y 1RM" },
       },
       {
         icon: <Trophy size={20} />,
         title: "Top PRs",
         text: "La pestaña \"Top PRs\" te muestra tus 5 mejores ejercicios según el 1RM estimado (una proyección de tu máximo a 1 repetición, calculada con la fórmula de Epley).",
+        demo: { kind: "progreso", view: "prs" },
       },
       {
         icon: <Dumbbell size={20} />,
         title: "Volumen por músculo",
         text: "En \"Músculo\" ves el volumen acumulado histórico por grupo muscular, para detectar si algún grupo está quedando atrás respecto a los demás.",
+        demo: { kind: "progreso", view: "muscle" },
       },
       {
         icon: <Calendar size={20} />,
         title: "Historial de sesiones",
         text: "En \"Historial\" podés ver todo lo que entrenaste: en un calendario mensual con un punto de color por día entrenado, o en una lista con el detalle completo de cada sesión.",
+        demo: { kind: "progreso", view: "calendar" },
       },
       {
         icon: <Trash2 size={20} />,
         title: "Resetear historial",
         text: "Al final de la pestaña tenés la opción de borrar todo tu historial de series, si alguna vez querés empezar de cero. Tus récords se mantienen guardados.",
+        demo: { kind: "progreso", view: "resetall" },
       },
     ],
   },
@@ -755,11 +1106,13 @@ const HELP_CHAPTERS = [
         icon: <Zap size={20} />,
         title: "Descarga: tu semana de recuperación",
         text: "Cada cierta cantidad de semanas de entrenamiento (lo configurás en Perfil), tu ciclo entra en una semana de descarga: menos series y menos peso, para bajar la fatiga sin perder lo ganado.",
+        demo: { kind: "descarga", view: "header" },
       },
       {
         icon: <ArrowDown size={20} />,
         title: "Cargas sugeridas por día",
         text: "Elegí el día arriba y vas a ver, ejercicio por ejercicio, tu mejor marca tachada y al lado el peso sugerido para esta semana — calculado como un porcentaje de tu récord, con menos series por ejercicio.",
+        demo: { kind: "descarga", view: "suggested" },
       },
     ],
   },
@@ -778,36 +1131,43 @@ const HELP_CHAPTERS = [
         icon: <Mail size={20} />,
         title: "Tus datos",
         text: "Arriba ves tu nombre, email (si lo cargaste) y fecha de alta. Tocá \"Editar perfil\" para cambiar el email cuando quieras.",
+        demo: { kind: "perfil", view: "datos" },
       },
       {
         icon: <Target size={20} />,
         title: "Marcas iniciales",
         text: "\"Marcas iniciales\" te lleva al asistente para cargar tus pesos de partida por día — podés hacerlo de a uno, cuando quieras, no hace falta completarlo todo de una vez.",
+        demo: { kind: "perfil", view: "marcas" },
       },
       {
         icon: <Calendar size={20} />,
         title: "Inicio de ciclo",
         text: "Configurá la fecha en la que arrancó tu ciclo actual de entrenamiento. A partir de ahí la app calcula en qué semana estás y cuándo te toca la descarga.",
+        demo: { kind: "perfil", view: "ciclo" },
       },
       {
         icon: <SlidersHorizontal size={20} />,
         title: "Configuración de descarga",
         text: "Elegís cuántas semanas entrenás antes de la descarga, cuántas semanas dura la descarga, a qué porcentaje de tu récord vas a entrenar, y cuánto se reducen las series.",
+        demo: { kind: "perfil", view: "configdescarga", caption: "Probá sumar o restar semanas" },
       },
       {
         icon: <Clock size={20} />,
         title: "Descanso entre series",
         text: "Elegís si te avisamos con sonido, vibración o ambos, y cuánto dura el descanso para ejercicios pesados y para el resto.",
+        demo: { kind: "perfil", view: "descanso", caption: "Probá cambiar el tipo de aviso" },
       },
       {
         icon: <ShieldCheck size={20} />,
         title: "Tus datos están respaldados",
         text: "Además de guardarse en el dispositivo, tus registros se respaldan automáticamente en una segunda copia local. Si algo borra los datos del navegador, la app intenta recuperarlos sola al abrir de nuevo.",
+        demo: { kind: "perfil", view: "backup" },
       },
       {
         icon: <LogOut size={20} />,
         title: "Cambiar o eliminar perfil",
         text: "Desde aquí podés cerrar sesión para cambiar de perfil, o eliminar tu perfil por completo (borra todo el historial de forma permanente, no se puede deshacer).",
+        demo: { kind: "perfil", view: "logout" },
       },
     ],
   },
@@ -856,7 +1216,7 @@ function HelpModal({ startTab, onClose }) {
 
   return (
     <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 modal-bg-in" onClick={onClose}>
-      <div className="bg-slate-900 border border-slate-700/60 rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-slate-900 border border-slate-700/60 rounded-3xl max-w-md w-full p-5 modal-pop-in shadow-2xl shadow-black/50 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         {/* Selector de capítulo — permite saltar directo a cualquier sección */}
         <div className="flex items-center gap-1.5 mb-3 overflow-x-auto pb-1 -mx-1 px-1">
           {HELP_CHAPTERS.map((c, ci) => (
@@ -889,7 +1249,23 @@ function HelpModal({ startTab, onClose }) {
           ))}
         </div>
 
-        <div key={i} className={`tab-fade-in min-h-[128px] ${step.isChapterIntro ? "flex flex-col items-center text-center gap-2.5 py-2" : "flex items-start gap-3"}`}>
+        {/* Demo en vivo — se mantiene montada mientras navegás dentro del
+            mismo capítulo (la key depende solo del capítulo, no del paso),
+            así lo que vas tocando/escribiendo no se resetea entre pasos. */}
+        {step.demo && (
+          <div key={`demo-${step.chapterKey}`} className="mb-3 tab-fade-in">
+            {step.demo.caption && (
+              <p className="text-[10px] font-bold mb-2 flex items-center gap-1.5" style={{ color: step.chapterColor }}>
+                <Sparkles size={11} /> {step.demo.caption}
+              </p>
+            )}
+            <div className="rounded-2xl border border-slate-700/40 bg-slate-950/60 p-3">
+              <DemoPreview kind={step.demo.kind} view={step.demo.view} />
+            </div>
+          </div>
+        )}
+
+        <div key={i} className={`tab-fade-in ${step.demo ? "min-h-[56px]" : "min-h-[128px]"} ${step.isChapterIntro ? "flex flex-col items-center text-center gap-2.5 py-2" : "flex items-start gap-3"}`}>
           {step.isChapterIntro ? (
             <>
               <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ backgroundColor: step.chapterColor + "18", color: step.chapterColor }}>{step.icon}</div>
@@ -1009,8 +1385,12 @@ function SetRow({ exerciseId, setIndex, setDef, accent, logs, setLogs, deloadKgF
 /* ============================================================================
    EXERCISE CARD
 ============================================================================ */
-function ExerciseCard({ exercise, accent, logs, setLogs, deloadSets, deloadMode, resetKey = 0, settings = DEFAULT_SETTINGS }) {
+function ExerciseCard({ exercise, accent, logs, setLogs, deloadSets, deloadMode, resetKey = 0, settings = DEFAULT_SETTINGS, forceOpen = false }) {
   const [open, setOpen] = useState(false);
+  // forceOpen se usa solo desde las demos del tutorial guiado, para abrir la
+  // tarjeta automáticamente cuando el paso explica algo de adentro (reps/kg,
+  // RPE, descanso, video). No afecta el comportamiento normal de la app.
+  useEffect(() => { if (forceOpen) setOpen(true); }, [forceOpen]);
   const hasHeavy = exercise.sets.some((s) => s.heavy);
   const setsToShow = deloadSets ? exercise.sets.slice(0, deloadSets) : exercise.sets;
   const { stagnant } = useMemo(() => getStagnationInfo(exercise, logs), [exercise, logs]);
