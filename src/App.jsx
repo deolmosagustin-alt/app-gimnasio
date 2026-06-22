@@ -10,6 +10,7 @@ import {
   ListChecks, LogOut, X, Check, AlertTriangle, Calendar, Zap,
   Mail, Clock, ChevronRight, Edit3, Info,
   Target, Award, Activity, ArrowDown, HelpCircle, List, LayoutGrid,
+  Sparkles, Layers, Video, SlidersHorizontal, ShieldCheck, UserCog,
 } from "lucide-react";
 
 /* ============================================================================
@@ -193,10 +194,11 @@ function loadCycleStart() { try { const raw = localStorage.getItem(CYCLE_START_K
 function saveCycleStart(d) { try { localStorage.setItem(CYCLE_START_KEY, d.toISOString()); } catch {} idbPut("cycleStart", d.toISOString()); }
 
 /* ============================== STORAGE: IndexedDB backup ==============================
-   localStorage tops out around 5MB and a browser "clear site data" wipes it instantly.
-   Every write is mirrored, best-effort, into IndexedDB so there's a second copy to
-   recover from. Nothing here ever throws into the UI — if IndexedDB isn't available
-   (old browser, private mode, etc.) the app just keeps working off localStorage alone. */
+   localStorage tops out around 5MB y un "clear site data" la borra al instante.
+   Cada escritura se espeja, best-effort, en IndexedDB para tener una segunda copia
+   de la cual recuperarse. Nada de esto tira un error a la UI — si IndexedDB no
+   está disponible (navegador viejo, modo privado, etc.) la app sigue funcionando
+   solo con localStorage. */
 
 const IDB_NAME = "gym_app_backup_v1";
 const IDB_STORE = "snapshots";
@@ -247,7 +249,7 @@ async function idbGetAll() {
   } catch { return null; }
 }
 
-// Used once on boot if localStorage looks empty — recovers the last good snapshot.
+// Used once on boot if localStorage looks empty — recupera el último snapshot bueno.
 async function tryRestoreFromIDB() {
   const snap = await idbGetAll();
   if (!snap || !snap.profiles || !Object.keys(snap.profiles).length) return null;
@@ -494,7 +496,22 @@ function LoginScreen({ onLogin }) {
   };
   const finishRegister = () => {
     const name = regName.trim();
-    const newProfiles = { ...profiles, [name]: { pin: regPin || null, logs: {}, email: regMail || null, joinedAt: new Date().toISOString(), deviceId, maxesSetupDays: { push: false, pull: false, legs: false, sarm: false }, onboardingDismissed: false } };
+    const newProfiles = {
+      ...profiles,
+      [name]: {
+        pin: regPin || null,
+        logs: {},
+        email: regMail || null,
+        joinedAt: new Date().toISOString(),
+        deviceId,
+        maxesSetupDays: { push: false, pull: false, legs: false, sarm: false },
+        onboardingDismissed: false,
+        // Perfil recién creado: todavía no vio el tutorial guiado de la app.
+        // Se dispara automáticamente apenas termina (o salta) el asistente
+        // de marcas iniciales — ver `closeHub` en el componente App.
+        tutorialSeen: false,
+      },
+    };
     saveProfiles(newProfiles); setProfilesState(newProfiles); saveActive(name); onLogin(name, newProfiles);
   };
   const handleRegister = () => {
@@ -599,56 +616,304 @@ function RestTimer({ seconds, accent, alertType = "sound" }) {
 }
 
 /* ============================================================================
-   HELP MODAL — guided step-by-step tour, opened from the (?) button in the
-   header. Walks through every function of the app in order, with Anterior/
-   Siguiente controls. Starts on the step closest to the tab you were on.
+   TUTORIAL GUIADO — modal de ayuda con forma de "tour", organizado en
+   capítulos (uno por sección de la app). Cada capítulo arranca con una
+   tarjeta de presentación y sigue con una tarjeta por cada función. Se abre:
+     a) manualmente, con el botón (?) del header (arranca en el capítulo de
+        la pestaña en la que estás), o
+     b) automáticamente la primera vez que un perfil nuevo termina (o
+        saltea) el asistente de marcas iniciales — funcionando como
+        onboarding completo de la app.
 ============================================================================ */
-const HELP_STEPS = [
-  { tab: "rutina", icon: <Dumbbell size={18} />, title: "Elegí tu día", text: "En Rutina, arriba de todo elegís el día: Push, Pull, Piernas u Hombros/Brazos. La app te resalta uno como \"sugerido para hoy\" según el último tipo de día que entrenaste — no según el calendario." },
-  { tab: "rutina", icon: <Save size={18} />, title: "Registrá tus series", text: "Por cada serie ingresás reps y kg, y tocás el botón de guardar. Tu mejor marca (récord) de esa serie se calcula sola, y si la superás te avisa con un mensaje y un efecto de confetti." },
-  { tab: "rutina", icon: <Activity size={18} />, title: "Esfuerzo (RPE), opcional", text: "Debajo de cada serie podés tocar \"+ Registrar RPE\" para anotar qué tan dura te resultó, en una escala de 6 a 10. Es opcional, pero te ayuda a detectar fatiga acumulada con el tiempo." },
-  { tab: "rutina", icon: <Pause size={18} />, title: "Descanso entre series", text: "El temporizador de descanso te avisa (con sonido o vibración, según tu configuración) cuándo arrancar la próxima serie." },
-  { tab: "progreso", icon: <BarChart3 size={18} />, title: "Elegí qué ejercicio mirar", text: "En Progreso, la grilla de tarjetas reemplaza al selector de toda la vida: elegís el ejercicio y la serie, y abajo se grafica su evolución en peso, volumen, 1RM estimado o RPE." },
-  { tab: "progreso", icon: <Trophy size={18} />, title: "Tus mejores marcas", text: "La pestaña \"Top PRs\" te muestra tus 5 mejores ejercicios por 1RM estimado, y \"Músculo\" el volumen acumulado por grupo muscular." },
-  { tab: "progreso", icon: <Calendar size={18} />, title: "Historial de sesiones", text: "En \"Historial\" podés ver todo lo que entrenaste, en un calendario mensual con un punto de color por cada día entrenado, o en una lista con el detalle completo de cada sesión." },
-  { tab: "descarga", icon: <Zap size={18} />, title: "Semana de descarga", text: "Cuando tu ciclo llega a la semana de recuperación activa, esta pestaña te muestra con cuánto peso y cuántas series entrenar (un porcentaje de tu récord, con menos series), para bajar la fatiga sin perder lo ganado." },
-  { tab: "perfil", icon: <Target size={18} />, title: "Marcas iniciales", text: "En Perfil, \"Marcas iniciales\" te lleva al asistente para cargar tus pesos de partida por día — podés hacerlo de a uno, cuando quieras, no hace falta completarlo todo de una vez." },
-  { tab: "perfil", icon: <Clock size={18} />, title: "Ciclo y descansos", text: "También desde Perfil configurás la duración del ciclo de entrenamiento/descarga, el porcentaje de carga en la descarga, y los tiempos de descanso entre series." },
-  { tab: "perfil", icon: <RotateCcw size={18} />, title: "Tus datos están respaldados", text: "Además de guardarse en el dispositivo, tus registros se respaldan automáticamente en una segunda copia local. Si algo borra los datos del navegador, la app intenta recuperarlos sola al abrir de nuevo." },
+const HELP_CHAPTERS = [
+  {
+    key: "_intro",
+    label: "Bienvenida",
+    color: "#14B8A6",
+    icon: <Sparkles size={16} />,
+    steps: [
+      {
+        icon: <Flame size={20} />,
+        title: "¡Bienvenido a Mi Rutina!",
+        text: "Esta app te ayuda a registrar tus entrenamientos, ver cómo progresan tus marcas con el tiempo, y saber cuándo te toca bajar la intensidad. Te mostramos rápido cómo funciona cada parte — podés saltear el recorrido en cualquier momento tocando la X.",
+      },
+      {
+        icon: <Layers size={20} />,
+        title: "Cuatro secciones principales",
+        text: "Abajo de la pantalla (o al costado, en pantallas grandes) tenés 4 pestañas: Rutina para entrenar, Progreso para ver tu evolución, Descarga para tu semana de recuperación, y Perfil para tu configuración. Vamos una por una.",
+      },
+    ],
+  },
+  {
+    key: "rutina",
+    label: "Rutina",
+    color: "#14B8A6",
+    icon: <Dumbbell size={16} />,
+    steps: [
+      {
+        icon: <Dumbbell size={20} />,
+        title: "Rutina: tu entrenamiento del día",
+        text: "Acá registrás lo que hacés en cada sesión: elegís el día, ves los ejercicios con sus series, y anotás reps y kg a medida que entrenás.",
+      },
+      {
+        icon: <Calendar size={20} />,
+        title: "Elegí tu día",
+        text: "Arriba de todo elegís el día: Push, Pull, Piernas u Hombros/Brazos. La app resalta uno como \"sugerido para hoy\" según el último tipo de día que entrenaste — no según el calendario.",
+      },
+      {
+        icon: <ListChecks size={20} />,
+        title: "Panel del día",
+        text: "El panel de arriba muestra cuánto llevás completado hoy (%), cuántos ejercicios tiene el día y cuántas series en total. Si tu ciclo está en semana de descarga, te lo avisa ahí mismo.",
+      },
+      {
+        icon: <ChevronDown size={20} />,
+        title: "Tarjetas de ejercicio",
+        text: "Cada ejercicio es una tarjeta: tocala para desplegarla y ver sus series, la nota técnica y el video. Si lleva 21+ días sin superar el récord, te avisa que está \"estancado\".",
+      },
+      {
+        icon: <Save size={20} />,
+        title: "Registrá tus series",
+        text: "Por cada serie ingresás reps y kg, y tocás el botón de guardar. Tu mejor marca (récord) de esa serie se calcula sola, y si la superás te avisa con un mensaje y un efecto de confetti.",
+      },
+      {
+        icon: <Activity size={20} />,
+        title: "Esfuerzo (RPE), opcional",
+        text: "Debajo de cada serie podés tocar \"+ Registrar RPE\" para anotar qué tan dura te resultó, en una escala de 6 a 10. Es opcional, pero ayuda a detectar fatiga acumulada con el tiempo.",
+      },
+      {
+        icon: <Pause size={20} />,
+        title: "Descanso entre series",
+        text: "El temporizador de descanso te avisa (con sonido, vibración o ambos, según lo que elijas en Perfil) cuándo arrancar la próxima serie. Podés pausarlo o reiniciarlo con los botones de al lado.",
+      },
+      {
+        icon: <Video size={20} />,
+        title: "Ver la técnica",
+        text: "Al final de cada ejercicio desplegado tenés un botón para ver un video de la técnica correcta en YouTube.",
+      },
+      {
+        icon: <RotateCcw size={20} />,
+        title: "Resetear el día",
+        text: "Si te equivocaste registrando algo, \"Resetear sesión de hoy\" borra solo los datos de hoy en ese día de rutina — tus récords no se tocan.",
+      },
+    ],
+  },
+  {
+    key: "progreso",
+    label: "Progreso",
+    color: "#06B6D4",
+    icon: <BarChart3 size={16} />,
+    steps: [
+      {
+        icon: <Activity size={20} />,
+        title: "Progreso: tu evolución",
+        text: "Esta pestaña junta todos tus registros para mostrarte qué tan constante fuiste y cuánto mejoraste, con gráficos, rankings y tu historial completo.",
+      },
+      {
+        icon: <Flame size={20} />,
+        title: "Estadísticas generales",
+        text: "Arriba ves tus días entrenados, tu racha actual de días seguidos, el total de series registradas y el volumen total (kg × reps) acumulado.",
+      },
+      {
+        icon: <TrendingUp size={20} />,
+        title: "Mejoras por día",
+        text: "Te muestra cuántas series mejoraste (superaste tu primer registro) en cada tipo de día: Push, Pull, Piernas y Hombros/Brazos.",
+      },
+      {
+        icon: <BarChart3 size={20} />,
+        title: "Gráfico de evolución",
+        text: "Elegí el día y el ejercicio con las tarjetas, la serie con los botones S1/S2/etc., y mirá su evolución en Kg, Volumen, 1RM estimado o RPE con los botones de arriba del gráfico.",
+      },
+      {
+        icon: <Trophy size={20} />,
+        title: "Top PRs",
+        text: "La pestaña \"Top PRs\" te muestra tus 5 mejores ejercicios según el 1RM estimado (una proyección de tu máximo a 1 repetición, calculada con la fórmula de Epley).",
+      },
+      {
+        icon: <Dumbbell size={20} />,
+        title: "Volumen por músculo",
+        text: "En \"Músculo\" ves el volumen acumulado histórico por grupo muscular, para detectar si algún grupo está quedando atrás respecto a los demás.",
+      },
+      {
+        icon: <Calendar size={20} />,
+        title: "Historial de sesiones",
+        text: "En \"Historial\" podés ver todo lo que entrenaste: en un calendario mensual con un punto de color por día entrenado, o en una lista con el detalle completo de cada sesión.",
+      },
+      {
+        icon: <Trash2 size={20} />,
+        title: "Resetear historial",
+        text: "Al final de la pestaña tenés la opción de borrar todo tu historial de series, si alguna vez querés empezar de cero. Tus récords se mantienen guardados.",
+      },
+    ],
+  },
+  {
+    key: "descarga",
+    label: "Descarga",
+    color: "#A855F7",
+    icon: <Zap size={16} />,
+    steps: [
+      {
+        icon: <Zap size={20} />,
+        title: "Descarga: tu semana de recuperación",
+        text: "Cada cierta cantidad de semanas de entrenamiento (lo configurás en Perfil), tu ciclo entra en una semana de descarga: menos series y menos peso, para bajar la fatiga sin perder lo ganado.",
+      },
+      {
+        icon: <ArrowDown size={20} />,
+        title: "Cargas sugeridas por día",
+        text: "Elegí el día arriba y vas a ver, ejercicio por ejercicio, tu mejor marca tachada y al lado el peso sugerido para esta semana — calculado como un porcentaje de tu récord, con menos series por ejercicio.",
+      },
+    ],
+  },
+  {
+    key: "perfil",
+    label: "Perfil",
+    color: "#F59E0B",
+    icon: <UserCog size={16} />,
+    steps: [
+      {
+        icon: <UserCog size={20} />,
+        title: "Perfil: tu cuenta y configuración",
+        text: "Acá ves tus datos, configurás cómo se comporta la app (ciclos, descarga, descansos) y administrás tu cuenta.",
+      },
+      {
+        icon: <Mail size={20} />,
+        title: "Tus datos",
+        text: "Arriba ves tu nombre, email (si lo cargaste) y fecha de alta. Tocá \"Editar perfil\" para cambiar el email cuando quieras.",
+      },
+      {
+        icon: <Target size={20} />,
+        title: "Marcas iniciales",
+        text: "\"Marcas iniciales\" te lleva al asistente para cargar tus pesos de partida por día — podés hacerlo de a uno, cuando quieras, no hace falta completarlo todo de una vez.",
+      },
+      {
+        icon: <Calendar size={20} />,
+        title: "Inicio de ciclo",
+        text: "Configurá la fecha en la que arrancó tu ciclo actual de entrenamiento. A partir de ahí la app calcula en qué semana estás y cuándo te toca la descarga.",
+      },
+      {
+        icon: <SlidersHorizontal size={20} />,
+        title: "Configuración de descarga",
+        text: "Elegís cuántas semanas entrenás antes de la descarga, cuántas semanas dura la descarga, a qué porcentaje de tu récord vas a entrenar, y cuánto se reducen las series.",
+      },
+      {
+        icon: <Clock size={20} />,
+        title: "Descanso entre series",
+        text: "Elegís si te avisamos con sonido, vibración o ambos, y cuánto dura el descanso para ejercicios pesados y para el resto.",
+      },
+      {
+        icon: <ShieldCheck size={20} />,
+        title: "Tus datos están respaldados",
+        text: "Además de guardarse en el dispositivo, tus registros se respaldan automáticamente en una segunda copia local. Si algo borra los datos del navegador, la app intenta recuperarlos sola al abrir de nuevo.",
+      },
+      {
+        icon: <LogOut size={20} />,
+        title: "Cambiar o eliminar perfil",
+        text: "Desde aquí podés cerrar sesión para cambiar de perfil, o eliminar tu perfil por completo (borra todo el historial de forma permanente, no se puede deshacer).",
+      },
+    ],
+  },
+  {
+    key: "_outro",
+    label: "Listo",
+    color: "#14B8A6",
+    icon: <Check size={16} />,
+    steps: [
+      {
+        icon: <Check size={20} />,
+        title: "¡Eso es todo!",
+        text: "Ya conocés todas las funciones de la app. Podés volver a ver este tutorial cuando quieras tocando el ícono de ayuda (?) arriba a la derecha, en cualquier pestaña.",
+      },
+    ],
+  },
 ];
 
-function HelpModal({ initialTab, onClose }) {
-  const startIdx = Math.max(0, HELP_STEPS.findIndex((s) => s.tab === initialTab));
+// Versión "plana" de todos los pasos, con metadata de a qué capítulo
+// pertenece cada uno — esto es lo que recorre el modal con Atrás/Siguiente.
+const ALL_HELP_STEPS = HELP_CHAPTERS.flatMap((c, ci) =>
+  c.steps.map((s, si) => ({
+    ...s,
+    chapterIndex: ci,
+    chapterKey: c.key,
+    chapterLabel: c.label,
+    chapterColor: c.color,
+    isChapterIntro: si === 0,
+    stepInChapter: si,
+  }))
+);
+
+function HelpModal({ startTab, onClose }) {
+  const startIdx = startTab
+    ? Math.max(0, ALL_HELP_STEPS.findIndex((s) => s.chapterKey === startTab))
+    : 0;
   const [i, setI] = useState(startIdx);
-  const step = HELP_STEPS[i];
-  const isFirst = i === 0, isLast = i === HELP_STEPS.length - 1;
-  const tabLabels = { rutina: "Rutina", progreso: "Progreso", descarga: "Descarga", perfil: "Perfil" };
+  const step = ALL_HELP_STEPS[i];
+  const isFirst = i === 0;
+  const isLast = i === ALL_HELP_STEPS.length - 1;
+
+  const jumpToChapter = (ci) => {
+    const idx = ALL_HELP_STEPS.findIndex((s) => s.chapterIndex === ci);
+    if (idx >= 0) setI(idx);
+  };
+
   return (
     <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 modal-bg-in" onClick={onClose}>
       <div className="bg-slate-900 border border-slate-700/60 rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-[10px] font-black uppercase tracking-widest text-teal-400">{tabLabels[step.tab]}</span>
-          <button onClick={onClose} className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition"><X size={18} /></button>
-        </div>
-        <div className="flex gap-1 mb-4">
-          {HELP_STEPS.map((_, idx) => (
-            <div key={idx} className="h-1 flex-1 rounded-full transition-colors" style={{ backgroundColor: idx <= i ? "#14B8A6" : "#1e293b" }} />
+        {/* Selector de capítulo — permite saltar directo a cualquier sección */}
+        <div className="flex items-center gap-1.5 mb-3 overflow-x-auto pb-1 -mx-1 px-1">
+          {HELP_CHAPTERS.map((c, ci) => (
+            <button
+              key={c.key}
+              onClick={() => jumpToChapter(ci)}
+              className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold whitespace-nowrap transition-all shrink-0"
+              style={ci === step.chapterIndex ? { backgroundColor: c.color + "22", color: c.color } : { color: "#475569" }}
+            >
+              {c.icon}{c.label}
+            </button>
           ))}
         </div>
-        <div key={i} className="flex items-start gap-3 tab-fade-in min-h-[92px]">
-          <div className="w-9 h-9 rounded-xl bg-teal-500/15 text-teal-400 flex items-center justify-center shrink-0">{step.icon}</div>
-          <div>
-            <h3 className="text-sm font-black text-white mb-1">{step.title}</h3>
-            <p className="text-sm text-slate-300 leading-relaxed">{step.text}</p>
-          </div>
+
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: step.chapterColor }}>{step.chapterLabel}</span>
+          <button onClick={onClose} aria-label="Cerrar ayuda" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition"><X size={18} /></button>
         </div>
+
+        {/* Barra de progreso tipo "historias", segmentada por capítulo */}
+        <div className="flex gap-2 mb-4">
+          {HELP_CHAPTERS.map((c, ci) => (
+            <div key={c.key} className="flex-1 flex gap-0.5">
+              {c.steps.map((_, si) => {
+                const globalIdx = ALL_HELP_STEPS.findIndex((s) => s.chapterIndex === ci && s.stepInChapter === si);
+                const filled = globalIdx <= i;
+                return <div key={si} className="h-1 flex-1 rounded-full transition-colors" style={{ backgroundColor: filled ? c.color : "#1e293b" }} />;
+              })}
+            </div>
+          ))}
+        </div>
+
+        <div key={i} className={`tab-fade-in min-h-[128px] ${step.isChapterIntro ? "flex flex-col items-center text-center gap-2.5 py-2" : "flex items-start gap-3"}`}>
+          {step.isChapterIntro ? (
+            <>
+              <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ backgroundColor: step.chapterColor + "18", color: step.chapterColor }}>{step.icon}</div>
+              <h3 className="text-base font-black text-white leading-tight">{step.title}</h3>
+              <p className="text-sm text-slate-300 leading-relaxed">{step.text}</p>
+            </>
+          ) : (
+            <>
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: step.chapterColor + "15", color: step.chapterColor }}>{step.icon}</div>
+              <div>
+                <h3 className="text-sm font-black text-white mb-1">{step.title}</h3>
+                <p className="text-sm text-slate-300 leading-relaxed">{step.text}</p>
+              </div>
+            </>
+          )}
+        </div>
+
         <div className="flex items-center justify-between mt-5">
           <button onClick={() => setI((n) => Math.max(0, n - 1))} disabled={isFirst} className={`px-3.5 py-2 rounded-xl text-xs font-bold transition ${isFirst ? "text-slate-700" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>Atrás</button>
-          <span className="text-[10px] text-slate-600 font-medium">{i + 1} / {HELP_STEPS.length}</span>
+          <span className="text-[10px] text-slate-600 font-medium">{i + 1} / {ALL_HELP_STEPS.length}</span>
           {isLast ? (
             <button onClick={onClose} className="px-4 py-2 rounded-xl text-xs font-black bg-teal-500 text-white transition active:scale-95">Listo</button>
           ) : (
-            <button onClick={() => setI((n) => Math.min(HELP_STEPS.length - 1, n + 1))} className="px-4 py-2 rounded-xl text-xs font-black bg-teal-500 text-white transition active:scale-95">Siguiente</button>
+            <button onClick={() => setI((n) => Math.min(ALL_HELP_STEPS.length - 1, n + 1))} className="px-4 py-2 rounded-xl text-xs font-black bg-teal-500 text-white transition active:scale-95">Siguiente</button>
           )}
         </div>
       </div>
@@ -1615,6 +1880,7 @@ export default function App() {
   const [showHub, setShowHub] = useState(false);
   const [wizardDay, setWizardDay] = useState(null);
   const [showHelp, setShowHelp] = useState(false);
+  const [helpStartTab, setHelpStartTab] = useState(null);
   const [recoveredNotice, setRecoveredNotice] = useState(false);
 
   useEffect(() => {
@@ -1647,8 +1913,8 @@ export default function App() {
   const profile = profiles[activeProfile], logs = profile?.logs || {};
   const setLogs = useCallback((newLogs) => { const np = { ...profiles, [activeProfile]: { ...profiles[activeProfile], logs: newLogs } }; setProfiles(np); saveProfiles(np); }, [profiles, activeProfile]);
   const handleLogin = (name, updatedProfiles) => { const profs = updatedProfiles || profiles; setProfiles(profs); setActiveProfile(name); if (!allDaysDone(profs[name]) && !profs[name]?.onboardingDismissed) setShowHub(true); };
-  const handleLogout = () => { saveActive(null); setActiveProfile(null); setShowHub(false); setWizardDay(null); };
-  const handleDelete = () => { const np = { ...profiles }; delete np[activeProfile]; setProfiles(np); saveProfiles(np); saveActive(null); setActiveProfile(null); setShowHub(false); setWizardDay(null); };
+  const handleLogout = () => { saveActive(null); setActiveProfile(null); setShowHub(false); setWizardDay(null); setShowHelp(false); setHelpStartTab(null); };
+  const handleDelete = () => { const np = { ...profiles }; delete np[activeProfile]; setProfiles(np); saveProfiles(np); saveActive(null); setActiveProfile(null); setShowHub(false); setWizardDay(null); setShowHelp(false); setHelpStartTab(null); };
   const handleUpdateProfile = (updates) => { const np = { ...profiles, [activeProfile]: { ...profiles[activeProfile], ...updates } }; setProfiles(np); saveProfiles(np); };
   const handleSetCycleStart = (d) => { setCycleStartState(d); saveCycleStart(d); };
   const handleWizardDone = () => {
@@ -1656,7 +1922,19 @@ export default function App() {
     const np = { ...profiles, [activeProfile]: { ...profiles[activeProfile], maxesSetupDays: { ...prevDays, [wizardDay]: true } } };
     setProfiles(np); saveProfiles(np); setWizardDay(null);
   };
-  const closeHub = () => { handleUpdateProfile({ onboardingDismissed: true }); setShowHub(false); };
+  // Se llama al cerrar el hub de marcas iniciales (la "encuesta" de bienvenida),
+  // ya sea porque el usuario terminó de configurar días o porque eligió
+  // "Configurar más tarde". Si es la primera vez que este perfil pasa por
+  // acá, disparamos el tutorial completo de la app automáticamente.
+  const closeHub = () => {
+    const shouldShowTutorial = profile?.tutorialSeen === false;
+    handleUpdateProfile({ onboardingDismissed: true, ...(shouldShowTutorial ? { tutorialSeen: true } : {}) });
+    setShowHub(false);
+    if (shouldShowTutorial) {
+      setHelpStartTab(null); // arranca desde el principio, recorrido completo
+      setShowHelp(true);
+    }
+  };
 
   if (!activeProfile) return (<><StyleInjector />{recoveredNotice && <RecoveredBanner onClose={() => setRecoveredNotice(false)} />}<LoginScreen onLogin={handleLogin} /></>);
   if (wizardDay) return (<><StyleInjector /><MaxSetupWizard dayKey={wizardDay} logs={logs} setLogs={setLogs} onDone={handleWizardDone} /></>);
@@ -1677,7 +1955,7 @@ export default function App() {
               </h1>
               <p className="text-[11px] text-slate-600 leading-tight">{activeProfile}</p>
             </div>
-            <button onClick={() => setShowHelp(true)} aria-label="Ayuda" className="w-8 h-8 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-center text-slate-400 hover:text-teal-400 hover:border-teal-500/30 transition active:scale-90"><HelpCircle size={16} /></button>
+            <button onClick={() => { setHelpStartTab(tab); setShowHelp(true); }} aria-label="Ayuda" className="w-8 h-8 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-center text-slate-400 hover:text-teal-400 hover:border-teal-500/30 transition active:scale-90"><HelpCircle size={16} /></button>
           </div>
         </header>
         <main className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto px-4 py-4 pb-28 lg:pb-10 space-y-4">
@@ -1690,7 +1968,7 @@ export default function App() {
         </main>
       </div>
       <BottomBar tab={tab} setTab={setTab} profileName={activeProfile} />
-      {showHelp && <HelpModal initialTab={tab} onClose={() => setShowHelp(false)} />}
+      {showHelp && <HelpModal startTab={helpStartTab} onClose={() => setShowHelp(false)} />}
     </div>
   );
 }
