@@ -1759,7 +1759,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, deloadSets, deloadMode,
 }
 
 /* ============================================================================
-   WEEK CALENDAR (cycle overview, unchanged logic — small polish)
+   WEEK CALENDAR (cuadro de "ciclo actual" en la pestaña Rutina)
 ============================================================================ */
 function WeekCalendar({ cycleStart, logs, settings = DEFAULT_SETTINGS }) {
   const weekInfo = getWeekInfo(cycleStart, settings);
@@ -1767,25 +1767,47 @@ function WeekCalendar({ cycleStart, logs, settings = DEFAULT_SETTINGS }) {
   const { cycleWeeks, trainWeeks } = weekInfo;
   const trainedDays = useMemo(() => { const s = new Set(); Object.entries(logs).forEach(([k, v]) => { if (k.endsWith("_pr_override") || !Array.isArray(v)) return; v.forEach((e) => s.add(e.date)); }); return s; }, [logs]);
   const weekDots = Array.from({ length: cycleWeeks }, (_, wi) => { const ws = new Date(cycleStart); ws.setDate(ws.getDate() + wi * 7); const days = Array.from({ length: 7 }, (_, di) => { const d = new Date(ws); d.setDate(d.getDate() + di); return d.toISOString().slice(0, 10); }); return { week: wi + 1, days, trained: days.filter((d) => trainedDays.has(d)).length, isDeload: wi + 1 > trainWeeks }; });
+  const phase = weekInfo.isDeload ? "#A855F7" : "#14B8A6";
+  const cyclePct = Math.round((weekInfo.weekInCycle / cycleWeeks) * 100);
   return (
-    <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 backdrop-blur-sm shadow-md shadow-black/20">
-      <div className="flex items-center justify-between mb-4">
-        <div><h3 className="text-sm font-bold text-white">Ciclo actual</h3><p className="text-[11px] text-slate-500">Ciclo #{weekInfo.cycleNumber} · Semana {weekInfo.weekInCycle} de {cycleWeeks}</p></div>
-        <div className={`px-3 py-1.5 rounded-xl text-xs font-bold ${weekInfo.isDeload ? "bg-purple-500/20 text-purple-400" : "bg-teal-500/20 text-teal-400"}`}>{weekInfo.isDeload ? "DESCARGA" : "ENTRENAMIENTO"}</div>
+    <div className="relative overflow-hidden bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 backdrop-blur-sm shadow-md shadow-black/20">
+      <div className="absolute -top-12 -right-12 w-36 h-36 rounded-full blur-3xl opacity-25 pointer-events-none" style={{ backgroundColor: phase }} />
+      <div className="relative flex items-center justify-between mb-3.5">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0" style={{ backgroundColor: phase + "1c", color: phase, boxShadow: `0 0 0 1px ${phase}30 inset` }}>
+            {weekInfo.isDeload ? <Zap size={17} /> : <Flame size={17} />}
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-white leading-tight">Ciclo #{weekInfo.cycleNumber}</h3>
+            <p className="text-[11px] text-slate-500 leading-tight mt-0.5">Semana {weekInfo.weekInCycle} de {cycleWeeks}</p>
+          </div>
+        </div>
+        <div className="px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wide shrink-0" style={{ backgroundColor: phase + "1c", color: phase }}>{weekInfo.isDeload ? "Descarga" : "Entrenamiento"}</div>
       </div>
-      <div className="flex gap-1.5 flex-wrap">
-        {weekDots.map(({ week, trained, isDeload }) => { const isCurrent = week === weekInfo.weekInCycle; return (
+
+      <div className="relative h-1.5 bg-slate-800/70 rounded-full overflow-hidden mb-4">
+        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${cyclePct}%`, background: `linear-gradient(90deg, ${phase}80, ${phase})` }} />
+      </div>
+
+      <div className="relative flex gap-1.5 flex-wrap">
+        {weekDots.map(({ week, trained, isDeload }) => { const isCurrent = week === weekInfo.weekInCycle; const dotColor = isDeload ? "#A855F7" : trained > 0 ? "#14B8A6" : "#475569"; return (
           <div key={week} className="flex flex-col items-center gap-1">
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-[10px] font-black transition-all ${isCurrent ? "ring-2 ring-offset-2 ring-offset-slate-950" : ""} ${isDeload ? (isCurrent ? "bg-purple-500 ring-purple-500 text-white" : "bg-purple-500/10 text-purple-600 border border-purple-500/20") : trained > 0 ? (isCurrent ? "bg-teal-500 ring-teal-500 text-white" : "bg-teal-500/20 text-teal-400 border border-teal-500/20") : (isCurrent ? "bg-slate-700 ring-slate-500 text-white" : "bg-slate-800/50 text-slate-700 border border-slate-800")}`}>
+            <div
+              className={`w-9 h-9 rounded-xl flex items-center justify-center text-[10px] font-black transition-all ${isCurrent ? "scale-110" : ""}`}
+              style={isCurrent
+                ? { backgroundColor: dotColor, color: "#fff", boxShadow: `0 6px 16px -4px ${dotColor}aa` }
+                : { backgroundColor: dotColor + "1a", color: dotColor, border: `1px solid ${dotColor}30` }}
+            >
               {isDeload ? "D" : week}
             </div>
             {trained > 0 && !isDeload && <div className="flex gap-0.5">{Array.from({ length: Math.min(trained, 7) }).map((_, i) => <div key={i} className="w-1 h-1 rounded-full bg-teal-500/60" />)}</div>}
           </div>
         ); })}
       </div>
-      <div className="flex gap-4 mt-4 text-[10px] text-slate-600">
-        <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-md bg-teal-500/20 border border-teal-500/30" /><span>Entrenamiento</span></div>
-        <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-md bg-purple-500/20 border border-purple-500/30" /><span>Descarga</span></div>
+
+      <div className="relative flex gap-4 mt-4 pt-3 border-t border-slate-800/50 text-[10px] text-slate-600">
+        <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-teal-500/70" /><span>Entrenamiento</span></div>
+        <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-purple-500/70" /><span>Descarga</span></div>
       </div>
     </div>
   );
@@ -2518,18 +2540,22 @@ function RoutinePreview({ routineDef }) {
 function PresetRoutineCard({ preset, isActive, onUse }) {
   const [open, setOpen] = useState(false);
   const dayCount = preset.dayOrder.length;
+  const accent = preset.days[preset.dayOrder[0]].color;
   return (
-    <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl overflow-hidden">
-      <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center justify-between gap-2 px-4 py-3.5 text-left hover:bg-slate-800/30 transition">
+    <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl overflow-hidden transition-shadow hover:shadow-lg hover:shadow-black/20">
+      <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-slate-800/30 transition">
+        <div className="w-2 h-10 rounded-full shrink-0" style={{ backgroundColor: accent, boxShadow: `0 0 10px -2px ${accent}` }} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h4 className="text-sm font-bold text-white">{preset.name}</h4>
             {isActive && <span className="text-[9px] font-black px-1.5 py-0.5 rounded-lg bg-teal-500/20 text-teal-400 shrink-0">ACTIVA</span>}
           </div>
           <p className="text-[11px] text-slate-500 mt-0.5">{preset.description}</p>
-          <div className="flex items-center gap-1 mt-1.5">
-            {preset.dayOrder.map((dk) => <span key={dk} className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: preset.days[dk].color }} />)}
-            <span className="text-[10px] text-slate-600 ml-1.5">{dayCount} día{dayCount === 1 ? "" : "s"}/semana</span>
+          <div className="flex items-center gap-1.5 mt-2">
+            {preset.dayOrder.map((dk) => (
+              <span key={dk} className="w-5 h-5 rounded-lg flex items-center justify-center text-[8px] font-black shrink-0" style={{ backgroundColor: preset.days[dk].color + "22", color: preset.days[dk].color }}>{preset.days[dk].label.charAt(0)}</span>
+            ))}
+            <span className="text-[10px] text-slate-600 ml-1">{dayCount} día{dayCount === 1 ? "" : "s"}/semana</span>
           </div>
         </div>
         <ChevronDown size={16} className={`text-slate-600 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
@@ -2538,7 +2564,9 @@ function PresetRoutineCard({ preset, isActive, onUse }) {
         <div className="px-4 pb-4 tab-fade-in space-y-3">
           {preset.recommendation && <p className="text-[11px] text-slate-400 bg-slate-800/40 rounded-xl px-3 py-2 flex items-start gap-1.5"><Info size={12} className="mt-0.5 shrink-0" />{preset.recommendation}</p>}
           <RoutinePreview routineDef={preset} />
-          <button onClick={onUse} disabled={isActive} className={`w-full py-2.5 rounded-xl text-sm font-bold transition ${isActive ? "bg-slate-800 text-slate-600" : "bg-teal-500 text-white hover:bg-teal-400 active:scale-[0.98]"}`}>{isActive ? "Ya la estás usando" : "Usar esta rutina"}</button>
+          <button onClick={onUse} disabled={isActive} className={`w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-bold transition ${isActive ? "bg-slate-800 text-slate-600" : "bg-teal-500 text-white hover:bg-teal-400 active:scale-[0.98] shadow-lg shadow-teal-500/20"}`}>
+            {isActive ? <><Check size={14} /> Ya la estás usando</> : <><Sparkles size={14} /> Usar esta rutina</>}
+          </button>
         </div>
       )}
     </div>
@@ -2549,10 +2577,11 @@ function SavedRoutineRow({ routine, isActive, onUse, onDelete }) {
   const [confirmDel, setConfirmDel] = useState(false);
   const [open, setOpen] = useState(false);
   const dayCount = routine.dayOrder.length;
+  const accent = routine.days[routine.dayOrder[0]]?.color || "#14B8A6";
   return (
-    <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl px-4 py-3.5">
+    <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl px-4 py-3.5 transition-shadow hover:shadow-lg hover:shadow-black/20">
       <div className="flex items-center gap-3">
-        <button onClick={() => setOpen((o) => !o)} className="w-9 h-9 rounded-xl bg-slate-800/60 text-slate-400 flex items-center justify-center shrink-0"><Layers size={16} /></button>
+        <div className="w-2 h-10 rounded-full shrink-0" style={{ backgroundColor: accent, boxShadow: `0 0 10px -2px ${accent}` }} />
         <button onClick={() => setOpen((o) => !o)} className="flex-1 min-w-0 text-left">
           <div className="flex items-center gap-2"><p className="text-sm font-bold text-white truncate">{routine.name}</p>{isActive && <span className="text-[9px] font-black px-1.5 py-0.5 rounded-lg bg-teal-500/20 text-teal-400 shrink-0">ACTIVA</span>}</div>
           <p className="text-[11px] text-slate-500">{dayCount} día{dayCount === 1 ? "" : "s"} · creada por vos</p>
@@ -2824,11 +2853,17 @@ function RoutinesView({ profile, forced, onActivate, onDelete }) {
       )}
 
       {!forced && activeDef && (
-        <div className="rounded-2xl border border-teal-500/25 bg-teal-500/5 p-4">
-          <div className="flex items-center gap-2 mb-1"><Layers size={14} className="text-teal-400" /><span className="text-[10px] font-black uppercase tracking-widest text-teal-400">Tu rutina activa</span></div>
-          <h3 className="text-base font-black text-white">{activeDef.name}</h3>
-          {activeDef.description && <p className="text-[11px] text-slate-400 mt-1">{activeDef.description}</p>}
-          <div className="flex items-center gap-1.5 mt-2.5 flex-wrap">
+        <div className="relative overflow-hidden rounded-2xl border border-teal-500/25 bg-gradient-to-br from-teal-500/10 to-transparent p-4">
+          <div className="absolute -top-10 -right-10 w-32 h-32 rounded-full bg-teal-500/20 blur-3xl pointer-events-none" />
+          <div className="relative flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-teal-500/20 text-teal-400 flex items-center justify-center shrink-0"><Dumbbell size={17} /></div>
+            <div className="min-w-0">
+              <span className="text-[10px] font-black uppercase tracking-widest text-teal-400">Tu rutina activa</span>
+              <h3 className="text-base font-black text-white leading-tight">{activeDef.name}</h3>
+            </div>
+          </div>
+          {activeDef.description && <p className="relative text-[11px] text-slate-400 mt-2.5">{activeDef.description}</p>}
+          <div className="relative flex items-center gap-1.5 mt-2.5 flex-wrap">
             {activeDef.dayOrder.map((dk) => (
               <span key={dk} className="text-[10px] font-bold px-2 py-0.5 rounded-lg" style={{ backgroundColor: activeDef.days[dk].color + "20", color: activeDef.days[dk].color }}>{activeDef.days[dk].label}</span>
             ))}
@@ -2838,7 +2873,7 @@ function RoutinesView({ profile, forced, onActivate, onDelete }) {
 
       {customEntries.length > 0 && (
         <div>
-          <p className="text-xs font-black uppercase tracking-widest text-slate-500 mb-2">Tus rutinas creadas</p>
+          <div className="flex items-center gap-1.5 mb-2"><ListChecks size={13} className="text-slate-500" /><p className="text-xs font-black uppercase tracking-widest text-slate-500">Tus rutinas creadas</p></div>
           <div className="space-y-2">
             {customEntries.map(([id, r]) => (
               <SavedRoutineRow key={id} routine={r} isActive={id === activeId} onUse={() => onActivate(id, null)} onDelete={() => onDelete(id)} />
@@ -2848,7 +2883,7 @@ function RoutinesView({ profile, forced, onActivate, onDelete }) {
       )}
 
       <div>
-        <p className="text-xs font-black uppercase tracking-widest text-slate-500 mb-2">Rutinas preestablecidas</p>
+        <div className="flex items-center gap-1.5 mb-2"><Sparkles size={13} className="text-slate-500" /><p className="text-xs font-black uppercase tracking-widest text-slate-500">Rutinas preestablecidas</p></div>
         <div className="space-y-2">
           {PRESET_ROUTINES.map((preset) => (
             <PresetRoutineCard key={preset.id} preset={preset} isActive={preset.id === activeId} onUse={() => onActivate(preset.id, cloneRoutineDef(preset))} />
@@ -2856,7 +2891,7 @@ function RoutinesView({ profile, forced, onActivate, onDelete }) {
         </div>
       </div>
 
-      <button onClick={() => setMode("builder")} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl border border-dashed border-teal-500/40 text-teal-400 hover:bg-teal-500/5 transition text-sm font-bold"><Sparkles size={15} /> Crear mi propia rutina</button>
+      <button onClick={() => setMode("builder")} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98] shadow-lg shadow-teal-500/20" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}><Sparkles size={15} /> Crear mi propia rutina</button>
     </div>
   );
 }
@@ -2864,15 +2899,16 @@ function RoutinesView({ profile, forced, onActivate, onDelete }) {
 /* ============================================================================
    NAVIGATION — bottom bar on mobile, side rail from lg breakpoint up. El
    perfil ya no es una pestaña: se accede tocando el avatar (ver header en
-   App() y el avatar de arriba en SideNav). Esto le deja lugar a "Rutinas".
-   Orden pedido: Rutinas, Progreso, Descarga y Rutina (la principal, a la
-   derecha del todo en la barra inferior).
+   App() y el avatar de arriba en SideNav).
+   Orden pedido: Rutina (la principal, a la izquierda del todo — donde se
+   anotan reps/kg), después Descarga, después Progreso, y Rutinas a la
+   derecha del todo.
 ============================================================================ */
 const NAV_TABS = [
-  { key: "rutinas", icon: <Layers size={20} />, label: "Rutinas" },
-  { key: "progreso", icon: <BarChart3 size={20} />, label: "Progreso" },
-  { key: "descarga", icon: <Zap size={20} />, label: "Descarga" },
   { key: "rutina", icon: <Dumbbell size={20} />, label: "Rutina" },
+  { key: "descarga", icon: <Zap size={20} />, label: "Descarga" },
+  { key: "progreso", icon: <BarChart3 size={20} />, label: "Progreso" },
+  { key: "rutinas", icon: <Layers size={20} />, label: "Rutinas" },
 ];
 
 function BottomBar({ tab, setTab }) {
