@@ -6,140 +6,345 @@ import {
 } from "recharts";
 import {
   Play, Pause, RotateCcw, TrendingUp, TrendingDown, Dumbbell,
-  ChevronDown, ChevronLeft, Trophy, Flame, Save, Trash2, BarChart3,
+  ChevronDown, ChevronUp, ChevronLeft, Trophy, Flame, Save, Trash2, BarChart3,
   ListChecks, LogOut, X, Check, AlertTriangle, Calendar, Zap,
-  Mail, Clock, ChevronRight, Edit3, Info,
+  Mail, Clock, ChevronRight, Edit3, Info, Plus,
   Target, Award, Activity, ArrowDown, HelpCircle, List, LayoutGrid,
   Sparkles, Layers, Video, SlidersHorizontal, ShieldCheck, UserCog,
 } from "lucide-react";
 
 /* ============================================================================
-   DATOS DE LA RUTINA — antes vivían en routine.json como archivo separado.
-   Para editar ejercicios, series o rangos de repeticiones, modificá este objeto
-   directamente (es el único lugar donde aparecen los datos "duros" de la rutina).
-============================================================================ */
-const routineData = {
-  "dayOrder": ["push", "pull", "legs", "sarm"],
-  "days": {
-    "push": {
-      "label": "PUSH",
-      "description": "Pecho · Hombro anterior · Tríceps",
-      "color": "#14B8A6",
-      "grad": "from-teal-500/20 to-transparent",
-      "exercises": [
-        { "id": "press_banca", "name": "Press Banca", "muscle": "Pectoral", "nota": "Hacer fuerza con las piernas.", "videoQuery": "press banca técnica correcta",
-          "sets": [{ "repRange": "3-5", "heavy": true }, { "repRange": "3-5", "heavy": true }, { "repRange": "8-10" }] },
-        { "id": "press_inclinado_smith", "name": "Press Inclinado Smith", "muscle": "Pectoral sup.", "nota": "Codos bastante pegados.", "videoQuery": "press inclinado smith técnica",
-          "sets": [{ "repRange": "8-10" }, { "repRange": "8-10" }, { "repRange": "8-10" }] },
-        { "id": "cruce_poleas", "name": "Cruce de Poleas", "muscle": "Pectoral", "nota": "Énfasis en el estiramiento.", "videoQuery": "cruce de poleas técnica pectoral",
-          "sets": [{ "repRange": "10-12" }, { "repRange": "10-12" }] },
-        { "id": "vuelos_laterales_mancuerna", "name": "Vuelos Laterales Mancuerna", "muscle": "Deltoides lateral", "nota": "Levantar un poco para adelante.", "videoQuery": "vuelos laterales mancuerna técnica deltoides",
-          "sets": [{ "repRange": "12-15" }, { "repRange": "12-15" }, { "repRange": "12-15" }, { "repRange": "12-15" }] },
-        { "id": "pec_dec_deltoides_push", "name": "Pec Dec para Deltoides", "muscle": "Deltoides post.", "nota": "Unilateral.", "videoQuery": "pec dec deltoides posterior técnica",
-          "sets": [{ "repRange": "12-15" }, { "repRange": "12-15" }] },
-        { "id": "triceps_trasnuca_push", "name": "Tríceps Trasnuca", "muscle": "Tríceps", "nota": "Pausa en el fondo, codos no van cerrados.", "videoQuery": "triceps trasnuca técnica overhead extension",
-          "sets": [{ "repRange": "8-10" }, { "repRange": "8-10" }] },
-        { "id": "triceps_polea_alta", "name": "Tríceps Polea Alta", "muscle": "Tríceps", "nota": "El húmero no se mueve.", "videoQuery": "tríceps polea alta técnica cable pushdown",
-          "sets": [{ "repRange": "8-10" }, { "repRange": "8-10" }] }
-      ]
-    },
-    "pull": {
-      "label": "PULL",
-      "description": "Dorsal · Romboides · Bíceps",
-      "color": "#3B82F6",
-      "grad": "from-blue-500/20 to-transparent",
-      "exercises": [
-        { "id": "remo_ancho_maquina", "name": "Remo Ancho Máquina", "muscle": "Dorsal", "nota": "No levantar los hombros.", "videoQuery": "remo ancho máquina técnica espalda",
-          "sets": [{ "repRange": "4-6", "heavy": true }, { "repRange": "4-6", "heavy": true }, { "repRange": "8-10" }] },
-        { "id": "dorsalera", "name": "Dorsalera Agarre Ancho", "muscle": "Dorsal", "nota": "No descolocar los hombros, pulgar en la marca.", "videoQuery": "dorsalera lat pulldown agarre ancho técnica",
-          "sets": [{ "repRange": "8-10" }, { "repRange": "8-10" }, { "repRange": "8-10" }] },
-        { "id": "remo_unilateral", "name": "Remo Unilateral", "muscle": "Dorsal / oblicuos", "nota": "Contraer los oblicuos, codo lo más abajo posible.", "videoQuery": "remo unilateral mancuerna técnica espalda",
-          "sets": [{ "repRange": "8-10" }, { "repRange": "8-10" }] },
-        { "id": "pull_over", "name": "Pull Over", "muscle": "Dorsal / serrato", "nota": "Codos siempre un poco flexionados.", "videoQuery": "pull over espalda técnica mancuerna",
-          "sets": [{ "repRange": "8-10" }, { "repRange": "8-10" }, { "repRange": "8-10" }] },
-        { "id": "face_pull", "name": "Face Pull", "muscle": "Deltoides post.", "nota": "Polea a la altura de los ojos.", "videoQuery": "face pull técnica deltoides posterior",
-          "sets": [{ "repRange": "15-20" }, { "repRange": "15-20" }] },
-        { "id": "biceps_alternado_mancuerna", "name": "Bíceps Alternado Mancuerna", "muscle": "Bíceps", "nota": "Mover un poco el húmero al final.", "videoQuery": "curl alternado mancuerna técnica bíceps",
-          "sets": [{ "repRange": "8-10" }, { "repRange": "8-10" }, { "repRange": "8-10" }, { "repRange": "8-10" }] }
-      ]
-    },
-    "legs": {
-      "label": "PIERNAS",
-      "description": "Glúteo · Cuádriceps · Femoral · Aductores",
-      "color": "#F97316",
-      "grad": "from-orange-500/20 to-transparent",
-      "isNew": true,
-      "exercises": [
-        { "id": "sentadilla_bulgara", "name": "Sentadilla Búlgara", "muscle": "Glúteo", "nota": "Torso ligeramente inclinado adelante.", "videoQuery": "sentadilla búlgara técnica glúteo",
-          "sets": [{ "repRange": "8-10" }, { "repRange": "8-10" }] },
-        { "id": "abdominales", "name": "Abdominales", "muscle": "Core", "nota": "Controlar la excéntrica, sin impulso.", "videoQuery": "abdominales técnica correcta core",
-          "sets": [{ "repRange": "8-10" }, { "repRange": "8-10" }, { "repRange": "8-10" }, { "repRange": "8-10" }] },
-        { "id": "jaca", "name": "Hack Squat", "muscle": "Cuádriceps", "nota": "Pies a la altura de hombros, bajar controlado.", "videoQuery": "hack squat técnica cuádriceps",
-          "sets": [{ "repRange": "4-6", "heavy": true }, { "repRange": "4-6", "heavy": true }, { "repRange": "8-10" }] },
-        { "id": "curl_femoral_maquina", "name": "Curl Femoral Máquina", "muscle": "Femoral", "nota": "Controlar la fase negativa.", "videoQuery": "curl femoral máquina técnica isquios",
-          "sets": [{ "repRange": "8-10" }, { "repRange": "8-10" }, { "repRange": "8-10" }] },
-        { "id": "extension_cuadriceps", "name": "Extensión de Cuádriceps", "muscle": "Cuádriceps", "nota": "Pausa de 1 seg arriba.", "videoQuery": "extensión cuádriceps máquina técnica",
-          "sets": [{ "repRange": "8-10" }, { "repRange": "8-10" }, { "repRange": "8-10" }] },
-        { "id": "aductor_maquina", "name": "Aductor Máquina", "muscle": "Aductores", "nota": "Rango completo, sin rebotar.", "videoQuery": "aductor máquina técnica inner thigh",
-          "sets": [{ "repRange": "8-10" }, { "repRange": "8-10" }] },
-        { "id": "abductor_maquina", "name": "Abductor Máquina", "muscle": "Glúteo medio", "nota": "Espalda apoyada, movimiento controlado.", "videoQuery": "abductor máquina técnica glúteo medio",
-          "sets": [{ "repRange": "8-10" }, { "repRange": "8-10" }] }
-      ]
-    },
-    "sarm": {
-      "label": "HOMBROS / BRAZOS",
-      "description": "Deltoides · Bíceps · Tríceps",
-      "color": "#A855F7",
-      "grad": "from-purple-500/20 to-transparent",
-      "exercises": [
-        { "id": "press_militar_smith", "name": "Press Militar Smith", "muscle": "Deltoides ant.", "nota": "Codos adelante, banco 80-90°.", "videoQuery": "press militar smith técnica hombros",
-          "sets": [{ "repRange": "4-6", "heavy": true }, { "repRange": "4-6", "heavy": true }, { "repRange": "8-10" }] },
-        { "id": "vuelos_laterales_maquina", "name": "Vuelos Laterales Máquina", "muscle": "Deltoides lateral", "nota": "No hacer tanta fuerza con el agarre.", "videoQuery": "vuelos laterales máquina deltoides técnica",
-          "sets": [{ "repRange": "12-15" }, { "repRange": "12-15" }, { "repRange": "12-15" }, { "repRange": "12-15" }] },
-        { "id": "pec_dec_deltoides_sarm", "name": "Pec Dec Deltoides Posterior", "muscle": "Deltoides post.", "nota": "Unilateral.", "videoQuery": "pec dec deltoides posterior técnica",
-          "sets": [{ "repRange": "12-15" }, { "repRange": "12-15" }] },
-        { "id": "biceps_martillo", "name": "Bíceps Martillo", "muscle": "Bíceps / braquial", "nota": "Alternado.", "videoQuery": "curl martillo bíceps técnica hammer curl",
-          "sets": [{ "repRange": "6-8" }, { "repRange": "6-8" }, { "repRange": "6-8" }] },
-        { "id": "biceps_banco_scott", "name": "Bíceps Banco Scott", "muscle": "Bíceps", "nota": "Unilateral con mancuerna.", "videoQuery": "curl banco scott técnica bíceps preacher curl",
-          "sets": [{ "repRange": "6-8" }, { "repRange": "6-8" }, { "repRange": "6-8" }] },
-        { "id": "biceps_banco_inclinado", "name": "Bíceps Banco Inclinado", "muscle": "Bíceps cab. larga", "nota": "Alternado, 6 puntos arriba.", "videoQuery": "curl banco inclinado bíceps técnica incline curl",
-          "sets": [{ "repRange": "8-10" }, { "repRange": "8-10" }] },
-        { "id": "triceps_trasnuca_sarm", "name": "Tríceps Trasnuca", "muscle": "Tríceps", "nota": "Pausa en el fondo.", "videoQuery": "triceps trasnuca técnica overhead extension",
-          "sets": [{ "repRange": "8-10" }, { "repRange": "8-10" }, { "repRange": "8-10" }] }
-      ]
-    }
-  }
-};
+   BIBLIOTECA DE EJERCICIOS Y RUTINAS — a partir de esta actualización, la app
+   ya no tiene una sola rutina fija. Hay:
 
-/* ============================================================================
-   UTILIDADES — antes vivían en utils.js como archivo separado. Helpers de
-   fechas/volumen, storage (localStorage + backup en IndexedDB), RPE, etc.
+   1. EXERCISE_LIBRARY: el catálogo de ejercicios (por grupo muscular), cada
+      uno con nombre, músculo específico, una breve nota/recomendación y un
+      video de referencia. Es de donde se elige al crear una rutina propia.
+   2. PRESET_ROUTINES: rutinas prearmadas (Push/Pull/Legs, Arnold Split,
+      Upper/Lower, Cuerpo Completo, y la "Clásica" que es la rutina original
+      de la app — se mantiene para no romper los datos de perfiles viejos).
+   3. Cada perfil guarda SUS PROPIAS rutinas en profile.routines (las que
+      activó de la lista de preestablecidas, más las que creó), y cuál está
+      activa en profile.activeRoutineId. Los registros (logs) siguen
+      identificando cada ejercicio por su id de forma global — así, si dos
+      rutinas distintas usan "Press Banca", tu marca histórica es la misma
+      sin importar en qué rutina la estés entrenando.
+
+   Para que todo el resto de los componentes (que ya leían ROUTINE,
+   DAY_ORDER, EXERCISE_BY_ID, KEY_TO_DAY como constantes fijas) sigan
+   funcionando sin tocarlos uno por uno, esas cuatro variables ahora son
+   "mutables": applyRoutineModel(...) las recalcula a partir de la rutina
+   activa cada vez que cambia, y el componente App() la llama en cada
+   render — así cualquier componente que las lea durante el render ve
+   siempre los datos de la rutina activa del perfil actual.
 ============================================================================ */
-/* ============================== ROUTINE DATA ============================== */
-/* The exercise list lives in routine.json — edit that file to add, remove, or
-   tweak exercises without touching any component code. */
 
 const yt = (q) => `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`;
 
-const DAY_ORDER = routineData.dayOrder;
+function mkSets(n, repRange) { return Array.from({ length: n }, () => ({ repRange })); }
 
-const ROUTINE = DAY_ORDER.reduce((acc, dk) => {
-  const d = routineData.days[dk];
-  acc[dk] = { ...d, exercises: d.exercises.map((ex) => ({ ...ex, video: yt(ex.videoQuery) })) };
-  return acc;
-}, {});
+const MUSCLE_GROUPS = [
+  { key: "pecho", label: "Pecho", color: "#14B8A6" },
+  { key: "espalda", label: "Espalda", color: "#3B82F6" },
+  { key: "hombros", label: "Hombros", color: "#A855F7" },
+  { key: "biceps", label: "Bíceps", color: "#F59E0B" },
+  { key: "triceps", label: "Tríceps", color: "#F97316" },
+  { key: "cuadriceps", label: "Cuádriceps", color: "#EF4444" },
+  { key: "femoral", label: "Femoral", color: "#EC4899" },
+  { key: "gluteo", label: "Glúteo y cadera", color: "#8B5CF6" },
+  { key: "core", label: "Core / Abdomen", color: "#06B6D4" },
+  { key: "pantorrillas", label: "Pantorrillas", color: "#22C55E" },
+];
+const MUSCLE_GROUP_BY_KEY = {};
+MUSCLE_GROUPS.forEach((g) => { MUSCLE_GROUP_BY_KEY[g.key] = g; });
 
-const EXERCISE_BY_ID = {};
-DAY_ORDER.forEach((dk) => {
-  ROUTINE[dk].exercises.forEach((ex) => { EXERCISE_BY_ID[ex.id] = { ...ex, dayKey: dk }; });
-});
+// El catálogo de ejercicios. "group" es el grupo muscular para el buscador al
+// crear una rutina; "muscle" es el texto específico que se ve en la tarjeta.
+const EXERCISE_LIBRARY = [
+  // Pecho
+  { id: "press_banca", name: "Press Banca", muscle: "Pectoral", group: "pecho", nota: "Hacé fuerza con las piernas y mantené los omóplatos retraídos.", videoQuery: "press banca técnica correcta" },
+  { id: "press_inclinado_smith", name: "Press Inclinado Smith", muscle: "Pectoral sup.", group: "pecho", nota: "Codos bastante pegados, para enfocar la parte superior del pecho.", videoQuery: "press inclinado smith técnica" },
+  { id: "press_inclinado_mancuernas", name: "Press Inclinado con Mancuernas", muscle: "Pectoral sup.", group: "pecho", nota: "Mayor rango que con barra, cuidá no hiperextender el hombro abajo.", videoQuery: "press inclinado mancuernas técnica" },
+  { id: "press_plano_mancuernas", name: "Press Plano con Mancuernas", muscle: "Pectoral", group: "pecho", nota: "Buen complemento del press banca, permite mayor estiramiento.", videoQuery: "press plano mancuernas técnica" },
+  { id: "cruce_poleas", name: "Cruce de Poleas", muscle: "Pectoral", group: "pecho", nota: "Énfasis en el estiramiento, no uses demasiado peso.", videoQuery: "cruce de poleas técnica pectoral" },
+  { id: "flexiones", name: "Flexiones de Brazos", muscle: "Pectoral", group: "pecho", nota: "Con tu propio peso corporal, útil para activar antes de entrenar.", videoQuery: "flexiones de brazos técnica correcta" },
+  // Espalda
+  { id: "remo_ancho_maquina", name: "Remo Ancho Máquina", muscle: "Dorsal", group: "espalda", nota: "No levantes los hombros, llevá el movimiento con la espalda.", videoQuery: "remo ancho máquina técnica espalda" },
+  { id: "dorsalera", name: "Dorsalera Agarre Ancho", muscle: "Dorsal", group: "espalda", nota: "No descoloques los hombros, pulgar en la marca.", videoQuery: "dorsalera lat pulldown agarre ancho técnica" },
+  { id: "remo_unilateral", name: "Remo Unilateral", muscle: "Dorsal / oblicuos", group: "espalda", nota: "Contraé los oblicuos, codo lo más abajo posible.", videoQuery: "remo unilateral mancuerna técnica espalda" },
+  { id: "pull_over", name: "Pull Over", muscle: "Dorsal / serrato", group: "espalda", nota: "Codos siempre un poco flexionados.", videoQuery: "pull over espalda técnica mancuerna" },
+  { id: "peso_muerto", name: "Peso Muerto", muscle: "Espalda baja / Femoral", group: "espalda", nota: "Pilar de la cadena posterior, mantené la espalda neutra todo el recorrido.", videoQuery: "peso muerto técnica correcta" },
+  { id: "remo_t", name: "Remo en T", muscle: "Dorsal medio", group: "espalda", nota: "Pecho apoyado si tenés banco, foco en juntar los omóplatos.", videoQuery: "remo en T técnica espalda" },
+  { id: "dominadas", name: "Dominadas", muscle: "Dorsal", group: "espalda", nota: "Si todavía no podés hacer muchas, usá banda de asistencia.", videoQuery: "dominadas técnica correcta" },
+  // Hombros
+  { id: "press_militar_smith", name: "Press Militar Smith", muscle: "Deltoides ant.", group: "hombros", nota: "Codos adelante, banco a 80-90°.", videoQuery: "press militar smith técnica hombros" },
+  { id: "press_militar_mancuernas", name: "Press Militar con Mancuernas", muscle: "Deltoides ant.", group: "hombros", nota: "Mayor rango y estabilidad que con barra.", videoQuery: "press militar mancuernas técnica" },
+  { id: "vuelos_laterales_mancuerna", name: "Vuelos Laterales Mancuerna", muscle: "Deltoides lateral", group: "hombros", nota: "Levantá un poco hacia adelante, no uses impulso.", videoQuery: "vuelos laterales mancuerna técnica deltoides" },
+  { id: "vuelos_laterales_maquina", name: "Vuelos Laterales Máquina", muscle: "Deltoides lateral", group: "hombros", nota: "No hagas tanta fuerza con el agarre, dejá trabajar al hombro.", videoQuery: "vuelos laterales máquina deltoides técnica" },
+  { id: "pec_dec_deltoides", name: "Pec Dec para Deltoides Posterior", muscle: "Deltoides post.", group: "hombros", nota: "Unilateral, movimiento controlado.", videoQuery: "pec dec deltoides posterior técnica" },
+  { id: "face_pull", name: "Face Pull", muscle: "Deltoides post.", group: "hombros", nota: "Polea a la altura de los ojos.", videoQuery: "face pull técnica deltoides posterior" },
+  // Bíceps
+  { id: "biceps_alternado_mancuerna", name: "Bíceps Alternado Mancuerna", muscle: "Bíceps", group: "biceps", nota: "Movés un poco el húmero al final del recorrido.", videoQuery: "curl alternado mancuerna técnica bíceps" },
+  { id: "biceps_martillo", name: "Bíceps Martillo", muscle: "Bíceps / braquial", group: "biceps", nota: "Alternado, agarre neutro.", videoQuery: "curl martillo bíceps técnica hammer curl" },
+  { id: "biceps_banco_scott", name: "Bíceps Banco Scott", muscle: "Bíceps", group: "biceps", nota: "Unilateral con mancuerna, evitá usar impulso.", videoQuery: "curl banco scott técnica bíceps preacher curl" },
+  { id: "biceps_banco_inclinado", name: "Bíceps Banco Inclinado", muscle: "Bíceps cab. larga", group: "biceps", nota: "Alternado, buen estiramiento al inicio del movimiento.", videoQuery: "curl banco inclinado bíceps técnica incline curl" },
+  { id: "biceps_barra_z", name: "Curl con Barra Z", muscle: "Bíceps", group: "biceps", nota: "Más amigable para la muñeca que la barra recta.", videoQuery: "curl barra Z técnica bíceps" },
+  // Tríceps
+  { id: "triceps_trasnuca", name: "Tríceps Trasnuca", muscle: "Tríceps", group: "triceps", nota: "Pausa en el fondo, los codos no van cerrados.", videoQuery: "triceps trasnuca técnica overhead extension" },
+  { id: "triceps_polea_alta", name: "Tríceps Polea Alta", muscle: "Tríceps", group: "triceps", nota: "El húmero no se mueve durante el ejercicio.", videoQuery: "tríceps polea alta técnica cable pushdown" },
+  { id: "triceps_frances", name: "Press Francés", muscle: "Tríceps", group: "triceps", nota: "Codos fijos, cuidado con sobrecargar el hombro.", videoQuery: "press francés técnica tríceps" },
+  { id: "fondos_triceps", name: "Fondos en Paralelas o Banco", muscle: "Tríceps", group: "triceps", nota: "Buen ejercicio compuesto, inclinate poco para enfocar el tríceps.", videoQuery: "fondos tríceps técnica correcta" },
+  // Cuádriceps
+  { id: "jaca", name: "Hack Squat", muscle: "Cuádriceps", group: "cuadriceps", nota: "Pies a la altura de los hombros, bajá controlado.", videoQuery: "hack squat técnica cuádriceps" },
+  { id: "extension_cuadriceps", name: "Extensión de Cuádriceps", muscle: "Cuádriceps", group: "cuadriceps", nota: "Pausa de 1 segundo arriba.", videoQuery: "extensión cuádriceps máquina técnica" },
+  { id: "sentadilla_convencional", name: "Sentadilla con Barra", muscle: "Cuádriceps", group: "cuadriceps", nota: "El básico de piernas, la profundidad depende de tu movilidad.", videoQuery: "sentadilla con barra técnica correcta" },
+  { id: "prensa", name: "Prensa de Piernas", muscle: "Cuádriceps", group: "cuadriceps", nota: "Alternativa de bajo estrés en la zona lumbar.", videoQuery: "prensa de piernas técnica" },
+  { id: "zancadas", name: "Zancadas", muscle: "Cuádriceps / Glúteo", group: "cuadriceps", nota: "Trabajo unilateral, ayuda a corregir desbalances entre piernas.", videoQuery: "zancadas técnica correcta" },
+  // Femoral
+  { id: "curl_femoral_maquina", name: "Curl Femoral Máquina", muscle: "Femoral", group: "femoral", nota: "Controlá bien la fase negativa.", videoQuery: "curl femoral máquina técnica isquios" },
+  { id: "peso_muerto_rumano", name: "Peso Muerto Rumano", muscle: "Femoral", group: "femoral", nota: "Bajá llevando la cadera hacia atrás, rodillas casi rectas.", videoQuery: "peso muerto rumano técnica" },
+  { id: "curl_femoral_acostado", name: "Curl Femoral Acostado", muscle: "Femoral", group: "femoral", nota: "Variante tumbado, controlá bien la vuelta.", videoQuery: "curl femoral acostado técnica" },
+  // Glúteo y cadera
+  { id: "sentadilla_bulgara", name: "Sentadilla Búlgara", muscle: "Glúteo", group: "gluteo", nota: "Torso ligeramente inclinado hacia adelante.", videoQuery: "sentadilla búlgara técnica glúteo" },
+  { id: "hip_thrust", name: "Hip Thrust", muscle: "Glúteo", group: "gluteo", nota: "Pausa de 1-2 segundos arriba, contraé bien el glúteo.", videoQuery: "hip thrust técnica glúteo" },
+  { id: "abductor_maquina", name: "Abductor Máquina", muscle: "Glúteo medio", group: "gluteo", nota: "Espalda apoyada, movimiento controlado.", videoQuery: "abductor máquina técnica glúteo medio" },
+  { id: "aductor_maquina", name: "Aductor Máquina", muscle: "Aductores", group: "gluteo", nota: "Rango completo, sin rebotar.", videoQuery: "aductor máquina técnica inner thigh" },
+  { id: "patada_gluteo", name: "Patada de Glúteo en Polea", muscle: "Glúteo", group: "gluteo", nota: "Movimiento controlado, evitá usar la zona lumbar para empujar.", videoQuery: "patada de glúteo polea técnica" },
+  // Core
+  { id: "abdominales", name: "Abdominales", muscle: "Core", group: "core", nota: "Controlá la fase excéntrica, sin impulso.", videoQuery: "abdominales técnica correcta core" },
+  { id: "plancha", name: "Plancha Abdominal", muscle: "Core", group: "core", nota: "Mantené la cadera alineada con los hombros, no la dejes caer.", videoQuery: "plancha abdominal técnica correcta" },
+  { id: "elevacion_piernas", name: "Elevación de Piernas Colgado", muscle: "Core / abdomen bajo", group: "core", nota: "Controlá el balanceo, el foco está en el abdomen bajo.", videoQuery: "elevación de piernas colgado técnica" },
+  // Pantorrillas
+  { id: "elevacion_talones_parado", name: "Elevación de Talones de Pie", muscle: "Pantorrillas", group: "pantorrillas", nota: "Rango completo, hacé una pausa arriba.", videoQuery: "elevación de talones de pie técnica gemelos" },
+  { id: "elevacion_talones_sentado", name: "Elevación de Talones Sentado", muscle: "Pantorrillas (sóleo)", group: "pantorrillas", nota: "Variante que enfatiza más el sóleo.", videoQuery: "elevación de talones sentado técnica sóleo" },
+];
+const EXERCISE_LIBRARY_BY_ID = {};
+EXERCISE_LIBRARY.forEach((e) => { EXERCISE_LIBRARY_BY_ID[e.id] = e; });
+const EXERCISE_LIBRARY_BY_GROUP = {};
+MUSCLE_GROUPS.forEach((g) => { EXERCISE_LIBRARY_BY_GROUP[g.key] = EXERCISE_LIBRARY.filter((e) => e.group === g.key); });
 
-const KEY_TO_DAY = {};
-DAY_ORDER.forEach((dk) => {
-  ROUTINE[dk].exercises.forEach((ex) => {
-    ex.sets.forEach((_, i) => { KEY_TO_DAY[`${ex.id}_${i}`] = dk; });
+/* ---- Rutinas preestablecidas ---- */
+const PRESET_ROUTINES = [
+  {
+    id: "classic_default",
+    name: "Clásica",
+    source: "preset",
+    description: "La rutina original de la app: empuje, tracción, pierna y un día extra de hombros y brazos.",
+    recommendation: "Pensada para entrenar 4 veces por semana, repitiendo el ciclo.",
+    dayOrder: ["push", "pull", "legs", "sarm"],
+    days: {
+      push: { label: "PUSH", description: "Pecho · Hombro anterior · Tríceps", color: "#14B8A6", exercises: [
+        { libId: "press_banca", sets: [{ repRange: "3-5" }, { repRange: "3-5" }, { repRange: "8-10" }] },
+        { libId: "press_inclinado_smith", sets: mkSets(3, "8-10") },
+        { libId: "cruce_poleas", sets: mkSets(2, "10-12") },
+        { libId: "vuelos_laterales_mancuerna", sets: mkSets(4, "12-15") },
+        { libId: "pec_dec_deltoides", idOverride: "pec_dec_deltoides_push", sets: mkSets(2, "12-15") },
+        { libId: "triceps_trasnuca", idOverride: "triceps_trasnuca_push", sets: mkSets(2, "8-10") },
+        { libId: "triceps_polea_alta", sets: mkSets(2, "8-10") },
+      ] },
+      pull: { label: "PULL", description: "Dorsal · Romboides · Bíceps", color: "#3B82F6", exercises: [
+        { libId: "remo_ancho_maquina", sets: [{ repRange: "4-6" }, { repRange: "4-6" }, { repRange: "8-10" }] },
+        { libId: "dorsalera", sets: mkSets(3, "8-10") },
+        { libId: "remo_unilateral", sets: mkSets(2, "8-10") },
+        { libId: "pull_over", sets: mkSets(3, "8-10") },
+        { libId: "face_pull", sets: mkSets(2, "15-20") },
+        { libId: "biceps_alternado_mancuerna", sets: mkSets(4, "8-10") },
+      ] },
+      legs: { label: "PIERNAS", description: "Glúteo · Cuádriceps · Femoral · Aductores", color: "#F97316", exercises: [
+        { libId: "sentadilla_bulgara", sets: mkSets(2, "8-10") },
+        { libId: "abdominales", sets: mkSets(4, "8-10") },
+        { libId: "jaca", sets: [{ repRange: "4-6" }, { repRange: "4-6" }, { repRange: "8-10" }] },
+        { libId: "curl_femoral_maquina", sets: mkSets(3, "8-10") },
+        { libId: "extension_cuadriceps", sets: mkSets(3, "8-10") },
+        { libId: "aductor_maquina", sets: mkSets(2, "8-10") },
+        { libId: "abductor_maquina", sets: mkSets(2, "8-10") },
+      ] },
+      sarm: { label: "HOMBROS / BRAZOS", description: "Deltoides · Bíceps · Tríceps", color: "#A855F7", exercises: [
+        { libId: "press_militar_smith", sets: [{ repRange: "4-6" }, { repRange: "4-6" }, { repRange: "8-10" }] },
+        { libId: "vuelos_laterales_maquina", sets: mkSets(4, "12-15") },
+        { libId: "pec_dec_deltoides", idOverride: "pec_dec_deltoides_sarm", sets: mkSets(2, "12-15") },
+        { libId: "biceps_martillo", sets: mkSets(3, "6-8") },
+        { libId: "biceps_banco_scott", sets: mkSets(3, "6-8") },
+        { libId: "biceps_banco_inclinado", sets: mkSets(2, "8-10") },
+        { libId: "triceps_trasnuca", idOverride: "triceps_trasnuca_sarm", sets: mkSets(3, "8-10") },
+      ] },
+    },
+  },
+  {
+    id: "ppl",
+    name: "Push / Pull / Legs",
+    source: "preset",
+    description: "Empuje, tracción y pierna en días separados. El split más popular para arrancar.",
+    recommendation: "Recomendado: 3 a 6 sesiones semanales (podés repetir el ciclo dos veces si entrenás 6 días).",
+    dayOrder: ["push", "pull", "legs"],
+    days: {
+      push: { label: "Push", description: "Pecho · Hombro · Tríceps", color: "#14B8A6", exercises: [
+        { libId: "press_banca", sets: [{ repRange: "3-5" }, { repRange: "3-5" }, { repRange: "8-10" }] },
+        { libId: "press_inclinado_mancuernas", sets: mkSets(3, "8-10") },
+        { libId: "vuelos_laterales_mancuerna", sets: mkSets(3, "12-15") },
+        { libId: "press_militar_mancuernas", sets: mkSets(3, "8-10") },
+        { libId: "triceps_polea_alta", sets: mkSets(3, "10-12") },
+      ] },
+      pull: { label: "Pull", description: "Espalda · Bíceps", color: "#3B82F6", exercises: [
+        { libId: "peso_muerto", sets: [{ repRange: "4-6" }, { repRange: "4-6" }, { repRange: "4-6" }] },
+        { libId: "dorsalera", sets: mkSets(3, "8-10") },
+        { libId: "remo_unilateral", sets: mkSets(3, "8-10") },
+        { libId: "face_pull", sets: mkSets(2, "15-20") },
+        { libId: "biceps_alternado_mancuerna", sets: mkSets(3, "8-10") },
+      ] },
+      legs: { label: "Legs", description: "Cuádriceps · Femoral · Glúteo", color: "#F97316", exercises: [
+        { libId: "sentadilla_convencional", sets: [{ repRange: "4-6" }, { repRange: "4-6" }, { repRange: "8-10" }] },
+        { libId: "curl_femoral_maquina", sets: mkSets(3, "8-10") },
+        { libId: "extension_cuadriceps", sets: mkSets(3, "10-12") },
+        { libId: "hip_thrust", sets: mkSets(3, "8-10") },
+        { libId: "elevacion_talones_parado", sets: mkSets(3, "12-15") },
+      ] },
+    },
+  },
+  {
+    id: "upper_lower",
+    name: "Upper / Lower",
+    source: "preset",
+    description: "Divide el cuerpo en tren superior e inferior. Simple y eficiente.",
+    recommendation: "Recomendado: 4 sesiones semanales alternando Torso y Pierna (ej: Lun Torso, Mar Pierna, Jue Torso, Vie Pierna).",
+    dayOrder: ["upper", "lower"],
+    days: {
+      upper: { label: "Torso", description: "Pecho · Espalda · Hombro · Brazos", color: "#14B8A6", exercises: [
+        { libId: "press_banca", sets: [{ repRange: "4-6" }, { repRange: "4-6" }, { repRange: "8-10" }] },
+        { libId: "dorsalera", sets: mkSets(3, "8-10") },
+        { libId: "press_militar_mancuernas", sets: mkSets(3, "8-10") },
+        { libId: "remo_unilateral", sets: mkSets(3, "8-10") },
+        { libId: "biceps_martillo", sets: mkSets(2, "10-12") },
+        { libId: "triceps_polea_alta", sets: mkSets(2, "10-12") },
+      ] },
+      lower: { label: "Pierna", description: "Cuádriceps · Femoral · Pantorrilla", color: "#F97316", exercises: [
+        { libId: "sentadilla_convencional", sets: [{ repRange: "4-6" }, { repRange: "4-6" }, { repRange: "8-10" }] },
+        { libId: "peso_muerto_rumano", sets: mkSets(3, "8-10") },
+        { libId: "prensa", sets: mkSets(3, "10-12") },
+        { libId: "curl_femoral_maquina", sets: mkSets(3, "10-12") },
+        { libId: "elevacion_talones_parado", sets: mkSets(3, "12-15") },
+      ] },
+    },
+  },
+  {
+    id: "arnold",
+    name: "Arnold Split",
+    source: "preset",
+    description: "El clásico de Arnold Schwarzenegger: pecho y espalda juntos, hombros y brazos juntos, y pierna aparte.",
+    recommendation: "Para gente con buena base de entrenamiento: 3 a 6 sesiones semanales repitiendo el ciclo.",
+    dayOrder: ["chest_back", "shoulders_arms", "legs"],
+    days: {
+      chest_back: { label: "Pecho y Espalda", description: "Empuje y tracción de torso juntos", color: "#14B8A6", exercises: [
+        { libId: "press_banca", sets: [{ repRange: "4-6" }, { repRange: "4-6" }, { repRange: "8-10" }] },
+        { libId: "dorsalera", sets: mkSets(3, "8-10") },
+        { libId: "press_inclinado_mancuernas", sets: mkSets(3, "8-10") },
+        { libId: "remo_unilateral", sets: mkSets(3, "8-10") },
+        { libId: "cruce_poleas", sets: mkSets(2, "10-12") },
+        { libId: "pull_over", sets: mkSets(2, "10-12") },
+      ] },
+      shoulders_arms: { label: "Hombros y Brazos", description: "Deltoides, bíceps y tríceps", color: "#A855F7", exercises: [
+        { libId: "press_militar_smith", sets: [{ repRange: "4-6" }, { repRange: "4-6" }, { repRange: "8-10" }] },
+        { libId: "vuelos_laterales_mancuerna", sets: mkSets(3, "12-15") },
+        { libId: "biceps_alternado_mancuerna", sets: mkSets(3, "8-10") },
+        { libId: "triceps_trasnuca", sets: mkSets(3, "8-10") },
+        { libId: "biceps_martillo", sets: mkSets(2, "10-12") },
+        { libId: "triceps_polea_alta", sets: mkSets(2, "10-12") },
+      ] },
+      legs: { label: "Piernas", description: "Cuádriceps · Femoral · Glúteo", color: "#F97316", exercises: [
+        { libId: "jaca", sets: [{ repRange: "4-6" }, { repRange: "4-6" }, { repRange: "8-10" }] },
+        { libId: "curl_femoral_maquina", sets: mkSets(3, "8-10") },
+        { libId: "extension_cuadriceps", sets: mkSets(3, "10-12") },
+        { libId: "sentadilla_bulgara", sets: mkSets(2, "8-10") },
+        { libId: "elevacion_talones_parado", sets: mkSets(3, "12-15") },
+      ] },
+    },
+  },
+  {
+    id: "fullbody",
+    name: "Cuerpo Completo",
+    source: "preset",
+    description: "Trabajás todo el cuerpo en cada sesión, con tres días distintos para variar el estímulo.",
+    recommendation: "Recomendado: 3 sesiones semanales no consecutivas (ej. Lunes, Miércoles, Viernes).",
+    dayOrder: ["day_a", "day_b", "day_c"],
+    days: {
+      day_a: { label: "Día A", description: "Full body — variante A", color: "#14B8A6", exercises: [
+        { libId: "sentadilla_convencional", sets: [{ repRange: "4-6" }, { repRange: "4-6" }, { repRange: "8-10" }] },
+        { libId: "press_banca", sets: mkSets(3, "8-10") },
+        { libId: "dorsalera", sets: mkSets(3, "8-10") },
+        { libId: "vuelos_laterales_mancuerna", sets: mkSets(2, "12-15") },
+        { libId: "abdominales", sets: mkSets(3, "10-12") },
+      ] },
+      day_b: { label: "Día B", description: "Full body — variante B", color: "#3B82F6", exercises: [
+        { libId: "peso_muerto_rumano", sets: mkSets(3, "8-10") },
+        { libId: "press_militar_mancuernas", sets: mkSets(3, "8-10") },
+        { libId: "remo_unilateral", sets: mkSets(3, "8-10") },
+        { libId: "biceps_martillo", sets: mkSets(2, "10-12") },
+        { libId: "plancha", sets: mkSets(3, "12-15") },
+      ] },
+      day_c: { label: "Día C", description: "Full body — variante C", color: "#F97316", exercises: [
+        { libId: "prensa", sets: mkSets(3, "10-12") },
+        { libId: "press_inclinado_mancuernas", sets: mkSets(3, "8-10") },
+        { libId: "remo_t", sets: mkSets(3, "8-10") },
+        { libId: "triceps_polea_alta", sets: mkSets(2, "10-12") },
+        { libId: "elevacion_piernas", sets: mkSets(3, "12-15") },
+      ] },
+    },
+  },
+];
+const PRESET_ROUTINES_BY_ID = {};
+PRESET_ROUTINES.forEach((r) => { PRESET_ROUTINES_BY_ID[r.id] = r; });
+const CLASSIC_PRESET = PRESET_ROUTINES_BY_ID["classic_default"];
+
+function cloneRoutineDef(def) { return JSON.parse(JSON.stringify(def)); }
+
+// Convierte una definición de rutina (preset o creada por el usuario) en el
+// modelo "resuelto" que usa el resto de la app: cada ejercicio ya trae su
+// nombre/músculo/nota/video (sacados de la biblioteca, salvo que sea un
+// ejercicio personalizado, que sólo trae lo que el usuario tipeó).
+function buildRoutineModel(routineDef) {
+  const dayOrder = routineDef.dayOrder;
+  const days = {};
+  const exerciseById = {};
+  const keyToDay = {};
+  dayOrder.forEach((dk) => {
+    const d = routineDef.days[dk];
+    const exercises = (d.exercises || []).map((entry) => {
+      const lib = entry.libId ? EXERCISE_LIBRARY_BY_ID[entry.libId] : null;
+      const id = entry.idOverride || (lib ? lib.id : entry.id);
+      const name = lib ? lib.name : entry.name;
+      const muscle = lib ? lib.muscle : (entry.muscle || "Personalizado");
+      const nota = lib ? lib.nota : (entry.nota || null);
+      const video = lib ? yt(lib.videoQuery) : null;
+      return { id, name, muscle, nota, video, sets: entry.sets, custom: !lib };
+    });
+    days[dk] = { ...d, exercises };
+    exercises.forEach((ex) => {
+      exerciseById[ex.id] = { ...ex, dayKey: dk };
+      ex.sets.forEach((_, i) => { keyToDay[`${ex.id}_${i}`] = dk; });
+    });
   });
-});
+  return { dayOrder, days, exerciseById, keyToDay };
+}
+
+// ROUTINE / DAY_ORDER / EXERCISE_BY_ID / KEY_TO_DAY son las cuatro variables
+// que el resto del archivo usa para "la rutina de ahora". Se reasignan cada
+// vez que cambia la rutina activa — ver applyRoutineModel() más abajo y su
+// uso en el componente App().
+let ROUTINE = {};
+let DAY_ORDER = [];
+let EXERCISE_BY_ID = {};
+let KEY_TO_DAY = {};
+
+function applyRoutineModel(routineDef) {
+  const model = buildRoutineModel(routineDef);
+  DAY_ORDER = model.dayOrder;
+  ROUTINE = model.days;
+  EXERCISE_BY_ID = model.exerciseById;
+  KEY_TO_DAY = model.keyToDay;
+}
+
+// Valor inicial (antes de que cargue cualquier perfil) para que nada truene.
+applyRoutineModel(CLASSIC_PRESET);
 
 /* ============================== CONSTANTS ============================== */
 
@@ -186,7 +391,29 @@ function getDeviceId() {
   return id;
 }
 
-function loadProfiles() { try { return JSON.parse(localStorage.getItem(PROFILES_KEY) || "{}"); } catch { return {}; } }
+// Perfiles de versiones anteriores de la app (antes de que existieran
+// múltiples rutinas) no tienen `routines`/`activeRoutineId`. Si ya tenían
+// `maxesSetupDays` es señal de que es un perfil viejo con datos reales: se le
+// asigna la rutina "Clásica" automáticamente, sin pedirle nada, para que no
+// pierda ni su rutina ni su historial. Un perfil realmente nuevo (creado ya
+// con esta versión) no tiene `maxesSetupDays`, así que se lo deja sin rutina
+// activa a propósito: la pantalla de Rutinas se va a encargar de pedírsela.
+function migrateProfile(p) {
+  if (p.routines && p.activeRoutineId) return p;
+  if (p.maxesSetupDays) {
+    return { ...p, routines: { [CLASSIC_PRESET.id]: cloneRoutineDef(CLASSIC_PRESET) }, activeRoutineId: CLASSIC_PRESET.id };
+  }
+  return p;
+}
+
+function loadAndMigrateProfiles() {
+  const raw = (() => { try { return JSON.parse(localStorage.getItem(PROFILES_KEY) || "{}"); } catch { return {}; } })();
+  const out = {};
+  Object.entries(raw).forEach(([name, p]) => { out[name] = migrateProfile(p); });
+  return out;
+}
+
+function loadProfiles() { return loadAndMigrateProfiles(); }
 function saveProfiles(p) { try { localStorage.setItem(PROFILES_KEY, JSON.stringify(p)); } catch {} idbPut("profiles", p); }
 function loadActive() { try { return localStorage.getItem(ACTIVE_KEY) || null; } catch { return null; } }
 function saveActive(n) { try { n ? localStorage.setItem(ACTIVE_KEY, n) : localStorage.removeItem(ACTIVE_KEY); } catch {} idbPut("active", n); }
@@ -272,6 +499,10 @@ function formatTime(s) { return `${Math.floor(s / 60).toString().padStart(2, "0"
 function vol(kg, reps) { return (!kg || !reps) ? 0 : kg * reps; }
 function estimate1RM(kg, reps) { return (!kg || !reps) ? 0 : Math.round(kg * (1 + reps / 30) * 10) / 10; }
 function repRangeTop(repRange) { const parts = String(repRange).split("-"); return parseInt(parts[parts.length - 1], 10); }
+// Detecta series de fuerza automáticamente: si el techo del rango de
+// repeticiones es 6 o menos, se la considera "FUERZA" — sin que nadie tenga
+// que marcarla a mano al crear la rutina.
+function isHeavyRepRange(repRange) { const top = repRangeTop(repRange); return !isNaN(top) && top <= 6; }
 
 function parseLogKey(key) {
   const idx = key.lastIndexOf("_");
@@ -504,11 +735,11 @@ function LoginScreen({ onLogin }) {
         email: regMail || null,
         joinedAt: new Date().toISOString(),
         deviceId,
-        maxesSetupDays: { push: false, pull: false, legs: false, sarm: false },
-        onboardingDismissed: false,
+        // Sin `routines`/`activeRoutineId`: la pantalla de Rutinas se va a
+        // encargar de pedirle que elija una preestablecida o cree la suya.
         // Perfil recién creado: todavía no vio el tutorial guiado de la app.
-        // Se dispara automáticamente apenas termina (o salta) el asistente
-        // de marcas iniciales — ver `closeHub` en el componente App.
+        // Se dispara automáticamente apenas activa su primera rutina — ver
+        // `handleActivateRoutine` en el componente App.
         tutorialSeen: false,
       },
     };
@@ -651,7 +882,7 @@ const DEMO_CAROUSEL_EXERCISES = ROUTINE.push.exercises.map((e) => ({ id: e.id, n
 
 /* ---- Demo en vivo: pestaña Rutina (día, panel, tarjeta de ejercicio, reset) ---- */
 function RutinaDemo({ view }) {
-  const [demoDay, setDemoDay] = useState("push");
+  const [demoDay, setDemoDay] = useState(() => DAY_ORDER[0]);
   const [demoLogs, setDemoLogs] = useState({});
   const [confirmReset, setConfirmReset] = useState(false);
 
@@ -748,13 +979,13 @@ function ProgresoDemo({ view }) {
   }
 
   if (view === "daycounts") {
-    const counts = { push: 5, pull: 4, legs: 3, sarm: 6 };
+    const exampleCounts = [5, 4, 3, 6, 2, 4];
     return (
       <div className="flex gap-2">
-        {DAY_ORDER.map((dk) => { const d = ROUTINE[dk]; return (
+        {DAY_ORDER.map((dk, i) => { const d = ROUTINE[dk]; return (
           <div key={dk} className="flex-1 bg-slate-800/40 rounded-xl p-2.5 text-center border border-slate-800/60">
             <div className="w-7 h-7 rounded-lg mx-auto flex items-center justify-center mb-1 text-[10px] font-black" style={{ backgroundColor: d.color + "18", color: d.color }}>{d.label.slice(0, 1)}</div>
-            <p className="text-sm font-black text-white">{counts[dk]}</p>
+            <p className="text-sm font-black text-white">{exampleCounts[i % exampleCounts.length]}</p>
             <p className="text-[8px] text-slate-600 leading-tight">series<br />mejoradas</p>
           </div>
         ); })}
@@ -898,16 +1129,6 @@ function PerfilDemo({ view }) {
     );
   }
 
-  if (view === "marcas") {
-    return (
-      <div className="flex items-center gap-3 bg-slate-900/60 border border-slate-800/50 rounded-xl px-3.5 py-3">
-        <div className="w-8 h-8 rounded-lg bg-teal-500/15 text-teal-400 flex items-center justify-center shrink-0"><Target size={14} /></div>
-        <div className="flex-1"><p className="text-xs font-bold text-white">Marcas iniciales</p><p className="text-[10px] text-slate-500">2/4 días configurados</p></div>
-        <ChevronRight size={14} className="text-slate-600 shrink-0" />
-      </div>
-    );
-  }
-
   if (view === "ciclo") {
     return (
       <div className="flex items-center justify-between bg-slate-900/60 border border-slate-800/50 rounded-xl px-3.5 py-3">
@@ -958,8 +1179,75 @@ function PerfilDemo({ view }) {
   );
 }
 
+/* ---- Demo en vivo: pestaña Rutinas ---- */
+function RutinasDemo({ view }) {
+  const [open, setOpen] = useState(false);
+
+  if (view === "active") {
+    return (
+      <div className="rounded-xl border border-teal-500/25 bg-teal-500/5 p-3">
+        <div className="flex items-center gap-1.5 mb-1"><Layers size={12} className="text-teal-400" /><span className="text-[9px] font-black uppercase tracking-widest text-teal-400">Tu rutina activa</span></div>
+        <p className="text-sm font-black text-white">Push / Pull / Legs</p>
+        <div className="flex items-center gap-1.5 mt-2">
+          <span className="text-[9px] font-bold px-2 py-0.5 rounded-lg bg-teal-500/20 text-teal-400">Push</span>
+          <span className="text-[9px] font-bold px-2 py-0.5 rounded-lg bg-blue-500/20 text-blue-400">Pull</span>
+          <span className="text-[9px] font-bold px-2 py-0.5 rounded-lg bg-orange-500/20 text-orange-400">Legs</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (view === "preset") {
+    return (
+      <div className="bg-slate-900/60 border border-slate-800/50 rounded-xl overflow-hidden">
+        <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center justify-between gap-2 px-3.5 py-3 text-left">
+          <div className="min-w-0">
+            <p className="text-xs font-bold text-white">Arnold Split</p>
+            <p className="text-[10px] text-slate-500 mt-0.5">Pecho y espalda juntos, hombros y brazos juntos…</p>
+          </div>
+          <ChevronDown size={14} className={`text-slate-600 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
+        </button>
+        {open && (
+          <div className="px-3.5 pb-3 text-[10px] text-slate-500 space-y-1 tab-fade-in">
+            <p>· Pecho y Espalda — 6 ejercicios</p>
+            <p>· Hombros y Brazos — 6 ejercicios</p>
+            <p>· Piernas — 5 ejercicios</p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (view === "builder") {
+    return (
+      <div className="bg-slate-950/50 border border-slate-800/50 rounded-xl p-3">
+        <div className="flex gap-1.5 mb-2.5">
+          {["Pecho", "Espalda", "Hombros", "Bíceps"].map((g, i) => (
+            <span key={g} className={`px-2 py-1 rounded-lg text-[9px] font-bold ${i === 0 ? "bg-teal-500/20 text-teal-400" : "text-slate-600 border border-slate-800"}`}>{g}</span>
+          ))}
+        </div>
+        <div className="flex items-center gap-2.5 bg-slate-900/60 rounded-lg px-2.5 py-2">
+          <div className="flex-1 min-w-0"><p className="text-[10px] font-bold text-white truncate">Press Inclinado con Mancuernas</p><p className="text-[9px] text-slate-500">3 series · 8-10 reps</p></div>
+          <Plus size={13} className="text-teal-400 shrink-0" />
+        </div>
+      </div>
+    );
+  }
+
+  // "manage"
+  return (
+    <div className="bg-slate-900/60 border border-slate-800/50 rounded-xl px-3.5 py-3 flex items-center gap-2.5">
+      <div className="w-7 h-7 rounded-lg bg-slate-800/60 text-slate-400 flex items-center justify-center shrink-0"><Layers size={13} /></div>
+      <div className="flex-1 min-w-0"><p className="text-xs font-bold text-white truncate">Mi rutina de verano</p><p className="text-[10px] text-slate-500">3 días · creada por vos</p></div>
+      <span className="px-2.5 py-1 rounded-lg bg-teal-500/15 text-teal-400 text-[10px] font-bold shrink-0">Activar</span>
+      <Trash2 size={13} className="text-slate-600 shrink-0" />
+    </div>
+  );
+}
+
 function DemoPreview({ kind, view }) {
   if (kind === "rutina") return <RutinaDemo view={view} />;
+  if (kind === "rutinas") return <RutinasDemo view={view} />;
   if (kind === "progreso") return <ProgresoDemo view={view} />;
   if (kind === "descarga") return <DescargaDemo view={view} />;
   if (kind === "perfil") return <PerfilDemo view={view} />;
@@ -981,7 +1269,44 @@ const HELP_CHAPTERS = [
       {
         icon: <Layers size={20} />,
         title: "Cuatro secciones principales",
-        text: "Abajo de la pantalla (o al costado, en pantallas grandes) tenés 4 pestañas: Rutina para entrenar, Progreso para ver tu evolución, Descarga para tu semana de recuperación, y Perfil para tu configuración. Vamos una por una.",
+        text: "Abajo de la pantalla (o al costado, en pantallas grandes) tenés 4 pestañas: Rutinas para elegir o crear tu plan de entrenamiento, Progreso para ver tu evolución, Descarga para tu semana de recuperación, y Rutina —la principal— para entrenar. Tu perfil y configuración los abrís tocando tu avatar arriba a la izquierda.",
+      },
+    ],
+  },
+  {
+    key: "rutinas",
+    label: "Rutinas",
+    color: "#14B8A6",
+    icon: <Layers size={16} />,
+    steps: [
+      {
+        icon: <Layers size={20} />,
+        title: "Rutinas: elegí cómo entrenar",
+        text: "Acá elegís qué rutina vas a seguir: alguna ya armada (Push/Pull/Legs, Arnold Split, Upper/Lower y alguna más) o una creada por vos desde cero. Es lo primero que ves con un perfil nuevo, y podés volver cuando quieras para cambiar de rutina.",
+      },
+      {
+        icon: <Dumbbell size={20} />,
+        title: "Tu rutina activa",
+        text: "Arriba de todo ves un resumen de la rutina que estás siguiendo ahora: su nombre y los días que la componen, cada uno con su color.",
+        demo: { kind: "rutinas", view: "active" },
+      },
+      {
+        icon: <ListChecks size={20} />,
+        title: "Rutinas preestablecidas",
+        text: "Más abajo está el catálogo: Push/Pull/Legs, Arnold Split, Upper/Lower, Cuerpo Completo y la Clásica. Tocá una para ver su distribución semanal completa —día por día, con sus ejercicios y series— antes de usarla.",
+        demo: { kind: "rutinas", view: "preset", caption: "Tocá la rutina para ver el detalle" },
+      },
+      {
+        icon: <Sparkles size={20} />,
+        title: "Creá la tuya",
+        text: "Con \"Crear mi propia rutina\" le ponés nombre, armás los días que quieras y agregás ejercicios buscando por grupo muscular. Por cada uno elegís series y repeticiones aproximadas — si son 6 o menos, se marca como FUERZA automáticamente. También podés agregar un ejercicio que no esté en la lista, aunque ese no va a tener nota técnica ni video.",
+        demo: { kind: "rutinas", view: "builder" },
+      },
+      {
+        icon: <Trash2 size={20} />,
+        title: "Cambiar o borrar tus rutinas",
+        text: "Las rutinas que creaste (o las preestablecidas que ya probaste) quedan guardadas: tocá \"Activar\" para cambiar a esa, o el tacho para borrar una creada por vos. Las preestablecidas no se pueden borrar, siempre están disponibles.",
+        demo: { kind: "rutinas", view: "manage" },
       },
     ],
   },
@@ -999,7 +1324,7 @@ const HELP_CHAPTERS = [
       {
         icon: <Calendar size={20} />,
         title: "Elegí tu día",
-        text: "Arriba de todo elegís el día: Push, Pull, Piernas u Hombros/Brazos. La app resalta uno como \"sugerido para hoy\" según el último tipo de día que entrenaste — no según el calendario.",
+        text: "Arriba de todo elegís el día de tu rutina activa. La app resalta uno como \"sugerido para hoy\" según el último tipo de día que entrenaste — no según el calendario.",
         demo: { kind: "rutina", view: "daypicker", caption: "Tocá un día y mirá cómo cambia" },
       },
       {
@@ -1011,13 +1336,19 @@ const HELP_CHAPTERS = [
       {
         icon: <ChevronDown size={20} />,
         title: "Tarjetas de ejercicio",
-        text: "Cada ejercicio es una tarjeta: tocala para desplegarla y ver sus series, la nota técnica y el video. Si lleva 21+ días sin superar el récord, te avisa que está \"estancado\".",
+        text: "Cada ejercicio es una tarjeta: tocala para desplegarla y ver el cronómetro, sus series, la nota técnica y el video. Si lleva 21+ días sin superar el récord, te avisa que está \"estancado\".",
         demo: { kind: "rutina", view: "card-closed", caption: "Tocá la tarjeta para desplegarla" },
+      },
+      {
+        icon: <Pause size={20} />,
+        title: "Descanso entre series",
+        text: "Apenas abrís la tarjeta, arriba de todo está el temporizador de descanso: te avisa (con sonido, vibración o ambos, según lo que elijas en Perfil) cuándo arrancar la próxima serie. Podés pausarlo o reiniciarlo con los botones de al lado.",
+        demo: { kind: "rutina", view: "card-open", caption: "El cronómetro está arriba de las series — probá pausarlo" },
       },
       {
         icon: <Save size={20} />,
         title: "Registrá tus series",
-        text: "Por cada serie ingresás reps y kg, y tocás el botón de guardar. Tu mejor marca (récord) de esa serie se calcula sola, y si la superás te avisa con un mensaje y un efecto de confetti.",
+        text: "Debajo del cronómetro, por cada serie ingresás reps y kg, y tocás el botón de guardar. Tu mejor marca (récord) de esa serie se calcula sola, y si la superás te avisa con un mensaje y un efecto de confetti.",
         demo: { kind: "rutina", view: "card-open", caption: "Probá: ingresá reps y kg, y tocá Guardar" },
       },
       {
@@ -1025,12 +1356,6 @@ const HELP_CHAPTERS = [
         title: "Esfuerzo (RPE), opcional",
         text: "Debajo de cada serie podés tocar \"+ Registrar RPE\" para anotar qué tan dura te resultó, en una escala de 6 a 10. Es opcional, pero ayuda a detectar fatiga acumulada con el tiempo.",
         demo: { kind: "rutina", view: "card-open", caption: "Tocá \"+ Registrar RPE\" debajo de una serie" },
-      },
-      {
-        icon: <Pause size={20} />,
-        title: "Descanso entre series",
-        text: "El temporizador de descanso te avisa (con sonido, vibración o ambos, según lo que elijas en Perfil) cuándo arrancar la próxima serie. Podés pausarlo o reiniciarlo con los botones de al lado.",
-        demo: { kind: "rutina", view: "card-open", caption: "El cronómetro está debajo de las series — probá pausarlo" },
       },
       {
         icon: <Video size={20} />,
@@ -1066,7 +1391,7 @@ const HELP_CHAPTERS = [
       {
         icon: <TrendingUp size={20} />,
         title: "Mejoras por día",
-        text: "Te muestra cuántas series mejoraste (superaste tu primer registro) en cada tipo de día: Push, Pull, Piernas y Hombros/Brazos.",
+        text: "Te muestra cuántas series mejoraste (superaste tu primer registro) en cada día de tu rutina activa.",
         demo: { kind: "progreso", view: "daycounts" },
       },
       {
@@ -1139,10 +1464,9 @@ const HELP_CHAPTERS = [
         demo: { kind: "perfil", view: "datos" },
       },
       {
-        icon: <Target size={20} />,
-        title: "Marcas iniciales",
-        text: "\"Marcas iniciales\" te lleva al asistente para cargar tus pesos de partida por día — podés hacerlo de a uno, cuando quieras, no hace falta completarlo todo de una vez.",
-        demo: { kind: "perfil", view: "marcas" },
+        icon: <Layers size={20} />,
+        title: "Tu rutina",
+        text: "Debajo de \"Editar perfil\" tenés un acceso directo que muestra qué rutina tenés activa y cuántas guardaste. Tocalo para ir a la pestaña Rutinas y cambiar o crear otra.",
       },
       {
         icon: <Calendar size={20} />,
@@ -1339,7 +1663,7 @@ function SetRow({ exerciseId, setIndex, setDef, accent, logs, setLogs, deloadKgF
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">S{setIndex + 1}</span>
           <span className="text-[10px] bg-slate-800/80 text-slate-500 rounded-lg px-2 py-0.5">{setDef.repRange} reps</span>
-          {setDef.heavy && <span className="text-[10px] bg-amber-500/15 text-amber-400 rounded-lg px-2 py-0.5 font-bold">FUERZA</span>}
+          {isHeavyRepRange(setDef.repRange) && <span className="text-[10px] bg-amber-500/15 text-amber-400 rounded-lg px-2 py-0.5 font-bold">FUERZA</span>}
         </div>
         {feedback && <span className={`text-xs font-semibold ${feedback.type === "pr" ? "text-emerald-400 pr-pop" : feedback.type === "down" ? "text-rose-400" : "text-amber-400"}`}>{feedback.msg}</span>}
       </div>
@@ -1396,7 +1720,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, deloadSets, deloadMode,
   // tarjeta automáticamente cuando el paso explica algo de adentro (reps/kg,
   // RPE, descanso, video). No afecta el comportamiento normal de la app.
   useEffect(() => { if (forceOpen) setOpen(true); }, [forceOpen]);
-  const hasHeavy = exercise.sets.some((s) => s.heavy);
+  const hasHeavy = exercise.sets.some((s) => isHeavyRepRange(s.repRange));
   const setsToShow = deloadSets ? exercise.sets.slice(0, deloadSets) : exercise.sets;
   const { stagnant } = useMemo(() => getStagnationInfo(exercise, logs), [exercise, logs]);
   return (
@@ -1411,7 +1735,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, deloadSets, deloadMode,
               {deloadMode && <span className="text-[10px] bg-purple-500/15 text-purple-400 rounded-lg px-1.5 py-0.5 font-bold">DESCARGA</span>}
               {!deloadMode && stagnant && <span className="text-[10px] bg-rose-500/15 text-rose-400 rounded-lg px-1.5 py-0.5 font-bold flex items-center gap-1"><AlertTriangle size={9} /> ESTANCADO</span>}
             </div>
-            <p className="text-[11px] text-slate-500 mt-0.5">{exercise.nota}</p>
+            {exercise.nota && <p className="text-[11px] text-slate-500 mt-0.5">{exercise.nota}</p>}
           </div>
         </div>
         <ChevronDown size={18} className={`text-slate-600 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
@@ -1419,11 +1743,15 @@ function ExerciseCard({ exercise, accent, logs, setLogs, deloadSets, deloadMode,
       {open && (
         <div className="px-4 pb-4 pt-0 tab-fade-in">
           {!deloadMode && stagnant && <div className="mb-3 text-[11px] text-rose-400/90 bg-rose-500/5 border border-rose-500/15 rounded-xl px-3 py-2 flex items-start gap-1.5"><Info size={12} className="mt-0.5 shrink-0" /><span>Hace {STAGNATION_DAYS}+ días sin superar el récord. Considerá cambiar reps, descanso o variante.</span></div>}
-          {setsToShow.map((s, i) => <SetRow key={i} exerciseId={exercise.id} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} deloadKgFactor={settings.deloadPct} deloadMode={deloadMode} resetKey={resetKey} />)}
-          <div className="flex flex-col gap-2 pt-3">
+          <div className="mb-1">
             <RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={accent} alertType={settings.alertType} />
-            <a href={exercise.video} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 py-3 rounded-xl border border-slate-800 text-slate-400 hover:border-slate-600 hover:text-white transition text-sm font-medium">▶ Ver técnica en YouTube</a>
           </div>
+          {setsToShow.map((s, i) => <SetRow key={i} exerciseId={exercise.id} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} deloadKgFactor={settings.deloadPct} deloadMode={deloadMode} resetKey={resetKey} />)}
+          {exercise.video && (
+            <div className="pt-3">
+              <a href={exercise.video} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 py-3 rounded-xl border border-slate-800 text-slate-400 hover:border-slate-600 hover:text-white transition text-sm font-medium">▶ Ver técnica en YouTube</a>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -1472,7 +1800,7 @@ function RoutineView({ logs, setLogs, cycleStart, settings }) {
   const [activeDay, setActiveDay] = useState(() => getSuggestedDay(logs));
   const suggestedDay = useMemo(() => getSuggestedDay(logs), []);
   const weekInfo = getWeekInfo(cycleStart, settings), isDeload = weekInfo?.isDeload, day = ROUTINE[activeDay];
-  const [resetKeys, setResetKeys] = useState({ push: 0, pull: 0, legs: 0, sarm: 0 });
+  const [resetKeys, setResetKeys] = useState({});
   const [confirmReset, setConfirmReset] = useState(false);
   const getDeloadSets = (ex) => Math.max(1, Math.ceil(ex.sets.length / settings.deloadSetDivisor));
 
@@ -1484,7 +1812,7 @@ function RoutineView({ logs, setLogs, cycleStart, settings }) {
   const handleResetDay = () => {
     const newLogs = { ...logs };
     day.exercises.forEach((ex) => { ex.sets.forEach((_, i) => { const key = `${ex.id}_${i}`; if (newLogs[key]) { newLogs[key] = newLogs[key].filter((h) => h.date !== today); if (!newLogs[key].length) delete newLogs[key]; } }); });
-    setLogs(newLogs); setResetKeys((prev) => ({ ...prev, [activeDay]: prev[activeDay] + 1 })); setConfirmReset(false);
+    setLogs(newLogs); setResetKeys((prev) => ({ ...prev, [activeDay]: (prev[activeDay] || 0) + 1 })); setConfirmReset(false);
   };
 
   return (
@@ -2045,7 +2373,7 @@ function ProgressView({ logs, setLogs }) {
 /* ============================================================================
    PROFILE VIEW — adds an entry point to the setup hub + a backup status line
 ============================================================================ */
-function ProfileView({ profileName, profiles, onLogout, onDelete, onUpdateProfile, cycleStart, onSetCycleStart, onOpenSetup }) {
+function ProfileView({ profileName, profiles, onLogout, onDelete, onUpdateProfile, cycleStart, onSetCycleStart, onGoToRoutines }) {
   const profile = profiles[profileName];
   const [showDeletePin, setShowDeletePin] = useState(false); const [deleteError, setDeleteError] = useState("");
   const [editing, setEditing] = useState(false); const [editMail, setEditMail] = useState(profile?.email || "");
@@ -2058,8 +2386,8 @@ function ProfileView({ profileName, profiles, onLogout, onDelete, onUpdateProfil
   const adjustDeloadPct = (delta) => updateSettings({ deloadPct: Math.min(0.95, Math.max(0.5, Math.round((settings.deloadPct + delta) * 100) / 100)) });
   const handleDeleteConfirm = (pin) => { if (profile.pin && pin !== profile.pin) { setDeleteError("PIN incorrecto."); setTimeout(() => setDeleteError(""), 1500); } else { onDelete(); } };
   const initial = profileName.charAt(0).toUpperCase();
-  const setupDays = profile?.maxesSetupDays || {};
-  const setupDoneCount = DAY_ORDER.filter((dk) => setupDays[dk]).length;
+  const activeRoutineDef = profile?.routines?.[profile.activeRoutineId];
+  const savedRoutineCount = Object.keys(profile?.routines || {}).length;
 
   return (
     <div className="space-y-4">
@@ -2088,9 +2416,9 @@ function ProfileView({ profileName, profiles, onLogout, onDelete, onUpdateProfil
         <button onClick={() => setEditing(true)} className="w-full flex items-center gap-2 justify-center py-3 rounded-2xl border border-slate-800 text-slate-400 hover:border-slate-600 hover:text-white transition text-sm font-medium"><Edit3 size={14} /> Editar perfil</button>
       )}
 
-      <button onClick={onOpenSetup} className="w-full flex items-center gap-3 bg-slate-900/50 border border-slate-800/50 rounded-2xl px-4 py-3.5 hover:border-teal-500/30 transition text-left">
-        <div className="w-9 h-9 rounded-xl bg-teal-500/15 text-teal-400 flex items-center justify-center shrink-0"><Target size={16} /></div>
-        <div className="flex-1 min-w-0"><p className="text-sm font-bold text-white">Marcas iniciales</p><p className="text-[11px] text-slate-500">{setupDoneCount}/4 días configurados</p></div>
+      <button onClick={onGoToRoutines} className="w-full flex items-center gap-3 bg-slate-900/50 border border-slate-800/50 rounded-2xl px-4 py-3.5 hover:border-teal-500/30 transition text-left">
+        <div className="w-9 h-9 rounded-xl bg-teal-500/15 text-teal-400 flex items-center justify-center shrink-0"><Layers size={16} /></div>
+        <div className="flex-1 min-w-0"><p className="text-sm font-bold text-white">Tu rutina: {activeRoutineDef?.name || "—"}</p><p className="text-[11px] text-slate-500">{savedRoutineCount} guardada{savedRoutineCount === 1 ? "" : "s"} · tocá para cambiar o crear otra</p></div>
         <ChevronRight size={16} className="text-slate-600 shrink-0" />
       </button>
 
@@ -2156,108 +2484,405 @@ function ProfileView({ profileName, profiles, onLogout, onDelete, onUpdateProfil
 }
 
 /* ============================================================================
-   MAX SETUP HUB + WIZARD — split by day, can be done at different times.
+   RUTINAS — catálogo (preestablecidas + las que creaste) y creador de
+   rutinas propias. Reemplaza al viejo asistente de "marcas iniciales": ahora,
+   en vez de pedirte pesos apenas entrás, te deja elegir cómo vas a entrenar.
 ============================================================================ */
-function MaxSetupHub({ profile, onStartDay, onClose }) {
-  const done = profile?.maxesSetupDays || {};
-  const doneCount = DAY_ORDER.filter((dk) => done[dk]).length;
+
+// Vista de solo lectura de una rutina (preset o propia): un resumen por día
+// con sus ejercicios y cuántas series tiene en total. Se usa tanto para
+// "previsualizar" un preset antes de usarlo como, en teoría, para cualquier
+// definición de rutina con la misma forma (dayOrder + days).
+function RoutinePreview({ routineDef }) {
+  const model = useMemo(() => buildRoutineModel(routineDef), [routineDef]);
   return (
-    <div className="min-h-screen bg-[#0a0a0f] flex flex-col px-4 py-10 relative overflow-hidden">
-      <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-80 h-80 rounded-full bg-teal-500/10 blur-3xl pointer-events-none" />
-      <div className="max-w-sm mx-auto w-full relative flex-1 flex flex-col">
-        <div className="text-center mb-8">
-          <div className="w-14 h-14 rounded-2xl bg-teal-500/15 flex items-center justify-center mx-auto mb-4"><Target className="text-teal-500" size={26} /></div>
-          <h2 className="text-xl font-black text-white">Configurá tus marcas iniciales</h2>
-          <p className="text-sm text-slate-500 mt-2 leading-relaxed">Podés hacerlo de a un día por vez, cuando tengas tiempo. La app va a guardar tu progreso por separado en cada uno.</p>
-        </div>
-        <div className="space-y-2.5 flex-1">
-          {DAY_ORDER.map((dk) => {
-            const d = ROUTINE[dk], isDone = !!done[dk];
-            return (
-              <button key={dk} onClick={() => onStartDay(dk)} className="w-full flex items-center gap-3.5 bg-slate-900/60 border border-slate-800/60 hover:border-slate-700 rounded-2xl px-4 py-3.5 transition-all active:scale-[0.98] text-left">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: isDone ? "#10B98122" : d.color + "18", color: isDone ? "#10B981" : d.color }}>{isDone ? <Check size={18} /> : <Dumbbell size={16} />}</div>
-                <div className="flex-1 min-w-0"><p className="text-white font-semibold text-sm">{d.label}</p><p className="text-[11px] text-slate-500">{isDone ? "Configurado" : `${d.exercises.length} ejercicios`}</p></div>
-                <ChevronRight size={16} className="text-slate-600 shrink-0" />
-              </button>
-            );
-          })}
-        </div>
-        <div className="pt-6">
-          <p className="text-center text-[11px] text-slate-600 mb-3">{doneCount}/4 días configurados</p>
-          <button onClick={onClose} className="w-full py-4 rounded-2xl bg-teal-500 text-white font-bold text-sm hover:bg-teal-400 active:scale-[0.98] transition-all shadow-lg shadow-teal-500/20">{doneCount > 0 ? "Continuar a la app" : "Configurar más tarde"}</button>
-        </div>
-      </div>
+    <div className="space-y-2">
+      {model.dayOrder.map((dk) => {
+        const d = model.days[dk];
+        const totalSets = d.exercises.reduce((a, e) => a + e.sets.length, 0);
+        return (
+          <div key={dk} className="rounded-xl border border-slate-800/60 bg-slate-950/40 px-3 py-2.5">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: d.color }} />
+              <span className="text-xs font-bold text-white">{d.label}</span>
+              <span className="text-[10px] text-slate-600 ml-auto shrink-0">{d.exercises.length} ejerc. · {totalSets} series</span>
+            </div>
+            <p className="text-[10px] text-slate-500 leading-relaxed">{d.exercises.map((ex) => ex.name).join(" · ")}</p>
+          </div>
+        );
+      })}
     </div>
   );
 }
 
-function MaxSetupWizard({ dayKey, logs, setLogs, onDone }) {
-  const day = ROUTINE[dayKey];
-  const allSets = day.exercises.flatMap((ex) => ex.sets.map((s, si) => ({ ex, setIndex: si, s, key: `${ex.id}_${si}` })));
-  const [step, setStep] = useState(0); const [values, setValues] = useState({});
-  const current = allSets[step];
-  const handleNext = () => {
-    const v = values[current.key];
-    if (v?.kg && v?.reps) { const prKey = `${current.key}_pr_override`; setLogs({ ...logs, [prKey]: { kg: parseFloat(v.kg), reps: parseFloat(v.reps) } }); }
-    if (step >= allSets.length - 1) onDone(); else setStep((s) => s + 1);
-  };
-  const pct = Math.round((step / allSets.length) * 100);
+function PresetRoutineCard({ preset, isActive, onUse }) {
+  const [open, setOpen] = useState(false);
+  const dayCount = preset.dayOrder.length;
   return (
-    <div className="min-h-screen bg-[#0a0a0f] flex flex-col px-4 py-8 relative overflow-hidden">
-      <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-80 h-80 rounded-full blur-3xl pointer-events-none opacity-30" style={{ backgroundColor: day.color }} />
-      <div className="max-w-sm mx-auto w-full flex-1 flex flex-col relative">
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-bold text-white">Marcas — {day.label}</h2>
-            <span className="text-xs text-slate-500">{step + 1} / {allSets.length}</span>
+    <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl overflow-hidden">
+      <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center justify-between gap-2 px-4 py-3.5 text-left hover:bg-slate-800/30 transition">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h4 className="text-sm font-bold text-white">{preset.name}</h4>
+            {isActive && <span className="text-[9px] font-black px-1.5 py-0.5 rounded-lg bg-teal-500/20 text-teal-400 shrink-0">ACTIVA</span>}
           </div>
-          <div className="h-1 bg-slate-800 rounded-full overflow-hidden"><div className="h-full rounded-full transition-all duration-300" style={{ width: `${pct}%`, backgroundColor: day.color }} /></div>
-          <p className="text-[10px] text-slate-600 mt-1.5">Podés saltear ejercicios que no hayas hecho</p>
+          <p className="text-[11px] text-slate-500 mt-0.5">{preset.description}</p>
+          <div className="flex items-center gap-1 mt-1.5">
+            {preset.dayOrder.map((dk) => <span key={dk} className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: preset.days[dk].color }} />)}
+            <span className="text-[10px] text-slate-600 ml-1.5">{dayCount} día{dayCount === 1 ? "" : "s"}/semana</span>
+          </div>
         </div>
-        <div className="bg-slate-900/60 border border-slate-800/50 rounded-2xl p-5 flex-1 flex flex-col justify-between shadow-xl shadow-black/30">
-          <div>
-            <span className="text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-lg mb-3 inline-block" style={{ backgroundColor: day.color + "18", color: day.color }}>{day.label}</span>
-            <h3 className="text-xl font-black text-white mt-2">{current.ex.name}</h3>
-            <p className="text-sm text-slate-500 mt-1">{current.ex.muscle}</p>
-            <p className="text-xs text-slate-600 mt-3 italic">"{current.ex.nota}"</p>
-            <div className="mt-6">
-              <p className="text-xs font-semibold text-slate-400 mb-3">Serie {current.setIndex + 1} · {current.s.repRange} reps</p>
-              <div className="flex gap-3">
-                <div className="flex-1"><label className="text-[10px] text-slate-600 uppercase tracking-wider font-bold mb-1.5 block">Tu mejor Reps</label><input type="number" inputMode="decimal" placeholder="—" value={values[current.key]?.reps || ""} onChange={(e) => setValues((v) => ({ ...v, [current.key]: { ...v[current.key], reps: e.target.value } }))} className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-3 py-4 text-2xl font-black text-center text-white focus:outline-none transition" /></div>
-                <div className="text-slate-700 text-xl pb-2 flex items-end">×</div>
-                <div className="flex-1"><label className="text-[10px] text-slate-600 uppercase tracking-wider font-bold mb-1.5 block">Tu mejor Kg</label><input type="number" inputMode="decimal" placeholder="—" value={values[current.key]?.kg || ""} onChange={(e) => setValues((v) => ({ ...v, [current.key]: { ...v[current.key], kg: e.target.value } }))} className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-3 py-4 text-2xl font-black text-center text-white focus:outline-none transition" /></div>
+        <ChevronDown size={16} className={`text-slate-600 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="px-4 pb-4 tab-fade-in space-y-3">
+          {preset.recommendation && <p className="text-[11px] text-slate-400 bg-slate-800/40 rounded-xl px-3 py-2 flex items-start gap-1.5"><Info size={12} className="mt-0.5 shrink-0" />{preset.recommendation}</p>}
+          <RoutinePreview routineDef={preset} />
+          <button onClick={onUse} disabled={isActive} className={`w-full py-2.5 rounded-xl text-sm font-bold transition ${isActive ? "bg-slate-800 text-slate-600" : "bg-teal-500 text-white hover:bg-teal-400 active:scale-[0.98]"}`}>{isActive ? "Ya la estás usando" : "Usar esta rutina"}</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SavedRoutineRow({ routine, isActive, onUse, onDelete }) {
+  const [confirmDel, setConfirmDel] = useState(false);
+  const [open, setOpen] = useState(false);
+  const dayCount = routine.dayOrder.length;
+  return (
+    <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl px-4 py-3.5">
+      <div className="flex items-center gap-3">
+        <button onClick={() => setOpen((o) => !o)} className="w-9 h-9 rounded-xl bg-slate-800/60 text-slate-400 flex items-center justify-center shrink-0"><Layers size={16} /></button>
+        <button onClick={() => setOpen((o) => !o)} className="flex-1 min-w-0 text-left">
+          <div className="flex items-center gap-2"><p className="text-sm font-bold text-white truncate">{routine.name}</p>{isActive && <span className="text-[9px] font-black px-1.5 py-0.5 rounded-lg bg-teal-500/20 text-teal-400 shrink-0">ACTIVA</span>}</div>
+          <p className="text-[11px] text-slate-500">{dayCount} día{dayCount === 1 ? "" : "s"} · creada por vos</p>
+        </button>
+        {!isActive && <button onClick={onUse} className="px-3 py-1.5 rounded-lg bg-teal-500/15 text-teal-400 text-xs font-bold shrink-0">Activar</button>}
+        {!confirmDel && <button onClick={() => setConfirmDel(true)} className="p-2 rounded-lg text-slate-600 hover:text-rose-400 shrink-0"><Trash2 size={14} /></button>}
+      </div>
+      {open && <div className="mt-3 pt-3 border-t border-slate-800/50 tab-fade-in"><RoutinePreview routineDef={routine} /></div>}
+      {confirmDel && (
+        <div className="flex gap-2 items-center mt-2.5 bg-rose-950/30 border border-rose-500/20 rounded-xl px-3 py-2 bounce-in">
+          <p className="text-[11px] text-rose-300/80 flex-1">¿Borrar "{routine.name}"? No se puede deshacer.</p>
+          <button onClick={() => setConfirmDel(false)} className="px-2 py-1 rounded-lg bg-slate-800 text-slate-400 text-[11px]">No</button>
+          <button onClick={onDelete} className="px-2 py-1 rounded-lg bg-rose-500 text-white text-[11px] font-bold">Sí</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Buscador de ejercicios por grupo muscular (con filtro de texto), para
+// agregarlos a un día al crear una rutina. También deja agregar un ejercicio
+// propio que no esté en la biblioteca (sin nota técnica ni video).
+function ExercisePickerPanel({ existingIds, onAdd, onAddCustom, onClose }) {
+  const [group, setGroup] = useState(MUSCLE_GROUPS[0].key);
+  const [search, setSearch] = useState("");
+  const [customName, setCustomName] = useState("");
+  const pool = search.trim()
+    ? EXERCISE_LIBRARY.filter((e) => e.name.toLowerCase().includes(search.trim().toLowerCase()))
+    : EXERCISE_LIBRARY_BY_GROUP[group];
+
+  return (
+    <div className="mt-2.5 bg-slate-950/60 border border-slate-800/60 rounded-2xl p-3 bounce-in">
+      <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar ejercicio…" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white mb-2.5 focus:outline-none focus:border-teal-500/50" />
+      {!search.trim() && (
+        <div className="flex gap-1.5 overflow-x-auto pb-2 -mx-1 px-1">
+          {MUSCLE_GROUPS.map((g) => (
+            <button key={g.key} onClick={() => setGroup(g.key)} className="px-2.5 py-1 rounded-lg text-[10px] font-bold whitespace-nowrap transition-all border shrink-0"
+              style={group === g.key ? { backgroundColor: g.color + "22", borderColor: g.color + "55", color: g.color } : { borderColor: "#1e2035", color: "#475569" }}>
+              {g.label}
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="max-h-52 overflow-y-auto space-y-1.5 mt-1 -mx-1 px-1">
+        {pool.map((e) => {
+          const added = existingIds.includes(e.id);
+          return (
+            <button key={e.id} onClick={() => !added && onAdd(e)} disabled={added} className={`w-full flex items-center gap-2.5 text-left rounded-xl px-2.5 py-2 transition ${added ? "bg-teal-500/10" : "bg-slate-900/60 hover:bg-slate-800/60"}`}>
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] font-bold text-white truncate">{e.name}</p>
+                <p className="text-[10px] text-slate-500 truncate">{e.nota}</p>
               </div>
+              {added ? <Check size={14} className="text-teal-400 shrink-0" /> : <Plus size={14} className="text-teal-400 shrink-0" />}
+            </button>
+          );
+        })}
+        {pool.length === 0 && <p className="text-[11px] text-slate-600 text-center py-3">Sin resultados.</p>}
+      </div>
+      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-800/60">
+        <input value={customName} onChange={(e) => setCustomName(e.target.value)} placeholder="¿No está? Agregá uno propio…" className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-teal-500/50" />
+        <button onClick={() => { if (customName.trim()) { onAddCustom(customName.trim()); setCustomName(""); } }} className="px-3 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-bold shrink-0">Agregar</button>
+      </div>
+      <p className="text-[9px] text-slate-600 mt-1.5">Los ejercicios propios no tienen nota técnica ni video de YouTube.</p>
+      <button onClick={onClose} className="w-full mt-3 py-2 rounded-xl text-slate-500 hover:text-slate-300 text-[11px] font-semibold">Cerrar buscador</button>
+    </div>
+  );
+}
+
+const REP_RANGE_OPTIONS = ["1-3", "3-5", "4-6", "6-8", "8-10", "10-12", "12-15", "15-20"];
+
+function BuilderExerciseRow({ ex, canMoveUp, canMoveDown, onMove, onRemove, onConfigChange }) {
+  const [editing, setEditing] = useState(false);
+  const repRange = ex.sets[0]?.repRange || "8-10";
+  const setsCount = ex.sets.length;
+  const heavy = isHeavyRepRange(repRange);
+  return (
+    <div className="bg-slate-900/60 border border-slate-800/50 rounded-xl px-3 py-2.5">
+      <div className="flex items-center gap-2">
+        <div className="flex flex-col -my-1 shrink-0">
+          <button onClick={() => onMove(-1)} disabled={!canMoveUp} className="p-0.5 text-slate-600 hover:text-slate-300 disabled:opacity-20"><ChevronUp size={13} /></button>
+          <button onClick={() => onMove(1)} disabled={!canMoveDown} className="p-0.5 text-slate-600 hover:text-slate-300 disabled:opacity-20"><ChevronDown size={13} /></button>
+        </div>
+        <button onClick={() => setEditing((o) => !o)} className="flex-1 min-w-0 text-left">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <p className="text-xs font-bold text-white truncate">{ex.name}</p>
+            {heavy && <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-amber-500/15 text-amber-400 shrink-0">FUERZA</span>}
+            {!ex.libId && <span className="text-[9px] text-slate-600 shrink-0">propio</span>}
+          </div>
+          <p className="text-[10px] text-slate-500">{setsCount} series · {repRange} reps</p>
+        </button>
+        <button onClick={() => setEditing((o) => !o)} className="p-1.5 text-slate-500 hover:text-teal-400 shrink-0"><SlidersHorizontal size={14} /></button>
+        <button onClick={onRemove} className="p-1.5 text-slate-600 hover:text-rose-400 shrink-0"><Trash2 size={14} /></button>
+      </div>
+      {editing && (
+        <div className="mt-2.5 pt-2.5 border-t border-slate-800/60 space-y-2.5 bounce-in">
+          <div>
+            <p className="text-[10px] text-slate-500 mb-1.5">Cantidad de series</p>
+            <div className="flex items-center gap-2">
+              <button onClick={() => onConfigChange({ setsCount: Math.max(1, setsCount - 1), repRange })} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm active:scale-95">−</button>
+              <span className="text-sm font-black text-white w-5 text-center tabular-nums">{setsCount}</span>
+              <button onClick={() => onConfigChange({ setsCount: Math.min(6, setsCount + 1), repRange })} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm active:scale-95">+</button>
             </div>
           </div>
-          <div className="flex gap-2 mt-6">
-            <button onClick={() => { if (step < allSets.length - 1) setStep((s) => s + 1); else onDone(); }} className="py-3.5 px-4 rounded-2xl border border-slate-700 text-slate-400 text-sm font-semibold">Saltear</button>
-            <button onClick={handleNext} className="flex-1 py-3.5 rounded-2xl text-white text-sm font-bold active:scale-[0.98] transition-all shadow-lg" style={{ backgroundColor: day.color, boxShadow: `0 10px 25px -8px ${day.color}aa` }}>{step < allSets.length - 1 ? "Siguiente →" : "Listo ✓"}</button>
+          <div>
+            <p className="text-[10px] text-slate-500 mb-1.5">Repeticiones aproximadas</p>
+            <div className="flex flex-wrap gap-1.5">
+              {REP_RANGE_OPTIONS.map((r) => (
+                <button key={r} onClick={() => onConfigChange({ setsCount, repRange: r })} className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all border ${repRange === r ? "bg-teal-500 border-teal-500 text-white" : "border-slate-800 text-slate-500"}`}>{r}</button>
+              ))}
+            </div>
+            {isHeavyRepRange(repRange) && <p className="text-[9px] text-amber-500/80 mt-1.5">Se marca como FUERZA automáticamente (6 reps o menos).</p>}
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+function BuilderDayCard({ day, dayIdx, totalDays, onRename, onRemove, onMoveDay, onAddExercise, onAddCustomExercise, onRemoveExercise, onMoveExercise, onConfigExercise }) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const existingIds = day.exercises.map((e) => e.id);
+  return (
+    <div className="bg-slate-900/40 border border-slate-800/50 rounded-2xl p-3.5" style={{ borderLeft: `3px solid ${day.color}` }}>
+      <div className="flex items-center gap-2 mb-3">
+        <div className="flex flex-col -my-1 shrink-0">
+          <button onClick={() => onMoveDay(-1)} disabled={dayIdx === 0} className="p-0.5 text-slate-600 hover:text-slate-300 disabled:opacity-20"><ChevronUp size={13} /></button>
+          <button onClick={() => onMoveDay(1)} disabled={dayIdx === totalDays - 1} className="p-0.5 text-slate-600 hover:text-slate-300 disabled:opacity-20"><ChevronDown size={13} /></button>
+        </div>
+        <input value={day.label} onChange={(e) => onRename(e.target.value)} placeholder={`Día ${dayIdx + 1}`} className="flex-1 bg-transparent text-sm font-black text-white focus:outline-none border-b border-transparent focus:border-slate-700 py-0.5 min-w-0" />
+        {totalDays > 1 && <button onClick={onRemove} className="p-1.5 text-slate-600 hover:text-rose-400 shrink-0"><Trash2 size={14} /></button>}
+      </div>
+
+      {day.exercises.length === 0 && <p className="text-[11px] text-slate-600 mb-2">Todavía no agregaste ejercicios a este día.</p>}
+
+      <div className="space-y-2">
+        {day.exercises.map((ex, i) => (
+          <BuilderExerciseRow key={ex.id} ex={ex} canMoveUp={i > 0} canMoveDown={i < day.exercises.length - 1}
+            onMove={(delta) => onMoveExercise(i, delta)} onRemove={() => onRemoveExercise(i)}
+            onConfigChange={(cfg) => onConfigExercise(i, cfg)} />
+        ))}
+      </div>
+
+      {!pickerOpen ? (
+        <button onClick={() => setPickerOpen(true)} className="w-full flex items-center justify-center gap-1.5 mt-2.5 py-2.5 rounded-xl border border-dashed border-slate-700 text-slate-400 hover:text-white hover:border-slate-500 transition text-xs font-semibold"><Plus size={13} /> Agregar ejercicio</button>
+      ) : (
+        <ExercisePickerPanel existingIds={existingIds} onAdd={onAddExercise} onAddCustom={onAddCustomExercise} onClose={() => setPickerOpen(false)} />
+      )}
+      {day.exercises.length > 0 && (
+        <p className="text-[9px] text-slate-600 mt-2">
+          {day.exercises.length < 4 ? "Recomendado: entre 4 y 8 ejercicios por sesión." : day.exercises.length > 10 ? "Es bastante para una sola sesión — capaz conviene dividirlo en otro día." : "Buena cantidad de ejercicios para la sesión."}
+        </p>
+      )}
+    </div>
+  );
+}
+
+const BUILDER_COLOR_PALETTE = ["#14B8A6", "#3B82F6", "#F97316", "#A855F7", "#F43F5E", "#F59E0B", "#06B6D4", "#10B981"];
+let _builderUidCounter = 0;
+function builderUid(prefix) { _builderUidCounter += 1; return `${prefix}_${Date.now()}_${_builderUidCounter}`; }
+
+function RoutineBuilder({ onCancel, onSave }) {
+  const [name, setName] = useState("");
+  const [days, setDays] = useState(() => [{ key: builderUid("day"), label: "Día 1", color: BUILDER_COLOR_PALETTE[0], exercises: [] }]);
+  const [error, setError] = useState("");
+
+  const addDay = () => setDays((d) => [...d, { key: builderUid("day"), label: `Día ${d.length + 1}`, color: BUILDER_COLOR_PALETTE[d.length % BUILDER_COLOR_PALETTE.length], exercises: [] }]);
+  const removeDay = (idx) => setDays((d) => d.filter((_, i) => i !== idx));
+  const moveDay = (idx, delta) => setDays((d) => { const j = idx + delta; if (j < 0 || j >= d.length) return d; const n = [...d]; [n[idx], n[j]] = [n[j], n[idx]]; return n; });
+  const renameDay = (idx, label) => setDays((d) => d.map((day, i) => (i === idx ? { ...day, label } : day)));
+
+  const addExercise = (dayIdx, libEx) => setDays((d) => d.map((day, i) => {
+    if (i !== dayIdx || day.exercises.some((e) => e.id === libEx.id)) return day;
+    return { ...day, exercises: [...day.exercises, { id: libEx.id, libId: libEx.id, name: libEx.name, muscle: libEx.muscle, sets: mkSets(3, "8-10") }] };
+  }));
+  const addCustomExercise = (dayIdx, rawName) => setDays((d) => d.map((day, i) => (i !== dayIdx ? day : {
+    ...day, exercises: [...day.exercises, { id: builderUid("custom"), libId: null, name: rawName, muscle: "Personalizado", sets: mkSets(3, "8-10") }],
+  })));
+  const removeExercise = (dayIdx, exIdx) => setDays((d) => d.map((day, i) => (i === dayIdx ? { ...day, exercises: day.exercises.filter((_, j) => j !== exIdx) } : day)));
+  const moveExercise = (dayIdx, exIdx, delta) => setDays((d) => d.map((day, i) => {
+    if (i !== dayIdx) return day;
+    const j = exIdx + delta; if (j < 0 || j >= day.exercises.length) return day;
+    const n = [...day.exercises]; [n[exIdx], n[j]] = [n[j], n[exIdx]]; return { ...day, exercises: n };
+  }));
+  const configExercise = (dayIdx, exIdx, { setsCount, repRange }) => setDays((d) => d.map((day, i) => (i !== dayIdx ? day : {
+    ...day, exercises: day.exercises.map((e, j) => (j === exIdx ? { ...e, sets: mkSets(setsCount, repRange) } : e)),
+  })));
+
+  const handleSave = () => {
+    if (!name.trim()) { setError("Ponele un nombre a tu rutina."); return; }
+    if (!days.length) { setError("Agregá al menos un día."); return; }
+    if (days.some((d) => d.exercises.length === 0)) { setError("Cada día necesita al menos un ejercicio."); return; }
+    const dayOrder = days.map((d) => d.key);
+    const daysObj = {};
+    days.forEach((d) => {
+      daysObj[d.key] = {
+        label: d.label.trim() || "Día",
+        description: "",
+        color: d.color,
+        exercises: d.exercises.map((e) => (e.libId ? { libId: e.libId, sets: e.sets } : { id: e.id, name: e.name, muscle: e.muscle, sets: e.sets })),
+      };
+    });
+    onSave({ name: name.trim(), source: "custom", description: "Rutina creada por vos.", recommendation: "", dayOrder, days: daysObj });
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <button onClick={onCancel} className="p-2 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition shrink-0"><ChevronDown size={18} className="rotate-90" /></button>
+        <h2 className="text-base font-black text-white">Creá tu rutina</h2>
+      </div>
+
+      <div>
+        <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Nombre de la rutina</label>
+        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej: Mi rutina de verano" className="w-full bg-slate-900/80 border border-slate-700/50 rounded-2xl px-4 py-3 text-white text-sm focus:outline-none focus:border-teal-500/60" />
+      </div>
+
+      <div className="space-y-3">
+        {days.map((day, idx) => (
+          <BuilderDayCard key={day.key} day={day} dayIdx={idx} totalDays={days.length}
+            onRename={(label) => renameDay(idx, label)} onRemove={() => removeDay(idx)} onMoveDay={(delta) => moveDay(idx, delta)}
+            onAddExercise={(libEx) => addExercise(idx, libEx)} onAddCustomExercise={(rawName) => addCustomExercise(idx, rawName)}
+            onRemoveExercise={(exIdx) => removeExercise(idx, exIdx)} onMoveExercise={(exIdx, delta) => moveExercise(idx, exIdx, delta)}
+            onConfigExercise={(exIdx, cfg) => configExercise(idx, exIdx, cfg)} />
+        ))}
+      </div>
+
+      <button onClick={addDay} className="w-full flex items-center justify-center gap-1.5 py-3 rounded-2xl border border-dashed border-slate-700 text-slate-400 hover:text-white hover:border-slate-500 transition text-sm font-semibold"><Plus size={14} /> Agregar día</button>
+
+      {error && <p className="text-xs text-rose-400 text-center">{error}</p>}
+
+      <div className="flex gap-2 pt-1">
+        <button onClick={onCancel} className="flex-1 py-3.5 rounded-2xl bg-slate-800 text-slate-300 text-sm font-semibold">Cancelar</button>
+        <button onClick={handleSave} className="flex-1 py-3.5 rounded-2xl bg-teal-500 text-white text-sm font-bold active:scale-[0.98] transition-all shadow-lg shadow-teal-500/20">Guardar rutina</button>
       </div>
     </div>
   );
 }
 
 /* ============================================================================
-   NAVIGATION — bottom bar on mobile, side rail from lg breakpoint up
+   RUTINAS VIEW — pantalla principal: rutina activa, las que ya guardaste, el
+   catálogo de preestablecidas, y el botón para crear una propia. Es la misma
+   pantalla que se muestra a la fuerza (forced=true) cuando un perfil nuevo
+   todavía no eligió ninguna rutina.
+============================================================================ */
+function RoutinesView({ profile, forced, onActivate, onDelete }) {
+  const [mode, setMode] = useState("catalog");
+  const routines = profile?.routines || {};
+  const activeId = profile?.activeRoutineId;
+  const activeDef = routines[activeId];
+  const customEntries = Object.entries(routines).filter(([, r]) => r.source !== "preset");
+
+  if (mode === "builder") {
+    return (
+      <RoutineBuilder
+        onCancel={() => setMode("catalog")}
+        onSave={(def) => { onActivate(builderUid("custom_routine"), def); setMode("catalog"); }}
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      {forced && (
+        <div className="text-center pt-2 pb-1">
+          <div className="w-14 h-14 rounded-2xl bg-teal-500/15 flex items-center justify-center mx-auto mb-3"><Layers className="text-teal-500" size={26} /></div>
+          <h2 className="text-lg font-black text-white">¿Cómo vas a entrenar?</h2>
+          <p className="text-sm text-slate-500 mt-1.5 leading-relaxed px-2">Elegí una rutina ya armada o creá la tuya desde cero. La vas a poder cambiar cuando quieras.</p>
+        </div>
+      )}
+
+      {!forced && activeDef && (
+        <div className="rounded-2xl border border-teal-500/25 bg-teal-500/5 p-4">
+          <div className="flex items-center gap-2 mb-1"><Layers size={14} className="text-teal-400" /><span className="text-[10px] font-black uppercase tracking-widest text-teal-400">Tu rutina activa</span></div>
+          <h3 className="text-base font-black text-white">{activeDef.name}</h3>
+          {activeDef.description && <p className="text-[11px] text-slate-400 mt-1">{activeDef.description}</p>}
+          <div className="flex items-center gap-1.5 mt-2.5 flex-wrap">
+            {activeDef.dayOrder.map((dk) => (
+              <span key={dk} className="text-[10px] font-bold px-2 py-0.5 rounded-lg" style={{ backgroundColor: activeDef.days[dk].color + "20", color: activeDef.days[dk].color }}>{activeDef.days[dk].label}</span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {customEntries.length > 0 && (
+        <div>
+          <p className="text-xs font-black uppercase tracking-widest text-slate-500 mb-2">Tus rutinas creadas</p>
+          <div className="space-y-2">
+            {customEntries.map(([id, r]) => (
+              <SavedRoutineRow key={id} routine={r} isActive={id === activeId} onUse={() => onActivate(id, null)} onDelete={() => onDelete(id)} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div>
+        <p className="text-xs font-black uppercase tracking-widest text-slate-500 mb-2">Rutinas preestablecidas</p>
+        <div className="space-y-2">
+          {PRESET_ROUTINES.map((preset) => (
+            <PresetRoutineCard key={preset.id} preset={preset} isActive={preset.id === activeId} onUse={() => onActivate(preset.id, cloneRoutineDef(preset))} />
+          ))}
+        </div>
+      </div>
+
+      <button onClick={() => setMode("builder")} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl border border-dashed border-teal-500/40 text-teal-400 hover:bg-teal-500/5 transition text-sm font-bold"><Sparkles size={15} /> Crear mi propia rutina</button>
+    </div>
+  );
+}
+
+/* ============================================================================
+   NAVIGATION — bottom bar on mobile, side rail from lg breakpoint up. El
+   perfil ya no es una pestaña: se accede tocando el avatar (ver header en
+   App() y el avatar de arriba en SideNav). Esto le deja lugar a "Rutinas".
+   Orden pedido: Rutinas, Progreso, Descarga y Rutina (la principal, a la
+   derecha del todo en la barra inferior).
 ============================================================================ */
 const NAV_TABS = [
-  { key: "rutina", icon: <Dumbbell size={20} />, label: "Rutina" },
+  { key: "rutinas", icon: <Layers size={20} />, label: "Rutinas" },
   { key: "progreso", icon: <BarChart3 size={20} />, label: "Progreso" },
   { key: "descarga", icon: <Zap size={20} />, label: "Descarga" },
+  { key: "rutina", icon: <Dumbbell size={20} />, label: "Rutina" },
 ];
 
-function BottomBar({ tab, setTab, profileName }) {
-  const initial = profileName.charAt(0).toUpperCase();
-  const tabs = [...NAV_TABS, { key: "perfil", icon: <div className="w-7 h-7 rounded-xl flex items-center justify-center text-sm font-black text-white" style={{ background: tab === "perfil" ? "linear-gradient(135deg,#14B8A6,#0E7490)" : "transparent", border: tab === "perfil" ? "none" : "2px solid #334155", color: tab === "perfil" ? "white" : "#6B7280" }}>{initial}</div>, label: profileName }];
+function BottomBar({ tab, setTab }) {
   return (
     <div className="lg:hidden fixed bottom-0 left-0 right-0 z-20 bg-slate-950/95 backdrop-blur-xl border-t border-slate-800/50">
       <div className="max-w-xl mx-auto flex">
-        {tabs.map(({ key, icon, label }) => (
+        {NAV_TABS.map(({ key, icon, label }) => (
           <button key={key} onClick={() => setTab(key)} className="flex-1 flex flex-col items-center justify-center gap-1 py-3 transition-all active:scale-95">
             <span className={`transition-all ${tab === key ? "text-teal-400" : "text-slate-600"}`}>{icon}</span>
-            <span className={`text-[9px] font-bold uppercase tracking-wider transition-all ${tab === key ? "text-teal-400" : "text-slate-700"}`}>{label.length > 8 ? label.slice(0, 7) + "…" : label}</span>
+            <span className={`text-[9px] font-bold uppercase tracking-wider transition-all ${tab === key ? "text-teal-400" : "text-slate-700"}`}>{label}</span>
           </button>
         ))}
       </div>
@@ -2267,15 +2892,18 @@ function BottomBar({ tab, setTab, profileName }) {
 
 function SideNav({ tab, setTab, profileName }) {
   const initial = profileName.charAt(0).toUpperCase();
-  const tabs = [...NAV_TABS, { key: "perfil", icon: <div className="w-6 h-6 rounded-lg flex items-center justify-center text-[11px] font-black text-white shrink-0" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>{initial}</div>, label: profileName }];
   return (
     <div className="hidden lg:flex lg:flex-col lg:w-56 lg:shrink-0 lg:h-screen lg:sticky lg:top-0 border-r border-slate-800/50 bg-[#0a0a0f]/60 px-3 py-6">
       <div className="flex items-center gap-2.5 px-2 mb-8">
         <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-teal-500/30 to-teal-500/5 border border-teal-500/20 flex items-center justify-center shrink-0"><Flame className="text-teal-500" size={18} /></div>
         <span className="font-black text-white text-sm tracking-tight">Mi Rutina</span>
       </div>
+      <button onClick={() => setTab("perfil")} className={`w-full flex items-center gap-3 px-3 py-2.5 mb-3 rounded-xl text-sm font-semibold transition-all ${tab === "perfil" ? "bg-teal-500/15 text-teal-400" : "text-slate-500 hover:text-slate-300 hover:bg-slate-900/60"}`}>
+        <div className="w-6 h-6 rounded-lg flex items-center justify-center text-[11px] font-black text-white shrink-0" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>{initial}</div>
+        <span className="truncate">{profileName}</span>
+      </button>
       <div className="space-y-1">
-        {tabs.map(({ key, icon, label }) => (
+        {NAV_TABS.map(({ key, icon, label }) => (
           <button key={key} onClick={() => setTab(key)} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${tab === key ? "bg-teal-500/15 text-teal-400" : "text-slate-500 hover:text-slate-300 hover:bg-slate-900/60"}`}>
             <span className={tab === key ? "text-teal-400" : "text-slate-600"}>{icon}</span>
             <span className="truncate">{label}</span>
@@ -2286,32 +2914,28 @@ function SideNav({ tab, setTab, profileName }) {
   );
 }
 
+const TAB_TITLES = { rutinas: "Rutinas", rutina: "Rutina", progreso: "Progreso", descarga: "Descarga", perfil: "Perfil" };
+
 /* ============================================================================
    APP ROOT
 ============================================================================ */
-function allDaysDone(profile) {
-  if (profile?.maxesSetupDays) return DAY_ORDER.every((dk) => profile.maxesSetupDays[dk]);
-  return !!profile?.maxesSetup;
-}
-
 export default function App() {
   const [profiles, setProfiles] = useState(loadProfiles);
   const [activeProfile, setActiveProfile] = useState(null);
   const [tab, setTab] = useState("rutina");
   const [cycleStart, setCycleStartState] = useState(loadCycleStart);
-  const [showHub, setShowHub] = useState(false);
-  const [wizardDay, setWizardDay] = useState(null);
   const [showHelp, setShowHelp] = useState(false);
   const [helpStartTab, setHelpStartTab] = useState(null);
   const [recoveredNotice, setRecoveredNotice] = useState(false);
 
   useEffect(() => {
     const saved = loadActive();
-    if (saved && profiles[saved] && !profiles[saved].pin) {
-      setActiveProfile(saved);
-      if (!allDaysDone(profiles[saved]) && !profiles[saved].onboardingDismissed) setShowHub(true);
-    }
+    if (saved && profiles[saved] && !profiles[saved].pin) setActiveProfile(saved);
   }, []);
+
+  // Persiste, una sola vez al montar, la migración de perfiles viejos (los
+  // que tenían `maxesSetupDays` y ahora necesitan `routines`/`activeRoutineId`).
+  useEffect(() => { saveProfiles(profiles); }, []);
 
   // One-time recovery: if localStorage looks empty, see if IndexedDB has a backup.
   useEffect(() => {
@@ -2319,48 +2943,78 @@ export default function App() {
     (async () => {
       const restored = await tryRestoreFromIDB();
       if (restored?.profiles && Object.keys(restored.profiles).length) {
-        setProfiles(restored.profiles);
+        const migrated = {};
+        Object.entries(restored.profiles).forEach(([name, p]) => { migrated[name] = migrateProfile(p); });
+        setProfiles(migrated);
+        saveProfiles(migrated);
         setRecoveredNotice(true);
         if (restored.cycleStart) setCycleStartState(new Date(restored.cycleStart));
         const savedActive = restored.active;
-        if (savedActive && restored.profiles[savedActive] && !restored.profiles[savedActive].pin) {
-          setActiveProfile(savedActive);
-          if (!allDaysDone(restored.profiles[savedActive]) && !restored.profiles[savedActive].onboardingDismissed) setShowHub(true);
-        }
+        if (savedActive && migrated[savedActive] && !migrated[savedActive].pin) setActiveProfile(savedActive);
         setTimeout(() => setRecoveredNotice(false), 6000);
       }
     })();
   }, []);
 
   const profile = profiles[activeProfile], logs = profile?.logs || {};
+  // La rutina activa del perfil actual (o la Clásica como respaldo) se
+  // recalcula en cada render — así ROUTINE/DAY_ORDER/EXERCISE_BY_ID/KEY_TO_DAY
+  // siempre reflejan la rutina correcta antes de que se rendericen sus hijos.
+  applyRoutineModel((profile && profile.routines && profile.routines[profile.activeRoutineId]) || CLASSIC_PRESET);
+  const needsRoutinePick = !!profile && !profile.activeRoutineId;
+
   const setLogs = useCallback((newLogs) => { const np = { ...profiles, [activeProfile]: { ...profiles[activeProfile], logs: newLogs } }; setProfiles(np); saveProfiles(np); }, [profiles, activeProfile]);
-  const handleLogin = (name, updatedProfiles) => { const profs = updatedProfiles || profiles; setProfiles(profs); setActiveProfile(name); if (!allDaysDone(profs[name]) && !profs[name]?.onboardingDismissed) setShowHub(true); };
-  const handleLogout = () => { saveActive(null); setActiveProfile(null); setShowHub(false); setWizardDay(null); setShowHelp(false); setHelpStartTab(null); };
-  const handleDelete = () => { const np = { ...profiles }; delete np[activeProfile]; setProfiles(np); saveProfiles(np); saveActive(null); setActiveProfile(null); setShowHub(false); setWizardDay(null); setShowHelp(false); setHelpStartTab(null); };
+  const handleLogin = (name, updatedProfiles) => { const profs = updatedProfiles || profiles; setProfiles(profs); setActiveProfile(name); setTab("rutina"); };
+  const handleLogout = () => { saveActive(null); setActiveProfile(null); setShowHelp(false); setHelpStartTab(null); };
+  const handleDelete = () => { const np = { ...profiles }; delete np[activeProfile]; setProfiles(np); saveProfiles(np); saveActive(null); setActiveProfile(null); setShowHelp(false); setHelpStartTab(null); };
   const handleUpdateProfile = (updates) => { const np = { ...profiles, [activeProfile]: { ...profiles[activeProfile], ...updates } }; setProfiles(np); saveProfiles(np); };
   const handleSetCycleStart = (d) => { setCycleStartState(d); saveCycleStart(d); };
-  const handleWizardDone = () => {
-    const prevDays = profiles[activeProfile]?.maxesSetupDays || { push: false, pull: false, legs: false, sarm: false };
-    const np = { ...profiles, [activeProfile]: { ...profiles[activeProfile], maxesSetupDays: { ...prevDays, [wizardDay]: true } } };
-    setProfiles(np); saveProfiles(np); setWizardDay(null);
+
+  // Activa una rutina (preestablecida recién clonada, recién creada, o una
+  // ya guardada que sólo hay que volver a marcar como activa). Si es la
+  // primera rutina que activa este perfil, dispara el tutorial guiado.
+  const handleActivateRoutine = (routineId, routineDef) => {
+    setProfiles((prev) => {
+      const p = prev[activeProfile];
+      if (!p) return prev;
+      const wasFirstTime = !p.activeRoutineId;
+      const newRoutines = routineDef ? { ...(p.routines || {}), [routineId]: routineDef } : (p.routines || {});
+      const updatedProfile = { ...p, routines: newRoutines, activeRoutineId: routineId, ...(wasFirstTime && p.tutorialSeen === false ? { tutorialSeen: true } : {}) };
+      const np = { ...prev, [activeProfile]: updatedProfile };
+      saveProfiles(np);
+      if (wasFirstTime && p.tutorialSeen === false) { setHelpStartTab(null); setShowHelp(true); }
+      return np;
+    });
   };
-  // Se llama al cerrar el hub de marcas iniciales (la "encuesta" de bienvenida),
-  // ya sea porque el usuario terminó de configurar días o porque eligió
-  // "Configurar más tarde". Si es la primera vez que este perfil pasa por
-  // acá, disparamos el tutorial completo de la app automáticamente.
-  const closeHub = () => {
-    const shouldShowTutorial = profile?.tutorialSeen === false;
-    handleUpdateProfile({ onboardingDismissed: true, ...(shouldShowTutorial ? { tutorialSeen: true } : {}) });
-    setShowHub(false);
-    if (shouldShowTutorial) {
-      setHelpStartTab(null); // arranca desde el principio, recorrido completo
-      setShowHelp(true);
-    }
+  const handleDeleteRoutine = (routineId) => {
+    setProfiles((prev) => {
+      const p = prev[activeProfile];
+      if (!p) return prev;
+      const newRoutines = { ...(p.routines || {}) };
+      delete newRoutines[routineId];
+      const newActive = p.activeRoutineId === routineId ? null : p.activeRoutineId;
+      const np = { ...prev, [activeProfile]: { ...p, routines: newRoutines, activeRoutineId: newActive } };
+      saveProfiles(np);
+      return np;
+    });
   };
 
   if (!activeProfile) return (<><StyleInjector />{recoveredNotice && <RecoveredBanner onClose={() => setRecoveredNotice(false)} />}<LoginScreen onLogin={handleLogin} /></>);
-  if (wizardDay) return (<><StyleInjector /><MaxSetupWizard dayKey={wizardDay} logs={logs} setLogs={setLogs} onDone={handleWizardDone} /></>);
-  if (showHub) return (<><StyleInjector /><MaxSetupHub profile={profile} onStartDay={(dk) => setWizardDay(dk)} onClose={closeHub} /></>);
+
+  if (needsRoutinePick) return (
+    <>
+      <StyleInjector />
+      {recoveredNotice && <RecoveredBanner onClose={() => setRecoveredNotice(false)} />}
+      <div className="min-h-screen bg-[#0a0a0f] px-4 py-6">
+        <div className="max-w-xl mx-auto">
+          <div className="flex justify-end mb-2">
+            <button onClick={handleLogout} className="text-[11px] text-slate-600 hover:text-slate-400 font-semibold flex items-center gap-1"><LogOut size={11} /> Cambiar de perfil</button>
+          </div>
+          <RoutinesView profile={profile} forced onActivate={handleActivateRoutine} onDelete={handleDeleteRoutine} />
+        </div>
+      </div>
+    </>
+  );
 
   return (
     <div className="min-h-screen bg-[#0a0a0f] text-white font-sans lg:flex">
@@ -2370,26 +3024,29 @@ export default function App() {
       <div className="flex-1 min-w-0">
         <header className="sticky top-0 z-10 bg-[#0a0a0f]/90 backdrop-blur-xl border-b border-slate-800/40">
           <div className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto px-4 py-4 flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center text-base font-black text-white shrink-0 lg:hidden" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>{activeProfile.charAt(0).toUpperCase()}</div>
+            {tab === "perfil" ? (
+              <button onClick={() => setTab("rutina")} aria-label="Volver" className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800/80 transition shrink-0 lg:hidden"><ChevronDown size={18} className="rotate-90" /></button>
+            ) : (
+              <button onClick={() => setTab("perfil")} aria-label="Tu perfil" className="w-8 h-8 rounded-xl flex items-center justify-center text-base font-black text-white shrink-0 lg:hidden active:scale-90 transition" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>{activeProfile.charAt(0).toUpperCase()}</button>
+            )}
             <div className="flex-1 min-w-0">
-              <h1 className="font-black text-base text-white leading-tight tracking-tight">
-                {tab === "rutina" && "Rutina"}{tab === "progreso" && "Progreso"}{tab === "descarga" && "Descarga"}{tab === "perfil" && "Perfil"}
-              </h1>
+              <h1 className="font-black text-base text-white leading-tight tracking-tight">{TAB_TITLES[tab] || ""}</h1>
               <p className="text-[11px] text-slate-600 leading-tight">{activeProfile}</p>
             </div>
-            <button onClick={() => { setHelpStartTab(tab); setShowHelp(true); }} aria-label="Ayuda" className="w-8 h-8 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-center text-slate-400 hover:text-teal-400 hover:border-teal-500/30 transition active:scale-90"><HelpCircle size={16} /></button>
+            {tab !== "perfil" && <button onClick={() => { setHelpStartTab(tab); setShowHelp(true); }} aria-label="Ayuda" className="w-8 h-8 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-center text-slate-400 hover:text-teal-400 hover:border-teal-500/30 transition active:scale-90"><HelpCircle size={16} /></button>}
           </div>
         </header>
         <main className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto px-4 py-4 pb-28 lg:pb-10 space-y-4">
           <div key={tab} className="tab-fade-in">
+            {tab === "rutinas" && <RoutinesView profile={profile} forced={false} onActivate={handleActivateRoutine} onDelete={handleDeleteRoutine} />}
             {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} cycleStart={cycleStart} settings={getProfileSettings(profile)} />}
             {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} />}
             {tab === "descarga" && <DeloadView logs={logs} settings={getProfileSettings(profile)} />}
-            {tab === "perfil" && <ProfileView profileName={activeProfile} profiles={profiles} onLogout={handleLogout} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onOpenSetup={() => setShowHub(true)} />}
+            {tab === "perfil" && <ProfileView profileName={activeProfile} profiles={profiles} onLogout={handleLogout} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} />}
           </div>
         </main>
       </div>
-      <BottomBar tab={tab} setTab={setTab} profileName={activeProfile} />
+      <BottomBar tab={tab} setTab={setTab} />
       {showHelp && <HelpModal startTab={helpStartTab} onClose={() => setShowHelp(false)} />}
     </div>
   );
