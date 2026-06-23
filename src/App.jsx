@@ -643,61 +643,71 @@ const ANIMATION_CSS = `
    el tema oscuro (que sigue siendo el default). En vez de reescribir cada
    componente, estas reglas pisan esas mismas clases cuando el contenedor
    raíz tiene la clase "light-mode" (ver el toggle en Perfil). Los colores de
-   acento (teal, púrpura, rosa, etc.) no cambian — sólo los fondos, textos y
-   bordes "neutros" que dependían de que la página fuera oscura.
-============================================================================ */
+   acento (teal, púrpura, rosa, etc.) en sus versiones de FONDO tintado
+   (bg-teal-500/15, bg-purple-500/20, etc.) no cambian — sólo los fondos,
+   textos y bordes "neutros" que dependían de que la página fuera oscura.
+
+   Nota técnica importante: esto vive dentro de un template literal de JS.
+   Los selectores de Tailwind con caracteres especiales (/, :, [, ], #)
+   necesitan escaparse con una barra invertida para que CSS los entienda
+   como parte del nombre de la clase — pero como JS *también* interpreta
+   las barras invertidas al evaluar el string (y se come la que no
+   reconoce), hay que escribirlas DOBLES acá para que llegue una sola al
+   CSS final. Si agregás una regla nueva con /, : , [ o # y no se aplica,
+   lo primero a revisar es que tenga \\ (doble) y no \ (simple). */
 .light-mode { color-scheme: light; }
 
 /* Fondo de la app */
-.light-mode .bg-\[\#0a0a0f\] { background-color: #f8fafc !important; }
-.light-mode .bg-\[\#0a0a0f\]\/60 { background-color: rgba(248,250,252,0.75) !important; }
-.light-mode .bg-\[\#0a0a0f\]\/90 { background-color: rgba(248,250,252,0.92) !important; }
-.light-mode .bg-\[\#0f0f1a\] { background-color: #ffffff !important; }
+.light-mode .bg-\\[\\#0a0a0f\\] { background-color: #f8fafc !important; }
+.light-mode .bg-\\[\\#0a0a0f\\]\\/60 { background-color: rgba(248,250,252,0.75) !important; }
+.light-mode .bg-\\[\\#0a0a0f\\]\\/90 { background-color: rgba(248,250,252,0.92) !important; }
+.light-mode .bg-\\[\\#0f0f1a\\] { background-color: #ffffff !important; }
 
 /* Tarjetas / superficies principales */
 .light-mode .bg-slate-900 { background-color: #ffffff !important; }
-.light-mode .bg-slate-900\/40 { background-color: rgba(255,255,255,0.85) !important; }
-.light-mode .bg-slate-900\/50 { background-color: rgba(255,255,255,0.92) !important; }
-.light-mode .bg-slate-900\/60 { background-color: rgba(255,255,255,0.94) !important; }
-.light-mode .bg-slate-900\/80 { background-color: rgba(255,255,255,0.97) !important; }
-.light-mode .bg-slate-950\/40 { background-color: rgba(226,232,240,0.55) !important; }
-.light-mode .bg-slate-950\/50 { background-color: rgba(226,232,240,0.6) !important; }
-.light-mode .bg-slate-950\/60 { background-color: rgba(226,232,240,0.65) !important; }
-.light-mode .bg-slate-950\/95 { background-color: rgba(255,255,255,0.97) !important; }
+.light-mode .bg-slate-900\\/40 { background-color: rgba(255,255,255,0.85) !important; }
+.light-mode .bg-slate-900\\/50 { background-color: rgba(255,255,255,0.92) !important; }
+.light-mode .bg-slate-900\\/60 { background-color: rgba(255,255,255,0.94) !important; }
+.light-mode .bg-slate-900\\/80 { background-color: rgba(255,255,255,0.97) !important; }
+.light-mode .bg-slate-950\\/40 { background-color: rgba(226,232,240,0.55) !important; }
+.light-mode .bg-slate-950\\/50 { background-color: rgba(226,232,240,0.6) !important; }
+.light-mode .bg-slate-950\\/60 { background-color: rgba(226,232,240,0.65) !important; }
+.light-mode .bg-slate-950\\/95 { background-color: rgba(255,255,255,0.97) !important; }
 .light-mode .bg-slate-950 { background-color: #e2e8f0 !important; }
 
 /* Superficies secundarias (chips, botones, inputs) */
 .light-mode .bg-slate-800 { background-color: #e2e8f0 !important; }
-.light-mode .bg-slate-800\/30 { background-color: rgba(226,232,240,0.5) !important; }
-.light-mode .bg-slate-800\/40 { background-color: rgba(226,232,240,0.6) !important; }
-.light-mode .bg-slate-800\/50 { background-color: rgba(226,232,240,0.7) !important; }
-.light-mode .bg-slate-800\/60 { background-color: rgba(226,232,240,0.75) !important; }
-.light-mode .bg-slate-800\/70 { background-color: rgba(226,232,240,0.8) !important; }
-.light-mode .bg-slate-800\/80 { background-color: rgba(226,232,240,0.85) !important; }
+.light-mode .bg-slate-800\\/30 { background-color: rgba(226,232,240,0.5) !important; }
+.light-mode .bg-slate-800\\/40 { background-color: rgba(226,232,240,0.6) !important; }
+.light-mode .bg-slate-800\\/50 { background-color: rgba(226,232,240,0.7) !important; }
+.light-mode .bg-slate-800\\/60 { background-color: rgba(226,232,240,0.75) !important; }
+.light-mode .bg-slate-800\\/70 { background-color: rgba(226,232,240,0.8) !important; }
+.light-mode .bg-slate-800\\/80 { background-color: rgba(226,232,240,0.85) !important; }
 .light-mode .bg-slate-700 { background-color: #cbd5e1 !important; }
-.light-mode .bg-slate-700\/80 { background-color: rgba(203,213,225,0.85) !important; }
-.light-mode .hover\:bg-slate-700:hover { background-color: #b6c3d4 !important; }
-.light-mode .hover\:bg-slate-700\/80:hover { background-color: rgba(182,195,212,0.9) !important; }
-.light-mode .hover\:bg-slate-800:hover { background-color: #d6dee7 !important; }
-.light-mode .hover\:bg-slate-800\/30:hover { background-color: rgba(214,222,231,0.6) !important; }
-.light-mode .hover\:bg-slate-800\/60:hover { background-color: rgba(214,222,231,0.8) !important; }
-.light-mode .hover\:bg-slate-800\/80:hover { background-color: rgba(214,222,231,0.9) !important; }
-.light-mode .hover\:bg-slate-900\/60:hover { background-color: rgba(241,245,249,0.9) !important; }
-.light-mode .active\:bg-slate-800:active { background-color: #d6dee7 !important; }
+.light-mode .bg-slate-700\\/80 { background-color: rgba(203,213,225,0.85) !important; }
+.light-mode .hover\\:bg-slate-700:hover { background-color: #b6c3d4 !important; }
+.light-mode .hover\\:bg-slate-700\\/80:hover { background-color: rgba(182,195,212,0.9) !important; }
+.light-mode .hover\\:bg-slate-800:hover { background-color: #d6dee7 !important; }
+.light-mode .hover\\:bg-slate-800\\/30:hover { background-color: rgba(214,222,231,0.6) !important; }
+.light-mode .hover\\:bg-slate-800\\/60:hover { background-color: rgba(214,222,231,0.8) !important; }
+.light-mode .hover\\:bg-slate-800\\/80:hover { background-color: rgba(214,222,231,0.9) !important; }
+.light-mode .hover\\:bg-slate-900\\/60:hover { background-color: rgba(241,245,249,0.9) !important; }
+.light-mode .active\\:bg-slate-800:active { background-color: #d6dee7 !important; }
 
-/* Recuadros oscuros (stat tiles) dentro de paneles con degradé de color —
-   en claro pasan a un overlay blanco translúcido para que el texto siga
-   teniendo contraste. */
-.light-mode .bg-black\/20 { background-color: rgba(255,255,255,0.55) !important; }
-.light-mode .bg-black\/30 { background-color: rgba(255,255,255,0.65) !important; }
-.light-mode .bg-black\/70 { background-color: rgba(255,255,255,0.8) !important; }
-.light-mode .border-white\/5 { border-color: rgba(15,23,42,0.06) !important; }
-.light-mode .border-white\/10 { border-color: rgba(15,23,42,0.1) !important; }
+/* Recuadros oscuros (stat tiles) dentro de paneles con degradé de color, y
+   recuadros de alerta tintados (confirmaciones de borrado) — en claro pasan
+   a un overlay claro para que el texto siga teniendo contraste. */
+.light-mode .bg-black\\/20 { background-color: rgba(255,255,255,0.55) !important; }
+.light-mode .bg-black\\/30 { background-color: rgba(255,255,255,0.65) !important; }
+.light-mode .bg-black\\/70 { background-color: rgba(255,255,255,0.8) !important; }
+.light-mode .bg-rose-950\\/30 { background-color: rgba(254,205,211,0.65) !important; }
+.light-mode .border-white\\/5 { border-color: rgba(15,23,42,0.06) !important; }
+.light-mode .border-white\\/10 { border-color: rgba(15,23,42,0.1) !important; }
 
 /* Texto */
 .light-mode .text-white { color: #0f172a !important; }
-.light-mode .text-white\/80 { color: rgba(15,23,42,0.75) !important; }
-.light-mode .hover\:text-white:hover { color: #0f172a !important; }
+.light-mode .text-white\\/80 { color: rgba(15,23,42,0.75) !important; }
+.light-mode .hover\\:text-white:hover { color: #0f172a !important; }
 .light-mode .text-slate-100 { color: #1e293b !important; }
 .light-mode .text-slate-200 { color: #1e293b !important; }
 .light-mode .text-slate-300 { color: #334155 !important; }
@@ -705,38 +715,75 @@ const ANIMATION_CSS = `
 .light-mode .text-slate-500 { color: #75839a !important; }
 .light-mode .text-slate-600 { color: #94a3b8 !important; }
 .light-mode .text-slate-700 { color: #b6c2d1 !important; }
-.light-mode .hover\:text-slate-200:hover { color: #1e293b !important; }
-.light-mode .hover\:text-slate-300:hover { color: #334155 !important; }
-.light-mode .hover\:text-slate-400:hover { color: #475569 !important; }
+.light-mode .hover\\:text-slate-200:hover { color: #1e293b !important; }
+.light-mode .hover\\:text-slate-300:hover { color: #334155 !important; }
+.light-mode .hover\\:text-slate-400:hover { color: #475569 !important; }
+
+/* Textos de acento en tonos claros (200/300/400) — se eligieron para leerse
+   sobre fondos casi negros y pierden casi todo el contraste sobre fondos
+   claros. Sólo en modo claro se oscurecen estos tonos puntuales que se usan
+   como texto; los FONDOS tintados con esos mismos colores no se tocan. */
+.light-mode .text-teal-400 { color: #0d9488 !important; }
+.light-mode .hover\\:text-teal-400:hover { color: #0d9488 !important; }
+.light-mode .text-teal-300\\/60 { color: rgba(13,148,136,0.85) !important; }
+.light-mode .text-cyan-400 { color: #0e7490 !important; }
+.light-mode .text-cyan-300\\/60 { color: rgba(14,116,144,0.85) !important; }
+.light-mode .text-purple-200 { color: #7e22ce !important; }
+.light-mode .text-purple-300 { color: #7e22ce !important; }
+.light-mode .text-purple-300\\/60 { color: rgba(126,34,206,0.8) !important; }
+.light-mode .text-purple-400 { color: #9333ea !important; }
+.light-mode .text-purple-500 { color: #7e22ce !important; }
+.light-mode .text-rose-300\\/80 { color: rgba(190,18,60,0.9) !important; }
+.light-mode .text-rose-400 { color: #e11d48 !important; }
+.light-mode .hover\\:text-rose-400:hover { color: #e11d48 !important; }
+.light-mode .text-rose-400\\/90 { color: rgba(225,29,72,0.95) !important; }
+.light-mode .text-rose-500\\/70 { color: rgba(190,18,60,0.85) !important; }
+.light-mode .hover\\:text-rose-500\\/70:hover { color: rgba(190,18,60,0.9) !important; }
+.light-mode .text-amber-400 { color: #b45309 !important; }
+.light-mode .text-emerald-400 { color: #059669 !important; }
+.light-mode .text-blue-400 { color: #1d4ed8 !important; }
+.light-mode .text-orange-400 { color: #c2410c !important; }
 
 /* Bordes */
 .light-mode .border-slate-800 { border-color: #e2e8f0 !important; }
-.light-mode .border-slate-800\/40 { border-color: rgba(226,232,240,0.65) !important; }
-.light-mode .border-slate-800\/50 { border-color: rgba(226,232,240,0.75) !important; }
-.light-mode .border-slate-800\/60 { border-color: rgba(226,232,240,0.85) !important; }
+.light-mode .border-slate-800\\/40 { border-color: rgba(226,232,240,0.65) !important; }
+.light-mode .border-slate-800\\/50 { border-color: rgba(226,232,240,0.75) !important; }
+.light-mode .border-slate-800\\/60 { border-color: rgba(226,232,240,0.85) !important; }
 .light-mode .border-slate-700 { border-color: #cbd5e1 !important; }
-.light-mode .border-slate-700\/40 { border-color: rgba(203,213,225,0.55) !important; }
-.light-mode .border-slate-700\/50 { border-color: rgba(203,213,225,0.65) !important; }
-.light-mode .border-slate-700\/60 { border-color: rgba(203,213,225,0.75) !important; }
+.light-mode .border-slate-700\\/40 { border-color: rgba(203,213,225,0.55) !important; }
+.light-mode .border-slate-700\\/50 { border-color: rgba(203,213,225,0.65) !important; }
+.light-mode .border-slate-700\\/60 { border-color: rgba(203,213,225,0.75) !important; }
 .light-mode .border-slate-600 { border-color: #94a3b8 !important; }
 .light-mode .border-slate-500 { border-color: #64748b !important; }
-.light-mode .hover\:border-slate-500:hover { border-color: #94a3b8 !important; }
-.light-mode .hover\:border-slate-600:hover { border-color: #64748b !important; }
-.light-mode .focus\:border-slate-700:focus { border-color: #94a3b8 !important; }
-.light-mode .divide-slate-800\/50 > :not([hidden]) ~ :not([hidden]) { border-color: rgba(226,232,240,0.75) !important; }
+.light-mode .hover\\:border-slate-500:hover { border-color: #94a3b8 !important; }
+.light-mode .hover\\:border-slate-600:hover { border-color: #64748b !important; }
+.light-mode .focus\\:border-slate-700:focus { border-color: #94a3b8 !important; }
+.light-mode .divide-slate-800\\/50 > :not([hidden]) ~ :not([hidden]) { border-color: rgba(226,232,240,0.75) !important; }
 .light-mode .divide-slate-800 > :not([hidden]) ~ :not([hidden]) { border-color: #e2e8f0 !important; }
 
-/* Tarjetas con degradé propio (hero de Descarga/Progreso/Perfil) — ver
-   variables --grad-* aplicadas vía estilo inline en esos componentes. */
+/* Tarjetas con degradé propio (hero de Rutinas/Descarga/Progreso/Perfil) —
+   ver variables --grad-* aplicadas vía estilo inline en esos componentes.
+   --ring-track/--chart-grid/--chart-axis son los grises del cronómetro de
+   descanso y de la grilla/ejes de los gráficos (Recharts): antes eran un
+   gris casi negro fijo en cualquier tema, ahora también cambian con el
+   resto de la app. */
 :root {
   --grad-hero-purple: linear-gradient(135deg, rgba(168,85,247,0.28), rgba(15,23,42,0.85) 55%, rgba(15,23,42,0.6));
   --grad-hero-cyan: linear-gradient(135deg, rgba(6,182,212,0.25), rgba(15,23,42,0.85) 55%, rgba(15,23,42,0.6));
+  --grad-hero-teal: linear-gradient(135deg, rgba(20,184,166,0.25), rgba(15,23,42,0.85) 55%, rgba(15,23,42,0.6));
   --grad-profile-avatar: linear-gradient(135deg, #0f172a, rgba(15,23,42,0.5));
+  --ring-track: #1a1a2e;
+  --chart-grid: #1a1a2e;
+  --chart-axis: #334155;
 }
 .light-mode {
   --grad-hero-purple: linear-gradient(135deg, rgba(168,85,247,0.16), rgba(255,255,255,0.85) 55%, rgba(255,255,255,0.96));
   --grad-hero-cyan: linear-gradient(135deg, rgba(6,182,212,0.14), rgba(255,255,255,0.85) 55%, rgba(255,255,255,0.96));
+  --grad-hero-teal: linear-gradient(135deg, rgba(20,184,166,0.14), rgba(255,255,255,0.85) 55%, rgba(255,255,255,0.96));
   --grad-profile-avatar: linear-gradient(135deg, #ffffff, rgba(255,255,255,0.5));
+  --ring-track: #e2e8f0;
+  --chart-grid: #e2e8f0;
+  --chart-axis: #94a3b8;
 }
 `;
 
@@ -945,7 +992,7 @@ function RestTimer({ seconds, accent, alertType = "sound" }) {
     <div className="flex items-center gap-3 bg-slate-900/60 rounded-2xl px-4 py-3 border border-slate-800/60">
       <div className="relative w-12 h-12 shrink-0">
         <svg viewBox="0 0 36 36" className="w-12 h-12 -rotate-90">
-          <circle cx="18" cy="18" r={r} fill="none" stroke="#1a1a2e" strokeWidth="3" />
+          <circle cx="18" cy="18" r={r} fill="none" stroke="var(--ring-track)" strokeWidth="3" />
           <circle cx="18" cy="18" r={r} fill="none" stroke={accent} strokeWidth="3" strokeDasharray={circ} strokeDashoffset={circ * (1 - pct / 100)} strokeLinecap="round" style={{ transition: "stroke-dashoffset 0.3s linear" }} />
         </svg>
         <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-slate-200">{formatTime(remaining)}</span>
@@ -1083,19 +1130,25 @@ function ProgresoDemo({ view }) {
   const [metric, setMetric] = useState("peso");
   const [demoExId, setDemoExId] = useState(DEMO_CAROUSEL_EXERCISES[0].id);
 
+  if (view === "ciclo") {
+    const mockStart = new Date();
+    mockStart.setDate(mockStart.getDate() - 9);
+    return <WeekCalendar cycleStart={mockStart} logs={{}} sessions={[]} settings={DEFAULT_SETTINGS} />;
+  }
+
   if (view === "stats") {
     const tiles = [
-      { val: 34, label: "Días entrenados", accent: "#14B8A6" },
-      { val: "6🔥", label: "Racha actual", accent: "#F59E0B" },
-      { val: 187, label: "Series registradas", accent: "#06B6D4" },
-      { val: "12.4k", label: "Kg × reps", accent: "#A855F7" },
+      { val: 34, label: "Días" },
+      { val: "6🔥", label: "Racha" },
+      { val: 187, label: "Series" },
+      { val: "12.4k", label: "Kg×reps" },
     ];
     return (
-      <div className="grid grid-cols-2 gap-2">
-        {tiles.map(({ val, label, accent }) => (
-          <div key={label} className="rounded-xl p-3 border" style={{ backgroundColor: accent + "12", borderColor: accent + "30" }}>
-            <p className="text-lg font-black text-white leading-none tabular-nums">{val}</p>
-            <p className="text-[10px] font-semibold text-white/80 mt-1">{label}</p>
+      <div className="grid grid-cols-4 gap-2">
+        {tiles.map(({ val, label }) => (
+          <div key={label} className="bg-slate-900/60 rounded-xl p-2.5 text-center">
+            <p className="text-sm font-black text-white leading-none tabular-nums">{val}</p>
+            <p className="text-[9px] font-semibold text-slate-500 mt-1">{label}</p>
           </div>
         ))}
       </div>
@@ -1105,12 +1158,12 @@ function ProgresoDemo({ view }) {
   if (view === "daycounts") {
     const exampleCounts = [5, 4, 3, 6, 2, 4];
     return (
-      <div className="flex gap-2">
+      <div className="flex items-center gap-1.5">
+        <span className="text-[9px] text-slate-600 font-bold uppercase tracking-wider shrink-0">Mejoras</span>
         {DAY_ORDER.map((dk, i) => { const d = ROUTINE[dk]; return (
-          <div key={dk} className="flex-1 bg-slate-800/40 rounded-xl p-2.5 text-center border border-slate-800/60">
-            <div className="w-7 h-7 rounded-lg mx-auto flex items-center justify-center mb-1 text-[10px] font-black" style={{ backgroundColor: d.color + "18", color: d.color }}>{d.label.slice(0, 1)}</div>
-            <p className="text-sm font-black text-white">{exampleCounts[i % exampleCounts.length]}</p>
-            <p className="text-[8px] text-slate-600 leading-tight">series<br />mejoradas</p>
+          <div key={dk} className="flex items-center gap-1 px-2 py-1 rounded-lg shrink-0" style={{ backgroundColor: d.color + "12" }}>
+            <span className="w-4 h-4 rounded-md flex items-center justify-center text-[8px] font-black shrink-0" style={{ backgroundColor: d.color + "22", color: d.color }}>{d.label.charAt(0)}</span>
+            <span className="text-[10px] font-bold" style={{ color: d.color }}>{exampleCounts[i % exampleCounts.length]}</span>
           </div>
         ); })}
       </div>
@@ -1138,9 +1191,9 @@ function ProgresoDemo({ view }) {
                   <stop offset="5%" stopColor="#14B8A6" stopOpacity={0.35} /><stop offset="95%" stopColor="#14B8A6" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1a1a2e" />
-              <XAxis dataKey="date" stroke="#334155" fontSize={9} />
-              <YAxis stroke="#334155" fontSize={9} />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
+              <XAxis dataKey="date" stroke="var(--chart-axis)" fontSize={9} />
+              <YAxis stroke="var(--chart-axis)" fontSize={9} />
               <Tooltip content={<CustomTooltip />} />
               <Area type="monotone" dataKey={dataKey} stroke="#14B8A6" fill="url(#gDemoChart)" strokeWidth={2} dot={{ r: 2.5, fill: "#14B8A6", strokeWidth: 0 }} name={label} />
             </AreaChart>
@@ -1524,15 +1577,21 @@ const HELP_CHAPTERS = [
         text: "Esta pestaña junta todos tus registros para mostrarte qué tan constante fuiste y cuánto mejoraste, con gráficos, rankings y tu historial completo.",
       },
       {
+        icon: <Calendar size={20} />,
+        title: "Tu ciclo de entrenamiento",
+        text: "Arriba de todo (recién mudado acá desde Rutina) ves en qué semana de tu ciclo estás, si es semana de entrenamiento o de descarga, y cuántos días entrenaste en cada semana.",
+        demo: { kind: "progreso", view: "ciclo" },
+      },
+      {
         icon: <Flame size={20} />,
         title: "Estadísticas generales",
-        text: "Arriba ves tus días entrenados, tu racha actual de días seguidos, el total de series registradas y el volumen total (kg × reps) acumulado.",
+        text: "Debajo, una fila compacta con tus días entrenados, tu racha actual de días seguidos, el total de series registradas y el volumen total (kg × reps) acumulado.",
         demo: { kind: "progreso", view: "stats" },
       },
       {
         icon: <TrendingUp size={20} />,
         title: "Mejoras por día",
-        text: "Te muestra cuántas series mejoraste (superaste tu primer registro) en cada día de tu rutina activa.",
+        text: "Dentro de la pestaña Evolución, una fila de chips chiquita te muestra cuántas series mejoraste (superaste tu primer registro) en cada día de tu rutina activa.",
         demo: { kind: "progreso", view: "daycounts" },
       },
       {
@@ -1904,7 +1963,9 @@ function ExerciseCard({ exercise, accent, logs, setLogs, deloadSets, deloadMode,
 }
 
 /* ============================================================================
-   WEEK CALENDAR (cuadro de "ciclo actual" en la pestaña Rutina)
+   WEEK CALENDAR (cuadro de "ciclo actual" — vive en la pestaña Progreso;
+   antes estaba en Rutina, se movió para no competir con el registro de
+   series del día a día).
 ============================================================================ */
 function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS }) {
   const weekInfo = getWeekInfo(cycleStart, settings);
@@ -1959,9 +2020,10 @@ function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS 
 }
 
 /* ============================================================================
-   ROUTINE VIEW — redesigned: day picker up top, a single "hero" panel for the
-   active day (gradient + stats + reset, replacing the old separate summary
-   card), then the exercise list in a responsive grid.
+   ROUTINE VIEW — day picker up top, a single "hero" panel for the active day
+   (gradient + stats + reset, replacing the old separate summary card), then
+   the exercise list in a responsive grid. El cuadro de "ciclo actual" (antes
+   acá) se movió a Progreso — ver WeekCalendar más arriba en el archivo.
 ============================================================================ */
 /* ============================================================================
    SESSION BAR — botón de Iniciar sesión (arriba) / estado en curso con
@@ -1999,7 +2061,7 @@ function SessionStartBar({ activeSession, onStart, onCancel }) {
   );
 }
 
-function RoutineView({ logs, setLogs, cycleStart, settings, sessions, activeSession, onStartSession, onEndSession, onCancelSession }) {
+function RoutineView({ logs, setLogs, cycleStart, settings, activeSession, onStartSession, onEndSession, onCancelSession }) {
   const [activeDay, setActiveDay] = useState(() => getSuggestedDay(logs));
   const suggestedDay = useMemo(() => getSuggestedDay(logs), []);
   const weekInfo = getWeekInfo(cycleStart, settings), isDeload = weekInfo?.isDeload, day = ROUTINE[activeDay];
@@ -2021,8 +2083,6 @@ function RoutineView({ logs, setLogs, cycleStart, settings, sessions, activeSess
   return (
     <div className="space-y-4">
       <SessionStartBar activeSession={activeSession} onStart={() => onStartSession(activeDay)} onCancel={onCancelSession} />
-
-      <WeekCalendar cycleStart={cycleStart} logs={logs} sessions={sessions} settings={settings} />
 
       <div className="flex gap-1.5 overflow-x-auto pb-1">
         {DAY_ORDER.map((k) => (
@@ -2347,7 +2407,7 @@ function ExerciseCarousel({ exercises, selId, onSelect, logs }) {
   );
 }
 
-function ProgressView({ logs, setLogs, sessions }) {
+function ProgressView({ logs, setLogs, sessions, cycleStart, settings }) {
   const allExercises = useMemo(() => DAY_ORDER.flatMap((dk) => ROUTINE[dk].exercises.map((e) => ({ id: e.id, name: e.name, day: ROUTINE[dk].label, color: ROUTINE[dk].color, sets: e.sets.length, dayKey: dk }))), []);
 
   const stats = useMemo(() => {
@@ -2408,35 +2468,24 @@ function ProgressView({ logs, setLogs, sessions }) {
         <p className="relative text-xs text-cyan-300/60 mt-1">Marcas, volumen y constancia a lo largo del tiempo</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-2.5">
-        {[
-          { val: stats.daysTrained, label: "Días entrenados", sub: "desde el inicio", accent: "#14B8A6" },
-          { val: stats.streak > 0 ? `${stats.streak}🔥` : "0", label: "Racha actual", sub: "días seguidos", accent: "#F59E0B" },
-          { val: stats.totalSets, label: "Series registradas", sub: "total histórico", accent: "#06B6D4" },
-          { val: stats.totalVol > 999 ? `${(stats.totalVol / 1000).toFixed(1)}k` : stats.totalVol, label: "Kg × reps", sub: "volumen total", accent: "#A855F7" },
-        ].map(({ val, label, sub, accent }) => (
-          <div key={label} className="rounded-2xl p-4 backdrop-blur-sm shadow-md shadow-black/20 relative overflow-hidden border" style={{ backgroundColor: accent + "12", borderColor: accent + "30" }}>
-            <div className="absolute top-0 right-0 w-16 h-16 rounded-full blur-2xl opacity-25 -translate-y-4 translate-x-4" style={{ backgroundColor: accent }} />
-            <p className="text-2xl font-black text-white tabular-nums leading-none relative">{val}</p>
-            <p className="text-xs font-semibold text-white/80 mt-1 relative">{label}</p>
-            <p className="text-[10px] text-slate-600 mt-0.5 relative">{sub}</p>
-          </div>
-        ))}
-      </div>
+      {/* Ciclo actual — antes vivía en Rutina, se mudó acá */}
+      <WeekCalendar cycleStart={cycleStart} logs={logs} sessions={sessions} settings={settings} />
 
-      <div className="bg-cyan-500/[0.04] border border-cyan-500/15 rounded-2xl p-4 backdrop-blur-sm shadow-md shadow-black/20">
-        <p className="text-xs font-black uppercase tracking-widest text-slate-500 mb-3">Mejoras por día</p>
-        <div className="flex gap-2">
-          {DAY_ORDER.map((dk) => {
-            const d = ROUTINE[dk], count = dayPRcounts[dk] || 0;
-            return (
-              <div key={dk} className="flex-1 bg-slate-800/40 rounded-xl p-2.5 text-center border border-slate-800/60">
-                <div className="w-8 h-8 rounded-xl mx-auto flex items-center justify-center mb-1.5 text-[10px] font-black" style={{ backgroundColor: d.color + "18", color: d.color }}>{d.label.slice(0, 1)}</div>
-                <p className="text-sm font-black text-white">{count}</p>
-                <p className="text-[9px] text-slate-600 leading-tight mt-0.5">series<br />mejoradas</p>
-              </div>
-            );
-          })}
+      {/* Estadísticas — una fila compacta en vez de 4 tarjetas grandes, para
+          no saturar la pantalla antes de llegar a lo interesante (las tabs). */}
+      <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-3.5 backdrop-blur-sm shadow-md shadow-black/20">
+        <div className="grid grid-cols-4 gap-2">
+          {[
+            { val: stats.daysTrained, label: "Días", accent: "#14B8A6" },
+            { val: stats.streak > 0 ? `${stats.streak}🔥` : "0", label: "Racha", accent: "#F59E0B" },
+            { val: stats.totalSets, label: "Series", accent: "#06B6D4" },
+            { val: stats.totalVol > 999 ? `${(stats.totalVol / 1000).toFixed(1)}k` : stats.totalVol, label: "Kg×reps", accent: "#A855F7" },
+          ].map(({ val, label, accent }) => (
+            <div key={label} className="bg-slate-950/40 rounded-xl p-2.5 text-center">
+              <p className="text-base font-black text-white tabular-nums leading-none">{val}</p>
+              <p className="text-[9px] font-semibold text-slate-500 mt-1">{label}</p>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -2450,79 +2499,99 @@ function ProgressView({ logs, setLogs, sessions }) {
         <div key={activeTab} className="p-4 tab-fade-in">
           {activeTab === "chart" && (
             <div className="space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-xs text-slate-500 font-semibold">Ejercicio y serie</p>
-                <div className="flex bg-slate-950/60 rounded-xl p-0.5 border border-slate-800/60 shrink-0">
-                  {[{ k: "peso", l: "Kg" }, { k: "vol", l: "Vol" }, { k: "1rm", l: "1RM" }, { k: "rpe", l: "RPE" }].map((opt) => (
-                    <button key={opt.k} onClick={() => setMetric(opt.k)} className={`px-2 py-1.5 rounded-[10px] text-[10px] font-bold transition-all ${metric === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
+              {/* Mejoras por día — chips chicos en vez de un panel grande propio */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 -mx-1 px-1">
+                <span className="text-[9px] text-slate-600 font-bold uppercase tracking-wider shrink-0">Mejoras</span>
+                {DAY_ORDER.map((dk) => {
+                  const d = ROUTINE[dk], count = dayPRcounts[dk] || 0;
+                  return (
+                    <div key={dk} className="flex items-center gap-1 px-2 py-1 rounded-lg shrink-0" style={{ backgroundColor: d.color + "12" }}>
+                      <span className="w-4 h-4 rounded-md flex items-center justify-center text-[8px] font-black shrink-0" style={{ backgroundColor: d.color + "22", color: d.color }}>{d.label.charAt(0)}</span>
+                      <span className="text-[10px] font-bold" style={{ color: d.color }}>{count}</span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Selector: día → ejercicio (carrusel) → serie */}
+              <div className="bg-slate-950/40 rounded-xl p-3 space-y-3">
+                <div className="flex flex-wrap justify-center gap-1.5">
+                  {DAY_ORDER.map((dk) => (
+                    <button key={dk} onClick={() => { setDayFilter(dk); const first = allExercises.find((e) => e.dayKey === dk); if (first) { setSelId(first.id); setSelSet(0); } }}
+                      className="px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all border shrink-0"
+                      style={dayFilter === dk ? { backgroundColor: ROUTINE[dk].color + "22", borderColor: ROUTINE[dk].color + "55", color: ROUTINE[dk].color } : { borderColor: "#1e2035", color: "#475569" }}>
+                      {ROUTINE[dk].label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Deslizá con el dedo o usá las flechas para cambiar de ejercicio */}
+                <ExerciseCarousel exercises={filteredExercises} selId={selId} onSelect={(id) => { setSelId(id); setSelSet(0); }} logs={logs} />
+
+                <div className="flex gap-2">
+                  {Array.from({ length: selEx?.sets || 1 }).map((_, i) => (
+                    <button key={i} onClick={() => setSelSet(i)} className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all border ${selSet === i ? "border-teal-500/50 bg-teal-500/10 text-teal-400" : "border-slate-800 text-slate-600"}`}>S{i + 1}</button>
                   ))}
                 </div>
               </div>
 
-              <div className="flex flex-wrap justify-center gap-1.5">
-                {DAY_ORDER.map((dk) => (
-                  <button key={dk} onClick={() => { setDayFilter(dk); const first = allExercises.find((e) => e.dayKey === dk); if (first) { setSelId(first.id); setSelSet(0); } }}
-                    className="px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all border shrink-0"
-                    style={dayFilter === dk ? { backgroundColor: ROUTINE[dk].color + "22", borderColor: ROUTINE[dk].color + "55", color: ROUTINE[dk].color } : { borderColor: "#1e2035", color: "#475569" }}>
-                    {ROUTINE[dk].label}
-                  </button>
-                ))}
-              </div>
-
-              {/* Carrusel de un solo ejercicio — deslizá con el dedo o usá las flechas */}
-              <ExerciseCarousel exercises={filteredExercises} selId={selId} onSelect={(id) => { setSelId(id); setSelSet(0); }} logs={logs} />
-
-              <div className="flex gap-2">
-                {Array.from({ length: selEx?.sets || 1 }).map((_, i) => (
-                  <button key={i} onClick={() => setSelSet(i)} className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all border ${selSet === i ? "border-teal-500/50 bg-teal-500/10 text-teal-400" : "border-slate-800 text-slate-600"}`}>S{i + 1}</button>
-                ))}
-              </div>
-
-              {chartData.length === 0 ? (
-                <div className="text-center text-slate-600 py-10"><BarChart3 size={28} className="mx-auto mb-2.5 opacity-30" /><p className="text-sm">Sin registros para esta serie.</p><p className="text-xs mt-1 text-slate-700">Guardá series en la rutina para ver tu evolución aquí.</p></div>
-              ) : (
-                <>
-                  <div className="h-52">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={chartData} margin={{ top: 5, right: 0, left: -25, bottom: 0 }}>
-                        <defs>
-                          <linearGradient id="gA" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor={selEx?.color} stopOpacity={0.35} /><stop offset="95%" stopColor={selEx?.color} stopOpacity={0} />
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#1a1a2e" />
-                        <XAxis dataKey="date" stroke="#334155" fontSize={10} />
-                        <YAxis stroke="#334155" fontSize={10} domain={metric === "rpe" ? [0, 10] : ["auto", "auto"]} />
-                        <Tooltip content={<CustomTooltip />} />
-                        {metric === "peso" && <Area type="monotone" dataKey="kg" stroke={selEx?.color || "#14B8A6"} fill="url(#gA)" strokeWidth={2.5} dot={{ r: 3, fill: selEx?.color, strokeWidth: 0 }} name="Kg" />}
-                        {metric === "vol" && <Area type="monotone" dataKey="vol" stroke="#A855F7" fill="url(#gA)" strokeWidth={2.5} dot={{ r: 3, fill: "#A855F7", strokeWidth: 0 }} name="Volumen" />}
-                        {metric === "1rm" && <Area type="monotone" dataKey="e1rm" stroke="#14B8A6" fill="url(#gA)" strokeWidth={2.5} dot={{ r: 3, fill: "#14B8A6", strokeWidth: 0 }} name="1RM est." />}
-                        {metric === "rpe" && <Area type="monotone" dataKey="rpe" stroke="#F43F5E" fill="url(#gA)" strokeWidth={2.5} dot={{ r: 3, fill: "#F43F5E", strokeWidth: 0 }} name="RPE" connectNulls />}
-                      </AreaChart>
-                    </ResponsiveContainer>
+              {/* Gráfico de la serie elegida */}
+              <div className="bg-slate-950/40 rounded-xl p-3">
+                <div className="flex items-center justify-between gap-2 mb-2.5">
+                  <p className="text-xs font-bold truncate" style={{ color: selEx?.color }}>{selEx?.name}</p>
+                  <div className="flex bg-slate-900/60 rounded-xl p-0.5 border border-slate-800/60 shrink-0">
+                    {[{ k: "peso", l: "Kg" }, { k: "vol", l: "Vol" }, { k: "1rm", l: "1RM" }, { k: "rpe", l: "RPE" }].map((opt) => (
+                      <button key={opt.k} onClick={() => setMetric(opt.k)} className={`px-2 py-1.5 rounded-[10px] text-[10px] font-bold transition-all ${metric === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
+                    ))}
                   </div>
-                  {metric === "rpe" ? (
-                    (() => {
-                      const vals = chartData.filter((d) => d.rpe != null).map((d) => d.rpe);
-                      if (!vals.length) return <p className="text-[11px] text-slate-600 text-center">Todavía no registraste RPE para esta serie.</p>;
-                      const avg = Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10;
-                      return <div className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-semibold bg-rose-500/10 text-rose-300 border border-rose-500/15"><Activity size={14} /><span>RPE promedio: <span className="font-black">{avg}</span> · {vals.length} sesiones con dato</span></div>;
-                    })()
-                  ) : chartData.length >= 2 && (() => {
-                    const f = chartData[0], l = chartData[chartData.length - 1];
-                    const fVal = metric === "peso" ? f.kg : metric === "vol" ? f.vol : f.e1rm, lVal = metric === "peso" ? l.kg : metric === "vol" ? l.vol : l.e1rm;
-                    const diff = lVal - fVal, pct2 = fVal ? ((diff / fVal) * 100).toFixed(1) : 0, pos = diff >= 0;
-                    const metricLabel = metric === "peso" ? "de kg" : metric === "vol" ? "de volumen" : "de 1RM estimado";
-                    return (
-                      <div className={`flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-semibold ${pos ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/15" : "bg-rose-500/10 text-rose-400 border border-rose-500/15"}`}>
-                        {pos ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-                        <div><span className="font-black">{pos ? "+" : ""}{pct2}% {metricLabel}</span><span className="text-xs opacity-60 ml-1.5">· {chartData.length} sesiones</span></div>
-                      </div>
-                    );
-                  })()}
-                  {metric === "1rm" && <p className="text-[10px] text-slate-600">Estimado con fórmula de Epley. Solo referencia, no un máximo real.</p>}
-                </>
-              )}
+                </div>
+
+                {chartData.length === 0 ? (
+                  <div className="text-center text-slate-600 py-10"><BarChart3 size={28} className="mx-auto mb-2.5 opacity-30" /><p className="text-sm">Sin registros para esta serie.</p><p className="text-xs mt-1 text-slate-700">Guardá series en la rutina para ver tu evolución aquí.</p></div>
+                ) : (
+                  <>
+                    <div className="h-52">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={chartData} margin={{ top: 5, right: 0, left: -25, bottom: 0 }}>
+                          <defs>
+                            <linearGradient id="gA" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor={selEx?.color} stopOpacity={0.35} /><stop offset="95%" stopColor={selEx?.color} stopOpacity={0} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
+                          <XAxis dataKey="date" stroke="var(--chart-axis)" fontSize={10} />
+                          <YAxis stroke="var(--chart-axis)" fontSize={10} domain={metric === "rpe" ? [0, 10] : ["auto", "auto"]} />
+                          <Tooltip content={<CustomTooltip />} />
+                          {metric === "peso" && <Area type="monotone" dataKey="kg" stroke={selEx?.color || "#14B8A6"} fill="url(#gA)" strokeWidth={2.5} dot={{ r: 3, fill: selEx?.color, strokeWidth: 0 }} name="Kg" />}
+                          {metric === "vol" && <Area type="monotone" dataKey="vol" stroke="#A855F7" fill="url(#gA)" strokeWidth={2.5} dot={{ r: 3, fill: "#A855F7", strokeWidth: 0 }} name="Volumen" />}
+                          {metric === "1rm" && <Area type="monotone" dataKey="e1rm" stroke="#14B8A6" fill="url(#gA)" strokeWidth={2.5} dot={{ r: 3, fill: "#14B8A6", strokeWidth: 0 }} name="1RM est." />}
+                          {metric === "rpe" && <Area type="monotone" dataKey="rpe" stroke="#F43F5E" fill="url(#gA)" strokeWidth={2.5} dot={{ r: 3, fill: "#F43F5E", strokeWidth: 0 }} name="RPE" connectNulls />}
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+                    {metric === "rpe" ? (
+                      (() => {
+                        const vals = chartData.filter((d) => d.rpe != null).map((d) => d.rpe);
+                        if (!vals.length) return <p className="text-[11px] text-slate-600 text-center">Todavía no registraste RPE para esta serie.</p>;
+                        const avg = Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10;
+                        return <div className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-semibold bg-rose-500/10 text-rose-300 border border-rose-500/15"><Activity size={14} /><span>RPE promedio: <span className="font-black">{avg}</span> · {vals.length} sesiones con dato</span></div>;
+                      })()
+                    ) : chartData.length >= 2 && (() => {
+                      const f = chartData[0], l = chartData[chartData.length - 1];
+                      const fVal = metric === "peso" ? f.kg : metric === "vol" ? f.vol : f.e1rm, lVal = metric === "peso" ? l.kg : metric === "vol" ? l.vol : l.e1rm;
+                      const diff = lVal - fVal, pct2 = fVal ? ((diff / fVal) * 100).toFixed(1) : 0, pos = diff >= 0;
+                      const metricLabel = metric === "peso" ? "de kg" : metric === "vol" ? "de volumen" : "de 1RM estimado";
+                      return (
+                        <div className={`flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-semibold ${pos ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/15" : "bg-rose-500/10 text-rose-400 border border-rose-500/15"}`}>
+                          {pos ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                          <div><span className="font-black">{pos ? "+" : ""}{pct2}% {metricLabel}</span><span className="text-xs opacity-60 ml-1.5">· {chartData.length} sesiones</span></div>
+                        </div>
+                      );
+                    })()}
+                    {metric === "1rm" && <p className="text-[10px] text-slate-600">Estimado con fórmula de Epley. Solo referencia, no un máximo real.</p>}
+                  </>
+                )}
+              </div>
             </div>
           )}
 
@@ -2535,7 +2604,7 @@ function ProgressView({ logs, setLogs, sessions }) {
                 prBoard.map((ex, idx) => {
                   const medals = ["🥇", "🥈", "🥉", "4", "5"];
                   return (
-                    <div key={ex.id} className="flex items-center gap-3 bg-slate-800/40 rounded-xl px-3.5 py-3 border border-slate-800/40">
+                    <div key={ex.id} className="flex items-center gap-3 bg-slate-950/40 rounded-xl px-3.5 py-3 border border-slate-800/40">
                       <span className="text-lg shrink-0 w-7 text-center">{medals[idx]}</span>
                       <div className="flex-1 min-w-0"><p className="text-sm font-bold text-white truncate">{ex.name}</p><p className="text-[10px] font-bold" style={{ color: ex.color }}>{ex.day}</p></div>
                       <div className="text-right shrink-0"><p className="text-sm font-black text-white">{ex.best1rm}<span className="text-xs text-slate-500 font-normal">kg</span></p><p className="text-[10px] text-slate-500">{ex.bestReps}×{ex.bestKg}kg</p></div>
@@ -3055,6 +3124,19 @@ function RoutinesView({ profile, forced, onActivate, onDelete }) {
         </div>
       )}
 
+      {!forced && (
+        <div className="relative overflow-hidden rounded-2xl border border-teal-500/20 p-5" style={{ background: "var(--grad-hero-teal)" }}>
+          <div className="absolute -top-8 -right-6 w-32 h-32 rounded-full bg-teal-500/15 blur-2xl pointer-events-none" />
+          <div className="absolute -bottom-6 -left-6 w-28 h-28 rounded-full bg-cyan-500/10 blur-2xl pointer-events-none" />
+          <div className="relative flex items-center gap-2 mb-1">
+            <Layers size={16} className="text-teal-400" />
+            <span className="text-[11px] font-black uppercase tracking-widest text-teal-400">Tu plan de entrenamiento</span>
+          </div>
+          <h2 className="relative text-xl font-black text-white leading-tight">Rutinas</h2>
+          <p className="relative text-xs text-teal-300/60 mt-1">Elegí cómo entrenar: una rutina ya armada o una creada por vos</p>
+        </div>
+      )}
+
       {!forced && activeDef && (
         <div className="relative overflow-hidden rounded-2xl border border-teal-500/25 bg-gradient-to-br from-teal-500/10 to-transparent p-4">
           <div className="absolute -top-10 -right-10 w-32 h-32 rounded-full bg-teal-500/20 blur-3xl pointer-events-none" />
@@ -3307,8 +3389,8 @@ export default function App() {
         <main className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto px-4 py-4 pb-28 lg:pb-10 space-y-4">
           <div key={tab} className="tab-fade-in">
             {tab === "rutinas" && <RoutinesView profile={profile} forced={false} onActivate={handleActivateRoutine} onDelete={handleDeleteRoutine} />}
-            {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} cycleStart={cycleStart} settings={getProfileSettings(profile)} sessions={profile?.trainingSessions || []} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} />}
-            {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} />}
+            {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} cycleStart={cycleStart} settings={getProfileSettings(profile)} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} />}
+            {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} />}
             {tab === "descarga" && <DeloadView logs={logs} settings={getProfileSettings(profile)} />}
             {tab === "perfil" && <ProfileView profileName={activeProfile} profiles={profiles} onLogout={handleLogout} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} />}
           </div>
