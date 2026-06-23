@@ -8,7 +8,7 @@ import {
   Play, Pause, RotateCcw, TrendingUp, TrendingDown, Dumbbell,
   ChevronDown, ChevronUp, ChevronLeft, Trophy, Flame, Save, Trash2, BarChart3,
   ListChecks, LogOut, X, Check, AlertTriangle, Calendar, Zap,
-  Mail, Clock, ChevronRight, Edit3, Info, Plus,
+  Mail, Clock, ChevronRight, Edit3, Info, Plus, Sun, Moon,
   Target, Award, Activity, ArrowDown, HelpCircle, List, LayoutGrid,
   Sparkles, Layers, Video, SlidersHorizontal, ShieldCheck, UserCog,
 } from "lucide-react";
@@ -358,6 +358,7 @@ const STAGNATION_DAYS = 21;
 const DEFAULT_SETTINGS = {
   alertType: "sound", restLong: REST_LONG, restShort: REST_SHORT,
   trainWeeks: TRAIN_WEEKS, deloadWeeks: DELOAD_WEEKS, deloadPct: 0.75, deloadSetDivisor: 2,
+  theme: "dark",
 };
 
 function getProfileSettings(profile) { return { ...DEFAULT_SETTINGS, ...(profile?.settings || {}) }; }
@@ -509,6 +510,17 @@ function parseLogKey(key) {
   return { exerciseId: key.slice(0, idx), setIndex: parseInt(key.slice(idx + 1), 10) };
 }
 
+// Días "entrenados": unión de fechas que tienen al menos una serie guardada
+// y fechas con una sesión explícita (botón Iniciar/Finalizar sesión)
+// finalizada — así un día cuenta como entrenado aunque te hayas olvidado de
+// guardar alguna serie individual, mientras hayas usado Inicio/Fin de sesión.
+function getTrainedDateSet(logs, sessions) {
+  const s = new Set();
+  Object.entries(logs).forEach(([k, v]) => { if (k.endsWith("_pr_override") || !Array.isArray(v)) return; v.forEach((e) => s.add(e.date)); });
+  (sessions || []).forEach((ses) => { if (ses?.date) s.add(ses.date); });
+  return s;
+}
+
 function getSuggestedDay(logs) {
   let lastDate = null;
   Object.entries(logs).forEach(([k, v]) => { if (k.endsWith("_pr_override") || !Array.isArray(v) || !KEY_TO_DAY[k]) return; v.forEach((e) => { if (!lastDate || e.date > lastDate) lastDate = e.date; }); });
@@ -624,6 +636,107 @@ const ANIMATION_CSS = `
   width: 0;
   height: 0;
   display: none;
+}
+
+/* ============================================================================
+   MODO CLARO — la app está escrita enteramente con clases de Tailwind para
+   el tema oscuro (que sigue siendo el default). En vez de reescribir cada
+   componente, estas reglas pisan esas mismas clases cuando el contenedor
+   raíz tiene la clase "light-mode" (ver el toggle en Perfil). Los colores de
+   acento (teal, púrpura, rosa, etc.) no cambian — sólo los fondos, textos y
+   bordes "neutros" que dependían de que la página fuera oscura.
+============================================================================ */
+.light-mode { color-scheme: light; }
+
+/* Fondo de la app */
+.light-mode .bg-\[\#0a0a0f\] { background-color: #f8fafc !important; }
+.light-mode .bg-\[\#0a0a0f\]\/60 { background-color: rgba(248,250,252,0.75) !important; }
+.light-mode .bg-\[\#0a0a0f\]\/90 { background-color: rgba(248,250,252,0.92) !important; }
+.light-mode .bg-\[\#0f0f1a\] { background-color: #ffffff !important; }
+
+/* Tarjetas / superficies principales */
+.light-mode .bg-slate-900 { background-color: #ffffff !important; }
+.light-mode .bg-slate-900\/40 { background-color: rgba(255,255,255,0.85) !important; }
+.light-mode .bg-slate-900\/50 { background-color: rgba(255,255,255,0.92) !important; }
+.light-mode .bg-slate-900\/60 { background-color: rgba(255,255,255,0.94) !important; }
+.light-mode .bg-slate-900\/80 { background-color: rgba(255,255,255,0.97) !important; }
+.light-mode .bg-slate-950\/40 { background-color: rgba(226,232,240,0.55) !important; }
+.light-mode .bg-slate-950\/50 { background-color: rgba(226,232,240,0.6) !important; }
+.light-mode .bg-slate-950\/60 { background-color: rgba(226,232,240,0.65) !important; }
+.light-mode .bg-slate-950\/95 { background-color: rgba(255,255,255,0.97) !important; }
+.light-mode .bg-slate-950 { background-color: #e2e8f0 !important; }
+
+/* Superficies secundarias (chips, botones, inputs) */
+.light-mode .bg-slate-800 { background-color: #e2e8f0 !important; }
+.light-mode .bg-slate-800\/30 { background-color: rgba(226,232,240,0.5) !important; }
+.light-mode .bg-slate-800\/40 { background-color: rgba(226,232,240,0.6) !important; }
+.light-mode .bg-slate-800\/50 { background-color: rgba(226,232,240,0.7) !important; }
+.light-mode .bg-slate-800\/60 { background-color: rgba(226,232,240,0.75) !important; }
+.light-mode .bg-slate-800\/70 { background-color: rgba(226,232,240,0.8) !important; }
+.light-mode .bg-slate-800\/80 { background-color: rgba(226,232,240,0.85) !important; }
+.light-mode .bg-slate-700 { background-color: #cbd5e1 !important; }
+.light-mode .bg-slate-700\/80 { background-color: rgba(203,213,225,0.85) !important; }
+.light-mode .hover\:bg-slate-700:hover { background-color: #b6c3d4 !important; }
+.light-mode .hover\:bg-slate-700\/80:hover { background-color: rgba(182,195,212,0.9) !important; }
+.light-mode .hover\:bg-slate-800:hover { background-color: #d6dee7 !important; }
+.light-mode .hover\:bg-slate-800\/30:hover { background-color: rgba(214,222,231,0.6) !important; }
+.light-mode .hover\:bg-slate-800\/60:hover { background-color: rgba(214,222,231,0.8) !important; }
+.light-mode .hover\:bg-slate-800\/80:hover { background-color: rgba(214,222,231,0.9) !important; }
+.light-mode .hover\:bg-slate-900\/60:hover { background-color: rgba(241,245,249,0.9) !important; }
+.light-mode .active\:bg-slate-800:active { background-color: #d6dee7 !important; }
+
+/* Recuadros oscuros (stat tiles) dentro de paneles con degradé de color —
+   en claro pasan a un overlay blanco translúcido para que el texto siga
+   teniendo contraste. */
+.light-mode .bg-black\/20 { background-color: rgba(255,255,255,0.55) !important; }
+.light-mode .bg-black\/30 { background-color: rgba(255,255,255,0.65) !important; }
+.light-mode .bg-black\/70 { background-color: rgba(255,255,255,0.8) !important; }
+.light-mode .border-white\/5 { border-color: rgba(15,23,42,0.06) !important; }
+.light-mode .border-white\/10 { border-color: rgba(15,23,42,0.1) !important; }
+
+/* Texto */
+.light-mode .text-white { color: #0f172a !important; }
+.light-mode .text-white\/80 { color: rgba(15,23,42,0.75) !important; }
+.light-mode .hover\:text-white:hover { color: #0f172a !important; }
+.light-mode .text-slate-100 { color: #1e293b !important; }
+.light-mode .text-slate-200 { color: #1e293b !important; }
+.light-mode .text-slate-300 { color: #334155 !important; }
+.light-mode .text-slate-400 { color: #64748b !important; }
+.light-mode .text-slate-500 { color: #75839a !important; }
+.light-mode .text-slate-600 { color: #94a3b8 !important; }
+.light-mode .text-slate-700 { color: #b6c2d1 !important; }
+.light-mode .hover\:text-slate-200:hover { color: #1e293b !important; }
+.light-mode .hover\:text-slate-300:hover { color: #334155 !important; }
+.light-mode .hover\:text-slate-400:hover { color: #475569 !important; }
+
+/* Bordes */
+.light-mode .border-slate-800 { border-color: #e2e8f0 !important; }
+.light-mode .border-slate-800\/40 { border-color: rgba(226,232,240,0.65) !important; }
+.light-mode .border-slate-800\/50 { border-color: rgba(226,232,240,0.75) !important; }
+.light-mode .border-slate-800\/60 { border-color: rgba(226,232,240,0.85) !important; }
+.light-mode .border-slate-700 { border-color: #cbd5e1 !important; }
+.light-mode .border-slate-700\/40 { border-color: rgba(203,213,225,0.55) !important; }
+.light-mode .border-slate-700\/50 { border-color: rgba(203,213,225,0.65) !important; }
+.light-mode .border-slate-700\/60 { border-color: rgba(203,213,225,0.75) !important; }
+.light-mode .border-slate-600 { border-color: #94a3b8 !important; }
+.light-mode .border-slate-500 { border-color: #64748b !important; }
+.light-mode .hover\:border-slate-500:hover { border-color: #94a3b8 !important; }
+.light-mode .hover\:border-slate-600:hover { border-color: #64748b !important; }
+.light-mode .focus\:border-slate-700:focus { border-color: #94a3b8 !important; }
+.light-mode .divide-slate-800\/50 > :not([hidden]) ~ :not([hidden]) { border-color: rgba(226,232,240,0.75) !important; }
+.light-mode .divide-slate-800 > :not([hidden]) ~ :not([hidden]) { border-color: #e2e8f0 !important; }
+
+/* Tarjetas con degradé propio (hero de Descarga/Progreso/Perfil) — ver
+   variables --grad-* aplicadas vía estilo inline en esos componentes. */
+:root {
+  --grad-hero-purple: linear-gradient(135deg, rgba(168,85,247,0.28), rgba(15,23,42,0.85) 55%, rgba(15,23,42,0.6));
+  --grad-hero-cyan: linear-gradient(135deg, rgba(6,182,212,0.25), rgba(15,23,42,0.85) 55%, rgba(15,23,42,0.6));
+  --grad-profile-avatar: linear-gradient(135deg, #0f172a, rgba(15,23,42,0.5));
+}
+.light-mode {
+  --grad-hero-purple: linear-gradient(135deg, rgba(168,85,247,0.16), rgba(255,255,255,0.85) 55%, rgba(255,255,255,0.96));
+  --grad-hero-cyan: linear-gradient(135deg, rgba(6,182,212,0.14), rgba(255,255,255,0.85) 55%, rgba(255,255,255,0.96));
+  --grad-profile-avatar: linear-gradient(135deg, #ffffff, rgba(255,255,255,0.5));
 }
 `;
 
@@ -783,12 +896,12 @@ function LoginScreen({ onLogin }) {
             <div><label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 block">Nombre</label><input type="text" placeholder="¿Cómo te llamás?" value={regName} onChange={(e) => setRegName(e.target.value)} className="w-full bg-slate-900/80 border border-slate-700/50 rounded-2xl px-4 py-3.5 text-white focus:outline-none focus:border-teal-500/60 text-sm transition" autoFocus /></div>
             <div><label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 block">Email <span className="text-slate-600 normal-case">(opcional)</span></label><input type="email" placeholder="tu@email.com" value={regMail} onChange={(e) => setRegMail(e.target.value)} className="w-full bg-slate-900/80 border border-slate-700/50 rounded-2xl px-4 py-3.5 text-white focus:outline-none focus:border-teal-500/60 text-sm transition" /></div>
           </>)}
-          {regStep === 2 && (<div className="text-center py-4"><p className="text-slate-400 text-sm mb-6">¿Querés proteger tu perfil con un PIN?</p><div className="flex gap-3 justify-center"><button onClick={() => { setRegPin(""); finishRegister(); }} className="flex-1 py-3.5 rounded-2xl border border-slate-700 text-slate-400 text-sm font-semibold">Sin PIN</button><button onClick={() => setRegStep(2.5)} className="flex-1 py-3.5 rounded-2xl bg-teal-500 text-white text-sm font-bold">Con PIN</button></div></div>)}
+          {regStep === 2 && (<div className="text-center py-4"><p className="text-slate-400 text-sm mb-6">¿Querés proteger tu perfil con un PIN?</p><div className="flex gap-3 justify-center"><button onClick={() => { setRegPin(""); finishRegister(); }} className="flex-1 py-3.5 rounded-2xl border border-slate-700 text-slate-400 text-sm font-semibold">Sin PIN</button><button onClick={() => setRegStep(2.5)} className="flex-1 py-3.5 rounded-2xl bg-teal-500 !text-white text-sm font-bold">Con PIN</button></div></div>)}
           {regStep === 2.5 && <PinInput length={4} label="Elegí un PIN" onComplete={(p) => { setRegPin(p); setRegStep(3); }} />}
           {regStep === 3 && <PinInput length={4} label="Confirmá el PIN" onComplete={(p) => { if (p === regPin) { finishRegister(); } else { setRegError("No coinciden."); setTimeout(() => setRegError(""), 1500); } }} error={regError} />}
         </div>
         {regError && regStep === 1 && <p className="text-rose-400 text-xs mt-3 text-center">{regError}</p>}
-        {regStep === 1 && <button onClick={handleRegister} className="w-full mt-6 py-4 rounded-2xl bg-teal-500 text-white font-bold text-sm hover:bg-teal-400 active:scale-[0.98] transition-all shadow-lg shadow-teal-500/20">Continuar →</button>}
+        {regStep === 1 && <button onClick={handleRegister} className="w-full mt-6 py-4 rounded-2xl bg-teal-500 !text-white font-bold text-sm hover:bg-teal-400 active:scale-[0.98] transition-all shadow-lg shadow-teal-500/20">Continuar →</button>}
       </div>
     </div>
   );
@@ -885,6 +998,17 @@ function RutinaDemo({ view }) {
   const [demoDay, setDemoDay] = useState(() => DAY_ORDER[0]);
   const [demoLogs, setDemoLogs] = useState({});
   const [confirmReset, setConfirmReset] = useState(false);
+  const [demoSession, setDemoSession] = useState(null);
+
+  if (view === "session") {
+    return (
+      <SessionStartBar
+        activeSession={demoSession}
+        onStart={() => setDemoSession({ dayKey: demoDay, startedAt: new Date().toISOString() })}
+        onCancel={() => setDemoSession(null)}
+      />
+    );
+  }
 
   if (view === "daypicker") {
     return (
@@ -930,7 +1054,7 @@ function RutinaDemo({ view }) {
           <div className="flex gap-2 items-center bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 bounce-in">
             <p className="text-[11px] text-slate-400 flex-1">¿Borrar reps/kg de hoy? Los récords no cambian.</p>
             <button onClick={() => setConfirmReset(false)} className="px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-400 text-xs">No</button>
-            <button onClick={() => setConfirmReset(false)} className="px-2.5 py-1.5 rounded-lg bg-rose-500/80 text-white text-xs font-bold">Sí</button>
+            <button onClick={() => setConfirmReset(false)} className="px-2.5 py-1.5 rounded-lg bg-rose-500/80 !text-white text-xs font-bold">Sí</button>
           </div>
         )}
       </div>
@@ -1002,7 +1126,7 @@ function ProgresoDemo({ view }) {
         <div className="flex justify-end mt-3 mb-2">
           <div className="flex bg-slate-950/60 rounded-xl p-0.5 border border-slate-800/60">
             {[{ k: "peso", l: "Kg" }, { k: "vol", l: "Vol" }, { k: "1rm", l: "1RM" }].map((opt) => (
-              <button key={opt.k} onClick={() => setMetric(opt.k)} className={`px-2.5 py-1 rounded-[8px] text-[10px] font-bold transition-all ${metric === opt.k ? "bg-teal-500 text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
+              <button key={opt.k} onClick={() => setMetric(opt.k)} className={`px-2.5 py-1 rounded-[8px] text-[10px] font-bold transition-all ${metric === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
             ))}
           </div>
         </div>
@@ -1118,6 +1242,17 @@ function DescargaDemo({ view }) {
 function PerfilDemo({ view }) {
   const [trainW, setTrainW] = useState(7);
   const [alertType, setAlertType] = useState("sound");
+  const [demoTheme, setDemoTheme] = useState("dark");
+
+  if (view === "apariencia") {
+    return (
+      <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
+        {[{ k: "dark", l: "Oscuro", icon: <Moon size={13} /> }, { k: "light", l: "Claro", icon: <Sun size={13} /> }].map((opt) => (
+          <button key={opt.k} onClick={() => setDemoTheme(opt.k)} className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-all ${demoTheme === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.icon} {opt.l}</button>
+        ))}
+      </div>
+    );
+  }
 
   if (view === "datos") {
     return (
@@ -1155,7 +1290,7 @@ function PerfilDemo({ view }) {
     return (
       <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
         {[{ k: "sound", l: "Sonido" }, { k: "vibration", l: "Vibración" }, { k: "both", l: "Ambos" }].map((opt) => (
-          <button key={opt.k} onClick={() => setAlertType(opt.k)} className={`flex-1 py-2 rounded-lg text-[10px] font-bold transition-all ${alertType === opt.k ? "bg-teal-500 text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
+          <button key={opt.k} onClick={() => setAlertType(opt.k)} className={`flex-1 py-2 rounded-lg text-[10px] font-bold transition-all ${alertType === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
         ))}
       </div>
     );
@@ -1322,9 +1457,15 @@ const HELP_CHAPTERS = [
         text: "Acá registrás lo que hacés en cada sesión: elegís el día, ves los ejercicios con sus series, y anotás reps y kg a medida que entrenás.",
       },
       {
+        icon: <Play size={20} />,
+        title: "Iniciar y finalizar sesión",
+        text: "Arriba de todo tenés \"Iniciar sesión\" — tocalo cuando arrancás a entrenar. Al final de la pantalla, mientras la sesión esté en curso, aparece \"Finalizar sesión\": al tocarlo queda registrado que entrenaste hoy, lo que alimenta tu racha, calendario y gráficas, incluso si te olvidaste de guardar alguna serie suelta.",
+        demo: { kind: "rutina", view: "session", caption: "Probá iniciar la sesión y mirá cómo cambia" },
+      },
+      {
         icon: <Calendar size={20} />,
         title: "Elegí tu día",
-        text: "Arriba de todo elegís el día de tu rutina activa. La app resalta uno como \"sugerido para hoy\" según el último tipo de día que entrenaste — no según el calendario.",
+        text: "Más abajo elegís el día de tu rutina activa. La app resalta uno como \"sugerido para hoy\" según el último tipo de día que entrenaste — no según el calendario.",
         demo: { kind: "rutina", view: "daypicker", caption: "Tocá un día y mirá cómo cambia" },
       },
       {
@@ -1467,6 +1608,12 @@ const HELP_CHAPTERS = [
         icon: <Layers size={20} />,
         title: "Tu rutina",
         text: "Debajo de \"Editar perfil\" tenés un acceso directo que muestra qué rutina tenés activa y cuántas guardaste. Tocalo para ir a la pestaña Rutinas y cambiar o crear otra.",
+      },
+      {
+        icon: <Sun size={20} />,
+        title: "Apariencia",
+        text: "Elegí entre el tema oscuro (el de siempre) o uno claro, lo que te resulte más cómodo.",
+        demo: { kind: "perfil", view: "apariencia", caption: "Probá cambiar de tema" },
       },
       {
         icon: <Calendar size={20} />,
@@ -1616,9 +1763,9 @@ function HelpModal({ startTab, onClose }) {
           <button onClick={() => setI((n) => Math.max(0, n - 1))} disabled={isFirst} className={`px-3.5 py-2 rounded-xl text-xs font-bold transition ${isFirst ? "text-slate-700" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>Atrás</button>
           <span className="text-[10px] text-slate-600 font-medium">{i + 1} / {ALL_HELP_STEPS.length}</span>
           {isLast ? (
-            <button onClick={onClose} className="px-4 py-2 rounded-xl text-xs font-black bg-teal-500 text-white transition active:scale-95">Listo</button>
+            <button onClick={onClose} className="px-4 py-2 rounded-xl text-xs font-black bg-teal-500 !text-white transition active:scale-95">Listo</button>
           ) : (
-            <button onClick={() => setI((n) => Math.min(ALL_HELP_STEPS.length - 1, n + 1))} className="px-4 py-2 rounded-xl text-xs font-black bg-teal-500 text-white transition active:scale-95">Siguiente</button>
+            <button onClick={() => setI((n) => Math.min(ALL_HELP_STEPS.length - 1, n + 1))} className="px-4 py-2 rounded-xl text-xs font-black bg-teal-500 !text-white transition active:scale-95">Siguiente</button>
           )}
         </div>
       </div>
@@ -1740,20 +1887,18 @@ function ExerciseCard({ exercise, accent, logs, setLogs, deloadSets, deloadMode,
         </div>
         <ChevronDown size={18} className={`text-slate-600 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
       </button>
-      {open && (
-        <div className="px-4 pb-4 pt-0 tab-fade-in">
-          {!deloadMode && stagnant && <div className="mb-3 text-[11px] text-rose-400/90 bg-rose-500/5 border border-rose-500/15 rounded-xl px-3 py-2 flex items-start gap-1.5"><Info size={12} className="mt-0.5 shrink-0" /><span>Hace {STAGNATION_DAYS}+ días sin superar el récord. Considerá cambiar reps, descanso o variante.</span></div>}
-          <div className="mb-1">
-            <RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={accent} alertType={settings.alertType} />
-          </div>
-          {setsToShow.map((s, i) => <SetRow key={i} exerciseId={exercise.id} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} deloadKgFactor={settings.deloadPct} deloadMode={deloadMode} resetKey={resetKey} />)}
-          {exercise.video && (
-            <div className="pt-3">
-              <a href={exercise.video} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 py-3 rounded-xl border border-slate-800 text-slate-400 hover:border-slate-600 hover:text-white transition text-sm font-medium">▶ Ver técnica en YouTube</a>
-            </div>
-          )}
+      <div className={open ? "px-4 pb-4 pt-0 tab-fade-in" : "hidden"}>
+        {!deloadMode && stagnant && <div className="mb-3 text-[11px] text-rose-400/90 bg-rose-500/5 border border-rose-500/15 rounded-xl px-3 py-2 flex items-start gap-1.5"><Info size={12} className="mt-0.5 shrink-0" /><span>Hace {STAGNATION_DAYS}+ días sin superar el récord. Considerá cambiar reps, descanso o variante.</span></div>}
+        <div className="mb-1">
+          <RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={accent} alertType={settings.alertType} />
         </div>
-      )}
+        {setsToShow.map((s, i) => <SetRow key={i} exerciseId={exercise.id} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} deloadKgFactor={settings.deloadPct} deloadMode={deloadMode} resetKey={resetKey} />)}
+        {exercise.video && (
+          <div className="pt-3">
+            <a href={exercise.video} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 py-3 rounded-xl border border-slate-800 text-slate-400 hover:border-slate-600 hover:text-white transition text-sm font-medium">▶ Ver técnica en YouTube</a>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -1761,11 +1906,11 @@ function ExerciseCard({ exercise, accent, logs, setLogs, deloadSets, deloadMode,
 /* ============================================================================
    WEEK CALENDAR (cuadro de "ciclo actual" en la pestaña Rutina)
 ============================================================================ */
-function WeekCalendar({ cycleStart, logs, settings = DEFAULT_SETTINGS }) {
+function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS }) {
   const weekInfo = getWeekInfo(cycleStart, settings);
   if (!cycleStart || !weekInfo) return null;
   const { cycleWeeks, trainWeeks } = weekInfo;
-  const trainedDays = useMemo(() => { const s = new Set(); Object.entries(logs).forEach(([k, v]) => { if (k.endsWith("_pr_override") || !Array.isArray(v)) return; v.forEach((e) => s.add(e.date)); }); return s; }, [logs]);
+  const trainedDays = useMemo(() => getTrainedDateSet(logs, sessions), [logs, sessions]);
   const weekDots = Array.from({ length: cycleWeeks }, (_, wi) => { const ws = new Date(cycleStart); ws.setDate(ws.getDate() + wi * 7); const days = Array.from({ length: 7 }, (_, di) => { const d = new Date(ws); d.setDate(d.getDate() + di); return d.toISOString().slice(0, 10); }); return { week: wi + 1, days, trained: days.filter((d) => trainedDays.has(d)).length, isDeload: wi + 1 > trainWeeks }; });
   const phase = weekInfo.isDeload ? "#A855F7" : "#14B8A6";
   const cyclePct = Math.round((weekInfo.weekInCycle / cycleWeeks) * 100);
@@ -1818,7 +1963,43 @@ function WeekCalendar({ cycleStart, logs, settings = DEFAULT_SETTINGS }) {
    active day (gradient + stats + reset, replacing the old separate summary
    card), then the exercise list in a responsive grid.
 ============================================================================ */
-function RoutineView({ logs, setLogs, cycleStart, settings }) {
+/* ============================================================================
+   SESSION BAR — botón de Iniciar sesión (arriba) / estado en curso con
+   tiempo transcurrido. El de Finalizar sesión vive abajo, en RoutineView.
+============================================================================ */
+function SessionStartBar({ activeSession, onStart, onCancel }) {
+  const [, forceTick] = useState(0);
+  useEffect(() => {
+    if (!activeSession) return;
+    const id = setInterval(() => forceTick((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, [activeSession]);
+
+  if (!activeSession) {
+    return (
+      <button onClick={onStart} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98] shadow-lg shadow-teal-500/20" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>
+        <Play size={15} /> Iniciar sesión
+      </button>
+    );
+  }
+
+  const elapsedMin = Math.max(0, Math.floor((Date.now() - new Date(activeSession.startedAt).getTime()) / 60000));
+  return (
+    <div className="flex items-center gap-3 bg-teal-500/10 border border-teal-500/25 rounded-2xl px-4 py-3">
+      <span className="relative flex h-2.5 w-2.5 shrink-0">
+        <span className="absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75 animate-ping" />
+        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-teal-500" />
+      </span>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-bold text-white">Sesión en curso</p>
+        <p className="text-[11px] text-teal-400/80">{elapsedMin} min · arrancó a las {new Date(activeSession.startedAt).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}</p>
+      </div>
+      <button onClick={onCancel} className="text-[11px] text-slate-500 hover:text-slate-300 font-semibold shrink-0">Cancelar</button>
+    </div>
+  );
+}
+
+function RoutineView({ logs, setLogs, cycleStart, settings, sessions, activeSession, onStartSession, onEndSession, onCancelSession }) {
   const [activeDay, setActiveDay] = useState(() => getSuggestedDay(logs));
   const suggestedDay = useMemo(() => getSuggestedDay(logs), []);
   const weekInfo = getWeekInfo(cycleStart, settings), isDeload = weekInfo?.isDeload, day = ROUTINE[activeDay];
@@ -1839,7 +2020,9 @@ function RoutineView({ logs, setLogs, cycleStart, settings }) {
 
   return (
     <div className="space-y-4">
-      <WeekCalendar cycleStart={cycleStart} logs={logs} settings={settings} />
+      <SessionStartBar activeSession={activeSession} onStart={() => onStartSession(activeDay)} onCancel={onCancelSession} />
+
+      <WeekCalendar cycleStart={cycleStart} logs={logs} sessions={sessions} settings={settings} />
 
       <div className="flex gap-1.5 overflow-x-auto pb-1">
         {DAY_ORDER.map((k) => (
@@ -1873,7 +2056,7 @@ function RoutineView({ logs, setLogs, cycleStart, settings }) {
             <div className="flex gap-2 items-center mt-3 bg-black/30 border border-white/10 rounded-xl px-3 py-2">
               <p className="text-[11px] text-slate-400 flex-1">¿Borrar reps/kg de hoy? Los récords no cambian.</p>
               <button onClick={() => setConfirmReset(false)} className="px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-400 text-xs">No</button>
-              <button onClick={handleResetDay} className="px-2.5 py-1.5 rounded-lg bg-rose-500/80 text-white text-xs font-bold">Sí</button>
+              <button onClick={handleResetDay} className="px-2.5 py-1.5 rounded-lg bg-rose-500/80 !text-white text-xs font-bold">Sí</button>
             </div>
           )}
         </div>
@@ -1882,6 +2065,15 @@ function RoutineView({ logs, setLogs, cycleStart, settings }) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         {day.exercises.map((ex) => <ExerciseCard key={ex.id} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} deloadSets={isDeload ? getDeloadSets(ex) : null} deloadMode={isDeload} resetKey={resetKeys[activeDay]} settings={settings} />)}
       </div>
+
+      {activeSession && (
+        <div>
+          <button onClick={onEndSession} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98] shadow-lg shadow-emerald-500/20" style={{ background: "linear-gradient(135deg,#10B981,#047857)" }}>
+            <Check size={15} /> Finalizar sesión
+          </button>
+          <p className="text-center text-[10px] text-slate-600 mt-2">Se guarda como entrenamiento de hoy — alimenta tu racha, calendario y gráficas.</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -1939,7 +2131,7 @@ function SessionHistoryView({ logs }) {
     <div className="space-y-3">
       <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60 w-fit">
         {[{ k: "calendar", icon: <LayoutGrid size={13} />, l: "Calendario" }, { k: "list", icon: <List size={13} />, l: "Lista" }].map((opt) => (
-          <button key={opt.k} onClick={() => setView(opt.k)} className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-[11px] font-bold transition-all ${view === opt.k ? "bg-teal-500 text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.icon}{opt.l}</button>
+          <button key={opt.k} onClick={() => setView(opt.k)} className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-[11px] font-bold transition-all ${view === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.icon}{opt.l}</button>
         ))}
       </div>
 
@@ -1991,7 +2183,7 @@ function DeloadView({ logs, settings = DEFAULT_SETTINGS }) {
 
   return (
     <div className="space-y-5">
-      <div className="relative overflow-hidden rounded-2xl border border-purple-500/20 bg-gradient-to-br from-purple-950/60 via-slate-900/80 to-slate-900/60 p-5">
+      <div className="relative overflow-hidden rounded-2xl border border-purple-500/20 p-5" style={{ background: "var(--grad-hero-purple)" }}>
         <div className="absolute -top-8 -right-8 w-32 h-32 rounded-full bg-purple-500/15 blur-2xl pointer-events-none" />
         <div className="absolute -bottom-4 -left-4 w-24 h-24 rounded-full bg-indigo-500/10 blur-2xl pointer-events-none" />
         <div className="relative">
@@ -2155,16 +2347,17 @@ function ExerciseCarousel({ exercises, selId, onSelect, logs }) {
   );
 }
 
-function ProgressView({ logs, setLogs }) {
+function ProgressView({ logs, setLogs, sessions }) {
   const allExercises = useMemo(() => DAY_ORDER.flatMap((dk) => ROUTINE[dk].exercises.map((e) => ({ id: e.id, name: e.name, day: ROUTINE[dk].label, color: ROUTINE[dk].color, sets: e.sets.length, dayKey: dk }))), []);
 
   const stats = useMemo(() => {
-    const dateSet = new Set(); let totalVol = 0, totalSets = 0;
-    Object.entries(logs).forEach(([k, v]) => { if (k.endsWith("_pr_override") || !Array.isArray(v)) return; v.forEach((e) => { dateSet.add(e.date); totalVol += vol(e.kg, e.reps); totalSets++; }); });
+    const dateSet = getTrainedDateSet(logs, sessions);
+    let totalVol = 0, totalSets = 0;
+    Object.entries(logs).forEach(([k, v]) => { if (k.endsWith("_pr_override") || !Array.isArray(v)) return; v.forEach((e) => { totalVol += vol(e.kg, e.reps); totalSets++; }); });
     let streak = 0, cursor = new Date();
     while (true) { const d = cursor.toISOString().slice(0, 10); if (dateSet.has(d)) { streak++; cursor.setDate(cursor.getDate() - 1); } else break; }
     return { totalVol: Math.round(totalVol), totalSets, streak, daysTrained: dateSet.size };
-  }, [logs]);
+  }, [logs, sessions]);
 
   const muscleVolume = useMemo(() => {
     const map = {};
@@ -2204,7 +2397,7 @@ function ProgressView({ logs, setLogs }) {
 
   return (
     <div className="space-y-4">
-      <div className="relative overflow-hidden rounded-2xl border border-cyan-500/20 bg-gradient-to-br from-cyan-950/50 via-slate-900/80 to-slate-900/60 p-5">
+      <div className="relative overflow-hidden rounded-2xl border border-cyan-500/20 p-5" style={{ background: "var(--grad-hero-cyan)" }}>
         <div className="absolute -top-8 -right-6 w-32 h-32 rounded-full bg-cyan-500/15 blur-2xl pointer-events-none" />
         <div className="absolute -bottom-6 -left-6 w-28 h-28 rounded-full bg-teal-500/10 blur-2xl pointer-events-none" />
         <div className="relative flex items-center gap-2 mb-1">
@@ -2261,7 +2454,7 @@ function ProgressView({ logs, setLogs }) {
                 <p className="text-xs text-slate-500 font-semibold">Ejercicio y serie</p>
                 <div className="flex bg-slate-950/60 rounded-xl p-0.5 border border-slate-800/60 shrink-0">
                   {[{ k: "peso", l: "Kg" }, { k: "vol", l: "Vol" }, { k: "1rm", l: "1RM" }, { k: "rpe", l: "RPE" }].map((opt) => (
-                    <button key={opt.k} onClick={() => setMetric(opt.k)} className={`px-2 py-1.5 rounded-[10px] text-[10px] font-bold transition-all ${metric === opt.k ? "bg-teal-500 text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
+                    <button key={opt.k} onClick={() => setMetric(opt.k)} className={`px-2 py-1.5 rounded-[10px] text-[10px] font-bold transition-all ${metric === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
                   ))}
                 </div>
               </div>
@@ -2385,7 +2578,7 @@ function ProgressView({ logs, setLogs }) {
         <div className="flex gap-2 items-center bg-rose-950/30 border border-rose-500/20 rounded-xl px-3 py-2.5">
           <p className="text-xs text-rose-300/80 flex-1">¿Borrar todo el historial? Los récords se mantienen.</p>
           <button onClick={() => setConfirmResetProgress(false)} className="px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-400 text-xs">No</button>
-          <button onClick={() => { const nl = {}; Object.entries(logs).forEach(([k, v]) => { if (k.endsWith("_pr_override")) nl[k] = v; }); setLogs(nl); setConfirmResetProgress(false); }} className="px-2.5 py-1.5 rounded-lg bg-rose-500 text-white text-xs font-bold">Sí, borrar</button>
+          <button onClick={() => { const nl = {}; Object.entries(logs).forEach(([k, v]) => { if (k.endsWith("_pr_override")) nl[k] = v; }); setLogs(nl); setConfirmResetProgress(false); }} className="px-2.5 py-1.5 rounded-lg bg-rose-500 !text-white text-xs font-bold">Sí, borrar</button>
         </div>
       )}
     </div>
@@ -2413,8 +2606,8 @@ function ProfileView({ profileName, profiles, onLogout, onDelete, onUpdateProfil
 
   return (
     <div className="space-y-4">
-      <div className="bg-gradient-to-br from-slate-900 to-slate-900/50 border border-slate-800/50 rounded-2xl p-5 text-center shadow-md shadow-black/20">
-        <div className="w-20 h-20 rounded-3xl mx-auto flex items-center justify-center text-3xl font-black text-white mb-3" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>{initial}</div>
+      <div className="border border-slate-800/50 rounded-2xl p-5 text-center shadow-md shadow-black/20" style={{ background: "var(--grad-profile-avatar)" }}>
+        <div className="w-20 h-20 rounded-3xl mx-auto flex items-center justify-center text-3xl font-black !text-white mb-3" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>{initial}</div>
         <h2 className="text-xl font-black text-white">{profileName}</h2>
         {profile?.email && <p className="text-sm text-slate-400 mt-1">{profile.email}</p>}
         <p className="text-[11px] text-slate-600 mt-1">Miembro desde {joinDate}</p>
@@ -2431,7 +2624,7 @@ function ProfileView({ profileName, profiles, onLogout, onDelete, onUpdateProfil
           <input type="email" value={editMail} onChange={(e) => setEditMail(e.target.value)} placeholder="tu@email.com" className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none" />
           <div className="flex gap-2">
             <button onClick={() => setEditing(false)} className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-400 text-sm font-semibold">Cancelar</button>
-            <button onClick={() => { onUpdateProfile({ email: editMail }); setEditing(false); }} className="flex-1 py-3 rounded-xl bg-teal-500 text-white text-sm font-bold">Guardar</button>
+            <button onClick={() => { onUpdateProfile({ email: editMail }); setEditing(false); }} className="flex-1 py-3 rounded-xl bg-teal-500 !text-white text-sm font-bold">Guardar</button>
           </div>
         </div>
       ) : (
@@ -2445,6 +2638,16 @@ function ProfileView({ profileName, profiles, onLogout, onDelete, onUpdateProfil
       </button>
 
       <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 backdrop-blur-sm shadow-md shadow-black/20">
+        <p className="text-sm font-bold text-white mb-0.5">Apariencia</p>
+        <p className="text-[11px] text-slate-500 mb-3">Elegí el tema con el que se ve la app</p>
+        <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
+          {[{ k: "dark", l: "Oscuro", icon: <Moon size={13} /> }, { k: "light", l: "Claro", icon: <Sun size={13} /> }].map((opt) => (
+            <button key={opt.k} onClick={() => updateSettings({ theme: opt.k })} className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-all ${settings.theme === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.icon} {opt.l}</button>
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 backdrop-blur-sm shadow-md shadow-black/20">
         <div className="flex items-center justify-between mb-2">
           <div><p className="text-sm font-bold text-white">Inicio de ciclo</p><p className="text-[11px] text-slate-500 mt-0.5">{cycleStart ? `Iniciado el ${new Date(cycleStart).toLocaleDateString("es-AR")}` : "No configurado"}</p></div>
           <button onClick={() => setShowCycleSetup(true)} className="px-3 py-1.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold hover:bg-slate-700">{cycleStart ? "Cambiar" : "Configurar"}</button>
@@ -2456,7 +2659,7 @@ function ProfileView({ profileName, profiles, onLogout, onDelete, onUpdateProfil
           <input type="date" className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none" defaultValue={cycleStart ? new Date(cycleStart).toISOString().slice(0, 10) : todayStr()} id="cycle-date-input" />
           <div className="flex gap-2">
             <button onClick={() => setShowCycleSetup(false)} className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-400 text-sm font-semibold">Cancelar</button>
-            <button onClick={() => { const val = document.getElementById("cycle-date-input").value; if (val) { onSetCycleStart(new Date(val)); setShowCycleSetup(false); } }} className="flex-1 py-3 rounded-xl bg-teal-500 text-white text-sm font-bold">Guardar</button>
+            <button onClick={() => { const val = document.getElementById("cycle-date-input").value; if (val) { onSetCycleStart(new Date(val)); setShowCycleSetup(false); } }} className="flex-1 py-3 rounded-xl bg-teal-500 !text-white text-sm font-bold">Guardar</button>
           </div>
         </div>
       )}
@@ -2472,12 +2675,12 @@ function ProfileView({ profileName, profiles, onLogout, onDelete, onUpdateProfil
           <div className="flex items-center justify-between mb-2"><p className="text-[10px] text-slate-500">Carga en descarga</p><span className="text-[11px] font-bold text-purple-400 tabular-nums">{Math.round(settings.deloadPct * 100)}%</span></div>
           <div className="flex items-center gap-3"><button onClick={() => adjustDeloadPct(-0.05)} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95 shrink-0">−</button><div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden"><div className="h-full bg-purple-500 rounded-full transition-all" style={{ width: `${settings.deloadPct * 100}%` }} /></div><button onClick={() => adjustDeloadPct(0.05)} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95 shrink-0">+</button></div>
         </div>
-        <div><p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Reducción de series</p><div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">{[{ k: 2, l: "Mitad" }, { k: 3, l: "Tercio" }, { k: 4, l: "Cuarto" }].map((opt) => <button key={opt.k} onClick={() => updateSettings({ deloadSetDivisor: opt.k })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${settings.deloadSetDivisor === opt.k ? "bg-purple-500 text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>)}</div></div>
+        <div><p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Reducción de series</p><div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">{[{ k: 2, l: "Mitad" }, { k: 3, l: "Tercio" }, { k: 4, l: "Cuarto" }].map((opt) => <button key={opt.k} onClick={() => updateSettings({ deloadSetDivisor: opt.k })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${settings.deloadSetDivisor === opt.k ? "bg-purple-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>)}</div></div>
       </div>
 
       <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 backdrop-blur-sm shadow-md shadow-black/20 space-y-3.5">
         <div><p className="text-sm font-bold text-white">Descanso entre series</p><p className="text-[11px] text-slate-500 mt-0.5">Cómo te avisamos y cuánto dura cada pausa</p></div>
-        <div><p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Aviso al terminar</p><div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">{[{ k: "sound", l: "Sonido" }, { k: "vibration", l: "Vibración" }, { k: "both", l: "Ambos" }].map((opt) => <button key={opt.k} onClick={() => updateSettings({ alertType: opt.k })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${settings.alertType === opt.k ? "bg-teal-500 text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>)}</div></div>
+        <div><p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Aviso al terminar</p><div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">{[{ k: "sound", l: "Sonido" }, { k: "vibration", l: "Vibración" }, { k: "both", l: "Ambos" }].map((opt) => <button key={opt.k} onClick={() => updateSettings({ alertType: opt.k })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${settings.alertType === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>)}</div></div>
         <div className="grid grid-cols-2 gap-3">
           {[{ key: "restLong", label: "Ejercicios pesados" }, { key: "restShort", label: "Resto" }].map(({ key, label }) => (
             <div key={key} className="bg-slate-950/40 rounded-xl p-3"><p className="text-[10px] text-slate-500 mb-2">{label}</p><div className="flex items-center justify-between"><button onClick={() => adjustRest(key, -15)} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95">−</button><span className="text-sm font-black text-white tabular-nums">{formatTime(settings[key])}</span><button onClick={() => adjustRest(key, 15)} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95">+</button></div></div>
@@ -2497,7 +2700,7 @@ function ProfileView({ profileName, profiles, onLogout, onDelete, onUpdateProfil
         <div className="bg-rose-500/5 border border-rose-500/20 rounded-2xl p-4 bounce-in">
           <div className="flex items-start gap-2.5 mb-4"><AlertTriangle size={16} className="text-rose-400 mt-0.5 shrink-0" /><p className="text-xs text-rose-400 font-semibold">{profile?.pin ? "Esto borra el perfil y todo el historial de forma permanente. Ingresá tu PIN para confirmar." : "Esto borra el perfil y todo el historial de forma permanente. No se puede deshacer."}</p></div>
           {profile?.pin ? <PinInput label="PIN para confirmar" onComplete={handleDeleteConfirm} error={deleteError} onCancel={() => setShowDeletePin(false)} /> : (
-            <div className="flex gap-2"><button onClick={() => setShowDeletePin(false)} className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-400 text-sm font-semibold">Cancelar</button><button onClick={onDelete} className="flex-1 py-3 rounded-xl bg-rose-500 text-white text-sm font-bold">Eliminar perfil</button></div>
+            <div className="flex gap-2"><button onClick={() => setShowDeletePin(false)} className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-400 text-sm font-semibold">Cancelar</button><button onClick={onDelete} className="flex-1 py-3 rounded-xl bg-rose-500 !text-white text-sm font-bold">Eliminar perfil</button></div>
           )}
         </div>
       )}
@@ -2564,7 +2767,7 @@ function PresetRoutineCard({ preset, isActive, onUse }) {
         <div className="px-4 pb-4 tab-fade-in space-y-3">
           {preset.recommendation && <p className="text-[11px] text-slate-400 bg-slate-800/40 rounded-xl px-3 py-2 flex items-start gap-1.5"><Info size={12} className="mt-0.5 shrink-0" />{preset.recommendation}</p>}
           <RoutinePreview routineDef={preset} />
-          <button onClick={onUse} disabled={isActive} className={`w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-bold transition ${isActive ? "bg-slate-800 text-slate-600" : "bg-teal-500 text-white hover:bg-teal-400 active:scale-[0.98] shadow-lg shadow-teal-500/20"}`}>
+          <button onClick={onUse} disabled={isActive} className={`w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-bold transition ${isActive ? "bg-slate-800 text-slate-600" : "bg-teal-500 !text-white hover:bg-teal-400 active:scale-[0.98] shadow-lg shadow-teal-500/20"}`}>
             {isActive ? <><Check size={14} /> Ya la estás usando</> : <><Sparkles size={14} /> Usar esta rutina</>}
           </button>
         </div>
@@ -2594,7 +2797,7 @@ function SavedRoutineRow({ routine, isActive, onUse, onDelete }) {
         <div className="flex gap-2 items-center mt-2.5 bg-rose-950/30 border border-rose-500/20 rounded-xl px-3 py-2 bounce-in">
           <p className="text-[11px] text-rose-300/80 flex-1">¿Borrar "{routine.name}"? No se puede deshacer.</p>
           <button onClick={() => setConfirmDel(false)} className="px-2 py-1 rounded-lg bg-slate-800 text-slate-400 text-[11px]">No</button>
-          <button onClick={onDelete} className="px-2 py-1 rounded-lg bg-rose-500 text-white text-[11px] font-bold">Sí</button>
+          <button onClick={onDelete} className="px-2 py-1 rounded-lg bg-rose-500 !text-white text-[11px] font-bold">Sí</button>
         </div>
       )}
     </div>
@@ -2689,7 +2892,7 @@ function BuilderExerciseRow({ ex, canMoveUp, canMoveDown, onMove, onRemove, onCo
             <p className="text-[10px] text-slate-500 mb-1.5">Repeticiones aproximadas</p>
             <div className="flex flex-wrap gap-1.5">
               {REP_RANGE_OPTIONS.map((r) => (
-                <button key={r} onClick={() => onConfigChange({ setsCount, repRange: r })} className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all border ${repRange === r ? "bg-teal-500 border-teal-500 text-white" : "border-slate-800 text-slate-500"}`}>{r}</button>
+                <button key={r} onClick={() => onConfigChange({ setsCount, repRange: r })} className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all border ${repRange === r ? "bg-teal-500 border-teal-500 !text-white" : "border-slate-800 text-slate-500"}`}>{r}</button>
               ))}
             </div>
             {isHeavyRepRange(repRange) && <p className="text-[9px] text-amber-500/80 mt-1.5">Se marca como FUERZA automáticamente (6 reps o menos).</p>}
@@ -2814,7 +3017,7 @@ function RoutineBuilder({ onCancel, onSave }) {
 
       <div className="flex gap-2 pt-1">
         <button onClick={onCancel} className="flex-1 py-3.5 rounded-2xl bg-slate-800 text-slate-300 text-sm font-semibold">Cancelar</button>
-        <button onClick={handleSave} className="flex-1 py-3.5 rounded-2xl bg-teal-500 text-white text-sm font-bold active:scale-[0.98] transition-all shadow-lg shadow-teal-500/20">Guardar rutina</button>
+        <button onClick={handleSave} className="flex-1 py-3.5 rounded-2xl bg-teal-500 !text-white text-sm font-bold active:scale-[0.98] transition-all shadow-lg shadow-teal-500/20">Guardar rutina</button>
       </div>
     </div>
   );
@@ -2993,6 +3196,7 @@ export default function App() {
   }, []);
 
   const profile = profiles[activeProfile], logs = profile?.logs || {};
+  const themeClass = getProfileSettings(profile).theme === "light" ? "light-mode" : "";
   // La rutina activa del perfil actual (o la Clásica como respaldo) se
   // recalcula en cada render — así ROUTINE/DAY_ORDER/EXERCISE_BY_ID/KEY_TO_DAY
   // siempre reflejan la rutina correcta antes de que se rendericen sus hijos.
@@ -3035,13 +3239,41 @@ export default function App() {
     });
   };
 
+  // Sesión de entrenamiento explícita (botón Iniciar arriba / Finalizar
+  // abajo, en Rutina). Al finalizar, queda un registro con fecha — eso es lo
+  // que alimenta racha/calendario/gráficas aunque no se haya guardado cada
+  // serie individualmente.
+  const handleStartSession = (dayKey) => {
+    const np = { ...profiles, [activeProfile]: { ...profiles[activeProfile], activeSession: { dayKey, startedAt: new Date().toISOString() } } };
+    setProfiles(np); saveProfiles(np);
+  };
+  const handleEndSession = () => {
+    setProfiles((prev) => {
+      const p = prev[activeProfile];
+      if (!p?.activeSession) return prev;
+      const finished = { date: todayStr(), dayKey: p.activeSession.dayKey, startedAt: p.activeSession.startedAt, endedAt: new Date().toISOString() };
+      const np = { ...prev, [activeProfile]: { ...p, activeSession: null, trainingSessions: [...(p.trainingSessions || []), finished] } };
+      saveProfiles(np);
+      return np;
+    });
+  };
+  const handleCancelSession = () => {
+    setProfiles((prev) => {
+      const p = prev[activeProfile];
+      if (!p?.activeSession) return prev;
+      const np = { ...prev, [activeProfile]: { ...p, activeSession: null } };
+      saveProfiles(np);
+      return np;
+    });
+  };
+
   if (!activeProfile) return (<><StyleInjector />{recoveredNotice && <RecoveredBanner onClose={() => setRecoveredNotice(false)} />}<LoginScreen onLogin={handleLogin} /></>);
 
   if (needsRoutinePick) return (
     <>
       <StyleInjector />
       {recoveredNotice && <RecoveredBanner onClose={() => setRecoveredNotice(false)} />}
-      <div className="min-h-screen bg-[#0a0a0f] px-4 py-6">
+      <div className={`min-h-screen bg-[#0a0a0f] px-4 py-6 ${themeClass}`}>
         <div className="max-w-xl mx-auto">
           <div className="flex justify-end mb-2">
             <button onClick={handleLogout} className="text-[11px] text-slate-600 hover:text-slate-400 font-semibold flex items-center gap-1"><LogOut size={11} /> Cambiar de perfil</button>
@@ -3053,7 +3285,7 @@ export default function App() {
   );
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white font-sans lg:flex">
+    <div className={`min-h-screen bg-[#0a0a0f] text-white font-sans lg:flex ${themeClass}`}>
       <StyleInjector />
       {recoveredNotice && <RecoveredBanner onClose={() => setRecoveredNotice(false)} />}
       <SideNav tab={tab} setTab={setTab} profileName={activeProfile} />
@@ -3075,8 +3307,8 @@ export default function App() {
         <main className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto px-4 py-4 pb-28 lg:pb-10 space-y-4">
           <div key={tab} className="tab-fade-in">
             {tab === "rutinas" && <RoutinesView profile={profile} forced={false} onActivate={handleActivateRoutine} onDelete={handleDeleteRoutine} />}
-            {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} cycleStart={cycleStart} settings={getProfileSettings(profile)} />}
-            {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} />}
+            {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} cycleStart={cycleStart} settings={getProfileSettings(profile)} sessions={profile?.trainingSessions || []} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} />}
+            {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} />}
             {tab === "descarga" && <DeloadView logs={logs} settings={getProfileSettings(profile)} />}
             {tab === "perfil" && <ProfileView profileName={activeProfile} profiles={profiles} onLogout={handleLogout} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} />}
           </div>
@@ -3090,7 +3322,7 @@ export default function App() {
 
 function RecoveredBanner({ onClose }) {
   return (
-    <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[150] bg-teal-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-teal-500/30 flex items-center gap-2 bounce-in">
+    <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[150] bg-teal-500 !text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-teal-500/30 flex items-center gap-2 bounce-in">
       <Check size={14} /> Recuperamos tu copia de seguridad local
       <button onClick={onClose} className="ml-1 opacity-80 hover:opacity-100"><X size={13} /></button>
     </div>
