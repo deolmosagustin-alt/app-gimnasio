@@ -646,6 +646,9 @@ const DEMO_CHART_DATA = [
   { date: "08-06", kg: 80, vol: 800, e1rm: 98 },
 ];
 
+// Lista de ejercicios de ejemplo para la demo del carrusel (Progreso → Evolución).
+const DEMO_CAROUSEL_EXERCISES = ROUTINE.push.exercises.map((e) => ({ id: e.id, name: e.name, color: ROUTINE.push.color, sets: e.sets.length }));
+
 /* ---- Demo en vivo: pestaña Rutina (día, panel, tarjeta de ejercicio, reset) ---- */
 function RutinaDemo({ view }) {
   const [demoDay, setDemoDay] = useState("push");
@@ -723,6 +726,7 @@ function RutinaDemo({ view }) {
 /* ---- Demo en vivo: pestaña Progreso (stats, gráfico, PRs, músculo, historial) ---- */
 function ProgresoDemo({ view }) {
   const [metric, setMetric] = useState("peso");
+  const [demoExId, setDemoExId] = useState(DEMO_CAROUSEL_EXERCISES[0].id);
 
   if (view === "stats") {
     const tiles = [
@@ -763,7 +767,8 @@ function ProgresoDemo({ view }) {
     const label = metric === "peso" ? "Kg" : metric === "vol" ? "Volumen" : "1RM est.";
     return (
       <div>
-        <div className="flex justify-end mb-2">
+        <ExerciseCarousel exercises={DEMO_CAROUSEL_EXERCISES} selId={demoExId} onSelect={setDemoExId} logs={{}} />
+        <div className="flex justify-end mt-3 mb-2">
           <div className="flex bg-slate-950/60 rounded-xl p-0.5 border border-slate-800/60">
             {[{ k: "peso", l: "Kg" }, { k: "vol", l: "Vol" }, { k: "1rm", l: "1RM" }].map((opt) => (
               <button key={opt.k} onClick={() => setMetric(opt.k)} className={`px-2.5 py-1 rounded-[8px] text-[10px] font-bold transition-all ${metric === opt.k ? "bg-teal-500 text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
@@ -1067,8 +1072,8 @@ const HELP_CHAPTERS = [
       {
         icon: <BarChart3 size={20} />,
         title: "Gráfico de evolución",
-        text: "Elegí el día y el ejercicio con las tarjetas, la serie con los botones S1/S2/etc., y mirá su evolución en Kg, Volumen, 1RM estimado o RPE con los botones de arriba del gráfico.",
-        demo: { kind: "progreso", view: "chart", caption: "Probá cambiar entre Kg, Vol y 1RM" },
+        text: "Elegí el día con los botones de arriba, y después deslizá hacia los costados sobre la tarjeta del ejercicio (o tocá las flechitas) para ir cambiando de ejercicio, de a uno por vez. Elegí la serie con los botones S1/S2/etc., y mirá su evolución en Kg, Volumen, 1RM estimado o RPE con los botones de arriba del gráfico.",
+        demo: { kind: "progreso", view: "chart", caption: "Deslizá la tarjeta para cambiar de ejercicio" },
       },
       {
         icon: <Trophy size={20} />,
@@ -1750,6 +1755,56 @@ const CustomTooltip = ({ active, payload, label }) => {
   );
 };
 
+/* ============================================================================
+   EXERCISE CARROUSEL — muestra un solo ejercicio a la vez (en vez de una fila
+   de tarjetas), con flechas y deslizando con el dedo (swipe) para cambiar.
+   Reemplaza al selector horizontal de tarjetas en "Progreso → Evolución".
+============================================================================ */
+function ExerciseCarousel({ exercises, selId, onSelect, logs }) {
+  const index = Math.max(0, exercises.findIndex((e) => e.id === selId));
+  const ex = exercises[index] || exercises[0];
+  const touchX = useRef(null);
+
+  const go = (delta) => {
+    if (!exercises.length) return;
+    const next = (index + delta + exercises.length) % exercises.length;
+    onSelect(exercises[next].id);
+  };
+
+  const handleTouchStart = (e) => { touchX.current = e.touches[0].clientX; };
+  const handleTouchEnd = (e) => {
+    if (touchX.current == null) return;
+    const dx = e.changedTouches[0].clientX - touchX.current;
+    touchX.current = null;
+    if (Math.abs(dx) > 40) { haptic(12); go(dx > 0 ? -1 : 1); }
+  };
+
+  if (!ex) return null;
+  const best = (() => { let b = 0; for (let i = 0; i < ex.sets; i++) { const ov = logs[`${ex.id}_${i}_pr_override`]; const h = logs[`${ex.id}_${i}`] || []; const entries = ov ? [ov] : h; entries.forEach((x) => { const rm = estimate1RM(x.kg, x.reps); if (rm > b) b = rm; }); } return b; })();
+
+  return (
+    <div>
+      <div className="flex items-center gap-2">
+        <button onClick={() => go(-1)} aria-label="Ejercicio anterior" className="p-2.5 rounded-xl bg-slate-800/60 hover:bg-slate-800 active:scale-90 text-slate-400 hover:text-white transition shrink-0"><ChevronLeft size={16} /></button>
+        <div className="flex-1 overflow-hidden touch-pan-y select-none" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+          <div key={ex.id} className="rounded-2xl border px-4 py-3 text-center tab-fade-in" style={{ backgroundColor: ex.color + "1c", borderColor: ex.color + "55" }}>
+            <p className="text-sm font-bold truncate" style={{ color: ex.color }}>{ex.name}</p>
+            <p className="text-[10px] text-slate-500 mt-0.5">{best > 0 ? `1RM est. ${best}kg` : "Sin marca"}</p>
+          </div>
+        </div>
+        <button onClick={() => go(1)} aria-label="Siguiente ejercicio" className="p-2.5 rounded-xl bg-slate-800/60 hover:bg-slate-800 active:scale-90 text-slate-400 hover:text-white transition shrink-0"><ChevronRight size={16} /></button>
+      </div>
+      <div className="flex justify-center flex-wrap gap-1.5 mt-2.5">
+        {exercises.map((e, i) => (
+          <button key={e.id} onClick={() => onSelect(e.id)} aria-label={e.name} className="p-1 -m-1">
+            <span className="block w-1.5 h-1.5 rounded-full transition-all" style={i === index ? { backgroundColor: ex.color, transform: "scale(1.3)" } : { backgroundColor: "#334155" }} />
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ProgressView({ logs, setLogs }) {
   const allExercises = useMemo(() => DAY_ORDER.flatMap((dk) => ROUTINE[dk].exercises.map((e) => ({ id: e.id, name: e.name, day: ROUTINE[dk].label, color: ROUTINE[dk].color, sets: e.sets.length, dayKey: dk }))), []);
 
@@ -1861,7 +1916,7 @@ function ProgressView({ logs, setLogs }) {
                 </div>
               </div>
 
-              <div className="flex gap-1.5 overflow-x-auto pb-1">
+              <div className="flex flex-wrap justify-center gap-1.5">
                 {DAY_ORDER.map((dk) => (
                   <button key={dk} onClick={() => { setDayFilter(dk); const first = allExercises.find((e) => e.dayKey === dk); if (first) { setSelId(first.id); setSelSet(0); } }}
                     className="px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all border shrink-0"
@@ -1871,21 +1926,8 @@ function ProgressView({ logs, setLogs }) {
                 ))}
               </div>
 
-              {/* Visual exercise picker — replaces the old <select> dropdown */}
-              <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-                {filteredExercises.map((e) => {
-                  const isSel = e.id === selId;
-                  const best = (() => { let b = 0; for (let i = 0; i < e.sets; i++) { const ov = logs[`${e.id}_${i}_pr_override`]; const h = logs[`${e.id}_${i}`] || []; const entries = ov ? [ov] : h; entries.forEach((x) => { const rm = estimate1RM(x.kg, x.reps); if (rm > b) b = rm; }); } return b; })();
-                  return (
-                    <button key={e.id} onClick={() => { setSelId(e.id); setSelSet(0); }}
-                      className={`shrink-0 min-w-[132px] text-left rounded-2xl border px-3 py-2.5 transition-all active:scale-95 ${isSel ? "" : "border-slate-800 bg-slate-900/40 hover:border-slate-700"}`}
-                      style={isSel ? { backgroundColor: e.color + "1c", borderColor: e.color + "55" } : {}}>
-                      <p className="text-[11px] font-bold truncate" style={{ color: isSel ? e.color : "#e2e8f0" }}>{e.name}</p>
-                      <p className="text-[10px] text-slate-600 mt-0.5">{best > 0 ? `1RM est. ${best}kg` : "Sin marca"}</p>
-                    </button>
-                  );
-                })}
-              </div>
+              {/* Carrusel de un solo ejercicio — deslizá con el dedo o usá las flechas */}
+              <ExerciseCarousel exercises={filteredExercises} selId={selId} onSelect={(id) => { setSelId(id); setSelSet(0); }} logs={logs} />
 
               <div className="flex gap-2">
                 {Array.from({ length: selEx?.sets || 1 }).map((_, i) => (
