@@ -658,10 +658,23 @@ const ANIMATION_CSS = `
 /* Fondo de página: gris muy suave (no blanco puro), para que las tarjetas
    blancas de arriba se despeguen con un contraste sutil — look "Apple /
    Vercel / Linear", no el clásico blanco-sobre-blanco que se ve plano. */
-.light-mode .bg-\\[\\#0a0a0f\\] { background-color: #f8fafc !important; }
-.light-mode .bg-\\[\\#0a0a0f\\]\\/60 { background-color: rgba(248,250,252,0.85) !important; }
-.light-mode .bg-\\[\\#0a0a0f\\]\\/90 { background-color: rgba(248,250,252,0.96) !important; }
-.light-mode .bg-\\[\\#0f0f1a\\] { background-color: #ffffff !important; }
+/* Importante: en los contenedores raíz de App(), la clase de fondo y la
+   clase "light-mode" viven en el MISMO elemento (ej. el div principal que
+   envuelve toda la app). Un selector descendiente como ".light-mode
+   .bg-[...]" (con espacio) sólo matchea cuando una está adentro de la otra,
+   NO cuando están juntas en el mismo div — por eso antes el fondo general
+   de la página se quedaba oscuro aunque las tarjetas de adentro sí
+   cambiaran. Por eso van DOS variantes de cada regla: la de siempre (con
+   espacio, para cuando son elementos distintos) y la compuesta sin espacio
+   (para cuando coinciden en el mismo elemento). */
+.light-mode .bg-\\[\\#0a0a0f\\],
+.light-mode.bg-\\[\\#0a0a0f\\] { background-color: #f8fafc !important; }
+.light-mode .bg-\\[\\#0a0a0f\\]\\/60,
+.light-mode.bg-\\[\\#0a0a0f\\]\\/60 { background-color: rgba(248,250,252,0.85) !important; }
+.light-mode .bg-\\[\\#0a0a0f\\]\\/90,
+.light-mode.bg-\\[\\#0a0a0f\\]\\/90 { background-color: rgba(248,250,252,0.96) !important; }
+.light-mode .bg-\\[\\#0f0f1a\\],
+.light-mode.bg-\\[\\#0f0f1a\\] { background-color: #ffffff !important; }
 
 /* Tarjetas / superficies principales — blanco PURO y sólido (no rgba), para
    que destaquen limpias sobre el fondo gris, sin tonos grisáceos al
@@ -714,7 +727,8 @@ const ANIMATION_CSS = `
 /* Texto — jerarquía invertida: lo que en oscuro era "casi blanco" pasa a
    "gris casi negro" (#0f172a), y lo que era apenas visible pasa a un gris
    medio (#64748b) y más claro, manteniendo la misma jerarquía relativa. */
-.light-mode .text-white { color: #0f172a !important; }
+.light-mode .text-white,
+.light-mode.text-white { color: #0f172a !important; }
 .light-mode .text-white\\/80 { color: rgba(15,23,42,0.75) !important; }
 .light-mode .hover\\:text-white:hover { color: #0f172a !important; }
 .light-mode .text-slate-100,
