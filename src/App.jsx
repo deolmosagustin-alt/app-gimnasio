@@ -63,25 +63,41 @@ MUSCLE_GROUPS.forEach((g) => { MUSCLE_GROUP_BY_KEY[g.key] = g; });
 const EXERCISE_LIBRARY = [
   // Pecho
   { id: "press_banca", name: "Press Banca", muscle: "Pectoral", group: "pecho", nota: "Hacé fuerza con las piernas y mantené los omóplatos retraídos.", videoQuery: "press banca técnica correcta" },
+  { id: "press_banca_smith", name: "Press Banca Smith", muscle: "Pectoral", group: "pecho", nota: "El riel fija el recorrido, ideal para enfocarte en el músculo sin estabilizar la barra.", videoQuery: "press banca smith técnica" },
   { id: "press_inclinado_smith", name: "Press Inclinado Smith", muscle: "Pectoral sup.", group: "pecho", nota: "Codos bastante pegados, para enfocar la parte superior del pecho.", videoQuery: "press inclinado smith técnica" },
   { id: "press_inclinado_mancuernas", name: "Press Inclinado con Mancuernas", muscle: "Pectoral sup.", group: "pecho", nota: "Mayor rango que con barra, cuidá no hiperextender el hombro abajo.", videoQuery: "press inclinado mancuernas técnica" },
   { id: "press_plano_mancuernas", name: "Press Plano con Mancuernas", muscle: "Pectoral", group: "pecho", nota: "Buen complemento del press banca, permite mayor estiramiento.", videoQuery: "press plano mancuernas técnica" },
+  { id: "press_declinado_barra", name: "Press Declinado con Barra", muscle: "Pectoral inf.", group: "pecho", nota: "Enfoca la parte baja del pectoral, asegurá bien los pies.", videoQuery: "press declinado barra técnica" },
+  { id: "press_pecho_maquina", name: "Press de Pecho en Máquina", muscle: "Pectoral", group: "pecho", nota: "Buena opción para sumar volumen sin fatigar tanto los estabilizadores.", videoQuery: "press de pecho en máquina técnica chest press machine" },
   { id: "cruce_poleas", name: "Cruce de Poleas", muscle: "Pectoral", group: "pecho", nota: "Énfasis en el estiramiento, no uses demasiado peso.", videoQuery: "cruce de poleas técnica pectoral" },
+  { id: "aperturas_mancuerna", name: "Aperturas con Mancuernas", muscle: "Pectoral", group: "pecho", nota: "Codos siempre un poco flexionados, no los traves rectos.", videoQuery: "aperturas con mancuernas técnica dumbbell flyes" },
+  { id: "pec_deck_pectoral", name: "Pec Deck (Aperturas en Máquina)", muscle: "Pectoral", group: "pecho", nota: "Movimiento controlado, juntá bien al frente sin golpear las almohadillas.", videoQuery: "pec deck máquina técnica pectoral" },
+  { id: "press_cerrado", name: "Press Banca Agarre Cerrado", muscle: "Pectoral / Tríceps", group: "pecho", nota: "Manos a la altura de los hombros, buen híbrido con tríceps.", videoQuery: "press banca agarre cerrado técnica" },
   { id: "flexiones", name: "Flexiones de Brazos", muscle: "Pectoral", group: "pecho", nota: "Con tu propio peso corporal, útil para activar antes de entrenar.", videoQuery: "flexiones de brazos técnica correcta" },
   // Espalda
   { id: "remo_ancho_maquina", name: "Remo Ancho Máquina", muscle: "Dorsal", group: "espalda", nota: "No levantes los hombros, llevá el movimiento con la espalda.", videoQuery: "remo ancho máquina técnica espalda" },
   { id: "dorsalera", name: "Dorsalera Agarre Ancho", muscle: "Dorsal", group: "espalda", nota: "No descoloques los hombros, pulgar en la marca.", videoQuery: "dorsalera lat pulldown agarre ancho técnica" },
+  { id: "dorsalera_agarre_cerrado", name: "Dorsalera Agarre Cerrado", muscle: "Dorsal", group: "espalda", nota: "Agarre supino o en V, más activación de la parte baja del dorsal.", videoQuery: "jalón agarre cerrado técnica dorsal" },
+  { id: "remo_barra", name: "Remo con Barra", muscle: "Dorsal medio", group: "espalda", nota: "Espalda neutra, torso a unos 45°, no uses impulso de la zona lumbar.", videoQuery: "remo con barra técnica bent over row" },
   { id: "remo_unilateral", name: "Remo Unilateral", muscle: "Dorsal / oblicuos", group: "espalda", nota: "Contraé los oblicuos, codo lo más abajo posible.", videoQuery: "remo unilateral mancuerna técnica espalda" },
+  { id: "remo_maquina_sentado", name: "Remo Sentado en Máquina/Polea", muscle: "Dorsal medio", group: "espalda", nota: "Pecho contra el apoyo, llevá los codos atrás sin balancear el torso.", videoQuery: "remo sentado polea técnica seated cable row" },
+  { id: "remo_pecho_apoyado", name: "Remo con Pecho Apoyado", muscle: "Dorsal medio", group: "espalda", nota: "El banco inclinado quita la zona lumbar de la ecuación, foco puro en espalda.", videoQuery: "remo pecho apoyado técnica chest supported row" },
   { id: "pull_over", name: "Pull Over", muscle: "Dorsal / serrato", group: "espalda", nota: "Codos siempre un poco flexionados.", videoQuery: "pull over espalda técnica mancuerna" },
   { id: "peso_muerto", name: "Peso Muerto", muscle: "Espalda baja / Femoral", group: "espalda", nota: "Pilar de la cadena posterior, mantené la espalda neutra todo el recorrido.", videoQuery: "peso muerto técnica correcta" },
   { id: "remo_t", name: "Remo en T", muscle: "Dorsal medio", group: "espalda", nota: "Pecho apoyado si tenés banco, foco en juntar los omóplatos.", videoQuery: "remo en T técnica espalda" },
+  { id: "hiperextensiones", name: "Hiperextensiones", muscle: "Espalda baja", group: "espalda", nota: "No hiperextiendas de más arriba, contraé glúteo al subir.", videoQuery: "hiperextensiones técnica espalda baja" },
   { id: "dominadas", name: "Dominadas", muscle: "Dorsal", group: "espalda", nota: "Si todavía no podés hacer muchas, usá banda de asistencia.", videoQuery: "dominadas técnica correcta" },
   // Hombros
   { id: "press_militar_smith", name: "Press Militar Smith", muscle: "Deltoides ant.", group: "hombros", nota: "Codos adelante, banco a 80-90°.", videoQuery: "press militar smith técnica hombros" },
+  { id: "press_militar_maquina", name: "Press Militar en Máquina", muscle: "Deltoides ant.", group: "hombros", nota: "Recorrido guiado, buena opción para sumar series sin estabilizar tanto.", videoQuery: "press militar máquina técnica shoulder press machine" },
   { id: "press_militar_mancuernas", name: "Press Militar con Mancuernas", muscle: "Deltoides ant.", group: "hombros", nota: "Mayor rango y estabilidad que con barra.", videoQuery: "press militar mancuernas técnica" },
+  { id: "press_arnold", name: "Press Arnold", muscle: "Deltoides ant. / lateral", group: "hombros", nota: "La rotación de muñeca suma trabajo del deltoides lateral.", videoQuery: "press arnold técnica hombros" },
   { id: "vuelos_laterales_mancuerna", name: "Vuelos Laterales Mancuerna", muscle: "Deltoides lateral", group: "hombros", nota: "Levantá un poco hacia adelante, no uses impulso.", videoQuery: "vuelos laterales mancuerna técnica deltoides" },
   { id: "vuelos_laterales_maquina", name: "Vuelos Laterales Máquina", muscle: "Deltoides lateral", group: "hombros", nota: "No hagas tanta fuerza con el agarre, dejá trabajar al hombro.", videoQuery: "vuelos laterales máquina deltoides técnica" },
+  { id: "vuelos_frontales", name: "Vuelos Frontales", muscle: "Deltoides ant.", group: "hombros", nota: "No subas más arriba de los hombros, evitá el impulso lumbar.", videoQuery: "vuelos frontales técnica front raise" },
+  { id: "remo_al_cuello", name: "Remo al Cuello", muscle: "Deltoides lateral / Trapecio", group: "hombros", nota: "Codos por encima de las manos, no subas la barra más de la altura del pecho.", videoQuery: "remo al cuello técnica upright row" },
   { id: "pec_dec_deltoides", name: "Pec Dec para Deltoides Posterior", muscle: "Deltoides post.", group: "hombros", nota: "Unilateral, movimiento controlado.", videoQuery: "pec dec deltoides posterior técnica" },
+  { id: "elevaciones_pajaro", name: "Elevaciones tipo Pájaro", muscle: "Deltoides post.", group: "hombros", nota: "Torso inclinado hacia adelante, codos con leve flexión fija.", videoQuery: "elevaciones pájaro técnica reverse fly deltoides posterior" },
   { id: "face_pull", name: "Face Pull", muscle: "Deltoides post.", group: "hombros", nota: "Polea a la altura de los ojos.", videoQuery: "face pull técnica deltoides posterior" },
   // Bíceps
   { id: "biceps_alternado_mancuerna", name: "Bíceps Alternado Mancuerna", muscle: "Bíceps", group: "biceps", nota: "Movés un poco el húmero al final del recorrido.", videoQuery: "curl alternado mancuerna técnica bíceps" },
@@ -89,34 +105,50 @@ const EXERCISE_LIBRARY = [
   { id: "biceps_banco_scott", name: "Bíceps Banco Scott", muscle: "Bíceps", group: "biceps", nota: "Unilateral con mancuerna, evitá usar impulso.", videoQuery: "curl banco scott técnica bíceps preacher curl" },
   { id: "biceps_banco_inclinado", name: "Bíceps Banco Inclinado", muscle: "Bíceps cab. larga", group: "biceps", nota: "Alternado, buen estiramiento al inicio del movimiento.", videoQuery: "curl banco inclinado bíceps técnica incline curl" },
   { id: "biceps_barra_z", name: "Curl con Barra Z", muscle: "Bíceps", group: "biceps", nota: "Más amigable para la muñeca que la barra recta.", videoQuery: "curl barra Z técnica bíceps" },
+  { id: "biceps_polea_barra", name: "Curl en Polea Baja con Barra", muscle: "Bíceps", group: "biceps", nota: "Tensión constante durante todo el recorrido, no balancees el torso.", videoQuery: "curl polea baja barra técnica bíceps" },
+  { id: "biceps_concentrado", name: "Curl Concentrado", muscle: "Bíceps", group: "biceps", nota: "Codo apoyado en la pierna, foco total en el pico del bíceps.", videoQuery: "curl concentrado técnica bíceps" },
   // Tríceps
   { id: "triceps_trasnuca", name: "Tríceps Trasnuca", muscle: "Tríceps", group: "triceps", nota: "Pausa en el fondo, los codos no van cerrados.", videoQuery: "triceps trasnuca técnica overhead extension" },
   { id: "triceps_polea_alta", name: "Tríceps Polea Alta", muscle: "Tríceps", group: "triceps", nota: "El húmero no se mueve durante el ejercicio.", videoQuery: "tríceps polea alta técnica cable pushdown" },
+  { id: "triceps_polea_cuerda", name: "Tríceps en Polea con Cuerda", muscle: "Tríceps", group: "triceps", nota: "Separá las manos al final del recorrido para más contracción.", videoQuery: "tríceps polea cuerda técnica rope pushdown" },
   { id: "triceps_frances", name: "Press Francés", muscle: "Tríceps", group: "triceps", nota: "Codos fijos, cuidado con sobrecargar el hombro.", videoQuery: "press francés técnica tríceps" },
+  { id: "triceps_patada", name: "Patada de Tríceps", muscle: "Tríceps", group: "triceps", nota: "Brazo pegado al torso, extendé solo el antebrazo.", videoQuery: "patada de tríceps técnica kickback" },
   { id: "fondos_triceps", name: "Fondos en Paralelas o Banco", muscle: "Tríceps", group: "triceps", nota: "Buen ejercicio compuesto, inclinate poco para enfocar el tríceps.", videoQuery: "fondos tríceps técnica correcta" },
   // Cuádriceps
   { id: "jaca", name: "Hack Squat", muscle: "Cuádriceps", group: "cuadriceps", nota: "Pies a la altura de los hombros, bajá controlado.", videoQuery: "hack squat técnica cuádriceps" },
+  { id: "sentadilla_smith", name: "Sentadilla en Multipower", muscle: "Cuádriceps", group: "cuadriceps", nota: "El riel fija el recorrido, buena opción para enfocarte en la pierna.", videoQuery: "sentadilla multipower smith técnica" },
+  { id: "sentadilla_goblet", name: "Sentadilla Goblet", muscle: "Cuádriceps", group: "cuadriceps", nota: "Mancuerna pegada al pecho, codos adentro de las rodillas al bajar.", videoQuery: "sentadilla goblet técnica" },
   { id: "extension_cuadriceps", name: "Extensión de Cuádriceps", muscle: "Cuádriceps", group: "cuadriceps", nota: "Pausa de 1 segundo arriba.", videoQuery: "extensión cuádriceps máquina técnica" },
   { id: "sentadilla_convencional", name: "Sentadilla con Barra", muscle: "Cuádriceps", group: "cuadriceps", nota: "El básico de piernas, la profundidad depende de tu movilidad.", videoQuery: "sentadilla con barra técnica correcta" },
   { id: "prensa", name: "Prensa de Piernas", muscle: "Cuádriceps", group: "cuadriceps", nota: "Alternativa de bajo estrés en la zona lumbar.", videoQuery: "prensa de piernas técnica" },
+  { id: "step_up", name: "Step Up (Subida al Cajón)", muscle: "Cuádriceps / Glúteo", group: "cuadriceps", nota: "Empujá con el talón del pie de arriba, evitá rebotar con el de abajo.", videoQuery: "step up subida al cajón técnica" },
   { id: "zancadas", name: "Zancadas", muscle: "Cuádriceps / Glúteo", group: "cuadriceps", nota: "Trabajo unilateral, ayuda a corregir desbalances entre piernas.", videoQuery: "zancadas técnica correcta" },
   // Femoral
   { id: "curl_femoral_maquina", name: "Curl Femoral Máquina", muscle: "Femoral", group: "femoral", nota: "Controlá bien la fase negativa.", videoQuery: "curl femoral máquina técnica isquios" },
   { id: "peso_muerto_rumano", name: "Peso Muerto Rumano", muscle: "Femoral", group: "femoral", nota: "Bajá llevando la cadera hacia atrás, rodillas casi rectas.", videoQuery: "peso muerto rumano técnica" },
+  { id: "peso_muerto_piernas_rigidas", name: "Peso Muerto Piernas Rígidas", muscle: "Femoral", group: "femoral", nota: "Rango más amplio que el rumano, rodillas casi sin flexión.", videoQuery: "peso muerto piernas rígidas técnica stiff leg deadlift" },
   { id: "curl_femoral_acostado", name: "Curl Femoral Acostado", muscle: "Femoral", group: "femoral", nota: "Variante tumbado, controlá bien la vuelta.", videoQuery: "curl femoral acostado técnica" },
   // Glúteo y cadera
   { id: "sentadilla_bulgara", name: "Sentadilla Búlgara", muscle: "Glúteo", group: "gluteo", nota: "Torso ligeramente inclinado hacia adelante.", videoQuery: "sentadilla búlgara técnica glúteo" },
   { id: "hip_thrust", name: "Hip Thrust", muscle: "Glúteo", group: "gluteo", nota: "Pausa de 1-2 segundos arriba, contraé bien el glúteo.", videoQuery: "hip thrust técnica glúteo" },
+  { id: "puente_gluteo", name: "Puente de Glúteo", muscle: "Glúteo", group: "gluteo", nota: "Variante sin barra, buena para activar antes de entrenar pierna.", videoQuery: "puente de glúteo técnica glute bridge" },
+  { id: "peso_muerto_sumo", name: "Peso Muerto Sumo", muscle: "Glúteo / Aductores", group: "gluteo", nota: "Postura ancha, rodillas hacia afuera siguiendo la punta del pie.", videoQuery: "peso muerto sumo técnica" },
   { id: "abductor_maquina", name: "Abductor Máquina", muscle: "Glúteo medio", group: "gluteo", nota: "Espalda apoyada, movimiento controlado.", videoQuery: "abductor máquina técnica glúteo medio" },
   { id: "aductor_maquina", name: "Aductor Máquina", muscle: "Aductores", group: "gluteo", nota: "Rango completo, sin rebotar.", videoQuery: "aductor máquina técnica inner thigh" },
   { id: "patada_gluteo", name: "Patada de Glúteo en Polea", muscle: "Glúteo", group: "gluteo", nota: "Movimiento controlado, evitá usar la zona lumbar para empujar.", videoQuery: "patada de glúteo polea técnica" },
   // Core
   { id: "abdominales", name: "Abdominales", muscle: "Core", group: "core", nota: "Controlá la fase excéntrica, sin impulso.", videoQuery: "abdominales técnica correcta core" },
+  { id: "abdominales_maquina", name: "Abdominales en Máquina", muscle: "Core", group: "core", nota: "Foco en doblar la zona media, no solo flexionar el cuello.", videoQuery: "abdominales máquina técnica" },
   { id: "plancha", name: "Plancha Abdominal", muscle: "Core", group: "core", nota: "Mantené la cadera alineada con los hombros, no la dejes caer.", videoQuery: "plancha abdominal técnica correcta" },
+  { id: "plancha_lateral", name: "Plancha Lateral", muscle: "Core / oblicuos", group: "core", nota: "Cadera elevada en línea recta, no la dejes caer hacia el piso.", videoQuery: "plancha lateral técnica side plank" },
+  { id: "giros_rusos", name: "Giros Rusos", muscle: "Core / oblicuos", group: "core", nota: "Movimiento controlado desde el torso, no solo los brazos.", videoQuery: "giros rusos técnica russian twist" },
+  { id: "rueda_abdominal", name: "Rueda Abdominal", muscle: "Core", group: "core", nota: "Empezá con poco recorrido, mantené la zona lumbar protegida.", videoQuery: "rueda abdominal técnica ab wheel" },
   { id: "elevacion_piernas", name: "Elevación de Piernas Colgado", muscle: "Core / abdomen bajo", group: "core", nota: "Controlá el balanceo, el foco está en el abdomen bajo.", videoQuery: "elevación de piernas colgado técnica" },
   // Pantorrillas
   { id: "elevacion_talones_parado", name: "Elevación de Talones de Pie", muscle: "Pantorrillas", group: "pantorrillas", nota: "Rango completo, hacé una pausa arriba.", videoQuery: "elevación de talones de pie técnica gemelos" },
   { id: "elevacion_talones_sentado", name: "Elevación de Talones Sentado", muscle: "Pantorrillas (sóleo)", group: "pantorrillas", nota: "Variante que enfatiza más el sóleo.", videoQuery: "elevación de talones sentado técnica sóleo" },
+  { id: "elevacion_talones_prensa", name: "Elevación de Talones en Prensa", muscle: "Pantorrillas", group: "pantorrillas", nota: "Apoyá solo la punta del pie en la plataforma, rango completo.", videoQuery: "elevación de talones en prensa técnica" },
+  { id: "elevacion_talones_unilateral", name: "Elevación de Talones a Una Pierna", muscle: "Pantorrillas", group: "pantorrillas", nota: "Sostenete de algo para el equilibrio, no hace falta peso extra al principio.", videoQuery: "elevación de talones a una pierna técnica" },
 ];
 const EXERCISE_LIBRARY_BY_ID = {};
 EXERCISE_LIBRARY.forEach((e) => { EXERCISE_LIBRARY_BY_ID[e.id] = e; });
@@ -529,6 +561,52 @@ function getSuggestedDay(logs) {
   Object.entries(logs).forEach(([k, v]) => { if (k.endsWith("_pr_override") || !Array.isArray(v) || !KEY_TO_DAY[k]) return; if (v.some((e) => e.date === lastDate)) lastDayKey = KEY_TO_DAY[k]; });
   if (!lastDayKey) return DAY_ORDER[0];
   return DAY_ORDER[(DAY_ORDER.indexOf(lastDayKey) + 1) % DAY_ORDER.length];
+}
+
+/* ============================== CRONOGRAMA SEMANAL ==============================
+   Cada rutina puede tener un `weekSchedule`: qué día de tu rutina (o
+   descanso) corresponde a cada día de la semana calendario (lunes a
+   domingo). Esto es lo que le permite a la app reconocer sola en qué día
+   estás (en vez de adivinar solo por el último día entrenado), y también
+   permite repetir días de la rutina dentro de la semana — por ejemplo un
+   Upper/Lower de 2 días entrenado 4 veces por semana (lun=Upper, mar=Lower,
+   mié=descanso, jue=Upper, vie=Lower, sáb/dom=descanso).
+
+   Si una rutina todavía no tiene `weekSchedule` guardado (rutinas viejas,
+   o recién activadas), se genera uno por defecto: ubica los días de la
+   rutina de corrido a partir del lunes, y descanso el resto de la semana —
+   eso es el "por defecto en base a la rutina" que se puede después
+   personalizar día por día desde Rutinas. */
+const WEEKDAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
+const WEEKDAY_SHORT_LABELS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+const WEEKDAY_FULL_LABELS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+
+function defaultWeekSchedule(dayOrder) {
+  const sched = {};
+  WEEKDAY_KEYS.forEach((wk, i) => { sched[wk] = dayOrder[i] || null; });
+  return sched;
+}
+
+// Devuelve el cronograma de una rutina (el guardado, o uno por defecto
+// calculado al vuelo si todavía no se personalizó ninguno).
+function getRoutineWeekSchedule(routineDef) {
+  if (!routineDef) return {};
+  return routineDef.weekSchedule || defaultWeekSchedule(routineDef.dayOrder || []);
+}
+
+function todayWeekdayKey(date = new Date()) {
+  const jsDay = date.getDay(); // 0=domingo .. 6=sábado
+  return WEEKDAY_KEYS[(jsDay + 6) % 7]; // reordenado a 0=lunes .. 6=domingo
+}
+
+// El día de rutina que te toca HOY según tu cronograma — null si hoy es
+// descanso programado, o si el día guardado ya no existe en la rutina
+// (por ej. lo borraste al editarla).
+function getScheduledDayForToday(routineDef) {
+  const sched = getRoutineWeekSchedule(routineDef);
+  const dk = sched[todayWeekdayKey()];
+  if (dk && DAY_ORDER.includes(dk)) return dk;
+  return null;
 }
 
 function getStagnationInfo(exercise, logs) {
@@ -951,15 +1029,20 @@ function LoginScreen({ onLogin }) {
     };
     saveProfiles(newProfiles); setProfilesState(newProfiles); saveActive(name); onLogin(name, newProfiles);
   };
-  const handleRegister = () => {
+  // Validación compartida del formulario (nombre/email) — la usan tanto el
+  // botón "Crear perfil" directo (sin PIN) como el link de "agregar PIN".
+  const validateRegForm = () => {
     setRegError("");
-    if (!regName.trim()) { setRegError("Ingresá tu nombre."); return; }
-    if (profiles[regName.trim()]) { setRegError("Ya existe ese nombre."); return; }
-    if (regMail && !regMail.includes("@")) { setRegError("Email inválido."); return; }
-    if (regStep === 1) { setRegStep(2); return; }
-    if (regStep === 2) { if (regPin.length > 0 && regPin.length < 4) { setRegError("El PIN debe tener 4 dígitos."); return; } if (regPin.length === 0) { finishRegister(); return; } setRegStep(3); return; }
-    if (regStep === 3) { finishRegister(); }
+    if (!regName.trim()) { setRegError("Ingresá tu nombre."); return false; }
+    if (profiles[regName.trim()]) { setRegError("Ya existe ese nombre."); return false; }
+    if (regMail && !regMail.includes("@")) { setRegError("Email inválido."); return false; }
+    return true;
   };
+  // Camino rápido (el de siempre): nombre + email, sin PIN, un solo toque.
+  const handleRegister = () => { if (validateRegForm()) finishRegister(); };
+  // Camino opcional con PIN: valida el formulario igual, pero en vez de
+  // crear el perfil ya mismo, pasa a pedir el PIN.
+  const handleWantsPin = () => { if (validateRegForm()) setRegStep(2); };
   useEffect(() => { if (deviceProfile && !profiles[deviceProfile].pin) { saveActive(deviceProfile); onLogin(deviceProfile, profiles); } }, []);
 
   if (phase === "pin") return (
@@ -975,26 +1058,33 @@ function LoginScreen({ onLogin }) {
     </div>
   );
 
+  // Creación de perfil simplificada a un solo paso para el caso común: con
+  // el nombre alcanza, "Crear perfil" te deja adentro al toque. El PIN es
+  // un link aparte, totalmente opcional — sólo si lo tocás se piden los dos
+  // pasos de siempre (elegir y confirmar).
   if (phase === "register") return (
     <div className="min-h-screen bg-[#0a0a0f] flex flex-col items-center justify-center px-4 py-8 relative overflow-hidden">
       <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-72 h-72 rounded-full bg-teal-500/10 blur-3xl pointer-events-none" />
       <div className="w-full max-w-sm relative">
         <div className="flex items-center gap-3 mb-8">
-          <button onClick={() => { setPhase("list"); setRegStep(1); setRegError(""); }} className="text-slate-500 hover:text-slate-300"><ChevronDown size={20} className="rotate-90" /></button>
+          <button onClick={() => { if (regStep !== 1) { setRegStep(1); setRegError(""); } else { setPhase("list"); setRegError(""); } }} className="text-slate-500 hover:text-slate-300"><ChevronDown size={20} className="rotate-90" /></button>
           <h2 className="text-lg font-bold text-white">Crear perfil</h2>
         </div>
-        <div className="flex gap-1.5 mb-6">{[1, 2, 3].map((s) => <div key={s} className={`h-1 flex-1 rounded-full transition-all ${regStep >= s ? "bg-teal-500" : "bg-slate-800"}`} />)}</div>
         <div className="space-y-4">
           {regStep === 1 && (<>
-            <div><label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 block">Nombre</label><input type="text" placeholder="¿Cómo te llamás?" value={regName} onChange={(e) => setRegName(e.target.value)} className="w-full bg-slate-900/80 border border-slate-700/50 rounded-2xl px-4 py-3.5 text-white focus:outline-none focus:border-teal-500/60 text-sm transition" autoFocus /></div>
-            <div><label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 block">Email <span className="text-slate-600 normal-case">(opcional)</span></label><input type="email" placeholder="tu@email.com" value={regMail} onChange={(e) => setRegMail(e.target.value)} className="w-full bg-slate-900/80 border border-slate-700/50 rounded-2xl px-4 py-3.5 text-white focus:outline-none focus:border-teal-500/60 text-sm transition" /></div>
+            <div><label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 block">Nombre</label><input type="text" placeholder="¿Cómo te llamás?" value={regName} onChange={(e) => setRegName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleRegister(); }} className="w-full bg-slate-900/80 border border-slate-700/50 rounded-2xl px-4 py-3.5 text-white focus:outline-none focus:border-teal-500/60 text-sm transition" autoFocus /></div>
+            <div><label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 block">Email <span className="text-slate-600 normal-case">(opcional)</span></label><input type="email" placeholder="tu@email.com" value={regMail} onChange={(e) => setRegMail(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleRegister(); }} className="w-full bg-slate-900/80 border border-slate-700/50 rounded-2xl px-4 py-3.5 text-white focus:outline-none focus:border-teal-500/60 text-sm transition" /></div>
           </>)}
-          {regStep === 2 && (<div className="text-center py-4"><p className="text-slate-400 text-sm mb-6">¿Querés proteger tu perfil con un PIN?</p><div className="flex gap-3 justify-center"><button onClick={() => { setRegPin(""); finishRegister(); }} className="flex-1 py-3.5 rounded-2xl border border-slate-700 text-slate-400 text-sm font-semibold">Sin PIN</button><button onClick={() => setRegStep(2.5)} className="flex-1 py-3.5 rounded-2xl bg-teal-500 !text-white text-sm font-bold">Con PIN</button></div></div>)}
-          {regStep === 2.5 && <PinInput length={4} label="Elegí un PIN" onComplete={(p) => { setRegPin(p); setRegStep(3); }} />}
-          {regStep === 3 && <PinInput length={4} label="Confirmá el PIN" onComplete={(p) => { if (p === regPin) { finishRegister(); } else { setRegError("No coinciden."); setTimeout(() => setRegError(""), 1500); } }} error={regError} />}
+          {regStep === 2 && <PinInput length={4} label="Elegí un PIN" onComplete={(p) => { setRegPin(p); setRegStep(3); }} onCancel={() => setRegStep(1)} />}
+          {regStep === 3 && <PinInput length={4} label="Confirmá el PIN" onComplete={(p) => { if (p === regPin) { finishRegister(); } else { setRegError("No coinciden."); setTimeout(() => setRegError(""), 1500); } }} error={regError} onCancel={() => setRegStep(1)} />}
         </div>
         {regError && regStep === 1 && <p className="text-rose-400 text-xs mt-3 text-center">{regError}</p>}
-        {regStep === 1 && <button onClick={handleRegister} className="w-full mt-6 py-4 rounded-2xl bg-teal-500 !text-white font-bold text-sm hover:bg-teal-400 active:scale-[0.98] transition-all shadow-lg shadow-teal-500/20">Continuar →</button>}
+        {regStep === 1 && (
+          <div className="mt-6 space-y-2.5">
+            <button onClick={handleRegister} className="w-full py-4 rounded-2xl bg-teal-500 !text-white font-bold text-sm hover:bg-teal-400 active:scale-[0.98] transition-all shadow-lg shadow-teal-500/20">Crear perfil</button>
+            <button onClick={handleWantsPin} className="w-full py-2 text-slate-500 hover:text-slate-300 text-xs font-semibold transition">+ Proteger con PIN (opcional)</button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1529,6 +1619,11 @@ const HELP_CHAPTERS = [
         demo: { kind: "rutinas", view: "active" },
       },
       {
+        icon: <Calendar size={20} />,
+        title: "¿Qué día entrenás cada cosa?",
+        text: "Tocando \"Configurar días de la semana\" en la rutina activa elegís qué día de tu rutina (o descanso) le corresponde a cada día calendario, de lunes a domingo. Podés repetir días — por ejemplo un Upper/Lower entrenado 4 veces por semana — y la app reconoce sola en qué día estás cuando abrís Rutina. Por defecto los ubica de corrido desde el lunes, pero lo podés cambiar cuando quieras.",
+      },
+      {
         icon: <ListChecks size={20} />,
         title: "Rutinas preestablecidas",
         text: "Más abajo está el catálogo: Push/Pull/Legs, Arnold Split, Upper/Lower, Cuerpo Completo y la Clásica. Tocá una para ver su distribución semanal completa —día por día, con sus ejercicios y series— antes de usarla.",
@@ -1568,7 +1663,7 @@ const HELP_CHAPTERS = [
       {
         icon: <Calendar size={20} />,
         title: "Elegí tu día",
-        text: "Más abajo elegís el día de tu rutina activa. La app resalta uno como \"sugerido para hoy\" según el último tipo de día que entrenaste — no según el calendario.",
+        text: "Más abajo elegís el día de tu rutina activa. La app reconoce sola cuál te toca hoy según tu cronograma semanal (lo configurás en Rutinas); si hoy es descanso programado o todavía no armaste un cronograma, te sugiere uno según el último día que entrenaste. En cualquier caso, podés elegir el día que quieras — nunca te restringe.",
         demo: { kind: "rutina", view: "daypicker", caption: "Tocá un día y mirá cómo cambia" },
       },
       {
@@ -1690,7 +1785,7 @@ const HELP_CHAPTERS = [
       {
         icon: <Zap size={20} />,
         title: "Descarga: tu semana de recuperación",
-        text: "Cada cierta cantidad de semanas de entrenamiento (lo configurás en Perfil), tu ciclo entra en una semana de descarga: menos series y menos peso, para bajar la fatiga sin perder lo ganado.",
+        text: "Cada cierta cantidad de semanas de entrenamiento (lo configurás en Perfil), tu ciclo entra en una semana de descarga: menos series y menos peso, para bajar la fatiga sin perder lo ganado. La primera vez que abrís la app en esa semana, te avisamos con un cartel y te traemos directo a esta pestaña — pero podés ir a entrenar normal cuando quieras, no te restringe nada.",
         demo: { kind: "descarga", view: "header" },
       },
       {
@@ -2134,9 +2229,16 @@ function SessionStartBar({ activeSession, onStart, onCancel }) {
    volver a abrir una tarjeta. Sólo se limpia con "Resetear sesión de hoy"
    (acá abajo) o al finalizar la sesión (ver handleEndSession en App()).
 ============================================================================ */
-function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, activeSession, onStartSession, onEndSession, onCancelSession }) {
-  const [activeDay, setActiveDay] = useState(() => getSuggestedDay(logs));
-  const suggestedDay = useMemo(() => getSuggestedDay(logs), []);
+function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, weekSchedule, activeSession, onStartSession, onEndSession, onCancelSession }) {
+  // El día programado para hoy según el cronograma semanal (lunes a domingo)
+  // de la rutina activa. Si hoy es descanso programado (o no hay cronograma
+  // todavía), cae al viejo heurístico de "último día entrenado + 1" — pero
+  // nunca bloquea nada: siempre podés elegir cualquier día con los chips.
+  const scheduledDay = useMemo(() => { const dk = weekSchedule?.[todayWeekdayKey()]; return dk && DAY_ORDER.includes(dk) ? dk : null; }, [weekSchedule]);
+  const isRestToday = !!weekSchedule && !scheduledDay;
+  const fallbackSuggested = useMemo(() => getSuggestedDay(logs), []);
+  const suggestedDay = scheduledDay || fallbackSuggested;
+  const [activeDay, setActiveDay] = useState(() => scheduledDay || fallbackSuggested);
   const weekInfo = getWeekInfo(cycleStart, settings), isDeload = weekInfo?.isDeload, day = ROUTINE[activeDay];
   const [resetKeys, setResetKeys] = useState({});
   const [confirmReset, setConfirmReset] = useState(false);
@@ -2158,6 +2260,13 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, a
     <div className="space-y-4">
       <SessionStartBar activeSession={activeSession} onStart={() => onStartSession(activeDay)} onCancel={onCancelSession} />
 
+      {isRestToday && (
+        <div className="flex items-start gap-2.5 bg-slate-900/50 border border-slate-800/50 rounded-xl px-3.5 py-2.5">
+          <Calendar size={13} className="text-slate-500 mt-0.5 shrink-0" />
+          <p className="text-[11px] text-slate-400">Hoy es descanso según tu cronograma semanal — pero entrená el día que quieras, esto es solo una guía. <span className="text-slate-600">(Lo configurás en Rutinas.)</span></p>
+        </div>
+      )}
+
       <div className="flex gap-1.5 overflow-x-auto pb-1">
         {DAY_ORDER.map((k) => (
           <button key={k} onClick={() => setActiveDay(k)} className="px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all active:scale-95 border hover:-translate-y-0.5"
@@ -2172,7 +2281,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, a
         <div className="relative p-5">
           {activeDay === suggestedDay && (
             <div className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg mb-3" style={{ backgroundColor: day.color + "22", color: day.color }}>
-              <RotateCcw size={10} /> Sugerido para hoy
+              <RotateCcw size={10} /> {scheduledDay === activeDay ? "Programado para hoy" : "Sugerido para hoy"}
             </div>
           )}
           <h2 className="text-xl font-black text-white leading-tight">{day.label}</h2>
@@ -3107,16 +3216,64 @@ function builderDaysFromRoutineDef(routineDef) {
   });
 }
 
+/* ============================================================================
+   WEEKLY SCHEDULE EDITOR — una fila por día de la semana (lunes a domingo),
+   cada una con chips para elegir qué día de la rutina (o descanso) le
+   corresponde. Permite repetir días de la rutina dentro de la semana (por
+   ej. Upper/Lower entrenado 4 veces: lun=Upper, mar=Lower, jue=Upper,
+   vie=Lower). Se usa tanto al crear/editar una rutina como, después, para
+   ajustarle el cronograma a cualquier rutina ya activa (incluidas las
+   preestablecidas) desde Rutinas.
+============================================================================ */
+function WeeklyScheduleEditor({ dayOrder, days, schedule, onChange }) {
+  return (
+    <div className="space-y-1.5">
+      {WEEKDAY_KEYS.map((wk, i) => {
+        const current = schedule[wk] || null;
+        return (
+          <div key={wk} className="flex items-center gap-2">
+            <span className="w-8 text-[11px] font-bold text-slate-500 shrink-0">{WEEKDAY_SHORT_LABELS[i]}</span>
+            <div className="flex gap-1.5 overflow-x-auto pb-0.5 flex-1 -mx-1 px-1">
+              <button onClick={() => onChange(wk, null)} className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 border shrink-0"
+                style={!current ? { backgroundColor: "var(--surface-2)", borderColor: "var(--surface-2)", color: "var(--surface-2-text)" } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
+                Descanso
+              </button>
+              {dayOrder.map((dk) => {
+                const d = days[dk]; if (!d) return null;
+                const active = current === dk;
+                return (
+                  <button key={dk} onClick={() => onChange(wk, dk)} className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 border shrink-0"
+                    style={active ? { background: d.color, borderColor: d.color, color: "#fff" } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
+                    {d.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function RoutineBuilder({ initialRoutine, onCancel, onSave }) {
   const isEditing = !!initialRoutine;
   const [name, setName] = useState(initialRoutine?.name || "");
   const [days, setDays] = useState(() => (initialRoutine ? builderDaysFromRoutineDef(initialRoutine) : [{ key: builderUid("day"), label: "Día 1", color: BUILDER_COLOR_PALETTE[0], exercises: [] }]));
+  const [schedule, setSchedule] = useState(() => getRoutineWeekSchedule(initialRoutine || { dayOrder: days.map((d) => d.key) }));
   const [error, setError] = useState("");
 
   const addDay = () => setDays((d) => [...d, { key: builderUid("day"), label: `Día ${d.length + 1}`, color: BUILDER_COLOR_PALETTE[d.length % BUILDER_COLOR_PALETTE.length], exercises: [] }]);
-  const removeDay = (idx) => setDays((d) => d.filter((_, i) => i !== idx));
+  const removeDay = (idx) => {
+    setDays((d) => {
+      const removedKey = d[idx]?.key;
+      if (removedKey) setSchedule((prevSched) => { const next = { ...prevSched }; WEEKDAY_KEYS.forEach((wk) => { if (next[wk] === removedKey) next[wk] = null; }); return next; });
+      return d.filter((_, i) => i !== idx);
+    });
+  };
   const moveDay = (idx, delta) => setDays((d) => { const j = idx + delta; if (j < 0 || j >= d.length) return d; const n = [...d]; [n[idx], n[j]] = [n[j], n[idx]]; return n; });
   const renameDay = (idx, label) => setDays((d) => d.map((day, i) => (i === idx ? { ...day, label } : day)));
+  const updateScheduleDay = (wk, dayKeyOrNull) => setSchedule((prev) => ({ ...prev, [wk]: dayKeyOrNull }));
 
   const addExercise = (dayIdx, libEx) => setDays((d) => d.map((day, i) => {
     if (i !== dayIdx || day.exercises.some((e) => e.id === libEx.id)) return day;
@@ -3149,7 +3306,7 @@ function RoutineBuilder({ initialRoutine, onCancel, onSave }) {
         exercises: d.exercises.map((e) => (e.libId ? { libId: e.libId, sets: e.sets } : { id: e.id, name: e.name, muscle: e.muscle, sets: e.sets })),
       };
     });
-    onSave({ name: name.trim(), source: "custom", description: "Rutina creada por vos.", recommendation: "", dayOrder, days: daysObj });
+    onSave({ name: name.trim(), source: "custom", description: "Rutina creada por vos.", recommendation: "", dayOrder, days: daysObj, weekSchedule: schedule });
   };
 
   return (
@@ -3176,6 +3333,14 @@ function RoutineBuilder({ initialRoutine, onCancel, onSave }) {
 
       <button onClick={addDay} className="w-full flex items-center justify-center gap-1.5 py-3 rounded-2xl border border-dashed border-slate-700 text-slate-400 hover:text-white hover:border-slate-500 transition text-sm font-semibold"><Plus size={14} /> Agregar día</button>
 
+      <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 space-y-2.5">
+        <div>
+          <p className="text-sm font-bold text-white">¿Qué día de la semana entrenás cada uno?</p>
+          <p className="text-[11px] text-slate-500 mt-0.5">Por defecto los ubicamos de corrido desde el lunes. Podés repetir días (ej. Upper lunes y jueves) o dejar descanso donde quieras.</p>
+        </div>
+        <WeeklyScheduleEditor dayOrder={days.map((d) => d.key)} days={Object.fromEntries(days.map((d) => [d.key, d]))} schedule={schedule} onChange={updateScheduleDay} />
+      </div>
+
       {error && <p className="text-xs text-rose-400 text-center">{error}</p>}
 
       <div className="flex gap-2 pt-1">
@@ -3195,6 +3360,7 @@ function RoutineBuilder({ initialRoutine, onCancel, onSave }) {
 function RoutinesView({ profile, forced, onActivate, onUpdate, onDelete }) {
   const [mode, setMode] = useState("catalog");
   const [editingRoutineId, setEditingRoutineId] = useState(null);
+  const [showSchedule, setShowSchedule] = useState(false);
   const routines = profile?.routines || {};
   const activeId = profile?.activeRoutineId;
   const activeDef = routines[activeId];
@@ -3206,6 +3372,9 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onDelete }) {
     activeDef.dayOrder.forEach((dk) => { const exs = activeDef.days[dk]?.exercises || []; exercises += exs.length; exs.forEach((e) => { sets += e.sets?.length || 0; }); });
     return { days: activeDef.dayOrder.length, exercises, sets };
   }, [activeDef]);
+
+  const activeSchedule = activeDef ? getRoutineWeekSchedule(activeDef) : {};
+  const updateActiveScheduleDay = (wk, dayKeyOrNull) => { onUpdate(activeId, { ...activeDef, weekSchedule: { ...activeSchedule, [wk]: dayKeyOrNull } }); };
 
   if (mode === "builder") {
     return (
@@ -3264,6 +3433,15 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onDelete }) {
               <span key={dk} className="text-[10px] font-bold px-2 py-0.5 rounded-lg" style={{ backgroundColor: activeDef.days[dk].color + "20", color: activeDef.days[dk].color }}>{activeDef.days[dk].label}</span>
             ))}
           </div>
+          <button onClick={() => setShowSchedule((s) => !s)} className="relative w-full flex items-center justify-center gap-1.5 mt-3 py-2 rounded-xl border border-white/10 text-teal-200 hover:text-white transition text-[11px] font-bold">
+            <Calendar size={11} /> {showSchedule ? "Ocultar" : "Configurar"} días de la semana
+          </button>
+          {showSchedule && (
+            <div className="relative mt-3 pt-3 border-t border-white/10 tab-fade-in">
+              <p className="text-[11px] text-slate-400 mb-2.5">Elegí qué día de tu rutina (o descanso) le toca a cada día de la semana. Podés repetir días.</p>
+              <WeeklyScheduleEditor dayOrder={activeDef.dayOrder} days={activeDef.days} schedule={activeSchedule} onChange={updateActiveScheduleDay} />
+            </div>
+          )}
         </div>
       )}
 
@@ -3394,8 +3572,37 @@ export default function App() {
   // La rutina activa del perfil actual (o la Clásica como respaldo) se
   // recalcula en cada render — así ROUTINE/DAY_ORDER/EXERCISE_BY_ID/KEY_TO_DAY
   // siempre reflejan la rutina correcta antes de que se rendericen sus hijos.
-  applyRoutineModel((profile && profile.routines && profile.routines[profile.activeRoutineId]) || CLASSIC_PRESET);
+  const activeRoutineDef = (profile && profile.routines && profile.routines[profile.activeRoutineId]) || null;
+  applyRoutineModel(activeRoutineDef || CLASSIC_PRESET);
   const needsRoutinePick = !!profile && !profile.activeRoutineId;
+  // Cronograma semanal de la rutina activa (lunes a domingo → día de rutina
+  // o descanso) — ver getRoutineWeekSchedule más arriba en el archivo.
+  const weekSchedule = activeRoutineDef ? getRoutineWeekSchedule(activeRoutineDef) : {};
+
+  // Aviso automático (y no restrictivo) de semana de descarga: la primera
+  // vez que se abre la app durante una semana de descarga, te avisa y te
+  // lleva a esa pestaña — pero no bloquea nada, podés ir a cualquier otra
+  // pestaña apenas quieras. Se marca `dismissedDeloadCycle` para no repetir
+  // el aviso todos los días dentro de la misma semana de descarga.
+  const [deloadNotice, setDeloadNotice] = useState(false);
+  useEffect(() => {
+    if (!profile || !cycleStart) return;
+    const wi = getWeekInfo(cycleStart, getProfileSettings(profile));
+    if (wi?.isDeload && profile.dismissedDeloadCycle !== wi.cycleNumber) {
+      setTab("descarga");
+      setDeloadNotice(true);
+      setProfiles((prev) => {
+        const p = prev[activeProfile];
+        if (!p) return prev;
+        const np = { ...prev, [activeProfile]: { ...p, dismissedDeloadCycle: wi.cycleNumber } };
+        saveProfiles(np);
+        return np;
+      });
+      const t = setTimeout(() => setDeloadNotice(false), 7000);
+      return () => clearTimeout(t);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeProfile]);
 
   const setLogs = useCallback((newLogs) => { const np = { ...profiles, [activeProfile]: { ...profiles[activeProfile], logs: newLogs } }; setProfiles(np); saveProfiles(np); }, [profiles, activeProfile]);
   // `drafts` se guarda igual que `logs` (full-replace), pero son los valores
@@ -3503,6 +3710,7 @@ export default function App() {
     <div className={`min-h-screen bg-[#0a0a0f] text-white font-sans lg:flex ${themeClass}`}>
       <StyleInjector />
       {recoveredNotice && <RecoveredBanner onClose={() => setRecoveredNotice(false)} />}
+      {deloadNotice && <DeloadNoticeBanner onClose={() => setDeloadNotice(false)} />}
       <SideNav tab={tab} setTab={setTab} profileName={activeProfile} />
       <div className="flex-1 min-w-0">
         <header className="sticky top-0 z-10 bg-[#0a0a0f]/90 backdrop-blur-xl border-b border-slate-800/40">
@@ -3522,7 +3730,7 @@ export default function App() {
         <main className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto px-4 py-4 pb-28 lg:pb-10 space-y-4">
           <div key={tab} className="tab-fade-in">
             {tab === "rutinas" && <RoutinesView profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onDelete={handleDeleteRoutine} />}
-            {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} />}
+            {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} />}
             {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} />}
             {tab === "descarga" && <DeloadView logs={logs} settings={getProfileSettings(profile)} />}
             {tab === "perfil" && <ProfileView profileName={activeProfile} profiles={profiles} onLogout={handleLogout} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} />}
@@ -3540,6 +3748,15 @@ function RecoveredBanner({ onClose }) {
     <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[150] bg-teal-500 !text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-teal-500/30 flex items-center gap-2 bounce-in">
       <Check size={14} /> Recuperamos tu copia de seguridad local
       <button onClick={onClose} className="ml-1 opacity-80 hover:opacity-100"><X size={13} /></button>
+    </div>
+  );
+}
+
+function DeloadNoticeBanner({ onClose }) {
+  return (
+    <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[150] bg-purple-500 !text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-purple-500/30 flex items-center gap-2 bounce-in max-w-[92vw]">
+      <Zap size={14} className="shrink-0" /> Esta semana es de descarga — te llevamos a esa pestaña
+      <button onClick={onClose} className="ml-1 opacity-80 hover:opacity-100 shrink-0"><X size={13} /></button>
     </div>
   );
 }
