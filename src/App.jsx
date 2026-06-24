@@ -655,64 +655,67 @@ const ANIMATION_CSS = `
 ============================================================================ */
 .light-mode { color-scheme: light; }
 
-/* Fondo de la app: gris muy claro, no blanco puro, para que las tarjetas
-   blancas de arriba resalten con un poco de contraste. */
-.light-mode .bg-\\[\\#0a0a0f\\] { background-color: #eef1f6 !important; }
-.light-mode .bg-\\[\\#0a0a0f\\]\\/60 { background-color: rgba(238,241,246,0.85) !important; }
-.light-mode .bg-\\[\\#0a0a0f\\]\\/90 { background-color: rgba(238,241,246,0.95) !important; }
+/* Fondo de página: gris muy suave (no blanco puro), para que las tarjetas
+   blancas de arriba se despeguen con un contraste sutil — look "Apple /
+   Vercel / Linear", no el clásico blanco-sobre-blanco que se ve plano. */
+.light-mode .bg-\\[\\#0a0a0f\\] { background-color: #f8fafc !important; }
+.light-mode .bg-\\[\\#0a0a0f\\]\\/60 { background-color: rgba(248,250,252,0.85) !important; }
+.light-mode .bg-\\[\\#0a0a0f\\]\\/90 { background-color: rgba(248,250,252,0.96) !important; }
 .light-mode .bg-\\[\\#0f0f1a\\] { background-color: #ffffff !important; }
 
-/* Tarjetas / superficies principales — blanco SÓLIDO (no rgba), para que no
-   se vean grisáceas al apilarse (tarjeta sobre tarjeta sobre fondo). */
+/* Tarjetas / superficies principales — blanco PURO y sólido (no rgba), para
+   que destaquen limpias sobre el fondo gris, sin tonos grisáceos al
+   apilarse una tarjeta sobre otra. */
 .light-mode .bg-slate-900,
 .light-mode .bg-slate-900\\/40,
 .light-mode .bg-slate-900\\/50,
 .light-mode .bg-slate-900\\/60,
 .light-mode .bg-slate-900\\/80 { background-color: #ffffff !important; }
 
-/* Superficies "recesadas" (paneles internos, inputs, chips de fondo) — gris
-   clarito sólido, un escalón más oscuro que la tarjeta blanca que las
-   contiene, para dar sensación de profundidad hacia adentro. */
+/* Superficies "recesadas" (paneles internos, inputs) — un gris casi
+   imperceptible, apenas un paso por debajo del blanco de la tarjeta que las
+   contiene, para dar sensación de profundidad sin ensuciar el conjunto. */
 .light-mode .bg-slate-950,
 .light-mode .bg-slate-950\\/40,
 .light-mode .bg-slate-950\\/50,
 .light-mode .bg-slate-950\\/60,
-.light-mode .bg-slate-950\\/95 { background-color: #f1f4f9 !important; }
+.light-mode .bg-slate-950\\/95 { background-color: #f1f5f9 !important; }
 
-/* Superficies secundarias (chips, botones, inputs) — grises sólidos */
+/* Superficies secundarias (chips, botones, inputs) — grises sólidos suaves */
 .light-mode .bg-slate-800,
 .light-mode .bg-slate-800\\/30,
 .light-mode .bg-slate-800\\/40,
 .light-mode .bg-slate-800\\/50,
 .light-mode .bg-slate-800\\/60,
 .light-mode .bg-slate-800\\/70,
-.light-mode .bg-slate-800\\/80 { background-color: #e7eaf0 !important; }
+.light-mode .bg-slate-800\\/80 { background-color: #eef2f6 !important; }
 .light-mode .bg-slate-700,
-.light-mode .bg-slate-700\\/80 { background-color: #d7dce4 !important; }
+.light-mode .bg-slate-700\\/80 { background-color: #e2e8f0 !important; }
 .light-mode .hover\\:bg-slate-700:hover,
-.light-mode .hover\\:bg-slate-700\\/80:hover { background-color: #c7cdd8 !important; }
+.light-mode .hover\\:bg-slate-700\\/80:hover { background-color: #d8e0e9 !important; }
 .light-mode .hover\\:bg-slate-800:hover,
 .light-mode .hover\\:bg-slate-800\\/30:hover,
 .light-mode .hover\\:bg-slate-800\\/60:hover,
-.light-mode .hover\\:bg-slate-800\\/80:hover { background-color: #dbdfe7 !important; }
-.light-mode .hover\\:bg-slate-900\\/60:hover { background-color: #f1f4f9 !important; }
-.light-mode .active\\:bg-slate-800:active { background-color: #dbdfe7 !important; }
+.light-mode .hover\\:bg-slate-800\\/80:hover { background-color: #e2e8f0 !important; }
+.light-mode .hover\\:bg-slate-900\\/60:hover { background-color: #f1f5f9 !important; }
+.light-mode .active\\:bg-slate-800:active { background-color: #e2e8f0 !important; }
 
-/* Recuadros oscuros (stat tiles) dentro de paneles con degradé de color, y
+/* Recuadros (stat tiles) dentro de paneles con degradé de color, y
    recuadros de alerta tintados (confirmaciones de borrado) — en claro pasan
-   a un overlay claro para que el texto siga teniendo contraste. */
-.light-mode .bg-black\\/20 { background-color: rgba(255,255,255,0.6) !important; }
-.light-mode .bg-black\\/30 { background-color: rgba(255,255,255,0.7) !important; }
-.light-mode .bg-black\\/70 { background-color: rgba(255,255,255,0.85) !important; }
-.light-mode .bg-rose-950\\/30 { background-color: rgba(254,205,211,0.7) !important; }
-.light-mode .border-white\\/5 { border-color: rgba(15,23,42,0.06) !important; }
-.light-mode .border-white\\/10 { border-color: rgba(15,23,42,0.1) !important; }
+   a un gris muy suave para distinguirse del hero pastel que los contiene,
+   y el de alerta a un rosa pastel en vez del rojo oscuro translúcido. */
+.light-mode .bg-black\\/20 { background-color: rgba(241,245,249,0.9) !important; }
+.light-mode .bg-black\\/30 { background-color: rgba(226,232,240,0.95) !important; }
+.light-mode .bg-black\\/70 { background-color: rgba(226,232,240,0.97) !important; }
+.light-mode .bg-rose-950\\/30 { background-color: rgba(254,226,226,0.85) !important; }
+.light-mode .border-white\\/5 { border-color: rgba(15,23,42,0.05) !important; }
+.light-mode .border-white\\/10 { border-color: rgba(15,23,42,0.08) !important; }
 
-/* Texto — escala invertida: lo que en oscuro era "casi blanco" pasa a "casi
-   negro", y lo que era "gris oscuro apenas visible" pasa a "gris clarito",
-   manteniendo la misma jerarquía visual relativa en ambos temas. */
+/* Texto — jerarquía invertida: lo que en oscuro era "casi blanco" pasa a
+   "gris casi negro" (#0f172a), y lo que era apenas visible pasa a un gris
+   medio (#64748b) y más claro, manteniendo la misma jerarquía relativa. */
 .light-mode .text-white { color: #0f172a !important; }
-.light-mode .text-white\\/80 { color: rgba(15,23,42,0.78) !important; }
+.light-mode .text-white\\/80 { color: rgba(15,23,42,0.75) !important; }
 .light-mode .hover\\:text-white:hover { color: #0f172a !important; }
 .light-mode .text-slate-100,
 .light-mode .text-slate-200 { color: #1e293b !important; }
@@ -720,7 +723,7 @@ const ANIMATION_CSS = `
 .light-mode .text-slate-400 { color: #475569 !important; }
 .light-mode .text-slate-500 { color: #64748b !important; }
 .light-mode .text-slate-600 { color: #94a3b8 !important; }
-.light-mode .text-slate-700 { color: #b3bdc9 !important; }
+.light-mode .text-slate-700 { color: #cbd5e1 !important; }
 .light-mode .hover\\:text-slate-200:hover { color: #1e293b !important; }
 .light-mode .hover\\:text-slate-300:hover { color: #334155 !important; }
 .light-mode .hover\\:text-slate-400:hover { color: #475569 !important; }
@@ -753,32 +756,36 @@ const ANIMATION_CSS = `
 .light-mode .text-blue-400 { color: #1d4ed8 !important; }
 .light-mode .text-orange-400 { color: #c2410c !important; }
 
-/* Bordes — grises sólidos suaves */
+/* Bordes — grises muy sutiles, sin saltar a la vista */
 .light-mode .border-slate-800,
 .light-mode .border-slate-800\\/40,
 .light-mode .border-slate-800\\/50,
-.light-mode .border-slate-800\\/60 { border-color: #e2e7ee !important; }
+.light-mode .border-slate-800\\/60 { border-color: #e2e8f0 !important; }
 .light-mode .border-slate-700,
 .light-mode .border-slate-700\\/40,
 .light-mode .border-slate-700\\/50,
-.light-mode .border-slate-700\\/60 { border-color: #cdd4de !important; }
-.light-mode .border-slate-600 { border-color: #aab3c0 !important; }
-.light-mode .border-slate-500 { border-color: #8893a3 !important; }
-.light-mode .hover\\:border-slate-500:hover { border-color: #aab3c0 !important; }
-.light-mode .hover\\:border-slate-600:hover { border-color: #8893a3 !important; }
-.light-mode .focus\\:border-slate-700:focus { border-color: #aab3c0 !important; }
+.light-mode .border-slate-700\\/60 { border-color: #cbd5e1 !important; }
+.light-mode .border-slate-600 { border-color: #94a3b8 !important; }
+.light-mode .border-slate-500 { border-color: #64748b !important; }
+.light-mode .hover\\:border-slate-500:hover { border-color: #94a3b8 !important; }
+.light-mode .hover\\:border-slate-600:hover { border-color: #64748b !important; }
+.light-mode .focus\\:border-slate-700:focus { border-color: #94a3b8 !important; }
 .light-mode .divide-slate-800\\/50 > :not([hidden]) ~ :not([hidden]),
-.light-mode .divide-slate-800 > :not([hidden]) ~ :not([hidden]) { border-color: #e2e7ee !important; }
+.light-mode .divide-slate-800 > :not([hidden]) ~ :not([hidden]) { border-color: #e2e8f0 !important; }
 
-/* Sombras: en claro casi no se ven sombras negras translúcidas sobre fondos
-   claros (quedan como manchas grises) — se atenúan bastante. */
+/* Sombras: el negro translúcido sobre fondo blanco se ve como una mancha
+   gris sucia — se reemplaza por una sombra casi imperceptible, estilo
+   Apple/Linear (apenas una insinuación de elevación, no un bloque oscuro). */
 .light-mode .shadow-black\\/20,
 .light-mode .shadow-black\\/30,
 .light-mode .shadow-black\\/40,
-.light-mode .shadow-black\\/50 { --tw-shadow-color: rgba(100,116,139,0.12) !important; box-shadow: var(--tw-shadow, 0 1px 2px 0 rgba(100,116,139,0.12)) !important; }
+.light-mode .shadow-black\\/50 { --tw-shadow-color: rgba(15,23,42,0.05) !important; box-shadow: var(--tw-shadow, 0 1px 3px 0 rgba(15,23,42,0.05)) !important; }
 
 /* Tarjetas con degradé propio (hero de Rutinas/Descarga/Progreso/Perfil) —
    ver variables --grad-* aplicadas vía estilo inline en esos componentes.
+   En claro, estos degradés pasan a ser pasteles muy suaves (un toque de
+   color sobre blanco, no un color saturado) en vez de la versión intensa
+   pensada para fondo oscuro.
    --ring-track/--chart-grid/--chart-axis/--chip-border/--chip-text/
    --surface-2/--surface-2-text son grises "neutros" que antes estaban
    escritos a mano como hex fijo en varios componentes (cronómetro,
@@ -798,16 +805,16 @@ const ANIMATION_CSS = `
   --surface-2-text: #64748b;
 }
 .light-mode {
-  --grad-hero-purple: linear-gradient(135deg, rgba(168,85,247,0.14), rgba(255,255,255,0.9) 55%, rgba(255,255,255,0.98));
-  --grad-hero-cyan: linear-gradient(135deg, rgba(6,182,212,0.13), rgba(255,255,255,0.9) 55%, rgba(255,255,255,0.98));
-  --grad-hero-teal: linear-gradient(135deg, rgba(20,184,166,0.13), rgba(255,255,255,0.9) 55%, rgba(255,255,255,0.98));
+  --grad-hero-purple: linear-gradient(135deg, rgba(168,85,247,0.10), rgba(255,255,255,0.96) 55%, #ffffff);
+  --grad-hero-cyan: linear-gradient(135deg, rgba(6,182,212,0.10), rgba(255,255,255,0.96) 55%, #ffffff);
+  --grad-hero-teal: linear-gradient(135deg, rgba(20,184,166,0.10), rgba(255,255,255,0.96) 55%, #ffffff);
   --grad-profile-avatar: linear-gradient(135deg, #ffffff, #f8fafc);
-  --ring-track: #e7eaf0;
-  --chart-grid: #e7eaf0;
+  --ring-track: #eef2f6;
+  --chart-grid: #eef2f6;
   --chart-axis: #94a3b8;
-  --chip-border: #cdd4de;
+  --chip-border: #e2e8f0;
   --chip-text: #64748b;
-  --surface-2: #e7eaf0;
+  --surface-2: #eef2f6;
   --surface-2-text: #475569;
 }
 `;
