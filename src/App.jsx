@@ -13,7 +13,8 @@ import {
   Sparkles, Layers, Video, SlidersHorizontal, ShieldCheck, UserCog,
   Share2, Download, Link2, Copy,
 } from "lucide-react";
-import { signInWithPopup } from "firebase/auth";
+import { signInWithPopup, signOut } from "firebase/auth";
+import { doc, setDoc, getDoc } from "firebase/firestore";
 import { auth, googleProvider, db } from "./firebase";
 
 /* ============================================================================
@@ -329,21 +330,21 @@ const PRESET_ROUTINES = [
     recommendation: "Recomendado: 3 a 6 sesiones semanales (podés repetir el ciclo dos veces si entrenás 6 días).",
     dayOrder: ["push", "pull", "legs"],
     days: {
-      push: { label: "Push", description: "Pecho · Hombro · Tríceps", color: "#14B8A6", exercises: [
+      push: { label: "PUSH", description: "Pecho · Hombro · Tríceps", color: "#14B8A6", exercises: [
         { libId: "press_banca", sets: [{ repRange: "3-5" }, { repRange: "3-5" }, { repRange: "8-10" }] },
         { libId: "press_inclinado_mancuernas", sets: mkSets(3, "8-10") },
         { libId: "vuelos_laterales_mancuerna", sets: mkSets(3, "15-20") },
         { libId: "press_militar_mancuernas", sets: mkSets(3, "8-10") },
         { libId: "triceps_polea_alta", sets: mkSets(3, "10-12") },
       ] },
-      pull: { label: "Pull", description: "Espalda · Bíceps", color: "#3B82F6", exercises: [
+      pull: { label: "PULL", description: "Espalda · Bíceps", color: "#3B82F6", exercises: [
         { libId: "peso_muerto", sets: [{ repRange: "4-6" }, { repRange: "4-6" }, { repRange: "4-6" }] },
         { libId: "dorsalera", sets: mkSets(3, "8-10") },
         { libId: "remo_unilateral", sets: mkSets(3, "8-10") },
         { libId: "face_pull", sets: mkSets(2, "15-20") },
         { libId: "biceps_alternado_mancuerna", sets: mkSets(3, "8-10") },
       ] },
-      legs: { label: "Legs", description: "Cuádriceps · Femoral · Glúteo", color: "#F97316", exercises: [
+      legs: { label: "LEGS", description: "Cuádriceps · Femoral · Glúteo", color: "#F97316", exercises: [
         { libId: "sentadilla_convencional", sets: [{ repRange: "4-6" }, { repRange: "4-6" }, { repRange: "8-10" }] },
         { libId: "curl_femoral_maquina", sets: mkSets(3, "10-12") },
         { libId: "extension_cuadriceps", sets: mkSets(3, "10-12") },
@@ -360,7 +361,7 @@ const PRESET_ROUTINES = [
     recommendation: "Recomendado: 4 sesiones semanales alternando Torso y Pierna (ej: Lun Torso, Mar Pierna, Jue Torso, Vie Pierna).",
     dayOrder: ["upper", "lower"],
     days: {
-      upper: { label: "Torso", description: "Pecho · Espalda · Hombro · Brazos", color: "#14B8A6", exercises: [
+      upper: { label: "TORSO", description: "Pecho · Espalda · Hombro · Brazos", color: "#14B8A6", exercises: [
         { libId: "press_banca", sets: [{ repRange: "4-6" }, { repRange: "4-6" }, { repRange: "8-10" }] },
         { libId: "dorsalera", sets: mkSets(3, "8-10") },
         { libId: "press_militar_mancuernas", sets: mkSets(3, "8-10") },
@@ -369,7 +370,7 @@ const PRESET_ROUTINES = [
         { libId: "biceps_martillo", sets: mkSets(3, "10-12") },
         { libId: "triceps_polea_alta", sets: mkSets(3, "10-12") },
       ] },
-      lower: { label: "Pierna", description: "Cuádriceps · Femoral · Pantorrilla", color: "#F97316", exercises: [
+      lower: { label: "PIERNA", description: "Cuádriceps · Femoral · Pantorrilla", color: "#F97316", exercises: [
         { libId: "sentadilla_convencional", sets: [{ repRange: "4-6" }, { repRange: "4-6" }, { repRange: "8-10" }] },
         { libId: "peso_muerto_rumano", sets: mkSets(3, "10-12") },
         { libId: "prensa", sets: mkSets(3, "10-12") },
@@ -387,7 +388,7 @@ const PRESET_ROUTINES = [
     recommendation: "Para gente con buena base de entrenamiento: 3 a 6 sesiones semanales repitiendo el ciclo.",
     dayOrder: ["chest_back", "shoulders_arms", "legs"],
     days: {
-      chest_back: { label: "Pecho y Espalda", description: "Empuje y tracción de torso juntos", color: "#14B8A6", exercises: [
+      chest_back: { label: "PECHO Y ESPALDA", description: "Empuje y tracción de torso juntos", color: "#14B8A6", exercises: [
         { libId: "press_banca", sets: [{ repRange: "4-6" }, { repRange: "4-6" }, { repRange: "8-10" }] },
         { libId: "dorsalera", sets: mkSets(3, "8-10") },
         { libId: "press_inclinado_mancuernas", sets: mkSets(3, "8-10") },
@@ -395,7 +396,7 @@ const PRESET_ROUTINES = [
         { libId: "cruce_poleas", sets: mkSets(3, "12-15") },
         { libId: "pull_over", sets: mkSets(2, "12-15") },
       ] },
-      shoulders_arms: { label: "Hombros y Brazos", description: "Deltoides, bíceps y tríceps", color: "#A855F7", exercises: [
+      shoulders_arms: { label: "HOMBROS Y BRAZOS", description: "Deltoides, bíceps y tríceps", color: "#A855F7", exercises: [
         { libId: "press_militar_smith", sets: [{ repRange: "4-6" }, { repRange: "4-6" }, { repRange: "8-10" }] },
         { libId: "vuelos_laterales_mancuerna", sets: mkSets(3, "15-20") },
         { libId: "biceps_alternado_mancuerna", sets: mkSets(3, "8-10") },
@@ -403,7 +404,7 @@ const PRESET_ROUTINES = [
         { libId: "biceps_martillo", sets: mkSets(2, "10-12") },
         { libId: "triceps_polea_alta", sets: mkSets(3, "10-12") },
       ] },
-      legs: { label: "Piernas", description: "Cuádriceps · Femoral · Glúteo", color: "#F97316", exercises: [
+      legs: { label: "PIERNAS", description: "Cuádriceps · Femoral · Glúteo", color: "#F97316", exercises: [
         { libId: "jaca", sets: [{ repRange: "4-6" }, { repRange: "4-6" }, { repRange: "8-10" }] },
         { libId: "curl_femoral_maquina", sets: mkSets(3, "10-12") },
         { libId: "extension_cuadriceps", sets: mkSets(3, "10-12") },
@@ -420,28 +421,28 @@ const PRESET_ROUTINES = [
     recommendation: "Recomendado: 5 sesiones semanales, un grupo por día. Si entrenás hace poco, frecuencias de 2 veces por semana por músculo suelen rendir mejor — pero este formato sigue siendo válido y es el más tradicional para enfocarte a fondo en cada grupo.",
     dayOrder: ["chest", "back", "shoulders", "arms", "legs"],
     days: {
-      chest: { label: "Pecho", description: "Pectoral en todos los ángulos", color: "#14B8A6", exercises: [
+      chest: { label: "PECHO", description: "Pectoral en todos los ángulos", color: "#14B8A6", exercises: [
         { libId: "press_banca", sets: [{ repRange: "4-6" }, { repRange: "4-6" }, { repRange: "8-10" }] },
         { libId: "press_inclinado_mancuernas", sets: mkSets(3, "8-10") },
         { libId: "press_pecho_maquina", sets: mkSets(3, "10-12") },
         { libId: "aperturas_mancuerna", sets: mkSets(3, "12-15") },
         { libId: "cruce_poleas", sets: mkSets(2, "12-15") },
       ] },
-      back: { label: "Espalda", description: "Dorsal, espalda media y romboides", color: "#3B82F6", exercises: [
+      back: { label: "ESPALDA", description: "Dorsal, espalda media y romboides", color: "#3B82F6", exercises: [
         { libId: "remo_barra", sets: [{ repRange: "4-6" }, { repRange: "4-6" }, { repRange: "8-10" }] },
         { libId: "dorsalera", sets: mkSets(3, "8-10") },
         { libId: "remo_unilateral", sets: mkSets(3, "8-10") },
         { libId: "remo_polea_agarre_ancho", sets: mkSets(3, "12-15") },
         { libId: "face_pull", sets: mkSets(2, "15-20") },
       ] },
-      shoulders: { label: "Hombros", description: "Deltoides anterior, lateral y posterior", color: "#A855F7", exercises: [
+      shoulders: { label: "HOMBROS", description: "Deltoides anterior, lateral y posterior", color: "#A855F7", exercises: [
         { libId: "press_militar_mancuernas", sets: [{ repRange: "4-6" }, { repRange: "4-6" }, { repRange: "8-10" }] },
         { libId: "vuelos_laterales_mancuerna", sets: mkSets(4, "15-20") },
         { libId: "press_arnold", sets: mkSets(3, "10-12") },
         { libId: "cruces_invertidos_polea", sets: mkSets(3, "12-15") },
         { libId: "vuelos_frontales", sets: mkSets(2, "12-15") },
       ] },
-      arms: { label: "Brazos", description: "Bíceps y tríceps por igual", color: "#F59E0B", exercises: [
+      arms: { label: "BRAZOS", description: "Bíceps y tríceps por igual", color: "#F59E0B", exercises: [
         { libId: "curl_barra_recta", sets: mkSets(3, "8-10") },
         { libId: "biceps_banco_scott", sets: mkSets(3, "10-12") },
         { libId: "biceps_martillo", sets: mkSets(2, "10-12") },
@@ -449,7 +450,7 @@ const PRESET_ROUTINES = [
         { libId: "triceps_polea_cuerda", sets: mkSets(3, "10-12") },
         { libId: "triceps_patada", sets: mkSets(2, "12-15") },
       ] },
-      legs: { label: "Piernas", description: "Cuádriceps, femoral, glúteo y pantorrilla", color: "#F97316", exercises: [
+      legs: { label: "PIERNAS", description: "Cuádriceps, femoral, glúteo y pantorrilla", color: "#F97316", exercises: [
         { libId: "sentadilla_convencional", sets: [{ repRange: "4-6" }, { repRange: "4-6" }, { repRange: "8-10" }] },
         { libId: "prensa", sets: mkSets(3, "10-12") },
         { libId: "peso_muerto_rumano", sets: mkSets(3, "8-10") },
@@ -467,21 +468,21 @@ const PRESET_ROUTINES = [
     recommendation: "Recomendado: 3 sesiones semanales no consecutivas (ej. Lunes, Miércoles, Viernes).",
     dayOrder: ["day_a", "day_b", "day_c"],
     days: {
-      day_a: { label: "Día A", description: "Full body — variante A", color: "#14B8A6", exercises: [
+      day_a: { label: "DÍA A", description: "Full body — variante A", color: "#14B8A6", exercises: [
         { libId: "sentadilla_convencional", sets: [{ repRange: "4-6" }, { repRange: "4-6" }, { repRange: "8-10" }] },
         { libId: "press_banca", sets: mkSets(3, "8-10") },
         { libId: "dorsalera", sets: mkSets(3, "8-10") },
         { libId: "vuelos_laterales_mancuerna", sets: mkSets(2, "15-20") },
         { libId: "abdominales", sets: mkSets(3, "12-15") },
       ] },
-      day_b: { label: "Día B", description: "Full body — variante B", color: "#3B82F6", exercises: [
+      day_b: { label: "DÍA B", description: "Full body — variante B", color: "#3B82F6", exercises: [
         { libId: "peso_muerto_rumano", sets: mkSets(3, "10-12") },
         { libId: "press_militar_mancuernas", sets: mkSets(3, "8-10") },
         { libId: "remo_unilateral", sets: mkSets(3, "8-10") },
         { libId: "biceps_martillo", sets: mkSets(2, "10-12") },
         { libId: "plancha", sets: mkSets(3, "12-15") },
       ] },
-      day_c: { label: "Día C", description: "Full body — variante C", color: "#F97316", exercises: [
+      day_c: { label: "DÍA C", description: "Full body — variante C", color: "#F97316", exercises: [
         { libId: "prensa", sets: mkSets(3, "10-12") },
         { libId: "press_inclinado_mancuernas", sets: mkSets(3, "8-10") },
         { libId: "remo_t", sets: mkSets(3, "8-10") },
@@ -517,72 +518,21 @@ function resolveRoutineDef(routineEntry, routineId) {
 }
 
 /* ============================== COMPARTIR RUTINAS ==============================
-   Como la app no tiene backend, "compartir por link" funciona codificando
-   la rutina entera adentro del link (en el fragmento #shared-routine=...):
-   no hace falta ningún servidor, el que abre el link decodifica los datos
-   directamente del navegador. Para que el link no quede gigante, se usa una
-   forma compacta (claves cortas, series como "3x8-10" en vez de objetos). */
-function compactSetsToken(sets) {
-  const groups = [];
-  (sets || []).forEach((s) => {
-    const last = groups[groups.length - 1];
-    if (last && last.repRange === s.repRange) last.count++;
-    else groups.push({ repRange: s.repRange, count: 1 });
-  });
-  return groups.map((g) => `${g.count}x${g.repRange}`).join(",");
-}
-function setsFromCompactToken(token) {
-  return (token || "3x8-10").split(",").flatMap((part) => {
-    const [countStr, repRange] = part.split("x");
-    const count = parseInt(countStr, 10) || 1;
-    return Array.from({ length: count }, () => ({ repRange: repRange || "8-10" }));
-  });
-}
-
-function encodeRoutineForShare(routineDef) {
-  const compact = {
-    n: routineDef.name,
-    o: routineDef.dayOrder,
-    d: routineDef.dayOrder.map((dk) => {
-      const day = routineDef.days[dk];
-      return {
-        k: dk, l: day.label, c: day.color,
-        e: (day.exercises || []).map((ex) => (
-          ex.libId ? { i: ex.libId, s: compactSetsToken(ex.sets) } : { x: ex.name, m: ex.muscle, s: compactSetsToken(ex.sets) }
-        )),
-      };
-    }),
-  };
-  const json = JSON.stringify(compact);
-  const b64 = btoa(unescape(encodeURIComponent(json)));
-  return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
-function decodeSharedRoutine(token) {
-  try {
-    const b64 = token.replace(/-/g, "+").replace(/_/g, "/");
-    const json = decodeURIComponent(escape(atob(b64)));
-    const compact = JSON.parse(json);
-    if (!compact || !Array.isArray(compact.o) || !compact.d) return null;
-    const days = {};
-    compact.d.forEach((day) => {
-      days[day.k] = {
-        label: day.l, description: "", color: day.c,
-        exercises: (day.e || []).map((ex) => (
-          ex.i
-            ? { libId: ex.i, sets: setsFromCompactToken(ex.s) }
-            : { id: builderUid("shared"), name: ex.x || "Ejercicio", muscle: ex.m || "Personalizado", sets: setsFromCompactToken(ex.s) }
-        )),
-      };
-    });
-    return { name: compact.n || "Rutina compartida", source: "custom", description: "Rutina recibida por enlace.", recommendation: "", dayOrder: compact.o, days };
-  } catch { return null; }
-}
-
-function buildRoutineShareUrl(routineDef) {
-  const token = encodeRoutineForShare(routineDef);
+   Antes, "compartir por link" codificaba la rutina entera en base64 dentro
+   del propio link (#shared-routine=...) — sin backend, pero generaba
+   enlaces de más de 3000 caracteres que WhatsApp e Instagram bloqueaban o
+   recortaban, así que en la práctica casi nunca llegaban completos. Ahora
+   que ya hay Firebase Firestore configurado (`db`), la rutina se guarda
+   ahí bajo un ID corto al azar (6 caracteres) en la colección
+   "shared_routines", y el link sólo lleva ese ID (#r=ID_CORTO) — corto de
+   verdad, sin límites de longitud para la rutina en sí. */
+async function shareRoutineToFirestore(routineDef) {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  let shortId = "";
+  for (let i = 0; i < 6; i++) shortId += chars[Math.floor(Math.random() * chars.length)];
+  await setDoc(doc(db, "shared_routines", shortId), routineDef);
   const base = typeof window !== "undefined" ? window.location.origin + window.location.pathname : "";
-  return `${base}#shared-routine=${token}`;
+  return `${base}#r=${shortId}`;
 }
 
 // Convierte una definición de rutina (preset o creada por el usuario) en el
@@ -1265,21 +1215,41 @@ function PRBurst({ anchorRef, trigger }) {
       "logo" de la app abajo. Sin backend: todo se dibuja y se comparte/baja
       directamente desde el navegador.
 ============================================================================ */
-function ShareLinkModal({ title, shareTitle, shareText, url, onClose }) {
+function ShareLinkModal({ title, shareTitle, shareText, shareTarget, onClose }) {
+  const [url, setUrl] = useState("");
+  const [linkError, setLinkError] = useState(false);
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState(false);
+  const [exporting, setExporting] = useState(null);
   const urlInputRef = useRef(null);
+
+  // El enlace ya no se armaba localmente (antes codificaba toda la rutina
+  // en base64 dentro de la URL, generando links de miles de caracteres que
+  // WhatsApp/Instagram bloqueaban o recortaban). Ahora la rutina se guarda
+  // en Firestore bajo un ID corto al azar, y recién entonces tenemos un
+  // link de verdad cortito para mostrar — por eso esto es asíncrono y arranca
+  // mostrando "Generando enlace mágico...".
+  useEffect(() => {
+    let cancelled = false;
+    setUrl(""); setLinkError(false);
+    (async () => {
+      try {
+        const link = await shareRoutineToFirestore(shareTarget);
+        if (!cancelled) setUrl(link);
+      } catch (err) {
+        console.error("Error al generar el enlace de la rutina:", err);
+        if (!cancelled) setLinkError(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [shareTarget]);
+
   const canNativeShare = typeof navigator !== "undefined" && !!navigator.share;
   const handleNativeShare = async () => { try { await navigator.share({ title: shareTitle, text: shareText, url }); onClose(); } catch { /* cancelado, no hacemos nada */ } };
   // Copiado con respaldo: navigator.clipboard no está disponible en todos
   // los contextos (por ejemplo, si la app se sirve por HTTP sin TLS, o en
-  // algunos navegadores/webviews) — antes, si fallaba, el botón "Copiar
-  // enlace" no hacía absolutamente nada y no había ninguna otra forma de
-  // ver el link, así que parecía que "no funcionaba". Ahora, si la API
-  // moderna no está, recurre al truco clásico de seleccionar un campo de
-  // texto oculto y ejecutar el copiado del navegador; y si ni eso
-  // funciona, el enlace queda visible y seleccionable más abajo para
-  // copiarlo a mano.
+  // algunos navegadores/webviews) — si falla, el enlace queda visible y
+  // seleccionable más abajo para copiarlo a mano.
   const handleCopy = async () => {
     setCopyError(false);
     try {
@@ -1300,32 +1270,72 @@ function ShareLinkModal({ title, shareTitle, shareText, url, onClose }) {
       urlInputRef.current?.select();
     }
   };
-  const waUrl = `https://wa.me/?text=${encodeURIComponent(shareText + " " + url)}`;
-  const xUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(url)}`;
-  const redditUrl = `https://www.reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(shareTitle)}`;
+  const handleExportDoc = async (kind) => {
+    setExporting(kind);
+    try {
+      if (kind === "pdf") await exportRoutineToPdf(shareTarget);
+      else if (kind === "word") await exportRoutineToWord(shareTarget);
+      else if (kind === "excel") await exportRoutineToExcel(shareTarget);
+    } catch (err) {
+      console.error(`Error al exportar la rutina a ${kind}:`, err);
+    } finally {
+      setExporting(null);
+    }
+  };
+  const waUrl = url ? `https://wa.me/?text=${encodeURIComponent(shareText + " " + url)}` : "#";
+  const xUrl = url ? `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(url)}` : "#";
+  const redditUrl = url ? `https://www.reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(shareTitle)}` : "#";
   return (
     <div className="fixed inset-0 z-[120] bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 modal-bg-in" onClick={onClose}>
-      <div className="bg-slate-900 border border-slate-700/60 rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-slate-900 border border-slate-700/60 rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50 max-h-[92vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-base font-black text-white">{title}</h3>
           <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition"><X size={18} /></button>
         </div>
-        {canNativeShare && (
-          <button onClick={handleNativeShare} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white text-sm font-bold mb-3 transition-all active:scale-[0.98] shadow-lg shadow-teal-500/20" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>
-            <Share2 size={15} /> Compartir
-          </button>
+
+        {!url && !linkError && (
+          <div className="flex flex-col items-center gap-3 py-8">
+            <div className="w-9 h-9 rounded-full border-[3px] border-teal-500/25 border-t-teal-500 animate-spin" />
+            <p className="text-sm text-slate-400">Generando enlace mágico...</p>
+          </div>
         )}
-        <div className="grid grid-cols-3 gap-2 mb-3">
-          <a href={waUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition"><Share2 size={15} className="text-emerald-400" />WhatsApp</a>
-          <a href={xUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition"><Share2 size={15} className="text-slate-200" />X</a>
-          <a href={redditUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition"><Share2 size={15} className="text-orange-400" />Reddit</a>
-        </div>
-        <button onClick={handleCopy} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition text-sm font-semibold">
-          {copied ? <><Check size={14} className="text-teal-400" /> ¡Copiado!</> : <><Copy size={14} /> Copiar enlace</>}
-        </button>
-        {copyError && <p className="text-[11px] text-amber-400 mt-2 text-center">No pudimos copiarlo automáticamente — tocá el enlace de abajo y copialo a mano.</p>}
-        <input ref={urlInputRef} value={url} readOnly onFocus={(e) => e.target.select()} className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-3 py-2.5 text-[11px] text-slate-400 mt-3 focus:outline-none focus:border-teal-500/50 truncate" />
-        <p className="text-[10px] text-slate-600 mt-3 text-center">Para Instagram: copiá el enlace y pegalo en tu historia, bio o un mensaje.</p>
+
+        {linkError && (
+          <div className="bg-rose-500/10 border border-rose-500/20 rounded-2xl p-4 mb-3">
+            <p className="text-sm text-rose-300 mb-3">No pudimos generar el enlace — revisá tu conexión e intentá de nuevo.</p>
+            <button onClick={() => { setLinkError(false); setUrl(""); shareRoutineToFirestore(shareTarget).then(setUrl).catch(() => setLinkError(true)); }} className="w-full py-2.5 rounded-xl bg-slate-800 text-slate-200 text-sm font-bold">Reintentar</button>
+          </div>
+        )}
+
+        {url && (
+          <>
+            {canNativeShare && (
+              <button onClick={handleNativeShare} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white text-sm font-bold mb-3 transition-all active:scale-[0.98] shadow-lg shadow-teal-500/20" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>
+                <Share2 size={15} /> Compartir
+              </button>
+            )}
+            <div className="grid grid-cols-3 gap-2 mb-3">
+              <a href={waUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition"><Share2 size={15} className="text-emerald-400" />WhatsApp</a>
+              <a href={xUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition"><Share2 size={15} className="text-slate-200" />X</a>
+              <a href={redditUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition"><Share2 size={15} className="text-orange-400" />Reddit</a>
+            </div>
+            <button onClick={handleCopy} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition text-sm font-semibold">
+              {copied ? <><Check size={14} className="text-teal-400" /> ¡Copiado!</> : <><Copy size={14} /> Copiar enlace</>}
+            </button>
+            {copyError && <p className="text-[11px] text-amber-400 mt-2 text-center">No pudimos copiarlo automáticamente — tocá el enlace de abajo y copialo a mano.</p>}
+            <input ref={urlInputRef} value={url} readOnly onFocus={(e) => e.target.select()} className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-3 py-2.5 text-[11px] text-slate-400 mt-3 focus:outline-none focus:border-teal-500/50 truncate" />
+            <p className="text-[10px] text-slate-600 mt-3 text-center">Quien abra el enlace puede agregar la rutina a su propia app con un toque. Para Instagram: copiá el enlace y pegalo en tu historia, bio o un mensaje.</p>
+
+            <div className="mt-4 pt-4 border-t border-slate-800/60">
+              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2.5">O descargala como archivo</p>
+              <div className="grid grid-cols-3 gap-2">
+                <button onClick={() => handleExportDoc("pdf")} disabled={!!exporting} className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition disabled:opacity-50">{exporting === "pdf" ? <RotateCcw size={15} className="animate-spin text-rose-400" /> : <Download size={15} className="text-rose-400" />}PDF</button>
+                <button onClick={() => handleExportDoc("word")} disabled={!!exporting} className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition disabled:opacity-50">{exporting === "word" ? <RotateCcw size={15} className="animate-spin text-blue-400" /> : <Download size={15} className="text-blue-400" />}Word</button>
+                <button onClick={() => handleExportDoc("excel")} disabled={!!exporting} className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition disabled:opacity-50">{exporting === "excel" ? <RotateCcw size={15} className="animate-spin text-emerald-400" /> : <Download size={15} className="text-emerald-400" />}Excel</button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -1382,25 +1392,57 @@ function drawWordmark(ctx, W, H, accent) {
   ctx.fillText("Mi Rutina", cx, y + 64);
 }
 
-function drawPRShareCard(ctx, W, H, { exerciseName, kg, reps, accent = "#14B8A6" }) {
+function drawPRShareCard(ctx, W, H, { exerciseName, muscle, kg, reps, accent = "#14B8A6" }) {
   drawShareCardBase(ctx, W, H, accent, "#A855F7");
   ctx.textAlign = "center";
   ctx.fillStyle = accent;
-  ctx.font = "800 42px sans-serif";
-  ctx.fillText("🔥 NUEVA MARCA PERSONAL", W / 2, 480);
+  ctx.font = "800 40px sans-serif";
+  ctx.fillText("🔥 NUEVA MARCA PERSONAL", W / 2, 360);
   ctx.fillStyle = "#f8fafc";
-  ctx.font = "800 64px sans-serif";
-  const nameLines = wrapCanvasText(ctx, (exerciseName || "").toUpperCase(), W / 2, 600, W - 160, 74);
-  const statsY = 600 + nameLines * 74 + 140;
+  ctx.font = "800 62px sans-serif";
+  const nameLines = wrapCanvasText(ctx, (exerciseName || "").toUpperCase(), W / 2, 470, W - 160, 72);
+  let y = 470 + (nameLines - 1) * 72;
+  if (muscle) {
+    y += 95;
+    const label = muscle.toUpperCase();
+    ctx.font = "700 30px sans-serif";
+    const boxW = ctx.measureText(label).width + 72, boxH = 64;
+    ctx.fillStyle = accent + "26";
+    ctx.beginPath(); ctx.roundRect(W / 2 - boxW / 2, y - boxH + 16, boxW, boxH, boxH / 2); ctx.fill();
+    ctx.fillStyle = accent;
+    ctx.fillText(label, W / 2, y + 14);
+  }
+  const kgY = y + 280;
   ctx.fillStyle = accent;
-  ctx.font = "900 220px sans-serif";
-  ctx.fillText(`${kg}`, W / 2, statsY);
+  ctx.font = "900 200px sans-serif";
+  ctx.fillText(`${kg}`, W / 2, kgY);
   ctx.fillStyle = "#94a3b8";
-  ctx.font = "700 46px sans-serif";
-  ctx.fillText("KILOGRAMOS", W / 2, statsY + 70);
+  ctx.font = "700 42px sans-serif";
+  ctx.fillText("KILOGRAMOS", W / 2, kgY + 64);
   ctx.fillStyle = "#cbd5e1";
-  ctx.font = "700 52px sans-serif";
-  ctx.fillText(`${reps} repeticiones`, W / 2, statsY + 170);
+  ctx.font = "700 48px sans-serif";
+  ctx.fillText(`${reps} repeticiones`, W / 2, kgY + 150);
+
+  // Un par de datos más para que no se sienta tan vacía: el 1RM estimado
+  // (mismo cálculo que usa Progreso) y el volumen de esa serie puntual.
+  const est = estimate1RM(kg, reps);
+  const tileY = kgY + 250, tileGap = 50, tileW = (W - 160 - tileGap) / 2;
+  const tiles = [
+    { val: `${est}kg`, label: "1RM\nESTIMADO" },
+    { val: `${Math.round((kg || 0) * (reps || 0)).toLocaleString("es-AR")}`, label: "VOLUMEN\nDE LA SERIE" },
+  ];
+  tiles.forEach((t, i) => {
+    const x = 80 + i * (tileW + tileGap);
+    ctx.fillStyle = "rgba(255,255,255,0.06)";
+    ctx.beginPath(); ctx.roundRect(x, tileY, tileW, 230, 26); ctx.fill();
+    ctx.fillStyle = "#f8fafc";
+    ctx.font = "900 64px sans-serif";
+    ctx.fillText(`${t.val}`, x + tileW / 2, tileY + 105);
+    ctx.fillStyle = "#94a3b8";
+    ctx.font = "700 26px sans-serif";
+    t.label.split("\n").forEach((l, li) => ctx.fillText(l, x + tileW / 2, tileY + 160 + li * 32));
+  });
+
   drawWordmark(ctx, W, H, accent);
 }
 
@@ -1439,36 +1481,67 @@ function drawCycleShareCard(ctx, W, H, { cycleNumber, daysTrained, totalVol, acc
 // genera a pedido desde Historial (no por completar un ciclo entero, sino
 // el resumen de hoy, de la semana o del mes) — mismo estilo visual que
 // drawCycleShareCard, pero con un título y una etiqueta de período
-// configurables en vez del texto fijo de "Ciclo completo".
-function drawPeriodShareCard(ctx, W, H, { periodLabel, daysTrained, totalVol, accent = "#3B82F6" }) {
+// configurables, una grilla de casilleros llenos/vacíos (igual a la del
+// calendario de Historial) cuando el período es semana o mes, y una
+// estadística más (series totales) para que no se sienta tan vacía.
+function drawPeriodShareCard(ctx, W, H, { periodLabel, daysTrained, totalSets, totalVol, calendarCells, accent = "#3B82F6" }) {
   drawShareCardBase(ctx, W, H, accent, "#06B6D4");
   ctx.textAlign = "center";
   ctx.fillStyle = accent;
-  ctx.font = "800 42px sans-serif";
-  ctx.fillText("💪 RESUMEN DE ENTRENAMIENTO", W / 2, 480);
+  ctx.font = "800 40px sans-serif";
+  ctx.fillText("💪 RESUMEN DE ENTRENAMIENTO", W / 2, 360);
   ctx.fillStyle = "#f8fafc";
-  ctx.font = "900 110px sans-serif";
-  const lines = wrapCanvasText(ctx, periodLabel.toUpperCase(), W / 2, 650, W - 160, 120);
-  const tileY = 650 + lines * 120 + 200;
+  ctx.font = "900 96px sans-serif";
+  const lines = wrapCanvasText(ctx, (periodLabel || "").toUpperCase(), W / 2, 480, W - 160, 104);
+  let y = 480 + (lines - 1) * 104;
+
+  // Grilla de días entrenados — los mismos casilleros llenos/vacíos que se
+  // ven en el calendario de Historial, pero pensados para la foto.
+  const gridCols = 7;
+  if (calendarCells && calendarCells.length) {
+    const rows = Math.ceil(calendarCells.length / gridCols);
+    const cell = rows > 1 ? 70 : 96, gap = rows > 1 ? 12 : 18;
+    const gridW = gridCols * cell + (gridCols - 1) * gap;
+    const startX = (W - gridW) / 2, startY = y + 110;
+    calendarCells.forEach((c, i) => {
+      if (c.isPad) return;
+      const col = i % gridCols, row = Math.floor(i / gridCols);
+      const x = startX + col * (cell + gap), cy = startY + row * (cell + gap);
+      ctx.fillStyle = c.trained ? accent : "rgba(255,255,255,0.07)";
+      ctx.beginPath(); ctx.roundRect(x, cy, cell, cell, 16); ctx.fill();
+      if (c.trained) {
+        ctx.fillStyle = "rgba(255,255,255,0.92)";
+        ctx.font = `700 ${Math.round(cell * 0.46)}px sans-serif`;
+        ctx.fillText("✓", x + cell / 2, cy + cell / 2 + cell * 0.17);
+      }
+    });
+    y = startY + rows * cell + (rows - 1) * gap;
+  } else {
+    y += 130;
+  }
+
+  const tileY = y + 90;
   const tiles = [
     { val: daysTrained, label: "DÍAS\nENTRENADOS" },
+    { val: totalSets ?? 0, label: "SERIES\nTOTALES" },
     { val: totalVol > 999 ? `${(totalVol / 1000).toFixed(1)}k` : totalVol, label: "KG × REPS\nTOTALES" },
   ];
-  const tileGap = 60, tileW = (W - 160 - tileGap) / 2;
+  const tileGap = 30, tileW = (W - 160 - tileGap * 2) / 3;
   tiles.forEach((t, i) => {
     const x = 80 + i * (tileW + tileGap);
     ctx.fillStyle = "rgba(255,255,255,0.06)";
-    ctx.beginPath(); ctx.roundRect(x, tileY, tileW, 280, 28); ctx.fill();
+    ctx.beginPath(); ctx.roundRect(x, tileY, tileW, 230, 24); ctx.fill();
     ctx.fillStyle = "#f8fafc";
-    ctx.font = "900 86px sans-serif";
-    ctx.fillText(`${t.val}`, x + tileW / 2, tileY + 130);
+    ctx.font = "900 56px sans-serif";
+    ctx.fillText(`${t.val}`, x + tileW / 2, tileY + 100);
     ctx.fillStyle = "#94a3b8";
-    ctx.font = "700 28px sans-serif";
-    t.label.split("\n").forEach((l, li) => ctx.fillText(l, x + tileW / 2, tileY + 190 + li * 36));
+    ctx.font = "700 22px sans-serif";
+    t.label.split("\n").forEach((l, li) => ctx.fillText(l, x + tileW / 2, tileY + 150 + li * 28));
   });
+
   ctx.fillStyle = "#cbd5e1";
-  ctx.font = "700 44px sans-serif";
-  ctx.fillText("Mi Rutina 💪", W / 2, 1450);
+  ctx.font = "700 40px sans-serif";
+  ctx.fillText(daysTrained > 0 ? "¡Seguí así! 💪" : "A entrenar 💪", W / 2, tileY + 320);
   drawWordmark(ctx, W, H, accent);
 }
 
@@ -1838,13 +1911,13 @@ function RutinaDemo({ view }) {
       <div>
         <div className="flex gap-1.5 overflow-x-auto pb-1">
           {DAY_ORDER.map((k) => (
-            <button key={k} onClick={() => setDemoDay(k)} className="px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all active:scale-95 border"
+            <button key={k} onClick={() => setDemoDay(k)} className="px-3.5 py-2 rounded-xl text-xs font-bold uppercase whitespace-nowrap transition-all active:scale-95 border"
               style={demoDay === k ? { background: ROUTINE[k].color, borderColor: ROUTINE[k].color, color: "#fff" } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
               {ROUTINE[k].label}
             </button>
           ))}
         </div>
-        <p className="text-[10px] text-slate-600 mt-2">Elegiste <span className="font-bold" style={{ color: ROUTINE[demoDay].color }}>{ROUTINE[demoDay].label}</span> — así de simple cambia el día.</p>
+        <p className="text-[10px] text-slate-600 mt-2">Elegiste <span className="font-bold uppercase" style={{ color: ROUTINE[demoDay].color }}>{ROUTINE[demoDay].label}</span> — así de simple cambia el día.</p>
       </div>
     );
   }
@@ -1857,7 +1930,7 @@ function RutinaDemo({ view }) {
         <div className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg mb-2" style={{ backgroundColor: day.color + "22", color: day.color }}>
           <RotateCcw size={10} /> Sugerido para hoy
         </div>
-        <h3 className="text-lg font-black text-white leading-tight">{day.label}</h3>
+        <h3 className="text-lg font-black text-white leading-tight uppercase">{day.label}</h3>
         <p className="text-[11px] text-slate-400 mt-0.5">{day.description}</p>
         <div className="grid grid-cols-3 gap-2 mt-3">
           <div className="bg-black/20 rounded-xl p-2 text-center"><p className="text-base font-black text-white tabular-nums">43%</p><p className="text-[9px] text-slate-500 mt-0.5">Hoy</p></div>
@@ -2145,6 +2218,7 @@ function PerfilDemo({ view }) {
   return (
     <div className="space-y-2">
       <div className="w-full flex items-center gap-2 justify-center py-2.5 rounded-xl border border-slate-700 text-slate-400 text-[11px] font-semibold"><LogOut size={12} /> Cambiar de perfil</div>
+      <div className="w-full flex items-center gap-2 justify-center py-2.5 rounded-xl border border-slate-700 text-slate-400 text-[11px] font-semibold"><LogOut size={12} /> Cerrar sesión</div>
       <div className="w-full flex items-center gap-2 justify-center py-2.5 rounded-xl border border-rose-500/20 text-rose-500/70 text-[11px] font-semibold"><Trash2 size={12} /> Eliminar perfil</div>
     </div>
   );
@@ -2153,7 +2227,7 @@ function PerfilDemo({ view }) {
 /* ---- Demo en vivo: pestaña Rutinas ---- */
 function RutinasDemo({ view }) {
   const [open, setOpen] = useState(false);
-  const [demoDayName, setDemoDayName] = useState("Día 1");
+  const [demoDayName, setDemoDayName] = useState("DÍA 1");
 
   if (view === "active") {
     return (
@@ -2161,9 +2235,9 @@ function RutinasDemo({ view }) {
         <div className="flex items-center gap-1.5 mb-1"><Layers size={12} className="text-teal-400" /><span className="text-[9px] font-black uppercase tracking-widest text-teal-400">Tu rutina activa</span></div>
         <p className="text-sm font-black text-white">Push / Pull / Legs</p>
         <div className="flex items-center gap-1.5 mt-2">
-          <span className="text-[9px] font-bold px-2 py-0.5 rounded-lg bg-teal-500/20" style={{ color: muteHexColor("#14B8A6") }}>Push</span>
-          <span className="text-[9px] font-bold px-2 py-0.5 rounded-lg bg-blue-500/20" style={{ color: muteHexColor("#3B82F6") }}>Pull</span>
-          <span className="text-[9px] font-bold px-2 py-0.5 rounded-lg bg-orange-500/20" style={{ color: muteHexColor("#F97316") }}>Legs</span>
+          <span className="text-[9px] font-bold px-2 py-0.5 rounded-lg bg-teal-500/20" style={{ color: muteHexColor("#14B8A6") }}>PUSH</span>
+          <span className="text-[9px] font-bold px-2 py-0.5 rounded-lg bg-blue-500/20" style={{ color: muteHexColor("#3B82F6") }}>PULL</span>
+          <span className="text-[9px] font-bold px-2 py-0.5 rounded-lg bg-orange-500/20" style={{ color: muteHexColor("#F97316") }}>LEGS</span>
         </div>
       </div>
     );
@@ -2265,7 +2339,7 @@ const HELP_CHAPTERS = [
       {
         icon: <Dumbbell size={20} />,
         title: "Tu rutina activa",
-        text: "Arriba de todo ves un resumen de la rutina que estás siguiendo ahora: su nombre, cuántos días/ejercicios/series tiene en total, y cada día con su color.",
+        text: "Arriba de todo ves un resumen de la rutina que estás siguiendo ahora: su nombre, cuántos días/ejercicios/series tiene en total, y cada día con su color. El ícono de compartir genera un enlace cortito para mandarle tu rutina a quien quieras —con un toque la puede agregar a su propia app— o, si preferís, también la podés descargar como PDF, Word o Excel.",
         demo: { kind: "rutinas", view: "active" },
       },
       {
@@ -2525,8 +2599,8 @@ const HELP_CHAPTERS = [
       },
       {
         icon: <LogOut size={20} />,
-        title: "Cambiar o eliminar perfil",
-        text: "Desde aquí podés cerrar sesión para cambiar de perfil, o eliminar tu perfil por completo (borra todo el historial de forma permanente, no se puede deshacer).",
+        title: "Cambiar de perfil o cerrar sesión",
+        text: "\"Cambiar de perfil\" guarda tu sesión de Google para elegir otro perfil rápido en este dispositivo. \"Cerrar sesión\" además cierra tu cuenta de Google acá. Y \"Eliminar perfil\" borra tu perfil por completo, con todo su historial (no se puede deshacer).",
         demo: { kind: "perfil", view: "logout" },
       },
     ],
@@ -2667,7 +2741,7 @@ function HelpModal({ startTab, onClose }) {
    cambiar de día). Ahora sobreviven a eso — sólo se limpian cuando se
    resetea el día (resetKey) o se finaliza la sesión (ver RoutineView/App).
 ============================================================================ */
-function SetRow({ exerciseId, exerciseName, setIndex, setDef, accent, logs, setLogs, drafts = {}, setDrafts, deloadKgFactor = 1, deloadMode = false, resetKey = 0, autoShowPrShare = true, onDisableAutoShowPrShare }) {
+function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, accent, logs, setLogs, drafts = {}, setDrafts, deloadKgFactor = 1, deloadMode = false, resetKey = 0, autoShowPrShare = true, onDisableAutoShowPrShare }) {
   const key = `${exerciseId}_${setIndex}`, prKey = `${key}_pr_override`, today = todayStr();
   const history = logs[key] || [], override = logs[prKey];
   const computedPR = useMemo(() => { let best = setDef.pr ? { ...setDef.pr } : null; history.forEach((h) => { if (!best || vol(h.kg, h.reps) > vol(best.kg, best.reps)) best = { kg: h.kg, reps: h.reps }; }); return best; }, [history, setDef.pr]);
@@ -2761,7 +2835,7 @@ function SetRow({ exerciseId, exerciseName, setIndex, setDef, accent, logs, setL
           fileNamePrefix={`pr-${exerciseId}`}
           shareTitle="Mi Rutina — Nueva marca"
           shareText={`¡Nueva marca en ${exerciseName}! 🔥`}
-          draw={(ctx, W, H) => drawPRShareCard(ctx, W, H, { exerciseName, kg: parseFloat(kg) || currentPR?.kg, reps: parseFloat(reps) || currentPR?.reps, accent })}
+          draw={(ctx, W, H) => drawPRShareCard(ctx, W, H, { exerciseName, muscle: exerciseMuscle, kg: parseFloat(kg) || currentPR?.kg, reps: parseFloat(reps) || currentPR?.reps, accent })}
           onClose={() => setShowPRShare(false)}
           autoShowOptOutLabel={autoShowPrShare ? "No mostrar esto automáticamente la próxima vez" : null}
           onOptOutAutoShow={() => { onDisableAutoShowPrShare?.(); setShowPRShare(false); }}
@@ -2805,7 +2879,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
         <div className="mb-1">
           <RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={accent} alertType={settings.alertType} />
         </div>
-        {setsToShow.map((s, i) => <SetRow key={i} exerciseId={exercise.id} exerciseName={exercise.name} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadKgFactor={settings.deloadPct} deloadMode={deloadMode} resetKey={resetKey} autoShowPrShare={settings.autoShowPrShare ?? true} onDisableAutoShowPrShare={onDisableAutoShowPrShare} />)}
+        {setsToShow.map((s, i) => <SetRow key={i} exerciseId={exercise.id} exerciseName={exercise.name} exerciseMuscle={exercise.muscle} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadKgFactor={settings.deloadPct} deloadMode={deloadMode} resetKey={resetKey} autoShowPrShare={settings.autoShowPrShare ?? true} onDisableAutoShowPrShare={onDisableAutoShowPrShare} />)}
         {exercise.video && (
           <div className="pt-3">
             <a href={exercise.video} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 py-3 rounded-xl border border-slate-800 text-slate-400 hover:border-slate-600 hover:text-white transition text-sm font-medium">▶ Ver técnica en YouTube</a>
@@ -2961,7 +3035,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
 
       <div className="flex gap-1.5 overflow-x-auto pb-1">
         {DAY_ORDER.map((k) => (
-          <button key={k} onClick={() => setActiveDay(k)} className="px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all active:scale-95 border hover:-translate-y-0.5"
+          <button key={k} onClick={() => setActiveDay(k)} className="px-4 py-2.5 rounded-xl text-xs font-bold uppercase whitespace-nowrap transition-all active:scale-95 border hover:-translate-y-0.5"
             style={activeDay === k ? { background: ROUTINE[k].color, borderColor: ROUTINE[k].color, color: "#fff", boxShadow: `0 4px 14px -4px ${ROUTINE[k].color}66` } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
             {ROUTINE[k].label}
           </button>
@@ -2976,7 +3050,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
               <RotateCcw size={10} /> {scheduledDay === activeDay ? "Programado para hoy" : "Sugerido para hoy"}
             </div>
           )}
-          <h2 className="text-xl font-black text-white leading-tight">{day.label}</h2>
+          <h2 className="text-xl font-black text-white leading-tight uppercase">{day.label}</h2>
           <p className="text-xs text-slate-400 mt-1">{day.description}</p>
           {day.isNew && <div className="mt-2 inline-flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] rounded-lg px-2.5 py-1">🆕 Empezás a registrar tus marcas desde hoy.</div>}
           {isDeload && <div className="mt-3 flex items-start gap-2.5 bg-purple-500/10 border border-purple-500/20 rounded-xl px-3 py-2.5"><Zap size={14} className="text-purple-400 mt-0.5 shrink-0" /><p className="text-[11px] text-purple-300/90">Semana de descarga · Series ÷{settings.deloadSetDivisor} · Cargas al {Math.round(settings.deloadPct * 100)}%</p></div>}
@@ -3024,7 +3098,7 @@ function SessionDetailCard({ session, onDelete }) {
       <div className="flex items-center justify-between mb-3 gap-2">
         <div className="min-w-0">
           <p className="text-sm font-bold text-white capitalize">{dateLabel}</p>
-          <div className="flex gap-1 mt-1 flex-wrap">{session.dayKeys.map((dk) => <span key={dk} className="text-[10px] font-bold px-1.5 py-0.5 rounded-lg" style={{ backgroundColor: ROUTINE[dk].color + "20", color: muteHexColor(ROUTINE[dk].color) }}>{ROUTINE[dk].label}</span>)}</div>
+          <div className="flex gap-1 mt-1 flex-wrap">{session.dayKeys.map((dk) => <span key={dk} className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-lg" style={{ backgroundColor: ROUTINE[dk].color + "20", color: muteHexColor(ROUTINE[dk].color) }}>{ROUTINE[dk].label}</span>)}</div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <div className="text-right">
@@ -3076,14 +3150,33 @@ function ShareSummaryCard({ logs }) {
   const [selExId, setSelExId] = useState(null);
   const [showImage, setShowImage] = useState(false);
 
-  const allExercises = useMemo(() => DAY_ORDER.flatMap((dk) => ROUTINE[dk].exercises.map((e) => ({ id: e.id, name: e.name, color: ROUTINE[dk].color, sets: e.sets.length }))), []);
+  const allExercises = useMemo(() => DAY_ORDER.flatMap((dk) => ROUTINE[dk].exercises.map((e) => ({ id: e.id, name: e.name, muscle: e.muscle, color: ROUTINE[dk].color, sets: e.sets.length }))), []);
   const allSessions = useMemo(() => buildSessionsIndex(logs), [logs]);
   const periodSessions = useMemo(() => getSessionsForPeriod(allSessions, period), [allSessions, period]);
   const periodStats = useMemo(() => {
-    const daySet = new Set(); let totalVol = 0;
-    periodSessions.forEach((s) => { daySet.add(s.date); totalVol += s.totalVolume; });
-    return { daysTrained: daySet.size, totalVol: Math.round(totalVol) };
+    const daySet = new Set(); let totalVol = 0, totalSets = 0;
+    periodSessions.forEach((s) => { daySet.add(s.date); totalVol += s.totalVolume; totalSets += s.totalSets; });
+    return { daysTrained: daySet.size, totalVol: Math.round(totalVol), totalSets };
   }, [periodSessions]);
+
+  // Para que la imagen del resumen se vea con los casilleros llenos/vacíos
+  // de la semana o el mes (igual que el calendario de Historial), armamos
+  // la misma grilla acá — sólo tiene sentido para "semana" y "mes"; para
+  // "hoy" no hay grilla, es un solo día.
+  const trainedDateSet = useMemo(() => new Set(periodSessions.map((s) => s.date)), [periodSessions]);
+  const calendarCells = useMemo(() => {
+    const now = new Date();
+    if (period === "week") {
+      const dow = (now.getDay() + 6) % 7;
+      const monday = new Date(now); monday.setDate(now.getDate() - dow);
+      return Array.from({ length: 7 }, (_, i) => { const d = new Date(monday); d.setDate(monday.getDate() + i); const ds = d.toISOString().slice(0, 10); return { trained: trainedDateSet.has(ds), isPad: false }; });
+    }
+    if (period === "month") {
+      const weeks = getMonthMatrix(now.getFullYear(), now.getMonth());
+      return weeks.flat().map((d) => (d ? { trained: trainedDateSet.has(d), isPad: false } : { trained: false, isPad: true }));
+    }
+    return [];
+  }, [period, trainedDateSet]);
 
   const getPRForExercise = (ex) => {
     let best1rm = 0, bestKg = 0, bestReps = 0;
@@ -3156,7 +3249,7 @@ function ShareSummaryCard({ logs }) {
           fileNamePrefix={`pr-${selEx.id}`}
           shareTitle="Mi Rutina — Marca"
           shareText={`Mi marca en ${selEx.name} 🔥`}
-          draw={(ctx, W, H) => drawPRShareCard(ctx, W, H, { exerciseName: selEx.name, kg: selPR.bestKg, reps: selPR.bestReps, accent: selEx.color })}
+          draw={(ctx, W, H) => drawPRShareCard(ctx, W, H, { exerciseName: selEx.name, muscle: selEx.muscle, kg: selPR.bestKg, reps: selPR.bestReps, accent: selEx.color })}
           onClose={() => setShowImage(false)}
         />
       )}
@@ -3166,7 +3259,7 @@ function ShareSummaryCard({ logs }) {
           fileNamePrefix={`resumen-${period}`}
           shareTitle="Mi Rutina — Resumen"
           shareText="Mi resumen de entrenamiento 💪"
-          draw={(ctx, W, H) => drawPeriodShareCard(ctx, W, H, { periodLabel, daysTrained: periodStats.daysTrained, totalVol: periodStats.totalVol, accent: "#3B82F6" })}
+          draw={(ctx, W, H) => drawPeriodShareCard(ctx, W, H, { periodLabel, daysTrained: periodStats.daysTrained, totalSets: periodStats.totalSets, totalVol: periodStats.totalVol, calendarCells, accent: "#3B82F6" })}
           onClose={() => setShowImage(false)}
         />
       )}
@@ -3290,7 +3383,7 @@ function DeloadView({ logs, settings = DEFAULT_SETTINGS }) {
             <button key={dk} onClick={() => setActiveDay(dk)}
               className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all active:scale-95 border shrink-0"
               style={isActive ? { backgroundColor: d.color + "22", borderColor: d.color + "55", color: d.color } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
-              <span>{d.label}</span>
+              <span className="uppercase">{d.label}</span>
               {withPR > 0 && <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full" style={isActive ? { backgroundColor: d.color + "30", color: d.color } : { backgroundColor: "var(--surface-2)", color: "var(--surface-2-text)" }}>{withPR}/{d.exercises.length}</span>}
             </button>
           );
@@ -3741,6 +3834,80 @@ async function exportTrainingToExcel(rows, meta) {
   XLSX.writeFile(wb, `${meta.filename}.xlsx`);
 }
 
+/* ============================================================================
+   EXPORTAR LA RUTINA (no el entrenamiento) — pensado para cuando querés
+   compartir tu PLAN (qué ejercicios/series/reps tiene cada día) en PDF,
+   Word o Excel en vez de (o además de) mandar el link. Reutiliza
+   buildRoutineModel para resolver nombre/músculo de cada ejercicio.
+============================================================================ */
+function buildRoutineExportDays(routineDef) {
+  const model = buildRoutineModel(routineDef);
+  return model.dayOrder.map((dk) => {
+    const d = model.days[dk];
+    return { dayLabel: d.label, exercises: d.exercises.map((ex) => ({ name: ex.name, muscle: ex.muscle, sets: ex.sets.length, repRange: ex.sets[0]?.repRange || "—" })) };
+  });
+}
+
+async function exportRoutineToPdf(routineDef) {
+  const { jsPDF } = await import("jspdf");
+  const autoTable = (await import("jspdf-autotable")).default;
+  const days = buildRoutineExportDays(routineDef);
+  const doc = new jsPDF();
+  doc.setFontSize(16);
+  doc.text(routineDef.name || "Mi rutina", 14, 18);
+  doc.setFontSize(10);
+  doc.setTextColor(110);
+  doc.text("Generada con Mi Rutina", 14, 25);
+  doc.setTextColor(20);
+  let y = 34;
+  days.forEach((d) => {
+    if (y > 268) { doc.addPage(); y = 20; }
+    doc.setFontSize(12);
+    doc.text(d.dayLabel, 14, y);
+    y += 3;
+    autoTable(doc, {
+      startY: y,
+      head: [["Ejercicio", "Músculo", "Series", "Reps"]],
+      body: d.exercises.map((ex) => [ex.name, ex.muscle, String(ex.sets), ex.repRange]),
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [20, 184, 166] },
+      margin: { left: 14, right: 14 },
+    });
+    y = doc.lastAutoTable.finalY + 10;
+  });
+  doc.save(`${slugifyForFilename(routineDef.name)}.pdf`);
+}
+
+async function exportRoutineToWord(routineDef) {
+  const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, HeadingLevel, WidthType } = await import("docx");
+  const days = buildRoutineExportDays(routineDef);
+  const children = [
+    new Paragraph({ text: routineDef.name || "Mi rutina", heading: HeadingLevel.HEADING_1 }),
+    new Paragraph({ children: [new TextRun({ text: "Generada con Mi Rutina", color: "666666" })], spacing: { after: 200 } }),
+  ];
+  days.forEach((d) => {
+    children.push(new Paragraph({ text: d.dayLabel, heading: HeadingLevel.HEADING_2, spacing: { before: 260, after: 100 } }));
+    const headerRow = new TableRow({ children: ["Ejercicio", "Músculo", "Series", "Reps"].map((h) => new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: h, bold: true })] })] })) });
+    const dataRows = d.exercises.map((ex) => new TableRow({ children: [ex.name, ex.muscle, String(ex.sets), ex.repRange].map((v) => new TableCell({ children: [new Paragraph(v)] })) }));
+    children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [headerRow, ...dataRows] }));
+  });
+  const doc = new Document({ sections: [{ children }] });
+  const blob = await Packer.toBlob(doc);
+  downloadBlob(blob, `${slugifyForFilename(routineDef.name)}.docx`);
+}
+
+async function exportRoutineToExcel(routineDef) {
+  const XLSX = await import("xlsx");
+  const days = buildRoutineExportDays(routineDef);
+  const header = ["Día", "Ejercicio", "Músculo", "Series", "Reps"];
+  const data = [];
+  days.forEach((d) => { d.exercises.forEach((ex) => { data.push([d.dayLabel, ex.name, ex.muscle, ex.sets, ex.repRange]); }); });
+  const ws = XLSX.utils.aoa_to_sheet([header, ...data]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Rutina");
+  XLSX.writeFile(wb, `${slugifyForFilename(routineDef.name)}.xlsx`);
+}
+
 const EXPORT_PERIODS = [
   { k: "day", l: "Hoy" },
   { k: "week", l: "Esta semana" },
@@ -3802,7 +3969,7 @@ function ExportTrainingCard({ profileName, logs }) {
 /* ============================================================================
    PROFILE VIEW — adds an entry point to the setup hub + a backup status line
 ============================================================================ */
-function ProfileView({ profileName, profiles, logs, onLogout, onDelete, onUpdateProfile, cycleStart, onSetCycleStart, onGoToRoutines }) {
+function ProfileView({ profileName, profiles, logs, onLogout, onSignOut, onDelete, onUpdateProfile, cycleStart, onSetCycleStart, onGoToRoutines }) {
   const profile = profiles[profileName];
   const [showDeletePin, setShowDeletePin] = useState(false); const [deleteError, setDeleteError] = useState("");
   const [editing, setEditing] = useState(false); const [editMail, setEditMail] = useState(profile?.email || "");
@@ -3973,7 +4140,9 @@ function ProfileView({ profileName, profiles, logs, onLogout, onDelete, onUpdate
         <span>Tus datos se guardan en este dispositivo, con una copia de seguridad automática.</span>
       </div>
 
+      <p className="text-[10px] text-slate-600 text-center px-2 -mt-1">"Cambiar de perfil" guarda tu sesión de Google para elegir otro perfil rápido. "Cerrar sesión" además cierra tu cuenta de Google en este dispositivo.</p>
       <button onClick={onLogout} className="w-full flex items-center gap-2 justify-center py-3.5 rounded-2xl border border-slate-800 text-slate-400 hover:text-white hover:border-slate-600 transition text-sm font-semibold"><LogOut size={14} /> Cambiar de perfil</button>
+      <button onClick={onSignOut} className="w-full flex items-center gap-2 justify-center py-3.5 rounded-2xl border border-slate-800 text-slate-400 hover:text-white hover:border-slate-600 transition text-sm font-semibold"><LogOut size={14} /> Cerrar sesión</button>
       {!showDeletePin ? (
         <button onClick={() => setShowDeletePin(true)} className="w-full flex items-center gap-2 justify-center py-3.5 rounded-2xl border border-rose-500/20 text-rose-500/70 hover:text-rose-400 hover:border-rose-500/40 transition text-sm font-semibold"><Trash2 size={14} /> Eliminar perfil de {profileName}</button>
       ) : (
@@ -4011,7 +4180,7 @@ function RoutinePreview({ routineDef }) {
           <div key={dk} className="rounded-xl border border-slate-800/60 bg-slate-950/40 px-3 py-2.5">
             <div className="flex items-center gap-2 mb-1">
               <span className="w-5 h-5 rounded-lg flex items-center justify-center text-[8px] font-black shrink-0" style={{ backgroundColor: d.color + "1c", color: muted }}>{d.label.charAt(0)}</span>
-              <span className="text-xs font-bold text-white">{d.label}</span>
+              <span className="text-xs font-bold text-white uppercase">{d.label}</span>
               <span className="text-[10px] text-slate-600 ml-auto shrink-0">{d.exercises.length} ejerc. · {totalSets} series</span>
             </div>
             <p className="text-[10px] text-slate-500 leading-relaxed">{d.exercises.map((ex) => ex.name).join(" · ")}</p>
@@ -4219,7 +4388,7 @@ function BuilderDayCard({ day, dayIdx, totalDays, onRename, onRemove, onMoveDay,
           <button onClick={() => onMoveDay(1)} disabled={dayIdx === totalDays - 1} className="p-0.5 text-slate-600 hover:text-slate-300 disabled:opacity-20"><ChevronDown size={13} /></button>
         </div>
         <div className="flex-1 relative min-w-0">
-          <input value={day.label} onChange={(e) => onRename(e.target.value)} placeholder={`Día ${dayIdx + 1}`} className="w-full bg-slate-950/50 border border-slate-700/60 rounded-xl pl-3 pr-8 py-2 text-sm font-black text-white focus:outline-none focus:border-teal-500/60 transition" />
+          <input value={day.label} onChange={(e) => onRename(e.target.value.toUpperCase())} placeholder={`DÍA ${dayIdx + 1}`} className="w-full bg-slate-950/50 border border-slate-700/60 rounded-xl pl-3 pr-8 py-2 text-sm font-black text-white uppercase focus:outline-none focus:border-teal-500/60 transition" />
           <Edit3 size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
         </div>
         {totalDays > 1 && <button onClick={onRemove} className="p-1.5 text-slate-600 hover:text-rose-400 shrink-0"><Trash2 size={14} /></button>}
@@ -4355,7 +4524,7 @@ function parseRoutineFromText(rawText) {
   lines.forEach((line, i) => {
     const m = line.match(SETREP_REGEX);
     if (m) {
-      if (!current) { current = { label: "Día 1", exercises: [] }; days.push(current); }
+      if (!current) { current = { label: "DÍA 1", exercises: [] }; days.push(current); }
       const setsCount = Math.max(1, Math.min(8, parseInt(m[1], 10) || 3));
       const repLow = m[2], repHigh = m[3] || m[2];
       const repRange = repHigh && repHigh !== repLow ? `${repLow}-${repHigh}` : `${repLow}`;
@@ -4365,7 +4534,7 @@ function parseRoutineFromText(rawText) {
         ? { libId: lib.id, sets: mkSets(setsCount, repRange) }
         : { id: builderUid("imported"), name: namePart, muscle: "Personalizado", sets: mkSets(setsCount, repRange) });
     } else if (isLikelyDayHeader(line, lines[i + 1])) {
-      current = { label: line.replace(/[:：]\s*$/, ""), exercises: [] };
+      current = { label: line.replace(/[:：]\s*$/, "").toUpperCase(), exercises: [] };
       days.push(current);
     }
   });
@@ -4532,7 +4701,7 @@ function WeeklyScheduleEditor({ dayOrder, days, schedule, onChange }) {
                 const d = days[dk]; if (!d) return null;
                 const active = current === dk;
                 return (
-                  <button key={dk} onClick={() => onChange(wk, dk)} className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 border shrink-0"
+                  <button key={dk} onClick={() => onChange(wk, dk)} className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase whitespace-nowrap transition-all active:scale-95 border shrink-0"
                     style={active ? { background: d.color, borderColor: d.color, color: "#fff" } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
                     {d.label}
                   </button>
@@ -4549,11 +4718,11 @@ function WeeklyScheduleEditor({ dayOrder, days, schedule, onChange }) {
 function RoutineBuilder({ initialRoutine, onCancel, onSave }) {
   const isEditing = !!initialRoutine;
   const [name, setName] = useState(initialRoutine?.name || "");
-  const [days, setDays] = useState(() => (initialRoutine ? builderDaysFromRoutineDef(initialRoutine) : [{ key: builderUid("day"), label: "Día 1", color: BUILDER_COLOR_PALETTE[0], exercises: [] }]));
+  const [days, setDays] = useState(() => (initialRoutine ? builderDaysFromRoutineDef(initialRoutine) : [{ key: builderUid("day"), label: "DÍA 1", color: BUILDER_COLOR_PALETTE[0], exercises: [] }]));
   const [schedule, setSchedule] = useState(() => getRoutineWeekSchedule(initialRoutine || { dayOrder: days.map((d) => d.key) }));
   const [error, setError] = useState("");
 
-  const addDay = () => setDays((d) => [...d, { key: builderUid("day"), label: `Día ${d.length + 1}`, color: BUILDER_COLOR_PALETTE[d.length % BUILDER_COLOR_PALETTE.length], exercises: [] }]);
+  const addDay = () => setDays((d) => [...d, { key: builderUid("day"), label: `DÍA ${d.length + 1}`, color: BUILDER_COLOR_PALETTE[d.length % BUILDER_COLOR_PALETTE.length], exercises: [] }]);
   const removeDay = (idx) => {
     setDays((d) => {
       const removedKey = d[idx]?.key;
@@ -4761,7 +4930,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onDelete }) {
           <div className="relative flex items-center gap-1.5 mt-3 flex-wrap">
             {activeDef.dayOrder.map((dk) => {
               const dColor = activeDef.days[dk].color, muted = muteHexColor(dColor);
-              return <span key={dk} className="text-[10px] font-bold px-2 py-0.5 rounded-lg" style={{ backgroundColor: dColor + "1c", color: muted }}>{activeDef.days[dk].label}</span>;
+              return <span key={dk} className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-lg" style={{ backgroundColor: dColor + "1c", color: muted }}>{activeDef.days[dk].label}</span>;
             })}
           </div>
           <button onClick={() => setShowSchedule((s) => !s)} className="relative w-full flex items-center justify-center gap-1.5 mt-3 py-2 rounded-xl border border-white/10 text-teal-200 hover:text-white transition text-[11px] font-bold">
@@ -4807,7 +4976,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onDelete }) {
           title="Compartir rutina"
           shareTitle={`Mi rutina: ${shareTarget.name}`}
           shareText={`Mirá mi rutina "${shareTarget.name}" en Mi Rutina 💪`}
-          url={buildRoutineShareUrl(shareTarget)}
+          shareTarget={shareTarget}
           onClose={() => setShareTarget(null)}
         />
       )}
@@ -5004,20 +5173,31 @@ export default function App() {
     return { daysTrained: dateSet.size, totalVol: Math.round(totalVol) };
   };
 
-  // Importar una rutina compartida por link: si la URL trae
-  // #shared-routine=<token>, se decodifica apenas hay un perfil activo y se
+  // Importar una rutina compartida por link: si la URL trae #r=<id_corto>,
+  // se busca ese documento en Firestore (colección "shared_routines") y se
   // ofrece agregarla — no se activa sola, así no se interrumpe lo que ya
-  // estabas entrenando.
+  // estabas entrenando. Se fuerza source:"custom" en la copia recibida
+  // (aunque quien la compartió la tuviera activada como preestablecida),
+  // para que te quede visible y editable en "Tus rutinas creadas".
   const [importRoutine, setImportRoutine] = useState(null);
+  const [importRoutineError, setImportRoutineError] = useState(false);
   useEffect(() => {
     if (!profile) return;
     const hash = typeof window !== "undefined" ? window.location.hash : "";
-    const m = hash.match(/shared-routine=([^&]+)/);
-    if (m) {
-      const decoded = decodeSharedRoutine(decodeURIComponent(m[1]));
-      if (decoded) setImportRoutine(decoded);
-      window.history.replaceState(null, "", window.location.pathname + window.location.search);
-    }
+    const m = hash.match(/^#r=([^&]+)/);
+    if (!m) return;
+    const shortId = decodeURIComponent(m[1]);
+    window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    (async () => {
+      try {
+        const snap = await getDoc(doc(db, "shared_routines", shortId));
+        if (snap.exists()) setImportRoutine({ ...snap.data(), source: "custom" });
+        else setImportRoutineError(true);
+      } catch (err) {
+        console.error("Error al leer la rutina compartida:", err);
+        setImportRoutineError(true);
+      }
+    })();
   }, [activeProfile]);
   const handleImportSharedRoutine = () => {
     if (!importRoutine) return;
@@ -5041,6 +5221,15 @@ export default function App() {
   const setDrafts = useCallback((newDrafts) => { const np = { ...profiles, [activeProfile]: { ...profiles[activeProfile], drafts: newDrafts } }; setProfiles(np); saveProfiles(np); }, [profiles, activeProfile]);
   const handleLogin = (name, updatedProfiles) => { const profs = updatedProfiles || profiles; setProfiles(profs); setActiveProfile(name); setJustLoggedOut(false); setTab("rutina"); };
   const handleLogout = () => { saveActive(null); setActiveProfile(null); setJustLoggedOut(true); setShowHelp(false); setHelpStartTab(null); };
+  // "Cerrar sesión" es distinto de "Cambiar de perfil": este además cierra
+  // la sesión de Google en Firebase (signOut), por si varias personas usan
+  // el mismo dispositivo y querés asegurarte de que no quede ninguna
+  // cuenta de Google logueada antes de soltar el celu/compu. Si nunca se
+  // inició sesión con Google, signOut no hace nada (no tira error).
+  const handleSignOut = async () => {
+    try { await signOut(auth); } catch (err) { console.error("Error al cerrar sesión de Google:", err); }
+    handleLogout();
+  };
   const handleDelete = () => { const np = { ...profiles }; delete np[activeProfile]; setProfiles(np); saveProfiles(np); saveActive(null); setActiveProfile(null); setJustLoggedOut(true); setShowHelp(false); setHelpStartTab(null); };
   const handleUpdateProfile = (updates) => { const np = { ...profiles, [activeProfile]: { ...profiles[activeProfile], ...updates } }; setProfiles(np); saveProfiles(np); };
   const handleSetCycleStart = (d) => { setCycleStartState(d); saveCycleStart(d); };
@@ -5163,6 +5352,7 @@ export default function App() {
     <>
       <StyleInjector />
       {recoveredNotice && <RecoveredBanner onClose={() => setRecoveredNotice(false)} />}
+      {importRoutineError && <ImportRoutineErrorBanner onClose={() => setImportRoutineError(false)} />}
       <div className={`min-h-screen bg-[#0a0a0f] px-4 py-6 ${themeClass}`} style={{ "--small-text-scale": smallTextScale }}>
         <div className="max-w-xl mx-auto">
           <div className="flex justify-end mb-2">
@@ -5180,6 +5370,7 @@ export default function App() {
       <StyleInjector />
       {recoveredNotice && <RecoveredBanner onClose={() => setRecoveredNotice(false)} />}
       {deloadNotice && <DeloadNoticeBanner onClose={() => setDeloadNotice(false)} />}
+      {importRoutineError && <ImportRoutineErrorBanner onClose={() => setImportRoutineError(false)} />}
       <SideNav tab={tab} setTab={setTab} profileName={activeProfile} />
       <div className="flex-1 min-w-0">
         <header className="sticky top-0 z-10 bg-[#0a0a0f]/90 backdrop-blur-xl border-b border-slate-800/40">
@@ -5202,7 +5393,7 @@ export default function App() {
             {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} />}
             {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} />}
             {tab === "descarga" && <DeloadView logs={logs} settings={getProfileSettings(profile)} />}
-            {tab === "perfil" && <ProfileView profileName={activeProfile} profiles={profiles} logs={logs} onLogout={handleLogout} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} />}
+            {tab === "perfil" && <ProfileView profileName={activeProfile} profiles={profiles} logs={logs} onLogout={handleLogout} onSignOut={handleSignOut} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} />}
           </div>
         </main>
       </div>
@@ -5249,6 +5440,15 @@ function DeloadNoticeBanner({ onClose }) {
   return (
     <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[150] bg-purple-500 !text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-purple-500/30 flex items-center gap-2 bounce-in max-w-[92vw]">
       <Zap size={14} className="shrink-0" /> Esta semana es de descarga — te llevamos a esa pestaña
+      <button onClick={onClose} className="ml-1 opacity-80 hover:opacity-100 shrink-0"><X size={13} /></button>
+    </div>
+  );
+}
+
+function ImportRoutineErrorBanner({ onClose }) {
+  return (
+    <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[150] bg-rose-500 !text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-rose-500/30 flex items-center gap-2 bounce-in max-w-[92vw]">
+      <AlertTriangle size={14} className="shrink-0" /> No pudimos abrir esa rutina compartida — puede que el enlace ya no exista.
       <button onClick={onClose} className="ml-1 opacity-80 hover:opacity-100 shrink-0"><X size={13} /></button>
     </div>
   );
