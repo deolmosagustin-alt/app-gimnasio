@@ -48,7 +48,8 @@ function mkSets(n, repRange) { return Array.from({ length: n }, () => ({ repRang
 
 // Mezcla un color hexadecimal hacia gris para obtener una versión más tenue
 // (menos saturada) — se usa en las iniciales de día (P/P/P/H, etc.) tanto en
-// Rutinas como en "Mejoras por día" de Progreso, para que no griten tanto.
+// Rutinas como en las etiquetas de día del Historial de Progreso, para que
+// no griten tanto.
 function muteHexColor(hex, towardsGray = 0.45) {
   try {
     const h = hex.replace("#", "");
@@ -626,10 +627,24 @@ const STAGNATION_DAYS = 21;
 const DEFAULT_SETTINGS = {
   alertType: "sound", restLong: REST_LONG, restShort: REST_SHORT,
   trainWeeks: TRAIN_WEEKS, deloadWeeks: DELOAD_WEEKS, deloadPct: 0.75, deloadSetDivisor: 2,
-  theme: "dark",
+  theme: "dark", textScale: 1,
 };
 
 function getProfileSettings(profile) { return { ...DEFAULT_SETTINGS, ...(profile?.settings || {}) }; }
+
+// Opciones de tamaño de letra (Perfil → Tamaño de letra). El valor se aplica
+// como font-size del elemento raíz (<html>) — la mayoría de los tamaños de
+// Tailwind usados en la app (text-xs, text-sm, text-base, text-lg, text-xl,
+// text-2xl...) están definidos en rem, así que escalan todos juntos y en
+// proporción al cambiar este único valor. Las etiquetas chiquitas escritas
+// con un tamaño fijo en píxeles (ej. text-[10px]) no se ven afectadas por
+// este control — son las que menos dependen de leerse grandes.
+const TEXT_SCALE_OPTIONS = [
+  { k: "sm", v: 0.9, l: "Chica" },
+  { k: "md", v: 1, l: "Normal" },
+  { k: "lg", v: 1.15, l: "Grande" },
+  { k: "xl", v: 1.3, l: "Muy grande" },
+];
 
 // RPE (esfuerzo percibido). 6-10 cubre el rango útil para hipertrofia/fuerza;
 // por debajo de 6 casi no aporta información de fatiga.
@@ -883,12 +898,21 @@ function buildSessionsIndex(logs) {
     const { exerciseId, setIndex } = parseLogKey(key);
     const ex = EXERCISE_BY_ID[exerciseId];
     if (!ex) return;
+    // Historial ordenado de esta serie, para saber si cada registro fue una
+    // mejora EN EL MOMENTO en que se guardó (comparado contra lo mejor hasta
+    // la fecha anterior) — no contra el récord actual, que puede haber sido
+    // corregido a mano después y ya no reflejar lo que pasó ese día.
+    const sortedHist = [...entries].sort((a, b) => (a.date < b.date ? -1 : 1));
     entries.forEach((e) => {
-      if (!byDate[e.date]) byDate[e.date] = { date: e.date, dayKeys: new Set(), items: [], totalVolume: 0, rpeSum: 0, rpeCount: 0 };
+      if (!byDate[e.date]) byDate[e.date] = { date: e.date, dayKeys: new Set(), items: [], totalVolume: 0, rpeSum: 0, rpeCount: 0, improvedCount: 0 };
       const s = byDate[e.date];
       s.dayKeys.add(ex.dayKey);
-      s.items.push({ exerciseId, exerciseName: ex.name, dayKey: ex.dayKey, setIndex, reps: e.reps, kg: e.kg, rpe: e.rpe ?? null });
-      s.totalVolume += vol(e.kg, e.reps);
+      const priorBest = sortedHist.filter((h) => h.date < e.date).reduce((max, h) => Math.max(max, vol(h.kg, h.reps)), 0);
+      const thisVol = vol(e.kg, e.reps);
+      const isImprovement = thisVol > 0 && thisVol > priorBest;
+      if (isImprovement) s.improvedCount++;
+      s.items.push({ exerciseId, exerciseName: ex.name, dayKey: ex.dayKey, setIndex, reps: e.reps, kg: e.kg, rpe: e.rpe ?? null, isImprovement });
+      s.totalVolume += thisVol;
       if (e.rpe != null) { s.rpeSum += e.rpe; s.rpeCount++; }
     });
   });
@@ -1788,21 +1812,6 @@ function ProgresoDemo({ view }) {
     );
   }
 
-  if (view === "daycounts") {
-    const exampleCounts = [5, 4, 3, 6, 2, 4];
-    return (
-      <div className="flex items-center gap-1.5 overflow-x-auto">
-        <span className="text-[9px] text-slate-600 font-bold uppercase tracking-wider shrink-0">Mejoras</span>
-        {DAY_ORDER.map((dk, i) => { const d = ROUTINE[dk]; const muted = muteHexColor(d.color); return (
-          <div key={dk} className="flex items-center gap-1 px-2 py-1 rounded-lg shrink-0" style={{ backgroundColor: d.color + "12" }}>
-            <span className="w-4 h-4 rounded-md flex items-center justify-center text-[8px] font-black shrink-0" style={{ backgroundColor: d.color + "22", color: muted }}>{d.label.charAt(0)}</span>
-            <span className="text-[10px] font-bold" style={{ color: muted }}>{exampleCounts[i % exampleCounts.length]}</span>
-          </div>
-        ); })}
-      </div>
-    );
-  }
-
   if (view === "chart") {
     const dataKey = metric === "peso" ? "kg" : metric === "vol" ? "vol" : "e1rm";
     const label = metric === "peso" ? "Kg" : metric === "vol" ? "Volumen" : "1RM est.";
@@ -2235,13 +2244,18 @@ const HELP_CHAPTERS = [
       {
         icon: <BarChart3 size={20} />,
         title: "Elegí qué ver",
-        text: "Con los botones elegís entre Evolución, Top PRs, Músculo o Historial — cada uno con su propia tarjeta debajo, igual que elegís el día en la pestaña Rutina.",
+        text: "Con los botones elegís entre Historial, Evolución, Top PRs o Músculo — cada uno con su propia tarjeta debajo, igual que elegís el día en la pestaña Rutina.",
+      },
+      {
+        icon: <Calendar size={20} />,
+        title: "Historial de sesiones",
+        text: "En \"Historial\" podés ver todo lo que entrenaste: en un calendario mensual con un punto de color por día entrenado, o en una lista con el detalle completo de cada sesión.",
+        demo: { kind: "progreso", view: "calendar" },
       },
       {
         icon: <TrendingUp size={20} />,
-        title: "Mejoras por día",
-        text: "Dentro de Evolución, justo antes del selector de ejercicio, una fila de chips te muestra cuántas series mejoraste (superaste tu primer registro) en cada día de tu rutina activa.",
-        demo: { kind: "progreso", view: "daycounts" },
+        title: "Mejoras al detalle",
+        text: "Tocá un día con marca (o cualquier sesión en la vista de lista) para ver el detalle completo: cada serie con sus reps y kg, y cuántas de esas series fueron una mejora respecto a tu historial — marcadas con 🔥.",
       },
       {
         icon: <BarChart3 size={20} />,
@@ -2260,12 +2274,6 @@ const HELP_CHAPTERS = [
         title: "Volumen por músculo",
         text: "En \"Músculo\" ves el volumen acumulado histórico por grupo muscular, para detectar si algún grupo está quedando atrás respecto a los demás.",
         demo: { kind: "progreso", view: "muscle" },
-      },
-      {
-        icon: <Calendar size={20} />,
-        title: "Historial de sesiones",
-        text: "En \"Historial\" podés ver todo lo que entrenaste: en un calendario mensual con un punto de color por día entrenado, o en una lista con el detalle completo de cada sesión.",
-        demo: { kind: "progreso", view: "calendar" },
       },
       {
         icon: <Trash2 size={20} />,
@@ -2849,6 +2857,7 @@ function SessionDetailCard({ session }) {
         </div>
         <div className="text-right shrink-0">
           <p className="text-sm font-black text-white">{session.totalSets} <span className="text-[10px] text-slate-500 font-normal">series</span></p>
+          {session.improvedCount > 0 && <p className="text-[10px] font-bold text-emerald-400 mt-0.5 flex items-center justify-end gap-1"><TrendingUp size={10} /> {session.improvedCount} mejora{session.improvedCount === 1 ? "" : "s"}</p>}
           {session.avgRpe != null && <p className="text-[10px] font-bold mt-0.5" style={{ color: rpeColor(session.avgRpe) }}>RPE prom. {session.avgRpe}</p>}
         </div>
       </div>
@@ -2856,7 +2865,7 @@ function SessionDetailCard({ session }) {
         {session.items.map((it, i) => (
           <div key={i} className="flex items-center justify-between text-xs">
             <span className="text-slate-400 truncate flex-1">{it.exerciseName} <span className="text-slate-600">S{it.setIndex + 1}</span></span>
-            <span className="text-slate-200 font-semibold shrink-0 ml-2">{it.reps}×{it.kg}kg{it.rpe != null && <span className="ml-1.5 font-bold" style={{ color: rpeColor(it.rpe) }}>RPE{it.rpe}</span>}</span>
+            <span className="text-slate-200 font-semibold shrink-0 ml-2">{it.reps}×{it.kg}kg{it.isImprovement && <span className="ml-1 text-emerald-400" title="Mejora">🔥</span>}{it.rpe != null && <span className="ml-1.5 font-bold" style={{ color: rpeColor(it.rpe) }}>RPE{it.rpe}</span>}</span>
           </div>
         ))}
       </div>
@@ -3082,10 +3091,10 @@ function ExerciseChipRow({ exercises, selId, onSelect }) {
 // fija de 4 columnas (ícono arriba, etiqueta abajo, como en la barra de
 // navegación inferior) — siempre entran los 4 sin deslizar.
 const PROGRESS_SECTIONS = [
+  { k: "historial", l: "Historial", icon: <Calendar size={15} />, color: "#06B6D4" },
   { k: "chart", l: "Evolución", icon: <Activity size={15} />, color: "#3B82F6" },
   { k: "prs", l: "Top PRs", icon: <Trophy size={15} />, color: "#F59E0B" },
   { k: "muscle", l: "Músculo", icon: <BarChart3 size={15} />, color: "#A855F7" },
-  { k: "historial", l: "Historial", icon: <Calendar size={15} />, color: "#06B6D4" },
 ];
 
 function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_SETTINGS }) {
@@ -3125,14 +3134,8 @@ function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_
     }).filter((e) => e.best1rm > 0).sort((a, b) => b.best1rm - a.best1rm).slice(0, 5);
   }, [logs, allExercises]);
 
-  const dayPRcounts = useMemo(() => {
-    const counts = {};
-    DAY_ORDER.forEach((dk) => { let improved = 0; ROUTINE[dk].exercises.forEach((ex) => { ex.sets.forEach((s, i) => { const h = logs[`${ex.id}_${i}`] || []; if (h.length > 1 && vol(h[h.length - 1].kg, h[h.length - 1].reps) > vol(h[0].kg, h[0].reps)) improved++; }); }); counts[dk] = improved; });
-    return counts;
-  }, [logs]);
-
   const [confirmResetProgress, setConfirmResetProgress] = useState(false);
-  const [activeSection, setActiveSection] = useState("chart");
+  const [activeSection, setActiveSection] = useState("historial");
 
   return (
     <div className="space-y-4">
@@ -3182,20 +3185,6 @@ function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-xl bg-blue-500/15 text-blue-400 flex items-center justify-center shrink-0"><Activity size={15} /></div>
               <p className="text-sm font-bold text-white">Evolución por ejercicio</p>
-            </div>
-
-            {/* Mejoras por día — entre el título de la tarjeta y el selector de ejercicio */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 -mx-1 px-1">
-              <span className="text-[9px] text-slate-600 font-bold uppercase tracking-wider shrink-0">Mejoras por día</span>
-              {DAY_ORDER.map((dk) => {
-                const d = ROUTINE[dk], count = dayPRcounts[dk] || 0, muted = muteHexColor(d.color);
-                return (
-                  <div key={dk} className="flex items-center gap-1 px-2 py-1 rounded-lg shrink-0" style={{ backgroundColor: d.color + "12" }}>
-                    <span className="w-4 h-4 rounded-md flex items-center justify-center text-[8px] font-black shrink-0" style={{ backgroundColor: d.color + "22", color: muted }}>{d.label.charAt(0)}</span>
-                    <span className="text-[10px] font-bold" style={{ color: muted }}>{count}</span>
-                  </div>
-                );
-              })}
             </div>
 
             <ExerciseChipRow exercises={allExercises} selId={selId} onSelect={(id) => { setSelId(id); setSelSet(0); }} />
@@ -3330,9 +3319,182 @@ function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_
 }
 
 /* ============================================================================
+   EXPORTAR ENTRENAMIENTO (PDF / Word / Excel) — pensado para mandarle a tu
+   entrenador el resumen de un día, una semana o un mes. Reutiliza
+   buildSessionsIndex(logs) (la misma función del Historial) para armar la
+   lista de sesiones, la filtra por período, y la "achata" en filas
+   (fecha, día, ejercicio, serie, reps, kg, RPE) que alimentan los tres
+   formatos. Las librerías (jspdf, jspdf-autotable, docx, xlsx) se cargan
+   con import() dinámico recién cuando se exporta, para no sumarle peso al
+   resto de la app.
+============================================================================ */
+function slugifyForFilename(s) {
+  return String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "perfil";
+}
+
+function getSessionsForPeriod(sessions, period) {
+  const now = new Date();
+  if (period === "day") { const d = todayStr(); return sessions.filter((s) => s.date === d); }
+  if (period === "week") {
+    const dow = (now.getDay() + 6) % 7; // 0=lunes
+    const monday = new Date(now); monday.setDate(now.getDate() - dow); monday.setHours(0, 0, 0, 0);
+    const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
+    const mondayStr = monday.toISOString().slice(0, 10), sundayStr = sunday.toISOString().slice(0, 10);
+    return sessions.filter((s) => s.date >= mondayStr && s.date <= sundayStr);
+  }
+  if (period === "month") { const ym = todayStr().slice(0, 7); return sessions.filter((s) => s.date.startsWith(ym)); }
+  return sessions;
+}
+
+// Agrupa las filas ya achatadas de vuelta por fecha, en orden cronológico —
+// es como se ven mejor tanto en el PDF como en el Word (una sub-sección por
+// día entrenado, con su propia tablita de series).
+function groupExportRowsByDate(rows) {
+  const map = {};
+  rows.forEach((r) => { if (!map[r.date]) map[r.date] = { date: r.date, dayLabel: r.dayLabel, rows: [] }; map[r.date].rows.push(r); });
+  return Object.values(map).sort((a, b) => (a.date < b.date ? -1 : 1)).map((g) => ({
+    ...g,
+    dateLabel: new Date(g.date + "T00:00:00").toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" }),
+  }));
+}
+
+function buildExportRows(filteredSessions) {
+  const rows = [];
+  filteredSessions.slice().sort((a, b) => (a.date < b.date ? -1 : 1)).forEach((s) => {
+    const dayLabel = s.dayKeys.map((dk) => ROUTINE[dk]?.label || dk).join(" / ");
+    s.items.forEach((it) => { rows.push({ date: s.date, dayLabel, exercise: it.exerciseName, set: it.setIndex + 1, reps: it.reps, kg: it.kg, rpe: it.rpe }); });
+  });
+  return rows;
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+
+async function exportTrainingToPdf(rows, meta) {
+  const { jsPDF } = await import("jspdf");
+  const autoTable = (await import("jspdf-autotable")).default;
+  const doc = new jsPDF();
+  doc.setFontSize(16);
+  doc.text("Mi Rutina — Resumen de entrenamiento", 14, 18);
+  doc.setFontSize(10);
+  doc.setTextColor(110);
+  doc.text(`${meta.profileName} · ${meta.periodLabel}`, 14, 25);
+  doc.setTextColor(20);
+  let y = 34;
+  const groups = groupExportRowsByDate(rows);
+  groups.forEach((g) => {
+    if (y > 268) { doc.addPage(); y = 20; }
+    doc.setFontSize(11);
+    doc.setTextColor(20);
+    doc.text(`${g.dateLabel.charAt(0).toUpperCase()}${g.dateLabel.slice(1)} — ${g.dayLabel}`, 14, y);
+    y += 3;
+    autoTable(doc, {
+      startY: y,
+      head: [["Ejercicio", "Serie", "Reps", "Kg", "RPE"]],
+      body: g.rows.map((r) => [r.exercise, `S${r.set}`, String(r.reps), `${r.kg} kg`, r.rpe != null ? String(r.rpe) : "—"]),
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [20, 184, 166] },
+      margin: { left: 14, right: 14 },
+    });
+    y = doc.lastAutoTable.finalY + 10;
+  });
+  doc.save(`${meta.filename}.pdf`);
+}
+
+async function exportTrainingToWord(rows, meta) {
+  const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, HeadingLevel, WidthType } = await import("docx");
+  const groups = groupExportRowsByDate(rows);
+  const children = [
+    new Paragraph({ text: "Mi Rutina — Resumen de entrenamiento", heading: HeadingLevel.HEADING_1 }),
+    new Paragraph({ children: [new TextRun({ text: `${meta.profileName} · ${meta.periodLabel}`, color: "666666" })], spacing: { after: 200 } }),
+  ];
+  groups.forEach((g) => {
+    children.push(new Paragraph({ text: `${g.dateLabel.charAt(0).toUpperCase()}${g.dateLabel.slice(1)} — ${g.dayLabel}`, heading: HeadingLevel.HEADING_2, spacing: { before: 260, after: 100 } }));
+    const headerRow = new TableRow({ children: ["Ejercicio", "Serie", "Reps", "Kg", "RPE"].map((h) => new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: h, bold: true })] })] })) });
+    const dataRows = g.rows.map((r) => new TableRow({ children: [r.exercise, `S${r.set}`, String(r.reps), `${r.kg} kg`, r.rpe != null ? String(r.rpe) : "—"].map((v) => new TableCell({ children: [new Paragraph(v)] })) }));
+    children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [headerRow, ...dataRows] }));
+  });
+  const doc = new Document({ sections: [{ children }] });
+  const blob = await Packer.toBlob(doc);
+  downloadBlob(blob, `${meta.filename}.docx`);
+}
+
+async function exportTrainingToExcel(rows, meta) {
+  const XLSX = await import("xlsx");
+  const header = ["Fecha", "Día", "Ejercicio", "Serie", "Reps", "Kg", "RPE"];
+  const data = rows.map((r) => [r.date, r.dayLabel, r.exercise, r.set, r.reps, r.kg, r.rpe ?? ""]);
+  const ws = XLSX.utils.aoa_to_sheet([header, ...data]);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Entrenamiento");
+  XLSX.writeFile(wb, `${meta.filename}.xlsx`);
+}
+
+const EXPORT_PERIODS = [
+  { k: "day", l: "Hoy" },
+  { k: "week", l: "Esta semana" },
+  { k: "month", l: "Este mes" },
+];
+
+// Tarjeta de Perfil: elegís el período y el formato, y se descarga
+// directo — pensado para mandarle a tu entrenador el resumen sin tener que
+// armarlo a mano.
+function ExportTrainingCard({ profileName, logs }) {
+  const allSessions = useMemo(() => buildSessionsIndex(logs), [logs]);
+  const [period, setPeriod] = useState("week");
+  const [exporting, setExporting] = useState(null);
+  const [error, setError] = useState("");
+  const filtered = useMemo(() => getSessionsForPeriod(allSessions, period), [allSessions, period]);
+  const rows = useMemo(() => buildExportRows(filtered), [filtered]);
+  const periodLabel = EXPORT_PERIODS.find((p) => p.k === period)?.l || "";
+
+  const handleExport = async (format) => {
+    if (!rows.length) { setError("No hay entrenamientos registrados en ese período."); return; }
+    setError(""); setExporting(format);
+    const meta = { profileName, periodLabel, filename: `mi-rutina-${slugifyForFilename(profileName)}-${period}-${todayStr()}` };
+    try {
+      if (format === "pdf") await exportTrainingToPdf(rows, meta);
+      else if (format === "word") await exportTrainingToWord(rows, meta);
+      else if (format === "excel") await exportTrainingToExcel(rows, meta);
+    } catch (err) {
+      console.error("Error exportando entrenamiento:", err);
+      setError("No pudimos generar el archivo. Probá de nuevo.");
+    } finally {
+      setExporting(null);
+    }
+  };
+
+  return (
+    <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 backdrop-blur-sm shadow-md shadow-black/20 space-y-3.5">
+      <div>
+        <p className="text-sm font-bold text-white">Exportar entrenamiento</p>
+        <p className="text-[11px] text-slate-500 mt-0.5">Descargá el resumen para mandarle a tu entrenador</p>
+      </div>
+      <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
+        {EXPORT_PERIODS.map((opt) => (
+          <button key={opt.k} onClick={() => { setPeriod(opt.k); setError(""); }} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${period === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
+        ))}
+      </div>
+      <p className="text-[10px] text-slate-600">{rows.length > 0 ? `${groupExportRowsByDate(rows).length} día${groupExportRowsByDate(rows).length === 1 ? "" : "s"} entrenado${groupExportRowsByDate(rows).length === 1 ? "" : "s"} en este período.` : "Sin entrenamientos registrados en este período."}</p>
+      <div className="grid grid-cols-3 gap-2">
+        {[{ k: "pdf", l: "PDF" }, { k: "word", l: "Word" }, { k: "excel", l: "Excel" }].map((opt) => (
+          <button key={opt.k} onClick={() => handleExport(opt.k)} disabled={!!exporting} className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition text-xs font-bold disabled:opacity-50">
+            <Download size={13} /> {exporting === opt.k ? "..." : opt.l}
+          </button>
+        ))}
+      </div>
+      {error && <p className="text-[11px] text-amber-400">{error}</p>}
+    </div>
+  );
+}
+
+/* ============================================================================
    PROFILE VIEW — adds an entry point to the setup hub + a backup status line
 ============================================================================ */
-function ProfileView({ profileName, profiles, onLogout, onDelete, onUpdateProfile, cycleStart, onSetCycleStart, onGoToRoutines }) {
+function ProfileView({ profileName, profiles, logs, onLogout, onDelete, onUpdateProfile, cycleStart, onSetCycleStart, onGoToRoutines }) {
   const profile = profiles[profileName];
   const [showDeletePin, setShowDeletePin] = useState(false); const [deleteError, setDeleteError] = useState("");
   const [editing, setEditing] = useState(false); const [editMail, setEditMail] = useState(profile?.email || "");
@@ -3423,6 +3585,18 @@ function ProfileView({ profileName, profiles, onLogout, onDelete, onUpdateProfil
           ))}
         </div>
       </div>
+
+      <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 backdrop-blur-sm shadow-md shadow-black/20">
+        <p className="text-sm font-bold text-white mb-0.5">Tamaño de letra</p>
+        <p className="text-[11px] text-slate-500 mb-3">Agrandá el texto de toda la app si te resulta más cómodo de leer</p>
+        <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
+          {TEXT_SCALE_OPTIONS.map((opt) => (
+            <button key={opt.k} onClick={() => updateSettings({ textScale: opt.v })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${(settings.textScale ?? 1) === opt.v ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
+          ))}
+        </div>
+      </div>
+
+      <ExportTrainingCard profileName={profileName} logs={logs} />
 
       <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 backdrop-blur-sm shadow-md shadow-black/20">
         <div className="flex items-center justify-between mb-2">
@@ -4425,6 +4599,16 @@ export default function App() {
 
   const profile = profiles[activeProfile], logs = profile?.logs || {}, drafts = profile?.drafts || {};
   const themeClass = getProfileSettings(profile).theme === "light" ? "light-mode" : "";
+
+  // Tamaño de letra (Perfil → Tamaño de letra): se aplica como font-size del
+  // <html>, así que todo lo que esté en rem (la mayoría de los tamaños de
+  // texto de Tailwind) escala junto y en proporción. Sin perfil activo (o
+  // sin esta preferencia guardada) queda en el tamaño normal de siempre.
+  const textScale = profile ? (getProfileSettings(profile).textScale ?? 1) : 1;
+  useEffect(() => {
+    if (typeof document !== "undefined") document.documentElement.style.fontSize = `${16 * textScale}px`;
+  }, [textScale]);
+
   // La rutina activa del perfil actual (o Push/ Pull/ Legs + Hombro/Brazo
   // como respaldo) se recalcula en cada render — así
   // ROUTINE/DAY_ORDER/EXERCISE_BY_ID/KEY_TO_DAY siempre reflejan la rutina
@@ -4646,7 +4830,7 @@ export default function App() {
             {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} />}
             {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} />}
             {tab === "descarga" && <DeloadView logs={logs} settings={getProfileSettings(profile)} />}
-            {tab === "perfil" && <ProfileView profileName={activeProfile} profiles={profiles} onLogout={handleLogout} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} />}
+            {tab === "perfil" && <ProfileView profileName={activeProfile} profiles={profiles} logs={logs} onLogout={handleLogout} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} />}
           </div>
         </main>
       </div>
