@@ -9,7 +9,7 @@ import {
   ChevronDown, ChevronUp, ChevronLeft, Trophy, Flame, Save, Trash2, BarChart3,
   ListChecks, LogOut, X, Check, AlertTriangle, Calendar, Zap,
   Mail, Clock, ChevronRight, Edit3, Info, Plus, Sun, Moon,
-  Target, Award, Activity, ArrowDown, Compass, List, LayoutGrid,
+  Target, Award, Activity, ArrowDown, HelpCircle, List, LayoutGrid,
   Sparkles, Layers, Video, SlidersHorizontal, ShieldCheck, UserCog,
   Share2, Download, Link2, Copy,
 } from "lucide-react";
@@ -45,6 +45,21 @@ import { auth, googleProvider, db } from "./firebase";
 const yt = (q) => `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`;
 
 function mkSets(n, repRange) { return Array.from({ length: n }, () => ({ repRange })); }
+
+// Mezcla un color hexadecimal hacia gris para obtener una versión más tenue
+// (menos saturada) — se usa en las iniciales de día (P/P/P/H, etc.) tanto en
+// Rutinas como en "Mejoras por día" de Progreso, para que no griten tanto.
+function muteHexColor(hex, towardsGray = 0.45) {
+  try {
+    const h = hex.replace("#", "");
+    const r = parseInt(h.substring(0, 2), 16), g = parseInt(h.substring(2, 4), 16), b = parseInt(h.substring(4, 6), 16);
+    const gray = (r + g + b) / 3;
+    const mr = Math.round(r + (gray - r) * towardsGray);
+    const mg = Math.round(g + (gray - g) * towardsGray);
+    const mb = Math.round(b + (gray - b) * towardsGray);
+    return `#${mr.toString(16).padStart(2, "0")}${mg.toString(16).padStart(2, "0")}${mb.toString(16).padStart(2, "0")}`;
+  } catch { return hex; }
+}
 
 const MUSCLE_GROUPS = [
   { key: "pecho", label: "Pecho", color: "#14B8A6" },
@@ -262,7 +277,7 @@ MUSCLE_GROUPS.forEach((g) => { EXERCISE_LIBRARY_BY_GROUP[g.key] = EXERCISE_LIBRA
 const PRESET_ROUTINES = [
   {
     id: "classic_default",
-    name: "Push Pull Legs + Hombro/Brazo",
+    name: "Push/ Pull/ Legs + Hombro/Brazo",
     source: "preset",
     description: "La rutina original de la app: empuje, tracción, pierna y un día extra de hombros y brazos.",
     recommendation: "Pensada para entrenar 4 veces por semana, repitiendo el ciclo.",
@@ -648,7 +663,7 @@ function getDeviceId() {
 // Perfiles de versiones anteriores de la app (antes de que existieran
 // múltiples rutinas) no tienen `routines`/`activeRoutineId`. Si ya tenían
 // `maxesSetupDays` es señal de que es un perfil viejo con datos reales: se le
-// asigna la rutina "Push Pull Legs + Hombro/Brazo" automáticamente, sin pedirle nada, para que no
+// asigna la rutina "Push/ Pull/ Legs + Hombro/Brazo" automáticamente, sin pedirle nada, para que no
 // pierda ni su rutina ni su historial. Un perfil realmente nuevo (creado ya
 // con esta versión) no tiene `maxesSetupDays`, así que se lo deja sin rutina
 // activa a propósito: la pantalla de Rutinas se va a encargar de pedírsela.
@@ -1415,8 +1430,17 @@ function PinInput({ length = 4, onComplete, label = "Ingresá tu PIN", error, on
 
 /* ============================================================================
    LOGIN
+
+   `allowAutoLogin` (default true): si hay un solo perfil en el dispositivo y
+   no tiene PIN, normalmente se entra solo apenas carga la pantalla — es una
+   comodidad para cuando volvés a abrir la app. Pero si LLEGASTE a esta
+   pantalla tocando "Cambiar de perfil" a propósito, ese auto-login te
+   mandaba de vuelta al mismo perfil sin que pase nada (el botón "no
+   funcionaba"). App() pone allowAutoLogin=false justo después de un logout
+   explícito para evitar ese rebote — en una carga nueva de la página vuelve
+   a ser true por defecto, así que el auto-login normal sigue funcionando.
 ============================================================================ */
-function LoginScreen({ onLogin }) {
+function LoginScreen({ onLogin, allowAutoLogin = true }) {
   const [profiles, setProfilesState] = useState(loadProfiles);
   const [phase, setPhase] = useState("list");
   const [pendingProfile, setPendingProfile] = useState(null);
@@ -1502,7 +1526,7 @@ function LoginScreen({ onLogin }) {
     }
   };
 
-  useEffect(() => { if (deviceProfile && !profiles[deviceProfile].pin) { saveActive(deviceProfile); onLogin(deviceProfile, profiles); } }, []);
+  useEffect(() => { if (allowAutoLogin && deviceProfile && !profiles[deviceProfile].pin) { saveActive(deviceProfile); onLogin(deviceProfile, profiles); } }, []);
 
   if (phase === "pin") return (
     <div className="min-h-screen bg-[#0a0a0f] flex flex-col items-center justify-center px-4 relative overflow-hidden">
@@ -1747,17 +1771,17 @@ function ProgresoDemo({ view }) {
 
   if (view === "stats") {
     const tiles = [
-      { val: 34, label: "Días", accent: "#14B8A6" },
-      { val: "6🔥", label: "Racha", accent: "#F59E0B" },
-      { val: 187, label: "Series", accent: "#06B6D4" },
-      { val: "12.4k", label: "Kg×reps", accent: "#A855F7" },
+      { val: 34, label: "Días" },
+      { val: "6🔥", label: "Racha" },
+      { val: 187, label: "Series" },
+      { val: "12.4k", label: "Kg×reps" },
     ];
     return (
       <div className="grid grid-cols-4 gap-2">
-        {tiles.map(({ val, label, accent }) => (
-          <div key={label} className="rounded-xl p-2.5 text-center border" style={{ backgroundColor: accent + "12", borderColor: accent + "30" }}>
+        {tiles.map(({ val, label }) => (
+          <div key={label} className="rounded-xl p-2.5 text-center bg-slate-900/50 border border-slate-800/50">
             <p className="text-sm font-black text-white leading-none tabular-nums">{val}</p>
-            <p className="text-[9px] font-semibold mt-1" style={{ color: accent }}>{label}</p>
+            <p className="text-[9px] font-semibold text-slate-500 mt-1">{label}</p>
           </div>
         ))}
       </div>
@@ -1769,10 +1793,10 @@ function ProgresoDemo({ view }) {
     return (
       <div className="flex items-center gap-1.5 overflow-x-auto">
         <span className="text-[9px] text-slate-600 font-bold uppercase tracking-wider shrink-0">Mejoras</span>
-        {DAY_ORDER.map((dk, i) => { const d = ROUTINE[dk]; return (
+        {DAY_ORDER.map((dk, i) => { const d = ROUTINE[dk]; const muted = muteHexColor(d.color); return (
           <div key={dk} className="flex items-center gap-1 px-2 py-1 rounded-lg shrink-0" style={{ backgroundColor: d.color + "12" }}>
-            <span className="w-4 h-4 rounded-md flex items-center justify-center text-[8px] font-black shrink-0" style={{ backgroundColor: d.color + "22", color: d.color }}>{d.label.charAt(0)}</span>
-            <span className="text-[10px] font-bold" style={{ color: d.color }}>{exampleCounts[i % exampleCounts.length]}</span>
+            <span className="w-4 h-4 rounded-md flex items-center justify-center text-[8px] font-black shrink-0" style={{ backgroundColor: d.color + "22", color: muted }}>{d.label.charAt(0)}</span>
+            <span className="text-[10px] font-bold" style={{ color: muted }}>{exampleCounts[i % exampleCounts.length]}</span>
           </div>
         ); })}
       </div>
@@ -1986,9 +2010,9 @@ function RutinasDemo({ view }) {
         <div className="flex items-center gap-1.5 mb-1"><Layers size={12} className="text-teal-400" /><span className="text-[9px] font-black uppercase tracking-widest text-teal-400">Tu rutina activa</span></div>
         <p className="text-sm font-black text-white">Push / Pull / Legs</p>
         <div className="flex items-center gap-1.5 mt-2">
-          <span className="text-[9px] font-bold px-2 py-0.5 rounded-lg bg-teal-500/20 text-teal-400">Push</span>
-          <span className="text-[9px] font-bold px-2 py-0.5 rounded-lg bg-blue-500/20 text-blue-400">Pull</span>
-          <span className="text-[9px] font-bold px-2 py-0.5 rounded-lg bg-orange-500/20 text-orange-400">Legs</span>
+          <span className="text-[9px] font-bold px-2 py-0.5 rounded-lg bg-teal-500/20" style={{ color: muteHexColor("#14B8A6") }}>Push</span>
+          <span className="text-[9px] font-bold px-2 py-0.5 rounded-lg bg-blue-500/20" style={{ color: muteHexColor("#3B82F6") }}>Pull</span>
+          <span className="text-[9px] font-bold px-2 py-0.5 rounded-lg bg-orange-500/20" style={{ color: muteHexColor("#F97316") }}>Legs</span>
         </div>
       </div>
     );
@@ -2091,12 +2115,12 @@ const HELP_CHAPTERS = [
       {
         icon: <Calendar size={20} />,
         title: "¿Qué día entrenás cada cosa?",
-        text: "Tocando \"Configurar días de la semana\" en la rutina activa elegís qué día de tu rutina (o descanso) le corresponde a cada día calendario, de lunes a domingo. Podés repetir días — por ejemplo un Upper/Lower entrenado 4 veces por semana — y la app reconoce sola en qué día estás cuando abrís Rutina. Por defecto los ubica de corrido desde el lunes, pero lo podés cambiar cuando quieras.",
+        text: "Tocando \"Configurar días de la semana\" en la rutina activa elegís qué día de tu rutina (o descanso) le corresponde a cada día calendario, de lunes a domingo. Podés repetir días — por ejemplo un Upper/Lower entrenado 4 veces por semana — y la app reconoce sola en qué día estás cuando abrís Rutina. Por defecto los ubica de corrido desde el lunes, pero lo podés cambiar cuando quieras. Esto te lo preguntamos apenas elegís o creás una rutina, así no hay que volver después.",
       },
       {
         icon: <ListChecks size={20} />,
         title: "Rutinas preestablecidas",
-        text: "Más abajo está el catálogo: Push/Pull/Legs, Arnold Split, Upper/Lower, Cuerpo Completo y Push Pull Legs + Hombro/Brazo. Tocá una para ver su distribución semanal completa —día por día, con sus ejercicios y series— antes de usarla.",
+        text: "Más abajo está el catálogo: Push/Pull/Legs, Arnold Split, Upper/Lower, Bro Split, Cuerpo Completo y Push/ Pull/ Legs + Hombro/Brazo. Tocá una para ver su distribución semanal completa —día por día, con sus ejercicios y series— antes de usarla.",
         demo: { kind: "rutinas", view: "preset", caption: "Tocá la rutina para ver el detalle" },
       },
       {
@@ -2110,6 +2134,11 @@ const HELP_CHAPTERS = [
         title: "Editá, activá o borrá tus rutinas",
         text: "Las rutinas que creaste quedan guardadas: tocá el lápiz para modificarlas (cambiar nombre, días o ejercicios), \"Activar\" para cambiar a esa, o el tacho para borrarla. Las preestablecidas no se editan ni se borran, pero siempre podés activarlas y desde ahí crear tu propia versión.",
         demo: { kind: "rutinas", view: "manage" },
+      },
+      {
+        icon: <Download size={20} />,
+        title: "Importar una rutina desde un archivo",
+        text: "Si ya tenés tu rutina anotada en un Excel, Word o PDF, no hace falta tipearla de nuevo: con \"Importar rutina\" subís ese archivo (o copiás y pegás el texto) y la app detecta sola los días, ejercicios, series y repeticiones, buscando cada ejercicio en el catálogo. Antes de guardarla te muestra una vista previa para que la revises.",
       },
     ],
   },
@@ -2157,7 +2186,7 @@ const HELP_CHAPTERS = [
       {
         icon: <Save size={20} />,
         title: "Registrá tus series",
-        text: "Debajo del cronómetro, por cada serie ingresás reps y kg, y tocás el botón de guardar. Lo que escribís no se borra aunque salgas de la tarjeta o cambies de pestaña — sólo se limpia cuando finalizás la sesión o reseteás el día. Tu mejor marca se calcula sola, y si la superás te avisa con un mensaje y un efecto de confetti.",
+        text: "Debajo del cronómetro, por cada serie ingresás reps y kg, y tocás el botón de guardar. Lo que escribís no se borra aunque salgas de la tarjeta o cambies de pestaña — sólo se limpia cuando finalizás la sesión o reseteás el día. Tu mejor marca se calcula sola, y si la superás te avisa con un mensaje y un efecto de confetti — desde ahí mismo podés compartir una imagen prolija de tu nueva marca.",
         demo: { kind: "rutina", view: "card-open", caption: "Probá: ingresá reps y kg, y tocá Guardar" },
       },
       {
@@ -2183,7 +2212,7 @@ const HELP_CHAPTERS = [
   {
     key: "progreso",
     label: "Progreso",
-    color: "#06B6D4",
+    color: "#3B82F6",
     icon: <BarChart3 size={16} />,
     steps: [
       {
@@ -2206,18 +2235,18 @@ const HELP_CHAPTERS = [
       {
         icon: <BarChart3 size={20} />,
         title: "Elegí qué ver",
-        text: "Con los botones de colores elegís entre Evolución, Top PRs, Músculo o Historial — cada uno con su propia tarjeta debajo, igual que elegís el día en la pestaña Rutina.",
+        text: "Con los botones elegís entre Evolución, Top PRs, Músculo o Historial — cada uno con su propia tarjeta debajo, igual que elegís el día en la pestaña Rutina.",
       },
       {
         icon: <TrendingUp size={20} />,
         title: "Mejoras por día",
-        text: "Dentro de Evolución, una fila de chips te muestra cuántas series mejoraste (superaste tu primer registro) en cada día de tu rutina activa.",
+        text: "Dentro de Evolución, justo antes del selector de ejercicio, una fila de chips te muestra cuántas series mejoraste (superaste tu primer registro) en cada día de tu rutina activa.",
         demo: { kind: "progreso", view: "daycounts" },
       },
       {
         icon: <BarChart3 size={20} />,
         title: "Gráfico de evolución",
-        text: "Elegí el día, después el ejercicio (deslizando la fila de chips hacia los costados) y la serie con los botones S1/S2/etc. Mirá su evolución en Kg, Volumen, 1RM estimado o RPE con los botones de arriba del gráfico.",
+        text: "Elegí el ejercicio (deslizando la fila de chips hacia los costados) y la serie con los botones S1/S2/etc. Mirá su evolución en Kg, Volumen, 1RM estimado o RPE con los botones de arriba del gráfico.",
         demo: { kind: "progreso", view: "chart", caption: "Deslizá la fila de chips para ver más ejercicios" },
       },
       {
@@ -2280,13 +2309,13 @@ const HELP_CHAPTERS = [
       {
         icon: <Mail size={20} />,
         title: "Tus datos",
-        text: "Arriba ves tu nombre, email (si lo cargaste) y fecha de alta. Tocá \"Editar perfil\" para cambiar el email cuando quieras.",
+        text: "Arriba ves tu nombre, email (si lo cargaste) y fecha de alta. Tocá \"Editar perfil\" para cambiar el email cuando quieras, o \"Vincular con Google\" si querés asociar tu cuenta de Google a este perfil.",
         demo: { kind: "perfil", view: "datos" },
       },
       {
         icon: <Layers size={20} />,
         title: "Tu rutina",
-        text: "Debajo de \"Editar perfil\" tenés un acceso directo que muestra qué rutina tenés activa y cuántas guardaste. Tocalo para ir a la pestaña Rutinas y cambiar, editar o crear otra.",
+        text: "Debajo tenés un acceso directo que muestra qué rutina tenés activa y cuántas guardaste. Tocalo para ir a la pestaña Rutinas y cambiar, editar o crear otra.",
       },
       {
         icon: <Sun size={20} />,
@@ -2335,7 +2364,7 @@ const HELP_CHAPTERS = [
       {
         icon: <Check size={20} />,
         title: "¡Eso es todo!",
-        text: "Ya conocés todas las funciones de la app. Podés volver a ver este tour guiado cuando quieras tocando el ícono de la brújula arriba a la derecha, en cualquier pestaña.",
+        text: "Ya conocés todas las funciones de la app. Podés volver a ver este tour guiado cuando quieras tocando el ícono de ayuda (?) arriba a la derecha, en cualquier pestaña.",
       },
     ],
   },
@@ -2612,7 +2641,10 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
 /* ============================================================================
    WEEK CALENDAR (cuadro de "ciclo actual" — vive en la pestaña Progreso;
    antes estaba en Rutina, se movió para no competir con el registro de
-   series del día a día).
+   series del día a día). Usa el mismo tratamiento visual que el hero de
+   Descarga (fondo en degradé + manchas de color decorativas): azul cuando
+   es semana de entrenamiento, violeta —igual que Descarga— cuando es
+   semana de descarga.
 ============================================================================ */
 function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS }) {
   const weekInfo = getWeekInfo(cycleStart, settings);
@@ -2623,9 +2655,12 @@ function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS 
   const trainedDays = useMemo(() => getTrainedDateSet(logs, sessions), [logs, sessions]);
   const weekDots = Array.from({ length: cycleWeeks }, (_, wi) => { const ws = new Date(cycleStart); ws.setDate(ws.getDate() + wi * 7); const days = Array.from({ length: 7 }, (_, di) => { const d = new Date(ws); d.setDate(d.getDate() + di); return d.toISOString().slice(0, 10); }); return { week: wi + 1, days, trained: days.filter((d) => trainedDays.has(d)).length, isDeload: wi + 1 > trainWeeks }; });
   const phase = weekInfo.isDeload ? "#A855F7" : "#3B82F6";
+  const heroGrad = weekInfo.isDeload ? "var(--grad-hero-purple)" : "var(--grad-hero-blue)";
+  const borderClass = weekInfo.isDeload ? "border-purple-500/20" : "border-blue-500/20";
   return (
-    <div className="relative overflow-hidden bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 backdrop-blur-sm shadow-md shadow-black/20">
-      <div className="absolute -top-12 -right-12 w-36 h-36 rounded-full blur-3xl opacity-25 pointer-events-none" style={{ backgroundColor: phase }} />
+    <div className={`relative overflow-hidden border ${borderClass} rounded-2xl p-4 shadow-md shadow-black/20`} style={{ background: heroGrad }}>
+      <div className="absolute -top-12 -right-12 w-36 h-36 rounded-full blur-3xl opacity-30 pointer-events-none" style={{ backgroundColor: phase }} />
+      <div className="absolute -bottom-8 -left-8 w-28 h-28 rounded-full blur-2xl opacity-20 pointer-events-none" style={{ backgroundColor: phase }} />
       <div className="relative flex items-center justify-between mb-3.5">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0" style={{ backgroundColor: phase + "1c", color: phase, boxShadow: `0 0 0 1px ${phase}30 inset` }}>
@@ -2653,7 +2688,7 @@ function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS 
         ); })}
       </div>
 
-      <div className="relative flex gap-4 mt-4 pt-3 border-t border-slate-800/50 text-[10px] text-slate-600">
+      <div className="relative flex gap-4 mt-4 pt-3 border-t border-white/10 text-[10px] text-slate-500">
         <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-blue-500/70" /><span>Entrenamiento</span></div>
         <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-purple-500/70" /><span>Descarga</span></div>
       </div>
@@ -2810,7 +2845,7 @@ function SessionDetailCard({ session }) {
       <div className="flex items-center justify-between mb-3">
         <div>
           <p className="text-sm font-bold text-white capitalize">{dateLabel}</p>
-          <div className="flex gap-1 mt-1">{session.dayKeys.map((dk) => <span key={dk} className="text-[10px] font-bold px-1.5 py-0.5 rounded-lg" style={{ backgroundColor: ROUTINE[dk].color + "20", color: ROUTINE[dk].color }}>{ROUTINE[dk].label}</span>)}</div>
+          <div className="flex gap-1 mt-1">{session.dayKeys.map((dk) => <span key={dk} className="text-[10px] font-bold px-1.5 py-0.5 rounded-lg" style={{ backgroundColor: ROUTINE[dk].color + "20", color: muteHexColor(ROUTINE[dk].color) }}>{ROUTINE[dk].label}</span>)}</div>
         </div>
         <div className="text-right shrink-0">
           <p className="text-sm font-black text-white">{session.totalSets} <span className="text-[10px] text-slate-500 font-normal">series</span></p>
@@ -3041,11 +3076,16 @@ function ExerciseChipRow({ exercises, selId, onSelect }) {
   );
 }
 
+// Antes era una fila con scroll horizontal (icono + texto, "Evolución" /
+// "Top PRs" / "Músculo" / "Historial") que en pantallas angostas no entraba
+// completa y había que deslizar para ver "Historial". Ahora es una grilla
+// fija de 4 columnas (ícono arriba, etiqueta abajo, como en la barra de
+// navegación inferior) — siempre entran los 4 sin deslizar.
 const PROGRESS_SECTIONS = [
-  { k: "chart", l: "Evolución", icon: <Activity size={13} />, color: "#3B82F6" },
-  { k: "prs", l: "Top PRs", icon: <Trophy size={13} />, color: "#F59E0B" },
-  { k: "muscle", l: "Músculo", icon: <BarChart3 size={13} />, color: "#A855F7" },
-  { k: "historial", l: "Historial", icon: <Calendar size={13} />, color: "#06B6D4" },
+  { k: "chart", l: "Evolución", icon: <Activity size={15} />, color: "#3B82F6" },
+  { k: "prs", l: "Top PRs", icon: <Trophy size={15} />, color: "#F59E0B" },
+  { k: "muscle", l: "Músculo", icon: <BarChart3 size={15} />, color: "#A855F7" },
+  { k: "historial", l: "Historial", icon: <Calendar size={15} />, color: "#06B6D4" },
 ];
 
 function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_SETTINGS }) {
@@ -3126,12 +3166,12 @@ function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_
         ))}
       </div>
 
-      {/* Selector de sección — mismo lenguaje visual que los chips de día */}
-      <div className="flex gap-1.5 overflow-x-auto pb-1">
+      {/* Selector de sección — grilla fija de 4, siempre entra sin deslizar */}
+      <div className="grid grid-cols-4 gap-1.5">
         {PROGRESS_SECTIONS.map((s) => (
-          <button key={s.k} onClick={() => setActiveSection(s.k)} className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all active:scale-95 border"
+          <button key={s.k} onClick={() => setActiveSection(s.k)} className="flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl text-[10px] font-bold transition-all active:scale-95 border"
             style={activeSection === s.k ? { background: s.color, borderColor: s.color, color: "#fff" } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
-            {s.icon}{s.l}
+            {s.icon}<span>{s.l}</span>
           </button>
         ))}
       </div>
@@ -3142,6 +3182,20 @@ function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-xl bg-blue-500/15 text-blue-400 flex items-center justify-center shrink-0"><Activity size={15} /></div>
               <p className="text-sm font-bold text-white">Evolución por ejercicio</p>
+            </div>
+
+            {/* Mejoras por día — entre el título de la tarjeta y el selector de ejercicio */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 -mx-1 px-1">
+              <span className="text-[9px] text-slate-600 font-bold uppercase tracking-wider shrink-0">Mejoras por día</span>
+              {DAY_ORDER.map((dk) => {
+                const d = ROUTINE[dk], count = dayPRcounts[dk] || 0, muted = muteHexColor(d.color);
+                return (
+                  <div key={dk} className="flex items-center gap-1 px-2 py-1 rounded-lg shrink-0" style={{ backgroundColor: d.color + "12" }}>
+                    <span className="w-4 h-4 rounded-md flex items-center justify-center text-[8px] font-black shrink-0" style={{ backgroundColor: d.color + "22", color: muted }}>{d.label.charAt(0)}</span>
+                    <span className="text-[10px] font-bold" style={{ color: muted }}>{count}</span>
+                  </div>
+                );
+              })}
             </div>
 
             <ExerciseChipRow exercises={allExercises} selId={selId} onSelect={(id) => { setSelId(id); setSelSet(0); }} />
@@ -3208,22 +3262,6 @@ function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_
                 {metric === "1rm" && <p className="text-[10px] text-slate-600">Estimado con fórmula de Epley. Solo referencia, no un máximo real.</p>}
               </>
             )}
-
-            {/* Mejoras por día — ahora vive adentro de esta misma tarjeta */}
-            <div className="pt-2 border-t border-slate-800/50">
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 -mx-1 px-1">
-                <span className="text-[9px] text-slate-600 font-bold uppercase tracking-wider shrink-0">Mejoras por día</span>
-                {DAY_ORDER.map((dk) => {
-                  const d = ROUTINE[dk], count = dayPRcounts[dk] || 0;
-                  return (
-                    <div key={dk} className="flex items-center gap-1 px-2 py-1 rounded-lg shrink-0" style={{ backgroundColor: d.color + "12" }}>
-                      <span className="w-4 h-4 rounded-md flex items-center justify-center text-[8px] font-black shrink-0" style={{ backgroundColor: d.color + "22", color: d.color }}>{d.label.charAt(0)}</span>
-                      <span className="text-[10px] font-bold" style={{ color: d.color }}>{count}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
           </div>
         )}
 
@@ -3299,6 +3337,7 @@ function ProfileView({ profileName, profiles, onLogout, onDelete, onUpdateProfil
   const [showDeletePin, setShowDeletePin] = useState(false); const [deleteError, setDeleteError] = useState("");
   const [editing, setEditing] = useState(false); const [editMail, setEditMail] = useState(profile?.email || "");
   const [showCycleSetup, setShowCycleSetup] = useState(false);
+  const [googleLinkError, setGoogleLinkError] = useState("");
   const joinDate = profile?.joinedAt ? new Date(profile.joinedAt).toLocaleDateString("es-AR", { day: "numeric", month: "long", year: "numeric" }) : "—";
   const settings = getProfileSettings(profile), weekInfo = getWeekInfo(cycleStart, settings);
   const updateSettings = (patch) => onUpdateProfile({ settings: { ...settings, ...patch } });
@@ -3309,6 +3348,21 @@ function ProfileView({ profileName, profiles, onLogout, onDelete, onUpdateProfil
   const initial = profileName.charAt(0).toUpperCase();
   const activeRoutineDef = profile?.routines?.[profile.activeRoutineId];
   const savedRoutineCount = Object.keys(profile?.routines || {}).length;
+
+  // Vincular este perfil local con una cuenta de Google: abre el mismo popup
+  // que el login, y si funciona le guarda el googleUid/email al perfil
+  // actual (sin crear un perfil nuevo ni cerrar la sesión).
+  const handleLinkGoogle = async () => {
+    setGoogleLinkError("");
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      const user = result.user;
+      onUpdateProfile({ googleUid: user.uid, email: user.email || profile?.email });
+    } catch (err) {
+      console.error("Error al vincular con Google:", err);
+      setGoogleLinkError("No se pudo vincular con Google. Intentá de nuevo.");
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -3336,6 +3390,23 @@ function ProfileView({ profileName, profiles, onLogout, onDelete, onUpdateProfil
       ) : (
         <button onClick={() => setEditing(true)} className="w-full flex items-center gap-2 justify-center py-3 rounded-2xl border border-slate-800 text-slate-400 hover:border-slate-600 hover:text-white transition text-sm font-medium"><Edit3 size={14} /> Editar perfil</button>
       )}
+
+      {profile?.googleUid ? (
+        <div className="flex items-center gap-2.5 px-4 py-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 text-emerald-400 text-sm font-medium">
+          <Check size={14} className="shrink-0" /> Vinculado con Google
+        </div>
+      ) : (
+        <button onClick={handleLinkGoogle} className="w-full flex items-center gap-2.5 justify-center py-3 rounded-2xl border border-slate-800 text-slate-400 hover:border-slate-600 hover:text-white transition text-sm font-medium">
+          <svg className="w-4 h-4" viewBox="0 0 24 24">
+            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+          </svg>
+          Vincular con Google
+        </button>
+      )}
+      {googleLinkError && <p className="text-rose-400 text-xs text-center">{googleLinkError}</p>}
 
       <button onClick={onGoToRoutines} className="w-full flex items-center gap-3 bg-slate-900/50 border border-slate-800/50 rounded-2xl px-4 py-3.5 hover:border-teal-500/30 transition text-left">
         <div className="w-9 h-9 rounded-xl bg-teal-500/15 text-teal-400 flex items-center justify-center shrink-0"><Layers size={16} /></div>
@@ -3487,9 +3558,10 @@ function PresetRoutineCard({ preset, isActive, onUse }) {
           </div>
           <p className="text-[11px] text-slate-500 mt-0.5">{preset.description}</p>
           <div className="flex items-center gap-1.5 mt-2">
-            {preset.dayOrder.map((dk) => (
-              <span key={dk} className="w-5 h-5 rounded-lg flex items-center justify-center text-[8px] font-black shrink-0" style={{ backgroundColor: preset.days[dk].color + "22", color: preset.days[dk].color }}>{preset.days[dk].label.charAt(0)}</span>
-            ))}
+            {preset.dayOrder.map((dk) => {
+              const dColor = preset.days[dk].color, muted = muteHexColor(dColor);
+              return <span key={dk} className="w-5 h-5 rounded-lg flex items-center justify-center text-[8px] font-black shrink-0" style={{ backgroundColor: dColor + "1c", color: muted }}>{preset.days[dk].label.charAt(0)}</span>;
+            })}
             <span className="text-[10px] text-slate-600 ml-1">{dayCount} día{dayCount === 1 ? "" : "s"}/semana</span>
           </div>
         </div>
@@ -3703,6 +3775,236 @@ function builderDaysFromRoutineDef(routineDef) {
 }
 
 /* ============================================================================
+   IMPORTAR RUTINA DESDE UN ARCHIVO (Excel, PDF, Word, CSV, texto plano).
+
+   `xlsx` lee directamente el binario de .xlsx/.xls (hoja por hoja, fila por
+   fila). `pdfjs-dist` lee el texto "de verdad" embebido en un PDF (no hace
+   falta copiar y pegar). Para Word no hay una librería liviana 100%
+   client-side instalada todavía — si subís un .docx, se lo avisa y se le
+   pide que copie el texto de adentro (Ctrl+A, Ctrl+C en Word) y lo pegue en
+   la caja de texto, que funciona exactamente igual.
+
+   Una vez que hay texto (de cualquiera de esas fuentes, o pegado a mano), un
+   parser heurístico hace el resto: detecta los "días" (líneas cortas sin
+   números, tipo "Push" o "Día 1") y los ejercicios — tanto en formato libre
+   ("Press banca 3x8-10") como en filas de planilla con columnas separadas
+   por coma/tabulación (nombre, series, repeticiones en celdas distintas) —
+   y busca cada nombre en el catálogo de la app para que el ejercicio
+   importado tenga nota técnica y video; si no lo reconoce, lo agrega igual
+   como ejercicio personalizado.
+============================================================================ */
+const SETREP_REGEX = /(\d+)\s*(?:series|sets)?\s*[x×X]\s*(\d+)\s*(?:[-–aA]\s*(\d+))?/;
+
+function normalizeExerciseText(s) {
+  return String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function matchExerciseToLibrary(rawName) {
+  const norm = normalizeExerciseText(rawName);
+  if (!norm) return null;
+  let best = EXERCISE_LIBRARY.find((e) => normalizeExerciseText(e.name) === norm);
+  if (best) return best;
+  let bestScore = 0;
+  EXERCISE_LIBRARY.forEach((e) => {
+    const en = normalizeExerciseText(e.name);
+    if (en.includes(norm) || norm.includes(en)) {
+      const score = Math.min(en.length, norm.length);
+      if (score > bestScore) { bestScore = score; best = e; }
+    }
+  });
+  return bestScore >= 4 ? best : null;
+}
+
+function isLikelyDayHeader(line, nextLine) {
+  if (SETREP_REGEX.test(line)) return false;
+  if (line.length > 40) return false;
+  const nextHasSets = nextLine && SETREP_REGEX.test(nextLine);
+  const looksLikeHeaderWord = /^(d[ií]a|day|push|pull|legs?|pecho|espalda|hombro|b[íi]ceps|tr[íi]ceps|piernas?|brazos?|torso|upper|lower|full ?body|lunes|martes|mi[ée]rcoles|jueves|viernes|s[áa]bado|domingo)/i.test(line);
+  return nextHasSets || looksLikeHeaderWord || (line === line.toUpperCase() && /[A-ZÁÉÍÓÚ]/.test(line));
+}
+
+// Una fila de planilla suele venir como "Ejercicio,3,8-10" o con tabs en vez
+// de comas. Si encontramos una celda puramente numérica (series) y otra que
+// parece un rango de reps, reconstruimos una línea "Nombre 3x8-10" para que
+// el mismo parser de texto libre la pueda procesar sin duplicar lógica.
+function spreadsheetRowToFreeTextLine(line) {
+  if (!/[,\t]/.test(line)) return line;
+  const cells = line.split(/\t|,/).map((c) => c.trim()).filter((c) => c !== "");
+  if (cells.length < 2) return line;
+  let setsCell = null, repsCell = null, nameCells = [];
+  cells.forEach((c) => {
+    if (/^\d+$/.test(c) && setsCell == null && parseInt(c, 10) <= 10) { setsCell = c; return; }
+    if (/^\d+\s*-\s*\d+$/.test(c) && repsCell == null) { repsCell = c.replace(/\s+/g, ""); return; }
+    if (/^\d+$/.test(c) && repsCell == null) { repsCell = c; return; }
+    nameCells.push(c);
+  });
+  if (setsCell && repsCell && nameCells.length) return `${nameCells.join(" ")} ${setsCell}x${repsCell}`;
+  return line;
+}
+
+// Parsea texto libre (extraído de un PDF/Excel, o pegado a mano) y devuelve
+// una lista de "días" con sus ejercicios ya resueltos.
+function parseRoutineFromText(rawText) {
+  const lines = String(rawText || "").split(/\r?\n/)
+    .map((l) => spreadsheetRowToFreeTextLine(l.replace(/^[-•*\d.)\s]+/, "").trim()))
+    .filter(Boolean);
+  const days = [];
+  let current = null;
+  lines.forEach((line, i) => {
+    const m = line.match(SETREP_REGEX);
+    if (m) {
+      if (!current) { current = { label: "Día 1", exercises: [] }; days.push(current); }
+      const setsCount = Math.max(1, Math.min(8, parseInt(m[1], 10) || 3));
+      const repLow = m[2], repHigh = m[3] || m[2];
+      const repRange = repHigh && repHigh !== repLow ? `${repLow}-${repHigh}` : `${repLow}`;
+      const namePart = line.slice(0, m.index).replace(/[-:–]\s*$/, "").trim() || `Ejercicio ${current.exercises.length + 1}`;
+      const lib = matchExerciseToLibrary(namePart);
+      current.exercises.push(lib
+        ? { libId: lib.id, sets: mkSets(setsCount, repRange) }
+        : { id: builderUid("imported"), name: namePart, muscle: "Personalizado", sets: mkSets(setsCount, repRange) });
+    } else if (isLikelyDayHeader(line, lines[i + 1])) {
+      current = { label: line.replace(/[:：]\s*$/, ""), exercises: [] };
+      days.push(current);
+    }
+  });
+  return days.filter((d) => d.exercises.length > 0);
+}
+
+function buildImportedRoutineDef(parsedDays, name) {
+  const dayOrder = [];
+  const daysObj = {};
+  parsedDays.forEach((d, i) => {
+    const key = builderUid("imported_day");
+    dayOrder.push(key);
+    daysObj[key] = { label: d.label || `Día ${i + 1}`, description: "", color: BUILDER_COLOR_PALETTE[i % BUILDER_COLOR_PALETTE.length], exercises: d.exercises };
+  });
+  return { name: name || "Rutina importada", source: "custom", description: "Importada automáticamente desde un archivo.", recommendation: "", dayOrder, days: daysObj };
+}
+
+// --- Lectura real de archivos binarios (xlsx/pdfjs-dist) ---
+// Carga perezosa (import() dinámico) para no sumar peso al bundle inicial de
+// la app si la persona nunca usa "Importar rutina".
+async function extractTextFromExcelFile(file) {
+  const XLSX = await import("xlsx");
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf, { type: "array" });
+  return wb.SheetNames.map((name) => XLSX.utils.sheet_to_csv(wb.Sheets[name], { FS: "\t" })).join("\n");
+}
+
+async function extractTextFromPdfFile(file) {
+  const pdfjsLib = await import("pdfjs-dist");
+  // El worker corre la lectura en otro hilo — se apunta a la misma versión
+  // instalada vía CDN para no tener que configurar el bundler a mano.
+  if (pdfjsLib.GlobalWorkerOptions && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+  }
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  let fullText = "";
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p);
+    const content = await page.getTextContent();
+    // Reconstruye saltos de línea agrupando los fragmentos de texto por su
+    // posición vertical — pdf.js no devuelve líneas, devuelve fragmentos
+    // sueltos con coordenadas.
+    let lastY = null, pageText = "";
+    content.items.forEach((item) => {
+      const y = item.transform[5];
+      if (lastY !== null && Math.abs(y - lastY) > 2) pageText += "\n";
+      else if (lastY !== null) pageText += " ";
+      pageText += item.str;
+      lastY = y;
+    });
+    fullText += pageText + "\n";
+  }
+  return fullText;
+}
+
+// Modal de importación: subís un archivo (.pdf/.xlsx/.xls/.csv/.txt) o
+// pegás texto a mano, se detecta la rutina, y se muestra una vista previa
+// antes de crearla — así, si el parser interpretó mal algo, lo notás antes
+// de guardar nada.
+function ImportRoutineModal({ onImport, onClose }) {
+  const [text, setText] = useState("");
+  const [routineName, setRoutineName] = useState("");
+  const [parsed, setParsed] = useState(null);
+  const [notice, setNotice] = useState("");
+  const [loadingFile, setLoadingFile] = useState(false);
+
+  const handleFile = async (file) => {
+    if (!file) return;
+    const ext = file.name.split(".").pop().toLowerCase();
+    setNotice(""); setLoadingFile(true);
+    try {
+      if (["xlsx", "xls"].includes(ext)) {
+        setText(await extractTextFromExcelFile(file));
+      } else if (ext === "pdf") {
+        setText(await extractTextFromPdfFile(file));
+      } else if (["csv", "txt"].includes(ext)) {
+        setText(await file.text());
+      } else if (ext === "docx" || ext === "doc") {
+        setNotice("Todavía no podemos leer el binario de Word directamente. Abrí el archivo, copiá todo el texto (Ctrl+A, Ctrl+C) y pegalo abajo — funciona igual de bien.");
+      } else {
+        setNotice("Formato no reconocido. Probá con .pdf, .xlsx, .xls, .csv, .txt, o pegá el texto directamente.");
+      }
+    } catch (err) {
+      console.error("Error leyendo el archivo:", err);
+      setNotice("No pudimos leer ese archivo. Probá copiando y pegando el texto directamente abajo.");
+    } finally {
+      setLoadingFile(false);
+    }
+  };
+
+  const handleProcess = () => {
+    const parsedDays = parseRoutineFromText(text);
+    if (!parsedDays.length) { setNotice("No pudimos detectar ejercicios. Revisá que cada uno tenga un patrón como \"Press banca 3x8-10\" (o, si es una planilla, columnas de series y repeticiones)."); return; }
+    setNotice("");
+    setParsed(buildImportedRoutineDef(parsedDays, routineName.trim() || "Rutina importada"));
+  };
+
+  if (parsed) {
+    return (
+      <div className="fixed inset-0 z-[130] bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 modal-bg-in" onClick={onClose}>
+        <div className="bg-slate-900 border border-slate-700/60 rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50 max-h-[88vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 rounded-2xl bg-teal-500/15 text-teal-400 flex items-center justify-center shrink-0"><Sparkles size={18} /></div>
+            <div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-widest text-teal-400">Vista previa</p><h3 className="text-base font-black text-white leading-tight truncate">{parsed.name}</h3></div>
+          </div>
+          <p className="text-sm text-slate-400 mb-3">Así interpretamos tu archivo. Revisalo — si algo quedó mal, lo podés corregir después editando la rutina desde Rutinas.</p>
+          <RoutinePreview routineDef={parsed} />
+          <div className="flex gap-2 mt-4">
+            <button onClick={() => setParsed(null)} className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-400 text-sm font-semibold">Volver</button>
+            <button onClick={() => onImport(parsed)} className="flex-1 py-3 rounded-xl bg-teal-500 !text-white text-sm font-bold active:scale-[0.98] transition-all">Crear rutina</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-[130] bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 modal-bg-in" onClick={onClose}>
+      <div className="bg-slate-900 border border-slate-700/60 rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50 max-h-[92vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-base font-black text-white">Importar rutina</h3>
+          <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition"><X size={18} /></button>
+        </div>
+        <p className="text-[12px] text-slate-400 mb-3 leading-relaxed">Subí tu rutina en .pdf, .xlsx, .xls, .csv o .txt — la leemos directo. Para Word, copiá y pegá el texto acá abajo. Un ejercicio por línea (o por fila, si es una planilla), con un patrón tipo <span className="text-slate-300 font-semibold">"Press banca 3x8-10"</span>; el nombre del día (Push, Pecho, Día 1...) va solo en su propia línea.</p>
+        <label className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl border-2 border-dashed border-slate-700 text-slate-400 hover:text-white hover:border-teal-500/40 transition cursor-pointer text-sm font-semibold mb-3">
+          <Download size={15} className="rotate-180" /> {loadingFile ? "Leyendo archivo…" : "Subir archivo (PDF, Excel, CSV, TXT)"}
+          <input type="file" accept=".pdf,.xlsx,.xls,.csv,.txt,.docx,.doc" className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} disabled={loadingFile} />
+        </label>
+        <textarea value={text} onChange={(e) => setText(e.target.value)} rows={8} placeholder={"Push\nPress banca 3x8-10\nPress militar 3x8-10\n\nPull\nDominadas 3x8-10\n..."} className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-teal-500/50 mb-3" />
+        <input value={routineName} onChange={(e) => setRoutineName(e.target.value)} placeholder="Nombre para la rutina (opcional)" className="w-full bg-slate-900/80 border border-slate-700/50 rounded-xl px-3 py-2.5 text-white text-sm mb-3 focus:outline-none focus:border-teal-500/60" />
+        {notice && <p className="text-[11px] text-amber-400 mb-3 leading-relaxed">{notice}</p>}
+        <button onClick={handleProcess} disabled={!text.trim() || loadingFile} className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-sm font-bold transition-all active:scale-[0.98] ${text.trim() && !loadingFile ? "text-white shadow-lg shadow-teal-500/20" : "bg-slate-800 text-slate-600"}`} style={text.trim() && !loadingFile ? { background: "linear-gradient(135deg,#14B8A6,#0E7490)" } : {}}>
+          <Sparkles size={15} /> Detectar rutina
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================================
    WEEKLY SCHEDULE EDITOR — una fila por día de la semana (lunes a domingo),
    cada una con chips para elegir qué día de la rutina (o descanso) le
    corresponde. Permite repetir días de la rutina dentro de la semana (por
@@ -3839,9 +4141,9 @@ function RoutineBuilder({ initialRoutine, onCancel, onSave }) {
 
 /* ============================================================================
    RUTINAS VIEW — pantalla principal: rutina activa, las que ya guardaste, el
-   catálogo de preestablecidas, y el botón para crear una propia. Es la misma
-   pantalla que se muestra a la fuerza (forced=true) cuando un perfil nuevo
-   todavía no eligió ninguna rutina.
+   catálogo de preestablecidas, y el botón para crear una propia o importar
+   una desde un archivo. Es la misma pantalla que se muestra a la fuerza
+   (forced=true) cuando un perfil nuevo todavía no eligió ninguna rutina.
 ============================================================================ */
 function RoutinesView({ profile, forced, onActivate, onUpdate, onDelete }) {
   const [mode, setMode] = useState("catalog");
@@ -3849,6 +4151,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onDelete }) {
   const [showSchedule, setShowSchedule] = useState(false);
   const [shareTarget, setShareTarget] = useState(null);
   const [pendingActivation, setPendingActivation] = useState(null);
+  const [showImport, setShowImport] = useState(false);
   const routines = profile?.routines || {};
   const activeId = profile?.activeRoutineId;
   const activeDef = routines[activeId];
@@ -3864,10 +4167,11 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onDelete }) {
   const activeSchedule = activeDef ? getRoutineWeekSchedule(activeDef) : {};
   const updateActiveScheduleDay = (wk, dayKeyOrNull) => { onUpdate(activeId, { ...activeDef, weekSchedule: { ...activeSchedule, [wk]: dayKeyOrNull } }); };
 
-  // Activar una rutina recién elegida (preset clonado o recién creada) pasa
-  // primero por "¿qué días entrenás cada cosa?" — así no hay que ir después
-  // a Rutinas a configurarlo aparte. Reactivar una rutina YA guardada (que
-  // ya tiene su propio cronograma) no pasa por este paso, va directo.
+  // Activar una rutina recién elegida (preset clonado, recién creada, o
+  // recién importada de un archivo) pasa primero por "¿qué días entrenás
+  // cada cosa?" — así no hay que ir después a Rutinas a configurarlo
+  // aparte. Reactivar una rutina YA guardada (que ya tiene su propio
+  // cronograma) no pasa por este paso, va directo.
   const handleUseClick = (id, def) => {
     if (def) { setPendingActivation({ id, def: { ...def, weekSchedule: getRoutineWeekSchedule(def) } }); setMode("scheduleSetup"); }
     else onActivate(id, null);
@@ -3918,7 +4222,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onDelete }) {
         <div className="text-center pt-2 pb-1">
           <div className="w-14 h-14 rounded-2xl bg-teal-500/15 flex items-center justify-center mx-auto mb-3"><Layers className="text-teal-500" size={26} /></div>
           <h2 className="text-lg font-black text-white">¿Cómo vas a entrenar?</h2>
-          <p className="text-sm text-slate-500 mt-1.5 leading-relaxed px-2">Elegí una rutina ya armada o creá la tuya desde cero. La vas a poder cambiar cuando quieras.</p>
+          <p className="text-sm text-slate-500 mt-1.5 leading-relaxed px-2">Elegí una rutina ya armada, creá la tuya desde cero, o importá una que ya tengas escrita. La vas a poder cambiar cuando quieras.</p>
         </div>
       )}
 
@@ -3953,9 +4257,10 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onDelete }) {
             <div className="bg-black/20 rounded-xl p-2 text-center"><p className="text-sm font-black text-white tabular-nums">{activeStats.sets}</p><p className="text-[9px] text-slate-500 mt-0.5">Series</p></div>
           </div>
           <div className="relative flex items-center gap-1.5 mt-3 flex-wrap">
-            {activeDef.dayOrder.map((dk) => (
-              <span key={dk} className="text-[10px] font-bold px-2 py-0.5 rounded-lg" style={{ backgroundColor: activeDef.days[dk].color + "20", color: activeDef.days[dk].color }}>{activeDef.days[dk].label}</span>
-            ))}
+            {activeDef.dayOrder.map((dk) => {
+              const dColor = activeDef.days[dk].color, muted = muteHexColor(dColor);
+              return <span key={dk} className="text-[10px] font-bold px-2 py-0.5 rounded-lg" style={{ backgroundColor: dColor + "1c", color: muted }}>{activeDef.days[dk].label}</span>;
+            })}
           </div>
           <button onClick={() => setShowSchedule((s) => !s)} className="relative w-full flex items-center justify-center gap-1.5 mt-3 py-2 rounded-xl border border-white/10 text-teal-200 hover:text-white transition text-[11px] font-bold">
             <Calendar size={11} /> {showSchedule ? "Ocultar" : "Configurar"} días de la semana
@@ -3990,7 +4295,10 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onDelete }) {
         </div>
       </div>
 
-      <button onClick={() => { setEditingRoutineId(null); setMode("builder"); }} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98] shadow-lg shadow-teal-500/20" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}><Sparkles size={15} /> Crear mi propia rutina</button>
+      <div className="flex gap-2">
+        <button onClick={() => { setEditingRoutineId(null); setMode("builder"); }} className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98] shadow-lg shadow-teal-500/20" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}><Sparkles size={15} /> Crear mi rutina</button>
+        <button onClick={() => setShowImport(true)} className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition text-sm font-bold active:scale-[0.98]"><Download size={15} /> Importar rutina</button>
+      </div>
 
       {shareTarget && (
         <ShareLinkModal
@@ -3999,6 +4307,13 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onDelete }) {
           shareText={`Mirá mi rutina "${shareTarget.name}" en Mi Rutina 💪`}
           url={buildRoutineShareUrl(shareTarget)}
           onClose={() => setShareTarget(null)}
+        />
+      )}
+
+      {showImport && (
+        <ImportRoutineModal
+          onImport={(def) => { setShowImport(false); handleUseClick(builderUid("imported_routine"), def); }}
+          onClose={() => setShowImport(false)}
         />
       )}
     </div>
@@ -4072,6 +4387,13 @@ export default function App() {
   const [showHelp, setShowHelp] = useState(false);
   const [helpStartTab, setHelpStartTab] = useState(null);
   const [recoveredNotice, setRecoveredNotice] = useState(false);
+  // Se pone en true justo después de un logout explícito ("Cambiar de
+  // perfil") para que LoginScreen NO se auto-loguee sola de nuevo al mismo
+  // perfil — antes, con un solo perfil sin PIN en el dispositivo, tocar ese
+  // botón no parecía hacer nada porque te re-logueaba al instante. En una
+  // carga nueva de la página este estado vuelve a su valor inicial (false),
+  // así que el auto-login normal al abrir la app sigue funcionando igual.
+  const [justLoggedOut, setJustLoggedOut] = useState(false);
 
   useEffect(() => {
     const saved = loadActive();
@@ -4103,9 +4425,10 @@ export default function App() {
 
   const profile = profiles[activeProfile], logs = profile?.logs || {}, drafts = profile?.drafts || {};
   const themeClass = getProfileSettings(profile).theme === "light" ? "light-mode" : "";
-  // La rutina activa del perfil actual (o Push Pull Legs + Hombro/Brazo como respaldo) se
-  // recalcula en cada render — así ROUTINE/DAY_ORDER/EXERCISE_BY_ID/KEY_TO_DAY
-  // siempre reflejan la rutina correcta antes de que se rendericen sus hijos.
+  // La rutina activa del perfil actual (o Push/ Pull/ Legs + Hombro/Brazo
+  // como respaldo) se recalcula en cada render — así
+  // ROUTINE/DAY_ORDER/EXERCISE_BY_ID/KEY_TO_DAY siempre reflejan la rutina
+  // correcta antes de que se rendericen sus hijos.
   const activeRoutineDef = (profile && profile.routines && profile.routines[profile.activeRoutineId]) || null;
   applyRoutineModel(activeRoutineDef || CLASSIC_PRESET);
   const needsRoutinePick = !!profile && !profile.activeRoutineId;
@@ -4199,9 +4522,9 @@ export default function App() {
   // a cambios de pestaña/día/colapsar tarjetas; sólo se limpian al resetear
   // el día (RoutineView) o al finalizar la sesión (handleEndSession, abajo).
   const setDrafts = useCallback((newDrafts) => { const np = { ...profiles, [activeProfile]: { ...profiles[activeProfile], drafts: newDrafts } }; setProfiles(np); saveProfiles(np); }, [profiles, activeProfile]);
-  const handleLogin = (name, updatedProfiles) => { const profs = updatedProfiles || profiles; setProfiles(profs); setActiveProfile(name); setTab("rutina"); };
-  const handleLogout = () => { saveActive(null); setActiveProfile(null); setShowHelp(false); setHelpStartTab(null); };
-  const handleDelete = () => { const np = { ...profiles }; delete np[activeProfile]; setProfiles(np); saveProfiles(np); saveActive(null); setActiveProfile(null); setShowHelp(false); setHelpStartTab(null); };
+  const handleLogin = (name, updatedProfiles) => { const profs = updatedProfiles || profiles; setProfiles(profs); setActiveProfile(name); setJustLoggedOut(false); setTab("rutina"); };
+  const handleLogout = () => { saveActive(null); setActiveProfile(null); setJustLoggedOut(true); setShowHelp(false); setHelpStartTab(null); };
+  const handleDelete = () => { const np = { ...profiles }; delete np[activeProfile]; setProfiles(np); saveProfiles(np); saveActive(null); setActiveProfile(null); setJustLoggedOut(true); setShowHelp(false); setHelpStartTab(null); };
   const handleUpdateProfile = (updates) => { const np = { ...profiles, [activeProfile]: { ...profiles[activeProfile], ...updates } }; setProfiles(np); saveProfiles(np); };
   const handleSetCycleStart = (d) => { setCycleStartState(d); saveCycleStart(d); };
 
@@ -4278,7 +4601,7 @@ export default function App() {
     });
   };
 
-  if (!activeProfile) return (<><StyleInjector />{recoveredNotice && <RecoveredBanner onClose={() => setRecoveredNotice(false)} />}<LoginScreen onLogin={handleLogin} /></>);
+  if (!activeProfile) return (<><StyleInjector />{recoveredNotice && <RecoveredBanner onClose={() => setRecoveredNotice(false)} />}<LoginScreen onLogin={handleLogin} allowAutoLogin={!justLoggedOut} /></>);
 
   if (needsRoutinePick) return (
     <>
@@ -4314,7 +4637,7 @@ export default function App() {
               <h1 className="font-black text-base text-white leading-tight tracking-tight">{TAB_TITLES[tab] || ""}</h1>
               <p className="text-[11px] text-slate-600 leading-tight">{activeProfile}</p>
             </div>
-            {tab !== "perfil" && <button onClick={() => { setHelpStartTab(tab); setShowHelp(true); }} aria-label="Tour guiado" title="Tour guiado" className="w-8 h-8 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-center text-slate-400 hover:text-teal-400 hover:border-teal-500/30 transition active:scale-90"><Compass size={16} /></button>}
+            {tab !== "perfil" && <button onClick={() => { setHelpStartTab(tab); setShowHelp(true); }} aria-label="Ayuda" className="w-8 h-8 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-center text-slate-400 hover:text-teal-400 hover:border-teal-500/30 transition active:scale-90"><HelpCircle size={16} /></button>}
           </div>
         </header>
         <main className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto px-4 py-4 pb-28 lg:pb-10 space-y-4">
