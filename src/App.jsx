@@ -13,6 +13,8 @@ import {
   Sparkles, Layers, Video, SlidersHorizontal, ShieldCheck, UserCog,
   Share2, Download, Link2, Copy,
 } from "lucide-react";
+import { signInWithPopup } from "firebase/auth";
+import { auth, googleProvider, db } from "./firebase";
 
 /* ============================================================================
    BIBLIOTECA DE EJERCICIOS Y RUTINAS — a partir de esta actualización, la app
@@ -1426,10 +1428,12 @@ function LoginScreen({ onLogin }) {
   const deviceProfile = profileList.find((n) => profiles[n].deviceId === deviceId);
 
   const tryLogin = (name) => { const p = profiles[name]; if (p.pin) { setPendingProfile(name); setPhase("pin"); } else { saveActive(name); onLogin(name, profiles); } };
+  
   const handlePinLogin = (entered) => {
     if (entered === profiles[pendingProfile].pin) { haptic(20); saveActive(pendingProfile); onLogin(pendingProfile, profiles); }
     else { haptic([30, 40, 30]); setPinError("PIN incorrecto."); setTimeout(() => setPinError(""), 1500); }
   };
+
   const finishRegister = () => {
     const name = regName.trim();
     const newProfiles = {
@@ -1440,18 +1444,12 @@ function LoginScreen({ onLogin }) {
         email: regMail || null,
         joinedAt: new Date().toISOString(),
         deviceId,
-        // Sin `routines`/`activeRoutineId`: la pantalla de Rutinas se va a
-        // encargar de pedirle que elija una preestablecida o cree la suya.
-        // Perfil recién creado: todavía no vio el tutorial guiado de la app.
-        // Se dispara automáticamente apenas activa su primera rutina — ver
-        // `handleActivateRoutine` en el componente App.
         tutorialSeen: false,
       },
     };
     saveProfiles(newProfiles); setProfilesState(newProfiles); saveActive(name); onLogin(name, newProfiles);
   };
-  // Validación compartida del formulario (nombre/email) — la usan tanto el
-  // botón "Crear perfil" directo (sin PIN) como el link de "agregar PIN".
+
   const validateRegForm = () => {
     setRegError("");
     if (!regName.trim()) { setRegError("Ingresá tu nombre."); return false; }
@@ -1459,11 +1457,51 @@ function LoginScreen({ onLogin }) {
     if (regMail && !regMail.includes("@")) { setRegError("Email inválido."); return false; }
     return true;
   };
-  // Camino rápido (el de siempre): nombre + email, sin PIN, un solo toque.
+
   const handleRegister = () => { if (validateRegForm()) finishRegister(); };
-  // Camino opcional con PIN: valida el formulario igual, pero en vez de
-  // crear el perfil ya mismo, pasa a pedir el PIN.
   const handleWantsPin = () => { if (validateRegForm()) setRegStep(2); };
+
+  // --- NUEVA FUNCIÓN PARA INICIAR SESIÓN CON GOOGLE ---
+  const handleGoogleLogin = async () => {
+    try {
+      // 1. Abre la ventana de Google
+      const result = await signInWithPopup(auth, googleProvider);
+      const user = result.user;
+      
+      // 2. Extrae los datos de la cuenta de Google
+      const name = user.displayName || "Usuario de Google";
+      const email = user.email;
+
+      // 3. Verifica si el usuario ya existe en este dispositivo
+      if (profiles[name]) {
+        // Entra directo
+        saveActive(name);
+        onLogin(name, profiles);
+      } else {
+        // Crea un perfil nuevo usando los datos de Google
+        const newProfiles = {
+          ...profiles,
+          [name]: {
+            pin: null, // Si usa Google, no necesita PIN local
+            logs: {},
+            email: email,
+            joinedAt: new Date().toISOString(),
+            deviceId,
+            tutorialSeen: false,
+            googleUid: user.uid, // Guardamos su ID de Google para la nube
+          },
+        };
+        saveProfiles(newProfiles);
+        setProfilesState(newProfiles);
+        saveActive(name);
+        onLogin(name, newProfiles);
+      }
+    } catch (error) {
+      console.error("Error al iniciar sesión con Google:", error);
+      setRegError("Error al conectar con Google. Intentá de nuevo.");
+    }
+  };
+
   useEffect(() => { if (deviceProfile && !profiles[deviceProfile].pin) { saveActive(deviceProfile); onLogin(deviceProfile, profiles); } }, []);
 
   if (phase === "pin") return (
@@ -1479,10 +1517,6 @@ function LoginScreen({ onLogin }) {
     </div>
   );
 
-  // Creación de perfil simplificada a un solo paso para el caso común: con
-  // el nombre alcanza, "Crear perfil" te deja adentro al toque. El PIN es
-  // un link aparte, totalmente opcional — sólo si lo tocás se piden los dos
-  // pasos de siempre (elegir y confirmar).
   if (phase === "register") return (
     <div className="min-h-screen bg-[#0a0a0f] flex flex-col items-center justify-center px-4 py-8 relative overflow-hidden">
       <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-72 h-72 rounded-full bg-teal-500/10 blur-3xl pointer-events-none" />
@@ -1519,19 +1553,34 @@ function LoginScreen({ onLogin }) {
           <h1 className="text-2xl font-black text-white tracking-tight">Mi Rutina</h1>
           <p className="text-slate-500 text-sm mt-1">Seguimiento de cargas y progreso</p>
         </div>
-        {profileList.length > 0 && (<div className="mb-5"><p className="text-[11px] font-bold uppercase tracking-widest text-slate-600 mb-3">Perfiles</p><div className="space-y-2">{profileList.map((name) => (
+
+        {/* --- BOTÓN DE GOOGLE --- */}
+        <button onClick={handleGoogleLogin} className="w-full mb-5 py-3.5 rounded-2xl bg-white text-slate-900 font-bold text-sm hover:bg-slate-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 shadow-lg shadow-white/10">
+          <svg className="w-5 h-5" viewBox="0 0 24 24">
+            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+          </svg>
+          Continuar con Google
+        </button>
+
+        {profileList.length > 0 && (<div className="mb-5"><p className="text-[11px] font-bold uppercase tracking-widest text-slate-600 mb-3">Perfiles en este dispositivo</p><div className="space-y-2">{profileList.map((name) => (
           <button key={name} onClick={() => tryLogin(name)} className="w-full flex items-center gap-3.5 bg-slate-900/60 border border-slate-800/60 hover:border-teal-500/30 rounded-2xl px-4 py-3.5 transition-all active:scale-[0.98] text-left group">
             <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg font-black shrink-0" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)", color: "white" }}>{name.charAt(0).toUpperCase()}</div>
-            <div className="flex-1 min-w-0"><p className="text-white font-semibold text-sm">{name}</p><p className="text-[11px] text-slate-500">{profiles[name].pin ? "🔒 Con PIN" : "Sin PIN"} · {profiles[name].deviceId === deviceId ? "Este dispositivo" : "Otro dispositivo"}</p></div>
+            <div className="flex-1 min-w-0">
+              <p className="text-white font-semibold text-sm truncate">{name}</p>
+              <p className="text-[11px] text-slate-500">{profiles[name].googleUid ? "Vinculado a Google" : profiles[name].pin ? "🔒 Con PIN" : "Sin PIN"}</p>
+            </div>
             <ChevronRight size={16} className="text-slate-600 group-hover:text-teal-400 transition shrink-0" />
           </button>
         ))}</div></div>)}
-        <button onClick={() => setPhase("register")} className="w-full py-4 rounded-2xl border border-dashed border-slate-700 text-slate-400 hover:text-white hover:border-teal-500/40 transition-all text-sm font-semibold flex items-center justify-center gap-2">+ Crear perfil nuevo</button>
+        <button onClick={() => setPhase("register")} className="w-full py-4 rounded-2xl border border-dashed border-slate-700 text-slate-400 hover:text-white hover:border-teal-500/40 transition-all text-sm font-semibold flex items-center justify-center gap-2">+ Crear perfil sin Google</button>
+        {regError && <p className="text-rose-400 text-xs mt-3 text-center">{regError}</p>}
       </div>
     </div>
   );
 }
-
 /* ============================================================================
    REST TIMER
 ============================================================================ */
