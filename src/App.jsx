@@ -2876,21 +2876,34 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
 /* ============================================================================
    SESSION HISTORY — calendar + list views over buildSessionsIndex(logs)
 ============================================================================ */
-function SessionDetailCard({ session }) {
+function SessionDetailCard({ session, onDelete }) {
   const dateLabel = new Date(session.date + "T00:00:00").toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" });
+  const [confirmDel, setConfirmDel] = useState(false);
   return (
     <div className="bg-slate-900/60 border border-slate-800/50 rounded-2xl p-4 bounce-in">
-      <div className="flex items-center justify-between mb-3">
-        <div>
+      <div className="flex items-center justify-between mb-3 gap-2">
+        <div className="min-w-0">
           <p className="text-sm font-bold text-white capitalize">{dateLabel}</p>
-          <div className="flex gap-1 mt-1">{session.dayKeys.map((dk) => <span key={dk} className="text-[10px] font-bold px-1.5 py-0.5 rounded-lg" style={{ backgroundColor: ROUTINE[dk].color + "20", color: muteHexColor(ROUTINE[dk].color) }}>{ROUTINE[dk].label}</span>)}</div>
+          <div className="flex gap-1 mt-1 flex-wrap">{session.dayKeys.map((dk) => <span key={dk} className="text-[10px] font-bold px-1.5 py-0.5 rounded-lg" style={{ backgroundColor: ROUTINE[dk].color + "20", color: muteHexColor(ROUTINE[dk].color) }}>{ROUTINE[dk].label}</span>)}</div>
         </div>
-        <div className="text-right shrink-0">
-          <p className="text-sm font-black text-white">{session.totalSets} <span className="text-[10px] text-slate-500 font-normal">series</span></p>
-          {session.improvedCount > 0 && <p className="text-[10px] font-bold text-emerald-400 mt-0.5 flex items-center justify-end gap-1"><TrendingUp size={10} /> {session.improvedCount} mejora{session.improvedCount === 1 ? "" : "s"}</p>}
-          {session.avgRpe != null && <p className="text-[10px] font-bold mt-0.5" style={{ color: rpeColor(session.avgRpe) }}>RPE prom. {session.avgRpe}</p>}
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="text-right">
+            <p className="text-sm font-black text-white">{session.totalSets} <span className="text-[10px] text-slate-500 font-normal">series</span></p>
+            {session.improvedCount > 0 && <p className="text-[10px] font-bold text-emerald-400 mt-0.5 flex items-center justify-end gap-1"><TrendingUp size={10} /> {session.improvedCount} mejora{session.improvedCount === 1 ? "" : "s"}</p>}
+            {session.avgRpe != null && <p className="text-[10px] font-bold mt-0.5" style={{ color: rpeColor(session.avgRpe) }}>RPE prom. {session.avgRpe}</p>}
+          </div>
+          {onDelete && !confirmDel && (
+            <button onClick={() => setConfirmDel(true)} aria-label="Borrar este día" className="p-1.5 rounded-lg text-slate-600 hover:text-rose-400 transition shrink-0"><Trash2 size={14} /></button>
+          )}
         </div>
       </div>
+      {confirmDel && (
+        <div className="flex gap-2 items-center mb-3 bg-rose-950/30 border border-rose-500/20 rounded-xl px-3 py-2 bounce-in">
+          <p className="text-[11px] text-rose-300/80 flex-1">¿Borrar el entrenamiento de este día? Los récords no cambian.</p>
+          <button onClick={() => setConfirmDel(false)} className="px-2 py-1 rounded-lg bg-slate-800 text-slate-400 text-[11px]">No</button>
+          <button onClick={() => onDelete(session.date)} className="px-2 py-1 rounded-lg bg-rose-500 !text-white text-[11px] font-bold">Sí, borrar</button>
+        </div>
+      )}
       <div className="space-y-1.5">
         {session.items.map((it, i) => (
           <div key={i} className="flex items-center justify-between text-xs">
@@ -2903,7 +2916,7 @@ function SessionDetailCard({ session }) {
   );
 }
 
-function SessionHistoryView({ logs }) {
+function SessionHistoryView({ logs, onDeleteDay }) {
   const sessions = useMemo(() => buildSessionsIndex(logs), [logs]);
   const sessionByDate = useMemo(() => { const m = {}; sessions.forEach((s) => { m[s.date] = s; }); return m; }, [sessions]);
   const [view, setView] = useState("calendar");
@@ -2912,6 +2925,7 @@ function SessionHistoryView({ logs }) {
   const [selectedDate, setSelectedDate] = useState(null);
   const weeks = useMemo(() => getMonthMatrix(cursor.y, cursor.m), [cursor]);
   const selectedSession = selectedDate ? sessionByDate[selectedDate] : null;
+  const handleDeleteDay = (date) => { onDeleteDay?.(date); if (selectedDate === date) setSelectedDate(null); };
 
   if (!sessions.length) {
     return (
@@ -2957,11 +2971,11 @@ function SessionHistoryView({ logs }) {
               })}
             </div>
           </div>
-          {selectedSession ? <SessionDetailCard session={selectedSession} /> : <p className="text-center text-[11px] text-slate-600 py-2">Tocá un día con marca para ver el detalle.</p>}
+          {selectedSession ? <SessionDetailCard session={selectedSession} onDelete={handleDeleteDay} /> : <p className="text-center text-[11px] text-slate-600 py-2">Tocá un día con marca para ver el detalle.</p>}
         </div>
       ) : (
         <div key="list" className="space-y-2.5 tab-fade-in">
-          {sessions.map((s) => <SessionDetailCard key={s.date} session={s} />)}
+          {sessions.map((s) => <SessionDetailCard key={s.date} session={s} onDelete={handleDeleteDay} />)}
         </div>
       )}
     </div>
@@ -3127,7 +3141,7 @@ const PROGRESS_SECTIONS = [
   { k: "muscle", l: "Músculo", icon: <BarChart3 size={15} />, color: "#A855F7" },
 ];
 
-function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_SETTINGS }) {
+function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_SETTINGS, onResetAll, onDeleteDay }) {
   const allExercises = useMemo(() => DAY_ORDER.flatMap((dk) => ROUTINE[dk].exercises.map((e) => ({ id: e.id, name: e.name, day: ROUTINE[dk].label, color: ROUTINE[dk].color, sets: e.sets.length, dayKey: dk }))), []);
 
   const stats = useMemo(() => {
@@ -3332,16 +3346,19 @@ function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_
           </div>
         )}
 
-        {activeSection === "historial" && <SessionHistoryView logs={logs} />}
+        {activeSection === "historial" && <SessionHistoryView logs={logs} onDeleteDay={onDeleteDay} />}
       </div>
 
       {!confirmResetProgress ? (
-        <button onClick={() => setConfirmResetProgress(true)} className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-slate-800/60 text-slate-600 hover:text-rose-400 hover:border-rose-500/30 transition text-xs font-medium"><Trash2 size={12} /> Resetear todo el historial</button>
+        <div className="flex gap-2">
+          <button onClick={() => setConfirmResetProgress(true)} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-slate-800/60 text-slate-600 hover:text-rose-400 hover:border-rose-500/30 transition text-xs font-medium"><Trash2 size={12} /> Resetear todo</button>
+          <button onClick={() => setActiveSection("historial")} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-slate-800/60 text-slate-600 hover:text-amber-400 hover:border-amber-500/30 transition text-xs font-medium"><Calendar size={12} /> Borrar un día</button>
+        </div>
       ) : (
         <div className="flex gap-2 items-center bg-rose-950/30 border border-rose-500/20 rounded-xl px-3 py-2.5">
           <p className="text-xs text-rose-300/80 flex-1">¿Borrar todo el historial? Los récords se mantienen.</p>
           <button onClick={() => setConfirmResetProgress(false)} className="px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-400 text-xs">No</button>
-          <button onClick={() => { const nl = {}; Object.entries(logs).forEach(([k, v]) => { if (k.endsWith("_pr_override")) nl[k] = v; }); setLogs(nl); setConfirmResetProgress(false); }} className="px-2.5 py-1.5 rounded-lg bg-rose-500 !text-white text-xs font-bold">Sí, borrar</button>
+          <button onClick={() => { onResetAll?.(); setConfirmResetProgress(false); }} className="px-2.5 py-1.5 rounded-lg bg-rose-500 !text-white text-xs font-bold">Sí, borrar</button>
         </div>
       )}
     </div>
@@ -4831,6 +4848,45 @@ export default function App() {
     });
   };
 
+  // "Resetear todo el historial" (Progreso): antes sólo limpiaba `logs`, así
+  // que un día donde se haya usado Iniciar/Finalizar sesión (que se guarda
+  // aparte, en `trainingSessions`) seguía contando como "entrenado" en la
+  // estadística de Días aunque ya no tuviera ninguna serie registrada — ese
+  // era el bug. Ahora limpia las dos cosas a la vez. Los récords
+  // (_pr_override) nunca se tocan, como en el resto de la app.
+  const handleResetAllHistory = useCallback(() => {
+    setProfiles((prev) => {
+      const p = prev[activeProfile];
+      if (!p) return prev;
+      const newLogs = {};
+      Object.entries(p.logs || {}).forEach(([k, v]) => { if (k.endsWith("_pr_override")) newLogs[k] = v; });
+      const np = { ...prev, [activeProfile]: { ...p, logs: newLogs, trainingSessions: [] } };
+      saveProfiles(np);
+      return np;
+    });
+  }, [activeProfile]);
+
+  // Borrar un día puntual del historial (Progreso → Historial → ícono de
+  // tacho en el detalle de ese día): quita sólo las series de esa fecha de
+  // cada ejercicio, y la sesión explícita de Iniciar/Finalizar de ese día
+  // si la hubiera — sin tocar ningún otro día ni los récords.
+  const handleDeleteDay = useCallback((date) => {
+    setProfiles((prev) => {
+      const p = prev[activeProfile];
+      if (!p) return prev;
+      const newLogs = { ...(p.logs || {}) };
+      Object.entries(newLogs).forEach(([k, v]) => {
+        if (k.endsWith("_pr_override") || !Array.isArray(v)) return;
+        const filtered = v.filter((e) => e.date !== date);
+        if (filtered.length) newLogs[k] = filtered; else delete newLogs[k];
+      });
+      const newSessions = (p.trainingSessions || []).filter((s) => s.date !== date);
+      const np = { ...prev, [activeProfile]: { ...p, logs: newLogs, trainingSessions: newSessions } };
+      saveProfiles(np);
+      return np;
+    });
+  }, [activeProfile]);
+
   if (!activeProfile) return (<><StyleInjector />{recoveredNotice && <RecoveredBanner onClose={() => setRecoveredNotice(false)} />}<LoginScreen onLogin={handleLogin} allowAutoLogin={!justLoggedOut} /></>);
 
   if (needsRoutinePick) return (
@@ -4874,7 +4930,7 @@ export default function App() {
           <div key={tab} className="tab-fade-in">
             {tab === "rutinas" && <RoutinesView profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onDelete={handleDeleteRoutine} />}
             {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} />}
-            {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} />}
+            {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} />}
             {tab === "descarga" && <DeloadView logs={logs} settings={getProfileSettings(profile)} />}
             {tab === "perfil" && <ProfileView profileName={activeProfile} profiles={profiles} logs={logs} onLogout={handleLogout} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} />}
           </div>
@@ -4927,4 +4983,3 @@ function DeloadNoticeBanner({ onClose }) {
     </div>
   );
 }
-
