@@ -1221,6 +1221,7 @@ function ShareLinkModal({ title, shareTitle, shareText, shareTarget, onClose }) 
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState(false);
   const [exporting, setExporting] = useState(null);
+  const [showFileOptions, setShowFileOptions] = useState(false);
   const urlInputRef = useRef(null);
 
   // El enlace ya no se armaba localmente (antes codificaba toda la rutina
@@ -1324,16 +1325,20 @@ function ShareLinkModal({ title, shareTitle, shareText, shareTarget, onClose }) 
             </button>
             {copyError && <p className="text-[11px] text-amber-400 mt-2 text-center">No pudimos copiarlo automáticamente — tocá el enlace de abajo y copialo a mano.</p>}
             <input ref={urlInputRef} value={url} readOnly onFocus={(e) => e.target.select()} className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-3 py-2.5 text-[11px] text-slate-400 mt-3 focus:outline-none focus:border-teal-500/50 truncate" />
-            <p className="text-[10px] text-slate-600 mt-3 text-center">Quien abra el enlace puede agregar la rutina a su propia app con un toque. Para Instagram: copiá el enlace y pegalo en tu historia, bio o un mensaje.</p>
+            <p className="text-[10px] text-slate-600 mt-3 text-center">Quien abra el enlace puede agregar la rutina a su propia app con un toque.</p>
 
-            <div className="mt-4 pt-4 border-t border-slate-800/60">
-              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2.5">O descargala como archivo</p>
-              <div className="grid grid-cols-3 gap-2">
-                <button onClick={() => handleExportDoc("pdf")} disabled={!!exporting} className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition disabled:opacity-50">{exporting === "pdf" ? <RotateCcw size={15} className="animate-spin text-rose-400" /> : <Download size={15} className="text-rose-400" />}PDF</button>
-                <button onClick={() => handleExportDoc("word")} disabled={!!exporting} className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition disabled:opacity-50">{exporting === "word" ? <RotateCcw size={15} className="animate-spin text-blue-400" /> : <Download size={15} className="text-blue-400" />}Word</button>
-                <button onClick={() => handleExportDoc("excel")} disabled={!!exporting} className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition disabled:opacity-50">{exporting === "excel" ? <RotateCcw size={15} className="animate-spin text-emerald-400" /> : <Download size={15} className="text-emerald-400" />}Excel</button>
+            {!showFileOptions ? (
+              <button onClick={() => setShowFileOptions(true)} className="w-full flex items-center justify-center gap-1.5 mt-3 pt-3 border-t border-slate-800/60 text-slate-500 hover:text-slate-300 text-xs font-semibold transition"><Download size={12} /> O descargala como archivo (PDF, Word, Excel)</button>
+            ) : (
+              <div className="mt-4 pt-4 border-t border-slate-800/60">
+                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2.5">Descargar como archivo</p>
+                <div className="grid grid-cols-3 gap-2">
+                  <button onClick={() => handleExportDoc("pdf")} disabled={!!exporting} className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition disabled:opacity-50">{exporting === "pdf" ? <RotateCcw size={15} className="animate-spin text-rose-400" /> : <Download size={15} className="text-rose-400" />}PDF</button>
+                  <button onClick={() => handleExportDoc("word")} disabled={!!exporting} className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition disabled:opacity-50">{exporting === "word" ? <RotateCcw size={15} className="animate-spin text-blue-400" /> : <Download size={15} className="text-blue-400" />}Word</button>
+                  <button onClick={() => handleExportDoc("excel")} disabled={!!exporting} className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition disabled:opacity-50">{exporting === "excel" ? <RotateCcw size={15} className="animate-spin text-emerald-400" /> : <Download size={15} className="text-emerald-400" />}Excel</button>
+                </div>
               </div>
-            </div>
+            )}
           </>
         )}
       </div>
@@ -1588,7 +1593,7 @@ function ShareImageModal({ title, fileNamePrefix, shareTitle, shareText, draw, o
           <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition"><X size={18} /></button>
         </div>
         <canvas ref={canvasRef} className="hidden" />
-        {previewUrl && <img src={previewUrl} alt="Vista previa para compartir" className="w-full rounded-2xl border border-slate-800/60 mb-4" style={{ aspectRatio: "9 / 16", objectFit: "cover" }} />}
+        {previewUrl && <img src={previewUrl} alt="Vista previa para compartir" className="w-full rounded-2xl border border-slate-800/60 mb-4" style={{ aspectRatio: "9 / 16", objectFit: "cover", maxHeight: "50vh" }} />}
         <div className="flex gap-2">
           <button onClick={handleDownload} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition text-sm font-semibold"><Download size={14} /> Descargar</button>
           <button onClick={handleShare} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98] shadow-lg shadow-teal-500/20" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}><Share2 size={14} /> Compartir</button>
@@ -1605,6 +1610,76 @@ function ShareImageModal({ title, fileNamePrefix, shareTitle, shareText, draw, o
 /* ============================================================================
    PIN INPUT
 ============================================================================ */
+/* ============================================================================
+   SWIPE TO ARCHIVE — deslizá una fila hacia la derecha y un tacho rojo se
+   va asomando por la izquierda (como agregar una canción a la cola en
+   Spotify); soltala pasado la mitad para que quede revelado, tocá el
+   tacho y confirmá. OJO: esto nunca borra datos — sólo oculta el perfil o
+   la rutina de la lista hasta que se recupere (ver más abajo en
+   LoginScreen y RoutinesView). Funciona con mouse y con touch (pointer
+   events), y un primer toque sobre la fila revelada la vuelve a cerrar en
+   vez de disparar la acción normal de la fila (tocarla una segunda vez ya
+   sí hace lo de siempre).
+============================================================================ */
+function SwipeToArchive({ children, onArchive, confirmText, revealWidth = 84 }) {
+  const [dragX, setDragX] = useState(0);
+  const [confirming, setConfirming] = useState(false);
+  const draggingRef = useRef(false);
+  const movedRef = useRef(false);
+  const startXRef = useRef(0);
+  const startDragRef = useRef(0);
+
+  const handlePointerDown = (e) => {
+    draggingRef.current = true;
+    movedRef.current = false;
+    startXRef.current = e.clientX;
+    startDragRef.current = dragX;
+  };
+  const handlePointerMove = (e) => {
+    if (!draggingRef.current) return;
+    const delta = e.clientX - startXRef.current;
+    if (Math.abs(delta) > 6) movedRef.current = true;
+    setDragX(Math.min(revealWidth, Math.max(0, startDragRef.current + delta)));
+  };
+  const handlePointerUp = () => {
+    draggingRef.current = false;
+    setDragX((x) => (x > revealWidth / 2 ? revealWidth : 0));
+  };
+  // Si recién arrastraste, o si la fila ya estaba revelada, el primer
+  // toque no dispara la acción normal (login/editar/etc.) — sólo la cierra.
+  const handleClickCapture = (e) => {
+    if (movedRef.current) { movedRef.current = false; e.preventDefault(); e.stopPropagation(); return; }
+    if (dragX > 0) { setDragX(0); e.preventDefault(); e.stopPropagation(); }
+  };
+
+  return (
+    <div className="relative overflow-hidden rounded-2xl">
+      <div className="absolute inset-y-0 left-0 flex items-center pl-5 bg-rose-500 rounded-2xl" style={{ width: revealWidth }}>
+        <button onClick={() => setConfirming(true)} aria-label="Quitar de la lista" className="text-white active:scale-90 transition"><Trash2 size={18} /></button>
+      </div>
+      <div
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        onClickCapture={handleClickCapture}
+        style={{ transform: `translateX(${dragX}px)`, transition: draggingRef.current ? "none" : "transform 0.2s ease", touchAction: "pan-y" }}
+        className="relative"
+      >
+        {children}
+      </div>
+      {confirming && (
+        <div className="absolute inset-0 z-10 flex items-center gap-2 px-4 bg-slate-950/95 rounded-2xl modal-bg-in" onClick={(e) => e.stopPropagation()}>
+          <p className="text-xs text-rose-300 flex-1">{confirmText}</p>
+          <button onClick={() => { setConfirming(false); setDragX(0); }} className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs font-semibold shrink-0">No</button>
+          <button onClick={() => { setConfirming(false); setDragX(0); onArchive(); }} className="px-3 py-1.5 rounded-lg bg-rose-500 text-white text-xs font-bold shrink-0">Sí</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 function PinInput({ length = 4, onComplete, label = "Ingresá tu PIN", error, onCancel }) {
   const [digits, setDigits] = useState([]);
   const inputRef = useRef();
@@ -1652,7 +1727,7 @@ function PinInput({ length = 4, onComplete, label = "Ingresá tu PIN", error, on
    `allowAutoLogin` (default true): si hay un solo perfil en el dispositivo y
    no tiene PIN, normalmente se entra solo apenas carga la pantalla — es una
    comodidad para cuando volvés a abrir la app. Pero si LLEGASTE a esta
-   pantalla tocando "Cambiar de perfil" a propósito, ese auto-login te
+   pantalla tocando "Cerrar sesión" a propósito, ese auto-login te
    mandaba de vuelta al mismo perfil sin que pase nada (el botón "no
    funcionaba"). App() pone allowAutoLogin=false justo después de un logout
    explícito para evitar ese rebote — en una carga nueva de la página vuelve
@@ -1666,10 +1741,34 @@ function LoginScreen({ onLogin, allowAutoLogin = true }) {
   const [regName, setRegName] = useState(""); const [regMail, setRegMail] = useState(""); const [regPin, setRegPin] = useState("");
   const [regStep, setRegStep] = useState(1); const [regError, setRegError] = useState("");
   const deviceId = getDeviceId();
-  const profileList = Object.keys(profiles);
+  const profileList = Object.keys(profiles).filter((n) => !profiles[n].archived);
+  const archivedList = Object.keys(profiles).filter((n) => profiles[n].archived);
   const deviceProfile = profileList.find((n) => profiles[n].deviceId === deviceId);
+  const [showArchived, setShowArchived] = useState(false);
+  const [recoverTarget, setRecoverTarget] = useState(null);
+  const [recoverEmail, setRecoverEmail] = useState("");
+  const [recoverError, setRecoverError] = useState("");
 
   const tryLogin = (name) => { const p = profiles[name]; if (p.pin) { setPendingProfile(name); setPhase("pin"); } else { saveActive(name); onLogin(name, profiles); } };
+
+  // "Deslizar para quitar" un perfil de la lista: NUNCA borra nada — sólo
+  // lo marca como archived, así desaparece de las opciones hasta que
+  // vuelvas a entrar con Google (si está vinculado) o confirmes tu email
+  // (ver más abajo, sección de perfiles ocultos).
+  const handleArchiveProfile = (name) => {
+    const updated = { ...profiles, [name]: { ...profiles[name], archived: true } };
+    saveProfiles(updated); setProfilesState(updated);
+  };
+  const handleRecoverProfile = (name) => {
+    const p = profiles[name];
+    if (p.email) {
+      if (recoverEmail.trim().toLowerCase() !== p.email.toLowerCase()) { setRecoverError("El email no coincide con el de este perfil."); return; }
+    }
+    const updated = { ...profiles, [name]: { ...p, archived: false } };
+    saveProfiles(updated); setProfilesState(updated);
+    setRecoverTarget(null); setRecoverEmail(""); setRecoverError("");
+    tryLogin(name);
+  };
   
   const handlePinLogin = (entered) => {
     if (entered === profiles[pendingProfile].pin) { haptic(20); saveActive(pendingProfile); onLogin(pendingProfile, profiles); }
@@ -1703,22 +1802,38 @@ function LoginScreen({ onLogin, allowAutoLogin = true }) {
   const handleRegister = () => { if (validateRegForm()) finishRegister(); };
   const handleWantsPin = () => { if (validateRegForm()) setRegStep(2); };
 
-  // --- NUEVA FUNCIÓN PARA INICIAR SESIÓN CON GOOGLE ---
+  // --- FUNCIÓN PARA INICIAR SESIÓN CON GOOGLE ---
   const handleGoogleLogin = async () => {
     try {
       // 1. Abre la ventana de Google
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
-      
+
       // 2. Extrae los datos de la cuenta de Google
       const name = user.displayName || "Usuario de Google";
       const email = user.email;
 
-      // 3. Verifica si el usuario ya existe en este dispositivo
-      if (profiles[name]) {
-        // Entra directo
+      // 3. Busca primero por googleUid en TODOS los perfiles (incluidos los
+      // archivados) — así, si quitaste un perfil de la lista deslizándolo,
+      // volver a entrar con la misma cuenta de Google lo recupera solo,
+      // sin crear un duplicado ni perder el historial.
+      const matchEntry = Object.entries(profiles).find(([, p]) => p.googleUid === user.uid);
+      if (matchEntry) {
+        const [matchName, matchProfile] = matchEntry;
+        const updated = { ...profiles, [matchName]: { ...matchProfile, archived: false, email } };
+        saveProfiles(updated); setProfilesState(updated);
+        saveActive(matchName); onLogin(matchName, updated);
+        return;
+      }
+      if (profiles[name] && !profiles[name].archived) {
+        // Ya existe visible (sin vincular por uid todavía) — entra directo.
         saveActive(name);
         onLogin(name, profiles);
+      } else if (profiles[name] && profiles[name].archived) {
+        // Mismo nombre, pero estaba archivado — lo recupera.
+        const updated = { ...profiles, [name]: { ...profiles[name], archived: false, googleUid: user.uid, email } };
+        saveProfiles(updated); setProfilesState(updated);
+        saveActive(name); onLogin(name, updated);
       } else {
         // Crea un perfil nuevo usando los datos de Google
         const newProfiles = {
@@ -1808,15 +1923,56 @@ function LoginScreen({ onLogin, allowAutoLogin = true }) {
         </button>
 
         {profileList.length > 0 && (<div className="mb-5"><p className="text-[11px] font-bold uppercase tracking-widest text-slate-600 mb-3">Perfiles en este dispositivo</p><div className="space-y-2">{profileList.map((name) => (
-          <button key={name} onClick={() => tryLogin(name)} className="w-full flex items-center gap-3.5 bg-slate-900/60 border border-slate-800/60 hover:border-teal-500/30 rounded-2xl px-4 py-3.5 transition-all active:scale-[0.98] text-left group">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg font-black shrink-0" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)", color: "white" }}>{name.charAt(0).toUpperCase()}</div>
-            <div className="flex-1 min-w-0">
-              <p className="text-white font-semibold text-sm truncate">{name}</p>
-              <p className="text-[11px] text-slate-500">{profiles[name].googleUid ? "Vinculado a Google" : profiles[name].pin ? "🔒 Con PIN" : "Sin PIN"}</p>
-            </div>
-            <ChevronRight size={16} className="text-slate-600 group-hover:text-teal-400 transition shrink-0" />
-          </button>
-        ))}</div></div>)}
+          <SwipeToArchive key={name} confirmText={`¿Quitar a ${name} de esta lista? No se borra nada.`} onArchive={() => handleArchiveProfile(name)}>
+            <button onClick={() => tryLogin(name)} className="w-full flex items-center gap-3.5 bg-slate-900/60 border border-slate-800/60 hover:border-teal-500/30 rounded-2xl px-4 py-3.5 transition-all active:scale-[0.98] text-left group">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg font-black shrink-0" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)", color: "white" }}>{name.charAt(0).toUpperCase()}</div>
+              <div className="flex-1 min-w-0">
+                <p className="text-white font-semibold text-sm truncate">{name}</p>
+                <p className="text-[11px] text-slate-500">{profiles[name].googleUid ? "Vinculado a Google" : profiles[name].pin ? "🔒 Con PIN" : "Sin PIN"}</p>
+              </div>
+              <ChevronRight size={16} className="text-slate-600 group-hover:text-teal-400 transition shrink-0" />
+            </button>
+          </SwipeToArchive>
+        ))}</div>
+        <p className="text-[10px] text-slate-700 mt-2.5">Deslizá un perfil hacia la derecha para quitarlo de esta lista sin borrar sus datos.</p>
+        </div>)}
+
+        {archivedList.length > 0 && (
+          <div className="mb-5">
+            {!showArchived ? (
+              <button onClick={() => setShowArchived(true)} className="text-[11px] text-slate-600 hover:text-slate-400 font-semibold underline">¿Quitaste un perfil por error? Recuperarlo ({archivedList.length})</button>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-[11px] font-bold uppercase tracking-widest text-slate-600 mb-2">Perfiles ocultos en este dispositivo</p>
+                {archivedList.map((name) => (
+                  <div key={name} className="bg-slate-900/40 border border-slate-800/50 rounded-2xl px-4 py-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-slate-300 truncate">{name}</p>
+                      {recoverTarget !== name && <button onClick={() => { setRecoverTarget(name); setRecoverEmail(""); setRecoverError(""); }} className="text-[11px] text-teal-400 font-bold shrink-0">Recuperar</button>}
+                    </div>
+                    {recoverTarget === name && (
+                      <div className="mt-2.5 space-y-2 bounce-in">
+                        {profiles[name].email ? (
+                          <>
+                            <p className="text-[11px] text-slate-500">Confirmá el email de este perfil para recuperarlo:</p>
+                            <input value={recoverEmail} onChange={(e) => setRecoverEmail(e.target.value)} placeholder="tu@email.com" className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none" />
+                            {recoverError && <p className="text-rose-400 text-[11px]">{recoverError}</p>}
+                          </>
+                        ) : (
+                          <p className="text-[11px] text-slate-500">Este perfil no tiene email ni Google vinculado — confirmá que es el tuyo para recuperarlo.</p>
+                        )}
+                        <div className="flex gap-2">
+                          <button onClick={() => setRecoverTarget(null)} className="flex-1 py-2 rounded-xl bg-slate-800 text-slate-400 text-xs font-semibold">Cancelar</button>
+                          <button onClick={() => handleRecoverProfile(name)} className="flex-1 py-2 rounded-xl bg-teal-500 !text-white text-xs font-bold">Recuperar perfil</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
         <button onClick={() => setPhase("register")} className="w-full py-4 rounded-2xl border border-dashed border-slate-700 text-slate-400 hover:text-white hover:border-teal-500/40 transition-all text-sm font-semibold flex items-center justify-center gap-2">+ Crear perfil sin Google</button>
         {regError && <p className="text-rose-400 text-xs mt-3 text-center">{regError}</p>}
       </div>
@@ -2039,21 +2195,15 @@ function ProgresoDemo({ view }) {
     );
   }
 
-  if (view === "prs") {
-    const items = [
-      { medal: "🥇", name: "Press Banca", day: "PUSH", val: "98kg", sub: "5×80kg" },
-      { medal: "🥈", name: "Sentadilla Búlgara", day: "PIERNAS", val: "91kg", sub: "8×72.5kg" },
-      { medal: "🥉", name: "Dorsalera Agarre Ancho", day: "PULL", val: "84kg", sub: "8×65kg" },
-    ];
+  if (view === "rank") {
+    const demoRanks = {
+      hombros: { color: "#FFD23F" }, pecho: { color: "#5FC1B9" }, biceps: { color: "#2FB866" },
+      antebrazos: { color: "#94A3B8" }, core: { color: "#56A6F0" }, cuadriceps: { color: "#C026D3" },
+    };
     return (
-      <div className="space-y-2">
-        {items.map((it) => (
-          <div key={it.name} className="flex items-center gap-2.5 bg-slate-800/40 rounded-xl px-3 py-2 border border-slate-800/40">
-            <span className="text-base shrink-0 w-6 text-center">{it.medal}</span>
-            <div className="flex-1 min-w-0"><p className="text-xs font-bold text-white truncate">{it.name}</p><p className="text-[9px] font-bold text-teal-500">{it.day}</p></div>
-            <div className="text-right shrink-0"><p className="text-xs font-black text-white">{it.val}</p><p className="text-[9px] text-slate-500">{it.sub}</p></div>
-          </div>
-        ))}
+      <div className="space-y-1.5">
+        <MuscleBodyDiagram view="front" ranks={demoRanks} selected={null} onSelect={() => {}} />
+        <p className="text-center text-[10px] text-slate-600">Cada músculo, pintado según tu rango ahí</p>
       </div>
     );
   }
@@ -2217,7 +2367,6 @@ function PerfilDemo({ view }) {
   // "logout"
   return (
     <div className="space-y-2">
-      <div className="w-full flex items-center gap-2 justify-center py-2.5 rounded-xl border border-slate-700 text-slate-400 text-[11px] font-semibold"><LogOut size={12} /> Cambiar de perfil</div>
       <div className="w-full flex items-center gap-2 justify-center py-2.5 rounded-xl border border-slate-700 text-slate-400 text-[11px] font-semibold"><LogOut size={12} /> Cerrar sesión</div>
       <div className="w-full flex items-center gap-2 justify-center py-2.5 rounded-xl border border-rose-500/20 text-rose-500/70 text-[11px] font-semibold"><Trash2 size={12} /> Eliminar perfil</div>
     </div>
@@ -2465,7 +2614,7 @@ const HELP_CHAPTERS = [
       {
         icon: <BarChart3 size={20} />,
         title: "Elegí qué ver",
-        text: "Con los botones elegís entre Historial, Evolución, Top PRs o Músculo — cada uno con su propia tarjeta debajo, igual que elegís el día en la pestaña Rutina.",
+        text: "Con los botones elegís entre Historial, Evolución, Rango o Músculo — cada uno con su propia tarjeta debajo, igual que elegís el día en la pestaña Rutina.",
       },
       {
         icon: <Calendar size={20} />,
@@ -2490,10 +2639,10 @@ const HELP_CHAPTERS = [
         demo: { kind: "progreso", view: "chart", caption: "Deslizá la fila de chips para ver más ejercicios" },
       },
       {
-        icon: <Trophy size={20} />,
-        title: "Top PRs",
-        text: "\"Top PRs\" te muestra tus 5 mejores ejercicios según el 1RM estimado (una proyección de tu máximo a 1 repetición, calculada con la fórmula de Epley).",
-        demo: { kind: "progreso", view: "prs" },
+        icon: <Award size={20} />,
+        title: "Rango por músculo",
+        text: "El \"muñeco\" de toda la vida, de frente y de espalda: cada músculo se pinta según el rango que alcanzaste ahí — Bronce, Plata, Oro, Platino, Esmeralda, Diamante o Maestro (cada uno con tres niveles, salvo Maestro) — calculado con el mayor peso que levantaste en cualquier ejercicio de ese grupo. Tocá un músculo para ver tu rango, tu mejor marca, y cuánto te falta para subir.",
+        demo: { kind: "progreso", view: "rank" },
       },
       {
         icon: <Dumbbell size={20} />,
@@ -2599,8 +2748,8 @@ const HELP_CHAPTERS = [
       },
       {
         icon: <LogOut size={20} />,
-        title: "Cambiar de perfil o cerrar sesión",
-        text: "\"Cambiar de perfil\" guarda tu sesión de Google para elegir otro perfil rápido en este dispositivo. \"Cerrar sesión\" además cierra tu cuenta de Google acá. Y \"Eliminar perfil\" borra tu perfil por completo, con todo su historial (no se puede deshacer).",
+        title: "Cerrar sesión o eliminar perfil",
+        text: "\"Cerrar sesión\" cierra tu cuenta de Google en este dispositivo y te vuelve a la pantalla de inicio. \"Eliminar perfil\" en cambio borra tu perfil por completo, con todo su historial (no se puede deshacer).",
         demo: { kind: "perfil", view: "logout" },
       },
     ],
@@ -3484,16 +3633,250 @@ function ExerciseChipRow({ exercises, selId, onSelect }) {
 }
 
 // Antes era una fila con scroll horizontal (icono + texto, "Evolución" /
-// "Top PRs" / "Músculo" / "Historial") que en pantallas angostas no entraba
+// "Rango" / "Músculo" / "Historial") que en pantallas angostas no entraba
 // completa y había que deslizar para ver "Historial". Ahora es una grilla
 // fija de 4 columnas (ícono arriba, etiqueta abajo, como en la barra de
 // navegación inferior) — siempre entran los 4 sin deslizar.
 const PROGRESS_SECTIONS = [
   { k: "historial", l: "Historial", icon: <Calendar size={15} />, color: "#06B6D4" },
   { k: "chart", l: "Evolución", icon: <Activity size={15} />, color: "#3B82F6" },
-  { k: "prs", l: "Top PRs", icon: <Trophy size={15} />, color: "#F59E0B" },
+  { k: "rank", l: "Rango", icon: <Award size={15} />, color: "#F59E0B" },
   { k: "muscle", l: "Músculo", icon: <BarChart3 size={15} />, color: "#A855F7" },
 ];
+
+/* ============================================================================
+   RANGO POR MÚSCULO — el "muñeco" de las apps de rutinas: una figura de
+   frente y de espalda donde cada grupo muscular se pinta según el rango
+   que alcanzaste ahí, calculado a partir del mayor peso (kg) que alguna
+   vez levantaste en cualquier ejercicio de ese grupo. Reemplaza a la vieja
+   pestaña "Top PRs" (la vieja lista de 1RM estimado).
+
+   19 niveles en total: Bronce/Plata/Oro/Platino/Esmeralda/Diamante (cada
+   uno con I, II y III) + Maestro, el techo. Los colores son todos
+   distintos a propósito — son provisorios, pensados para que cada nivel
+   se distinga del resto, más adelante se pueden afinar para que combinen
+   mejor con la estética general de la app.
+============================================================================ */
+const RANK_TIERS = [
+  { tier: "Bronce", sub: "I", color: "#8B5A2B" },
+  { tier: "Bronce", sub: "II", color: "#A8692F" },
+  { tier: "Bronce", sub: "III", color: "#CD7F32" },
+  { tier: "Plata", sub: "I", color: "#94A3B8" },
+  { tier: "Plata", sub: "II", color: "#B8C2CC" },
+  { tier: "Plata", sub: "III", color: "#DCE3E8" },
+  { tier: "Oro", sub: "I", color: "#C99A2E" },
+  { tier: "Oro", sub: "II", color: "#E0B632" },
+  { tier: "Oro", sub: "III", color: "#FFD23F" },
+  { tier: "Platino", sub: "I", color: "#3E9C95" },
+  { tier: "Platino", sub: "II", color: "#5FC1B9" },
+  { tier: "Platino", sub: "III", color: "#8BE0D8" },
+  { tier: "Esmeralda", sub: "I", color: "#1E8449" },
+  { tier: "Esmeralda", sub: "II", color: "#2FB866" },
+  { tier: "Esmeralda", sub: "III", color: "#4CD787" },
+  { tier: "Diamante", sub: "I", color: "#2E7BD6" },
+  { tier: "Diamante", sub: "II", color: "#56A6F0" },
+  { tier: "Diamante", sub: "III", color: "#8FCBFB" },
+  { tier: "Maestro", sub: "", color: "#C026D3" },
+];
+
+// Techo (Maestro) por grupo muscular, en kg — pensado para que sea
+// exigente pero no imposible: 160kg de press banca, por ejemplo, ya te
+// pone en Maestro de pecho. Cada grupo tiene su propio techo porque la
+// capacidad de carga típica varía muchísimo entre, por ejemplo, piernas y
+// antebrazos.
+const MUSCLE_RANK_MAX_KG = {
+  pecho: 160, espalda: 180, hombros: 110, biceps: 50, triceps: 70,
+  antebrazos: 40, cuadriceps: 220, femoral: 140, gluteo: 180, core: 60, pantorrillas: 150,
+};
+
+// Qué fracción del techo hace falta para cada uno de los 19 niveles — no
+// es lineal a propósito: los primeros niveles suben rápido (para que se
+// sienta progreso enseguida) y cuesta cada vez más cerca del techo.
+const RANK_LEVEL_FRACTIONS = [0.125, 0.1875, 0.25, 0.3125, 0.375, 0.4375, 0.5, 0.5625, 0.625, 0.6875, 0.75, 0.8125, 0.875, 0.90625, 0.9375, 0.95, 0.96875, 0.9875, 1];
+
+function getMuscleRank(muscleKey, bestKg) {
+  const max = MUSCLE_RANK_MAX_KG[muscleKey] || 100;
+  if (!bestKg || bestKg <= 0) {
+    return { tier: "Bronce", sub: "I", color: "#475569", levelIdx: -1, max, threshold: 0, nextThreshold: RANK_LEVEL_FRACTIONS[0] * max, hasData: false };
+  }
+  let levelIdx = -1;
+  for (let i = 0; i < RANK_LEVEL_FRACTIONS.length; i++) { if (bestKg >= RANK_LEVEL_FRACTIONS[i] * max) levelIdx = i; }
+  if (levelIdx === -1) {
+    return { tier: "Bronce", sub: "I", color: "#475569", levelIdx: -1, max, threshold: 0, nextThreshold: RANK_LEVEL_FRACTIONS[0] * max, hasData: true };
+  }
+  const info = RANK_TIERS[levelIdx];
+  const threshold = RANK_LEVEL_FRACTIONS[levelIdx] * max;
+  const nextThreshold = levelIdx < RANK_TIERS.length - 1 ? RANK_LEVEL_FRACTIONS[levelIdx + 1] * max : null;
+  return { ...info, levelIdx, max, threshold, nextThreshold, hasData: true };
+}
+
+// Mayor peso (kg) levantado alguna vez en cualquier ejercicio de un grupo
+// muscular — recorre logs + récords corregidos a mano, respetando la misma
+// regla del resto de la app: si hay un récord corregido a mano para una
+// serie, ese manda sobre el historial de esa serie puntual.
+function getBestKgForMuscleGroup(groupKey, logs) {
+  const idsInGroup = new Set((EXERCISE_LIBRARY_BY_GROUP[groupKey] || []).map((e) => e.id));
+  const overriddenBaseKeys = new Set();
+  Object.keys(logs).forEach((k) => { if (k.endsWith("_pr_override")) overriddenBaseKeys.add(k.replace(/_pr_override$/, "")); });
+  let bestKg = 0, bestExerciseName = null;
+  Object.entries(logs).forEach(([key, val]) => {
+    const isOverride = key.endsWith("_pr_override");
+    const baseKey = isOverride ? key.replace(/_pr_override$/, "") : key;
+    if (!isOverride && overriddenBaseKeys.has(baseKey)) return;
+    const { exerciseId } = parseLogKey(baseKey);
+    if (!idsInGroup.has(exerciseId)) return;
+    const entries = isOverride ? [val] : (Array.isArray(val) ? val : []);
+    entries.forEach((e) => { if (e && e.kg > bestKg) { bestKg = e.kg; bestExerciseName = EXERCISE_LIBRARY_BY_ID[exerciseId]?.name || exerciseId; } });
+  });
+  return { bestKg, bestExerciseName };
+}
+
+// Regiones del muñeco visibles desde adelante y desde atrás — entre las
+// dos vistas se cubren los 11 grupos musculares del catálogo, cada uno en
+// la vista donde más sentido anatómico tiene (los cuádriceps de frente,
+// los isquiotibiales de atrás, etc.). Los antebrazos sólo se muestran de
+// frente para no duplicar la métrica en las dos vistas.
+const MUSCLE_BODY_FRONT_KEYS = ["hombros", "pecho", "biceps", "antebrazos", "core", "cuadriceps"];
+const MUSCLE_BODY_BACK_KEYS = ["espalda", "triceps", "gluteo", "femoral", "pantorrillas"];
+
+function MuscleBodyDiagram({ view, ranks, selected, onSelect }) {
+  const fillFor = (key) => ranks[key]?.color || "#334155";
+  const strokeFor = (key) => (selected === key ? "#f8fafc" : "transparent");
+  const NEUTRAL = "#334155";
+  if (view === "front") {
+    return (
+      <svg viewBox="0 0 240 420" className="w-full max-w-[210px] mx-auto select-none">
+        <circle cx="120" cy="28" r="20" fill={NEUTRAL} />
+        <rect x="112" y="44" width="16" height="14" fill={NEUTRAL} />
+        <g onClick={() => onSelect("hombros")} className="cursor-pointer">
+          <ellipse cx="76" cy="74" rx="24" ry="17" fill={fillFor("hombros")} stroke={strokeFor("hombros")} strokeWidth="3" />
+          <ellipse cx="164" cy="74" rx="24" ry="17" fill={fillFor("hombros")} stroke={strokeFor("hombros")} strokeWidth="3" />
+        </g>
+        <g onClick={() => onSelect("pecho")} className="cursor-pointer">
+          <rect x="78" y="66" width="84" height="60" rx="20" fill={fillFor("pecho")} stroke={strokeFor("pecho")} strokeWidth="3" />
+        </g>
+        <g onClick={() => onSelect("biceps")} className="cursor-pointer">
+          <rect x="44" y="80" width="22" height="68" rx="11" fill={fillFor("biceps")} stroke={strokeFor("biceps")} strokeWidth="3" />
+          <rect x="174" y="80" width="22" height="68" rx="11" fill={fillFor("biceps")} stroke={strokeFor("biceps")} strokeWidth="3" />
+        </g>
+        <g onClick={() => onSelect("antebrazos")} className="cursor-pointer">
+          <rect x="40" y="150" width="20" height="62" rx="10" fill={fillFor("antebrazos")} stroke={strokeFor("antebrazos")} strokeWidth="3" />
+          <rect x="180" y="150" width="20" height="62" rx="10" fill={fillFor("antebrazos")} stroke={strokeFor("antebrazos")} strokeWidth="3" />
+        </g>
+        <circle cx="50" cy="218" r="9" fill={NEUTRAL} />
+        <circle cx="190" cy="218" r="9" fill={NEUTRAL} />
+        <g onClick={() => onSelect("core")} className="cursor-pointer">
+          <rect x="90" y="124" width="60" height="54" rx="14" fill={fillFor("core")} stroke={strokeFor("core")} strokeWidth="3" />
+        </g>
+        <rect x="82" y="176" width="76" height="22" rx="10" fill={NEUTRAL} />
+        <g onClick={() => onSelect("cuadriceps")} className="cursor-pointer">
+          <rect x="82" y="196" width="34" height="112" rx="16" fill={fillFor("cuadriceps")} stroke={strokeFor("cuadriceps")} strokeWidth="3" />
+          <rect x="124" y="196" width="34" height="112" rx="16" fill={fillFor("cuadriceps")} stroke={strokeFor("cuadriceps")} strokeWidth="3" />
+        </g>
+        <rect x="86" y="310" width="26" height="78" rx="12" fill={NEUTRAL} />
+        <rect x="128" y="310" width="26" height="78" rx="12" fill={NEUTRAL} />
+        <ellipse cx="99" cy="398" rx="16" ry="8" fill={NEUTRAL} />
+        <ellipse cx="141" cy="398" rx="16" ry="8" fill={NEUTRAL} />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 240 420" className="w-full max-w-[210px] mx-auto select-none">
+      <circle cx="120" cy="28" r="20" fill={NEUTRAL} />
+      <rect x="112" y="44" width="16" height="14" fill={NEUTRAL} />
+      <ellipse cx="76" cy="74" rx="24" ry="17" fill={NEUTRAL} />
+      <ellipse cx="164" cy="74" rx="24" ry="17" fill={NEUTRAL} />
+      <g onClick={() => onSelect("espalda")} className="cursor-pointer">
+        <rect x="78" y="66" width="84" height="112" rx="22" fill={fillFor("espalda")} stroke={strokeFor("espalda")} strokeWidth="3" />
+      </g>
+      <g onClick={() => onSelect("triceps")} className="cursor-pointer">
+        <rect x="44" y="80" width="22" height="68" rx="11" fill={fillFor("triceps")} stroke={strokeFor("triceps")} strokeWidth="3" />
+        <rect x="174" y="80" width="22" height="68" rx="11" fill={fillFor("triceps")} stroke={strokeFor("triceps")} strokeWidth="3" />
+      </g>
+      <rect x="40" y="150" width="20" height="62" rx="10" fill={NEUTRAL} />
+      <rect x="180" y="150" width="20" height="62" rx="10" fill={NEUTRAL} />
+      <circle cx="50" cy="218" r="9" fill={NEUTRAL} />
+      <circle cx="190" cy="218" r="9" fill={NEUTRAL} />
+      <g onClick={() => onSelect("gluteo")} className="cursor-pointer">
+        <rect x="78" y="176" width="84" height="42" rx="18" fill={fillFor("gluteo")} stroke={strokeFor("gluteo")} strokeWidth="3" />
+      </g>
+      <g onClick={() => onSelect("femoral")} className="cursor-pointer">
+        <rect x="82" y="216" width="34" height="94" rx="16" fill={fillFor("femoral")} stroke={strokeFor("femoral")} strokeWidth="3" />
+        <rect x="124" y="216" width="34" height="94" rx="16" fill={fillFor("femoral")} stroke={strokeFor("femoral")} strokeWidth="3" />
+      </g>
+      <g onClick={() => onSelect("pantorrillas")} className="cursor-pointer">
+        <rect x="86" y="310" width="26" height="78" rx="12" fill={fillFor("pantorrillas")} stroke={strokeFor("pantorrillas")} strokeWidth="3" />
+        <rect x="128" y="310" width="26" height="78" rx="12" fill={fillFor("pantorrillas")} stroke={strokeFor("pantorrillas")} strokeWidth="3" />
+      </g>
+      <ellipse cx="99" cy="398" rx="16" ry="8" fill={NEUTRAL} />
+      <ellipse cx="141" cy="398" rx="16" ry="8" fill={NEUTRAL} />
+    </svg>
+  );
+}
+
+function MuscleRankView({ logs }) {
+  const [view, setView] = useState("front");
+  const [selected, setSelected] = useState(null);
+
+  const ranks = useMemo(() => {
+    const out = {};
+    MUSCLE_GROUPS.forEach((g) => {
+      const { bestKg, bestExerciseName } = getBestKgForMuscleGroup(g.key, logs);
+      out[g.key] = { ...getMuscleRank(g.key, bestKg), bestKg, bestExerciseName, label: g.label };
+    });
+    return out;
+  }, [logs]);
+
+  // Si cambiás de vista (frente/espalda) y el músculo seleccionado no
+  // existe en la vista nueva, lo deselecciona en vez de dejar un estado
+  // raro (seleccionado pero invisible).
+  const visibleKeys = view === "front" ? MUSCLE_BODY_FRONT_KEYS : MUSCLE_BODY_BACK_KEYS;
+  const selInfo = selected && visibleKeys.includes(selected) ? ranks[selected] : null;
+
+  return (
+    <div className="relative overflow-hidden rounded-2xl border border-amber-500/20 bg-slate-900/50 backdrop-blur-sm shadow-md shadow-black/20 p-4 space-y-3">
+      <div className="flex items-center gap-2.5 mb-1">
+        <div className="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center shrink-0"><Award size={15} /></div>
+        <p className="text-sm font-bold text-white">Rango por músculo</p>
+      </div>
+      <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60 w-fit mx-auto">
+        {[{ k: "front", l: "De frente" }, { k: "back", l: "De espalda" }].map((opt) => (
+          <button key={opt.k} onClick={() => { setView(opt.k); setSelected(null); }} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${view === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
+        ))}
+      </div>
+      <MuscleBodyDiagram view={view} ranks={ranks} selected={selected} onSelect={(k) => setSelected((s) => (s === k ? null : k))} />
+      {selInfo ? (
+        <div className="bg-slate-950/50 border border-slate-800/60 rounded-xl p-3.5 bounce-in">
+          <div className="flex items-center justify-between mb-1.5 gap-2">
+            <p className="text-sm font-bold text-white">{selInfo.label}</p>
+            <span className="text-xs font-black px-2.5 py-1 rounded-lg shrink-0" style={{ backgroundColor: selInfo.color + "30", color: selInfo.color }}>{selInfo.tier} {selInfo.sub}</span>
+          </div>
+          {selInfo.hasData ? (
+            <>
+              <p className="text-[11px] text-slate-500">Mejor marca: <span className="text-slate-300 font-bold">{selInfo.bestKg}kg</span>{selInfo.bestExerciseName ? <> en {selInfo.bestExerciseName}</> : null}</p>
+              {selInfo.nextThreshold ? (
+                <>
+                  <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden mt-2">
+                    <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(100, Math.max(4, ((selInfo.bestKg - selInfo.threshold) / (selInfo.nextThreshold - selInfo.threshold)) * 100))}%`, backgroundColor: selInfo.color }} />
+                  </div>
+                  <p className="text-[10px] text-slate-600 mt-1">Te faltan {Math.max(0, Math.round(selInfo.nextThreshold - selInfo.bestKg))}kg para el próximo rango</p>
+                </>
+              ) : <p className="text-[10px] text-amber-400 mt-1.5 font-bold">¡Rango máximo! 🏆</p>}
+            </>
+          ) : <p className="text-[11px] text-slate-600">Todavía no registraste marcas en este grupo.</p>}
+        </div>
+      ) : (
+        <p className="text-center text-[11px] text-slate-600">Tocá un músculo para ver tu rango y tu mejor marca.</p>
+      )}
+      <div className="flex flex-wrap gap-2 justify-center pt-1">
+        {["Bronce", "Plata", "Oro", "Platino", "Esmeralda", "Diamante", "Maestro"].map((t) => {
+          const rep = RANK_TIERS.find((r) => r.tier === t);
+          return <span key={t} className="flex items-center gap-1 text-[9px] text-slate-500"><span className="w-2.5 h-2.5 rounded-full inline-block shrink-0" style={{ backgroundColor: rep.color }} />{t}</span>;
+        })}
+      </div>
+    </div>
+  );
+}
 
 function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_SETTINGS, onResetAll, onDeleteDay }) {
   const allExercises = useMemo(() => DAY_ORDER.flatMap((dk) => ROUTINE[dk].exercises.map((e) => ({ id: e.id, name: e.name, day: ROUTINE[dk].label, color: ROUTINE[dk].color, sets: e.sets.length, dayKey: dk }))), []);
@@ -3519,18 +3902,6 @@ function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_
   const selEx = allExercises.find((e) => e.id === selId);
   const history = (logs[`${selId}_${selSet}`] || []).slice().sort((a, b) => (a.date > b.date ? 1 : -1));
   const chartData = history.map((h) => ({ date: h.date.slice(5), kg: h.kg, reps: h.reps, vol: vol(h.kg, h.reps), e1rm: estimate1RM(h.kg, h.reps), rpe: h.rpe ?? null }));
-
-  const prBoard = useMemo(() => {
-    return allExercises.map((ex) => {
-      let best1rm = 0, bestKg = 0, bestReps = 0;
-      Array.from({ length: ex.sets }).forEach((_, i) => {
-        const ov = logs[`${ex.id}_${i}_pr_override`], h = logs[`${ex.id}_${i}`] || [];
-        const entries = ov ? [ov] : h;
-        entries.forEach((e) => { const rm = estimate1RM(e.kg, e.reps); if (rm > best1rm) { best1rm = rm; bestKg = e.kg; bestReps = e.reps; } });
-      });
-      return { ...ex, best1rm, bestKg, bestReps };
-    }).filter((e) => e.best1rm > 0).sort((a, b) => b.best1rm - a.best1rm).slice(0, 5);
-  }, [logs, allExercises]);
 
   const [confirmResetProgress, setConfirmResetProgress] = useState(false);
   const [activeSection, setActiveSection] = useState("historial");
@@ -3652,28 +4023,7 @@ function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_
           </div>
         )}
 
-        {activeSection === "prs" && (
-          <div className="relative overflow-hidden rounded-2xl border border-amber-500/20 bg-slate-900/50 backdrop-blur-sm shadow-md shadow-black/20 p-4 space-y-2.5">
-            <div className="flex items-center gap-2.5 mb-1">
-              <div className="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center shrink-0"><Trophy size={15} /></div>
-              <p className="text-sm font-bold text-white">Top ejercicios por 1RM estimado</p>
-            </div>
-            {prBoard.length === 0 ? (
-              <div className="text-center py-10 text-slate-600"><Award size={28} className="mx-auto mb-2.5 opacity-30" /><p className="text-sm">Todavía no hay marcas registradas.</p></div>
-            ) : (
-              prBoard.map((ex, idx) => {
-                const medals = ["🥇", "🥈", "🥉", "4", "5"];
-                return (
-                  <div key={ex.id} className="flex items-center gap-3 bg-slate-950/40 rounded-xl px-3.5 py-3 border border-slate-800/40">
-                    <span className="text-lg shrink-0 w-7 text-center">{medals[idx]}</span>
-                    <div className="flex-1 min-w-0"><p className="text-sm font-bold text-white truncate">{ex.name}</p><p className="text-[10px] font-bold" style={{ color: ex.color }}>{ex.day}</p></div>
-                    <div className="text-right shrink-0"><p className="text-sm font-black text-white">{ex.best1rm}<span className="text-xs text-slate-500 font-normal">kg</span></p><p className="text-[10px] text-slate-500">{ex.bestReps}×{ex.bestKg}kg</p></div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        )}
+        {activeSection === "rank" && <MuscleRankView logs={logs} />}
 
         {activeSection === "muscle" && (
           <div className="relative overflow-hidden rounded-2xl border border-purple-500/20 bg-slate-900/50 backdrop-blur-sm shadow-md shadow-black/20 p-4 space-y-3">
@@ -3969,7 +4319,7 @@ function ExportTrainingCard({ profileName, logs }) {
 /* ============================================================================
    PROFILE VIEW — adds an entry point to the setup hub + a backup status line
 ============================================================================ */
-function ProfileView({ profileName, profiles, logs, onLogout, onSignOut, onDelete, onUpdateProfile, cycleStart, onSetCycleStart, onGoToRoutines }) {
+function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdateProfile, cycleStart, onSetCycleStart, onGoToRoutines }) {
   const profile = profiles[profileName];
   const [showDeletePin, setShowDeletePin] = useState(false); const [deleteError, setDeleteError] = useState("");
   const [editing, setEditing] = useState(false); const [editMail, setEditMail] = useState(profile?.email || "");
@@ -4140,8 +4490,6 @@ function ProfileView({ profileName, profiles, logs, onLogout, onSignOut, onDelet
         <span>Tus datos se guardan en este dispositivo, con una copia de seguridad automática.</span>
       </div>
 
-      <p className="text-[10px] text-slate-600 text-center px-2 -mt-1">"Cambiar de perfil" guarda tu sesión de Google para elegir otro perfil rápido. "Cerrar sesión" además cierra tu cuenta de Google en este dispositivo.</p>
-      <button onClick={onLogout} className="w-full flex items-center gap-2 justify-center py-3.5 rounded-2xl border border-slate-800 text-slate-400 hover:text-white hover:border-slate-600 transition text-sm font-semibold"><LogOut size={14} /> Cambiar de perfil</button>
       <button onClick={onSignOut} className="w-full flex items-center gap-2 justify-center py-3.5 rounded-2xl border border-slate-800 text-slate-400 hover:text-white hover:border-slate-600 transition text-sm font-semibold"><LogOut size={14} /> Cerrar sesión</button>
       {!showDeletePin ? (
         <button onClick={() => setShowDeletePin(true)} className="w-full flex items-center gap-2 justify-center py-3.5 rounded-2xl border border-rose-500/20 text-rose-500/70 hover:text-rose-400 hover:border-rose-500/40 transition text-sm font-semibold"><Trash2 size={14} /> Eliminar perfil de {profileName}</button>
@@ -4247,33 +4595,26 @@ function PresetRoutineCard({ preset, isActive, onUse }) {
   );
 }
 
-function SavedRoutineRow({ routine, isActive, onUse, onEdit, onShare, onDelete }) {
-  const [confirmDel, setConfirmDel] = useState(false);
+function SavedRoutineRow({ routine, isActive, onUse, onEdit, onShare, onArchive }) {
   const [open, setOpen] = useState(false);
   const dayCount = routine.dayOrder.length;
   const accent = routine.days[routine.dayOrder[0]]?.color || "#14B8A6";
   return (
-    <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl px-4 py-3.5 backdrop-blur-sm shadow-md shadow-black/20 transition-shadow hover:shadow-lg hover:shadow-black/30">
-      <div className="flex items-center gap-3">
-        <div className="w-2 h-10 rounded-full shrink-0" style={{ backgroundColor: accent, boxShadow: `0 0 10px -2px ${accent}` }} />
-        <button onClick={() => setOpen((o) => !o)} className="flex-1 min-w-0 text-left">
-          <div className="flex items-center gap-2"><p className="text-sm font-bold text-white truncate">{routine.name}</p>{isActive && <span className="text-[9px] font-black px-1.5 py-0.5 rounded-lg bg-teal-500/20 text-teal-400 shrink-0">ACTIVA</span>}</div>
-          <p className="text-[11px] text-slate-500">{dayCount} día{dayCount === 1 ? "" : "s"} · creada por vos</p>
-        </button>
-        {!isActive && <button onClick={onUse} className="px-3 py-1.5 rounded-lg bg-teal-500/15 text-teal-400 text-xs font-bold shrink-0">Activar</button>}
-        <button onClick={onShare} aria-label="Compartir rutina" className="p-2 rounded-lg text-slate-500 hover:text-cyan-400 shrink-0"><Share2 size={14} /></button>
-        <button onClick={onEdit} aria-label="Editar rutina" className="p-2 rounded-lg text-slate-500 hover:text-teal-400 shrink-0"><Edit3 size={14} /></button>
-        {!confirmDel && <button onClick={() => setConfirmDel(true)} aria-label="Borrar rutina" className="p-2 rounded-lg text-slate-600 hover:text-rose-400 shrink-0"><Trash2 size={14} /></button>}
-      </div>
-      {open && <div className="mt-3 pt-3 border-t border-slate-800/50 tab-fade-in"><RoutinePreview routineDef={routine} /></div>}
-      {confirmDel && (
-        <div className="flex gap-2 items-center mt-2.5 bg-rose-950/30 border border-rose-500/20 rounded-xl px-3 py-2 bounce-in">
-          <p className="text-[11px] text-rose-300/80 flex-1">¿Borrar "{routine.name}"? No se puede deshacer.</p>
-          <button onClick={() => setConfirmDel(false)} className="px-2 py-1 rounded-lg bg-slate-800 text-slate-400 text-[11px]">No</button>
-          <button onClick={onDelete} className="px-2 py-1 rounded-lg bg-rose-500 !text-white text-[11px] font-bold">Sí</button>
+    <SwipeToArchive confirmText={`¿Quitar "${routine.name}" de tus rutinas? No se borra nada.`} onArchive={onArchive}>
+      <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl px-4 py-3.5 backdrop-blur-sm shadow-md shadow-black/20 transition-shadow hover:shadow-lg hover:shadow-black/30">
+        <div className="flex items-center gap-3">
+          <div className="w-2 h-10 rounded-full shrink-0" style={{ backgroundColor: accent, boxShadow: `0 0 10px -2px ${accent}` }} />
+          <button onClick={() => setOpen((o) => !o)} className="flex-1 min-w-0 text-left">
+            <div className="flex items-center gap-2"><p className="text-sm font-bold text-white truncate">{routine.name}</p>{isActive && <span className="text-[9px] font-black px-1.5 py-0.5 rounded-lg bg-teal-500/20 text-teal-400 shrink-0">ACTIVA</span>}</div>
+            <p className="text-[11px] text-slate-500">{dayCount} día{dayCount === 1 ? "" : "s"} · creada por vos</p>
+          </button>
+          {!isActive && <button onClick={onUse} className="px-3 py-1.5 rounded-lg bg-teal-500/15 text-teal-400 text-xs font-bold shrink-0">Activar</button>}
+          <button onClick={onShare} aria-label="Compartir rutina" className="p-2 rounded-lg text-slate-500 hover:text-cyan-400 shrink-0"><Share2 size={14} /></button>
+          <button onClick={onEdit} aria-label="Editar rutina" className="p-2 rounded-lg text-slate-500 hover:text-teal-400 shrink-0"><Edit3 size={14} /></button>
         </div>
-      )}
-    </div>
+        {open && <div className="mt-3 pt-3 border-t border-slate-800/50 tab-fade-in"><RoutinePreview routineDef={routine} /></div>}
+      </div>
+    </SwipeToArchive>
   );
 }
 
@@ -4816,17 +5157,19 @@ function RoutineBuilder({ initialRoutine, onCancel, onSave }) {
    una desde un archivo. Es la misma pantalla que se muestra a la fuerza
    (forced=true) cuando un perfil nuevo todavía no eligió ninguna rutina.
 ============================================================================ */
-function RoutinesView({ profile, forced, onActivate, onUpdate, onDelete }) {
+function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRestore }) {
   const [mode, setMode] = useState("catalog");
   const [editingRoutineId, setEditingRoutineId] = useState(null);
   const [showSchedule, setShowSchedule] = useState(false);
   const [shareTarget, setShareTarget] = useState(null);
   const [pendingActivation, setPendingActivation] = useState(null);
   const [showImport, setShowImport] = useState(false);
+  const [showArchivedRoutines, setShowArchivedRoutines] = useState(false);
   const routines = profile?.routines || {};
   const activeId = profile?.activeRoutineId;
   const activeDef = resolveRoutineDef(routines[activeId], activeId);
-  const customEntries = Object.entries(routines).filter(([, r]) => r.source !== "preset");
+  const customEntries = Object.entries(routines).filter(([, r]) => r.source !== "preset" && !r.archived);
+  const archivedEntries = Object.entries(routines).filter(([, r]) => r.source !== "preset" && r.archived);
 
   const activeStats = useMemo(() => {
     if (!activeDef) return { days: 0, exercises: 0, sets: 0 };
@@ -4951,9 +5294,30 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onDelete }) {
           <div className="space-y-2">
             {customEntries.map(([id, r]) => (
               <SavedRoutineRow key={id} routine={r} isActive={id === activeId} onUse={() => handleUseClick(id, null)}
-                onEdit={() => { setEditingRoutineId(id); setMode("builder"); }} onShare={() => setShareTarget(r)} onDelete={() => onDelete(id)} />
+                onEdit={() => { setEditingRoutineId(id); setMode("builder"); }} onShare={() => setShareTarget(r)} onArchive={() => onArchive(id)} />
             ))}
           </div>
+          <p className="text-[10px] text-slate-700 mt-2">Deslizá una rutina hacia la derecha para quitarla de esta lista sin borrarla.</p>
+        </div>
+      )}
+
+      {archivedEntries.length > 0 && (
+        <div>
+          {!showArchivedRoutines ? (
+            <button onClick={() => setShowArchivedRoutines(true)} className="text-[11px] text-slate-600 hover:text-slate-400 font-semibold underline">Rutinas archivadas ({archivedEntries.length})</button>
+          ) : (
+            <div>
+              <div className="flex items-center gap-1.5 mb-2"><ListChecks size={13} className="text-slate-500" /><p className="text-xs font-black uppercase tracking-widest text-slate-500">Rutinas archivadas</p></div>
+              <div className="space-y-2">
+                {archivedEntries.map(([id, r]) => (
+                  <div key={id} className="flex items-center gap-3 bg-slate-900/30 border border-slate-800/40 rounded-2xl px-4 py-3">
+                    <p className="text-sm font-semibold text-slate-400 flex-1 min-w-0 truncate">{r.name}</p>
+                    <button onClick={() => onRestore(id)} className="px-3 py-1.5 rounded-lg bg-teal-500/15 text-teal-400 text-xs font-bold shrink-0">Restaurar</button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -5221,11 +5585,11 @@ export default function App() {
   const setDrafts = useCallback((newDrafts) => { const np = { ...profiles, [activeProfile]: { ...profiles[activeProfile], drafts: newDrafts } }; setProfiles(np); saveProfiles(np); }, [profiles, activeProfile]);
   const handleLogin = (name, updatedProfiles) => { const profs = updatedProfiles || profiles; setProfiles(profs); setActiveProfile(name); setJustLoggedOut(false); setTab("rutina"); };
   const handleLogout = () => { saveActive(null); setActiveProfile(null); setJustLoggedOut(true); setShowHelp(false); setHelpStartTab(null); };
-  // "Cerrar sesión" es distinto de "Cambiar de perfil": este además cierra
-  // la sesión de Google en Firebase (signOut), por si varias personas usan
-  // el mismo dispositivo y querés asegurarte de que no quede ninguna
-  // cuenta de Google logueada antes de soltar el celu/compu. Si nunca se
-  // inició sesión con Google, signOut no hace nada (no tira error).
+  // Cierra la sesión de Google en Firebase (signOut) y vuelve a la
+  // pantalla de inicio — por si varias personas usan el mismo dispositivo
+  // y querés asegurarte de que no quede ninguna cuenta de Google logueada
+  // antes de soltar el celu/compu. Si nunca se inició sesión con Google,
+  // signOut no hace nada (no tira error).
   const handleSignOut = async () => {
     try { await signOut(auth); } catch (err) { console.error("Error al cerrar sesión de Google:", err); }
     handleLogout();
@@ -5264,14 +5628,30 @@ export default function App() {
       return np;
     });
   };
-  const handleDeleteRoutine = (routineId) => {
+  // Antes esto borraba la rutina para siempre. Ahora, igual que con los
+  // perfiles, "quitar" una rutina creada por vos sólo la archiva — sigue
+  // ahí, con todos sus ejercicios, lista para recuperarla desde "Rutinas
+  // archivadas" en Rutinas. Si era la activa, te deja sin rutina activa
+  // (la pantalla de Rutinas se va a encargar de pedirte otra).
+  const handleArchiveRoutine = (routineId) => {
     setProfiles((prev) => {
       const p = prev[activeProfile];
       if (!p) return prev;
       const newRoutines = { ...(p.routines || {}) };
-      delete newRoutines[routineId];
+      if (newRoutines[routineId]) newRoutines[routineId] = { ...newRoutines[routineId], archived: true };
       const newActive = p.activeRoutineId === routineId ? null : p.activeRoutineId;
       const np = { ...prev, [activeProfile]: { ...p, routines: newRoutines, activeRoutineId: newActive } };
+      saveProfiles(np);
+      return np;
+    });
+  };
+  const handleRestoreRoutine = (routineId) => {
+    setProfiles((prev) => {
+      const p = prev[activeProfile];
+      if (!p) return prev;
+      const newRoutines = { ...(p.routines || {}) };
+      if (newRoutines[routineId]) newRoutines[routineId] = { ...newRoutines[routineId], archived: false };
+      const np = { ...prev, [activeProfile]: { ...p, routines: newRoutines } };
       saveProfiles(np);
       return np;
     });
@@ -5356,9 +5736,9 @@ export default function App() {
       <div className={`min-h-screen bg-[#0a0a0f] px-4 py-6 ${themeClass}`} style={{ "--small-text-scale": smallTextScale }}>
         <div className="max-w-xl mx-auto">
           <div className="flex justify-end mb-2">
-            <button onClick={handleLogout} className="text-[11px] text-slate-600 hover:text-slate-400 font-semibold flex items-center gap-1"><LogOut size={11} /> Cambiar de perfil</button>
+            <button onClick={handleSignOut} className="text-[11px] text-slate-600 hover:text-slate-400 font-semibold flex items-center gap-1"><LogOut size={11} /> Cerrar sesión</button>
           </div>
-          <RoutinesView profile={profile} forced onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onDelete={handleDeleteRoutine} />
+          <RoutinesView profile={profile} forced onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleArchiveRoutine} onRestore={handleRestoreRoutine} />
         </div>
       </div>
       {importRoutine && <SharedRoutineImportModal routine={importRoutine} onImport={handleImportSharedRoutine} onDiscard={() => setImportRoutine(null)} />}
@@ -5389,11 +5769,11 @@ export default function App() {
         </header>
         <main className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto px-4 py-4 pb-28 lg:pb-10 space-y-4">
           <div key={tab} className="tab-fade-in">
-            {tab === "rutinas" && <RoutinesView profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onDelete={handleDeleteRoutine} />}
+            {tab === "rutinas" && <RoutinesView profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleArchiveRoutine} onRestore={handleRestoreRoutine} />}
             {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} />}
             {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} />}
             {tab === "descarga" && <DeloadView logs={logs} settings={getProfileSettings(profile)} />}
-            {tab === "perfil" && <ProfileView profileName={activeProfile} profiles={profiles} logs={logs} onLogout={handleLogout} onSignOut={handleSignOut} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} />}
+            {tab === "perfil" && <ProfileView profileName={activeProfile} profiles={profiles} logs={logs} onSignOut={handleSignOut} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} />}
           </div>
         </main>
       </div>
