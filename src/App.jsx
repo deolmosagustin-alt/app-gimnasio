@@ -627,7 +627,7 @@ const STAGNATION_DAYS = 21;
 const DEFAULT_SETTINGS = {
   alertType: "sound", restLong: REST_LONG, restShort: REST_SHORT,
   trainWeeks: TRAIN_WEEKS, deloadWeeks: DELOAD_WEEKS, deloadPct: 0.75, deloadSetDivisor: 2,
-  theme: "dark", textScale: 1,
+  theme: "dark", textScale: 1, smallTextScale: 1,
 };
 
 function getProfileSettings(profile) { return { ...DEFAULT_SETTINGS, ...(profile?.settings || {}) }; }
@@ -637,13 +637,23 @@ function getProfileSettings(profile) { return { ...DEFAULT_SETTINGS, ...(profile
 // Tailwind usados en la app (text-xs, text-sm, text-base, text-lg, text-xl,
 // text-2xl...) están definidos en rem, así que escalan todos juntos y en
 // proporción al cambiar este único valor. Las etiquetas chiquitas escritas
-// con un tamaño fijo en píxeles (ej. text-[10px]) no se ven afectadas por
-// este control — son las que menos dependen de leerse grandes.
+// con un tamaño fijo en píxeles (ej. text-[10px]) no escalan con este
+// control — para esas existe el segundo control de abajo.
 const TEXT_SCALE_OPTIONS = [
   { k: "sm", v: 0.9, l: "Chica" },
   { k: "md", v: 1, l: "Normal" },
   { k: "lg", v: 1.15, l: "Grande" },
   { k: "xl", v: 1.3, l: "Muy grande" },
+];
+
+// Opciones para las "letras chicas" (consejos de cada ejercicio, récord,
+// badges de RPE/día, etc.) — todo lo que en el código usa text-[Npx] con un
+// tamaño fijo en píxeles. Se aplican multiplicando la variable CSS
+// --small-text-scale (ver ANIMATION_CSS), no el font-size del <html>.
+const SMALL_TEXT_SCALE_OPTIONS = [
+  { k: "md", v: 1, l: "Normal" },
+  { k: "lg", v: 1.25, l: "Grande" },
+  { k: "xl", v: 1.5, l: "Muy grande" },
 ];
 
 // RPE (esfuerzo percibido). 6-10 cubre el rango útil para hipertrofia/fuerza;
@@ -1155,6 +1165,7 @@ const ANIMATION_CSS = `
   --chip-text: #475569;
   --surface-2: #1e293b;
   --surface-2-text: #64748b;
+  --small-text-scale: 1;
 }
 .light-mode {
   --grad-hero-purple: linear-gradient(135deg, rgba(168,85,247,0.10), rgba(255,255,255,0.96) 55%, #ffffff);
@@ -1169,6 +1180,25 @@ const ANIMATION_CSS = `
   --surface-2: #eef2f6;
   --surface-2-text: #475569;
 }
+
+/* ============================================================================
+   LETRAS CHICAS (Perfil → Tamaño de letra → "Letras chicas") — las clases
+   text-xs/sm/base/lg/xl/2xl de Tailwind están en rem y ya escalan solas al
+   cambiar el font-size del <html> (ver el otro control, "Tamaño de letra").
+   Pero gran parte de las etiquetas más chicas de la app (consejos de cada
+   ejercicio, "récord: ...", badges de música/día, RPE, etc.) usan un
+   tamaño FIJO en píxeles vía la sintaxis text-[Npx] de Tailwind — eso no
+   responde al font-size del <html>, así que necesitan su propio multiplicador.
+   --small-text-scale se setea inline (custom property) en el contenedor
+   raíz de la app según lo elegido en Perfil; por defecto es 1 (sin cambio).
+   Mismo motivo que en .light-mode: los corchetes de Tailwind se escapan
+   para que CSS los lea como parte del nombre de la clase, y las barras
+   invertidas van dobles porque esto vive en un template literal de JS. */
+.text-\\[8px\\] { font-size: calc(8px * var(--small-text-scale, 1)) !important; }
+.text-\\[9px\\] { font-size: calc(9px * var(--small-text-scale, 1)) !important; }
+.text-\\[10px\\] { font-size: calc(10px * var(--small-text-scale, 1)) !important; }
+.text-\\[11px\\] { font-size: calc(11px * var(--small-text-scale, 1)) !important; }
+.text-\\[12px\\] { font-size: calc(12px * var(--small-text-scale, 1)) !important; }
 `;
 
 function StyleInjector() {
@@ -3586,13 +3616,24 @@ function ProfileView({ profileName, profiles, logs, onLogout, onDelete, onUpdate
         </div>
       </div>
 
-      <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 backdrop-blur-sm shadow-md shadow-black/20">
-        <p className="text-sm font-bold text-white mb-0.5">Tamaño de letra</p>
-        <p className="text-[11px] text-slate-500 mb-3">Agrandá el texto de toda la app si te resulta más cómodo de leer</p>
-        <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
-          {TEXT_SCALE_OPTIONS.map((opt) => (
-            <button key={opt.k} onClick={() => updateSettings({ textScale: opt.v })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${(settings.textScale ?? 1) === opt.v ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
-          ))}
+      <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 backdrop-blur-sm shadow-md shadow-black/20 space-y-4">
+        <div>
+          <p className="text-sm font-bold text-white mb-0.5">Tamaño de letra</p>
+          <p className="text-[11px] text-slate-500 mb-3">Agrandá el texto de toda la app si te resulta más cómodo de leer</p>
+          <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
+            {TEXT_SCALE_OPTIONS.map((opt) => (
+              <button key={opt.k} onClick={() => updateSettings({ textScale: opt.v })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${(settings.textScale ?? 1) === opt.v ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
+            ))}
+          </div>
+        </div>
+        <div className="pt-3.5 border-t border-slate-800/50">
+          <p className="text-sm font-bold text-white mb-0.5">Letras chicas</p>
+          <p className="text-[11px] text-slate-500 mb-3">Consejos de cada ejercicio, récords, RPE y otras etiquetas pequeñas que el control de arriba no agranda</p>
+          <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
+            {SMALL_TEXT_SCALE_OPTIONS.map((opt) => (
+              <button key={opt.k} onClick={() => updateSettings({ smallTextScale: opt.v })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${(settings.smallTextScale ?? 1) === opt.v ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -4608,6 +4649,11 @@ export default function App() {
   useEffect(() => {
     if (typeof document !== "undefined") document.documentElement.style.fontSize = `${16 * textScale}px`;
   }, [textScale]);
+  // Letras chicas (Perfil → Tamaño de letra → "Letras chicas"): multiplica
+  // los text-[Npx] fijos (consejos, récords, RPE, badges...) — ver la
+  // variable --small-text-scale en ANIMATION_CSS. Se pasa como custom
+  // property inline en los contenedores raíz más abajo, no en el <html>.
+  const smallTextScale = profile ? (getProfileSettings(profile).smallTextScale ?? 1) : 1;
 
   // La rutina activa del perfil actual (o Push/ Pull/ Legs + Hombro/Brazo
   // como respaldo) se recalcula en cada render — así
@@ -4791,7 +4837,7 @@ export default function App() {
     <>
       <StyleInjector />
       {recoveredNotice && <RecoveredBanner onClose={() => setRecoveredNotice(false)} />}
-      <div className={`min-h-screen bg-[#0a0a0f] px-4 py-6 ${themeClass}`}>
+      <div className={`min-h-screen bg-[#0a0a0f] px-4 py-6 ${themeClass}`} style={{ "--small-text-scale": smallTextScale }}>
         <div className="max-w-xl mx-auto">
           <div className="flex justify-end mb-2">
             <button onClick={handleLogout} className="text-[11px] text-slate-600 hover:text-slate-400 font-semibold flex items-center gap-1"><LogOut size={11} /> Cambiar de perfil</button>
@@ -4804,7 +4850,7 @@ export default function App() {
   );
 
   return (
-    <div className={`min-h-screen bg-[#0a0a0f] text-white font-sans lg:flex ${themeClass}`}>
+    <div className={`min-h-screen bg-[#0a0a0f] text-white font-sans lg:flex ${themeClass}`} style={{ "--small-text-scale": smallTextScale }}>
       <StyleInjector />
       {recoveredNotice && <RecoveredBanner onClose={() => setRecoveredNotice(false)} />}
       {deloadNotice && <DeloadNoticeBanner onClose={() => setDeloadNotice(false)} />}
