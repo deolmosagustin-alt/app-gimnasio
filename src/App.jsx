@@ -24,7 +24,7 @@ import { auth, googleProvider, db } from "./firebase";
       uno con nombre, músculo específico, una breve nota/recomendación y un
       video de referencia. Es de donde se elige al crear una rutina propia.
    2. PRESET_ROUTINES: rutinas prearmadas (Push/Pull/Legs, Arnold Split,
-      Upper/Lower, Cuerpo Completo, y "Push Pull Legs + Hombro/Brazo" que es la rutina original
+      Upper/Lower, Cuerpo Completo, y "Push / Pull / Pierna + Hombros / Brazos" que es la rutina original
       de la app — se mantiene para no romper los datos de perfiles viejos).
    3. Cada perfil guarda SUS PROPIAS rutinas en profile.routines (las que
       activó de la lista de preestablecidas, más las que creó), y cuál está
@@ -278,7 +278,7 @@ MUSCLE_GROUPS.forEach((g) => { EXERCISE_LIBRARY_BY_GROUP[g.key] = EXERCISE_LIBRA
 const PRESET_ROUTINES = [
   {
     id: "classic_default",
-    name: "Push/ Pull/ Legs + Hombro/Brazo",
+    name: "Push / Pull / Pierna + Hombros / Brazos",
     source: "preset",
     description: "La rutina original de la app: empuje, tracción, pierna y un día extra de hombros y brazos.",
     recommendation: "Pensada para entrenar 4 veces por semana, repitiendo el ciclo.",
@@ -497,6 +497,25 @@ const CLASSIC_PRESET = PRESET_ROUTINES_BY_ID["classic_default"];
 
 function cloneRoutineDef(def) { return JSON.parse(JSON.stringify(def)); }
 
+// Cuando activás una rutina preestablecida, lo que se guarda en tu perfil
+// es una FOTO de ese momento (cloneRoutineDef). Si más adelante corregimos
+// algo del catálogo (por ejemplo, un nombre mal escrito), esa foto vieja
+// se queda como estaba — y por eso alguien podía seguir viendo "Clásica"
+// en "Tu rutina activa" mucho después de que el catálogo ya dijera otra
+// cosa. Como las preestablecidas no son "tuyas" para renombrar, esta
+// función siempre prioriza la versión actual del catálogo para nombre,
+// descripción y ejercicios — lo único que conserva de tu copia guardada es
+// el cronograma semanal que hayas personalizado. Las rutinas creadas por
+// el usuario (source !== "preset") se devuelven tal cual, sin tocar nada.
+function resolveRoutineDef(routineEntry, routineId) {
+  if (!routineEntry) return null;
+  const livePreset = routineId ? PRESET_ROUTINES_BY_ID[routineId] : null;
+  if (routineEntry.source === "preset" && livePreset) {
+    return { ...livePreset, weekSchedule: routineEntry.weekSchedule || livePreset.weekSchedule };
+  }
+  return routineEntry;
+}
+
 /* ============================== COMPARTIR RUTINAS ==============================
    Como la app no tiene backend, "compartir por link" funciona codificando
    la rutina entera adentro del link (en el fragmento #shared-routine=...):
@@ -627,7 +646,7 @@ const STAGNATION_DAYS = 21;
 const DEFAULT_SETTINGS = {
   alertType: "sound", restLong: REST_LONG, restShort: REST_SHORT,
   trainWeeks: TRAIN_WEEKS, deloadWeeks: DELOAD_WEEKS, deloadPct: 0.75, deloadSetDivisor: 2,
-  theme: "dark", textScale: 1, smallTextScale: 1,
+  theme: "dark", textScale: 1, smallTextScale: 1, autoShowPrShare: true,
 };
 
 function getProfileSettings(profile) { return { ...DEFAULT_SETTINGS, ...(profile?.settings || {}) }; }
@@ -688,7 +707,7 @@ function getDeviceId() {
 // Perfiles de versiones anteriores de la app (antes de que existieran
 // múltiples rutinas) no tienen `routines`/`activeRoutineId`. Si ya tenían
 // `maxesSetupDays` es señal de que es un perfil viejo con datos reales: se le
-// asigna la rutina "Push/ Pull/ Legs + Hombro/Brazo" automáticamente, sin pedirle nada, para que no
+// asigna la rutina "Push / Pull / Pierna + Hombros / Brazos" automáticamente, sin pedirle nada, para que no
 // pierda ni su rutina ni su historial. Un perfil realmente nuevo (creado ya
 // con esta versión) no tiene `maxesSetupDays`, así que se lo deja sin rutina
 // activa a propósito: la pantalla de Rutinas se va a encargar de pedírsela.
@@ -1248,9 +1267,39 @@ function PRBurst({ anchorRef, trigger }) {
 ============================================================================ */
 function ShareLinkModal({ title, shareTitle, shareText, url, onClose }) {
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState(false);
+  const urlInputRef = useRef(null);
   const canNativeShare = typeof navigator !== "undefined" && !!navigator.share;
   const handleNativeShare = async () => { try { await navigator.share({ title: shareTitle, text: shareText, url }); onClose(); } catch { /* cancelado, no hacemos nada */ } };
-  const handleCopy = async () => { try { await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch {} };
+  // Copiado con respaldo: navigator.clipboard no está disponible en todos
+  // los contextos (por ejemplo, si la app se sirve por HTTP sin TLS, o en
+  // algunos navegadores/webviews) — antes, si fallaba, el botón "Copiar
+  // enlace" no hacía absolutamente nada y no había ninguna otra forma de
+  // ver el link, así que parecía que "no funcionaba". Ahora, si la API
+  // moderna no está, recurre al truco clásico de seleccionar un campo de
+  // texto oculto y ejecutar el copiado del navegador; y si ni eso
+  // funciona, el enlace queda visible y seleccionable más abajo para
+  // copiarlo a mano.
+  const handleCopy = async () => {
+    setCopyError(false);
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(url);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = url; ta.style.position = "fixed"; ta.style.opacity = "0";
+        document.body.appendChild(ta); ta.focus(); ta.select();
+        const ok = document.execCommand("copy");
+        document.body.removeChild(ta);
+        if (!ok) throw new Error("copy-failed");
+      }
+      setCopied(true); setTimeout(() => setCopied(false), 1500);
+    } catch {
+      setCopyError(true);
+      urlInputRef.current?.focus();
+      urlInputRef.current?.select();
+    }
+  };
   const waUrl = `https://wa.me/?text=${encodeURIComponent(shareText + " " + url)}`;
   const xUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(url)}`;
   const redditUrl = `https://www.reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(shareTitle)}`;
@@ -1274,6 +1323,8 @@ function ShareLinkModal({ title, shareTitle, shareText, url, onClose }) {
         <button onClick={handleCopy} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition text-sm font-semibold">
           {copied ? <><Check size={14} className="text-teal-400" /> ¡Copiado!</> : <><Copy size={14} /> Copiar enlace</>}
         </button>
+        {copyError && <p className="text-[11px] text-amber-400 mt-2 text-center">No pudimos copiarlo automáticamente — tocá el enlace de abajo y copialo a mano.</p>}
+        <input ref={urlInputRef} value={url} readOnly onFocus={(e) => e.target.select()} className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-3 py-2.5 text-[11px] text-slate-400 mt-3 focus:outline-none focus:border-teal-500/50 truncate" />
         <p className="text-[10px] text-slate-600 mt-3 text-center">Para Instagram: copiá el enlace y pegalo en tu historia, bio o un mensaje.</p>
       </div>
     </div>
@@ -1384,7 +1435,44 @@ function drawCycleShareCard(ctx, W, H, { cycleNumber, daysTrained, totalVol, acc
   drawWordmark(ctx, W, H, accent);
 }
 
-function ShareImageModal({ title, fileNamePrefix, shareTitle, shareText, draw, onClose }) {
+// Versión genérica de la tarjeta de resumen, para cuando la persona la
+// genera a pedido desde Historial (no por completar un ciclo entero, sino
+// el resumen de hoy, de la semana o del mes) — mismo estilo visual que
+// drawCycleShareCard, pero con un título y una etiqueta de período
+// configurables en vez del texto fijo de "Ciclo completo".
+function drawPeriodShareCard(ctx, W, H, { periodLabel, daysTrained, totalVol, accent = "#3B82F6" }) {
+  drawShareCardBase(ctx, W, H, accent, "#06B6D4");
+  ctx.textAlign = "center";
+  ctx.fillStyle = accent;
+  ctx.font = "800 42px sans-serif";
+  ctx.fillText("💪 RESUMEN DE ENTRENAMIENTO", W / 2, 480);
+  ctx.fillStyle = "#f8fafc";
+  ctx.font = "900 110px sans-serif";
+  const lines = wrapCanvasText(ctx, periodLabel.toUpperCase(), W / 2, 650, W - 160, 120);
+  const tileY = 650 + lines * 120 + 200;
+  const tiles = [
+    { val: daysTrained, label: "DÍAS\nENTRENADOS" },
+    { val: totalVol > 999 ? `${(totalVol / 1000).toFixed(1)}k` : totalVol, label: "KG × REPS\nTOTALES" },
+  ];
+  const tileGap = 60, tileW = (W - 160 - tileGap) / 2;
+  tiles.forEach((t, i) => {
+    const x = 80 + i * (tileW + tileGap);
+    ctx.fillStyle = "rgba(255,255,255,0.06)";
+    ctx.beginPath(); ctx.roundRect(x, tileY, tileW, 280, 28); ctx.fill();
+    ctx.fillStyle = "#f8fafc";
+    ctx.font = "900 86px sans-serif";
+    ctx.fillText(`${t.val}`, x + tileW / 2, tileY + 130);
+    ctx.fillStyle = "#94a3b8";
+    ctx.font = "700 28px sans-serif";
+    t.label.split("\n").forEach((l, li) => ctx.fillText(l, x + tileW / 2, tileY + 190 + li * 36));
+  });
+  ctx.fillStyle = "#cbd5e1";
+  ctx.font = "700 44px sans-serif";
+  ctx.fillText("Mi Rutina 💪", W / 2, 1450);
+  drawWordmark(ctx, W, H, accent);
+}
+
+function ShareImageModal({ title, fileNamePrefix, shareTitle, shareText, draw, onClose, autoShowOptOutLabel, onOptOutAutoShow }) {
   const canvasRef = useRef(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   useEffect(() => {
@@ -1433,6 +1521,9 @@ function ShareImageModal({ title, fileNamePrefix, shareTitle, shareText, draw, o
           <button onClick={handleShare} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98] shadow-lg shadow-teal-500/20" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}><Share2 size={14} /> Compartir</button>
         </div>
         <p className="text-[10px] text-slate-600 mt-3 text-center">Para tu historia de Instagram: compartila directo, o descargala y subila desde la app.</p>
+        {autoShowOptOutLabel && (
+          <button onClick={onOptOutAutoShow} className="w-full text-center text-[11px] text-slate-500 hover:text-slate-300 underline mt-3 transition">{autoShowOptOutLabel}</button>
+        )}
       </div>
     </div>
   );
@@ -1928,7 +2019,12 @@ function ProgresoDemo({ view }) {
   }
 
   // "resetall"
-  return <div className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-slate-700 text-slate-500 text-[11px] font-medium"><Trash2 size={11} /> Resetear todo el historial</div>;
+  return (
+    <div className="flex gap-2">
+      <div className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-slate-700 text-slate-500 text-[11px] font-medium"><Trash2 size={11} /> Resetear todo</div>
+      <div className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-slate-700 text-slate-500 text-[11px] font-medium"><Calendar size={11} /> Borrar un día</div>
+    </div>
+  );
 }
 
 /* ---- Demo en vivo: pestaña Descarga ---- */
@@ -1968,6 +2064,7 @@ function PerfilDemo({ view }) {
   const [trainW, setTrainW] = useState(7);
   const [alertType, setAlertType] = useState("sound");
   const [demoTheme, setDemoTheme] = useState("dark");
+  const [demoTextScale, setDemoTextScale] = useState(1);
 
   if (view === "apariencia") {
     return (
@@ -1975,6 +2072,20 @@ function PerfilDemo({ view }) {
         {[{ k: "dark", l: "Oscuro", icon: <Moon size={13} /> }, { k: "light", l: "Claro", icon: <Sun size={13} /> }].map((opt) => (
           <button key={opt.k} onClick={() => setDemoTheme(opt.k)} className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-all ${demoTheme === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.icon} {opt.l}</button>
         ))}
+      </div>
+    );
+  }
+
+  if (view === "textsize") {
+    return (
+      <div className="space-y-2.5">
+        <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
+          {TEXT_SCALE_OPTIONS.map((opt) => (
+            <button key={opt.k} onClick={() => setDemoTextScale(opt.v)} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${demoTextScale === opt.v ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
+          ))}
+        </div>
+        <p className="text-center font-bold text-white transition-all" style={{ fontSize: `${demoTextScale}rem` }}>Así se ve un texto normal</p>
+        <p className="text-center text-slate-500 transition-all" style={{ fontSize: `${0.6875 * demoTextScale}rem` }}>Texto chico (consejos, badges) — éste lo agranda el control de abajo, "Letras chicas"</p>
       </div>
     );
   }
@@ -2042,6 +2153,7 @@ function PerfilDemo({ view }) {
 /* ---- Demo en vivo: pestaña Rutinas ---- */
 function RutinasDemo({ view }) {
   const [open, setOpen] = useState(false);
+  const [demoDayName, setDemoDayName] = useState("Día 1");
 
   if (view === "active") {
     return (
@@ -2081,6 +2193,11 @@ function RutinasDemo({ view }) {
   if (view === "builder") {
     return (
       <div className="bg-slate-950/50 border border-slate-800/50 rounded-xl p-3">
+        <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Nombre del día — tocá para cambiarlo</p>
+        <div className="relative mb-2.5">
+          <input value={demoDayName} onChange={(e) => setDemoDayName(e.target.value)} className="w-full bg-slate-900/60 border border-slate-700/60 rounded-xl pl-3 pr-8 py-2 text-sm font-black text-white focus:outline-none focus:border-teal-500/60 transition" />
+          <Edit3 size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+        </div>
         <div className="flex gap-1.5 mb-2.5">
           {["Pecho", "Espalda", "Hombros", "Bíceps"].map((g, i) => (
             <span key={g} className={`px-2 py-1 rounded-lg text-[9px] font-bold ${i === 0 ? "bg-teal-500/20 text-teal-400" : "text-slate-600 border border-slate-800"}`}>{g}</span>
@@ -2159,14 +2276,14 @@ const HELP_CHAPTERS = [
       {
         icon: <ListChecks size={20} />,
         title: "Rutinas preestablecidas",
-        text: "Más abajo está el catálogo: Push/Pull/Legs, Arnold Split, Upper/Lower, Bro Split, Cuerpo Completo y Push/ Pull/ Legs + Hombro/Brazo. Tocá una para ver su distribución semanal completa —día por día, con sus ejercicios y series— antes de usarla.",
+        text: "Más abajo está el catálogo: Push/Pull/Legs, Arnold Split, Upper/Lower, Bro Split, Cuerpo Completo y Push / Pull / Pierna + Hombros / Brazos. Tocá una para ver su distribución semanal completa —día por día, con sus ejercicios y series— antes de usarla.",
         demo: { kind: "rutinas", view: "preset", caption: "Tocá la rutina para ver el detalle" },
       },
       {
         icon: <Sparkles size={20} />,
         title: "Creá la tuya",
-        text: "Con \"Crear mi propia rutina\" le ponés nombre, armás los días que quieras y agregás ejercicios buscando por grupo muscular. Por cada uno elegís series y repeticiones aproximadas — si son 6 o menos, se marca como FUERZA automáticamente. También podés agregar un ejercicio que no esté en la lista, aunque ese no va a tener nota técnica ni video.",
-        demo: { kind: "rutinas", view: "builder" },
+        text: "Con \"Crear mi propia rutina\" le ponés nombre, armás los días que quieras —tocando el nombre de cada uno (con el lápiz al lado) lo podés cambiar, por ejemplo a \"Push\" o \"Pecho y tríceps\"— y agregás ejercicios buscando por grupo muscular. Por cada uno elegís series y repeticiones aproximadas — si son 6 o menos, se marca como FUERZA automáticamente. También podés agregar un ejercicio que no esté en la lista, aunque ese no va a tener nota técnica ni video.",
+        demo: { kind: "rutinas", view: "builder", caption: "Probá cambiar el nombre del día" },
       },
       {
         icon: <Edit3 size={20} />,
@@ -2225,7 +2342,7 @@ const HELP_CHAPTERS = [
       {
         icon: <Save size={20} />,
         title: "Registrá tus series",
-        text: "Debajo del cronómetro, por cada serie ingresás reps y kg, y tocás el botón de guardar. Lo que escribís no se borra aunque salgas de la tarjeta o cambies de pestaña — sólo se limpia cuando finalizás la sesión o reseteás el día. Tu mejor marca se calcula sola, y si la superás te avisa con un mensaje y un efecto de confetti — desde ahí mismo podés compartir una imagen prolija de tu nueva marca.",
+        text: "Debajo del cronómetro, por cada serie ingresás reps y kg, y tocás el botón de guardar. Lo que escribís no se borra aunque salgas de la tarjeta o cambies de pestaña — sólo se limpia cuando finalizás la sesión o reseteás el día. Tu mejor marca se calcula sola, y si la superás te avisa con un mensaje y un efecto de confetti — y por defecto se te abre directo la imagen prolija para compartir esa marca. Si preferís que sólo aparezca el ícono chico (sin la imagen saltando sola), hay un botón para no mostrarla automáticamente la próxima vez, o lo configurás de una desde Perfil → Compartir marcas.",
         demo: { kind: "rutina", view: "card-open", caption: "Probá: ingresá reps y kg, y tocá Guardar" },
       },
       {
@@ -2288,6 +2405,11 @@ const HELP_CHAPTERS = [
         text: "Tocá un día con marca (o cualquier sesión en la vista de lista) para ver el detalle completo: cada serie con sus reps y kg, y cuántas de esas series fueron una mejora respecto a tu historial — marcadas con 🔥.",
       },
       {
+        icon: <Share2 size={20} />,
+        title: "Crear una imagen para compartir, cuando quieras",
+        text: "Las imágenes para Instagram (de una marca o de un ciclo completo) no son solo automáticas: en Historial tenés \"Crear imagen para compartir\" para generarlas cuando quieras — elegís tu mejor marca en cualquier ejercicio, o un resumen de hoy, de la semana o del mes, con tus días entrenados y el volumen total.",
+      },
+      {
         icon: <BarChart3 size={20} />,
         title: "Gráfico de evolución",
         text: "Elegí el ejercicio (deslizando la fila de chips hacia los costados) y la serie con los botones S1/S2/etc. Mirá su evolución en Kg, Volumen, 1RM estimado o RPE con los botones de arriba del gráfico.",
@@ -2308,7 +2430,7 @@ const HELP_CHAPTERS = [
       {
         icon: <Trash2 size={20} />,
         title: "Resetear historial",
-        text: "Al final de la pestaña tenés la opción de borrar todo tu historial de series, si alguna vez querés empezar de cero. Tus récords se mantienen guardados.",
+        text: "Al final de la pestaña tenés \"Resetear todo\", para borrar todo tu historial de series si alguna vez querés empezar de cero, y \"Borrar un día\", que te lleva directo a Historial para elegir y borrar solamente una fecha puntual (por si te confundiste registrando algo). En los dos casos tus récords se mantienen guardados.",
         demo: { kind: "progreso", view: "resetall" },
       },
     ],
@@ -2360,6 +2482,22 @@ const HELP_CHAPTERS = [
         title: "Apariencia",
         text: "Elegí entre el tema oscuro (el de siempre) o uno claro, lo que te resulte más cómodo.",
         demo: { kind: "perfil", view: "apariencia", caption: "Probá cambiar de tema" },
+      },
+      {
+        icon: <SlidersHorizontal size={20} />,
+        title: "Tamaño de letra",
+        text: "Dos controles: uno agranda el texto normal de la app (títulos, números de reps/kg, párrafos) y el otro, \"Letras chicas\", agranda específicamente las etiquetas más chiquitas — consejos de cada ejercicio, récords, RPE, badges de día — pensado para que se lea más fácil si tenés problemas de vista.",
+        demo: { kind: "perfil", view: "textsize", caption: "Probá cambiar el tamaño" },
+      },
+      {
+        icon: <Download size={20} />,
+        title: "Exportar entrenamiento",
+        text: "Descargá el resumen de tu entrenamiento de hoy, de la semana o del mes en PDF, Word o Excel — pensado para mandárselo directo a tu entrenador, con cada ejercicio, serie, reps, kg y RPE.",
+      },
+      {
+        icon: <Share2 size={20} />,
+        title: "Compartir marcas",
+        text: "Elegís si, al lograr una nueva marca, se te abre directo la imagen para compartir, o si preferís que sólo aparezca el ícono chico al lado de \"¡Nueva marca!\" para abrirla vos cuando quieras.",
       },
       {
         icon: <Calendar size={20} />,
@@ -2529,7 +2667,7 @@ function HelpModal({ startTab, onClose }) {
    cambiar de día). Ahora sobreviven a eso — sólo se limpian cuando se
    resetea el día (resetKey) o se finaliza la sesión (ver RoutineView/App).
 ============================================================================ */
-function SetRow({ exerciseId, exerciseName, setIndex, setDef, accent, logs, setLogs, drafts = {}, setDrafts, deloadKgFactor = 1, deloadMode = false, resetKey = 0 }) {
+function SetRow({ exerciseId, exerciseName, setIndex, setDef, accent, logs, setLogs, drafts = {}, setDrafts, deloadKgFactor = 1, deloadMode = false, resetKey = 0, autoShowPrShare = true, onDisableAutoShowPrShare }) {
   const key = `${exerciseId}_${setIndex}`, prKey = `${key}_pr_override`, today = todayStr();
   const history = logs[key] || [], override = logs[prKey];
   const computedPR = useMemo(() => { let best = setDef.pr ? { ...setDef.pr } : null; history.forEach((h) => { if (!best || vol(h.kg, h.reps) > vol(best.kg, best.reps)) best = { kg: h.kg, reps: h.reps }; }); return best; }, [history, setDef.pr]);
@@ -2557,7 +2695,7 @@ function SetRow({ exerciseId, exerciseName, setIndex, setDef, accent, logs, setL
     if (isPR) newLogs = { ...newLogs, [prKey]: { kg: k, reps: r, date: today } };
     setLogs(newLogs); setSaved(true); setTimeout(() => setSaved(false), 1200);
     const suggestUp = r > repRangeTop(setDef.repRange);
-    if (isPR) { haptic([35, 25, 45]); setPrBurst((n) => n + 1); setFeedback({ type: "pr", msg: "¡Nueva marca! 🔥", suggestUp }); }
+    if (isPR) { haptic([35, 25, 45]); setPrBurst((n) => n + 1); setFeedback({ type: "pr", msg: "¡Nueva marca! 🔥", suggestUp }); if (autoShowPrShare) setShowPRShare(true); }
     else { haptic(18); if (newVol === prevVol) setFeedback({ type: "tie", msg: "Igualaste tu marca 💪", suggestUp: false }); else setFeedback({ type: "down", msg: `-${(((prevVol - newVol) / prevVol) * 100).toFixed(0)}% vs récord`, suggestUp: false }); }
   };
   const savePR = () => { const r = parseFloat(editReps), k = parseFloat(editKg); if (!r || !k || isNaN(r) || isNaN(k)) return; setLogs({ ...logs, [prKey]: { kg: k, reps: r } }); setEditingPR(false); };
@@ -2625,6 +2763,8 @@ function SetRow({ exerciseId, exerciseName, setIndex, setDef, accent, logs, setL
           shareText={`¡Nueva marca en ${exerciseName}! 🔥`}
           draw={(ctx, W, H) => drawPRShareCard(ctx, W, H, { exerciseName, kg: parseFloat(kg) || currentPR?.kg, reps: parseFloat(reps) || currentPR?.reps, accent })}
           onClose={() => setShowPRShare(false)}
+          autoShowOptOutLabel={autoShowPrShare ? "No mostrar esto automáticamente la próxima vez" : null}
+          onOptOutAutoShow={() => { onDisableAutoShowPrShare?.(); setShowPRShare(false); }}
         />
       )}
     </div>
@@ -2634,7 +2774,7 @@ function SetRow({ exerciseId, exerciseName, setIndex, setDef, accent, logs, setL
 /* ============================================================================
    EXERCISE CARD
 ============================================================================ */
-function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts, deloadSets, deloadMode, resetKey = 0, settings = DEFAULT_SETTINGS, forceOpen = false }) {
+function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts, deloadSets, deloadMode, resetKey = 0, settings = DEFAULT_SETTINGS, forceOpen = false, onDisableAutoShowPrShare }) {
   const [open, setOpen] = useState(false);
   // forceOpen se usa solo desde las demos del tutorial guiado, para abrir la
   // tarjeta automáticamente cuando el paso explica algo de adentro (reps/kg,
@@ -2665,7 +2805,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
         <div className="mb-1">
           <RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={accent} alertType={settings.alertType} />
         </div>
-        {setsToShow.map((s, i) => <SetRow key={i} exerciseId={exercise.id} exerciseName={exercise.name} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadKgFactor={settings.deloadPct} deloadMode={deloadMode} resetKey={resetKey} />)}
+        {setsToShow.map((s, i) => <SetRow key={i} exerciseId={exercise.id} exerciseName={exercise.name} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadKgFactor={settings.deloadPct} deloadMode={deloadMode} resetKey={resetKey} autoShowPrShare={settings.autoShowPrShare ?? true} onDisableAutoShowPrShare={onDisableAutoShowPrShare} />)}
         {exercise.video && (
           <div className="pt-3">
             <a href={exercise.video} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 py-3 rounded-xl border border-slate-800 text-slate-400 hover:border-slate-600 hover:text-white transition text-sm font-medium">▶ Ver técnica en YouTube</a>
@@ -2781,7 +2921,7 @@ function SessionStartBar({ activeSession, onStart, onCancel }) {
    volver a abrir una tarjeta. Sólo se limpia con "Resetear sesión de hoy"
    (acá abajo) o al finalizar la sesión (ver handleEndSession en App()).
 ============================================================================ */
-function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, weekSchedule, activeSession, onStartSession, onEndSession, onCancelSession }) {
+function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, weekSchedule, activeSession, onStartSession, onEndSession, onCancelSession, onDisableAutoShowPrShare }) {
   // El día programado para hoy según el cronograma semanal (lunes a domingo)
   // de la rutina activa. Si hoy es descanso programado (o no hay cronograma
   // todavía), cae al viejo heurístico de "último día entrenado + 1" — pero
@@ -2858,7 +2998,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-        {day.exercises.map((ex) => <ExerciseCard key={ex.id} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadSets={isDeload ? getDeloadSets(ex) : null} deloadMode={isDeload} resetKey={resetKeys[activeDay]} settings={settings} />)}
+        {day.exercises.map((ex) => <ExerciseCard key={ex.id} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadSets={isDeload ? getDeloadSets(ex) : null} deloadMode={isDeload} resetKey={resetKeys[activeDay]} settings={settings} onDisableAutoShowPrShare={onDisableAutoShowPrShare} />)}
       </div>
 
       {activeSession && (
@@ -2916,6 +3056,124 @@ function SessionDetailCard({ session, onDelete }) {
   );
 }
 
+/* ============================================================================
+   CREAR IMAGEN PARA COMPARTIR (a pedido) — antes, las tarjetas de Instagram
+   sólo aparecían en el momento exacto de un récord o de completar un ciclo
+   entero. Esta es la versión "a demanda": una opción chica en Historial que
+   deja generar la misma clase de imagen en cualquier momento, ya sea de tu
+   mejor marca en un ejercicio o de un resumen de hoy/la semana/el mes.
+============================================================================ */
+const SHARE_SUMMARY_PERIODS = [
+  { k: "day", l: "Hoy" },
+  { k: "week", l: "Esta semana" },
+  { k: "month", l: "Este mes" },
+];
+
+function ShareSummaryCard({ logs }) {
+  const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState(null); // "pr" | "period"
+  const [period, setPeriod] = useState("week");
+  const [selExId, setSelExId] = useState(null);
+  const [showImage, setShowImage] = useState(false);
+
+  const allExercises = useMemo(() => DAY_ORDER.flatMap((dk) => ROUTINE[dk].exercises.map((e) => ({ id: e.id, name: e.name, color: ROUTINE[dk].color, sets: e.sets.length }))), []);
+  const allSessions = useMemo(() => buildSessionsIndex(logs), [logs]);
+  const periodSessions = useMemo(() => getSessionsForPeriod(allSessions, period), [allSessions, period]);
+  const periodStats = useMemo(() => {
+    const daySet = new Set(); let totalVol = 0;
+    periodSessions.forEach((s) => { daySet.add(s.date); totalVol += s.totalVolume; });
+    return { daysTrained: daySet.size, totalVol: Math.round(totalVol) };
+  }, [periodSessions]);
+
+  const getPRForExercise = (ex) => {
+    let best1rm = 0, bestKg = 0, bestReps = 0;
+    Array.from({ length: ex.sets }).forEach((_, i) => {
+      const ov = logs[`${ex.id}_${i}_pr_override`], h = logs[`${ex.id}_${i}`] || [];
+      const entries = ov ? [ov] : h;
+      entries.forEach((e) => { const rm = estimate1RM(e.kg, e.reps); if (rm > best1rm) { best1rm = rm; bestKg = e.kg; bestReps = e.reps; } });
+    });
+    return { best1rm, bestKg, bestReps };
+  };
+  const selEx = allExercises.find((e) => e.id === selExId);
+  const selPR = selEx ? getPRForExercise(selEx) : null;
+  const periodLabel = SHARE_SUMMARY_PERIODS.find((p) => p.k === period)?.l || "";
+
+  const close = () => { setOpen(false); setMode(null); setSelExId(null); };
+
+  if (!open) {
+    return (
+      <button onClick={() => setOpen(true)} className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-500 hover:text-teal-400 transition shrink-0"><Share2 size={12} /> Crear imagen para compartir</button>
+    );
+  }
+
+  return (
+    <div className="bg-slate-900/60 border border-slate-800/50 rounded-2xl p-3.5 bounce-in space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-bold text-white flex items-center gap-1.5"><Share2 size={13} className="text-teal-400" /> Crear imagen para compartir</p>
+        <button onClick={close} aria-label="Cerrar" className="p-1 rounded-lg text-slate-500 hover:text-white hover:bg-slate-800 transition"><X size={14} /></button>
+      </div>
+
+      {mode === null && (
+        <div className="flex gap-2">
+          <button onClick={() => setMode("pr")} className="flex-1 py-2.5 rounded-xl border border-slate-700 text-slate-300 hover:text-white hover:border-teal-500/40 transition text-xs font-bold">Tu mejor marca</button>
+          <button onClick={() => setMode("period")} className="flex-1 py-2.5 rounded-xl border border-slate-700 text-slate-300 hover:text-white hover:border-teal-500/40 transition text-xs font-bold">Resumen de un período</button>
+        </div>
+      )}
+
+      {mode === "pr" && (
+        <div className="space-y-2.5">
+          <ExerciseChipRow exercises={allExercises} selId={selExId} onSelect={setSelExId} />
+          {selEx && (selPR?.best1rm > 0 ? (
+            <p className="text-[11px] text-slate-500">Tu mejor marca en <span className="text-slate-300 font-bold">{selEx.name}</span>: {selPR.bestReps}×{selPR.bestKg}kg</p>
+          ) : (
+            <p className="text-[11px] text-slate-600">Todavía no hay marcas registradas en este ejercicio.</p>
+          ))}
+          <div className="flex gap-2">
+            <button onClick={() => setMode(null)} className="px-3 py-2.5 rounded-xl bg-slate-800 text-slate-400 text-xs font-semibold">Atrás</button>
+            <button onClick={() => setShowImage(true)} disabled={!selPR?.best1rm} className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-[0.98] ${selPR?.best1rm ? "text-white shadow-lg shadow-teal-500/20" : "bg-slate-800 text-slate-600"}`} style={selPR?.best1rm ? { background: "linear-gradient(135deg,#14B8A6,#0E7490)" } : {}}>Generar imagen</button>
+          </div>
+        </div>
+      )}
+
+      {mode === "period" && (
+        <div className="space-y-2.5">
+          <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
+            {SHARE_SUMMARY_PERIODS.map((opt) => (
+              <button key={opt.k} onClick={() => setPeriod(opt.k)} className={`flex-1 py-2 rounded-lg text-[11px] font-bold transition-all ${period === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
+            ))}
+          </div>
+          <p className="text-[11px] text-slate-500">{periodStats.daysTrained} día{periodStats.daysTrained === 1 ? "" : "s"} entrenado{periodStats.daysTrained === 1 ? "" : "s"} · {periodStats.totalVol.toLocaleString("es-AR")} kg×reps en este período.</p>
+          <div className="flex gap-2">
+            <button onClick={() => setMode(null)} className="px-3 py-2.5 rounded-xl bg-slate-800 text-slate-400 text-xs font-semibold">Atrás</button>
+            <button onClick={() => setShowImage(true)} disabled={!periodStats.daysTrained} className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-[0.98] ${periodStats.daysTrained ? "text-white shadow-lg shadow-teal-500/20" : "bg-slate-800 text-slate-600"}`} style={periodStats.daysTrained ? { background: "linear-gradient(135deg,#14B8A6,#0E7490)" } : {}}>Generar imagen</button>
+          </div>
+        </div>
+      )}
+
+      {showImage && mode === "pr" && selEx && (
+        <ShareImageModal
+          title="Compartí tu marca"
+          fileNamePrefix={`pr-${selEx.id}`}
+          shareTitle="Mi Rutina — Marca"
+          shareText={`Mi marca en ${selEx.name} 🔥`}
+          draw={(ctx, W, H) => drawPRShareCard(ctx, W, H, { exerciseName: selEx.name, kg: selPR.bestKg, reps: selPR.bestReps, accent: selEx.color })}
+          onClose={() => setShowImage(false)}
+        />
+      )}
+      {showImage && mode === "period" && (
+        <ShareImageModal
+          title="Compartí tu resumen"
+          fileNamePrefix={`resumen-${period}`}
+          shareTitle="Mi Rutina — Resumen"
+          shareText="Mi resumen de entrenamiento 💪"
+          draw={(ctx, W, H) => drawPeriodShareCard(ctx, W, H, { periodLabel, daysTrained: periodStats.daysTrained, totalVol: periodStats.totalVol, accent: "#3B82F6" })}
+          onClose={() => setShowImage(false)}
+        />
+      )}
+    </div>
+  );
+}
+
 function SessionHistoryView({ logs, onDeleteDay }) {
   const sessions = useMemo(() => buildSessionsIndex(logs), [logs]);
   const sessionByDate = useMemo(() => { const m = {}; sessions.forEach((s) => { m[s.date] = s; }); return m; }, [sessions]);
@@ -2939,11 +3197,14 @@ function SessionHistoryView({ logs, onDeleteDay }) {
 
   return (
     <div className="space-y-3">
-      <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60 w-fit">
-        {[{ k: "calendar", icon: <LayoutGrid size={13} />, l: "Calendario" }, { k: "list", icon: <List size={13} />, l: "Lista" }].map((opt) => (
-          <button key={opt.k} onClick={() => setView(opt.k)} className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-[11px] font-bold transition-all ${view === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.icon}{opt.l}</button>
-        ))}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60 w-fit">
+          {[{ k: "calendar", icon: <LayoutGrid size={13} />, l: "Calendario" }, { k: "list", icon: <List size={13} />, l: "Lista" }].map((opt) => (
+            <button key={opt.k} onClick={() => setView(opt.k)} className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-[11px] font-bold transition-all ${view === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.icon}{opt.l}</button>
+          ))}
+        </div>
       </div>
+      <ShareSummaryCard logs={logs} />
 
       {view === "calendar" ? (
         <div key="calendar" className="space-y-3 tab-fade-in">
@@ -3555,7 +3816,7 @@ function ProfileView({ profileName, profiles, logs, onLogout, onDelete, onUpdate
   const adjustDeloadPct = (delta) => updateSettings({ deloadPct: Math.min(0.95, Math.max(0.5, Math.round((settings.deloadPct + delta) * 100) / 100)) });
   const handleDeleteConfirm = (pin) => { if (profile.pin && pin !== profile.pin) { setDeleteError("PIN incorrecto."); setTimeout(() => setDeleteError(""), 1500); } else { onDelete(); } };
   const initial = profileName.charAt(0).toUpperCase();
-  const activeRoutineDef = profile?.routines?.[profile.activeRoutineId];
+  const activeRoutineDef = resolveRoutineDef(profile?.routines?.[profile?.activeRoutineId], profile?.activeRoutineId);
   const savedRoutineCount = Object.keys(profile?.routines || {}).length;
 
   // Vincular este perfil local con una cuenta de Google: abre el mismo popup
@@ -3654,6 +3915,16 @@ function ProfileView({ profileName, profiles, logs, onLogout, onDelete, onUpdate
         </div>
       </div>
 
+      <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 backdrop-blur-sm shadow-md shadow-black/20">
+        <p className="text-sm font-bold text-white mb-0.5">Compartir marcas</p>
+        <p className="text-[11px] text-slate-500 mb-3">Al lograr una nueva marca, ¿mostramos la imagen para compartir automáticamente?</p>
+        <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
+          {[{ v: true, l: "Sí, mostrarla" }, { v: false, l: "No, solo el ícono" }].map((opt) => (
+            <button key={String(opt.v)} onClick={() => updateSettings({ autoShowPrShare: opt.v })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${(settings.autoShowPrShare ?? true) === opt.v ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
+          ))}
+        </div>
+      </div>
+
       <ExportTrainingCard profileName={profileName} logs={logs} />
 
       <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 backdrop-blur-sm shadow-md shadow-black/20">
@@ -3735,10 +4006,11 @@ function RoutinePreview({ routineDef }) {
       {model.dayOrder.map((dk) => {
         const d = model.days[dk];
         const totalSets = d.exercises.reduce((a, e) => a + e.sets.length, 0);
+        const muted = muteHexColor(d.color);
         return (
           <div key={dk} className="rounded-xl border border-slate-800/60 bg-slate-950/40 px-3 py-2.5">
             <div className="flex items-center gap-2 mb-1">
-              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: d.color }} />
+              <span className="w-5 h-5 rounded-lg flex items-center justify-center text-[8px] font-black shrink-0" style={{ backgroundColor: d.color + "1c", color: muted }}>{d.label.charAt(0)}</span>
               <span className="text-xs font-bold text-white">{d.label}</span>
               <span className="text-[10px] text-slate-600 ml-auto shrink-0">{d.exercises.length} ejerc. · {totalSets} series</span>
             </div>
@@ -3789,13 +4061,7 @@ function PresetRoutineCard({ preset, isActive, onUse }) {
             {isActive && <span className="text-[9px] font-black px-1.5 py-0.5 rounded-lg bg-teal-500/20 text-teal-400 shrink-0">ACTIVA</span>}
           </div>
           <p className="text-[11px] text-slate-500 mt-0.5">{preset.description}</p>
-          <div className="flex items-center gap-1.5 mt-2">
-            {preset.dayOrder.map((dk) => {
-              const dColor = preset.days[dk].color, muted = muteHexColor(dColor);
-              return <span key={dk} className="w-5 h-5 rounded-lg flex items-center justify-center text-[8px] font-black shrink-0" style={{ backgroundColor: dColor + "1c", color: muted }}>{preset.days[dk].label.charAt(0)}</span>;
-            })}
-            <span className="text-[10px] text-slate-600 ml-1">{dayCount} día{dayCount === 1 ? "" : "s"}/semana</span>
-          </div>
+          <p className="text-[10px] text-slate-600 mt-2">{dayCount} día{dayCount === 1 ? "" : "s"}/semana</p>
         </div>
         <ChevronDown size={16} className={`text-slate-600 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
@@ -3946,12 +4212,16 @@ function BuilderDayCard({ day, dayIdx, totalDays, onRename, onRemove, onMoveDay,
   const existingIds = day.exercises.map((e) => e.id);
   return (
     <div className="bg-slate-900/40 border border-slate-800/50 rounded-2xl p-3.5" style={{ borderLeft: `3px solid ${day.color}` }}>
+      <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 ml-7">Nombre del día — tocá para cambiarlo</p>
       <div className="flex items-center gap-2 mb-3">
         <div className="flex flex-col -my-1 shrink-0">
           <button onClick={() => onMoveDay(-1)} disabled={dayIdx === 0} className="p-0.5 text-slate-600 hover:text-slate-300 disabled:opacity-20"><ChevronUp size={13} /></button>
           <button onClick={() => onMoveDay(1)} disabled={dayIdx === totalDays - 1} className="p-0.5 text-slate-600 hover:text-slate-300 disabled:opacity-20"><ChevronDown size={13} /></button>
         </div>
-        <input value={day.label} onChange={(e) => onRename(e.target.value)} placeholder={`Día ${dayIdx + 1}`} className="flex-1 bg-transparent text-sm font-black text-white focus:outline-none border-b border-transparent focus:border-slate-700 py-0.5 min-w-0" />
+        <div className="flex-1 relative min-w-0">
+          <input value={day.label} onChange={(e) => onRename(e.target.value)} placeholder={`Día ${dayIdx + 1}`} className="w-full bg-slate-950/50 border border-slate-700/60 rounded-xl pl-3 pr-8 py-2 text-sm font-black text-white focus:outline-none focus:border-teal-500/60 transition" />
+          <Edit3 size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+        </div>
         {totalDays > 1 && <button onClick={onRemove} className="p-1.5 text-slate-600 hover:text-rose-400 shrink-0"><Trash2 size={14} /></button>}
       </div>
 
@@ -4386,7 +4656,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onDelete }) {
   const [showImport, setShowImport] = useState(false);
   const routines = profile?.routines || {};
   const activeId = profile?.activeRoutineId;
-  const activeDef = routines[activeId];
+  const activeDef = resolveRoutineDef(routines[activeId], activeId);
   const customEntries = Object.entries(routines).filter(([, r]) => r.source !== "preset");
 
   const activeStats = useMemo(() => {
@@ -4672,11 +4942,11 @@ export default function App() {
   // property inline en los contenedores raíz más abajo, no en el <html>.
   const smallTextScale = profile ? (getProfileSettings(profile).smallTextScale ?? 1) : 1;
 
-  // La rutina activa del perfil actual (o Push/ Pull/ Legs + Hombro/Brazo
+  // La rutina activa del perfil actual (o Push / Pull / Pierna + Hombros / Brazos
   // como respaldo) se recalcula en cada render — así
   // ROUTINE/DAY_ORDER/EXERCISE_BY_ID/KEY_TO_DAY siempre reflejan la rutina
   // correcta antes de que se rendericen sus hijos.
-  const activeRoutineDef = (profile && profile.routines && profile.routines[profile.activeRoutineId]) || null;
+  const activeRoutineDef = resolveRoutineDef((profile && profile.routines && profile.routines[profile.activeRoutineId]) || null, profile?.activeRoutineId);
   applyRoutineModel(activeRoutineDef || CLASSIC_PRESET);
   const needsRoutinePick = !!profile && !profile.activeRoutineId;
   // Cronograma semanal de la rutina activa (lunes a domingo → día de rutina
@@ -4929,7 +5199,7 @@ export default function App() {
         <main className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto px-4 py-4 pb-28 lg:pb-10 space-y-4">
           <div key={tab} className="tab-fade-in">
             {tab === "rutinas" && <RoutinesView profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onDelete={handleDeleteRoutine} />}
-            {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} />}
+            {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} />}
             {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} />}
             {tab === "descarga" && <DeloadView logs={logs} settings={getProfileSettings(profile)} />}
             {tab === "perfil" && <ProfileView profileName={activeProfile} profiles={profiles} logs={logs} onLogout={handleLogout} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} />}
