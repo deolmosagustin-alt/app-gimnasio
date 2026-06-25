@@ -11,6 +11,7 @@ import {
   Mail, Clock, ChevronRight, Edit3, Info, Plus, Sun, Moon,
   Target, Award, Activity, ArrowDown, HelpCircle, List, LayoutGrid,
   Sparkles, Layers, Video, SlidersHorizontal, ShieldCheck, UserCog,
+  Share2, Download, Link2, Copy,
 } from "lucide-react";
 
 /* ============================================================================
@@ -21,7 +22,7 @@ import {
       uno con nombre, músculo específico, una breve nota/recomendación y un
       video de referencia. Es de donde se elige al crear una rutina propia.
    2. PRESET_ROUTINES: rutinas prearmadas (Push/Pull/Legs, Arnold Split,
-      Upper/Lower, Cuerpo Completo, y la "Clásica" que es la rutina original
+      Upper/Lower, Cuerpo Completo, y "Push Pull Legs + Hombro/Brazo" que es la rutina original
       de la app — se mantiene para no romper los datos de perfiles viejos).
    3. Cada perfil guarda SUS PROPIAS rutinas en profile.routines (las que
       activó de la lista de preestablecidas, más las que creó), y cuál está
@@ -49,6 +50,7 @@ const MUSCLE_GROUPS = [
   { key: "hombros", label: "Hombros", color: "#A855F7" },
   { key: "biceps", label: "Bíceps", color: "#F59E0B" },
   { key: "triceps", label: "Tríceps", color: "#F97316" },
+  { key: "antebrazos", label: "Antebrazos", color: "#84CC16" },
   { key: "cuadriceps", label: "Cuádriceps", color: "#EF4444" },
   { key: "femoral", label: "Femoral", color: "#EC4899" },
   { key: "gluteo", label: "Glúteo y cadera", color: "#8B5CF6" },
@@ -71,7 +73,7 @@ const EXERCISE_LIBRARY = [
   { id: "press_pecho_maquina", name: "Press de Pecho en Máquina", muscle: "Pectoral", group: "pecho", nota: "Buena opción para sumar volumen sin fatigar tanto los estabilizadores.", videoQuery: "press de pecho en máquina técnica chest press machine" },
   { id: "cruce_poleas", name: "Cruce de Poleas", muscle: "Pectoral", group: "pecho", nota: "Énfasis en el estiramiento, no uses demasiado peso.", videoQuery: "cruce de poleas técnica pectoral" },
   { id: "aperturas_mancuerna", name: "Aperturas con Mancuernas", muscle: "Pectoral", group: "pecho", nota: "Codos siempre un poco flexionados, no los traves rectos.", videoQuery: "aperturas con mancuernas técnica dumbbell flyes" },
-  { id: "pec_deck_pectoral", name: "Pec Deck (Aperturas en Máquina)", muscle: "Pectoral", group: "pecho", nota: "Movimiento controlado, juntá bien al frente sin golpear las almohadillas.", videoQuery: "pec deck máquina técnica pectoral" },
+  { id: "pec_deck_pectoral", name: "Pec Deck", muscle: "Pectoral", group: "pecho", nota: "Movimiento controlado, juntá bien al frente sin golpear las almohadillas.", videoQuery: "pec deck máquina técnica pectoral" },
   { id: "press_cerrado", name: "Press Banca Agarre Cerrado", muscle: "Pectoral / Tríceps", group: "pecho", nota: "Manos a la altura de los hombros, buen híbrido con tríceps.", videoQuery: "press banca agarre cerrado técnica" },
   { id: "flexiones", name: "Flexiones de Brazos", muscle: "Pectoral", group: "pecho", nota: "Con tu propio peso corporal, útil para activar antes de entrenar.", videoQuery: "flexiones de brazos técnica correcta" },
   // Espalda
@@ -149,6 +151,105 @@ const EXERCISE_LIBRARY = [
   { id: "elevacion_talones_sentado", name: "Elevación de Talones Sentado", muscle: "Pantorrillas (sóleo)", group: "pantorrillas", nota: "Variante que enfatiza más el sóleo.", videoQuery: "elevación de talones sentado técnica sóleo" },
   { id: "elevacion_talones_prensa", name: "Elevación de Talones en Prensa", muscle: "Pantorrillas", group: "pantorrillas", nota: "Apoyá solo la punta del pie en la plataforma, rango completo.", videoQuery: "elevación de talones en prensa técnica" },
   { id: "elevacion_talones_unilateral", name: "Elevación de Talones a Una Pierna", muscle: "Pantorrillas", group: "pantorrillas", nota: "Sostenete de algo para el equilibrio, no hace falta peso extra al principio.", videoQuery: "elevación de talones a una pierna técnica" },
+  // Pecho (catálogo extendido)
+  { id: "press_banca_agarre_invertido", name: "Press Banca Agarre Invertido", muscle: "Pectoral sup.", group: "pecho", nota: "Agarre supino en la barra, mayor énfasis en la porción clavicular del pecho.", videoQuery: "press banca agarre invertido técnica" },
+  { id: "press_banca_mancuernas_neutro", name: "Press Banca con Mancuernas Agarre Neutro", muscle: "Pectoral", group: "pecho", nota: "Palmas enfrentadas, reduce el estrés sobre el hombro respecto al agarre pronado.", videoQuery: "press banca mancuernas agarre neutro técnica" },
+  { id: "press_inclinado_barra", name: "Press Inclinado con Barra", muscle: "Pectoral sup.", group: "pecho", nota: "Banco entre 30° y 45°, no lo subas más o vas a sumar más hombro que pecho.", videoQuery: "press inclinado con barra técnica" },
+  { id: "press_inclinado_maquina", name: "Press Inclinado en Máquina", muscle: "Pectoral sup.", group: "pecho", nota: "Trayectoria fija, buena opción para sumar volumen sin estabilizar tanto.", videoQuery: "press inclinado en máquina técnica" },
+  { id: "press_declinado_mancuernas", name: "Press Declinado con Mancuernas", muscle: "Pectoral inf.", group: "pecho", nota: "Asegurá bien los pies, bajá controlado hacia la parte baja del pecho.", videoQuery: "press declinado con mancuernas técnica" },
+  { id: "press_declinado_maquina", name: "Press Declinado en Máquina", muscle: "Pectoral inf.", group: "pecho", nota: "Recorrido guiado, foco en la parte baja del pectoral.", videoQuery: "press declinado en máquina técnica" },
+  { id: "aperturas_banco_inclinado", name: "Aperturas con Mancuernas en Banco Inclinado", muscle: "Pectoral sup.", group: "pecho", nota: "Mismo cuidado que las aperturas planas, pero con énfasis en la parte alta.", videoQuery: "aperturas banco inclinado técnica pectoral" },
+  { id: "cruce_poleas_alto_bajo", name: "Cruce de Poleas Alto a Bajo", muscle: "Pectoral inf.", group: "pecho", nota: "Poleas arriba, tirá hacia abajo y adelante para sumar la parte baja del pecho.", videoQuery: "cruce de poleas alto a bajo técnica" },
+  { id: "cruce_poleas_bajo_alto", name: "Cruce de Poleas Bajo a Alto", muscle: "Pectoral sup.", group: "pecho", nota: "Poleas abajo, tirá hacia arriba y adelante para sumar la parte alta del pecho.", videoQuery: "cruce de poleas bajo a alto técnica" },
+  { id: "cruce_poleas_una_mano", name: "Cruce de Poleas a Una Mano", muscle: "Pectoral", group: "pecho", nota: "Trabajo unilateral, buscá la máxima contracción al final del recorrido.", videoQuery: "cruce de poleas a una mano técnica" },
+  { id: "press_landmine", name: "Press Landmine", muscle: "Pectoral", group: "pecho", nota: "Barra apoyada en un extremo, empujá en diagonal hacia arriba y adelante.", videoQuery: "press landmine técnica pectoral" },
+  { id: "svend_press", name: "Svend Press", muscle: "Pectoral", group: "pecho", nota: "Apretá un disco entre las palmas y empujá hacia adelante, sin soltar la presión.", videoQuery: "svend press técnica pectoral" },
+  { id: "flexiones_declinadas", name: "Flexiones Declinadas", muscle: "Pectoral sup.", group: "pecho", nota: "Pies elevados sobre un banco, mayor énfasis en la parte alta del pecho.", videoQuery: "flexiones declinadas técnica" },
+  { id: "flexiones_inclinadas", name: "Flexiones Inclinadas", muscle: "Pectoral inf.", group: "pecho", nota: "Manos elevadas sobre un banco o step, más enfocadas en la parte baja del pecho.", videoQuery: "flexiones inclinadas técnica" },
+  { id: "flexiones_deficit", name: "Flexiones con Déficit", muscle: "Pectoral", group: "pecho", nota: "Manos sobre discos o mancuernas para sumar rango de estiramiento.", videoQuery: "flexiones con déficit técnica" },
+  { id: "flexiones_pliometricas", name: "Flexiones Pliométricas", muscle: "Pectoral", group: "pecho", nota: "Empujá con fuerza para despegar las manos del piso, controlá bien la caída.", videoQuery: "flexiones pliométricas técnica" },
+  { id: "fondos_anillas", name: "Fondos en Anillas", muscle: "Pectoral", group: "pecho", nota: "Mayor inestabilidad que en paralelas fijas, controlá bien la apertura final.", videoQuery: "fondos en anillas técnica" },
+  // Espalda (catálogo extendido)
+  { id: "dominadas_supinas", name: "Dominadas Supinas", muscle: "Dorsal / Bíceps", group: "espalda", nota: "Agarre invertido (palmas hacia vos), suma más trabajo de bíceps que la prona.", videoQuery: "dominadas supinas chin up técnica" },
+  { id: "dominadas_agarre_neutro", name: "Dominadas Agarre Neutro", muscle: "Dorsal", group: "espalda", nota: "Palmas enfrentadas, suele ser más amigable para el hombro.", videoQuery: "dominadas agarre neutro técnica" },
+  { id: "dominadas_lastre", name: "Dominadas con Lastre", muscle: "Dorsal", group: "espalda", nota: "Sumá peso con un cinturón sólo cuando domines bien la dominada de tu propio peso.", videoQuery: "dominadas con lastre técnica" },
+  { id: "dominadas_asistidas", name: "Dominadas Asistidas en Máquina", muscle: "Dorsal", group: "espalda", nota: "Buena opción para sumar volumen de dominadas con control de la carga.", videoQuery: "dominadas asistidas máquina técnica" },
+  { id: "jalon_agarre_neutro", name: "Jalón al Pecho Agarre Neutro", muscle: "Dorsal", group: "espalda", nota: "Barra en V o agarres neutros, buen estiramiento al final del recorrido.", videoQuery: "jalón al pecho agarre neutro técnica" },
+  { id: "jalon_unilateral", name: "Jalón Unilateral en Polea Alta", muscle: "Dorsal", group: "espalda", nota: "Trabajo unilateral, mantené el torso estable sin rotar de más.", videoQuery: "jalón unilateral polea alta técnica" },
+  { id: "remo_barra_supino", name: "Remo con Barra Agarre Supino", muscle: "Dorsal", group: "espalda", nota: "Agarre supino, mayor énfasis en la parte baja del dorsal.", videoQuery: "remo con barra agarre supino técnica" },
+  { id: "remo_t_libre", name: "Remo en T Libre", muscle: "Dorsal medio", group: "espalda", nota: "Sin apoyo de pecho, exige más estabilidad del core que la versión apoyada.", videoQuery: "remo en T libre técnica" },
+  { id: "remo_polea_agarre_ancho", name: "Remo en Polea Baja Agarre Ancho", muscle: "Deltoides post. / Romboides", group: "espalda", nota: "Barra recta con agarre ancho, más foco en deltoides posterior y romboides.", videoQuery: "remo polea baja agarre ancho técnica" },
+  { id: "remo_meadows", name: "Remo Meadows", muscle: "Dorsal", group: "espalda", nota: "Remo unilateral con barra apoyada en un soporte, buen estiramiento inicial.", videoQuery: "remo meadows técnica espalda" },
+  { id: "pullover_polea_alta", name: "Pullover en Polea Alta", muscle: "Dorsal", group: "espalda", nota: "Brazos extendidos, bajá la barra en arco sin flexionar los codos.", videoQuery: "pullover polea alta técnica dorsal" },
+  { id: "encogimientos_barra", name: "Encogimientos de Hombros con Barra", muscle: "Trapecio", group: "espalda", nota: "Subí los hombros derecho hacia arriba, no los gires en círculo.", videoQuery: "encogimientos de hombros con barra técnica shrugs" },
+  { id: "encogimientos_mancuernas", name: "Encogimientos de Hombros con Mancuernas", muscle: "Trapecio", group: "espalda", nota: "Línea de tracción más natural que con barra, pausa arriba.", videoQuery: "encogimientos de hombros con mancuernas técnica" },
+  { id: "encogimientos_smith", name: "Encogimientos en Máquina Smith", muscle: "Trapecio", group: "espalda", nota: "Trayectoria vertical fija, te deja enfocarte en apretar el trapecio.", videoQuery: "encogimientos máquina smith técnica trapecio" },
+  { id: "encogimientos_polea_baja", name: "Encogimientos en Polea Baja", muscle: "Trapecio", group: "espalda", nota: "Tensión constante durante todo el recorrido, no uses impulso de piernas.", videoQuery: "encogimientos polea baja técnica trapecio" },
+  { id: "paseo_granjero", name: "Paseo del Granjero", muscle: "Trapecio / Agarre", group: "espalda", nota: "Caminá con el torso erguido, sin dejar caer los hombros hacia adelante.", videoQuery: "paseo del granjero técnica farmers walk" },
+  { id: "buenos_dias", name: "Buenos Días con Barra", muscle: "Espalda baja / Femoral", group: "espalda", nota: "Empezá con poco peso, la espalda se mantiene siempre neutra al flexionar la cadera.", videoQuery: "buenos días con barra técnica good morning" },
+  { id: "supermans", name: "Supermans", muscle: "Espalda baja", group: "espalda", nota: "Tumbado boca abajo, levantá brazos y piernas a la vez de forma controlada.", videoQuery: "supermans técnica espalda baja" },
+  // Hombros (catálogo extendido)
+  { id: "press_militar_pie_barra", name: "Press Militar de Pie con Barra", muscle: "Deltoides ant.", group: "hombros", nota: "Apretá el core para no arquear la espalda baja al empujar.", videoQuery: "press militar de pie con barra técnica" },
+  { id: "press_militar_sentado_barra", name: "Press Militar Sentado con Barra", muscle: "Deltoides ant.", group: "hombros", nota: "El banco te quita el impulso de piernas, foco puro en el hombro.", videoQuery: "press militar sentado con barra técnica" },
+  { id: "press_militar_smith_otravar", name: "Press Militar en Máquina Smith", muscle: "Deltoides ant.", group: "hombros", nota: "Recorrido fijo hacia adelante, no lo hagas tras nuca para proteger el hombro.", videoQuery: "press militar smith técnica frontal" },
+  { id: "press_hombro_una_mano", name: "Press de Hombro a Una Mano", muscle: "Deltoides ant.", group: "hombros", nota: "De pie con una mancuerna, exige estabilidad extra del core de ese lado.", videoQuery: "press de hombro a una mano técnica" },
+  { id: "z_press", name: "Z Press", muscle: "Deltoides ant. / Core", group: "hombros", nota: "Sentado en el piso con piernas estiradas, sin apoyo de espalda ni impulso.", videoQuery: "z press técnica hombros" },
+  { id: "vuelos_laterales_polea_baja", name: "Elevaciones Laterales en Polea Baja", muscle: "Deltoides lateral", group: "hombros", nota: "Tensión constante incluso al inicio del recorrido, a diferencia de la mancuerna.", videoQuery: "elevaciones laterales polea baja técnica" },
+  { id: "vuelos_laterales_inclinado", name: "Elevaciones Laterales Inclinadas", muscle: "Deltoides lateral", group: "hombros", nota: "Acostado de lado en un banco inclinado, cambia la curva de esfuerzo del movimiento.", videoQuery: "elevaciones laterales inclinadas técnica" },
+  { id: "cruces_invertidos_polea", name: "Cruces Invertidos en Polea Alta", muscle: "Deltoides post.", group: "hombros", nota: "Poleas cruzadas a la altura de los hombros, tirá hacia afuera y atrás.", videoQuery: "cruces invertidos polea alta técnica deltoides posterior" },
+  // Bíceps (catálogo extendido)
+  { id: "curl_barra_recta", name: "Curl con Barra Recta", muscle: "Bíceps", group: "biceps", nota: "Codos fijos pegados al torso, no los lleves hacia adelante al subir.", videoQuery: "curl con barra recta técnica bíceps" },
+  { id: "curl_polea_cuerda", name: "Curl en Polea Baja con Cuerda", muscle: "Bíceps", group: "biceps", nota: "Separá un poco las manos arriba para sumar contracción extra.", videoQuery: "curl polea baja cuerda técnica bíceps" },
+  { id: "curl_spider", name: "Curl Spider", muscle: "Bíceps", group: "biceps", nota: "Boca abajo en un banco inclinado, sin poder hacer trampa con el cuerpo.", videoQuery: "curl spider técnica bíceps" },
+  { id: "curl_zottman", name: "Curl Zottman", muscle: "Bíceps / Antebrazo", group: "biceps", nota: "Subí en supinación y girá las muñecas para bajar en pronación.", videoQuery: "curl zottman técnica bíceps antebrazo" },
+  { id: "curl_hercules", name: "Curl Hércules", muscle: "Bíceps", group: "biceps", nota: "En poleas dobles, brazos abiertos en cruz, llevá las manos hacia los hombros.", videoQuery: "curl hércules técnica bíceps poleas" },
+  // Tríceps (catálogo extendido)
+  { id: "triceps_trasnuca_polea", name: "Extensión de Tríceps Tras Nuca en Polea", muscle: "Tríceps", group: "triceps", nota: "Codos fijos cerca de la cabeza, extendé sin abrirlos hacia los costados.", videoQuery: "extensión tríceps tras nuca polea técnica" },
+  { id: "flexiones_diamante", name: "Flexiones Diamante", muscle: "Tríceps", group: "triceps", nota: "Manos juntas formando un rombo debajo del pecho, codos cerca del cuerpo.", videoQuery: "flexiones diamante técnica tríceps" },
+  // Antebrazos
+  { id: "curl_muneca_pronacion", name: "Curl de Muñeca en Pronación", muscle: "Antebrazo (extensores)", group: "antebrazos", nota: "Palmas hacia abajo, subí solo la muñeca sin mover el antebrazo.", videoQuery: "curl de muñeca pronación técnica antebrazo" },
+  { id: "curl_muneca_supinacion", name: "Curl de Muñeca en Supinación", muscle: "Antebrazo (flexores)", group: "antebrazos", nota: "Palmas hacia arriba, apoyá los antebrazos y flexioná solo la muñeca.", videoQuery: "curl de muñeca supinación técnica antebrazo" },
+  { id: "rodillo_muneca", name: "Rodillo de Muñeca", muscle: "Antebrazo", group: "antebrazos", nota: "Enrollá la cuerda con peso girando las muñecas, sin balancear los brazos.", videoQuery: "rodillo de muñeca técnica antebrazo" },
+  { id: "sujecion_discos_pellizco", name: "Sujeción de Discos por Pellizco", muscle: "Antebrazo / Agarre", group: "antebrazos", nota: "Sostené discos lisos solo con la punta de los dedos el mayor tiempo posible.", videoQuery: "sujeción de discos por pellizco técnica agarre" },
+  // Cuádriceps (catálogo extendido)
+  { id: "sentadilla_frontal", name: "Sentadilla Frontal", muscle: "Cuádriceps", group: "cuadriceps", nota: "Barra apoyada adelante en los hombros, torso bien vertical durante todo el movimiento.", videoQuery: "sentadilla frontal técnica front squat" },
+  { id: "sentadilla_sissy", name: "Sentadilla Sissy", muscle: "Cuádriceps", group: "cuadriceps", nota: "Sostenete de algo fijo, llevá las rodillas adelante manteniendo el torso recto.", videoQuery: "sentadilla sissy técnica cuádriceps" },
+  { id: "zancadas_atras", name: "Zancadas hacia Atrás", muscle: "Cuádriceps / Glúteo", group: "cuadriceps", nota: "Dar el paso hacia atrás suele ser más suave para la rodilla que hacia adelante.", videoQuery: "zancadas hacia atrás técnica reverse lunge" },
+  { id: "sentadilla_zercher", name: "Sentadilla Zercher", muscle: "Cuádriceps", group: "cuadriceps", nota: "Barra sostenida en el pliegue de los codos, exige mucho del core.", videoQuery: "sentadilla zercher técnica" },
+  { id: "sentadilla_pistol", name: "Sentadilla Pistol", muscle: "Cuádriceps", group: "cuadriceps", nota: "A una sola pierna, requiere buena movilidad y equilibrio — progresá de a poco.", videoQuery: "sentadilla pistol técnica una pierna" },
+  // Femoral (catálogo extendido)
+  { id: "peso_muerto_rumano_mancuernas", name: "Peso Muerto Rumano con Mancuernas", muscle: "Femoral", group: "femoral", nota: "Mismo patrón que con barra, pero con más libertad en la trayectoria.", videoQuery: "peso muerto rumano con mancuernas técnica" },
+  { id: "curl_femoral_sentado", name: "Curl Femoral Sentado", muscle: "Femoral", group: "femoral", nota: "El ángulo de cadera flexionado pone al isquiotibial en un estiramiento previo mayor.", videoQuery: "curl femoral sentado técnica" },
+  { id: "curl_femoral_pie", name: "Curl Femoral de Pie", muscle: "Femoral", group: "femoral", nota: "Trabajo unilateral, apoyate bien para no compensar con la cadera.", videoQuery: "curl femoral de pie técnica" },
+  { id: "curl_femoral_nordico", name: "Curl Femoral Nórdico", muscle: "Femoral", group: "femoral", nota: "Bajá lo más lento posible controlando con los isquiotibiales, es muy exigente.", videoQuery: "curl femoral nórdico técnica nordic curl" },
+  { id: "glute_ham_raise", name: "Glute Ham Raise", muscle: "Femoral / Glúteo", group: "femoral", nota: "Combina cadera y rodilla en un solo movimiento, empezá con rango parcial.", videoQuery: "glute ham raise técnica" },
+  // Glúteo y cadera (catálogo extendido)
+  { id: "hip_thrust_unilateral", name: "Hip Thrust Unilateral", muscle: "Glúteo", group: "gluteo", nota: "Una pierna apoyada en el piso, la otra extendida — bueno para corregir asimetrías.", videoQuery: "hip thrust unilateral técnica" },
+  { id: "paseos_laterales_banda", name: "Paseos Laterales con Banda", muscle: "Glúteo medio", group: "gluteo", nota: "Banda por encima de las rodillas o tobillos, mantené tensión todo el recorrido.", videoQuery: "paseos laterales con banda técnica monster walk" },
+  { id: "sentadilla_sumo", name: "Sentadilla Sumo", muscle: "Glúteo / Aductores", group: "gluteo", nota: "Postura ancha con puntas afuera, mayor participación de glúteo y aductores.", videoQuery: "sentadilla sumo técnica" },
+  { id: "hiperextension_invertida", name: "Hiperextensión Invertida", muscle: "Glúteo / Espalda baja", group: "gluteo", nota: "Torso fijo, levantás las piernas en vez del torso — cuidá no usar impulso.", videoQuery: "hiperextensión invertida técnica reverse hyper" },
+  { id: "plancha_copenhague", name: "Plancha Copenhague", muscle: "Aductores", group: "gluteo", nota: "Pierna de arriba apoyada en un banco, exige mucho de los aductores y el core.", videoQuery: "plancha copenhague técnica aductores" },
+  { id: "aduccion_polea_baja", name: "Aducción de Cadera en Polea Baja", muscle: "Aductores", group: "gluteo", nota: "De pie, cruzá la pierna por delante del cuerpo en un arco controlado.", videoQuery: "aducción cadera polea baja técnica" },
+  // Pantorrillas (catálogo extendido)
+  { id: "elevacion_talones_burro", name: "Elevación de Talones tipo Burro", muscle: "Pantorrillas", group: "pantorrillas", nota: "Torso inclinado hacia adelante, mayor estiramiento del gemelo en la fase baja.", videoQuery: "elevación de talones tipo burro técnica donkey calf raise" },
+  // Core (catálogo extendido)
+  { id: "crunch_polea_alta", name: "Crunch en Polea Alta", muscle: "Core", group: "core", nota: "Arrodillado, flexioná la zona media hacia las rodillas, no tires solo con los brazos.", videoQuery: "crunch polea alta arrodillado técnica" },
+  { id: "crunch_banco_declinado", name: "Crunch en Banco Declinado", muscle: "Core", group: "core", nota: "Mayor rango que en el piso, controlá la bajada sin dejarte caer.", videoQuery: "crunch banco declinado técnica" },
+  { id: "crunch_fitball", name: "Crunch en Fitball", muscle: "Core", group: "core", nota: "La base inestable suma rango excéntrico, mantené los pies bien apoyados.", videoQuery: "crunch en fitball técnica" },
+  { id: "v_ups", name: "V-Ups", muscle: "Core", group: "core", nota: "Subís piernas y torso a la vez formando una V, controlá la bajada.", videoQuery: "v-ups técnica abdominales" },
+  { id: "elevacion_rodillas_silla_romana", name: "Elevación de Rodillas en Silla Romana", muscle: "Core / abdomen bajo", group: "core", nota: "Apoyado en los antebrazos, subí las rodillas sin balancear el cuerpo.", videoQuery: "elevación de rodillas silla romana técnica" },
+  { id: "elevacion_piernas_tumbado", name: "Elevación de Piernas Tumbado", muscle: "Core / abdomen bajo", group: "core", nota: "Espalda baja pegada al piso, no la dejes despegar al bajar las piernas.", videoQuery: "elevación de piernas tumbado técnica" },
+  { id: "tijeras_piernas", name: "Tijeras de Piernas", muscle: "Core", group: "core", nota: "Espalda baja apoyada en el piso, movimiento controlado sin golpear los pies.", videoQuery: "tijeras de piernas técnica core" },
+  { id: "l_sit", name: "L-Sit", muscle: "Core", group: "core", nota: "Piernas estiradas y paralelas al piso, sostenido en paralelas o colgado — muy exigente.", videoQuery: "l-sit técnica core" },
+  { id: "plancha_rkc", name: "Plancha RKC", muscle: "Core", group: "core", nota: "Apretá con fuerza glúteos y cuádriceps durante toda la plancha, tensión máxima.", videoQuery: "plancha rkc técnica core" },
+  { id: "paseo_granjero_unilateral", name: "Paseo del Granjero Unilateral", muscle: "Core / oblicuos", group: "core", nota: "Peso de un solo lado, evitá que el torso se incline hacia donde cargás.", videoQuery: "paseo del granjero unilateral técnica suitcase carry" },
+  { id: "press_pallof", name: "Press Pallof", muscle: "Core / oblicuos", group: "core", nota: "De pie de costado a la polea, empujá hacia adelante sin dejar que el torso rote.", videoQuery: "press pallof técnica core antirotación" },
+  { id: "bird_dog", name: "Bird Dog", muscle: "Core", group: "core", nota: "En cuatro apoyos, estirá brazo y pierna contraria manteniendo la espalda estable.", videoQuery: "bird dog técnica core" },
+  { id: "dead_bug", name: "Dead Bug", muscle: "Core", group: "core", nota: "Boca arriba, bajá brazo y pierna opuestos sin que la espalda baja se despegue del piso.", videoQuery: "dead bug técnica core" },
+  { id: "lenador_polea", name: "Leñador en Polea", muscle: "Core / oblicuos", group: "core", nota: "Movimiento diagonal de arriba a abajo (o viceversa), rotando desde el torso.", videoQuery: "leñador polea técnica core woodchopper" },
+  { id: "crunch_lateral", name: "Crunch Lateral", muscle: "Core / oblicuos", group: "core", nota: "Tumbado de costado, flexioná hacia el oblicuo sin tirar del cuello.", videoQuery: "crunch lateral técnica oblicuos" },
+  { id: "giros_torso_barra", name: "Giros de Torso con Barra", muscle: "Core / oblicuos", group: "core", nota: "Barra sobre los hombros, girá despacio y controlado — nunca de golpe.", videoQuery: "giros de torso con barra técnica core" },
+  { id: "stomach_vacuum", name: "Stomach Vacuum", muscle: "Core (transverso)", group: "core", nota: "Exhalá todo el aire y metiendo el ombligo hacia la columna, sostené unos segundos.", videoQuery: "stomach vacuum técnica transverso abdominal" },
 ];
 const EXERCISE_LIBRARY_BY_ID = {};
 EXERCISE_LIBRARY.forEach((e) => { EXERCISE_LIBRARY_BY_ID[e.id] = e; });
@@ -159,7 +260,7 @@ MUSCLE_GROUPS.forEach((g) => { EXERCISE_LIBRARY_BY_GROUP[g.key] = EXERCISE_LIBRA
 const PRESET_ROUTINES = [
   {
     id: "classic_default",
-    name: "Clásica",
+    name: "Push Pull Legs + Hombro/Brazo",
     source: "preset",
     description: "La rutina original de la app: empuje, tracción, pierna y un día extra de hombros y brazos.",
     recommendation: "Pensada para entrenar 4 veces por semana, repitiendo el ciclo.",
@@ -329,6 +430,75 @@ const CLASSIC_PRESET = PRESET_ROUTINES_BY_ID["classic_default"];
 
 function cloneRoutineDef(def) { return JSON.parse(JSON.stringify(def)); }
 
+/* ============================== COMPARTIR RUTINAS ==============================
+   Como la app no tiene backend, "compartir por link" funciona codificando
+   la rutina entera adentro del link (en el fragmento #shared-routine=...):
+   no hace falta ningún servidor, el que abre el link decodifica los datos
+   directamente del navegador. Para que el link no quede gigante, se usa una
+   forma compacta (claves cortas, series como "3x8-10" en vez de objetos). */
+function compactSetsToken(sets) {
+  const groups = [];
+  (sets || []).forEach((s) => {
+    const last = groups[groups.length - 1];
+    if (last && last.repRange === s.repRange) last.count++;
+    else groups.push({ repRange: s.repRange, count: 1 });
+  });
+  return groups.map((g) => `${g.count}x${g.repRange}`).join(",");
+}
+function setsFromCompactToken(token) {
+  return (token || "3x8-10").split(",").flatMap((part) => {
+    const [countStr, repRange] = part.split("x");
+    const count = parseInt(countStr, 10) || 1;
+    return Array.from({ length: count }, () => ({ repRange: repRange || "8-10" }));
+  });
+}
+
+function encodeRoutineForShare(routineDef) {
+  const compact = {
+    n: routineDef.name,
+    o: routineDef.dayOrder,
+    d: routineDef.dayOrder.map((dk) => {
+      const day = routineDef.days[dk];
+      return {
+        k: dk, l: day.label, c: day.color,
+        e: (day.exercises || []).map((ex) => (
+          ex.libId ? { i: ex.libId, s: compactSetsToken(ex.sets) } : { x: ex.name, m: ex.muscle, s: compactSetsToken(ex.sets) }
+        )),
+      };
+    }),
+  };
+  const json = JSON.stringify(compact);
+  const b64 = btoa(unescape(encodeURIComponent(json)));
+  return b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function decodeSharedRoutine(token) {
+  try {
+    const b64 = token.replace(/-/g, "+").replace(/_/g, "/");
+    const json = decodeURIComponent(escape(atob(b64)));
+    const compact = JSON.parse(json);
+    if (!compact || !Array.isArray(compact.o) || !compact.d) return null;
+    const days = {};
+    compact.d.forEach((day) => {
+      days[day.k] = {
+        label: day.l, description: "", color: day.c,
+        exercises: (day.e || []).map((ex) => (
+          ex.i
+            ? { libId: ex.i, sets: setsFromCompactToken(ex.s) }
+            : { id: builderUid("shared"), name: ex.x || "Ejercicio", muscle: ex.m || "Personalizado", sets: setsFromCompactToken(ex.s) }
+        )),
+      };
+    });
+    return { name: compact.n || "Rutina compartida", source: "custom", description: "Rutina recibida por enlace.", recommendation: "", dayOrder: compact.o, days };
+  } catch { return null; }
+}
+
+function buildRoutineShareUrl(routineDef) {
+  const token = encodeRoutineForShare(routineDef);
+  const base = typeof window !== "undefined" ? window.location.origin + window.location.pathname : "";
+  return `${base}#shared-routine=${token}`;
+}
+
 // Convierte una definición de rutina (preset o creada por el usuario) en el
 // modelo "resuelto" que usa el resto de la app: cada ejercicio ya trae su
 // nombre/músculo/nota/video (sacados de la biblioteca, salvo que sea un
@@ -427,7 +597,7 @@ function getDeviceId() {
 // Perfiles de versiones anteriores de la app (antes de que existieran
 // múltiples rutinas) no tienen `routines`/`activeRoutineId`. Si ya tenían
 // `maxesSetupDays` es señal de que es un perfil viejo con datos reales: se le
-// asigna la rutina "Clásica" automáticamente, sin pedirle nada, para que no
+// asigna la rutina "Push Pull Legs + Hombro/Brazo" automáticamente, sin pedirle nada, para que no
 // pierda ni su rutina ni su historial. Un perfil realmente nuevo (creado ya
 // con esta versión) no tiene `maxesSetupDays`, así que se lo deja sin rutina
 // activa a propósito: la pantalla de Rutinas se va a encargar de pedírsela.
@@ -943,6 +1113,208 @@ function PRBurst({ anchorRef, trigger }) {
       ))}
     </div>,
     document.body
+  );
+}
+
+/* ============================================================================
+   COMPARTIR — dos mecanismos:
+   1) ShareLinkModal: comparte un link (usado para rutinas) por la API nativa
+      del sistema (que en celular suele incluir WhatsApp/Instagram/etc. como
+      destino), o por botones directos a WhatsApp/X/Reddit, o copiando el link.
+   2) ShareImageModal: genera una imagen prolija con Canvas (para Stories de
+      Instagram, etc.) cuando rompés un récord o completás un ciclo, con el
+      "logo" de la app abajo. Sin backend: todo se dibuja y se comparte/baja
+      directamente desde el navegador.
+============================================================================ */
+function ShareLinkModal({ title, shareTitle, shareText, url, onClose }) {
+  const [copied, setCopied] = useState(false);
+  const canNativeShare = typeof navigator !== "undefined" && !!navigator.share;
+  const handleNativeShare = async () => { try { await navigator.share({ title: shareTitle, text: shareText, url }); onClose(); } catch { /* cancelado, no hacemos nada */ } };
+  const handleCopy = async () => { try { await navigator.clipboard.writeText(url); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch {} };
+  const waUrl = `https://wa.me/?text=${encodeURIComponent(shareText + " " + url)}`;
+  const xUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(url)}`;
+  const redditUrl = `https://www.reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(shareTitle)}`;
+  return (
+    <div className="fixed inset-0 z-[120] bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 modal-bg-in" onClick={onClose}>
+      <div className="bg-slate-900 border border-slate-700/60 rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-base font-black text-white">{title}</h3>
+          <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition"><X size={18} /></button>
+        </div>
+        {canNativeShare && (
+          <button onClick={handleNativeShare} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white text-sm font-bold mb-3 transition-all active:scale-[0.98] shadow-lg shadow-teal-500/20" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>
+            <Share2 size={15} /> Compartir
+          </button>
+        )}
+        <div className="grid grid-cols-3 gap-2 mb-3">
+          <a href={waUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition"><Share2 size={15} className="text-emerald-400" />WhatsApp</a>
+          <a href={xUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition"><Share2 size={15} className="text-slate-200" />X</a>
+          <a href={redditUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition"><Share2 size={15} className="text-orange-400" />Reddit</a>
+        </div>
+        <button onClick={handleCopy} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition text-sm font-semibold">
+          {copied ? <><Check size={14} className="text-teal-400" /> ¡Copiado!</> : <><Copy size={14} /> Copiar enlace</>}
+        </button>
+        <p className="text-[10px] text-slate-600 mt-3 text-center">Para Instagram: copiá el enlace y pegalo en tu historia, bio o un mensaje.</p>
+      </div>
+    </div>
+  );
+}
+
+// Reparte texto largo en varias líneas dentro de un ancho máximo — Canvas no
+// hace word-wrap solo. Devuelve cuántas líneas ocupó.
+function wrapCanvasText(ctx, text, x, y, maxWidth, lineHeight) {
+  const words = String(text).split(" ");
+  let line = "", lines = [];
+  words.forEach((w) => {
+    const test = line ? `${line} ${w}` : w;
+    if (ctx.measureText(test).width > maxWidth && line) { lines.push(line); line = w; }
+    else line = test;
+  });
+  if (line) lines.push(line);
+  lines.forEach((l, i) => ctx.fillText(l, x, y + i * lineHeight));
+  return lines.length;
+}
+
+function drawShareCardBase(ctx, W, H, accent, accent2) {
+  const bg = ctx.createLinearGradient(0, 0, W, H);
+  bg.addColorStop(0, "#0a0a0f"); bg.addColorStop(1, "#13141f");
+  ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
+  const blob = (x, y, r, color, alpha) => {
+    ctx.save(); ctx.globalAlpha = alpha;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, color); g.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+  };
+  blob(W * 0.18, H * 0.16, W * 0.62, accent, 0.4);
+  blob(W * 0.86, H * 0.82, W * 0.55, accent2, 0.28);
+}
+
+// El "logo" de la app abajo de la tarjeta: una llamita simple dibujada a
+// mano (no hay archivo de imagen en este proyecto de un solo archivo) más
+// el nombre, en la parte inferior — tal como se pidió.
+function drawWordmark(ctx, W, H, accent) {
+  const cx = W / 2, y = H - 150;
+  ctx.save();
+  ctx.fillStyle = accent;
+  ctx.beginPath();
+  ctx.moveTo(cx - 17, y + 16);
+  ctx.quadraticCurveTo(cx - 26, y - 14, cx - 2, y - 46);
+  ctx.quadraticCurveTo(cx + 6, y - 22, cx + 4, y - 6);
+  ctx.quadraticCurveTo(cx + 16, y - 18, cx + 17, y - 2);
+  ctx.quadraticCurveTo(cx + 22, y + 10, cx, y + 18);
+  ctx.quadraticCurveTo(cx - 8, y + 10, cx - 17, y + 16);
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
+  ctx.fillStyle = "#f1f5f9";
+  ctx.font = "800 36px sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("Mi Rutina", cx, y + 64);
+}
+
+function drawPRShareCard(ctx, W, H, { exerciseName, kg, reps, accent = "#14B8A6" }) {
+  drawShareCardBase(ctx, W, H, accent, "#A855F7");
+  ctx.textAlign = "center";
+  ctx.fillStyle = accent;
+  ctx.font = "800 42px sans-serif";
+  ctx.fillText("🔥 NUEVA MARCA PERSONAL", W / 2, 480);
+  ctx.fillStyle = "#f8fafc";
+  ctx.font = "800 64px sans-serif";
+  const nameLines = wrapCanvasText(ctx, (exerciseName || "").toUpperCase(), W / 2, 600, W - 160, 74);
+  const statsY = 600 + nameLines * 74 + 140;
+  ctx.fillStyle = accent;
+  ctx.font = "900 220px sans-serif";
+  ctx.fillText(`${kg}`, W / 2, statsY);
+  ctx.fillStyle = "#94a3b8";
+  ctx.font = "700 46px sans-serif";
+  ctx.fillText("KILOGRAMOS", W / 2, statsY + 70);
+  ctx.fillStyle = "#cbd5e1";
+  ctx.font = "700 52px sans-serif";
+  ctx.fillText(`${reps} repeticiones`, W / 2, statsY + 170);
+  drawWordmark(ctx, W, H, accent);
+}
+
+function drawCycleShareCard(ctx, W, H, { cycleNumber, daysTrained, totalVol, accent = "#A855F7" }) {
+  drawShareCardBase(ctx, W, H, accent, "#06B6D4");
+  ctx.textAlign = "center";
+  ctx.fillStyle = accent;
+  ctx.font = "800 42px sans-serif";
+  ctx.fillText("🎉 CICLO COMPLETO", W / 2, 480);
+  ctx.fillStyle = "#f8fafc";
+  ctx.font = "900 130px sans-serif";
+  ctx.fillText(`Ciclo #${cycleNumber}`, W / 2, 660);
+  const tiles = [
+    { val: daysTrained, label: "DÍAS\nENTRENADOS" },
+    { val: totalVol > 999 ? `${(totalVol / 1000).toFixed(1)}k` : totalVol, label: "KG × REPS\nTOTALES" },
+  ];
+  const tileY = 950, tileGap = 60, tileW = (W - 160 - tileGap) / 2;
+  tiles.forEach((t, i) => {
+    const x = 80 + i * (tileW + tileGap);
+    ctx.fillStyle = "rgba(255,255,255,0.06)";
+    ctx.beginPath(); ctx.roundRect(x, tileY, tileW, 280, 28); ctx.fill();
+    ctx.fillStyle = "#f8fafc";
+    ctx.font = "900 86px sans-serif";
+    ctx.fillText(`${t.val}`, x + tileW / 2, tileY + 130);
+    ctx.fillStyle = "#94a3b8";
+    ctx.font = "700 28px sans-serif";
+    t.label.split("\n").forEach((l, li) => ctx.fillText(l, x + tileW / 2, tileY + 190 + li * 36));
+  });
+  ctx.fillStyle = "#cbd5e1";
+  ctx.font = "700 44px sans-serif";
+  ctx.fillText("7 semanas de entrenamiento y descarga 💪", W / 2, 1450);
+  drawWordmark(ctx, W, H, accent);
+}
+
+function ShareImageModal({ title, fileNamePrefix, shareTitle, shareText, draw, onClose }) {
+  const canvasRef = useRef(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    canvas.width = 1080; canvas.height = 1920;
+    const ctx = canvas.getContext("2d");
+    draw(ctx, 1080, 1920);
+    setPreviewUrl(canvas.toDataURL("image/png"));
+    // eslint-disable-next-line
+  }, []);
+
+  const handleDownload = () => {
+    const canvas = canvasRef.current; if (!canvas) return;
+    const link = document.createElement("a");
+    link.download = `${fileNamePrefix}.png`;
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+  };
+  const handleShare = async () => {
+    const canvas = canvasRef.current; if (!canvas) return;
+    try {
+      const blob = await new Promise((res) => canvas.toBlob(res, "image/png"));
+      if (blob) {
+        const file = new File([blob], `${fileNamePrefix}.png`, { type: "image/png" });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: shareTitle, text: shareText });
+          return;
+        }
+      }
+    } catch { return; /* cancelado por el usuario, no descargamos igual */ }
+    handleDownload();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[130] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in" onClick={onClose}>
+      <div className="bg-slate-900 border border-slate-700/60 rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50 max-h-[92vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-base font-black text-white">{title}</h3>
+          <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition"><X size={18} /></button>
+        </div>
+        <canvas ref={canvasRef} className="hidden" />
+        {previewUrl && <img src={previewUrl} alt="Vista previa para compartir" className="w-full rounded-2xl border border-slate-800/60 mb-4" style={{ aspectRatio: "9 / 16", objectFit: "cover" }} />}
+        <div className="flex gap-2">
+          <button onClick={handleDownload} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition text-sm font-semibold"><Download size={14} /> Descargar</button>
+          <button onClick={handleShare} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98] shadow-lg shadow-teal-500/20" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}><Share2 size={14} /> Compartir</button>
+        </div>
+        <p className="text-[10px] text-slate-600 mt-3 text-center">Para tu historia de Instagram: compartila directo, o descargala y subila desde la app.</p>
+      </div>
+    </div>
   );
 }
 
@@ -1626,7 +1998,7 @@ const HELP_CHAPTERS = [
       {
         icon: <ListChecks size={20} />,
         title: "Rutinas preestablecidas",
-        text: "Más abajo está el catálogo: Push/Pull/Legs, Arnold Split, Upper/Lower, Cuerpo Completo y la Clásica. Tocá una para ver su distribución semanal completa —día por día, con sus ejercicios y series— antes de usarla.",
+        text: "Más abajo está el catálogo: Push/Pull/Legs, Arnold Split, Upper/Lower, Cuerpo Completo y Push Pull Legs + Hombro/Brazo. Tocá una para ver su distribución semanal completa —día por día, con sus ejercicios y series— antes de usarla.",
         demo: { kind: "rutinas", view: "preset", caption: "Tocá la rutina para ver el detalle" },
       },
       {
@@ -1992,7 +2364,7 @@ function HelpModal({ startTab, onClose }) {
    cambiar de día). Ahora sobreviven a eso — sólo se limpian cuando se
    resetea el día (resetKey) o se finaliza la sesión (ver RoutineView/App).
 ============================================================================ */
-function SetRow({ exerciseId, setIndex, setDef, accent, logs, setLogs, drafts = {}, setDrafts, deloadKgFactor = 1, deloadMode = false, resetKey = 0 }) {
+function SetRow({ exerciseId, exerciseName, setIndex, setDef, accent, logs, setLogs, drafts = {}, setDrafts, deloadKgFactor = 1, deloadMode = false, resetKey = 0 }) {
   const key = `${exerciseId}_${setIndex}`, prKey = `${key}_pr_override`, today = todayStr();
   const history = logs[key] || [], override = logs[prKey];
   const computedPR = useMemo(() => { let best = setDef.pr ? { ...setDef.pr } : null; history.forEach((h) => { if (!best || vol(h.kg, h.reps) > vol(best.kg, best.reps)) best = { kg: h.kg, reps: h.reps }; }); return best; }, [history, setDef.pr]);
@@ -2006,6 +2378,7 @@ function SetRow({ exerciseId, setIndex, setDef, accent, logs, setLogs, drafts = 
   const showRpe = showRpeLocal || rpe != null;
   const [editingPR, setEditingPR] = useState(false); const [editReps, setEditReps] = useState(""); const [editKg, setEditKg] = useState(""); const [saved, setSaved] = useState(false);
   const [prBurst, setPrBurst] = useState(0);
+  const [showPRShare, setShowPRShare] = useState(false);
   const saveBtnRef = useRef(null);
   useEffect(() => { setFeedback(null); setSaved(false); setShowRpeLocal(false); }, [resetKey]);
   const handleSave = () => {
@@ -2032,7 +2405,12 @@ function SetRow({ exerciseId, setIndex, setDef, accent, logs, setLogs, drafts = 
           <span className="text-[10px] bg-slate-800/80 text-slate-500 rounded-lg px-2 py-0.5">{setDef.repRange} reps</span>
           {isHeavyRepRange(setDef.repRange) && <span className="text-[10px] bg-amber-500/15 text-amber-400 rounded-lg px-2 py-0.5 font-bold">FUERZA</span>}
         </div>
-        {feedback && <span className={`text-xs font-semibold ${feedback.type === "pr" ? "text-emerald-400 pr-pop" : feedback.type === "down" ? "text-rose-400" : "text-amber-400"}`}>{feedback.msg}</span>}
+        {feedback && (
+          <span className={`flex items-center gap-1.5 text-xs font-semibold ${feedback.type === "pr" ? "text-emerald-400 pr-pop" : feedback.type === "down" ? "text-rose-400" : "text-amber-400"}`}>
+            {feedback.msg}
+            {feedback.type === "pr" && <button onClick={() => setShowPRShare(true)} aria-label="Compartir esta marca" className="text-emerald-300 hover:text-emerald-100 active:scale-90 transition"><Share2 size={13} /></button>}
+          </span>
+        )}
       </div>
       {feedback?.suggestUp && <div className="mb-2.5 -mt-1 text-[11px] text-teal-400 flex items-center gap-1.5"><TrendingUp size={11} /> Superaste el rango · probá +2.5kg la próxima</div>}
       {deloadMode && suggestedKg && <div className="mb-2 text-[11px] text-purple-400 flex items-center gap-1.5"><Zap size={11} /> Descarga: {suggestedKg} kg sugerido ({Math.round(deloadKgFactor * 100)}%)</div>}
@@ -2074,6 +2452,16 @@ function SetRow({ exerciseId, setIndex, setDef, accent, logs, setLogs, drafts = 
           </div>
         </div>
       )}
+      {showPRShare && (
+        <ShareImageModal
+          title="Compartí tu marca"
+          fileNamePrefix={`pr-${exerciseId}`}
+          shareTitle="Mi Rutina — Nueva marca"
+          shareText={`¡Nueva marca en ${exerciseName}! 🔥`}
+          draw={(ctx, W, H) => drawPRShareCard(ctx, W, H, { exerciseName, kg: parseFloat(kg) || currentPR?.kg, reps: parseFloat(reps) || currentPR?.reps, accent })}
+          onClose={() => setShowPRShare(false)}
+        />
+      )}
     </div>
   );
 }
@@ -2112,7 +2500,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
         <div className="mb-1">
           <RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={accent} alertType={settings.alertType} />
         </div>
-        {setsToShow.map((s, i) => <SetRow key={i} exerciseId={exercise.id} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadKgFactor={settings.deloadPct} deloadMode={deloadMode} resetKey={resetKey} />)}
+        {setsToShow.map((s, i) => <SetRow key={i} exerciseId={exercise.id} exerciseName={exercise.name} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadKgFactor={settings.deloadPct} deloadMode={deloadMode} resetKey={resetKey} />)}
         {exercise.video && (
           <div className="pt-3">
             <a href={exercise.video} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 py-3 rounded-xl border border-slate-800 text-slate-400 hover:border-slate-600 hover:text-white transition text-sm font-medium">▶ Ver técnica en YouTube</a>
@@ -2987,6 +3375,31 @@ function RoutinePreview({ routineDef }) {
   );
 }
 
+// Modal que aparece cuando se abre la app con un link de rutina compartida
+// (#shared-routine=...). No la activa sola: sólo la agrega a "Tus rutinas
+// creadas" para no interrumpir lo que ya estabas entrenando.
+function SharedRoutineImportModal({ routine, onImport, onDiscard }) {
+  return (
+    <div className="fixed inset-0 z-[130] bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 modal-bg-in" onClick={onDiscard}>
+      <div className="bg-slate-900 border border-slate-700/60 rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50 max-h-[88vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-10 h-10 rounded-2xl bg-teal-500/15 text-teal-400 flex items-center justify-center shrink-0"><Share2 size={18} /></div>
+          <div className="min-w-0">
+            <p className="text-[10px] font-black uppercase tracking-widest text-teal-400">Rutina compartida</p>
+            <h3 className="text-base font-black text-white leading-tight truncate">{routine.name}</h3>
+          </div>
+        </div>
+        <p className="text-sm text-slate-400 mb-3">Te compartieron esta rutina por enlace. ¿Querés agregarla a tus rutinas?</p>
+        <RoutinePreview routineDef={routine} />
+        <div className="flex gap-2 mt-4">
+          <button onClick={onDiscard} className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-400 text-sm font-semibold">Descartar</button>
+          <button onClick={onImport} className="flex-1 py-3 rounded-xl bg-teal-500 !text-white text-sm font-bold active:scale-[0.98] transition-all">Agregar a mis rutinas</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PresetRoutineCard({ preset, isActive, onUse }) {
   const [open, setOpen] = useState(false);
   const dayCount = preset.dayOrder.length;
@@ -3023,7 +3436,7 @@ function PresetRoutineCard({ preset, isActive, onUse }) {
   );
 }
 
-function SavedRoutineRow({ routine, isActive, onUse, onEdit, onDelete }) {
+function SavedRoutineRow({ routine, isActive, onUse, onEdit, onShare, onDelete }) {
   const [confirmDel, setConfirmDel] = useState(false);
   const [open, setOpen] = useState(false);
   const dayCount = routine.dayOrder.length;
@@ -3037,6 +3450,7 @@ function SavedRoutineRow({ routine, isActive, onUse, onEdit, onDelete }) {
           <p className="text-[11px] text-slate-500">{dayCount} día{dayCount === 1 ? "" : "s"} · creada por vos</p>
         </button>
         {!isActive && <button onClick={onUse} className="px-3 py-1.5 rounded-lg bg-teal-500/15 text-teal-400 text-xs font-bold shrink-0">Activar</button>}
+        <button onClick={onShare} aria-label="Compartir rutina" className="p-2 rounded-lg text-slate-500 hover:text-cyan-400 shrink-0"><Share2 size={14} /></button>
         <button onClick={onEdit} aria-label="Editar rutina" className="p-2 rounded-lg text-slate-500 hover:text-teal-400 shrink-0"><Edit3 size={14} /></button>
         {!confirmDel && <button onClick={() => setConfirmDel(true)} aria-label="Borrar rutina" className="p-2 rounded-lg text-slate-600 hover:text-rose-400 shrink-0"><Trash2 size={14} /></button>}
       </div>
@@ -3361,6 +3775,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onDelete }) {
   const [mode, setMode] = useState("catalog");
   const [editingRoutineId, setEditingRoutineId] = useState(null);
   const [showSchedule, setShowSchedule] = useState(false);
+  const [shareTarget, setShareTarget] = useState(null);
   const routines = profile?.routines || {};
   const activeId = profile?.activeRoutineId;
   const activeDef = routines[activeId];
@@ -3417,10 +3832,11 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onDelete }) {
           <div className="absolute -top-10 -right-10 w-32 h-32 rounded-full bg-teal-500/20 blur-3xl pointer-events-none" />
           <div className="relative flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-teal-500/20 text-teal-400 flex items-center justify-center shrink-0"><Dumbbell size={17} /></div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <span className="text-[10px] font-black uppercase tracking-widest text-teal-400">Tu rutina activa</span>
               <h3 className="text-base font-black text-white leading-tight">{activeDef.name}</h3>
             </div>
+            <button onClick={() => setShareTarget(activeDef)} aria-label="Compartir rutina activa" className="p-2 rounded-xl text-teal-200 hover:text-white hover:bg-white/10 transition shrink-0"><Share2 size={15} /></button>
           </div>
           {activeDef.description && <p className="relative text-[11px] text-slate-400 mt-2.5">{activeDef.description}</p>}
           <div className="relative grid grid-cols-3 gap-2 mt-3.5">
@@ -3451,7 +3867,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onDelete }) {
           <div className="space-y-2">
             {customEntries.map(([id, r]) => (
               <SavedRoutineRow key={id} routine={r} isActive={id === activeId} onUse={() => onActivate(id, null)}
-                onEdit={() => { setEditingRoutineId(id); setMode("builder"); }} onDelete={() => onDelete(id)} />
+                onEdit={() => { setEditingRoutineId(id); setMode("builder"); }} onShare={() => setShareTarget(r)} onDelete={() => onDelete(id)} />
             ))}
           </div>
         </div>
@@ -3467,6 +3883,16 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onDelete }) {
       </div>
 
       <button onClick={() => { setEditingRoutineId(null); setMode("builder"); }} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98] shadow-lg shadow-teal-500/20" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}><Sparkles size={15} /> Crear mi propia rutina</button>
+
+      {shareTarget && (
+        <ShareLinkModal
+          title="Compartir rutina"
+          shareTitle={`Mi rutina: ${shareTarget.name}`}
+          shareText={`Mirá mi rutina "${shareTarget.name}" en Mi Rutina 💪`}
+          url={buildRoutineShareUrl(shareTarget)}
+          onClose={() => setShareTarget(null)}
+        />
+      )}
     </div>
   );
 }
@@ -3569,7 +3995,7 @@ export default function App() {
 
   const profile = profiles[activeProfile], logs = profile?.logs || {}, drafts = profile?.drafts || {};
   const themeClass = getProfileSettings(profile).theme === "light" ? "light-mode" : "";
-  // La rutina activa del perfil actual (o la Clásica como respaldo) se
+  // La rutina activa del perfil actual (o Push Pull Legs + Hombro/Brazo como respaldo) se
   // recalcula en cada render — así ROUTINE/DAY_ORDER/EXERCISE_BY_ID/KEY_TO_DAY
   // siempre reflejan la rutina correcta antes de que se rendericen sus hijos.
   const activeRoutineDef = (profile && profile.routines && profile.routines[profile.activeRoutineId]) || null;
@@ -3603,6 +4029,61 @@ export default function App() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeProfile]);
+
+  // Festejo (con opción de compartir) cuando se completa un ciclo entero
+  // (entrenamiento + descarga): se guarda `lastSeenCycleNumber` y, si en un
+  // login posterior el ciclo actual ya avanzó, se muestra el festejo del
+  // ciclo recién terminado. La primera vez que se ve un ciclo (perfil nuevo
+  // con cycleStart recién puesto) sólo se registra, sin festejar nada.
+  const [cycleCompleteNotice, setCycleCompleteNotice] = useState(null);
+  const [showCycleShareImage, setShowCycleShareImage] = useState(false);
+  useEffect(() => {
+    if (!profile || !cycleStart) return;
+    const wi = getWeekInfo(cycleStart, getProfileSettings(profile));
+    if (!wi) return;
+    if (profile.lastSeenCycleNumber == null) {
+      setProfiles((prev) => { const p = prev[activeProfile]; if (!p) return prev; const np = { ...prev, [activeProfile]: { ...p, lastSeenCycleNumber: wi.cycleNumber } }; saveProfiles(np); return np; });
+    } else if (wi.cycleNumber > profile.lastSeenCycleNumber) {
+      setCycleCompleteNotice({ cycleNumber: profile.lastSeenCycleNumber });
+      setProfiles((prev) => { const p = prev[activeProfile]; if (!p) return prev; const np = { ...prev, [activeProfile]: { ...p, lastSeenCycleNumber: wi.cycleNumber } }; saveProfiles(np); return np; });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeProfile]);
+  const computeCycleShareStats = () => {
+    const dateSet = getTrainedDateSet(logs, profile?.trainingSessions || []);
+    let totalVol = 0;
+    Object.entries(logs).forEach(([k, v]) => { if (k.endsWith("_pr_override") || !Array.isArray(v)) return; v.forEach((e) => { totalVol += vol(e.kg, e.reps); }); });
+    return { daysTrained: dateSet.size, totalVol: Math.round(totalVol) };
+  };
+
+  // Importar una rutina compartida por link: si la URL trae
+  // #shared-routine=<token>, se decodifica apenas hay un perfil activo y se
+  // ofrece agregarla — no se activa sola, así no se interrumpe lo que ya
+  // estabas entrenando.
+  const [importRoutine, setImportRoutine] = useState(null);
+  useEffect(() => {
+    if (!profile) return;
+    const hash = typeof window !== "undefined" ? window.location.hash : "";
+    const m = hash.match(/shared-routine=([^&]+)/);
+    if (m) {
+      const decoded = decodeSharedRoutine(decodeURIComponent(m[1]));
+      if (decoded) setImportRoutine(decoded);
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    }
+  }, [activeProfile]);
+  const handleImportSharedRoutine = () => {
+    if (!importRoutine) return;
+    setProfiles((prev) => {
+      const p = prev[activeProfile];
+      if (!p) return prev;
+      const newId = builderUid("shared_routine");
+      const np = { ...prev, [activeProfile]: { ...p, routines: { ...(p.routines || {}), [newId]: importRoutine } } };
+      saveProfiles(np);
+      return np;
+    });
+    setImportRoutine(null);
+    setTab("rutinas");
+  };
 
   const setLogs = useCallback((newLogs) => { const np = { ...profiles, [activeProfile]: { ...profiles[activeProfile], logs: newLogs } }; setProfiles(np); saveProfiles(np); }, [profiles, activeProfile]);
   // `drafts` se guarda igual que `logs` (full-replace), pero son los valores
@@ -3703,6 +4184,7 @@ export default function App() {
           <RoutinesView profile={profile} forced onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onDelete={handleDeleteRoutine} />
         </div>
       </div>
+      {importRoutine && <SharedRoutineImportModal routine={importRoutine} onImport={handleImportSharedRoutine} onDiscard={() => setImportRoutine(null)} />}
     </>
   );
 
@@ -3739,6 +4221,30 @@ export default function App() {
       </div>
       <BottomBar tab={tab} setTab={setTab} />
       {showHelp && <HelpModal startTab={helpStartTab} onClose={() => setShowHelp(false)} />}
+      {importRoutine && <SharedRoutineImportModal routine={importRoutine} onImport={handleImportSharedRoutine} onDiscard={() => setImportRoutine(null)} />}
+      {cycleCompleteNotice && !showCycleShareImage && (
+        <div className="fixed inset-0 z-[125] bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 modal-bg-in" onClick={() => setCycleCompleteNotice(null)}>
+          <div className="bg-slate-900 border border-slate-700/60 rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50 text-center" onClick={(e) => e.stopPropagation()}>
+            <div className="text-4xl mb-2">🎉</div>
+            <h3 className="text-lg font-black text-white">¡Completaste el Ciclo #{cycleCompleteNotice.cycleNumber}!</h3>
+            <p className="text-sm text-slate-400 mt-1.5 mb-4">Entrenamiento y descarga, hechos. ¿Lo compartís?</p>
+            <div className="flex gap-2">
+              <button onClick={() => setCycleCompleteNotice(null)} className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-400 text-sm font-semibold">Cerrar</button>
+              <button onClick={() => setShowCycleShareImage(true)} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98] shadow-lg shadow-purple-500/20" style={{ background: "linear-gradient(135deg,#A855F7,#7C3AED)" }}><Share2 size={14} /> Compartir</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showCycleShareImage && cycleCompleteNotice && (
+        <ShareImageModal
+          title="Compartí tu ciclo"
+          fileNamePrefix={`ciclo-${cycleCompleteNotice.cycleNumber}`}
+          shareTitle="Mi Rutina — Ciclo completo"
+          shareText={`¡Completé el Ciclo #${cycleCompleteNotice.cycleNumber} en Mi Rutina! 💪`}
+          draw={(ctx, W, H) => drawCycleShareCard(ctx, W, H, { cycleNumber: cycleCompleteNotice.cycleNumber, ...computeCycleShareStats() })}
+          onClose={() => { setShowCycleShareImage(false); setCycleCompleteNotice(null); }}
+        />
+      )}
     </div>
   );
 }
