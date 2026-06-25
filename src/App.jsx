@@ -9,7 +9,7 @@ import {
   ChevronDown, ChevronUp, ChevronLeft, Trophy, Flame, Save, Trash2, BarChart3,
   ListChecks, LogOut, X, Check, AlertTriangle, Calendar, Zap,
   Mail, Clock, ChevronRight, Edit3, Info, Plus, Sun, Moon,
-  Target, Award, Activity, ArrowDown, HelpCircle, List, LayoutGrid,
+  Target, Award, Activity, ArrowDown, Compass, List, LayoutGrid,
   Sparkles, Layers, Video, SlidersHorizontal, ShieldCheck, UserCog,
   Share2, Download, Link2, Copy,
 } from "lucide-react";
@@ -269,37 +269,37 @@ const PRESET_ROUTINES = [
       push: { label: "PUSH", description: "Pecho · Hombro anterior · Tríceps", color: "#14B8A6", exercises: [
         { libId: "press_banca", sets: [{ repRange: "3-5" }, { repRange: "3-5" }, { repRange: "8-10" }] },
         { libId: "press_inclinado_smith", sets: mkSets(3, "8-10") },
-        { libId: "cruce_poleas", sets: mkSets(2, "10-12") },
-        { libId: "vuelos_laterales_mancuerna", sets: mkSets(4, "12-15") },
+        { libId: "cruce_poleas", sets: mkSets(3, "12-15") },
+        { libId: "vuelos_laterales_mancuerna", sets: mkSets(3, "15-20") },
         { libId: "pec_dec_deltoides", idOverride: "pec_dec_deltoides_push", sets: mkSets(2, "12-15") },
-        { libId: "triceps_trasnuca", idOverride: "triceps_trasnuca_push", sets: mkSets(2, "8-10") },
-        { libId: "triceps_polea_alta", sets: mkSets(2, "8-10") },
+        { libId: "triceps_trasnuca", idOverride: "triceps_trasnuca_push", sets: mkSets(3, "10-12") },
+        { libId: "triceps_polea_alta", sets: mkSets(2, "12-15") },
       ] },
       pull: { label: "PULL", description: "Dorsal · Romboides · Bíceps", color: "#3B82F6", exercises: [
         { libId: "remo_ancho_maquina", sets: [{ repRange: "4-6" }, { repRange: "4-6" }, { repRange: "8-10" }] },
         { libId: "dorsalera", sets: mkSets(3, "8-10") },
-        { libId: "remo_unilateral", sets: mkSets(2, "8-10") },
-        { libId: "pull_over", sets: mkSets(3, "8-10") },
+        { libId: "remo_unilateral", sets: mkSets(3, "8-10") },
+        { libId: "pull_over", sets: mkSets(3, "10-12") },
         { libId: "face_pull", sets: mkSets(2, "15-20") },
-        { libId: "biceps_alternado_mancuerna", sets: mkSets(4, "8-10") },
+        { libId: "biceps_alternado_mancuerna", sets: mkSets(3, "8-10") },
       ] },
       legs: { label: "PIERNAS", description: "Glúteo · Cuádriceps · Femoral · Aductores", color: "#F97316", exercises: [
-        { libId: "sentadilla_bulgara", sets: mkSets(2, "8-10") },
-        { libId: "abdominales", sets: mkSets(4, "8-10") },
+        { libId: "sentadilla_bulgara", sets: mkSets(3, "8-10") },
+        { libId: "abdominales", sets: mkSets(3, "12-15") },
         { libId: "jaca", sets: [{ repRange: "4-6" }, { repRange: "4-6" }, { repRange: "8-10" }] },
-        { libId: "curl_femoral_maquina", sets: mkSets(3, "8-10") },
-        { libId: "extension_cuadriceps", sets: mkSets(3, "8-10") },
-        { libId: "aductor_maquina", sets: mkSets(2, "8-10") },
-        { libId: "abductor_maquina", sets: mkSets(2, "8-10") },
+        { libId: "curl_femoral_maquina", sets: mkSets(3, "10-12") },
+        { libId: "extension_cuadriceps", sets: mkSets(3, "12-15") },
+        { libId: "aductor_maquina", sets: mkSets(2, "12-15") },
+        { libId: "abductor_maquina", sets: mkSets(2, "12-15") },
       ] },
       sarm: { label: "HOMBROS / BRAZOS", description: "Deltoides · Bíceps · Tríceps", color: "#A855F7", exercises: [
         { libId: "press_militar_smith", sets: [{ repRange: "4-6" }, { repRange: "4-6" }, { repRange: "8-10" }] },
-        { libId: "vuelos_laterales_maquina", sets: mkSets(4, "12-15") },
+        { libId: "vuelos_laterales_maquina", sets: mkSets(3, "15-20") },
         { libId: "pec_dec_deltoides", idOverride: "pec_dec_deltoides_sarm", sets: mkSets(2, "12-15") },
-        { libId: "biceps_martillo", sets: mkSets(3, "6-8") },
-        { libId: "biceps_banco_scott", sets: mkSets(3, "6-8") },
-        { libId: "biceps_banco_inclinado", sets: mkSets(2, "8-10") },
-        { libId: "triceps_trasnuca", idOverride: "triceps_trasnuca_sarm", sets: mkSets(3, "8-10") },
+        { libId: "biceps_martillo", sets: mkSets(3, "10-12") },
+        { libId: "biceps_banco_scott", sets: mkSets(3, "10-12") },
+        { libId: "biceps_banco_inclinado", sets: mkSets(3, "10-12") },
+        { libId: "triceps_trasnuca", idOverride: "triceps_trasnuca_sarm", sets: mkSets(3, "10-12") },
       ] },
     },
   },
@@ -314,7 +314,7 @@ const PRESET_ROUTINES = [
       push: { label: "Push", description: "Pecho · Hombro · Tríceps", color: "#14B8A6", exercises: [
         { libId: "press_banca", sets: [{ repRange: "3-5" }, { repRange: "3-5" }, { repRange: "8-10" }] },
         { libId: "press_inclinado_mancuernas", sets: mkSets(3, "8-10") },
-        { libId: "vuelos_laterales_mancuerna", sets: mkSets(3, "12-15") },
+        { libId: "vuelos_laterales_mancuerna", sets: mkSets(3, "15-20") },
         { libId: "press_militar_mancuernas", sets: mkSets(3, "8-10") },
         { libId: "triceps_polea_alta", sets: mkSets(3, "10-12") },
       ] },
@@ -327,9 +327,9 @@ const PRESET_ROUTINES = [
       ] },
       legs: { label: "Legs", description: "Cuádriceps · Femoral · Glúteo", color: "#F97316", exercises: [
         { libId: "sentadilla_convencional", sets: [{ repRange: "4-6" }, { repRange: "4-6" }, { repRange: "8-10" }] },
-        { libId: "curl_femoral_maquina", sets: mkSets(3, "8-10") },
+        { libId: "curl_femoral_maquina", sets: mkSets(3, "10-12") },
         { libId: "extension_cuadriceps", sets: mkSets(3, "10-12") },
-        { libId: "hip_thrust", sets: mkSets(3, "8-10") },
+        { libId: "hip_thrust", sets: mkSets(3, "10-12") },
         { libId: "elevacion_talones_parado", sets: mkSets(3, "12-15") },
       ] },
     },
@@ -347,15 +347,17 @@ const PRESET_ROUTINES = [
         { libId: "dorsalera", sets: mkSets(3, "8-10") },
         { libId: "press_militar_mancuernas", sets: mkSets(3, "8-10") },
         { libId: "remo_unilateral", sets: mkSets(3, "8-10") },
-        { libId: "biceps_martillo", sets: mkSets(2, "10-12") },
-        { libId: "triceps_polea_alta", sets: mkSets(2, "10-12") },
+        { libId: "vuelos_laterales_mancuerna", sets: mkSets(3, "15-20") },
+        { libId: "biceps_martillo", sets: mkSets(3, "10-12") },
+        { libId: "triceps_polea_alta", sets: mkSets(3, "10-12") },
       ] },
       lower: { label: "Pierna", description: "Cuádriceps · Femoral · Pantorrilla", color: "#F97316", exercises: [
         { libId: "sentadilla_convencional", sets: [{ repRange: "4-6" }, { repRange: "4-6" }, { repRange: "8-10" }] },
-        { libId: "peso_muerto_rumano", sets: mkSets(3, "8-10") },
+        { libId: "peso_muerto_rumano", sets: mkSets(3, "10-12") },
         { libId: "prensa", sets: mkSets(3, "10-12") },
         { libId: "curl_femoral_maquina", sets: mkSets(3, "10-12") },
         { libId: "elevacion_talones_parado", sets: mkSets(3, "12-15") },
+        { libId: "abdominales", sets: mkSets(3, "12-15") },
       ] },
     },
   },
@@ -372,23 +374,70 @@ const PRESET_ROUTINES = [
         { libId: "dorsalera", sets: mkSets(3, "8-10") },
         { libId: "press_inclinado_mancuernas", sets: mkSets(3, "8-10") },
         { libId: "remo_unilateral", sets: mkSets(3, "8-10") },
-        { libId: "cruce_poleas", sets: mkSets(2, "10-12") },
-        { libId: "pull_over", sets: mkSets(2, "10-12") },
+        { libId: "cruce_poleas", sets: mkSets(3, "12-15") },
+        { libId: "pull_over", sets: mkSets(2, "12-15") },
       ] },
       shoulders_arms: { label: "Hombros y Brazos", description: "Deltoides, bíceps y tríceps", color: "#A855F7", exercises: [
         { libId: "press_militar_smith", sets: [{ repRange: "4-6" }, { repRange: "4-6" }, { repRange: "8-10" }] },
-        { libId: "vuelos_laterales_mancuerna", sets: mkSets(3, "12-15") },
+        { libId: "vuelos_laterales_mancuerna", sets: mkSets(3, "15-20") },
         { libId: "biceps_alternado_mancuerna", sets: mkSets(3, "8-10") },
-        { libId: "triceps_trasnuca", sets: mkSets(3, "8-10") },
+        { libId: "triceps_trasnuca", sets: mkSets(3, "10-12") },
         { libId: "biceps_martillo", sets: mkSets(2, "10-12") },
-        { libId: "triceps_polea_alta", sets: mkSets(2, "10-12") },
+        { libId: "triceps_polea_alta", sets: mkSets(3, "10-12") },
       ] },
       legs: { label: "Piernas", description: "Cuádriceps · Femoral · Glúteo", color: "#F97316", exercises: [
         { libId: "jaca", sets: [{ repRange: "4-6" }, { repRange: "4-6" }, { repRange: "8-10" }] },
-        { libId: "curl_femoral_maquina", sets: mkSets(3, "8-10") },
+        { libId: "curl_femoral_maquina", sets: mkSets(3, "10-12") },
         { libId: "extension_cuadriceps", sets: mkSets(3, "10-12") },
-        { libId: "sentadilla_bulgara", sets: mkSets(2, "8-10") },
+        { libId: "sentadilla_bulgara", sets: mkSets(3, "8-10") },
         { libId: "elevacion_talones_parado", sets: mkSets(3, "12-15") },
+      ] },
+    },
+  },
+  {
+    id: "bro_split",
+    name: "Bro Split",
+    source: "preset",
+    description: "Un grupo muscular grande por día: pecho, espalda, hombros, brazos y piernas. El clásico del fisicoculturismo.",
+    recommendation: "Recomendado: 5 sesiones semanales, un grupo por día. Si entrenás hace poco, frecuencias de 2 veces por semana por músculo suelen rendir mejor — pero este formato sigue siendo válido y es el más tradicional para enfocarte a fondo en cada grupo.",
+    dayOrder: ["chest", "back", "shoulders", "arms", "legs"],
+    days: {
+      chest: { label: "Pecho", description: "Pectoral en todos los ángulos", color: "#14B8A6", exercises: [
+        { libId: "press_banca", sets: [{ repRange: "4-6" }, { repRange: "4-6" }, { repRange: "8-10" }] },
+        { libId: "press_inclinado_mancuernas", sets: mkSets(3, "8-10") },
+        { libId: "press_pecho_maquina", sets: mkSets(3, "10-12") },
+        { libId: "aperturas_mancuerna", sets: mkSets(3, "12-15") },
+        { libId: "cruce_poleas", sets: mkSets(2, "12-15") },
+      ] },
+      back: { label: "Espalda", description: "Dorsal, espalda media y romboides", color: "#3B82F6", exercises: [
+        { libId: "remo_barra", sets: [{ repRange: "4-6" }, { repRange: "4-6" }, { repRange: "8-10" }] },
+        { libId: "dorsalera", sets: mkSets(3, "8-10") },
+        { libId: "remo_unilateral", sets: mkSets(3, "8-10") },
+        { libId: "remo_polea_agarre_ancho", sets: mkSets(3, "12-15") },
+        { libId: "face_pull", sets: mkSets(2, "15-20") },
+      ] },
+      shoulders: { label: "Hombros", description: "Deltoides anterior, lateral y posterior", color: "#A855F7", exercises: [
+        { libId: "press_militar_mancuernas", sets: [{ repRange: "4-6" }, { repRange: "4-6" }, { repRange: "8-10" }] },
+        { libId: "vuelos_laterales_mancuerna", sets: mkSets(4, "15-20") },
+        { libId: "press_arnold", sets: mkSets(3, "10-12") },
+        { libId: "cruces_invertidos_polea", sets: mkSets(3, "12-15") },
+        { libId: "vuelos_frontales", sets: mkSets(2, "12-15") },
+      ] },
+      arms: { label: "Brazos", description: "Bíceps y tríceps por igual", color: "#F59E0B", exercises: [
+        { libId: "curl_barra_recta", sets: mkSets(3, "8-10") },
+        { libId: "biceps_banco_scott", sets: mkSets(3, "10-12") },
+        { libId: "biceps_martillo", sets: mkSets(2, "10-12") },
+        { libId: "triceps_frances", sets: mkSets(3, "8-10") },
+        { libId: "triceps_polea_cuerda", sets: mkSets(3, "10-12") },
+        { libId: "triceps_patada", sets: mkSets(2, "12-15") },
+      ] },
+      legs: { label: "Piernas", description: "Cuádriceps, femoral, glúteo y pantorrilla", color: "#F97316", exercises: [
+        { libId: "sentadilla_convencional", sets: [{ repRange: "4-6" }, { repRange: "4-6" }, { repRange: "8-10" }] },
+        { libId: "prensa", sets: mkSets(3, "10-12") },
+        { libId: "peso_muerto_rumano", sets: mkSets(3, "8-10") },
+        { libId: "curl_femoral_maquina", sets: mkSets(3, "10-12") },
+        { libId: "extension_cuadriceps", sets: mkSets(3, "12-15") },
+        { libId: "elevacion_talones_parado", sets: mkSets(3, "15-20") },
       ] },
     },
   },
@@ -404,11 +453,11 @@ const PRESET_ROUTINES = [
         { libId: "sentadilla_convencional", sets: [{ repRange: "4-6" }, { repRange: "4-6" }, { repRange: "8-10" }] },
         { libId: "press_banca", sets: mkSets(3, "8-10") },
         { libId: "dorsalera", sets: mkSets(3, "8-10") },
-        { libId: "vuelos_laterales_mancuerna", sets: mkSets(2, "12-15") },
-        { libId: "abdominales", sets: mkSets(3, "10-12") },
+        { libId: "vuelos_laterales_mancuerna", sets: mkSets(2, "15-20") },
+        { libId: "abdominales", sets: mkSets(3, "12-15") },
       ] },
       day_b: { label: "Día B", description: "Full body — variante B", color: "#3B82F6", exercises: [
-        { libId: "peso_muerto_rumano", sets: mkSets(3, "8-10") },
+        { libId: "peso_muerto_rumano", sets: mkSets(3, "10-12") },
         { libId: "press_militar_mancuernas", sets: mkSets(3, "8-10") },
         { libId: "remo_unilateral", sets: mkSets(3, "8-10") },
         { libId: "biceps_martillo", sets: mkSets(2, "10-12") },
@@ -418,7 +467,7 @@ const PRESET_ROUTINES = [
         { libId: "prensa", sets: mkSets(3, "10-12") },
         { libId: "press_inclinado_mancuernas", sets: mkSets(3, "8-10") },
         { libId: "remo_t", sets: mkSets(3, "8-10") },
-        { libId: "triceps_polea_alta", sets: mkSets(2, "10-12") },
+        { libId: "triceps_polea_alta", sets: mkSets(3, "10-12") },
         { libId: "elevacion_piernas", sets: mkSets(3, "12-15") },
       ] },
     },
@@ -1055,7 +1104,7 @@ const ANIMATION_CSS = `
    también cambian solos al cambiar de tema. */
 :root {
   --grad-hero-purple: linear-gradient(135deg, rgba(168,85,247,0.28), rgba(15,23,42,0.85) 55%, rgba(15,23,42,0.6));
-  --grad-hero-cyan: linear-gradient(135deg, rgba(6,182,212,0.25), rgba(15,23,42,0.85) 55%, rgba(15,23,42,0.6));
+  --grad-hero-blue: linear-gradient(135deg, rgba(59,130,246,0.25), rgba(15,23,42,0.85) 55%, rgba(15,23,42,0.6));
   --grad-hero-teal: linear-gradient(135deg, rgba(20,184,166,0.25), rgba(15,23,42,0.85) 55%, rgba(15,23,42,0.6));
   --grad-profile-avatar: linear-gradient(135deg, #0f172a, rgba(15,23,42,0.5));
   --ring-track: #1a1a2e;
@@ -1068,7 +1117,7 @@ const ANIMATION_CSS = `
 }
 .light-mode {
   --grad-hero-purple: linear-gradient(135deg, rgba(168,85,247,0.10), rgba(255,255,255,0.96) 55%, #ffffff);
-  --grad-hero-cyan: linear-gradient(135deg, rgba(6,182,212,0.10), rgba(255,255,255,0.96) 55%, #ffffff);
+  --grad-hero-blue: linear-gradient(135deg, rgba(59,130,246,0.10), rgba(255,255,255,0.96) 55%, #ffffff);
   --grad-hero-teal: linear-gradient(135deg, rgba(20,184,166,0.10), rgba(255,255,255,0.96) 55%, #ffffff);
   --grad-profile-avatar: linear-gradient(135deg, #ffffff, #f8fafc);
   --ring-track: #eef2f6;
@@ -1964,7 +2013,7 @@ const HELP_CHAPTERS = [
       {
         icon: <Flame size={20} />,
         title: "¡Bienvenido a Mi Rutina!",
-        text: "Esta app te ayuda a registrar tus entrenamientos, ver cómo progresan tus marcas con el tiempo, y saber cuándo te toca bajar la intensidad. Te mostramos rápido cómo funciona cada parte — y vas a poder probar cada función en vivo a medida que la explicamos. Podés saltear el recorrido en cualquier momento tocando la X.",
+        text: "Este es un tour guiado por la app: en vez de un texto largo de ayuda, te vamos mostrando cada función en vivo, paso a paso, mientras la explicamos. Esta app te ayuda a registrar tus entrenamientos, ver cómo progresan tus marcas con el tiempo, y saber cuándo te toca bajar la intensidad. Podés saltear el recorrido en cualquier momento tocando la X.",
       },
       {
         icon: <Layers size={20} />,
@@ -2237,7 +2286,7 @@ const HELP_CHAPTERS = [
       {
         icon: <Check size={20} />,
         title: "¡Eso es todo!",
-        text: "Ya conocés todas las funciones de la app. Podés volver a ver este tutorial cuando quieras tocando el ícono de ayuda (?) arriba a la derecha, en cualquier pestaña.",
+        text: "Ya conocés todas las funciones de la app. Podés volver a ver este tour guiado cuando quieras tocando el ícono de la brújula arriba a la derecha, en cualquier pestaña.",
       },
     ],
   },
@@ -2290,7 +2339,7 @@ function HelpModal({ startTab, onClose }) {
 
         <div className="flex items-center justify-between mb-2">
           <span className="text-[10px] font-black uppercase tracking-widest" style={{ color: step.chapterColor }}>{step.chapterLabel}</span>
-          <button onClick={onClose} aria-label="Cerrar ayuda" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition"><X size={18} /></button>
+          <button onClick={onClose} aria-label="Cerrar tour" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition"><X size={18} /></button>
         </div>
 
         {/* Barra de progreso tipo "historias", segmentada por capítulo */}
@@ -2524,8 +2573,7 @@ function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS 
   const neutralDot = isLight ? "#94a3b8" : "#475569";
   const trainedDays = useMemo(() => getTrainedDateSet(logs, sessions), [logs, sessions]);
   const weekDots = Array.from({ length: cycleWeeks }, (_, wi) => { const ws = new Date(cycleStart); ws.setDate(ws.getDate() + wi * 7); const days = Array.from({ length: 7 }, (_, di) => { const d = new Date(ws); d.setDate(d.getDate() + di); return d.toISOString().slice(0, 10); }); return { week: wi + 1, days, trained: days.filter((d) => trainedDays.has(d)).length, isDeload: wi + 1 > trainWeeks }; });
-  const phase = weekInfo.isDeload ? "#A855F7" : "#14B8A6";
-  const cyclePct = Math.round((weekInfo.weekInCycle / cycleWeeks) * 100);
+  const phase = weekInfo.isDeload ? "#A855F7" : "#3B82F6";
   return (
     <div className="relative overflow-hidden bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 backdrop-blur-sm shadow-md shadow-black/20">
       <div className="absolute -top-12 -right-12 w-36 h-36 rounded-full blur-3xl opacity-25 pointer-events-none" style={{ backgroundColor: phase }} />
@@ -2542,28 +2590,22 @@ function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS 
         <div className="px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wide shrink-0" style={{ backgroundColor: phase + "1c", color: phase }}>{weekInfo.isDeload ? "Descarga" : "Entrenamiento"}</div>
       </div>
 
-      <div className="relative h-1.5 bg-slate-800/70 rounded-full overflow-hidden mb-4">
-        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${cyclePct}%`, background: `linear-gradient(90deg, ${phase}80, ${phase})` }} />
-      </div>
-
       <div className="relative flex gap-1.5 flex-wrap">
-        {weekDots.map(({ week, trained, isDeload }) => { const isCurrent = week === weekInfo.weekInCycle; const dotColor = isDeload ? "#A855F7" : trained > 0 ? "#14B8A6" : neutralDot; return (
-          <div key={week} className="flex flex-col items-center gap-1">
-            <div
-              className={`w-9 h-9 rounded-xl flex items-center justify-center text-[10px] font-black transition-all ${isCurrent ? "scale-110" : ""}`}
-              style={isCurrent
-                ? { backgroundColor: dotColor, color: "#fff", boxShadow: `0 6px 16px -4px ${dotColor}aa` }
-                : { backgroundColor: dotColor + "1a", color: dotColor, border: `1px solid ${dotColor}30` }}
-            >
-              {isDeload ? "D" : week}
-            </div>
-            {trained > 0 && !isDeload && <div className="flex gap-0.5">{Array.from({ length: Math.min(trained, 7) }).map((_, i) => <div key={i} className="w-1 h-1 rounded-full bg-teal-500/60" />)}</div>}
+        {weekDots.map(({ week, trained, isDeload }) => { const isCurrent = week === weekInfo.weekInCycle; const dotColor = isDeload ? "#A855F7" : trained > 0 ? "#3B82F6" : neutralDot; return (
+          <div
+            key={week}
+            className={`w-9 h-9 rounded-xl flex items-center justify-center text-[10px] font-black transition-all ${isCurrent ? "scale-110" : ""}`}
+            style={isCurrent
+              ? { backgroundColor: dotColor, color: "#fff", boxShadow: `0 6px 16px -4px ${dotColor}aa` }
+              : { backgroundColor: dotColor + "1a", color: dotColor, border: `1px solid ${dotColor}30` }}
+          >
+            {isDeload ? "D" : week}
           </div>
         ); })}
       </div>
 
       <div className="relative flex gap-4 mt-4 pt-3 border-t border-slate-800/50 text-[10px] text-slate-600">
-        <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-teal-500/70" /><span>Entrenamiento</span></div>
+        <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-blue-500/70" /><span>Entrenamiento</span></div>
         <div className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-full bg-purple-500/70" /><span>Descarga</span></div>
       </div>
     </div>
@@ -2951,10 +2993,10 @@ function ExerciseChipRow({ exercises, selId, onSelect }) {
 }
 
 const PROGRESS_SECTIONS = [
-  { k: "chart", l: "Evolución", icon: <Activity size={13} />, color: "#06B6D4" },
+  { k: "chart", l: "Evolución", icon: <Activity size={13} />, color: "#3B82F6" },
   { k: "prs", l: "Top PRs", icon: <Trophy size={13} />, color: "#F59E0B" },
   { k: "muscle", l: "Músculo", icon: <BarChart3 size={13} />, color: "#A855F7" },
-  { k: "historial", l: "Historial", icon: <Calendar size={13} />, color: "#3B82F6" },
+  { k: "historial", l: "Historial", icon: <Calendar size={13} />, color: "#06B6D4" },
 ];
 
 function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_SETTINGS }) {
@@ -2975,20 +3017,12 @@ function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_
     return Object.entries(map).map(([name, val]) => ({ name, val: Math.round(val) })).sort((a, b) => b.val - a.val).slice(0, 6);
   }, [logs]);
 
-  const [dayFilter, setDayFilter] = useState(DAY_ORDER[0]);
-  const filteredExercises = useMemo(() => allExercises.filter((e) => e.dayKey === dayFilter), [allExercises, dayFilter]);
-  const [selId, setSelId] = useState(filteredExercises[0]?.id);
+  const [selId, setSelId] = useState(allExercises[0]?.id);
   const [selSet, setSelSet] = useState(0);
   const [metric, setMetric] = useState("peso");
   const selEx = allExercises.find((e) => e.id === selId);
   const history = (logs[`${selId}_${selSet}`] || []).slice().sort((a, b) => (a.date > b.date ? 1 : -1));
   const chartData = history.map((h) => ({ date: h.date.slice(5), kg: h.kg, reps: h.reps, vol: vol(h.kg, h.reps), e1rm: estimate1RM(h.kg, h.reps), rpe: h.rpe ?? null }));
-
-  const handleDayFilter = (dk) => {
-    setDayFilter(dk);
-    const first = allExercises.find((e) => e.dayKey === dk);
-    if (first) { setSelId(first.id); setSelSet(0); }
-  };
 
   const prBoard = useMemo(() => {
     return allExercises.map((ex) => {
@@ -3013,32 +3047,32 @@ function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_
 
   return (
     <div className="space-y-4">
-      {/* Hero */}
-      <div className="relative overflow-hidden rounded-2xl border border-cyan-500/20 p-5" style={{ background: "var(--grad-hero-cyan)" }}>
-        <div className="absolute -top-8 -right-6 w-32 h-32 rounded-full bg-cyan-500/15 blur-2xl pointer-events-none" />
-        <div className="absolute -bottom-6 -left-6 w-28 h-28 rounded-full bg-teal-500/10 blur-2xl pointer-events-none" />
+      {/* Hero — el azul es el color característico de Progreso (como el violeta lo es de Descarga) */}
+      <div className="relative overflow-hidden rounded-2xl border border-blue-500/20 p-5" style={{ background: "var(--grad-hero-blue)" }}>
+        <div className="absolute -top-8 -right-6 w-32 h-32 rounded-full bg-blue-500/15 blur-2xl pointer-events-none" />
+        <div className="absolute -bottom-6 -left-6 w-28 h-28 rounded-full bg-cyan-500/10 blur-2xl pointer-events-none" />
         <div className="relative flex items-center gap-2 mb-1">
-          <Activity size={16} className="text-cyan-400" />
-          <span className="text-[11px] font-black uppercase tracking-widest text-cyan-400">Tu evolución</span>
+          <Activity size={16} className="text-blue-400" />
+          <span className="text-[11px] font-black uppercase tracking-widest text-blue-400">Tu evolución</span>
         </div>
         <h2 className="relative text-xl font-black text-white leading-tight">Progreso</h2>
-        <p className="relative text-xs text-cyan-300/60 mt-1">Marcas, volumen y constancia a lo largo del tiempo</p>
+        <p className="relative text-xs text-blue-300/60 mt-1">Marcas, volumen y constancia a lo largo del tiempo</p>
       </div>
 
       {/* Ciclo actual */}
       <WeekCalendar cycleStart={cycleStart} logs={logs} sessions={sessions} settings={settings} />
 
-      {/* Estadísticas — fila compacta, cada métrica con su propio color */}
+      {/* Estadísticas — fila compacta y neutra, sin un color por cada una */}
       <div className="grid grid-cols-4 gap-2">
         {[
-          { val: stats.daysTrained, label: "Días", accent: "#14B8A6" },
-          { val: stats.streak > 0 ? `${stats.streak}🔥` : "0", label: "Racha", accent: "#F59E0B" },
-          { val: stats.totalSets, label: "Series", accent: "#06B6D4" },
-          { val: stats.totalVol > 999 ? `${(stats.totalVol / 1000).toFixed(1)}k` : stats.totalVol, label: "Kg×reps", accent: "#A855F7" },
-        ].map(({ val, label, accent }) => (
-          <div key={label} className="rounded-xl p-2.5 text-center border shadow-md shadow-black/20" style={{ backgroundColor: accent + "12", borderColor: accent + "30" }}>
+          { val: stats.daysTrained, label: "Días" },
+          { val: stats.streak > 0 ? `${stats.streak}🔥` : "0", label: "Racha" },
+          { val: stats.totalSets, label: "Series" },
+          { val: stats.totalVol > 999 ? `${(stats.totalVol / 1000).toFixed(1)}k` : stats.totalVol, label: "Kg×reps" },
+        ].map(({ val, label }) => (
+          <div key={label} className="rounded-xl p-2.5 text-center bg-slate-900/50 border border-slate-800/50 shadow-md shadow-black/20">
             <p className="text-sm font-black text-white leading-none tabular-nums">{val}</p>
-            <p className="text-[9px] font-semibold mt-1" style={{ color: accent }}>{label}</p>
+            <p className="text-[9px] font-semibold text-slate-500 mt-1">{label}</p>
           </div>
         ))}
       </div>
@@ -3055,102 +3089,91 @@ function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_
 
       <div key={activeSection} className="tab-fade-in space-y-3">
         {activeSection === "chart" && (
-          <div className="space-y-3">
-            {/* Mejoras por día */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 -mx-1 px-1">
-              <span className="text-[9px] text-slate-600 font-bold uppercase tracking-wider shrink-0">Mejoras</span>
-              {DAY_ORDER.map((dk) => {
-                const d = ROUTINE[dk], count = dayPRcounts[dk] || 0;
-                return (
-                  <div key={dk} className="flex items-center gap-1 px-2 py-1 rounded-lg shrink-0" style={{ backgroundColor: d.color + "12" }}>
-                    <span className="w-4 h-4 rounded-md flex items-center justify-center text-[8px] font-black shrink-0" style={{ backgroundColor: d.color + "22", color: d.color }}>{d.label.charAt(0)}</span>
-                    <span className="text-[10px] font-bold" style={{ color: d.color }}>{count}</span>
-                  </div>
-                );
-              })}
+          <div className="relative overflow-hidden rounded-2xl border border-blue-500/20 bg-slate-900/50 backdrop-blur-sm shadow-md shadow-black/20 p-4 space-y-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-blue-500/15 text-blue-400 flex items-center justify-center shrink-0"><Activity size={15} /></div>
+              <p className="text-sm font-bold text-white">Evolución por ejercicio</p>
             </div>
 
-            {/* Tarjeta principal: día → ejercicio → serie → métrica → gráfico */}
-            <div className="relative overflow-hidden rounded-2xl border border-cyan-500/20 bg-slate-900/50 backdrop-blur-sm shadow-md shadow-black/20 p-4 space-y-3">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-cyan-500/15 text-cyan-400 flex items-center justify-center shrink-0"><Activity size={15} /></div>
-                <p className="text-sm font-bold text-white">Evolución por ejercicio</p>
-              </div>
+            <ExerciseChipRow exercises={allExercises} selId={selId} onSelect={(id) => { setSelId(id); setSelSet(0); }} />
 
-              <div className="flex flex-wrap gap-1.5">
-                {DAY_ORDER.map((dk) => (
-                  <button key={dk} onClick={() => handleDayFilter(dk)}
-                    className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold transition-all border shrink-0"
-                    style={dayFilter === dk ? { backgroundColor: ROUTINE[dk].color, borderColor: ROUTINE[dk].color, color: "#fff" } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
-                    {ROUTINE[dk].label}
-                  </button>
+            <div className="flex gap-2">
+              {Array.from({ length: selEx?.sets || 1 }).map((_, i) => (
+                <button key={i} onClick={() => setSelSet(i)} className="flex-1 py-2 rounded-xl text-xs font-bold transition-all border"
+                  style={selSet === i ? { backgroundColor: selEx?.color, borderColor: selEx?.color, color: "#fff" } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
+                  S{i + 1}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-end">
+              <div className="flex bg-slate-950/60 rounded-xl p-0.5 border border-slate-800/60">
+                {[{ k: "peso", l: "Kg" }, { k: "vol", l: "Vol" }, { k: "1rm", l: "1RM" }, { k: "rpe", l: "RPE" }].map((opt) => (
+                  <button key={opt.k} onClick={() => setMetric(opt.k)} className={`px-2 py-1.5 rounded-[10px] text-[10px] font-bold transition-all ${metric === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
                 ))}
               </div>
+            </div>
 
-              <ExerciseChipRow exercises={filteredExercises} selId={selId} onSelect={(id) => { setSelId(id); setSelSet(0); }} />
-
-              <div className="flex gap-2">
-                {Array.from({ length: selEx?.sets || 1 }).map((_, i) => (
-                  <button key={i} onClick={() => setSelSet(i)} className="flex-1 py-2 rounded-xl text-xs font-bold transition-all border"
-                    style={selSet === i ? { backgroundColor: selEx?.color, borderColor: selEx?.color, color: "#fff" } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
-                    S{i + 1}
-                  </button>
-                ))}
-              </div>
-
-              <div className="flex items-center justify-end">
-                <div className="flex bg-slate-950/60 rounded-xl p-0.5 border border-slate-800/60">
-                  {[{ k: "peso", l: "Kg" }, { k: "vol", l: "Vol" }, { k: "1rm", l: "1RM" }, { k: "rpe", l: "RPE" }].map((opt) => (
-                    <button key={opt.k} onClick={() => setMetric(opt.k)} className={`px-2 py-1.5 rounded-[10px] text-[10px] font-bold transition-all ${metric === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
-                  ))}
+            {chartData.length === 0 ? (
+              <div className="text-center text-slate-600 py-10"><BarChart3 size={28} className="mx-auto mb-2.5 opacity-30" /><p className="text-sm">Sin registros para esta serie.</p><p className="text-xs mt-1 text-slate-700">Guardá series en la rutina para ver tu evolución aquí.</p></div>
+            ) : (
+              <>
+                <div className="h-52">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={chartData} margin={{ top: 5, right: 0, left: -25, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="gA" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor={selEx?.color} stopOpacity={0.35} /><stop offset="95%" stopColor={selEx?.color} stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
+                      <XAxis dataKey="date" stroke="var(--chart-axis)" fontSize={10} />
+                      <YAxis stroke="var(--chart-axis)" fontSize={10} domain={metric === "rpe" ? [0, 10] : ["auto", "auto"]} />
+                      <Tooltip content={<CustomTooltip />} />
+                      {metric === "peso" && <Area type="monotone" dataKey="kg" stroke={selEx?.color || "#14B8A6"} fill="url(#gA)" strokeWidth={2.5} dot={{ r: 3, fill: selEx?.color, strokeWidth: 0 }} name="Kg" />}
+                      {metric === "vol" && <Area type="monotone" dataKey="vol" stroke="#A855F7" fill="url(#gA)" strokeWidth={2.5} dot={{ r: 3, fill: "#A855F7", strokeWidth: 0 }} name="Volumen" />}
+                      {metric === "1rm" && <Area type="monotone" dataKey="e1rm" stroke="#14B8A6" fill="url(#gA)" strokeWidth={2.5} dot={{ r: 3, fill: "#14B8A6", strokeWidth: 0 }} name="1RM est." />}
+                      {metric === "rpe" && <Area type="monotone" dataKey="rpe" stroke="#F43F5E" fill="url(#gA)" strokeWidth={2.5} dot={{ r: 3, fill: "#F43F5E", strokeWidth: 0 }} name="RPE" connectNulls />}
+                    </AreaChart>
+                  </ResponsiveContainer>
                 </div>
-              </div>
+                {metric === "rpe" ? (
+                  (() => {
+                    const vals = chartData.filter((d) => d.rpe != null).map((d) => d.rpe);
+                    if (!vals.length) return <p className="text-[11px] text-slate-600 text-center">Todavía no registraste RPE para esta serie.</p>;
+                    const avg = Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10;
+                    return <div className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-semibold bg-rose-500/10 text-rose-300 border border-rose-500/15"><Activity size={14} /><span>RPE promedio: <span className="font-black">{avg}</span> · {vals.length} sesiones con dato</span></div>;
+                  })()
+                ) : chartData.length >= 2 && (() => {
+                  const f = chartData[0], l = chartData[chartData.length - 1];
+                  const fVal = metric === "peso" ? f.kg : metric === "vol" ? f.vol : f.e1rm, lVal = metric === "peso" ? l.kg : metric === "vol" ? l.vol : l.e1rm;
+                  const diff = lVal - fVal, pct2 = fVal ? ((diff / fVal) * 100).toFixed(1) : 0, pos = diff >= 0;
+                  const metricLabel = metric === "peso" ? "de kg" : metric === "vol" ? "de volumen" : "de 1RM estimado";
+                  return (
+                    <div className={`flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-semibold ${pos ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/15" : "bg-rose-500/10 text-rose-400 border border-rose-500/15"}`}>
+                      {pos ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                      <div><span className="font-black">{pos ? "+" : ""}{pct2}% {metricLabel}</span><span className="text-xs opacity-60 ml-1.5">· {chartData.length} sesiones</span></div>
+                    </div>
+                  );
+                })()}
+                {metric === "1rm" && <p className="text-[10px] text-slate-600">Estimado con fórmula de Epley. Solo referencia, no un máximo real.</p>}
+              </>
+            )}
 
-              {chartData.length === 0 ? (
-                <div className="text-center text-slate-600 py-10"><BarChart3 size={28} className="mx-auto mb-2.5 opacity-30" /><p className="text-sm">Sin registros para esta serie.</p><p className="text-xs mt-1 text-slate-700">Guardá series en la rutina para ver tu evolución aquí.</p></div>
-              ) : (
-                <>
-                  <div className="h-52">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart data={chartData} margin={{ top: 5, right: 0, left: -25, bottom: 0 }}>
-                        <defs>
-                          <linearGradient id="gA" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor={selEx?.color} stopOpacity={0.35} /><stop offset="95%" stopColor={selEx?.color} stopOpacity={0} />
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
-                        <XAxis dataKey="date" stroke="var(--chart-axis)" fontSize={10} />
-                        <YAxis stroke="var(--chart-axis)" fontSize={10} domain={metric === "rpe" ? [0, 10] : ["auto", "auto"]} />
-                        <Tooltip content={<CustomTooltip />} />
-                        {metric === "peso" && <Area type="monotone" dataKey="kg" stroke={selEx?.color || "#14B8A6"} fill="url(#gA)" strokeWidth={2.5} dot={{ r: 3, fill: selEx?.color, strokeWidth: 0 }} name="Kg" />}
-                        {metric === "vol" && <Area type="monotone" dataKey="vol" stroke="#A855F7" fill="url(#gA)" strokeWidth={2.5} dot={{ r: 3, fill: "#A855F7", strokeWidth: 0 }} name="Volumen" />}
-                        {metric === "1rm" && <Area type="monotone" dataKey="e1rm" stroke="#14B8A6" fill="url(#gA)" strokeWidth={2.5} dot={{ r: 3, fill: "#14B8A6", strokeWidth: 0 }} name="1RM est." />}
-                        {metric === "rpe" && <Area type="monotone" dataKey="rpe" stroke="#F43F5E" fill="url(#gA)" strokeWidth={2.5} dot={{ r: 3, fill: "#F43F5E", strokeWidth: 0 }} name="RPE" connectNulls />}
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
-                  {metric === "rpe" ? (
-                    (() => {
-                      const vals = chartData.filter((d) => d.rpe != null).map((d) => d.rpe);
-                      if (!vals.length) return <p className="text-[11px] text-slate-600 text-center">Todavía no registraste RPE para esta serie.</p>;
-                      const avg = Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10;
-                      return <div className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-semibold bg-rose-500/10 text-rose-300 border border-rose-500/15"><Activity size={14} /><span>RPE promedio: <span className="font-black">{avg}</span> · {vals.length} sesiones con dato</span></div>;
-                    })()
-                  ) : chartData.length >= 2 && (() => {
-                    const f = chartData[0], l = chartData[chartData.length - 1];
-                    const fVal = metric === "peso" ? f.kg : metric === "vol" ? f.vol : f.e1rm, lVal = metric === "peso" ? l.kg : metric === "vol" ? l.vol : l.e1rm;
-                    const diff = lVal - fVal, pct2 = fVal ? ((diff / fVal) * 100).toFixed(1) : 0, pos = diff >= 0;
-                    const metricLabel = metric === "peso" ? "de kg" : metric === "vol" ? "de volumen" : "de 1RM estimado";
-                    return (
-                      <div className={`flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-semibold ${pos ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/15" : "bg-rose-500/10 text-rose-400 border border-rose-500/15"}`}>
-                        {pos ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-                        <div><span className="font-black">{pos ? "+" : ""}{pct2}% {metricLabel}</span><span className="text-xs opacity-60 ml-1.5">· {chartData.length} sesiones</span></div>
-                      </div>
-                    );
-                  })()}
-                  {metric === "1rm" && <p className="text-[10px] text-slate-600">Estimado con fórmula de Epley. Solo referencia, no un máximo real.</p>}
-                </>
-              )}
+            {/* Mejoras por día — ahora vive adentro de esta misma tarjeta */}
+            <div className="pt-2 border-t border-slate-800/50">
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 -mx-1 px-1">
+                <span className="text-[9px] text-slate-600 font-bold uppercase tracking-wider shrink-0">Mejoras por día</span>
+                {DAY_ORDER.map((dk) => {
+                  const d = ROUTINE[dk], count = dayPRcounts[dk] || 0;
+                  return (
+                    <div key={dk} className="flex items-center gap-1 px-2 py-1 rounded-lg shrink-0" style={{ backgroundColor: d.color + "12" }}>
+                      <span className="w-4 h-4 rounded-md flex items-center justify-center text-[8px] font-black shrink-0" style={{ backgroundColor: d.color + "22", color: d.color }}>{d.label.charAt(0)}</span>
+                      <span className="text-[10px] font-bold" style={{ color: d.color }}>{count}</span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}
@@ -3776,6 +3799,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onDelete }) {
   const [editingRoutineId, setEditingRoutineId] = useState(null);
   const [showSchedule, setShowSchedule] = useState(false);
   const [shareTarget, setShareTarget] = useState(null);
+  const [pendingActivation, setPendingActivation] = useState(null);
   const routines = profile?.routines || {};
   const activeId = profile?.activeRoutineId;
   const activeDef = routines[activeId];
@@ -3791,14 +3815,49 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onDelete }) {
   const activeSchedule = activeDef ? getRoutineWeekSchedule(activeDef) : {};
   const updateActiveScheduleDay = (wk, dayKeyOrNull) => { onUpdate(activeId, { ...activeDef, weekSchedule: { ...activeSchedule, [wk]: dayKeyOrNull } }); };
 
+  // Activar una rutina recién elegida (preset clonado o recién creada) pasa
+  // primero por "¿qué días entrenás cada cosa?" — así no hay que ir después
+  // a Rutinas a configurarlo aparte. Reactivar una rutina YA guardada (que
+  // ya tiene su propio cronograma) no pasa por este paso, va directo.
+  const handleUseClick = (id, def) => {
+    if (def) { setPendingActivation({ id, def: { ...def, weekSchedule: getRoutineWeekSchedule(def) } }); setMode("scheduleSetup"); }
+    else onActivate(id, null);
+  };
+  const updatePendingScheduleDay = (wk, dayKeyOrNull) => {
+    setPendingActivation((prev) => (prev ? { ...prev, def: { ...prev.def, weekSchedule: { ...prev.def.weekSchedule, [wk]: dayKeyOrNull } } } : prev));
+  };
+  const confirmPendingActivation = () => {
+    if (!pendingActivation) return;
+    onActivate(pendingActivation.id, pendingActivation.def);
+    setPendingActivation(null);
+    setMode("catalog");
+  };
+
+  if (mode === "scheduleSetup" && pendingActivation) {
+    const { def } = pendingActivation;
+    return (
+      <div className="space-y-4">
+        <div className="text-center pt-2 pb-1">
+          <div className="w-14 h-14 rounded-2xl bg-teal-500/15 flex items-center justify-center mx-auto mb-3"><Calendar className="text-teal-500" size={26} /></div>
+          <h2 className="text-lg font-black text-white">¿Qué días entrenás "{def.name}"?</h2>
+          <p className="text-sm text-slate-500 mt-1.5 leading-relaxed px-2">Ya armamos un cronograma por defecto de lunes a domingo — lo podés dejar así o cambiarlo. Esto te evita tener que venir después a configurarlo.</p>
+        </div>
+        <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4">
+          <WeeklyScheduleEditor dayOrder={def.dayOrder} days={def.days} schedule={def.weekSchedule} onChange={updatePendingScheduleDay} />
+        </div>
+        <button onClick={confirmPendingActivation} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98] shadow-lg shadow-teal-500/20" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}><Check size={15} /> Listo, empezar a entrenar</button>
+      </div>
+    );
+  }
+
   if (mode === "builder") {
     return (
       <RoutineBuilder
         initialRoutine={editingRoutineId ? routines[editingRoutineId] : null}
         onCancel={() => { setMode("catalog"); setEditingRoutineId(null); }}
         onSave={(def) => {
-          if (editingRoutineId) { onUpdate(editingRoutineId, def); } else { onActivate(builderUid("custom_routine"), def); }
-          setMode("catalog"); setEditingRoutineId(null);
+          if (editingRoutineId) { onUpdate(editingRoutineId, def); setMode("catalog"); setEditingRoutineId(null); }
+          else { handleUseClick(builderUid("custom_routine"), def); setEditingRoutineId(null); }
         }}
       />
     );
@@ -3866,7 +3925,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onDelete }) {
           <div className="flex items-center gap-1.5 mb-2"><ListChecks size={13} className="text-slate-500" /><p className="text-xs font-black uppercase tracking-widest text-slate-500">Tus rutinas creadas</p></div>
           <div className="space-y-2">
             {customEntries.map(([id, r]) => (
-              <SavedRoutineRow key={id} routine={r} isActive={id === activeId} onUse={() => onActivate(id, null)}
+              <SavedRoutineRow key={id} routine={r} isActive={id === activeId} onUse={() => handleUseClick(id, null)}
                 onEdit={() => { setEditingRoutineId(id); setMode("builder"); }} onShare={() => setShareTarget(r)} onDelete={() => onDelete(id)} />
             ))}
           </div>
@@ -3877,7 +3936,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onDelete }) {
         <div className="flex items-center gap-1.5 mb-2"><Sparkles size={13} className="text-slate-500" /><p className="text-xs font-black uppercase tracking-widest text-slate-500">Rutinas preestablecidas</p></div>
         <div className="space-y-2">
           {PRESET_ROUTINES.map((preset) => (
-            <PresetRoutineCard key={preset.id} preset={preset} isActive={preset.id === activeId} onUse={() => onActivate(preset.id, cloneRoutineDef(preset))} />
+            <PresetRoutineCard key={preset.id} preset={preset} isActive={preset.id === activeId} onUse={() => handleUseClick(preset.id, cloneRoutineDef(preset))} />
           ))}
         </div>
       </div>
@@ -4206,7 +4265,7 @@ export default function App() {
               <h1 className="font-black text-base text-white leading-tight tracking-tight">{TAB_TITLES[tab] || ""}</h1>
               <p className="text-[11px] text-slate-600 leading-tight">{activeProfile}</p>
             </div>
-            {tab !== "perfil" && <button onClick={() => { setHelpStartTab(tab); setShowHelp(true); }} aria-label="Ayuda" className="w-8 h-8 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-center text-slate-400 hover:text-teal-400 hover:border-teal-500/30 transition active:scale-90"><HelpCircle size={16} /></button>}
+            {tab !== "perfil" && <button onClick={() => { setHelpStartTab(tab); setShowHelp(true); }} aria-label="Tour guiado" title="Tour guiado" className="w-8 h-8 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-center text-slate-400 hover:text-teal-400 hover:border-teal-500/30 transition active:scale-90"><Compass size={16} /></button>}
           </div>
         </header>
         <main className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto px-4 py-4 pb-28 lg:pb-10 space-y-4">
