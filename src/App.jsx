@@ -78,7 +78,9 @@ const MUSCLE_GROUPS = [
   { key: "cuadriceps", label: "Cuádriceps", color: "#EF4444" },
   { key: "femoral", label: "Femoral", color: "#EC4899" },
   { key: "gluteo", label: "Glúteo y cadera", color: "#8B5CF6" },
+  { key: "aductores", label: "Aductores", color: "#D946EF" },
   { key: "core", label: "Core / Abdomen", color: "#06B6D4" },
+  { key: "espalda_baja", label: "Espalda baja", color: "#2563EB" },
   { key: "pantorrillas", label: "Pantorrillas", color: "#22C55E" },
 ];
 const MUSCLE_GROUP_BY_KEY = {};
@@ -109,9 +111,9 @@ const EXERCISE_LIBRARY = [
   { id: "remo_maquina_sentado", name: "Remo Sentado en Máquina/Polea", muscle: "Dorsal medio", group: "dorsales", secondary: [{ group: "biceps", weight: 0.25 }, { group: "deltoide_posterior", weight: 0.25 }, { group: "trapecio", weight: 0.2 }], nota: "Pecho contra el apoyo, llevá los codos atrás sin balancear el torso.", videoQuery: "remo sentado polea técnica seated cable row" },
   { id: "remo_pecho_apoyado", name: "Remo con Pecho Apoyado", muscle: "Dorsal medio", group: "dorsales", secondary: [{ group: "biceps", weight: 0.25 }, { group: "deltoide_posterior", weight: 0.25 }, { group: "trapecio", weight: 0.2 }], nota: "El banco inclinado quita la zona lumbar de la ecuación, foco puro en espalda.", videoQuery: "remo pecho apoyado técnica chest supported row" },
   { id: "pull_over", name: "Pull Over", muscle: "Dorsal / serrato", group: "dorsales", secondary: [{ group: "triceps", weight: 0.15, alwaysCount: true }], nota: "Codos siempre un poco flexionados.", videoQuery: "pull over espalda técnica mancuerna" },
-  { id: "peso_muerto", name: "Peso Muerto", muscle: "Espalda baja / Femoral", group: "dorsales", secondary: [{ group: "gluteo", weight: 0.4 }, { group: "femoral", weight: 0.35 }, { group: "trapecio", weight: 0.3 }, { group: "antebrazos", weight: 0.3 }], nota: "Pilar de la cadena posterior, mantené la espalda neutra todo el recorrido.", videoQuery: "peso muerto técnica correcta" },
+  { id: "peso_muerto", name: "Peso Muerto", muscle: "Espalda baja / Femoral", group: "dorsales", secondary: [{ group: "gluteo", weight: 0.4 }, { group: "femoral", weight: 0.35 }, { group: "trapecio", weight: 0.3 }, { group: "antebrazos", weight: 0.3 }, { group: "espalda_baja", weight: 0.4 }], nota: "Pilar de la cadena posterior, mantené la espalda neutra todo el recorrido.", videoQuery: "peso muerto técnica correcta" },
   { id: "remo_t", name: "Remo en T", muscle: "Dorsal medio", group: "dorsales", secondary: [{ group: "biceps", weight: 0.35 }, { group: "trapecio", weight: 0.25 }, { group: "deltoide_posterior", weight: 0.1 }], nota: "Pecho apoyado si tenés banco, foco en juntar los omóplatos.", videoQuery: "remo en T técnica espalda" },
-  { id: "hiperextensiones", name: "Hiperextensiones", muscle: "Espalda baja", group: "dorsales", secondary: [{ group: "gluteo", weight: 0.3 }, { group: "femoral", weight: 0.25 }], nota: "No hiperextiendas de más arriba, contraé glúteo al subir.", videoQuery: "hiperextensiones técnica espalda baja" },
+  { id: "hiperextensiones", name: "Hiperextensiones", muscle: "Espalda baja", group: "espalda_baja", secondary: [{ group: "gluteo", weight: 0.3 }, { group: "femoral", weight: 0.25 }], nota: "No hiperextiendas de más arriba, contraé glúteo al subir.", videoQuery: "hiperextensiones técnica espalda baja" },
   { id: "dominadas", name: "Dominadas", muscle: "Dorsal", group: "dorsales", rankExcluded: true, nota: "Si todavía no podés hacer muchas, usá banda de asistencia.", videoQuery: "dominadas técnica correcta" },
   // Hombros
   { id: "press_militar_smith", name: "Press Militar Smith", muscle: "Deltoides ant.", group: "deltoide_anterior", secondary: [{ group: "triceps", weight: 0.3, alwaysCount: true }, { group: "trapecio", weight: 0.15 }], nota: "Codos adelante, banco a 80-90°.", videoQuery: "press militar smith técnica hombros" },
@@ -145,20 +147,21 @@ const EXERCISE_LIBRARY = [
   { id: "sentadilla_smith", name: "Sentadilla en Multipower", muscle: "Cuádriceps", group: "cuadriceps", secondary: [{ group: "gluteo", weight: 0.3 }], nota: "El riel fija el recorrido, buena opción para enfocarte en la pierna.", videoQuery: "sentadilla multipower smith técnica" },
   { id: "sentadilla_goblet", name: "Sentadilla Goblet", muscle: "Cuádriceps", group: "cuadriceps", secondary: [{ group: "gluteo", weight: 0.25 }, { group: "core", weight: 0.15 }], nota: "Mancuerna pegada al pecho, codos adentro de las rodillas al bajar.", videoQuery: "sentadilla goblet técnica" },
   { id: "extension_cuadriceps", name: "Extensión de Cuádriceps", muscle: "Cuádriceps", group: "cuadriceps", nota: "Pausa de 1 segundo arriba.", videoQuery: "extensión cuádriceps máquina técnica" },
-  { id: "sentadilla_convencional", name: "Sentadilla con Barra", muscle: "Cuádriceps", group: "cuadriceps", secondary: [{ group: "gluteo", weight: 0.4 }, { group: "femoral", weight: 0.2 }, { group: "core", weight: 0.15 }], nota: "El básico de piernas, la profundidad depende de tu movilidad.", videoQuery: "sentadilla con barra técnica correcta" },
+  { id: "sentadilla_convencional", name: "Sentadilla con Barra", muscle: "Cuádriceps", group: "cuadriceps", secondary: [{ group: "gluteo", weight: 0.4 }, { group: "femoral", weight: 0.2 }, { group: "core", weight: 0.15 }, { group: "espalda_baja", weight: 0.15 }], nota: "El básico de piernas, la profundidad depende de tu movilidad.", videoQuery: "sentadilla con barra técnica correcta" },
   { id: "prensa", name: "Prensa de Piernas", muscle: "Cuádriceps", group: "cuadriceps", secondary: [{ group: "gluteo", weight: 0.3 }], nota: "Alternativa de bajo estrés en la zona lumbar.", videoQuery: "prensa de piernas técnica" },
   { id: "step_up", name: "Step Up (Subida al Cajón)", muscle: "Cuádriceps / Glúteo", group: "cuadriceps", secondary: [{ group: "gluteo", weight: 0.35 }, { group: "femoral", weight: 0.15 }], nota: "Empujá con el talón del pie de arriba, evitá rebotar con el de abajo.", videoQuery: "step up subida al cajón técnica" },
   { id: "zancadas", name: "Zancadas", muscle: "Cuádriceps / Glúteo", group: "cuadriceps", secondary: [{ group: "gluteo", weight: 0.4 }, { group: "femoral", weight: 0.15 }], nota: "Trabajo unilateral, ayuda a corregir desbalances entre piernas.", videoQuery: "zancadas técnica correcta" },
   // Femoral
   { id: "curl_femoral_maquina", name: "Curl Femoral Máquina", muscle: "Femoral", group: "femoral", nota: "Controlá bien la fase negativa.", videoQuery: "curl femoral máquina técnica isquios" },
-  { id: "peso_muerto_rumano", name: "Peso Muerto Rumano", muscle: "Femoral", group: "femoral", secondary: [{ group: "gluteo", weight: 0.35 }, { group: "dorsales", weight: 0.2 }], nota: "Bajá llevando la cadera hacia atrás, rodillas casi rectas.", videoQuery: "peso muerto rumano técnica" },
-  { id: "peso_muerto_piernas_rigidas", name: "Peso Muerto Piernas Rígidas", muscle: "Femoral", group: "femoral", secondary: [{ group: "gluteo", weight: 0.35 }, { group: "dorsales", weight: 0.2 }], nota: "Rango más amplio que el rumano, rodillas casi sin flexión.", videoQuery: "peso muerto piernas rígidas técnica stiff leg deadlift" },
+  { id: "peso_muerto_rumano", name: "Peso Muerto Rumano", muscle: "Femoral", group: "femoral", secondary: [{ group: "gluteo", weight: 0.35 }, { group: "dorsales", weight: 0.2 }, { group: "espalda_baja", weight: 0.25 }], nota: "Bajá llevando la cadera hacia atrás, rodillas casi rectas.", videoQuery: "peso muerto rumano técnica" },
+  { id: "peso_muerto_piernas_rigidas", name: "Peso Muerto Piernas Rígidas", muscle: "Femoral", group: "femoral", secondary: [{ group: "gluteo", weight: 0.35 }, { group: "dorsales", weight: 0.2 }, { group: "espalda_baja", weight: 0.25 }], nota: "Rango más amplio que el rumano, rodillas casi sin flexión.", videoQuery: "peso muerto piernas rígidas técnica stiff leg deadlift" },
   { id: "curl_femoral_acostado", name: "Curl Femoral Acostado", muscle: "Femoral", group: "femoral", nota: "Variante tumbado, controlá bien la vuelta.", videoQuery: "curl femoral acostado técnica" },
   // Glúteo y cadera
   { id: "sentadilla_bulgara", name: "Sentadilla Búlgara", muscle: "Glúteo", group: "gluteo", nota: "Torso ligeramente inclinado hacia adelante.", videoQuery: "sentadilla búlgara técnica glúteo" },
   { id: "hip_thrust", name: "Hip Thrust", muscle: "Glúteo", group: "gluteo", secondary: [{ group: "femoral", weight: 0.25 }], nota: "Pausa de 1-2 segundos arriba, contraé bien el glúteo.", videoQuery: "hip thrust técnica glúteo" },
   { id: "puente_gluteo", name: "Puente de Glúteo", muscle: "Glúteo", group: "gluteo", secondary: [{ group: "femoral", weight: 0.15 }], nota: "Variante sin barra, buena para activar antes de entrenar pierna.", videoQuery: "puente de glúteo técnica glute bridge" },
-  { id: "peso_muerto_sumo", name: "Peso Muerto Sumo", muscle: "Glúteo / Aductores", group: "gluteo", secondary: [{ group: "femoral", weight: 0.3 }, { group: "dorsales", weight: 0.2 }, { group: "cuadriceps", weight: 0.2 }], nota: "Postura ancha, rodillas hacia afuera siguiendo la punta del pie.", videoQuery: "peso muerto sumo técnica" },
+  { id: "aductores_maquina", name: "Aductores en Máquina", muscle: "Aductores", group: "aductores", nota: "Movimiento controlado, sin usar el impulso del tronco.", videoQuery: "aductores en máquina técnica" },
+  { id: "peso_muerto_sumo", name: "Peso Muerto Sumo", muscle: "Glúteo / Aductores", group: "gluteo", secondary: [{ group: "femoral", weight: 0.3 }, { group: "dorsales", weight: 0.2 }, { group: "cuadriceps", weight: 0.2 }, { group: "aductores", weight: 0.25 }, { group: "espalda_baja", weight: 0.25 }], nota: "Postura ancha, rodillas hacia afuera siguiendo la punta del pie.", videoQuery: "peso muerto sumo técnica" },
   { id: "abductor_maquina", name: "Abductor Máquina", muscle: "Glúteo medio", group: "gluteo", nota: "Espalda apoyada, movimiento controlado.", videoQuery: "abductor máquina técnica glúteo medio" },
   { id: "aductor_maquina", name: "Aductor Máquina", muscle: "Aductores", group: "gluteo", nota: "Rango completo, sin rebotar.", videoQuery: "aductor máquina técnica inner thigh" },
   { id: "patada_gluteo", name: "Patada de Glúteo en Polea", muscle: "Glúteo", group: "gluteo", nota: "Movimiento controlado, evitá usar la zona lumbar para empujar.", videoQuery: "patada de glúteo polea técnica" },
@@ -211,8 +214,8 @@ const EXERCISE_LIBRARY = [
   { id: "encogimientos_polea_baja", name: "Encogimientos en Polea Baja", muscle: "Trapecio", group: "trapecio", nota: "Tensión constante durante todo el recorrido, no uses impulso de piernas.", videoQuery: "encogimientos polea baja técnica trapecio" },
   { id: "paseo_granjero", name: "Paseo del Granjero", muscle: "Trapecio / Agarre", group: "trapecio", secondary: [{ group: "antebrazos", weight: 0.5 }, { group: "core", weight: 0.2 }], nota: "Caminá con el torso erguido, sin dejar caer los hombros hacia adelante.", videoQuery: "paseo del granjero técnica farmers walk" },
   { id: "retraccion_escapular", name: "Retracción Escapular", muscle: "Trapecio medio / Romboides", group: "trapecio", secondary: [{ group: "deltoide_posterior", weight: 0.25 }], nota: "En polea o banda: llevá los hombros hacia atrás juntando las escápulas, sin doblar los codos. Movimiento corto, pausa apretando arriba.", videoQuery: "retracción escapular técnica trapecio romboides" },
-  { id: "buenos_dias", name: "Buenos Días con Barra", muscle: "Espalda baja / Femoral", group: "dorsales", secondary: [{ group: "femoral", weight: 0.4 }, { group: "gluteo", weight: 0.3 }], nota: "Empezá con poco peso, la espalda se mantiene siempre neutra al flexionar la cadera.", videoQuery: "buenos días con barra técnica good morning" },
-  { id: "supermans", name: "Supermans", muscle: "Espalda baja", group: "dorsales", secondary: [{ group: "gluteo", weight: 0.2 }], nota: "Tumbado boca abajo, levantá brazos y piernas a la vez de forma controlada.", videoQuery: "supermans técnica espalda baja" },
+  { id: "buenos_dias", name: "Buenos Días con Barra", muscle: "Espalda baja / Femoral", group: "espalda_baja", secondary: [{ group: "femoral", weight: 0.4 }, { group: "gluteo", weight: 0.3 }], nota: "Empezá con poco peso, la espalda se mantiene siempre neutra al flexionar la cadera.", videoQuery: "buenos días con barra técnica good morning" },
+  { id: "supermans", name: "Supermans", muscle: "Espalda baja", group: "espalda_baja", secondary: [{ group: "gluteo", weight: 0.2 }], nota: "Tumbado boca abajo, levantá brazos y piernas a la vez de forma controlada.", videoQuery: "supermans técnica espalda baja" },
   // Hombros (catálogo extendido)
   { id: "press_militar_pie_barra", name: "Press Militar de Pie con Barra", muscle: "Deltoides ant.", group: "deltoide_anterior", secondary: [{ group: "triceps", weight: 0.3, alwaysCount: true }, { group: "trapecio", weight: 0.2 }, { group: "core", weight: 0.15 }], nota: "Apretá el core para no arquear la espalda baja al empujar.", videoQuery: "press militar de pie con barra técnica" },
   { id: "press_militar_sentado_barra", name: "Press Militar Sentado con Barra", muscle: "Deltoides ant.", group: "deltoide_anterior", secondary: [{ group: "triceps", weight: 0.3, alwaysCount: true }], nota: "El banco te quita el impulso de piernas, foco puro en el hombro.", videoQuery: "press militar sentado con barra técnica" },
@@ -243,7 +246,7 @@ const EXERCISE_LIBRARY = [
   { id: "sentadilla_zercher", name: "Sentadilla Zercher", muscle: "Cuádriceps", group: "cuadriceps", secondary: [{ group: "gluteo", weight: 0.3 }, { group: "core", weight: 0.25 }], nota: "Barra sostenida en el pliegue de los codos, exige mucho del core.", videoQuery: "sentadilla zercher técnica" },
   { id: "sentadilla_pistol", name: "Sentadilla Pistol", muscle: "Cuádriceps", group: "cuadriceps", secondary: [{ group: "gluteo", weight: 0.3 }, { group: "core", weight: 0.2 }], nota: "A una sola pierna, requiere buena movilidad y equilibrio — progresá de a poco.", videoQuery: "sentadilla pistol técnica una pierna" },
   // Femoral (catálogo extendido)
-  { id: "peso_muerto_rumano_mancuernas", name: "Peso Muerto Rumano con Mancuernas", muscle: "Femoral", group: "femoral", loadFactor: 2, secondary: [{ group: "gluteo", weight: 0.35 }, { group: "dorsales", weight: 0.15 }, { group: "antebrazos", weight: 0.15 }], nota: "Mismo patrón que con barra, pero con más libertad en la trayectoria.", videoQuery: "peso muerto rumano con mancuernas técnica" },
+  { id: "peso_muerto_rumano_mancuernas", name: "Peso Muerto Rumano con Mancuernas", muscle: "Femoral", group: "femoral", loadFactor: 2, secondary: [{ group: "gluteo", weight: 0.35 }, { group: "dorsales", weight: 0.15 }, { group: "antebrazos", weight: 0.15 }, { group: "espalda_baja", weight: 0.2 }], nota: "Mismo patrón que con barra, pero con más libertad en la trayectoria.", videoQuery: "peso muerto rumano con mancuernas técnica" },
   { id: "curl_femoral_sentado", name: "Curl Femoral Sentado", muscle: "Femoral", group: "femoral", nota: "El ángulo de cadera flexionado pone al isquiotibial en un estiramiento previo mayor.", videoQuery: "curl femoral sentado técnica" },
   { id: "curl_femoral_pie", name: "Curl Femoral de Pie", muscle: "Femoral", group: "femoral", nota: "Trabajo unilateral, apoyate bien para no compensar con la cadera.", videoQuery: "curl femoral de pie técnica" },
   { id: "curl_femoral_nordico", name: "Curl Femoral Nórdico", muscle: "Femoral", group: "femoral", rankExcluded: true, nota: "Bajá lo más lento posible controlando con los isquiotibiales, es muy exigente.", videoQuery: "curl femoral nórdico técnica nordic curl" },
@@ -251,8 +254,8 @@ const EXERCISE_LIBRARY = [
   // Glúteo y cadera (catálogo extendido)
   { id: "hip_thrust_unilateral", name: "Hip Thrust Unilateral", muscle: "Glúteo", group: "gluteo", secondary: [{ group: "femoral", weight: 0.2 }], nota: "Una pierna apoyada en el piso, la otra extendida — bueno para corregir asimetrías.", videoQuery: "hip thrust unilateral técnica" },
   { id: "paseos_laterales_banda", name: "Paseos Laterales con Banda", muscle: "Glúteo medio", group: "gluteo", nota: "Banda por encima de las rodillas o tobillos, mantené tensión todo el recorrido.", videoQuery: "paseos laterales con banda técnica monster walk" },
-  { id: "sentadilla_sumo", name: "Sentadilla Sumo", muscle: "Glúteo / Aductores", group: "gluteo", secondary: [{ group: "cuadriceps", weight: 0.3 }, { group: "femoral", weight: 0.15 }], nota: "Postura ancha con puntas afuera, mayor participación de glúteo y aductores.", videoQuery: "sentadilla sumo técnica" },
-  { id: "hiperextension_invertida", name: "Hiperextensión Invertida", muscle: "Glúteo / Espalda baja", group: "gluteo", secondary: [{ group: "dorsales", weight: 0.2 }], nota: "Torso fijo, levantás las piernas en vez del torso — cuidá no usar impulso.", videoQuery: "hiperextensión invertida técnica reverse hyper" },
+  { id: "sentadilla_sumo", name: "Sentadilla Sumo", muscle: "Glúteo / Aductores", group: "gluteo", secondary: [{ group: "cuadriceps", weight: 0.3 }, { group: "femoral", weight: 0.15 }, { group: "aductores", weight: 0.3 }], nota: "Postura ancha con puntas afuera, mayor participación de glúteo y aductores.", videoQuery: "sentadilla sumo técnica" },
+  { id: "hiperextension_invertida", name: "Hiperextensión Invertida", muscle: "Glúteo / Espalda baja", group: "espalda_baja", secondary: [{ group: "gluteo", weight: 0.3 }], nota: "Torso fijo, levantás las piernas en vez del torso — cuidá no usar impulso.", videoQuery: "hiperextensión invertida técnica reverse hyper" },
   { id: "plancha_copenhague", name: "Plancha Copenhague", muscle: "Aductores", group: "gluteo", nota: "Pierna de arriba apoyada en un banco, exige mucho de los aductores y el core.", videoQuery: "plancha copenhague técnica aductores" },
   { id: "aduccion_polea_baja", name: "Aducción de Cadera en Polea Baja", muscle: "Aductores", group: "gluteo", nota: "De pie, cruzá la pierna por delante del cuerpo en un arco controlado.", videoQuery: "aducción cadera polea baja técnica" },
   // Pantorrillas (catálogo extendido)
@@ -638,7 +641,7 @@ const STAGNATION_DAYS = 21;
 const DEFAULT_SETTINGS = {
   alertType: "sound", restLong: REST_LONG, restShort: REST_SHORT,
   trainWeeks: TRAIN_WEEKS, deloadWeeks: DELOAD_WEEKS, deloadPct: 0.75, deloadSetDivisor: 2,
-  theme: "dark", textScale: 1, smallTextScale: 1, autoShowPrShare: true, bodyWeightKg: 0, muscleRankMode: "general",
+  theme: "dark", textScale: 1, smallTextScale: 1, autoShowPrShare: true, bodyWeightKg: 0, muscleRankMode: "general", allowZoom: false,
 };
 
 function getProfileSettings(profile) { return { ...DEFAULT_SETTINGS, ...(profile?.settings || {}) }; }
@@ -1665,7 +1668,7 @@ const POSTERIOR_POLY_POINTS = {
 // costillas" y no tenemos ese grupo separado), aductor (cara interna del
 // muslo, tampoco modelado) y la parte baja de la espalda (ya cubierta por
 // dorsales a través de "upper-back", para no duplicar).
-const NON_INTERACTIVE_SLUGS = new Set(["head", "neck", "knees", "abductors", "adductor", "obliques", "lower-back"]);
+const NON_INTERACTIVE_SLUGS = new Set(["head", "neck", "knees", "abductors", "obliques"]);
 
 function buildPolyIndexToSlug(order) {
   const out = [];
@@ -1679,9 +1682,10 @@ const POSTERIOR_POLY_SLUGS = buildPolyIndexToSlug(POSTERIOR_POLY_ORDER);
 // con sus mismos puntos exactos — así la imagen para compartir queda
 // igual a lo que se ve en la app, sin depender de capturar nada del DOM
 // en vivo (lo que podía fallar y no generar la imagen).
-function buildSvgPolygonsForView(order, points, ranks, neutral) {
+function buildSvgPolygonsForView(order, points, ranks, neutral, view) {
   const fillFor = (slug) => {
     if (NON_INTERACTIVE_SLUGS.has(slug)) return neutral;
+    if (view === "front" && slug === "calves") return neutral;
     const keys = Object.entries(BODY_HIGHLIGHTER_SLUG_MAP).filter(([, s]) => s === slug || (slug.endsWith("-soleus") && s === "calves")).map(([k]) => k);
     if (!keys.length) return neutral;
     const best = keys.reduce((a, b) => ((ranks[b]?.levelIdx ?? -1) > (ranks[a]?.levelIdx ?? -1) ? b : a));
@@ -1696,7 +1700,7 @@ function buildMuscleBodySvgMarkup(view, ranks) {
   const NEUTRAL = "#334155";
   const order = view === "front" ? ANTERIOR_POLY_ORDER : POSTERIOR_POLY_ORDER;
   const points = view === "front" ? ANTERIOR_POLY_POINTS : POSTERIOR_POLY_POINTS;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 200">${buildSvgPolygonsForView(order, points, ranks, NEUTRAL)}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 200">${buildSvgPolygonsForView(order, points, ranks, NEUTRAL, view)}</svg>`;
 }
 
 function svgMarkupToImage(svgMarkup) {
@@ -2907,7 +2911,7 @@ const HELP_CHAPTERS = [
       {
         icon: <Award size={20} />,
         title: "Rango por músculo",
-        text: "El \"muñeco\" de toda la vida, de frente y de espalda: cada músculo se pinta según el rango que alcanzaste ahí — Bronce, Plata, Oro, Platino, Esmeralda, Diamante o Maestro en rojo (el techo), cada uno con tres niveles (I, II y III) — calculado con tu 1RM estimado en cualquier ejercicio de ese grupo, usando estándares de fuerza reales. Siempre se prioriza un ejercicio dedicado a ese músculo si tenés marca ahí; sólo si no entrenaste nada directo, usa de forma secundaria lo que aportan ejercicios compuestos relacionados (por ejemplo, un remo entrena la espalda ancha como principal pero también un poco el bíceps y el deltoides posterior), con menos peso que un ejercicio dedicado. Elegís entre \"General\" (una vara fija, igual para todos) o \"Según tu contexto\" (ajusta el cálculo a tu peso, sexo y edad — cargalos en tu perfil). Tocá un músculo entrenable para que se resalte completo con un borde blanco y ver tu rango, tu mejor marca, y cuántos kilos más necesitás (a tus mismas repeticiones) para subir al rango siguiente — cabeza, cuello, articulaciones y alguna zona sin músculo asignado no son tocables. Desde el ícono de compartir podés mandar una imagen con tus rangos.",
+        text: "El \"muñeco\" de toda la vida, de frente y de espalda: cada músculo se pinta según el rango que alcanzaste ahí — Bronce, Plata, Oro, Platino, Esmeralda, Diamante o Maestro en rojo (el techo), cada uno con tres niveles (I, II y III) — calculado con tu 1RM estimado en cualquier ejercicio de ese grupo, usando estándares de fuerza reales. Incluye aductor y espalda baja además de los músculos principales. Siempre se prioriza un ejercicio dedicado a ese músculo si tenés marca ahí; sólo si no entrenaste nada directo, usa de forma secundaria lo que aportan ejercicios compuestos relacionados (por ejemplo, un remo entrena la espalda ancha como principal pero también un poco el bíceps y el deltoides posterior), con menos peso que un ejercicio dedicado — y si todavía no tenés ninguna marca ahí, directamente te dice \"Sin rango\" en vez de inventarte uno. Elegís entre \"General\" (una vara fija, igual para todos) o \"Según tu contexto\" (ajusta el cálculo a tu peso, sexo y edad — cargalos en tu perfil). Tocá un músculo entrenable para que se resalte completo con un borde blanco y ver tu rango, tu mejor marca, y cuántos kilos más necesitás (a tus mismas repeticiones) para subir al rango siguiente, que te muestra nombrado — cabeza, cuello, articulaciones y alguna zona sin músculo asignado no son tocables. Desde el ícono de compartir podés mandar una imagen con tus rangos.",
         demo: { kind: "progreso", view: "rank" },
       },
       {
@@ -2975,7 +2979,7 @@ const HELP_CHAPTERS = [
       {
         icon: <SlidersHorizontal size={20} />,
         title: "Tamaño de letra",
-        text: "Dos controles: uno agranda el texto normal de la app (títulos, números de reps/kg, párrafos) y el otro, \"Letras chicas\", agranda específicamente las etiquetas más chiquitas — consejos de cada ejercicio, récords, RPE, badges de día — pensado para que se lea más fácil si tenés problemas de vista.",
+        text: "Dos controles: uno agranda el texto normal de la app (títulos, números de reps/kg, párrafos) y el otro, \"Letras chicas\", agranda específicamente las etiquetas más chiquitas — consejos de cada ejercicio, récords, RPE, badges de día — pensado para que se lea más fácil si tenés problemas de vista. Ahí mismo está \"Zoom con los dedos\", apagado por defecto para que no se desencuadre la pantalla si pellizcás por accidente — activalo si preferís poder agrandar partes puntuales.",
         demo: { kind: "perfil", view: "textsize", caption: "Probá cambiar el tamaño" },
       },
       {
@@ -4008,7 +4012,9 @@ const ESTIMATED_GROUP_RATIO = {
   antebrazos: { anchor: "deltoide_anterior", ratio: 0.308 },
   femoral: { anchor: "cuadriceps", ratio: 0.769 },
   gluteo: { anchor: "dorsales", ratio: 0.933 },
+  aductores: { anchor: "cuadriceps", ratio: 0.35 },
   core: { anchor: "pectoral_medio", ratio: 0.262 },
+  espalda_baja: { anchor: "dorsales", ratio: 0.20 },
   pantorrillas: { anchor: "cuadriceps", ratio: 0.846 },
 };
 
@@ -4026,7 +4032,7 @@ const MUSCLE_RANK_CONTEXTUAL_MULT_TABLE = buildFullRankTable(ANCHOR_CONTEXTUAL_M
 // por sexo, 0.65 en ejercicios de tren superior (banca/hombro) y 0.75 en
 // tren inferior (sentadilla/peso muerto); por edad, una curva que sube
 // hasta el pico de fuerza (18-39) y baja gradualmente después.
-const LOWER_BODY_RANK_GROUPS = new Set(["cuadriceps", "femoral", "gluteo", "pantorrillas"]);
+const LOWER_BODY_RANK_GROUPS = new Set(["cuadriceps", "femoral", "gluteo", "pantorrillas", "aductores"]);
 function getSexFactor(muscleKey, sex) {
   if (sex !== "F") return 1;
   return LOWER_BODY_RANK_GROUPS.has(muscleKey) ? 0.75 : 0.65;
@@ -4144,28 +4150,43 @@ function getBest1RMForMuscleGroup(groupKey, logs) {
 // y el mismo brillo de fondo (drop-shadow del color del nivel) que tenía
 // la versión dibujada a mano. Si la imagen no carga por algún motivo, cae
 // a un círculo simple del color del nivel en vez de mostrarse rota.
+// Insignias con las imágenes reales en /insignias/{tier}.png. Tres ajustes
+// pedidos:
+//  - Brillo bajado a algo mínimo y sin tinte de color (antes el
+//    drop-shadow tomaba el color del rango y quedaba muy intenso).
+//  - Colores más tenues: un filtro CSS de saturación/brillo reducidos,
+//    sin tocar los archivos (no tenemos acceso a esos PNG para editarlos).
+//  - Plata, Platino y Esmeralda venían con otra proporción (más angostas)
+//    que el resto — como no se puede editar el archivo en sí, se las
+//    estira para que ocupen el mismo ancho que las demás (con
+//    object-fit: fill en vez de cover, sólo para esas tres).
+const BADGE_STRETCH_TIERS = new Set(["plata", "platino", "esmeralda"]);
 function RankBadgeIcon({ tier, sub, color, size = 26 }) {
   const [imgError, setImgError] = useState(false);
   const tierFile = (tier || "bronce").toLowerCase();
   return (
-    <div className="shrink-0" style={{ position: "relative", width: size, height: size, filter: `drop-shadow(0 2px 3px ${color}55)`, overflow: "hidden", borderRadius: "20%" }}>
-      {!imgError ? (
-        <img
-          src={`/insignias/${tierFile}.png`}
-          alt={`${tier || ""}${sub ? ` ${sub}` : ""}`.trim()}
-          onError={() => setImgError(true)}
-          draggable={false}
-          style={{ width: "100%", height: "100%", objectFit: "cover" }}
-        />
-      ) : (
-        <div style={{ width: "100%", height: "100%", borderRadius: "50%", backgroundColor: color }} />
-      )}
+    <div className="shrink-0" style={{ position: "relative", width: size, height: size, filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.35))" }}>
+      <div style={{ width: "100%", height: "100%", overflow: "hidden", borderRadius: "20%" }}>
+        {!imgError ? (
+          <img
+            src={`/insignias/${tierFile}.png`}
+            alt={`${tier || ""}${sub ? ` ${sub}` : ""}`.trim()}
+            onError={() => setImgError(true)}
+            draggable={false}
+            style={{ width: "100%", height: "100%", objectFit: BADGE_STRETCH_TIERS.has(tierFile) ? "fill" : "cover", filter: "saturate(0.7) brightness(0.92)" }}
+          />
+        ) : (
+          <div style={{ width: "100%", height: "100%", borderRadius: "50%", backgroundColor: color, filter: "saturate(0.7)" }} />
+        )}
+      </div>
       {sub && (
         <span
           style={{
-            position: "absolute", bottom: -4, left: "50%", transform: "translateX(-50%)",
-            fontSize: Math.max(9, Math.round(size * 0.38)), fontWeight: 900, color: "#ffffff",
-            textShadow: "0 1px 2px rgba(0,0,0,0.95), 0 0 4px rgba(0,0,0,0.9)", lineHeight: 1, whiteSpace: "nowrap",
+            position: "absolute", bottom: -Math.max(5, size * 0.12), left: "50%", transform: "translateX(-50%)",
+            fontSize: Math.max(9, Math.round(size * 0.32)), fontWeight: 800, color: "#ffffff",
+            background: "linear-gradient(135deg, rgba(13,148,136,0.95), rgba(15,118,110,0.95))",
+            borderRadius: "999px", padding: `0 ${Math.max(4, Math.round(size * 0.12))}px`, lineHeight: Math.max(1.3, size * 0.032),
+            border: "1px solid rgba(255,255,255,0.35)", boxShadow: "0 1px 3px rgba(0,0,0,0.5)", whiteSpace: "nowrap",
           }}
         >
           {sub}
@@ -4195,10 +4216,10 @@ function RankBadgeIcon({ tier, sub, color, size = 26 }) {
 // tocar nada de la librería.
 const BODY_HIGHLIGHTER_SLUG_MAP = {
   pectoral_superior: "chest", pectoral_medio: "chest",
-  trapecio: "trapezius", dorsales: "upper-back",
+  trapecio: "trapezius", dorsales: "upper-back", espalda_baja: "lower-back",
   deltoide_anterior: "front-deltoids", deltoide_lateral: "front-deltoids", deltoide_posterior: "back-deltoids",
   biceps: "biceps", triceps: "triceps", antebrazos: "forearm",
-  cuadriceps: "quadriceps", femoral: "hamstring", gluteo: "gluteal",
+  cuadriceps: "quadriceps", femoral: "hamstring", gluteo: "gluteal", aductores: "adductor",
   core: "abs", pantorrillas: "calves",
 };
 function getOurGroupKeysForSlug(slug) {
@@ -4275,6 +4296,19 @@ function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backR
     });
   }, [selected, data, frontRef, backRef]);
 
+  // La librería usa el MISMO nombre "calves" para la pantorrilla de
+  // frente y la de atrás, así que pintar una pinta las dos a la vez —
+  // pero la de frente en realidad es el tibial anterior, otro músculo, y
+  // no debería iluminarse nunca. Después de cada render se le fuerza el
+  // color neutro de nuevo, sólo del lado de adelante.
+  useEffect(() => {
+    const svg = frontRef.current?.querySelector("svg");
+    if (!svg) return;
+    svg.querySelectorAll("polygon").forEach((p, i) => {
+      if (ANTERIOR_POLY_SLUGS[i] === "calves") p.style.fill = "#334155";
+    });
+  }, [data, frontRef]);
+
   return (
     <div className="flex gap-2 justify-center items-start">
       <div className="flex-1 min-w-0 max-w-[180px]">
@@ -4350,47 +4384,64 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
 
       <MuscleHighlighterBody ranks={ranks} selected={selected} onMuscleClick={(k) => setSelected((s) => (s === k ? null : k))} frontRef={frontBodyRef} backRef={backBodyRef} />
       {selInfo ? (
-        <div className="bg-slate-950/50 border border-slate-800/60 rounded-xl p-3.5 bounce-in">
-          <div className="flex items-center justify-between mb-2 gap-2">
+        <div className="bg-slate-950/50 border border-slate-800/60 rounded-2xl p-4 bounce-in">
+          <div className="flex items-center justify-between mb-3 gap-2">
             <p className="text-sm font-bold text-white">{selInfo.label}</p>
-            <span className="flex items-center gap-2 text-sm font-black pl-1.5 pr-3 py-1 rounded-xl shrink-0" style={{ backgroundColor: selInfo.color + "1c", color: selInfo.color }}>
-              <RankBadgeIcon tier={selInfo.tier} sub={selInfo.sub} color={selInfo.color} size={48} />
-              {selInfo.tier}{selInfo.sub ? ` ${selInfo.sub}` : ""}
-            </span>
+            {!selInfo.hasData && <span className="text-[11px] font-bold text-slate-500 px-2.5 py-1 rounded-lg bg-slate-800/60 shrink-0">Sin rango</span>}
           </div>
           {selInfo.hasData ? (
             <>
-              <p className="text-[11px] text-slate-500">
-                {selInfo.bestKg ? (
-                  <>Mejor marca: <span className="text-slate-300 font-bold">{selInfo.bestReps}×{selInfo.bestKg}kg</span>{selInfo.bestLoadFactor > 1 ? <span className="text-slate-600"> (×2 mancuernas)</span> : null}{selInfo.bestExerciseName ? <> en {selInfo.bestExerciseName}</> : null}</>
-                ) : (
-                  <>Todavía no tenés una marca en un ejercicio dedicado a este músculo — esto es una estimación.</>
-                )}
-              </p>
+              <div className="flex items-center gap-3.5 mb-3.5">
+                <RankBadgeIcon tier={selInfo.tier} sub={selInfo.sub} color={selInfo.color} size={58} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-lg font-black leading-tight" style={{ color: selInfo.color }}>{selInfo.tier}{selInfo.sub ? ` ${selInfo.sub}` : ""}</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    {selInfo.bestKg ? (
+                      <>Mejor marca: <span className="text-slate-300 font-bold">{selInfo.bestReps}×{selInfo.bestKg}kg</span>{selInfo.bestLoadFactor > 1 ? <span className="text-slate-600"> (×2 mancuernas)</span> : null}{selInfo.bestExerciseName ? <> en {selInfo.bestExerciseName}</> : null}</>
+                    ) : (
+                      <>Estimado por ejercicios relacionados — todavía sin marca propia</>
+                    )}
+                  </p>
+                </div>
+              </div>
               {selInfo.nextThreshold ? (
-                <>
-                  <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden mt-2">
-                    <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(100, Math.max(4, ((selInfo.best1RM - selInfo.threshold) / (selInfo.nextThreshold - selInfo.threshold)) * 100))}%`, backgroundColor: selInfo.color }} />
+                <div className="bg-slate-900/60 border border-slate-800/50 rounded-xl p-3">
+                  <div className="flex items-center justify-between mb-2 gap-2">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Progreso al próximo rango</span>
+                    <span className="flex items-center gap-1.5 text-[11px] font-bold shrink-0" style={{ color: nextTierInfo?.color }}>
+                      <RankBadgeIcon tier={nextTierInfo?.tier} sub="" color={nextTierInfo?.color} size={20} />
+                      {nextTierInfo?.tier}{nextTierInfo?.sub ? ` ${nextTierInfo.sub}` : ""}
+                    </span>
                   </div>
-                  {extraKgNeeded != null && <p className="text-[10px] text-slate-600 mt-1">Te faltan {extraKgNeeded}kg (a tus mismas {selInfo.bestReps} reps) para subir a {nextTierInfo?.tier}{nextTierInfo?.sub ? ` ${nextTierInfo.sub}` : ""}</p>}
-                </>
-              ) : <p className="text-[10px] text-amber-400 mt-1.5 font-bold">¡Rango máximo! 🏆</p>}
+                  <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(100, Math.max(4, ((selInfo.best1RM - selInfo.threshold) / (selInfo.nextThreshold - selInfo.threshold)) * 100))}%`, background: `linear-gradient(90deg, ${selInfo.color}, ${nextTierInfo?.color || selInfo.color})` }} />
+                  </div>
+                  {extraKgNeeded != null && <p className="text-[11px] text-slate-400 mt-2.5">Sumá <span className="font-black text-white">{extraKgNeeded}kg</span> a tus mismas {selInfo.bestReps} reps para subir</p>}
+                </div>
+              ) : (
+                <div className="bg-amber-500/10 border border-amber-500/25 rounded-xl px-3 py-3 text-center">
+                  <p className="text-sm font-black text-amber-400">🏆 ¡Rango máximo!</p>
+                </div>
+              )}
             </>
-          ) : <p className="text-[11px] text-slate-600">Todavía no registraste marcas en este grupo.</p>}
+          ) : <p className="text-[11px] text-slate-600 text-center py-2">Todavía no registraste marcas en este grupo.</p>}
         </div>
       ) : (
-        <p className="text-center text-[11px] text-slate-600">Tocá un músculo para ver tu rango y tu mejor marca.</p>
+        <p className="text-center text-[11px] text-slate-600">Tocá un músculo entrenable para ver tu rango y tu mejor marca.</p>
       )}
-      <div className="flex flex-wrap gap-2.5 justify-center pt-1">
-        {["Bronce", "Plata", "Oro", "Platino", "Esmeralda", "Diamante", "Maestro"].map((t) => {
-          const rep = RANK_TIERS.find((r) => r.tier === t && r.sub === "II") || RANK_TIERS.find((r) => r.tier === t);
-          return (
-            <span key={t} className="flex items-center gap-1 text-[9px] text-slate-500">
-              <RankBadgeIcon tier={rep.tier} sub="" color={rep.color} size={32} />
-              {t}
-            </span>
-          );
-        })}
+      <div className="pt-2 border-t border-slate-800/60">
+        <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider text-center mb-3">Todos los rangos</p>
+        <div className="flex flex-wrap justify-center gap-x-4 gap-y-3">
+          {["Bronce", "Plata", "Oro", "Platino", "Esmeralda", "Diamante", "Maestro"].map((t) => {
+            const rep = RANK_TIERS.find((r) => r.tier === t && r.sub === "II") || RANK_TIERS.find((r) => r.tier === t);
+            return (
+              <div key={t} className="flex flex-col items-center gap-1.5 w-14">
+                <RankBadgeIcon tier={rep.tier} sub="" color={rep.color} size={38} />
+                <span className="text-[9px] text-slate-500 font-semibold">{t}</span>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {showImage && (
@@ -4963,12 +5014,14 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
       )}
       {googleLinkError && <p className="text-rose-400 text-xs text-center">{googleLinkError}</p>}
 
+      <div className="flex items-center gap-1.5 px-1 pt-1"><Dumbbell size={11} className="text-slate-600" /><p className="text-[10px] font-black uppercase tracking-widest text-slate-600">Entrenamiento</p></div>
       <button onClick={onGoToRoutines} className="w-full flex items-center gap-3 bg-slate-900/50 border border-slate-800/50 rounded-2xl px-4 py-3.5 hover:border-teal-500/30 transition text-left">
         <div className="w-9 h-9 rounded-xl bg-teal-500/15 text-teal-400 flex items-center justify-center shrink-0"><Layers size={16} /></div>
         <div className="flex-1 min-w-0"><p className="text-sm font-bold text-white">Tu rutina: {activeRoutineDef?.name || "—"}</p><p className="text-[11px] text-slate-500">{savedRoutineCount} guardada{savedRoutineCount === 1 ? "" : "s"} · tocá para cambiar, editar o crear otra</p></div>
         <ChevronRight size={16} className="text-slate-600 shrink-0" />
       </button>
 
+      <div className="flex items-center gap-1.5 px-1 pt-2"><Sun size={11} className="text-slate-600" /><p className="text-[10px] font-black uppercase tracking-widest text-slate-600">Apariencia y accesibilidad</p></div>
       <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 backdrop-blur-sm shadow-md shadow-black/20">
         <p className="text-sm font-bold text-white mb-0.5">Apariencia</p>
         <p className="text-[11px] text-slate-500 mb-3">Elegí el tema con el que se ve la app</p>
@@ -4998,8 +5051,18 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
             ))}
           </div>
         </div>
+        <div className="pt-3.5 border-t border-slate-800/50">
+          <p className="text-sm font-bold text-white mb-0.5">Zoom con los dedos</p>
+          <p className="text-[11px] text-slate-500 mb-3">Viene desactivado para que pellizcar la pantalla por accidente no te desencuadre la app. Activalo si te resulta más cómodo agrandar partes puntuales.</p>
+          <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
+            {[{ v: false, l: "Desactivado" }, { v: true, l: "Activado" }].map((opt) => (
+              <button key={String(opt.v)} onClick={() => updateSettings({ allowZoom: opt.v })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${(settings.allowZoom ?? false) === opt.v ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
+            ))}
+          </div>
+        </div>
       </div>
 
+      <div className="flex items-center gap-1.5 px-1 pt-2"><Zap size={11} className="text-slate-600" /><p className="text-[10px] font-black uppercase tracking-widest text-slate-600">Notificaciones</p></div>
       <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 backdrop-blur-sm shadow-md shadow-black/20">
         <p className="text-sm font-bold text-white mb-0.5">Compartir marcas</p>
         <p className="text-[11px] text-slate-500 mb-3">Al lograr una nueva marca, ¿mostramos la imagen para compartir automáticamente?</p>
@@ -5010,6 +5073,7 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
         </div>
       </div>
 
+      <div className="flex items-center gap-1.5 px-1 pt-2"><Download size={11} className="text-slate-600" /><p className="text-[10px] font-black uppercase tracking-widest text-slate-600">Datos</p></div>
       <ExportTrainingCard profileName={profileName} logs={logs} />
 
       <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 backdrop-blur-sm shadow-md shadow-black/20">
@@ -6052,6 +6116,22 @@ export default function App() {
   useEffect(() => {
     if (typeof document !== "undefined") document.documentElement.style.fontSize = `${16 * textScale}px`;
   }, [textScale]);
+  // Zoom con los dedos (Perfil → Zoom): por defecto viene DESACTIVADO —
+  // sin esto, pellizcar la pantalla por accidente mientras entrenás (o
+  // doble-tap en un botón) puede dejarte la app desencuadrada. Se controla
+  // de verdad ajustando la etiqueta <meta name="viewport"> del documento
+  // (si no existe todavía, se crea) — `user-scalable=no` + `maximum-scale=1`
+  // es lo que efectivamente bloquea el pellizco para agrandar en la
+  // mayoría de los navegadores.
+  const allowZoom = profile ? !!getProfileSettings(profile).allowZoom : false;
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    let meta = document.querySelector('meta[name="viewport"]');
+    if (!meta) { meta = document.createElement("meta"); meta.name = "viewport"; document.head.appendChild(meta); }
+    meta.content = allowZoom
+      ? "width=device-width, initial-scale=1, viewport-fit=cover"
+      : "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover";
+  }, [allowZoom]);
   // Letras chicas (Perfil → Tamaño de letra → "Letras chicas"): multiplica
   // los text-[Npx] fijos (consejos, récords, RPE, badges...) — ver la
   // variable --small-text-scale en ANIMATION_CSS. Se pasa como custom
