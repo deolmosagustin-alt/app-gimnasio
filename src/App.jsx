@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { signInWithPopup, signOut } from "firebase/auth";
 import { doc, setDoc, getDoc } from "firebase/firestore";
+import Model from "react-body-highlighter";
 import { auth, googleProvider, db } from "./firebase";
 
 /* ============================================================================
@@ -1555,13 +1556,15 @@ function drawPeriodShareCard(ctx, W, H, { periodLabel, daysTrained, totalSets, t
 }
 
 /* ============================================================================
-   COMPARTIR EL MUÑECO — el body diagram de Progreso → Rango está hecho con
-   SVG (ver MuscleBodyDiagram), no con Canvas como el resto de las tarjetas
-   para compartir. Para generar la imagen, se construye el mismo dibujo
-   como texto SVG (estas dos funciones reproducen a mano las mismas formas
-   que MuscleBodyDiagram, para no depender de renderizar React a un string),
-   se convierte en una <img> vía data URL, y recién ahí se dibuja sobre el
-   canvas de la tarjeta — por eso drawMuscleRankShareCard es async.
+   COMPARTIR EL MUÑECO — desde que el muñeco en pantalla usa la librería
+   react-body-highlighter (ver MuscleHighlighterBody), la imagen para
+   compartir captura el SVG REAL que la librería ya renderizó en pantalla
+   (vía ref + outerHTML) en vez de redibujarlo — así se ve idéntico al de
+   la app. `buildMuscleBodySvgMarkup` queda sólo como respaldo, por si los
+   refs todavía no están listos en el momento de compartir (no debería
+   pasar en uso normal, pero por si acaso). Se convierte en una <img> vía
+   data URL, y recién ahí se dibuja sobre el canvas de la tarjeta — por eso
+   drawMuscleRankShareCard es async.
 ============================================================================ */
 function buildMuscleBodySvgMarkup(view, ranks) {
   const fillFor = (key) => ranks[key]?.color || "#334155";
@@ -1647,7 +1650,23 @@ function svgMarkupToImage(svgMarkup) {
   });
 }
 
-async function drawMuscleRankShareCard(ctx, W, H, { ranks, modeLabel, accent = "#F59E0B" }) {
+// El SVG de react-body-highlighter usa width/height="100%" (pensado para
+// adaptarse al contenedor en pantalla) — para convertirlo en una <img>
+// independiente necesita un tamaño en píxeles concreto, si no algunos
+// navegadores lo rasterizan con un tamaño por defecto que no tiene nada
+// que ver con el dibujo real.
+function normalizeSvgSizeForRaster(svgMarkup, fallbackW, fallbackH) {
+  if (!svgMarkup) return null;
+  const viewBoxMatch = svgMarkup.match(/viewBox="0 0 ([\d.]+) ([\d.]+)"/);
+  const w = viewBoxMatch ? viewBoxMatch[1] : fallbackW;
+  const h = viewBoxMatch ? viewBoxMatch[2] : fallbackH;
+  return svgMarkup.replace(/<svg([^>]*)>/, (full, attrs) => {
+    const cleaned = attrs.replace(/\swidth="[^"]*"/, "").replace(/\sheight="[^"]*"/, "");
+    return `<svg${cleaned} width="${w}" height="${h}">`;
+  });
+}
+
+async function drawMuscleRankShareCard(ctx, W, H, { frontSvg, backSvg, modeLabel, accent = "#F59E0B" }) {
   drawShareCardBase(ctx, W, H, accent, "#A855F7");
   ctx.textAlign = "center";
   ctx.fillStyle = accent;
@@ -1658,10 +1677,13 @@ async function drawMuscleRankShareCard(ctx, W, H, { ranks, modeLabel, accent = "
   ctx.fillText(modeLabel, W / 2, 295);
 
   const [frontImg, backImg] = await Promise.all([
-    svgMarkupToImage(buildMuscleBodySvgMarkup("front", ranks)),
-    svgMarkupToImage(buildMuscleBodySvgMarkup("back", ranks)),
+    svgMarkupToImage(normalizeSvgSizeForRaster(frontSvg, 100, 200) || buildMuscleBodySvgMarkup("front", {})),
+    svgMarkupToImage(normalizeSvgSizeForRaster(backSvg, 100, 200) || buildMuscleBodySvgMarkup("back", {})),
   ]);
-  const bodyW = 400, bodyH = bodyW * (420 / 240);
+  // El viewBox real de la librería es 100×200 (relación 1:2), distinto del
+  // viejo dibujo a mano (240×420) — se recalcula el ancho del cuerpo acá
+  // para que no salga estirado.
+  const bodyW = 360, bodyH = bodyW * 2;
   const gap = 50;
   const startX = (W - (bodyW * 2 + gap)) / 2;
   const bodyY = 360;
@@ -2343,12 +2365,12 @@ function ProgresoDemo({ view }) {
 
   if (view === "rank") {
     const demoRanks = {
-      hombros: { color: "#FFD23F" }, pecho: { color: "#5FC1B9" }, biceps: { color: "#2FB866" },
-      antebrazos: { color: "#94A3B8" }, core: { color: "#56A6F0" }, cuadriceps: { color: "#C026D3" },
+      deltoide_anterior: { levelIdx: 8 }, pectoral_medio: { levelIdx: 11 }, biceps: { levelIdx: 5 },
+      antebrazos: { levelIdx: 2 }, core: { levelIdx: 14 }, cuadriceps: { levelIdx: 17 },
     };
     return (
       <div className="space-y-1.5">
-        <MuscleBodyDiagram view="front" ranks={demoRanks} selected={null} onSelect={() => {}} />
+        <MuscleHighlighterBody ranks={demoRanks} onMuscleClick={() => {}} frontRef={{ current: null }} backRef={{ current: null }} />
         <p className="text-center text-[10px] text-slate-600">Cada músculo, pintado según tu rango ahí</p>
       </div>
     );
@@ -3986,135 +4008,81 @@ function RankBadgeIcon({ sub, color, size = 26 }) {
   );
 }
 
-// Regiones del muñeco visibles desde adelante y desde atrás — entre las
-// dos vistas se cubren los grupos musculares del catálogo, cada uno en la
-// vista donde más sentido anatómico tiene. El deltoide lateral se muestra
-// de frente (es el "gorro" visible del hombro desde ahí) y el deltoide
-// posterior de espalda; el trapecio ahora tiene su propia región arriba de
-// los dorsales, en vez de ir todo junto como "espalda".
-const MUSCLE_BODY_FRONT_KEYS = ["deltoide_anterior", "deltoide_lateral", "pectoral_superior", "pectoral_medio", "biceps", "antebrazos", "core", "cuadriceps"];
-const MUSCLE_BODY_BACK_KEYS = ["trapecio", "deltoide_posterior", "dorsales", "triceps", "gluteo", "femoral", "pantorrillas"];
+// ============================================================================
+// MUÑECO CON react-body-highlighter — reemplaza al dibujo a mano (rectángulos
+// y óvalos) por un modelo anatómico real de la librería. La librería sólo
+// entiende un set fijo de músculos (no separa pectoral superior/medio ni
+// tiene una cabeza "lateral" de deltoides separada) — para esos casos se
+// combinan nuestros grupos tomando el MEJOR rango entre los que comparten
+// el mismo músculo de la librería, así no se pierde el dato, sólo la
+// posibilidad de pintarlo por separado en el dibujo. El detalle de abajo
+// (al tocar un músculo) sigue mostrando cada uno de nuestros grupos por
+// separado, con su propio rango.
+//
+// Cómo pinta los colores la librería (revisado en su código fuente): cada
+// "ejercicio" en `data` suma +1 (o `frequency`) a cada músculo que toca, y
+// el color final es `highlightedColors[frecuencia - 1]`. Por eso `RANK_TIERS`
+// se pasa tal cual como `highlightedColors` (19 colores, uno por nivel) y a
+// cada músculo le mandamos UN solo "ejercicio" con frequency = levelIdx + 1
+// — así el índice cae siempre en el color exacto del rango, sin tener que
+// tocar nada de la librería.
+const BODY_HIGHLIGHTER_SLUG_MAP = {
+  pectoral_superior: "chest", pectoral_medio: "chest",
+  trapecio: "trapezius", dorsales: "upper-back",
+  deltoide_anterior: "front-deltoids", deltoide_lateral: "front-deltoids", deltoide_posterior: "back-deltoids",
+  biceps: "biceps", triceps: "triceps", antebrazos: "forearm",
+  cuadriceps: "quadriceps", femoral: "hamstring", gluteo: "gluteal",
+  core: "abs", pantorrillas: "calves",
+};
+function getOurGroupKeysForSlug(slug) {
+  if (slug === "obliques") return ["core"];
+  return Object.entries(BODY_HIGHLIGHTER_SLUG_MAP).filter(([, s]) => s === slug).map(([k]) => k);
+}
 
-// Muñeco con formas más anatómicas que antes: el pecho está separado en
-// superior/medio (dos óvalos apilados), el hombro en sus tres cabezas
-// (anterior/lateral de frente, posterior de espalda), la espalda separa
-// trapecio (arriba) de dorsales (forma de V angostándose a la cintura), y
-// las pantorrillas tienen la curva típica de la gemela — todo con figuras
-// simples (óvalos, rectángulos redondeados y polígonos) para que se pueda
-// armar de forma confiable sin depender de curvas bézier complejas.
-function MuscleBodyDiagram({ view, ranks, selected, onSelect }) {
-  const fillFor = (key) => ranks[key]?.color || "#334155";
-  const strokeFor = (key) => (selected === key ? "#f8fafc" : "rgba(255,255,255,0.12)");
-  const NEUTRAL = "#334155";
-  if (view === "front") {
-    return (
-      <svg viewBox="0 0 240 420" className="w-full max-w-[210px] mx-auto select-none">
-        <circle cx="120" cy="26" r="19" fill={NEUTRAL} />
-        <polygon points="109,42 131,42 127,53 113,53" fill={NEUTRAL} />
-        <g onClick={() => onSelect("deltoide_lateral")} className="cursor-pointer">
-          <ellipse cx="66" cy="68" rx="18" ry="15" fill={fillFor("deltoide_lateral")} stroke={strokeFor("deltoide_lateral")} strokeWidth="3" />
-          <ellipse cx="174" cy="68" rx="18" ry="15" fill={fillFor("deltoide_lateral")} stroke={strokeFor("deltoide_lateral")} strokeWidth="3" />
-        </g>
-        <g onClick={() => onSelect("deltoide_anterior")} className="cursor-pointer">
-          <ellipse cx="80" cy="80" rx="15" ry="14" fill={fillFor("deltoide_anterior")} stroke={strokeFor("deltoide_anterior")} strokeWidth="3" />
-          <ellipse cx="160" cy="80" rx="15" ry="14" fill={fillFor("deltoide_anterior")} stroke={strokeFor("deltoide_anterior")} strokeWidth="3" />
-        </g>
-        <g onClick={() => onSelect("pectoral_superior")} className="cursor-pointer">
-          <ellipse cx="98" cy="78" rx="24" ry="17" fill={fillFor("pectoral_superior")} stroke={strokeFor("pectoral_superior")} strokeWidth="3" />
-          <ellipse cx="142" cy="78" rx="24" ry="17" fill={fillFor("pectoral_superior")} stroke={strokeFor("pectoral_superior")} strokeWidth="3" />
-        </g>
-        <g onClick={() => onSelect("pectoral_medio")} className="cursor-pointer">
-          <ellipse cx="98" cy="104" rx="25" ry="20" fill={fillFor("pectoral_medio")} stroke={strokeFor("pectoral_medio")} strokeWidth="3" />
-          <ellipse cx="142" cy="104" rx="25" ry="20" fill={fillFor("pectoral_medio")} stroke={strokeFor("pectoral_medio")} strokeWidth="3" />
-        </g>
-        <line x1="120" y1="64" x2="120" y2="122" stroke="#0a0a0f" strokeWidth="2" opacity="0.3" />
-        <g onClick={() => onSelect("biceps")} className="cursor-pointer">
-          <rect x="40" y="84" width="22" height="64" rx="11" fill={fillFor("biceps")} stroke={strokeFor("biceps")} strokeWidth="3" />
-          <rect x="178" y="84" width="22" height="64" rx="11" fill={fillFor("biceps")} stroke={strokeFor("biceps")} strokeWidth="3" />
-          <ellipse cx="51" cy="101" rx="10" ry="8" fill="#fff" opacity="0.14" />
-          <ellipse cx="189" cy="101" rx="10" ry="8" fill="#fff" opacity="0.14" />
-        </g>
-        <g onClick={() => onSelect("antebrazos")} className="cursor-pointer">
-          <rect x="37" y="148" width="20" height="60" rx="10" fill={fillFor("antebrazos")} stroke={strokeFor("antebrazos")} strokeWidth="3" />
-          <rect x="183" y="148" width="20" height="60" rx="10" fill={fillFor("antebrazos")} stroke={strokeFor("antebrazos")} strokeWidth="3" />
-        </g>
-        <circle cx="47" cy="216" r="9" fill={NEUTRAL} />
-        <circle cx="193" cy="216" r="9" fill={NEUTRAL} />
-        <g onClick={() => onSelect("core")} className="cursor-pointer">
-          <rect x="86" y="126" width="11" height="50" rx="6" fill={fillFor("core")} opacity="0.55" />
-          <rect x="143" y="126" width="11" height="50" rx="6" fill={fillFor("core")} opacity="0.55" />
-          {[0, 1, 2].map((row) => (
-            <g key={row}>
-              <rect x="100" y={128 + row * 17} width="16" height="14" rx="4" fill={fillFor("core")} stroke={strokeFor("core")} strokeWidth="2" />
-              <rect x="124" y={128 + row * 17} width="16" height="14" rx="4" fill={fillFor("core")} stroke={strokeFor("core")} strokeWidth="2" />
-            </g>
-          ))}
-        </g>
-        <polygon points="84,176 156,176 162,198 78,198" fill={NEUTRAL} />
-        <g onClick={() => onSelect("cuadriceps")} className="cursor-pointer">
-          <rect x="79" y="196" width="37" height="108" rx="17" fill={fillFor("cuadriceps")} stroke={strokeFor("cuadriceps")} strokeWidth="3" />
-          <rect x="124" y="196" width="37" height="108" rx="17" fill={fillFor("cuadriceps")} stroke={strokeFor("cuadriceps")} strokeWidth="3" />
-          <ellipse cx="90" cy="228" rx="11" ry="22" fill="#fff" opacity="0.12" />
-          <ellipse cx="150" cy="228" rx="11" ry="22" fill="#fff" opacity="0.12" />
-        </g>
-        <ellipse cx="93" cy="324" rx="14" ry="18" fill={NEUTRAL} />
-        <ellipse cx="147" cy="324" rx="14" ry="18" fill={NEUTRAL} />
-        <rect x="84" y="338" width="18" height="48" rx="9" fill={NEUTRAL} />
-        <rect x="138" y="338" width="18" height="48" rx="9" fill={NEUTRAL} />
-        <ellipse cx="93" cy="398" rx="16" ry="8" fill={NEUTRAL} />
-        <ellipse cx="147" cy="398" rx="16" ry="8" fill={NEUTRAL} />
-      </svg>
-    );
-  }
+function MuscleHighlighterBody({ ranks, onMuscleClick, frontRef, backRef }) {
+  const highlightedColors = useMemo(() => RANK_TIERS.map((t) => t.color), []);
+  const data = useMemo(() => {
+    const bestLevelBySlug = {};
+    Object.entries(BODY_HIGHLIGHTER_SLUG_MAP).forEach(([ourKey, slug]) => {
+      const lvl = ranks[ourKey]?.levelIdx ?? -1;
+      if (lvl > (bestLevelBySlug[slug] ?? -1)) bestLevelBySlug[slug] = lvl;
+    });
+    const out = Object.entries(bestLevelBySlug)
+      .filter(([, lvl]) => lvl >= 0)
+      .map(([slug, lvl]) => ({ name: slug, muscles: [slug], frequency: lvl + 1 }));
+    // El "core" también pinta los oblicuos con el mismo rango — no tenemos
+    // un grupo separado para oblicuos en el catálogo.
+    const coreLevel = ranks.core?.levelIdx ?? -1;
+    if (coreLevel >= 0) out.push({ name: "obliques", muscles: ["obliques"], frequency: coreLevel + 1 });
+    return out;
+  }, [ranks]);
+
+  const handleClick = ({ muscle }) => {
+    const keys = getOurGroupKeysForSlug(muscle);
+    if (!keys.length) return;
+    const best = keys.reduce((a, b) => ((ranks[b]?.levelIdx ?? -1) > (ranks[a]?.levelIdx ?? -1) ? b : a));
+    onMuscleClick(best);
+  };
+
   return (
-    <svg viewBox="0 0 240 420" className="w-full max-w-[210px] mx-auto select-none">
-      <circle cx="120" cy="26" r="19" fill={NEUTRAL} />
-      <polygon points="109,42 131,42 127,53 113,53" fill={NEUTRAL} />
-      <g onClick={() => onSelect("deltoide_posterior")} className="cursor-pointer">
-        <ellipse cx="68" cy="70" rx="20" ry="16" fill={fillFor("deltoide_posterior")} stroke={strokeFor("deltoide_posterior")} strokeWidth="3" />
-        <ellipse cx="172" cy="70" rx="20" ry="16" fill={fillFor("deltoide_posterior")} stroke={strokeFor("deltoide_posterior")} strokeWidth="3" />
-      </g>
-      <g onClick={() => onSelect("trapecio")} className="cursor-pointer">
-        <polygon points="120,44 153,78 120,98 87,78" fill={fillFor("trapecio")} stroke={strokeFor("trapecio")} strokeWidth="3" strokeLinejoin="round" />
-      </g>
-      <g onClick={() => onSelect("dorsales")} className="cursor-pointer">
-        <polygon points="80,84 160,84 154,142 148,180 92,180 86,142" fill={fillFor("dorsales")} stroke={strokeFor("dorsales")} strokeWidth="3" strokeLinejoin="round" />
-        <line x1="120" y1="86" x2="120" y2="178" stroke="#0a0a0f" strokeWidth="2" opacity="0.25" />
-      </g>
-      <g onClick={() => onSelect("triceps")} className="cursor-pointer">
-        <rect x="40" y="84" width="22" height="64" rx="11" fill={fillFor("triceps")} stroke={strokeFor("triceps")} strokeWidth="3" />
-        <rect x="178" y="84" width="22" height="64" rx="11" fill={fillFor("triceps")} stroke={strokeFor("triceps")} strokeWidth="3" />
-        <ellipse cx="51" cy="118" rx="9" ry="14" fill="#fff" opacity="0.12" />
-        <ellipse cx="189" cy="118" rx="9" ry="14" fill="#fff" opacity="0.12" />
-      </g>
-      <rect x="37" y="148" width="20" height="60" rx="10" fill={NEUTRAL} />
-      <rect x="183" y="148" width="20" height="60" rx="10" fill={NEUTRAL} />
-      <circle cx="47" cy="216" r="9" fill={NEUTRAL} />
-      <circle cx="193" cy="216" r="9" fill={NEUTRAL} />
-      <g onClick={() => onSelect("gluteo")} className="cursor-pointer">
-        <ellipse cx="98" cy="198" rx="26" ry="23" fill={fillFor("gluteo")} stroke={strokeFor("gluteo")} strokeWidth="3" />
-        <ellipse cx="142" cy="198" rx="26" ry="23" fill={fillFor("gluteo")} stroke={strokeFor("gluteo")} strokeWidth="3" />
-      </g>
-      <g onClick={() => onSelect("femoral")} className="cursor-pointer">
-        <rect x="79" y="216" width="37" height="96" rx="17" fill={fillFor("femoral")} stroke={strokeFor("femoral")} strokeWidth="3" />
-        <rect x="124" y="216" width="37" height="96" rx="17" fill={fillFor("femoral")} stroke={strokeFor("femoral")} strokeWidth="3" />
-      </g>
-      <g onClick={() => onSelect("pantorrillas")} className="cursor-pointer">
-        <ellipse cx="93" cy="324" rx="15" ry="20" fill={fillFor("pantorrillas")} stroke={strokeFor("pantorrillas")} strokeWidth="3" />
-        <ellipse cx="147" cy="324" rx="15" ry="20" fill={fillFor("pantorrillas")} stroke={strokeFor("pantorrillas")} strokeWidth="3" />
-        <rect x="84" y="340" width="18" height="46" rx="9" fill={fillFor("pantorrillas")} stroke={strokeFor("pantorrillas")} strokeWidth="2" />
-        <rect x="138" y="340" width="18" height="46" rx="9" fill={fillFor("pantorrillas")} stroke={strokeFor("pantorrillas")} strokeWidth="2" />
-      </g>
-      <ellipse cx="93" cy="398" rx="16" ry="8" fill={NEUTRAL} />
-      <ellipse cx="147" cy="398" rx="16" ry="8" fill={NEUTRAL} />
-    </svg>
+    <div className="flex gap-2 justify-center items-start">
+      <div className="flex-1 min-w-0 max-w-[180px]">
+        <div ref={frontRef}><Model data={data} type="anterior" bodyColor="#334155" highlightedColors={highlightedColors} onClick={handleClick} style={{ width: "100%" }} svgStyle={{ width: "100%" }} /></div>
+        <p className="text-center text-[10px] text-slate-600 mt-1">De frente</p>
+      </div>
+      <div className="flex-1 min-w-0 max-w-[180px]">
+        <div ref={backRef}><Model data={data} type="posterior" bodyColor="#334155" highlightedColors={highlightedColors} onClick={handleClick} style={{ width: "100%" }} svgStyle={{ width: "100%" }} /></div>
+        <p className="text-center text-[10px] text-slate-600 mt-1">De espalda</p>
+      </div>
+    </div>
   );
 }
 
 function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, onGoToProfile, sex }) {
-  const [view, setView] = useState("front");
   const [selected, setSelected] = useState(null);
   const [showImage, setShowImage] = useState(false);
+  const frontBodyRef = useRef(null);
+  const backBodyRef = useRef(null);
   const mode = settings.muscleRankMode === "relative" ? "relative" : "general";
   const bodyWeightKg = settings.bodyWeightKg || 0;
 
@@ -4127,11 +4095,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
     return out;
   }, [logs, mode, bodyWeightKg, sex]);
 
-  // Si cambiás de vista (frente/espalda) y el músculo seleccionado no
-  // existe en la vista nueva, lo deselecciona en vez de dejar un estado
-  // raro (seleccionado pero invisible).
-  const visibleKeys = view === "front" ? MUSCLE_BODY_FRONT_KEYS : MUSCLE_BODY_BACK_KEYS;
-  const selInfo = selected && visibleKeys.includes(selected) ? ranks[selected] : null;
+  const selInfo = selected ? ranks[selected] : null;
   const needsWeight = mode === "relative" && !bodyWeightKg;
   const modeLabel = mode === "relative" && bodyWeightKg ? `Según tu peso (${bodyWeightKg}kg)` : "General";
 
@@ -4168,12 +4132,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
         )}
       </div>
 
-      <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60 w-fit mx-auto">
-        {[{ k: "front", l: "De frente" }, { k: "back", l: "De espalda" }].map((opt) => (
-          <button key={opt.k} onClick={() => { setView(opt.k); setSelected(null); }} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${view === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
-        ))}
-      </div>
-      <MuscleBodyDiagram view={view} ranks={ranks} selected={selected} onSelect={(k) => setSelected((s) => (s === k ? null : k))} />
+      <MuscleHighlighterBody ranks={ranks} onMuscleClick={(k) => setSelected((s) => (s === k ? null : k))} frontRef={frontBodyRef} backRef={backBodyRef} />
       {selInfo ? (
         <div className="bg-slate-950/50 border border-slate-800/60 rounded-xl p-3.5 bounce-in">
           <div className="flex items-center justify-between mb-2 gap-2">
@@ -4222,7 +4181,11 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
           fileNamePrefix="mi-rango-muscular"
           shareTitle="Mi Rutina — Rango muscular"
           shareText="Mirá mis rangos por músculo 💪"
-          draw={(ctx, W, H) => drawMuscleRankShareCard(ctx, W, H, { ranks, modeLabel, accent: "#F59E0B" })}
+          draw={(ctx, W, H) => drawMuscleRankShareCard(ctx, W, H, {
+            frontSvg: frontBodyRef.current?.querySelector("svg")?.outerHTML,
+            backSvg: backBodyRef.current?.querySelector("svg")?.outerHTML,
+            modeLabel, accent: "#F59E0B",
+          })}
           onClose={() => setShowImage(false)}
         />
       )}

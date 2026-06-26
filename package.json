@@ -17,6 +17,7 @@
     "lucide-react": "^1.21.0",
     "pdfjs-dist": "^6.0.227",
     "react": "^19.2.6",
+    "react-body-highlighter": "^2.0.5",
     "react-dom": "^19.2.6",
     "recharts": "^3.8.1",
     "xlsx": "^0.18.5"
