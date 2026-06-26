@@ -596,7 +596,7 @@ const STAGNATION_DAYS = 21;
 const DEFAULT_SETTINGS = {
   alertType: "sound", restLong: REST_LONG, restShort: REST_SHORT,
   trainWeeks: TRAIN_WEEKS, deloadWeeks: DELOAD_WEEKS, deloadPct: 0.75, deloadSetDivisor: 2,
-  theme: "dark", textScale: 1, smallTextScale: 1, autoShowPrShare: true,
+  theme: "dark", textScale: 1, smallTextScale: 1, autoShowPrShare: true, bodyWeightKg: 0, muscleRankMode: "general",
 };
 
 function getProfileSettings(profile) { return { ...DEFAULT_SETTINGS, ...(profile?.settings || {}) }; }
@@ -934,13 +934,13 @@ const ANIMATION_CSS = `
 @keyframes prPop { 0% { transform: scale(1); } 35% { transform: scale(1.22); } 60% { transform: scale(0.94); } 100% { transform: scale(1); } }
 .pr-pop { animation: prPop 0.5s ease; display: inline-block; }
 @keyframes fadeSlideIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-.tab-fade-in { animation: fadeSlideIn 0.25s ease both; }
+.tab-fade-in { animation: fadeSlideIn 0.25s ease; }
 @keyframes modalBgIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes modalPopIn { from { opacity: 0; transform: translateY(12px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
 .modal-bg-in { animation: modalBgIn 0.18s ease both; }
-.modal-pop-in { animation: modalPopIn 0.22s cubic-bezier(.2,.8,.3,1) both; }
+.modal-pop-in { animation: modalPopIn 0.22s cubic-bezier(.2,.8,.3,1); }
 @keyframes gentleBounceIn { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
-.bounce-in { animation: gentleBounceIn 0.3s cubic-bezier(.34,1.56,.64,1) both; }
+.bounce-in { animation: gentleBounceIn 0.3s cubic-bezier(.34,1.56,.64,1); }
 
 /* Hide the default scrollbar everywhere — vertical page scroll and the
    horizontal chip/card carousels (day tabs, exercise picker, etc.). Scrolling
@@ -1550,6 +1550,124 @@ function drawPeriodShareCard(ctx, W, H, { periodLabel, daysTrained, totalSets, t
   drawWordmark(ctx, W, H, accent);
 }
 
+/* ============================================================================
+   COMPARTIR EL MUÑECO — el body diagram de Progreso → Rango está hecho con
+   SVG (ver MuscleBodyDiagram), no con Canvas como el resto de las tarjetas
+   para compartir. Para generar la imagen, se construye el mismo dibujo
+   como texto SVG (estas dos funciones reproducen a mano las mismas formas
+   que MuscleBodyDiagram, para no depender de renderizar React a un string),
+   se convierte en una <img> vía data URL, y recién ahí se dibuja sobre el
+   canvas de la tarjeta — por eso drawMuscleRankShareCard es async.
+============================================================================ */
+function buildMuscleBodySvgMarkup(view, ranks) {
+  const fillFor = (key) => ranks[key]?.color || "#334155";
+  const NEUTRAL = "#334155";
+  if (view === "front") {
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 420">
+      <circle cx="120" cy="26" r="19" fill="${NEUTRAL}" />
+      <polygon points="109,42 131,42 127,53 113,53" fill="${NEUTRAL}" />
+      <ellipse cx="72" cy="72" rx="22" ry="16" fill="${fillFor("hombros")}" />
+      <ellipse cx="168" cy="72" rx="22" ry="16" fill="${fillFor("hombros")}" />
+      <ellipse cx="98" cy="92" rx="27" ry="29" fill="${fillFor("pecho")}" />
+      <ellipse cx="142" cy="92" rx="27" ry="29" fill="${fillFor("pecho")}" />
+      <line x1="120" y1="70" x2="120" y2="118" stroke="#0a0a0f" stroke-width="2" opacity="0.35" />
+      <rect x="40" y="82" width="22" height="66" rx="11" fill="${fillFor("biceps")}" />
+      <rect x="178" y="82" width="22" height="66" rx="11" fill="${fillFor("biceps")}" />
+      <ellipse cx="51" cy="100" rx="10" ry="8" fill="#fff" opacity="0.14" />
+      <ellipse cx="189" cy="100" rx="10" ry="8" fill="#fff" opacity="0.14" />
+      <rect x="37" y="148" width="20" height="60" rx="10" fill="${fillFor("antebrazos")}" />
+      <rect x="183" y="148" width="20" height="60" rx="10" fill="${fillFor("antebrazos")}" />
+      <circle cx="47" cy="216" r="9" fill="${NEUTRAL}" />
+      <circle cx="193" cy="216" r="9" fill="${NEUTRAL}" />
+      <rect x="86" y="124" width="11" height="52" rx="6" fill="${fillFor("core")}" opacity="0.55" />
+      <rect x="143" y="124" width="11" height="52" rx="6" fill="${fillFor("core")}" opacity="0.55" />
+      <rect x="100" y="126" width="16" height="15" rx="4" fill="${fillFor("core")}" />
+      <rect x="124" y="126" width="16" height="15" rx="4" fill="${fillFor("core")}" />
+      <rect x="100" y="144" width="16" height="15" rx="4" fill="${fillFor("core")}" />
+      <rect x="124" y="144" width="16" height="15" rx="4" fill="${fillFor("core")}" />
+      <rect x="100" y="162" width="16" height="15" rx="4" fill="${fillFor("core")}" />
+      <rect x="124" y="162" width="16" height="15" rx="4" fill="${fillFor("core")}" />
+      <polygon points="84,176 156,176 162,198 78,198" fill="${NEUTRAL}" />
+      <rect x="79" y="196" width="37" height="108" rx="17" fill="${fillFor("cuadriceps")}" />
+      <rect x="124" y="196" width="37" height="108" rx="17" fill="${fillFor("cuadriceps")}" />
+      <ellipse cx="90" cy="228" rx="11" ry="22" fill="#fff" opacity="0.12" />
+      <ellipse cx="150" cy="228" rx="11" ry="22" fill="#fff" opacity="0.12" />
+      <ellipse cx="93" cy="324" rx="14" ry="18" fill="${NEUTRAL}" />
+      <ellipse cx="147" cy="324" rx="14" ry="18" fill="${NEUTRAL}" />
+      <rect x="84" y="338" width="18" height="48" rx="9" fill="${NEUTRAL}" />
+      <rect x="138" y="338" width="18" height="48" rx="9" fill="${NEUTRAL}" />
+      <ellipse cx="93" cy="398" rx="16" ry="8" fill="${NEUTRAL}" />
+      <ellipse cx="147" cy="398" rx="16" ry="8" fill="${NEUTRAL}" />
+    </svg>`;
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 420">
+    <circle cx="120" cy="26" r="19" fill="${NEUTRAL}" />
+    <polygon points="109,42 131,42 127,53 113,53" fill="${NEUTRAL}" />
+    <ellipse cx="72" cy="72" rx="22" ry="16" fill="${NEUTRAL}" />
+    <ellipse cx="168" cy="72" rx="22" ry="16" fill="${NEUTRAL}" />
+    <polygon points="68,64 172,64 158,142 150,180 90,180 82,142" fill="${fillFor("espalda")}" />
+    <line x1="120" y1="64" x2="120" y2="178" stroke="#0a0a0f" stroke-width="2" opacity="0.3" />
+    <rect x="40" y="82" width="22" height="66" rx="11" fill="${fillFor("triceps")}" />
+    <rect x="178" y="82" width="22" height="66" rx="11" fill="${fillFor("triceps")}" />
+    <ellipse cx="51" cy="118" rx="9" ry="14" fill="#fff" opacity="0.12" />
+    <ellipse cx="189" cy="118" rx="9" ry="14" fill="#fff" opacity="0.12" />
+    <rect x="37" y="148" width="20" height="60" rx="10" fill="${NEUTRAL}" />
+    <rect x="183" y="148" width="20" height="60" rx="10" fill="${NEUTRAL}" />
+    <circle cx="47" cy="216" r="9" fill="${NEUTRAL}" />
+    <circle cx="193" cy="216" r="9" fill="${NEUTRAL}" />
+    <ellipse cx="98" cy="198" rx="26" ry="23" fill="${fillFor("gluteo")}" />
+    <ellipse cx="142" cy="198" rx="26" ry="23" fill="${fillFor("gluteo")}" />
+    <rect x="79" y="216" width="37" height="96" rx="17" fill="${fillFor("femoral")}" />
+    <rect x="124" y="216" width="37" height="96" rx="17" fill="${fillFor("femoral")}" />
+    <ellipse cx="93" cy="324" rx="15" ry="20" fill="${fillFor("pantorrillas")}" />
+    <ellipse cx="147" cy="324" rx="15" ry="20" fill="${fillFor("pantorrillas")}" />
+    <rect x="84" y="340" width="18" height="46" rx="9" fill="${fillFor("pantorrillas")}" />
+    <rect x="138" y="340" width="18" height="46" rx="9" fill="${fillFor("pantorrillas")}" />
+    <ellipse cx="93" cy="398" rx="16" ry="8" fill="${NEUTRAL}" />
+    <ellipse cx="147" cy="398" rx="16" ry="8" fill="${NEUTRAL}" />
+  </svg>`;
+}
+
+function svgMarkupToImage(svgMarkup) {
+  return new Promise((resolve, reject) => {
+    const svg64 = btoa(unescape(encodeURIComponent(svgMarkup)));
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = `data:image/svg+xml;base64,${svg64}`;
+  });
+}
+
+async function drawMuscleRankShareCard(ctx, W, H, { ranks, modeLabel, accent = "#F59E0B" }) {
+  drawShareCardBase(ctx, W, H, accent, "#A855F7");
+  ctx.textAlign = "center";
+  ctx.fillStyle = accent;
+  ctx.font = "800 38px sans-serif";
+  ctx.fillText("💪 MI RANGO MUSCULAR", W / 2, 250);
+  ctx.fillStyle = "#94a3b8";
+  ctx.font = "700 28px sans-serif";
+  ctx.fillText(modeLabel, W / 2, 295);
+
+  const [frontImg, backImg] = await Promise.all([
+    svgMarkupToImage(buildMuscleBodySvgMarkup("front", ranks)),
+    svgMarkupToImage(buildMuscleBodySvgMarkup("back", ranks)),
+  ]);
+  const bodyW = 400, bodyH = bodyW * (420 / 240);
+  const gap = 50;
+  const startX = (W - (bodyW * 2 + gap)) / 2;
+  const bodyY = 360;
+  ctx.drawImage(frontImg, startX, bodyY, bodyW, bodyH);
+  ctx.drawImage(backImg, startX + bodyW + gap, bodyY, bodyW, bodyH);
+
+  const labelY = bodyY + bodyH + 60;
+  ctx.fillStyle = "#cbd5e1";
+  ctx.font = "700 30px sans-serif";
+  ctx.fillText("De frente", startX + bodyW / 2, labelY);
+  ctx.fillText("De espalda", startX + bodyW + gap + bodyW / 2, labelY);
+
+  drawWordmark(ctx, W, H, accent);
+}
+
 function ShareImageModal({ title, fileNamePrefix, shareTitle, shareText, draw, onClose, autoShowOptOutLabel, onOptOutAutoShow }) {
   const canvasRef = useRef(null);
   const [previewUrl, setPreviewUrl] = useState(null);
@@ -1558,8 +1676,20 @@ function ShareImageModal({ title, fileNamePrefix, shareTitle, shareText, draw, o
     if (!canvas) return;
     canvas.width = 1080; canvas.height = 1920;
     const ctx = canvas.getContext("2d");
-    draw(ctx, 1080, 1920);
-    setPreviewUrl(canvas.toDataURL("image/png"));
+    let cancelled = false;
+    // `draw` puede ser sync (la mayoría de las tarjetas) o async (la del
+    // muñeco, que necesita esperar a que el SVG se convierta en imagen
+    // antes de poder dibujarlo en el canvas) — await sobre un valor no
+    //-Promise se resuelve solo, así que esto funciona para ambos casos.
+    (async () => {
+      try {
+        await draw(ctx, 1080, 1920);
+        if (!cancelled) setPreviewUrl(canvas.toDataURL("image/png"));
+      } catch (err) {
+        console.error("Error generando la imagen para compartir:", err);
+      }
+    })();
+    return () => { cancelled = true; };
     // eslint-disable-next-line
   }, []);
 
@@ -1593,7 +1723,14 @@ function ShareImageModal({ title, fileNamePrefix, shareTitle, shareText, draw, o
           <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition"><X size={18} /></button>
         </div>
         <canvas ref={canvasRef} className="hidden" />
-        {previewUrl && <img src={previewUrl} alt="Vista previa para compartir" className="w-full rounded-2xl border border-slate-800/60 mb-4" style={{ aspectRatio: "9 / 16", objectFit: "cover", maxHeight: "50vh" }} />}
+        {previewUrl ? (
+          <img src={previewUrl} alt="Vista previa para compartir" className="w-full rounded-2xl border border-slate-800/60 mb-4" style={{ aspectRatio: "9 / 16", objectFit: "cover", maxHeight: "50vh" }} />
+        ) : (
+          <div className="w-full rounded-2xl border border-slate-800/60 mb-4 flex flex-col items-center justify-center gap-2 py-10" style={{ aspectRatio: "9 / 16", maxHeight: "50vh" }}>
+            <div className="w-7 h-7 rounded-full border-[3px] border-teal-500/25 border-t-teal-500 animate-spin" />
+            <p className="text-[11px] text-slate-500">Generando imagen...</p>
+          </div>
+        )}
         <div className="flex gap-2">
           <button onClick={handleDownload} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition text-sm font-semibold"><Download size={14} /> Descargar</button>
           <button onClick={handleShare} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98] shadow-lg shadow-teal-500/20" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}><Share2 size={14} /> Compartir</button>
@@ -1664,7 +1801,7 @@ function SwipeToArchive({ children, onArchive, confirmText, revealWidth = 84 }) 
         onPointerCancel={handlePointerUp}
         onClickCapture={handleClickCapture}
         style={{ transform: `translateX(${dragX}px)`, transition: draggingRef.current ? "none" : "transform 0.2s ease", touchAction: "pan-y" }}
-        className="relative"
+        className="relative bg-[#0a0a0f] rounded-2xl"
       >
         {children}
       </div>
@@ -2614,7 +2751,7 @@ const HELP_CHAPTERS = [
       {
         icon: <BarChart3 size={20} />,
         title: "Elegí qué ver",
-        text: "Con los botones elegís entre Historial, Evolución, Rango o Músculo — cada uno con su propia tarjeta debajo, igual que elegís el día en la pestaña Rutina.",
+        text: "Con los botones elegís entre Historial, Rango, Evolución o Músculo — cada uno con su propia tarjeta debajo, igual que elegís el día en la pestaña Rutina.",
       },
       {
         icon: <Calendar size={20} />,
@@ -2641,7 +2778,7 @@ const HELP_CHAPTERS = [
       {
         icon: <Award size={20} />,
         title: "Rango por músculo",
-        text: "El \"muñeco\" de toda la vida, de frente y de espalda: cada músculo se pinta según el rango que alcanzaste ahí — Bronce, Plata, Oro, Platino, Esmeralda, Diamante o Maestro (cada uno con tres niveles, salvo Maestro) — calculado con el mayor peso que levantaste en cualquier ejercicio de ese grupo. Tocá un músculo para ver tu rango, tu mejor marca, y cuánto te falta para subir.",
+        text: "El \"muñeco\" de toda la vida, de frente y de espalda: cada músculo se pinta según el rango que alcanzaste ahí — Bronce, Plata, Oro, Platino, Esmeralda, Diamante o Maestro (cada uno con tres niveles, salvo Maestro) — calculado con tu 1RM estimado en cualquier ejercicio de ese grupo, usando estándares de fuerza reales. Elegís entre \"General\" o \"Según tu peso\" (ahí cargás tu peso corporal y el rango se ajusta a vos). Tocá un músculo para ver tu rango, tu mejor marca y si estás por debajo, en, o por encima del promedio — y desde el ícono de compartir podés mandar una imagen de tu muñeco completo.",
         demo: { kind: "progreso", view: "rank" },
       },
       {
@@ -3639,8 +3776,8 @@ function ExerciseChipRow({ exercises, selId, onSelect }) {
 // navegación inferior) — siempre entran los 4 sin deslizar.
 const PROGRESS_SECTIONS = [
   { k: "historial", l: "Historial", icon: <Calendar size={15} />, color: "#06B6D4" },
-  { k: "chart", l: "Evolución", icon: <Activity size={15} />, color: "#3B82F6" },
   { k: "rank", l: "Rango", icon: <Award size={15} />, color: "#F59E0B" },
+  { k: "chart", l: "Evolución", icon: <Activity size={15} />, color: "#3B82F6" },
   { k: "muscle", l: "Músculo", icon: <BarChart3 size={15} />, color: "#A855F7" },
 ];
 
@@ -3679,46 +3816,89 @@ const RANK_TIERS = [
   { tier: "Maestro", sub: "", color: "#C026D3" },
 ];
 
-// Techo (Maestro) por grupo muscular, en kg — pensado para que sea
-// exigente pero no imposible: 160kg de press banca, por ejemplo, ya te
-// pone en Maestro de pecho. Cada grupo tiene su propio techo porque la
-// capacidad de carga típica varía muchísimo entre, por ejemplo, piernas y
-// antebrazos.
-const MUSCLE_RANK_MAX_KG = {
-  pecho: 160, espalda: 180, hombros: 110, biceps: 50, triceps: 70,
-  antebrazos: 40, cuadriceps: 220, femoral: 140, gluteo: 180, core: 60, pantorrillas: 150,
+// Techo (Maestro) por grupo muscular en 1RM ESTIMADO, calibrado con
+// estándares de fuerza reales (ExRx, Strength Level, y guías de la
+// comunidad de fuerza para press banca/sentadilla/peso muerto/press
+// militar — el resto de los grupos se estimó por relación razonable con
+// esos cuatro). Dos formas de usarlos:
+//  - "general": un número fijo en kg, pensado para un cuerpo de
+//    referencia de 75kg — simple, pero menos justo si pesás mucho más o
+//    mucho menos que eso.
+//  - "relativo": el mismo techo pero expresado como múltiplo de TU peso
+//    corporal (por ejemplo, pecho ×2.1 — levantar 2.1 veces tu peso en
+//    press banca ya es nivel "Elite" según esos estándares), así el rango
+//    se ajusta a tu cuerpo en vez de tratar a todos igual.
+// Nota: como los ejercicios de mancuerna (vuelos laterales, press Arnold,
+// etc.) registran el peso POR MANCUERNA y no el total de las dos manos,
+// el techo de "hombros" está pensado alrededor del press militar (que sí
+// es peso total) — en la práctica, una mancuerna sola rara vez va a ser
+// tu mejor marca del grupo frente a un press pesado.
+const RANK_REFERENCE_BODYWEIGHT_KG = 75;
+const MUSCLE_RANK_BW_MULTIPLIER = {
+  pecho: 2.1, espalda: 3.0, hombros: 1.3, biceps: 0.7, triceps: 0.75,
+  antebrazos: 0.4, cuadriceps: 2.6, femoral: 2.0, gluteo: 2.8, core: 0.55, pantorrillas: 2.2,
 };
+const MUSCLE_RANK_MAX_KG = Object.fromEntries(
+  Object.entries(MUSCLE_RANK_BW_MULTIPLIER).map(([k, mult]) => [k, Math.round(mult * RANK_REFERENCE_BODYWEIGHT_KG)])
+);
 
-// Qué fracción del techo hace falta para cada uno de los 19 niveles — no
-// es lineal a propósito: los primeros niveles suben rápido (para que se
-// sienta progreso enseguida) y cuesta cada vez más cerca del techo.
+function getMuscleRankMaxKg(muscleKey, mode, bodyWeightKg) {
+  if (mode === "relative" && bodyWeightKg > 0) {
+    return (MUSCLE_RANK_BW_MULTIPLIER[muscleKey] || 1) * bodyWeightKg;
+  }
+  return MUSCLE_RANK_MAX_KG[muscleKey] || 100;
+}
+
+// Qué fracción del techo hace falta para cada uno de los 19 niveles. No es
+// lineal — está pensada para que coincida con la curva real de progreso de
+// fuerza (los estándares de la comunidad ubican al lifter "Intermedio",
+// que es donde está la mayoría de la gente que entrena con regularidad,
+// alrededor de la mitad del camino entre principiante y elite — por eso
+// el promedio cae justo en Oro, no en el medio exacto de los 19 niveles):
+//   Bronce/Plata  → por debajo del promedio (debutante a novato)
+//   Oro           → el promedio (lo que logra la mayoría con 1-2 años de entrenamiento)
+//   Platino/Esmeralda → por encima del promedio (avanzado)
+//   Diamante/Maestro  → el extremo superior de la curva (elite)
 const RANK_LEVEL_FRACTIONS = [0.125, 0.1875, 0.25, 0.3125, 0.375, 0.4375, 0.5, 0.5625, 0.625, 0.6875, 0.75, 0.8125, 0.875, 0.90625, 0.9375, 0.95, 0.96875, 0.9875, 1];
 
-function getMuscleRank(muscleKey, bestKg) {
-  const max = MUSCLE_RANK_MAX_KG[muscleKey] || 100;
-  if (!bestKg || bestKg <= 0) {
+// Para mostrar la franja de la campana de Gauss a la que corresponde cada
+// nivel — "por debajo del promedio", "promedio" o "por encima del
+// promedio" — sin tener que repetir el cálculo en cada lugar que lo usa.
+function getRankZoneLabel(tier) {
+  if (tier === "Bronce" || tier === "Plata") return "Por debajo del promedio";
+  if (tier === "Oro") return "Promedio";
+  if (tier === "Platino" || tier === "Esmeralda") return "Por encima del promedio";
+  return "Elite";
+}
+
+function getMuscleRank(muscleKey, best1RM, mode = "general", bodyWeightKg = 0) {
+  const max = getMuscleRankMaxKg(muscleKey, mode, bodyWeightKg);
+  if (!best1RM || best1RM <= 0) {
     return { tier: "Bronce", sub: "I", color: "#475569", levelIdx: -1, max, threshold: 0, nextThreshold: RANK_LEVEL_FRACTIONS[0] * max, hasData: false };
   }
   let levelIdx = -1;
-  for (let i = 0; i < RANK_LEVEL_FRACTIONS.length; i++) { if (bestKg >= RANK_LEVEL_FRACTIONS[i] * max) levelIdx = i; }
+  for (let i = 0; i < RANK_LEVEL_FRACTIONS.length; i++) { if (best1RM >= RANK_LEVEL_FRACTIONS[i] * max) levelIdx = i; }
   if (levelIdx === -1) {
     return { tier: "Bronce", sub: "I", color: "#475569", levelIdx: -1, max, threshold: 0, nextThreshold: RANK_LEVEL_FRACTIONS[0] * max, hasData: true };
   }
   const info = RANK_TIERS[levelIdx];
   const threshold = RANK_LEVEL_FRACTIONS[levelIdx] * max;
   const nextThreshold = levelIdx < RANK_TIERS.length - 1 ? RANK_LEVEL_FRACTIONS[levelIdx + 1] * max : null;
-  return { ...info, levelIdx, max, threshold, nextThreshold, hasData: true };
+  return { ...info, levelIdx, max, threshold, nextThreshold, hasData: true, zone: getRankZoneLabel(info.tier) };
 }
 
-// Mayor peso (kg) levantado alguna vez en cualquier ejercicio de un grupo
-// muscular — recorre logs + récords corregidos a mano, respetando la misma
-// regla del resto de la app: si hay un récord corregido a mano para una
-// serie, ese manda sobre el historial de esa serie puntual.
-function getBestKgForMuscleGroup(groupKey, logs) {
+// Mejor 1RM ESTIMADO (fórmula de Epley, igual que en Progreso) en
+// cualquier ejercicio de un grupo muscular — no el peso más pesado a
+// secas, porque eso hacía que levantar poco peso a una sola repetición
+// pareciera "más fuerte" que levantar casi lo mismo varias veces. Guarda
+// también con qué kg×reps puntual se logró ese estimado, para poder
+// mostrarlo (en vez de mostrar sólo "110kg", que da la idea equivocada de
+// que fue a una repetición).
+function getBest1RMForMuscleGroup(groupKey, logs) {
   const idsInGroup = new Set((EXERCISE_LIBRARY_BY_GROUP[groupKey] || []).map((e) => e.id));
   const overriddenBaseKeys = new Set();
   Object.keys(logs).forEach((k) => { if (k.endsWith("_pr_override")) overriddenBaseKeys.add(k.replace(/_pr_override$/, "")); });
-  let bestKg = 0, bestExerciseName = null;
+  let best1RM = 0, bestKg = 0, bestReps = 0, bestExerciseName = null;
   Object.entries(logs).forEach(([key, val]) => {
     const isOverride = key.endsWith("_pr_override");
     const baseKey = isOverride ? key.replace(/_pr_override$/, "") : key;
@@ -3726,9 +3906,41 @@ function getBestKgForMuscleGroup(groupKey, logs) {
     const { exerciseId } = parseLogKey(baseKey);
     if (!idsInGroup.has(exerciseId)) return;
     const entries = isOverride ? [val] : (Array.isArray(val) ? val : []);
-    entries.forEach((e) => { if (e && e.kg > bestKg) { bestKg = e.kg; bestExerciseName = EXERCISE_LIBRARY_BY_ID[exerciseId]?.name || exerciseId; } });
+    entries.forEach((e) => {
+      if (!e || !e.kg || !e.reps) return;
+      const rm = estimate1RM(e.kg, e.reps);
+      if (rm > best1RM) { best1RM = rm; bestKg = e.kg; bestReps = e.reps; bestExerciseName = EXERCISE_LIBRARY_BY_ID[exerciseId]?.name || exerciseId; }
+    });
   });
-  return { bestKg, bestExerciseName };
+  return { best1RM, bestKg, bestReps, bestExerciseName };
+}
+
+// Insignia tipo "gema/medalla" para cada nivel — antes era sólo un punto
+// de color, ahora tiene una forma real (parecida a las medallas de las
+// apps de rutinas tipo Strafit/Strong) con un degradé del color del nivel,
+// un facetado claro arriba para que se vea con volumen, y el número romano
+// (I/II/III) grabado adentro — Maestro, que es el techo y no tiene
+// sub-nivel, lleva una estrella en su lugar.
+function RankBadgeIcon({ sub, color, size = 26 }) {
+  const gradId = `rb-${color.replace("#", "")}`;
+  const isMaestro = !sub;
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" className="shrink-0" style={{ filter: `drop-shadow(0 0 4px ${color}55)` }}>
+      <defs>
+        <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor={color} />
+          <stop offset="100%" stopColor={color} stopOpacity="0.6" />
+        </linearGradient>
+      </defs>
+      <path d="M24 2 L43 15 L37 45 L11 45 L5 15 Z" fill={`url(#${gradId})`} stroke="rgba(255,255,255,0.45)" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M24 2 L43 15 L24 23 L5 15 Z" fill="#ffffff" opacity="0.22" />
+      {isMaestro ? (
+        <path d="M24 18 L27.2 25 L34.5 25.6 L29 30.6 L30.8 38 L24 34 L17.2 38 L19 30.6 L13.5 25.6 L20.8 25 Z" fill="#ffffff" opacity="0.92" />
+      ) : (
+        <text x="24" y="32" textAnchor="middle" fontSize="15" fontWeight="900" fill="#ffffff" stroke="#0a0a0f" strokeWidth="2.4" paintOrder="stroke" fontFamily="sans-serif">{sub}</text>
+      )}
+    </svg>
+  );
 }
 
 // Regiones del muñeco visibles desde adelante y desde atrás — entre las
@@ -3739,106 +3951,171 @@ function getBestKgForMuscleGroup(groupKey, logs) {
 const MUSCLE_BODY_FRONT_KEYS = ["hombros", "pecho", "biceps", "antebrazos", "core", "cuadriceps"];
 const MUSCLE_BODY_BACK_KEYS = ["espalda", "triceps", "gluteo", "femoral", "pantorrillas"];
 
+// Muñeco con formas más anatómicas que antes: el pecho y los glúteos son
+// dos óvalos (no un solo rectángulo), el abdomen es una grilla tipo
+// "tabla", la espalda es un trapecio que se angosta hacia la cintura
+// (forma de V) y las pantorrillas tienen la curva típica de la gemela —
+// todo con figuras simples (óvalos, rectángulos redondeados y polígonos)
+// para que se pueda armar de forma confiable sin curvas complejas.
 function MuscleBodyDiagram({ view, ranks, selected, onSelect }) {
   const fillFor = (key) => ranks[key]?.color || "#334155";
-  const strokeFor = (key) => (selected === key ? "#f8fafc" : "transparent");
+  const strokeFor = (key) => (selected === key ? "#f8fafc" : "rgba(255,255,255,0.12)");
   const NEUTRAL = "#334155";
   if (view === "front") {
     return (
       <svg viewBox="0 0 240 420" className="w-full max-w-[210px] mx-auto select-none">
-        <circle cx="120" cy="28" r="20" fill={NEUTRAL} />
-        <rect x="112" y="44" width="16" height="14" fill={NEUTRAL} />
+        <circle cx="120" cy="26" r="19" fill={NEUTRAL} />
+        <polygon points="109,42 131,42 127,53 113,53" fill={NEUTRAL} />
         <g onClick={() => onSelect("hombros")} className="cursor-pointer">
-          <ellipse cx="76" cy="74" rx="24" ry="17" fill={fillFor("hombros")} stroke={strokeFor("hombros")} strokeWidth="3" />
-          <ellipse cx="164" cy="74" rx="24" ry="17" fill={fillFor("hombros")} stroke={strokeFor("hombros")} strokeWidth="3" />
+          <ellipse cx="72" cy="72" rx="22" ry="16" fill={fillFor("hombros")} stroke={strokeFor("hombros")} strokeWidth="3" />
+          <ellipse cx="168" cy="72" rx="22" ry="16" fill={fillFor("hombros")} stroke={strokeFor("hombros")} strokeWidth="3" />
         </g>
         <g onClick={() => onSelect("pecho")} className="cursor-pointer">
-          <rect x="78" y="66" width="84" height="60" rx="20" fill={fillFor("pecho")} stroke={strokeFor("pecho")} strokeWidth="3" />
+          <ellipse cx="98" cy="92" rx="27" ry="29" fill={fillFor("pecho")} stroke={strokeFor("pecho")} strokeWidth="3" />
+          <ellipse cx="142" cy="92" rx="27" ry="29" fill={fillFor("pecho")} stroke={strokeFor("pecho")} strokeWidth="3" />
+          <line x1="120" y1="70" x2="120" y2="118" stroke="#0a0a0f" strokeWidth="2" opacity="0.35" />
         </g>
         <g onClick={() => onSelect("biceps")} className="cursor-pointer">
-          <rect x="44" y="80" width="22" height="68" rx="11" fill={fillFor("biceps")} stroke={strokeFor("biceps")} strokeWidth="3" />
-          <rect x="174" y="80" width="22" height="68" rx="11" fill={fillFor("biceps")} stroke={strokeFor("biceps")} strokeWidth="3" />
+          <rect x="40" y="82" width="22" height="66" rx="11" fill={fillFor("biceps")} stroke={strokeFor("biceps")} strokeWidth="3" />
+          <rect x="178" y="82" width="22" height="66" rx="11" fill={fillFor("biceps")} stroke={strokeFor("biceps")} strokeWidth="3" />
+          <ellipse cx="51" cy="100" rx="10" ry="8" fill="#fff" opacity="0.14" />
+          <ellipse cx="189" cy="100" rx="10" ry="8" fill="#fff" opacity="0.14" />
         </g>
         <g onClick={() => onSelect("antebrazos")} className="cursor-pointer">
-          <rect x="40" y="150" width="20" height="62" rx="10" fill={fillFor("antebrazos")} stroke={strokeFor("antebrazos")} strokeWidth="3" />
-          <rect x="180" y="150" width="20" height="62" rx="10" fill={fillFor("antebrazos")} stroke={strokeFor("antebrazos")} strokeWidth="3" />
+          <rect x="37" y="148" width="20" height="60" rx="10" fill={fillFor("antebrazos")} stroke={strokeFor("antebrazos")} strokeWidth="3" />
+          <rect x="183" y="148" width="20" height="60" rx="10" fill={fillFor("antebrazos")} stroke={strokeFor("antebrazos")} strokeWidth="3" />
         </g>
-        <circle cx="50" cy="218" r="9" fill={NEUTRAL} />
-        <circle cx="190" cy="218" r="9" fill={NEUTRAL} />
+        <circle cx="47" cy="216" r="9" fill={NEUTRAL} />
+        <circle cx="193" cy="216" r="9" fill={NEUTRAL} />
         <g onClick={() => onSelect("core")} className="cursor-pointer">
-          <rect x="90" y="124" width="60" height="54" rx="14" fill={fillFor("core")} stroke={strokeFor("core")} strokeWidth="3" />
+          <rect x="86" y="124" width="11" height="52" rx="6" fill={fillFor("core")} opacity="0.55" />
+          <rect x="143" y="124" width="11" height="52" rx="6" fill={fillFor("core")} opacity="0.55" />
+          {[0, 1, 2].map((row) => (
+            <g key={row}>
+              <rect x="100" y={126 + row * 18} width="16" height="15" rx="4" fill={fillFor("core")} stroke={strokeFor("core")} strokeWidth="2" />
+              <rect x="124" y={126 + row * 18} width="16" height="15" rx="4" fill={fillFor("core")} stroke={strokeFor("core")} strokeWidth="2" />
+            </g>
+          ))}
         </g>
-        <rect x="82" y="176" width="76" height="22" rx="10" fill={NEUTRAL} />
+        <polygon points="84,176 156,176 162,198 78,198" fill={NEUTRAL} />
         <g onClick={() => onSelect("cuadriceps")} className="cursor-pointer">
-          <rect x="82" y="196" width="34" height="112" rx="16" fill={fillFor("cuadriceps")} stroke={strokeFor("cuadriceps")} strokeWidth="3" />
-          <rect x="124" y="196" width="34" height="112" rx="16" fill={fillFor("cuadriceps")} stroke={strokeFor("cuadriceps")} strokeWidth="3" />
+          <rect x="79" y="196" width="37" height="108" rx="17" fill={fillFor("cuadriceps")} stroke={strokeFor("cuadriceps")} strokeWidth="3" />
+          <rect x="124" y="196" width="37" height="108" rx="17" fill={fillFor("cuadriceps")} stroke={strokeFor("cuadriceps")} strokeWidth="3" />
+          <ellipse cx="90" cy="228" rx="11" ry="22" fill="#fff" opacity="0.12" />
+          <ellipse cx="150" cy="228" rx="11" ry="22" fill="#fff" opacity="0.12" />
         </g>
-        <rect x="86" y="310" width="26" height="78" rx="12" fill={NEUTRAL} />
-        <rect x="128" y="310" width="26" height="78" rx="12" fill={NEUTRAL} />
-        <ellipse cx="99" cy="398" rx="16" ry="8" fill={NEUTRAL} />
-        <ellipse cx="141" cy="398" rx="16" ry="8" fill={NEUTRAL} />
+        <ellipse cx="93" cy="324" rx="14" ry="18" fill={NEUTRAL} />
+        <ellipse cx="147" cy="324" rx="14" ry="18" fill={NEUTRAL} />
+        <rect x="84" y="338" width="18" height="48" rx="9" fill={NEUTRAL} />
+        <rect x="138" y="338" width="18" height="48" rx="9" fill={NEUTRAL} />
+        <ellipse cx="93" cy="398" rx="16" ry="8" fill={NEUTRAL} />
+        <ellipse cx="147" cy="398" rx="16" ry="8" fill={NEUTRAL} />
       </svg>
     );
   }
   return (
     <svg viewBox="0 0 240 420" className="w-full max-w-[210px] mx-auto select-none">
-      <circle cx="120" cy="28" r="20" fill={NEUTRAL} />
-      <rect x="112" y="44" width="16" height="14" fill={NEUTRAL} />
-      <ellipse cx="76" cy="74" rx="24" ry="17" fill={NEUTRAL} />
-      <ellipse cx="164" cy="74" rx="24" ry="17" fill={NEUTRAL} />
+      <circle cx="120" cy="26" r="19" fill={NEUTRAL} />
+      <polygon points="109,42 131,42 127,53 113,53" fill={NEUTRAL} />
+      <ellipse cx="72" cy="72" rx="22" ry="16" fill={NEUTRAL} />
+      <ellipse cx="168" cy="72" rx="22" ry="16" fill={NEUTRAL} />
       <g onClick={() => onSelect("espalda")} className="cursor-pointer">
-        <rect x="78" y="66" width="84" height="112" rx="22" fill={fillFor("espalda")} stroke={strokeFor("espalda")} strokeWidth="3" />
+        <polygon points="68,64 172,64 158,142 150,180 90,180 82,142" fill={fillFor("espalda")} stroke={strokeFor("espalda")} strokeWidth="3" strokeLinejoin="round" />
+        <line x1="120" y1="64" x2="120" y2="178" stroke="#0a0a0f" strokeWidth="2" opacity="0.3" />
       </g>
       <g onClick={() => onSelect("triceps")} className="cursor-pointer">
-        <rect x="44" y="80" width="22" height="68" rx="11" fill={fillFor("triceps")} stroke={strokeFor("triceps")} strokeWidth="3" />
-        <rect x="174" y="80" width="22" height="68" rx="11" fill={fillFor("triceps")} stroke={strokeFor("triceps")} strokeWidth="3" />
+        <rect x="40" y="82" width="22" height="66" rx="11" fill={fillFor("triceps")} stroke={strokeFor("triceps")} strokeWidth="3" />
+        <rect x="178" y="82" width="22" height="66" rx="11" fill={fillFor("triceps")} stroke={strokeFor("triceps")} strokeWidth="3" />
+        <ellipse cx="51" cy="118" rx="9" ry="14" fill="#fff" opacity="0.12" />
+        <ellipse cx="189" cy="118" rx="9" ry="14" fill="#fff" opacity="0.12" />
       </g>
-      <rect x="40" y="150" width="20" height="62" rx="10" fill={NEUTRAL} />
-      <rect x="180" y="150" width="20" height="62" rx="10" fill={NEUTRAL} />
-      <circle cx="50" cy="218" r="9" fill={NEUTRAL} />
-      <circle cx="190" cy="218" r="9" fill={NEUTRAL} />
+      <rect x="37" y="148" width="20" height="60" rx="10" fill={NEUTRAL} />
+      <rect x="183" y="148" width="20" height="60" rx="10" fill={NEUTRAL} />
+      <circle cx="47" cy="216" r="9" fill={NEUTRAL} />
+      <circle cx="193" cy="216" r="9" fill={NEUTRAL} />
       <g onClick={() => onSelect("gluteo")} className="cursor-pointer">
-        <rect x="78" y="176" width="84" height="42" rx="18" fill={fillFor("gluteo")} stroke={strokeFor("gluteo")} strokeWidth="3" />
+        <ellipse cx="98" cy="198" rx="26" ry="23" fill={fillFor("gluteo")} stroke={strokeFor("gluteo")} strokeWidth="3" />
+        <ellipse cx="142" cy="198" rx="26" ry="23" fill={fillFor("gluteo")} stroke={strokeFor("gluteo")} strokeWidth="3" />
       </g>
       <g onClick={() => onSelect("femoral")} className="cursor-pointer">
-        <rect x="82" y="216" width="34" height="94" rx="16" fill={fillFor("femoral")} stroke={strokeFor("femoral")} strokeWidth="3" />
-        <rect x="124" y="216" width="34" height="94" rx="16" fill={fillFor("femoral")} stroke={strokeFor("femoral")} strokeWidth="3" />
+        <rect x="79" y="216" width="37" height="96" rx="17" fill={fillFor("femoral")} stroke={strokeFor("femoral")} strokeWidth="3" />
+        <rect x="124" y="216" width="37" height="96" rx="17" fill={fillFor("femoral")} stroke={strokeFor("femoral")} strokeWidth="3" />
       </g>
       <g onClick={() => onSelect("pantorrillas")} className="cursor-pointer">
-        <rect x="86" y="310" width="26" height="78" rx="12" fill={fillFor("pantorrillas")} stroke={strokeFor("pantorrillas")} strokeWidth="3" />
-        <rect x="128" y="310" width="26" height="78" rx="12" fill={fillFor("pantorrillas")} stroke={strokeFor("pantorrillas")} strokeWidth="3" />
+        <ellipse cx="93" cy="324" rx="15" ry="20" fill={fillFor("pantorrillas")} stroke={strokeFor("pantorrillas")} strokeWidth="3" />
+        <ellipse cx="147" cy="324" rx="15" ry="20" fill={fillFor("pantorrillas")} stroke={strokeFor("pantorrillas")} strokeWidth="3" />
+        <rect x="84" y="340" width="18" height="46" rx="9" fill={fillFor("pantorrillas")} stroke={strokeFor("pantorrillas")} strokeWidth="2" />
+        <rect x="138" y="340" width="18" height="46" rx="9" fill={fillFor("pantorrillas")} stroke={strokeFor("pantorrillas")} strokeWidth="2" />
       </g>
-      <ellipse cx="99" cy="398" rx="16" ry="8" fill={NEUTRAL} />
-      <ellipse cx="141" cy="398" rx="16" ry="8" fill={NEUTRAL} />
+      <ellipse cx="93" cy="398" rx="16" ry="8" fill={NEUTRAL} />
+      <ellipse cx="147" cy="398" rx="16" ry="8" fill={NEUTRAL} />
     </svg>
   );
 }
 
-function MuscleRankView({ logs }) {
+function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings }) {
   const [view, setView] = useState("front");
   const [selected, setSelected] = useState(null);
+  const [showImage, setShowImage] = useState(false);
+  const [weightDraft, setWeightDraft] = useState(settings.bodyWeightKg ? String(settings.bodyWeightKg) : "");
+  const mode = settings.muscleRankMode === "relative" ? "relative" : "general";
+  const bodyWeightKg = settings.bodyWeightKg || 0;
 
   const ranks = useMemo(() => {
     const out = {};
     MUSCLE_GROUPS.forEach((g) => {
-      const { bestKg, bestExerciseName } = getBestKgForMuscleGroup(g.key, logs);
-      out[g.key] = { ...getMuscleRank(g.key, bestKg), bestKg, bestExerciseName, label: g.label };
+      const { best1RM, bestKg, bestReps, bestExerciseName } = getBest1RMForMuscleGroup(g.key, logs);
+      out[g.key] = { ...getMuscleRank(g.key, best1RM, mode, bodyWeightKg), best1RM, bestKg, bestReps, bestExerciseName, label: g.label };
     });
     return out;
-  }, [logs]);
+  }, [logs, mode, bodyWeightKg]);
 
   // Si cambiás de vista (frente/espalda) y el músculo seleccionado no
   // existe en la vista nueva, lo deselecciona en vez de dejar un estado
   // raro (seleccionado pero invisible).
   const visibleKeys = view === "front" ? MUSCLE_BODY_FRONT_KEYS : MUSCLE_BODY_BACK_KEYS;
   const selInfo = selected && visibleKeys.includes(selected) ? ranks[selected] : null;
+  const needsWeight = mode === "relative" && !bodyWeightKg;
+  const modeLabel = mode === "relative" && bodyWeightKg ? `Según tu peso (${bodyWeightKg}kg)` : "General";
+
+  const saveWeight = () => {
+    const w = parseFloat(weightDraft);
+    if (w > 0) onUpdateSettings?.({ bodyWeightKg: w });
+  };
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-amber-500/20 bg-slate-900/50 backdrop-blur-sm shadow-md shadow-black/20 p-4 space-y-3">
-      <div className="flex items-center gap-2.5 mb-1">
-        <div className="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center shrink-0"><Award size={15} /></div>
-        <p className="text-sm font-bold text-white">Rango por músculo</p>
+      <div className="flex items-center justify-between gap-2 mb-1">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center shrink-0"><Award size={15} /></div>
+          <p className="text-sm font-bold text-white">Rango por músculo</p>
+        </div>
+        <button onClick={() => setShowImage(true)} aria-label="Compartir tu muñeco" className="p-1.5 rounded-lg text-slate-500 hover:text-amber-400 transition shrink-0"><Share2 size={15} /></button>
       </div>
+
+      <div>
+        <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
+          {[{ k: "general", l: "General" }, { k: "relative", l: "Según tu peso" }].map((opt) => (
+            <button key={opt.k} onClick={() => onUpdateSettings?.({ muscleRankMode: opt.k })} className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${mode === opt.k ? "bg-amber-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
+          ))}
+        </div>
+        {mode === "relative" && (
+          <div className="mt-2">
+            {needsWeight ? (
+              <div className="flex gap-2">
+                <input type="number" inputMode="decimal" value={weightDraft} onChange={(e) => setWeightDraft(e.target.value)} placeholder="Tu peso en kg" className="flex-1 bg-slate-950/60 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500/50" />
+                <button onClick={saveWeight} className="px-4 py-2 rounded-xl bg-amber-500 !text-white text-xs font-bold shrink-0">Listo</button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between bg-slate-950/40 rounded-xl px-3 py-1.5">
+                <p className="text-[11px] text-slate-500">Calculando con tu peso: <span className="text-slate-300 font-bold">{bodyWeightKg}kg</span></p>
+                <button onClick={() => { setWeightDraft(String(bodyWeightKg)); onUpdateSettings?.({ bodyWeightKg: 0 }); }} className="text-[11px] text-amber-400 font-bold shrink-0">Cambiar</button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60 w-fit mx-auto">
         {[{ k: "front", l: "De frente" }, { k: "back", l: "De espalda" }].map((opt) => (
           <button key={opt.k} onClick={() => { setView(opt.k); setSelected(null); }} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${view === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
@@ -3849,17 +4126,23 @@ function MuscleRankView({ logs }) {
         <div className="bg-slate-950/50 border border-slate-800/60 rounded-xl p-3.5 bounce-in">
           <div className="flex items-center justify-between mb-1.5 gap-2">
             <p className="text-sm font-bold text-white">{selInfo.label}</p>
-            <span className="text-xs font-black px-2.5 py-1 rounded-lg shrink-0" style={{ backgroundColor: selInfo.color + "30", color: selInfo.color }}>{selInfo.tier} {selInfo.sub}</span>
+            <span className="flex items-center gap-1.5 text-xs font-black px-2 py-1 rounded-lg shrink-0" style={{ backgroundColor: selInfo.color + "22", color: selInfo.color }}>
+              <RankBadgeIcon sub={selInfo.sub} color={selInfo.color} size={22} />
+              {selInfo.tier}{selInfo.sub ? ` ${selInfo.sub}` : ""}
+            </span>
           </div>
           {selInfo.hasData ? (
             <>
-              <p className="text-[11px] text-slate-500">Mejor marca: <span className="text-slate-300 font-bold">{selInfo.bestKg}kg</span>{selInfo.bestExerciseName ? <> en {selInfo.bestExerciseName}</> : null}</p>
+              <p className="text-[11px] text-slate-500">
+                Mejor marca: <span className="text-slate-300 font-bold">{selInfo.bestReps}×{selInfo.bestKg}kg</span>{selInfo.bestExerciseName ? <> en {selInfo.bestExerciseName}</> : null} <span className="text-slate-600">(1RM est. {selInfo.best1RM}kg)</span>
+              </p>
+              <p className="text-[10px] font-bold mt-1" style={{ color: selInfo.color }}>{selInfo.zone} para tu grupo en este músculo</p>
               {selInfo.nextThreshold ? (
                 <>
                   <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden mt-2">
-                    <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(100, Math.max(4, ((selInfo.bestKg - selInfo.threshold) / (selInfo.nextThreshold - selInfo.threshold)) * 100))}%`, backgroundColor: selInfo.color }} />
+                    <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(100, Math.max(4, ((selInfo.best1RM - selInfo.threshold) / (selInfo.nextThreshold - selInfo.threshold)) * 100))}%`, backgroundColor: selInfo.color }} />
                   </div>
-                  <p className="text-[10px] text-slate-600 mt-1">Te faltan {Math.max(0, Math.round(selInfo.nextThreshold - selInfo.bestKg))}kg para el próximo rango</p>
+                  <p className="text-[10px] text-slate-600 mt-1">Te faltan {Math.max(0, Math.round(selInfo.nextThreshold - selInfo.best1RM))}kg de 1RM estimado para el próximo rango</p>
                 </>
               ) : <p className="text-[10px] text-amber-400 mt-1.5 font-bold">¡Rango máximo! 🏆</p>}
             </>
@@ -3868,17 +4151,34 @@ function MuscleRankView({ logs }) {
       ) : (
         <p className="text-center text-[11px] text-slate-600">Tocá un músculo para ver tu rango y tu mejor marca.</p>
       )}
-      <div className="flex flex-wrap gap-2 justify-center pt-1">
+      <div className="flex flex-wrap gap-2.5 justify-center pt-1">
         {["Bronce", "Plata", "Oro", "Platino", "Esmeralda", "Diamante", "Maestro"].map((t) => {
-          const rep = RANK_TIERS.find((r) => r.tier === t);
-          return <span key={t} className="flex items-center gap-1 text-[9px] text-slate-500"><span className="w-2.5 h-2.5 rounded-full inline-block shrink-0" style={{ backgroundColor: rep.color }} />{t}</span>;
+          const rep = RANK_TIERS.find((r) => r.tier === t && r.sub === "II") || RANK_TIERS.find((r) => r.tier === t);
+          return (
+            <span key={t} className="flex items-center gap-1 text-[9px] text-slate-500">
+              <RankBadgeIcon sub="" color={rep.color} size={16} />
+              {t}
+            </span>
+          );
         })}
       </div>
+      <p className="text-[9px] text-slate-700 text-center -mt-1">Bronce/Plata: por debajo del promedio · Oro: promedio · Platino/Esmeralda: por encima del promedio · Diamante/Maestro: elite. Calculado con tu 1RM estimado (Epley) y estándares de fuerza reales, no sólo el peso a secas.</p>
+
+      {showImage && (
+        <ShareImageModal
+          title="Compartí tu muñeco"
+          fileNamePrefix="mi-rango-muscular"
+          shareTitle="Mi Rutina — Rango muscular"
+          shareText="Mirá mis rangos por músculo 💪"
+          draw={(ctx, W, H) => drawMuscleRankShareCard(ctx, W, H, { ranks, modeLabel, accent: "#F59E0B" })}
+          onClose={() => setShowImage(false)}
+        />
+      )}
     </div>
   );
 }
 
-function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_SETTINGS, onResetAll, onDeleteDay }) {
+function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_SETTINGS, onResetAll, onDeleteDay, onUpdateSettings }) {
   const allExercises = useMemo(() => DAY_ORDER.flatMap((dk) => ROUTINE[dk].exercises.map((e) => ({ id: e.id, name: e.name, day: ROUTINE[dk].label, color: ROUTINE[dk].color, sets: e.sets.length, dayKey: dk }))), []);
 
   const stats = useMemo(() => {
@@ -4023,7 +4323,7 @@ function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_
           </div>
         )}
 
-        {activeSection === "rank" && <MuscleRankView logs={logs} />}
+        {activeSection === "rank" && <MuscleRankView logs={logs} settings={settings} onUpdateSettings={onUpdateSettings} />}
 
         {activeSection === "muscle" && (
           <div className="relative overflow-hidden rounded-2xl border border-purple-500/20 bg-slate-900/50 backdrop-blur-sm shadow-md shadow-black/20 p-4 space-y-3">
@@ -5596,6 +5896,10 @@ export default function App() {
   };
   const handleDelete = () => { const np = { ...profiles }; delete np[activeProfile]; setProfiles(np); saveProfiles(np); saveActive(null); setActiveProfile(null); setJustLoggedOut(true); setShowHelp(false); setHelpStartTab(null); };
   const handleUpdateProfile = (updates) => { const np = { ...profiles, [activeProfile]: { ...profiles[activeProfile], ...updates } }; setProfiles(np); saveProfiles(np); };
+  // Helper genérico para parchear cualquier campo de settings sin pisar el
+  // resto — lo usa, por ejemplo, el selector "General" / "Según tu peso"
+  // y el campo de peso corporal en Progreso → Rango.
+  const handleUpdateSettings = (patch) => handleUpdateProfile({ settings: { ...getProfileSettings(profile), ...patch } });
   const handleSetCycleStart = (d) => { setCycleStartState(d); saveCycleStart(d); };
 
   // Activa una rutina (preestablecida recién clonada, recién creada, o una
@@ -5771,7 +6075,7 @@ export default function App() {
           <div key={tab} className="tab-fade-in">
             {tab === "rutinas" && <RoutinesView profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleArchiveRoutine} onRestore={handleRestoreRoutine} />}
             {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} />}
-            {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} />}
+            {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} />}
             {tab === "descarga" && <DeloadView logs={logs} settings={getProfileSettings(profile)} />}
             {tab === "perfil" && <ProfileView profileName={activeProfile} profiles={profiles} logs={logs} onSignOut={handleSignOut} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} />}
           </div>
