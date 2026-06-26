@@ -64,9 +64,13 @@ function muteHexColor(hex, towardsGray = 0.45) {
 }
 
 const MUSCLE_GROUPS = [
-  { key: "pecho", label: "Pecho", color: "#14B8A6" },
-  { key: "espalda", label: "Espalda", color: "#3B82F6" },
-  { key: "hombros", label: "Hombros", color: "#A855F7" },
+  { key: "pectoral_superior", label: "Pectoral superior", color: "#14B8A6" },
+  { key: "pectoral_medio", label: "Pectoral medio/inferior", color: "#0D9488" },
+  { key: "dorsales", label: "Dorsales", color: "#3B82F6" },
+  { key: "trapecio", label: "Trapecio", color: "#1D4ED8" },
+  { key: "deltoide_anterior", label: "Deltoide anterior", color: "#A855F7" },
+  { key: "deltoide_lateral", label: "Deltoide lateral", color: "#9333EA" },
+  { key: "deltoide_posterior", label: "Deltoide posterior", color: "#7E22CE" },
   { key: "biceps", label: "Bíceps", color: "#F59E0B" },
   { key: "triceps", label: "Tríceps", color: "#F97316" },
   { key: "antebrazos", label: "Antebrazos", color: "#84CC16" },
@@ -83,43 +87,43 @@ MUSCLE_GROUPS.forEach((g) => { MUSCLE_GROUP_BY_KEY[g.key] = g; });
 // crear una rutina; "muscle" es el texto específico que se ve en la tarjeta.
 const EXERCISE_LIBRARY = [
   // Pecho
-  { id: "press_banca", name: "Press Banca", muscle: "Pectoral", group: "pecho", nota: "Hacé fuerza con las piernas y mantené los omóplatos retraídos.", videoQuery: "press banca técnica correcta" },
-  { id: "press_banca_smith", name: "Press Banca Smith", muscle: "Pectoral", group: "pecho", nota: "El riel fija el recorrido, ideal para enfocarte en el músculo sin estabilizar la barra.", videoQuery: "press banca smith técnica" },
-  { id: "press_inclinado_smith", name: "Press Inclinado Smith", muscle: "Pectoral sup.", group: "pecho", nota: "Codos bastante pegados, para enfocar la parte superior del pecho.", videoQuery: "press inclinado smith técnica" },
-  { id: "press_inclinado_mancuernas", name: "Press Inclinado con Mancuernas", muscle: "Pectoral sup.", group: "pecho", nota: "Mayor rango que con barra, cuidá no hiperextender el hombro abajo.", videoQuery: "press inclinado mancuernas técnica" },
-  { id: "press_plano_mancuernas", name: "Press Plano con Mancuernas", muscle: "Pectoral", group: "pecho", nota: "Buen complemento del press banca, permite mayor estiramiento.", videoQuery: "press plano mancuernas técnica" },
-  { id: "press_declinado_barra", name: "Press Declinado con Barra", muscle: "Pectoral inf.", group: "pecho", nota: "Enfoca la parte baja del pectoral, asegurá bien los pies.", videoQuery: "press declinado barra técnica" },
-  { id: "press_pecho_maquina", name: "Press de Pecho en Máquina", muscle: "Pectoral", group: "pecho", nota: "Buena opción para sumar volumen sin fatigar tanto los estabilizadores.", videoQuery: "press de pecho en máquina técnica chest press machine" },
-  { id: "cruce_poleas", name: "Cruce de Poleas", muscle: "Pectoral", group: "pecho", nota: "Énfasis en el estiramiento, no uses demasiado peso.", videoQuery: "cruce de poleas técnica pectoral" },
-  { id: "aperturas_mancuerna", name: "Aperturas con Mancuernas", muscle: "Pectoral", group: "pecho", nota: "Codos siempre un poco flexionados, no los traves rectos.", videoQuery: "aperturas con mancuernas técnica dumbbell flyes" },
-  { id: "pec_deck_pectoral", name: "Pec Deck", muscle: "Pectoral", group: "pecho", nota: "Movimiento controlado, juntá bien al frente sin golpear las almohadillas.", videoQuery: "pec deck máquina técnica pectoral" },
-  { id: "press_cerrado", name: "Press Banca Agarre Cerrado", muscle: "Pectoral / Tríceps", group: "pecho", nota: "Manos a la altura de los hombros, buen híbrido con tríceps.", videoQuery: "press banca agarre cerrado técnica" },
-  { id: "flexiones", name: "Flexiones de Brazos", muscle: "Pectoral", group: "pecho", nota: "Con tu propio peso corporal, útil para activar antes de entrenar.", videoQuery: "flexiones de brazos técnica correcta" },
+  { id: "press_banca", name: "Press Banca", muscle: "Pectoral", group: "pectoral_medio", nota: "Hacé fuerza con las piernas y mantené los omóplatos retraídos.", videoQuery: "press banca técnica correcta" },
+  { id: "press_banca_smith", name: "Press Banca Smith", muscle: "Pectoral", group: "pectoral_medio", nota: "El riel fija el recorrido, ideal para enfocarte en el músculo sin estabilizar la barra.", videoQuery: "press banca smith técnica" },
+  { id: "press_inclinado_smith", name: "Press Inclinado Smith", muscle: "Pectoral sup.", group: "pectoral_superior", nota: "Codos bastante pegados, para enfocar la parte superior del pecho.", videoQuery: "press inclinado smith técnica" },
+  { id: "press_inclinado_mancuernas", name: "Press Inclinado con Mancuernas", muscle: "Pectoral sup.", group: "pectoral_superior", loadFactor: 2, nota: "Mayor rango que con barra, cuidá no hiperextender el hombro abajo.", videoQuery: "press inclinado mancuernas técnica" },
+  { id: "press_plano_mancuernas", name: "Press Plano con Mancuernas", muscle: "Pectoral", group: "pectoral_medio", loadFactor: 2, nota: "Buen complemento del press banca, permite mayor estiramiento.", videoQuery: "press plano mancuernas técnica" },
+  { id: "press_declinado_barra", name: "Press Declinado con Barra", muscle: "Pectoral inf.", group: "pectoral_medio", nota: "Enfoca la parte baja del pectoral, asegurá bien los pies.", videoQuery: "press declinado barra técnica" },
+  { id: "press_pecho_maquina", name: "Press de Pecho en Máquina", muscle: "Pectoral", group: "pectoral_medio", nota: "Buena opción para sumar volumen sin fatigar tanto los estabilizadores.", videoQuery: "press de pecho en máquina técnica chest press machine" },
+  { id: "cruce_poleas", name: "Cruce de Poleas", muscle: "Pectoral", group: "pectoral_medio", nota: "Énfasis en el estiramiento, no uses demasiado peso.", videoQuery: "cruce de poleas técnica pectoral" },
+  { id: "aperturas_mancuerna", name: "Aperturas con Mancuernas", muscle: "Pectoral", group: "pectoral_medio", loadFactor: 2, nota: "Codos siempre un poco flexionados, no los traves rectos.", videoQuery: "aperturas con mancuernas técnica dumbbell flyes" },
+  { id: "pec_deck_pectoral", name: "Pec Deck", muscle: "Pectoral", group: "pectoral_medio", nota: "Movimiento controlado, juntá bien al frente sin golpear las almohadillas.", videoQuery: "pec deck máquina técnica pectoral" },
+  { id: "press_cerrado", name: "Press Banca Agarre Cerrado", muscle: "Pectoral / Tríceps", group: "pectoral_medio", nota: "Manos a la altura de los hombros, buen híbrido con tríceps.", videoQuery: "press banca agarre cerrado técnica" },
+  { id: "flexiones", name: "Flexiones de Brazos", muscle: "Pectoral", group: "pectoral_medio", rankExcluded: true, nota: "Con tu propio peso corporal, útil para activar antes de entrenar.", videoQuery: "flexiones de brazos técnica correcta" },
   // Espalda
-  { id: "remo_ancho_maquina", name: "Remo Ancho Máquina", muscle: "Dorsal", group: "espalda", nota: "No levantes los hombros, llevá el movimiento con la espalda.", videoQuery: "remo ancho máquina técnica espalda" },
-  { id: "dorsalera", name: "Dorsalera Agarre Ancho", muscle: "Dorsal", group: "espalda", nota: "No descoloques los hombros, pulgar en la marca.", videoQuery: "dorsalera lat pulldown agarre ancho técnica" },
-  { id: "dorsalera_agarre_cerrado", name: "Dorsalera Agarre Cerrado", muscle: "Dorsal", group: "espalda", nota: "Agarre supino o en V, más activación de la parte baja del dorsal.", videoQuery: "jalón agarre cerrado técnica dorsal" },
-  { id: "remo_barra", name: "Remo con Barra", muscle: "Dorsal medio", group: "espalda", nota: "Espalda neutra, torso a unos 45°, no uses impulso de la zona lumbar.", videoQuery: "remo con barra técnica bent over row" },
-  { id: "remo_unilateral", name: "Remo Unilateral", muscle: "Dorsal / oblicuos", group: "espalda", nota: "Contraé los oblicuos, codo lo más abajo posible.", videoQuery: "remo unilateral mancuerna técnica espalda" },
-  { id: "remo_maquina_sentado", name: "Remo Sentado en Máquina/Polea", muscle: "Dorsal medio", group: "espalda", nota: "Pecho contra el apoyo, llevá los codos atrás sin balancear el torso.", videoQuery: "remo sentado polea técnica seated cable row" },
-  { id: "remo_pecho_apoyado", name: "Remo con Pecho Apoyado", muscle: "Dorsal medio", group: "espalda", nota: "El banco inclinado quita la zona lumbar de la ecuación, foco puro en espalda.", videoQuery: "remo pecho apoyado técnica chest supported row" },
-  { id: "pull_over", name: "Pull Over", muscle: "Dorsal / serrato", group: "espalda", nota: "Codos siempre un poco flexionados.", videoQuery: "pull over espalda técnica mancuerna" },
-  { id: "peso_muerto", name: "Peso Muerto", muscle: "Espalda baja / Femoral", group: "espalda", nota: "Pilar de la cadena posterior, mantené la espalda neutra todo el recorrido.", videoQuery: "peso muerto técnica correcta" },
-  { id: "remo_t", name: "Remo en T", muscle: "Dorsal medio", group: "espalda", nota: "Pecho apoyado si tenés banco, foco en juntar los omóplatos.", videoQuery: "remo en T técnica espalda" },
-  { id: "hiperextensiones", name: "Hiperextensiones", muscle: "Espalda baja", group: "espalda", nota: "No hiperextiendas de más arriba, contraé glúteo al subir.", videoQuery: "hiperextensiones técnica espalda baja" },
-  { id: "dominadas", name: "Dominadas", muscle: "Dorsal", group: "espalda", nota: "Si todavía no podés hacer muchas, usá banda de asistencia.", videoQuery: "dominadas técnica correcta" },
+  { id: "remo_ancho_maquina", name: "Remo Ancho Máquina", muscle: "Dorsal", group: "dorsales", nota: "No levantes los hombros, llevá el movimiento con la espalda.", videoQuery: "remo ancho máquina técnica espalda" },
+  { id: "dorsalera", name: "Dorsalera Agarre Ancho", muscle: "Dorsal", group: "dorsales", nota: "No descoloques los hombros, pulgar en la marca.", videoQuery: "dorsalera lat pulldown agarre ancho técnica" },
+  { id: "dorsalera_agarre_cerrado", name: "Dorsalera Agarre Cerrado", muscle: "Dorsal", group: "dorsales", nota: "Agarre supino o en V, más activación de la parte baja del dorsal.", videoQuery: "jalón agarre cerrado técnica dorsal" },
+  { id: "remo_barra", name: "Remo con Barra", muscle: "Dorsal medio", group: "dorsales", nota: "Espalda neutra, torso a unos 45°, no uses impulso de la zona lumbar.", videoQuery: "remo con barra técnica bent over row" },
+  { id: "remo_unilateral", name: "Remo Unilateral", muscle: "Dorsal / oblicuos", group: "dorsales", nota: "Contraé los oblicuos, codo lo más abajo posible.", videoQuery: "remo unilateral mancuerna técnica espalda" },
+  { id: "remo_maquina_sentado", name: "Remo Sentado en Máquina/Polea", muscle: "Dorsal medio", group: "dorsales", nota: "Pecho contra el apoyo, llevá los codos atrás sin balancear el torso.", videoQuery: "remo sentado polea técnica seated cable row" },
+  { id: "remo_pecho_apoyado", name: "Remo con Pecho Apoyado", muscle: "Dorsal medio", group: "dorsales", nota: "El banco inclinado quita la zona lumbar de la ecuación, foco puro en espalda.", videoQuery: "remo pecho apoyado técnica chest supported row" },
+  { id: "pull_over", name: "Pull Over", muscle: "Dorsal / serrato", group: "dorsales", nota: "Codos siempre un poco flexionados.", videoQuery: "pull over espalda técnica mancuerna" },
+  { id: "peso_muerto", name: "Peso Muerto", muscle: "Espalda baja / Femoral", group: "dorsales", nota: "Pilar de la cadena posterior, mantené la espalda neutra todo el recorrido.", videoQuery: "peso muerto técnica correcta" },
+  { id: "remo_t", name: "Remo en T", muscle: "Dorsal medio", group: "dorsales", nota: "Pecho apoyado si tenés banco, foco en juntar los omóplatos.", videoQuery: "remo en T técnica espalda" },
+  { id: "hiperextensiones", name: "Hiperextensiones", muscle: "Espalda baja", group: "dorsales", nota: "No hiperextiendas de más arriba, contraé glúteo al subir.", videoQuery: "hiperextensiones técnica espalda baja" },
+  { id: "dominadas", name: "Dominadas", muscle: "Dorsal", group: "dorsales", rankExcluded: true, nota: "Si todavía no podés hacer muchas, usá banda de asistencia.", videoQuery: "dominadas técnica correcta" },
   // Hombros
-  { id: "press_militar_smith", name: "Press Militar Smith", muscle: "Deltoides ant.", group: "hombros", nota: "Codos adelante, banco a 80-90°.", videoQuery: "press militar smith técnica hombros" },
-  { id: "press_militar_maquina", name: "Press Militar en Máquina", muscle: "Deltoides ant.", group: "hombros", nota: "Recorrido guiado, buena opción para sumar series sin estabilizar tanto.", videoQuery: "press militar máquina técnica shoulder press machine" },
-  { id: "press_militar_mancuernas", name: "Press Militar con Mancuernas", muscle: "Deltoides ant.", group: "hombros", nota: "Mayor rango y estabilidad que con barra.", videoQuery: "press militar mancuernas técnica" },
-  { id: "press_arnold", name: "Press Arnold", muscle: "Deltoides ant. / lateral", group: "hombros", nota: "La rotación de muñeca suma trabajo del deltoides lateral.", videoQuery: "press arnold técnica hombros" },
-  { id: "vuelos_laterales_mancuerna", name: "Vuelos Laterales Mancuerna", muscle: "Deltoides lateral", group: "hombros", nota: "Levantá un poco hacia adelante, no uses impulso.", videoQuery: "vuelos laterales mancuerna técnica deltoides" },
-  { id: "vuelos_laterales_maquina", name: "Vuelos Laterales Máquina", muscle: "Deltoides lateral", group: "hombros", nota: "No hagas tanta fuerza con el agarre, dejá trabajar al hombro.", videoQuery: "vuelos laterales máquina deltoides técnica" },
-  { id: "vuelos_frontales", name: "Vuelos Frontales", muscle: "Deltoides ant.", group: "hombros", nota: "No subas más arriba de los hombros, evitá el impulso lumbar.", videoQuery: "vuelos frontales técnica front raise" },
-  { id: "remo_al_cuello", name: "Remo al Cuello", muscle: "Deltoides lateral / Trapecio", group: "hombros", nota: "Codos por encima de las manos, no subas la barra más de la altura del pecho.", videoQuery: "remo al cuello técnica upright row" },
-  { id: "pec_dec_deltoides", name: "Pec Dec para Deltoides Posterior", muscle: "Deltoides post.", group: "hombros", nota: "Unilateral, movimiento controlado.", videoQuery: "pec dec deltoides posterior técnica" },
-  { id: "elevaciones_pajaro", name: "Elevaciones tipo Pájaro", muscle: "Deltoides post.", group: "hombros", nota: "Torso inclinado hacia adelante, codos con leve flexión fija.", videoQuery: "elevaciones pájaro técnica reverse fly deltoides posterior" },
-  { id: "face_pull", name: "Face Pull", muscle: "Deltoides post.", group: "hombros", nota: "Polea a la altura de los ojos.", videoQuery: "face pull técnica deltoides posterior" },
+  { id: "press_militar_smith", name: "Press Militar Smith", muscle: "Deltoides ant.", group: "deltoide_anterior", nota: "Codos adelante, banco a 80-90°.", videoQuery: "press militar smith técnica hombros" },
+  { id: "press_militar_maquina", name: "Press Militar en Máquina", muscle: "Deltoides ant.", group: "deltoide_anterior", nota: "Recorrido guiado, buena opción para sumar series sin estabilizar tanto.", videoQuery: "press militar máquina técnica shoulder press machine" },
+  { id: "press_militar_mancuernas", name: "Press Militar con Mancuernas", muscle: "Deltoides ant.", group: "deltoide_anterior", loadFactor: 2, nota: "Mayor rango y estabilidad que con barra.", videoQuery: "press militar mancuernas técnica" },
+  { id: "press_arnold", name: "Press Arnold", muscle: "Deltoides ant. / lateral", group: "deltoide_anterior", loadFactor: 2, nota: "La rotación de muñeca suma trabajo del deltoides lateral.", videoQuery: "press arnold técnica hombros" },
+  { id: "vuelos_laterales_mancuerna", name: "Vuelos Laterales Mancuerna", muscle: "Deltoides lateral", group: "deltoide_lateral", loadFactor: 2, nota: "Levantá un poco hacia adelante, no uses impulso.", videoQuery: "vuelos laterales mancuerna técnica deltoides" },
+  { id: "vuelos_laterales_maquina", name: "Vuelos Laterales Máquina", muscle: "Deltoides lateral", group: "deltoide_lateral", nota: "No hagas tanta fuerza con el agarre, dejá trabajar al hombro.", videoQuery: "vuelos laterales máquina deltoides técnica" },
+  { id: "vuelos_frontales", name: "Vuelos Frontales", muscle: "Deltoides ant.", group: "deltoide_anterior", loadFactor: 2, nota: "No subas más arriba de los hombros, evitá el impulso lumbar.", videoQuery: "vuelos frontales técnica front raise" },
+  { id: "remo_al_cuello", name: "Remo al Cuello", muscle: "Deltoides lateral / Trapecio", group: "deltoide_lateral", nota: "Codos por encima de las manos, no subas la barra más de la altura del pecho.", videoQuery: "remo al cuello técnica upright row" },
+  { id: "pec_dec_deltoides", name: "Pec Dec para Deltoides Posterior", muscle: "Deltoides post.", group: "deltoide_posterior", nota: "Unilateral, movimiento controlado.", videoQuery: "pec dec deltoides posterior técnica" },
+  { id: "elevaciones_pajaro", name: "Elevaciones tipo Pájaro", muscle: "Deltoides post.", group: "deltoide_posterior", loadFactor: 2, nota: "Torso inclinado hacia adelante, codos con leve flexión fija.", videoQuery: "elevaciones pájaro técnica reverse fly deltoides posterior" },
+  { id: "face_pull", name: "Face Pull", muscle: "Deltoides post.", group: "deltoide_posterior", nota: "Polea a la altura de los ojos.", videoQuery: "face pull técnica deltoides posterior" },
   // Bíceps
   { id: "biceps_alternado_mancuerna", name: "Bíceps Alternado Mancuerna", muscle: "Bíceps", group: "biceps", nota: "Movés un poco el húmero al final del recorrido.", videoQuery: "curl alternado mancuerna técnica bíceps" },
   { id: "biceps_martillo", name: "Bíceps Martillo", muscle: "Bíceps / braquial", group: "biceps", nota: "Alternado, agarre neutro.", videoQuery: "curl martillo bíceps técnica hammer curl" },
@@ -134,7 +138,7 @@ const EXERCISE_LIBRARY = [
   { id: "triceps_polea_cuerda", name: "Tríceps en Polea con Cuerda", muscle: "Tríceps", group: "triceps", nota: "Separá las manos al final del recorrido para más contracción.", videoQuery: "tríceps polea cuerda técnica rope pushdown" },
   { id: "triceps_frances", name: "Press Francés", muscle: "Tríceps", group: "triceps", nota: "Codos fijos, cuidado con sobrecargar el hombro.", videoQuery: "press francés técnica tríceps" },
   { id: "triceps_patada", name: "Patada de Tríceps", muscle: "Tríceps", group: "triceps", nota: "Brazo pegado al torso, extendé solo el antebrazo.", videoQuery: "patada de tríceps técnica kickback" },
-  { id: "fondos_triceps", name: "Fondos en Paralelas o Banco", muscle: "Tríceps", group: "triceps", nota: "Buen ejercicio compuesto, inclinate poco para enfocar el tríceps.", videoQuery: "fondos tríceps técnica correcta" },
+  { id: "fondos_triceps", name: "Fondos en Paralelas o Banco", muscle: "Tríceps", group: "triceps", rankExcluded: true, nota: "Buen ejercicio compuesto, inclinate poco para enfocar el tríceps.", videoQuery: "fondos tríceps técnica correcta" },
   // Cuádriceps
   { id: "jaca", name: "Hack Squat", muscle: "Cuádriceps", group: "cuadriceps", nota: "Pies a la altura de los hombros, bajá controlado.", videoQuery: "hack squat técnica cuádriceps" },
   { id: "sentadilla_smith", name: "Sentadilla en Multipower", muscle: "Cuádriceps", group: "cuadriceps", nota: "El riel fija el recorrido, buena opción para enfocarte en la pierna.", videoQuery: "sentadilla multipower smith técnica" },
@@ -160,10 +164,10 @@ const EXERCISE_LIBRARY = [
   // Core
   { id: "abdominales", name: "Abdominales", muscle: "Core", group: "core", nota: "Controlá la fase excéntrica, sin impulso.", videoQuery: "abdominales técnica correcta core" },
   { id: "abdominales_maquina", name: "Abdominales en Máquina", muscle: "Core", group: "core", nota: "Foco en doblar la zona media, no solo flexionar el cuello.", videoQuery: "abdominales máquina técnica" },
-  { id: "plancha", name: "Plancha Abdominal", muscle: "Core", group: "core", nota: "Mantené la cadera alineada con los hombros, no la dejes caer.", videoQuery: "plancha abdominal técnica correcta" },
-  { id: "plancha_lateral", name: "Plancha Lateral", muscle: "Core / oblicuos", group: "core", nota: "Cadera elevada en línea recta, no la dejes caer hacia el piso.", videoQuery: "plancha lateral técnica side plank" },
+  { id: "plancha", name: "Plancha Abdominal", muscle: "Core", group: "core", rankExcluded: true, nota: "Mantené la cadera alineada con los hombros, no la dejes caer.", videoQuery: "plancha abdominal técnica correcta" },
+  { id: "plancha_lateral", name: "Plancha Lateral", muscle: "Core / oblicuos", group: "core", rankExcluded: true, nota: "Cadera elevada en línea recta, no la dejes caer hacia el piso.", videoQuery: "plancha lateral técnica side plank" },
   { id: "giros_rusos", name: "Giros Rusos", muscle: "Core / oblicuos", group: "core", nota: "Movimiento controlado desde el torso, no solo los brazos.", videoQuery: "giros rusos técnica russian twist" },
-  { id: "rueda_abdominal", name: "Rueda Abdominal", muscle: "Core", group: "core", nota: "Empezá con poco recorrido, mantené la zona lumbar protegida.", videoQuery: "rueda abdominal técnica ab wheel" },
+  { id: "rueda_abdominal", name: "Rueda Abdominal", muscle: "Core", group: "core", rankExcluded: true, nota: "Empezá con poco recorrido, mantené la zona lumbar protegida.", videoQuery: "rueda abdominal técnica ab wheel" },
   { id: "elevacion_piernas", name: "Elevación de Piernas Colgado", muscle: "Core / abdomen bajo", group: "core", nota: "Controlá el balanceo, el foco está en el abdomen bajo.", videoQuery: "elevación de piernas colgado técnica" },
   // Pantorrillas
   { id: "elevacion_talones_parado", name: "Elevación de Talones de Pie", muscle: "Pantorrillas", group: "pantorrillas", nota: "Rango completo, hacé una pausa arriba.", videoQuery: "elevación de talones de pie técnica gemelos" },
@@ -171,51 +175,51 @@ const EXERCISE_LIBRARY = [
   { id: "elevacion_talones_prensa", name: "Elevación de Talones en Prensa", muscle: "Pantorrillas", group: "pantorrillas", nota: "Apoyá solo la punta del pie en la plataforma, rango completo.", videoQuery: "elevación de talones en prensa técnica" },
   { id: "elevacion_talones_unilateral", name: "Elevación de Talones a Una Pierna", muscle: "Pantorrillas", group: "pantorrillas", nota: "Sostenete de algo para el equilibrio, no hace falta peso extra al principio.", videoQuery: "elevación de talones a una pierna técnica" },
   // Pecho (catálogo extendido)
-  { id: "press_banca_agarre_invertido", name: "Press Banca Agarre Invertido", muscle: "Pectoral sup.", group: "pecho", nota: "Agarre supino en la barra, mayor énfasis en la porción clavicular del pecho.", videoQuery: "press banca agarre invertido técnica" },
-  { id: "press_banca_mancuernas_neutro", name: "Press Banca con Mancuernas Agarre Neutro", muscle: "Pectoral", group: "pecho", nota: "Palmas enfrentadas, reduce el estrés sobre el hombro respecto al agarre pronado.", videoQuery: "press banca mancuernas agarre neutro técnica" },
-  { id: "press_inclinado_barra", name: "Press Inclinado con Barra", muscle: "Pectoral sup.", group: "pecho", nota: "Banco entre 30° y 45°, no lo subas más o vas a sumar más hombro que pecho.", videoQuery: "press inclinado con barra técnica" },
-  { id: "press_inclinado_maquina", name: "Press Inclinado en Máquina", muscle: "Pectoral sup.", group: "pecho", nota: "Trayectoria fija, buena opción para sumar volumen sin estabilizar tanto.", videoQuery: "press inclinado en máquina técnica" },
-  { id: "press_declinado_mancuernas", name: "Press Declinado con Mancuernas", muscle: "Pectoral inf.", group: "pecho", nota: "Asegurá bien los pies, bajá controlado hacia la parte baja del pecho.", videoQuery: "press declinado con mancuernas técnica" },
-  { id: "press_declinado_maquina", name: "Press Declinado en Máquina", muscle: "Pectoral inf.", group: "pecho", nota: "Recorrido guiado, foco en la parte baja del pectoral.", videoQuery: "press declinado en máquina técnica" },
-  { id: "aperturas_banco_inclinado", name: "Aperturas con Mancuernas en Banco Inclinado", muscle: "Pectoral sup.", group: "pecho", nota: "Mismo cuidado que las aperturas planas, pero con énfasis en la parte alta.", videoQuery: "aperturas banco inclinado técnica pectoral" },
-  { id: "cruce_poleas_alto_bajo", name: "Cruce de Poleas Alto a Bajo", muscle: "Pectoral inf.", group: "pecho", nota: "Poleas arriba, tirá hacia abajo y adelante para sumar la parte baja del pecho.", videoQuery: "cruce de poleas alto a bajo técnica" },
-  { id: "cruce_poleas_bajo_alto", name: "Cruce de Poleas Bajo a Alto", muscle: "Pectoral sup.", group: "pecho", nota: "Poleas abajo, tirá hacia arriba y adelante para sumar la parte alta del pecho.", videoQuery: "cruce de poleas bajo a alto técnica" },
-  { id: "cruce_poleas_una_mano", name: "Cruce de Poleas a Una Mano", muscle: "Pectoral", group: "pecho", nota: "Trabajo unilateral, buscá la máxima contracción al final del recorrido.", videoQuery: "cruce de poleas a una mano técnica" },
-  { id: "press_landmine", name: "Press Landmine", muscle: "Pectoral", group: "pecho", nota: "Barra apoyada en un extremo, empujá en diagonal hacia arriba y adelante.", videoQuery: "press landmine técnica pectoral" },
-  { id: "svend_press", name: "Svend Press", muscle: "Pectoral", group: "pecho", nota: "Apretá un disco entre las palmas y empujá hacia adelante, sin soltar la presión.", videoQuery: "svend press técnica pectoral" },
-  { id: "flexiones_declinadas", name: "Flexiones Declinadas", muscle: "Pectoral sup.", group: "pecho", nota: "Pies elevados sobre un banco, mayor énfasis en la parte alta del pecho.", videoQuery: "flexiones declinadas técnica" },
-  { id: "flexiones_inclinadas", name: "Flexiones Inclinadas", muscle: "Pectoral inf.", group: "pecho", nota: "Manos elevadas sobre un banco o step, más enfocadas en la parte baja del pecho.", videoQuery: "flexiones inclinadas técnica" },
-  { id: "flexiones_deficit", name: "Flexiones con Déficit", muscle: "Pectoral", group: "pecho", nota: "Manos sobre discos o mancuernas para sumar rango de estiramiento.", videoQuery: "flexiones con déficit técnica" },
-  { id: "flexiones_pliometricas", name: "Flexiones Pliométricas", muscle: "Pectoral", group: "pecho", nota: "Empujá con fuerza para despegar las manos del piso, controlá bien la caída.", videoQuery: "flexiones pliométricas técnica" },
-  { id: "fondos_anillas", name: "Fondos en Anillas", muscle: "Pectoral", group: "pecho", nota: "Mayor inestabilidad que en paralelas fijas, controlá bien la apertura final.", videoQuery: "fondos en anillas técnica" },
+  { id: "press_banca_agarre_invertido", name: "Press Banca Agarre Invertido", muscle: "Pectoral sup.", group: "pectoral_superior", nota: "Agarre supino en la barra, mayor énfasis en la porción clavicular del pecho.", videoQuery: "press banca agarre invertido técnica" },
+  { id: "press_banca_mancuernas_neutro", name: "Press Banca con Mancuernas Agarre Neutro", muscle: "Pectoral", group: "pectoral_medio", loadFactor: 2, nota: "Palmas enfrentadas, reduce el estrés sobre el hombro respecto al agarre pronado.", videoQuery: "press banca mancuernas agarre neutro técnica" },
+  { id: "press_inclinado_barra", name: "Press Inclinado con Barra", muscle: "Pectoral sup.", group: "pectoral_superior", nota: "Banco entre 30° y 45°, no lo subas más o vas a sumar más hombro que pecho.", videoQuery: "press inclinado con barra técnica" },
+  { id: "press_inclinado_maquina", name: "Press Inclinado en Máquina", muscle: "Pectoral sup.", group: "pectoral_superior", nota: "Trayectoria fija, buena opción para sumar volumen sin estabilizar tanto.", videoQuery: "press inclinado en máquina técnica" },
+  { id: "press_declinado_mancuernas", name: "Press Declinado con Mancuernas", muscle: "Pectoral inf.", group: "pectoral_medio", loadFactor: 2, nota: "Asegurá bien los pies, bajá controlado hacia la parte baja del pecho.", videoQuery: "press declinado con mancuernas técnica" },
+  { id: "press_declinado_maquina", name: "Press Declinado en Máquina", muscle: "Pectoral inf.", group: "pectoral_medio", nota: "Recorrido guiado, foco en la parte baja del pectoral.", videoQuery: "press declinado en máquina técnica" },
+  { id: "aperturas_banco_inclinado", name: "Aperturas con Mancuernas en Banco Inclinado", muscle: "Pectoral sup.", group: "pectoral_superior", loadFactor: 2, nota: "Mismo cuidado que las aperturas planas, pero con énfasis en la parte alta.", videoQuery: "aperturas banco inclinado técnica pectoral" },
+  { id: "cruce_poleas_alto_bajo", name: "Cruce de Poleas Alto a Bajo", muscle: "Pectoral inf.", group: "pectoral_medio", nota: "Poleas arriba, tirá hacia abajo y adelante para sumar la parte baja del pecho.", videoQuery: "cruce de poleas alto a bajo técnica" },
+  { id: "cruce_poleas_bajo_alto", name: "Cruce de Poleas Bajo a Alto", muscle: "Pectoral sup.", group: "pectoral_superior", nota: "Poleas abajo, tirá hacia arriba y adelante para sumar la parte alta del pecho.", videoQuery: "cruce de poleas bajo a alto técnica" },
+  { id: "cruce_poleas_una_mano", name: "Cruce de Poleas a Una Mano", muscle: "Pectoral", group: "pectoral_medio", nota: "Trabajo unilateral, buscá la máxima contracción al final del recorrido.", videoQuery: "cruce de poleas a una mano técnica" },
+  { id: "press_landmine", name: "Press Landmine", muscle: "Pectoral", group: "pectoral_medio", nota: "Barra apoyada en un extremo, empujá en diagonal hacia arriba y adelante.", videoQuery: "press landmine técnica pectoral" },
+  { id: "svend_press", name: "Svend Press", muscle: "Pectoral", group: "pectoral_medio", nota: "Apretá un disco entre las palmas y empujá hacia adelante, sin soltar la presión.", videoQuery: "svend press técnica pectoral" },
+  { id: "flexiones_declinadas", name: "Flexiones Declinadas", muscle: "Pectoral sup.", group: "pectoral_superior", rankExcluded: true, nota: "Pies elevados sobre un banco, mayor énfasis en la parte alta del pecho.", videoQuery: "flexiones declinadas técnica" },
+  { id: "flexiones_inclinadas", name: "Flexiones Inclinadas", muscle: "Pectoral inf.", group: "pectoral_medio", rankExcluded: true, nota: "Manos elevadas sobre un banco o step, más enfocadas en la parte baja del pecho.", videoQuery: "flexiones inclinadas técnica" },
+  { id: "flexiones_deficit", name: "Flexiones con Déficit", muscle: "Pectoral", group: "pectoral_medio", rankExcluded: true, nota: "Manos sobre discos o mancuernas para sumar rango de estiramiento.", videoQuery: "flexiones con déficit técnica" },
+  { id: "flexiones_pliometricas", name: "Flexiones Pliométricas", muscle: "Pectoral", group: "pectoral_medio", rankExcluded: true, nota: "Empujá con fuerza para despegar las manos del piso, controlá bien la caída.", videoQuery: "flexiones pliométricas técnica" },
+  { id: "fondos_anillas", name: "Fondos en Anillas", muscle: "Pectoral", group: "pectoral_medio", rankExcluded: true, nota: "Mayor inestabilidad que en paralelas fijas, controlá bien la apertura final.", videoQuery: "fondos en anillas técnica" },
   // Espalda (catálogo extendido)
-  { id: "dominadas_supinas", name: "Dominadas Supinas", muscle: "Dorsal / Bíceps", group: "espalda", nota: "Agarre invertido (palmas hacia vos), suma más trabajo de bíceps que la prona.", videoQuery: "dominadas supinas chin up técnica" },
-  { id: "dominadas_agarre_neutro", name: "Dominadas Agarre Neutro", muscle: "Dorsal", group: "espalda", nota: "Palmas enfrentadas, suele ser más amigable para el hombro.", videoQuery: "dominadas agarre neutro técnica" },
-  { id: "dominadas_lastre", name: "Dominadas con Lastre", muscle: "Dorsal", group: "espalda", nota: "Sumá peso con un cinturón sólo cuando domines bien la dominada de tu propio peso.", videoQuery: "dominadas con lastre técnica" },
-  { id: "dominadas_asistidas", name: "Dominadas Asistidas en Máquina", muscle: "Dorsal", group: "espalda", nota: "Buena opción para sumar volumen de dominadas con control de la carga.", videoQuery: "dominadas asistidas máquina técnica" },
-  { id: "jalon_agarre_neutro", name: "Jalón al Pecho Agarre Neutro", muscle: "Dorsal", group: "espalda", nota: "Barra en V o agarres neutros, buen estiramiento al final del recorrido.", videoQuery: "jalón al pecho agarre neutro técnica" },
-  { id: "jalon_unilateral", name: "Jalón Unilateral en Polea Alta", muscle: "Dorsal", group: "espalda", nota: "Trabajo unilateral, mantené el torso estable sin rotar de más.", videoQuery: "jalón unilateral polea alta técnica" },
-  { id: "remo_barra_supino", name: "Remo con Barra Agarre Supino", muscle: "Dorsal", group: "espalda", nota: "Agarre supino, mayor énfasis en la parte baja del dorsal.", videoQuery: "remo con barra agarre supino técnica" },
-  { id: "remo_t_libre", name: "Remo en T Libre", muscle: "Dorsal medio", group: "espalda", nota: "Sin apoyo de pecho, exige más estabilidad del core que la versión apoyada.", videoQuery: "remo en T libre técnica" },
-  { id: "remo_polea_agarre_ancho", name: "Remo en Polea Baja Agarre Ancho", muscle: "Deltoides post. / Romboides", group: "espalda", nota: "Barra recta con agarre ancho, más foco en deltoides posterior y romboides.", videoQuery: "remo polea baja agarre ancho técnica" },
-  { id: "remo_meadows", name: "Remo Meadows", muscle: "Dorsal", group: "espalda", nota: "Remo unilateral con barra apoyada en un soporte, buen estiramiento inicial.", videoQuery: "remo meadows técnica espalda" },
-  { id: "pullover_polea_alta", name: "Pullover en Polea Alta", muscle: "Dorsal", group: "espalda", nota: "Brazos extendidos, bajá la barra en arco sin flexionar los codos.", videoQuery: "pullover polea alta técnica dorsal" },
-  { id: "encogimientos_barra", name: "Encogimientos de Hombros con Barra", muscle: "Trapecio", group: "espalda", nota: "Subí los hombros derecho hacia arriba, no los gires en círculo.", videoQuery: "encogimientos de hombros con barra técnica shrugs" },
-  { id: "encogimientos_mancuernas", name: "Encogimientos de Hombros con Mancuernas", muscle: "Trapecio", group: "espalda", nota: "Línea de tracción más natural que con barra, pausa arriba.", videoQuery: "encogimientos de hombros con mancuernas técnica" },
-  { id: "encogimientos_smith", name: "Encogimientos en Máquina Smith", muscle: "Trapecio", group: "espalda", nota: "Trayectoria vertical fija, te deja enfocarte en apretar el trapecio.", videoQuery: "encogimientos máquina smith técnica trapecio" },
-  { id: "encogimientos_polea_baja", name: "Encogimientos en Polea Baja", muscle: "Trapecio", group: "espalda", nota: "Tensión constante durante todo el recorrido, no uses impulso de piernas.", videoQuery: "encogimientos polea baja técnica trapecio" },
-  { id: "paseo_granjero", name: "Paseo del Granjero", muscle: "Trapecio / Agarre", group: "espalda", nota: "Caminá con el torso erguido, sin dejar caer los hombros hacia adelante.", videoQuery: "paseo del granjero técnica farmers walk" },
-  { id: "buenos_dias", name: "Buenos Días con Barra", muscle: "Espalda baja / Femoral", group: "espalda", nota: "Empezá con poco peso, la espalda se mantiene siempre neutra al flexionar la cadera.", videoQuery: "buenos días con barra técnica good morning" },
-  { id: "supermans", name: "Supermans", muscle: "Espalda baja", group: "espalda", nota: "Tumbado boca abajo, levantá brazos y piernas a la vez de forma controlada.", videoQuery: "supermans técnica espalda baja" },
+  { id: "dominadas_supinas", name: "Dominadas Supinas", muscle: "Dorsal / Bíceps", group: "dorsales", rankExcluded: true, nota: "Agarre invertido (palmas hacia vos), suma más trabajo de bíceps que la prona.", videoQuery: "dominadas supinas chin up técnica" },
+  { id: "dominadas_agarre_neutro", name: "Dominadas Agarre Neutro", muscle: "Dorsal", group: "dorsales", rankExcluded: true, nota: "Palmas enfrentadas, suele ser más amigable para el hombro.", videoQuery: "dominadas agarre neutro técnica" },
+  { id: "dominadas_lastre", name: "Dominadas con Lastre", muscle: "Dorsal", group: "dorsales", rankExcluded: true, nota: "Sumá peso con un cinturón sólo cuando domines bien la dominada de tu propio peso.", videoQuery: "dominadas con lastre técnica" },
+  { id: "dominadas_asistidas", name: "Dominadas Asistidas en Máquina", muscle: "Dorsal", group: "dorsales", rankExcluded: true, nota: "Buena opción para sumar volumen de dominadas con control de la carga.", videoQuery: "dominadas asistidas máquina técnica" },
+  { id: "jalon_agarre_neutro", name: "Jalón al Pecho Agarre Neutro", muscle: "Dorsal", group: "dorsales", nota: "Barra en V o agarres neutros, buen estiramiento al final del recorrido.", videoQuery: "jalón al pecho agarre neutro técnica" },
+  { id: "jalon_unilateral", name: "Jalón Unilateral en Polea Alta", muscle: "Dorsal", group: "dorsales", nota: "Trabajo unilateral, mantené el torso estable sin rotar de más.", videoQuery: "jalón unilateral polea alta técnica" },
+  { id: "remo_barra_supino", name: "Remo con Barra Agarre Supino", muscle: "Dorsal", group: "dorsales", nota: "Agarre supino, mayor énfasis en la parte baja del dorsal.", videoQuery: "remo con barra agarre supino técnica" },
+  { id: "remo_t_libre", name: "Remo en T Libre", muscle: "Dorsal medio", group: "dorsales", nota: "Sin apoyo de pecho, exige más estabilidad del core que la versión apoyada.", videoQuery: "remo en T libre técnica" },
+  { id: "remo_polea_agarre_ancho", name: "Remo en Polea Baja Agarre Ancho", muscle: "Deltoides post. / Romboides", group: "deltoide_posterior", nota: "Barra recta con agarre ancho, más foco en deltoides posterior y romboides.", videoQuery: "remo polea baja agarre ancho técnica" },
+  { id: "remo_meadows", name: "Remo Meadows", muscle: "Dorsal", group: "dorsales", nota: "Remo unilateral con barra apoyada en un soporte, buen estiramiento inicial.", videoQuery: "remo meadows técnica espalda" },
+  { id: "pullover_polea_alta", name: "Pullover en Polea Alta", muscle: "Dorsal", group: "dorsales", nota: "Brazos extendidos, bajá la barra en arco sin flexionar los codos.", videoQuery: "pullover polea alta técnica dorsal" },
+  { id: "encogimientos_barra", name: "Encogimientos de Hombros con Barra", muscle: "Trapecio", group: "trapecio", nota: "Subí los hombros derecho hacia arriba, no los gires en círculo.", videoQuery: "encogimientos de hombros con barra técnica shrugs" },
+  { id: "encogimientos_mancuernas", name: "Encogimientos de Hombros con Mancuernas", muscle: "Trapecio", group: "trapecio", nota: "Línea de tracción más natural que con barra, pausa arriba.", videoQuery: "encogimientos de hombros con mancuernas técnica" },
+  { id: "encogimientos_smith", name: "Encogimientos en Máquina Smith", muscle: "Trapecio", group: "trapecio", nota: "Trayectoria vertical fija, te deja enfocarte en apretar el trapecio.", videoQuery: "encogimientos máquina smith técnica trapecio" },
+  { id: "encogimientos_polea_baja", name: "Encogimientos en Polea Baja", muscle: "Trapecio", group: "trapecio", nota: "Tensión constante durante todo el recorrido, no uses impulso de piernas.", videoQuery: "encogimientos polea baja técnica trapecio" },
+  { id: "paseo_granjero", name: "Paseo del Granjero", muscle: "Trapecio / Agarre", group: "trapecio", nota: "Caminá con el torso erguido, sin dejar caer los hombros hacia adelante.", videoQuery: "paseo del granjero técnica farmers walk" },
+  { id: "buenos_dias", name: "Buenos Días con Barra", muscle: "Espalda baja / Femoral", group: "dorsales", nota: "Empezá con poco peso, la espalda se mantiene siempre neutra al flexionar la cadera.", videoQuery: "buenos días con barra técnica good morning" },
+  { id: "supermans", name: "Supermans", muscle: "Espalda baja", group: "dorsales", nota: "Tumbado boca abajo, levantá brazos y piernas a la vez de forma controlada.", videoQuery: "supermans técnica espalda baja" },
   // Hombros (catálogo extendido)
-  { id: "press_militar_pie_barra", name: "Press Militar de Pie con Barra", muscle: "Deltoides ant.", group: "hombros", nota: "Apretá el core para no arquear la espalda baja al empujar.", videoQuery: "press militar de pie con barra técnica" },
-  { id: "press_militar_sentado_barra", name: "Press Militar Sentado con Barra", muscle: "Deltoides ant.", group: "hombros", nota: "El banco te quita el impulso de piernas, foco puro en el hombro.", videoQuery: "press militar sentado con barra técnica" },
-  { id: "press_militar_smith_otravar", name: "Press Militar en Máquina Smith", muscle: "Deltoides ant.", group: "hombros", nota: "Recorrido fijo hacia adelante, no lo hagas tras nuca para proteger el hombro.", videoQuery: "press militar smith técnica frontal" },
-  { id: "press_hombro_una_mano", name: "Press de Hombro a Una Mano", muscle: "Deltoides ant.", group: "hombros", nota: "De pie con una mancuerna, exige estabilidad extra del core de ese lado.", videoQuery: "press de hombro a una mano técnica" },
-  { id: "z_press", name: "Z Press", muscle: "Deltoides ant. / Core", group: "hombros", nota: "Sentado en el piso con piernas estiradas, sin apoyo de espalda ni impulso.", videoQuery: "z press técnica hombros" },
-  { id: "vuelos_laterales_polea_baja", name: "Elevaciones Laterales en Polea Baja", muscle: "Deltoides lateral", group: "hombros", nota: "Tensión constante incluso al inicio del recorrido, a diferencia de la mancuerna.", videoQuery: "elevaciones laterales polea baja técnica" },
-  { id: "vuelos_laterales_inclinado", name: "Elevaciones Laterales Inclinadas", muscle: "Deltoides lateral", group: "hombros", nota: "Acostado de lado en un banco inclinado, cambia la curva de esfuerzo del movimiento.", videoQuery: "elevaciones laterales inclinadas técnica" },
-  { id: "cruces_invertidos_polea", name: "Cruces Invertidos en Polea Alta", muscle: "Deltoides post.", group: "hombros", nota: "Poleas cruzadas a la altura de los hombros, tirá hacia afuera y atrás.", videoQuery: "cruces invertidos polea alta técnica deltoides posterior" },
+  { id: "press_militar_pie_barra", name: "Press Militar de Pie con Barra", muscle: "Deltoides ant.", group: "deltoide_anterior", nota: "Apretá el core para no arquear la espalda baja al empujar.", videoQuery: "press militar de pie con barra técnica" },
+  { id: "press_militar_sentado_barra", name: "Press Militar Sentado con Barra", muscle: "Deltoides ant.", group: "deltoide_anterior", nota: "El banco te quita el impulso de piernas, foco puro en el hombro.", videoQuery: "press militar sentado con barra técnica" },
+  { id: "press_militar_smith_otravar", name: "Press Militar en Máquina Smith", muscle: "Deltoides ant.", group: "deltoide_anterior", nota: "Recorrido fijo hacia adelante, no lo hagas tras nuca para proteger el hombro.", videoQuery: "press militar smith técnica frontal" },
+  { id: "press_hombro_una_mano", name: "Press de Hombro a Una Mano", muscle: "Deltoides ant.", group: "deltoide_anterior", nota: "De pie con una mancuerna, exige estabilidad extra del core de ese lado.", videoQuery: "press de hombro a una mano técnica" },
+  { id: "z_press", name: "Z Press", muscle: "Deltoides ant. / Core", group: "deltoide_anterior", nota: "Sentado en el piso con piernas estiradas, sin apoyo de espalda ni impulso.", videoQuery: "z press técnica hombros" },
+  { id: "vuelos_laterales_polea_baja", name: "Elevaciones Laterales en Polea Baja", muscle: "Deltoides lateral", group: "deltoide_lateral", nota: "Tensión constante incluso al inicio del recorrido, a diferencia de la mancuerna.", videoQuery: "elevaciones laterales polea baja técnica" },
+  { id: "vuelos_laterales_inclinado", name: "Elevaciones Laterales Inclinadas", muscle: "Deltoides lateral", group: "deltoide_lateral", nota: "Acostado de lado en un banco inclinado, cambia la curva de esfuerzo del movimiento.", videoQuery: "elevaciones laterales inclinadas técnica" },
+  { id: "cruces_invertidos_polea", name: "Cruces Invertidos en Polea Alta", muscle: "Deltoides post.", group: "deltoide_posterior", nota: "Poleas cruzadas a la altura de los hombros, tirá hacia afuera y atrás.", videoQuery: "cruces invertidos polea alta técnica deltoides posterior" },
   // Bíceps (catálogo extendido)
   { id: "curl_barra_recta", name: "Curl con Barra Recta", muscle: "Bíceps", group: "biceps", nota: "Codos fijos pegados al torso, no los lleves hacia adelante al subir.", videoQuery: "curl con barra recta técnica bíceps" },
   { id: "curl_polea_cuerda", name: "Curl en Polea Baja con Cuerda", muscle: "Bíceps", group: "biceps", nota: "Separá un poco las manos arriba para sumar contracción extra.", videoQuery: "curl polea baja cuerda técnica bíceps" },
@@ -224,7 +228,7 @@ const EXERCISE_LIBRARY = [
   { id: "curl_hercules", name: "Curl Hércules", muscle: "Bíceps", group: "biceps", nota: "En poleas dobles, brazos abiertos en cruz, llevá las manos hacia los hombros.", videoQuery: "curl hércules técnica bíceps poleas" },
   // Tríceps (catálogo extendido)
   { id: "triceps_trasnuca_polea", name: "Extensión de Tríceps Tras Nuca en Polea", muscle: "Tríceps", group: "triceps", nota: "Codos fijos cerca de la cabeza, extendé sin abrirlos hacia los costados.", videoQuery: "extensión tríceps tras nuca polea técnica" },
-  { id: "flexiones_diamante", name: "Flexiones Diamante", muscle: "Tríceps", group: "triceps", nota: "Manos juntas formando un rombo debajo del pecho, codos cerca del cuerpo.", videoQuery: "flexiones diamante técnica tríceps" },
+  { id: "flexiones_diamante", name: "Flexiones Diamante", muscle: "Tríceps", group: "triceps", rankExcluded: true, nota: "Manos juntas formando un rombo debajo del pecho, codos cerca del cuerpo.", videoQuery: "flexiones diamante técnica tríceps" },
   // Antebrazos
   { id: "curl_muneca_pronacion", name: "Curl de Muñeca en Pronación", muscle: "Antebrazo (extensores)", group: "antebrazos", nota: "Palmas hacia abajo, subí solo la muñeca sin mover el antebrazo.", videoQuery: "curl de muñeca pronación técnica antebrazo" },
   { id: "curl_muneca_supinacion", name: "Curl de Muñeca en Supinación", muscle: "Antebrazo (flexores)", group: "antebrazos", nota: "Palmas hacia arriba, apoyá los antebrazos y flexioná solo la muñeca.", videoQuery: "curl de muñeca supinación técnica antebrazo" },
@@ -240,8 +244,8 @@ const EXERCISE_LIBRARY = [
   { id: "peso_muerto_rumano_mancuernas", name: "Peso Muerto Rumano con Mancuernas", muscle: "Femoral", group: "femoral", nota: "Mismo patrón que con barra, pero con más libertad en la trayectoria.", videoQuery: "peso muerto rumano con mancuernas técnica" },
   { id: "curl_femoral_sentado", name: "Curl Femoral Sentado", muscle: "Femoral", group: "femoral", nota: "El ángulo de cadera flexionado pone al isquiotibial en un estiramiento previo mayor.", videoQuery: "curl femoral sentado técnica" },
   { id: "curl_femoral_pie", name: "Curl Femoral de Pie", muscle: "Femoral", group: "femoral", nota: "Trabajo unilateral, apoyate bien para no compensar con la cadera.", videoQuery: "curl femoral de pie técnica" },
-  { id: "curl_femoral_nordico", name: "Curl Femoral Nórdico", muscle: "Femoral", group: "femoral", nota: "Bajá lo más lento posible controlando con los isquiotibiales, es muy exigente.", videoQuery: "curl femoral nórdico técnica nordic curl" },
-  { id: "glute_ham_raise", name: "Glute Ham Raise", muscle: "Femoral / Glúteo", group: "femoral", nota: "Combina cadera y rodilla en un solo movimiento, empezá con rango parcial.", videoQuery: "glute ham raise técnica" },
+  { id: "curl_femoral_nordico", name: "Curl Femoral Nórdico", muscle: "Femoral", group: "femoral", rankExcluded: true, nota: "Bajá lo más lento posible controlando con los isquiotibiales, es muy exigente.", videoQuery: "curl femoral nórdico técnica nordic curl" },
+  { id: "glute_ham_raise", name: "Glute Ham Raise", muscle: "Femoral / Glúteo", group: "femoral", rankExcluded: true, nota: "Combina cadera y rodilla en un solo movimiento, empezá con rango parcial.", videoQuery: "glute ham raise técnica" },
   // Glúteo y cadera (catálogo extendido)
   { id: "hip_thrust_unilateral", name: "Hip Thrust Unilateral", muscle: "Glúteo", group: "gluteo", nota: "Una pierna apoyada en el piso, la otra extendida — bueno para corregir asimetrías.", videoQuery: "hip thrust unilateral técnica" },
   { id: "paseos_laterales_banda", name: "Paseos Laterales con Banda", muscle: "Glúteo medio", group: "gluteo", nota: "Banda por encima de las rodillas o tobillos, mantené tensión todo el recorrido.", videoQuery: "paseos laterales con banda técnica monster walk" },
@@ -259,12 +263,12 @@ const EXERCISE_LIBRARY = [
   { id: "elevacion_rodillas_silla_romana", name: "Elevación de Rodillas en Silla Romana", muscle: "Core / abdomen bajo", group: "core", nota: "Apoyado en los antebrazos, subí las rodillas sin balancear el cuerpo.", videoQuery: "elevación de rodillas silla romana técnica" },
   { id: "elevacion_piernas_tumbado", name: "Elevación de Piernas Tumbado", muscle: "Core / abdomen bajo", group: "core", nota: "Espalda baja pegada al piso, no la dejes despegar al bajar las piernas.", videoQuery: "elevación de piernas tumbado técnica" },
   { id: "tijeras_piernas", name: "Tijeras de Piernas", muscle: "Core", group: "core", nota: "Espalda baja apoyada en el piso, movimiento controlado sin golpear los pies.", videoQuery: "tijeras de piernas técnica core" },
-  { id: "l_sit", name: "L-Sit", muscle: "Core", group: "core", nota: "Piernas estiradas y paralelas al piso, sostenido en paralelas o colgado — muy exigente.", videoQuery: "l-sit técnica core" },
-  { id: "plancha_rkc", name: "Plancha RKC", muscle: "Core", group: "core", nota: "Apretá con fuerza glúteos y cuádriceps durante toda la plancha, tensión máxima.", videoQuery: "plancha rkc técnica core" },
+  { id: "l_sit", name: "L-Sit", muscle: "Core", group: "core", rankExcluded: true, nota: "Piernas estiradas y paralelas al piso, sostenido en paralelas o colgado — muy exigente.", videoQuery: "l-sit técnica core" },
+  { id: "plancha_rkc", name: "Plancha RKC", muscle: "Core", group: "core", rankExcluded: true, nota: "Apretá con fuerza glúteos y cuádriceps durante toda la plancha, tensión máxima.", videoQuery: "plancha rkc técnica core" },
   { id: "paseo_granjero_unilateral", name: "Paseo del Granjero Unilateral", muscle: "Core / oblicuos", group: "core", nota: "Peso de un solo lado, evitá que el torso se incline hacia donde cargás.", videoQuery: "paseo del granjero unilateral técnica suitcase carry" },
   { id: "press_pallof", name: "Press Pallof", muscle: "Core / oblicuos", group: "core", nota: "De pie de costado a la polea, empujá hacia adelante sin dejar que el torso rote.", videoQuery: "press pallof técnica core antirotación" },
-  { id: "bird_dog", name: "Bird Dog", muscle: "Core", group: "core", nota: "En cuatro apoyos, estirá brazo y pierna contraria manteniendo la espalda estable.", videoQuery: "bird dog técnica core" },
-  { id: "dead_bug", name: "Dead Bug", muscle: "Core", group: "core", nota: "Boca arriba, bajá brazo y pierna opuestos sin que la espalda baja se despegue del piso.", videoQuery: "dead bug técnica core" },
+  { id: "bird_dog", name: "Bird Dog", muscle: "Core", group: "core", rankExcluded: true, nota: "En cuatro apoyos, estirá brazo y pierna contraria manteniendo la espalda estable.", videoQuery: "bird dog técnica core" },
+  { id: "dead_bug", name: "Dead Bug", muscle: "Core", group: "core", rankExcluded: true, nota: "Boca arriba, bajá brazo y pierna opuestos sin que la espalda baja se despegue del piso.", videoQuery: "dead bug técnica core" },
   { id: "lenador_polea", name: "Leñador en Polea", muscle: "Core / oblicuos", group: "core", nota: "Movimiento diagonal de arriba a abajo (o viceversa), rotando desde el torso.", videoQuery: "leñador polea técnica core woodchopper" },
   { id: "crunch_lateral", name: "Crunch Lateral", muscle: "Core / oblicuos", group: "core", nota: "Tumbado de costado, flexioná hacia el oblicuo sin tirar del cuello.", videoQuery: "crunch lateral técnica oblicuos" },
   { id: "giros_torso_barra", name: "Giros de Torso con Barra", muscle: "Core / oblicuos", group: "core", nota: "Barra sobre los hombros, girá despacio y controlado — nunca de golpe.", videoQuery: "giros de torso con barra técnica core" },
@@ -1566,27 +1570,31 @@ function buildMuscleBodySvgMarkup(view, ranks) {
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 420">
       <circle cx="120" cy="26" r="19" fill="${NEUTRAL}" />
       <polygon points="109,42 131,42 127,53 113,53" fill="${NEUTRAL}" />
-      <ellipse cx="72" cy="72" rx="22" ry="16" fill="${fillFor("hombros")}" />
-      <ellipse cx="168" cy="72" rx="22" ry="16" fill="${fillFor("hombros")}" />
-      <ellipse cx="98" cy="92" rx="27" ry="29" fill="${fillFor("pecho")}" />
-      <ellipse cx="142" cy="92" rx="27" ry="29" fill="${fillFor("pecho")}" />
-      <line x1="120" y1="70" x2="120" y2="118" stroke="#0a0a0f" stroke-width="2" opacity="0.35" />
-      <rect x="40" y="82" width="22" height="66" rx="11" fill="${fillFor("biceps")}" />
-      <rect x="178" y="82" width="22" height="66" rx="11" fill="${fillFor("biceps")}" />
-      <ellipse cx="51" cy="100" rx="10" ry="8" fill="#fff" opacity="0.14" />
-      <ellipse cx="189" cy="100" rx="10" ry="8" fill="#fff" opacity="0.14" />
+      <ellipse cx="66" cy="68" rx="18" ry="15" fill="${fillFor("deltoide_lateral")}" />
+      <ellipse cx="174" cy="68" rx="18" ry="15" fill="${fillFor("deltoide_lateral")}" />
+      <ellipse cx="80" cy="80" rx="15" ry="14" fill="${fillFor("deltoide_anterior")}" />
+      <ellipse cx="160" cy="80" rx="15" ry="14" fill="${fillFor("deltoide_anterior")}" />
+      <ellipse cx="98" cy="78" rx="24" ry="17" fill="${fillFor("pectoral_superior")}" />
+      <ellipse cx="142" cy="78" rx="24" ry="17" fill="${fillFor("pectoral_superior")}" />
+      <ellipse cx="98" cy="104" rx="25" ry="20" fill="${fillFor("pectoral_medio")}" />
+      <ellipse cx="142" cy="104" rx="25" ry="20" fill="${fillFor("pectoral_medio")}" />
+      <line x1="120" y1="64" x2="120" y2="122" stroke="#0a0a0f" stroke-width="2" opacity="0.3" />
+      <rect x="40" y="84" width="22" height="64" rx="11" fill="${fillFor("biceps")}" />
+      <rect x="178" y="84" width="22" height="64" rx="11" fill="${fillFor("biceps")}" />
+      <ellipse cx="51" cy="101" rx="10" ry="8" fill="#fff" opacity="0.14" />
+      <ellipse cx="189" cy="101" rx="10" ry="8" fill="#fff" opacity="0.14" />
       <rect x="37" y="148" width="20" height="60" rx="10" fill="${fillFor("antebrazos")}" />
       <rect x="183" y="148" width="20" height="60" rx="10" fill="${fillFor("antebrazos")}" />
       <circle cx="47" cy="216" r="9" fill="${NEUTRAL}" />
       <circle cx="193" cy="216" r="9" fill="${NEUTRAL}" />
-      <rect x="86" y="124" width="11" height="52" rx="6" fill="${fillFor("core")}" opacity="0.55" />
-      <rect x="143" y="124" width="11" height="52" rx="6" fill="${fillFor("core")}" opacity="0.55" />
-      <rect x="100" y="126" width="16" height="15" rx="4" fill="${fillFor("core")}" />
-      <rect x="124" y="126" width="16" height="15" rx="4" fill="${fillFor("core")}" />
-      <rect x="100" y="144" width="16" height="15" rx="4" fill="${fillFor("core")}" />
-      <rect x="124" y="144" width="16" height="15" rx="4" fill="${fillFor("core")}" />
-      <rect x="100" y="162" width="16" height="15" rx="4" fill="${fillFor("core")}" />
-      <rect x="124" y="162" width="16" height="15" rx="4" fill="${fillFor("core")}" />
+      <rect x="86" y="126" width="11" height="50" rx="6" fill="${fillFor("core")}" opacity="0.55" />
+      <rect x="143" y="126" width="11" height="50" rx="6" fill="${fillFor("core")}" opacity="0.55" />
+      <rect x="100" y="128" width="16" height="14" rx="4" fill="${fillFor("core")}" />
+      <rect x="124" y="128" width="16" height="14" rx="4" fill="${fillFor("core")}" />
+      <rect x="100" y="145" width="16" height="14" rx="4" fill="${fillFor("core")}" />
+      <rect x="124" y="145" width="16" height="14" rx="4" fill="${fillFor("core")}" />
+      <rect x="100" y="162" width="16" height="14" rx="4" fill="${fillFor("core")}" />
+      <rect x="124" y="162" width="16" height="14" rx="4" fill="${fillFor("core")}" />
       <polygon points="84,176 156,176 162,198 78,198" fill="${NEUTRAL}" />
       <rect x="79" y="196" width="37" height="108" rx="17" fill="${fillFor("cuadriceps")}" />
       <rect x="124" y="196" width="37" height="108" rx="17" fill="${fillFor("cuadriceps")}" />
@@ -1603,12 +1611,13 @@ function buildMuscleBodySvgMarkup(view, ranks) {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 420">
     <circle cx="120" cy="26" r="19" fill="${NEUTRAL}" />
     <polygon points="109,42 131,42 127,53 113,53" fill="${NEUTRAL}" />
-    <ellipse cx="72" cy="72" rx="22" ry="16" fill="${NEUTRAL}" />
-    <ellipse cx="168" cy="72" rx="22" ry="16" fill="${NEUTRAL}" />
-    <polygon points="68,64 172,64 158,142 150,180 90,180 82,142" fill="${fillFor("espalda")}" />
-    <line x1="120" y1="64" x2="120" y2="178" stroke="#0a0a0f" stroke-width="2" opacity="0.3" />
-    <rect x="40" y="82" width="22" height="66" rx="11" fill="${fillFor("triceps")}" />
-    <rect x="178" y="82" width="22" height="66" rx="11" fill="${fillFor("triceps")}" />
+    <ellipse cx="68" cy="70" rx="20" ry="16" fill="${fillFor("deltoide_posterior")}" />
+    <ellipse cx="172" cy="70" rx="20" ry="16" fill="${fillFor("deltoide_posterior")}" />
+    <polygon points="120,44 153,78 120,98 87,78" fill="${fillFor("trapecio")}" />
+    <polygon points="80,84 160,84 154,142 148,180 92,180 86,142" fill="${fillFor("dorsales")}" />
+    <line x1="120" y1="86" x2="120" y2="178" stroke="#0a0a0f" stroke-width="2" opacity="0.25" />
+    <rect x="40" y="84" width="22" height="64" rx="11" fill="${fillFor("triceps")}" />
+    <rect x="178" y="84" width="22" height="64" rx="11" fill="${fillFor("triceps")}" />
     <ellipse cx="51" cy="118" rx="9" ry="14" fill="#fff" opacity="0.12" />
     <ellipse cx="189" cy="118" rx="9" ry="14" fill="#fff" opacity="0.12" />
     <rect x="37" y="148" width="20" height="60" rx="10" fill="${NEUTRAL}" />
@@ -2829,7 +2838,7 @@ const HELP_CHAPTERS = [
       {
         icon: <Mail size={20} />,
         title: "Tus datos",
-        text: "Arriba ves tu nombre, email (si lo cargaste) y fecha de alta. Tocá \"Editar perfil\" para cambiar el email cuando quieras, o \"Vincular con Google\" si querés asociar tu cuenta de Google a este perfil.",
+        text: "Arriba ves tu nombre, email (si lo cargaste) y fecha de alta. Tocá \"Editar perfil\" para cambiar el email, tu sexo, tu edad o tu peso corporal — estos últimos tres se usan para calibrar mejor el rango por músculo de Progreso. O tocá \"Vincular con Google\" si querés asociar tu cuenta de Google a este perfil.",
         demo: { kind: "perfil", view: "datos" },
       },
       {
@@ -3819,34 +3828,54 @@ const RANK_TIERS = [
 // Techo (Maestro) por grupo muscular en 1RM ESTIMADO, calibrado con
 // estándares de fuerza reales (ExRx, Strength Level, y guías de la
 // comunidad de fuerza para press banca/sentadilla/peso muerto/press
-// militar — el resto de los grupos se estimó por relación razonable con
-// esos cuatro). Dos formas de usarlos:
+// militar — el resto se estimó por relación razonable con esos cuatro).
+// Pectoral superior pondera un poco menos que el medio (el inclinado mueve
+// algo menos peso que el plano); trapecio se calibró con encogimientos
+// pesados (suelen mover más que el peso muerto); los tres deltoides NO
+// comparten techo: el anterior está pensado para press militar (peso
+// total), mientras que lateral/posterior son ejercicios de aislamiento
+// que mueven mucho menos peso — y tríceps se recalibró hacia abajo porque
+// ya no incluye fondos (que mezclaban peso corporal con peso externo y
+// disparaban el número para arriba sin sentido).
+// Dos formas de usarlos:
 //  - "general": un número fijo en kg, pensado para un cuerpo de
 //    referencia de 75kg — simple, pero menos justo si pesás mucho más o
 //    mucho menos que eso.
 //  - "relativo": el mismo techo pero expresado como múltiplo de TU peso
-//    corporal (por ejemplo, pecho ×2.1 — levantar 2.1 veces tu peso en
-//    press banca ya es nivel "Elite" según esos estándares), así el rango
-//    se ajusta a tu cuerpo en vez de tratar a todos igual.
-// Nota: como los ejercicios de mancuerna (vuelos laterales, press Arnold,
-// etc.) registran el peso POR MANCUERNA y no el total de las dos manos,
-// el techo de "hombros" está pensado alrededor del press militar (que sí
-// es peso total) — en la práctica, una mancuerna sola rara vez va a ser
-// tu mejor marca del grupo frente a un press pesado.
+//    corporal, así el rango se ajusta a tu cuerpo en vez de tratar a
+//    todos igual.
+// Nota: los ejercicios de DOS mancuernas (press Arnold, vuelos laterales,
+// etc.) llevan loadFactor:2 en el catálogo — el peso que se loguea es por
+// mancuerna, pero para comparar contra estándares de barra (que son peso
+// TOTAL) hay que sumar las dos manos.
 const RANK_REFERENCE_BODYWEIGHT_KG = 75;
 const MUSCLE_RANK_BW_MULTIPLIER = {
-  pecho: 2.1, espalda: 3.0, hombros: 1.3, biceps: 0.7, triceps: 0.75,
-  antebrazos: 0.4, cuadriceps: 2.6, femoral: 2.0, gluteo: 2.8, core: 0.55, pantorrillas: 2.2,
+  pectoral_superior: 1.8, pectoral_medio: 2.1, dorsales: 3.0, trapecio: 2.4,
+  deltoide_anterior: 1.3, deltoide_lateral: 0.5, deltoide_posterior: 0.55,
+  biceps: 0.7, triceps: 0.6, antebrazos: 0.4,
+  cuadriceps: 2.6, femoral: 2.0, gluteo: 2.8, core: 0.55, pantorrillas: 2.2,
 };
 const MUSCLE_RANK_MAX_KG = Object.fromEntries(
   Object.entries(MUSCLE_RANK_BW_MULTIPLIER).map(([k, mult]) => [k, Math.round(mult * RANK_REFERENCE_BODYWEIGHT_KG)])
 );
 
-function getMuscleRankMaxKg(muscleKey, mode, bodyWeightKg) {
-  if (mode === "relative" && bodyWeightKg > 0) {
-    return (MUSCLE_RANK_BW_MULTIPLIER[muscleKey] || 1) * bodyWeightKg;
-  }
-  return MUSCLE_RANK_MAX_KG[muscleKey] || 100;
+// Ajuste por sexo: en promedio, según estándares de fuerza publicados, la
+// fuerza máxima femenina suele rondar 55-65% de la masculina en tren
+// superior y 70-80% en tren inferior — por eso el techo se achica para que
+// un esfuerzo relativo equivalente caiga en un rango parecido, en vez de
+// medir a todo el mundo contra una escala pensada para fisiología
+// masculina promedio.
+const LOWER_BODY_RANK_GROUPS = new Set(["cuadriceps", "femoral", "gluteo", "pantorrillas"]);
+function getSexFactor(muscleKey, sex) {
+  if (sex !== "F") return 1;
+  return LOWER_BODY_RANK_GROUPS.has(muscleKey) ? 0.75 : 0.62;
+}
+
+function getMuscleRankMaxKg(muscleKey, mode, bodyWeightKg, sex) {
+  const base = mode === "relative" && bodyWeightKg > 0
+    ? (MUSCLE_RANK_BW_MULTIPLIER[muscleKey] || 1) * bodyWeightKg
+    : (MUSCLE_RANK_MAX_KG[muscleKey] || 100);
+  return base * getSexFactor(muscleKey, sex);
 }
 
 // Qué fracción del techo hace falta para cada uno de los 19 niveles. No es
@@ -3871,8 +3900,8 @@ function getRankZoneLabel(tier) {
   return "Elite";
 }
 
-function getMuscleRank(muscleKey, best1RM, mode = "general", bodyWeightKg = 0) {
-  const max = getMuscleRankMaxKg(muscleKey, mode, bodyWeightKg);
+function getMuscleRank(muscleKey, best1RM, mode = "general", bodyWeightKg = 0, sex = null) {
+  const max = getMuscleRankMaxKg(muscleKey, mode, bodyWeightKg, sex);
   if (!best1RM || best1RM <= 0) {
     return { tier: "Bronce", sub: "I", color: "#475569", levelIdx: -1, max, threshold: 0, nextThreshold: RANK_LEVEL_FRACTIONS[0] * max, hasData: false };
   }
@@ -3890,73 +3919,89 @@ function getMuscleRank(muscleKey, best1RM, mode = "general", bodyWeightKg = 0) {
 // Mejor 1RM ESTIMADO (fórmula de Epley, igual que en Progreso) en
 // cualquier ejercicio de un grupo muscular — no el peso más pesado a
 // secas, porque eso hacía que levantar poco peso a una sola repetición
-// pareciera "más fuerte" que levantar casi lo mismo varias veces. Guarda
-// también con qué kg×reps puntual se logró ese estimado, para poder
-// mostrarlo (en vez de mostrar sólo "110kg", que da la idea equivocada de
-// que fue a una repetición).
+// pareciera "más fuerte" que levantar casi lo mismo varias veces.
+// Dos correcciones más, agregadas porque el tríceps rankeaba absurdamente
+// alto y el hombro absurdamente bajo:
+//  - Ejercicios marcados `rankExcluded` (fondos, dominadas, flexiones,
+//    planchas...) no entran en la cuenta: mezclan peso corporal con peso
+//    externo de forma ambigua y distorsionaban el número.
+//  - Ejercicios marcados `loadFactor` (dos mancuernas) multiplican el kg
+//    logueado antes de calcular el 1RM, para que sean comparables contra
+//    estándares de barra (peso total).
+// Guarda también con qué kg×reps puntual (sin el factor aplicado, el
+// número real que logueaste) se logró ese estimado, para poder mostrarlo.
 function getBest1RMForMuscleGroup(groupKey, logs) {
-  const idsInGroup = new Set((EXERCISE_LIBRARY_BY_GROUP[groupKey] || []).map((e) => e.id));
+  const exsInGroup = (EXERCISE_LIBRARY_BY_GROUP[groupKey] || []).filter((e) => !e.rankExcluded);
+  const loadFactorById = new Map(exsInGroup.map((e) => [e.id, e.loadFactor || 1]));
   const overriddenBaseKeys = new Set();
   Object.keys(logs).forEach((k) => { if (k.endsWith("_pr_override")) overriddenBaseKeys.add(k.replace(/_pr_override$/, "")); });
-  let best1RM = 0, bestKg = 0, bestReps = 0, bestExerciseName = null;
+  let best1RM = 0, bestKg = 0, bestReps = 0, bestExerciseName = null, bestLoadFactor = 1;
   Object.entries(logs).forEach(([key, val]) => {
     const isOverride = key.endsWith("_pr_override");
     const baseKey = isOverride ? key.replace(/_pr_override$/, "") : key;
     if (!isOverride && overriddenBaseKeys.has(baseKey)) return;
     const { exerciseId } = parseLogKey(baseKey);
-    if (!idsInGroup.has(exerciseId)) return;
+    if (!loadFactorById.has(exerciseId)) return;
+    const lf = loadFactorById.get(exerciseId);
     const entries = isOverride ? [val] : (Array.isArray(val) ? val : []);
     entries.forEach((e) => {
       if (!e || !e.kg || !e.reps) return;
-      const rm = estimate1RM(e.kg, e.reps);
-      if (rm > best1RM) { best1RM = rm; bestKg = e.kg; bestReps = e.reps; bestExerciseName = EXERCISE_LIBRARY_BY_ID[exerciseId]?.name || exerciseId; }
+      const rm = estimate1RM(e.kg * lf, e.reps);
+      if (rm > best1RM) { best1RM = rm; bestKg = e.kg; bestReps = e.reps; bestExerciseName = EXERCISE_LIBRARY_BY_ID[exerciseId]?.name || exerciseId; bestLoadFactor = lf; }
     });
   });
-  return { best1RM, bestKg, bestReps, bestExerciseName };
+  return { best1RM, bestKg, bestReps, bestExerciseName, bestLoadFactor };
 }
 
-// Insignia tipo "gema/medalla" para cada nivel — antes era sólo un punto
-// de color, ahora tiene una forma real (parecida a las medallas de las
-// apps de rutinas tipo Strafit/Strong) con un degradé del color del nivel,
-// un facetado claro arriba para que se vea con volumen, y el número romano
-// (I/II/III) grabado adentro — Maestro, que es el techo y no tiene
-// sub-nivel, lleva una estrella en su lugar.
+// Insignia tipo "medalla hexagonal" para cada nivel — antes era sólo un
+// punto de color, ahora es una forma real (parecida a los emblemas de
+// rango de juegos competitivos) con degradé radial (brillo arriba a la
+// izquierda, más oscuro en los bordes para dar volumen), un aro metálico
+// oscuro por fuera, un bisel interno fino, y el número romano (I/II/III)
+// grabado adentro — Maestro, que es el techo y no tiene sub-nivel, lleva
+// una estrella en su lugar.
 function RankBadgeIcon({ sub, color, size = 26 }) {
   const gradId = `rb-${color.replace("#", "")}`;
   const isMaestro = !sub;
+  const hex = "24,3 42,14 42,34 24,45 6,34 6,14";
   return (
-    <svg width={size} height={size} viewBox="0 0 48 48" className="shrink-0" style={{ filter: `drop-shadow(0 0 4px ${color}55)` }}>
+    <svg width={size} height={size} viewBox="0 0 48 48" className="shrink-0" style={{ filter: `drop-shadow(0 3px 6px ${color}80)` }}>
       <defs>
-        <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor={color} />
-          <stop offset="100%" stopColor={color} stopOpacity="0.6" />
-        </linearGradient>
+        <radialGradient id={gradId} cx="35%" cy="22%" r="80%">
+          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.55" />
+          <stop offset="35%" stopColor={color} stopOpacity="1" />
+          <stop offset="100%" stopColor={color} stopOpacity="0.62" />
+        </radialGradient>
       </defs>
-      <path d="M24 2 L43 15 L37 45 L11 45 L5 15 Z" fill={`url(#${gradId})`} stroke="rgba(255,255,255,0.45)" strokeWidth="1.5" strokeLinejoin="round" />
-      <path d="M24 2 L43 15 L24 23 L5 15 Z" fill="#ffffff" opacity="0.22" />
+      <polygon points={hex} fill="#0a0a0f" opacity="0.55" transform="scale(1.07) translate(-1.6,-1.6)" />
+      <polygon points={hex} fill={`url(#${gradId})`} stroke="rgba(255,255,255,0.55)" strokeWidth="1.4" strokeLinejoin="round" />
+      <polygon points="24,7 38,15.5 38,32.5 24,41 10,32.5 10,15.5" fill="none" stroke="rgba(255,255,255,0.32)" strokeWidth="1" />
+      <path d="M24 3 L42 14 L24 24 L6 14 Z" fill="#ffffff" opacity="0.18" />
       {isMaestro ? (
-        <path d="M24 18 L27.2 25 L34.5 25.6 L29 30.6 L30.8 38 L24 34 L17.2 38 L19 30.6 L13.5 25.6 L20.8 25 Z" fill="#ffffff" opacity="0.92" />
+        <path d="M24 16 L27.6 23.6 L36 24.4 L29.8 30 L31.8 38.2 L24 33.8 L16.2 38.2 L18.2 30 L12 24.4 L20.4 23.6 Z" fill="#ffffff" opacity="0.95" />
       ) : (
-        <text x="24" y="32" textAnchor="middle" fontSize="15" fontWeight="900" fill="#ffffff" stroke="#0a0a0f" strokeWidth="2.4" paintOrder="stroke" fontFamily="sans-serif">{sub}</text>
+        <text x="24" y="31" textAnchor="middle" fontSize="16" fontWeight="900" fill="#ffffff" stroke="#0a0a0f" strokeWidth="2.6" paintOrder="stroke" fontFamily="sans-serif">{sub}</text>
       )}
     </svg>
   );
 }
 
 // Regiones del muñeco visibles desde adelante y desde atrás — entre las
-// dos vistas se cubren los 11 grupos musculares del catálogo, cada uno en
-// la vista donde más sentido anatómico tiene (los cuádriceps de frente,
-// los isquiotibiales de atrás, etc.). Los antebrazos sólo se muestran de
-// frente para no duplicar la métrica en las dos vistas.
-const MUSCLE_BODY_FRONT_KEYS = ["hombros", "pecho", "biceps", "antebrazos", "core", "cuadriceps"];
-const MUSCLE_BODY_BACK_KEYS = ["espalda", "triceps", "gluteo", "femoral", "pantorrillas"];
+// dos vistas se cubren los grupos musculares del catálogo, cada uno en la
+// vista donde más sentido anatómico tiene. El deltoide lateral se muestra
+// de frente (es el "gorro" visible del hombro desde ahí) y el deltoide
+// posterior de espalda; el trapecio ahora tiene su propia región arriba de
+// los dorsales, en vez de ir todo junto como "espalda".
+const MUSCLE_BODY_FRONT_KEYS = ["deltoide_anterior", "deltoide_lateral", "pectoral_superior", "pectoral_medio", "biceps", "antebrazos", "core", "cuadriceps"];
+const MUSCLE_BODY_BACK_KEYS = ["trapecio", "deltoide_posterior", "dorsales", "triceps", "gluteo", "femoral", "pantorrillas"];
 
-// Muñeco con formas más anatómicas que antes: el pecho y los glúteos son
-// dos óvalos (no un solo rectángulo), el abdomen es una grilla tipo
-// "tabla", la espalda es un trapecio que se angosta hacia la cintura
-// (forma de V) y las pantorrillas tienen la curva típica de la gemela —
-// todo con figuras simples (óvalos, rectángulos redondeados y polígonos)
-// para que se pueda armar de forma confiable sin curvas complejas.
+// Muñeco con formas más anatómicas que antes: el pecho está separado en
+// superior/medio (dos óvalos apilados), el hombro en sus tres cabezas
+// (anterior/lateral de frente, posterior de espalda), la espalda separa
+// trapecio (arriba) de dorsales (forma de V angostándose a la cintura), y
+// las pantorrillas tienen la curva típica de la gemela — todo con figuras
+// simples (óvalos, rectángulos redondeados y polígonos) para que se pueda
+// armar de forma confiable sin depender de curvas bézier complejas.
 function MuscleBodyDiagram({ view, ranks, selected, onSelect }) {
   const fillFor = (key) => ranks[key]?.color || "#334155";
   const strokeFor = (key) => (selected === key ? "#f8fafc" : "rgba(255,255,255,0.12)");
@@ -3966,20 +4011,28 @@ function MuscleBodyDiagram({ view, ranks, selected, onSelect }) {
       <svg viewBox="0 0 240 420" className="w-full max-w-[210px] mx-auto select-none">
         <circle cx="120" cy="26" r="19" fill={NEUTRAL} />
         <polygon points="109,42 131,42 127,53 113,53" fill={NEUTRAL} />
-        <g onClick={() => onSelect("hombros")} className="cursor-pointer">
-          <ellipse cx="72" cy="72" rx="22" ry="16" fill={fillFor("hombros")} stroke={strokeFor("hombros")} strokeWidth="3" />
-          <ellipse cx="168" cy="72" rx="22" ry="16" fill={fillFor("hombros")} stroke={strokeFor("hombros")} strokeWidth="3" />
+        <g onClick={() => onSelect("deltoide_lateral")} className="cursor-pointer">
+          <ellipse cx="66" cy="68" rx="18" ry="15" fill={fillFor("deltoide_lateral")} stroke={strokeFor("deltoide_lateral")} strokeWidth="3" />
+          <ellipse cx="174" cy="68" rx="18" ry="15" fill={fillFor("deltoide_lateral")} stroke={strokeFor("deltoide_lateral")} strokeWidth="3" />
         </g>
-        <g onClick={() => onSelect("pecho")} className="cursor-pointer">
-          <ellipse cx="98" cy="92" rx="27" ry="29" fill={fillFor("pecho")} stroke={strokeFor("pecho")} strokeWidth="3" />
-          <ellipse cx="142" cy="92" rx="27" ry="29" fill={fillFor("pecho")} stroke={strokeFor("pecho")} strokeWidth="3" />
-          <line x1="120" y1="70" x2="120" y2="118" stroke="#0a0a0f" strokeWidth="2" opacity="0.35" />
+        <g onClick={() => onSelect("deltoide_anterior")} className="cursor-pointer">
+          <ellipse cx="80" cy="80" rx="15" ry="14" fill={fillFor("deltoide_anterior")} stroke={strokeFor("deltoide_anterior")} strokeWidth="3" />
+          <ellipse cx="160" cy="80" rx="15" ry="14" fill={fillFor("deltoide_anterior")} stroke={strokeFor("deltoide_anterior")} strokeWidth="3" />
         </g>
+        <g onClick={() => onSelect("pectoral_superior")} className="cursor-pointer">
+          <ellipse cx="98" cy="78" rx="24" ry="17" fill={fillFor("pectoral_superior")} stroke={strokeFor("pectoral_superior")} strokeWidth="3" />
+          <ellipse cx="142" cy="78" rx="24" ry="17" fill={fillFor("pectoral_superior")} stroke={strokeFor("pectoral_superior")} strokeWidth="3" />
+        </g>
+        <g onClick={() => onSelect("pectoral_medio")} className="cursor-pointer">
+          <ellipse cx="98" cy="104" rx="25" ry="20" fill={fillFor("pectoral_medio")} stroke={strokeFor("pectoral_medio")} strokeWidth="3" />
+          <ellipse cx="142" cy="104" rx="25" ry="20" fill={fillFor("pectoral_medio")} stroke={strokeFor("pectoral_medio")} strokeWidth="3" />
+        </g>
+        <line x1="120" y1="64" x2="120" y2="122" stroke="#0a0a0f" strokeWidth="2" opacity="0.3" />
         <g onClick={() => onSelect("biceps")} className="cursor-pointer">
-          <rect x="40" y="82" width="22" height="66" rx="11" fill={fillFor("biceps")} stroke={strokeFor("biceps")} strokeWidth="3" />
-          <rect x="178" y="82" width="22" height="66" rx="11" fill={fillFor("biceps")} stroke={strokeFor("biceps")} strokeWidth="3" />
-          <ellipse cx="51" cy="100" rx="10" ry="8" fill="#fff" opacity="0.14" />
-          <ellipse cx="189" cy="100" rx="10" ry="8" fill="#fff" opacity="0.14" />
+          <rect x="40" y="84" width="22" height="64" rx="11" fill={fillFor("biceps")} stroke={strokeFor("biceps")} strokeWidth="3" />
+          <rect x="178" y="84" width="22" height="64" rx="11" fill={fillFor("biceps")} stroke={strokeFor("biceps")} strokeWidth="3" />
+          <ellipse cx="51" cy="101" rx="10" ry="8" fill="#fff" opacity="0.14" />
+          <ellipse cx="189" cy="101" rx="10" ry="8" fill="#fff" opacity="0.14" />
         </g>
         <g onClick={() => onSelect("antebrazos")} className="cursor-pointer">
           <rect x="37" y="148" width="20" height="60" rx="10" fill={fillFor("antebrazos")} stroke={strokeFor("antebrazos")} strokeWidth="3" />
@@ -3988,12 +4041,12 @@ function MuscleBodyDiagram({ view, ranks, selected, onSelect }) {
         <circle cx="47" cy="216" r="9" fill={NEUTRAL} />
         <circle cx="193" cy="216" r="9" fill={NEUTRAL} />
         <g onClick={() => onSelect("core")} className="cursor-pointer">
-          <rect x="86" y="124" width="11" height="52" rx="6" fill={fillFor("core")} opacity="0.55" />
-          <rect x="143" y="124" width="11" height="52" rx="6" fill={fillFor("core")} opacity="0.55" />
+          <rect x="86" y="126" width="11" height="50" rx="6" fill={fillFor("core")} opacity="0.55" />
+          <rect x="143" y="126" width="11" height="50" rx="6" fill={fillFor("core")} opacity="0.55" />
           {[0, 1, 2].map((row) => (
             <g key={row}>
-              <rect x="100" y={126 + row * 18} width="16" height="15" rx="4" fill={fillFor("core")} stroke={strokeFor("core")} strokeWidth="2" />
-              <rect x="124" y={126 + row * 18} width="16" height="15" rx="4" fill={fillFor("core")} stroke={strokeFor("core")} strokeWidth="2" />
+              <rect x="100" y={128 + row * 17} width="16" height="14" rx="4" fill={fillFor("core")} stroke={strokeFor("core")} strokeWidth="2" />
+              <rect x="124" y={128 + row * 17} width="16" height="14" rx="4" fill={fillFor("core")} stroke={strokeFor("core")} strokeWidth="2" />
             </g>
           ))}
         </g>
@@ -4017,15 +4070,20 @@ function MuscleBodyDiagram({ view, ranks, selected, onSelect }) {
     <svg viewBox="0 0 240 420" className="w-full max-w-[210px] mx-auto select-none">
       <circle cx="120" cy="26" r="19" fill={NEUTRAL} />
       <polygon points="109,42 131,42 127,53 113,53" fill={NEUTRAL} />
-      <ellipse cx="72" cy="72" rx="22" ry="16" fill={NEUTRAL} />
-      <ellipse cx="168" cy="72" rx="22" ry="16" fill={NEUTRAL} />
-      <g onClick={() => onSelect("espalda")} className="cursor-pointer">
-        <polygon points="68,64 172,64 158,142 150,180 90,180 82,142" fill={fillFor("espalda")} stroke={strokeFor("espalda")} strokeWidth="3" strokeLinejoin="round" />
-        <line x1="120" y1="64" x2="120" y2="178" stroke="#0a0a0f" strokeWidth="2" opacity="0.3" />
+      <g onClick={() => onSelect("deltoide_posterior")} className="cursor-pointer">
+        <ellipse cx="68" cy="70" rx="20" ry="16" fill={fillFor("deltoide_posterior")} stroke={strokeFor("deltoide_posterior")} strokeWidth="3" />
+        <ellipse cx="172" cy="70" rx="20" ry="16" fill={fillFor("deltoide_posterior")} stroke={strokeFor("deltoide_posterior")} strokeWidth="3" />
+      </g>
+      <g onClick={() => onSelect("trapecio")} className="cursor-pointer">
+        <polygon points="120,44 153,78 120,98 87,78" fill={fillFor("trapecio")} stroke={strokeFor("trapecio")} strokeWidth="3" strokeLinejoin="round" />
+      </g>
+      <g onClick={() => onSelect("dorsales")} className="cursor-pointer">
+        <polygon points="80,84 160,84 154,142 148,180 92,180 86,142" fill={fillFor("dorsales")} stroke={strokeFor("dorsales")} strokeWidth="3" strokeLinejoin="round" />
+        <line x1="120" y1="86" x2="120" y2="178" stroke="#0a0a0f" strokeWidth="2" opacity="0.25" />
       </g>
       <g onClick={() => onSelect("triceps")} className="cursor-pointer">
-        <rect x="40" y="82" width="22" height="66" rx="11" fill={fillFor("triceps")} stroke={strokeFor("triceps")} strokeWidth="3" />
-        <rect x="178" y="82" width="22" height="66" rx="11" fill={fillFor("triceps")} stroke={strokeFor("triceps")} strokeWidth="3" />
+        <rect x="40" y="84" width="22" height="64" rx="11" fill={fillFor("triceps")} stroke={strokeFor("triceps")} strokeWidth="3" />
+        <rect x="178" y="84" width="22" height="64" rx="11" fill={fillFor("triceps")} stroke={strokeFor("triceps")} strokeWidth="3" />
         <ellipse cx="51" cy="118" rx="9" ry="14" fill="#fff" opacity="0.12" />
         <ellipse cx="189" cy="118" rx="9" ry="14" fill="#fff" opacity="0.12" />
       </g>
@@ -4053,22 +4111,21 @@ function MuscleBodyDiagram({ view, ranks, selected, onSelect }) {
   );
 }
 
-function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings }) {
+function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, onGoToProfile, sex }) {
   const [view, setView] = useState("front");
   const [selected, setSelected] = useState(null);
   const [showImage, setShowImage] = useState(false);
-  const [weightDraft, setWeightDraft] = useState(settings.bodyWeightKg ? String(settings.bodyWeightKg) : "");
   const mode = settings.muscleRankMode === "relative" ? "relative" : "general";
   const bodyWeightKg = settings.bodyWeightKg || 0;
 
   const ranks = useMemo(() => {
     const out = {};
     MUSCLE_GROUPS.forEach((g) => {
-      const { best1RM, bestKg, bestReps, bestExerciseName } = getBest1RMForMuscleGroup(g.key, logs);
-      out[g.key] = { ...getMuscleRank(g.key, best1RM, mode, bodyWeightKg), best1RM, bestKg, bestReps, bestExerciseName, label: g.label };
+      const { best1RM, bestKg, bestReps, bestExerciseName, bestLoadFactor } = getBest1RMForMuscleGroup(g.key, logs);
+      out[g.key] = { ...getMuscleRank(g.key, best1RM, mode, bodyWeightKg, sex), best1RM, bestKg, bestReps, bestExerciseName, bestLoadFactor, label: g.label };
     });
     return out;
-  }, [logs, mode, bodyWeightKg]);
+  }, [logs, mode, bodyWeightKg, sex]);
 
   // Si cambiás de vista (frente/espalda) y el músculo seleccionado no
   // existe en la vista nueva, lo deselecciona en vez de dejar un estado
@@ -4077,11 +4134,6 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings })
   const selInfo = selected && visibleKeys.includes(selected) ? ranks[selected] : null;
   const needsWeight = mode === "relative" && !bodyWeightKg;
   const modeLabel = mode === "relative" && bodyWeightKg ? `Según tu peso (${bodyWeightKg}kg)` : "General";
-
-  const saveWeight = () => {
-    const w = parseFloat(weightDraft);
-    if (w > 0) onUpdateSettings?.({ bodyWeightKg: w });
-  };
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-amber-500/20 bg-slate-900/50 backdrop-blur-sm shadow-md shadow-black/20 p-4 space-y-3">
@@ -4102,14 +4154,14 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings })
         {mode === "relative" && (
           <div className="mt-2">
             {needsWeight ? (
-              <div className="flex gap-2">
-                <input type="number" inputMode="decimal" value={weightDraft} onChange={(e) => setWeightDraft(e.target.value)} placeholder="Tu peso en kg" className="flex-1 bg-slate-950/60 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500/50" />
-                <button onClick={saveWeight} className="px-4 py-2 rounded-xl bg-amber-500 !text-white text-xs font-bold shrink-0">Listo</button>
-              </div>
+              <button onClick={onGoToProfile} className="w-full flex items-center justify-between gap-2 bg-amber-500/10 border border-amber-500/25 rounded-xl px-3 py-2.5 text-left hover:bg-amber-500/15 transition">
+                <p className="text-[11px] text-amber-300/90">Para calcular "Según tu peso" necesitamos tu peso corporal — agregalo en tu perfil.</p>
+                <ChevronRight size={15} className="text-amber-400 shrink-0" />
+              </button>
             ) : (
               <div className="flex items-center justify-between bg-slate-950/40 rounded-xl px-3 py-1.5">
                 <p className="text-[11px] text-slate-500">Calculando con tu peso: <span className="text-slate-300 font-bold">{bodyWeightKg}kg</span></p>
-                <button onClick={() => { setWeightDraft(String(bodyWeightKg)); onUpdateSettings?.({ bodyWeightKg: 0 }); }} className="text-[11px] text-amber-400 font-bold shrink-0">Cambiar</button>
+                <button onClick={onGoToProfile} className="text-[11px] text-amber-400 font-bold shrink-0">Cambiar en Perfil</button>
               </div>
             )}
           </div>
@@ -4124,17 +4176,17 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings })
       <MuscleBodyDiagram view={view} ranks={ranks} selected={selected} onSelect={(k) => setSelected((s) => (s === k ? null : k))} />
       {selInfo ? (
         <div className="bg-slate-950/50 border border-slate-800/60 rounded-xl p-3.5 bounce-in">
-          <div className="flex items-center justify-between mb-1.5 gap-2">
+          <div className="flex items-center justify-between mb-2 gap-2">
             <p className="text-sm font-bold text-white">{selInfo.label}</p>
-            <span className="flex items-center gap-1.5 text-xs font-black px-2 py-1 rounded-lg shrink-0" style={{ backgroundColor: selInfo.color + "22", color: selInfo.color }}>
-              <RankBadgeIcon sub={selInfo.sub} color={selInfo.color} size={22} />
+            <span className="flex items-center gap-2 text-sm font-black pl-1.5 pr-3 py-1 rounded-xl shrink-0" style={{ backgroundColor: selInfo.color + "1c", color: selInfo.color }}>
+              <RankBadgeIcon sub={selInfo.sub} color={selInfo.color} size={34} />
               {selInfo.tier}{selInfo.sub ? ` ${selInfo.sub}` : ""}
             </span>
           </div>
           {selInfo.hasData ? (
             <>
               <p className="text-[11px] text-slate-500">
-                Mejor marca: <span className="text-slate-300 font-bold">{selInfo.bestReps}×{selInfo.bestKg}kg</span>{selInfo.bestExerciseName ? <> en {selInfo.bestExerciseName}</> : null} <span className="text-slate-600">(1RM est. {selInfo.best1RM}kg)</span>
+                Mejor marca: <span className="text-slate-300 font-bold">{selInfo.bestReps}×{selInfo.bestKg}kg</span>{selInfo.bestLoadFactor > 1 ? <span className="text-slate-600"> (×2 mancuernas)</span> : null}{selInfo.bestExerciseName ? <> en {selInfo.bestExerciseName}</> : null} <span className="text-slate-600">(1RM est. {selInfo.best1RM}kg)</span>
               </p>
               <p className="text-[10px] font-bold mt-1" style={{ color: selInfo.color }}>{selInfo.zone} para tu grupo en este músculo</p>
               {selInfo.nextThreshold ? (
@@ -4156,7 +4208,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings })
           const rep = RANK_TIERS.find((r) => r.tier === t && r.sub === "II") || RANK_TIERS.find((r) => r.tier === t);
           return (
             <span key={t} className="flex items-center gap-1 text-[9px] text-slate-500">
-              <RankBadgeIcon sub="" color={rep.color} size={16} />
+              <RankBadgeIcon sub="" color={rep.color} size={22} />
               {t}
             </span>
           );
@@ -4178,7 +4230,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings })
   );
 }
 
-function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_SETTINGS, onResetAll, onDeleteDay, onUpdateSettings }) {
+function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_SETTINGS, onResetAll, onDeleteDay, onUpdateSettings, onGoToProfile, sex }) {
   const allExercises = useMemo(() => DAY_ORDER.flatMap((dk) => ROUTINE[dk].exercises.map((e) => ({ id: e.id, name: e.name, day: ROUTINE[dk].label, color: ROUTINE[dk].color, sets: e.sets.length, dayKey: dk }))), []);
 
   const stats = useMemo(() => {
@@ -4269,7 +4321,7 @@ function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_
 
             <div className="flex items-center justify-end">
               <div className="flex bg-slate-950/60 rounded-xl p-0.5 border border-slate-800/60">
-                {[{ k: "peso", l: "Kg" }, { k: "vol", l: "Vol" }, { k: "1rm", l: "1RM" }, { k: "rpe", l: "RPE" }].map((opt) => (
+                {[{ k: "peso", l: "Kg" }, { k: "1rm", l: "1RM" }].map((opt) => (
                   <button key={opt.k} onClick={() => setMetric(opt.k)} className={`px-2 py-1.5 rounded-[10px] text-[10px] font-bold transition-all ${metric === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
                 ))}
               </div>
@@ -4289,27 +4341,18 @@ function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
                       <XAxis dataKey="date" stroke="var(--chart-axis)" fontSize={10} />
-                      <YAxis stroke="var(--chart-axis)" fontSize={10} domain={metric === "rpe" ? [0, 10] : ["auto", "auto"]} />
+                      <YAxis stroke="var(--chart-axis)" fontSize={10} domain={["auto", "auto"]} />
                       <Tooltip content={<CustomTooltip />} />
                       {metric === "peso" && <Area type="monotone" dataKey="kg" stroke={selEx?.color || "#14B8A6"} fill="url(#gA)" strokeWidth={2.5} dot={{ r: 3, fill: selEx?.color, strokeWidth: 0 }} name="Kg" />}
-                      {metric === "vol" && <Area type="monotone" dataKey="vol" stroke="#A855F7" fill="url(#gA)" strokeWidth={2.5} dot={{ r: 3, fill: "#A855F7", strokeWidth: 0 }} name="Volumen" />}
                       {metric === "1rm" && <Area type="monotone" dataKey="e1rm" stroke="#14B8A6" fill="url(#gA)" strokeWidth={2.5} dot={{ r: 3, fill: "#14B8A6", strokeWidth: 0 }} name="1RM est." />}
-                      {metric === "rpe" && <Area type="monotone" dataKey="rpe" stroke="#F43F5E" fill="url(#gA)" strokeWidth={2.5} dot={{ r: 3, fill: "#F43F5E", strokeWidth: 0 }} name="RPE" connectNulls />}
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
-                {metric === "rpe" ? (
-                  (() => {
-                    const vals = chartData.filter((d) => d.rpe != null).map((d) => d.rpe);
-                    if (!vals.length) return <p className="text-[11px] text-slate-600 text-center">Todavía no registraste RPE para esta serie.</p>;
-                    const avg = Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10;
-                    return <div className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-semibold bg-rose-500/10 text-rose-300 border border-rose-500/15"><Activity size={14} /><span>RPE promedio: <span className="font-black">{avg}</span> · {vals.length} sesiones con dato</span></div>;
-                  })()
-                ) : chartData.length >= 2 && (() => {
+                {chartData.length >= 2 && (() => {
                   const f = chartData[0], l = chartData[chartData.length - 1];
-                  const fVal = metric === "peso" ? f.kg : metric === "vol" ? f.vol : f.e1rm, lVal = metric === "peso" ? l.kg : metric === "vol" ? l.vol : l.e1rm;
+                  const fVal = metric === "peso" ? f.kg : f.e1rm, lVal = metric === "peso" ? l.kg : l.e1rm;
                   const diff = lVal - fVal, pct2 = fVal ? ((diff / fVal) * 100).toFixed(1) : 0, pos = diff >= 0;
-                  const metricLabel = metric === "peso" ? "de kg" : metric === "vol" ? "de volumen" : "de 1RM estimado";
+                  const metricLabel = metric === "peso" ? "de kg" : "de 1RM estimado";
                   return (
                     <div className={`flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-semibold ${pos ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/15" : "bg-rose-500/10 text-rose-400 border border-rose-500/15"}`}>
                       {pos ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
@@ -4323,7 +4366,7 @@ function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_
           </div>
         )}
 
-        {activeSection === "rank" && <MuscleRankView logs={logs} settings={settings} onUpdateSettings={onUpdateSettings} />}
+        {activeSection === "rank" && <MuscleRankView logs={logs} settings={settings} onUpdateSettings={onUpdateSettings} onGoToProfile={onGoToProfile} sex={sex} />}
 
         {activeSection === "muscle" && (
           <div className="relative overflow-hidden rounded-2xl border border-purple-500/20 bg-slate-900/50 backdrop-blur-sm shadow-md shadow-black/20 p-4 space-y-3">
@@ -4622,7 +4665,11 @@ function ExportTrainingCard({ profileName, logs }) {
 function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdateProfile, cycleStart, onSetCycleStart, onGoToRoutines }) {
   const profile = profiles[profileName];
   const [showDeletePin, setShowDeletePin] = useState(false); const [deleteError, setDeleteError] = useState("");
-  const [editing, setEditing] = useState(false); const [editMail, setEditMail] = useState(profile?.email || "");
+  const [editing, setEditing] = useState(false);
+  const [editMail, setEditMail] = useState(profile?.email || "");
+  const [editSex, setEditSex] = useState(profile?.sex || "");
+  const [editAge, setEditAge] = useState(profile?.age ? String(profile.age) : "");
+  const [editWeight, setEditWeight] = useState(profile?.settings?.bodyWeightKg ? String(profile.settings.bodyWeightKg) : "");
   const [showCycleSetup, setShowCycleSetup] = useState(false);
   const [googleLinkError, setGoogleLinkError] = useState("");
   const joinDate = profile?.joinedAt ? new Date(profile.joinedAt).toLocaleDateString("es-AR", { day: "numeric", month: "long", year: "numeric" }) : "—";
@@ -4635,6 +4682,20 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
   const initial = profileName.charAt(0).toUpperCase();
   const activeRoutineDef = resolveRoutineDef(profile?.routines?.[profile?.activeRoutineId], profile?.activeRoutineId);
   const savedRoutineCount = Object.keys(profile?.routines || {}).length;
+
+  // Sexo/edad/peso son datos personales (igual que el email), así que
+  // viven junto al resto del perfil — salvo el peso y el sexo, que por
+  // compatibilidad con cómo ya estaba armado el flujo de Progreso → Rango
+  // (que sólo recibe `settings`, no el perfil completo), se espejan
+  // también ahí. Se guardan los tres juntos en una sola llamada para no
+  // pisarse entre sí.
+  const handleSaveProfile = () => {
+    const updates = { email: editMail, sex: editSex || null, age: editAge ? parseInt(editAge, 10) : null };
+    const w = parseFloat(editWeight);
+    updates.settings = { ...settings, bodyWeightKg: w > 0 ? w : 0, sex: editSex || null };
+    onUpdateProfile(updates);
+    setEditing(false);
+  };
 
   // Vincular este perfil local con una cuenta de Google: abre el mismo popup
   // que el login, y si funciona le guarda el googleUid/email al perfil
@@ -4661,17 +4722,47 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
       </div>
 
       <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl divide-y divide-slate-800/50 overflow-hidden backdrop-blur-sm shadow-md shadow-black/20">
-        {[{ icon: <Mail size={14} />, label: "Email", val: profile?.email || "No configurado" }, { icon: <Clock size={14} />, label: "Unido el", val: joinDate }, { icon: <Calendar size={14} />, label: "Ciclo actual", val: weekInfo ? `Ciclo #${weekInfo.cycleNumber} · Semana ${weekInfo.weekInCycle}/${weekInfo.cycleWeeks}` : "No iniciado" }, { icon: <Zap size={14} />, label: "Estado", val: weekInfo ? (weekInfo.isDeload ? "🟣 Semana de descarga" : "🟠 Semana de entrenamiento") : "—" }].map(({ icon, label, val }) => (
+        {[
+          { icon: <Mail size={14} />, label: "Email", val: profile?.email || "No configurado" },
+          { icon: <UserCog size={14} />, label: "Sexo", val: profile?.sex === "M" ? "Masculino" : profile?.sex === "F" ? "Femenino" : "No configurado" },
+          { icon: <Calendar size={14} />, label: "Edad", val: profile?.age ? `${profile.age} años` : "No configurada" },
+          { icon: <Dumbbell size={14} />, label: "Peso corporal", val: settings.bodyWeightKg ? `${settings.bodyWeightKg}kg` : "No configurado" },
+          { icon: <Clock size={14} />, label: "Unido el", val: joinDate },
+          { icon: <Calendar size={14} />, label: "Ciclo actual", val: weekInfo ? `Ciclo #${weekInfo.cycleNumber} · Semana ${weekInfo.weekInCycle}/${weekInfo.cycleWeeks}` : "No iniciado" },
+          { icon: <Zap size={14} />, label: "Estado", val: weekInfo ? (weekInfo.isDeload ? "🟣 Semana de descarga" : "🟠 Semana de entrenamiento") : "—" },
+        ].map(({ icon, label, val }) => (
           <div key={label} className="flex items-center gap-3 px-4 py-3.5"><span className="text-slate-600">{icon}</span><span className="text-slate-500 text-xs flex-1">{label}</span><span className="text-slate-300 text-xs font-medium text-right">{val}</span></div>
         ))}
       </div>
 
       {editing ? (
         <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 space-y-3 bounce-in">
-          <input type="email" value={editMail} onChange={(e) => setEditMail(e.target.value)} placeholder="tu@email.com" className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none" />
+          <div>
+            <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Email</label>
+            <input type="email" value={editMail} onChange={(e) => setEditMail(e.target.value)} placeholder="tu@email.com" className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none" />
+          </div>
+          <div>
+            <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Sexo</label>
+            <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-700/50">
+              {[{ k: "M", l: "Masculino" }, { k: "F", l: "Femenino" }].map((opt) => (
+                <button key={opt.k} onClick={() => setEditSex(opt.k)} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${editSex === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
+              ))}
+            </div>
+            <p className="text-[10px] text-slate-600 mt-1.5">Se usa sólo para calibrar mejor el rango por músculo (la fuerza relativa típica varía según esto).</p>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Edad</label>
+              <input type="number" inputMode="numeric" value={editAge} onChange={(e) => setEditAge(e.target.value)} placeholder="Años" className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none" />
+            </div>
+            <div>
+              <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Peso corporal</label>
+              <input type="number" inputMode="decimal" value={editWeight} onChange={(e) => setEditWeight(e.target.value)} placeholder="Kg" className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none" />
+            </div>
+          </div>
           <div className="flex gap-2">
             <button onClick={() => setEditing(false)} className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-400 text-sm font-semibold">Cancelar</button>
-            <button onClick={() => { onUpdateProfile({ email: editMail }); setEditing(false); }} className="flex-1 py-3 rounded-xl bg-teal-500 !text-white text-sm font-bold">Guardar</button>
+            <button onClick={handleSaveProfile} className="flex-1 py-3 rounded-xl bg-teal-500 !text-white text-sm font-bold">Guardar</button>
           </div>
         </div>
       ) : (
@@ -6075,7 +6166,7 @@ export default function App() {
           <div key={tab} className="tab-fade-in">
             {tab === "rutinas" && <RoutinesView profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleArchiveRoutine} onRestore={handleRestoreRoutine} />}
             {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} />}
-            {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} />}
+            {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} sex={profile?.sex} />}
             {tab === "descarga" && <DeloadView logs={logs} settings={getProfileSettings(profile)} />}
             {tab === "perfil" && <ProfileView profileName={activeProfile} profiles={profiles} logs={logs} onSignOut={handleSignOut} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} />}
           </div>
