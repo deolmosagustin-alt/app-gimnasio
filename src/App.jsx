@@ -101,11 +101,11 @@ const EXERCISE_LIBRARY = [
   { id: "press_cerrado", name: "Press Banca Agarre Cerrado", muscle: "Pectoral / Tríceps", group: "pectoral_medio", secondary: [{ group: "triceps", weight: 0.5, alwaysCount: true }], nota: "Manos a la altura de los hombros, buen híbrido con tríceps.", videoQuery: "press banca agarre cerrado técnica" },
   { id: "flexiones", name: "Flexiones de Brazos", muscle: "Pectoral", group: "pectoral_medio", rankExcluded: true, nota: "Con tu propio peso corporal, útil para activar antes de entrenar.", videoQuery: "flexiones de brazos técnica correcta" },
   // Espalda
-  { id: "remo_ancho_maquina", name: "Remo Ancho Máquina", muscle: "Dorsal", group: "dorsales", secondary: [{ group: "deltoide_posterior", weight: 0.35 }, { group: "biceps", weight: 0.2 }], nota: "No levantes los hombros, llevá el movimiento con la espalda.", videoQuery: "remo ancho máquina técnica espalda" },
+  { id: "remo_ancho_maquina", name: "Remo Ancho Máquina", muscle: "Trapecio", group: "trapecio", secondary: [{ group: "dorsales", weight: 0.3 }, { group: "deltoide_posterior", weight: 0.25 }, { group: "biceps", weight: 0.15 }], nota: "No levantes los hombros, llevá el movimiento con la espalda.", videoQuery: "remo ancho máquina técnica espalda" },
   { id: "dorsalera", name: "Dorsalera Agarre Ancho", muscle: "Dorsal", group: "dorsales", secondary: [{ group: "deltoide_posterior", weight: 0.25 }, { group: "biceps", weight: 0.2 }, { group: "antebrazos", weight: 0.15 }], nota: "No descoloques los hombros, pulgar en la marca.", videoQuery: "dorsalera lat pulldown agarre ancho técnica" },
   { id: "dorsalera_agarre_cerrado", name: "Dorsalera Agarre Cerrado", muscle: "Dorsal", group: "dorsales", secondary: [{ group: "biceps", weight: 0.4 }, { group: "antebrazos", weight: 0.2 }], nota: "Agarre supino o en V, más activación de la parte baja del dorsal.", videoQuery: "jalón agarre cerrado técnica dorsal" },
   { id: "remo_barra", name: "Remo con Barra", muscle: "Dorsal medio", group: "dorsales", secondary: [{ group: "biceps", weight: 0.3 }, { group: "deltoide_posterior", weight: 0.25 }, { group: "trapecio", weight: 0.2 }, { group: "antebrazos", weight: 0.15 }], nota: "Espalda neutra, torso a unos 45°, no uses impulso de la zona lumbar.", videoQuery: "remo con barra técnica bent over row" },
-  { id: "remo_unilateral", name: "Remo Unilateral", muscle: "Dorsal / oblicuos", group: "dorsales", secondary: [{ group: "biceps", weight: 0.3 }, { group: "deltoide_posterior", weight: 0.25 }, { group: "trapecio", weight: 0.15 }, { group: "antebrazos", weight: 0.15 }], nota: "Contraé los oblicuos, codo lo más abajo posible.", videoQuery: "remo unilateral mancuerna técnica espalda" },
+  { id: "remo_unilateral", name: "Remo Unilateral", muscle: "Dorsal / oblicuos", group: "dorsales", secondary: [{ group: "biceps", weight: 0.3 }, { group: "deltoide_posterior", weight: 0.25 }, { group: "antebrazos", weight: 0.15 }], nota: "Contraé los oblicuos, codo lo más abajo posible.", videoQuery: "remo unilateral mancuerna técnica espalda" },
   { id: "remo_maquina_sentado", name: "Remo Sentado en Máquina/Polea", muscle: "Dorsal medio", group: "dorsales", secondary: [{ group: "biceps", weight: 0.25 }, { group: "deltoide_posterior", weight: 0.25 }, { group: "trapecio", weight: 0.2 }], nota: "Pecho contra el apoyo, llevá los codos atrás sin balancear el torso.", videoQuery: "remo sentado polea técnica seated cable row" },
   { id: "remo_pecho_apoyado", name: "Remo con Pecho Apoyado", muscle: "Dorsal medio", group: "dorsales", secondary: [{ group: "biceps", weight: 0.25 }, { group: "deltoide_posterior", weight: 0.25 }, { group: "trapecio", weight: 0.2 }], nota: "El banco inclinado quita la zona lumbar de la ecuación, foco puro en espalda.", videoQuery: "remo pecho apoyado técnica chest supported row" },
   { id: "pull_over", name: "Pull Over", muscle: "Dorsal / serrato", group: "dorsales", secondary: [{ group: "triceps", weight: 0.15, alwaysCount: true }], nota: "Codos siempre un poco flexionados.", videoQuery: "pull over espalda técnica mancuerna" },
@@ -1604,78 +1604,99 @@ function drawPeriodShareCard(ctx, W, H, { periodLabel, daysTrained, totalSets, t
    <img> vía data URL, y recién ahí se dibuja sobre el canvas de la
    tarjeta — por eso drawMuscleRankShareCard es async.
 ============================================================================ */
+/* ============================================================================
+   DATOS EXACTOS DE LA LIBRERÍA — extraídos directamente del código fuente
+   de react-body-highlighter (orden y cantidad de polígonos por músculo en
+   cada vista, y los puntos de cada polígono). Esto reemplaza al sistema
+   anterior, que adivinaba a qué músculo pertenecía un polígono comparando
+   colores de relleno — fallaba constantemente: músculos con varias piezas
+   (el cuádriceps tiene 6, el antebrazo y el isquiotibial 4 cada uno) sólo
+   se resaltaban a medias, y músculos distintos que coincidían en el mismo
+   color de rango (ej. dos en Maestro) se resaltaban juntos por error.
+   Ahora, cada polígono se identifica por su ÍNDICE exacto en el SVG, sin
+   ambigüedad posible.
+   Ojo con un detalle de nombres de la propia librería: la clave interna
+   "ABDUCTOR" en realidad vale 'adductor' (aductor, cara interna del
+   muslo) y "ABDUCTORS" vale 'abductors' (cara externa de la cadera) — están
+   invertidas respecto a lo que uno esperaría, pero así están en su código.
+============================================================================ */
+const ANTERIOR_POLY_ORDER = [["chest", 2], ["obliques", 2], ["abs", 2], ["biceps", 2], ["triceps", 2], ["neck", 2], ["front-deltoids", 2], ["head", 1], ["abductors", 2], ["quadriceps", 6], ["knees", 2], ["calves", 4], ["forearm", 4]];
+
+const POSTERIOR_POLY_ORDER = [["head", 1], ["trapezius", 2], ["back-deltoids", 2], ["upper-back", 2], ["triceps", 4], ["lower-back", 2], ["forearm", 4], ["gluteal", 2], ["adductor", 2], ["hamstring", 4], ["knees", 2], ["calves", 4], ["left-soleus", 1], ["right-soleus", 1]];
+
+const ANTERIOR_POLY_POINTS = {
+  "chest": ["51.8367347 41.6326531 51.0204082 55.1020408 57.9591837 57.9591837 67.755102 55.5102041 70.6122449 47.3469388 62.0408163 41.6326531", "29.7959184 46.5306122 31.4285714 55.5102041 40.8163265 57.9591837 48.1632653 55.1020408 47.755102 42.0408163 37.5510204 42.0408163"],
+  "obliques": ["68.5714286 63.2653061 67.3469388 57.1428571 58.7755102 59.5918367 60 64.0816327 60.4081633 83.2653061 65.7142857 78.7755102 66.5306122 69.7959184", "33.877551 78.3673469 33.0612245 71.8367347 31.0204082 63.2653061 32.244898 57.1428571 40.8163265 59.1836735 39.1836735 63.2653061 39.1836735 83.6734694"],
+  "abs": ["56.3265306 59.1836735 57.9591837 64.0816327 58.3673469 77.9591837 58.3673469 92.6530612 56.3265306 98.3673469 55.1020408 104.081633 51.4285714 107.755102 51.0204082 84.4897959 50.6122449 67.3469388 51.0204082 57.1428571", "43.6734694 58.7755102 48.5714286 57.1428571 48.9795918 67.3469388 48.5714286 84.4897959 48.1632653 107.346939 44.4897959 103.673469 40.8163265 91.4285714 40.8163265 78.3673469 41.2244898 64.4897959"],
+  "biceps": ["16.7346939 68.1632653 17.9591837 71.4285714 22.8571429 66.122449 28.9795918 53.877551 27.755102 49.3877551 20.4081633 55.9183673", "71.4285714 49.3877551 70.2040816 54.6938776 76.3265306 66.122449 81.6326531 71.8367347 82.8571429 68.9795918 78.7755102 55.5102041"],
+  "triceps": ["69.3877551 55.5102041 69.3877551 61.6326531 75.9183673 72.6530612 77.5510204 70.2040816 75.5102041 67.3469388", "22.4489796 69.3877551 29.7959184 55.5102041 29.7959184 60.8163265 22.8571429 73.0612245"],
+  "neck": ["55.5102041 23.6734694 50.6122449 33.4693878 50.6122449 39.1836735 61.6326531 40 70.6122449 44.8979592 69.3877551 36.7346939 63.2653061 35.1020408 58.3673469 30.6122449", "28.9795918 44.8979592 30.2040816 37.1428571 36.3265306 35.1020408 41.2244898 30.2040816 44.4897959 24.4897959 48.9795918 33.877551 48.5714286 39.1836735 37.9591837 39.5918367"],
+  "front-deltoids": ["78.3673469 53.0612245 79.5918367 47.755102 79.1836735 41.2244898 75.9183673 37.9591837 71.0204082 36.3265306 72.244898 42.8571429 71.4285714 47.3469388", "28.1632653 47.3469388 21.2244898 53.0612245 20 47.755102 20.4081633 40.8163265 24.4897959 37.1428571 28.5714286 37.1428571 26.9387755 43.2653061"],
+  "head": ["42.4489796 2.85714286 40 11.8367347 42.0408163 19.5918367 46.122449 23.2653061 49.7959184 25.3061224 54.6938776 22.4489796 57.5510204 19.1836735 59.1836735 10.2040816 57.1428571 2.44897959 49.7959184 0"],
+  "abductors": ["52.6530612 110.204082 54.2857143 124.897959 60 110.204082 62.0408163 100 64.8979592 94.2857143 60 92.6530612 56.7346939 104.489796", "47.755102 110.612245 44.8979592 125.306122 42.0408163 115.918367 40.4081633 113.061224 39.5918367 107.346939 37.9591837 102.44898 34.6938776 93.877551 39.5918367 92.244898 41.6326531 99.1836735 43.6734694 105.306122"],
+  "quadriceps": ["34.6938776 98.7755102 37.1428571 108.163265 37.1428571 127.755102 34.2857143 137.142857 31.0204082 132.653061 29.3877551 120 28.1632653 111.428571 29.3877551 100.816327 32.244898 94.6938776", "63.2653061 105.714286 64.4897959 100 66.9387755 94.6938776 70.2040816 101.22449 71.0204082 111.836735 68.1632653 133.061224 65.3061224 137.55102 62.4489796 128.571429 62.0408163 111.428571", "38.7755102 129.387755 38.3673469 112.244898 41.2244898 118.367347 44.4897959 129.387755 42.8571429 135.102041 40 146.122449 36.3265306 146.530612 35.5102041 140", "59.5918367 145.714286 55.5102041 128.979592 60.8163265 113.877551 61.2244898 130.204082 64.0816327 139.591837 62.8571429 146.530612", "32.6530612 138.367347 26.5306122 145.714286 25.7142857 136.734694 25.7142857 127.346939 26.9387755 114.285714 29.3877551 133.469388", "71.8367347 113.061224 73.877551 124.081633 73.877551 140.408163 72.6530612 145.714286 66.5306122 138.367347 70.2040816 133.469388"],
+  "knees": ["33.877551 140 34.6938776 143.265306 35.5102041 147.346939 36.3265306 151.020408 35.1020408 156.734694 29.7959184 156.734694 27.3469388 152.653061 27.3469388 147.346939 30.2040816 144.081633", "65.7142857 140 72.244898 147.755102 72.244898 152.244898 69.7959184 157.142857 64.8979592 156.734694 62.8571429 151.020408"],
+  "calves": ["71.4285714 160.408163 73.4693878 153.469388 76.7346939 161.22449 79.5918367 167.755102 78.3673469 187.755102 79.5918367 195.510204 74.6938776 195.510204", "24.8979592 194.693878 27.755102 164.897959 28.1632653 160.408163 26.122449 154.285714 24.8979592 157.55102 22.4489796 161.632653 20.8163265 167.755102 22.0408163 188.163265 20.8163265 195.510204", "72.6530612 195.102041 69.7959184 159.183673 65.3061224 158.367347 64.0816327 162.44898 64.0816327 165.306122 65.7142857 177.142857", "35.5102041 158.367347 35.9183673 162.44898 35.9183673 166.938776 35.1020408 172.244898 35.1020408 176.734694 32.244898 182.040816 30.6122449 187.346939 26.9387755 194.693878 27.3469388 187.755102 28.1632653 180.408163 28.5714286 175.510204 28.9795918 169.795918 29.7959184 164.081633 30.2040816 158.77551"],
+  "forearm": ["6.12244898 88.5714286 10.2040816 75.1020408 14.6938776 70.2040816 16.3265306 74.2857143 19.1836735 73.4693878 4.48979592 97.5510204 0 100", "84.4897959 69.7959184 83.2653061 73.4693878 80 73.0612245 95.1020408 98.3673469 100 100.408163 93.4693878 89.3877551 89.7959184 76.3265306", "77.5510204 72.244898 77.5510204 77.5510204 80.4081633 84.0816327 85.3061224 89.7959184 92.244898 101.22449 94.6938776 99.5918367", "6.93877551 101.22449 13.4693878 90.6122449 18.7755102 84.0816327 21.6326531 77.1428571 21.2244898 71.8367347 4.89795918 98.7755102"]
+};
+
+const POSTERIOR_POLY_POINTS = {
+  "head": ["50.6382979 0 45.9574468 0.85106383 40.8510638 5.53191489 40.4255319 12.7659574 45.106383 20 55.7446809 20 59.1489362 13.6170213 59.5744681 4.68085106 55.7446809 1.27659574"],
+  "trapezius": ["44.6808511 21.7021277 47.6595745 21.7021277 47.2340426 38.2978723 47.6595745 64.6808511 38.2978723 53.1914894 35.3191489 40.8510638 31.0638298 36.5957447 39.1489362 33.1914894 43.8297872 27.2340426", "52.3404255 21.7021277 55.7446809 21.7021277 56.5957447 27.2340426 60.8510638 32.7659574 68.9361702 36.5957447 64.6808511 40.4255319 61.7021277 53.1914894 52.3404255 64.6808511 53.1914894 38.2978723"],
+  "back-deltoids": ["29.3617021 37.0212766 22.9787234 39.1489362 17.4468085 44.2553191 18.2978723 53.6170213 24.2553191 49.3617021 27.2340426 46.3829787", "71.0638298 37.0212766 78.2978723 39.5744681 82.5531915 44.6808511 81.7021277 53.6170213 74.893617 48.9361702 72.3404255 45.106383"],
+  "upper-back": ["31.0638298 38.7234043 28.0851064 48.9361702 28.5106383 55.3191489 34.0425532 75.3191489 47.2340426 71.0638298 47.2340426 66.3829787 36.5957447 54.0425532 33.6170213 41.2765957", "68.9361702 38.7234043 71.9148936 49.3617021 71.4893617 56.1702128 65.9574468 75.3191489 52.7659574 71.0638298 52.7659574 66.3829787 63.4042553 54.4680851 66.3829787 41.7021277"],
+  "triceps": ["26.8085106 49.787234 17.8723404 55.7446809 14.4680851 72.3404255 16.5957447 81.7021277 21.7021277 63.8297872 26.8085106 55.7446809", "73.6170213 50.212766 82.1276596 55.7446809 85.9574468 73.1914894 83.4042553 82.1276596 77.8723404 62.9787234 73.1914894 55.7446809", "26.8085106 58.2978723 26.8085106 68.5106383 22.9787234 75.3191489 19.1489362 77.4468085 22.5531915 65.5319149", "72.7659574 58.2978723 77.0212766 64.6808511 80.4255319 77.4468085 76.5957447 75.3191489 72.7659574 68.9361702"],
+  "lower-back": ["47.6595745 72.7659574 34.4680851 77.0212766 35.3191489 83.4042553 49.3617021 102.12766 46.8085106 82.9787234", "52.3404255 72.7659574 65.5319149 77.0212766 64.6808511 83.4042553 50.6382979 102.12766 53.1914894 83.8297872"],
+  "forearm": ["86.3829787 75.7446809 91.0638298 83.4042553 93.1914894 94.0425532 100 106.382979 96.1702128 104.255319 88.0851064 89.3617021 84.2553191 83.8297872", "13.6170213 75.7446809 8.93617021 83.8297872 6.80851064 93.6170213 0 106.382979 3.82978723 104.255319 12.3404255 88.5106383 15.7446809 82.9787234", "81.2765957 79.5744681 77.4468085 77.8723404 79.1489362 84.6808511 91.0638298 103.829787 93.1914894 108.93617 94.4680851 104.680851", "18.7234043 79.5744681 22.1276596 77.8723404 20.8510638 84.2553191 9.36170213 102.978723 6.80851064 108.510638 5.10638298 104.680851"],
+  "gluteal": ["44.6808511 99.5744681 30.212766 108.510638 29.787234 118.723404 31.4893617 125.957447 47.2340426 121.276596 49.3617021 114.893617", "55.3191489 99.1489362 51.0638298 114.468085 52.3404255 120.851064 68.0851064 125.957447 69.787234 119.148936 69.3617021 108.510638"],
+  "adductor": ["48.0851064 122.978723 44.6808511 122.978723 41.2765957 125.531915 45.106383 144.255319 48.5106383 135.744681 48.9361702 129.361702", "51.9148936 122.553191 55.7446809 123.404255 59.1489362 125.957447 54.893617 144.255319 51.9148936 136.170213 51.0638298 129.361702"],
+  "hamstring": ["28.9361702 122.12766 31.0638298 129.361702 36.5957447 125.957447 35.3191489 135.319149 34.4680851 150.212766 29.3617021 158.297872 28.9361702 146.808511 27.6595745 141.276596 27.2340426 131.489362", "71.4893617 121.702128 69.3617021 128.93617 63.8297872 125.957447 65.5319149 136.595745 66.3829787 150.212766 71.0638298 158.297872 71.4893617 147.659574 72.7659574 142.12766 73.6170213 131.914894", "38.7234043 125.531915 44.2553191 145.957447 40.4255319 166.808511 36.1702128 152.765957 37.0212766 135.319149", "61.7021277 125.531915 63.4042553 136.170213 64.2553191 153.191489 60 166.808511 56.1702128 146.382979"],
+  "knees": ["34.4680851 153.191489 31.0638298 159.148936 33.6170213 166.382979 37.4468085 162.553191", "66.3829787 153.617021 62.9787234 162.978723 66.8085106 166.382979 69.3617021 159.148936"],
+  "calves": ["29.3617021 160.425532 28.5106383 167.234043 24.6808511 179.574468 23.8297872 192.765957 25.5319149 197.021277 28.5106383 193.191489 29.787234 180 31.9148936 171.06383 31.9148936 166.808511", "37.4468085 165.106383 35.3191489 167.659574 33.1914894 171.914894 31.0638298 180.425532 30.212766 191.914894 34.0425532 200 38.7234043 190.638298 39.1489362 168.93617", "62.9787234 165.106383 61.2765957 168.510638 61.7021277 190.638298 66.3829787 199.574468 70.6382979 191.914894 68.9361702 179.574468 66.8085106 170.212766", "70.6382979 160.425532 72.3404255 168.510638 75.7446809 179.148936 76.5957447 192.765957 74.4680851 196.595745 72.3404255 193.617021 70.6382979 179.574468 68.0851064 168.085106"],
+  "left-soleus": ["28.5106383 195.744681 30.212766 195.744681 33.6170213 201.702128 30.6382979 220 28.5106383 213.617021 26.8085106 198.297872"],
+  "right-soleus": ["69.787234 195.744681 71.9148936 195.744681 73.6170213 198.297872 71.9148936 213.191489 70.212766 219.574468 67.2340426 202.12766"]
+};
+
+// Músculos que existen en el dibujo de la librería pero que no
+// corresponden a ningún grupo del catálogo, o que no tiene sentido poder
+// tocar: cabeza, cuello/clavícula visto de frente, rodillas (no es
+// músculo), la franja de cadera entre abdomen y cuádriceps (sería flexor
+// de cadera, no está modelado), oblicuos (queda muy parecido a "las
+// costillas" y no tenemos ese grupo separado), aductor (cara interna del
+// muslo, tampoco modelado) y la parte baja de la espalda (ya cubierta por
+// dorsales a través de "upper-back", para no duplicar).
+const NON_INTERACTIVE_SLUGS = new Set(["head", "neck", "knees", "abductors", "adductor", "obliques", "lower-back"]);
+
+function buildPolyIndexToSlug(order) {
+  const out = [];
+  order.forEach(([slug, count]) => { for (let i = 0; i < count; i++) out.push(slug); });
+  return out;
+}
+const ANTERIOR_POLY_SLUGS = buildPolyIndexToSlug(ANTERIOR_POLY_ORDER);
+const POSTERIOR_POLY_SLUGS = buildPolyIndexToSlug(POSTERIOR_POLY_ORDER);
+
+// Mismo dibujo que ve la librería en pantalla, pero reconstruido a mano
+// con sus mismos puntos exactos — así la imagen para compartir queda
+// igual a lo que se ve en la app, sin depender de capturar nada del DOM
+// en vivo (lo que podía fallar y no generar la imagen).
+function buildSvgPolygonsForView(order, points, ranks, neutral) {
+  const fillFor = (slug) => {
+    if (NON_INTERACTIVE_SLUGS.has(slug)) return neutral;
+    const keys = Object.entries(BODY_HIGHLIGHTER_SLUG_MAP).filter(([, s]) => s === slug || (slug.endsWith("-soleus") && s === "calves")).map(([k]) => k);
+    if (!keys.length) return neutral;
+    const best = keys.reduce((a, b) => ((ranks[b]?.levelIdx ?? -1) > (ranks[a]?.levelIdx ?? -1) ? b : a));
+    return ranks[best]?.color || neutral;
+  };
+  return order.map(([slug]) => {
+    const color = fillFor(slug);
+    return (points[slug] || []).map((p) => `<polygon points="${p}" fill="${color}" />`).join("");
+  }).join("");
+}
 function buildMuscleBodySvgMarkup(view, ranks) {
-  const fillFor = (key) => ranks[key]?.color || "#334155";
   const NEUTRAL = "#334155";
-  if (view === "front") {
-    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 420">
-      <circle cx="120" cy="26" r="19" fill="${NEUTRAL}" />
-      <polygon points="109,42 131,42 127,53 113,53" fill="${NEUTRAL}" />
-      <ellipse cx="66" cy="68" rx="18" ry="15" fill="${fillFor("deltoide_lateral")}" />
-      <ellipse cx="174" cy="68" rx="18" ry="15" fill="${fillFor("deltoide_lateral")}" />
-      <ellipse cx="80" cy="80" rx="15" ry="14" fill="${fillFor("deltoide_anterior")}" />
-      <ellipse cx="160" cy="80" rx="15" ry="14" fill="${fillFor("deltoide_anterior")}" />
-      <ellipse cx="98" cy="78" rx="24" ry="17" fill="${fillFor("pectoral_superior")}" />
-      <ellipse cx="142" cy="78" rx="24" ry="17" fill="${fillFor("pectoral_superior")}" />
-      <ellipse cx="98" cy="104" rx="25" ry="20" fill="${fillFor("pectoral_medio")}" />
-      <ellipse cx="142" cy="104" rx="25" ry="20" fill="${fillFor("pectoral_medio")}" />
-      <line x1="120" y1="64" x2="120" y2="122" stroke="#0a0a0f" stroke-width="2" opacity="0.3" />
-      <rect x="40" y="84" width="22" height="64" rx="11" fill="${fillFor("biceps")}" />
-      <rect x="178" y="84" width="22" height="64" rx="11" fill="${fillFor("biceps")}" />
-      <ellipse cx="51" cy="101" rx="10" ry="8" fill="#fff" opacity="0.14" />
-      <ellipse cx="189" cy="101" rx="10" ry="8" fill="#fff" opacity="0.14" />
-      <rect x="37" y="148" width="20" height="60" rx="10" fill="${fillFor("antebrazos")}" />
-      <rect x="183" y="148" width="20" height="60" rx="10" fill="${fillFor("antebrazos")}" />
-      <circle cx="47" cy="216" r="9" fill="${NEUTRAL}" />
-      <circle cx="193" cy="216" r="9" fill="${NEUTRAL}" />
-      <rect x="86" y="126" width="11" height="50" rx="6" fill="${fillFor("core")}" opacity="0.55" />
-      <rect x="143" y="126" width="11" height="50" rx="6" fill="${fillFor("core")}" opacity="0.55" />
-      <rect x="100" y="128" width="16" height="14" rx="4" fill="${fillFor("core")}" />
-      <rect x="124" y="128" width="16" height="14" rx="4" fill="${fillFor("core")}" />
-      <rect x="100" y="145" width="16" height="14" rx="4" fill="${fillFor("core")}" />
-      <rect x="124" y="145" width="16" height="14" rx="4" fill="${fillFor("core")}" />
-      <rect x="100" y="162" width="16" height="14" rx="4" fill="${fillFor("core")}" />
-      <rect x="124" y="162" width="16" height="14" rx="4" fill="${fillFor("core")}" />
-      <polygon points="84,176 156,176 162,198 78,198" fill="${NEUTRAL}" />
-      <rect x="79" y="196" width="37" height="108" rx="17" fill="${fillFor("cuadriceps")}" />
-      <rect x="124" y="196" width="37" height="108" rx="17" fill="${fillFor("cuadriceps")}" />
-      <ellipse cx="90" cy="228" rx="11" ry="22" fill="#fff" opacity="0.12" />
-      <ellipse cx="150" cy="228" rx="11" ry="22" fill="#fff" opacity="0.12" />
-      <ellipse cx="93" cy="324" rx="14" ry="18" fill="${NEUTRAL}" />
-      <ellipse cx="147" cy="324" rx="14" ry="18" fill="${NEUTRAL}" />
-      <rect x="84" y="338" width="18" height="48" rx="9" fill="${NEUTRAL}" />
-      <rect x="138" y="338" width="18" height="48" rx="9" fill="${NEUTRAL}" />
-      <ellipse cx="93" cy="398" rx="16" ry="8" fill="${NEUTRAL}" />
-      <ellipse cx="147" cy="398" rx="16" ry="8" fill="${NEUTRAL}" />
-    </svg>`;
-  }
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 420">
-    <circle cx="120" cy="26" r="19" fill="${NEUTRAL}" />
-    <polygon points="109,42 131,42 127,53 113,53" fill="${NEUTRAL}" />
-    <ellipse cx="68" cy="70" rx="20" ry="16" fill="${fillFor("deltoide_posterior")}" />
-    <ellipse cx="172" cy="70" rx="20" ry="16" fill="${fillFor("deltoide_posterior")}" />
-    <polygon points="120,44 153,78 120,98 87,78" fill="${fillFor("trapecio")}" />
-    <polygon points="80,84 160,84 154,142 148,180 92,180 86,142" fill="${fillFor("dorsales")}" />
-    <line x1="120" y1="86" x2="120" y2="178" stroke="#0a0a0f" stroke-width="2" opacity="0.25" />
-    <rect x="40" y="84" width="22" height="64" rx="11" fill="${fillFor("triceps")}" />
-    <rect x="178" y="84" width="22" height="64" rx="11" fill="${fillFor("triceps")}" />
-    <ellipse cx="51" cy="118" rx="9" ry="14" fill="#fff" opacity="0.12" />
-    <ellipse cx="189" cy="118" rx="9" ry="14" fill="#fff" opacity="0.12" />
-    <rect x="37" y="148" width="20" height="60" rx="10" fill="${NEUTRAL}" />
-    <rect x="183" y="148" width="20" height="60" rx="10" fill="${NEUTRAL}" />
-    <circle cx="47" cy="216" r="9" fill="${NEUTRAL}" />
-    <circle cx="193" cy="216" r="9" fill="${NEUTRAL}" />
-    <ellipse cx="98" cy="198" rx="26" ry="23" fill="${fillFor("gluteo")}" />
-    <ellipse cx="142" cy="198" rx="26" ry="23" fill="${fillFor("gluteo")}" />
-    <rect x="79" y="216" width="37" height="96" rx="17" fill="${fillFor("femoral")}" />
-    <rect x="124" y="216" width="37" height="96" rx="17" fill="${fillFor("femoral")}" />
-    <ellipse cx="93" cy="324" rx="15" ry="20" fill="${fillFor("pantorrillas")}" />
-    <ellipse cx="147" cy="324" rx="15" ry="20" fill="${fillFor("pantorrillas")}" />
-    <rect x="84" y="340" width="18" height="46" rx="9" fill="${fillFor("pantorrillas")}" />
-    <rect x="138" y="340" width="18" height="46" rx="9" fill="${fillFor("pantorrillas")}" />
-    <ellipse cx="93" cy="398" rx="16" ry="8" fill="${NEUTRAL}" />
-    <ellipse cx="147" cy="398" rx="16" ry="8" fill="${NEUTRAL}" />
-  </svg>`;
+  const order = view === "front" ? ANTERIOR_POLY_ORDER : POSTERIOR_POLY_ORDER;
+  const points = view === "front" ? ANTERIOR_POLY_POINTS : POSTERIOR_POLY_POINTS;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 200">${buildSvgPolygonsForView(order, points, ranks, NEUTRAL)}</svg>`;
 }
 
 function svgMarkupToImage(svgMarkup) {
@@ -1703,7 +1724,7 @@ async function drawMuscleRankShareCard(ctx, W, H, { ranks, modeLabel, accent = "
     svgMarkupToImage(buildMuscleBodySvgMarkup("front", ranks)),
     svgMarkupToImage(buildMuscleBodySvgMarkup("back", ranks)),
   ]);
-  const bodyW = 360, bodyH = bodyW * (420 / 240);
+  const bodyW = 360, bodyH = bodyW * 2;
   const gap = 50;
   const startX = (W - (bodyW * 2 + gap)) / 2;
   const bodyY = 360;
@@ -2886,7 +2907,7 @@ const HELP_CHAPTERS = [
       {
         icon: <Award size={20} />,
         title: "Rango por músculo",
-        text: "El \"muñeco\" de toda la vida, de frente y de espalda: cada músculo se pinta según el rango que alcanzaste ahí — Bronce, Plata, Oro, Platino, Esmeralda, Diamante o Maestro en rojo (el techo), cada uno con tres niveles (I, II y III) — calculado con tu 1RM estimado en cualquier ejercicio de ese grupo, usando estándares de fuerza reales. Siempre se prioriza un ejercicio dedicado a ese músculo si tenés marca ahí; sólo si no entrenaste nada directo, usa de forma secundaria lo que aportan ejercicios compuestos relacionados (por ejemplo, un remo entrena la espalda ancha como principal pero también un poco el bíceps y el deltoides posterior), con menos peso que un ejercicio dedicado. Elegís entre \"General\" (una vara fija, igual para todos) o \"Según tu contexto\" (ajusta el cálculo a tu peso, sexo y edad — cargalos en tu perfil). Tocá un músculo para que se resalte con un borde blanco y ver tu rango y tu mejor marca — y desde el ícono de compartir podés mandar una imagen con tus rangos.",
+        text: "El \"muñeco\" de toda la vida, de frente y de espalda: cada músculo se pinta según el rango que alcanzaste ahí — Bronce, Plata, Oro, Platino, Esmeralda, Diamante o Maestro en rojo (el techo), cada uno con tres niveles (I, II y III) — calculado con tu 1RM estimado en cualquier ejercicio de ese grupo, usando estándares de fuerza reales. Siempre se prioriza un ejercicio dedicado a ese músculo si tenés marca ahí; sólo si no entrenaste nada directo, usa de forma secundaria lo que aportan ejercicios compuestos relacionados (por ejemplo, un remo entrena la espalda ancha como principal pero también un poco el bíceps y el deltoides posterior), con menos peso que un ejercicio dedicado. Elegís entre \"General\" (una vara fija, igual para todos) o \"Según tu contexto\" (ajusta el cálculo a tu peso, sexo y edad — cargalos en tu perfil). Tocá un músculo entrenable para que se resalte completo con un borde blanco y ver tu rango, tu mejor marca, y cuántos kilos más necesitás (a tus mismas repeticiones) para subir al rango siguiente — cabeza, cuello, articulaciones y alguna zona sin músculo asignado no son tocables. Desde el ícono de compartir podés mandar una imagen con tus rangos.",
         demo: { kind: "progreso", view: "rank" },
       },
       {
@@ -4071,7 +4092,7 @@ function getMuscleRank(muscleKey, best1RM, mode = "general", bodyWeightKg = 0, s
 // mancuernas) multiplica el kg logueado antes de calcular el 1RM, para
 // que sea comparable contra estándares de barra (peso total).
 function scanContributorsFor1RM(contributors, logs, overriddenBaseKeys) {
-  let best1RM = 0, bestKg = 0, bestReps = 0, bestExerciseId = null, bestLoadFactor = 1;
+  let best1RM = 0, bestKg = 0, bestReps = 0, bestExerciseId = null, bestLoadFactor = 1, bestWeight = 1;
   Object.entries(logs).forEach(([key, val]) => {
     const isOverride = key.endsWith("_pr_override");
     const baseKey = isOverride ? key.replace(/_pr_override$/, "") : key;
@@ -4084,10 +4105,10 @@ function scanContributorsFor1RM(contributors, logs, overriddenBaseKeys) {
     entries.forEach((e) => {
       if (!e || !e.kg || !e.reps) return;
       const rm = estimate1RM(e.kg * lf, e.reps) * weight;
-      if (rm > best1RM) { best1RM = rm; bestKg = e.kg; bestReps = e.reps; bestExerciseId = exerciseId; bestLoadFactor = lf; }
+      if (rm > best1RM) { best1RM = rm; bestKg = e.kg; bestReps = e.reps; bestExerciseId = exerciseId; bestLoadFactor = lf; bestWeight = weight; }
     });
   });
-  return { best1RM, bestKg, bestReps, bestExerciseId, bestLoadFactor };
+  return { best1RM, bestKg, bestReps, bestExerciseId, bestLoadFactor, bestWeight };
 }
 
 function getBest1RMForMuscleGroup(groupKey, logs) {
@@ -4099,15 +4120,20 @@ function getBest1RMForMuscleGroup(groupKey, logs) {
   const alwaysResult = scanContributorsFor1RM(always, logs, overriddenBaseKeys);
   let best = primaryResult.best1RM >= alwaysResult.best1RM ? primaryResult : alwaysResult;
   if (best === alwaysResult && alwaysResult.best1RM > 0) {
-    // Ganó un "siempre cuenta" (ej. press banca para tríceps) — no se
-    // muestra como la fuente; si había alguna marca principal (aunque
-    // menor), se prioriza mostrar esa en su lugar.
-    best = { ...alwaysResult, bestExerciseId: primaryResult.bestExerciseId || null };
+    // Ganó un "siempre cuenta" (ej. press banca para tríceps) — nunca se
+    // muestra ese ejercicio como la fuente. Si hay marca propia en un
+    // ejercicio dedicado (aunque sea menor), se muestra ESA marca real
+    // (su propio kg×reps, no mezclado con el del que ganó el número). Si
+    // no hay ninguna marca dedicada todavía, no se nombra ningún
+    // ejercicio en particular.
+    best = primaryResult.bestExerciseId
+      ? { ...alwaysResult, bestKg: primaryResult.bestKg, bestReps: primaryResult.bestReps, bestExerciseId: primaryResult.bestExerciseId }
+      : { ...alwaysResult, bestKg: null, bestReps: null, bestExerciseId: null };
   }
   if (best.best1RM <= 0) best = scanContributorsFor1RM(secondary, logs, overriddenBaseKeys);
 
   return {
-    best1RM: best.best1RM, bestKg: best.bestKg, bestReps: best.bestReps, bestLoadFactor: best.bestLoadFactor,
+    best1RM: best.best1RM, bestKg: best.bestKg, bestReps: best.bestReps, bestLoadFactor: best.bestLoadFactor, bestWeight: best.bestWeight,
     bestExerciseName: best.bestExerciseId ? (EXERCISE_LIBRARY_BY_ID[best.bestExerciseId]?.name || best.bestExerciseId) : null,
   };
 }
@@ -4122,14 +4148,14 @@ function RankBadgeIcon({ tier, sub, color, size = 26 }) {
   const [imgError, setImgError] = useState(false);
   const tierFile = (tier || "bronce").toLowerCase();
   return (
-    <div className="shrink-0" style={{ position: "relative", width: size, height: size, filter: `drop-shadow(0 3px 6px ${color}80)` }}>
+    <div className="shrink-0" style={{ position: "relative", width: size, height: size, filter: `drop-shadow(0 2px 3px ${color}55)`, overflow: "hidden", borderRadius: "20%" }}>
       {!imgError ? (
         <img
           src={`/insignias/${tierFile}.png`}
           alt={`${tier || ""}${sub ? ` ${sub}` : ""}`.trim()}
           onError={() => setImgError(true)}
           draggable={false}
-          style={{ width: "100%", height: "100%", objectFit: "contain" }}
+          style={{ width: "100%", height: "100%", objectFit: "cover" }}
         />
       ) : (
         <div style={{ width: "100%", height: "100%", borderRadius: "50%", backgroundColor: color }} />
@@ -4176,8 +4202,16 @@ const BODY_HIGHLIGHTER_SLUG_MAP = {
   core: "abs", pantorrillas: "calves",
 };
 function getOurGroupKeysForSlug(slug) {
-  if (slug === "obliques") return ["core"];
   return Object.entries(BODY_HIGHLIGHTER_SLUG_MAP).filter(([, s]) => s === slug).map(([k]) => k);
+}
+// El sóleo es parte de la pantorrilla, pero en la librería es un slug
+// aparte (left-soleus/right-soleus) — así que cuenta como "pantorrillas"
+// también, para que la gemela se pinte completa y no a medias.
+function getSlugsForOurGroup(ourKey) {
+  const slug = BODY_HIGHLIGHTER_SLUG_MAP[ourKey];
+  if (!slug) return [];
+  if (slug === "calves") return ["calves", "left-soleus", "right-soleus"];
+  return [slug];
 }
 
 function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backRef }) {
@@ -4188,75 +4222,67 @@ function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backR
       const lvl = ranks[ourKey]?.levelIdx ?? -1;
       if (lvl > (bestLevelBySlug[slug] ?? -1)) bestLevelBySlug[slug] = lvl;
     });
-    const out = Object.entries(bestLevelBySlug)
+    if (bestLevelBySlug.calves != null) {
+      bestLevelBySlug["left-soleus"] = bestLevelBySlug.calves;
+      bestLevelBySlug["right-soleus"] = bestLevelBySlug.calves;
+    }
+    return Object.entries(bestLevelBySlug)
       .filter(([, lvl]) => lvl >= 0)
       .map(([slug, lvl]) => ({ name: slug, muscles: [slug], frequency: lvl + 1 }));
-    // El "core" también pinta los oblicuos con el mismo rango — no tenemos
-    // un grupo separado para oblicuos en el catálogo.
-    const coreLevel = ranks.core?.levelIdx ?? -1;
-    if (coreLevel >= 0) out.push({ name: "obliques", muscles: ["obliques"], frequency: coreLevel + 1 });
-    return out;
   }, [ranks]);
 
-  const handleClick = ({ muscle }) => {
-    const keys = getOurGroupKeysForSlug(muscle);
+  // Clic e identificación del músculo: antes esto comparaba colores de
+  // relleno para adivinar qué tocaste, y fallaba todo el tiempo —
+  // músculos de varias piezas (cuádriceps: 6, antebrazo/isquiotibial: 4
+  // cada uno) sólo se resaltaban a medias, y músculos DISTINTOS que
+  // coincidían en el mismo color de rango (ej. glúteo y aductor, los dos
+  // sin marcas todavía) se resaltaban juntos por error. Ahora cada
+  // polígono se identifica por su ÍNDICE exacto dentro del SVG (los
+  // mismos índices que usa la propia librería internamente), así que no
+  // hay ninguna ambigüedad: se sabe con certeza a qué músculo pertenece
+  // cada polígono, sin importar el color que tenga.
+  const handlePolygonClick = (view) => (e) => {
+    const poly = e.target.closest?.("polygon");
+    if (!poly) return;
+    const svg = poly.closest("svg");
+    if (!svg) return;
+    const idx = Array.from(svg.querySelectorAll("polygon")).indexOf(poly);
+    const slug = (view === "front" ? ANTERIOR_POLY_SLUGS : POSTERIOR_POLY_SLUGS)[idx];
+    if (!slug || NON_INTERACTIVE_SLUGS.has(slug)) return;
+    // El gemelo visto de frente en realidad es otro músculo (tibial
+    // anterior) — no se deja tocar desde ahí, sólo desde la espalda.
+    if (view === "front" && slug === "calves") return;
+    const keys = getOurGroupKeysForSlug(slug);
     if (!keys.length) return;
     const best = keys.reduce((a, b) => ((ranks[b]?.levelIdx ?? -1) > (ranks[a]?.levelIdx ?? -1) ? b : a));
     onMuscleClick(best);
   };
 
-  // La librería no expone una forma de marcar UN músculo puntual con
-  // borde (sólo controla el relleno), así que el resaltado se hace "a
-  // mano". La PRIMERA versión de esto comparaba colores (buscaba qué
-  // polígono tenía el mismo relleno que el músculo seleccionado) — pero
-  // si dos músculos distintos llegan al mismo rango (mismo color exacto,
-  // ej. los dos en Maestro III), eso resaltaba TODOS los que comparten
-  // ese color a la vez, no sólo el tocado. Ahora se intercepta el click
-  // a nivel DOM (la librería no pasa el evento nativo a su prop onClick,
-  // sólo {muscle, data}) y se guarda una referencia directa al <polygon>
-  // que realmente se tocó — sin ambigüedad posible. Si el músculo tiene
-  // dos mitades (ej. pecho izquierdo/derecho), también se resalta el
-  // polígono inmediato vecino si comparte el mismo relleno (son la otra
-  // mitad del mismo músculo, siempre quedan adyacentes en los datos de la
-  // librería), pero sin expandirse más allá de eso.
-  const lastClickedPolyRef = useRef(null);
+  // Resaltado con borde blanco: con los mismos índices exactos de arriba,
+  // se prende SIEMPRE el músculo completo (todas sus piezas) y nunca uno
+  // ajeno, sin importar si comparten color con otro músculo.
   useEffect(() => {
-    const cleanups = [];
-    [frontRef, backRef].forEach((ref) => {
+    const slugs = new Set(getSlugsForOurGroup(selected));
+    [{ ref: frontRef, order: ANTERIOR_POLY_SLUGS }, { ref: backRef, order: POSTERIOR_POLY_SLUGS }].forEach(({ ref, order }) => {
       const svg = ref.current?.querySelector("svg");
       if (!svg) return;
-      const onSvgClick = (e) => {
-        const poly = e.target.closest?.("polygon");
-        if (poly) lastClickedPolyRef.current = poly;
-      };
-      svg.addEventListener("click", onSvgClick);
-      cleanups.push(() => svg.removeEventListener("click", onSvgClick));
-    });
-    return () => cleanups.forEach((fn) => fn());
-  }, [data, frontRef, backRef]);
-
-  useEffect(() => {
-    [frontRef, backRef].forEach((ref) => {
-      ref.current?.querySelectorAll("polygon").forEach((p) => { p.style.stroke = "none"; p.style.strokeWidth = "0"; p.style.filter = "none"; });
-    });
-    const poly = selected ? lastClickedPolyRef.current : null;
-    if (!poly) return;
-    const applyHighlight = (p) => { p.style.stroke = "#f8fafc"; p.style.strokeWidth = "1.6"; p.style.filter = "drop-shadow(0 0 3px rgba(248,250,252,0.85))"; };
-    applyHighlight(poly);
-    const fill = poly.style.fill;
-    [poly.previousElementSibling, poly.nextElementSibling].forEach((sib) => {
-      if (sib && sib.tagName === "polygon" && sib.style.fill === fill) applyHighlight(sib);
+      svg.querySelectorAll("polygon").forEach((p, i) => {
+        const isSel = selected && slugs.has(order[i]);
+        p.style.stroke = isSel ? "#f8fafc" : "none";
+        p.style.strokeWidth = isSel ? "1.6" : "0";
+        p.style.filter = isSel ? "drop-shadow(0 0 3px rgba(248,250,252,0.85))" : "none";
+      });
     });
   }, [selected, data, frontRef, backRef]);
 
   return (
     <div className="flex gap-2 justify-center items-start">
       <div className="flex-1 min-w-0 max-w-[180px]">
-        <div ref={frontRef}><Model data={data} type="anterior" bodyColor="#334155" highlightedColors={highlightedColors} onClick={handleClick} style={{ width: "100%" }} svgStyle={{ width: "100%" }} /></div>
+        <div ref={frontRef} onClick={handlePolygonClick("front")}><Model data={data} type="anterior" bodyColor="#334155" highlightedColors={highlightedColors} onClick={() => {}} style={{ width: "100%" }} svgStyle={{ width: "100%" }} /></div>
         <p className="text-center text-[10px] text-slate-600 mt-1">De frente</p>
       </div>
       <div className="flex-1 min-w-0 max-w-[180px]">
-        <div ref={backRef}><Model data={data} type="posterior" bodyColor="#334155" highlightedColors={highlightedColors} onClick={handleClick} style={{ width: "100%" }} svgStyle={{ width: "100%" }} /></div>
+        <div ref={backRef} onClick={handlePolygonClick("back")}><Model data={data} type="posterior" bodyColor="#334155" highlightedColors={highlightedColors} onClick={() => {}} style={{ width: "100%" }} svgStyle={{ width: "100%" }} /></div>
         <p className="text-center text-[10px] text-slate-600 mt-1">De espalda</p>
       </div>
     </div>
@@ -4274,8 +4300,8 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
   const ranks = useMemo(() => {
     const out = {};
     MUSCLE_GROUPS.forEach((g) => {
-      const { best1RM, bestKg, bestReps, bestExerciseName, bestLoadFactor } = getBest1RMForMuscleGroup(g.key, logs);
-      out[g.key] = { ...getMuscleRank(g.key, best1RM, mode, bodyWeightKg, sex, age), best1RM, bestKg, bestReps, bestExerciseName, bestLoadFactor, label: g.label };
+      const { best1RM, bestKg, bestReps, bestExerciseName, bestLoadFactor, bestWeight } = getBest1RMForMuscleGroup(g.key, logs);
+      out[g.key] = { ...getMuscleRank(g.key, best1RM, mode, bodyWeightKg, sex, age), best1RM, bestKg, bestReps, bestExerciseName, bestLoadFactor, bestWeight, label: g.label };
     });
     return out;
   }, [logs, mode, bodyWeightKg, sex, age]);
@@ -4286,10 +4312,14 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
   // a partir del 1RM objetivo (el umbral del próximo nivel) se despeja,
   // con la misma fórmula de Epley y a las MISMAS repeticiones que tu
   // mejor marca, cuántos kg en la barra/mancuerna hacen falta — y se
-  // resta lo que ya levantás para saber cuánto más.
+  // resta lo que ya levantás para saber cuánto más. Importante: hay que
+  // dividir también por el "peso" de la contribución (1.0 si es un
+  // ejercicio principal, menos si es secundario, ej. 0.35 para el
+  // trapecio en un remo) — si no, el cálculo salía mal y mostraba "0kg"
+  // sin sentido cada vez que la mejor marca venía de un secundario.
   const nextTierInfo = selInfo && selInfo.nextThreshold != null && selInfo.levelIdx + 1 < RANK_TIERS.length ? RANK_TIERS[selInfo.levelIdx + 1] : null;
-  const extraKgNeeded = selInfo && selInfo.nextThreshold != null && selInfo.bestReps
-    ? Math.max(0, Math.ceil(((selInfo.nextThreshold / (1 + selInfo.bestReps / 30) / (selInfo.bestLoadFactor || 1)) - selInfo.bestKg) * 2) / 2)
+  const extraKgNeeded = selInfo && selInfo.nextThreshold != null && selInfo.bestReps && selInfo.bestKg
+    ? Math.max(0, Math.ceil(((selInfo.nextThreshold / (1 + selInfo.bestReps / 30) / (selInfo.bestWeight || 1) / (selInfo.bestLoadFactor || 1)) - selInfo.bestKg) * 2) / 2)
     : null;
   const needsWeight = mode === "relative" && !bodyWeightKg;
   const modeLabel = mode === "relative" && bodyWeightKg ? "Según tu contexto" : "General";
@@ -4324,21 +4354,25 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
           <div className="flex items-center justify-between mb-2 gap-2">
             <p className="text-sm font-bold text-white">{selInfo.label}</p>
             <span className="flex items-center gap-2 text-sm font-black pl-1.5 pr-3 py-1 rounded-xl shrink-0" style={{ backgroundColor: selInfo.color + "1c", color: selInfo.color }}>
-              <RankBadgeIcon tier={selInfo.tier} sub={selInfo.sub} color={selInfo.color} size={34} />
+              <RankBadgeIcon tier={selInfo.tier} sub={selInfo.sub} color={selInfo.color} size={48} />
               {selInfo.tier}{selInfo.sub ? ` ${selInfo.sub}` : ""}
             </span>
           </div>
           {selInfo.hasData ? (
             <>
               <p className="text-[11px] text-slate-500">
-                Mejor marca: <span className="text-slate-300 font-bold">{selInfo.bestReps}×{selInfo.bestKg}kg</span>{selInfo.bestLoadFactor > 1 ? <span className="text-slate-600"> (×2 mancuernas)</span> : null}{selInfo.bestExerciseName ? <> en {selInfo.bestExerciseName}</> : null}
+                {selInfo.bestKg ? (
+                  <>Mejor marca: <span className="text-slate-300 font-bold">{selInfo.bestReps}×{selInfo.bestKg}kg</span>{selInfo.bestLoadFactor > 1 ? <span className="text-slate-600"> (×2 mancuernas)</span> : null}{selInfo.bestExerciseName ? <> en {selInfo.bestExerciseName}</> : null}</>
+                ) : (
+                  <>Todavía no tenés una marca en un ejercicio dedicado a este músculo — esto es una estimación.</>
+                )}
               </p>
               {selInfo.nextThreshold ? (
                 <>
                   <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden mt-2">
                     <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(100, Math.max(4, ((selInfo.best1RM - selInfo.threshold) / (selInfo.nextThreshold - selInfo.threshold)) * 100))}%`, backgroundColor: selInfo.color }} />
                   </div>
-                  <p className="text-[10px] text-slate-600 mt-1">Te faltan {extraKgNeeded}kg (a tus mismas {selInfo.bestReps} reps) para subir a {nextTierInfo?.tier}{nextTierInfo?.sub ? ` ${nextTierInfo.sub}` : ""}</p>
+                  {extraKgNeeded != null && <p className="text-[10px] text-slate-600 mt-1">Te faltan {extraKgNeeded}kg (a tus mismas {selInfo.bestReps} reps) para subir a {nextTierInfo?.tier}{nextTierInfo?.sub ? ` ${nextTierInfo.sub}` : ""}</p>}
                 </>
               ) : <p className="text-[10px] text-amber-400 mt-1.5 font-bold">¡Rango máximo! 🏆</p>}
             </>
@@ -4352,7 +4386,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
           const rep = RANK_TIERS.find((r) => r.tier === t && r.sub === "II") || RANK_TIERS.find((r) => r.tier === t);
           return (
             <span key={t} className="flex items-center gap-1 text-[9px] text-slate-500">
-              <RankBadgeIcon tier={rep.tier} sub="" color={rep.color} size={22} />
+              <RankBadgeIcon tier={rep.tier} sub="" color={rep.color} size={32} />
               {t}
             </span>
           );
