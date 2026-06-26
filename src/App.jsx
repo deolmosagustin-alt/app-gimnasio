@@ -2911,7 +2911,7 @@ const HELP_CHAPTERS = [
       {
         icon: <Award size={20} />,
         title: "Rango por músculo",
-        text: "El \"muñeco\" de toda la vida, de frente y de espalda: cada músculo se pinta según el rango que alcanzaste ahí — Bronce, Plata, Oro, Platino, Esmeralda, Diamante o Maestro en rojo (el techo), cada uno con tres niveles (I, II y III) — calculado con tu 1RM estimado en cualquier ejercicio de ese grupo, usando estándares de fuerza reales. Incluye aductor y espalda baja además de los músculos principales. Siempre se prioriza un ejercicio dedicado a ese músculo si tenés marca ahí; sólo si no entrenaste nada directo, usa de forma secundaria lo que aportan ejercicios compuestos relacionados (por ejemplo, un remo entrena la espalda ancha como principal pero también un poco el bíceps y el deltoides posterior), con menos peso que un ejercicio dedicado — y si todavía no tenés ninguna marca ahí, directamente te dice \"Sin rango\" en vez de inventarte uno. Elegís entre \"General\" (una vara fija, igual para todos) o \"Según tu contexto\" (ajusta el cálculo a tu peso, sexo y edad — cargalos en tu perfil). Tocá un músculo entrenable para que se resalte completo con un borde blanco y ver tu rango, tu mejor marca, y cuántos kilos más necesitás (a tus mismas repeticiones) para subir al rango siguiente, que te muestra nombrado — cabeza, cuello, articulaciones y alguna zona sin músculo asignado no son tocables. Desde el ícono de compartir podés mandar una imagen con tus rangos.",
+        text: "El \"muñeco\" de toda la vida, de frente y de espalda: cada músculo se pinta según el rango que alcanzaste ahí — Bronce, Plata, Oro, Esmeralda, Diamante o Maestro en rojo (el techo), cada uno con tres niveles (I, II y III) — calculado con tu 1RM estimado en cualquier ejercicio de ese grupo, usando estándares de fuerza reales. Incluye aductor y espalda baja además de los músculos principales. Siempre se prioriza un ejercicio dedicado a ese músculo si tenés marca ahí; sólo si no entrenaste nada directo, usa de forma secundaria lo que aportan ejercicios compuestos relacionados (por ejemplo, un remo entrena la espalda ancha como principal pero también un poco el bíceps y el deltoides posterior), con menos peso que un ejercicio dedicado — y si todavía no tenés ninguna marca ahí, directamente te dice \"Sin rango\" en vez de inventarte uno. Elegís entre \"General\" (una vara fija, igual para todos) o \"Según tu contexto\" (ajusta el cálculo a tu peso, sexo y edad — cargalos en tu perfil). Tocá un músculo entrenable para que se resalte completo con un borde blanco y ver tu rango, tu mejor marca, y cuántos kilos más necesitás (a tus mismas repeticiones) para subir al rango siguiente, que te muestra nombrado — cabeza, cuello, articulaciones y alguna zona sin músculo asignado no son tocables. Desde el ícono de compartir podés mandar una imagen con tus rangos.",
         demo: { kind: "progreso", view: "rank" },
       },
       {
@@ -3930,18 +3930,16 @@ const PROGRESS_SECTIONS = [
    vez levantaste en cualquier ejercicio de ese grupo. Reemplaza a la vieja
    pestaña "Top PRs" (la vieja lista de 1RM estimado).
 
-   19 niveles en total: Bronce/Plata/Oro/Platino/Esmeralda/Diamante (cada
-   uno con I, II y III) + Maestro, el techo. Los colores son todos
-   distintos a propósito — son provisorios, pensados para que cada nivel
-   se distinga del resto, más adelante se pueden afinar para que combinen
-   mejor con la estética general de la app.
+   18 niveles en total: Bronce/Plata/Oro/Esmeralda/Diamante/Maestro (cada
+   uno con I, II y III). Platino se sacó de la lista de rangos — al
+   sacarlo, toda la progresión se recalculó de nuevo (no se borraron 3
+   niveles nomás y se dejó el resto pegado). Los colores son todos
+   distintos a propósito.
 ============================================================================ */
-// 21 niveles en total: los 7 rangos (Bronce, Plata, Oro, Platino,
-// Esmeralda, Diamante y ahora también Maestro) con sus tres sub-niveles
-// I/II/III cada uno — antes Maestro era un único nivel "techo", ahora
-// también se subdivide (Maestro III queda como el tope abierto, "180+kg"
-// en el ejemplo de banca). Colores todos distintos, con una rampa propia
-// para cada rango.
+// 18 niveles en total: los 6 rangos (Bronce, Plata, Oro, Esmeralda,
+// Diamante y Maestro) con sus tres sub-niveles I/II/III cada uno — Maestro
+// III queda como el tope abierto, "180+kg" en el ejemplo de banca.
+// Colores todos distintos, con una rampa propia para cada rango.
 const RANK_TIERS = [
   { tier: "Bronce", sub: "I", color: "#8B5A2B" },
   { tier: "Bronce", sub: "II", color: "#A8692F" },
@@ -3952,9 +3950,6 @@ const RANK_TIERS = [
   { tier: "Oro", sub: "I", color: "#C99A2E" },
   { tier: "Oro", sub: "II", color: "#E0B632" },
   { tier: "Oro", sub: "III", color: "#FFD23F" },
-  { tier: "Platino", sub: "I", color: "#3E9C95" },
-  { tier: "Platino", sub: "II", color: "#5FC1B9" },
-  { tier: "Platino", sub: "III", color: "#8BE0D8" },
   { tier: "Esmeralda", sub: "I", color: "#1E8449" },
   { tier: "Esmeralda", sub: "II", color: "#2FB866" },
   { tier: "Esmeralda", sub: "III", color: "#4CD787" },
@@ -3980,22 +3975,27 @@ const RANK_TIERS = [
      sexo y edad — más justo, pero necesita que cargues tus datos.
 ============================================================================ */
 
-// Las 4 tablas "ancla", con sus 21 niveles exactos tal como los pasaste.
+// Las 4 tablas "ancla" — empezaron como tus 21 niveles exactos, pero al
+// sacar Platino quedaron en 18: en vez de simplemente borrar esos 3 y
+// dejar pegados los de Esmeralda en su lugar, se "re-muestreó" la curva
+// completa (los 21 puntos originales) en 18 puntos nuevos, bien
+// repartidos a lo largo de toda la progresión — el primer y el último
+// nivel quedan iguales que antes, todo el resto se redistribuye.
 // Hombros no tenía tabla de multiplicador contextual en tu lista — se
 // derivó calculando, nivel por nivel, qué fracción es el press militar
 // del press de banca en la tabla general (ronda 0.6-0.7), y aplicando esa
 // misma fracción al multiplicador de banca en cada nivel.
 const ANCHOR_GENERAL_KG = {
-  pectoral_medio: [20, 30, 40, 45, 50, 55, 60, 67, 75, 82, 90, 100, 110, 117, 125, 132, 140, 150, 160, 170, 180],
-  cuadriceps: [30, 40, 50, 57, 65, 72, 80, 90, 100, 110, 120, 132, 142, 152, 165, 177, 190, 202, 215, 227, 240],
-  dorsales: [40, 50, 60, 70, 80, 90, 100, 112, 125, 137, 150, 162, 175, 187, 200, 212, 225, 240, 255, 270, 285],
-  deltoide_anterior: [15, 20, 25, 27, 32, 37, 42, 47, 52, 57, 62, 67, 72, 77, 82, 87, 92, 97, 102, 107, 115],
+  pectoral_medio: [20, 32, 42, 48, 54, 59, 67, 77, 85, 96, 108, 117, 126, 134, 145, 156, 168, 180],
+  cuadriceps: [30, 42, 52, 61, 70, 79, 91, 102, 114, 127, 140, 151, 166, 181, 196, 210, 225, 240],
+  dorsales: [40, 52, 64, 75, 87, 99, 113, 128, 142, 157, 172, 186, 201, 216, 232, 250, 267, 285],
+  deltoide_anterior: [15, 21, 26, 30, 36, 41, 47, 53, 59, 65, 71, 77, 83, 88, 94, 100, 106, 115],
 };
 const ANCHOR_CONTEXTUAL_MULT = {
-  pectoral_medio: [0.35, 0.45, 0.55, 0.62, 0.70, 0.77, 0.85, 0.92, 1.00, 1.07, 1.15, 1.22, 1.30, 1.37, 1.45, 1.52, 1.60, 1.70, 1.80, 1.90, 2.00],
-  cuadriceps: [0.45, 0.55, 0.65, 0.75, 0.85, 0.95, 1.05, 1.15, 1.25, 1.35, 1.45, 1.55, 1.65, 1.75, 1.85, 1.95, 2.07, 2.20, 2.32, 2.45, 2.60],
-  dorsales: [0.55, 0.67, 0.80, 0.92, 1.05, 1.17, 1.30, 1.42, 1.55, 1.67, 1.80, 1.92, 2.05, 2.17, 2.30, 2.42, 2.55, 2.70, 2.85, 3.00, 3.15],
-  deltoide_anterior: [0.26, 0.30, 0.34, 0.37, 0.45, 0.52, 0.59, 0.65, 0.69, 0.74, 0.79, 0.82, 0.85, 0.90, 0.95, 1.00, 1.05, 1.10, 1.15, 1.20, 1.28],
+  pectoral_medio: [0.35, 0.47, 0.57, 0.66, 0.75, 0.84, 0.92, 1.02, 1.10, 1.19, 1.28, 1.37, 1.46, 1.54, 1.65, 1.76, 1.88, 2.00],
+  cuadriceps: [0.45, 0.57, 0.69, 0.80, 0.92, 1.04, 1.16, 1.27, 1.39, 1.51, 1.63, 1.74, 1.86, 1.99, 2.13, 2.28, 2.43, 2.60],
+  dorsales: [0.55, 0.69, 0.84, 0.99, 1.13, 1.28, 1.43, 1.58, 1.72, 1.87, 2.02, 2.16, 2.31, 2.46, 2.62, 2.80, 2.97, 3.15],
+  deltoide_anterior: [0.26, 0.31, 0.35, 0.41, 0.50, 0.58, 0.65, 0.70, 0.76, 0.81, 0.84, 0.90, 0.96, 1.01, 1.07, 1.13, 1.19, 1.28],
 };
 
 // Grupos sin tabla propia: a qué ancla se parecen más y en qué proporción
@@ -4144,23 +4144,20 @@ function getBest1RMForMuscleGroup(groupKey, logs) {
   };
 }
 
-// Insignia de cada nivel — usa las imágenes PNG reales en
-// /insignias/{tier}.png (bronce, plata, oro, platino, esmeralda,
-// diamante, maestro), con el número romano (I/II/III) superpuesto abajo
-// y el mismo brillo de fondo (drop-shadow del color del nivel) que tenía
-// la versión dibujada a mano. Si la imagen no carga por algún motivo, cae
-// a un círculo simple del color del nivel en vez de mostrarse rota.
-// Insignias con las imágenes reales en /insignias/{tier}.png. Tres ajustes
-// pedidos:
+// Insignias con las imágenes reales en /insignias/{tier}.png (bronce,
+// plata, oro, esmeralda, diamante, maestro). El número romano (I/II/III)
+// va en un chip circular chico en la esquina inferior derecha — antes era
+// una franja que cruzaba toda la base y tapaba buena parte del dibujo de
+// la medalla, así queda bien visible sin cubrirla. Ajustes pedidos:
 //  - Brillo bajado a algo mínimo y sin tinte de color (antes el
 //    drop-shadow tomaba el color del rango y quedaba muy intenso).
 //  - Colores más tenues: un filtro CSS de saturación/brillo reducidos,
 //    sin tocar los archivos (no tenemos acceso a esos PNG para editarlos).
-//  - Plata, Platino y Esmeralda venían con otra proporción (más angostas)
+//  - Plata y Esmeralda venían con otra proporción (más angostas)
 //    que el resto — como no se puede editar el archivo en sí, se las
 //    estira para que ocupen el mismo ancho que las demás (con
-//    object-fit: fill en vez de cover, sólo para esas tres).
-const BADGE_STRETCH_TIERS = new Set(["plata", "platino", "esmeralda"]);
+//    object-fit: fill en vez de cover, sólo para esas dos).
+const BADGE_STRETCH_TIERS = new Set(["plata", "esmeralda"]);
 function RankBadgeIcon({ tier, sub, color, size = 26 }) {
   const [imgError, setImgError] = useState(false);
   const tierFile = (tier || "bronce").toLowerCase();
@@ -4182,11 +4179,13 @@ function RankBadgeIcon({ tier, sub, color, size = 26 }) {
       {sub && (
         <span
           style={{
-            position: "absolute", bottom: -Math.max(5, size * 0.12), left: "50%", transform: "translateX(-50%)",
-            fontSize: Math.max(9, Math.round(size * 0.32)), fontWeight: 800, color: "#ffffff",
-            background: "linear-gradient(135deg, rgba(13,148,136,0.95), rgba(15,118,110,0.95))",
-            borderRadius: "999px", padding: `0 ${Math.max(4, Math.round(size * 0.12))}px`, lineHeight: Math.max(1.3, size * 0.032),
-            border: "1px solid rgba(255,255,255,0.35)", boxShadow: "0 1px 3px rgba(0,0,0,0.5)", whiteSpace: "nowrap",
+            position: "absolute", bottom: -Math.max(2, size * 0.03), right: -Math.max(2, size * 0.03),
+            width: Math.max(16, Math.round(size * 0.36)), height: Math.max(16, Math.round(size * 0.36)),
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: Math.max(8, Math.round(size * 0.19)), fontWeight: 800, color: "#ffffff",
+            background: "linear-gradient(135deg, #14B8A6, #0E7490)", borderRadius: "50%",
+            border: `${Math.max(1.5, Math.round(size * 0.02))}px solid #0a0a0f`,
+            boxShadow: "0 1px 3px rgba(0,0,0,0.5)",
           }}
         >
           {sub}
@@ -4234,6 +4233,19 @@ function getSlugsForOurGroup(ourKey) {
   if (slug === "calves") return ["calves", "left-soleus", "right-soleus"];
   return [slug];
 }
+
+// Referencias ESTABLES (un solo objeto/función, nunca se vuelven a crear)
+// para pasarle a <Model> — esto es lo que en realidad causaba el bug de
+// "la pantorrilla de frente se sigue marcando": al pasarle `onClick={() =>
+// {}}` y `style={{...}}` como literales, React creaba un objeto/función
+// NUEVO en cada render, así que el React.memo interno de la librería
+// nunca detectaba "no cambió nada" y volvía a pintar todo desde cero cada
+// vez que el padre se renderizaba por CUALQUIER motivo (no sólo cuando
+// `data` cambiaba) — pisando la corrección de la pantorrilla, que sólo se
+// volvía a aplicar cuando `data` cambiaba. Con referencias estables, el
+// <Model> sólo se vuelve a pintar cuando algo realmente cambió.
+const MODEL_NOOP_CLICK = () => {};
+const MODEL_STYLE = { width: "100%" };
 
 function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backRef }) {
   const highlightedColors = useMemo(() => RANK_TIERS.map((t) => t.color), []);
@@ -4307,16 +4319,16 @@ function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backR
     svg.querySelectorAll("polygon").forEach((p, i) => {
       if (ANTERIOR_POLY_SLUGS[i] === "calves") p.style.fill = "#334155";
     });
-  }, [data, frontRef]);
+  }, [data, selected, frontRef]);
 
   return (
     <div className="flex gap-2 justify-center items-start">
       <div className="flex-1 min-w-0 max-w-[180px]">
-        <div ref={frontRef} onClick={handlePolygonClick("front")}><Model data={data} type="anterior" bodyColor="#334155" highlightedColors={highlightedColors} onClick={() => {}} style={{ width: "100%" }} svgStyle={{ width: "100%" }} /></div>
+        <div ref={frontRef} onClick={handlePolygonClick("front")}><Model data={data} type="anterior" bodyColor="#334155" highlightedColors={highlightedColors} onClick={MODEL_NOOP_CLICK} style={MODEL_STYLE} svgStyle={MODEL_STYLE} /></div>
         <p className="text-center text-[10px] text-slate-600 mt-1">De frente</p>
       </div>
       <div className="flex-1 min-w-0 max-w-[180px]">
-        <div ref={backRef} onClick={handlePolygonClick("back")}><Model data={data} type="posterior" bodyColor="#334155" highlightedColors={highlightedColors} onClick={() => {}} style={{ width: "100%" }} svgStyle={{ width: "100%" }} /></div>
+        <div ref={backRef} onClick={handlePolygonClick("back")}><Model data={data} type="posterior" bodyColor="#334155" highlightedColors={highlightedColors} onClick={MODEL_NOOP_CLICK} style={MODEL_STYLE} svgStyle={MODEL_STYLE} /></div>
         <p className="text-center text-[10px] text-slate-600 mt-1">De espalda</p>
       </div>
     </div>
@@ -4392,7 +4404,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
           {selInfo.hasData ? (
             <>
               <div className="flex items-center gap-3.5 mb-3.5">
-                <RankBadgeIcon tier={selInfo.tier} sub={selInfo.sub} color={selInfo.color} size={58} />
+                <RankBadgeIcon tier={selInfo.tier} sub={selInfo.sub} color={selInfo.color} size={116} />
                 <div className="flex-1 min-w-0">
                   <p className="text-lg font-black leading-tight" style={{ color: selInfo.color }}>{selInfo.tier}{selInfo.sub ? ` ${selInfo.sub}` : ""}</p>
                   <p className="text-[11px] text-slate-500 mt-0.5">
@@ -4409,7 +4421,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
                   <div className="flex items-center justify-between mb-2 gap-2">
                     <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Progreso al próximo rango</span>
                     <span className="flex items-center gap-1.5 text-[11px] font-bold shrink-0" style={{ color: nextTierInfo?.color }}>
-                      <RankBadgeIcon tier={nextTierInfo?.tier} sub="" color={nextTierInfo?.color} size={20} />
+                      <RankBadgeIcon tier={nextTierInfo?.tier} sub="" color={nextTierInfo?.color} size={40} />
                       {nextTierInfo?.tier}{nextTierInfo?.sub ? ` ${nextTierInfo.sub}` : ""}
                     </span>
                   </div>
@@ -4431,12 +4443,12 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
       )}
       <div className="pt-2 border-t border-slate-800/60">
         <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider text-center mb-3">Todos los rangos</p>
-        <div className="flex flex-wrap justify-center gap-x-4 gap-y-3">
-          {["Bronce", "Plata", "Oro", "Platino", "Esmeralda", "Diamante", "Maestro"].map((t) => {
+        <div className="grid grid-cols-3 gap-3 max-w-[280px] mx-auto">
+          {["Bronce", "Plata", "Oro", "Esmeralda", "Diamante", "Maestro"].map((t) => {
             const rep = RANK_TIERS.find((r) => r.tier === t && r.sub === "II") || RANK_TIERS.find((r) => r.tier === t);
             return (
-              <div key={t} className="flex flex-col items-center gap-1.5 w-14">
-                <RankBadgeIcon tier={rep.tier} sub="" color={rep.color} size={38} />
+              <div key={t} className="flex flex-col items-center gap-1.5">
+                <RankBadgeIcon tier={rep.tier} sub="" color={rep.color} size={76} />
                 <span className="text-[9px] text-slate-500 font-semibold">{t}</span>
               </div>
             );
