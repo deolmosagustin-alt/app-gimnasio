@@ -2591,8 +2591,8 @@ const HELP_CHAPTERS = [
       },
       {
         icon: <Layers size={20} />,
-        title: "Pedile que te arme una rutina",
-        text: "Decile qué tipo de rutina querés y te propone una completa con días y ejercicios. Nunca se guarda sola: te muestra una tarjeta con \"Confirmar y guardar\" o \"Descartar\" — sólo se suma a tus rutinas si confirmás.",
+        title: "Pedile que haga cambios por vos",
+        text: "Puede crear o activar una rutina (te muestra la vista previa completa, día por día), actualizar tu perfil (sexo, edad, peso), o ajustar la configuración de ciclo y descarga, apariencia o descanso entre series. Nunca aplica nada solo: siempre te muestra una tarjeta con \"Confirmar\" o \"Descartar\" antes de tocar algo de verdad.",
       },
     ],
   },
@@ -3058,7 +3058,7 @@ function SessionStartBar({ activeSession, onStart, onCancel }) {
    volver a abrir una tarjeta. Sólo se limpia con "Resetear sesión de hoy"
    (acá abajo) o al finalizar la sesión (ver handleEndSession en App()).
 ============================================================================ */
-function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, weekSchedule, activeSession, onStartSession, onEndSession, onCancelSession, onDisableAutoShowPrShare, onGoToDeload }) {
+function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, weekSchedule, activeSession, onStartSession, onEndSession, onCancelSession, onDisableAutoShowPrShare }) {
   // El día programado para hoy según el cronograma semanal (lunes a domingo)
   // de la rutina activa. Si hoy es descanso programado (o no hay cronograma
   // todavía), cae al viejo heurístico de "último día entrenado + 1" — pero
@@ -3098,9 +3098,6 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
         <p className="relative text-xs text-teal-300/60 mt-1">Registrá tus series de hoy y seguí tu progreso día a día</p>
       </div>
 
-      <button onClick={onGoToDeload} className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border border-purple-500/30 bg-purple-500/10 text-purple-300 hover:bg-purple-500/20 hover:border-purple-500/50 transition text-sm font-bold active:scale-[0.98]">
-        <Zap size={14} /> Mi semana de descarga{isDeload ? <span className="text-[10px] font-black px-1.5 py-0.5 rounded-md bg-purple-500/30 ml-1">ACTIVA AHORA</span> : null}
-      </button>
       <SessionStartBar activeSession={activeSession} onStart={() => onStartSession(activeDay)} onCancel={onCancelSession} />
 
       {isRestToday && (
@@ -4055,7 +4052,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
             <>
               <div className="flex items-center gap-3.5 mb-3.5">
                 <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-2 shrink-0 backdrop-blur-sm shadow-md shadow-black/20">
-                  <RankBadgeIcon tier={selInfo.tier} sub={selInfo.sub} color={selInfo.color} size={80} />
+                  <RankBadgeIcon tier={selInfo.tier} sub={selInfo.sub} color={selInfo.color} size={92} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-lg font-black leading-tight" style={{ color: selInfo.color }}>{selInfo.tier}{selInfo.sub ? ` ${selInfo.sub}` : ""}</p>
@@ -4103,7 +4100,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
             const rep = RANK_TIERS.find((r) => r.tier === t && r.sub === "II") || RANK_TIERS.find((r) => r.tier === t);
             return (
               <div key={t} className="flex flex-col items-center gap-1 rounded-xl py-2 bg-slate-800/30">
-                <RankBadgeIcon tier={rep.tier} sub="" color={rep.color} size={44} />
+                <RankBadgeIcon tier={rep.tier} sub="" color={rep.color} size={52} />
                 <span className="text-[9px] font-bold" style={{ color: rep.color }}>{t}</span>
               </div>
             );
@@ -5256,34 +5253,160 @@ async function extractTextFromPdfFile(file) {
    con IA" — ver getGeminiKey y su aclaración de seguridad arriba del
    archivo, aplica exactamente igual acá: la clave de Remote Config no es
    un secreto real, es visible para quien abra las herramientas de
-   desarrollador. Esto es un cascarón funcional: conecta de verdad con
-   Gemini, pero todavía no tiene memoria entre sesiones ni límites de uso.
+   desarrollador.
+
+   Puede proponer ACCIONES reales sobre la app (crear o activar una
+   rutina, editar el perfil, cambiar configuración de ciclo/descarga,
+   apariencia o descanso) — pero nunca las aplica solo: siempre las pide
+   en un bloque de texto especial (ver parseAction), que se muestra como
+   una tarjeta de confirmación con su propia vista previa cuando
+   corresponde (una rutina, por ejemplo, se ve completa día por día antes
+   de guardarla). Sólo se aplica algo si la persona toca "Confirmar".
 ============================================================================ */
-function EntrenadorIAChat({ profile, logs, profileName, messages, setMessages, onCreateRoutine }) {
+
+// Markdown bien liviano para los mensajes del asistente — Gemini responde
+// con **negrita** y listas con guion casi siempre, pero como antes el chat
+// mostraba el texto crudo, esos asteriscos y guiones quedaban tal cual en
+// vez de aplicarse. Esto separa el texto en bloques (párrafos y listas) y
+// dentro de cada uno resuelve **negrita** — nada más que eso, a propósito
+// (no hace falta un parser de markdown completo para una respuesta de chat).
+function renderChatMarkdown(text) {
+  if (!text) return null;
+  const renderInline = (str, key) => {
+    const parts = String(str).split(/(\*\*[^*]+\*\*)/g).filter((p) => p !== "");
+    return parts.map((part, j) => {
+      if (part.startsWith("**") && part.endsWith("**") && part.length > 4) {
+        return <strong key={`${key}-${j}`} className="font-bold text-white">{part.slice(2, -2)}</strong>;
+      }
+      return <span key={`${key}-${j}`}>{part}</span>;
+    });
+  };
+  const lines = String(text).split("\n");
+  const blocks = [];
+  let currentList = null;
+  const flushList = () => { if (currentList) { blocks.push(currentList); currentList = null; } };
+  lines.forEach((line) => {
+    const bulletMatch = line.match(/^\s*[-*]\s+(.*)/);
+    if (bulletMatch) {
+      if (!currentList) currentList = { type: "ul", items: [] };
+      currentList.items.push(bulletMatch[1]);
+    } else {
+      flushList();
+      if (line.trim()) blocks.push({ type: "p", text: line });
+    }
+  });
+  flushList();
+  return blocks.map((b, i) => {
+    if (b.type === "ul") {
+      return (
+        <ul key={i} className="list-disc list-outside ml-4 space-y-0.5 my-1.5">
+          {b.items.map((item, j) => <li key={j}>{renderInline(item, `${i}-${j}`)}</li>)}
+        </ul>
+      );
+    }
+    return <p key={i} className={i > 0 ? "mt-1.5" : ""}>{renderInline(b.text, i)}</p>;
+  });
+}
+
+// Extrae el bloque de acción propuesta (si lo hay) del texto crudo que
+// devuelve Gemini, y lo separa del texto que se le muestra a la persona.
+function parseAction(rawText) {
+  const match = rawText.match(/###ACCION###([\s\S]*?)###FIN###/);
+  if (!match) return { text: rawText, action: null };
+  const cleanText = rawText.replace(match[0], "").trim();
+  try {
+    const parsed = JSON.parse(match[1].trim());
+    if (!parsed?.type) return { text: cleanText, action: null };
+    return { text: cleanText, action: parsed };
+  } catch (err) {
+    console.error("No se pudo interpretar la acción propuesta:", err);
+    return { text: cleanText, action: null };
+  }
+}
+
+// A partir de la acción que propuso el modelo, arma el "plan": qué
+// mostrar en la tarjeta de confirmación, y qué función llamar si la
+// persona confirma. Si la acción no se puede interpretar (por ejemplo,
+// "activar_rutina" con un nombre que no existe), devuelve null — en ese
+// caso no se muestra ninguna tarjeta, sólo el texto del mensaje.
+function buildActionPlan(action, ctx) {
+  const { profile, settings, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings } = ctx;
+  if (action.type === "crear_rutina") {
+    const days = (action.days || []).map((d) => ({
+      label: String(d.label || "Día"),
+      exercises: (d.exercises || []).map((ex) => {
+        const lib = matchExerciseToLibrary(ex.name);
+        const sets = Array.from({ length: Math.max(1, Math.min(8, ex.setsCount || 3)) }, () => ({ repRange: ex.repRange || "8-10" }));
+        return lib ? { libId: lib.id, sets } : { id: builderUid("imported"), name: ex.name || "Ejercicio", muscle: "Personalizado", sets };
+      }),
+    }));
+    if (!days.length) return null;
+    const def = buildImportedRoutineDef(days, action.name || "Rutina propuesta");
+    return { kind: "routine", title: `Crear "${def.name}"`, routineDef: def, confirmLabel: "Crear y guardar", confirm: () => onCreateRoutine(builderUid("ai_routine"), def) };
+  }
+  if (action.type === "activar_rutina") {
+    const wanted = String(action.routineName || "").toLowerCase().trim();
+    if (!wanted) return null;
+    let foundId = null, foundDef = null, isPreset = false;
+    Object.entries(profile?.routines || {}).forEach(([id, def]) => {
+      if (!foundId && !def?.archived && def?.name?.toLowerCase().includes(wanted)) { foundId = id; foundDef = def; }
+    });
+    if (!foundId) {
+      const preset = PRESET_ROUTINES.find((p) => p.name.toLowerCase().includes(wanted));
+      if (preset) { foundId = preset.id; foundDef = preset; isPreset = true; }
+    }
+    if (!foundId) return null;
+    return { kind: "routine", title: `Activar "${foundDef.name}"`, routineDef: foundDef, confirmLabel: "Activar esta rutina", confirm: () => onActivateRoutine(foundId, isPreset ? cloneRoutineDef(foundDef) : null) };
+  }
+  if (action.type === "editar_perfil") {
+    const patch = {}; const items = [];
+    if (action.sex === "M" || action.sex === "F") { patch.sex = action.sex; items.push(`Sexo: ${action.sex === "M" ? "Masculino" : "Femenino"}`); }
+    if (action.age) { patch.age = parseInt(action.age, 10); items.push(`Edad: ${patch.age} años`); }
+    if (action.bodyWeightKg) { patch.settings = { ...settings, bodyWeightKg: parseFloat(action.bodyWeightKg) }; items.push(`Peso corporal: ${action.bodyWeightKg}kg`); }
+    if (action.email) { patch.email = action.email; items.push(`Email: ${action.email}`); }
+    if (!items.length) return null;
+    return { kind: "list", title: "Actualizar tu perfil", items, confirmLabel: "Guardar cambios", confirm: () => onUpdateProfile(patch) };
+  }
+  if (action.type === "config_ciclo") {
+    const patch = {}; const items = [];
+    if (action.trainWeeks) { patch.trainWeeks = Math.min(12, Math.max(2, action.trainWeeks)); items.push(`Semanas de entrenamiento: ${patch.trainWeeks}`); }
+    if (action.deloadWeeks) { patch.deloadWeeks = Math.min(4, Math.max(1, action.deloadWeeks)); items.push(`Semanas de descarga: ${patch.deloadWeeks}`); }
+    if (action.deloadPct) { patch.deloadPct = Math.min(0.95, Math.max(0.5, action.deloadPct)); items.push(`Carga en descarga: ${Math.round(patch.deloadPct * 100)}%`); }
+    if (action.deloadSetDivisor) { patch.deloadSetDivisor = action.deloadSetDivisor; items.push(`Reducción de series: ÷${action.deloadSetDivisor}`); }
+    if (!items.length) return null;
+    return { kind: "list", title: "Cambiar configuración de ciclo y descarga", items, confirmLabel: "Aplicar cambios", confirm: () => onUpdateSettings(patch) };
+  }
+  if (action.type === "config_apariencia") {
+    if (action.theme !== "dark" && action.theme !== "light") return null;
+    return { kind: "list", title: "Cambiar apariencia", items: [`Tema: ${action.theme === "light" ? "Claro" : "Oscuro"}`], confirmLabel: "Aplicar", confirm: () => onUpdateSettings({ theme: action.theme }) };
+  }
+  if (action.type === "config_descanso") {
+    const patch = {}; const items = [];
+    if (["sound", "vibration", "both"].includes(action.alertType)) { patch.alertType = action.alertType; items.push(`Aviso al terminar: ${{ sound: "Sonido", vibration: "Vibración", both: "Ambos" }[action.alertType]}`); }
+    if (action.restLong) { patch.restLong = Math.min(600, Math.max(30, action.restLong)); items.push(`Descanso ejercicios pesados: ${patch.restLong}s`); }
+    if (action.restShort) { patch.restShort = Math.min(600, Math.max(30, action.restShort)); items.push(`Descanso resto: ${patch.restShort}s`); }
+    if (!items.length) return null;
+    return { kind: "list", title: "Cambiar descanso entre series", items, confirmLabel: "Aplicar", confirm: () => onUpdateSettings(patch) };
+  }
+  return null;
+}
+
+function EntrenadorIAChat({ profile, logs, profileName, messages, setMessages, settings, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings }) {
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
   const bottomRef = useRef(null);
-
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }); }, [messages, isSending]);
-
-  // Si la persona le pide crear o rehacer una rutina, el modelo agrega
-  // este bloque al final de su respuesta (se lo pedimos en el system
-  // prompt) — nunca se guarda directo: se muestra como una tarjeta de
-  // confirmación, y sólo se guarda en sus rutinas si toca "Confirmar y
-  // guardar". El bloque se recorta del texto antes de mostrarlo.
-  const parseRoutineProposal = (rawText) => {
-    const match = rawText.match(/###RUTINA_PROPUESTA###([\s\S]*?)###FIN###/);
-    if (!match) return { text: rawText, proposal: null };
-    const cleanText = rawText.replace(match[0], "").trim();
-    try {
-      const parsed = JSON.parse(match[1].trim());
-      if (!parsed?.name || !Array.isArray(parsed?.days)) return { text: cleanText, proposal: null };
-      return { text: cleanText, proposal: parsed };
-    } catch (err) {
-      console.error("No se pudo interpretar la rutina propuesta:", err);
-      return { text: cleanText, proposal: null };
-    }
-  };
+  // Sin este guardado, el efecto de "bajar al último mensaje" también se
+  // disparaba al recién entrar a la pestaña (con un solo mensaje de
+  // bienvenida, sin nada para desplazar) — eso alcanzaba para que el
+  // navegador recalculara el alto visible de la pantalla un instante
+  // (por ejemplo, si el navegador del celular ajusta su propia barra),
+  // y la barra de escribir (fija abajo de todo) se veía saltar un
+  // microsegundo antes de asentarse. Ahora ese scroll inicial se saltea.
+  const didMountRef = useRef(false);
+  useEffect(() => {
+    if (!didMountRef.current) { didMountRef.current = true; return; }
+    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [messages, isSending]);
 
   const enviarMensajeIA = async (userText) => {
     const newMessages = [...messages, { role: "user", text: userText }];
@@ -5296,12 +5419,21 @@ function EntrenadorIAChat({ profile, logs, profileName, messages, setMessages, o
       // Contexto recortado a propósito — el historial completo puede
       // crecer mucho con el tiempo, y no hace falta mandar absolutamente
       // todo para que pueda responder con criterio.
-      const context = { perfil: profileName, rutinaActivaId: profile?.activeRoutineId || null, logs: logs || {} };
-      const systemPrompt = `Sos un entrenador personal experto, breve, cercano y motivador, que habla en español rioplatense. Tenés acceso a los datos reales de entrenamiento de esta persona en el siguiente JSON — usalos para responder con precisión (fechas, pesos, repeticiones reales), nunca inventes números que no estén ahí. Si no encontrás el dato para responder algo puntual, decilo en vez de inventarlo. Respuestas cortas, 2 a 4 oraciones salvo que te pidan más detalle.
+      const context = { perfil: profileName, rutinaActivaId: profile?.activeRoutineId || null, rutinasGuardadas: Object.values(profile?.routines || {}).filter((r) => !r.archived).map((r) => r.name), configuracionActual: settings, logs: logs || {} };
+      const systemPrompt = `Sos un entrenador personal experto, breve, cercano y motivador, que habla en español rioplatense. Tenés acceso a los datos reales de entrenamiento de esta persona en el siguiente JSON — usalos para responder con precisión (fechas, pesos, repeticiones reales), nunca inventes números que no estén ahí. Si no encontrás el dato para responder algo puntual, decilo en vez de inventarlo. Respuestas cortas, 2 a 4 oraciones salvo que te pidan más detalle. Para dar formato a tu texto podés usar **negrita** y listas con guion (-), nada más — no uses títulos, tablas, ni bloques de código.
 
-Si la persona te pide explícitamente crear, armar o rehacer una rutina, además de tu respuesta normal agregá AL FINAL, en una línea aparte, un bloque con este formato exacto (sin texto markdown, sin comillas triples, sin nada más en esa línea):
-###RUTINA_PROPUESTA###{"name":"Nombre de la rutina","days":[{"label":"Día 1","exercises":[{"name":"Press Banca","setsCount":3,"repRange":"8-10"}]}]}###FIN###
-Nunca digas que ya la guardaste: la persona tiene que confirmarla desde un botón antes de que se guarde de verdad. No agregues ese bloque si no te pidieron explícitamente crear o rehacer una rutina.
+Si la persona te pide explícitamente hacer un cambio en la app, respondé primero tu explicación normal y agregá AL FINAL, en una línea aparte, un bloque con ESTE formato exacto (sin texto markdown alrededor, sin comillas triples, nada más en esa línea):
+###ACCION###{"type":"TIPO", ...campos...}###FIN###
+
+Tipos disponibles:
+- crear_rutina: {"type":"crear_rutina","name":"...","days":[{"label":"Día 1","exercises":[{"name":"Press Banca","setsCount":3,"repRange":"8-10"}]}]}
+- activar_rutina: {"type":"activar_rutina","routineName":"nombre o parte del nombre de una rutina que ya tenga guardada (mirá rutinasGuardadas)"}
+- editar_perfil: {"type":"editar_perfil","sex":"M"|"F","age":30,"bodyWeightKg":80,"email":"..."} (incluí sólo los campos que pidió cambiar)
+- config_ciclo: {"type":"config_ciclo","trainWeeks":4,"deloadWeeks":1,"deloadPct":0.6,"deloadSetDivisor":2} (deloadPct es la fracción de su récord, ej. 0.6 = 60%; deloadSetDivisor: 2 = mitad de series, 3 = un tercio, 4 = un cuarto)
+- config_apariencia: {"type":"config_apariencia","theme":"dark"|"light"}
+- config_descanso: {"type":"config_descanso","alertType":"sound"|"vibration"|"both","restLong":120,"restShort":60} (segundos)
+
+Reglas importantes: nunca digas que ya aplicaste el cambio — la persona siempre tiene que confirmarlo desde un botón antes de que se aplique de verdad. Agregá el bloque ###ACCION### sólo si pidió ESE cambio puntual en este mensaje o el anterior, nunca como sugerencia general no pedida.
 
 Datos: ${JSON.stringify(context)}`;
       const history = newMessages.map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.text }] }));
@@ -5321,8 +5453,9 @@ Datos: ${JSON.stringify(context)}`;
       const data = await response.json();
       const rawReply = data?.candidates?.[0]?.content?.parts?.[0]?.text;
       if (!rawReply) { setMessages((prev) => [...prev, { role: "assistant", text: "No se me ocurrió una respuesta — probá de nuevo." }]); return; }
-      const { text, proposal } = parseRoutineProposal(rawReply);
-      setMessages((prev) => [...prev, { role: "assistant", text, proposal, proposalStatus: proposal ? "pending" : null }]);
+      const { text, action } = parseAction(rawReply);
+      const plan = action ? buildActionPlan(action, { profile, settings, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings }) : null;
+      setMessages((prev) => [...prev, { role: "assistant", text, plan, planStatus: plan ? "pending" : null }]);
     } catch (err) {
       console.error("Error al hablar con el entrenador IA:", err);
       setMessages((prev) => [...prev, { role: "assistant", text: "No pude conectarme. Revisá que esté configurado el parámetro \"GEMINI_API_KEY\" en Firebase → Remote Config." }]);
@@ -5337,26 +5470,14 @@ Datos: ${JSON.stringify(context)}`;
     enviarMensajeIA(trimmed);
   };
 
-  // Confirmar la propuesta: recién ACÁ se toca algo de verdad — se mapean
-  // los ejercicios contra el catálogo (igual que en "Importar con IA") y
-  // se guarda como una rutina NUEVA, nunca pisando ninguna existente.
-  const handleConfirmProposal = (msgIndex) => {
-    const proposal = messages[msgIndex]?.proposal;
-    if (!proposal) return;
-    const parsedDays = proposal.days.map((d) => ({
-      label: String(d.label || "Día"),
-      exercises: (d.exercises || []).map((ex) => {
-        const lib = matchExerciseToLibrary(ex.name);
-        const sets = Array.from({ length: Math.max(1, Math.min(8, ex.setsCount || 3)) }, () => ({ repRange: ex.repRange || "8-10" }));
-        return lib ? { libId: lib.id, sets } : { id: builderUid("imported"), name: ex.name || "Ejercicio", muscle: "Personalizado", sets };
-      }),
-    }));
-    const def = buildImportedRoutineDef(parsedDays, proposal.name);
-    onCreateRoutine(builderUid("ai_routine"), def);
-    setMessages((prev) => prev.map((m, i) => (i === msgIndex ? { ...m, proposalStatus: "confirmed" } : m)));
+  const handleConfirmPlan = (msgIndex) => {
+    const plan = messages[msgIndex]?.plan;
+    if (!plan) return;
+    plan.confirm();
+    setMessages((prev) => prev.map((m, i) => (i === msgIndex ? { ...m, planStatus: "confirmed" } : m)));
   };
-  const handleDiscardProposal = (msgIndex) => {
-    setMessages((prev) => prev.map((m, i) => (i === msgIndex ? { ...m, proposalStatus: "discarded" } : m)));
+  const handleDiscardPlan = (msgIndex) => {
+    setMessages((prev) => prev.map((m, i) => (i === msgIndex ? { ...m, planStatus: "discarded" } : m)));
   };
 
   return (
@@ -5369,7 +5490,7 @@ Datos: ${JSON.stringify(context)}`;
           <span className="text-[11px] font-black uppercase tracking-widest text-teal-400">Tu asistente</span>
         </div>
         <h2 className="relative text-xl font-black text-white leading-tight">Entrenador IA</h2>
-        <p className="relative text-xs text-teal-300/60 mt-1">Conoce tu historial — preguntale lo que quieras, o pedile que te arme una rutina</p>
+        <p className="relative text-xs text-teal-300/60 mt-1">Conoce tu historial — pedile que te arme una rutina, que ajuste tu perfil o tu configuración</p>
       </div>
 
       <div className="space-y-3">
@@ -5380,24 +5501,30 @@ Datos: ${JSON.stringify(context)}`;
                 className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${m.role === "user" ? "!text-white" : "bg-slate-900/60 border border-slate-800/60 text-slate-200"}`}
                 style={m.role === "user" ? { background: "linear-gradient(135deg,#14B8A6,#0E7490)" } : {}}
               >
-                {m.text}
+                {m.role === "assistant" ? renderChatMarkdown(m.text) : m.text}
               </div>
             </div>
-            {m.proposal && m.proposalStatus === "pending" && (
+            {m.plan && m.planStatus === "pending" && (
               <div className="mt-2 bg-slate-900/70 border border-teal-500/25 rounded-2xl p-3.5 max-w-[85%] bounce-in">
-                <div className="flex items-center gap-2 mb-2"><Layers size={14} className="text-teal-400 shrink-0" /><p className="text-sm font-bold text-white truncate">{m.proposal.name}</p></div>
-                <p className="text-[11px] text-slate-500 mb-3">{m.proposal.days.length} día{m.proposal.days.length === 1 ? "" : "s"} · {m.proposal.days.reduce((acc, d) => acc + (d.exercises?.length || 0), 0)} ejercicios en total</p>
+                <p className="text-sm font-bold text-white mb-2.5">{m.plan.title}</p>
+                {m.plan.kind === "routine" ? (
+                  <div className="mb-3"><RoutinePreview routineDef={m.plan.routineDef} /></div>
+                ) : (
+                  <ul className="mb-3 space-y-1">
+                    {m.plan.items.map((item, j) => <li key={j} className="text-[11px] text-slate-400 flex items-start gap-1.5"><span className="text-teal-400 mt-0.5">•</span>{item}</li>)}
+                  </ul>
+                )}
                 <div className="flex gap-2">
-                  <button onClick={() => handleConfirmProposal(i)} className="flex-1 py-2.5 rounded-xl text-white text-xs font-bold transition-all active:scale-[0.98]" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>Confirmar y guardar</button>
-                  <button onClick={() => handleDiscardProposal(i)} className="px-3.5 py-2.5 rounded-xl border border-slate-700 text-slate-400 hover:text-white text-xs font-bold transition">Descartar</button>
+                  <button onClick={() => handleConfirmPlan(i)} className="flex-1 py-2.5 rounded-xl text-white text-xs font-bold transition-all active:scale-[0.98]" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>{m.plan.confirmLabel}</button>
+                  <button onClick={() => handleDiscardPlan(i)} className="px-3.5 py-2.5 rounded-xl border border-slate-700 text-slate-400 hover:text-white text-xs font-bold transition">Descartar</button>
                 </div>
               </div>
             )}
-            {m.proposal && m.proposalStatus === "confirmed" && (
-              <div className="mt-2 flex items-center gap-1.5 text-[11px] text-emerald-400 font-semibold max-w-[85%]"><Check size={12} /> Guardada en tus rutinas — activala desde la pestaña Rutinas cuando quieras</div>
+            {m.plan && m.planStatus === "confirmed" && (
+              <div className="mt-2 flex items-center gap-1.5 text-[11px] text-emerald-400 font-semibold max-w-[85%]"><Check size={12} /> Listo, aplicado.</div>
             )}
-            {m.proposal && m.proposalStatus === "discarded" && (
-              <div className="mt-2 text-[11px] text-slate-600 max-w-[85%]">Propuesta descartada.</div>
+            {m.plan && m.planStatus === "discarded" && (
+              <div className="mt-2 text-[11px] text-slate-600 max-w-[85%]">Descartado.</div>
             )}
           </div>
         ))}
@@ -5413,10 +5540,7 @@ Datos: ${JSON.stringify(context)}`;
         <div ref={bottomRef} />
       </div>
 
-      {/* Input fijo de verdad, anclado al fondo de la pantalla — antes
-          dependía de calcular "100vh menos tal altura" para encajar dentro
-          de la página, y como esa cuenta no daba exacto, quedaba como
-          flotando en el medio en vez de pegado abajo. */}
+      {/* Input fijo de verdad, anclado al fondo de la pantalla. */}
       <div className="fixed bottom-20 lg:bottom-6 left-0 right-0 z-10 px-4 lg:pl-56">
         <div className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto">
           <div className="flex items-center gap-2 bg-slate-900/90 border border-slate-800/60 rounded-2xl p-1.5 backdrop-blur-xl shadow-lg shadow-black/30">
@@ -6373,10 +6497,10 @@ export default function App() {
         <main className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto px-4 py-4 pb-28 lg:pb-10 space-y-4">
           <div key={tab} className="tab-fade-in">
             {tab === "rutinas" && <RoutinesView profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleArchiveRoutine} onRestore={handleRestoreRoutine} />}
-            {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} onGoToDeload={() => setTab("descarga")} />}
+            {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} />}
             {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} sex={profile?.sex} age={profile?.age} onGoToDeload={() => setTab("descarga")} />}
             {tab === "descarga" && <DeloadView logs={logs} settings={getProfileSettings(profile)} />}
-            {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} onCreateRoutine={handleUpdateRoutine} />}
+            {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} settings={getProfileSettings(profile)} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} />}
             {tab === "perfil" && <ProfileView profileName={activeProfile} profiles={profiles} logs={logs} onSignOut={handleSignOut} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} />}
           </div>
         </main>
