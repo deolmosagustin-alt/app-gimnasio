@@ -5416,10 +5416,36 @@ function EntrenadorIAChat({ profile, logs, profileName, messages, setMessages, s
     try {
       const apiKey = await getGeminiKey();
       if (!apiKey) throw new Error("falta configurar GEMINI_API_KEY en Remote Config");
-      // Contexto recortado a propósito — el historial completo puede
-      // crecer mucho con el tiempo, y no hace falta mandar absolutamente
-      // todo para que pueda responder con criterio.
-      const context = { perfil: profileName, rutinaActivaId: profile?.activeRoutineId || null, rutinasGuardadas: Object.values(profile?.routines || {}).filter((r) => !r.archived).map((r) => r.name), configuracionActual: settings, logs: logs || {} };
+      // Antes esto sólo le mandaba los NOMBRES de las rutinas guardadas —
+      // por eso no podía ver qué ejercicios tenía cada una, sólo los
+      // récords sueltos en logs. Ahora se resuelve cada rutina (incluida
+      // la activa, las creadas/editadas, y las archivadas) a su estructura
+      // real día por día — lo mismo que ve la persona en la pestaña
+      // Rutinas — y se manda completo. Lo único que sigue recortado es el
+      // texto largo (nota técnica, video) de cada ejercicio: no aporta
+      // nada para responder y agranda el pedido sin necesidad.
+      const allRoutines = Object.entries(profile?.routines || {}).map(([id, entry]) => {
+        const resolved = resolveRoutineDef(entry, id);
+        if (!resolved) return null;
+        let dias = [];
+        try {
+          const model = buildRoutineModel(resolved);
+          dias = model.dayOrder.map((dk) => {
+            const d = model.days[dk];
+            return { dia: d.label, ejercicios: d.exercises.map((ex) => ({ nombre: ex.name, musculo: ex.muscle, series: ex.sets.length, repeticionesPorSerie: ex.sets.map((s) => s.repRange) })) };
+          });
+        } catch (err) {
+          console.error("No se pudo resolver una rutina para el contexto de la IA:", id, err);
+        }
+        return { id, nombre: resolved.name, esLaActiva: id === profile?.activeRoutineId, archivada: !!entry.archived, origen: entry.source || "custom", dias };
+      }).filter(Boolean);
+      const context = {
+        perfil: { nombre: profileName, email: profile?.email || null, sexo: profile?.sex || null, edad: profile?.age || null, miembroDesde: profile?.joinedAt || null },
+        rutinaActivaId: profile?.activeRoutineId || null,
+        rutinas: allRoutines,
+        configuracionActual: settings,
+        logs: logs || {},
+      };
       const systemPrompt = `Sos un entrenador personal y coach de fuerza con dominio profundo y actualizado de la ciencia del entrenamiento — no sólo frases motivacionales genéricas. Hablás en español rioplatense, breve y cercano.
 
 Aplicá estos marcos cuando sean relevantes para lo que te preguntan (no los recites si no vienen al caso):
@@ -5435,14 +5461,14 @@ Aplicá estos marcos cuando sean relevantes para lo que te preguntan (no los rec
 
 Antes de responder, revisá en silencio que tu respuesta resuelva exactamente lo que te preguntaron — no un tema parecido ni una versión genérica — y que cubra todas las partes si la pregunta tenía varias. Interpretá la intención real aunque venga en jerga informal o mal escrita. Si la pregunta es genérica o ambigua y la respuesta cambia mucho según un dato que no tenés (objetivo, experiencia, qué ejercicio), pedí ESE dato puntual en vez de adivinar — pero si ya tenés lo necesario en el historial o el contexto de abajo, respondé directo sin preguntar de más.
 
-Tenés acceso a los datos reales de entrenamiento de esta persona en el siguiente JSON — usalos para responder con precisión (fechas, pesos, repeticiones reales), nunca inventes números que no estén ahí. Si no encontrás el dato para responder algo puntual, decilo en vez de inventarlo. Respuestas cortas, 2 a 4 oraciones salvo que te pidan más detalle o la pregunta lo amerite. Para dar formato a tu texto podés usar **negrita** y listas con guion (-), nada más — no uses títulos, tablas, ni bloques de código.
+Tenés acceso a los datos reales de esta persona en el siguiente JSON — usalos para responder con precisión (fechas, pesos, repeticiones, y la estructura real de sus rutinas día por día), nunca inventes datos que no estén ahí. "rutinas" incluye TODAS sus rutinas (activa, creadas, editadas y archivadas) con sus días y ejercicios completos — las marcadas "archivada":true no están visibles para ella en la pestaña Rutinas salvo que las recupere, tenelo en cuenta si te pregunta qué tiene disponible ahora. Si no encontrás el dato para responder algo puntual, decilo en vez de inventarlo. Respuestas cortas, 2 a 4 oraciones salvo que te pidan más detalle o la pregunta lo amerite. Para dar formato a tu texto podés usar **negrita** y listas con guion (-), nada más — no uses títulos, tablas, ni bloques de código.
 
 Si la persona te pide explícitamente hacer un cambio en la app, respondé primero tu explicación normal y agregá AL FINAL, en una línea aparte, un bloque con ESTE formato exacto (sin texto markdown alrededor, sin comillas triples, nada más en esa línea):
 ###ACCION###{"type":"TIPO", ...campos...}###FIN###
 
 Tipos disponibles:
 - crear_rutina: {"type":"crear_rutina","name":"...","days":[{"label":"Día 1","exercises":[{"name":"Press Banca","setsCount":3,"repRange":"8-10"}]}]}
-- activar_rutina: {"type":"activar_rutina","routineName":"nombre o parte del nombre de una rutina que ya tenga guardada (mirá rutinasGuardadas)"}
+- activar_rutina: {"type":"activar_rutina","routineName":"nombre o parte del nombre de una rutina que ya tenga guardada (mirá la lista en rutinas)"}
 - editar_perfil: {"type":"editar_perfil","sex":"M"|"F","age":30,"bodyWeightKg":80,"email":"..."} (incluí sólo los campos que pidió cambiar)
 - config_ciclo: {"type":"config_ciclo","trainWeeks":4,"deloadWeeks":1,"deloadPct":0.6,"deloadSetDivisor":2} (deloadPct es la fracción de su récord, ej. 0.6 = 60%; deloadSetDivisor: 2 = mitad de series, 3 = un tercio, 4 = un cuarto)
 - config_apariencia: {"type":"config_apariencia","theme":"dark"|"light"}
