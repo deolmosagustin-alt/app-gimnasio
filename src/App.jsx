@@ -67,10 +67,21 @@ async function getGeminiKey() {
   }
   try {
     await fetchAndActivate(_remoteConfigInstance);
+    // --- diagnóstico temporal: para ver en la consola del navegador qué
+    // valor está trayendo Remote Config de verdad. Una vez que confirmes
+    // que la clave llega bien, te conviene borrar esta línea — no por un
+    // motivo de seguridad nuevo (ya sabés que este valor no es secreto de
+    // verdad, como hablamos antes), sino porque dejar console.log de
+    // depuración dando vueltas en producción no es buena práctica en
+    // general (ensucia la consola, y algunas herramientas de monitoreo
+    // de errores capturan TODO lo que se loguea).
+    const key = getValue(_remoteConfigInstance, "GEMINI_API_KEY").asString();
+    console.log("DEBUG: ¿Qué valor trajo Remote Config para GEMINI_API_KEY?", key);
+    return key;
   } catch (err) {
     console.error("Error al obtener Remote Config:", err);
+    return "";
   }
-  return getValue(_remoteConfigInstance, "GEMINI_API_KEY").asString();
 }
 // Para que esto devuelva algo de verdad, en la consola de Firebase →
 // Remote Config tenés que crear un parámetro llamado exactamente
@@ -2358,59 +2369,12 @@ const HELP_CHAPTERS = [
       {
         icon: <Flame size={20} />,
         title: "¡Bienvenido a Mi Rutina!",
-        text: "Este es un tour guiado por la app: en vez de un texto largo de ayuda, te vamos mostrando cada función en vivo, paso a paso, mientras la explicamos. Esta app te ayuda a registrar tus entrenamientos, ver cómo progresan tus marcas con el tiempo, y saber cuándo te toca bajar la intensidad. Podés saltear el recorrido en cualquier momento tocando la X.",
+        text: "Este es un tour guiado: te vamos mostrando cada función en vivo, paso a paso. Podés saltearlo en cualquier momento tocando la X.",
       },
       {
         icon: <Layers size={20} />,
         title: "Cuatro secciones principales",
-        text: "Abajo de la pantalla (o al costado, en pantallas grandes) tenés 4 pestañas: Rutinas para elegir o crear tu plan de entrenamiento, Progreso para ver tu evolución, Descarga para tu semana de recuperación, y Rutina —la principal— para entrenar. Tu perfil y configuración los abrís tocando tu avatar arriba a la izquierda.",
-      },
-    ],
-  },
-  {
-    key: "rutinas",
-    label: "Rutinas",
-    color: "#14B8A6",
-    icon: <Layers size={16} />,
-    steps: [
-      {
-        icon: <Layers size={20} />,
-        title: "Rutinas: elegí cómo entrenar",
-        text: "Acá elegís qué rutina vas a seguir: alguna ya armada (Push/Pull/Legs, Arnold Split, Upper/Lower y alguna más) o una creada por vos desde cero. Es lo primero que ves con un perfil nuevo, y podés volver cuando quieras para cambiar de rutina.",
-      },
-      {
-        icon: <Dumbbell size={20} />,
-        title: "Tu rutina activa",
-        text: "Arriba de todo ves un resumen de la rutina que estás siguiendo ahora: su nombre, cuántos días/ejercicios/series tiene en total, y cada día con su color. El ícono de compartir genera un enlace cortito para mandarle tu rutina a quien quieras —con un toque la puede agregar a su propia app— o, si preferís, también la podés descargar como PDF, Word o Excel.",
-        demo: { kind: "rutinas", view: "active" },
-      },
-      {
-        icon: <Calendar size={20} />,
-        title: "¿Qué día entrenás cada cosa?",
-        text: "Tocando \"Configurar días de la semana\" en la rutina activa elegís qué día de tu rutina (o descanso) le corresponde a cada día calendario, de lunes a domingo. Podés repetir días — por ejemplo un Upper/Lower entrenado 4 veces por semana — y la app reconoce sola en qué día estás cuando abrís Rutina. Por defecto los ubica de corrido desde el lunes, pero lo podés cambiar cuando quieras. Esto te lo preguntamos apenas elegís o creás una rutina, así no hay que volver después.",
-      },
-      {
-        icon: <ListChecks size={20} />,
-        title: "Rutinas preestablecidas",
-        text: "Más abajo está el catálogo: Push/Pull/Legs, Arnold Split, Upper/Lower, Bro Split, Cuerpo Completo y Push / Pull / Pierna + Hombros / Brazos. Tocá una para ver su distribución semanal completa —día por día, con sus ejercicios y series— antes de usarla.",
-        demo: { kind: "rutinas", view: "preset", caption: "Tocá la rutina para ver el detalle" },
-      },
-      {
-        icon: <Sparkles size={20} />,
-        title: "Creá la tuya",
-        text: "Con \"Crear mi propia rutina\" le ponés nombre, armás los días que quieras —tocando el nombre de cada uno (con el lápiz al lado) lo podés cambiar, por ejemplo a \"Push\" o \"Pecho y tríceps\"— y agregás ejercicios buscando por grupo muscular. Por cada uno elegís series y repeticiones aproximadas — si son 6 o menos, se marca como FUERZA automáticamente. También podés agregar un ejercicio que no esté en la lista, aunque ese no va a tener nota técnica ni video.",
-        demo: { kind: "rutinas", view: "builder", caption: "Probá cambiar el nombre del día" },
-      },
-      {
-        icon: <Edit3 size={20} />,
-        title: "Editá, activá o borrá tus rutinas",
-        text: "Las rutinas que creaste quedan guardadas: tocá el lápiz para modificarlas (cambiar nombre, días o ejercicios), \"Activar\" para cambiar a esa, o deslizá hacia la derecha para quitarla de la lista. Las preestablecidas no se modifican directamente (siempre tienen que quedar disponibles para todos), pero el lápiz en su tarjeta te crea una copia personal editable al toque, sin tocar la original.",
-        demo: { kind: "rutinas", view: "manage" },
-      },
-      {
-        icon: <Download size={20} />,
-        title: "Importar una rutina desde un archivo",
-        text: "Si ya tenés tu rutina anotada en un Excel, Word o PDF, no hace falta tipearla de nuevo: con \"Importar rutina\" subís ese archivo (o copiás y pegás el texto) y la app detecta sola los días, ejercicios, series y repeticiones, buscando cada ejercicio en el catálogo. También hay un botón \"Detectar con IA\" para formatos más libres (necesita que tengas configurado tu propio servidor con la clave de Gemini — si no, usá el detector normal de arriba, que no necesita nada extra). Antes de guardarla te muestra una vista previa para que la revises.",
+        text: "Abajo de la pantalla (o al costado, en pantallas grandes) tenés 4 pestañas: Rutina —la principal, donde entrenás—, Progreso, Rutinas, y Entrenador IA. Tu perfil y configuración los abrís tocando tu avatar arriba a la izquierda.",
       },
     ],
   },
@@ -2428,20 +2392,31 @@ const HELP_CHAPTERS = [
       {
         icon: <Play size={20} />,
         title: "Iniciar y finalizar sesión",
-        text: "Arriba de todo tenés \"Iniciar sesión\" — tocalo cuando arrancás a entrenar. Al final de la pantalla, mientras la sesión esté en curso, aparece \"Finalizar sesión\": al tocarlo queda registrado que entrenaste hoy. Lo que vayas escribiendo en reps/kg se mantiene aunque cambies de pestaña o cierres una tarjeta, hasta que finalices la sesión. Si guardás una serie sin haber tocado \"Iniciar sesión\", te lo recuerda ahí mismo — los datos se guardan igual, pero ese día no cuenta en tu historial hasta que inicies la sesión.",
+        text: "Arriba de todo tenés \"Iniciar sesión\" — tocalo cuando arrancás a entrenar. Al final, mientras esté en curso, aparece \"Finalizar sesión\": al tocarlo queda registrado que entrenaste hoy. Lo que vayas escribiendo se mantiene aunque cambies de pestaña, hasta que finalices.",
         demo: { kind: "rutina", view: "session", caption: "Probá iniciar la sesión y mirá cómo cambia" },
+      },
+      {
+        icon: <AlertTriangle size={20} />,
+        title: "Si te olvidás de iniciarla",
+        text: "Guardar una serie sin haber tocado \"Iniciar sesión\" te lo recuerda ahí mismo — los datos se guardan igual, pero ese día no cuenta en tu historial hasta que la inicies.",
+      },
+      {
+        icon: <Zap size={20} />,
+        title: "Tu semana de descarga",
+        text: "Cada cierta cantidad de semanas (lo configurás en Perfil), tu ciclo entra en una semana de descarga: menos series y menos peso, para bajar la fatiga sin perder lo ganado. Se accede con el botón \"Mi semana de descarga\", arriba de \"Iniciar sesión\" — la primera vez que abrís la app en esa semana te avisamos con un cartel y te lleva directo ahí, pero podés entrenar normal cuando quieras.",
+        demo: { kind: "descarga", view: "header" },
+      },
+      {
+        icon: <ArrowDown size={20} />,
+        title: "Cargas sugeridas en la descarga",
+        text: "Ahí dentro, elegí el día arriba y vas a ver, ejercicio por ejercicio, tu mejor marca tachada y al lado el peso sugerido para esta semana — un porcentaje de tu récord, con menos series.",
+        demo: { kind: "descarga", view: "suggested" },
       },
       {
         icon: <Calendar size={20} />,
         title: "Elegí tu día",
-        text: "Más abajo elegís el día de tu rutina activa. La app reconoce sola cuál te toca hoy según tu cronograma semanal (lo configurás en Rutinas); si hoy es descanso programado o todavía no armaste un cronograma, te sugiere uno según el último día que entrenaste. En cualquier caso, podés elegir el día que quieras — nunca te restringe.",
+        text: "Más abajo elegís el día de tu rutina activa. La app reconoce sola cuál te toca hoy según tu cronograma semanal (lo configurás en Rutinas) — pero nunca te restringe, podés elegir el que quieras.",
         demo: { kind: "rutina", view: "daypicker", caption: "Tocá un día y mirá cómo cambia" },
-      },
-      {
-        icon: <ListChecks size={20} />,
-        title: "Panel del día",
-        text: "El panel de arriba muestra cuánto llevás completado hoy (%), cuántos ejercicios tiene el día y cuántas series en total. Si tu ciclo está en semana de descarga, te lo avisa ahí mismo.",
-        demo: { kind: "rutina", view: "panel" },
       },
       {
         icon: <ChevronDown size={20} />,
@@ -2452,19 +2427,24 @@ const HELP_CHAPTERS = [
       {
         icon: <Pause size={20} />,
         title: "Descanso entre series",
-        text: "Apenas abrís la tarjeta, arriba de todo está el temporizador de descanso: te avisa (con sonido, vibración o ambos, según lo que elijas en Perfil) cuándo arrancar la próxima serie. Podés pausarlo o reiniciarlo con los botones de al lado. Si cambiás de app o se bloquea la pantalla mientras corre, al volver se corrige solo contra la hora real (no se atrasa) — y si el navegador lo permite, también manda una notificación cuando termina.",
+        text: "Arriba de las series está el temporizador de descanso: avisa con sonido, vibración o ambos (lo elegís en Perfil) cuándo arrancar la próxima. Si cambiás de app mientras corre, al volver se corrige solo contra la hora real.",
         demo: { kind: "rutina", view: "card-open", caption: "El cronómetro está arriba de las series — probá pausarlo" },
       },
       {
         icon: <Save size={20} />,
         title: "Registrá tus series",
-        text: "Debajo del cronómetro, por cada serie ingresás reps y kg, y tocás el botón de guardar. Lo que escribís no se borra aunque salgas de la tarjeta o cambies de pestaña — sólo se limpia cuando finalizás la sesión o reseteás el día. La primera vez que registrás una serie todavía no hay nada que comparar, así que no te muestra cartel de récord ni imagen — recién a partir de la segunda vez que la mejorás te avisa con un mensaje y un efecto de confetti, y por defecto se te abre directo la imagen prolija para compartir esa marca. Esa imagen tiene, justo abajo del título (sin tener que desplazar), el botón para no mostrarla automáticamente la próxima vez — también lo podés configurar de una desde Perfil → Compartir marcas.",
+        text: "Por cada serie ingresás reps y kg, y tocás guardar. La primera vez que registrás una serie todavía no hay nada que comparar, así que no muestra cartel de récord — recién desde la segunda vez que la mejorás te avisa con confetti.",
         demo: { kind: "rutina", view: "card-open", caption: "Probá: ingresá reps y kg, y tocá Guardar" },
+      },
+      {
+        icon: <Share2 size={20} />,
+        title: "Compartir una marca nueva",
+        text: "Al lograr una marca, por defecto se abre directo una imagen prolija para compartirla — el botón para desactivar eso está justo abajo del título de esa imagen, sin tener que desplazar. También lo configurás de una en Perfil → Compartir marcas.",
       },
       {
         icon: <Activity size={20} />,
         title: "Esfuerzo (RPE), opcional",
-        text: "Debajo de cada serie podés tocar \"+ Registrar RPE\" para anotar qué tan dura te resultó, en una escala de 6 a 10. Es opcional, pero ayuda a detectar fatiga acumulada con el tiempo.",
+        text: "Debajo de cada serie podés tocar \"+ Registrar RPE\" para anotar qué tan dura te resultó (6 a 10). Ayuda a detectar fatiga acumulada con el tiempo.",
         demo: { kind: "rutina", view: "card-open", caption: "Tocá \"+ Registrar RPE\" debajo de una serie" },
       },
       {
@@ -2476,7 +2456,7 @@ const HELP_CHAPTERS = [
       {
         icon: <RotateCcw size={20} />,
         title: "Resetear el día",
-        text: "Si te equivocaste registrando algo, \"Resetear sesión de hoy\" borra solo los datos de hoy en ese día de rutina (incluido lo que tenías escrito sin guardar) — tus récords no se tocan.",
+        text: "Si te equivocaste registrando algo, \"Resetear sesión de hoy\" borra solo los datos de hoy en ese día — tus récords no se tocan.",
         demo: { kind: "rutina", view: "reset", caption: "Tocá el botón para ver cómo pide confirmación" },
       },
     ],
@@ -2507,67 +2487,99 @@ const HELP_CHAPTERS = [
       {
         icon: <BarChart3 size={20} />,
         title: "Elegí qué ver",
-        text: "Con los botones elegís entre Rango, Historial, Evolución o Músculo — cada uno con su propia tarjeta debajo, igual que elegís el día en la pestaña Rutina.",
+        text: "Con los botones elegís entre Rango, Historial, Evolución o Músculo — cada uno con su propia tarjeta debajo, igual que elegís el día en Rutina.",
       },
       {
         icon: <Calendar size={20} />,
         title: "Historial de sesiones",
-        text: "En \"Historial\" podés ver todo lo que entrenaste: en un calendario mensual con un punto de color por día entrenado, o en una lista con el detalle completo de cada sesión.",
+        text: "En \"Historial\" ves todo lo que entrenaste: en un calendario mensual con un punto de color por día, o en una lista con el detalle completo. Tocá cualquier sesión para ver cada serie con sus reps y kg, marcando con 🔥 las que fueron mejora.",
         demo: { kind: "progreso", view: "calendar" },
       },
       {
-        icon: <TrendingUp size={20} />,
-        title: "Mejoras al detalle",
-        text: "Tocá un día con marca (o cualquier sesión en la vista de lista) para ver el detalle completo: cada serie con sus reps y kg, y cuántas de esas series fueron una mejora respecto a tu historial — marcadas con 🔥.",
-      },
-      {
         icon: <Share2 size={20} />,
-        title: "Crear una imagen para compartir, cuando quieras",
-        text: "Las imágenes para Instagram (de una marca o de un ciclo completo) no son solo automáticas: en Historial tenés \"Crear imagen para compartir\" para generarlas cuando quieras — elegís tu mejor marca en cualquier ejercicio, o un resumen de hoy, de la semana o del mes, con tus días entrenados y el volumen total.",
+        title: "Crear una imagen para compartir",
+        text: "Ahí mismo tenés \"Crear imagen para compartir\" cuando quieras — tu mejor marca en cualquier ejercicio, o un resumen de hoy, la semana o el mes.",
       },
       {
         icon: <BarChart3 size={20} />,
         title: "Gráfico de evolución",
-        text: "Elegí el ejercicio (deslizando la fila de chips hacia los costados) y la serie con los botones S1/S2/etc. Mirá su evolución en Kg, Volumen, 1RM estimado o RPE con los botones de arriba del gráfico.",
+        text: "Elegí el ejercicio (deslizando la fila de chips) y la serie con los botones S1/S2/etc. Mirá su evolución en Kg o en 1RM estimado con los botones de arriba del gráfico.",
         demo: { kind: "progreso", view: "chart", caption: "Deslizá la fila de chips para ver más ejercicios" },
       },
       {
         icon: <Award size={20} />,
         title: "Rango por músculo",
-        text: "El \"muñeco\" de toda la vida, de frente y de espalda: cada músculo se pinta según el rango que alcanzaste ahí — Bronce, Plata, Oro, Esmeralda, Diamante o Maestro en rojo (el techo), cada uno con tres niveles (I, II y III) — calculado con tu 1RM estimado en cualquier ejercicio de ese grupo, usando estándares de fuerza reales. Incluye aductor y espalda baja además de los músculos principales. Siempre se prioriza un ejercicio dedicado a ese músculo si tenés marca ahí; sólo si no entrenaste nada directo, usa de forma secundaria lo que aportan ejercicios compuestos relacionados (por ejemplo, un remo entrena la espalda ancha como principal pero también un poco el bíceps y el deltoides posterior), con menos peso que un ejercicio dedicado — y si todavía no tenés ninguna marca ahí, directamente te dice \"Sin rango\" en vez de inventarte uno. Elegís entre \"General\" (una vara fija, igual para todos) o \"Según tu contexto\" (ajusta el cálculo a tu peso, sexo y edad — cargalos en tu perfil). Tocá un músculo entrenable para que se resalte completo con un borde blanco y ver tu rango, tu mejor marca, y cuántos kilos más necesitás (a tus mismas repeticiones) para subir al rango siguiente, que te muestra nombrado — cabeza, cuello, articulaciones y alguna zona sin músculo asignado no son tocables. Desde el ícono de compartir podés mandar una imagen con tus rangos.",
+        text: "El \"muñeco\", de frente y de espalda: cada músculo se pinta según el rango ahí — Bronce, Plata, Oro, Esmeralda, Diamante o Maestro (el techo, en rojo), cada uno con tres niveles. Se calcula con tu 1RM estimado, priorizando siempre un ejercicio dedicado a ese músculo por sobre uno que lo trabaja sólo de paso. Si todavía no tenés ninguna marca ahí, dice \"Sin rango\" en vez de inventarte uno.",
         demo: { kind: "progreso", view: "rank" },
+      },
+      {
+        icon: <SlidersHorizontal size={20} />,
+        title: "General vs. Según tu contexto",
+        text: "\"General\" usa una vara fija, igual para todos. \"Según tu contexto\" ajusta el cálculo a tu peso, sexo y edad (los cargás en tu perfil) — más representativo de tu caso particular.",
+      },
+      {
+        icon: <Check size={20} />,
+        title: "Tocá un músculo",
+        text: "Se resalta completo con un borde blanco, y abajo ves tu rango, tu mejor marca, y cuántos kilos más necesitás (a tus mismas repeticiones) para subir al rango siguiente, nombrado. Cabeza, cuello, articulaciones y alguna zona sin músculo asignado no son tocables. Desde el ícono de compartir mandás una imagen con tus rangos.",
       },
       {
         icon: <Dumbbell size={20} />,
         title: "Volumen por músculo",
-        text: "En \"Músculo\" ves el volumen acumulado histórico por grupo muscular, para detectar si algún grupo está quedando atrás respecto a los demás.",
+        text: "En \"Músculo\" ves el volumen acumulado histórico por grupo, para detectar si alguno está quedando atrás respecto a los demás.",
         demo: { kind: "progreso", view: "muscle" },
       },
       {
         icon: <Trash2 size={20} />,
         title: "Resetear historial",
-        text: "Al final de la pestaña tenés \"Resetear todo\", para borrar todo tu historial de series si alguna vez querés empezar de cero, y \"Borrar un día\", que te lleva directo a Historial para elegir y borrar solamente una fecha puntual (por si te confundiste registrando algo). En los dos casos tus récords se mantienen guardados.",
+        text: "Al final tenés \"Resetear todo\" (borra todo tu historial de series) y \"Borrar un día\" (sólo una fecha puntual). En los dos casos tus récords se mantienen guardados.",
         demo: { kind: "progreso", view: "resetall" },
       },
     ],
   },
   {
-    key: "descarga",
-    label: "Descarga",
+    key: "rutinas",
+    label: "Rutinas",
     color: "#A855F7",
-    icon: <Zap size={16} />,
+    icon: <Layers size={16} />,
     steps: [
       {
-        icon: <Zap size={20} />,
-        title: "Descarga: tu semana de recuperación",
-        text: "Cada cierta cantidad de semanas de entrenamiento (lo configurás en Perfil), tu ciclo entra en una semana de descarga: menos series y menos peso, para bajar la fatiga sin perder lo ganado. Se accede con el botón \"Mi semana de descarga\" en la pestaña Rutina, justo debajo de \"Iniciar sesión\" — la primera vez que abrís la app en esa semana, además te avisamos con un cartel y te lleva directo ahí, pero podés ir a entrenar normal cuando quieras, no te restringe nada.",
-        demo: { kind: "descarga", view: "header" },
+        icon: <Layers size={20} />,
+        title: "Rutinas: elegí cómo entrenar",
+        text: "Acá elegís qué rutina vas a seguir: alguna ya armada (Push/Pull/Legs, Arnold Split, Upper/Lower y alguna más) o una creada por vos desde cero.",
       },
       {
-        icon: <ArrowDown size={20} />,
-        title: "Cargas sugeridas por día",
-        text: "Elegí el día arriba y vas a ver, ejercicio por ejercicio, tu mejor marca tachada y al lado el peso sugerido para esta semana — calculado como un porcentaje de tu récord, con menos series por ejercicio.",
-        demo: { kind: "descarga", view: "suggested" },
+        icon: <Dumbbell size={20} />,
+        title: "Tu rutina activa",
+        text: "Arriba ves un resumen de la rutina que estás siguiendo: su nombre, y cuántos días/ejercicios/series tiene. El ícono de compartir genera un enlace para mandarle tu rutina a quien quieras, o la descargás como PDF, Word o Excel.",
+        demo: { kind: "rutinas", view: "active" },
+      },
+      {
+        icon: <Calendar size={20} />,
+        title: "¿Qué día entrenás cada cosa?",
+        text: "Tocando \"Configurar días de la semana\" elegís qué día de tu rutina (o descanso) le corresponde a cada día calendario — podés repetir días, y la app reconoce sola en qué día estás cuando abrís Rutina.",
+      },
+      {
+        icon: <ListChecks size={20} />,
+        title: "Rutinas preestablecidas",
+        text: "Más abajo está el catálogo. Tocá una para ver su distribución semanal completa antes de usarla.",
+        demo: { kind: "rutinas", view: "preset", caption: "Tocá la rutina para ver el detalle" },
+      },
+      {
+        icon: <Sparkles size={20} />,
+        title: "Creá la tuya",
+        text: "Con \"Crear mi propia rutina\" le ponés nombre, armás los días que quieras (con su propio nombre y color), y agregás ejercicios buscando por grupo muscular.",
+        demo: { kind: "rutinas", view: "builder", caption: "Probá cambiar el nombre del día" },
+      },
+      {
+        icon: <Edit3 size={20} />,
+        title: "Editá, activá o borrá tus rutinas",
+        text: "Tocá el lápiz para modificar las que creaste, \"Activar\" para cambiar a esa, o deslizá hacia la derecha para quitarla de la lista. Las preestablecidas no se modifican directamente, pero el lápiz en su tarjeta te crea una copia personal editable.",
+        demo: { kind: "rutinas", view: "manage" },
+      },
+      {
+        icon: <Download size={20} />,
+        title: "Importar una rutina desde un archivo",
+        text: "Si ya la tenés anotada en Excel, Word o PDF, subís ese archivo (o pegás el texto) y la app detecta sola los días, ejercicios, series y repeticiones. \"Detectar con IA\" es una alternativa para formatos más libres.",
       },
     ],
   },
@@ -2580,7 +2592,12 @@ const HELP_CHAPTERS = [
       {
         icon: <Sparkles size={20} />,
         title: "Chateá con tu entrenador IA",
-        text: "Preguntale lo que quieras sobre tu entrenamiento — tiene a la vista tu historial real (marcas, fechas, pesos), así que puede responder con datos concretos en vez de generalidades. Necesita el parámetro \"GEMINI_API_KEY\" configurado en Firebase → Remote Config para funcionar.",
+        text: "Preguntale lo que quieras sobre tu entrenamiento — tiene a la vista tu historial real (marcas, fechas, pesos), así que responde con datos concretos en vez de generalidades.",
+      },
+      {
+        icon: <RotateCcw size={20} />,
+        title: "La conversación se mantiene",
+        text: "El chat sigue ahí aunque cambies de pestaña y vuelvas — sólo se reinicia si cerrás la app por completo, no al ir y volver adentro de ella.",
       },
     ],
   },
@@ -2598,47 +2615,35 @@ const HELP_CHAPTERS = [
       {
         icon: <Mail size={20} />,
         title: "Tus datos",
-        text: "Arriba ves tu nombre, email (si lo cargaste) y fecha de alta. Tocá \"Editar perfil\" para cambiar el email, tu sexo, tu edad o tu peso corporal — estos últimos tres se usan para calibrar mejor el rango por músculo de Progreso. O tocá \"Vincular con Google\" si querés asociar tu cuenta de Google a este perfil — iniciar sesión con esa misma cuenta desde otro dispositivo (celular, computadora) va a encontrar este mismo perfil en vez de crear uno nuevo.",
+        text: "Arriba ves tu nombre, email y fecha de alta. \"Editar perfil\" cambia el email, sexo, edad o peso corporal (afinan el rango por músculo). \"Vincular con Google\" hace que iniciar sesión desde otro dispositivo encuentre este mismo perfil.",
         demo: { kind: "perfil", view: "datos" },
       },
       {
         icon: <Layers size={20} />,
         title: "Tu rutina",
-        text: "Debajo tenés un acceso directo que muestra qué rutina tenés activa y cuántas guardaste. Tocalo para ir a la pestaña Rutinas y cambiar, editar o crear otra.",
+        text: "Un acceso directo que muestra qué rutina tenés activa. Tocalo para ir a Rutinas y cambiar, editar o crear otra.",
       },
       {
         icon: <Sun size={20} />,
-        title: "Apariencia",
-        text: "Elegí entre el tema oscuro (el de siempre) o uno claro, lo que te resulte más cómodo.",
+        title: "Apariencia y accesibilidad",
+        text: "Tema oscuro o claro, tamaño de letra (general y de etiquetas chicas), y zoom con los dedos — este último apagado por defecto para que no se desencuadre la pantalla si pellizcás por accidente.",
         demo: { kind: "perfil", view: "apariencia", caption: "Probá cambiar de tema" },
-      },
-      {
-        icon: <SlidersHorizontal size={20} />,
-        title: "Tamaño de letra",
-        text: "Dos controles: uno agranda el texto normal de la app (títulos, números de reps/kg, párrafos) y el otro, \"Letras chicas\", agranda específicamente las etiquetas más chiquitas — consejos de cada ejercicio, récords, RPE, badges de día — pensado para que se lea más fácil si tenés problemas de vista. Ahí mismo está \"Zoom con los dedos\", apagado por defecto para que no se desencuadre la pantalla si pellizcás por accidente — activalo si preferís poder agrandar partes puntuales.",
-        demo: { kind: "perfil", view: "textsize", caption: "Probá cambiar el tamaño" },
       },
       {
         icon: <Download size={20} />,
         title: "Exportar entrenamiento",
-        text: "Descargá el resumen de tu entrenamiento de hoy, de la semana o del mes en PDF, Word o Excel — pensado para mandárselo directo a tu entrenador, con cada ejercicio, serie, reps, kg y RPE.",
+        text: "Descargá el resumen de hoy, la semana o el mes en PDF, Word o Excel — para mandárselo a tu entrenador.",
       },
       {
         icon: <Share2 size={20} />,
         title: "Compartir marcas",
-        text: "Elegís si, al lograr una nueva marca, se te abre directo la imagen para compartir, o si preferís que sólo aparezca el ícono chico al lado de \"¡Nueva marca!\" para abrirla vos cuando quieras.",
+        text: "Elegís si una marca nueva abre directo la imagen para compartir, o si preferís sólo el ícono chico para abrirla cuando quieras.",
       },
       {
         icon: <Calendar size={20} />,
-        title: "Inicio de ciclo",
-        text: "Configurá la fecha en la que arrancó tu ciclo actual de entrenamiento. A partir de ahí la app calcula en qué semana estás y cuándo te toca la descarga.",
+        title: "Ciclo y descarga",
+        text: "Configurás la fecha de inicio de tu ciclo, cuántas semanas entrenás antes de la descarga, cuánto dura, y a qué porcentaje de tu récord entrenás en esa semana.",
         demo: { kind: "perfil", view: "ciclo" },
-      },
-      {
-        icon: <SlidersHorizontal size={20} />,
-        title: "Configuración de descarga",
-        text: "Elegís cuántas semanas entrenás antes de la descarga, cuántas semanas dura la descarga, a qué porcentaje de tu récord vas a entrenar, y cuánto se reducen las series.",
-        demo: { kind: "perfil", view: "configdescarga", caption: "Probá sumar o restar semanas" },
       },
       {
         icon: <Clock size={20} />,
@@ -2649,13 +2654,13 @@ const HELP_CHAPTERS = [
       {
         icon: <ShieldCheck size={20} />,
         title: "Tus datos están respaldados",
-        text: "Además de guardarse en el dispositivo, tus registros se respaldan automáticamente en una segunda copia local. Si algo borra los datos del navegador, la app intenta recuperarlos sola al abrir de nuevo.",
+        text: "Además del dispositivo, tus registros se respaldan en una segunda copia local — si algo borra los datos del navegador, la app intenta recuperarlos sola al abrir de nuevo.",
         demo: { kind: "perfil", view: "backup" },
       },
       {
         icon: <LogOut size={20} />,
         title: "Cerrar sesión o eliminar perfil",
-        text: "\"Cerrar sesión\" cierra tu cuenta de Google en este dispositivo y te vuelve a la pantalla de inicio. \"Eliminar perfil\" en cambio borra tu perfil por completo, con todo su historial (no se puede deshacer).",
+        text: "\"Cerrar sesión\" te vuelve a la pantalla de inicio. \"Eliminar perfil\" borra el perfil por completo, con todo su historial (no se puede deshacer).",
         demo: { kind: "perfil", view: "logout" },
       },
     ],
@@ -2669,7 +2674,7 @@ const HELP_CHAPTERS = [
       {
         icon: <Check size={20} />,
         title: "¡Eso es todo!",
-        text: "Ya conocés todas las funciones de la app. Podés volver a ver este tour guiado cuando quieras tocando el ícono de ayuda (?) arriba a la derecha, en cualquier pestaña.",
+        text: "Ya conocés todas las funciones de la app. Podés volver a ver este tour cuando quieras tocando el ícono de ayuda (?) arriba a la derecha, en cualquier pestaña.",
       },
     ],
   },
@@ -3088,10 +3093,21 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
 
   return (
     <div className="space-y-4">
-      <SessionStartBar activeSession={activeSession} onStart={() => onStartSession(activeDay)} onCancel={onCancelSession} />
+      <div className="relative overflow-hidden rounded-2xl border border-teal-500/20 p-5" style={{ background: "var(--grad-hero-teal)" }}>
+        <div className="absolute -top-8 -right-6 w-32 h-32 rounded-full bg-teal-500/15 blur-2xl pointer-events-none" />
+        <div className="absolute -bottom-6 -left-6 w-28 h-28 rounded-full bg-cyan-500/10 blur-2xl pointer-events-none" />
+        <div className="relative flex items-center gap-2 mb-1">
+          <Dumbbell size={16} className="text-teal-400" />
+          <span className="text-[11px] font-black uppercase tracking-widest text-teal-400">Tu entrenamiento</span>
+        </div>
+        <h2 className="relative text-xl font-black text-white leading-tight">Rutina</h2>
+        <p className="relative text-xs text-teal-300/60 mt-1">Registrá tus series de hoy y seguí tu progreso día a día</p>
+      </div>
+
       <button onClick={onGoToDeload} className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border border-purple-500/30 bg-purple-500/10 text-purple-300 hover:bg-purple-500/20 hover:border-purple-500/50 transition text-sm font-bold active:scale-[0.98]">
         <Zap size={14} /> Mi semana de descarga{isDeload ? <span className="text-[10px] font-black px-1.5 py-0.5 rounded-md bg-purple-500/30 ml-1">ACTIVA AHORA</span> : null}
       </button>
+      <SessionStartBar activeSession={activeSession} onStart={() => onStartSession(activeDay)} onCancel={onCancelSession} />
 
       {isRestToday && (
         <div className="flex items-start gap-2.5 bg-slate-900/50 border border-slate-800/50 rounded-xl px-3.5 py-2.5">
@@ -4082,17 +4098,20 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
       ) : (
         <p className="text-center text-[11px] text-slate-600">Tocá un músculo entrenable para ver tu rango y tu mejor marca.</p>
       )}
-      <div className="pt-2 border-t border-slate-800/60">
-        <p className="text-[10px] font-bold text-slate-600 uppercase tracking-wider text-center mb-3">Todos los rangos</p>
-        <div className="grid grid-cols-3 gap-3 max-w-[280px] mx-auto">
+      <div className="bg-slate-900/40 border border-slate-800/50 rounded-2xl p-4">
+        <div className="flex items-center gap-1.5 justify-center mb-3.5">
+          <Trophy size={12} className="text-slate-600" />
+          <p className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Todos los rangos</p>
+        </div>
+        <div className="grid grid-cols-3 gap-2.5">
           {["Bronce", "Plata", "Oro", "Esmeralda", "Diamante", "Maestro"].map((t) => {
             const rep = RANK_TIERS.find((r) => r.tier === t && r.sub === "II") || RANK_TIERS.find((r) => r.tier === t);
             return (
-              <div key={t} className="flex flex-col items-center gap-1.5">
-                <div className="bg-slate-900/40 border border-slate-800/60 rounded-2xl p-1.5">
-                  <RankBadgeIcon tier={rep.tier} sub="" color={rep.color} size={64} />
+              <div key={t} className="flex flex-col items-center gap-1.5 rounded-xl py-2.5" style={{ background: `linear-gradient(180deg, ${rep.color}14, transparent)` }}>
+                <div className="rounded-2xl p-1.5" style={{ backgroundColor: rep.color + "12", border: `1px solid ${rep.color}30` }}>
+                  <RankBadgeIcon tier={rep.tier} sub="" color={rep.color} size={60} />
                 </div>
-                <span className="text-[9px] text-slate-500 font-semibold">{t}</span>
+                <span className="text-[10px] font-bold" style={{ color: rep.color }}>{t}</span>
               </div>
             );
           })}
@@ -4205,7 +4224,7 @@ function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_
             <div className="flex items-center justify-end">
               <div className="flex bg-slate-950/60 rounded-xl p-0.5 border border-slate-800/60">
                 {[{ k: "peso", l: "Kg" }, { k: "1rm", l: "1RM" }].map((opt) => (
-                  <button key={opt.k} onClick={() => setMetric(opt.k)} className={`px-2 py-1.5 rounded-[10px] text-[10px] font-bold transition-all ${metric === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
+                  <button key={opt.k} onClick={() => setMetric(opt.k)} className={`px-2 py-1.5 rounded-[10px] text-[10px] font-bold transition-all ${metric === opt.k ? "bg-amber-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
                 ))}
               </div>
             </div>
@@ -4227,7 +4246,7 @@ function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_
                       <YAxis stroke="var(--chart-axis)" fontSize={10} domain={["auto", "auto"]} />
                       <Tooltip content={<CustomTooltip />} />
                       {metric === "peso" && <Area type="monotone" dataKey="kg" stroke={selEx?.color || "#14B8A6"} fill="url(#gA)" strokeWidth={2.5} dot={{ r: 3, fill: selEx?.color, strokeWidth: 0 }} name="Kg" />}
-                      {metric === "1rm" && <Area type="monotone" dataKey="e1rm" stroke="#14B8A6" fill="url(#gA)" strokeWidth={2.5} dot={{ r: 3, fill: "#14B8A6", strokeWidth: 0 }} name="1RM est." />}
+                      {metric === "1rm" && <Area type="monotone" dataKey="e1rm" stroke="#F59E0B" fill="url(#gA)" strokeWidth={2.5} dot={{ r: 3, fill: "#F59E0B", strokeWidth: 0 }} name="1RM est." />}
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
@@ -5243,10 +5262,7 @@ async function extractTextFromPdfFile(file) {
    desarrollador. Esto es un cascarón funcional: conecta de verdad con
    Gemini, pero todavía no tiene memoria entre sesiones ni límites de uso.
 ============================================================================ */
-function EntrenadorIAChat({ profile, logs, profileName }) {
-  const [messages, setMessages] = useState([
-    { role: "assistant", text: "¡Hola! Soy tu entrenador IA — tengo a la vista tu historial de entrenamiento. Preguntame sobre tu rutina, tus marcas o tu progreso." },
-  ]);
+function EntrenadorIAChat({ profile, logs, profileName, messages, setMessages }) {
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
   const scrollRef = useRef(null);
@@ -5293,13 +5309,16 @@ Datos: ${JSON.stringify(context)}`;
   };
 
   return (
-    <div className="flex flex-col" style={{ height: "calc(100vh - 220px)", minHeight: 420 }}>
-      <div className="flex items-center gap-2.5 mb-3 shrink-0">
-        <div className="w-9 h-9 rounded-xl bg-teal-500/15 text-teal-400 flex items-center justify-center shrink-0"><Sparkles size={16} /></div>
-        <div className="min-w-0">
-          <p className="text-sm font-bold text-white">Entrenador IA</p>
-          <p className="text-[11px] text-slate-500">Conoce tu historial de entrenamiento</p>
+    <div className="flex flex-col" style={{ height: "calc(100vh - 320px)", minHeight: 360 }}>
+      <div className="relative overflow-hidden rounded-2xl border border-teal-500/20 p-5 mb-3 shrink-0" style={{ background: "var(--grad-hero-teal)" }}>
+        <div className="absolute -top-8 -right-6 w-32 h-32 rounded-full bg-teal-500/15 blur-2xl pointer-events-none" />
+        <div className="absolute -bottom-6 -left-6 w-28 h-28 rounded-full bg-cyan-500/10 blur-2xl pointer-events-none" />
+        <div className="relative flex items-center gap-2 mb-1">
+          <Sparkles size={16} className="text-teal-400" />
+          <span className="text-[11px] font-black uppercase tracking-widest text-teal-400">Tu asistente</span>
         </div>
+        <h2 className="relative text-xl font-black text-white leading-tight">Entrenador IA</h2>
+        <p className="relative text-xs text-teal-300/60 mt-1">Conoce tu historial de entrenamiento — preguntale lo que quieras</p>
       </div>
       <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-3 pb-3 pr-1">
         {messages.map((m, i) => (
@@ -5683,14 +5702,14 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
     return (
       <div className="space-y-4">
         <div className="text-center pt-2 pb-1">
-          <div className="w-14 h-14 rounded-2xl bg-teal-500/15 flex items-center justify-center mx-auto mb-3"><Calendar className="text-teal-500" size={26} /></div>
+          <div className="w-14 h-14 rounded-2xl bg-purple-500/15 flex items-center justify-center mx-auto mb-3"><Calendar className="text-purple-500" size={26} /></div>
           <h2 className="text-lg font-black text-white">¿Qué días entrenás "{def.name}"?</h2>
           <p className="text-sm text-slate-500 mt-1.5 leading-relaxed px-2">Ya armamos un cronograma por defecto de lunes a domingo — lo podés dejar así o cambiarlo. Esto te evita tener que venir después a configurarlo.</p>
         </div>
         <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4">
           <WeeklyScheduleEditor dayOrder={def.dayOrder} days={def.days} schedule={def.weekSchedule} onChange={updatePendingScheduleDay} />
         </div>
-        <button onClick={confirmPendingActivation} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98] shadow-lg shadow-teal-500/20" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}><Check size={15} /> Listo, empezar a entrenar</button>
+        <button onClick={confirmPendingActivation} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98] shadow-lg shadow-purple-500/20" style={{ background: "linear-gradient(135deg,#A855F7,#7E22CE)" }}><Check size={15} /> Listo, empezar a entrenar</button>
       </div>
     );
   }
@@ -5712,22 +5731,22 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
     <div className="space-y-4">
       {forced && (
         <div className="text-center pt-2 pb-1">
-          <div className="w-14 h-14 rounded-2xl bg-teal-500/15 flex items-center justify-center mx-auto mb-3"><Layers className="text-teal-500" size={26} /></div>
+          <div className="w-14 h-14 rounded-2xl bg-purple-500/15 flex items-center justify-center mx-auto mb-3"><Layers className="text-purple-500" size={26} /></div>
           <h2 className="text-lg font-black text-white">¿Cómo vas a entrenar?</h2>
           <p className="text-sm text-slate-500 mt-1.5 leading-relaxed px-2">Elegí una rutina ya armada, creá la tuya desde cero, o importá una que ya tengas escrita. La vas a poder cambiar cuando quieras.</p>
         </div>
       )}
 
       {!forced && (
-        <div className="relative overflow-hidden rounded-2xl border border-teal-500/20 p-5" style={{ background: "var(--grad-hero-teal)" }}>
-          <div className="absolute -top-8 -right-6 w-32 h-32 rounded-full bg-teal-500/15 blur-2xl pointer-events-none" />
-          <div className="absolute -bottom-6 -left-6 w-28 h-28 rounded-full bg-cyan-500/10 blur-2xl pointer-events-none" />
+        <div className="relative overflow-hidden rounded-2xl border border-purple-500/20 p-5" style={{ background: "var(--grad-hero-purple)" }}>
+          <div className="absolute -top-8 -right-6 w-32 h-32 rounded-full bg-purple-500/15 blur-2xl pointer-events-none" />
+          <div className="absolute -bottom-6 -left-6 w-28 h-28 rounded-full bg-fuchsia-500/10 blur-2xl pointer-events-none" />
           <div className="relative flex items-center gap-2 mb-1">
-            <Layers size={16} className="text-teal-400" />
-            <span className="text-[11px] font-black uppercase tracking-widest text-teal-400">Tu plan de entrenamiento</span>
+            <Layers size={16} className="text-purple-400" />
+            <span className="text-[11px] font-black uppercase tracking-widest text-purple-400">Tu plan de entrenamiento</span>
           </div>
           <h2 className="relative text-xl font-black text-white leading-tight">Rutinas</h2>
-          <p className="relative text-xs text-teal-300/60 mt-1">Elegí cómo entrenar: una rutina ya armada o una creada por vos</p>
+          <p className="relative text-xs text-purple-300/60 mt-1">Elegí cómo entrenar: una rutina ya armada o una creada por vos</p>
         </div>
       )}
 
@@ -5784,7 +5803,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
                 {archivedEntries.map(([id, r]) => (
                   <div key={id} className="flex items-center gap-3 bg-slate-900/30 border border-slate-800/40 rounded-2xl px-4 py-3">
                     <p className="text-sm font-semibold text-slate-400 flex-1 min-w-0 truncate">{r.name}</p>
-                    <button onClick={() => onRestore(id)} className="px-3 py-1.5 rounded-lg bg-teal-500/15 text-teal-400 text-xs font-bold shrink-0">Restaurar</button>
+                    <button onClick={() => onRestore(id)} className="px-3 py-1.5 rounded-lg bg-purple-500/15 text-purple-400 text-xs font-bold shrink-0">Restaurar</button>
                   </div>
                 ))}
               </div>
@@ -5803,7 +5822,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
       </div>
 
       <div className="flex gap-2">
-        <button onClick={() => { setEditingRoutineId(null); setMode("builder"); }} className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98] shadow-lg shadow-teal-500/20" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}><Sparkles size={15} /> Crear mi rutina</button>
+        <button onClick={() => { setEditingRoutineId(null); setMode("builder"); }} className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98] shadow-lg shadow-purple-500/20" style={{ background: "linear-gradient(135deg,#A855F7,#7E22CE)" }}><Sparkles size={15} /> Crear mi rutina</button>
         <button onClick={() => setShowImport(true)} className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition text-sm font-bold active:scale-[0.98]"><Download size={15} /> Importar rutina</button>
       </div>
 
@@ -5838,9 +5857,9 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
 ============================================================================ */
 const NAV_TABS = [
   { key: "rutina", icon: <Dumbbell size={20} />, label: "Rutina" },
-  { key: "entrenador_ia", icon: <Sparkles size={20} />, label: "Entrenador IA" },
   { key: "progreso", icon: <BarChart3 size={20} />, label: "Progreso" },
   { key: "rutinas", icon: <Layers size={20} />, label: "Rutinas" },
+  { key: "entrenador_ia", icon: <Sparkles size={20} />, label: "Entrenador IA" },
 ];
 
 function BottomBar({ tab, setTab }) {
@@ -5891,6 +5910,13 @@ export default function App() {
   const [profiles, setProfiles] = useState(loadProfiles);
   const [activeProfile, setActiveProfile] = useState(null);
   const [tab, setTab] = useState("rutina");
+  // El historial del chat con el Entrenador IA vive acá (no dentro del
+  // componente del chat) a propósito: así sigue ahí cuando cambiás de
+  // pestaña y volvés — sólo se reinicia si recargás la app entera (cerrarla
+  // de verdad, no sólo cambiar de pestaña adentro de ella).
+  const [aiChatMessages, setAiChatMessages] = useState([
+    { role: "assistant", text: "¡Hola! Soy tu entrenador IA — tengo a la vista tu historial de entrenamiento. Preguntame sobre tu rutina, tus marcas o tu progreso." },
+  ]);
   const [cycleStart, setCycleStartState] = useState(loadCycleStart);
   const [showHelp, setShowHelp] = useState(false);
   const [helpStartTab, setHelpStartTab] = useState(null);
@@ -6266,7 +6292,7 @@ export default function App() {
             {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} onGoToDeload={() => setTab("descarga")} />}
             {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} sex={profile?.sex} age={profile?.age} />}
             {tab === "descarga" && <DeloadView logs={logs} settings={getProfileSettings(profile)} />}
-            {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} profileName={activeProfile} />}
+            {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} />}
             {tab === "perfil" && <ProfileView profileName={activeProfile} profiles={profiles} logs={logs} onSignOut={handleSignOut} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} />}
           </div>
         </main>
