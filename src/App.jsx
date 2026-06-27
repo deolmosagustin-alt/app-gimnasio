@@ -152,12 +152,42 @@ function resolveRoutineDef(routineEntry, routineId) {
    que ya hay Firebase Firestore configurado (`db`), la rutina se guarda
    ahí bajo un ID corto al azar (6 caracteres) en la colección
    "shared_routines", y el link sólo lleva ese ID (#r=ID_CORTO) — corto de
-   verdad, sin límites de longitud para la rutina en sí. */
+   verdad, sin límites de longitud para la rutina en sí.
+
+   IMPORTANTE — esto necesita un paso de configuración fuera de este
+   archivo: las reglas de seguridad de Firestore tienen que permitir
+   escribir en la colección "shared_routines" (por defecto, Firestore
+   RECHAZA toda lectura/escritura hasta que se lo permitas explícitamente
+   en la consola de Firebase). Si nunca se configuró esto, CUALQUIER
+   intento de compartir una rutina va a fallar con "permission-denied" —
+   se ve exactamente como "no pudimos generar el enlace", sin relación
+   con cómo está organizado el código (App.jsx vs. data.js).
+   En Firebase Console → Firestore Database → Reglas, agregá algo como:
+     match /shared_routines/{shortId} {
+       allow read: if true;
+       allow create: if true;
+       allow update, delete: if false;
+     }
+   (lectura y creación públicas porque cualquiera con el link tiene que
+   poder verla sin iniciar sesión; nunca se debería poder pisar o borrar
+   una ya creada). */
 async function shareRoutineToFirestore(routineDef) {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   let shortId = "";
   for (let i = 0; i < 6; i++) shortId += chars[Math.floor(Math.random() * chars.length)];
-  await setDoc(doc(db, "shared_routines", shortId), routineDef);
+  try {
+    await setDoc(doc(db, "shared_routines", shortId), routineDef);
+  } catch (err) {
+    // Se reempaqueta el error con un mensaje más claro según la causa real,
+    // en vez de dejar que todo termine en el mismo "no pudimos generar el
+    // enlace" genérico — así, tanto en la consola como en pantalla, queda
+    // claro si hace falta configurar las reglas de Firestore (lo más
+    // probable) o si es otra cosa (sin conexión, cuota agotada, etc.).
+    if (err?.code === "permission-denied") {
+      throw new Error("Firestore rechazó la escritura (permission-denied) — hace falta configurar las reglas de seguridad de la colección \"shared_routines\" en la consola de Firebase para permitir escritura pública. Ver el comentario arriba de shareRoutineToFirestore.");
+    }
+    throw err;
+  }
   const base = typeof window !== "undefined" ? window.location.origin + window.location.pathname : "";
   return `${base}#r=${shortId}`;
 }
@@ -880,7 +910,7 @@ function PRBurst({ anchorRef, trigger }) {
 ============================================================================ */
 function ShareLinkModal({ title, shareTitle, shareText, shareTarget, onClose }) {
   const [url, setUrl] = useState("");
-  const [linkError, setLinkError] = useState(false);
+  const [linkError, setLinkError] = useState(null);
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState(false);
   const [exporting, setExporting] = useState(null);
@@ -895,14 +925,14 @@ function ShareLinkModal({ title, shareTitle, shareText, shareTarget, onClose }) 
   // mostrando "Generando enlace mágico...".
   useEffect(() => {
     let cancelled = false;
-    setUrl(""); setLinkError(false);
+    setUrl(""); setLinkError(null);
     (async () => {
       try {
         const link = await shareRoutineToFirestore(shareTarget);
         if (!cancelled) setUrl(link);
       } catch (err) {
         console.error("Error al generar el enlace de la rutina:", err);
-        if (!cancelled) setLinkError(true);
+        if (!cancelled) setLinkError(err?.code === "permission-denied" ? "permission-denied" : "other");
       }
     })();
     return () => { cancelled = true; };
@@ -966,8 +996,12 @@ function ShareLinkModal({ title, shareTitle, shareText, shareTarget, onClose }) 
 
         {linkError && (
           <div className="bg-rose-500/10 border border-rose-500/20 rounded-2xl p-4 mb-3">
-            <p className="text-sm text-rose-300 mb-3">No pudimos generar el enlace — revisá tu conexión e intentá de nuevo.</p>
-            <button onClick={() => { setLinkError(false); setUrl(""); shareRoutineToFirestore(shareTarget).then(setUrl).catch(() => setLinkError(true)); }} className="w-full py-2.5 rounded-xl bg-slate-800 text-slate-200 text-sm font-bold">Reintentar</button>
+            <p className="text-sm text-rose-300 mb-3">
+              {linkError === "permission-denied"
+                ? "Firestore todavía no tiene permiso para guardar rutinas compartidas — hace falta ajustar las reglas de seguridad de la colección \"shared_routines\" en la consola de Firebase."
+                : "No pudimos generar el enlace — revisá tu conexión e intentá de nuevo."}
+            </p>
+            <button onClick={() => { setLinkError(null); setUrl(""); shareRoutineToFirestore(shareTarget).then(setUrl).catch((err) => setLinkError(err?.code === "permission-denied" ? "permission-denied" : "other")); }} className="w-full py-2.5 rounded-xl bg-slate-800 text-slate-200 text-sm font-bold">Reintentar</button>
           </div>
         )}
 
@@ -3098,8 +3132,6 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
         <p className="relative text-xs text-teal-300/60 mt-1">Registrá tus series de hoy y seguí tu progreso día a día</p>
       </div>
 
-      <SessionStartBar activeSession={activeSession} onStart={() => onStartSession(activeDay)} onCancel={onCancelSession} />
-
       {isRestToday && (
         <div className="flex items-start gap-2.5 bg-slate-900/50 border border-slate-800/50 rounded-xl px-3.5 py-2.5">
           <Calendar size={13} className="text-slate-500 mt-0.5 shrink-0" />
@@ -3144,6 +3176,12 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           )}
         </div>
       </div>
+
+      {/* Fuera del bloque con key={activeDay} a propósito: así, aunque
+          cambies de día (lo que SÍ remonta la tarjeta de arriba por el
+          cambio de key), este botón nunca se desmonta — sigue en el mismo
+          lugar siempre, entre la tarjeta del día y los ejercicios. */}
+      <SessionStartBar activeSession={activeSession} onStart={() => onStartSession(activeDay)} onCancel={onCancelSession} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         {day.exercises.map((ex) => <ExerciseCard key={ex.id} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadSets={isDeload ? getDeloadSets(ex) : null} deloadMode={isDeload} resetKey={resetKeys[activeDay]} settings={settings} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!activeSession} />)}
