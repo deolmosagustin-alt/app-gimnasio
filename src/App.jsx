@@ -11,54 +11,62 @@ import {
   Mail, Clock, ChevronRight, Edit3, Info, Plus, Sun, Moon,
   Target, Award, Activity, ArrowDown, HelpCircle, List, LayoutGrid,
   Sparkles, Layers, Video, SlidersHorizontal, ShieldCheck, UserCog,
-  Share2, Download, Link2, Copy, BellOff,
+  Share2, Download, Link2, Copy, BellOff, Send,
 } from "lucide-react";
 import { signInWithPopup, signOut } from "firebase/auth";
 import { doc, setDoc, getDoc } from "firebase/firestore";
 import Model from "react-body-highlighter";
-import { auth, googleProvider, db } from "./firebase";
+import { auth, googleProvider, db, app } from "./firebase";
+import { getRemoteConfig, getValue, fetchAndActivate } from "firebase/remote-config";
 
 /* ============================================================================
-   IMPORTAR RUTINA CON IA — sobre la clave de la API de Gemini que me
-   pasaste: NO la puse en este archivo, y es importante que entiendas por
-   qué antes de seguir.
-   App.jsx corre ENTERO en el navegador de cada persona que abre la app —
-   no hay ningún paso de "compilación secreta" que la oculte. Cualquiera
-   puede tocar F12, ir a la pestaña Network, y ver la clave tal cual viaja
-   en cada pedido a Gemini; o simplemente leerla en el código fuente. Una
-   vez que una clave de API queda en código que se sirve públicamente, hay
-   que darla por filtrada — cualquiera puede copiarla y usarla a tu costo
-   (Gemini cobra por uso) o agotar tu cuota.
-   La forma correcta de hacer esto es que la clave viva en un SERVIDOR
-   (algo que vos controlás y que la gente no puede leer), y que la app le
-   pida el análisis a ESE servidor en vez de pedírselo a Gemini
-   directamente. Como yo sólo puedo editar este archivo (App.jsx) y no
-   tengo forma de desplegar ese servidor por vos, dejé el código de la app
-   ya listo para usarlo (con el spinner, el prompt, el parseo de la
-   respuesta, todo) apuntando a esta URL de ejemplo — reemplazala por la
-   de tu propia función, y ahí sí poné la clave (como variable de entorno
-   del servidor, nunca en este archivo).
-   La forma más simple de armar ese servidor es una Cloud Function de
-   Firebase (ya tenés Firebase configurado). Un punto de partida — esto va
-   en un archivo APARTE (`functions/index.js`), no en App.jsx:
+   IMPORTAR RUTINA CON IA — usando Firebase Remote Config para la clave de
+   Gemini, como pediste. Antes de nada, una aclaración importante para que
+   la uses con la información correcta (no es una negativa, lo implementé
+   tal cual lo pediste — pero hay una diferencia entre "no está en el
+   código" y "está oculta"):
 
-     const functions = require("firebase-functions");
-     const fetch = require("node-fetch");
-     exports.parseRoutineWithAI = functions.https.onRequest(async (req, res) => {
-       res.set("Access-Control-Allow-Origin", "*"); // restringilo a tu dominio en producción
-       const apiKey = functions.config().gemini.key; // configurado con `firebase functions:config:set gemini.key="TU_CLAVE"`
-       const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-         method: "POST",
-         headers: { "Content-Type": "application/json" },
-         body: JSON.stringify(req.body.geminiPayload),
-       });
-       res.json(await r.json());
-     });
+   Remote Config NO es un lugar para guardar secretos — es un sistema para
+   mandarle configuración al CLIENTE (a la app que corre en el navegador
+   de cada persona), como un interruptor de "activar función nueva" o un
+   número de prueba A/B. El valor SÍ viaja hasta el navegador (se puede ver
+   en la pestaña Network al pedirlo, o tipeando `getValue(...).asString()`
+   en la consola del navegador) — la propia documentación de Firebase lo
+   dice explícitamente: no es para datos sensibles. Así que la clave de
+   Gemini sigue tan visible para cualquiera que abra las herramientas de
+   desarrollador como si estuviera escrita directo en este archivo — sólo
+   cambia DESDE DÓNDE se la baja, no que esté escondida.
+   La única forma real de que la clave no viaje nunca al navegador es que
+   el pedido a Gemini lo haga un servidor (te lo mostré la vez pasada con
+   una Cloud Function) — si en algún momento te interesa, lo retomamos.
+   Mientras tanto, para que el riesgo sea bien chico si seguís con este
+   camino: en la consola de Google Cloud, a esa clave de API le podés
+   poner una restricción de "HTTP referrers" para que sólo funcione desde
+   el dominio donde publicás la app — así, aunque alguien la copie, no le
+   sirve para usarla desde otro lado.
 
-   Si querés, puedo ayudarte a escribir ese archivo de Cloud Function
-   completo en otra vuelta — pedímelo y lo armamos.
-============================================================================ */
-const ROUTINE_AI_PARSE_ENDPOINT = "/api/parseRoutineWithAI"; // reemplazá esto por la URL real de tu Cloud Function
+   Implementación: */
+let _remoteConfigInstance = null;
+async function getGeminiKey() {
+  if (!_remoteConfigInstance) {
+    _remoteConfigInstance = getRemoteConfig(app);
+    // Corto a propósito mientras probás (así un cambio del valor en la
+    // consola de Firebase se nota enseguida) — subilo bastante en
+    // producción (por ejemplo, una hora) para no gastar de más la cuota
+    // de pedidos de Remote Config.
+    _remoteConfigInstance.settings.minimumFetchIntervalMillis = 10000;
+    _remoteConfigInstance.defaultConfig = { GEMINI_API_KEY: "" };
+  }
+  try {
+    await fetchAndActivate(_remoteConfigInstance);
+  } catch (err) {
+    console.error("Error al obtener Remote Config:", err);
+  }
+  return getValue(_remoteConfigInstance, "GEMINI_API_KEY").asString();
+}
+// Para que esto devuelva algo de verdad, en la consola de Firebase →
+// Remote Config tenés que crear un parámetro llamado exactamente
+// "GEMINI_API_KEY" con tu clave como valor, y publicarlo.
 
 /* ============================================================================
    BIBLIOTECA DE EJERCICIOS Y RUTINAS — a partir de esta actualización, la app
@@ -366,7 +374,7 @@ MUSCLE_GROUPS.forEach((g) => {
 const PRESET_ROUTINES = [
   {
     id: "classic_default",
-    name: "Push / Pull / Pierna + Hombros / Brazos",
+    name: "PUSH / PULL / PIERNA + HOMBROS / BRAZOS",
     source: "preset",
     description: "La rutina original de la app: empuje, tracción, pierna y un día extra de hombros y brazos.",
     recommendation: "Pensada para entrenar 4 veces por semana, repitiendo el ciclo.",
@@ -411,7 +419,7 @@ const PRESET_ROUTINES = [
   },
   {
     id: "ppl",
-    name: "Push / Pull / Legs",
+    name: "PUSH / PULL / LEGS",
     source: "preset",
     description: "Empuje, tracción y pierna en días separados. El split más popular para arrancar.",
     recommendation: "Recomendado: 3 a 6 sesiones semanales (podés repetir el ciclo dos veces si entrenás 6 días).",
@@ -442,7 +450,7 @@ const PRESET_ROUTINES = [
   },
   {
     id: "upper_lower",
-    name: "Upper / Lower",
+    name: "UPPER / LOWER",
     source: "preset",
     description: "Divide el cuerpo en tren superior e inferior. Simple y eficiente.",
     recommendation: "Recomendado: 4 sesiones semanales alternando Torso y Pierna (ej: Lun Torso, Mar Pierna, Jue Torso, Vie Pierna).",
@@ -469,7 +477,7 @@ const PRESET_ROUTINES = [
   },
   {
     id: "arnold",
-    name: "Arnold Split",
+    name: "ARNOLD SPLIT",
     source: "preset",
     description: "El clásico de Arnold Schwarzenegger: pecho y espalda juntos, hombros y brazos juntos, y pierna aparte.",
     recommendation: "Para gente con buena base de entrenamiento: 3 a 6 sesiones semanales repitiendo el ciclo.",
@@ -502,7 +510,7 @@ const PRESET_ROUTINES = [
   },
   {
     id: "bro_split",
-    name: "Bro Split",
+    name: "BRO SPLIT",
     source: "preset",
     description: "Un grupo muscular grande por día: pecho, espalda, hombros, brazos y piernas. El clásico del fisicoculturismo.",
     recommendation: "Recomendado: 5 sesiones semanales, un grupo por día. Si entrenás hace poco, frecuencias de 2 veces por semana por músculo suelen rendir mejor — pero este formato sigue siendo válido y es el más tradicional para enfocarte a fondo en cada grupo.",
@@ -549,7 +557,7 @@ const PRESET_ROUTINES = [
   },
   {
     id: "fullbody",
-    name: "Cuerpo Completo",
+    name: "CUERPO COMPLETO",
     source: "preset",
     description: "Trabajás todo el cuerpo en cada sesión, con tres días distintos para variar el estímulo.",
     recommendation: "Recomendado: 3 sesiones semanales no consecutivas (ej. Lunes, Miércoles, Viernes).",
@@ -1246,9 +1254,9 @@ const ANIMATION_CSS = `
    gráficos, chips de día/serie inactivos) — ahora salen de aquí, así
    también cambian solos al cambiar de tema. */
 :root {
-  --grad-hero-purple: linear-gradient(135deg, rgba(168,85,247,0.28), rgba(15,23,42,0.85) 55%, rgba(15,23,42,0.6));
-  --grad-hero-blue: linear-gradient(135deg, rgba(59,130,246,0.25), rgba(15,23,42,0.85) 55%, rgba(15,23,42,0.6));
-  --grad-hero-teal: linear-gradient(135deg, rgba(20,184,166,0.25), rgba(15,23,42,0.85) 55%, rgba(15,23,42,0.6));
+  --grad-hero-purple: linear-gradient(135deg, rgba(168,85,247,0.42), rgba(15,23,42,0.82) 55%, rgba(15,23,42,0.6));
+  --grad-hero-blue: linear-gradient(135deg, rgba(59,130,246,0.4), rgba(15,23,42,0.82) 55%, rgba(15,23,42,0.6));
+  --grad-hero-teal: linear-gradient(135deg, rgba(20,184,166,0.4), rgba(15,23,42,0.82) 55%, rgba(15,23,42,0.6));
   --grad-profile-avatar: linear-gradient(135deg, #0f172a, rgba(15,23,42,0.5));
   --ring-track: #1a1a2e;
   --chart-grid: #1a1a2e;
@@ -2436,7 +2444,7 @@ function RutinaDemo({ view }) {
     const day = ROUTINE[demoDay];
     const totalSets = day.exercises.reduce((a, e) => a + e.sets.length, 0);
     return (
-      <div className="relative overflow-hidden rounded-2xl border p-4" style={{ borderColor: day.color + "30", background: `linear-gradient(135deg, ${day.color}1c, transparent 70%)` }}>
+      <div className="relative overflow-hidden rounded-2xl border p-4" style={{ borderColor: day.color + "55", background: `linear-gradient(135deg, ${day.color}38, transparent 75%)` }}>
         <div className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg mb-2" style={{ backgroundColor: day.color + "22", color: day.color }}>
           <RotateCcw size={10} /> Sugerido para hoy
         </div>
@@ -3021,7 +3029,7 @@ const HELP_CHAPTERS = [
       {
         icon: <Zap size={20} />,
         title: "Descarga: tu semana de recuperación",
-        text: "Cada cierta cantidad de semanas de entrenamiento (lo configurás en Perfil), tu ciclo entra en una semana de descarga: menos series y menos peso, para bajar la fatiga sin perder lo ganado. La primera vez que abrís la app en esa semana, te avisamos con un cartel y te traemos directo a esta pestaña — pero podés ir a entrenar normal cuando quieras, no te restringe nada.",
+        text: "Cada cierta cantidad de semanas de entrenamiento (lo configurás en Perfil), tu ciclo entra en una semana de descarga: menos series y menos peso, para bajar la fatiga sin perder lo ganado. Se accede con el botón \"Mi semana de descarga\" en la pestaña Rutina, justo debajo de \"Iniciar sesión\" — la primera vez que abrís la app en esa semana, además te avisamos con un cartel y te lleva directo ahí, pero podés ir a entrenar normal cuando quieras, no te restringe nada.",
         demo: { kind: "descarga", view: "header" },
       },
       {
@@ -3029,6 +3037,19 @@ const HELP_CHAPTERS = [
         title: "Cargas sugeridas por día",
         text: "Elegí el día arriba y vas a ver, ejercicio por ejercicio, tu mejor marca tachada y al lado el peso sugerido para esta semana — calculado como un porcentaje de tu récord, con menos series por ejercicio.",
         demo: { kind: "descarga", view: "suggested" },
+      },
+    ],
+  },
+  {
+    key: "entrenador_ia",
+    label: "Entrenador IA",
+    color: "#14B8A6",
+    icon: <Sparkles size={16} />,
+    steps: [
+      {
+        icon: <Sparkles size={20} />,
+        title: "Chateá con tu entrenador IA",
+        text: "Preguntale lo que quieras sobre tu entrenamiento — tiene a la vista tu historial real (marcas, fechas, pesos), así que puede responder con datos concretos en vez de generalidades. Necesita el parámetro \"GEMINI_API_KEY\" configurado en Firebase → Remote Config para funcionar.",
       },
     ],
   },
@@ -3420,7 +3441,7 @@ function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS 
   const weekDots = Array.from({ length: cycleWeeks }, (_, wi) => { const ws = new Date(cycleStart); ws.setDate(ws.getDate() + wi * 7); const days = Array.from({ length: 7 }, (_, di) => { const d = new Date(ws); d.setDate(d.getDate() + di); return d.toISOString().slice(0, 10); }); return { week: wi + 1, days, trained: days.filter((d) => trainedDays.has(d)).length, isDeload: wi + 1 > trainWeeks }; });
   const phase = weekInfo.isDeload ? "#A855F7" : "#3B82F6";
   const heroGrad = weekInfo.isDeload ? "var(--grad-hero-purple)" : "var(--grad-hero-blue)";
-  const borderClass = weekInfo.isDeload ? "border-purple-500/20" : "border-blue-500/20";
+  const borderClass = weekInfo.isDeload ? "border-purple-500/45" : "border-blue-500/45";
   return (
     <div className={`relative overflow-hidden border ${borderClass} rounded-2xl p-4 shadow-md shadow-black/20`} style={{ background: heroGrad }}>
       <div className="absolute -top-12 -right-12 w-36 h-36 rounded-full blur-3xl opacity-30 pointer-events-none" style={{ backgroundColor: phase }} />
@@ -3507,7 +3528,7 @@ function SessionStartBar({ activeSession, onStart, onCancel }) {
    volver a abrir una tarjeta. Sólo se limpia con "Resetear sesión de hoy"
    (acá abajo) o al finalizar la sesión (ver handleEndSession en App()).
 ============================================================================ */
-function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, weekSchedule, activeSession, onStartSession, onEndSession, onCancelSession, onDisableAutoShowPrShare }) {
+function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, weekSchedule, activeSession, onStartSession, onEndSession, onCancelSession, onDisableAutoShowPrShare, onGoToDeload }) {
   // El día programado para hoy según el cronograma semanal (lunes a domingo)
   // de la rutina activa. Si hoy es descanso programado (o no hay cronograma
   // todavía), cae al viejo heurístico de "último día entrenado + 1" — pero
@@ -3537,6 +3558,9 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
   return (
     <div className="space-y-4">
       <SessionStartBar activeSession={activeSession} onStart={() => onStartSession(activeDay)} onCancel={onCancelSession} />
+      <button onClick={onGoToDeload} className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border border-purple-500/30 bg-purple-500/10 text-purple-300 hover:bg-purple-500/20 hover:border-purple-500/50 transition text-sm font-bold active:scale-[0.98]">
+        <Zap size={14} /> Mi semana de descarga{isDeload ? <span className="text-[10px] font-black px-1.5 py-0.5 rounded-md bg-purple-500/30 ml-1">ACTIVA AHORA</span> : null}
+      </button>
 
       {isRestToday && (
         <div className="flex items-start gap-2.5 bg-slate-900/50 border border-slate-800/50 rounded-xl px-3.5 py-2.5">
@@ -3554,7 +3578,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
         ))}
       </div>
 
-      <div key={activeDay} className="relative overflow-hidden rounded-2xl border tab-fade-in" style={{ borderColor: day.color + "30", background: `linear-gradient(135deg, ${day.color}1c, transparent 70%)` }}>
+      <div key={activeDay} className="relative overflow-hidden rounded-2xl border tab-fade-in" style={{ borderColor: day.color + "55", background: `linear-gradient(135deg, ${day.color}38, transparent 75%)` }}>
         <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full blur-3xl opacity-25 pointer-events-none" style={{ backgroundColor: day.color }} />
         <div className="relative p-5">
           {activeDay === suggestedDay && (
@@ -4455,25 +4479,25 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
   const modeLabel = mode === "relative" && bodyWeightKg ? "Según tu contexto" : "General";
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-amber-500/20 bg-slate-900/50 backdrop-blur-sm shadow-md shadow-black/20 p-4 space-y-3">
+    <div className="relative overflow-hidden rounded-2xl border border-blue-500/20 bg-slate-900/50 backdrop-blur-sm shadow-md shadow-black/20 p-4 space-y-3">
       <div className="flex items-center justify-between gap-2 mb-1">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center shrink-0"><Award size={15} /></div>
+          <div className="w-8 h-8 rounded-xl bg-blue-500/15 text-blue-400 flex items-center justify-center shrink-0"><Award size={15} /></div>
           <p className="text-sm font-bold text-white">Rango por músculo</p>
         </div>
-        <button onClick={() => setShowImage(true)} aria-label="Compartir tus rangos" className="p-1.5 rounded-lg text-slate-500 hover:text-amber-400 transition shrink-0"><Share2 size={15} /></button>
+        <button onClick={() => setShowImage(true)} aria-label="Compartir tus rangos" className="p-1.5 rounded-lg text-slate-500 hover:text-blue-400 transition shrink-0"><Share2 size={15} /></button>
       </div>
 
       <div>
         <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
           {[{ k: "general", l: "General" }, { k: "relative", l: "Según tu contexto" }].map((opt) => (
-            <button key={opt.k} onClick={() => onUpdateSettings?.({ muscleRankMode: opt.k })} className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${mode === opt.k ? "bg-amber-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
+            <button key={opt.k} onClick={() => onUpdateSettings?.({ muscleRankMode: opt.k })} className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${mode === opt.k ? "bg-blue-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
           ))}
         </div>
         {mode === "relative" && needsWeight && (
-          <button onClick={onGoToProfile} className="w-full flex items-center justify-between gap-2 bg-amber-500/10 border border-amber-500/25 rounded-xl px-3 py-2.5 text-left hover:bg-amber-500/15 transition mt-2">
-            <p className="text-[11px] text-amber-300/90">Para calcular "Según tu contexto" necesitamos tu peso corporal — agregalo en tu perfil (sexo y edad son opcionales, pero afinan más el cálculo).</p>
-            <ChevronRight size={15} className="text-amber-400 shrink-0" />
+          <button onClick={onGoToProfile} className="w-full flex items-center justify-between gap-2 bg-blue-500/10 border border-blue-500/25 rounded-xl px-3 py-2.5 text-left hover:bg-blue-500/15 transition mt-2">
+            <p className="text-[11px] text-blue-300/90">Para calcular "Según tu contexto" necesitamos tu peso corporal — agregalo en tu perfil (sexo y edad son opcionales, pero afinan más el cálculo).</p>
+            <ChevronRight size={15} className="text-blue-400 shrink-0" />
           </button>
         )}
       </div>
@@ -4488,7 +4512,9 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
           {selInfo.hasData ? (
             <>
               <div className="flex items-center gap-3.5 mb-3.5">
-                <RankBadgeIcon tier={selInfo.tier} sub={selInfo.sub} color={selInfo.color} size={116} />
+                <div className="bg-slate-900/40 border border-slate-800/60 rounded-2xl p-2 shrink-0">
+                  <RankBadgeIcon tier={selInfo.tier} sub={selInfo.sub} color={selInfo.color} size={100} />
+                </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-lg font-black leading-tight" style={{ color: selInfo.color }}>{selInfo.tier}{selInfo.sub ? ` ${selInfo.sub}` : ""}</p>
                   <p className="text-[11px] text-slate-500 mt-0.5">
@@ -4515,8 +4541,8 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
                   {extraKgNeeded != null && <p className="text-[11px] text-slate-400 mt-2.5">Sumá <span className="font-black text-white">{extraKgNeeded}kg</span> a tus mismas {selInfo.bestReps} reps para subir</p>}
                 </div>
               ) : (
-                <div className="bg-amber-500/10 border border-amber-500/25 rounded-xl px-3 py-3 text-center">
-                  <p className="text-sm font-black text-amber-400">🏆 ¡Rango máximo!</p>
+                <div className="bg-blue-500/10 border border-blue-500/25 rounded-xl px-3 py-3 text-center">
+                  <p className="text-sm font-black text-blue-400">🏆 ¡Rango máximo!</p>
                 </div>
               )}
             </>
@@ -4532,7 +4558,9 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
             const rep = RANK_TIERS.find((r) => r.tier === t && r.sub === "II") || RANK_TIERS.find((r) => r.tier === t);
             return (
               <div key={t} className="flex flex-col items-center gap-1.5">
-                <RankBadgeIcon tier={rep.tier} sub="" color={rep.color} size={76} />
+                <div className="bg-slate-900/40 border border-slate-800/60 rounded-2xl p-1.5">
+                  <RankBadgeIcon tier={rep.tier} sub="" color={rep.color} size={64} />
+                </div>
                 <span className="text-[9px] text-slate-500 font-semibold">{t}</span>
               </div>
             );
@@ -4580,7 +4608,7 @@ function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_
   const chartData = history.map((h) => ({ date: h.date.slice(5), kg: h.kg, reps: h.reps, vol: vol(h.kg, h.reps), e1rm: estimate1RM(h.kg, h.reps), rpe: h.rpe ?? null }));
 
   const [confirmResetProgress, setConfirmResetProgress] = useState(false);
-  const [activeSection, setActiveSection] = useState("historial");
+  const [activeSection, setActiveSection] = useState("rank");
 
   return (
     <div className="space-y-4">
@@ -4626,9 +4654,9 @@ function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_
 
       <div key={activeSection} className="tab-fade-in space-y-3">
         {activeSection === "chart" && (
-          <div className="relative overflow-hidden rounded-2xl border border-blue-500/20 bg-slate-900/50 backdrop-blur-sm shadow-md shadow-black/20 p-4 space-y-3">
+          <div className="relative overflow-hidden rounded-2xl border border-amber-500/20 bg-slate-900/50 backdrop-blur-sm shadow-md shadow-black/20 p-4 space-y-3">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-blue-500/15 text-blue-400 flex items-center justify-center shrink-0"><Activity size={15} /></div>
+              <div className="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center shrink-0"><Activity size={15} /></div>
               <p className="text-sm font-bold text-white">Evolución por ejercicio</p>
             </div>
 
@@ -5673,6 +5701,115 @@ async function extractTextFromPdfFile(file) {
 // pegás texto a mano, se detecta la rutina, y se muestra una vista previa
 // antes de crearla — así, si el parser interpretó mal algo, lo notás antes
 // de guardar nada.
+/* ============================================================================
+   ENTRENADOR IA — chat con un asistente que tiene tu historial de
+   entrenamiento como contexto (se lo manda a Gemini en el prompt de
+   sistema antes de tu pregunta, así puede responder con tus datos reales
+   en vez de en abstracto). Mismo mecanismo de clave que "Importar rutina
+   con IA" — ver getGeminiKey y su aclaración de seguridad arriba del
+   archivo, aplica exactamente igual acá: la clave de Remote Config no es
+   un secreto real, es visible para quien abra las herramientas de
+   desarrollador. Esto es un cascarón funcional: conecta de verdad con
+   Gemini, pero todavía no tiene memoria entre sesiones ni límites de uso.
+============================================================================ */
+function EntrenadorIAChat({ profile, logs, profileName }) {
+  const [messages, setMessages] = useState([
+    { role: "assistant", text: "¡Hola! Soy tu entrenador IA — tengo a la vista tu historial de entrenamiento. Preguntame sobre tu rutina, tus marcas o tu progreso." },
+  ]);
+  const [input, setInput] = useState("");
+  const [isSending, setIsSending] = useState(false);
+  const scrollRef = useRef(null);
+
+  useEffect(() => { scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" }); }, [messages, isSending]);
+
+  const enviarMensajeIA = async (userText) => {
+    const newMessages = [...messages, { role: "user", text: userText }];
+    setMessages(newMessages);
+    setInput("");
+    setIsSending(true);
+    try {
+      const apiKey = await getGeminiKey();
+      if (!apiKey) throw new Error("falta configurar GEMINI_API_KEY en Remote Config");
+      // Contexto recortado a propósito — el historial completo puede
+      // crecer mucho con el tiempo, y no hace falta mandar absolutamente
+      // todo para que pueda responder con criterio.
+      const context = { perfil: profileName, rutinaActivaId: profile?.activeRoutineId || null, logs: logs || {} };
+      const systemPrompt = `Sos un entrenador personal experto, breve, cercano y motivador, que habla en español rioplatense. Tenés acceso a los datos reales de entrenamiento de esta persona en el siguiente JSON — usalos para responder con precisión (fechas, pesos, repeticiones reales), nunca inventes números que no estén ahí. Si no encontrás el dato para responder algo puntual, decilo en vez de inventarlo. Respuestas cortas, 2 a 4 oraciones salvo que te pidan más detalle.
+
+Datos: ${JSON.stringify(context)}`;
+      const history = newMessages.map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.text }] }));
+      const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + apiKey, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ systemInstruction: { parts: [{ text: systemPrompt }] }, contents: history }),
+      });
+      if (!response.ok) throw new Error(`request failed with status ${response.status}`);
+      const data = await response.json();
+      const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      setMessages((prev) => [...prev, { role: "assistant", text: reply || "No se me ocurrió una respuesta — probá de nuevo." }]);
+    } catch (err) {
+      console.error("Error al hablar con el entrenador IA:", err);
+      setMessages((prev) => [...prev, { role: "assistant", text: "No pude conectarme. Revisá que esté configurado el parámetro \"GEMINI_API_KEY\" en Firebase → Remote Config." }]);
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  const handleSend = () => {
+    const trimmed = input.trim();
+    if (!trimmed || isSending) return;
+    enviarMensajeIA(trimmed);
+  };
+
+  return (
+    <div className="flex flex-col" style={{ height: "calc(100vh - 220px)", minHeight: 420 }}>
+      <div className="flex items-center gap-2.5 mb-3 shrink-0">
+        <div className="w-9 h-9 rounded-xl bg-teal-500/15 text-teal-400 flex items-center justify-center shrink-0"><Sparkles size={16} /></div>
+        <div className="min-w-0">
+          <p className="text-sm font-bold text-white">Entrenador IA</p>
+          <p className="text-[11px] text-slate-500">Conoce tu historial de entrenamiento</p>
+        </div>
+      </div>
+      <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-3 pb-3 pr-1">
+        {messages.map((m, i) => (
+          <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+            <div
+              className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${m.role === "user" ? "!text-white" : "bg-slate-900/60 border border-slate-800/60 text-slate-200"}`}
+              style={m.role === "user" ? { background: "linear-gradient(135deg,#14B8A6,#0E7490)" } : {}}
+            >
+              {m.text}
+            </div>
+          </div>
+        ))}
+        {isSending && (
+          <div className="flex justify-start">
+            <div className="bg-slate-900/60 border border-slate-800/60 rounded-2xl px-4 py-3 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-slate-500 animate-pulse" />
+              <span className="w-1.5 h-1.5 rounded-full bg-slate-500 animate-pulse" style={{ animationDelay: "0.15s" }} />
+              <span className="w-1.5 h-1.5 rounded-full bg-slate-500 animate-pulse" style={{ animationDelay: "0.3s" }} />
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="flex items-center gap-2 bg-slate-900/60 border border-slate-800/60 rounded-2xl p-1.5 shrink-0">
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") handleSend(); }}
+          placeholder="Preguntale algo a tu entrenador..."
+          className="flex-1 bg-transparent px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none min-w-0"
+          disabled={isSending}
+        />
+        <button onClick={handleSend} disabled={!input.trim() || isSending} aria-label="Enviar" className="p-2.5 rounded-xl text-white shrink-0 disabled:opacity-40 transition-all active:scale-95" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>
+          <Send size={16} />
+        </button>
+      </div>
+      <p className="text-[9px] text-slate-700 text-center mt-2 shrink-0">Puede cometer errores — no reemplaza el consejo de un profesional de la salud.</p>
+    </div>
+  );
+}
+
+
 function ImportRoutineModal({ onImport, onClose }) {
   const [text, setText] = useState("");
   const [routineName, setRoutineName] = useState("");
@@ -5680,6 +5817,14 @@ function ImportRoutineModal({ onImport, onClose }) {
   const [notice, setNotice] = useState("");
   const [loadingFile, setLoadingFile] = useState(false);
   const [isParsingAI, setIsParsingAI] = useState(false);
+  const [geminiKey, setGeminiKey] = useState("");
+
+  // Se trae la clave de Remote Config apenas se abre el modal, no recién
+  // al tocar "Detectar con IA" — así, si tarda un poquito, ya está lista
+  // para cuando la persona la necesite.
+  useEffect(() => {
+    getGeminiKey().then(setGeminiKey).catch((err) => console.error("Error al obtener la clave de Gemini:", err));
+  }, []);
 
   const handleFile = async (file) => {
     if (!file) return;
@@ -5715,15 +5860,15 @@ function ImportRoutineModal({ onImport, onClose }) {
   // Detección con IA: en vez de patrones de texto, le pide a un modelo de
   // lenguaje que entienda la rutina y devuelva días/ejercicios en JSON —
   // útil para formatos más libres que el detector de patrones no capta.
-  // La clave de la API NUNCA viaja desde acá: esto le pide el análisis a
-  // tu propio servidor (ROUTINE_AI_PARSE_ENDPOINT, definido arriba del
-  // todo del archivo), que es quien de verdad llama a Gemini con la clave
-  // guardada de forma segura — si todavía no desplegaste ese servidor,
-  // esto va a fallar con el aviso de abajo (no con la app rota).
+  // La clave sale de Remote Config (ver getGeminiKey, arriba del todo del
+  // archivo) — léase ahí la aclaración sobre qué tan "secreta" es de
+  // verdad antes de depender de esto para algo sensible.
   const handleProcessAI = async () => {
     setIsParsingAI(true);
     setNotice("");
     try {
+      const apiKey = geminiKey || (await getGeminiKey());
+      if (!apiKey) throw new Error("falta configurar GEMINI_API_KEY en Remote Config");
       const prompt = `Extraé la rutina de entrenamiento del siguiente texto y devolvé ÚNICAMENTE un array JSON con esta estructura exacta, sin texto adicional y SIN bloques de código markdown (nada de \`\`\`):
 [{"label": "Día 1", "exercises": [{"name": "Press Banca", "setsCount": 3, "repRange": "8-10"}]}]
 
@@ -5731,13 +5876,13 @@ Texto:
 """
 ${text}
 """`;
-      const res = await fetch(ROUTINE_AI_PARSE_ENDPOINT, {
+      const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + apiKey, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ geminiPayload: { contents: [{ parts: [{ text: prompt }] }] } }),
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
       });
-      if (!res.ok) throw new Error(`request failed with status ${res.status}`);
-      const data = await res.json();
+      if (!response.ok) throw new Error(`request failed with status ${response.status}`);
+      const data = await response.json();
       const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
       if (!rawText) throw new Error("respuesta vacía");
       const cleaned = rawText.replace(/```json|```/g, "").trim();
@@ -5801,7 +5946,7 @@ ${text}
         <button onClick={handleProcessAI} disabled={!text.trim() || loadingFile || isParsingAI} className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition text-sm font-semibold mt-2 disabled:opacity-50">
           {isParsingAI ? <><RotateCcw size={14} className="animate-spin" /> Analizando rutina con Inteligencia Artificial...</> : <><Sparkles size={14} /> Detectar con IA</>}
         </button>
-        <p className="text-[10px] text-slate-600 mt-2 text-center">"Detectar con IA" necesita un servidor propio configurado con tu clave de Gemini — si todavía no lo armaste, usá "Detectar rutina" de arriba.</p>
+        <p className="text-[10px] text-slate-600 mt-2 text-center">"Detectar con IA" necesita el parámetro "GEMINI_API_KEY" configurado en Firebase → Remote Config — si todavía no lo armaste, usá "Detectar rutina" de arriba.</p>
       </div>
     </div>
   );
@@ -6056,15 +6201,15 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
       )}
 
       {!forced && activeDef && (
-        <div className="relative overflow-hidden rounded-2xl border border-teal-500/25 bg-gradient-to-br from-teal-500/10 to-transparent p-4 shadow-md shadow-black/20">
-          <div className="absolute -top-10 -right-10 w-32 h-32 rounded-full bg-teal-500/20 blur-3xl pointer-events-none" />
+        <div className="relative overflow-hidden rounded-2xl border border-purple-500/25 p-4 shadow-md shadow-black/20" style={{ background: "var(--grad-hero-purple)" }}>
+          <div className="absolute -top-10 -right-10 w-32 h-32 rounded-full bg-purple-500/20 blur-3xl pointer-events-none" />
           <div className="relative flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-teal-500/20 text-teal-400 flex items-center justify-center shrink-0"><Dumbbell size={17} /></div>
+            <div className="w-10 h-10 rounded-2xl bg-purple-500/20 text-purple-300 flex items-center justify-center shrink-0"><Dumbbell size={17} /></div>
             <div className="min-w-0 flex-1">
-              <span className="text-[10px] font-black uppercase tracking-widest text-teal-400">Tu rutina activa</span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-purple-300">Tu rutina activa</span>
               <h3 className="text-base font-black text-white leading-tight">{activeDef.name}</h3>
             </div>
-            <button onClick={() => setShareTarget(activeDef)} aria-label="Compartir rutina activa" className="p-2 rounded-xl text-teal-200 hover:text-white hover:bg-white/10 transition shrink-0"><Share2 size={15} /></button>
+            <button onClick={() => setShareTarget(activeDef)} aria-label="Compartir rutina activa" className="p-2 rounded-xl text-purple-200 hover:text-white hover:bg-white/10 transition shrink-0"><Share2 size={15} /></button>
           </div>
           {activeDef.description && <p className="relative text-[11px] text-slate-400 mt-2.5">{activeDef.description}</p>}
           <div className="relative grid grid-cols-3 gap-2 mt-3.5">
@@ -6072,13 +6217,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
             <div className="bg-black/20 rounded-xl p-2 text-center"><p className="text-sm font-black text-white tabular-nums">{activeStats.exercises}</p><p className="text-[9px] text-slate-500 mt-0.5">Ejercicios</p></div>
             <div className="bg-black/20 rounded-xl p-2 text-center"><p className="text-sm font-black text-white tabular-nums">{activeStats.sets}</p><p className="text-[9px] text-slate-500 mt-0.5">Series</p></div>
           </div>
-          <div className="relative flex items-center gap-1.5 mt-3 flex-wrap">
-            {activeDef.dayOrder.map((dk) => {
-              const dColor = activeDef.days[dk].color, muted = muteHexColor(dColor);
-              return <span key={dk} className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-lg" style={{ backgroundColor: dColor + "1c", color: muted }}>{activeDef.days[dk].label}</span>;
-            })}
-          </div>
-          <button onClick={() => setShowSchedule((s) => !s)} className="relative w-full flex items-center justify-center gap-1.5 mt-3 py-2 rounded-xl border border-white/10 text-teal-200 hover:text-white transition text-[11px] font-bold">
+          <button onClick={() => setShowSchedule((s) => !s)} className="relative w-full flex items-center justify-center gap-1.5 mt-3 py-2 rounded-xl border border-white/10 text-purple-200 hover:text-white transition text-[11px] font-bold">
             <Calendar size={11} /> {showSchedule ? "Ocultar" : "Configurar"} días de la semana
           </button>
           {showSchedule && (
@@ -6161,13 +6300,14 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
    NAVIGATION — bottom bar on mobile, side rail from lg breakpoint up. El
    perfil ya no es una pestaña: se accede tocando el avatar (ver header en
    App() y el avatar de arriba en SideNav).
-   Orden pedido: Rutina (la principal, a la izquierda del todo — donde se
-   anotan reps/kg), después Descarga, después Progreso, y Rutinas a la
-   derecha del todo.
+   "Descarga" dejó de ser una pestaña propia — ahora es un botón dentro de
+   "Rutina" (debajo de "Iniciar sesión"), porque no es algo que se consulte
+   tan seguido como para merecer un lugar fijo en la barra. En su lugar
+   entra "Entrenador IA", el chat con el asistente de entrenamiento.
 ============================================================================ */
 const NAV_TABS = [
   { key: "rutina", icon: <Dumbbell size={20} />, label: "Rutina" },
-  { key: "descarga", icon: <Zap size={20} />, label: "Descarga" },
+  { key: "entrenador_ia", icon: <Sparkles size={20} />, label: "Entrenador IA" },
   { key: "progreso", icon: <BarChart3 size={20} />, label: "Progreso" },
   { key: "rutinas", icon: <Layers size={20} />, label: "Rutinas" },
 ];
@@ -6592,9 +6732,10 @@ export default function App() {
         <main className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto px-4 py-4 pb-28 lg:pb-10 space-y-4">
           <div key={tab} className="tab-fade-in">
             {tab === "rutinas" && <RoutinesView profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleArchiveRoutine} onRestore={handleRestoreRoutine} />}
-            {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} />}
+            {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} onGoToDeload={() => setTab("descarga")} />}
             {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} sex={profile?.sex} age={profile?.age} />}
             {tab === "descarga" && <DeloadView logs={logs} settings={getProfileSettings(profile)} />}
+            {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} profileName={activeProfile} />}
             {tab === "perfil" && <ProfileView profileName={activeProfile} profiles={profiles} logs={logs} onSignOut={handleSignOut} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} />}
           </div>
         </main>
