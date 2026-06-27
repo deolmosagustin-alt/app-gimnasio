@@ -19,6 +19,48 @@ import Model from "react-body-highlighter";
 import { auth, googleProvider, db } from "./firebase";
 
 /* ============================================================================
+   IMPORTAR RUTINA CON IA — sobre la clave de la API de Gemini que me
+   pasaste: NO la puse en este archivo, y es importante que entiendas por
+   qué antes de seguir.
+   App.jsx corre ENTERO en el navegador de cada persona que abre la app —
+   no hay ningún paso de "compilación secreta" que la oculte. Cualquiera
+   puede tocar F12, ir a la pestaña Network, y ver la clave tal cual viaja
+   en cada pedido a Gemini; o simplemente leerla en el código fuente. Una
+   vez que una clave de API queda en código que se sirve públicamente, hay
+   que darla por filtrada — cualquiera puede copiarla y usarla a tu costo
+   (Gemini cobra por uso) o agotar tu cuota.
+   La forma correcta de hacer esto es que la clave viva en un SERVIDOR
+   (algo que vos controlás y que la gente no puede leer), y que la app le
+   pida el análisis a ESE servidor en vez de pedírselo a Gemini
+   directamente. Como yo sólo puedo editar este archivo (App.jsx) y no
+   tengo forma de desplegar ese servidor por vos, dejé el código de la app
+   ya listo para usarlo (con el spinner, el prompt, el parseo de la
+   respuesta, todo) apuntando a esta URL de ejemplo — reemplazala por la
+   de tu propia función, y ahí sí poné la clave (como variable de entorno
+   del servidor, nunca en este archivo).
+   La forma más simple de armar ese servidor es una Cloud Function de
+   Firebase (ya tenés Firebase configurado). Un punto de partida — esto va
+   en un archivo APARTE (`functions/index.js`), no en App.jsx:
+
+     const functions = require("firebase-functions");
+     const fetch = require("node-fetch");
+     exports.parseRoutineWithAI = functions.https.onRequest(async (req, res) => {
+       res.set("Access-Control-Allow-Origin", "*"); // restringilo a tu dominio en producción
+       const apiKey = functions.config().gemini.key; // configurado con `firebase functions:config:set gemini.key="TU_CLAVE"`
+       const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+         method: "POST",
+         headers: { "Content-Type": "application/json" },
+         body: JSON.stringify(req.body.geminiPayload),
+       });
+       res.json(await r.json());
+     });
+
+   Si querés, puedo ayudarte a escribir ese archivo de Cloud Function
+   completo en otra vuelta — pedímelo y lo armamos.
+============================================================================ */
+const ROUTINE_AI_PARSE_ENDPOINT = "/api/parseRoutineWithAI"; // reemplazá esto por la URL real de tu Cloud Function
+
+/* ============================================================================
    BIBLIOTECA DE EJERCICIOS Y RUTINAS — a partir de esta actualización, la app
    ya no tiene una sola rutina fija. Hay:
 
@@ -578,6 +620,42 @@ async function shareRoutineToFirestore(routineDef) {
   await setDoc(doc(db, "shared_routines", shortId), routineDef);
   const base = typeof window !== "undefined" ? window.location.origin + window.location.pathname : "";
   return `${base}#r=${shortId}`;
+}
+
+/* ============================== CUENTA EN LA NUBE ==============================
+   Por qué hacía falta esto: iniciar sesión con Google en dos dispositivos
+   distintos los trataba como dos cuentas separadas, porque el perfil vivía
+   únicamente en el localStorage de CADA dispositivo (Google sólo se usaba
+   para identificarte, nunca para guardar nada). Estas dos funciones leen y
+   escriben el perfil en Firestore, en la colección "users", usando el
+   googleUid como id del documento — así el mismo uid encuentra el mismo
+   perfil sin importar desde qué computadora o celular entres.
+   Para que esto funcione de verdad hace falta que las reglas de seguridad
+   de Firestore permitan a cada usuario autenticado leer y escribir
+   ÚNICAMENTE su propio documento en "users" (algo como
+   `allow read, write: if request.auth.uid == userId;`) — eso se configura
+   en la consola de Firebase, no acá.
+   Importante para entender el alcance real de este cambio: esto sincroniza
+   el perfil en el momento de iniciar sesión (y la primera vez que vinculás
+   Google), no en tiempo real con cada serie que guardás. Si querés que
+   cada entrenamiento se suba solo apenas lo registrás (sin tener que volver
+   a iniciar sesión), eso es un paso más grande — avisame si lo querés y lo
+   armamos en otra vuelta. */
+async function fetchProfileFromCloud(uid) {
+  try {
+    const docSnap = await getDoc(doc(db, "users", uid));
+    return docSnap.exists() ? docSnap.data() : null;
+  } catch (err) {
+    console.error("Error al leer el perfil desde la nube:", err);
+    return null;
+  }
+}
+async function syncProfileToCloud(uid, profileData) {
+  try {
+    await setDoc(doc(db, "users", uid), profileData, { merge: true });
+  } catch (err) {
+    console.error("Error al sincronizar el perfil a la nube:", err);
+  }
 }
 
 // Convierte una definición de rutina (preset o creada por el usuario) en el
@@ -2029,10 +2107,9 @@ function LoginScreen({ onLogin, allowAutoLogin = true }) {
       const name = user.displayName || "Usuario de Google";
       const email = user.email;
 
-      // 3. Busca primero por googleUid en TODOS los perfiles (incluidos los
-      // archivados) — así, si quitaste un perfil de la lista deslizándolo,
-      // volver a entrar con la misma cuenta de Google lo recupera solo,
-      // sin crear un duplicado ni perder el historial.
+      // 3. Busca primero por googleUid en TODOS los perfiles LOCALES
+      // (incluidos los archivados) — si ya usaste esta cuenta en ESTE
+      // dispositivo, no hace falta consultar la nube para nada.
       const matchEntry = Object.entries(profiles).find(([, p]) => p.googleUid === user.uid);
       if (matchEntry) {
         const [matchName, matchProfile] = matchEntry;
@@ -2041,34 +2118,41 @@ function LoginScreen({ onLogin, allowAutoLogin = true }) {
         saveActive(matchName); onLogin(matchName, updated);
         return;
       }
-      if (profiles[name] && !profiles[name].archived) {
-        // Ya existe visible (sin vincular por uid todavía) — entra directo.
-        saveActive(name);
-        onLogin(name, profiles);
-      } else if (profiles[name] && profiles[name].archived) {
-        // Mismo nombre, pero estaba archivado — lo recupera.
-        const updated = { ...profiles, [name]: { ...profiles[name], archived: false, googleUid: user.uid, email } };
+
+      // 4. Nada local con este uid — puede ser la primera vez en ESTE
+      // dispositivo aunque la cuenta ya exista en otro (computadora,
+      // celular...). Antes de crear nada, se consulta si ya hay un
+      // perfil guardado en la nube para este uid.
+      const cloudProfile = await fetchProfileFromCloud(user.uid);
+      if (cloudProfile) {
+        // Ya existe en la nube: entraste antes desde otro dispositivo —
+        // se usa esa copia como la verdad (si hubiera algo local con el
+        // mismo nombre pero sin vincular, queda pisado por la de la nube).
+        const cloudName = cloudProfile.name || name;
+        const updated = { ...profiles, [cloudName]: { ...cloudProfile, archived: false } };
         saveProfiles(updated); setProfilesState(updated);
-        saveActive(name); onLogin(name, updated);
-      } else {
-        // Crea un perfil nuevo usando los datos de Google
-        const newProfiles = {
-          ...profiles,
-          [name]: {
-            pin: null, // Si usa Google, no necesita PIN local
-            logs: {},
-            email: email,
-            joinedAt: new Date().toISOString(),
-            deviceId,
-            tutorialSeen: false,
-            googleUid: user.uid, // Guardamos su ID de Google para la nube
-          },
-        };
-        saveProfiles(newProfiles);
-        setProfilesState(newProfiles);
-        saveActive(name);
-        onLogin(name, newProfiles);
+        saveActive(cloudName); onLogin(cloudName, updated);
+        return;
       }
+
+      // 5. No existe en ningún lado todavía con este uid: es la primera
+      // vez que esta cuenta de Google se vincula. Si ya había un perfil
+      // local con ese mismo nombre (creado sin Google), se conservan sus
+      // datos en vez de pisarlos; si no, se crea uno nuevo.
+      const existingLocal = profiles[name];
+      const profileToSave = existingLocal
+        ? { ...existingLocal, archived: false, googleUid: user.uid, email }
+        : { pin: null, logs: {}, email, joinedAt: new Date().toISOString(), deviceId, tutorialSeen: false, googleUid: user.uid };
+      const updated = { ...profiles, [name]: profileToSave };
+      saveProfiles(updated);
+      setProfilesState(updated);
+      saveActive(name);
+      // Primera vez con este uid: se sube a la nube para que el próximo
+      // dispositivo donde inicies sesión con esta misma cuenta la encuentre
+      // (se guarda también el nombre, porque en la nube no hay "clave del
+      // diccionario" como en el perfil local — hace falta guardarlo adentro).
+      await syncProfileToCloud(user.uid, { ...profileToSave, name });
+      onLogin(name, updated);
     } catch (error) {
       console.error("Error al iniciar sesión con Google:", error);
       setRegError("Error al conectar con Google. Intentá de nuevo.");
@@ -2787,7 +2871,7 @@ const HELP_CHAPTERS = [
       {
         icon: <Download size={20} />,
         title: "Importar una rutina desde un archivo",
-        text: "Si ya tenés tu rutina anotada en un Excel, Word o PDF, no hace falta tipearla de nuevo: con \"Importar rutina\" subís ese archivo (o copiás y pegás el texto) y la app detecta sola los días, ejercicios, series y repeticiones, buscando cada ejercicio en el catálogo. Antes de guardarla te muestra una vista previa para que la revises.",
+        text: "Si ya tenés tu rutina anotada en un Excel, Word o PDF, no hace falta tipearla de nuevo: con \"Importar rutina\" subís ese archivo (o copiás y pegás el texto) y la app detecta sola los días, ejercicios, series y repeticiones, buscando cada ejercicio en el catálogo. También hay un botón \"Detectar con IA\" para formatos más libres (necesita que tengas configurado tu propio servidor con la clave de Gemini — si no, usá el detector normal de arriba, que no necesita nada extra). Antes de guardarla te muestra una vista previa para que la revises.",
       },
     ],
   },
@@ -2884,7 +2968,7 @@ const HELP_CHAPTERS = [
       {
         icon: <BarChart3 size={20} />,
         title: "Elegí qué ver",
-        text: "Con los botones elegís entre Historial, Rango, Evolución o Músculo — cada uno con su propia tarjeta debajo, igual que elegís el día en la pestaña Rutina.",
+        text: "Con los botones elegís entre Rango, Historial, Evolución o Músculo — cada uno con su propia tarjeta debajo, igual que elegís el día en la pestaña Rutina.",
       },
       {
         icon: <Calendar size={20} />,
@@ -2962,7 +3046,7 @@ const HELP_CHAPTERS = [
       {
         icon: <Mail size={20} />,
         title: "Tus datos",
-        text: "Arriba ves tu nombre, email (si lo cargaste) y fecha de alta. Tocá \"Editar perfil\" para cambiar el email, tu sexo, tu edad o tu peso corporal — estos últimos tres se usan para calibrar mejor el rango por músculo de Progreso. O tocá \"Vincular con Google\" si querés asociar tu cuenta de Google a este perfil.",
+        text: "Arriba ves tu nombre, email (si lo cargaste) y fecha de alta. Tocá \"Editar perfil\" para cambiar el email, tu sexo, tu edad o tu peso corporal — estos últimos tres se usan para calibrar mejor el rango por músculo de Progreso. O tocá \"Vincular con Google\" si querés asociar tu cuenta de Google a este perfil — iniciar sesión con esa misma cuenta desde otro dispositivo (celular, computadora) va a encontrar este mismo perfil en vez de crear uno nuevo.",
         demo: { kind: "perfil", view: "datos" },
       },
       {
@@ -3917,9 +4001,9 @@ function ExerciseChipRow({ exercises, selId, onSelect }) {
 // fija de 4 columnas (ícono arriba, etiqueta abajo, como en la barra de
 // navegación inferior) — siempre entran los 4 sin deslizar.
 const PROGRESS_SECTIONS = [
+  { k: "rank", l: "Rango", icon: <Award size={15} />, color: "#3B82F6" },
   { k: "historial", l: "Historial", icon: <Calendar size={15} />, color: "#06B6D4" },
-  { k: "rank", l: "Rango", icon: <Award size={15} />, color: "#F59E0B" },
-  { k: "chart", l: "Evolución", icon: <Activity size={15} />, color: "#3B82F6" },
+  { k: "chart", l: "Evolución", icon: <Activity size={15} />, color: "#F59E0B" },
   { k: "muscle", l: "Músculo", icon: <BarChart3 size={15} />, color: "#A855F7" },
 ];
 
@@ -4939,13 +5023,18 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
 
   // Vincular este perfil local con una cuenta de Google: abre el mismo popup
   // que el login, y si funciona le guarda el googleUid/email al perfil
-  // actual (sin crear un perfil nuevo ni cerrar la sesión).
+  // actual (sin crear un perfil nuevo ni cerrar la sesión) y lo sube a la
+  // nube por primera vez — así, si después entrás con esta misma cuenta
+  // desde otro dispositivo, la encuentra (ver fetchProfileFromCloud en
+  // handleGoogleLogin).
   const handleLinkGoogle = async () => {
     setGoogleLinkError("");
     try {
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
-      onUpdateProfile({ googleUid: user.uid, email: user.email || profile?.email });
+      const updatedFields = { googleUid: user.uid, email: user.email || profile?.email };
+      onUpdateProfile(updatedFields);
+      await syncProfileToCloud(user.uid, { ...profile, ...updatedFields, name: profileName });
     } catch (err) {
       console.error("Error al vincular con Google:", err);
       setGoogleLinkError("No se pudo vincular con Google. Intentá de nuevo.");
@@ -5590,6 +5679,7 @@ function ImportRoutineModal({ onImport, onClose }) {
   const [parsed, setParsed] = useState(null);
   const [notice, setNotice] = useState("");
   const [loadingFile, setLoadingFile] = useState(false);
+  const [isParsingAI, setIsParsingAI] = useState(false);
 
   const handleFile = async (file) => {
     if (!file) return;
@@ -5620,6 +5710,55 @@ function ImportRoutineModal({ onImport, onClose }) {
     if (!parsedDays.length) { setNotice("No pudimos detectar ejercicios. Revisá que cada uno tenga un patrón como \"Press banca 3x8-10\" (o, si es una planilla, columnas de series y repeticiones)."); return; }
     setNotice("");
     setParsed(buildImportedRoutineDef(parsedDays, routineName.trim() || "Rutina importada"));
+  };
+
+  // Detección con IA: en vez de patrones de texto, le pide a un modelo de
+  // lenguaje que entienda la rutina y devuelva días/ejercicios en JSON —
+  // útil para formatos más libres que el detector de patrones no capta.
+  // La clave de la API NUNCA viaja desde acá: esto le pide el análisis a
+  // tu propio servidor (ROUTINE_AI_PARSE_ENDPOINT, definido arriba del
+  // todo del archivo), que es quien de verdad llama a Gemini con la clave
+  // guardada de forma segura — si todavía no desplegaste ese servidor,
+  // esto va a fallar con el aviso de abajo (no con la app rota).
+  const handleProcessAI = async () => {
+    setIsParsingAI(true);
+    setNotice("");
+    try {
+      const prompt = `Extraé la rutina de entrenamiento del siguiente texto y devolvé ÚNICAMENTE un array JSON con esta estructura exacta, sin texto adicional y SIN bloques de código markdown (nada de \`\`\`):
+[{"label": "Día 1", "exercises": [{"name": "Press Banca", "setsCount": 3, "repRange": "8-10"}]}]
+
+Texto:
+"""
+${text}
+"""`;
+      const res = await fetch(ROUTINE_AI_PARSE_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ geminiPayload: { contents: [{ parts: [{ text: prompt }] }] } }),
+      });
+      if (!res.ok) throw new Error(`request failed with status ${res.status}`);
+      const data = await res.json();
+      const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!rawText) throw new Error("respuesta vacía");
+      const cleaned = rawText.replace(/```json|```/g, "").trim();
+      const days = JSON.parse(cleaned);
+      if (!Array.isArray(days) || !days.length) throw new Error("formato inesperado");
+
+      const parsedDays = days.map((d) => ({
+        label: String(d.label || "Día").toUpperCase(),
+        exercises: (d.exercises || []).map((ex) => {
+          const lib = matchExerciseToLibrary(ex.name);
+          const sets = Array.from({ length: Math.max(1, Math.min(8, ex.setsCount || 3)) }, () => ({ repRange: ex.repRange || "8-10" }));
+          return lib ? { libId: lib.id, sets } : { id: builderUid("imported"), name: ex.name || "Ejercicio", muscle: "Personalizado", sets };
+        }),
+      }));
+      setParsed(buildImportedRoutineDef(parsedDays, routineName.trim() || "Rutina importada"));
+    } catch (err) {
+      console.error("Error al analizar la rutina con IA:", err);
+      setNotice("No pudimos analizar el texto. Asegurate de que el formato sea comprensible.");
+    } finally {
+      setIsParsingAI(false);
+    }
   };
 
   if (parsed) {
@@ -5659,6 +5798,10 @@ function ImportRoutineModal({ onImport, onClose }) {
         <button onClick={handleProcess} disabled={!text.trim() || loadingFile} className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-sm font-bold transition-all active:scale-[0.98] ${text.trim() && !loadingFile ? "text-white shadow-lg shadow-teal-500/20" : "bg-slate-800 text-slate-600"}`} style={text.trim() && !loadingFile ? { background: "linear-gradient(135deg,#14B8A6,#0E7490)" } : {}}>
           <Sparkles size={15} /> Detectar rutina
         </button>
+        <button onClick={handleProcessAI} disabled={!text.trim() || loadingFile || isParsingAI} className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition text-sm font-semibold mt-2 disabled:opacity-50">
+          {isParsingAI ? <><RotateCcw size={14} className="animate-spin" /> Analizando rutina con Inteligencia Artificial...</> : <><Sparkles size={14} /> Detectar con IA</>}
+        </button>
+        <p className="text-[10px] text-slate-600 mt-2 text-center">"Detectar con IA" necesita un servidor propio configurado con tu clave de Gemini — si todavía no lo armaste, usá "Detectar rutina" de arriba.</p>
       </div>
     </div>
   );
