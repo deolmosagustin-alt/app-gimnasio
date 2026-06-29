@@ -25,18 +25,15 @@ import {
   EXERCISE_LIBRARY_BY_GROUP, EXERCISE_LIBRARY_CONTRIBUTORS_BY_GROUP,
   PRESET_ROUTINES, PRESET_ROUTINES_BY_ID, CLASSIC_PRESET,
 } from "./data";
-import { httpsCallable } from "firebase/functions";
-import { functions } from "./firebase";
 
 /* ============================================================================
    GEMINI — la clave de la API ya NO vive en este archivo ni en Remote
    Config (eso era visible para cualquiera que abriera las herramientas de
    desarrollador, sin importar desde dónde se la bajara). Ahora vive como
-   secreto en Cloud Functions (Secret Manager), y nunca llega al navegador:
-   el cliente llama a las funciones "entrenadorIA" y "detectarRutinaIA"
-   (autenticado con Firebase Auth, vía httpsCallable — ver más abajo en
-   EntrenadorIAChat e ImportRoutineModal), y son ESAS funciones las que le
-   hablan a Gemini con la clave real. Ver functions/index.js.
+   variable de entorno del servidor (GEMINI_API_KEY en Vercel), y nunca
+   llega al navegador: el cliente le pega a "/api/ia" (ver api/ia.js, una
+   función serverless de Vercel), y es ESA función la que le habla a
+   Gemini con la clave real.
 ============================================================================ */
 /* ============================================================================
    BIBLIOTECA DE EJERCICIOS Y RUTINAS — a partir de esta actualización, la app
@@ -5283,9 +5280,9 @@ async function extractTextFromPdfFile(file) {
    entrenamiento como contexto (se lo manda a Gemini en el prompt de
    sistema antes de tu pregunta, así puede responder con tus datos reales
    en vez de en abstracto). El pedido a Gemini ya no lo hace el navegador
-   directo: llama a la Cloud Function "entrenadorIA" (ver
-   functions/index.js), que es la que tiene la clave real y nunca la
-   expone — ver el comentario al principio del archivo.
+   directo: llama a "/api/ia" (ver api/ia.js), que es la que tiene la
+   clave real y nunca la expone — ver el comentario al principio del
+   archivo.
 
    Puede proponer ACCIONES reales sobre la app (crear o activar una
    rutina, editar el perfil, cambiar configuración de ciclo/descarga,
@@ -5528,17 +5525,25 @@ Reglas importantes: nunca digas que ya aplicaste el cambio — la persona siempr
 
 Datos: ${JSON.stringify(context)}`;
       const history = newMessages.map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.text }] }));
-      // El pedido a Gemini ya no lo hace el navegador: lo hace la Cloud
-      // Function "entrenadorIA" (ver functions/index.js), que tiene la
-      // clave real y nunca la expone, y que ahora también activa la
-      // búsqueda con Google cuando hace falta respaldar una afirmación
-      // científica — devuelve el texto y, si corresponde, las fuentes
-      // reales que usó (ver "sources" más abajo).
-      const callEntrenadorIA = httpsCallable(functions, "entrenadorIA");
-      const { data: result } = await callEntrenadorIA({ systemPrompt, history });
+      // El pedido a Gemini ya no lo hace el navegador directo: lo hace
+      // /api/ia (función serverless de Vercel — ver api/ia.js), que tiene
+      // la clave real en una variable de entorno del servidor y nunca la
+      // expone, y que activa la búsqueda con Google cuando hace falta
+      // respaldar una afirmación científica — devuelve el texto y, si
+      // corresponde, las fuentes reales que usó (ver "sources" más abajo).
+      const response = await fetch("/api/ia", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "chat", systemPrompt, history })
+      });
+
+      if (!response.ok) throw new Error("Error en el servidor");
+      const result = await response.json();
+
       const rawReply = result?.text;
       const sources = Array.isArray(result?.sources) ? result.sources : [];
       if (!rawReply) { setMessages((prev) => [...prev, { role: "assistant", text: "No se me ocurrió una respuesta — probá de nuevo." }]); return; }
+
       const { text, action } = parseAction(rawReply);
       const plan = action ? buildActionPlan(action, { profile, settings, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings }) : null;
       setMessages((prev) => [...prev, { role: "assistant", text, plan, planStatus: plan ? "pending" : null, sources }]);
@@ -5627,8 +5632,8 @@ Datos: ${JSON.stringify(context)}`;
                 {m.role === "assistant" ? renderChatMarkdown(m.text) : m.text}
               </div>
             </div>
-            {/* Fuentes reales que usó la IA (búsqueda con Google, ver la
-                Cloud Function) — chips chicos con link, separados del
+            {/* Fuentes reales que usó la IA (búsqueda con Google, ver
+                api/ia.js) — chips chicos con link, separados del
                 texto de la respuesta para que no se confundan con algo
                 que la IA escribió por su cuenta. */}
             {m.sources && m.sources.length > 0 && (
@@ -5761,14 +5766,21 @@ function ImportRoutineModal({ onImport, onClose }) {
   // Detección con IA: en vez de patrones de texto, le pide a un modelo de
   // lenguaje que entienda la rutina y devuelva días/ejercicios en JSON —
   // útil para formatos más libres que el detector de patrones no capta.
-  // El pedido a Gemini lo hace la Cloud Function "detectarRutinaIA" (ver
-  // functions/index.js) — la clave real nunca llega al navegador.
+  // El pedido a Gemini lo hace /api/ia (función serverless de Vercel — ver
+  // api/ia.js) — la clave real nunca llega al navegador.
   const handleProcessAI = async () => {
     setIsParsingAI(true);
     setNotice("");
     try {
-      const callDetectarRutinaIA = httpsCallable(functions, "detectarRutinaIA");
-      const { data: result } = await callDetectarRutinaIA({ text });
+      const response = await fetch("/api/ia", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "detect", text })
+      });
+
+      if (!response.ok) throw new Error("Error en el servidor");
+      const result = await response.json();
+
       const rawText = result?.text;
       if (!rawText) throw new Error("respuesta vacía");
       const cleaned = rawText.replace(/```json|```/g, "").trim();
@@ -5785,8 +5797,8 @@ function ImportRoutineModal({ onImport, onClose }) {
       }));
       setParsed(buildImportedRoutineDef(parsedDays, routineName.trim() || "Rutina importada"));
     } catch (err) {
-      console.error("Error al analizar la rutina con IA:", err);
-      setNotice("No pudimos analizar el texto. Asegurate de que el formato sea comprensible.");
+      console.error("Error detectando rutina con IA:", err);
+      setNotice("No pudimos detectar la rutina. Asegurate de que el texto sea claro o probá copiarlo de nuevo.");
     } finally {
       setIsParsingAI(false);
     }
