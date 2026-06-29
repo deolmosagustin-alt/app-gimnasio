@@ -39,7 +39,7 @@ async function callGemini(body) {
   return response.json();
 }
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   if (req.method !== "POST") {
     res.status(405).json({ error: "Sólo se acepta POST." });
     return;
