@@ -3427,7 +3427,7 @@ function SessionHistoryView({ logs, onDeleteDay }) {
 /* ============================================================================
    DELOAD VIEW (unchanged from prior redesign)
 ============================================================================ */
-function DeloadView({ logs, settings = DEFAULT_SETTINGS, deloadProgress = {}, setDeloadProgress }) {
+function DeloadView({ logs, settings = DEFAULT_SETTINGS, deloadProgress = {}, setDeloadProgress, onFinishDeloadSession }) {
   const { trainWeeks, deloadWeeks, deloadPct, deloadSetDivisor } = settings;
   const pctLabel = Math.round(deloadPct * 100);
   const [activeDay, setActiveDay] = useState(DAY_ORDER[0]);
@@ -3443,6 +3443,23 @@ function DeloadView({ logs, settings = DEFAULT_SETTINGS, deloadProgress = {}, se
     if (next[key] === today) delete next[key];
     else next[key] = today;
     setDeloadProgress(next);
+  };
+  // Antes, entrenar desde la pestaña Descarga no quedaba registrado en
+  // ningún lado — no contaba como "día entrenado", no sumaba a la racha,
+  // no aparecía en el calendario de Historial. "Finalizar sesión de
+  // descarga" crea el mismo tipo de registro que el botón equivalente de
+  // la rutina normal (ver handleEndSession en App()), y de paso limpia
+  // los tildes de hoy de TODOS los días (no sólo el que tenías
+  // seleccionado) — "finalizar" significa "ya entrené hoy", sin importar
+  // si tocaste más de un día en la misma sesión.
+  const hasAnyDoneToday = Object.values(deloadProgress).some((d) => d === today);
+  const handleFinishSession = () => {
+    if (setDeloadProgress) {
+      const next = { ...deloadProgress };
+      Object.keys(next).forEach((k) => { if (next[k] === today) delete next[k]; });
+      setDeloadProgress(next);
+    }
+    onFinishDeloadSession?.(activeDay);
   };
 
   return (
@@ -3521,7 +3538,7 @@ function DeloadView({ logs, settings = DEFAULT_SETTINGS, deloadProgress = {}, se
                     const done = deloadProgress[progressKey] === today;
                     return (
                       <div key={i} className="flex items-center gap-3">
-                        <button onClick={() => toggleDeloadDone(progressKey)} aria-label={done ? "Marcar como no hecha" : "Marcar serie como hecha"} className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-all active:scale-90 border ${done ? "bg-emerald-500 border-emerald-500" : "border-slate-700 hover:border-slate-500"}`}>
+                        <button onClick={() => toggleDeloadDone(progressKey)} aria-label={done ? "Marcar como no hecha" : "Marcar serie como hecha"} className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-all active:scale-90 border ${done ? "bg-purple-500 border-purple-500" : "border-slate-700 hover:border-slate-500"}`}>
                           {done && <Check size={13} className="text-white" />}
                         </button>
                         <span className="text-[10px] font-black text-slate-600 w-5 shrink-0">S{i + 1}</span>
@@ -3530,8 +3547,8 @@ function DeloadView({ logs, settings = DEFAULT_SETTINGS, deloadProgress = {}, se
                           <div className="flex items-center gap-2 flex-1 justify-end">
                             <span className="text-[11px] text-slate-600 line-through">{best.reps}×{best.kg}kg</span>
                             <div className="flex items-center gap-1">
-                              <ArrowDown size={10} className="text-purple-400" />
-                              <span className={`text-sm font-black ${done ? "text-emerald-400" : "text-purple-300"}`}>{best.reps}×{deloadKg}kg</span>
+                              <ArrowDown size={10} style={{ color: done ? day.color : "#C084FC" }} />
+                              <span className="text-sm font-black" style={{ color: done ? day.color : "#D8B4FE" }}>{best.reps}×{deloadKg}kg</span>
                             </div>
                           </div>
                         ) : <span className="text-[11px] text-slate-700 flex-1 text-right">Sin marca</span>}
@@ -3554,6 +3571,15 @@ function DeloadView({ logs, settings = DEFAULT_SETTINGS, deloadProgress = {}, se
         <Info size={14} className="text-slate-600 mt-0.5 shrink-0" />
         <p className="text-[11px] text-slate-500 leading-relaxed">La descarga reduce el estrés acumulado sin perder las adaptaciones. Mantené la técnica y el ritmo, pero no busques marcas nuevas esta semana.</p>
       </div>
+
+      {hasAnyDoneToday && (
+        <div>
+          <button onClick={handleFinishSession} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98] shadow-lg" style={{ backgroundColor: "#A855F7", boxShadow: "0 10px 24px -8px #A855F788" }}>
+            <Check size={15} /> Finalizar sesión de descarga
+          </button>
+          <p className="text-center text-[10px] text-slate-600 mt-2">Se registra como entrenamiento de hoy (suma a tu racha y calendario) y se desmarcan las series tildadas, para la próxima vez.</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -6591,6 +6617,22 @@ export default function App() {
       return np;
     });
   };
+  // Mismo registro que handleEndSession (mismo "tipo" de entrada en
+  // trainingSessions), pero para la pestaña Descarga — que no tiene
+  // Iniciar/Cancelar, así que no depende de activeSession. Antes de
+  // esto, entrenar tu semana de descarga desde esa pestaña no quedaba
+  // registrado en ningún lado: no contaba como día entrenado, no sumaba
+  // a la racha, no aparecía en el calendario de Historial.
+  const handleFinishDeloadSession = (dayKey) => {
+    setProfiles((prev) => {
+      const p = prev[activeProfile];
+      if (!p) return prev;
+      const finished = { date: todayStr(), dayKey, startedAt: new Date().toISOString(), endedAt: new Date().toISOString(), deload: true };
+      const np = { ...prev, [activeProfile]: { ...p, trainingSessions: [...(p.trainingSessions || []), finished] } };
+      saveProfiles(np);
+      return np;
+    });
+  };
 
   // "Resetear todo el historial" (Progreso): antes sólo limpiaba `logs`, así
   // que un día donde se haya usado Iniciar/Finalizar sesión (que se guarda
@@ -6677,7 +6719,7 @@ export default function App() {
             {tab === "rutinas" && <RoutinesView profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleArchiveRoutine} onRestore={handleRestoreRoutine} />}
             {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} />}
             {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} sex={profile?.sex} age={profile?.age} onGoToDeload={() => setTab("descarga")} />}
-            {tab === "descarga" && <DeloadView logs={logs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} />}
+            {tab === "descarga" && <DeloadView logs={logs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} />}
             {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} settings={getProfileSettings(profile)} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} />}
             {tab === "perfil" && <ProfileView profileName={activeProfile} profiles={profiles} logs={logs} onSignOut={handleSignOut} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} />}
           </div>
