@@ -119,6 +119,10 @@ ${text}
     res.status(400).json({ error: "Acción no reconocida." });
   } catch (err) {
     console.error("Error en /api/ia:", err);
-    res.status(500).json({ error: "Error en el servidor." });
+    // "detail" es temporal, sólo para terminar de diagnosticar esto sin
+    // tener que ir a buscar los logs de Vercel cada vez — antes de
+    // publicar la app de verdad, hay que sacar esta línea (no se le debe
+    // mostrar el motivo técnico exacto a cualquiera que use el chat).
+    res.status(500).json({ error: "Error en el servidor.", detail: err.message });
   }
 };
