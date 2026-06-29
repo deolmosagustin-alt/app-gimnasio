@@ -11,7 +11,7 @@ import {
   Mail, Clock, ChevronRight, Edit3, Info, Plus, Sun, Moon,
   Target, Award, Activity, ArrowDown, HelpCircle, List, LayoutGrid,
   Sparkles, Layers, Video, SlidersHorizontal, ShieldCheck, UserCog,
-  Share2, Download, Link2, Copy, BellOff, Send,
+  Share2, Download, Link2, Copy, BellOff, Send, Mic,
 } from "lucide-react";
 import { signInWithPopup, signOut } from "firebase/auth";
 import { doc, setDoc, getDoc } from "firebase/firestore";
@@ -25,58 +25,19 @@ import {
   EXERCISE_LIBRARY_BY_GROUP, EXERCISE_LIBRARY_CONTRIBUTORS_BY_GROUP,
   PRESET_ROUTINES, PRESET_ROUTINES_BY_ID, CLASSIC_PRESET,
 } from "./data";
-import { getRemoteConfig, getValue, fetchAndActivate } from "firebase/remote-config";
+import { httpsCallable } from "firebase/functions";
+import { functions } from "./firebase";
 
 /* ============================================================================
-   IMPORTAR RUTINA CON IA — usando Firebase Remote Config para la clave de
-   Gemini, como pediste. Antes de nada, una aclaración importante para que
-   la uses con la información correcta (no es una negativa, lo implementé
-   tal cual lo pediste — pero hay una diferencia entre "no está en el
-   código" y "está oculta"):
-
-   Remote Config NO es un lugar para guardar secretos — es un sistema para
-   mandarle configuración al CLIENTE (a la app que corre en el navegador
-   de cada persona), como un interruptor de "activar función nueva" o un
-   número de prueba A/B. El valor SÍ viaja hasta el navegador (se puede ver
-   en la pestaña Network al pedirlo, o tipeando `getValue(...).asString()`
-   en la consola del navegador) — la propia documentación de Firebase lo
-   dice explícitamente: no es para datos sensibles. Así que la clave de
-   Gemini sigue tan visible para cualquiera que abra las herramientas de
-   desarrollador como si estuviera escrita directo en este archivo — sólo
-   cambia DESDE DÓNDE se la baja, no que esté escondida.
-   La única forma real de que la clave no viaje nunca al navegador es que
-   el pedido a Gemini lo haga un servidor (te lo mostré la vez pasada con
-   una Cloud Function) — si en algún momento te interesa, lo retomamos.
-   Mientras tanto, para que el riesgo sea bien chico si seguís con este
-   camino: en la consola de Google Cloud, a esa clave de API le podés
-   poner una restricción de "HTTP referrers" para que sólo funcione desde
-   el dominio donde publicás la app — así, aunque alguien la copie, no le
-   sirve para usarla desde otro lado.
-
-   Implementación: */
-let _remoteConfigInstance = null;
-async function getGeminiKey() {
-  if (!_remoteConfigInstance) {
-    _remoteConfigInstance = getRemoteConfig(app);
-    // Corto a propósito mientras probás (así un cambio del valor en la
-    // consola de Firebase se nota enseguida) — subilo bastante en
-    // producción (por ejemplo, una hora) para no gastar de más la cuota
-    // de pedidos de Remote Config.
-    _remoteConfigInstance.settings.minimumFetchIntervalMillis = 10000;
-    _remoteConfigInstance.defaultConfig = { GEMINI_API_KEY: "" };
-  }
-  try {
-    await fetchAndActivate(_remoteConfigInstance);
-    return getValue(_remoteConfigInstance, "GEMINI_API_KEY").asString();
-  } catch (err) {
-    console.error("Error al obtener Remote Config:", err);
-    return "";
-  }
-}
-// Para que esto devuelva algo de verdad, en la consola de Firebase →
-// Remote Config tenés que crear un parámetro llamado exactamente
-// "GEMINI_API_KEY" con tu clave como valor, y publicarlo.
-
+   GEMINI — la clave de la API ya NO vive en este archivo ni en Remote
+   Config (eso era visible para cualquiera que abriera las herramientas de
+   desarrollador, sin importar desde dónde se la bajara). Ahora vive como
+   secreto en Cloud Functions (Secret Manager), y nunca llega al navegador:
+   el cliente llama a las funciones "entrenadorIA" y "detectarRutinaIA"
+   (autenticado con Firebase Auth, vía httpsCallable — ver más abajo en
+   EntrenadorIAChat e ImportRoutineModal), y son ESAS funciones las que le
+   hablan a Gemini con la clave real. Ver functions/index.js.
+============================================================================ */
 /* ============================================================================
    BIBLIOTECA DE EJERCICIOS Y RUTINAS — a partir de esta actualización, la app
    ya no tiene una sola rutina fija. Hay:
@@ -1887,6 +1848,13 @@ function RestTimer({ seconds, accent, alertType = "sound" }) {
       try {
         const a = new AudioContext();
         [0, 220].forEach((d) => setTimeout(() => { const o = a.createOscillator(), g = a.createGain(); o.frequency.value = 880; o.connect(g); g.connect(a.destination); g.gain.value = 0.2; o.start(); setTimeout(() => o.stop(), 280); }, d));
+        // Antes esto se acumulaba: cada serie creaba un AudioContext nuevo
+        // y nunca se cerraba. Los navegadores tienen un límite de
+        // contextos simultáneos (chico en iOS Safari en particular) —
+        // pasado ese límite, el sonido deja de sonar sin ningún error
+        // visible. Se cierra solo, ~700ms después (los dos beeps de
+        // 280ms con 220ms de diferencia entre uno y otro ya terminaron).
+        setTimeout(() => { a.close().catch(() => { }); }, 700);
       } catch { }
     }
     if (alertType !== "sound") haptic([250, 120, 250, 120, 250]);
@@ -1986,6 +1954,7 @@ function RutinaDemo({ view }) {
         activeSession={demoSession}
         onStart={() => setDemoSession({ dayKey: demoDay, startedAt: new Date().toISOString() })}
         onCancel={() => setDemoSession(null)}
+        color={ROUTINE[demoDay].color}
       />
     );
   }
@@ -2499,7 +2468,7 @@ const HELP_CHAPTERS = [
       {
         icon: <Calendar size={20} />,
         title: "Tu ciclo de entrenamiento",
-        text: "Arriba de todo ves en qué semana de tu ciclo estás, si es semana de entrenamiento o de descarga, y cuántos días entrenaste en cada semana.",
+        text: "Arriba de todo ves en qué semana de tu ciclo estás, si es semana de entrenamiento o de descarga, y cuántos días entrenaste en cada semana. Si todavía no registraste cuándo arrancó tu ciclo, en cambio te aparece un aviso para configurarlo — sin esa fecha no hay nada que calcular.",
         demo: { kind: "progreso", view: "ciclo" },
       },
       {
@@ -2544,7 +2513,7 @@ const HELP_CHAPTERS = [
       {
         icon: <Check size={20} />,
         title: "Tocá un músculo",
-        text: "Se resalta completo con un borde blanco, y abajo ves tu rango, tu mejor marca, y cuántos kilos más necesitás (a tus mismas repeticiones) para subir al rango siguiente, nombrado. Cabeza, cuello, articulaciones y alguna zona sin músculo asignado no son tocables. Desde el ícono de compartir mandás una imagen con tus rangos.",
+        text: "Se resalta completo con un borde blanco, y abajo ves tu rango, tu mejor marca, y cuántos kilos más necesitás (a tus mismas repeticiones) para subir al rango siguiente, nombrado. Cabeza, cuello, articulaciones y alguna zona sin músculo asignado no son tocables. Desde el ícono de compartir mandás una imagen con tus rangos. Más abajo, \"Ver todos los rangos\" despliega la leyenda completa de Bronce a Maestro.",
       },
       {
         icon: <Dumbbell size={20} />,
@@ -2627,6 +2596,16 @@ const HELP_CHAPTERS = [
         icon: <Layers size={20} />,
         title: "Pedile que haga cambios por vos",
         text: "Puede crear o activar una rutina (te muestra la vista previa completa, día por día), actualizar tu perfil (sexo, edad, peso), o ajustar la configuración de ciclo y descarga, apariencia o descanso entre series. Nunca aplica nada solo: siempre te muestra una tarjeta con \"Confirmar\" o \"Descartar\" antes de tocar algo de verdad.",
+      },
+      {
+        icon: <Mic size={20} />,
+        title: "Hablale en vez de escribir",
+        text: "El ícono del micrófono (si tu navegador lo soporta) te deja dictar la pregunta — se va completando el cuadro de texto a medida que hablás, y la enviás cuando quieras como cualquier mensaje escrito.",
+      },
+      {
+        icon: <Link2 size={20} />,
+        title: "Cita fuentes reales",
+        text: "Cuando una respuesta se apoya en un estudio o una cifra científica concreta, busca un respaldo real y te lo muestra como un link clicable debajo del mensaje — nunca se lo inventa.",
       },
     ],
   },
@@ -3049,7 +3028,7 @@ function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS,
    SESSION BAR — botón de Iniciar sesión (arriba) / estado en curso con
    tiempo transcurrido. El de Finalizar sesión vive abajo, en RoutineView.
 ============================================================================ */
-function SessionStartBar({ activeSession, onStart, onCancel }) {
+function SessionStartBar({ activeSession, onStart, onCancel, color = "#14B8A6" }) {
   const [, forceTick] = useState(0);
   useEffect(() => {
     if (!activeSession) return;
@@ -3059,7 +3038,7 @@ function SessionStartBar({ activeSession, onStart, onCancel }) {
 
   if (!activeSession) {
     return (
-      <button onClick={onStart} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98] shadow-lg shadow-teal-500/20" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>
+      <button onClick={onStart} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98] shadow-lg" style={{ backgroundColor: color, boxShadow: `0 10px 24px -8px ${color}88` }}>
         <Play size={15} /> Iniciar sesión
       </button>
     );
@@ -3067,14 +3046,14 @@ function SessionStartBar({ activeSession, onStart, onCancel }) {
 
   const elapsedMin = Math.max(0, Math.floor((Date.now() - new Date(activeSession.startedAt).getTime()) / 60000));
   return (
-    <div className="flex items-center gap-3 bg-teal-500/10 border border-teal-500/25 rounded-2xl px-4 py-3">
+    <div className="flex items-center gap-3 rounded-2xl px-4 py-3" style={{ backgroundColor: color + "1a", border: `1px solid ${color}40` }}>
       <span className="relative flex h-2.5 w-2.5 shrink-0">
-        <span className="absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75 animate-ping" />
-        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-teal-500" />
+        <span className="absolute inline-flex h-full w-full rounded-full opacity-75 animate-ping" style={{ backgroundColor: color }} />
+        <span className="relative inline-flex rounded-full h-2.5 w-2.5" style={{ backgroundColor: color }} />
       </span>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-bold text-white">Sesión en curso</p>
-        <p className="text-[11px] text-teal-400/80">{elapsedMin} min · arrancó a las {new Date(activeSession.startedAt).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}</p>
+        <p className="text-[11px]" style={{ color: color + "cc" }}>{elapsedMin} min · arrancó a las {new Date(activeSession.startedAt).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}</p>
       </div>
       <button onClick={onCancel} className="text-[11px] text-slate-500 hover:text-slate-300 font-semibold shrink-0">Cancelar</button>
     </div>
@@ -3181,7 +3160,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           cambies de día (lo que SÍ remonta la tarjeta de arriba por el
           cambio de key), este botón nunca se desmonta — sigue en el mismo
           lugar siempre, entre la tarjeta del día y los ejercicios. */}
-      <SessionStartBar activeSession={activeSession} onStart={() => onStartSession(activeDay)} onCancel={onCancelSession} />
+      <SessionStartBar activeSession={activeSession} onStart={() => onStartSession(activeDay)} onCancel={onCancelSession} color={day.color} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         {day.exercises.map((ex) => <ExerciseCard key={ex.id} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadSets={isDeload ? getDeloadSets(ex) : null} deloadMode={isDeload} resetKey={resetKeys[activeDay]} settings={settings} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!activeSession} />)}
@@ -3189,7 +3168,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
 
       {activeSession && (
         <div>
-          <button onClick={onEndSession} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98] shadow-lg shadow-emerald-500/20" style={{ background: "linear-gradient(135deg,#10B981,#047857)" }}>
+          <button onClick={onEndSession} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98] shadow-lg" style={{ backgroundColor: day.color, boxShadow: `0 10px 24px -8px ${day.color}88` }}>
             <Check size={15} /> Finalizar sesión
           </button>
           <p className="text-center text-[10px] text-slate-600 mt-2">Se guarda como entrenamiento de hoy y se limpia lo que tenías escrito sin guardar — alimenta tu racha, calendario y gráficas.</p>
@@ -4023,6 +4002,7 @@ function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backR
 function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, onGoToProfile, sex, age }) {
   const [selected, setSelected] = useState(null);
   const [showImage, setShowImage] = useState(false);
+  const [showAllRanks, setShowAllRanks] = useState(false);
   const frontBodyRef = useRef(null);
   const backBodyRef = useRef(null);
   const mode = settings.muscleRankMode === "relative" ? "relative" : "general";
@@ -4128,23 +4108,30 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
       ) : (
         <p className="text-center text-[11px] text-slate-600">Tocá un músculo entrenable para ver tu rango y tu mejor marca.</p>
       )}
-      <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-3.5 backdrop-blur-sm shadow-md shadow-black/20">
-        <div className="flex items-center gap-1.5 justify-center mb-3">
-          <Trophy size={11} className="text-slate-600" />
-          <p className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Todos los rangos</p>
+      {!showAllRanks ? (
+        <button onClick={() => setShowAllRanks(true)} className="w-full flex items-center justify-center gap-1.5 py-3 rounded-2xl border border-slate-800/60 text-slate-500 hover:text-slate-300 hover:border-slate-700 transition text-xs font-bold">
+          <Trophy size={13} /> Ver todos los rangos
+        </button>
+      ) : (
+        <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-3.5 backdrop-blur-sm shadow-md shadow-black/20 bounce-in">
+          <button onClick={() => setShowAllRanks(false)} className="w-full flex items-center gap-1.5 justify-center mb-3" aria-label="Ocultar todos los rangos">
+            <Trophy size={11} className="text-slate-600" />
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Todos los rangos</p>
+            <ChevronUp size={12} className="text-slate-600" />
+          </button>
+          <div className="grid grid-cols-3 gap-2">
+            {["Bronce", "Plata", "Oro", "Esmeralda", "Diamante", "Maestro"].map((t) => {
+              const rep = RANK_TIERS.find((r) => r.tier === t && r.sub === "II") || RANK_TIERS.find((r) => r.tier === t);
+              return (
+                <div key={t} className="flex flex-col items-center gap-1 rounded-xl py-2 bg-slate-800/30">
+                  <RankBadgeIcon tier={rep.tier} sub="" color={rep.color} size={52} />
+                  <span className="text-[9px] font-bold" style={{ color: rep.color }}>{t}</span>
+                </div>
+              );
+            })}
+          </div>
         </div>
-        <div className="grid grid-cols-3 gap-2">
-          {["Bronce", "Plata", "Oro", "Esmeralda", "Diamante", "Maestro"].map((t) => {
-            const rep = RANK_TIERS.find((r) => r.tier === t && r.sub === "II") || RANK_TIERS.find((r) => r.tier === t);
-            return (
-              <div key={t} className="flex flex-col items-center gap-1 rounded-xl py-2 bg-slate-800/30">
-                <RankBadgeIcon tier={rep.tier} sub="" color={rep.color} size={52} />
-                <span className="text-[9px] font-bold" style={{ color: rep.color }}>{t}</span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      )}
 
       {showImage && (
         <ShareImageModal
@@ -4203,7 +4190,15 @@ function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_
       </div>
 
       {/* Ciclo actual */}
-      <WeekCalendar cycleStart={cycleStart} logs={logs} sessions={sessions} settings={settings} onGoToDeload={onGoToDeload} />
+      {cycleStart ? (
+        <WeekCalendar cycleStart={cycleStart} logs={logs} sessions={sessions} settings={settings} onGoToDeload={onGoToDeload} />
+      ) : (
+        <button onClick={onGoToProfile} className="w-full flex items-center gap-3 bg-amber-500/10 border border-amber-500/25 rounded-2xl px-4 py-3.5 text-left hover:bg-amber-500/15 transition">
+          <div className="w-9 h-9 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center shrink-0"><AlertTriangle size={16} /></div>
+          <div className="flex-1 min-w-0"><p className="text-sm font-bold text-white">No registraste el inicio de tu ciclo</p><p className="text-[11px] text-amber-300/80">Sin esa fecha no podemos calcular en qué semana estás ni cuándo te toca la descarga — tocá para configurarla</p></div>
+          <ChevronRight size={16} className="text-amber-400 shrink-0" />
+        </button>
+      )}
 
       {/* Estadísticas — fila compacta y neutra, sin un color por cada una */}
       <div className="grid grid-cols-4 gap-2">
@@ -5287,11 +5282,10 @@ async function extractTextFromPdfFile(file) {
    ENTRENADOR IA — chat con un asistente que tiene tu historial de
    entrenamiento como contexto (se lo manda a Gemini en el prompt de
    sistema antes de tu pregunta, así puede responder con tus datos reales
-   en vez de en abstracto). Mismo mecanismo de clave que "Importar rutina
-   con IA" — ver getGeminiKey y su aclaración de seguridad arriba del
-   archivo, aplica exactamente igual acá: la clave de Remote Config no es
-   un secreto real, es visible para quien abra las herramientas de
-   desarrollador.
+   en vez de en abstracto). El pedido a Gemini ya no lo hace el navegador
+   directo: llama a la Cloud Function "entrenadorIA" (ver
+   functions/index.js), que es la que tiene la clave real y nunca la
+   expone — ver el comentario al principio del archivo.
 
    Puede proponer ACCIONES reales sobre la app (crear o activar una
    rutina, editar el perfil, cambiar configuración de ciclo/descarga,
@@ -5429,6 +5423,24 @@ function buildActionPlan(action, ctx) {
   return null;
 }
 
+// Recorta el historial que se manda a la IA: para cada serie, sólo los
+// últimos N registros (no toda la vida de la cuenta). En perfiles con
+// meses de historial, mandar TODO agranda mucho el pedido — y un pedido
+// más grande es, ni más ni menos, una respuesta más lenta (la IA tiene
+// que "leer" más antes de poder empezar a contestar). Para responder con
+// criterio sobre cómo venís, los últimos registros alcanzan de sobra; los
+// récords corregidos a mano (_pr_override) se mandan completos siempre,
+// son un solo objeto chico cada uno, no pesan nada.
+const AI_LOG_HISTORY_LIMIT = 12;
+function trimLogsForAI(logs) {
+  const out = {};
+  Object.entries(logs || {}).forEach(([key, val]) => {
+    if (key.endsWith("_pr_override") || !Array.isArray(val)) { out[key] = val; return; }
+    out[key] = val.slice().sort((a, b) => (a.date < b.date ? -1 : 1)).slice(-AI_LOG_HISTORY_LIMIT);
+  });
+  return out;
+}
+
 function EntrenadorIAChat({ profile, logs, profileName, messages, setMessages, settings, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings }) {
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
@@ -5452,8 +5464,6 @@ function EntrenadorIAChat({ profile, logs, profileName, messages, setMessages, s
     setInput("");
     setIsSending(true);
     try {
-      const apiKey = await getGeminiKey();
-      if (!apiKey) throw new Error("falta configurar GEMINI_API_KEY en Remote Config");
       // Antes esto sólo le mandaba los NOMBRES de las rutinas guardadas —
       // por eso no podía ver qué ejercicios tenía cada una, sólo los
       // récords sueltos en logs. Ahora se resuelve cada rutina (incluida
@@ -5482,7 +5492,7 @@ function EntrenadorIAChat({ profile, logs, profileName, messages, setMessages, s
         rutinaActivaId: profile?.activeRoutineId || null,
         rutinas: allRoutines,
         configuracionActual: settings,
-        logs: logs || {},
+        logs: trimLogsForAI(logs),
       };
       const systemPrompt = `Sos un entrenador personal y coach de fuerza con dominio profundo y actualizado de la ciencia del entrenamiento — no sólo frases motivacionales genéricas. Hablás en español rioplatense, breve y cercano.
 
@@ -5499,7 +5509,9 @@ Aplicá estos marcos cuando sean relevantes para lo que te preguntan (no los rec
 
 Antes de responder, revisá en silencio que tu respuesta resuelva exactamente lo que te preguntaron — no un tema parecido ni una versión genérica — y que cubra todas las partes si la pregunta tenía varias. Interpretá la intención real aunque venga en jerga informal o mal escrita. Si la pregunta es genérica o ambigua y la respuesta cambia mucho según un dato que no tenés (objetivo, experiencia, qué ejercicio), pedí ESE dato puntual en vez de adivinar — pero si ya tenés lo necesario en el historial o el contexto de abajo, respondé directo sin preguntar de más.
 
-Tenés acceso a los datos reales de esta persona en el siguiente JSON — usalos para responder con precisión (fechas, pesos, repeticiones, y la estructura real de sus rutinas día por día), nunca inventes datos que no estén ahí. "rutinas" incluye TODAS sus rutinas (activa, creadas, editadas y archivadas) con sus días y ejercicios completos — las marcadas "archivada":true no están visibles para ella en la pestaña Rutinas salvo que las recupere, tenelo en cuenta si te pregunta qué tiene disponible ahora. Si no encontrás el dato para responder algo puntual, decilo en vez de inventarlo. Respuestas cortas, 2 a 4 oraciones salvo que te pidan más detalle o la pregunta lo amerite. Para dar formato a tu texto podés usar **negrita** y listas con guion (-), nada más — no uses títulos, tablas, ni bloques de código.
+Cuando tu respuesta se apoye en evidencia científica concreta (un estudio, una guía clínica, una revisión sistemática, una cifra puntual), buscá un respaldo real si hace falta — tenés acceso a resultados de búsqueda actuales para fundamentarla con fuentes reales en vez de citar de memoria. Nunca inventes un estudio, un autor o un link que no exista. No escribas vos los links ni los nombres de los estudios dentro del texto de tu respuesta — las fuentes reales que se usen se muestran aparte, debajo de tu mensaje, de forma automática. Si no encontrás un respaldo real, está bien responder sin citar nada en vez de inventarlo.
+
+Tenés acceso a los datos reales de esta persona en el siguiente JSON — usalos para responder con precisión (fechas, pesos, repeticiones, y la estructura real de sus rutinas día por día), nunca inventes datos que no estén ahí. "rutinas" incluye TODAS sus rutinas (activa, creadas, editadas y archivadas) con sus días y ejercicios completos — las marcadas "archivada":true no están visibles para ella en la pestaña Rutinas salvo que las recupere, tenelo en cuenta si te pregunta qué tiene disponible ahora. "logs" trae sólo los últimos registros de cada serie (no el historial completo) — alcanza para evaluar tendencia reciente, pero si te preguntan por una marca muy vieja que no aparece, decilo en vez de inventar un valor. Respuestas cortas, 2 a 4 oraciones salvo que te pidan más detalle o la pregunta lo amerite. Para dar formato a tu texto podés usar **negrita** y listas con guion (-), nada más — no uses títulos, tablas, ni bloques de código.
 
 Si la persona te pide explícitamente hacer un cambio en la app, respondé primero tu explicación normal y agregá AL FINAL, en una línea aparte, un bloque con ESTE formato exacto (sin texto markdown alrededor, sin comillas triples, nada más en esa línea):
 ###ACCION###{"type":"TIPO", ...campos...}###FIN###
@@ -5516,25 +5528,20 @@ Reglas importantes: nunca digas que ya aplicaste el cambio — la persona siempr
 
 Datos: ${JSON.stringify(context)}`;
       const history = newMessages.map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.text }] }));
-      // "gemini-1.5-flash" ya no existe — Google lo apagó del todo (cualquier
-      // pedido devuelve 404), por eso el chat no contestaba nada. En vez de
-      // poner a mano la versión más nueva (que en algún momento TAMBIÉN se va
-      // a apagar y vamos a tener este mismo problema de nuevo), uso el alias
-      // "gemini-flash-latest" — Google lo mantiene apuntando solo al modelo
-      // Flash vigente en cada momento, así que no debería volver a romperse
-      // por esto.
-      const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=" + apiKey, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ systemInstruction: { parts: [{ text: systemPrompt }] }, contents: history }),
-      });
-      if (!response.ok) throw new Error(`request failed with status ${response.status}`);
-      const data = await response.json();
-      const rawReply = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      // El pedido a Gemini ya no lo hace el navegador: lo hace la Cloud
+      // Function "entrenadorIA" (ver functions/index.js), que tiene la
+      // clave real y nunca la expone, y que ahora también activa la
+      // búsqueda con Google cuando hace falta respaldar una afirmación
+      // científica — devuelve el texto y, si corresponde, las fuentes
+      // reales que usó (ver "sources" más abajo).
+      const callEntrenadorIA = httpsCallable(functions, "entrenadorIA");
+      const { data: result } = await callEntrenadorIA({ systemPrompt, history });
+      const rawReply = result?.text;
+      const sources = Array.isArray(result?.sources) ? result.sources : [];
       if (!rawReply) { setMessages((prev) => [...prev, { role: "assistant", text: "No se me ocurrió una respuesta — probá de nuevo." }]); return; }
       const { text, action } = parseAction(rawReply);
       const plan = action ? buildActionPlan(action, { profile, settings, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings }) : null;
-      setMessages((prev) => [...prev, { role: "assistant", text, plan, planStatus: plan ? "pending" : null }]);
+      setMessages((prev) => [...prev, { role: "assistant", text, plan, planStatus: plan ? "pending" : null, sources }]);
     } catch (err) {
       console.error("Error al hablar con el entrenador IA:", err);
       setMessages((prev) => [...prev, { role: "assistant", text: "Uy, no me pude conectar. Probá de nuevo en un momento 🙏" }]);
@@ -5559,9 +5566,31 @@ Datos: ${JSON.stringify(context)}`;
     setMessages((prev) => prev.map((m, i) => (i === msgIndex ? { ...m, planStatus: "discarded" } : m)));
   };
 
+  // Dictado por voz — Web Speech API, nativa del navegador (sin librerías
+  // nuevas). No todos los navegadores la tienen (Firefox de escritorio,
+  // por ejemplo, no) — si no está disponible, el botón del micrófono
+  // simplemente no se muestra, en vez de mostrar un botón roto.
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef(null);
+  const SpeechRecognitionAPI = typeof window !== "undefined" ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
+  useEffect(() => () => { try { recognitionRef.current?.stop(); } catch { } }, []);
+  const handleMicToggle = () => {
+    if (!SpeechRecognitionAPI) return;
+    if (isListening) { recognitionRef.current?.stop(); return; }
+    const recognition = new SpeechRecognitionAPI();
+    recognition.lang = "es-AR";
+    recognition.interimResults = true;
+    recognition.continuous = false;
+    recognition.onresult = (e) => { setInput(Array.from(e.results).map((r) => r[0].transcript).join(" ")); };
+    recognition.onerror = () => setIsListening(false);
+    recognition.onend = () => setIsListening(false);
+    recognitionRef.current = recognition;
+    try { recognition.start(); setIsListening(true); } catch { setIsListening(false); }
+  };
+
   return (
     <div className="pb-32">
-      <div className="relative overflow-hidden rounded-2xl border border-teal-500/20 p-5 mb-4" style={{ background: "var(--grad-hero-teal)" }}>
+      <div className="relative overflow-hidden rounded-2xl border border-teal-500/20 p-5 mb-3" style={{ background: "var(--grad-hero-teal)" }}>
         <div className="absolute -top-8 -right-6 w-32 h-32 rounded-full bg-teal-500/15 blur-2xl pointer-events-none" />
         <div className="absolute -bottom-6 -left-6 w-28 h-28 rounded-full bg-cyan-500/10 blur-2xl pointer-events-none" />
         <div className="relative flex items-center gap-2 mb-1">
@@ -5569,7 +5598,22 @@ Datos: ${JSON.stringify(context)}`;
           <span className="text-[11px] font-black uppercase tracking-widest text-teal-400">Tu asistente</span>
         </div>
         <h2 className="relative text-xl font-black text-white leading-tight">Entrenador IA</h2>
-        <p className="relative text-xs text-teal-300/60 mt-1">Conoce tu historial — pedile que te arme una rutina, que ajuste tu perfil o tu configuración</p>
+        <p className="relative text-xs text-teal-300/60 mt-1">Conoce tu historial real de entrenamiento — preguntale lo que quieras</p>
+      </div>
+
+      {/* Qué puede hacer, en una sola fila chica con scroll horizontal —
+          en vez de un párrafo largo que ocupa media pantalla apenas
+          entrás. */}
+      <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 mb-4">
+        {[
+          { icon: <Layers size={11} />, label: "Crear o activar rutinas" },
+          { icon: <UserCog size={11} />, label: "Editar tu perfil" },
+          { icon: <Calendar size={11} />, label: "Ciclo y descarga" },
+          { icon: <Sun size={11} />, label: "Apariencia" },
+          { icon: <Award size={11} />, label: "Cita estudios reales" },
+        ].map((c, i) => (
+          <span key={i} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-teal-500/10 border border-teal-500/20 text-teal-300 text-[10px] font-bold whitespace-nowrap shrink-0">{c.icon}{c.label}</span>
+        ))}
       </div>
 
       <div className="space-y-3">
@@ -5583,6 +5627,19 @@ Datos: ${JSON.stringify(context)}`;
                 {m.role === "assistant" ? renderChatMarkdown(m.text) : m.text}
               </div>
             </div>
+            {/* Fuentes reales que usó la IA (búsqueda con Google, ver la
+                Cloud Function) — chips chicos con link, separados del
+                texto de la respuesta para que no se confundan con algo
+                que la IA escribió por su cuenta. */}
+            {m.sources && m.sources.length > 0 && (
+              <div className="mt-1.5 flex flex-wrap gap-1.5 max-w-[85%]">
+                {m.sources.map((s, j) => (
+                  <a key={j} href={s.uri} target="_blank" rel="noreferrer" className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800/60 border border-slate-700/50 text-[10px] text-slate-400 hover:text-teal-300 hover:border-teal-500/40 transition truncate max-w-[170px]">
+                    <Link2 size={9} className="shrink-0" />{s.title || "Fuente"}
+                  </a>
+                ))}
+              </div>
+            )}
             {m.plan && m.planStatus === "pending" && (
               <div className="mt-2 bg-slate-900/70 border border-teal-500/25 rounded-2xl p-3.5 max-w-[85%] bounce-in">
                 <p className="text-sm font-bold text-white mb-2.5">{m.plan.title}</p>
@@ -5619,25 +5676,44 @@ Datos: ${JSON.stringify(context)}`;
         <div ref={bottomRef} />
       </div>
 
-      {/* Input fijo de verdad, anclado al fondo de la pantalla. */}
-      <div className="fixed bottom-20 lg:bottom-6 left-0 right-0 z-10 px-4 lg:pl-56">
-        <div className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto">
-          <div className="flex items-center gap-2 bg-slate-900/90 border border-slate-800/60 rounded-2xl p-1.5 backdrop-blur-xl shadow-lg shadow-black/30">
-            <input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") handleSend(); }}
-              placeholder="Preguntale algo a tu entrenador..."
-              className="flex-1 bg-transparent px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none min-w-0"
-              disabled={isSending}
-            />
-            <button onClick={handleSend} disabled={!input.trim() || isSending} aria-label="Enviar" className="p-2.5 rounded-xl text-white shrink-0 disabled:opacity-40 transition-all active:scale-95" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>
-              <Send size={16} />
-            </button>
+      {/* El input fijo va por un portal, afuera del árbol normal del
+          componente, a propósito: el contenedor de cada pestaña (en
+          App()) tiene la animación "tab-fade-in", que anima un
+          translateY — y cualquier ancestro con una transformación activa
+          (aunque sea por una animación CSS) pasa a ser, mientras dura, el
+          punto de referencia de TODO lo que esté "fixed" adentro suyo, en
+          vez del viewport real. Por eso el input aparecía arriba un
+          instante y recién se acomodaba abajo cuando la animación
+          terminaba (a los 250ms) y el navegador volvía a calcular su
+          posición contra la pantalla real. Renderizándolo directo en
+          document.body, queda totalmente afuera de esa animación, así que
+          desde el primer frame está exactamente donde tiene que estar. */}
+      {typeof document !== "undefined" && createPortal(
+        <div className="fixed bottom-20 lg:bottom-6 left-0 right-0 z-10 px-4 lg:pl-56">
+          <div className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto">
+            <div className="flex items-center gap-2 bg-slate-900/90 border border-slate-800/60 rounded-2xl p-1.5 backdrop-blur-xl shadow-lg shadow-black/30">
+              {SpeechRecognitionAPI && (
+                <button onClick={handleMicToggle} aria-label={isListening ? "Detener grabación" : "Hablar"} className={`p-2.5 rounded-xl shrink-0 transition-all active:scale-95 ${isListening ? "bg-rose-500 !text-white animate-pulse" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>
+                  <Mic size={16} />
+                </button>
+              )}
+              <input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") handleSend(); }}
+                placeholder={isListening ? "Escuchando..." : "Preguntale algo a tu entrenador..."}
+                className="flex-1 bg-transparent px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none min-w-0"
+                disabled={isSending}
+              />
+              <button onClick={handleSend} disabled={!input.trim() || isSending} aria-label="Enviar" className="p-2.5 rounded-xl text-white shrink-0 disabled:opacity-40 transition-all active:scale-95" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>
+                <Send size={16} />
+              </button>
+            </div>
+            <p className="text-[9px] text-slate-700 text-center mt-1.5">Puede cometer errores — no reemplaza el consejo de un profesional de la salud.</p>
           </div>
-          <p className="text-[9px] text-slate-700 text-center mt-1.5">Puede cometer errores — no reemplaza el consejo de un profesional de la salud.</p>
-        </div>
-      </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }
@@ -5650,14 +5726,6 @@ function ImportRoutineModal({ onImport, onClose }) {
   const [notice, setNotice] = useState("");
   const [loadingFile, setLoadingFile] = useState(false);
   const [isParsingAI, setIsParsingAI] = useState(false);
-  const [geminiKey, setGeminiKey] = useState("");
-
-  // Se trae la clave de Remote Config apenas se abre el modal, no recién
-  // al tocar "Detectar con IA" — así, si tarda un poquito, ya está lista
-  // para cuando la persona la necesite.
-  useEffect(() => {
-    getGeminiKey().then(setGeminiKey).catch((err) => console.error("Error al obtener la clave de Gemini:", err));
-  }, []);
 
   const handleFile = async (file) => {
     if (!file) return;
@@ -5693,30 +5761,15 @@ function ImportRoutineModal({ onImport, onClose }) {
   // Detección con IA: en vez de patrones de texto, le pide a un modelo de
   // lenguaje que entienda la rutina y devuelva días/ejercicios en JSON —
   // útil para formatos más libres que el detector de patrones no capta.
-  // La clave sale de Remote Config (ver getGeminiKey, arriba del todo del
-  // archivo) — léase ahí la aclaración sobre qué tan "secreta" es de
-  // verdad antes de depender de esto para algo sensible.
+  // El pedido a Gemini lo hace la Cloud Function "detectarRutinaIA" (ver
+  // functions/index.js) — la clave real nunca llega al navegador.
   const handleProcessAI = async () => {
     setIsParsingAI(true);
     setNotice("");
     try {
-      const apiKey = geminiKey || (await getGeminiKey());
-      if (!apiKey) throw new Error("falta configurar GEMINI_API_KEY en Remote Config");
-      const prompt = `Extraé la rutina de entrenamiento del siguiente texto y devolvé ÚNICAMENTE un array JSON con esta estructura exacta, sin texto adicional y SIN bloques de código markdown (nada de \`\`\`):
-[{"label": "Día 1", "exercises": [{"name": "Press Banca", "setsCount": 3, "repRange": "8-10"}]}]
-
-Texto:
-"""
-${text}
-"""`;
-      const response = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=" + apiKey, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
-      });
-      if (!response.ok) throw new Error(`request failed with status ${response.status}`);
-      const data = await response.json();
-      const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      const callDetectarRutinaIA = httpsCallable(functions, "detectarRutinaIA");
+      const { data: result } = await callDetectarRutinaIA({ text });
+      const rawText = result?.text;
       if (!rawText) throw new Error("respuesta vacía");
       const cleaned = rawText.replace(/```json|```/g, "").trim();
       const days = JSON.parse(cleaned);
@@ -5779,7 +5832,7 @@ ${text}
         <button onClick={handleProcessAI} disabled={!text.trim() || loadingFile || isParsingAI} className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition text-sm font-semibold mt-2 disabled:opacity-50">
           {isParsingAI ? <><RotateCcw size={14} className="animate-spin" /> Analizando rutina con Inteligencia Artificial...</> : <><Sparkles size={14} /> Detectar con IA</>}
         </button>
-        <p className="text-[10px] text-slate-600 mt-2 text-center">"Detectar con IA" necesita el parámetro "GEMINI_API_KEY" configurado en Firebase → Remote Config — si todavía no lo armaste, usá "Detectar rutina" de arriba.</p>
+        <p className="text-[10px] text-slate-600 mt-2 text-center">"Detectar con IA" necesita estar conectado a internet y haber iniciado sesión — si falla, usá "Detectar rutina" de arriba.</p>
       </div>
     </div>
   );
