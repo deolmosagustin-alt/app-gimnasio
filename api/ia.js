@@ -1,4 +1,4 @@
-const MODEL = "gemini-1.5-flash";
+const MODEL = "gemini-flash-latest";
 
 async function callGemini(body) {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -26,7 +26,7 @@ async function callGemini(body) {
 }
 
 module.exports = async function handler(req, res) {
-  // Configuración de CORS por si Vercel bloquea la petición
+  // Configuración de CORS
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
