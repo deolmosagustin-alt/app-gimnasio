@@ -1,19 +1,10 @@
-/**
- * api/ia.js — función serverless de Vercel
- *
- * Por qué este archivo existe en vez de llamar a Gemini directo desde el
- * navegador: la clave vive en una VARIABLE DE ENTORNO del servidor
- * (GEMINI_API_KEY), no en el código ni en Remote Config — el navegador
- * nunca la ve, sólo este archivo, que corre en el servidor de Vercel.
- */
-
 const MODEL = "gemini-1.5-flash";
 
 async function callGemini(body) {
   const apiKey = process.env.GEMINI_API_KEY;
   
   if (!apiKey) {
-    throw new Error("Falta configurar GEMINI_API_KEY en las variables de entorno de Vercel.");
+    throw new Error("Falta configurar GEMINI_API_KEY en las variables de Vercel.");
   }
   
   const response = await fetch(
@@ -34,30 +25,31 @@ async function callGemini(body) {
   return response.json();
 }
 
-export default async function handler(req, res) {
-  // Sólo permitimos peticiones POST
+module.exports = async function handler(req, res) {
+  // Configuración de CORS por si Vercel bloquea la petición
+  res.setHeader('Access-Control-Allow-Credentials', true);
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+  res.setHeader('Access-Control-Allow-Headers', 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version');
+
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+
   if (req.method !== "POST") {
     res.status(405).json({ error: "Sólo se acepta POST." });
     return;
   }
 
   let body = req.body;
-  
-  // En algunos entornos de Vercel el body ya llega parseado;
-  // en otros llega como string crudo. Esto cubre los dos casos.
   if (typeof body === "string") {
-    try { 
-      body = JSON.parse(body); 
-    } catch { 
-      body = {}; 
-    }
+    try { body = JSON.parse(body); } catch { body = {}; }
   }
   body = body || {};
 
   try {
-    // ---------------------------------------------------------
     // ACCIÓN 1: CHAT DEL ENTRENADOR IA
-    // ---------------------------------------------------------
     if (body.action === "chat") {
       const { systemPrompt, history } = body;
       
@@ -66,12 +58,6 @@ export default async function handler(req, res) {
         return;
       }
       
-      // Tope de tamaño por seguridad
-      if (systemPrompt.length > 60000 || JSON.stringify(history).length > 60000) {
-        res.status(400).json({ error: "El mensaje es demasiado largo." });
-        return;
-      }
-
       const data = await callGemini({
         systemInstruction: { parts: [{ text: systemPrompt }] },
         contents: history,
@@ -84,7 +70,6 @@ export default async function handler(req, res) {
       
       const seen = new Set();
       const sources = [];
-      
       chunks.forEach((c) => {
         const uri = c?.web?.uri;
         if (!uri || seen.has(uri)) return;
@@ -96,44 +81,25 @@ export default async function handler(req, res) {
       return;
     }
 
-    // ---------------------------------------------------------
-    // ACCIÓN 2: DETECTAR RUTINA IMPORTADA
-    // ---------------------------------------------------------
+    // ACCIÓN 2: DETECTAR RUTINA
     if (body.action === "detect") {
       const { text } = body;
-      
       if (typeof text !== "string" || !text.trim()) {
         res.status(400).json({ error: "Falta el texto de la rutina." });
         return;
       }
       
-      if (text.length > 30000) {
-        res.status(400).json({ error: "El texto es demasiado largo." });
-        return;
-      }
+      const prompt = `Extraé la rutina de entrenamiento del siguiente texto y devolvé ÚNICAMENTE un array JSON con esta estructura exacta, sin texto adicional y SIN bloques de código markdown (nada de \`\`\`):\n[{"label": "Día 1", "exercises": [{"name": "Press Banca", "setsCount": 3, "repRange": "8-10"}]}]\n\nTexto:\n"""\n${text}\n"""`;
       
-      const prompt = `Extraé la rutina de entrenamiento del siguiente texto y devolvé ÚNICAMENTE un array JSON con esta estructura exacta, sin texto adicional y SIN bloques de código markdown (nada de \`\`\`):
-[{"label": "Día 1", "exercises": [{"name": "Press Banca", "setsCount": 3, "repRange": "8-10"}]}]
-
-Texto:
-"""
-${text}
-"""`;
-      
-      const data = await callGemini({ 
-        contents: [{ parts: [{ text: prompt }] }] 
-      });
-      
+      const data = await callGemini({ contents: [{ parts: [{ text: prompt }] }] });
       const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
       res.status(200).json({ text: rawText });
       return;
     }
 
-    // Si la acción no es "chat" ni "detect"
     res.status(400).json({ error: "Acción no reconocida." });
-    
   } catch (err) {
     console.error("Error en /api/ia:", err);
-    res.status(500).json({ error: "Error interno del servidor." });
+    res.status(500).json({ error: err.message || "Error interno del servidor." });
   }
-}
+};
