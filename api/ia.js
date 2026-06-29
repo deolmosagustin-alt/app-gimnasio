@@ -63,15 +63,20 @@ export default async function handler(req, res) {
         return;
       }
 
-      // tools: google_search — el modelo decide buscar en la web cuando
-      // una pregunta se beneficia de eso (no en cada mensaje, sólo cuando
-      // le conviene a la respuesta). groundingMetadata.groundingChunks
-      // trae las fuentes reales usadas — esto es lo que alimenta los
-      // links clicables debajo de la respuesta en el chat.
+      // tools: google_search queda comentado MIENTRAS DIAGNOSTICAMOS el
+      // 429 — la búsqueda con Google puede necesitar que el proyecto de
+      // Google Cloud tenga facturación habilitada para funcionar (incluso
+      // si el uso real entra dentro de lo gratis), y si no la tenés
+      // habilitada, esto puede ser justamente lo que está disparando el
+      // error. Sin esto, el chat sigue funcionando igual — sólo deja de
+      // poder citar fuentes con link. Si funciona así, confirmamos que
+      // era esto; si seguís recibiendo 429 incluso sin esto, es un límite
+      // normal de pedidos por minuto del nivel gratis (15 por minuto),
+      // que se soluciona esperando un poco entre mensajes.
       const data = await callGemini({
         systemInstruction: { parts: [{ text: systemPrompt }] },
         contents: history,
-        tools: [{ google_search: {} }],
+        // tools: [{ google_search: {} }],
       });
       const candidate = data?.candidates?.[0];
       const text = candidate?.content?.parts?.[0]?.text || "";
