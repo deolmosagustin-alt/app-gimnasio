@@ -2399,7 +2399,7 @@ const HELP_CHAPTERS = [
       {
         icon: <ArrowDown size={20} />,
         title: "Cargas sugeridas en la descarga",
-        text: "Ahí dentro, elegí el día arriba y vas a ver, ejercicio por ejercicio, tu mejor marca tachada y al lado el peso sugerido para esta semana — un porcentaje de tu récord, con menos series.",
+        text: "Ahí dentro, elegí el día arriba y vas a ver, ejercicio por ejercicio, tu mejor marca tachada y al lado el peso sugerido para esta semana — un porcentaje de tu récord, con menos series. Cada ejercicio tiene su cronómetro de descanso, y podés tildar cada serie a medida que la hacés.",
         demo: { kind: "descarga", view: "suggested" },
       },
       {
@@ -2597,7 +2597,7 @@ const HELP_CHAPTERS = [
       {
         icon: <Mic size={20} />,
         title: "Hablale en vez de escribir",
-        text: "El ícono del micrófono (si tu navegador lo soporta) te deja dictar la pregunta — se va completando el cuadro de texto a medida que hablás, y la enviás cuando quieras como cualquier mensaje escrito.",
+        text: "El ícono del micrófono (si tu navegador lo soporta) te deja dictar la pregunta — se va completando el cuadro de texto a medida que hablás, sin cortarse solo por una pausa. Cuando termines, tocá el ✓ que aparece en su lugar para confirmar, y enviá el mensaje como cualquier otro.",
       },
       {
         icon: <Link2 size={20} />,
@@ -3427,11 +3427,23 @@ function SessionHistoryView({ logs, onDeleteDay }) {
 /* ============================================================================
    DELOAD VIEW (unchanged from prior redesign)
 ============================================================================ */
-function DeloadView({ logs, settings = DEFAULT_SETTINGS }) {
+function DeloadView({ logs, settings = DEFAULT_SETTINGS, deloadProgress = {}, setDeloadProgress }) {
   const { trainWeeks, deloadWeeks, deloadPct, deloadSetDivisor } = settings;
   const pctLabel = Math.round(deloadPct * 100);
   const [activeDay, setActiveDay] = useState(DAY_ORDER[0]);
   const day = ROUTINE[activeDay];
+  const today = todayStr();
+  // Marcar una serie como hecha hoy (o desmarcarla si ya estaba marcada) —
+  // se guarda con la fecha de hoy, no como simple true/false, para que la
+  // próxima semana de descarga (siete y pico semanas después) empiece
+  // sin nada tildado, sin necesidad de un botón de "reiniciar" aparte.
+  const toggleDeloadDone = (key) => {
+    if (!setDeloadProgress) return;
+    const next = { ...deloadProgress };
+    if (next[key] === today) delete next[key];
+    else next[key] = today;
+    setDeloadProgress(next);
+  };
 
   return (
     <div className="space-y-5">
@@ -3483,6 +3495,7 @@ function DeloadView({ logs, settings = DEFAULT_SETTINGS }) {
           const deloadSets = Math.max(1, Math.ceil(ex.sets.length / deloadSetDivisor));
           const bestPerSet = ex.sets.map((s, i) => { const h = logs[`${ex.id}_${i}`] || []; let best = s.pr ? { ...s.pr } : null; const ov = logs[`${ex.id}_${i}_pr_override`]; if (ov) best = ov; else h.forEach((e) => { if (!best || vol(e.kg, e.reps) > vol(best.kg, best.reps)) best = e; }); return best; });
           const hasPR = bestPerSet.some(Boolean);
+          const hasHeavy = ex.sets.slice(0, deloadSets).some((s) => isHeavyRepRange(s.repRange));
           return (
             <div key={ex.id} className="bg-slate-900/50 border border-slate-800/50 rounded-2xl overflow-hidden backdrop-blur-sm">
               <div className="flex items-center gap-3 px-4 py-3.5 border-b border-slate-800/40">
@@ -3495,12 +3508,22 @@ function DeloadView({ logs, settings = DEFAULT_SETTINGS }) {
                   <p className="text-[10px] text-slate-500 mt-0.5">{ex.sets.length} → <span className="text-purple-400 font-bold">{deloadSets} series</span> en descarga</p>
                 </div>
               </div>
+              {hasPR && (
+                <div className="px-4 pt-3">
+                  <RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent="#A855F7" alertType={settings.alertType} />
+                </div>
+              )}
               <div className="px-4 py-3 space-y-2">
                 {hasPR ? (
                   ex.sets.slice(0, deloadSets).map((s, i) => {
                     const best = bestPerSet[i], deloadKg = best ? Math.round(best.kg * deloadPct * 2) / 2 : null;
+                    const progressKey = `${ex.id}_${i}`;
+                    const done = deloadProgress[progressKey] === today;
                     return (
                       <div key={i} className="flex items-center gap-3">
+                        <button onClick={() => toggleDeloadDone(progressKey)} aria-label={done ? "Marcar como no hecha" : "Marcar serie como hecha"} className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-all active:scale-90 border ${done ? "bg-emerald-500 border-emerald-500" : "border-slate-700 hover:border-slate-500"}`}>
+                          {done && <Check size={13} className="text-white" />}
+                        </button>
                         <span className="text-[10px] font-black text-slate-600 w-5 shrink-0">S{i + 1}</span>
                         <span className="text-[10px] text-slate-600 bg-slate-800/60 rounded-lg px-2 py-1 shrink-0">{s.repRange} reps</span>
                         {best ? (
@@ -3508,7 +3531,7 @@ function DeloadView({ logs, settings = DEFAULT_SETTINGS }) {
                             <span className="text-[11px] text-slate-600 line-through">{best.reps}×{best.kg}kg</span>
                             <div className="flex items-center gap-1">
                               <ArrowDown size={10} className="text-purple-400" />
-                              <span className="text-sm font-black text-purple-300">{best.reps}×{deloadKg}kg</span>
+                              <span className={`text-sm font-black ${done ? "text-emerald-400" : "text-purple-300"}`}>{best.reps}×{deloadKg}kg</span>
                             </div>
                           </div>
                         ) : <span className="text-[11px] text-slate-700 flex-1 text-right">Sin marca</span>}
@@ -5585,7 +5608,13 @@ Datos: ${JSON.stringify(context)}`;
     const recognition = new SpeechRecognitionAPI();
     recognition.lang = "es-AR";
     recognition.interimResults = true;
-    recognition.continuous = false;
+    // Antes esto estaba en false: el navegador cortaba la escucha solo, a
+    // los pocos segundos de detectar una pausa — aunque siguieras
+    // hablando después. Con continuous=true sigue escuchando todo lo que
+    // digas hasta que VOS toques el botón de nuevo para confirmar que
+    // terminaste (ver el ícono de tilde más abajo, en vez del micrófono,
+    // mientras está escuchando).
+    recognition.continuous = true;
     recognition.onresult = (e) => { setInput(Array.from(e.results).map((r) => r[0].transcript).join(" ")); };
     recognition.onerror = () => setIsListening(false);
     recognition.onend = () => setIsListening(false);
@@ -5698,15 +5727,15 @@ Datos: ${JSON.stringify(context)}`;
           <div className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto">
             <div className="flex items-center gap-2 bg-slate-900/90 border border-slate-800/60 rounded-2xl p-1.5 backdrop-blur-xl shadow-lg shadow-black/30">
               {SpeechRecognitionAPI && (
-                <button onClick={handleMicToggle} aria-label={isListening ? "Detener grabación" : "Hablar"} className={`p-2.5 rounded-xl shrink-0 transition-all active:scale-95 ${isListening ? "bg-rose-500 !text-white animate-pulse" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>
-                  <Mic size={16} />
+                <button onClick={handleMicToggle} aria-label={isListening ? "Confirmar — terminé de hablar" : "Hablar"} className={`p-2.5 rounded-xl shrink-0 transition-all active:scale-95 ${isListening ? "bg-emerald-500 !text-white animate-pulse" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>
+                  {isListening ? <Check size={16} /> : <Mic size={16} />}
                 </button>
               )}
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") handleSend(); }}
-                placeholder={isListening ? "Escuchando..." : "Preguntale algo a tu entrenador..."}
+                placeholder={isListening ? "Escuchando... tocá el ✓ cuando termines" : "Preguntale algo a tu entrenador..."}
                 className="flex-1 bg-transparent px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none min-w-0"
                 disabled={isSending}
               />
@@ -6450,6 +6479,11 @@ export default function App() {
   // a cambios de pestaña/día/colapsar tarjetas; sólo se limpian al resetear
   // el día (RoutineView) o al finalizar la sesión (handleEndSession, abajo).
   const setDrafts = useCallback((newDrafts) => { const np = { ...profiles, [activeProfile]: { ...profiles[activeProfile], drafts: newDrafts } }; setProfiles(np); saveProfiles(np); }, [profiles, activeProfile]);
+  // `deloadProgress` marca qué series ya tildaste como hechas en la semana
+  // de descarga — guardado por fecha (no true/false) para que la próxima
+  // semana de descarga, varias semanas después, arranque sin nada
+  // tildado, sin necesitar un botón de reinicio aparte.
+  const setDeloadProgress = useCallback((newProgress) => { const np = { ...profiles, [activeProfile]: { ...profiles[activeProfile], deloadProgress: newProgress } }; setProfiles(np); saveProfiles(np); }, [profiles, activeProfile]);
   const handleLogin = (name, updatedProfiles) => { const profs = updatedProfiles || profiles; setProfiles(profs); setActiveProfile(name); setJustLoggedOut(false); setTab("rutina"); };
   const handleLogout = () => { saveActive(null); setActiveProfile(null); setJustLoggedOut(true); setShowHelp(false); setHelpStartTab(null); };
   // Cierra la sesión de Google en Firebase (signOut) y vuelve a la
@@ -6643,7 +6677,7 @@ export default function App() {
             {tab === "rutinas" && <RoutinesView profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleArchiveRoutine} onRestore={handleRestoreRoutine} />}
             {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} />}
             {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} sex={profile?.sex} age={profile?.age} onGoToDeload={() => setTab("descarga")} />}
-            {tab === "descarga" && <DeloadView logs={logs} settings={getProfileSettings(profile)} />}
+            {tab === "descarga" && <DeloadView logs={logs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} />}
             {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} settings={getProfileSettings(profile)} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} />}
             {tab === "perfil" && <ProfileView profileName={activeProfile} profiles={profiles} logs={logs} onSignOut={handleSignOut} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} />}
           </div>
