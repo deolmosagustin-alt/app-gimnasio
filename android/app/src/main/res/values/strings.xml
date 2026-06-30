@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
     <string name="app_name">Ponos</string>
-    <string name="title_activity_main">Ponos: Rutinas y Registro Gym</string>
+    <string name="title_activity_main">Ponos</string>
     <string name="package_name">com.agustin.ponos</string>
     <string name="custom_url_scheme">com.agustin.ponos</string>
 </resources>
