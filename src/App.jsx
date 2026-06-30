@@ -11,9 +11,9 @@ import {
   Mail, Clock, ChevronRight, Edit3, Info, Plus, Sun, Moon,
   Target, Award, Activity, ArrowDown, HelpCircle, List, LayoutGrid,
   Sparkles, Layers, Video, SlidersHorizontal, ShieldCheck, UserCog,
-  Share2, Download, Link2, Copy, BellOff, Send, Mic, Ruler, Camera, Link, Footprints, Star,
+  Share2, Download, Link2, Copy, BellOff, Send, Mic, Ruler, Camera, Link, Footprints, Star, SquarePlay,
 } from "lucide-react";
-import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signOut } from "firebase/auth";
+import { signInWithPopup, signOut } from "firebase/auth";
 import { Capacitor } from "@capacitor/core";
 import { FirebaseAuthentication } from "@capacitor-firebase/authentication";
 import { doc, setDoc, getDoc } from "firebase/firestore";
@@ -1649,12 +1649,16 @@ function PinInput({ length = 4, onComplete, label = "Ingresá tu PIN", error, on
 // caminos se usó.
 async function googleSignIn() {
   if (Capacitor.isNativePlatform()) {
+    // Con skipNativeAuth: false (configurado en capacitor.config.json), el
+    // plugin YA deja autenticada la sesión de Firebase del lado JS por su
+    // cuenta apenas termina el login nativo — no hace falta (ni conviene)
+    // volver a armar la credencial a mano con signInWithCredential: hacerlo
+    // duplicaba el trabajo que el plugin ya hizo, y era la causa real del
+    // "Error al conectar con Google" que tirabas. `result.user` ya trae
+    // uid/email/displayName listos para usar.
     const result = await FirebaseAuthentication.signInWithGoogle();
-    const idToken = result?.credential?.idToken;
-    if (!idToken) throw new Error("No se recibió el token de Google.");
-    const credential = GoogleAuthProvider.credential(idToken);
-    const userCred = await signInWithCredential(auth, credential);
-    return userCred.user;
+    if (!result?.user) throw new Error("No se recibió el usuario de Google.");
+    return result.user;
   }
   const result = await signInWithPopup(auth, googleProvider);
   return result.user;
@@ -3007,15 +3011,15 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
       <div className="flex items-center gap-2 mb-3">
         {currentPR ? (
           <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl flex-1" style={{ backgroundColor: accent + "1c", border: `1px solid ${accent}40` }}>
-            <Trophy size={16} style={{ color: accent }} className="shrink-0" />
-            <div className="flex-1 min-w-0">
-              <p className="text-[9px] font-bold uppercase tracking-wide" style={{ color: accent + "bb" }}>A superar</p>
-              <p className="text-lg font-black leading-tight" style={{ color: accent }}>
-                {cardio ? <>{currentPR.minutes} min{currentPR.km ? <span className="text-sm"> · {currentPR.km}km</span> : null}</> : <>{currentPR.reps}×{currentPR.kg}<span className="text-sm">kg</span></>}
-              </p>
-            </div>
+            <Trophy size={14} style={{ color: accent }} className="shrink-0" />
+            <p className="flex-1 min-w-0 truncate">
+              <span className="text-[10px] font-bold uppercase tracking-wide mr-1.5" style={{ color: accent + "bb" }}>A superar:</span>
+              <span className="text-base font-black" style={{ color: accent }}>
+                {cardio ? <>{currentPR.minutes} min{currentPR.km ? ` · ${currentPR.km}km` : ""}</> : <>{currentPR.reps}×{currentPR.kg}kg</>}
+              </span>
+            </p>
             {!cardio && (
-              <button onClick={() => { setEditReps(currentPR?.reps ?? ""); setEditKg(currentPR?.kg ?? ""); setEditingPR((e) => !e); }} className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-[10px] font-bold shrink-0 transition active:scale-95" style={{ backgroundColor: accent + "22", color: accent }}>
+              <button onClick={() => { setEditReps(currentPR?.reps ?? ""); setEditKg(currentPR?.kg ?? ""); setEditingPR((e) => !e); }} className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold shrink-0 transition active:scale-95" style={{ backgroundColor: accent + "22", color: accent }}>
                 <Edit3 size={11} /> Editar
               </button>
             )}
@@ -3153,7 +3157,9 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
         {setsToShow.map((s, i) => <SetRow key={i} exerciseId={exercise.id} exerciseName={exercise.name} exerciseMuscle={exercise.muscle} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadKgFactor={settings.deloadPct} deloadMode={deloadMode} resetKey={resetKey} autoShowPrShare={settings.autoShowPrShare ?? true} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={hasActiveSession} cardio={exercise.cardio} />)}
         {exercise.video && (
           <div className="pt-3">
-            <a href={exercise.video} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 py-3 rounded-xl border border-slate-800 text-slate-400 hover:border-slate-600 hover:text-white transition text-sm font-medium">▶ Ver técnica en YouTube</a>
+            <a href={exercise.video} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 py-3 rounded-xl border transition text-sm font-bold active:scale-[0.98]" style={{ borderColor: "#EF444435", backgroundColor: "#EF44440c", color: "#F87171" }}>
+              <SquarePlay size={17} /> Ver técnica en YouTube
+            </a>
           </div>
         )}
       </div>
@@ -3596,6 +3602,14 @@ function SessionHistoryView({ logs, onDeleteDay }) {
   const weeks = useMemo(() => getMonthMatrix(cursor.y, cursor.m), [cursor]);
   const selectedSession = selectedDate ? sessionByDate[selectedDate] : null;
   const handleDeleteDay = (date) => { onDeleteDay?.(date); if (selectedDate === date) setSelectedDate(null); };
+  // Qué días de tu rutina aparecen en el mes que estás mirando — para la
+  // leyenda de abajo del calendario, así el color de cada celda no queda
+  // sin explicación.
+  const monthDayKeys = useMemo(() => {
+    const seen = new Set();
+    weeks.flat().forEach((d) => { if (d && sessionByDate[d]) sessionByDate[d].dayKeys.forEach((dk) => seen.add(dk)); });
+    return Array.from(seen).filter((dk) => ROUTINE[dk]);
+  }, [weeks, sessionByDate]);
 
   if (!sessions.length) {
     return (
@@ -3656,6 +3670,13 @@ function SessionHistoryView({ logs, onDeleteDay }) {
                 );
               })}
             </div>
+            {monthDayKeys.length > 0 && (
+              <div className="flex items-center gap-3 mt-3 pt-3 border-t border-slate-800/50 flex-wrap">
+                {monthDayKeys.map((dk) => (
+                  <span key={dk} className="flex items-center gap-1 text-[9px] text-slate-500"><span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: ROUTINE[dk].color }} /> {ROUTINE[dk].label}</span>
+                ))}
+              </div>
+            )}
           </div>
           {selectedSession ? <SessionDetailCard session={selectedSession} onDelete={handleDeleteDay} /> : <p className="text-center text-[11px] text-slate-600 py-2">Tocá un día con marca para ver el detalle.</p>}
         </div>
@@ -4627,9 +4648,19 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
                   const hasWeight = entry?.weight != null;
                   const hasMeasures = entry && Object.keys(entry.measures).length > 0;
                   const complete = hasPhoto && hasWeight && hasMeasures;
+                  // Mismo tratamiento que el calendario de Historial: el
+                  // fondo de la celda se tiñe con el/los colores de lo que
+                  // cargaste ese día, en vez de quedar todo gris con sólo
+                  // puntitos chicos abajo — de un vistazo se nota más.
+                  const dayColors = [hasPhoto && "#FB7185", hasWeight && "#A855F7", hasMeasures && "#3B82F6"].filter(Boolean);
+                  const bgStyle = dayColors.length > 1
+                    ? { background: `linear-gradient(135deg, ${dayColors.map((c) => c + "38").join(", ")})`, border: `1px solid ${dayColors[0]}55` }
+                    : dayColors.length === 1
+                      ? { backgroundColor: dayColors[0] + "30", border: `1px solid ${dayColors[0]}55` }
+                      : {};
                   return (
-                    <button key={i} onClick={() => entry && setSelectedDate(isSelected ? null : d)} disabled={!entry}
-                      className={`relative aspect-square rounded-lg flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold transition-all ${isSelected ? "ring-2 ring-purple-400" : ""} ${isToday ? "border border-purple-500/50" : ""} ${entry ? "bg-slate-800/70 text-slate-200 hover:bg-slate-700/80 active:scale-95" : "text-slate-700"}`}>
+                    <button key={i} onClick={() => entry && setSelectedDate(isSelected ? null : d)} disabled={!entry} style={bgStyle}
+                      className={`relative aspect-square rounded-lg flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold transition-all ${isSelected ? "ring-2 ring-purple-400" : ""} ${isToday && !entry ? "border border-purple-500/50" : ""} ${entry ? "text-white hover:brightness-125 active:scale-95" : "text-slate-700"}`}>
                       {complete && <Star size={9} className="absolute -top-1 -right-1 text-amber-400 fill-amber-400" />}
                       {dayNum}
                       {entry && (
@@ -5583,16 +5614,26 @@ function BuilderExerciseRow({ ex, canMoveUp, canMoveDown, onMove, onRemove, onCo
   );
 }
 
-function BuilderDayCard({ day, dayIdx, totalDays, onRename, onRemove, onMoveDay, onAddExercise, onAddCustomExercise, onRemoveExercise, onMoveExercise, onConfigExercise, onToggleSuperset }) {
+function BuilderDayCard({ day, dayIdx, totalDays, onRename, onRemove, onMoveDay, onChangeColor, onAddExercise, onAddCustomExercise, onRemoveExercise, onMoveExercise, onConfigExercise, onToggleSuperset }) {
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [colorPickerOpen, setColorPickerOpen] = useState(false);
   const existingIds = day.exercises.map((e) => e.id);
   const totalSets = day.exercises.reduce((a, e) => a + (e.sets?.length || 0), 0);
   return (
     <div className="rounded-2xl p-3.5" style={{ backgroundColor: day.color + "0d", border: `1px solid ${day.color}35` }}>
       <div className="flex items-center gap-2 mb-1">
-        <div className="w-7 h-7 rounded-xl flex items-center justify-center text-[11px] font-black shrink-0" style={{ backgroundColor: day.color + "25", color: day.color }}>{dayIdx + 1}</div>
-        <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Nombre del día — tocá para cambiarlo</p>
+        <button onClick={() => setColorPickerOpen((o) => !o)} aria-label="Cambiar color del día" className="w-7 h-7 rounded-xl flex items-center justify-center text-[11px] font-black shrink-0 transition active:scale-90 ring-1 ring-inset ring-white/10" style={{ backgroundColor: day.color + "25", color: day.color }}>{dayIdx + 1}</button>
+        <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Nombre del día — tocá el número para cambiar el color</p>
       </div>
+      {colorPickerOpen && (
+        <div className="flex gap-1.5 flex-wrap mb-2.5 ml-9 bounce-in">
+          {BUILDER_COLOR_PALETTE.map((c) => (
+            <button key={c} onClick={() => { onChangeColor(c); setColorPickerOpen(false); }} aria-label={`Color ${c}`} className="w-7 h-7 rounded-lg shrink-0 transition active:scale-90 flex items-center justify-center" style={{ backgroundColor: c }}>
+              {c === day.color && <Check size={14} className="text-white" />}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="flex items-center gap-2 mb-3 ml-9">
         <div className="flex flex-col -my-1 shrink-0">
           <button onClick={() => onMoveDay(-1)} disabled={dayIdx === 0} className="p-0.5 text-slate-600 hover:text-slate-300 disabled:opacity-20"><ChevronUp size={13} /></button>
@@ -6463,6 +6504,13 @@ function RoutineBuilder({ initialRoutine, onCancel, onSave }) {
   };
   const moveDay = (idx, delta) => setDays((d) => { const j = idx + delta; if (j < 0 || j >= d.length) return d; const n = [...d]; [n[idx], n[j]] = [n[j], n[idx]]; return n; });
   const renameDay = (idx, label) => setDays((d) => d.map((day, i) => (i === idx ? { ...day, label } : day)));
+  // Cambiar el color de un día NUNCA toca `logs` — el color sólo vive
+  // adentro de la rutina (day.color), separado por completo del historial
+  // de marcas (que se guarda por id de ejercicio + número de serie, sin
+  // importar nada de la rutina). Por eso cambiar colores, renombrar días,
+  // o reordenar ejercicios nunca borra ni "resetea" tus récords — eso
+  // sigue intacto pase lo que pase acá.
+  const changeDayColor = (idx, color) => setDays((d) => d.map((day, i) => (i === idx ? { ...day, color } : day)));
   const updateScheduleDay = (wk, dayKeyOrNull) => setSchedule((prev) => ({ ...prev, [wk]: dayKeyOrNull }));
 
   const addExercise = (dayIdx, libEx) => setDays((d) => d.map((day, i) => {
@@ -6525,7 +6573,7 @@ function RoutineBuilder({ initialRoutine, onCancel, onSave }) {
       <div className="space-y-3">
         {days.map((day, idx) => (
           <BuilderDayCard key={day.key} day={day} dayIdx={idx} totalDays={days.length}
-            onRename={(label) => renameDay(idx, label)} onRemove={() => removeDay(idx)} onMoveDay={(delta) => moveDay(idx, delta)}
+            onRename={(label) => renameDay(idx, label)} onRemove={() => removeDay(idx)} onMoveDay={(delta) => moveDay(idx, delta)} onChangeColor={(color) => changeDayColor(idx, color)}
             onAddExercise={(libEx) => addExercise(idx, libEx)} onAddCustomExercise={(rawName) => addCustomExercise(idx, rawName)}
             onRemoveExercise={(exIdx) => removeExercise(idx, exIdx)} onMoveExercise={(exIdx, delta) => moveExercise(idx, exIdx, delta)}
             onConfigExercise={(exIdx, cfg) => configExercise(idx, exIdx, cfg)} onToggleSuperset={(exIdx) => toggleSuperset(idx, exIdx)} />
