@@ -1,0 +1,8 @@
+{
+  "appId": "com.agustin.ponos",
+  "appName": "Ponos: Rutinas y Registro Gym",
+  "webDir": "dist",
+  "server": {
+    "url": "https://app-gimnasio-two.vercel.app"
+  }
+}
