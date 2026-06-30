@@ -13,7 +13,9 @@ import {
   Sparkles, Layers, Video, SlidersHorizontal, ShieldCheck, UserCog,
   Share2, Download, Link2, Copy, BellOff, Send, Mic, Ruler, Camera, Link, Footprints, Star,
 } from "lucide-react";
-import { signInWithPopup, signOut } from "firebase/auth";
+import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signOut } from "firebase/auth";
+import { Capacitor } from "@capacitor/core";
+import { FirebaseAuthentication } from "@capacitor-firebase/authentication";
 import { doc, setDoc, getDoc } from "firebase/firestore";
 import Model from "react-body-highlighter";
 import { auth, googleProvider, db, app } from "./firebase";
@@ -1632,6 +1634,32 @@ function PinInput({ length = 4, onComplete, label = "Ingresá tu PIN", error, on
    explícito para evitar ese rebote — en una carga nueva de la página vuelve
    a ser true por defecto, así que el auto-login normal sigue funcionando.
 ============================================================================ */
+// Login con Google: en el navegador (claude.ai/Vercel) usa el popup de
+// siempre — funciona perfecto ahí. Pero adentro de la app empaquetada con
+// Capacitor, ese popup corre dentro de un WebView, y Google BLOQUEA a
+// propósito el login desde WebViews embebidos (política de seguridad
+// "disallowed_useragent" — no es un bug nuestro, es Google evitando que
+// apps maliciosas se hagan pasar por el login real). Por eso, cuando la
+// app corre nativa (Capacitor.isNativePlatform() === true), usamos en
+// cambio el selector de cuenta NATIVO de Android (el mismo que usás para
+// Gmail o Play Store) vía @capacitor-firebase/authentication, y con el
+// token que devuelve armamos las credenciales para Firebase Auth — el
+// resultado final (`user`) es el mismo objeto en los dos casos, así que
+// todo el código que viene después no necesita saber cuál de los dos
+// caminos se usó.
+async function googleSignIn() {
+  if (Capacitor.isNativePlatform()) {
+    const result = await FirebaseAuthentication.signInWithGoogle();
+    const idToken = result?.credential?.idToken;
+    if (!idToken) throw new Error("No se recibió el token de Google.");
+    const credential = GoogleAuthProvider.credential(idToken);
+    const userCred = await signInWithCredential(auth, credential);
+    return userCred.user;
+  }
+  const result = await signInWithPopup(auth, googleProvider);
+  return result.user;
+}
+
 function LoginScreen({ onLogin, allowAutoLogin = true }) {
   const [profiles, setProfilesState] = useState(loadProfiles);
   const [phase, setPhase] = useState("list");
@@ -1704,9 +1732,8 @@ function LoginScreen({ onLogin, allowAutoLogin = true }) {
   // --- FUNCIÓN PARA INICIAR SESIÓN CON GOOGLE ---
   const handleGoogleLogin = async () => {
     try {
-      // 1. Abre la ventana de Google
-      const result = await signInWithPopup(auth, googleProvider);
-      const user = result.user;
+      // 1. Abre el selector de cuenta de Google (popup en navegador, nativo en la app)
+      const user = await googleSignIn();
 
       // 2. Extrae los datos de la cuenta de Google
       const name = user.displayName || "Usuario de Google";
@@ -2954,11 +2981,12 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   };
   const savePR = () => { const r = parseFloat(editReps), k = parseFloat(editKg); if (!r || !k || isNaN(r) || isNaN(k)) return; setLogs({ ...logs, [prKey]: { kg: k, reps: r } }); setEditingPR(false); };
   return (
-    <div className="py-3 border-b border-slate-800/50 last:border-0 relative">
+    <div className="relative rounded-xl px-3.5 py-3.5 mb-2.5 last:mb-0" style={{ backgroundColor: accent + "0a", border: `1px solid ${accent}25` }}>
       <PRBurst anchorRef={saveBtnRef} trigger={prBurst} />
+      <div className="absolute left-0 top-2 bottom-2 w-1 rounded-full" style={{ backgroundColor: accent }} />
       <div className="flex items-center justify-between mb-2.5">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">{cardio ? "SESIÓN" : `S${setIndex + 1}`}</span>
+          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">{cardio ? "SESIÓN" : `S${setIndex + 1}`}</span>
           {!cardio && <span className="text-[10px] bg-slate-800/80 text-slate-500 rounded-lg px-2 py-0.5">{setDef.repRange} reps</span>}
           {!cardio && isHeavyRepRange(setDef.repRange) && <span className="text-[10px] bg-amber-500/15 text-amber-400 rounded-lg px-2 py-0.5 font-bold">FUERZA</span>}
         </div>
@@ -2972,6 +3000,34 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
       {feedback?.suggestUp && <div className="mb-2.5 -mt-1 text-[11px] text-teal-400 flex items-center gap-1.5"><TrendingUp size={11} /> Superaste el rango · probá +2.5kg la próxima</div>}
       {feedback?.noSession && <div className="mb-2.5 -mt-1 text-[11px] text-amber-400 flex items-center gap-1.5"><AlertTriangle size={11} /> Tocá "Iniciar sesión" arriba para que este día cuente en tu historial</div>}
       {deloadMode && suggestedKg && <div className="mb-2 text-[11px] text-purple-400 flex items-center gap-1.5"><Zap size={11} /> Descarga: {suggestedKg} kg sugerido ({Math.round(deloadKgFactor * 100)}%)</div>}
+
+      {/* El récord va PRIMERO, grande — es lo que estás tratando de
+          superar en esta serie, así que tiene que verse antes de
+          ponerte a cargar números, no como una nota chica al final. */}
+      <div className="flex items-center gap-2 mb-3">
+        {currentPR ? (
+          <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl flex-1" style={{ backgroundColor: accent + "1c", border: `1px solid ${accent}40` }}>
+            <Trophy size={16} style={{ color: accent }} className="shrink-0" />
+            <div className="flex-1 min-w-0">
+              <p className="text-[9px] font-bold uppercase tracking-wide" style={{ color: accent + "bb" }}>A superar</p>
+              <p className="text-lg font-black leading-tight" style={{ color: accent }}>
+                {cardio ? <>{currentPR.minutes} min{currentPR.km ? <span className="text-sm"> · {currentPR.km}km</span> : null}</> : <>{currentPR.reps}×{currentPR.kg}<span className="text-sm">kg</span></>}
+              </p>
+            </div>
+            {!cardio && (
+              <button onClick={() => { setEditReps(currentPR?.reps ?? ""); setEditKg(currentPR?.kg ?? ""); setEditingPR((e) => !e); }} className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-[10px] font-bold shrink-0 transition active:scale-95" style={{ backgroundColor: accent + "22", color: accent }}>
+                <Edit3 size={11} /> Editar
+              </button>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl flex-1 bg-slate-800/40 border border-slate-700/40">
+            <Target size={15} className="text-slate-600 shrink-0" />
+            <p className="text-xs text-slate-500">Sin marca aún — esta va a ser tu primera</p>
+          </div>
+        )}
+      </div>
+
       {cardio ? (
         <div className="flex items-end gap-2">
           <div className="flex-1"><label className="text-[10px] text-slate-600 font-semibold uppercase tracking-wider mb-1.5 block">Minutos</label><input type="number" inputMode="decimal" placeholder="—" value={minutes} onChange={(e) => updateDraft({ minutes: e.target.value })} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3.5 text-xl font-black text-center text-white focus:outline-none focus:border-teal-500/50 transition" /></div>
@@ -2987,9 +3043,9 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
         </div>
       )}
       {!showRpe ? (
-        <button onClick={() => setShowRpeLocal(true)} className="text-[10px] text-slate-600 hover:text-slate-400 font-semibold mt-2.5 flex items-center gap-1 transition-colors">+ Registrar RPE (esfuerzo)</button>
+        <button onClick={() => setShowRpeLocal(true)} className="w-full flex items-center justify-center gap-1.5 mt-2.5 py-2 rounded-lg border border-dashed border-slate-700 text-slate-500 hover:text-slate-300 hover:border-slate-500 text-[11px] font-bold transition"><Activity size={11} /> Registrar esfuerzo (RPE)</button>
       ) : (
-        <div className="mt-2.5 flex items-center gap-1.5 bounce-in">
+        <div className="mt-2.5 flex items-center gap-1.5 bounce-in bg-slate-900/60 rounded-lg px-2 py-2">
           <span className="text-[10px] text-slate-600 font-semibold w-7 shrink-0">RPE</span>
           {RPE_SCALE.map((rs) => (
             <button key={rs.value} onClick={() => updateDraft({ rpe: rpe === rs.value ? null : rs.value })} title={rs.desc} className="w-7 h-7 rounded-lg text-[11px] font-bold transition-all active:scale-90 shrink-0" style={rpe === rs.value ? { backgroundColor: rpeColor(rs.value), color: "#0a0a0f" } : { backgroundColor: "var(--surface-2)", color: "var(--surface-2-text)" }}>{rs.value}</button>
@@ -2998,29 +3054,6 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           <button onClick={() => { updateDraft({ rpe: null }); setShowRpeLocal(false); }} className="text-slate-600 hover:text-slate-400 ml-auto shrink-0"><X size={12} /></button>
         </div>
       )}
-      <div className="flex items-center justify-between mt-2">
-        <div className="flex items-center gap-2">
-          {cardio ? (
-            currentPR ? (
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg" style={{ backgroundColor: accent + "15", border: `1px solid ${accent}35` }}>
-                <Trophy size={10} style={{ color: accent }} />
-                <span className="text-[11px] font-bold" style={{ color: accent }}>{currentPR.minutes} min{currentPR.km ? ` · ${currentPR.km}km` : ""}</span>
-              </div>
-            ) : <span className="text-[11px] text-slate-700">Sin marca aún</span>
-          ) : (
-            <>
-              {currentPR ? (
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg" style={{ backgroundColor: accent + "15", border: `1px solid ${accent}35` }}>
-                  <Trophy size={10} style={{ color: accent }} />
-                  <span className="text-[11px] font-bold" style={{ color: accent }}>{currentPR.reps}×{currentPR.kg}kg</span>
-                  {override && <Edit3 size={10} className="text-amber-400" />}
-                </div>
-              ) : <span className="text-[11px] text-slate-700">Sin marca aún</span>}
-              <button onClick={() => { setEditReps(currentPR?.reps ?? ""); setEditKg(currentPR?.kg ?? ""); setEditingPR((e) => !e); }} aria-label="Corregir récord" className="p-1 rounded-md text-slate-600 hover:text-teal-400 hover:bg-slate-800/60 transition"><Edit3 size={11} /></button>
-            </>
-          )}
-        </div>
-      </div>
       {editingPR && !cardio && (
         <div className="mt-2 bg-slate-900/80 border border-slate-800 rounded-xl p-3 space-y-2 bounce-in">
           <p className="text-[11px] text-slate-500">Corregir récord:</p>
@@ -3116,6 +3149,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
             )}
           </div>
         )}
+        <p className="text-[9px] font-black uppercase tracking-widest text-slate-600 mb-2 mt-1">{exercise.cardio ? "Registrá tu sesión" : "Tus series"}</p>
         {setsToShow.map((s, i) => <SetRow key={i} exerciseId={exercise.id} exerciseName={exercise.name} exerciseMuscle={exercise.muscle} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadKgFactor={settings.deloadPct} deloadMode={deloadMode} resetKey={resetKey} autoShowPrShare={settings.autoShowPrShare ?? true} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={hasActiveSession} cardio={exercise.cardio} />)}
         {exercise.video && (
           <div className="pt-3">
@@ -3600,11 +3634,24 @@ function SessionHistoryView({ logs, onDeleteDay }) {
                 const isToday = d === todayStr();
                 const isSelected = d === selectedDate;
                 const dayNum = parseInt(d.slice(8, 10), 10);
+                // El color del día entrenado ahora se ve en el FONDO de la
+                // celda (no sólo en puntitos chicos abajo) — así el
+                // calendario de un vistazo te dice qué entrenaste, no sólo
+                // que entrenaste algo. Con más de un día en la misma fecha,
+                // se arma un degradé entre los colores en vez de un sólo
+                // tono — y siguen los puntitos abajo para distinguir cada
+                // uno por separado.
+                const mainColor = s ? ROUTINE[s.dayKeys[0]]?.color : null;
+                const bgStyle = s
+                  ? (s.dayKeys.length > 1
+                    ? { background: `linear-gradient(135deg, ${mainColor}38, ${ROUTINE[s.dayKeys[1]]?.color || mainColor}38)`, border: `1px solid ${mainColor}55` }
+                    : { backgroundColor: mainColor + "30", border: `1px solid ${mainColor}55` })
+                  : {};
                 return (
-                  <button key={i} onClick={() => s && setSelectedDate(isSelected ? null : d)} disabled={!s}
-                    className={`aspect-square rounded-lg flex flex-col items-center justify-center gap-0.5 text-[11px] font-bold transition-all ${isSelected ? "ring-2 ring-teal-400" : ""} ${isToday ? "border border-teal-500/50" : ""} ${s ? "bg-slate-800/70 text-slate-200 hover:bg-slate-700/80 active:scale-95" : "text-slate-700"}`}>
+                  <button key={i} onClick={() => s && setSelectedDate(isSelected ? null : d)} disabled={!s} style={bgStyle}
+                    className={`aspect-square rounded-lg flex flex-col items-center justify-center gap-0.5 text-[11px] font-bold transition-all ${isSelected ? "ring-2 ring-teal-400" : ""} ${isToday && !s ? "border border-teal-500/50" : ""} ${s ? "text-white hover:brightness-125 active:scale-95" : "text-slate-700"}`}>
                     {dayNum}
-                    {s && <div className="flex gap-0.5">{s.dayKeys.slice(0, 3).map((dk) => <span key={dk} className="w-1 h-1 rounded-full" style={{ backgroundColor: ROUTINE[dk].color }} />)}</div>}
+                    {s && <div className="flex gap-0.5">{s.dayKeys.slice(0, 3).map((dk) => <span key={dk} className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: ROUTINE[dk].color }} />)}</div>}
                   </button>
                 );
               })}
@@ -5114,8 +5161,7 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
   const handleLinkGoogle = async () => {
     setGoogleLinkError("");
     try {
-      const result = await signInWithPopup(auth, googleProvider);
-      const user = result.user;
+      const user = await googleSignIn();
       const updatedFields = { googleUid: user.uid, email: user.email || profile?.email };
       onUpdateProfile(updatedFields);
       await syncProfileToCloud(user.uid, { ...profile, ...updatedFields, name: profileName });
@@ -5540,32 +5586,40 @@ function BuilderExerciseRow({ ex, canMoveUp, canMoveDown, onMove, onRemove, onCo
 function BuilderDayCard({ day, dayIdx, totalDays, onRename, onRemove, onMoveDay, onAddExercise, onAddCustomExercise, onRemoveExercise, onMoveExercise, onConfigExercise, onToggleSuperset }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const existingIds = day.exercises.map((e) => e.id);
+  const totalSets = day.exercises.reduce((a, e) => a + (e.sets?.length || 0), 0);
   return (
-    <div className="bg-slate-900/40 border border-slate-800/50 rounded-2xl p-3.5" style={{ borderLeft: `3px solid ${day.color}` }}>
-      <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500 mb-1.5 ml-7">Nombre del día — tocá para cambiarlo</p>
-      <div className="flex items-center gap-2 mb-3">
+    <div className="rounded-2xl p-3.5" style={{ backgroundColor: day.color + "0d", border: `1px solid ${day.color}35` }}>
+      <div className="flex items-center gap-2 mb-1">
+        <div className="w-7 h-7 rounded-xl flex items-center justify-center text-[11px] font-black shrink-0" style={{ backgroundColor: day.color + "25", color: day.color }}>{dayIdx + 1}</div>
+        <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Nombre del día — tocá para cambiarlo</p>
+      </div>
+      <div className="flex items-center gap-2 mb-3 ml-9">
         <div className="flex flex-col -my-1 shrink-0">
           <button onClick={() => onMoveDay(-1)} disabled={dayIdx === 0} className="p-0.5 text-slate-600 hover:text-slate-300 disabled:opacity-20"><ChevronUp size={13} /></button>
           <button onClick={() => onMoveDay(1)} disabled={dayIdx === totalDays - 1} className="p-0.5 text-slate-600 hover:text-slate-300 disabled:opacity-20"><ChevronDown size={13} /></button>
         </div>
         <div className="flex-1 relative min-w-0">
-          <input value={day.label} onChange={(e) => onRename(e.target.value.toUpperCase())} placeholder={`DÍA ${dayIdx + 1}`} className="w-full bg-slate-950/50 border border-slate-700/60 rounded-xl pl-3 pr-8 py-2 text-sm font-black text-white uppercase focus:outline-none focus:border-teal-500/60 transition" />
+          <input value={day.label} onChange={(e) => onRename(e.target.value.toUpperCase())} placeholder={`DÍA ${dayIdx + 1}`} className="w-full bg-slate-950/50 border border-slate-700/60 rounded-xl pl-3 pr-8 py-2 text-sm font-black text-white uppercase focus:outline-none transition" style={{ borderColor: day.color + "30" }} />
           <Edit3 size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
         </div>
+        {day.exercises.length > 0 && (
+          <span className="text-[10px] font-bold px-2 py-1.5 rounded-lg shrink-0" style={{ backgroundColor: day.color + "18", color: day.color }}>{day.exercises.length} ej. · {totalSets} series</span>
+        )}
         {totalDays > 1 && <button onClick={onRemove} className="p-1.5 text-slate-600 hover:text-rose-400 shrink-0"><Trash2 size={14} /></button>}
       </div>
 
       {day.exercises.length === 0 && <p className="text-[11px] text-slate-600 mb-2">Todavía no agregaste ejercicios a este día.</p>}
 
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         {day.exercises.map((ex, i) => (
           <div key={ex.id}>
             <BuilderExerciseRow ex={ex} canMoveUp={i > 0} canMoveDown={i < day.exercises.length - 1}
               onMove={(delta) => onMoveExercise(i, delta)} onRemove={() => onRemoveExercise(i)}
               onConfigChange={(cfg) => onConfigExercise(i, cfg)} />
             {i < day.exercises.length - 1 && (
-              <button onClick={() => onToggleSuperset(i)} className="w-full flex items-center justify-center gap-1.5 py-1.5 text-[10px] font-bold transition" style={ex.supersetNext ? { color: day.color } : { color: "var(--chip-text)" }}>
-                <Link size={11} /> {ex.supersetNext ? "Superserie con el siguiente — tocá para separar" : "Vincular en superserie con el siguiente"}
+              <button onClick={() => onToggleSuperset(i)} className="w-full flex items-center justify-center gap-1.5 my-1 py-2 rounded-lg text-[11px] font-bold transition-all active:scale-[0.98] border"
+                style={ex.supersetNext ? { backgroundColor: day.color + "22", borderColor: day.color + "60", color: day.color } : { backgroundColor: "transparent", borderColor: "var(--chip-border)", color: "var(--chip-text)", borderStyle: "dashed" }}>
+                <Link size={13} /> {ex.supersetNext ? "Superserie activada — tocá para separar" : "+ Vincular en superserie"}
               </button>
             )}
           </div>

@@ -4,5 +4,11 @@
   "webDir": "dist",
   "server": {
     "url": "https://app-gimnasio-two.vercel.app"
+  },
+  "plugins": {
+    "FirebaseAuthentication": {
+      "skipNativeAuth": false,
+      "providers": ["google.com"]
+    }
   }
 }
