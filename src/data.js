@@ -34,6 +34,7 @@ export const MUSCLE_GROUPS = [
   { key: "core", label: "Core / Abdomen", color: "#06B6D4" },
   { key: "espalda_baja", label: "Espalda baja", color: "#2563EB" },
   { key: "pantorrillas", label: "Pantorrillas", color: "#22C55E" },
+  { key: "cardio", label: "Cardio", color: "#FB7185" },
 ];
 export const MUSCLE_GROUP_BY_KEY = {};
 MUSCLE_GROUPS.forEach((g) => { MUSCLE_GROUP_BY_KEY[g.key] = g; });
@@ -230,6 +231,20 @@ export const EXERCISE_LIBRARY = [
   { id: "crunch_lateral", name: "Crunch Lateral", muscle: "Core / oblicuos", group: "core", nota: "Tumbado de costado, flexioná hacia el oblicuo sin tirar del cuello.", videoQuery: "crunch lateral técnica oblicuos" },
   { id: "giros_torso_barra", name: "Giros de Torso con Barra", muscle: "Core / oblicuos", group: "core", nota: "Barra sobre los hombros, girá despacio y controlado — nunca de golpe.", videoQuery: "giros de torso con barra técnica core" },
   { id: "stomach_vacuum", name: "Stomach Vacuum", muscle: "Core (transverso)", group: "core", nota: "Exhalá todo el aire y metiendo el ombligo hacia la columna, sostené unos segundos.", videoQuery: "stomach vacuum técnica transverso abdominal" },
+  // Cardio — a diferencia del resto, no se registran en reps×kg sino en
+  // minutos (y distancia, opcional). `cardio: true` es lo que le avisa a
+  // SetRow que tiene que mostrar esos campos en vez de los de siempre.
+  // rankExcluded porque no tienen una carga comparable para el sistema de
+  // rangos por músculo (igual que pasa con dominadas, planchas, etc.).
+  { id: "cinta_caminar", name: "Cinta — Caminar", muscle: "Cardio", group: "cardio", cardio: true, rankExcluded: true, nota: "Ritmo cómodo, ideal para entrada en calor o cardio de baja intensidad.", videoQuery: "caminar en cinta técnica" },
+  { id: "cinta_correr", name: "Cinta — Correr", muscle: "Cardio", group: "cardio", cardio: true, rankExcluded: true, nota: "Ajustá la inclinación si querés sumar dificultad sin aumentar la velocidad.", videoQuery: "correr en cinta técnica" },
+  { id: "bicicleta_fija", name: "Bicicleta Fija", muscle: "Cardio", group: "cardio", cardio: true, rankExcluded: true, nota: "Ajustá el asiento para que la pierna casi se estire del todo en el pedaleo más bajo.", videoQuery: "bicicleta fija técnica" },
+  { id: "elíptico", name: "Elíptico", muscle: "Cardio", group: "cardio", cardio: true, rankExcluded: true, nota: "Bajo impacto en las articulaciones, buena alternativa a correr.", videoQuery: "elíptico máquina técnica" },
+  { id: "remo_ergometro", name: "Remo (Ergómetro)", muscle: "Cardio", group: "cardio", cardio: true, rankExcluded: true, nota: "La fuerza sale de las piernas primero, después espalda, recién al final los brazos.", videoQuery: "remo ergómetro técnica rowing machine" },
+  { id: "escaladora", name: "Escaladora (StairMaster)", muscle: "Cardio", group: "cardio", cardio: true, rankExcluded: true, nota: "Pasos cortos y constantes rinden mejor que pisotones largos y salteados.", videoQuery: "escaladora stairmaster técnica" },
+  { id: "soga", name: "Soga (Saltar la Cuerda)", muscle: "Cardio", group: "cardio", cardio: true, rankExcluded: true, nota: "Saltos chicos, apoyando la punta del pie, sin necesidad de subir mucho del piso.", videoQuery: "saltar la cuerda técnica" },
+  { id: "bicicleta_aire", name: "Bicicleta de Aire (Assault Bike)", muscle: "Cardio", group: "cardio", cardio: true, rankExcluded: true, nota: "Sube la intensidad sola con el esfuerzo que le metas — ideal para intervalos cortos y duros.", videoQuery: "assault bike air bike técnica" },
+  { id: "caminata_aire_libre", name: "Caminata / Trote al Aire Libre", muscle: "Cardio", group: "cardio", cardio: true, rankExcluded: true, nota: "Sin máquina — registrá el tiempo y, si lo sabés, la distancia recorrida.", videoQuery: "trote al aire libre técnica" },
 ];
 export const EXERCISE_LIBRARY_BY_ID = {};
 EXERCISE_LIBRARY.forEach((e) => { EXERCISE_LIBRARY_BY_ID[e.id] = e; });

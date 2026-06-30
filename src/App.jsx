@@ -11,7 +11,7 @@ import {
   Mail, Clock, ChevronRight, Edit3, Info, Plus, Sun, Moon,
   Target, Award, Activity, ArrowDown, HelpCircle, List, LayoutGrid,
   Sparkles, Layers, Video, SlidersHorizontal, ShieldCheck, UserCog,
-  Share2, Download, Link2, Copy, BellOff, Send, Mic,
+  Share2, Download, Link2, Copy, BellOff, Send, Mic, Ruler, Camera, Link, Footprints, Star,
 } from "lucide-react";
 import { signInWithPopup, signOut } from "firebase/auth";
 import { doc, setDoc, getDoc } from "firebase/firestore";
@@ -204,7 +204,8 @@ function buildRoutineModel(routineDef) {
       const muscle = lib ? lib.muscle : (entry.muscle || "Personalizado");
       const nota = lib ? lib.nota : (entry.nota || null);
       const video = lib ? yt(lib.videoQuery) : null;
-      return { id, name, muscle, nota, video, sets: entry.sets, custom: !lib };
+      const cardio = !!(lib ? lib.cardio : entry.cardio);
+      return { id, name, muscle, nota, video, sets: entry.sets, custom: !lib, cardio, supersetNext: !!entry.supersetNext };
     });
     days[dk] = { ...d, exercises };
     exercises.forEach((ex) => {
@@ -243,6 +244,14 @@ const TRAIN_WEEKS = 7;
 const DELOAD_WEEKS = 1;
 const CYCLE_WEEKS = TRAIN_WEEKS + DELOAD_WEEKS;
 const STAGNATION_DAYS = 21;
+
+// Actualizá esto con tu applicationId real apenas lo tengas (Play Console
+// → tu app → la URL de la ficha, o simplemente
+// com.tu_paquete.elegido) — se usa para el botón "Dejanos una reseña" que
+// aparece al completar el primer ciclo. Mientras la app no esté publicada,
+// el link no encuentra nada — no rompe nada, pero tampoco sirve hasta que
+// lo reemplaces.
+const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.agustin.mirutina";
 
 const DEFAULT_SETTINGS = {
   alertType: "sound", restLong: REST_LONG, restShort: REST_SHORT,
@@ -390,6 +399,25 @@ async function idbGetAll() {
   } catch { return null; }
 }
 
+// Lectura de UNA sola clave — usado por las fotos de progreso. A
+// diferencia de profiles/active/cycleStart (que viven en localStorage Y
+// se espejan en IndexedDB como respaldo), las fotos viven DIRECTO en
+// IndexedDB — localStorage tiene un límite de unos 5MB en total, y unas
+// pocas fotos ya lo agotarían; IndexedDB no tiene ese problema.
+async function idbGet(key) {
+  try {
+    const db = await openIDB();
+    const result = await new Promise((res, rej) => {
+      const tx = db.transaction(IDB_STORE, "readonly");
+      const r = tx.objectStore(IDB_STORE).get(key);
+      r.onsuccess = () => res(r.result ? r.result.value : null);
+      r.onerror = () => rej(r.error);
+    });
+    db.close();
+    return result;
+  } catch { return null; }
+}
+
 // Used once on boot if localStorage looks empty — recupera el último snapshot bueno.
 async function tryRestoreFromIDB() {
   const snap = await idbGetAll();
@@ -503,6 +531,27 @@ function getStagnationInfo(exercise, logs) {
     if (gapDays >= STAGNATION_DAYS) stagnant = true;
   });
   return { stagnant, maxGapDays };
+}
+
+// Calentamiento sugerido: rampa clásica de fuerza (50% → 70% → 85% del
+// peso de trabajo), redondeada de a 2.5kg como el resto de la app. Se
+// basa en el kg más pesado registrado en CUALQUIERA de las series del
+// ejercicio (no en una serie puntual) — es lo más parecido a "tu peso de
+// trabajo de hoy" sin tener que pedirte que lo cargues de antemano.
+const WARMUP_STEPS = [
+  { pct: 0.5, reps: 8 },
+  { pct: 0.7, reps: 5 },
+  { pct: 0.85, reps: 3 },
+];
+function getBestWorkingKg(exercise, logs) {
+  let best = null;
+  exercise.sets.forEach((s, i) => {
+    const key = `${exercise.id}_${i}`;
+    const ov = logs[`${key}_pr_override`];
+    if (ov && (!best || ov.kg > best)) best = ov.kg;
+    (logs[key] || []).forEach((h) => { if (!best || h.kg > best) best = h.kg; });
+  });
+  return best;
 }
 
 function getWeekInfo(cycleStart, settings = DEFAULT_SETTINGS) {
@@ -1003,6 +1052,30 @@ function ShareLinkModal({ title, shareTitle, shareText, shareTarget, onClose }) 
 
 // Reparte texto largo en varias líneas dentro de un ancho máximo — Canvas no
 // hace word-wrap solo. Devuelve cuántas líneas ocupó.
+// Redimensiona y comprime una foto antes de guardarla — una foto de
+// cámara sin tocar puede pesar varios MB; bajada a 1080px de lado más
+// largo y comprimida como JPEG queda en unos cientos de KB sin perder
+// calidad visible para este uso, y eso multiplicado por muchas fotos no
+// agota el espacio disponible.
+function resizeImageFile(file, maxDim = 1080, quality = 0.82) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width, height } = img;
+      if (width > height && width > maxDim) { height = Math.round((height * maxDim) / width); width = maxDim; }
+      else if (height >= width && height > maxDim) { width = Math.round((width * maxDim) / height); height = maxDim; }
+      const canvas = document.createElement("canvas");
+      canvas.width = width; canvas.height = height;
+      canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL("image/jpeg", quality));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("No se pudo leer la imagen")); };
+    img.src = url;
+  });
+}
+
 function wrapCanvasText(ctx, text, x, y, maxWidth, lineHeight) {
   const words = String(text).split(" ");
   let line = "", lines = [];
@@ -2411,7 +2484,7 @@ const HELP_CHAPTERS = [
       {
         icon: <ChevronDown size={20} />,
         title: "Tarjetas de ejercicio",
-        text: "Cada ejercicio es una tarjeta: tocala para desplegarla y ver el cronómetro, sus series, la nota técnica y el video. Si lleva 21+ días sin superar el récord, te avisa que está \"estancado\".",
+        text: "Cada ejercicio es una tarjeta: tocala para desplegarla y ver el cronómetro, sus series, la nota técnica y el video. Tu récord en cada serie se ve en un recuadro con el color del día. Si lleva 21+ días sin superar el récord, te avisa que está \"estancado\".",
         demo: { kind: "rutina", view: "card-closed", caption: "Tocá la tarjeta para desplegarla" },
       },
       {
@@ -2419,6 +2492,11 @@ const HELP_CHAPTERS = [
         title: "Descanso entre series",
         text: "Arriba de las series está el temporizador de descanso: avisa con sonido, vibración o ambos (lo elegís en Perfil) cuándo arrancar la próxima. Si cambiás de app mientras corre, al volver se corrige solo contra la hora real.",
         demo: { kind: "rutina", view: "card-open", caption: "El cronómetro está arriba de las series — probá pausarlo" },
+      },
+      {
+        icon: <Flame size={20} />,
+        title: "Calentamiento sugerido",
+        text: "Si ya tenés una marca en el ejercicio, justo debajo del cronómetro aparece \"Ver calentamiento sugerido\": una rampa de 3 series (50%, 70% y 85% de tu peso actual) para llegar entrado en calor a la serie de trabajo. Es sólo una guía, no se guarda como serie registrada.",
       },
       {
         icon: <Save size={20} />,
@@ -2513,10 +2591,9 @@ const HELP_CHAPTERS = [
         text: "Se resalta completo con un borde blanco, y abajo ves tu rango, tu mejor marca, y cuántos kilos más necesitás (a tus mismas repeticiones) para subir al rango siguiente, nombrado. Cabeza, cuello, articulaciones y alguna zona sin músculo asignado no son tocables. Desde el ícono de compartir mandás una imagen con tus rangos. Más abajo, \"Ver todos los rangos\" despliega la leyenda completa de Bronce a Maestro.",
       },
       {
-        icon: <Dumbbell size={20} />,
-        title: "Volumen por músculo",
-        text: "En \"Músculo\" ves el volumen acumulado histórico por grupo, para detectar si alguno está quedando atrás respecto a los demás.",
-        demo: { kind: "progreso", view: "muscle" },
+        icon: <Ruler size={20} />,
+        title: "Medidas y fotos de progreso",
+        text: "En \"Medidas\" registrás peso, cintura, pecho, brazo y pierna — cada uno con su propio historial, gráfico de evolución, y cuánto hace que no lo actualizás. El peso que cargues ahí es el mismo que usa el rango \"Según tu contexto\". Más abajo podés agregar fotos de progreso — quedan guardadas en este dispositivo, no se suben a ningún lado.",
       },
       {
         icon: <Trash2 size={20} />,
@@ -2557,8 +2634,13 @@ const HELP_CHAPTERS = [
       {
         icon: <Sparkles size={20} />,
         title: "Creá la tuya",
-        text: "Con \"Crear mi propia rutina\" le ponés nombre, armás los días que quieras (con su propio nombre y color), y agregás ejercicios buscando por grupo muscular.",
+        text: "Con \"Crear mi propia rutina\" le ponés nombre, armás los días que quieras (con su propio nombre y color), y agregás ejercicios buscando por grupo muscular — incluido un grupo de Cardio (cinta, bici, remo, soga...), que se registra en minutos en vez de en kg.",
         demo: { kind: "rutinas", view: "builder", caption: "Probá cambiar el nombre del día" },
+      },
+      {
+        icon: <Link size={20} />,
+        title: "Superseries",
+        text: "Debajo de cada ejercicio (salvo el último del día) hay un botón para vincularlo en superserie con el siguiente — se hacen uno después del otro sin descansar entre medio, y comparten un solo cronómetro al terminar la vuelta completa.",
       },
       {
         icon: <Edit3 size={20} />,
@@ -2806,14 +2888,21 @@ function HelpModal({ startTab, onClose }) {
    cambiar de día). Ahora sobreviven a eso — sólo se limpian cuando se
    resetea el día (resetKey) o se finaliza la sesión (ver RoutineView/App).
 ============================================================================ */
-function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, accent, logs, setLogs, drafts = {}, setDrafts, deloadKgFactor = 1, deloadMode = false, resetKey = 0, autoShowPrShare = true, onDisableAutoShowPrShare, hasActiveSession = true }) {
+function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, accent, logs, setLogs, drafts = {}, setDrafts, deloadKgFactor = 1, deloadMode = false, resetKey = 0, autoShowPrShare = true, onDisableAutoShowPrShare, hasActiveSession = true, cardio = false }) {
   const key = `${exerciseId}_${setIndex}`, prKey = `${key}_pr_override`, today = todayStr();
   const history = logs[key] || [], override = logs[prKey];
-  const computedPR = useMemo(() => { let best = setDef.pr ? { ...setDef.pr } : null; history.forEach((h) => { if (!best || vol(h.kg, h.reps) > vol(best.kg, best.reps)) best = { kg: h.kg, reps: h.reps }; }); return best; }, [history, setDef.pr]);
+  // Cardio no tiene una "carga" comparable (no hay kg×reps) — el récord
+  // ahí es, simplemente, la sesión más larga en minutos. La distancia es
+  // un dato extra que se guarda si lo cargás, pero no decide el récord.
+  const computedPR = useMemo(() => {
+    if (cardio) { let best = null; history.forEach((h) => { if (!best || (h.minutes || 0) > (best.minutes || 0)) best = { minutes: h.minutes, km: h.km }; }); return best; }
+    let best = setDef.pr ? { ...setDef.pr } : null; history.forEach((h) => { if (!best || vol(h.kg, h.reps) > vol(best.kg, best.reps)) best = { kg: h.kg, reps: h.reps }; }); return best;
+  }, [history, setDef.pr, cardio]);
   const currentPR = override || computedPR;
-  const suggestedKg = currentPR && deloadMode ? Math.round(currentPR.kg * deloadKgFactor * 2) / 2 : null;
+  const suggestedKg = !cardio && currentPR && deloadMode ? Math.round(currentPR.kg * deloadKgFactor * 2) / 2 : null;
   const draft = drafts[key] || {};
   const reps = draft.reps ?? ""; const kg = draft.kg ?? ""; const rpe = draft.rpe ?? null;
+  const minutes = draft.minutes ?? ""; const km = draft.km ?? "";
   const updateDraft = (patch) => { if (setDrafts) setDrafts({ ...drafts, [key]: { ...draft, ...patch } }); };
   const [feedback, setFeedback] = useState(null);
   const [showRpeLocal, setShowRpeLocal] = useState(false);
@@ -2824,6 +2913,24 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   const saveBtnRef = useRef(null);
   useEffect(() => { setFeedback(null); setSaved(false); setShowRpeLocal(false); }, [resetKey]);
   const handleSave = () => {
+    if (cardio) {
+      const m = parseFloat(minutes), d = km ? parseFloat(km) : null;
+      if (!m || isNaN(m)) { setFeedback({ type: "error", msg: "Completá los minutos." }); return; }
+      const isFirstEver = !currentPR;
+      const prevMin = currentPR?.minutes || 0;
+      const entry = { date: today, minutes: m }; if (d && !isNaN(d)) entry.km = d; if (rpe != null) entry.rpe = rpe;
+      const newHistory = [...history.filter((h) => h.date !== today), entry];
+      let newLogs = { ...logs, [key]: newHistory };
+      const isPR = !isFirstEver && m > prevMin;
+      if (isFirstEver || isPR) newLogs = { ...newLogs, [prKey]: { minutes: m, km: d || null, date: today } };
+      setLogs(newLogs); setSaved(true); setTimeout(() => setSaved(false), 1200);
+      const noSession = !hasActiveSession;
+      if (isFirstEver) { haptic(18); setFeedback({ type: "first", msg: "Primer registro 📝", noSession }); }
+      else if (isPR) { haptic([35, 25, 45]); setPrBurst((n) => n + 1); setFeedback({ type: "pr", msg: "¡Sesión más larga hasta ahora! 🔥", noSession }); }
+      else if (m === prevMin) { haptic(18); setFeedback({ type: "tie", msg: "Igualaste tu marca 💪", noSession }); }
+      else { haptic(18); setFeedback({ type: "down", msg: `-${(((prevMin - m) / prevMin) * 100).toFixed(0)}% vs récord`, noSession }); }
+      return;
+    }
     const r = parseFloat(reps), k = parseFloat(kg);
     if (!r || !k || isNaN(r) || isNaN(k)) { setFeedback({ type: "error", msg: "Completá reps y kg." }); return; }
     // Si no había ninguna marca previa, esto es la PRIMERA vez que se
@@ -2851,26 +2958,34 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
       <PRBurst anchorRef={saveBtnRef} trigger={prBurst} />
       <div className="flex items-center justify-between mb-2.5">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">S{setIndex + 1}</span>
-          <span className="text-[10px] bg-slate-800/80 text-slate-500 rounded-lg px-2 py-0.5">{setDef.repRange} reps</span>
-          {isHeavyRepRange(setDef.repRange) && <span className="text-[10px] bg-amber-500/15 text-amber-400 rounded-lg px-2 py-0.5 font-bold">FUERZA</span>}
+          <span className="text-[10px] font-black uppercase tracking-widest text-slate-600">{cardio ? "SESIÓN" : `S${setIndex + 1}`}</span>
+          {!cardio && <span className="text-[10px] bg-slate-800/80 text-slate-500 rounded-lg px-2 py-0.5">{setDef.repRange} reps</span>}
+          {!cardio && isHeavyRepRange(setDef.repRange) && <span className="text-[10px] bg-amber-500/15 text-amber-400 rounded-lg px-2 py-0.5 font-bold">FUERZA</span>}
         </div>
         {feedback && (
           <span className={`flex items-center gap-1.5 text-xs font-semibold ${feedback.type === "pr" ? "text-emerald-400 pr-pop" : feedback.type === "down" ? "text-rose-400" : feedback.type === "first" ? "text-teal-400" : "text-amber-400"}`}>
             {feedback.msg}
-            {feedback.type === "pr" && <button onClick={() => setShowPRShare(true)} aria-label="Compartir esta marca" className="text-emerald-300 hover:text-emerald-100 active:scale-90 transition"><Share2 size={13} /></button>}
+            {feedback.type === "pr" && !cardio && <button onClick={() => setShowPRShare(true)} aria-label="Compartir esta marca" className="text-emerald-300 hover:text-emerald-100 active:scale-90 transition"><Share2 size={13} /></button>}
           </span>
         )}
       </div>
       {feedback?.suggestUp && <div className="mb-2.5 -mt-1 text-[11px] text-teal-400 flex items-center gap-1.5"><TrendingUp size={11} /> Superaste el rango · probá +2.5kg la próxima</div>}
       {feedback?.noSession && <div className="mb-2.5 -mt-1 text-[11px] text-amber-400 flex items-center gap-1.5"><AlertTriangle size={11} /> Tocá "Iniciar sesión" arriba para que este día cuente en tu historial</div>}
       {deloadMode && suggestedKg && <div className="mb-2 text-[11px] text-purple-400 flex items-center gap-1.5"><Zap size={11} /> Descarga: {suggestedKg} kg sugerido ({Math.round(deloadKgFactor * 100)}%)</div>}
-      <div className="flex items-end gap-2">
-        <div className="flex-1"><label className="text-[10px] text-slate-600 font-semibold uppercase tracking-wider mb-1.5 block">Reps</label><input type="number" inputMode="decimal" placeholder="—" value={reps} onChange={(e) => updateDraft({ reps: e.target.value })} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3.5 text-xl font-black text-center text-white focus:outline-none focus:border-teal-500/50 transition" /></div>
-        <div className="text-slate-700 text-lg pb-3">×</div>
-        <div className="flex-1"><label className="text-[10px] text-slate-600 font-semibold uppercase tracking-wider mb-1.5 block">Kg</label><input type="number" inputMode="decimal" placeholder="—" value={kg} onChange={(e) => updateDraft({ kg: e.target.value })} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3.5 text-xl font-black text-center text-white focus:outline-none focus:border-teal-500/50 transition" /></div>
-        <button ref={saveBtnRef} onClick={handleSave} className={`p-3.5 rounded-xl transition-all active:scale-90 font-bold text-white flex items-center justify-center ${saved ? "bg-emerald-500" : "hover:opacity-90"}`} style={!saved ? { backgroundColor: accent } : {}}>{saved ? <Check size={18} /> : <Save size={18} />}</button>
-      </div>
+      {cardio ? (
+        <div className="flex items-end gap-2">
+          <div className="flex-1"><label className="text-[10px] text-slate-600 font-semibold uppercase tracking-wider mb-1.5 block">Minutos</label><input type="number" inputMode="decimal" placeholder="—" value={minutes} onChange={(e) => updateDraft({ minutes: e.target.value })} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3.5 text-xl font-black text-center text-white focus:outline-none focus:border-teal-500/50 transition" /></div>
+          <div className="flex-1"><label className="text-[10px] text-slate-600 font-semibold uppercase tracking-wider mb-1.5 block">Km <span className="text-slate-700 normal-case">(opc.)</span></label><input type="number" inputMode="decimal" placeholder="—" value={km} onChange={(e) => updateDraft({ km: e.target.value })} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3.5 text-xl font-black text-center text-white focus:outline-none focus:border-teal-500/50 transition" /></div>
+          <button ref={saveBtnRef} onClick={handleSave} className={`p-3.5 rounded-xl transition-all active:scale-90 font-bold text-white flex items-center justify-center ${saved ? "bg-emerald-500" : "hover:opacity-90"}`} style={!saved ? { backgroundColor: accent } : {}}>{saved ? <Check size={18} /> : <Save size={18} />}</button>
+        </div>
+      ) : (
+        <div className="flex items-end gap-2">
+          <div className="flex-1"><label className="text-[10px] text-slate-600 font-semibold uppercase tracking-wider mb-1.5 block">Reps</label><input type="number" inputMode="decimal" placeholder="—" value={reps} onChange={(e) => updateDraft({ reps: e.target.value })} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3.5 text-xl font-black text-center text-white focus:outline-none focus:border-teal-500/50 transition" /></div>
+          <div className="text-slate-700 text-lg pb-3">×</div>
+          <div className="flex-1"><label className="text-[10px] text-slate-600 font-semibold uppercase tracking-wider mb-1.5 block">Kg</label><input type="number" inputMode="decimal" placeholder="—" value={kg} onChange={(e) => updateDraft({ kg: e.target.value })} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3.5 text-xl font-black text-center text-white focus:outline-none focus:border-teal-500/50 transition" /></div>
+          <button ref={saveBtnRef} onClick={handleSave} className={`p-3.5 rounded-xl transition-all active:scale-90 font-bold text-white flex items-center justify-center ${saved ? "bg-emerald-500" : "hover:opacity-90"}`} style={!saved ? { backgroundColor: accent } : {}}>{saved ? <Check size={18} /> : <Save size={18} />}</button>
+        </div>
+      )}
       {!showRpe ? (
         <button onClick={() => setShowRpeLocal(true)} className="text-[10px] text-slate-600 hover:text-slate-400 font-semibold mt-2.5 flex items-center gap-1 transition-colors">+ Registrar RPE (esfuerzo)</button>
       ) : (
@@ -2885,11 +3000,28 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
       )}
       <div className="flex items-center justify-between mt-2">
         <div className="flex items-center gap-2">
-          {currentPR ? <span className="text-[11px] text-slate-600">Récord: <span className="text-slate-300 font-bold">{currentPR.reps}×{currentPR.kg}kg</span>{override && <Edit3 size={10} className="text-amber-500 ml-1 inline -translate-y-px" />}</span> : <span className="text-[11px] text-slate-700">Sin marca aún</span>}
-          <button onClick={() => { setEditReps(currentPR?.reps ?? ""); setEditKg(currentPR?.kg ?? ""); setEditingPR((e) => !e); }} aria-label="Corregir récord" className="p-1 rounded-md text-slate-600 hover:text-teal-400 hover:bg-slate-800/60 transition"><Edit3 size={11} /></button>
+          {cardio ? (
+            currentPR ? (
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg" style={{ backgroundColor: accent + "15", border: `1px solid ${accent}35` }}>
+                <Trophy size={10} style={{ color: accent }} />
+                <span className="text-[11px] font-bold" style={{ color: accent }}>{currentPR.minutes} min{currentPR.km ? ` · ${currentPR.km}km` : ""}</span>
+              </div>
+            ) : <span className="text-[11px] text-slate-700">Sin marca aún</span>
+          ) : (
+            <>
+              {currentPR ? (
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg" style={{ backgroundColor: accent + "15", border: `1px solid ${accent}35` }}>
+                  <Trophy size={10} style={{ color: accent }} />
+                  <span className="text-[11px] font-bold" style={{ color: accent }}>{currentPR.reps}×{currentPR.kg}kg</span>
+                  {override && <Edit3 size={10} className="text-amber-400" />}
+                </div>
+              ) : <span className="text-[11px] text-slate-700">Sin marca aún</span>}
+              <button onClick={() => { setEditReps(currentPR?.reps ?? ""); setEditKg(currentPR?.kg ?? ""); setEditingPR((e) => !e); }} aria-label="Corregir récord" className="p-1 rounded-md text-slate-600 hover:text-teal-400 hover:bg-slate-800/60 transition"><Edit3 size={11} /></button>
+            </>
+          )}
         </div>
       </div>
-      {editingPR && (
+      {editingPR && !cardio && (
         <div className="mt-2 bg-slate-900/80 border border-slate-800 rounded-xl p-3 space-y-2 bounce-in">
           <p className="text-[11px] text-slate-500">Corregir récord:</p>
           <div className="flex flex-wrap gap-2 items-center">
@@ -2903,7 +3035,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           </div>
         </div>
       )}
-      {showPRShare && (
+      {showPRShare && !cardio && (
         <ShareImageModal
           title="Compartí tu marca"
           fileNamePrefix={`pr-${exerciseId}`}
@@ -2922,8 +3054,9 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
 /* ============================================================================
    EXERCISE CARD
 ============================================================================ */
-function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts, deloadSets, deloadMode, resetKey = 0, settings = DEFAULT_SETTINGS, forceOpen = false, onDisableAutoShowPrShare, hasActiveSession = true }) {
+function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts, deloadSets, deloadMode, resetKey = 0, settings = DEFAULT_SETTINGS, forceOpen = false, onDisableAutoShowPrShare, hasActiveSession = true, hideTimer = false }) {
   const [open, setOpen] = useState(false);
+  const [showWarmup, setShowWarmup] = useState(false);
   // forceOpen se usa solo desde las demos del tutorial guiado, para abrir la
   // tarjeta automáticamente cuando el paso explica algo de adentro (reps/kg,
   // RPE, descanso, video). No afecta el comportamiento normal de la app.
@@ -2931,6 +3064,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
   const hasHeavy = exercise.sets.some((s) => isHeavyRepRange(s.repRange));
   const setsToShow = deloadSets ? exercise.sets.slice(0, deloadSets) : exercise.sets;
   const { stagnant } = useMemo(() => getStagnationInfo(exercise, logs), [exercise, logs]);
+  const bestWorkingKg = !exercise.cardio ? getBestWorkingKg(exercise, logs) : null;
   return (
     <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl overflow-hidden backdrop-blur-sm shadow-md shadow-black/20 transition-shadow hover:shadow-lg hover:shadow-black/30">
       <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center justify-between px-4 py-4 hover:bg-slate-800/30 active:bg-slate-800/50 transition text-left">
@@ -2940,6 +3074,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="font-bold text-white text-sm">{exercise.name}</h3>
               <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded-lg font-bold" style={{ backgroundColor: accent + "18", color: accent }}>{exercise.muscle}</span>
+              {exercise.cardio && <span className="text-[10px] bg-rose-400/15 text-rose-300 rounded-lg px-1.5 py-0.5 font-bold flex items-center gap-1"><Footprints size={9} /> CARDIO</span>}
               {deloadMode && <span className="text-[10px] bg-purple-500/15 text-purple-400 rounded-lg px-1.5 py-0.5 font-bold">DESCARGA</span>}
               {!deloadMode && stagnant && <span className="text-[10px] bg-rose-500/15 text-rose-400 rounded-lg px-1.5 py-0.5 font-bold flex items-center gap-1"><AlertTriangle size={9} /> ESTANCADO</span>}
             </div>
@@ -2950,10 +3085,38 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
       </button>
       <div className={open ? "px-4 pb-4 pt-0 tab-fade-in" : "hidden"}>
         {!deloadMode && stagnant && <div className="mb-3 text-[11px] text-rose-400/90 bg-rose-500/5 border border-rose-500/15 rounded-xl px-3 py-2 flex items-start gap-1.5"><Info size={12} className="mt-0.5 shrink-0" /><span>Hace {STAGNATION_DAYS}+ días sin superar el récord. Considerá cambiar reps, descanso o variante.</span></div>}
-        <div className="mb-1">
-          <RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={accent} alertType={settings.alertType} />
-        </div>
-        {setsToShow.map((s, i) => <SetRow key={i} exerciseId={exercise.id} exerciseName={exercise.name} exerciseMuscle={exercise.muscle} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadKgFactor={settings.deloadPct} deloadMode={deloadMode} resetKey={resetKey} autoShowPrShare={settings.autoShowPrShare ?? true} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={hasActiveSession} />)}
+        {!exercise.cardio && !hideTimer && (
+          <div className="mb-1">
+            <RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={accent} alertType={settings.alertType} />
+          </div>
+        )}
+        {!exercise.cardio && !deloadMode && bestWorkingKg != null && (
+          <div className="mb-2">
+            {!showWarmup ? (
+              <button onClick={() => setShowWarmup(true)} className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-dashed text-[11px] font-bold transition" style={{ borderColor: accent + "40", color: accent }}>
+                <Flame size={12} /> Ver calentamiento sugerido
+              </button>
+            ) : (
+              <div className="rounded-xl border p-3 space-y-2 bounce-in" style={{ borderColor: accent + "30", backgroundColor: accent + "0c" }}>
+                <button onClick={() => setShowWarmup(false)} className="w-full flex items-center justify-center gap-1.5" style={{ color: accent }} aria-label="Ocultar calentamiento sugerido">
+                  <Flame size={11} /><span className="text-[10px] font-black uppercase tracking-wider">Calentamiento sugerido</span><ChevronUp size={11} />
+                </button>
+                {WARMUP_STEPS.map((w, i) => {
+                  const wKg = Math.round(bestWorkingKg * w.pct * 2) / 2;
+                  return (
+                    <div key={i} className="flex items-center gap-3">
+                      <span className="text-[10px] font-black w-10 shrink-0" style={{ color: accent }}>{Math.round(w.pct * 100)}%</span>
+                      <span className="text-[11px] text-slate-500 bg-slate-800/60 rounded-lg px-2 py-1 shrink-0">{w.reps} reps</span>
+                      <span className="text-sm font-black flex-1 text-right" style={{ color: accent }}>{wKg}kg</span>
+                    </div>
+                  );
+                })}
+                <p className="text-[9px] text-slate-600 pt-1">Basado en tu mejor marca actual ({bestWorkingKg}kg) — es sólo una guía, no se guarda como serie.</p>
+              </div>
+            )}
+          </div>
+        )}
+        {setsToShow.map((s, i) => <SetRow key={i} exerciseId={exercise.id} exerciseName={exercise.name} exerciseMuscle={exercise.muscle} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadKgFactor={settings.deloadPct} deloadMode={deloadMode} resetKey={resetKey} autoShowPrShare={settings.autoShowPrShare ?? true} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={hasActiveSession} cardio={exercise.cardio} />)}
         {exercise.video && (
           <div className="pt-3">
             <a href={exercise.video} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 py-3 rounded-xl border border-slate-800 text-slate-400 hover:border-slate-600 hover:text-white transition text-sm font-medium">▶ Ver técnica en YouTube</a>
@@ -3068,6 +3231,22 @@ function SessionStartBar({ activeSession, onStart, onCancel, color = "#14B8A6" }
    volver a abrir una tarjeta. Sólo se limpia con "Resetear sesión de hoy"
    (acá abajo) o al finalizar la sesión (ver handleEndSession en App()).
 ============================================================================ */
+// Agrupa ejercicios consecutivos encadenados con supersetNext en un solo
+// "grupo" — un ejercicio con supersetNext:true se hace sin descanso antes
+// del siguiente de la lista, así que comparten un único cronómetro al
+// final del grupo en vez de uno por ejercicio. Un grupo de un solo
+// elemento (el caso normal, sin superserie) se renderiza exactamente
+// igual que antes.
+function groupExercisesIntoSupersets(exercises) {
+  const groups = [];
+  let current = [];
+  exercises.forEach((ex, i) => {
+    current.push(ex);
+    if (!ex.supersetNext || i === exercises.length - 1) { groups.push(current); current = []; }
+  });
+  return groups;
+}
+
 function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, weekSchedule, activeSession, onStartSession, onEndSession, onCancelSession, onDisableAutoShowPrShare }) {
   // El día programado para hoy según el cronograma semanal (lunes a domingo)
   // de la rutina activa. Si hoy es descanso programado (o no hay cronograma
@@ -3160,7 +3339,25 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
       <SessionStartBar activeSession={activeSession} onStart={() => onStartSession(activeDay)} onCancel={onCancelSession} color={day.color} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-        {day.exercises.map((ex) => <ExerciseCard key={ex.id} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadSets={isDeload ? getDeloadSets(ex) : null} deloadMode={isDeload} resetKey={resetKeys[activeDay]} settings={settings} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!activeSession} />)}
+        {groupExercisesIntoSupersets(day.exercises).map((group) => {
+          if (group.length === 1) {
+            const ex = group[0];
+            return <ExerciseCard key={ex.id} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadSets={isDeload ? getDeloadSets(ex) : null} deloadMode={isDeload} resetKey={resetKeys[activeDay]} settings={settings} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!activeSession} />;
+          }
+          // Superserie: varios ejercicios encadenados comparten un solo
+          // cronómetro al final del grupo, en vez de uno por ejercicio —
+          // la idea de la superserie es justamente no descansar entre
+          // ellos, sólo al terminar la vuelta completa.
+          const hasHeavyGroup = group.some((ex) => ex.sets.some((s) => isHeavyRepRange(s.repRange)));
+          return (
+            <div key={group.map((e) => e.id).join("-")} className="rounded-2xl border-2 border-dashed p-2.5 space-y-2.5" style={{ borderColor: day.color + "45" }}>
+              <div className="flex items-center gap-1.5 px-1"><Link size={11} style={{ color: day.color }} /><span className="text-[10px] font-black uppercase tracking-wider" style={{ color: day.color }}>Superserie · {group.length} ejercicios</span></div>
+              {group.map((ex) => <ExerciseCard key={ex.id} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadSets={isDeload ? getDeloadSets(ex) : null} deloadMode={isDeload} resetKey={resetKeys[activeDay]} settings={settings} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!activeSession} hideTimer />)}
+              <div className="px-1"><RestTimer seconds={hasHeavyGroup ? settings.restLong : settings.restShort} accent={day.color} alertType={settings.alertType} /></div>
+              <p className="text-[10px] text-slate-600 px-1">Descansá recién después de completar los {group.length} ejercicios — ese es el cronómetro de arriba.</p>
+            </div>
+          );
+        })}
       </div>
 
       {activeSession && (
@@ -3629,8 +3826,8 @@ function ExerciseChipRow({ exercises, selId, onSelect, activeColor }) {
 const PROGRESS_SECTIONS = [
   { k: "rank", l: "Rango", icon: <Award size={15} />, color: "#3B82F6" },
   { k: "historial", l: "Historial", icon: <Calendar size={15} />, color: "#06B6D4" },
-  { k: "chart", l: "Evolución", icon: <Activity size={15} />, color: "#F59E0B" },
-  { k: "muscle", l: "Músculo", icon: <BarChart3 size={15} />, color: "#A855F7" },
+  { k: "chart", l: "Ejercicios", icon: <Activity size={15} />, color: "#F59E0B" },
+  { k: "medidas", l: "Medidas", icon: <Ruler size={15} />, color: "#A855F7" },
 ];
 
 /* ============================================================================
@@ -4193,7 +4390,134 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
   );
 }
 
-function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_SETTINGS, onResetAll, onDeleteDay, onUpdateSettings, onGoToProfile, sex, age, onGoToDeload }) {
+/* ============================================================================
+   MEDIDAS — reemplaza a la vieja sección "Volumen por músculo". Junta dos
+   cosas relacionadas: medidas corporales con su propio historial y
+   gráfico (mismo lenguaje visual que la Evolución por ejercicio), y fotos
+   de progreso. El peso corporal vive ACÁ ahora (antes se editaba en
+   Perfil) — cada medición nueva de peso también actualiza
+   settings.bodyWeightKg por detrás, así el resto de la app (el rango
+   "Según tu contexto") sigue funcionando sin que haya que tocar nada más.
+============================================================================ */
+const MEASUREMENT_TYPES = [
+  { k: "weight", l: "Peso", unit: "kg" },
+  { k: "waist", l: "Cintura", unit: "cm" },
+  { k: "chest", l: "Pecho", unit: "cm" },
+  { k: "arm", l: "Brazo", unit: "cm" },
+  { k: "leg", l: "Pierna", unit: "cm" },
+];
+
+function getLatestMeasurement(history) {
+  if (!history || !history.length) return null;
+  return history.slice().sort((a, b) => (a.date < b.date ? 1 : -1))[0];
+}
+function daysSince(dateStr) {
+  if (!dateStr) return null;
+  return Math.floor((new Date() - new Date(dateStr + "T00:00:00")) / 86400000);
+}
+
+function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], photosLoading, onAddPhoto, onDeletePhoto }) {
+  const [selType, setSelType] = useState("weight");
+  const [inputVal, setInputVal] = useState("");
+  const [addingPhoto, setAddingPhoto] = useState(false);
+  const selMeta = MEASUREMENT_TYPES.find((t) => t.k === selType);
+  const selHistory = measurements[selType] || [];
+  const latest = getLatestMeasurement(selHistory);
+  const days = latest ? daysSince(latest.date) : null;
+  const chartData = selHistory.slice().sort((a, b) => (a.date < b.date ? -1 : 1)).map((h) => ({ date: h.date.slice(5), val: h.value }));
+
+  const handleAdd = () => {
+    const v = parseFloat(inputVal);
+    if (!v || isNaN(v)) return;
+    onAddMeasurement(selType, v);
+    setInputVal("");
+  };
+
+  const handlePhotoChange = async (file) => {
+    if (!file) return;
+    setAddingPhoto(true);
+    try { await onAddPhoto(file); } finally { setAddingPhoto(false); }
+  };
+
+  return (
+    <div className="relative overflow-hidden rounded-2xl border border-purple-500/20 bg-slate-900/50 backdrop-blur-sm shadow-md shadow-black/20 p-4 space-y-3">
+      <div className="flex items-center gap-2.5">
+        <div className="w-8 h-8 rounded-xl bg-purple-500/15 text-purple-400 flex items-center justify-center shrink-0"><Ruler size={15} /></div>
+        <p className="text-sm font-bold text-white">Tus medidas</p>
+      </div>
+
+      <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
+        {MEASUREMENT_TYPES.map((t) => {
+          const active = t.k === selType;
+          return (
+            <button key={t.k} onClick={() => { setSelType(t.k); setInputVal(""); }} className="px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all active:scale-95 border shrink-0"
+              style={active ? { background: "#A855F7", borderColor: "#A855F7", color: "#fff" } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
+              {t.l}
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="flex items-center gap-2">
+        <input type="number" inputMode="decimal" value={inputVal} onChange={(e) => setInputVal(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }} placeholder={`Nuevo valor (${selMeta.unit})`} className="flex-1 bg-slate-950/60 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-purple-500/50" />
+        <button onClick={handleAdd} disabled={!inputVal.trim()} className="px-4 py-2.5 rounded-xl text-white text-sm font-bold disabled:opacity-40 transition-all active:scale-95" style={{ backgroundColor: "#A855F7" }}>Guardar</button>
+      </div>
+
+      {latest ? (
+        <p className="text-[11px] text-slate-500">Último registro: <span className="text-slate-300 font-bold">{latest.value}{selMeta.unit}</span> · hace {days === 0 ? "hoy" : days === 1 ? "1 día" : `${days} días`}</p>
+      ) : (
+        <p className="text-[11px] text-slate-600">Todavía no registraste {selMeta.l.toLowerCase()}.</p>
+      )}
+
+      {chartData.length >= 2 && (
+        <div className="h-36">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={chartData} margin={{ top: 5, right: 0, left: -25, bottom: 0 }}>
+              <defs>
+                <linearGradient id="gMedidas" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#A855F7" stopOpacity={0.35} /><stop offset="95%" stopColor="#A855F7" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
+              <XAxis dataKey="date" stroke="var(--chart-axis)" fontSize={10} />
+              <YAxis stroke="var(--chart-axis)" fontSize={10} domain={["auto", "auto"]} />
+              <Tooltip content={<CustomTooltip />} />
+              <Area type="monotone" dataKey="val" stroke="#A855F7" fill="url(#gMedidas)" strokeWidth={2.5} dot={{ r: 3, fill: "#A855F7", strokeWidth: 0 }} name={`${selMeta.l} (${selMeta.unit})`} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      <div className="pt-3 border-t border-slate-800/50">
+        <div className="flex items-center justify-between mb-2.5">
+          <p className="text-xs font-bold text-white flex items-center gap-1.5"><Camera size={13} className="text-purple-400" /> Fotos de progreso</p>
+          <label className={`px-2.5 py-1.5 rounded-lg bg-purple-500/15 text-purple-400 text-[11px] font-bold ${addingPhoto ? "opacity-50" : "cursor-pointer"}`}>
+            {addingPhoto ? "Subiendo..." : "+ Agregar"}
+            <input type="file" accept="image/*" capture="environment" className="hidden" disabled={addingPhoto} onChange={(e) => { handlePhotoChange(e.target.files?.[0]); e.target.value = ""; }} />
+          </label>
+        </div>
+        {photosLoading ? (
+          <p className="text-[11px] text-slate-600 text-center py-4">Cargando fotos...</p>
+        ) : photos.length === 0 ? (
+          <p className="text-[11px] text-slate-600 text-center py-4">Todavía no agregaste ninguna foto.</p>
+        ) : (
+          <div className="grid grid-cols-3 gap-2">
+            {photos.map((p) => (
+              <div key={p.id} className="relative aspect-square rounded-xl overflow-hidden border border-slate-800/60">
+                <img src={p.dataUrl} alt={p.date} className="w-full h-full object-cover" />
+                <span className="absolute bottom-1 left-1 text-[8px] font-bold bg-black/60 text-white px-1.5 py-0.5 rounded">{new Date(p.date + "T00:00:00").toLocaleDateString("es-AR", { day: "numeric", month: "short" })}</span>
+                <button onClick={() => onDeletePhoto(p.id)} aria-label="Borrar foto" className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/70 text-white flex items-center justify-center active:scale-90 transition"><X size={11} /></button>
+              </div>
+            ))}
+          </div>
+        )}
+        <p className="text-[9px] text-slate-600 mt-2">Las fotos quedan guardadas en este dispositivo, no se suben a ningún lado.</p>
+      </div>
+    </div>
+  );
+}
+
+function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_SETTINGS, onResetAll, onDeleteDay, onUpdateSettings, onGoToProfile, sex, age, onGoToDeload, measurements, onAddMeasurement, photos, photosLoading, onAddPhoto, onDeletePhoto }) {
   const allExercises = useMemo(() => DAY_ORDER.flatMap((dk) => ROUTINE[dk].exercises.map((e) => ({ id: e.id, name: e.name, day: ROUTINE[dk].label, color: ROUTINE[dk].color, sets: e.sets.length, dayKey: dk }))), []);
 
   const stats = useMemo(() => {
@@ -4204,12 +4528,6 @@ function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_
     while (true) { const d = cursor.toISOString().slice(0, 10); if (dateSet.has(d)) { streak++; cursor.setDate(cursor.getDate() - 1); } else break; }
     return { totalVol: Math.round(totalVol), totalSets, streak, daysTrained: dateSet.size };
   }, [logs, sessions]);
-
-  const muscleVolume = useMemo(() => {
-    const map = {};
-    DAY_ORDER.forEach((dk) => { ROUTINE[dk].exercises.forEach((ex) => { const muscle = ex.muscle.split(" ")[0]; ex.sets.forEach((s, i) => { (logs[`${ex.id}_${i}`] || []).forEach((e) => { map[muscle] = (map[muscle] || 0) + vol(e.kg, e.reps); }); }); }); });
-    return Object.entries(map).map(([name, val]) => ({ name, val: Math.round(val) })).sort((a, b) => b.val - a.val).slice(0, 6);
-  }, [logs]);
 
   const [selId, setSelId] = useState(allExercises[0]?.id);
   const [selSet, setSelSet] = useState(0);
@@ -4339,29 +4657,8 @@ function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_
 
         {activeSection === "rank" && <MuscleRankView logs={logs} settings={settings} onUpdateSettings={onUpdateSettings} onGoToProfile={onGoToProfile} sex={sex} age={age} />}
 
-        {activeSection === "muscle" && (
-          <div className="relative overflow-hidden rounded-2xl border border-purple-500/20 bg-slate-900/50 backdrop-blur-sm shadow-md shadow-black/20 p-4 space-y-3">
-            <div className="flex items-center gap-2.5 mb-1">
-              <div className="w-8 h-8 rounded-xl bg-purple-500/15 text-purple-400 flex items-center justify-center shrink-0"><BarChart3 size={15} /></div>
-              <p className="text-sm font-bold text-white">Volumen acumulado por grupo muscular</p>
-            </div>
-            {muscleVolume.length === 0 ? (
-              <div className="text-center py-10 text-slate-600"><Dumbbell size={28} className="mx-auto mb-2.5 opacity-30" /><p className="text-sm">Sin datos todavía.</p></div>
-            ) : (
-              muscleVolume.map(({ name, val }, i) => {
-                const max = muscleVolume[0].val, pct3 = max ? (val / max) * 100 : 0;
-                const colors = ["#14B8A6", "#3B82F6", "#F97316", "#A855F7", "#F59E0B", "#EC4899"];
-                const color = colors[i % colors.length];
-                return (
-                  <div key={name}>
-                    <div className="flex items-center justify-between mb-1.5"><span className="text-xs font-bold text-slate-300">{name}</span><span className="text-xs font-black tabular-nums" style={{ color }}>{val.toLocaleString("es-AR")}</span></div>
-                    <div className="h-2 bg-slate-800 rounded-full overflow-hidden"><div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct3}%`, backgroundColor: color, boxShadow: `0 0 8px -2px ${color}` }} /></div>
-                  </div>
-                );
-              })
-            )}
-            <p className="text-[10px] text-slate-600 pt-1">Volumen = kg × repeticiones totales históricas</p>
-          </div>
+        {activeSection === "medidas" && (
+          <MeasurementsView measurements={measurements} onAddMeasurement={onAddMeasurement} photos={photos} photosLoading={photosLoading} onAddPhoto={onAddPhoto} onDeletePhoto={onDeletePhoto} />
         )}
 
         {activeSection === "historial" && <SessionHistoryView logs={logs} onDeleteDay={onDeleteDay} />}
@@ -4640,7 +4937,6 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
   const [editMail, setEditMail] = useState(profile?.email || "");
   const [editSex, setEditSex] = useState(profile?.sex || "");
   const [editAge, setEditAge] = useState(profile?.age ? String(profile.age) : "");
-  const [editWeight, setEditWeight] = useState(profile?.settings?.bodyWeightKg ? String(profile.settings.bodyWeightKg) : "");
   const [showCycleSetup, setShowCycleSetup] = useState(false);
   const [googleLinkError, setGoogleLinkError] = useState("");
   const joinDate = profile?.joinedAt ? new Date(profile.joinedAt).toLocaleDateString("es-AR", { day: "numeric", month: "long", year: "numeric" }) : "—";
@@ -4654,16 +4950,15 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
   const activeRoutineDef = resolveRoutineDef(profile?.routines?.[profile?.activeRoutineId], profile?.activeRoutineId);
   const savedRoutineCount = Object.keys(profile?.routines || {}).length;
 
-  // Sexo/edad/peso son datos personales (igual que el email), así que
-  // viven junto al resto del perfil — salvo el peso y el sexo, que por
-  // compatibilidad con cómo ya estaba armado el flujo de Progreso → Rango
-  // (que sólo recibe `settings`, no el perfil completo), se espejan
-  // también ahí. Se guardan los tres juntos en una sola llamada para no
-  // pisarse entre sí.
+  // Sexo/edad son datos personales (igual que el email), así que viven
+  // junto al resto del perfil. El peso corporal se sacó de acá — ahora se
+  // registra con su propio historial en Progreso → Medidas (junto con
+  // cintura, pecho, brazo, pierna), y cada medición nueva de peso
+  // actualiza settings.bodyWeightKg por detrás para que el rango "Según
+  // tu contexto" siga funcionando sin tener que tocar nada más.
   const handleSaveProfile = () => {
     const updates = { email: editMail, sex: editSex || null, age: editAge ? parseInt(editAge, 10) : null };
-    const w = parseFloat(editWeight);
-    updates.settings = { ...settings, bodyWeightKg: w > 0 ? w : 0, sex: editSex || null };
+    updates.settings = { ...settings, sex: editSex || null };
     onUpdateProfile(updates);
     setEditing(false);
   };
@@ -4702,7 +4997,6 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
           { icon: <Mail size={14} />, label: "Email", val: profile?.email || "No configurado" },
           { icon: <UserCog size={14} />, label: "Sexo", val: profile?.sex === "M" ? "Masculino" : profile?.sex === "F" ? "Femenino" : "No configurado" },
           { icon: <Calendar size={14} />, label: "Edad", val: profile?.age ? `${profile.age} años` : "No configurada" },
-          { icon: <Dumbbell size={14} />, label: "Peso corporal", val: settings.bodyWeightKg ? `${settings.bodyWeightKg}kg` : "No configurado" },
           { icon: <Clock size={14} />, label: "Miembro desde", val: joinDate },
         ].map(({ icon, label, val }) => (
           <div key={label} className="flex items-center gap-3 px-4 py-3.5"><span className="text-slate-600">{icon}</span><span className="text-slate-500 text-xs flex-1">{label}</span><span className="text-slate-300 text-xs font-medium text-right">{val}</span></div>
@@ -4724,16 +5018,11 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
             </div>
             <p className="text-[10px] text-slate-600 mt-1.5">Se usa sólo para calibrar mejor el rango por músculo (la fuerza relativa típica varía según esto).</p>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Edad</label>
-              <input type="number" inputMode="numeric" value={editAge} onChange={(e) => setEditAge(e.target.value)} placeholder="Años" className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none" />
-            </div>
-            <div>
-              <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Peso corporal</label>
-              <input type="number" inputMode="decimal" value={editWeight} onChange={(e) => setEditWeight(e.target.value)} placeholder="Kg" className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none" />
-            </div>
+          <div>
+            <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Edad</label>
+            <input type="number" inputMode="numeric" value={editAge} onChange={(e) => setEditAge(e.target.value)} placeholder="Años" className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none" />
           </div>
+          <p className="text-[10px] text-slate-600">Tu peso corporal y otras medidas ahora se registran con su propio historial en Progreso → Medidas.</p>
           <div className="flex gap-2">
             <button onClick={() => setEditing(false)} className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-400 text-sm font-semibold">Cancelar</button>
             <button onClick={handleSaveProfile} className="flex-1 py-3 rounded-xl bg-teal-500 !text-white text-sm font-bold">Guardar</button>
@@ -5069,18 +5358,19 @@ function BuilderExerciseRow({ ex, canMoveUp, canMoveDown, onMove, onRemove, onCo
           <button onClick={() => onMove(-1)} disabled={!canMoveUp} className="p-0.5 text-slate-600 hover:text-slate-300 disabled:opacity-20"><ChevronUp size={13} /></button>
           <button onClick={() => onMove(1)} disabled={!canMoveDown} className="p-0.5 text-slate-600 hover:text-slate-300 disabled:opacity-20"><ChevronDown size={13} /></button>
         </div>
-        <button onClick={() => setEditing((o) => !o)} className="flex-1 min-w-0 text-left">
+        <button onClick={() => !ex.cardio && setEditing((o) => !o)} className="flex-1 min-w-0 text-left">
           <div className="flex items-center gap-1.5 flex-wrap">
             <p className="text-xs font-bold text-white truncate">{ex.name}</p>
-            {heavy && <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-amber-500/15 text-amber-400 shrink-0">FUERZA</span>}
+            {ex.cardio && <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-rose-400/15 text-rose-300 shrink-0 flex items-center gap-0.5"><Footprints size={9} /> CARDIO</span>}
+            {!ex.cardio && heavy && <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-amber-500/15 text-amber-400 shrink-0">FUERZA</span>}
             {!ex.libId && <span className="text-[9px] text-slate-600 shrink-0">propio</span>}
           </div>
-          <p className="text-[10px] text-slate-500">{setsCount} series · {repRange} reps</p>
+          <p className="text-[10px] text-slate-500">{ex.cardio ? "Se registra en minutos, no en series" : `${setsCount} series · ${repRange} reps`}</p>
         </button>
-        <button onClick={() => setEditing((o) => !o)} className="p-1.5 text-slate-500 hover:text-teal-400 shrink-0"><SlidersHorizontal size={14} /></button>
+        {!ex.cardio && <button onClick={() => setEditing((o) => !o)} className="p-1.5 text-slate-500 hover:text-teal-400 shrink-0"><SlidersHorizontal size={14} /></button>}
         <button onClick={onRemove} className="p-1.5 text-slate-600 hover:text-rose-400 shrink-0"><Trash2 size={14} /></button>
       </div>
-      {editing && (
+      {editing && !ex.cardio && (
         <div className="mt-2.5 pt-2.5 border-t border-slate-800/60 space-y-2.5 bounce-in">
           <div>
             <p className="text-[10px] text-slate-500 mb-1.5">Cantidad de series</p>
@@ -5105,7 +5395,7 @@ function BuilderExerciseRow({ ex, canMoveUp, canMoveDown, onMove, onRemove, onCo
   );
 }
 
-function BuilderDayCard({ day, dayIdx, totalDays, onRename, onRemove, onMoveDay, onAddExercise, onAddCustomExercise, onRemoveExercise, onMoveExercise, onConfigExercise }) {
+function BuilderDayCard({ day, dayIdx, totalDays, onRename, onRemove, onMoveDay, onAddExercise, onAddCustomExercise, onRemoveExercise, onMoveExercise, onConfigExercise, onToggleSuperset }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const existingIds = day.exercises.map((e) => e.id);
   return (
@@ -5127,9 +5417,16 @@ function BuilderDayCard({ day, dayIdx, totalDays, onRename, onRemove, onMoveDay,
 
       <div className="space-y-2">
         {day.exercises.map((ex, i) => (
-          <BuilderExerciseRow key={ex.id} ex={ex} canMoveUp={i > 0} canMoveDown={i < day.exercises.length - 1}
-            onMove={(delta) => onMoveExercise(i, delta)} onRemove={() => onRemoveExercise(i)}
-            onConfigChange={(cfg) => onConfigExercise(i, cfg)} />
+          <div key={ex.id}>
+            <BuilderExerciseRow ex={ex} canMoveUp={i > 0} canMoveDown={i < day.exercises.length - 1}
+              onMove={(delta) => onMoveExercise(i, delta)} onRemove={() => onRemoveExercise(i)}
+              onConfigChange={(cfg) => onConfigExercise(i, cfg)} />
+            {i < day.exercises.length - 1 && (
+              <button onClick={() => onToggleSuperset(i)} className="w-full flex items-center justify-center gap-1.5 py-1.5 text-[10px] font-bold transition" style={ex.supersetNext ? { color: day.color } : { color: "var(--chip-text)" }}>
+                <Link size={11} /> {ex.supersetNext ? "Superserie con el siguiente — tocá para separar" : "Vincular en superserie con el siguiente"}
+              </button>
+            )}
+          </div>
         ))}
       </div>
 
@@ -5166,9 +5463,9 @@ function builderDaysFromRoutineDef(routineDef) {
       exercises: (d.exercises || []).map((entry) => {
         if (entry.libId) {
           const lib = EXERCISE_LIBRARY_BY_ID[entry.libId];
-          return { id: entry.libId, libId: entry.libId, name: lib ? lib.name : entry.libId, muscle: lib ? lib.muscle : "Personalizado", sets: entry.sets };
+          return { id: entry.libId, libId: entry.libId, name: lib ? lib.name : entry.libId, muscle: lib ? lib.muscle : "Personalizado", sets: entry.sets, cardio: !!lib?.cardio, supersetNext: !!entry.supersetNext };
         }
-        return { id: entry.id, libId: null, name: entry.name, muscle: entry.muscle || "Personalizado", sets: entry.sets };
+        return { id: entry.id, libId: null, name: entry.name, muscle: entry.muscle || "Personalizado", sets: entry.sets, cardio: false, supersetNext: !!entry.supersetNext };
       }),
     };
   });
@@ -5408,7 +5705,7 @@ function parseAction(rawText) {
 // "activar_rutina" con un nombre que no existe), devuelve null — en ese
 // caso no se muestra ninguna tarjeta, sólo el texto del mensaje.
 function buildActionPlan(action, ctx) {
-  const { profile, settings, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings } = ctx;
+  const { profile, settings, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement } = ctx;
   if (action.type === "crear_rutina") {
     const days = (action.days || []).map((d) => ({
       label: String(d.label || "Día"),
@@ -5438,12 +5735,20 @@ function buildActionPlan(action, ctx) {
   }
   if (action.type === "editar_perfil") {
     const patch = {}; const items = [];
+    let newWeight = null;
     if (action.sex === "M" || action.sex === "F") { patch.sex = action.sex; items.push(`Sexo: ${action.sex === "M" ? "Masculino" : "Femenino"}`); }
     if (action.age) { patch.age = parseInt(action.age, 10); items.push(`Edad: ${patch.age} años`); }
-    if (action.bodyWeightKg) { patch.settings = { ...settings, bodyWeightKg: parseFloat(action.bodyWeightKg) }; items.push(`Peso corporal: ${action.bodyWeightKg}kg`); }
+    // El peso ya NO se guarda directo en settings acá — pasa por
+    // onAddMeasurement, el mismo camino que si lo cargaras a mano en
+    // Progreso → Medidas, así queda en su historial con fecha (y de paso
+    // sigue actualizando settings.bodyWeightKg por detrás, como siempre).
+    if (action.bodyWeightKg) { newWeight = parseFloat(action.bodyWeightKg); items.push(`Peso corporal: ${newWeight}kg`); }
     if (action.email) { patch.email = action.email; items.push(`Email: ${action.email}`); }
     if (!items.length) return null;
-    return { kind: "list", title: "Actualizar tu perfil", items, confirmLabel: "Guardar cambios", confirm: () => onUpdateProfile(patch) };
+    return {
+      kind: "list", title: "Actualizar tu perfil", items, confirmLabel: "Guardar cambios",
+      confirm: () => { if (Object.keys(patch).length) onUpdateProfile(patch); if (newWeight != null) onAddMeasurement?.("weight", newWeight); },
+    };
   }
   if (action.type === "config_ciclo") {
     const patch = {}; const items = [];
@@ -5487,7 +5792,7 @@ function trimLogsForAI(logs) {
   return out;
 }
 
-function EntrenadorIAChat({ profile, logs, profileName, messages, setMessages, settings, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings }) {
+function EntrenadorIAChat({ profile, logs, profileName, messages, setMessages, settings, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement }) {
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
   const bottomRef = useRef(null);
@@ -5594,7 +5899,7 @@ Datos: ${JSON.stringify(context)}`;
       if (!rawReply) { setMessages((prev) => [...prev, { role: "assistant", text: "No se me ocurrió una respuesta — probá de nuevo." }]); return; }
 
       const { text, action } = parseAction(rawReply);
-      const plan = action ? buildActionPlan(action, { profile, settings, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings }) : null;
+      const plan = action ? buildActionPlan(action, { profile, settings, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement }) : null;
       setMessages((prev) => [...prev, { role: "assistant", text, plan, planStatus: plan ? "pending" : null, sources }]);
     } catch (err) {
       console.error("Error al hablar con el entrenador IA:", err);
@@ -5966,10 +6271,14 @@ function RoutineBuilder({ initialRoutine, onCancel, onSave }) {
 
   const addExercise = (dayIdx, libEx) => setDays((d) => d.map((day, i) => {
     if (i !== dayIdx || day.exercises.some((e) => e.id === libEx.id)) return day;
-    return { ...day, exercises: [...day.exercises, { id: libEx.id, libId: libEx.id, name: libEx.name, muscle: libEx.muscle, sets: mkSets(3, "8-10") }] };
+    // Cardio no se piensa en "series" — entra como una sola sesión, sin
+    // rango de repeticiones (no aplica). El resto sigue igual: 3 series
+    // de 8-10 por defecto, editable después con el selector de siempre.
+    const sets = libEx.cardio ? mkSets(1, "") : mkSets(3, "8-10");
+    return { ...day, exercises: [...day.exercises, { id: libEx.id, libId: libEx.id, name: libEx.name, muscle: libEx.muscle, sets, cardio: !!libEx.cardio, supersetNext: false }] };
   }));
   const addCustomExercise = (dayIdx, rawName) => setDays((d) => d.map((day, i) => (i !== dayIdx ? day : {
-    ...day, exercises: [...day.exercises, { id: builderUid("custom"), libId: null, name: rawName, muscle: "Personalizado", sets: mkSets(3, "8-10") }],
+    ...day, exercises: [...day.exercises, { id: builderUid("custom"), libId: null, name: rawName, muscle: "Personalizado", sets: mkSets(3, "8-10"), cardio: false, supersetNext: false }],
   })));
   const removeExercise = (dayIdx, exIdx) => setDays((d) => d.map((day, i) => (i === dayIdx ? { ...day, exercises: day.exercises.filter((_, j) => j !== exIdx) } : day)));
   const moveExercise = (dayIdx, exIdx, delta) => setDays((d) => d.map((day, i) => {
@@ -5979,6 +6288,13 @@ function RoutineBuilder({ initialRoutine, onCancel, onSave }) {
   }));
   const configExercise = (dayIdx, exIdx, { setsCount, repRange }) => setDays((d) => d.map((day, i) => (i !== dayIdx ? day : {
     ...day, exercises: day.exercises.map((e, j) => (j === exIdx ? { ...e, sets: mkSets(setsCount, repRange) } : e)),
+  })));
+  // Encadena (o desencadena) este ejercicio con el siguiente de la lista
+  // en una superserie — se hacen uno después del otro sin descansar, y
+  // recién descansás al completar la vuelta completa del grupo. Sólo
+  // tiene sentido si hay un "siguiente" (no en el último ejercicio del día).
+  const toggleSuperset = (dayIdx, exIdx) => setDays((d) => d.map((day, i) => (i !== dayIdx ? day : {
+    ...day, exercises: day.exercises.map((e, j) => (j === exIdx ? { ...e, supersetNext: !e.supersetNext } : e)),
   })));
 
   const handleSave = () => {
@@ -5992,7 +6308,7 @@ function RoutineBuilder({ initialRoutine, onCancel, onSave }) {
         label: d.label.trim() || "Día",
         description: "",
         color: d.color,
-        exercises: d.exercises.map((e) => (e.libId ? { libId: e.libId, sets: e.sets } : { id: e.id, name: e.name, muscle: e.muscle, sets: e.sets })),
+        exercises: d.exercises.map((e) => (e.libId ? { libId: e.libId, sets: e.sets, supersetNext: !!e.supersetNext } : { id: e.id, name: e.name, muscle: e.muscle, sets: e.sets, supersetNext: !!e.supersetNext })),
       };
     });
     onSave({ name: name.trim(), source: "custom", description: "Rutina creada por vos.", recommendation: "", dayOrder, days: daysObj, weekSchedule: schedule });
@@ -6016,7 +6332,7 @@ function RoutineBuilder({ initialRoutine, onCancel, onSave }) {
             onRename={(label) => renameDay(idx, label)} onRemove={() => removeDay(idx)} onMoveDay={(delta) => moveDay(idx, delta)}
             onAddExercise={(libEx) => addExercise(idx, libEx)} onAddCustomExercise={(rawName) => addCustomExercise(idx, rawName)}
             onRemoveExercise={(exIdx) => removeExercise(idx, exIdx)} onMoveExercise={(exIdx, delta) => moveExercise(idx, exIdx, delta)}
-            onConfigExercise={(exIdx, cfg) => configExercise(idx, exIdx, cfg)} />
+            onConfigExercise={(exIdx, cfg) => configExercise(idx, exIdx, cfg)} onToggleSuperset={(exIdx) => toggleSuperset(idx, exIdx)} />
         ))}
       </div>
 
@@ -6433,6 +6749,41 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeProfile]);
 
+  // Recordatorio si ayer te tocaba entrenar (según tu cronograma semanal)
+  // y no quedó nada registrado. Esto es un aviso DENTRO de la app — se ve
+  // la próxima vez que la abrís, no es una notificación push real que
+  // llegue aunque tengas la app cerrada (eso necesitaría empaquetar la
+  // app con Capacitor y su plugin de notificaciones locales, que es un
+  // paso de configuración nativa aparte — avisame si lo querés armar).
+  // `dismissedMissedDayNotice` guarda la fecha ya avisada, para no
+  // repetir el mismo aviso cada vez que abrís la app en el mismo día.
+  const [missedDayNotice, setMissedDayNotice] = useState(null);
+  useEffect(() => {
+    if (!profile || !activeRoutineDef) return;
+    const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
+    const sched = getRoutineWeekSchedule(activeRoutineDef);
+    const scheduledDayKey = sched[todayWeekdayKey(yesterday)];
+    if (!scheduledDayKey || !DAY_ORDER.includes(scheduledDayKey)) return;
+    const yStr = yesterday.toISOString().slice(0, 10);
+    const trainedDates = getTrainedDateSet(profile.logs || {}, profile.trainingSessions || []);
+    if (trainedDates.has(yStr)) return;
+    if (profile.dismissedMissedDayNotice === yStr) return;
+    setMissedDayNotice({ dayLabel: ROUTINE[scheduledDayKey]?.label || scheduledDayKey, date: yStr });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeProfile]);
+  const dismissMissedDayNotice = () => {
+    if (missedDayNotice) {
+      setProfiles((prev) => {
+        const p = prev[activeProfile];
+        if (!p) return prev;
+        const np = { ...prev, [activeProfile]: { ...p, dismissedMissedDayNotice: missedDayNotice.date } };
+        saveProfiles(np);
+        return np;
+      });
+    }
+    setMissedDayNotice(null);
+  };
+
   // Festejo (con opción de compartir) cuando se completa un ciclo entero
   // (entrenamiento + descarga): se guarda `lastSeenCycleNumber` y, si en un
   // login posterior el ciclo actual ya avanzó, se muestra el festejo del
@@ -6510,6 +6861,64 @@ export default function App() {
   // semana de descarga, varias semanas después, arranque sin nada
   // tildado, sin necesitar un botón de reinicio aparte.
   const setDeloadProgress = useCallback((newProgress) => { const np = { ...profiles, [activeProfile]: { ...profiles[activeProfile], deloadProgress: newProgress } }; setProfiles(np); saveProfiles(np); }, [profiles, activeProfile]);
+  // Registra una medición nueva (peso, cintura, pecho, brazo, pierna) con
+  // la fecha de hoy — si ya había una de HOY para ese mismo tipo, la
+  // reemplaza en vez de duplicarla (por si te equivocás y corregís). El
+  // peso es especial: además de quedar en su propio historial, espeja el
+  // valor en settings.bodyWeightKg, que es lo que sigue usando el rango
+  // "Según tu contexto" — así no hubo que tocar esa parte del código.
+  const handleAddMeasurement = useCallback((type, value) => {
+    setProfiles((prev) => {
+      const p = prev[activeProfile];
+      if (!p) return prev;
+      const measurements = { ...(p.measurements || {}) };
+      const history = [...(measurements[type] || [])];
+      const today = todayStr();
+      const todayIdx = history.findIndex((h) => h.date === today);
+      const entry = { date: today, value };
+      if (todayIdx >= 0) history[todayIdx] = entry; else history.push(entry);
+      measurements[type] = history;
+      const patch = { measurements };
+      if (type === "weight") patch.settings = { ...getProfileSettings(p), bodyWeightKg: value };
+      const np = { ...prev, [activeProfile]: { ...p, ...patch } };
+      saveProfiles(np);
+      return np;
+    });
+  }, [activeProfile]);
+
+  // Fotos de progreso — viven en IndexedDB, no en localStorage (ver el
+  // comentario de idbGet más arriba en el archivo): localStorage tiene un
+  // techo de unos 5MB en total para TODO lo que guarda la app, y unas
+  // pocas fotos ya lo agotarían. Se cargan una sola vez al entrar al
+  // perfil, y se actualiza el estado local en cada cambio para que la UI
+  // responda al instante sin esperar a IndexedDB.
+  const [progressPhotos, setProgressPhotos] = useState([]);
+  const [photosLoading, setPhotosLoading] = useState(true);
+  useEffect(() => {
+    if (!activeProfile) { setProgressPhotos([]); return; }
+    setPhotosLoading(true);
+    idbGet(`photos_${activeProfile}`).then((stored) => {
+      setProgressPhotos(stored || []);
+      setPhotosLoading(false);
+    });
+  }, [activeProfile]);
+  const handleAddPhoto = async (file) => {
+    try {
+      const dataUrl = await resizeImageFile(file);
+      const photo = { id: builderUid("photo"), date: todayStr(), dataUrl };
+      const next = [photo, ...progressPhotos];
+      setProgressPhotos(next);
+      await idbPut(`photos_${activeProfile}`, next);
+    } catch (err) {
+      console.error("Error al guardar la foto de progreso:", err);
+    }
+  };
+  const handleDeletePhoto = (id) => {
+    const next = progressPhotos.filter((p) => p.id !== id);
+    setProgressPhotos(next);
+    idbPut(`photos_${activeProfile}`, next);
+  };
+
   const handleLogin = (name, updatedProfiles) => { const profs = updatedProfiles || profiles; setProfiles(profs); setActiveProfile(name); setJustLoggedOut(false); setTab("rutina"); };
   const handleLogout = () => { saveActive(null); setActiveProfile(null); setJustLoggedOut(true); setShowHelp(false); setHelpStartTab(null); };
   // Cierra la sesión de Google en Firebase (signOut) y vuelve a la
@@ -6697,6 +7106,7 @@ export default function App() {
       <StyleInjector />
       {recoveredNotice && <RecoveredBanner onClose={() => setRecoveredNotice(false)} />}
       {deloadNotice && <DeloadNoticeBanner onClose={() => setDeloadNotice(false)} />}
+      {missedDayNotice && <MissedDayBanner dayLabel={missedDayNotice.dayLabel} onClose={dismissMissedDayNotice} />}
       {importRoutineError && <ImportRoutineErrorBanner onClose={() => setImportRoutineError(false)} />}
       <SideNav tab={tab} setTab={setTab} profileName={activeProfile} />
       <div className="flex-1 min-w-0">
@@ -6718,9 +7128,9 @@ export default function App() {
           <div key={tab} className="tab-fade-in">
             {tab === "rutinas" && <RoutinesView profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleArchiveRoutine} onRestore={handleRestoreRoutine} />}
             {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} />}
-            {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} sex={profile?.sex} age={profile?.age} onGoToDeload={() => setTab("descarga")} />}
+            {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} sex={profile?.sex} age={profile?.age} onGoToDeload={() => setTab("descarga")} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} />}
             {tab === "descarga" && <DeloadView logs={logs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} />}
-            {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} settings={getProfileSettings(profile)} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} />}
+            {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} settings={getProfileSettings(profile)} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} />}
             {tab === "perfil" && <ProfileView profileName={activeProfile} profiles={profiles} logs={logs} onSignOut={handleSignOut} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} />}
           </div>
         </main>
@@ -6738,6 +7148,14 @@ export default function App() {
               <button onClick={() => setCycleCompleteNotice(null)} className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-400 text-sm font-semibold">Cerrar</button>
               <button onClick={() => setShowCycleShareImage(true)} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98] shadow-lg shadow-purple-500/20" style={{ background: "linear-gradient(135deg,#A855F7,#7C3AED)" }}><Share2 size={14} /> Compartir</button>
             </div>
+            {/* Sólo en el PRIMER ciclo — es el momento en que alguien está
+                más contento con la app, mejor punto para pedir una
+                reseña que esperar a que alguien lo haga por su cuenta. */}
+            {cycleCompleteNotice.cycleNumber === 1 && (
+              <a href={PLAY_STORE_URL} target="_blank" rel="noreferrer" onClick={() => setCycleCompleteNotice(null)} className="w-full flex items-center justify-center gap-1.5 mt-2.5 py-3 rounded-2xl border border-amber-500/30 text-amber-400 hover:bg-amber-500/10 transition text-sm font-bold">
+                <Star size={14} /> ¿Te gustó? Dejanos una reseña
+              </a>
+            )}
           </div>
         </div>
       )}
@@ -6768,6 +7186,15 @@ function DeloadNoticeBanner({ onClose }) {
   return (
     <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[150] bg-purple-500 !text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-purple-500/30 flex items-center gap-2 bounce-in max-w-[92vw]">
       <Zap size={14} className="shrink-0" /> Esta semana es de descarga — te llevamos a esa pestaña
+      <button onClick={onClose} className="ml-1 opacity-80 hover:opacity-100 shrink-0"><X size={13} /></button>
+    </div>
+  );
+}
+
+function MissedDayBanner({ dayLabel, onClose }) {
+  return (
+    <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[150] bg-amber-500 !text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-amber-500/30 flex items-center gap-2 bounce-in max-w-[92vw]">
+      <AlertTriangle size={14} className="shrink-0" /> Ayer te tocaba {dayLabel} y no registramos nada — ¿todo bien?
       <button onClick={onClose} className="ml-1 opacity-80 hover:opacity-100 shrink-0"><X size={13} /></button>
     </div>
   );
