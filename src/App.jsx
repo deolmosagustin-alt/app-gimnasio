@@ -2593,7 +2593,7 @@ const HELP_CHAPTERS = [
       {
         icon: <Ruler size={20} />,
         title: "Medidas y fotos de progreso",
-        text: "En \"Medidas\" registrás peso, cintura, pecho, brazo y pierna — cada uno con su propio historial, gráfico de evolución, y cuánto hace que no lo actualizás. El peso que cargues ahí es el mismo que usa el rango \"Según tu contexto\". Más abajo podés agregar fotos de progreso — quedan guardadas en este dispositivo, no se suben a ningún lado.",
+        text: "En \"Medidas\" registrás peso, cintura, pecho, brazo y pierna — cada uno con su gráfico de evolución. El peso que cargues ahí es el mismo que usa el rango \"Según tu contexto\". Más abajo tenés tu calendario: cada día con un punto rosa si hay foto, violeta si cargaste tu peso, y azul si cargaste otra medida — con una estrellita si ese día hiciste las tres cosas. Tocá cualquier día para ver el detalle completo.",
       },
       {
         icon: <Trash2 size={20} />,
@@ -4416,10 +4416,43 @@ function daysSince(dateStr) {
   return Math.floor((new Date() - new Date(dateStr + "T00:00:00")) / 86400000);
 }
 
+// Visor de foto a pantalla completa — se abre al tocar una miniatura en el
+// detalle del día. Mismo lenguaje visual que el resto de los modales de
+// la app (fondo oscuro, tarjeta redondeada), sin nada de canvas porque acá
+// sólo se muestra la imagen tal cual quedó guardada.
+function PhotoViewerModal({ photo, onClose, onDelete }) {
+  const [confirmDel, setConfirmDel] = useState(false);
+  const dateLabel = new Date(photo.date + "T00:00:00").toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" });
+  return (
+    <div className="fixed inset-0 z-[140] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in" onClick={onClose}>
+      <div className="max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-2 px-1">
+          <p className="text-sm font-bold text-white capitalize">{dateLabel}</p>
+          <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-300 hover:text-white hover:bg-white/10 transition"><X size={18} /></button>
+        </div>
+        <img src={photo.dataUrl} alt={photo.date} className="w-full rounded-2xl border border-slate-700/50" />
+        {!confirmDel ? (
+          <button onClick={() => setConfirmDel(true)} className="w-full flex items-center justify-center gap-1.5 mt-3 py-2.5 rounded-xl border border-rose-500/30 text-rose-400 text-xs font-bold"><Trash2 size={12} /> Borrar esta foto</button>
+        ) : (
+          <div className="flex gap-2 items-center mt-3 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5">
+            <p className="text-[11px] text-slate-400 flex-1">¿Borrar esta foto?</p>
+            <button onClick={() => setConfirmDel(false)} className="px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-400 text-xs">No</button>
+            <button onClick={() => { onDelete(photo.id); onClose(); }} className="px-2.5 py-1.5 rounded-lg bg-rose-500 !text-white text-xs font-bold">Sí, borrar</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], photosLoading, onAddPhoto, onDeletePhoto }) {
   const [selType, setSelType] = useState("weight");
   const [inputVal, setInputVal] = useState("");
   const [addingPhoto, setAddingPhoto] = useState(false);
+  const now = new Date();
+  const [cursor, setCursor] = useState({ y: now.getFullYear(), m: now.getMonth() });
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [viewingPhoto, setViewingPhoto] = useState(null);
   const selMeta = MEASUREMENT_TYPES.find((t) => t.k === selType);
   const selHistory = measurements[selType] || [];
   const latest = getLatestMeasurement(selHistory);
@@ -4438,6 +4471,32 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
     setAddingPhoto(true);
     try { await onAddPhoto(file); } finally { setAddingPhoto(false); }
   };
+
+  // Un solo calendario para las tres cosas — igual que el de Historial,
+  // pero acá cada día junta lo que hayas cargado: foto, peso, y/o el
+  // resto de las medidas (cintura, pecho, brazo, pierna). Se arma una
+  // sola vez por fecha, recorriendo measurements y photos juntos.
+  const dailyIndex = useMemo(() => {
+    const map = {};
+    Object.entries(measurements).forEach(([type, entries]) => {
+      (entries || []).forEach((e) => {
+        if (!map[e.date]) map[e.date] = { weight: null, measures: {}, photos: [] };
+        if (type === "weight") map[e.date].weight = e.value;
+        else map[e.date].measures[type] = e.value;
+      });
+    });
+    photos.forEach((p) => {
+      if (!map[p.date]) map[p.date] = { weight: null, measures: {}, photos: [] };
+      map[p.date].photos.push(p);
+    });
+    return map;
+  }, [measurements, photos]);
+
+  const weeks = useMemo(() => getMonthMatrix(cursor.y, cursor.m), [cursor]);
+  const hasAnyData = Object.keys(dailyIndex).length > 0;
+  const selectedEntry = selectedDate ? dailyIndex[selectedDate] : null;
+  const selectedDateLabel = selectedDate ? new Date(selectedDate + "T00:00:00").toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" }) : null;
+  const measureTypesNoWeight = MEASUREMENT_TYPES.filter((t) => t.k !== "weight");
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-purple-500/20 bg-slate-900/50 backdrop-blur-sm shadow-md shadow-black/20 p-4 space-y-3">
@@ -4490,29 +4549,112 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
 
       <div className="pt-3 border-t border-slate-800/50">
         <div className="flex items-center justify-between mb-2.5">
-          <p className="text-xs font-bold text-white flex items-center gap-1.5"><Camera size={13} className="text-purple-400" /> Fotos de progreso</p>
-          <label className={`px-2.5 py-1.5 rounded-lg bg-purple-500/15 text-purple-400 text-[11px] font-bold ${addingPhoto ? "opacity-50" : "cursor-pointer"}`}>
-            {addingPhoto ? "Subiendo..." : "+ Agregar"}
+          <p className="text-xs font-bold text-white flex items-center gap-1.5"><Calendar size={13} className="text-purple-400" /> Tu calendario</p>
+          <label className={`px-2.5 py-1.5 rounded-lg bg-purple-500/15 text-purple-400 text-[11px] font-bold flex items-center gap-1 ${addingPhoto ? "opacity-50" : "cursor-pointer"}`}>
+            <Camera size={11} /> {addingPhoto ? "Subiendo..." : "Foto de hoy"}
             <input type="file" accept="image/*" capture="environment" className="hidden" disabled={addingPhoto} onChange={(e) => { handlePhotoChange(e.target.files?.[0]); e.target.value = ""; }} />
           </label>
         </div>
+
         {photosLoading ? (
-          <p className="text-[11px] text-slate-600 text-center py-4">Cargando fotos...</p>
-        ) : photos.length === 0 ? (
-          <p className="text-[11px] text-slate-600 text-center py-4">Todavía no agregaste ninguna foto.</p>
+          <p className="text-[11px] text-slate-600 text-center py-4">Cargando...</p>
+        ) : !hasAnyData ? (
+          <p className="text-[11px] text-slate-600 text-center py-4">Todavía no registraste nada — agregá una medida arriba o una foto para empezar tu calendario.</p>
         ) : (
-          <div className="grid grid-cols-3 gap-2">
-            {photos.map((p) => (
-              <div key={p.id} className="relative aspect-square rounded-xl overflow-hidden border border-slate-800/60">
-                <img src={p.dataUrl} alt={p.date} className="w-full h-full object-cover" />
-                <span className="absolute bottom-1 left-1 text-[8px] font-bold bg-black/60 text-white px-1.5 py-0.5 rounded">{new Date(p.date + "T00:00:00").toLocaleDateString("es-AR", { day: "numeric", month: "short" })}</span>
-                <button onClick={() => onDeletePhoto(p.id)} aria-label="Borrar foto" className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/70 text-white flex items-center justify-center active:scale-90 transition"><X size={11} /></button>
+          <>
+            <div className="bg-slate-950/40 border border-slate-800/50 rounded-2xl p-3">
+              <div className="flex items-center justify-between mb-2.5">
+                <button onClick={() => setCursor((c) => { const m = c.m === 0 ? 11 : c.m - 1; const y = c.m === 0 ? c.y - 1 : c.y; return { y, m }; })} className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400"><ChevronLeft size={16} /></button>
+                <p className="text-sm font-bold text-white">{MONTH_LABELS[cursor.m]} {cursor.y}</p>
+                <button onClick={() => setCursor((c) => { const m = c.m === 11 ? 0 : c.m + 1; const y = c.m === 11 ? c.y + 1 : c.y; return { y, m }; })} className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400"><ChevronRight size={16} /></button>
               </div>
-            ))}
-          </div>
+              <div className="grid grid-cols-7 gap-1 mb-1.5">{WEEKDAY_LABELS.map((l, i) => <div key={i} className="text-center text-[9px] font-bold text-slate-600">{l}</div>)}</div>
+              <div className="grid grid-cols-7 gap-1">
+                {weeks.flat().map((d, i) => {
+                  if (!d) return <div key={i} />;
+                  const entry = dailyIndex[d];
+                  const isToday = d === todayStr();
+                  const isSelected = d === selectedDate;
+                  const dayNum = parseInt(d.slice(8, 10), 10);
+                  const hasPhoto = entry?.photos?.length > 0;
+                  const hasWeight = entry?.weight != null;
+                  const hasMeasures = entry && Object.keys(entry.measures).length > 0;
+                  const complete = hasPhoto && hasWeight && hasMeasures;
+                  return (
+                    <button key={i} onClick={() => entry && setSelectedDate(isSelected ? null : d)} disabled={!entry}
+                      className={`relative aspect-square rounded-lg flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold transition-all ${isSelected ? "ring-2 ring-purple-400" : ""} ${isToday ? "border border-purple-500/50" : ""} ${entry ? "bg-slate-800/70 text-slate-200 hover:bg-slate-700/80 active:scale-95" : "text-slate-700"}`}>
+                      {complete && <Star size={9} className="absolute -top-1 -right-1 text-amber-400 fill-amber-400" />}
+                      {dayNum}
+                      {entry && (
+                        <div className="flex gap-0.5">
+                          {hasPhoto && <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />}
+                          {hasWeight && <span className="w-1.5 h-1.5 rounded-full bg-purple-400" />}
+                          {hasMeasures && <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />}
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex items-center gap-3 mt-3 pt-3 border-t border-slate-800/50 flex-wrap">
+                <span className="flex items-center gap-1 text-[9px] text-slate-500"><span className="w-1.5 h-1.5 rounded-full bg-rose-400" /> Foto</span>
+                <span className="flex items-center gap-1 text-[9px] text-slate-500"><span className="w-1.5 h-1.5 rounded-full bg-purple-400" /> Peso</span>
+                <span className="flex items-center gap-1 text-[9px] text-slate-500"><span className="w-1.5 h-1.5 rounded-full bg-blue-400" /> Medidas</span>
+                <span className="flex items-center gap-1 text-[9px] text-slate-500"><Star size={9} className="text-amber-400 fill-amber-400" /> Día completo</span>
+              </div>
+            </div>
+
+            {selectedEntry ? (
+              <div className="bg-slate-950/50 border border-slate-800/60 rounded-2xl p-4 mt-3 bounce-in space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-bold text-white capitalize">{selectedDateLabel}</p>
+                  {selectedEntry.photos.length > 0 && selectedEntry.weight != null && Object.keys(selectedEntry.measures).length > 0 && (
+                    <span className="flex items-center gap-1 text-[10px] font-bold text-amber-400 shrink-0"><Star size={11} className="fill-amber-400" /> Completo</span>
+                  )}
+                </div>
+
+                {selectedEntry.weight != null && (
+                  <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-purple-500/10 border border-purple-500/20 w-fit">
+                    <span className="w-2 h-2 rounded-full bg-purple-400 shrink-0" />
+                    <span className="text-xs text-slate-300">Peso: <span className="font-bold text-white">{selectedEntry.weight}kg</span></span>
+                  </div>
+                )}
+
+                {Object.keys(selectedEntry.measures).length > 0 && (
+                  <div className="grid grid-cols-2 gap-2">
+                    {measureTypesNoWeight.filter((t) => selectedEntry.measures[t.k] != null).map((t) => (
+                      <div key={t.k} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-500/10 border border-blue-500/20">
+                        <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0" />
+                        <span className="text-xs text-slate-300">{t.l}: <span className="font-bold text-white">{selectedEntry.measures[t.k]}{t.unit}</span></span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {selectedEntry.photos.length > 0 && (
+                  <div>
+                    <p className="text-[10px] font-bold text-rose-300 uppercase tracking-wide mb-1.5 flex items-center gap-1"><Camera size={10} /> {selectedEntry.photos.length > 1 ? `${selectedEntry.photos.length} fotos` : "Foto"}</p>
+                    <div className="flex gap-2 flex-wrap">
+                      {selectedEntry.photos.map((p) => (
+                        <button key={p.id} onClick={() => setViewingPhoto(p)} className="w-20 h-20 rounded-xl overflow-hidden border border-slate-800/60 active:scale-95 transition">
+                          <img src={p.dataUrl} alt={p.date} className="w-full h-full object-cover" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="text-center text-[11px] text-slate-600 py-2">Tocá un día con registro para ver el detalle.</p>
+            )}
+          </>
         )}
         <p className="text-[9px] text-slate-600 mt-2">Las fotos quedan guardadas en este dispositivo, no se suben a ningún lado.</p>
       </div>
+
+      {viewingPhoto && (
+        <PhotoViewerModal photo={viewingPhoto} onClose={() => setViewingPhoto(null)} onDelete={onDeletePhoto} />
+      )}
     </div>
   );
 }
