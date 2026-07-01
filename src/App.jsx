@@ -187,6 +187,21 @@ try {
   });
 } catch { /* no-op */ }
 
+// Espera a que Firebase Auth resuelva el estado de la sesión y devuelve
+// el usuario actual (o null si no hay sesión). Sin esto, si llamamos a
+// setDoc cuando auth.currentUser todavía es null (porque Firebase tarda
+// ~1 segundo en restaurar la sesión desde IndexedDB al abrir la app), las
+// reglas de seguridad de Firestore rechazan el write silenciosamente.
+function getCurrentUser() {
+  return new Promise((resolve) => {
+    // Si ya hay un usuario autenticado, lo devolvemos de inmediato.
+    if (auth.currentUser) { resolve(auth.currentUser); return; }
+    // Si no, esperamos el primer evento de onAuthStateChanged — que
+    // dispara exactamente cuando Firebase termina de verificar la sesión.
+    const unsub = onAuthStateChanged(auth, (user) => { unsub(); resolve(user); });
+  });
+}
+
 // Qué campos del perfil van a la nube y cuáles se quedan solo en local.
 // Las fotos de progreso NO se sincronizan — viven en IndexedDB porque
 // son binarios grandes; Firestore tiene un límite de 1MB por documento,
@@ -215,19 +230,17 @@ async function fetchProfileFromCloud(uid) {
   }
 }
 
-// Sube el perfil completo a Firestore — merge:true para no pisar campos
-// que otro dispositivo pudo haber actualizado mientras estabas offline.
-// Esta función es la que se llama en todos los puntos de guardado de la
-// app (con un debounce de 4 segundos para no spamear Firestore con cada
-// tecla que escribís en el input de kg).
+// Sube el perfil completo a Firestore — espera a que Firebase Auth esté
+// listo antes de intentar el write (sin esto, Firestore rechaza el write
+// silenciosamente porque auth.currentUser es null durante el primer segundo
+// de vida de la app, mientras Firebase restaura la sesión desde IndexedDB).
 async function syncProfileToCloud(uid, profile) {
   try {
+    const firebaseUser = await getCurrentUser();
+    if (!firebaseUser || firebaseUser.uid !== uid) return; // no auth → no sync
     const data = profileToCloud(profile);
     await setDoc(doc(db, "users", uid), { ...data, _syncedAt: new Date().toISOString() }, { merge: true });
   } catch (err) {
-    // Si hay un error de red (offline), Firestore lo encola solo y lo
-    // reintenta cuando vuelve la conexión — no hace falta manejar ese
-    // caso acá. Solo logueamos para detectar errores reales.
     console.error("Error al sincronizar el perfil a la nube:", err);
   }
 }
@@ -7012,42 +7025,22 @@ export default function App() {
   const [helpStartTab, setHelpStartTab] = useState(null);
   const [recoveredNotice, setRecoveredNotice] = useState(false);
 
-  // Auto-sync inteligente: escucha cuándo Firebase Auth confirma la sesión
-  // del usuario (onAuthStateChanged) y en ese momento sube el perfil
-  // completo a Firestore. Este evento se dispara:
-  //   • Al abrir la app (Firebase restaura la sesión guardada)
-  //   • Al hacer login con Google
-  //   • Al cerrar sesión (firebaseUser = null → no hace nada)
-  // Por qué onAuthStateChanged y no un useEffect sobre activeProfile:
-  // cuando el perfil carga desde localStorage, Firebase Auth todavía no
-  // restauró la sesión — si intentamos escribir a Firestore en ese
-  // instante, las reglas de seguridad lo rechazan silenciosamente porque
-  // auth.currentUser es null. onAuthStateChanged garantiza que Firebase
-  // Auth ya está listo antes de intentar el write.
+  // Sync al hacer login / cambiar de perfil — sube todo apenas el usuario
+  // entra. `syncProfileToCloud` espera internamente a que Firebase Auth
+  // esté listo, así que no hay que preocuparse por el timing acá.
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (firebaseUser) => {
-      if (!firebaseUser || !activeProfile) return;
-      const p = profiles[activeProfile];
-      // Solo sincronizamos si el perfil local corresponde a esta cuenta de
-      // Google — evita subir el perfil equivocado si hay varios perfiles.
-      if (p?.googleUid === firebaseUser.uid) {
-        syncProfileToCloud(firebaseUser.uid, { ...p, name: activeProfile });
-      }
-    });
-    return () => unsub();
+    if (!activeProfile) return;
+    const p = profiles[activeProfile];
+    if (p?.googleUid) syncProfileToCloud(p.googleUid, { ...p, name: activeProfile });
   }, [activeProfile]);
 
-  // Debounce para cambios en tiempo real — cada vez que el usuario guarda
-  // una serie, una medida o cualquier configuración, a los 4 segundos
-  // sube los cambios a Firestore. Firebase Auth ya está activo en este
-  // punto (el efecto anterior ya se ejecutó), así que el write tiene
-  // permiso. Firestore encola los writes cuando no hay internet y los
-  // sube automáticamente cuando vuelve la conexión.
+  // Debounce para cambios en tiempo real — 4 segundos después de cualquier
+  // write (serie, medida, configuración), sube los cambios a Firestore.
+  // Si no hay internet, Firestore los encola y los sube cuando vuelve la
+  // conexión — automáticamente, sin que tengamos que hacer nada extra.
   const debouncedSync = useMemo(() => debounce((prof, name) => {
     const p = prof[name];
-    if (p?.googleUid && auth.currentUser?.uid === p.googleUid) {
-      syncProfileToCloud(p.googleUid, { ...p, name });
-    }
+    if (p?.googleUid) syncProfileToCloud(p.googleUid, { ...p, name });
   }, 4000), []);
   useEffect(() => {
     if (activeProfile && profiles[activeProfile]) debouncedSync(profiles, activeProfile);
