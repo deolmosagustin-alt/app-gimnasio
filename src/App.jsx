@@ -1826,14 +1826,43 @@ function LoginScreen({ onLogin, allowAutoLogin = true }) {
       const email = firebaseUser.email || pluginUser.email;
 
       // 3. Busca primero por googleUid en TODOS los perfiles LOCALES
-      // (incluidos los archivados) — si ya usaste esta cuenta en ESTE
-      // dispositivo, no hace falta consultar la nube para nada.
       const matchEntry = Object.entries(profiles).find(([, p]) => p.googleUid === uid);
       if (matchEntry) {
         const [matchName, matchProfile] = matchEntry;
-        const updated = { ...profiles, [matchName]: { ...matchProfile, archived: false, email } };
+        // Si el perfil vinculado a Google tiene poquísimos datos de
+        // entrenamiento, puede que el usuario haya creado otro perfil
+        // local (sin Google) donde entrenó todo este tiempo — en ese
+        // caso, buscamos el perfil local con MÁS datos y fusionamos su
+        // historial adentro del perfil de Google, para que no pierda nada.
+        const linkedLogs = Object.keys(matchProfile.logs || {}).length;
+        const linkedSessions = (matchProfile.trainingSessions || []).length;
+        const linkedIsEmpty = linkedLogs < 5 && linkedSessions < 2;
+        let richestProfile = null;
+        if (linkedIsEmpty) {
+          let richScore = 0;
+          Object.entries(profiles).forEach(([pName, p]) => {
+            if (pName === matchName) return;
+            const score = Object.keys(p.logs || {}).length + (p.trainingSessions || []).length * 3;
+            if (score > richScore) { richScore = score; richestProfile = p; }
+          });
+        }
+        const baseProfile = richestProfile
+          ? {
+              ...matchProfile,
+              logs: { ...(richestProfile.logs || {}), ...(matchProfile.logs || {}) },
+              trainingSessions: [...(richestProfile.trainingSessions || []), ...(matchProfile.trainingSessions || [])],
+              measurements: { ...(richestProfile.measurements || {}), ...(matchProfile.measurements || {}) },
+              settings: richestProfile.settings || matchProfile.settings,
+              routines: { ...(richestProfile.routines || {}), ...(matchProfile.routines || {}) },
+              activeRoutineId: matchProfile.activeRoutineId || richestProfile.activeRoutineId,
+            }
+          : matchProfile;
+        const merged = { ...baseProfile, archived: false, email, googleUid: uid };
+        const updated = { ...profiles, [matchName]: merged };
         saveProfiles(updated); setProfilesState(updated);
         saveActive(matchName); onLogin(matchName, updated);
+        // Subir el perfil fusionado a la nube inmediatamente
+        syncProfileToCloud(uid, { ...merged, name: matchName });
         return;
       }
 
@@ -6974,6 +7003,19 @@ export default function App() {
   useEffect(() => {
     if (activeProfile && profiles[activeProfile]) debouncedSync(profiles, activeProfile);
   }, [profiles, activeProfile]);
+
+  // Sync INMEDIATO al hacer login — independiente del debounce de arriba.
+  // Sin esto, si el usuario abre la app y no toca nada, el debounce nunca
+  // se dispara y Firestore queda desactualizado. Con esto, en cuanto
+  // `activeProfile` se establece (login automático o manual), sube todo
+  // de una sin esperar cambios. Es el sync más importante: es el que
+  // permite que el celular encuentre el historial completo la primera vez
+  // que entrás con Google desde Android.
+  useEffect(() => {
+    if (!activeProfile) return;
+    const p = profiles[activeProfile];
+    if (p?.googleUid) syncProfileToCloud(p.googleUid, { ...p, name: activeProfile });
+  }, [activeProfile]);
   // perfil — antes, con un solo perfil sin PIN en el dispositivo, tocar ese
   // botón no parecía hacer nada porque te re-logueaba al instante. En una
   // carga nueva de la página este estado vuelve a su valor inicial (false),
