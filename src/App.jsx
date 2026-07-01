@@ -16,6 +16,10 @@ import {
 import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signOut, onAuthStateChanged } from "firebase/auth";
 import { Capacitor } from "@capacitor/core";
 import { FirebaseAuthentication } from "@capacitor-firebase/authentication";
+// @capacitor/local-notifications — se importa estáticamente; si el paquete
+// no está instalado el build falla con un error claro. Instalarlo primero:
+//   npm install @capacitor/local-notifications && npx cap sync android
+import { LocalNotifications } from "@capacitor/local-notifications";
 import { doc, setDoc, getDoc, enableIndexedDbPersistence } from "firebase/firestore";
 import Model from "react-body-highlighter";
 import { auth, googleProvider, db, app } from "./firebase";
@@ -2083,7 +2087,7 @@ function RestTimer({ seconds, accent, alertType = "sound" }) {
   const firedRef = useRef(false);
   useEffect(() => { setRemaining(seconds); setRunning(false); endTimeRef.current = null; firedRef.current = false; }, [seconds]);
 
-  const fireAlert = () => {
+  const fireAlert = async () => {
     if (firedRef.current) return;
     firedRef.current = true;
     if (alertType !== "vibration") {
@@ -2100,16 +2104,26 @@ function RestTimer({ seconds, accent, alertType = "sound" }) {
       } catch { }
     }
     if (alertType !== "sound") haptic([250, 120, 250, 120, 250]);
-    // Notificación del sistema al terminar el descanso — funciona tanto en
-    // el navegador (Chrome/Safari escritorio) como en la app Android
-    // (Capacitor), donde el WebView tiene acceso a la Notifications API del
-    // sistema operativo siempre que el usuario haya dado permiso.
+    // Notificación del sistema al terminar el descanso
     try {
-      if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+      if (Capacitor.isNativePlatform()) {
+        // LocalNotifications en Android: aparece como notificación real del sistema,
+        // incluso con la pantalla apagada o la app en segundo plano.
+        await LocalNotifications.schedule({
+          notifications: [{
+            id: 9001,
+            title: "⏱️ Descanso terminado — Ponos",
+            body: "Es hora de la próxima serie 💪",
+            channelId: "ponos-rest-timer",
+            sound: alertType === "vibration" ? undefined : "default",
+            schedule: { at: new Date(Date.now() + 100) },
+          }],
+        });
+      } else if (typeof Notification !== "undefined" && Notification.permission === "granted") {
         new Notification("⏱️ Descanso terminado — Ponos", {
           body: "Es hora de la próxima serie 💪",
           silent: alertType === "vibration",
-          tag: "rest-timer", // reemplaza la notificación anterior si sigue visible
+          tag: "rest-timer",
           renotify: true,
         });
       }
@@ -2126,12 +2140,17 @@ function RestTimer({ seconds, accent, alertType = "sound" }) {
   useEffect(() => {
     if (running) {
       if (!endTimeRef.current) { endTimeRef.current = Date.now() + remaining * 1000; firedRef.current = false; }
-      // Pedir permiso de notificación al iniciar el timer — en Android
-      // con Capacitor, la Notifications API del WebView puede mostrar
-      // notificaciones del sistema operativo si el usuario concede el permiso.
-      if (typeof Notification !== "undefined" && Notification.permission === "default") {
-        Notification.requestPermission().catch(() => {});
-      }
+      // Pedir permiso de notificación al iniciar el timer si todavía no fue concedido
+      (async () => {
+        try {
+          if (Capacitor.isNativePlatform()) {
+            const { display } = await LocalNotifications.requestPermissions();
+            if (display === "granted") await LocalNotifications.createChannel({ id: "ponos-rest-timer", name: "Descanso entre series", importance: 5, vibration: true });
+          } else if (typeof Notification !== "undefined" && Notification.permission === "default") {
+            Notification.requestPermission().catch(() => {});
+          }
+        } catch { }
+      })();
       intervalRef.current = setInterval(recompute, 500);
       const onVisible = () => { if (document.visibilityState === "visible") recompute(); };
       document.addEventListener("visibilitychange", onVisible);
@@ -3200,10 +3219,10 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
         )}
       </div>
 
-      {/* Modo bloqueado: si ya guardaste una entrada hoy, los inputs se
-          reemplazan por la vista en solo lectura. El usuario puede tocar
-          "Editar" para desbloquear y corregir — así no hay riesgo de
-          guardar dos veces sin querer. */}
+      {/* Modo bloqueado: si ya guardaste una entrada hoy Y la sesión está
+          activa, los inputs se reemplazan por la vista de solo lectura para
+          evitar guardar dos veces sin querer. Sin sesión iniciada (o después
+          de finalizar) los inputs quedan desbloqueados siempre. */}
       {(() => {
         const today = new Date().toISOString().split("T")[0];
         const key = `${exerciseId}_${setIndex}`;
@@ -3211,7 +3230,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
         const todayEntry = history.find((h) => h.date === today);
         if (cardio) {
           const todayCardio = (logs[`${exerciseId}_${setIndex}`] || []).find((h) => h.date === today);
-          if (todayCardio) {
+          if (todayCardio && hasActiveSession) {
             return (
               <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ backgroundColor: accent + "15", border: `1px solid ${accent}30` }}>
                 <Check size={14} style={{ color: accent }} className="shrink-0" />
@@ -3229,7 +3248,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
             </div>
           );
         }
-        if (todayEntry) {
+        if (todayEntry && hasActiveSession) {
           return (
             <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ backgroundColor: accent + "15", border: `1px solid ${accent}30` }}>
               <Check size={14} style={{ color: accent }} className="shrink-0" />
@@ -5424,6 +5443,25 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
   const activeRoutineDef = resolveRoutineDef(profile?.routines?.[profile?.activeRoutineId], profile?.activeRoutineId);
   const savedRoutineCount = Object.keys(profile?.routines || {}).length;
 
+  // Foto de perfil — se guarda en IndexedDB con la clave avatar_${profileName}
+  // (igual que las fotos de progreso, no va a Firestore por tamaño).
+  const [avatarUrl, setAvatarUrl] = useState(null);
+  const avatarInputRef = useRef(null);
+  useEffect(() => {
+    idbGet(`avatar_${profileName}`).then((data) => { if (data) setAvatarUrl(data); }).catch(() => {});
+  }, [profileName]);
+  const handleAvatarChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const dataUrl = ev.target.result;
+      setAvatarUrl(dataUrl);
+      idbPut(`avatar_${profileName}`, dataUrl).catch(() => {});
+    };
+    reader.readAsDataURL(file);
+  };
+
   // Sync manual — sube TODO el perfil a Firestore ahora mismo, sin esperar
   // el debounce automático. Imprescindible para la primera vez que tenés
   // datos locales (historial, récords, sesiones) que nunca se subieron.
@@ -5482,7 +5520,16 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
   return (
     <div className="space-y-4">
       <div className="border border-slate-800/50 rounded-2xl p-5 text-center shadow-md shadow-black/20" style={{ background: "var(--grad-profile-avatar)" }}>
-        <div className="w-20 h-20 rounded-3xl mx-auto flex items-center justify-center text-3xl font-black !text-white mb-3" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>{initial}</div>
+        <div className="relative w-20 h-20 mx-auto mb-3">
+          {avatarUrl
+            ? <img src={avatarUrl} alt="Foto de perfil" className="w-20 h-20 rounded-3xl object-cover" />
+            : <div className="w-20 h-20 rounded-3xl flex items-center justify-center text-3xl font-black !text-white" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>{initial}</div>
+          }
+          <button onClick={() => avatarInputRef.current?.click()} className="absolute -bottom-1.5 -right-1.5 w-8 h-8 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center hover:bg-slate-700 transition active:scale-90" title="Cambiar foto de perfil">
+            <Camera size={14} className="text-teal-400" />
+          </button>
+          <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
+        </div>
         <h2 className="text-xl font-black text-white">{profileName}</h2>
         {profile?.email && <p className="text-sm text-slate-400 mt-1">{profile.email}</p>}
         <p className="text-[11px] text-slate-600 mt-1">Miembro desde {joinDate}</p>
@@ -7179,6 +7226,8 @@ function BottomBar({ tab, setTab }) {
 
 function SideNav({ tab, setTab, profileName }) {
   const initial = profileName.charAt(0).toUpperCase();
+  const [avatarUrl, setAvatarUrl] = useState(null);
+  useEffect(() => { idbGet(`avatar_${profileName}`).then((d) => { if (d) setAvatarUrl(d); }).catch(() => {}); }, [profileName]);
   return (
     <div className="hidden lg:flex lg:flex-col lg:w-56 lg:shrink-0 lg:h-screen lg:sticky lg:top-0 border-r border-slate-800/50 bg-[#0a0a0f]/60 px-3 py-6">
       <div className="flex items-center gap-2.5 px-2 mb-8">
@@ -7186,7 +7235,10 @@ function SideNav({ tab, setTab, profileName }) {
         <span className="font-black text-white text-sm tracking-tight">Mi Rutina</span>
       </div>
       <button onClick={() => setTab("perfil")} className={`w-full flex items-center gap-3 px-3 py-2.5 mb-3 rounded-xl text-sm font-semibold transition-all ${tab === "perfil" ? "bg-teal-500/15 text-teal-400" : "text-slate-500 hover:text-slate-300 hover:bg-slate-900/60"}`}>
-        <div className="w-6 h-6 rounded-lg flex items-center justify-center text-[11px] font-black text-white shrink-0" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>{initial}</div>
+        {avatarUrl
+          ? <img src={avatarUrl} className="w-6 h-6 rounded-lg object-cover shrink-0" alt="" />
+          : <div className="w-6 h-6 rounded-lg flex items-center justify-center text-[11px] font-black text-white shrink-0" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>{initial}</div>
+        }
         <span className="truncate">{profileName}</span>
       </button>
       <div className="space-y-1">
@@ -7251,16 +7303,32 @@ export default function App() {
     if (saved && profiles[saved] && !profiles[saved].pin) setActiveProfile(saved);
   }, []);
 
-  // Pedir permiso de notificaciones al montar — en Android con Capacitor,
-  // las notificaciones del WebView (Notification API) aparecen como
-  // notificaciones del sistema operativo si el usuario las acepta.
-  // Lo pedimos al inicio para que el diálogo aparezca pronto, no cuando
-  // ya está entrenando (que sería más molesto).
+  // Pedir permiso de notificaciones al montar la app.
+  // En Android con Capacitor usamos LocalNotifications.requestPermissions()
+  // que muestra el diálogo nativo del sistema y crea el canal de Android 8+.
+  // En el navegador web usamos la Notifications API estándar como fallback.
   useEffect(() => {
-    if (typeof Notification !== "undefined" && Notification.permission === "default") {
-      // Pequeño delay para no interrumpir la carga inicial de la app
-      setTimeout(() => { Notification.requestPermission().catch(() => {}); }, 3000);
-    }
+    const requestNotifPermission = async () => {
+      try {
+        if (Capacitor.isNativePlatform()) {
+          const { display } = await LocalNotifications.requestPermissions();
+          if (display === "granted") {
+            await LocalNotifications.createChannel({
+              id: "ponos-rest-timer",
+              name: "Descanso entre series",
+              description: "Avisa cuando termina el descanso entre series",
+              importance: 5, // IMPORTANCE_HIGH
+              visibility: 1,
+              sound: "default",
+              vibration: true,
+            });
+          }
+        } else if (typeof Notification !== "undefined" && Notification.permission === "default") {
+          await Notification.requestPermission();
+        }
+      } catch { }
+    };
+    setTimeout(requestNotifPermission, 2000);
   }, []);
 
   // Persiste, una sola vez al montar, la migración de perfiles viejos (los

@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Ponos</string>
-    <string name="title_activity_main">Ponos</string>
+    <string name="app_name">ModusFit</string>
+    <string name="title_activity_main">ModusFit</string>
     <string name="server_client_id">1027242959052-b9i0hq3fc2rbfoqr48chkpkkir2qu4e6.apps.googleusercontent.com</string>
 </resources>
