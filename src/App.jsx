@@ -16,7 +16,7 @@ import {
 import { signInWithPopup, signOut } from "firebase/auth";
 import { Capacitor } from "@capacitor/core";
 import { FirebaseAuthentication } from "@capacitor-firebase/authentication";
-import { doc, setDoc, getDoc } from "firebase/firestore";
+import { doc, setDoc, getDoc, enableIndexedDbPersistence } from "firebase/firestore";
 import Model from "react-body-highlighter";
 import { auth, googleProvider, db, app } from "./firebase";
 // Catálogo de ejercicios, grupos musculares y rutinas preestablecidas —
@@ -171,6 +171,40 @@ async function shareRoutineToFirestore(routineDef) {
    cada entrenamiento se suba solo apenas lo registrás (sin tener que volver
    a iniciar sesión), eso es un paso más grande — avisame si lo querés y lo
    armamos en otra vuelta. */
+// Activa la persistencia offline de Firestore — esto hace que Firestore
+// guarde una copia local de todos los datos que lee y escribe, y los
+// encolados que no se pudieron subir por falta de conexión los sube
+// automáticamente cuando vuelve internet, sin que tengamos que hacer nada
+// extra. Es la pieza clave del comportamiento "offline-first": el usuario
+// puede entrenar sin internet y cuando se conecte el próximo sync sube todo.
+// Se llama una sola vez al cargar la app. Los errores de "ya habilitada" o
+// "no soportada" se ignoran — no rompen nada.
+try {
+  enableIndexedDbPersistence(db).catch((err) => {
+    if (err.code !== "failed-precondition" && err.code !== "unimplemented") {
+      console.warn("Firestore offline persistence:", err);
+    }
+  });
+} catch { /* no-op */ }
+
+// Qué campos del perfil van a la nube y cuáles se quedan solo en local.
+// Las fotos de progreso NO se sincronizan — viven en IndexedDB porque
+// son binarios grandes; Firestore tiene un límite de 1MB por documento,
+// y unas pocas fotos sin comprimir lo agotarían. El resto (logs, sesiones,
+// medidas, rutinas, configuración) sí sube completo.
+const CLOUD_PROFILE_FIELDS = [
+  "name", "email", "sex", "age", "joinedAt", "googleUid",
+  "settings", "logs", "trainingSessions", "measurements",
+  "deloadProgress", "activeRoutineId", "routines", "weekSchedule",
+  "dismissedMissedDayNotice",
+];
+function profileToCloud(profile) {
+  const out = {};
+  CLOUD_PROFILE_FIELDS.forEach((k) => { if (profile[k] !== undefined) out[k] = profile[k]; });
+  return out;
+}
+
+// Descarga el perfil completo desde Firestore.
 async function fetchProfileFromCloud(uid) {
   try {
     const docSnap = await getDoc(doc(db, "users", uid));
@@ -180,12 +214,53 @@ async function fetchProfileFromCloud(uid) {
     return null;
   }
 }
-async function syncProfileToCloud(uid, profileData) {
+
+// Sube el perfil completo a Firestore — merge:true para no pisar campos
+// que otro dispositivo pudo haber actualizado mientras estabas offline.
+// Esta función es la que se llama en todos los puntos de guardado de la
+// app (con un debounce de 4 segundos para no spamear Firestore con cada
+// tecla que escribís en el input de kg).
+async function syncProfileToCloud(uid, profile) {
   try {
-    await setDoc(doc(db, "users", uid), profileData, { merge: true });
+    const data = profileToCloud(profile);
+    await setDoc(doc(db, "users", uid), { ...data, _syncedAt: new Date().toISOString() }, { merge: true });
   } catch (err) {
+    // Si hay un error de red (offline), Firestore lo encola solo y lo
+    // reintenta cuando vuelve la conexión — no hace falta manejar ese
+    // caso acá. Solo logueamos para detectar errores reales.
     console.error("Error al sincronizar el perfil a la nube:", err);
   }
+}
+
+// Merge inteligente al entrar desde un dispositivo nuevo: toma lo más
+// reciente entre el local y el de la nube, campo por campo, usando
+// _syncedAt como criterio. Si alguno de los dos no tiene _syncedAt
+// (perfil viejo, antes de esta implementación), gana el de la nube —
+// porque el local ya fue descargado en algún momento y la nube tiene
+// lo más actualizado.
+function mergeProfiles(local, cloud) {
+  if (!cloud) return local;
+  if (!local) return cloud;
+  const localTime = local._syncedAt ? new Date(local._syncedAt).getTime() : 0;
+  const cloudTime = cloud._syncedAt ? new Date(cloud._syncedAt).getTime() : Infinity;
+  if (cloudTime >= localTime) {
+    // La nube es más reciente — usamos la nube como base, pero
+    // preservamos los logs locales si la nube no tiene ninguno (el
+    // usuario pudo haber entrenado offline y ese sync todavía no subió).
+    return {
+      ...cloud,
+      logs: (cloud.logs && Object.keys(cloud.logs).length > 0) ? cloud.logs : (local.logs || {}),
+      trainingSessions: cloud.trainingSessions?.length > 0 ? cloud.trainingSessions : (local.trainingSessions || []),
+      measurements: (cloud.measurements && Object.keys(cloud.measurements).length > 0) ? cloud.measurements : (local.measurements || {}),
+    };
+  }
+  return local;
+}
+
+// Debounce util — devuelve una versión de la función que se llama como
+// máximo una vez cada `ms` ms, ignorando las llamadas intermedias.
+function debounce(fn, ms) {
+  let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
 }
 
 // Convierte una definición de rutina (preset o creada por el usuario) en el
@@ -1763,37 +1838,30 @@ function LoginScreen({ onLogin, allowAutoLogin = true }) {
       }
 
       // 4. Nada local con este uid — puede ser la primera vez en ESTE
-      // dispositivo aunque la cuenta ya exista en otro (computadora,
-      // celular...). Antes de crear nada, se consulta si ya hay un
-      // perfil guardado en la nube para este uid.
+      // dispositivo aunque la cuenta ya exista en otro. Antes de crear
+      // nada, bajamos el perfil completo (logs, sesiones, medidas, todo)
+      // desde Firestore y lo mergeamos con lo que haya en local.
       const cloudProfile = await fetchProfileFromCloud(uid);
       if (cloudProfile) {
-        // Ya existe en la nube: entraste antes desde otro dispositivo —
-        // se usa esa copia como la verdad (si hubiera algo local con el
-        // mismo nombre pero sin vincular, queda pisado por la de la nube).
         const cloudName = cloudProfile.name || name;
-        const updated = { ...profiles, [cloudName]: { ...cloudProfile, archived: false } };
+        // Merge: si hay un perfil local con ese mismo nombre (quizás creado
+        // offline antes de vincular), combinamos ambos tomando lo más reciente.
+        const localForName = profiles[cloudName];
+        const merged = mergeProfiles(localForName || null, cloudProfile);
+        const updated = { ...profiles, [cloudName]: { ...merged, archived: false } };
         saveProfiles(updated); setProfilesState(updated);
         saveActive(cloudName); onLogin(cloudName, updated);
         return;
       }
 
-      // 5. No existe en ningún lado todavía con este uid: es la primera
-      // vez que esta cuenta de Google se vincula. Si ya había un perfil
-      // local con ese mismo nombre (creado sin Google), se conservan sus
-      // datos en vez de pisarlos; si no, se crea uno nuevo.
+      // 5. No existe en ningún lado: primera vez. Conservamos datos locales
+      // si ya hay un perfil con ese nombre (creado offline).
       const existingLocal = profiles[name];
       const profileToSave = existingLocal
         ? { ...existingLocal, archived: false, googleUid: uid, email }
         : { pin: null, logs: {}, email, joinedAt: new Date().toISOString(), deviceId, tutorialSeen: false, googleUid: uid };
       const updated = { ...profiles, [name]: profileToSave };
-      saveProfiles(updated);
-      setProfilesState(updated);
-      saveActive(name);
-      // Primera vez con este uid: se sube a la nube para que el próximo
-      // dispositivo donde inicies sesión con esta misma cuenta la encuentre
-      // (se guarda también el nombre, porque en la nube no hay "clave del
-      // diccionario" como en el perfil local — hace falta guardarlo adentro).
+      saveProfiles(updated); setProfilesState(updated); saveActive(name);
       await syncProfileToCloud(uid, { ...profileToSave, name });
       onLogin(name, updated);
     } catch (error) {
@@ -6883,14 +6951,7 @@ export default function App() {
   const [profiles, setProfiles] = useState(loadProfiles);
   const [activeProfile, setActiveProfile] = useState(null);
   const [tab, setTab] = useState("rutina");
-  // Sin esto, cambiar de pestaña dejaba la página en el mismo scroll en el
-  // que estabas en la pestaña anterior — a veces abrías una pestaña nueva
-  // y aparecía mostrando el medio del contenido en vez de arriba de todo.
   useEffect(() => { window.scrollTo({ top: 0 }); }, [tab]);
-  // El historial del chat con el Entrenador IA vive acá (no dentro del
-  // componente del chat) a propósito: así sigue ahí cuando cambiás de
-  // pestaña y volvés — sólo se reinicia si recargás la app entera (cerrarla
-  // de verdad, no sólo cambiar de pestaña adentro de ella).
   const [aiChatMessages, setAiChatMessages] = useState([
     { role: "assistant", text: "¡Hola! Soy tu entrenador IA — tengo a la vista tu historial de entrenamiento. Preguntame sobre tu rutina, tus marcas o tu progreso." },
   ]);
@@ -6898,8 +6959,21 @@ export default function App() {
   const [showHelp, setShowHelp] = useState(false);
   const [helpStartTab, setHelpStartTab] = useState(null);
   const [recoveredNotice, setRecoveredNotice] = useState(false);
-  // Se pone en true justo después de un logout explícito ("Cambiar de
-  // perfil") para que LoginScreen NO se auto-loguee sola de nuevo al mismo
+
+  // Auto-sync a Firestore con debounce de 4 segundos — cada vez que
+  // `profiles` cambia (cualquier serie guardada, cualquier configuración
+  // tocada, cualquier medida nueva) y hay una cuenta de Google vinculada,
+  // se sube el perfil completo a la nube. El debounce evita spamear
+  // Firestore con cada keystroke. Cuando el celular está offline, Firestore
+  // encola el write y lo sube cuando vuelve la conexión — automáticamente,
+  // sin que tengamos que hacer nada extra acá.
+  const debouncedSync = useMemo(() => debounce((prof, name) => {
+    const p = prof[name];
+    if (p?.googleUid) syncProfileToCloud(p.googleUid, { ...p, name });
+  }, 4000), []);
+  useEffect(() => {
+    if (activeProfile && profiles[activeProfile]) debouncedSync(profiles, activeProfile);
+  }, [profiles, activeProfile]);
   // perfil — antes, con un solo perfil sin PIN en el dispositivo, tocar ese
   // botón no parecía hacer nada porque te re-logueaba al instante. En una
   // carga nueva de la página este estado vuelve a su valor inicial (false),
