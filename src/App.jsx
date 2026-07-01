@@ -222,6 +222,19 @@ function profileToCloud(profile) {
 // Descarga el perfil completo desde Firestore.
 async function fetchProfileFromCloud(uid) {
   try {
+    // En Android con Capacitor, el plugin autentica Firebase nativamente
+    // un instante ANTES de que el Firebase JS SDK (que corre en el WebView)
+    // reciba esa notificación. Si leemos Firestore en ese intervalo,
+    // auth.currentUser es null en el SDK de JS y Firestore rechaza el
+    // read con "permission-denied". Esperamos hasta 5 segundos a que el
+    // SDK de JS confirme específicamente este uid antes de proceder.
+    await new Promise((resolve) => {
+      if (auth.currentUser?.uid === uid) { resolve(); return; }
+      const unsub = onAuthStateChanged(auth, (user) => {
+        if (user?.uid === uid || user === null) { unsub(); resolve(); }
+      });
+      setTimeout(() => { unsub(); resolve(); }, 5000);
+    });
     const docSnap = await getDoc(doc(db, "users", uid));
     return docSnap.exists() ? docSnap.data() : null;
   } catch (err) {
