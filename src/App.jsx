@@ -1737,16 +1737,23 @@ function LoginScreen({ onLogin, allowAutoLogin = true }) {
   const handleGoogleLogin = async () => {
     try {
       // 1. Abre el selector de cuenta de Google (popup en navegador, nativo en la app)
-      const user = await googleSignIn();
+      const pluginUser = await googleSignIn();
 
-      // 2. Extrae los datos de la cuenta de Google
-      const name = user.displayName || "Usuario de Google";
-      const email = user.email;
+      // 2. Usa auth.currentUser como fuente de UID — con skipNativeAuth:false
+      // el plugin ya sincronizó la sesión de Firebase JS, así que
+      // auth.currentUser tiene el UID real de Firebase (igual en web y en
+      // la app nativa). pluginUser.uid en el caso nativo es el mismo valor,
+      // pero auth.currentUser es más confiable como fuente de verdad porque
+      // viene directo del SDK de Firebase JS que ya quedó autenticado.
+      const firebaseUser = auth.currentUser || pluginUser;
+      const uid = firebaseUser.uid;
+      const name = firebaseUser.displayName || pluginUser.displayName || "Usuario de Google";
+      const email = firebaseUser.email || pluginUser.email;
 
       // 3. Busca primero por googleUid en TODOS los perfiles LOCALES
       // (incluidos los archivados) — si ya usaste esta cuenta en ESTE
       // dispositivo, no hace falta consultar la nube para nada.
-      const matchEntry = Object.entries(profiles).find(([, p]) => p.googleUid === user.uid);
+      const matchEntry = Object.entries(profiles).find(([, p]) => p.googleUid === uid);
       if (matchEntry) {
         const [matchName, matchProfile] = matchEntry;
         const updated = { ...profiles, [matchName]: { ...matchProfile, archived: false, email } };
@@ -1759,7 +1766,7 @@ function LoginScreen({ onLogin, allowAutoLogin = true }) {
       // dispositivo aunque la cuenta ya exista en otro (computadora,
       // celular...). Antes de crear nada, se consulta si ya hay un
       // perfil guardado en la nube para este uid.
-      const cloudProfile = await fetchProfileFromCloud(user.uid);
+      const cloudProfile = await fetchProfileFromCloud(uid);
       if (cloudProfile) {
         // Ya existe en la nube: entraste antes desde otro dispositivo —
         // se usa esa copia como la verdad (si hubiera algo local con el
@@ -1777,8 +1784,8 @@ function LoginScreen({ onLogin, allowAutoLogin = true }) {
       // datos en vez de pisarlos; si no, se crea uno nuevo.
       const existingLocal = profiles[name];
       const profileToSave = existingLocal
-        ? { ...existingLocal, archived: false, googleUid: user.uid, email }
-        : { pin: null, logs: {}, email, joinedAt: new Date().toISOString(), deviceId, tutorialSeen: false, googleUid: user.uid };
+        ? { ...existingLocal, archived: false, googleUid: uid, email }
+        : { pin: null, logs: {}, email, joinedAt: new Date().toISOString(), deviceId, tutorialSeen: false, googleUid: uid };
       const updated = { ...profiles, [name]: profileToSave };
       saveProfiles(updated);
       setProfilesState(updated);
@@ -1787,7 +1794,7 @@ function LoginScreen({ onLogin, allowAutoLogin = true }) {
       // dispositivo donde inicies sesión con esta misma cuenta la encuentre
       // (se guarda también el nombre, porque en la nube no hay "clave del
       // diccionario" como en el perfil local — hace falta guardarlo adentro).
-      await syncProfileToCloud(user.uid, { ...profileToSave, name });
+      await syncProfileToCloud(uid, { ...profileToSave, name });
       onLogin(name, updated);
     } catch (error) {
       console.error("Error al iniciar sesión con Google:", error);
@@ -5192,10 +5199,13 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
   const handleLinkGoogle = async () => {
     setGoogleLinkError("");
     try {
-      const user = await googleSignIn();
-      const updatedFields = { googleUid: user.uid, email: user.email || profile?.email };
+      const pluginUser = await googleSignIn();
+      const firebaseUser = auth.currentUser || pluginUser;
+      const uid = firebaseUser.uid;
+      const email = firebaseUser.email || pluginUser.email || profile?.email;
+      const updatedFields = { googleUid: uid, email };
       onUpdateProfile(updatedFields);
-      await syncProfileToCloud(user.uid, { ...profile, ...updatedFields, name: profileName });
+      await syncProfileToCloud(uid, { ...profile, ...updatedFields, name: profileName });
     } catch (err) {
       console.error("Error al vincular con Google:", err);
       setGoogleLinkError("No se pudo vincular con Google. Intentá de nuevo.");
