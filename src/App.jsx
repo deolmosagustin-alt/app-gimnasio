@@ -5458,6 +5458,24 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
     reader.readAsDataURL(file);
   };
 
+  const handleAvatarClick = async () => {
+    // En Android pedimos permiso de galería antes de abrir el picker —
+    // sin este paso, en algunos dispositivos el selector se abre vacío.
+    if (Capacitor.isNativePlatform()) {
+      try {
+        // @capacitor/camera maneja permisos de galería automáticamente
+        const { Camera } = await import("@capacitor/camera").catch(() => ({}));
+        if (Camera?.checkPermissions) {
+          const perms = await Camera.checkPermissions();
+          if (perms.photos !== "granted") {
+            await Camera.requestPermissions({ permissions: ["photos"] });
+          }
+        }
+      } catch { /* si el plugin no está instalado, continuar igual */ }
+    }
+    avatarInputRef.current?.click();
+  };
+
   // Sync manual — sube TODO el perfil a Firestore ahora mismo, sin esperar
   // el debounce automático. Imprescindible para la primera vez que tenés
   // datos locales (historial, récords, sesiones) que nunca se subieron.
@@ -5521,7 +5539,7 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
             ? <img src={avatarUrl} alt="Foto de perfil" className="w-20 h-20 rounded-3xl object-cover" />
             : <div className="w-20 h-20 rounded-3xl flex items-center justify-center text-3xl font-black !text-white" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>{initial}</div>
           }
-          <button onClick={() => avatarInputRef.current?.click()} className="absolute -bottom-1.5 -right-1.5 w-8 h-8 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center hover:bg-slate-700 transition active:scale-90" title="Cambiar foto de perfil">
+          <button onClick={handleAvatarClick} className="absolute -bottom-1.5 -right-1.5 w-8 h-8 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center hover:bg-slate-700 transition active:scale-90" title="Cambiar foto de perfil">
             <Camera size={14} className="text-teal-400" />
           </button>
           <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
@@ -7256,7 +7274,15 @@ const TAB_TITLES = { rutinas: "Rutinas", rutina: "Rutina", progreso: "Progreso",
 ============================================================================ */
 export default function App() {
   const [profiles, setProfiles] = useState(loadProfiles);
-  const [activeProfile, setActiveProfile] = useState(null);
+  // Inicialización síncrona — si hay un perfil guardado sin PIN,
+  // activeProfile arranca con ese valor directamente sin esperar un
+  // useEffect, eliminando el flash de LoginScreen que se veía al abrir.
+  const [activeProfile, setActiveProfile] = useState(() => {
+    const saved = loadActive();
+    const p = loadProfiles();
+    if (saved && p[saved] && !p[saved].pin) return saved;
+    return null;
+  });
   const [tab, setTab] = useState("rutina");
   useEffect(() => { window.scrollTo({ top: 0 }); }, [tab]);
   const [aiChatMessages, setAiChatMessages] = useState([
@@ -7294,9 +7320,22 @@ export default function App() {
   // así que el auto-login normal al abrir la app sigue funcionando igual.
   const [justLoggedOut, setJustLoggedOut] = useState(false);
 
+  // Auto-login silencioso para usuarios con Google:
+  // Firebase restaura la sesión automáticamente al abrir la app.
+  // Cuando eso ocurre, buscamos el perfil local que tenga ese uid y
+  // lo activamos sin que el usuario tenga que tocar nada.
   useEffect(() => {
-    const saved = loadActive();
-    if (saved && profiles[saved] && !profiles[saved].pin) setActiveProfile(saved);
+    if (activeProfile) return; // ya está logueado, no hacer nada
+    const unsub = onAuthStateChanged(auth, async (user) => {
+      if (!user) return;
+      const p = loadProfiles();
+      const match = Object.entries(p).find(([, prof]) => prof.googleUid === user.uid);
+      if (match) {
+        const [name] = match;
+        if (!p[name].pin) { saveActive(name); setActiveProfile(name); }
+      }
+    });
+    return () => unsub();
   }, []);
 
   // Pedir permiso de notificaciones al montar la app.
