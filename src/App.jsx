@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback, createContext, useContext } from "react";
 import { createPortal } from "react-dom";
 import {
   LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -11,7 +11,7 @@ import {
   Mail, Clock, ChevronRight, Edit3, Info, Plus, Sun, Moon,
   Target, Award, Activity, ArrowDown, HelpCircle, List, LayoutGrid,
   Sparkles, Layers, Video, SlidersHorizontal, ShieldCheck, UserCog,
-  Share2, Download, Link2, Copy, BellOff, Send, Mic, Ruler, Camera, Link, Footprints, Star, SquarePlay, Upload, RefreshCw,
+  Share2, Download, Link2, Copy, BellOff, Send, Mic, Ruler, Camera, Link, Footprints, Star, SquarePlay, Upload, RefreshCw, Timer,
 } from "lucide-react";
 import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signOut, onAuthStateChanged } from "firebase/auth";
 import { Capacitor } from "@capacitor/core";
@@ -208,9 +208,17 @@ function getCurrentUser() {
 // y unas pocas fotos sin comprimir lo agotarían. El resto (logs, sesiones,
 // medidas, rutinas, configuración) sí sube completo.
 const CLOUD_PROFILE_FIELDS = [
-  "name", "email", "sex", "age", "joinedAt", "googleUid",
-  "settings", "logs", "trainingSessions", "measurements",
-  "deloadProgress", "activeRoutineId", "routines", "weekSchedule",
+  // Datos básicos del perfil
+  "name", "email", "sex", "age", "joinedAt", "googleUid", "tutorialSeen",
+  // Configuración y rutinas
+  "settings", "activeRoutineId", "routines", "weekSchedule",
+  // Historial de entrenamiento completo
+  "logs", "trainingSessions",
+  // Medidas corporales (sin fotos — demasiado grandes para Firestore)
+  "measurements",
+  // Estado de ciclo y descarga
+  "cycleStart", "deloadProgress",
+  // UI state
   "dismissedMissedDayNotice",
 ];
 function profileToCloud(profile) {
@@ -368,9 +376,25 @@ const DEFAULT_SETTINGS = {
   alertType: "sound", restLong: REST_LONG, restShort: REST_SHORT,
   trainWeeks: TRAIN_WEEKS, deloadWeeks: DELOAD_WEEKS, deloadPct: 0.75, deloadSetDivisor: 2,
   theme: "dark", textScale: 1, smallTextScale: 1, autoShowPrShare: true, bodyWeightKg: 0, muscleRankMode: "general", allowZoom: false,
+  weightUnit: "kg", // "kg" o "lbs"
 };
 
+// Conversión de peso: en la app todo se guarda en kg (los logs, los récords),
+// pero si el usuario eligió "lbs" mostramos los valores convertidos.
+// kgToDisplay: convierte kg → unidad del usuario para MOSTRAR en pantalla.
+// displayToKg: convierte lo que escribe el usuario → kg para GUARDAR.
+const KG_TO_LBS = 2.20462;
+function kgToDisplay(kg, unit) { return unit === "lbs" ? Math.round(kg * KG_TO_LBS * 4) / 4 : kg; } // redondea a 0.25lbs
+function displayToKg(val, unit) { return unit === "lbs" ? Math.round((val / KG_TO_LBS) * 4) / 4 : val; }
+function weightLabel(unit) { return unit === "lbs" ? "lbs" : "kg"; }
+
 function getProfileSettings(profile) { return { ...DEFAULT_SETTINGS, ...(profile?.settings || {}) }; }
+
+// Context de unidad de peso — permite que SetRow, DeloadView y cualquier
+// otro componente lean "kg" o "lbs" sin necesitar un prop extra en cada nivel.
+const WeightUnitCtx = createContext("kg");
+function useWeightUnit() { return useContext(WeightUnitCtx); }
+
 
 // Opciones de tamaño de letra (Perfil → Tamaño de letra). El valor se aplica
 // como font-size del elemento raíz (<html>) — la mayoría de los tamaños de
@@ -1885,7 +1909,13 @@ function LoginScreen({ onLogin, allowAutoLogin = true }) {
         console.log("[PONOS] Logs después del merge:", Object.keys(finalProfile.logs || {}).length);
         const updated = { ...profiles, [matchName]: finalProfile };
         saveProfiles(updated); setProfilesState(updated);
-        saveActive(matchName); onLogin(matchName, updated);
+        saveActive(matchName);
+        // Restaurar cycleStart si viene de la nube y es más reciente que el local
+        if (finalProfile.cycleStart) {
+          const cloudDate = new Date(finalProfile.cycleStart);
+          if (!isNaN(cloudDate)) { saveCycleStart(cloudDate); }
+        }
+        onLogin(matchName, updated);
         syncProfileToCloud(uid, { ...finalProfile, name: matchName }).catch(() => {});
         return;
       }
@@ -2070,9 +2100,18 @@ function RestTimer({ seconds, accent, alertType = "sound" }) {
       } catch { }
     }
     if (alertType !== "sound") haptic([250, 120, 250, 120, 250]);
+    // Notificación del sistema al terminar el descanso — funciona tanto en
+    // el navegador (Chrome/Safari escritorio) como en la app Android
+    // (Capacitor), donde el WebView tiene acceso a la Notifications API del
+    // sistema operativo siempre que el usuario haya dado permiso.
     try {
       if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-        new Notification("⏱️ Descanso terminado", { body: "Es hora de la próxima serie.", silent: alertType === "vibration" });
+        new Notification("⏱️ Descanso terminado — Ponos", {
+          body: "Es hora de la próxima serie 💪",
+          silent: alertType === "vibration",
+          tag: "rest-timer", // reemplaza la notificación anterior si sigue visible
+          renotify: true,
+        });
       }
     } catch { }
   };
@@ -2087,9 +2126,12 @@ function RestTimer({ seconds, accent, alertType = "sound" }) {
   useEffect(() => {
     if (running) {
       if (!endTimeRef.current) { endTimeRef.current = Date.now() + remaining * 1000; firedRef.current = false; }
-      // Pide permiso de notificación sin interrumpir — si ya fue
-      // concedido o denegado antes, esto no vuelve a preguntar nada.
-      try { if (typeof Notification !== "undefined" && Notification.permission === "default") Notification.requestPermission(); } catch { }
+      // Pedir permiso de notificación al iniciar el timer — en Android
+      // con Capacitor, la Notifications API del WebView puede mostrar
+      // notificaciones del sistema operativo si el usuario concede el permiso.
+      if (typeof Notification !== "undefined" && Notification.permission === "default") {
+        Notification.requestPermission().catch(() => {});
+      }
       intervalRef.current = setInterval(recompute, 500);
       const onVisible = () => { if (document.visibilityState === "visible") recompute(); };
       document.addEventListener("visibilitychange", onVisible);
@@ -2101,19 +2143,19 @@ function RestTimer({ seconds, accent, alertType = "sound" }) {
 
   const pct = Math.max(0, Math.min(100, (remaining / seconds) * 100)), r = 16, circ = 2 * Math.PI * r;
   return (
-    <div className="flex items-center gap-3 bg-slate-900/60 rounded-2xl px-4 py-3 border border-slate-800/60">
+    <div className="flex items-center gap-3 rounded-2xl px-4 py-3 border" style={{ backgroundColor: accent + "12", borderColor: accent + "30" }}>
       <div className="relative w-12 h-12 shrink-0">
         <svg viewBox="0 0 36 36" className="w-12 h-12 -rotate-90">
-          <circle cx="18" cy="18" r={r} fill="none" stroke="var(--ring-track)" strokeWidth="3" />
+          <circle cx="18" cy="18" r={r} fill="none" stroke={accent + "25"} strokeWidth="3" />
           <circle cx="18" cy="18" r={r} fill="none" stroke={accent} strokeWidth="3" strokeDasharray={circ} strokeDashoffset={circ * (1 - pct / 100)} strokeLinecap="round" style={{ transition: "stroke-dashoffset 0.3s linear" }} />
         </svg>
         <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-slate-200">{formatTime(remaining)}</span>
       </div>
       <div className="flex gap-2">
-        <button onClick={() => { haptic(15); setRunning((r) => !r); }} className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 transition text-slate-200">{running ? <Pause size={16} /> : <Play size={16} />}</button>
-        <button onClick={() => { setRunning(false); setRemaining(seconds); endTimeRef.current = null; firedRef.current = false; }} className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 transition text-slate-200"><RotateCcw size={16} /></button>
+        <button onClick={() => { haptic(15); setRunning((r) => !r); }} className="p-2.5 rounded-xl active:scale-95 transition text-slate-200" style={{ backgroundColor: accent + "20" }}>{running ? <Pause size={16} /> : <Play size={16} />}</button>
+        <button onClick={() => { setRunning(false); setRemaining(seconds); endTimeRef.current = null; firedRef.current = false; }} className="p-2.5 rounded-xl active:scale-95 transition text-slate-200" style={{ backgroundColor: accent + "20" }}><RotateCcw size={16} /></button>
       </div>
-      <span className="text-xs text-slate-500">{formatTime(seconds)} descanso</span>
+      <span className="text-xs" style={{ color: accent + "99" }}>{formatTime(seconds)} descanso</span>
     </div>
   );
 }
@@ -3031,6 +3073,7 @@ function HelpModal({ startTab, onClose }) {
    resetea el día (resetKey) o se finaliza la sesión (ver RoutineView/App).
 ============================================================================ */
 function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, accent, logs, setLogs, drafts = {}, setDrafts, deloadKgFactor = 1, deloadMode = false, resetKey = 0, autoShowPrShare = true, onDisableAutoShowPrShare, hasActiveSession = true, cardio = false }) {
+  const unit = useWeightUnit();
   const key = `${exerciseId}_${setIndex}`, prKey = `${key}_pr_override`, today = todayStr();
   const history = logs[key] || [], override = logs[prKey];
   // Cardio no tiene una "carga" comparable (no hay kg×reps) — el récord
@@ -3040,7 +3083,16 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     if (cardio) { let best = null; history.forEach((h) => { if (!best || (h.minutes || 0) > (best.minutes || 0)) best = { minutes: h.minutes, km: h.km }; }); return best; }
     let best = setDef.pr ? { ...setDef.pr } : null; history.forEach((h) => { if (!best || vol(h.kg, h.reps) > vol(best.kg, best.reps)) best = { kg: h.kg, reps: h.reps }; }); return best;
   }, [history, setDef.pr, cardio]);
-  const currentPR = override || computedPR;
+  const currentPR = useMemo(() => {
+    // Tomar el MEJOR entre el override manual y el historial real.
+    // Antes, si existía override, se ignoraba el historial — así cualquier
+    // marca nueva registrada después de editar el récord a mano quedaba
+    // invisible en el "A superar" hasta que se borrara el override.
+    if (!override && !computedPR) return null;
+    if (!override) return computedPR;
+    if (!computedPR) return override;
+    return vol(override.kg, override.reps) >= vol(computedPR.kg, computedPR.reps) ? override : computedPR;
+  }, [override, computedPR]);
   const suggestedKg = !cardio && currentPR && deloadMode ? Math.round(currentPR.kg * deloadKgFactor * 2) / 2 : null;
   const draft = drafts[key] || {};
   const reps = draft.reps ?? ""; const kg = draft.kg ?? ""; const rpe = draft.rpe ?? null;
@@ -3073,8 +3125,9 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
       else { haptic(18); setFeedback({ type: "down", msg: `-${(((prevMin - m) / prevMin) * 100).toFixed(0)}% vs récord`, noSession }); }
       return;
     }
-    const r = parseFloat(reps), k = parseFloat(kg);
-    if (!r || !k || isNaN(r) || isNaN(k)) { setFeedback({ type: "error", msg: "Completá reps y kg." }); return; }
+    const r = parseFloat(reps), kDisplay = parseFloat(kg);
+    if (!r || !kDisplay || isNaN(r) || isNaN(kDisplay)) { setFeedback({ type: "error", msg: "Completá reps y kg." }); return; }
+    const k = displayToKg(kDisplay, unit); // convierte lbs→kg si corresponde
     // Si no había ninguna marca previa, esto es la PRIMERA vez que se
     // registra esta serie — no es un "récord" todavía (no hay nada que
     // estés superando), así que no dispara fuego, ni el cartel de "¡Nueva
@@ -3126,7 +3179,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
             <p className="flex-1 min-w-0 truncate">
               <span className="text-[10px] font-bold uppercase tracking-wide mr-1.5" style={{ color: accent + "bb" }}>A superar:</span>
               <span className="text-base font-black" style={{ color: accent }}>
-                {cardio ? <>{currentPR.minutes} min{currentPR.km ? ` · ${currentPR.km}km` : ""}</> : <>{currentPR.reps}×{currentPR.kg}kg</>}
+                {cardio ? <>{currentPR.minutes} min{currentPR.km ? ` · ${currentPR.km}km` : ""}</> : <>{currentPR.reps}×{kgToDisplay(currentPR.kg, unit)}{weightLabel(unit)}</>}
               </span>
             </p>
             {!cardio && (
@@ -3153,7 +3206,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
         <div className="flex items-end gap-2">
           <div className="flex-1"><label className="text-[10px] text-slate-600 font-semibold uppercase tracking-wider mb-1.5 block">Reps</label><input type="number" inputMode="decimal" placeholder="—" value={reps} onChange={(e) => updateDraft({ reps: e.target.value })} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3.5 text-xl font-black text-center text-white focus:outline-none focus:border-teal-500/50 transition" /></div>
           <div className="text-slate-700 text-lg pb-3">×</div>
-          <div className="flex-1"><label className="text-[10px] text-slate-600 font-semibold uppercase tracking-wider mb-1.5 block">Kg</label><input type="number" inputMode="decimal" placeholder="—" value={kg} onChange={(e) => updateDraft({ kg: e.target.value })} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3.5 text-xl font-black text-center text-white focus:outline-none focus:border-teal-500/50 transition" /></div>
+          <div className="flex-1"><label className="text-[10px] text-slate-600 font-semibold uppercase tracking-wider mb-1.5 block">{weightLabel(unit)}</label><input type="number" inputMode="decimal" placeholder="—" value={kg} onChange={(e) => updateDraft({ kg: e.target.value })} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3.5 text-xl font-black text-center text-white focus:outline-none focus:border-teal-500/50 transition" /></div>
           <button ref={saveBtnRef} onClick={handleSave} className={`p-3.5 rounded-xl transition-all active:scale-90 font-bold text-white flex items-center justify-center ${saved ? "bg-emerald-500" : "hover:opacity-90"}`} style={!saved ? { backgroundColor: accent } : {}}>{saved ? <Check size={18} /> : <Save size={18} />}</button>
         </div>
       )}
@@ -3268,7 +3321,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
         {setsToShow.map((s, i) => <SetRow key={i} exerciseId={exercise.id} exerciseName={exercise.name} exerciseMuscle={exercise.muscle} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadKgFactor={settings.deloadPct} deloadMode={deloadMode} resetKey={resetKey} autoShowPrShare={settings.autoShowPrShare ?? true} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={hasActiveSession} cardio={exercise.cardio} />)}
         {exercise.video && (
           <div className="pt-3">
-            <a href={exercise.video} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 py-3 rounded-xl border transition text-sm font-bold active:scale-[0.98]" style={{ borderColor: "#EF444435", backgroundColor: "#EF44440c", color: "#F87171" }}>
+            <a href={exercise.video} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 py-3 rounded-xl border border-slate-800 text-slate-400 hover:border-slate-600 hover:text-white transition text-sm font-medium active:scale-[0.98]">
               <SquarePlay size={17} /> Ver técnica en YouTube
             </a>
           </div>
@@ -3445,9 +3498,9 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
         </div>
       )}
 
-      <div className="flex gap-1.5 overflow-x-auto pb-1">
+      <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-4 px-4 snap-x">
         {DAY_ORDER.map((k) => (
-          <button key={k} onClick={() => setActiveDay(k)} className="px-4 py-2.5 rounded-xl text-xs font-bold uppercase whitespace-nowrap transition-all active:scale-95 border hover:-translate-y-0.5"
+          <button key={k} onClick={() => setActiveDay(k)} className="px-4 py-2.5 rounded-xl text-xs font-bold uppercase whitespace-nowrap transition-all active:scale-95 border hover:-translate-y-0.5 snap-start shrink-0"
             style={activeDay === k ? { background: ROUTINE[k].color, borderColor: ROUTINE[k].color, color: "#fff", boxShadow: `0 4px 14px -4px ${ROUTINE[k].color}66` } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
             {ROUTINE[k].label}
           </button>
@@ -3804,6 +3857,7 @@ function SessionHistoryView({ logs, onDeleteDay }) {
    DELOAD VIEW (unchanged from prior redesign)
 ============================================================================ */
 function DeloadView({ logs, settings = DEFAULT_SETTINGS, deloadProgress = {}, setDeloadProgress, onFinishDeloadSession }) {
+  const unit = useWeightUnit();
   const { trainWeeks, deloadWeeks, deloadPct, deloadSetDivisor } = settings;
   const pctLabel = Math.round(deloadPct * 100);
   const [activeDay, setActiveDay] = useState(DAY_ORDER[0]);
@@ -3906,28 +3960,30 @@ function DeloadView({ logs, settings = DEFAULT_SETTINGS, deloadProgress = {}, se
                   <RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent="#A855F7" alertType={settings.alertType} />
                 </div>
               )}
-              <div className="px-4 py-3 space-y-2">
+              <div className="px-4 py-3 space-y-2.5">
                 {hasPR ? (
                   ex.sets.slice(0, deloadSets).map((s, i) => {
                     const best = bestPerSet[i], deloadKg = best ? Math.round(best.kg * deloadPct * 2) / 2 : null;
                     const progressKey = `${ex.id}_${i}`;
                     const done = deloadProgress[progressKey] === today;
                     return (
-                      <div key={i} className="flex items-center gap-3">
-                        <button onClick={() => toggleDeloadDone(progressKey)} aria-label={done ? "Marcar como no hecha" : "Marcar serie como hecha"} className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 transition-all active:scale-90 border ${done ? "bg-purple-500 border-purple-500" : "border-slate-700 hover:border-slate-500"}`}>
-                          {done && <Check size={13} className="text-white" />}
-                        </button>
-                        <span className="text-[10px] font-black text-slate-600 w-5 shrink-0">S{i + 1}</span>
-                        <span className="text-[10px] text-slate-600 bg-slate-800/60 rounded-lg px-2 py-1 shrink-0">{s.repRange} reps</span>
-                        {best ? (
-                          <div className="flex items-center gap-2 flex-1 justify-end">
-                            <span className="text-[11px] text-slate-600 line-through">{best.reps}×{best.kg}kg</span>
-                            <div className="flex items-center gap-1">
-                              <ArrowDown size={10} style={{ color: done ? day.color : "#C084FC" }} />
-                              <span className="text-sm font-black" style={{ color: done ? day.color : "#D8B4FE" }}>{best.reps}×{deloadKg}kg</span>
-                            </div>
+                      <div key={i} className="relative rounded-xl px-3.5 py-3" style={{ backgroundColor: done ? day.color + "18" : "#A855F715", border: `1px solid ${done ? day.color + "40" : "#A855F730"}` }}>
+                        <div className="absolute left-0 top-2 bottom-2 w-1 rounded-full" style={{ backgroundColor: done ? day.color : "#A855F7" }} />
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">S{i + 1}</span>
+                          <span className="text-[10px] bg-slate-800/80 text-slate-500 rounded-lg px-2 py-0.5">{s.repRange} reps</span>
+                        </div>
+                        {best && (
+                          <div className="flex items-center gap-2 mb-2.5 px-2 py-1.5 rounded-lg" style={{ backgroundColor: done ? day.color + "15" : "#A855F715" }}>
+                            <Zap size={12} style={{ color: done ? day.color : "#C084FC" }} className="shrink-0" />
+                            <span className="text-[10px] font-bold text-slate-500 line-through mr-1">{best.reps}×{kgToDisplay(best.kg, unit)}{weightLabel(unit)}</span>
+                            <ArrowDown size={10} style={{ color: done ? day.color : "#C084FC" }} />
+                            <span className="text-sm font-black" style={{ color: done ? day.color : "#D8B4FE" }}>{best.reps}×{kgToDisplay(deloadKg, unit)}{weightLabel(unit)}</span>
                           </div>
-                        ) : <span className="text-[11px] text-slate-700 flex-1 text-right">Sin marca</span>}
+                        )}
+                        <button onClick={() => toggleDeloadDone(progressKey)} className={`w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all active:scale-95 ${done ? "text-white" : "border border-dashed border-slate-700 text-slate-500 hover:text-slate-300 hover:border-slate-500"}`} style={done ? { backgroundColor: day.color } : {}}>
+                          {done ? <><Check size={13} /> Hecho</> : "Marcar como hecha"}
+                        </button>
                       </div>
                     );
                   })
@@ -4188,7 +4244,13 @@ function scanContributorsFor1RM(contributors, logs, overriddenBaseKeys) {
   Object.entries(logs).forEach(([key, val]) => {
     const isOverride = key.endsWith("_pr_override");
     const baseKey = isOverride ? key.replace(/_pr_override$/, "") : key;
-    if (!isOverride && overriddenBaseKeys.has(baseKey)) return;
+    // BUG FIX: antes, cuando existía un override para una serie, se ignoraba
+    // completamente el historial real (la línea "if (!isOverride && overridden…)
+    // return" saltaba afuera antes de procesar las entradas). Esto causaba que
+    // cualquier marca nueva registrada DESPUÉS de haber editado el récord a
+    // mano quedara invisible para el cálculo de rango — el muñeco dejaba de
+    // actualizarse y el "A superar" también. Ahora procesamos AMBOS (override
+    // + historial real) y nos quedamos con el que dé el mejor 1RM.
     const { exerciseId } = parseLogKey(baseKey);
     if (!contributors.has(exerciseId)) return;
     const weight = contributors.get(exerciseId);
@@ -4205,11 +4267,8 @@ function scanContributorsFor1RM(contributors, logs, overriddenBaseKeys) {
 
 function getBest1RMForMuscleGroup(groupKey, logs) {
   const { primary, always, secondary } = EXERCISE_LIBRARY_CONTRIBUTORS_BY_GROUP[groupKey] || { primary: new Map(), always: new Map(), secondary: new Map() };
-  const overriddenBaseKeys = new Set();
-  Object.keys(logs).forEach((k) => { if (k.endsWith("_pr_override")) overriddenBaseKeys.add(k.replace(/_pr_override$/, "")); });
-
-  const primaryResult = scanContributorsFor1RM(primary, logs, overriddenBaseKeys);
-  const alwaysResult = scanContributorsFor1RM(always, logs, overriddenBaseKeys);
+  const primaryResult = scanContributorsFor1RM(primary, logs);
+  const alwaysResult = scanContributorsFor1RM(always, logs);
   let best = primaryResult.best1RM >= alwaysResult.best1RM ? primaryResult : alwaysResult;
   if (best === alwaysResult && alwaysResult.best1RM > 0) {
     // Ganó un "siempre cuenta" (ej. press banca para tríceps) — nunca se
@@ -4222,7 +4281,7 @@ function getBest1RMForMuscleGroup(groupKey, logs) {
       ? { ...alwaysResult, bestKg: primaryResult.bestKg, bestReps: primaryResult.bestReps, bestExerciseId: primaryResult.bestExerciseId }
       : { ...alwaysResult, bestKg: null, bestReps: null, bestExerciseId: null };
   }
-  if (best.best1RM <= 0) best = scanContributorsFor1RM(secondary, logs, overriddenBaseKeys);
+  if (best.best1RM <= 0) best = scanContributorsFor1RM(secondary, logs);
 
   return {
     best1RM: best.best1RM, bestKg: best.bestKg, bestReps: best.bestReps, bestLoadFactor: best.bestLoadFactor, bestWeight: best.bestWeight,
@@ -5261,6 +5320,24 @@ function ExportTrainingCard({ profileName, logs }) {
 /* ============================================================================
    PROFILE VIEW — adds an entry point to the setup hub + a backup status line
 ============================================================================ */
+// Sección desplegable reutilizable para ProfileView
+function CollapsibleSection({ title, subtitle, icon, defaultOpen = false, children, accent }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl overflow-hidden backdrop-blur-sm shadow-md shadow-black/20">
+      <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-slate-800/30 active:bg-slate-800/50">
+        {icon && <span className="shrink-0" style={{ color: accent || "var(--chip-text)" }}>{icon}</span>}
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-bold text-white">{title}</p>
+          {subtitle && <p className="text-[11px] text-slate-500 mt-0.5 truncate">{subtitle}</p>}
+        </div>
+        <ChevronDown size={16} className={`text-slate-600 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && <div className="px-4 pb-4 pt-1 space-y-3.5 border-t border-slate-800/50">{children}</div>}
+    </div>
+  );
+}
+
 function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdateProfile, cycleStart, onSetCycleStart, onGoToRoutines }) {
   const profile = profiles[profileName];
   const [showDeletePin, setShowDeletePin] = useState(false); const [deleteError, setDeleteError] = useState("");
@@ -5289,13 +5366,14 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
     if (!profile?.googleUid) return;
     setSyncStatus("syncing");
     try {
-      await syncProfileToCloud(profile.googleUid, { ...profile, name: profileName });
+      await syncProfileToCloud(profile.googleUid, {
+        ...profile,
+        name: profileName,
+        cycleStart: cycleStart?.toISOString() ?? null,
+      });
       setSyncStatus("ok");
       setTimeout(() => setSyncStatus(null), 3000);
     } catch (err) {
-      // Si el error es NO_AUTH → no hay sesión de Firebase activa.
-      // Le explicamos al usuario qué tiene que hacer: salir y entrar
-      // con Google para activar la sesión.
       setSyncStatus(err?.message === "NO_AUTH" ? "no_auth" : "error");
       setTimeout(() => setSyncStatus(null), 6000);
     }
@@ -5442,8 +5520,7 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
         </div>
       )}
 
-      <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 backdrop-blur-sm shadow-md shadow-black/20 space-y-3.5">
-        <div><p className="text-sm font-bold text-white">Configuración de descarga</p><p className="text-[11px] text-slate-500 mt-0.5">Cada cuánto llega y cómo se reduce la carga</p></div>
+      <CollapsibleSection title="Configuración de descarga" subtitle={`Ciclo ${settings.trainWeeks}+${settings.deloadWeeks} sem · Carga ${Math.round(settings.deloadPct * 100)}%`} icon={<Zap size={16} />} accent="#A855F7">
         <div className="grid grid-cols-2 gap-3">
           {[{ key: "trainWeeks", label: "Sem. entrenamiento", min: 2, max: 12 }, { key: "deloadWeeks", label: "Sem. descarga", min: 1, max: 4 }].map(({ key, label, min, max }) => (
             <div key={key} className="bg-slate-950/40 rounded-xl p-3"><p className="text-[10px] text-slate-500 mb-2">{label}</p><div className="flex items-center justify-between"><button onClick={() => adjustSetting(key, -1, min, max)} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95">−</button><span className="text-sm font-black text-white tabular-nums">{settings[key]}</span><button onClick={() => adjustSetting(key, 1, min, max)} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95">+</button></div></div>
@@ -5454,58 +5531,59 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
           <div className="flex items-center gap-3"><button onClick={() => adjustDeloadPct(-0.05)} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95 shrink-0">−</button><div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden"><div className="h-full bg-purple-500 rounded-full transition-all" style={{ width: `${settings.deloadPct * 100}%` }} /></div><button onClick={() => adjustDeloadPct(0.05)} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95 shrink-0">+</button></div>
         </div>
         <div><p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Reducción de series</p><div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">{[{ k: 2, l: "Mitad" }, { k: 3, l: "Tercio" }, { k: 4, l: "Cuarto" }].map((opt) => <button key={opt.k} onClick={() => updateSettings({ deloadSetDivisor: opt.k })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${settings.deloadSetDivisor === opt.k ? "bg-purple-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>)}</div></div>
-      </div>
+      </CollapsibleSection>
 
-      <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 backdrop-blur-sm shadow-md shadow-black/20 space-y-3.5">
-        <div><p className="text-sm font-bold text-white">Descanso entre series</p><p className="text-[11px] text-slate-500 mt-0.5">Cómo te avisamos y cuánto dura cada pausa</p></div>
+      <CollapsibleSection title="Descanso entre series" subtitle={`${formatTime(settings.restShort)} – ${formatTime(settings.restLong)}`} icon={<Timer size={16} />} accent="#14B8A6">
         <div><p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Aviso al terminar</p><div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">{[{ k: "sound", l: "Sonido" }, { k: "vibration", l: "Vibración" }, { k: "both", l: "Ambos" }].map((opt) => <button key={opt.k} onClick={() => updateSettings({ alertType: opt.k })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${settings.alertType === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>)}</div></div>
         <div className="grid grid-cols-2 gap-3">
           {[{ key: "restLong", label: "Ejercicios pesados" }, { key: "restShort", label: "Resto" }].map(({ key, label }) => (
             <div key={key} className="bg-slate-950/40 rounded-xl p-3"><p className="text-[10px] text-slate-500 mb-2">{label}</p><div className="flex items-center justify-between"><button onClick={() => adjustRest(key, -15)} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95">−</button><span className="text-sm font-black text-white tabular-nums">{formatTime(settings[key])}</span><button onClick={() => adjustRest(key, 15)} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95">+</button></div></div>
           ))}
         </div>
-      </div>
+      </CollapsibleSection>
 
-      <div className="flex items-center gap-1.5 px-1 pt-2"><Sun size={11} className="text-slate-600" /><p className="text-[10px] font-black uppercase tracking-widest text-slate-600">Apariencia y accesibilidad</p></div>
-      <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 backdrop-blur-sm shadow-md shadow-black/20">
-        <p className="text-sm font-bold text-white mb-0.5">Apariencia</p>
-        <p className="text-[11px] text-slate-500 mb-3">Elegí el tema con el que se ve la app</p>
-        <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
-          {[{ k: "dark", l: "Oscuro", icon: <Moon size={13} /> }, { k: "light", l: "Claro", icon: <Sun size={13} /> }].map((opt) => (
-            <button key={opt.k} onClick={() => updateSettings({ theme: opt.k })} className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-all ${settings.theme === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.icon} {opt.l}</button>
-          ))}
-        </div>
-      </div>
-
-      <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 backdrop-blur-sm shadow-md shadow-black/20 space-y-4">
+      <CollapsibleSection title="Apariencia y accesibilidad" subtitle="Tema, unidad de peso, tamaño de letra" icon={<Sun size={16} />} accent="#F59E0B">
         <div>
-          <p className="text-sm font-bold text-white mb-0.5">Tamaño de letra</p>
-          <p className="text-[11px] text-slate-500 mb-3">Agrandá el texto de toda la app si te resulta más cómodo de leer</p>
+          <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Tema</p>
+          <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
+            {[{ k: "dark", l: "Oscuro", icon: <Moon size={13} /> }, { k: "light", l: "Claro", icon: <Sun size={13} /> }].map((opt) => (
+              <button key={opt.k} onClick={() => updateSettings({ theme: opt.k })} className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-all ${settings.theme === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.icon} {opt.l}</button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Unidad de peso</p>
+          <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
+            {[{ k: "kg", l: "Kilogramos (kg)" }, { k: "lbs", l: "Libras (lbs)" }].map((opt) => (
+              <button key={opt.k} onClick={() => updateSettings({ weightUnit: opt.k })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${settings.weightUnit === opt.k || (!settings.weightUnit && opt.k === "kg") ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
+            ))}
+          </div>
+        </div>
+        <div>
+          <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Tamaño de letra</p>
           <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
             {TEXT_SCALE_OPTIONS.map((opt) => (
               <button key={opt.k} onClick={() => updateSettings({ textScale: opt.v })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${(settings.textScale ?? 1) === opt.v ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
             ))}
           </div>
         </div>
-        <div className="pt-3.5 border-t border-slate-800/50">
-          <p className="text-sm font-bold text-white mb-0.5">Letras chicas</p>
-          <p className="text-[11px] text-slate-500 mb-3">Consejos de cada ejercicio, récords, RPE y otras etiquetas pequeñas que el control de arriba no agranda</p>
+        <div>
+          <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Letras chicas</p>
           <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
             {SMALL_TEXT_SCALE_OPTIONS.map((opt) => (
               <button key={opt.k} onClick={() => updateSettings({ smallTextScale: opt.v })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${(settings.smallTextScale ?? 1) === opt.v ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
             ))}
           </div>
         </div>
-        <div className="pt-3.5 border-t border-slate-800/50">
-          <p className="text-sm font-bold text-white mb-0.5">Zoom con los dedos</p>
-          <p className="text-[11px] text-slate-500 mb-3">Viene desactivado para que pellizcar la pantalla por accidente no te desencuadre la app. Activalo si te resulta más cómodo agrandar partes puntuales.</p>
+        <div>
+          <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Zoom con los dedos</p>
           <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
             {[{ v: false, l: "Desactivado" }, { v: true, l: "Activado" }].map((opt) => (
               <button key={String(opt.v)} onClick={() => updateSettings({ allowZoom: opt.v })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${(settings.allowZoom ?? false) === opt.v ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
             ))}
           </div>
         </div>
-      </div>
+      </CollapsibleSection>
 
       <div className="flex items-center gap-1.5 px-1 pt-2"><Zap size={11} className="text-slate-600" /><p className="text-[10px] font-black uppercase tracking-widest text-slate-600">Notificaciones</p></div>
       <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 backdrop-blur-sm shadow-md shadow-black/20">
@@ -6195,7 +6273,6 @@ function EntrenadorIAChat({ profile, logs, profileName, messages, setMessages, s
     setMessages(newMessages);
     setInput("");
     setIsSending(true);
-    try {
       // Antes esto sólo le mandaba los NOMBRES de las rutinas guardadas —
       // por eso no podía ver qué ejercicios tenía cada una, sólo los
       // récords sueltos en logs. Ahora se resuelve cada rutina (incluida
@@ -6266,28 +6343,43 @@ Datos: ${JSON.stringify(context)}`;
       // expone, y que activa la búsqueda con Google cuando hace falta
       // respaldar una afirmación científica — devuelve el texto y, si
       // corresponde, las fuentes reales que usó (ver "sources" más abajo).
-      const response = await fetch("/api/ia", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "chat", systemPrompt, history })
-      });
+      // Timeout de 30 segundos — Gemini en el plan gratuito a veces tarda
+      // bastante o directamente no responde. Con AbortController cortamos
+      // la espera y mostramos un mensaje claro en vez de quedarnos colgados.
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      try {
+        const response = await fetch("/api/ia", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "chat", systemPrompt, history }),
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
 
-      if (!response.ok) throw new Error("Error en el servidor");
-      const result = await response.json();
+        if (!response.ok) throw new Error(`Error ${response.status}`);
+        const result = await response.json();
 
-      const rawReply = result?.text;
-      const sources = Array.isArray(result?.sources) ? result.sources : [];
-      if (!rawReply) { setMessages((prev) => [...prev, { role: "assistant", text: "No se me ocurrió una respuesta — probá de nuevo." }]); return; }
+        const rawReply = result?.text;
+        const sources = Array.isArray(result?.sources) ? result.sources : [];
+        if (!rawReply) { setMessages((prev) => [...prev, { role: "assistant", text: "No se me ocurrió una respuesta — probá de nuevo." }]); return; }
 
-      const { text, action } = parseAction(rawReply);
-      const plan = action ? buildActionPlan(action, { profile, settings, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement }) : null;
-      setMessages((prev) => [...prev, { role: "assistant", text, plan, planStatus: plan ? "pending" : null, sources }]);
-    } catch (err) {
-      console.error("Error al hablar con el entrenador IA:", err);
-      setMessages((prev) => [...prev, { role: "assistant", text: "Uy, no me pude conectar. Probá de nuevo en un momento 🙏" }]);
-    } finally {
-      setIsSending(false);
-    }
+        const { text, action } = parseAction(rawReply);
+        const plan = action ? buildActionPlan(action, { profile, settings, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement }) : null;
+        setMessages((prev) => [...prev, { role: "assistant", text, plan, planStatus: plan ? "pending" : null, sources }]);
+      } catch (err) {
+        clearTimeout(timeoutId);
+        console.error("Error al hablar con el entrenador IA:", err);
+        const isTimeout = err.name === "AbortError";
+        setMessages((prev) => [...prev, {
+          role: "assistant",
+          text: isTimeout
+            ? "Tardé demasiado en responder (más de 30 segundos). El plan gratuito de Gemini tiene momentos pico — esperá un poco y volvé a intentar 🙏"
+            : "Uy, no me pude conectar. Revisá tu conexión o probá de nuevo en un momento 🙏"
+        }]);
+      } finally {
+        setIsSending(false);
+      }
   };
 
   const handleSend = () => {
@@ -6339,26 +6431,30 @@ Datos: ${JSON.stringify(context)}`;
       <div className="relative overflow-hidden rounded-2xl border border-teal-500/20 p-5 mb-3" style={{ background: "var(--grad-hero-teal)" }}>
         <div className="absolute -top-8 -right-6 w-32 h-32 rounded-full bg-teal-500/15 blur-2xl pointer-events-none" />
         <div className="absolute -bottom-6 -left-6 w-28 h-28 rounded-full bg-cyan-500/10 blur-2xl pointer-events-none" />
-        <div className="relative flex items-center gap-2 mb-1">
-          <Sparkles size={16} className="text-teal-400" />
-          <span className="text-[11px] font-black uppercase tracking-widest text-teal-400">Tu asistente</span>
+        <div className="relative flex items-center gap-3">
+          <div className="w-11 h-11 rounded-2xl bg-teal-500/20 border border-teal-500/30 flex items-center justify-center shrink-0">
+            <Sparkles size={20} className="text-teal-400" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className="text-[10px] font-black uppercase tracking-widest text-teal-400">Tu asistente</span>
+              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-teal-500/20 text-teal-400 font-bold border border-teal-500/20">BETA</span>
+            </div>
+            <h2 className="relative text-xl font-black text-white leading-tight">Entrenador IA</h2>
+            <p className="relative text-xs text-teal-300/60 mt-0.5">Conoce tu historial real — preguntale lo que quieras</p>
+          </div>
         </div>
-        <h2 className="relative text-xl font-black text-white leading-tight">Entrenador IA</h2>
-        <p className="relative text-xs text-teal-300/60 mt-1">Conoce tu historial real de entrenamiento — preguntale lo que quieras</p>
       </div>
 
-      {/* Qué puede hacer, en una sola fila chica con scroll horizontal —
-          en vez de un párrafo largo que ocupa media pantalla apenas
-          entrás. */}
       <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 mb-4">
         {[
-          { icon: <Layers size={11} />, label: "Crear o activar rutinas" },
-          { icon: <UserCog size={11} />, label: "Editar tu perfil" },
+          { icon: <Layers size={11} />, label: "Crear rutinas" },
+          { icon: <UserCog size={11} />, label: "Editar perfil" },
           { icon: <Calendar size={11} />, label: "Ciclo y descarga" },
-          { icon: <Sun size={11} />, label: "Apariencia" },
+          { icon: <BarChart3 size={11} />, label: "Analizar progreso" },
           { icon: <Award size={11} />, label: "Cita estudios reales" },
         ].map((c, i) => (
-          <span key={i} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-teal-500/10 border border-teal-500/20 text-teal-300 text-[10px] font-bold whitespace-nowrap shrink-0">{c.icon}{c.label}</span>
+          <button key={i} onClick={() => { setInput(c.label); }} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-teal-500/10 border border-teal-500/20 text-teal-300 text-[10px] font-bold whitespace-nowrap shrink-0 hover:bg-teal-500/20 transition active:scale-95">{c.icon}{c.label}</button>
         ))}
       </div>
 
@@ -6412,10 +6508,13 @@ Datos: ${JSON.stringify(context)}`;
         ))}
         {isSending && (
           <div className="flex justify-start">
-            <div className="bg-slate-900/60 border border-slate-800/60 rounded-2xl px-4 py-3 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-slate-500 animate-pulse" />
-              <span className="w-1.5 h-1.5 rounded-full bg-slate-500 animate-pulse" style={{ animationDelay: "0.15s" }} />
-              <span className="w-1.5 h-1.5 rounded-full bg-slate-500 animate-pulse" style={{ animationDelay: "0.3s" }} />
+            <div className="bg-slate-900/60 border border-slate-800/60 rounded-2xl px-4 py-3.5 flex items-center gap-3 max-w-[70%]">
+              <div className="flex gap-1">
+                <span className="w-2 h-2 rounded-full bg-teal-500 animate-bounce" style={{ animationDelay: "0ms" }} />
+                <span className="w-2 h-2 rounded-full bg-teal-500 animate-bounce" style={{ animationDelay: "150ms" }} />
+                <span className="w-2 h-2 rounded-full bg-teal-500 animate-bounce" style={{ animationDelay: "300ms" }} />
+              </div>
+              <span className="text-[11px] text-slate-500">Pensando... puede tardar hasta 30s</span>
             </div>
           </div>
         )}
@@ -7034,16 +7133,19 @@ export default function App() {
   useEffect(() => {
     if (!activeProfile) return;
     const p = profiles[activeProfile];
-    if (p?.googleUid) syncProfileToCloud(p.googleUid, { ...p, name: activeProfile }).catch(() => {});
+    // cycleStart vive fuera del perfil (su propia clave en localStorage),
+    // así que lo adjuntamos al objeto antes de subir — en la nube queda
+    // adentro del documento del usuario como un campo más.
+    if (p?.googleUid) syncProfileToCloud(p.googleUid, { ...p, name: activeProfile, cycleStart: cycleStart?.toISOString() ?? null }).catch(() => {});
   }, [activeProfile]);
 
-  const debouncedSync = useMemo(() => debounce((prof, name) => {
+  const debouncedSync = useMemo(() => debounce((prof, name, cs) => {
     const p = prof[name];
-    if (p?.googleUid) syncProfileToCloud(p.googleUid, { ...p, name }).catch(() => {});
+    if (p?.googleUid) syncProfileToCloud(p.googleUid, { ...p, name, cycleStart: cs?.toISOString() ?? null }).catch(() => {});
   }, 4000), []);
   useEffect(() => {
-    if (activeProfile && profiles[activeProfile]) debouncedSync(profiles, activeProfile);
-  }, [profiles, activeProfile]);
+    if (activeProfile && profiles[activeProfile]) debouncedSync(profiles, activeProfile, cycleStart);
+  }, [profiles, activeProfile, cycleStart]);
   // perfil — antes, con un solo perfil sin PIN en el dispositivo, tocar ese
   // botón no parecía hacer nada porque te re-logueaba al instante. En una
   // carga nueva de la página este estado vuelve a su valor inicial (false),
@@ -7053,6 +7155,18 @@ export default function App() {
   useEffect(() => {
     const saved = loadActive();
     if (saved && profiles[saved] && !profiles[saved].pin) setActiveProfile(saved);
+  }, []);
+
+  // Pedir permiso de notificaciones al montar — en Android con Capacitor,
+  // las notificaciones del WebView (Notification API) aparecen como
+  // notificaciones del sistema operativo si el usuario las acepta.
+  // Lo pedimos al inicio para que el diálogo aparezca pronto, no cuando
+  // ya está entrenando (que sería más molesto).
+  useEffect(() => {
+    if (typeof Notification !== "undefined" && Notification.permission === "default") {
+      // Pequeño delay para no interrumpir la carga inicial de la app
+      setTimeout(() => { Notification.requestPermission().catch(() => {}); }, 3000);
+    }
   }, []);
 
   // Persiste, una sola vez al montar, la migración de perfiles viejos (los
@@ -7499,7 +7613,9 @@ export default function App() {
     </>
   );
 
+  const activeWeightUnit = getProfileSettings(profiles[activeProfile]).weightUnit ?? "kg";
   return (
+    <WeightUnitCtx.Provider value={activeWeightUnit}>
     <div className={`min-h-screen bg-[#0a0a0f] text-white font-sans lg:flex ${themeClass}`} style={{ "--small-text-scale": smallTextScale }}>
       <StyleInjector />
       {recoveredNotice && <RecoveredBanner onClose={() => setRecoveredNotice(false)} />}
@@ -7568,6 +7684,7 @@ export default function App() {
         />
       )}
     </div>
+    </WeightUnitCtx.Provider>
   );
 }
 
