@@ -128,6 +128,6 @@ ${text}
     // tener que ir a buscar los logs de Vercel cada vez — antes de
     // publicar la app de verdad, hay que sacar esta línea (no se le debe
     // mostrar el motivo técnico exacto a cualquiera que use el chat).
-    res.status(500).json({ error: "Error en el servidor.", detail: err.message });
+    res.status(500).json({ error: "Error en el servidor." });
   }
 };

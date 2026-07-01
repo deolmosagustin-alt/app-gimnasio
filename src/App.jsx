@@ -1901,16 +1901,12 @@ function LoginScreen({ onLogin, allowAutoLogin = true }) {
       // haya un perfil local con este uid, puede estar vacío (si fue creado
       // en una sesión anterior antes de que los datos llegaran a Firestore).
       const matchEntry = Object.entries(profiles).find(([, p]) => p.googleUid === uid);
-      console.log("[PONOS] Login Google - uid:", uid);
-      console.log("[PONOS] Perfil local encontrado:", matchEntry ? matchEntry[0] : "ninguno");
       const cloudProfile = await fetchProfileFromCloud(uid);
-      console.log("[PONOS] Perfil en Firestore:", cloudProfile ? `encontrado (logs: ${Object.keys(cloudProfile.logs || {}).length})` : "no encontrado");
 
       if (matchEntry || cloudProfile) {
         const [matchName, localProfile] = matchEntry || [cloudProfile?.name || name, null];
         const merged = mergeProfiles(localProfile, cloudProfile);
         const finalProfile = { ...merged, archived: false, googleUid: uid, email };
-        console.log("[PONOS] Logs después del merge:", Object.keys(finalProfile.logs || {}).length);
         const updated = { ...profiles, [matchName]: finalProfile };
         saveProfiles(updated); setProfilesState(updated);
         saveActive(matchName);
