@@ -1847,61 +1847,24 @@ function LoginScreen({ onLogin, allowAutoLogin = true }) {
       const name = firebaseUser.displayName || pluginUser.displayName || "Usuario de Google";
       const email = firebaseUser.email || pluginUser.email;
 
-      // 3. Busca primero por googleUid en TODOS los perfiles LOCALES
+      // 3. Siempre consultamos Firestore al hacer login con Google — aunque
+      // haya un perfil local con este uid, puede estar vacío (si fue creado
+      // en una sesión anterior antes de que los datos llegaran a Firestore).
+      // Mergeamos local y cloud tomando lo más completo de los dos.
       const matchEntry = Object.entries(profiles).find(([, p]) => p.googleUid === uid);
-      if (matchEntry) {
-        const [matchName, matchProfile] = matchEntry;
-        // Si el perfil vinculado a Google tiene poquísimos datos de
-        // entrenamiento, puede que el usuario haya creado otro perfil
-        // local (sin Google) donde entrenó todo este tiempo — en ese
-        // caso, buscamos el perfil local con MÁS datos y fusionamos su
-        // historial adentro del perfil de Google, para que no pierda nada.
-        const linkedLogs = Object.keys(matchProfile.logs || {}).length;
-        const linkedSessions = (matchProfile.trainingSessions || []).length;
-        const linkedIsEmpty = linkedLogs < 5 && linkedSessions < 2;
-        let richestProfile = null;
-        if (linkedIsEmpty) {
-          let richScore = 0;
-          Object.entries(profiles).forEach(([pName, p]) => {
-            if (pName === matchName) return;
-            const score = Object.keys(p.logs || {}).length + (p.trainingSessions || []).length * 3;
-            if (score > richScore) { richScore = score; richestProfile = p; }
-          });
-        }
-        const baseProfile = richestProfile
-          ? {
-              ...matchProfile,
-              logs: { ...(richestProfile.logs || {}), ...(matchProfile.logs || {}) },
-              trainingSessions: [...(richestProfile.trainingSessions || []), ...(matchProfile.trainingSessions || [])],
-              measurements: { ...(richestProfile.measurements || {}), ...(matchProfile.measurements || {}) },
-              settings: richestProfile.settings || matchProfile.settings,
-              routines: { ...(richestProfile.routines || {}), ...(matchProfile.routines || {}) },
-              activeRoutineId: matchProfile.activeRoutineId || richestProfile.activeRoutineId,
-            }
-          : matchProfile;
-        const merged = { ...baseProfile, archived: false, email, googleUid: uid };
-        const updated = { ...profiles, [matchName]: merged };
+      const cloudProfile = await fetchProfileFromCloud(uid);
+
+      if (matchEntry || cloudProfile) {
+        const [matchName, localProfile] = matchEntry || [cloudProfile?.name || name, null];
+        // mergeProfiles toma el más reciente según _syncedAt, y preserva
+        // los logs locales si la nube no tiene ninguno (y viceversa).
+        const merged = mergeProfiles(localProfile, cloudProfile);
+        const finalProfile = { ...merged, archived: false, googleUid: uid, email };
+        const updated = { ...profiles, [matchName]: finalProfile };
         saveProfiles(updated); setProfilesState(updated);
         saveActive(matchName); onLogin(matchName, updated);
-        // Subir el perfil fusionado a la nube inmediatamente
-        syncProfileToCloud(uid, { ...merged, name: matchName });
-        return;
-      }
-
-      // 4. Nada local con este uid — puede ser la primera vez en ESTE
-      // dispositivo aunque la cuenta ya exista en otro. Antes de crear
-      // nada, bajamos el perfil completo (logs, sesiones, medidas, todo)
-      // desde Firestore y lo mergeamos con lo que haya en local.
-      const cloudProfile = await fetchProfileFromCloud(uid);
-      if (cloudProfile) {
-        const cloudName = cloudProfile.name || name;
-        // Merge: si hay un perfil local con ese mismo nombre (quizás creado
-        // offline antes de vincular), combinamos ambos tomando lo más reciente.
-        const localForName = profiles[cloudName];
-        const merged = mergeProfiles(localForName || null, cloudProfile);
-        const updated = { ...profiles, [cloudName]: { ...merged, archived: false } };
-        saveProfiles(updated); setProfilesState(updated);
-        saveActive(cloudName); onLogin(cloudName, updated);
+        // Subir el resultado del merge a la nube (sin await — no bloquea el login)
+        syncProfileToCloud(uid, { ...finalProfile, name: matchName }).catch(() => {});
         return;
       }
 
