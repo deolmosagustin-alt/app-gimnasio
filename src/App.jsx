@@ -1649,14 +1649,14 @@ function PinInput({ length = 4, onComplete, label = "Ingresá tu PIN", error, on
 // caminos se usó.
 async function googleSignIn() {
   if (Capacitor.isNativePlatform()) {
-    // Con skipNativeAuth: false (configurado en capacitor.config.json), el
-    // plugin YA deja autenticada la sesión de Firebase del lado JS por su
-    // cuenta apenas termina el login nativo — no hace falta (ni conviene)
-    // volver a armar la credencial a mano con signInWithCredential: hacerlo
-    // duplicaba el trabajo que el plugin ya hizo, y era la causa real del
-    // "Error al conectar con Google" que tirabas. `result.user` ya trae
-    // uid/email/displayName listos para usar.
-    const result = await FirebaseAuthentication.signInWithGoogle();
+    const result = await FirebaseAuthentication.signInWithGoogle({
+      // El Web Client ID hay que pasarlo acá explícitamente además de
+      // en strings.xml — el Credential Manager lo necesita en los dos
+      // lugares para funcionar correctamente en Android.
+      customParameters: [
+        { key: "client_id", value: "1027242959052-b9i0hq3fc2rbfoqr48chkpkkir2qu4e6.apps.googleusercontent.com" }
+      ]
+    });
     if (!result?.user) throw new Error("No se recibió el usuario de Google.");
     return result.user;
   }
