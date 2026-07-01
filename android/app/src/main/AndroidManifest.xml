@@ -40,11 +40,15 @@
     <uses-permission android:name="android.permission.INTERNET" />
 
     <!-- Notificaciones locales (timer de descanso entre series) -->
-    <!-- POST_NOTIFICATIONS requerido en Android 13+ (API 33+) para mostrar notificaciones -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-    <!-- RECEIVE_BOOT_COMPLETED permite reprogramar notificaciones al reiniciar el dispositivo -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
-    <!-- SCHEDULE_EXACT_ALARM permite que LocalNotifications dispare la notificación en el momento exacto -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+
+    <!-- Galería de fotos (foto de perfil y fotos de progreso) -->
+    <!-- Android 13+ (API 33+) -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
+    <!-- Android 12 y anteriores -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32"/>
 
 </manifest>
