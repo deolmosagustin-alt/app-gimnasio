@@ -3498,9 +3498,9 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
         </div>
       )}
 
-      <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-4 px-4 snap-x">
+      <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${DAY_ORDER.length}, 1fr)` }}>
         {DAY_ORDER.map((k) => (
-          <button key={k} onClick={() => setActiveDay(k)} className="px-4 py-2.5 rounded-xl text-xs font-bold uppercase whitespace-nowrap transition-all active:scale-95 border hover:-translate-y-0.5 snap-start shrink-0"
+          <button key={k} onClick={() => setActiveDay(k)} className="py-2.5 rounded-xl text-[10px] font-black uppercase transition-all active:scale-95 border text-center leading-tight"
             style={activeDay === k ? { background: ROUTINE[k].color, borderColor: ROUTINE[k].color, color: "#fff", boxShadow: `0 4px 14px -4px ${ROUTINE[k].color}66` } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
             {ROUTINE[k].label}
           </button>
