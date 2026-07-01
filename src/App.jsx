@@ -237,11 +237,20 @@ async function fetchProfileFromCloud(uid) {
 async function syncProfileToCloud(uid, profile) {
   try {
     const firebaseUser = await getCurrentUser();
-    if (!firebaseUser || firebaseUser.uid !== uid) return; // no auth → no sync
+    if (!firebaseUser || firebaseUser.uid !== uid) {
+      // No hay sesión de Firebase Auth activa para este uid — el write
+      // fallaría. Lanzamos un error para que quien llame (ej. el botón
+      // de sync manual) pueda mostrar un mensaje apropiado al usuario.
+      throw new Error("NO_AUTH");
+    }
     const data = profileToCloud(profile);
     await setDoc(doc(db, "users", uid), { ...data, _syncedAt: new Date().toISOString() }, { merge: true });
   } catch (err) {
-    console.error("Error al sincronizar el perfil a la nube:", err);
+    // Re-throw para que el caller pueda manejar el error.
+    // En el sync automático (debounce / useEffect), el error se loguea
+    // y se ignora — se reintentará en el próximo cambio o al reabrir.
+    console.error("Error al sincronizar:", err.message);
+    throw err;
   }
 }
 
@@ -5298,9 +5307,12 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
       await syncProfileToCloud(profile.googleUid, { ...profile, name: profileName });
       setSyncStatus("ok");
       setTimeout(() => setSyncStatus(null), 3000);
-    } catch {
-      setSyncStatus("error");
-      setTimeout(() => setSyncStatus(null), 3000);
+    } catch (err) {
+      // Si el error es NO_AUTH → no hay sesión de Firebase activa.
+      // Le explicamos al usuario qué tiene que hacer: salir y entrar
+      // con Google para activar la sesión.
+      setSyncStatus(err?.message === "NO_AUTH" ? "no_auth" : "error");
+      setTimeout(() => setSyncStatus(null), 6000);
     }
   };
 
@@ -5393,8 +5405,12 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
           <div className="flex items-center gap-2.5 px-4 py-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 text-emerald-400 text-sm font-medium">
             <Check size={14} className="shrink-0" /> Vinculado con Google
           </div>
-          <button onClick={handleManualSync} disabled={syncStatus === "syncing"} className={`w-full flex items-center gap-2 justify-center py-2.5 rounded-2xl border text-xs font-bold transition-all active:scale-[0.98] ${syncStatus === "ok" ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400" : syncStatus === "error" ? "border-rose-500/40 bg-rose-500/10 text-rose-400" : syncStatus === "syncing" ? "border-slate-700 text-slate-500" : "border-slate-700 text-slate-400 hover:border-teal-500/40 hover:text-teal-400"}`}>
-            {syncStatus === "syncing" ? <><RefreshCw size={12} className="animate-spin" /> Subiendo datos...</> : syncStatus === "ok" ? <><Check size={12} /> Datos subidos a la nube</> : syncStatus === "error" ? "Error al subir — intentá de nuevo" : <><Upload size={12} /> Subir mis datos a la nube ahora</>}
+          <button onClick={handleManualSync} disabled={syncStatus === "syncing"} className={`w-full flex items-center gap-2 justify-center py-2.5 rounded-2xl border text-xs font-bold transition-all active:scale-[0.98] ${syncStatus === "ok" ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400" : syncStatus === "error" || syncStatus === "no_auth" ? "border-rose-500/40 bg-rose-500/10 text-rose-400" : syncStatus === "syncing" ? "border-slate-700 text-slate-500" : "border-slate-700 text-slate-400 hover:border-teal-500/40 hover:text-teal-400"}`}>
+            {syncStatus === "syncing" ? <><RefreshCw size={12} className="animate-spin" /> Subiendo datos...</>
+              : syncStatus === "ok" ? <><Check size={12} /> Datos subidos a la nube</>
+              : syncStatus === "no_auth" ? "Salí y volvé a entrar con Google primero"
+              : syncStatus === "error" ? "Error al subir — verificá tu conexión"
+              : <><Upload size={12} /> Subir mis datos a la nube ahora</>}
           </button>
           <p className="text-[10px] text-slate-600 text-center">Tocá este botón desde cada dispositivo antes de cambiar de celular o reinstalar.</p>
         </div>
@@ -7026,21 +7042,19 @@ export default function App() {
   const [recoveredNotice, setRecoveredNotice] = useState(false);
 
   // Sync al hacer login / cambiar de perfil — sube todo apenas el usuario
-  // entra. `syncProfileToCloud` espera internamente a que Firebase Auth
-  // esté listo, así que no hay que preocuparse por el timing acá.
+  // entra. Si no hay sesión de Firebase Auth activa todavía (por ejemplo,
+  // auto-login desde localStorage sin haber pasado por Google), el sync
+  // falla silenciosamente y se reintenta en el próximo cambio o cuando
+  // el usuario entre por Google y Auth esté activo.
   useEffect(() => {
     if (!activeProfile) return;
     const p = profiles[activeProfile];
-    if (p?.googleUid) syncProfileToCloud(p.googleUid, { ...p, name: activeProfile });
+    if (p?.googleUid) syncProfileToCloud(p.googleUid, { ...p, name: activeProfile }).catch(() => {});
   }, [activeProfile]);
 
-  // Debounce para cambios en tiempo real — 4 segundos después de cualquier
-  // write (serie, medida, configuración), sube los cambios a Firestore.
-  // Si no hay internet, Firestore los encola y los sube cuando vuelve la
-  // conexión — automáticamente, sin que tengamos que hacer nada extra.
   const debouncedSync = useMemo(() => debounce((prof, name) => {
     const p = prof[name];
-    if (p?.googleUid) syncProfileToCloud(p.googleUid, { ...p, name });
+    if (p?.googleUid) syncProfileToCloud(p.googleUid, { ...p, name }).catch(() => {});
   }, 4000), []);
   useEffect(() => {
     if (activeProfile && profiles[activeProfile]) debouncedSync(profiles, activeProfile);
