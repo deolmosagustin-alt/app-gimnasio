@@ -3073,7 +3073,11 @@ function HelpModal({ startTab, onClose }) {
    resetea el día (resetKey) o se finaliza la sesión (ver RoutineView/App).
 ============================================================================ */
 function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, accent, logs, setLogs, drafts = {}, setDrafts, deloadKgFactor = 1, deloadMode = false, resetKey = 0, autoShowPrShare = true, onDisableAutoShowPrShare, hasActiveSession = true, cardio = false }) {
-  const unit = useWeightUnit();
+  const globalUnit = useWeightUnit();
+  // Unidad local: arranca desde la preferencia global, pero el usuario puede
+  // cambiarla ejercicio por ejercicio con el toggle kg/lbs del input.
+  const [unit, setUnit] = useState(globalUnit);
+  useEffect(() => { setUnit(globalUnit); }, [globalUnit]);
   const key = `${exerciseId}_${setIndex}`, prKey = `${key}_pr_override`, today = todayStr();
   const history = logs[key] || [], override = logs[prKey];
   // Cardio no tiene una "carga" comparable (no hay kg×reps) — el récord
@@ -3196,20 +3200,66 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
         )}
       </div>
 
-      {cardio ? (
-        <div className="flex items-end gap-2">
-          <div className="flex-1"><label className="text-[10px] text-slate-600 font-semibold uppercase tracking-wider mb-1.5 block">Minutos</label><input type="number" inputMode="decimal" placeholder="—" value={minutes} onChange={(e) => updateDraft({ minutes: e.target.value })} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3.5 text-xl font-black text-center text-white focus:outline-none focus:border-teal-500/50 transition" /></div>
-          <div className="flex-1"><label className="text-[10px] text-slate-600 font-semibold uppercase tracking-wider mb-1.5 block">Km <span className="text-slate-700 normal-case">(opc.)</span></label><input type="number" inputMode="decimal" placeholder="—" value={km} onChange={(e) => updateDraft({ km: e.target.value })} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3.5 text-xl font-black text-center text-white focus:outline-none focus:border-teal-500/50 transition" /></div>
-          <button ref={saveBtnRef} onClick={handleSave} className={`p-3.5 rounded-xl transition-all active:scale-90 font-bold text-white flex items-center justify-center ${saved ? "bg-emerald-500" : "hover:opacity-90"}`} style={!saved ? { backgroundColor: accent } : {}}>{saved ? <Check size={18} /> : <Save size={18} />}</button>
-        </div>
-      ) : (
-        <div className="flex items-end gap-2">
-          <div className="flex-1"><label className="text-[10px] text-slate-600 font-semibold uppercase tracking-wider mb-1.5 block">Reps</label><input type="number" inputMode="decimal" placeholder="—" value={reps} onChange={(e) => updateDraft({ reps: e.target.value })} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3.5 text-xl font-black text-center text-white focus:outline-none focus:border-teal-500/50 transition" /></div>
-          <div className="text-slate-700 text-lg pb-3">×</div>
-          <div className="flex-1"><label className="text-[10px] text-slate-600 font-semibold uppercase tracking-wider mb-1.5 block">{weightLabel(unit)}</label><input type="number" inputMode="decimal" placeholder="—" value={kg} onChange={(e) => updateDraft({ kg: e.target.value })} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3.5 text-xl font-black text-center text-white focus:outline-none focus:border-teal-500/50 transition" /></div>
-          <button ref={saveBtnRef} onClick={handleSave} className={`p-3.5 rounded-xl transition-all active:scale-90 font-bold text-white flex items-center justify-center ${saved ? "bg-emerald-500" : "hover:opacity-90"}`} style={!saved ? { backgroundColor: accent } : {}}>{saved ? <Check size={18} /> : <Save size={18} />}</button>
-        </div>
-      )}
+      {/* Modo bloqueado: si ya guardaste una entrada hoy, los inputs se
+          reemplazan por la vista en solo lectura. El usuario puede tocar
+          "Editar" para desbloquear y corregir — así no hay riesgo de
+          guardar dos veces sin querer. */}
+      {(() => {
+        const today = new Date().toISOString().split("T")[0];
+        const key = `${exerciseId}_${setIndex}`;
+        const history = logs[key] || [];
+        const todayEntry = history.find((h) => h.date === today);
+        if (cardio) {
+          const todayCardio = (logs[`${exerciseId}_${setIndex}`] || []).find((h) => h.date === today);
+          if (todayCardio) {
+            return (
+              <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ backgroundColor: accent + "15", border: `1px solid ${accent}30` }}>
+                <Check size={14} style={{ color: accent }} className="shrink-0" />
+                <span className="text-sm font-black" style={{ color: accent }}>{todayCardio.minutes} min{todayCardio.km ? ` · ${todayCardio.km} km` : ""}</span>
+                <span className="text-[10px] text-slate-500 ml-1">guardado hoy</span>
+                <button onClick={() => updateDraft({ minutes: String(todayCardio.minutes), km: String(todayCardio.km || "") })} className="ml-auto text-[10px] font-bold px-2 py-1 rounded-lg transition" style={{ backgroundColor: accent + "20", color: accent }}>Editar</button>
+              </div>
+            );
+          }
+          return (
+            <div className="flex items-end gap-2">
+              <div className="flex-1"><label className="text-[10px] text-slate-600 font-semibold uppercase tracking-wider mb-1.5 block">Minutos</label><input type="number" inputMode="decimal" placeholder="—" value={minutes} onChange={(e) => updateDraft({ minutes: e.target.value })} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3.5 text-xl font-black text-center text-white focus:outline-none focus:border-teal-500/50 transition" /></div>
+              <div className="flex-1"><label className="text-[10px] text-slate-600 font-semibold uppercase tracking-wider mb-1.5 block">Km <span className="text-slate-700 normal-case">(opc.)</span></label><input type="number" inputMode="decimal" placeholder="—" value={km} onChange={(e) => updateDraft({ km: e.target.value })} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3.5 text-xl font-black text-center text-white focus:outline-none focus:border-teal-500/50 transition" /></div>
+              <button ref={saveBtnRef} onClick={handleSave} className={`p-3.5 rounded-xl transition-all active:scale-90 font-bold text-white flex items-center justify-center ${saved ? "bg-emerald-500" : "hover:opacity-90"}`} style={!saved ? { backgroundColor: accent } : {}}>{saved ? <Check size={18} /> : <Save size={18} />}</button>
+            </div>
+          );
+        }
+        if (todayEntry) {
+          return (
+            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ backgroundColor: accent + "15", border: `1px solid ${accent}30` }}>
+              <Check size={14} style={{ color: accent }} className="shrink-0" />
+              <span className="text-sm font-black" style={{ color: accent }}>{todayEntry.reps}×{kgToDisplay(todayEntry.kg, unit)}{weightLabel(unit)}</span>
+              {todayEntry.rpe && <span className="text-[10px] px-1.5 py-0.5 rounded-lg bg-slate-800 text-slate-400">RPE {todayEntry.rpe}</span>}
+              <span className="text-[10px] text-slate-500 ml-1">guardado hoy</span>
+              <button onClick={() => { updateDraft({ reps: String(todayEntry.reps), kg: String(kgToDisplay(todayEntry.kg, unit)) }); }} className="ml-auto text-[10px] font-bold px-2 py-1 rounded-lg transition" style={{ backgroundColor: accent + "20", color: accent }}>Editar</button>
+            </div>
+          );
+        }
+        return (
+          <div className="flex items-end gap-2">
+            <div className="flex-1">
+              <label className="text-[10px] text-slate-600 font-semibold uppercase tracking-wider mb-1.5 block">Reps</label>
+              <input type="number" inputMode="decimal" placeholder="—" value={reps} onChange={(e) => updateDraft({ reps: e.target.value })} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3.5 text-xl font-black text-center text-white focus:outline-none focus:border-teal-500/50 transition" />
+            </div>
+            <div className="text-slate-700 text-lg pb-3">×</div>
+            <div className="flex-1">
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-[10px] text-slate-600 font-semibold uppercase tracking-wider">{weightLabel(unit)}</label>
+                <button onClick={() => setUnit((u) => u === "kg" ? "lbs" : "kg")} className="text-[9px] font-bold px-1.5 py-0.5 rounded-md transition" style={{ backgroundColor: accent + "20", color: accent }}>
+                  {unit === "kg" ? "→ lbs" : "→ kg"}
+                </button>
+              </div>
+              <input type="number" inputMode="decimal" placeholder="—" value={kg} onChange={(e) => updateDraft({ kg: e.target.value })} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3.5 text-xl font-black text-center text-white focus:outline-none focus:border-teal-500/50 transition" />
+            </div>
+            <button ref={saveBtnRef} onClick={handleSave} className={`p-3.5 rounded-xl transition-all active:scale-90 font-bold text-white flex items-center justify-center ${saved ? "bg-emerald-500" : "hover:opacity-90"}`} style={!saved ? { backgroundColor: accent } : {}}>{saved ? <Check size={18} /> : <Save size={18} />}</button>
+          </div>
+        );
+      })()}
       {!showRpe ? (
         <button onClick={() => setShowRpeLocal(true)} className="w-full flex items-center justify-center gap-1.5 mt-2.5 py-2 rounded-lg border border-dashed border-slate-700 text-slate-500 hover:text-slate-300 hover:border-slate-500 text-[11px] font-bold transition"><Activity size={11} /> Registrar esfuerzo (RPE)</button>
       ) : (
@@ -4392,8 +4442,23 @@ function getSlugsForOurGroup(ourKey) {
 const MODEL_NOOP_CLICK = () => {};
 const MODEL_STYLE = { width: "100%" };
 
+// Mezcla un color hex con el color del cuerpo del muñeco (#334155)
+// para reducir la saturación y bajar la intensidad visual sin cambiar
+// los colores de los badges/cards de rango — 0.65 = 65% original, 35% fondo.
+function muteHex(hex, amount = 0.65) {
+  const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+  const br = 51, bg = 65, bb = 85; // body color #334155
+  const nr = Math.round(r * amount + br * (1 - amount));
+  const ng = Math.round(g * amount + bg * (1 - amount));
+  const nb = Math.round(b * amount + bb * (1 - amount));
+  return `#${nr.toString(16).padStart(2, "0")}${ng.toString(16).padStart(2, "0")}${nb.toString(16).padStart(2, "0")}`;
+}
+
 function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backRef }) {
-  const highlightedColors = useMemo(() => RANK_TIERS.map((t) => t.color), []);
+  // highlightedColors: versión suavizada de los colores de RANK_TIERS —
+  // mezclada 65/35 con el fondo oscuro para que el muñeco no acapare
+  // toda la atención visual de la pantalla.
+  const highlightedColors = useMemo(() => RANK_TIERS.map((t) => muteHex(t.color, 0.65)), []);
   const data = useMemo(() => {
     const bestLevelBySlug = {};
     Object.entries(BODY_HIGHLIGHTER_SLUG_MAP).forEach(([ourKey, slug]) => {
@@ -5743,6 +5808,8 @@ function ExercisePickerPanel({ existingIds, onAdd, onAddCustom, onClose }) {
   const [group, setGroup] = useState(MUSCLE_GROUPS[0].key);
   const [search, setSearch] = useState("");
   const [customName, setCustomName] = useState("");
+  // Músculo del ejercicio personalizado — por defecto el grupo activo en el picker
+  const [customMuscle, setCustomMuscle] = useState(MUSCLE_GROUPS[0].key);
   const pool = search.trim()
     ? EXERCISE_LIBRARY.filter((e) => e.name.toLowerCase().includes(search.trim().toLowerCase()))
     : EXERCISE_LIBRARY_BY_GROUP[group];
@@ -5753,7 +5820,7 @@ function ExercisePickerPanel({ existingIds, onAdd, onAddCustom, onClose }) {
       {!search.trim() && (
         <div className="flex gap-1.5 overflow-x-auto pb-2 -mx-1 px-1">
           {MUSCLE_GROUPS.map((g) => (
-            <button key={g.key} onClick={() => setGroup(g.key)} className="px-2.5 py-1 rounded-lg text-[10px] font-bold whitespace-nowrap transition-all border shrink-0"
+            <button key={g.key} onClick={() => { setGroup(g.key); setCustomMuscle(g.key); }} className="px-2.5 py-1 rounded-lg text-[10px] font-bold whitespace-nowrap transition-all border shrink-0"
               style={group === g.key ? { backgroundColor: g.color + "22", borderColor: g.color + "55", color: g.color } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
               {g.label}
             </button>
@@ -5775,9 +5842,23 @@ function ExercisePickerPanel({ existingIds, onAdd, onAddCustom, onClose }) {
         })}
         {pool.length === 0 && <p className="text-[11px] text-slate-600 text-center py-3">Sin resultados.</p>}
       </div>
-      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-800/60">
-        <input value={customName} onChange={(e) => setCustomName(e.target.value)} placeholder="¿No está? Agregá uno propio…" className="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-teal-500/50" />
-        <button onClick={() => { if (customName.trim()) { onAddCustom(customName.trim()); setCustomName(""); } }} className="px-3 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs font-bold shrink-0">Agregar</button>
+      <div className="mt-3 pt-3 border-t border-slate-800/60 space-y-2">
+        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Agregar ejercicio propio</p>
+        <input value={customName} onChange={(e) => setCustomName(e.target.value)} placeholder="Nombre del ejercicio…" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-teal-500/50" />
+        <div>
+          <p className="text-[9px] text-slate-600 mb-1.5">Músculo principal:</p>
+          <div className="flex flex-wrap gap-1.5">
+            {MUSCLE_GROUPS.filter((g) => g.key !== "cardio").map((g) => (
+              <button key={g.key} onClick={() => setCustomMuscle(g.key)} className="px-2 py-1 rounded-lg text-[9px] font-bold border transition shrink-0"
+                style={customMuscle === g.key ? { backgroundColor: g.color + "22", borderColor: g.color + "55", color: g.color } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
+                {g.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <button onClick={() => { if (customName.trim()) { onAddCustom(customName.trim(), customMuscle); setCustomName(""); } }} className="w-full py-2 rounded-xl bg-teal-500/20 border border-teal-500/30 text-teal-400 text-xs font-bold transition active:scale-95">
+          <Plus size={12} className="inline mr-1" /> Agregar a la rutina
+        </button>
       </div>
       <p className="text-[9px] text-slate-600 mt-1.5">Los ejercicios propios no tienen nota técnica ni video de YouTube.</p>
       <button onClick={onClose} className="w-full mt-3 py-2 rounded-xl text-slate-500 hover:text-slate-300 text-[11px] font-semibold">Cerrar buscador</button>
@@ -6241,7 +6322,7 @@ function buildActionPlan(action, ctx) {
 // criterio sobre cómo venís, los últimos registros alcanzan de sobra; los
 // récords corregidos a mano (_pr_override) se mandan completos siempre,
 // son un solo objeto chico cada uno, no pesan nada.
-const AI_LOG_HISTORY_LIMIT = 12;
+const AI_LOG_HISTORY_LIMIT = 6; // últimas 6 sesiones por serie — suficiente para tendencia reciente
 function trimLogsForAI(logs) {
   const out = {};
   Object.entries(logs || {}).forEach(([key, val]) => {
@@ -6281,9 +6362,18 @@ function EntrenadorIAChat({ profile, logs, profileName, messages, setMessages, s
       // Rutinas — y se manda completo. Lo único que sigue recortado es el
       // texto largo (nota técnica, video) de cada ejercicio: no aporta
       // nada para responder y agranda el pedido sin necesidad.
+      // Construir el contexto de rutinas de forma eficiente:
+      // - Rutina activa → estructura completa (días, ejercicios, series)
+      // - Rutinas no activas → solo nombre e id (ahorra 80% del tamaño)
+      // Sin esto, con varias rutinas guardadas el systemPrompt puede superar
+      // los 60.000 chars y Gemini lo rechaza o tarda demasiado.
+      const activeRoutineId = profile?.activeRoutineId || null;
       const allRoutines = Object.entries(profile?.routines || {}).map(([id, entry]) => {
         const resolved = resolveRoutineDef(entry, id);
         if (!resolved) return null;
+        const base = { id, nombre: resolved.name, esLaActiva: id === activeRoutineId, archivada: !!entry.archived, origen: entry.source || "custom" };
+        // Solo expandir la rutina activa — las demás no necesitan detalle para responder preguntas sobre el entrenamiento actual
+        if (id !== activeRoutineId) return base;
         let dias = [];
         try {
           const model = buildRoutineModel(resolved);
@@ -6291,10 +6381,8 @@ function EntrenadorIAChat({ profile, logs, profileName, messages, setMessages, s
             const d = model.days[dk];
             return { dia: d.label, ejercicios: d.exercises.map((ex) => ({ nombre: ex.name, musculo: ex.muscle, series: ex.sets.length, repeticionesPorSerie: ex.sets.map((s) => s.repRange) })) };
           });
-        } catch (err) {
-          console.error("No se pudo resolver una rutina para el contexto de la IA:", id, err);
-        }
-        return { id, nombre: resolved.name, esLaActiva: id === profile?.activeRoutineId, archivada: !!entry.archived, origen: entry.source || "custom", dias };
+        } catch { }
+        return { ...base, dias };
       }).filter(Boolean);
       const context = {
         perfil: { nombre: profileName, email: profile?.email || null, sexo: profile?.sex || null, edad: profile?.age || null, miembroDesde: profile?.joinedAt || null },
@@ -6336,7 +6424,13 @@ Tipos disponibles:
 Reglas importantes: nunca digas que ya aplicaste el cambio — la persona siempre tiene que confirmarlo desde un botón antes de que se aplique de verdad. Agregá el bloque ###ACCION### sólo si pidió ESE cambio puntual en este mensaje o el anterior, nunca como sugerencia general no pedida.
 
 Datos: ${JSON.stringify(context)}`;
-      const history = newMessages.map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.text }] }));
+      // Limitamos el historial a los últimos 10 mensajes — después de
+      // varios intercambios el contexto acumulado puede superar el límite
+      // de tokens de Gemini o disparar el 429 por tamaño de pedido, aunque
+      // no se hayan hecho muchos requests en el minuto. El sistema sigue
+      // leyendo TODO el historial de entrenamiento real del usuario (en el
+      // systemPrompt), así que no pierde contexto de lo que importa.
+      const history = newMessages.slice(-10).map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.text }] }));
       // El pedido a Gemini ya no lo hace el navegador directo: lo hace
       // /api/ia (función serverless de Vercel — ver api/ia.js), que tiene
       // la clave real en una variable de entorno del servidor y nunca la
@@ -6764,8 +6858,8 @@ function RoutineBuilder({ initialRoutine, onCancel, onSave }) {
     const sets = libEx.cardio ? mkSets(1, "") : mkSets(3, "8-10");
     return { ...day, exercises: [...day.exercises, { id: libEx.id, libId: libEx.id, name: libEx.name, muscle: libEx.muscle, sets, cardio: !!libEx.cardio, supersetNext: false }] };
   }));
-  const addCustomExercise = (dayIdx, rawName) => setDays((d) => d.map((day, i) => (i !== dayIdx ? day : {
-    ...day, exercises: [...day.exercises, { id: builderUid("custom"), libId: null, name: rawName, muscle: "Personalizado", sets: mkSets(3, "8-10"), cardio: false, supersetNext: false }],
+  const addCustomExercise = (dayIdx, rawName, muscle = "Personalizado") => setDays((d) => d.map((day, i) => (i !== dayIdx ? day : {
+    ...day, exercises: [...day.exercises, { id: builderUid("custom"), libId: null, name: rawName, muscle, sets: mkSets(3, "8-10"), cardio: false, supersetNext: false }],
   })));
   const removeExercise = (dayIdx, exIdx) => setDays((d) => d.map((day, i) => (i === dayIdx ? { ...day, exercises: day.exercises.filter((_, j) => j !== exIdx) } : day)));
   const moveExercise = (dayIdx, exIdx, delta) => setDays((d) => d.map((day, i) => {
@@ -6817,7 +6911,7 @@ function RoutineBuilder({ initialRoutine, onCancel, onSave }) {
         {days.map((day, idx) => (
           <BuilderDayCard key={day.key} day={day} dayIdx={idx} totalDays={days.length}
             onRename={(label) => renameDay(idx, label)} onRemove={() => removeDay(idx)} onMoveDay={(delta) => moveDay(idx, delta)} onChangeColor={(color) => changeDayColor(idx, color)}
-            onAddExercise={(libEx) => addExercise(idx, libEx)} onAddCustomExercise={(rawName) => addCustomExercise(idx, rawName)}
+            onAddExercise={(libEx) => addExercise(idx, libEx)} onAddCustomExercise={(rawName, muscle) => addCustomExercise(idx, rawName, muscle)}
             onRemoveExercise={(exIdx) => removeExercise(idx, exIdx)} onMoveExercise={(exIdx, delta) => moveExercise(idx, exIdx, delta)}
             onConfigExercise={(exIdx, cfg) => configExercise(idx, exIdx, cfg)} onToggleSuperset={(exIdx) => toggleSuperset(idx, exIdx)} />
         ))}
