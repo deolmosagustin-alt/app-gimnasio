@@ -11,7 +11,7 @@ import {
   Mail, Clock, ChevronRight, Edit3, Info, Plus, Sun, Moon,
   Target, Award, Activity, ArrowDown, HelpCircle, List, LayoutGrid,
   Sparkles, Layers, Video, SlidersHorizontal, ShieldCheck, UserCog,
-  Share2, Download, Link2, Copy, BellOff, Send, Mic, Ruler, Camera, Link, Footprints, Star, SquarePlay,
+  Share2, Download, Link2, Copy, BellOff, Send, Mic, Ruler, Camera, Link, Footprints, Star, SquarePlay, Upload, RefreshCw,
 } from "lucide-react";
 import { signInWithPopup, signOut } from "firebase/auth";
 import { Capacitor } from "@capacitor/core";
@@ -5263,6 +5263,7 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
   const [editAge, setEditAge] = useState(profile?.age ? String(profile.age) : "");
   const [showCycleSetup, setShowCycleSetup] = useState(false);
   const [googleLinkError, setGoogleLinkError] = useState("");
+  const [syncStatus, setSyncStatus] = useState(null); // null | "syncing" | "ok" | "error"
   const joinDate = profile?.joinedAt ? new Date(profile.joinedAt).toLocaleDateString("es-AR", { day: "numeric", month: "long", year: "numeric" }) : "—";
   const settings = getProfileSettings(profile), weekInfo = getWeekInfo(cycleStart, settings);
   const updateSettings = (patch) => onUpdateProfile({ settings: { ...settings, ...patch } });
@@ -5273,6 +5274,22 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
   const initial = profileName.charAt(0).toUpperCase();
   const activeRoutineDef = resolveRoutineDef(profile?.routines?.[profile?.activeRoutineId], profile?.activeRoutineId);
   const savedRoutineCount = Object.keys(profile?.routines || {}).length;
+
+  // Sync manual — sube TODO el perfil a Firestore ahora mismo, sin esperar
+  // el debounce automático. Imprescindible para la primera vez que tenés
+  // datos locales (historial, récords, sesiones) que nunca se subieron.
+  const handleManualSync = async () => {
+    if (!profile?.googleUid) return;
+    setSyncStatus("syncing");
+    try {
+      await syncProfileToCloud(profile.googleUid, { ...profile, name: profileName });
+      setSyncStatus("ok");
+      setTimeout(() => setSyncStatus(null), 3000);
+    } catch {
+      setSyncStatus("error");
+      setTimeout(() => setSyncStatus(null), 3000);
+    }
+  };
 
   // Sexo/edad son datos personales (igual que el email), así que viven
   // junto al resto del perfil. El peso corporal se sacó de acá — ahora se
@@ -5359,8 +5376,14 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
       )}
 
       {profile?.googleUid ? (
-        <div className="flex items-center gap-2.5 px-4 py-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 text-emerald-400 text-sm font-medium">
-          <Check size={14} className="shrink-0" /> Vinculado con Google
+        <div className="space-y-2">
+          <div className="flex items-center gap-2.5 px-4 py-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 text-emerald-400 text-sm font-medium">
+            <Check size={14} className="shrink-0" /> Vinculado con Google
+          </div>
+          <button onClick={handleManualSync} disabled={syncStatus === "syncing"} className={`w-full flex items-center gap-2 justify-center py-2.5 rounded-2xl border text-xs font-bold transition-all active:scale-[0.98] ${syncStatus === "ok" ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400" : syncStatus === "error" ? "border-rose-500/40 bg-rose-500/10 text-rose-400" : syncStatus === "syncing" ? "border-slate-700 text-slate-500" : "border-slate-700 text-slate-400 hover:border-teal-500/40 hover:text-teal-400"}`}>
+            {syncStatus === "syncing" ? <><RefreshCw size={12} className="animate-spin" /> Subiendo datos...</> : syncStatus === "ok" ? <><Check size={12} /> Datos subidos a la nube</> : syncStatus === "error" ? "Error al subir — intentá de nuevo" : <><Upload size={12} /> Subir mis datos a la nube ahora</>}
+          </button>
+          <p className="text-[10px] text-slate-600 text-center">Tocá este botón desde cada dispositivo antes de cambiar de celular o reinstalar.</p>
         </div>
       ) : (
         <button onClick={handleLinkGoogle} className="w-full flex items-center gap-2.5 justify-center py-3 rounded-2xl border border-slate-800 text-slate-400 hover:border-slate-600 hover:text-white transition text-sm font-medium">
