@@ -2650,13 +2650,13 @@ const HELP_CHAPTERS = [
       {
         icon: <Zap size={20} />,
         title: "Tu semana de descarga",
-        text: "Cada cierta cantidad de semanas (lo configurás en Perfil), tu ciclo entra en una semana de descarga: menos series y menos peso, para bajar la fatiga sin perder lo ganado. Se accede con el botón \"Mi semana de descarga\", arriba de \"Iniciar sesión\" — la primera vez que abrís la app en esa semana te avisamos con un cartel y te lleva directo ahí, pero podés entrenar normal cuando quieras.",
+        text: "Cada cierta cantidad de semanas (lo configurás en Perfil), tu ciclo entra en descarga: menos series y menos peso para bajar la fatiga sin perder lo ganado. La primera vez que abrís la app en esa semana te avisamos y te llevamos directo ahí.",
         demo: { kind: "descarga", view: "header" },
       },
       {
         icon: <ArrowDown size={20} />,
         title: "Cargas sugeridas en la descarga",
-        text: "Ahí dentro, elegí el día arriba y vas a ver, ejercicio por ejercicio, tu mejor marca tachada y al lado el peso sugerido para esta semana — un porcentaje de tu récord, con menos series. Cada ejercicio tiene su cronómetro de descanso, y podés tildar cada serie a medida que la hacés.",
+        text: "Los botones de días se ajustan al ancho de la pantalla — tocá el día que querés entrenar y ves, ejercicio por ejercicio, tu mejor marca tachada y al lado el peso sugerido. Cada ejercicio tiene su cronómetro de descanso con el color del día, y podés tildar cada serie a medida que la hacés. Al terminar, \"Finalizar sesión\" la registra en tu historial.",
         demo: { kind: "descarga", view: "suggested" },
       },
       {
@@ -2818,7 +2818,7 @@ const HELP_CHAPTERS = [
       {
         icon: <Sparkles size={20} />,
         title: "Creá la tuya",
-        text: "Con \"Crear mi propia rutina\" le ponés nombre, armás los días que quieras (con su propio nombre y color), y agregás ejercicios buscando por grupo muscular — incluido un grupo de Cardio (cinta, bici, remo, soga...), que se registra en minutos en vez de en kg.",
+        text: "Con \"Crear mi propia rutina\" le ponés nombre, armás los días que quieras, y agregás ejercicios buscando por grupo muscular — incluido Cardio (cinta, bici, remo...), que se registra en minutos. El círculo numerado de cada día es un selector de color: tocalo para cambiar el color de ese día, que se usa en toda la app.",
         demo: { kind: "rutinas", view: "builder", caption: "Probá cambiar el nombre del día" },
       },
       {
@@ -2886,7 +2886,7 @@ const HELP_CHAPTERS = [
       {
         icon: <Mail size={20} />,
         title: "Tus datos",
-        text: "Arriba ves tu nombre, email y fecha de alta. \"Editar perfil\" cambia el email, sexo, edad o peso corporal (afinan el rango por músculo). \"Vincular con Google\" hace que iniciar sesión desde otro dispositivo encuentre este mismo perfil.",
+        text: "Arriba ves tu nombre, email y fecha de alta. \"Editar perfil\" cambia el email, sexo y edad (afinan el rango por músculo). \"Vincular con Google\" te permite entrar desde cualquier dispositivo con tu cuenta y encontrar este mismo perfil con todo tu historial. El botón \"Subir mis datos a la nube ahora\" sube todo manualmente si cambiás de dispositivo.",
         demo: { kind: "perfil", view: "datos" },
       },
       {
@@ -2896,9 +2896,9 @@ const HELP_CHAPTERS = [
       },
       {
         icon: <Sun size={20} />,
-        title: "Apariencia y accesibilidad",
-        text: "Tema oscuro o claro, tamaño de letra (general y de etiquetas chicas), y zoom con los dedos — este último apagado por defecto para que no se desencuadre la pantalla si pellizcás por accidente.",
-        demo: { kind: "perfil", view: "apariencia", caption: "Probá cambiar de tema" },
+        title: "Configuración: secciones desplegables",
+        text: "Las opciones de configuración (Descarga, Descanso, Apariencia) están agrupadas en acordeones — tocás el título para abrirlas o cerrarlas. En Apariencia encontrás también la unidad de peso: podés elegir kg o libras (lbs), y la app convierte todo automáticamente.",
+        demo: { kind: "perfil", view: "apariencia", caption: "Tocá la sección para desplegarla" },
       },
       {
         icon: <Download size={20} />,
@@ -3922,16 +3922,16 @@ function DeloadView({ logs, settings = DEFAULT_SETTINGS, deloadProgress = {}, se
         </div>
       </div>
 
-      <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+      <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${DAY_ORDER.length}, 1fr)` }}>
         {DAY_ORDER.map((dk) => {
           const d = ROUTINE[dk], isActive = activeDay === dk;
           const withPR = d.exercises.filter((ex) => ex.sets.some((s, i) => logs[`${ex.id}_${i}_pr_override`] || (logs[`${ex.id}_${i}`] || []).length > 0)).length;
           return (
             <button key={dk} onClick={() => setActiveDay(dk)}
-              className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all active:scale-95 border shrink-0"
+              className="py-2.5 rounded-xl text-[10px] font-black uppercase transition-all active:scale-95 border text-center leading-tight"
               style={isActive ? { backgroundColor: d.color + "22", borderColor: d.color + "55", color: d.color } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
-              <span className="uppercase">{d.label}</span>
-              {withPR > 0 && <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full" style={isActive ? { backgroundColor: d.color + "30", color: d.color } : { backgroundColor: "var(--surface-2)", color: "var(--surface-2-text)" }}>{withPR}/{d.exercises.length}</span>}
+              <span className="block">{d.label}</span>
+              {withPR > 0 && <span className="text-[8px] font-black opacity-70">{withPR}/{d.exercises.length}</span>}
             </button>
           );
         })}
@@ -3957,7 +3957,7 @@ function DeloadView({ logs, settings = DEFAULT_SETTINGS, deloadProgress = {}, se
               </div>
               {hasPR && (
                 <div className="px-4 pt-3">
-                  <RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent="#A855F7" alertType={settings.alertType} />
+                  <RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={day.color} alertType={settings.alertType} />
                 </div>
               )}
               <div className="px-4 py-3 space-y-2.5">
