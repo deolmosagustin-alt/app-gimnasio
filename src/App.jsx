@@ -13,7 +13,7 @@ import {
   Sparkles, Layers, Video, SlidersHorizontal, ShieldCheck, UserCog,
   Share2, Download, Link2, Copy, BellOff, Send, Mic, Ruler, Camera, Link, Footprints, Star, SquarePlay, Upload, RefreshCw,
 } from "lucide-react";
-import { signInWithPopup, signOut } from "firebase/auth";
+import { signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
 import { Capacitor } from "@capacitor/core";
 import { FirebaseAuthentication } from "@capacitor-firebase/authentication";
 import { doc, setDoc, getDoc, enableIndexedDbPersistence } from "firebase/firestore";
@@ -7012,33 +7012,46 @@ export default function App() {
   const [helpStartTab, setHelpStartTab] = useState(null);
   const [recoveredNotice, setRecoveredNotice] = useState(false);
 
-  // Auto-sync a Firestore con debounce de 4 segundos — cada vez que
-  // `profiles` cambia (cualquier serie guardada, cualquier configuración
-  // tocada, cualquier medida nueva) y hay una cuenta de Google vinculada,
-  // se sube el perfil completo a la nube. El debounce evita spamear
-  // Firestore con cada keystroke. Cuando el celular está offline, Firestore
-  // encola el write y lo sube cuando vuelve la conexión — automáticamente,
-  // sin que tengamos que hacer nada extra acá.
+  // Auto-sync inteligente: escucha cuándo Firebase Auth confirma la sesión
+  // del usuario (onAuthStateChanged) y en ese momento sube el perfil
+  // completo a Firestore. Este evento se dispara:
+  //   • Al abrir la app (Firebase restaura la sesión guardada)
+  //   • Al hacer login con Google
+  //   • Al cerrar sesión (firebaseUser = null → no hace nada)
+  // Por qué onAuthStateChanged y no un useEffect sobre activeProfile:
+  // cuando el perfil carga desde localStorage, Firebase Auth todavía no
+  // restauró la sesión — si intentamos escribir a Firestore en ese
+  // instante, las reglas de seguridad lo rechazan silenciosamente porque
+  // auth.currentUser es null. onAuthStateChanged garantiza que Firebase
+  // Auth ya está listo antes de intentar el write.
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (firebaseUser) => {
+      if (!firebaseUser || !activeProfile) return;
+      const p = profiles[activeProfile];
+      // Solo sincronizamos si el perfil local corresponde a esta cuenta de
+      // Google — evita subir el perfil equivocado si hay varios perfiles.
+      if (p?.googleUid === firebaseUser.uid) {
+        syncProfileToCloud(firebaseUser.uid, { ...p, name: activeProfile });
+      }
+    });
+    return () => unsub();
+  }, [activeProfile]);
+
+  // Debounce para cambios en tiempo real — cada vez que el usuario guarda
+  // una serie, una medida o cualquier configuración, a los 4 segundos
+  // sube los cambios a Firestore. Firebase Auth ya está activo en este
+  // punto (el efecto anterior ya se ejecutó), así que el write tiene
+  // permiso. Firestore encola los writes cuando no hay internet y los
+  // sube automáticamente cuando vuelve la conexión.
   const debouncedSync = useMemo(() => debounce((prof, name) => {
     const p = prof[name];
-    if (p?.googleUid) syncProfileToCloud(p.googleUid, { ...p, name });
+    if (p?.googleUid && auth.currentUser?.uid === p.googleUid) {
+      syncProfileToCloud(p.googleUid, { ...p, name });
+    }
   }, 4000), []);
   useEffect(() => {
     if (activeProfile && profiles[activeProfile]) debouncedSync(profiles, activeProfile);
   }, [profiles, activeProfile]);
-
-  // Sync INMEDIATO al hacer login — independiente del debounce de arriba.
-  // Sin esto, si el usuario abre la app y no toca nada, el debounce nunca
-  // se dispara y Firestore queda desactualizado. Con esto, en cuanto
-  // `activeProfile` se establece (login automático o manual), sube todo
-  // de una sin esperar cambios. Es el sync más importante: es el que
-  // permite que el celular encuentre el historial completo la primera vez
-  // que entrás con Google desde Android.
-  useEffect(() => {
-    if (!activeProfile) return;
-    const p = profiles[activeProfile];
-    if (p?.googleUid) syncProfileToCloud(p.googleUid, { ...p, name: activeProfile });
-  }, [activeProfile]);
   // perfil — antes, con un solo perfil sin PIN en el dispositivo, tocar ese
   // botón no parecía hacer nada porque te re-logueaba al instante. En una
   // carga nueva de la página este estado vuelve a su valor inicial (false),
