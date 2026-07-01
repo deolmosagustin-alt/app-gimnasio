@@ -13,7 +13,7 @@ import {
   Sparkles, Layers, Video, SlidersHorizontal, ShieldCheck, UserCog,
   Share2, Download, Link2, Copy, BellOff, Send, Mic, Ruler, Camera, Link, Footprints, Star, SquarePlay, Upload, RefreshCw,
 } from "lucide-react";
-import { signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
+import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signOut, onAuthStateChanged } from "firebase/auth";
 import { Capacitor } from "@capacitor/core";
 import { FirebaseAuthentication } from "@capacitor-firebase/authentication";
 import { doc, setDoc, getDoc, enableIndexedDbPersistence } from "firebase/firestore";
@@ -222,18 +222,17 @@ function profileToCloud(profile) {
 // Descarga el perfil completo desde Firestore.
 async function fetchProfileFromCloud(uid) {
   try {
-    // En Android con Capacitor, el plugin autentica Firebase nativamente
-    // un instante ANTES de que el Firebase JS SDK (que corre en el WebView)
-    // reciba esa notificación. Si leemos Firestore en ese intervalo,
-    // auth.currentUser es null en el SDK de JS y Firestore rechaza el
-    // read con "permission-denied". Esperamos hasta 5 segundos a que el
-    // SDK de JS confirme específicamente este uid antes de proceder.
+    // Esperar a que el SDK de JS tenga la sesión activa con este uid específico.
+    // No resolvemos en null (que sería "cerró sesión") — solo en el uid correcto
+    // o después del timeout. Con el signInWithCredential de googleSignIn,
+    // esto debería resolverse en milisegundos, no en segundos.
     await new Promise((resolve) => {
       if (auth.currentUser?.uid === uid) { resolve(); return; }
       const unsub = onAuthStateChanged(auth, (user) => {
-        if (user?.uid === uid || user === null) { unsub(); resolve(); }
+        if (user?.uid === uid) { unsub(); resolve(); }
+        // null → no resolver, el usuario correcto todavía no llegó
       });
-      setTimeout(() => { unsub(); resolve(); }, 5000);
+      setTimeout(() => { unsub(); resolve(); }, 8000);
     });
     const docSnap = await getDoc(doc(db, "users", uid));
     return docSnap.exists() ? docSnap.data() : null;
@@ -1760,14 +1759,24 @@ function PinInput({ length = 4, onComplete, label = "Ingresá tu PIN", error, on
 async function googleSignIn() {
   if (Capacitor.isNativePlatform()) {
     const result = await FirebaseAuthentication.signInWithGoogle({
-      // El Web Client ID hay que pasarlo acá explícitamente además de
-      // en strings.xml — el Credential Manager lo necesita en los dos
-      // lugares para funcionar correctamente en Android.
       customParameters: [
         { key: "client_id", value: "1027242959052-b9i0hq3fc2rbfoqr48chkpkkir2qu4e6.apps.googleusercontent.com" }
       ]
     });
     if (!result?.user) throw new Error("No se recibió el usuario de Google.");
+
+    // El plugin autentica Firebase en la capa nativa de Android, pero el
+    // Firebase JS SDK que corre en el WebView es una instancia separada —
+    // su auth.currentUser queda null hasta que lo sincronizamos a mano.
+    // Sin este paso, Firestore rechaza todas las lecturas/escrituras con
+    // permission-denied aunque el usuario esté autenticado en la capa nativa.
+    // signInWithCredential fuerza la sincronización de forma inmediata.
+    const idToken = result.credential?.idToken;
+    if (idToken) {
+      const credential = GoogleAuthProvider.credential(idToken);
+      const userCred = await signInWithCredential(auth, credential);
+      return userCred.user;
+    }
     return result.user;
   }
   const result = await signInWithPopup(auth, googleProvider);
