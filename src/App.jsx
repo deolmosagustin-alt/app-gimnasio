@@ -20,7 +20,7 @@ import { FirebaseAuthentication } from "@capacitor-firebase/authentication";
 // no está instalado el build falla con un error claro. Instalarlo primero:
 //   npm install @capacitor/local-notifications && npx cap sync android
 import { LocalNotifications } from "@capacitor/local-notifications";
-import { doc, setDoc, getDoc, enableIndexedDbPersistence } from "firebase/firestore";
+import { doc, setDoc, getDoc, enableIndexedDbPersistence, onSnapshot } from "firebase/firestore";
 import Model from "react-body-highlighter";
 import { auth, googleProvider, db, app } from "./firebase";
 // Catálogo de ejercicios, grupos musculares y rutinas preestablecidas —
@@ -254,27 +254,27 @@ async function fetchProfileFromCloud(uid) {
   }
 }
 
-// Sube el perfil completo a Firestore — espera a que Firebase Auth esté
-// listo antes de intentar el write (sin esto, Firestore rechaza el write
-// silenciosamente porque auth.currentUser es null durante el primer segundo
-// de vida de la app, mientras Firebase restaura la sesión desde IndexedDB).
-async function syncProfileToCloud(uid, profile) {
+// Sube el perfil completo a Firestore.
+// Para syncs automáticos (debounce): si Firebase Auth no está listo todavía,
+// espera hasta 5s y reintenta. Si sigue sin auth, falla silenciosamente —
+// el próximo cambio de datos disparará otro intento.
+// Para el botón manual: el llamador pasa requireAuth=true y recibe el error.
+async function syncProfileToCloud(uid, profile, requireAuth = false) {
   try {
-    const firebaseUser = await getCurrentUser();
+    // Esperar auth con timeout de 5s
+    const firebaseUser = await Promise.race([
+      getCurrentUser(),
+      new Promise((resolve) => setTimeout(() => resolve(null), 5000)),
+    ]);
     if (!firebaseUser || firebaseUser.uid !== uid) {
-      // No hay sesión de Firebase Auth activa para este uid — el write
-      // fallaría. Lanzamos un error para que quien llame (ej. el botón
-      // de sync manual) pueda mostrar un mensaje apropiado al usuario.
-      throw new Error("NO_AUTH");
+      if (requireAuth) throw new Error("NO_AUTH");
+      return; // sync automático: fallar silenciosamente, reintentar después
     }
     const data = profileToCloud(profile);
     await setDoc(doc(db, "users", uid), { ...data, _syncedAt: new Date().toISOString() }, { merge: true });
   } catch (err) {
-    // Re-throw para que el caller pueda manejar el error.
-    // En el sync automático (debounce / useEffect), el error se loguea
-    // y se ignora — se reintentará en el próximo cambio o al reabrir.
-    console.error("Error al sincronizar:", err.message);
-    throw err;
+    if (requireAuth) throw err;
+    // sync automático: ignorar el error
   }
 }
 
@@ -1910,7 +1910,6 @@ function LoginScreen({ onLogin, allowAutoLogin = true }) {
         const updated = { ...profiles, [matchName]: finalProfile };
         saveProfiles(updated); setProfilesState(updated);
         saveActive(matchName);
-        // Restaurar cycleStart si viene de la nube y es más reciente que el local
         if (finalProfile.cycleStart) {
           const cloudDate = new Date(finalProfile.cycleStart);
           if (!isNaN(cloudDate)) { saveCycleStart(cloudDate); }
@@ -1920,12 +1919,23 @@ function LoginScreen({ onLogin, allowAutoLogin = true }) {
         return;
       }
 
-      // 5. No existe en ningún lado: primera vez. Conservamos datos locales
-      // si ya hay un perfil con ese nombre (creado offline).
-      const existingLocal = profiles[name];
-      const profileToSave = existingLocal
-        ? { ...existingLocal, archived: false, googleUid: uid, email }
-        : { pin: null, logs: {}, email, joinedAt: new Date().toISOString(), deviceId, tutorialSeen: false, googleUid: uid };
+      // No hay perfil en Firestore ni local con este googleUid.
+      // Antes de crear uno nuevo, buscamos si hay UN SOLO perfil local sin
+      // googleUid (creado offline) — si es así, es casi seguro que es el
+      // mismo usuario. Lo fusionamos en vez de crear un duplicado.
+      const localProfiles = Object.entries(profiles).filter(([, p]) => !p.googleUid && !p.archived);
+      if (localProfiles.length === 1) {
+        const [localName, localProfile] = localProfiles[0];
+        const finalProfile = { ...localProfile, archived: false, googleUid: uid, email };
+        const updated = { ...profiles, [localName]: finalProfile };
+        saveProfiles(updated); setProfilesState(updated); saveActive(localName);
+        await syncProfileToCloud(uid, { ...finalProfile, name: localName });
+        onLogin(localName, updated);
+        return;
+      }
+
+      // Primera vez real: no hay ningún perfil local. Crear uno nuevo.
+      const profileToSave = { pin: null, logs: {}, email, joinedAt: new Date().toISOString(), deviceId, tutorialSeen: false, googleUid: uid };
       const updated = { ...profiles, [name]: profileToSave };
       saveProfiles(updated); setProfilesState(updated); saveActive(name);
       await syncProfileToCloud(uid, { ...profileToSave, name });
@@ -5520,21 +5530,9 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
     reader.readAsDataURL(file);
   };
 
-  const handleAvatarClick = async () => {
-    // En Android pedimos permiso de galería antes de abrir el picker —
-    // sin este paso, en algunos dispositivos el selector se abre vacío.
-    if (Capacitor.isNativePlatform()) {
-      try {
-        // @capacitor/camera maneja permisos de galería automáticamente
-        const { Camera } = await import("@capacitor/camera").catch(() => ({}));
-        if (Camera?.checkPermissions) {
-          const perms = await Camera.checkPermissions();
-          if (perms.photos !== "granted") {
-            await Camera.requestPermissions({ permissions: ["photos"] });
-          }
-        }
-      } catch { /* si el plugin no está instalado, continuar igual */ }
-    }
+  const handleAvatarClick = () => {
+    // En Android moderno (13+) el Photo Picker nativo no requiere permiso
+    // explícito — el sistema gestiona el acceso directo al selector.
     avatarInputRef.current?.click();
   };
 
@@ -5549,7 +5547,7 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
         ...profile,
         name: profileName,
         cycleStart: cycleStart?.toISOString() ?? null,
-      });
+      }, true); // requireAuth=true — el botón manual sí necesita saber si falló
       setSyncStatus("ok");
       setTimeout(() => setSyncStatus(null), 3000);
     } catch (err) {
@@ -7392,11 +7390,37 @@ export default function App() {
   const [helpStartTab, setHelpStartTab] = useState(null);
   const [recoveredNotice, setRecoveredNotice] = useState(false);
 
-  // Sync al hacer login / cambiar de perfil — sube todo apenas el usuario
-  // entra. Si no hay sesión de Firebase Auth activa todavía (por ejemplo,
-  // auto-login desde localStorage sin haber pasado por Google), el sync
-  // falla silenciosamente y se reintenta en el próximo cambio o cuando
-  // el usuario entre por Google y Auth esté activo.
+  // Sync en tiempo real: escucha cambios en Firestore y los aplica localmente.
+  // Esto hace que si abrís la app en dos dispositivos, ambos se actualicen
+  // automáticamente cuando hacés un cambio en cualquiera de los dos.
+  useEffect(() => {
+    if (!activeProfile) return;
+    const p = profiles[activeProfile];
+    if (!p?.googleUid) return;
+    // Solo escuchar si la sesión de Firebase está activa
+    if (!auth.currentUser || auth.currentUser.uid !== p.googleUid) return;
+    const unsub = onSnapshot(
+      doc(db, "users", p.googleUid),
+      (snap) => {
+        if (!snap.exists()) return;
+        const cloudData = snap.data();
+        // Ignorar si el cambio lo generamos nosotros (mismo _syncedAt)
+        const local = profiles[activeProfile];
+        if (cloudData._syncedAt === local._syncedAt) return;
+        // Mergear con el local — el más reciente gana
+        const merged = mergeProfiles(local, cloudData);
+        const updated = { ...profiles, [activeProfile]: { ...merged, googleUid: p.googleUid } };
+        saveProfiles(updated);
+        setProfiles(updated);
+        if (cloudData.cycleStart) {
+          const d = new Date(cloudData.cycleStart);
+          if (!isNaN(d)) setCycleStartState(d);
+        }
+      },
+      () => {} // ignorar errores de permisos
+    );
+    return () => unsub();
+  }, [activeProfile, auth.currentUser?.uid]);
   useEffect(() => {
     if (!activeProfile) return;
     const p = profiles[activeProfile];
