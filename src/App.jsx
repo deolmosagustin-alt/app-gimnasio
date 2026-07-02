@@ -20,7 +20,7 @@ import { FirebaseAuthentication } from "@capacitor-firebase/authentication";
 // no está instalado el build falla con un error claro. Instalarlo primero:
 //   npm install @capacitor/local-notifications && npx cap sync android
 import { LocalNotifications } from "@capacitor/local-notifications";
-import { doc, setDoc, getDoc, enableIndexedDbPersistence, onSnapshot } from "firebase/firestore";
+import { doc, setDoc, getDoc, enableIndexedDbPersistence } from "firebase/firestore";
 import Model from "react-body-highlighter";
 import { auth, googleProvider, db, app } from "./firebase";
 // Catálogo de ejercicios, grupos musculares y rutinas preestablecidas —
@@ -3261,13 +3261,6 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
         )}
       </div>
 
-        {cardio && cardioTimerLeft !== null && (
-          <div className="mb-2 flex items-center gap-2 px-3 py-2 rounded-xl" style={{ backgroundColor: accent + "15", border: `1px solid ${accent}30` }}>
-            <Timer size={14} style={{ color: accent }} className="shrink-0" />
-            <span className="text-xl font-black tabular-nums" style={{ color: accent }}>{Math.floor(cardioTimerLeft / 60).toString().padStart(2, "0")}:{(cardioTimerLeft % 60).toString().padStart(2, "0")}</span>
-            <span className="text-[10px] text-slate-500 ml-1">{cardioTimerRunning ? "corriendo…" : "pausado"}</span>
-          </div>
-        )}
         {/* Modo bloqueado: si ya guardaste una entrada hoy Y la sesión está
           activa, los inputs se reemplazan por la vista de solo lectura para
           evitar guardar dos veces sin querer. Sin sesión iniciada (o después
@@ -7458,43 +7451,9 @@ export default function App() {
   const [helpStartTab, setHelpStartTab] = useState(null);
   const [recoveredNotice, setRecoveredNotice] = useState(false);
 
-  // Sync en tiempo real: escucha cambios en Firestore y los aplica localmente.
-  // Esto hace que si abrís la app en dos dispositivos, ambos se actualicen
-  // automáticamente cuando hacés un cambio en cualquiera de los dos.
   useEffect(() => {
     if (!activeProfile) return;
     const p = profiles[activeProfile];
-    if (!p?.googleUid) return;
-    // Solo escuchar si la sesión de Firebase está activa
-    if (!auth.currentUser || auth.currentUser.uid !== p.googleUid) return;
-    const unsub = onSnapshot(
-      doc(db, "users", p.googleUid),
-      (snap) => {
-        if (!snap.exists()) return;
-        const cloudData = snap.data();
-        // Ignorar si el cambio lo generamos nosotros (mismo _syncedAt)
-        const local = profiles[activeProfile];
-        if (cloudData._syncedAt === local._syncedAt) return;
-        // Mergear con el local — el más reciente gana
-        const merged = mergeProfiles(local, cloudData);
-        const updated = { ...profiles, [activeProfile]: { ...merged, googleUid: p.googleUid } };
-        saveProfiles(updated);
-        setProfiles(updated);
-        if (cloudData.cycleStart) {
-          const d = new Date(cloudData.cycleStart);
-          if (!isNaN(d)) setCycleStartState(d);
-        }
-      },
-      () => {} // ignorar errores de permisos
-    );
-    return () => unsub();
-  }, [activeProfile, auth.currentUser?.uid]);
-  useEffect(() => {
-    if (!activeProfile) return;
-    const p = profiles[activeProfile];
-    // cycleStart vive fuera del perfil (su propia clave en localStorage),
-    // así que lo adjuntamos al objeto antes de subir — en la nube queda
-    // adentro del documento del usuario como un campo más.
     if (p?.googleUid) syncProfileToCloud(p.googleUid, { ...p, name: activeProfile, cycleStart: cycleStart?.toISOString() ?? null }).catch(() => {});
   }, [activeProfile]);
 
