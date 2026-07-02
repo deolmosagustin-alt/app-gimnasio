@@ -17,6 +17,7 @@
 export function mkSets(n, repRange) { return Array.from({ length: n }, () => ({ repRange })); }
 
 export const MUSCLE_GROUPS = [
+  { key: "cardio", label: "Cardio", color: "#FB7185" },
   { key: "pectoral_superior", label: "Pectoral superior", color: "#14B8A6" },
   { key: "pectoral_medio", label: "Pectoral medio/inferior", color: "#0D9488" },
   { key: "dorsales", label: "Dorsales", color: "#3B82F6" },
@@ -34,7 +35,6 @@ export const MUSCLE_GROUPS = [
   { key: "core", label: "Core / Abdomen", color: "#06B6D4" },
   { key: "espalda_baja", label: "Espalda baja", color: "#2563EB" },
   { key: "pantorrillas", label: "Pantorrillas", color: "#22C55E" },
-  { key: "cardio", label: "Cardio", color: "#FB7185" },
 ];
 export const MUSCLE_GROUP_BY_KEY = {};
 MUSCLE_GROUPS.forEach((g) => { MUSCLE_GROUP_BY_KEY[g.key] = g; });
@@ -110,7 +110,8 @@ export const EXERCISE_LIBRARY = [
   { id: "peso_muerto_piernas_rigidas", name: "Peso Muerto Piernas Rígidas", muscle: "Femoral", group: "femoral", secondary: [{ group: "gluteo", weight: 0.35 }, { group: "dorsales", weight: 0.2 }, { group: "espalda_baja", weight: 0.25 }], nota: "Rango más amplio que el rumano, rodillas casi sin flexión.", videoQuery: "peso muerto piernas rígidas técnica stiff leg deadlift" },
   { id: "curl_femoral_acostado", name: "Curl Femoral Acostado", muscle: "Femoral", group: "femoral", nota: "Variante tumbado, controlá bien la vuelta.", videoQuery: "curl femoral acostado técnica" },
   // Glúteo y cadera
-  { id: "sentadilla_bulgara", name: "Sentadilla Búlgara", muscle: "Glúteo", group: "gluteo", nota: "Torso ligeramente inclinado hacia adelante.", videoQuery: "sentadilla búlgara técnica glúteo" },
+  { id: "sentadilla_bulgara", name: "Sentadilla Búlgara (énfasis glúteo)", muscle: "Glúteo", group: "gluteo", secondary: [{ group: "cuadriceps", weight: 0.3 }, { group: "femoral", weight: 0.2 }], nota: "Torso inclinado hacia adelante ~30°, pie trasero elevado. El torso inclinado transfiere el trabajo al glúteo.", videoQuery: "sentadilla búlgara técnica glúteo" },
+  { id: "sentadilla_bulgara_cuad", name: "Sentadilla Búlgara (énfasis cuádriceps)", muscle: "Cuádriceps", group: "cuadriceps", secondary: [{ group: "gluteo", weight: 0.25 }, { group: "femoral", weight: 0.15 }], nota: "Torso vertical, pie trasero elevado. El torso recto transfiere el trabajo al cuádriceps.", videoQuery: "sentadilla búlgara cuádriceps torso vertical técnica" },
   { id: "hip_thrust", name: "Hip Thrust", muscle: "Glúteo", group: "gluteo", secondary: [{ group: "femoral", weight: 0.25 }], nota: "Pausa de 1-2 segundos arriba, contraé bien el glúteo.", videoQuery: "hip thrust técnica glúteo" },
   { id: "puente_gluteo", name: "Puente de Glúteo", muscle: "Glúteo", group: "gluteo", secondary: [{ group: "femoral", weight: 0.15 }], nota: "Variante sin barra, buena para activar antes de entrenar pierna.", videoQuery: "puente de glúteo técnica glute bridge" },
   { id: "aductores_maquina", name: "Aductores en Máquina", muscle: "Aductores", group: "aductores", nota: "Movimiento controlado, sin usar el impulso del tronco.", videoQuery: "aductores en máquina técnica" },

@@ -3124,7 +3124,29 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   const [prBurst, setPrBurst] = useState(0);
   const [showPRShare, setShowPRShare] = useState(false);
   const saveBtnRef = useRef(null);
-  useEffect(() => { setFeedback(null); setSaved(false); setShowRpeLocal(false); }, [resetKey]);
+  // Cronómetro regresivo para cardio — cuenta desde los minutos ingresados
+  // hasta 0 y marca la serie como hecha automáticamente al llegar a 0.
+  const [cardioTimerRunning, setCardioTimerRunning] = useState(false);
+  const [cardioTimerLeft, setCardioTimerLeft] = useState(null); // en segundos
+  const cardioTimerRef = useRef(null);
+  useEffect(() => {
+    if (!cardioTimerRunning) return;
+    cardioTimerRef.current = setInterval(() => {
+      setCardioTimerLeft((s) => {
+        if (s <= 1) {
+          clearInterval(cardioTimerRef.current);
+          setCardioTimerRunning(false);
+          haptic([100, 50, 100, 50, 200]);
+          // Guardar automáticamente cuando llega a 0
+          const m = parseFloat(minutes);
+          if (m) setTimeout(() => saveBtnRef.current?.click(), 200);
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+    return () => clearInterval(cardioTimerRef.current);
+  }, [cardioTimerRunning]);
   const handleSave = () => {
     if (cardio) {
       const m = parseFloat(minutes), d = km ? parseFloat(km) : null;
@@ -3215,7 +3237,14 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
         )}
       </div>
 
-      {/* Modo bloqueado: si ya guardaste una entrada hoy Y la sesión está
+        {cardio && cardioTimerLeft !== null && (
+          <div className="mb-2 flex items-center gap-2 px-3 py-2 rounded-xl" style={{ backgroundColor: accent + "15", border: `1px solid ${accent}30` }}>
+            <Timer size={14} style={{ color: accent }} className="shrink-0" />
+            <span className="text-xl font-black tabular-nums" style={{ color: accent }}>{Math.floor(cardioTimerLeft / 60).toString().padStart(2, "0")}:{(cardioTimerLeft % 60).toString().padStart(2, "0")}</span>
+            <span className="text-[10px] text-slate-500 ml-1">{cardioTimerRunning ? "corriendo…" : "pausado"}</span>
+          </div>
+        )}
+        {/* Modo bloqueado: si ya guardaste una entrada hoy Y la sesión está
           activa, los inputs se reemplazan por la vista de solo lectura para
           evitar guardar dos veces sin querer. Sin sesión iniciada (o después
           de finalizar) los inputs quedan desbloqueados siempre. */}
@@ -3238,9 +3267,20 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           }
           return (
             <div className="flex items-end gap-2">
-              <div className="flex-1"><label className="text-[10px] text-slate-600 font-semibold uppercase tracking-wider mb-1.5 block">Minutos</label><input type="number" inputMode="decimal" placeholder="—" value={minutes} onChange={(e) => updateDraft({ minutes: e.target.value })} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3.5 text-xl font-black text-center text-white focus:outline-none focus:border-teal-500/50 transition" /></div>
+              <div className="flex-1"><label className="text-[10px] text-slate-600 font-semibold uppercase tracking-wider mb-1.5 block">Minutos</label>
+                <input type="number" inputMode="decimal" placeholder="—" value={minutes} onChange={(e) => { updateDraft({ minutes: e.target.value }); setCardioTimerLeft(null); setCardioTimerRunning(false); }} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3.5 text-xl font-black text-center text-white focus:outline-none focus:border-teal-500/50 transition" />
+              </div>
               <div className="flex-1"><label className="text-[10px] text-slate-600 font-semibold uppercase tracking-wider mb-1.5 block">Km <span className="text-slate-700 normal-case">(opc.)</span></label><input type="number" inputMode="decimal" placeholder="—" value={km} onChange={(e) => updateDraft({ km: e.target.value })} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3.5 text-xl font-black text-center text-white focus:outline-none focus:border-teal-500/50 transition" /></div>
-              <button ref={saveBtnRef} onClick={handleSave} className={`p-3.5 rounded-xl transition-all active:scale-90 font-bold text-white flex items-center justify-center ${saved ? "bg-emerald-500" : "hover:opacity-90"}`} style={!saved ? { backgroundColor: accent } : {}}>{saved ? <Check size={18} /> : <Save size={18} />}</button>
+              {/* Botón de cronómetro regresivo */}
+              {minutes && !isNaN(parseFloat(minutes)) && (
+                <button onClick={() => {
+                  if (cardioTimerRunning) { clearInterval(cardioTimerRef.current); setCardioTimerRunning(false); }
+                  else { setCardioTimerLeft(Math.round(parseFloat(minutes) * 60)); setCardioTimerRunning(true); }
+                }} className="p-3.5 rounded-xl transition-all active:scale-90 border border-slate-700 text-slate-300 shrink-0" title="Iniciar cronómetro">
+                  {cardioTimerRunning ? <Pause size={18} /> : <Play size={18} />}
+                </button>
+              )}
+              <button ref={saveBtnRef} onClick={handleSave} className={`p-3.5 rounded-xl transition-all active:scale-90 font-bold text-white flex items-center justify-center shrink-0 ${saved ? "bg-emerald-500" : "hover:opacity-90"}`} style={!saved ? { backgroundColor: accent } : {}}>{saved ? <Check size={18} /> : <Save size={18} />}</button>
             </div>
           );
         }
@@ -3265,9 +3305,31 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
             <div className="flex-1">
               <div className="flex items-center justify-between mb-1.5">
                 <label className="text-[10px] text-slate-600 font-semibold uppercase tracking-wider">{weightLabel(unit)}</label>
-                <button onClick={() => setUnit((u) => u === "kg" ? "lbs" : "kg")} className="text-[9px] font-bold px-1.5 py-0.5 rounded-md transition" style={{ backgroundColor: accent + "20", color: accent }}>
-                  {unit === "kg" ? "→ lbs" : "→ kg"}
-                </button>
+                <div className="flex items-center gap-1">
+                  {/* Badge de % del 1RM — aparece cuando hay PR y hay peso ingresado */}
+                  {currentPR && kg && !isNaN(parseFloat(kg)) && (() => {
+                    const est1RM = estimate1RM(displayToKg(parseFloat(kg), unit), parseFloat(reps) || 1);
+                    const pr1RM = estimate1RM(currentPR.kg, currentPR.reps);
+                    const pct = pr1RM > 0 ? Math.round((est1RM / pr1RM) * 100) : null;
+                    return pct ? <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-lg bg-slate-800 text-slate-400">~{pct}% 1RM</span> : null;
+                  })()}
+                  {/* Presets de % del 1RM */}
+                  {currentPR && (
+                    <div className="flex gap-0.5">
+                      {[90, 80, 70].map((pct) => {
+                        const targetKg = kgToDisplay(Math.round(estimate1RM(currentPR.kg, currentPR.reps) * pct / 100 * 2) / 2, unit);
+                        return (
+                          <button key={pct} onClick={() => updateDraft({ kg: String(targetKg) })} className="text-[8px] font-bold px-1 py-0.5 rounded transition active:scale-95" style={{ backgroundColor: accent + "20", color: accent }}>
+                            {pct}%
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <button onClick={() => setUnit((u) => u === "kg" ? "lbs" : "kg")} className="text-[9px] font-bold px-1.5 py-0.5 rounded-md transition" style={{ backgroundColor: accent + "20", color: accent }}>
+                    {unit === "kg" ? "→ lbs" : "→ kg"}
+                  </button>
+                </div>
               </div>
               <input type="number" inputMode="decimal" placeholder="—" value={kg} onChange={(e) => updateDraft({ kg: e.target.value })} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3.5 text-xl font-black text-center text-white focus:outline-none focus:border-teal-500/50 transition" />
             </div>
@@ -5877,7 +5939,10 @@ function ExercisePickerPanel({ existingIds, onAdd, onAddCustom, onClose }) {
 
   return (
     <div className="mt-2.5 bg-slate-950/60 border border-slate-800/60 rounded-2xl p-3 bounce-in">
-      <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar ejercicio…" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white mb-2.5 focus:outline-none focus:border-teal-500/50" />
+      <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar ejercicio…" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white mb-2 focus:outline-none focus:border-teal-500/50" />
+      <p className="text-[9px] text-slate-600 mb-2 px-0.5 flex items-center gap-1">
+        <Layers size={9} className="shrink-0" /> Podés combinar dos ejercicios en superserie tocando <span className="text-teal-600 font-bold">⟨S⟩</span> en la lista de ejercicios.
+      </p>
       {!search.trim() && (
         <div className="flex gap-1.5 overflow-x-auto pb-2 -mx-1 px-1">
           {MUSCLE_GROUPS.map((g) => (
@@ -5934,6 +5999,14 @@ function BuilderExerciseRow({ ex, canMoveUp, canMoveDown, onMove, onRemove, onCo
   const repRange = ex.sets[0]?.repRange || "8-10";
   const setsCount = ex.sets.length;
   const heavy = isHeavyRepRange(repRange);
+  // ¿Todas las series tienen el mismo rango?
+  const allSame = ex.sets.every((s) => s.repRange === repRange);
+
+  const handleSetRepRange = (setIdx, newRange) => {
+    const newSets = ex.sets.map((s, i) => i === setIdx ? { ...s, repRange: newRange } : s);
+    onConfigChange({ sets: newSets });
+  };
+
   return (
     <div className="bg-slate-900/60 border border-slate-800/50 rounded-xl px-3 py-2.5">
       <div className="flex items-center gap-2">
@@ -5941,37 +6014,58 @@ function BuilderExerciseRow({ ex, canMoveUp, canMoveDown, onMove, onRemove, onCo
           <button onClick={() => onMove(-1)} disabled={!canMoveUp} className="p-0.5 text-slate-600 hover:text-slate-300 disabled:opacity-20"><ChevronUp size={13} /></button>
           <button onClick={() => onMove(1)} disabled={!canMoveDown} className="p-0.5 text-slate-600 hover:text-slate-300 disabled:opacity-20"><ChevronDown size={13} /></button>
         </div>
-        <button onClick={() => !ex.cardio && setEditing((o) => !o)} className="flex-1 min-w-0 text-left">
+        <button onClick={() => setEditing((o) => !o)} className="flex-1 min-w-0 text-left">
           <div className="flex items-center gap-1.5 flex-wrap">
             <p className="text-xs font-bold text-white truncate">{ex.name}</p>
             {ex.cardio && <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-rose-400/15 text-rose-300 shrink-0 flex items-center gap-0.5"><Footprints size={9} /> CARDIO</span>}
             {!ex.cardio && heavy && <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-amber-500/15 text-amber-400 shrink-0">FUERZA</span>}
             {!ex.libId && <span className="text-[9px] text-slate-600 shrink-0">propio</span>}
           </div>
-          <p className="text-[10px] text-slate-500">{ex.cardio ? "Se registra en minutos, no en series" : `${setsCount} series · ${repRange} reps`}</p>
+          <p className="text-[10px] text-slate-500">
+            {ex.cardio
+              ? `${setsCount} bloque${setsCount !== 1 ? "s" : ""} de tiempo`
+              : allSame
+                ? `${setsCount} series · ${repRange} reps`
+                : `${setsCount} series · rangos mixtos`
+            }
+          </p>
         </button>
-        {!ex.cardio && <button onClick={() => setEditing((o) => !o)} className="p-1.5 text-slate-500 hover:text-teal-400 shrink-0"><SlidersHorizontal size={14} /></button>}
+        <button onClick={() => setEditing((o) => !o)} className="p-1.5 text-slate-500 hover:text-teal-400 shrink-0"><SlidersHorizontal size={14} /></button>
         <button onClick={onRemove} className="p-1.5 text-slate-600 hover:text-rose-400 shrink-0"><Trash2 size={14} /></button>
       </div>
-      {editing && !ex.cardio && (
-        <div className="mt-2.5 pt-2.5 border-t border-slate-800/60 space-y-2.5 bounce-in">
+      {editing && (
+        <div className="mt-2.5 pt-2.5 border-t border-slate-800/60 space-y-3 bounce-in">
+          {/* Cantidad de bloques/series */}
           <div>
-            <p className="text-[10px] text-slate-500 mb-1.5">Cantidad de series</p>
+            <p className="text-[10px] text-slate-500 mb-1.5">{ex.cardio ? "Bloques (intervalos)" : "Cantidad de series"}</p>
             <div className="flex items-center gap-2">
               <button onClick={() => onConfigChange({ setsCount: Math.max(1, setsCount - 1), repRange })} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm active:scale-95">−</button>
               <span className="text-sm font-black text-white w-5 text-center tabular-nums">{setsCount}</span>
-              <button onClick={() => onConfigChange({ setsCount: Math.min(6, setsCount + 1), repRange })} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm active:scale-95">+</button>
+              <button onClick={() => onConfigChange({ setsCount: Math.min(8, setsCount + 1), repRange })} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm active:scale-95">+</button>
             </div>
           </div>
-          <div>
-            <p className="text-[10px] text-slate-500 mb-1.5">Repeticiones aproximadas</p>
-            <div className="flex flex-wrap gap-1.5">
-              {REP_RANGE_OPTIONS.map((r) => (
-                <button key={r} onClick={() => onConfigChange({ setsCount, repRange: r })} className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all border ${repRange === r ? "bg-teal-500 border-teal-500 !text-white" : "border-slate-800 text-slate-500"}`}>{r}</button>
-              ))}
-            </div>
-            {isHeavyRepRange(repRange) && <p className="text-[9px] text-amber-500/80 mt-1.5">Se marca como FUERZA automáticamente (6 reps o menos).</p>}
-          </div>
+
+          {!ex.cardio && (
+            <>
+              {/* Reps por serie — cada una editable individualmente */}
+              <div>
+                <p className="text-[10px] text-slate-500 mb-2">Repeticiones por serie <span className="text-slate-600">(podés poner rangos distintos)</span></p>
+                <div className="space-y-2">
+                  {ex.sets.map((s, i) => (
+                    <div key={i} className="space-y-1">
+                      <p className="text-[9px] text-slate-600 font-bold">Serie {i + 1}</p>
+                      <div className="flex flex-wrap gap-1">
+                        {REP_RANGE_OPTIONS.map((r) => (
+                          <button key={r} onClick={() => handleSetRepRange(i, r)} className={`px-2 py-0.5 rounded-lg text-[9px] font-bold transition-all border ${s.repRange === r ? "bg-teal-500 border-teal-500 !text-white" : "border-slate-800 text-slate-500"}`}>{r}</button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {isHeavyRepRange(ex.sets[0]?.repRange) && <p className="text-[9px] text-amber-500/80 mt-1.5">La primera serie en ≤6 reps se marca como FUERZA.</p>}
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>
@@ -6928,8 +7022,13 @@ function RoutineBuilder({ initialRoutine, onCancel, onSave }) {
     const j = exIdx + delta; if (j < 0 || j >= day.exercises.length) return day;
     const n = [...day.exercises]; [n[exIdx], n[j]] = [n[j], n[exIdx]]; return { ...day, exercises: n };
   }));
-  const configExercise = (dayIdx, exIdx, { setsCount, repRange }) => setDays((d) => d.map((day, i) => (i !== dayIdx ? day : {
-    ...day, exercises: day.exercises.map((e, j) => (j === exIdx ? { ...e, sets: mkSets(setsCount, repRange) } : e)),
+  const configExercise = (dayIdx, exIdx, { setsCount, repRange, sets }) => setDays((d) => d.map((day, i) => (i !== dayIdx ? day : {
+    ...day, exercises: day.exercises.map((e, j) => (j === exIdx ? {
+      ...e,
+      sets: sets
+        ? sets  // sets completos pasados directamente (edición per-set)
+        : Array.from({ length: setsCount }, (_, k) => ({ repRange: e.sets[k]?.repRange || repRange })),
+    } : e)),
   })));
   // Encadena (o desencadena) este ejercicio con el siguiente de la lista
   // en una superserie — se hacen uno después del otro sin descansar, y
