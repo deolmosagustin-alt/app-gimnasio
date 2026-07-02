@@ -3297,18 +3297,18 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
               {cardioMode === "stopwatch" ? (
                 /* MODO CRONÓMETRO — arrancás, entrenás, parás, se guarda el tiempo */
                 <div className="flex items-center gap-3">
-                  <div className="flex-1 flex flex-col items-center justify-center rounded-xl py-4 border" style={{ backgroundColor: accent + "10", borderColor: accent + "30" }}>
-                    <span className="text-3xl font-black tabular-nums" style={{ color: cardioRunning || cardioElapsed > 0 ? accent : "#475569" }}>
+                  <div className="flex-1 flex flex-col items-center justify-center rounded-xl py-2.5 border" style={{ backgroundColor: accent + "10", borderColor: accent + "30" }}>
+                    <span className="text-xl font-black tabular-nums" style={{ color: cardioRunning || cardioElapsed > 0 ? accent : "#475569" }}>
                       {Math.floor(cardioElapsed / 60).toString().padStart(2, "0")}:{(cardioElapsed % 60).toString().padStart(2, "0")}
                     </span>
-                    <span className="text-[9px] text-slate-600 mt-0.5">{cardioRunning ? "corriendo…" : cardioElapsed > 0 ? "pausado" : "listo para empezar"}</span>
+                    <span className="text-[9px] text-slate-600 mt-0.5">{cardioRunning ? "corriendo…" : cardioElapsed > 0 ? "pausado" : "listo"}</span>
                   </div>
-                  <div className="flex flex-col gap-2">
-                    <button onClick={() => setCardioRunning((r) => !r)} className="w-12 h-12 rounded-2xl flex items-center justify-center text-white transition active:scale-90" style={{ backgroundColor: accent }}>
-                      {cardioRunning ? <Pause size={20} /> : <Play size={20} />}
+                  <div className="flex flex-col gap-1.5">
+                    <button onClick={() => setCardioRunning((r) => !r)} className="w-10 h-10 rounded-xl flex items-center justify-center text-white transition active:scale-90" style={{ backgroundColor: accent }}>
+                      {cardioRunning ? <Pause size={16} /> : <Play size={16} />}
                     </button>
-                    <button onClick={() => { setCardioRunning(false); setCardioElapsed(0); }} className="w-12 h-12 rounded-2xl flex items-center justify-center text-slate-400 bg-slate-800 transition active:scale-90">
-                      <RotateCcw size={16} />
+                    <button onClick={() => { setCardioRunning(false); setCardioElapsed(0); }} className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 bg-slate-800 transition active:scale-90">
+                      <RotateCcw size={13} />
                     </button>
                   </div>
                 </div>
@@ -3320,16 +3320,16 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
                       <label className="text-[10px] text-slate-600 font-semibold uppercase tracking-wider mb-1.5 block">Minutos objetivo</label>
                       <input type="number" inputMode="decimal" placeholder="30" value={minutes} onChange={(e) => { updateDraft({ minutes: e.target.value }); setCardioElapsed(0); setCardioRunning(false); }} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3.5 text-xl font-black text-center text-white focus:outline-none focus:border-teal-500/50 transition" />
                     </div>
-                    <div className="flex flex-col gap-2">
+                    <div className="flex flex-col gap-1.5">
                       <button onClick={() => {
                         if (!minutes || isNaN(parseFloat(minutes))) return;
                         if (cardioRunning) { setCardioRunning(false); }
                         else { setCardioElapsed(0); setCardioLeft(parseFloat(minutes) * 60); setCardioRunning(true); }
-                      }} className="w-12 h-12 rounded-2xl flex items-center justify-center text-white transition active:scale-90" style={{ backgroundColor: accent }}>
-                        {cardioRunning ? <Pause size={20} /> : <Play size={20} />}
+                      }} className="w-10 h-10 rounded-xl flex items-center justify-center text-white transition active:scale-90" style={{ backgroundColor: accent }}>
+                        {cardioRunning ? <Pause size={16} /> : <Play size={16} />}
                       </button>
-                      <button onClick={() => { setCardioRunning(false); setCardioElapsed(0); setCardioLeft(0); }} className="w-12 h-12 rounded-2xl flex items-center justify-center text-slate-400 bg-slate-800 transition active:scale-90">
-                        <RotateCcw size={16} />
+                      <button onClick={() => { setCardioRunning(false); setCardioElapsed(0); setCardioLeft(0); }} className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 bg-slate-800 transition active:scale-90">
+                        <RotateCcw size={13} />
                       </button>
                     </div>
                   </div>
