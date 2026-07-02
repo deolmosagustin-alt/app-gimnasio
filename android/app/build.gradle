@@ -4,7 +4,7 @@ android {
     namespace = "com.agustin.ponos"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.agustin.ponos"
+        applicationId "com.modusfit.fitness"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
