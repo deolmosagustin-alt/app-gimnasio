@@ -3374,41 +3374,38 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
             </div>
             <div className="text-slate-700 text-lg pb-3">×</div>
             <div className="flex-1">
-              {/* Fila de label + herramientas — separadas en dos secciones */}
               <div className="flex items-center justify-between mb-1.5">
                 <label className="text-[10px] text-slate-600 font-semibold uppercase tracking-wider">{weightLabel(unit)}</label>
-                {/* Toggle kg/lbs — estilo neutro/gris para diferenciarlo del % 1RM */}
                 <button onClick={() => setUnit((u) => u === "kg" ? "lbs" : "kg")} className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-slate-800 text-slate-500 hover:text-slate-300 transition border border-slate-700">
                   {unit === "kg" ? "lbs" : "kg"}
                 </button>
               </div>
-              {/* % del 1RM — fila sutil debajo del label, solo si hay PR */}
+              <input type="number" inputMode="decimal" placeholder="—" value={kg} onChange={(e) => updateDraft({ kg: e.target.value })} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3.5 text-xl font-black text-center text-white focus:outline-none focus:border-teal-500/50 transition" />
+              {/* % del 1RM — debajo del input de kg, sutil, solo si hay PR */}
               {currentPR && (() => {
                 const pr1RM = estimate1RM(currentPR.kg, currentPR.reps);
                 const currentPct = (kg && !isNaN(parseFloat(kg)) && pr1RM > 0)
                   ? Math.round((estimate1RM(displayToKg(parseFloat(kg), unit), parseFloat(reps) || 1) / pr1RM) * 100)
                   : null;
                 return (
-                  <div className="flex items-center gap-1.5 mb-1.5">
-                    <span className="text-[9px] text-slate-600 shrink-0">% de 1RM:</span>
+                  <div className="flex items-center gap-1 mt-1.5">
+                    <span className="text-[9px] text-slate-600 shrink-0">% 1RM</span>
                     <input
-                      type="number" inputMode="numeric" placeholder="ej. 80"
-                      className="w-12 bg-slate-900/60 border border-slate-800 rounded-lg px-1.5 py-0.5 text-[10px] font-bold text-center text-slate-400 focus:outline-none focus:border-teal-500/40 transition"
-                      min={1} max={150}
+                      type="number" inputMode="numeric" placeholder="—"
+                      className="w-10 bg-transparent border-b border-slate-800 text-[10px] font-bold text-center text-slate-500 focus:outline-none focus:border-slate-600 transition"
                       onFocus={(e) => e.target.select()}
                       onChange={(e) => {
                         const pct = parseFloat(e.target.value);
-                        if (!isNaN(pct) && pct > 0) {
+                        if (!isNaN(pct) && pct > 0 && pr1RM > 0) {
                           const targetKg = kgToDisplay(Math.round(pr1RM * pct / 100 * 2) / 2, unit);
                           updateDraft({ kg: String(targetKg) });
                         }
                       }}
                     />
-                    {currentPct && <span className="text-[9px] text-slate-600 tabular-nums">→ ~{currentPct}%</span>}
+                    {currentPct && <span className="text-[9px] text-slate-600 tabular-nums ml-auto">~{currentPct}%</span>}
                   </div>
                 );
               })()}
-              <input type="number" inputMode="decimal" placeholder="—" value={kg} onChange={(e) => updateDraft({ kg: e.target.value })} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3.5 text-xl font-black text-center text-white focus:outline-none focus:border-teal-500/50 transition" />
             </div>
             <button ref={saveBtnRef} onClick={handleSave} className={`p-3.5 rounded-xl transition-all active:scale-90 font-bold text-white flex items-center justify-center ${saved ? "bg-emerald-500" : "hover:opacity-90"}`} style={!saved ? { backgroundColor: accent } : {}}>{saved ? <Check size={18} /> : <Save size={18} />}</button>
           </div>
