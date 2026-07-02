@@ -3136,31 +3136,45 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   const saveBtnRef = useRef(null);
   // Cronómetro regresivo para cardio — cuenta desde los minutos ingresados
   // hasta 0 y marca la serie como hecha automáticamente al llegar a 0.
-  const [cardioTimerRunning, setCardioTimerRunning] = useState(false);
-  const [cardioTimerLeft, setCardioTimerLeft] = useState(null); // en segundos
-  const cardioTimerRef = useRef(null);
+  // Timer de cardio — dos modos:
+  // "stopwatch": cuenta para ARRIBA (arrancás cuando empezás, parás cuando terminás)
+  // "countdown": cuenta para ABAJO desde los minutos ingresados (objetivo)
+  const [cardioMode, setCardioMode] = useState("stopwatch"); // "stopwatch" | "countdown"
+  const [cardioRunning, setCardioRunning] = useState(false);
+  const [cardioElapsed, setCardioElapsed] = useState(0); // segundos transcurridos (stopwatch)
+  const [cardioLeft, setCardioLeft] = useState(0);       // segundos restantes (countdown)
+  const cardioIntervalRef = useRef(null);
+  const cardioStartRef = useRef(null);
+
   useEffect(() => {
-    if (!cardioTimerRunning) return;
-    cardioTimerRef.current = setInterval(() => {
-      setCardioTimerLeft((s) => {
-        if (s <= 1) {
-          clearInterval(cardioTimerRef.current);
-          setCardioTimerRunning(false);
+    if (!cardioRunning) { clearInterval(cardioIntervalRef.current); return; }
+    const startedAt = Date.now() - cardioElapsed * 1000;
+    cardioIntervalRef.current = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+      if (cardioMode === "stopwatch") {
+        setCardioElapsed(elapsed);
+      } else {
+        const targetSecs = parseFloat(minutes) * 60 || 0;
+        const left = Math.max(0, targetSecs - elapsed);
+        setCardioLeft(left);
+        if (left === 0) {
+          clearInterval(cardioIntervalRef.current);
+          setCardioRunning(false);
           haptic([100, 50, 100, 50, 200]);
-          // Guardar automáticamente cuando llega a 0
-          const m = parseFloat(minutes);
-          if (m) setTimeout(() => saveBtnRef.current?.click(), 200);
-          return 0;
+          // Guardar automáticamente
+          setCardioElapsed(elapsed);
+          setTimeout(() => saveBtnRef.current?.click(), 300);
         }
-        return s - 1;
-      });
-    }, 1000);
-    return () => clearInterval(cardioTimerRef.current);
-  }, [cardioTimerRunning]);
+      }
+    }, 500);
+    return () => clearInterval(cardioIntervalRef.current);
+  }, [cardioRunning, cardioMode]);
   const handleSave = () => {
     if (cardio) {
-      const m = parseFloat(minutes), d = km ? parseFloat(km) : null;
-      if (!m || isNaN(m)) { setFeedback({ type: "error", msg: "Completá los minutos." }); return; }
+      // Si el cronómetro estuvo corriendo, usar el tiempo transcurrido
+      const autoMinutes = cardioElapsed > 0 ? Math.round(cardioElapsed / 60 * 10) / 10 : null;
+      const m = autoMinutes || parseFloat(minutes), d = km ? parseFloat(km) : null;
+      if (!m || isNaN(m)) { setFeedback({ type: "error", msg: "Iniciá el cronómetro o ingresá los minutos." }); return; }
       const isFirstEver = !currentPR;
       const prevMin = currentPR?.minutes || 0;
       const entry = { date: today, minutes: m }; if (d && !isNaN(d)) entry.km = d; if (rpe != null) entry.rpe = rpe;
@@ -3276,21 +3290,75 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
             );
           }
           return (
-            <div className="flex items-end gap-2">
-              <div className="flex-1"><label className="text-[10px] text-slate-600 font-semibold uppercase tracking-wider mb-1.5 block">Minutos</label>
-                <input type="number" inputMode="decimal" placeholder="—" value={minutes} onChange={(e) => { updateDraft({ minutes: e.target.value }); setCardioTimerLeft(null); setCardioTimerRunning(false); }} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3.5 text-xl font-black text-center text-white focus:outline-none focus:border-teal-500/50 transition" />
-              </div>
-              <div className="flex-1"><label className="text-[10px] text-slate-600 font-semibold uppercase tracking-wider mb-1.5 block">Km <span className="text-slate-700 normal-case">(opc.)</span></label><input type="number" inputMode="decimal" placeholder="—" value={km} onChange={(e) => updateDraft({ km: e.target.value })} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3.5 text-xl font-black text-center text-white focus:outline-none focus:border-teal-500/50 transition" /></div>
-              {/* Botón de cronómetro regresivo */}
-              {minutes && !isNaN(parseFloat(minutes)) && (
-                <button onClick={() => {
-                  if (cardioTimerRunning) { clearInterval(cardioTimerRef.current); setCardioTimerRunning(false); }
-                  else { setCardioTimerLeft(Math.round(parseFloat(minutes) * 60)); setCardioTimerRunning(true); }
-                }} className="p-3.5 rounded-xl transition-all active:scale-90 border border-slate-700 text-slate-300 shrink-0" title="Iniciar cronómetro">
-                  {cardioTimerRunning ? <Pause size={18} /> : <Play size={18} />}
+            <div className="space-y-2.5">
+              {/* Selector de modo */}
+              <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
+                <button onClick={() => { setCardioMode("stopwatch"); setCardioRunning(false); setCardioElapsed(0); }} className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[10px] font-bold transition-all ${cardioMode === "stopwatch" ? "text-white" : "text-slate-500"}`} style={cardioMode === "stopwatch" ? { backgroundColor: accent } : {}}>
+                  <Clock size={11} /> Cronómetro
                 </button>
+                <button onClick={() => { setCardioMode("countdown"); setCardioRunning(false); setCardioElapsed(0); }} className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[10px] font-bold transition-all ${cardioMode === "countdown" ? "text-white" : "text-slate-500"}`} style={cardioMode === "countdown" ? { backgroundColor: accent } : {}}>
+                  <Timer size={11} /> Cuenta regresiva
+                </button>
+              </div>
+
+              {cardioMode === "stopwatch" ? (
+                /* MODO CRONÓMETRO — arrancás, entrenás, parás, se guarda el tiempo */
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 flex flex-col items-center justify-center rounded-xl py-4 border" style={{ backgroundColor: accent + "10", borderColor: accent + "30" }}>
+                    <span className="text-3xl font-black tabular-nums" style={{ color: cardioRunning || cardioElapsed > 0 ? accent : "#475569" }}>
+                      {Math.floor(cardioElapsed / 60).toString().padStart(2, "0")}:{(cardioElapsed % 60).toString().padStart(2, "0")}
+                    </span>
+                    <span className="text-[9px] text-slate-600 mt-0.5">{cardioRunning ? "corriendo…" : cardioElapsed > 0 ? "pausado" : "listo para empezar"}</span>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <button onClick={() => setCardioRunning((r) => !r)} className="w-12 h-12 rounded-2xl flex items-center justify-center text-white transition active:scale-90" style={{ backgroundColor: accent }}>
+                      {cardioRunning ? <Pause size={20} /> : <Play size={20} />}
+                    </button>
+                    <button onClick={() => { setCardioRunning(false); setCardioElapsed(0); }} className="w-12 h-12 rounded-2xl flex items-center justify-center text-slate-400 bg-slate-800 transition active:scale-90">
+                      <RotateCcw size={16} />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* MODO CUENTA REGRESIVA — ingresás el objetivo, cuenta hasta 0 y guarda */
+                <div className="space-y-2">
+                  <div className="flex items-end gap-2">
+                    <div className="flex-1">
+                      <label className="text-[10px] text-slate-600 font-semibold uppercase tracking-wider mb-1.5 block">Minutos objetivo</label>
+                      <input type="number" inputMode="decimal" placeholder="30" value={minutes} onChange={(e) => { updateDraft({ minutes: e.target.value }); setCardioElapsed(0); setCardioRunning(false); }} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3.5 text-xl font-black text-center text-white focus:outline-none focus:border-teal-500/50 transition" />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <button onClick={() => {
+                        if (!minutes || isNaN(parseFloat(minutes))) return;
+                        if (cardioRunning) { setCardioRunning(false); }
+                        else { setCardioElapsed(0); setCardioLeft(parseFloat(minutes) * 60); setCardioRunning(true); }
+                      }} className="w-12 h-12 rounded-2xl flex items-center justify-center text-white transition active:scale-90" style={{ backgroundColor: accent }}>
+                        {cardioRunning ? <Pause size={20} /> : <Play size={20} />}
+                      </button>
+                      <button onClick={() => { setCardioRunning(false); setCardioElapsed(0); setCardioLeft(0); }} className="w-12 h-12 rounded-2xl flex items-center justify-center text-slate-400 bg-slate-800 transition active:scale-90">
+                        <RotateCcw size={16} />
+                      </button>
+                    </div>
+                  </div>
+                  {(cardioRunning || cardioElapsed > 0) && (
+                    <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ backgroundColor: accent + "12", border: `1px solid ${accent}30` }}>
+                      <Timer size={14} style={{ color: accent }} className="shrink-0" />
+                      <span className="text-xl font-black tabular-nums" style={{ color: accent }}>
+                        {Math.floor(cardioLeft / 60).toString().padStart(2, "0")}:{(cardioLeft % 60).toString().padStart(2, "0")}
+                      </span>
+                      <span className="text-[9px] text-slate-500 ml-1">{cardioRunning ? "corriendo…" : "pausado"}</span>
+                    </div>
+                  )}
+                </div>
               )}
-              <button ref={saveBtnRef} onClick={handleSave} className={`p-3.5 rounded-xl transition-all active:scale-90 font-bold text-white flex items-center justify-center shrink-0 ${saved ? "bg-emerald-500" : "hover:opacity-90"}`} style={!saved ? { backgroundColor: accent } : {}}>{saved ? <Check size={18} /> : <Save size={18} />}</button>
+
+              {/* Km opcional y botón guardar */}
+              <div className="flex items-center gap-2">
+                <div className="flex-1"><label className="text-[10px] text-slate-600 font-semibold uppercase tracking-wider mb-1.5 block">Km <span className="text-slate-700 normal-case">(opc.)</span></label><input type="number" inputMode="decimal" placeholder="—" value={km} onChange={(e) => updateDraft({ km: e.target.value })} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3 text-lg font-black text-center text-white focus:outline-none focus:border-teal-500/50 transition" /></div>
+                <button ref={saveBtnRef} onClick={handleSave} className={`p-3.5 rounded-xl transition-all active:scale-90 font-bold text-white flex items-center justify-center shrink-0 ${saved ? "bg-emerald-500" : "hover:opacity-90"}`} style={!saved ? { backgroundColor: accent } : {}}>
+                  {saved ? <Check size={18} /> : <Save size={18} />}
+                </button>
+              </div>
             </div>
           );
         }
