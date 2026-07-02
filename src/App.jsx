@@ -3367,47 +3367,49 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           );
         }
         return (
-          <div className="flex items-end gap-2">
-            <div className="flex-1">
-              <label className="text-[10px] text-slate-600 font-semibold uppercase tracking-wider mb-1.5 block">Reps</label>
-              <input type="number" inputMode="decimal" placeholder="—" value={reps} onChange={(e) => updateDraft({ reps: e.target.value })} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3.5 text-xl font-black text-center text-white focus:outline-none focus:border-teal-500/50 transition" />
-            </div>
-            <div className="text-slate-700 text-lg pb-3">×</div>
-            <div className="flex-1">
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-[10px] text-slate-600 font-semibold uppercase tracking-wider">{weightLabel(unit)}</label>
-                <button onClick={() => setUnit((u) => u === "kg" ? "lbs" : "kg")} className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-slate-800 text-slate-500 hover:text-slate-300 transition border border-slate-700">
-                  {unit === "kg" ? "lbs" : "kg"}
-                </button>
+          <div className="space-y-1.5">
+            <div className="flex items-end gap-2">
+              <div className="flex-1">
+                <label className="text-[10px] text-slate-600 font-semibold uppercase tracking-wider mb-1.5 block">Reps</label>
+                <input type="number" inputMode="decimal" placeholder="—" value={reps} onChange={(e) => updateDraft({ reps: e.target.value })} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3.5 text-xl font-black text-center text-white focus:outline-none focus:border-teal-500/50 transition" />
               </div>
-              <input type="number" inputMode="decimal" placeholder="—" value={kg} onChange={(e) => updateDraft({ kg: e.target.value })} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3.5 text-xl font-black text-center text-white focus:outline-none focus:border-teal-500/50 transition" />
-              {/* % del 1RM — debajo del input de kg, sutil, solo si hay PR */}
-              {currentPR && (() => {
-                const pr1RM = estimate1RM(currentPR.kg, currentPR.reps);
-                const currentPct = (kg && !isNaN(parseFloat(kg)) && pr1RM > 0)
-                  ? Math.round((estimate1RM(displayToKg(parseFloat(kg), unit), parseFloat(reps) || 1) / pr1RM) * 100)
-                  : null;
-                return (
-                  <div className="flex items-center gap-1 mt-1.5">
-                    <span className="text-[9px] text-slate-600 shrink-0">% 1RM</span>
-                    <input
-                      type="number" inputMode="numeric" placeholder="—"
-                      className="w-10 bg-transparent border-b border-slate-800 text-[10px] font-bold text-center text-slate-500 focus:outline-none focus:border-slate-600 transition"
-                      onFocus={(e) => e.target.select()}
-                      onChange={(e) => {
-                        const pct = parseFloat(e.target.value);
-                        if (!isNaN(pct) && pct > 0 && pr1RM > 0) {
-                          const targetKg = kgToDisplay(Math.round(pr1RM * pct / 100 * 2) / 2, unit);
-                          updateDraft({ kg: String(targetKg) });
-                        }
-                      }}
-                    />
-                    {currentPct && <span className="text-[9px] text-slate-600 tabular-nums ml-auto">~{currentPct}%</span>}
-                  </div>
-                );
-              })()}
+              <div className="text-slate-700 text-lg pb-3">×</div>
+              <div className="flex-1">
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-[10px] text-slate-600 font-semibold uppercase tracking-wider">{weightLabel(unit)}</label>
+                  <button onClick={() => setUnit((u) => u === "kg" ? "lbs" : "kg")} className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-slate-800 text-slate-500 hover:text-slate-300 transition border border-slate-700">
+                    {unit === "kg" ? "lbs" : "kg"}
+                  </button>
+                </div>
+                <input type="number" inputMode="decimal" placeholder="—" value={kg} onChange={(e) => updateDraft({ kg: e.target.value })} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3.5 text-xl font-black text-center text-white focus:outline-none focus:border-teal-500/50 transition" />
+              </div>
+              <button ref={saveBtnRef} onClick={handleSave} className={`p-3.5 rounded-xl transition-all active:scale-90 font-bold text-white flex items-center justify-center ${saved ? "bg-emerald-500" : "hover:opacity-90"}`} style={!saved ? { backgroundColor: accent } : {}}>{saved ? <Check size={18} /> : <Save size={18} />}</button>
             </div>
-            <button ref={saveBtnRef} onClick={handleSave} className={`p-3.5 rounded-xl transition-all active:scale-90 font-bold text-white flex items-center justify-center ${saved ? "bg-emerald-500" : "hover:opacity-90"}`} style={!saved ? { backgroundColor: accent } : {}}>{saved ? <Check size={18} /> : <Save size={18} />}</button>
+            {/* % del 1RM — debajo de la fila de inputs, no desplaza nada */}
+            {currentPR && (() => {
+              const pr1RM = estimate1RM(currentPR.kg, currentPR.reps);
+              const currentPct = (kg && !isNaN(parseFloat(kg)) && pr1RM > 0)
+                ? Math.round((estimate1RM(displayToKg(parseFloat(kg), unit), parseFloat(reps) || 1) / pr1RM) * 100)
+                : null;
+              return (
+                <div className="flex items-center gap-2 px-1">
+                  <span className="text-[9px] text-slate-600 shrink-0">% 1RM</span>
+                  <input
+                    type="number" inputMode="numeric" placeholder="—"
+                    className="w-10 bg-transparent border-b border-slate-800 text-[10px] font-bold text-center text-slate-500 focus:outline-none focus:border-slate-600 transition"
+                    onFocus={(e) => e.target.select()}
+                    onChange={(e) => {
+                      const pct = parseFloat(e.target.value);
+                      if (!isNaN(pct) && pct > 0 && pr1RM > 0) {
+                        const targetKg = kgToDisplay(Math.round(pr1RM * pct / 100 * 2) / 2, unit);
+                        updateDraft({ kg: String(targetKg) });
+                      }
+                    }}
+                  />
+                  {currentPct && <span className="text-[9px] text-slate-600 tabular-nums">~{currentPct}% actual</span>}
+                </div>
+              );
+            })()}
           </div>
         );
       })()}
@@ -7435,15 +7437,16 @@ const TAB_TITLES = { rutinas: "Rutinas", rutina: "Rutina", progreso: "Progreso",
 ============================================================================ */
 export default function App() {
   const [profiles, setProfiles] = useState(loadProfiles);
-  // Inicialización síncrona — si hay un perfil guardado sin PIN,
-  // activeProfile arranca con ese valor directamente sin esperar un
-  // useEffect, eliminando el flash de LoginScreen que se veía al abrir.
   const [activeProfile, setActiveProfile] = useState(() => {
     const saved = loadActive();
     const p = loadProfiles();
     if (saved && p[saved] && !p[saved].pin) return saved;
     return null;
   });
+  // Splash de carga — evita el flash negro→blanco al abrir la app.
+  // Se muestra durante 600ms con la animación del logo y luego desaparece.
+  const [showSplash, setShowSplash] = useState(true);
+  useEffect(() => { const t = setTimeout(() => setShowSplash(false), 600); return () => clearTimeout(t); }, []);
   const [tab, setTab] = useState("rutina");
   useEffect(() => { window.scrollTo({ top: 0 }); }, [tab]);
   const [aiChatMessages, setAiChatMessages] = useState([
@@ -7943,6 +7946,15 @@ export default function App() {
       return np;
     });
   }, [activeProfile]);
+
+  if (showSplash) return (
+    <div className="min-h-screen bg-[#0a0a0f] flex flex-col items-center justify-center gap-4">
+      <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-teal-500 to-teal-700 flex items-center justify-center shadow-2xl shadow-teal-500/30" style={{ animation: "gentleBounceIn 0.4s cubic-bezier(.34,1.56,.64,1)" }}>
+        <Dumbbell size={30} className="text-white" />
+      </div>
+      <p className="text-white font-black text-xl tracking-tight" style={{ animation: "gentleBounceIn 0.4s cubic-bezier(.34,1.56,.64,1) 0.1s both" }}>Modus Fit</p>
+    </div>
+  );
 
   if (!activeProfile) return (<><StyleInjector />{recoveredNotice && <RecoveredBanner onClose={() => setRecoveredNotice(false)} />}<LoginScreen onLogin={handleLogin} allowAutoLogin={!justLoggedOut} /></>);
 
