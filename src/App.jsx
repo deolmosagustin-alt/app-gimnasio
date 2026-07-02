@@ -7443,15 +7443,6 @@ export default function App() {
     if (saved && p[saved] && !p[saved].pin) return saved;
     return null;
   });
-  // Splash de carga — cubre el flash negro→blanco mientras WebView y React
-  // cargan. Dura 700ms mínimo para que el logo se vea, después fade out.
-  const [showSplash, setShowSplash] = useState(true);
-  const [splashFading, setSplashFading] = useState(false);
-  useEffect(() => {
-    const fadeTimer = setTimeout(() => setSplashFading(true), 500);
-    const hideTimer = setTimeout(() => setShowSplash(false), 800);
-    return () => { clearTimeout(fadeTimer); clearTimeout(hideTimer); };
-  }, []);
   const [tab, setTab] = useState("rutina");
   useEffect(() => { window.scrollTo({ top: 0 }); }, [tab]);
   const [aiChatMessages, setAiChatMessages] = useState([
@@ -7951,15 +7942,6 @@ export default function App() {
       return np;
     });
   }, [activeProfile]);
-
-  if (showSplash) return (
-    <div className="min-h-screen bg-[#0a0a0f] flex flex-col items-center justify-center gap-4 transition-opacity duration-300" style={{ opacity: splashFading ? 0 : 1 }}>
-      <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-teal-500 to-teal-700 flex items-center justify-center shadow-2xl shadow-teal-500/30" style={{ animation: "gentleBounceIn 0.4s cubic-bezier(.34,1.56,.64,1)" }}>
-        <Dumbbell size={30} className="text-white" />
-      </div>
-      <p className="text-white font-black text-xl tracking-tight" style={{ animation: "gentleBounceIn 0.4s cubic-bezier(.34,1.56,.64,1) 0.1s both" }}>Modus Fit</p>
-    </div>
-  );
 
   if (!activeProfile) return (<><StyleInjector />{recoveredNotice && <RecoveredBanner onClose={() => setRecoveredNotice(false)} />}<LoginScreen onLogin={handleLogin} allowAutoLogin={!justLoggedOut} /></>);
 
