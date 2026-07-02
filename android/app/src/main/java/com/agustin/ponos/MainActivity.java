@@ -1,5 +1,6 @@
 package com.agustin.ponos;
 
+import android.graphics.Color;
 import android.Manifest;
 import android.content.pm.PackageManager;
 import android.os.Build;
@@ -14,13 +15,12 @@ public class MainActivity extends BridgeActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Quitar scrollbar nativo del WebView
         WebView webView = getBridge().getWebView();
+        // Fondo oscuro desde el primer frame — elimina el flash blanco
+        webView.setBackgroundColor(Color.parseColor("#0a0a0f"));
         webView.setVerticalScrollBarEnabled(false);
         webView.setHorizontalScrollBarEnabled(false);
 
-        // Pedir permiso de notificaciones en Android 13+
-        // (versiones anteriores lo tienen habilitado por defecto)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this,
                     Manifest.permission.POST_NOTIFICATIONS)
