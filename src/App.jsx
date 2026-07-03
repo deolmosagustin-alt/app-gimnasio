@@ -213,7 +213,7 @@ function getCurrentUser() {
 // medidas, rutinas, configuración) sí sube completo.
 const CLOUD_PROFILE_FIELDS = [
   // Datos básicos del perfil
-  "name", "email", "sex", "age", "joinedAt", "googleUid", "tutorialSeen", "pin",
+  "name", "email", "sex", "age", "heightCm", "joinedAt", "googleUid", "tutorialSeen", "pin",
   // Configuración y rutinas
   "settings", "activeRoutineId", "routines", "weekSchedule",
   // Historial de entrenamiento completo
@@ -223,7 +223,7 @@ const CLOUD_PROFILE_FIELDS = [
   // Estado de ciclo y descarga
   "cycleStart", "deloadProgress", "dismissedDeloadCycle", "lastSeenCycleNumber",
   // UI state
-  "dismissedMissedDayNotice",
+  "dismissedMissedDayNotice", "onboardingDone",
 ];
 function profileToCloud(profile) {
   const out = {};
@@ -847,6 +847,18 @@ button:active { transform: scale(0.97); }
 
 /* Transición suave al cambiar de tema o estados de tarjetas */
 .smooth-card { transition: background-color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease; }
+
+/* ==== Tolerancia al escalado de texto (accesibilidad) ====
+   Cuando el usuario agranda la letra, los textos en rem crecen pero los
+   contenedores con medidas fijas no. Estas reglas hacen que el layout
+   SE ADAPTE en vez de deformarse: los flex hijos pueden encogerse y
+   truncar, las filas de chips hacen wrap, y nada desborda de su tarjeta. */
+.flex > * { min-width: 0; }
+p, span, label, button { overflow-wrap: break-word; }
+/* Las filas de tabs/chips que no scrollean horizontalmente hacen wrap */
+.flex.flex-wrap-safe { flex-wrap: wrap; }
+/* Los números tabulares no se desbordan de sus celdas */
+.tabular-nums { font-variant-numeric: tabular-nums; }
 
 /* Hide the default scrollbar everywhere — vertical page scroll and the
    horizontal chip/card carousels (day tabs, exercise picker, etc.). Scrolling
@@ -3635,7 +3647,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
               {deloadMode && <span className="text-[10px] bg-purple-500/15 text-purple-400 rounded-lg px-1.5 py-0.5 font-bold">DESCARGA</span>}
               {!deloadMode && stagnant && <span className="text-[10px] bg-rose-500/15 text-rose-400 rounded-lg px-1.5 py-0.5 font-bold flex items-center gap-1"><AlertTriangle size={9} /> ESTANCADO</span>}
             </div>
-            {exercise.nota && <p className="text-[11px] text-slate-500 mt-0.5 truncate">{exercise.nota}</p>}
+            {exercise.nota && <p className="text-[11px] text-slate-500 mt-0.5" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{exercise.nota}</p>}
           </div>
         </div>
         <ChevronDown size={18} className={`text-slate-600 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
@@ -4213,7 +4225,8 @@ function SessionHistoryView({ logs, onDeleteDay }) {
    DELOAD VIEW (unchanged from prior redesign)
 ============================================================================ */
 function DeloadView({ logs, settings = DEFAULT_SETTINGS, deloadProgress = {}, setDeloadProgress, onFinishDeloadSession }) {
-  const unit = useWeightUnit();
+  const globalUnit = useWeightUnit();
+  const [unit, setUnit] = useState(globalUnit);
   const { trainWeeks, deloadWeeks, deloadPct, deloadSetDivisor } = settings;
   const pctLabel = Math.round(deloadPct * 100);
   const [activeDay, setActiveDay] = useState(DAY_ORDER[0]);
@@ -4259,6 +4272,9 @@ function DeloadView({ logs, settings = DEFAULT_SETTINGS, deloadProgress = {}, se
               <div className="flex items-center gap-2 mb-1">
                 <Zap size={16} className="text-purple-400" />
                 <span className="text-[11px] font-black uppercase tracking-widest text-purple-400">Semana de descarga</span>
+                <button onClick={() => setUnit((u) => u === "kg" ? "lbs" : "kg")} className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-slate-800 text-slate-500 hover:text-slate-300 transition border border-slate-700 ml-1">
+                  {unit === "kg" ? "lbs" : "kg"}
+                </button>
               </div>
               <h2 className="text-xl font-black text-white leading-tight">Recuperación activa</h2>
               <p className="text-xs text-purple-300/60 mt-1">Menos carga · Menos series · Mismas reps</p>
@@ -4296,7 +4312,7 @@ function DeloadView({ logs, settings = DEFAULT_SETTINGS, deloadProgress = {}, se
       <div key={activeDay} className="space-y-3 tab-fade-in">
         {day.exercises.map((ex) => {
           const deloadSets = Math.max(1, Math.ceil(ex.sets.length / deloadSetDivisor));
-          const bestPerSet = ex.sets.map((s, i) => { const h = logs[`${ex.id}_${i}`] || []; let best = s.pr ? { ...s.pr } : null; const ov = logs[`${ex.id}_${i}_pr_override`]; if (ov) best = ov; else h.forEach((e) => { if (!best || vol(e.kg, e.reps) > vol(best.kg, best.reps)) best = e; }); return best; });
+          const bestPerSet = ex.sets.map((s, i) => { const h = logs[`${ex.id}_${i}`] || []; let best = s.pr ? { ...s.pr } : null; const ov = logs[`${ex.id}_${i}_pr_override`]; if (ov) best = ov; else h.forEach((e) => { const scoreE = ex.cardio ? (e.minutes || 0) : vol(e.kg, e.reps); const scoreB = best ? (ex.cardio ? (best.minutes || 0) : vol(best.kg, best.reps)) : -1; if (!best || scoreE > scoreB) best = e; }); return best; });
           const hasPR = bestPerSet.some(Boolean);
           const hasHeavy = ex.sets.slice(0, deloadSets).some((s) => isHeavyRepRange(s.repRange));
           return (
@@ -4329,14 +4345,21 @@ function DeloadView({ logs, settings = DEFAULT_SETTINGS, deloadProgress = {}, se
                           <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">S{i + 1}</span>
                           <span className="text-[10px] bg-slate-800/80 text-slate-500 rounded-lg px-2 py-0.5">{s.repRange} reps</span>
                         </div>
-                        {best && (
+                        {best && (ex.cardio ? (
+                          <div className="flex items-center gap-2 mb-2.5 px-2 py-1.5 rounded-lg" style={{ backgroundColor: done ? day.color + "15" : "#A855F715" }}>
+                            <Zap size={12} style={{ color: done ? day.color : "#C084FC" }} className="shrink-0" />
+                            <span className="text-[10px] font-bold text-slate-500 line-through mr-1">{best.minutes} min</span>
+                            <ArrowDown size={10} style={{ color: done ? day.color : "#C084FC" }} />
+                            <span className="text-sm font-black" style={{ color: done ? day.color : "#D8B4FE" }}>{Math.max(1, Math.round((best.minutes || 0) * deloadPct))} min</span>
+                          </div>
+                        ) : (
                           <div className="flex items-center gap-2 mb-2.5 px-2 py-1.5 rounded-lg" style={{ backgroundColor: done ? day.color + "15" : "#A855F715" }}>
                             <Zap size={12} style={{ color: done ? day.color : "#C084FC" }} className="shrink-0" />
                             <span className="text-[10px] font-bold text-slate-500 line-through mr-1">{best.reps}×{kgToDisplay(best.kg, unit)}{weightLabel(unit)}</span>
                             <ArrowDown size={10} style={{ color: done ? day.color : "#C084FC" }} />
                             <span className="text-sm font-black" style={{ color: done ? day.color : "#D8B4FE" }}>{best.reps}×{kgToDisplay(deloadKg, unit)}{weightLabel(unit)}</span>
                           </div>
-                        )}
+                        ))}
                         <button onClick={() => toggleDeloadDone(progressKey)} className={`w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all active:scale-95 ${done ? "text-white" : "border border-dashed border-slate-700 text-slate-500 hover:text-slate-300 hover:border-slate-500"}`} style={done ? { backgroundColor: day.color } : {}}>
                           {done ? <><Check size={13} /> Hecho</> : "Marcar como hecha"}
                         </button>
@@ -4567,7 +4590,10 @@ function getMuscleRank(muscleKey, best1RM, mode = "general", bodyWeightKg = 0, s
   let levelIdx = -1;
   for (let i = 0; i < thresholds.length; i++) { if (best1RM >= thresholds[i]) levelIdx = i; }
   if (levelIdx === -1) {
-    return { tier: "Bronce", sub: "I", color: "#475569", levelIdx: -1, threshold: 0, nextThreshold: thresholds[0], hasData: true };
+    // Con cualquier marca registrada ya sos Bronce I (y el músculo se
+    // pinta en el muñeco). El primer umbral es la meta hacia el próximo
+    // nivel, no una barrera de entrada al sistema de rangos.
+    return { ...RANK_TIERS[0], levelIdx: 0, threshold: 0, nextThreshold: thresholds[0], hasData: true };
   }
   const info = RANK_TIERS[levelIdx];
   const threshold = thresholds[levelIdx];
@@ -4646,15 +4672,24 @@ function getBest1RMForMuscleGroup(groupKey, logs) {
 }
 
 // Insignias de rango — imágenes en /public/insignias/{tier}.png.
-// Todas se renderizan con object-fit: contain, que ajusta cada imagen
-// dentro del cuadro SIN deformarla (nada de fill que estira ni cover
-// que recorta). Si alguna imagen tiene proporción distinta, queda
-// centrada con aire a los costados — siempre con su forma real.
-function RankBadgeIcon({ tier, sub, color, size = 30 }) {
+// object-fit: contain (sin deformar). Dos ajustes por tier:
+//  - widthAdjust: bronce/plata venían más anchas que oro → se les reduce
+//    el ancho visual para que las tres coincidan; diamante y maestro se
+//    igualan a esmeralda.
+//  - TIER_SCALE: escala progresiva casi imperceptible (bronce el más
+//    chico → maestro el más grande) que refuerza psicológicamente la
+//    jerarquía de rangos sin que se note a simple vista.
+//  - Plata tiene el brillo del archivo más fuerte que el resto → se le
+//    baja un poco el brightness para emparejar.
+const TIER_SCALE = { bronce: 0.90, plata: 0.94, oro: 0.98, esmeralda: 1.02, diamante: 1.06, maestro: 1.10 };
+function RankBadgeIcon({ tier, sub, color, size = 34 }) {
   const [imgError, setImgError] = useState(false);
   const tierFile = (tier || "bronce").toLowerCase();
+  const scale = TIER_SCALE[tierFile] ?? 1;
+  const s = Math.round(size * scale);
+  const imgFilter = tierFile === "plata" ? "saturate(0.7) brightness(0.82)" : "saturate(0.7) brightness(0.92)";
   return (
-    <div className="shrink-0" style={{ position: "relative", width: size, height: size, filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.35))" }}>
+    <div className="shrink-0" style={{ position: "relative", width: s, height: s, filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.35))" }}>
       <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
         {!imgError ? (
           <img
@@ -4662,7 +4697,7 @@ function RankBadgeIcon({ tier, sub, color, size = 30 }) {
             alt={`${tier || ""}${sub ? ` ${sub}` : ""}`.trim()}
             onError={() => setImgError(true)}
             draggable={false}
-            style={{ width: "100%", height: "100%", objectFit: "contain", filter: "saturate(0.7) brightness(0.92)" }}
+            style={{ width: "100%", height: "100%", objectFit: "contain", filter: imgFilter }}
           />
         ) : (
           <div style={{ width: "100%", height: "100%", borderRadius: "50%", backgroundColor: color, filter: "saturate(0.7)" }} />
@@ -4755,7 +4790,7 @@ function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backR
   // highlightedColors: versión suavizada de los colores de RANK_TIERS —
   // mezclada 65/35 con el fondo oscuro para que el muñeco no acapare
   // toda la atención visual de la pantalla.
-  const highlightedColors = useMemo(() => RANK_TIERS.map((t) => muteHex(t.color, 0.65)), []);
+  const highlightedColors = useMemo(() => RANK_TIERS.map((t) => muteHex(t.color, 0.8)), []);
   const data = useMemo(() => {
     const bestLevelBySlug = {};
     Object.entries(BODY_HIGHLIGHTER_SLUG_MAP).forEach(([ourKey, slug]) => {
@@ -4879,13 +4914,19 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
   const modeLabel = mode === "relative" && bodyWeightKg ? "Según tu contexto" : "General";
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-blue-500/20 bg-slate-900/50 backdrop-blur-sm shadow-md shadow-black/20 p-4 space-y-3">
-      <div className="flex items-center justify-between gap-2 mb-1">
+    <div className="relative overflow-hidden rounded-2xl border border-blue-500/25 shadow-lg shadow-blue-500/5 p-4 space-y-3" style={{ background: "linear-gradient(160deg, #0d1526 0%, #0f172a 45%, #0a0f1e 100%)" }}>
+      {/* Glows decorativos de fondo */}
+      <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-8 -left-8 w-32 h-32 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
+      <div className="relative flex items-center justify-between gap-2 mb-1">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-blue-500/15 text-blue-400 flex items-center justify-center shrink-0"><Award size={15} /></div>
-          <p className="text-sm font-bold text-white">Rango por músculo</p>
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500/25 to-indigo-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center shrink-0"><Award size={16} /></div>
+          <div>
+            <p className="text-sm font-black text-white">Rango por músculo</p>
+            <p className="text-[9px] text-slate-500">Tocá un músculo para ver su detalle</p>
+          </div>
         </div>
-        <button onClick={() => setShowImage(true)} aria-label="Compartir tus rangos" className="p-1.5 rounded-lg text-slate-500 hover:text-blue-400 transition shrink-0"><Share2 size={15} /></button>
+        <button onClick={() => setShowImage(true)} aria-label="Compartir tus rangos" className="p-2 rounded-xl bg-slate-800/60 text-slate-400 hover:text-blue-400 transition shrink-0 border border-slate-700/50"><Share2 size={15} /></button>
       </div>
 
       <div>
@@ -4913,7 +4954,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
             <>
               <div className="flex items-center gap-3.5 mb-3.5">
                 <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-2 shrink-0 backdrop-blur-sm shadow-md shadow-black/20">
-                  <RankBadgeIcon tier={selInfo.tier} sub={selInfo.sub} color={selInfo.color} size={104} />
+                  <RankBadgeIcon tier={selInfo.tier} sub={selInfo.sub} color={selInfo.color} size={118} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-lg font-black leading-tight" style={{ color: selInfo.color }}>{selInfo.tier}{selInfo.sub ? ` ${selInfo.sub}` : ""}</p>
@@ -4931,7 +4972,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
                   <div className="flex items-center justify-between mb-2 gap-2">
                     <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Progreso al próximo rango</span>
                     <span className="flex items-center gap-1.5 text-[11px] font-bold shrink-0" style={{ color: nextTierInfo?.color }}>
-                      <RankBadgeIcon tier={nextTierInfo?.tier} sub="" color={nextTierInfo?.color} size={48} />
+                      <RankBadgeIcon tier={nextTierInfo?.tier} sub="" color={nextTierInfo?.color} size={52} />
                       {nextTierInfo?.tier}{nextTierInfo?.sub ? ` ${nextTierInfo.sub}` : ""}
                     </span>
                   </div>
@@ -4967,7 +5008,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
               const rep = RANK_TIERS.find((r) => r.tier === t && r.sub === "II") || RANK_TIERS.find((r) => r.tier === t);
               return (
                 <div key={t} className="flex flex-col items-center gap-2 rounded-xl py-3 bg-slate-800/30">
-                  <RankBadgeIcon tier={rep.tier} sub="" color={rep.color} size={76} />
+                  <RankBadgeIcon tier={rep.tier} sub="" color={rep.color} size={88} />
                   <span className="text-[10px] font-black" style={{ color: rep.color }}>{t}</span>
                 </div>
               );
@@ -5707,6 +5748,7 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
   const [editMail, setEditMail] = useState(profile?.email || "");
   const [editSex, setEditSex] = useState(profile?.sex || "");
   const [editAge, setEditAge] = useState(profile?.age ? String(profile.age) : "");
+  const [editHeight, setEditHeight] = useState(profile?.heightCm ? String(profile.heightCm) : "");
   const [showCycleSetup, setShowCycleSetup] = useState(false);
   const [googleLinkError, setGoogleLinkError] = useState("");
   const [syncStatus, setSyncStatus] = useState(null); // null | "syncing" | "ok" | "error"
@@ -5773,7 +5815,7 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
   // actualiza settings.bodyWeightKg por detrás para que el rango "Según
   // tu contexto" siga funcionando sin tener que tocar nada más.
   const handleSaveProfile = () => {
-    const updates = { email: editMail, sex: editSex || null, age: editAge ? parseInt(editAge, 10) : null };
+    const updates = { email: editMail, sex: editSex || null, age: editAge ? parseInt(editAge, 10) : null, heightCm: editHeight ? parseInt(editHeight, 10) : null };
     updates.settings = { ...settings, sex: editSex || null };
     onUpdateProfile(updates);
     setEditing(false);
@@ -5845,9 +5887,15 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
             </div>
             <p className="text-[10px] text-slate-600 mt-1.5">Se usa sólo para calibrar mejor el rango por músculo (la fuerza relativa típica varía según esto).</p>
           </div>
-          <div>
-            <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Edad</label>
-            <input type="number" inputMode="numeric" value={editAge} onChange={(e) => setEditAge(e.target.value)} placeholder="Años" className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none" />
+          <div className="flex gap-3">
+            <div className="flex-1">
+              <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Edad</label>
+              <input type="number" inputMode="numeric" value={editAge} onChange={(e) => setEditAge(e.target.value)} placeholder="Años" className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none" />
+            </div>
+            <div className="flex-1">
+              <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Altura</label>
+              <input type="number" inputMode="numeric" value={editHeight} onChange={(e) => setEditHeight(e.target.value)} placeholder="cm" className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none" />
+            </div>
           </div>
           <p className="text-[10px] text-slate-600">Tu peso corporal y otras medidas ahora se registran con su propio historial en Progreso → Medidas.</p>
           <div className="flex gap-2">
@@ -5999,6 +6047,10 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
         <Save size={12} className="text-slate-600 shrink-0" />
         <span>Tus datos se guardan en este dispositivo, con una copia de seguridad automática.</span>
       </div>
+
+      <a href="https://app-gimnasio-two.vercel.app/privacy-policy.html" target="_blank" rel="noreferrer" className="w-full flex items-center gap-2 justify-center py-3 rounded-2xl text-slate-500 hover:text-slate-300 transition text-xs font-semibold">
+        <Info size={13} /> Política de privacidad
+      </a>
 
       <button onClick={onSignOut} className="w-full flex items-center gap-2 justify-center py-3.5 rounded-2xl border border-slate-800 text-slate-400 hover:text-white hover:border-slate-600 transition text-sm font-semibold"><LogOut size={14} /> Cerrar sesión</button>
       {!showDeletePin ? (
@@ -6773,7 +6825,7 @@ Aplicá estos marcos cuando sean relevantes para lo que te preguntan (no los rec
 
 Antes de responder, revisá en silencio que tu respuesta resuelva exactamente lo que te preguntaron — no un tema parecido ni una versión genérica — y que cubra todas las partes si la pregunta tenía varias. Interpretá la intención real aunque venga en jerga informal o mal escrita. Si la pregunta es genérica o ambigua y la respuesta cambia mucho según un dato que no tenés (objetivo, experiencia, qué ejercicio), pedí ESE dato puntual en vez de adivinar — pero si ya tenés lo necesario en el historial o el contexto de abajo, respondé directo sin preguntar de más.
 
-Cuando tu respuesta se apoye en evidencia científica concreta (un estudio, una guía clínica, una revisión sistemática, una cifra puntual), buscá un respaldo real si hace falta — tenés acceso a resultados de búsqueda actuales para fundamentarla con fuentes reales en vez de citar de memoria. Nunca inventes un estudio, un autor o un link que no exista. No escribas vos los links ni los nombres de los estudios dentro del texto de tu respuesta — las fuentes reales que se usen se muestran aparte, debajo de tu mensaje, de forma automática. Si no encontrás un respaldo real, está bien responder sin citar nada en vez de inventarlo.
+Basá tus recomendaciones en los principios de entrenamiento con más consenso científico (sobrecarga progresiva, volumen y frecuencia adecuados, técnica y rango de movimiento, gestión de la fatiga). NUNCA inventes estudios, autores, cifras exactas ni links — si no estás seguro de un dato puntual, decilo con honestidad y da la recomendación práctica general.
 
 Tenés acceso a los datos reales de esta persona en el siguiente JSON — usalos para responder con precisión (fechas, pesos, repeticiones, y la estructura real de sus rutinas día por día), nunca inventes datos que no estén ahí. "rutinas" incluye TODAS sus rutinas (activa, creadas, editadas y archivadas) con sus días y ejercicios completos — las marcadas "archivada":true no están visibles para ella en la pestaña Rutinas salvo que las recupere, tenelo en cuenta si te pregunta qué tiene disponible ahora. "logs" trae sólo los últimos registros de cada serie (no el historial completo) — alcanza para evaluar tendencia reciente, pero si te preguntan por una marca muy vieja que no aparece, decilo en vez de inventar un valor. Respuestas cortas, 2 a 4 oraciones salvo que te pidan más detalle o la pregunta lo amerite. Para dar formato a tu texto podés usar **negrita** y listas con guion (-), nada más — no uses títulos, tablas, ni bloques de código.
 
@@ -6896,7 +6948,7 @@ Datos: ${JSON.stringify(context)}`;
           <div className="w-11 h-11 rounded-2xl bg-teal-500/20 border border-teal-500/30 flex items-center justify-center shrink-0">
             <Sparkles size={20} className="text-teal-400" />
           </div>
-          <div>
+          <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
               <span className="text-[10px] font-black uppercase tracking-widest text-teal-400">Tu asistente</span>
               <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-teal-500/20 text-teal-400 font-bold border border-teal-500/20">BETA</span>
@@ -6904,27 +6956,37 @@ Datos: ${JSON.stringify(context)}`;
             <h2 className="relative text-xl font-black text-white leading-tight">Entrenador IA</h2>
             <p className="relative text-xs text-teal-300/60 mt-0.5">Conoce tu historial real — preguntale lo que quieras</p>
           </div>
+          {messages.length > 1 && (
+            <button onClick={() => setMessages(messages.slice(0, 1))} title="Nueva conversación" className="p-2 rounded-xl bg-slate-800/60 border border-slate-700/50 text-slate-400 hover:text-teal-400 transition shrink-0 active:scale-95">
+              <RotateCcw size={14} />
+            </button>
+          )}
         </div>
       </div>
 
       <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 mb-4">
         {[
-          { icon: <Layers size={11} />, label: "Crear rutinas" },
-          { icon: <UserCog size={11} />, label: "Editar perfil" },
-          { icon: <Calendar size={11} />, label: "Ciclo y descarga" },
-          { icon: <BarChart3 size={11} />, label: "Analizar progreso" },
-          { icon: <Award size={11} />, label: "Cita estudios reales" },
+          { icon: <Layers size={11} />, label: "Crear rutina", prompt: "Armame una rutina nueva según mis objetivos" },
+          { icon: <BarChart3 size={11} />, label: "Analizar progreso", prompt: "Analizá mi progreso reciente: ¿en qué mejoré y qué tengo estancado?" },
+          { icon: <Target size={11} />, label: "Punto débil", prompt: "Mirando mis rangos por músculo, ¿cuál es mi punto más débil y cómo lo ataco?" },
+          { icon: <Zap size={11} />, label: "Plan de hoy", prompt: "¿Qué me toca entrenar hoy y con qué pesos me conviene arrancar?" },
+          { icon: <Calendar size={11} />, label: "Ciclo y descarga", prompt: "¿Cómo vengo en el ciclo actual? ¿Cuándo me toca la descarga?" },
         ].map((c, i) => (
-          <button key={i} onClick={() => { setInput(c.label); }} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-teal-500/10 border border-teal-500/20 text-teal-300 text-[10px] font-bold whitespace-nowrap shrink-0 hover:bg-teal-500/20 transition active:scale-95">{c.icon}{c.label}</button>
+          <button key={i} onClick={() => { setInput(c.prompt); }} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-teal-500/10 border border-teal-500/20 text-teal-300 text-[10px] font-bold whitespace-nowrap shrink-0 hover:bg-teal-500/20 transition active:scale-95">{c.icon}{c.label}</button>
         ))}
       </div>
 
       <div className="space-y-3">
         {messages.map((m, i) => (
           <div key={i}>
-            <div className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+            <div className={`flex items-end gap-2 ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+              {m.role === "assistant" && (
+                <div className="w-6 h-6 rounded-lg bg-teal-500/15 border border-teal-500/25 flex items-center justify-center shrink-0 mb-0.5">
+                  <Sparkles size={11} className="text-teal-400" />
+                </div>
+              )}
               <div
-                className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${m.role === "user" ? "!text-white" : "bg-slate-900/60 border border-slate-800/60 text-slate-200"}`}
+                className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${m.role === "user" ? "!text-white rounded-br-md" : "bg-slate-900/60 border border-slate-800/60 text-slate-200 rounded-bl-md"}`}
                 style={m.role === "user" ? { background: "linear-gradient(135deg,#14B8A6,#0E7490)" } : {}}
               >
                 {m.role === "assistant" ? renderChatMarkdown(m.text) : m.text}
@@ -6968,8 +7030,11 @@ Datos: ${JSON.stringify(context)}`;
           </div>
         ))}
         {isSending && (
-          <div className="flex justify-start">
-            <div className="bg-slate-900/60 border border-slate-800/60 rounded-2xl px-4 py-3.5 flex items-center gap-3 max-w-[70%]">
+          <div className="flex items-end gap-2 justify-start">
+            <div className="w-6 h-6 rounded-lg bg-teal-500/15 border border-teal-500/25 flex items-center justify-center shrink-0 mb-0.5">
+              <Sparkles size={11} className="text-teal-400 soft-pulse" />
+            </div>
+            <div className="bg-slate-900/60 border border-slate-800/60 rounded-2xl rounded-bl-md px-4 py-3.5 flex items-center gap-3 max-w-[70%]">
               <div className="flex gap-1">
                 <span className="w-2 h-2 rounded-full bg-teal-500 animate-bounce" style={{ animationDelay: "0ms" }} />
                 <span className="w-2 h-2 rounded-full bg-teal-500 animate-bounce" style={{ animationDelay: "150ms" }} />
@@ -7583,6 +7648,54 @@ const TAB_TITLES = { rutinas: "Rutinas", rutina: "Rutina", progreso: "Progreso",
 /* ============================================================================
    APP ROOT
 ============================================================================ */
+// Checklist de primeros pasos. Aparece arriba de la rutina hasta que el
+// usuario completa todo: fecha de inicio de ciclo, datos del perfil
+// (sexo, edad, peso, altura) y su primera marca registrada. Cuando todo
+// está completo se marca profile.onboardingDone y desaparece PARA SIEMPRE.
+function OnboardingTasksCard({ profile, cycleStart, logs, onGoToProfile, onDone }) {
+  const settings = profile ? getProfileSettings(profile) : DEFAULT_SETTINGS;
+  const tasks = [
+    { key: "cycle", label: "Elegí tu fecha de inicio de ciclo", done: !!cycleStart, hint: "Perfil → Ciclo de entrenamiento" },
+    { key: "profile", label: "Completá tus datos (sexo, edad, peso, altura)", done: !!(profile?.sex && profile?.age && (settings.bodyWeightKg > 0) && profile?.heightCm), hint: "Perfil → Editar perfil y Medidas" },
+    { key: "firstLog", label: "Registrá tu primera marca en un ejercicio", done: Object.entries(logs || {}).some(([k, v]) => !k.endsWith("_pr_override") && Array.isArray(v) && v.length > 0), hint: "Rutina → guardá una serie" },
+  ];
+  const doneCount = tasks.filter((t) => t.done).length;
+  const allDone = doneCount === tasks.length;
+  const hidden = !profile || profile.onboardingDone;
+
+  // Cuando todo está listo, marcarlo y no mostrar nunca más
+  useEffect(() => { if (!hidden && allDone) onDone?.(); }, [allDone, hidden]);
+  if (hidden || allDone) return null;
+
+  return (
+    <div className="mb-4 rounded-2xl border border-teal-500/25 overflow-hidden bounce-in" style={{ background: "linear-gradient(135deg, #0d1f1e, #0f172a)" }}>
+      <div className="px-4 py-3 flex items-center gap-2.5 border-b border-slate-800/50">
+        <div className="w-8 h-8 rounded-xl bg-teal-500/15 flex items-center justify-center shrink-0"><Target size={15} className="text-teal-400" /></div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-black text-white">Primeros pasos</p>
+          <p className="text-[10px] text-slate-500">{doneCount} de {tasks.length} completados</p>
+        </div>
+        <div className="flex gap-1">
+          {tasks.map((t) => <div key={t.key} className="w-2 h-2 rounded-full" style={{ backgroundColor: t.done ? "#14B8A6" : "#1e293b" }} />)}
+        </div>
+      </div>
+      <div className="px-4 py-2.5 space-y-2">
+        {tasks.map((t) => (
+          <button key={t.key} onClick={t.done ? undefined : onGoToProfile} className={`w-full flex items-center gap-2.5 text-left rounded-xl px-2 py-1.5 transition ${t.done ? "opacity-50" : "hover:bg-slate-800/40"}`}>
+            <div className={`w-5 h-5 rounded-lg flex items-center justify-center shrink-0 ${t.done ? "bg-teal-500" : "border border-slate-700"}`}>
+              {t.done && <Check size={12} className="text-white" />}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className={`text-xs font-semibold ${t.done ? "text-slate-500 line-through" : "text-slate-300"}`}>{t.label}</p>
+              {!t.done && <p className="text-[9px] text-slate-600">{t.hint}</p>}
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [profiles, setProfiles] = useState(loadProfiles);
   const [activeProfile, setActiveProfile] = useState(() => {
@@ -7594,7 +7707,7 @@ export default function App() {
   const [tab, setTab] = useState("rutina");
   useEffect(() => { window.scrollTo({ top: 0 }); }, [tab]);
   const [aiChatMessages, setAiChatMessages] = useState([
-    { role: "assistant", text: "¡Hola! Soy tu entrenador IA — tengo a la vista tu historial de entrenamiento. Preguntame sobre tu rutina, tus marcas o tu progreso." },
+    { role: "assistant", text: "¡Hola! 👋 Soy tu **Entrenador IA**.\n\nConozco tu rutina, tus marcas y tu progreso — todo lo que registrás en la app.\n\nPuedo ayudarte a:\n• **Crear o modificar rutinas** a tu medida\n• **Analizar tu progreso** y detectar puntos débiles\n• **Resolver dudas** de técnica, series y descanso\n\n¿Por dónde empezamos? 💪" },
   ]);
   const [cycleStart, setCycleStartState] = useState(loadCycleStart);
   const [showHelp, setShowHelp] = useState(false);
@@ -8125,7 +8238,7 @@ export default function App() {
       <StyleInjector />
       {recoveredNotice && <RecoveredBanner onClose={() => setRecoveredNotice(false)} />}
       {deloadNotice && <DeloadNoticeBanner onClose={() => setDeloadNotice(false)} />}
-      {missedDayNotice && <MissedDayBanner dayLabel={missedDayNotice.dayLabel} onClose={dismissMissedDayNotice} />}
+      
       {importRoutineError && <ImportRoutineErrorBanner onClose={() => setImportRoutineError(false)} />}
       <SideNav tab={tab} setTab={setTab} profileName={activeProfile} />
       <div className="flex-1 min-w-0">
@@ -8146,6 +8259,7 @@ export default function App() {
         <main className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto px-4 py-4 pb-28 lg:pb-10 space-y-4">
           <div key={tab} className="tab-fade-in">
             {tab === "rutinas" && <RoutinesView profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleArchiveRoutine} onRestore={handleRestoreRoutine} />}
+            {tab === "rutina" && <OnboardingTasksCard profile={profile} cycleStart={cycleStart} logs={logs} onGoToProfile={() => setTab("perfil")} onDone={() => handleUpdateProfile({ onboardingDone: true })} />}
             {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} />}
             {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} sex={profile?.sex} age={profile?.age} onGoToDeload={() => setTab("descarga")} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} />}
             {tab === "descarga" && <DeloadView logs={logs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} />}
