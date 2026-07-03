@@ -4687,36 +4687,40 @@ function RankBadgeIcon({ tier, sub, color, size = 32 }) {
   const tierFile = (tier || "bronce").toLowerCase();
   const scale = TIER_SCALE[tierFile] ?? 1;
   const s = Math.round(size * scale);
-  const imgFilter = tierFile === "plata" ? "saturate(0.7) brightness(0.82)" : "saturate(0.7) brightness(0.92)";
+  const imgFilter = tierFile === "plata"
+    ? "saturate(0.7) brightness(0.82)"
+    : "saturate(0.7) brightness(0.92)";
   return (
-    <div className="shrink-0" style={{ position: "relative", width: s, height: s, filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.35))" }}>
-      <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        {!imgError ? (
-          <img
-            src={`/insignias/${tierFile}.png`}
-            alt={`${tier || ""}${sub ? ` ${sub}` : ""}`.trim()}
-            onError={() => setImgError(true)}
-            draggable={false}
-            style={{ width: "100%", height: "100%", objectFit: "contain", filter: imgFilter }}
-          />
-        ) : (
-          <div style={{ width: "100%", height: "100%", borderRadius: "50%", backgroundColor: color, filter: "saturate(0.7)" }} />
-        )}
-      </div>
+    // Contenedor: ancho fijo, altura automática — la imagen define su
+    // propia altura según su proporción real. Así bronce/plata (más
+    // altas) y diamante/maestro (más anchas) no se deforman nunca,
+    // sin depender de objectFit que algunos WebViews ignoran.
+    <div className="shrink-0 relative inline-flex items-center justify-center"
+      style={{ width: s, filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.35))" }}>
+      {!imgError ? (
+        <img
+          src={`/insignias/${tierFile}.png`}
+          alt={`${tier || ""}${sub ? ` ${sub}` : ""}`.trim()}
+          onError={() => setImgError(true)}
+          draggable={false}
+          style={{ width: s, height: "auto", display: "block", filter: imgFilter }}
+        />
+      ) : (
+        <div style={{ width: s, height: s, borderRadius: "50%", backgroundColor: color, filter: "saturate(0.7)" }} />
+      )}
       {sub && (
-        <span
-          style={{
-            position: "absolute", bottom: -Math.max(2, size * 0.03), right: -Math.max(2, size * 0.03),
-            width: Math.max(16, Math.round(size * 0.36)), height: Math.max(16, Math.round(size * 0.36)),
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: Math.max(8, Math.round(size * 0.19)), fontWeight: 800, color: "#ffffff",
-            background: "linear-gradient(135deg, #14B8A6, #0E7490)", borderRadius: "50%",
-            border: `${Math.max(1.5, Math.round(size * 0.02))}px solid #0a0a0f`,
-            boxShadow: "0 1px 3px rgba(0,0,0,0.5)",
-          }}
-        >
-          {sub}
-        </span>
+        <span style={{
+          position: "absolute",
+          bottom: -Math.max(2, Math.round(s * 0.04)),
+          right: -Math.max(2, Math.round(s * 0.04)),
+          width: Math.max(16, Math.round(s * 0.36)),
+          height: Math.max(16, Math.round(s * 0.36)),
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: Math.max(8, Math.round(s * 0.19)), fontWeight: 800, color: "#fff",
+          background: "linear-gradient(135deg,#14B8A6,#0E7490)", borderRadius: "50%",
+          border: `${Math.max(1.5, Math.round(s * 0.025))}px solid #0a0a0f`,
+          boxShadow: "0 1px 3px rgba(0,0,0,0.5)",
+        }}>{sub}</span>
       )}
     </div>
   );
@@ -8237,7 +8241,7 @@ export default function App() {
       <StyleInjector />
       {recoveredNotice && <RecoveredBanner onClose={() => setRecoveredNotice(false)} />}
       {importRoutineError && <ImportRoutineErrorBanner onClose={() => setImportRoutineError(false)} />}
-      <div className={`min-h-screen bg-[#0a0a0f] px-4 py-6 ${themeClass}`} style={{ "--small-text-scale": smallTextScale }}>
+      <div className={`min-h-screen bg-[#0a0a0f] px-4 py-6 ${themeClass}`} style={{ "--small-text-scale": smallTextScale, paddingTop: "calc(env(safe-area-inset-top, 0px) + 1.5rem)" }}>
         <div className="max-w-xl mx-auto">
           <div className="flex justify-end mb-2">
             <button onClick={handleSignOut} className="text-[11px] text-slate-600 hover:text-slate-400 font-semibold flex items-center gap-1"><LogOut size={11} /> Cerrar sesión</button>
@@ -8252,7 +8256,7 @@ export default function App() {
   const activeWeightUnit = getProfileSettings(profiles[activeProfile]).weightUnit ?? "kg";
   return (
     <WeightUnitCtx.Provider value={activeWeightUnit}>
-    <div className={`min-h-screen bg-[#0a0a0f] text-white font-sans lg:flex ${themeClass}`} style={{ "--small-text-scale": smallTextScale }}>
+    <div className={`min-h-screen bg-[#0a0a0f] text-white font-sans lg:flex ${themeClass}`} style={{ "--small-text-scale": smallTextScale, paddingTop: "env(safe-area-inset-top, 0px)" }}>
       <StyleInjector />
       {recoveredNotice && <RecoveredBanner onClose={() => setRecoveredNotice(false)} />}
       {deloadNotice && <DeloadNoticeBanner onClose={() => setDeloadNotice(false)} />}
