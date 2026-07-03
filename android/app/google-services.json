@@ -7,9 +7,9 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:1027242959052:android:159bd74ccb65346e0a6269",
+        "mobilesdk_app_id": "1:1027242959052:android:22c773eddf20face0a6269",
         "android_client_info": {
-          "package_name": "com.agustin.ponos"
+          "package_name": "com.modusfit.fitness"
         }
       },
       "oauth_client": [
