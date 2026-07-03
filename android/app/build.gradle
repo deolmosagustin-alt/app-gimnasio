@@ -1,7 +1,7 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace = "com.agustin.ponos"
+    namespace = "com.agustin.fitness"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
         applicationId "com.modusfit.fitness"

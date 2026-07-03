@@ -1229,19 +1229,26 @@ function wrapCanvasText(ctx, text, x, y, maxWidth, lineHeight) {
 }
 
 function drawShareCardBase(ctx, W, H, accent, accent2) {
-  const bg = ctx.createLinearGradient(0, 0, W, H);
-  bg.addColorStop(0, "#0a0a0f"); bg.addColorStop(1, "#13141f");
+  // Fondo
+  const bg = ctx.createLinearGradient(0, 0, 0, H);
+  bg.addColorStop(0, "#0f0f1a"); bg.addColorStop(1, "#07070f");
   ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
-  const blob = (x, y, r, color, alpha) => {
-    ctx.save(); ctx.globalAlpha = alpha;
-    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-    g.addColorStop(0, color); g.addColorStop(1, "rgba(0,0,0,0)");
-    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.restore();
-  };
-  blob(W * 0.18, H * 0.16, W * 0.62, accent, 0.4);
-  blob(W * 0.86, H * 0.82, W * 0.55, accent2, 0.28);
+  // Glow top-left
+  const g1 = ctx.createRadialGradient(W * 0.15, H * 0.12, 0, W * 0.15, H * 0.12, W * 0.55);
+  g1.addColorStop(0, accent + "22"); g1.addColorStop(1, "transparent");
+  ctx.fillStyle = g1; ctx.fillRect(0, 0, W, H);
+  // Glow bottom-right
+  const g2 = ctx.createRadialGradient(W * 0.85, H * 0.88, 0, W * 0.85, H * 0.88, W * 0.45);
+  g2.addColorStop(0, (accent2 || accent) + "18"); g2.addColorStop(1, "transparent");
+  ctx.fillStyle = g2; ctx.fillRect(0, 0, W, H);
+  // Borde sutil
+  ctx.strokeStyle = accent + "30"; ctx.lineWidth = 2;
+  const r = 28; ctx.beginPath(); ctx.moveTo(r, 1); ctx.arcTo(W - 1, 1, W - 1, r, r); ctx.arcTo(W - 1, H - 1, W - r, H - 1, r); ctx.arcTo(1, H - 1, 1, H - r, r); ctx.arcTo(1, 1, r, 1, r); ctx.closePath(); ctx.stroke();
+  // Logo / branding
+  ctx.fillStyle = accent + "cc"; ctx.font = "bold 18px system-ui";
+  ctx.textAlign = "right"; ctx.fillText("Modus Fit", W - 28, H - 22);
+  ctx.textAlign = "left";
 }
-
 // El "logo" de la app abajo de la tarjeta: una llamita simple dibujada a
 // mano (no hay archivo de imagen en este proyecto de un solo archivo) más
 // el nombre, en la parte inferior — tal como se pidió.
@@ -1267,55 +1274,63 @@ function drawWordmark(ctx, W, H, accent) {
 function drawPRShareCard(ctx, W, H, { exerciseName, muscle, kg, reps, accent = "#14B8A6" }) {
   drawShareCardBase(ctx, W, H, accent, "#A855F7");
   ctx.textAlign = "center";
-  ctx.fillStyle = accent;
-  ctx.font = "800 40px sans-serif";
-  ctx.fillText("🔥 NUEVA MARCA PERSONAL", W / 2, 360);
-  ctx.fillStyle = "#f8fafc";
-  ctx.font = "800 62px sans-serif";
-  const nameLines = wrapCanvasText(ctx, (exerciseName || "").toUpperCase(), W / 2, 470, W - 160, 72);
-  let y = 470 + (nameLines - 1) * 72;
+
+  // Chip "NUEVA MARCA PERSONAL"
+  const chipY = 120, chipText = "✦  NUEVA MARCA PERSONAL  ✦";
+  ctx.font = "700 22px system-ui";
+  const chipW = ctx.measureText(chipText).width + 56;
+  const gChip = ctx.createLinearGradient(W/2 - chipW/2, 0, W/2 + chipW/2, 0);
+  gChip.addColorStop(0, accent + "40"); gChip.addColorStop(1, accent + "20");
+  ctx.fillStyle = gChip;
+  ctx.beginPath(); ctx.roundRect(W/2 - chipW/2, chipY - 26, chipW, 44, 22); ctx.fill();
+  ctx.strokeStyle = accent + "60"; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.roundRect(W/2 - chipW/2, chipY - 26, chipW, 44, 22); ctx.stroke();
+  ctx.fillStyle = accent; ctx.fillText(chipText, W/2, chipY + 6);
+
+  // Nombre del ejercicio
+  ctx.fillStyle = "#f8fafc"; ctx.font = "800 56px system-ui";
+  const nameLines = wrapCanvasText(ctx, (exerciseName || "").toUpperCase(), W/2, 230, W - 120, 68);
+  let y = 230 + (nameLines - 1) * 68;
+
+  // Chip de músculo
   if (muscle) {
-    y += 95;
-    const label = muscle.toUpperCase();
-    ctx.font = "700 30px sans-serif";
-    const boxW = ctx.measureText(label).width + 72, boxH = 64;
-    ctx.fillStyle = accent + "26";
-    ctx.beginPath(); ctx.roundRect(W / 2 - boxW / 2, y - boxH + 16, boxW, boxH, boxH / 2); ctx.fill();
-    ctx.fillStyle = accent;
-    ctx.fillText(label, W / 2, y + 14);
+    y += 72;
+    ctx.font = "600 26px system-ui";
+    const mW = ctx.measureText(muscle.toUpperCase()).width + 48;
+    ctx.fillStyle = accent + "20";
+    ctx.beginPath(); ctx.roundRect(W/2 - mW/2, y - 26, mW, 42, 21); ctx.fill();
+    ctx.fillStyle = accent + "dd"; ctx.fillText(muscle.toUpperCase(), W/2, y + 5);
   }
-  const kgY = y + 280;
-  ctx.fillStyle = accent;
-  ctx.font = "900 200px sans-serif";
-  ctx.fillText(`${kg}`, W / 2, kgY);
-  ctx.fillStyle = "#94a3b8";
-  ctx.font = "700 42px sans-serif";
-  ctx.fillText("KILOGRAMOS", W / 2, kgY + 64);
-  ctx.fillStyle = "#cbd5e1";
-  ctx.font = "700 48px sans-serif";
-  ctx.fillText(`${reps} repeticiones`, W / 2, kgY + 150);
 
-  // Un par de datos más para que no se sienta tan vacía: el 1RM estimado
-  // (mismo cálculo que usa Progreso) y el volumen de esa serie puntual.
+  // Número de kg — protagonista
+  y += 120;
+  ctx.font = `900 ${kg >= 100 ? "160" : "180"}px system-ui`;
+  const gKg = ctx.createLinearGradient(0, y - 160, 0, y + 20);
+  gKg.addColorStop(0, "#ffffff"); gKg.addColorStop(1, accent);
+  ctx.fillStyle = gKg;
+  ctx.fillText(`${kg}`, W/2, y);
+  ctx.fillStyle = "#64748b"; ctx.font = "600 30px system-ui";
+  ctx.fillText("kg", W/2, y + 44);
+
+  // Reps
+  y += 110;
+  ctx.fillStyle = "#e2e8f0"; ctx.font = "700 42px system-ui";
+  ctx.fillText(`${reps} repeticiones`, W/2, y);
+
+  // Tiles 1RM + Volumen
   const est = estimate1RM(kg, reps);
-  const tileY = kgY + 250, tileGap = 50, tileW = (W - 160 - tileGap) / 2;
-  const tiles = [
-    { val: `${est}kg`, label: "1RM\nESTIMADO" },
-    { val: `${Math.round((kg || 0) * (reps || 0)).toLocaleString("es-AR")}`, label: "VOLUMEN\nDE LA SERIE" },
-  ];
-  tiles.forEach((t, i) => {
-    const x = 80 + i * (tileW + tileGap);
-    ctx.fillStyle = "rgba(255,255,255,0.06)";
-    ctx.beginPath(); ctx.roundRect(x, tileY, tileW, 230, 26); ctx.fill();
-    ctx.fillStyle = "#f8fafc";
-    ctx.font = "900 64px sans-serif";
-    ctx.fillText(`${t.val}`, x + tileW / 2, tileY + 105);
-    ctx.fillStyle = "#94a3b8";
-    ctx.font = "700 26px sans-serif";
-    t.label.split("\n").forEach((l, li) => ctx.fillText(l, x + tileW / 2, tileY + 160 + li * 32));
+  const tileY = y + 80, tileGap = 32, tileW = (W - 120 - tileGap) / 2;
+  [{ val: `${est} kg`, label: "1RM estimado" }, { val: `${Math.round((kg||0)*(reps||0))} kg`, label: "Volumen" }].forEach((t, i) => {
+    const x = 60 + i * (tileW + tileGap);
+    ctx.fillStyle = "rgba(255,255,255,0.05)";
+    ctx.beginPath(); ctx.roundRect(x, tileY, tileW, 150, 20); ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.08)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.roundRect(x, tileY, tileW, 150, 20); ctx.stroke();
+    ctx.fillStyle = "#ffffff"; ctx.font = "800 46px system-ui";
+    ctx.fillText(t.val, x + tileW/2, tileY + 82);
+    ctx.fillStyle = "#64748b"; ctx.font = "500 24px system-ui";
+    ctx.fillText(t.label, x + tileW/2, tileY + 122);
   });
-
-  drawWordmark(ctx, W, H, accent);
 }
 
 function drawCycleShareCard(ctx, W, H, { cycleNumber, daysTrained, totalVol, accent = "#A855F7" }) {
@@ -3097,6 +3112,50 @@ function HelpModal({ startTab, onClose }) {
    cambiar de día). Ahora sobreviven a eso — sólo se limpian cuando se
    resetea el día (resetKey) o se finaliza la sesión (ver RoutineView/App).
 ============================================================================ */
+// Modal que aparece cuando guardás una marca que te hace subir de rango.
+// Solo aparece cuando el tier cambia (ej: Oro II → Esmeralda I), no en
+// cada nuevo récord dentro del mismo tier.
+function RankUpModal({ from, to, muscleName, onClose }) {
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-5" style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}>
+      <div className="relative w-full max-w-sm rounded-3xl overflow-hidden bounce-in" style={{ background: "linear-gradient(135deg, #0f0f1a, #1a1a2e)", border: `2px solid ${to.color}40` }}>
+        {/* Glow de fondo */}
+        <div className="absolute inset-0 opacity-30 pointer-events-none" style={{ background: `radial-gradient(circle at 50% 30%, ${to.color}60, transparent 65%)` }} />
+        <div className="relative p-7 text-center space-y-5">
+          {/* Chips "SUBISTE DE RANGO" */}
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest" style={{ backgroundColor: to.color + "20", color: to.color, border: `1px solid ${to.color}40` }}>
+            ✦ ¡Nuevo rango! ✦
+          </div>
+          {/* Flecha de progresión */}
+          <div className="flex items-center justify-center gap-4">
+            <div className="flex flex-col items-center gap-1.5 opacity-50">
+              <RankBadgeIcon tier={from.tier} sub={from.sub} color={from.color} size={60} />
+              <span className="text-[10px] font-bold" style={{ color: from.color }}>{from.tier} {from.sub}</span>
+            </div>
+            <div className="flex flex-col items-center gap-1">
+              <div className="text-xl">→</div>
+            </div>
+            <div className="flex flex-col items-center gap-1.5">
+              <div className="relative">
+                <div className="absolute inset-0 rounded-full blur-xl opacity-60" style={{ backgroundColor: to.color }} />
+                <RankBadgeIcon tier={to.tier} sub={to.sub} color={to.color} size={90} />
+              </div>
+              <span className="text-sm font-black" style={{ color: to.color }}>{to.tier} {to.sub}</span>
+            </div>
+          </div>
+          <div>
+            <p className="text-2xl font-black text-white">{to.tier}</p>
+            {muscleName && <p className="text-sm text-slate-400 mt-1">en {muscleName}</p>}
+          </div>
+          <button onClick={onClose} className="w-full py-3.5 rounded-2xl font-black text-white text-sm active:scale-95 transition-all" style={{ background: `linear-gradient(135deg, ${to.color}, ${to.color}bb)`, boxShadow: `0 8px 24px -4px ${to.color}50` }}>
+            ¡Vamos! 💪
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, accent, logs, setLogs, drafts = {}, setDrafts, deloadKgFactor = 1, deloadMode = false, resetKey = 0, autoShowPrShare = true, onDisableAutoShowPrShare, hasActiveSession = true, cardio = false }) {
   const globalUnit = useWeightUnit();
   // Unidad local: arranca desde la preferencia global, pero el usuario puede
@@ -3133,6 +3192,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   const [editingPR, setEditingPR] = useState(false); const [editReps, setEditReps] = useState(""); const [editKg, setEditKg] = useState(""); const [saved, setSaved] = useState(false);
   const [prBurst, setPrBurst] = useState(0);
   const [showPRShare, setShowPRShare] = useState(false);
+  const [rankUpInfo, setRankUpInfo] = useState(null); // { from, to, muscleName }
   const saveBtnRef = useRef(null);
   // Cronómetro regresivo para cardio — cuenta desde los minutos ingresados
   // hasta 0 y marca la serie como hecha automáticamente al llegar a 0.
@@ -3183,6 +3243,19 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
       const isPR = !isFirstEver && m > prevMin;
       if (isFirstEver || isPR) newLogs = { ...newLogs, [prKey]: { minutes: m, km: d || null, date: today } };
       setLogs(newLogs); setSaved(true); setTimeout(() => setSaved(false), 1200);
+      // Detectar si el nuevo récord sube de rango (tier change)
+      try {
+        const exLib = EXERCISE_LIBRARY_BY_ID[exerciseId];
+        if (exLib?.group && newBest) {
+          const prevRankData = getBest1RMForMuscleGroup(exLib.group, logs);
+          const newRankData = getBest1RMForMuscleGroup(exLib.group, newLogs);
+          const prevRank = getMuscleRank(exLib.group, prevRankData.best1RM);
+          const newRank = getMuscleRank(exLib.group, newRankData.best1RM);
+          if (newRank.levelIdx > prevRank.levelIdx && prevRank.tier !== newRank.tier) {
+            setRankUpInfo({ from: prevRank, to: newRank, muscleName: MUSCLE_GROUP_BY_KEY[exLib.group]?.label });
+          }
+        }
+      } catch { }
       const noSession = !hasActiveSession;
       if (isFirstEver) { haptic(18); setFeedback({ type: "first", msg: "Primer registro 📝", noSession }); }
       else if (isPR) { haptic([35, 25, 45]); setPrBurst((n) => n + 1); setFeedback({ type: "pr", msg: "¡Sesión más larga hasta ahora! 🔥", noSession }); }
@@ -3206,7 +3279,19 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     const isPR = !isFirstEver && newVol > prevVol;
     if (isFirstEver || isPR) newLogs = { ...newLogs, [prKey]: { kg: k, reps: r, date: today } };
     setLogs(newLogs); setSaved(true); setTimeout(() => setSaved(false), 1200);
-    const suggestUp = r > repRangeTop(setDef.repRange);
+    // Detectar cambio de rango
+    try {
+      const exLib = EXERCISE_LIBRARY_BY_ID[exerciseId];
+      if (exLib?.group && (isFirstEver || isPR)) {
+        const prevRankData = getBest1RMForMuscleGroup(exLib.group, logs);
+        const newRankData = getBest1RMForMuscleGroup(exLib.group, newLogs);
+        const prevRank = getMuscleRank(exLib.group, prevRankData.best1RM);
+        const newRank = getMuscleRank(exLib.group, newRankData.best1RM);
+        if (newRank.levelIdx > prevRank.levelIdx && prevRank.tier !== newRank.tier) {
+          setRankUpInfo({ from: prevRank, to: newRank, muscleName: MUSCLE_GROUP_BY_KEY[exLib.group]?.label });
+        }
+      }
+    } catch { }
     const noSession = !hasActiveSession;
     if (isFirstEver) { haptic(18); setFeedback({ type: "first", msg: "Primera marca registrada 📝", suggestUp, noSession }); }
     else if (isPR) { haptic([35, 25, 45]); setPrBurst((n) => n + 1); setFeedback({ type: "pr", msg: "¡Nueva marca! 🔥", suggestUp, noSession }); if (autoShowPrShare) setShowPRShare(true); }
@@ -3439,6 +3524,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           </div>
         </div>
       )}
+      {rankUpInfo && <RankUpModal from={rankUpInfo.from} to={rankUpInfo.to} muscleName={rankUpInfo.muscleName} onClose={() => setRankUpInfo(null)} />}
       {showPRShare && !cardio && (
         <ShareImageModal
           title="Compartí tu marca"
@@ -4822,9 +4908,9 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
             {["Bronce", "Plata", "Oro", "Esmeralda", "Diamante", "Maestro"].map((t) => {
               const rep = RANK_TIERS.find((r) => r.tier === t && r.sub === "II") || RANK_TIERS.find((r) => r.tier === t);
               return (
-                <div key={t} className="flex flex-col items-center gap-1 rounded-xl py-2 bg-slate-800/30">
-                  <RankBadgeIcon tier={rep.tier} sub="" color={rep.color} size={52} />
-                  <span className="text-[9px] font-bold" style={{ color: rep.color }}>{t}</span>
+                <div key={t} className="flex flex-col items-center gap-2 rounded-xl py-3 bg-slate-800/30">
+                  <RankBadgeIcon tier={rep.tier} sub="" color={rep.color} size={68} />
+                  <span className="text-[10px] font-black" style={{ color: rep.color }}>{t}</span>
                 </div>
               );
             })}
@@ -5968,19 +6054,23 @@ function PresetRoutineCard({ preset, isActive, onUse, onEdit }) {
 function SavedRoutineRow({ routine, isActive, onUse, onEdit, onShare, onArchive }) {
   const [open, setOpen] = useState(false);
   const dayCount = routine.dayOrder.length;
-  const accent = "#A855F7"; // violeta fijo, igual que en PresetRoutineCard
+  const accent = isActive ? "#14B8A6" : "#6366F1"; // teal si activa, indigo si no
   return (
     <SwipeToArchive confirmText={`¿Quitar "${routine.name}" de tus rutinas? No se borra nada.`} onArchive={onArchive}>
-      <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl px-4 py-3.5 backdrop-blur-sm shadow-md shadow-black/20 transition-shadow hover:shadow-lg hover:shadow-black/30">
+      <div className={`rounded-2xl px-4 py-3.5 backdrop-blur-sm shadow-md transition-shadow hover:shadow-lg ${isActive ? "border-2" : "border border-slate-800/50 bg-slate-900/50"}`}
+        style={isActive ? { borderColor: accent + "60", background: `linear-gradient(135deg, ${accent}12, #0f172a)`, boxShadow: `0 4px 20px -4px ${accent}25` } : {}}>
         <div className="flex items-center gap-3">
           <div className="w-2 h-10 rounded-full shrink-0" style={{ backgroundColor: accent, boxShadow: `0 0 10px -2px ${accent}` }} />
           <button onClick={() => setOpen((o) => !o)} className="flex-1 min-w-0 text-left">
-            <div className="flex items-center gap-2"><p className="text-sm font-bold text-white truncate">{routine.name}</p>{isActive && <span className="text-[9px] font-black px-1.5 py-0.5 rounded-lg bg-purple-500/20 text-purple-400 shrink-0">ACTIVA</span>}</div>
-            <p className="text-[11px] text-slate-500">{dayCount} día{dayCount === 1 ? "" : "s"} · creada por vos</p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="text-sm font-bold text-white truncate">{routine.name}</p>
+              {isActive && <span className="text-[9px] font-black px-2 py-0.5 rounded-full shrink-0" style={{ backgroundColor: accent + "25", color: accent, border: `1px solid ${accent}40` }}>ACTIVA</span>}
+            </div>
+            <p className="text-[11px] text-slate-500">{dayCount} día{dayCount !== 1 ? "s" : ""} · tuya</p>
           </button>
-          {!isActive && <button onClick={onUse} className="px-3 py-1.5 rounded-lg bg-purple-500/15 text-purple-400 text-xs font-bold shrink-0">Activar</button>}
-          <button onClick={onShare} aria-label="Compartir rutina" className="p-2 rounded-lg text-slate-500 hover:text-cyan-400 shrink-0"><Share2 size={14} /></button>
-          <button onClick={onEdit} aria-label="Editar rutina" className="p-2 rounded-lg text-slate-500 hover:text-purple-400 shrink-0"><Edit3 size={14} /></button>
+          {!isActive && <button onClick={onUse} className="px-3 py-1.5 rounded-lg text-xs font-bold shrink-0 transition" style={{ backgroundColor: accent + "18", color: accent }}>Activar</button>}
+          <button onClick={onShare} className="p-2 rounded-lg text-slate-500 hover:text-cyan-400 shrink-0"><Share2 size={14} /></button>
+          <button onClick={onEdit} className="p-2 rounded-lg text-slate-500 hover:text-indigo-400 shrink-0"><Edit3 size={14} /></button>
         </div>
         {open && <div className="mt-3 pt-3 border-t border-slate-800/50 tab-fade-in"><RoutinePreview routineDef={routine} /></div>}
       </div>

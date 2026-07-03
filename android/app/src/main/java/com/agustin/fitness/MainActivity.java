@@ -1,4 +1,4 @@
-package com.agustin.ponos;
+package com.agustin.fitness;
 
 import android.graphics.Color;
 import android.Manifest;
