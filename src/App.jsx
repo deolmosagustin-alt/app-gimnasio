@@ -213,7 +213,7 @@ function getCurrentUser() {
 // medidas, rutinas, configuración) sí sube completo.
 const CLOUD_PROFILE_FIELDS = [
   // Datos básicos del perfil
-  "name", "email", "sex", "age", "joinedAt", "googleUid", "tutorialSeen",
+  "name", "email", "sex", "age", "joinedAt", "googleUid", "tutorialSeen", "pin",
   // Configuración y rutinas
   "settings", "activeRoutineId", "routines", "weekSchedule",
   // Historial de entrenamiento completo
@@ -221,7 +221,7 @@ const CLOUD_PROFILE_FIELDS = [
   // Medidas corporales (sin fotos — demasiado grandes para Firestore)
   "measurements",
   // Estado de ciclo y descarga
-  "cycleStart", "deloadProgress",
+  "cycleStart", "deloadProgress", "dismissedDeloadCycle", "lastSeenCycleNumber",
   // UI state
   "dismissedMissedDayNotice",
 ];
@@ -284,23 +284,63 @@ async function syncProfileToCloud(uid, profile, requireAuth = false) {
 // (perfil viejo, antes de esta implementación), gana el de la nube —
 // porque el local ya fue descargado en algún momento y la nube tiene
 // lo más actualizado.
+// Une los logs de dos perfiles clave por clave y entrada por entrada.
+// Cada entrada se identifica por fecha (+kg+reps para desempatar) — así
+// entrenamientos hechos offline en un dispositivo no se pierden cuando
+// otro dispositivo ya subió los suyos a la nube.
+function mergeLogs(a = {}, b = {}) {
+  const out = { ...a };
+  Object.entries(b).forEach(([key, val]) => {
+    if (key.endsWith("_pr_override")) {
+      // Overrides: gana el de mayor 1RM estimado
+      const prev = out[key];
+      if (!prev || !prev.kg) { out[key] = val; return; }
+      const prevRM = (prev.kg || 0) * (1 + (prev.reps || 0) / 30);
+      const newRM = (val?.kg || 0) * (1 + (val?.reps || 0) / 30);
+      if (newRM > prevRM) out[key] = val;
+      return;
+    }
+    if (!Array.isArray(val)) { if (out[key] === undefined) out[key] = val; return; }
+    const prev = Array.isArray(out[key]) ? out[key] : [];
+    const seen = new Set(prev.map((e) => `${e.date}|${e.kg ?? ""}|${e.reps ?? ""}|${e.minutes ?? ""}`));
+    const mergedArr = [...prev];
+    val.forEach((e) => {
+      const sig = `${e.date}|${e.kg ?? ""}|${e.reps ?? ""}|${e.minutes ?? ""}`;
+      if (!seen.has(sig)) { seen.add(sig); mergedArr.push(e); }
+    });
+    mergedArr.sort((x, y) => (x.date < y.date ? -1 : 1));
+    out[key] = mergedArr;
+  });
+  return out;
+}
+
+// Une las sesiones de entrenamiento por fecha+día sin duplicados.
+function mergeSessions(a = [], b = []) {
+  const seen = new Set(a.map((s) => `${s.date}|${s.dayKey ?? s.day ?? ""}`));
+  const out = [...a];
+  b.forEach((s) => {
+    const sig = `${s.date}|${s.dayKey ?? s.day ?? ""}`;
+    if (!seen.has(sig)) { seen.add(sig); out.push(s); }
+  });
+  out.sort((x, y) => (x.date < y.date ? -1 : 1));
+  return out;
+}
+
 function mergeProfiles(local, cloud) {
   if (!cloud) return local;
   if (!local) return cloud;
   const localTime = local._syncedAt ? new Date(local._syncedAt).getTime() : 0;
   const cloudTime = cloud._syncedAt ? new Date(cloud._syncedAt).getTime() : Infinity;
-  if (cloudTime >= localTime) {
-    // La nube es más reciente — usamos la nube como base, pero
-    // preservamos los logs locales si la nube no tiene ninguno (el
-    // usuario pudo haber entrenado offline y ese sync todavía no subió).
-    return {
-      ...cloud,
-      logs: (cloud.logs && Object.keys(cloud.logs).length > 0) ? cloud.logs : (local.logs || {}),
-      trainingSessions: cloud.trainingSessions?.length > 0 ? cloud.trainingSessions : (local.trainingSessions || []),
-      measurements: (cloud.measurements && Object.keys(cloud.measurements).length > 0) ? cloud.measurements : (local.measurements || {}),
-    };
-  }
-  return local;
+  // Base: el perfil más reciente (settings, rutinas, config).
+  // Historial: SIEMPRE la unión de ambos — entrenamientos hechos offline
+  // en cualquier dispositivo nunca se pierden.
+  const base = cloudTime >= localTime ? cloud : local;
+  return {
+    ...base,
+    logs: mergeLogs(local.logs, cloud.logs),
+    trainingSessions: mergeSessions(local.trainingSessions, cloud.trainingSessions),
+    measurements: { ...(cloudTime >= localTime ? local.measurements : cloud.measurements), ...(cloudTime >= localTime ? cloud.measurements : local.measurements) },
+  };
 }
 
 // Debounce util — devuelve una versión de la función que se llama como
@@ -780,6 +820,33 @@ const ANIMATION_CSS = `
 .modal-pop-in { animation: modalPopIn 0.22s cubic-bezier(.2,.8,.3,1); }
 @keyframes gentleBounceIn { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
 .bounce-in { animation: gentleBounceIn 0.3s cubic-bezier(.34,1.56,.64,1); }
+
+/* ==== Animaciones nuevas ==== */
+/* Entrada escalonada para listas de tarjetas (ejercicios, rutinas) */
+@keyframes staggerIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.stagger-item { animation: staggerIn 0.32s cubic-bezier(.2,.8,.3,1) both; }
+.stagger-item:nth-child(1) { animation-delay: 0ms; }
+.stagger-item:nth-child(2) { animation-delay: 45ms; }
+.stagger-item:nth-child(3) { animation-delay: 90ms; }
+.stagger-item:nth-child(4) { animation-delay: 135ms; }
+.stagger-item:nth-child(5) { animation-delay: 180ms; }
+.stagger-item:nth-child(6) { animation-delay: 225ms; }
+.stagger-item:nth-child(n+7) { animation-delay: 260ms; }
+
+/* Glow pulsante sutil — para el récord "A superar" y elementos vivos */
+@keyframes softPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.75; } }
+.soft-pulse { animation: softPulse 2.4s ease-in-out infinite; }
+
+/* Barra de progreso animada al montarse */
+@keyframes growBar { from { width: 0; } }
+.grow-bar { animation: growBar 0.7s cubic-bezier(.2,.8,.3,1); }
+
+/* Feedback táctil universal en botones — más responsivo al tacto */
+button { transition: transform 0.12s ease, opacity 0.15s ease; }
+button:active { transform: scale(0.97); }
+
+/* Transición suave al cambiar de tema o estados de tarjetas */
+.smooth-card { transition: background-color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease; }
 
 /* Hide the default scrollbar everywhere — vertical page scroll and the
    horizontal chip/card carousels (day tabs, exercise picker, etc.). Scrolling
@@ -3325,7 +3392,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
       <div className="flex items-center gap-2 mb-3">
         {currentPR ? (
           <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl flex-1" style={{ backgroundColor: accent + "1c", border: `1px solid ${accent}40` }}>
-            <Trophy size={14} style={{ color: accent }} className="shrink-0" />
+            <Trophy size={14} style={{ color: accent }} className="shrink-0 soft-pulse" />
             <p className="flex-1 min-w-0 truncate">
               <span className="text-[10px] font-bold uppercase tracking-wide mr-1.5" style={{ color: accent + "bb" }}>A superar:</span>
               <span className="text-base font-black" style={{ color: accent }}>
@@ -3556,7 +3623,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
   const { stagnant } = useMemo(() => getStagnationInfo(exercise, logs), [exercise, logs]);
   const bestWorkingKg = !exercise.cardio ? getBestWorkingKg(exercise, logs) : null;
   return (
-    <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl overflow-hidden backdrop-blur-sm shadow-md shadow-black/20 transition-shadow hover:shadow-lg hover:shadow-black/30">
+    <div className="stagger-item smooth-card bg-slate-900/50 border border-slate-800/50 rounded-2xl overflow-hidden backdrop-blur-sm shadow-md shadow-black/20 transition-shadow hover:shadow-lg hover:shadow-black/30">
       <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center justify-between px-4 py-4 hover:bg-slate-800/30 active:bg-slate-800/50 transition text-left">
         <div className="flex items-center gap-3">
           <div className="w-2 h-8 rounded-full shrink-0" style={{ backgroundColor: accent, boxShadow: `0 0 10px -2px ${accent}` }} />
@@ -3568,7 +3635,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
               {deloadMode && <span className="text-[10px] bg-purple-500/15 text-purple-400 rounded-lg px-1.5 py-0.5 font-bold">DESCARGA</span>}
               {!deloadMode && stagnant && <span className="text-[10px] bg-rose-500/15 text-rose-400 rounded-lg px-1.5 py-0.5 font-bold flex items-center gap-1"><AlertTriangle size={9} /> ESTANCADO</span>}
             </div>
-            {exercise.nota && <p className="text-[11px] text-slate-500 mt-0.5">{exercise.nota}</p>}
+            {exercise.nota && <p className="text-[11px] text-slate-500 mt-0.5 truncate">{exercise.nota}</p>}
           </div>
         </div>
         <ChevronDown size={18} className={`text-slate-600 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
@@ -4578,33 +4645,24 @@ function getBest1RMForMuscleGroup(groupKey, logs) {
   };
 }
 
-// Insignias con las imágenes reales en /insignias/{tier}.png (bronce,
-// plata, oro, esmeralda, diamante, maestro). El número romano (I/II/III)
-// va en un chip circular chico en la esquina inferior derecha — antes era
-// una franja que cruzaba toda la base y tapaba buena parte del dibujo de
-// la medalla, así queda bien visible sin cubrirla. Ajustes pedidos:
-//  - Brillo bajado a algo mínimo y sin tinte de color (antes el
-//    drop-shadow tomaba el color del rango y quedaba muy intenso).
-//  - Colores más tenues: un filtro CSS de saturación/brillo reducidos,
-//    sin tocar los archivos (no tenemos acceso a esos PNG para editarlos).
-//  - Plata y Esmeralda venían con otra proporción (más angostas)
-//    que el resto — como no se puede editar el archivo en sí, se las
-//    estira para que ocupen el mismo ancho que las demás (con
-//    object-fit: fill en vez de cover, sólo para esas dos).
-const BADGE_STRETCH_TIERS = new Set(["plata", "esmeralda"]);
-function RankBadgeIcon({ tier, sub, color, size = 26 }) {
+// Insignias de rango — imágenes en /public/insignias/{tier}.png.
+// Todas se renderizan con object-fit: contain, que ajusta cada imagen
+// dentro del cuadro SIN deformarla (nada de fill que estira ni cover
+// que recorta). Si alguna imagen tiene proporción distinta, queda
+// centrada con aire a los costados — siempre con su forma real.
+function RankBadgeIcon({ tier, sub, color, size = 30 }) {
   const [imgError, setImgError] = useState(false);
   const tierFile = (tier || "bronce").toLowerCase();
   return (
     <div className="shrink-0" style={{ position: "relative", width: size, height: size, filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.35))" }}>
-      <div style={{ width: "100%", height: "100%", overflow: "hidden", borderRadius: "20%" }}>
+      <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
         {!imgError ? (
           <img
             src={`/insignias/${tierFile}.png`}
             alt={`${tier || ""}${sub ? ` ${sub}` : ""}`.trim()}
             onError={() => setImgError(true)}
             draggable={false}
-            style={{ width: "100%", height: "100%", objectFit: BADGE_STRETCH_TIERS.has(tierFile) ? "fill" : "cover", filter: "saturate(0.7) brightness(0.92)" }}
+            style={{ width: "100%", height: "100%", objectFit: "contain", filter: "saturate(0.7) brightness(0.92)" }}
           />
         ) : (
           <div style={{ width: "100%", height: "100%", borderRadius: "50%", backgroundColor: color, filter: "saturate(0.7)" }} />
@@ -4855,7 +4913,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
             <>
               <div className="flex items-center gap-3.5 mb-3.5">
                 <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-2 shrink-0 backdrop-blur-sm shadow-md shadow-black/20">
-                  <RankBadgeIcon tier={selInfo.tier} sub={selInfo.sub} color={selInfo.color} size={92} />
+                  <RankBadgeIcon tier={selInfo.tier} sub={selInfo.sub} color={selInfo.color} size={104} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-lg font-black leading-tight" style={{ color: selInfo.color }}>{selInfo.tier}{selInfo.sub ? ` ${selInfo.sub}` : ""}</p>
@@ -4873,12 +4931,12 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
                   <div className="flex items-center justify-between mb-2 gap-2">
                     <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Progreso al próximo rango</span>
                     <span className="flex items-center gap-1.5 text-[11px] font-bold shrink-0" style={{ color: nextTierInfo?.color }}>
-                      <RankBadgeIcon tier={nextTierInfo?.tier} sub="" color={nextTierInfo?.color} size={40} />
+                      <RankBadgeIcon tier={nextTierInfo?.tier} sub="" color={nextTierInfo?.color} size={48} />
                       {nextTierInfo?.tier}{nextTierInfo?.sub ? ` ${nextTierInfo.sub}` : ""}
                     </span>
                   </div>
                   <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
-                    <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(100, Math.max(4, ((selInfo.best1RM - selInfo.threshold) / (selInfo.nextThreshold - selInfo.threshold)) * 100))}%`, background: `linear-gradient(90deg, ${selInfo.color}, ${nextTierInfo?.color || selInfo.color})` }} />
+                    <div className="h-full rounded-full transition-all grow-bar" style={{ width: `${Math.min(100, Math.max(4, ((selInfo.best1RM - selInfo.threshold) / (selInfo.nextThreshold - selInfo.threshold)) * 100))}%`, background: `linear-gradient(90deg, ${selInfo.color}, ${nextTierInfo?.color || selInfo.color})` }} />
                   </div>
                   {extraKgNeeded != null && <p className="text-[11px] text-slate-400 mt-2.5">Sumá <span className="font-black text-white">{extraKgNeeded}kg</span> a tus mismas {selInfo.bestReps} reps para subir</p>}
                 </div>
@@ -4909,7 +4967,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
               const rep = RANK_TIERS.find((r) => r.tier === t && r.sub === "II") || RANK_TIERS.find((r) => r.tier === t);
               return (
                 <div key={t} className="flex flex-col items-center gap-2 rounded-xl py-3 bg-slate-800/30">
-                  <RankBadgeIcon tier={rep.tier} sub="" color={rep.color} size={68} />
+                  <RankBadgeIcon tier={rep.tier} sub="" color={rep.color} size={76} />
                   <span className="text-[10px] font-black" style={{ color: rep.color }}>{t}</span>
                 </div>
               );
@@ -6057,7 +6115,7 @@ function SavedRoutineRow({ routine, isActive, onUse, onEdit, onShare, onArchive 
   const accent = isActive ? "#14B8A6" : "#6366F1"; // teal si activa, indigo si no
   return (
     <SwipeToArchive confirmText={`¿Quitar "${routine.name}" de tus rutinas? No se borra nada.`} onArchive={onArchive}>
-      <div className={`rounded-2xl px-4 py-3.5 backdrop-blur-sm shadow-md transition-shadow hover:shadow-lg ${isActive ? "border-2" : "border border-slate-800/50 bg-slate-900/50"}`}
+      <div className={`stagger-item smooth-card rounded-2xl px-4 py-3.5 backdrop-blur-sm shadow-md transition-shadow hover:shadow-lg ${isActive ? "border-2" : "border border-slate-800/50 bg-slate-900/50"}`}
         style={isActive ? { borderColor: accent + "60", background: `linear-gradient(135deg, ${accent}12, #0f172a)`, boxShadow: `0 4px 20px -4px ${accent}25` } : {}}>
         <div className="flex items-center gap-3">
           <div className="w-2 h-10 rounded-full shrink-0" style={{ backgroundColor: accent, boxShadow: `0 0 10px -2px ${accent}` }} />
@@ -7870,7 +7928,15 @@ export default function App() {
     idbPut(`photos_${activeProfile}`, next);
   };
 
-  const handleLogin = (name, updatedProfiles) => { const profs = updatedProfiles || profiles; setProfiles(profs); setActiveProfile(name); setJustLoggedOut(false); setTab("rutina"); };
+  const handleLogin = (name, updatedProfiles) => {
+    const profs = updatedProfiles || profiles;
+    setProfiles(profs); setActiveProfile(name); setJustLoggedOut(false); setTab("rutina");
+    // El login con Google puede haber restaurado cycleStart desde la nube
+    // (lo escribe en localStorage) — releerlo para que el estado de React
+    // lo refleje sin necesidad de recargar la app.
+    const restored = loadCycleStart();
+    if (restored) setCycleStartState(restored);
+  };
   const handleLogout = () => { saveActive(null); setActiveProfile(null); setJustLoggedOut(true); setShowHelp(false); setHelpStartTab(null); };
   // Cierra la sesión de Google en Firebase (signOut) y vuelve a la
   // pantalla de inicio — por si varias personas usan el mismo dispositivo
@@ -8162,4 +8228,3 @@ function ImportRoutineErrorBanner({ onClose }) {
     </div>
   );
 }
-
