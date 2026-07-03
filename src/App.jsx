@@ -4682,7 +4682,7 @@ function getBest1RMForMuscleGroup(groupKey, logs) {
 //  - Plata tiene el brillo del archivo más fuerte que el resto → se le
 //    baja un poco el brightness para emparejar.
 const TIER_SCALE = { bronce: 0.90, plata: 0.94, oro: 0.98, esmeralda: 1.02, diamante: 1.06, maestro: 1.10 };
-function RankBadgeIcon({ tier, sub, color, size = 34 }) {
+function RankBadgeIcon({ tier, sub, color, size = 32 }) {
   const [imgError, setImgError] = useState(false);
   const tierFile = (tier || "bronce").toLowerCase();
   const scale = TIER_SCALE[tierFile] ?? 1;
@@ -4954,7 +4954,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
             <>
               <div className="flex items-center gap-3.5 mb-3.5">
                 <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-2 shrink-0 backdrop-blur-sm shadow-md shadow-black/20">
-                  <RankBadgeIcon tier={selInfo.tier} sub={selInfo.sub} color={selInfo.color} size={118} />
+                  <RankBadgeIcon tier={selInfo.tier} sub={selInfo.sub} color={selInfo.color} size={112} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-lg font-black leading-tight" style={{ color: selInfo.color }}>{selInfo.tier}{selInfo.sub ? ` ${selInfo.sub}` : ""}</p>
@@ -4972,7 +4972,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
                   <div className="flex items-center justify-between mb-2 gap-2">
                     <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Progreso al próximo rango</span>
                     <span className="flex items-center gap-1.5 text-[11px] font-bold shrink-0" style={{ color: nextTierInfo?.color }}>
-                      <RankBadgeIcon tier={nextTierInfo?.tier} sub="" color={nextTierInfo?.color} size={52} />
+                      <RankBadgeIcon tier={nextTierInfo?.tier} sub="" color={nextTierInfo?.color} size={50} />
                       {nextTierInfo?.tier}{nextTierInfo?.sub ? ` ${nextTierInfo.sub}` : ""}
                     </span>
                   </div>
@@ -5008,7 +5008,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
               const rep = RANK_TIERS.find((r) => r.tier === t && r.sub === "II") || RANK_TIERS.find((r) => r.tier === t);
               return (
                 <div key={t} className="flex flex-col items-center gap-2 rounded-xl py-3 bg-slate-800/30">
-                  <RankBadgeIcon tier={rep.tier} sub="" color={rep.color} size={88} />
+                  <RankBadgeIcon tier={rep.tier} sub="" color={rep.color} size={83} />
                   <span className="text-[10px] font-black" style={{ color: rep.color }}>{t}</span>
                 </div>
               );
@@ -5745,6 +5745,7 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
   const profile = profiles[profileName];
   const [showDeletePin, setShowDeletePin] = useState(false); const [deleteError, setDeleteError] = useState("");
   const [editing, setEditing] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
   const [editMail, setEditMail] = useState(profile?.email || "");
   const [editSex, setEditSex] = useState(profile?.sex || "");
   const [editAge, setEditAge] = useState(profile?.age ? String(profile.age) : "");
@@ -6048,9 +6049,26 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
         <span>Tus datos se guardan en este dispositivo, con una copia de seguridad automática.</span>
       </div>
 
-      <a href="https://app-gimnasio-two.vercel.app/privacy-policy.html" target="_blank" rel="noreferrer" className="w-full flex items-center gap-2 justify-center py-3 rounded-2xl text-slate-500 hover:text-slate-300 transition text-xs font-semibold">
+      {showPrivacy && (
+        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex flex-col">
+          <div className="flex items-center justify-between px-4 py-3 bg-[#0a0a0f] border-b border-slate-800/60 shrink-0">
+            <div className="flex items-center gap-2.5">
+              <Info size={16} className="text-teal-400" />
+              <span className="text-sm font-bold text-white">Política de privacidad</span>
+            </div>
+            <button onClick={() => setShowPrivacy(false)} className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white transition active:scale-90"><X size={16} /></button>
+          </div>
+          <iframe
+            src="https://app-gimnasio-two.vercel.app/privacy-policy.html"
+            className="flex-1 w-full border-0 bg-[#0a0a0f]"
+            title="Política de privacidad"
+          />
+        </div>
+      )}
+
+      <button onClick={() => setShowPrivacy(true)} className="w-full flex items-center gap-2 justify-center py-3 rounded-2xl text-slate-500 hover:text-slate-300 transition text-xs font-semibold">
         <Info size={13} /> Política de privacidad
-      </a>
+      </button>
 
       <button onClick={onSignOut} className="w-full flex items-center gap-2 justify-center py-3.5 rounded-2xl border border-slate-800 text-slate-400 hover:text-white hover:border-slate-600 transition text-sm font-semibold"><LogOut size={14} /> Cerrar sesión</button>
       {!showDeletePin ? (
