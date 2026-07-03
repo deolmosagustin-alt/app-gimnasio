@@ -4691,19 +4691,19 @@ function RankBadgeIcon({ tier, sub, color, size = 32 }) {
     ? "saturate(0.7) brightness(0.82)"
     : "saturate(0.7) brightness(0.92)";
   return (
-    // Contenedor: ancho fijo, altura automática — la imagen define su
-    // propia altura según su proporción real. Así bronce/plata (más
-    // altas) y diamante/maestro (más anchas) no se deforman nunca,
-    // sin depender de objectFit que algunos WebViews ignoran.
-    <div className="shrink-0 relative inline-flex items-center justify-center"
-      style={{ width: s, filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.35))" }}>
+    // Contenedor cuadrado fijo. La imagen usa max-width/max-height al 100%
+    // con width/height auto — se escala al máximo posible dentro del
+    // cuadrado SIN deformarse, sin importar si el PNG es alto, ancho o
+    // cuadrado. Funciona en todos los WebViews sin depender de objectFit.
+    <div className="shrink-0 relative"
+      style={{ width: s, height: s, filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.35))", display: "flex", alignItems: "center", justifyContent: "center" }}>
       {!imgError ? (
         <img
           src={`/insignias/${tierFile}.png`}
           alt={`${tier || ""}${sub ? ` ${sub}` : ""}`.trim()}
           onError={() => setImgError(true)}
           draggable={false}
-          style={{ width: s, height: "auto", display: "block", filter: imgFilter }}
+          style={{ width: "auto", height: "auto", maxWidth: "100%", maxHeight: "100%", display: "block", filter: imgFilter }}
         />
       ) : (
         <div style={{ width: s, height: s, borderRadius: "50%", backgroundColor: color, filter: "saturate(0.7)" }} />
@@ -6054,19 +6054,35 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
       </div>
 
       {showPrivacy && (
-        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex flex-col">
-          <div className="flex items-center justify-between px-4 py-3 bg-[#0a0a0f] border-b border-slate-800/60 shrink-0">
+        <div className="fixed inset-0 z-[200] flex flex-col" style={{ background: "#0a0a0f", paddingTop: "env(safe-area-inset-top,0px)" }}>
+          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800/60 shrink-0">
             <div className="flex items-center gap-2.5">
               <Info size={16} className="text-teal-400" />
               <span className="text-sm font-bold text-white">Política de privacidad</span>
             </div>
             <button onClick={() => setShowPrivacy(false)} className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white transition active:scale-90"><X size={16} /></button>
           </div>
-          <iframe
-            src="https://app-gimnasio-two.vercel.app/privacy-policy.html"
-            className="flex-1 w-full border-0 bg-[#0a0a0f]"
-            title="Política de privacidad"
-          />
+          <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5 text-slate-400 text-[13px] leading-relaxed">
+            <p className="text-[11px] text-slate-600">Última actualización: julio de 2026</p>
+            <p>Modus Fit respeta tu privacidad. Esta política explica qué datos recopilamos, cómo los usamos y cuáles son tus derechos.</p>
+            {[
+              { t: "1. Datos que recopilamos", b: "Datos de entrenamiento (series, pesos, récords), datos de perfil (nombre, email, sexo, edad, altura), medidas corporales y fotos de progreso (solo en tu dispositivo), y datos de cuenta Google si iniciás sesión con Google." },
+              { t: "2. Cómo usamos los datos", b: "Para mostrarte tu historial, récords y progreso. Para sincronizar tu perfil entre dispositivos si iniciaste sesión con Google. Para generar recomendaciones del Entrenador IA (el texto se envía a la API de Google Gemini y no se almacena en nuestros servidores). Para mostrar anuncios relevantes a través de Google AdMob (solo en la versión gratuita)." },
+              { t: "3. Almacenamiento y seguridad", b: "Tus datos se guardan localmente en tu dispositivo (IndexedDB/localStorage). Si usás la sincronización, se almacenan en Firebase Firestore con acceso restringido a tu cuenta. Las fotos nunca se transmiten a ningún servidor. Toda comunicación usa HTTPS." },
+              { t: "4. Terceros", b: "Usamos Google Firebase (autenticación y base de datos), Google Gemini API (IA), y Google AdMob (anuncios en la versión gratuita). Cada uno tiene su propia política de privacidad." },
+              { t: "5. Anuncios y versión Pro", b: "La versión gratuita muestra anuncios de AdMob en momentos específicos. La versión Pro ($4.99 pago único) elimina todos los anuncios. Podés inhabilitar la personalización de anuncios en Ajustes → Google → Anuncios de tu dispositivo." },
+              { t: "6. Retención de datos", b: "Los datos locales permanecen hasta que desinstalás la app o eliminás tu perfil. Los datos en la nube se eliminan cuando eliminás tu perfil desde la app." },
+              { t: "7. Menores de edad", b: "Modus Fit no está dirigida a menores de 13 años y no recopilamos intencionalmente sus datos." },
+              { t: "8. Tus derechos", b: "Podés acceder, corregir o eliminar tus datos desde la configuración de la app en cualquier momento." },
+              { t: "9. Contacto", b: "Para preguntas sobre privacidad o solicitudes de eliminación de datos: deolmosagustin@gmail.com" },
+            ].map(({ t, b }) => (
+              <div key={t}>
+                <p className="text-white font-bold mb-1" style={{ color: "#14B8A6" }}>{t}</p>
+                <p>{b}</p>
+              </div>
+            ))}
+            <p className="text-[11px] text-slate-600 pt-2">© 2026 Modus Fit. Todos los derechos reservados.</p>
+          </div>
         </div>
       )}
 
