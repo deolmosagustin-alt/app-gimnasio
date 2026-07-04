@@ -1332,22 +1332,12 @@ function drawShareCardBase(ctx, W, H, accent, accent2) {
 // mano (no hay archivo de imagen en este proyecto de un solo archivo) más
 // el nombre, en la parte inferior — tal como se pidió.
 function drawWordmark(ctx, W, H, accent) {
-  const cx = W / 2, y = H - 150;
   ctx.save();
-  ctx.fillStyle = accent;
-  ctx.beginPath();
-  ctx.moveTo(cx - 17, y + 16);
-  ctx.quadraticCurveTo(cx - 26, y - 14, cx - 2, y - 46);
-  ctx.quadraticCurveTo(cx + 6, y - 22, cx + 4, y - 6);
-  ctx.quadraticCurveTo(cx + 16, y - 18, cx + 17, y - 2);
-  ctx.quadraticCurveTo(cx + 22, y + 10, cx, y + 18);
-  ctx.quadraticCurveTo(cx - 8, y + 10, cx - 17, y + 16);
-  ctx.closePath(); ctx.fill();
-  ctx.restore();
-  ctx.fillStyle = "#f1f5f9";
-  ctx.font = "800 36px sans-serif";
   ctx.textAlign = "center";
-  ctx.fillText("Mi Rutina", cx, y + 64);
+  ctx.fillStyle = accent + "cc";
+  ctx.font = "bold 30px system-ui, sans-serif";
+  ctx.fillText("Modus Fit", W / 2, H - 80);
+  ctx.restore();
 }
 
 function drawPRShareCard(ctx, W, H, { exerciseName, muscle, kg, reps, accent = "#14B8A6" }) {
@@ -3110,7 +3100,7 @@ function HelpModal({ startTab, onClose }) {
         )}
 
         {/* Contenido del paso */}
-        <div key={i} className={`px-5 py-4 flex-1 overflow-y-auto tab-fade-in ${step.isChapterIntro ? "flex flex-col items-center text-center gap-3" : "flex items-start gap-4"}`}>
+        <div key={i} className={`px-5 py-4 overflow-y-auto tab-fade-in ${step.isChapterIntro ? "flex flex-col items-center text-center gap-3" : "flex items-start gap-4"}`} style={{ minHeight: 120, maxHeight: "45vh" }}>
           {step.isChapterIntro ? (
             <>
               <div className="w-14 h-14 rounded-2xl flex items-center justify-center mt-2 bg-teal-500/12 border border-teal-500/20 text-teal-400">
@@ -4770,7 +4760,7 @@ function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backR
   // highlightedColors: versión suavizada de los colores de RANK_TIERS —
   // mezclada 65/35 con el fondo oscuro para que el muñeco no acapare
   // toda la atención visual de la pantalla.
-  const highlightedColors = useMemo(() => RANK_TIERS.map((t) => muteHex(t.color, 0.8)), []);
+  const highlightedColors = useMemo(() => RANK_TIERS.map((t) => muteHex(t.color, 0.72)), []);
   const data = useMemo(() => {
     const bestLevelBySlug = {};
     Object.entries(BODY_HIGHLIGHTER_SLUG_MAP).forEach(([ourKey, slug]) => {
@@ -6960,22 +6950,40 @@ Datos: ${JSON.stringify(context)}`;
   const recognitionRef = useRef(null);
   const SpeechRecognitionAPI = typeof window !== "undefined" ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
   useEffect(() => () => { try { recognitionRef.current?.stop(); } catch { } }, []);
-  const handleMicToggle = () => {
+  const handleMicToggle = async () => {
     if (!SpeechRecognitionAPI) return;
-    if (isListening) { recognitionRef.current?.stop(); return; }
+    if (isListening) { try { recognitionRef.current?.stop(); } catch { } setIsListening(false); return; }
+    // Pedir permiso de micrófono explícitamente antes de iniciar.
+    // En Android/Capacitor sin este paso el WebView corta la escucha
+    // al segundo porque el sistema rechaza el acceso silenciosamente.
+    try {
+      const stream = await navigator.mediaDevices?.getUserMedia({ audio: true });
+      // No necesitamos el stream, solo verificar que el permiso fue concedido.
+      stream?.getTracks().forEach((t) => t.stop());
+    } catch {
+      setIsListening(false); return; // permiso denegado
+    }
     const recognition = new SpeechRecognitionAPI();
     recognition.lang = "es-AR";
     recognition.interimResults = true;
-    // Antes esto estaba en false: el navegador cortaba la escucha solo, a
-    // los pocos segundos de detectar una pausa — aunque siguieras
-    // hablando después. Con continuous=true sigue escuchando todo lo que
-    // digas hasta que VOS toques el botón de nuevo para confirmar que
-    // terminaste (ver el ícono de tilde más abajo, en vez del micrófono,
-    // mientras está escuchando).
     recognition.continuous = true;
-    recognition.onresult = (e) => { setInput(Array.from(e.results).map((r) => r[0].transcript).join(" ")); };
-    recognition.onerror = () => setIsListening(false);
-    recognition.onend = () => setIsListening(false);
+    recognition.maxAlternatives = 1;
+    recognition.onresult = (e) => {
+      const transcript = Array.from(e.results).map((r) => r[0].transcript).join(" ");
+      setInput(transcript);
+    };
+    recognition.onerror = (e) => {
+      if (e.error !== "no-speech") setIsListening(false);
+    };
+    recognition.onend = () => {
+      // En Android el WebView puede cortar la escucha solo — reiniciar si
+      // el usuario no tocó el botón de parar.
+      if (recognitionRef.current === recognition && isListening) {
+        try { recognition.start(); } catch { setIsListening(false); }
+      } else {
+        setIsListening(false);
+      }
+    };
     recognitionRef.current = recognition;
     try { recognition.start(); setIsListening(true); } catch { setIsListening(false); }
   };
@@ -7144,22 +7152,53 @@ function ImportRoutineModal({ onImport, onClose }) {
     const ext = file.name.split(".").pop().toLowerCase();
     setNotice(""); setLoadingFile(true);
     try {
+      let extracted = "";
       if (["xlsx", "xls"].includes(ext)) {
-        setText(await extractTextFromExcelFile(file));
+        extracted = await extractTextFromExcelFile(file);
       } else if (ext === "pdf") {
-        setText(await extractTextFromPdfFile(file));
+        extracted = await extractTextFromPdfFile(file);
       } else if (["csv", "txt"].includes(ext)) {
-        setText(await file.text());
+        extracted = await file.text();
       } else if (ext === "docx" || ext === "doc") {
-        setNotice("Todavía no podemos leer el binario de Word directamente. Abrí el archivo, copiá todo el texto (Ctrl+A, Ctrl+C) y pegalo abajo — funciona igual de bien.");
+        setNotice("Para Word: abrí el archivo, copiá todo (Ctrl+A, Ctrl+C) y pegalo abajo.");
+        setLoadingFile(false); return;
       } else {
-        setNotice("Formato no reconocido. Probá con .pdf, .xlsx, .xls, .csv, .txt, o pegá el texto directamente.");
+        setNotice("Formato no reconocido. Probá con .pdf, .xlsx, .xls, .csv o .txt.");
+        setLoadingFile(false); return;
       }
+      setText(extracted);
+      // Intentar detección local primero (instantánea)
+      const local = parseRoutineFromText(extracted);
+      if (local.length) {
+        setParsed(buildImportedRoutineDef(local, routineName.trim() || file.name.replace(/\.[^.]+$/, "")));
+        setLoadingFile(false); return;
+      }
+      // Si la detección local no encuentra nada, usar IA automáticamente
+      setNotice("Detectando con IA…");
+      setIsParsingAI(true);
+      const res = await fetch("/api/ia", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "detect", text: extracted }) });
+      if (res.ok) {
+        const result = await res.json();
+        const rawText = result?.text || "";
+        const cleaned = rawText.replace(/```json|```/g, "").trim();
+        const days = JSON.parse(cleaned);
+        if (Array.isArray(days) && days.length) {
+          const parsedDays = days.map((d) => ({
+            label: String(d.label || "Día").toUpperCase(),
+            exercises: (d.exercises || []).map((ex) => {
+              const lib = matchExerciseToLibrary(ex.name);
+              const sets = Array.from({ length: Math.max(1, Math.min(8, ex.setsCount || 3)) }, () => ({ repRange: ex.repRange || "8-10" }));
+              return lib ? { libId: lib.id, sets } : { id: builderUid("imported"), name: ex.name || "Ejercicio", muscle: "Personalizado", sets };
+            }),
+          }));
+          setParsed(buildImportedRoutineDef(parsedDays, routineName.trim() || file.name.replace(/\.[^.]+$/, "")));
+          setNotice("");
+        } else { setNotice("La IA no pudo interpretar el archivo. Pegá el texto manualmente abajo."); }
+      } else { setNotice("No se pudo detectar automáticamente. Pegá el texto abajo y tocá \"Detectar rutina\"."); }
     } catch (err) {
-      console.error("Error leyendo el archivo:", err);
-      setNotice("No pudimos leer ese archivo. Probá copiando y pegando el texto directamente abajo.");
+      setNotice("No pudimos leer ese archivo. Probá copiando el texto directamente.");
     } finally {
-      setLoadingFile(false);
+      setLoadingFile(false); setIsParsingAI(false);
     }
   };
 
@@ -8285,8 +8324,8 @@ export default function App() {
       {deloadNotice && <DeloadNoticeBanner onClose={() => setDeloadNotice(false)} />}
       
       {importRoutineError && <ImportRoutineErrorBanner onClose={() => setImportRoutineError(false)} />}
-      <SideNav tab={tab} setTab={setTab} profileName={activeProfile} />
-      <div className="flex-1 min-w-0" style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
+      <SideNav tab={tab} setTab={setTab} profileName={activeProfile} style={{ filter: "saturate(0.88)" }} />
+      <div className="flex-1 min-w-0" style={{ paddingTop: "env(safe-area-inset-top, 0px)", filter: "saturate(0.88)" }}>
         <header className="sticky z-10 bg-[#0a0a0f]/90 backdrop-blur-xl border-b border-slate-800/40" style={{ top: 0 }}>
           <div className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto px-4 py-4 flex items-center gap-3">
             {tab === "perfil" ? (
