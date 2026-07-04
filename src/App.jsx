@@ -1640,37 +1640,71 @@ function svgMarkupToImage(svgMarkup) {
 }
 
 
-async function drawMuscleRankShareCard(ctx, W, H, { ranks, modeLabel, accent = "#F59E0B" }) {
+function drawMuscleRankShareCard(ctx, W, H, { ranks, modeLabel, accent = "#F59E0B" }) {
   drawShareCardBase(ctx, W, H, accent, "#A855F7");
   ctx.textAlign = "center";
   ctx.fillStyle = accent;
-  ctx.font = "800 38px sans-serif";
-  ctx.fillText("💪 MIS RANGOS", W / 2, 250);
+  ctx.font = `800 ${Math.round(W * 0.052)}px sans-serif`;
+  ctx.fillText("MIS RANGOS", W / 2, Math.round(H * 0.13));
   ctx.fillStyle = "#94a3b8";
-  ctx.font = "700 28px sans-serif";
-  ctx.fillText(modeLabel, W / 2, 295);
+  ctx.font = `700 ${Math.round(W * 0.036)}px sans-serif`;
+  ctx.fillText(modeLabel, W / 2, Math.round(H * 0.158));
 
-  // Si los SVG fallan en cargar (WebView viejo, error raro), la card se
-  // genera igual sin los muñecos — mejor una imagen sin muñeco que un
-  // botón de compartir muerto que no hace nada.
-  try {
-    const [frontImg, backImg] = await Promise.all([
-      svgMarkupToImage(buildMuscleBodySvgMarkup("front", ranks)),
-      svgMarkupToImage(buildMuscleBodySvgMarkup("back", ranks)),
-    ]);
-    const bodyW = 360, bodyH = bodyW * 2;
-    const gap = 50;
-    const startX = (W - (bodyW * 2 + gap)) / 2;
-    const bodyY = 360;
-    ctx.drawImage(frontImg, startX, bodyY, bodyW, bodyH);
-    ctx.drawImage(backImg, startX + bodyW + gap, bodyY, bodyW, bodyH);
-  } catch (err) {
-    console.error("No se pudieron dibujar los muñecos en la card:", err);
-  }
+  // Dibujo DIRECTO de los polígonos en el canvas — sin SVG, sin Image,
+  // sin drawImage. La conversión SVG→Image fallaba en los WebViews de
+  // Android (el onload nunca disparaba o dibujaba 0×0) y por eso la
+  // imagen del muñeco no se generaba nunca en el teléfono.
+  const NEUTRAL = "#334155";
+  const bodyW = Math.round(W * 0.36);
+  const bodyH = bodyW * 2;
+  const gap = Math.round(W * 0.08);
+  const startX = (W - (bodyW * 2 + gap)) / 2;
+  const bodyY = Math.round(H * 0.20);
 
-  const labelY = bodyY + bodyH + 60;
+  const fillFor = (slug, view) => {
+    if (NON_INTERACTIVE_SLUGS.has(slug)) return NEUTRAL;
+    if (view === "front" && slug === "calves") {
+      const lvl = ranks.tibial_anterior?.levelIdx ?? -1;
+      return lvl >= 0 ? (ranks.tibial_anterior?.color || NEUTRAL) : NEUTRAL;
+    }
+    if (view === "back" && slug === "neck") return NEUTRAL;
+    if (view === "front" && slug === "neck") {
+      const lvl = ranks.trapecio?.levelIdx ?? -1;
+      return lvl >= 0 ? (ranks.trapecio?.color || NEUTRAL) : NEUTRAL;
+    }
+    const keys = Object.entries(BODY_HIGHLIGHTER_SLUG_MAP).filter(([, s]) => s === slug || (slug.endsWith("-soleus") && s === "calves")).map(([k]) => k);
+    if (!keys.length) return NEUTRAL;
+    const best = keys.reduce((a, b) => ((ranks[b]?.levelIdx ?? -1) > (ranks[a]?.levelIdx ?? -1) ? b : a));
+    const lvl = ranks[best]?.levelIdx ?? -1;
+    return lvl >= 0 ? (ranks[best]?.color || NEUTRAL) : NEUTRAL;
+  };
+
+  const drawView = (order, points, view, offsetX) => {
+    const sx = bodyW / 100, sy = bodyH / 200;
+    order.forEach(([slug]) => {
+      const color = fillFor(slug, view);
+      (points[slug] || []).forEach((pointStr) => {
+        const nums = pointStr.trim().split(/[\s,]+/).map(Number);
+        if (nums.length < 6) return;
+        ctx.beginPath();
+        for (let i = 0; i < nums.length - 1; i += 2) {
+          const x = offsetX + nums[i] * sx;
+          const y = bodyY + nums[i + 1] * sy;
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.fillStyle = color;
+        ctx.fill();
+      });
+    });
+  };
+
+  drawView(ANTERIOR_POLY_ORDER, ANTERIOR_POLY_POINTS, "front", startX);
+  drawView(POSTERIOR_POLY_ORDER, POSTERIOR_POLY_POINTS, "back", startX + bodyW + gap);
+
+  const labelY = bodyY + bodyH + Math.round(H * 0.035);
   ctx.fillStyle = "#cbd5e1";
-  ctx.font = "700 30px sans-serif";
+  ctx.font = `700 ${Math.round(W * 0.030)}px sans-serif`;
   ctx.fillText("De frente", startX + bodyW / 2, labelY);
   ctx.fillText("De espalda", startX + bodyW + gap + bodyW / 2, labelY);
 
@@ -1679,19 +1713,23 @@ async function drawMuscleRankShareCard(ctx, W, H, { ranks, modeLabel, accent = "
 
 function ShareImageModal({ title, fileNamePrefix, shareTitle, shareText, draw, onClose, autoShowOptOutLabel, onOptOutAutoShow }) {
   const canvasRef = useRef(null);
-  const previewRef = useRef(null);
+  const scrollContainerRef = useRef(null);
   const [previewUrl, setPreviewUrl] = useState(null);
-  // Al aparecer el preview, hacer scroll directo a él
+  // El modal SIEMPRE arranca con el scroll arriba — sin esto, si el modal
+  // se abre mientras la página de atrás está scrolleada, algunos WebViews
+  // heredan una posición de scroll intermedia y los botones quedan fuera
+  // de vista hasta que el usuario scrollea a mano.
   useEffect(() => {
-    if (previewUrl && previewRef.current) {
-      previewRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (scrollContainerRef.current) scrollContainerRef.current.scrollTop = 0;
+  }, []);
+  useEffect(() => {
+    if (previewUrl && scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = 0;
     }
   }, [previewUrl]);
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    // 540×960 en vez de 1080×1920: 4× menos píxeles → genera ~4× más rápido.
-    // Las redes sociales comprimen de todas formas; la calidad visual es la misma.
     canvas.width = 540; canvas.height = 960;
     const ctx = canvas.getContext("2d");
     let cancelled = false;
@@ -1731,7 +1769,7 @@ function ShareImageModal({ title, fileNamePrefix, shareTitle, shareText, draw, o
 
   return (
     <div className="fixed inset-0 z-[130] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in" onClick={onClose}>
-      <div className="bg-slate-900 border border-slate-700/60 rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50 max-h-[92vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+      <div ref={scrollContainerRef} className="bg-slate-900 border border-slate-700/60 rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50 max-h-[92vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-base font-black text-white">{title}</h3>
           <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition"><X size={18} /></button>
@@ -1743,20 +1781,19 @@ function ShareImageModal({ title, fileNamePrefix, shareTitle, shareText, draw, o
           </button>
         )}
         <canvas ref={canvasRef} className="hidden" />
+        {/* Botones siempre visibles primero — el preview es secundario */}
+        <div className="flex gap-2 mb-3">
+          <button onClick={handleShare} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98]" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}><Share2 size={14} /> Compartir</button>
+          <button onClick={handleDownload} disabled={!previewUrl} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition text-sm font-semibold disabled:opacity-40"><Download size={14} /> Descargar</button>
+        </div>
         {previewUrl ? (
-          <div ref={previewRef}>
-          <img src={previewUrl} alt="Vista previa para compartir" className="w-full rounded-2xl border border-slate-800/60 mb-4" style={{ aspectRatio: "9 / 16", objectFit: "cover", maxHeight: "50vh" }} />
-          </div>
+          <img src={previewUrl} alt="Vista previa para compartir" className="w-full rounded-2xl border border-slate-800/60" style={{ aspectRatio: "9 / 16", objectFit: "cover", maxHeight: "50vh" }} />
         ) : (
-          <div className="w-full rounded-2xl border border-slate-800/60 mb-4 flex flex-col items-center justify-center gap-2 py-10" style={{ aspectRatio: "9 / 16", maxHeight: "50vh" }}>
+          <div className="w-full rounded-2xl border border-slate-800/60 flex flex-col items-center justify-center gap-2 py-10" style={{ aspectRatio: "9 / 16", maxHeight: "50vh" }}>
             <div className="w-7 h-7 rounded-full border-[3px] border-teal-500/25 border-t-teal-500 animate-spin" />
             <p className="text-[11px] text-slate-500">Generando imagen...</p>
           </div>
         )}
-        <div className="flex gap-2">
-          <button onClick={handleDownload} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition text-sm font-semibold"><Download size={14} /> Descargar</button>
-          <button onClick={handleShare} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98] shadow-lg shadow-teal-500/20" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}><Share2 size={14} /> Compartir</button>
-        </div>
         <p className="text-[10px] text-slate-600 mt-3 text-center">Para tu historia de Instagram: compartila directo, o descargala y subila desde la app.</p>
       </div>
     </div>
@@ -6997,68 +7034,62 @@ Datos: ${JSON.stringify(context)}`;
     if (!SpeechRecognitionAPI) return;
     if (listeningRef.current) {
       listeningRef.current = false;
-      try { recognitionRef.current?.stop(); } catch { }
+      try { recognitionRef.current?.abort(); } catch { }
+      recognitionRef.current = null;
       setIsListening(false);
       return;
     }
-    // en el WebView de Android, SpeechRecognition sin este paso previo
-    // se corta al segundo porque el sistema rechaza el acceso en silencio.
-    finalTranscriptRef.current = ""; // limpiar acumulado de sesiones anteriores
+    // Pedir el permiso de micrófono explícitamente ANTES de iniciar —
+    // sin esto el WebView de Android rechaza el acceso en silencio.
+    finalTranscriptRef.current = "";
     try {
       const stream = await navigator.mediaDevices?.getUserMedia({ audio: true });
       stream?.getTracks().forEach((t) => t.stop());
     } catch {
       setIsListening(false); return; // permiso denegado
     }
-    const recognition = new SpeechRecognitionAPI();
-    recognition.lang = "es-AR";
-    recognition.interimResults = true;
-    recognition.continuous = true;
-    recognition.maxAlternatives = 1;
-    recognition.onresult = (e) => {
-      // Solo procesamos los resultados NUEVOS desde e.resultIndex.
-      // Los finales se acumulan en el ref; los interinos se muestran
-      // encima pero no se guardan — así un reinicio no repite nada.
-      let interim = "";
-      for (let idx = e.resultIndex; idx < e.results.length; idx++) {
-        const result = e.results[idx];
-        if (result.isFinal) {
-          finalTranscriptRef.current += result[0].transcript + " ";
-        } else {
-          interim += result[0].transcript;
+    // En Android, reutilizar la MISMA instancia con start() tras onend
+    // re-entrega resultados ya procesados (por eso se repetían las
+    // palabras). Creamos una instancia NUEVA en cada tramo de escucha:
+    // cada instancia entrega su resultado final una sola vez.
+    const startSegment = () => {
+      if (!listeningRef.current) return;
+      const recognition = new SpeechRecognitionAPI();
+      recognition.lang = "es-AR";
+      recognition.interimResults = false; // sin interinos: solo lo confirmado
+      recognition.continuous = false;     // un segmento por instancia
+      recognition.maxAlternatives = 1;
+      recognition.onresult = (e) => {
+        const last = e.results[e.results.length - 1];
+        if (last && last.isFinal) {
+          finalTranscriptRef.current += last[0].transcript + " ";
+          setInput(finalTranscriptRef.current.trim());
         }
-      }
-      setInput(finalTranscriptRef.current + interim);
-    };
-    recognition.onerror = (e) => {
-      // "no-speech" y "aborted" son cortes normales del WebView — el
-      // onend se encarga de reiniciar. Cualquier otro error sí apaga.
-      if (e.error !== "no-speech" && e.error !== "aborted") {
+      };
+      recognition.onerror = (e) => {
+        if (e.error !== "no-speech" && e.error !== "aborted") {
+          listeningRef.current = false;
+          setIsListening(false);
+        }
+      };
+      recognition.onend = () => {
+        // Fin del segmento — si el usuario sigue en modo escucha,
+        // arrancamos un segmento nuevo con una instancia nueva.
+        if (listeningRef.current) {
+          setTimeout(startSegment, 150);
+        } else {
+          setIsListening(false);
+        }
+      };
+      recognitionRef.current = recognition;
+      try { recognition.start(); } catch {
         listeningRef.current = false;
         setIsListening(false);
       }
     };
-    recognition.onend = () => {
-      // Android corta la escucha solo cada pocos segundos — mientras el
-      // usuario no haya tocado el botón de parar, la relanzamos.
-      if (listeningRef.current && recognitionRef.current === recognition) {
-        try { recognition.start(); } catch {
-          listeningRef.current = false;
-          setIsListening(false);
-        }
-      } else {
-        setIsListening(false);
-      }
-    };
-    recognitionRef.current = recognition;
-    try {
-      recognition.start();
-      listeningRef.current = true;
-      setIsListening(true);
-    } catch {
-      listeningRef.current = false;
-      setIsListening(false);
-    }
+    listeningRef.current = true;
+    setIsListening(true);
+    startSegment();
   };
 
   return (
