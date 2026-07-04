@@ -1679,21 +1679,26 @@ async function drawMuscleRankShareCard(ctx, W, H, { ranks, modeLabel, accent = "
 
 function ShareImageModal({ title, fileNamePrefix, shareTitle, shareText, draw, onClose, autoShowOptOutLabel, onOptOutAutoShow }) {
   const canvasRef = useRef(null);
+  const previewRef = useRef(null);
   const [previewUrl, setPreviewUrl] = useState(null);
+  // Al aparecer el preview, hacer scroll directo a él
+  useEffect(() => {
+    if (previewUrl && previewRef.current) {
+      previewRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [previewUrl]);
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    canvas.width = 1080; canvas.height = 1920;
+    // 540×960 en vez de 1080×1920: 4× menos píxeles → genera ~4× más rápido.
+    // Las redes sociales comprimen de todas formas; la calidad visual es la misma.
+    canvas.width = 540; canvas.height = 960;
     const ctx = canvas.getContext("2d");
     let cancelled = false;
-    // `draw` puede ser sync (la mayoría de las tarjetas) o async (la del
-    // muñeco, que necesita esperar a que el SVG se convierta en imagen
-    // antes de poder dibujarlo en el canvas) — await sobre un valor no
-    //-Promise se resuelve solo, así que esto funciona para ambos casos.
     (async () => {
       try {
-        await draw(ctx, 1080, 1920);
-        if (!cancelled) setPreviewUrl(canvas.toDataURL("image/png"));
+        await draw(ctx, 540, 960);
+        if (!cancelled) setPreviewUrl(canvas.toDataURL("image/jpeg", 0.88));
       } catch (err) {
         console.error("Error generando la imagen para compartir:", err);
       }
@@ -1739,7 +1744,9 @@ function ShareImageModal({ title, fileNamePrefix, shareTitle, shareText, draw, o
         )}
         <canvas ref={canvasRef} className="hidden" />
         {previewUrl ? (
+          <div ref={previewRef}>
           <img src={previewUrl} alt="Vista previa para compartir" className="w-full rounded-2xl border border-slate-800/60 mb-4" style={{ aspectRatio: "9 / 16", objectFit: "cover", maxHeight: "50vh" }} />
+          </div>
         ) : (
           <div className="w-full rounded-2xl border border-slate-800/60 mb-4 flex flex-col items-center justify-center gap-2 py-10" style={{ aspectRatio: "9 / 16", maxHeight: "50vh" }}>
             <div className="w-7 h-7 rounded-full border-[3px] border-teal-500/25 border-t-teal-500 animate-spin" />
@@ -6979,11 +6986,11 @@ Datos: ${JSON.stringify(context)}`;
   // simplemente no se muestra, en vez de mostrar un botón roto.
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef(null);
-  // Ref espejo de isListening: los callbacks de SpeechRecognition (onend,
-  // onerror) capturan el valor del estado del render en que se crearon —
-  // siempre "false" — así que leerlo directo del state hacía que el
-  // auto-restart nunca corriera y la escucha muriera al primer corte.
   const listeningRef = useRef(false);
+  // Acumula solo los resultados FINALES entre reinicios de Android.
+  // Sin esto, cada reinicio volvía a procesar e.results desde 0 sumando
+  // lo que ya se había dicho — por eso las palabras se repetían.
+  const finalTranscriptRef = useRef("");
   const SpeechRecognitionAPI = typeof window !== "undefined" ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
   useEffect(() => () => { listeningRef.current = false; try { recognitionRef.current?.stop(); } catch { } }, []);
   const handleMicToggle = async () => {
@@ -6994,9 +7001,9 @@ Datos: ${JSON.stringify(context)}`;
       setIsListening(false);
       return;
     }
-    // Pedir el permiso de micrófono explícitamente ANTES de iniciar —
     // en el WebView de Android, SpeechRecognition sin este paso previo
     // se corta al segundo porque el sistema rechaza el acceso en silencio.
+    finalTranscriptRef.current = ""; // limpiar acumulado de sesiones anteriores
     try {
       const stream = await navigator.mediaDevices?.getUserMedia({ audio: true });
       stream?.getTracks().forEach((t) => t.stop());
@@ -7009,8 +7016,19 @@ Datos: ${JSON.stringify(context)}`;
     recognition.continuous = true;
     recognition.maxAlternatives = 1;
     recognition.onresult = (e) => {
-      const transcript = Array.from(e.results).map((r) => r[0].transcript).join(" ");
-      setInput(transcript);
+      // Solo procesamos los resultados NUEVOS desde e.resultIndex.
+      // Los finales se acumulan en el ref; los interinos se muestran
+      // encima pero no se guardan — así un reinicio no repite nada.
+      let interim = "";
+      for (let idx = e.resultIndex; idx < e.results.length; idx++) {
+        const result = e.results[idx];
+        if (result.isFinal) {
+          finalTranscriptRef.current += result[0].transcript + " ";
+        } else {
+          interim += result[0].transcript;
+        }
+      }
+      setInput(finalTranscriptRef.current + interim);
     };
     recognition.onerror = (e) => {
       // "no-speech" y "aborted" son cortes normales del WebView — el
