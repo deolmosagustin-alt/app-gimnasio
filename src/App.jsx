@@ -20,6 +20,13 @@ import { FirebaseAuthentication } from "@capacitor-firebase/authentication";
 // no está instalado el build falla con un error claro. Instalarlo primero:
 //   npm install @capacitor/local-notifications && npx cap sync android
 import { LocalNotifications } from "@capacitor/local-notifications";
+// @capacitor/share y @capacitor/filesystem — para compartir/guardar las
+// imágenes generadas: el WebView de Android NO soporta navigator.share
+// con archivos ni descargas de data-URLs con <a download>, así que en
+// nativo esto va por los plugins. Instalar con:
+//   npm install @capacitor/share @capacitor/filesystem && npx cap sync android
+import { Share as CapShare } from "@capacitor/share";
+import { Filesystem, Directory } from "@capacitor/filesystem";
 import { doc, setDoc, getDoc, enableIndexedDbPersistence } from "firebase/firestore";
 import Model from "react-body-highlighter";
 import { auth, googleProvider, db, app } from "./firebase";
@@ -1745,8 +1752,28 @@ function ShareImageModal({ title, fileNamePrefix, shareTitle, shareText, draw, o
     // eslint-disable-next-line
   }, []);
 
-  const handleDownload = () => {
+  const isNative = typeof window !== "undefined" && window.Capacitor?.isNativePlatform?.();
+  // Guarda el PNG en el caché de la app y devuelve su URI nativa.
+  const writeImageToCache = async () => {
+    const canvas = canvasRef.current; if (!canvas) return null;
+    const dataUrl = canvas.toDataURL("image/png");
+    const base64 = dataUrl.split(",")[1];
+    const fileName = `${fileNamePrefix}-${Date.now()}.png`;
+    const result = await Filesystem.writeFile({ path: fileName, data: base64, directory: Directory.Cache });
+    return result.uri;
+  };
+  const handleDownload = async () => {
     const canvas = canvasRef.current; if (!canvas) return;
+    if (isNative) {
+      // El WebView no maneja <a download> con data-URLs — en nativo,
+      // guardamos el archivo y abrimos el share sheet del sistema (desde
+      // ahí se puede "Guardar en galería/archivos").
+      try {
+        const uri = await writeImageToCache();
+        if (uri) { await CapShare.share({ title: shareTitle, files: [uri] }); return; }
+      } catch (err) { console.error("Descarga nativa falló:", err); }
+      return;
+    }
     const link = document.createElement("a");
     link.download = `${fileNamePrefix}.png`;
     link.href = canvas.toDataURL("image/png");
@@ -1754,6 +1781,13 @@ function ShareImageModal({ title, fileNamePrefix, shareTitle, shareText, draw, o
   };
   const handleShare = async () => {
     const canvas = canvasRef.current; if (!canvas) return;
+    if (isNative) {
+      try {
+        const uri = await writeImageToCache();
+        if (uri) { await CapShare.share({ title: shareTitle, text: shareText, files: [uri] }); return; }
+      } catch (err) { console.error("Share nativo falló:", err); }
+      return;
+    }
     try {
       const blob = await new Promise((res) => canvas.toBlob(res, "image/png"));
       if (blob) {
@@ -8423,13 +8457,19 @@ export default function App() {
       {/* Escudo fijo de la status bar — cubre la zona de batería/hora sin
           importar cuánto hayas scrolleado. El color es siempre #0a0a0f. */}
       <div style={{ position: "fixed", top: 0, left: 0, right: 0, height: "env(safe-area-inset-top, 0px)", backgroundColor: "#0a0a0f", zIndex: 9999 }} />
+      {/* Desaturación global: un overlay con backdrop-filter en vez de
+          filter en el contenedor — filter en un ancestro convierte a ese
+          ancestro en el containing block de position:fixed y ROMPE todos
+          los modales (aparecían en el medio del documento, no del viewport).
+          El overlay no bloquea toques y queda debajo de los modales. */}
+      <div style={{ position: "fixed", inset: 0, backdropFilter: "saturate(0.88)", WebkitBackdropFilter: "saturate(0.88)", pointerEvents: "none", zIndex: 50 }} />
       <StyleInjector />
       {recoveredNotice && <RecoveredBanner onClose={() => setRecoveredNotice(false)} />}
       {deloadNotice && <DeloadNoticeBanner onClose={() => setDeloadNotice(false)} />}
       
       {importRoutineError && <ImportRoutineErrorBanner onClose={() => setImportRoutineError(false)} />}
-      <SideNav tab={tab} setTab={setTab} profileName={activeProfile} style={{ filter: "saturate(0.88)" }} />
-      <div className="flex-1 min-w-0" style={{ paddingTop: "env(safe-area-inset-top, 0px)", filter: "saturate(0.88)" }}>
+      <SideNav tab={tab} setTab={setTab} profileName={activeProfile} />
+      <div className="flex-1 min-w-0" style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
         <header className="sticky z-10 bg-[#0a0a0f]/90 backdrop-blur-xl border-b border-slate-800/40" style={{ top: 0 }}>
           <div className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto px-4 py-4 flex items-center gap-3">
             {tab === "perfil" ? (
