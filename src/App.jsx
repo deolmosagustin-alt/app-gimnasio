@@ -20,13 +20,6 @@ import { FirebaseAuthentication } from "@capacitor-firebase/authentication";
 // no está instalado el build falla con un error claro. Instalarlo primero:
 //   npm install @capacitor/local-notifications && npx cap sync android
 import { LocalNotifications } from "@capacitor/local-notifications";
-// @capacitor/share y @capacitor/filesystem — para compartir/guardar las
-// imágenes generadas: el WebView de Android NO soporta navigator.share
-// con archivos ni descargas de data-URLs con <a download>, así que en
-// nativo esto va por los plugins. Instalar con:
-//   npm install @capacitor/share @capacitor/filesystem && npx cap sync android
-import { Share as CapShare } from "@capacitor/share";
-import { Filesystem, Directory } from "@capacitor/filesystem";
 import { doc, setDoc, getDoc, enableIndexedDbPersistence } from "firebase/firestore";
 import Model from "react-body-highlighter";
 import { auth, googleProvider, db, app } from "./firebase";
@@ -1753,24 +1746,29 @@ function ShareImageModal({ title, fileNamePrefix, shareTitle, shareText, draw, o
   }, []);
 
   const isNative = typeof window !== "undefined" && window.Capacitor?.isNativePlatform?.();
-  // Guarda el PNG en el caché de la app y devuelve su URI nativa.
+  // Guarda el PNG en el caché de la app (Android nativo) y devuelve su URI.
+  // Usa import() dinámico — @capacitor/filesystem no está en package.json del
+  // servidor de Vercel, solo en el proyecto de Android. Import estático
+  // rompía el build de Vercel porque Vite lo buscaba al compilar.
   const writeImageToCache = async () => {
     const canvas = canvasRef.current; if (!canvas) return null;
     const dataUrl = canvas.toDataURL("image/png");
     const base64 = dataUrl.split(",")[1];
     const fileName = `${fileNamePrefix}-${Date.now()}.png`;
+    const { Filesystem, Directory } = await import("@capacitor/filesystem");
     const result = await Filesystem.writeFile({ path: fileName, data: base64, directory: Directory.Cache });
     return result.uri;
   };
   const handleDownload = async () => {
     const canvas = canvasRef.current; if (!canvas) return;
     if (isNative) {
-      // El WebView no maneja <a download> con data-URLs — en nativo,
-      // guardamos el archivo y abrimos el share sheet del sistema (desde
-      // ahí se puede "Guardar en galería/archivos").
       try {
         const uri = await writeImageToCache();
-        if (uri) { await CapShare.share({ title: shareTitle, files: [uri] }); return; }
+        if (uri) {
+          const { Share } = await import("@capacitor/share");
+          await Share.share({ title: shareTitle, files: [uri] });
+          return;
+        }
       } catch (err) { console.error("Descarga nativa falló:", err); }
       return;
     }
@@ -1784,7 +1782,11 @@ function ShareImageModal({ title, fileNamePrefix, shareTitle, shareText, draw, o
     if (isNative) {
       try {
         const uri = await writeImageToCache();
-        if (uri) { await CapShare.share({ title: shareTitle, text: shareText, files: [uri] }); return; }
+        if (uri) {
+          const { Share } = await import("@capacitor/share");
+          await Share.share({ title: shareTitle, text: shareText, files: [uri] });
+          return;
+        }
       } catch (err) { console.error("Share nativo falló:", err); }
       return;
     }
@@ -1797,7 +1799,7 @@ function ShareImageModal({ title, fileNamePrefix, shareTitle, shareText, draw, o
           return;
         }
       }
-    } catch { return; /* cancelado por el usuario, no descargamos igual */ }
+    } catch { return; }
     handleDownload();
   };
 
