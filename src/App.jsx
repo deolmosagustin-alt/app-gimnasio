@@ -1232,32 +1232,35 @@ function ShareLinkModal({ title, shareTitle, shareText, shareTarget, onClose }) 
 
         {url && (
           <>
+            {/* Botón principal de compartir — prominente y arriba */}
             {canNativeShare && (
-              <button onClick={handleNativeShare} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white text-sm font-bold mb-3 transition-all active:scale-[0.98] shadow-lg shadow-teal-500/20" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>
+              <button onClick={handleNativeShare} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white text-sm font-bold mb-3 transition-all active:scale-[0.98]" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>
                 <Share2 size={15} /> Compartir
               </button>
             )}
-            <div className="grid grid-cols-3 gap-2 mb-3">
-              <a href={waUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition"><Share2 size={15} className="text-emerald-400" />WhatsApp</a>
-              <a href={xUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition"><Share2 size={15} className="text-slate-200" />X</a>
-              <a href={redditUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition"><Share2 size={15} className="text-orange-400" />Reddit</a>
-            </div>
-            <button onClick={handleCopy} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition text-sm font-semibold">
+            {/* Copiar enlace */}
+            <button onClick={handleCopy} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition text-sm font-semibold mb-2">
               {copied ? <><Check size={14} className="text-teal-400" /> ¡Copiado!</> : <><Copy size={14} /> Copiar enlace</>}
             </button>
-            {copyError && <p className="text-[11px] text-amber-400 mt-2 text-center">No pudimos copiarlo automáticamente — tocá el enlace de abajo y copialo a mano.</p>}
-            <input ref={urlInputRef} value={url} readOnly onFocus={(e) => e.target.select()} className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-3 py-2.5 text-[11px] text-slate-400 mt-3 focus:outline-none focus:border-teal-500/50 truncate" />
-            <p className="text-[10px] text-slate-600 mt-3 text-center">Quien abra el enlace puede agregar la rutina a su propia app con un toque.</p>
-
+            {copyError && <p className="text-[11px] text-amber-400 mb-2 text-center">No pudimos copiarlo — tocá el enlace de abajo y copialo a mano.</p>}
+            <input ref={urlInputRef} value={url} readOnly onFocus={(e) => e.target.select()} className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-3 py-2.5 text-[11px] text-slate-400 mb-3 focus:outline-none focus:border-teal-500/50 truncate" />
+            {/* Redes sociales — colapsadas en fila compacta */}
+            <div className="grid grid-cols-3 gap-2 mb-3">
+              <a href={waUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center gap-1.5 py-2.5 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition"><Share2 size={13} className="text-emerald-400" />WhatsApp</a>
+              <a href={xUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center gap-1.5 py-2.5 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition"><Share2 size={13} className="text-slate-200" />X</a>
+              <a href={redditUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center gap-1.5 py-2.5 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition"><Share2 size={13} className="text-orange-400" />Reddit</a>
+            </div>
+            <p className="text-[10px] text-slate-600 mb-3 text-center">Quien abra el enlace puede agregar la rutina a su app con un toque.</p>
+            {/* Exportar como archivo — al fondo, colapsado por defecto */}
             {!showFileOptions ? (
-              <button onClick={() => setShowFileOptions(true)} className="w-full flex items-center justify-center gap-1.5 mt-3 pt-3 border-t border-slate-800/60 text-slate-500 hover:text-slate-300 text-xs font-semibold transition"><Download size={12} /> O descargala como archivo (PDF, Word, Excel)</button>
+              <button onClick={() => setShowFileOptions(true)} className="w-full flex items-center justify-center gap-1.5 pt-3 border-t border-slate-800/60 text-slate-500 hover:text-slate-300 text-xs font-semibold transition"><Download size={12} /> Descargar como archivo (PDF, Word, Excel)</button>
             ) : (
-              <div className="mt-4 pt-4 border-t border-slate-800/60">
-                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2.5">Descargar como archivo</p>
+              <div className="pt-3 border-t border-slate-800/60">
+                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Descargar</p>
                 <div className="grid grid-cols-3 gap-2">
-                  <button onClick={() => handleExportDoc("pdf")} disabled={!!exporting} className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition disabled:opacity-50">{exporting === "pdf" ? <RotateCcw size={15} className="animate-spin text-rose-400" /> : <Download size={15} className="text-rose-400" />}PDF</button>
-                  <button onClick={() => handleExportDoc("word")} disabled={!!exporting} className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition disabled:opacity-50">{exporting === "word" ? <RotateCcw size={15} className="animate-spin text-blue-400" /> : <Download size={15} className="text-blue-400" />}Word</button>
-                  <button onClick={() => handleExportDoc("excel")} disabled={!!exporting} className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition disabled:opacity-50">{exporting === "excel" ? <RotateCcw size={15} className="animate-spin text-emerald-400" /> : <Download size={15} className="text-emerald-400" />}Excel</button>
+                  <button onClick={() => handleExportDoc("pdf")} disabled={!!exporting} className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition disabled:opacity-50">{exporting === "pdf" ? <RotateCcw size={14} className="animate-spin text-rose-400" /> : <Download size={14} className="text-rose-400" />}PDF</button>
+                  <button onClick={() => handleExportDoc("word")} disabled={!!exporting} className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition disabled:opacity-50">{exporting === "word" ? <RotateCcw size={14} className="animate-spin text-blue-400" /> : <Download size={14} className="text-blue-400" />}Word</button>
+                  <button onClick={() => handleExportDoc("excel")} disabled={!!exporting} className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition disabled:opacity-50">{exporting === "excel" ? <RotateCcw size={14} className="animate-spin text-emerald-400" /> : <Download size={14} className="text-emerald-400" />}Excel</button>
                 </div>
               </div>
             )}
@@ -1307,6 +1310,18 @@ function wrapCanvasText(ctx, text, x, y, maxWidth, lineHeight) {
   return lines.length;
 }
 
+// Polyfill de roundRect — ctx.roundRect no está disponible en WebViews
+// de Android anteriores a Chrome 99. Esta función hace lo mismo con arcTo.
+function canvasRoundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
 function drawShareCardBase(ctx, W, H, accent, accent2) {
   // Fondo
   const bg = ctx.createLinearGradient(0, 0, 0, H);
@@ -1351,9 +1366,9 @@ function drawPRShareCard(ctx, W, H, { exerciseName, muscle, kg, reps, accent = "
   const gChip = ctx.createLinearGradient(W/2 - chipW/2, 0, W/2 + chipW/2, 0);
   gChip.addColorStop(0, accent + "40"); gChip.addColorStop(1, accent + "20");
   ctx.fillStyle = gChip;
-  ctx.beginPath(); ctx.roundRect(W/2 - chipW/2, chipY - 26, chipW, 44, 22); ctx.fill();
+  canvasRoundRect(ctx, W/2 - chipW/2, chipY - 26, chipW, 44, 22); ctx.fill();
   ctx.strokeStyle = accent + "60"; ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.roundRect(W/2 - chipW/2, chipY - 26, chipW, 44, 22); ctx.stroke();
+  canvasRoundRect(ctx, W/2 - chipW/2, chipY - 26, chipW, 44, 22); ctx.stroke();
   ctx.fillStyle = accent; ctx.fillText(chipText, W/2, chipY + 6);
 
   // Nombre del ejercicio
@@ -1367,7 +1382,7 @@ function drawPRShareCard(ctx, W, H, { exerciseName, muscle, kg, reps, accent = "
     ctx.font = "600 26px system-ui";
     const mW = ctx.measureText(muscle.toUpperCase()).width + 48;
     ctx.fillStyle = accent + "20";
-    ctx.beginPath(); ctx.roundRect(W/2 - mW/2, y - 26, mW, 42, 21); ctx.fill();
+    canvasRoundRect(ctx, W/2 - mW/2, y - 26, mW, 42, 21); ctx.fill();
     ctx.fillStyle = accent + "dd"; ctx.fillText(muscle.toUpperCase(), W/2, y + 5);
   }
 
@@ -1392,9 +1407,9 @@ function drawPRShareCard(ctx, W, H, { exerciseName, muscle, kg, reps, accent = "
   [{ val: `${est} kg`, label: "1RM estimado" }, { val: `${Math.round((kg||0)*(reps||0))} kg`, label: "Volumen" }].forEach((t, i) => {
     const x = 60 + i * (tileW + tileGap);
     ctx.fillStyle = "rgba(255,255,255,0.05)";
-    ctx.beginPath(); ctx.roundRect(x, tileY, tileW, 150, 20); ctx.fill();
+    canvasRoundRect(ctx, x, tileY, tileW, 150, 20); ctx.fill();
     ctx.strokeStyle = "rgba(255,255,255,0.08)"; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.roundRect(x, tileY, tileW, 150, 20); ctx.stroke();
+    canvasRoundRect(ctx, x, tileY, tileW, 150, 20); ctx.stroke();
     ctx.fillStyle = "#ffffff"; ctx.font = "800 46px system-ui";
     ctx.fillText(t.val, x + tileW/2, tileY + 82);
     ctx.fillStyle = "#64748b"; ctx.font = "500 24px system-ui";
@@ -1419,7 +1434,7 @@ function drawCycleShareCard(ctx, W, H, { cycleNumber, daysTrained, totalVol, acc
   tiles.forEach((t, i) => {
     const x = 80 + i * (tileW + tileGap);
     ctx.fillStyle = "rgba(255,255,255,0.06)";
-    ctx.beginPath(); ctx.roundRect(x, tileY, tileW, 280, 28); ctx.fill();
+    canvasRoundRect(ctx, x, tileY, tileW, 280, 28); ctx.fill();
     ctx.fillStyle = "#f8fafc";
     ctx.font = "900 86px sans-serif";
     ctx.fillText(`${t.val}`, x + tileW / 2, tileY + 130);
@@ -1464,7 +1479,7 @@ function drawPeriodShareCard(ctx, W, H, { periodLabel, daysTrained, totalSets, t
       const col = i % gridCols, row = Math.floor(i / gridCols);
       const x = startX + col * (cell + gap), cy = startY + row * (cell + gap);
       ctx.fillStyle = c.trained ? accent : "rgba(255,255,255,0.07)";
-      ctx.beginPath(); ctx.roundRect(x, cy, cell, cell, 16); ctx.fill();
+      canvasRoundRect(ctx, x, cy, cell, cell, 16); ctx.fill();
       if (c.trained) {
         ctx.fillStyle = "rgba(255,255,255,0.92)";
         ctx.font = `700 ${Math.round(cell * 0.46)}px sans-serif`;
@@ -1486,7 +1501,7 @@ function drawPeriodShareCard(ctx, W, H, { periodLabel, daysTrained, totalSets, t
   tiles.forEach((t, i) => {
     const x = 80 + i * (tileW + tileGap);
     ctx.fillStyle = "rgba(255,255,255,0.06)";
-    ctx.beginPath(); ctx.roundRect(x, tileY, tileW, 230, 24); ctx.fill();
+    canvasRoundRect(ctx, x, tileY, tileW, 230, 24); ctx.fill();
     ctx.fillStyle = "#f8fafc";
     ctx.font = "900 56px sans-serif";
     ctx.fillText(`${t.val}`, x + tileW / 2, tileY + 100);
@@ -3042,7 +3057,7 @@ function HelpModal({ startTab, onClose }) {
   return (
     <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-end sm:items-center justify-center p-4 modal-bg-in" onClick={onClose}>
       <div
-        className="max-w-md w-full rounded-3xl overflow-hidden modal-pop-in shadow-2xl shadow-black/70 max-h-[92vh] flex flex-col"
+        className="max-w-md w-full rounded-3xl modal-pop-in shadow-2xl shadow-black/70 max-h-[92vh] flex flex-col"
         style={{ background: "linear-gradient(160deg,#0f1a1f 0%,#0a0f1a 100%)", border: "1px solid rgba(20,184,166,0.2)" }}
         onClick={(e) => e.stopPropagation()}
       >

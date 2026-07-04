@@ -1,37 +1,21 @@
 /**
  * api/ia.js — función serverless de Vercel
  *
- * La clave vive en una VARIABLE DE ENTORNO del servidor (GEMINI_API_KEY) —
- * el navegador nunca la ve, sólo este archivo, que corre en el servidor
- * de Vercel.
- *
- * Maneja dos acciones, según lo que mande App.jsx en el body del pedido:
- *  - { action: "chat", systemPrompt, history }  → el chat del Entrenador IA
- *  - { action: "detect", text }                  → "Detectar con IA" al importar una rutina
+ * Maneja dos acciones:
+ *  - { action: "chat", systemPrompt, history }  → chat del Entrenador IA
+ *  - { action: "detect", text }                  → importar rutina con IA
  */
 
 const MODEL = "gemini-flash-latest";
-// "gemini-1.5-flash" (y "gemini-2.0-flash") ya no existen — Google los dio
-// de baja por completo, así que cualquier pedido devuelve un error sin
-// "candidates". El alias "gemini-flash-latest" lo mantiene Google apuntando
-// siempre al modelo Flash vigente, así esto no se rompe de nuevo cuando la
-// próxima versión salga.
 
 async function callGemini(body) {
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error("Falta configurar GEMINI_API_KEY en las variables de entorno de Vercel.");
-  }
+  if (!apiKey) throw new Error("Falta GEMINI_API_KEY en las variables de entorno de Vercel.");
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${apiKey}`,
     { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }
   );
   if (!response.ok) {
-    // Este chequeo es justo lo que faltaba — sin él, un pedido rechazado
-    // por Google (modelo apagado, clave inválida, cuota agotada, lo que
-    // sea) seguía de largo como si nada, y el cliente terminaba recibiendo
-    // un string fijo de "no funcionó" disfrazado de respuesta válida (200
-    // OK) en vez de un error de verdad que se pueda diagnosticar.
     const errText = await response.text().catch(() => "");
     console.error("Gemini respondió con error:", response.status, errText);
     throw new Error(`Gemini devolvió ${response.status}`);
@@ -40,43 +24,24 @@ async function callGemini(body) {
 }
 
 export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    res.status(405).json({ error: "Sólo se acepta POST." });
-    return;
-  }
+  if (req.method !== "POST") { res.status(405).json({ error: "Sólo se acepta POST." }); return; }
 
   let body = req.body;
-  if (typeof body === "string") {
-    try { body = JSON.parse(body); } catch { body = {}; }
-  }
+  if (typeof body === "string") { try { body = JSON.parse(body); } catch { body = {}; } }
   body = body || {};
 
   try {
     if (body.action === "chat") {
       const { systemPrompt, history } = body;
       if (typeof systemPrompt !== "string" || !Array.isArray(history)) {
-        res.status(400).json({ error: "Faltan datos para procesar el pedido." });
-        return;
+        res.status(400).json({ error: "Faltan datos para procesar el pedido." }); return;
       }
       if (systemPrompt.length > 60000 || JSON.stringify(history).length > 60000) {
-        res.status(400).json({ error: "El mensaje es demasiado largo." });
-        return;
+        res.status(400).json({ error: "El mensaje es demasiado largo." }); return;
       }
-
-      // tools: google_search queda comentado MIENTRAS DIAGNOSTICAMOS el
-      // 429 — la búsqueda con Google puede necesitar que el proyecto de
-      // Google Cloud tenga facturación habilitada para funcionar (incluso
-      // si el uso real entra dentro de lo gratis), y si no la tenés
-      // habilitada, esto puede ser justamente lo que está disparando el
-      // error. Sin esto, el chat sigue funcionando igual — sólo deja de
-      // poder citar fuentes con link. Si funciona así, confirmamos que
-      // era esto; si seguís recibiendo 429 incluso sin esto, es un límite
-      // normal de pedidos por minuto del nivel gratis (15 por minuto),
-      // que se soluciona esperando un poco entre mensajes.
       const data = await callGemini({
         systemInstruction: { parts: [{ text: systemPrompt }] },
         contents: history,
-        // tools: [{ google_search: {} }],
       });
       const candidate = data?.candidates?.[0];
       const text = candidate?.content?.parts?.[0]?.text || "";
@@ -96,25 +61,28 @@ export default async function handler(req, res) {
     if (body.action === "detect") {
       const { text } = body;
       if (typeof text !== "string" || !text.trim()) {
-        res.status(400).json({ error: "Falta el texto de la rutina." });
-        return;
+        res.status(400).json({ error: "Falta el texto de la rutina." }); return;
       }
-      if (text.length > 30000) {
-        res.status(400).json({ error: "El texto es demasiado largo." });
-        return;
-      }
-      // El esquema exacto importa: App.jsx (handleProcessAI) espera estos
-      // nombres de campo puntuales para poder mapear cada ejercicio al
-      // catálogo — pedir "JSON simple" sin más detalle deja que Gemini
-      // invente su propia forma, que después no calza con lo que el
-      // cliente intenta leer.
-      const prompt = `Extraé la rutina de entrenamiento del siguiente texto y devolvé ÚNICAMENTE un array JSON con esta estructura exacta, sin texto adicional y SIN bloques de código markdown (nada de \`\`\`):
-[{"label": "Día 1", "exercises": [{"name": "Press Banca", "setsCount": 3, "repRange": "8-10"}]}]
-
-Texto:
-"""
-${text}
-"""`;
+      const truncated = text.substring(0, 25000);
+      const prompt = [
+        "Analizá el siguiente texto y extraé la rutina de entrenamiento completa.",
+        "Devolvé ÚNICAMENTE un array JSON válido (sin texto adicional, sin markdown):",
+        '[{"label": "Push", "exercises": [{"name": "Press Banca", "setsCount": 3, "repRange": "8-10"}]}]',
+        "",
+        "Reglas:",
+        '- "label": nombre del día/sesión (Push, Pull, Legs, Día 1, Pecho, etc.)',
+        '- "name": nombre completo del ejercicio en español',
+        '- "setsCount": cantidad de series (1-8)',
+        '- "repRange": rango de reps (ej: "8-10", "6-8", "5", "20")',
+        '- "3x8-10" o "3 series 8-10 reps" → setsCount=3, repRange="8-10"',
+        "- Incluí TODOS los ejercicios, no omitas ninguno",
+        '- Cardio (cinta, bici, elíptica): repRange = minutos (ej: "30")',
+        "",
+        "Texto:",
+        '"""',
+        truncated,
+        '"""',
+      ].join("\n");
       const data = await callGemini({ contents: [{ parts: [{ text: prompt }] }] });
       const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
       res.status(200).json({ text: rawText });
@@ -124,10 +92,6 @@ ${text}
     res.status(400).json({ error: "Acción no reconocida." });
   } catch (err) {
     console.error("Error en /api/ia:", err);
-    // "detail" es temporal, sólo para terminar de diagnosticar esto sin
-    // tener que ir a buscar los logs de Vercel cada vez — antes de
-    // publicar la app de verdad, hay que sacar esta línea (no se le debe
-    // mostrar el motivo técnico exacto a cualquiera que use el chat).
     res.status(500).json({ error: "Error en el servidor." });
   }
-};
+}
