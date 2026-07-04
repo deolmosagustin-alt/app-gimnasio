@@ -3053,43 +3053,42 @@ function HelpModal({ startTab, onClose }) {
     <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-end sm:items-center justify-center p-4 modal-bg-in" onClick={onClose}>
       <div
         className="max-w-md w-full rounded-3xl overflow-hidden modal-pop-in shadow-2xl shadow-black/70 max-h-[92vh] flex flex-col"
-        style={{ background: "linear-gradient(160deg,#0f1a1f 0%,#0a0f1a 100%)", border: `1px solid ${chapter.color}35` }}
+        style={{ background: "linear-gradient(160deg,#0f1a1f 0%,#0a0f1a 100%)", border: "1px solid rgba(20,184,166,0.2)" }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header con glow */}
+        {/* Header */}
         <div className="relative px-5 pt-5 pb-3 shrink-0" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-          <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-48 h-24 rounded-full blur-3xl pointer-events-none opacity-40" style={{ backgroundColor: chapter.color }} />
-          <div className="flex items-center justify-between mb-3 relative">
+          <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-xl flex items-center justify-center" style={{ backgroundColor: chapter.color + "22", color: chapter.color }}>
+              <div className="w-7 h-7 rounded-xl flex items-center justify-center bg-teal-500/15 text-teal-400">
                 {chapter.icon}
               </div>
-              <span className="text-xs font-black uppercase tracking-widest" style={{ color: chapter.color }}>{chapter.label}</span>
+              <span className="text-xs font-black uppercase tracking-widest text-teal-400">{chapter.label}</span>
             </div>
             <button onClick={onClose} className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800/80 transition"><X size={17} /></button>
           </div>
-          {/* Chips de capítulo */}
+          {/* Chips de capítulo — todos en el mismo gris, el activo en teal */}
           <div className="flex gap-1.5 overflow-x-auto pb-0.5 -mx-1 px-1">
             {HELP_CHAPTERS.map((c, ci) => (
               <button
                 key={c.key}
                 onClick={() => jumpToChapter(ci)}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold whitespace-nowrap transition-all shrink-0 border"
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold whitespace-nowrap transition-all shrink-0"
                 style={ci === step.chapterIndex
-                  ? { backgroundColor: c.color + "20", color: c.color, borderColor: c.color + "50" }
-                  : { color: "#475569", borderColor: "transparent" }}
+                  ? { backgroundColor: "#14B8A620", color: "#14B8A6", border: "1px solid #14B8A640" }
+                  : { color: "#475569", border: "1px solid transparent" }}
               >
                 {c.icon}{c.label}
               </button>
             ))}
           </div>
-          {/* Barra de progreso */}
+          {/* Barra de progreso — teal unificado */}
           <div className="flex gap-1.5 mt-3">
             {HELP_CHAPTERS.map((c, ci) => (
               <div key={c.key} className="flex-1 flex gap-0.5">
                 {c.steps.map((_, si) => {
                   const globalIdx = ALL_HELP_STEPS.findIndex((s) => s.chapterIndex === ci && s.stepInChapter === si);
-                  return <div key={si} className="h-0.5 flex-1 rounded-full transition-all duration-300" style={{ backgroundColor: globalIdx <= i ? c.color : "#1e293b" }} />;
+                  return <div key={si} className="h-0.5 flex-1 rounded-full transition-all duration-300" style={{ backgroundColor: globalIdx <= i ? "#14B8A6" : "#1e293b" }} />;
                 })}
               </div>
             ))}
@@ -3114,15 +3113,15 @@ function HelpModal({ startTab, onClose }) {
         <div key={i} className={`px-5 py-4 flex-1 overflow-y-auto tab-fade-in ${step.isChapterIntro ? "flex flex-col items-center text-center gap-3" : "flex items-start gap-4"}`}>
           {step.isChapterIntro ? (
             <>
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center mt-2" style={{ background: `linear-gradient(135deg,${chapter.color}30,${chapter.color}10)`, border: `1px solid ${chapter.color}30`, color: chapter.color }}>
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center mt-2 bg-teal-500/12 border border-teal-500/20 text-teal-400">
                 {step.icon}
               </div>
               <h3 className="text-lg font-black text-white leading-tight">{step.title}</h3>
-              <p className="text-sm text-slate-300 leading-relaxed">{step.text}</p>
+              <p className="text-sm text-slate-400 leading-relaxed">{step.text}</p>
             </>
           ) : (
             <>
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5" style={{ backgroundColor: chapter.color + "15", color: chapter.color, border: `1px solid ${chapter.color}25` }}>
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5 bg-slate-800/80 border border-slate-700/60 text-teal-400">
                 {step.icon}
               </div>
               <div className="flex-1 min-w-0">
@@ -3133,23 +3132,17 @@ function HelpModal({ startTab, onClose }) {
           )}
         </div>
 
-        {/* Footer de navegación */}
         <div className="flex items-center justify-between px-5 py-4 shrink-0" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-          <button
-            onClick={() => setI((n) => Math.max(0, n - 1))}
-            disabled={isFirst}
-            className="px-4 py-2 rounded-xl text-xs font-bold transition border"
-            style={isFirst ? { color: "#1e293b", borderColor: "transparent" } : { color: "#94a3b8", borderColor: "#1e293b" }}
-          >
+          <button onClick={() => setI((n) => Math.max(0, n - 1))} disabled={isFirst} className="px-4 py-2 rounded-xl text-xs font-bold transition border border-slate-800 text-slate-500 disabled:opacity-20 hover:text-white hover:border-slate-600">
             Atrás
           </button>
           <span className="text-[10px] text-slate-600 font-medium tabular-nums">{i + 1} / {ALL_HELP_STEPS.length}</span>
           {isLast ? (
-            <button onClick={onClose} className="px-5 py-2 rounded-xl text-xs font-black text-white transition active:scale-95" style={{ background: `linear-gradient(135deg,${chapter.color},${chapter.color}cc)` }}>
+            <button onClick={onClose} className="px-5 py-2 rounded-xl text-xs font-black text-white transition active:scale-95 bg-teal-500 hover:bg-teal-400">
               ¡Listo! 🎉
             </button>
           ) : (
-            <button onClick={() => setI((n) => Math.min(ALL_HELP_STEPS.length - 1, n + 1))} className="px-5 py-2 rounded-xl text-xs font-black text-white transition active:scale-95" style={{ background: `linear-gradient(135deg,${chapter.color},${chapter.color}cc)` }}>
+            <button onClick={() => setI((n) => Math.min(ALL_HELP_STEPS.length - 1, n + 1))} className="px-5 py-2 rounded-xl text-xs font-black text-white transition active:scale-95 bg-teal-500 hover:bg-teal-400">
               Siguiente →
             </button>
           )}
@@ -4784,7 +4777,13 @@ function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backR
       const lvl = ranks[ourKey]?.levelIdx ?? -1;
       if (lvl > (bestLevelBySlug[slug] ?? -1)) bestLevelBySlug[slug] = lvl;
     });
-    if (bestLevelBySlug.calves != null) {
+    // Trapecio pinta también el "neck" en la vista frontal
+    if (bestLevelBySlug["trapezius"] != null) {
+      bestLevelBySlug["neck"] = bestLevelBySlug["trapezius"];
+    }
+    // Tibial anterior: también usar calves (aparece en vista frontal y trasera,
+    // pero el useEffect de abajo fuerza neutro en trasera)
+    if (bestLevelBySlug["calves"] != null) {
       bestLevelBySlug["left-soleus"] = bestLevelBySlug.calves;
       bestLevelBySlug["right-soleus"] = bestLevelBySlug.calves;
     }
@@ -4846,17 +4845,30 @@ function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backR
     });
   }, [selected, data, frontRef, backRef]);
 
-  // Solo forzar color neutro en calves-frente cuando tibial no está seleccionado.
-  // Si tibial_anterior está seleccionado, dejamos que el useEffect de arriba
-  // lo pinte con el color correspondiente.
+  // Post-procesado de colores por vista:
+  // - calves en vista FRONTAL = tibial_anterior → pintar con su color de rango
+  //   (o neutro si no tiene rango)
+  // - calves en vista TRASERA = pantorrillas → ya lo maneja el data prop
+  // - neck en vista TRASERA → forzar neutro (es parte del trapecio solo al frente)
   useEffect(() => {
-    if (selected === "tibial_anterior") return;
-    const svg = frontRef.current?.querySelector("svg");
-    if (!svg) return;
-    svg.querySelectorAll("polygon").forEach((p, i) => {
-      if (ANTERIOR_POLY_SLUGS[i] === "calves") p.style.fill = "#334155";
-    });
-  }, [data, selected, frontRef]);
+    if (selected === "tibial_anterior") return; // el useEffect de selección ya lo maneja
+    // Vista frontal: calves = tibial_anterior
+    const frontSvg = frontRef.current?.querySelector("svg");
+    if (frontSvg) {
+      const tibialLvl = ranks.tibial_anterior?.levelIdx ?? -1;
+      const tibialColor = tibialLvl >= 0 ? highlightedColors[tibialLvl] : "#334155";
+      frontSvg.querySelectorAll("polygon").forEach((p, i) => {
+        if (ANTERIOR_POLY_SLUGS[i] === "calves") p.style.fill = tibialColor;
+      });
+    }
+    // Vista trasera: el neck no es trapecio desde atrás — forzar neutro
+    const backSvg = backRef.current?.querySelector("svg");
+    if (backSvg) {
+      backSvg.querySelectorAll("polygon").forEach((p, i) => {
+        if (POSTERIOR_POLY_SLUGS[i] === "neck") p.style.fill = "#334155";
+      });
+    }
+  }, [data, selected, ranks, frontRef, backRef, highlightedColors]);
 
   return (
     <div className="flex gap-2 justify-center items-start">
@@ -8274,8 +8286,8 @@ export default function App() {
       
       {importRoutineError && <ImportRoutineErrorBanner onClose={() => setImportRoutineError(false)} />}
       <SideNav tab={tab} setTab={setTab} profileName={activeProfile} />
-      <div className="flex-1 min-w-0">
-        <header className="sticky top-0 z-10 bg-[#0a0a0f]/90 backdrop-blur-xl border-b border-slate-800/40">
+      <div className="flex-1 min-w-0" style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
+        <header className="sticky z-10 bg-[#0a0a0f]/90 backdrop-blur-xl border-b border-slate-800/40" style={{ top: 0 }}>
           <div className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto px-4 py-4 flex items-center gap-3">
             {tab === "perfil" ? (
               <button onClick={() => setTab("rutina")} aria-label="Volver" className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800/80 transition shrink-0 lg:hidden"><ChevronDown size={18} className="rotate-90" /></button>
