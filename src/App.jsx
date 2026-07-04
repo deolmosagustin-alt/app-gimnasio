@@ -1205,7 +1205,7 @@ function ShareLinkModal({ title, shareTitle, shareText, shareTarget, onClose }) 
   const xUrl = url ? `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(url)}` : "#";
   const redditUrl = url ? `https://www.reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(shareTitle)}` : "#";
   return (
-    <div className="fixed inset-0 z-[120] bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 modal-bg-in" onClick={onClose}>
+    <div className="fixed inset-0 z-[120] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in" onClick={onClose}>
       <div className="bg-slate-900 border border-slate-700/60 rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50 max-h-[92vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-base font-black text-white">{title}</h3>
@@ -1621,15 +1621,20 @@ function buildMuscleBodySvgMarkup(view, ranks) {
   const NEUTRAL = "#334155";
   const order = view === "front" ? ANTERIOR_POLY_ORDER : POSTERIOR_POLY_ORDER;
   const points = view === "front" ? ANTERIOR_POLY_POINTS : POSTERIOR_POLY_POINTS;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 200">${buildSvgPolygonsForView(order, points, ranks, NEUTRAL, view)}</svg>`;
+  // width/height EXPLÍCITOS son obligatorios: un SVG que solo tiene viewBox
+  // no tiene tamaño intrínseco, y ctx.drawImage() con esos SVG falla o
+  // dibuja 0×0 en los WebViews de Android — por eso el share del muñeco
+  // nunca generaba la imagen en el teléfono aunque funcionara en desktop.
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="600" viewBox="0 0 100 200">${buildSvgPolygonsForView(order, points, ranks, NEUTRAL, view)}</svg>`;
 }
 
 function svgMarkupToImage(svgMarkup) {
   return new Promise((resolve, reject) => {
     const svg64 = btoa(unescape(encodeURIComponent(svgMarkup)));
     const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = reject;
+    const timer = setTimeout(() => reject(new Error("svg-load-timeout")), 5000);
+    img.onload = () => { clearTimeout(timer); resolve(img); };
+    img.onerror = (e) => { clearTimeout(timer); reject(e); };
     img.src = `data:image/svg+xml;base64,${svg64}`;
   });
 }
@@ -1645,16 +1650,23 @@ async function drawMuscleRankShareCard(ctx, W, H, { ranks, modeLabel, accent = "
   ctx.font = "700 28px sans-serif";
   ctx.fillText(modeLabel, W / 2, 295);
 
-  const [frontImg, backImg] = await Promise.all([
-    svgMarkupToImage(buildMuscleBodySvgMarkup("front", ranks)),
-    svgMarkupToImage(buildMuscleBodySvgMarkup("back", ranks)),
-  ]);
-  const bodyW = 360, bodyH = bodyW * 2;
-  const gap = 50;
-  const startX = (W - (bodyW * 2 + gap)) / 2;
-  const bodyY = 360;
-  ctx.drawImage(frontImg, startX, bodyY, bodyW, bodyH);
-  ctx.drawImage(backImg, startX + bodyW + gap, bodyY, bodyW, bodyH);
+  // Si los SVG fallan en cargar (WebView viejo, error raro), la card se
+  // genera igual sin los muñecos — mejor una imagen sin muñeco que un
+  // botón de compartir muerto que no hace nada.
+  try {
+    const [frontImg, backImg] = await Promise.all([
+      svgMarkupToImage(buildMuscleBodySvgMarkup("front", ranks)),
+      svgMarkupToImage(buildMuscleBodySvgMarkup("back", ranks)),
+    ]);
+    const bodyW = 360, bodyH = bodyW * 2;
+    const gap = 50;
+    const startX = (W - (bodyW * 2 + gap)) / 2;
+    const bodyY = 360;
+    ctx.drawImage(frontImg, startX, bodyY, bodyW, bodyH);
+    ctx.drawImage(backImg, startX + bodyW + gap, bodyY, bodyW, bodyH);
+  } catch (err) {
+    console.error("No se pudieron dibujar los muñecos en la card:", err);
+  }
 
   const labelY = bodyY + bodyH + 60;
   ctx.fillStyle = "#cbd5e1";
@@ -3055,7 +3067,7 @@ function HelpModal({ startTab, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-end sm:items-center justify-center p-4 modal-bg-in" onClick={onClose}>
+    <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 modal-bg-in" onClick={onClose}>
       <div
         className="max-w-md w-full rounded-3xl modal-pop-in shadow-2xl shadow-black/70 max-h-[92vh] flex flex-col"
         style={{ background: "linear-gradient(160deg,#0f1a1f 0%,#0a0f1a 100%)", border: "1px solid rgba(20,184,166,0.2)" }}
@@ -3100,22 +3112,25 @@ function HelpModal({ startTab, onClose }) {
           </div>
         </div>
 
-        {/* Demo */}
+        {/* Área media scrolleable: demo + texto scrollean JUNTOS.
+            flex-1 + minHeight: 0 es lo que permite que overflow-y-auto
+            funcione dentro del flex-col limitado por max-h del modal. */}
+        <div className="flex-1 overflow-y-auto" style={{ minHeight: 0, WebkitOverflowScrolling: "touch" }}>
         {step.demo && (
-          <div key={`demo-${step.chapterKey}`} className="mx-5 mt-4 tab-fade-in shrink-0">
+          <div key={`demo-${step.chapterKey}`} className="mx-5 mt-4 tab-fade-in">
             {step.demo.caption && (
-              <p className="text-[10px] font-bold mb-2 flex items-center gap-1.5" style={{ color: chapter.color }}>
+              <p className="text-[10px] font-bold mb-2 flex items-center gap-1.5 text-teal-400">
                 <Sparkles size={10} /> {step.demo.caption}
               </p>
             )}
-            <div className="rounded-2xl border overflow-hidden" style={{ borderColor: chapter.color + "25", backgroundColor: "#0a0a0f" }}>
+            <div className="rounded-2xl border border-slate-800/60 overflow-hidden" style={{ backgroundColor: "#0a0a0f" }}>
               <DemoPreview kind={step.demo.kind} view={step.demo.view} />
             </div>
           </div>
         )}
 
         {/* Contenido del paso */}
-        <div key={i} className={`px-5 py-4 overflow-y-auto tab-fade-in ${step.isChapterIntro ? "flex flex-col items-center text-center gap-3" : "flex items-start gap-4"}`} style={{ minHeight: 120, maxHeight: "45vh" }}>
+        <div key={i} className={`px-5 py-4 tab-fade-in ${step.isChapterIntro ? "flex flex-col items-center text-center gap-3" : "flex items-start gap-4"}`}>
           {step.isChapterIntro ? (
             <>
               <div className="w-14 h-14 rounded-2xl flex items-center justify-center mt-2 bg-teal-500/12 border border-teal-500/20 text-teal-400">
@@ -3135,6 +3150,7 @@ function HelpModal({ startTab, onClose }) {
               </div>
             </>
           )}
+        </div>
         </div>
 
         <div className="flex items-center justify-between px-5 py-4 shrink-0" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
@@ -6152,7 +6168,7 @@ function RoutinePreview({ routineDef }) {
 // creadas" para no interrumpir lo que ya estabas entrenando.
 function SharedRoutineImportModal({ routine, onImport, onDiscard }) {
   return (
-    <div className="fixed inset-0 z-[130] bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 modal-bg-in" onClick={onDiscard}>
+    <div className="fixed inset-0 z-[130] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in" onClick={onDiscard}>
       <div className="bg-slate-900 border border-slate-700/60 rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50 max-h-[88vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-3 mb-3">
           <div className="w-10 h-10 rounded-2xl bg-teal-500/15 text-teal-400 flex items-center justify-center shrink-0"><Share2 size={18} /></div>
@@ -6963,17 +6979,26 @@ Datos: ${JSON.stringify(context)}`;
   // simplemente no se muestra, en vez de mostrar un botón roto.
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef(null);
+  // Ref espejo de isListening: los callbacks de SpeechRecognition (onend,
+  // onerror) capturan el valor del estado del render en que se crearon —
+  // siempre "false" — así que leerlo directo del state hacía que el
+  // auto-restart nunca corriera y la escucha muriera al primer corte.
+  const listeningRef = useRef(false);
   const SpeechRecognitionAPI = typeof window !== "undefined" ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
-  useEffect(() => () => { try { recognitionRef.current?.stop(); } catch { } }, []);
+  useEffect(() => () => { listeningRef.current = false; try { recognitionRef.current?.stop(); } catch { } }, []);
   const handleMicToggle = async () => {
     if (!SpeechRecognitionAPI) return;
-    if (isListening) { try { recognitionRef.current?.stop(); } catch { } setIsListening(false); return; }
-    // Pedir permiso de micrófono explícitamente antes de iniciar.
-    // En Android/Capacitor sin este paso el WebView corta la escucha
-    // al segundo porque el sistema rechaza el acceso silenciosamente.
+    if (listeningRef.current) {
+      listeningRef.current = false;
+      try { recognitionRef.current?.stop(); } catch { }
+      setIsListening(false);
+      return;
+    }
+    // Pedir el permiso de micrófono explícitamente ANTES de iniciar —
+    // en el WebView de Android, SpeechRecognition sin este paso previo
+    // se corta al segundo porque el sistema rechaza el acceso en silencio.
     try {
       const stream = await navigator.mediaDevices?.getUserMedia({ audio: true });
-      // No necesitamos el stream, solo verificar que el permiso fue concedido.
       stream?.getTracks().forEach((t) => t.stop());
     } catch {
       setIsListening(false); return; // permiso denegado
@@ -6988,19 +7013,34 @@ Datos: ${JSON.stringify(context)}`;
       setInput(transcript);
     };
     recognition.onerror = (e) => {
-      if (e.error !== "no-speech") setIsListening(false);
+      // "no-speech" y "aborted" son cortes normales del WebView — el
+      // onend se encarga de reiniciar. Cualquier otro error sí apaga.
+      if (e.error !== "no-speech" && e.error !== "aborted") {
+        listeningRef.current = false;
+        setIsListening(false);
+      }
     };
     recognition.onend = () => {
-      // En Android el WebView puede cortar la escucha solo — reiniciar si
-      // el usuario no tocó el botón de parar.
-      if (recognitionRef.current === recognition && isListening) {
-        try { recognition.start(); } catch { setIsListening(false); }
+      // Android corta la escucha solo cada pocos segundos — mientras el
+      // usuario no haya tocado el botón de parar, la relanzamos.
+      if (listeningRef.current && recognitionRef.current === recognition) {
+        try { recognition.start(); } catch {
+          listeningRef.current = false;
+          setIsListening(false);
+        }
       } else {
         setIsListening(false);
       }
     };
     recognitionRef.current = recognition;
-    try { recognition.start(); setIsListening(true); } catch { setIsListening(false); }
+    try {
+      recognition.start();
+      listeningRef.current = true;
+      setIsListening(true);
+    } catch {
+      listeningRef.current = false;
+      setIsListening(false);
+    }
   };
 
   return (
@@ -7267,7 +7307,7 @@ function ImportRoutineModal({ onImport, onClose }) {
 
   if (parsed) {
     return (
-      <div className="fixed inset-0 z-[130] bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 modal-bg-in" onClick={onClose}>
+      <div className="fixed inset-0 z-[130] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in" onClick={onClose}>
         <div className="bg-slate-900 border border-slate-700/60 rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50 max-h-[88vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 rounded-2xl bg-teal-500/15 text-teal-400 flex items-center justify-center shrink-0"><Sparkles size={18} /></div>
@@ -7285,7 +7325,7 @@ function ImportRoutineModal({ onImport, onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 z-[130] bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 modal-bg-in" onClick={onClose}>
+    <div className="fixed inset-0 z-[130] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in" onClick={onClose}>
       <div className="bg-slate-900 border border-slate-700/60 rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50 max-h-[92vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-base font-black text-white">Importar rutina</h3>
@@ -8371,7 +8411,7 @@ export default function App() {
       {showHelp && <HelpModal startTab={helpStartTab} onClose={() => setShowHelp(false)} />}
       {importRoutine && <SharedRoutineImportModal routine={importRoutine} onImport={handleImportSharedRoutine} onDiscard={() => setImportRoutine(null)} />}
       {cycleCompleteNotice && !showCycleShareImage && (
-        <div className="fixed inset-0 z-[125] bg-black/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 modal-bg-in" onClick={() => setCycleCompleteNotice(null)}>
+        <div className="fixed inset-0 z-[125] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in" onClick={() => setCycleCompleteNotice(null)}>
           <div className="bg-slate-900 border border-slate-700/60 rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50 text-center" onClick={(e) => e.stopPropagation()}>
             <div className="text-4xl mb-2">🎉</div>
             <h3 className="text-lg font-black text-white">¡Completaste el Ciclo #{cycleCompleteNotice.cycleNumber}!</h3>
