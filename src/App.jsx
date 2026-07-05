@@ -4296,6 +4296,56 @@ function SessionHistoryView({ logs, onDeleteDay }) {
 /* ============================================================================
    DELOAD VIEW (unchanged from prior redesign)
 ============================================================================ */
+// Cronómetro/cuenta regresiva compacto para los ejercicios de cardio en la
+// semana de descarga — misma funcionalidad que en la rutina normal: modo
+// cronómetro (cuenta arriba) o cuenta regresiva desde los minutos reducidos.
+// Al llegar a 0 en cuenta regresiva, marca la serie como hecha con vibración.
+function DeloadCardioTimer({ targetMinutes, accent, onComplete }) {
+  const [mode, setMode] = useState("countdown"); // countdown | stopwatch
+  const [running, setRunning] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+  const intervalRef = useRef(null);
+  const fmt = (secs) => `${Math.floor(secs / 60)}:${String(Math.floor(secs % 60)).padStart(2, "0")}`;
+  const targetSecs = Math.max(1, Math.round(targetMinutes * 60));
+
+  useEffect(() => {
+    if (!running) { clearInterval(intervalRef.current); return; }
+    const startedAt = Date.now() - elapsed * 1000;
+    intervalRef.current = setInterval(() => {
+      const el = Math.floor((Date.now() - startedAt) / 1000);
+      setElapsed(el);
+      if (mode === "countdown" && el >= targetSecs) {
+        clearInterval(intervalRef.current);
+        setRunning(false);
+        haptic([100, 50, 100, 50, 200]);
+        onComplete?.();
+      }
+    }, 500);
+    return () => clearInterval(intervalRef.current);
+  }, [running, mode, targetSecs]);
+
+  const display = mode === "countdown" ? fmt(Math.max(0, targetSecs - elapsed)) : fmt(elapsed);
+  return (
+    <div className="mb-2.5 rounded-lg overflow-hidden border border-slate-800/60">
+      <div className="flex bg-slate-900/60 p-0.5 gap-0.5">
+        <button onClick={() => { setMode("countdown"); setRunning(false); setElapsed(0); }} className={`flex-1 py-1.5 rounded-md text-[9px] font-bold transition-all ${mode === "countdown" ? "text-white" : "text-slate-600"}`} style={mode === "countdown" ? { backgroundColor: accent } : {}}>Cuenta regresiva</button>
+        <button onClick={() => { setMode("stopwatch"); setRunning(false); setElapsed(0); }} className={`flex-1 py-1.5 rounded-md text-[9px] font-bold transition-all ${mode === "stopwatch" ? "text-white" : "text-slate-600"}`} style={mode === "stopwatch" ? { backgroundColor: accent } : {}}>Cronómetro</button>
+      </div>
+      <div className="flex items-center justify-between px-3 py-2 bg-slate-950/40">
+        <span className="text-lg font-black tabular-nums" style={{ color: running ? accent : "#94a3b8" }}>{display}</span>
+        <div className="flex gap-1.5">
+          <button onClick={() => setRunning((r) => !r)} className="px-3 py-1.5 rounded-lg text-[10px] font-bold text-white transition active:scale-95" style={{ backgroundColor: accent }}>
+            {running ? "Pausar" : elapsed > 0 ? "Seguir" : "Iniciar"}
+          </button>
+          {elapsed > 0 && !running && (
+            <button onClick={() => { setElapsed(0); }} className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold border border-slate-700 text-slate-400 transition active:scale-95">↺</button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DeloadView({ logs, settings = DEFAULT_SETTINGS, deloadProgress = {}, setDeloadProgress, onFinishDeloadSession }) {
   const globalUnit = useWeightUnit();
   const [unit, setUnit] = useState(globalUnit);
@@ -4418,12 +4468,15 @@ function DeloadView({ logs, settings = DEFAULT_SETTINGS, deloadProgress = {}, se
                           <span className="text-[10px] bg-slate-800/80 text-slate-500 rounded-lg px-2 py-0.5">{s.repRange} reps</span>
                         </div>
                         {best && (ex.cardio ? (
+                          <>
                           <div className="flex items-center gap-2 mb-2.5 px-2 py-1.5 rounded-lg" style={{ backgroundColor: done ? day.color + "15" : "#A855F715" }}>
                             <Zap size={12} style={{ color: done ? day.color : "#C084FC" }} className="shrink-0" />
                             <span className="text-[10px] font-bold text-slate-500 line-through mr-1">{best.minutes} min</span>
                             <ArrowDown size={10} style={{ color: done ? day.color : "#C084FC" }} />
                             <span className="text-sm font-black" style={{ color: done ? day.color : "#D8B4FE" }}>{Math.max(1, Math.round((best.minutes || 0) * deloadPct))} min</span>
                           </div>
+                          {!done && <DeloadCardioTimer targetMinutes={Math.max(1, Math.round((best.minutes || 0) * deloadPct))} accent={day.color} onComplete={() => toggleDeloadDone(progressKey)} />}
+                          </>
                         ) : (
                           <div className="flex items-center gap-2 mb-2.5 px-2 py-1.5 rounded-lg" style={{ backgroundColor: done ? day.color + "15" : "#A855F715" }}>
                             <Zap size={12} style={{ color: done ? day.color : "#C084FC" }} className="shrink-0" />
@@ -7600,8 +7653,191 @@ function RoutineBuilder({ initialRoutine, onCancel, onSave }) {
    una desde un archivo. Es la misma pantalla que se muestra a la fuerza
    (forced=true) cuando un perfil nuevo todavía no eligió ninguna rutina.
 ============================================================================ */
-function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRestore }) {
+// Asistente de rutina personalizada — aparece como primera opción cuando
+// entrás por primera vez. Preguntas básicas estilo chat (sexo, edad, peso,
+// altura, días, tiempo, objetivo), autocompleta el perfil con las respuestas
+// y le pide a la IA una rutina a medida que podés revisar antes de aceptar.
+function PersonalizedRoutineWizard({ profile, onUpdateProfile, onCreateRoutine, onActivate, onClose }) {
+  const [step, setStep] = useState(0);
+  const [answers, setAnswers] = useState({ sex: profile?.sex || null, age: profile?.age || "", weight: "", height: profile?.heightCm || "", daysPerWeek: null, minutes: null, goal: null });
+  const [inputVal, setInputVal] = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [genError, setGenError] = useState("");
+  const [preview, setPreview] = useState(null);
+
+  const STEPS = [
+    { key: "sex", q: "¿Sos hombre o mujer?", hint: "Ajusta los estándares de fuerza a tu contexto", chips: [{ v: "M", l: "Hombre" }, { v: "F", l: "Mujer" }] },
+    { key: "age", q: "¿Cuántos años tenés?", hint: "", input: { type: "number", placeholder: "Ej: 25", unit: "años" } },
+    { key: "weight", q: "¿Cuánto pesás?", hint: "Se usa para el ranking muscular relativo", input: { type: "number", placeholder: "Ej: 75", unit: "kg" } },
+    { key: "height", q: "¿Cuánto medís?", hint: "", input: { type: "number", placeholder: "Ej: 175", unit: "cm" } },
+    { key: "daysPerWeek", q: "¿Cuántos días a la semana querés entrenar?", hint: "Sé realista — mejor 3 días consistentes que 6 imposibles", chips: [{ v: 2, l: "2 días" }, { v: 3, l: "3 días" }, { v: 4, l: "4 días" }, { v: 5, l: "5 días" }, { v: 6, l: "6 días" }] },
+    { key: "minutes", q: "¿Cuánto tiempo tenés por sesión?", hint: "", chips: [{ v: 30, l: "30 min" }, { v: 45, l: "45 min" }, { v: 60, l: "1 hora" }, { v: 90, l: "1:30 o más" }] },
+    { key: "goal", q: "¿Cuál es tu objetivo principal?", hint: "", chips: [{ v: "hipertrofia", l: "Ganar músculo" }, { v: "fuerza", l: "Ganar fuerza" }, { v: "grasa", l: "Perder grasa" }, { v: "salud", l: "Salud general" }] },
+  ];
+  const current = STEPS[step];
+  const isLastQuestion = step === STEPS.length - 1;
+
+  const answer = (val) => {
+    const next = { ...answers, [current.key]: val };
+    setAnswers(next);
+    setInputVal("");
+    if (isLastQuestion) { generateRoutine(next); } else { setStep((s) => s + 1); }
+  };
+
+  const generateRoutine = async (a) => {
+    setGenerating(true); setGenError("");
+    // Guardar los datos en el perfil de una — aunque la generación falle,
+    // las respuestas del usuario no se pierden.
+    const profileUpdates = {};
+    if (a.sex) profileUpdates.sex = a.sex;
+    if (a.age) profileUpdates.age = parseInt(a.age, 10) || null;
+    if (a.height) profileUpdates.heightCm = parseInt(a.height, 10) || null;
+    if (a.weight) profileUpdates.settings = { ...(getProfileSettings(profile)), bodyWeightKg: parseFloat(a.weight) || 0, sex: a.sex || null };
+    onUpdateProfile?.(profileUpdates);
+
+    const goalLabel = { hipertrofia: "hipertrofia (ganar músculo)", fuerza: "fuerza máxima", grasa: "pérdida de grasa manteniendo músculo", salud: "salud y acondicionamiento general" }[a.goal] || a.goal;
+    const prompt = [
+      `Creá una rutina de gimnasio personalizada para: ${a.sex === "F" ? "mujer" : "hombre"} de ${a.age} años, ${a.weight} kg, ${a.height} cm.`,
+      `Entrena ${a.daysPerWeek} días por semana, ${a.minutes} minutos por sesión. Objetivo: ${goalLabel}.`,
+      `La cantidad de ejercicios por día debe ajustarse al tiempo disponible (aprox 1 ejercicio cada 10-12 min).`,
+      `Devolvé ÚNICAMENTE un array JSON válido, sin texto adicional ni markdown:`,
+      `[{"label": "Día 1 - Empuje", "exercises": [{"name": "Press Banca", "setsCount": 3, "repRange": "8-10"}]}]`,
+      `Usá nombres de ejercicios comunes en español. El array debe tener exactamente ${a.daysPerWeek} días.`,
+    ].join("\n");
+    try {
+      const res = await fetch("/api/ia", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "chat", systemPrompt: "Sos un entrenador experto. Respondés ÚNICAMENTE con JSON válido, sin explicaciones ni bloques de código.", history: [{ role: "user", parts: [{ text: prompt }] }] }) });
+      if (!res.ok) throw new Error("server");
+      const data = await res.json();
+      const cleaned = (data?.text || "").replace(/```json|```/g, "").trim();
+      const days = JSON.parse(cleaned);
+      if (!Array.isArray(days) || !days.length) throw new Error("empty");
+      const parsedDays = days.map((d) => ({
+        label: String(d.label || "Día").toUpperCase(),
+        exercises: (d.exercises || []).map((ex) => {
+          const lib = matchExerciseToLibrary(ex.name);
+          const sets = Array.from({ length: Math.max(1, Math.min(8, ex.setsCount || 3)) }, () => ({ repRange: ex.repRange || "8-10" }));
+          return lib ? { libId: lib.id, sets } : { id: builderUid("wizard"), name: ex.name || "Ejercicio", muscle: "Personalizado", sets };
+        }),
+      }));
+      setPreview(buildImportedRoutineDef(parsedDays, "Mi rutina personalizada"));
+    } catch (err) {
+      console.error("Error generando rutina:", err);
+      setGenError("No pudimos generar la rutina. Revisá tu conexión e intentá de nuevo — o elegí una rutina prearmada y personalizala después.");
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handleConfirm = () => {
+    if (!preview) return;
+    const id = builderUid("wizard_routine");
+    onCreateRoutine(id, preview);
+    onActivate(id, preview);
+    onClose();
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <button onClick={onClose} className="flex items-center gap-1 text-slate-500 hover:text-white transition text-xs font-bold"><ChevronLeft size={14} /> Volver</button>
+        <span className="text-[10px] text-slate-600 font-bold">{preview ? "Revisá tu rutina" : generating ? "Generando..." : `${step + 1} / ${STEPS.length}`}</span>
+      </div>
+
+      {/* Barra de progreso */}
+      <div className="flex gap-1">
+        {STEPS.map((_, i) => (
+          <div key={i} className="h-1 flex-1 rounded-full transition-all duration-300" style={{ backgroundColor: i <= step || preview ? "#14B8A6" : "#1e293b" }} />
+        ))}
+      </div>
+
+      {!generating && !preview && !genError && (
+        <div className="rounded-2xl border border-teal-500/20 p-5 bounce-in" style={{ background: "linear-gradient(160deg,#0d1f1e,#0f172a)" }} key={step}>
+          <div className="flex items-start gap-3 mb-4">
+            <div className="w-9 h-9 rounded-xl bg-teal-500/15 border border-teal-500/25 flex items-center justify-center shrink-0"><Sparkles size={16} className="text-teal-400" /></div>
+            <div>
+              <p className="text-base font-black text-white leading-snug">{current.q}</p>
+              {current.hint && <p className="text-[11px] text-slate-500 mt-1">{current.hint}</p>}
+            </div>
+          </div>
+          {current.chips ? (
+            <div className="flex flex-wrap gap-2">
+              {current.chips.map((chip) => (
+                <button key={chip.v} onClick={() => answer(chip.v)} className="px-4 py-2.5 rounded-xl bg-slate-800/70 border border-slate-700 text-slate-200 text-sm font-bold hover:border-teal-500/50 hover:text-teal-300 transition active:scale-95">
+                  {chip.l}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <div className="flex-1 relative">
+                <input type={current.input.type} inputMode="numeric" value={inputVal} onChange={(e) => setInputVal(e.target.value)} placeholder={current.input.placeholder} autoFocus
+                  onKeyDown={(e) => { if (e.key === "Enter" && inputVal.trim()) answer(inputVal.trim()); }}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-teal-500/60" />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-slate-600 font-bold">{current.input.unit}</span>
+              </div>
+              <button onClick={() => inputVal.trim() && answer(inputVal.trim())} disabled={!inputVal.trim()} className="px-5 rounded-xl text-white font-bold text-sm disabled:opacity-30 transition active:scale-95" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>OK</button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {generating && (
+        <div className="rounded-2xl border border-teal-500/20 p-8 flex flex-col items-center gap-3 text-center" style={{ background: "linear-gradient(160deg,#0d1f1e,#0f172a)" }}>
+          <div className="w-8 h-8 rounded-full border-[3px] border-teal-500/25 border-t-teal-500 animate-spin" />
+          <p className="text-sm font-bold text-white">Armando tu rutina personalizada...</p>
+          <p className="text-[11px] text-slate-500">La IA está diseñando un plan a tu medida. Puede tardar unos segundos.</p>
+        </div>
+      )}
+
+      {genError && (
+        <div className="rounded-2xl border border-amber-500/25 bg-amber-500/5 p-5 text-center space-y-3">
+          <AlertTriangle size={22} className="text-amber-400 mx-auto" />
+          <p className="text-sm text-slate-300">{genError}</p>
+          <div className="flex gap-2 justify-center">
+            <button onClick={() => generateRoutine(answers)} className="px-4 py-2 rounded-xl text-white text-xs font-bold" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>Reintentar</button>
+            <button onClick={onClose} className="px-4 py-2 rounded-xl border border-slate-700 text-slate-400 text-xs font-bold">Ver rutinas prearmadas</button>
+          </div>
+        </div>
+      )}
+
+      {preview && (
+        <div className="space-y-3 bounce-in">
+          <div className="rounded-2xl border border-teal-500/25 p-4" style={{ background: "linear-gradient(160deg,#0d1f1e,#0f172a)" }}>
+            <div className="flex items-center gap-2.5 mb-3">
+              <div className="w-9 h-9 rounded-xl bg-teal-500/15 flex items-center justify-center"><Check size={16} className="text-teal-400" /></div>
+              <div>
+                <p className="text-sm font-black text-white">{preview.name}</p>
+                <p className="text-[10px] text-slate-500">{preview.dayOrder.length} días · revisala y confirmá</p>
+              </div>
+            </div>
+            <div className="space-y-2 max-h-[40vh] overflow-y-auto">
+              {preview.dayOrder.map((dk) => {
+                const d = preview.days[dk];
+                return (
+                  <div key={dk} className="bg-slate-900/60 rounded-xl p-3">
+                    <p className="text-[11px] font-black text-teal-400 uppercase tracking-wider mb-1.5">{d.label}</p>
+                    {(d.exercises || []).map((ex, i) => {
+                      const lib = ex.libId ? EXERCISE_LIBRARY_BY_ID[ex.libId] : null;
+                      return <p key={i} className="text-xs text-slate-300 py-0.5">• {lib?.name || ex.name} — {ex.sets?.length || 0}×{ex.sets?.[0]?.repRange || ""}</p>;
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={onClose} className="flex-1 py-3 rounded-xl border border-slate-700 text-slate-400 text-sm font-bold hover:text-white transition">Descartar</button>
+            <button onClick={handleConfirm} className="flex-1 py-3 rounded-xl text-white text-sm font-black transition active:scale-95" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>Usar esta rutina</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRestore, onUpdateProfile }) {
   const [mode, setMode] = useState("catalog");
+  const [showWizard, setShowWizard] = useState(false);
   const [editingRoutineId, setEditingRoutineId] = useState(null);
   const [showSchedule, setShowSchedule] = useState(false);
   const [shareTarget, setShareTarget] = useState(null);
@@ -7684,6 +7920,18 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
     );
   }
 
+  if (showWizard) {
+    return (
+      <PersonalizedRoutineWizard
+        profile={profile}
+        onUpdateProfile={onUpdateProfile}
+        onCreateRoutine={(id, def) => onUpdate(id, def)}
+        onActivate={(id, def) => onActivate(id, def)}
+        onClose={() => setShowWizard(false)}
+      />
+    );
+  }
+
   return (
     <div className="space-y-4">
       {forced && (
@@ -7692,6 +7940,20 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
           <h2 className="text-lg font-black text-white">¿Cómo vas a entrenar?</h2>
           <p className="text-sm text-slate-500 mt-1.5 leading-relaxed px-2">Elegí una rutina ya armada, creá la tuya desde cero, o importá una que ya tengas escrita. La vas a poder cambiar cuando quieras.</p>
         </div>
+      )}
+
+      {forced && (
+        <button onClick={() => setShowWizard(true)} className="relative overflow-hidden w-full rounded-2xl border border-teal-500/30 p-4 text-left transition active:scale-[0.99] hover:border-teal-500/50" style={{ background: "linear-gradient(135deg,#0d1f1e,#0f172a)" }}>
+          <div className="absolute -top-8 -right-8 w-28 h-28 rounded-full bg-teal-500/15 blur-2xl pointer-events-none" />
+          <div className="relative flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-teal-500/20 border border-teal-500/30 flex items-center justify-center shrink-0"><Sparkles size={19} className="text-teal-400" /></div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-black text-white">Crear mi rutina personalizada</p>
+              <p className="text-[11px] text-teal-300/60 mt-0.5">Respondé unas preguntas y la IA arma un plan a tu medida</p>
+            </div>
+            <ChevronRight size={16} className="text-teal-500 shrink-0" />
+          </div>
+        </button>
       )}
 
       {!forced && (
@@ -8445,7 +8707,7 @@ export default function App() {
           <div className="flex justify-end mb-2">
             <button onClick={handleSignOut} className="text-[11px] text-slate-600 hover:text-slate-400 font-semibold flex items-center gap-1"><LogOut size={11} /> Cerrar sesión</button>
           </div>
-          <RoutinesView profile={profile} forced onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleArchiveRoutine} onRestore={handleRestoreRoutine} />
+          <RoutinesView profile={profile} forced onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleArchiveRoutine} onRestore={handleRestoreRoutine} onUpdateProfile={handleUpdateProfile} />
         </div>
       </div>
       {importRoutine && <SharedRoutineImportModal routine={importRoutine} onImport={handleImportSharedRoutine} onDiscard={() => setImportRoutine(null)} />}
@@ -8472,7 +8734,7 @@ export default function App() {
       {importRoutineError && <ImportRoutineErrorBanner onClose={() => setImportRoutineError(false)} />}
       <SideNav tab={tab} setTab={setTab} profileName={activeProfile} />
       <div className="flex-1 min-w-0" style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
-        <header className="sticky z-10 bg-[#0a0a0f]/90 backdrop-blur-xl border-b border-slate-800/40" style={{ top: 0 }}>
+        <header className="sticky z-10 bg-[#0a0a0f]/90 backdrop-blur-xl border-b border-slate-800/40" style={{ top: "env(safe-area-inset-top, 0px)" }}>
           <div className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto px-4 py-4 flex items-center gap-3">
             {tab === "perfil" ? (
               <button onClick={() => setTab("rutina")} aria-label="Volver" className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800/80 transition shrink-0 lg:hidden"><ChevronDown size={18} className="rotate-90" /></button>
@@ -8488,7 +8750,7 @@ export default function App() {
         </header>
         <main className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto px-4 py-4 pb-28 lg:pb-10 space-y-4">
           <div key={tab} className="tab-fade-in">
-            {tab === "rutinas" && <RoutinesView profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleArchiveRoutine} onRestore={handleRestoreRoutine} />}
+            {tab === "rutinas" && <RoutinesView profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleArchiveRoutine} onRestore={handleRestoreRoutine} onUpdateProfile={handleUpdateProfile} />}
             {tab === "rutina" && <OnboardingTasksCard profile={profile} cycleStart={cycleStart} logs={logs} onGoToProfile={() => setTab("perfil")} onDone={() => handleUpdateProfile({ onboardingDone: true })} />}
             {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} />}
             {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} sex={profile?.sex} age={profile?.age} onGoToDeload={() => setTab("descarga")} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} />}
