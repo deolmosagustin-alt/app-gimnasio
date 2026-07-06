@@ -2357,6 +2357,7 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default" }
         // LocalNotifications en Android: aparece como notificación real del sistema,
         // incluso con la pantalla apagada o la app en segundo plano.
         await LocalNotifications.cancel({ notifications: [{ id: 9002 }] }).catch(() => {});
+        await window.Capacitor?.Plugins?.RestTimerNotification?.stop().catch(() => {});
         await LocalNotifications.schedule({
           notifications: [{
             id: 9001,
@@ -2398,22 +2399,30 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default" }
             const { display } = await LocalNotifications.requestPermissions();
             if (display === "granted") {
               await LocalNotifications.createChannel({ id: "ponos-rest-timer", name: "Descanso entre series", importance: 5, vibration: true });
-              // Notificación persistente estilo reproductor: queda fija en
-              // la barra mientras corre el descanso, con la hora de fin.
-              const endsAt = new Date(endTimeRef.current);
-              const hh = String(endsAt.getHours()).padStart(2, "0");
-              const mm = String(endsAt.getMinutes()).padStart(2, "0");
-              await LocalNotifications.schedule({
-                notifications: [{
-                  id: 9002,
-                  title: "⏱️ Descanso en curso — Modus Fit",
-                  body: `La próxima serie arranca a las ${hh}:${mm}`,
-                  channelId: "ponos-rest-timer",
-                  ongoing: true,
-                  autoCancel: false,
-                  smallIcon: "ic_stat_modusfit",
-                }],
-              });
+              // Cronómetro EN VIVO en la notificación (cuenta regresiva que
+              // se actualiza sola, como Spotify con una canción): usa el
+              // plugin nativo RestTimerNotification. Si el plugin no está
+              // (build viejo), cae a la notificación estática con la hora.
+              const RestTimerNotification = window.Capacitor?.Plugins?.RestTimerNotification;
+              if (RestTimerNotification) {
+                const secsLeft = Math.max(1, Math.ceil((endTimeRef.current - Date.now()) / 1000));
+                await RestTimerNotification.start({ seconds: secsLeft });
+              } else {
+                const endsAt = new Date(endTimeRef.current);
+                const hh = String(endsAt.getHours()).padStart(2, "0");
+                const mm = String(endsAt.getMinutes()).padStart(2, "0");
+                await LocalNotifications.schedule({
+                  notifications: [{
+                    id: 9002,
+                    title: "⏱️ Descanso en curso — Modus Fit",
+                    body: `La próxima serie arranca a las ${hh}:${mm}`,
+                    channelId: "ponos-rest-timer",
+                    ongoing: true,
+                    autoCancel: false,
+                    smallIcon: "ic_stat_modusfit",
+                  }],
+                });
+              }
             }
           } else if (typeof Notification !== "undefined" && Notification.permission === "default") {
             Notification.requestPermission().catch(() => {});
@@ -2428,7 +2437,12 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default" }
     endTimeRef.current = null;
     delete ACTIVE_REST_TIMERS[timerId];
     // Cancelar la notificación persistente si el timer se pausa/resetea
-    try { if (Capacitor.isNativePlatform()) LocalNotifications.cancel({ notifications: [{ id: 9002 }] }).catch(() => {}); } catch { }
+    try {
+      if (Capacitor.isNativePlatform()) {
+        LocalNotifications.cancel({ notifications: [{ id: 9002 }] }).catch(() => {});
+        window.Capacitor?.Plugins?.RestTimerNotification?.stop().catch(() => {});
+      }
+    } catch { }
     // eslint-disable-next-line
   }, [running]);
 
@@ -4890,23 +4904,17 @@ function getBest1RMForMuscleGroup(groupKey, logs) {
   const { primary, always, secondary } = EXERCISE_LIBRARY_CONTRIBUTORS_BY_GROUP[groupKey] || { primary: new Map(), always: new Map(), secondary: new Map() };
   const primaryResult = scanContributorsFor1RM(primary, logs);
   const alwaysResult = scanContributorsFor1RM(always, logs);
-  let best = primaryResult.best1RM >= alwaysResult.best1RM ? primaryResult : alwaysResult;
-  if (best === alwaysResult && alwaysResult.best1RM > 0) {
-    // Ganó un "siempre cuenta" (ej. press banca para tríceps) — nunca se
-    // muestra ese ejercicio como la fuente. Si hay marca propia en un
-    // ejercicio dedicado (aunque sea menor), se muestra ESA marca real
-    // (su propio kg×reps, no mezclado con el del que ganó el número). Si
-    // no hay ninguna marca dedicada todavía, no se nombra ningún
-    // ejercicio en particular.
-    best = primaryResult.bestExerciseId
-      ? { ...alwaysResult, bestKg: primaryResult.bestKg, bestReps: primaryResult.bestReps, bestExerciseId: primaryResult.bestExerciseId }
-      : { ...alwaysResult, bestKg: null, bestReps: null, bestExerciseId: null };
-  }
-  if (best.best1RM <= 0) best = scanContributorsFor1RM(secondary, logs);
+  // La marca mostrada es SIEMPRE la del ejercicio que ganó el cálculo del
+  // 1RM — antes, cuando ganaba un "siempre cuenta", se mostraba el kg×reps
+  // de otro ejercicio (el dedicado) junto al número del ganador: veías
+  // "95kg×8" aunque el rango salía de tus 110kg×5, y parecía que la app
+  // tomaba mal tu mejor marca.
+  const best = primaryResult.best1RM >= alwaysResult.best1RM ? primaryResult : alwaysResult;
+  const finalBest = best.best1RM > 0 ? best : scanContributorsFor1RM(secondary, logs);
 
   return {
-    best1RM: best.best1RM, bestKg: best.bestKg, bestReps: best.bestReps, bestLoadFactor: best.bestLoadFactor, bestWeight: best.bestWeight,
-    bestExerciseName: best.bestExerciseId ? (EXERCISE_LIBRARY_BY_ID[best.bestExerciseId]?.name || best.bestExerciseId) : null,
+    best1RM: finalBest.best1RM, bestKg: finalBest.bestKg, bestReps: finalBest.bestReps, bestLoadFactor: finalBest.bestLoadFactor, bestWeight: finalBest.bestWeight,
+    bestExerciseName: finalBest.bestExerciseId ? (EXERCISE_LIBRARY_BY_ID[finalBest.bestExerciseId]?.name || finalBest.bestExerciseId) : null,
   };
 }
 
@@ -4926,6 +4934,8 @@ function RankBadgeIcon({ tier, sub, color, size = 32 }) {
   const tierFile = (tier || "bronce").toLowerCase();
   const scale = TIER_SCALE[tierFile] ?? 1;
   const s = Math.round(size * scale);
+  // Diamante viene un poco más alto que el resto — se lo achata apenas
+  const squashY = tierFile === "diamante" ? 0.9 : 1;
   const imgFilter = tierFile === "plata"
     ? "saturate(0.7) brightness(0.82)"
     : "saturate(0.7) brightness(0.92)";
@@ -4942,7 +4952,7 @@ function RankBadgeIcon({ tier, sub, color, size = 32 }) {
           alt={`${tier || ""}${sub ? ` ${sub}` : ""}`.trim()}
           onError={() => setImgError(true)}
           draggable={false}
-          style={{ width: "auto", height: "auto", maxWidth: "100%", maxHeight: "100%", display: "block", filter: imgFilter }}
+          style={{ width: "auto", height: "auto", maxWidth: "100%", maxHeight: `${squashY * 100}%`, display: "block", filter: imgFilter, transform: squashY !== 1 ? `scaleY(${squashY})` : undefined }}
         />
       ) : (
         <div style={{ width: s, height: s, borderRadius: "50%", backgroundColor: color, filter: "saturate(0.7)" }} />
@@ -5632,26 +5642,36 @@ function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_
         </button>
       )}
 
-      {/* Estadísticas — fila compacta y neutra, sin un color por cada una */}
-      <div className="grid grid-cols-4 gap-2">
-        {[
-          { val: stats.daysTrained, label: "Días" },
-          { val: stats.streak > 0 ? `${stats.streak}🔥` : "0", label: "Racha" },
-          { val: stats.totalSets, label: "Series" },
-          { val: stats.totalVol > 999 ? `${(stats.totalVol / 1000).toFixed(1)}k` : stats.totalVol, label: "Kg×reps" },
-        ].map(({ val, label }) => (
-          <div key={label} className="rounded-xl p-2.5 text-center bg-slate-900/50 border border-slate-800/50 shadow-md shadow-black/20">
-            <p className="text-sm font-black text-white leading-none tabular-nums">{val}</p>
-            <p className="text-[9px] font-semibold text-slate-500 mt-1">{label}</p>
-          </div>
-        ))}
+      {/* Hero de progreso: las estadísticas integradas en una tarjeta con
+          gradiente y glows — el resumen de tu recorrido como protagonista */}
+      <div className="relative overflow-hidden rounded-2xl border border-blue-500/20 p-4" style={{ background: "linear-gradient(150deg,#0d1526 0%,#0f172a 55%,#0a0f1e 100%)" }}>
+        <div className="absolute -top-12 -right-8 w-40 h-40 rounded-full bg-blue-500/12 blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-10 -left-10 w-32 h-32 rounded-full bg-teal-500/8 blur-3xl pointer-events-none" />
+        <div className="relative flex items-center gap-2.5 mb-3.5">
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500/25 to-teal-500/10 border border-blue-500/25 flex items-center justify-center"><TrendingUp size={14} className="text-blue-400" /></div>
+          <p className="text-[10px] font-black uppercase tracking-widest text-blue-400">Tu recorrido</p>
+        </div>
+        <div className="relative grid grid-cols-4 gap-1">
+          {[
+            { val: stats.daysTrained, label: "días", sub: "entrenados" },
+            { val: stats.streak, label: "racha", sub: stats.streak === 1 ? "día seguido" : "días seguidos", fire: stats.streak > 0 },
+            { val: stats.totalSets, label: "series", sub: "registradas" },
+            { val: stats.totalVol > 999 ? `${(stats.totalVol / 1000).toFixed(1)}k` : stats.totalVol, label: "volumen", sub: "kg × reps" },
+          ].map(({ val, label, sub, fire }) => (
+            <div key={label} className="text-center">
+              <p className="text-xl font-black text-white leading-none tabular-nums">{val}{fire && <span className="text-sm">🔥</span>}</p>
+              <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-wide">{label}</p>
+              <p className="text-[8px] text-slate-600">{sub}</p>
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* Selector de sección — grilla fija de 4, siempre entra sin deslizar */}
-      <div className="grid grid-cols-4 gap-1.5">
+      {/* Selector de sección — segmentado tipo pill con ícono, más liviano */}
+      <div className="grid grid-cols-4 gap-1 p-1 rounded-2xl bg-slate-900/60 border border-slate-800/50">
         {PROGRESS_SECTIONS.map((s) => (
-          <button key={s.k} onClick={() => setActiveSection(s.k)} className="flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl text-[10px] font-bold transition-all active:scale-95 border"
-            style={activeSection === s.k ? { background: s.color, borderColor: s.color, color: "#fff" } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
+          <button key={s.k} onClick={() => setActiveSection(s.k)} className="flex flex-col items-center justify-center gap-1 py-2 rounded-xl text-[10px] font-bold transition-all active:scale-95"
+            style={activeSection === s.k ? { background: s.color + "22", color: s.color, boxShadow: `inset 0 0 0 1px ${s.color}45` } : { color: "#64748b" }}>
             {s.icon}<span>{s.l}</span>
           </button>
         ))}
