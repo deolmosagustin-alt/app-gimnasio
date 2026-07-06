@@ -2357,21 +2357,30 @@ function RestTimer({ seconds, accent, alertType = "sound" }) {
     // eslint-disable-next-line
   }, [running]);
 
-  const pct = Math.max(0, Math.min(100, (remaining / seconds) * 100)), r = 16, circ = 2 * Math.PI * r;
+  const pct = Math.max(0, Math.min(100, (remaining / seconds) * 100));
   return (
-    <div className="flex items-center gap-3 rounded-2xl px-4 py-3 border" style={{ backgroundColor: accent + "12", borderColor: accent + "30" }}>
-      <div className="relative w-12 h-12 shrink-0">
-        <svg viewBox="0 0 36 36" className="w-12 h-12 -rotate-90">
-          <circle cx="18" cy="18" r={r} fill="none" stroke={accent + "25"} strokeWidth="3" />
-          <circle cx="18" cy="18" r={r} fill="none" stroke={accent} strokeWidth="3" strokeDasharray={circ} strokeDashoffset={circ * (1 - pct / 100)} strokeLinecap="round" style={{ transition: "stroke-dashoffset 0.3s linear" }} />
-        </svg>
-        <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-slate-200">{formatTime(remaining)}</span>
+    // Cronómetro de descanso rediseñado: tiempo grande protagonista,
+    // controles minimalistas a la derecha y barra de progreso fina abajo
+    // — misma info, la mitad del ruido visual.
+    <div className="relative rounded-2xl overflow-hidden bg-slate-900/50 border border-slate-800/60">
+      <div className="flex items-center justify-between px-4 py-2.5">
+        <div className="flex items-baseline gap-2">
+          <span className={`text-2xl font-black tabular-nums transition-colors ${running ? "" : "text-slate-300"}`} style={running ? { color: accent } : {}}>{formatTime(remaining)}</span>
+          <span className="text-[10px] text-slate-600 font-semibold">descanso · {formatTime(seconds)}</span>
+        </div>
+        <div className="flex gap-1.5">
+          <button onClick={() => { haptic(15); setRunning((r) => !r); }} aria-label={running ? "Pausar" : "Iniciar"} className="w-9 h-9 rounded-xl flex items-center justify-center active:scale-90 transition text-white" style={{ backgroundColor: running ? accent : accent + "30", color: running ? "#fff" : accent }}>
+            {running ? <Pause size={15} /> : <Play size={15} className="ml-0.5" />}
+          </button>
+          <button onClick={() => { setRunning(false); setRemaining(seconds); endTimeRef.current = null; firedRef.current = false; }} aria-label="Reiniciar" className="w-9 h-9 rounded-xl flex items-center justify-center active:scale-90 transition text-slate-500 hover:text-slate-300 bg-slate-800/60">
+            <RotateCcw size={14} />
+          </button>
+        </div>
       </div>
-      <div className="flex gap-2">
-        <button onClick={() => { haptic(15); setRunning((r) => !r); }} className="p-2.5 rounded-xl active:scale-95 transition text-slate-200" style={{ backgroundColor: accent + "20" }}>{running ? <Pause size={16} /> : <Play size={16} />}</button>
-        <button onClick={() => { setRunning(false); setRemaining(seconds); endTimeRef.current = null; firedRef.current = false; }} className="p-2.5 rounded-xl active:scale-95 transition text-slate-200" style={{ backgroundColor: accent + "20" }}><RotateCcw size={16} /></button>
+      {/* Barra de progreso fina en la base */}
+      <div className="h-0.5 w-full bg-slate-800/60">
+        <div className="h-full transition-all duration-300" style={{ width: `${pct}%`, backgroundColor: accent }} />
       </div>
-      <span className="text-xs" style={{ color: accent + "99" }}>{formatTime(seconds)} descanso</span>
     </div>
   );
 }
@@ -3604,35 +3613,37 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
         }
         return (
           <div className="space-y-1.5">
-            <div className="flex items-end gap-2">
-              <div className="flex-1">
-                <label className="text-[10px] text-slate-600 font-semibold uppercase tracking-wider mb-1.5 block">Reps</label>
-                <input type="number" inputMode="decimal" placeholder="—" value={reps} onChange={(e) => updateDraft({ reps: e.target.value })} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3.5 text-xl font-black text-center text-white focus:outline-none focus:border-teal-500/50 transition" />
+            {/* Fila de registro unificada: una sola superficie limpia con
+                inputs "abiertos" (sin cajas anidadas), separador × sutil
+                y guardar integrado a la derecha. */}
+            <div className="flex items-stretch rounded-2xl bg-slate-900/60 border border-slate-800/60 overflow-hidden">
+              <div className="flex-1 flex flex-col items-center justify-center py-2.5">
+                <span className="text-[9px] text-slate-600 font-bold uppercase tracking-widest">Reps</span>
+                <input type="number" inputMode="decimal" placeholder="—" value={reps} onChange={(e) => updateDraft({ reps: e.target.value })} className="w-full bg-transparent text-2xl font-black text-center text-white focus:outline-none placeholder:text-slate-800" />
               </div>
-              <div className="text-slate-700 text-lg pb-3">×</div>
-              <div className="flex-1">
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-[10px] text-slate-600 font-semibold uppercase tracking-wider">{weightLabel(unit)}</label>
-                  <button onClick={() => setUnit((u) => u === "kg" ? "lbs" : "kg")} className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-slate-800 text-slate-500 hover:text-slate-300 transition border border-slate-700">
-                    {unit === "kg" ? "lbs" : "kg"}
-                  </button>
-                </div>
-                <input type="number" inputMode="decimal" placeholder="—" value={kg} onChange={(e) => updateDraft({ kg: e.target.value })} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3.5 text-xl font-black text-center text-white focus:outline-none focus:border-teal-500/50 transition" />
+              <div className="flex items-center text-slate-700 text-base font-light select-none">×</div>
+              <div className="flex-1 flex flex-col items-center justify-center py-2.5 relative">
+                <button onClick={() => setUnit((u) => u === "kg" ? "lbs" : "kg")} className="text-[9px] text-slate-600 font-bold uppercase tracking-widest hover:text-slate-400 transition">
+                  {weightLabel(unit)} <span className="text-slate-700">⇄</span>
+                </button>
+                <input type="number" inputMode="decimal" placeholder="—" value={kg} onChange={(e) => updateDraft({ kg: e.target.value })} className="w-full bg-transparent text-2xl font-black text-center text-white focus:outline-none placeholder:text-slate-800" />
               </div>
-              <button ref={saveBtnRef} onClick={handleSave} className={`p-3.5 rounded-xl transition-all active:scale-90 font-bold text-white flex items-center justify-center ${saved ? "bg-emerald-500" : "hover:opacity-90"}`} style={!saved ? { backgroundColor: accent } : {}}>{saved ? <Check size={18} /> : <Save size={18} />}</button>
+              <button ref={saveBtnRef} onClick={handleSave} aria-label="Guardar serie" className={`w-14 flex items-center justify-center transition-all active:scale-95 text-white ${saved ? "bg-emerald-500" : "hover:opacity-90"}`} style={!saved ? { backgroundColor: accent } : {}}>
+                {saved ? <Check size={19} /> : <Save size={18} />}
+              </button>
             </div>
-            {/* % del 1RM — debajo de la fila de inputs, no desplaza nada */}
+            {/* % del 1RM — línea sutil integrada */}
             {currentPR && (() => {
               const pr1RM = estimate1RM(currentPR.kg, currentPR.reps);
               const currentPct = (kg && !isNaN(parseFloat(kg)) && pr1RM > 0)
                 ? Math.round((estimate1RM(displayToKg(parseFloat(kg), unit), parseFloat(reps) || 1) / pr1RM) * 100)
                 : null;
               return (
-                <div className="flex items-center gap-2 px-1">
-                  <span className="text-[9px] text-slate-600 shrink-0">% 1RM</span>
+                <div className="flex items-center justify-center gap-2">
+                  <span className="text-[9px] text-slate-700">% 1RM</span>
                   <input
                     type="number" inputMode="numeric" placeholder="—"
-                    className="w-10 bg-transparent border-b border-slate-800 text-[10px] font-bold text-center text-slate-500 focus:outline-none focus:border-slate-600 transition"
+                    className="w-10 bg-transparent border-b border-slate-800/80 text-[10px] font-bold text-center text-slate-500 focus:outline-none focus:border-slate-600 transition"
                     onFocus={(e) => e.target.select()}
                     onChange={(e) => {
                       const pct = parseFloat(e.target.value);
@@ -3642,7 +3653,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
                       }
                     }}
                   />
-                  {currentPct && <span className="text-[9px] text-slate-600 tabular-nums">~{currentPct}% actual</span>}
+                  {currentPct && <span className="text-[9px] text-slate-700 tabular-nums">~{currentPct}%</span>}
                 </div>
               );
             })()}
@@ -7653,41 +7664,57 @@ function RoutineBuilder({ initialRoutine, onCancel, onSave }) {
    una desde un archivo. Es la misma pantalla que se muestra a la fuerza
    (forced=true) cuando un perfil nuevo todavía no eligió ninguna rutina.
 ============================================================================ */
-// Asistente de rutina personalizada — aparece como primera opción cuando
-// entrás por primera vez. Preguntas básicas estilo chat (sexo, edad, peso,
-// altura, días, tiempo, objetivo), autocompleta el perfil con las respuestas
-// y le pide a la IA una rutina a medida que podés revisar antes de aceptar.
+// Asistente de rutina personalizada — preguntas visuales paso a paso,
+// autocompleta el perfil y genera la rutina con IA con preview confirmable.
 function PersonalizedRoutineWizard({ profile, onUpdateProfile, onCreateRoutine, onActivate, onClose }) {
   const [step, setStep] = useState(0);
-  const [answers, setAnswers] = useState({ sex: profile?.sex || null, age: profile?.age || "", weight: "", height: profile?.heightCm || "", daysPerWeek: null, minutes: null, goal: null });
+  const [answers, setAnswers] = useState({
+    sex: profile?.sex || null, age: profile?.age || "", weight: "", height: profile?.heightCm || "",
+    experience: null, place: null, daysPerWeek: null, minutes: null, goals: [], focus: [],
+  });
   const [inputVal, setInputVal] = useState("");
+  const [multiSel, setMultiSel] = useState([]);
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState("");
   const [preview, setPreview] = useState(null);
 
   const STEPS = [
-    { key: "sex", q: "¿Sos hombre o mujer?", hint: "Ajusta los estándares de fuerza a tu contexto", chips: [{ v: "M", l: "Hombre" }, { v: "F", l: "Mujer" }] },
-    { key: "age", q: "¿Cuántos años tenés?", hint: "", input: { type: "number", placeholder: "Ej: 25", unit: "años" } },
-    { key: "weight", q: "¿Cuánto pesás?", hint: "Se usa para el ranking muscular relativo", input: { type: "number", placeholder: "Ej: 75", unit: "kg" } },
-    { key: "height", q: "¿Cuánto medís?", hint: "", input: { type: "number", placeholder: "Ej: 175", unit: "cm" } },
-    { key: "daysPerWeek", q: "¿Cuántos días a la semana querés entrenar?", hint: "Sé realista — mejor 3 días consistentes que 6 imposibles", chips: [{ v: 2, l: "2 días" }, { v: 3, l: "3 días" }, { v: 4, l: "4 días" }, { v: 5, l: "5 días" }, { v: 6, l: "6 días" }] },
-    { key: "minutes", q: "¿Cuánto tiempo tenés por sesión?", hint: "", chips: [{ v: 30, l: "30 min" }, { v: 45, l: "45 min" }, { v: 60, l: "1 hora" }, { v: 90, l: "1:30 o más" }] },
-    { key: "goal", q: "¿Cuál es tu objetivo principal?", hint: "", chips: [{ v: "hipertrofia", l: "Ganar músculo" }, { v: "fuerza", l: "Ganar fuerza" }, { v: "grasa", l: "Perder grasa" }, { v: "salud", l: "Salud general" }] },
+    { key: "sex", icon: <UserCog size={18} />, q: "¿Sos hombre o mujer?", hint: "Ajusta los estándares de fuerza a tu contexto",
+      chips: [{ v: "M", l: "💪 Hombre" }, { v: "F", l: "🏋️‍♀️ Mujer" }] },
+    { key: "age", icon: <Calendar size={18} />, q: "¿Cuántos años tenés?", hint: "",
+      input: { placeholder: "Ej: 25", unit: "años" } },
+    { key: "weight", icon: <Activity size={18} />, q: "¿Cuánto pesás?", hint: "Se usa para el ranking muscular y las cargas iniciales",
+      input: { placeholder: "Ej: 75", unit: "kg" } },
+    { key: "height", icon: <Ruler size={18} />, q: "¿Cuánto medís?", hint: "",
+      input: { placeholder: "Ej: 175", unit: "cm" } },
+    { key: "experience", icon: <Award size={18} />, q: "¿Cuál es tu nivel de experiencia?", hint: "Sé honesto — la rutina se ajusta a tu nivel real",
+      chips: [{ v: "principiante", l: "🌱 Principiante", d: "Menos de 1 año" }, { v: "intermedio", l: "⚡ Intermedio", d: "1 a 3 años" }, { v: "avanzado", l: "🔥 Avanzado", d: "Más de 3 años" }] },
+    { key: "place", icon: <Dumbbell size={18} />, q: "¿Dónde vas a entrenar?", hint: "",
+      chips: [{ v: "gym", l: "🏢 Gimnasio completo", d: "Máquinas, barras y mancuernas" }, { v: "casa_equipada", l: "🏠 Casa con equipo", d: "Mancuernas, bandas o barra" }, { v: "casa", l: "🤸 Solo peso corporal", d: "Sin equipamiento" }] },
+    { key: "daysPerWeek", icon: <Calendar size={18} />, q: "¿Cuántos días a la semana?", hint: "Mejor 3 días consistentes que 6 imposibles",
+      chips: [{ v: 2, l: "2" }, { v: 3, l: "3" }, { v: 4, l: "4" }, { v: 5, l: "5" }, { v: 6, l: "6" }], compact: true },
+    { key: "minutes", icon: <Clock size={18} />, q: "¿Cuánto tiempo por sesión?", hint: "",
+      chips: [{ v: 30, l: "30 min" }, { v: 45, l: "45 min" }, { v: 60, l: "1 hora" }, { v: 90, l: "1:30+" }], compact: true },
+    { key: "goals", icon: <Target size={18} />, q: "¿Cuáles son tus objetivos?", hint: "Podés elegir más de uno", multi: true,
+      chips: [{ v: "hipertrofia", l: "💪 Ganar músculo" }, { v: "fuerza", l: "🏋️ Ganar fuerza" }, { v: "potencia", l: "⚡ Potencia" }, { v: "grasa", l: "🔥 Perder grasa" }, { v: "resistencia", l: "🏃 Resistencia" }, { v: "salud", l: "❤️ Salud general" }] },
+    { key: "focus", icon: <Flame size={18} />, q: "¿Querés priorizar algún grupo muscular?", hint: "Opcional — podés elegir varios o saltear", multi: true, optional: true,
+      chips: [{ v: "pecho", l: "Pecho" }, { v: "espalda", l: "Espalda" }, { v: "hombros", l: "Hombros" }, { v: "brazos", l: "Brazos" }, { v: "piernas", l: "Piernas" }, { v: "gluteo", l: "Glúteos" }, { v: "core", l: "Core / Abs" }] },
   ];
   const current = STEPS[step];
   const isLastQuestion = step === STEPS.length - 1;
 
-  const answer = (val) => {
-    const next = { ...answers, [current.key]: val };
-    setAnswers(next);
-    setInputVal("");
-    if (isLastQuestion) { generateRoutine(next); } else { setStep((s) => s + 1); }
+  const advance = (next) => {
+    setAnswers(next); setInputVal(""); setMultiSel([]);
+    if (isLastQuestion) generateRoutine(next); else setStep((s) => s + 1);
   };
+  const answer = (val) => advance({ ...answers, [current.key]: val });
+  const answerMulti = () => advance({ ...answers, [current.key]: multiSel });
+  const toggleMulti = (v) => setMultiSel((prev) => prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]);
 
   const generateRoutine = async (a) => {
     setGenerating(true); setGenError("");
-    // Guardar los datos en el perfil de una — aunque la generación falle,
-    // las respuestas del usuario no se pierden.
+    // Guardar los datos del perfil de una — aunque la generación falle,
+    // las respuestas no se pierden.
     const profileUpdates = {};
     if (a.sex) profileUpdates.sex = a.sex;
     if (a.age) profileUpdates.age = parseInt(a.age, 10) || null;
@@ -7695,11 +7722,16 @@ function PersonalizedRoutineWizard({ profile, onUpdateProfile, onCreateRoutine, 
     if (a.weight) profileUpdates.settings = { ...(getProfileSettings(profile)), bodyWeightKg: parseFloat(a.weight) || 0, sex: a.sex || null };
     onUpdateProfile?.(profileUpdates);
 
-    const goalLabel = { hipertrofia: "hipertrofia (ganar músculo)", fuerza: "fuerza máxima", grasa: "pérdida de grasa manteniendo músculo", salud: "salud y acondicionamiento general" }[a.goal] || a.goal;
+    const goalLabels = { hipertrofia: "hipertrofia (ganar músculo)", fuerza: "fuerza máxima", potencia: "potencia explosiva", grasa: "pérdida de grasa", resistencia: "resistencia muscular", salud: "salud general" };
+    const goalsTxt = (a.goals || []).map((g) => goalLabels[g] || g).join(" + ") || "salud general";
+    const placeTxt = { gym: "gimnasio completo con máquinas, barras y mancuernas", casa_equipada: "casa con mancuernas y equipo básico", casa: "solo con peso corporal, sin equipamiento" }[a.place] || "gimnasio";
+    const focusTxt = (a.focus || []).length ? `Priorizar estos grupos musculares con más volumen: ${a.focus.join(", ")}.` : "";
     const prompt = [
-      `Creá una rutina de gimnasio personalizada para: ${a.sex === "F" ? "mujer" : "hombre"} de ${a.age} años, ${a.weight} kg, ${a.height} cm.`,
-      `Entrena ${a.daysPerWeek} días por semana, ${a.minutes} minutos por sesión. Objetivo: ${goalLabel}.`,
-      `La cantidad de ejercicios por día debe ajustarse al tiempo disponible (aprox 1 ejercicio cada 10-12 min).`,
+      `Creá una rutina de gimnasio personalizada para: ${a.sex === "F" ? "mujer" : "hombre"} de ${a.age} años, ${a.weight} kg, ${a.height} cm, nivel ${a.experience}.`,
+      `Entrena ${a.daysPerWeek} días por semana, ${a.minutes} minutos por sesión, en ${placeTxt}.`,
+      `Objetivos: ${goalsTxt}. ${focusTxt}`,
+      `Ajustá la cantidad de ejercicios al tiempo disponible (aprox 1 ejercicio cada 10-12 min).`,
+      `Si el objetivo incluye fuerza o potencia, incluí básicos pesados a bajas reps (3-6); si incluye hipertrofia, trabajo en 8-12; si incluye resistencia o grasa, series de 12-20 o circuitos.`,
       `Devolvé ÚNICAMENTE un array JSON válido, sin texto adicional ni markdown:`,
       `[{"label": "Día 1 - Empuje", "exercises": [{"name": "Press Banca", "setsCount": 3, "repRange": "8-10"}]}]`,
       `Usá nombres de ejercicios comunes en español. El array debe tener exactamente ${a.daysPerWeek} días.`,
@@ -7708,8 +7740,14 @@ function PersonalizedRoutineWizard({ profile, onUpdateProfile, onCreateRoutine, 
       const res = await fetch("/api/ia", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "chat", systemPrompt: "Sos un entrenador experto. Respondés ÚNICAMENTE con JSON válido, sin explicaciones ni bloques de código.", history: [{ role: "user", parts: [{ text: prompt }] }] }) });
       if (!res.ok) throw new Error("server");
       const data = await res.json();
-      const cleaned = (data?.text || "").replace(/```json|```/g, "").trim();
-      const days = JSON.parse(cleaned);
+      const raw = data?.text || "";
+      // Extracción ROBUSTA del JSON: Gemini a veces envuelve la respuesta
+      // con texto ("Aquí está tu rutina: [...]") aunque se le pida JSON
+      // puro — eso rompía JSON.parse y tiraba error siempre. Tomamos del
+      // primer "[" al último "]" y parseamos solo eso.
+      const first = raw.indexOf("["); const last = raw.lastIndexOf("]");
+      if (first === -1 || last === -1 || last <= first) throw new Error("no-json");
+      const days = JSON.parse(raw.slice(first, last + 1));
       if (!Array.isArray(days) || !days.length) throw new Error("empty");
       const parsedDays = days.map((d) => ({
         label: String(d.label || "Día").toUpperCase(),
@@ -7738,12 +7776,26 @@ function PersonalizedRoutineWizard({ profile, onUpdateProfile, onCreateRoutine, 
 
   return (
     <div className="space-y-4">
+      {/* Hero visual del asistente */}
+      <div className="relative overflow-hidden rounded-2xl border border-teal-500/25 p-4" style={{ background: "linear-gradient(135deg,#0d1f1e 0%,#0f172a 60%,#0d1526 100%)" }}>
+        <div className="absolute -top-10 -right-6 w-36 h-36 rounded-full bg-teal-500/15 blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-8 -left-8 w-28 h-28 rounded-full bg-blue-500/10 blur-2xl pointer-events-none" />
+        <div className="relative flex items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-teal-500/30 to-cyan-500/10 border border-teal-500/30 flex items-center justify-center shrink-0">
+            <Dumbbell size={20} className="text-teal-400" />
+          </div>
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-teal-400">Asistente IA</p>
+            <h2 className="text-base font-black text-white leading-tight">Tu rutina, a tu medida</h2>
+          </div>
+        </div>
+      </div>
+
       <div className="flex items-center justify-between">
-        <button onClick={onClose} className="flex items-center gap-1 text-slate-500 hover:text-white transition text-xs font-bold"><ChevronLeft size={14} /> Volver</button>
+        <button onClick={step > 0 && !preview && !generating ? () => setStep((s) => s - 1) : onClose} className="flex items-center gap-1 text-slate-500 hover:text-white transition text-xs font-bold"><ChevronLeft size={14} /> {step > 0 && !preview && !generating ? "Anterior" : "Volver"}</button>
         <span className="text-[10px] text-slate-600 font-bold">{preview ? "Revisá tu rutina" : generating ? "Generando..." : `${step + 1} / ${STEPS.length}`}</span>
       </div>
 
-      {/* Barra de progreso */}
       <div className="flex gap-1">
         {STEPS.map((_, i) => (
           <div key={i} className="h-1 flex-1 rounded-full transition-all duration-300" style={{ backgroundColor: i <= step || preview ? "#14B8A6" : "#1e293b" }} />
@@ -7753,24 +7805,38 @@ function PersonalizedRoutineWizard({ profile, onUpdateProfile, onCreateRoutine, 
       {!generating && !preview && !genError && (
         <div className="rounded-2xl border border-teal-500/20 p-5 bounce-in" style={{ background: "linear-gradient(160deg,#0d1f1e,#0f172a)" }} key={step}>
           <div className="flex items-start gap-3 mb-4">
-            <div className="w-9 h-9 rounded-xl bg-teal-500/15 border border-teal-500/25 flex items-center justify-center shrink-0"><Sparkles size={16} className="text-teal-400" /></div>
+            <div className="w-10 h-10 rounded-xl bg-teal-500/15 border border-teal-500/25 flex items-center justify-center shrink-0 text-teal-400">{current.icon}</div>
             <div>
               <p className="text-base font-black text-white leading-snug">{current.q}</p>
               {current.hint && <p className="text-[11px] text-slate-500 mt-1">{current.hint}</p>}
             </div>
           </div>
           {current.chips ? (
-            <div className="flex flex-wrap gap-2">
-              {current.chips.map((chip) => (
-                <button key={chip.v} onClick={() => answer(chip.v)} className="px-4 py-2.5 rounded-xl bg-slate-800/70 border border-slate-700 text-slate-200 text-sm font-bold hover:border-teal-500/50 hover:text-teal-300 transition active:scale-95">
-                  {chip.l}
-                </button>
-              ))}
+            <>
+            <div className={current.compact ? "flex gap-2" : "grid grid-cols-1 sm:grid-cols-2 gap-2"}>
+              {current.chips.map((chip) => {
+                const selected = current.multi && multiSel.includes(chip.v);
+                return (
+                  <button key={chip.v}
+                    onClick={() => current.multi ? toggleMulti(chip.v) : answer(chip.v)}
+                    className={`${current.compact ? "flex-1 py-3 text-center" : "px-4 py-3 text-left"} rounded-xl border text-sm font-bold transition active:scale-95 ${selected ? "border-teal-500/60 text-teal-300" : "bg-slate-800/70 border-slate-700 text-slate-200 hover:border-teal-500/40"}`}
+                    style={selected ? { background: "linear-gradient(135deg,#14B8A620,#0E749010)" } : {}}>
+                    <span className="block">{chip.l}</span>
+                    {chip.d && <span className={`block text-[10px] font-medium mt-0.5 ${selected ? "text-teal-400/70" : "text-slate-500"}`}>{chip.d}</span>}
+                  </button>
+                );
+              })}
             </div>
+            {current.multi && (
+              <button onClick={answerMulti} disabled={!current.optional && multiSel.length === 0} className="w-full mt-3 py-3 rounded-xl text-white text-sm font-black transition active:scale-95 disabled:opacity-30" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>
+                {multiSel.length === 0 && current.optional ? "Saltear" : "Continuar"} {multiSel.length > 0 && `(${multiSel.length})`}
+              </button>
+            )}
+            </>
           ) : (
             <div className="flex gap-2">
               <div className="flex-1 relative">
-                <input type={current.input.type} inputMode="numeric" value={inputVal} onChange={(e) => setInputVal(e.target.value)} placeholder={current.input.placeholder} autoFocus
+                <input type="number" inputMode="numeric" value={inputVal} onChange={(e) => setInputVal(e.target.value)} placeholder={current.input.placeholder} autoFocus
                   onKeyDown={(e) => { if (e.key === "Enter" && inputVal.trim()) answer(inputVal.trim()); }}
                   className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-teal-500/60" />
                 <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-slate-600 font-bold">{current.input.unit}</span>
@@ -7782,10 +7848,18 @@ function PersonalizedRoutineWizard({ profile, onUpdateProfile, onCreateRoutine, 
       )}
 
       {generating && (
-        <div className="rounded-2xl border border-teal-500/20 p-8 flex flex-col items-center gap-3 text-center" style={{ background: "linear-gradient(160deg,#0d1f1e,#0f172a)" }}>
-          <div className="w-8 h-8 rounded-full border-[3px] border-teal-500/25 border-t-teal-500 animate-spin" />
-          <p className="text-sm font-bold text-white">Armando tu rutina personalizada...</p>
-          <p className="text-[11px] text-slate-500">La IA está diseñando un plan a tu medida. Puede tardar unos segundos.</p>
+        <div className="rounded-2xl border border-teal-500/20 p-8 flex flex-col items-center gap-4 text-center" style={{ background: "linear-gradient(160deg,#0d1f1e,#0f172a)" }}>
+          <div className="relative w-16 h-16">
+            <div className="absolute inset-0 rounded-full border-[3px] border-teal-500/20 border-t-teal-500 animate-spin" />
+            <div className="absolute inset-0 flex items-center justify-center"><Dumbbell size={22} className="text-teal-400 soft-pulse" /></div>
+          </div>
+          <div>
+            <p className="text-sm font-black text-white">Armando tu rutina personalizada...</p>
+            <p className="text-[11px] text-slate-500 mt-1">La IA está diseñando un plan a tu medida.<br/>Puede tardar unos segundos.</p>
+          </div>
+          <div className="flex gap-1.5">
+            {[0, 1, 2].map((i) => <div key={i} className="w-1.5 h-1.5 rounded-full bg-teal-500 soft-pulse" style={{ animationDelay: `${i * 0.3}s` }} />)}
+          </div>
         </div>
       )}
 
@@ -7794,7 +7868,7 @@ function PersonalizedRoutineWizard({ profile, onUpdateProfile, onCreateRoutine, 
           <AlertTriangle size={22} className="text-amber-400 mx-auto" />
           <p className="text-sm text-slate-300">{genError}</p>
           <div className="flex gap-2 justify-center">
-            <button onClick={() => generateRoutine(answers)} className="px-4 py-2 rounded-xl text-white text-xs font-bold" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>Reintentar</button>
+            <button onClick={() => { setGenError(""); generateRoutine(answers); }} className="px-4 py-2 rounded-xl text-white text-xs font-bold" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>Reintentar</button>
             <button onClick={onClose} className="px-4 py-2 rounded-xl border border-slate-700 text-slate-400 text-xs font-bold">Ver rutinas prearmadas</button>
           </div>
         </div>
@@ -7804,21 +7878,22 @@ function PersonalizedRoutineWizard({ profile, onUpdateProfile, onCreateRoutine, 
         <div className="space-y-3 bounce-in">
           <div className="rounded-2xl border border-teal-500/25 p-4" style={{ background: "linear-gradient(160deg,#0d1f1e,#0f172a)" }}>
             <div className="flex items-center gap-2.5 mb-3">
-              <div className="w-9 h-9 rounded-xl bg-teal-500/15 flex items-center justify-center"><Check size={16} className="text-teal-400" /></div>
+              <div className="w-10 h-10 rounded-xl bg-teal-500/15 border border-teal-500/25 flex items-center justify-center"><Check size={17} className="text-teal-400" /></div>
               <div>
                 <p className="text-sm font-black text-white">{preview.name}</p>
-                <p className="text-[10px] text-slate-500">{preview.dayOrder.length} días · revisala y confirmá</p>
+                <p className="text-[10px] text-slate-500">{preview.dayOrder.length} días · hecha a tu medida · revisala y confirmá</p>
               </div>
             </div>
             <div className="space-y-2 max-h-[40vh] overflow-y-auto">
-              {preview.dayOrder.map((dk) => {
+              {preview.dayOrder.map((dk, di) => {
                 const d = preview.days[dk];
+                const color = d.color || ["#14B8A6", "#3B82F6", "#A855F7", "#F59E0B", "#EF4444", "#10B981"][di % 6];
                 return (
-                  <div key={dk} className="bg-slate-900/60 rounded-xl p-3">
-                    <p className="text-[11px] font-black text-teal-400 uppercase tracking-wider mb-1.5">{d.label}</p>
+                  <div key={dk} className="bg-slate-900/60 rounded-xl p-3 border-l-2" style={{ borderColor: color }}>
+                    <p className="text-[11px] font-black uppercase tracking-wider mb-1.5" style={{ color }}>{d.label}</p>
                     {(d.exercises || []).map((ex, i) => {
                       const lib = ex.libId ? EXERCISE_LIBRARY_BY_ID[ex.libId] : null;
-                      return <p key={i} className="text-xs text-slate-300 py-0.5">• {lib?.name || ex.name} — {ex.sets?.length || 0}×{ex.sets?.[0]?.repRange || ""}</p>;
+                      return <p key={i} className="text-xs text-slate-300 py-0.5">• {lib?.name || ex.name} <span className="text-slate-600">— {ex.sets?.length || 0}×{ex.sets?.[0]?.repRange || ""}</span></p>;
                     })}
                   </div>
                 );
@@ -7838,6 +7913,8 @@ function PersonalizedRoutineWizard({ profile, onUpdateProfile, onCreateRoutine, 
 function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRestore, onUpdateProfile }) {
   const [mode, setMode] = useState("catalog");
   const [showWizard, setShowWizard] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [showPresetsForced, setShowPresetsForced] = useState(false);
   const [editingRoutineId, setEditingRoutineId] = useState(null);
   const [showSchedule, setShowSchedule] = useState(false);
   const [shareTarget, setShareTarget] = useState(null);
@@ -7943,17 +8020,67 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
       )}
 
       {forced && (
-        <button onClick={() => setShowWizard(true)} className="relative overflow-hidden w-full rounded-2xl border border-teal-500/30 p-4 text-left transition active:scale-[0.99] hover:border-teal-500/50" style={{ background: "linear-gradient(135deg,#0d1f1e,#0f172a)" }}>
-          <div className="absolute -top-8 -right-8 w-28 h-28 rounded-full bg-teal-500/15 blur-2xl pointer-events-none" />
-          <div className="relative flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-teal-500/20 border border-teal-500/30 flex items-center justify-center shrink-0"><Sparkles size={19} className="text-teal-400" /></div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-black text-white">Crear mi rutina personalizada</p>
-              <p className="text-[11px] text-teal-300/60 mt-0.5">Respondé unas preguntas y la IA arma un plan a tu medida</p>
-            </div>
-            <ChevronRight size={16} className="text-teal-500 shrink-0" />
+        <div className="space-y-2.5">
+          {/* Opción 1: Crear rutina (expande IA / Manual) */}
+          <div className={`rounded-2xl border overflow-hidden transition-all ${createOpen ? "border-teal-500/40" : "border-teal-500/25"}`} style={{ background: "linear-gradient(135deg,#0d1f1e,#0f172a)" }}>
+            <button onClick={() => { setCreateOpen((o) => !o); setShowPresetsForced(false); }} className="relative overflow-hidden w-full p-4 text-left transition active:scale-[0.99]">
+              <div className="absolute -top-8 -right-8 w-28 h-28 rounded-full bg-teal-500/15 blur-2xl pointer-events-none" />
+              <div className="relative flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-teal-500/20 border border-teal-500/30 flex items-center justify-center shrink-0"><Plus size={19} className="text-teal-400" /></div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-black text-white">Crear mi rutina</p>
+                  <p className="text-[11px] text-teal-300/60 mt-0.5">Con ayuda de la IA o armándola vos</p>
+                </div>
+                <ChevronDown size={16} className={`text-teal-500 shrink-0 transition-transform ${createOpen ? "rotate-180" : ""}`} />
+              </div>
+            </button>
+            {createOpen && (
+              <div className="px-3 pb-3 space-y-2 tab-fade-in">
+                <button onClick={() => setShowWizard(true)} className="w-full flex items-center gap-3 rounded-xl border border-teal-500/25 bg-teal-500/5 p-3.5 text-left transition active:scale-[0.98] hover:border-teal-500/50">
+                  <div className="w-9 h-9 rounded-xl bg-teal-500/15 flex items-center justify-center shrink-0"><Sparkles size={16} className="text-teal-400" /></div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-black text-white">Personalizada con IA</p>
+                    <p className="text-[10px] text-slate-500 mt-0.5">Respondé unas preguntas y la IA arma tu plan</p>
+                  </div>
+                  <ChevronRight size={14} className="text-teal-500 shrink-0" />
+                </button>
+                <button onClick={() => { setEditingRoutineId(null); setMode("builder"); }} className="w-full flex items-center gap-3 rounded-xl border border-slate-700/60 bg-slate-800/40 p-3.5 text-left transition active:scale-[0.98] hover:border-slate-500">
+                  <div className="w-9 h-9 rounded-xl bg-purple-500/15 flex items-center justify-center shrink-0"><Edit3 size={15} className="text-purple-400" /></div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-black text-white">Manualmente</p>
+                    <p className="text-[10px] text-slate-500 mt-0.5">Elegí vos cada día, ejercicio y serie</p>
+                  </div>
+                  <ChevronRight size={14} className="text-slate-600 shrink-0" />
+                </button>
+              </div>
+            )}
           </div>
-        </button>
+
+          {/* Opción 2: Preestablecidas */}
+          <button onClick={() => { setShowPresetsForced((s) => !s); setCreateOpen(false); }} className={`relative overflow-hidden w-full rounded-2xl border p-4 text-left transition active:scale-[0.99] ${showPresetsForced ? "border-purple-500/40" : "border-purple-500/25"}`} style={{ background: "var(--grad-hero-purple, linear-gradient(135deg,#1a1025,#0f172a))" }}>
+            <div className="absolute -top-8 -right-8 w-28 h-28 rounded-full bg-purple-500/15 blur-2xl pointer-events-none" />
+            <div className="relative flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center shrink-0"><Layers size={18} className="text-purple-400" /></div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-black text-white">Elegir una preestablecida</p>
+                <p className="text-[11px] text-purple-300/60 mt-0.5">Push/Pull/Legs, Arnold, Upper/Lower y más</p>
+              </div>
+              <ChevronDown size={16} className={`text-purple-500 shrink-0 transition-transform ${showPresetsForced ? "rotate-180" : ""}`} />
+            </div>
+          </button>
+
+          {/* Opción 3: Importar */}
+          <button onClick={() => setShowImport(true)} className="relative overflow-hidden w-full rounded-2xl border border-slate-700/60 p-4 text-left transition active:scale-[0.99] hover:border-slate-500 bg-slate-900/40">
+            <div className="relative flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center shrink-0"><Download size={17} className="text-slate-400" /></div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-black text-white">Importar una rutina</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">Desde PDF, Excel, Word o texto</p>
+              </div>
+              <ChevronRight size={16} className="text-slate-600 shrink-0" />
+            </div>
+          </button>
+        </div>
       )}
 
       {!forced && (
@@ -8031,7 +8158,8 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
         </div>
       )}
 
-      <div>
+      {(!forced || showPresetsForced) && (
+      <div className={forced ? "tab-fade-in" : ""}>
         <div className="flex items-center gap-1.5 mb-2"><Sparkles size={13} className="text-slate-500" /><p className="text-xs font-black uppercase tracking-widest text-slate-500">Rutinas preestablecidas</p></div>
         <div className="space-y-2">
           {PRESET_ROUTINES.map((preset) => (
@@ -8039,11 +8167,14 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
           ))}
         </div>
       </div>
+      )}
 
+      {!forced && (
       <div className="flex gap-2">
         <button onClick={() => { setEditingRoutineId(null); setMode("builder"); }} className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98] shadow-lg shadow-purple-500/20" style={{ background: "linear-gradient(135deg,#A855F7,#7E22CE)" }}><Sparkles size={15} /> Crear mi rutina</button>
         <button onClick={() => setShowImport(true)} className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition text-sm font-bold active:scale-[0.98]"><Download size={15} /> Importar rutina</button>
       </div>
+      )}
 
       {shareTarget && (
         <ShareLinkModal
