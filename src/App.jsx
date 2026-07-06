@@ -749,8 +749,15 @@ function getWeekInfo(cycleStart, settings = DEFAULT_SETTINGS) {
    chronological list of "sessions" — one entry per date actually trained,
    with every set logged that day, total volume and average RPE. */
 
-function buildSessionsIndex(logs) {
+function buildSessionsIndex(logs, trainingSessions = []) {
   const byDate = {};
+  // Sesiones formales por fecha: aportan el dayKey REAL que entrenaste
+  // (no los días de la rutina donde "aparece" cada ejercicio), la
+  // duración y la base para el % completado.
+  const formalByDate = {};
+  (trainingSessions || []).forEach((ts) => {
+    if (ts?.date) formalByDate[ts.date] = ts;
+  });
   Object.entries(logs).forEach(([key, entries]) => {
     if (key.endsWith("_pr_override") || !Array.isArray(entries)) return;
     const { exerciseId, setIndex } = parseLogKey(key);
@@ -775,7 +782,30 @@ function buildSessionsIndex(logs) {
     });
   });
   return Object.values(byDate)
-    .map((s) => ({ ...s, dayKeys: Array.from(s.dayKeys), totalSets: s.items.length, avgRpe: s.rpeCount ? Math.round((s.rpeSum / s.rpeCount) * 10) / 10 : null }))
+    .map((s) => {
+      const formal = formalByDate[s.date];
+      let dayKeys = Array.from(s.dayKeys);
+      let durationMin = null;
+      let completionPct = null;
+      if (formal?.dayKey) {
+        // La sesión formal manda: mostrás SOLO el día que realmente
+        // entrenaste, no todos los días donde aparecen esos ejercicios.
+        dayKeys = [formal.dayKey];
+        if (formal.startedAt && formal.endedAt) {
+          durationMin = Math.max(1, Math.round((new Date(formal.endedAt) - new Date(formal.startedAt)) / 60000));
+        }
+        // % completado: ejercicios del día programado con al menos una
+        // serie registrada esa fecha, sobre el total de ejercicios del día.
+        const dayDef = ROUTINE[formal.dayKey];
+        if (dayDef?.exercises?.length) {
+          const doneIds = new Set(s.items.map((it) => it.exerciseId));
+          const total = dayDef.exercises.length;
+          const done = dayDef.exercises.filter((e) => doneIds.has(e.id)).length;
+          completionPct = Math.round((done / total) * 100);
+        }
+      }
+      return { ...s, dayKeys, durationMin, completionPct, totalSets: s.items.length, avgRpe: s.rpeCount ? Math.round((s.rpeSum / s.rpeCount) * 10) / 10 : null };
+    })
     .sort((a, b) => (a.date < b.date ? 1 : -1));
 }
 
@@ -2276,17 +2306,37 @@ function LoginScreen({ onLogin, allowAutoLogin = true }) {
 // del alcance de una single-page app sin backend) — es la mejor
 // aproximación posible: se corrige apenas volvés a la app, y manda una
 // notificación del sistema si el navegador la soporta y la permitiste.
-function RestTimer({ seconds, accent, alertType = "sound" }) {
-  const [remaining, setRemaining] = useState(seconds);
-  const [running, setRunning] = useState(false);
-  const endTimeRef = useRef(null);
+// Registro global de descansos en curso — sobrevive al desmontaje del
+// componente (cambio de pestaña, scroll virtual, etc.). Cada timer se
+// identifica por timerId y guarda su hora real de finalización.
+const ACTIVE_REST_TIMERS = {};
+
+function RestTimer({ seconds, accent, alertType = "sound", timerId = "default" }) {
+  const persisted = ACTIVE_REST_TIMERS[timerId];
+  const stillRunning = persisted && persisted.endTime > Date.now();
+  const [remaining, setRemaining] = useState(stillRunning ? Math.ceil((persisted.endTime - Date.now()) / 1000) : seconds);
+  const [running, setRunning] = useState(!!stillRunning);
+  const endTimeRef = useRef(stillRunning ? persisted.endTime : null);
   const intervalRef = useRef();
   const firedRef = useRef(false);
-  useEffect(() => { setRemaining(seconds); setRunning(false); endTimeRef.current = null; firedRef.current = false; }, [seconds]);
+  useEffect(() => {
+    // Si hay un descanso en curso persistido para este timer, retomarlo;
+    // si no, resetear normalmente cuando cambian los segundos base.
+    const p = ACTIVE_REST_TIMERS[timerId];
+    if (p && p.endTime > Date.now()) {
+      endTimeRef.current = p.endTime;
+      setRemaining(Math.ceil((p.endTime - Date.now()) / 1000));
+      setRunning(true);
+    } else {
+      delete ACTIVE_REST_TIMERS[timerId];
+      setRemaining(seconds); setRunning(false); endTimeRef.current = null; firedRef.current = false;
+    }
+  }, [seconds, timerId]);
 
   const fireAlert = async () => {
     if (firedRef.current) return;
     firedRef.current = true;
+    delete ACTIVE_REST_TIMERS[timerId];
     if (alertType !== "vibration") {
       try {
         const a = new AudioContext();
@@ -2300,16 +2350,18 @@ function RestTimer({ seconds, accent, alertType = "sound" }) {
         setTimeout(() => { a.close().catch(() => { }); }, 700);
       } catch { }
     }
-    if (alertType !== "sound") haptic([250, 120, 250, 120, 250]);
+    if (alertType !== "sound") haptic([400, 150, 400, 150, 500, 150, 400]);
     // Notificación del sistema al terminar el descanso
     try {
       if (Capacitor.isNativePlatform()) {
         // LocalNotifications en Android: aparece como notificación real del sistema,
         // incluso con la pantalla apagada o la app en segundo plano.
+        await LocalNotifications.cancel({ notifications: [{ id: 9002 }] }).catch(() => {});
         await LocalNotifications.schedule({
           notifications: [{
             id: 9001,
-            title: "⏱️ Descanso terminado — Ponos",
+            smallIcon: "ic_stat_modusfit",
+            title: "⏱️ Descanso terminado — Modus Fit",
             body: "Es hora de la próxima serie 💪",
             channelId: "ponos-rest-timer",
             sound: alertType === "vibration" ? undefined : "default",
@@ -2317,7 +2369,7 @@ function RestTimer({ seconds, accent, alertType = "sound" }) {
           }],
         });
       } else if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-        new Notification("⏱️ Descanso terminado — Ponos", {
+        new Notification("⏱️ Descanso terminado — Modus Fit", {
           body: "Es hora de la próxima serie 💪",
           silent: alertType === "vibration",
           tag: "rest-timer",
@@ -2337,12 +2389,32 @@ function RestTimer({ seconds, accent, alertType = "sound" }) {
   useEffect(() => {
     if (running) {
       if (!endTimeRef.current) { endTimeRef.current = Date.now() + remaining * 1000; firedRef.current = false; }
-      // Pedir permiso de notificación al iniciar el timer si todavía no fue concedido
+      // Persistir en el registro global — si el componente se desmonta
+      // (cambio de pestaña), al volver retoma desde acá.
+      ACTIVE_REST_TIMERS[timerId] = { endTime: endTimeRef.current };
       (async () => {
         try {
           if (Capacitor.isNativePlatform()) {
             const { display } = await LocalNotifications.requestPermissions();
-            if (display === "granted") await LocalNotifications.createChannel({ id: "ponos-rest-timer", name: "Descanso entre series", importance: 5, vibration: true });
+            if (display === "granted") {
+              await LocalNotifications.createChannel({ id: "ponos-rest-timer", name: "Descanso entre series", importance: 5, vibration: true });
+              // Notificación persistente estilo reproductor: queda fija en
+              // la barra mientras corre el descanso, con la hora de fin.
+              const endsAt = new Date(endTimeRef.current);
+              const hh = String(endsAt.getHours()).padStart(2, "0");
+              const mm = String(endsAt.getMinutes()).padStart(2, "0");
+              await LocalNotifications.schedule({
+                notifications: [{
+                  id: 9002,
+                  title: "⏱️ Descanso en curso — Modus Fit",
+                  body: `La próxima serie arranca a las ${hh}:${mm}`,
+                  channelId: "ponos-rest-timer",
+                  ongoing: true,
+                  autoCancel: false,
+                  smallIcon: "ic_stat_modusfit",
+                }],
+              });
+            }
           } else if (typeof Notification !== "undefined" && Notification.permission === "default") {
             Notification.requestPermission().catch(() => {});
           }
@@ -2354,6 +2426,9 @@ function RestTimer({ seconds, accent, alertType = "sound" }) {
       return () => { clearInterval(intervalRef.current); document.removeEventListener("visibilitychange", onVisible); };
     }
     endTimeRef.current = null;
+    delete ACTIVE_REST_TIMERS[timerId];
+    // Cancelar la notificación persistente si el timer se pausa/resetea
+    try { if (Capacitor.isNativePlatform()) LocalNotifications.cancel({ notifications: [{ id: 9002 }] }).catch(() => {}); } catch { }
     // eslint-disable-next-line
   }, [running]);
 
@@ -3600,14 +3675,38 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
             </div>
           );
         }
-        if (todayEntry && hasActiveSession) {
+        // El bloque "guardado hoy" solo se muestra si el draft está vacío —
+        // sin el chequeo de !reps && !kg, el botón Editar seteaba el draft
+        // pero esta rama seguía ganando y los inputs nunca aparecían.
+        if (todayEntry && hasActiveSession && !reps && !kg) {
+          // Mensaje de coaching: compara lo hecho contra el rango objetivo
+          // de la serie y sugiere qué hacer la próxima.
+          const coaching = (() => {
+            const rr = String(setDef?.repRange || "");
+            const m = rr.match(/(\d+)\s*[-–a]\s*(\d+)/);
+            const single = rr.match(/^(\d+)$/);
+            const lo = m ? parseInt(m[1], 10) : single ? parseInt(single[1], 10) : null;
+            const hi = m ? parseInt(m[2], 10) : single ? parseInt(single[1], 10) : null;
+            const r = parseFloat(todayEntry.reps);
+            if (lo == null || isNaN(r)) return null;
+            if (r > hi) return { icon: "📈", text: `Superaste el rango (${rr}) — subile el peso la próxima`, color: "#34D399" };
+            if (r < lo) return { icon: "📉", text: `Quedaste corto del rango (${rr}) — probá con menos peso`, color: "#FBBF24" };
+            return { icon: "✓", text: `Dentro del rango objetivo (${rr}) — sostenelo o sumá una rep`, color: accent };
+          })();
           return (
-            <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ backgroundColor: accent + "15", border: `1px solid ${accent}30` }}>
-              <Check size={14} style={{ color: accent }} className="shrink-0" />
-              <span className="text-sm font-black" style={{ color: accent }}>{todayEntry.reps}×{kgToDisplay(todayEntry.kg, unit)}{weightLabel(unit)}</span>
-              {todayEntry.rpe && <span className="text-[10px] px-1.5 py-0.5 rounded-lg bg-slate-800 text-slate-400">RPE {todayEntry.rpe}</span>}
-              <span className="text-[10px] text-slate-500 ml-1">guardado hoy</span>
-              <button onClick={() => { updateDraft({ reps: String(todayEntry.reps), kg: String(kgToDisplay(todayEntry.kg, unit)) }); }} className="ml-auto text-[10px] font-bold px-2 py-1 rounded-lg transition" style={{ backgroundColor: accent + "20", color: accent }}>Editar</button>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ backgroundColor: accent + "15", border: `1px solid ${accent}30` }}>
+                <Check size={14} style={{ color: accent }} className="shrink-0" />
+                <span className="text-sm font-black" style={{ color: accent }}>{todayEntry.reps}×{kgToDisplay(todayEntry.kg, unit)}{weightLabel(unit)}</span>
+                {todayEntry.rpe && <span className="text-[10px] px-1.5 py-0.5 rounded-lg bg-slate-800 text-slate-400">RPE {todayEntry.rpe}</span>}
+                <span className="text-[10px] text-slate-500 ml-1">guardado hoy</span>
+                <button onClick={() => { updateDraft({ reps: String(todayEntry.reps), kg: String(kgToDisplay(todayEntry.kg, unit)) }); }} className="ml-auto text-[10px] font-bold px-2 py-1 rounded-lg transition" style={{ backgroundColor: accent + "20", color: accent }}>Editar</button>
+              </div>
+              {coaching && (
+                <p className="text-[10px] px-1 flex items-center gap-1.5" style={{ color: coaching.color }}>
+                  <span>{coaching.icon}</span>{coaching.text}
+                </p>
+              )}
             </div>
           );
         }
@@ -3739,7 +3838,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
         {!deloadMode && stagnant && <div className="mb-3 text-[11px] text-rose-400/90 bg-rose-500/5 border border-rose-500/15 rounded-xl px-3 py-2 flex items-start gap-1.5"><Info size={12} className="mt-0.5 shrink-0" /><span>Hace {STAGNATION_DAYS}+ días sin superar el récord. Considerá cambiar reps, descanso o variante.</span></div>}
         {!exercise.cardio && !hideTimer && (
           <div className="mb-1">
-            <RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={accent} alertType={settings.alertType} />
+            <RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={accent} alertType={settings.alertType} timerId={`ex_${exercise.id}`} />
           </div>
         )}
         {!exercise.cardio && !deloadMode && bestWorkingKg != null && (
@@ -4008,7 +4107,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             <div key={group.map((e) => e.id).join("-")} className="rounded-2xl border-2 border-dashed p-2.5 space-y-2.5" style={{ borderColor: day.color + "45" }}>
               <div className="flex items-center gap-1.5 px-1"><Link size={11} style={{ color: day.color }} /><span className="text-[10px] font-black uppercase tracking-wider" style={{ color: day.color }}>Superserie · {group.length} ejercicios</span></div>
               {group.map((ex) => <ExerciseCard key={ex.id} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadSets={isDeload ? getDeloadSets(ex) : null} deloadMode={isDeload} resetKey={resetKeys[activeDay]} settings={settings} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!activeSession} hideTimer />)}
-              <div className="px-1"><RestTimer seconds={hasHeavyGroup ? settings.restLong : settings.restShort} accent={day.color} alertType={settings.alertType} /></div>
+              <div className="px-1"><RestTimer seconds={hasHeavyGroup ? settings.restLong : settings.restShort} accent={day.color} alertType={settings.alertType} timerId={`grp_${group.map((g) => g.id).join("_")}`} /></div>
               <p className="text-[10px] text-slate-600 px-1">Descansá recién después de completar los {group.length} ejercicios — ese es el cronómetro de arriba.</p>
             </div>
           );
@@ -4038,7 +4137,11 @@ function SessionDetailCard({ session, onDelete }) {
       <div className="flex items-center justify-between mb-3 gap-2">
         <div className="min-w-0">
           <p className="text-sm font-bold text-white capitalize">{dateLabel}</p>
-          <div className="flex gap-1 mt-1 flex-wrap">{session.dayKeys.map((dk) => <span key={dk} className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-lg" style={{ backgroundColor: ROUTINE[dk].color + "20", color: muteHexColor(ROUTINE[dk].color) }}>{ROUTINE[dk].label}</span>)}</div>
+          <div className="flex gap-1 mt-1 flex-wrap items-center">
+            {session.dayKeys.map((dk) => ROUTINE[dk] && <span key={dk} className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-lg" style={{ backgroundColor: ROUTINE[dk].color + "20", color: muteHexColor(ROUTINE[dk].color) }}>{ROUTINE[dk].label}</span>)}
+            {session.durationMin != null && <span className="text-[10px] text-slate-500 flex items-center gap-0.5"><Clock size={9} /> {session.durationMin >= 60 ? `${Math.floor(session.durationMin / 60)}h ${session.durationMin % 60}m` : `${session.durationMin} min`}</span>}
+            {session.completionPct != null && <span className={`text-[10px] font-bold ${session.completionPct >= 100 ? "text-emerald-400" : session.completionPct >= 60 ? "text-teal-400" : "text-amber-400"}`}>{session.completionPct}% del día</span>}
+          </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <div className="text-right">
@@ -4083,7 +4186,7 @@ const SHARE_SUMMARY_PERIODS = [
   { k: "month", l: "Este mes" },
 ];
 
-function ShareSummaryCard({ logs }) {
+function ShareSummaryCard({ logs, trainingSessions = [] }) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState(null); // "pr" | "period"
   const [period, setPeriod] = useState("week");
@@ -4091,7 +4194,7 @@ function ShareSummaryCard({ logs }) {
   const [showImage, setShowImage] = useState(false);
 
   const allExercises = useMemo(() => DAY_ORDER.flatMap((dk) => ROUTINE[dk].exercises.map((e) => ({ id: e.id, name: e.name, muscle: e.muscle, color: ROUTINE[dk].color, sets: e.sets.length }))), []);
-  const allSessions = useMemo(() => buildSessionsIndex(logs), [logs]);
+  const allSessions = useMemo(() => buildSessionsIndex(logs, trainingSessions), [logs, trainingSessions]);
   const periodSessions = useMemo(() => getSessionsForPeriod(allSessions, period), [allSessions, period]);
   const periodStats = useMemo(() => {
     const daySet = new Set(); let totalVol = 0, totalSets = 0;
@@ -4207,8 +4310,8 @@ function ShareSummaryCard({ logs }) {
   );
 }
 
-function SessionHistoryView({ logs, onDeleteDay }) {
-  const sessions = useMemo(() => buildSessionsIndex(logs), [logs]);
+function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [] }) {
+  const sessions = useMemo(() => buildSessionsIndex(logs, trainingSessions), [logs, trainingSessions]);
   const sessionByDate = useMemo(() => { const m = {}; sessions.forEach((s) => { m[s.date] = s; }); return m; }, [sessions]);
   const [view, setView] = useState("calendar");
   const now = new Date();
@@ -4462,7 +4565,7 @@ function DeloadView({ logs, settings = DEFAULT_SETTINGS, deloadProgress = {}, se
               </div>
               {hasPR && (
                 <div className="px-4 pt-3">
-                  <RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={day.color} alertType={settings.alertType} />
+                  <RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={day.color} alertType={settings.alertType} timerId={`deload_${ex.id}`} />
                 </div>
               )}
               <div className="px-4 py-3 space-y-2.5">
@@ -5626,7 +5729,7 @@ function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_
           <MeasurementsView measurements={measurements} onAddMeasurement={onAddMeasurement} photos={photos} photosLoading={photosLoading} onAddPhoto={onAddPhoto} onDeletePhoto={onDeletePhoto} />
         )}
 
-        {activeSection === "historial" && <SessionHistoryView logs={logs} onDeleteDay={onDeleteDay} />}
+        {activeSection === "historial" && <SessionHistoryView logs={logs} onDeleteDay={onDeleteDay} trainingSessions={sessions} />}
       </div>
 
       {!confirmResetProgress ? (
@@ -5843,8 +5946,8 @@ const EXPORT_PERIODS = [
 // Tarjeta de Perfil: elegís el período y el formato, y se descarga
 // directo — pensado para mandarle a tu entrenador el resumen sin tener que
 // armarlo a mano.
-function ExportTrainingCard({ profileName, logs }) {
-  const allSessions = useMemo(() => buildSessionsIndex(logs), [logs]);
+function ExportTrainingCard({ profileName, logs, trainingSessions = [] }) {
+  const allSessions = useMemo(() => buildSessionsIndex(logs, trainingSessions), [logs, trainingSessions]);
   const [period, setPeriod] = useState("week");
   const [exporting, setExporting] = useState(null);
   const [error, setError] = useState("");
