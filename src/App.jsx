@@ -4033,7 +4033,12 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
   const today = todayStr();
   let totalSets = 0, doneToday = 0;
   day.exercises.forEach((ex) => ex.sets.forEach((s, i) => { totalSets++; const h = logs[`${ex.id}_${i}`] || []; if (h.some((x) => x.date === today)) doneToday++; }));
-  const pct = totalSets ? Math.round((doneToday / totalSets) * 100) : 0;
+  // Si hoy entrenaste (o estás entrenando) un día ESPECÍFICO, los demás
+  // días muestran 0% — antes, los ejercicios compartidos entre días (ej.
+  // press militar en Push y en Hombro/Brazo) hacían aparecer un % fantasma
+  // en días que no entrenaste, y el "resetear" del día activo no lo sacaba.
+  const rawPct = totalSets ? Math.round((doneToday / totalSets) * 100) : 0;
+  const pct = (todaySessionDayKey && todaySessionDayKey !== activeDay) ? 0 : rawPct;
 
   const handleResetDay = () => {
     const newLogs = { ...logs };
@@ -4326,6 +4331,14 @@ function ShareSummaryCard({ logs, trainingSessions = [] }) {
 
 function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [] }) {
   const sessions = useMemo(() => buildSessionsIndex(logs, trainingSessions), [logs, trainingSessions]);
+  // Días entrenados y racha — mudados acá desde el hero de Progreso,
+  // en formato compacto acoplado al calendario.
+  const miniStats = useMemo(() => {
+    const dateSet = new Set(sessions.map((s) => s.date));
+    let streak = 0; const cursor = new Date();
+    while (true) { const d = cursor.toISOString().slice(0, 10); if (dateSet.has(d)) { streak++; cursor.setDate(cursor.getDate() - 1); } else break; }
+    return { days: dateSet.size, streak };
+  }, [sessions]);
   const sessionByDate = useMemo(() => { const m = {}; sessions.forEach((s) => { m[s.date] = s; }); return m; }, [sessions]);
   const [view, setView] = useState("calendar");
   const now = new Date();
@@ -4360,6 +4373,19 @@ function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [] }) {
           {[{ k: "calendar", icon: <LayoutGrid size={13} />, l: "Calendario" }, { k: "list", icon: <List size={13} />, l: "Lista" }].map((opt) => (
             <button key={opt.k} onClick={() => setView(opt.k)} className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-[11px] font-bold transition-all ${view === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.icon}{opt.l}</button>
           ))}
+        </div>
+        {/* Días entrenados y racha — compactos, acoplados al historial */}
+        <div className="flex gap-1.5">
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900/60 border border-slate-800/60">
+            <Calendar size={11} className="text-blue-400" />
+            <span className="text-xs font-black text-white tabular-nums">{miniStats.days}</span>
+            <span className="text-[9px] text-slate-500 font-semibold">días</span>
+          </div>
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900/60 border border-slate-800/60">
+            <span className="text-[11px]">🔥</span>
+            <span className="text-xs font-black text-white tabular-nums">{miniStats.streak}</span>
+            <span className="text-[9px] text-slate-500 font-semibold">racha</span>
+          </div>
         </div>
       </div>
       <ShareSummaryCard logs={logs} />
@@ -4410,7 +4436,20 @@ function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [] }) {
               </div>
             )}
           </div>
-          {selectedSession ? <SessionDetailCard session={selectedSession} onDelete={handleDeleteDay} /> : <p className="text-center text-[11px] text-slate-600 py-2">Tocá un día con marca para ver el detalle.</p>}
+          {!selectedSession && <p className="text-center text-[11px] text-slate-600 py-2">Tocá un día con marca para ver el detalle.</p>}
+          {/* Detalle de la sesión como modal centrado — antes se desplegaba
+              abajo del calendario y quedaba escondido; ahora aparece al
+              frente, con fondo difuminado y cierre con toque afuera o X. */}
+          {selectedSession && (
+            <div className="fixed inset-0 z-[140] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in" onClick={() => setSelectedDate(null)}>
+              <div className="max-w-md w-full max-h-[85vh] overflow-y-auto rounded-3xl modal-pop-in" onClick={(e) => e.stopPropagation()}>
+                <div className="relative">
+                  <button onClick={() => setSelectedDate(null)} aria-label="Cerrar" className="absolute top-3 right-3 z-10 p-2 rounded-xl bg-slate-800/90 text-slate-400 hover:text-white transition active:scale-90"><X size={15} /></button>
+                  <SessionDetailCard session={selectedSession} onDelete={(date) => { handleDeleteDay(date); setSelectedDate(null); }} />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <div key="list" className="space-y-2.5 tab-fade-in">
@@ -5641,31 +5680,6 @@ function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_
           <ChevronRight size={16} className="text-amber-400 shrink-0" />
         </button>
       )}
-
-      {/* Hero de progreso: las estadísticas integradas en una tarjeta con
-          gradiente y glows — el resumen de tu recorrido como protagonista */}
-      <div className="relative overflow-hidden rounded-2xl border border-blue-500/20 p-4" style={{ background: "linear-gradient(150deg,#0d1526 0%,#0f172a 55%,#0a0f1e 100%)" }}>
-        <div className="absolute -top-12 -right-8 w-40 h-40 rounded-full bg-blue-500/12 blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-10 -left-10 w-32 h-32 rounded-full bg-teal-500/8 blur-3xl pointer-events-none" />
-        <div className="relative flex items-center gap-2.5 mb-3.5">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500/25 to-teal-500/10 border border-blue-500/25 flex items-center justify-center"><TrendingUp size={14} className="text-blue-400" /></div>
-          <p className="text-[10px] font-black uppercase tracking-widest text-blue-400">Tu recorrido</p>
-        </div>
-        <div className="relative grid grid-cols-4 gap-1">
-          {[
-            { val: stats.daysTrained, label: "días", sub: "entrenados" },
-            { val: stats.streak, label: "racha", sub: stats.streak === 1 ? "día seguido" : "días seguidos", fire: stats.streak > 0 },
-            { val: stats.totalSets, label: "series", sub: "registradas" },
-            { val: stats.totalVol > 999 ? `${(stats.totalVol / 1000).toFixed(1)}k` : stats.totalVol, label: "volumen", sub: "kg × reps" },
-          ].map(({ val, label, sub, fire }) => (
-            <div key={label} className="text-center">
-              <p className="text-xl font-black text-white leading-none tabular-nums">{val}{fire && <span className="text-sm">🔥</span>}</p>
-              <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-wide">{label}</p>
-              <p className="text-[8px] text-slate-600">{sub}</p>
-            </div>
-          ))}
-        </div>
-      </div>
 
       {/* Selector de sección — segmentado tipo pill con ícono, más liviano */}
       <div className="grid grid-cols-4 gap-1 p-1 rounded-2xl bg-slate-900/60 border border-slate-800/50">
@@ -9006,7 +9020,7 @@ export default function App() {
           <div key={tab} className="tab-fade-in">
             {tab === "rutinas" && <RoutinesView profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleArchiveRoutine} onRestore={handleRestoreRoutine} onUpdateProfile={handleUpdateProfile} />}
             {tab === "rutina" && <OnboardingTasksCard profile={profile} cycleStart={cycleStart} logs={logs} onGoToProfile={() => setTab("perfil")} onDone={() => handleUpdateProfile({ onboardingDone: true })} />}
-            {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} />}
+            {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} todaySessionDayKey={(profile?.trainingSessions || []).find((ts) => ts.date === todayStr())?.dayKey || profile?.activeSession?.dayKey || null} />}
             {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} sex={profile?.sex} age={profile?.age} onGoToDeload={() => setTab("descarga")} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} />}
             {tab === "descarga" && <DeloadView logs={logs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} />}
             {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} settings={getProfileSettings(profile)} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} />}
