@@ -2394,35 +2394,26 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default" }
       // (cambio de pestaña), al volver retoma desde acá.
       ACTIVE_REST_TIMERS[timerId] = { endTime: endTimeRef.current };
       (async () => {
+        // Cronómetro EN VIVO en la barra de notificaciones: va PRIMERO y en
+        // su propio try — antes estaba encadenado detrás del pedido de
+        // permisos de LocalNotifications, y si cualquier paso previo
+        // fallaba, el catch silencioso se tragaba todo y el plugin nativo
+        // nunca llegaba a ejecutarse.
+        try {
+          if (Capacitor.isNativePlatform()) {
+            const RestTimerNotification = window.Capacitor?.Plugins?.RestTimerNotification;
+            if (RestTimerNotification) {
+              const secsLeft = Math.max(1, Math.ceil((endTimeRef.current - Date.now()) / 1000));
+              await RestTimerNotification.start({ seconds: secsLeft });
+            }
+          }
+        } catch (err) { console.error("Cronómetro nativo:", err); }
+        // Permisos + canal para la notificación FINAL de "descanso terminado"
         try {
           if (Capacitor.isNativePlatform()) {
             const { display } = await LocalNotifications.requestPermissions();
             if (display === "granted") {
               await LocalNotifications.createChannel({ id: "ponos-rest-timer", name: "Descanso entre series", importance: 5, vibration: true });
-              // Cronómetro EN VIVO en la notificación (cuenta regresiva que
-              // se actualiza sola, como Spotify con una canción): usa el
-              // plugin nativo RestTimerNotification. Si el plugin no está
-              // (build viejo), cae a la notificación estática con la hora.
-              const RestTimerNotification = window.Capacitor?.Plugins?.RestTimerNotification;
-              if (RestTimerNotification) {
-                const secsLeft = Math.max(1, Math.ceil((endTimeRef.current - Date.now()) / 1000));
-                await RestTimerNotification.start({ seconds: secsLeft });
-              } else {
-                const endsAt = new Date(endTimeRef.current);
-                const hh = String(endsAt.getHours()).padStart(2, "0");
-                const mm = String(endsAt.getMinutes()).padStart(2, "0");
-                await LocalNotifications.schedule({
-                  notifications: [{
-                    id: 9002,
-                    title: "⏱️ Descanso en curso — Modus Fit",
-                    body: `La próxima serie arranca a las ${hh}:${mm}`,
-                    channelId: "ponos-rest-timer",
-                    ongoing: true,
-                    autoCancel: false,
-                    smallIcon: "ic_stat_modusfit",
-                  }],
-                });
-              }
             }
           } else if (typeof Notification !== "undefined" && Notification.permission === "default") {
             Notification.requestPermission().catch(() => {});
@@ -4149,45 +4140,96 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
    SESSION HISTORY — calendar + list views over buildSessionsIndex(logs)
 ============================================================================ */
 function SessionDetailCard({ session, onDelete }) {
-  const dateLabel = new Date(session.date + "T00:00:00").toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" });
   const [confirmDel, setConfirmDel] = useState(false);
+  const dateLabel = new Date(session.date + "T12:00:00").toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" });
+  const mainDay = ROUTINE[session.dayKeys[0]];
+  const accent = mainDay?.color || "#14B8A6";
+  // Agrupar las series por ejercicio — en vez de una lista plana de
+  // "ejercicio S1 / ejercicio S2", cada ejercicio es una tarjeta con sus
+  // series adentro como pills. Mucho más legible de un vistazo.
+  const grouped = useMemo(() => {
+    const map = new Map();
+    session.items.forEach((it) => {
+      if (!map.has(it.exerciseName)) map.set(it.exerciseName, []);
+      map.get(it.exerciseName).push(it);
+    });
+    return Array.from(map.entries());
+  }, [session.items]);
+  const improvements = session.improvedCount || 0;
+
   return (
-    <div className="bg-slate-900/60 border border-slate-800/50 rounded-2xl p-4 bounce-in">
-      <div className="flex items-center justify-between mb-3 gap-2">
-        <div className="min-w-0">
-          <p className="text-sm font-bold text-white capitalize">{dateLabel}</p>
-          <div className="flex gap-1 mt-1 flex-wrap items-center">
-            {session.dayKeys.map((dk) => ROUTINE[dk] && <span key={dk} className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-lg" style={{ backgroundColor: ROUTINE[dk].color + "20", color: muteHexColor(ROUTINE[dk].color) }}>{ROUTINE[dk].label}</span>)}
-            {session.durationMin != null && <span className="text-[10px] text-slate-500 flex items-center gap-0.5"><Clock size={9} /> {session.durationMin >= 60 ? `${Math.floor(session.durationMin / 60)}h ${session.durationMin % 60}m` : `${session.durationMin} min`}</span>}
-            {session.completionPct != null && <span className={`text-[10px] font-bold ${session.completionPct >= 100 ? "text-emerald-400" : session.completionPct >= 60 ? "text-teal-400" : "text-amber-400"}`}>{session.completionPct}% del día</span>}
+    <div className="rounded-3xl overflow-hidden bounce-in border" style={{ borderColor: accent + "35", background: "linear-gradient(170deg,#0f172a 0%,#0a0f1a 100%)" }}>
+      {/* Header con el color del día entrenado */}
+      <div className="relative px-4 pt-4 pb-3 overflow-hidden">
+        <div className="absolute -top-10 -right-8 w-36 h-36 rounded-full blur-3xl opacity-25 pointer-events-none" style={{ backgroundColor: accent }} />
+        <div className="relative">
+          <div className="flex gap-1.5 mb-2 flex-wrap">
+            {session.dayKeys.map((dk) => ROUTINE[dk] && (
+              <span key={dk} className="text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded-lg" style={{ backgroundColor: ROUTINE[dk].color + "25", color: ROUTINE[dk].color }}>{ROUTINE[dk].label}</span>
+            ))}
           </div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <div className="text-right">
-            <p className="text-sm font-black text-white">{session.totalSets} <span className="text-[10px] text-slate-500 font-normal">series</span></p>
-            {session.improvedCount > 0 && <p className="text-[10px] font-bold text-emerald-400 mt-0.5 flex items-center justify-end gap-1"><TrendingUp size={10} /> {session.improvedCount} mejora{session.improvedCount === 1 ? "" : "s"}</p>}
-            {session.avgRpe != null && <p className="text-[10px] font-bold mt-0.5" style={{ color: rpeColor(session.avgRpe) }}>RPE prom. {session.avgRpe}</p>}
-          </div>
-          {onDelete && !confirmDel && (
-            <button onClick={() => setConfirmDel(true)} aria-label="Borrar este día" className="p-1.5 rounded-lg text-slate-600 hover:text-rose-400 transition shrink-0"><Trash2 size={14} /></button>
-          )}
+          <p className="text-base font-black text-white capitalize leading-tight pr-10">{dateLabel}</p>
         </div>
       </div>
-      {confirmDel && (
-        <div className="flex gap-2 items-center mb-3 bg-rose-950/30 border border-rose-500/20 rounded-xl px-3 py-2 bounce-in">
-          <p className="text-[11px] text-rose-300/80 flex-1">¿Borrar el entrenamiento de este día? Los récords no cambian.</p>
-          <button onClick={() => setConfirmDel(false)} className="px-2 py-1 rounded-lg bg-slate-800 text-slate-400 text-[11px]">No</button>
-          <button onClick={() => onDelete(session.date)} className="px-2 py-1 rounded-lg bg-rose-500 !text-white text-[11px] font-bold">Sí, borrar</button>
+
+      {/* Tiles de stats de la sesión */}
+      <div className="grid grid-cols-3 gap-1.5 px-4 pb-3">
+        <div className="rounded-xl bg-black/25 border border-slate-800/50 py-2 text-center">
+          <p className="text-lg font-black text-white tabular-nums leading-none">{session.totalSets}</p>
+          <p className="text-[8px] font-bold text-slate-500 uppercase tracking-wider mt-1">series</p>
+        </div>
+        <div className="rounded-xl bg-black/25 border border-slate-800/50 py-2 text-center">
+          <p className="text-lg font-black tabular-nums leading-none" style={{ color: session.durationMin != null ? "#fff" : "#334155" }}>
+            {session.durationMin != null ? (session.durationMin >= 60 ? `${Math.floor(session.durationMin / 60)}h${String(session.durationMin % 60).padStart(2, "0")}` : `${session.durationMin}m`) : "—"}
+          </p>
+          <p className="text-[8px] font-bold text-slate-500 uppercase tracking-wider mt-1">duración</p>
+        </div>
+        <div className="rounded-xl bg-black/25 border border-slate-800/50 py-2 text-center">
+          <p className={`text-lg font-black tabular-nums leading-none ${session.completionPct == null ? "text-slate-700" : session.completionPct >= 100 ? "text-emerald-400" : session.completionPct >= 60 ? "text-teal-400" : "text-amber-400"}`}>
+            {session.completionPct != null ? `${session.completionPct}%` : "—"}
+          </p>
+          <p className="text-[8px] font-bold text-slate-500 uppercase tracking-wider mt-1">del día</p>
+        </div>
+      </div>
+
+      {improvements > 0 && (
+        <div className="mx-4 mb-3 flex items-center gap-2 rounded-xl px-3 py-2 bg-emerald-500/10 border border-emerald-500/20">
+          <TrendingUp size={13} className="text-emerald-400 shrink-0" />
+          <p className="text-[11px] font-bold text-emerald-300">{improvements} marca{improvements === 1 ? "" : "s"} personal{improvements === 1 ? "" : "es"} este día 🔥</p>
         </div>
       )}
-      <div className="space-y-1.5">
-        {session.items.map((it, i) => (
-          <div key={i} className="flex items-center justify-between text-xs">
-            <span className="text-slate-400 truncate flex-1">{it.exerciseName} <span className="text-slate-600">S{it.setIndex + 1}</span></span>
-            <span className="text-slate-200 font-semibold shrink-0 ml-2">{it.reps}×{it.kg}kg{it.isImprovement && <span className="ml-1 text-emerald-400" title="Mejora">🔥</span>}{it.rpe != null && <span className="ml-1.5 font-bold" style={{ color: rpeColor(it.rpe) }}>RPE{it.rpe}</span>}</span>
+
+      {/* Ejercicios agrupados con sus series como pills */}
+      <div className="px-4 pb-4 space-y-2">
+        {grouped.map(([exName, items]) => (
+          <div key={exName} className="rounded-xl bg-slate-900/70 border border-slate-800/60 px-3 py-2.5">
+            <p className="text-xs font-bold text-white mb-1.5 truncate">{exName}</p>
+            <div className="flex flex-wrap gap-1.5">
+              {items.map((it, i) => (
+                <span key={i} className={`text-[11px] font-bold px-2 py-1 rounded-lg tabular-nums ${it.isImprovement ? "text-emerald-300" : "text-slate-300"}`}
+                  style={{ backgroundColor: it.isImprovement ? "#10B98118" : "#1e293b", border: it.isImprovement ? "1px solid #10B98135" : "1px solid transparent" }}>
+                  {it.minutes != null ? `${it.minutes} min` : `${it.reps}×${it.kg}kg`}{it.isImprovement && " 🔥"}
+                </span>
+              ))}
+            </div>
           </div>
         ))}
       </div>
+
+      {/* Borrar día */}
+      {onDelete && (
+        <div className="px-4 pb-4">
+          {!confirmDel ? (
+            <button onClick={() => setConfirmDel(true)} className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-[11px] font-semibold text-slate-600 hover:text-rose-400 transition"><Trash2 size={12} /> Borrar este día</button>
+          ) : (
+            <div className="flex gap-2 items-center bg-rose-950/30 border border-rose-500/20 rounded-xl px-3 py-2 bounce-in">
+              <p className="text-[11px] text-rose-300/80 flex-1">¿Borrar este día? Los récords no cambian.</p>
+              <button onClick={() => setConfirmDel(false)} className="px-2 py-1 rounded-lg bg-slate-800 text-slate-400 text-[11px]">No</button>
+              <button onClick={() => onDelete(session.date)} className="px-2 py-1 rounded-lg bg-rose-500 !text-white text-[11px] font-bold">Sí</button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
