@@ -14,7 +14,15 @@ import {
   Share2, Download, Link2, Copy, BellOff, Send, Mic, Ruler, Camera, Link, Footprints, Star, SquarePlay, Upload, RefreshCw, Timer, Percent,
 } from "lucide-react";
 import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signOut, onAuthStateChanged } from "firebase/auth";
-import { Capacitor } from "@capacitor/core";
+import { Capacitor, registerPlugin } from "@capacitor/core";
+// Lado JS del plugin nativo del cronómetro. CLAVE: en Capacitor 5/6,
+// window.Capacitor.Plugins solo contiene plugins registrados desde JS con
+// registerPlugin() — los plugins custom de Java NO aparecen ahí solos.
+// Acceder via window.Capacitor.Plugins.RestTimerNotification devolvía
+// siempre undefined y el cronómetro nativo jamás corría. registerPlugin()
+// crea el proxy correcto: en Android ejecuta la implementación Java; en
+// web rechaza con "not implemented" (capturado por los try/catch).
+const RestTimerNotification = registerPlugin("RestTimerNotification");
 import { FirebaseAuthentication } from "@capacitor-firebase/authentication";
 // @capacitor/local-notifications — se importa estáticamente; si el paquete
 // no está instalado el build falla con un error claro. Instalarlo primero:
@@ -2357,7 +2365,7 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default" }
         // LocalNotifications en Android: aparece como notificación real del sistema,
         // incluso con la pantalla apagada o la app en segundo plano.
         await LocalNotifications.cancel({ notifications: [{ id: 9002 }] }).catch(() => {});
-        await window.Capacitor?.Plugins?.RestTimerNotification?.stop().catch(() => {});
+        await RestTimerNotification.stop().catch(() => {});
         await LocalNotifications.schedule({
           notifications: [{
             id: 9001,
@@ -2401,10 +2409,26 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default" }
         // nunca llegaba a ejecutarse.
         try {
           if (Capacitor.isNativePlatform()) {
-            const RestTimerNotification = window.Capacitor?.Plugins?.RestTimerNotification;
-            if (RestTimerNotification) {
-              const secsLeft = Math.max(1, Math.ceil((endTimeRef.current - Date.now()) / 1000));
+            const secsLeft = Math.max(1, Math.ceil((endTimeRef.current - Date.now()) / 1000));
+            try {
               await RestTimerNotification.start({ seconds: secsLeft });
+            } catch (pluginErr) {
+              // Plugin no disponible (build viejo sin el Java) — fallback:
+              // notificación estática con la hora de fin, mejor que nada.
+              const endsAt = new Date(endTimeRef.current);
+              const hh = String(endsAt.getHours()).padStart(2, "0");
+              const mm = String(endsAt.getMinutes()).padStart(2, "0");
+              await LocalNotifications.schedule({
+                notifications: [{
+                  id: 9002,
+                  title: "⏱️ Descanso en curso — Modus Fit",
+                  body: `La próxima serie arranca a las ${hh}:${mm}`,
+                  channelId: "ponos-rest-timer",
+                  ongoing: true,
+                  autoCancel: false,
+                  smallIcon: "ic_stat_modusfit",
+                }],
+              });
             }
           }
         } catch (err) { console.error("Cronómetro nativo:", err); }
@@ -2431,7 +2455,7 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default" }
     try {
       if (Capacitor.isNativePlatform()) {
         LocalNotifications.cancel({ notifications: [{ id: 9002 }] }).catch(() => {});
-        window.Capacitor?.Plugins?.RestTimerNotification?.stop().catch(() => {});
+        RestTimerNotification.stop().catch(() => {});
       }
     } catch { }
     // eslint-disable-next-line
@@ -8498,6 +8522,22 @@ export default function App() {
   });
   const [tab, setTab] = useState("rutina");
   useEffect(() => { window.scrollTo({ top: 0 }); }, [tab]);
+  // Permisos de notificación + canales al ARRANQUE de la app — antes solo
+  // se pedían al iniciar un descanso, y si esa cadena fallaba en silencio,
+  // los canales nunca existían (imposible de diagnosticar en Ajustes).
+  // Con esto, apenas abrís la app los canales quedan creados y visibles.
+  useEffect(() => {
+    (async () => {
+      try {
+        if (Capacitor.isNativePlatform()) {
+          const { display } = await LocalNotifications.requestPermissions();
+          if (display === "granted") {
+            await LocalNotifications.createChannel({ id: "ponos-rest-timer", name: "Descanso entre series", importance: 5, vibration: true });
+          }
+        }
+      } catch (err) { console.error("Setup de notificaciones:", err); }
+    })();
+  }, []);
   const [aiChatMessages, setAiChatMessages] = useState([
     { role: "assistant", text: "¡Hola! 👋 Soy tu **Entrenador IA**.\n\nConozco tu rutina, tus marcas y tu progreso — todo lo que registrás en la app.\n\nPuedo ayudarte a:\n• **Crear o modificar rutinas** a tu medida\n• **Analizar tu progreso** y detectar puntos débiles\n• **Resolver dudas** de técnica, series y descanso\n\n¿Por dónde empezamos? 💪" },
   ]);
