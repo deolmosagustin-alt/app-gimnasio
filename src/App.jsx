@@ -623,7 +623,18 @@ function haptic(pattern = 25) {
 
 /* ============================== TIME / MATH HELPERS ============================== */
 
-function todayStr() { return new Date().toISOString().slice(0, 10); }
+// Fecha local YYYY-MM-DD. CLAVE: toISOString() devuelve la fecha en UTC —
+// en Argentina (UTC-3), desde las 21:00 la app creía que ya era "mañana":
+// los registros caían en el día equivocado, la racha se cortaba, y el
+// calendario marcaba días corridos. TODAS las fechas de calendario deben
+// pasar por acá, nunca por toISOString().
+function localDateStr(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+function todayStr() { return localDateStr(new Date()); }
 function formatTime(s) { return `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`; }
 function vol(kg, reps) { return (!kg || !reps) ? 0 : kg * reps; }
 function estimate1RM(kg, reps) { return (!kg || !reps) ? 0 : Math.round(kg * (1 + reps / 30) * 10) / 10; }
@@ -827,7 +838,7 @@ function getMonthMatrix(year, month) {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const cells = [];
   for (let i = 0; i < startDow; i++) cells.push(null);
-  for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(year, month, d).toISOString().slice(0, 10));
+  for (let d = 1; d <= daysInMonth; d++) cells.push(localDateStr(new Date(year, month, d)));
   while (cells.length % 7 !== 0) cells.push(null);
   const weeks = [];
   for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
@@ -2705,7 +2716,7 @@ function ProgresoDemo({ view }) {
   if (view === "calendar") {
     const now = new Date();
     const weeks = getMonthMatrix(now.getFullYear(), now.getMonth());
-    const trainedSample = new Set([3, 5, 9, 12, 16, 19, 23].map((d) => new Date(now.getFullYear(), now.getMonth(), d).toISOString().slice(0, 10)));
+    const trainedSample = new Set([3, 5, 9, 12, 16, 19, 23].map((d) => localDateStr(new Date(now.getFullYear(), now.getMonth(), d))));
     return (
       <div>
         <div className="grid grid-cols-7 gap-1 mb-1">{WEEKDAY_LABELS.map((l, i) => <div key={i} className="text-center text-[8px] font-bold text-slate-600">{l}</div>)}</div>
@@ -3925,7 +3936,7 @@ function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS,
   const isLight = settings.theme === "light";
   const neutralDot = isLight ? "#94a3b8" : "#475569";
   const trainedDays = useMemo(() => getTrainedDateSet(logs, sessions), [logs, sessions]);
-  const weekDots = Array.from({ length: cycleWeeks }, (_, wi) => { const ws = new Date(cycleStart); ws.setDate(ws.getDate() + wi * 7); const days = Array.from({ length: 7 }, (_, di) => { const d = new Date(ws); d.setDate(d.getDate() + di); return d.toISOString().slice(0, 10); }); return { week: wi + 1, days, trained: days.filter((d) => trainedDays.has(d)).length, isDeload: wi + 1 > trainWeeks }; });
+  const weekDots = Array.from({ length: cycleWeeks }, (_, wi) => { const ws = new Date(cycleStart); ws.setDate(ws.getDate() + wi * 7); const days = Array.from({ length: 7 }, (_, di) => { const d = new Date(ws); d.setDate(d.getDate() + di); return localDateStr(d); }); return { week: wi + 1, days, trained: days.filter((d) => trainedDays.has(d)).length, isDeload: wi + 1 > trainWeeks }; });
   const phase = weekInfo.isDeload ? "#A855F7" : "#3B82F6";
   const heroGrad = weekInfo.isDeload ? "var(--grad-hero-purple)" : "var(--grad-hero-blue)";
   const borderClass = weekInfo.isDeload ? "border-purple-500/45" : "border-blue-500/45";
@@ -4297,7 +4308,7 @@ function ShareSummaryCard({ logs, trainingSessions = [] }) {
     if (period === "week") {
       const dow = (now.getDay() + 6) % 7;
       const monday = new Date(now); monday.setDate(now.getDate() - dow);
-      return Array.from({ length: 7 }, (_, i) => { const d = new Date(monday); d.setDate(monday.getDate() + i); const ds = d.toISOString().slice(0, 10); return { trained: trainedDateSet.has(ds), isPad: false }; });
+      return Array.from({ length: 7 }, (_, i) => { const d = new Date(monday); d.setDate(monday.getDate() + i); const ds = localDateStr(d); return { trained: trainedDateSet.has(ds), isPad: false }; });
     }
     if (period === "month") {
       const weeks = getMonthMatrix(now.getFullYear(), now.getMonth());
@@ -4402,7 +4413,7 @@ function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [] }) {
   const miniStats = useMemo(() => {
     const dateSet = new Set(sessions.map((s) => s.date));
     let streak = 0; const cursor = new Date();
-    while (true) { const d = cursor.toISOString().slice(0, 10); if (dateSet.has(d)) { streak++; cursor.setDate(cursor.getDate() - 1); } else break; }
+    while (true) { const d = localDateStr(cursor); if (dateSet.has(d)) { streak++; cursor.setDate(cursor.getDate() - 1); } else break; }
     return { days: dateSet.size, streak };
   }, [sessions]);
   const sessionByDate = useMemo(() => { const m = {}; sessions.forEach((s) => { m[s.date] = s; }); return m; }, [sessions]);
@@ -5040,7 +5051,7 @@ function RankBadgeIcon({ tier, sub, color, size = 32 }) {
   const scale = TIER_SCALE[tierFile] ?? 1;
   const s = Math.round(size * scale);
   // Diamante viene un poco más alto que el resto — se lo achata apenas
-  const squashY = tierFile === "diamante" ? 0.9 : 1;
+  const squashY = tierFile === "diamante" ? 0.95 : 1;
   const imgFilter = tierFile === "plata"
     ? "saturate(0.7) brightness(0.82)"
     : "saturate(0.7) brightness(0.92)";
@@ -5484,6 +5495,11 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
   const [cursor, setCursor] = useState({ y: now.getFullYear(), m: now.getMonth() });
   const [selectedDate, setSelectedDate] = useState(null);
   const [viewingPhoto, setViewingPhoto] = useState(null);
+  // Modo comparación de fotos: compareBase es el día de partida; con él
+  // activo, el calendario espera que elijas OTRO día con foto y abre el
+  // modal de comparación lado a lado.
+  const [compareBase, setCompareBase] = useState(null);
+  const [comparePair, setComparePair] = useState(null);
   const selMeta = MEASUREMENT_TYPES.find((t) => t.k === selType);
   const selHistory = measurements[selType] || [];
   const latest = getLatestMeasurement(selHistory);
@@ -5593,6 +5609,13 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
           <p className="text-[11px] text-slate-600 text-center py-4">Todavía no registraste nada — agregá una medida arriba o una foto para empezar tu calendario.</p>
         ) : (
           <>
+            {compareBase && (
+              <div className="flex items-center gap-2 mb-2 px-3 py-2 rounded-xl bg-rose-500/10 border border-rose-500/25 bounce-in">
+                <Camera size={13} className="text-rose-400 shrink-0" />
+                <p className="text-[11px] text-rose-200 flex-1">Elegí <span className="font-bold">otro día con foto</span> para comparar</p>
+                <button onClick={() => setCompareBase(null)} className="text-[10px] font-bold text-slate-400 px-2 py-1 rounded-lg bg-slate-800">Cancelar</button>
+              </div>
+            )}
             <div className="bg-slate-950/40 border border-slate-800/50 rounded-2xl p-3">
               <div className="flex items-center justify-between mb-2.5">
                 <button onClick={() => setCursor((c) => { const m = c.m === 0 ? 11 : c.m - 1; const y = c.m === 0 ? c.y - 1 : c.y; return { y, m }; })} className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400"><ChevronLeft size={16} /></button>
@@ -5621,9 +5644,23 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
                     : dayColors.length === 1
                       ? { backgroundColor: dayColors[0] + "30", border: `1px solid ${dayColors[0]}55` }
                       : {};
+                  const isCompareBase = compareBase && d === compareBase.date;
+                  const compareSelectable = compareBase && hasPhoto && !isCompareBase;
                   return (
-                    <button key={i} onClick={() => entry && setSelectedDate(isSelected ? null : d)} disabled={!entry} style={bgStyle}
-                      className={`relative aspect-square rounded-lg flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold transition-all ${isSelected ? "ring-2 ring-purple-400" : ""} ${isToday && !entry ? "border border-purple-500/50" : ""} ${entry ? "text-white hover:brightness-125 active:scale-95" : "text-slate-700"}`}>
+                    <button key={i}
+                      onClick={() => {
+                        if (compareBase) {
+                          // Modo comparación: solo días con foto (distintos del base)
+                          if (compareSelectable) {
+                            setComparePair([compareBase, { date: d, entry }]);
+                            setCompareBase(null);
+                          }
+                          return;
+                        }
+                        if (entry) setSelectedDate(isSelected ? null : d);
+                      }}
+                      disabled={compareBase ? !compareSelectable && !isCompareBase : !entry} style={bgStyle}
+                      className={`relative aspect-square rounded-lg flex flex-col items-center justify-center gap-0.5 text-[10px] font-bold transition-all ${isSelected && !compareBase ? "ring-2 ring-purple-400" : ""} ${isCompareBase ? "ring-2 ring-rose-400" : ""} ${compareSelectable ? "ring-1 ring-rose-400/60 animate-pulse" : ""} ${compareBase && !compareSelectable && !isCompareBase ? "opacity-30" : ""} ${isToday && !entry ? "border border-purple-500/50" : ""} ${entry ? "text-white hover:brightness-125 active:scale-95" : "text-slate-700"}`}>
                       {complete && <Star size={9} className="absolute -top-1 -right-1 text-amber-400 fill-amber-400" />}
                       {dayNum}
                       {entry && (
@@ -5645,49 +5682,98 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
               </div>
             </div>
 
-            {selectedEntry ? (
-              <div className="bg-slate-950/50 border border-slate-800/60 rounded-2xl p-4 mt-3 bounce-in space-y-3">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-sm font-bold text-white capitalize">{selectedDateLabel}</p>
-                  {selectedEntry.photos.length > 0 && selectedEntry.weight != null && Object.keys(selectedEntry.measures).length > 0 && (
-                    <span className="flex items-center gap-1 text-[10px] font-bold text-amber-400 shrink-0"><Star size={11} className="fill-amber-400" /> Completo</span>
-                  )}
-                </div>
+            {!selectedEntry && !compareBase && <p className="text-center text-[11px] text-slate-600 py-2">Tocá un día con registro para ver el detalle.</p>}
 
-                {selectedEntry.weight != null && (
-                  <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-purple-500/10 border border-purple-500/20 w-fit">
-                    <span className="w-2 h-2 rounded-full bg-purple-400 shrink-0" />
-                    <span className="text-xs text-slate-300">Peso: <span className="font-bold text-white">{selectedEntry.weight}kg</span></span>
+            {/* Detalle del día como MODAL centrado — mismo tratamiento que
+                el historial de entrenamientos */}
+            {selectedEntry && (
+              <div className="fixed inset-0 z-[140] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in" onClick={() => setSelectedDate(null)}>
+                <div className="max-w-md w-full max-h-[85vh] overflow-y-auto rounded-3xl modal-pop-in border border-purple-500/30" style={{ background: "linear-gradient(170deg,#0f172a 0%,#0a0f1a 100%)" }} onClick={(e) => e.stopPropagation()}>
+                  <div className="relative px-4 pt-4 pb-3 overflow-hidden">
+                    <div className="absolute -top-10 -right-8 w-36 h-36 rounded-full blur-3xl opacity-20 bg-purple-500 pointer-events-none" />
+                    <button onClick={() => setSelectedDate(null)} aria-label="Cerrar" className="absolute top-3 right-3 z-10 p-2 rounded-xl bg-slate-800/90 text-slate-400 hover:text-white transition active:scale-90"><X size={15} /></button>
+                    <div className="relative pr-10">
+                      <p className="text-base font-black text-white capitalize leading-tight">{selectedDateLabel}</p>
+                      {selectedEntry.photos.length > 0 && selectedEntry.weight != null && Object.keys(selectedEntry.measures).length > 0 && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-400 mt-1"><Star size={11} className="fill-amber-400" /> Día completo</span>
+                      )}
+                    </div>
                   </div>
-                )}
-
-                {Object.keys(selectedEntry.measures).length > 0 && (
-                  <div className="grid grid-cols-2 gap-2">
-                    {measureTypesNoWeight.filter((t) => selectedEntry.measures[t.k] != null).map((t) => (
-                      <div key={t.k} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-500/10 border border-blue-500/20">
-                        <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0" />
-                        <span className="text-xs text-slate-300">{t.l}: <span className="font-bold text-white">{selectedEntry.measures[t.k]}{t.unit}</span></span>
+                  <div className="px-4 pb-4 space-y-3">
+                    {selectedEntry.weight != null && (
+                      <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-purple-500/10 border border-purple-500/20 w-fit">
+                        <span className="w-2 h-2 rounded-full bg-purple-400 shrink-0" />
+                        <span className="text-xs text-slate-300">Peso: <span className="font-bold text-white">{selectedEntry.weight}kg</span></span>
                       </div>
-                    ))}
-                  </div>
-                )}
-
-                {selectedEntry.photos.length > 0 && (
-                  <div>
-                    <p className="text-[10px] font-bold text-rose-300 uppercase tracking-wide mb-1.5 flex items-center gap-1"><Camera size={10} /> {selectedEntry.photos.length > 1 ? `${selectedEntry.photos.length} fotos` : "Foto"}</p>
-                    <div className="flex gap-2 flex-wrap">
-                      {selectedEntry.photos.map((p) => (
-                        <button key={p.id} onClick={() => setViewingPhoto(p)} className="w-20 h-20 rounded-xl overflow-hidden border border-slate-800/60 active:scale-95 transition">
-                          <img src={p.dataUrl} alt={p.date} className="w-full h-full object-cover" />
+                    )}
+                    {Object.keys(selectedEntry.measures).length > 0 && (
+                      <div className="grid grid-cols-2 gap-2">
+                        {measureTypesNoWeight.filter((t) => selectedEntry.measures[t.k] != null).map((t) => (
+                          <div key={t.k} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-500/10 border border-blue-500/20">
+                            <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0" />
+                            <span className="text-xs text-slate-300">{t.l}: <span className="font-bold text-white">{selectedEntry.measures[t.k]}{t.unit}</span></span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {selectedEntry.photos.length > 0 && (
+                      <div>
+                        <p className="text-[10px] font-bold text-rose-300 uppercase tracking-wide mb-1.5 flex items-center gap-1"><Camera size={10} /> {selectedEntry.photos.length > 1 ? `${selectedEntry.photos.length} fotos` : "Foto"}</p>
+                        <div className="flex gap-2 flex-wrap">
+                          {selectedEntry.photos.map((p) => (
+                            <button key={p.id} onClick={() => setViewingPhoto(p)} className="w-20 h-20 rounded-xl overflow-hidden border border-slate-800/60 active:scale-95 transition">
+                              <img src={p.dataUrl} alt={p.date} className="w-full h-full object-cover" />
+                            </button>
+                          ))}
+                        </div>
+                        {/* Comparar: cierra este modal y activa el modo de
+                            selección del segundo día en el calendario */}
+                        <button onClick={() => { setCompareBase({ date: selectedDate, entry: selectedEntry }); setSelectedDate(null); }} className="w-full mt-3 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold text-rose-300 bg-rose-500/10 border border-rose-500/25 transition active:scale-[0.98]">
+                          <Camera size={13} /> Comparar con otro día
                         </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Modal de comparación: las dos fotos lado a lado con fecha y peso */}
+            {comparePair && (() => {
+              const [a, b] = comparePair[0].date <= comparePair[1].date ? comparePair : [comparePair[1], comparePair[0]];
+              const fmt = (ds) => new Date(ds + "T00:00:00").toLocaleDateString("es-AR", { day: "numeric", month: "short", year: "numeric" });
+              const diffDays = Math.round((new Date(b.date) - new Date(a.date)) / 86400000);
+              const weightDiff = (a.entry.weight != null && b.entry.weight != null) ? Math.round((b.entry.weight - a.entry.weight) * 10) / 10 : null;
+              return (
+                <div className="fixed inset-0 z-[150] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in" onClick={() => setComparePair(null)}>
+                  <div className="max-w-lg w-full max-h-[90vh] overflow-y-auto rounded-3xl modal-pop-in border border-rose-500/30 bg-slate-950" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center justify-between px-4 pt-4 pb-2">
+                      <p className="text-sm font-black text-white flex items-center gap-2"><Camera size={15} className="text-rose-400" /> Tu comparación</p>
+                      <button onClick={() => setComparePair(null)} aria-label="Cerrar" className="p-2 rounded-xl bg-slate-800/90 text-slate-400 hover:text-white transition active:scale-90"><X size={15} /></button>
+                    </div>
+                    <div className="px-3 pb-2 text-center">
+                      <span className="text-[11px] font-bold text-rose-300">{diffDays} día{diffDays === 1 ? "" : "s"} de diferencia</span>
+                      {weightDiff != null && weightDiff !== 0 && (
+                        <span className={`ml-2 text-[11px] font-bold ${weightDiff < 0 ? "text-emerald-400" : "text-amber-400"}`}>{weightDiff > 0 ? "+" : ""}{weightDiff}kg</span>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 px-3 pb-4">
+                      {[a, b].map((side, idx) => (
+                        <div key={idx} className="space-y-1.5">
+                          <div className="rounded-2xl overflow-hidden border border-slate-800 aspect-[3/4]">
+                            <img src={side.entry.photos[0]?.dataUrl} alt={side.date} className="w-full h-full object-cover" />
+                          </div>
+                          <div className="text-center">
+                            <p className="text-[11px] font-bold text-white">{fmt(side.date)}</p>
+                            {side.entry.weight != null && <p className="text-[10px] text-slate-400">{side.entry.weight}kg</p>}
+                          </div>
+                        </div>
                       ))}
                     </div>
                   </div>
-                )}
-              </div>
-            ) : (
-              <p className="text-center text-[11px] text-slate-600 py-2">Tocá un día con registro para ver el detalle.</p>
-            )}
+                </div>
+              );
+            })()}
           </>
         )}
         <p className="text-[9px] text-slate-600 mt-2">Las fotos quedan guardadas en este dispositivo, no se suben a ningún lado.</p>
@@ -5708,7 +5794,7 @@ function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_
     let totalVol = 0, totalSets = 0;
     Object.entries(logs).forEach(([k, v]) => { if (k.endsWith("_pr_override") || !Array.isArray(v)) return; v.forEach((e) => { totalVol += vol(e.kg, e.reps); totalSets++; }); });
     let streak = 0, cursor = new Date();
-    while (true) { const d = cursor.toISOString().slice(0, 10); if (dateSet.has(d)) { streak++; cursor.setDate(cursor.getDate() - 1); } else break; }
+    while (true) { const d = localDateStr(cursor); if (dateSet.has(d)) { streak++; cursor.setDate(cursor.getDate() - 1); } else break; }
     return { totalVol: Math.round(totalVol), totalSets, streak, daysTrained: dateSet.size };
   }, [logs, sessions]);
 
@@ -5869,7 +5955,7 @@ function getSessionsForPeriod(sessions, period) {
     const dow = (now.getDay() + 6) % 7; // 0=lunes
     const monday = new Date(now); monday.setDate(now.getDate() - dow); monday.setHours(0, 0, 0, 0);
     const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
-    const mondayStr = monday.toISOString().slice(0, 10), sundayStr = sunday.toISOString().slice(0, 10);
+    const mondayStr = localDateStr(monday), sundayStr = localDateStr(sunday);
     return sessions.filter((s) => s.date >= mondayStr && s.date <= sundayStr);
   }
   if (period === "month") { const ym = todayStr().slice(0, 7); return sessions.filter((s) => s.date.startsWith(ym)); }
@@ -6153,7 +6239,9 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
     reader.onload = (ev) => {
       const dataUrl = ev.target.result;
       setAvatarUrl(dataUrl);
-      idbPut(`avatar_${profileName}`, dataUrl).catch(() => {});
+      idbPut(`avatar_${profileName}`, dataUrl).then(() => {
+        window.dispatchEvent(new Event("modusfit-avatar-updated"));
+      }).catch(() => {});
     };
     reader.readAsDataURL(file);
   };
@@ -8415,6 +8503,25 @@ const NAV_TABS = [
   { key: "entrenador_ia", icon: <Sparkles size={20} />, label: "Entrenador IA" },
 ];
 
+// Avatar del header móvil: muestra la foto de perfil si existe, con la
+// inicial como fallback. Escucha el evento "modusfit-avatar-updated" para
+// refrescarse al instante cuando cambiás la foto desde Perfil.
+function HeaderAvatar({ profileName, onClick }) {
+  const [avatarUrl, setAvatarUrl] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    const load = () => idbGet(`avatar_${profileName}`).then((d) => { if (alive) setAvatarUrl(d || null); }).catch(() => {});
+    load();
+    window.addEventListener("modusfit-avatar-updated", load);
+    return () => { alive = false; window.removeEventListener("modusfit-avatar-updated", load); };
+  }, [profileName]);
+  return (
+    <button onClick={onClick} aria-label="Tu perfil" className="w-8 h-8 rounded-xl overflow-hidden flex items-center justify-center text-base font-black text-white shrink-0 lg:hidden active:scale-90 transition" style={!avatarUrl ? { background: "linear-gradient(135deg,#14B8A6,#0E7490)" } : {}}>
+      {avatarUrl ? <img src={avatarUrl} className="w-full h-full object-cover" alt="" /> : profileName.charAt(0).toUpperCase()}
+    </button>
+  );
+}
+
 function BottomBar({ tab, setTab }) {
   return (
     <div className="lg:hidden fixed bottom-0 left-0 right-0 z-20 bg-slate-950/95 backdrop-blur-xl border-t border-slate-800/50">
@@ -8433,7 +8540,12 @@ function BottomBar({ tab, setTab }) {
 function SideNav({ tab, setTab, profileName }) {
   const initial = profileName.charAt(0).toUpperCase();
   const [avatarUrl, setAvatarUrl] = useState(null);
-  useEffect(() => { idbGet(`avatar_${profileName}`).then((d) => { if (d) setAvatarUrl(d); }).catch(() => {}); }, [profileName]);
+  useEffect(() => {
+    const load = () => idbGet(`avatar_${profileName}`).then((d) => setAvatarUrl(d || null)).catch(() => {});
+    load();
+    window.addEventListener("modusfit-avatar-updated", load);
+    return () => window.removeEventListener("modusfit-avatar-updated", load);
+  }, [profileName]);
   return (
     <div className="hidden lg:flex lg:flex-col lg:w-56 lg:shrink-0 lg:h-screen lg:sticky lg:top-0 border-r border-slate-800/50 bg-[#0a0a0f]/60 px-3 py-6">
       <div className="flex items-center gap-2.5 px-2 mb-8">
@@ -8718,7 +8830,7 @@ export default function App() {
     const sched = getRoutineWeekSchedule(activeRoutineDef);
     const scheduledDayKey = sched[todayWeekdayKey(yesterday)];
     if (!scheduledDayKey || !DAY_ORDER.includes(scheduledDayKey)) return;
-    const yStr = yesterday.toISOString().slice(0, 10);
+    const yStr = localDateStr(yesterday);
     const trainedDates = getTrainedDateSet(profile.logs || {}, profile.trainingSessions || []);
     if (trainedDates.has(yStr)) return;
     if (profile.dismissedMissedDayNotice === yStr) return;
@@ -9089,7 +9201,7 @@ export default function App() {
             {tab === "perfil" ? (
               <button onClick={() => setTab("rutina")} aria-label="Volver" className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800/80 transition shrink-0 lg:hidden"><ChevronDown size={18} className="rotate-90" /></button>
             ) : (
-              <button onClick={() => setTab("perfil")} aria-label="Tu perfil" className="w-8 h-8 rounded-xl flex items-center justify-center text-base font-black text-white shrink-0 lg:hidden active:scale-90 transition" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>{activeProfile.charAt(0).toUpperCase()}</button>
+              <HeaderAvatar profileName={activeProfile} onClick={() => setTab("perfil")} />
             )}
             <div className="flex-1 min-w-0">
               <h1 className="font-black text-base text-white leading-tight tracking-tight">{TAB_TITLES[tab] || ""}</h1>
