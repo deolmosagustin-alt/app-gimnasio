@@ -2376,7 +2376,12 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default" }
         // LocalNotifications en Android: aparece como notificación real del sistema,
         // incluso con la pantalla apagada o la app en segundo plano.
         await LocalNotifications.cancel({ notifications: [{ id: 9002 }] }).catch(() => {});
-        await RestTimerNotification.stop().catch(() => {});
+        // Solo apagar la notif nativa si ESTE timer sigue siendo el dueño —
+        // si otro cronómetro la tomó, no se la pisamos.
+        if (ACTIVE_REST_TIMERS.__notifOwner === timerId) {
+          await RestTimerNotification.stop().catch(() => {});
+          delete ACTIVE_REST_TIMERS.__notifOwner;
+        }
         await LocalNotifications.schedule({
           notifications: [{
             id: 9001,
@@ -2421,6 +2426,7 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default" }
         try {
           if (Capacitor.isNativePlatform()) {
             const secsLeft = Math.max(1, Math.ceil((endTimeRef.current - Date.now()) / 1000));
+            ACTIVE_REST_TIMERS.__notifOwner = timerId; // este timer es dueño de la notif ahora
             try {
               await RestTimerNotification.start({ seconds: secsLeft });
             } catch (pluginErr) {
@@ -2466,7 +2472,10 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default" }
     try {
       if (Capacitor.isNativePlatform()) {
         LocalNotifications.cancel({ notifications: [{ id: 9002 }] }).catch(() => {});
-        RestTimerNotification.stop().catch(() => {});
+        if (ACTIVE_REST_TIMERS.__notifOwner === timerId) {
+          RestTimerNotification.stop().catch(() => {});
+          delete ACTIVE_REST_TIMERS.__notifOwner;
+        }
       }
     } catch { }
     // eslint-disable-next-line
@@ -3518,6 +3527,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
       const isPR = !isFirstEver && m > prevMin;
       if (isFirstEver || isPR) newLogs = { ...newLogs, [prKey]: { minutes: m, km: d || null, date: today } };
       setLogs(newLogs); setSaved(true); setTimeout(() => setSaved(false), 1200);
+      if (setDrafts) setDrafts((prev) => { const n = { ...prev }; delete n[key]; return n; });
       // Detectar si el nuevo récord sube de rango (tier change)
       try {
         const exLib = EXERCISE_LIBRARY_BY_ID[exerciseId];
@@ -3554,6 +3564,9 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     const isPR = !isFirstEver && newVol > prevVol;
     if (isFirstEver || isPR) newLogs = { ...newLogs, [prKey]: { kg: k, reps: r, date: today } };
     setLogs(newLogs); setSaved(true); setTimeout(() => setSaved(false), 1200);
+    // Limpiar el draft al guardar → la serie queda lockeada (se muestra el
+    // bloque "guardado hoy" con botón Editar), en vez de quedar en modo input.
+    if (setDrafts) setDrafts((prev) => { const n = { ...prev }; delete n[key]; return n; });
     // Detectar cambio de rango
     try {
       const exLib = EXERCISE_LIBRARY_BY_ID[exerciseId];
@@ -3638,7 +3651,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
                 <Check size={14} style={{ color: accent }} className="shrink-0" />
                 <span className="text-sm font-black" style={{ color: accent }}>{todayCardio.minutes} min{todayCardio.km ? ` · ${todayCardio.km} km` : ""}</span>
                 <span className="text-[10px] text-slate-500 ml-1">guardado hoy</span>
-                <button onClick={() => updateDraft({ minutes: String(todayCardio.minutes), km: String(todayCardio.km || "") })} className="ml-auto text-[10px] font-bold px-2 py-1 rounded-lg transition" style={{ backgroundColor: accent + "20", color: accent }}>Editar</button>
+                <button onClick={() => updateDraft({ minutes: String(todayCardio.minutes), km: String(todayCardio.km || ""), editing: true })} className="ml-auto text-[10px] font-bold px-2 py-1 rounded-lg transition" style={{ backgroundColor: accent + "20", color: accent }}>Editar</button>
               </div>
             );
           }
@@ -3718,7 +3731,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
         // El bloque "guardado hoy" solo se muestra si el draft está vacío —
         // sin el chequeo de !reps && !kg, el botón Editar seteaba el draft
         // pero esta rama seguía ganando y los inputs nunca aparecían.
-        if (todayEntry && hasActiveSession && !reps && !kg) {
+        if (todayEntry && hasActiveSession && !draft.editing) {
           // Mensaje de coaching: compara lo hecho contra el rango objetivo
           // de la serie y sugiere qué hacer la próxima.
           const coaching = (() => {
@@ -3740,7 +3753,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
                 <span className="text-sm font-black" style={{ color: accent }}>{todayEntry.reps}×{kgToDisplay(todayEntry.kg, unit)}{weightLabel(unit)}</span>
                 {todayEntry.rpe && <span className="text-[10px] px-1.5 py-0.5 rounded-lg bg-slate-800 text-slate-400">RPE {todayEntry.rpe}</span>}
                 <span className="text-[10px] text-slate-500 ml-1">guardado hoy</span>
-                <button onClick={() => { updateDraft({ reps: String(todayEntry.reps), kg: String(kgToDisplay(todayEntry.kg, unit)) }); }} className="ml-auto text-[10px] font-bold px-2 py-1 rounded-lg transition" style={{ backgroundColor: accent + "20", color: accent }}>Editar</button>
+                <button onClick={() => { updateDraft({ reps: String(todayEntry.reps), kg: String(kgToDisplay(todayEntry.kg, unit)), editing: true }); }} className="ml-auto text-[10px] font-bold px-2 py-1 rounded-lg transition" style={{ backgroundColor: accent + "20", color: accent }}>Editar</button>
               </div>
               {coaching && (
                 <p className="text-[10px] px-1 flex items-center gap-1.5" style={{ color: coaching.color }}>
@@ -3762,7 +3775,17 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
               </div>
               <div className="flex items-center text-slate-700 text-base font-light select-none">×</div>
               <div className="flex-1 flex flex-col items-center justify-center py-2.5 relative">
-                <button onClick={() => setUnit((u) => u === "kg" ? "lbs" : "kg")} className="text-[9px] text-slate-600 font-bold uppercase tracking-widest hover:text-slate-400 transition">
+                <button onClick={() => {
+                  // Convertir el valor ya escrito a la nueva unidad, así no
+                  // tenés que recalcular a mano lo que pusiste.
+                  const cur = parseFloat(kg);
+                  const newUnit = unit === "kg" ? "lbs" : "kg";
+                  if (!isNaN(cur)) {
+                    const inKg = displayToKg(cur, unit);
+                    updateDraft({ kg: String(kgToDisplay(inKg, newUnit)) });
+                  }
+                  setUnit(newUnit);
+                }} className="text-[9px] text-slate-600 font-bold uppercase tracking-widest hover:text-slate-400 transition">
                   {weightLabel(unit)} <span className="text-slate-700">⇄</span>
                 </button>
                 <input type="number" inputMode="decimal" placeholder="—" value={kg} onChange={(e) => updateDraft({ kg: e.target.value })} className="w-full bg-transparent text-2xl font-black text-center text-white focus:outline-none placeholder:text-slate-800" />
@@ -4051,6 +4074,10 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
   const fallbackSuggested = useMemo(() => getSuggestedDay(logs), []);
   const suggestedDay = scheduledDay || fallbackSuggested;
   const [activeDay, setActiveDay] = useState(() => scheduledDay || fallbackSuggested);
+  // La sesión activa solo "cuenta" en el día donde se inició. Al cambiar de
+  // día se ve sin sesión (podés iniciar otra o solo registrar), pero la
+  // sesión original sigue corriendo en su día — no se resetea.
+  const sessionForThisDay = (activeSession && (!activeSession.dayKey || activeSession.dayKey === activeDay)) ? activeSession : null;
   const weekInfo = getWeekInfo(cycleStart, settings), isDeload = weekInfo?.isDeload, day = ROUTINE[activeDay];
   const [resetKeys, setResetKeys] = useState({});
   const [confirmReset, setConfirmReset] = useState(false);
@@ -4131,17 +4158,16 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
         </div>
       </div>
 
-      {/* Fuera del bloque con key={activeDay} a propósito: así, aunque
-          cambies de día (lo que SÍ remonta la tarjeta de arriba por el
-          cambio de key), este botón nunca se desmonta — sigue en el mismo
-          lugar siempre, entre la tarjeta del día y los ejercicios. */}
-      <SessionStartBar activeSession={activeSession} onStart={() => onStartSession(activeDay)} onCancel={onCancelSession} color={day.color} />
+      {/* La sesión activa pertenece a UN día (el que iniciaste). Si estás
+          viendo otro día, no mostramos "sesión en curso" ahí — pero la
+          sesión real sigue viva en su día, no se resetea. */}
+      <SessionStartBar activeSession={sessionForThisDay} onStart={() => onStartSession(activeDay)} onCancel={onCancelSession} color={day.color} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         {groupExercisesIntoSupersets(day.exercises).map((group) => {
           if (group.length === 1) {
             const ex = group[0];
-            return <ExerciseCard key={ex.id} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadSets={isDeload ? getDeloadSets(ex) : null} deloadMode={isDeload} resetKey={resetKeys[activeDay]} settings={settings} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!activeSession} />;
+            return <ExerciseCard key={ex.id} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadSets={isDeload ? getDeloadSets(ex) : null} deloadMode={isDeload} resetKey={resetKeys[activeDay]} settings={settings} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} />;
           }
           // Superserie: varios ejercicios encadenados comparten un solo
           // cronómetro al final del grupo, en vez de uno por ejercicio —
@@ -4151,7 +4177,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           return (
             <div key={group.map((e) => e.id).join("-")} className="rounded-2xl border-2 border-dashed p-2.5 space-y-2.5" style={{ borderColor: day.color + "45" }}>
               <div className="flex items-center gap-1.5 px-1"><Link size={11} style={{ color: day.color }} /><span className="text-[10px] font-black uppercase tracking-wider" style={{ color: day.color }}>Superserie · {group.length} ejercicios</span></div>
-              {group.map((ex) => <ExerciseCard key={ex.id} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadSets={isDeload ? getDeloadSets(ex) : null} deloadMode={isDeload} resetKey={resetKeys[activeDay]} settings={settings} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!activeSession} hideTimer />)}
+              {group.map((ex) => <ExerciseCard key={ex.id} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadSets={isDeload ? getDeloadSets(ex) : null} deloadMode={isDeload} resetKey={resetKeys[activeDay]} settings={settings} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} hideTimer />)}
               <div className="px-1"><RestTimer seconds={hasHeavyGroup ? settings.restLong : settings.restShort} accent={day.color} alertType={settings.alertType} timerId={`grp_${group.map((g) => g.id).join("_")}`} /></div>
               <p className="text-[10px] text-slate-600 px-1">Descansá recién después de completar los {group.length} ejercicios — ese es el cronómetro de arriba.</p>
             </div>
@@ -4991,7 +5017,7 @@ function getMuscleRank(muscleKey, best1RM, mode = "general", bodyWeightKg = 0, s
 // mancuernas) multiplica el kg logueado antes de calcular el 1RM, para
 // que sea comparable contra estándares de barra (peso total).
 function scanContributorsFor1RM(contributors, logs, overriddenBaseKeys) {
-  let best1RM = 0, bestKg = 0, bestReps = 0, bestExerciseId = null, bestLoadFactor = 1, bestWeight = 1;
+  let best1RM = 0, bestKg = 0, bestReps = 0, bestExerciseId = null, bestLoadFactor = 1, bestWeight = 1, bestRawRm = 0;
   Object.entries(logs).forEach(([key, val]) => {
     const isOverride = key.endsWith("_pr_override");
     const baseKey = isOverride ? key.replace(/_pr_override$/, "") : key;
@@ -5009,11 +5035,16 @@ function scanContributorsFor1RM(contributors, logs, overriddenBaseKeys) {
     const entries = isOverride ? [val] : (Array.isArray(val) ? val : []);
     entries.forEach((e) => {
       if (!e || !e.kg || !e.reps) return;
-      const rm = estimate1RM(e.kg * lf, e.reps) * weight;
-      if (rm > best1RM) { best1RM = rm; bestKg = e.kg; bestReps = e.reps; bestExerciseId = exerciseId; bestLoadFactor = lf; bestWeight = weight; }
+      // 1RM CRUDO del levantamiento (sin el factor de contribución): esto
+      // es lo que define cuál serie es "tu mejor marca" real. Entre 110×5
+      // (1RM≈128) y 95×8 (1RM≈120) gana 110×5 siempre, sin que el weight
+      // del grupo pueda invertir el resultado.
+      const rawRm = estimate1RM(e.kg * lf, e.reps);
+      const weightedRm = rawRm * weight;
+      if (weightedRm > best1RM) { best1RM = weightedRm; bestKg = e.kg; bestReps = e.reps; bestExerciseId = exerciseId; bestLoadFactor = lf; bestWeight = weight; bestRawRm = rawRm; }
     });
   });
-  return { best1RM, bestKg, bestReps, bestExerciseId, bestLoadFactor, bestWeight };
+  return { best1RM, bestKg, bestReps, bestExerciseId, bestLoadFactor, bestWeight, bestRawRm };
 }
 
 function getBest1RMForMuscleGroup(groupKey, logs) {
@@ -7439,35 +7470,49 @@ Datos: ${JSON.stringify(context)}`;
     } catch {
       setIsListening(false); return; // permiso denegado
     }
-    // En Android, reutilizar la MISMA instancia con start() tras onend
-    // re-entrega resultados ya procesados (por eso se repetían las
-    // palabras). Creamos una instancia NUEVA en cada tramo de escucha:
-    // cada instancia entrega su resultado final una sola vez.
-    const startSegment = () => {
+    // continuous=true mantiene la escucha activa; interimResults=true
+    // muestra las palabras en vivo mientras hablás. Acumulamos SOLO los
+    // resultados finales (procesados una vez por resultIndex) en el ref,
+    // y encima mostramos el interino actual — así no se repiten palabras
+    // ni se pierden entre pausas.
+    const startRecognition = () => {
       if (!listeningRef.current) return;
       const recognition = new SpeechRecognitionAPI();
       recognition.lang = "es-AR";
-      recognition.interimResults = false; // sin interinos: solo lo confirmado
-      recognition.continuous = false;     // un segmento por instancia
+      recognition.interimResults = true;
+      recognition.continuous = true;
       recognition.maxAlternatives = 1;
+      let processedIndex = 0; // hasta qué resultado ya guardamos como final
       recognition.onresult = (e) => {
-        const last = e.results[e.results.length - 1];
-        if (last && last.isFinal) {
-          finalTranscriptRef.current += last[0].transcript + " ";
-          setInput(finalTranscriptRef.current.trim());
+        let interim = "";
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const res = e.results[i];
+          const txt = res[0].transcript;
+          if (res.isFinal) {
+            if (i >= processedIndex) {
+              finalTranscriptRef.current += txt + " ";
+              processedIndex = i + 1;
+            }
+          } else {
+            interim += txt;
+          }
         }
+        setInput((finalTranscriptRef.current + interim).trim());
       };
       recognition.onerror = (e) => {
+        // "no-speech"/"aborted" son cortes normales; el onend reinicia.
         if (e.error !== "no-speech" && e.error !== "aborted") {
           listeningRef.current = false;
           setIsListening(false);
         }
       };
       recognition.onend = () => {
-        // Fin del segmento — si el usuario sigue en modo escucha,
-        // arrancamos un segmento nuevo con una instancia nueva.
+        // Android corta la escucha sola cada tanto. Reiniciamos con una
+        // instancia NUEVA (no recognition.start() sobre la misma, que
+        // re-entrega resultados viejos). El texto final ya está en el ref.
+        recognitionRef.current = null;
         if (listeningRef.current) {
-          setTimeout(startSegment, 150);
+          setTimeout(startRecognition, 200);
         } else {
           setIsListening(false);
         }
@@ -7480,7 +7525,7 @@ Datos: ${JSON.stringify(context)}`;
     };
     listeningRef.current = true;
     setIsListening(true);
-    startSegment();
+    startRecognition();
   };
 
   return (

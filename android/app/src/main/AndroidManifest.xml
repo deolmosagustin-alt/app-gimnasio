@@ -10,20 +10,22 @@
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths"/>
         </provider>
     </application>
-    <!--   Permissions   -->
+    <!--    Permissions    -->
     <uses-permission android:name="android.permission.INTERNET"/>
-    <!--   Notificaciones locales (timer de descanso entre series)   -->
+    <!--    Notificaciones locales (timer de descanso entre series)    -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
-    <!--   Galería de fotos (foto de perfil y fotos de progreso)   -->
-    <!--   Android 13+ (API 33+)   -->
+    <!--    Live Update chip en la barra de estado (Android 16+) — cronómetro tipo Spotify    -->
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS"/>
+    <!--    Galería de fotos (foto de perfil y fotos de progreso)    -->
+    <!--    Android 13+ (API 33+)    -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
-    <!--   Android 12 y anteriores   -->
+    <!--    Android 12 y anteriores    -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
-    <!--   Micrófono (dictado por voz en el Entrenador IA)   -->
+    <!--    Micrófono (dictado por voz en el Entrenador IA)    -->
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
-    <!--   ID de publicidad (AdMob)   -->
+    <!--    ID de publicidad (AdMob)    -->
     <uses-permission android:name="com.google.android.gms.permission.AD_ID"/>
 </manifest>

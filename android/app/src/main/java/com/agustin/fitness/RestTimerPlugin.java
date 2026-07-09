@@ -1,5 +1,6 @@
 package com.agustin.fitness;
 
+import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
@@ -22,13 +23,11 @@ import java.util.Locale;
 @CapacitorPlugin(name = "RestTimerNotification")
 public class RestTimerPlugin extends Plugin {
 
-    // Cambié a v3 para forzar la recreación del canal con importancia ALTA (Heads-Up)
-    private static final String CHANNEL_ID = "modusfit-rest-chrono-v3";
+    private static final String CHANNEL_ID = "modusfit-rest-chrono-v4";
     private static final int NOTIFICATION_ID = 9100;
 
     @PluginMethod
     public void start(PluginCall call) {
-        // 1. Corrección del NullPointerException y variables redundantes
         Integer secondsParam = call.getInt("seconds");
         long seconds = (secondsParam != null) ? secondsParam.longValue() : 60L;
 
@@ -48,29 +47,45 @@ public class RestTimerPlugin extends Plugin {
 
         int minutes = (int) (seconds / 60);
         int secsRem = (int) (seconds % 60);
-
-        // 2. Corrección del bug de Locale en String.format
         String durationLabel = minutes > 0
                 ? String.format(Locale.getDefault(), "Descanso de %d:%02d", minutes, secsRem)
                 : String.format(Locale.getDefault(), "Descanso de %d seg", secsRem);
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
                 .setSmallIcon(getIconResId(context))
-                .setContentTitle("La cuenta regresiva está corriendo")
+                .setContentTitle("Descanso en curso")
                 .setContentText(durationLabel + " — toca para volver a Modus Fit")
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
-                // 3. Corrección clave para que aparezca expandida (estilo Spotify):
-                // Debe ser HIGH, con DEFAULT solo se queda en la barra silenciosamente
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setCategory(NotificationCompat.CATEGORY_STOPWATCH)
                 .setColor(Color.parseColor("#14B8A6"))
+                .setColorized(true)
                 .setContentIntent(pendingIntent)
                 .setWhen(whenMillis)
                 .setUsesChronometer(true)
                 .setChronometerCountDown(true)
                 .setShowWhen(true)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC);
+
+        // ===== LIVE UPDATE / STATUS BAR CHIP (Android 16+, API 36) =====
+        // Esto es lo que hace que el cronómetro aparezca como "chip" al lado
+        // de la hora — igual que Spotify — sin bajar la barra. Solo existe en
+        // Android 16+; en versiones anteriores el resto de la notificación
+        // funciona igual (aparece expandida al bajar la barra).
+        if (Build.VERSION.SDK_INT >= 36) {
+            try {
+                // setRequestPromotedOngoing(true) → promueve la notif al chip
+                builder.setRequestPromotedOngoing(true);
+                // setShortCriticalText → el texto que se ve en el chip (máx útil ~7 chars)
+                String chipText = minutes > 0
+                        ? String.format(Locale.getDefault(), "%d:%02d", minutes, secsRem)
+                        : (secsRem + "s");
+                builder.setShortCriticalText(chipText);
+            } catch (Throwable ignored) {
+                // Si el método no existe (compilado contra SDK viejo), se ignora.
+            }
+        }
 
         try {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU
@@ -99,16 +114,14 @@ public class RestTimerPlugin extends Plugin {
     }
 
     private void createChannel(Context context) {
-        // 4. Corrección del error crítico: Envolver en comprobación de API 26+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            // Para notificaciones flotantes (Heads-Up), la importancia del canal debe ser HIGH
             NotificationChannel channel = new NotificationChannel(
                     CHANNEL_ID, "Cronómetro de descanso",
                     NotificationManager.IMPORTANCE_HIGH
             );
             channel.setDescription("Cuenta regresiva del descanso entre series");
             channel.setShowBadge(false);
-            channel.setSound(null, null); // sin sonido al aparecer — solo visual
+            channel.setSound(null, null);
             channel.enableVibration(false);
             NotificationManager manager = context.getSystemService(NotificationManager.class);
             if (manager != null) manager.createNotificationChannel(channel);
