@@ -3453,7 +3453,11 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   // un dato extra que se guarda si lo cargás, pero no decide el récord.
   const computedPR = useMemo(() => {
     if (cardio) { let best = null; history.forEach((h) => { if (!best || (h.minutes || 0) > (best.minutes || 0)) best = { minutes: h.minutes, km: h.km }; }); return best; }
-    let best = setDef.pr ? { ...setDef.pr } : null; history.forEach((h) => { if (!best || vol(h.kg, h.reps) > vol(best.kg, best.reps)) best = { kg: h.kg, reps: h.reps }; }); return best;
+    // La marca "a superar" se elige por 1RM ESTIMADO, no por volumen. Con
+    // volumen, 95×8 (760) le ganaba a 110×5 (550) y se mostraba la serie
+    // más liviana como tu mejor marca — que es justo lo que se veía mal en
+    // el muñeco y en el "A superar". Por 1RM, 110×5 (128) supera a 95×8 (120).
+    let best = setDef.pr ? { ...setDef.pr } : null; history.forEach((h) => { if (!best || estimate1RM(h.kg, h.reps) > estimate1RM(best.kg, best.reps)) best = { kg: h.kg, reps: h.reps }; }); return best;
   }, [history, setDef.pr, cardio]);
   const currentPR = useMemo(() => {
     // Tomar el MEJOR entre el override manual y el historial real.
@@ -3463,7 +3467,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     if (!override && !computedPR) return null;
     if (!override) return computedPR;
     if (!computedPR) return override;
-    return vol(override.kg, override.reps) >= vol(computedPR.kg, computedPR.reps) ? override : computedPR;
+    return estimate1RM(override.kg, override.reps) >= estimate1RM(computedPR.kg, computedPR.reps) ? override : computedPR;
   }, [override, computedPR]);
   const suggestedKg = !cardio && currentPR && deloadMode ? Math.round(currentPR.kg * deloadKgFactor * 2) / 2 : null;
   const draft = drafts[key] || {};
@@ -3557,11 +3561,15 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     // marca!", ni el popup automático para compartir. Igual queda
     // guardada como el punto de partida para comparar la próxima vez.
     const isFirstEver = !currentPR;
-    const prevVol = currentPR ? vol(currentPR.kg, currentPR.reps) : 0, newVol = vol(k, r);
+    // El récord se evalúa por 1RM ESTIMADO (consistente con la marca "a
+    // superar" que se muestra). Antes usaba volumen: guardar 95×8 tras un
+    // 110×5 marcaba "récord" (760>550) aunque tu 1RM real no mejorara, y
+    // encima cambiaba la marca mostrada a la serie más liviana.
+    const prev1RM = currentPR ? estimate1RM(currentPR.kg, currentPR.reps) : 0, new1RM = estimate1RM(k, r);
     const entry = { date: today, reps: r, kg: k }; if (rpe != null) entry.rpe = rpe;
     const newHistory = [...history.filter((h) => h.date !== today), entry];
     let newLogs = { ...logs, [key]: newHistory };
-    const isPR = !isFirstEver && newVol > prevVol;
+    const isPR = !isFirstEver && new1RM > prev1RM;
     if (isFirstEver || isPR) newLogs = { ...newLogs, [prKey]: { kg: k, reps: r, date: today } };
     setLogs(newLogs); setSaved(true); setTimeout(() => setSaved(false), 1200);
     // Limpiar el draft al guardar → la serie queda lockeada (se muestra el
@@ -3589,7 +3597,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     const suggestUp = !isNaN(repTop) && r > repTop;
     if (isFirstEver) { haptic(18); setFeedback({ type: "first", msg: "Primera marca registrada 📝", suggestUp, noSession }); }
     else if (isPR) { haptic([35, 25, 45]); setPrBurst((n) => n + 1); setFeedback({ type: "pr", msg: "¡Nueva marca! 🔥", suggestUp, noSession }); if (autoShowPrShare) setShowPRShare(true); }
-    else { haptic(18); if (newVol === prevVol) setFeedback({ type: "tie", msg: "Igualaste tu marca 💪", suggestUp: false, noSession }); else setFeedback({ type: "down", msg: `-${(((prevVol - newVol) / prevVol) * 100).toFixed(0)}% vs récord`, suggestUp: false, noSession }); }
+    else { haptic(18); if (new1RM === prev1RM) setFeedback({ type: "tie", msg: "Igualaste tu marca 💪", suggestUp: false, noSession }); else setFeedback({ type: "down", msg: `-${(((prev1RM - new1RM) / prev1RM) * 100).toFixed(0)}% vs récord`, suggestUp: false, noSession }); }
   };
   const savePR = () => { const r = parseFloat(editReps), k = parseFloat(editKg); if (!r || !k || isNaN(r) || isNaN(k)) return; setLogs({ ...logs, [prKey]: { kg: k, reps: r } }); setEditingPR(false); };
   return (
@@ -4709,7 +4717,7 @@ function DeloadView({ logs, settings = DEFAULT_SETTINGS, deloadProgress = {}, se
       <div key={activeDay} className="space-y-3 tab-fade-in">
         {day.exercises.map((ex) => {
           const deloadSets = Math.max(1, Math.ceil(ex.sets.length / deloadSetDivisor));
-          const bestPerSet = ex.sets.map((s, i) => { const h = logs[`${ex.id}_${i}`] || []; let best = s.pr ? { ...s.pr } : null; const ov = logs[`${ex.id}_${i}_pr_override`]; if (ov) best = ov; else h.forEach((e) => { const scoreE = ex.cardio ? (e.minutes || 0) : vol(e.kg, e.reps); const scoreB = best ? (ex.cardio ? (best.minutes || 0) : vol(best.kg, best.reps)) : -1; if (!best || scoreE > scoreB) best = e; }); return best; });
+          const bestPerSet = ex.sets.map((s, i) => { const h = logs[`${ex.id}_${i}`] || []; let best = s.pr ? { ...s.pr } : null; const ov = logs[`${ex.id}_${i}_pr_override`]; if (ov) best = ov; else h.forEach((e) => { const scoreE = ex.cardio ? (e.minutes || 0) : estimate1RM(e.kg, e.reps); const scoreB = best ? (ex.cardio ? (best.minutes || 0) : estimate1RM(best.kg, best.reps)) : -1; if (!best || scoreE > scoreB) best = e; }); return best; });
           const hasPR = bestPerSet.some(Boolean);
           const hasHeavy = ex.sets.slice(0, deloadSets).some((s) => isHeavyRepRange(s.repRange));
           return (

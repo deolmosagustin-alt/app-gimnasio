@@ -25,7 +25,7 @@ import java.util.Locale;
 public class RestTimerPlugin extends Plugin {
 
     private static final String TAG = "RestTimerPlugin";
-    private static final String CHANNEL_ID = "modusfit-rest-chrono-v5";
+    private static final String CHANNEL_ID = "modusfit-rest-chrono-v6";
     private static final int NOTIFICATION_ID = 9100;
 
     @PluginMethod
@@ -40,47 +40,54 @@ public class RestTimerPlugin extends Plugin {
 
         Intent openIntent = new Intent(context, MainActivity.class);
         openIntent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-
         int flags = PendingIntent.FLAG_UPDATE_CURRENT;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            flags |= PendingIntent.FLAG_IMMUTABLE;
-        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) flags |= PendingIntent.FLAG_IMMUTABLE;
         PendingIntent pendingIntent = PendingIntent.getActivity(context, 0, openIntent, flags);
 
         int minutes = (int) (seconds / 60);
         int secsRem = (int) (seconds % 60);
-        String durationLabel = minutes > 0
-                ? String.format(Locale.getDefault(), "Descanso de %d:%02d", minutes, secsRem)
-                : String.format(Locale.getDefault(), "Descanso de %d seg", secsRem);
+        String chipText = minutes > 0
+                ? String.format(Locale.getDefault(), "%d:%02d", minutes, secsRem)
+                : (secsRem + "s");
 
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
                 .setSmallIcon(getIconResId(context))
                 .setContentTitle("Descanso en curso")
-                .setContentText(durationLabel + " — toca para volver a Modus Fit")
+                .setContentText("Modus Fit · próxima serie")
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setCategory(NotificationCompat.CATEGORY_STOPWATCH)
-                // Color del icono/acento — SIN setColorized(true): la doc de
-                // Live Updates exige que NO esté colorizada para promover el
-                // chip. setColorized(true) era justamente lo que impedía que
-                // apareciera al lado de la hora.
                 .setColor(Color.parseColor("#14B8A6"))
                 .setContentIntent(pendingIntent)
+                // Cronómetro en cuenta regresiva. setShowWhen(FALSE) es
+                // OBLIGATORIO: la doc de Live Updates dice que el "when time"
+                // NO debe mostrarse en la notif para que el chip use el
+                // cronómetro. Tenerlo en true impedía el chip.
                 .setWhen(whenMillis)
+                .setShowWhen(false)
                 .setUsesChronometer(true)
                 .setChronometerCountDown(true)
-                .setShowWhen(true)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC);
 
         // ===== LIVE UPDATE / STATUS BAR CHIP (Android 16+, API 36) =====
+        // Requiere: permiso POST_PROMOTED_NOTIFICATIONS (manifest),
+        // setRequestPromotedOngoing(true), un estilo ELEGIBLE (Standard/
+        // BigText/Call/Progress), ongoing, y setShortCriticalText para el
+        // texto del chip. Usamos ProgressStyle (el estilo pensado para
+        // tareas con inicio y fin, como este descanso) que es lo que
+        // dispara el chip en la barra de estado.
         if (Build.VERSION.SDK_INT >= 36) {
             try {
                 builder.setRequestPromotedOngoing(true);
-                String chipText = minutes > 0
-                        ? String.format(Locale.getDefault(), "%d:%02d", minutes, secsRem)
-                        : (secsRem + "s");
                 builder.setShortCriticalText(chipText);
+                // ProgressStyle: barra de progreso llena (el descanso corriendo).
+                NotificationCompat.ProgressStyle progressStyle =
+                        new NotificationCompat.ProgressStyle()
+                                .setProgress(100, 100)
+                                .setProgressTrackerIcon(
+                                        androidx.core.graphics.drawable.IconCompat.createWithResource(context, getIconResId(context)));
+                builder.setStyle(progressStyle);
             } catch (Throwable t) {
                 Log.w(TAG, "Live Update API no disponible: " + t.getMessage());
             }
@@ -88,8 +95,7 @@ public class RestTimerPlugin extends Plugin {
 
         Notification notification = builder.build();
 
-        // Diagnóstico: registra en Logcat si el sistema considera la notif
-        // promovible al chip. Filtrá "RestTimerPlugin" en Logcat para verlo.
+        // Diagnóstico — filtrá "RestTimerPlugin" en Logcat.
         if (Build.VERSION.SDK_INT >= 36) {
             try {
                 boolean promotable = notification.hasPromotableCharacteristics();
@@ -130,8 +136,6 @@ public class RestTimerPlugin extends Plugin {
 
     private void createChannel(Context context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            // IMPORTANCE_HIGH: NO puede ser IMPORTANCE_MIN (la doc de Live
-            // Updates lo prohíbe para promover el chip).
             NotificationChannel channel = new NotificationChannel(
                     CHANNEL_ID, "Cronómetro de descanso",
                     NotificationManager.IMPORTANCE_HIGH
