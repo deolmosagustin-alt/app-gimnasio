@@ -795,7 +795,7 @@ function buildSessionsIndex(logs, trainingSessions = []) {
       const thisVol = vol(e.kg, e.reps);
       const isImprovement = thisVol > 0 && thisVol > priorBest;
       if (isImprovement) s.improvedCount++;
-      s.items.push({ exerciseId, exerciseName: ex.name, dayKey: ex.dayKey, setIndex, reps: e.reps, kg: e.kg, rpe: e.rpe ?? null, isImprovement });
+      s.items.push({ exerciseId, exerciseName: ex.name, dayKey: ex.dayKey, setIndex, reps: e.reps, kg: e.kg, minutes: e.minutes ?? null, km: e.km ?? null, rpe: e.rpe ?? null, isImprovement });
       s.totalVolume += thisVol;
       if (e.rpe != null) { s.rpeSum += e.rpe; s.rpeCount++; }
     });
@@ -3469,7 +3469,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   const draft = drafts[key] || {};
   const reps = draft.reps ?? ""; const kg = draft.kg ?? ""; const rpe = draft.rpe ?? null;
   const minutes = draft.minutes ?? ""; const km = draft.km ?? "";
-  const updateDraft = (patch) => { if (setDrafts) setDrafts({ ...drafts, [key]: { ...draft, ...patch } }); };
+  const updateDraft = (patch) => { if (setDrafts) setDrafts((prev) => ({ ...prev, [key]: { ...(prev[key] || {}), ...patch } })); };
   const [feedback, setFeedback] = useState(null);
   const [showRpeLocal, setShowRpeLocal] = useState(false);
   const showRpe = showRpeLocal || rpe != null;
@@ -3531,7 +3531,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
       // Detectar si el nuevo récord sube de rango (tier change)
       try {
         const exLib = EXERCISE_LIBRARY_BY_ID[exerciseId];
-        if (exLib?.group && newBest) {
+        if (exLib?.group && (isFirstEver || isPR)) {
           const prevRankData = getBest1RMForMuscleGroup(exLib.group, logs);
           const newRankData = getBest1RMForMuscleGroup(exLib.group, newLogs);
           const prevRank = getMuscleRank(exLib.group, prevRankData.best1RM);
@@ -3581,6 +3581,12 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
       }
     } catch { }
     const noSession = !hasActiveSession;
+    // suggestUp: si superaste el techo del rango de reps objetivo, sugerimos
+    // subir el peso la próxima. Antes esta variable se USABA sin estar
+    // definida → ReferenceError que impedía que apareciera CUALQUIER mensaje
+    // al guardar (incluido "¡Nueva marca!"). Ahora se calcula acá.
+    const repTop = repRangeTop(setDef.repRange);
+    const suggestUp = !isNaN(repTop) && r > repTop;
     if (isFirstEver) { haptic(18); setFeedback({ type: "first", msg: "Primera marca registrada 📝", suggestUp, noSession }); }
     else if (isPR) { haptic([35, 25, 45]); setPrBurst((n) => n + 1); setFeedback({ type: "pr", msg: "¡Nueva marca! 🔥", suggestUp, noSession }); if (autoShowPrShare) setShowPRShare(true); }
     else { haptic(18); if (newVol === prevVol) setFeedback({ type: "tie", msg: "Igualaste tu marca 💪", suggestUp: false, noSession }); else setFeedback({ type: "down", msg: `-${(((prevVol - newVol) / prevVol) * 100).toFixed(0)}% vs récord`, suggestUp: false, noSession }); }
@@ -3639,7 +3645,6 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           evitar guardar dos veces sin querer. Sin sesión iniciada (o después
           de finalizar) los inputs quedan desbloqueados siempre. */}
       {(() => {
-        const today = new Date().toISOString().split("T")[0];
         const key = `${exerciseId}_${setIndex}`;
         const history = logs[key] || [];
         const todayEntry = history.find((h) => h.date === today);
@@ -6464,7 +6469,7 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
       {showCycleSetup && (
         <div className="bg-slate-900/80 border border-slate-700/50 rounded-2xl p-4 space-y-3 bounce-in">
           <p className="text-sm font-semibold text-white">¿Cuándo empezaste el ciclo actual?</p>
-          <input type="date" className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none" defaultValue={cycleStart ? new Date(cycleStart).toISOString().slice(0, 10) : todayStr()} id="cycle-date-input" />
+          <input type="date" className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none" defaultValue={cycleStart ? localDateStr(new Date(cycleStart)) : todayStr()} id="cycle-date-input" />
           <div className="flex gap-2">
             <button onClick={() => setShowCycleSetup(false)} className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-400 text-sm font-semibold">Cancelar</button>
             <button onClick={() => { const val = document.getElementById("cycle-date-input").value; if (val) { onSetCycleStart(new Date(val)); setShowCycleSetup(false); } }} className="flex-1 py-3 rounded-xl bg-teal-500 !text-white text-sm font-bold">Guardar</button>
@@ -8697,22 +8702,8 @@ export default function App() {
   });
   const [tab, setTab] = useState("rutina");
   useEffect(() => { window.scrollTo({ top: 0 }); }, [tab]);
-  // Permisos de notificación + canales al ARRANQUE de la app — antes solo
-  // se pedían al iniciar un descanso, y si esa cadena fallaba en silencio,
-  // los canales nunca existían (imposible de diagnosticar en Ajustes).
-  // Con esto, apenas abrís la app los canales quedan creados y visibles.
-  useEffect(() => {
-    (async () => {
-      try {
-        if (Capacitor.isNativePlatform()) {
-          const { display } = await LocalNotifications.requestPermissions();
-          if (display === "granted") {
-            await LocalNotifications.createChannel({ id: "ponos-rest-timer", name: "Descanso entre series", importance: 5, vibration: true });
-          }
-        }
-      } catch (err) { console.error("Setup de notificaciones:", err); }
-    })();
-  }, []);
+  // (Los permisos de notificación y el canal se piden en el efecto
+  // requestNotifPermission más abajo — un solo lugar, sin duplicar.)
   const [aiChatMessages, setAiChatMessages] = useState([
     { role: "assistant", text: "¡Hola! 👋 Soy tu **Entrenador IA**.\n\nConozco tu rutina, tus marcas y tu progreso — todo lo que registrás en la app.\n\nPuedo ayudarte a:\n• **Crear o modificar rutinas** a tu medida\n• **Analizar tu progreso** y detectar puntos débiles\n• **Resolver dudas** de técnica, series y descanso\n\n¿Por dónde empezamos? 💪" },
   ]);
@@ -8979,12 +8970,32 @@ export default function App() {
     setTab("rutinas");
   };
 
-  const setLogs = useCallback((newLogs) => { const np = { ...profiles, [activeProfile]: { ...profiles[activeProfile], logs: newLogs } }; setProfiles(np); saveProfiles(np); }, [profiles, activeProfile]);
+  const setLogs = useCallback((newLogsOrFn) => {
+    setProfiles((prev) => {
+      const cur = prev[activeProfile];
+      const nextLogs = typeof newLogsOrFn === "function" ? newLogsOrFn(cur?.logs || {}) : newLogsOrFn;
+      const np = { ...prev, [activeProfile]: { ...cur, logs: nextLogs } };
+      saveProfiles(np);
+      return np;
+    });
+  }, [activeProfile]);
   // `drafts` se guarda igual que `logs` (full-replace), pero son los valores
   // tipeados-sin-guardar de reps/kg/RPE en cada serie — ver SetRow. Sobreviven
   // a cambios de pestaña/día/colapsar tarjetas; sólo se limpian al resetear
   // el día (RoutineView) o al finalizar la sesión (handleEndSession, abajo).
-  const setDrafts = useCallback((newDrafts) => { const np = { ...profiles, [activeProfile]: { ...profiles[activeProfile], drafts: newDrafts } }; setProfiles(np); saveProfiles(np); }, [profiles, activeProfile]);
+  const setDrafts = useCallback((newDraftsOrFn) => {
+    setProfiles((prev) => {
+      const cur = prev[activeProfile];
+      // Soporta las dos formas: setDrafts(obj) y setDrafts(prevDrafts => obj).
+      // SetRow usa la forma funcional para evitar pisar cambios concurrentes;
+      // sin este soporte, la función se guardaba TAL CUAL como los drafts y
+      // corrompía todo el guardado/lockeo de series.
+      const nextDrafts = typeof newDraftsOrFn === "function" ? newDraftsOrFn(cur?.drafts || {}) : newDraftsOrFn;
+      const np = { ...prev, [activeProfile]: { ...cur, drafts: nextDrafts } };
+      saveProfiles(np);
+      return np;
+    });
+  }, [activeProfile]);
   // `deloadProgress` marca qué series ya tildaste como hechas en la semana
   // de descarga — guardado por fecha (no true/false) para que la próxima
   // semana de descarga, varias semanas después, arranque sin nada
