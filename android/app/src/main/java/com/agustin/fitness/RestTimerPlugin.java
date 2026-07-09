@@ -12,6 +12,7 @@ import android.os.Build;
 import android.util.Log;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
+import androidx.core.graphics.drawable.IconCompat;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -19,19 +20,27 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
 @CapacitorPlugin(name = "RestTimerNotification")
 public class RestTimerPlugin extends Plugin {
 
     private static final String TAG = "RestTimerPlugin";
-    private static final String CHANNEL_ID = "modusfit-rest-chrono-v6";
+    // Canal nuevo (v7) para que el diseño y la config se apliquen limpios
+    // sin heredar ajustes viejos que Android cachea por canal.
+    private static final String CHANNEL_ID = "modusfit-rest-chrono-v7";
     private static final int NOTIFICATION_ID = 9100;
+
+    // Paleta de la app
+    private static final int ACCENT = Color.parseColor("#14B8A6"); // teal marca
 
     @PluginMethod
     public void start(PluginCall call) {
         Integer secondsParam = call.getInt("seconds");
         long seconds = (secondsParam != null) ? secondsParam.longValue() : 60L;
+        String exerciseName = call.getString("exerciseName", "");
 
         Context context = getContext();
         createChannel(context);
@@ -50,43 +59,62 @@ public class RestTimerPlugin extends Plugin {
                 ? String.format(Locale.getDefault(), "%d:%02d", minutes, secsRem)
                 : (secsRem + "s");
 
+        // ===== DISEÑO MINIMALISTA (lo que se ve al bajar la barra) =====
+        // Título: solo "Descanso" — limpio, sin ruido. El cronómetro (when +
+        // usesChronometer) hace de protagonista a la derecha, contando solo.
+        // Subtexto: el nombre del ejercicio si vino, si no una línea sobria.
+        // El acento teal tiñe el ícono y la barra de progreso. Sin sonido,
+        // sin badge, sin vibración: presencia silenciosa y elegante.
+        String title = "Descanso";
+        String body = (exerciseName != null && !exerciseName.isEmpty())
+                ? exerciseName
+                : "Recuperá · próxima serie";
+
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
                 .setSmallIcon(getIconResId(context))
-                .setContentTitle("Descanso en curso")
-                .setContentText("Modus Fit · próxima serie")
+                .setContentTitle(title)
+                .setContentText(body)
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setCategory(NotificationCompat.CATEGORY_STOPWATCH)
-                .setColor(Color.parseColor("#14B8A6"))
+                .setColor(ACCENT)
                 .setContentIntent(pendingIntent)
-                // Cronómetro en cuenta regresiva. setShowWhen(FALSE) es
-                // OBLIGATORIO: la doc de Live Updates dice que el "when time"
-                // NO debe mostrarse en la notif para que el chip use el
-                // cronómetro. Tenerlo en true impedía el chip.
+                // Cronómetro en cuenta regresiva a la derecha del título.
+                // setShowWhen(FALSE) es obligatorio para el chip de Live
+                // Updates (el "when" no debe mostrarse como hora), pero el
+                // cronómetro sí se ve porque usamos setUsesChronometer.
                 .setWhen(whenMillis)
                 .setShowWhen(false)
                 .setUsesChronometer(true)
                 .setChronometerCountDown(true)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC);
 
-        // ===== LIVE UPDATE / STATUS BAR CHIP (Android 16+, API 36) =====
+        // ===== LIVE UPDATE / STATUS BAR CHIP (Android 16 QPR1+, API 36) =====
+        // IMPORTANTE: el chip al lado de la hora NO está activo en Android 16
+        // estable — llegó recién con QPR1. En estable esto no hace daño: la
+        // notificación se muestra igual (con la barra de progreso), y cuando
+        // el teléfono reciba QPR1 el chip aparece solo, sin tocar el código.
         // Requiere: permiso POST_PROMOTED_NOTIFICATIONS (manifest),
-        // setRequestPromotedOngoing(true), un estilo ELEGIBLE (Standard/
-        // BigText/Call/Progress), ongoing, y setShortCriticalText para el
-        // texto del chip. Usamos ProgressStyle (el estilo pensado para
-        // tareas con inicio y fin, como este descanso) que es lo que
-        // dispara el chip en la barra de estado.
+        // setRequestPromotedOngoing(true), estilo elegible (ProgressStyle),
+        // ongoing, y setShortCriticalText para el texto del chip.
         if (Build.VERSION.SDK_INT >= 36) {
             try {
                 builder.setRequestPromotedOngoing(true);
                 builder.setShortCriticalText(chipText);
-                // ProgressStyle: barra de progreso llena (el descanso corriendo).
+                // ProgressStyle: el TOTAL se define con segmentos
+                // (Segment(length)) y la posición con setProgress(valor) —
+                // UN solo argumento (Builder.setProgress toma tres, ProgressStyle
+                // toma uno). Un segmento teal lleno = barra de progreso estética
+                // que aparece abajo de la notificación, muy en la línea moderna.
+                List<NotificationCompat.ProgressStyle.Segment> segments = new ArrayList<>();
+                segments.add(new NotificationCompat.ProgressStyle.Segment(100).setColor(ACCENT));
                 NotificationCompat.ProgressStyle progressStyle =
                         new NotificationCompat.ProgressStyle()
-                                .setProgress(100, 100)
+                                .setProgressSegments(segments)
+                                .setProgress(100)
                                 .setProgressTrackerIcon(
-                                        androidx.core.graphics.drawable.IconCompat.createWithResource(context, getIconResId(context)));
+                                        IconCompat.createWithResource(context, getIconResId(context)));
                 builder.setStyle(progressStyle);
             } catch (Throwable t) {
                 Log.w(TAG, "Live Update API no disponible: " + t.getMessage());
@@ -95,11 +123,14 @@ public class RestTimerPlugin extends Plugin {
 
         Notification notification = builder.build();
 
-        // Diagnóstico — filtrá "RestTimerPlugin" en Logcat.
+        // Diagnóstico — filtrá "RestTimerPlugin" en Logcat. En Android 16
+        // estable esto va a decir normalmente false (el sistema aún no
+        // promueve); en QPR1+ debería dar true.
         if (Build.VERSION.SDK_INT >= 36) {
             try {
                 boolean promotable = notification.hasPromotableCharacteristics();
-                Log.i(TAG, "hasPromotableCharacteristics = " + promotable);
+                Log.i(TAG, "hasPromotableCharacteristics = " + promotable
+                        + " (chip solo visible en Android 16 QPR1+)");
             } catch (Throwable t) {
                 Log.w(TAG, "No se pudo verificar promotable: " + t.getMessage());
             }
@@ -144,6 +175,8 @@ public class RestTimerPlugin extends Plugin {
             channel.setShowBadge(false);
             channel.setSound(null, null);
             channel.enableVibration(false);
+            channel.enableLights(true);
+            channel.setLightColor(ACCENT);
             NotificationManager manager = context.getSystemService(NotificationManager.class);
             if (manager != null) manager.createNotificationChannel(channel);
         }
