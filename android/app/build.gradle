@@ -11,8 +11,8 @@ android {
         versionName "1.0.15"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
-             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
-             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
+            // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
+            // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
@@ -40,6 +40,24 @@ dependencies {
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
     implementation project(':capacitor-cordova-android-plugins')
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FIX: "Duplicate class kotlin.collections.jdk8..." al compilar.
+// Causa: dos versiones de la librería estándar de Kotlin chocando
+// (kotlin-stdlib 1.8.22 vs kotlin-stdlib-jdk8 1.6.21) que llegaron
+// arrastradas por los plugins de Capacitor (share/filesystem). Se
+// fuerza UNA sola versión de Kotlin en TODO el proyecto para que no
+// haya clases duplicadas. Desde Kotlin 1.8 los módulos -jdk7 y -jdk8
+// ya están incluidos dentro de kotlin-stdlib, así que redirigirlos a
+// 1.8.22 es seguro y no rompe nada.
+// ═══════════════════════════════════════════════════════════════
+configurations.all {
+    resolutionStrategy {
+        force "org.jetbrains.kotlin:kotlin-stdlib:1.8.22"
+        force "org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22"
+        force "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22"
+    }
 }
 
 apply from: 'capacitor.build.gradle'
