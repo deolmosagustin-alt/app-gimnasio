@@ -5035,13 +5035,17 @@ function scanContributorsFor1RM(contributors, logs, overriddenBaseKeys) {
     const entries = isOverride ? [val] : (Array.isArray(val) ? val : []);
     entries.forEach((e) => {
       if (!e || !e.kg || !e.reps) return;
-      // 1RM CRUDO del levantamiento (sin el factor de contribución): esto
-      // es lo que define cuál serie es "tu mejor marca" real. Entre 110×5
-      // (1RM≈128) y 95×8 (1RM≈120) gana 110×5 siempre, sin que el weight
-      // del grupo pueda invertir el resultado.
+      // Para elegir CUÁL serie es tu marca (bestKg/bestReps) comparamos por
+      // 1RM CRUDO — así entre 110×5 (1RM≈128) y 95×8 (1RM≈120) gana 110×5,
+      // sin que el factor de contribución del grupo (weight) pueda invertir
+      // el resultado eligiendo una serie con menos kg reales solo porque su
+      // ejercicio pesa más en el promedio del grupo.
       const rawRm = estimate1RM(e.kg * lf, e.reps);
-      const weightedRm = rawRm * weight;
-      if (weightedRm > best1RM) { best1RM = weightedRm; bestKg = e.kg; bestReps = e.reps; bestExerciseId = exerciseId; bestLoadFactor = lf; bestWeight = weight; bestRawRm = rawRm; }
+      if (rawRm > bestRawRm) {
+        bestRawRm = rawRm;
+        bestKg = e.kg; bestReps = e.reps; bestExerciseId = exerciseId; bestLoadFactor = lf; bestWeight = weight;
+        best1RM = rawRm * weight; // el número del ranking sí usa el weight
+      }
     });
   });
   return { best1RM, bestKg, bestReps, bestExerciseId, bestLoadFactor, bestWeight, bestRawRm };
@@ -5051,12 +5055,21 @@ function getBest1RMForMuscleGroup(groupKey, logs) {
   const { primary, always, secondary } = EXERCISE_LIBRARY_CONTRIBUTORS_BY_GROUP[groupKey] || { primary: new Map(), always: new Map(), secondary: new Map() };
   const primaryResult = scanContributorsFor1RM(primary, logs);
   const alwaysResult = scanContributorsFor1RM(always, logs);
-  // La marca mostrada es SIEMPRE la del ejercicio que ganó el cálculo del
-  // 1RM — antes, cuando ganaba un "siempre cuenta", se mostraba el kg×reps
-  // de otro ejercicio (el dedicado) junto al número del ganador: veías
-  // "95kg×8" aunque el rango salía de tus 110kg×5, y parecía que la app
-  // tomaba mal tu mejor marca.
-  const best = primaryResult.best1RM >= alwaysResult.best1RM ? primaryResult : alwaysResult;
+  // La marca que se MUESTRA prioriza el ejercicio PRIMARIO del músculo:
+  // si tenés una marca en un ejercicio dedicado (ej. curl para bíceps),
+  // esa es "tu marca de bíceps" aunque un ejercicio indirecto con weight
+  // alto (ej. remo, que también trabaja bíceps) diera un 1RM ponderado
+  // mayor. Solo si NO hay marca primaria se usa el "siempre cuenta".
+  // El ranking numérico sí puede usar el mayor de los dos; pero bestKg/
+  // bestReps (lo que ve el usuario) sale del primario cuando existe.
+  let best;
+  if (primaryResult.best1RM > 0) {
+    // Hay marca en un ejercicio primario: esa es la que se muestra. El
+    // número del ranking toma el mayor 1RM ponderado de ambos.
+    best = { ...primaryResult, best1RM: Math.max(primaryResult.best1RM, alwaysResult.best1RM) };
+  } else {
+    best = alwaysResult;
+  }
   const finalBest = best.best1RM > 0 ? best : scanContributorsFor1RM(secondary, logs);
 
   return {
@@ -7470,49 +7483,54 @@ Datos: ${JSON.stringify(context)}`;
     } catch {
       setIsListening(false); return; // permiso denegado
     }
-    // continuous=true mantiene la escucha activa; interimResults=true
-    // muestra las palabras en vivo mientras hablás. Acumulamos SOLO los
-    // resultados finales (procesados una vez por resultIndex) en el ref,
-    // y encima mostramos el interino actual — así no se repiten palabras
-    // ni se pierden entre pausas.
+    // ENFOQUE ROBUSTO PARA ANDROID:
+    // El bug de repetición viene de continuous=true: en Android Chrome, al
+    // reiniciar el reconocimiento (que se corta solo cada pocos segundos),
+    // los resultados finales previos se RE-EMITEN con resultIndex en 0, y
+    // se acumulan de nuevo → cada frase aparece 2, 3, 4 veces.
+    //
+    // Solución: continuous=false (un segmento corto por instancia). Cada
+    // instancia entrega UNA transcripción final, la agregamos al ref una
+    // sola vez, y arrancamos una instancia nueva. El interino se muestra
+    // aparte y NO se acumula. Así cada palabra entra exactamente una vez.
     const startRecognition = () => {
       if (!listeningRef.current) return;
       const recognition = new SpeechRecognitionAPI();
       recognition.lang = "es-AR";
       recognition.interimResults = true;
-      recognition.continuous = true;
+      recognition.continuous = false; // clave: un segmento por instancia
       recognition.maxAlternatives = 1;
-      let processedIndex = 0; // hasta qué resultado ya guardamos como final
+      let segmentFinal = ""; // la transcripción final de ESTE segmento
+
       recognition.onresult = (e) => {
         let interim = "";
-        for (let i = e.resultIndex; i < e.results.length; i++) {
+        let finalThisSegment = "";
+        for (let i = 0; i < e.results.length; i++) {
           const res = e.results[i];
-          const txt = res[0].transcript;
-          if (res.isFinal) {
-            if (i >= processedIndex) {
-              finalTranscriptRef.current += txt + " ";
-              processedIndex = i + 1;
-            }
-          } else {
-            interim += txt;
-          }
+          if (res.isFinal) finalThisSegment += res[0].transcript;
+          else interim += res[0].transcript;
         }
-        setInput((finalTranscriptRef.current + interim).trim());
+        segmentFinal = finalThisSegment;
+        // Mostrar: lo ya confirmado (ref) + lo de este segmento + interino
+        const preview = (finalTranscriptRef.current + finalThisSegment + " " + interim).replace(/\s+/g, " ").trim();
+        setInput(preview);
       };
       recognition.onerror = (e) => {
-        // "no-speech"/"aborted" son cortes normales; el onend reinicia.
         if (e.error !== "no-speech" && e.error !== "aborted") {
           listeningRef.current = false;
           setIsListening(false);
         }
       };
       recognition.onend = () => {
-        // Android corta la escucha sola cada tanto. Reiniciamos con una
-        // instancia NUEVA (no recognition.start() sobre la misma, que
-        // re-entrega resultados viejos). El texto final ya está en el ref.
         recognitionRef.current = null;
+        // Consolidar el final de este segmento al acumulado — UNA sola vez.
+        if (segmentFinal.trim()) {
+          finalTranscriptRef.current = (finalTranscriptRef.current + segmentFinal + " ").replace(/\s+/g, " ");
+          setInput(finalTranscriptRef.current.trim());
+        }
+        // Siguiente segmento si el usuario sigue en modo escucha.
         if (listeningRef.current) {
-          setTimeout(startRecognition, 200);
+          setTimeout(startRecognition, 120);
         } else {
           setIsListening(false);
         }
@@ -8815,8 +8833,8 @@ export default function App() {
     let meta = document.querySelector('meta[name="viewport"]');
     if (!meta) { meta = document.createElement("meta"); meta.name = "viewport"; document.head.appendChild(meta); }
     meta.content = allowZoom
-      ? "width=device-width, initial-scale=1, viewport-fit=cover"
-      : "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover";
+      ? "width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content"
+      : "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content";
   }, [allowZoom]);
   // Letras chicas (Perfil → Tamaño de letra → "Letras chicas"): multiplica
   // los text-[Npx] fijos (consejos, récords, RPE, badges...) — ver la

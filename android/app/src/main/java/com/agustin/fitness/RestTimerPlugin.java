@@ -9,6 +9,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.os.Build;
+import android.util.Log;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 
@@ -23,7 +24,8 @@ import java.util.Locale;
 @CapacitorPlugin(name = "RestTimerNotification")
 public class RestTimerPlugin extends Plugin {
 
-    private static final String CHANNEL_ID = "modusfit-rest-chrono-v4";
+    private static final String TAG = "RestTimerPlugin";
+    private static final String CHANNEL_ID = "modusfit-rest-chrono-v5";
     private static final int NOTIFICATION_ID = 9100;
 
     @PluginMethod
@@ -59,8 +61,11 @@ public class RestTimerPlugin extends Plugin {
                 .setOnlyAlertOnce(true)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setCategory(NotificationCompat.CATEGORY_STOPWATCH)
+                // Color del icono/acento — SIN setColorized(true): la doc de
+                // Live Updates exige que NO esté colorizada para promover el
+                // chip. setColorized(true) era justamente lo que impedía que
+                // apareciera al lado de la hora.
                 .setColor(Color.parseColor("#14B8A6"))
-                .setColorized(true)
                 .setContentIntent(pendingIntent)
                 .setWhen(whenMillis)
                 .setUsesChronometer(true)
@@ -69,31 +74,41 @@ public class RestTimerPlugin extends Plugin {
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC);
 
         // ===== LIVE UPDATE / STATUS BAR CHIP (Android 16+, API 36) =====
-        // Esto es lo que hace que el cronómetro aparezca como "chip" al lado
-        // de la hora — igual que Spotify — sin bajar la barra. Solo existe en
-        // Android 16+; en versiones anteriores el resto de la notificación
-        // funciona igual (aparece expandida al bajar la barra).
         if (Build.VERSION.SDK_INT >= 36) {
             try {
-                // setRequestPromotedOngoing(true) → promueve la notif al chip
                 builder.setRequestPromotedOngoing(true);
-                // setShortCriticalText → el texto que se ve en el chip (máx útil ~7 chars)
                 String chipText = minutes > 0
                         ? String.format(Locale.getDefault(), "%d:%02d", minutes, secsRem)
                         : (secsRem + "s");
                 builder.setShortCriticalText(chipText);
-            } catch (Throwable ignored) {
-                // Si el método no existe (compilado contra SDK viejo), se ignora.
+            } catch (Throwable t) {
+                Log.w(TAG, "Live Update API no disponible: " + t.getMessage());
+            }
+        }
+
+        Notification notification = builder.build();
+
+        // Diagnóstico: registra en Logcat si el sistema considera la notif
+        // promovible al chip. Filtrá "RestTimerPlugin" en Logcat para verlo.
+        if (Build.VERSION.SDK_INT >= 36) {
+            try {
+                boolean promotable = notification.hasPromotableCharacteristics();
+                Log.i(TAG, "hasPromotableCharacteristics = " + promotable);
+            } catch (Throwable t) {
+                Log.w(TAG, "No se pudo verificar promotable: " + t.getMessage());
             }
         }
 
         try {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU
                     || context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
-                NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, builder.build());
+                NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, notification);
+                Log.i(TAG, "Notificación posteada (id " + NOTIFICATION_ID + ")");
+            } else {
+                Log.w(TAG, "Sin permiso POST_NOTIFICATIONS — no se posteó");
             }
         } catch (SecurityException e) {
-            // Sin permiso de notificaciones — la app sigue igual.
+            Log.e(TAG, "SecurityException al postear: " + e.getMessage());
         }
 
         JSObject ret = new JSObject();
@@ -106,7 +121,7 @@ public class RestTimerPlugin extends Plugin {
         try {
             NotificationManagerCompat.from(getContext()).cancel(NOTIFICATION_ID);
         } catch (SecurityException e) {
-            // Sin permiso no hay nada que cancelar.
+            Log.e(TAG, "SecurityException al cancelar: " + e.getMessage());
         }
         JSObject ret = new JSObject();
         ret.put("stopped", true);
@@ -115,6 +130,8 @@ public class RestTimerPlugin extends Plugin {
 
     private void createChannel(Context context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            // IMPORTANCE_HIGH: NO puede ser IMPORTANCE_MIN (la doc de Live
+            // Updates lo prohíbe para promover el chip).
             NotificationChannel channel = new NotificationChannel(
                     CHANNEL_ID, "Cronómetro de descanso",
                     NotificationManager.IMPORTANCE_HIGH
