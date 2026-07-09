@@ -226,8 +226,11 @@ const CLOUD_PROFILE_FIELDS = [
   "settings", "activeRoutineId", "routines", "weekSchedule",
   // Historial de entrenamiento completo
   "logs", "trainingSessions",
-  // Medidas corporales (sin fotos — demasiado grandes para Firestore)
+  // Medidas corporales (sin fotos de progreso — demasiado grandes para Firestore)
   "measurements",
+  // Foto de perfil comprimida (chica, ~256px) — SÍ se sincroniza para que
+  // aparezca en cualquier dispositivo. Las fotos de progreso siguen locales.
+  "avatarData",
   // Estado de ciclo y descarga
   "cycleStart", "deloadProgress", "dismissedDeloadCycle", "lastSeenCycleNumber",
   // UI state
@@ -556,6 +559,18 @@ async function idbPut(key, value) {
     await new Promise((res, rej) => {
       const tx = db.transaction(IDB_STORE, "readwrite");
       tx.objectStore(IDB_STORE).put({ value, savedAt: new Date().toISOString() }, key);
+      tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+    });
+    db.close();
+  } catch { /* best effort, ignore */ }
+}
+
+async function idbDelete(key) {
+  try {
+    const db = await openIDB();
+    await new Promise((res, rej) => {
+      const tx = db.transaction(IDB_STORE, "readwrite");
+      tx.objectStore(IDB_STORE).delete(key);
       tx.oncomplete = res; tx.onerror = () => rej(tx.error);
     });
     db.close();
@@ -3570,7 +3585,18 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     const newHistory = [...history.filter((h) => h.date !== today), entry];
     let newLogs = { ...logs, [key]: newHistory };
     const isPR = !isFirstEver && new1RM > prev1RM;
-    if (isFirstEver || isPR) newLogs = { ...newLogs, [prKey]: { kg: k, reps: r, date: today } };
+    // NO guardamos un override automático al hacer récord. El récord se
+    // calcula SIEMPRE del historial real (que ya tiene todas tus series). El
+    // override (`prKey`) queda reservado para cuando el usuario corrige la
+    // marca a mano. Guardarlo automáticamente creaba un dato duplicado que se
+    // desincronizaba del historial: si una versión vieja guardó 8×95 como
+    // override y después hiciste 9×95, el override viejo quedaba "pegado" y
+    // pisaba tu marca real para siempre. Además, si el historial nuevo YA
+    // alcanzó o superó un override viejo, lo borramos acá para limpiar el
+    // fantasma de una vez.
+    if (override && newHistory.some((h) => estimate1RM(h.kg, h.reps) >= estimate1RM(override.kg, override.reps))) {
+      const cleaned = { ...newLogs }; delete cleaned[prKey]; newLogs = cleaned;
+    }
     setLogs(newLogs); setSaved(true); setTimeout(() => setSaved(false), 1200);
     // Limpiar el draft al guardar → la serie queda lockeada (se muestra el
     // bloque "guardado hoy" con botón Editar), en vez de quedar en modo input.
@@ -4360,7 +4386,13 @@ function ShareSummaryCard({ logs, trainingSessions = [] }) {
     let best1rm = 0, bestKg = 0, bestReps = 0;
     Array.from({ length: ex.sets }).forEach((_, i) => {
       const ov = logs[`${ex.id}_${i}_pr_override`], h = logs[`${ex.id}_${i}`] || [];
-      const entries = ov ? [ov] : h;
+      // Consideramos el override MANUAL *y* el historial real juntos, y nos
+      // quedamos con el de mayor 1RM. Antes se usaba SOLO el override cuando
+      // existía (`ov ? [ov] : h`), lo que hacía que un override viejo (ej.
+      // 8×95, guardado automáticamente por una versión anterior) pisara para
+      // siempre marcas nuevas mejores del historial (ej. 9×95) — el famoso
+      // "dato fantasma" que no se actualizaba nunca.
+      const entries = ov ? [ov, ...h] : h;
       entries.forEach((e) => { const rm = estimate1RM(e.kg, e.reps); if (rm > best1rm) { best1rm = rm; bestKg = e.kg; bestReps = e.reps; } });
     });
     return { best1rm, bestKg, bestReps };
@@ -4717,7 +4749,7 @@ function DeloadView({ logs, settings = DEFAULT_SETTINGS, deloadProgress = {}, se
       <div key={activeDay} className="space-y-3 tab-fade-in">
         {day.exercises.map((ex) => {
           const deloadSets = Math.max(1, Math.ceil(ex.sets.length / deloadSetDivisor));
-          const bestPerSet = ex.sets.map((s, i) => { const h = logs[`${ex.id}_${i}`] || []; let best = s.pr ? { ...s.pr } : null; const ov = logs[`${ex.id}_${i}_pr_override`]; if (ov) best = ov; else h.forEach((e) => { const scoreE = ex.cardio ? (e.minutes || 0) : estimate1RM(e.kg, e.reps); const scoreB = best ? (ex.cardio ? (best.minutes || 0) : estimate1RM(best.kg, best.reps)) : -1; if (!best || scoreE > scoreB) best = e; }); return best; });
+          const bestPerSet = ex.sets.map((s, i) => { const h = logs[`${ex.id}_${i}`] || []; let best = s.pr ? { ...s.pr } : null; const ov = logs[`${ex.id}_${i}_pr_override`]; if (ov) best = ov; const pool = ov ? h : h; pool.forEach((e) => { const scoreE = ex.cardio ? (e.minutes || 0) : estimate1RM(e.kg, e.reps); const scoreB = best ? (ex.cardio ? (best.minutes || 0) : estimate1RM(best.kg, best.reps)) : -1; if (!best || scoreE > scoreB) best = e; }); return best; });
           const hasPR = bestPerSet.some(Boolean);
           const hasHeavy = ex.sets.slice(0, deloadSets).some((s) => isHeavyRepRange(s.repRange));
           return (
@@ -6282,25 +6314,66 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
   const activeRoutineDef = resolveRoutineDef(profile?.routines?.[profile?.activeRoutineId], profile?.activeRoutineId);
   const savedRoutineCount = Object.keys(profile?.routines || {}).length;
 
-  // Foto de perfil — se guarda en IndexedDB con la clave avatar_${profileName}
-  // (igual que las fotos de progreso, no va a Firestore por tamaño).
+  // Foto de perfil. Se guarda comprimida (~256px) en DOS lugares: en el
+  // perfil (campo avatarData → se SINCRONIZA a Firebase, así aparece en
+  // cualquier dispositivo) y en IndexedDB (para carga instantánea local sin
+  // esperar la nube). Antes solo iba a IndexedDB, por eso no aparecía al
+  // entrar desde otro dispositivo ni desde la web.
   const [avatarUrl, setAvatarUrl] = useState(null);
   const avatarInputRef = useRef(null);
   useEffect(() => {
+    // Prioridad: lo que vino sincronizado en el perfil; si no, IndexedDB local.
+    if (profile?.avatarData) {
+      setAvatarUrl(profile.avatarData);
+      // Espejamos a IndexedDB para que HeaderAvatar y SideNav (que leen de
+      // IndexedDB) también la muestren al entrar desde otro dispositivo.
+      idbPut(`avatar_${profileName}`, profile.avatarData).catch(() => {});
+      return;
+    }
     idbGet(`avatar_${profileName}`).then((data) => { if (data) setAvatarUrl(data); }).catch(() => {});
-  }, [profileName]);
-  const handleAvatarChange = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  }, [profileName, profile?.avatarData]);
+
+  // Comprime la imagen elegida a un cuadrado de máx 256px (suficiente para un
+  // avatar) y la devuelve como dataURL JPEG liviano que entra sin problema en
+  // Firestore (muy por debajo del límite de 1MB por documento).
+  const compressAvatar = (file) => new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (ev) => {
-      const dataUrl = ev.target.result;
-      setAvatarUrl(dataUrl);
-      idbPut(`avatar_${profileName}`, dataUrl).then(() => {
-        window.dispatchEvent(new Event("modusfit-avatar-updated"));
-      }).catch(() => {});
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 256;
+        const side = Math.min(img.width, img.height);
+        const sx = (img.width - side) / 2, sy = (img.height - side) / 2;
+        const canvas = document.createElement("canvas");
+        canvas.width = MAX; canvas.height = MAX;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, sx, sy, side, side, 0, 0, MAX, MAX);
+        resolve(canvas.toDataURL("image/jpeg", 0.82));
+      };
+      img.onerror = reject;
+      img.src = ev.target.result;
     };
+    reader.onerror = reject;
     reader.readAsDataURL(file);
+  });
+
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const dataUrl = await compressAvatar(file);
+      setAvatarUrl(dataUrl);
+      idbPut(`avatar_${profileName}`, dataUrl).catch(() => {});
+      if (onUpdateProfile) onUpdateProfile({ avatarData: dataUrl }); // → se sincroniza
+      window.dispatchEvent(new Event("modusfit-avatar-updated"));
+    } catch { /* imagen inválida: no hacer nada */ }
+  };
+
+  const handleAvatarRemove = () => {
+    setAvatarUrl(null);
+    idbDelete(`avatar_${profileName}`).catch(() => {});
+    if (onUpdateProfile) onUpdateProfile({ avatarData: null }); // → se sincroniza el borrado
+    window.dispatchEvent(new Event("modusfit-avatar-updated"));
   };
 
   const handleAvatarClick = () => {
@@ -6375,6 +6448,11 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
           <button onClick={handleAvatarClick} className="absolute -bottom-1.5 -right-1.5 w-8 h-8 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center hover:bg-slate-700 transition active:scale-90" title="Cambiar foto de perfil">
             <Camera size={14} className="text-teal-400" />
           </button>
+          {avatarUrl && (
+            <button onClick={handleAvatarRemove} className="absolute -bottom-1.5 -left-1.5 w-8 h-8 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center hover:bg-red-900/40 transition active:scale-90" title="Quitar foto de perfil">
+              <X size={14} className="text-red-400" />
+            </button>
+          )}
           <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
         </div>
         <h2 className="text-xl font-black text-white">{profileName}</h2>
