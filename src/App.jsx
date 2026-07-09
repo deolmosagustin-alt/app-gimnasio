@@ -283,9 +283,14 @@ async function syncProfileToCloud(uid, profile, requireAuth = false) {
     }
     const data = profileToCloud(profile);
     await setDoc(doc(db, "users", uid), { ...data, _syncedAt: new Date().toISOString() }, { merge: true });
+    console.log("[sync] Perfil subido a la nube OK");
   } catch (err) {
+    // Antes el sync automático se tragaba TODO error en silencio, así que si
+    // la subida fallaba (tamaño, red, permisos) el usuario nunca se enteraba y
+    // sus datos no llegaban a la nube. Ahora al menos lo logueamos para poder
+    // diagnosticar (visible en la consola / Logcat con filtro "sync").
+    console.warn("[sync] No se pudo subir el perfil a la nube:", err?.message || err);
     if (requireAuth) throw err;
-    // sync automático: ignorar el error
   }
 }
 
@@ -662,6 +667,30 @@ function isHeavyRepRange(repRange) { const top = repRangeTop(repRange); return !
 function parseLogKey(key) {
   const idx = key.lastIndexOf("_");
   return { exerciseId: key.slice(0, idx), setIndex: parseInt(key.slice(idx + 1), 10) };
+}
+
+// Limpia los `_pr_override` OBSOLETOS: un override es obsoleto cuando el
+// historial REAL de esa misma serie ya tiene una entrada con 1RM igual o
+// mayor. En ese caso el override no aporta nada — solo es un "dato fantasma"
+// que puede pisar la marca real (ej. un override viejo 8×95 que quedó de una
+// versión anterior aunque ya hiciste 9×95). Se borra sin miedo. Los overrides
+// que SIGUEN siendo mayores que todo el historial son correcciones manuales
+// legítimas del usuario y NO se tocan. Devuelve { logs, changed }.
+function cleanObsoleteOverrides(logs) {
+  if (!logs || typeof logs !== "object") return { logs, changed: false };
+  const out = { ...logs };
+  let changed = false;
+  Object.keys(logs).forEach((key) => {
+    if (!key.endsWith("_pr_override")) return;
+    const ov = logs[key];
+    if (!ov || !ov.kg || !ov.reps) return;
+    const baseKey = key.replace(/_pr_override$/, "");
+    const history = Array.isArray(logs[baseKey]) ? logs[baseKey] : [];
+    const ovRm = estimate1RM(ov.kg, ov.reps);
+    const historyBeatsIt = history.some((e) => e && e.kg && e.reps && estimate1RM(e.kg, e.reps) >= ovRm);
+    if (historyBeatsIt) { delete out[key]; changed = true; }
+  });
+  return { logs: out, changed };
 }
 
 // Días "entrenados": unión de fechas que tienen al menos una serie guardada
@@ -5875,7 +5904,7 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
   );
 }
 
-function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_SETTINGS, onResetAll, onDeleteDay, onUpdateSettings, onGoToProfile, sex, age, onGoToDeload, measurements, onAddMeasurement, photos, photosLoading, onAddPhoto, onDeletePhoto }) {
+function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_SETTINGS, onResetAll, onRecalcPRs, onDeleteDay, onUpdateSettings, onGoToProfile, sex, age, onGoToDeload, measurements, onAddMeasurement, photos, photosLoading, onAddPhoto, onDeletePhoto }) {
   const allExercises = useMemo(() => DAY_ORDER.flatMap((dk) => ROUTINE[dk].exercises.map((e) => ({ id: e.id, name: e.name, day: ROUTINE[dk].label, color: ROUTINE[dk].color, sets: e.sets.length, dayKey: dk }))), []);
 
   const stats = useMemo(() => {
@@ -5895,6 +5924,7 @@ function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_
   const chartData = history.map((h) => ({ date: h.date.slice(5), kg: h.kg, reps: h.reps, vol: vol(h.kg, h.reps), e1rm: estimate1RM(h.kg, h.reps), rpe: h.rpe ?? null }));
 
   const [confirmResetProgress, setConfirmResetProgress] = useState(false);
+  const [confirmRecalcPRs, setConfirmRecalcPRs] = useState(false);
   const [activeSection, setActiveSection] = useState("rank");
 
   return (
@@ -6007,10 +6037,19 @@ function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_
         {activeSection === "historial" && <SessionHistoryView logs={logs} onDeleteDay={onDeleteDay} trainingSessions={sessions} />}
       </div>
 
-      {!confirmResetProgress ? (
-        <div className="flex gap-2">
-          <button onClick={() => setConfirmResetProgress(true)} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-slate-800/60 text-slate-600 hover:text-rose-400 hover:border-rose-500/30 transition text-xs font-medium"><Trash2 size={12} /> Resetear todo</button>
-          <button onClick={() => setActiveSection("historial")} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-slate-800/60 text-slate-600 hover:text-amber-400 hover:border-amber-500/30 transition text-xs font-medium"><Calendar size={12} /> Borrar un día</button>
+      {!confirmResetProgress && !confirmRecalcPRs ? (
+        <div className="flex flex-col gap-2">
+          <div className="flex gap-2">
+            <button onClick={() => setConfirmResetProgress(true)} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-slate-800/60 text-slate-600 hover:text-rose-400 hover:border-rose-500/30 transition text-xs font-medium"><Trash2 size={12} /> Resetear todo</button>
+            <button onClick={() => setActiveSection("historial")} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-slate-800/60 text-slate-600 hover:text-amber-400 hover:border-amber-500/30 transition text-xs font-medium"><Calendar size={12} /> Borrar un día</button>
+          </div>
+          <button onClick={() => setConfirmRecalcPRs(true)} className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-slate-800/60 text-slate-600 hover:text-teal-400 hover:border-teal-500/30 transition text-xs font-medium"><Zap size={12} /> Recalcular marcas</button>
+        </div>
+      ) : confirmRecalcPRs ? (
+        <div className="flex gap-2 items-center bg-teal-950/30 border border-teal-500/20 rounded-xl px-3 py-2.5">
+          <p className="text-xs text-teal-200/80 flex-1">¿Recalcular todas tus marcas desde tu historial real? Corrige marcas que hayan quedado desactualizadas. No borra tu historial.</p>
+          <button onClick={() => setConfirmRecalcPRs(false)} className="px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-400 text-xs">No</button>
+          <button onClick={() => { onRecalcPRs?.(); setConfirmRecalcPRs(false); }} className="px-2.5 py-1.5 rounded-lg bg-teal-500 !text-white text-xs font-bold">Sí, recalcular</button>
         </div>
       ) : (
         <div className="flex gap-2 items-center bg-rose-950/30 border border-rose-500/20 rounded-xl px-3 py-2.5">
@@ -8889,6 +8928,32 @@ export default function App() {
   const profile = profiles[activeProfile], logs = profile?.logs || {}, drafts = profile?.drafts || {};
   const themeClass = getProfileSettings(profile).theme === "light" ? "light-mode" : "";
 
+  // Limpieza automática de récords-override obsoletos (datos fantasma). Corre
+  // una vez cuando entrás con un perfil: si hay un override viejo que tu
+  // historial real ya superó (ej. 8×95 guardado por una versión anterior
+  // cuando ya hiciste 9×95), lo borra y guarda el perfil limpio. Así el muñeco
+  // y el "A superar" vuelven a reflejar tus marcas reales sin que tengas que
+  // hacer nada. Sólo toca overrides obsoletos; las correcciones manuales que
+  // siguen siendo tu mejor marca quedan intactas.
+  const overrideCleanupRef = useRef(null);
+  useEffect(() => {
+    if (!activeProfile || !profile?.logs) return;
+    if (overrideCleanupRef.current === activeProfile) return; // ya limpiado en esta sesión
+    const { logs: cleaned, changed } = cleanObsoleteOverrides(profile.logs);
+    if (changed) {
+      overrideCleanupRef.current = activeProfile;
+      setProfiles((prev) => {
+        const p = prev[activeProfile];
+        if (!p) return prev;
+        const np = { ...prev, [activeProfile]: { ...p, logs: cleaned } };
+        saveProfiles(np);
+        return np;
+      });
+    } else {
+      overrideCleanupRef.current = activeProfile;
+    }
+  }, [activeProfile, profile?.logs]);
+
   // Tamaño de letra (Perfil → Tamaño de letra): se aplica como font-size del
   // <html>, así que todo lo que esté en rem (la mayoría de los tamaños de
   // texto de Tailwind) escala junto y en proporción. Sin perfil activo (o
@@ -9295,6 +9360,23 @@ export default function App() {
     });
   }, [activeProfile]);
 
+  // Borra TODOS los récords-override manuales, dejando el historial real
+  // intacto. Sirve para forzar que las marcas (muñeco, "A superar") se
+  // recalculen desde cero a partir de tus series reales — útil si quedó algún
+  // "dato fantasma" que el override viejo mantenía pegado. El historial de
+  // entrenamientos NO se toca; solo se recalculan las marcas.
+  const handleRecalcPRs = useCallback(() => {
+    setProfiles((prev) => {
+      const p = prev[activeProfile];
+      if (!p) return prev;
+      const newLogs = {};
+      Object.entries(p.logs || {}).forEach(([k, v]) => { if (!k.endsWith("_pr_override")) newLogs[k] = v; });
+      const np = { ...prev, [activeProfile]: { ...p, logs: newLogs } };
+      saveProfiles(np);
+      return np;
+    });
+  }, [activeProfile]);
+
   // Borrar un día puntual del historial (Progreso → Historial → ícono de
   // tacho en el detalle de ese día): quita sólo las series de esa fecha de
   // cada ejercicio, y la sesión explícita de Iniciar/Finalizar de ese día
@@ -9375,7 +9457,7 @@ export default function App() {
             {tab === "rutinas" && <RoutinesView profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleArchiveRoutine} onRestore={handleRestoreRoutine} onUpdateProfile={handleUpdateProfile} />}
             {tab === "rutina" && <OnboardingTasksCard profile={profile} cycleStart={cycleStart} logs={logs} onGoToProfile={() => setTab("perfil")} onDone={() => handleUpdateProfile({ onboardingDone: true })} />}
             {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} todaySessionDayKey={(profile?.trainingSessions || []).find((ts) => ts.date === todayStr())?.dayKey || profile?.activeSession?.dayKey || null} />}
-            {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} sex={profile?.sex} age={profile?.age} onGoToDeload={() => setTab("descarga")} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} />}
+            {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onRecalcPRs={handleRecalcPRs} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} sex={profile?.sex} age={profile?.age} onGoToDeload={() => setTab("descarga")} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} />}
             {tab === "descarga" && <DeloadView logs={logs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} />}
             {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} settings={getProfileSettings(profile)} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} />}
             {tab === "perfil" && <ProfileView profileName={activeProfile} profiles={profiles} logs={logs} onSignOut={handleSignOut} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} />}
