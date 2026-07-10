@@ -9,6 +9,8 @@
         <provider android:name="androidx.core.content.FileProvider" android:authorities="${applicationId}.fileprovider" android:exported="false" android:grantUriPermissions="true">
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths"/>
         </provider>
+        <!--    Botones de la notificación del descanso (+15s / Saltar)    -->
+        <receiver android:name=".RestTimerActionReceiver" android:exported="false"/>
     </application>
     <!--    Permissions    -->
     <uses-permission android:name="android.permission.INTERNET"/>

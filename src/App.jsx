@@ -282,7 +282,16 @@ async function syncProfileToCloud(uid, profile, requireAuth = false) {
       return; // sync automático: fallar silenciosamente, reintentar después
     }
     const data = profileToCloud(profile);
-    await setDoc(doc(db, "users", uid), { ...data, _syncedAt: new Date().toISOString() }, { merge: true });
+    // setDoc SIN {merge:true}: el documento de la nube queda como espejo
+    // EXACTO del perfil local. Antes usábamos merge:true, y Firestore hace
+    // merge PROFUNDO de mapas: si borrábamos una key del objeto `logs` en el
+    // teléfono (ej. un récord-override obsoleto), la key seguía viva en la
+    // nube para siempre — el borrado nunca se propagaba, y el próximo merge
+    // local↔nube reintroducía el dato fantasma. Con el reemplazo completo,
+    // lo que se limpia acá se limpia en la nube. La combinación de datos
+    // entre dispositivos ya la resuelve mergeProfiles ANTES de subir, así
+    // que el reemplazo no pierde nada.
+    await setDoc(doc(db, "users", uid), { ...data, _syncedAt: new Date().toISOString() });
     console.log("[sync] Perfil subido a la nube OK");
   } catch (err) {
     // Antes el sync automático se tragaba TODO error en silencio, así que si
@@ -351,9 +360,15 @@ function mergeProfiles(local, cloud) {
   // Historial: SIEMPRE la unión de ambos — entrenamientos hechos offline
   // en cualquier dispositivo nunca se pierden.
   const base = cloudTime >= localTime ? cloud : local;
+  // Tras unir los logs, limpiamos los récords-override OBSOLETOS (los que el
+  // historial real ya alcanzó o superó). Esto es clave: aunque la nube
+  // traiga un override viejo que localmente ya habíamos borrado (dato
+  // fantasma tipo 8×95 cuando el historial ya tiene 9×95), acá muere en el
+  // mismo momento del merge — no puede volver a colarse a la app.
+  const { logs: mergedCleanLogs } = cleanObsoleteOverrides(mergeLogs(local.logs, cloud.logs));
   return {
     ...base,
-    logs: mergeLogs(local.logs, cloud.logs),
+    logs: mergedCleanLogs,
     trainingSessions: mergeSessions(local.trainingSessions, cloud.trainingSessions),
     measurements: { ...(cloudTime >= localTime ? local.measurements : cloud.measurements), ...(cloudTime >= localTime ? cloud.measurements : local.measurements) },
   };
@@ -580,6 +595,30 @@ async function idbDelete(key) {
     });
     db.close();
   } catch { /* best effort, ignore */ }
+}
+
+// Comprime un dataURL de imagen a un cuadrado de máx 256px (suficiente para
+// un avatar) → JPEG liviano que entra de sobra en Firestore (límite 1MB/doc).
+// A nivel módulo para reutilizarla desde App (migración automática de la foto
+// vieja) y desde ProfileView (foto nueva elegida del selector).
+function compressAvatarDataUrl(srcDataUrl) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const MAX = 256;
+        const side = Math.min(img.width, img.height);
+        const sx = (img.width - side) / 2, sy = (img.height - side) / 2;
+        const canvas = document.createElement("canvas");
+        canvas.width = MAX; canvas.height = MAX;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, sx, sy, side, side, 0, 0, MAX, MAX);
+        resolve(canvas.toDataURL("image/jpeg", 0.82));
+      } catch (e) { reject(e); }
+    };
+    img.onerror = reject;
+    img.src = srcDataUrl;
+  });
 }
 
 async function idbGetAll() {
@@ -2374,7 +2413,7 @@ function LoginScreen({ onLogin, allowAutoLogin = true }) {
 // identifica por timerId y guarda su hora real de finalización.
 const ACTIVE_REST_TIMERS = {};
 
-function RestTimer({ seconds, accent, alertType = "sound", timerId = "default" }) {
+function RestTimer({ seconds, accent, alertType = "sound", timerId = "default", exerciseName = "" }) {
   const persisted = ACTIVE_REST_TIMERS[timerId];
   const stillRunning = persisted && persisted.endTime > Date.now();
   const [remaining, setRemaining] = useState(stillRunning ? Math.ceil((persisted.endTime - Date.now()) / 1000) : seconds);
@@ -2472,10 +2511,14 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default" }
             const secsLeft = Math.max(1, Math.ceil((endTimeRef.current - Date.now()) / 1000));
             ACTIVE_REST_TIMERS.__notifOwner = timerId; // este timer es dueño de la notif ahora
             try {
-              await RestTimerNotification.start({ seconds: secsLeft });
+              await RestTimerNotification.start({ seconds: secsLeft, exerciseName: exerciseName || "" });
+              console.log("[notif] Plugin nativo OK — cronómetro en vivo (RestTimerPlugin)");
             } catch (pluginErr) {
               // Plugin no disponible (build viejo sin el Java) — fallback:
               // notificación estática con la hora de fin, mejor que nada.
+              // Si ves este log, la app instalada NO tiene el RestTimerPlugin
+              // compilado adentro: hay que recompilar el .aab/APK e instalar.
+              console.warn("[notif] Plugin nativo NO disponible, usando fallback estático:", pluginErr?.message || pluginErr);
               const endsAt = new Date(endTimeRef.current);
               const hh = String(endsAt.getHours()).padStart(2, "0");
               const mm = String(endsAt.getMinutes()).padStart(2, "0");
@@ -3969,7 +4012,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
         {!deloadMode && stagnant && <div className="mb-3 text-[11px] text-rose-400/90 bg-rose-500/5 border border-rose-500/15 rounded-xl px-3 py-2 flex items-start gap-1.5"><Info size={12} className="mt-0.5 shrink-0" /><span>Hace {STAGNATION_DAYS}+ días sin superar el récord. Considerá cambiar reps, descanso o variante.</span></div>}
         {!exercise.cardio && !hideTimer && (
           <div className="mb-1">
-            <RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={accent} alertType={settings.alertType} timerId={`ex_${exercise.id}`} />
+            <RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={accent} alertType={settings.alertType} timerId={`ex_${exercise.id}`} exerciseName={exercise.name} />
           </div>
         )}
         {!exercise.cardio && !deloadMode && bestWorkingKg != null && (
@@ -4246,7 +4289,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             <div key={group.map((e) => e.id).join("-")} className="rounded-2xl border-2 border-dashed p-2.5 space-y-2.5" style={{ borderColor: day.color + "45" }}>
               <div className="flex items-center gap-1.5 px-1"><Link size={11} style={{ color: day.color }} /><span className="text-[10px] font-black uppercase tracking-wider" style={{ color: day.color }}>Superserie · {group.length} ejercicios</span></div>
               {group.map((ex) => <ExerciseCard key={ex.id} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadSets={isDeload ? getDeloadSets(ex) : null} deloadMode={isDeload} resetKey={resetKeys[activeDay]} settings={settings} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} hideTimer />)}
-              <div className="px-1"><RestTimer seconds={hasHeavyGroup ? settings.restLong : settings.restShort} accent={day.color} alertType={settings.alertType} timerId={`grp_${group.map((g) => g.id).join("_")}`} /></div>
+              <div className="px-1"><RestTimer seconds={hasHeavyGroup ? settings.restLong : settings.restShort} accent={day.color} alertType={settings.alertType} timerId={`grp_${group.map((g) => g.id).join("_")}`} exerciseName={group.map((g) => g.name).filter(Boolean).join(" + ")} /></div>
               <p className="text-[10px] text-slate-600 px-1">Descansá recién después de completar los {group.length} ejercicios — ese es el cronómetro de arriba.</p>
             </div>
           );
@@ -4795,7 +4838,7 @@ function DeloadView({ logs, settings = DEFAULT_SETTINGS, deloadProgress = {}, se
               </div>
               {hasPR && (
                 <div className="px-4 pt-3">
-                  <RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={day.color} alertType={settings.alertType} timerId={`deload_${ex.id}`} />
+                  <RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={day.color} alertType={settings.alertType} timerId={`deload_${ex.id}`} exerciseName={ex.name} />
                 </div>
               )}
               <div className="px-4 py-3 space-y-2.5">
@@ -5127,8 +5170,16 @@ function scanContributorsFor1RM(contributors, logs, overriddenBaseKeys) {
 
 function getBest1RMForMuscleGroup(groupKey, logs) {
   const { primary, always, secondary } = EXERCISE_LIBRARY_CONTRIBUTORS_BY_GROUP[groupKey] || { primary: new Map(), always: new Map(), secondary: new Map() };
-  const primaryResult = scanContributorsFor1RM(primary, logs);
-  const alwaysResult = scanContributorsFor1RM(always, logs);
+  // INMUNIDAD A DATOS FANTASMA: antes de escanear, descartamos los
+  // récords-override que el historial real ya alcanzó o superó. Así el
+  // muñeco SIEMPRE analiza todos los ejercicios del músculo y elige el de
+  // mayor 1RM real, sin que un override viejo (guardado por una versión
+  // anterior, o reintroducido por la nube) pueda pisar tus marcas
+  // verdaderas. No importa de dónde venga el dato: si el historial lo
+  // supera, acá no se considera.
+  const { logs: cleanLogs } = cleanObsoleteOverrides(logs);
+  const primaryResult = scanContributorsFor1RM(primary, cleanLogs);
+  const alwaysResult = scanContributorsFor1RM(always, cleanLogs);
   // La marca que se MUESTRA prioriza el ejercicio PRIMARIO del músculo:
   // si tenés una marca en un ejercicio dedicado (ej. curl para bíceps),
   // esa es "tu marca de bíceps" aunque un ejercicio indirecto con weight
@@ -5144,7 +5195,7 @@ function getBest1RMForMuscleGroup(groupKey, logs) {
   } else {
     best = alwaysResult;
   }
-  const finalBest = best.best1RM > 0 ? best : scanContributorsFor1RM(secondary, logs);
+  const finalBest = best.best1RM > 0 ? best : scanContributorsFor1RM(secondary, cleanLogs);
 
   return {
     best1RM: finalBest.best1RM, bestKg: finalBest.bestKg, bestReps: finalBest.bestReps, bestLoadFactor: finalBest.bestLoadFactor, bestWeight: finalBest.bestWeight,
@@ -6360,8 +6411,11 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
   // entrar desde otro dispositivo ni desde la web.
   const [avatarUrl, setAvatarUrl] = useState(null);
   const avatarInputRef = useRef(null);
+
   useEffect(() => {
     // Prioridad: lo que vino sincronizado en el perfil; si no, IndexedDB local.
+    // (La migración de fotos viejas de IndexedDB → perfil corre a nivel App,
+    // apenas se abre la app, así no depende de visitar esta pestaña.)
     if (profile?.avatarData) {
       setAvatarUrl(profile.avatarData);
       // Espejamos a IndexedDB para que HeaderAvatar y SideNav (que leen de
@@ -6372,26 +6426,11 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
     idbGet(`avatar_${profileName}`).then((data) => { if (data) setAvatarUrl(data); }).catch(() => {});
   }, [profileName, profile?.avatarData]);
 
-  // Comprime la imagen elegida a un cuadrado de máx 256px (suficiente para un
-  // avatar) y la devuelve como dataURL JPEG liviano que entra sin problema en
-  // Firestore (muy por debajo del límite de 1MB por documento).
+  // Comprime la imagen elegida (File) leyéndola como dataURL y pasándola por
+  // la misma compresión de arriba — una sola lógica para todo.
   const compressAvatar = (file) => new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = (ev) => {
-      const img = new Image();
-      img.onload = () => {
-        const MAX = 256;
-        const side = Math.min(img.width, img.height);
-        const sx = (img.width - side) / 2, sy = (img.height - side) / 2;
-        const canvas = document.createElement("canvas");
-        canvas.width = MAX; canvas.height = MAX;
-        const ctx = canvas.getContext("2d");
-        ctx.drawImage(img, sx, sy, side, side, 0, 0, MAX, MAX);
-        resolve(canvas.toDataURL("image/jpeg", 0.82));
-      };
-      img.onerror = reject;
-      img.src = ev.target.result;
-    };
+    reader.onload = (ev) => compressAvatarDataUrl(ev.target.result).then(resolve).catch(reject);
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
@@ -8953,6 +8992,34 @@ export default function App() {
       overrideCleanupRef.current = activeProfile;
     }
   }, [activeProfile, profile?.logs]);
+
+  // MIGRACIÓN AUTOMÁTICA DE LA FOTO DE PERFIL: las fotos puestas con
+  // versiones anteriores quedaron SOLO en IndexedDB del dispositivo (nunca
+  // subían a la nube, por eso no aparecían en la web ni en otros equipos).
+  // Acá, apenas se abre la app: si el perfil no tiene avatarData pero hay
+  // una foto local vieja, la comprimimos (256px JPEG) y la guardamos en el
+  // perfil → se sincroniza a Firebase → aparece en todos lados.
+  const avatarMigrationRef = useRef(null);
+  useEffect(() => {
+    if (!activeProfile || !profile) return;
+    if (profile.avatarData) return; // ya migrada o puesta con la versión nueva
+    if (avatarMigrationRef.current === activeProfile) return; // un intento por sesión
+    avatarMigrationRef.current = activeProfile;
+    idbGet(`avatar_${activeProfile}`).then(async (data) => {
+      if (!data) return;
+      try {
+        const small = await compressAvatarDataUrl(data);
+        setProfiles((prev) => {
+          const p = prev[activeProfile];
+          if (!p || p.avatarData) return prev;
+          const np = { ...prev, [activeProfile]: { ...p, avatarData: small } };
+          saveProfiles(np);
+          return np;
+        });
+        window.dispatchEvent(new Event("modusfit-avatar-updated"));
+      } catch { /* imagen vieja ilegible: queda local como antes */ }
+    }).catch(() => {});
+  }, [activeProfile, profile?.avatarData]);
 
   // Tamaño de letra (Perfil → Tamaño de letra): se aplica como font-size del
   // <html>, así que todo lo que esté en rem (la mayoría de los tamaños de
