@@ -5489,7 +5489,6 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
   const [selected, setSelected] = useState(null);
   const [showImage, setShowImage] = useState(false);
   const [showTierRef, setShowTierRef] = useState(false); // modal de referencia de rangos
-  const carouselRef = useRef(null);
   const initialSelRef = useRef(false);
   const frontBodyRef = useRef(null);
   const backBodyRef = useRef(null);
@@ -5523,40 +5522,17 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
   const needsWeight = mode === "relative" && !bodyWeightKg;
   const modeLabel = mode === "relative" && bodyWeightKg ? "Según tu contexto" : "General";
 
-  // NIVEL GENERAL DEL CUERPO: el promedio de tus rangos con datos, como un
-  // "nivel de personaje". Da el vistazo de 2 segundos que antes no existía
-  // y un número global que dan ganas de subir.
-  const generalRank = useMemo(() => {
-    const withData = MUSCLE_GROUPS.map((g) => ({ g, r: ranks[g.key] })).filter((x) => x.r?.hasData);
-    if (!withData.length) return null;
-    const avgIdx = Math.round(withData.reduce((s, x) => s + x.r.levelIdx, 0) / withData.length);
-    const tier = RANK_TIERS[Math.max(0, Math.min(avgIdx, RANK_TIERS.length - 1))];
-    const sorted = withData.slice().sort((a, b) => b.r.levelIdx - a.r.levelIdx);
-    return { tier, best: sorted[0], worst: sorted[sorted.length - 1], count: withData.length };
-  }, [ranks]);
-
-  // Carrusel: músculos ordenados del mejor rango al peor; sin datos al final.
-  const musclesSorted = useMemo(() => MUSCLE_GROUPS.slice().sort((a, b) => {
-    const la = ranks[a.key]?.hasData ? ranks[a.key].levelIdx : -1;
-    const lb = ranks[b.key]?.hasData ? ranks[b.key].levelIdx : -1;
-    return lb - la;
-  }), [ranks]);
-
-  // Al entrar, arrancamos con tu MEJOR músculo seleccionado — la primera
-  // impresión siempre es tu mejor logro y la tarjeta nunca está vacía.
+  // Al entrar, la tarjeta de detalle arranca en tu MEJOR músculo — así
+  // nunca está vacía, sin agregar ningún elemento visual extra.
   useEffect(() => {
     if (initialSelRef.current || selected) return;
-    const best = musclesSorted.find((g) => ranks[g.key]?.hasData);
-    if (best) { initialSelRef.current = true; setSelected(best.key); }
-  }, [musclesSorted, ranks, selected]);
-
-  // El chip del músculo seleccionado se centra solo en el carrusel — tanto
-  // si lo elegiste tocando el chip como tocando el muñeco.
-  useEffect(() => {
-    if (!selected || !carouselRef.current) return;
-    const chip = carouselRef.current.querySelector(`[data-chip="${selected}"]`);
-    if (chip) { try { chip.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" }); } catch { } }
-  }, [selected]);
+    let bestKey = null, bestLvl = -1;
+    MUSCLE_GROUPS.forEach((g) => {
+      const r = ranks[g.key];
+      if (r?.hasData && r.levelIdx > bestLvl) { bestLvl = r.levelIdx; bestKey = g.key; }
+    });
+    if (bestKey) { initialSelRef.current = true; setSelected(bestKey); }
+  }, [ranks, selected]);
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-blue-500/25 shadow-lg shadow-blue-500/5 p-4 space-y-3" style={{ background: "linear-gradient(160deg, #0d1526 0%, #0f172a 45%, #0a0f1e 100%)" }}>
@@ -5591,50 +5567,21 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
         )}
       </div>
 
-      {generalRank && (
-        <div className="relative flex items-center gap-3 bg-slate-950/50 rounded-2xl px-3.5 py-3 bounce-in border" style={{ borderColor: generalRank.tier.color + "35" }}>
-          <div className="absolute -top-6 -left-6 w-24 h-24 rounded-full blur-2xl pointer-events-none opacity-25" style={{ backgroundColor: generalRank.tier.color }} />
-          <RankBadgeIcon tier={generalRank.tier.tier} sub="" color={generalRank.tier.color} size={64} />
-          <div className="flex-1 min-w-0 relative">
-            <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Nivel general del cuerpo</p>
-            <p className="text-lg font-black leading-tight" style={{ color: generalRank.tier.color }}>{generalRank.tier.tier}{generalRank.tier.sub ? ` ${generalRank.tier.sub}` : ""}</p>
-            <p className="text-[10px] text-slate-500 mt-0.5 truncate">
-              Mejor: <span className="font-bold" style={{ color: generalRank.best.r.color }}>{generalRank.best.g.label}</span>
-              {generalRank.count > 1 && <> · A mejorar: <span className="font-bold text-slate-400">{generalRank.worst.g.label}</span></>}
-            </p>
-          </div>
-        </div>
-      )}
+      <MuscleHighlighterBody ranks={ranks} selected={selected} onMuscleClick={(k) => setSelected(k)} frontRef={frontBodyRef} backRef={backBodyRef} />
 
-      {/* Carrusel de músculos ordenados por rango — tocás un chip y el
-          músculo se ilumina en el muñeco; tocás el muñeco y el chip se
-          centra solo. El activo brilla con el color de su tier. */}
-      <div ref={carouselRef} className="flex gap-2 overflow-x-auto pb-1.5 -mx-1 px-1" style={{ scrollbarWidth: "none" }}>
-        {musclesSorted.map((g) => {
-          const r = ranks[g.key];
-          const has = !!r?.hasData;
-          const active = selected === g.key;
-          const col = has ? r.color : "#475569";
+      {/* Leyenda mínima: qué significa cada color del muñeco, de un vistazo
+          y sin tocar nada. Seis puntitos, cero ruido. */}
+      <div className="flex items-center justify-center gap-3 flex-wrap px-1">
+        {["Bronce", "Plata", "Oro", "Esmeralda", "Diamante", "Maestro"].map((t) => {
+          const rep = RANK_TIERS.find((r) => r.tier === t && r.sub === "II") || RANK_TIERS.find((r) => r.tier === t);
           return (
-            <button
-              key={g.key}
-              data-chip={g.key}
-              onClick={() => setSelected((s) => (s === g.key ? s : g.key))}
-              className={`flex items-center gap-1.5 pl-1.5 pr-3 py-1.5 rounded-xl shrink-0 transition-all duration-200 border ${active ? "scale-[1.06]" : has ? "" : "opacity-50"}`}
-              style={active
-                ? { borderColor: col + "70", backgroundColor: col + "1e", boxShadow: `0 0 14px ${col}30` }
-                : { borderColor: "#1e293b", backgroundColor: "rgba(15,23,42,0.6)" }}
-            >
-              {has
-                ? <RankBadgeIcon tier={r.tier} sub="" color={r.color} size={34} />
-                : <span className="w-[22px] h-[22px] rounded-full bg-slate-800 border border-slate-700 inline-block shrink-0" />}
-              <span className="text-[10px] font-bold whitespace-nowrap" style={{ color: active ? col : has ? "#94a3b8" : "#475569" }}>{g.label}</span>
-            </button>
+            <span key={t} className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: rep.color }} />
+              <span className="text-[9px] font-bold text-slate-500">{t}</span>
+            </span>
           );
         })}
       </div>
-
-      <MuscleHighlighterBody ranks={ranks} selected={selected} onMuscleClick={(k) => setSelected(k)} frontRef={frontBodyRef} backRef={backBodyRef} />
       {selInfo ? (
         <div className="relative overflow-hidden bg-slate-950/50 rounded-2xl p-4 bounce-in border transition-colors duration-300" style={{ borderColor: selInfo.hasData ? selInfo.color + "40" : "#1e293b" }}>
           {selInfo.hasData && <div className="absolute -top-8 -right-8 w-28 h-28 rounded-full blur-3xl pointer-events-none opacity-20" style={{ backgroundColor: selInfo.color }} />}
