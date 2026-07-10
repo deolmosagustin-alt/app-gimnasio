@@ -1,4 +1,23 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!--  ═══ Permisos (SIEMPRE antes de <application>, Android lo exige) ═══  -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <!--  Notificaciones locales (timer de descanso entre series)  -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+    <!--  Live Update chip en la barra de estado (Android 16 QPR1+)  -->
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS"/>
+    <!--  Micrófono (dictado por voz en el Entrenador IA)  -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
+    <!--  ID de publicidad (AdMob)  -->
+    <uses-permission android:name="com.google.android.gms.permission.AD_ID"/>
+    <!--  NOTA: se quitaron READ_MEDIA_IMAGES y READ_EXTERNAL_STORAGE a
+             propósito. La foto de perfil y las fotos de progreso se eligen con
+             el selector de archivos del sistema (input type="file" de la web),
+             que NO requiere permisos de almacenamiento en ninguna versión de
+             Android. Así también desaparece el aviso de Google Play sobre
+             "Selected Photos Access" de Android 14+.  -->
     <application android:allowBackup="true" android:icon="@mipmap/ic_launcher" android:label="@string/app_name" android:roundIcon="@mipmap/ic_launcher_round" android:supportsRtl="true" android:theme="@style/AppTheme">
         <activity android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density" android:name=".MainActivity" android:label="@string/title_activity_main" android:theme="@style/AppTheme.NoActionBarLaunch" android:launchMode="singleTask" android:exported="true">
             <intent-filter>
@@ -9,25 +28,9 @@
         <provider android:name="androidx.core.content.FileProvider" android:authorities="${applicationId}.fileprovider" android:exported="false" android:grantUriPermissions="true">
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths"/>
         </provider>
-        <!--    Botones de la notificación del descanso (+15s / Saltar)    -->
-        <receiver android:name=".RestTimerActionReceiver" android:exported="false"/>
+        <!--  El <receiver .RestTimerActionReceiver> que estaba acá se ELIMINÓ:
+                     declaraba una clase Java que no existe en el proyecto (quedó de
+                     una versión vieja que planeaba botones +15s/Saltar en la
+                     notificación) y rompía el build. El plugin actual no lo usa.  -->
     </application>
-    <!--    Permissions    -->
-    <uses-permission android:name="android.permission.INTERNET"/>
-    <!--    Notificaciones locales (timer de descanso entre series)    -->
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
-    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
-    <!--    Live Update chip en la barra de estado (Android 16+) — cronómetro tipo Spotify    -->
-    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS"/>
-    <!--    Galería de fotos (foto de perfil y fotos de progreso)    -->
-    <!--    Android 13+ (API 33+)    -->
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
-    <!--    Android 12 y anteriores    -->
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
-    <!--    Micrófono (dictado por voz en el Entrenador IA)    -->
-    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
-    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
-    <!--    ID de publicidad (AdMob)    -->
-    <uses-permission android:name="com.google.android.gms.permission.AD_ID"/>
 </manifest>
