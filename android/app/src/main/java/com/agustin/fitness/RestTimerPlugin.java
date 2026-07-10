@@ -10,6 +10,7 @@ import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.drawable.Icon;
 import android.os.Build;
+import android.os.Bundle;
 import android.util.Log;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
@@ -66,13 +67,6 @@ public class RestTimerPlugin extends Plugin {
         Notification notification = null;
 
         // ═══════ CAMINO 1 (Android 16+, API 36): API NATIVA del framework ═══════
-        // Construimos la notificación con android.app.Notification.Builder
-        // DIRECTO, sin la capa de compatibilidad. Motivo: las APIs de Live
-        // Updates (setRequestPromotedOngoing, setShortCriticalText,
-        // ProgressStyle) son nuevísimas, y la versión compat puede no
-        // trasladar el pedido de promoción al sistema real — la notificación
-        // se ve, pero el sistema nunca la considera para la Now Bar / chip.
-        // Con la API nativa no hay intermediario posible.
         if (Build.VERSION.SDK_INT >= 36) {
             try {
                 Icon smallIcon = Icon.createWithResource(context, getIconResId(context));
@@ -101,8 +95,13 @@ public class RestTimerPlugin extends Plugin {
                         .setChronometerCountDown(true)
                         .setVisibility(Notification.VISIBILITY_PUBLIC)
                         .setStyle(progressStyle)
-                        .setShortCriticalText(chipText)
-                        .setRequestPromotedOngoing(true);
+                        .setShortCriticalText(chipText);
+                // ACÁ ESTABA EL ERROR: .setRequestPromotedOngoing(true);
+
+                // SOLUCIÓN: Inyectamos la orden en los Extras para que el compilador no tire error.
+                Bundle extras = new Bundle();
+                extras.putBoolean("android.requestPromotedOngoing", true);
+                nb.addExtras(extras);
 
                 notification = nb.build();
                 Log.i(TAG, "v8: notificación construida con API NATIVA de Android 16");
@@ -131,7 +130,9 @@ public class RestTimerPlugin extends Plugin {
                     .setVisibility(NotificationCompat.VISIBILITY_PUBLIC);
             if (Build.VERSION.SDK_INT >= 36) {
                 try {
-                    builder.setRequestPromotedOngoing(true);
+                    // SOLUCIÓN: Hacemos lo mismo acá en el Camino 2
+                    builder.getExtras().putBoolean("android.requestPromotedOngoing", true);
+
                     builder.setShortCriticalText(chipText);
                     List<NotificationCompat.ProgressStyle.Segment> segments = new ArrayList<>();
                     segments.add(new NotificationCompat.ProgressStyle.Segment(100).setColor(ACCENT));
