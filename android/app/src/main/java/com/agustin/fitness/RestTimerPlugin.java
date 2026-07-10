@@ -10,7 +10,6 @@ import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.drawable.Icon;
 import android.os.Build;
-import android.os.Bundle;
 import android.util.Log;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
@@ -67,6 +66,13 @@ public class RestTimerPlugin extends Plugin {
         Notification notification = null;
 
         // ═══════ CAMINO 1 (Android 16+, API 36): API NATIVA del framework ═══════
+        // Construimos la notificación con android.app.Notification.Builder
+        // DIRECTO, sin la capa de compatibilidad. Motivo: las APIs de Live
+        // Updates (setRequestPromotedOngoing, setShortCriticalText,
+        // ProgressStyle) son nuevísimas, y la versión compat puede no
+        // trasladar el pedido de promoción al sistema real — la notificación
+        // se ve, pero el sistema nunca la considera para la Now Bar / chip.
+        // Con la API nativa no hay intermediario posible.
         if (Build.VERSION.SDK_INT >= 36) {
             try {
                 Icon smallIcon = Icon.createWithResource(context, getIconResId(context));
@@ -96,15 +102,37 @@ public class RestTimerPlugin extends Plugin {
                         .setVisibility(Notification.VISIBILITY_PUBLIC)
                         .setStyle(progressStyle)
                         .setShortCriticalText(chipText);
-                // ACÁ ESTABA EL ERROR: .setRequestPromotedOngoing(true);
 
-                // SOLUCIÓN: Inyectamos la orden en los Extras para que el compilador no tire error.
-                Bundle extras = new Bundle();
-                extras.putBoolean("android.requestPromotedOngoing", true);
-                nb.addExtras(extras);
+                // setRequestPromotedOngoing NO está expuesto en el android.jar
+                // del SDK (Google lo tiene detrás de un feature flag → "Cannot
+                // resolve method" al compilar), pero SÍ existe en el framework
+                // real del teléfono con Android 16 / One UI 8.5. Lo invocamos
+                // por REFLECTION: compila siempre y en el dispositivo funciona.
+                boolean promotedRequested = false;
+                try {
+                    Notification.Builder.class
+                            .getMethod("setRequestPromotedOngoing", boolean.class)
+                            .invoke(nb, true);
+                    promotedRequested = true;
+                    Log.i(TAG, "v9: setRequestPromotedOngoing invocado por reflection OK");
+                } catch (Throwable t) {
+                    Log.w(TAG, "v9: setRequestPromotedOngoing no disponible: " + t);
+                }
 
                 notification = nb.build();
-                Log.i(TAG, "v8: notificación construida con API NATIVA de Android 16");
+
+                // Doble red: si el método no existió, seteamos el flag de
+                // promoción directo sobre la notificación construida.
+                if (!promotedRequested) {
+                    try {
+                        int flag = Notification.class.getField("FLAG_PROMOTED_ONGOING").getInt(null);
+                        notification.flags |= flag;
+                        Log.i(TAG, "v9: FLAG_PROMOTED_ONGOING aplicado por field");
+                    } catch (Throwable t) {
+                        Log.w(TAG, "v9: FLAG_PROMOTED_ONGOING no disponible: " + t);
+                    }
+                }
+                Log.i(TAG, "v9: notificación construida con API NATIVA de Android 16");
             } catch (Throwable t) {
                 Log.w(TAG, "v8: API nativa falló (" + t + ") — usando camino compat");
                 notification = null;
@@ -130,9 +158,7 @@ public class RestTimerPlugin extends Plugin {
                     .setVisibility(NotificationCompat.VISIBILITY_PUBLIC);
             if (Build.VERSION.SDK_INT >= 36) {
                 try {
-                    // SOLUCIÓN: Hacemos lo mismo acá en el Camino 2
-                    builder.getExtras().putBoolean("android.requestPromotedOngoing", true);
-
+                    builder.setRequestPromotedOngoing(true);
                     builder.setShortCriticalText(chipText);
                     List<NotificationCompat.ProgressStyle.Segment> segments = new ArrayList<>();
                     segments.add(new NotificationCompat.ProgressStyle.Segment(100).setColor(ACCENT));
@@ -145,7 +171,7 @@ public class RestTimerPlugin extends Plugin {
                 }
             }
             notification = builder.build();
-            Log.i(TAG, "v8: notificación construida con NotificationCompat");
+            Log.i(TAG, "v9: notificación construida con NotificationCompat");
         }
 
         // Diagnóstico definitivo — filtrá "RestTimerPlugin" en Logcat.

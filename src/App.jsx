@@ -3180,13 +3180,23 @@ const HELP_CHAPTERS = [
       },
       {
         icon: <Award size={20} />,
-        title: "Rangos por músculo",
-        text: "El muñeco muscular se colorea según tu nivel en cada grupo: desde Bronce I hasta Maestro III. Tocá cualquier músculo para ver tu mejor marca, el % de tu próximo rango y la barra de progreso. Hay dos modos: General (kg absolutos) y Según tu contexto (relativo a tu peso corporal).",
+        title: "El muñeco muscular",
+        text: "Es el mapa de tu cuerpo: cada músculo se pinta con el color de tu rango actual, de Bronce a Maestro. Podés girarlo para ver frente y espalda, y tocar cualquier músculo para abrir su detalle: tu mejor marca, con qué ejercicio la hiciste, el % hacia el próximo rango y la barra de progreso.",
+      },
+      {
+        icon: <Zap size={20} />,
+        title: "Cómo se calculan los rangos",
+        text: "Cada grupo muscular toma tu mejor 1RM estimado (peso × reps, fórmula de Epley) entre TODOS los ejercicios que lo trabajan — gana el que dé el número más alto, y se recalcula solo con cada registro. Hay dos modos: General (kg absolutos) y Según tu contexto (ajustado a tu peso corporal, sexo y edad, configurables en Perfil).",
       },
       {
         icon: <Sparkles size={20} />,
         title: "Subida de rango",
         text: "Cuando una marca te hace pasar de tier (ej. Oro → Esmeralda), aparece un modal de celebración con el badge anterior y el nuevo. Ocurre solo al cruzar un tier, no en cada récord dentro del mismo.",
+      },
+      {
+        icon: <Ruler size={20} />,
+        title: "Medidas y fotos de progreso",
+        text: "Registrá tu peso y medidas corporales, y sacá fotos de progreso. En el calendario de medidas podés tocar un día para ver el detalle, y \"Comparar con otro día\" pone dos fotos lado a lado con la diferencia de peso y de días entre ambas.",
       },
       {
         icon: <Flame size={20} />,
@@ -3389,8 +3399,8 @@ function HelpModal({ startTab, onClose }) {
   return (
     <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 modal-bg-in" onClick={onClose}>
       <div
-        className="max-w-md w-full rounded-3xl modal-pop-in shadow-2xl shadow-black/70 max-h-[92vh] flex flex-col"
-        style={{ background: "linear-gradient(160deg,#0f1a1f 0%,#0a0f1a 100%)", border: "1px solid rgba(20,184,166,0.2)" }}
+        className="max-w-md w-full rounded-3xl modal-pop-in shadow-2xl shadow-black/70 flex flex-col"
+        style={{ background: "linear-gradient(160deg,#0f1a1f 0%,#0a0f1a 100%)", border: "1px solid rgba(20,184,166,0.2)", height: "min(92vh, 700px)" }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -5478,7 +5488,9 @@ function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backR
 function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, onGoToProfile, sex, age }) {
   const [selected, setSelected] = useState(null);
   const [showImage, setShowImage] = useState(false);
-  const [showAllRanks, setShowAllRanks] = useState(false);
+  const [showTierRef, setShowTierRef] = useState(false); // modal de referencia de rangos
+  const carouselRef = useRef(null);
+  const initialSelRef = useRef(false);
   const frontBodyRef = useRef(null);
   const backBodyRef = useRef(null);
   const mode = settings.muscleRankMode === "relative" ? "relative" : "general";
@@ -5511,6 +5523,41 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
   const needsWeight = mode === "relative" && !bodyWeightKg;
   const modeLabel = mode === "relative" && bodyWeightKg ? "Según tu contexto" : "General";
 
+  // NIVEL GENERAL DEL CUERPO: el promedio de tus rangos con datos, como un
+  // "nivel de personaje". Da el vistazo de 2 segundos que antes no existía
+  // y un número global que dan ganas de subir.
+  const generalRank = useMemo(() => {
+    const withData = MUSCLE_GROUPS.map((g) => ({ g, r: ranks[g.key] })).filter((x) => x.r?.hasData);
+    if (!withData.length) return null;
+    const avgIdx = Math.round(withData.reduce((s, x) => s + x.r.levelIdx, 0) / withData.length);
+    const tier = RANK_TIERS[Math.max(0, Math.min(avgIdx, RANK_TIERS.length - 1))];
+    const sorted = withData.slice().sort((a, b) => b.r.levelIdx - a.r.levelIdx);
+    return { tier, best: sorted[0], worst: sorted[sorted.length - 1], count: withData.length };
+  }, [ranks]);
+
+  // Carrusel: músculos ordenados del mejor rango al peor; sin datos al final.
+  const musclesSorted = useMemo(() => MUSCLE_GROUPS.slice().sort((a, b) => {
+    const la = ranks[a.key]?.hasData ? ranks[a.key].levelIdx : -1;
+    const lb = ranks[b.key]?.hasData ? ranks[b.key].levelIdx : -1;
+    return lb - la;
+  }), [ranks]);
+
+  // Al entrar, arrancamos con tu MEJOR músculo seleccionado — la primera
+  // impresión siempre es tu mejor logro y la tarjeta nunca está vacía.
+  useEffect(() => {
+    if (initialSelRef.current || selected) return;
+    const best = musclesSorted.find((g) => ranks[g.key]?.hasData);
+    if (best) { initialSelRef.current = true; setSelected(best.key); }
+  }, [musclesSorted, ranks, selected]);
+
+  // El chip del músculo seleccionado se centra solo en el carrusel — tanto
+  // si lo elegiste tocando el chip como tocando el muñeco.
+  useEffect(() => {
+    if (!selected || !carouselRef.current) return;
+    const chip = carouselRef.current.querySelector(`[data-chip="${selected}"]`);
+    if (chip) { try { chip.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" }); } catch { } }
+  }, [selected]);
+
   return (
     <div className="relative overflow-hidden rounded-2xl border border-blue-500/25 shadow-lg shadow-blue-500/5 p-4 space-y-3" style={{ background: "linear-gradient(160deg, #0d1526 0%, #0f172a 45%, #0a0f1e 100%)" }}>
       {/* Glows decorativos de fondo */}
@@ -5524,7 +5571,10 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
             <p className="text-[9px] text-slate-500">Tocá un músculo para ver su detalle</p>
           </div>
         </div>
-        <button onClick={() => setShowImage(true)} aria-label="Compartir tus rangos" className="p-2 rounded-xl bg-slate-800/60 text-slate-400 hover:text-blue-400 transition shrink-0 border border-slate-700/50"><Share2 size={15} /></button>
+        <div className="flex gap-1.5 shrink-0">
+          <button onClick={() => setShowTierRef(true)} aria-label="Ver la escala de rangos" className="p-2 rounded-xl bg-slate-800/60 text-slate-400 hover:text-amber-400 transition border border-slate-700/50"><Trophy size={15} /></button>
+          <button onClick={() => setShowImage(true)} aria-label="Compartir tus rangos" className="p-2 rounded-xl bg-slate-800/60 text-slate-400 hover:text-blue-400 transition border border-slate-700/50"><Share2 size={15} /></button>
+        </div>
       </div>
 
       <div>
@@ -5541,10 +5591,54 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
         )}
       </div>
 
-      <MuscleHighlighterBody ranks={ranks} selected={selected} onMuscleClick={(k) => setSelected((s) => (s === k ? null : k))} frontRef={frontBodyRef} backRef={backBodyRef} />
+      {generalRank && (
+        <div className="relative flex items-center gap-3 bg-slate-950/50 rounded-2xl px-3.5 py-3 bounce-in border" style={{ borderColor: generalRank.tier.color + "35" }}>
+          <div className="absolute -top-6 -left-6 w-24 h-24 rounded-full blur-2xl pointer-events-none opacity-25" style={{ backgroundColor: generalRank.tier.color }} />
+          <RankBadgeIcon tier={generalRank.tier.tier} sub="" color={generalRank.tier.color} size={64} />
+          <div className="flex-1 min-w-0 relative">
+            <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Nivel general del cuerpo</p>
+            <p className="text-lg font-black leading-tight" style={{ color: generalRank.tier.color }}>{generalRank.tier.tier}{generalRank.tier.sub ? ` ${generalRank.tier.sub}` : ""}</p>
+            <p className="text-[10px] text-slate-500 mt-0.5 truncate">
+              Mejor: <span className="font-bold" style={{ color: generalRank.best.r.color }}>{generalRank.best.g.label}</span>
+              {generalRank.count > 1 && <> · A mejorar: <span className="font-bold text-slate-400">{generalRank.worst.g.label}</span></>}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Carrusel de músculos ordenados por rango — tocás un chip y el
+          músculo se ilumina en el muñeco; tocás el muñeco y el chip se
+          centra solo. El activo brilla con el color de su tier. */}
+      <div ref={carouselRef} className="flex gap-2 overflow-x-auto pb-1.5 -mx-1 px-1" style={{ scrollbarWidth: "none" }}>
+        {musclesSorted.map((g) => {
+          const r = ranks[g.key];
+          const has = !!r?.hasData;
+          const active = selected === g.key;
+          const col = has ? r.color : "#475569";
+          return (
+            <button
+              key={g.key}
+              data-chip={g.key}
+              onClick={() => setSelected((s) => (s === g.key ? s : g.key))}
+              className={`flex items-center gap-1.5 pl-1.5 pr-3 py-1.5 rounded-xl shrink-0 transition-all duration-200 border ${active ? "scale-[1.06]" : has ? "" : "opacity-50"}`}
+              style={active
+                ? { borderColor: col + "70", backgroundColor: col + "1e", boxShadow: `0 0 14px ${col}30` }
+                : { borderColor: "#1e293b", backgroundColor: "rgba(15,23,42,0.6)" }}
+            >
+              {has
+                ? <RankBadgeIcon tier={r.tier} sub="" color={r.color} size={34} />
+                : <span className="w-[22px] h-[22px] rounded-full bg-slate-800 border border-slate-700 inline-block shrink-0" />}
+              <span className="text-[10px] font-bold whitespace-nowrap" style={{ color: active ? col : has ? "#94a3b8" : "#475569" }}>{g.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <MuscleHighlighterBody ranks={ranks} selected={selected} onMuscleClick={(k) => setSelected(k)} frontRef={frontBodyRef} backRef={backBodyRef} />
       {selInfo ? (
-        <div className="bg-slate-950/50 border border-slate-800/60 rounded-2xl p-4 bounce-in">
-          <div className="flex items-center justify-between mb-3 gap-2">
+        <div className="relative overflow-hidden bg-slate-950/50 rounded-2xl p-4 bounce-in border transition-colors duration-300" style={{ borderColor: selInfo.hasData ? selInfo.color + "40" : "#1e293b" }}>
+          {selInfo.hasData && <div className="absolute -top-8 -right-8 w-28 h-28 rounded-full blur-3xl pointer-events-none opacity-20" style={{ backgroundColor: selInfo.color }} />}
+          <div className="relative flex items-center justify-between mb-3 gap-2">
             <p className="text-sm font-bold text-white">{selInfo.label}</p>
             {!selInfo.hasData && <span className="text-[11px] font-bold text-slate-500 px-2.5 py-1 rounded-lg bg-slate-800/60 shrink-0">Sin rango</span>}
           </div>
@@ -5590,27 +5684,31 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
       ) : (
         <p className="text-center text-[11px] text-slate-600">Tocá un músculo entrenable para ver tu rango y tu mejor marca.</p>
       )}
-      {!showAllRanks ? (
-        <button onClick={() => setShowAllRanks(true)} className="w-full flex items-center justify-center gap-1.5 py-3 rounded-2xl border border-slate-800/60 text-slate-500 hover:text-slate-300 hover:border-slate-700 transition text-xs font-bold">
-          <Trophy size={13} /> Ver todos los rangos
-        </button>
-      ) : (
-        <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-3.5 backdrop-blur-sm shadow-md shadow-black/20 bounce-in">
-          <button onClick={() => setShowAllRanks(false)} className="w-full flex items-center gap-1.5 justify-center mb-3" aria-label="Ocultar todos los rangos">
-            <Trophy size={11} className="text-slate-600" />
-            <p className="text-[10px] font-black text-slate-500 uppercase tracking-wider">Todos los rangos</p>
-            <ChevronUp size={12} className="text-slate-600" />
-          </button>
-          <div className="grid grid-cols-3 gap-2">
-            {["Bronce", "Plata", "Oro", "Esmeralda", "Diamante", "Maestro"].map((t) => {
-              const rep = RANK_TIERS.find((r) => r.tier === t && r.sub === "II") || RANK_TIERS.find((r) => r.tier === t);
-              return (
-                <div key={t} className="flex flex-col items-center gap-2 rounded-xl py-3 bg-slate-800/30">
-                  <RankBadgeIcon tier={rep.tier} sub="" color={rep.color} size={83} />
-                  <span className="text-[10px] font-black" style={{ color: rep.color }}>{t}</span>
-                </div>
-              );
-            })}
+      {/* Modal de referencia: la escala completa de rangos (se abre con el
+          trofeo del header — antes ocupaba lugar fijo como "Ver todos los
+          rangos"; ahora el espacio lo usa el carrusel con TUS rangos). */}
+      {showTierRef && (
+        <div className="fixed inset-0 z-[130] bg-black/75 backdrop-blur-sm flex items-center justify-center p-5 modal-bg-in" onClick={() => setShowTierRef(false)}>
+          <div className="max-w-sm w-full bg-slate-900 border border-slate-700/60 rounded-3xl p-5 modal-pop-in shadow-2xl shadow-black/60" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Trophy size={15} className="text-amber-400" />
+                <p className="text-sm font-black text-white">Escala de rangos</p>
+              </div>
+              <button onClick={() => setShowTierRef(false)} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition"><X size={16} /></button>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {["Bronce", "Plata", "Oro", "Esmeralda", "Diamante", "Maestro"].map((t) => {
+                const rep = RANK_TIERS.find((r) => r.tier === t && r.sub === "II") || RANK_TIERS.find((r) => r.tier === t);
+                return (
+                  <div key={t} className="flex flex-col items-center gap-2 rounded-xl py-3 bg-slate-800/40">
+                    <RankBadgeIcon tier={rep.tier} sub="" color={rep.color} size={83} />
+                    <span className="text-[10px] font-black" style={{ color: rep.color }}>{t}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="text-[10px] text-slate-500 text-center mt-3">Cada rango tiene 3 niveles (III → I). Subís entrenando más pesado.</p>
           </div>
         </div>
       )}
@@ -5983,7 +6081,7 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
   );
 }
 
-function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_SETTINGS, onResetAll, onRecalcPRs, onDeleteDay, onUpdateSettings, onGoToProfile, sex, age, onGoToDeload, measurements, onAddMeasurement, photos, photosLoading, onAddPhoto, onDeletePhoto }) {
+function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_SETTINGS, onResetAll, onDeleteDay, onUpdateSettings, onGoToProfile, sex, age, onGoToDeload, measurements, onAddMeasurement, photos, photosLoading, onAddPhoto, onDeletePhoto }) {
   const allExercises = useMemo(() => DAY_ORDER.flatMap((dk) => ROUTINE[dk].exercises.map((e) => ({ id: e.id, name: e.name, day: ROUTINE[dk].label, color: ROUTINE[dk].color, sets: e.sets.length, dayKey: dk }))), []);
 
   const stats = useMemo(() => {
@@ -6003,7 +6101,6 @@ function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_
   const chartData = history.map((h) => ({ date: h.date.slice(5), kg: h.kg, reps: h.reps, vol: vol(h.kg, h.reps), e1rm: estimate1RM(h.kg, h.reps), rpe: h.rpe ?? null }));
 
   const [confirmResetProgress, setConfirmResetProgress] = useState(false);
-  const [confirmRecalcPRs, setConfirmRecalcPRs] = useState(false);
   const [activeSection, setActiveSection] = useState("rank");
 
   return (
@@ -6116,19 +6213,10 @@ function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_
         {activeSection === "historial" && <SessionHistoryView logs={logs} onDeleteDay={onDeleteDay} trainingSessions={sessions} />}
       </div>
 
-      {!confirmResetProgress && !confirmRecalcPRs ? (
-        <div className="flex flex-col gap-2">
-          <div className="flex gap-2">
-            <button onClick={() => setConfirmResetProgress(true)} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-slate-800/60 text-slate-600 hover:text-rose-400 hover:border-rose-500/30 transition text-xs font-medium"><Trash2 size={12} /> Resetear todo</button>
-            <button onClick={() => setActiveSection("historial")} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-slate-800/60 text-slate-600 hover:text-amber-400 hover:border-amber-500/30 transition text-xs font-medium"><Calendar size={12} /> Borrar un día</button>
-          </div>
-          <button onClick={() => setConfirmRecalcPRs(true)} className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-slate-800/60 text-slate-600 hover:text-teal-400 hover:border-teal-500/30 transition text-xs font-medium"><Zap size={12} /> Recalcular marcas</button>
-        </div>
-      ) : confirmRecalcPRs ? (
-        <div className="flex gap-2 items-center bg-teal-950/30 border border-teal-500/20 rounded-xl px-3 py-2.5">
-          <p className="text-xs text-teal-200/80 flex-1">¿Recalcular todas tus marcas desde tu historial real? Corrige marcas que hayan quedado desactualizadas. No borra tu historial.</p>
-          <button onClick={() => setConfirmRecalcPRs(false)} className="px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-400 text-xs">No</button>
-          <button onClick={() => { onRecalcPRs?.(); setConfirmRecalcPRs(false); }} className="px-2.5 py-1.5 rounded-lg bg-teal-500 !text-white text-xs font-bold">Sí, recalcular</button>
+      {!confirmResetProgress ? (
+        <div className="flex gap-2">
+          <button onClick={() => setConfirmResetProgress(true)} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-slate-800/60 text-slate-600 hover:text-rose-400 hover:border-rose-500/30 transition text-xs font-medium"><Trash2 size={12} /> Resetear todo</button>
+          <button onClick={() => setActiveSection("historial")} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-slate-800/60 text-slate-600 hover:text-amber-400 hover:border-amber-500/30 transition text-xs font-medium"><Calendar size={12} /> Borrar un día</button>
         </div>
       ) : (
         <div className="flex gap-2 items-center bg-rose-950/30 border border-rose-500/20 rounded-xl px-3 py-2.5">
@@ -7608,7 +7696,14 @@ Datos: ${JSON.stringify(context)}`;
         });
         clearTimeout(timeoutId);
 
-        if (!response.ok) throw new Error(`Error ${response.status}`);
+        if (!response.ok) {
+          // El servidor ahora manda el motivo real en { error } (cuota
+          // agotada, clave inválida, IA caída...) — lo mostramos tal cual
+          // en vez de un "no me pude conectar" genérico que no dice nada.
+          const errBody = await response.json().catch(() => null);
+          const serverMsg = errBody?.error;
+          throw new Error(serverMsg || `Error ${response.status}`, { cause: serverMsg ? "server" : undefined });
+        }
         const result = await response.json();
 
         const rawReply = result?.text;
@@ -7622,11 +7717,14 @@ Datos: ${JSON.stringify(context)}`;
         clearTimeout(timeoutId);
         console.error("Error al hablar con el entrenador IA:", err);
         const isTimeout = err.name === "AbortError";
+        const serverMsg = err.cause === "server" ? err.message : null;
         setMessages((prev) => [...prev, {
           role: "assistant",
           text: isTimeout
             ? "Tardé demasiado en responder (más de 30 segundos). El plan gratuito de Gemini tiene momentos pico — esperá un poco y volvé a intentar 🙏"
-            : "Uy, no me pude conectar. Revisá tu conexión o probá de nuevo en un momento 🙏"
+            : serverMsg
+              ? `${serverMsg} 🙏`
+              : "Uy, no me pude conectar. Revisá tu conexión o probá de nuevo en un momento 🙏"
         }]);
       } finally {
         setIsSending(false);
@@ -9474,23 +9572,6 @@ export default function App() {
     });
   }, [activeProfile]);
 
-  // Borra TODOS los récords-override manuales, dejando el historial real
-  // intacto. Sirve para forzar que las marcas (muñeco, "A superar") se
-  // recalculen desde cero a partir de tus series reales — útil si quedó algún
-  // "dato fantasma" que el override viejo mantenía pegado. El historial de
-  // entrenamientos NO se toca; solo se recalculan las marcas.
-  const handleRecalcPRs = useCallback(() => {
-    setProfiles((prev) => {
-      const p = prev[activeProfile];
-      if (!p) return prev;
-      const newLogs = {};
-      Object.entries(p.logs || {}).forEach(([k, v]) => { if (!k.endsWith("_pr_override")) newLogs[k] = v; });
-      const np = { ...prev, [activeProfile]: { ...p, logs: newLogs } };
-      saveProfiles(np);
-      return np;
-    });
-  }, [activeProfile]);
-
   // Borrar un día puntual del historial (Progreso → Historial → ícono de
   // tacho en el detalle de ese día): quita sólo las series de esa fecha de
   // cada ejercicio, y la sesión explícita de Iniciar/Finalizar de ese día
@@ -9571,7 +9652,7 @@ export default function App() {
             {tab === "rutinas" && <RoutinesView profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleArchiveRoutine} onRestore={handleRestoreRoutine} onUpdateProfile={handleUpdateProfile} />}
             {tab === "rutina" && <OnboardingTasksCard profile={profile} cycleStart={cycleStart} logs={logs} onGoToProfile={() => setTab("perfil")} onDone={() => handleUpdateProfile({ onboardingDone: true })} />}
             {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} todaySessionDayKey={(profile?.trainingSessions || []).find((ts) => ts.date === todayStr())?.dayKey || profile?.activeSession?.dayKey || null} />}
-            {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onRecalcPRs={handleRecalcPRs} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} sex={profile?.sex} age={profile?.age} onGoToDeload={() => setTab("descarga")} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} />}
+            {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} sex={profile?.sex} age={profile?.age} onGoToDeload={() => setTab("descarga")} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} />}
             {tab === "descarga" && <DeloadView logs={logs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} />}
             {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} settings={getProfileSettings(profile)} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} />}
             {tab === "perfil" && <ProfileView profileName={activeProfile} profiles={profiles} logs={logs} onSignOut={handleSignOut} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} />}
