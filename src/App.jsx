@@ -723,6 +723,10 @@ function cleanObsoleteOverrides(logs) {
     if (!key.endsWith("_pr_override")) return;
     const ov = logs[key];
     if (!ov || !ov.kg || !ov.reps) return;
+    // Los récords EDITADOS A MANO por el usuario (manual: true) no se tocan
+    // acá jamás: son correcciones explícitas. Solo se liberan al superarlos
+    // entrenando (handleSave) o con el botón "Quitar".
+    if (ov.manual) return;
     const baseKey = key.replace(/_pr_override$/, "");
     const history = Array.isArray(logs[baseKey]) ? logs[baseKey] : [];
     const ovRm = estimate1RM(ov.kg, ov.reps);
@@ -1488,95 +1492,101 @@ function drawWordmark(ctx, W, H, accent) {
 }
 
 function drawPRShareCard(ctx, W, H, { exerciseName, muscle, kg, reps, accent = "#14B8A6" }) {
+  // Layout FIJO para el canvas real de 540×960 — la versión anterior usaba
+  // posiciones acumulativas pensadas para un lienzo más grande: con nombres
+  // largos todo se corría hacia abajo y los tiles quedaban cortados o fuera.
   drawShareCardBase(ctx, W, H, accent, "#A855F7");
   ctx.textAlign = "center";
 
   // Chip "NUEVA MARCA PERSONAL"
-  const chipY = 120, chipText = "✦  NUEVA MARCA PERSONAL  ✦";
-  ctx.font = "700 22px system-ui";
-  const chipW = ctx.measureText(chipText).width + 56;
-  const gChip = ctx.createLinearGradient(W/2 - chipW/2, 0, W/2 + chipW/2, 0);
+  const chipText = "✦  NUEVA MARCA PERSONAL  ✦";
+  ctx.font = "700 16px system-ui";
+  const chipW = ctx.measureText(chipText).width + 44;
+  const gChip = ctx.createLinearGradient(W / 2 - chipW / 2, 0, W / 2 + chipW / 2, 0);
   gChip.addColorStop(0, accent + "40"); gChip.addColorStop(1, accent + "20");
   ctx.fillStyle = gChip;
-  canvasRoundRect(ctx, W/2 - chipW/2, chipY - 26, chipW, 44, 22); ctx.fill();
+  canvasRoundRect(ctx, W / 2 - chipW / 2, 96, chipW, 36, 18); ctx.fill();
   ctx.strokeStyle = accent + "60"; ctx.lineWidth = 1.5;
-  canvasRoundRect(ctx, W/2 - chipW/2, chipY - 26, chipW, 44, 22); ctx.stroke();
-  ctx.fillStyle = accent; ctx.fillText(chipText, W/2, chipY + 6);
+  canvasRoundRect(ctx, W / 2 - chipW / 2, 96, chipW, 36, 18); ctx.stroke();
+  ctx.fillStyle = accent; ctx.fillText(chipText, W / 2, 120);
 
-  // Nombre del ejercicio
-  ctx.fillStyle = "#f8fafc"; ctx.font = "800 56px system-ui";
-  const nameLines = wrapCanvasText(ctx, (exerciseName || "").toUpperCase(), W/2, 230, W - 120, 68);
-  let y = 230 + (nameLines - 1) * 68;
+  // Nombre del ejercicio — truncado a un largo seguro, máximo 2 líneas.
+  let name = (exerciseName || "").toUpperCase();
+  if (name.length > 44) name = name.slice(0, 43).trimEnd() + "…";
+  ctx.fillStyle = "#f8fafc"; ctx.font = "800 34px system-ui";
+  wrapCanvasText(ctx, name, W / 2, 188, W - 72, 42);
 
-  // Chip de músculo
+  // Chip de músculo — posición fija, debajo del área reservada del nombre.
   if (muscle) {
-    y += 72;
-    ctx.font = "600 26px system-ui";
-    const mW = ctx.measureText(muscle.toUpperCase()).width + 48;
+    ctx.font = "600 17px system-ui";
+    const mW = ctx.measureText(muscle.toUpperCase()).width + 36;
     ctx.fillStyle = accent + "20";
-    canvasRoundRect(ctx, W/2 - mW/2, y - 26, mW, 42, 21); ctx.fill();
-    ctx.fillStyle = accent + "dd"; ctx.fillText(muscle.toUpperCase(), W/2, y + 5);
+    canvasRoundRect(ctx, W / 2 - mW / 2, 268, mW, 32, 16); ctx.fill();
+    ctx.fillStyle = accent + "dd"; ctx.fillText(muscle.toUpperCase(), W / 2, 290);
   }
 
-  // Número de kg — protagonista
-  y += 120;
-  ctx.font = `900 ${kg >= 100 ? "160" : "180"}px system-ui`;
-  const gKg = ctx.createLinearGradient(0, y - 160, 0, y + 20);
+  // Número de kg — protagonista, centrado en el tercio medio.
+  const kgStr = `${kg ?? 0}`;
+  ctx.font = `900 ${kgStr.length >= 3 ? 128 : 148}px system-ui`;
+  const gKg = ctx.createLinearGradient(0, 340, 0, 500);
   gKg.addColorStop(0, "#ffffff"); gKg.addColorStop(1, accent);
   ctx.fillStyle = gKg;
-  ctx.fillText(`${kg}`, W/2, y);
-  ctx.fillStyle = "#64748b"; ctx.font = "600 30px system-ui";
-  ctx.fillText("kg", W/2, y + 44);
+  ctx.fillText(kgStr, W / 2, 492);
+  ctx.fillStyle = "#64748b"; ctx.font = "600 24px system-ui";
+  ctx.fillText("kg", W / 2, 528);
 
   // Reps
-  y += 110;
-  ctx.fillStyle = "#e2e8f0"; ctx.font = "700 42px system-ui";
-  ctx.fillText(`${reps} repeticiones`, W/2, y);
+  ctx.fillStyle = "#e2e8f0"; ctx.font = "700 30px system-ui";
+  ctx.fillText(`${reps ?? 0} repeticiones`, W / 2, 596);
 
   // Tiles 1RM + Volumen
   const est = estimate1RM(kg, reps);
-  const tileY = y + 80, tileGap = 32, tileW = (W - 120 - tileGap) / 2;
-  [{ val: `${est} kg`, label: "1RM estimado" }, { val: `${Math.round((kg||0)*(reps||0))} kg`, label: "Volumen" }].forEach((t, i) => {
-    const x = 60 + i * (tileW + tileGap);
+  const tileY = 660, tileGap = 20, tileW = (W - 80 - tileGap) / 2, tileH = 108;
+  [{ val: `${est} kg`, label: "1RM estimado" }, { val: `${Math.round((kg || 0) * (reps || 0))} kg`, label: "Volumen" }].forEach((t, i) => {
+    const x = 40 + i * (tileW + tileGap);
     ctx.fillStyle = "rgba(255,255,255,0.05)";
-    canvasRoundRect(ctx, x, tileY, tileW, 150, 20); ctx.fill();
+    canvasRoundRect(ctx, x, tileY, tileW, tileH, 16); ctx.fill();
     ctx.strokeStyle = "rgba(255,255,255,0.08)"; ctx.lineWidth = 1;
-    canvasRoundRect(ctx, x, tileY, tileW, 150, 20); ctx.stroke();
-    ctx.fillStyle = "#ffffff"; ctx.font = "800 46px system-ui";
-    ctx.fillText(t.val, x + tileW/2, tileY + 82);
-    ctx.fillStyle = "#64748b"; ctx.font = "500 24px system-ui";
-    ctx.fillText(t.label, x + tileW/2, tileY + 122);
+    canvasRoundRect(ctx, x, tileY, tileW, tileH, 16); ctx.stroke();
+    ctx.fillStyle = "#ffffff"; ctx.font = "800 32px system-ui";
+    ctx.fillText(t.val, x + tileW / 2, tileY + 56);
+    ctx.fillStyle = "#64748b"; ctx.font = "500 16px system-ui";
+    ctx.fillText(t.label, x + tileW / 2, tileY + 86);
   });
+
+  drawWordmark(ctx, W, H, accent);
 }
 
 function drawCycleShareCard(ctx, W, H, { cycleNumber, daysTrained, totalVol, accent = "#A855F7" }) {
+  // Layout para el canvas real de 540×960 (las coordenadas anteriores eran
+  // de un lienzo del doble: la mitad de la tarjeta quedaba fuera de cuadro).
   drawShareCardBase(ctx, W, H, accent, "#06B6D4");
   ctx.textAlign = "center";
   ctx.fillStyle = accent;
-  ctx.font = "800 42px sans-serif";
-  ctx.fillText("🎉 CICLO COMPLETO", W / 2, 480);
+  ctx.font = "800 26px sans-serif";
+  ctx.fillText("🎉 CICLO COMPLETO", W / 2, 250);
   ctx.fillStyle = "#f8fafc";
-  ctx.font = "900 130px sans-serif";
-  ctx.fillText(`Ciclo #${cycleNumber}`, W / 2, 660);
+  ctx.font = "900 76px sans-serif";
+  ctx.fillText(`Ciclo #${cycleNumber}`, W / 2, 360);
   const tiles = [
     { val: daysTrained, label: "DÍAS\nENTRENADOS" },
     { val: totalVol > 999 ? `${(totalVol / 1000).toFixed(1)}k` : totalVol, label: "KG × REPS\nTOTALES" },
   ];
-  const tileY = 950, tileGap = 60, tileW = (W - 160 - tileGap) / 2;
+  const tileY = 460, tileGap = 28, tileW = (W - 80 - tileGap) / 2, tileH = 170;
   tiles.forEach((t, i) => {
-    const x = 80 + i * (tileW + tileGap);
+    const x = 40 + i * (tileW + tileGap);
     ctx.fillStyle = "rgba(255,255,255,0.06)";
-    canvasRoundRect(ctx, x, tileY, tileW, 280, 28); ctx.fill();
+    canvasRoundRect(ctx, x, tileY, tileW, tileH, 20); ctx.fill();
     ctx.fillStyle = "#f8fafc";
-    ctx.font = "900 86px sans-serif";
-    ctx.fillText(`${t.val}`, x + tileW / 2, tileY + 130);
+    ctx.font = "900 54px sans-serif";
+    ctx.fillText(`${t.val}`, x + tileW / 2, tileY + 82);
     ctx.fillStyle = "#94a3b8";
-    ctx.font = "700 28px sans-serif";
-    t.label.split("\n").forEach((l, li) => ctx.fillText(l, x + tileW / 2, tileY + 190 + li * 36));
+    ctx.font = "700 17px sans-serif";
+    t.label.split("\n").forEach((l, li) => ctx.fillText(l, x + tileW / 2, tileY + 118 + li * 22));
   });
   ctx.fillStyle = "#cbd5e1";
-  ctx.font = "700 44px sans-serif";
-  ctx.fillText("7 semanas de entrenamiento y descarga 💪", W / 2, 1450);
+  ctx.font = "700 26px sans-serif";
+  ctx.fillText("7 semanas de entrenamiento y descarga 💪", W / 2, 740);
   drawWordmark(ctx, W, H, accent);
 }
 
@@ -1588,30 +1598,39 @@ function drawCycleShareCard(ctx, W, H, { cycleNumber, daysTrained, totalVol, acc
 // calendario de Historial) cuando el período es semana o mes, y una
 // estadística más (series totales) para que no se sienta tan vacía.
 function drawPeriodShareCard(ctx, W, H, { periodLabel, daysTrained, totalSets, totalVol, calendarCells, accent = "#3B82F6" }) {
+  // Layout para el canvas real de 540×960. La versión anterior usaba
+  // coordenadas de un lienzo del doble (título en y=480, cierre en y≈1200):
+  // la tarjeta salía cortada, con textos gigantes y la mitad fuera de
+  // cuadro — la "imagen bugueada" del historial.
   drawShareCardBase(ctx, W, H, accent, "#06B6D4");
   ctx.textAlign = "center";
-  ctx.fillStyle = accent;
-  ctx.font = "800 40px sans-serif";
-  ctx.fillText("💪 RESUMEN DE ENTRENAMIENTO", W / 2, 360);
-  ctx.fillStyle = "#f8fafc";
-  ctx.font = "900 96px sans-serif";
-  const lines = wrapCanvasText(ctx, (periodLabel || "").toUpperCase(), W / 2, 480, W - 160, 104);
-  let y = 480 + (lines - 1) * 104;
 
-  // Grilla de días entrenados — los mismos casilleros llenos/vacíos que se
-  // ven en el calendario de Historial, pero pensados para la foto.
+  ctx.fillStyle = accent;
+  ctx.font = "800 22px sans-serif";
+  ctx.fillText("💪 RESUMEN DE ENTRENAMIENTO", W / 2, 150);
+
+  ctx.fillStyle = "#f8fafc";
+  ctx.font = "900 42px sans-serif";
+  let label = (periodLabel || "").toUpperCase();
+  if (label.length > 40) label = label.slice(0, 39).trimEnd() + "…";
+  const lines = wrapCanvasText(ctx, label, W / 2, 208, W - 80, 50);
+  let y = 208 + (lines - 1) * 50;
+
+  // Grilla de días entrenados — mismos casilleros llenos/vacíos que el
+  // calendario de Historial, dimensionados para que SIEMPRE entren:
+  // semana = 1 fila (celdas grandes), mes = hasta 6 filas (celdas chicas).
   const gridCols = 7;
   if (calendarCells && calendarCells.length) {
     const rows = Math.ceil(calendarCells.length / gridCols);
-    const cell = rows > 1 ? 70 : 96, gap = rows > 1 ? 12 : 18;
+    const cell = rows > 1 ? 44 : 56, gap = rows > 1 ? 8 : 12;
     const gridW = gridCols * cell + (gridCols - 1) * gap;
-    const startX = (W - gridW) / 2, startY = y + 110;
+    const startX = (W - gridW) / 2, startY = y + 50;
     calendarCells.forEach((c, i) => {
       if (c.isPad) return;
       const col = i % gridCols, row = Math.floor(i / gridCols);
       const x = startX + col * (cell + gap), cy = startY + row * (cell + gap);
       ctx.fillStyle = c.trained ? accent : "rgba(255,255,255,0.07)";
-      canvasRoundRect(ctx, x, cy, cell, cell, 16); ctx.fill();
+      canvasRoundRect(ctx, x, cy, cell, cell, 10); ctx.fill();
       if (c.trained) {
         ctx.fillStyle = "rgba(255,255,255,0.92)";
         ctx.font = `700 ${Math.round(cell * 0.46)}px sans-serif`;
@@ -1620,31 +1639,32 @@ function drawPeriodShareCard(ctx, W, H, { periodLabel, daysTrained, totalSets, t
     });
     y = startY + rows * cell + (rows - 1) * gap;
   } else {
-    y += 130;
+    y += 60;
   }
 
-  const tileY = y + 90;
+  // 3 tiles de estadísticas
+  const tileY = Math.min(y + 44, 640);
   const tiles = [
     { val: daysTrained, label: "DÍAS\nENTRENADOS" },
     { val: totalSets ?? 0, label: "SERIES\nTOTALES" },
     { val: totalVol > 999 ? `${(totalVol / 1000).toFixed(1)}k` : totalVol, label: "KG × REPS\nTOTALES" },
   ];
-  const tileGap = 30, tileW = (W - 160 - tileGap * 2) / 3;
+  const tileGap = 16, tileW = (W - 64 - tileGap * 2) / 3, tileH = 128;
   tiles.forEach((t, i) => {
-    const x = 80 + i * (tileW + tileGap);
+    const x = 32 + i * (tileW + tileGap);
     ctx.fillStyle = "rgba(255,255,255,0.06)";
-    canvasRoundRect(ctx, x, tileY, tileW, 230, 24); ctx.fill();
+    canvasRoundRect(ctx, x, tileY, tileW, tileH, 16); ctx.fill();
     ctx.fillStyle = "#f8fafc";
-    ctx.font = "900 56px sans-serif";
-    ctx.fillText(`${t.val}`, x + tileW / 2, tileY + 100);
+    ctx.font = "900 34px sans-serif";
+    ctx.fillText(`${t.val}`, x + tileW / 2, tileY + 58);
     ctx.fillStyle = "#94a3b8";
-    ctx.font = "700 22px sans-serif";
-    t.label.split("\n").forEach((l, li) => ctx.fillText(l, x + tileW / 2, tileY + 150 + li * 28));
+    ctx.font = "700 13px sans-serif";
+    t.label.split("\n").forEach((l, li) => ctx.fillText(l, x + tileW / 2, tileY + 86 + li * 17));
   });
 
   ctx.fillStyle = "#cbd5e1";
-  ctx.font = "700 40px sans-serif";
-  ctx.fillText(daysTrained > 0 ? "¡Seguí así! 💪" : "A entrenar 💪", W / 2, tileY + 320);
+  ctx.font = "700 24px sans-serif";
+  ctx.fillText(daysTrained > 0 ? "¡Seguí así! 💪" : "A entrenar 💪", W / 2, tileY + tileH + 60);
   drawWordmark(ctx, W, H, accent);
 }
 
@@ -3547,11 +3567,15 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     let best = setDef.pr ? { ...setDef.pr } : null; history.forEach((h) => { if (!best || estimate1RM(h.kg, h.reps) > estimate1RM(best.kg, best.reps)) best = { kg: h.kg, reps: h.reps }; }); return best;
   }, [history, setDef.pr, cardio]);
   const currentPR = useMemo(() => {
-    // Tomar el MEJOR entre el override manual y el historial real.
-    // Antes, si existía override, se ignoraba el historial — así cualquier
-    // marca nueva registrada después de editar el récord a mano quedaba
-    // invisible en el "A superar" hasta que se borrara el override.
     if (!override && !computedPR) return null;
+    // Un récord EDITADO A MANO (manual: true) manda SIEMPRE mientras exista:
+    // es una corrección explícita del usuario y se respeta tal cual, sea
+    // mayor o menor que el historial. Se libera solo cuando lo superás
+    // entrenando (ver handleSave) o con el botón "Quitar".
+    if (override?.manual) return override;
+    // Overrides viejos sin flag (guardados automáticamente por versiones
+    // anteriores): gana el mejor entre ese dato y el historial real, así un
+    // dato viejo nunca esconde una marca real superior.
     if (!override) return computedPR;
     if (!computedPR) return override;
     return estimate1RM(override.kg, override.reps) >= estimate1RM(computedPR.kg, computedPR.reps) ? override : computedPR;
@@ -3666,7 +3690,11 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     // pisaba tu marca real para siempre. Además, si el historial nuevo YA
     // alcanzó o superó un override viejo, lo borramos acá para limpiar el
     // fantasma de una vez.
-    if (override && newHistory.some((h) => estimate1RM(h.kg, h.reps) >= estimate1RM(override.kg, override.reps))) {
+    if (override && (
+      override.manual
+        ? new1RM > estimate1RM(override.kg, override.reps) // manual: solo lo libera una marca real que lo SUPERE
+        : newHistory.some((h) => estimate1RM(h.kg, h.reps) >= estimate1RM(override.kg, override.reps)) // legacy: el historial lo cubre
+    )) {
       const cleaned = { ...newLogs }; delete cleaned[prKey]; newLogs = cleaned;
     }
     setLogs(newLogs); setSaved(true); setTimeout(() => setSaved(false), 1200);
@@ -3697,7 +3725,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     else if (isPR) { haptic([35, 25, 45]); setPrBurst((n) => n + 1); setFeedback({ type: "pr", msg: "¡Nueva marca! 🔥", suggestUp, noSession }); if (autoShowPrShare) setShowPRShare(true); }
     else { haptic(18); if (new1RM === prev1RM) setFeedback({ type: "tie", msg: "Igualaste tu marca 💪", suggestUp: false, noSession }); else setFeedback({ type: "down", msg: `-${(((prev1RM - new1RM) / prev1RM) * 100).toFixed(0)}% vs récord`, suggestUp: false, noSession }); }
   };
-  const savePR = () => { const r = parseFloat(editReps), k = parseFloat(editKg); if (!r || !k || isNaN(r) || isNaN(k)) return; setLogs({ ...logs, [prKey]: { kg: k, reps: r } }); setEditingPR(false); };
+  const savePR = () => { const r = parseFloat(editReps), k = parseFloat(editKg); if (!r || !k || isNaN(r) || isNaN(k)) return; setLogs({ ...logs, [prKey]: { kg: k, reps: r, date: today, manual: true } }); setEditingPR(false); };
   return (
     <div className="relative rounded-xl px-3.5 py-3.5 mb-2.5 last:mb-0" style={{ backgroundColor: accent + "0a", border: `1px solid ${accent}25` }}>
       <PRBurst anchorRef={saveBtnRef} trigger={prBurst} />
@@ -8992,6 +9020,25 @@ export default function App() {
       overrideCleanupRef.current = activeProfile;
     }
   }, [activeProfile, profile?.logs]);
+
+  // AUTO-CENTRADO DE INPUTS: cuando enfocás cualquier campo de la app
+  // (editar récord, reps, kg, medidas, chat...), la pantalla se desplaza
+  // sola para centrarlo — así el teclado nunca lo tapa y no tenés que
+  // scrollear a mano. El delay le da tiempo al teclado a abrirse y al
+  // viewport a achicarse (interactive-widget=resizes-content) antes de
+  // calcular el centro.
+  useEffect(() => {
+    const onFocusIn = (e) => {
+      const t = e.target;
+      if (!t || !(t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT")) return;
+      if (t.type === "checkbox" || t.type === "radio" || t.type === "file" || t.type === "range") return;
+      setTimeout(() => {
+        try { t.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" }); } catch { }
+      }, 350);
+    };
+    window.addEventListener("focusin", onFocusIn);
+    return () => window.removeEventListener("focusin", onFocusIn);
+  }, []);
 
   // MIGRACIÓN AUTOMÁTICA DE LA FOTO DE PERFIL: las fotos puestas con
   // versiones anteriores quedaron SOLO en IndexedDB del dispositivo (nunca
