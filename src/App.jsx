@@ -5489,7 +5489,9 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
   const [selected, setSelected] = useState(null);
   const [showImage, setShowImage] = useState(false);
   const [showTierRef, setShowTierRef] = useState(false); // modal de referencia de rangos
+  const [showAnalysis, setShowAnalysis] = useState(false); // modal de análisis muscular
   const initialSelRef = useRef(false);
+  const detailRef = useRef(null); // la tarjeta de detalle, para el scroll automático
   const frontBodyRef = useRef(null);
   const backBodyRef = useRef(null);
   const mode = settings.muscleRankMode === "relative" ? "relative" : "general";
@@ -5522,6 +5524,25 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
   const needsWeight = mode === "relative" && !bodyWeightKg;
   const modeLabel = mode === "relative" && bodyWeightKg ? "Según tu contexto" : "General";
 
+  // ANÁLISIS MUSCULAR: tus mejores, los que tenés que mejorar, y los que
+  // no estás entrenando. Alimenta el modal del botón de análisis.
+  const analysis = useMemo(() => {
+    const withData = MUSCLE_GROUPS.map((g) => ({ key: g.key, label: g.label, r: ranks[g.key] })).filter((x) => x.r?.hasData);
+    const sorted = withData.slice().sort((a, b) => b.r.levelIdx - a.r.levelIdx);
+    const tops = sorted.slice(0, 3);
+    const topKeys = new Set(tops.map((t) => t.key));
+    const weak = sorted.slice().reverse().filter((x) => !topKeys.has(x.key)).slice(0, 3);
+    const untrained = MUSCLE_GROUPS.filter((g) => !ranks[g.key]?.hasData);
+    return { tops, weak, untrained, hasAny: withData.length > 0 };
+  }, [ranks]);
+
+  // Seleccionar un músculo (desde el muñeco o el análisis) y "redireccionar":
+  // la tarjeta de detalle se centra sola en pantalla con una animación suave.
+  const goToMuscle = (k) => {
+    setSelected(k);
+    setTimeout(() => { try { detailRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); } catch { } }, 80);
+  };
+
   // Al entrar, la tarjeta de detalle arranca en tu MEJOR músculo — así
   // nunca está vacía, sin agregar ningún elemento visual extra.
   useEffect(() => {
@@ -5548,6 +5569,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
           </div>
         </div>
         <div className="flex gap-1.5 shrink-0">
+          <button onClick={() => setShowAnalysis(true)} aria-label="Análisis muscular" className="p-2 rounded-xl bg-slate-800/60 text-slate-400 hover:text-teal-400 transition border border-slate-700/50"><BarChart3 size={15} /></button>
           <button onClick={() => setShowTierRef(true)} aria-label="Ver la escala de rangos" className="p-2 rounded-xl bg-slate-800/60 text-slate-400 hover:text-amber-400 transition border border-slate-700/50"><Trophy size={15} /></button>
           <button onClick={() => setShowImage(true)} aria-label="Compartir tus rangos" className="p-2 rounded-xl bg-slate-800/60 text-slate-400 hover:text-blue-400 transition border border-slate-700/50"><Share2 size={15} /></button>
         </div>
@@ -5567,70 +5589,146 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
         )}
       </div>
 
-      <MuscleHighlighterBody ranks={ranks} selected={selected} onMuscleClick={(k) => setSelected(k)} frontRef={frontBodyRef} backRef={backBodyRef} />
+      <MuscleHighlighterBody ranks={ranks} selected={selected} onMuscleClick={goToMuscle} frontRef={frontBodyRef} backRef={backBodyRef} />
 
-      {/* Leyenda mínima: qué significa cada color del muñeco, de un vistazo
-          y sin tocar nada. Seis puntitos, cero ruido. */}
-      <div className="flex items-center justify-center gap-3 flex-wrap px-1">
-        {["Bronce", "Plata", "Oro", "Esmeralda", "Diamante", "Maestro"].map((t) => {
-          const rep = RANK_TIERS.find((r) => r.tier === t && r.sub === "II") || RANK_TIERS.find((r) => r.tier === t);
-          return (
-            <span key={t} className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: rep.color }} />
-              <span className="text-[9px] font-bold text-slate-500">{t}</span>
-            </span>
-          );
-        })}
-      </div>
-      {selInfo ? (
-        <div className="relative overflow-hidden bg-slate-950/50 rounded-2xl p-4 bounce-in border transition-colors duration-300" style={{ borderColor: selInfo.hasData ? selInfo.color + "40" : "#1e293b" }}>
-          {selInfo.hasData && <div className="absolute -top-8 -right-8 w-28 h-28 rounded-full blur-3xl pointer-events-none opacity-20" style={{ backgroundColor: selInfo.color }} />}
-          <div className="relative flex items-center justify-between mb-3 gap-2">
-            <p className="text-sm font-bold text-white">{selInfo.label}</p>
-            {!selInfo.hasData && <span className="text-[11px] font-bold text-slate-500 px-2.5 py-1 rounded-lg bg-slate-800/60 shrink-0">Sin rango</span>}
-          </div>
-          {selInfo.hasData ? (
-            <>
-              <div className="flex items-center gap-3.5 mb-3.5">
-                <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-2 shrink-0 backdrop-blur-sm shadow-md shadow-black/20">
-                  <RankBadgeIcon tier={selInfo.tier} sub={selInfo.sub} color={selInfo.color} size={112} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-lg font-black leading-tight" style={{ color: selInfo.color }}>{selInfo.tier}{selInfo.sub ? ` ${selInfo.sub}` : ""}</p>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
+     {selInfo ? (
+        <div key={selected} ref={detailRef} className="relative overflow-hidden rounded-3xl p-[1.5px] bounce-in" style={{ background: selInfo.hasData ? `linear-gradient(140deg, ${selInfo.color}55, transparent 45%, transparent 60%, ${selInfo.color}30)` : "#1e293b" }}>
+          <div className="relative overflow-hidden rounded-[calc(1.5rem-1.5px)] p-4" style={{ background: "linear-gradient(165deg, #0c1420 0%, #0a0f1a 100%)" }}>
+            {selInfo.hasData && (
+              <>
+                <div className="absolute -top-12 -right-10 w-44 h-44 rounded-full blur-3xl pointer-events-none opacity-25" style={{ backgroundColor: selInfo.color }} />
+                <div className="absolute -bottom-16 -left-12 w-40 h-40 rounded-full blur-3xl pointer-events-none opacity-10" style={{ backgroundColor: selInfo.color }} />
+              </>
+            )}
+
+            {/* Nombre del músculo como chip protagonista */}
+            <div className="relative flex items-center justify-between gap-2 mb-3.5">
+              <span className="text-[11px] font-black uppercase tracking-[0.18em] px-3 py-1.5 rounded-xl" style={selInfo.hasData ? { color: selInfo.color, backgroundColor: selInfo.color + "18", border: `1px solid ${selInfo.color}35` } : { color: "#64748b", backgroundColor: "#1e293b66", border: "1px solid #1e293b" }}>{selInfo.label}</span>
+              {!selInfo.hasData && <span className="text-[11px] font-bold text-slate-500 px-2.5 py-1 rounded-lg bg-slate-800/60 shrink-0">Sin rango</span>}
+            </div>
+
+            {selInfo.hasData ? (
+              <>
+                {/* Badge + rango + marca en display grande */}
+                <div className="relative flex items-center gap-4 mb-4">
+                  <div className="shrink-0" style={{ filter: `drop-shadow(0 6px 18px ${selInfo.color}50)` }}>
+                    <RankBadgeIcon tier={selInfo.tier} sub={selInfo.sub} color={selInfo.color} size={118} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-2xl font-black leading-none tracking-tight" style={{ color: selInfo.color, textShadow: `0 0 24px ${selInfo.color}40` }}>{selInfo.tier}{selInfo.sub ? ` ${selInfo.sub}` : ""}</p>
                     {selInfo.bestKg ? (
-                      <>Mejor marca: <span className="text-slate-300 font-bold">{selInfo.bestReps}×{selInfo.bestKg}kg</span>{selInfo.bestLoadFactor > 1 ? <span className="text-slate-600"> (×2 mancuernas)</span> : null}{selInfo.bestExerciseName ? <> en {selInfo.bestExerciseName}</> : null}</>
+                      <>
+                        <p className="mt-2 text-[26px] font-black text-white leading-none tabular-nums">{selInfo.bestReps}<span className="text-slate-500 text-lg font-bold mx-0.5">×</span>{selInfo.bestKg}<span className="text-slate-400 text-base font-bold ml-0.5">kg</span></p>
+                        <p className="text-[10.5px] text-slate-500 mt-1.5 leading-snug">{selInfo.bestExerciseName ? <>en <span className="text-slate-300 font-bold">{selInfo.bestExerciseName}</span></> : "Tu mejor marca"}{selInfo.bestLoadFactor > 1 ? <span className="text-slate-600"> · ×2 mancuernas</span> : null}</p>
+                      </>
                     ) : (
-                      <>Estimado por ejercicios relacionados — todavía sin marca propia</>
+                      <p className="text-[11px] text-slate-500 mt-2 leading-snug">Estimado por ejercicios relacionados — todavía sin marca propia</p>
                     )}
-                  </p>
-                </div>
-              </div>
-              {selInfo.nextThreshold ? (
-                <div className="bg-slate-900/60 border border-slate-800/50 rounded-xl p-3">
-                  <div className="flex items-center justify-between mb-2 gap-2">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Progreso al próximo rango</span>
-                    <span className="flex items-center gap-1.5 text-[11px] font-bold shrink-0" style={{ color: nextTierInfo?.color }}>
-                      <RankBadgeIcon tier={nextTierInfo?.tier} sub="" color={nextTierInfo?.color} size={50} />
-                      {nextTierInfo?.tier}{nextTierInfo?.sub ? ` ${nextTierInfo.sub}` : ""}
-                    </span>
                   </div>
-                  <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
-                    <div className="h-full rounded-full transition-all grow-bar" style={{ width: `${Math.min(100, Math.max(4, ((selInfo.best1RM - selInfo.threshold) / (selInfo.nextThreshold - selInfo.threshold)) * 100))}%`, background: `linear-gradient(90deg, ${selInfo.color}, ${nextTierInfo?.color || selInfo.color})` }} />
+                </div>
+
+                {selInfo.nextThreshold ? (
+                  <div className="relative bg-slate-900/70 border border-slate-800/60 rounded-2xl p-3.5 backdrop-blur-sm">
+                    <div className="flex items-center justify-between mb-2.5 gap-2">
+                      <span className="text-[9.5px] font-black text-slate-500 uppercase tracking-[0.14em]">Próximo rango</span>
+                      <span className="flex items-center gap-1.5 text-[11px] font-black shrink-0" style={{ color: nextTierInfo?.color }}>
+                        <RankBadgeIcon tier={nextTierInfo?.tier} sub="" color={nextTierInfo?.color} size={46} />
+                        {nextTierInfo?.tier}{nextTierInfo?.sub ? ` ${nextTierInfo.sub}` : ""}
+                      </span>
+                    </div>
+                    {(() => {
+                      const pct = Math.min(100, Math.max(4, ((selInfo.best1RM - selInfo.threshold) / (selInfo.nextThreshold - selInfo.threshold)) * 100));
+                      return (
+                        <div className="relative h-3 bg-slate-800/80 rounded-full overflow-hidden">
+                          <div className="h-full rounded-full transition-all grow-bar relative" style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${selInfo.color}, ${nextTierInfo?.color || selInfo.color})`, boxShadow: `0 0 12px ${selInfo.color}70` }} />
+                          <span className="absolute inset-0 flex items-center justify-center text-[8.5px] font-black text-white/90 tabular-nums" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.8)" }}>{Math.round(pct)}%</span>
+                        </div>
+                      );
+                    })()}
+                    {extraKgNeeded != null && (
+                      <div className="mt-3 flex items-center gap-2 rounded-xl px-3 py-2" style={{ backgroundColor: (nextTierInfo?.color || selInfo.color) + "14", border: `1px solid ${(nextTierInfo?.color || selInfo.color)}30` }}>
+                        <TrendingUp size={13} style={{ color: nextTierInfo?.color || selInfo.color }} className="shrink-0" />
+                        <p className="text-[11px] text-slate-300 leading-snug">Sumá <span className="font-black text-white">{extraKgNeeded}kg</span> a tus {selInfo.bestReps} reps y subís de rango</p>
+                      </div>
+                    )}
                   </div>
-                  {extraKgNeeded != null && <p className="text-[11px] text-slate-400 mt-2.5">Sumá <span className="font-black text-white">{extraKgNeeded}kg</span> a tus mismas {selInfo.bestReps} reps para subir</p>}
-                </div>
-              ) : (
-                <div className="bg-blue-500/10 border border-blue-500/25 rounded-xl px-3 py-3 text-center">
-                  <p className="text-sm font-black text-blue-400">🏆 ¡Rango máximo!</p>
-                </div>
-              )}
-            </>
-          ) : <p className="text-[11px] text-slate-600 text-center py-2">Todavía no registraste marcas en este grupo.</p>}
+                ) : (
+                  <div className="relative rounded-2xl px-3 py-3.5 text-center" style={{ background: `linear-gradient(135deg, ${selInfo.color}20, ${selInfo.color}08)`, border: `1px solid ${selInfo.color}40` }}>
+                    <p className="text-sm font-black" style={{ color: selInfo.color }}>🏆 ¡Rango máximo alcanzado!</p>
+                  </div>
+                )}
+              </>
+            ) : <p className="text-[11px] text-slate-600 text-center py-2 relative">Todavía no registraste marcas en este grupo.</p>}
+          </div>
         </div>
       ) : (
         <p className="text-center text-[11px] text-slate-600">Tocá un músculo entrenable para ver tu rango y tu mejor marca.</p>
       )}
+      {/* Modal de ANÁLISIS MUSCULAR: tus mejores, los que hay que mejorar
+          y los que no estás entrenando. Cada fila es tocable: te lleva
+          directo a la tarjeta de ese músculo. */}
+      {showAnalysis && (
+        <div className="fixed inset-0 z-[130] bg-black/75 backdrop-blur-sm flex items-center justify-center p-5 modal-bg-in" onClick={() => setShowAnalysis(false)}>
+          <div className="max-w-sm w-full max-h-[85vh] overflow-y-auto bg-slate-900 border border-slate-700/60 rounded-3xl p-5 modal-pop-in shadow-2xl shadow-black/60" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <BarChart3 size={15} className="text-teal-400" />
+                <p className="text-sm font-black text-white">Análisis muscular</p>
+              </div>
+              <button onClick={() => setShowAnalysis(false)} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition"><X size={16} /></button>
+            </div>
+
+            {!analysis.hasAny ? (
+              <p className="text-[11px] text-slate-500 text-center py-4">Registrá tus primeras marcas y acá vas a ver tus fortalezas y pendientes.</p>
+            ) : (
+              <div className="space-y-4">
+                {analysis.tops.length > 0 && (
+                  <div>
+                    <p className="text-[9.5px] font-black uppercase tracking-[0.15em] text-amber-400 mb-2 flex items-center gap-1.5"><Trophy size={11} /> Tus mejores</p>
+                    <div className="space-y-1.5">
+                      {analysis.tops.map((m) => (
+                        <button key={m.key} onClick={() => { setShowAnalysis(false); goToMuscle(m.key); }} className="w-full flex items-center gap-2.5 rounded-xl px-2.5 py-2 transition active:scale-[0.98] text-left" style={{ backgroundColor: m.r.color + "12", border: `1px solid ${m.r.color}30` }}>
+                          <RankBadgeIcon tier={m.r.tier} sub="" color={m.r.color} size={40} />
+                          <span className="flex-1 text-xs font-bold text-slate-200">{m.label}</span>
+                          <span className="text-[10.5px] font-black shrink-0" style={{ color: m.r.color }}>{m.r.tier}{m.r.sub ? ` ${m.r.sub}` : ""}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {analysis.weak.length > 0 && (
+                  <div>
+                    <p className="text-[9.5px] font-black uppercase tracking-[0.15em] text-orange-400 mb-2 flex items-center gap-1.5"><TrendingUp size={11} /> Para mejorar</p>
+                    <div className="space-y-1.5">
+                      {analysis.weak.map((m) => (
+                        <button key={m.key} onClick={() => { setShowAnalysis(false); goToMuscle(m.key); }} className="w-full flex items-center gap-2.5 rounded-xl px-2.5 py-2 bg-slate-800/40 border border-slate-700/40 transition active:scale-[0.98] text-left">
+                          <RankBadgeIcon tier={m.r.tier} sub="" color={m.r.color} size={40} />
+                          <span className="flex-1 text-xs font-bold text-slate-300">{m.label}</span>
+                          <span className="text-[10.5px] font-black shrink-0" style={{ color: m.r.color }}>{m.r.tier}{m.r.sub ? ` ${m.r.sub}` : ""}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {analysis.untrained.length > 0 && (
+                  <div>
+                    <p className="text-[9.5px] font-black uppercase tracking-[0.15em] text-slate-500 mb-2 flex items-center gap-1.5"><Moon size={11} /> Sin entrenar</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {analysis.untrained.map((g) => (
+                        <button key={g.key} onClick={() => { setShowAnalysis(false); goToMuscle(g.key); }} className="text-[10px] font-bold text-slate-500 px-2.5 py-1.5 rounded-lg bg-slate-800/50 border border-slate-700/40 transition active:scale-95">{g.label}</button>
+                      ))}
+                    </div>
+                    <p className="text-[9.5px] text-slate-600 mt-2">Sumá ejercicios de estos grupos a tu rutina para desbloquear su rango.</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Modal de referencia: la escala completa de rangos (se abre con el
           trofeo del header — antes ocupaba lugar fijo como "Ver todos los
           rangos"; ahora el espacio lo usa el carrusel con TUS rangos). */}
@@ -7629,11 +7727,14 @@ Datos: ${JSON.stringify(context)}`;
       // expone, y que activa la búsqueda con Google cuando hace falta
       // respaldar una afirmación científica — devuelve el texto y, si
       // corresponde, las fuentes reales que usó (ver "sources" más abajo).
-      // Timeout de 30 segundos — Gemini en el plan gratuito a veces tarda
-      // bastante o directamente no responde. Con AbortController cortamos
-      // la espera y mostramos un mensaje claro en vez de quedarnos colgados.
+      // Timeout de 65 segundos — las respuestas LARGAS (rutinas completas,
+      // análisis extensos) en el plan gratuito de Gemini tardan 30-50s.
+      // Antes cortábamos a los 30s y por eso "hola" funcionaba pero los
+      // pedidos grandes morían a mitad de generación. El servidor tiene su
+      // propio límite de 60s, así que su mensaje de error siempre llega
+      // antes que este corte.
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      const timeoutId = setTimeout(() => controller.abort(), 65000);
       try {
         const response = await fetch("/api/ia", {
           method: "POST",
@@ -7668,7 +7769,7 @@ Datos: ${JSON.stringify(context)}`;
         setMessages((prev) => [...prev, {
           role: "assistant",
           text: isTimeout
-            ? "Tardé demasiado en responder (más de 30 segundos). El plan gratuito de Gemini tiene momentos pico — esperá un poco y volvé a intentar 🙏"
+            ? "Tardé demasiado en responder (más de un minuto). El plan gratuito de Gemini tiene momentos pico — esperá un poco y volvé a intentar 🙏"
             : serverMsg
               ? `${serverMsg} 🙏`
               : "Uy, no me pude conectar. Revisá tu conexión o probá de nuevo en un momento 🙏"

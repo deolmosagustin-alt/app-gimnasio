@@ -29,7 +29,11 @@ let preferredModel = null;
 
 async function callModel(model, body, apiKey) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 25000);
+  // 50s: las respuestas LARGAS (rutinas completas) en el free tier tardan
+  // 30-50s. Con 25s las matábamos a mitad de generación — por eso "hola"
+  // funcionaba y los pedidos grandes no. Los errores de modelo (404/429)
+  // responden en milisegundos, así que el timeout largo no los demora.
+  const timer = setTimeout(() => controller.abort(), 50000);
   try {
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
@@ -85,6 +89,11 @@ async function callGemini(body) {
   else e.userMessage = "La IA no está disponible en este momento. Probá de nuevo en unos minutos.";
   throw e;
 }
+
+// Vercel: permitir hasta 60s de ejecución (el máximo del plan Hobby).
+// Sin esto, el default puede cortar la función antes de que Gemini
+// termine una respuesta larga.
+export const config = { maxDuration: 60 };
 
 export default async function handler(req, res) {
   if (req.method !== "POST") { res.status(405).json({ error: "Sólo se acepta POST." }); return; }
