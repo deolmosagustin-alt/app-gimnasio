@@ -3656,7 +3656,21 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   const [editingPR, setEditingPR] = useState(false);
   const [rowFocus, setRowFocus] = useState(false); // enciende el borde al enfocar
   const cardioFinishedRef = useRef(false); // el countdown llegó a 0 solo (no pausa manual)
-
+  const [editReps, setEditReps] = useState(""); const [editKg, setEditKg] = useState(""); const [saved, setSaved] = useState(false);
+  const [prBurst, setPrBurst] = useState(0);
+  const [showPRShare, setShowPRShare] = useState(false);
+  const [rankUpInfo, setRankUpInfo] = useState(null); // { from, to, muscleName }
+  const saveBtnRef = useRef(null);
+  // Cronómetro regresivo para cardio — cuenta desde los minutos ingresados
+  // hasta 0 y marca la serie como hecha automáticamente al llegar a 0.
+  // Timer de cardio — dos modos:
+  // "stopwatch": cuenta para ARRIBA (arrancás cuando empezás, parás cuando terminás)
+  // "countdown": cuenta para ABAJO desde los minutos ingresados (objetivo)
+  const [cardioMode, setCardioMode] = useState("stopwatch"); // "stopwatch" | "countdown"
+  const [cardioRunning, setCardioRunning] = useState(false);
+  const [cardioElapsed, setCardioElapsed] = useState(0); // segundos transcurridos (stopwatch)
+  const [cardioLeft, setCardioLeft] = useState(0);       // segundos restantes (countdown)
+  const cardioIntervalRef = useRef(null);
   // NOTIFICACIÓN NATIVA DEL CARDIO — misma función que el reloj de descanso:
   // · Cuenta regresiva: cronómetro vivo en la barra (plugin nativo) + aviso
   //   de fin PROGRAMADO con hora exacta (canal de vibración fuerte), que el
@@ -3723,21 +3737,6 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     };
     // eslint-disable-next-line
   }, [cardioRunning, cardioMode]);
-  const [editReps, setEditReps] = useState(""); const [editKg, setEditKg] = useState(""); const [saved, setSaved] = useState(false);
-  const [prBurst, setPrBurst] = useState(0);
-  const [showPRShare, setShowPRShare] = useState(false);
-  const [rankUpInfo, setRankUpInfo] = useState(null); // { from, to, muscleName }
-  const saveBtnRef = useRef(null);
-  // Cronómetro regresivo para cardio — cuenta desde los minutos ingresados
-  // hasta 0 y marca la serie como hecha automáticamente al llegar a 0.
-  // Timer de cardio — dos modos:
-  // "stopwatch": cuenta para ARRIBA (arrancás cuando empezás, parás cuando terminás)
-  // "countdown": cuenta para ABAJO desde los minutos ingresados (objetivo)
-  const [cardioMode, setCardioMode] = useState("stopwatch"); // "stopwatch" | "countdown"
-  const [cardioRunning, setCardioRunning] = useState(false);
-  const [cardioElapsed, setCardioElapsed] = useState(0); // segundos transcurridos (stopwatch)
-  const [cardioLeft, setCardioLeft] = useState(0);       // segundos restantes (countdown)
-  const cardioIntervalRef = useRef(null);
   const cardioStartRef = useRef(null);
 
   useEffect(() => {
