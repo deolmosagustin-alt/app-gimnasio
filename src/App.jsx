@@ -7,7 +7,7 @@ import {
 import {
   Play, Pause, RotateCcw, TrendingUp, TrendingDown, Dumbbell,
   ChevronDown, ChevronUp, ChevronLeft, Trophy, Flame, Save, Trash2, BarChart3,
-  ListChecks, LogOut, X, Check, AlertTriangle, Calendar, Zap,
+  ListChecks, LogOut, X, Check, AlertTriangle, Calendar, Zap, Bell, GripVertical, Sliders,
   Mail, Clock, ChevronRight, Edit3, Info, Plus, Sun, Moon,
   Target, Award, Activity, ArrowDown, HelpCircle, List, LayoutGrid,
   Sparkles, Layers, Video, SlidersHorizontal, ShieldCheck, UserCog,
@@ -452,6 +452,10 @@ const DEFAULT_SETTINGS = {
   trainWeeks: TRAIN_WEEKS, deloadWeeks: DELOAD_WEEKS, deloadPct: 0.75, deloadSetDivisor: 2,
   theme: "dark", textScale: 1, smallTextScale: 1, autoShowPrShare: true, bodyWeightKg: 0, muscleRankMode: "general", allowZoom: false,
   weightUnit: "kg", // "kg" o "lbs"
+  reminderEnabled: false, reminderTime: "18:00", // recordatorio de entrenamiento
+  // Qué mostrar en la ficha de registro (reps/kg). Todo activado por
+  // default; quien no use alguna opción puede apagarla y deja de estorbar.
+  showRpe: true, showWarmup: true, show1RMPercent: true, showCoaching: true,
 };
 
 // Conversión de peso: en la app todo se guarda en kg (los logs, los récords),
@@ -3612,7 +3616,7 @@ function RankUpModal({ from, to, muscleName, onClose }) {
   );
 }
 
-function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, accent, logs, setLogs, drafts = {}, setDrafts, deloadKgFactor = 1, deloadMode = false, resetKey = 0, autoShowPrShare = true, onDisableAutoShowPrShare, hasActiveSession = true, cardio = false, dumbbellDouble = null }) {
+function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, accent, logs, setLogs, drafts = {}, setDrafts, deloadKgFactor = 1, deloadMode = false, resetKey = 0, autoShowPrShare = true, onDisableAutoShowPrShare, hasActiveSession = true, cardio = false, dumbbellDouble = null, fieldSettings = DEFAULT_SETTINGS }) {
   const globalUnit = useWeightUnit();
   // Unidad local: arranca desde la preferencia global, pero el usuario puede
   // cambiarla ejercicio por ejercicio con el toggle kg/lbs del input.
@@ -4034,7 +4038,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
                 </div>
                 <button onClick={() => { updateDraft({ reps: String(todayEntry.reps), kg: String(kgToDisplay(todayEntry.kg, unit)), editing: true }); }} className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg shrink-0 transition active:scale-95" style={{ backgroundColor: accent + "22", color: accent }}>Editar</button>
               </div>
-              {coaching && (
+              {coaching && fieldSettings.showCoaching !== false && (
                 <p className="text-[10px] mt-2.5 pt-2.5 flex items-center gap-1.5 border-t" style={{ color: coaching.color, borderColor: accent + "20" }}>
                   <span>{coaching.icon}</span>{coaching.text}
                 </p>
@@ -4086,7 +4090,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
               );
             })()}
             {/* % del 1RM — línea sutil integrada */}
-            {currentPR && (() => {
+            {currentPR && fieldSettings.show1RMPercent !== false && (() => {
               const pr1RM = estimate1RM(currentPR.kg, currentPR.reps);
               const currentPct = (kg && !isNaN(parseFloat(kg)) && pr1RM > 0)
                 ? Math.round((estimate1RM(displayToKg(parseFloat(kg), unit), parseFloat(reps) || 1) / pr1RM) * 100)
@@ -4113,7 +4117,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           </div>
         );
       })()}
-      {!showRpe ? (
+      {fieldSettings.showRpe !== false && (!showRpe ? (
         <button onClick={() => setShowRpeLocal(true)} className="w-full flex items-center justify-center gap-1.5 mt-2.5 py-2 rounded-lg bg-slate-900/50 border border-slate-800/70 text-slate-500 hover:text-slate-300 hover:border-slate-600 text-[11px] font-bold transition"><Activity size={11} /> Registrar esfuerzo (RPE)</button>
       ) : (
         <div className="mt-2.5 flex items-center gap-1.5 bounce-in bg-slate-900/60 rounded-lg px-2 py-2">
@@ -4124,7 +4128,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           {rpe != null && <span className="text-[10px] text-slate-500 ml-1 truncate">{RPE_SCALE.find((r) => r.value === rpe)?.desc}</span>}
           <button onClick={() => { updateDraft({ rpe: null }); setShowRpeLocal(false); }} className="text-slate-600 hover:text-slate-400 ml-auto shrink-0"><X size={12} /></button>
         </div>
-      )}
+      ))}
       {editingPR && !cardio && (
         <div className="mt-2 rounded-xl p-3 space-y-2 bounce-in" style={{ backgroundColor: "rgba(2,6,23,0.7)", border: `1px solid ${accent}30` }}>
           <p className="text-[10px] font-black uppercase tracking-[0.14em] flex items-center gap-1.5" style={{ color: accent }}><Edit3 size={11} /> Corregir récord</p>
@@ -4212,7 +4216,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
             <RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={accent} alertType={settings.alertType} timerId={`ex_${exercise.id}`} exerciseName={exercise.name} />
           </div>
         )}
-        {!exercise.cardio && !deloadMode && bestWorkingKg != null && (
+        {!exercise.cardio && !deloadMode && bestWorkingKg != null && settings.showWarmup !== false && (
           <div className="mb-2">
             {!showWarmup ? (
               <button onClick={() => setShowWarmup(true)} className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-[11px] font-bold transition" style={{ backgroundColor: accent + "10", border: `1px solid ${accent}30`, color: accent }}>
@@ -4239,7 +4243,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
           </div>
         )}
         <p className="text-[9px] font-black uppercase tracking-widest text-slate-600 mb-2 mt-1">{exercise.cardio ? "Registrá tu sesión" : "Tus series"}</p>
-        {setsToShow.map((s, i) => <SetRow key={i} exerciseId={exercise.id} exerciseName={exercise.name} exerciseMuscle={exercise.muscle} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadKgFactor={settings.deloadPct} deloadMode={deloadMode} resetKey={resetKey} autoShowPrShare={settings.autoShowPrShare ?? true} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={hasActiveSession} cardio={exercise.cardio} dumbbellDouble={settings?.dumbbellDouble || null} />)}
+        {setsToShow.map((s, i) => <SetRow key={i} exerciseId={exercise.id} exerciseName={exercise.name} exerciseMuscle={exercise.muscle} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadKgFactor={settings.deloadPct} deloadMode={deloadMode} resetKey={resetKey} autoShowPrShare={settings.autoShowPrShare ?? true} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={hasActiveSession} cardio={exercise.cardio} dumbbellDouble={settings?.dumbbellDouble || null} fieldSettings={settings} />)}
         {exercise.video && (
           <div className="pt-3">
             <a href={exercise.video} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 py-3 rounded-xl border border-slate-800 text-slate-400 hover:border-slate-600 hover:text-white transition text-sm font-medium active:scale-[0.98]">
@@ -4372,7 +4376,7 @@ function groupExercisesIntoSupersets(exercises) {
   return groups;
 }
 
-function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, weekSchedule, activeSession, onStartSession, onEndSession, onCancelSession, onDisableAutoShowPrShare, onUpdateSettings = null, todaySessionDayKey = null }) {
+function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, weekSchedule, activeSession, onStartSession, onEndSession, onCancelSession, onDisableAutoShowPrShare, onUpdateSettings = null, onGoToRoutines = null, onGoToFieldSettings = null, todaySessionDayKey = null }) {
   // El día programado para hoy según el cronograma semanal (lunes a domingo)
   // de la rutina activa. Si hoy es descanso programado (o no hay cronograma
   // todavía), cae al viejo heurístico de "último día entrenado + 1" — pero
@@ -4380,7 +4384,11 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
   const scheduledDay = useMemo(() => { const dk = weekSchedule?.[todayWeekdayKey()]; return dk && DAY_ORDER.includes(dk) ? dk : null; }, [weekSchedule]);
   const isRestToday = !!weekSchedule && !scheduledDay;
   const fallbackSuggested = useMemo(() => getSuggestedDay(logs), []);
-  const suggestedDay = scheduledDay || fallbackSuggested;
+  // Si hoy es descanso programado, NO se sugiere ningún día: mostrar una
+  // sugerencia contradice el propio cronograma ("hoy descansás" + "hacé
+  // Push" a la vez). El día activo igual arranca en el heurístico para que
+  // puedas registrar si querés entrenar igual, pero sin el badge "sugerido".
+  const suggestedDay = scheduledDay || (isRestToday ? null : fallbackSuggested);
   const [activeDay, setActiveDay] = useState(() => scheduledDay || fallbackSuggested);
   // La sesión activa solo "cuenta" en el día donde se inició. Al cambiar de
   // día se ve sin sesión (podés iniciar otra o solo registrar), pero la
@@ -4419,13 +4427,21 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
         </div>
         <h2 className="relative text-xl font-black text-white leading-tight">Rutina</h2>
         <p className="relative text-xs text-teal-300/60 mt-1">Registrá tus series de hoy y seguí tu progreso día a día</p>
+        {onGoToFieldSettings && (
+          <button onClick={onGoToFieldSettings} className="relative w-full flex items-center justify-center gap-1.5 mt-4 pt-3 border-t border-white/10 text-[10px] font-bold text-teal-300/75 hover:text-teal-300 transition">
+            <Sliders size={11} /> Personalizar qué ves al registrar <ChevronRight size={11} />
+          </button>
+        )}
       </div>
 
       {isRestToday && (
-        <div className="flex items-start gap-2.5 bg-slate-900/50 border border-slate-800/50 rounded-xl px-3.5 py-2.5">
+        <button onClick={() => onGoToRoutines?.()} className="w-full flex items-start gap-2.5 bg-slate-900/50 border border-slate-800/50 rounded-xl px-3.5 py-2.5 text-left transition active:scale-[0.99] hover:border-slate-700">
           <Calendar size={13} className="text-slate-500 mt-0.5 shrink-0" />
-          <p className="text-[11px] text-slate-400">Hoy es descanso según tu cronograma semanal — pero entrená el día que quieras, esto es solo una guía. <span className="text-slate-600">(Lo configurás en Rutinas.)</span></p>
-        </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[11px] text-slate-400">Hoy es descanso según tu cronograma semanal, pero entrená el día que quieras: esto es solo una guía.</p>
+            <p className="text-[10px] text-slate-600 mt-1 flex items-center gap-1">Tocá acá para editar tu cronograma <ChevronRight size={11} /></p>
+          </div>
+        </button>
       )}
 
       <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${DAY_ORDER.length}, 1fr)` }}>
@@ -5043,40 +5059,45 @@ function DeloadView({ logs, settings = DEFAULT_SETTINGS, deloadProgress = {}, se
                     const progressKey = `${ex.id}_${i}`;
                     const done = deloadProgress[progressKey] === today;
                     return (
-                      <div key={i} className="relative rounded-xl px-3.5 py-3" style={{ backgroundColor: done ? day.color + "18" : "#A855F715", border: `1px solid ${done ? day.color + "40" : "#A855F730"}` }}>
+                      <div key={i} className="relative overflow-hidden rounded-2xl px-3.5 py-3 transition-all duration-200" style={{ background: done ? `linear-gradient(130deg, ${day.color}18, ${day.color}06)` : "linear-gradient(130deg, #A855F718, #A855F706)", border: `1px solid ${done ? day.color + "45" : "#A855F735"}` }}>
+                        <div className="absolute -top-6 -right-6 w-20 h-20 rounded-full blur-2xl pointer-events-none opacity-25" style={{ backgroundColor: done ? day.color : "#A855F7" }} />
                         <div className="absolute left-0 top-2 bottom-2 w-1 rounded-full" style={{ backgroundColor: done ? day.color : "#A855F7" }} />
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">S{i + 1}</span>
-                          <span className="text-[10px] bg-slate-800/80 text-slate-500 rounded-lg px-2 py-0.5">{s.repRange} reps</span>
+                        <div className="relative flex items-center gap-2 mb-2.5">
+                          <span className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">Serie {i + 1}</span>
+                          <span className="text-[9.5px] bg-slate-800/70 text-slate-500 rounded-md px-1.5 py-0.5 font-bold">{s.repRange} reps</span>
                         </div>
                         {best && (ex.cardio ? (
                           <>
-                          <div className="flex items-center gap-2 mb-2.5 px-2 py-1.5 rounded-lg" style={{ backgroundColor: done ? day.color + "15" : "#A855F715" }}>
-                            <Zap size={12} style={{ color: done ? day.color : "#C084FC" }} className="shrink-0" />
-                            <span className="text-[10px] font-bold text-slate-500 line-through mr-1">{best.minutes} min</span>
-                            <ArrowDown size={10} style={{ color: done ? day.color : "#C084FC" }} />
-                            <span className="text-sm font-black" style={{ color: done ? day.color : "#D8B4FE" }}>{Math.max(1, Math.round((best.minutes || 0) * deloadPct))} min</span>
+                          <div className="relative rounded-xl px-3 py-2.5 mb-2.5 bg-slate-950/60 border" style={{ borderColor: done ? day.color + "35" : "#A855F730" }}>
+                            <span className="block text-[8px] font-black uppercase tracking-[0.16em] mb-1.5" style={{ color: done ? day.color + "aa" : "#C084FCaa" }}>Tiempo de descarga</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[11px] font-bold text-slate-600 line-through tabular-nums shrink-0">{best.minutes} min</span>
+                              <ArrowDown size={12} style={{ color: done ? day.color : "#C084FC" }} className="shrink-0" />
+                              <span className="text-xl font-black tabular-nums" style={{ color: done ? day.color : "#D8B4FE", textShadow: `0 0 16px ${done ? day.color : "#A855F7"}50` }}>{Math.max(1, Math.round((best.minutes || 0) * deloadPct))}<span className="opacity-60 text-xs ml-1">min</span></span>
+                            </div>
                           </div>
                           {!done && <DeloadCardioTimer targetMinutes={Math.max(1, Math.round((best.minutes || 0) * deloadPct))} accent={day.color} onComplete={() => toggleDeloadDone(progressKey)} />}
                           </>
                         ) : (
-                          <div className="flex items-center gap-2 mb-2.5 px-2 py-1.5 rounded-lg" style={{ backgroundColor: done ? day.color + "15" : "#A855F715" }}>
-                            <Zap size={12} style={{ color: done ? day.color : "#C084FC" }} className="shrink-0" />
-                            <span className="text-[10px] font-bold text-slate-500 line-through mr-1">{best.reps}×{kgToDisplay(best.kg, unit)}{weightLabel(unit)}</span>
-                            <ArrowDown size={10} style={{ color: done ? day.color : "#C084FC" }} />
-                            <span className="text-sm font-black" style={{ color: done ? day.color : "#D8B4FE" }}>{best.reps}×{kgToDisplay(deloadKg, unit)}{weightLabel(unit)}</span>
+                          <div className="relative rounded-xl px-3 py-2.5 mb-2.5 bg-slate-950/60 border" style={{ borderColor: done ? day.color + "35" : "#A855F730" }}>
+                            <span className="block text-[8px] font-black uppercase tracking-[0.16em] mb-1.5" style={{ color: done ? day.color + "aa" : "#C084FCaa" }}>Peso de descarga</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[11px] font-bold text-slate-600 line-through tabular-nums shrink-0">{best.reps}×{kgToDisplay(best.kg, unit)}{weightLabel(unit)}</span>
+                              <ArrowDown size={12} style={{ color: done ? day.color : "#C084FC" }} className="shrink-0" />
+                              <span className="text-xl font-black tabular-nums" style={{ color: done ? day.color : "#D8B4FE", textShadow: `0 0 16px ${done ? day.color : "#A855F7"}50` }}>{best.reps}<span className="opacity-50 text-sm mx-0.5">×</span>{kgToDisplay(deloadKg, unit)}<span className="opacity-60 text-xs ml-0.5">{weightLabel(unit)}</span></span>
+                            </div>
                           </div>
                         ))}
-                        <button onClick={() => toggleDeloadDone(progressKey)} className={`w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-bold transition-all active:scale-95 ${done ? "text-white" : "border border-dashed border-slate-700 text-slate-500 hover:text-slate-300 hover:border-slate-500"}`} style={done ? { backgroundColor: day.color } : {}}>
-                          {done ? <><Check size={13} /> Hecho</> : "Marcar como hecha"}
+                        <button onClick={() => toggleDeloadDone(progressKey)} className="relative w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-black transition-all active:scale-[0.98]" style={done ? { background: `linear-gradient(160deg, ${day.color}, ${day.color}b0)`, color: "#fff" } : { backgroundColor: "rgba(15,23,42,0.6)", border: "1px solid #33415580", color: "#94a3b8" }}>
+                          {done ? <><span className="w-5 h-5 rounded-full bg-white/25 flex items-center justify-center"><Check size={12} strokeWidth={3} /></span> Hecha</> : "Marcar como hecha"}
                         </button>
                       </div>
                     );
                   })
                 ) : (
-                  <div className="flex items-center gap-2 py-1">
-                    <div className="w-5 h-5 rounded-lg bg-slate-800/80 flex items-center justify-center shrink-0"><Target size={11} className="text-slate-600" /></div>
-                    <p className="text-[11px] text-slate-600">Registrá marcas en la rutina para ver la descarga calculada.</p>
+                  <div className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 bg-slate-900/40 border border-slate-800/60">
+                    <div className="w-6 h-6 rounded-lg bg-slate-800/80 flex items-center justify-center shrink-0"><Target size={12} className="text-slate-600" /></div>
+                    <p className="text-[11px] text-slate-500 leading-snug">Registrá marcas en la rutina para ver la descarga calculada.</p>
                   </div>
                 )}
               </div>
@@ -7040,6 +7061,54 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
         </div>
       </CollapsibleSection>
 
+      <div id="field-settings-section">
+      <CollapsibleSection title="Qué ves al registrar" subtitle={(() => { const on = [settings.showRpe !== false, settings.showWarmup !== false, settings.show1RMPercent !== false, settings.showCoaching !== false].filter(Boolean).length; return on === 4 ? "Todo activado" : `${on} de 4 opciones activadas`; })()} icon={<Sliders size={16} />} accent="#14B8A6">
+        <div className="space-y-2">
+          <p className="text-[10px] text-slate-500 leading-snug mb-1">Apagá lo que no uses y la ficha de registro queda más limpia. No se pierde ningún dato: podés volver a prenderlo cuando quieras.</p>
+          {[
+            { key: "showWarmup", label: "Calentamiento sugerido", desc: "La rampa de series previas (50% → 70% → 85%)." },
+            { key: "showRpe", label: "Esfuerzo (RPE)", desc: "El botón para registrar qué tan duro fue." },
+            { key: "show1RMPercent", label: "Porcentaje de 1RM", desc: "A qué % de tu récord estás levantando." },
+            { key: "showCoaching", label: "Consejos al guardar", desc: "El mensaje 📈/✓/📉 comparando con tu marca." },
+          ].map(({ key, label, desc }) => {
+            const on = settings[key] !== false;
+            return (
+              <button key={key} onClick={() => updateSettings({ [key]: !on })} className="w-full flex items-center justify-between gap-3 rounded-xl px-3.5 py-2.5 transition active:scale-[0.99]" style={on ? { backgroundColor: "#14B8A614", border: "1px solid #14B8A640" } : { backgroundColor: "rgba(15,23,42,0.6)", border: "1px solid #33415580" }}>
+                <div className="text-left min-w-0">
+                  <p className="text-xs font-bold" style={{ color: on ? "#2DD4BF" : "#94a3b8" }}>{label}</p>
+                  <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">{desc}</p>
+                </div>
+                <span className="w-11 h-6 rounded-full shrink-0 relative transition-colors" style={{ backgroundColor: on ? "#14B8A6" : "#334155" }}>
+                  <span className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all" style={{ left: on ? "22px" : "2px" }} />
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </CollapsibleSection>
+      </div>
+
+      <CollapsibleSection title="Recordatorio de entrenamiento" subtitle={settings.reminderEnabled ? `Todos los días de rutina a las ${settings.reminderTime}` : "Desactivado"} icon={<Bell size={16} />} accent="#F59E0B">
+        <div className="space-y-3">
+          <button onClick={() => updateSettings({ reminderEnabled: !settings.reminderEnabled })} className="w-full flex items-center justify-between gap-3 rounded-xl px-3.5 py-3 transition active:scale-[0.99]" style={settings.reminderEnabled ? { backgroundColor: "#F59E0B14", border: "1px solid #F59E0B40" } : { backgroundColor: "rgba(15,23,42,0.6)", border: "1px solid #33415580" }}>
+            <div className="text-left min-w-0">
+              <p className="text-xs font-bold" style={{ color: settings.reminderEnabled ? "#FBBF24" : "#94a3b8" }}>Avisarme los días que entreno</p>
+              <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">Solo los días con rutina en tu agenda semanal — los de descanso no molestan.</p>
+            </div>
+            <span className="w-11 h-6 rounded-full shrink-0 relative transition-colors" style={{ backgroundColor: settings.reminderEnabled ? "#F59E0B" : "#334155" }}>
+              <span className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all" style={{ left: settings.reminderEnabled ? "22px" : "2px" }} />
+            </span>
+          </button>
+          {settings.reminderEnabled && (
+            <div className="bounce-in">
+              <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Hora del aviso</p>
+              <input type="time" value={settings.reminderTime || "18:00"} onChange={(e) => updateSettings({ reminderTime: e.target.value })} className="w-full bg-slate-950/60 border border-slate-800/60 rounded-xl px-3.5 py-2.5 text-sm font-bold text-white focus:outline-none focus:border-amber-500/50 transition" />
+              <p className="text-[10px] text-slate-600 mt-2">Si hoy ya pasó esa hora, el primer aviso llega el próximo día de rutina.</p>
+            </div>
+          )}
+        </div>
+      </CollapsibleSection>
+
       <CollapsibleSection title="Apariencia y accesibilidad" subtitle="Tema, unidad de peso, tamaño de letra" icon={<Sun size={16} />} accent="#F59E0B">
         <div>
           <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Tema</p>
@@ -7345,7 +7414,7 @@ function ExercisePickerPanel({ existingIds, onAdd, onAddCustom, onClose }) {
 
 const REP_RANGE_OPTIONS = ["1-3", "3-5", "4-6", "6-8", "8-10", "10-12", "12-15", "15-20"];
 
-function BuilderExerciseRow({ ex, canMoveUp, canMoveDown, onMove, onRemove, onConfigChange }) {
+function BuilderExerciseRow({ ex, canMoveUp, canMoveDown, onMove, onRemove, onConfigChange, dragHandlers = null, isDragging = false, isDragOver = false }) {
   const [editing, setEditing] = useState(false);
   const repRange = ex.sets[0]?.repRange || "8-10";
   const setsCount = ex.sets.length;
@@ -7359,10 +7428,25 @@ function BuilderExerciseRow({ ex, canMoveUp, canMoveDown, onMove, onRemove, onCo
   };
 
   return (
-    <div className="bg-slate-900/60 border border-slate-800/50 rounded-xl px-3 py-2.5">
+    <div
+      {...(dragHandlers?.container || {})}
+      className="bg-slate-900/60 border rounded-xl px-3 py-2.5 transition-all duration-150"
+      style={{
+        borderColor: isDragOver ? "#14B8A6" : "rgba(30,41,59,0.5)",
+        opacity: isDragging ? 0.35 : 1,
+        transform: isDragging ? "scale(0.98)" : "none",
+        boxShadow: isDragOver ? "0 0 0 1px #14B8A6, 0 0 14px -4px #14B8A680" : "none",
+      }}
+    >
       <div className="flex items-center gap-2">
-        <div className="flex flex-col -my-1 shrink-0">
+        <div className="flex flex-col items-center -my-1 shrink-0">
           <button onClick={() => onMove(-1)} disabled={!canMoveUp} className="p-0.5 text-slate-600 hover:text-slate-300 disabled:opacity-20"><ChevronUp size={13} /></button>
+          {/* Asa de arrastre: mantené apretado y deslizá para reordenar.
+              touchAction:none evita que el gesto scrollee la página. Las
+              flechas siguen ahí para quien prefiera tocar. */}
+          <span {...(dragHandlers?.handle || {})} className="py-0.5 cursor-grab active:cursor-grabbing text-slate-600 hover:text-teal-400 transition-colors select-none" style={{ touchAction: "none" }} title="Mantené apretado y arrastrá para reordenar">
+            <GripVertical size={13} />
+          </span>
           <button onClick={() => onMove(1)} disabled={!canMoveDown} className="p-0.5 text-slate-600 hover:text-slate-300 disabled:opacity-20"><ChevronDown size={13} /></button>
         </div>
         <button onClick={() => setEditing((o) => !o)} className="flex-1 min-w-0 text-left">
@@ -7426,6 +7510,63 @@ function BuilderExerciseRow({ ex, canMoveUp, canMoveDown, onMove, onRemove, onCo
 function BuilderDayCard({ day, dayIdx, totalDays, onRename, onRemove, onMoveDay, onChangeColor, onAddExercise, onAddCustomExercise, onRemoveExercise, onMoveExercise, onConfigExercise, onToggleSuperset }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
+
+  // ── REORDENAR ARRASTRANDO ──────────────────────────────────────────────
+  // Drag & drop con Pointer Events (funciona igual con dedo y con mouse).
+  // Al soltar, se reordena usando el mismo onMoveExercise que las flechas,
+  // aplicando el desplazamiento paso a paso — así el modelo de datos y el
+  // undo del builder siguen funcionando exactamente igual que antes.
+  const [dragIdx, setDragIdx] = useState(null);
+  const [overIdx, setOverIdx] = useState(null);
+  const dragRef = useRef({ from: null, over: null });
+
+  const startDrag = (e, i) => {
+    e.preventDefault();
+    dragRef.current = { from: i, over: i };
+    setDragIdx(i); setOverIdx(i);
+    haptic(12);
+
+    const findIdxAt = (clientY) => {
+      const rows = document.querySelectorAll("[data-drag-idx]");
+      for (const row of rows) {
+        const r = row.getBoundingClientRect();
+        if (clientY >= r.top && clientY <= r.bottom) return Number(row.getAttribute("data-drag-idx"));
+      }
+      return null;
+    };
+
+    const onMove = (ev) => {
+      const idx = findIdxAt(ev.clientY);
+      if (idx != null && idx !== dragRef.current.over) {
+        dragRef.current.over = idx;
+        setOverIdx(idx);
+        haptic(8);
+      }
+      // Auto-scroll cuando arrastrás cerca de los bordes de la pantalla
+      const margin = 90, speed = 9;
+      if (ev.clientY < margin) window.scrollBy(0, -speed);
+      else if (ev.clientY > window.innerHeight - margin) window.scrollBy(0, speed);
+    };
+
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+      const { from, over } = dragRef.current;
+      if (from != null && over != null && from !== over) {
+        // Mover paso a paso reutilizando onMoveExercise (respeta superseries)
+        const step = over > from ? 1 : -1;
+        for (let k = from; k !== over; k += step) onMoveExercise(k, step);
+        haptic(18);
+      }
+      dragRef.current = { from: null, over: null };
+      setDragIdx(null); setOverIdx(null);
+    };
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+  };
   const existingIds = day.exercises.map((e) => e.id);
   const totalSets = day.exercises.reduce((a, e) => a + (e.sets?.length || 0), 0);
   return (
@@ -7462,10 +7603,12 @@ function BuilderDayCard({ day, dayIdx, totalDays, onRename, onRemove, onMoveDay,
 
       <div className="space-y-1.5">
         {day.exercises.map((ex, i) => (
-          <div key={ex.id}>
+          <div key={ex.id} data-drag-idx={i}>
             <BuilderExerciseRow ex={ex} canMoveUp={i > 0} canMoveDown={i < day.exercises.length - 1}
               onMove={(delta) => onMoveExercise(i, delta)} onRemove={() => onRemoveExercise(i)}
-              onConfigChange={(cfg) => onConfigExercise(i, cfg)} />
+              onConfigChange={(cfg) => onConfigExercise(i, cfg)}
+              isDragging={dragIdx === i} isDragOver={overIdx === i && dragIdx !== null && dragIdx !== i}
+              dragHandlers={{ handle: { onPointerDown: (e) => startDrag(e, i) } }} />
             {i < day.exercises.length - 1 && (
               <button onClick={() => onToggleSuperset(i)} className="w-full flex items-center justify-center gap-1.5 my-1 py-2 rounded-lg text-[11px] font-bold transition-all active:scale-[0.98] border"
                 style={ex.supersetNext ? { backgroundColor: day.color + "22", borderColor: day.color + "60", color: day.color } : { backgroundColor: "transparent", borderColor: "var(--chip-border)", color: "var(--chip-text)", borderStyle: "dashed" }}>
@@ -7829,6 +7972,106 @@ function buildActionPlan(action, ctx) {
 // récords corregidos a mano (_pr_override) se mandan completos siempre,
 // son un solo objeto chico cada uno, no pesan nada.
 const AI_LOG_HISTORY_LIMIT = 6; // últimas 6 sesiones por serie — suficiente para tendencia reciente
+// ANÁLISIS PRECALCULADO PARA LA IA. Antes le mandábamos los logs crudos y
+// tenía que deducir sola qué era récord, si venías progresando o estancado,
+// cuánto volumen hacías. Eso la hacía lenta e imprecisa. Acá le damos las
+// conclusiones ya masticadas — con esto puede responder "¿por qué me estanqué
+// en press banca?" con TUS números reales, o "armame el día de mañana" sabiendo
+// qué músculos tenés frescos y cuáles reventados.
+function buildTrainingInsights(logs, sessions, weekSchedule) {
+  const today = todayStr();
+  const daysAgo = (dateStr) => Math.round((new Date(today) - new Date(dateStr)) / 86400000);
+
+  // ── Por ejercicio: mejor marca, última sesión, y TENDENCIA de 1RM
+  const porEjercicio = [];
+  const byExercise = {};
+  Object.entries(logs || {}).forEach(([key, val]) => {
+    if (key.endsWith("_pr_override") || !Array.isArray(val)) return;
+    const { exerciseId } = parseLogKey(key);
+    (byExercise[exerciseId] ||= []).push(...val.filter((e) => e && e.kg && e.reps));
+  });
+  Object.entries(byExercise).forEach(([exId, entries]) => {
+    if (!entries.length) return;
+    const lib = EXERCISE_LIBRARY_BY_ID[exId];
+    const sorted = entries.slice().sort((a, b) => (a.date < b.date ? -1 : 1));
+    // Mejor 1RM por fecha (una sesión puede tener varias series)
+    const byDate = {};
+    sorted.forEach((e) => {
+      const rm = estimate1RM(e.kg, e.reps);
+      if (!byDate[e.date] || rm > byDate[e.date].rm) byDate[e.date] = { rm, kg: e.kg, reps: e.reps };
+    });
+    const fechas = Object.keys(byDate).sort();
+    if (!fechas.length) return;
+    const best = fechas.reduce((b, f) => (byDate[f].rm > byDate[b].rm ? f : b), fechas[0]);
+    const ult = fechas[fechas.length - 1];
+    // Tendencia: comparar el mejor 1RM de las últimas 3 sesiones vs las 3 previas
+    const recientes = fechas.slice(-3).map((f) => byDate[f].rm);
+    const previas = fechas.slice(-6, -3).map((f) => byDate[f].rm);
+    let tendencia = "sin datos suficientes";
+    if (previas.length && recientes.length) {
+      const maxR = Math.max(...recientes), maxP = Math.max(...previas);
+      const delta = ((maxR - maxP) / maxP) * 100;
+      tendencia = delta > 2 ? "subiendo" : delta < -2 ? "bajando" : "estancado";
+    } else if (fechas.length >= 2) {
+      tendencia = byDate[ult].rm > byDate[fechas[0]].rm ? "subiendo" : "plano";
+    }
+    porEjercicio.push({
+      ejercicio: lib?.name || exId,
+      musculo: lib?.group || null,
+      mejorMarca: `${byDate[best].reps}x${byDate[best].kg}kg`,
+      mejor1RMest: byDate[best].rm,
+      fechaMejorMarca: best,
+      diasDesdeMejorMarca: daysAgo(best),
+      ultimaVez: ult,
+      diasDesdeUltimaVez: daysAgo(ult),
+      sesionesRegistradas: fechas.length,
+      tendencia,
+    });
+  });
+  porEjercicio.sort((a, b) => a.diasDesdeUltimaVez - b.diasDesdeUltimaVez);
+
+  // ── Volumen semanal por músculo (últimos 7 y 14 días) + días sin tocarlo
+  const volSemana = {}, volSemanaPrevia = {}, seriesSemana = {}, ultimaVezMusculo = {};
+  Object.entries(logs || {}).forEach(([key, val]) => {
+    if (key.endsWith("_pr_override") || !Array.isArray(val)) return;
+    const { exerciseId } = parseLogKey(key);
+    const g = EXERCISE_LIBRARY_BY_ID[exerciseId]?.group;
+    if (!g) return;
+    val.forEach((e) => {
+      if (!e || !e.kg || !e.reps || !e.date) return;
+      const d = daysAgo(e.date);
+      if (!ultimaVezMusculo[g] || d < ultimaVezMusculo[g]) ultimaVezMusculo[g] = d;
+      if (d <= 7) { volSemana[g] = (volSemana[g] || 0) + e.kg * e.reps; seriesSemana[g] = (seriesSemana[g] || 0) + 1; }
+      else if (d <= 14) volSemanaPrevia[g] = (volSemanaPrevia[g] || 0) + e.kg * e.reps;
+    });
+  });
+  const porMusculo = MUSCLE_GROUPS.map((g) => ({
+    musculo: g.label,
+    seriesUltimos7dias: seriesSemana[g.key] || 0,
+    volumenUltimos7dias: Math.round(volSemana[g.key] || 0),
+    volumenSemanaPrevia: Math.round(volSemanaPrevia[g.key] || 0),
+    diasSinEntrenarlo: ultimaVezMusculo[g.key] ?? null,
+  }));
+
+  // ── Adherencia: entrenamientos vs agenda
+  const dateSet = getTrainedDateSet(logs, sessions);
+  const ultimos30 = [...dateSet].filter((d) => daysAgo(d) <= 30).length;
+  const ultimos7 = [...dateSet].filter((d) => daysAgo(d) <= 7).length;
+  const diasProgramados = weekSchedule ? Object.values(weekSchedule).filter(Boolean).length : null;
+
+  return {
+    fechaHoy: today,
+    adherencia: {
+      entrenamientosUltimos7dias: ultimos7,
+      entrenamientosUltimos30dias: ultimos30,
+      diasProgramadosPorSemana: diasProgramados,
+      rachaActual: computeSmartStreak(dateSet, weekSchedule),
+    },
+    porMusculo,
+    porEjercicio: porEjercicio.slice(0, 25),
+  };
+}
+
 function trimLogsForAI(logs) {
   const out = {};
   Object.entries(logs || {}).forEach(([key, val]) => {
@@ -7896,6 +8139,12 @@ function EntrenadorIAChat({ profile, logs, profileName, messages, setMessages, s
         rutinas: allRoutines,
         configuracionActual: settings,
         logs: trimLogsForAI(logs),
+        // Análisis YA CALCULADO de su entrenamiento: marcas, tendencias,
+        // estancamientos, volumen por músculo y adherencia. Con esto la IA
+        // no tiene que deducir nada de los logs crudos — responde con datos
+        // duros y detecta problemas reales (ej. "llevás 5 semanas estancado
+        // en press banca y le bajaste el volumen a pecho un 30%").
+        analisisEntrenamiento: buildTrainingInsights(logs, profile?.trainingSessions || [], profile?.weekSchedule || null),
       };
       const systemPrompt = `Sos un entrenador personal y coach de fuerza con dominio profundo y actualizado de la ciencia del entrenamiento — no sólo frases motivacionales genéricas. Hablás en español rioplatense, breve y cercano.
 
@@ -7914,7 +8163,13 @@ Antes de responder, revisá en silencio que tu respuesta resuelva exactamente lo
 
 Basá tus recomendaciones en los principios de entrenamiento con más consenso científico (sobrecarga progresiva, volumen y frecuencia adecuados, técnica y rango de movimiento, gestión de la fatiga). NUNCA inventes estudios, autores, cifras exactas ni links — si no estás seguro de un dato puntual, decilo con honestidad y da la recomendación práctica general.
 
-Tenés acceso a los datos reales de esta persona en el siguiente JSON — usalos para responder con precisión (fechas, pesos, repeticiones, y la estructura real de sus rutinas día por día), nunca inventes datos que no estén ahí. "rutinas" incluye TODAS sus rutinas (activa, creadas, editadas y archivadas) con sus días y ejercicios completos — las marcadas "archivada":true no están visibles para ella en la pestaña Rutinas salvo que las recupere, tenelo en cuenta si te pregunta qué tiene disponible ahora. "logs" trae sólo los últimos registros de cada serie (no el historial completo) — alcanza para evaluar tendencia reciente, pero si te preguntan por una marca muy vieja que no aparece, decilo en vez de inventar un valor. Respuestas cortas, 2 a 4 oraciones salvo que te pidan más detalle o la pregunta lo amerite. Para dar formato a tu texto podés usar **negrita** y listas con guion (-), nada más — no uses títulos, tablas, ni bloques de código.
+Tenés acceso a los datos reales de esta persona en el siguiente JSON — usalos para responder con precisión (fechas, pesos, repeticiones, y la estructura real de sus rutinas día por día), nunca inventes datos que no estén ahí.
+
+LEÉ SIEMPRE "analisisEntrenamiento" ANTES DE RESPONDER: es el análisis ya calculado de su entrenamiento real y es tu fuente principal para cualquier consejo. Trae, por ejercicio, su mejor marca con fecha, el 1RM estimado, hace cuántos días no lo hace y la TENDENCIA ("subiendo" / "estancado" / "bajando"); por músculo, las series y el volumen de los últimos 7 días comparados con la semana previa, y hace cuántos días no lo entrena; y su adherencia real (entrenamientos por semana, racha). Usalo así:
+- Si te preguntan por un estancamiento, mirá "tendencia" y "diasDesdeMejorMarca" de ESE ejercicio y el volumen de su músculo — respondé con los números concretos, no con generalidades.
+- Si te piden armar o ajustar un entrenamiento, priorizá los músculos con más "diasSinEntrenarlo" o menos "seriesUltimos7dias", y evitá recargar lo que entrenó hace 1-2 días.
+- Si detectás algo importante que no preguntaron (un músculo abandonado hace semanas, una caída fuerte de volumen, un ejercicio estancado hace mucho), mencionalo brevemente al final.
+- Citá siempre datos reales ("tu mejor press banca es 5x110 del 6 de julio, hace 12 días") en vez de hablar en abstracto. "rutinas" incluye TODAS sus rutinas (activa, creadas, editadas y archivadas) con sus días y ejercicios completos — las marcadas "archivada":true no están visibles para ella en la pestaña Rutinas salvo que las recupere, tenelo en cuenta si te pregunta qué tiene disponible ahora. "logs" trae sólo los últimos registros de cada serie (no el historial completo) — alcanza para evaluar tendencia reciente, pero si te preguntan por una marca muy vieja que no aparece, decilo en vez de inventar un valor. Respuestas cortas, 2 a 4 oraciones salvo que te pidan más detalle o la pregunta lo amerite. Para dar formato a tu texto podés usar **negrita** y listas con guion (-), nada más — no uses títulos, tablas, ni bloques de código.
 
 Si la persona te pide explícitamente hacer un cambio en la app, respondé primero tu explicación normal y agregá AL FINAL, en una línea aparte, un bloque con ESTE formato exacto (sin texto markdown alrededor, sin comillas triples, nada más en esa línea):
 ###ACCION###{"type":"TIPO", ...campos...}###FIN###
@@ -9402,6 +9657,49 @@ export default function App() {
     return () => window.removeEventListener("focusin", onFocusIn);
   }, []);
 
+  // RECORDATORIO DE ENTRENAMIENTO: notificación diaria a la hora elegida,
+  // SOLO los días que te toca entrenar según tu agenda semanal. Programa una
+  // por cada día de los próximos 7 (ids 9200-9206) y las reprograma cada vez
+  // que abrís la app o cambiás la agenda/hora — así siempre hay una semana de
+  // avisos cargada aunque no entres por días. Reusa el mismo mecanismo del
+  // aviso de fin de descanso: lo dispara el sistema, no el JavaScript.
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    const st = getProfileSettings(profile);
+    const ids = [9200, 9201, 9202, 9203, 9204, 9205, 9206];
+    (async () => {
+      try {
+        await LocalNotifications.cancel({ notifications: ids.map((id) => ({ id })) }).catch(() => {});
+        const sched = profile?.weekSchedule || null;
+        if (!st.reminderEnabled || !sched) return;
+        await LocalNotifications.createChannel({ id: "modusfit-reminder-v1", name: "Recordatorio de entrenamiento", description: "Aviso los días que te toca entrenar", importance: 4, vibration: true }).catch(() => {});
+        const [hh, mm] = String(st.reminderTime || "18:00").split(":").map(Number);
+        const notifs = [];
+        for (let i = 0; i < 7; i++) {
+          const d = new Date();
+          d.setDate(d.getDate() + i);
+          d.setHours(hh || 18, mm || 0, 0, 0);
+          if (d.getTime() <= Date.now()) continue; // ya pasó la hora de hoy
+          const dayKey = sched[todayWeekdayKey(d)];
+          if (!dayKey) continue; // día de descanso: no molestar
+          const label = ROUTINE[dayKey]?.label || "entrenar";
+          notifs.push({
+            id: ids[i], smallIcon: "ic_stat_modusfit",
+            title: `💪 Hoy toca ${label}`,
+            body: "Tu rutina te espera — dale que se puede",
+            channelId: "modusfit-reminder-v1",
+            schedule: { at: d, allowWhileIdle: true },
+          });
+        }
+        if (notifs.length) {
+          await LocalNotifications.schedule({ notifications: notifs });
+          console.log(`[notif] ${notifs.length} recordatorios programados a las ${st.reminderTime}`);
+        }
+      } catch (e) { console.warn("[notif] recordatorio:", e); }
+    })();
+    // eslint-disable-next-line
+  }, [profile?.settings?.reminderEnabled, profile?.settings?.reminderTime, profile?.weekSchedule, activeProfile]);
+
   // MIGRACIÓN AUTOMÁTICA DE LA FOTO DE PERFIL: las fotos puestas con
   // versiones anteriores quedaron SOLO en IndexedDB del dispositivo (nunca
   // subían a la nube, por eso no aparecían en la web ni en otros equipos).
@@ -9915,7 +10213,7 @@ export default function App() {
           <div key={tab} className="tab-fade-in">
             {tab === "rutinas" && <RoutinesView profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleArchiveRoutine} onRestore={handleRestoreRoutine} onUpdateProfile={handleUpdateProfile} />}
             {tab === "rutina" && <OnboardingTasksCard profile={profile} cycleStart={cycleStart} logs={logs} onGoToProfile={() => setTab("perfil")} onDone={() => handleUpdateProfile({ onboardingDone: true })} />}
-            {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} todaySessionDayKey={(profile?.trainingSessions || []).find((ts) => ts.date === todayStr())?.dayKey || profile?.activeSession?.dayKey || null} />}
+            {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToRoutines={() => setTab("rutinas")} onGoToFieldSettings={() => { setTab("perfil"); setTimeout(() => { document.getElementById("field-settings-section")?.scrollIntoView({ behavior: "smooth", block: "center" }); }, 250); }} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} todaySessionDayKey={(profile?.trainingSessions || []).find((ts) => ts.date === todayStr())?.dayKey || profile?.activeSession?.dayKey || null} />}
             {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} onGoToRoutines={() => setTab("rutinas")} weekSchedule={weekSchedule} sex={profile?.sex} age={profile?.age} onGoToDeload={() => setTab("descarga")} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} />}
             {tab === "descarga" && <DeloadView logs={logs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} />}
             {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} settings={getProfileSettings(profile)} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} />}
