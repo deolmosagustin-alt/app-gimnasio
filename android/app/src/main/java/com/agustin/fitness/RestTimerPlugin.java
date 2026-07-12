@@ -58,7 +58,7 @@ public class RestTimerPlugin extends Plugin {
         String chipText = minutes > 0
                 ? String.format(Locale.getDefault(), "%d:%02d", minutes, secsRem)
                 : (secsRem + "s");
-        String title = "Descanso";
+        String title = "⏱️ Descanso";
         String body = (exerciseName != null && !exerciseName.isEmpty())
                 ? exerciseName
                 : "Recuperá · próxima serie";
@@ -90,6 +90,7 @@ public class RestTimerPlugin extends Plugin {
                         .setSmallIcon(smallIcon)
                         .setContentTitle(title)
                         .setContentText(body)
+                        .setSubText("Modus Fit")
                         .setOngoing(true)
                         .setOnlyAlertOnce(true)
                         .setCategory(Notification.CATEGORY_STOPWATCH)
@@ -145,6 +146,7 @@ public class RestTimerPlugin extends Plugin {
                     .setSmallIcon(getIconResId(context))
                     .setContentTitle(title)
                     .setContentText(body)
+                    .setSubText("Modus Fit")
                     .setOngoing(true)
                     .setOnlyAlertOnce(true)
                     .setPriority(NotificationCompat.PRIORITY_DEFAULT)
@@ -215,16 +217,35 @@ public class RestTimerPlugin extends Plugin {
 
     private void createChannel(Context context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationManager manager = context.getSystemService(NotificationManager.class);
+            if (manager == null) return;
+
+            // Canal del CRONÓMETRO (silencioso, no salta heads-up)
             NotificationChannel channel = new NotificationChannel(
                     CHANNEL_ID, "Cronómetro de descanso",
-                    NotificationManager.IMPORTANCE_DEFAULT // no salta heads-up
+                    NotificationManager.IMPORTANCE_DEFAULT
             );
             channel.setDescription("Cuenta regresiva del descanso entre series");
             channel.setShowBadge(false);
             channel.setSound(null, null);
             channel.enableVibration(false);
-            NotificationManager manager = context.getSystemService(NotificationManager.class);
-            if (manager != null) manager.createNotificationChannel(channel);
+            manager.createNotificationChannel(channel);
+
+            // Canal del FIN DEL DESCANSO: vibración FUERTE tipo alarma —
+            // un patrón largo que se siente aunque estés scrolleando en
+            // otra app. Los canales de Capacitor (JS) solo permiten
+            // vibración genérica corta; el patrón custom hay que crearlo
+            // acá en nativo. Android respeta al PRIMERO que crea el canal,
+            // así que con el build nuevo instalado este patrón manda.
+            NotificationChannel done = new NotificationChannel(
+                    "modusfit-rest-done-v1", "Fin del descanso",
+                    NotificationManager.IMPORTANCE_HIGH
+            );
+            done.setDescription("Aviso al terminar el descanso entre series");
+            done.setShowBadge(false);
+            done.enableVibration(true);
+            done.setVibrationPattern(new long[]{0, 500, 250, 500, 250, 800});
+            manager.createNotificationChannel(done);
         }
     }
 

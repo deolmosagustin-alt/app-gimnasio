@@ -740,6 +740,33 @@ function cleanObsoleteOverrides(logs) {
 // y fechas con una sesión explícita (botón Iniciar/Finalizar sesión)
 // finalizada — así un día cuenta como entrenado aunque te hayas olvidado de
 // guardar alguna serie individual, mientras hayas usado Inicio/Fin de sesión.
+// Racha "inteligente": cuenta días entrenados consecutivos, pero los días
+// de DESCANSO programados (sin rutina en weekSchedule) no la cortan — solo
+// la corta faltar un día que TOCABA entrenar. Sin esto, cualquier día de
+// descanso reiniciaba la racha a cero, que era injusto y desmotivante.
+// Sin weekSchedule cae al comportamiento clásico (días seguidos).
+function computeSmartStreak(dateSet, weekSchedule) {
+  let streak = 0;
+  const cursor = new Date();
+  const isScheduled = (date) => {
+    if (!weekSchedule) return true; // sin agenda: todos los días "tocan"
+    return !!weekSchedule[todayWeekdayKey(date)];
+  };
+  // Hoy: si entrenaste suma; si tocaba pero todavía no fuiste, NO corta
+  // (el día no terminó). Después retrocedemos día por día.
+  if (dateSet.has(localDateStr(cursor))) streak++;
+  cursor.setDate(cursor.getDate() - 1);
+  let guard = 0;
+  while (guard++ < 400) {
+    const d = localDateStr(cursor);
+    if (dateSet.has(d)) streak++;
+    else if (isScheduled(cursor)) break; // tocaba y no fuiste → se corta
+    // día de descanso programado: ni corta ni suma
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return streak;
+}
+
 function getTrainedDateSet(logs, sessions) {
   const s = new Set();
   Object.entries(logs).forEach(([k, v]) => { if (k.endsWith("_pr_override") || !Array.isArray(v)) return; v.forEach((e) => s.add(e.date)); });
@@ -2491,7 +2518,7 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default", 
             smallIcon: "ic_stat_modusfit",
             title: "⏱️ Descanso terminado — Modus Fit",
             body: "Es hora de la próxima serie 💪",
-            channelId: "ponos-rest-timer",
+            channelId: "modusfit-rest-done-v1",
             sound: alertType === "vibration" ? undefined : "default",
             schedule: { at: new Date(Date.now() + 100) },
           }],
@@ -2556,6 +2583,32 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default", 
             }
           }
         } catch (err) { console.error("Cronómetro nativo:", err); }
+        // LA NOTIFICACIÓN DE FIN, PROGRAMADA DESDE EL INICIO con hora
+        // exacta: la dispara EL SISTEMA aunque la app esté congelada en
+        // segundo plano. Antes se creaba recién cuando el JS detectaba el
+        // fin — y si estabas scrolleando Instagram, Android congela el JS
+        // de la WebView: ni vibración ni aviso hasta reabrir la app. Con
+        // allowWhileIdle atraviesa también el modo Doze. Usa el canal
+        // "modusfit-rest-done-v1" (vibración fuerte tipo alarma, creado
+        // con patrón custom desde el plugin nativo; acá se crea igual por
+        // si el build nativo es viejo — Android usa el primero que llegue).
+        try {
+          if (Capacitor.isNativePlatform()) {
+            await LocalNotifications.createChannel({ id: "modusfit-rest-done-v1", name: "Fin del descanso", description: "Aviso al terminar el descanso entre series", importance: 5, vibration: true }).catch(() => {});
+            await LocalNotifications.schedule({
+              notifications: [{
+                id: 9001,
+                smallIcon: "ic_stat_modusfit",
+                title: "⏱️ ¡Descanso terminado!",
+                body: "Dale, volvé a la serie 💪",
+                channelId: "modusfit-rest-done-v1",
+                sound: alertType === "vibration" ? undefined : "default",
+                schedule: { at: new Date(endTimeRef.current), allowWhileIdle: true },
+              }],
+            });
+            console.log("[notif] Aviso de fin programado para", new Date(endTimeRef.current).toLocaleTimeString());
+          }
+        } catch (e) { console.warn("[notif] No se pudo programar el aviso de fin:", e); }
         // Permisos + canal para la notificación FINAL de "descanso terminado"
         try {
           if (Capacitor.isNativePlatform()) {
@@ -2575,10 +2628,12 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default", 
     }
     endTimeRef.current = null;
     delete ACTIVE_REST_TIMERS[timerId];
-    // Cancelar la notificación persistente si el timer se pausa/resetea
+    // Cancelar la notificación persistente Y el aviso de fin programado
+    // si el timer se pausa/resetea — si no, el aviso sonaría igual a la
+    // hora original aunque hayas frenado el descanso.
     try {
       if (Capacitor.isNativePlatform()) {
-        LocalNotifications.cancel({ notifications: [{ id: 9002 }] }).catch(() => {});
+        LocalNotifications.cancel({ notifications: [{ id: 9001 }, { id: 9002 }] }).catch(() => {});
         if (ACTIVE_REST_TIMERS.__notifOwner === timerId) {
           RestTimerNotification.stop().catch(() => {});
           delete ACTIVE_REST_TIMERS.__notifOwner;
@@ -3557,7 +3612,7 @@ function RankUpModal({ from, to, muscleName, onClose }) {
   );
 }
 
-function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, accent, logs, setLogs, drafts = {}, setDrafts, deloadKgFactor = 1, deloadMode = false, resetKey = 0, autoShowPrShare = true, onDisableAutoShowPrShare, hasActiveSession = true, cardio = false }) {
+function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, accent, logs, setLogs, drafts = {}, setDrafts, deloadKgFactor = 1, deloadMode = false, resetKey = 0, autoShowPrShare = true, onDisableAutoShowPrShare, hasActiveSession = true, cardio = false, dumbbellDouble = null }) {
   const globalUnit = useWeightUnit();
   // Unidad local: arranca desde la preferencia global, pero el usuario puede
   // cambiarla ejercicio por ejercicio con el toggle kg/lbs del input.
@@ -3598,7 +3653,77 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   const [feedback, setFeedback] = useState(null);
   const [showRpeLocal, setShowRpeLocal] = useState(false);
   const showRpe = showRpeLocal || rpe != null;
-  const [editingPR, setEditingPR] = useState(false); const [editReps, setEditReps] = useState(""); const [editKg, setEditKg] = useState(""); const [saved, setSaved] = useState(false);
+  const [editingPR, setEditingPR] = useState(false);
+  const [rowFocus, setRowFocus] = useState(false); // enciende el borde al enfocar
+  const cardioFinishedRef = useRef(false); // el countdown llegó a 0 solo (no pausa manual)
+
+  // NOTIFICACIÓN NATIVA DEL CARDIO — misma función que el reloj de descanso:
+  // · Cuenta regresiva: cronómetro vivo en la barra (plugin nativo) + aviso
+  //   de fin PROGRAMADO con hora exacta (canal de vibración fuerte), que el
+  //   sistema dispara aunque la app esté congelada en segundo plano.
+  // · Cronómetro ascendente: notificación persistente "Cardio en curso".
+  // Al pausar a mano se limpia todo; si el countdown termina solo, el aviso
+  // programado NO se cancela (cardioFinishedRef) — así siempre suena.
+  useEffect(() => {
+    if (!cardio) return;
+    const cardioNotifId = 9003;
+    if (cardioRunning) {
+      cardioFinishedRef.current = false;
+      (async () => {
+        try {
+          if (!Capacitor.isNativePlatform()) return;
+          if (cardioMode === "countdown") {
+            const targetLeft = Math.max(1, Math.round((parseFloat(minutes) * 60 || 0) - cardioElapsed));
+            ACTIVE_REST_TIMERS.__notifOwner = `cardio_${exerciseId}`;
+            await RestTimerNotification.start({ seconds: targetLeft, exerciseName: exerciseName || "Cardio" }).catch(() => {});
+            await LocalNotifications.createChannel({ id: "modusfit-rest-done-v1", name: "Fin del descanso", description: "Aviso al terminar", importance: 5, vibration: true }).catch(() => {});
+            await LocalNotifications.schedule({
+              notifications: [{
+                id: cardioNotifId, smallIcon: "ic_stat_modusfit",
+                title: "🏁 ¡Cardio completado!", body: `${exerciseName || "Sesión"} — llegaste al objetivo 💪`,
+                channelId: "modusfit-rest-done-v1", sound: "default",
+                schedule: { at: new Date(Date.now() + targetLeft * 1000), allowWhileIdle: true },
+              }],
+            });
+          } else {
+            await LocalNotifications.schedule({
+              notifications: [{
+                id: cardioNotifId, smallIcon: "ic_stat_modusfit",
+                title: "⏱️ Cardio en curso", body: `${exerciseName || "Sesión"} · tocá para volver`,
+                channelId: "ponos-rest-timer", ongoing: true, autoCancel: false,
+                schedule: { at: new Date(Date.now() + 300) },
+              }],
+            });
+          }
+        } catch (e) { console.warn("[notif] cardio:", e); }
+      })();
+    } else {
+      try {
+        if (Capacitor.isNativePlatform()) {
+          // Pausa manual: limpiar todo. Fin natural: dejar vivo el aviso
+          // programado (suena a su hora exacta) y solo bajar el cronómetro.
+          if (!cardioFinishedRef.current) LocalNotifications.cancel({ notifications: [{ id: cardioNotifId }] }).catch(() => {});
+          if (ACTIVE_REST_TIMERS.__notifOwner === `cardio_${exerciseId}`) {
+            RestTimerNotification.stop().catch(() => {});
+            delete ACTIVE_REST_TIMERS.__notifOwner;
+          }
+        }
+      } catch { }
+      cardioFinishedRef.current = false;
+    }
+    // Cleanup al desmontar: si te vas de la pantalla con el CRONÓMETRO
+    // ascendente corriendo, su notificación "Cardio en curso" (ongoing) se
+    // quedaba pegada en la barra para siempre. La cuenta regresiva NO se
+    // cancela acá: su aviso de fin debe sonar a la hora exacta aunque salgas.
+    return () => {
+      if (!Capacitor.isNativePlatform()) return;
+      if (cardioMode === "stopwatch" && cardioRunning) {
+        LocalNotifications.cancel({ notifications: [{ id: 9003 }] }).catch(() => {});
+      }
+    };
+    // eslint-disable-next-line
+  }, [cardioRunning, cardioMode]);
+  const [editReps, setEditReps] = useState(""); const [editKg, setEditKg] = useState(""); const [saved, setSaved] = useState(false);
   const [prBurst, setPrBurst] = useState(0);
   const [showPRShare, setShowPRShare] = useState(false);
   const [rankUpInfo, setRankUpInfo] = useState(null); // { from, to, muscleName }
@@ -3628,6 +3753,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
         setCardioLeft(left);
         if (left === 0) {
           clearInterval(cardioIntervalRef.current);
+          cardioFinishedRef.current = true; // fin NATURAL: no cancelar el aviso programado
           setCardioRunning(false);
           haptic([100, 50, 100, 50, 200]);
           // Guardar automáticamente
@@ -3657,8 +3783,8 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
       try {
         const exLib = EXERCISE_LIBRARY_BY_ID[exerciseId];
         if (exLib?.group && (isFirstEver || isPR)) {
-          const prevRankData = getBest1RMForMuscleGroup(exLib.group, logs);
-          const newRankData = getBest1RMForMuscleGroup(exLib.group, newLogs);
+          const prevRankData = getBest1RMForMuscleGroup(exLib.group, logs, dumbbellDouble);
+          const newRankData = getBest1RMForMuscleGroup(exLib.group, newLogs, dumbbellDouble);
           const prevRank = getMuscleRank(exLib.group, prevRankData.best1RM);
           const newRank = getMuscleRank(exLib.group, newRankData.best1RM);
           if (newRank.levelIdx > prevRank.levelIdx && prevRank.tier !== newRank.tier) {
@@ -3715,8 +3841,8 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     try {
       const exLib = EXERCISE_LIBRARY_BY_ID[exerciseId];
       if (exLib?.group && (isFirstEver || isPR)) {
-        const prevRankData = getBest1RMForMuscleGroup(exLib.group, logs);
-        const newRankData = getBest1RMForMuscleGroup(exLib.group, newLogs);
+        const prevRankData = getBest1RMForMuscleGroup(exLib.group, logs, dumbbellDouble);
+        const newRankData = getBest1RMForMuscleGroup(exLib.group, newLogs, dumbbellDouble);
         const prevRank = getMuscleRank(exLib.group, prevRankData.best1RM);
         const newRank = getMuscleRank(exLib.group, newRankData.best1RM);
         if (newRank.levelIdx > prevRank.levelIdx && prevRank.tier !== newRank.tier) {
@@ -3762,17 +3888,18 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           ponerte a cargar números, no como una nota chica al final. */}
       <div className="flex items-center gap-2 mb-3">
         {currentPR ? (
-          <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl flex-1" style={{ backgroundColor: accent + "1c", border: `1px solid ${accent}40` }}>
-            <Trophy size={14} style={{ color: accent }} className="shrink-0 soft-pulse" />
-            <p className="flex-1 min-w-0 truncate">
-              <span className="text-[10px] font-bold uppercase tracking-wide mr-1.5" style={{ color: accent + "bb" }}>A superar:</span>
-              <span className="text-base font-black" style={{ color: accent }}>
-                {cardio ? <>{currentPR.minutes} min{currentPR.km ? ` · ${currentPR.km}km` : ""}</> : <>{currentPR.reps}×{kgToDisplay(currentPR.kg, unit)}{weightLabel(unit)}</>}
+          <div className="relative overflow-hidden flex items-center gap-2.5 pl-3.5 pr-2 py-2.5 rounded-xl flex-1" style={{ background: `linear-gradient(120deg, ${accent}20, ${accent}0c)`, border: `1px solid ${accent}45` }}>
+            <div className="absolute -top-5 -left-5 w-16 h-16 rounded-full blur-2xl pointer-events-none opacity-30" style={{ backgroundColor: accent }} />
+            <Trophy size={15} style={{ color: accent }} className="shrink-0 soft-pulse relative" />
+            <p className="flex-1 min-w-0 truncate relative leading-none">
+              <span className="block text-[8.5px] font-black uppercase tracking-[0.16em] mb-1" style={{ color: accent + "aa" }}>A superar{override?.manual ? " · editado" : ""}</span>
+              <span className="text-xl font-black tabular-nums" style={{ color: accent, textShadow: `0 0 16px ${accent}50` }}>
+                {cardio ? <>{currentPR.minutes} min{currentPR.km ? ` · ${currentPR.km}km` : ""}</> : <>{currentPR.reps}<span className="opacity-50 text-sm mx-0.5">×</span>{kgToDisplay(currentPR.kg, unit)}<span className="opacity-60 text-xs ml-0.5">{weightLabel(unit)}</span></>}
               </span>
             </p>
             {!cardio && (
-              <button onClick={() => { setEditReps(currentPR?.reps ?? ""); setEditKg(currentPR?.kg ?? ""); setEditingPR((e) => !e); }} className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold shrink-0 transition active:scale-95" style={{ backgroundColor: accent + "22", color: accent }}>
-                <Edit3 size={11} /> Editar
+              <button onClick={() => { setEditReps(currentPR?.reps ?? ""); setEditKg(currentPR?.kg ?? ""); setEditingPR((e) => !e); }} aria-label="Corregir récord" className="relative flex items-center justify-center w-8 h-8 rounded-lg shrink-0 transition active:scale-90" style={{ backgroundColor: accent + "22", color: accent }}>
+                <Edit3 size={13} />
               </button>
             )}
           </div>
@@ -3794,7 +3921,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
         const todayEntry = history.find((h) => h.date === today);
         if (cardio) {
           const todayCardio = (logs[`${exerciseId}_${setIndex}`] || []).find((h) => h.date === today);
-          if (todayCardio && hasActiveSession) {
+          if (todayCardio && hasActiveSession && !draft.editing) {
             return (
               <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ backgroundColor: accent + "15", border: `1px solid ${accent}30` }}>
                 <Check size={14} style={{ color: accent }} className="shrink-0" />
@@ -3896,16 +4023,20 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
             return { icon: "✓", text: `Dentro del rango objetivo (${rr}) — sostenelo o sumá una rep`, color: accent };
           })();
           return (
-            <div className="space-y-1.5">
-              <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ backgroundColor: accent + "15", border: `1px solid ${accent}30` }}>
-                <Check size={14} style={{ color: accent }} className="shrink-0" />
-                <span className="text-sm font-black" style={{ color: accent }}>{todayEntry.reps}×{kgToDisplay(todayEntry.kg, unit)}{weightLabel(unit)}</span>
-                {todayEntry.rpe && <span className="text-[10px] px-1.5 py-0.5 rounded-lg bg-slate-800 text-slate-400">RPE {todayEntry.rpe}</span>}
-                <span className="text-[10px] text-slate-500 ml-1">guardado hoy</span>
-                <button onClick={() => { updateDraft({ reps: String(todayEntry.reps), kg: String(kgToDisplay(todayEntry.kg, unit)), editing: true }); }} className="ml-auto text-[10px] font-bold px-2 py-1 rounded-lg transition" style={{ backgroundColor: accent + "20", color: accent }}>Editar</button>
+            <div className="relative overflow-hidden rounded-2xl px-3 py-3 bounce-in" style={{ background: `linear-gradient(130deg, ${accent}16, ${accent}06)`, border: `1px solid ${accent}35` }}>
+              <div className="flex items-center gap-2.5">
+                <span className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: accent }}>
+                  <Check size={14} className="text-white" strokeWidth={3} />
+                </span>
+                <div className="flex-1 min-w-0 leading-none">
+                  <span className="block text-[8.5px] font-black uppercase tracking-[0.16em] text-slate-500 mb-1">Guardado hoy</span>
+                  <span className="text-lg font-black tabular-nums" style={{ color: accent }}>{todayEntry.reps}<span className="opacity-50 text-sm mx-0.5">×</span>{kgToDisplay(todayEntry.kg, unit)}<span className="opacity-60 text-xs ml-0.5">{weightLabel(unit)}</span></span>
+                  {todayEntry.rpe && <span className="ml-2 text-[9.5px] px-1.5 py-0.5 rounded-md bg-slate-800/80 text-slate-400 align-middle">RPE {todayEntry.rpe}</span>}
+                </div>
+                <button onClick={() => { updateDraft({ reps: String(todayEntry.reps), kg: String(kgToDisplay(todayEntry.kg, unit)), editing: true }); }} className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg shrink-0 transition active:scale-95" style={{ backgroundColor: accent + "22", color: accent }}>Editar</button>
               </div>
               {coaching && (
-                <p className="text-[10px] px-1 flex items-center gap-1.5" style={{ color: coaching.color }}>
+                <p className="text-[10px] mt-2.5 pt-2.5 flex items-center gap-1.5 border-t" style={{ color: coaching.color, borderColor: accent + "20" }}>
                   <span>{coaching.icon}</span>{coaching.text}
                 </p>
               )}
@@ -3914,10 +4045,20 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
         }
         return (
           <div className="space-y-1.5">
-            {/* Fila de registro unificada: una sola superficie limpia con
-                inputs "abiertos" (sin cajas anidadas), separador × sutil
-                y guardar integrado a la derecha. */}
-            <div className="flex items-stretch rounded-2xl bg-slate-900/60 border border-slate-800/60 overflow-hidden">
+            {/* Fila de registro estilo "display digital": superficie sólida
+                cuyo borde SE ENCIENDE con el color del día al enfocar, y se
+                tiñe VERDE en vivo cuando lo que escribiste ya supera tu
+                marca — sabés que va a ser récord antes de guardar. */}
+            {(() => {
+              const rNum = parseFloat(reps), kNum = parseFloat(kg);
+              const liveBeats = !cardio && !isNaN(rNum) && !isNaN(kNum) && rNum > 0 && kNum > 0 && currentPR?.kg
+                && estimate1RM(displayToKg(kNum, unit), rNum) > estimate1RM(currentPR.kg, currentPR.reps);
+              const borderCol = liveBeats ? "#10B981" : rowFocus ? accent : "rgba(30,41,59,0.7)";
+              const glow = liveBeats ? "0 0 16px -4px rgba(16,185,129,0.55)" : rowFocus ? `0 0 16px -4px ${accent}70` : "none";
+              return (
+            <div onFocus={() => setRowFocus(true)} onBlur={() => setRowFocus(false)}
+                 className="flex items-stretch rounded-2xl bg-slate-950/70 overflow-hidden transition-all duration-200"
+                 style={{ border: `1px solid ${borderCol}`, boxShadow: glow }}>
               <div className="flex-1 flex flex-col items-center justify-center py-2.5">
                 <span className="text-[9px] text-slate-600 font-bold uppercase tracking-widest">Reps</span>
                 <input type="number" inputMode="decimal" placeholder="—" value={reps} onChange={(e) => updateDraft({ reps: e.target.value })} className="w-full bg-transparent text-2xl font-black text-center text-white focus:outline-none placeholder:text-slate-800" />
@@ -3939,10 +4080,12 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
                 </button>
                 <input type="number" inputMode="decimal" placeholder="—" value={kg} onChange={(e) => updateDraft({ kg: e.target.value })} className="w-full bg-transparent text-2xl font-black text-center text-white focus:outline-none placeholder:text-slate-800" />
               </div>
-              <button ref={saveBtnRef} onClick={handleSave} aria-label="Guardar serie" className={`w-14 flex items-center justify-center transition-all active:scale-95 text-white ${saved ? "bg-emerald-500" : "hover:opacity-90"}`} style={!saved ? { backgroundColor: accent } : {}}>
+              <button ref={saveBtnRef} onClick={handleSave} aria-label="Guardar serie" className={`w-14 flex items-center justify-center transition-all active:scale-95 text-white ${saved ? "" : "hover:opacity-90"}`} style={saved ? { background: "linear-gradient(160deg, #10B981, #059669)" } : { background: `linear-gradient(160deg, ${accent}, ${accent}b0)` }}>
                 {saved ? <Check size={19} /> : <Save size={18} />}
               </button>
             </div>
+              );
+            })()}
             {/* % del 1RM — línea sutil integrada */}
             {currentPR && (() => {
               const pr1RM = estimate1RM(currentPR.kg, currentPR.reps);
@@ -3972,7 +4115,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
         );
       })()}
       {!showRpe ? (
-        <button onClick={() => setShowRpeLocal(true)} className="w-full flex items-center justify-center gap-1.5 mt-2.5 py-2 rounded-lg border border-dashed border-slate-700 text-slate-500 hover:text-slate-300 hover:border-slate-500 text-[11px] font-bold transition"><Activity size={11} /> Registrar esfuerzo (RPE)</button>
+        <button onClick={() => setShowRpeLocal(true)} className="w-full flex items-center justify-center gap-1.5 mt-2.5 py-2 rounded-lg bg-slate-900/50 border border-slate-800/70 text-slate-500 hover:text-slate-300 hover:border-slate-600 text-[11px] font-bold transition"><Activity size={11} /> Registrar esfuerzo (RPE)</button>
       ) : (
         <div className="mt-2.5 flex items-center gap-1.5 bounce-in bg-slate-900/60 rounded-lg px-2 py-2">
           <span className="text-[10px] text-slate-600 font-semibold w-7 shrink-0">RPE</span>
@@ -3984,8 +4127,8 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
         </div>
       )}
       {editingPR && !cardio && (
-        <div className="mt-2 bg-slate-900/80 border border-slate-800 rounded-xl p-3 space-y-2 bounce-in">
-          <p className="text-[11px] text-slate-500">Corregir récord:</p>
+        <div className="mt-2 rounded-xl p-3 space-y-2 bounce-in" style={{ backgroundColor: "rgba(2,6,23,0.7)", border: `1px solid ${accent}30` }}>
+          <p className="text-[10px] font-black uppercase tracking-[0.14em] flex items-center gap-1.5" style={{ color: accent }}><Edit3 size={11} /> Corregir récord</p>
           <div className="flex flex-wrap gap-2 items-center">
             <input type="number" inputMode="decimal" placeholder="Reps" value={editReps} onChange={(e) => setEditReps(e.target.value)} className="w-20 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm text-white" />
             <span className="text-slate-600 text-xs">reps ×</span>
@@ -4017,7 +4160,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
 /* ============================================================================
    EXERCISE CARD
 ============================================================================ */
-function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts, deloadSets, deloadMode, resetKey = 0, settings = DEFAULT_SETTINGS, forceOpen = false, onDisableAutoShowPrShare, hasActiveSession = true, hideTimer = false }) {
+function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts, deloadSets, deloadMode, resetKey = 0, settings = DEFAULT_SETTINGS, forceOpen = false, onDisableAutoShowPrShare, hasActiveSession = true, hideTimer = false, onUpdateSettings = null }) {
   const [open, setOpen] = useState(false);
   const [showWarmup, setShowWarmup] = useState(false);
   // forceOpen se usa solo desde las demos del tutorial guiado, para abrir la
@@ -4039,6 +4182,23 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
               <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded-lg font-bold" style={{ backgroundColor: accent + "18", color: accent }}>{exercise.muscle}</span>
               {exercise.cardio && <span className="text-[10px] bg-rose-400/15 text-rose-300 rounded-lg px-1.5 py-0.5 font-bold flex items-center gap-1"><Footprints size={9} /> CARDIO</span>}
               {deloadMode && <span className="text-[10px] bg-purple-500/15 text-purple-400 rounded-lg px-1.5 py-0.5 font-bold">DESCARGA</span>}
+              {/* Toggle ×1/×2 para ejercicios de mancuerna: cuántas usás.
+                  Afecta el peso REAL que cuenta para tu rango muscular —
+                  búlgaras con 2×20kg son 40kg de carga, no 20. Se guarda
+                  por ejercicio en tu perfil (sincroniza a la nube). */}
+              {!exercise.cardio && onUpdateSettings && /mancuerna/i.test(exercise.name || "") && (() => {
+                const effLf = settings?.dumbbellDouble?.[exercise.id] || EXERCISE_LIBRARY_BY_ID[exercise.id]?.loadFactor || 1;
+                return (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onUpdateSettings({ dumbbellDouble: { ...(settings?.dumbbellDouble || {}), [exercise.id]: effLf === 2 ? 1 : 2 } }); }}
+                    title={effLf === 2 ? "Contando DOS mancuernas (peso ×2)" : "Contando UNA mancuerna"}
+                    className="text-[10px] rounded-lg px-1.5 py-0.5 font-black flex items-center gap-1 transition active:scale-95"
+                    style={effLf === 2 ? { backgroundColor: accent + "22", color: accent, border: `1px solid ${accent}45` } : { backgroundColor: "rgba(30,41,59,0.6)", color: "#64748b", border: "1px solid #334155" }}
+                  >
+                    <Dumbbell size={9} /> ×{effLf}
+                  </button>
+                );
+              })()}
               {!deloadMode && stagnant && <span className="text-[10px] bg-rose-500/15 text-rose-400 rounded-lg px-1.5 py-0.5 font-bold flex items-center gap-1"><AlertTriangle size={9} /> ESTANCADO</span>}
             </div>
             {exercise.nota && <p className="text-[11px] text-slate-500 mt-0.5" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{exercise.nota}</p>}
@@ -4056,7 +4216,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
         {!exercise.cardio && !deloadMode && bestWorkingKg != null && (
           <div className="mb-2">
             {!showWarmup ? (
-              <button onClick={() => setShowWarmup(true)} className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-dashed text-[11px] font-bold transition" style={{ borderColor: accent + "40", color: accent }}>
+              <button onClick={() => setShowWarmup(true)} className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-[11px] font-bold transition" style={{ backgroundColor: accent + "10", border: `1px solid ${accent}30`, color: accent }}>
                 <Flame size={12} /> Ver calentamiento sugerido
               </button>
             ) : (
@@ -4080,7 +4240,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
           </div>
         )}
         <p className="text-[9px] font-black uppercase tracking-widest text-slate-600 mb-2 mt-1">{exercise.cardio ? "Registrá tu sesión" : "Tus series"}</p>
-        {setsToShow.map((s, i) => <SetRow key={i} exerciseId={exercise.id} exerciseName={exercise.name} exerciseMuscle={exercise.muscle} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadKgFactor={settings.deloadPct} deloadMode={deloadMode} resetKey={resetKey} autoShowPrShare={settings.autoShowPrShare ?? true} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={hasActiveSession} cardio={exercise.cardio} />)}
+        {setsToShow.map((s, i) => <SetRow key={i} exerciseId={exercise.id} exerciseName={exercise.name} exerciseMuscle={exercise.muscle} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadKgFactor={settings.deloadPct} deloadMode={deloadMode} resetKey={resetKey} autoShowPrShare={settings.autoShowPrShare ?? true} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={hasActiveSession} cardio={exercise.cardio} dumbbellDouble={settings?.dumbbellDouble || null} />)}
         {exercise.video && (
           <div className="pt-3">
             <a href={exercise.video} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 py-3 rounded-xl border border-slate-800 text-slate-400 hover:border-slate-600 hover:text-white transition text-sm font-medium active:scale-[0.98]">
@@ -4213,7 +4373,7 @@ function groupExercisesIntoSupersets(exercises) {
   return groups;
 }
 
-function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, weekSchedule, activeSession, onStartSession, onEndSession, onCancelSession, onDisableAutoShowPrShare, todaySessionDayKey = null }) {
+function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, weekSchedule, activeSession, onStartSession, onEndSession, onCancelSession, onDisableAutoShowPrShare, onUpdateSettings = null, todaySessionDayKey = null }) {
   // El día programado para hoy según el cronograma semanal (lunes a domingo)
   // de la rutina activa. Si hoy es descanso programado (o no hay cronograma
   // todavía), cae al viejo heurístico de "último día entrenado + 1" — pero
@@ -4316,7 +4476,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
         {groupExercisesIntoSupersets(day.exercises).map((group) => {
           if (group.length === 1) {
             const ex = group[0];
-            return <ExerciseCard key={ex.id} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadSets={isDeload ? getDeloadSets(ex) : null} deloadMode={isDeload} resetKey={resetKeys[activeDay]} settings={settings} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} />;
+            return <ExerciseCard key={ex.id} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadSets={isDeload ? getDeloadSets(ex) : null} deloadMode={isDeload} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} />;
           }
           // Superserie: varios ejercicios encadenados comparten un solo
           // cronómetro al final del grupo, en vez de uno por ejercicio —
@@ -4324,9 +4484,9 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           // ellos, sólo al terminar la vuelta completa.
           const hasHeavyGroup = group.some((ex) => ex.sets.some((s) => isHeavyRepRange(s.repRange)));
           return (
-            <div key={group.map((e) => e.id).join("-")} className="rounded-2xl border-2 border-dashed p-2.5 space-y-2.5" style={{ borderColor: day.color + "45" }}>
+            <div key={group.map((e) => e.id).join("-")} className="rounded-2xl border p-2.5 space-y-2.5" style={{ borderColor: day.color + "50", backgroundColor: day.color + "06" }}>
               <div className="flex items-center gap-1.5 px-1"><Link size={11} style={{ color: day.color }} /><span className="text-[10px] font-black uppercase tracking-wider" style={{ color: day.color }}>Superserie · {group.length} ejercicios</span></div>
-              {group.map((ex) => <ExerciseCard key={ex.id} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadSets={isDeload ? getDeloadSets(ex) : null} deloadMode={isDeload} resetKey={resetKeys[activeDay]} settings={settings} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} hideTimer />)}
+              {group.map((ex) => <ExerciseCard key={ex.id} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadSets={isDeload ? getDeloadSets(ex) : null} deloadMode={isDeload} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} hideTimer />)}
               <div className="px-1"><RestTimer seconds={hasHeavyGroup ? settings.restLong : settings.restShort} accent={day.color} alertType={settings.alertType} timerId={`grp_${group.map((g) => g.id).join("_")}`} exerciseName={group.map((g) => g.name).filter(Boolean).join(" + ")} /></div>
               <p className="text-[10px] text-slate-600 px-1">Descansá recién después de completar los {group.length} ejercicios — ese es el cronómetro de arriba.</p>
             </div>
@@ -4587,16 +4747,14 @@ function ShareSummaryCard({ logs, trainingSessions = [] }) {
   );
 }
 
-function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [] }) {
+function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [], weekSchedule = null }) {
   const sessions = useMemo(() => buildSessionsIndex(logs, trainingSessions), [logs, trainingSessions]);
   // Días entrenados y racha — mudados acá desde el hero de Progreso,
   // en formato compacto acoplado al calendario.
   const miniStats = useMemo(() => {
     const dateSet = new Set(sessions.map((s) => s.date));
-    let streak = 0; const cursor = new Date();
-    while (true) { const d = localDateStr(cursor); if (dateSet.has(d)) { streak++; cursor.setDate(cursor.getDate() - 1); } else break; }
-    return { days: dateSet.size, streak };
-  }, [sessions]);
+    return { days: dateSet.size, streak: computeSmartStreak(dateSet, weekSchedule) };
+  }, [sessions, weekSchedule]);
   const sessionByDate = useMemo(() => { const m = {}; sessions.forEach((s) => { m[s.date] = s; }); return m; }, [sessions]);
   const [view, setView] = useState("calendar");
   const now = new Date();
@@ -5171,7 +5329,7 @@ function getMuscleRank(muscleKey, best1RM, mode = "general", bodyWeightKg = 0, s
 // planchas...) nunca entra, en ningún nivel. `loadFactor` (dos
 // mancuernas) multiplica el kg logueado antes de calcular el 1RM, para
 // que sea comparable contra estándares de barra (peso total).
-function scanContributorsFor1RM(contributors, logs, overriddenBaseKeys) {
+function scanContributorsFor1RM(contributors, logs, overriddenBaseKeys, lfOverrides = null) {
   let best1RM = 0, bestKg = 0, bestReps = 0, bestExerciseId = null, bestLoadFactor = 1, bestWeight = 1, bestRawRm = 0;
   Object.entries(logs).forEach(([key, val]) => {
     const isOverride = key.endsWith("_pr_override");
@@ -5186,7 +5344,11 @@ function scanContributorsFor1RM(contributors, logs, overriddenBaseKeys) {
     const { exerciseId } = parseLogKey(baseKey);
     if (!contributors.has(exerciseId)) return;
     const weight = contributors.get(exerciseId);
-    const lf = EXERCISE_LIBRARY_BY_ID[exerciseId]?.loadFactor || 1;
+    // El usuario puede fijar por ejercicio si entrena con UNA o DOS
+    // mancuernas (toggle ×1/×2 en la tarjeta del ejercicio) — ese override
+    // manda sobre el valor de la librería. Ej: búlgaras con 2×20kg cuentan
+    // 40kg reales para el rango, no 20.
+    const lf = (lfOverrides && lfOverrides[exerciseId]) || EXERCISE_LIBRARY_BY_ID[exerciseId]?.loadFactor || 1;
     const entries = isOverride ? [val] : (Array.isArray(val) ? val : []);
     entries.forEach((e) => {
       if (!e || !e.kg || !e.reps) return;
@@ -5206,7 +5368,7 @@ function scanContributorsFor1RM(contributors, logs, overriddenBaseKeys) {
   return { best1RM, bestKg, bestReps, bestExerciseId, bestLoadFactor, bestWeight, bestRawRm };
 }
 
-function getBest1RMForMuscleGroup(groupKey, logs) {
+function getBest1RMForMuscleGroup(groupKey, logs, lfOverrides = null) {
   const { primary, always, secondary } = EXERCISE_LIBRARY_CONTRIBUTORS_BY_GROUP[groupKey] || { primary: new Map(), always: new Map(), secondary: new Map() };
   // INMUNIDAD A DATOS FANTASMA: antes de escanear, descartamos los
   // récords-override que el historial real ya alcanzó o superó. Así el
@@ -5216,8 +5378,8 @@ function getBest1RMForMuscleGroup(groupKey, logs) {
   // verdaderas. No importa de dónde venga el dato: si el historial lo
   // supera, acá no se considera.
   const { logs: cleanLogs } = cleanObsoleteOverrides(logs);
-  const primaryResult = scanContributorsFor1RM(primary, cleanLogs);
-  const alwaysResult = scanContributorsFor1RM(always, cleanLogs);
+  const primaryResult = scanContributorsFor1RM(primary, cleanLogs, null, lfOverrides);
+  const alwaysResult = scanContributorsFor1RM(always, cleanLogs, null, lfOverrides);
   // La marca que se MUESTRA prioriza el ejercicio PRIMARIO del músculo:
   // si tenés una marca en un ejercicio dedicado (ej. curl para bíceps),
   // esa es "tu marca de bíceps" aunque un ejercicio indirecto con weight
@@ -5233,7 +5395,7 @@ function getBest1RMForMuscleGroup(groupKey, logs) {
   } else {
     best = alwaysResult;
   }
-  const finalBest = best.best1RM > 0 ? best : scanContributorsFor1RM(secondary, cleanLogs);
+  const finalBest = best.best1RM > 0 ? best : scanContributorsFor1RM(secondary, cleanLogs, null, lfOverrides);
 
   return {
     best1RM: finalBest.best1RM, bestKg: finalBest.bestKg, bestReps: finalBest.bestReps, bestLoadFactor: finalBest.bestLoadFactor, bestWeight: finalBest.bestWeight,
@@ -5485,12 +5647,12 @@ function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backR
   );
 }
 
-function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, onGoToProfile, sex, age }) {
+function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, onGoToProfile, onGoToRoutines, sex, age }) {
   const [selected, setSelected] = useState(null);
   const [showImage, setShowImage] = useState(false);
   const [showTierRef, setShowTierRef] = useState(false); // modal de referencia de rangos
   const [showAnalysis, setShowAnalysis] = useState(false); // modal de análisis muscular
-  const initialSelRef = useRef(false);
+  const [showGroupExercises, setShowGroupExercises] = useState(false); // ejercicios del grupo sin entrenar
   const detailRef = useRef(null); // la tarjeta de detalle, para el scroll automático
   const frontBodyRef = useRef(null);
   const backBodyRef = useRef(null);
@@ -5500,7 +5662,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
   const ranks = useMemo(() => {
     const out = {};
     MUSCLE_GROUPS.forEach((g) => {
-      const { best1RM, bestKg, bestReps, bestExerciseName, bestLoadFactor, bestWeight } = getBest1RMForMuscleGroup(g.key, logs);
+      const { best1RM, bestKg, bestReps, bestExerciseName, bestLoadFactor, bestWeight } = getBest1RMForMuscleGroup(g.key, logs, settings?.dumbbellDouble || null);
       out[g.key] = { ...getMuscleRank(g.key, best1RM, mode, bodyWeightKg, sex, age), best1RM, bestKg, bestReps, bestExerciseName, bestLoadFactor, bestWeight, label: g.label };
     });
     return out;
@@ -5540,20 +5702,31 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
   // la tarjeta de detalle se centra sola en pantalla con una animación suave.
   const goToMuscle = (k) => {
     setSelected(k);
-    setTimeout(() => { try { detailRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); } catch { } }, 80);
+    setTimeout(() => {
+      try {
+        const el = detailRef.current;
+        if (!el) return;
+        // scrollIntoView movía TODOS los ancestros scrolleables — incluso
+        // wrappers que no deben desplazarse — y al volver arriba el padding
+        // del título "Rango por músculo" quedaba comido contra el borde.
+        // Acá scrolleamos SOLO el contenedor scrolleable real (o la ventana),
+        // centrando la tarjeta sin tocar nada más.
+        let p = el.parentElement, scroller = null;
+        while (p && p !== document.body) {
+          const s = getComputedStyle(p);
+          if (/(auto|scroll)/.test(s.overflowY) && p.scrollHeight > p.clientHeight + 4) { scroller = p; break; }
+          p = p.parentElement;
+        }
+        const r = el.getBoundingClientRect();
+        if (scroller) {
+          const sr = scroller.getBoundingClientRect();
+          scroller.scrollTo({ top: scroller.scrollTop + (r.top - sr.top) - (sr.height - r.height) / 2, behavior: "smooth" });
+        } else {
+          window.scrollTo({ top: window.scrollY + r.top - (window.innerHeight - r.height) / 2, behavior: "smooth" });
+        }
+      } catch { }
+    }, 80);
   };
-
-  // Al entrar, la tarjeta de detalle arranca en tu MEJOR músculo — así
-  // nunca está vacía, sin agregar ningún elemento visual extra.
-  useEffect(() => {
-    if (initialSelRef.current || selected) return;
-    let bestKey = null, bestLvl = -1;
-    MUSCLE_GROUPS.forEach((g) => {
-      const r = ranks[g.key];
-      if (r?.hasData && r.levelIdx > bestLvl) { bestLvl = r.levelIdx; bestKey = g.key; }
-    });
-    if (bestKey) { initialSelRef.current = true; setSelected(bestKey); }
-  }, [ranks, selected]);
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-blue-500/25 shadow-lg shadow-blue-500/5 p-4 space-y-3" style={{ background: "linear-gradient(160deg, #0d1526 0%, #0f172a 45%, #0a0f1e 100%)" }}>
@@ -5658,12 +5831,57 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
                   </div>
                 )}
               </>
-            ) : <p className="text-[11px] text-slate-600 text-center py-2 relative">Todavía no registraste marcas en este grupo.</p>}
+            ) : (
+              <div className="relative text-center py-1">
+                <p className="text-[11px] text-slate-600 mb-3">Todavía no registraste marcas en este grupo.</p>
+                <button onClick={() => setShowGroupExercises(true)} className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[11px] font-black text-teal-400 bg-teal-500/10 border border-teal-500/30 transition active:scale-95">
+                  <Dumbbell size={12} /> Ver ejercicios para {selInfo.label}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       ) : (
         <p className="text-center text-[11px] text-slate-600">Tocá un músculo entrenable para ver tu rango y tu mejor marca.</p>
       )}
+      {/* Modal: ejercicios que trabajan un grupo SIN entrenar — el atajo
+          para desbloquear su rango. Lista los ejercicios de la librería que
+          apuntan a ese músculo y un botón directo a Rutinas para sumarlos. */}
+      {showGroupExercises && selInfo && (
+        <div className="fixed inset-0 z-[130] bg-black/75 backdrop-blur-sm flex items-center justify-center p-5 modal-bg-in" onClick={() => setShowGroupExercises(false)}>
+          <div className="max-w-sm w-full max-h-[80vh] overflow-y-auto bg-slate-900 border border-slate-700/60 rounded-3xl p-5 modal-pop-in shadow-2xl shadow-black/60" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-2">
+                <Dumbbell size={15} className="text-teal-400" />
+                <p className="text-sm font-black text-white">Ejercicios de {selInfo.label}</p>
+              </div>
+              <button onClick={() => setShowGroupExercises(false)} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition"><X size={16} /></button>
+            </div>
+            <p className="text-[10.5px] text-slate-500 mb-3.5">Sumá alguno a tu rutina y este músculo desbloquea su rango.</p>
+            {(() => {
+              const groups = EXERCISE_LIBRARY_CONTRIBUTORS_BY_GROUP[selected] || {};
+              const ids = [...(groups.primary?.keys() || []), ...(groups.always?.keys() || [])];
+              const uniq = [...new Set(ids)];
+              const list = uniq.map((id) => EXERCISE_LIBRARY_BY_ID[id]).filter(Boolean).slice(0, 10);
+              if (!list.length) return <p className="text-[11px] text-slate-600 text-center py-3">No hay ejercicios de librería para este grupo.</p>;
+              return (
+                <div className="space-y-1.5 mb-4">
+                  {list.map((ex) => (
+                    <div key={ex.id} className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 bg-slate-800/40 border border-slate-700/40">
+                      <span className="flex-1 text-xs font-bold text-slate-200">{ex.name}</span>
+                      <a href={yt(ex.name + " ejercicio")} target="_blank" rel="noreferrer" className="text-[9.5px] font-black text-rose-400 px-2 py-1 rounded-lg bg-rose-500/10 border border-rose-500/25 shrink-0">▶ Ver</a>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+            <button onClick={() => { setShowGroupExercises(false); onGoToRoutines?.(); }} className="w-full py-3 rounded-2xl text-sm font-black !text-white transition active:scale-[0.98]" style={{ background: "linear-gradient(135deg, #14B8A6, #0E7490)" }}>
+              Ir a mis rutinas y agregarlos →
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Modal de ANÁLISIS MUSCULAR: tus mejores, los que hay que mejorar
           y los que no estás entrenando. Cada fila es tocable: te lleva
           directo a la tarjeta de ese músculo. */}
@@ -6126,17 +6344,16 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
   );
 }
 
-function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_SETTINGS, onResetAll, onDeleteDay, onUpdateSettings, onGoToProfile, sex, age, onGoToDeload, measurements, onAddMeasurement, photos, photosLoading, onAddPhoto, onDeletePhoto }) {
+function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_SETTINGS, onResetAll, onDeleteDay, onUpdateSettings, onGoToProfile, onGoToRoutines, weekSchedule = null, sex, age, onGoToDeload, measurements, onAddMeasurement, photos, photosLoading, onAddPhoto, onDeletePhoto }) {
   const allExercises = useMemo(() => DAY_ORDER.flatMap((dk) => ROUTINE[dk].exercises.map((e) => ({ id: e.id, name: e.name, day: ROUTINE[dk].label, color: ROUTINE[dk].color, sets: e.sets.length, dayKey: dk }))), []);
 
   const stats = useMemo(() => {
     const dateSet = getTrainedDateSet(logs, sessions);
     let totalVol = 0, totalSets = 0;
     Object.entries(logs).forEach(([k, v]) => { if (k.endsWith("_pr_override") || !Array.isArray(v)) return; v.forEach((e) => { totalVol += vol(e.kg, e.reps); totalSets++; }); });
-    let streak = 0, cursor = new Date();
-    while (true) { const d = localDateStr(cursor); if (dateSet.has(d)) { streak++; cursor.setDate(cursor.getDate() - 1); } else break; }
+    const streak = computeSmartStreak(dateSet, weekSchedule);
     return { totalVol: Math.round(totalVol), totalSets, streak, daysTrained: dateSet.size };
-  }, [logs, sessions]);
+  }, [logs, sessions, weekSchedule]);
 
   const [selId, setSelId] = useState(allExercises[0]?.id);
   const [selSet, setSelSet] = useState(0);
@@ -6249,13 +6466,13 @@ function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_
           </div>
         )}
 
-        {activeSection === "rank" && <MuscleRankView logs={logs} settings={settings} onUpdateSettings={onUpdateSettings} onGoToProfile={onGoToProfile} sex={sex} age={age} />}
+        {activeSection === "rank" && <MuscleRankView logs={logs} settings={settings} onUpdateSettings={onUpdateSettings} onGoToProfile={onGoToProfile} onGoToRoutines={onGoToRoutines} sex={sex} age={age} />}
 
         {activeSection === "medidas" && (
           <MeasurementsView measurements={measurements} onAddMeasurement={onAddMeasurement} photos={photos} photosLoading={photosLoading} onAddPhoto={onAddPhoto} onDeletePhoto={onDeletePhoto} />
         )}
 
-        {activeSection === "historial" && <SessionHistoryView logs={logs} onDeleteDay={onDeleteDay} trainingSessions={sessions} />}
+        {activeSection === "historial" && <SessionHistoryView logs={logs} onDeleteDay={onDeleteDay} trainingSessions={sessions} weekSchedule={weekSchedule} />}
       </div>
 
       {!confirmResetProgress ? (
@@ -9699,8 +9916,8 @@ export default function App() {
           <div key={tab} className="tab-fade-in">
             {tab === "rutinas" && <RoutinesView profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleArchiveRoutine} onRestore={handleRestoreRoutine} onUpdateProfile={handleUpdateProfile} />}
             {tab === "rutina" && <OnboardingTasksCard profile={profile} cycleStart={cycleStart} logs={logs} onGoToProfile={() => setTab("perfil")} onDone={() => handleUpdateProfile({ onboardingDone: true })} />}
-            {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} todaySessionDayKey={(profile?.trainingSessions || []).find((ts) => ts.date === todayStr())?.dayKey || profile?.activeSession?.dayKey || null} />}
-            {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} sex={profile?.sex} age={profile?.age} onGoToDeload={() => setTab("descarga")} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} />}
+            {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} todaySessionDayKey={(profile?.trainingSessions || []).find((ts) => ts.date === todayStr())?.dayKey || profile?.activeSession?.dayKey || null} />}
+            {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} onGoToRoutines={() => setTab("rutinas")} weekSchedule={weekSchedule} sex={profile?.sex} age={profile?.age} onGoToDeload={() => setTab("descarga")} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} />}
             {tab === "descarga" && <DeloadView logs={logs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} />}
             {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} settings={getProfileSettings(profile)} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} />}
             {tab === "perfil" && <ProfileView profileName={activeProfile} profiles={profiles} logs={logs} onSignOut={handleSignOut} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} />}
