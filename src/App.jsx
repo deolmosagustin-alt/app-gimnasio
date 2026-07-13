@@ -987,6 +987,11 @@ const ANIMATION_CSS = `
 .text-\[15px\]{font-size:0.9375rem !important}
 .text-\[26px\]{font-size:1.625rem !important}
 
+/* Hueco que deja la barra de navegación bajo el input del chat: en móvil
+   la nav va abajo (4rem), en escritorio va al costado (0). */
+:root { --chat-nav-gap: 4rem; }
+@media (min-width: 1024px) { :root { --chat-nav-gap: 0rem; } }
+
 @keyframes voiceBar { 0%, 100% { transform: scaleY(0.4); } 50% { transform: scaleY(1); } }
 .voice-bar { animation: voiceBar 0.7s ease-in-out infinite; transform-origin: bottom; }
 @keyframes prConfettiFall {
@@ -8647,8 +8652,16 @@ Datos: ${JSON.stringify(context)}`;
           document.body, queda totalmente afuera de esa animación, así que
           desde el primer frame está exactamente donde tiene que estar. */}
       {typeof document !== "undefined" && createPortal(
-        <div className="fixed bottom-16 lg:bottom-0 left-0 right-0 z-10 pb-4 pt-8 px-4 lg:pl-56 pointer-events-none"
-             style={{ background: "linear-gradient(to top, var(--app-bg, #0a0f1a) 55%, transparent)" }}>
+        <div className="fixed bottom-0 left-0 right-0 z-10 pt-8 px-4 lg:pl-56 pointer-events-none"
+             style={{
+               // El degradado llega HASTA ABAJO DEL TODO (bottom-0) y el hueco
+               // de la barra de navegación se cubre con padding sólido. Antes
+               // arrancaba en bottom-16 y quedaba una franja transparente entre
+               // el degradado y la nav: se veía el contenido del chat pasando
+               // por atrás. Ahora no hay ningún hueco.
+               background: "linear-gradient(to top, var(--app-bg, #0a0f1a) 62%, transparent)",
+               paddingBottom: "calc(var(--chat-nav-gap, 4rem) + 1rem)",
+             }}>
           <div className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto pointer-events-auto">
             {isListening && (
               <div className="flex items-center justify-center gap-2 mb-2 bounce-in">
