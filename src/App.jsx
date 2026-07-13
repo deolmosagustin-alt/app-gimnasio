@@ -1057,6 +1057,66 @@ const ANIMATION_CSS = `
 :root { --chat-nav-gap: 4rem; }
 @media (min-width: 1024px) { :root { --chat-nav-gap: 0rem; } }
 
+/* ── ANIMACIONES DE FEEDBACK ──────────────────────────────────────────────
+   Todas cortas (≤600ms) y con propósito: comunican un cambio de estado, no
+   decoran. Se disfrutan la primera vez y no molestan la número 300. */
+
+/* Cascada del muñeco: cada músculo se enciende con un retraso escalonado */
+@keyframes muscleFadeIn { from { opacity: 0; transform: scale(0.94); } to { opacity: 1; transform: scale(1); } }
+.muscle-cascade { animation: muscleFadeIn 0.4s cubic-bezier(0.34, 1.3, 0.64, 1) both; }
+
+/* Subida de rango: el músculo late con su color */
+@keyframes rankUpPulse { 0%, 100% { filter: brightness(1); transform: scale(1); } 40% { filter: brightness(1.6); transform: scale(1.06); } }
+.rank-up-pulse { animation: rankUpPulse 0.9s ease-in-out 2; }
+
+/* Check que se dibuja solo (trazo del tilde) */
+@keyframes drawCheck { from { stroke-dashoffset: 30; } to { stroke-dashoffset: 0; } }
+.draw-check path, .draw-check polyline { stroke-dasharray: 30; animation: drawCheck 0.45s ease-out 0.1s both; }
+
+/* Salto sutil de los números al aparecer */
+@keyframes numberPop { 0% { transform: scale(0.8); opacity: 0; } 55% { transform: scale(1.08); } 100% { transform: scale(1); opacity: 1; } }
+.number-pop { animation: numberPop 0.45s cubic-bezier(0.34, 1.4, 0.64, 1) both; }
+
+/* Barra que se llena deslizándose */
+@keyframes barFill { from { width: 0%; } }
+.bar-fill { animation: barFill 0.9s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* Pulso lento e invitante (botón de iniciar sesión) */
+@keyframes invitePulse { 0%, 100% { box-shadow: 0 0 0 0 var(--invite-glow, rgba(20,184,166,0.5)); } 50% { box-shadow: 0 0 0 7px rgba(20,184,166,0); } }
+.invite-pulse { animation: invitePulse 2.4s ease-out infinite; }
+
+/* Entrada de las tarjetas al cambiar de día (según dirección) */
+@keyframes slideFromRight { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes slideFromLeft { from { opacity: 0; transform: translateX(-18px); } to { opacity: 1; transform: translateX(0); } }
+.slide-right { animation: slideFromRight 0.32s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.slide-left { animation: slideFromLeft 0.32s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* Latido de la racha + destello dorado si aumentó */
+@keyframes streakBeat { 0%, 100% { transform: scale(1); } 30% { transform: scale(1.22); } 55% { transform: scale(0.97); } }
+.streak-beat { animation: streakBeat 0.7s cubic-bezier(0.34, 1.4, 0.64, 1) 0.3s both; }
+@keyframes streakGlow { 0%, 100% { filter: drop-shadow(0 0 0 rgba(251,191,36,0)); } 50% { filter: drop-shadow(0 0 9px rgba(251,191,36,0.9)); } }
+.streak-glow { animation: streakGlow 1.1s ease-in-out 0.3s 2; }
+
+/* Despliegue elástico de la tarjeta de detalle del músculo */
+@keyframes elasticIn { 0% { opacity: 0; transform: scale(0.95) translateY(8px); } 60% { transform: scale(1.015) translateY(-2px); } 100% { opacity: 1; transform: scale(1) translateY(0); } }
+.elastic-in { animation: elasticIn 0.42s cubic-bezier(0.34, 1.35, 0.64, 1) both; }
+
+/* Skeletons: formas grises que laten mientras cargan los datos */
+@keyframes skeletonShimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+.skeleton {
+  background: linear-gradient(90deg, rgba(30,41,59,0.6) 25%, rgba(51,65,85,0.85) 50%, rgba(30,41,59,0.6) 75%);
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.4s ease-in-out infinite;
+  border-radius: 0.75rem;
+}
+
+/* Respeta a quien pidió menos movimiento en su sistema */
+@media (prefers-reduced-motion: reduce) {
+  .muscle-cascade, .rank-up-pulse, .draw-check path, .number-pop, .bar-fill,
+  .invite-pulse, .slide-right, .slide-left, .streak-beat, .streak-glow,
+  .elastic-in, .skeleton { animation: none !important; }
+}
+
 @keyframes voiceBar { 0%, 100% { transform: scaleY(0.4); } 50% { transform: scaleY(1); } }
 .voice-bar { animation: voiceBar 0.7s ease-in-out infinite; transform-origin: bottom; }
 @keyframes prConfettiFall {
@@ -2552,6 +2612,31 @@ function LoginScreen({ onLogin, allowAutoLogin = true }) {
 // identifica por timerId y guarda su hora real de finalización.
 const ACTIVE_REST_TIMERS = {};
 
+// Número que "cuenta" hasta su valor final en vez de aparecer de golpe.
+// Se usa para los récords: ver el peso subir de 80 a 82.5 refuerza la
+// sensación de progreso mucho más que verlo ya escrito.
+function CountUpNumber({ value, from = null, duration = 700, decimals = 1, className = "", style = {} }) {
+  const [shown, setShown] = useState(from ?? value);
+  const rafRef = useRef(null);
+  useEffect(() => {
+    const start = from ?? 0;
+    const end = Number(value) || 0;
+    if (start === end) { setShown(end); return; }
+    const t0 = Date.now();
+    const tick = () => {
+      const p = Math.min(1, (Date.now() - t0) / duration);
+      // easeOutCubic: arranca rápido y frena suave al llegar
+      const eased = 1 - Math.pow(1 - p, 3);
+      setShown(start + (end - start) * eased);
+      if (p < 1) rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+  }, [value, from, duration]);
+  const txt = decimals > 0 ? (Math.round(shown * 10) / 10).toString().replace(/\.0$/, "") : String(Math.round(shown));
+  return <span className={`tabular-nums ${className}`} style={style}>{txt}</span>;
+}
+
 function RestTimer({ seconds, accent, alertType = "sound", timerId = "default", exerciseName = "" }) {
   const persisted = ACTIVE_REST_TIMERS[timerId];
   const stillRunning = persisted && persisted.endTime > Date.now();
@@ -3721,7 +3806,7 @@ function HelpModal({ startTab, onClose }) {
 function RankUpModal({ from, to, muscleName, onClose }) {
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-5" style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}>
-      <div className="relative w-full max-w-sm rounded-3xl overflow-hidden bounce-in" style={{ background: "linear-gradient(135deg, #0f0f1a, #1a1a2e)", border: `2px solid ${to.color}40` }}>
+      <div className="relative w-full max-w-sm rounded-3xl overflow-hidden elastic-in" style={{ background: "linear-gradient(135deg, #0f0f1a, #1a1a2e)", border: `2px solid ${to.color}40` }}>
         {/* Glow de fondo */}
         <div className="absolute inset-0 opacity-30 pointer-events-none" style={{ background: `radial-gradient(circle at 50% 30%, ${to.color}60, transparent 65%)` }} />
         <div className="relative p-7 text-center space-y-5">
@@ -3739,7 +3824,7 @@ function RankUpModal({ from, to, muscleName, onClose }) {
               <div className="text-xl">→</div>
             </div>
             <div className="flex flex-col items-center gap-1.5">
-              <div className="relative">
+              <div className="relative rank-up-pulse">
                 <div className="absolute inset-0 rounded-full blur-xl opacity-60" style={{ backgroundColor: to.color }} />
                 <RankBadgeIcon tier={to.tier} sub={to.sub} color={to.color} size={90} />
               </div>
@@ -4182,12 +4267,12 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           return (
             <div className="relative overflow-hidden rounded-2xl px-3 py-3 bounce-in" style={{ background: `linear-gradient(130deg, ${accent}16, ${accent}06)`, border: `1px solid ${accent}35` }}>
               <div className="flex items-center gap-2.5">
-                <span className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: accent }}>
-                  <Check size={14} className="text-white" strokeWidth={3} />
+                <span className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 number-pop" style={{ backgroundColor: accent }}>
+                  <Check size={14} className="text-white draw-check" strokeWidth={3} />
                 </span>
                 <div className="flex-1 min-w-0 leading-none">
                   <span className="block text-[8.5px] font-black uppercase tracking-[0.16em] text-slate-500 mb-1">Guardado hoy</span>
-                  <span className="text-lg font-black tabular-nums" style={{ color: accent }}>{todayEntry.reps}<span className="opacity-50 text-sm mx-0.5">×</span>{kgToDisplay(todayEntry.kg, unit)}<span className="opacity-60 text-xs ml-0.5">{weightLabel(unit)}</span></span>
+                  <span className="text-lg font-black tabular-nums number-pop inline-block" style={{ color: accent, animationDelay: "0.12s" }}>{todayEntry.reps}<span className="opacity-50 text-sm mx-0.5">×</span>{kgToDisplay(todayEntry.kg, unit)}<span className="opacity-60 text-xs ml-0.5">{weightLabel(unit)}</span></span>
                   {todayEntry.rpe && <span className="ml-2 text-[9.5px] px-1.5 py-0.5 rounded-md bg-slate-800/80 text-slate-400 align-middle">RPE {todayEntry.rpe}</span>}
                 </div>
                 <button onClick={() => { updateDraft({ reps: String(todayEntry.reps), kg: String(kgToDisplay(todayEntry.kg, unit)), editing: true }); }} className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg shrink-0 transition active:scale-95" style={{ backgroundColor: accent + "22", color: accent }}>Editar</button>
@@ -4528,7 +4613,7 @@ function SessionStartBar({ activeSession, onStart, onCancel, color = "#14B8A6" }
 
   if (!activeSession) {
     return (
-      <button onClick={onStart} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98] shadow-lg" style={{ backgroundColor: color, boxShadow: `0 10px 24px -8px ${color}88` }}>
+      <button onClick={onStart} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98] invite-pulse" style={{ backgroundColor: color, "--invite-glow": `${color}80` }}>
         <Play size={15} /> Iniciar sesión
       </button>
     );
@@ -4595,6 +4680,16 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
   // (ej. Hombro/Brazos) es arbitrario y confuso. El primer día es un punto
   // de partida neutro y predecible.
   const [activeDay, setActiveDay] = useState(() => scheduledDay || (isRestToday ? DAY_ORDER[0] : fallbackSuggested));
+  // Dirección del último cambio de día, para que las tarjetas entren
+  // deslizándose desde el lado correcto (como pasar páginas).
+  const [slideDir, setSlideDir] = useState(null);
+  const prevDayRef = useRef(activeDay);
+  useEffect(() => {
+    const prev = DAY_ORDER.indexOf(prevDayRef.current);
+    const now = DAY_ORDER.indexOf(activeDay);
+    if (prev !== -1 && now !== -1 && prev !== now) setSlideDir(now > prev ? "right" : "left");
+    prevDayRef.current = activeDay;
+  }, [activeDay]);
   // La sesión activa solo "cuenta" en el día donde se inició. Al cambiar de
   // día se ve sin sesión (podés iniciar otra o solo registrar), pero la
   // sesión original sigue corriendo en su día — no se resetea.
@@ -4692,7 +4787,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           sesión real sigue viva en su día, no se resetea. */}
       <SessionStartBar activeSession={sessionForThisDay} onStart={() => onStartSession(activeDay)} onCancel={onCancelSession} color={day.color} />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+      <div key={activeDay} className={`grid grid-cols-1 lg:grid-cols-2 gap-3 ${slideDir === "right" ? "slide-right" : slideDir === "left" ? "slide-left" : ""}`}>
         {groupExercisesIntoSupersets(day.exercises).map((group) => {
           if (group.length === 1) {
             const ex = group[0];
@@ -5034,7 +5129,7 @@ function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [], weekSche
           </div>
           <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900/60 border border-slate-800/60">
             <span className="text-[11px]">🔥</span>
-            <span className="text-xs font-black text-white tabular-nums">{miniStats.streak}</span>
+            <span className="text-xs font-black text-white tabular-nums streak-beat streak-glow inline-block">{miniStats.streak}</span>
             <span className="text-[9px] text-slate-500 font-semibold">racha</span>
           </div>
         </div>
@@ -5819,6 +5914,33 @@ function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backR
     onMuscleClick(best);
   };
 
+  // CASCADA DE ENTRADA: al abrir la pantalla, los músculos se encienden uno
+  // por uno de arriba hacia abajo en vez de aparecer todos de golpe. Da
+  // sensación de que el cuerpo "cobra vida" y dirige la mirada. Corre una
+  // sola vez por montaje (no cada vez que cambiás de músculo seleccionado).
+  const cascadeDoneRef = useRef(false);
+  useEffect(() => {
+    if (cascadeDoneRef.current) return;
+    cascadeDoneRef.current = true;
+    const t = setTimeout(() => {
+      [frontRef, backRef].forEach((ref) => {
+        const svg = ref.current?.querySelector("svg");
+        if (!svg) return;
+        const polys = Array.from(svg.querySelectorAll("polygon"));
+        // Ordenar de arriba hacia abajo por la coordenada Y del polígono
+        const conY = polys.map((p) => {
+          const pts = (p.getAttribute("points") || "").split(/[\s,]+/).map(Number);
+          const ys = pts.filter((_, i) => i % 2 === 1);
+          return { p, y: ys.length ? Math.min(...ys) : 0 };
+        }).sort((a, b) => a.y - b.y);
+        conY.forEach(({ p }, i) => {
+          p.style.animation = `muscleFadeIn 0.4s cubic-bezier(0.34,1.3,0.64,1) ${i * 22}ms both`;
+        });
+      });
+    }, 60);
+    return () => clearTimeout(t);
+  }, []);
+
   // Resaltado con borde blanco: con los mismos índices exactos de arriba,
   // se prende SIEMPRE el músculo completo (todas sus piezas) y nunca uno
   // ajeno, sin importar si comparten color con otro músculo.
@@ -6402,7 +6524,14 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
         </div>
 
         {photosLoading ? (
-          <p className="text-[11px] text-slate-600 text-center py-4">Cargando...</p>
+          // Skeletons: formas que laten mientras llegan los datos. Se siente
+          // más rápido que un "Cargando..." aunque tarde exactamente lo mismo,
+          // porque ya ves la forma de lo que viene.
+          <div className="space-y-2 py-2">
+            <div className="skeleton h-16 w-full" />
+            <div className="skeleton h-16 w-full" style={{ animationDelay: "0.15s" }} />
+            <div className="skeleton h-16 w-3/4" style={{ animationDelay: "0.3s" }} />
+          </div>
         ) : !hasAnyData ? (
           <p className="text-[11px] text-slate-600 text-center py-4">Todavía no registraste nada — agregá una medida arriba o una foto para empezar tu calendario.</p>
         ) : (
