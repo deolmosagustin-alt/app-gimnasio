@@ -7759,6 +7759,40 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
 
 // Vista de solo lectura de una rutina (preset o propia): un resumen por día
 // con sus ejercicios y cuántas series tiene en total.
+// Cuando te comparten una rutina por enlace, este modal te la muestra y te
+// pregunta si querés agregarla a las tuyas.
+function SharedRoutineImportModal({ routine, onImport, onDiscard }) {
+  if (!routine) return null;
+  return (
+    <div className="fixed inset-0 z-[125] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in" onClick={onDiscard}>
+      <div className="w-full max-w-md max-h-[86vh] overflow-y-auto bg-slate-900 border border-slate-700/60 rounded-3xl modal-pop-in shadow-2xl shadow-black/70" onClick={(e) => e.stopPropagation()}>
+        <div className="p-5">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 rounded-2xl bg-teal-500/20 border border-teal-500/30 text-teal-300 flex items-center justify-center shrink-0">
+              <Share2 size={17} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[10px] font-black uppercase tracking-widest text-teal-400">Rutina compartida</p>
+              <h3 className="text-base font-black text-white leading-tight truncate">{routine.name}</h3>
+            </div>
+          </div>
+          <p className="text-sm text-slate-400 mb-3">Te compartieron esta rutina por enlace. ¿Querés agregarla a tus rutinas?</p>
+          <RoutinePreview routineDef={routine} />
+          <div className="flex gap-2 mt-4">
+            <button onClick={onDiscard} className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-400 text-sm font-semibold">Descartar</button>
+            <button onClick={onImport} className="flex-1 py-3 rounded-xl bg-teal-500 !text-white text-sm font-bold active:scale-[0.98] transition-all">Agregar a mis rutinas</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Resumen de una rutina al expandirla. Antes los ejercicios iban todos en una
+// línea corrida separados por puntos ("Press · Vuelos · Fondos · Curl · …"),
+// que a partir del cuarto se vuelve ilegible. Ahora cada día es una tarjeta con
+// su franja de color y los ejercicios listados con sus series, que es lo que
+// realmente querés ver.
 function RoutinePreview({ routineDef }) {
   const model = useMemo(() => buildRoutineModel(routineDef), [routineDef]);
   return (
@@ -7766,15 +7800,31 @@ function RoutinePreview({ routineDef }) {
       {model.dayOrder.map((dk) => {
         const d = model.days[dk];
         const totalSets = d.exercises.reduce((a, e) => a + e.sets.length, 0);
-        const muted = muteHexColor(d.color);
         return (
-          <div key={dk} className="rounded-xl border border-slate-800/60 bg-slate-950/40 px-3 py-2.5">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="w-5 h-5 rounded-lg flex items-center justify-center text-[8px] font-black shrink-0" style={{ backgroundColor: d.color + "1c", color: muted }}>{d.label.charAt(0)}</span>
-              <span className="text-xs font-bold text-white uppercase">{d.label}</span>
-              <span className="text-[10px] text-slate-600 ml-auto shrink-0">{d.exercises.length} ejerc. · {totalSets} series</span>
+          <div key={dk} className="rounded-xl border border-slate-800/60 bg-slate-950/40 overflow-hidden">
+            {/* Cabecera del día: franja de color + nombre + números */}
+            <div className="flex items-center gap-2.5 px-3 py-2 border-b border-slate-800/50" style={{ backgroundColor: d.color + "0c" }}>
+              <span className="w-1 h-6 rounded-full shrink-0" style={{ backgroundColor: d.color }} />
+              <span className="text-[11px] font-black text-white uppercase tracking-wide flex-1 min-w-0 truncate">{d.label}</span>
+              <span className="text-[9px] text-slate-500 shrink-0 tabular-nums">{d.exercises.length} ejerc. · {totalSets} series</span>
             </div>
-            <p className="text-[10px] text-slate-500 leading-relaxed">{d.exercises.map((ex) => ex.name).join(" · ")}</p>
+
+            {/* Ejercicios: uno por línea, con sus series a la derecha */}
+            {d.exercises.length > 0 ? (
+              <div className="px-3 py-2 space-y-1">
+                {d.exercises.map((ex, i) => (
+                  <div key={`${dk}:${ex.id}:${i}`} className="flex items-baseline gap-2 text-[10.5px]">
+                    <span className="text-slate-700 tabular-nums w-3 shrink-0 text-right">{i + 1}</span>
+                    <span className="flex-1 min-w-0 truncate text-slate-400">{ex.name}</span>
+                    <span className="text-slate-600 tabular-nums shrink-0">
+                      {ex.sets.length}{ex.sets[0]?.repRange ? `×${ex.sets[0].repRange}` : ""}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="px-3 py-2 text-[10px] text-slate-600 italic">Sin ejercicios.</p>
+            )}
           </div>
         );
       })}
@@ -7782,47 +7832,17 @@ function RoutinePreview({ routineDef }) {
   );
 }
 
-// Modal que aparece cuando se abre la app con un link de rutina compartida
-// (#shared-routine=...). No la activa sola: sólo la agrega a "Tus rutinas
-// creadas" para no interrumpir lo que ya estabas entrenando.
-function SharedRoutineImportModal({ routine, onImport, onDiscard }) {
-  return (
-    <div className="fixed inset-0 z-[130] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in" onClick={onDiscard}>
-      <div className="bg-slate-900 border border-slate-700/60 rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50 max-h-[88vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center gap-3 mb-3">
-          <div className="w-10 h-10 rounded-2xl bg-teal-500/15 text-teal-400 flex items-center justify-center shrink-0"><Share2 size={18} /></div>
-          <div className="min-w-0">
-            <p className="text-[10px] font-black uppercase tracking-widest text-teal-400">Rutina compartida</p>
-            <h3 className="text-base font-black text-white leading-tight truncate">{routine.name}</h3>
-          </div>
-        </div>
-        <p className="text-sm text-slate-400 mb-3">Te compartieron esta rutina por enlace. ¿Querés agregarla a tus rutinas?</p>
-        <RoutinePreview routineDef={routine} />
-        <div className="flex gap-2 mt-4">
-          <button onClick={onDiscard} className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-400 text-sm font-semibold">Descartar</button>
-          <button onClick={onImport} className="flex-1 py-3 rounded-xl bg-teal-500 !text-white text-sm font-bold active:scale-[0.98] transition-all">Agregar a mis rutinas</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Contexto de cada rutina preestablecida: para quién es y qué frecuencia pide.
-// Es la información que te falta para elegir sin tener que abrir cada una.
+// Frecuencia sugerida de cada rutina preestablecida: cuántos días por semana
+// pide. Es el dato práctico que te falta para elegir; el "nivel" era una
+// etiqueta que encasillaba sin aportar.
 const PRESET_CONTEXTO = {
-  classic_default: { nivel: "Intermedio", frecuencia: "4 días/semana" },
-  ppl:             { nivel: "Principiante", frecuencia: "3-6 días/semana" },
-  upper_lower:     { nivel: "Principiante", frecuencia: "4 días/semana" },
-  arnold:          { nivel: "Avanzado", frecuencia: "3-6 días/semana" },
-  bro_split:       { nivel: "Intermedio", frecuencia: "5 días/semana" },
-  fullbody:        { nivel: "Principiante", frecuencia: "3 días/semana" },
+  classic_default: { frecuencia: "4 días/semana" },
+  ppl:             { frecuencia: "3-6 días/semana" },
+  upper_lower:     { frecuencia: "4 días/semana" },
+  arnold:          { frecuencia: "3-6 días/semana" },
+  bro_split:       { frecuencia: "5 días/semana" },
+  fullbody:        { frecuencia: "3 días/semana" },
 };
-const NIVEL_COLOR = {
-  Principiante: "#34D399",
-  Intermedio: "#FBBF24",
-  Avanzado: "#F87171",
-};
-
 function PresetRoutineCard({ preset, isActive, onUse, onEdit, onPreview }) {
   const [open, setOpen] = useState(false);
   const dayCount = preset.dayOrder.length;
@@ -7857,16 +7877,9 @@ function PresetRoutineCard({ preset, isActive, onUse, onEdit, onPreview }) {
             {isActive && <span className="text-[9px] font-black px-1.5 py-0.5 rounded-lg bg-purple-500/20 text-purple-400 shrink-0 badge-pop">ACTIVA</span>}
           </div>
           <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-2">{preset.description}</p>
-          {/* Contexto: nivel y frecuencia. Es lo que te falta para elegir sin
-              tener que abrir cada rutina y leerla entera. */}
-          <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-            {ctx?.nivel && (
-              <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md" style={{ backgroundColor: (NIVEL_COLOR[ctx.nivel] || "#64748b") + "1e", color: NIVEL_COLOR[ctx.nivel] || "#94a3b8" }}>
-                {ctx.nivel}
-              </span>
-            )}
-            <span className="text-[9px] text-slate-600">{ctx?.frecuencia || `${dayCount} día${dayCount === 1 ? "" : "s"}/semana`}</span>
-          </div>
+          {/* Solo la frecuencia: el nivel ("principiante/avanzado") era una
+              etiqueta que no aportaba y encasillaba de más. */}
+          <p className="text-[10px] text-slate-600 mt-2">{ctx?.frecuencia || `${dayCount} día${dayCount === 1 ? "" : "s"}/semana`}</p>
         </div>
         <ChevronDown size={16} className={`text-slate-600 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
@@ -10056,73 +10069,107 @@ function BalanceMuscular({ routineDef, compacto = true }) {
 // nombre y "4 días" no te dicen si te sirve. Acá ves los días, sus ejercicios
 // y el balance muscular, y recién ahí decidís. Los días arrancan colapsados
 // (solo el primero abierto) para que no te caiga un muro de texto encima.
+// Vista previa completa de una rutina, en pop-up (mismo lenguaje visual que el
+// detalle de una sesión del historial). Ves los días, sus ejercicios y el
+// balance ANTES de activarla, en vez de hacerlo a ciegas.
 function RoutinePreviewModal({ routineDef, routineName, onActivate, onClose, yaActiva = false }) {
   const dias = routineDef?.dayOrder || Object.keys(routineDef?.days || {});
   const [abierto, setAbierto] = useState(dias[0] || null);
   if (!routineDef) return null;
 
   const totalEjercicios = dias.reduce((a, dk) => a + (routineDef.days[dk]?.exercises?.length || 0), 0);
+  const totalSeries = dias.reduce(
+    (a, dk) => a + (routineDef.days[dk]?.exercises || []).reduce((b, e) => b + (e.sets?.length || 0), 0),
+    0
+  );
 
   return (
-    <div className="fixed inset-0 z-[130] bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 modal-bg-in" onClick={onClose}>
+    <div className="fixed inset-0 z-[130] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in" onClick={onClose}>
       <div
-        className="w-full sm:max-w-md max-h-[88vh] overflow-y-auto bg-slate-900 border border-slate-700/60 rounded-t-3xl sm:rounded-3xl modal-pop-in shadow-2xl shadow-black/70"
+        className="w-full max-w-md max-h-[86vh] flex flex-col bg-slate-900 border border-slate-700/60 rounded-3xl overflow-hidden modal-pop-in shadow-2xl shadow-black/70"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Encabezado fijo */}
-        <div className="sticky top-0 z-10 bg-slate-900 px-5 pt-5 pb-3 border-b border-slate-800/60">
-          <div className="flex items-start justify-between gap-3">
+        {/* Encabezado con un halo violeta suave, como el héroe */}
+        <div className="relative px-5 pt-5 pb-4 border-b border-slate-800/60 shrink-0 overflow-hidden">
+          <div className="absolute -top-14 -right-10 w-36 h-36 rounded-full bg-purple-500/15 blur-3xl pointer-events-none" />
+          <div className="relative flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-base font-black text-white leading-tight">{routineName}</p>
-              <p className="text-[11px] text-slate-500 mt-0.5">
-                {dias.length} día{dias.length !== 1 ? "s" : ""} · {totalEjercicios} ejercicio{totalEjercicios !== 1 ? "s" : ""}
-              </p>
+              <span className="text-[9px] font-black uppercase tracking-[0.16em] text-purple-400/80">Vista previa</span>
+              <p className="text-lg font-black text-white leading-tight mt-0.5 truncate">{routineName}</p>
             </div>
             <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition shrink-0">
               <X size={16} />
             </button>
           </div>
+          {/* Tres números clave, como las estadísticas de una sesión */}
+          <div className="relative grid grid-cols-3 gap-2 mt-3.5">
+            {[
+              { v: dias.length, l: dias.length === 1 ? "Día" : "Días" },
+              { v: totalEjercicios, l: "Ejercicios" },
+              { v: totalSeries, l: "Series" },
+            ].map((s) => (
+              <div key={s.l} className="bg-black/25 rounded-xl py-2 text-center border border-white/[0.05]">
+                <p className="text-base font-black text-white tabular-nums leading-none">{s.v}</p>
+                <p className="text-[9px] text-slate-500 mt-1">{s.l}</p>
+              </div>
+            ))}
+          </div>
         </div>
 
-        <div className="px-5 py-4 space-y-4">
-          {/* Balance: lo primero que querés saber es si está equilibrada */}
+        {/* Cuerpo con scroll */}
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
           <div className="rounded-2xl bg-slate-950/50 border border-slate-800/60 p-3.5">
             <BalanceMuscular routineDef={routineDef} />
           </div>
 
-          {/* Los días, colapsables */}
           <div className="space-y-2">
             {dias.map((dk) => {
               const day = routineDef.days[dk];
               if (!day) return null;
-              const abiertoEste = abierto === dk;
+              const esteAbierto = abierto === dk;
+              const seriesDia = (day.exercises || []).reduce((a, e) => a + (e.sets?.length || 0), 0);
               return (
-                <div key={dk} className="rounded-2xl border overflow-hidden transition-colors" style={{ borderColor: abiertoEste ? day.color + "50" : "rgba(30,41,59,0.6)", backgroundColor: abiertoEste ? day.color + "0a" : "transparent" }}>
-                  <button
-                    onClick={() => setAbierto(abiertoEste ? null : dk)}
-                    className="w-full flex items-center gap-2.5 px-3.5 py-3 text-left"
-                  >
-                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: day.color }} />
+                <div
+                  key={dk}
+                  className="rounded-2xl border overflow-hidden transition-all"
+                  style={{
+                    borderColor: esteAbierto ? day.color + "45" : "rgba(30,41,59,0.6)",
+                    backgroundColor: esteAbierto ? day.color + "0b" : "rgba(15,23,42,0.4)",
+                  }}
+                >
+                  <button onClick={() => setAbierto(esteAbierto ? null : dk)} className="w-full flex items-center gap-3 px-3.5 py-3 text-left">
+                    {/* Barra de color vertical: identifica el día sin inundar */}
+                    <span className="w-1 h-8 rounded-full shrink-0" style={{ backgroundColor: day.color }} />
                     <span className="flex-1 min-w-0">
                       <span className="block text-xs font-black text-white truncate">{day.label}</span>
-                      <span className="block text-[10px] text-slate-500 truncate">{day.exercises?.length || 0} ejercicios</span>
+                      <span className="block text-[10px] text-slate-500 tabular-nums">
+                        {day.exercises?.length || 0} ejercicios · {seriesDia} series
+                      </span>
                     </span>
-                    <ChevronDown size={14} className="text-slate-600 shrink-0 transition-transform" style={{ transform: abiertoEste ? "rotate(180deg)" : "none" }} />
+                    <ChevronDown size={14} className="text-slate-600 shrink-0 transition-transform duration-200" style={{ transform: esteAbierto ? "rotate(180deg)" : "none" }} />
                   </button>
-                  {abiertoEste && (
-                    <div className="px-3.5 pb-3 space-y-1 bounce-in">
+
+                  {esteAbierto && (
+                    <div className="px-3.5 pb-3 pt-0.5 space-y-1.5 bounce-in">
                       {(day.exercises || []).map((ex, i) => {
                         const lib = EXERCISE_LIBRARY_BY_ID[ex.libId || ex.id];
+                        const sets = ex.sets?.length || 0;
+                        const rango = ex.sets?.[0]?.repRange || null;
                         return (
-                          <div key={`${dk}:${ex.id || ex.libId}:${i}`} className="flex items-center gap-2 text-[11px]">
-                            <span className="text-slate-600 tabular-nums w-3.5 shrink-0">{i + 1}</span>
-                            <span className="flex-1 min-w-0 truncate text-slate-300">{lib?.name || ex.name || ex.libId}</span>
-                            <span className="text-slate-600 tabular-nums shrink-0">
-                              {ex.sets?.length || 0}×{ex.sets?.[0]?.repRange || "—"}
+                          <div key={`${dk}:${ex.id || ex.libId}:${i}`} className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 bg-black/20">
+                            <span className="w-4 h-4 rounded-md flex items-center justify-center text-[8px] font-black shrink-0 tabular-nums" style={{ backgroundColor: day.color + "25", color: day.color }}>
+                              {i + 1}
+                            </span>
+                            <span className="flex-1 min-w-0 truncate text-[11px] text-slate-300">{lib?.name || ex.name || ex.libId}</span>
+                            <span className="text-[10px] text-slate-500 tabular-nums shrink-0">
+                              {sets}{rango ? `×${rango}` : ""}
                             </span>
                           </div>
                         );
                       })}
+                      {(day.exercises || []).length === 0 && (
+                        <p className="text-[10px] text-slate-600 italic py-1">Sin ejercicios en este día.</p>
+                      )}
                     </div>
                   )}
                 </div>
@@ -10132,18 +10179,18 @@ function RoutinePreviewModal({ routineDef, routineName, onActivate, onClose, yaA
         </div>
 
         {/* Botón fijo abajo */}
-        <div className="sticky bottom-0 bg-slate-900 border-t border-slate-800/60 px-5 py-3.5">
+        <div className="border-t border-slate-800/60 px-5 py-3.5 shrink-0 bg-slate-900">
           {yaActiva ? (
-            <div className="w-full py-3 rounded-2xl text-sm font-black text-center bg-slate-800 text-slate-500">
-              Ya es tu rutina activa
+            <div className="w-full py-3 rounded-2xl text-sm font-black text-center bg-slate-800/70 text-slate-500 flex items-center justify-center gap-1.5">
+              <Check size={14} /> Ya es tu rutina activa
             </div>
           ) : (
             <button
               onClick={() => { onActivate?.(); onClose(); }}
-              className="w-full py-3 rounded-2xl text-sm font-black !text-white transition active:scale-[0.98] shadow-lg shadow-purple-500/25"
+              className="w-full py-3 rounded-2xl text-sm font-black !text-white transition active:scale-[0.98] shadow-lg shadow-purple-500/25 flex items-center justify-center gap-1.5"
               style={{ background: "linear-gradient(135deg,#A855F7,#7C3AED)" }}
             >
-              Usar esta rutina
+              <Sparkles size={14} /> Usar esta rutina
             </button>
           )}
         </div>
@@ -10431,16 +10478,18 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
             <button onClick={() => setShareTarget(activeDef)} aria-label="Compartir rutina activa" className="p-2 rounded-xl text-purple-200 hover:text-white hover:bg-white/10 transition shrink-0"><Share2 size={15} /></button>
           </div>
 
-          {/* Los días, en chips con su color: el vistazo más útil de la pantalla */}
+          {/* Los días. Fondo neutro para todos y el color solo en el punto: así
+              se distinguen entre sí sin que la tarjeta se vuelva multicolor.
+              El número es la cantidad de ejercicios de ese día. */}
           <div className="relative flex gap-1.5 flex-wrap mt-3.5">
             {(activeDef.dayOrder || Object.keys(activeDef.days || {})).map((dk) => {
               const d = activeDef.days?.[dk];
               if (!d) return null;
               return (
-                <span key={dk} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[10px] font-bold" style={{ backgroundColor: d.color + "1e", color: d.color, border: `1px solid ${d.color}38` }}>
-                  <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: d.color }} />
+                <span key={dk} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[10px] font-bold bg-black/25 text-slate-300 border border-white/[0.07]">
+                  <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: d.color }} />
                   {d.label}
-                  <span className="opacity-50 tabular-nums">{d.exercises?.length || 0}</span>
+                  <span className="text-slate-500 tabular-nums">{d.exercises?.length || 0}</span>
                 </span>
               );
             })}
