@@ -1061,9 +1061,24 @@ const ANIMATION_CSS = `
    Todas cortas (≤600ms) y con propósito: comunican un cambio de estado, no
    decoran. Se disfrutan la primera vez y no molestan la número 300. */
 
-/* Cascada del muñeco: cada músculo se enciende con un retraso escalonado */
-@keyframes muscleFadeIn { from { opacity: 0; transform: scale(0.94); } to { opacity: 1; transform: scale(1); } }
-.muscle-cascade { animation: muscleFadeIn 0.4s cubic-bezier(0.34, 1.3, 0.64, 1) both; }
+/* Muñeco: BARRIDO DE ENERGÍA. Una onda de luz recorre el cuerpo de arriba
+   hacia abajo y va "cargando" cada músculo a su paso: brilla un instante y
+   se asienta en su color de rango. Como un escáner que activa el cuerpo. */
+@keyframes muscleCharge {
+  0%   { opacity: 0.15; filter: brightness(0.6) saturate(0.4); }
+  45%  { opacity: 1;    filter: brightness(2.1) saturate(1.5); }
+  100% { opacity: 1;    filter: brightness(1)   saturate(1); }
+}
+.muscle-charge { animation: muscleCharge 0.55s cubic-bezier(0.33, 1, 0.68, 1) both; }
+
+/* La línea de escaneo que baja por el cuerpo */
+@keyframes scanSweep {
+  0%   { transform: translateY(-8%); opacity: 0; }
+  12%  { opacity: 1; }
+  88%  { opacity: 1; }
+  100% { transform: translateY(108%); opacity: 0; }
+}
+.scan-sweep { animation: scanSweep 1.05s cubic-bezier(0.4, 0, 0.5, 1) both; }
 
 /* Subida de rango: el músculo late con su color */
 @keyframes rankUpPulse { 0%, 100% { filter: brightness(1); transform: scale(1); } 40% { filter: brightness(1.6); transform: scale(1.06); } }
@@ -1077,9 +1092,12 @@ const ANIMATION_CSS = `
 @keyframes numberPop { 0% { transform: scale(0.8); opacity: 0; } 55% { transform: scale(1.08); } 100% { transform: scale(1); opacity: 1; } }
 .number-pop { animation: numberPop 0.45s cubic-bezier(0.34, 1.4, 0.64, 1) both; }
 
-/* Barra que se llena deslizándose */
-@keyframes barFill { from { width: 0%; } }
-.bar-fill { animation: barFill 0.9s cubic-bezier(0.22, 1, 0.36, 1) both; }
+/* Barra que se llena deslizándose. Anima transform (GPU) en vez de width
+   (que fuerza recalcular el layout en CADA frame y hace tirones en
+   teléfonos de gama media). El origen a la izquierda hace que crezca desde
+   ahí, igual que antes. */
+@keyframes barFill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.bar-fill { transform-origin: left center; animation: barFill 0.9s cubic-bezier(0.22, 1, 0.36, 1) both; }
 
 /* Pulso lento e invitante (botón de iniciar sesión) */
 @keyframes invitePulse { 0%, 100% { box-shadow: 0 0 0 0 var(--invite-glow, rgba(20,184,166,0.5)); } 50% { box-shadow: 0 0 0 7px rgba(20,184,166,0); } }
@@ -1112,7 +1130,7 @@ const ANIMATION_CSS = `
 
 /* Respeta a quien pidió menos movimiento en su sistema */
 @media (prefers-reduced-motion: reduce) {
-  .muscle-cascade, .rank-up-pulse, .draw-check path, .number-pop, .bar-fill,
+  .muscle-charge, .scan-sweep, .rank-up-pulse, .draw-check path, .number-pop, .bar-fill,
   .invite-pulse, .slide-right, .slide-left, .streak-beat, .streak-glow,
   .elastic-in, .skeleton { animation: none !important; }
 }
@@ -1153,8 +1171,8 @@ const ANIMATION_CSS = `
 .soft-pulse { animation: softPulse 2.4s ease-in-out infinite; }
 
 /* Barra de progreso animada al montarse */
-@keyframes growBar { from { width: 0; } }
-.grow-bar { animation: growBar 0.7s cubic-bezier(.2,.8,.3,1); }
+@keyframes growBar { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.grow-bar { transform-origin: left center; animation: growBar 0.7s cubic-bezier(.2,.8,.3,1); }
 
 /* Feedback táctil universal en botones — más responsivo al tacto */
 button { transition: transform 0.12s ease, opacity 0.15s ease; }
@@ -2615,6 +2633,24 @@ const ACTIVE_REST_TIMERS = {};
 // Número que "cuenta" hasta su valor final en vez de aparecer de golpe.
 // Se usa para los récords: ver el peso subir de 80 a 82.5 refuerza la
 // sensación de progreso mucho más que verlo ya escrito.
+// Línea de luz que barre el muñeco de arriba a abajo al abrir la pantalla,
+// acompañando la "carga" de cada músculo. Puramente decorativa: no
+// intercepta clics ni ocupa espacio en el layout.
+function ScanLine() {
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none rounded-xl">
+      <div
+        className="absolute left-0 right-0 scan-sweep"
+        style={{
+          height: "16%",
+          background: "linear-gradient(to bottom, transparent, rgba(45,212,191,0.18) 35%, rgba(94,234,212,0.55) 50%, rgba(45,212,191,0.18) 65%, transparent)",
+          filter: "blur(1px)",
+        }}
+      />
+    </div>
+  );
+}
+
 function CountUpNumber({ value, from = null, duration = 700, decimals = 1, className = "", style = {} }) {
   const [shown, setShown] = useState(from ?? value);
   const rafRef = useRef(null);
@@ -2820,7 +2856,9 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default", 
     // eslint-disable-next-line
   }, [running]);
 
-  const pct = Math.max(0, Math.min(100, (remaining / seconds) * 100));
+  // Guarda contra división por cero: si un ejercicio quedara configurado con
+  // 0 segundos de descanso, (remaining/0)*100 da NaN y la barra desaparece.
+  const pct = seconds > 0 ? Math.max(0, Math.min(100, (remaining / seconds) * 100)) : 0;
   // Cronómetro estilo "barra de energía": el tiempo grande a la izquierda y
   // una barra que se vacía ocupando todo el ancho. En los últimos 10 segundos
   // se tiñe de ámbar y late; al terminar se pone verde. Sin adornos ni
@@ -4529,7 +4567,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
           </div>
         )}
         <p className="text-[9px] font-black uppercase tracking-widest text-slate-600 mb-2 mt-1">{exercise.cardio ? "Registrá tu sesión" : "Tus series"}</p>
-        {setsToShow.map((s, i) => <SetRow key={i} exerciseId={exercise.id} exerciseName={exercise.name} exerciseMuscle={exercise.muscle} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadKgFactor={settings.deloadPct} deloadMode={deloadMode} resetKey={resetKey} autoShowPrShare={settings.autoShowPrShare ?? true} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={hasActiveSession} cardio={exercise.cardio} dumbbellDouble={settings?.dumbbellDouble || null} fieldSettings={settings} />)}
+        {setsToShow.map((s, i) => <SetRow key={`${exercise.id}:${i}`} exerciseId={exercise.id} exerciseName={exercise.name} exerciseMuscle={exercise.muscle} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadKgFactor={settings.deloadPct} deloadMode={deloadMode} resetKey={resetKey} autoShowPrShare={settings.autoShowPrShare ?? true} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={hasActiveSession} cardio={exercise.cardio} dumbbellDouble={settings?.dumbbellDouble || null} fieldSettings={settings} />)}
         {exercise.video && (
           <div className="pt-3">
             <a href={exercise.video} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 py-3 rounded-xl border border-slate-800 text-slate-400 hover:border-slate-600 hover:text-white transition text-sm font-medium active:scale-[0.98]">
@@ -4552,11 +4590,16 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
 ============================================================================ */
 function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS, onGoToDeload }) {
   const weekInfo = getWeekInfo(cycleStart, settings);
+  // BUG ARREGLADO: este useMemo estaba DESPUÉS del `return null` de abajo.
+  // Los hooks tienen que llamarse siempre, en el mismo orden, en todos los
+  // renders — si el componente salía temprano, React perdía la cuenta y podía
+  // corromper el estado de otros componentes. Ahora el hook va primero y el
+  // early return después.
+  const trainedDays = useMemo(() => getTrainedDateSet(logs, sessions), [logs, sessions]);
   if (!cycleStart || !weekInfo) return null;
   const { cycleWeeks, trainWeeks } = weekInfo;
   const isLight = settings.theme === "light";
   const neutralDot = isLight ? "#94a3b8" : "#475569";
-  const trainedDays = useMemo(() => getTrainedDateSet(logs, sessions), [logs, sessions]);
   const weekDots = Array.from({ length: cycleWeeks }, (_, wi) => { const ws = new Date(cycleStart); ws.setDate(ws.getDate() + wi * 7); const days = Array.from({ length: 7 }, (_, di) => { const d = new Date(ws); d.setDate(d.getDate() + di); return localDateStr(d); }); return { week: wi + 1, days, trained: days.filter((d) => trainedDays.has(d)).length, isDeload: wi + 1 > trainWeeks }; });
   const phase = weekInfo.isDeload ? "#A855F7" : "#3B82F6";
   const heroGrad = weekInfo.isDeload ? "var(--grad-hero-purple)" : "var(--grad-hero-blue)";
@@ -4682,13 +4725,21 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
   const [activeDay, setActiveDay] = useState(() => scheduledDay || (isRestToday ? DAY_ORDER[0] : fallbackSuggested));
   // Dirección del último cambio de día, para que las tarjetas entren
   // deslizándose desde el lado correcto (como pasar páginas).
-  const [slideDir, setSlideDir] = useState(null);
+  const gridRef = useRef(null);
   const prevDayRef = useRef(activeDay);
   useEffect(() => {
     const prev = DAY_ORDER.indexOf(prevDayRef.current);
     const now = DAY_ORDER.indexOf(activeDay);
-    if (prev !== -1 && now !== -1 && prev !== now) setSlideDir(now > prev ? "right" : "left");
     prevDayRef.current = activeDay;
+    if (prev === -1 || now === -1 || prev === now) return;
+    const el = gridRef.current;
+    if (!el) return;
+    const cls = now > prev ? "slide-right" : "slide-left";
+    el.classList.remove("slide-right", "slide-left");
+    // Forzar reflow para que el navegador reinicie la animación aunque sea
+    // la misma clase que la vez anterior.
+    void el.offsetWidth;
+    el.classList.add(cls);
   }, [activeDay]);
   // La sesión activa solo "cuenta" en el día donde se inició. Al cambiar de
   // día se ve sin sesión (podés iniciar otra o solo registrar), pero la
@@ -4787,11 +4838,16 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           sesión real sigue viva en su día, no se resetea. */}
       <SessionStartBar activeSession={sessionForThisDay} onStart={() => onStartSession(activeDay)} onCancel={onCancelSession} color={day.color} />
 
-      <div key={activeDay} className={`grid grid-cols-1 lg:grid-cols-2 gap-3 ${slideDir === "right" ? "slide-right" : slideDir === "left" ? "slide-left" : ""}`}>
+      {/* La animación de deslizamiento se dispara reiniciando la clase por
+          JS (ver el efecto de slideDir) en vez de con key={activeDay}: usar
+          key acá remontaba TODAS las tarjetas y se perdía su estado local
+          (si estaba abierta, la nota a medio escribir, el calentamiento
+          desplegado). Así se anima igual pero sin destruir nada. */}
+      <div ref={gridRef} className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         {groupExercisesIntoSupersets(day.exercises).map((group) => {
           if (group.length === 1) {
             const ex = group[0];
-            return <ExerciseCard key={ex.id} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadSets={isDeload ? getDeloadSets(ex) : null} deloadMode={isDeload} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} />;
+            return <ExerciseCard key={`${activeDay}:${ex.id}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadSets={isDeload ? getDeloadSets(ex) : null} deloadMode={isDeload} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} />;
           }
           // Superserie: varios ejercicios encadenados comparten un solo
           // cronómetro al final del grupo, en vez de uno por ejercicio —
@@ -4799,9 +4855,9 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           // ellos, sólo al terminar la vuelta completa.
           const hasHeavyGroup = group.some((ex) => ex.sets.some((s) => isHeavyRepRange(s.repRange)));
           return (
-            <div key={group.map((e) => e.id).join("-")} className="rounded-2xl border p-2.5 space-y-2.5" style={{ borderColor: day.color + "50", backgroundColor: day.color + "06" }}>
+            <div key={`${activeDay}:${group.map((e) => e.id).join("-")}`} className="rounded-2xl border p-2.5 space-y-2.5" style={{ borderColor: day.color + "50", backgroundColor: day.color + "06" }}>
               <div className="flex items-center gap-1.5 px-1"><Link size={11} style={{ color: day.color }} /><span className="text-[10px] font-black uppercase tracking-wider" style={{ color: day.color }}>Superserie · {group.length} ejercicios</span></div>
-              {group.map((ex) => <ExerciseCard key={ex.id} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadSets={isDeload ? getDeloadSets(ex) : null} deloadMode={isDeload} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} hideTimer />)}
+              {group.map((ex) => <ExerciseCard key={`${activeDay}:${ex.id}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadSets={isDeload ? getDeloadSets(ex) : null} deloadMode={isDeload} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} hideTimer />)}
               <div className="px-1"><RestTimer seconds={hasHeavyGroup ? settings.restLong : settings.restShort} accent={day.color} alertType={settings.alertType} timerId={`grp_${group.map((g) => g.id).join("_")}`} exerciseName={group.map((g) => g.name).filter(Boolean).join(" + ")} /></div>
               <p className="text-[10px] text-slate-600 px-1">Descansá recién después de completar los {group.length} ejercicios — ese es el cronómetro de arriba.</p>
             </div>
@@ -5914,31 +5970,49 @@ function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backR
     onMuscleClick(best);
   };
 
-  // CASCADA DE ENTRADA: al abrir la pantalla, los músculos se encienden uno
-  // por uno de arriba hacia abajo en vez de aparecer todos de golpe. Da
-  // sensación de que el cuerpo "cobra vida" y dirige la mirada. Corre una
-  // sola vez por montaje (no cada vez que cambiás de músculo seleccionado).
-  const cascadeDoneRef = useRef(false);
+  // BARRIDO DE ENERGÍA: al abrir la pantalla, una onda de luz recorre el
+  // cuerpo de arriba hacia abajo. Cada músculo se "carga" cuando la onda lo
+  // toca: brilla fuerte un instante y se asienta en el color de su rango.
+  // El retraso de cada uno se calcula con su posición Y real, así el efecto
+  // sigue la onda de verdad en vez de ser un escalonado arbitrario.
+  const chargeDoneRef = useRef(false);
+  const [showScan, setShowScan] = useState(true); // la línea de luz que baja
   useEffect(() => {
-    if (cascadeDoneRef.current) return;
-    cascadeDoneRef.current = true;
+    const t = setTimeout(() => setShowScan(false), 1300); // se va al terminar
+    return () => clearTimeout(t);
+  }, []);
+  useEffect(() => {
+    if (chargeDoneRef.current) return;
+    chargeDoneRef.current = true;
+    const limpiezas = [];
     const t = setTimeout(() => {
       [frontRef, backRef].forEach((ref) => {
         const svg = ref.current?.querySelector("svg");
         if (!svg) return;
         const polys = Array.from(svg.querySelectorAll("polygon"));
-        // Ordenar de arriba hacia abajo por la coordenada Y del polígono
+        if (!polys.length) return;
+        // Posición vertical de cada músculo (su punto más alto)
         const conY = polys.map((p) => {
-          const pts = (p.getAttribute("points") || "").split(/[\s,]+/).map(Number);
-          const ys = pts.filter((_, i) => i % 2 === 1);
+          const nums = (p.getAttribute("points") || "").split(/[\s,]+/).map(Number).filter((n) => !isNaN(n));
+          const ys = nums.filter((_, i) => i % 2 === 1);
           return { p, y: ys.length ? Math.min(...ys) : 0 };
-        }).sort((a, b) => a.y - b.y);
-        conY.forEach(({ p }, i) => {
-          p.style.animation = `muscleFadeIn 0.4s cubic-bezier(0.34,1.3,0.64,1) ${i * 22}ms both`;
         });
+        const minY = Math.min(...conY.map((c) => c.y));
+        const maxY = Math.max(...conY.map((c) => c.y));
+        const span = Math.max(1, maxY - minY);
+        conY.forEach(({ p, y }) => {
+          // El retraso es proporcional a qué tan abajo está: la onda tarda
+          // ~700ms en recorrer el cuerpo entero.
+          const delay = Math.round(((y - minY) / span) * 700);
+          p.style.animation = `muscleCharge 0.55s cubic-bezier(0.33,1,0.68,1) ${delay}ms both`;
+        });
+        // Al terminar, limpiamos el estilo inline para no interferir con el
+        // resaltado del músculo seleccionado ni con futuros repintados.
+        const tc = setTimeout(() => { polys.forEach((p) => { p.style.animation = ""; }); }, 1400);
+        limpiezas.push(tc);
       });
-    }, 60);
-    return () => clearTimeout(t);
+    }, 80);
+    return () => { clearTimeout(t); limpiezas.forEach(clearTimeout); };
   }, []);
 
   // Resaltado con borde blanco: con los mismos índices exactos de arriba,
@@ -5998,11 +6072,17 @@ function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backR
   return (
     <div className="flex gap-2 justify-center items-start">
       <div className="flex-1 min-w-0 max-w-[180px]">
-        <div ref={frontRef} onClick={handlePolygonClick("front")}><Model data={data} type="anterior" bodyColor="#334155" highlightedColors={highlightedColors} onClick={MODEL_NOOP_CLICK} style={MODEL_STYLE} svgStyle={MODEL_STYLE} /></div>
+        <div ref={frontRef} onClick={handlePolygonClick("front")} className="relative">
+          <Model data={data} type="anterior" bodyColor="#334155" highlightedColors={highlightedColors} onClick={MODEL_NOOP_CLICK} style={MODEL_STYLE} svgStyle={MODEL_STYLE} />
+          {showScan && <ScanLine />}
+        </div>
         <p className="text-center text-[10px] text-slate-600 mt-1">De frente</p>
       </div>
       <div className="flex-1 min-w-0 max-w-[180px]">
-        <div ref={backRef} onClick={handlePolygonClick("back")}><Model data={data} type="posterior" bodyColor="#334155" highlightedColors={highlightedColors} onClick={MODEL_NOOP_CLICK} style={MODEL_STYLE} svgStyle={MODEL_STYLE} /></div>
+        <div ref={backRef} onClick={handlePolygonClick("back")} className="relative">
+          <Model data={data} type="posterior" bodyColor="#334155" highlightedColors={highlightedColors} onClick={MODEL_NOOP_CLICK} style={MODEL_STYLE} svgStyle={MODEL_STYLE} />
+          {showScan && <ScanLine />}
+        </div>
         <p className="text-center text-[10px] text-slate-600 mt-1">De espalda</p>
       </div>
     </div>
@@ -7117,10 +7197,13 @@ function CollapsibleSection({ title, subtitle, icon, defaultOpen = false, childr
   // Cuando forceOpenSignal cambia (lo incrementa un botón de otra pantalla),
   // esta sección se abre sola y hace scroll hasta quedar visible.
   useEffect(() => {
-    if (forceOpenSignal > 0) {
-      setOpen(true);
-      setTimeout(() => { try { selfRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); } catch { } }, 120);
-    }
+    if (forceOpenSignal <= 0) return;
+    setOpen(true);
+    // El timer se limpia al desmontar: sin esto, si cambiás de pantalla justo
+    // después de abrir la sección, el scroll dispara sobre un nodo que ya no
+    // existe (React tira warnings y el scroll salta a un lugar raro).
+    const t = setTimeout(() => { try { selfRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); } catch { } }, 120);
+    return () => clearTimeout(t);
   }, [forceOpenSignal]);
   return (
     <div ref={selfRef} id={sectionId || undefined} className="bg-slate-900/50 border border-slate-800/50 rounded-2xl overflow-hidden backdrop-blur-sm shadow-md shadow-black/20">
@@ -9508,10 +9591,10 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
   // Al llegar desde el aviso "hoy es descanso" (que incrementa la señal),
   // abrimos el editor de días y scrolleamos hasta él.
   useEffect(() => {
-    if (openScheduleSignal > 0) {
-      setShowSchedule(true);
-      setTimeout(() => { try { scheduleRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); } catch { } }, 150);
-    }
+    if (openScheduleSignal <= 0) return;
+    setShowSchedule(true);
+    const t = setTimeout(() => { try { scheduleRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); } catch { } }, 150);
+    return () => clearTimeout(t);
   }, [openScheduleSignal]);
 
   // Al llegar desde "agregar ejercicios de [músculo] a mi rutina" (en el
