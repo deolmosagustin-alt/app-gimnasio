@@ -1077,14 +1077,6 @@ const ANIMATION_CSS = `
 }
 .muscle-charge { animation: muscleCharge 0.55s cubic-bezier(0.33, 1, 0.68, 1) both; }
 
-/* La línea de escaneo que baja por el cuerpo */
-@keyframes scanSweep {
-  0%   { transform: translateY(-8%); opacity: 0; }
-  12%  { opacity: 1; }
-  88%  { opacity: 1; }
-  100% { transform: translateY(108%); opacity: 0; }
-}
-.scan-sweep { animation: scanSweep 1.05s cubic-bezier(0.4, 0, 0.5, 1) both; }
 
 /* Subida de rango: el músculo late con su color */
 @keyframes rankUpPulse { 0%, 100% { filter: brightness(1); transform: scale(1); } 40% { filter: brightness(1.6); transform: scale(1.06); } }
@@ -1136,7 +1128,7 @@ const ANIMATION_CSS = `
 
 /* Respeta a quien pidió menos movimiento en su sistema */
 @media (prefers-reduced-motion: reduce) {
-  .muscle-charge, .scan-sweep, .rank-up-pulse, .draw-check path, .number-pop, .bar-fill,
+  .muscle-charge, .rank-up-pulse, .draw-check path, .number-pop, .bar-fill,
   .invite-pulse, .slide-right, .slide-left, .streak-beat, .streak-glow,
   .elastic-in, .skeleton { animation: none !important; }
 }
@@ -2639,24 +2631,6 @@ const ACTIVE_REST_TIMERS = {};
 // Número que "cuenta" hasta su valor final en vez de aparecer de golpe.
 // Se usa para los récords: ver el peso subir de 80 a 82.5 refuerza la
 // sensación de progreso mucho más que verlo ya escrito.
-// Línea de luz que barre el muñeco de arriba a abajo al abrir la pantalla,
-// acompañando la "carga" de cada músculo. Puramente decorativa: no
-// intercepta clics ni ocupa espacio en el layout.
-function ScanLine() {
-  return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none rounded-xl">
-      <div
-        className="absolute left-0 right-0 scan-sweep"
-        style={{
-          height: "16%",
-          background: "linear-gradient(to bottom, transparent, rgba(45,212,191,0.18) 35%, rgba(94,234,212,0.55) 50%, rgba(45,212,191,0.18) 65%, transparent)",
-          filter: "blur(1px)",
-        }}
-      />
-    </div>
-  );
-}
-
 function CountUpNumber({ value, from = null, duration = 700, decimals = 1, className = "", style = {} }) {
   const [shown, setShown] = useState(from ?? value);
   const rafRef = useRef(null);
@@ -5934,7 +5908,7 @@ function muteHex(hex, amount = 0.65) {
   return `#${nr.toString(16).padStart(2, "0")}${ng.toString(16).padStart(2, "0")}${nb.toString(16).padStart(2, "0")}`;
 }
 
-function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backRef }) {
+function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backRef, rankMode = "general" }) {
   // highlightedColors: versión suavizada de los colores de RANK_TIERS —
   // mezclada 65/35 con el fondo oscuro para que el muñeco no acapare
   // toda la atención visual de la pantalla.
@@ -5984,20 +5958,14 @@ function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backR
     onMuscleClick(best);
   };
 
-  // BARRIDO DE ENERGÍA: al abrir la pantalla, una onda de luz recorre el
-  // cuerpo de arriba hacia abajo. Cada músculo se "carga" cuando la onda lo
-  // toca: brilla fuerte un instante y se asienta en el color de su rango.
-  // El retraso de cada uno se calcula con su posición Y real, así el efecto
-  // sigue la onda de verdad en vez de ser un escalonado arbitrario.
-  const chargeDoneRef = useRef(false);
-  const [showScan, setShowScan] = useState(true); // la línea de luz que baja
+  // CARGA DE MÚSCULOS: cada músculo se enciende con un retraso proporcional a
+  // su altura en el cuerpo — brilla fuerte un instante y se asienta en el
+  // color de su rango, como si el cuerpo se fuera "cargando" de arriba hacia
+  // abajo. Se dispara al abrir la pantalla Y cada vez que cambiás entre
+  // "General" y "Según tu contexto", porque ahí todos los colores se
+  // recalculan: la animación deja ver ese cambio en vez de que aparezca de
+  // golpe.
   useEffect(() => {
-    const t = setTimeout(() => setShowScan(false), 1300); // se va al terminar
-    return () => clearTimeout(t);
-  }, []);
-  useEffect(() => {
-    if (chargeDoneRef.current) return;
-    chargeDoneRef.current = true;
     const limpiezas = [];
     const t = setTimeout(() => {
       [frontRef, backRef].forEach((ref) => {
@@ -6015,9 +5983,13 @@ function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backR
         const maxY = Math.max(...conY.map((c) => c.y));
         const span = Math.max(1, maxY - minY);
         conY.forEach(({ p, y }) => {
-          // El retraso es proporcional a qué tan abajo está: la onda tarda
+          // El retraso es proporcional a qué tan abajo está: la carga tarda
           // ~700ms en recorrer el cuerpo entero.
           const delay = Math.round(((y - minY) / span) * 700);
+          // Reiniciamos la animación antes de asignarla: sin esto, al cambiar
+          // de modo el navegador ve la misma regla y no la vuelve a correr.
+          p.style.animation = "none";
+          void p.getBoundingClientRect();
           p.style.animation = `muscleCharge 0.55s cubic-bezier(0.33,1,0.68,1) ${delay}ms both`;
         });
         // Al terminar, limpiamos el estilo inline para no interferir con el
@@ -6027,7 +5999,7 @@ function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backR
       });
     }, 80);
     return () => { clearTimeout(t); limpiezas.forEach(clearTimeout); };
-  }, []);
+  }, [rankMode]);
 
   // Resaltado con borde blanco: con los mismos índices exactos de arriba,
   // se prende SIEMPRE el músculo completo (todas sus piezas) y nunca uno
@@ -6088,14 +6060,12 @@ function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backR
       <div className="flex-1 min-w-0 max-w-[180px]">
         <div ref={frontRef} onClick={handlePolygonClick("front")} className="relative">
           <Model data={data} type="anterior" bodyColor="#334155" highlightedColors={highlightedColors} onClick={MODEL_NOOP_CLICK} style={MODEL_STYLE} svgStyle={MODEL_STYLE} />
-          {showScan && <ScanLine />}
         </div>
         <p className="text-center text-[10px] text-slate-600 mt-1">De frente</p>
       </div>
       <div className="flex-1 min-w-0 max-w-[180px]">
         <div ref={backRef} onClick={handlePolygonClick("back")} className="relative">
           <Model data={data} type="posterior" bodyColor="#334155" highlightedColors={highlightedColors} onClick={MODEL_NOOP_CLICK} style={MODEL_STYLE} svgStyle={MODEL_STYLE} />
-          {showScan && <ScanLine />}
         </div>
         <p className="text-center text-[10px] text-slate-600 mt-1">De espalda</p>
       </div>
@@ -6218,7 +6188,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
         )}
       </div>
 
-      <MuscleHighlighterBody ranks={ranks} selected={selected} onMuscleClick={goToMuscle} frontRef={frontBodyRef} backRef={backBodyRef} />
+      <MuscleHighlighterBody ranks={ranks} selected={selected} onMuscleClick={goToMuscle} frontRef={frontBodyRef} backRef={backBodyRef} rankMode={mode} />
 
      {selInfo ? (
         <div key={selected} ref={detailRef} className="relative overflow-hidden rounded-3xl p-[1.5px] bounce-in" style={{ background: selInfo.hasData ? `linear-gradient(140deg, ${selInfo.color}55, transparent 45%, transparent 60%, ${selInfo.color}30)` : "#1e293b" }}>
