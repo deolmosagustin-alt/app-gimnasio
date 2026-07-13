@@ -1126,11 +1126,77 @@ const ANIMATION_CSS = `
   border-radius: 0.75rem;
 }
 
+/* ── RUTINAS ── */
+/* Ejercicio nuevo: entra desde abajo empujando y queda resaltado un instante */
+@keyframes rowEnter {
+  0%   { opacity: 0; transform: translateY(-10px) scale(0.97); }
+  60%  { opacity: 1; transform: translateY(2px) scale(1.01); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.row-enter { animation: rowEnter 0.42s cubic-bezier(0.34, 1.3, 0.64, 1) both; }
+@keyframes rowFlash { 0%, 100% { background-color: transparent; } 35% { background-color: var(--flash-color, rgba(20,184,166,0.18)); } }
+.row-flash { animation: rowFlash 0.9s ease-out 0.1s both; }
+
+/* Ejercicio borrado: colapsa hacia adentro en vez de desaparecer de golpe */
+@keyframes rowLeave {
+  0%   { opacity: 1; transform: scale(1); max-height: 200px; }
+  100% { opacity: 0; transform: scale(0.9); max-height: 0; margin-bottom: 0; }
+}
+.row-leave { animation: rowLeave 0.3s cubic-bezier(0.4, 0, 1, 1) both; overflow: hidden; }
+
+/* Rutina activada: pulso del color + badge que entra */
+@keyframes activatePulse {
+  0%   { box-shadow: 0 0 0 0 var(--pulse-color, rgba(20,184,166,0.6)); }
+  70%  { box-shadow: 0 0 0 12px rgba(20,184,166,0); }
+  100% { box-shadow: 0 0 0 0 rgba(20,184,166,0); }
+}
+.activate-pulse { animation: activatePulse 0.85s cubic-bezier(0.22, 1, 0.36, 1) both; }
+@keyframes badgePop { 0% { transform: scale(0); opacity: 0; } 60% { transform: scale(1.18); } 100% { transform: scale(1); opacity: 1; } }
+.badge-pop { animation: badgePop 0.45s cubic-bezier(0.34, 1.5, 0.64, 1) both; }
+
+/* Superserie: el recuadro que agrupa se dibuja */
+@keyframes supersetDraw {
+  0%   { clip-path: inset(0 0 100% 0); opacity: 0; }
+  100% { clip-path: inset(0 0 0 0);    opacity: 1; }
+}
+.superset-draw { animation: supersetDraw 0.4s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* ── CHATBOT ── */
+/* Los tres puntitos que rebotan mientras la IA piensa */
+@keyframes dotBounce { 0%, 80%, 100% { transform: translateY(0); opacity: 0.4; } 40% { transform: translateY(-6px); opacity: 1; } }
+.dot-bounce { animation: dotBounce 1.2s ease-in-out infinite; }
+
+/* Mensajes que entran: suben apenas mientras aparecen */
+@keyframes msgIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.msg-in { animation: msgIn 0.24s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* ── OTROS ── */
+/* Las tarjetas se "despiertan" al iniciar la sesión */
+@keyframes wakeUp { 0%, 100% { transform: scale(1); } 45% { transform: scale(1.02); } }
+.wake-up { animation: wakeUp 0.45s cubic-bezier(0.34, 1.3, 0.64, 1) both; }
+
+/* Días del calendario que se marcan en cascada */
+@keyframes dayMark { 0% { transform: scale(0); opacity: 0; } 65% { transform: scale(1.25); } 100% { transform: scale(1); opacity: 1; } }
+.day-mark { animation: dayMark 0.38s cubic-bezier(0.34, 1.4, 0.64, 1) both; }
+
+/* Transición suave del tema claro/oscuro (no un salto agresivo). Solo anima
+   COLORES — nada de transform ni layout, para no interferir con el arrastre de
+   ejercicios ni con las demás animaciones, que tienen su propio timing. */
+.theme-fade, .theme-fade * {
+  transition-property: background-color, color, border-color;
+  transition-duration: 0.35s;
+  transition-timing-function: ease;
+}
+/* Los elementos con su propia transición mandan (el arrastre, por ejemplo) */
+.theme-fade [data-drag-idx] { transition-property: transform; }
+
 /* Respeta a quien pidió menos movimiento en su sistema */
 @media (prefers-reduced-motion: reduce) {
   .muscle-charge, .rank-up-pulse, .draw-check path, .number-pop, .bar-fill,
   .invite-pulse, .slide-right, .slide-left, .streak-beat, .streak-glow,
-  .elastic-in, .skeleton { animation: none !important; }
+  .elastic-in, .skeleton, .row-enter, .row-flash, .row-leave, .activate-pulse,
+  .badge-pop, .superset-draw, .dot-bounce, .msg-in, .wake-up, .day-mark { animation: none !important; }
+  .theme-fade, .theme-fade * { transition: none !important; }
 }
 
 @keyframes voiceBar { 0%, 100% { transform: scaleY(0.4); } 50% { transform: scaleY(1); } }
@@ -3538,7 +3604,7 @@ const HELP_CHAPTERS = [
       {
         icon: <GripVertical size={20} />,
         title: "Reordená arrastrando",
-        text: "En el editor de rutinas, mantené apretada el asa (⠿) de cualquier ejercicio y deslizá para cambiarlo de lugar. La fila destino se ilumina mientras arrastrás. Las flechas siguen ahí si preferís tocar.",
+        text: "En el editor de rutinas, mantené apretado un ejercicio (desde cualquier parte) y deslizá: los demás se corren solos para mostrarte dónde va a caer. Soltá y listo. Las flechas siguen ahí si preferís tocar.",
       },
       {
         icon: <Link size={20} />,
@@ -4584,6 +4650,11 @@ function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS,
   // corromper el estado de otros componentes. Ahora el hook va primero y el
   // early return después.
   const trainedDays = useMemo(() => getTrainedDateSet(logs, sessions), [logs, sessions]);
+  // La cascada del calendario corre UNA vez al montar. Sin este flag, cada
+  // vez que cambia cualquier cosa (registrás una serie, tocás un día) las
+  // semanas volverían a parpadear.
+  const [yaAnimado, setYaAnimado] = useState(false);
+  useEffect(() => { const t = setTimeout(() => setYaAnimado(true), 900); return () => clearTimeout(t); }, []);
   if (!cycleStart || !weekInfo) return null;
   const { cycleWeeks, trainWeeks } = weekInfo;
   const isLight = settings.theme === "light";
@@ -4610,9 +4681,12 @@ function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS,
       </div>
 
       <div className="relative flex gap-1.5 flex-wrap">
-        {weekDots.map(({ week, trained, isDeload }) => { const isCurrent = week === weekInfo.weekInCycle; const dotColor = isDeload ? "#A855F7" : trained > 0 ? "#3B82F6" : neutralDot; return (
+        {weekDots.map(({ week, trained, isDeload }, wi) => { const isCurrent = week === weekInfo.weekInCycle; const dotColor = isDeload ? "#A855F7" : trained > 0 ? "#3B82F6" : neutralDot; return (
           <div
             key={week}
+            // Cascada de entrada: las semanas se marcan una tras otra. Solo al
+            // montar (yaAnimado); si no, parpadearían en cada render.
+            style={yaAnimado ? undefined : { animation: `dayMark 0.38s cubic-bezier(0.34,1.4,0.64,1) ${wi * 45}ms both` }}
             className={`w-9 h-9 rounded-xl flex items-center justify-center text-[10px] font-black transition-all ${isCurrent ? "scale-110" : ""}`}
             style={isCurrent
               ? { backgroundColor: dotColor, color: "#fff", boxShadow: `0 6px 16px -4px ${dotColor}aa` }
@@ -4733,6 +4807,25 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
   // día se ve sin sesión (podés iniciar otra o solo registrar), pero la
   // sesión original sigue corriendo en su día — no se resetea.
   const sessionForThisDay = (activeSession && (!activeSession.dayKey || activeSession.dayKey === activeDay)) ? activeSession : null;
+
+  // Al iniciar la sesión, las tarjetas se "despiertan" con un pulso en cascada:
+  // marca el momento en que arranca el entrenamiento. Va DESPUÉS de declarar
+  // sessionForThisDay (si no, sería un uso antes de la declaración → crash).
+  const prevSesionRef = useRef(false);
+  useEffect(() => {
+    const hayAhora = !!sessionForThisDay;
+    const habiaAntes = prevSesionRef.current;
+    prevSesionRef.current = hayAhora;
+    if (!hayAhora || habiaAntes) return; // solo al pasar de "sin sesión" a "con sesión"
+    const el = gridRef.current;
+    if (!el) return;
+    const tarjetas = Array.from(el.children);
+    tarjetas.forEach((t, i) => {
+      t.style.animation = `wakeUp 0.45s cubic-bezier(0.34,1.3,0.64,1) ${i * 55}ms both`;
+    });
+    const limpiar = setTimeout(() => { tarjetas.forEach((t) => { t.style.animation = ""; }); }, 1200);
+    return () => clearTimeout(limpiar);
+  }, [sessionForThisDay]);
   const weekInfo = getWeekInfo(cycleStart, settings), isDeload = weekInfo?.isDeload, day = ROUTINE[activeDay];
   const [resetKeys, setResetKeys] = useState({});
   const [confirmReset, setConfirmReset] = useState(false);
@@ -7709,14 +7802,33 @@ function PresetRoutineCard({ preset, isActive, onUse, onEdit }) {
   const [open, setOpen] = useState(false);
   const dayCount = preset.dayOrder.length;
   const accent = "#A855F7"; // violeta fijo — antes usaba el color del primer día, pero esta tarjeta es de Rutinas, no del día
+  // Pulso al activar: detectamos el momento exacto en que esta rutina pasa a
+  // ser la activa (no en cada render) para que el destello ocurra una sola vez.
+  const [recienActivada, setRecienActivada] = useState(false);
+  const antesActivaRef = useRef(isActive);
+  useEffect(() => {
+    if (isActive && !antesActivaRef.current) {
+      setRecienActivada(true);
+      const t = setTimeout(() => setRecienActivada(false), 900);
+      antesActivaRef.current = isActive;
+      return () => clearTimeout(t);
+    }
+    antesActivaRef.current = isActive;
+  }, [isActive]);
   return (
-    <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl overflow-hidden backdrop-blur-sm shadow-md shadow-black/20 transition-shadow hover:shadow-lg hover:shadow-black/30">
+    <div
+      className={`bg-slate-900/50 border rounded-2xl overflow-hidden backdrop-blur-sm shadow-md shadow-black/20 transition-all hover:shadow-lg hover:shadow-black/30 ${recienActivada ? "activate-pulse" : ""}`}
+      style={{
+        borderColor: isActive ? accent + "60" : "rgba(30,41,59,0.5)",
+        "--pulse-color": accent + "99",
+      }}
+    >
       <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-slate-800/30 transition">
         <div className="w-2 h-10 rounded-full shrink-0" style={{ backgroundColor: accent, boxShadow: `0 0 10px -2px ${accent}` }} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h4 className="text-sm font-bold text-white">{preset.name}</h4>
-            {isActive && <span className="text-[9px] font-black px-1.5 py-0.5 rounded-lg bg-purple-500/20 text-purple-400 shrink-0">ACTIVA</span>}
+            {isActive && <span className="text-[9px] font-black px-1.5 py-0.5 rounded-lg bg-purple-500/20 text-purple-400 shrink-0 badge-pop">ACTIVA</span>}
           </div>
           <p className="text-[11px] text-slate-500 mt-0.5">{preset.description}</p>
           <p className="text-[10px] text-slate-600 mt-2">{dayCount} día{dayCount === 1 ? "" : "s"}/semana</p>
@@ -7837,7 +7949,7 @@ function ExercisePickerPanel({ existingIds, onAdd, onAddCustom, onClose }) {
 
 const REP_RANGE_OPTIONS = ["1-3", "3-5", "4-6", "6-8", "8-10", "10-12", "12-15", "15-20"];
 
-function BuilderExerciseRow({ ex, canMoveUp, canMoveDown, onMove, onRemove, onConfigChange, dragHandlers = null, isDragging = false, isDragOver = false, dumbbellFactor = null, onToggleDumbbell = null }) {
+function BuilderExerciseRow({ ex, canMoveUp, canMoveDown, onMove, onRemove, onConfigChange, isDragging = false, isDragOver = false, dumbbellFactor = null, onToggleDumbbell = null, recienAgregado = false, dayColor = "#14B8A6" }) {
   const [editing, setEditing] = useState(false);
   const repRange = ex.sets[0]?.repRange || "8-10";
   const setsCount = ex.sets.length;
@@ -7852,24 +7964,23 @@ function BuilderExerciseRow({ ex, canMoveUp, canMoveDown, onMove, onRemove, onCo
 
   return (
     <div
-      {...(dragHandlers?.container || {})}
-      className="bg-slate-900/60 border rounded-xl px-3 py-2.5 transition-all duration-150"
+      className={`bg-slate-900/60 border rounded-xl px-3 py-2.5 transition-all duration-150${recienAgregado ? " row-flash" : ""}`}
       style={{
-        borderColor: isDragOver ? "#14B8A6" : "rgba(30,41,59,0.5)",
-        opacity: isDragging ? 0.35 : 1,
-        transform: isDragging ? "scale(0.98)" : "none",
-        boxShadow: isDragOver ? "0 0 0 1px #14B8A6, 0 0 14px -4px #14B8A680" : "none",
+        borderColor: isDragging ? "#14B8A6" : "rgba(30,41,59,0.5)",
+        // La fila que arrastrás se "levanta": escala apenas, sombra fuerte y
+        // se despega del fondo. Las demás se corren solas (el padre les aplica
+        // el translateY), así ves el hueco abrirse en tiempo real.
+        opacity: isDragging ? 0.92 : 1,
+        transform: isDragging ? "scale(1.03)" : "none",
+        boxShadow: isDragging ? "0 12px 28px -8px rgba(0,0,0,0.6), 0 0 0 1px #14B8A6" : "none",
+        cursor: isDragging ? "grabbing" : "default",
+        transition: "transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease",
+        "--flash-color": dayColor + "2e",
       }}
     >
       <div className="flex items-center gap-2">
         <div className="flex flex-col items-center -my-1 shrink-0">
           <button onClick={() => onMove(-1)} disabled={!canMoveUp} className="p-0.5 text-slate-600 hover:text-slate-300 disabled:opacity-20"><ChevronUp size={13} /></button>
-          {/* Asa de arrastre: mantené apretado y deslizá para reordenar.
-              touchAction:none evita que el gesto scrollee la página. Las
-              flechas siguen ahí para quien prefiera tocar. */}
-          <span {...(dragHandlers?.handle || {})} className="py-0.5 cursor-grab active:cursor-grabbing text-slate-600 hover:text-teal-400 transition-colors select-none" style={{ touchAction: "none" }} title="Mantené apretado y arrastrá para reordenar">
-            <GripVertical size={13} />
-          </span>
           <button onClick={() => onMove(1)} disabled={!canMoveDown} className="p-0.5 text-slate-600 hover:text-slate-300 disabled:opacity-20"><ChevronDown size={13} /></button>
         </div>
         <button onClick={() => setEditing((o) => !o)} className="flex-1 min-w-0 text-left">
@@ -7975,11 +8086,94 @@ function BuilderDayCard({ day, dayIdx, totalDays, onRename, onRemove, onMoveDay,
   const [overIdx, setOverIdx] = useState(null);
   const dragRef = useRef({ from: null, over: null });
 
+  // ── ARRASTRE PARA REORDENAR ──────────────────────────────────────────────
+  // Se agarra desde CUALQUIER parte de la fila manteniendo apretado (no hace
+  // falta un asa). Los ejercicios se corren en vivo mientras arrastrás, así
+  // ves exactamente dónde va a quedar antes de soltar.
+  //
+  // El truco para que no pelee con el scroll: no bloqueamos nada hasta que se
+  // cumple el long-press (280ms sin mover el dedo). Si movés antes de eso, es
+  // un scroll normal y cancelamos el arrastre. Si mantenés quieto, vibra y
+  // ahí sí tomamos el control del gesto.
+  const LONG_PRESS_MS = 280;
+  const MOVE_TOLERANCE = 8; // px que podés temblar sin cancelar
+
+  // Animaciones de la lista: qué ejercicio acaba de entrar (para resaltarlo) y
+  // cuál se está yendo (para que colapse antes de desaparecer de verdad).
+  const [nuevoId, setNuevoId] = useState(null);
+  const [saliendoIdx, setSaliendoIdx] = useState(null);
+  const [supersetNuevo, setSupersetNuevo] = useState(null); // el vínculo recién creado
+  const supersetTimerRef = useRef(null);
+  useEffect(() => () => { if (supersetTimerRef.current) clearTimeout(supersetTimerRef.current); }, []);
+  const vincularSuperserie = (i) => {
+    setSupersetNuevo(i);
+    if (supersetTimerRef.current) clearTimeout(supersetTimerRef.current);
+    supersetTimerRef.current = setTimeout(() => { setSupersetNuevo(null); supersetTimerRef.current = null; }, 500);
+    onToggleSuperset(i);
+  };
+  // Si el componente se desmonta a mitad de un arrastre (cerrás el editor con
+  // el dedo apoyado), hay que soltar los listeners globales igual — si no,
+  // quedan escuchando para siempre sobre un componente que ya no existe.
+  const cleanupDragRef = useRef(null);
+  useEffect(() => () => { cleanupDragRef.current?.(); }, []);
+  // Detecta cuándo se agregó un ejercicio para resaltarlo. Guardamos el id del
+  // último en una ref y la actualizamos DENTRO del efecto (nunca durante el
+  // render: React puede renderizar de más y quedaría desincronizado).
+  const prevUltimoIdRef = useRef(null);
+  const prevCantRef = useRef(day.exercises.length);
+  useEffect(() => {
+    const antes = prevCantRef.current;
+    const ahora = day.exercises.length;
+    const idUltimo = day.exercises[ahora - 1]?.id ?? null;
+    prevCantRef.current = ahora;
+    prevUltimoIdRef.current = idUltimo;
+    // Creció la lista Y el último cambió → es uno nuevo
+    if (ahora > antes && idUltimo) {
+      setNuevoId(idUltimo);
+      // 950ms ≈ lo que dura row-flash: la clase se saca justo al terminar.
+      const t = setTimeout(() => setNuevoId(null), 950);
+      return () => clearTimeout(t);
+    }
+  }, [day.exercises]);
+
+  // Borrado con animación: primero colapsa, después se borra de verdad.
+  // Si tocás borrar dos veces rápido, el segundo pedido se ignora hasta que
+  // termine el primero: si no, el segundo timeout dispararía con un índice
+  // viejo (la lista ya cambió) y borraría el ejercicio equivocado.
+  const borrandoRef = useRef(false);
+  const borrarTimerRef = useRef(null);
+  useEffect(() => () => { if (borrarTimerRef.current) clearTimeout(borrarTimerRef.current); }, []);
+  const borrarConAnimacion = (i) => {
+    if (borrandoRef.current) return; // ya hay uno en curso
+    borrandoRef.current = true;
+    setSaliendoIdx(i);
+    borrarTimerRef.current = setTimeout(() => {
+      setSaliendoIdx(null);
+      onRemoveExercise(i);
+      borrandoRef.current = false;
+      borrarTimerRef.current = null;
+    }, 280); // coincide con la duración de row-leave
+  };
+
   const startDrag = (e, i) => {
-    e.preventDefault();
-    dragRef.current = { from: i, over: i };
-    setDragIdx(i); setOverIdx(i);
-    haptic(12);
+    // Solo botón principal / dedo (ignorar click derecho)
+    if (e.button != null && e.button !== 0) return;
+    // No arrastrar si tocaste un control (botón, input, textarea)
+    if (e.target?.closest?.("button, input, textarea, select, a")) return;
+
+    const startY = e.clientY, startX = e.clientX;
+    let armado = false;   // ¿ya se cumplió el long-press?
+    let cancelado = false;
+
+    const armar = () => {
+      if (cancelado) return;
+      armado = true;
+      dragRef.current = { from: i, over: i };
+      setDragIdx(i);
+      setOverIdx(i);
+      haptic(14);
+    };
+    let timer = setTimeout(armar, LONG_PRESS_MS);
 
     const findIdxAt = (clientY) => {
       const rows = document.querySelectorAll("[data-drag-idx]");
@@ -7991,37 +8185,74 @@ function BuilderDayCard({ day, dayIdx, totalDays, onRename, onRemove, onMoveDay,
     };
 
     const onMove = (ev) => {
+      if (!armado) {
+        // Todavía no se armó: si el dedo se movió, era un scroll → cancelar
+        const dy = Math.abs(ev.clientY - startY);
+        const dx = Math.abs(ev.clientX - startX);
+        if (dy > MOVE_TOLERANCE || dx > MOVE_TOLERANCE) {
+          cancelado = true;
+          clearTimeout(timer);
+          limpiar();
+        }
+        return;
+      }
+      // Ya armado: tomamos el control del gesto (no scrollear la página)
+      ev.preventDefault();
       const idx = findIdxAt(ev.clientY);
       if (idx != null && idx !== dragRef.current.over) {
         dragRef.current.over = idx;
         setOverIdx(idx);
-        haptic(8);
+        haptic(6);
       }
-      // Auto-scroll cuando arrastrás cerca de los bordes de la pantalla
+      // Auto-scroll al acercarte a los bordes
       const margin = 90, speed = 9;
       if (ev.clientY < margin) window.scrollBy(0, -speed);
       else if (ev.clientY > window.innerHeight - margin) window.scrollBy(0, speed);
     };
 
-    const onUp = () => {
+    const limpiar = () => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);
+    };
+
+    const onUp = () => {
+      clearTimeout(timer);
+      limpiar();
+      cleanupDragRef.current = null;
+      if (!armado) return; // fue un toque simple, no un arrastre
       const { from, over } = dragRef.current;
       if (from != null && over != null && from !== over) {
         // Mover paso a paso reutilizando onMoveExercise (respeta superseries)
         const step = over > from ? 1 : -1;
         for (let k = from; k !== over; k += step) onMoveExercise(k, step);
-        haptic(18);
+        haptic(20);
       }
       dragRef.current = { from: null, over: null };
-      setDragIdx(null); setOverIdx(null);
+      setDragIdx(null);
+      setOverIdx(null);
     };
 
-    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointermove", onMove, { passive: false });
     window.addEventListener("pointerup", onUp);
     window.addEventListener("pointercancel", onUp);
+    // Lo guardamos por si el componente se desmonta antes de que sueltes
+    cleanupDragRef.current = () => { clearTimeout(timer); limpiar(); };
   };
+
+  // Desplazamiento en vivo: mientras arrastrás, las filas que están entre el
+  // origen y el destino se corren para dejar el hueco. Devuelve cuántos
+  // píxeles tiene que moverse la fila `i` (aproximando el alto de una fila).
+  const ROW_SHIFT = 64; // alto aproximado de una fila + separación
+  const desplazamientoDe = (i) => {
+    const from = dragIdx, over = overIdx;
+    if (from == null || over == null || from === over) return 0;
+    if (i === from) return 0; // la que arrastrás no se corre (queda semi-transparente)
+    if (from < over && i > from && i <= over) return -ROW_SHIFT; // suben
+    if (from > over && i < from && i >= over) return ROW_SHIFT;  // bajan
+    return 0;
+  };
+
   const existingIds = day.exercises.map((e) => e.id);
   const totalSets = day.exercises.reduce((a, e) => a + (e.sets?.length || 0), 0);
   return (
@@ -8063,16 +8294,36 @@ function BuilderDayCard({ day, dayIdx, totalDays, onRename, onRemove, onMoveDay,
 
       <div className="space-y-1.5">
         {day.exercises.map((ex, i) => (
-          <div key={ex.id} data-drag-idx={i}>
+          <div
+            key={ex.id}
+            data-drag-idx={i}
+            // El arrastre se inicia desde CUALQUIER punto de la fila (long-press).
+            onPointerDown={(e) => startDrag(e, i)}
+            className={`${nuevoId === ex.id ? "row-enter" : ""} ${saliendoIdx === i ? "row-leave" : ""}`}
+            style={{
+              // Desplazamiento en vivo: las filas se corren para abrir el hueco
+              // donde va a caer la que arrastrás. transform (no margin) para que
+              // corra en la GPU y no recalcule el layout en cada frame.
+              // Si la fila está entrando o saliendo, dejamos que su propia
+              // animación maneje el transform (si no, se pisarían).
+              transform: (nuevoId === ex.id || saliendoIdx === i) ? undefined : `translateY(${desplazamientoDe(i)}px)`,
+              transition: (nuevoId === ex.id || saliendoIdx === i) ? undefined : "transform 0.2s cubic-bezier(0.22,1,0.36,1)",
+              // Mientras arrastrás, el navegador no debe hacer scroll con el dedo
+              touchAction: dragIdx === i ? "none" : "auto",
+              zIndex: dragIdx === i ? 20 : 1,
+              position: "relative",
+            }}
+          >
             <BuilderExerciseRow ex={ex} canMoveUp={i > 0} canMoveDown={i < day.exercises.length - 1}
-              onMove={(delta) => onMoveExercise(i, delta)} onRemove={() => onRemoveExercise(i)}
+              recienAgregado={nuevoId === ex.id} dayColor={day.color}
+              onMove={(delta) => onMoveExercise(i, delta)} onRemove={() => borrarConAnimacion(i)}
               onConfigChange={(cfg) => onConfigExercise(i, cfg)}
               isDragging={dragIdx === i} isDragOver={overIdx === i && dragIdx !== null && dragIdx !== i}
-              dragHandlers={{ handle: { onPointerDown: (e) => startDrag(e, i) } }}
               dumbbellFactor={(dumbbellDouble || {})[ex.id] || EXERCISE_LIBRARY_BY_ID[ex.id]?.loadFactor || 1}
               onToggleDumbbell={onUpdateSettings ? (v) => onUpdateSettings({ dumbbellDouble: { ...(dumbbellDouble || {}), [ex.id]: v } }) : null} />
             {i < day.exercises.length - 1 && (
-              <button onClick={() => onToggleSuperset(i)} className="w-full flex items-center justify-center gap-1.5 my-1 py-2 rounded-lg text-[11px] font-bold transition-all active:scale-[0.98] border"
+              <button onClick={() => { vincularSuperserie(i); }}
+                className={`w-full flex items-center justify-center gap-1.5 my-1 py-2 rounded-lg text-[11px] font-bold transition-all active:scale-[0.98] border ${supersetNuevo === i && !ex.supersetNext ? "superset-draw" : ""}`}
                 style={ex.supersetNext ? { backgroundColor: day.color + "22", borderColor: day.color + "60", color: day.color } : { backgroundColor: "transparent", borderColor: "var(--chip-border)", color: "var(--chip-text)", borderStyle: "dashed" }}>
                 <Link size={13} /> {ex.supersetNext ? "Superserie activada — tocá para separar" : "+ Vincular en superserie"}
               </button>
@@ -8885,7 +9136,7 @@ Datos: ${JSON.stringify(context)}`;
 
       <div className="space-y-3">
         {messages.map((m, i) => (
-          <div key={i}>
+          <div key={i} className="msg-in">
             <div className={`flex items-end gap-2 ${m.role === "user" ? "justify-end" : "justify-start"}`}>
               {m.role === "assistant" && (
                 <div className="w-6 h-6 rounded-lg bg-teal-500/15 border border-teal-500/25 flex items-center justify-center shrink-0 mb-0.5">
@@ -8942,10 +9193,12 @@ Datos: ${JSON.stringify(context)}`;
               <Sparkles size={11} className="text-teal-400 soft-pulse" />
             </div>
             <div className="bg-slate-900/60 border border-slate-800/60 rounded-2xl rounded-bl-md px-4 py-3.5 flex items-center gap-3 max-w-[70%]">
+              {/* Rebote propio en vez de animate-bounce: el de Tailwind salta
+                  demasiado (parece nervioso). Este es más suave y contenido. */}
               <div className="flex gap-1">
-                <span className="w-2 h-2 rounded-full bg-teal-500 animate-bounce" style={{ animationDelay: "0ms" }} />
-                <span className="w-2 h-2 rounded-full bg-teal-500 animate-bounce" style={{ animationDelay: "150ms" }} />
-                <span className="w-2 h-2 rounded-full bg-teal-500 animate-bounce" style={{ animationDelay: "300ms" }} />
+                <span className="w-2 h-2 rounded-full bg-teal-500 dot-bounce" style={{ animationDelay: "0ms" }} />
+                <span className="w-2 h-2 rounded-full bg-teal-500 dot-bounce" style={{ animationDelay: "180ms" }} />
+                <span className="w-2 h-2 rounded-full bg-teal-500 dot-bounce" style={{ animationDelay: "360ms" }} />
               </div>
               <span className="text-[11px] text-slate-500">Pensando... puede tardar hasta 30s</span>
             </div>
@@ -10832,7 +11085,7 @@ export default function App() {
       <StyleInjector />
       {recoveredNotice && <RecoveredBanner onClose={() => setRecoveredNotice(false)} />}
       {importRoutineError && <ImportRoutineErrorBanner onClose={() => setImportRoutineError(false)} />}
-      <div className={`min-h-screen bg-[#0a0a0f] px-4 py-6 ${themeClass}`} style={{ "--small-text-scale": smallTextScale }}>
+      <div className={`min-h-screen bg-[#0a0a0f] px-4 py-6 theme-fade ${themeClass}`} style={{ "--small-text-scale": smallTextScale }}>
         <div style={{ height: "env(safe-area-inset-top, 0px)" }} />
         <div className="max-w-xl mx-auto">
           <div className="flex justify-end mb-2">
