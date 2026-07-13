@@ -2670,7 +2670,7 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default", 
   // anillo, que se vacía a medida que descansás. En los últimos 10 segundos
   // todo se tiñe de ámbar y el número late. Al terminar, el anillo se
   // completa en verde.
-  const R = 26, C = 2 * Math.PI * R;
+  const R = 31, C = 2 * Math.PI * R;
   const urgent = running && remaining <= 10 && remaining > 0;
   const done = remaining === 0;
   const ringColor = done ? "#10B981" : urgent ? "#F59E0B" : accent;
@@ -2683,21 +2683,21 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default", 
           {running && <div className="absolute -top-10 -right-8 w-32 h-32 rounded-full blur-3xl pointer-events-none transition-opacity" style={{ backgroundColor: ringColor, opacity: urgent ? 0.28 : 0.14 }} />}
 
           <div className="relative flex items-center gap-3.5 px-3.5 py-3">
-            {/* Anillo de progreso con el tiempo adentro */}
-            <div className="relative shrink-0" style={{ width: 64, height: 64 }}>
-              <svg width="64" height="64" className="-rotate-90">
-                <circle cx="32" cy="32" r={R} fill="none" stroke="rgba(30,41,59,0.8)" strokeWidth="4" />
+            {/* Anillo de progreso con el tiempo adentro — protagonista */}
+            <div className="relative shrink-0" style={{ width: 74, height: 74 }}>
+              <svg width="74" height="74" className="-rotate-90">
+                <circle cx="37" cy="37" r={R} fill="none" stroke="rgba(30,41,59,0.9)" strokeWidth="5" />
                 <circle
-                  cx="32" cy="32" r={R} fill="none"
-                  stroke={ringColor} strokeWidth="4" strokeLinecap="round"
+                  cx="37" cy="37" r={R} fill="none"
+                  stroke={ringColor} strokeWidth="5" strokeLinecap="round"
                   strokeDasharray={C}
                   strokeDashoffset={C - (C * pct) / 100}
-                  style={{ transition: "stroke-dashoffset 0.95s linear, stroke 0.3s", filter: `drop-shadow(0 0 5px ${ringColor}90)` }}
+                  style={{ transition: "stroke-dashoffset 0.95s linear, stroke 0.3s", filter: `drop-shadow(0 0 7px ${ringColor})` }}
                 />
               </svg>
               <span
-                className={`absolute inset-0 flex items-center justify-center text-[15px] font-black tabular-nums transition-colors ${urgent ? "soft-pulse" : ""}`}
-                style={{ color: running || done ? ringColor : "#94a3b8" }}
+                className={`absolute inset-0 flex items-center justify-center text-[17px] font-black tabular-nums transition-colors ${urgent ? "soft-pulse" : ""}`}
+                style={{ color: running || done ? ringColor : "#94a3b8", textShadow: running ? `0 0 12px ${ringColor}60` : "none" }}
               >
                 {formatTime(remaining)}
               </span>
@@ -5993,7 +5993,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
               );
             })()}
             <button onClick={() => { setShowGroupExercises(false); onGoToRoutines?.(); }} className="w-full py-3 rounded-2xl text-sm font-black !text-white transition active:scale-[0.98]" style={{ background: "linear-gradient(135deg, #14B8A6, #0E7490)" }}>
-              Ir a mis rutinas y agregarlos →
+              Editar mi rutina y agregarlos →
             </button>
           </div>
         </div>
@@ -9202,7 +9202,7 @@ function PersonalizedRoutineWizard({ profile, onUpdateProfile, onCreateRoutine, 
   );
 }
 
-function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRestore, onUpdateProfile, openScheduleSignal = 0 }) {
+function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRestore, onUpdateProfile, openScheduleSignal = 0, openEditorSignal = 0 }) {
   const [mode, setMode] = useState("catalog");
   const [showWizard, setShowWizard] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
@@ -9218,6 +9218,31 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
       setTimeout(() => { try { scheduleRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); } catch { } }, 150);
     }
   }, [openScheduleSignal]);
+
+  // Al llegar desde "agregar ejercicios de [músculo] a mi rutina" (en el
+  // muñeco), abrimos DIRECTO el armador de la rutina activa — no la lista
+  // de rutinas, que obligaba a buscarla y tocar "Editar" a mano.
+  useEffect(() => {
+    if (openEditorSignal <= 0) return;
+    const activeId = profile?.activeRoutineId;
+    if (!activeId) return;
+    const def = (profile?.routines || {})[activeId];
+    if (!def) return;
+    if (def.source === "preset") {
+      // Una preestablecida no se puede editar en sitio: se clona (mismo
+      // criterio que el botón "Editar" del catálogo). Inlineado a propósito:
+      // handleEditPreset se declara más abajo y llamarlo acá daría TDZ.
+      const newId = builderUid("custom_routine");
+      const clone = { ...cloneRoutineDef(def), source: "custom", name: `${def.name} (mi copia)` };
+      onUpdate(newId, clone);
+      setEditingRoutineId(newId);
+      setMode("builder");
+    } else {
+      setEditingRoutineId(activeId);
+      setMode("builder");
+    }
+    // eslint-disable-next-line
+  }, [openEditorSignal]);
   const [shareTarget, setShareTarget] = useState(null);
   const [pendingActivation, setPendingActivation] = useState(null);
   const [showImport, setShowImport] = useState(false);
@@ -10352,10 +10377,10 @@ export default function App() {
         </header>
         <main className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto px-4 py-4 pb-28 lg:pb-10 space-y-4">
           <div key={tab} className="tab-fade-in">
-            {tab === "rutinas" && <RoutinesView openScheduleSignal={openSectionSignal.id === "week-schedule" ? openSectionSignal.n : 0} profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleArchiveRoutine} onRestore={handleRestoreRoutine} onUpdateProfile={handleUpdateProfile} />}
+            {tab === "rutinas" && <RoutinesView openScheduleSignal={openSectionSignal.id === "week-schedule" ? openSectionSignal.n : 0} openEditorSignal={openSectionSignal.id === "routine-editor" ? openSectionSignal.n : 0} profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleArchiveRoutine} onRestore={handleRestoreRoutine} onUpdateProfile={handleUpdateProfile} />}
             {tab === "rutina" && <OnboardingTasksCard profile={profile} cycleStart={cycleStart} logs={logs} onGoToProfile={() => setTab("perfil")} onDone={() => handleUpdateProfile({ onboardingDone: true })} />}
             {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToRoutines={() => setTab("rutinas")} onGoToSchedule={() => goToSection("rutinas", "week-schedule")} onGoToFieldSettings={() => goToSection("perfil", "field-settings-section")} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} todaySessionDayKey={(profile?.trainingSessions || []).find((ts) => ts.date === todayStr())?.dayKey || profile?.activeSession?.dayKey || null} />}
-            {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} onGoToRoutines={() => setTab("rutinas")} weekSchedule={weekSchedule} sex={profile?.sex} age={profile?.age} onGoToDeload={() => setTab("descarga")} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} />}
+            {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} onGoToRoutines={() => goToSection("rutinas", "routine-editor")} weekSchedule={weekSchedule} sex={profile?.sex} age={profile?.age} onGoToDeload={() => setTab("descarga")} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} />}
             {tab === "descarga" && <DeloadView logs={logs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} />}
             {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} settings={getProfileSettings(profile)} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} />}
             {tab === "perfil" && <ProfileView openSectionSignal={openSectionSignal} profileName={activeProfile} profiles={profiles} logs={logs} onSignOut={handleSignOut} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} />}
