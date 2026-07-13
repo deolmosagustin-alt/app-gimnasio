@@ -7,7 +7,7 @@ import {
 import {
   Play, Pause, RotateCcw, TrendingUp, TrendingDown, Dumbbell,
   ChevronDown, ChevronUp, ChevronLeft, Trophy, Flame, Save, Trash2, BarChart3,
-  ListChecks, LogOut, X, Check, AlertTriangle, Calendar, Zap, Bell, GripVertical, Sliders, StickyNote,
+  ListChecks, LogOut, X, Check, AlertTriangle, Calendar, Zap, Bell, GripVertical, Sliders, StickyNote, Eye,
   Mail, Clock, ChevronRight, Edit3, Info, Plus, Sun, Moon,
   Target, Award, Activity, ArrowDown, HelpCircle, List, LayoutGrid,
   Sparkles, Layers, Video, SlidersHorizontal, ShieldCheck, UserCog,
@@ -1190,12 +1190,21 @@ const ANIMATION_CSS = `
 /* Los elementos con su propia transición mandan (el arrastre, por ejemplo) */
 .theme-fade [data-drag-idx] { transition-property: transform; }
 
+/* La rutina activa "respira": un halo lentísimo que marca cuál es la tuya
+   sin gritar. 4 segundos por ciclo — se percibe pero no distrae. */
+@keyframes breathe {
+  0%, 100% { box-shadow: 0 0 0 0 var(--breathe-color, rgba(168,85,247,0.3)), 0 10px 30px -12px rgba(0,0,0,0.5); }
+  50%      { box-shadow: 0 0 0 6px rgba(168,85,247,0), 0 10px 30px -12px rgba(0,0,0,0.5); }
+}
+.breathe { animation: breathe 4s ease-in-out infinite; }
+
 /* Respeta a quien pidió menos movimiento en su sistema */
 @media (prefers-reduced-motion: reduce) {
   .muscle-charge, .rank-up-pulse, .draw-check path, .number-pop, .bar-fill,
   .invite-pulse, .slide-right, .slide-left, .streak-beat, .streak-glow,
   .elastic-in, .skeleton, .row-enter, .row-flash, .row-leave, .activate-pulse,
-  .badge-pop, .superset-draw, .dot-bounce, .msg-in, .wake-up, .day-mark { animation: none !important; }
+  .badge-pop, .superset-draw, .dot-bounce, .msg-in, .wake-up, .day-mark,
+  .breathe { animation: none !important; }
   .theme-fade, .theme-fade * { transition: none !important; }
 }
 
@@ -7798,9 +7807,26 @@ function SharedRoutineImportModal({ routine, onImport, onDiscard }) {
   );
 }
 
-function PresetRoutineCard({ preset, isActive, onUse, onEdit }) {
+// Contexto de cada rutina preestablecida: para quién es y qué frecuencia pide.
+// Es la información que te falta para elegir sin tener que abrir cada una.
+const PRESET_CONTEXTO = {
+  classic_default: { nivel: "Intermedio", frecuencia: "4 días/semana" },
+  ppl:             { nivel: "Principiante", frecuencia: "3-6 días/semana" },
+  upper_lower:     { nivel: "Principiante", frecuencia: "4 días/semana" },
+  arnold:          { nivel: "Avanzado", frecuencia: "3-6 días/semana" },
+  bro_split:       { nivel: "Intermedio", frecuencia: "5 días/semana" },
+  fullbody:        { nivel: "Principiante", frecuencia: "3 días/semana" },
+};
+const NIVEL_COLOR = {
+  Principiante: "#34D399",
+  Intermedio: "#FBBF24",
+  Avanzado: "#F87171",
+};
+
+function PresetRoutineCard({ preset, isActive, onUse, onEdit, onPreview }) {
   const [open, setOpen] = useState(false);
   const dayCount = preset.dayOrder.length;
+  const ctx = PRESET_CONTEXTO[preset.id] || null;
   const accent = "#A855F7"; // violeta fijo — antes usaba el color del primer día, pero esta tarjeta es de Rutinas, no del día
   // Pulso al activar: detectamos el momento exacto en que esta rutina pasa a
   // ser la activa (no en cada render) para que el destello ocurra una sola vez.
@@ -7830,8 +7856,17 @@ function PresetRoutineCard({ preset, isActive, onUse, onEdit }) {
             <h4 className="text-sm font-bold text-white">{preset.name}</h4>
             {isActive && <span className="text-[9px] font-black px-1.5 py-0.5 rounded-lg bg-purple-500/20 text-purple-400 shrink-0 badge-pop">ACTIVA</span>}
           </div>
-          <p className="text-[11px] text-slate-500 mt-0.5">{preset.description}</p>
-          <p className="text-[10px] text-slate-600 mt-2">{dayCount} día{dayCount === 1 ? "" : "s"}/semana</p>
+          <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-2">{preset.description}</p>
+          {/* Contexto: nivel y frecuencia. Es lo que te falta para elegir sin
+              tener que abrir cada rutina y leerla entera. */}
+          <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+            {ctx?.nivel && (
+              <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md" style={{ backgroundColor: (NIVEL_COLOR[ctx.nivel] || "#64748b") + "1e", color: NIVEL_COLOR[ctx.nivel] || "#94a3b8" }}>
+                {ctx.nivel}
+              </span>
+            )}
+            <span className="text-[9px] text-slate-600">{ctx?.frecuencia || `${dayCount} día${dayCount === 1 ? "" : "s"}/semana`}</span>
+          </div>
         </div>
         <ChevronDown size={16} className={`text-slate-600 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
@@ -7839,6 +7874,15 @@ function PresetRoutineCard({ preset, isActive, onUse, onEdit }) {
         <div className="px-4 pb-4 tab-fade-in space-y-3">
           {preset.recommendation && <p className="text-[11px] text-slate-400 bg-slate-800/40 rounded-xl px-3 py-2 flex items-start gap-1.5"><Info size={12} className="mt-0.5 shrink-0" />{preset.recommendation}</p>}
           <RoutinePreview routineDef={preset} />
+          {/* Balance muscular: ves si está equilibrada ANTES de activarla */}
+          <div className="rounded-xl bg-slate-950/40 border border-slate-800/50 p-3">
+            <BalanceMuscular routineDef={preset} />
+          </div>
+          {onPreview && (
+            <button onClick={onPreview} className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-[11px] font-bold text-slate-400 bg-slate-800/50 border border-slate-700/50 hover:text-white transition active:scale-[0.98]">
+              <Eye size={12} /> Ver todos los días y ejercicios
+            </button>
+          )}
           <div className="flex gap-2">
             <button onClick={onUse} disabled={isActive} className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-bold transition ${isActive ? "bg-slate-800 text-slate-600" : "bg-purple-500 !text-white hover:bg-purple-400 active:scale-[0.98] shadow-lg shadow-purple-500/20"}`}>
               {isActive ? <><Check size={14} /> Ya la estás usando</> : <><Sparkles size={14} /> Usar esta rutina</>}
@@ -7852,7 +7896,7 @@ function PresetRoutineCard({ preset, isActive, onUse, onEdit }) {
   );
 }
 
-function SavedRoutineRow({ routine, isActive, onUse, onEdit, onShare, onArchive }) {
+function SavedRoutineRow({ routine, isActive, onUse, onEdit, onShare, onArchive, onDuplicate, onPreview, uso = null }) {
   const [open, setOpen] = useState(false);
   const dayCount = routine.dayOrder.length;
   const accent = isActive ? "#14B8A6" : "#6366F1"; // teal si activa, indigo si no
@@ -7867,13 +7911,41 @@ function SavedRoutineRow({ routine, isActive, onUse, onEdit, onShare, onArchive 
               <p className="text-sm font-bold text-white truncate">{routine.name}</p>
               {isActive && <span className="text-[9px] font-black px-2 py-0.5 rounded-full shrink-0" style={{ backgroundColor: accent + "25", color: accent, border: `1px solid ${accent}40` }}>ACTIVA</span>}
             </div>
-            <p className="text-[11px] text-slate-500">{dayCount} día{dayCount !== 1 ? "s" : ""} · tuya</p>
+            <p className="text-[11px] text-slate-500">
+              {dayCount} día{dayCount !== 1 ? "s" : ""}
+              {uso?.sesiones > 0 ? (
+                <span className="text-slate-600"> · {uso.sesiones} sesion{uso.sesiones !== 1 ? "es" : ""} · {haceCuanto(uso.diasDesde)}</span>
+              ) : (
+                <span className="text-slate-600"> · sin usar</span>
+              )}
+            </p>
           </button>
           {!isActive && <button onClick={onUse} className="px-3 py-1.5 rounded-lg text-xs font-bold shrink-0 transition" style={{ backgroundColor: accent + "18", color: accent }}>Activar</button>}
           <button onClick={onShare} className="p-2 rounded-lg text-slate-500 hover:text-cyan-400 shrink-0"><Share2 size={14} /></button>
           <button onClick={onEdit} className="p-2 rounded-lg text-slate-500 hover:text-indigo-400 shrink-0"><Edit3 size={14} /></button>
         </div>
-        {open && <div className="mt-3 pt-3 border-t border-slate-800/50 tab-fade-in"><RoutinePreview routineDef={routine} /></div>}
+        {open && (
+          <div className="mt-3 pt-3 border-t border-slate-800/50 tab-fade-in space-y-3">
+            <RoutinePreview routineDef={routine} />
+            {/* Balance muscular: detectás desbalances sin sumar series a mano */}
+            <div className="rounded-xl bg-slate-950/40 border border-slate-800/50 p-3">
+              <BalanceMuscular routineDef={routine} />
+            </div>
+            {/* Acciones secundarias, discretas */}
+            <div className="flex gap-2">
+              {onPreview && (
+                <button onClick={onPreview} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[11px] font-bold text-slate-400 bg-slate-800/50 border border-slate-700/50 hover:text-white transition active:scale-[0.98]">
+                  <Eye size={12} /> Ver completa
+                </button>
+              )}
+              {onDuplicate && (
+                <button onClick={onDuplicate} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[11px] font-bold text-slate-400 bg-slate-800/50 border border-slate-700/50 hover:text-white transition active:scale-[0.98]">
+                  <Copy size={12} /> Duplicar
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </SwipeToArchive>
   );
@@ -8073,7 +8145,7 @@ function BuilderExerciseRow({ ex, canMoveUp, canMoveDown, onMove, onRemove, onCo
   );
 }
 
-function BuilderDayCard({ day, dayIdx, totalDays, onRename, onRemove, onMoveDay, onChangeColor, onAddExercise, onAddCustomExercise, onRemoveExercise, onMoveExercise, onConfigExercise, onToggleSuperset, dumbbellDouble = null, onUpdateSettings = null }) {
+function BuilderDayCard({ day, dayIdx, totalDays, onRename, onRemove, onMoveDay, onChangeColor, onAddExercise, onAddCustomExercise, onRemoveExercise, onMoveExercise, onConfigExercise, onToggleSuperset, dumbbellDouble = null, onUpdateSettings = null, onDuplicateDay = null }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
 
@@ -8281,6 +8353,13 @@ function BuilderDayCard({ day, dayIdx, totalDays, onRename, onRemove, onMoveDay,
         </div>
         {day.exercises.length > 0 && (
           <span className="text-[10px] font-bold px-2 py-1.5 rounded-lg shrink-0" style={{ backgroundColor: day.color + "18", color: day.color }}>{day.exercises.length} ej. · {totalSets} series</span>
+        )}
+        {/* Duplicar el día completo: si tu Lunes y tu Jueves son parecidos,
+            antes había que armarlos dos veces desde cero. */}
+        {onDuplicateDay && day.exercises.length > 0 && (
+          <button onClick={onDuplicateDay} aria-label="Duplicar este día" title="Duplicar día" className="p-1.5 text-slate-600 hover:text-teal-400 shrink-0 transition-colors">
+            <Copy size={13} />
+          </button>
         )}
         {totalDays > 1 && <button onClick={onRemove} className="p-1.5 text-slate-600 hover:text-rose-400 shrink-0"><Trash2 size={14} /></button>}
       </div>
@@ -9478,6 +9557,29 @@ function RoutineBuilder({ initialRoutine, onCancel, onSave, dumbbellDouble = nul
   const [error, setError] = useState("");
 
   const addDay = () => setDays((d) => [...d, { key: builderUid("day"), label: `DÍA ${d.length + 1}`, color: BUILDER_COLOR_PALETTE[d.length % BUILDER_COLOR_PALETTE.length], exercises: [] }]);
+  // Duplicar un día con todos sus ejercicios y series.
+  //
+  // IMPORTANTE: los ids de ejercicio se CONSERVAN, no se regeneran. Tu récord
+  // de press banca es tuyo, no del día ni de la rutina: si al copiar el día le
+  // cambiáramos el id, el press banca copiado sería "otro ejercicio" y
+  // aparecería sin marcas. Que el mismo ejercicio esté en dos días es normal
+  // (y ya está contemplado: las tarjetas se identifican por día:ejercicio).
+  const duplicateDay = (idx) => {
+    setDays((d) => {
+      const orig = d[idx];
+      if (!orig) return d;
+      const copia = {
+        key: builderUid("day"),   // la KEY del día sí es nueva (es otro día)
+        label: `${orig.label} (copia)`,
+        color: BUILDER_COLOR_PALETTE[d.length % BUILDER_COLOR_PALETTE.length],
+        exercises: cloneRoutineDef(orig.exercises || []),  // copia profunda, mismos ids
+      };
+      const nuevo = [...d];
+      nuevo.splice(idx + 1, 0, copia); // la copia va justo después del original
+      return nuevo;
+    });
+    haptic(15);
+  };
   const removeDay = (idx) => {
     setDays((d) => {
       const removedKey = d[idx]?.key;
@@ -9562,6 +9664,7 @@ function RoutineBuilder({ initialRoutine, onCancel, onSave, dumbbellDouble = nul
         {days.map((day, idx) => (
           <BuilderDayCard key={day.key} day={day} dayIdx={idx} totalDays={days.length}
             dumbbellDouble={dumbbellDouble} onUpdateSettings={onUpdateSettings}
+            onDuplicateDay={() => duplicateDay(idx)}
             onRename={(label) => renameDay(idx, label)} onRemove={() => removeDay(idx)} onMoveDay={(delta) => moveDay(idx, delta)} onChangeColor={(color) => changeDayColor(idx, color)}
             onAddExercise={(libEx) => addExercise(idx, libEx)} onAddCustomExercise={(rawName, muscle) => addCustomExercise(idx, rawName, muscle)}
             onRemoveExercise={(exIdx) => removeExercise(idx, exIdx)} onMoveExercise={(exIdx, delta) => moveExercise(idx, exIdx, delta)}
@@ -9570,6 +9673,15 @@ function RoutineBuilder({ initialRoutine, onCancel, onSave, dumbbellDouble = nul
       </div>
 
       <button onClick={addDay} className="w-full flex items-center justify-center gap-1.5 py-3 rounded-2xl border border-dashed border-slate-700 text-slate-400 hover:text-white hover:border-slate-500 transition text-sm font-semibold"><Plus size={14} /> Agregar día</button>
+
+      {/* Balance EN VIVO mientras armás: acá es donde más sirve, porque podés
+          corregir el desbalance antes de entrenar tres meses con la rutina
+          torcida. Se actualiza solo a medida que agregás o sacás ejercicios. */}
+      {days.some((d) => (d.exercises || []).length > 0) && (
+        <div className="rounded-2xl bg-slate-900/50 border border-slate-800/60 p-3.5">
+          <BalanceMuscular routineDef={{ days: Object.fromEntries(days.map((d) => [d.key, d])), dayOrder: days.map((d) => d.key) }} />
+        </div>
+      )}
 
       <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 space-y-2.5">
         <div>
@@ -9841,6 +9953,205 @@ function PersonalizedRoutineWizard({ profile, onUpdateProfile, onCreateRoutine, 
   );
 }
 
+// ── HELPERS DE RUTINAS ────────────────────────────────────────────────────
+// Cuenta las series por grupo muscular de una rutina entera. Sirve para
+// mostrar el balance (¿le estás dando 12 series a pecho y 4 a espalda?) sin
+// que tengas que sumarlas a mano. Solo cuenta el músculo PRINCIPAL de cada
+// ejercicio: sumar los secundarios daría números inflados y confusos.
+function volumenPorMusculo(routineDef) {
+  if (!routineDef?.days) return [];
+  const conteo = {};
+  Object.values(routineDef.days).forEach((day) => {
+    (day.exercises || []).forEach((ex) => {
+      const lib = EXERCISE_LIBRARY_BY_ID[ex.libId || ex.id];
+      const g = lib?.group;
+      if (!g || g === "cardio") return;
+      conteo[g] = (conteo[g] || 0) + (ex.sets?.length || 0);
+    });
+  });
+  return Object.entries(conteo)
+    .map(([g, series]) => ({
+      grupo: g,
+      label: MUSCLE_GROUP_BY_KEY[g]?.label || g,
+      color: MUSCLE_GROUP_BY_KEY[g]?.color || "#64748b",
+      series,
+    }))
+    .sort((a, b) => b.series - a.series);
+}
+
+// Cuántas sesiones hiciste con una rutina y cuándo fue la última. Con varias
+// rutinas archivadas, esto es lo que te permite acordarte de cuál era cuál.
+function usoDeRutina(routineId, sessions) {
+  const propias = (sessions || []).filter((s) => s?.routineId === routineId && s?.date);
+  if (!propias.length) return { sesiones: 0, ultimaVez: null, diasDesde: null };
+  const fechas = propias.map((s) => s.date).sort();
+  const ultima = fechas[fechas.length - 1];
+  const dias = Math.round((new Date(todayStr()) - new Date(ultima)) / 86400000);
+  return { sesiones: propias.length, ultimaVez: ultima, diasDesde: dias };
+}
+
+// Texto humano para "hace cuánto": "hoy", "ayer", "hace 3 días", "hace 2 meses"
+function haceCuanto(dias) {
+  if (dias == null) return null;
+  if (dias <= 0) return "hoy";
+  if (dias === 1) return "ayer";
+  if (dias < 7) return `hace ${dias} días`;
+  if (dias < 14) return "hace 1 semana";
+  if (dias < 30) return `hace ${Math.floor(dias / 7)} semanas`;
+  if (dias < 60) return "hace 1 mes";
+  if (dias < 365) return `hace ${Math.floor(dias / 30)} meses`;
+  return "hace más de un año";
+}
+
+// Balance muscular de una rutina: barras horizontales, la más entrenada
+// arriba. Se muestra COLAPSADO por defecto (solo los 3 primeros + un "ver
+// todos") para no saturar: lo importante es detectar el desbalance de un
+// vistazo, no leer una tabla.
+function BalanceMuscular({ routineDef, compacto = true }) {
+  const [expandido, setExpandido] = useState(false);
+  const datos = useMemo(() => volumenPorMusculo(routineDef), [routineDef]);
+  if (!datos.length) return null;
+
+  const max = datos[0].series;
+  const mostrar = (compacto && !expandido) ? datos.slice(0, 3) : datos;
+  const totalSeries = datos.reduce((a, d) => a + d.series, 0);
+
+  return (
+    <div>
+      <div className="flex items-baseline justify-between mb-2">
+        <span className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-500">Balance muscular</span>
+        <span className="text-[9px] text-slate-600 tabular-nums">{totalSeries} series</span>
+      </div>
+      <div className="space-y-1.5">
+        {mostrar.map((d, i) => (
+          <div key={d.grupo} className="flex items-center gap-2">
+            <span className="text-[10px] text-slate-400 w-[88px] shrink-0 truncate">{d.label}</span>
+            <div className="flex-1 h-1.5 rounded-full bg-slate-800/70 overflow-hidden">
+              <div
+                className="h-full rounded-full grow-bar"
+                style={{
+                  width: `${(d.series / max) * 100}%`,
+                  backgroundColor: d.color,
+                  animationDelay: `${i * 60}ms`,
+                }}
+              />
+            </div>
+            <span className="text-[10px] font-bold text-slate-500 tabular-nums w-4 text-right shrink-0">{d.series}</span>
+          </div>
+        ))}
+      </div>
+      {compacto && datos.length > 3 && (
+        <button
+          onClick={() => setExpandido((v) => !v)}
+          className="mt-2 text-[10px] font-bold text-slate-500 hover:text-slate-300 transition"
+        >
+          {expandido ? "Ver menos" : `Ver los ${datos.length} grupos`}
+        </button>
+      )}
+    </div>
+  );
+}
+
+// Vista previa de una rutina ANTES de activarla. Hoy la activás a ciegas: el
+// nombre y "4 días" no te dicen si te sirve. Acá ves los días, sus ejercicios
+// y el balance muscular, y recién ahí decidís. Los días arrancan colapsados
+// (solo el primero abierto) para que no te caiga un muro de texto encima.
+function RoutinePreviewModal({ routineDef, routineName, onActivate, onClose, yaActiva = false }) {
+  const dias = routineDef?.dayOrder || Object.keys(routineDef?.days || {});
+  const [abierto, setAbierto] = useState(dias[0] || null);
+  if (!routineDef) return null;
+
+  const totalEjercicios = dias.reduce((a, dk) => a + (routineDef.days[dk]?.exercises?.length || 0), 0);
+
+  return (
+    <div className="fixed inset-0 z-[130] bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 modal-bg-in" onClick={onClose}>
+      <div
+        className="w-full sm:max-w-md max-h-[88vh] overflow-y-auto bg-slate-900 border border-slate-700/60 rounded-t-3xl sm:rounded-3xl modal-pop-in shadow-2xl shadow-black/70"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Encabezado fijo */}
+        <div className="sticky top-0 z-10 bg-slate-900 px-5 pt-5 pb-3 border-b border-slate-800/60">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-base font-black text-white leading-tight">{routineName}</p>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                {dias.length} día{dias.length !== 1 ? "s" : ""} · {totalEjercicios} ejercicio{totalEjercicios !== 1 ? "s" : ""}
+              </p>
+            </div>
+            <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition shrink-0">
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+
+        <div className="px-5 py-4 space-y-4">
+          {/* Balance: lo primero que querés saber es si está equilibrada */}
+          <div className="rounded-2xl bg-slate-950/50 border border-slate-800/60 p-3.5">
+            <BalanceMuscular routineDef={routineDef} />
+          </div>
+
+          {/* Los días, colapsables */}
+          <div className="space-y-2">
+            {dias.map((dk) => {
+              const day = routineDef.days[dk];
+              if (!day) return null;
+              const abiertoEste = abierto === dk;
+              return (
+                <div key={dk} className="rounded-2xl border overflow-hidden transition-colors" style={{ borderColor: abiertoEste ? day.color + "50" : "rgba(30,41,59,0.6)", backgroundColor: abiertoEste ? day.color + "0a" : "transparent" }}>
+                  <button
+                    onClick={() => setAbierto(abiertoEste ? null : dk)}
+                    className="w-full flex items-center gap-2.5 px-3.5 py-3 text-left"
+                  >
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: day.color }} />
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-xs font-black text-white truncate">{day.label}</span>
+                      <span className="block text-[10px] text-slate-500 truncate">{day.exercises?.length || 0} ejercicios</span>
+                    </span>
+                    <ChevronDown size={14} className="text-slate-600 shrink-0 transition-transform" style={{ transform: abiertoEste ? "rotate(180deg)" : "none" }} />
+                  </button>
+                  {abiertoEste && (
+                    <div className="px-3.5 pb-3 space-y-1 bounce-in">
+                      {(day.exercises || []).map((ex, i) => {
+                        const lib = EXERCISE_LIBRARY_BY_ID[ex.libId || ex.id];
+                        return (
+                          <div key={`${dk}:${ex.id || ex.libId}:${i}`} className="flex items-center gap-2 text-[11px]">
+                            <span className="text-slate-600 tabular-nums w-3.5 shrink-0">{i + 1}</span>
+                            <span className="flex-1 min-w-0 truncate text-slate-300">{lib?.name || ex.name || ex.libId}</span>
+                            <span className="text-slate-600 tabular-nums shrink-0">
+                              {ex.sets?.length || 0}×{ex.sets?.[0]?.repRange || "—"}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Botón fijo abajo */}
+        <div className="sticky bottom-0 bg-slate-900 border-t border-slate-800/60 px-5 py-3.5">
+          {yaActiva ? (
+            <div className="w-full py-3 rounded-2xl text-sm font-black text-center bg-slate-800 text-slate-500">
+              Ya es tu rutina activa
+            </div>
+          ) : (
+            <button
+              onClick={() => { onActivate?.(); onClose(); }}
+              className="w-full py-3 rounded-2xl text-sm font-black !text-white transition active:scale-[0.98] shadow-lg shadow-purple-500/25"
+              style={{ background: "linear-gradient(135deg,#A855F7,#7C3AED)" }}
+            >
+              Usar esta rutina
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRestore, onUpdateProfile, openScheduleSignal = 0, openEditorSignal = 0 }) {
   const [mode, setMode] = useState("catalog");
   const [showWizard, setShowWizard] = useState(false);
@@ -9848,6 +10159,8 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
   const [showPresetsForced, setShowPresetsForced] = useState(false);
   const [editingRoutineId, setEditingRoutineId] = useState(null);
   const [showSchedule, setShowSchedule] = useState(false);
+  const [showBalance, setShowBalance] = useState(false);   // balance muscular del héroe
+  const [preview, setPreview] = useState(null);            // {def, name, id, isPreset} de la rutina en vista previa
   const scheduleRef = useRef(null);
   // Al llegar desde el aviso "hoy es descanso" (que incrementa la señal),
   // abrimos el editor de días y scrolleamos hasta él.
@@ -9899,6 +10212,31 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
     return { days: activeDef.dayOrder.length, exercises, sets };
   }, [activeDef]);
 
+  // Cuántas veces usaste la rutina activa y cuándo fue la última
+  const activeUso = useMemo(
+    () => usoDeRutina(activeId, profile?.trainingSessions),
+    [activeId, profile?.trainingSessions]
+  );
+
+  // Uso de TODAS las rutinas en UNA sola pasada por el historial. Si llamáramos
+  // a usoDeRutina dentro del .map, recorreríamos las sesiones enteras una vez
+  // por rutina, en cada render (con 5 rutinas y 200 sesiones: 1000 iteraciones
+  // por render, y hay muchos renders).
+  const usoPorRutina = useMemo(() => {
+    const acc = {};
+    (profile?.trainingSessions || []).forEach((s) => {
+      if (!s?.routineId || !s?.date) return;
+      const e = (acc[s.routineId] ||= { sesiones: 0, ultimaVez: null, diasDesde: null });
+      e.sesiones++;
+      if (!e.ultimaVez || s.date > e.ultimaVez) e.ultimaVez = s.date;
+    });
+    const hoy = new Date(todayStr());
+    Object.values(acc).forEach((e) => {
+      e.diasDesde = e.ultimaVez ? Math.round((hoy - new Date(e.ultimaVez)) / 86400000) : null;
+    });
+    return acc;
+  }, [profile?.trainingSessions]);
+
   const activeSchedule = activeDef ? getRoutineWeekSchedule(activeDef) : {};
   const updateActiveScheduleDay = (wk, dayKeyOrNull) => { onUpdate(activeId, { ...activeDef, weekSchedule: { ...activeSchedule, [wk]: dayKeyOrNull } }); };
 
@@ -9915,6 +10253,15 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
   // con source:"preset" siempre se resincroniza con el catálogo en vivo,
   // así que editar el clon original no serviría de nada) — en cambio,
   // crea una copia personal con source:"custom" y abre el armador ahí.
+  // Duplicar una rutina propia: querés probar una variante sin romper la que
+  // ya usás. Antes había que rearmarla entera a mano.
+  const handleDuplicate = (id, def) => {
+    const newId = builderUid("custom_routine");
+    const clone = { ...cloneRoutineDef(def), source: "custom", name: `${def.name} (copia)` };
+    onUpdate(newId, clone);
+    haptic(15);
+  };
+
   const handleEditPreset = (preset) => {
     const newId = builderUid("custom_routine");
     const clone = { ...cloneRoutineDef(preset), source: "custom", name: `${preset.name} (mi copia)` };
@@ -10064,25 +10411,57 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
       )}
 
       {!forced && activeDef && (
-        <div className="relative overflow-hidden rounded-2xl border border-purple-500/25 p-4 shadow-md shadow-black/20" style={{ background: "var(--grad-hero-purple)" }}>
-          <div className="absolute -top-10 -right-10 w-32 h-32 rounded-full bg-purple-500/20 blur-3xl pointer-events-none" />
+        // ── HÉROE: la rutina activa domina la pantalla ──────────────────────
+        // Antes era una tarjeta más entre otras. Ahora es lo primero y lo más
+        // grande: ves sus días de un vistazo (con su color), y el detalle
+        // (balance, cronograma) queda a un toque para no saturar.
+        <div className="relative overflow-hidden rounded-3xl border p-4 shadow-lg shadow-black/25 breathe" style={{ background: "var(--grad-hero-purple)", borderColor: "rgba(168,85,247,0.3)", "--breathe-color": "rgba(168,85,247,0.35)" }}>
+          <div className="absolute -top-12 -right-12 w-40 h-40 rounded-full bg-purple-500/20 blur-3xl pointer-events-none" />
+
           <div className="relative flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-purple-500/20 text-purple-300 flex items-center justify-center shrink-0"><Dumbbell size={17} /></div>
+            <div className="w-11 h-11 rounded-2xl bg-purple-500/25 text-purple-200 flex items-center justify-center shrink-0 ring-1 ring-inset ring-white/10"><Dumbbell size={18} /></div>
             <div className="min-w-0 flex-1">
-              <span className="text-[10px] font-black uppercase tracking-widest text-purple-300">Tu rutina activa</span>
-              <h3 className="text-base font-black text-white leading-tight">{activeDef.name}</h3>
+              <span className="text-[9px] font-black uppercase tracking-[0.16em] text-purple-300/90">Tu rutina activa</span>
+              <h3 className="text-[17px] font-black text-white leading-tight truncate">{activeDef.name}</h3>
+              <p className="text-[10px] text-slate-400 mt-0.5 tabular-nums">
+                {activeStats.days} días · {activeStats.exercises} ejercicios · {activeStats.sets} series
+                {activeUso.sesiones > 0 && <span className="text-slate-500"> · {activeUso.sesiones} sesion{activeUso.sesiones !== 1 ? "es" : ""}</span>}
+              </p>
             </div>
             <button onClick={() => setShareTarget(activeDef)} aria-label="Compartir rutina activa" className="p-2 rounded-xl text-purple-200 hover:text-white hover:bg-white/10 transition shrink-0"><Share2 size={15} /></button>
           </div>
-          {activeDef.description && <p className="relative text-[11px] text-slate-400 mt-2.5">{activeDef.description}</p>}
-          <div className="relative grid grid-cols-3 gap-2 mt-3.5">
-            <div className="bg-black/20 rounded-xl p-2 text-center"><p className="text-sm font-black text-white tabular-nums">{activeStats.days}</p><p className="text-[9px] text-slate-500 mt-0.5">Días</p></div>
-            <div className="bg-black/20 rounded-xl p-2 text-center"><p className="text-sm font-black text-white tabular-nums">{activeStats.exercises}</p><p className="text-[9px] text-slate-500 mt-0.5">Ejercicios</p></div>
-            <div className="bg-black/20 rounded-xl p-2 text-center"><p className="text-sm font-black text-white tabular-nums">{activeStats.sets}</p><p className="text-[9px] text-slate-500 mt-0.5">Series</p></div>
+
+          {/* Los días, en chips con su color: el vistazo más útil de la pantalla */}
+          <div className="relative flex gap-1.5 flex-wrap mt-3.5">
+            {(activeDef.dayOrder || Object.keys(activeDef.days || {})).map((dk) => {
+              const d = activeDef.days?.[dk];
+              if (!d) return null;
+              return (
+                <span key={dk} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[10px] font-bold" style={{ backgroundColor: d.color + "1e", color: d.color, border: `1px solid ${d.color}38` }}>
+                  <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: d.color }} />
+                  {d.label}
+                  <span className="opacity-50 tabular-nums">{d.exercises?.length || 0}</span>
+                </span>
+              );
+            })}
           </div>
-          <button ref={scheduleRef} onClick={() => setShowSchedule((s) => !s)} className="relative w-full flex items-center justify-center gap-1.5 mt-3 py-2 rounded-xl border border-white/10 text-purple-200 hover:text-white transition text-[11px] font-bold">
-            <Calendar size={11} /> {showSchedule ? "Ocultar" : "Configurar"} días de la semana
-          </button>
+
+          {/* Acciones: dos botones parejos, sin ruido */}
+          <div className="relative grid grid-cols-2 gap-2 mt-3.5">
+            <button onClick={() => setShowBalance((v) => !v)} className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-white/10 text-purple-200 hover:text-white hover:bg-white/5 transition text-[11px] font-bold">
+              <Activity size={11} /> {showBalance ? "Ocultar" : "Balance"}
+            </button>
+            <button ref={scheduleRef} onClick={() => setShowSchedule((s) => !s)} className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-white/10 text-purple-200 hover:text-white hover:bg-white/5 transition text-[11px] font-bold">
+              <Calendar size={11} /> {showSchedule ? "Ocultar" : "Cronograma"}
+            </button>
+          </div>
+
+          {showBalance && (
+            <div className="relative mt-3 pt-3 border-t border-white/10 tab-fade-in">
+              <BalanceMuscular routineDef={activeDef} />
+            </div>
+          )}
+
           {showSchedule && (
             <div className="relative mt-3 pt-3 border-t border-white/10 tab-fade-in">
               <p className="text-[11px] text-slate-400 mb-2.5">Elegí qué día de tu rutina (o descanso) le toca a cada día de la semana. Podés repetir días.</p>
@@ -10098,7 +10477,10 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
           <div className="space-y-2">
             {customEntries.map(([id, r]) => (
               <SavedRoutineRow key={id} routine={r} isActive={id === activeId} onUse={() => handleUseClick(id, null)}
-                onEdit={() => { setEditingRoutineId(id); setMode("builder"); }} onShare={() => setShareTarget(r)} onArchive={() => onArchive(id)} />
+                onEdit={() => { setEditingRoutineId(id); setMode("builder"); }} onShare={() => setShareTarget(r)} onArchive={() => onArchive(id)}
+                onDuplicate={() => handleDuplicate(id, r)}
+                onPreview={() => setPreview({ def: r, name: r.name, id, isPreset: false })}
+                uso={usoPorRutina[id] || null} />
             ))}
           </div>
           <p className="text-[10px] text-slate-700 mt-2">Deslizá una rutina hacia la derecha para quitarla de esta lista sin borrarla.</p>
@@ -10130,7 +10512,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
         <div className="flex items-center gap-1.5 mb-2"><Sparkles size={13} className="text-slate-500" /><p className="text-xs font-black uppercase tracking-widest text-slate-500">Rutinas preestablecidas</p></div>
         <div className="space-y-2">
           {PRESET_ROUTINES.map((preset) => (
-            <PresetRoutineCard key={preset.id} preset={preset} isActive={preset.id === activeId} onUse={() => handleUseClick(preset.id, cloneRoutineDef(preset))} onEdit={() => handleEditPreset(preset)} />
+            <PresetRoutineCard key={preset.id} preset={preset} isActive={preset.id === activeId} onUse={() => handleUseClick(preset.id, cloneRoutineDef(preset))} onEdit={() => handleEditPreset(preset)} onPreview={() => setPreview({ def: preset, name: preset.name, id: preset.id, isPreset: true })} />
           ))}
         </div>
       </div>
@@ -10141,6 +10523,17 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
         <button onClick={() => { setEditingRoutineId(null); setMode("builder"); }} className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98] shadow-lg shadow-purple-500/20" style={{ background: "linear-gradient(135deg,#A855F7,#7E22CE)" }}><Sparkles size={15} /> Crear mi rutina</button>
         <button onClick={() => setShowImport(true)} className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition text-sm font-bold active:scale-[0.98]"><Download size={15} /> Importar rutina</button>
       </div>
+      )}
+
+      {/* Vista previa: ves los días, ejercicios y el balance ANTES de activar */}
+      {preview && (
+        <RoutinePreviewModal
+          routineDef={preview.def}
+          routineName={preview.name}
+          yaActiva={preview.id === activeId}
+          onActivate={() => handleUseClick(preview.id, preview.isPreset ? cloneRoutineDef(preview.def) : null)}
+          onClose={() => setPreview(null)}
+        />
       )}
 
       {shareTarget && (
@@ -11007,7 +11400,10 @@ export default function App() {
     setProfiles((prev) => {
       const p = prev[activeProfile];
       if (!p?.activeSession) return prev;
+      // Guardamos CON QUÉ RUTINA se hizo: es lo que permite mostrar después
+      // "24 sesiones · usada hace 3 meses" en cada rutina.
       const finished = { date: todayStr(), dayKey: p.activeSession.dayKey, startedAt: p.activeSession.startedAt, endedAt: new Date().toISOString() };
+      if (p.activeRoutineId) finished.routineId = p.activeRoutineId;
       const np = { ...prev, [activeProfile]: { ...p, activeSession: null, trainingSessions: [...(p.trainingSessions || []), finished], drafts: {} } };
       saveProfiles(np);
       return np;
@@ -11033,6 +11429,7 @@ export default function App() {
       const p = prev[activeProfile];
       if (!p) return prev;
       const finished = { date: todayStr(), dayKey, startedAt: new Date().toISOString(), endedAt: new Date().toISOString(), deload: true };
+      if (p.activeRoutineId) finished.routineId = p.activeRoutineId;
       const np = { ...prev, [activeProfile]: { ...p, trainingSessions: [...(p.trainingSessions || []), finished] } };
       saveProfiles(np);
       return np;
