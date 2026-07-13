@@ -2666,62 +2666,60 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default", 
   }, [running]);
 
   const pct = Math.max(0, Math.min(100, (remaining / seconds) * 100));
-  // Cronómetro con ANILLO circular de progreso: el tiempo vive dentro del
-  // anillo, que se vacía a medida que descansás. En los últimos 10 segundos
-  // todo se tiñe de ámbar y el número late. Al terminar, el anillo se
-  // completa en verde.
-  const R = 31, C = 2 * Math.PI * R;
+  // Cronómetro estilo "barra de energía": el tiempo grande a la izquierda y
+  // una barra que se vacía ocupando todo el ancho. En los últimos 10 segundos
+  // se tiñe de ámbar y late; al terminar se pone verde. Sin adornos ni
+  // círculos: se lee de un vistazo desde lejos, que es lo que importa cuando
+  // estás por volver a la serie.
   const urgent = running && remaining <= 10 && remaining > 0;
   const done = remaining === 0;
-  const ringColor = done ? "#10B981" : urgent ? "#F59E0B" : accent;
+  const barColor = done ? "#10B981" : urgent ? "#F59E0B" : accent;
   return (
-        <div className="relative rounded-2xl overflow-hidden transition-all duration-300" style={{
-          background: running ? `linear-gradient(130deg, ${ringColor}12, ${ringColor}04)` : "rgba(15,23,42,0.5)",
-          border: `1px solid ${running ? ringColor + "35" : "rgba(30,41,59,0.6)"}`,
-          boxShadow: urgent ? `0 0 20px -6px ${ringColor}70` : "none",
-        }}>
-          {running && <div className="absolute -top-10 -right-8 w-32 h-32 rounded-full blur-3xl pointer-events-none transition-opacity" style={{ backgroundColor: ringColor, opacity: urgent ? 0.28 : 0.14 }} />}
+    <div className="relative rounded-2xl overflow-hidden px-3.5 py-2.5 transition-colors duration-300" style={{
+      backgroundColor: running ? barColor + "0e" : "rgba(15,23,42,0.5)",
+      border: `1px solid ${running ? barColor + "30" : "rgba(30,41,59,0.6)"}`,
+    }}>
+      <div className="flex items-center gap-3">
+        {/* Tiempo protagonista */}
+        <span
+          className={`text-2xl font-black tabular-nums shrink-0 transition-colors ${urgent ? "soft-pulse" : ""}`}
+          style={{ color: running || done ? barColor : "#94a3b8", textShadow: urgent ? `0 0 16px ${barColor}70` : "none" }}
+        >
+          {formatTime(remaining)}
+        </span>
 
-          <div className="relative flex items-center gap-3.5 px-3.5 py-3">
-            {/* Anillo de progreso con el tiempo adentro — protagonista */}
-            <div className="relative shrink-0" style={{ width: 74, height: 74 }}>
-              <svg width="74" height="74" className="-rotate-90">
-                <circle cx="37" cy="37" r={R} fill="none" stroke="rgba(30,41,59,0.9)" strokeWidth="5" />
-                <circle
-                  cx="37" cy="37" r={R} fill="none"
-                  stroke={ringColor} strokeWidth="5" strokeLinecap="round"
-                  strokeDasharray={C}
-                  strokeDashoffset={C - (C * pct) / 100}
-                  style={{ transition: "stroke-dashoffset 0.95s linear, stroke 0.3s", filter: `drop-shadow(0 0 7px ${ringColor})` }}
-                />
-              </svg>
-              <span
-                className={`absolute inset-0 flex items-center justify-center text-[17px] font-black tabular-nums transition-colors ${urgent ? "soft-pulse" : ""}`}
-                style={{ color: running || done ? ringColor : "#94a3b8", textShadow: running ? `0 0 12px ${ringColor}60` : "none" }}
-              >
-                {formatTime(remaining)}
-              </span>
-            </div>
-
-            {/* Etiqueta + estado */}
-            <div className="flex-1 min-w-0 leading-none">
-              <span className="block text-[8.5px] font-black uppercase tracking-[0.16em] text-slate-500 mb-1.5">Descanso</span>
-              <span className="text-xs font-bold transition-colors" style={{ color: done ? "#10B981" : urgent ? "#FBBF24" : running ? "#cbd5e1" : "#64748b" }}>
-                {done ? "¡Dale, a la serie! 💪" : urgent ? "Preparate…" : running ? "Recuperando" : `${formatTime(seconds)} en total`}
-              </span>
-            </div>
-
-            {/* Controles */}
-            <div className="flex gap-1.5 shrink-0">
-              <button onClick={() => { haptic(15); setRunning((r) => !r); }} aria-label={running ? "Pausar" : "Iniciar"} className="w-10 h-10 rounded-xl flex items-center justify-center active:scale-90 transition" style={running ? { background: `linear-gradient(160deg, ${accent}, ${accent}b0)`, color: "#fff" } : { backgroundColor: accent + "1e", color: accent, border: `1px solid ${accent}40` }}>
-                {running ? <Pause size={16} /> : <Play size={16} className="ml-0.5" />}
-              </button>
-              <button onClick={() => { setRunning(false); setRemaining(seconds); endTimeRef.current = null; firedRef.current = false; }} aria-label="Reiniciar" className="w-10 h-10 rounded-xl flex items-center justify-center active:scale-90 transition text-slate-500 hover:text-slate-300 bg-slate-800/50 border border-slate-700/50">
-                <RotateCcw size={14} />
-              </button>
-            </div>
+        {/* Barra que se vacía + etiqueta de estado */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline justify-between mb-1.5">
+            <span className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">Descanso</span>
+            <span className="text-[10px] font-bold transition-colors" style={{ color: done ? "#10B981" : urgent ? "#FBBF24" : "#64748b" }}>
+              {done ? "¡Dale! 💪" : urgent ? "Preparate…" : formatTime(seconds)}
+            </span>
+          </div>
+          <div className="h-1.5 rounded-full overflow-hidden bg-slate-800/70">
+            <div
+              className="h-full rounded-full"
+              style={{
+                width: `${pct}%`,
+                background: `linear-gradient(90deg, ${barColor}90, ${barColor})`,
+                boxShadow: running ? `0 0 8px ${barColor}80` : "none",
+                transition: "width 0.95s linear, background 0.3s",
+              }}
+            />
           </div>
         </div>
+
+        {/* Controles */}
+        <div className="flex gap-1.5 shrink-0">
+          <button onClick={() => { haptic(15); setRunning((r) => !r); }} aria-label={running ? "Pausar" : "Iniciar"} className="w-9 h-9 rounded-xl flex items-center justify-center active:scale-90 transition" style={running ? { background: `linear-gradient(160deg, ${accent}, ${accent}b0)`, color: "#fff" } : { backgroundColor: accent + "1e", color: accent, border: `1px solid ${accent}40` }}>
+            {running ? <Pause size={15} /> : <Play size={15} className="ml-0.5" />}
+          </button>
+          <button onClick={() => { setRunning(false); setRemaining(seconds); endTimeRef.current = null; firedRef.current = false; }} aria-label="Reiniciar" className="w-9 h-9 rounded-xl flex items-center justify-center active:scale-90 transition text-slate-500 hover:text-slate-300 bg-slate-800/50 border border-slate-700/50">
+            <RotateCcw size={13} />
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -3219,6 +3217,21 @@ const HELP_CHAPTERS = [
         demo: { kind: "rutina", view: "card-closed", caption: "Tocá la tarjeta para desplegarla" },
       },
       {
+        icon: <StickyNote size={20} />,
+        title: "Notas por ejercicio",
+        text: "Tocá el ícono de nota en la tarjeta de cualquier ejercicio para escribir tus recordatorios: \"agarre más cerrado\", \"el banco 3 está flojo\", \"probar pausa abajo\". La nota queda siempre visible bajo el nombre y se sincroniza con tu cuenta.",
+      },
+      {
+        icon: <Dumbbell size={20} />,
+        title: "¿Una o dos mancuernas?",
+        text: "En los ejercicios de mancuerna aparece un chip ×1/×2. Tocalo para indicar cuántas usás: con dos de 20kg, tu rango cuenta 40kg de carga real en vez de 20. También podés configurarlo al editar la rutina.",
+      },
+      {
+        icon: <Sliders size={20} />,
+        title: "Personalizá qué ves al registrar",
+        text: "¿No usás el RPE o el calentamiento? Apagalos y la ficha queda más limpia. Está en Perfil → \"Qué ves al registrar\", o con el botón que aparece en el recuadro \"Tu entrenamiento\". Tiene vista previa en vivo: ves cómo queda mientras elegís.",
+      },
+      {
         icon: <Save size={20} />,
         title: "Registrá tus series",
         text: "Ingresás reps y kg y tocás guardar. La primera vez no muestra récord — desde la segunda mejora en adelante aparece el confetti.",
@@ -3350,6 +3363,11 @@ const HELP_CHAPTERS = [
         text: "Al configurar un ejercicio en el builder podés poner un rango de reps distinto para cada serie. Así armás fácilmente series de back-off o pirámides (ej. S1: 4-6, S2: 8-10, S3: 12-15).",
       },
       {
+        icon: <GripVertical size={20} />,
+        title: "Reordená arrastrando",
+        text: "En el editor de rutinas, mantené apretada el asa (⠿) de cualquier ejercicio y deslizá para cambiarlo de lugar. La fila destino se ilumina mientras arrastrás. Las flechas siguen ahí si preferís tocar.",
+      },
+      {
         icon: <Link size={20} />,
         title: "Superseries",
         text: "Debajo de cada ejercicio hay un botón para vincularlo en superserie con el siguiente — se hacen uno tras otro sin descanso y comparten un solo cronómetro.",
@@ -3376,7 +3394,7 @@ const HELP_CHAPTERS = [
       {
         icon: <Sparkles size={20} />,
         title: "Entrenador IA: tu asistente personal",
-        text: "Conoce tu historial completo — marcas, fechas, pesos, rutinas y ciclo. Preguntale lo que quieras y responde con datos concretos sobre tu entrenamiento real.",
+        text: "Conoce tu entrenamiento real: tus marcas con fecha, si venís subiendo o estancado en cada ejercicio, cuánto volumen le das a cada músculo y hace cuántos días no entrenás alguno. Preguntale \"¿por qué me estanqué en press banca?\" o \"armame el día de mañana\" y responde con TUS números, no con generalidades.",
       },
       {
         icon: <Layers size={20} />,
@@ -3438,6 +3456,11 @@ const HELP_CHAPTERS = [
         title: "Descanso entre series",
         text: "Elegís si avisamos con sonido, vibración o ambos, y cuánto dura el descanso para ejercicios pesados y para el resto.",
         demo: { kind: "perfil", view: "descanso", caption: "Probá cambiar el tipo de aviso" },
+      },
+      {
+        icon: <Bell size={20} />,
+        title: "Recordatorio de entrenamiento",
+        text: "Activalo y elegí la hora: te avisa \"💪 Hoy toca Push\" solo los días que te toca entrenar según tu cronograma. Los días de descanso no te molesta.",
       },
       {
         icon: <Sun size={20} />,
@@ -7518,7 +7541,7 @@ function ExercisePickerPanel({ existingIds, onAdd, onAddCustom, onClose }) {
 
 const REP_RANGE_OPTIONS = ["1-3", "3-5", "4-6", "6-8", "8-10", "10-12", "12-15", "15-20"];
 
-function BuilderExerciseRow({ ex, canMoveUp, canMoveDown, onMove, onRemove, onConfigChange, dragHandlers = null, isDragging = false, isDragOver = false }) {
+function BuilderExerciseRow({ ex, canMoveUp, canMoveDown, onMove, onRemove, onConfigChange, dragHandlers = null, isDragging = false, isDragOver = false, dumbbellFactor = null, onToggleDumbbell = null }) {
   const [editing, setEditing] = useState(false);
   const repRange = ex.sets[0]?.repRange || "8-10";
   const setsCount = ex.sets.length;
@@ -7560,13 +7583,22 @@ function BuilderExerciseRow({ ex, canMoveUp, canMoveDown, onMove, onRemove, onCo
             {!ex.cardio && heavy && <span className="text-[9px] font-bold px-1 py-0.5 rounded bg-amber-500/15 text-amber-400 shrink-0">FUERZA</span>}
             {!ex.libId && <span className="text-[9px] text-slate-600 shrink-0">propio</span>}
           </div>
-          <p className="text-[10px] text-slate-500">
-            {ex.cardio
-              ? `${setsCount} bloque${setsCount !== 1 ? "s" : ""} de tiempo`
-              : allSame
-                ? `${setsCount} series · ${repRange} reps`
-                : `${setsCount} series · rangos mixtos`
-            }
+          <p className="text-[10px] text-slate-500 flex items-center gap-1.5 flex-wrap">
+            <span>
+              {ex.cardio
+                ? `${setsCount} bloque${setsCount !== 1 ? "s" : ""} de tiempo`
+                : allSame
+                  ? `${setsCount} series · ${repRange} reps`
+                  : `${setsCount} series · rangos mixtos`
+              }
+            </span>
+            {/* Chip de mancuernas: se muestra solo cuando el ejercicio está
+                configurado con DOS. Discreto pero visible de un vistazo. */}
+            {dumbbellFactor === 2 && (
+              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9px] font-black bg-teal-500/15 text-teal-400 border border-teal-500/25">
+                <Dumbbell size={8} /> ×2
+              </span>
+            )}
           </p>
         </button>
         <button onClick={() => setEditing((o) => !o)} className="p-1.5 text-slate-500 hover:text-teal-400 shrink-0"><SlidersHorizontal size={14} /></button>
@@ -7574,6 +7606,29 @@ function BuilderExerciseRow({ ex, canMoveUp, canMoveDown, onMove, onRemove, onCo
       </div>
       {editing && (
         <div className="mt-2.5 pt-2.5 border-t border-slate-800/60 space-y-3 bounce-in">
+          {/* ¿Una o dos mancuernas? Define si el peso que registrás cuenta
+              simple o doble para tu rango muscular. Solo aparece en
+              ejercicios de mancuerna (por el nombre). */}
+          {!ex.cardio && onToggleDumbbell && /mancuerna/i.test(ex.name || "") && (
+            <div>
+              <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">¿Con cuántas mancuernas?</p>
+              <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
+                {[{ v: 1, l: "Una", d: "El peso cuenta tal cual" }, { v: 2, l: "Dos", d: "El peso cuenta ×2" }].map((opt) => {
+                  const on = (dumbbellFactor || 1) === opt.v;
+                  return (
+                    <button key={opt.v} onClick={() => onToggleDumbbell(opt.v)} className={`flex-1 py-2 rounded-lg text-[11px] font-bold transition-all ${on ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>
+                      <span className="flex items-center justify-center gap-1"><Dumbbell size={10} /> {opt.l}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="text-[9.5px] text-slate-600 mt-1.5">
+                {(dumbbellFactor || 1) === 2
+                  ? "Con dos de 20kg, tu rango cuenta 40kg de carga real."
+                  : "El peso que anotes es el que cuenta para tu rango."}
+              </p>
+            </div>
+          )}
           {/* Cantidad de bloques/series */}
           <div>
             <p className="text-[10px] text-slate-500 mb-1.5">{ex.cardio ? "Bloques (intervalos)" : "Cantidad de series"}</p>
@@ -7611,7 +7666,7 @@ function BuilderExerciseRow({ ex, canMoveUp, canMoveDown, onMove, onRemove, onCo
   );
 }
 
-function BuilderDayCard({ day, dayIdx, totalDays, onRename, onRemove, onMoveDay, onChangeColor, onAddExercise, onAddCustomExercise, onRemoveExercise, onMoveExercise, onConfigExercise, onToggleSuperset }) {
+function BuilderDayCard({ day, dayIdx, totalDays, onRename, onRemove, onMoveDay, onChangeColor, onAddExercise, onAddCustomExercise, onRemoveExercise, onMoveExercise, onConfigExercise, onToggleSuperset, dumbbellDouble = null, onUpdateSettings = null }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
 
@@ -7717,7 +7772,9 @@ function BuilderDayCard({ day, dayIdx, totalDays, onRename, onRemove, onMoveDay,
               onMove={(delta) => onMoveExercise(i, delta)} onRemove={() => onRemoveExercise(i)}
               onConfigChange={(cfg) => onConfigExercise(i, cfg)}
               isDragging={dragIdx === i} isDragOver={overIdx === i && dragIdx !== null && dragIdx !== i}
-              dragHandlers={{ handle: { onPointerDown: (e) => startDrag(e, i) } }} />
+              dragHandlers={{ handle: { onPointerDown: (e) => startDrag(e, i) } }}
+              dumbbellFactor={(dumbbellDouble || {})[ex.id] || EXERCISE_LIBRARY_BY_ID[ex.id]?.loadFactor || 1}
+              onToggleDumbbell={onUpdateSettings ? (v) => onUpdateSettings({ dumbbellDouble: { ...(dumbbellDouble || {}), [ex.id]: v } }) : null} />
             {i < day.exercises.length - 1 && (
               <button onClick={() => onToggleSuperset(i)} className="w-full flex items-center justify-center gap-1.5 my-1 py-2 rounded-lg text-[11px] font-bold transition-all active:scale-[0.98] border"
                 style={ex.supersetNext ? { backgroundColor: day.color + "22", borderColor: day.color + "60", color: day.color } : { backgroundColor: "transparent", borderColor: "var(--chip-border)", color: "var(--chip-text)", borderStyle: "dashed" }}>
@@ -8832,7 +8889,7 @@ function WeeklyScheduleEditor({ dayOrder, days, schedule, onChange }) {
   );
 }
 
-function RoutineBuilder({ initialRoutine, onCancel, onSave }) {
+function RoutineBuilder({ initialRoutine, onCancel, onSave, dumbbellDouble = null, onUpdateSettings = null }) {
   const isEditing = !!initialRoutine;
   const [name, setName] = useState(initialRoutine?.name || "");
   const [days, setDays] = useState(() => (initialRoutine ? builderDaysFromRoutineDef(initialRoutine) : [{ key: builderUid("day"), label: "DÍA 1", color: BUILDER_COLOR_PALETTE[0], exercises: [] }]));
@@ -8923,6 +8980,7 @@ function RoutineBuilder({ initialRoutine, onCancel, onSave }) {
       <div className="space-y-3">
         {days.map((day, idx) => (
           <BuilderDayCard key={day.key} day={day} dayIdx={idx} totalDays={days.length}
+            dumbbellDouble={dumbbellDouble} onUpdateSettings={onUpdateSettings}
             onRename={(label) => renameDay(idx, label)} onRemove={() => removeDay(idx)} onMoveDay={(delta) => moveDay(idx, delta)} onChangeColor={(color) => changeDayColor(idx, color)}
             onAddExercise={(libEx) => addExercise(idx, libEx)} onAddCustomExercise={(rawName, muscle) => addCustomExercise(idx, rawName, muscle)}
             onRemoveExercise={(exIdx) => removeExercise(idx, exIdx)} onMoveExercise={(exIdx, delta) => moveExercise(idx, exIdx, delta)}
@@ -9313,6 +9371,8 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
   if (mode === "builder") {
     return (
       <RoutineBuilder
+        dumbbellDouble={getProfileSettings(profile)?.dumbbellDouble || null}
+        onUpdateSettings={(patch) => onUpdateProfile?.({ settings: { ...getProfileSettings(profile), ...patch } })}
         initialRoutine={editingRoutineId ? routines[editingRoutineId] : null}
         onCancel={() => { setMode("catalog"); setEditingRoutineId(null); }}
         onSave={(def) => {
@@ -9615,12 +9675,121 @@ const TAB_TITLES = { rutinas: "Rutinas", rutina: "Rutina", progreso: "Progreso",
 // usuario completa todo: fecha de inicio de ciclo, datos del perfil
 // (sexo, edad, peso, altura) y su primera marca registrada. Cuando todo
 // está completo se marca profile.onboardingDone y desaparece PARA SIEMPRE.
-function OnboardingTasksCard({ profile, cycleStart, logs, onGoToProfile, onDone }) {
+// Modal de bienvenida para configurar la ficha de registro. Lo distintivo:
+// una VISTA PREVIA EN VIVO arriba que se actualiza al tocar cada switch —
+// ves exactamente qué aparece y qué desaparece, en vez de adivinar por el
+// nombre de la opción. Aparece como tarea del onboarding y también desde
+// Perfil cuando quieras cambiarlo.
+function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
+  const s = settings || DEFAULT_SETTINGS;
+  const on = (k) => s[k] !== false;
+  const OPCIONES = [
+    { key: "showWarmup", label: "Calentamiento sugerido", desc: "Una rampa de series previas calculada desde tu marca (50% → 70% → 85%). Útil en ejercicios pesados." },
+    { key: "showRpe", label: "Esfuerzo (RPE)", desc: "Registrá del 1 al 10 qué tan duro fue. Sirve para saber si podés subir peso o conviene bajar." },
+    { key: "show1RMPercent", label: "Porcentaje de 1RM", desc: "A qué porcentaje de tu récord estás levantando ahora mismo." },
+    { key: "showCoaching", label: "Consejos al guardar", desc: "Un mensaje corto comparando la serie con tu marca (📈 subiste, ✓ igualaste, 📉 bajaste)." },
+  ];
+
+  return (
+    <div className="fixed inset-0 z-[140] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in" onClick={onClose}>
+      <div className="max-w-md w-full max-h-[92vh] overflow-y-auto bg-slate-900 border border-slate-700/60 rounded-3xl modal-pop-in shadow-2xl shadow-black/70" onClick={(e) => e.stopPropagation()}>
+        <div className="sticky top-0 z-10 bg-slate-900 px-5 pt-5 pb-3 border-b border-slate-800/60">
+          <div className="flex items-start justify-between gap-3 mb-1">
+            <div className="flex items-center gap-2">
+              <Sliders size={16} className="text-teal-400" />
+              <p className="text-base font-black text-white">Personalizá tu ficha</p>
+            </div>
+            <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition shrink-0"><X size={16} /></button>
+          </div>
+          <p className="text-[11px] text-slate-500 leading-snug">Elegí qué querés ver al registrar una serie. Mirá cómo cambia acá abajo en vivo — podés cambiarlo cuando quieras desde Perfil.</p>
+        </div>
+
+        <div className="px-5 py-4">
+          {/* ── VISTA PREVIA EN VIVO ── */}
+          <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-600 mb-2">Así se va a ver</p>
+          <div className="rounded-2xl bg-slate-950/70 border border-slate-800 p-3 mb-5">
+            <div className="flex items-center gap-2 mb-2.5">
+              <span className="text-xs font-bold text-white">Press Banca</span>
+              <span className="text-[9px] px-1.5 py-0.5 rounded-md font-bold bg-teal-500/15 text-teal-400">Pectoral</span>
+            </div>
+
+            {on("showWarmup") && (
+              <div className="mb-2 rounded-xl px-2.5 py-2 bounce-in" style={{ backgroundColor: "#14B8A610", border: "1px solid #14B8A630" }}>
+                <p className="text-[10px] font-bold text-teal-400 flex items-center gap-1"><Flame size={9} /> Calentamiento: 40kg → 55kg → 70kg</p>
+              </div>
+            )}
+
+            <div className="rounded-xl px-2.5 py-2 mb-2" style={{ background: "linear-gradient(120deg,#14B8A620,#14B8A60c)", border: "1px solid #14B8A645" }}>
+              <span className="block text-[8px] font-black uppercase tracking-[0.16em] text-teal-400/70 mb-0.5">A superar</span>
+              <span className="text-base font-black text-teal-400 tabular-nums">8<span className="opacity-50 text-xs mx-0.5">×</span>80<span className="opacity-60 text-[10px] ml-0.5">kg</span></span>
+            </div>
+
+            <div className="flex items-stretch rounded-xl bg-slate-950/80 border border-slate-800 overflow-hidden mb-2">
+              <div className="flex-1 px-2.5 py-1.5 text-center border-r border-slate-800">
+                <span className="block text-[8px] font-black uppercase tracking-wider text-slate-600">Reps</span>
+                <span className="text-sm font-black text-white tabular-nums">8</span>
+              </div>
+              <div className="flex-1 px-2.5 py-1.5 text-center">
+                <span className="block text-[8px] font-black uppercase tracking-wider text-slate-600">Kg</span>
+                <span className="text-sm font-black text-white tabular-nums">82.5</span>
+              </div>
+              <span className="w-10 flex items-center justify-center text-white" style={{ background: "linear-gradient(160deg,#14B8A6,#14B8A6b0)" }}><Save size={13} /></span>
+            </div>
+
+            {on("show1RMPercent") && (
+              <p className="text-[9px] text-slate-600 text-center mb-2 bounce-in">103% de tu 1RM · <span className="text-slate-500">% 1RM</span></p>
+            )}
+
+            {on("showRpe") && (
+              <div className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-slate-900/60 border border-slate-800 mb-2 bounce-in">
+                <Activity size={9} className="text-slate-500" />
+                <span className="text-[10px] font-bold text-slate-500">Registrar esfuerzo (RPE)</span>
+              </div>
+            )}
+
+            {on("showCoaching") && (
+              <p className="text-[10px] flex items-center gap-1.5 text-emerald-400 bounce-in">📈 ¡Nuevo récord! Subiste 2.5kg respecto a la última vez.</p>
+            )}
+
+            {!on("showWarmup") && !on("showRpe") && !on("show1RMPercent") && !on("showCoaching") && (
+              <p className="text-[9.5px] text-slate-600 text-center italic">Ficha mínima: solo reps, kg y tu marca a superar.</p>
+            )}
+          </div>
+
+          {/* ── SWITCHES ── */}
+          <div className="space-y-2">
+            {OPCIONES.map((o) => {
+              const active = on(o.key);
+              return (
+                <button key={o.key} onClick={() => onUpdateSettings({ [o.key]: !active })} className="w-full flex items-start justify-between gap-3 rounded-xl px-3.5 py-2.5 text-left transition active:scale-[0.99]" style={active ? { backgroundColor: "#14B8A614", border: "1px solid #14B8A640" } : { backgroundColor: "rgba(15,23,42,0.6)", border: "1px solid #33415580" }}>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold" style={{ color: active ? "#2DD4BF" : "#94a3b8" }}>{o.label}</p>
+                    <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">{o.desc}</p>
+                  </div>
+                  <span className="w-11 h-6 rounded-full shrink-0 relative transition-colors mt-0.5" style={{ backgroundColor: active ? "#14B8A6" : "#334155" }}>
+                    <span className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all" style={{ left: active ? "22px" : "2px" }} />
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          <button onClick={onClose} className="w-full mt-4 py-3 rounded-2xl text-sm font-black !text-white transition active:scale-[0.98]" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>
+            Listo, empecemos 💪
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function OnboardingTasksCard({ profile, cycleStart, logs, onGoToProfile, onDone, onOpenFieldSettings }) {
   const settings = profile ? getProfileSettings(profile) : DEFAULT_SETTINGS;
   const tasks = [
     { key: "cycle", label: "Elegí tu fecha de inicio de ciclo", done: !!cycleStart, hint: "Perfil → Ciclo de entrenamiento" },
     { key: "profile", label: "Completá tus datos (sexo, edad, peso, altura)", done: !!(profile?.sex && profile?.age && (settings.bodyWeightKg > 0) && profile?.heightCm), hint: "Perfil → Editar perfil y Medidas" },
     { key: "firstLog", label: "Registrá tu primera marca en un ejercicio", done: Object.entries(logs || {}).some(([k, v]) => !k.endsWith("_pr_override") && Array.isArray(v) && v.length > 0), hint: "Rutina → guardá una serie" },
+    { key: "fields", label: "Elegí qué ves al registrar una serie", done: !!profile?.fieldSettingsSeen, hint: "Con vista previa en vivo", action: "fields" },
   ];
   const doneCount = tasks.filter((t) => t.done).length;
   const allDone = doneCount === tasks.length;
@@ -9644,7 +9813,7 @@ function OnboardingTasksCard({ profile, cycleStart, logs, onGoToProfile, onDone 
       </div>
       <div className="px-4 py-2.5 space-y-2">
         {tasks.map((t) => (
-          <button key={t.key} onClick={t.done ? undefined : onGoToProfile} className={`w-full flex items-center gap-2.5 text-left rounded-xl px-2 py-1.5 transition ${t.done ? "opacity-50" : "hover:bg-slate-800/40"}`}>
+          <button key={t.key} onClick={t.done ? undefined : (t.action === "fields" ? onOpenFieldSettings : onGoToProfile)} className={`w-full flex items-center gap-2.5 text-left rounded-xl px-2 py-1.5 transition ${t.done ? "opacity-50" : "hover:bg-slate-800/40"}`}>
             <div className={`w-5 h-5 rounded-lg flex items-center justify-center shrink-0 ${t.done ? "bg-teal-500" : "border border-slate-700"}`}>
               {t.done && <Check size={12} className="text-white" />}
             </div>
@@ -9672,6 +9841,7 @@ export default function App() {
   // botón incrementa el contador → la CollapsibleSection destino lo detecta
   // y se abre sola. Guardamos qué sección abrir por su id.
   const [openSectionSignal, setOpenSectionSignal] = useState({ id: null, n: 0 });
+  const [showFieldIntro, setShowFieldIntro] = useState(false); // modal de "qué ves al registrar"
   const goToSection = (targetTab, sectionId) => {
     setTab(targetTab);
     setOpenSectionSignal((s) => ({ id: sectionId, n: s.n + 1 }));
@@ -10378,8 +10548,8 @@ export default function App() {
         <main className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto px-4 py-4 pb-28 lg:pb-10 space-y-4">
           <div key={tab} className="tab-fade-in">
             {tab === "rutinas" && <RoutinesView openScheduleSignal={openSectionSignal.id === "week-schedule" ? openSectionSignal.n : 0} openEditorSignal={openSectionSignal.id === "routine-editor" ? openSectionSignal.n : 0} profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleArchiveRoutine} onRestore={handleRestoreRoutine} onUpdateProfile={handleUpdateProfile} />}
-            {tab === "rutina" && <OnboardingTasksCard profile={profile} cycleStart={cycleStart} logs={logs} onGoToProfile={() => setTab("perfil")} onDone={() => handleUpdateProfile({ onboardingDone: true })} />}
-            {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToRoutines={() => setTab("rutinas")} onGoToSchedule={() => goToSection("rutinas", "week-schedule")} onGoToFieldSettings={() => goToSection("perfil", "field-settings-section")} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} todaySessionDayKey={(profile?.trainingSessions || []).find((ts) => ts.date === todayStr())?.dayKey || profile?.activeSession?.dayKey || null} />}
+            {tab === "rutina" && <OnboardingTasksCard profile={profile} cycleStart={cycleStart} logs={logs} onGoToProfile={() => setTab("perfil")} onOpenFieldSettings={() => setShowFieldIntro(true)} onDone={() => handleUpdateProfile({ onboardingDone: true })} />}
+            {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToRoutines={() => setTab("rutinas")} onGoToSchedule={() => goToSection("rutinas", "week-schedule")} onGoToFieldSettings={() => setShowFieldIntro(true)} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} todaySessionDayKey={(profile?.trainingSessions || []).find((ts) => ts.date === todayStr())?.dayKey || profile?.activeSession?.dayKey || null} />}
             {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} onGoToRoutines={() => goToSection("rutinas", "routine-editor")} weekSchedule={weekSchedule} sex={profile?.sex} age={profile?.age} onGoToDeload={() => setTab("descarga")} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} />}
             {tab === "descarga" && <DeloadView logs={logs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} />}
             {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} settings={getProfileSettings(profile)} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} />}
@@ -10389,6 +10559,13 @@ export default function App() {
       </div>
       <BottomBar tab={tab} setTab={setTab} />
       {showHelp && <HelpModal startTab={helpStartTab} onClose={() => setShowHelp(false)} />}
+      {showFieldIntro && (
+        <FieldSettingsIntroModal
+          settings={getProfileSettings(profile)}
+          onUpdateSettings={handleUpdateSettings}
+          onClose={() => { setShowFieldIntro(false); handleUpdateProfile({ fieldSettingsSeen: true }); }}
+        />
+      )}
       {importRoutine && <SharedRoutineImportModal routine={importRoutine} onImport={handleImportSharedRoutine} onDiscard={() => setImportRoutine(null)} />}
       {cycleCompleteNotice && !showCycleShareImage && (
         <div className="fixed inset-0 z-[125] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in" onClick={() => setCycleCompleteNotice(null)}>
@@ -10461,4 +10638,3 @@ function ImportRoutineErrorBanner({ onClose }) {
     </div>
   );
 }
-
