@@ -773,7 +773,11 @@ function computeSmartStreak(dateSet, weekSchedule) {
 
 function getTrainedDateSet(logs, sessions) {
   const s = new Set();
-  Object.entries(logs).forEach(([k, v]) => { if (k.endsWith("_pr_override") || !Array.isArray(v)) return; v.forEach((e) => s.add(e.date)); });
+  // Los registros marcados con noSession (marcas viejas cargadas a mano, sin
+  // haber iniciado la sesión) NO cuentan como días entrenados: no suman a la
+  // racha ni a las estadísticas. El récord se guarda igual, pero no mentimos
+  // sobre qué días fuiste al gimnasio.
+  Object.entries(logs).forEach(([k, v]) => { if (k.endsWith("_pr_override") || !Array.isArray(v)) return; v.forEach((e) => { if (!e.noSession) s.add(e.date); }); });
   (sessions || []).forEach((ses) => { if (ses?.date) s.add(ses.date); });
   return s;
 }
@@ -898,22 +902,40 @@ function buildSessionsIndex(logs, trainingSessions = []) {
   Object.entries(logs).forEach(([key, entries]) => {
     if (key.endsWith("_pr_override") || !Array.isArray(entries)) return;
     const { exerciseId, setIndex } = parseLogKey(key);
-    const ex = EXERCISE_BY_ID[exerciseId];
-    if (!ex) return;
+    // OJO: NO descartamos el registro si el ejercicio ya no está en la rutina.
+    // El historial es una foto de lo que hiciste ese día — si borraste el
+    // ejercicio o lo cambiaste por otra variante, lo que entrenaste sigue
+    // siendo cierto. Caemos al nombre guardado en el propio registro
+    // (exName), y si es viejo y no lo tiene, al catálogo global.
+    const ex = EXERCISE_BY_ID[exerciseId] || null;
     // Historial ordenado de esta serie, para saber si cada registro fue una
     // mejora EN EL MOMENTO en que se guardó (comparado contra lo mejor hasta
     // la fecha anterior) — no contra el récord actual, que puede haber sido
     // corregido a mano después y ya no reflejar lo que pasó ese día.
     const sortedHist = [...entries].sort((a, b) => (a.date < b.date ? -1 : 1));
     entries.forEach((e) => {
+      // Una marca cargada SIN iniciar la sesión (un récord viejo que anotaste
+      // a mano) no significa que hayas entrenado ese día: no entra al
+      // historial. El récord en sí ya se guardó aparte y sigue valiendo.
+      if (e.noSession) return;
       if (!byDate[e.date]) byDate[e.date] = { date: e.date, dayKeys: new Set(), items: [], totalVolume: 0, rpeSum: 0, rpeCount: 0, improvedCount: 0 };
       const s = byDate[e.date];
-      s.dayKeys.add(ex.dayKey);
+      if (ex?.dayKey) s.dayKeys.add(ex.dayKey);
       const priorBest = sortedHist.filter((h) => h.date < e.date).reduce((max, h) => Math.max(max, vol(h.kg, h.reps)), 0);
       const thisVol = vol(e.kg, e.reps);
       const isImprovement = thisVol > 0 && thisVol > priorBest;
+      // Comparación contra tu MEJOR MARCA HISTÓRICA del ejercicio (por 1RM
+      // estimado, que es como se miden los récords en el resto de la app).
+      // Sirve para marcar en rojo las series que quedaron por debajo.
+      const best1RM = sortedHist.reduce((max, h) => Math.max(max, estimate1RM(h.kg, h.reps)), 0);
+      const this1RM = estimate1RM(e.kg, e.reps);
+      const pctOfBest = best1RM > 0 && this1RM > 0 ? Math.round((this1RM / best1RM) * 100) : null;
       if (isImprovement) s.improvedCount++;
-      s.items.push({ exerciseId, exerciseName: ex.name, dayKey: ex.dayKey, setIndex, reps: e.reps, kg: e.kg, minutes: e.minutes ?? null, km: e.km ?? null, rpe: e.rpe ?? null, isImprovement });
+      // Nombre: primero el que quedó grabado en el registro, después el de la
+      // rutina actual, y si no hay ninguno (registro viejo de un ejercicio ya
+      // borrado) lo derivamos del catálogo global o del propio id.
+      const nombre = e.exName || ex?.name || EXERCISE_LIBRARY_BY_ID[exerciseId]?.name || exerciseId.replace(/_/g, " ");
+      s.items.push({ exerciseId, exerciseName: nombre, exerciseMuscle: e.exMuscle || ex?.muscle || null, dayKey: ex?.dayKey ?? null, setIndex, reps: e.reps, kg: e.kg, minutes: e.minutes ?? null, km: e.km ?? null, rpe: e.rpe ?? null, isImprovement, priorBest, pctOfBest, removedFromRoutine: !ex });
       s.totalVolume += thisVol;
       if (e.rpe != null) { s.rpeSum += e.rpe; s.rpeCount++; }
     });
@@ -3853,7 +3875,12 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
       if (!m || isNaN(m)) { setFeedback({ type: "error", msg: "Iniciá el cronómetro o ingresá los minutos." }); return; }
       const isFirstEver = !currentPR;
       const prevMin = currentPR?.minutes || 0;
-      const entry = { date: today, minutes: m }; if (d && !isNaN(d)) entry.km = d; if (rpe != null) entry.rpe = rpe;
+      // Guardamos el NOMBRE junto con la serie: el historial es una foto de
+      // lo que hiciste ese día y no debe depender de que el ejercicio siga
+      // en tu rutina. Si después lo borrás o lo cambiás por otra variante,
+      // el registro tiene que seguir contando lo que pasó.
+      const entry = { date: today, minutes: m, exName: exerciseName || undefined, exMuscle: exerciseMuscle || undefined }; if (d && !isNaN(d)) entry.km = d; if (rpe != null) entry.rpe = rpe;
+      if (!hasActiveSession) entry.noSession = true;
       const newHistory = [...history.filter((h) => h.date !== today), entry];
       let newLogs = { ...logs, [key]: newHistory };
       const isPR = !isFirstEver && m > prevMin;
@@ -3894,7 +3921,11 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     // 110×5 marcaba "récord" (760>550) aunque tu 1RM real no mejorara, y
     // encima cambiaba la marca mostrada a la serie más liviana.
     const prev1RM = currentPR ? estimate1RM(currentPR.kg, currentPR.reps) : 0, new1RM = estimate1RM(k, r);
-    const entry = { date: today, reps: r, kg: k }; if (rpe != null) entry.rpe = rpe;
+    // noSession: registraste una marca SIN haber iniciado la sesión (por
+    // ejemplo para cargar un récord viejo). El récord se guarda igual, pero
+    // ese día NO cuenta como entrenado en el historial ni en la racha.
+    const entry = { date: today, reps: r, kg: k, exName: exerciseName || undefined, exMuscle: exerciseMuscle || undefined }; if (rpe != null) entry.rpe = rpe;
+    if (!hasActiveSession) entry.noSession = true;
     const newHistory = [...history.filter((h) => h.date !== today), entry];
     let newLogs = { ...logs, [key]: newHistory };
     const isPR = !isFirstEver && new1RM > prev1RM;
@@ -4099,9 +4130,11 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
             const hi = m ? parseInt(m[2], 10) : single ? parseInt(single[1], 10) : null;
             const r = parseFloat(todayEntry.reps);
             if (lo == null || isNaN(r)) return null;
-            if (r > hi) return { icon: "📈", text: `Superaste el rango (${rr}) — subile el peso la próxima`, color: "#34D399" };
-            if (r < lo) return { icon: "📉", text: `Quedaste corto del rango (${rr}) — probá con menos peso`, color: "#FBBF24" };
-            return { icon: "✓", text: `Dentro del rango objetivo (${rr}) — sostenelo o sumá una rep`, color: accent };
+            // Consejo en dos partes: un titular corto que se lee de un vistazo
+            // y un detalle con la acción concreta para la próxima vez.
+            if (r > hi) return { icon: "📈", title: "Te sobró rango", body: `Pasaste las ${hi} reps del objetivo. La próxima subile el peso.`, color: "#34D399" };
+            if (r < lo) return { icon: "📉", title: "Quedaste corto", body: `El objetivo eran ${lo}-${hi} reps. Bajá un poco el peso y buscá el rango.`, color: "#FBBF24" };
+            return { icon: "🎯", title: "En el punto justo", body: `Clavaste el rango de ${rr}. Sostenelo o buscá una rep más.`, color: accent };
           })();
           return (
             <div className="relative overflow-hidden rounded-2xl px-3 py-3 bounce-in" style={{ background: `linear-gradient(130deg, ${accent}16, ${accent}06)`, border: `1px solid ${accent}35` }}>
@@ -4117,9 +4150,13 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
                 <button onClick={() => { updateDraft({ reps: String(todayEntry.reps), kg: String(kgToDisplay(todayEntry.kg, unit)), editing: true }); }} className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg shrink-0 transition active:scale-95" style={{ backgroundColor: accent + "22", color: accent }}>Editar</button>
               </div>
               {coaching && fieldSettings.showCoaching !== false && (
-                <p className="text-[10px] mt-2.5 pt-2.5 flex items-center gap-1.5 border-t" style={{ color: coaching.color, borderColor: accent + "20" }}>
-                  <span>{coaching.icon}</span>{coaching.text}
-                </p>
+                <div className="mt-2.5 pt-2.5 flex items-start gap-2 border-t" style={{ borderColor: accent + "20" }}>
+                  <span className="text-[13px] leading-none mt-0.5 shrink-0">{coaching.icon}</span>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-black leading-tight" style={{ color: coaching.color }}>{coaching.title}</p>
+                    <p className="text-[10px] text-slate-400 leading-snug mt-0.5">{coaching.body}</p>
+                  </div>
+                </div>
               )}
             </div>
           );
@@ -4715,12 +4752,23 @@ function SessionDetailCard({ session, onDelete }) {
           <div key={exName} className="rounded-xl bg-slate-900/70 border border-slate-800/60 px-3 py-2.5">
             <p className="text-xs font-bold text-white mb-1.5 truncate">{exName}</p>
             <div className="flex flex-wrap gap-1.5">
-              {items.map((it, i) => (
-                <span key={i} className={`text-[11px] font-bold px-2 py-1 rounded-lg tabular-nums ${it.isImprovement ? "text-emerald-300" : "text-slate-300"}`}
-                  style={{ backgroundColor: it.isImprovement ? "#10B98118" : "#1e293b", border: it.isImprovement ? "1px solid #10B98135" : "1px solid transparent" }}>
-                  {it.minutes != null ? `${it.minutes} min` : `${it.reps}×${it.kg}kg`}{it.isImprovement && " 🔥"}
-                </span>
-              ))}
+              {items.map((it, i) => {
+                // Por debajo del récord (≤95% del mejor 1RM): se marca en rojo
+                // con el porcentaje, así ves de un vistazo cuánto bajaste.
+                // El 95% da margen: una serie casi igual no es "peor".
+                const below = !it.isImprovement && it.minutes == null && it.pctOfBest != null && it.pctOfBest < 95;
+                const color = it.isImprovement ? "#6EE7B7" : below ? "#FCA5A5" : "#cbd5e1";
+                const bg = it.isImprovement ? "#10B98118" : below ? "#F43F5E14" : "#1e293b";
+                const bd = it.isImprovement ? "#10B98135" : below ? "#F43F5E30" : "transparent";
+                return (
+                  <span key={i} className="text-[11px] font-bold px-2 py-1 rounded-lg tabular-nums inline-flex items-center gap-1"
+                    style={{ color, backgroundColor: bg, border: `1px solid ${bd}` }}>
+                    {it.minutes != null ? `${it.minutes} min` : `${it.reps}×${it.kg}kg`}
+                    {it.isImprovement && " 🔥"}
+                    {below && <span className="text-[9px] font-black opacity-90">↓{100 - it.pctOfBest}%</span>}
+                  </span>
+                );
+              })}
             </div>
           </div>
         ))}
@@ -9761,7 +9809,13 @@ function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
             )}
 
             {on("showCoaching") && (
-              <p className="text-[10px] flex items-center gap-1.5 text-emerald-400 bounce-in">📈 ¡Nuevo récord! Subiste 2.5kg respecto a la última vez.</p>
+              <div className="flex items-start gap-2 bounce-in">
+                <span className="text-[13px] leading-none mt-0.5">📈</span>
+                <div>
+                  <p className="text-[11px] font-black text-emerald-400 leading-tight">Te sobró rango</p>
+                  <p className="text-[10px] text-slate-400 leading-snug mt-0.5">Pasaste las 10 reps del objetivo. La próxima subile el peso.</p>
+                </div>
+              </div>
             )}
 
             {!on("showWarmup") && !on("showRpe") && !on("show1RMPercent") && !on("showCoaching") && (
@@ -10562,7 +10616,7 @@ export default function App() {
           <div key={tab} className="tab-fade-in">
             {tab === "rutinas" && <RoutinesView openScheduleSignal={openSectionSignal.id === "week-schedule" ? openSectionSignal.n : 0} openEditorSignal={openSectionSignal.id === "routine-editor" ? openSectionSignal.n : 0} profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleArchiveRoutine} onRestore={handleRestoreRoutine} onUpdateProfile={handleUpdateProfile} />}
             {tab === "rutina" && <OnboardingTasksCard profile={profile} cycleStart={cycleStart} logs={logs} onGoToProfile={() => setTab("perfil")} onOpenFieldSettings={() => setShowFieldIntro(true)} onDone={() => handleUpdateProfile({ onboardingDone: true })} />}
-            {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToRoutines={() => setTab("rutinas")} onGoToSchedule={() => goToSection("rutinas", "week-schedule")} onGoToFieldSettings={() => setShowFieldIntro(true)} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} todaySessionDayKey={(profile?.trainingSessions || []).find((ts) => ts.date === todayStr())?.dayKey || profile?.activeSession?.dayKey || null} />}
+            {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToRoutines={() => setTab("rutinas")} onGoToSchedule={() => goToSection("rutinas", "week-schedule")} onGoToFieldSettings={() => goToSection("perfil", "field-settings-section")} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} todaySessionDayKey={(profile?.trainingSessions || []).find((ts) => ts.date === todayStr())?.dayKey || profile?.activeSession?.dayKey || null} />}
             {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} onGoToRoutines={() => goToSection("rutinas", "routine-editor")} weekSchedule={weekSchedule} sex={profile?.sex} age={profile?.age} onGoToDeload={() => setTab("descarga")} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} />}
             {tab === "descarga" && <DeloadView logs={logs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} />}
             {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} settings={getProfileSettings(profile)} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} />}
