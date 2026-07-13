@@ -7,7 +7,7 @@ import {
 import {
   Play, Pause, RotateCcw, TrendingUp, TrendingDown, Dumbbell,
   ChevronDown, ChevronUp, ChevronLeft, Trophy, Flame, Save, Trash2, BarChart3,
-  ListChecks, LogOut, X, Check, AlertTriangle, Calendar, Zap, Bell, GripVertical, Sliders,
+  ListChecks, LogOut, X, Check, AlertTriangle, Calendar, Zap, Bell, GripVertical, Sliders, StickyNote,
   Mail, Clock, ChevronRight, Edit3, Info, Plus, Sun, Moon,
   Target, Award, Activity, ArrowDown, HelpCircle, List, LayoutGrid,
   Sparkles, Layers, Video, SlidersHorizontal, ShieldCheck, UserCog,
@@ -971,6 +971,24 @@ const MONTH_LABELS = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Ju
    Move this into a stylesheet if your build already has one; it works as-is.
 ============================================================================ */
 const ANIMATION_CSS = `
+/* Los tamaños de fuente arbitrarios en px (text-[10px], etc.) que usamos
+   mucho NO escalaban con la config "Tamaño de texto" (que ajusta el
+   font-size raíz y solo afecta unidades relativas). Acá los redefinimos en
+   rem para que TODOS escalen en proporción cuando cambiás el tamaño. */
+.text-\[8px\]{font-size:0.5rem !important}
+.text-\[8\.5px\]{font-size:0.531rem !important}
+.text-\[9px\]{font-size:0.5625rem !important}
+.text-\[9\.5px\]{font-size:0.594rem !important}
+.text-\[10px\]{font-size:0.625rem !important}
+.text-\[10\.5px\]{font-size:0.656rem !important}
+.text-\[11px\]{font-size:0.6875rem !important}
+.text-\[12px\]{font-size:0.75rem !important}
+.text-\[13px\]{font-size:0.8125rem !important}
+.text-\[15px\]{font-size:0.9375rem !important}
+.text-\[26px\]{font-size:1.625rem !important}
+
+@keyframes voiceBar { 0%, 100% { transform: scaleY(0.4); } 50% { transform: scaleY(1); } }
+.voice-bar { animation: voiceBar 0.7s ease-in-out infinite; transform-origin: bottom; }
 @keyframes prConfettiFall {
   0% { transform: translate(-50%,-50%) rotate(0deg) scale(0.5); opacity: 0; }
   12% { opacity: 1; }
@@ -2648,30 +2666,62 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default", 
   }, [running]);
 
   const pct = Math.max(0, Math.min(100, (remaining / seconds) * 100));
+  // Cronómetro con ANILLO circular de progreso: el tiempo vive dentro del
+  // anillo, que se vacía a medida que descansás. En los últimos 10 segundos
+  // todo se tiñe de ámbar y el número late. Al terminar, el anillo se
+  // completa en verde.
+  const R = 26, C = 2 * Math.PI * R;
+  const urgent = running && remaining <= 10 && remaining > 0;
+  const done = remaining === 0;
+  const ringColor = done ? "#10B981" : urgent ? "#F59E0B" : accent;
   return (
-    // Cronómetro de descanso rediseñado: tiempo grande protagonista,
-    // controles minimalistas a la derecha y barra de progreso fina abajo
-    // — misma info, la mitad del ruido visual.
-    <div className="relative rounded-2xl overflow-hidden bg-slate-900/50 border border-slate-800/60">
-      <div className="flex items-center justify-between px-4 py-2.5">
-        <div className="flex items-baseline gap-2">
-          <span className={`text-2xl font-black tabular-nums transition-colors ${running ? "" : "text-slate-300"}`} style={running ? { color: accent } : {}}>{formatTime(remaining)}</span>
-          <span className="text-[10px] text-slate-600 font-semibold">descanso · {formatTime(seconds)}</span>
+        <div className="relative rounded-2xl overflow-hidden transition-all duration-300" style={{
+          background: running ? `linear-gradient(130deg, ${ringColor}12, ${ringColor}04)` : "rgba(15,23,42,0.5)",
+          border: `1px solid ${running ? ringColor + "35" : "rgba(30,41,59,0.6)"}`,
+          boxShadow: urgent ? `0 0 20px -6px ${ringColor}70` : "none",
+        }}>
+          {running && <div className="absolute -top-10 -right-8 w-32 h-32 rounded-full blur-3xl pointer-events-none transition-opacity" style={{ backgroundColor: ringColor, opacity: urgent ? 0.28 : 0.14 }} />}
+
+          <div className="relative flex items-center gap-3.5 px-3.5 py-3">
+            {/* Anillo de progreso con el tiempo adentro */}
+            <div className="relative shrink-0" style={{ width: 64, height: 64 }}>
+              <svg width="64" height="64" className="-rotate-90">
+                <circle cx="32" cy="32" r={R} fill="none" stroke="rgba(30,41,59,0.8)" strokeWidth="4" />
+                <circle
+                  cx="32" cy="32" r={R} fill="none"
+                  stroke={ringColor} strokeWidth="4" strokeLinecap="round"
+                  strokeDasharray={C}
+                  strokeDashoffset={C - (C * pct) / 100}
+                  style={{ transition: "stroke-dashoffset 0.95s linear, stroke 0.3s", filter: `drop-shadow(0 0 5px ${ringColor}90)` }}
+                />
+              </svg>
+              <span
+                className={`absolute inset-0 flex items-center justify-center text-[15px] font-black tabular-nums transition-colors ${urgent ? "soft-pulse" : ""}`}
+                style={{ color: running || done ? ringColor : "#94a3b8" }}
+              >
+                {formatTime(remaining)}
+              </span>
+            </div>
+
+            {/* Etiqueta + estado */}
+            <div className="flex-1 min-w-0 leading-none">
+              <span className="block text-[8.5px] font-black uppercase tracking-[0.16em] text-slate-500 mb-1.5">Descanso</span>
+              <span className="text-xs font-bold transition-colors" style={{ color: done ? "#10B981" : urgent ? "#FBBF24" : running ? "#cbd5e1" : "#64748b" }}>
+                {done ? "¡Dale, a la serie! 💪" : urgent ? "Preparate…" : running ? "Recuperando" : `${formatTime(seconds)} en total`}
+              </span>
+            </div>
+
+            {/* Controles */}
+            <div className="flex gap-1.5 shrink-0">
+              <button onClick={() => { haptic(15); setRunning((r) => !r); }} aria-label={running ? "Pausar" : "Iniciar"} className="w-10 h-10 rounded-xl flex items-center justify-center active:scale-90 transition" style={running ? { background: `linear-gradient(160deg, ${accent}, ${accent}b0)`, color: "#fff" } : { backgroundColor: accent + "1e", color: accent, border: `1px solid ${accent}40` }}>
+                {running ? <Pause size={16} /> : <Play size={16} className="ml-0.5" />}
+              </button>
+              <button onClick={() => { setRunning(false); setRemaining(seconds); endTimeRef.current = null; firedRef.current = false; }} aria-label="Reiniciar" className="w-10 h-10 rounded-xl flex items-center justify-center active:scale-90 transition text-slate-500 hover:text-slate-300 bg-slate-800/50 border border-slate-700/50">
+                <RotateCcw size={14} />
+              </button>
+            </div>
+          </div>
         </div>
-        <div className="flex gap-1.5">
-          <button onClick={() => { haptic(15); setRunning((r) => !r); }} aria-label={running ? "Pausar" : "Iniciar"} className="w-9 h-9 rounded-xl flex items-center justify-center active:scale-90 transition text-white" style={{ backgroundColor: running ? accent : accent + "30", color: running ? "#fff" : accent }}>
-            {running ? <Pause size={15} /> : <Play size={15} className="ml-0.5" />}
-          </button>
-          <button onClick={() => { setRunning(false); setRemaining(seconds); endTimeRef.current = null; firedRef.current = false; }} aria-label="Reiniciar" className="w-9 h-9 rounded-xl flex items-center justify-center active:scale-90 transition text-slate-500 hover:text-slate-300 bg-slate-800/60">
-            <RotateCcw size={14} />
-          </button>
-        </div>
-      </div>
-      {/* Barra de progreso fina en la base */}
-      <div className="h-0.5 w-full bg-slate-800/60">
-        <div className="h-full transition-all duration-300" style={{ width: `${pct}%`, backgroundColor: accent }} />
-      </div>
-    </div>
   );
 }
 
@@ -4166,6 +4216,11 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
 function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts, deloadSets, deloadMode, resetKey = 0, settings = DEFAULT_SETTINGS, forceOpen = false, onDisableAutoShowPrShare, hasActiveSession = true, hideTimer = false, onUpdateSettings = null }) {
   const [open, setOpen] = useState(false);
   const [showWarmup, setShowWarmup] = useState(false);
+  // Nota personal del ejercicio (persiste en el perfil → sincroniza)
+  const myNote = settings?.exerciseNotes?.[exercise.id] || "";
+  const [editingNote, setEditingNote] = useState(false);
+  const [noteDraft, setNoteDraft] = useState(myNote);
+  useEffect(() => { setNoteDraft(myNote); }, [myNote]);
   // forceOpen se usa solo desde las demos del tutorial guiado, para abrir la
   // tarjeta automáticamente cuando el paso explica algo de adentro (reps/kg,
   // RPE, descanso, video). No afecta el comportamiento normal de la app.
@@ -4203,13 +4258,51 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
                 );
               })()}
               {!deloadMode && stagnant && <span className="text-[10px] bg-rose-500/15 text-rose-400 rounded-lg px-1.5 py-0.5 font-bold flex items-center gap-1"><AlertTriangle size={9} /> ESTANCADO</span>}
+              {/* Nota personal: tocá para escribir tus recordatorios del
+                  ejercicio ("agarre más cerrado", "el banco 3 está flojo").
+                  El ícono se enciende con el color del día si ya hay nota. */}
+              {onUpdateSettings && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setEditingNote((v) => !v); if (!open) setOpen(true); }}
+                  title={myNote ? "Editar tu nota" : "Agregar una nota"}
+                  className="text-[10px] rounded-lg px-1.5 py-0.5 font-black flex items-center gap-1 transition active:scale-95"
+                  style={myNote ? { backgroundColor: accent + "22", color: accent, border: `1px solid ${accent}45` } : { backgroundColor: "rgba(30,41,59,0.6)", color: "#64748b", border: "1px solid #334155" }}
+                >
+                  <StickyNote size={9} />
+                </button>
+              )}
             </div>
             {exercise.nota && <p className="text-[11px] text-slate-500 mt-0.5" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{exercise.nota}</p>}
+            {myNote && !editingNote && (
+              <p className="text-[11px] mt-1 flex items-start gap-1.5 leading-snug" style={{ color: accent }}>
+                <StickyNote size={10} className="mt-0.5 shrink-0" />
+                <span style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{myNote}</span>
+              </p>
+            )}
           </div>
         </div>
         <ChevronDown size={18} className={`text-slate-600 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
       </button>
       <div className={open ? "px-4 pb-4 pt-0 tab-fade-in" : "hidden"}>
+        {editingNote && onUpdateSettings && (
+          <div className="mb-3 bounce-in rounded-xl p-3" style={{ backgroundColor: "rgba(2,6,23,0.7)", border: `1px solid ${accent}30` }}>
+            <p className="text-[10px] font-black uppercase tracking-[0.14em] flex items-center gap-1.5 mb-2" style={{ color: accent }}><StickyNote size={11} /> Tu nota</p>
+            <textarea
+              value={noteDraft}
+              onChange={(e) => setNoteDraft(e.target.value)}
+              placeholder="Agarre más cerrado · pausa abajo · el banco 3 está flojo…"
+              rows={2}
+              maxLength={200}
+              className="w-full bg-slate-950/70 border border-slate-800 rounded-lg px-2.5 py-2 text-xs text-white placeholder:text-slate-600 focus:outline-none resize-none transition"
+              style={{ borderColor: accent + "35" }}
+            />
+            <div className="flex items-center gap-2 mt-2">
+              <button onClick={() => { onUpdateSettings({ exerciseNotes: { ...(settings?.exerciseNotes || {}), [exercise.id]: noteDraft.trim() || undefined } }); setEditingNote(false); }} className="flex-1 py-2 rounded-lg text-[11px] font-black !text-white transition active:scale-95" style={{ background: `linear-gradient(160deg, ${accent}, ${accent}b0)` }}>Guardar</button>
+              {myNote && <button onClick={() => { onUpdateSettings({ exerciseNotes: { ...(settings?.exerciseNotes || {}), [exercise.id]: undefined } }); setNoteDraft(""); setEditingNote(false); }} className="px-3 py-2 rounded-lg text-[11px] font-bold text-rose-400 bg-rose-500/10 border border-rose-500/25 transition active:scale-95">Borrar</button>}
+              <button onClick={() => { setNoteDraft(myNote || ""); setEditingNote(false); }} className="px-3 py-2 rounded-lg text-[11px] font-bold text-slate-500 bg-slate-800/60 transition active:scale-95">Cancelar</button>
+            </div>
+          </div>
+        )}
         {!deloadMode && stagnant && <div className="mb-3 text-[11px] text-rose-400/90 bg-rose-500/5 border border-rose-500/15 rounded-xl px-3 py-2 flex items-start gap-1.5"><Info size={12} className="mt-0.5 shrink-0" /><span>Hace {STAGNATION_DAYS}+ días sin superar el récord. Considerá cambiar reps, descanso o variante.</span></div>}
         {!exercise.cardio && !hideTimer && (
           <div className="mb-1">
@@ -4376,7 +4469,7 @@ function groupExercisesIntoSupersets(exercises) {
   return groups;
 }
 
-function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, weekSchedule, activeSession, onStartSession, onEndSession, onCancelSession, onDisableAutoShowPrShare, onUpdateSettings = null, onGoToRoutines = null, onGoToFieldSettings = null, todaySessionDayKey = null }) {
+function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, weekSchedule, activeSession, onStartSession, onEndSession, onCancelSession, onDisableAutoShowPrShare, onUpdateSettings = null, onGoToRoutines = null, onGoToSchedule = null, onGoToFieldSettings = null, todaySessionDayKey = null }) {
   // El día programado para hoy según el cronograma semanal (lunes a domingo)
   // de la rutina activa. Si hoy es descanso programado (o no hay cronograma
   // todavía), cae al viejo heurístico de "último día entrenado + 1" — pero
@@ -4389,7 +4482,11 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
   // Push" a la vez). El día activo igual arranca en el heurístico para que
   // puedas registrar si querés entrenar igual, pero sin el badge "sugerido".
   const suggestedDay = scheduledDay || (isRestToday ? null : fallbackSuggested);
-  const [activeDay, setActiveDay] = useState(() => scheduledDay || fallbackSuggested);
+  // En día de descanso abrimos el PRIMER día de la rutina, no el heurístico
+  // de "último entrenado + 1": si hoy no toca nada, sugerir un día del medio
+  // (ej. Hombro/Brazos) es arbitrario y confuso. El primer día es un punto
+  // de partida neutro y predecible.
+  const [activeDay, setActiveDay] = useState(() => scheduledDay || (isRestToday ? DAY_ORDER[0] : fallbackSuggested));
   // La sesión activa solo "cuenta" en el día donde se inició. Al cambiar de
   // día se ve sin sesión (podés iniciar otra o solo registrar), pero la
   // sesión original sigue corriendo en su día — no se resetea.
@@ -4435,7 +4532,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
       </div>
 
       {isRestToday && (
-        <button onClick={() => onGoToRoutines?.()} className="w-full flex items-start gap-2.5 bg-slate-900/50 border border-slate-800/50 rounded-xl px-3.5 py-2.5 text-left transition active:scale-[0.99] hover:border-slate-700">
+        <button onClick={() => (onGoToSchedule || onGoToRoutines)?.()} className="w-full flex items-start gap-2.5 bg-slate-900/50 border border-slate-800/50 rounded-xl px-3.5 py-2.5 text-left transition active:scale-[0.99] hover:border-slate-700">
           <Calendar size={13} className="text-slate-500 mt-0.5 shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-[11px] text-slate-400">Hoy es descanso según tu cronograma semanal, pero entrená el día que quieras: esto es solo una guía.</p>
@@ -6762,10 +6859,19 @@ function ExportTrainingCard({ profileName, logs, trainingSessions = [] }) {
    PROFILE VIEW — adds an entry point to the setup hub + a backup status line
 ============================================================================ */
 // Sección desplegable reutilizable para ProfileView
-function CollapsibleSection({ title, subtitle, icon, defaultOpen = false, children, accent }) {
+function CollapsibleSection({ title, subtitle, icon, defaultOpen = false, children, accent, forceOpenSignal = 0, sectionId = null }) {
   const [open, setOpen] = useState(defaultOpen);
+  const selfRef = useRef(null);
+  // Cuando forceOpenSignal cambia (lo incrementa un botón de otra pantalla),
+  // esta sección se abre sola y hace scroll hasta quedar visible.
+  useEffect(() => {
+    if (forceOpenSignal > 0) {
+      setOpen(true);
+      setTimeout(() => { try { selfRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); } catch { } }, 120);
+    }
+  }, [forceOpenSignal]);
   return (
-    <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl overflow-hidden backdrop-blur-sm shadow-md shadow-black/20">
+    <div ref={selfRef} id={sectionId || undefined} className="bg-slate-900/50 border border-slate-800/50 rounded-2xl overflow-hidden backdrop-blur-sm shadow-md shadow-black/20">
       <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-slate-800/30 active:bg-slate-800/50">
         {icon && <span className="shrink-0" style={{ color: accent || "var(--chip-text)" }}>{icon}</span>}
         <div className="flex-1 min-w-0">
@@ -6779,7 +6885,7 @@ function CollapsibleSection({ title, subtitle, icon, defaultOpen = false, childr
   );
 }
 
-function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdateProfile, cycleStart, onSetCycleStart, onGoToRoutines }) {
+function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdateProfile, cycleStart, onSetCycleStart, onGoToRoutines, openSectionSignal = { id: null, n: 0 } }) {
   const profile = profiles[profileName];
   const [showDeletePin, setShowDeletePin] = useState(false); const [deleteError, setDeleteError] = useState("");
   const [editing, setEditing] = useState(false);
@@ -7061,8 +7167,7 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
         </div>
       </CollapsibleSection>
 
-      <div id="field-settings-section">
-      <CollapsibleSection title="Qué ves al registrar" subtitle={(() => { const on = [settings.showRpe !== false, settings.showWarmup !== false, settings.show1RMPercent !== false, settings.showCoaching !== false].filter(Boolean).length; return on === 4 ? "Todo activado" : `${on} de 4 opciones activadas`; })()} icon={<Sliders size={16} />} accent="#14B8A6">
+      <CollapsibleSection sectionId="field-settings-section" forceOpenSignal={openSectionSignal.id === "field-settings-section" ? openSectionSignal.n : 0} title="Qué ves al registrar" subtitle={(() => { const on = [settings.showRpe !== false, settings.showWarmup !== false, settings.show1RMPercent !== false, settings.showCoaching !== false].filter(Boolean).length; return on === 4 ? "Todo activado" : `${on} de 4 opciones activadas`; })()} icon={<Sliders size={16} />} accent="#14B8A6">
         <div className="space-y-2">
           <p className="text-[10px] text-slate-500 leading-snug mb-1">Apagá lo que no uses y la ficha de registro queda más limpia. No se pierde ningún dato: podés volver a prenderlo cuando quieras.</p>
           {[
@@ -7086,7 +7191,6 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
           })}
         </div>
       </CollapsibleSection>
-      </div>
 
       <CollapsibleSection title="Recordatorio de entrenamiento" subtitle={settings.reminderEnabled ? `Todos los días de rutina a las ${settings.reminderTime}` : "Desactivado"} icon={<Bell size={16} />} accent="#F59E0B">
         <div className="space-y-3">
@@ -7599,7 +7703,12 @@ function BuilderDayCard({ day, dayIdx, totalDays, onRename, onRemove, onMoveDay,
         {totalDays > 1 && <button onClick={onRemove} className="p-1.5 text-slate-600 hover:text-rose-400 shrink-0"><Trash2 size={14} /></button>}
       </div>
 
-      {day.exercises.length === 0 && <p className="text-[11px] text-slate-600 mb-2">Todavía no agregaste ejercicios a este día.</p>}
+      {day.exercises.length === 0 && (
+        <div className="flex flex-col items-center gap-1.5 py-4 rounded-xl mb-2" style={{ backgroundColor: day.color + "08", border: `1px dashed ${day.color}30` }}>
+          <Dumbbell size={20} style={{ color: day.color + "80" }} />
+          <p className="text-[11px] text-slate-500">Día vacío — agregá tu primer ejercicio</p>
+        </div>
+      )}
 
       <div className="space-y-1.5">
         {day.exercises.map((ex, i) => (
@@ -7620,7 +7729,7 @@ function BuilderDayCard({ day, dayIdx, totalDays, onRename, onRemove, onMoveDay,
       </div>
 
       {!pickerOpen ? (
-        <button onClick={() => setPickerOpen(true)} className="w-full flex items-center justify-center gap-1.5 mt-2.5 py-2.5 rounded-xl border border-dashed border-slate-700 text-slate-400 hover:text-white hover:border-slate-500 transition text-xs font-semibold"><Plus size={13} /> Agregar ejercicio</button>
+        <button onClick={() => setPickerOpen(true)} className="w-full flex items-center justify-center gap-1.5 mt-2.5 py-2.5 rounded-xl font-semibold text-xs transition active:scale-[0.98]" style={{ backgroundColor: day.color + "14", border: `1px solid ${day.color}35`, color: day.color }}><Plus size={13} /> Agregar ejercicio</button>
       ) : (
         <ExercisePickerPanel existingIds={existingIds} onAdd={onAddExercise} onAddCustom={onAddCustomExercise} onClose={() => setPickerOpen(false)} />
       )}
@@ -8481,19 +8590,34 @@ Datos: ${JSON.stringify(context)}`;
           document.body, queda totalmente afuera de esa animación, así que
           desde el primer frame está exactamente donde tiene que estar. */}
       {typeof document !== "undefined" && createPortal(
-        <div className="fixed bottom-20 lg:bottom-6 left-0 right-0 z-10 px-4 lg:pl-56">
-          <div className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto">
-            <div className="flex items-center gap-2 bg-slate-900/90 border border-slate-800/60 rounded-2xl p-1.5 backdrop-blur-xl shadow-lg shadow-black/30">
+        <div className="fixed bottom-16 lg:bottom-0 left-0 right-0 z-10 pb-4 pt-8 px-4 lg:pl-56 pointer-events-none"
+             style={{ background: "linear-gradient(to top, var(--app-bg, #0a0f1a) 55%, transparent)" }}>
+          <div className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto pointer-events-auto">
+            {isListening && (
+              <div className="flex items-center justify-center gap-2 mb-2 bounce-in">
+                <span className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/30">
+                  <span className="flex items-end gap-0.5 h-3.5">
+                    <span className="w-0.5 bg-emerald-400 rounded-full voice-bar" style={{ height: "40%", animationDelay: "0ms" }} />
+                    <span className="w-0.5 bg-emerald-400 rounded-full voice-bar" style={{ height: "100%", animationDelay: "150ms" }} />
+                    <span className="w-0.5 bg-emerald-400 rounded-full voice-bar" style={{ height: "65%", animationDelay: "300ms" }} />
+                    <span className="w-0.5 bg-emerald-400 rounded-full voice-bar" style={{ height: "85%", animationDelay: "450ms" }} />
+                  </span>
+                  <span className="text-[11px] font-bold text-emerald-300">Escuchando… tocá ✓ al terminar</span>
+                </span>
+              </div>
+            )}
+            <div className="flex items-center gap-2 rounded-2xl p-1.5 backdrop-blur-xl shadow-xl shadow-black/40 transition-colors" style={{ backgroundColor: isListening ? "rgba(6,78,59,0.55)" : "rgba(15,23,42,0.92)", border: `1px solid ${isListening ? "rgba(16,185,129,0.4)" : "rgba(30,41,59,0.6)"}` }}>
               {SpeechRecognitionAPI && (
-                <button onClick={handleMicToggle} aria-label={isListening ? "Confirmar — terminé de hablar" : "Hablar"} className={`p-2.5 rounded-xl shrink-0 transition-all active:scale-95 ${isListening ? "bg-emerald-500 !text-white animate-pulse" : "text-slate-400 hover:text-white hover:bg-slate-800"}`}>
-                  {isListening ? <Check size={16} /> : <Mic size={16} />}
+                <button onClick={handleMicToggle} aria-label={isListening ? "Confirmar — terminé de hablar" : "Hablar"} className="relative p-2.5 rounded-xl shrink-0 transition-all active:scale-95" style={isListening ? { background: "linear-gradient(160deg,#10B981,#059669)", color: "#fff" } : { color: "#94a3b8" }}>
+                  {isListening && <span className="absolute inset-0 rounded-xl bg-emerald-400/40 animate-ping" />}
+                  <span className="relative">{isListening ? <Check size={16} /> : <Mic size={16} />}</span>
                 </button>
               )}
               <input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") handleSend(); }}
-                placeholder={isListening ? "Escuchando... tocá el ✓ cuando termines" : "Preguntale algo a tu entrenador..."}
+                placeholder={isListening ? "Hablá tranquilo…" : "Preguntale algo a tu entrenador…"}
                 className="flex-1 bg-transparent px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none min-w-0"
                 disabled={isSending}
               />
@@ -8501,7 +8625,7 @@ Datos: ${JSON.stringify(context)}`;
                 <Send size={16} />
               </button>
             </div>
-            <p className="text-[9px] text-slate-700 text-center mt-1.5">Puede cometer errores — no reemplaza el consejo de un profesional de la salud.</p>
+            <p className="text-[9px] text-slate-600 text-center mt-1.5">Puede cometer errores — no reemplaza el consejo de un profesional de la salud.</p>
           </div>
         </div>,
         document.body
@@ -9078,13 +9202,22 @@ function PersonalizedRoutineWizard({ profile, onUpdateProfile, onCreateRoutine, 
   );
 }
 
-function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRestore, onUpdateProfile }) {
+function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRestore, onUpdateProfile, openScheduleSignal = 0 }) {
   const [mode, setMode] = useState("catalog");
   const [showWizard, setShowWizard] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [showPresetsForced, setShowPresetsForced] = useState(false);
   const [editingRoutineId, setEditingRoutineId] = useState(null);
   const [showSchedule, setShowSchedule] = useState(false);
+  const scheduleRef = useRef(null);
+  // Al llegar desde el aviso "hoy es descanso" (que incrementa la señal),
+  // abrimos el editor de días y scrolleamos hasta él.
+  useEffect(() => {
+    if (openScheduleSignal > 0) {
+      setShowSchedule(true);
+      setTimeout(() => { try { scheduleRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); } catch { } }, 150);
+    }
+  }, [openScheduleSignal]);
   const [shareTarget, setShareTarget] = useState(null);
   const [pendingActivation, setPendingActivation] = useState(null);
   const [showImport, setShowImport] = useState(false);
@@ -9281,7 +9414,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
             <div className="bg-black/20 rounded-xl p-2 text-center"><p className="text-sm font-black text-white tabular-nums">{activeStats.exercises}</p><p className="text-[9px] text-slate-500 mt-0.5">Ejercicios</p></div>
             <div className="bg-black/20 rounded-xl p-2 text-center"><p className="text-sm font-black text-white tabular-nums">{activeStats.sets}</p><p className="text-[9px] text-slate-500 mt-0.5">Series</p></div>
           </div>
-          <button onClick={() => setShowSchedule((s) => !s)} className="relative w-full flex items-center justify-center gap-1.5 mt-3 py-2 rounded-xl border border-white/10 text-purple-200 hover:text-white transition text-[11px] font-bold">
+          <button ref={scheduleRef} onClick={() => setShowSchedule((s) => !s)} className="relative w-full flex items-center justify-center gap-1.5 mt-3 py-2 rounded-xl border border-white/10 text-purple-200 hover:text-white transition text-[11px] font-bold">
             <Calendar size={11} /> {showSchedule ? "Ocultar" : "Configurar"} días de la semana
           </button>
           {showSchedule && (
@@ -9510,6 +9643,14 @@ export default function App() {
     return null;
   });
   const [tab, setTab] = useState("rutina");
+  // Señales para auto-abrir secciones al navegar desde otra pantalla. Cada
+  // botón incrementa el contador → la CollapsibleSection destino lo detecta
+  // y se abre sola. Guardamos qué sección abrir por su id.
+  const [openSectionSignal, setOpenSectionSignal] = useState({ id: null, n: 0 });
+  const goToSection = (targetTab, sectionId) => {
+    setTab(targetTab);
+    setOpenSectionSignal((s) => ({ id: sectionId, n: s.n + 1 }));
+  };
   useEffect(() => { window.scrollTo({ top: 0 }); }, [tab]);
   // (Los permisos de notificación y el canal se piden en el efecto
   // requestNotifPermission más abajo — un solo lugar, sin duplicar.)
@@ -10211,13 +10352,13 @@ export default function App() {
         </header>
         <main className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto px-4 py-4 pb-28 lg:pb-10 space-y-4">
           <div key={tab} className="tab-fade-in">
-            {tab === "rutinas" && <RoutinesView profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleArchiveRoutine} onRestore={handleRestoreRoutine} onUpdateProfile={handleUpdateProfile} />}
+            {tab === "rutinas" && <RoutinesView openScheduleSignal={openSectionSignal.id === "week-schedule" ? openSectionSignal.n : 0} profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleArchiveRoutine} onRestore={handleRestoreRoutine} onUpdateProfile={handleUpdateProfile} />}
             {tab === "rutina" && <OnboardingTasksCard profile={profile} cycleStart={cycleStart} logs={logs} onGoToProfile={() => setTab("perfil")} onDone={() => handleUpdateProfile({ onboardingDone: true })} />}
-            {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToRoutines={() => setTab("rutinas")} onGoToFieldSettings={() => { setTab("perfil"); setTimeout(() => { document.getElementById("field-settings-section")?.scrollIntoView({ behavior: "smooth", block: "center" }); }, 250); }} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} todaySessionDayKey={(profile?.trainingSessions || []).find((ts) => ts.date === todayStr())?.dayKey || profile?.activeSession?.dayKey || null} />}
+            {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToRoutines={() => setTab("rutinas")} onGoToSchedule={() => goToSection("rutinas", "week-schedule")} onGoToFieldSettings={() => goToSection("perfil", "field-settings-section")} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} todaySessionDayKey={(profile?.trainingSessions || []).find((ts) => ts.date === todayStr())?.dayKey || profile?.activeSession?.dayKey || null} />}
             {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} onGoToRoutines={() => setTab("rutinas")} weekSchedule={weekSchedule} sex={profile?.sex} age={profile?.age} onGoToDeload={() => setTab("descarga")} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} />}
             {tab === "descarga" && <DeloadView logs={logs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} />}
             {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} settings={getProfileSettings(profile)} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} />}
-            {tab === "perfil" && <ProfileView profileName={activeProfile} profiles={profiles} logs={logs} onSignOut={handleSignOut} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} />}
+            {tab === "perfil" && <ProfileView openSectionSignal={openSectionSignal} profileName={activeProfile} profiles={profiles} logs={logs} onSignOut={handleSignOut} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} />}
           </div>
         </main>
       </div>
