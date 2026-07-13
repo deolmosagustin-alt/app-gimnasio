@@ -892,6 +892,42 @@ function getWeekInfo(cycleStart, settings = DEFAULT_SETTINGS) {
 
 function buildSessionsIndex(logs, trainingSessions = []) {
   const byDate = {};
+  // Mejor marca (1RM estimado) de CADA EJERCICIO, mirando todas sus series
+  // juntas y también el récord cargado a mano. Con esto podemos decir, para
+  // cualquier serie del historial, a qué porcentaje de tu récord quedó —
+  // combinando reps y kilos: una rep menos con el mismo peso también baja.
+  // Para cada ejercicio, juntamos todas sus marcas (todas las series + el
+  // récord manual) y calculamos, para cada fecha entrenada, cuál era el mejor
+  // 1RM ANTES de ese día. Ese es el número contra el que se compara cada serie.
+  const marcasPorEjercicio = {};   // exId → [{date, rm}]
+  const manualPorEjercicio = {};   // exId → rm del récord cargado a mano
+  Object.entries(logs).forEach(([key, val]) => {
+    if (key.endsWith("_pr_override")) {
+      const exId = key.replace("_pr_override", "");
+      if (val?.kg && val?.reps) manualPorEjercicio[exId] = estimate1RM(val.kg, val.reps);
+      return;
+    }
+    if (!Array.isArray(val)) return;
+    const { exerciseId } = parseLogKey(key);
+    (marcasPorEjercicio[exerciseId] ||= []);
+    val.forEach((e) => {
+      if (!e?.kg || !e?.reps || !e.date) return;
+      marcasPorEjercicio[exerciseId].push({ date: e.date, rm: estimate1RM(e.kg, e.reps) });
+    });
+  });
+  const bestByExercise = {};       // exId → { fecha: mejor 1RM previo a esa fecha }
+  Object.entries(marcasPorEjercicio).forEach(([exId, marcas]) => {
+    const fechas = [...new Set(marcas.map((m) => m.date))];
+    bestByExercise[exId] = {};
+    fechas.forEach((f) => {
+      const previas = marcas.filter((m) => m.date < f).map((m) => m.rm);
+      // Si no hay nada previo, cae al récord manual (una marca vieja que
+      // cargaste a mano igual es tu récord aunque no la hayas "entrenado").
+      bestByExercise[exId][f] = previas.length
+        ? Math.max(...previas, manualPorEjercicio[exId] || 0)
+        : (manualPorEjercicio[exId] || 0);
+    });
+  });
   // Sesiones formales por fecha: aportan el dayKey REAL que entrenaste
   // (no los días de la rutina donde "aparece" cada ejercicio), la
   // duración y la base para el % completado.
@@ -921,13 +957,20 @@ function buildSessionsIndex(logs, trainingSessions = []) {
       if (!byDate[e.date]) byDate[e.date] = { date: e.date, dayKeys: new Set(), items: [], totalVolume: 0, rpeSum: 0, rpeCount: 0, improvedCount: 0 };
       const s = byDate[e.date];
       if (ex?.dayKey) s.dayKeys.add(ex.dayKey);
-      const priorBest = sortedHist.filter((h) => h.date < e.date).reduce((max, h) => Math.max(max, vol(h.kg, h.reps)), 0);
+      // ¿Fue una mejora EN EL MOMENTO? Se compara por 1RM estimado (igual que
+      // el porcentaje de abajo y que los récords del resto de la app), no por
+      // volumen: así el fueguito verde y el porcentaje rojo nunca se
+      // contradicen. Un 1RM mayor a todo lo anterior = récord nuevo ese día.
+      const priorBest1RM = sortedHist.filter((h) => h.date < e.date).reduce((max, h) => Math.max(max, estimate1RM(h.kg, h.reps)), 0);
       const thisVol = vol(e.kg, e.reps);
-      const isImprovement = thisVol > 0 && thisVol > priorBest;
-      // Comparación contra tu MEJOR MARCA HISTÓRICA del ejercicio (por 1RM
-      // estimado, que es como se miden los récords en el resto de la app).
-      // Sirve para marcar en rojo las series que quedaron por debajo.
-      const best1RM = sortedHist.reduce((max, h) => Math.max(max, estimate1RM(h.kg, h.reps)), 0);
+      const isImprovement = estimate1RM(e.kg, e.reps) > 0 && estimate1RM(e.kg, e.reps) > priorBest1RM;
+      const priorBest = priorBest1RM;
+      // Porcentaje respecto a tu récord del ejercicio ANTES de este día. Se
+      // usa el récord previo (no el que ya incluye lo de hoy) para que, si hoy
+      // superaste la marca, las otras series del mismo día no aparezcan en
+      // rojo por culpa de tu propia mejora. Como se mide en 1RM estimado,
+      // combina reps y kilos: 7×80 con récord 8×80 da 97% → bajaste.
+      const best1RM = bestByExercise[exerciseId]?.[e.date] ?? 0;
       const this1RM = estimate1RM(e.kg, e.reps);
       const pctOfBest = best1RM > 0 && this1RM > 0 ? Math.round((this1RM / best1RM) * 100) : null;
       if (isImprovement) s.improvedCount++;
@@ -4753,19 +4796,23 @@ function SessionDetailCard({ session, onDelete }) {
             <p className="text-xs font-bold text-white mb-1.5 truncate">{exName}</p>
             <div className="flex flex-wrap gap-1.5">
               {items.map((it, i) => {
-                // Por debajo del récord (≤95% del mejor 1RM): se marca en rojo
-                // con el porcentaje, así ves de un vistazo cuánto bajaste.
-                // El 95% da margen: una serie casi igual no es "peor".
-                const below = !it.isImprovement && it.minutes == null && it.pctOfBest != null && it.pctOfBest < 95;
+                // Tres estados, comparando SIEMPRE por 1RM estimado (combina
+                // reps y kilos: una rep menos con el mismo peso también baja):
+                //   · Mejoraste tu marca → verde + 🔥
+                //   · La igualaste       → gris, sin adornos
+                //   · Quedaste por debajo → rojo + cuánto bajaste
+                const isCardio = it.minutes != null;
+                const pct = it.pctOfBest;
+                const below = !isCardio && pct != null && pct < 100;
                 const color = it.isImprovement ? "#6EE7B7" : below ? "#FCA5A5" : "#cbd5e1";
                 const bg = it.isImprovement ? "#10B98118" : below ? "#F43F5E14" : "#1e293b";
                 const bd = it.isImprovement ? "#10B98135" : below ? "#F43F5E30" : "transparent";
                 return (
                   <span key={i} className="text-[11px] font-bold px-2 py-1 rounded-lg tabular-nums inline-flex items-center gap-1"
                     style={{ color, backgroundColor: bg, border: `1px solid ${bd}` }}>
-                    {it.minutes != null ? `${it.minutes} min` : `${it.reps}×${it.kg}kg`}
+                    {isCardio ? `${it.minutes} min` : `${it.reps}×${it.kg}kg`}
                     {it.isImprovement && " 🔥"}
-                    {below && <span className="text-[9px] font-black opacity-90">↓{100 - it.pctOfBest}%</span>}
+                    {below && <span className="text-[9px] font-black opacity-90">↓{100 - pct}%</span>}
                   </span>
                 );
               })}
