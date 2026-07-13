@@ -291,7 +291,13 @@ async function syncProfileToCloud(uid, profile, requireAuth = false) {
     // lo que se limpia acá se limpia en la nube. La combinación de datos
     // entre dispositivos ya la resuelve mergeProfiles ANTES de subir, así
     // que el reemplazo no pierde nada.
-    await setDoc(doc(db, "users", uid), { ...data, _syncedAt: new Date().toISOString() });
+    // RED DE SEGURIDAD: Firestore rechaza cualquier `undefined` con un error y
+    // eso hace fallar la subida ENTERA (perderías el entrenamiento del día).
+    // Este paso los elimina en profundidad: JSON.stringify descarta las claves
+    // con undefined, así que un bug nuevo en cualquier parte del código no
+    // puede volver a romper la sincronización.
+    const limpio = JSON.parse(JSON.stringify({ ...data, _syncedAt: new Date().toISOString() }));
+    await setDoc(doc(db, "users", uid), limpio);
     console.log("[sync] Perfil subido a la nube OK");
   } catch (err) {
     // Antes el sync automático se tragaba TODO error en silencio, así que si
@@ -4045,7 +4051,12 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
       // lo que hiciste ese día y no debe depender de que el ejercicio siga
       // en tu rutina. Si después lo borrás o lo cambiás por otra variante,
       // el registro tiene que seguir contando lo que pasó.
-      const entry = { date: today, minutes: m, exName: exerciseName || undefined, exMuscle: exerciseMuscle || undefined }; if (d && !isNaN(d)) entry.km = d; if (rpe != null) entry.rpe = rpe;
+      const entry = { date: today, minutes: m };
+      // Solo agregamos los campos si tienen valor: Firestore rechaza undefined
+      // y haría fallar la sincronización del perfil entero.
+      if (exerciseName) entry.exName = exerciseName;
+      if (exerciseMuscle) entry.exMuscle = exerciseMuscle;
+      if (d && !isNaN(d)) entry.km = d; if (rpe != null) entry.rpe = rpe;
       if (!hasActiveSession) entry.noSession = true;
       const newHistory = [...history.filter((h) => h.date !== today), entry];
       let newLogs = { ...logs, [key]: newHistory };
@@ -4090,7 +4101,10 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     // noSession: registraste una marca SIN haber iniciado la sesión (por
     // ejemplo para cargar un récord viejo). El récord se guarda igual, pero
     // ese día NO cuenta como entrenado en el historial ni en la racha.
-    const entry = { date: today, reps: r, kg: k, exName: exerciseName || undefined, exMuscle: exerciseMuscle || undefined }; if (rpe != null) entry.rpe = rpe;
+    const entry = { date: today, reps: r, kg: k };
+    if (exerciseName) entry.exName = exerciseName;
+    if (exerciseMuscle) entry.exMuscle = exerciseMuscle;
+    if (rpe != null) entry.rpe = rpe;
     if (!hasActiveSession) entry.noSession = true;
     const newHistory = [...history.filter((h) => h.date !== today), entry];
     let newLogs = { ...logs, [key]: newHistory };
@@ -4528,8 +4542,8 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
               style={{ borderColor: accent + "35" }}
             />
             <div className="flex items-center gap-2 mt-2">
-              <button onClick={() => { onUpdateSettings({ exerciseNotes: { ...(settings?.exerciseNotes || {}), [exercise.id]: noteDraft.trim() || undefined } }); setEditingNote(false); }} className="flex-1 py-2 rounded-lg text-[11px] font-black !text-white transition active:scale-95" style={{ background: `linear-gradient(160deg, ${accent}, ${accent}b0)` }}>Guardar</button>
-              {myNote && <button onClick={() => { onUpdateSettings({ exerciseNotes: { ...(settings?.exerciseNotes || {}), [exercise.id]: undefined } }); setNoteDraft(""); setEditingNote(false); }} className="px-3 py-2 rounded-lg text-[11px] font-bold text-rose-400 bg-rose-500/10 border border-rose-500/25 transition active:scale-95">Borrar</button>}
+              <button onClick={() => { const notas = { ...(settings?.exerciseNotes || {}) }; const t = noteDraft.trim(); if (t) notas[exercise.id] = t; else delete notas[exercise.id]; onUpdateSettings({ exerciseNotes: notas }); setEditingNote(false); }} className="flex-1 py-2 rounded-lg text-[11px] font-black !text-white transition active:scale-95" style={{ background: `linear-gradient(160deg, ${accent}, ${accent}b0)` }}>Guardar</button>
+              {myNote && <button onClick={() => { const notas = { ...(settings?.exerciseNotes || {}) }; delete notas[exercise.id]; onUpdateSettings({ exerciseNotes: notas }); setNoteDraft(""); setEditingNote(false); }} className="px-3 py-2 rounded-lg text-[11px] font-bold text-rose-400 bg-rose-500/10 border border-rose-500/25 transition active:scale-95">Borrar</button>}
               <button onClick={() => { setNoteDraft(myNote || ""); setEditingNote(false); }} className="px-3 py-2 rounded-lg text-[11px] font-bold text-slate-500 bg-slate-800/60 transition active:scale-95">Cancelar</button>
             </div>
           </div>
@@ -8456,15 +8470,29 @@ const AI_LOG_HISTORY_LIMIT = 6; // últimas 6 sesiones por serie — suficiente 
 // conclusiones ya masticadas — con esto puede responder "¿por qué me estanqué
 // en press banca?" con TUS números reales, o "armame el día de mañana" sabiendo
 // qué músculos tenés frescos y cuáles reventados.
-function buildTrainingInsights(logs, sessions, weekSchedule) {
+function buildTrainingInsights(logs, sessions, weekSchedule, dumbbellDouble = null) {
   const today = todayStr();
   const daysAgo = (dateStr) => Math.round((new Date(today) - new Date(dateStr)) / 86400000);
+
+  // Factor de carga del ejercicio: si entrenás con DOS mancuernas, el peso
+  // real es el doble. Sin esto la IA calculaba las marcas a la mitad y te
+  // daba consejos con números que no coincidían con lo que ves en la app.
+  const loadFactorDe = (exId) =>
+    (dumbbellDouble && dumbbellDouble[exId]) || EXERCISE_LIBRARY_BY_ID[exId]?.loadFactor || 1;
 
   // ── Por ejercicio: mejor marca, última sesión, y TENDENCIA de 1RM
   const porEjercicio = [];
   const byExercise = {};
+  // Récords corregidos a mano: mandan sobre lo calculado del historial. Antes
+  // se descartaban, así que si arreglabas una marca, la IA no se enteraba.
+  const manualPR = {};
   Object.entries(logs || {}).forEach(([key, val]) => {
-    if (key.endsWith("_pr_override") || !Array.isArray(val)) return;
+    if (key.endsWith("_pr_override")) {
+      const exId = key.replace("_pr_override", "");
+      if (val?.kg && val?.reps) manualPR[exId] = { kg: val.kg, reps: val.reps, manual: !!val.manual };
+      return;
+    }
+    if (!Array.isArray(val)) return;
     const { exerciseId } = parseLogKey(key);
     (byExercise[exerciseId] ||= []).push(...val.filter((e) => e && e.kg && e.reps));
   });
@@ -8474,8 +8502,9 @@ function buildTrainingInsights(logs, sessions, weekSchedule) {
     const sorted = entries.slice().sort((a, b) => (a.date < b.date ? -1 : 1));
     // Mejor 1RM por fecha (una sesión puede tener varias series)
     const byDate = {};
+    const lf = loadFactorDe(exId);
     sorted.forEach((e) => {
-      const rm = estimate1RM(e.kg, e.reps);
+      const rm = estimate1RM(e.kg * lf, e.reps);
       if (!byDate[e.date] || rm > byDate[e.date].rm) byDate[e.date] = { rm, kg: e.kg, reps: e.reps };
     });
     const fechas = Object.keys(byDate).sort();
@@ -8493,16 +8522,23 @@ function buildTrainingInsights(logs, sessions, weekSchedule) {
     } else if (fechas.length >= 2) {
       tendencia = byDate[ult].rm > byDate[fechas[0]].rm ? "subiendo" : "plano";
     }
+    // El récord corregido a mano manda sobre lo calculado del historial: es la
+    // misma regla que usa la app, así la IA habla de la misma marca que ves vos.
+    const mp = manualPR[exId];
+    const mpRm = mp ? estimate1RM(mp.kg * lf, mp.reps) : 0;
+    const usarManual = mp && mpRm >= byDate[best].rm;
     porEjercicio.push({
       ejercicio: lib?.name || exId,
       musculo: lib?.group || null,
-      mejorMarca: `${byDate[best].reps}x${byDate[best].kg}kg`,
-      mejor1RMest: byDate[best].rm,
-      fechaMejorMarca: best,
-      diasDesdeMejorMarca: daysAgo(best),
+      mejorMarca: usarManual ? `${mp.reps}x${mp.kg}kg` : `${byDate[best].reps}x${byDate[best].kg}kg`,
+      mejor1RMest: usarManual ? mpRm : byDate[best].rm,
+      marcaCorregidaAMano: usarManual ? true : undefined,
+      fechaMejorMarca: usarManual ? null : best,
+      diasDesdeMejorMarca: usarManual ? null : daysAgo(best),
       ultimaVez: ult,
       diasDesdeUltimaVez: daysAgo(ult),
       sesionesRegistradas: fechas.length,
+      dosMancuernas: lf === 2 ? true : undefined,
       tendencia,
     });
   });
@@ -8515,12 +8551,14 @@ function buildTrainingInsights(logs, sessions, weekSchedule) {
     const { exerciseId } = parseLogKey(key);
     const g = EXERCISE_LIBRARY_BY_ID[exerciseId]?.group;
     if (!g) return;
+    const lfv = loadFactorDe(exerciseId);
     val.forEach((e) => {
       if (!e || !e.kg || !e.reps || !e.date) return;
       const d = daysAgo(e.date);
       if (!ultimaVezMusculo[g] || d < ultimaVezMusculo[g]) ultimaVezMusculo[g] = d;
-      if (d <= 7) { volSemana[g] = (volSemana[g] || 0) + e.kg * e.reps; seriesSemana[g] = (seriesSemana[g] || 0) + 1; }
-      else if (d <= 14) volSemanaPrevia[g] = (volSemanaPrevia[g] || 0) + e.kg * e.reps;
+      const v = e.kg * lfv * e.reps;
+      if (d <= 7) { volSemana[g] = (volSemana[g] || 0) + v; seriesSemana[g] = (seriesSemana[g] || 0) + 1; }
+      else if (d <= 14) volSemanaPrevia[g] = (volSemanaPrevia[g] || 0) + v;
     });
   });
   const porMusculo = MUSCLE_GROUPS.map((g) => ({
@@ -8622,7 +8660,7 @@ function EntrenadorIAChat({ profile, logs, profileName, messages, setMessages, s
         // no tiene que deducir nada de los logs crudos — responde con datos
         // duros y detecta problemas reales (ej. "llevás 5 semanas estancado
         // en press banca y le bajaste el volumen a pecho un 30%").
-        analisisEntrenamiento: buildTrainingInsights(logs, profile?.trainingSessions || [], profile?.weekSchedule || null),
+        analisisEntrenamiento: buildTrainingInsights(logs, profile?.trainingSessions || [], profile?.weekSchedule || null, settings?.dumbbellDouble || null),
       };
       const systemPrompt = `Sos un entrenador personal y coach de fuerza con dominio profundo y actualizado de la ciencia del entrenamiento — no sólo frases motivacionales genéricas. Hablás en español rioplatense, breve y cercano.
 
