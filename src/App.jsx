@@ -407,7 +407,10 @@ function buildRoutineModel(routineDef) {
       const cardio = !!(lib ? lib.cardio : entry.cardio);
       return { id, name, muscle, nota, video, sets: entry.sets, custom: !lib, cardio, supersetNext: !!entry.supersetNext };
     });
-    days[dk] = { ...d, exercises };
+    // Color del día atenuado (30% hacia el gris): mantiene la identidad de
+    // cada día pero sin el neón saturado de origen, que hacía que la interfaz
+    // gritara. Un solo punto de verdad para toda la app.
+    days[dk] = { ...d, color: d.color ? muteHexColor(d.color, 0.3) : d.color, exercises };
     exercises.forEach((ex) => {
       exerciseById[ex.id] = { ...ex, dayKey: dk };
       ex.sets.forEach((_, i) => { keyToDay[`${ex.id}_${i}`] = dk; });
@@ -1518,6 +1521,15 @@ p, span, label, button { overflow-wrap: break-word; }
 .text-\\[10px\\] { font-size: calc(10px * var(--small-text-scale, 1)) !important; }
 .text-\\[11px\\] { font-size: calc(11px * var(--small-text-scale, 1)) !important; }
 .text-\\[12px\\] { font-size: calc(12px * var(--small-text-scale, 1)) !important; }
+/* Tamaños intermedios y grandes que también hay que escalar: sin estos, las
+   etiquetas quedaban fijas mientras el resto de la app crecía o se achicaba
+   (los decimales de Tailwind llevan el punto escapado en CSS). */
+.text-\\[8\\.5px\\]  { font-size: calc(8.5px * var(--small-text-scale, 1)) !important; }
+.text-\\[9\\.5px\\]  { font-size: calc(9.5px * var(--small-text-scale, 1)) !important; }
+.text-\\[10\\.5px\\] { font-size: calc(10.5px * var(--small-text-scale, 1)) !important; }
+.text-\\[13px\\] { font-size: calc(13px * var(--small-text-scale, 1)) !important; }
+.text-\\[17px\\] { font-size: calc(17px * var(--small-text-scale, 1)) !important; }
+.text-\\[26px\\] { font-size: calc(26px * var(--small-text-scale, 1)) !important; }
 `;
 
 function StyleInjector() {
@@ -1639,7 +1651,7 @@ function ShareLinkModal({ title, shareTitle, shareText, shareTarget, onClose }) 
   const redditUrl = url ? `https://www.reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(shareTitle)}` : "#";
   return (
     <div className="fixed inset-0 z-[120] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in" onClick={onClose}>
-      <div className="bg-slate-900 border border-slate-700/60 rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50 max-h-[92vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-slate-900 border border-slate-700/60 rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50 max-h-[92vh] overflow-y-auto overscroll-contain" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-base font-black text-white">{title}</h3>
           <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition"><X size={18} /></button>
@@ -2161,6 +2173,7 @@ function drawMuscleRankShareCard(ctx, W, H, { ranks, modeLabel, accent = "#F59E0
 }
 
 function ShareImageModal({ title, fileNamePrefix, shareTitle, shareText, draw, onClose, autoShowOptOutLabel, onOptOutAutoShow }) {
+  useAndroidBack(onClose);
   const canvasRef = useRef(null);
   const scrollContainerRef = useRef(null);
   const [previewUrl, setPreviewUrl] = useState(null);
@@ -2254,7 +2267,7 @@ function ShareImageModal({ title, fileNamePrefix, shareTitle, shareText, draw, o
 
   return (
     <div className="fixed inset-0 z-[130] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in" onClick={onClose}>
-      <div ref={scrollContainerRef} className="bg-slate-900 border border-slate-700/60 rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50 max-h-[92vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+      <div ref={scrollContainerRef} className="bg-slate-900 border border-slate-700/60 rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50 max-h-[92vh] overflow-y-auto overscroll-contain" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-base font-black text-white">{title}</h3>
           <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition"><X size={18} /></button>
@@ -2750,15 +2763,56 @@ const RECENT_RANK_UPS = new Set();
 // de siempre.
 let STREAK_VISTO = null;
 
-// Hook: registra el cierre de un modal en la pila mientras esté montado.
-// Uso: useAndroidBack(onClose) al principio de cualquier componente modal.
+// Cuántos modales hay abiertos ahora mismo. Sirve para congelar el fondo una
+// sola vez aunque haya modales apilados (y descongelarlo recién cuando se
+// cierra el último).
+let MODALES_ABIERTOS = 0;
+let SCROLL_CONGELADO_EN = 0;
+
+// Congela la página de fondo mientras hay un modal abierto.
+//
+// El problema: al deslizar dentro de un pop-up, cuando su contenido llega al
+// tope el gesto se propaga al fondo y mueve la página entera detrás del modal.
+// La solución robusta en móvil es `position: fixed` en el body — con
+// overflow:hidden solo, iOS y varios Android igual siguen scrolleando. Como
+// fixed haría saltar la página al tope, guardamos la posición y la
+// restauramos al cerrar.
+function congelarFondo() {
+  if (MODALES_ABIERTOS++ > 0) return; // ya estaba congelado por otro modal
+  SCROLL_CONGELADO_EN = window.scrollY || 0;
+  const b = document.body;
+  b.style.position = "fixed";
+  b.style.top = `-${SCROLL_CONGELADO_EN}px`;
+  b.style.left = "0";
+  b.style.right = "0";
+  b.style.width = "100%";
+  b.style.overflowY = "scroll"; // mantiene el ancho de la barra: no salta el layout
+}
+function descongelarFondo() {
+  if (--MODALES_ABIERTOS > 0) return;  // todavía queda otro modal abierto
+  if (MODALES_ABIERTOS < 0) MODALES_ABIERTOS = 0; // por las dudas
+  const b = document.body;
+  b.style.position = "";
+  b.style.top = "";
+  b.style.left = "";
+  b.style.right = "";
+  b.style.width = "";
+  b.style.overflowY = "";
+  window.scrollTo(0, SCROLL_CONGELADO_EN); // volver justo a donde estabas
+}
+
+// Hook de modal: registra el cierre para el botón atrás de Android Y congela
+// el fondo mientras está abierto. Lo llaman todos los modales.
+// Uso: useAndroidBack(onClose) al principio del componente.
 function useAndroidBack(onClose) {
   useEffect(() => {
     if (typeof onClose !== "function") return;
     BACK_HANDLERS.push(onClose);
+    congelarFondo();
     return () => {
       const i = BACK_HANDLERS.lastIndexOf(onClose);
       if (i !== -1) BACK_HANDLERS.splice(i, 1);
+      descongelarFondo();
     };
   }, [onClose]);
 }
@@ -4063,7 +4117,7 @@ function HelpModal({ startTab, onClose }) {
         {/* Área media scrolleable: demo + texto scrollean JUNTOS.
             flex-1 + minHeight: 0 es lo que permite que overflow-y-auto
             funcione dentro del flex-col limitado por max-h del modal. */}
-        <div className="flex-1 overflow-y-auto" style={{ minHeight: 0, WebkitOverflowScrolling: "touch" }}>
+        <div className="flex-1 overflow-y-auto overscroll-contain" style={{ minHeight: 0, WebkitOverflowScrolling: "touch" }}>
         {step.demo && (
           <div key={`demo-${step.chapterKey}`} className="mx-5 mt-4 tab-fade-in">
             {step.demo.caption && (
@@ -5490,6 +5544,9 @@ function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [], weekSche
   const [selectedDate, setSelectedDate] = useState(null);
   const weeks = useMemo(() => getMonthMatrix(cursor.y, cursor.m), [cursor]);
   const selectedSession = selectedDate ? sessionByDate[selectedDate] : null;
+  // El detalle del día también congela el fondo y responde al botón atrás.
+  const cerrarDetalleDia = useCallback(() => setSelectedDate(null), []);
+  useAndroidBack(selectedSession ? cerrarDetalleDia : null);
   const handleDeleteDay = (date) => { onDeleteDay?.(date); if (selectedDate === date) setSelectedDate(null); };
   // Qué días de tu rutina aparecen en el mes que estás mirando — para la
   // leyenda de abajo del calendario, así el color de cada celda no queda
@@ -5589,7 +5646,7 @@ function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [], weekSche
               frente, con fondo difuminado y cierre con toque afuera o X. */}
           {selectedSession && (
             <div className="fixed inset-0 z-[140] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in" onClick={() => setSelectedDate(null)}>
-              <div className="max-w-md w-full max-h-[85vh] overflow-y-auto rounded-3xl modal-pop-in" onClick={(e) => e.stopPropagation()}>
+              <div className="max-w-md w-full max-h-[85vh] overflow-y-auto overscroll-contain rounded-3xl modal-pop-in" onClick={(e) => e.stopPropagation()}>
                 <div className="relative">
                   <button onClick={() => setSelectedDate(null)} aria-label="Cerrar" className="absolute top-3 right-3 z-10 p-2 rounded-xl bg-slate-800/90 text-slate-400 hover:text-white transition active:scale-90"><X size={15} /></button>
                   <SessionDetailCard session={selectedSession} onDelete={(date) => { handleDeleteDay(date); setSelectedDate(null); }} />
@@ -6486,6 +6543,12 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
   const cerrarAnalisis = useCallback(() => setShowAnalysis(false), []);
   useAndroidBack(showAnalysis ? cerrarAnalisis : null);
   const [showGroupExercises, setShowGroupExercises] = useState(false); // ejercicios del grupo sin entrenar
+  // Los otros modales de esta vista también congelan el fondo y responden al
+  // botón atrás (mismo patrón que cerrarAnalisis, arriba).
+  const cerrarTierRef = useCallback(() => setShowTierRef(false), []);
+  const cerrarGroupEx = useCallback(() => setShowGroupExercises(false), []);
+  useAndroidBack(showTierRef ? cerrarTierRef : null);
+  useAndroidBack(showGroupExercises ? cerrarGroupEx : null);
   const detailRef = useRef(null); // la tarjeta de detalle, para el scroll automático
   const frontBodyRef = useRef(null);
   const backBodyRef = useRef(null);
@@ -6689,7 +6752,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
           apuntan a ese músculo y un botón directo a Rutinas para sumarlos. */}
       {showGroupExercises && selInfo && (
         <div className="fixed inset-0 z-[130] bg-black/75 backdrop-blur-sm flex items-center justify-center p-5 modal-bg-in" onClick={() => setShowGroupExercises(false)}>
-          <div className="max-w-sm w-full max-h-[80vh] overflow-y-auto bg-slate-900 border border-slate-700/60 rounded-3xl p-5 modal-pop-in shadow-2xl shadow-black/60" onClick={(e) => e.stopPropagation()}>
+          <div className="max-w-sm w-full max-h-[80vh] overflow-y-auto overscroll-contain bg-slate-900 border border-slate-700/60 rounded-3xl p-5 modal-pop-in shadow-2xl shadow-black/60" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-1">
               <div className="flex items-center gap-2">
                 <Dumbbell size={15} className="text-teal-400" />
@@ -6727,7 +6790,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
           directo a la tarjeta de ese músculo. */}
       {showAnalysis && (
         <div className="fixed inset-0 z-[130] bg-black/75 backdrop-blur-sm flex items-center justify-center p-5 modal-bg-in" onClick={() => setShowAnalysis(false)}>
-          <div className="max-w-sm w-full max-h-[85vh] overflow-y-auto bg-slate-900 border border-slate-700/60 rounded-3xl p-5 modal-pop-in shadow-2xl shadow-black/60" onClick={(e) => e.stopPropagation()}>
+          <div className="max-w-sm w-full max-h-[85vh] overflow-y-auto overscroll-contain bg-slate-900 border border-slate-700/60 rounded-3xl p-5 modal-pop-in shadow-2xl shadow-black/60" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <BarChart3 size={15} className="text-teal-400" />
@@ -6861,6 +6924,7 @@ function daysSince(dateStr) {
 // la app (fondo oscuro, tarjeta redondeada), sin nada de canvas porque acá
 // sólo se muestra la imagen tal cual quedó guardada.
 function PhotoViewerModal({ photo, onClose, onDelete }) {
+  useAndroidBack(onClose);
   const [confirmDel, setConfirmDel] = useState(false);
   const dateLabel = new Date(photo.date + "T00:00:00").toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" });
   return (
@@ -7093,7 +7157,7 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
                 el historial de entrenamientos */}
             {selectedEntry && (
               <div className="fixed inset-0 z-[140] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in" onClick={() => setSelectedDate(null)}>
-                <div className="max-w-md w-full max-h-[85vh] overflow-y-auto rounded-3xl modal-pop-in border border-purple-500/30" style={{ background: "linear-gradient(170deg,#0f172a 0%,#0a0f1a 100%)" }} onClick={(e) => e.stopPropagation()}>
+                <div className="max-w-md w-full max-h-[85vh] overflow-y-auto overscroll-contain rounded-3xl modal-pop-in border border-purple-500/30" style={{ background: "linear-gradient(170deg,#0f172a 0%,#0a0f1a 100%)" }} onClick={(e) => e.stopPropagation()}>
                   <div className="relative px-4 pt-4 pb-3 overflow-hidden">
                     <div className="absolute -top-10 -right-8 w-36 h-36 rounded-full blur-3xl opacity-20 bg-purple-500 pointer-events-none" />
                     <button onClick={() => setSelectedDate(null)} aria-label="Cerrar" className="absolute top-3 right-3 z-10 p-2 rounded-xl bg-slate-800/90 text-slate-400 hover:text-white transition active:scale-90"><X size={15} /></button>
@@ -7151,7 +7215,7 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
               const weightDiff = (a.entry.weight != null && b.entry.weight != null) ? Math.round((b.entry.weight - a.entry.weight) * 10) / 10 : null;
               return (
                 <div className="fixed inset-0 z-[150] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in" onClick={() => setComparePair(null)}>
-                  <div className="max-w-lg w-full max-h-[90vh] overflow-y-auto rounded-3xl modal-pop-in border border-rose-500/30 bg-slate-950" onClick={(e) => e.stopPropagation()}>
+                  <div className="max-w-lg w-full max-h-[90vh] overflow-y-auto overscroll-contain rounded-3xl modal-pop-in border border-rose-500/30 bg-slate-950" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center justify-between px-4 pt-4 pb-2">
                       <p className="text-sm font-black text-white flex items-center gap-2"><Camera size={15} className="text-rose-400" /> Tu comparación</p>
                       <button onClick={() => setComparePair(null)} aria-label="Cerrar" className="p-2 rounded-xl bg-slate-800/90 text-slate-400 hover:text-white transition active:scale-90"><X size={15} /></button>
@@ -8017,7 +8081,7 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
             </div>
             <button onClick={() => setShowPrivacy(false)} className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white transition active:scale-90"><X size={16} /></button>
           </div>
-          <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5 text-slate-400 text-[13px] leading-relaxed">
+          <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-5 space-y-5 text-slate-400 text-[13px] leading-relaxed">
             <p className="text-[11px] text-slate-600">Última actualización: julio de 2026</p>
             <p>Modus Fit respeta tu privacidad. Esta política explica qué datos recopilamos, cómo los usamos y cuáles son tus derechos.</p>
             {[
@@ -8078,7 +8142,7 @@ function SharedRoutineImportModal({ routine, onImport, onDiscard }) {
   if (!routine) return null;
   return (
     <div className="fixed inset-0 z-[125] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in" onClick={onDiscard}>
-      <div className="w-full max-w-md max-h-[86vh] overflow-y-auto bg-slate-900 border border-slate-700/60 rounded-3xl modal-pop-in shadow-2xl shadow-black/70" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-md max-h-[86vh] overflow-y-auto overscroll-contain bg-slate-900 border border-slate-700/60 rounded-3xl modal-pop-in shadow-2xl shadow-black/70" onClick={(e) => e.stopPropagation()}>
         <div className="p-5">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 rounded-2xl bg-teal-500/20 border border-teal-500/30 text-teal-300 flex items-center justify-center shrink-0">
@@ -8259,7 +8323,7 @@ function ExercisePickerPanel({ existingIds, onAdd, onAddCustom, onClose }) {
           ))}
         </div>
       )}
-      <div className="max-h-52 overflow-y-auto space-y-1.5 mt-1 -mx-1 px-1">
+      <div className="max-h-52 overflow-y-auto overscroll-contain space-y-1.5 mt-1 -mx-1 px-1">
         {pool.map((e) => {
           const added = existingIds.includes(e.id);
           return (
@@ -8613,8 +8677,8 @@ function BuilderDayCard({ day, dayIdx, totalDays, onRename, onRemove, onMoveDay,
       {colorPickerOpen && (
         <div className="flex gap-1.5 flex-wrap mb-2.5 ml-9 bounce-in">
           {BUILDER_COLOR_PALETTE.map((c) => (
-            <button key={c} onClick={() => { onChangeColor(c); setColorPickerOpen(false); }} aria-label={`Color ${c}`} className="w-7 h-7 rounded-lg shrink-0 transition active:scale-90 flex items-center justify-center" style={{ backgroundColor: c }}>
-              {c === day.color && <Check size={14} className="text-white" />}
+            <button key={c} onClick={() => { onChangeColor(c); setColorPickerOpen(false); }} aria-label={`Color ${c}`} className="w-7 h-7 rounded-lg shrink-0 transition active:scale-90 flex items-center justify-center" style={{ backgroundColor: muteHexColor(c, 0.3) }}>
+              {muteHexColor(c, 0.3).toLowerCase() === (day.color || "").toLowerCase() && <Check size={14} className="text-white" />}
             </button>
           ))}
         </div>
@@ -8702,6 +8766,11 @@ function BuilderDayCard({ day, dayIdx, totalDays, onRename, onRemove, onMoveDay,
   );
 }
 
+// Paleta del editor: guarda los tonos ORIGINALES. buildRoutineModel los atenúa
+// al cargar la rutina — si acá ya los guardáramos atenuados, se atenuarían dos
+// veces y quedarían apagados de más. Lo que sí hacemos es MOSTRAR la muestra
+// ya atenuada en el selector (con muteHexColor), así el color que ves al
+// elegir es el mismo que vas a ver después en la app.
 const BUILDER_COLOR_PALETTE = ["#14B8A6", "#3B82F6", "#F97316", "#A855F7", "#F43F5E", "#F59E0B", "#06B6D4", "#10B981"];
 let _builderUidCounter = 0;
 function builderUid(prefix) { _builderUidCounter += 1; return `${prefix}_${Date.now()}_${_builderUidCounter}`; }
@@ -9630,6 +9699,7 @@ Datos: ${JSON.stringify(context)}`;
 
 
 function ImportRoutineModal({ onImport, onClose }) {
+  useAndroidBack(onClose);
   const [text, setText] = useState("");
   const [routineName, setRoutineName] = useState("");
   const [parsed, setParsed] = useState(null);
@@ -9743,7 +9813,7 @@ function ImportRoutineModal({ onImport, onClose }) {
   if (parsed) {
     return (
       <div className="fixed inset-0 z-[130] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in" onClick={onClose}>
-        <div className="bg-slate-900 border border-slate-700/60 rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50 max-h-[88vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="bg-slate-900 border border-slate-700/60 rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50 max-h-[88vh] overflow-y-auto overscroll-contain" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 rounded-2xl bg-teal-500/15 text-teal-400 flex items-center justify-center shrink-0"><Sparkles size={18} /></div>
             <div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-widest text-teal-400">Vista previa</p><h3 className="text-base font-black text-white leading-tight truncate">{parsed.name}</h3></div>
@@ -9761,7 +9831,7 @@ function ImportRoutineModal({ onImport, onClose }) {
 
   return (
     <div className="fixed inset-0 z-[130] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in" onClick={onClose}>
-      <div className="bg-slate-900 border border-slate-700/60 rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50 max-h-[92vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-slate-900 border border-slate-700/60 rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50 max-h-[92vh] overflow-y-auto overscroll-contain" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-base font-black text-white">Importar rutina</h3>
           <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition"><X size={18} /></button>
@@ -10204,7 +10274,7 @@ function PersonalizedRoutineWizard({ profile, onUpdateProfile, onCreateRoutine, 
                 <p className="text-[10px] text-slate-500">{preview.dayOrder.length} días · hecha a tu medida · revisala y confirmá</p>
               </div>
             </div>
-            <div className="space-y-2 max-h-[40vh] overflow-y-auto">
+            <div className="space-y-2 max-h-[40vh] overflow-y-auto overscroll-contain">
               {preview.dayOrder.map((dk, di) => {
                 const d = preview.days[dk];
                 const color = d.color || ["#14B8A6", "#3B82F6", "#A855F7", "#F59E0B", "#EF4444", "#10B981"][di % 6];
@@ -10383,7 +10453,7 @@ function RoutinePreviewModal({ routineDef, routineName, onActivate, onClose, yaA
         </div>
 
         {/* Cuerpo con scroll */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+        <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-4 space-y-4">
           <div className="rounded-2xl bg-slate-950/50 border border-slate-800/60 p-3.5">
             <BalanceMuscular routineDef={routineDef} />
           </div>
@@ -11008,7 +11078,7 @@ function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
 
   return (
     <div className="fixed inset-0 z-[140] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in" onClick={onClose}>
-      <div className="max-w-md w-full max-h-[92vh] overflow-y-auto bg-slate-900 border border-slate-700/60 rounded-3xl modal-pop-in shadow-2xl shadow-black/70" onClick={(e) => e.stopPropagation()}>
+      <div className="max-w-md w-full max-h-[92vh] overflow-y-auto overscroll-contain bg-slate-900 border border-slate-700/60 rounded-3xl modal-pop-in shadow-2xl shadow-black/70" onClick={(e) => e.stopPropagation()}>
         <div className="sticky top-0 z-10 bg-slate-900 px-5 pt-5 pb-3 border-b border-slate-800/60">
           <div className="flex items-start justify-between gap-3 mb-1">
             <div className="flex items-center gap-2">
