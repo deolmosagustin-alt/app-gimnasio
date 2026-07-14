@@ -1190,6 +1190,32 @@ const ANIMATION_CSS = `
 /* Los elementos con su propia transición mandan (el arrastre, por ejemplo) */
 .theme-fade [data-drag-idx] { transition-property: transform; }
 
+/* La racha cuando SUMA un día: salto con destello dorado (solo esa vez) */
+@keyframes streakJump {
+  0%   { transform: scale(1); text-shadow: none; }
+  35%  { transform: scale(1.5); text-shadow: 0 0 14px rgba(251,191,36,0.95); }
+  60%  { transform: scale(0.94); }
+  100% { transform: scale(1); text-shadow: none; }
+}
+.streak-jump { animation: streakJump 0.75s cubic-bezier(0.34, 1.4, 0.64, 1) 0.15s both; }
+
+/* Cambio de pestaña: la entrante se desliza sutilmente desde su dirección */
+@keyframes tabSlideRight { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes tabSlideLeft  { from { opacity: 0; transform: translateX(-16px); } to { opacity: 1; transform: translateX(0); } }
+.tab-slide-right { animation: tabSlideRight 0.22s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.tab-slide-left  { animation: tabSlideLeft 0.22s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* El músculo que subió de rango late (solo brillo: escalar un polygon SVG lo
+   corre de lugar porque escala desde el origen del SVG, no desde su centro) */
+@keyframes muscleGlowBeat { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(2.1); } }
+
+/* Historial: las tarjetas de días entran en cascada al abrir la pestaña */
+@keyframes histEnter {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.hist-enter { animation: histEnter 0.35s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
 /* La rutina activa "respira": un halo lentísimo que marca cuál es la tuya
    sin gritar. 4 segundos por ciclo — se percibe pero no distrae. */
 @keyframes breathe {
@@ -1204,7 +1230,7 @@ const ANIMATION_CSS = `
   .invite-pulse, .slide-right, .slide-left, .streak-beat, .streak-glow,
   .elastic-in, .skeleton, .row-enter, .row-flash, .row-leave, .activate-pulse,
   .badge-pop, .superset-draw, .dot-bounce, .msg-in, .wake-up, .day-mark,
-  .breathe { animation: none !important; }
+  .breathe, .hist-enter, .streak-jump, .tab-slide-right, .tab-slide-left { animation: none !important; }
   .theme-fade, .theme-fade * { transition: none !important; }
 }
 
@@ -1540,6 +1566,7 @@ function PRBurst({ anchorRef, trigger }) {
       directamente desde el navegador.
 ============================================================================ */
 function ShareLinkModal({ title, shareTitle, shareText, shareTarget, onClose }) {
+  useAndroidBack(onClose);
   const [url, setUrl] = useState("");
   const [linkError, setLinkError] = useState(null);
   const [copied, setCopied] = useState(false);
@@ -2706,6 +2733,36 @@ const ACTIVE_REST_TIMERS = {};
 // Número que "cuenta" hasta su valor final en vez de aparecer de golpe.
 // Se usa para los récords: ver el peso subir de 80 a 82.5 refuerza la
 // sensación de progreso mucho más que verlo ya escrito.
+// ── Pila global de "cerradores" para el botón atrás de Android ──────────────
+// Cada modal abierto registra acá su función de cierre. Cuando el usuario usa
+// el gesto de atrás del sistema, se cierra el modal de más arriba en vez de
+// cerrarse la app entera.
+const BACK_HANDLERS = [];
+
+// Músculos que subieron de rango en esta sesión de uso. La próxima vez que
+// abras Progreso, esos músculos laten en el muñeco con su color nuevo y el
+// registro se consume. Vive en memoria (no en el perfil): es un efecto
+// visual efímero, no un dato.
+const RECENT_RANK_UPS = new Set();
+
+// Última racha que el usuario vio en Progreso. Si al volver aumentó (terminó
+// una sesión en el medio), el número hace un salto dorado en vez del latido
+// de siempre.
+let STREAK_VISTO = null;
+
+// Hook: registra el cierre de un modal en la pila mientras esté montado.
+// Uso: useAndroidBack(onClose) al principio de cualquier componente modal.
+function useAndroidBack(onClose) {
+  useEffect(() => {
+    if (typeof onClose !== "function") return;
+    BACK_HANDLERS.push(onClose);
+    return () => {
+      const i = BACK_HANDLERS.lastIndexOf(onClose);
+      if (i !== -1) BACK_HANDLERS.splice(i, 1);
+    };
+  }, [onClose]);
+}
+
 function CountUpNumber({ value, from = null, duration = 700, decimals = 1, className = "", style = {} }) {
   const [shown, setShown] = useState(from ?? value);
   const rafRef = useRef(null);
@@ -3420,7 +3477,7 @@ function DemoPreview({ kind, view }) {
 const HELP_CHAPTERS = [
   {
     key: "_intro",
-    label: "Inicio",
+    label: "Objetivo",
     color: "#14B8A6",
     icon: <Sparkles size={16} />,
     steps: [
@@ -3761,7 +3818,171 @@ const ALL_HELP_STEPS = HELP_CHAPTERS.flatMap((c, ci) =>
   }))
 );
 
+// ── INTRO DE BIENVENIDA (primera vez) ───────────────────────────────────────
+// Estilo "intro de app": 5 slides con un ícono grande, una idea por pantalla,
+// puntos de progreso y botones grandes. La primera vez que activás una rutina
+// se muestra ESTO en vez del tutorial completo de 51 pasos (que abruma como
+// primer contacto). El tutorial detallado queda en el "?" y como opción acá.
+const WELCOME_SLIDES = [
+  {
+    icon: <Flame size={38} />,
+    color: "#14B8A6",
+    title: "¡Bienvenido a Modus Fit!",
+    text: "Tu gym tracker inteligente: registrá tus entrenamientos, mirá tu progreso muscular y entrená con un plan a tu medida.",
+  },
+  {
+    icon: <Dumbbell size={38} />,
+    color: "#3B82F6",
+    title: "Registrá en segundos",
+    text: "Anotá reps y kilos de cada serie con dos toques. La app detecta tus récords sola y te avisa cuando los superás.",
+  },
+  {
+    icon: <TrendingUp size={38} />,
+    color: "#A855F7",
+    title: "Mirá tu progreso",
+    text: "Cada músculo sube de rango a medida que mejorás tus marcas. El muñeco te muestra de un vistazo qué está fuerte y qué falta.",
+  },
+  {
+    icon: <Layers size={38} />,
+    color: "#F59E0B",
+    title: "Rutinas a tu medida",
+    text: "Armá la tuya desde cero, usá una preestablecida o dejá que la IA te arme un plan respondiendo unas preguntas.",
+  },
+  {
+    icon: <Sparkles size={38} />,
+    color: "#14B8A6",
+    title: "Tu entrenador con IA",
+    text: "Un coach que ve TUS datos reales: tus marcas, tu volumen, tus días de descanso. Consejos concretos, no genéricos.",
+  },
+];
+
+// ── RESUMEN AL FINALIZAR EL ENTRENAMIENTO ───────────────────────────────────
+// El cierre emocional de la sesión: duración, volumen contando hacia arriba,
+// series y ejercicios, y los récords del día apareciendo uno a uno. Antes
+// finalizar no mostraba nada — el mejor momento de la app pasaba en silencio.
+function SessionSummaryModal({ resumen, onClose }) {
+  useAndroidBack(onClose);
+  if (!resumen) return null;
+  return (
+    <div className="fixed inset-0 z-[140] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 modal-bg-in" onClick={onClose}>
+      <div
+        className="max-w-sm w-full rounded-3xl modal-pop-in shadow-2xl shadow-black/70 overflow-hidden"
+        style={{ background: "linear-gradient(165deg,#0d1a17 0%,#0a0f1a 100%)", border: "1px solid rgba(20,184,166,0.3)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Hero: check grande con halo */}
+        <div className="relative flex flex-col items-center pt-9 pb-5 px-6 text-center">
+          <div className="absolute -top-16 left-1/2 -translate-x-1/2 w-52 h-52 rounded-full bg-teal-500/20 blur-3xl pointer-events-none" />
+          <div className="relative w-16 h-16 rounded-full flex items-center justify-center mb-4 elastic-in bg-teal-500/18 border border-teal-500/40 text-teal-300" style={{ boxShadow: "0 12px 38px -12px rgba(20,184,166,0.7)" }}>
+            <svg className="draw-check" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+          </div>
+          <h2 className="relative text-lg font-black text-white leading-tight">¡Entrenamiento completado!</h2>
+          {resumen.minutos != null && (
+            <p className="relative text-[11px] text-slate-500 mt-1 tabular-nums">{resumen.minutos >= 60 ? `${Math.floor(resumen.minutos / 60)}h ${resumen.minutos % 60}min` : `${resumen.minutos} min`} de sesión</p>
+          )}
+        </div>
+
+        {/* Los números del día, contando hacia arriba */}
+        <div className="grid grid-cols-3 gap-2 px-5">
+          {[
+            { v: resumen.volumen, l: "kg de volumen", dec: 0 },
+            { v: resumen.series, l: resumen.series === 1 ? "serie" : "series", dec: 0 },
+            { v: resumen.ejercicios, l: resumen.ejercicios === 1 ? "ejercicio" : "ejercicios", dec: 0 },
+          ].map((s) => (
+            <div key={s.l} className="bg-black/25 rounded-2xl py-3 text-center border border-white/[0.05]">
+              <CountUpNumber value={s.v} duration={900} decimals={s.dec} className="text-base font-black text-white tabular-nums leading-none" />
+              <p className="text-[9px] text-slate-500 mt-1.5 leading-tight px-1">{s.l}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Los récords del día, apareciendo uno a uno */}
+        {resumen.prs.length > 0 && (
+          <div className="px-5 mt-4 space-y-1.5">
+            <p className="text-[9px] font-black uppercase tracking-[0.14em] text-amber-400/90">Récords de hoy</p>
+            {resumen.prs.slice(0, 5).map((pr, i) => (
+              <div key={pr.id} className="flex items-center gap-2.5 rounded-xl px-3 py-2 bg-amber-500/[0.07] border border-amber-500/20 badge-pop" style={{ animationDelay: `${400 + i * 220}ms` }}>
+                <span className="text-sm">🔥</span>
+                <span className="flex-1 min-w-0 truncate text-[11px] font-bold text-amber-200">{pr.nombre}</span>
+                <span className="text-[10px] text-amber-400/80 tabular-nums shrink-0">{pr.marca}</span>
+              </div>
+            ))}
+            {resumen.prs.length > 5 && <p className="text-[9px] text-slate-600 text-center">y {resumen.prs.length - 5} más</p>}
+          </div>
+        )}
+
+        <div className="px-5 py-5">
+          <button onClick={onClose} className="w-full py-3.5 rounded-2xl text-sm font-black !text-white transition active:scale-[0.98]" style={{ background: "linear-gradient(135deg,#14B8A6,#0D9488)", boxShadow: "0 10px 28px -10px rgba(20,184,166,0.7)" }}>
+            ¡Seguir así! 💪
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WelcomeIntro({ onClose, onOpenTutorial }) {
+  useAndroidBack(onClose);
+  const [i, setI] = useState(0);
+  const slide = WELCOME_SLIDES[i];
+  const isLast = i === WELCOME_SLIDES.length - 1;
+  return (
+    <div className="fixed inset-0 z-[110] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 modal-bg-in">
+      <div
+        className="max-w-sm w-full rounded-3xl modal-pop-in shadow-2xl shadow-black/70 overflow-hidden flex flex-col"
+        style={{ background: "linear-gradient(165deg,#0f1a1f 0%,#0a0f1a 100%)", border: `1px solid ${slide.color}30`, minHeight: 440 }}
+      >
+        {/* Hero: el ícono grande sobre un halo del color del slide */}
+        <div key={`hero-${i}`} className="relative flex flex-col items-center pt-12 pb-6 px-6 text-center tab-fade-in">
+          <div className="absolute -top-16 left-1/2 -translate-x-1/2 w-56 h-56 rounded-full blur-3xl pointer-events-none transition-colors duration-500" style={{ backgroundColor: slide.color + "22" }} />
+          <div className="relative w-20 h-20 rounded-3xl flex items-center justify-center mb-5 elastic-in" style={{ backgroundColor: slide.color + "1c", border: `1px solid ${slide.color}40`, color: slide.color, boxShadow: `0 12px 40px -12px ${slide.color}70` }}>
+            {slide.icon}
+          </div>
+          <h2 className="relative text-xl font-black text-white leading-tight mb-2.5">{slide.title}</h2>
+          <p className="relative text-sm text-slate-400 leading-relaxed">{slide.text}</p>
+        </div>
+
+        <div className="flex-1" />
+
+        {/* Puntos de progreso */}
+        <div className="flex items-center justify-center gap-1.5 pb-5">
+          {WELCOME_SLIDES.map((s, si) => (
+            <button
+              key={si}
+              onClick={() => setI(si)}
+              aria-label={`Ir al paso ${si + 1}`}
+              className="rounded-full transition-all duration-300"
+              style={{ width: si === i ? 22 : 7, height: 7, backgroundColor: si === i ? slide.color : "#1e293b" }}
+            />
+          ))}
+        </div>
+
+        {/* Botones grandes, estilo intro de app */}
+        <div className="px-5 pb-5 space-y-2">
+          <button
+            onClick={() => (isLast ? onClose() : setI((n) => n + 1))}
+            className="w-full py-3.5 rounded-2xl text-sm font-black !text-white transition active:scale-[0.98]"
+            style={{ background: `linear-gradient(135deg, ${slide.color}, ${slide.color}b0)`, boxShadow: `0 10px 28px -10px ${slide.color}80` }}
+          >
+            {isLast ? "¡Empezar a entrenar!" : "Siguiente"}
+          </button>
+          {isLast ? (
+            <button onClick={() => { onClose(); onOpenTutorial?.(); }} className="w-full py-2.5 rounded-2xl text-xs font-bold text-slate-400 hover:text-white transition">
+              Ver el tutorial completo
+            </button>
+          ) : (
+            <button onClick={onClose} className="w-full py-2.5 rounded-2xl text-xs font-bold text-slate-600 hover:text-slate-400 transition">
+              Saltar
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function HelpModal({ startTab, onClose }) {
+  useAndroidBack(onClose);
   const startIdx = startTab
     ? Math.max(0, ALL_HELP_STEPS.findIndex((s) => s.chapterKey === startTab))
     : 0;
@@ -3787,35 +4008,52 @@ function HelpModal({ startTab, onClose }) {
         <div className="relative px-5 pt-5 pb-3 shrink-0" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-xl flex items-center justify-center bg-teal-500/15 text-teal-400">
+              <div className="w-7 h-7 rounded-xl flex items-center justify-center transition-colors duration-300" style={{ backgroundColor: chapter.color + "18", color: chapter.color }}>
                 {chapter.icon}
               </div>
-              <span className="text-xs font-black uppercase tracking-widest text-teal-400">{chapter.label}</span>
+              <span className="text-xs font-black uppercase tracking-widest transition-colors duration-300" style={{ color: chapter.color }}>{chapter.label}</span>
             </div>
             <button onClick={onClose} className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800/80 transition"><X size={17} /></button>
           </div>
-          {/* Chips de capítulo — todos en el mismo gris, el activo en teal */}
+          {/* Chips de capítulo, estilo "niveles de juego": el actual lleva el
+              color de SU capítulo, los ya recorridos muestran un check. */}
           <div className="flex gap-1.5 overflow-x-auto pb-0.5 -mx-1 px-1">
-            {HELP_CHAPTERS.map((c, ci) => (
-              <button
-                key={c.key}
-                onClick={() => jumpToChapter(ci)}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold whitespace-nowrap transition-all shrink-0"
-                style={ci === step.chapterIndex
-                  ? { backgroundColor: "#14B8A620", color: "#14B8A6", border: "1px solid #14B8A640" }
-                  : { color: "#475569", border: "1px solid transparent" }}
-              >
-                {c.icon}{c.label}
-              </button>
-            ))}
+            {HELP_CHAPTERS.map((c, ci) => {
+              const completado = ci < step.chapterIndex;
+              const actual = ci === step.chapterIndex;
+              return (
+                <button
+                  key={c.key}
+                  onClick={() => jumpToChapter(ci)}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold whitespace-nowrap transition-all shrink-0"
+                  style={actual
+                    ? { backgroundColor: c.color + "20", color: c.color, border: `1px solid ${c.color}40` }
+                    : completado
+                      ? { color: "#64748b", border: "1px solid transparent" }
+                      : { color: "#475569", border: "1px solid transparent" }}
+                >
+                  {completado ? <Check size={10} className="text-teal-500" /> : c.icon}
+                  {c.label}
+                </button>
+              );
+            })}
           </div>
-          {/* Barra de progreso — teal unificado */}
+          {/* Barra de progreso estilo juego: cada capítulo se llena con SU
+              color, y el segmento del paso actual queda un poco más brillante. */}
           <div className="flex gap-1.5 mt-3">
             {HELP_CHAPTERS.map((c, ci) => (
               <div key={c.key} className="flex-1 flex gap-0.5">
                 {c.steps.map((_, si) => {
                   const globalIdx = ALL_HELP_STEPS.findIndex((s) => s.chapterIndex === ci && s.stepInChapter === si);
-                  return <div key={si} className="h-0.5 flex-1 rounded-full transition-all duration-300" style={{ backgroundColor: globalIdx <= i ? "#14B8A6" : "#1e293b" }} />;
+                  const pasado = globalIdx < i;
+                  const actual = globalIdx === i;
+                  return (
+                    <div key={si} className="h-1 flex-1 rounded-full transition-all duration-300"
+                      style={{
+                        backgroundColor: actual ? c.color : pasado ? c.color + "90" : "#1e293b",
+                        boxShadow: actual ? `0 0 8px -1px ${c.color}` : "none",
+                      }} />
+                  );
                 })}
               </div>
             ))}
@@ -3843,15 +4081,20 @@ function HelpModal({ startTab, onClose }) {
         <div key={i} className={`px-5 py-4 tab-fade-in ${step.isChapterIntro ? "flex flex-col items-center text-center gap-3" : "flex items-start gap-4"}`}>
           {step.isChapterIntro ? (
             <>
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center mt-2 bg-teal-500/12 border border-teal-500/20 text-teal-400">
-                {step.icon}
+              {/* Portada de capítulo, estilo pantalla de nivel: ícono grande
+                  sobre un halo del color del capítulo. */}
+              <div className="relative mt-2">
+                <div className="absolute inset-0 rounded-3xl blur-2xl scale-150 pointer-events-none" style={{ backgroundColor: chapter.color + "20" }} />
+                <div className="relative w-16 h-16 rounded-3xl flex items-center justify-center elastic-in" style={{ backgroundColor: chapter.color + "18", border: `1px solid ${chapter.color}35`, color: chapter.color, boxShadow: `0 10px 30px -10px ${chapter.color}60` }}>
+                  {step.icon}
+                </div>
               </div>
               <h3 className="text-lg font-black text-white leading-tight">{step.title}</h3>
               <p className="text-sm text-slate-400 leading-relaxed">{step.text}</p>
             </>
           ) : (
             <>
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5 bg-slate-800/80 border border-slate-700/60 text-teal-400">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5 border transition-colors duration-300" style={{ backgroundColor: chapter.color + "12", borderColor: chapter.color + "28", color: chapter.color }}>
                 {step.icon}
               </div>
               <div className="flex-1 min-w-0">
@@ -3869,11 +4112,11 @@ function HelpModal({ startTab, onClose }) {
           </button>
           <span className="text-[10px] text-slate-600 font-medium tabular-nums">{i + 1} / {ALL_HELP_STEPS.length}</span>
           {isLast ? (
-            <button onClick={onClose} className="px-5 py-2 rounded-xl text-xs font-black text-white transition active:scale-95 bg-teal-500 hover:bg-teal-400">
+            <button onClick={onClose} className="px-6 py-2.5 rounded-xl text-xs font-black !text-white transition active:scale-95" style={{ background: `linear-gradient(135deg, ${chapter.color}, ${chapter.color}b0)`, boxShadow: `0 8px 22px -8px ${chapter.color}80` }}>
               ¡Listo! 🎉
             </button>
           ) : (
-            <button onClick={() => setI((n) => Math.min(ALL_HELP_STEPS.length - 1, n + 1))} className="px-5 py-2 rounded-xl text-xs font-black text-white transition active:scale-95 bg-teal-500 hover:bg-teal-400">
+            <button onClick={() => setI((n) => Math.min(ALL_HELP_STEPS.length - 1, n + 1))} className="px-6 py-2.5 rounded-xl text-xs font-black !text-white transition active:scale-95" style={{ background: `linear-gradient(135deg, ${chapter.color}, ${chapter.color}b0)`, boxShadow: `0 8px 22px -8px ${chapter.color}80` }}>
               Siguiente →
             </button>
           )}
@@ -3897,6 +4140,7 @@ function HelpModal({ startTab, onClose }) {
 // Solo aparece cuando el tier cambia (ej: Oro II → Esmeralda I), no en
 // cada nuevo récord dentro del mismo tier.
 function RankUpModal({ from, to, muscleName, onClose }) {
+  useAndroidBack(onClose);
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-5" style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}>
       <div className="relative w-full max-w-sm rounded-3xl overflow-hidden elastic-in" style={{ background: "linear-gradient(135deg, #0f0f1a, #1a1a2e)", border: `2px solid ${to.color}40` }}>
@@ -4123,6 +4367,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           const newRank = getMuscleRank(exLib.group, newRankData.best1RM);
           if (newRank.levelIdx > prevRank.levelIdx && prevRank.tier !== newRank.tier) {
             setRankUpInfo({ from: prevRank, to: newRank, muscleName: MUSCLE_GROUP_BY_KEY[exLib.group]?.label });
+            RECENT_RANK_UPS.add(exLib.group); // para que lata en Progreso
           }
         }
       } catch { }
@@ -4188,6 +4433,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
         const newRank = getMuscleRank(exLib.group, newRankData.best1RM);
         if (newRank.levelIdx > prevRank.levelIdx && prevRank.tier !== newRank.tier) {
           setRankUpInfo({ from: prevRank, to: newRank, muscleName: MUSCLE_GROUP_BY_KEY[exLib.group]?.label });
+          RECENT_RANK_UPS.add(exLib.group); // para que lata en Progreso
         }
       }
     } catch { }
@@ -5037,6 +5283,9 @@ function SessionDetailCard({ session, onDelete }) {
             <p className="text-xs font-bold text-white mb-1.5 truncate">{exName}</p>
             <div className="flex flex-wrap gap-1.5">
               {items.map((it, i) => {
+                // Al abrir el día, los chips de series aparecen uno tras otro
+                // (el color "se va llenando"). Delay corto: se percibe la
+                // onda pero no te hace esperar para leer.
                 // Tres estados, comparando SIEMPRE por 1RM estimado (combina
                 // reps y kilos: una rep menos con el mismo peso también baja):
                 //   · Mejoraste tu marca → verde + 🔥
@@ -5049,8 +5298,8 @@ function SessionDetailCard({ session, onDelete }) {
                 const bg = it.isImprovement ? "#10B98118" : below ? "#F43F5E14" : "#1e293b";
                 const bd = it.isImprovement ? "#10B98135" : below ? "#F43F5E30" : "transparent";
                 return (
-                  <span key={i} className="text-[11px] font-bold px-2 py-1 rounded-lg tabular-nums inline-flex items-center gap-1"
-                    style={{ color, backgroundColor: bg, border: `1px solid ${bd}` }}>
+                  <span key={i} className="text-[11px] font-bold px-2 py-1 rounded-lg tabular-nums inline-flex items-center gap-1 number-pop"
+                    style={{ color, backgroundColor: bg, border: `1px solid ${bd}`, animationDelay: `${Math.min(i, 10) * 40}ms` }}>
                     {isCardio ? `${it.minutes} min` : `${it.reps}×${it.kg}kg`}
                     {it.isImprovement && " 🔥"}
                     {below && <span className="text-[9px] font-black opacity-90">↓{100 - pct}%</span>}
@@ -5231,6 +5480,9 @@ function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [], weekSche
     const dateSet = new Set(sessions.map((s) => s.date));
     return { days: dateSet.size, streak: computeSmartStreak(dateSet, weekSchedule) };
   }, [sessions, weekSchedule]);
+  // ¿La racha SUBIÓ desde la última vez que la viste? → salto dorado.
+  const [rachaSubio] = useState(() => STREAK_VISTO !== null && miniStats.streak > STREAK_VISTO);
+  useEffect(() => { STREAK_VISTO = miniStats.streak; }, [miniStats.streak]);
   const sessionByDate = useMemo(() => { const m = {}; sessions.forEach((s) => { m[s.date] = s; }); return m; }, [sessions]);
   const [view, setView] = useState("calendar");
   const now = new Date();
@@ -5275,7 +5527,7 @@ function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [], weekSche
           </div>
           <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900/60 border border-slate-800/60">
             <span className="text-[11px]">🔥</span>
-            <span className="text-xs font-black text-white tabular-nums streak-beat streak-glow inline-block">{miniStats.streak}</span>
+            <span className={`text-xs font-black text-white tabular-nums inline-block ${rachaSubio ? "streak-jump" : "streak-beat streak-glow"}`}>{miniStats.streak}</span>
             <span className="text-[9px] text-slate-500 font-semibold">racha</span>
           </div>
         </div>
@@ -5321,9 +5573,12 @@ function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [], weekSche
               })}
             </div>
             {monthDayKeys.length > 0 && (
-              <div className="flex items-center gap-3 mt-3 pt-3 border-t border-slate-800/50 flex-wrap">
+              <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-slate-800/50 flex-wrap">
                 {monthDayKeys.map((dk) => (
-                  <span key={dk} className="flex items-center gap-1 text-[9px] text-slate-500"><span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: ROUTINE[dk].color }} /> {ROUTINE[dk].label}</span>
+                  <span key={dk} className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[9px] font-bold text-slate-400 bg-slate-800/50 border border-slate-700/40">
+                    <span className="w-[3px] h-3 rounded-full shrink-0" style={{ backgroundColor: ROUTINE[dk].color }} />
+                    {ROUTINE[dk].label}
+                  </span>
                 ))}
               </div>
             )}
@@ -5344,8 +5599,15 @@ function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [], weekSche
           )}
         </div>
       ) : (
-        <div key="list" className="space-y-2.5 tab-fade-in">
-          {sessions.map((s) => <SessionDetailCard key={s.date} session={s} onDelete={handleDeleteDay} />)}
+        <div key="list" className="space-y-2.5">
+          {/* Las tarjetas entran en cascada, cada una un poco después de la
+              anterior. Solo las primeras 12 llevan retraso: más allá de eso ya
+              están fuera de pantalla y retrasarlas solo haría lenta la carga. */}
+          {sessions.map((s, i) => (
+            <div key={s.date} className="hist-enter" style={{ animationDelay: `${Math.min(i, 12) * 45}ms` }}>
+              <SessionDetailCard session={s} onDelete={handleDeleteDay} />
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -6010,7 +6272,7 @@ function muteHex(hex, amount = 0.65) {
   return `#${nr.toString(16).padStart(2, "0")}${ng.toString(16).padStart(2, "0")}${nb.toString(16).padStart(2, "0")}`;
 }
 
-function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backRef, rankMode = "general" }) {
+function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backRef, rankMode = "general", pulseMuscles = null }) {
   // highlightedColors: versión suavizada de los colores de RANK_TIERS —
   // mezclada 65/35 con el fondo oscuro para que el muñeco no acapare
   // toda la atención visual de la pantalla.
@@ -6103,6 +6365,46 @@ function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backR
     return () => { clearTimeout(t); limpiezas.forEach(clearTimeout); };
   }, [rankMode]);
 
+  // LATIDO DE RANGO NUEVO: los músculos que subieron de rango desde la última
+  // visita laten con brillo. Solo brillo (nada de escalar: un polygon SVG
+  // escala desde el origen del SVG y se corre de lugar). Arranca a los 1550ms,
+  // recién cuando la animación de carga ya terminó y limpió sus estilos.
+  useEffect(() => {
+    if (!pulseMuscles || !pulseMuscles.length) return;
+    if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) return;
+    const timers = [];
+    const t0 = setTimeout(() => {
+      pulseMuscles.forEach((mk) => {
+        const slugs = getSlugsForOurGroup(mk);
+        const esTibial = mk === "tibial_anterior";
+        const esPantorrillas = mk === "pantorrillas";
+        [{ ref: frontRef, order: ANTERIOR_POLY_SLUGS, view: "front" }, { ref: backRef, order: POSTERIOR_POLY_SLUGS, view: "back" }].forEach(({ ref, order, view }) => {
+          const svg = ref.current?.querySelector("svg");
+          if (!svg) return;
+          svg.querySelectorAll("polygon").forEach((p, i) => {
+            const slug = order[i];
+            let es = false;
+            if (esTibial) es = view === "front" && slug === "calves";
+            else if (esPantorrillas) es = view === "back" && (slug === "calves" || slug === "left-soleus" || slug === "right-soleus");
+            else es = slugs.includes(slug);
+            if (es) p.style.animation = "muscleGlowBeat 0.7s ease-in-out 3";
+          });
+        });
+      });
+      // Limpiar los estilos al terminar (3 latidos × 0.7s = 2.1s)
+      const tc = setTimeout(() => {
+        [frontRef, backRef].forEach((ref) => {
+          const svg = ref.current?.querySelector("svg");
+          if (!svg) return;
+          svg.querySelectorAll("polygon").forEach((p) => { if (p.style.animation.includes("muscleGlowBeat")) p.style.animation = ""; });
+        });
+      }, 2300);
+      timers.push(tc);
+    }, 1550);
+    timers.push(t0);
+    return () => timers.forEach(clearTimeout);
+  }, [pulseMuscles, frontRef, backRef]);
+
   // Resaltado con borde blanco: con los mismos índices exactos de arriba,
   // se prende SIEMPRE el músculo completo (todas sus piezas) y nunca uno
   // ajeno, sin importar si comparten color con otro músculo.
@@ -6180,11 +6482,21 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
   const [showImage, setShowImage] = useState(false);
   const [showTierRef, setShowTierRef] = useState(false); // modal de referencia de rangos
   const [showAnalysis, setShowAnalysis] = useState(false); // modal de análisis muscular
+  // El gesto atrás de Android cierra este modal si está abierto
+  const cerrarAnalisis = useCallback(() => setShowAnalysis(false), []);
+  useAndroidBack(showAnalysis ? cerrarAnalisis : null);
   const [showGroupExercises, setShowGroupExercises] = useState(false); // ejercicios del grupo sin entrenar
   const detailRef = useRef(null); // la tarjeta de detalle, para el scroll automático
   const frontBodyRef = useRef(null);
   const backBodyRef = useRef(null);
   const mode = settings.muscleRankMode === "relative" ? "relative" : "general";
+  // Músculos que subieron de rango desde la última visita: se consumen acá
+  // (una sola vez, al montar) y laten en el muñeco.
+  const [musculosQueSubieron] = useState(() => {
+    const arr = [...RECENT_RANK_UPS];
+    RECENT_RANK_UPS.clear();
+    return arr.length ? arr : null;
+  });
   const bodyWeightKg = settings.bodyWeightKg || 0;
 
   const ranks = useMemo(() => {
@@ -6290,7 +6602,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
         )}
       </div>
 
-      <MuscleHighlighterBody ranks={ranks} selected={selected} onMuscleClick={goToMuscle} frontRef={frontBodyRef} backRef={backBodyRef} rankMode={mode} />
+      <MuscleHighlighterBody ranks={ranks} selected={selected} onMuscleClick={goToMuscle} frontRef={frontBodyRef} backRef={backBodyRef} rankMode={mode} pulseMuscles={musculosQueSubieron} />
 
      {selInfo ? (
         <div key={selected} ref={detailRef} className="relative overflow-hidden rounded-3xl p-[1.5px] bounce-in" style={{ background: selInfo.hasData ? `linear-gradient(140deg, ${selInfo.color}55, transparent 45%, transparent 60%, ${selInfo.color}30)` : "#1e293b" }}>
@@ -7762,6 +8074,7 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
 // Cuando te comparten una rutina por enlace, este modal te la muestra y te
 // pregunta si querés agregarla a las tuyas.
 function SharedRoutineImportModal({ routine, onImport, onDiscard }) {
+  useAndroidBack(onDiscard);
   if (!routine) return null;
   return (
     <div className="fixed inset-0 z-[125] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in" onClick={onDiscard}>
@@ -7844,12 +8157,10 @@ const PRESET_CONTEXTO = {
   fullbody:        { frecuencia: "3 días/semana" },
 };
 function PresetRoutineCard({ preset, isActive, onUse, onEdit, onPreview }) {
-  const [open, setOpen] = useState(false);
   const dayCount = preset.dayOrder.length;
   const ctx = PRESET_CONTEXTO[preset.id] || null;
-  const accent = "#A855F7"; // violeta fijo — antes usaba el color del primer día, pero esta tarjeta es de Rutinas, no del día
-  // Pulso al activar: detectamos el momento exacto en que esta rutina pasa a
-  // ser la activa (no en cada render) para que el destello ocurra una sola vez.
+  const accent = "#A855F7"; // violeta fijo — esta tarjeta es de Rutinas, no del día
+  // Pulso al activar: solo en el momento exacto en que pasa a ser la activa.
   const [recienActivada, setRecienActivada] = useState(false);
   const antesActivaRef = useRef(isActive);
   useEffect(() => {
@@ -7864,53 +8175,30 @@ function PresetRoutineCard({ preset, isActive, onUse, onEdit, onPreview }) {
   return (
     <div
       className={`bg-slate-900/50 border rounded-2xl overflow-hidden backdrop-blur-sm shadow-md shadow-black/20 transition-all hover:shadow-lg hover:shadow-black/30 ${recienActivada ? "activate-pulse" : ""}`}
-      style={{
-        borderColor: isActive ? accent + "60" : "rgba(30,41,59,0.5)",
-        "--pulse-color": accent + "99",
-      }}
+      style={{ borderColor: isActive ? accent + "60" : "rgba(30,41,59,0.5)", "--pulse-color": accent + "99" }}
     >
-      <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-slate-800/30 transition">
-        <div className="w-2 h-10 rounded-full shrink-0" style={{ backgroundColor: accent, boxShadow: `0 0 10px -2px ${accent}` }} />
+      {/* Tocar la tarjeta abre el POP-UP con todo (días, ejercicios, balance
+          y el botón de usar). Antes se expandía inline mostrando lo mismo que
+          el pop-up: información duplicada y más toques para cerrar todo. */}
+      <button onClick={onPreview} className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-slate-800/30 transition active:opacity-80">
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: accent + "1c", color: accent }}>
+          <Layers size={15} />
+        </div>
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <h4 className="text-sm font-bold text-white">{preset.name}</h4>
+          <div className="flex items-center gap-2">
+            <h4 className="text-sm font-bold text-white truncate">{preset.name}</h4>
             {isActive && <span className="text-[9px] font-black px-1.5 py-0.5 rounded-lg bg-purple-500/20 text-purple-400 shrink-0 badge-pop">ACTIVA</span>}
           </div>
           <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-2">{preset.description}</p>
-          {/* Solo la frecuencia: el nivel ("principiante/avanzado") era una
-              etiqueta que no aportaba y encasillaba de más. */}
-          <p className="text-[10px] text-slate-600 mt-2">{ctx?.frecuencia || `${dayCount} día${dayCount === 1 ? "" : "s"}/semana`}</p>
+          <p className="text-[10px] text-slate-600 mt-1.5">{ctx?.frecuencia || `${dayCount} día${dayCount === 1 ? "" : "s"}/semana`}</p>
         </div>
-        <ChevronDown size={16} className={`text-slate-600 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
+        <ChevronRight size={15} className="text-slate-600 shrink-0" />
       </button>
-      {open && (
-        <div className="px-4 pb-4 tab-fade-in space-y-3">
-          {preset.recommendation && <p className="text-[11px] text-slate-400 bg-slate-800/40 rounded-xl px-3 py-2 flex items-start gap-1.5"><Info size={12} className="mt-0.5 shrink-0" />{preset.recommendation}</p>}
-          <RoutinePreview routineDef={preset} />
-          {/* Balance muscular: ves si está equilibrada ANTES de activarla */}
-          <div className="rounded-xl bg-slate-950/40 border border-slate-800/50 p-3">
-            <BalanceMuscular routineDef={preset} />
-          </div>
-          {onPreview && (
-            <button onClick={onPreview} className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-[11px] font-bold text-slate-400 bg-slate-800/50 border border-slate-700/50 hover:text-white transition active:scale-[0.98]">
-              <Eye size={12} /> Ver todos los días y ejercicios
-            </button>
-          )}
-          <div className="flex gap-2">
-            <button onClick={onUse} disabled={isActive} className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-bold transition ${isActive ? "bg-slate-800 text-slate-600" : "bg-purple-500 !text-white hover:bg-purple-400 active:scale-[0.98] shadow-lg shadow-purple-500/20"}`}>
-              {isActive ? <><Check size={14} /> Ya la estás usando</> : <><Sparkles size={14} /> Usar esta rutina</>}
-            </button>
-            <button onClick={onEdit} aria-label="Editar una copia de esta rutina" className="px-3.5 py-2.5 rounded-xl border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition"><Edit3 size={15} /></button>
-          </div>
-          <p className="text-[10px] text-slate-600 text-center">Editar crea una copia para vos — la preestablecida original no se toca.</p>
-        </div>
-      )}
     </div>
   );
 }
 
 function SavedRoutineRow({ routine, isActive, onUse, onEdit, onShare, onArchive, onDuplicate, onPreview, uso = null }) {
-  const [open, setOpen] = useState(false);
   const dayCount = routine.dayOrder.length;
   const accent = isActive ? "#14B8A6" : "#6366F1"; // teal si activa, indigo si no
   return (
@@ -7919,7 +8207,10 @@ function SavedRoutineRow({ routine, isActive, onUse, onEdit, onShare, onArchive,
         style={isActive ? { borderColor: accent + "60", background: `linear-gradient(135deg, ${accent}12, #0f172a)`, boxShadow: `0 4px 20px -4px ${accent}25` } : {}}>
         <div className="flex items-center gap-3">
           <div className="w-2 h-10 rounded-full shrink-0" style={{ backgroundColor: accent, boxShadow: `0 0 10px -2px ${accent}` }} />
-          <button onClick={() => setOpen((o) => !o)} className="flex-1 min-w-0 text-left">
+          {/* Tocar la rutina abre el POP-UP completo directamente: antes había
+              una expansión inline que mostraba lo mismo que el pop-up, dos
+              veces. Ahora todo vive en un solo lugar, mejor diseñado. */}
+          <button onClick={onPreview} className="flex-1 min-w-0 text-left active:opacity-70 transition-opacity">
             <div className="flex items-center gap-2 flex-wrap">
               <p className="text-sm font-bold text-white truncate">{routine.name}</p>
               {isActive && <span className="text-[9px] font-black px-2 py-0.5 rounded-full shrink-0" style={{ backgroundColor: accent + "25", color: accent, border: `1px solid ${accent}40` }}>ACTIVA</span>}
@@ -7934,39 +8225,14 @@ function SavedRoutineRow({ routine, isActive, onUse, onEdit, onShare, onArchive,
             </p>
           </button>
           {!isActive && <button onClick={onUse} className="px-3 py-1.5 rounded-lg text-xs font-bold shrink-0 transition" style={{ backgroundColor: accent + "18", color: accent }}>Activar</button>}
-          <button onClick={onShare} className="p-2 rounded-lg text-slate-500 hover:text-cyan-400 shrink-0"><Share2 size={14} /></button>
-          <button onClick={onEdit} className="p-2 rounded-lg text-slate-500 hover:text-indigo-400 shrink-0"><Edit3 size={14} /></button>
+          <button onClick={onShare} aria-label="Compartir" className="p-2 rounded-lg text-slate-500 hover:text-cyan-400 shrink-0"><Share2 size={14} /></button>
+          <button onClick={onEdit} aria-label="Editar" className="p-2 rounded-lg text-slate-500 hover:text-indigo-400 shrink-0"><Edit3 size={14} /></button>
         </div>
-        {open && (
-          <div className="mt-3 pt-3 border-t border-slate-800/50 tab-fade-in space-y-3">
-            <RoutinePreview routineDef={routine} />
-            {/* Balance muscular: detectás desbalances sin sumar series a mano */}
-            <div className="rounded-xl bg-slate-950/40 border border-slate-800/50 p-3">
-              <BalanceMuscular routineDef={routine} />
-            </div>
-            {/* Acciones secundarias, discretas */}
-            <div className="flex gap-2">
-              {onPreview && (
-                <button onClick={onPreview} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[11px] font-bold text-slate-400 bg-slate-800/50 border border-slate-700/50 hover:text-white transition active:scale-[0.98]">
-                  <Eye size={12} /> Ver completa
-                </button>
-              )}
-              {onDuplicate && (
-                <button onClick={onDuplicate} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[11px] font-bold text-slate-400 bg-slate-800/50 border border-slate-700/50 hover:text-white transition active:scale-[0.98]">
-                  <Copy size={12} /> Duplicar
-                </button>
-              )}
-            </div>
-          </div>
-        )}
       </div>
     </SwipeToArchive>
   );
 }
 
-// Buscador de ejercicios por grupo muscular (con filtro de texto), para
-// agregarlos a un día al crear/editar una rutina. También deja agregar un
-// ejercicio propio que no esté en la biblioteca (sin nota técnica ni video).
 function ExercisePickerPanel({ existingIds, onAdd, onAddCustom, onClose }) {
   const [group, setGroup] = useState(MUSCLE_GROUPS[0].key);
   const [search, setSearch] = useState("");
@@ -8034,7 +8300,7 @@ function ExercisePickerPanel({ existingIds, onAdd, onAddCustom, onClose }) {
 
 const REP_RANGE_OPTIONS = ["1-3", "3-5", "4-6", "6-8", "8-10", "10-12", "12-15", "15-20"];
 
-function BuilderExerciseRow({ ex, canMoveUp, canMoveDown, onMove, onRemove, onConfigChange, isDragging = false, isDragOver = false, dumbbellFactor = null, onToggleDumbbell = null, recienAgregado = false, dayColor = "#14B8A6" }) {
+function BuilderExerciseRow({ ex, onRemove, onConfigChange, isDragging = false, isDragOver = false, dumbbellFactor = null, onToggleDumbbell = null, recienAgregado = false, dayColor = "#14B8A6" }) {
   const [editing, setEditing] = useState(false);
   const repRange = ex.sets[0]?.repRange || "8-10";
   const setsCount = ex.sets.length;
@@ -8064,10 +8330,8 @@ function BuilderExerciseRow({ ex, canMoveUp, canMoveDown, onMove, onRemove, onCo
       }}
     >
       <div className="flex items-center gap-2">
-        <div className="flex flex-col items-center -my-1 shrink-0">
-          <button onClick={() => onMove(-1)} disabled={!canMoveUp} className="p-0.5 text-slate-600 hover:text-slate-300 disabled:opacity-20"><ChevronUp size={13} /></button>
-          <button onClick={() => onMove(1)} disabled={!canMoveDown} className="p-0.5 text-slate-600 hover:text-slate-300 disabled:opacity-20"><ChevronDown size={13} /></button>
-        </div>
+        {/* Sin flechas: para reordenar, mantenés apretado el ejercicio (desde
+            cualquier parte) y arrastrás — los demás se corren en vivo. */}
         <button onClick={() => setEditing((o) => !o)} className="flex-1 min-w-0 text-left">
           <div className="flex items-center gap-1.5 flex-wrap">
             <p className="text-xs font-bold text-white truncate">{ex.name}</p>
@@ -8406,9 +8670,9 @@ function BuilderDayCard({ day, dayIdx, totalDays, onRename, onRemove, onMoveDay,
               position: "relative",
             }}
           >
-            <BuilderExerciseRow ex={ex} canMoveUp={i > 0} canMoveDown={i < day.exercises.length - 1}
+            <BuilderExerciseRow ex={ex}
               recienAgregado={nuevoId === ex.id} dayColor={day.color}
-              onMove={(delta) => onMoveExercise(i, delta)} onRemove={() => borrarConAnimacion(i)}
+              onRemove={() => borrarConAnimacion(i)}
               onConfigChange={(cfg) => onConfigExercise(i, cfg)}
               isDragging={dragIdx === i} isDragOver={overIdx === i && dragIdx !== null && dragIdx !== i}
               dumbbellFactor={(dumbbellDouble || {})[ex.id] || EXERCISE_LIBRARY_BY_ID[ex.id]?.loadFactor || 1}
@@ -10056,9 +10320,10 @@ function BalanceMuscular({ routineDef, compacto = true }) {
       {compacto && datos.length > 3 && (
         <button
           onClick={() => setExpandido((v) => !v)}
-          className="mt-2 text-[10px] font-bold text-slate-500 hover:text-slate-300 transition"
+          className="mt-2.5 w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-dashed border-slate-700/70 text-[10px] font-bold text-slate-400 hover:text-white hover:border-slate-500 transition active:scale-[0.99]"
         >
           {expandido ? "Ver menos" : `Ver los ${datos.length} grupos`}
+          <ChevronDown size={11} className="transition-transform duration-200" style={{ transform: expandido ? "rotate(180deg)" : "none" }} />
         </button>
       )}
     </div>
@@ -10072,7 +10337,8 @@ function BalanceMuscular({ routineDef, compacto = true }) {
 // Vista previa completa de una rutina, en pop-up (mismo lenguaje visual que el
 // detalle de una sesión del historial). Ves los días, sus ejercicios y el
 // balance ANTES de activarla, en vez de hacerlo a ciegas.
-function RoutinePreviewModal({ routineDef, routineName, onActivate, onClose, yaActiva = false }) {
+function RoutinePreviewModal({ routineDef, routineName, onActivate, onClose, yaActiva = false, onDuplicate = null, onEditCopy = null }) {
+  useAndroidBack(onClose);
   const dias = routineDef?.dayOrder || Object.keys(routineDef?.days || {});
   const [abierto, setAbierto] = useState(dias[0] || null);
   if (!routineDef) return null;
@@ -10179,7 +10445,23 @@ function RoutinePreviewModal({ routineDef, routineName, onActivate, onClose, yaA
         </div>
 
         {/* Botón fijo abajo */}
-        <div className="border-t border-slate-800/60 px-5 py-3.5 shrink-0 bg-slate-900">
+        <div className="border-t border-slate-800/60 px-5 py-3.5 shrink-0 bg-slate-900 space-y-2">
+          {/* Acciones secundarias: duplicar (rutinas tuyas) o editar una copia
+              (preestablecidas). Antes vivían en la expansión inline. */}
+          {(onDuplicate || onEditCopy) && (
+            <div className="flex gap-2">
+              {onDuplicate && (
+                <button onClick={() => { onDuplicate(); onClose(); }} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[11px] font-bold text-slate-400 bg-slate-800/60 border border-slate-700/50 hover:text-white transition active:scale-[0.98]">
+                  <Copy size={12} /> Duplicar
+                </button>
+              )}
+              {onEditCopy && (
+                <button onClick={() => { onEditCopy(); onClose(); }} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[11px] font-bold text-slate-400 bg-slate-800/60 border border-slate-700/50 hover:text-white transition active:scale-[0.98]">
+                  <Edit3 size={12} /> Editar una copia
+                </button>
+              )}
+            </div>
+          )}
           {yaActiva ? (
             <div className="w-full py-3 rounded-2xl text-sm font-black text-center bg-slate-800/70 text-slate-500 flex items-center justify-center gap-1.5">
               <Check size={14} /> Ya es tu rutina activa
@@ -10478,21 +10760,25 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
             <button onClick={() => setShareTarget(activeDef)} aria-label="Compartir rutina activa" className="p-2 rounded-xl text-purple-200 hover:text-white hover:bg-white/10 transition shrink-0"><Share2 size={15} /></button>
           </div>
 
-          {/* Los días. Fondo neutro para todos y el color solo en el punto: así
-              se distinguen entre sí sin que la tarjeta se vuelva multicolor.
-              El número es la cantidad de ejercicios de ese día. */}
-          <div className="relative flex gap-1.5 flex-wrap mt-3.5">
-            {(activeDef.dayOrder || Object.keys(activeDef.days || {})).map((dk) => {
-              const d = activeDef.days?.[dk];
-              if (!d) return null;
-              return (
-                <span key={dk} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[10px] font-bold bg-black/25 text-slate-300 border border-white/[0.07]">
-                  <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: d.color }} />
-                  {d.label}
-                  <span className="text-slate-500 tabular-nums">{d.exercises?.length || 0}</span>
-                </span>
-              );
-            })}
+          {/* Los días, en grilla SIMÉTRICA de 2 columnas: si son impares, el
+              último ocupa el ancho completo — nunca queda un 3 arriba y 1
+              abajo descolgado. El color del día es una franja vertical fina
+              (el lenguaje visual del resto de la app), no un puntito. */}
+          <div className="relative grid grid-cols-2 gap-1.5 mt-3.5">
+            {(() => {
+              const orden = (activeDef.dayOrder || Object.keys(activeDef.days || {})).filter((dk) => activeDef.days?.[dk]);
+              return orden.map((dk, i) => {
+                const d = activeDef.days[dk];
+                const ultimoImpar = i === orden.length - 1 && orden.length % 2 === 1;
+                return (
+                  <span key={dk} className={`flex items-center gap-2 px-2.5 py-2 rounded-xl text-[10px] font-bold bg-black/25 text-slate-300 border border-white/[0.07] min-w-0 ${ultimoImpar ? "col-span-2" : ""}`}>
+                    <span className="w-[3px] h-4 rounded-full shrink-0" style={{ backgroundColor: d.color }} />
+                    <span className="flex-1 min-w-0 truncate">{d.label}</span>
+                    <span className="text-slate-500 tabular-nums shrink-0">{d.exercises?.length || 0}</span>
+                  </span>
+                );
+              });
+            })()}
           </div>
 
           {/* Acciones: dos botones parejos, sin ruido */}
@@ -10581,6 +10867,8 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
           routineName={preview.name}
           yaActiva={preview.id === activeId}
           onActivate={() => handleUseClick(preview.id, preview.isPreset ? cloneRoutineDef(preview.def) : null)}
+          onDuplicate={preview.isPreset ? null : () => handleDuplicate(preview.id, preview.def)}
+          onEditCopy={preview.isPreset ? () => handleEditPreset(preview.def) : null}
           onClose={() => setPreview(null)}
         />
       )}
@@ -10614,6 +10902,10 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
    tan seguido como para merecer un lugar fijo en la barra. En su lugar
    entra "Entrenador IA", el chat con el asistente de entrenamiento.
 ============================================================================ */
+// Orden visual de las pestañas: define desde qué lado entra el contenido al
+// cambiar (si vas a una pestaña "más a la derecha", entra desde la derecha).
+const TAB_ORDER = ["rutina", "progreso", "descarga", "rutinas", "entrenador_ia", "perfil"];
+
 const NAV_TABS = [
   { key: "rutina", icon: <Dumbbell size={20} />, label: "Rutina" },
   { key: "progreso", icon: <BarChart3 size={20} />, label: "Progreso" },
@@ -10704,6 +10996,7 @@ const TAB_TITLES = { rutinas: "Rutinas", rutina: "Rutina", progreso: "Progreso",
 // nombre de la opción. Aparece como tarea del onboarding y también desde
 // Perfil cuando quieras cambiarlo.
 function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
+  useAndroidBack(onClose);
   const s = settings || DEFAULT_SETTINGS;
   const on = (k) => s[k] !== false;
   const OPCIONES = [
@@ -10866,6 +11159,44 @@ export default function App() {
     return null;
   });
   const [tab, setTab] = useState("rutina");
+
+  // ── El gesto "atrás" de Android funciona DENTRO de la app ────────────────
+  // Metemos una entrada centinela en el historial del WebView. Cuando el
+  // usuario va para atrás, el WebView la consume y dispara popstate: si hay
+  // un modal abierto lo cerramos; si no, volvemos a la pestaña Rutina. En
+  // ambos casos reponemos el centinela. Solo si ya estás en Rutina sin nada
+  // abierto dejamos el historial vacío → el siguiente atrás cierra la app.
+  const tabRef = useRef(tab);
+  useEffect(() => { tabRef.current = tab; }, [tab]);
+  // Cambio de perfil → resetear la memoria visual efímera (racha vista y
+  // rank-ups pendientes): son del perfil anterior, no de este.
+  useEffect(() => { STREAK_VISTO = null; RECENT_RANK_UPS.clear(); }, [activeProfile]);
+  // Dirección del deslizamiento al cambiar de pestaña
+  const prevTabRef = useRef(tab);
+  const tabSlideClass = useMemo(() => {
+    const nueva = TAB_ORDER.indexOf(tab);
+    const vieja = TAB_ORDER.indexOf(prevTabRef.current);
+    return nueva >= vieja ? "tab-slide-right" : "tab-slide-left";
+  }, [tab]);
+  useEffect(() => { prevTabRef.current = tab; }, [tab]);
+  useEffect(() => {
+    try { window.history.pushState({ __sentinela: true }, ""); } catch { }
+    const onPop = () => {
+      if (BACK_HANDLERS.length > 0) {
+        // Cerrar el modal de más arriba
+        const cerrar = BACK_HANDLERS[BACK_HANDLERS.length - 1];
+        try { cerrar(); } catch { }
+        try { window.history.pushState({ __sentinela: true }, ""); } catch { }
+      } else if (tabRef.current !== "rutina") {
+        setTab("rutina");
+        try { window.history.pushState({ __sentinela: true }, ""); } catch { }
+      }
+      // Si estás en Rutina sin modales: no reponemos nada → el próximo
+      // atrás cierra la app (comportamiento esperado).
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
   // Señales para auto-abrir secciones al navegar desde otra pantalla. Cada
   // botón incrementa el contador → la CollapsibleSection destino lo detecta
   // y se abre sola. Guardamos qué sección abrir por su id.
@@ -10884,6 +11215,8 @@ export default function App() {
   const [cycleStart, setCycleStartState] = useState(loadCycleStart);
   const [showHelp, setShowHelp] = useState(false);
   const [helpStartTab, setHelpStartTab] = useState(null);
+  const [showWelcome, setShowWelcome] = useState(false); // intro de la primera vez
+  const [sessionSummary, setSessionSummary] = useState(null); // resumen al finalizar
   const [recoveredNotice, setRecoveredNotice] = useState(false);
 
   useEffect(() => {
@@ -11388,7 +11721,9 @@ export default function App() {
       const updatedProfile = { ...p, routines: newRoutines, activeRoutineId: routineId, ...(wasFirstTime && p.tutorialSeen === false ? { tutorialSeen: true } : {}) };
       const np = { ...prev, [activeProfile]: updatedProfile };
       saveProfiles(np);
-      if (wasFirstTime && p.tutorialSeen === false) { setHelpStartTab(null); setShowHelp(true); }
+      // Primera vez: mostramos la INTRO corta (5 slides), no el tutorial de 51
+      // pasos — como primer contacto abrumaba. El tutorial queda en el "?".
+      if (wasFirstTime && p.tutorialSeen === false) { setShowWelcome(true); }
       return np;
     });
   };
@@ -11445,7 +11780,59 @@ export default function App() {
     const np = { ...profiles, [activeProfile]: { ...profiles[activeProfile], activeSession: { dayKey, startedAt: new Date().toISOString() } } };
     setProfiles(np); saveProfiles(np);
   };
+  // Arma el resumen del entrenamiento de hoy: volumen (con factor de
+  // mancuernas), series, ejercicios y los récords superados. Se calcula ANTES
+  // de cerrar la sesión, con los logs que ya están guardados.
+  const armarResumenSesion = () => {
+    const hoy = todayStr();
+    const dd = getProfileSettings(profile)?.dumbbellDouble || null;
+    const porEjercicio = {};
+    Object.entries(logs || {}).forEach(([key, val]) => {
+      if (key.endsWith("_pr_override") || !Array.isArray(val)) return;
+      const { exerciseId } = parseLogKey(key);
+      val.forEach((e) => {
+        if (!e || !e.kg || !e.reps || !e.date) return;
+        (porEjercicio[exerciseId] ||= []).push(e);
+      });
+    });
+    let volumen = 0, series = 0;
+    const ejercicios = new Set();
+    const prs = [];
+    Object.entries(porEjercicio).forEach(([exId, entries]) => {
+      const deHoy = entries.filter((e) => e.date === hoy);
+      if (!deHoy.length) return;
+      const lf = (dd && dd[exId]) || EXERCISE_LIBRARY_BY_ID[exId]?.loadFactor || 1;
+      deHoy.forEach((e) => { volumen += e.kg * lf * e.reps; series++; });
+      ejercicios.add(exId);
+      // ¿Superó hoy su mejor marca previa? El loadFactor se cancela (es el
+      // mismo ejercicio de ambos lados), así que comparamos 1RM crudo. El
+      // récord corregido a mano también cuenta como piso a superar.
+      const previas = entries.filter((e) => e.date < hoy);
+      const ov = (logs || {})[`${exId}_pr_override`];
+      let piso = 0;
+      previas.forEach((e) => { const rm = estimate1RM(e.kg, e.reps); if (rm > piso) piso = rm; });
+      if (ov?.kg && ov?.reps) { const rm = estimate1RM(ov.kg, ov.reps); if (rm > piso) piso = rm; }
+      if (piso > 0) {
+        let mejorHoy = null;
+        deHoy.forEach((e) => { const rm = estimate1RM(e.kg, e.reps); if (rm > piso && (!mejorHoy || rm > mejorHoy.rm)) mejorHoy = { rm, e }; });
+        if (mejorHoy) {
+          prs.push({ id: exId, nombre: EXERCISE_LIBRARY_BY_ID[exId]?.name || (deHoy[0].exName || exId.replace(/_/g, " ")), marca: `${mejorHoy.e.reps}×${mejorHoy.e.kg}kg` });
+        }
+      }
+    });
+    let minutos = null;
+    const inicio = profile?.activeSession?.startedAt;
+    if (inicio) {
+      const m = Math.round((Date.now() - new Date(inicio).getTime()) / 60000);
+      if (m >= 0 && m < 24 * 60) minutos = m; // descarta duraciones absurdas (sesión olvidada abierta)
+    }
+    return { volumen: Math.round(volumen), series, ejercicios: ejercicios.size, prs, minutos };
+  };
+
   const handleEndSession = () => {
+    // El resumen se arma ANTES de cerrar (después ya no existe activeSession
+    // para calcular la duración). Solo se muestra si registraste algo.
+    const resumen = armarResumenSesion();
     setProfiles((prev) => {
       const p = prev[activeProfile];
       if (!p?.activeSession) return prev;
@@ -11457,6 +11844,7 @@ export default function App() {
       saveProfiles(np);
       return np;
     });
+    if (resumen.series > 0) setSessionSummary(resumen);
   };
   const handleCancelSession = () => {
     setProfiles((prev) => {
@@ -11579,7 +11967,7 @@ export default function App() {
           </div>
         </header>
         <main className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto px-4 py-4 pb-28 lg:pb-10 space-y-4">
-          <div key={tab} className="tab-fade-in">
+          <div key={tab} className={tabSlideClass}>
             {tab === "rutinas" && <RoutinesView openScheduleSignal={openSectionSignal.id === "week-schedule" ? openSectionSignal.n : 0} openEditorSignal={openSectionSignal.id === "routine-editor" ? openSectionSignal.n : 0} profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleArchiveRoutine} onRestore={handleRestoreRoutine} onUpdateProfile={handleUpdateProfile} />}
             {tab === "rutina" && <OnboardingTasksCard profile={profile} cycleStart={cycleStart} logs={logs} onGoToProfile={() => setTab("perfil")} onOpenFieldSettings={() => setShowFieldIntro(true)} onDone={() => handleUpdateProfile({ onboardingDone: true })} />}
             {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToRoutines={() => setTab("rutinas")} onGoToSchedule={() => goToSection("rutinas", "week-schedule")} onGoToFieldSettings={() => goToSection("perfil", "field-settings-section")} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} todaySessionDayKey={(profile?.trainingSessions || []).find((ts) => ts.date === todayStr())?.dayKey || profile?.activeSession?.dayKey || null} />}
@@ -11591,6 +11979,8 @@ export default function App() {
         </main>
       </div>
       <BottomBar tab={tab} setTab={setTab} />
+      {sessionSummary && <SessionSummaryModal resumen={sessionSummary} onClose={() => setSessionSummary(null)} />}
+      {showWelcome && <WelcomeIntro onClose={() => setShowWelcome(false)} onOpenTutorial={() => { setHelpStartTab(null); setShowHelp(true); }} />}
       {showHelp && <HelpModal startTab={helpStartTab} onClose={() => setShowHelp(false)} />}
       {showFieldIntro && (
         <FieldSettingsIntroModal
