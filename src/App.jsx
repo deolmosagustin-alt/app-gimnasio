@@ -407,10 +407,7 @@ function buildRoutineModel(routineDef) {
       const cardio = !!(lib ? lib.cardio : entry.cardio);
       return { id, name, muscle, nota, video, sets: entry.sets, custom: !lib, cardio, supersetNext: !!entry.supersetNext };
     });
-    // Color del día atenuado (30% hacia el gris): mantiene la identidad de
-    // cada día pero sin el neón saturado de origen, que hacía que la interfaz
-    // gritara. Un solo punto de verdad para toda la app.
-    days[dk] = { ...d, color: d.color ? muteHexColor(d.color, 0.3) : d.color, exercises };
+    days[dk] = { ...d, exercises };
     exercises.forEach((ex) => {
       exerciseById[ex.id] = { ...ex, dayKey: dk };
       ex.sets.forEach((_, i) => { keyToDay[`${ex.id}_${i}`] = dk; });
@@ -1244,6 +1241,26 @@ const ANIMATION_CSS = `
   50%      { transform: translateY(-2px) rotate(4deg); }
 }
 .thinking-lift { animation: thinkingLift 1.1s ease-in-out infinite; }
+/* La pesa "hace repeticiones": sube y baja como un press, con un giro leve */
+@keyframes thinkingRep {
+  0%, 100% { transform: translateY(3px) rotate(-6deg) scale(0.96); }
+  50%      { transform: translateY(-4px) rotate(6deg) scale(1.04); }
+}
+.thinking-rep { animation: thinkingRep 0.9s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+/* Halo que late detrás de la pesa */
+@keyframes thinkingHalo { 0%, 100% { opacity: 0.4; transform: scale(0.9); } 50% { opacity: 1; transform: scale(1.1); } }
+.thinking-halo { animation: thinkingHalo 1.6s ease-in-out infinite; }
+/* Ecualizador: barras que suben y bajan como música */
+@keyframes thinkingEq { 0%, 100% { height: 5px; } 50% { height: 16px; } }
+.thinking-eq { height: 5px; animation: thinkingEq 0.7s ease-in-out infinite; }
+/* Los tres puntitos del texto "Pensando..." que aparecen de a uno */
+@keyframes thinkingDots {
+  0%   { content: ""; }
+  25%  { content: "."; }
+  50%  { content: ".."; }
+  75%, 100% { content: "..."; }
+}
+.thinking-dots::after { content: ""; animation: thinkingDots 1.4s steps(1) infinite; }
 @keyframes thinkingWave {
   0%   { transform: scale(0.5); opacity: 0.5; }
   100% { transform: scale(1.6); opacity: 0; }
@@ -1297,7 +1314,8 @@ const ANIMATION_CSS = `
   .muscle-charge, .rank-up-pulse, .draw-check path, .number-pop, .bar-fill,
   .invite-pulse, .slide-right, .slide-left, .streak-beat, .streak-glow,
   .elastic-in, .skeleton, .row-enter, .row-flash, .row-leave, .activate-pulse,
-  .thinking-lift, .thinking-wave,
+  .thinking-dots::after { animation: none !important; content: "..." !important; }
+  .thinking-lift, .thinking-wave, .thinking-rep, .thinking-halo, .thinking-eq,
   .badge-pop, .superset-draw, .dot-bounce, .msg-in, .wake-up, .day-mark,
   .breathe, .hist-enter, .streak-jump, .tab-slide-right, .tab-slide-left,
   .timer-hop, .session-start-pop, .session-start-text, .session-tint,
@@ -8844,8 +8862,8 @@ function BuilderDayCard({ day, dayIdx, totalDays, onRename, onRemove, onMoveDay,
       {colorPickerOpen && (
         <div className="flex gap-1.5 flex-wrap mb-2.5 ml-9 bounce-in">
           {BUILDER_COLOR_PALETTE.map((c) => (
-            <button key={c} onClick={() => { onChangeColor(c); setColorPickerOpen(false); }} aria-label={`Color ${c}`} className="w-7 h-7 rounded-lg shrink-0 transition active:scale-90 flex items-center justify-center" style={{ backgroundColor: muteHexColor(c, 0.3) }}>
-              {muteHexColor(c, 0.3).toLowerCase() === (day.color || "").toLowerCase() && <Check size={14} className="text-white" />}
+            <button key={c} onClick={() => { onChangeColor(c); setColorPickerOpen(false); }} aria-label={`Color ${c}`} className="w-7 h-7 rounded-lg shrink-0 transition active:scale-90 flex items-center justify-center" style={{ backgroundColor: c }}>
+              {c.toLowerCase() === (day.color || "").toLowerCase() && <Check size={14} className="text-white" />}
             </button>
           ))}
         </div>
@@ -9800,21 +9818,25 @@ Datos: ${JSON.stringify(context)}`;
           </div>
         ))}
         {isSending && (
-          <div className="flex items-end gap-2 justify-start">
-            <div className="w-6 h-6 rounded-lg bg-teal-500/15 border border-teal-500/25 flex items-center justify-center shrink-0 mb-0.5">
-              <Sparkles size={11} className="text-teal-400 soft-pulse" />
-            </div>
-            <div className="bg-slate-900/60 border border-slate-800/60 rounded-2xl rounded-bl-md px-4 py-3.5 flex items-center gap-3 max-w-[75%]">
-              {/* Animación propia de la app: una pesa que "levanta" mientras
-                  ondas de energía salen de ella. Reemplaza los 3 puntitos
-                  genéricos por algo con la identidad fitness. */}
-              <div className="relative w-7 h-7 flex items-center justify-center shrink-0">
-                <span className="absolute inset-0 rounded-full thinking-wave" />
-                <span className="absolute inset-0 rounded-full thinking-wave" style={{ animationDelay: "0.7s" }} />
-                <Dumbbell size={16} className="relative text-teal-400 thinking-lift" />
+          <div className="flex flex-col items-center justify-center py-8 gap-4">
+            {/* Escena abierta (sin burbuja): la pesa "hace repeticiones" en el
+                centro de un halo que late, con un ecualizador de energía debajo
+                — como si el entrenador estuviera trabajando. */}
+            <div className="relative flex items-center justify-center">
+              <span className="absolute w-20 h-20 rounded-full thinking-halo" style={{ background: "radial-gradient(circle, rgba(20,184,166,0.25), transparent 70%)" }} />
+              <span className="absolute w-20 h-20 rounded-full thinking-wave" />
+              <span className="absolute w-20 h-20 rounded-full thinking-wave" style={{ animationDelay: "0.9s" }} />
+              <div className="relative w-12 h-12 rounded-2xl bg-teal-500/15 border border-teal-500/30 flex items-center justify-center shadow-lg shadow-teal-500/20">
+                <Dumbbell size={22} className="text-teal-300 thinking-rep" />
               </div>
-              <span className="text-[11px] text-slate-500">Pensando... puede tardar hasta 30s</span>
             </div>
+            {/* Ecualizador: 5 barras que laten como música, con desfase */}
+            <div className="flex items-end gap-1 h-4">
+              {[0, 1, 2, 3, 4].map((k) => (
+                <span key={k} className="w-1 rounded-full bg-teal-400/80 thinking-eq" style={{ animationDelay: `${k * 0.12}s` }} />
+              ))}
+            </div>
+            <span className="text-[11px] text-slate-500 font-medium">Pensando<span className="thinking-dots" /> <span className="text-slate-600">· puede tardar hasta 30s</span></span>
           </div>
         )}
         <div ref={bottomRef} />
@@ -11037,7 +11059,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
                 const ultimoImpar = i === orden.length - 1 && orden.length % 2 === 1;
                 return (
                   <span key={dk} className={`flex items-center gap-2 px-2.5 py-2 rounded-xl text-[10px] font-bold bg-black/25 border border-white/[0.07] min-w-0 ${ultimoImpar ? "col-span-2" : ""}`}>
-                    <span className="flex-1 min-w-0 truncate" style={{ color: d.color }}>{d.label}</span>
+                    <span className="flex-1 min-w-0 truncate text-slate-300">{d.label}</span>
                     <span className="text-slate-500 tabular-nums shrink-0">{d.exercises?.length || 0}</span>
                   </span>
                 );
@@ -12195,11 +12217,17 @@ export default function App() {
       {recoveredNotice && <RecoveredBanner onClose={() => setRecoveredNotice(false)} />}
       {importRoutineError && <ImportRoutineErrorBanner onClose={() => setImportRoutineError(false)} />}
       <div className={`relative min-h-screen bg-[#0a0a0f] px-4 py-6 theme-fade ${themeClass}`} style={{ "--small-text-scale": smallTextScale }}>
-        {/* Tinte de sesión activa: un halo del color del día que estás
-            entrenando, arriba de todo. Marca sutilmente el "modo sesión" sin
-            estorbar. Aparece/desaparece con transición y no captura toques. */}
+        {/* Marco de sesión activa: barras del color del día pegadas arriba y
+            abajo de la pantalla, como un marco que enmarca el "modo sesión".
+            Van por encima del contenido (z alto) pero no capturan toques, y
+            palpitan suave. Antes esto era un halo en z-0 casi invisible. */}
         {sessionTintColor && (
-          <div className="fixed top-0 left-0 right-0 h-40 pointer-events-none z-0 session-tint session-tint-pulse" style={{ background: `linear-gradient(to bottom, ${sessionTintColor}22, transparent)` }} aria-hidden="true" />
+          <>
+            <div className="fixed top-0 left-0 right-0 h-1.5 pointer-events-none z-[60] session-tint-pulse" style={{ backgroundColor: sessionTintColor, boxShadow: `0 0 12px 1px ${sessionTintColor}` }} aria-hidden="true" />
+            <div className="fixed bottom-0 left-0 right-0 h-1.5 pointer-events-none z-[60] session-tint-pulse" style={{ backgroundColor: sessionTintColor, boxShadow: `0 0 12px 1px ${sessionTintColor}` }} aria-hidden="true" />
+            {/* Halo suave arriba, para reforzar sin tapar */}
+            <div className="fixed top-0 left-0 right-0 h-24 pointer-events-none z-[55] session-tint-pulse" style={{ background: `linear-gradient(to bottom, ${sessionTintColor}33, transparent)` }} aria-hidden="true" />
+          </>
         )}
         <div style={{ height: "env(safe-area-inset-top, 0px)" }} />
         <div className="max-w-xl mx-auto">
