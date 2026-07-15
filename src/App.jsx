@@ -1136,7 +1136,7 @@ const ANIMATION_CSS = `
   60%  { opacity: 1; transform: translateY(2px) scale(1.01); }
   100% { opacity: 1; transform: translateY(0) scale(1); }
 }
-.row-enter { animation: rowEnter 0.42s cubic-bezier(0.34, 1.3, 0.64, 1) both; }
+.row-enter { animation: rowEnter 0.42s cubic-bezier(0.34, 1.3, 0.64, 1) backwards; }
 @keyframes rowFlash { 0%, 100% { background-color: transparent; } 35% { background-color: var(--flash-color, rgba(20,184,166,0.18)); } }
 .row-flash { animation: rowFlash 0.9s ease-out 0.1s both; }
 
@@ -1171,7 +1171,7 @@ const ANIMATION_CSS = `
 
 /* Mensajes que entran: suben apenas mientras aparecen */
 @keyframes msgIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-.msg-in { animation: msgIn 0.24s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.msg-in { animation: msgIn 0.24s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
 
 /* ── OTROS ── */
 /* Las tarjetas se "despiertan" al iniciar la sesión */
@@ -1205,8 +1205,8 @@ const ANIMATION_CSS = `
 /* Cambio de pestaña: la entrante se desliza sutilmente desde su dirección */
 @keyframes tabSlideRight { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: translateX(0); } }
 @keyframes tabSlideLeft  { from { opacity: 0; transform: translateX(-16px); } to { opacity: 1; transform: translateX(0); } }
-.tab-slide-right { animation: tabSlideRight 0.22s cubic-bezier(0.22, 1, 0.36, 1) both; }
-.tab-slide-left  { animation: tabSlideLeft 0.22s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.tab-slide-right { animation: tabSlideRight 0.22s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+.tab-slide-left  { animation: tabSlideLeft 0.22s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
 
 /* El músculo que subió de rango late (solo brillo: escalar un polygon SVG lo
    corre de lugar porque escala desde el origen del SVG, no desde su centro) */
@@ -1217,7 +1217,26 @@ const ANIMATION_CSS = `
   from { opacity: 0; transform: translateY(10px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-.hist-enter { animation: histEnter 0.35s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.hist-enter { animation: histEnter 0.35s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+
+/* El cronómetro entre series: aparece con un pequeño salto al cambiar de
+   posición, para que se note que se movió. Usa fill-mode "backwards" (no
+   "both") para no dejar transform residual: un ancestro con transform rompe
+   el centrado de los modales fixed que tenga adentro. */
+@keyframes timerHop {
+  0%   { opacity: 0; transform: translateY(-8px) scale(0.96); }
+  55%  { opacity: 1; transform: translateY(2px) scale(1.02); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.timer-hop { animation: timerHop 0.34s cubic-bezier(0.34, 1.3, 0.64, 1) backwards; }
+
+/* Overlay de inicio de sesión: se va solo a los 1.4s */
+@keyframes sessionStartFade { 0% { opacity: 0; } 12% { opacity: 1; } 82% { opacity: 1; } 100% { opacity: 0; } }
+.session-start-fade { animation: sessionStartFade 1.4s ease-in-out both; }
+@keyframes sessionStartPop { 0% { transform: scale(0.4); opacity: 0; } 45% { transform: scale(1.12); opacity: 1; } 65% { transform: scale(0.98); } 100% { transform: scale(1); opacity: 1; } }
+.session-start-pop { animation: sessionStartPop 0.6s cubic-bezier(0.34, 1.5, 0.64, 1) both; }
+@keyframes sessionStartText { 0% { transform: translateY(12px); opacity: 0; } 100% { transform: translateY(0); opacity: 1; } }
+.session-start-text { animation: sessionStartText 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.2s backwards; }
 
 /* La rutina activa "respira": un halo lentísimo que marca cuál es la tuya
    sin gritar. 4 segundos por ciclo — se percibe pero no distrae. */
@@ -1233,7 +1252,9 @@ const ANIMATION_CSS = `
   .invite-pulse, .slide-right, .slide-left, .streak-beat, .streak-glow,
   .elastic-in, .skeleton, .row-enter, .row-flash, .row-leave, .activate-pulse,
   .badge-pop, .superset-draw, .dot-bounce, .msg-in, .wake-up, .day-mark,
-  .breathe, .hist-enter, .streak-jump, .tab-slide-right, .tab-slide-left { animation: none !important; }
+  .breathe, .hist-enter, .streak-jump, .tab-slide-right, .tab-slide-left,
+  .timer-hop, .session-start-pop, .session-start-text { animation: none !important; }
+  /* El fade del overlay se mantiene: es lo que lo hace desaparecer solo */
   .theme-fade, .theme-fade * { transition: none !important; }
 }
 
@@ -1253,6 +1274,12 @@ const ANIMATION_CSS = `
 @keyframes modalPopIn { from { opacity: 0; transform: translateY(12px) scale(0.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
 .modal-bg-in { animation: modalBgIn 0.18s ease both; }
 .modal-pop-in { animation: modalPopIn 0.22s cubic-bezier(.2,.8,.3,1); }
+/* BLINDAJE DE CENTRADO: un ancestro con transform (una animación con
+   fill-mode:both, un will-change) convierte a sus hijos position:fixed en
+   relativos a ÉL en vez de a la pantalla — eso descentra los modales y les
+   rompe el área de scroll. Anclar las 4 coordenadas los obliga a ocupar el
+   viewport completo pase lo que pase con los ancestros. */
+.modal-overlay { position: fixed !important; top: 0 !important; right: 0 !important; bottom: 0 !important; left: 0 !important; }
 @keyframes gentleBounceIn { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
 .bounce-in { animation: gentleBounceIn 0.3s cubic-bezier(.34,1.56,.64,1); }
 
@@ -1558,7 +1585,7 @@ function PRBurst({ anchorRef, trigger }) {
   }, [trigger]);
   if (!particles.length || !origin || typeof document === "undefined") return null;
   return createPortal(
-    <div className="fixed inset-0 pointer-events-none z-[300]">
+    <div className="fixed inset-0 pointer-events-none z-[300] modal-overlay">
       {particles.map((p) => (
         <span key={p.id} className="absolute rounded-sm pr-confetti" style={{ left: origin.x, top: origin.y, width: 5, height: 9, backgroundColor: p.color, "--tx": `${p.x}px`, "--ty": `${p.y}px`, "--rot": `${p.rot}deg`, animationDelay: `${p.delay}s` }} />
       ))}
@@ -1650,7 +1677,7 @@ function ShareLinkModal({ title, shareTitle, shareText, shareTarget, onClose }) 
   const xUrl = url ? `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(url)}` : "#";
   const redditUrl = url ? `https://www.reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(shareTitle)}` : "#";
   return (
-    <div className="fixed inset-0 z-[120] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in" onClick={onClose}>
+    <div className="fixed inset-0 z-[120] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
       <div className="bg-slate-900 border border-slate-700/60 rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50 max-h-[92vh] overflow-y-auto overscroll-contain" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-base font-black text-white">{title}</h3>
@@ -2266,7 +2293,7 @@ function ShareImageModal({ title, fileNamePrefix, shareTitle, shareText, draw, o
   };
 
   return (
-    <div className="fixed inset-0 z-[130] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in" onClick={onClose}>
+    <div className="fixed inset-0 z-[130] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
       <div ref={scrollContainerRef} className="bg-slate-900 border border-slate-700/60 rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50 max-h-[92vh] overflow-y-auto overscroll-contain" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-base font-black text-white">{title}</h3>
@@ -2847,6 +2874,8 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default", 
   const endTimeRef = useRef(stillRunning ? persisted.endTime : null);
   const intervalRef = useRef();
   const firedRef = useRef(false);
+  const resetTimerRef = useRef(null); // devuelve el reloj a los minutos originales al terminar
+  useEffect(() => () => { if (resetTimerRef.current) clearTimeout(resetTimerRef.current); }, []);
   useEffect(() => {
     // Si hay un descanso en curso persistido para este timer, retomarlo;
     // si no, resetear normalmente cuando cambian los segundos base.
@@ -2868,14 +2897,29 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default", 
     if (alertType !== "vibration") {
       try {
         const a = new AudioContext();
-        [0, 220].forEach((d) => setTimeout(() => { const o = a.createOscillator(), g = a.createGain(); o.frequency.value = 880; o.connect(g); g.connect(a.destination); g.gain.value = 0.2; o.start(); setTimeout(() => o.stop(), 280); }, d));
+        // Arpegio ascendente tipo "campanita" (Do-Mi-Sol de la 5ª octava): tres
+        // notas cortas que suben, con ataque rápido y caída suave. Más agradable
+        // que el doble beep plano y se distingue mejor del ruido del gimnasio.
+        // El envelope con rampas evita el "click" de cortar la onda de golpe.
+        [523.25, 659.25, 783.99].forEach((freq, k) => {
+          const t0 = a.currentTime + k * 0.13;
+          const o = a.createOscillator(), g = a.createGain();
+          o.type = "sine";
+          o.frequency.value = freq;
+          o.connect(g); g.connect(a.destination);
+          g.gain.setValueAtTime(0.0001, t0);
+          g.gain.exponentialRampToValueAtTime(0.28, t0 + 0.02);
+          g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.32);
+          o.start(t0);
+          o.stop(t0 + 0.34);
+        });
         // Antes esto se acumulaba: cada serie creaba un AudioContext nuevo
         // y nunca se cerraba. Los navegadores tienen un límite de
         // contextos simultáneos (chico en iOS Safari en particular) —
         // pasado ese límite, el sonido deja de sonar sin ningún error
         // visible. Se cierra solo, ~700ms después (los dos beeps de
         // 280ms con 220ms de diferencia entre uno y otro ya terminaron).
-        setTimeout(() => { a.close().catch(() => { }); }, 700);
+        setTimeout(() => { a.close().catch(() => { }); }, 900);
       } catch { }
     }
     if (alertType !== "sound") haptic([400, 150, 400, 150, 500, 150, 400]);
@@ -2917,7 +2961,15 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default", 
     if (!endTimeRef.current) return;
     const left = Math.max(0, Math.round((endTimeRef.current - Date.now()) / 1000));
     setRemaining(left);
-    if (left <= 0) { setRunning(false); fireAlert(); }
+    if (left <= 0) {
+      setRunning(false);
+      fireAlert();
+      endTimeRef.current = null;
+      // Volver al tiempo original: antes quedaba clavado en 0:00 y había que
+      // tocarlo. Esperamos 1.2s para que alcances a VER que llegó a cero.
+      if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
+      resetTimerRef.current = setTimeout(() => { setRemaining(seconds); resetTimerRef.current = null; }, 1200);
+    }
   };
 
   useEffect(() => {
@@ -3910,6 +3962,28 @@ const WELCOME_SLIDES = [
   },
 ];
 
+// ── OVERLAY DE INICIO DE SESIÓN ─────────────────────────────────────────────
+// Un flash breve (1.4s) que confirma que arrancó el entrenamiento. No bloquea
+// (pointer-events:none) ni congela el fondo: se va solo. Complementa la
+// cascada wake-up de las tarjetas.
+function SessionStartOverlay({ onDone }) {
+  useEffect(() => {
+    const t = setTimeout(onDone, 1400);
+    return () => clearTimeout(t);
+  }, [onDone]);
+  return (
+    <div className="fixed inset-0 z-[135] flex items-center justify-center pointer-events-none session-start-fade modal-overlay">
+      <div className="absolute inset-0 bg-black/55 backdrop-blur-[2px]" />
+      <div className="relative flex flex-col items-center gap-3">
+        <div className="w-24 h-24 rounded-full flex items-center justify-center session-start-pop" style={{ background: "radial-gradient(circle, rgba(20,184,166,0.35), rgba(20,184,166,0.05))", border: "2px solid rgba(20,184,166,0.5)", boxShadow: "0 0 50px -8px rgba(20,184,166,0.8)" }}>
+          <Dumbbell size={44} className="text-teal-300" />
+        </div>
+        <p className="text-2xl font-black text-white session-start-text" style={{ textShadow: "0 2px 20px rgba(20,184,166,0.6)" }}>¡A entrenar!</p>
+      </div>
+    </div>
+  );
+}
+
 // ── RESUMEN AL FINALIZAR EL ENTRENAMIENTO ───────────────────────────────────
 // El cierre emocional de la sesión: duración, volumen contando hacia arriba,
 // series y ejercicios, y los récords del día apareciendo uno a uno. Antes
@@ -3918,7 +3992,7 @@ function SessionSummaryModal({ resumen, onClose }) {
   useAndroidBack(onClose);
   if (!resumen) return null;
   return (
-    <div className="fixed inset-0 z-[140] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 modal-bg-in" onClick={onClose}>
+    <div className="fixed inset-0 z-[140] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
       <div
         className="max-w-sm w-full rounded-3xl modal-pop-in shadow-2xl shadow-black/70 overflow-hidden"
         style={{ background: "linear-gradient(165deg,#0d1a17 0%,#0a0f1a 100%)", border: "1px solid rgba(20,184,166,0.3)" }}
@@ -3981,7 +4055,7 @@ function WelcomeIntro({ onClose, onOpenTutorial }) {
   const slide = WELCOME_SLIDES[i];
   const isLast = i === WELCOME_SLIDES.length - 1;
   return (
-    <div className="fixed inset-0 z-[110] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 modal-bg-in">
+    <div className="fixed inset-0 z-[110] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 modal-bg-in modal-overlay">
       <div
         className="max-w-sm w-full rounded-3xl modal-pop-in shadow-2xl shadow-black/70 overflow-hidden flex flex-col"
         style={{ background: "linear-gradient(165deg,#0f1a1f 0%,#0a0f1a 100%)", border: `1px solid ${slide.color}30`, minHeight: 440 }}
@@ -4052,7 +4126,7 @@ function HelpModal({ startTab, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 modal-bg-in" onClick={onClose}>
+    <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
       <div
         className="max-w-md w-full rounded-3xl modal-pop-in shadow-2xl shadow-black/70 flex flex-col"
         style={{ background: "linear-gradient(160deg,#0f1a1f 0%,#0a0f1a 100%)", border: "1px solid rgba(20,184,166,0.2)", height: "min(92vh, 700px)" }}
@@ -4196,7 +4270,7 @@ function HelpModal({ startTab, onClose }) {
 function RankUpModal({ from, to, muscleName, onClose }) {
   useAndroidBack(onClose);
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-5" style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}>
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-5 modal-overlay" style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}>
       <div className="relative w-full max-w-sm rounded-3xl overflow-hidden elastic-in" style={{ background: "linear-gradient(135deg, #0f0f1a, #1a1a2e)", border: `2px solid ${to.color}40` }}>
         {/* Glow de fondo */}
         <div className="absolute inset-0 opacity-30 pointer-events-none" style={{ background: `radial-gradient(circle at 50% 30%, ${to.color}60, transparent 65%)` }} />
@@ -4821,6 +4895,23 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
   useEffect(() => { if (forceOpen) setOpen(true); }, [forceOpen]);
   const hasHeavy = exercise.sets.some((s) => isHeavyRepRange(s.repRange));
   const setsToShow = deloadSets ? exercise.sets.slice(0, deloadSets) : exercise.sets;
+
+  // ── POSICIÓN DEL CRONÓMETRO entre las series ──────────────────────────────
+  // Contamos cuántas series desde el principio ya están registradas HOY (racha
+  // inicial: si te salteás una, el timer se queda antes del hueco, que es donde
+  // te falta trabajo). 0 = arriba de todo; N = justo debajo de la serie N.
+  // Al completar TODAS vuelve a 0, listo para la próxima vuelta.
+  const hoyStr = todayStr();
+  const timerSlot = useMemo(() => {
+    if (exercise.cardio || hideTimer) return -1; // sin timer intercalado
+    let hechas = 0;
+    for (let i = 0; i < setsToShow.length; i++) {
+      const hist = logs[`${exercise.id}_${i}`] || [];
+      if (hist.some((h) => h.date === hoyStr)) hechas++;
+      else break;
+    }
+    return hechas >= setsToShow.length ? 0 : hechas;
+  }, [logs, exercise.id, exercise.cardio, hideTimer, setsToShow.length, hoyStr]);
   const { stagnant } = useMemo(() => getStagnationInfo(exercise, logs), [exercise, logs]);
   const bestWorkingKg = !exercise.cardio ? getBestWorkingKg(exercise, logs) : null;
   return (
@@ -4898,11 +4989,8 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
           </div>
         )}
         {!deloadMode && stagnant && <div className="mb-3 text-[11px] text-rose-400/90 bg-rose-500/5 border border-rose-500/15 rounded-xl px-3 py-2 flex items-start gap-1.5"><Info size={12} className="mt-0.5 shrink-0" /><span>Hace {STAGNATION_DAYS}+ días sin superar el récord. Considerá cambiar reps, descanso o variante.</span></div>}
-        {!exercise.cardio && !hideTimer && (
-          <div className="mb-1">
-            <RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={accent} alertType={settings.alertType} timerId={`ex_${exercise.id}`} exerciseName={exercise.name} />
-          </div>
-        )}
+        {/* El cronómetro ya no vive fijo acá: se posiciona entre las series
+            según timerSlot (más abajo, junto a "Tus series"). */}
         {!exercise.cardio && !deloadMode && bestWorkingKg != null && settings.showWarmup !== false && (
           <div className="mb-2">
             {!showWarmup ? (
@@ -4930,7 +5018,18 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
           </div>
         )}
         <p className="text-[9px] font-black uppercase tracking-widest text-slate-600 mb-2 mt-1">{exercise.cardio ? "Registrá tu sesión" : "Tus series"}</p>
-        {setsToShow.map((s, i) => <SetRow key={`${exercise.id}:${i}`} exerciseId={exercise.id} exerciseName={exercise.name} exerciseMuscle={exercise.muscle} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadKgFactor={settings.deloadPct} deloadMode={deloadMode} resetKey={resetKey} autoShowPrShare={settings.autoShowPrShare ?? true} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={hasActiveSession} cardio={exercise.cardio} dumbbellDouble={settings?.dumbbellDouble || null} fieldSettings={settings} />)}
+        {/* Arriba de todo: solo antes de empezar (o tras completar la última) */}
+        {timerSlot === 0 && (
+          <div className="mb-2 timer-hop"><RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={accent} alertType={settings.alertType} timerId={`ex_${exercise.id}`} exerciseName={exercise.name} /></div>
+        )}
+        {setsToShow.map((s, i) => <React.Fragment key={`${exercise.id}:frag:${i}`}>
+          <SetRow key={`${exercise.id}:${i}`} exerciseId={exercise.id} exerciseName={exercise.name} exerciseMuscle={exercise.muscle} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadKgFactor={settings.deloadPct} deloadMode={deloadMode} resetKey={resetKey} autoShowPrShare={settings.autoShowPrShare ?? true} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={hasActiveSession} cardio={exercise.cardio} dumbbellDouble={settings?.dumbbellDouble || null} fieldSettings={settings} />
+          {/* Debajo de la serie recién registrada: timerSlot = N significa
+              "después de la serie N" (1-indexado). */}
+          {timerSlot === i + 1 && (
+            <div className="my-2 timer-hop"><RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={accent} alertType={settings.alertType} timerId={`ex_${exercise.id}`} exerciseName={exercise.name} /></div>
+          )}
+        </React.Fragment>)}
         {exercise.video && (
           <div className="pt-3">
             <a href={exercise.video} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 py-3 rounded-xl border border-slate-800 text-slate-400 hover:border-slate-600 hover:text-white transition text-sm font-medium active:scale-[0.98]">
@@ -5645,7 +5744,7 @@ function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [], weekSche
               abajo del calendario y quedaba escondido; ahora aparece al
               frente, con fondo difuminado y cierre con toque afuera o X. */}
           {selectedSession && (
-            <div className="fixed inset-0 z-[140] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in" onClick={() => setSelectedDate(null)}>
+            <div className="fixed inset-0 z-[140] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={() => setSelectedDate(null)}>
               <div className="max-w-md w-full max-h-[85vh] overflow-y-auto overscroll-contain rounded-3xl modal-pop-in" onClick={(e) => e.stopPropagation()}>
                 <div className="relative">
                   <button onClick={() => setSelectedDate(null)} aria-label="Cerrar" className="absolute top-3 right-3 z-10 p-2 rounded-xl bg-slate-800/90 text-slate-400 hover:text-white transition active:scale-90"><X size={15} /></button>
@@ -6751,7 +6850,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
           para desbloquear su rango. Lista los ejercicios de la librería que
           apuntan a ese músculo y un botón directo a Rutinas para sumarlos. */}
       {showGroupExercises && selInfo && (
-        <div className="fixed inset-0 z-[130] bg-black/75 backdrop-blur-sm flex items-center justify-center p-5 modal-bg-in" onClick={() => setShowGroupExercises(false)}>
+        <div className="fixed inset-0 z-[130] bg-black/75 backdrop-blur-sm flex items-center justify-center p-5 modal-bg-in modal-overlay" onClick={() => setShowGroupExercises(false)}>
           <div className="max-w-sm w-full max-h-[80vh] overflow-y-auto overscroll-contain bg-slate-900 border border-slate-700/60 rounded-3xl p-5 modal-pop-in shadow-2xl shadow-black/60" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-1">
               <div className="flex items-center gap-2">
@@ -6789,7 +6888,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
           y los que no estás entrenando. Cada fila es tocable: te lleva
           directo a la tarjeta de ese músculo. */}
       {showAnalysis && (
-        <div className="fixed inset-0 z-[130] bg-black/75 backdrop-blur-sm flex items-center justify-center p-5 modal-bg-in" onClick={() => setShowAnalysis(false)}>
+        <div className="fixed inset-0 z-[130] bg-black/75 backdrop-blur-sm flex items-center justify-center p-5 modal-bg-in modal-overlay" onClick={() => setShowAnalysis(false)}>
           <div className="max-w-sm w-full max-h-[85vh] overflow-y-auto overscroll-contain bg-slate-900 border border-slate-700/60 rounded-3xl p-5 modal-pop-in shadow-2xl shadow-black/60" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
@@ -6854,7 +6953,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
           trofeo del header — antes ocupaba lugar fijo como "Ver todos los
           rangos"; ahora el espacio lo usa el carrusel con TUS rangos). */}
       {showTierRef && (
-        <div className="fixed inset-0 z-[130] bg-black/75 backdrop-blur-sm flex items-center justify-center p-5 modal-bg-in" onClick={() => setShowTierRef(false)}>
+        <div className="fixed inset-0 z-[130] bg-black/75 backdrop-blur-sm flex items-center justify-center p-5 modal-bg-in modal-overlay" onClick={() => setShowTierRef(false)}>
           <div className="max-w-sm w-full bg-slate-900 border border-slate-700/60 rounded-3xl p-5 modal-pop-in shadow-2xl shadow-black/60" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
@@ -6928,7 +7027,7 @@ function PhotoViewerModal({ photo, onClose, onDelete }) {
   const [confirmDel, setConfirmDel] = useState(false);
   const dateLabel = new Date(photo.date + "T00:00:00").toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" });
   return (
-    <div className="fixed inset-0 z-[140] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in" onClick={onClose}>
+    <div className="fixed inset-0 z-[140] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
       <div className="max-w-sm w-full" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-2 px-1">
           <p className="text-sm font-bold text-white capitalize">{dateLabel}</p>
@@ -7156,7 +7255,7 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
             {/* Detalle del día como MODAL centrado — mismo tratamiento que
                 el historial de entrenamientos */}
             {selectedEntry && (
-              <div className="fixed inset-0 z-[140] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in" onClick={() => setSelectedDate(null)}>
+              <div className="fixed inset-0 z-[140] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={() => setSelectedDate(null)}>
                 <div className="max-w-md w-full max-h-[85vh] overflow-y-auto overscroll-contain rounded-3xl modal-pop-in border border-purple-500/30" style={{ background: "linear-gradient(170deg,#0f172a 0%,#0a0f1a 100%)" }} onClick={(e) => e.stopPropagation()}>
                   <div className="relative px-4 pt-4 pb-3 overflow-hidden">
                     <div className="absolute -top-10 -right-8 w-36 h-36 rounded-full blur-3xl opacity-20 bg-purple-500 pointer-events-none" />
@@ -7214,7 +7313,7 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
               const diffDays = Math.round((new Date(b.date) - new Date(a.date)) / 86400000);
               const weightDiff = (a.entry.weight != null && b.entry.weight != null) ? Math.round((b.entry.weight - a.entry.weight) * 10) / 10 : null;
               return (
-                <div className="fixed inset-0 z-[150] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in" onClick={() => setComparePair(null)}>
+                <div className="fixed inset-0 z-[150] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={() => setComparePair(null)}>
                   <div className="max-w-lg w-full max-h-[90vh] overflow-y-auto overscroll-contain rounded-3xl modal-pop-in border border-rose-500/30 bg-slate-950" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center justify-between px-4 pt-4 pb-2">
                       <p className="text-sm font-black text-white flex items-center gap-2"><Camera size={15} className="text-rose-400" /> Tu comparación</p>
@@ -8073,7 +8172,7 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
       </div>
 
       {showPrivacy && (
-        <div className="fixed inset-0 z-[200] flex flex-col" style={{ background: "#0a0a0f", paddingTop: "env(safe-area-inset-top,0px)" }}>
+        <div className="fixed inset-0 z-[200] flex flex-col modal-overlay" style={{ background: "#0a0a0f", paddingTop: "env(safe-area-inset-top,0px)" }}>
           <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800/60 shrink-0">
             <div className="flex items-center gap-2.5">
               <Info size={16} className="text-teal-400" />
@@ -8141,7 +8240,7 @@ function SharedRoutineImportModal({ routine, onImport, onDiscard }) {
   useAndroidBack(onDiscard);
   if (!routine) return null;
   return (
-    <div className="fixed inset-0 z-[125] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in" onClick={onDiscard}>
+    <div className="fixed inset-0 z-[125] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onDiscard}>
       <div className="w-full max-w-md max-h-[86vh] overflow-y-auto overscroll-contain bg-slate-900 border border-slate-700/60 rounded-3xl modal-pop-in shadow-2xl shadow-black/70" onClick={(e) => e.stopPropagation()}>
         <div className="p-5">
           <div className="flex items-center gap-3 mb-3">
@@ -9812,7 +9911,7 @@ function ImportRoutineModal({ onImport, onClose }) {
 
   if (parsed) {
     return (
-      <div className="fixed inset-0 z-[130] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in" onClick={onClose}>
+      <div className="fixed inset-0 z-[130] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
         <div className="bg-slate-900 border border-slate-700/60 rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50 max-h-[88vh] overflow-y-auto overscroll-contain" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 rounded-2xl bg-teal-500/15 text-teal-400 flex items-center justify-center shrink-0"><Sparkles size={18} /></div>
@@ -9830,7 +9929,7 @@ function ImportRoutineModal({ onImport, onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 z-[130] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in" onClick={onClose}>
+    <div className="fixed inset-0 z-[130] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
       <div className="bg-slate-900 border border-slate-700/60 rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50 max-h-[92vh] overflow-y-auto overscroll-contain" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-base font-black text-white">Importar rutina</h3>
@@ -10420,7 +10519,7 @@ function RoutinePreviewModal({ routineDef, routineName, onActivate, onClose, yaA
   );
 
   return (
-    <div className="fixed inset-0 z-[130] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in" onClick={onClose}>
+    <div className="fixed inset-0 z-[130] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
       <div
         className="w-full max-w-md max-h-[86vh] flex flex-col bg-slate-900 border border-slate-700/60 rounded-3xl overflow-hidden modal-pop-in shadow-2xl shadow-black/70"
         onClick={(e) => e.stopPropagation()}
@@ -11077,7 +11176,7 @@ function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
   ];
 
   return (
-    <div className="fixed inset-0 z-[140] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in" onClick={onClose}>
+    <div className="fixed inset-0 z-[140] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
       <div className="max-w-md w-full max-h-[92vh] overflow-y-auto overscroll-contain bg-slate-900 border border-slate-700/60 rounded-3xl modal-pop-in shadow-2xl shadow-black/70" onClick={(e) => e.stopPropagation()}>
         <div className="sticky top-0 z-10 bg-slate-900 px-5 pt-5 pb-3 border-b border-slate-800/60">
           <div className="flex items-start justify-between gap-3 mb-1">
@@ -11287,6 +11386,7 @@ export default function App() {
   const [helpStartTab, setHelpStartTab] = useState(null);
   const [showWelcome, setShowWelcome] = useState(false); // intro de la primera vez
   const [sessionSummary, setSessionSummary] = useState(null); // resumen al finalizar
+  const [sessionStarted, setSessionStarted] = useState(false); // overlay "¡A entrenar!"
   const [recoveredNotice, setRecoveredNotice] = useState(false);
 
   useEffect(() => {
@@ -11849,6 +11949,8 @@ export default function App() {
   const handleStartSession = (dayKey) => {
     const np = { ...profiles, [activeProfile]: { ...profiles[activeProfile], activeSession: { dayKey, startedAt: new Date().toISOString() } } };
     setProfiles(np); saveProfiles(np);
+    setSessionStarted(true); // overlay "¡A entrenar!"
+    haptic([0, 40, 60, 40]);
   };
   // Arma el resumen del entrenamiento de hoy: volumen (con factor de
   // mancuernas), series, ejercicios y los récords superados. Se calcula ANTES
@@ -12049,6 +12151,7 @@ export default function App() {
         </main>
       </div>
       <BottomBar tab={tab} setTab={setTab} />
+      {sessionStarted && <SessionStartOverlay onDone={() => setSessionStarted(false)} />}
       {sessionSummary && <SessionSummaryModal resumen={sessionSummary} onClose={() => setSessionSummary(null)} />}
       {showWelcome && <WelcomeIntro onClose={() => setShowWelcome(false)} onOpenTutorial={() => { setHelpStartTab(null); setShowHelp(true); }} />}
       {showHelp && <HelpModal startTab={helpStartTab} onClose={() => setShowHelp(false)} />}
@@ -12061,7 +12164,7 @@ export default function App() {
       )}
       {importRoutine && <SharedRoutineImportModal routine={importRoutine} onImport={handleImportSharedRoutine} onDiscard={() => setImportRoutine(null)} />}
       {cycleCompleteNotice && !showCycleShareImage && (
-        <div className="fixed inset-0 z-[125] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in" onClick={() => setCycleCompleteNotice(null)}>
+        <div className="fixed inset-0 z-[125] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={() => setCycleCompleteNotice(null)}>
           <div className="bg-slate-900 border border-slate-700/60 rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50 text-center" onClick={(e) => e.stopPropagation()}>
             <div className="text-4xl mb-2">🎉</div>
             <h3 className="text-lg font-black text-white">¡Completaste el Ciclo #{cycleCompleteNotice.cycleNumber}!</h3>
