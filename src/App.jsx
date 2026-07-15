@@ -1268,6 +1268,13 @@ const ANIMATION_CSS = `
 /* Tinte de sesión activa: entra suave cuando arranca el entrenamiento */
 @keyframes sessionTintIn { from { opacity: 0; } to { opacity: 1; } }
 .session-tint { animation: sessionTintIn 0.6s ease-out both; }
+/* El tinte "respira": un latido lento y suave que da sensación de sesión viva.
+   Empieza DESPUÉS de que terminó la entrada (0.6s) para encadenar sin salto. */
+@keyframes sessionTintPulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.5; }
+}
+.session-tint-pulse { animation: sessionTintIn 0.6s ease-out, sessionTintPulse 3s ease-in-out 0.6s infinite; }
 
 /* Confeti del resumen de fin de sesión: cae de arriba girando y se desvanece */
 @keyframes confettiFall {
@@ -1294,7 +1301,7 @@ const ANIMATION_CSS = `
   .badge-pop, .superset-draw, .dot-bounce, .msg-in, .wake-up, .day-mark,
   .breathe, .hist-enter, .streak-jump, .tab-slide-right, .tab-slide-left,
   .timer-hop, .session-start-pop, .session-start-text, .session-tint,
-  .cell-pop, .sparkle-spin { animation: none !important; }
+  .cell-pop, .sparkle-spin, .session-tint-pulse { animation: none !important; }
   .confetti-piece { display: none !important; }
   /* El fade del overlay se mantiene: es lo que lo hace desaparecer solo */
   .theme-fade, .theme-fade * { transition: none !important; }
@@ -11475,13 +11482,6 @@ export default function App() {
   const [showWelcome, setShowWelcome] = useState(false); // intro de la primera vez
   const [sessionSummary, setSessionSummary] = useState(null); // resumen al finalizar
   const [sessionStarted, setSessionStarted] = useState(false); // overlay "¡A entrenar!"
-  // Color del día de la sesión activa, para teñir sutilmente la app mientras
-  // entrenás. null cuando no hay sesión → sin tinte.
-  const sessionTintColor = useMemo(() => {
-    const dk = profile?.activeSession?.dayKey;
-    if (!dk) return null;
-    return ROUTINE?.[dk]?.color || null;
-  }, [profile?.activeSession?.dayKey]);
   const [recoveredNotice, setRecoveredNotice] = useState(false);
 
   useEffect(() => {
@@ -11573,6 +11573,14 @@ export default function App() {
   }, []);
 
   const profile = profiles[activeProfile], logs = profile?.logs || {}, drafts = profile?.drafts || {};
+  // Color del día de la sesión activa, para teñir sutilmente la app mientras
+  // entrenás. null cuando no hay sesión → sin tinte. (Va DESPUÉS de `profile`
+  // porque lo usa: declararlo antes causaba un TDZ y pantalla negra.)
+  const sessionTintColor = useMemo(() => {
+    const dk = profile?.activeSession?.dayKey;
+    if (!dk) return null;
+    return ROUTINE?.[dk]?.color || null;
+  }, [profile?.activeSession?.dayKey]);
   const themeClass = getProfileSettings(profile).theme === "light" ? "light-mode" : "";
 
   // Limpieza automática de récords-override obsoletos (datos fantasma). Corre
@@ -12191,7 +12199,7 @@ export default function App() {
             entrenando, arriba de todo. Marca sutilmente el "modo sesión" sin
             estorbar. Aparece/desaparece con transición y no captura toques. */}
         {sessionTintColor && (
-          <div className="fixed top-0 left-0 right-0 h-40 pointer-events-none z-0 session-tint" style={{ background: `linear-gradient(to bottom, ${sessionTintColor}22, transparent)` }} aria-hidden="true" />
+          <div className="fixed top-0 left-0 right-0 h-40 pointer-events-none z-0 session-tint session-tint-pulse" style={{ background: `linear-gradient(to bottom, ${sessionTintColor}22, transparent)` }} aria-hidden="true" />
         )}
         <div style={{ height: "env(safe-area-inset-top, 0px)" }} />
         <div className="max-w-xl mx-auto">
