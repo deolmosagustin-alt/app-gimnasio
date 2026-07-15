@@ -1238,6 +1238,45 @@ const ANIMATION_CSS = `
 @keyframes sessionStartText { 0% { transform: translateY(12px); opacity: 0; } 100% { transform: translateY(0); opacity: 1; } }
 .session-start-text { animation: sessionStartText 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.2s backwards; }
 
+/* IA "pensando": la pesa sube y baja mientras ondas de energía se expanden */
+@keyframes thinkingLift {
+  0%, 100% { transform: translateY(2px) rotate(-4deg); }
+  50%      { transform: translateY(-2px) rotate(4deg); }
+}
+.thinking-lift { animation: thinkingLift 1.1s ease-in-out infinite; }
+@keyframes thinkingWave {
+  0%   { transform: scale(0.5); opacity: 0.5; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+.thinking-wave { background: radial-gradient(circle, rgba(20,184,166,0.35), transparent 70%); animation: thinkingWave 1.4s ease-out infinite; }
+
+/* Celdas del calendario del historial: aparecen en cascada al abrir la vista */
+@keyframes cellPop {
+  from { opacity: 0; transform: scale(0.8); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.cell-pop { animation: cellPop 0.3s cubic-bezier(0.34, 1.4, 0.64, 1) backwards; }
+
+/* Sparkle del chatbot: un giro-destello al abrir la sección */
+@keyframes sparkleSpin {
+  0%   { transform: rotate(-25deg) scale(0.6); opacity: 0; }
+  60%  { transform: rotate(8deg) scale(1.15); opacity: 1; }
+  100% { transform: rotate(0deg) scale(1); opacity: 1; }
+}
+.sparkle-spin { animation: sparkleSpin 0.6s cubic-bezier(0.34, 1.4, 0.64, 1) both; }
+
+/* Tinte de sesión activa: entra suave cuando arranca el entrenamiento */
+@keyframes sessionTintIn { from { opacity: 0; } to { opacity: 1; } }
+.session-tint { animation: sessionTintIn 0.6s ease-out both; }
+
+/* Confeti del resumen de fin de sesión: cae de arriba girando y se desvanece */
+@keyframes confettiFall {
+  0%   { transform: translateY(-20px) rotate(0deg); opacity: 0; }
+  12%  { opacity: 1; }
+  100% { transform: translateY(320px) rotate(320deg); opacity: 0; }
+}
+.confetti-piece { position: absolute; top: -10px; border-radius: 2px; animation-name: confettiFall; animation-timing-function: cubic-bezier(0.4, 0, 0.7, 1); animation-fill-mode: both; }
+
 /* La rutina activa "respira": un halo lentísimo que marca cuál es la tuya
    sin gritar. 4 segundos por ciclo — se percibe pero no distrae. */
 @keyframes breathe {
@@ -1251,9 +1290,12 @@ const ANIMATION_CSS = `
   .muscle-charge, .rank-up-pulse, .draw-check path, .number-pop, .bar-fill,
   .invite-pulse, .slide-right, .slide-left, .streak-beat, .streak-glow,
   .elastic-in, .skeleton, .row-enter, .row-flash, .row-leave, .activate-pulse,
+  .thinking-lift, .thinking-wave,
   .badge-pop, .superset-draw, .dot-bounce, .msg-in, .wake-up, .day-mark,
   .breathe, .hist-enter, .streak-jump, .tab-slide-right, .tab-slide-left,
-  .timer-hop, .session-start-pop, .session-start-text { animation: none !important; }
+  .timer-hop, .session-start-pop, .session-start-text, .session-tint,
+  .cell-pop, .sparkle-spin { animation: none !important; }
+  .confetti-piece { display: none !important; }
   /* El fade del overlay se mantiene: es lo que lo hace desaparecer solo */
   .theme-fade, .theme-fade * { transition: none !important; }
 }
@@ -3990,14 +4032,33 @@ function SessionStartOverlay({ onDone }) {
 // finalizar no mostraba nada — el mejor momento de la app pasaba en silencio.
 function SessionSummaryModal({ resumen, onClose }) {
   useAndroidBack(onClose);
+  // Destellos de celebración: posiciones/tiempos aleatorios pero fijos (una
+  // sola vez) para que no se regeneren en cada render. Colores de la app.
+  const confeti = useMemo(() => {
+    const cols = ["#14B8A6", "#F59E0B", "#3B82F6", "#A855F7", "#F43F5E"];
+    return Array.from({ length: 18 }, (_, i) => ({
+      id: i,
+      left: Math.round(Math.random() * 100),
+      delay: Math.round(Math.random() * 400),
+      dur: 1400 + Math.round(Math.random() * 900),
+      color: cols[i % cols.length],
+      size: 5 + Math.round(Math.random() * 4),
+    }));
+  }, []);
   if (!resumen) return null;
   return (
     <div className="fixed inset-0 z-[140] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
       <div
-        className="max-w-sm w-full rounded-3xl modal-pop-in shadow-2xl shadow-black/70 overflow-hidden"
+        className="relative max-w-sm w-full rounded-3xl modal-pop-in shadow-2xl shadow-black/70 overflow-hidden"
         style={{ background: "linear-gradient(165deg,#0d1a17 0%,#0a0f1a 100%)", border: "1px solid rgba(20,184,166,0.3)" }}
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Lluvia de destellos: cae detrás del contenido, no molesta al leer */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
+          {confeti.map((c) => (
+            <span key={c.id} className="confetti-piece" style={{ left: `${c.left}%`, width: c.size, height: c.size, backgroundColor: c.color, animationDelay: `${c.delay}ms`, animationDuration: `${c.dur}ms` }} />
+          ))}
+        </div>
         {/* Hero: check grande con halo */}
         <div className="relative flex flex-col items-center pt-9 pb-5 px-6 text-center">
           <div className="absolute -top-16 left-1/2 -translate-x-1/2 w-52 h-52 rounded-full bg-teal-500/20 blur-3xl pointer-events-none" />
@@ -5720,8 +5781,8 @@ function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [], weekSche
                     : { backgroundColor: mainColor + "30", border: `1px solid ${mainColor}55` })
                   : {};
                 return (
-                  <button key={i} onClick={() => s && setSelectedDate(isSelected ? null : d)} disabled={!s} style={bgStyle}
-                    className={`aspect-square rounded-lg flex flex-col items-center justify-center gap-0.5 text-[11px] font-bold transition-all ${isSelected ? "ring-2 ring-teal-400" : ""} ${isToday && !s ? "border border-teal-500/50" : ""} ${s ? "text-white hover:brightness-125 active:scale-95" : "text-slate-700"}`}>
+                  <button key={i} onClick={() => s && setSelectedDate(isSelected ? null : d)} disabled={!s} style={{ ...bgStyle, animationDelay: `${Math.min(i, 34) * 12}ms` }}
+                    className={`cell-pop aspect-square rounded-lg flex flex-col items-center justify-center gap-0.5 text-[11px] font-bold transition-all ${isSelected ? "ring-2 ring-teal-400" : ""} ${isToday && !s ? "border border-teal-500/50" : ""} ${s ? "text-white hover:brightness-125 active:scale-95" : "text-slate-700"}`}>
                     {dayNum}
                     {s && <div className="flex gap-0.5">{s.dayKeys.slice(0, 3).map((dk) => <span key={dk} className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: ROUTINE[dk].color }} />)}</div>}
                   </button>
@@ -7918,7 +7979,7 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
   return (
     <div className="space-y-4">
       <div className="border border-slate-800/50 rounded-2xl p-5 text-center shadow-md shadow-black/20" style={{ background: "var(--grad-profile-avatar)" }}>
-        <div className="relative w-20 h-20 mx-auto mb-3">
+        <div className="relative w-20 h-20 mx-auto mb-3 elastic-in">
           {avatarUrl
             ? <img src={avatarUrl} alt="Foto de perfil" className="w-20 h-20 rounded-3xl object-cover" />
             : <div className="w-20 h-20 rounded-3xl flex items-center justify-center text-3xl font-black !text-white" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>{initial}</div>
@@ -9345,6 +9406,7 @@ function trimLogsForAI(logs) {
 function EntrenadorIAChat({ profile, logs, profileName, messages, setMessages, settings, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement }) {
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const [editingIndex, setEditingIndex] = useState(null); // índice del mensaje propio que se está editando
   const bottomRef = useRef(null);
   // Sin este guardado, el efecto de "bajar al último mensaje" también se
   // disparaba al recién entrar a la pestaña (con un solo mensaje de
@@ -9359,10 +9421,14 @@ function EntrenadorIAChat({ profile, logs, profileName, messages, setMessages, s
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, isSending]);
 
-  const enviarMensajeIA = async (userText) => {
-    const newMessages = [...messages, { role: "user", text: userText }];
+  const enviarMensajeIA = async (userText, replaceIndex = null) => {
+    // Si estamos editando: cortamos la conversación hasta el mensaje editado
+    // (las respuestas siguientes ya no aplican) y lo reemplazamos por el nuevo.
+    const base = replaceIndex != null ? messages.slice(0, replaceIndex) : messages;
+    const newMessages = [...base, { role: "user", text: userText }];
     setMessages(newMessages);
     setInput("");
+    setEditingIndex(null);
     setIsSending(true);
       // Antes esto sólo le mandaba los NOMBRES de las rutinas guardadas —
       // por eso no podía ver qué ejercicios tenía cada una, sólo los
@@ -9514,8 +9580,16 @@ Datos: ${JSON.stringify(context)}`;
   const handleSend = () => {
     const trimmed = input.trim();
     if (!trimmed || isSending) return;
-    enviarMensajeIA(trimmed);
+    enviarMensajeIA(trimmed, editingIndex);
   };
+
+  // Cargar un mensaje propio en el input para editarlo
+  const handleEditMessage = (i) => {
+    if (isSending) return;
+    setInput(messages[i].text);
+    setEditingIndex(i);
+  };
+  const cancelarEdicion = () => { setEditingIndex(null); setInput(""); };
 
   const handleConfirmPlan = (msgIndex) => {
     const plan = messages[msgIndex]?.plan;
@@ -9627,8 +9701,8 @@ Datos: ${JSON.stringify(context)}`;
         <div className="absolute -top-8 -right-6 w-32 h-32 rounded-full bg-teal-500/15 blur-2xl pointer-events-none" />
         <div className="absolute -bottom-6 -left-6 w-28 h-28 rounded-full bg-cyan-500/10 blur-2xl pointer-events-none" />
         <div className="relative flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl bg-teal-500/20 border border-teal-500/30 flex items-center justify-center shrink-0">
-            <Sparkles size={20} className="text-teal-400" />
+                    <div className="w-11 h-11 rounded-2xl bg-teal-500/20 border border-teal-500/30 flex items-center justify-center shrink-0 shadow-lg shadow-teal-500/20 elastic-in">
+            <Sparkles size={20} className="text-teal-400 sparkle-spin" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
@@ -9661,14 +9735,21 @@ Datos: ${JSON.stringify(context)}`;
       <div className="space-y-3">
         {messages.map((m, i) => (
           <div key={i} className="msg-in">
-            <div className={`flex items-end gap-2 ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+            <div className={`group flex items-end gap-2 ${m.role === "user" ? "justify-end" : "justify-start"}`}>
               {m.role === "assistant" && (
                 <div className="w-6 h-6 rounded-lg bg-teal-500/15 border border-teal-500/25 flex items-center justify-center shrink-0 mb-0.5">
                   <Sparkles size={11} className="text-teal-400" />
                 </div>
               )}
+              {/* Editar: solo en mensajes propios, y solo si no está respondiendo.
+                  Toca el lápiz → el texto vuelve al input para reescribirlo. */}
+              {m.role === "user" && !isSending && (
+                <button onClick={() => handleEditMessage(i)} aria-label="Editar mensaje" className={`shrink-0 mb-1 p-1.5 rounded-lg text-slate-500 hover:text-teal-300 hover:bg-slate-800/60 transition ${editingIndex === i ? "text-teal-400" : ""}`}>
+                  <Edit3 size={13} />
+                </button>
+              )}
               <div
-                className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${m.role === "user" ? "!text-white rounded-br-md" : "bg-slate-900/60 border border-slate-800/60 text-slate-200 rounded-bl-md"}`}
+                className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${m.role === "user" ? "!text-white rounded-br-md" : "bg-slate-900/60 border border-slate-800/60 text-slate-200 rounded-bl-md"} ${editingIndex === i ? "ring-2 ring-teal-400/60" : ""}`}
                 style={m.role === "user" ? { background: "linear-gradient(135deg,#14B8A6,#0E7490)" } : {}}
               >
                 {m.role === "assistant" ? renderChatMarkdown(m.text) : m.text}
@@ -9716,13 +9797,14 @@ Datos: ${JSON.stringify(context)}`;
             <div className="w-6 h-6 rounded-lg bg-teal-500/15 border border-teal-500/25 flex items-center justify-center shrink-0 mb-0.5">
               <Sparkles size={11} className="text-teal-400 soft-pulse" />
             </div>
-            <div className="bg-slate-900/60 border border-slate-800/60 rounded-2xl rounded-bl-md px-4 py-3.5 flex items-center gap-3 max-w-[70%]">
-              {/* Rebote propio en vez de animate-bounce: el de Tailwind salta
-                  demasiado (parece nervioso). Este es más suave y contenido. */}
-              <div className="flex gap-1">
-                <span className="w-2 h-2 rounded-full bg-teal-500 dot-bounce" style={{ animationDelay: "0ms" }} />
-                <span className="w-2 h-2 rounded-full bg-teal-500 dot-bounce" style={{ animationDelay: "180ms" }} />
-                <span className="w-2 h-2 rounded-full bg-teal-500 dot-bounce" style={{ animationDelay: "360ms" }} />
+            <div className="bg-slate-900/60 border border-slate-800/60 rounded-2xl rounded-bl-md px-4 py-3.5 flex items-center gap-3 max-w-[75%]">
+              {/* Animación propia de la app: una pesa que "levanta" mientras
+                  ondas de energía salen de ella. Reemplaza los 3 puntitos
+                  genéricos por algo con la identidad fitness. */}
+              <div className="relative w-7 h-7 flex items-center justify-center shrink-0">
+                <span className="absolute inset-0 rounded-full thinking-wave" />
+                <span className="absolute inset-0 rounded-full thinking-wave" style={{ animationDelay: "0.7s" }} />
+                <Dumbbell size={16} className="relative text-teal-400 thinking-lift" />
               </div>
               <span className="text-[11px] text-slate-500">Pensando... puede tardar hasta 30s</span>
             </div>
@@ -9768,7 +9850,14 @@ Datos: ${JSON.stringify(context)}`;
                 </span>
               </div>
             )}
-            <div className="flex items-center gap-2 rounded-2xl p-1.5 backdrop-blur-xl shadow-xl shadow-black/40 transition-colors" style={{ backgroundColor: isListening ? "rgba(6,78,59,0.55)" : "rgba(15,23,42,0.92)", border: `1px solid ${isListening ? "rgba(16,185,129,0.4)" : "rgba(30,41,59,0.6)"}` }}>
+            {editingIndex != null && (
+              <div className="flex items-center gap-2 mb-1.5 px-3 py-2 rounded-xl bg-teal-500/10 border border-teal-500/25 msg-in">
+                <Edit3 size={12} className="text-teal-400 shrink-0" />
+                <span className="flex-1 text-[11px] text-teal-200 font-medium">Editando tu mensaje — al enviar se regenera la respuesta</span>
+                <button onClick={cancelarEdicion} aria-label="Cancelar edición" className="p-1 rounded-lg text-slate-400 hover:text-white transition shrink-0"><X size={13} /></button>
+              </div>
+            )}
+            <div className="flex items-center gap-2 rounded-2xl p-1.5 backdrop-blur-xl shadow-xl shadow-black/40 transition-colors" style={{ backgroundColor: isListening ? "rgba(6,78,59,0.55)" : editingIndex != null ? "rgba(13,42,38,0.92)" : "rgba(15,23,42,0.92)", border: `1px solid ${isListening ? "rgba(16,185,129,0.4)" : editingIndex != null ? "rgba(20,184,166,0.4)" : "rgba(30,41,59,0.6)"}` }}>
               {SpeechRecognitionAPI && (
                 <button onClick={handleMicToggle} aria-label={isListening ? "Confirmar — terminé de hablar" : "Hablar"} className="relative p-2.5 rounded-xl shrink-0 transition-all active:scale-95" style={isListening ? { background: "linear-gradient(160deg,#10B981,#059669)", color: "#fff" } : { color: "#94a3b8" }}>
                   {isListening && <span className="absolute inset-0 rounded-xl bg-emerald-400/40 animate-ping" />}
@@ -10940,9 +11029,8 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
                 const d = activeDef.days[dk];
                 const ultimoImpar = i === orden.length - 1 && orden.length % 2 === 1;
                 return (
-                  <span key={dk} className={`flex items-center gap-2 px-2.5 py-2 rounded-xl text-[10px] font-bold bg-black/25 text-slate-300 border border-white/[0.07] min-w-0 ${ultimoImpar ? "col-span-2" : ""}`}>
-                    <span className="w-[3px] h-4 rounded-full shrink-0" style={{ backgroundColor: d.color }} />
-                    <span className="flex-1 min-w-0 truncate">{d.label}</span>
+                  <span key={dk} className={`flex items-center gap-2 px-2.5 py-2 rounded-xl text-[10px] font-bold bg-black/25 border border-white/[0.07] min-w-0 ${ultimoImpar ? "col-span-2" : ""}`}>
+                    <span className="flex-1 min-w-0 truncate" style={{ color: d.color }}>{d.label}</span>
                     <span className="text-slate-500 tabular-nums shrink-0">{d.exercises?.length || 0}</span>
                   </span>
                 );
@@ -11387,6 +11475,13 @@ export default function App() {
   const [showWelcome, setShowWelcome] = useState(false); // intro de la primera vez
   const [sessionSummary, setSessionSummary] = useState(null); // resumen al finalizar
   const [sessionStarted, setSessionStarted] = useState(false); // overlay "¡A entrenar!"
+  // Color del día de la sesión activa, para teñir sutilmente la app mientras
+  // entrenás. null cuando no hay sesión → sin tinte.
+  const sessionTintColor = useMemo(() => {
+    const dk = profile?.activeSession?.dayKey;
+    if (!dk) return null;
+    return ROUTINE?.[dk]?.color || null;
+  }, [profile?.activeSession?.dayKey]);
   const [recoveredNotice, setRecoveredNotice] = useState(false);
 
   useEffect(() => {
@@ -12091,7 +12186,13 @@ export default function App() {
       <StyleInjector />
       {recoveredNotice && <RecoveredBanner onClose={() => setRecoveredNotice(false)} />}
       {importRoutineError && <ImportRoutineErrorBanner onClose={() => setImportRoutineError(false)} />}
-      <div className={`min-h-screen bg-[#0a0a0f] px-4 py-6 theme-fade ${themeClass}`} style={{ "--small-text-scale": smallTextScale }}>
+      <div className={`relative min-h-screen bg-[#0a0a0f] px-4 py-6 theme-fade ${themeClass}`} style={{ "--small-text-scale": smallTextScale }}>
+        {/* Tinte de sesión activa: un halo del color del día que estás
+            entrenando, arriba de todo. Marca sutilmente el "modo sesión" sin
+            estorbar. Aparece/desaparece con transición y no captura toques. */}
+        {sessionTintColor && (
+          <div className="fixed top-0 left-0 right-0 h-40 pointer-events-none z-0 session-tint" style={{ background: `linear-gradient(to bottom, ${sessionTintColor}22, transparent)` }} aria-hidden="true" />
+        )}
         <div style={{ height: "env(safe-area-inset-top, 0px)" }} />
         <div className="max-w-xl mx-auto">
           <div className="flex justify-end mb-2">
