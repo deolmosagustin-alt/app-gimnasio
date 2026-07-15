@@ -11595,14 +11595,6 @@ export default function App() {
   }, []);
 
   const profile = profiles[activeProfile], logs = profile?.logs || {}, drafts = profile?.drafts || {};
-  // Color del día de la sesión activa, para teñir sutilmente la app mientras
-  // entrenás. null cuando no hay sesión → sin tinte. (Va DESPUÉS de `profile`
-  // porque lo usa: declararlo antes causaba un TDZ y pantalla negra.)
-  const sessionTintColor = useMemo(() => {
-    const dk = profile?.activeSession?.dayKey;
-    if (!dk) return null;
-    return ROUTINE?.[dk]?.color || null;
-  }, [profile?.activeSession?.dayKey]);
   const themeClass = getProfileSettings(profile).theme === "light" ? "light-mode" : "";
 
   // Limpieza automática de récords-override obsoletos (datos fantasma). Corre
@@ -11756,7 +11748,20 @@ export default function App() {
   // ROUTINE/DAY_ORDER/EXERCISE_BY_ID/KEY_TO_DAY siempre reflejan la rutina
   // correcta antes de que se rendericen sus hijos.
   const activeRoutineDef = resolveRoutineDef((profile && profile.routines && profile.routines[profile.activeRoutineId]) || null, profile?.activeRoutineId);
+  // Color del día de la sesión activa, para el marco de "modo sesión". Se lee
+  // en el render (no en useMemo) desde ROUTINE global, igual que el resto de la
+  // app (p.ej. `const day = ROUTINE[activeDay]` en RoutineView): ROUTINE es
+  // global y se reasigna al cambiar de rutina, así que leerla en cada render da
+  // siempre el color vigente. Con useMemo quedaba cacheado el valor viejo (o
+  // null si ROUTINE aún no estaba poblada) y el marco no aparecía.
   applyRoutineModel(activeRoutineDef || CLASSIC_PRESET);
+  // El color del marco de sesión se lee DESPUÉS de applyRoutineModel: esa
+  // llamada es la que puebla ROUTINE con la rutina activa. Leerlo antes (como
+  // estaba) daba siempre vacío en el primer render y el marco no aparecía.
+  const _sesDayKey = profile?.activeSession?.dayKey;
+  const sessionTintColor = _sesDayKey
+    ? (ROUTINE?.[_sesDayKey]?.color || activeRoutineDef?.days?.[_sesDayKey]?.color || null)
+    : null;
   const needsRoutinePick = !!profile && !profile.activeRoutineId;
   // Cronograma semanal de la rutina activa (lunes a domingo → día de rutina
   // o descanso) — ver getRoutineWeekSchedule más arriba en el archivo.
@@ -12223,10 +12228,13 @@ export default function App() {
             palpitan suave. Antes esto era un halo en z-0 casi invisible. */}
         {sessionTintColor && (
           <>
-            <div className="fixed top-0 left-0 right-0 h-1.5 pointer-events-none z-[60] session-tint-pulse" style={{ backgroundColor: sessionTintColor, boxShadow: `0 0 12px 1px ${sessionTintColor}` }} aria-hidden="true" />
-            <div className="fixed bottom-0 left-0 right-0 h-1.5 pointer-events-none z-[60] session-tint-pulse" style={{ backgroundColor: sessionTintColor, boxShadow: `0 0 12px 1px ${sessionTintColor}` }} aria-hidden="true" />
-            {/* Halo suave arriba, para reforzar sin tapar */}
-            <div className="fixed top-0 left-0 right-0 h-24 pointer-events-none z-[55] session-tint-pulse" style={{ background: `linear-gradient(to bottom, ${sessionTintColor}33, transparent)` }} aria-hidden="true" />
+            {/* Borde perimetral: enmarca TODA la pantalla con un halo interno
+                del color del día. Es lo que da la sensación de "modo sesión"
+                envolvente. No captura toques y palpita suave. */}
+            <div className="fixed inset-0 pointer-events-none z-[60] session-tint-pulse" style={{ boxShadow: `inset 0 0 0 3px ${sessionTintColor}, inset 0 0 22px 2px ${sessionTintColor}66` }} aria-hidden="true" />
+            {/* Barras con glow arriba y abajo, para reforzar el marco */}
+            <div className="fixed top-0 left-0 right-0 h-2 pointer-events-none z-[61] session-tint-pulse" style={{ background: `linear-gradient(to bottom, ${sessionTintColor}, transparent)`, boxShadow: `0 0 16px 2px ${sessionTintColor}` }} aria-hidden="true" />
+            <div className="fixed bottom-0 left-0 right-0 h-2 pointer-events-none z-[61] session-tint-pulse" style={{ background: `linear-gradient(to top, ${sessionTintColor}, transparent)`, boxShadow: `0 0 16px 2px ${sessionTintColor}` }} aria-hidden="true" />
           </>
         )}
         <div style={{ height: "env(safe-area-inset-top, 0px)" }} />
