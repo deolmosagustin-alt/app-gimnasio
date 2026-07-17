@@ -7529,7 +7529,7 @@ function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_
         )}
 
         {activeSection === "historial" && (
-          <div className="relative overflow-hidden rounded-2xl border border-cyan-500/20 bg-slate-900/50 backdrop-blur-sm shadow-md shadow-black/20 p-4">
+          <div className="rounded-2xl border border-cyan-500/20 bg-slate-900/50 shadow-md shadow-black/20 p-4">
             <SessionHistoryView logs={logs} onDeleteDay={onDeleteDay} trainingSessions={sessions} weekSchedule={weekSchedule} />
           </div>
         )}
@@ -12216,10 +12216,10 @@ export default function App() {
               borde (sin líneas sólidas). Los 4 lados: arriba (z altísimo para
               que no lo tape el escudo de la status bar), abajo y los costados.
               Finos pero con color intenso: sutiles pero se notan sin molestar. */}
-          <div className="fixed left-0 right-0 h-16 pointer-events-none z-[61] session-tint-pulse" style={{ top: "env(safe-area-inset-top, 0px)", background: `linear-gradient(to bottom, ${sessionTintColor}88, ${sessionTintColor}2E 50%, transparent)` }} aria-hidden="true" />
-          <div className="fixed bottom-0 left-0 right-0 h-16 pointer-events-none z-[61] session-tint-pulse" style={{ background: `linear-gradient(to top, ${sessionTintColor}88, ${sessionTintColor}2E 50%, transparent)` }} aria-hidden="true" />
-          <div className="fixed top-0 bottom-0 left-0 w-10 pointer-events-none z-[61] session-tint-pulse" style={{ background: `linear-gradient(to right, ${sessionTintColor}55, transparent)` }} aria-hidden="true" />
-          <div className="fixed top-0 bottom-0 right-0 w-10 pointer-events-none z-[61] session-tint-pulse" style={{ background: `linear-gradient(to left, ${sessionTintColor}55, transparent)` }} aria-hidden="true" />
+          <div className="fixed left-0 right-0 h-10 pointer-events-none z-[61] session-tint-pulse" style={{ top: "env(safe-area-inset-top, 0px)", background: `linear-gradient(to bottom, ${sessionTintColor}5C, ${sessionTintColor}1A 55%, transparent)` }} aria-hidden="true" />
+          <div className="fixed bottom-0 left-0 right-0 h-10 pointer-events-none z-[61] session-tint-pulse" style={{ background: `linear-gradient(to top, ${sessionTintColor}5C, ${sessionTintColor}1A 55%, transparent)` }} aria-hidden="true" />
+          <div className="fixed top-0 bottom-0 left-0 w-6 pointer-events-none z-[61] session-tint-pulse" style={{ background: `linear-gradient(to right, ${sessionTintColor}33, transparent)` }} aria-hidden="true" />
+          <div className="fixed top-0 bottom-0 right-0 w-6 pointer-events-none z-[61] session-tint-pulse" style={{ background: `linear-gradient(to left, ${sessionTintColor}33, transparent)` }} aria-hidden="true" />
         </>
       )}
       {/* Desaturación global: un overlay con backdrop-filter en vez de
