@@ -3130,7 +3130,7 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default", 
       backgroundColor: running ? barColor + "0e" : "rgba(15,23,42,0.5)",
       border: `1px solid ${running ? barColor + "30" : "rgba(30,41,59,0.6)"}`,
     }}>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2.5">
         {/* Tiempo protagonista */}
         <span
           className={`text-2xl font-black tabular-nums shrink-0 transition-colors ${urgent ? "soft-pulse" : ""}`}
@@ -3141,9 +3141,9 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default", 
 
         {/* Barra que se vacía + etiqueta de estado */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-baseline justify-between mb-1.5">
-            <span className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">Descanso</span>
-            <span className="text-[10px] font-bold transition-colors" style={{ color: done ? "#10B981" : urgent ? "#FBBF24" : "#64748b" }}>
+          <div className="flex items-baseline justify-between gap-2 mb-1.5">
+            <span className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500 shrink-0">Descanso</span>
+            <span className="text-[10px] font-bold transition-colors whitespace-nowrap truncate" style={{ color: done ? "#10B981" : urgent ? "#FBBF24" : "#64748b" }}>
               {done ? "¡Dale! 💪" : urgent ? "Preparate…" : formatTime(seconds)}
             </span>
           </div>
@@ -4640,14 +4640,14 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     <div className="relative rounded-xl px-3.5 py-3.5 mb-2.5 last:mb-0" style={{ backgroundColor: accent + "0a", border: `1px solid ${accent}25` }}>
       <PRBurst anchorRef={saveBtnRef} trigger={prBurst} />
       <div className="absolute left-0 top-2 bottom-2 w-1 rounded-full" style={{ backgroundColor: accent }} />
-      <div className="flex items-center justify-between mb-2.5">
-        <div className="flex items-center gap-2">
-          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">{cardio ? "SESIÓN" : `S${setIndex + 1}`}</span>
-          {!cardio && <span className="text-[10px] bg-slate-800/80 text-slate-500 rounded-lg px-2 py-0.5">{setDef.repRange} reps</span>}
-          {!cardio && isHeavyRepRange(setDef.repRange) && <span className="text-[10px] bg-amber-500/15 text-amber-400 rounded-lg px-2 py-0.5 font-bold">FUERZA</span>}
+      <div className="flex items-center justify-between gap-2 mb-2.5 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap min-w-0">
+          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 shrink-0">{cardio ? "SESIÓN" : `S${setIndex + 1}`}</span>
+          {!cardio && <span className="text-[10px] bg-slate-800/80 text-slate-500 rounded-lg px-2 py-0.5 shrink-0">{setDef.repRange} reps</span>}
+          {!cardio && isHeavyRepRange(setDef.repRange) && <span className="text-[10px] bg-amber-500/15 text-amber-400 rounded-lg px-2 py-0.5 font-bold shrink-0">FUERZA</span>}
         </div>
         {feedback && (
-          <span className={`flex items-center gap-1.5 text-xs font-semibold ${feedback.type === "pr" ? "text-emerald-400 pr-pop" : feedback.type === "down" ? "text-rose-400" : feedback.type === "first" ? "text-teal-400" : "text-amber-400"}`}>
+          <span className={`flex items-center gap-1.5 text-xs font-semibold min-w-0 ${feedback.type === "pr" ? "text-emerald-400 pr-pop" : feedback.type === "down" ? "text-rose-400" : feedback.type === "first" ? "text-teal-400" : "text-amber-400"}`}>
             {feedback.msg}
             {feedback.type === "pr" && !cardio && <button onClick={() => setShowPRShare(true)} aria-label="Compartir esta marca" className="text-emerald-300 hover:text-emerald-100 active:scale-90 transition"><Share2 size={13} /></button>}
           </span>
@@ -5199,10 +5199,10 @@ function SessionStartBar({ activeSession, onStart, onCancel, color = "#14B8A6" }
         <span className="relative inline-flex rounded-full h-2.5 w-2.5" style={{ backgroundColor: color }} />
       </span>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-bold text-white">Sesión en curso</p>
-        <p className="text-[11px]" style={{ color: color + "cc" }}>{elapsedMin} min · arrancó a las {new Date(activeSession.startedAt).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}</p>
+        <p className="text-sm font-bold text-white truncate">Sesión en curso</p>
+        <p className="text-[11px] truncate" style={{ color: color + "cc" }}>{elapsedMin} min · arrancó a las {new Date(activeSession.startedAt).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}</p>
       </div>
-      <button onClick={onCancel} className="text-[11px] text-slate-500 hover:text-slate-300 font-semibold shrink-0">Cancelar</button>
+      <button onClick={onCancel} className="text-[11px] text-slate-500 hover:text-slate-300 font-semibold shrink-0 whitespace-nowrap">Cancelar</button>
     </div>
   );
 }
