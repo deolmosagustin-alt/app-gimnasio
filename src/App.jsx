@@ -12215,11 +12215,11 @@ export default function App() {
           {/* Degradados suaves que se desvanecen hacia el centro desde cada
               borde (sin líneas sólidas). Los 4 lados: arriba (z altísimo para
               que no lo tape el escudo de la status bar), abajo y los costados.
-              Opacidad baja (color + "22"/"33") para que sea leve. */}
-          <div className="fixed left-0 right-0 h-28 pointer-events-none z-[61] session-tint-pulse" style={{ top: "env(safe-area-inset-top, 0px)", background: `linear-gradient(to bottom, ${sessionTintColor}88, ${sessionTintColor}30 45%, transparent)` }} aria-hidden="true" />
-          <div className="fixed bottom-0 left-0 right-0 h-28 pointer-events-none z-[61] session-tint-pulse" style={{ background: `linear-gradient(to top, ${sessionTintColor}88, ${sessionTintColor}30 45%, transparent)` }} aria-hidden="true" />
-          <div className="fixed top-0 bottom-0 left-0 w-16 pointer-events-none z-[61] session-tint-pulse" style={{ background: `linear-gradient(to right, ${sessionTintColor}55, transparent)` }} aria-hidden="true" />
-          <div className="fixed top-0 bottom-0 right-0 w-16 pointer-events-none z-[61] session-tint-pulse" style={{ background: `linear-gradient(to left, ${sessionTintColor}55, transparent)` }} aria-hidden="true" />
+              Finos pero con color intenso: sutiles pero se notan sin molestar. */}
+          <div className="fixed left-0 right-0 h-16 pointer-events-none z-[61] session-tint-pulse" style={{ top: "env(safe-area-inset-top, 0px)", background: `linear-gradient(to bottom, ${sessionTintColor}88, ${sessionTintColor}2E 50%, transparent)` }} aria-hidden="true" />
+          <div className="fixed bottom-0 left-0 right-0 h-16 pointer-events-none z-[61] session-tint-pulse" style={{ background: `linear-gradient(to top, ${sessionTintColor}88, ${sessionTintColor}2E 50%, transparent)` }} aria-hidden="true" />
+          <div className="fixed top-0 bottom-0 left-0 w-10 pointer-events-none z-[61] session-tint-pulse" style={{ background: `linear-gradient(to right, ${sessionTintColor}55, transparent)` }} aria-hidden="true" />
+          <div className="fixed top-0 bottom-0 right-0 w-10 pointer-events-none z-[61] session-tint-pulse" style={{ background: `linear-gradient(to left, ${sessionTintColor}55, transparent)` }} aria-hidden="true" />
         </>
       )}
       {/* Desaturación global: un overlay con backdrop-filter en vez de
