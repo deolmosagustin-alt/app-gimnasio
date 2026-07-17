@@ -5711,12 +5711,6 @@ function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [], weekSche
   // Qué días de tu rutina aparecen en el mes que estás mirando — para la
   // leyenda de abajo del calendario, así el color de cada celda no queda
   // sin explicación.
-  const monthDayKeys = useMemo(() => {
-    const seen = new Set();
-    weeks.flat().forEach((d) => { if (d && sessionByDate[d]) sessionByDate[d].dayKeys.forEach((dk) => seen.add(dk)); });
-    return Array.from(seen).filter((dk) => ROUTINE[dk]);
-  }, [weeks, sessionByDate]);
-
   if (!sessions.length) {
     return (
       <div className="text-center py-14 text-slate-600">
@@ -5789,15 +5783,7 @@ function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [], weekSche
                 );
               })}
             </div>
-            {monthDayKeys.length > 0 && (
-              <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-slate-800/50 flex-wrap">
-                {monthDayKeys.map((dk) => (
-                  <span key={dk} className="inline-flex items-center px-2 py-1 rounded-lg text-[9px] font-bold" style={{ color: ROUTINE[dk].color, backgroundColor: `${ROUTINE[dk].color}1A`, border: `1px solid ${ROUTINE[dk].color}55` }}>
-                    {ROUTINE[dk].label}
-                  </span>
-                ))}
-              </div>
-            )}
+
           </div>
           {!selectedSession && <p className="text-center text-[11px] text-slate-600 py-2">Tocá un día con marca para ver el detalle.</p>}
           {/* Detalle de la sesión como modal centrado — antes se desplegaba
@@ -7542,7 +7528,11 @@ function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_
           <MeasurementsView measurements={measurements} onAddMeasurement={onAddMeasurement} photos={photos} photosLoading={photosLoading} onAddPhoto={onAddPhoto} onDeletePhoto={onDeletePhoto} />
         )}
 
-        {activeSection === "historial" && <SessionHistoryView logs={logs} onDeleteDay={onDeleteDay} trainingSessions={sessions} weekSchedule={weekSchedule} />}
+        {activeSection === "historial" && (
+          <div className="relative overflow-hidden rounded-2xl border border-cyan-500/20 bg-slate-900/50 backdrop-blur-sm shadow-md shadow-black/20 p-4">
+            <SessionHistoryView logs={logs} onDeleteDay={onDeleteDay} trainingSessions={sessions} weekSchedule={weekSchedule} />
+          </div>
+        )}
       </div>
 
       {!confirmResetProgress ? (
@@ -12226,10 +12216,10 @@ export default function App() {
               borde (sin líneas sólidas). Los 4 lados: arriba (z altísimo para
               que no lo tape el escudo de la status bar), abajo y los costados.
               Opacidad baja (color + "22"/"33") para que sea leve. */}
-          <div className="fixed left-0 right-0 h-28 pointer-events-none z-[61] session-tint-pulse" style={{ top: "env(safe-area-inset-top, 0px)", background: `linear-gradient(to bottom, ${sessionTintColor}55, ${sessionTintColor}18 45%, transparent)` }} aria-hidden="true" />
-          <div className="fixed bottom-0 left-0 right-0 h-28 pointer-events-none z-[61] session-tint-pulse" style={{ background: `linear-gradient(to top, ${sessionTintColor}55, ${sessionTintColor}18 45%, transparent)` }} aria-hidden="true" />
-          <div className="fixed top-0 bottom-0 left-0 w-16 pointer-events-none z-[61] session-tint-pulse" style={{ background: `linear-gradient(to right, ${sessionTintColor}33, transparent)` }} aria-hidden="true" />
-          <div className="fixed top-0 bottom-0 right-0 w-16 pointer-events-none z-[61] session-tint-pulse" style={{ background: `linear-gradient(to left, ${sessionTintColor}33, transparent)` }} aria-hidden="true" />
+          <div className="fixed left-0 right-0 h-28 pointer-events-none z-[61] session-tint-pulse" style={{ top: "env(safe-area-inset-top, 0px)", background: `linear-gradient(to bottom, ${sessionTintColor}88, ${sessionTintColor}30 45%, transparent)` }} aria-hidden="true" />
+          <div className="fixed bottom-0 left-0 right-0 h-28 pointer-events-none z-[61] session-tint-pulse" style={{ background: `linear-gradient(to top, ${sessionTintColor}88, ${sessionTintColor}30 45%, transparent)` }} aria-hidden="true" />
+          <div className="fixed top-0 bottom-0 left-0 w-16 pointer-events-none z-[61] session-tint-pulse" style={{ background: `linear-gradient(to right, ${sessionTintColor}55, transparent)` }} aria-hidden="true" />
+          <div className="fixed top-0 bottom-0 right-0 w-16 pointer-events-none z-[61] session-tint-pulse" style={{ background: `linear-gradient(to left, ${sessionTintColor}55, transparent)` }} aria-hidden="true" />
         </>
       )}
       {/* Desaturación global: un overlay con backdrop-filter en vez de
