@@ -5792,8 +5792,7 @@ function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [], weekSche
             {monthDayKeys.length > 0 && (
               <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-slate-800/50 flex-wrap">
                 {monthDayKeys.map((dk) => (
-                  <span key={dk} className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-[9px] font-bold text-slate-400 bg-slate-800/50 border border-slate-700/40">
-                    <span className="w-[3px] h-3 rounded-full shrink-0" style={{ backgroundColor: ROUTINE[dk].color }} />
+                  <span key={dk} className="inline-flex items-center px-2 py-1 rounded-lg text-[9px] font-bold" style={{ color: ROUTINE[dk].color, backgroundColor: `${ROUTINE[dk].color}1A`, border: `1px solid ${ROUTINE[dk].color}55` }}>
                     {ROUTINE[dk].label}
                   </span>
                 ))}
@@ -12223,9 +12222,14 @@ export default function App() {
           durante una sesión → por eso el marco nunca aparecía). */}
       {sessionTintColor && (
         <>
-          <div className="fixed inset-0 pointer-events-none z-[60] session-tint-pulse" style={{ boxShadow: `inset 0 0 0 3px ${sessionTintColor}, inset 0 0 22px 2px ${sessionTintColor}66` }} aria-hidden="true" />
-          <div className="fixed top-0 left-0 right-0 h-2 pointer-events-none z-[61] session-tint-pulse" style={{ background: `linear-gradient(to bottom, ${sessionTintColor}, transparent)`, boxShadow: `0 0 16px 2px ${sessionTintColor}` }} aria-hidden="true" />
-          <div className="fixed bottom-0 left-0 right-0 h-2 pointer-events-none z-[61] session-tint-pulse" style={{ background: `linear-gradient(to top, ${sessionTintColor}, transparent)`, boxShadow: `0 0 16px 2px ${sessionTintColor}` }} aria-hidden="true" />
+          {/* Degradados suaves que se desvanecen hacia el centro desde cada
+              borde (sin líneas sólidas). Los 4 lados: arriba (z altísimo para
+              que no lo tape el escudo de la status bar), abajo y los costados.
+              Opacidad baja (color + "22"/"33") para que sea leve. */}
+          <div className="fixed left-0 right-0 h-28 pointer-events-none z-[61] session-tint-pulse" style={{ top: "env(safe-area-inset-top, 0px)", background: `linear-gradient(to bottom, ${sessionTintColor}55, ${sessionTintColor}18 45%, transparent)` }} aria-hidden="true" />
+          <div className="fixed bottom-0 left-0 right-0 h-28 pointer-events-none z-[61] session-tint-pulse" style={{ background: `linear-gradient(to top, ${sessionTintColor}55, ${sessionTintColor}18 45%, transparent)` }} aria-hidden="true" />
+          <div className="fixed top-0 bottom-0 left-0 w-16 pointer-events-none z-[61] session-tint-pulse" style={{ background: `linear-gradient(to right, ${sessionTintColor}33, transparent)` }} aria-hidden="true" />
+          <div className="fixed top-0 bottom-0 right-0 w-16 pointer-events-none z-[61] session-tint-pulse" style={{ background: `linear-gradient(to left, ${sessionTintColor}33, transparent)` }} aria-hidden="true" />
         </>
       )}
       {/* Desaturación global: un overlay con backdrop-filter en vez de
