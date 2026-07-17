@@ -501,8 +501,8 @@ const TEXT_SCALE_OPTIONS = [
 // --small-text-scale (ver ANIMATION_CSS), no el font-size del <html>.
 const SMALL_TEXT_SCALE_OPTIONS = [
   { k: "md", v: 1, l: "Normal" },
-  { k: "lg", v: 1.25, l: "Grande" },
-  { k: "xl", v: 1.5, l: "Muy grande" },
+  { k: "lg", v: 1.15, l: "Grande" },
+  { k: "xl", v: 1.3, l: "Muy grande" },
 ];
 
 // RPE (esfuerzo percibido). 6-10 cubre el rango útil para hipertrofia/fuerza;
@@ -902,38 +902,9 @@ function buildSessionsIndex(logs, trainingSessions = []) {
   // juntas y también el récord cargado a mano. Con esto podemos decir, para
   // cualquier serie del historial, a qué porcentaje de tu récord quedó —
   // combinando reps y kilos: una rep menos con el mismo peso también baja.
-  // Para cada ejercicio, juntamos todas sus marcas (todas las series + el
-  // récord manual) y calculamos, para cada fecha entrenada, cuál era el mejor
-  // 1RM ANTES de ese día. Ese es el número contra el que se compara cada serie.
-  const marcasPorEjercicio = {};   // exId → [{date, rm}]
-  const manualPorEjercicio = {};   // exId → rm del récord cargado a mano
-  Object.entries(logs).forEach(([key, val]) => {
-    if (key.endsWith("_pr_override")) {
-      const exId = key.replace("_pr_override", "");
-      if (val?.kg && val?.reps) manualPorEjercicio[exId] = estimate1RM(val.kg, val.reps);
-      return;
-    }
-    if (!Array.isArray(val)) return;
-    const { exerciseId } = parseLogKey(key);
-    (marcasPorEjercicio[exerciseId] ||= []);
-    val.forEach((e) => {
-      if (!e?.kg || !e?.reps || !e.date) return;
-      marcasPorEjercicio[exerciseId].push({ date: e.date, rm: estimate1RM(e.kg, e.reps) });
-    });
-  });
-  const bestByExercise = {};       // exId → { fecha: mejor 1RM previo a esa fecha }
-  Object.entries(marcasPorEjercicio).forEach(([exId, marcas]) => {
-    const fechas = [...new Set(marcas.map((m) => m.date))];
-    bestByExercise[exId] = {};
-    fechas.forEach((f) => {
-      const previas = marcas.filter((m) => m.date < f).map((m) => m.rm);
-      // Si no hay nada previo, cae al récord manual (una marca vieja que
-      // cargaste a mano igual es tu récord aunque no la hayas "entrenado").
-      bestByExercise[exId][f] = previas.length
-        ? Math.max(...previas, manualPorEjercicio[exId] || 0)
-        : (manualPorEjercicio[exId] || 0);
-    });
-  });
+  // (Antes acá se construía bestByExercise para el % del historial, pero ese
+  // % ahora se calcula contra priorBest1RM en el propio loop de abajo — usa la
+  // MISMA base que "isImprovement", así el color y el % nunca se contradicen.)
   // Sesiones formales por fecha: aportan el dayKey REAL que entrenaste
   // (no los días de la rutina donde "aparece" cada ejercicio), la
   // duración y la base para el % completado.
@@ -976,9 +947,11 @@ function buildSessionsIndex(logs, trainingSessions = []) {
       // superaste la marca, las otras series del mismo día no aparezcan en
       // rojo por culpa de tu propia mejora. Como se mide en 1RM estimado,
       // combina reps y kilos: 7×80 con récord 8×80 da 97% → bajaste.
-      const best1RM = bestByExercise[exerciseId]?.[e.date] ?? 0;
+      // El % se mide contra la MISMA base que isImprovement (el mejor 1RM
+      // entrenado ANTES de hoy). Antes usaba otra base (que incluía el récord
+      // manual), y por eso igualabas tu marca real pero el % te daba rojo.
       const this1RM = estimate1RM(e.kg, e.reps);
-      const pctOfBest = best1RM > 0 && this1RM > 0 ? Math.round((this1RM / best1RM) * 100) : null;
+      const pctOfBest = priorBest1RM > 0 && this1RM > 0 ? Math.round((this1RM / priorBest1RM) * 100) : null;
       if (isImprovement) s.improvedCount++;
       // Nombre: primero el que quedó grabado en el registro, después el de la
       // rutina actual, y si no hay ninguno (registro viejo de un ejercicio ya
@@ -5532,7 +5505,9 @@ function SessionDetailCard({ session, onDelete }) {
                 //   · Quedaste por debajo → rojo + cuánto bajaste
                 const isCardio = it.minutes != null;
                 const pct = it.pctOfBest;
-                const below = !isCardio && pct != null && pct < 100;
+                // Rojo solo si bajaste de verdad (≤98%). Igualar o quedar a
+                // 1-2% por el redondeo de la fórmula NO es rojo: es "igualaste".
+                const below = !isCardio && pct != null && pct < 99;
                 const color = it.isImprovement ? "#6EE7B7" : below ? "#FCA5A5" : "#cbd5e1";
                 const bg = it.isImprovement ? "#10B98118" : below ? "#F43F5E14" : "#1e293b";
                 const bd = it.isImprovement ? "#10B98135" : below ? "#F43F5E30" : "transparent";
@@ -11741,7 +11716,7 @@ export default function App() {
   // los text-[Npx] fijos (consejos, récords, RPE, badges...) — ver la
   // variable --small-text-scale en ANIMATION_CSS. Se pasa como custom
   // property inline en los contenedores raíz más abajo, no en el <html>.
-  const smallTextScale = profile ? (getProfileSettings(profile).smallTextScale ?? 1) : 1;
+  const smallTextScale = profile ? Math.min(1.3, getProfileSettings(profile).smallTextScale ?? 1) : 1;
 
   // La rutina activa del perfil actual (o Push / Pull / Pierna + Hombros / Brazos
   // como respaldo) se recalcula en cada render — así
@@ -12222,21 +12197,6 @@ export default function App() {
       {recoveredNotice && <RecoveredBanner onClose={() => setRecoveredNotice(false)} />}
       {importRoutineError && <ImportRoutineErrorBanner onClose={() => setImportRoutineError(false)} />}
       <div className={`relative min-h-screen bg-[#0a0a0f] px-4 py-6 theme-fade ${themeClass}`} style={{ "--small-text-scale": smallTextScale }}>
-        {/* Marco de sesión activa: barras del color del día pegadas arriba y
-            abajo de la pantalla, como un marco que enmarca el "modo sesión".
-            Van por encima del contenido (z alto) pero no capturan toques, y
-            palpitan suave. Antes esto era un halo en z-0 casi invisible. */}
-        {sessionTintColor && (
-          <>
-            {/* Borde perimetral: enmarca TODA la pantalla con un halo interno
-                del color del día. Es lo que da la sensación de "modo sesión"
-                envolvente. No captura toques y palpita suave. */}
-            <div className="fixed inset-0 pointer-events-none z-[60] session-tint-pulse" style={{ boxShadow: `inset 0 0 0 3px ${sessionTintColor}, inset 0 0 22px 2px ${sessionTintColor}66` }} aria-hidden="true" />
-            {/* Barras con glow arriba y abajo, para reforzar el marco */}
-            <div className="fixed top-0 left-0 right-0 h-2 pointer-events-none z-[61] session-tint-pulse" style={{ background: `linear-gradient(to bottom, ${sessionTintColor}, transparent)`, boxShadow: `0 0 16px 2px ${sessionTintColor}` }} aria-hidden="true" />
-            <div className="fixed bottom-0 left-0 right-0 h-2 pointer-events-none z-[61] session-tint-pulse" style={{ background: `linear-gradient(to top, ${sessionTintColor}, transparent)`, boxShadow: `0 0 16px 2px ${sessionTintColor}` }} aria-hidden="true" />
-          </>
-        )}
         <div style={{ height: "env(safe-area-inset-top, 0px)" }} />
         <div className="max-w-xl mx-auto">
           <div className="flex justify-end mb-2">
@@ -12256,6 +12216,18 @@ export default function App() {
       {/* Escudo fijo de la status bar — cubre la zona de batería/hora sin
           importar cuánto hayas scrolleado. El color es siempre #0a0a0f. */}
       <div style={{ position: "fixed", top: 0, left: 0, right: 0, height: "env(safe-area-inset-top, 0px)", backgroundColor: "#0a0a0f", zIndex: 9999 }} />
+      {/* Marco de "modo sesión": borde perimetral del color del día que estás
+          entrenando + barras con glow arriba y abajo. Solo cuando hay sesión
+          activa. No captura toques y palpita suave. Va en el return PRINCIPAL
+          (antes estaba por error en la rama de "elegir rutina", que no se ve
+          durante una sesión → por eso el marco nunca aparecía). */}
+      {sessionTintColor && (
+        <>
+          <div className="fixed inset-0 pointer-events-none z-[60] session-tint-pulse" style={{ boxShadow: `inset 0 0 0 3px ${sessionTintColor}, inset 0 0 22px 2px ${sessionTintColor}66` }} aria-hidden="true" />
+          <div className="fixed top-0 left-0 right-0 h-2 pointer-events-none z-[61] session-tint-pulse" style={{ background: `linear-gradient(to bottom, ${sessionTintColor}, transparent)`, boxShadow: `0 0 16px 2px ${sessionTintColor}` }} aria-hidden="true" />
+          <div className="fixed bottom-0 left-0 right-0 h-2 pointer-events-none z-[61] session-tint-pulse" style={{ background: `linear-gradient(to top, ${sessionTintColor}, transparent)`, boxShadow: `0 0 16px 2px ${sessionTintColor}` }} aria-hidden="true" />
+        </>
+      )}
       {/* Desaturación global: un overlay con backdrop-filter en vez de
           filter en el contenedor — filter en un ancestro convierte a ese
           ancestro en el containing block de position:fixed y ROMPE todos
