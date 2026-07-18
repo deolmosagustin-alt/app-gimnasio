@@ -461,7 +461,7 @@ const DEFAULT_SETTINGS = {
   reminderEnabled: false, reminderTime: "18:00", // recordatorio de entrenamiento
   // Qué mostrar en la ficha de registro (reps/kg). Todo activado por
   // default; quien no use alguna opción puede apagarla y deja de estorbar.
-  showRpe: true, showWarmup: true, show1RMPercent: true, showCoaching: true,
+  showRpe: true, showWarmup: true, show1RMPercent: true, showCoaching: true, showExerciseNote: true, showPersonalNote: true,
 };
 
 // Conversión de peso: en la app todo se guarda en kg (los logs, los récords),
@@ -3142,15 +3142,9 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default", 
           {formatTime(remaining)}
         </span>
 
-        {/* Barra que se vacía + etiqueta de estado */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-baseline justify-between gap-2 mb-1.5">
-            <span className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500 shrink-0">Descanso</span>
-            <span className="text-[10px] font-bold transition-colors whitespace-nowrap truncate" style={{ color: done ? "#10B981" : urgent ? "#FBBF24" : "#64748b" }}>
-              {done ? "¡Dale! 💪" : urgent ? "Preparate…" : formatTime(seconds)}
-            </span>
-          </div>
-          <div className="h-1.5 rounded-full overflow-hidden bg-slate-800/70">
+        {/* Solo la barra que se vacía — sin palabras ni tiempo repetido. */}
+        <div className="flex-1 min-w-0 flex items-center">
+          <div className="w-full h-2 rounded-full overflow-hidden bg-slate-800/70">
             <div
               className="h-full rounded-full"
               style={{
@@ -4669,7 +4663,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
             <div className="absolute -top-5 -left-5 w-16 h-16 rounded-full blur-2xl pointer-events-none opacity-30" style={{ backgroundColor: accent }} />
             <Trophy size={15} style={{ color: accent }} className="shrink-0 soft-pulse relative" />
             <p className="flex-1 min-w-0 truncate relative leading-none">
-              <span className="block text-[8.5px] font-black uppercase tracking-[0.16em] mb-1" style={{ color: accent + "aa" }}>A superar{override?.manual ? " · editado" : ""}</span>
+              <span className="block text-[8.5px] font-black uppercase tracking-[0.16em] mb-1" style={{ color: accent + "aa" }}>Récord{override?.manual ? " · editado" : ""}</span>
               <span className="text-xl font-black tabular-nums" style={{ color: accent, textShadow: `0 0 16px ${accent}50` }}>
                 {cardio ? <>{currentPR.minutes} min{currentPR.km ? ` · ${currentPR.km}km` : ""}</> : <>{currentPR.reps}<span className="opacity-50 text-sm mx-0.5">×</span>{kgToDisplay(currentPR.kg, unit)}<span className="opacity-60 text-xs ml-0.5">{weightLabel(unit)}</span></>}
               </span>
@@ -5008,18 +5002,18 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
               {/* Nota personal: tocá para escribir tus recordatorios del
                   ejercicio ("agarre más cerrado", "el banco 3 está flojo").
                   El ícono se enciende con el color del día si ya hay nota. */}
-              {onUpdateSettings && (
+              {onUpdateSettings && settings.showPersonalNote !== false && (
                 <button
                   onClick={(e) => { e.stopPropagation(); setEditingNote((v) => !v); if (!open) setOpen(true); }}
                   title={myNote ? "Editar tu nota" : "Agregar una nota"}
-                  className="text-[10px] rounded-lg px-1.5 py-0.5 font-black flex items-center gap-1 transition active:scale-95"
-                  style={myNote ? { backgroundColor: accent + "22", color: accent, border: `1px solid ${accent}45` } : { backgroundColor: "rgba(30,41,59,0.6)", color: "#64748b", border: "1px solid #334155" }}
+                  className="text-[10px] rounded-lg px-2 py-0.5 font-black flex items-center gap-1 transition active:scale-95"
+                  style={myNote ? { backgroundColor: accent + "22", color: accent, border: `1px solid ${accent}45` } : { backgroundColor: "rgba(30,41,59,0.6)", color: "#94a3b8", border: "1px solid #475569" }}
                 >
-                  <StickyNote size={9} />
+                  <StickyNote size={11} /> {myNote ? "Nota" : "+ Nota"}
                 </button>
               )}
             </div>
-            {exercise.nota && <p className="text-[11px] text-slate-500 mt-0.5" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{exercise.nota}</p>}
+            {exercise.nota && settings.showExerciseNote !== false && <p className="text-[11px] text-slate-500 mt-0.5" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{exercise.nota}</p>}
             {myNote && !editingNote && (
               <p className="text-[11px] mt-1 flex items-start gap-1.5 leading-snug" style={{ color: accent }}>
                 <StickyNote size={10} className="mt-0.5 shrink-0" />
@@ -5052,7 +5046,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
         )}
         {!deloadMode && stagnant && <div className="mb-3 text-[11px] text-rose-400/90 bg-rose-500/5 border border-rose-500/15 rounded-xl px-3 py-2 flex items-start gap-1.5"><Info size={12} className="mt-0.5 shrink-0" /><span>Hace {STAGNATION_DAYS}+ días sin superar el récord. Considerá cambiar reps, descanso o variante.</span></div>}
         {/* El cronómetro ya no vive fijo acá: se posiciona entre las series
-            según timerSlot (más abajo, junto a "Tus series"). */}
+            según timerSlot (más abajo, junto a las series). */}
         {!exercise.cardio && !deloadMode && bestWorkingKg != null && settings.showWarmup !== false && (
           <div className="mb-2">
             {!showWarmup ? (
@@ -5079,7 +5073,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
             )}
           </div>
         )}
-        <p className="text-[9px] font-black uppercase tracking-widest text-slate-600 mb-2 mt-1">{exercise.cardio ? "Registrá tu sesión" : "Tus series"}</p>
+        <div className="mt-1 mb-2" />
         {/* Arriba de todo: solo antes de empezar (o tras completar la última) */}
         {timerSlot === 0 && (
           <div className="mb-2 timer-hop"><RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={accent} alertType={settings.alertType} timerId={`ex_${exercise.id}`} exerciseName={exercise.name} /></div>
@@ -8116,7 +8110,7 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
         </div>
       </CollapsibleSection>
 
-      <CollapsibleSection sectionId="field-settings-section" forceOpenSignal={openSectionSignal.id === "field-settings-section" ? openSectionSignal.n : 0} title="Qué ves al registrar" subtitle={(() => { const on = [settings.showRpe !== false, settings.showWarmup !== false, settings.show1RMPercent !== false, settings.showCoaching !== false].filter(Boolean).length; return on === 4 ? "Todo activado" : `${on} de 4 opciones activadas`; })()} icon={<Sliders size={16} />} accent="#14B8A6">
+      <CollapsibleSection sectionId="field-settings-section" forceOpenSignal={openSectionSignal.id === "field-settings-section" ? openSectionSignal.n : 0} title="Qué ves al registrar" subtitle={(() => { const on = [settings.showRpe !== false, settings.showWarmup !== false, settings.show1RMPercent !== false, settings.showCoaching !== false, settings.showExerciseNote !== false, settings.showPersonalNote !== false].filter(Boolean).length; return on === 6 ? "Todo activado" : `${on} de 6 opciones activadas`; })()} icon={<Sliders size={16} />} accent="#14B8A6">
         <div className="space-y-2">
           <p className="text-[10px] text-slate-500 leading-snug mb-1">Apagá lo que no uses y la ficha de registro queda más limpia. No se pierde ningún dato: podés volver a prenderlo cuando quieras.</p>
           {[
@@ -8124,6 +8118,8 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
             { key: "showRpe", label: "Esfuerzo (RPE)", desc: "El botón para registrar qué tan duro fue." },
             { key: "show1RMPercent", label: "Porcentaje de 1RM", desc: "A qué % de tu récord estás levantando." },
             { key: "showCoaching", label: "Consejos al guardar", desc: "El mensaje 📈/✓/📉 comparando con tu marca." },
+            { key: "showExerciseNote", label: "Consejos del ejercicio", desc: "La nota con la técnica debajo del nombre del ejercicio." },
+            { key: "showPersonalNote", label: "Botón de nota personal", desc: "El botón para escribir tus propios recordatorios por ejercicio." },
           ].map(({ key, label, desc }) => {
             const on = settings[key] !== false;
             return (
@@ -11071,7 +11067,6 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
                 uso={usoPorRutina[id] || null} />
             ))}
           </div>
-          <p className="text-[10px] text-slate-700 mt-2">Deslizá una rutina hacia la derecha para quitarla de esta lista sin borrarla.</p>
         </div>
       )}
 
@@ -11187,7 +11182,7 @@ function HeaderAvatar({ profileName, onClick }) {
 
 function BottomBar({ tab, setTab }) {
   return (
-    <div className="lg:hidden fixed bottom-0 left-0 right-0 z-20 bg-slate-950/95 backdrop-blur-xl border-t border-slate-800/50">
+    <div className="lg:hidden fixed bottom-0 left-0 right-0 z-20 bg-slate-950/95 backdrop-blur-xl border-t border-slate-800/50" style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
       <div className="max-w-xl mx-auto flex">
         {NAV_TABS.map(({ key, icon, label }) => (
           <button key={key} onClick={() => setTab(key)} className="flex-1 flex flex-col items-center justify-center gap-1 py-3 transition-all active:scale-95">
@@ -11289,7 +11284,7 @@ function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
             )}
 
             <div className="rounded-xl px-2.5 py-2 mb-2" style={{ background: "linear-gradient(120deg,#14B8A620,#14B8A60c)", border: "1px solid #14B8A645" }}>
-              <span className="block text-[8px] font-black uppercase tracking-[0.16em] text-teal-400/70 mb-0.5">A superar</span>
+              <span className="block text-[8px] font-black uppercase tracking-[0.16em] text-teal-400/70 mb-0.5">Récord</span>
               <span className="text-base font-black text-teal-400 tabular-nums">8<span className="opacity-50 text-xs mx-0.5">×</span>80<span className="opacity-60 text-[10px] ml-0.5">kg</span></span>
             </div>
 
@@ -12212,31 +12207,7 @@ export default function App() {
       {/* Escudo fijo de la status bar — cubre la zona de batería/hora sin
           importar cuánto hayas scrolleado. El color es siempre #0a0a0f. */}
       <div style={{ position: "fixed", top: 0, left: 0, right: 0, height: "env(safe-area-inset-top, 0px)", backgroundColor: "#0a0a0f", zIndex: 9999 }} />
-      {/* Chip flotante de "sesión activa": una pastillita fija arriba a la
-          derecha con un puntito que late y el nombre del día que estás
-          entrenando. Siempre visible (fixed, no se va con el scroll), ocupa un
-          rincón, semitransparente para no tapar. Reemplazó al marco, que
-          resultaba invasivo. No captura toques salvo... (es solo indicador). */}
-      {sessionTintColor && sessionDayLabel && (
-        <div
-          className="fixed z-[62] flex items-center gap-1.5 rounded-full pl-2 pr-2.5 py-1 pointer-events-none session-chip-in"
-          style={{
-            top: "calc(env(safe-area-inset-top, 0px) + 8px)",
-            right: "12px",
-            backgroundColor: "rgba(10,10,15,0.72)",
-            border: `1px solid ${sessionTintColor}66`,
-            backdropFilter: "blur(6px)",
-            WebkitBackdropFilter: "blur(6px)",
-          }}
-          aria-hidden="true"
-        >
-          <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full rounded-full opacity-60 session-chip-ping" style={{ backgroundColor: sessionTintColor }} />
-            <span className="relative inline-flex rounded-full h-2 w-2" style={{ backgroundColor: sessionTintColor }} />
-          </span>
-          <span className="text-[10px] font-bold tracking-wide" style={{ color: sessionTintColor }}>{sessionDayLabel}</span>
-        </div>
-      )}
+
       {/* Desaturación global: un overlay con backdrop-filter en vez de
           filter en el contenedor — filter en un ancestro convierte a ese
           ancestro en el containing block de position:fixed y ROMPE todos
@@ -12261,10 +12232,22 @@ export default function App() {
               <h1 className="font-black text-base text-white leading-tight tracking-tight">{TAB_TITLES[tab] || ""}</h1>
               <p className="text-[11px] text-slate-600 leading-tight">{activeProfile}</p>
             </div>
-            {tab !== "perfil" && <button onClick={() => { setHelpStartTab(tab); setShowHelp(true); }} aria-label="Ayuda" className="w-8 h-8 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-center text-slate-400 hover:text-teal-400 hover:border-teal-500/30 transition active:scale-90"><HelpCircle size={16} /></button>}
+            {/* Durante una sesión activa, el chip de "entrenando X" ocupa el
+                lugar del "?" (así no lo tapa). Sin sesión, el "?" normal. */}
+            {sessionTintColor && sessionDayLabel ? (
+              <div className="flex items-center gap-1.5 rounded-full pl-2 pr-2.5 py-1.5 shrink-0 session-chip-in" style={{ backgroundColor: `${sessionTintColor}1A`, border: `1px solid ${sessionTintColor}55` }}>
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full rounded-full opacity-60 session-chip-ping" style={{ backgroundColor: sessionTintColor }} />
+                  <span className="relative inline-flex rounded-full h-2 w-2" style={{ backgroundColor: sessionTintColor }} />
+                </span>
+                <span className="text-[10px] font-bold tracking-wide whitespace-nowrap" style={{ color: sessionTintColor }}>{sessionDayLabel}</span>
+              </div>
+            ) : (
+              tab !== "perfil" && <button onClick={() => { setHelpStartTab(tab); setShowHelp(true); }} aria-label="Ayuda" className="w-8 h-8 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-center text-slate-400 hover:text-teal-400 hover:border-teal-500/30 transition active:scale-90"><HelpCircle size={16} /></button>
+            )}
           </div>
         </header>
-        <main className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto px-4 py-4 pb-28 lg:pb-10 space-y-4">
+        <main className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto px-4 py-4 pb-28 lg:pb-10 space-y-4" style={{ paddingBottom: "calc(7rem + env(safe-area-inset-bottom, 0px))" }}>
           <div key={tab} className={tabSlideClass}>
             {tab === "rutinas" && <RoutinesView openScheduleSignal={openSectionSignal.id === "week-schedule" ? openSectionSignal.n : 0} openEditorSignal={openSectionSignal.id === "routine-editor" ? openSectionSignal.n : 0} profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleArchiveRoutine} onRestore={handleRestoreRoutine} onUpdateProfile={handleUpdateProfile} />}
             {tab === "rutina" && <OnboardingTasksCard profile={profile} cycleStart={cycleStart} logs={logs} onGoToProfile={() => setTab("perfil")} onOpenFieldSettings={() => setShowFieldIntro(true)} onDone={() => handleUpdateProfile({ onboardingDone: true })} />}
