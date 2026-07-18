@@ -27,6 +27,34 @@ const MODEL_CHAIN = [
 // arrancar por ese y no pagar reintentos en cada llamada.
 let preferredModel = null;
 
+// Rate limit básico por IP: sin esto, cualquiera que conozca la URL puede
+// pegarle directo al endpoint (sin pasar por la app) y agotar la cuota
+// gratuita de Gemini. No es a prueba de balas (cada instancia serverless
+// tiene su propio Map en memoria, y se pierde si la función se enfría),
+// pero frena el abuso más obvio de una misma IP mientras el lambda esté
+// caliente, que es el caso común.
+const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
+const RATE_LIMIT_MAX = 20;
+const requestLog = new Map();
+
+function isRateLimited(ip) {
+  const now = Date.now();
+  const timestamps = (requestLog.get(ip) || []).filter((t) => now - t < RATE_LIMIT_WINDOW_MS);
+  if (timestamps.length >= RATE_LIMIT_MAX) {
+    requestLog.set(ip, timestamps);
+    return true;
+  }
+  timestamps.push(now);
+  requestLog.set(ip, timestamps);
+  return false;
+}
+
+function getClientIp(req) {
+  const fwd = req.headers["x-forwarded-for"];
+  if (typeof fwd === "string" && fwd) return fwd.split(",")[0].trim();
+  return req.socket?.remoteAddress || "unknown";
+}
+
 async function callModel(model, body, apiKey) {
   const controller = new AbortController();
   // 50s: las respuestas LARGAS (rutinas completas) en el free tier tardan
@@ -58,7 +86,7 @@ async function callGemini(body) {
     ? [preferredModel, ...MODEL_CHAIN.filter((m) => m !== preferredModel)]
     : MODEL_CHAIN;
 
-  let lastStatus = null, lastDetail = "";
+  let lastStatus = null, lastDetail;
   for (const model of chain) {
     let response;
     try {
@@ -97,6 +125,11 @@ export const config = { maxDuration: 60 };
 
 export default async function handler(req, res) {
   if (req.method !== "POST") { res.status(405).json({ error: "Sólo se acepta POST." }); return; }
+
+  if (isRateLimited(getClientIp(req))) {
+    res.status(429).json({ error: "Demasiados pedidos. Esperá unos minutos y probá de nuevo." });
+    return;
+  }
 
   let body = req.body;
   if (typeof body === "string") { try { body = JSON.parse(body); } catch { body = {}; } }

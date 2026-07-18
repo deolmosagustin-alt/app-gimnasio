@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback, createContext, useContext } from "react";
 import { createPortal } from "react-dom";
 import {
-  LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, Legend,
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
+  ResponsiveContainer,
 } from "recharts";
 import {
   Play, Pause, RotateCcw, TrendingUp, TrendingDown, Dumbbell,
@@ -10,7 +10,7 @@ import {
   ListChecks, LogOut, X, Check, AlertTriangle, Calendar, Zap, Bell, GripVertical, Sliders, StickyNote, Eye,
   Mail, Clock, ChevronRight, Edit3, Info, Plus, Sun, Moon,
   Target, Award, Activity, ArrowDown, HelpCircle, List, LayoutGrid,
-  Sparkles, Layers, Video, SlidersHorizontal, ShieldCheck, UserCog,
+  Sparkles, Layers, SlidersHorizontal, ShieldCheck, UserCog,
   Share2, Download, Link2, Copy, BellOff, Send, Mic, Ruler, Camera, Link, Footprints, Star, SquarePlay, Upload, RefreshCw, Timer, Percent,
 } from "lucide-react";
 import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signOut, onAuthStateChanged } from "firebase/auth";
@@ -30,7 +30,11 @@ import { FirebaseAuthentication } from "@capacitor-firebase/authentication";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { doc, setDoc, getDoc, enableIndexedDbPersistence } from "firebase/firestore";
 import Model from "react-body-highlighter";
-import { auth, googleProvider, db, app } from "./firebase";
+import { auth, googleProvider, db } from "./firebase";
+import {
+  yt, mkSets, muteHexColor, cloneRoutineDef, debounce, kgToDisplay, displayToKg, weightLabel,
+  rpeColor, haptic, localDateStr, todayStr, formatTime, vol, estimate1RM, repRangeTop, isHeavyRepRange,
+} from "./utils";
 // Catálogo de ejercicios, grupos musculares y rutinas preestablecidas —
 // movidos a data.js para que este archivo quede más liviano. RANK_TIERS
 // sigue acá abajo, sin tocar.
@@ -74,28 +78,6 @@ import {
    render — así cualquier componente que las lea durante el render ve
    siempre los datos de la rutina activa del perfil actual.
 ============================================================================ */
-
-const yt = (q) => `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`;
-
-function mkSets(n, repRange) { return Array.from({ length: n }, () => ({ repRange })); }
-
-// Mezcla un color hexadecimal hacia gris para obtener una versión más tenue
-// (menos saturada) — se usa en las iniciales de día (P/P/P/H, etc.) tanto en
-// Rutinas como en las etiquetas de día del Historial de Progreso, para que
-// no griten tanto.
-function muteHexColor(hex, towardsGray = 0.45) {
-  try {
-    const h = hex.replace("#", "");
-    const r = parseInt(h.substring(0, 2), 16), g = parseInt(h.substring(2, 4), 16), b = parseInt(h.substring(4, 6), 16);
-    const gray = (r + g + b) / 3;
-    const mr = Math.round(r + (gray - r) * towardsGray);
-    const mg = Math.round(g + (gray - g) * towardsGray);
-    const mb = Math.round(b + (gray - b) * towardsGray);
-    return `#${mr.toString(16).padStart(2, "0")}${mg.toString(16).padStart(2, "0")}${mb.toString(16).padStart(2, "0")}`;
-  } catch { return hex; }
-}
-
-function cloneRoutineDef(def) { return JSON.parse(JSON.stringify(def)); }
 
 // Cuando activás una rutina preestablecida, lo que se guarda en tu perfil
 // es una FOTO de ese momento (cloneRoutineDef). Si más adelante corregimos
@@ -156,7 +138,7 @@ async function shareRoutineToFirestore(routineDef) {
     // claro si hace falta configurar las reglas de Firestore (lo más
     // probable) o si es otra cosa (sin conexión, cuota agotada, etc.).
     if (err?.code === "permission-denied") {
-      throw new Error("Firestore rechazó la escritura (permission-denied) — hace falta configurar las reglas de seguridad de la colección \"shared_routines\" en la consola de Firebase para permitir escritura pública. Ver el comentario arriba de shareRoutineToFirestore.");
+      throw new Error("Firestore rechazó la escritura (permission-denied) — hace falta configurar las reglas de seguridad de la colección \"shared_routines\" en la consola de Firebase para permitir escritura pública. Ver el comentario arriba de shareRoutineToFirestore.", { cause: err });
     }
     throw err;
   }
@@ -380,12 +362,6 @@ function mergeProfiles(local, cloud) {
   };
 }
 
-// Debounce util — devuelve una versión de la función que se llama como
-// máximo una vez cada `ms` ms, ignorando las llamadas intermedias.
-function debounce(fn, ms) {
-  let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
-}
-
 // Convierte una definición de rutina (preset o creada por el usuario) en el
 // modelo "resuelto" que usa el resto de la app: cada ejercicio ya trae su
 // nombre/músculo/nota/video (sacados de la biblioteca, salvo que sea un
@@ -442,7 +418,6 @@ const REST_LONG = 300;
 const REST_SHORT = 180;
 const TRAIN_WEEKS = 7;
 const DELOAD_WEEKS = 1;
-const CYCLE_WEEKS = TRAIN_WEEKS + DELOAD_WEEKS;
 const STAGNATION_DAYS = 21;
 
 // Actualizá esto con tu applicationId real apenas lo tengas (Play Console
@@ -464,14 +439,6 @@ const DEFAULT_SETTINGS = {
   showRpe: true, showWarmup: true, show1RMPercent: true, showCoaching: true, showExerciseNote: true, showPersonalNote: true,
 };
 
-// Conversión de peso: en la app todo se guarda en kg (los logs, los récords),
-// pero si el usuario eligió "lbs" mostramos los valores convertidos.
-// kgToDisplay: convierte kg → unidad del usuario para MOSTRAR en pantalla.
-// displayToKg: convierte lo que escribe el usuario → kg para GUARDAR.
-const KG_TO_LBS = 2.20462;
-function kgToDisplay(kg, unit) { return unit === "lbs" ? Math.round(kg * KG_TO_LBS * 4) / 4 : kg; } // redondea a 0.25lbs
-function displayToKg(val, unit) { return unit === "lbs" ? Math.round((val / KG_TO_LBS) * 4) / 4 : val; }
-function weightLabel(unit) { return unit === "lbs" ? "lbs" : "kg"; }
 
 function getProfileSettings(profile) { return { ...DEFAULT_SETTINGS, ...(profile?.settings || {}) }; }
 
@@ -514,14 +481,6 @@ const RPE_SCALE = [
   { value: 9, desc: "1 en reserva" },
   { value: 10, desc: "Al fallo" },
 ];
-function rpeColor(v) {
-  if (v == null) return "#475569";
-  if (v >= 9) return "#F43F5E";
-  if (v >= 8) return "#F59E0B";
-  if (v >= 7) return "#14B8A6";
-  return "#3B82F6";
-}
-
 /* ============================== STORAGE: localStorage ============================== */
 
 const PROFILES_KEY = "gym_profiles_v2";
@@ -557,11 +516,11 @@ function loadAndMigrateProfiles() {
 }
 
 function loadProfiles() { return loadAndMigrateProfiles(); }
-function saveProfiles(p) { try { localStorage.setItem(PROFILES_KEY, JSON.stringify(p)); } catch {} idbPut("profiles", p); }
+function saveProfiles(p) { try { localStorage.setItem(PROFILES_KEY, JSON.stringify(p)); } catch { /* ignorado a propósito */ } idbPut("profiles", p); }
 function loadActive() { try { return localStorage.getItem(ACTIVE_KEY) || null; } catch { return null; } }
-function saveActive(n) { try { n ? localStorage.setItem(ACTIVE_KEY, n) : localStorage.removeItem(ACTIVE_KEY); } catch {} idbPut("active", n); }
+function saveActive(n) { try { n ? localStorage.setItem(ACTIVE_KEY, n) : localStorage.removeItem(ACTIVE_KEY); } catch { /* ignorado a propósito */ } idbPut("active", n); }
 function loadCycleStart() { try { const raw = localStorage.getItem(CYCLE_START_KEY); return raw ? new Date(raw) : null; } catch { return null; } }
-function saveCycleStart(d) { try { localStorage.setItem(CYCLE_START_KEY, d.toISOString()); } catch {} idbPut("cycleStart", d.toISOString()); }
+function saveCycleStart(d) { try { localStorage.setItem(CYCLE_START_KEY, d.toISOString()); } catch { /* ignorado a propósito */ } idbPut("cycleStart", d.toISOString()); }
 
 /* ============================== STORAGE: IndexedDB backup ==============================
    localStorage tops out around 5MB y un "clear site data" la borra al instante.
@@ -678,40 +637,11 @@ async function idbGet(key) {
 async function tryRestoreFromIDB() {
   const snap = await idbGetAll();
   if (!snap || !snap.profiles || !Object.keys(snap.profiles).length) return null;
-  try { localStorage.setItem(PROFILES_KEY, JSON.stringify(snap.profiles)); } catch {}
-  if (snap.active) try { localStorage.setItem(ACTIVE_KEY, snap.active); } catch {}
-  if (snap.cycleStart) try { localStorage.setItem(CYCLE_START_KEY, snap.cycleStart); } catch {}
+  try { localStorage.setItem(PROFILES_KEY, JSON.stringify(snap.profiles)); } catch { /* ignorado a propósito */ }
+  if (snap.active) try { localStorage.setItem(ACTIVE_KEY, snap.active); } catch { /* ignorado a propósito */ }
+  if (snap.cycleStart) try { localStorage.setItem(CYCLE_START_KEY, snap.cycleStart); } catch { /* ignorado a propósito */ }
   return snap;
 }
-
-/* ============================== HAPTICS ============================== */
-
-function haptic(pattern = 25) {
-  try { if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(pattern); } catch {}
-}
-
-/* ============================== TIME / MATH HELPERS ============================== */
-
-// Fecha local YYYY-MM-DD. CLAVE: toISOString() devuelve la fecha en UTC —
-// en Argentina (UTC-3), desde las 21:00 la app creía que ya era "mañana":
-// los registros caían en el día equivocado, la racha se cortaba, y el
-// calendario marcaba días corridos. TODAS las fechas de calendario deben
-// pasar por acá, nunca por toISOString().
-function localDateStr(d) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-function todayStr() { return localDateStr(new Date()); }
-function formatTime(s) { return `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`; }
-function vol(kg, reps) { return (!kg || !reps) ? 0 : kg * reps; }
-function estimate1RM(kg, reps) { return (!kg || !reps) ? 0 : Math.round(kg * (1 + reps / 30) * 10) / 10; }
-function repRangeTop(repRange) { const parts = String(repRange).split("-"); return parseInt(parts[parts.length - 1], 10); }
-// Detecta series de fuerza automáticamente: si el techo del rango de
-// repeticiones es 6 o menos, se la considera "FUERZA" — sin que nadie tenga
-// que marcarla a mano al crear la rutina.
-function isHeavyRepRange(repRange) { const top = repRangeTop(repRange); return !isNaN(top) && top <= 6; }
 
 function parseLogKey(key) {
   const idx = key.lastIndexOf("_");
@@ -814,7 +744,6 @@ function getSuggestedDay(logs) {
    personalizar día por día desde Rutinas. */
 const WEEKDAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"];
 const WEEKDAY_SHORT_LABELS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
-const WEEKDAY_FULL_LABELS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 
 function defaultWeekSchedule(dayOrder) {
   const sched = {};
@@ -832,16 +761,6 @@ function getRoutineWeekSchedule(routineDef) {
 function todayWeekdayKey(date = new Date()) {
   const jsDay = date.getDay(); // 0=domingo .. 6=sábado
   return WEEKDAY_KEYS[(jsDay + 6) % 7]; // reordenado a 0=lunes .. 6=domingo
-}
-
-// El día de rutina que te toca HOY según tu cronograma — null si hoy es
-// descanso programado, o si el día guardado ya no existe en la rutina
-// (por ej. lo borraste al editarla).
-function getScheduledDayForToday(routineDef) {
-  const sched = getRoutineWeekSchedule(routineDef);
-  const dk = sched[todayWeekdayKey()];
-  if (dk && DAY_ORDER.includes(dk)) return dk;
-  return null;
 }
 
 function getStagnationInfo(exercise, logs) {
@@ -2195,47 +2114,6 @@ function buildPolyIndexToSlug(order) {
 const ANTERIOR_POLY_SLUGS = buildPolyIndexToSlug(ANTERIOR_POLY_ORDER);
 const POSTERIOR_POLY_SLUGS = buildPolyIndexToSlug(POSTERIOR_POLY_ORDER);
 
-// Mismo dibujo que ve la librería en pantalla, pero reconstruido a mano
-// con sus mismos puntos exactos — así la imagen para compartir queda
-// igual a lo que se ve en la app, sin depender de capturar nada del DOM
-// en vivo (lo que podía fallar y no generar la imagen).
-function buildSvgPolygonsForView(order, points, ranks, neutral, view) {
-  const fillFor = (slug) => {
-    if (NON_INTERACTIVE_SLUGS.has(slug)) return neutral;
-    if (view === "front" && slug === "calves") return neutral;
-    const keys = Object.entries(BODY_HIGHLIGHTER_SLUG_MAP).filter(([, s]) => s === slug || (slug.endsWith("-soleus") && s === "calves")).map(([k]) => k);
-    if (!keys.length) return neutral;
-    const best = keys.reduce((a, b) => ((ranks[b]?.levelIdx ?? -1) > (ranks[a]?.levelIdx ?? -1) ? b : a));
-    return ranks[best]?.color || neutral;
-  };
-  return order.map(([slug]) => {
-    const color = fillFor(slug);
-    return (points[slug] || []).map((p) => `<polygon points="${p}" fill="${color}" />`).join("");
-  }).join("");
-}
-function buildMuscleBodySvgMarkup(view, ranks) {
-  const NEUTRAL = "#334155";
-  const order = view === "front" ? ANTERIOR_POLY_ORDER : POSTERIOR_POLY_ORDER;
-  const points = view === "front" ? ANTERIOR_POLY_POINTS : POSTERIOR_POLY_POINTS;
-  // width/height EXPLÍCITOS son obligatorios: un SVG que solo tiene viewBox
-  // no tiene tamaño intrínseco, y ctx.drawImage() con esos SVG falla o
-  // dibuja 0×0 en los WebViews de Android — por eso el share del muñeco
-  // nunca generaba la imagen en el teléfono aunque funcionara en desktop.
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="300" height="600" viewBox="0 0 100 200">${buildSvgPolygonsForView(order, points, ranks, NEUTRAL, view)}</svg>`;
-}
-
-function svgMarkupToImage(svgMarkup) {
-  return new Promise((resolve, reject) => {
-    const svg64 = btoa(unescape(encodeURIComponent(svgMarkup)));
-    const img = new Image();
-    const timer = setTimeout(() => reject(new Error("svg-load-timeout")), 5000);
-    img.onload = () => { clearTimeout(timer); resolve(img); };
-    img.onerror = (e) => { clearTimeout(timer); reject(e); };
-    img.src = `data:image/svg+xml;base64,${svg64}`;
-  });
-}
-
-
 function drawMuscleRankShareCard(ctx, W, H, { ranks, modeLabel, accent = "#F59E0B" }) {
   drawShareCardBase(ctx, W, H, accent, "#A855F7");
   ctx.textAlign = "center";
@@ -3028,7 +2906,7 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default", 
         // visible. Se cierra solo, ~700ms después (los dos beeps de
         // 280ms con 220ms de diferencia entre uno y otro ya terminaron).
         setTimeout(() => { a.close().catch(() => { }); }, 900);
-      } catch { }
+      } catch { /* ignorado a propósito */ }
     }
     if (alertType !== "sound") haptic([400, 150, 400, 150, 500, 150, 400]);
     // Notificación del sistema al terminar el descanso
@@ -3062,7 +2940,7 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default", 
           renotify: true,
         });
       }
-    } catch { }
+    } catch { /* ignorado a propósito */ }
   };
 
   const recompute = () => {
@@ -3158,7 +3036,7 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default", 
           } else if (typeof Notification !== "undefined" && Notification.permission === "default") {
             Notification.requestPermission().catch(() => {});
           }
-        } catch { }
+        } catch { /* ignorado a propósito */ }
       })();
       intervalRef.current = setInterval(recompute, 500);
       const onVisible = () => { if (document.visibilityState === "visible") recompute(); };
@@ -3178,7 +3056,7 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default", 
           delete ACTIVE_REST_TIMERS.__notifOwner;
         }
       }
-    } catch { }
+    } catch { /* ignorado a propósito */ }
     // eslint-disable-next-line
   }, [running]);
 
@@ -4094,7 +3972,7 @@ function SessionSummaryModal({ resumen, onClose }) {
   useAndroidBack(onClose);
   // Destellos de celebración: posiciones/tiempos aleatorios pero fijos (una
   // sola vez) para que no se regeneren en cada render. Colores de la app.
-  const confeti = useMemo(() => {
+  const [confeti] = useState(() => {
     const cols = ["#14B8A6", "#F59E0B", "#3B82F6", "#A855F7", "#F43F5E"];
     return Array.from({ length: 18 }, (_, i) => ({
       id: i,
@@ -4104,7 +3982,7 @@ function SessionSummaryModal({ resumen, onClose }) {
       color: cols[i % cols.length],
       size: 5 + Math.round(Math.random() * 4),
     }));
-  }, []);
+  });
   if (!resumen) return null;
   return (
     <div className="fixed inset-0 z-[140] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
@@ -4430,7 +4308,7 @@ function RankUpModal({ from, to, muscleName, onClose }) {
   );
 }
 
-function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, accent, logs, setLogs, drafts = {}, setDrafts, deloadKgFactor = 1, deloadMode = false, resetKey = 0, autoShowPrShare = true, onDisableAutoShowPrShare, hasActiveSession = true, cardio = false, dumbbellDouble = null, fieldSettings = DEFAULT_SETTINGS, onUpdateSettings = null }) {
+function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, accent, logs, setLogs, drafts = {}, setDrafts, deloadKgFactor = 1, deloadMode = false, autoShowPrShare = true, onDisableAutoShowPrShare, hasActiveSession = true, cardio = false, dumbbellDouble = null, fieldSettings = DEFAULT_SETTINGS, onUpdateSettings = null, sex = null, age = null }) {
   const globalUnit = useWeightUnit();
   // Unidad local: arranca desde la preferencia global, pero el usuario puede
   // cambiarla ejercicio por ejercicio con el toggle kg/lbs del input.
@@ -4562,7 +4440,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
             delete ACTIVE_REST_TIMERS.__notifOwner;
           }
         }
-      } catch { }
+      } catch { /* ignorado a propósito */ }
       cardioFinishedRef.current = false;
     }
     // Cleanup al desmontar: si te vas de la pantalla con el CRONÓMETRO
@@ -4577,7 +4455,6 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     };
     // eslint-disable-next-line
   }, [cardioRunning, cardioMode]);
-  const cardioStartRef = useRef(null);
 
   useEffect(() => {
     if (!cardioRunning) { clearInterval(cardioIntervalRef.current); return; }
@@ -4634,14 +4511,15 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
         if (exLib?.group && (isFirstEver || isPR)) {
           const prevRankData = getBest1RMForMuscleGroup(exLib.group, logs, dumbbellDouble);
           const newRankData = getBest1RMForMuscleGroup(exLib.group, newLogs, dumbbellDouble);
-          const prevRank = getMuscleRank(exLib.group, prevRankData.best1RM);
-          const newRank = getMuscleRank(exLib.group, newRankData.best1RM);
+          const rankMode = fieldSettings.muscleRankMode === "relative" ? "relative" : "general";
+          const prevRank = getMuscleRank(exLib.group, prevRankData.best1RM, rankMode, fieldSettings.bodyWeightKg || 0, sex, age);
+          const newRank = getMuscleRank(exLib.group, newRankData.best1RM, rankMode, fieldSettings.bodyWeightKg || 0, sex, age);
           if (newRank.levelIdx > prevRank.levelIdx && prevRank.tier !== newRank.tier) {
             setRankUpInfo({ from: prevRank, to: newRank, muscleName: MUSCLE_GROUP_BY_KEY[exLib.group]?.label });
             RECENT_RANK_UPS.add(exLib.group); // para que lata en Progreso
           }
         }
-      } catch { }
+      } catch { /* ignorado a propósito */ }
       const noSession = !hasActiveSession;
       if (isFirstEver) { haptic(18); setFeedback({ type: "first", msg: "Primer registro 📝", noSession }); }
       else if (isPR) { haptic([35, 25, 45]); setPrBurst((n) => n + 1); setFeedback({ type: "pr", msg: "¡Sesión más larga hasta ahora! 🔥", noSession }); }
@@ -4700,14 +4578,15 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
       if (exLib?.group && (isFirstEver || isPR)) {
         const prevRankData = getBest1RMForMuscleGroup(exLib.group, logs, dumbbellDouble);
         const newRankData = getBest1RMForMuscleGroup(exLib.group, newLogs, dumbbellDouble);
-        const prevRank = getMuscleRank(exLib.group, prevRankData.best1RM);
-        const newRank = getMuscleRank(exLib.group, newRankData.best1RM);
+        const rankMode = fieldSettings.muscleRankMode === "relative" ? "relative" : "general";
+        const prevRank = getMuscleRank(exLib.group, prevRankData.best1RM, rankMode, fieldSettings.bodyWeightKg || 0, sex, age);
+        const newRank = getMuscleRank(exLib.group, newRankData.best1RM, rankMode, fieldSettings.bodyWeightKg || 0, sex, age);
         if (newRank.levelIdx > prevRank.levelIdx && prevRank.tier !== newRank.tier) {
           setRankUpInfo({ from: prevRank, to: newRank, muscleName: MUSCLE_GROUP_BY_KEY[exLib.group]?.label });
           RECENT_RANK_UPS.add(exLib.group); // para que lata en Progreso
         }
       }
-    } catch { }
+    } catch { /* ignorado a propósito */ }
     const noSession = !hasActiveSession;
     // suggestUp: si superaste el techo del rango de reps objetivo, sugerimos
     // subir el peso la próxima. Antes esta variable se USABA sin estar
@@ -5052,7 +4931,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
 /* ============================================================================
    EXERCISE CARD
 ============================================================================ */
-function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts, deloadSets, deloadMode, resetKey = 0, settings = DEFAULT_SETTINGS, forceOpen = false, onDisableAutoShowPrShare, hasActiveSession = true, hideTimer = false, onUpdateSettings = null }) {
+function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts, deloadSets, deloadMode, resetKey = 0, settings = DEFAULT_SETTINGS, forceOpen = false, onDisableAutoShowPrShare, hasActiveSession = true, hideTimer = false, onUpdateSettings = null, sex = null, age = null }) {
   const [open, setOpen] = useState(false);
   const [showWarmup, setShowWarmup] = useState(false);
   // Nota personal del ejercicio (persiste en el perfil → sincroniza)
@@ -5140,7 +5019,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
           <div className="mb-2 timer-hop"><RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={accent} alertType={settings.alertType} timerId={`ex_${exercise.id}`} exerciseName={exercise.name} /></div>
         )}
         {setsToShow.map((s, i) => <React.Fragment key={`${exercise.id}:frag:${i}`}>
-          <SetRow key={`${exercise.id}:${i}`} exerciseId={exercise.id} exerciseName={exercise.name} exerciseMuscle={exercise.muscle} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadKgFactor={settings.deloadPct} deloadMode={deloadMode} resetKey={resetKey} autoShowPrShare={settings.autoShowPrShare ?? true} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={hasActiveSession} cardio={exercise.cardio} dumbbellDouble={settings?.dumbbellDouble || null} fieldSettings={settings} onUpdateSettings={onUpdateSettings} />
+          <SetRow key={`${exercise.id}:${i}:${resetKey}`} exerciseId={exercise.id} exerciseName={exercise.name} exerciseMuscle={exercise.muscle} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadKgFactor={settings.deloadPct} deloadMode={deloadMode} resetKey={resetKey} autoShowPrShare={settings.autoShowPrShare ?? true} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={hasActiveSession} cardio={exercise.cardio} dumbbellDouble={settings?.dumbbellDouble || null} fieldSettings={settings} onUpdateSettings={onUpdateSettings} sex={sex} age={age} />
           {/* Debajo de la serie recién registrada: timerSlot = N significa
               "después de la serie N" (1-indexado). */}
           {timerSlot === i + 1 && (
@@ -5292,7 +5171,7 @@ function groupExercisesIntoSupersets(exercises) {
   return groups;
 }
 
-function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, weekSchedule, activeSession, onStartSession, onEndSession, onCancelSession, onDisableAutoShowPrShare, onUpdateSettings = null, onGoToRoutines = null, onGoToSchedule = null, onGoToFieldSettings = null, todaySessionDayKey = null }) {
+function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, weekSchedule, activeSession, onStartSession, onEndSession, onCancelSession, onDisableAutoShowPrShare, onUpdateSettings = null, onGoToRoutines = null, onGoToSchedule = null, onGoToFieldSettings = null, todaySessionDayKey = null, sex = null, age = null }) {
   // El día programado para hoy según el cronograma semanal (lunes a domingo)
   // de la rutina activa. Si hoy es descanso programado (o no hay cronograma
   // todavía), cae al viejo heurístico de "último día entrenado + 1" — pero
@@ -5453,7 +5332,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
         {groupExercisesIntoSupersets(day.exercises).map((group) => {
           if (group.length === 1) {
             const ex = group[0];
-            return <ExerciseCard key={`${activeDay}:${ex.id}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadSets={isDeload ? getDeloadSets(ex) : null} deloadMode={isDeload} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} />;
+            return <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadSets={isDeload ? getDeloadSets(ex) : null} deloadMode={isDeload} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} sex={sex} age={age} />;
           }
           // Superserie: varios ejercicios encadenados comparten un solo
           // cronómetro al final del grupo, en vez de uno por ejercicio —
@@ -5463,7 +5342,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           return (
             <div key={`${activeDay}:${group.map((e) => e.id).join("-")}`} className="rounded-2xl border p-2.5 space-y-2.5" style={{ borderColor: day.color + "50", backgroundColor: day.color + "06" }}>
               <div className="flex items-center gap-1.5 px-1"><Link size={11} style={{ color: day.color }} /><span className="text-[10px] font-black uppercase tracking-wider" style={{ color: day.color }}>Superserie · {group.length} ejercicios</span></div>
-              {group.map((ex) => <ExerciseCard key={`${activeDay}:${ex.id}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadSets={isDeload ? getDeloadSets(ex) : null} deloadMode={isDeload} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} hideTimer />)}
+              {group.map((ex) => <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadSets={isDeload ? getDeloadSets(ex) : null} deloadMode={isDeload} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} hideTimer sex={sex} age={age} />)}
               <div className="px-1"><RestTimer seconds={hasHeavyGroup ? settings.restLong : settings.restShort} accent={day.color} alertType={settings.alertType} timerId={`grp_${group.map((g) => g.id).join("_")}`} exerciseName={group.map((g) => g.name).filter(Boolean).join(" + ")} /></div>
               <p className="text-[10px] text-slate-600 px-1">Descansá recién después de completar los {group.length} ejercicios — ese es el cronómetro de arriba.</p>
             </div>
@@ -6643,7 +6522,7 @@ function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backR
           if (!svg) return;
           svg.querySelectorAll("polygon").forEach((p, i) => {
             const slug = order[i];
-            let es = false;
+            let es;
             if (esTibial) es = view === "front" && slug === "calves";
             else if (esPantorrillas) es = view === "back" && (slug === "calves" || slug === "left-soleus" || slug === "right-soleus");
             else es = slugs.includes(slug);
@@ -6677,7 +6556,7 @@ function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backR
       if (!svg) return;
       svg.querySelectorAll("polygon").forEach((p, i) => {
         const slug = order[i];
-        let isSel = false;
+        let isSel;
         if (isTibial) {
           // tibial: solo el calves de la vista frontal
           isSel = view === "front" && slug === "calves";
@@ -6830,7 +6709,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
         } else {
           window.scrollTo({ top: window.scrollY + r.top - (window.innerHeight - r.height) / 2, behavior: "smooth" });
         }
-      } catch { }
+      } catch { /* ignorado a propósito */ }
     }, 80);
   };
 
@@ -7458,16 +7337,8 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
   );
 }
 
-function ProgressView({ logs, setLogs, sessions, cycleStart, settings = DEFAULT_SETTINGS, onResetAll, onDeleteDay, onUpdateSettings, onGoToProfile, onGoToRoutines, weekSchedule = null, sex, age, onGoToDeload, measurements, onAddMeasurement, photos, photosLoading, onAddPhoto, onDeletePhoto }) {
+function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS, onResetAll, onDeleteDay, onUpdateSettings, onGoToProfile, onGoToRoutines, weekSchedule = null, sex, age, onGoToDeload, measurements, onAddMeasurement, photos, photosLoading, onAddPhoto, onDeletePhoto }) {
   const allExercises = useMemo(() => DAY_ORDER.flatMap((dk) => ROUTINE[dk].exercises.map((e) => ({ id: e.id, name: e.name, day: ROUTINE[dk].label, color: ROUTINE[dk].color, sets: e.sets.length, dayKey: dk }))), []);
-
-  const stats = useMemo(() => {
-    const dateSet = getTrainedDateSet(logs, sessions);
-    let totalVol = 0, totalSets = 0;
-    Object.entries(logs).forEach(([k, v]) => { if (k.endsWith("_pr_override") || !Array.isArray(v)) return; v.forEach((e) => { totalVol += vol(e.kg, e.reps); totalSets++; }); });
-    const streak = computeSmartStreak(dateSet, weekSchedule);
-    return { totalVol: Math.round(totalVol), totalSets, streak, daysTrained: dateSet.size };
-  }, [logs, sessions, weekSchedule]);
 
   const [selId, setSelId] = useState(allExercises[0]?.id);
   const [selSet, setSelSet] = useState(0);
@@ -7871,7 +7742,7 @@ function CollapsibleSection({ title, subtitle, icon, defaultOpen = false, childr
     // El timer se limpia al desmontar: sin esto, si cambiás de pantalla justo
     // después de abrir la sección, el scroll dispara sobre un nodo que ya no
     // existe (React tira warnings y el scroll salta a un lugar raro).
-    const t = setTimeout(() => { try { selfRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); } catch { } }, 120);
+    const t = setTimeout(() => { try { selfRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); } catch { /* ignorado a propósito */ } }, 120);
     return () => clearTimeout(t);
   }, [forceOpenSignal]);
   return (
@@ -8441,7 +8312,7 @@ const PRESET_CONTEXTO = {
   bro_split:       { frecuencia: "5 días/semana" },
   fullbody:        { frecuencia: "3 días/semana" },
 };
-function PresetRoutineCard({ preset, isActive, onUse, onEdit, onPreview }) {
+function PresetRoutineCard({ preset, isActive, onPreview }) {
   const dayCount = preset.dayOrder.length;
   const ctx = PRESET_CONTEXTO[preset.id] || null;
   const accent = "#A855F7"; // violeta fijo — esta tarjeta es de Rutinas, no del día
@@ -8483,7 +8354,7 @@ function PresetRoutineCard({ preset, isActive, onUse, onEdit, onPreview }) {
   );
 }
 
-function SavedRoutineRow({ routine, isActive, onUse, onEdit, onShare, onArchive, onDuplicate, onPreview, uso = null }) {
+function SavedRoutineRow({ routine, isActive, onUse, onEdit, onShare, onArchive, onPreview, uso = null }) {
   const dayCount = routine.dayOrder.length;
   const accent = isActive ? "#14B8A6" : "#6366F1"; // teal si activa, indigo si no
   return (
@@ -8585,7 +8456,7 @@ function ExercisePickerPanel({ existingIds, onAdd, onAddCustom, onClose }) {
 
 const REP_RANGE_OPTIONS = ["1-3", "3-5", "4-6", "6-8", "8-10", "10-12", "12-15", "15-20"];
 
-function BuilderExerciseRow({ ex, onRemove, onConfigChange, isDragging = false, isDragOver = false, dumbbellFactor = null, onToggleDumbbell = null, recienAgregado = false, dayColor = "#14B8A6" }) {
+function BuilderExerciseRow({ ex, onRemove, onConfigChange, isDragging = false, dumbbellFactor = null, onToggleDumbbell = null, recienAgregado = false, dayColor = "#14B8A6" }) {
   const [editing, setEditing] = useState(false);
   const repRange = ex.sets[0]?.repRange || "8-10";
   const setsCount = ex.sets.length;
@@ -9253,7 +9124,7 @@ function parseAction(rawText) {
 // "activar_rutina" con un nombre que no existe), devuelve null — en ese
 // caso no se muestra ninguna tarjeta, sólo el texto del mensaje.
 function buildActionPlan(action, ctx) {
-  const { profile, settings, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement } = ctx;
+  const { profile, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement } = ctx;
   if (action.type === "crear_rutina") {
     const days = (action.days || []).map((d) => ({
       label: String(d.label || "Día"),
@@ -9518,7 +9389,7 @@ function EntrenadorIAChat({ profile, logs, profileName, messages, setMessages, s
             const d = model.days[dk];
             return { dia: d.label, ejercicios: d.exercises.map((ex) => ({ nombre: ex.name, musculo: ex.muscle, series: ex.sets.length, repeticionesPorSerie: ex.sets.map((s) => s.repRange) })) };
           });
-        } catch { }
+        } catch { /* ignorado a propósito */ }
         return { ...base, dias };
       }).filter(Boolean);
       const context = {
@@ -9674,12 +9545,12 @@ Datos: ${JSON.stringify(context)}`;
   // lo que ya se había dicho — por eso las palabras se repetían.
   const finalTranscriptRef = useRef("");
   const SpeechRecognitionAPI = typeof window !== "undefined" ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
-  useEffect(() => () => { listeningRef.current = false; try { recognitionRef.current?.stop(); } catch { } }, []);
+  useEffect(() => () => { listeningRef.current = false; try { recognitionRef.current?.stop(); } catch { /* ignorado a propósito */ } }, []);
   const handleMicToggle = async () => {
     if (!SpeechRecognitionAPI) return;
     if (listeningRef.current) {
       listeningRef.current = false;
-      try { recognitionRef.current?.abort(); } catch { }
+      try { recognitionRef.current?.abort(); } catch { /* ignorado a propósito */ }
       recognitionRef.current = null;
       setIsListening(false);
       return;
@@ -10008,7 +9879,7 @@ function ImportRoutineModal({ onImport, onClose }) {
           setNotice("");
         } else { setNotice("La IA no pudo interpretar el archivo. Pegá el texto manualmente abajo."); }
       } else { setNotice("No se pudo detectar automáticamente. Pegá el texto abajo y tocá \"Detectar rutina\"."); }
-    } catch (err) {
+    } catch {
       setNotice("No pudimos leer ese archivo. Probá copiando el texto directamente.");
     } finally {
       setLoadingFile(false); setIsParsingAI(false);
@@ -10819,7 +10690,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
   useEffect(() => {
     if (openScheduleSignal <= 0) return;
     setShowSchedule(true);
-    const t = setTimeout(() => { try { scheduleRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); } catch { } }, 150);
+    const t = setTimeout(() => { try { scheduleRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); } catch { /* ignorado a propósito */ } }, 150);
     return () => clearTimeout(t);
   }, [openScheduleSignal]);
 
@@ -11135,7 +11006,6 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
             {customEntries.map(([id, r]) => (
               <SavedRoutineRow key={id} routine={r} isActive={id === activeId} onUse={() => handleUseClick(id, null)}
                 onEdit={() => { setEditingRoutineId(id); setMode("builder"); }} onShare={() => setShareTarget(r)} onArchive={() => onArchive(id)}
-                onDuplicate={() => handleDuplicate(id, r)}
                 onPreview={() => setPreview({ def: r, name: r.name, id, isPreset: false })}
                 uso={usoPorRutina[id] || null} />
             ))}
@@ -11168,7 +11038,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
         <div className="flex items-center gap-1.5 mb-2"><Sparkles size={13} className="text-slate-500" /><p className="text-xs font-black uppercase tracking-widest text-slate-500">Rutinas preestablecidas</p></div>
         <div className="space-y-2">
           {PRESET_ROUTINES.map((preset) => (
-            <PresetRoutineCard key={preset.id} preset={preset} isActive={preset.id === activeId} onUse={() => handleUseClick(preset.id, cloneRoutineDef(preset))} onEdit={() => handleEditPreset(preset)} onPreview={() => setPreview({ def: preset, name: preset.name, id: preset.id, isPreset: true })} />
+            <PresetRoutineCard key={preset.id} preset={preset} isActive={preset.id === activeId} onPreview={() => setPreview({ def: preset, name: preset.name, id: preset.id, isPreset: true })} />
           ))}
         </div>
       </div>
@@ -11517,16 +11387,16 @@ export default function App() {
   }, [tab]);
   useEffect(() => { prevTabRef.current = tab; }, [tab]);
   useEffect(() => {
-    try { window.history.pushState({ __sentinela: true }, ""); } catch { }
+    try { window.history.pushState({ __sentinela: true }, ""); } catch { /* ignorado a propósito */ }
     const onPop = () => {
       if (BACK_HANDLERS.length > 0) {
         // Cerrar el modal de más arriba
         const cerrar = BACK_HANDLERS[BACK_HANDLERS.length - 1];
-        try { cerrar(); } catch { }
-        try { window.history.pushState({ __sentinela: true }, ""); } catch { }
+        try { cerrar(); } catch { /* ignorado a propósito */ }
+        try { window.history.pushState({ __sentinela: true }, ""); } catch { /* ignorado a propósito */ }
       } else if (tabRef.current !== "rutina") {
         setTab("rutina");
-        try { window.history.pushState({ __sentinela: true }, ""); } catch { }
+        try { window.history.pushState({ __sentinela: true }, ""); } catch { /* ignorado a propósito */ }
       }
       // Si estás en Rutina sin modales: no reponemos nada → el próximo
       // atrás cierra la app (comportamiento esperado).
@@ -11617,7 +11487,7 @@ export default function App() {
         } else if (typeof Notification !== "undefined" && Notification.permission === "default") {
           await Notification.requestPermission();
         }
-      } catch { }
+      } catch { /* ignorado a propósito */ }
     };
     setTimeout(requestNotifPermission, 2000);
   }, []);
@@ -11686,7 +11556,7 @@ export default function App() {
       if (!t || !(t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT")) return;
       if (t.type === "checkbox" || t.type === "radio" || t.type === "file" || t.type === "range") return;
       setTimeout(() => {
-        try { t.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" }); } catch { }
+        try { t.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" }); } catch { /* ignorado a propósito */ }
       }, 350);
     };
     window.addEventListener("focusin", onFocusIn);
@@ -11846,41 +11716,6 @@ export default function App() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeProfile]);
-
-  // Recordatorio si ayer te tocaba entrenar (según tu cronograma semanal)
-  // y no quedó nada registrado. Esto es un aviso DENTRO de la app — se ve
-  // la próxima vez que la abrís, no es una notificación push real que
-  // llegue aunque tengas la app cerrada (eso necesitaría empaquetar la
-  // app con Capacitor y su plugin de notificaciones locales, que es un
-  // paso de configuración nativa aparte — avisame si lo querés armar).
-  // `dismissedMissedDayNotice` guarda la fecha ya avisada, para no
-  // repetir el mismo aviso cada vez que abrís la app en el mismo día.
-  const [missedDayNotice, setMissedDayNotice] = useState(null);
-  useEffect(() => {
-    if (!profile || !activeRoutineDef) return;
-    const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
-    const sched = getRoutineWeekSchedule(activeRoutineDef);
-    const scheduledDayKey = sched[todayWeekdayKey(yesterday)];
-    if (!scheduledDayKey || !DAY_ORDER.includes(scheduledDayKey)) return;
-    const yStr = localDateStr(yesterday);
-    const trainedDates = getTrainedDateSet(profile.logs || {}, profile.trainingSessions || []);
-    if (trainedDates.has(yStr)) return;
-    if (profile.dismissedMissedDayNotice === yStr) return;
-    setMissedDayNotice({ dayLabel: ROUTINE[scheduledDayKey]?.label || scheduledDayKey, date: yStr });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeProfile]);
-  const dismissMissedDayNotice = () => {
-    if (missedDayNotice) {
-      setProfiles((prev) => {
-        const p = prev[activeProfile];
-        if (!p) return prev;
-        const np = { ...prev, [activeProfile]: { ...p, dismissedMissedDayNotice: missedDayNotice.date } };
-        saveProfiles(np);
-        return np;
-      });
-    }
-    setMissedDayNotice(null);
-  };
 
   // Festejo (con opción de compartir) cuando se completa un ciclo entero
   // (entrenamiento + descarga): se guarda `lastSeenCycleNumber` y, si en un
@@ -12340,7 +12175,7 @@ export default function App() {
           <div key={tab} className={tabSlideClass}>
             {tab === "rutinas" && <RoutinesView openScheduleSignal={openSectionSignal.id === "week-schedule" ? openSectionSignal.n : 0} openEditorSignal={openSectionSignal.id === "routine-editor" ? openSectionSignal.n : 0} profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleArchiveRoutine} onRestore={handleRestoreRoutine} onUpdateProfile={handleUpdateProfile} />}
             {tab === "rutina" && <OnboardingTasksCard profile={profile} cycleStart={cycleStart} logs={logs} onGoToProfile={() => setTab("perfil")} onOpenFieldSettings={() => setShowFieldIntro(true)} onDone={() => handleUpdateProfile({ onboardingDone: true })} />}
-            {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToRoutines={() => setTab("rutinas")} onGoToSchedule={() => goToSection("rutinas", "week-schedule")} onGoToFieldSettings={() => goToSection("perfil", "field-settings-section")} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} todaySessionDayKey={(profile?.trainingSessions || []).find((ts) => ts.date === todayStr())?.dayKey || profile?.activeSession?.dayKey || null} />}
+            {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToRoutines={() => setTab("rutinas")} onGoToSchedule={() => goToSection("rutinas", "week-schedule")} onGoToFieldSettings={() => goToSection("perfil", "field-settings-section")} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} todaySessionDayKey={(profile?.trainingSessions || []).find((ts) => ts.date === todayStr())?.dayKey || profile?.activeSession?.dayKey || null} sex={profile?.sex} age={profile?.age} />}
             {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} onGoToRoutines={() => goToSection("rutinas", "routine-editor")} weekSchedule={weekSchedule} sex={profile?.sex} age={profile?.age} onGoToDeload={() => setTab("descarga")} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} />}
             {tab === "descarga" && <DeloadView logs={logs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} />}
             {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} settings={getProfileSettings(profile)} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} />}
@@ -12410,15 +12245,6 @@ function DeloadNoticeBanner({ onClose }) {
   return (
     <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[150] bg-purple-500 !text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-purple-500/30 flex items-center gap-2 bounce-in max-w-[92vw]">
       <Zap size={14} className="shrink-0" /> Esta semana es de descarga — te llevamos a esa pestaña
-      <button onClick={onClose} className="ml-1 opacity-80 hover:opacity-100 shrink-0"><X size={13} /></button>
-    </div>
-  );
-}
-
-function MissedDayBanner({ dayLabel, onClose }) {
-  return (
-    <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[150] bg-amber-500 !text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-amber-500/30 flex items-center gap-2 bounce-in max-w-[92vw]">
-      <AlertTriangle size={14} className="shrink-0" /> Ayer te tocaba {dayLabel} y no registramos nada — ¿todo bien?
       <button onClick={onClose} className="ml-1 opacity-80 hover:opacity-100 shrink-0"><X size={13} /></button>
     </div>
   );

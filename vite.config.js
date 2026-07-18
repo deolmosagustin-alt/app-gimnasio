@@ -11,7 +11,5 @@ export default defineConfig({
         manualChunks: undefined, // Quitamos la división manual para simplificar
       },
     },
-    // Añadimos esto para asegurar que el despliegue no falle por warnings
-    minify: 'terser',
   }
 })
