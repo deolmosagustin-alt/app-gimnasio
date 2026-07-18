@@ -1459,7 +1459,13 @@ p, span, label, button { overflow-wrap: break-word; }
    y el de alerta a un rosa pastel en vez del rojo oscuro translúcido. */
 .light-mode .bg-black\\/20 { background-color: rgba(241,245,249,0.9) !important; }
 .light-mode .bg-black\\/30 { background-color: rgba(226,232,240,0.95) !important; }
-.light-mode .bg-black\\/70 { background-color: rgba(226,232,240,0.97) !important; }
+/* Velo de los modales: sigue oscureciendo (si no, el modal blanco se pierde
+   sobre el fondo claro), pero en un slate suave en vez de negro puro. */
+.light-mode .bg-black\\/55 { background-color: rgba(15,23,42,0.32) !important; }
+.light-mode .bg-black\\/70 { background-color: rgba(15,23,42,0.42) !important; }
+.light-mode .bg-black\\/75 { background-color: rgba(15,23,42,0.45) !important; }
+.light-mode .bg-black\\/80 { background-color: rgba(15,23,42,0.48) !important; }
+.light-mode .bg-black\\/85 { background-color: rgba(15,23,42,0.52) !important; }
 .light-mode .bg-rose-950\\/30 { background-color: rgba(254,226,226,0.85) !important; }
 .light-mode .border-white\\/5 { border-color: rgba(15,23,42,0.05) !important; }
 .light-mode .border-white\\/10 { border-color: rgba(15,23,42,0.08) !important; }
@@ -1476,8 +1482,8 @@ p, span, label, button { overflow-wrap: break-word; }
 .light-mode .text-slate-300 { color: #334155 !important; }
 .light-mode .text-slate-400 { color: #475569 !important; }
 .light-mode .text-slate-500 { color: #64748b !important; }
-.light-mode .text-slate-600 { color: #94a3b8 !important; }
-.light-mode .text-slate-700 { color: #cbd5e1 !important; }
+.light-mode .text-slate-600 { color: #8593a8 !important; }
+.light-mode .text-slate-700 { color: #a2aec0 !important; }
 .light-mode .hover\\:text-slate-200:hover { color: #1e293b !important; }
 .light-mode .hover\\:text-slate-300:hover { color: #334155 !important; }
 .light-mode .hover\\:text-slate-400:hover { color: #475569 !important; }
@@ -1527,13 +1533,40 @@ p, span, label, button { overflow-wrap: break-word; }
 .light-mode .divide-slate-800\\/50 > :not([hidden]) ~ :not([hidden]),
 .light-mode .divide-slate-800 > :not([hidden]) ~ :not([hidden]) { border-color: #e2e8f0 !important; }
 
-/* Sombras: el negro translúcido sobre fondo blanco se ve como una mancha
-   gris sucia — se reemplaza por una sombra casi imperceptible, estilo
-   Apple/Linear (apenas una insinuación de elevación, no un bloque oscuro). */
+/* ── ELEVACIÓN EN MODO CLARO ────────────────────────────────────────────────
+   El negro translúcido pensado para fondo oscuro se ve como una mancha gris
+   sucia sobre blanco. Pero aplastarlo todo a una sombra plana (lo que hacíamos
+   antes) deja la interfaz sin profundidad: las tarjetas parecen calcomanías.
+   La solución es un sistema de elevación por niveles, cada uno con DOS capas:
+     · una capa corta y apenas visible que define el canto de la tarjeta;
+     · una capa difusa y más abierta que la "levanta" del fondo.
+   El color no es negro sino azul-gris muy diluido (15,23,42 = slate-900), que
+   sobre blanco lee como sombra natural y no como gris sucio. */
+.light-mode .shadow-sm {
+  box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 1px 3px rgba(15,23,42,0.03) !important;
+}
+.light-mode .shadow-md {
+  box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 3px 8px -2px rgba(15,23,42,0.06) !important;
+}
+.light-mode .shadow-lg {
+  box-shadow: 0 1px 3px rgba(15,23,42,0.04), 0 6px 16px -4px rgba(15,23,42,0.08) !important;
+}
+.light-mode .shadow-xl {
+  box-shadow: 0 2px 4px rgba(15,23,42,0.04), 0 12px 28px -8px rgba(15,23,42,0.10) !important;
+}
+.light-mode .shadow-2xl {
+  box-shadow: 0 4px 8px rgba(15,23,42,0.05), 0 20px 44px -12px rgba(15,23,42,0.14) !important;
+}
+/* Las clases de color de sombra (shadow-black/N) solo aportaban el tono, que
+   ahora ya viene resuelto arriba: acá se neutralizan para que no reinyecten
+   el negro. */
 .light-mode .shadow-black\\/20,
+.light-mode .shadow-black\\/25,
 .light-mode .shadow-black\\/30,
 .light-mode .shadow-black\\/40,
-.light-mode .shadow-black\\/50 { --tw-shadow-color: rgba(15,23,42,0.05) !important; box-shadow: var(--tw-shadow, 0 1px 3px 0 rgba(15,23,42,0.05)) !important; }
+.light-mode .shadow-black\\/50,
+.light-mode .shadow-black\\/60,
+.light-mode .shadow-black\\/70 { --tw-shadow-color: rgba(15,23,42,0.08) !important; }
 
 /* Tarjetas con degradé propio (hero de Rutinas/Descarga/Progreso/Perfil) —
    ver variables --grad-* aplicadas vía estilo inline en esos componentes.
@@ -1558,6 +1591,26 @@ p, span, label, button { overflow-wrap: break-word; }
   --surface-2: #1e293b;
   --surface-2-text: #64748b;
   --small-text-scale: 1;
+  /* Fondo base de la app. Lo usan los pocos lugares que necesitan el color
+     "de la página" en estilo inline (escudo de la status bar, pantallas a
+     pantalla completa). Antes estaba escrito a mano como #0a0a0f y en modo
+     claro dejaba franjas negras. */
+  --app-bg: #0a0a0f;
+  /* Superficies "hundidas": paneles que se abren dentro de una tarjeta y
+     filas de opciones. Estaban en estilo inline con rgba fijo y en claro se
+     veían como cajas oscuras. */
+  --panel-sunken: rgba(2,6,23,0.7);
+  --row-surface: rgba(15,23,42,0.6);
+  /* Degradés de paneles destacados (resumen de sesión, tarjetas del
+     entrenador). Conservan el valor exacto que tenían escrito a mano. */
+  --panel-grad-teal: linear-gradient(165deg,#0d1a17 0%,#0a0f1a 100%);
+  --panel-grad-cyan: linear-gradient(165deg,#0f1a1f 0%,#0a0f1a 100%);
+  --panel-grad-slate: linear-gradient(170deg,#0f172a 0%,#0a0f1a 100%);
+  --panel-grad-blue: linear-gradient(165deg, #0c1420 0%, #0a0f1a 100%);
+  --panel-grad-emerald: linear-gradient(160deg,#0d1f1e,#0f172a);
+  /* Cronómetro de descanso en reposo (cuando corre toma el color del día). */
+  --timer-idle-bg: rgba(15,23,42,0.5);
+  --timer-idle-border: rgba(30,41,59,0.6);
 }
 .light-mode {
   --grad-hero-purple: linear-gradient(135deg, rgba(168,85,247,0.10), rgba(255,255,255,0.96) 55%, #ffffff);
@@ -1571,6 +1624,18 @@ p, span, label, button { overflow-wrap: break-word; }
   --chip-text: #64748b;
   --surface-2: #eef2f6;
   --surface-2-text: #475569;
+  --app-bg: #f8fafc;
+  --panel-sunken: #f1f5f9;
+  --row-surface: #f8fafc;
+  /* En claro, el mismo matiz pero sobre blanco: apenas un velo de color en la
+     esquina superior que se disuelve, en vez de un bloque oscuro. */
+  --panel-grad-teal: linear-gradient(165deg, rgba(20,184,166,0.09) 0%, #ffffff 60%);
+  --panel-grad-cyan: linear-gradient(165deg, rgba(6,182,212,0.09) 0%, #ffffff 60%);
+  --panel-grad-slate: linear-gradient(170deg, rgba(100,116,139,0.08) 0%, #ffffff 60%);
+  --panel-grad-blue: linear-gradient(165deg, rgba(59,130,246,0.08) 0%, #ffffff 60%);
+  --panel-grad-emerald: linear-gradient(160deg, rgba(16,185,129,0.10), #ffffff 65%);
+  --timer-idle-bg: #f1f5f9;
+  --timer-idle-border: #e2e8f0;
 }
 
 /* ============================================================================
@@ -1749,7 +1814,7 @@ function ShareLinkModal({ title, shareTitle, shareText, shareTarget, onClose }) 
           <>
             {/* Botón principal de compartir — prominente y arriba */}
             {canNativeShare && (
-              <button onClick={handleNativeShare} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white text-sm font-bold mb-3 transition-all active:scale-[0.98]" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>
+              <button onClick={handleNativeShare} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl !text-white text-sm font-bold mb-3 transition-all active:scale-[0.98]" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>
                 <Share2 size={15} /> Compartir
               </button>
             )}
@@ -2351,7 +2416,7 @@ function ShareImageModal({ title, fileNamePrefix, shareTitle, shareText, draw, o
         <canvas ref={canvasRef} className="hidden" />
         {/* Botones siempre visibles primero — el preview es secundario */}
         <div className="flex gap-2 mb-3">
-          <button onClick={handleShare} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98]" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}><Share2 size={14} /> Compartir</button>
+          <button onClick={handleShare} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl !text-white text-sm font-bold transition-all active:scale-[0.98]" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}><Share2 size={14} /> Compartir</button>
           <button onClick={handleDownload} disabled={!previewUrl} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition text-sm font-semibold disabled:opacity-40"><Download size={14} /> Descargar</button>
         </div>
         {previewUrl ? (
@@ -3130,8 +3195,8 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default", 
   const barColor = done ? "#10B981" : urgent ? "#F59E0B" : accent;
   return (
     <div className="relative rounded-2xl overflow-hidden px-3.5 py-2.5 transition-colors duration-300" style={{
-      backgroundColor: running ? barColor + "0e" : "rgba(15,23,42,0.5)",
-      border: `1px solid ${running ? barColor + "30" : "rgba(30,41,59,0.6)"}`,
+      backgroundColor: running ? barColor + "0e" : "var(--timer-idle-bg)",
+      border: `1px solid ${running ? barColor + "30" : "var(--timer-idle-border)"}`,
     }}>
       <div className="flex items-center gap-2.5">
         {/* Tiempo protagonista */}
@@ -3677,7 +3742,7 @@ const HELP_CHAPTERS = [
       {
         icon: <Sliders size={20} />,
         title: "Personalizá qué ves al registrar",
-        text: "¿No usás el RPE o el calentamiento? Apagalos y la ficha queda más limpia. Está en Perfil → \"Qué ves al registrar\", o con el botón que aparece en el recuadro \"Tu entrenamiento\". Tiene vista previa en vivo: ves cómo queda mientras elegís.",
+        text: "Te recomendamos dejar prendido SOLO lo que vayas a usar: con las seis opciones activadas la ficha se llena de botones y cuesta encontrar lo importante. ¿No usás el RPE o el calentamiento? Apagalos y queda mucho más limpia. Está en Perfil → \"Qué ves al registrar\", con vista previa en vivo para que veas cómo queda mientras elegís.",
       },
       {
         icon: <Save size={20} />,
@@ -4045,7 +4110,7 @@ function SessionSummaryModal({ resumen, onClose }) {
     <div className="fixed inset-0 z-[140] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
       <div
         className="relative max-w-sm w-full rounded-3xl modal-pop-in shadow-2xl shadow-black/70 overflow-hidden"
-        style={{ background: "linear-gradient(165deg,#0d1a17 0%,#0a0f1a 100%)", border: "1px solid rgba(20,184,166,0.3)" }}
+        style={{ background: "var(--panel-grad-teal)", border: "1px solid rgba(20,184,166,0.3)" }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Lluvia de destellos: cae detrás del contenido, no molesta al leer */}
@@ -4114,7 +4179,7 @@ function WelcomeIntro({ onClose, onOpenTutorial }) {
     <div className="fixed inset-0 z-[110] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 modal-bg-in modal-overlay">
       <div
         className="max-w-sm w-full rounded-3xl modal-pop-in shadow-2xl shadow-black/70 overflow-hidden flex flex-col"
-        style={{ background: "linear-gradient(165deg,#0f1a1f 0%,#0a0f1a 100%)", border: `1px solid ${slide.color}30`, minHeight: 440 }}
+        style={{ background: "var(--panel-grad-cyan)", border: `1px solid ${slide.color}30`, minHeight: 440 }}
       >
         {/* Hero: el ícono grande sobre un halo del color del slide */}
         <div key={`hero-${i}`} className="relative flex flex-col items-center pt-12 pb-6 px-6 text-center tab-fade-in">
@@ -4255,7 +4320,7 @@ function HelpModal({ startTab, onClose }) {
                 <Sparkles size={10} /> {step.demo.caption}
               </p>
             )}
-            <div className="rounded-2xl border border-slate-800/60 overflow-hidden" style={{ backgroundColor: "#0a0a0f" }}>
+            <div className="rounded-2xl border border-slate-800/60 overflow-hidden" style={{ backgroundColor: "var(--app-bg)" }}>
               <DemoPreview kind={step.demo.kind} view={step.demo.view} />
             </div>
           </div>
@@ -4356,7 +4421,7 @@ function RankUpModal({ from, to, muscleName, onClose }) {
             <p className="text-2xl font-black text-white">{to.tier}</p>
             {muscleName && <p className="text-sm text-slate-400 mt-1">en {muscleName}</p>}
           </div>
-          <button onClick={onClose} className="w-full py-3.5 rounded-2xl font-black text-white text-sm active:scale-95 transition-all" style={{ background: `linear-gradient(135deg, ${to.color}, ${to.color}bb)`, boxShadow: `0 8px 24px -4px ${to.color}50` }}>
+          <button onClick={onClose} className="w-full py-3.5 rounded-2xl font-black !text-white text-sm active:scale-95 transition-all" style={{ background: `linear-gradient(135deg, ${to.color}, ${to.color}bb)`, boxShadow: `0 8px 24px -4px ${to.color}50` }}>
             ¡Vamos! 💪
           </button>
         </div>
@@ -4790,7 +4855,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
               {/* Km opcional y botón guardar */}
               <div className="flex items-center gap-2">
                 <div className="flex-1"><label className="text-[10px] text-slate-600 font-semibold uppercase tracking-wider mb-1.5 block">Km <span className="text-slate-700 normal-case">(opc.)</span></label><input type="number" inputMode="decimal" placeholder="—" value={km} onChange={(e) => updateDraft({ km: e.target.value })} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3 text-lg font-black text-center text-white focus:outline-none focus:border-teal-500/50 transition" /></div>
-                <button ref={saveBtnRef} onClick={handleSave} className={`p-3.5 rounded-xl transition-all active:scale-90 font-bold text-white flex items-center justify-center shrink-0 ${saved ? "bg-emerald-500" : "hover:opacity-90"}`} style={!saved ? { backgroundColor: accent } : {}}>
+                <button ref={saveBtnRef} onClick={handleSave} className={`p-3.5 rounded-xl transition-all active:scale-90 font-bold !text-white flex items-center justify-center shrink-0 ${saved ? "bg-emerald-500" : "hover:opacity-90"}`} style={!saved ? { backgroundColor: accent } : {}}>
                   {saved ? <Check size={18} /> : <Save size={18} />}
                 </button>
               </div>
@@ -4879,7 +4944,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
                 </button>
                 <input type="number" inputMode="decimal" placeholder="—" value={kg} onChange={(e) => updateDraft({ kg: e.target.value })} className="w-full bg-transparent text-2xl font-black text-center text-white focus:outline-none placeholder:text-slate-800" />
               </div>
-              <button ref={saveBtnRef} onClick={handleSave} aria-label="Guardar serie" className={`w-14 flex items-center justify-center transition-all active:scale-95 text-white ${saved ? "" : "hover:opacity-90"}`} style={saved ? { background: "linear-gradient(160deg, #10B981, #059669)" } : { background: `linear-gradient(160deg, ${accent}, ${accent}b0)` }}>
+              <button ref={saveBtnRef} onClick={handleSave} aria-label="Guardar serie" className={`w-14 flex items-center justify-center transition-all active:scale-95 !text-white ${saved ? "" : "hover:opacity-90"}`} style={saved ? { background: "linear-gradient(160deg, #10B981, #059669)" } : { background: `linear-gradient(160deg, ${accent}, ${accent}b0)` }}>
                 {saved ? <Check size={19} /> : <Save size={18} />}
               </button>
             </div>
@@ -4929,7 +4994,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           nada, y se abre al tocarlo. Una nota por serie, no por ejercicio. */}
       {fieldSettings.showPersonalNote !== false && onUpdateSettings && (
         editingNote ? (
-          <div className="mt-2.5 bounce-in rounded-lg p-2" style={{ backgroundColor: "rgba(2,6,23,0.7)", border: `1px solid ${accent}30` }}>
+          <div className="mt-2.5 bounce-in rounded-lg p-2" style={{ backgroundColor: "var(--panel-sunken)", border: `1px solid ${accent}30` }}>
             <textarea
               value={noteDraft}
               onChange={(e) => setNoteDraft(e.target.value)}
@@ -4954,14 +5019,14 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
         )
       )}
       {editingPR && !cardio && (
-        <div className="mt-2 rounded-xl p-3 space-y-2 bounce-in" style={{ backgroundColor: "rgba(2,6,23,0.7)", border: `1px solid ${accent}30` }}>
+        <div className="mt-2 rounded-xl p-3 space-y-2 bounce-in" style={{ backgroundColor: "var(--panel-sunken)", border: `1px solid ${accent}30` }}>
           <p className="text-[10px] font-black uppercase tracking-[0.14em] flex items-center gap-1.5" style={{ color: accent }}><Edit3 size={11} /> Corregir récord</p>
           <div className="flex flex-wrap gap-2 items-center">
             <input type="number" inputMode="decimal" placeholder="Reps" value={editReps} onChange={(e) => setEditReps(e.target.value)} className="w-20 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm text-white" />
             <span className="text-slate-600 text-xs">reps ×</span>
             <input type="number" inputMode="decimal" placeholder="Kg" value={editKg} onChange={(e) => setEditKg(e.target.value)} className="w-20 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm text-white" />
             <span className="text-slate-600 text-xs">kg</span>
-            <button onClick={savePR} className="px-3 py-1.5 rounded-lg text-white text-xs font-bold" style={{ backgroundColor: accent }}>Guardar</button>
+            <button onClick={savePR} className="px-3 py-1.5 rounded-lg !text-white text-xs font-bold" style={{ backgroundColor: accent }}>Guardar</button>
             {override && <button onClick={() => { const l = { ...logs }; delete l[prKey]; setLogs(l); setEditingPR(false); }} className="px-3 py-1.5 rounded-lg bg-slate-700 text-slate-200 text-xs">Quitar</button>}
             <button onClick={() => setEditingPR(false)} className="text-slate-500 text-xs">Cancelar</button>
           </div>
@@ -5440,7 +5505,7 @@ function SessionDetailCard({ session, onDelete }) {
   const improvements = session.improvedCount || 0;
 
   return (
-    <div className="rounded-3xl overflow-hidden bounce-in border" style={{ borderColor: accent + "35", background: "linear-gradient(170deg,#0f172a 0%,#0a0f1a 100%)" }}>
+    <div className="rounded-3xl overflow-hidden bounce-in border" style={{ borderColor: accent + "35", background: "var(--panel-grad-slate)" }}>
       {/* Header con el color del día entrenado */}
       <div className="relative px-4 pt-4 pb-3 overflow-hidden">
         <div className="absolute -top-10 -right-8 w-36 h-36 rounded-full blur-3xl opacity-25 pointer-events-none" style={{ backgroundColor: accent }} />
@@ -6006,7 +6071,7 @@ function DeloadView({ logs, settings = DEFAULT_SETTINGS, deloadProgress = {}, se
                             </div>
                           </div>
                         ))}
-                        <button onClick={() => toggleDeloadDone(progressKey)} className="relative w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-black transition-all active:scale-[0.98]" style={done ? { background: `linear-gradient(160deg, ${day.color}, ${day.color}b0)`, color: "#fff" } : { backgroundColor: "rgba(15,23,42,0.6)", border: "1px solid #33415580", color: "#94a3b8" }}>
+                        <button onClick={() => toggleDeloadDone(progressKey)} className="relative w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-black transition-all active:scale-[0.98]" style={done ? { background: `linear-gradient(160deg, ${day.color}, ${day.color}b0)`, color: "#fff" } : { backgroundColor: "var(--row-surface)", border: "1px solid #33415580", color: "#94a3b8" }}>
                           {done ? <><span className="w-5 h-5 rounded-full bg-white/25 flex items-center justify-center"><Check size={12} strokeWidth={3} /></span> Hecha</> : "Marcar como hecha"}
                         </button>
                       </div>
@@ -6031,7 +6096,7 @@ function DeloadView({ logs, settings = DEFAULT_SETTINGS, deloadProgress = {}, se
 
       {hasAnyDoneToday && (
         <div>
-          <button onClick={handleFinishSession} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98] shadow-lg" style={{ backgroundColor: "#A855F7", boxShadow: "0 10px 24px -8px #A855F788" }}>
+          <button onClick={handleFinishSession} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl !text-white text-sm font-bold transition-all active:scale-[0.98] shadow-lg" style={{ backgroundColor: "#A855F7", boxShadow: "0 10px 24px -8px #A855F788" }}>
             <Check size={15} /> Finalizar sesión de descarga
           </button>
           <p className="text-center text-[10px] text-slate-600 mt-2">Se registra como entrenamiento de hoy (suma a tu racha y calendario) y se desmarcan las series tildadas, para la próxima vez.</p>
@@ -6807,7 +6872,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
 
      {selInfo ? (
         <div key={selected} ref={detailRef} className="relative overflow-hidden rounded-3xl p-[1.5px] bounce-in" style={{ background: selInfo.hasData ? `linear-gradient(140deg, ${selInfo.color}55, transparent 45%, transparent 60%, ${selInfo.color}30)` : "#1e293b" }}>
-          <div className="relative overflow-hidden rounded-[calc(1.5rem-1.5px)] p-4" style={{ background: "linear-gradient(165deg, #0c1420 0%, #0a0f1a 100%)" }}>
+          <div className="relative overflow-hidden rounded-[calc(1.5rem-1.5px)] p-4" style={{ background: "var(--panel-grad-blue)" }}>
             {selInfo.hasData && (
               <>
                 <div className="absolute -top-12 -right-10 w-44 h-44 rounded-full blur-3xl pointer-events-none opacity-25" style={{ backgroundColor: selInfo.color }} />
@@ -7166,7 +7231,7 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
 
       <div className="flex items-center gap-2">
         <input type="number" inputMode="decimal" value={inputVal} onChange={(e) => setInputVal(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }} placeholder={`Nuevo valor (${selMeta.unit})`} className="flex-1 bg-slate-950/60 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-purple-500/50" />
-        <button onClick={handleAdd} disabled={!inputVal.trim()} className="px-4 py-2.5 rounded-xl text-white text-sm font-bold disabled:opacity-40 transition-all active:scale-95" style={{ backgroundColor: "#A855F7" }}>Guardar</button>
+        <button onClick={handleAdd} disabled={!inputVal.trim()} className="px-4 py-2.5 rounded-xl !text-white text-sm font-bold disabled:opacity-40 transition-all active:scale-95" style={{ backgroundColor: "#A855F7" }}>Guardar</button>
       </div>
 
       {latest ? (
@@ -7295,7 +7360,7 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
                 el historial de entrenamientos */}
             {selectedEntry && (
               <div className="fixed inset-0 z-[140] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={() => setSelectedDate(null)}>
-                <div className="max-w-md w-full max-h-[85vh] overflow-y-auto overscroll-contain rounded-3xl modal-pop-in border border-purple-500/30" style={{ background: "linear-gradient(170deg,#0f172a 0%,#0a0f1a 100%)" }} onClick={(e) => e.stopPropagation()}>
+                <div className="max-w-md w-full max-h-[85vh] overflow-y-auto overscroll-contain rounded-3xl modal-pop-in border border-purple-500/30" style={{ background: "var(--panel-grad-slate)" }} onClick={(e) => e.stopPropagation()}>
                   <div className="relative px-4 pt-4 pb-3 overflow-hidden">
                     <div className="absolute -top-10 -right-8 w-36 h-36 rounded-full blur-3xl opacity-20 bg-purple-500 pointer-events-none" />
                     <button onClick={() => setSelectedDate(null)} aria-label="Cerrar" className="absolute top-3 right-3 z-10 p-2 rounded-xl bg-slate-800/90 text-slate-400 hover:text-white transition active:scale-90"><X size={15} /></button>
@@ -7824,7 +7889,7 @@ function CollapsibleSection({ title, subtitle, icon, defaultOpen = false, childr
   );
 }
 
-function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdateProfile, cycleStart, onSetCycleStart, onGoToRoutines, openSectionSignal = { id: null, n: 0 } }) {
+function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdateProfile, cycleStart, onSetCycleStart, onGoToRoutines, openSectionSignal = { id: null, n: 0 }, onOpenFieldPreview = null }) {
   const profile = profiles[profileName];
   const [showDeletePin, setShowDeletePin] = useState(false); const [deleteError, setDeleteError] = useState("");
   const [editing, setEditing] = useState(false);
@@ -8109,6 +8174,18 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
       <CollapsibleSection sectionId="field-settings-section" forceOpenSignal={openSectionSignal.id === "field-settings-section" ? openSectionSignal.n : 0} title="Qué ves al registrar" subtitle={(() => { const on = [settings.showRpe !== false, settings.showWarmup !== false, settings.show1RMPercent !== false, settings.showCoaching !== false, settings.showExerciseNote !== false, settings.showPersonalNote !== false].filter(Boolean).length; return on === 6 ? "Todo activado" : `${on} de 6 opciones activadas`; })()} icon={<Sliders size={16} />} accent="#14B8A6">
         <div className="space-y-2">
           <p className="text-[10px] text-slate-500 leading-snug mb-1">Apagá lo que no uses y la ficha de registro queda más limpia. No se pierde ningún dato: podés volver a prenderlo cuando quieras.</p>
+          {/* Recomendación: con las 6 prendidas la ficha se satura. */}
+          <div className="flex items-start gap-2 rounded-xl px-2.5 py-2 mb-1" style={{ backgroundColor: "rgba(20,184,166,0.10)", border: "1px solid rgba(20,184,166,0.25)" }}>
+            <Info size={12} className="text-teal-400 mt-0.5 shrink-0" />
+            <p className="text-[10px] text-teal-200/90 leading-snug"><span className="font-black">Recomendado:</span> dejá prendido solo lo que uses. Con todo activado la ficha se llena de botones y cuesta encontrar lo importante.</p>
+          </div>
+          {/* Abre el modal con vista previa en vivo: los cambios se ven al
+              instante sobre una ficha de ejemplo. */}
+          {onOpenFieldPreview && (
+            <button onClick={onOpenFieldPreview} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-[11px] font-bold transition active:scale-[0.98] mb-1" style={{ backgroundColor: "rgba(20,184,166,0.12)", color: "#2dd4bf", border: "1px solid rgba(20,184,166,0.3)" }}>
+              <Eye size={13} /> Ver cambios en tiempo real
+            </button>
+          )}
           {[
             { key: "showWarmup", label: "Calentamiento sugerido", desc: "La rampa de series previas (50% → 70% → 85%)." },
             { key: "showRpe", label: "Esfuerzo (RPE)", desc: "El botón para registrar qué tan duro fue." },
@@ -8119,7 +8196,7 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
           ].map(({ key, label, desc }) => {
             const on = settings[key] !== false;
             return (
-              <button key={key} onClick={() => updateSettings({ [key]: !on })} className="w-full flex items-center justify-between gap-3 rounded-xl px-3.5 py-2.5 transition active:scale-[0.99]" style={on ? { backgroundColor: "#14B8A614", border: "1px solid #14B8A640" } : { backgroundColor: "rgba(15,23,42,0.6)", border: "1px solid #33415580" }}>
+              <button key={key} onClick={() => updateSettings({ [key]: !on })} className="w-full flex items-center justify-between gap-3 rounded-xl px-3.5 py-2.5 transition active:scale-[0.99]" style={on ? { backgroundColor: "#14B8A614", border: "1px solid #14B8A640" } : { backgroundColor: "var(--row-surface)", border: "1px solid #33415580" }}>
                 <div className="text-left min-w-0">
                   <p className="text-xs font-bold" style={{ color: on ? "#2DD4BF" : "#94a3b8" }}>{label}</p>
                   <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">{desc}</p>
@@ -8135,7 +8212,7 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
 
       <CollapsibleSection title="Recordatorio de entrenamiento" subtitle={settings.reminderEnabled ? `Todos los días de rutina a las ${settings.reminderTime}` : "Desactivado"} icon={<Bell size={16} />} accent="#F59E0B">
         <div className="space-y-3">
-          <button onClick={() => updateSettings({ reminderEnabled: !settings.reminderEnabled })} className="w-full flex items-center justify-between gap-3 rounded-xl px-3.5 py-3 transition active:scale-[0.99]" style={settings.reminderEnabled ? { backgroundColor: "#F59E0B14", border: "1px solid #F59E0B40" } : { backgroundColor: "rgba(15,23,42,0.6)", border: "1px solid #33415580" }}>
+          <button onClick={() => updateSettings({ reminderEnabled: !settings.reminderEnabled })} className="w-full flex items-center justify-between gap-3 rounded-xl px-3.5 py-3 transition active:scale-[0.99]" style={settings.reminderEnabled ? { backgroundColor: "#F59E0B14", border: "1px solid #F59E0B40" } : { backgroundColor: "var(--row-surface)", border: "1px solid #33415580" }}>
             <div className="text-left min-w-0">
               <p className="text-xs font-bold" style={{ color: settings.reminderEnabled ? "#FBBF24" : "#94a3b8" }}>Avisarme los días que entreno</p>
               <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">Solo los días con rutina en tu agenda semanal — los de descanso no molestan.</p>
@@ -8217,7 +8294,7 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
       </div>
 
       {showPrivacy && (
-        <div className="fixed inset-0 z-[200] flex flex-col modal-overlay" style={{ background: "#0a0a0f", paddingTop: "env(safe-area-inset-top,0px)" }}>
+        <div className="fixed inset-0 z-[200] flex flex-col modal-overlay" style={{ background: "var(--app-bg)", paddingTop: "env(safe-area-inset-top,0px)" }}>
           <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800/60 shrink-0">
             <div className="flex items-center gap-2.5">
               <Info size={16} className="text-teal-400" />
@@ -9860,7 +9937,7 @@ Datos: ${JSON.stringify(context)}`;
                 className="flex-1 bg-transparent px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none min-w-0"
                 disabled={isSending}
               />
-              <button onClick={handleSend} disabled={!input.trim() || isSending} aria-label="Enviar" className="p-2.5 rounded-xl text-white shrink-0 disabled:opacity-40 transition-all active:scale-95" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>
+              <button onClick={handleSend} disabled={!input.trim() || isSending} aria-label="Enviar" className="p-2.5 rounded-xl !text-white shrink-0 disabled:opacity-40 transition-all active:scale-95" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>
                 <Send size={16} />
               </button>
             </div>
@@ -10020,7 +10097,7 @@ function ImportRoutineModal({ onImport, onClose }) {
         <textarea value={text} onChange={(e) => setText(e.target.value)} rows={8} placeholder={"Push\nPress banca 3x8-10\nPress militar 3x8-10\n\nPull\nDominadas 3x8-10\n..."} className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-teal-500/50 mb-3" />
         <input value={routineName} onChange={(e) => setRoutineName(e.target.value)} placeholder="Nombre para la rutina (opcional)" className="w-full bg-slate-900/80 border border-slate-700/50 rounded-xl px-3 py-2.5 text-white text-sm mb-3 focus:outline-none focus:border-teal-500/60" />
         {notice && <p className="text-[11px] text-amber-400 mb-3 leading-relaxed">{notice}</p>}
-        <button onClick={handleProcess} disabled={!text.trim() || loadingFile} className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-sm font-bold transition-all active:scale-[0.98] ${text.trim() && !loadingFile ? "text-white shadow-lg shadow-teal-500/20" : "bg-slate-800 text-slate-600"}`} style={text.trim() && !loadingFile ? { background: "linear-gradient(135deg,#14B8A6,#0E7490)" } : {}}>
+        <button onClick={handleProcess} disabled={!text.trim() || loadingFile} className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-sm font-bold transition-all active:scale-[0.98] ${text.trim() && !loadingFile ? "!text-white shadow-lg shadow-teal-500/20" : "bg-slate-800 text-slate-600"}`} style={text.trim() && !loadingFile ? { background: "linear-gradient(135deg,#14B8A6,#0E7490)" } : {}}>
           <Sparkles size={15} /> Detectar rutina
         </button>
         <button onClick={handleProcessAI} disabled={!text.trim() || loadingFile || isParsingAI} className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition text-sm font-semibold mt-2 disabled:opacity-50">
@@ -10369,7 +10446,7 @@ function PersonalizedRoutineWizard({ profile, onUpdateProfile, onCreateRoutine, 
       </div>
 
       {!generating && !preview && !genError && (
-        <div className="rounded-2xl border border-teal-500/20 p-5 bounce-in" style={{ background: "linear-gradient(160deg,#0d1f1e,#0f172a)" }} key={step}>
+        <div className="rounded-2xl border border-teal-500/20 p-5 bounce-in" style={{ background: "var(--panel-grad-emerald)" }} key={step}>
           <div className="flex items-start gap-3 mb-4">
             <div className="w-10 h-10 rounded-xl bg-teal-500/15 border border-teal-500/25 flex items-center justify-center shrink-0 text-teal-400">{current.icon}</div>
             <div>
@@ -10394,7 +10471,7 @@ function PersonalizedRoutineWizard({ profile, onUpdateProfile, onCreateRoutine, 
               })}
             </div>
             {current.multi && (
-              <button onClick={answerMulti} disabled={!current.optional && multiSel.length === 0} className="w-full mt-3 py-3 rounded-xl text-white text-sm font-black transition active:scale-95 disabled:opacity-30" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>
+              <button onClick={answerMulti} disabled={!current.optional && multiSel.length === 0} className="w-full mt-3 py-3 rounded-xl !text-white text-sm font-black transition active:scale-95 disabled:opacity-30" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>
                 {multiSel.length === 0 && current.optional ? "Saltear" : "Continuar"} {multiSel.length > 0 && `(${multiSel.length})`}
               </button>
             )}
@@ -10414,7 +10491,7 @@ function PersonalizedRoutineWizard({ profile, onUpdateProfile, onCreateRoutine, 
       )}
 
       {generating && (
-        <div className="rounded-2xl border border-teal-500/20 p-8 flex flex-col items-center gap-4 text-center" style={{ background: "linear-gradient(160deg,#0d1f1e,#0f172a)" }}>
+        <div className="rounded-2xl border border-teal-500/20 p-8 flex flex-col items-center gap-4 text-center" style={{ background: "var(--panel-grad-emerald)" }}>
           <div className="relative w-16 h-16">
             <div className="absolute inset-0 rounded-full border-[3px] border-teal-500/20 border-t-teal-500 animate-spin" />
             <div className="absolute inset-0 flex items-center justify-center"><Dumbbell size={22} className="text-teal-400 soft-pulse" /></div>
@@ -10442,7 +10519,7 @@ function PersonalizedRoutineWizard({ profile, onUpdateProfile, onCreateRoutine, 
 
       {preview && (
         <div className="space-y-3 bounce-in">
-          <div className="rounded-2xl border border-teal-500/25 p-4" style={{ background: "linear-gradient(160deg,#0d1f1e,#0f172a)" }}>
+          <div className="rounded-2xl border border-teal-500/25 p-4" style={{ background: "var(--panel-grad-emerald)" }}>
             <div className="flex items-center gap-2.5 mb-3">
               <div className="w-10 h-10 rounded-xl bg-teal-500/15 border border-teal-500/25 flex items-center justify-center"><Check size={17} className="text-teal-400" /></div>
               <div>
@@ -10468,7 +10545,7 @@ function PersonalizedRoutineWizard({ profile, onUpdateProfile, onCreateRoutine, 
           </div>
           <div className="flex gap-2">
             <button onClick={onClose} className="flex-1 py-3 rounded-xl border border-slate-700 text-slate-400 text-sm font-bold hover:text-white transition">Descartar</button>
-            <button onClick={handleConfirm} className="flex-1 py-3 rounded-xl text-white text-sm font-black transition active:scale-95" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>Usar esta rutina</button>
+            <button onClick={handleConfirm} className="flex-1 py-3 rounded-xl !text-white text-sm font-black transition active:scale-95" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>Usar esta rutina</button>
           </div>
         </div>
       )}
@@ -10866,7 +10943,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
         <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4">
           <WeeklyScheduleEditor dayOrder={def.dayOrder} days={def.days} schedule={def.weekSchedule} onChange={updatePendingScheduleDay} />
         </div>
-        <button onClick={confirmPendingActivation} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98] shadow-lg shadow-purple-500/20" style={{ background: "linear-gradient(135deg,#A855F7,#7E22CE)" }}><Check size={15} /> Listo, empezar a entrenar</button>
+        <button onClick={confirmPendingActivation} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl !text-white text-sm font-bold transition-all active:scale-[0.98] shadow-lg shadow-purple-500/20" style={{ background: "linear-gradient(135deg,#A855F7,#7E22CE)" }}><Check size={15} /> Listo, empezar a entrenar</button>
       </div>
     );
   }
@@ -11170,7 +11247,7 @@ function HeaderAvatar({ profileName, onClick }) {
     return () => { alive = false; window.removeEventListener("modusfit-avatar-updated", load); };
   }, [profileName]);
   return (
-    <button onClick={onClick} aria-label="Tu perfil" className="w-8 h-8 rounded-xl overflow-hidden flex items-center justify-center text-base font-black text-white shrink-0 lg:hidden active:scale-90 transition" style={!avatarUrl ? { background: "linear-gradient(135deg,#14B8A6,#0E7490)" } : {}}>
+    <button onClick={onClick} aria-label="Tu perfil" className="w-8 h-8 rounded-xl overflow-hidden flex items-center justify-center text-base font-black !text-white shrink-0 lg:hidden active:scale-90 transition" style={!avatarUrl ? { background: "linear-gradient(135deg,#14B8A6,#0E7490)" } : {}}>
       {avatarUrl ? <img src={avatarUrl} className="w-full h-full object-cover" alt="" /> : profileName.charAt(0).toUpperCase()}
     </button>
   );
@@ -11209,7 +11286,7 @@ function SideNav({ tab, setTab, profileName }) {
       <button onClick={() => setTab("perfil")} className={`w-full flex items-center gap-3 px-3 py-2.5 mb-3 rounded-xl text-sm font-semibold transition-all ${tab === "perfil" ? "bg-teal-500/15 text-teal-400" : "text-slate-500 hover:text-slate-300 hover:bg-slate-900/60"}`}>
         {avatarUrl
           ? <img src={avatarUrl} className="w-6 h-6 rounded-lg object-cover shrink-0" alt="" />
-          : <div className="w-6 h-6 rounded-lg flex items-center justify-center text-[11px] font-black text-white shrink-0" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>{initial}</div>
+          : <div className="w-6 h-6 rounded-lg flex items-center justify-center text-[11px] font-black !text-white shrink-0" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>{initial}</div>
         }
         <span className="truncate">{profileName}</span>
       </button>
@@ -11248,6 +11325,8 @@ function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
     { key: "showRpe", label: "Esfuerzo (RPE)", desc: "Registrá del 1 al 10 qué tan duro fue. Sirve para saber si podés subir peso o conviene bajar." },
     { key: "show1RMPercent", label: "Porcentaje de 1RM", desc: "A qué porcentaje de tu récord estás levantando ahora mismo." },
     { key: "showCoaching", label: "Consejos al guardar", desc: "Un mensaje corto comparando la serie con tu marca (📈 subiste, ✓ igualaste, 📉 bajaste)." },
+    { key: "showExerciseNote", label: "Consejos del ejercicio", desc: "La nota con la técnica que aparece debajo del nombre del ejercicio." },
+    { key: "showPersonalNote", label: "Notas por serie", desc: "El botón para escribir tu propio recordatorio en cada serie." },
   ];
 
   return (
@@ -11262,16 +11341,24 @@ function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
             <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition shrink-0"><X size={16} /></button>
           </div>
           <p className="text-[11px] text-slate-500 leading-snug">Elegí qué querés ver al registrar una serie. Mirá cómo cambia acá abajo en vivo — podés cambiarlo cuando quieras desde Perfil.</p>
+          <div className="mt-2.5 flex items-start gap-2 rounded-xl px-2.5 py-2" style={{ backgroundColor: "rgba(20,184,166,0.10)", border: "1px solid rgba(20,184,166,0.25)" }}>
+            <Info size={12} className="text-teal-400 mt-0.5 shrink-0" />
+            <p className="text-[10.5px] text-teal-200/90 leading-snug"><span className="font-black">Nuestra recomendación:</span> dejá prendido solo lo que vayas a usar de verdad. Con todo activado la ficha se llena de botones y cuesta encontrar lo importante. Siempre podés volver a prender lo que te falte.</p>
+          </div>
         </div>
 
         <div className="px-5 py-4">
           {/* ── VISTA PREVIA EN VIVO ── */}
           <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-600 mb-2">Así se va a ver</p>
           <div className="rounded-2xl bg-slate-950/70 border border-slate-800 p-3 mb-5">
-            <div className="flex items-center gap-2 mb-2.5">
+            <div className="flex items-center gap-2 mb-1">
               <span className="text-xs font-bold text-white">Press Banca</span>
               <span className="text-[9px] px-1.5 py-0.5 rounded-md font-bold bg-teal-500/15 text-teal-400">Pectoral</span>
             </div>
+            {on("showExerciseNote") && (
+              <p className="text-[10px] text-slate-500 mb-2 bounce-in leading-snug">Bajá la barra al pecho sin rebotar y mantené los omóplatos juntos.</p>
+            )}
+            {!on("showExerciseNote") && <div className="mb-1.5" />}
 
             {on("showWarmup") && (
               <div className="mb-2 rounded-xl px-2.5 py-2 bounce-in" style={{ backgroundColor: "#14B8A610", border: "1px solid #14B8A630" }}>
@@ -11293,7 +11380,7 @@ function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
                 <span className="block text-[8px] font-black uppercase tracking-wider text-slate-600">Kg</span>
                 <span className="text-sm font-black text-white tabular-nums">82.5</span>
               </div>
-              <span className="w-10 flex items-center justify-center text-white" style={{ background: "linear-gradient(160deg,#14B8A6,#14B8A6b0)" }}><Save size={13} /></span>
+              <span className="w-10 flex items-center justify-center !text-white" style={{ background: "linear-gradient(160deg,#14B8A6,#14B8A6b0)" }}><Save size={13} /></span>
             </div>
 
             {on("show1RMPercent") && (
@@ -11317,8 +11404,14 @@ function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
               </div>
             )}
 
-            {!on("showWarmup") && !on("showRpe") && !on("show1RMPercent") && !on("showCoaching") && (
-              <p className="text-[9.5px] text-slate-600 text-center italic">Ficha mínima: solo reps, kg y tu marca a superar.</p>
+            {on("showPersonalNote") && (
+              <div className="mt-2 bounce-in">
+                <div className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-slate-900/50 border border-slate-800/70 text-slate-500 text-[10px] font-bold"><StickyNote size={10} /> Agregar nota</div>
+              </div>
+            )}
+
+            {!on("showWarmup") && !on("showRpe") && !on("show1RMPercent") && !on("showCoaching") && !on("showExerciseNote") && !on("showPersonalNote") && (
+              <p className="text-[9.5px] text-slate-600 text-center italic">Ficha mínima: solo reps, kg y tu récord.</p>
             )}
           </div>
 
@@ -11327,7 +11420,7 @@ function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
             {OPCIONES.map((o) => {
               const active = on(o.key);
               return (
-                <button key={o.key} onClick={() => onUpdateSettings({ [o.key]: !active })} className="w-full flex items-start justify-between gap-3 rounded-xl px-3.5 py-2.5 text-left transition active:scale-[0.99]" style={active ? { backgroundColor: "#14B8A614", border: "1px solid #14B8A640" } : { backgroundColor: "rgba(15,23,42,0.6)", border: "1px solid #33415580" }}>
+                <button key={o.key} onClick={() => onUpdateSettings({ [o.key]: !active })} className="w-full flex items-start justify-between gap-3 rounded-xl px-3.5 py-2.5 text-left transition active:scale-[0.99]" style={active ? { backgroundColor: "#14B8A614", border: "1px solid #14B8A640" } : { backgroundColor: "var(--row-surface)", border: "1px solid #33415580" }}>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-bold" style={{ color: active ? "#2DD4BF" : "#94a3b8" }}>{o.label}</p>
                     <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">{o.desc}</p>
@@ -12202,7 +12295,7 @@ export default function App() {
     <div className={`min-h-screen bg-[#0a0a0f] text-white font-sans lg:flex ${themeClass}`} style={{ "--small-text-scale": smallTextScale }}>
       {/* Escudo fijo de la status bar — cubre la zona de batería/hora sin
           importar cuánto hayas scrolleado. El color es siempre #0a0a0f. */}
-      <div style={{ position: "fixed", top: 0, left: 0, right: 0, height: "env(safe-area-inset-top, 0px)", backgroundColor: "#0a0a0f", zIndex: 9999 }} />
+      <div style={{ position: "fixed", top: 0, left: 0, right: 0, height: "env(safe-area-inset-top, 0px)", backgroundColor: "var(--app-bg)", zIndex: 9999 }} />
 
       {/* Desaturación global: un overlay con backdrop-filter en vez de
           filter en el contenedor — filter en un ancestro convierte a ese
@@ -12251,7 +12344,7 @@ export default function App() {
             {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} onGoToRoutines={() => goToSection("rutinas", "routine-editor")} weekSchedule={weekSchedule} sex={profile?.sex} age={profile?.age} onGoToDeload={() => setTab("descarga")} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} />}
             {tab === "descarga" && <DeloadView logs={logs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} />}
             {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} settings={getProfileSettings(profile)} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} />}
-            {tab === "perfil" && <ProfileView openSectionSignal={openSectionSignal} profileName={activeProfile} profiles={profiles} logs={logs} onSignOut={handleSignOut} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} />}
+            {tab === "perfil" && <ProfileView onOpenFieldPreview={() => setShowFieldIntro(true)} openSectionSignal={openSectionSignal} profileName={activeProfile} profiles={profiles} logs={logs} onSignOut={handleSignOut} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} />}
           </div>
         </main>
       </div>
