@@ -8824,8 +8824,18 @@ function BuilderDayCard({ day, dayIdx, totalDays, onRename, onRemove, onMoveDay,
               // animación maneje el transform (si no, se pisarían).
               transform: (nuevoId === ex.id || saliendoIdx === i) ? undefined : `translateY(${desplazamientoDe(i)}px)`,
               transition: (nuevoId === ex.id || saliendoIdx === i) ? undefined : "transform 0.2s cubic-bezier(0.22,1,0.36,1)",
-              // Mientras arrastrás, el navegador no debe hacer scroll con el dedo
-              touchAction: dragIdx === i ? "none" : "auto",
+              // pan-y (no "auto") desde el principio, no sólo mientras se arrastra:
+              // en un celular real, mantener el dedo quieto sobre texto con
+              // touch-action normal dispara el gesto nativo del navegador (selección
+              // de texto / menú de copiar) antes de que se cumplan los 280ms del
+              // long-press — eso cancela el gesto y el arrastre nunca se arma. Con
+              // pan-y de entrada, el navegador no compite por el gesto y el long
+              // press se detecta siempre; una vez armado, "none" bloquea también el
+              // scroll vertical mientras se arrastra.
+              touchAction: dragIdx === i ? "none" : "pan-y",
+              WebkitUserSelect: "none",
+              userSelect: "none",
+              WebkitTouchCallout: "none",
               zIndex: dragIdx === i ? 20 : 1,
               position: "relative",
             }}
