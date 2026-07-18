@@ -1530,6 +1530,9 @@ p, span, label, button { overflow-wrap: break-word; }
   /* Cronómetro de descanso en reposo (cuando corre toma el color del día). */
   --timer-idle-bg: rgba(15,23,42,0.5);
   --timer-idle-border: rgba(30,41,59,0.6);
+  /* Modal de "subiste de rango" — el color del tier ya se aplica encima como
+     glow/borde, esto es sólo la base neutra detrás. */
+  --rankup-grad: linear-gradient(135deg, #0f0f1a, #1a1a2e);
 }
 .light-mode {
   --grad-hero-purple: linear-gradient(135deg, rgba(168,85,247,0.10), rgba(255,255,255,0.96) 55%, #ffffff);
@@ -1555,6 +1558,7 @@ p, span, label, button { overflow-wrap: break-word; }
   --panel-grad-emerald: linear-gradient(160deg, rgba(16,185,129,0.10), #ffffff 65%);
   --timer-idle-bg: #f1f5f9;
   --timer-idle-border: #e2e8f0;
+  --rankup-grad: linear-gradient(135deg, #ffffff, #f8fafc);
 }
 
 /* ============================================================================
@@ -4079,7 +4083,7 @@ function WelcomeIntro({ onClose, onOpenTutorial }) {
               onClick={() => setI(si)}
               aria-label={`Ir al paso ${si + 1}`}
               className="rounded-full transition-all duration-300"
-              style={{ width: si === i ? 22 : 7, height: 7, backgroundColor: si === i ? slide.color : "#1e293b" }}
+              style={{ width: si === i ? 22 : 7, height: 7, backgroundColor: si === i ? slide.color : "var(--surface-2)" }}
             />
           ))}
         </div>
@@ -4128,7 +4132,7 @@ function HelpModal({ startTab, onClose }) {
     <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
       <div
         className="max-w-md w-full rounded-3xl modal-pop-in shadow-2xl shadow-black/70 flex flex-col"
-        style={{ background: "linear-gradient(160deg,#0f1a1f 0%,#0a0f1a 100%)", border: "1px solid rgba(20,184,166,0.2)", height: "min(92vh, 700px)" }}
+        style={{ background: "var(--panel-grad-cyan)", border: "1px solid rgba(20,184,166,0.2)", height: "min(92vh, 700px)" }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -4177,7 +4181,7 @@ function HelpModal({ startTab, onClose }) {
                   return (
                     <div key={si} className="h-1 flex-1 rounded-full transition-all duration-300"
                       style={{
-                        backgroundColor: actual ? c.color : pasado ? c.color + "90" : "#1e293b",
+                        backgroundColor: actual ? c.color : pasado ? c.color + "90" : "var(--surface-2)",
                         boxShadow: actual ? `0 0 8px -1px ${c.color}` : "none",
                       }} />
                   );
@@ -4270,7 +4274,7 @@ function RankUpModal({ from, to, muscleName, onClose }) {
   useAndroidBack(onClose);
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-5 modal-overlay" style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}>
-      <div className="relative w-full max-w-sm rounded-3xl overflow-hidden elastic-in" style={{ background: "linear-gradient(135deg, #0f0f1a, #1a1a2e)", border: `2px solid ${to.color}40` }}>
+      <div className="relative w-full max-w-sm rounded-3xl overflow-hidden elastic-in" style={{ background: "var(--rankup-grad)", border: `2px solid ${to.color}40` }}>
         {/* Glow de fondo */}
         <div className="absolute inset-0 opacity-30 pointer-events-none" style={{ background: `radial-gradient(circle at 50% 30%, ${to.color}60, transparent 65%)` }} />
         <div className="relative p-7 text-center space-y-5">
@@ -5446,7 +5450,7 @@ function SessionDetailCard({ session, onDelete }) {
                 // 1-2% por el redondeo de la fórmula NO es rojo: es "igualaste".
                 const below = !isCardio && pct != null && pct < 99;
                 const color = it.isImprovement ? "#6EE7B7" : below ? "#FCA5A5" : "#cbd5e1";
-                const bg = it.isImprovement ? "#10B98118" : below ? "#F43F5E14" : "#1e293b";
+                const bg = it.isImprovement ? "#10B98118" : below ? "#F43F5E14" : "var(--surface-2)";
                 const bd = it.isImprovement ? "#10B98135" : below ? "#F43F5E30" : "transparent";
                 return (
                   <span key={i} className="text-[11px] font-bold px-2 py-1 rounded-lg tabular-nums inline-flex items-center gap-1 number-pop"
@@ -6714,7 +6718,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
   };
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-blue-500/25 shadow-lg shadow-blue-500/5 p-4 space-y-3" style={{ background: "linear-gradient(160deg, #0d1526 0%, #0f172a 45%, #0a0f1e 100%)" }}>
+    <div className="relative overflow-hidden rounded-2xl border border-blue-500/25 shadow-lg shadow-blue-500/5 p-4 space-y-3" style={{ background: "var(--panel-grad-blue)" }}>
       {/* Glows decorativos de fondo */}
       <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
       <div className="absolute -bottom-8 -left-8 w-32 h-32 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
@@ -6750,7 +6754,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
       <MuscleHighlighterBody ranks={ranks} selected={selected} onMuscleClick={goToMuscle} frontRef={frontBodyRef} backRef={backBodyRef} rankMode={mode} pulseMuscles={musculosQueSubieron} />
 
      {selInfo ? (
-        <div key={selected} ref={detailRef} className="relative overflow-hidden rounded-3xl p-[1.5px] bounce-in" style={{ background: selInfo.hasData ? `linear-gradient(140deg, ${selInfo.color}55, transparent 45%, transparent 60%, ${selInfo.color}30)` : "#1e293b" }}>
+        <div key={selected} ref={detailRef} className="relative overflow-hidden rounded-3xl p-[1.5px] bounce-in" style={{ background: selInfo.hasData ? `linear-gradient(140deg, ${selInfo.color}55, transparent 45%, transparent 60%, ${selInfo.color}30)` : "var(--panel-sunken)" }}>
           <div className="relative overflow-hidden rounded-[calc(1.5rem-1.5px)] p-4" style={{ background: "var(--panel-grad-blue)" }}>
             {selInfo.hasData && (
               <>
@@ -8072,7 +8076,7 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
                   <p className="text-xs font-bold" style={{ color: on ? "#2DD4BF" : "#94a3b8" }}>{label}</p>
                   <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">{desc}</p>
                 </div>
-                <span className="w-11 h-6 rounded-full shrink-0 relative transition-colors" style={{ backgroundColor: on ? "#14B8A6" : "#334155" }}>
+                <span className="w-11 h-6 rounded-full shrink-0 relative transition-colors" style={{ backgroundColor: on ? "#14B8A6" : "var(--surface-2)" }}>
                   <span className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all" style={{ left: on ? "22px" : "2px" }} />
                 </span>
               </button>
@@ -8088,7 +8092,7 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
               <p className="text-xs font-bold" style={{ color: settings.reminderEnabled ? "#FBBF24" : "#94a3b8" }}>Avisarme los días que entreno</p>
               <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">Solo los días con rutina en tu agenda semanal — los de descanso no molestan.</p>
             </div>
-            <span className="w-11 h-6 rounded-full shrink-0 relative transition-colors" style={{ backgroundColor: settings.reminderEnabled ? "#F59E0B" : "#334155" }}>
+            <span className="w-11 h-6 rounded-full shrink-0 relative transition-colors" style={{ backgroundColor: settings.reminderEnabled ? "#F59E0B" : "var(--surface-2)" }}>
               <span className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all" style={{ left: settings.reminderEnabled ? "22px" : "2px" }} />
             </span>
           </button>
@@ -8360,7 +8364,7 @@ function SavedRoutineRow({ routine, isActive, onUse, onEdit, onShare, onArchive,
   return (
     <SwipeToArchive confirmText={`¿Quitar "${routine.name}" de tus rutinas? No se borra nada.`} onArchive={onArchive}>
       <div className={`stagger-item smooth-card rounded-2xl px-4 py-3.5 backdrop-blur-sm shadow-md transition-shadow hover:shadow-lg ${isActive ? "border-2" : "border border-slate-800/50 bg-slate-900/50"}`}
-        style={isActive ? { borderColor: accent + "60", background: `linear-gradient(135deg, ${accent}12, #0f172a)`, boxShadow: `0 4px 20px -4px ${accent}25` } : {}}>
+        style={isActive ? { borderColor: accent + "60", background: `linear-gradient(135deg, ${accent}12, var(--panel-sunken))`, boxShadow: `0 4px 20px -4px ${accent}25` } : {}}>
         <div className="flex items-center gap-3">
           <div className="w-2 h-10 rounded-full shrink-0" style={{ backgroundColor: accent, boxShadow: `0 0 10px -2px ${accent}` }} />
           {/* Tocar la rutina abre el POP-UP completo directamente: antes había
@@ -10291,7 +10295,7 @@ function PersonalizedRoutineWizard({ profile, onUpdateProfile, onCreateRoutine, 
   return (
     <div className="space-y-4">
       {/* Hero visual del asistente */}
-      <div className="relative overflow-hidden rounded-2xl border border-teal-500/25 p-4" style={{ background: "linear-gradient(135deg,#0d1f1e 0%,#0f172a 60%,#0d1526 100%)" }}>
+      <div className="relative overflow-hidden rounded-2xl border border-teal-500/25 p-4" style={{ background: "var(--panel-grad-emerald)" }}>
         <div className="absolute -top-10 -right-6 w-36 h-36 rounded-full bg-teal-500/15 blur-3xl pointer-events-none" />
         <div className="absolute -bottom-8 -left-8 w-28 h-28 rounded-full bg-blue-500/10 blur-2xl pointer-events-none" />
         <div className="relative flex items-center gap-3">
@@ -10312,7 +10316,7 @@ function PersonalizedRoutineWizard({ profile, onUpdateProfile, onCreateRoutine, 
 
       <div className="flex gap-1">
         {STEPS.map((_, i) => (
-          <div key={i} className="h-1 flex-1 rounded-full transition-all duration-300" style={{ backgroundColor: i <= step || preview ? "#14B8A6" : "#1e293b" }} />
+          <div key={i} className="h-1 flex-1 rounded-full transition-all duration-300" style={{ backgroundColor: i <= step || preview ? "#14B8A6" : "var(--surface-2)" }} />
         ))}
       </div>
 
@@ -10859,7 +10863,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
       {forced && (
         <div className="space-y-2.5">
           {/* Opción 1: Crear rutina (expande IA / Manual) */}
-          <div className={`rounded-2xl border overflow-hidden transition-all ${createOpen ? "border-teal-500/40" : "border-teal-500/25"}`} style={{ background: "linear-gradient(135deg,#0d1f1e,#0f172a)" }}>
+          <div className={`rounded-2xl border overflow-hidden transition-all ${createOpen ? "border-teal-500/40" : "border-teal-500/25"}`} style={{ background: "var(--panel-grad-emerald)" }}>
             <button onClick={() => { setCreateOpen((o) => !o); setShowPresetsForced(false); }} className="relative overflow-hidden w-full p-4 text-left transition active:scale-[0.99]">
               <div className="absolute -top-8 -right-8 w-28 h-28 rounded-full bg-teal-500/15 blur-2xl pointer-events-none" />
               <div className="relative flex items-center gap-3">
@@ -11295,7 +11299,7 @@ function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
                     <p className="text-xs font-bold" style={{ color: active ? "#2DD4BF" : "#94a3b8" }}>{o.label}</p>
                     <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">{o.desc}</p>
                   </div>
-                  <span className="w-11 h-6 rounded-full shrink-0 relative transition-colors mt-0.5" style={{ backgroundColor: active ? "#14B8A6" : "#334155" }}>
+                  <span className="w-11 h-6 rounded-full shrink-0 relative transition-colors mt-0.5" style={{ backgroundColor: active ? "#14B8A6" : "var(--surface-2)" }}>
                     <span className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all" style={{ left: active ? "22px" : "2px" }} />
                   </span>
                 </button>
@@ -11329,7 +11333,7 @@ function OnboardingTasksCard({ profile, cycleStart, logs, onGoToProfile, onDone,
   if (hidden || allDone) return null;
 
   return (
-    <div className="mb-4 rounded-2xl border border-teal-500/25 overflow-hidden bounce-in" style={{ background: "linear-gradient(135deg, #0d1f1e, #0f172a)" }}>
+    <div className="mb-4 rounded-2xl border border-teal-500/25 overflow-hidden bounce-in" style={{ background: "var(--panel-grad-emerald)" }}>
       <div className="px-4 py-3 flex items-center gap-2.5 border-b border-slate-800/50">
         <div className="w-8 h-8 rounded-xl bg-teal-500/15 flex items-center justify-center shrink-0"><Target size={15} className="text-teal-400" /></div>
         <div className="flex-1 min-w-0">
@@ -11337,7 +11341,7 @@ function OnboardingTasksCard({ profile, cycleStart, logs, onGoToProfile, onDone,
           <p className="text-[10px] text-slate-500">{doneCount} de {tasks.length} completados</p>
         </div>
         <div className="flex gap-1">
-          {tasks.map((t) => <div key={t.key} className="w-2 h-2 rounded-full" style={{ backgroundColor: t.done ? "#14B8A6" : "#1e293b" }} />)}
+          {tasks.map((t) => <div key={t.key} className="w-2 h-2 rounded-full" style={{ backgroundColor: t.done ? "#14B8A6" : "var(--surface-2)" }} />)}
         </div>
       </div>
       <div className="px-4 py-2.5 space-y-2">
