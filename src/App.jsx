@@ -8671,6 +8671,7 @@ function BuilderDayCard({ day, dayIdx, totalDays, onRename, onRemove, onMoveDay,
     if (e.target?.closest?.("button, input, textarea, select, a")) return;
 
     const startY = e.clientY, startX = e.clientX;
+    let lastY = e.clientY;
     let armado = false;   // ¿ya se cumplió el long-press?
     let cancelado = false;
 
@@ -8681,6 +8682,15 @@ function BuilderDayCard({ day, dayIdx, totalDays, onRename, onRemove, onMoveDay,
       setDragIdx(i);
       setOverIdx(i);
       haptic(14);
+      // Fija el gesto a este puntero: en un celular real, el touch-action de
+      // la fila se evalúa una sola vez al apoyar el dedo — si en esos
+      // primeros milisegundos el navegador ya decidió que esto es un scroll
+      // nativo, después ningún preventDefault() lo revierte, y el arrastre
+      // se arma (vibra) pero el dedo sigue "scrolleando" en vez de mover la
+      // fila. Por eso la fila usa touch-action:none desde el vamos (más
+      // abajo, en el style) y acá abajo pedimos el puntero explícitamente,
+      // para que el gesto quede 100% bajo control nuestro en vez del navegador.
+      e.target?.setPointerCapture?.(e.pointerId);
     };
     let timer = setTimeout(armar, LONG_PRESS_MS);
 
@@ -8695,14 +8705,17 @@ function BuilderDayCard({ day, dayIdx, totalDays, onRename, onRemove, onMoveDay,
 
     const onMove = (ev) => {
       if (!armado) {
-        // Todavía no se armó: si el dedo se movió, era un scroll → cancelar
-        const dy = Math.abs(ev.clientY - startY);
-        const dx = Math.abs(ev.clientX - startX);
-        if (dy > MOVE_TOLERANCE || dx > MOVE_TOLERANCE) {
+        // Todavía no se armó: si el dedo se movió, era un scroll — como la
+        // fila tiene touch-action:none, el navegador ya no lo hace solo, así
+        // que lo scrolleamos nosotros a mano para que se sienta igual.
+        const dy = ev.clientY - startY;
+        const dx = ev.clientX - startX;
+        if (!cancelado && (Math.abs(dy) > MOVE_TOLERANCE || Math.abs(dx) > MOVE_TOLERANCE)) {
           cancelado = true;
           clearTimeout(timer);
-          limpiar();
         }
+        if (cancelado) { ev.preventDefault(); window.scrollBy(0, lastY - ev.clientY); }
+        lastY = ev.clientY;
         return;
       }
       // Ya armado: tomamos el control del gesto (no scrollear la página)
@@ -8824,15 +8837,15 @@ function BuilderDayCard({ day, dayIdx, totalDays, onRename, onRemove, onMoveDay,
               // animación maneje el transform (si no, se pisarían).
               transform: (nuevoId === ex.id || saliendoIdx === i) ? undefined : `translateY(${desplazamientoDe(i)}px)`,
               transition: (nuevoId === ex.id || saliendoIdx === i) ? undefined : "transform 0.2s cubic-bezier(0.22,1,0.36,1)",
-              // pan-y (no "auto") desde el principio, no sólo mientras se arrastra:
-              // en un celular real, mantener el dedo quieto sobre texto con
-              // touch-action normal dispara el gesto nativo del navegador (selección
-              // de texto / menú de copiar) antes de que se cumplan los 280ms del
-              // long-press — eso cancela el gesto y el arrastre nunca se arma. Con
-              // pan-y de entrada, el navegador no compite por el gesto y el long
-              // press se detecta siempre; una vez armado, "none" bloquea también el
-              // scroll vertical mientras se arrastra.
-              touchAction: dragIdx === i ? "none" : "pan-y",
+              // "none" SIEMPRE, no sólo mientras se arrastra: el touch-action de
+              // una fila se decide una única vez, apenas el dedo la toca. Si acá
+              // dijera "pan-y", el navegador puede darle el gesto al scroll nativo
+              // en esos primeros milisegundos — y aunque el long-press se arme
+              // después (vibra), ya es tarde: el dedo sigue scrolleando en vez de
+              // mover la fila, sin que ningún preventDefault() lo pueda revertir.
+              // Por eso el scroll "antes de armar" se hace a mano en onMove (más
+              // arriba), y acá el navegador nunca llega a tomar el control.
+              touchAction: "none",
               WebkitUserSelect: "none",
               userSelect: "none",
               WebkitTouchCallout: "none",
