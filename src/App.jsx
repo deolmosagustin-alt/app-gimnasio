@@ -3667,12 +3667,12 @@ const HELP_CHAPTERS = [
       {
         icon: <StickyNote size={20} />,
         title: "Notas por ejercicio",
-        text: "Tocá el ícono de nota en la tarjeta de cualquier ejercicio para escribir tus recordatorios: \"agarre más cerrado\", \"el banco 3 está flojo\", \"probar pausa abajo\". La nota queda siempre visible bajo el nombre y se sincroniza con tu cuenta.",
+        text: "Debajo de cada serie tenés \"Agregar nota\" para escribir tus recordatorios: \"agarre más cerrado\", \"el banco 3 está flojo\", \"probar pausa abajo\". Cada serie guarda la suya y se sincroniza con tu cuenta.",
       },
       {
         icon: <Dumbbell size={20} />,
         title: "¿Una o dos mancuernas?",
-        text: "En los ejercicios de mancuerna aparece un chip ×1/×2. Tocalo para indicar cuántas usás: con dos de 20kg, tu rango cuenta 40kg de carga real en vez de 20. También podés configurarlo al editar la rutina.",
+        text: "Al editar la rutina, en cada ejercicio de mancuerna elegís si usás una o dos. Con dos de 20kg, tu rango cuenta 40kg de carga real en vez de 20.",
       },
       {
         icon: <Sliders size={20} />,
@@ -4365,7 +4365,7 @@ function RankUpModal({ from, to, muscleName, onClose }) {
   );
 }
 
-function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, accent, logs, setLogs, drafts = {}, setDrafts, deloadKgFactor = 1, deloadMode = false, resetKey = 0, autoShowPrShare = true, onDisableAutoShowPrShare, hasActiveSession = true, cardio = false, dumbbellDouble = null, fieldSettings = DEFAULT_SETTINGS }) {
+function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, accent, logs, setLogs, drafts = {}, setDrafts, deloadKgFactor = 1, deloadMode = false, resetKey = 0, autoShowPrShare = true, onDisableAutoShowPrShare, hasActiveSession = true, cardio = false, dumbbellDouble = null, fieldSettings = DEFAULT_SETTINGS, onUpdateSettings = null }) {
   const globalUnit = useWeightUnit();
   // Unidad local: arranca desde la preferencia global, pero el usuario puede
   // cambiarla ejercicio por ejercicio con el toggle kg/lbs del input.
@@ -4406,6 +4406,28 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   const [feedback, setFeedback] = useState(null);
   const [showRpeLocal, setShowRpeLocal] = useState(false);
   const showRpe = showRpeLocal || rpe != null;
+  // ── Nota de ESTA serie ────────────────────────────────────────────────────
+  // Antes había una sola nota por ejercicio; ahora es una por serie. La clave
+  // sigue el patrón de los logs (`ejercicio_indice`). Para no perder las notas
+  // que ya tenías (guardadas por ejercicio), la primera serie las hereda.
+  const noteKey = `${exerciseId}_${setIndex}`;
+  const setNote = fieldSettings?.exerciseNotes?.[noteKey] ?? (setIndex === 0 ? (fieldSettings?.exerciseNotes?.[exerciseId] || "") : "");
+  const [editingNote, setEditingNote] = useState(false);
+  const [noteDraft, setNoteDraft] = useState(setNote);
+  useEffect(() => { setNoteDraft(setNote); }, [setNote]);
+  const guardarNota = () => {
+    if (!onUpdateSettings) return;
+    const limpio = noteDraft.trim();
+    const notas = { ...(fieldSettings?.exerciseNotes || {}) };
+    if (limpio) notas[noteKey] = limpio;
+    else delete notas[noteKey];
+    // Si estábamos editando la nota heredada del ejercicio, la retiramos de la
+    // clave vieja para que no reaparezca.
+    if (setIndex === 0 && notas[exerciseId]) delete notas[exerciseId];
+    onUpdateSettings({ exerciseNotes: notas });
+    setEditingNote(false);
+    haptic(12);
+  };
   const [editingPR, setEditingPR] = useState(false);
   const [rowFocus, setRowFocus] = useState(false); // enciende el borde al enfocar
   const cardioFinishedRef = useRef(false); // el countdown llegó a 0 solo (no pausa manual)
@@ -4903,6 +4925,34 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           <button onClick={() => { updateDraft({ rpe: null }); setShowRpeLocal(false); }} className="text-slate-600 hover:text-slate-400 ml-auto shrink-0"><X size={12} /></button>
         </div>
       ))}
+      {/* Nota de esta serie: mismo patrón que el RPE — discreto cuando no hay
+          nada, y se abre al tocarlo. Una nota por serie, no por ejercicio. */}
+      {fieldSettings.showPersonalNote !== false && onUpdateSettings && (
+        editingNote ? (
+          <div className="mt-2.5 bounce-in rounded-lg p-2" style={{ backgroundColor: "rgba(2,6,23,0.7)", border: `1px solid ${accent}30` }}>
+            <textarea
+              value={noteDraft}
+              onChange={(e) => setNoteDraft(e.target.value)}
+              placeholder="Agarre más cerrado · pausa abajo…"
+              rows={2}
+              maxLength={200}
+              autoFocus
+              className="w-full bg-transparent text-[12px] text-slate-200 placeholder:text-slate-700 focus:outline-none resize-none leading-snug"
+            />
+            <div className="flex items-center gap-2 mt-1">
+              <button onClick={guardarNota} className="text-[11px] font-bold px-2.5 py-1 rounded-lg transition active:scale-95" style={{ backgroundColor: accent, color: "#fff" }}>Guardar</button>
+              <button onClick={() => { setNoteDraft(setNote); setEditingNote(false); }} className="text-[11px] text-slate-500 hover:text-slate-300 transition">Cancelar</button>
+            </div>
+          </div>
+        ) : setNote ? (
+          <button onClick={() => setEditingNote(true)} className="w-full mt-2.5 flex items-start gap-1.5 text-left rounded-lg px-2 py-1.5 transition active:scale-[0.99]" style={{ backgroundColor: accent + "12", border: `1px solid ${accent}28` }}>
+            <StickyNote size={11} className="mt-0.5 shrink-0" style={{ color: accent }} />
+            <span className="text-[11px] leading-snug" style={{ color: accent, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{setNote}</span>
+          </button>
+        ) : (
+          <button onClick={() => setEditingNote(true)} className="w-full flex items-center justify-center gap-1.5 mt-2.5 py-2 rounded-lg bg-slate-900/50 border border-slate-800/70 text-slate-500 hover:text-slate-300 hover:border-slate-600 text-[11px] font-bold transition"><StickyNote size={11} /> Agregar nota</button>
+        )
+      )}
       {editingPR && !cardio && (
         <div className="mt-2 rounded-xl p-3 space-y-2 bounce-in" style={{ backgroundColor: "rgba(2,6,23,0.7)", border: `1px solid ${accent}30` }}>
           <p className="text-[10px] font-black uppercase tracking-[0.14em] flex items-center gap-1.5" style={{ color: accent }}><Edit3 size={11} /> Corregir récord</p>
@@ -4941,10 +4991,6 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
   const [open, setOpen] = useState(false);
   const [showWarmup, setShowWarmup] = useState(false);
   // Nota personal del ejercicio (persiste en el perfil → sincroniza)
-  const myNote = settings?.exerciseNotes?.[exercise.id] || "";
-  const [editingNote, setEditingNote] = useState(false);
-  const [noteDraft, setNoteDraft] = useState(myNote);
-  useEffect(() => { setNoteDraft(myNote); }, [myNote]);
   // forceOpen se usa solo desde las demos del tutorial guiado, para abrir la
   // tarjeta automáticamente cuando el paso explica algo de adentro (reps/kg,
   // RPE, descanso, video). No afecta el comportamiento normal de la app.
@@ -4981,69 +5027,19 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
               <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded-lg font-bold" style={{ backgroundColor: accent + "18", color: accent }}>{exercise.muscle}</span>
               {exercise.cardio && <span className="text-[10px] bg-rose-400/15 text-rose-300 rounded-lg px-1.5 py-0.5 font-bold flex items-center gap-1"><Footprints size={9} /> CARDIO</span>}
               {deloadMode && <span className="text-[10px] bg-purple-500/15 text-purple-400 rounded-lg px-1.5 py-0.5 font-bold">DESCARGA</span>}
-              {/* Toggle ×1/×2 para ejercicios de mancuerna: cuántas usás.
-                  Afecta el peso REAL que cuenta para tu rango muscular —
-                  búlgaras con 2×20kg son 40kg de carga, no 20. Se guarda
-                  por ejercicio en tu perfil (sincroniza a la nube). */}
-              {!exercise.cardio && onUpdateSettings && /mancuerna/i.test(exercise.name || "") && (() => {
-                const effLf = settings?.dumbbellDouble?.[exercise.id] || EXERCISE_LIBRARY_BY_ID[exercise.id]?.loadFactor || 1;
-                return (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); onUpdateSettings({ dumbbellDouble: { ...(settings?.dumbbellDouble || {}), [exercise.id]: effLf === 2 ? 1 : 2 } }); }}
-                    title={effLf === 2 ? "Contando DOS mancuernas (peso ×2)" : "Contando UNA mancuerna"}
-                    className="text-[10px] rounded-lg px-1.5 py-0.5 font-black flex items-center gap-1 transition active:scale-95"
-                    style={effLf === 2 ? { backgroundColor: accent + "22", color: accent, border: `1px solid ${accent}45` } : { backgroundColor: "rgba(30,41,59,0.6)", color: "#64748b", border: "1px solid #334155" }}
-                  >
-                    <Dumbbell size={9} /> ×{effLf}
-                  </button>
-                );
-              })()}
+              {/* El ×1/×2 de mancuernas se configura al editar la rutina
+                  ("¿Con cuántas mancuernas?"), no acá: durante el
+                  entrenamiento sumaba ruido y ya está definido. */}
               {!deloadMode && stagnant && <span className="text-[10px] bg-rose-500/15 text-rose-400 rounded-lg px-1.5 py-0.5 font-bold flex items-center gap-1"><AlertTriangle size={9} /> ESTANCADO</span>}
-              {/* Nota personal: tocá para escribir tus recordatorios del
-                  ejercicio ("agarre más cerrado", "el banco 3 está flojo").
-                  El ícono se enciende con el color del día si ya hay nota. */}
-              {onUpdateSettings && settings.showPersonalNote !== false && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); setEditingNote((v) => !v); if (!open) setOpen(true); }}
-                  title={myNote ? "Editar tu nota" : "Agregar una nota"}
-                  className="text-[10px] rounded-lg px-2 py-0.5 font-black flex items-center gap-1 transition active:scale-95"
-                  style={myNote ? { backgroundColor: accent + "22", color: accent, border: `1px solid ${accent}45` } : { backgroundColor: "rgba(30,41,59,0.6)", color: "#94a3b8", border: "1px solid #475569" }}
-                >
-                  <StickyNote size={11} /> {myNote ? "Nota" : "+ Nota"}
-                </button>
-              )}
+              {/* Las notas ahora son POR SERIE (ver SetRow): cada serie tiene
+                  su propio "Agregar nota". Acá ya no va nada. */}
             </div>
             {exercise.nota && settings.showExerciseNote !== false && <p className="text-[11px] text-slate-500 mt-0.5" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{exercise.nota}</p>}
-            {myNote && !editingNote && (
-              <p className="text-[11px] mt-1 flex items-start gap-1.5 leading-snug" style={{ color: accent }}>
-                <StickyNote size={10} className="mt-0.5 shrink-0" />
-                <span style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{myNote}</span>
-              </p>
-            )}
           </div>
         </div>
         <ChevronDown size={18} className={`text-slate-600 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
       </button>
       <div className={open ? "px-4 pb-4 pt-0 tab-fade-in" : "hidden"}>
-        {editingNote && onUpdateSettings && (
-          <div className="mb-3 bounce-in rounded-xl p-3" style={{ backgroundColor: "rgba(2,6,23,0.7)", border: `1px solid ${accent}30` }}>
-            <p className="text-[10px] font-black uppercase tracking-[0.14em] flex items-center gap-1.5 mb-2" style={{ color: accent }}><StickyNote size={11} /> Tu nota</p>
-            <textarea
-              value={noteDraft}
-              onChange={(e) => setNoteDraft(e.target.value)}
-              placeholder="Agarre más cerrado · pausa abajo · el banco 3 está flojo…"
-              rows={2}
-              maxLength={200}
-              className="w-full bg-slate-950/70 border border-slate-800 rounded-lg px-2.5 py-2 text-xs text-white placeholder:text-slate-600 focus:outline-none resize-none transition"
-              style={{ borderColor: accent + "35" }}
-            />
-            <div className="flex items-center gap-2 mt-2">
-              <button onClick={() => { const notas = { ...(settings?.exerciseNotes || {}) }; const t = noteDraft.trim(); if (t) notas[exercise.id] = t; else delete notas[exercise.id]; onUpdateSettings({ exerciseNotes: notas }); setEditingNote(false); }} className="flex-1 py-2 rounded-lg text-[11px] font-black !text-white transition active:scale-95" style={{ background: `linear-gradient(160deg, ${accent}, ${accent}b0)` }}>Guardar</button>
-              {myNote && <button onClick={() => { const notas = { ...(settings?.exerciseNotes || {}) }; delete notas[exercise.id]; onUpdateSettings({ exerciseNotes: notas }); setNoteDraft(""); setEditingNote(false); }} className="px-3 py-2 rounded-lg text-[11px] font-bold text-rose-400 bg-rose-500/10 border border-rose-500/25 transition active:scale-95">Borrar</button>}
-              <button onClick={() => { setNoteDraft(myNote || ""); setEditingNote(false); }} className="px-3 py-2 rounded-lg text-[11px] font-bold text-slate-500 bg-slate-800/60 transition active:scale-95">Cancelar</button>
-            </div>
-          </div>
-        )}
         {!deloadMode && stagnant && <div className="mb-3 text-[11px] text-rose-400/90 bg-rose-500/5 border border-rose-500/15 rounded-xl px-3 py-2 flex items-start gap-1.5"><Info size={12} className="mt-0.5 shrink-0" /><span>Hace {STAGNATION_DAYS}+ días sin superar el récord. Considerá cambiar reps, descanso o variante.</span></div>}
         {/* El cronómetro ya no vive fijo acá: se posiciona entre las series
             según timerSlot (más abajo, junto a las series). */}
@@ -5079,7 +5075,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
           <div className="mb-2 timer-hop"><RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={accent} alertType={settings.alertType} timerId={`ex_${exercise.id}`} exerciseName={exercise.name} /></div>
         )}
         {setsToShow.map((s, i) => <React.Fragment key={`${exercise.id}:frag:${i}`}>
-          <SetRow key={`${exercise.id}:${i}`} exerciseId={exercise.id} exerciseName={exercise.name} exerciseMuscle={exercise.muscle} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadKgFactor={settings.deloadPct} deloadMode={deloadMode} resetKey={resetKey} autoShowPrShare={settings.autoShowPrShare ?? true} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={hasActiveSession} cardio={exercise.cardio} dumbbellDouble={settings?.dumbbellDouble || null} fieldSettings={settings} />
+          <SetRow key={`${exercise.id}:${i}`} exerciseId={exercise.id} exerciseName={exercise.name} exerciseMuscle={exercise.muscle} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadKgFactor={settings.deloadPct} deloadMode={deloadMode} resetKey={resetKey} autoShowPrShare={settings.autoShowPrShare ?? true} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={hasActiveSession} cardio={exercise.cardio} dumbbellDouble={settings?.dumbbellDouble || null} fieldSettings={settings} onUpdateSettings={onUpdateSettings} />
           {/* Debajo de la serie recién registrada: timerSlot = N significa
               "después de la serie N" (1-indexado). */}
           {timerSlot === i + 1 && (
@@ -8119,7 +8115,7 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
             { key: "show1RMPercent", label: "Porcentaje de 1RM", desc: "A qué % de tu récord estás levantando." },
             { key: "showCoaching", label: "Consejos al guardar", desc: "El mensaje 📈/✓/📉 comparando con tu marca." },
             { key: "showExerciseNote", label: "Consejos del ejercicio", desc: "La nota con la técnica debajo del nombre del ejercicio." },
-            { key: "showPersonalNote", label: "Botón de nota personal", desc: "El botón para escribir tus propios recordatorios por ejercicio." },
+            { key: "showPersonalNote", label: "Notas por serie", desc: "El botón para escribir un recordatorio en cada serie." },
           ].map(({ key, label, desc }) => {
             const on = settings[key] !== false;
             return (
