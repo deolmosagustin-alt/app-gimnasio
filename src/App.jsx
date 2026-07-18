@@ -8460,7 +8460,7 @@ function ExercisePickerPanel({ existingIds, onAdd, onAddCustom, onClose }) {
 
 const REP_RANGE_OPTIONS = ["1-3", "3-5", "4-6", "6-8", "8-10", "10-12", "12-15", "15-20"];
 
-function BuilderExerciseRow({ ex, onRemove, onConfigChange, isDragging = false, dumbbellFactor = null, onToggleDumbbell = null, recienAgregado = false, dayColor = "#14B8A6" }) {
+function BuilderExerciseRow({ ex, onRemove, onConfigChange, isDragging = false, dumbbellFactor = null, onToggleDumbbell = null, recienAgregado = false, dayColor = "#14B8A6", onHandlePointerDown = null, onMoveUp = null, onMoveDown = null }) {
   const [editing, setEditing] = useState(false);
   const repRange = ex.sets[0]?.repRange || "8-10";
   const setsCount = ex.sets.length;
@@ -8490,8 +8490,14 @@ function BuilderExerciseRow({ ex, onRemove, onConfigChange, isDragging = false, 
       }}
     >
       <div className="flex items-center gap-2">
-        {/* Sin flechas: para reordenar, mantenés apretado el ejercicio (desde
-            cualquier parte) y arrastrás — los demás se corren en vivo. */}
+        {/* Flechas: forma 100% confiable de reordenar, sin depender de ningún
+            gesto táctil. El asa de al lado (GripVertical) es la alternativa
+            "linda" para arrastrar en vivo cuando el gesto anda bien en el
+            dispositivo. */}
+        <div className="flex flex-col -my-1 shrink-0">
+          <button onClick={onMoveUp} disabled={!onMoveUp} aria-label="Mover arriba" className="p-0.5 text-slate-600 hover:text-slate-300 disabled:opacity-20"><ChevronUp size={13} /></button>
+          <button onClick={onMoveDown} disabled={!onMoveDown} aria-label="Mover abajo" className="p-0.5 text-slate-600 hover:text-slate-300 disabled:opacity-20"><ChevronDown size={13} /></button>
+        </div>
         <button onClick={() => setEditing((o) => !o)} className="flex-1 min-w-0 text-left">
           <div className="flex items-center gap-1.5 flex-wrap">
             <p className="text-xs font-bold text-white truncate">{ex.name}</p>
@@ -8519,6 +8525,19 @@ function BuilderExerciseRow({ ex, onRemove, onConfigChange, isDragging = false, 
         </button>
         <button onClick={() => setEditing((o) => !o)} className="p-1.5 text-slate-500 hover:text-teal-400 shrink-0"><SlidersHorizontal size={14} /></button>
         <button onClick={onRemove} className="p-1.5 text-slate-600 hover:text-rose-400 shrink-0"><Trash2 size={14} /></button>
+        {/* Asa de arrastre: único punto de la fila donde arranca el gesto de
+            reordenar en vivo. touchAction:none va SOLO acá (no en toda la
+            fila) para no pisarle el scroll normal al resto de la lista. */}
+        {onHandlePointerDown && (
+          <button
+            onPointerDown={onHandlePointerDown}
+            aria-label="Arrastrar para reordenar"
+            className="p-1.5 -mr-1 text-slate-600 hover:text-slate-300 shrink-0 cursor-grab active:cursor-grabbing"
+            style={{ touchAction: "none" }}
+          >
+            <GripVertical size={14} />
+          </button>
+        )}
       </div>
       {editing && (
         <div className="mt-2.5 pt-2.5 border-t border-slate-800/60 space-y-3 bounce-in">
@@ -8596,16 +8615,17 @@ function BuilderDayCard({ day, dayIdx, totalDays, onRename, onRemove, onMoveDay,
   const dragRef = useRef({ from: null, over: null });
 
   // ── ARRASTRE PARA REORDENAR ──────────────────────────────────────────────
-  // Se agarra desde CUALQUIER parte de la fila manteniendo apretado (no hace
-  // falta un asa). Los ejercicios se corren en vivo mientras arrastrás, así
-  // ves exactamente dónde va a quedar antes de soltar.
-  //
-  // El truco para que no pelee con el scroll: no bloqueamos nada hasta que se
-  // cumple el long-press (280ms sin mover el dedo). Si movés antes de eso, es
-  // un scroll normal y cancelamos el arrastre. Si mantenés quieto, vibra y
-  // ahí sí tomamos el control del gesto.
-  const LONG_PRESS_MS = 280;
-  const MOVE_TOLERANCE = 8; // px que podés temblar sin cancelar
+  // Se agarra desde un asa dedicada (ícono de agarre) en vez de la fila
+  // entera. Antes se armaba con un long-press desde cualquier punto de la
+  // fila, pero en celulares reales el touch-action de la fila se decide
+  // UNA sola vez, apenas el dedo la toca — si el navegador ya había
+  // decidido "esto es scroll" en esos primeros milisegundos, el long-press
+  // se cumplía igual (vibraba) pero el dedo seguía scrolleando en vez de
+  // mover la fila, sin que ningún preventDefault() lo revirtiera a mitad
+  // de gesto. Con un asa chica y dedicada que SIEMPRE tiene touch-action:
+  // none, no hay ambigüedad que resolver: tocar el asa es sólo para
+  // arrastrar, tocar el resto de la fila sigue siendo scroll normal — así
+  // que el arrastre arranca al toque, sin esperar nada.
 
   // Animaciones de la lista: qué ejercicio acaba de entrar (para resaltarlo) y
   // cuál se está yendo (para que colapse antes de desaparecer de verdad).
@@ -8667,32 +8687,15 @@ function BuilderDayCard({ day, dayIdx, totalDays, onRename, onRemove, onMoveDay,
   const startDrag = (e, i) => {
     // Solo botón principal / dedo (ignorar click derecho)
     if (e.button != null && e.button !== 0) return;
-    // No arrastrar si tocaste un control (botón, input, textarea)
-    if (e.target?.closest?.("button, input, textarea, select, a")) return;
+    e.preventDefault();
 
-    const startY = e.clientY, startX = e.clientX;
-    let lastY = e.clientY;
-    let armado = false;   // ¿ya se cumplió el long-press?
-    let cancelado = false;
-
-    const armar = () => {
-      if (cancelado) return;
-      armado = true;
-      dragRef.current = { from: i, over: i };
-      setDragIdx(i);
-      setOverIdx(i);
-      haptic(14);
-      // Fija el gesto a este puntero: en un celular real, el touch-action de
-      // la fila se evalúa una sola vez al apoyar el dedo — si en esos
-      // primeros milisegundos el navegador ya decidió que esto es un scroll
-      // nativo, después ningún preventDefault() lo revierte, y el arrastre
-      // se arma (vibra) pero el dedo sigue "scrolleando" en vez de mover la
-      // fila. Por eso la fila usa touch-action:none desde el vamos (más
-      // abajo, en el style) y acá abajo pedimos el puntero explícitamente,
-      // para que el gesto quede 100% bajo control nuestro en vez del navegador.
-      e.target?.setPointerCapture?.(e.pointerId);
-    };
-    let timer = setTimeout(armar, LONG_PRESS_MS);
+    dragRef.current = { from: i, over: i };
+    setDragIdx(i);
+    setOverIdx(i);
+    haptic(14);
+    // Fija el gesto a este puntero: así lo seguimos recibiendo aunque el
+    // dedo se mueva sobre otras filas mientras arrastra.
+    e.target?.setPointerCapture?.(e.pointerId);
 
     const findIdxAt = (clientY) => {
       const rows = document.querySelectorAll("[data-drag-idx]");
@@ -8704,21 +8707,6 @@ function BuilderDayCard({ day, dayIdx, totalDays, onRename, onRemove, onMoveDay,
     };
 
     const onMove = (ev) => {
-      if (!armado) {
-        // Todavía no se armó: si el dedo se movió, era un scroll — como la
-        // fila tiene touch-action:none, el navegador ya no lo hace solo, así
-        // que lo scrolleamos nosotros a mano para que se sienta igual.
-        const dy = ev.clientY - startY;
-        const dx = ev.clientX - startX;
-        if (!cancelado && (Math.abs(dy) > MOVE_TOLERANCE || Math.abs(dx) > MOVE_TOLERANCE)) {
-          cancelado = true;
-          clearTimeout(timer);
-        }
-        if (cancelado) { ev.preventDefault(); window.scrollBy(0, lastY - ev.clientY); }
-        lastY = ev.clientY;
-        return;
-      }
-      // Ya armado: tomamos el control del gesto (no scrollear la página)
       ev.preventDefault();
       const idx = findIdxAt(ev.clientY);
       if (idx != null && idx !== dragRef.current.over) {
@@ -8739,10 +8727,8 @@ function BuilderDayCard({ day, dayIdx, totalDays, onRename, onRemove, onMoveDay,
     };
 
     const onUp = () => {
-      clearTimeout(timer);
       limpiar();
       cleanupDragRef.current = null;
-      if (!armado) return; // fue un toque simple, no un arrastre
       const { from, over } = dragRef.current;
       if (from != null && over != null && from !== over) {
         // Mover paso a paso reutilizando onMoveExercise (respeta superseries)
@@ -8759,7 +8745,7 @@ function BuilderDayCard({ day, dayIdx, totalDays, onRename, onRemove, onMoveDay,
     window.addEventListener("pointerup", onUp);
     window.addEventListener("pointercancel", onUp);
     // Lo guardamos por si el componente se desmonta antes de que sueltes
-    cleanupDragRef.current = () => { clearTimeout(timer); limpiar(); };
+    cleanupDragRef.current = limpiar;
   };
 
   // Desplazamiento en vivo: mientras arrastrás, las filas que están entre el
@@ -8826,8 +8812,6 @@ function BuilderDayCard({ day, dayIdx, totalDays, onRename, onRemove, onMoveDay,
           <div
             key={ex.id}
             data-drag-idx={i}
-            // El arrastre se inicia desde CUALQUIER punto de la fila (long-press).
-            onPointerDown={(e) => startDrag(e, i)}
             className={`${nuevoId === ex.id ? "row-enter" : ""} ${saliendoIdx === i ? "row-leave" : ""}`}
             style={{
               // Desplazamiento en vivo: las filas se corren para abrir el hueco
@@ -8837,18 +8821,6 @@ function BuilderDayCard({ day, dayIdx, totalDays, onRename, onRemove, onMoveDay,
               // animación maneje el transform (si no, se pisarían).
               transform: (nuevoId === ex.id || saliendoIdx === i) ? undefined : `translateY(${desplazamientoDe(i)}px)`,
               transition: (nuevoId === ex.id || saliendoIdx === i) ? undefined : "transform 0.2s cubic-bezier(0.22,1,0.36,1)",
-              // "none" SIEMPRE, no sólo mientras se arrastra: el touch-action de
-              // una fila se decide una única vez, apenas el dedo la toca. Si acá
-              // dijera "pan-y", el navegador puede darle el gesto al scroll nativo
-              // en esos primeros milisegundos — y aunque el long-press se arme
-              // después (vibra), ya es tarde: el dedo sigue scrolleando en vez de
-              // mover la fila, sin que ningún preventDefault() lo pueda revertir.
-              // Por eso el scroll "antes de armar" se hace a mano en onMove (más
-              // arriba), y acá el navegador nunca llega a tomar el control.
-              touchAction: "none",
-              WebkitUserSelect: "none",
-              userSelect: "none",
-              WebkitTouchCallout: "none",
               zIndex: dragIdx === i ? 20 : 1,
               position: "relative",
             }}
@@ -8858,6 +8830,9 @@ function BuilderDayCard({ day, dayIdx, totalDays, onRename, onRemove, onMoveDay,
               onRemove={() => borrarConAnimacion(i)}
               onConfigChange={(cfg) => onConfigExercise(i, cfg)}
               isDragging={dragIdx === i} isDragOver={overIdx === i && dragIdx !== null && dragIdx !== i}
+              onHandlePointerDown={(e) => startDrag(e, i)}
+              onMoveUp={i > 0 ? () => onMoveExercise(i, -1) : null}
+              onMoveDown={i < day.exercises.length - 1 ? () => onMoveExercise(i, 1) : null}
               dumbbellFactor={(dumbbellDouble || {})[ex.id] || EXERCISE_LIBRARY_BY_ID[ex.id]?.loadFactor || 1}
               onToggleDumbbell={onUpdateSettings ? (v) => onUpdateSettings({ dumbbellDouble: { ...(dumbbellDouble || {}), [ex.id]: v } }) : null} />
             {i < day.exercises.length - 1 && (
