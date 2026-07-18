@@ -1255,16 +1255,19 @@ const ANIMATION_CSS = `
 }
 .sparkle-spin { animation: sparkleSpin 0.6s cubic-bezier(0.34, 1.4, 0.64, 1) both; }
 
-/* Tinte de sesión activa: entra suave cuando arranca el entrenamiento */
-@keyframes sessionTintIn { from { opacity: 0; } to { opacity: 1; } }
-.session-tint { animation: sessionTintIn 0.6s ease-out both; }
-/* El tinte "respira": un latido lento y suave que da sensación de sesión viva.
-   Empieza DESPUÉS de que terminó la entrada (0.6s) para encadenar sin salto. */
-@keyframes sessionTintPulse {
-  0%, 100% { opacity: 1; }
-  50%      { opacity: 0.5; }
+/* Chip flotante de sesión activa: entra deslizándose desde arriba, suave */
+@keyframes sessionChipIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
-.session-tint-pulse { animation: sessionTintIn 0.6s ease-out, sessionTintPulse 3s ease-in-out 0.6s infinite; }
+.session-chip-in { animation: sessionChipIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both; }
+/* El puntito del chip "late" como un indicador de en-vivo: se expande y
+   desvanece en bucle (igual que el ping de la barra de sesión en curso). */
+@keyframes sessionChipPing {
+  0%   { transform: scale(1); opacity: 0.6; }
+  75%, 100% { transform: scale(2.2); opacity: 0; }
+}
+.session-chip-ping { animation: sessionChipPing 1.8s cubic-bezier(0, 0, 0.2, 1) infinite; }
 
 /* Confeti del resumen de fin de sesión: cae de arriba girando y se desvanece */
 @keyframes confettiFall {
@@ -1291,8 +1294,8 @@ const ANIMATION_CSS = `
   .thinking-lift, .thinking-wave, .thinking-rep, .thinking-halo, .thinking-eq,
   .badge-pop, .superset-draw, .dot-bounce, .msg-in, .wake-up, .day-mark,
   .breathe, .hist-enter, .streak-jump, .tab-slide-right, .tab-slide-left,
-  .timer-hop, .session-start-pop, .session-start-text, .session-tint,
-  .cell-pop, .sparkle-spin, .session-tint-pulse { animation: none !important; }
+  .timer-hop, .session-start-pop, .session-start-text, .session-chip-in,
+  .cell-pop, .sparkle-spin, .session-chip-ping { animation: none !important; }
   .confetti-piece { display: none !important; }
   /* El fade del overlay se mantiene: es lo que lo hace desaparecer solo */
   .theme-fade, .theme-fade * { transition: none !important; }
@@ -11726,6 +11729,10 @@ export default function App() {
   const sessionTintColor = _sesDayKey
     ? (ROUTINE?.[_sesDayKey]?.color || activeRoutineDef?.days?.[_sesDayKey]?.color || null)
     : null;
+  // Nombre del día que estás entrenando, para el chip flotante de sesión activa.
+  const sessionDayLabel = _sesDayKey
+    ? (ROUTINE?.[_sesDayKey]?.label || activeRoutineDef?.days?.[_sesDayKey]?.label || null)
+    : null;
   const needsRoutinePick = !!profile && !profile.activeRoutineId;
   // Cronograma semanal de la rutina activa (lunes a domingo → día de rutina
   // o descanso) — ver getRoutineWeekSchedule más arriba en el archivo.
@@ -12205,22 +12212,30 @@ export default function App() {
       {/* Escudo fijo de la status bar — cubre la zona de batería/hora sin
           importar cuánto hayas scrolleado. El color es siempre #0a0a0f. */}
       <div style={{ position: "fixed", top: 0, left: 0, right: 0, height: "env(safe-area-inset-top, 0px)", backgroundColor: "#0a0a0f", zIndex: 9999 }} />
-      {/* Marco de "modo sesión": borde perimetral del color del día que estás
-          entrenando + barras con glow arriba y abajo. Solo cuando hay sesión
-          activa. No captura toques y palpita suave. Va en el return PRINCIPAL
-          (antes estaba por error en la rama de "elegir rutina", que no se ve
-          durante una sesión → por eso el marco nunca aparecía). */}
-      {sessionTintColor && (
-        <>
-          {/* Degradados suaves que se desvanecen hacia el centro desde cada
-              borde (sin líneas sólidas). Los 4 lados: arriba (z altísimo para
-              que no lo tape el escudo de la status bar), abajo y los costados.
-              Finos pero con color intenso: sutiles pero se notan sin molestar. */}
-          <div className="fixed left-0 right-0 h-10 pointer-events-none z-[61] session-tint-pulse" style={{ top: "env(safe-area-inset-top, 0px)", background: `linear-gradient(to bottom, ${sessionTintColor}5C, ${sessionTintColor}1A 55%, transparent)` }} aria-hidden="true" />
-          <div className="fixed bottom-0 left-0 right-0 h-10 pointer-events-none z-[61] session-tint-pulse" style={{ background: `linear-gradient(to top, ${sessionTintColor}5C, ${sessionTintColor}1A 55%, transparent)` }} aria-hidden="true" />
-          <div className="fixed top-0 bottom-0 left-0 w-6 pointer-events-none z-[61] session-tint-pulse" style={{ background: `linear-gradient(to right, ${sessionTintColor}33, transparent)` }} aria-hidden="true" />
-          <div className="fixed top-0 bottom-0 right-0 w-6 pointer-events-none z-[61] session-tint-pulse" style={{ background: `linear-gradient(to left, ${sessionTintColor}33, transparent)` }} aria-hidden="true" />
-        </>
+      {/* Chip flotante de "sesión activa": una pastillita fija arriba a la
+          derecha con un puntito que late y el nombre del día que estás
+          entrenando. Siempre visible (fixed, no se va con el scroll), ocupa un
+          rincón, semitransparente para no tapar. Reemplazó al marco, que
+          resultaba invasivo. No captura toques salvo... (es solo indicador). */}
+      {sessionTintColor && sessionDayLabel && (
+        <div
+          className="fixed z-[62] flex items-center gap-1.5 rounded-full pl-2 pr-2.5 py-1 pointer-events-none session-chip-in"
+          style={{
+            top: "calc(env(safe-area-inset-top, 0px) + 8px)",
+            right: "12px",
+            backgroundColor: "rgba(10,10,15,0.72)",
+            border: `1px solid ${sessionTintColor}66`,
+            backdropFilter: "blur(6px)",
+            WebkitBackdropFilter: "blur(6px)",
+          }}
+          aria-hidden="true"
+        >
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full rounded-full opacity-60 session-chip-ping" style={{ backgroundColor: sessionTintColor }} />
+            <span className="relative inline-flex rounded-full h-2 w-2" style={{ backgroundColor: sessionTintColor }} />
+          </span>
+          <span className="text-[10px] font-bold tracking-wide" style={{ color: sessionTintColor }}>{sessionDayLabel}</span>
+        </div>
       )}
       {/* Desaturación global: un overlay con backdrop-filter en vez de
           filter en el contenedor — filter en un ancestro convierte a ese
