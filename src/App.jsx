@@ -437,6 +437,10 @@ const DEFAULT_SETTINGS = {
   // Qué mostrar en la ficha de registro (reps/kg). Todo activado por
   // default; quien no use alguna opción puede apagarla y deja de estorbar.
   showRpe: true, showWarmup: true, show1RMPercent: true, showCoaching: true, showExerciseNote: true, showPersonalNote: true,
+  // Al guardar una serie, arrancar solo el cronómetro de descanso. Apagado
+  // por default: es un cambio de comportamiento (no solo de qué se ve), así
+  // que preferimos que lo prendas vos a que te aparezca activado de golpe.
+  autoStartRestTimer: false,
 };
 
 
@@ -4312,7 +4316,7 @@ function RankUpModal({ from, to, muscleName, onClose }) {
   );
 }
 
-function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, accent, logs, setLogs, drafts = {}, setDrafts, deloadKgFactor = 1, deloadMode = false, autoShowPrShare = true, onDisableAutoShowPrShare, hasActiveSession = true, cardio = false, dumbbellDouble = null, fieldSettings = DEFAULT_SETTINGS, onUpdateSettings = null, sex = null, age = null }) {
+function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, accent, logs, setLogs, drafts = {}, setDrafts, deloadKgFactor = 1, deloadMode = false, autoShowPrShare = true, onDisableAutoShowPrShare, hasActiveSession = true, cardio = false, dumbbellDouble = null, fieldSettings = DEFAULT_SETTINGS, onUpdateSettings = null, sex = null, age = null, restTimerId = null, restSeconds = null }) {
   const globalUnit = useWeightUnit();
   // Unidad local: arranca desde la preferencia global, pero el usuario puede
   // cambiarla ejercicio por ejercicio con el toggle kg/lbs del input.
@@ -4484,6 +4488,18 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     }, 500);
     return () => clearInterval(cardioIntervalRef.current);
   }, [cardioRunning, cardioMode]);
+  // Si "Cronómetro automático" está activo, al guardar arranca solo el
+  // descanso de ESTE ejercicio — escribimos directo en ACTIVE_REST_TIMERS
+  // (el mismo registro global que ya usa RestTimer para sobrevivir a
+  // cambios de pestaña) así el cronómetro que se re-posiciona debajo de la
+  // serie recién guardada lo recoge ya corriendo, sin tocar RestTimer para
+  // nada. restTimerId viene null en cardio y en superseries (ahí el
+  // descanso se comparte y no debe arrancar hasta completar la vuelta).
+  const autoStartRestTimer = () => {
+    if (fieldSettings.autoStartRestTimer === true && restTimerId && restSeconds) {
+      ACTIVE_REST_TIMERS[restTimerId] = { endTime: Date.now() + restSeconds * 1000 };
+    }
+  };
   const handleSave = () => {
     if (cardio) {
       // Si el cronómetro estuvo corriendo, usar el tiempo transcurrido
@@ -4507,7 +4523,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
       let newLogs = { ...logs, [key]: newHistory };
       const isPR = !isFirstEver && m > prevMin;
       if (isFirstEver || isPR) newLogs = { ...newLogs, [prKey]: { minutes: m, km: d || null, date: today } };
-      setLogs(newLogs); setSaved(true); setTimeout(() => setSaved(false), 1200);
+      setLogs(newLogs); setSaved(true); setTimeout(() => setSaved(false), 1200); autoStartRestTimer();
       if (setDrafts) setDrafts((prev) => { const n = { ...prev }; delete n[key]; return n; });
       // Detectar si el nuevo récord sube de rango (tier change)
       try {
@@ -4572,7 +4588,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     )) {
       const cleaned = { ...newLogs }; delete cleaned[prKey]; newLogs = cleaned;
     }
-    setLogs(newLogs); setSaved(true); setTimeout(() => setSaved(false), 1200);
+    setLogs(newLogs); setSaved(true); setTimeout(() => setSaved(false), 1200); autoStartRestTimer();
     // Limpiar el draft al guardar → la serie queda lockeada (se muestra el
     // bloque "guardado hoy" con botón Editar), en vez de quedar en modo input.
     if (setDrafts) setDrafts((prev) => { const n = { ...prev }; delete n[key]; return n; });
@@ -4945,6 +4961,12 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
   useEffect(() => { if (forceOpen) setOpen(true); }, [forceOpen]);
   const hasHeavy = exercise.sets.some((s) => isHeavyRepRange(s.repRange));
   const setsToShow = deloadSets ? exercise.sets.slice(0, deloadSets) : exercise.sets;
+  // Id del cronómetro que corresponde a ESTE ejercicio — null si es cardio o
+  // si está dentro de una superserie (ahí el descanso es compartido y recién
+  // arranca al completar la vuelta entera, no después de cada ejercicio; ver
+  // RoutineView). Se usa para el auto-inicio del descanso al guardar serie.
+  const restTimerId = (exercise.cardio || hideTimer) ? null : `ex_${exercise.id}`;
+  const restSeconds = hasHeavy ? settings.restLong : settings.restShort;
 
   // ── POSICIÓN DEL CRONÓMETRO entre las series ──────────────────────────────
   // Contamos cuántas series desde el principio ya están registradas HOY (racha
@@ -5023,7 +5045,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
           <div className="mb-2 timer-hop"><RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={accent} alertType={settings.alertType} timerId={`ex_${exercise.id}`} exerciseName={exercise.name} /></div>
         )}
         {setsToShow.map((s, i) => <React.Fragment key={`${exercise.id}:frag:${i}`}>
-          <SetRow key={`${exercise.id}:${i}:${resetKey}`} exerciseId={exercise.id} exerciseName={exercise.name} exerciseMuscle={exercise.muscle} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadKgFactor={settings.deloadPct} deloadMode={deloadMode} resetKey={resetKey} autoShowPrShare={settings.autoShowPrShare ?? true} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={hasActiveSession} cardio={exercise.cardio} dumbbellDouble={settings?.dumbbellDouble || null} fieldSettings={settings} onUpdateSettings={onUpdateSettings} sex={sex} age={age} />
+          <SetRow key={`${exercise.id}:${i}:${resetKey}`} exerciseId={exercise.id} exerciseName={exercise.name} exerciseMuscle={exercise.muscle} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadKgFactor={settings.deloadPct} deloadMode={deloadMode} resetKey={resetKey} autoShowPrShare={settings.autoShowPrShare ?? true} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={hasActiveSession} cardio={exercise.cardio} dumbbellDouble={settings?.dumbbellDouble || null} fieldSettings={settings} onUpdateSettings={onUpdateSettings} sex={sex} age={age} restTimerId={restTimerId} restSeconds={restSeconds} />
           {/* Debajo de la serie recién registrada: timerSlot = N significa
               "después de la serie N" (1-indexado). */}
           {timerSlot === i + 1 && (
@@ -8068,6 +8090,7 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
             { key: "showCoaching", label: "Consejos al guardar", desc: "El mensaje 📈/✓/📉 comparando con tu marca." },
             { key: "showExerciseNote", label: "Consejos del ejercicio", desc: "La nota con la técnica debajo del nombre del ejercicio." },
             { key: "showPersonalNote", label: "Notas por serie", desc: "El botón para escribir un recordatorio en cada serie." },
+            { key: "autoStartRestTimer", label: "Cronómetro automático", desc: "Al guardar la serie, arranca solo el descanso. No aplica dentro de superseries." },
           ].map(({ key, label, desc }) => {
             const on = settings[key] !== false;
             return (
@@ -11199,6 +11222,7 @@ function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
     { key: "showCoaching", label: "Consejos al guardar", desc: "Un mensaje corto comparando la serie con tu marca (📈 subiste, ✓ igualaste, 📉 bajaste)." },
     { key: "showExerciseNote", label: "Consejos del ejercicio", desc: "La nota con la técnica que aparece debajo del nombre del ejercicio." },
     { key: "showPersonalNote", label: "Notas por serie", desc: "El botón para escribir tu propio recordatorio en cada serie." },
+    { key: "autoStartRestTimer", label: "Cronómetro automático", desc: "Al guardar la serie, arranca solo el descanso — no hace falta tocar play. (No aplica dentro de superseries.)" },
   ];
 
   return (
