@@ -1343,9 +1343,11 @@ p, span, label, button { overflow-wrap: break-word; }
    que destaquen limpias sobre el fondo gris, sin tonos grisáceos al
    apilarse una tarjeta sobre otra. */
 .light-mode .bg-slate-900,
+.light-mode .bg-slate-900\\/30,
 .light-mode .bg-slate-900\\/40,
 .light-mode .bg-slate-900\\/50,
 .light-mode .bg-slate-900\\/60,
+.light-mode .bg-slate-900\\/70,
 .light-mode .bg-slate-900\\/80 { background-color: #ffffff !important; }
 
 /* Superficies "recesadas" (paneles internos, inputs) — un gris casi
@@ -1355,6 +1357,8 @@ p, span, label, button { overflow-wrap: break-word; }
 .light-mode .bg-slate-950\\/40,
 .light-mode .bg-slate-950\\/50,
 .light-mode .bg-slate-950\\/60,
+.light-mode .bg-slate-950\\/70,
+.light-mode .bg-slate-950\\/80,
 .light-mode .bg-slate-950\\/95 { background-color: #f1f5f9 !important; }
 
 /* Superficies secundarias (chips, botones, inputs) — grises sólidos suaves */
@@ -1364,7 +1368,8 @@ p, span, label, button { overflow-wrap: break-word; }
 .light-mode .bg-slate-800\\/50,
 .light-mode .bg-slate-800\\/60,
 .light-mode .bg-slate-800\\/70,
-.light-mode .bg-slate-800\\/80 { background-color: #eef2f6 !important; }
+.light-mode .bg-slate-800\\/80,
+.light-mode .bg-slate-800\\/90 { background-color: #eef2f6 !important; }
 .light-mode .bg-slate-700,
 .light-mode .bg-slate-700\\/80 { background-color: #e2e8f0 !important; }
 .light-mode .hover\\:bg-slate-700:hover,
@@ -1381,6 +1386,7 @@ p, span, label, button { overflow-wrap: break-word; }
    a un gris muy suave para distinguirse del hero pastel que los contiene,
    y el de alerta a un rosa pastel en vez del rojo oscuro translúcido. */
 .light-mode .bg-black\\/20 { background-color: rgba(241,245,249,0.9) !important; }
+.light-mode .bg-black\\/25 { background-color: rgba(236,241,247,0.92) !important; }
 .light-mode .bg-black\\/30 { background-color: rgba(226,232,240,0.95) !important; }
 /* Velo de los modales: sigue oscureciendo (si no, el modal blanco se pierde
    sobre el fondo claro), pero en un slate suave en vez de negro puro. */
@@ -1392,6 +1398,8 @@ p, span, label, button { overflow-wrap: break-word; }
 .light-mode .bg-rose-950\\/30 { background-color: rgba(254,226,226,0.85) !important; }
 .light-mode .border-white\\/5 { border-color: rgba(15,23,42,0.05) !important; }
 .light-mode .border-white\\/10 { border-color: rgba(15,23,42,0.08) !important; }
+.light-mode .border-white\\/\\[0\\.05\\],
+.light-mode .border-white\\/\\[0\\.07\\] { border-color: rgba(15,23,42,0.06) !important; }
 
 /* Texto — jerarquía invertida: lo que en oscuro era "casi blanco" pasa a
    "gris casi negro" (#0f172a), y lo que era apenas visible pasa a un gris
@@ -1417,23 +1425,42 @@ p, span, label, button { overflow-wrap: break-word; }
    como texto; los FONDOS tintados con esos mismos colores casi no se tocan. */
 .light-mode .text-teal-400 { color: #0d9488 !important; }
 .light-mode .hover\\:text-teal-400:hover { color: #0d9488 !important; }
+.light-mode .text-teal-200,
+.light-mode .text-teal-200\\/90,
 .light-mode .text-teal-300\\/60,
 .light-mode .text-teal-300\\/70,
+.light-mode .text-teal-300\\/75,
 .light-mode .text-teal-400\\/80 { color: rgba(13,148,136,0.85) !important; }
-.light-mode .text-cyan-400 { color: #0e7490 !important; }
+.light-mode .text-cyan-400,
+.light-mode .text-cyan-300 { color: #0e7490 !important; }
 .light-mode .text-cyan-300\\/60 { color: rgba(14,116,144,0.85) !important; }
 .light-mode .text-purple-200,
 .light-mode .text-purple-300 { color: #7e22ce !important; }
 .light-mode .text-purple-300\\/60,
+.light-mode .text-purple-300\\/70,
+.light-mode .text-purple-300\\/75,
 .light-mode .text-purple-300\\/90 { color: rgba(126,34,206,0.85) !important; }
 .light-mode .text-purple-400 { color: #9333ea !important; }
 .light-mode .text-purple-500 { color: #7e22ce !important; }
+.light-mode .text-rose-200,
 .light-mode .text-rose-300\\/80 { color: rgba(190,18,60,0.9) !important; }
-.light-mode .text-rose-400 { color: #e11d48 !important; }
+.light-mode .text-rose-400,
+.light-mode .text-red-400 { color: #e11d48 !important; }
 .light-mode .hover\\:text-rose-400:hover { color: #e11d48 !important; }
 .light-mode .text-rose-400\\/90 { color: rgba(225,29,72,0.95) !important; }
 .light-mode .text-rose-500\\/70 { color: rgba(190,18,60,0.85) !important; }
 .light-mode .hover\\:text-rose-500\\/70:hover { color: rgba(190,18,60,0.9) !important; }
+.light-mode .text-emerald-100,
+.light-mode .text-emerald-300 { color: #059669 !important; }
+.light-mode .text-amber-200 { color: #b45309 !important; }
+.light-mode .text-amber-300\\/80 { color: rgba(180,83,9,0.85) !important; }
+.light-mode .text-blue-300\\/60,
+.light-mode .text-blue-300\\/90 { color: rgba(29,78,216,0.85) !important; }
+.light-mode .hover\\:text-indigo-400:hover { color: #4f46e5 !important; }
+/* Placeholder "—" del input de reps/kg: pensado para ser casi invisible
+   sobre el input oscuro — con el mismo gris oscuro fijo, en claro se veía
+   como un guión bien marcado (el input pasa a blanco y el color no). */
+.light-mode .placeholder\\:text-slate-800::placeholder { color: #cbd5e1 !important; }
 .light-mode .text-amber-400 { color: #b45309 !important; }
 .light-mode .text-emerald-400 { color: #059669 !important; }
 .light-mode .text-blue-400 { color: #1d4ed8 !important; }
@@ -1443,11 +1470,14 @@ p, span, label, button { overflow-wrap: break-word; }
 .light-mode .border-slate-800,
 .light-mode .border-slate-800\\/40,
 .light-mode .border-slate-800\\/50,
-.light-mode .border-slate-800\\/60 { border-color: #e2e8f0 !important; }
+.light-mode .border-slate-800\\/60,
+.light-mode .border-slate-800\\/70,
+.light-mode .border-slate-800\\/80 { border-color: #e2e8f0 !important; }
 .light-mode .border-slate-700,
 .light-mode .border-slate-700\\/40,
 .light-mode .border-slate-700\\/50,
-.light-mode .border-slate-700\\/60 { border-color: #cbd5e1 !important; }
+.light-mode .border-slate-700\\/60,
+.light-mode .border-slate-700\\/70 { border-color: #cbd5e1 !important; }
 .light-mode .border-slate-600 { border-color: #94a3b8 !important; }
 .light-mode .border-slate-500 { border-color: #64748b !important; }
 .light-mode .hover\\:border-slate-500:hover { border-color: #94a3b8 !important; }
@@ -1537,6 +1567,16 @@ p, span, label, button { overflow-wrap: break-word; }
   /* Modal de "subiste de rango" — el color del tier ya se aplica encima como
      glow/borde, esto es sólo la base neutra detrás. */
   --rankup-grad: linear-gradient(135deg, #0f0f1a, #1a1a2e);
+  /* Barra de mensaje del Entrenador IA — se porta afuera del árbol temeado
+     (createPortal a document.body), así que no le llegan ni las clases
+     .light-mode ni las variables que sólo se definen inline más arriba: por
+     eso vive acá, en :root, donde sí es alcanzable desde cualquier lado. */
+  --chat-bar-idle: rgba(15,23,42,0.92);
+  --chat-bar-listening: rgba(6,78,59,0.55);
+  --chat-bar-editing: rgba(13,42,38,0.92);
+  --chat-bar-border-idle: rgba(30,41,59,0.6);
+  --chat-bar-border-listening: rgba(16,185,129,0.4);
+  --chat-bar-border-editing: rgba(20,184,166,0.4);
 }
 .light-mode {
   --grad-hero-purple: linear-gradient(135deg, rgba(168,85,247,0.10), rgba(255,255,255,0.96) 55%, #ffffff);
@@ -1563,6 +1603,12 @@ p, span, label, button { overflow-wrap: break-word; }
   --timer-idle-bg: #f1f5f9;
   --timer-idle-border: #e2e8f0;
   --rankup-grad: linear-gradient(135deg, #ffffff, #f8fafc);
+  --chat-bar-idle: rgba(255,255,255,0.92);
+  --chat-bar-listening: rgba(209,250,229,0.92);
+  --chat-bar-editing: rgba(204,251,241,0.92);
+  --chat-bar-border-idle: rgba(203,213,225,0.8);
+  --chat-bar-border-listening: rgba(16,185,129,0.35);
+  --chat-bar-border-editing: rgba(20,184,166,0.35);
 }
 
 /* ============================================================================
@@ -4277,7 +4323,7 @@ function HelpModal({ startTab, onClose }) {
 function RankUpModal({ from, to, muscleName, onClose }) {
   useAndroidBack(onClose);
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-5 modal-overlay" style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}>
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-5 modal-overlay bg-black/85" style={{ backdropFilter: "blur(8px)" }}>
       <div className="relative w-full max-w-sm rounded-3xl overflow-hidden elastic-in" style={{ background: "var(--rankup-grad)", border: `2px solid ${to.color}40` }}>
         {/* Glow de fondo */}
         <div className="absolute inset-0 opacity-30 pointer-events-none" style={{ background: `radial-gradient(circle at 50% 30%, ${to.color}60, transparent 65%)` }} />
@@ -5480,6 +5526,7 @@ function SessionDetailCard({ session, onDelete }) {
                     {isCardio ? `${it.minutes} min` : `${it.reps}×${it.kg}kg`}
                     {it.isImprovement && " 🔥"}
                     {below && <span className="text-[9px] font-black opacity-90">↓{100 - pct}%</span>}
+                    {!isCardio && it.rpe != null && <span className="text-[9px] font-black opacity-80" style={{ color: rpeColor(it.rpe) }}>· RPE {it.rpe}</span>}
                   </span>
                 );
               })}
@@ -7368,7 +7415,7 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
 
   const [selId, setSelId] = useState(allExercises[0]?.id);
   const [selSet, setSelSet] = useState(0);
-  const [metric, setMetric] = useState("peso");
+  const [metric, setMetric] = useState("grafico");
   const selEx = allExercises.find((e) => e.id === selId);
   const history = (logs[`${selId}_${selSet}`] || []).slice().sort((a, b) => (a.date > b.date ? 1 : -1));
   const chartData = history.map((h) => ({ date: h.date.slice(5), kg: h.kg, reps: h.reps, vol: vol(h.kg, h.reps), e1rm: estimate1RM(h.kg, h.reps), rpe: h.rpe ?? null }));
@@ -7432,7 +7479,7 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
 
             <div className="flex items-center justify-end">
               <div className="flex bg-slate-950/60 rounded-xl p-0.5 border border-slate-800/60">
-                {[{ k: "peso", l: "Kg" }, { k: "1rm", l: "1RM" }].map((opt) => (
+                {[{ k: "grafico", l: "Gráfico" }, { k: "1rm", l: "1RM" }].map((opt) => (
                   <button key={opt.k} onClick={() => setMetric(opt.k)} className={`px-2 py-1.5 rounded-[10px] text-[10px] font-bold transition-all ${metric === opt.k ? "bg-amber-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
                 ))}
               </div>
@@ -7440,6 +7487,31 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
 
             {chartData.length === 0 ? (
               <div className="text-center text-slate-600 py-10"><BarChart3 size={28} className="mx-auto mb-2.5 opacity-30" /><p className="text-sm">Sin registros para esta serie.</p><p className="text-xs mt-1 text-slate-700">Guardá series en la rutina para ver tu evolución aquí.</p></div>
+            ) : metric === "1rm" ? (
+              <>
+                {/* Lista directa del 1RM estimado de cada sesión — más precisa
+                    que leerla de un gráfico. Más reciente arriba. */}
+                <div className="space-y-1.5">
+                  {chartData.slice().reverse().map((h, i) => (
+                    <div key={i} className="flex items-center justify-between rounded-xl px-3 py-2.5" style={{ backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}>
+                      <span className="text-[11px] text-slate-500 shrink-0">{h.date}</span>
+                      <span className="text-[11px] text-slate-500 tabular-nums">{h.reps}×{h.kg}kg</span>
+                      <span className="text-sm font-black tabular-nums shrink-0" style={{ color: "#F59E0B" }}>{h.e1rm}kg</span>
+                    </div>
+                  ))}
+                </div>
+                {chartData.length >= 2 && (() => {
+                  const f = chartData[0], l = chartData[chartData.length - 1];
+                  const diff = l.e1rm - f.e1rm, pct2 = f.e1rm ? ((diff / f.e1rm) * 100).toFixed(1) : 0, pos = diff >= 0;
+                  return (
+                    <div className={`flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-semibold ${pos ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/15" : "bg-rose-500/10 text-rose-400 border border-rose-500/15"}`}>
+                      {pos ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                      <div><span className="font-black">{pos ? "+" : ""}{pct2}% de 1RM estimado</span><span className="text-xs opacity-60 ml-1.5">· {chartData.length} sesiones</span></div>
+                    </div>
+                  );
+                })()}
+                <p className="text-[10px] text-slate-600">Estimado con fórmula de Epley (combina reps y kilos). Solo referencia, no un máximo real.</p>
+              </>
             ) : (
               <>
                 <div className="h-52">
@@ -7454,24 +7526,25 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
                       <XAxis dataKey="date" stroke="var(--chart-axis)" fontSize={10} />
                       <YAxis stroke="var(--chart-axis)" fontSize={10} domain={["auto", "auto"]} />
                       <Tooltip content={<CustomTooltip />} />
-                      {metric === "peso" && <Area type="monotone" dataKey="kg" stroke={selEx?.color || "#14B8A6"} fill="url(#gA)" strokeWidth={2.5} dot={{ r: 3, fill: selEx?.color, strokeWidth: 0 }} name="Kg" />}
-                      {metric === "1rm" && <Area type="monotone" dataKey="e1rm" stroke="#F59E0B" fill="url(#gA)" strokeWidth={2.5} dot={{ r: 3, fill: "#F59E0B", strokeWidth: 0 }} name="1RM est." />}
+                      {/* Se grafica SIEMPRE el 1RM estimado (combina reps y kilos: sube
+                          o baja el peso, sube o baja las reps, y el número igual lo
+                          refleja) — pero rotulado como "Kg" a propósito, sin mencionar
+                          1RM acá. Quien quiera el número exacto por sesión tiene la
+                          pestaña "1RM" al lado. */}
+                      <Area type="monotone" dataKey="e1rm" stroke={selEx?.color || "#14B8A6"} fill="url(#gA)" strokeWidth={2.5} dot={{ r: 3, fill: selEx?.color, strokeWidth: 0 }} name="Kg" />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
                 {chartData.length >= 2 && (() => {
                   const f = chartData[0], l = chartData[chartData.length - 1];
-                  const fVal = metric === "peso" ? f.kg : f.e1rm, lVal = metric === "peso" ? l.kg : l.e1rm;
-                  const diff = lVal - fVal, pct2 = fVal ? ((diff / fVal) * 100).toFixed(1) : 0, pos = diff >= 0;
-                  const metricLabel = metric === "peso" ? "de kg" : "de 1RM estimado";
+                  const diff = l.e1rm - f.e1rm, pct2 = f.e1rm ? ((diff / f.e1rm) * 100).toFixed(1) : 0, pos = diff >= 0;
                   return (
                     <div className={`flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-semibold ${pos ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/15" : "bg-rose-500/10 text-rose-400 border border-rose-500/15"}`}>
                       {pos ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-                      <div><span className="font-black">{pos ? "+" : ""}{pct2}% {metricLabel}</span><span className="text-xs opacity-60 ml-1.5">· {chartData.length} sesiones</span></div>
+                      <div><span className="font-black">{pos ? "+" : ""}{pct2}% de kg</span><span className="text-xs opacity-60 ml-1.5">· {chartData.length} sesiones</span></div>
                     </div>
                   );
                 })()}
-                {metric === "1rm" && <p className="text-[10px] text-slate-600">Estimado con fórmula de Epley. Solo referencia, no un máximo real.</p>}
               </>
             )}
           </div>
@@ -9787,7 +9860,7 @@ Datos: ${JSON.stringify(context)}`;
           document.body, queda totalmente afuera de esa animación, así que
           desde el primer frame está exactamente donde tiene que estar. */}
       {typeof document !== "undefined" && createPortal(
-        <div className="fixed bottom-0 left-0 right-0 z-10 pt-8 px-4 lg:pl-56 pointer-events-none"
+        <div className={`fixed bottom-0 left-0 right-0 z-10 pt-8 px-4 lg:pl-56 pointer-events-none ${settings.theme === "light" ? "light-mode" : ""}`}
              style={{
                // El degradado llega HASTA ABAJO DEL TODO (bottom-0) y el hueco
                // de la barra de navegación se cubre con padding sólido. Antes
@@ -9818,7 +9891,7 @@ Datos: ${JSON.stringify(context)}`;
                 <button onClick={cancelarEdicion} aria-label="Cancelar edición" className="p-1 rounded-lg text-slate-400 hover:text-white transition shrink-0"><X size={13} /></button>
               </div>
             )}
-            <div className="flex items-center gap-2 rounded-2xl p-1.5 backdrop-blur-xl shadow-xl shadow-black/40 transition-colors" style={{ backgroundColor: isListening ? "rgba(6,78,59,0.55)" : editingIndex != null ? "rgba(13,42,38,0.92)" : "rgba(15,23,42,0.92)", border: `1px solid ${isListening ? "rgba(16,185,129,0.4)" : editingIndex != null ? "rgba(20,184,166,0.4)" : "rgba(30,41,59,0.6)"}` }}>
+            <div className="flex items-center gap-2 rounded-2xl p-1.5 backdrop-blur-xl shadow-xl shadow-black/40 transition-colors" style={{ backgroundColor: isListening ? "var(--chat-bar-listening)" : editingIndex != null ? "var(--chat-bar-editing)" : "var(--chat-bar-idle)", border: `1px solid ${isListening ? "var(--chat-bar-border-listening)" : editingIndex != null ? "var(--chat-bar-border-editing)" : "var(--chat-bar-border-idle)"}` }}>
               {SpeechRecognitionAPI && (
                 <button onClick={handleMicToggle} aria-label={isListening ? "Confirmar — terminé de hablar" : "Hablar"} className="relative p-2.5 rounded-xl shrink-0 transition-all active:scale-95" style={isListening ? { background: "linear-gradient(160deg,#10B981,#059669)", color: "#fff" } : { color: "#94a3b8" }}>
                   {isListening && <span className="absolute inset-0 rounded-xl bg-emerald-400/40 animate-ping" />}
@@ -10618,8 +10691,8 @@ function RoutinePreviewModal({ routineDef, routineName, onActivate, onClose, yaA
                   key={dk}
                   className="rounded-2xl border overflow-hidden transition-all"
                   style={{
-                    borderColor: esteAbierto ? day.color + "45" : "rgba(30,41,59,0.6)",
-                    backgroundColor: esteAbierto ? day.color + "0b" : "rgba(15,23,42,0.4)",
+                    borderColor: esteAbierto ? day.color + "45" : "var(--chip-border)",
+                    backgroundColor: esteAbierto ? day.color + "0b" : "var(--panel-sunken)",
                   }}
                 >
                   <button onClick={() => setAbierto(esteAbierto ? null : dk)} className="w-full flex items-center gap-3 px-3.5 py-3 text-left">
