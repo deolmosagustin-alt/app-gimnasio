@@ -70,3 +70,28 @@ export function repRangeTop(repRange) { const parts = String(repRange).split("-"
 // repeticiones es 6 o menos, se la considera "FUERZA" — sin que nadie tenga
 // que marcarla a mano al crear la rutina.
 export function isHeavyRepRange(repRange) { const top = repRangeTop(repRange); return !isNaN(top) && top <= 6; }
+
+// ── TINTES DE COLOR SEGÚN TEMA ───────────────────────────────────────────
+// Toda la app arma sus "badges"/íconos/bordes con el patrón `accent + "NN"`
+// (un color hex + un sufijo de 2 dígitos de alfa, ej. "#14B8A6" + "18" =
+// ~9% de opacidad). Ese nivel de transparencia se pensó para leerse como un
+// brillo suave sobre fondo casi negro — sobre blanco, el mismo 9% de un
+// color se percibe como un lavado casi imperceptible, porque alfa-blending
+// con blanco da un resultado mucho más parecido al blanco que alfa-blending
+// con negro. No hay forma de arreglar esto por CSS (el color final es un
+// valor calculado en JS, embebido como estilo inline; ninguna regla de
+// hoja de estilos puede "adivinar" a qué color debe ganarle sin romper la
+// diferenciación entre accents distintos). tint() intensifica el alfa en
+// modo claro con una curva raíz cuadrada — sube mucho los valores bajos
+// (los que más se lavaban) y cada vez menos a medida que el original ya
+// era bastante visible — y deja el modo oscuro sin tocar.
+let IS_LIGHT_THEME = false;
+export function setThemeMode(isLight) { IS_LIGHT_THEME = !!isLight; }
+
+export function tint(hex, alphaHex) {
+  if (!IS_LIGHT_THEME || typeof hex !== "string" || !hex.startsWith("#")) return hex + alphaHex;
+  const a = parseInt(alphaHex, 16);
+  if (isNaN(a)) return hex + alphaHex;
+  const boosted = Math.round(Math.sqrt(a / 255) * 255);
+  return hex + boosted.toString(16).padStart(2, "0");
+}

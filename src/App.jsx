@@ -34,6 +34,7 @@ import { auth, googleProvider, db } from "./firebase";
 import {
   yt, mkSets, muteHexColor, cloneRoutineDef, debounce, kgToDisplay, displayToKg, weightLabel,
   rpeColor, haptic, localDateStr, todayStr, formatTime, vol, estimate1RM, repRangeTop, isHeavyRepRange,
+  tint, setThemeMode,
 } from "./utils";
 // Catálogo de ejercicios, grupos musculares y rutinas preestablecidas —
 // movidos a data.js para que este archivo quede más liviano. RANK_TIERS
@@ -1882,17 +1883,17 @@ function drawShareCardBase(ctx, W, H, accent, accent2) {
   ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
   // Glow top-left
   const g1 = ctx.createRadialGradient(W * 0.15, H * 0.12, 0, W * 0.15, H * 0.12, W * 0.55);
-  g1.addColorStop(0, accent + "22"); g1.addColorStop(1, "transparent");
+  g1.addColorStop(0, tint(accent, "22")); g1.addColorStop(1, "transparent");
   ctx.fillStyle = g1; ctx.fillRect(0, 0, W, H);
   // Glow bottom-right
   const g2 = ctx.createRadialGradient(W * 0.85, H * 0.88, 0, W * 0.85, H * 0.88, W * 0.45);
   g2.addColorStop(0, (accent2 || accent) + "18"); g2.addColorStop(1, "transparent");
   ctx.fillStyle = g2; ctx.fillRect(0, 0, W, H);
   // Borde sutil
-  ctx.strokeStyle = accent + "30"; ctx.lineWidth = 2;
+  ctx.strokeStyle = tint(accent, "30"); ctx.lineWidth = 2;
   const r = 28; ctx.beginPath(); ctx.moveTo(r, 1); ctx.arcTo(W - 1, 1, W - 1, r, r); ctx.arcTo(W - 1, H - 1, W - r, H - 1, r); ctx.arcTo(1, H - 1, 1, H - r, r); ctx.arcTo(1, 1, r, 1, r); ctx.closePath(); ctx.stroke();
   // Logo / branding
-  ctx.fillStyle = accent + "cc"; ctx.font = "bold 18px system-ui";
+  ctx.fillStyle = tint(accent, "cc"); ctx.font = "bold 18px system-ui";
   ctx.textAlign = "right"; ctx.fillText("Modus Fit", W - 28, H - 22);
   ctx.textAlign = "left";
 }
@@ -1902,7 +1903,7 @@ function drawShareCardBase(ctx, W, H, accent, accent2) {
 function drawWordmark(ctx, W, H, accent) {
   ctx.save();
   ctx.textAlign = "center";
-  ctx.fillStyle = accent + "cc";
+  ctx.fillStyle = tint(accent, "cc");
   ctx.font = "bold 30px system-ui, sans-serif";
   ctx.fillText("Modus Fit", W / 2, H - 80);
   ctx.restore();
@@ -1920,10 +1921,10 @@ function drawPRShareCard(ctx, W, H, { exerciseName, muscle, kg, reps, accent = "
   ctx.font = "700 16px system-ui";
   const chipW = ctx.measureText(chipText).width + 44;
   const gChip = ctx.createLinearGradient(W / 2 - chipW / 2, 0, W / 2 + chipW / 2, 0);
-  gChip.addColorStop(0, accent + "40"); gChip.addColorStop(1, accent + "20");
+  gChip.addColorStop(0, tint(accent, "40")); gChip.addColorStop(1, tint(accent, "20"));
   ctx.fillStyle = gChip;
   canvasRoundRect(ctx, W / 2 - chipW / 2, 96, chipW, 36, 18); ctx.fill();
-  ctx.strokeStyle = accent + "60"; ctx.lineWidth = 1.5;
+  ctx.strokeStyle = tint(accent, "60"); ctx.lineWidth = 1.5;
   canvasRoundRect(ctx, W / 2 - chipW / 2, 96, chipW, 36, 18); ctx.stroke();
   ctx.fillStyle = accent; ctx.fillText(chipText, W / 2, 120);
 
@@ -1937,9 +1938,9 @@ function drawPRShareCard(ctx, W, H, { exerciseName, muscle, kg, reps, accent = "
   if (muscle) {
     ctx.font = "600 17px system-ui";
     const mW = ctx.measureText(muscle.toUpperCase()).width + 36;
-    ctx.fillStyle = accent + "20";
+    ctx.fillStyle = tint(accent, "20");
     canvasRoundRect(ctx, W / 2 - mW / 2, 268, mW, 32, 16); ctx.fill();
-    ctx.fillStyle = accent + "dd"; ctx.fillText(muscle.toUpperCase(), W / 2, 290);
+    ctx.fillStyle = tint(accent, "dd"); ctx.fillText(muscle.toUpperCase(), W / 2, 290);
   }
 
   // Número de kg — protagonista, centrado en el tercio medio.
@@ -3127,14 +3128,14 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default", 
   const barColor = done ? "#10B981" : urgent ? "#F59E0B" : accent;
   return (
     <div className="relative rounded-2xl overflow-hidden px-3.5 py-2.5 transition-colors duration-300" style={{
-      backgroundColor: running ? barColor + "0e" : "var(--timer-idle-bg)",
-      border: `1px solid ${running ? barColor + "30" : "var(--timer-idle-border)"}`,
+      backgroundColor: running ? tint(barColor, "0e") : "var(--timer-idle-bg)",
+      border: `1px solid ${running ? tint(barColor, "30") : "var(--timer-idle-border)"}`,
     }}>
       <div className="flex items-center gap-2.5">
         {/* Tiempo protagonista */}
         <span
           className={`text-2xl font-black tabular-nums shrink-0 transition-colors ${urgent ? "soft-pulse" : ""}`}
-          style={{ color: running || done ? barColor : "#94a3b8", textShadow: urgent ? `0 0 16px ${barColor}70` : "none" }}
+          style={{ color: running || done ? barColor : "#94a3b8", textShadow: urgent ? `0 0 16px ${tint(barColor, "70")}` : "none" }}
         >
           {formatTime(remaining)}
         </span>
@@ -3146,8 +3147,8 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default", 
               className="h-full rounded-full"
               style={{
                 width: `${pct}%`,
-                background: `linear-gradient(90deg, ${barColor}90, ${barColor})`,
-                boxShadow: running ? `0 0 8px ${barColor}80` : "none",
+                background: `linear-gradient(90deg, ${tint(barColor, "90")}, ${barColor})`,
+                boxShadow: running ? `0 0 8px ${tint(barColor, "80")}` : "none",
                 transition: "width 0.95s linear, background 0.3s",
               }}
             />
@@ -3156,7 +3157,7 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default", 
 
         {/* Controles */}
         <div className="flex gap-1.5 shrink-0">
-          <button onClick={() => { haptic(15); setRunning((r) => !r); }} aria-label={running ? "Pausar" : "Iniciar"} className="w-9 h-9 rounded-xl flex items-center justify-center active:scale-90 transition" style={running ? { background: `linear-gradient(160deg, ${accent}, ${accent}b0)`, color: "#fff" } : { backgroundColor: accent + "1e", color: accent, border: `1px solid ${accent}40` }}>
+          <button onClick={() => { haptic(15); setRunning((r) => !r); }} aria-label={running ? "Pausar" : "Iniciar"} className="w-9 h-9 rounded-xl flex items-center justify-center active:scale-90 transition" style={running ? { background: `linear-gradient(160deg, ${accent}, ${tint(accent, "b0")})`, color: "#fff" } : { backgroundColor: tint(accent, "1e"), color: accent, border: `1px solid ${tint(accent, "40")}` }}>
             {running ? <Pause size={15} /> : <Play size={15} className="ml-0.5" />}
           </button>
           <button onClick={() => { setRunning(false); setRemaining(seconds); endTimeRef.current = null; firedRef.current = false; }} aria-label="Reiniciar" className="w-9 h-9 rounded-xl flex items-center justify-center active:scale-90 transition text-slate-500 hover:text-slate-300 bg-slate-800/50 border border-slate-700/50">
@@ -3241,8 +3242,8 @@ function RutinaDemo({ view }) {
     const day = ROUTINE[demoDay];
     const totalSets = day.exercises.reduce((a, e) => a + e.sets.length, 0);
     return (
-      <div className="relative overflow-hidden rounded-2xl border p-4" style={{ borderColor: day.color + "55", background: `linear-gradient(135deg, ${day.color}38, transparent 75%)` }}>
-        <div className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg mb-2" style={{ backgroundColor: day.color + "22", color: day.color }}>
+      <div className="relative overflow-hidden rounded-2xl border p-4" style={{ borderColor: tint(day.color, "55"), background: `linear-gradient(135deg, ${tint(day.color, "38")}, transparent 75%)` }}>
+        <div className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg mb-2" style={{ backgroundColor: tint(day.color, "22"), color: day.color }}>
           <RotateCcw size={10} /> Sugerido para hoy
         </div>
         <h3 className="text-lg font-black text-white leading-tight uppercase">{day.label}</h3>
@@ -4111,12 +4112,12 @@ function WelcomeIntro({ onClose, onOpenTutorial }) {
     <div className="fixed inset-0 z-[110] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 modal-bg-in modal-overlay">
       <div
         className="max-w-sm w-full rounded-3xl modal-pop-in shadow-2xl shadow-black/70 overflow-hidden flex flex-col"
-        style={{ background: "var(--panel-grad-cyan)", border: `1px solid ${slide.color}30`, minHeight: 440 }}
+        style={{ background: "var(--panel-grad-cyan)", border: `1px solid ${tint(slide.color, "30")}`, minHeight: 440 }}
       >
         {/* Hero: el ícono grande sobre un halo del color del slide */}
         <div key={`hero-${i}`} className="relative flex flex-col items-center pt-12 pb-6 px-6 text-center tab-fade-in">
-          <div className="absolute -top-16 left-1/2 -translate-x-1/2 w-56 h-56 rounded-full blur-3xl pointer-events-none transition-colors duration-500" style={{ backgroundColor: slide.color + "22" }} />
-          <div className="relative w-20 h-20 rounded-3xl flex items-center justify-center mb-5 elastic-in" style={{ backgroundColor: slide.color + "1c", border: `1px solid ${slide.color}40`, color: slide.color, boxShadow: `0 12px 40px -12px ${slide.color}70` }}>
+          <div className="absolute -top-16 left-1/2 -translate-x-1/2 w-56 h-56 rounded-full blur-3xl pointer-events-none transition-colors duration-500" style={{ backgroundColor: tint(slide.color, "22") }} />
+          <div className="relative w-20 h-20 rounded-3xl flex items-center justify-center mb-5 elastic-in" style={{ backgroundColor: tint(slide.color, "1c"), border: `1px solid ${tint(slide.color, "40")}`, color: slide.color, boxShadow: `0 12px 40px -12px ${tint(slide.color, "70")}` }}>
             {slide.icon}
           </div>
           <h2 className="relative text-xl font-black text-white leading-tight mb-2.5">{slide.title}</h2>
@@ -4143,7 +4144,7 @@ function WelcomeIntro({ onClose, onOpenTutorial }) {
           <button
             onClick={() => (isLast ? onClose() : setI((n) => n + 1))}
             className="w-full py-3.5 rounded-2xl text-sm font-black !text-white transition active:scale-[0.98]"
-            style={{ background: `linear-gradient(135deg, ${slide.color}, ${slide.color}b0)`, boxShadow: `0 10px 28px -10px ${slide.color}80` }}
+            style={{ background: `linear-gradient(135deg, ${slide.color}, ${tint(slide.color, "b0")})`, boxShadow: `0 10px 28px -10px ${tint(slide.color, "80")}` }}
           >
             {isLast ? "¡Empezar a entrenar!" : "Siguiente"}
           </button>
@@ -4189,7 +4190,7 @@ function HelpModal({ startTab, onClose }) {
         <div className="relative px-5 pt-5 pb-3 shrink-0" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-xl flex items-center justify-center transition-colors duration-300" style={{ backgroundColor: chapter.color + "18", color: chapter.color }}>
+              <div className="w-7 h-7 rounded-xl flex items-center justify-center transition-colors duration-300" style={{ backgroundColor: tint(chapter.color, "18"), color: chapter.color }}>
                 {chapter.icon}
               </div>
               <span className="text-xs font-black uppercase tracking-widest transition-colors duration-300" style={{ color: chapter.color }}>{chapter.label}</span>
@@ -4208,7 +4209,7 @@ function HelpModal({ startTab, onClose }) {
                   onClick={() => jumpToChapter(ci)}
                   className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold whitespace-nowrap transition-all shrink-0"
                   style={actual
-                    ? { backgroundColor: c.color + "20", color: c.color, border: `1px solid ${c.color}40` }
+                    ? { backgroundColor: tint(c.color, "20"), color: c.color, border: `1px solid ${tint(c.color, "40")}` }
                     : completado
                       ? { color: "#64748b", border: "1px solid transparent" }
                       : { color: "#475569", border: "1px solid transparent" }}
@@ -4231,7 +4232,7 @@ function HelpModal({ startTab, onClose }) {
                   return (
                     <div key={si} className="h-1 flex-1 rounded-full transition-all duration-300"
                       style={{
-                        backgroundColor: actual ? c.color : pasado ? c.color + "90" : "var(--surface-2)",
+                        backgroundColor: actual ? c.color : pasado ? tint(c.color, "90") : "var(--surface-2)",
                         boxShadow: actual ? `0 0 8px -1px ${c.color}` : "none",
                       }} />
                   );
@@ -4265,8 +4266,8 @@ function HelpModal({ startTab, onClose }) {
               {/* Portada de capítulo, estilo pantalla de nivel: ícono grande
                   sobre un halo del color del capítulo. */}
               <div className="relative mt-2">
-                <div className="absolute inset-0 rounded-3xl blur-2xl scale-150 pointer-events-none" style={{ backgroundColor: chapter.color + "20" }} />
-                <div className="relative w-16 h-16 rounded-3xl flex items-center justify-center elastic-in" style={{ backgroundColor: chapter.color + "18", border: `1px solid ${chapter.color}35`, color: chapter.color, boxShadow: `0 10px 30px -10px ${chapter.color}60` }}>
+                <div className="absolute inset-0 rounded-3xl blur-2xl scale-150 pointer-events-none" style={{ backgroundColor: tint(chapter.color, "20") }} />
+                <div className="relative w-16 h-16 rounded-3xl flex items-center justify-center elastic-in" style={{ backgroundColor: tint(chapter.color, "18"), border: `1px solid ${tint(chapter.color, "35")}`, color: chapter.color, boxShadow: `0 10px 30px -10px ${tint(chapter.color, "60")}` }}>
                   {step.icon}
                 </div>
               </div>
@@ -4275,7 +4276,7 @@ function HelpModal({ startTab, onClose }) {
             </>
           ) : (
             <>
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5 border transition-colors duration-300" style={{ backgroundColor: chapter.color + "12", borderColor: chapter.color + "28", color: chapter.color }}>
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5 border transition-colors duration-300" style={{ backgroundColor: tint(chapter.color, "12"), borderColor: tint(chapter.color, "28"), color: chapter.color }}>
                 {step.icon}
               </div>
               <div className="flex-1 min-w-0">
@@ -4293,11 +4294,11 @@ function HelpModal({ startTab, onClose }) {
           </button>
           <span className="text-[10px] text-slate-600 font-medium tabular-nums">{i + 1} / {ALL_HELP_STEPS.length}</span>
           {isLast ? (
-            <button onClick={onClose} className="px-6 py-2.5 rounded-xl text-xs font-black !text-white transition active:scale-95" style={{ background: `linear-gradient(135deg, ${chapter.color}, ${chapter.color}b0)`, boxShadow: `0 8px 22px -8px ${chapter.color}80` }}>
+            <button onClick={onClose} className="px-6 py-2.5 rounded-xl text-xs font-black !text-white transition active:scale-95" style={{ background: `linear-gradient(135deg, ${chapter.color}, ${tint(chapter.color, "b0")})`, boxShadow: `0 8px 22px -8px ${tint(chapter.color, "80")}` }}>
               ¡Listo! 🎉
             </button>
           ) : (
-            <button onClick={() => setI((n) => Math.min(ALL_HELP_STEPS.length - 1, n + 1))} className="px-6 py-2.5 rounded-xl text-xs font-black !text-white transition active:scale-95" style={{ background: `linear-gradient(135deg, ${chapter.color}, ${chapter.color}b0)`, boxShadow: `0 8px 22px -8px ${chapter.color}80` }}>
+            <button onClick={() => setI((n) => Math.min(ALL_HELP_STEPS.length - 1, n + 1))} className="px-6 py-2.5 rounded-xl text-xs font-black !text-white transition active:scale-95" style={{ background: `linear-gradient(135deg, ${chapter.color}, ${tint(chapter.color, "b0")})`, boxShadow: `0 8px 22px -8px ${tint(chapter.color, "80")}` }}>
               Siguiente →
             </button>
           )}
@@ -4324,12 +4325,12 @@ function RankUpModal({ from, to, muscleName, onClose }) {
   useAndroidBack(onClose);
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-5 modal-overlay bg-black/85" style={{ backdropFilter: "blur(8px)" }}>
-      <div className="relative w-full max-w-sm rounded-3xl overflow-hidden elastic-in" style={{ background: "var(--rankup-grad)", border: `2px solid ${to.color}40` }}>
+      <div className="relative w-full max-w-sm rounded-3xl overflow-hidden elastic-in" style={{ background: "var(--rankup-grad)", border: `2px solid ${tint(to.color, "40")}` }}>
         {/* Glow de fondo */}
-        <div className="absolute inset-0 opacity-30 pointer-events-none" style={{ background: `radial-gradient(circle at 50% 30%, ${to.color}60, transparent 65%)` }} />
+        <div className="absolute inset-0 opacity-30 pointer-events-none" style={{ background: `radial-gradient(circle at 50% 30%, ${tint(to.color, "60")}, transparent 65%)` }} />
         <div className="relative p-7 text-center space-y-5">
           {/* Chips "SUBISTE DE RANGO" */}
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest" style={{ backgroundColor: to.color + "20", color: to.color, border: `1px solid ${to.color}40` }}>
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest" style={{ backgroundColor: tint(to.color, "20"), color: to.color, border: `1px solid ${tint(to.color, "40")}` }}>
             ✦ ¡Nuevo rango! ✦
           </div>
           {/* Flecha de progresión */}
@@ -4353,7 +4354,7 @@ function RankUpModal({ from, to, muscleName, onClose }) {
             <p className="text-2xl font-black text-white">{to.tier}</p>
             {muscleName && <p className="text-sm text-slate-400 mt-1">en {muscleName}</p>}
           </div>
-          <button onClick={onClose} className="w-full py-3.5 rounded-2xl font-black !text-white text-sm active:scale-95 transition-all" style={{ background: `linear-gradient(135deg, ${to.color}, ${to.color}bb)`, boxShadow: `0 8px 24px -4px ${to.color}50` }}>
+          <button onClick={onClose} className="w-full py-3.5 rounded-2xl font-black !text-white text-sm active:scale-95 transition-all" style={{ background: `linear-gradient(135deg, ${to.color}, ${tint(to.color, "bb")})`, boxShadow: `0 8px 24px -4px ${tint(to.color, "50")}` }}>
             ¡Vamos! 💪
           </button>
         </div>
@@ -4666,7 +4667,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   };
   const savePR = () => { const r = parseFloat(editReps), k = parseFloat(editKg); if (!r || !k || isNaN(r) || isNaN(k)) return; setLogs({ ...logs, [prKey]: { kg: k, reps: r, date: today, manual: true } }); setEditingPR(false); };
   return (
-    <div className="relative rounded-xl px-3.5 py-3.5 mb-2.5 last:mb-0" style={{ backgroundColor: accent + "0a", border: `1px solid ${accent}25` }}>
+    <div className="relative rounded-xl px-3.5 py-3.5 mb-2.5 last:mb-0" style={{ backgroundColor: tint(accent, "0a"), border: `1px solid ${tint(accent, "25")}` }}>
       <PRBurst anchorRef={saveBtnRef} trigger={prBurst} />
       <div className="absolute left-0 top-2 bottom-2 w-1 rounded-full" style={{ backgroundColor: accent }} />
       <div className="flex items-center justify-between gap-2 mb-2.5 flex-wrap">
@@ -4691,17 +4692,17 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           ponerte a cargar números, no como una nota chica al final. */}
       <div className="flex items-center gap-2 mb-3">
         {currentPR ? (
-          <div className="relative overflow-hidden flex items-center gap-2.5 pl-3.5 pr-2 py-2.5 rounded-xl flex-1" style={{ background: `linear-gradient(120deg, ${accent}20, ${accent}0c)`, border: `1px solid ${accent}45` }}>
+          <div className="relative overflow-hidden flex items-center gap-2.5 pl-3.5 pr-2 py-2.5 rounded-xl flex-1" style={{ background: `linear-gradient(120deg, ${tint(accent, "20")}, ${tint(accent, "0c")})`, border: `1px solid ${tint(accent, "45")}` }}>
             <div className="absolute -top-5 -left-5 w-16 h-16 rounded-full blur-2xl pointer-events-none opacity-30" style={{ backgroundColor: accent }} />
             <Trophy size={15} style={{ color: accent }} className="shrink-0 soft-pulse relative" />
             <p className="flex-1 min-w-0 truncate relative leading-none">
-              <span className="block text-[8.5px] font-black uppercase tracking-[0.16em] mb-1" style={{ color: accent + "aa" }}>Récord{override?.manual ? " · editado" : ""}</span>
-              <span className="text-xl font-black tabular-nums" style={{ color: accent, textShadow: `0 0 16px ${accent}50` }}>
+              <span className="block text-[8.5px] font-black uppercase tracking-[0.16em] mb-1" style={{ color: tint(accent, "aa") }}>Récord{override?.manual ? " · editado" : ""}</span>
+              <span className="text-xl font-black tabular-nums" style={{ color: accent, textShadow: `0 0 16px ${tint(accent, "50")}` }}>
                 {cardio ? <>{currentPR.minutes} min{currentPR.km ? ` · ${currentPR.km}km` : ""}</> : <>{currentPR.reps}<span className="opacity-50 text-sm mx-0.5">×</span>{kgToDisplay(currentPR.kg, unit)}<span className="opacity-60 text-xs ml-0.5">{weightLabel(unit)}</span></>}
               </span>
             </p>
             {!cardio && (
-              <button onClick={() => { setEditReps(currentPR?.reps ?? ""); setEditKg(currentPR?.kg ?? ""); setEditingPR((e) => !e); }} aria-label="Corregir récord" className="relative flex items-center justify-center w-8 h-8 rounded-lg shrink-0 transition active:scale-90" style={{ backgroundColor: accent + "22", color: accent }}>
+              <button onClick={() => { setEditReps(currentPR?.reps ?? ""); setEditKg(currentPR?.kg ?? ""); setEditingPR((e) => !e); }} aria-label="Corregir récord" className="relative flex items-center justify-center w-8 h-8 rounded-lg shrink-0 transition active:scale-90" style={{ backgroundColor: tint(accent, "22"), color: accent }}>
                 <Edit3 size={13} />
               </button>
             )}
@@ -4726,11 +4727,11 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           const todayCardio = (logs[`${exerciseId}_${setIndex}`] || []).find((h) => h.date === today);
           if (todayCardio && hasActiveSession && !draft.editing) {
             return (
-              <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ backgroundColor: accent + "15", border: `1px solid ${accent}30` }}>
+              <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ backgroundColor: tint(accent, "15"), border: `1px solid ${tint(accent, "30")}` }}>
                 <Check size={14} style={{ color: accent }} className="shrink-0" />
                 <span className="text-sm font-black" style={{ color: accent }}>{todayCardio.minutes} min{todayCardio.km ? ` · ${todayCardio.km} km` : ""}</span>
                 <span className="text-[10px] text-slate-500 ml-1">guardado hoy</span>
-                <button onClick={() => updateDraft({ minutes: String(todayCardio.minutes), km: String(todayCardio.km || ""), editing: true })} className="ml-auto text-[10px] font-bold px-2 py-1 rounded-lg transition" style={{ backgroundColor: accent + "20", color: accent }}>Editar</button>
+                <button onClick={() => updateDraft({ minutes: String(todayCardio.minutes), km: String(todayCardio.km || ""), editing: true })} className="ml-auto text-[10px] font-bold px-2 py-1 rounded-lg transition" style={{ backgroundColor: tint(accent, "20"), color: accent }}>Editar</button>
               </div>
             );
           }
@@ -4749,7 +4750,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
               {cardioMode === "stopwatch" ? (
                 /* MODO CRONÓMETRO — arrancás, entrenás, parás, se guarda el tiempo */
                 <div className="flex items-center gap-3">
-                  <div className="flex-1 flex flex-col items-center justify-center rounded-xl py-2.5 border" style={{ backgroundColor: accent + "10", borderColor: accent + "30" }}>
+                  <div className="flex-1 flex flex-col items-center justify-center rounded-xl py-2.5 border" style={{ backgroundColor: tint(accent, "10"), borderColor: tint(accent, "30") }}>
                     <span className="text-xl font-black tabular-nums" style={{ color: cardioRunning || cardioElapsed > 0 ? accent : "#475569" }}>
                       {Math.floor(cardioElapsed / 60).toString().padStart(2, "0")}:{(cardioElapsed % 60).toString().padStart(2, "0")}
                     </span>
@@ -4786,7 +4787,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
                     </div>
                   </div>
                   {(cardioRunning || cardioElapsed > 0) && (
-                    <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ backgroundColor: accent + "12", border: `1px solid ${accent}30` }}>
+                    <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ backgroundColor: tint(accent, "12"), border: `1px solid ${tint(accent, "30")}` }}>
                       <Timer size={14} style={{ color: accent }} className="shrink-0" />
                       <span className="text-xl font-black tabular-nums" style={{ color: accent }}>
                         {Math.floor(cardioLeft / 60).toString().padStart(2, "0")}:{(cardioLeft % 60).toString().padStart(2, "0")}
@@ -4828,7 +4829,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
             return { icon: "🎯", title: "En el punto justo", body: `Clavaste el rango de ${rr}. Sostenelo o buscá una rep más.`, color: accent };
           })();
           return (
-            <div className="relative overflow-hidden rounded-2xl px-3 py-3 bounce-in" style={{ background: `linear-gradient(130deg, ${accent}16, ${accent}06)`, border: `1px solid ${accent}35` }}>
+            <div className="relative overflow-hidden rounded-2xl px-3 py-3 bounce-in" style={{ background: `linear-gradient(130deg, ${tint(accent, "16")}, ${tint(accent, "06")})`, border: `1px solid ${tint(accent, "35")}` }}>
               <div className="flex items-center gap-2.5">
                 <span className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 number-pop" style={{ backgroundColor: accent }}>
                   <Check size={14} className="text-white draw-check" strokeWidth={3} />
@@ -4838,10 +4839,10 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
                   <span className="text-lg font-black tabular-nums number-pop inline-block" style={{ color: accent, animationDelay: "0.12s" }}>{todayEntry.reps}<span className="opacity-50 text-sm mx-0.5">×</span>{kgToDisplay(todayEntry.kg, unit)}<span className="opacity-60 text-xs ml-0.5">{weightLabel(unit)}</span></span>
                   {todayEntry.rpe && <span className="ml-2 text-[9.5px] px-1.5 py-0.5 rounded-md bg-slate-800/80 text-slate-400 align-middle">RPE {todayEntry.rpe}</span>}
                 </div>
-                <button onClick={() => { updateDraft({ reps: String(todayEntry.reps), kg: String(kgToDisplay(todayEntry.kg, unit)), editing: true }); }} className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg shrink-0 transition active:scale-95" style={{ backgroundColor: accent + "22", color: accent }}>Editar</button>
+                <button onClick={() => { updateDraft({ reps: String(todayEntry.reps), kg: String(kgToDisplay(todayEntry.kg, unit)), editing: true }); }} className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg shrink-0 transition active:scale-95" style={{ backgroundColor: tint(accent, "22"), color: accent }}>Editar</button>
               </div>
               {coaching && fieldSettings.showCoaching !== false && (
-                <div className="mt-2.5 pt-2.5 flex items-start gap-2 border-t" style={{ borderColor: accent + "20" }}>
+                <div className="mt-2.5 pt-2.5 flex items-start gap-2 border-t" style={{ borderColor: tint(accent, "20") }}>
                   <span className="text-[13px] leading-none mt-0.5 shrink-0">{coaching.icon}</span>
                   <div className="min-w-0">
                     <p className="text-[11px] font-black leading-tight" style={{ color: coaching.color }}>{coaching.title}</p>
@@ -4863,7 +4864,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
               const liveBeats = !cardio && !isNaN(rNum) && !isNaN(kNum) && rNum > 0 && kNum > 0 && currentPR?.kg
                 && estimate1RM(displayToKg(kNum, unit), rNum) > estimate1RM(currentPR.kg, currentPR.reps);
               const borderCol = liveBeats ? "#10B981" : rowFocus ? accent : "rgba(30,41,59,0.7)";
-              const glow = liveBeats ? "0 0 16px -4px rgba(16,185,129,0.55)" : rowFocus ? `0 0 16px -4px ${accent}70` : "none";
+              const glow = liveBeats ? "0 0 16px -4px rgba(16,185,129,0.55)" : rowFocus ? `0 0 16px -4px ${tint(accent, "70")}` : "none";
               return (
             <div onFocus={() => setRowFocus(true)} onBlur={() => setRowFocus(false)}
                  className="flex items-stretch rounded-2xl bg-slate-950/70 overflow-hidden transition-all duration-200"
@@ -4889,7 +4890,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
                 </button>
                 <input type="number" inputMode="decimal" placeholder="—" value={kg} onChange={(e) => updateDraft({ kg: e.target.value })} className="w-full bg-transparent text-2xl font-black text-center text-white focus:outline-none placeholder:text-slate-800" />
               </div>
-              <button ref={saveBtnRef} onClick={handleSave} aria-label="Guardar serie" className={`w-14 flex items-center justify-center transition-all active:scale-95 !text-white ${saved ? "" : "hover:opacity-90"}`} style={saved ? { background: "linear-gradient(160deg, #10B981, #059669)" } : { background: `linear-gradient(160deg, ${accent}, ${accent}b0)` }}>
+              <button ref={saveBtnRef} onClick={handleSave} aria-label="Guardar serie" className={`w-14 flex items-center justify-center transition-all active:scale-95 !text-white ${saved ? "" : "hover:opacity-90"}`} style={saved ? { background: "linear-gradient(160deg, #10B981, #059669)" } : { background: `linear-gradient(160deg, ${accent}, ${tint(accent, "b0")})` }}>
                 {saved ? <Check size={19} /> : <Save size={18} />}
               </button>
             </div>
@@ -4939,7 +4940,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           nada, y se abre al tocarlo. Una nota por serie, no por ejercicio. */}
       {fieldSettings.showPersonalNote !== false && onUpdateSettings && (
         editingNote ? (
-          <div className="mt-2.5 bounce-in rounded-lg p-2" style={{ backgroundColor: "var(--panel-sunken)", border: `1px solid ${accent}30` }}>
+          <div className="mt-2.5 bounce-in rounded-lg p-2" style={{ backgroundColor: "var(--panel-sunken)", border: `1px solid ${tint(accent, "30")}` }}>
             <textarea
               value={noteDraft}
               onChange={(e) => setNoteDraft(e.target.value)}
@@ -4955,7 +4956,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
             </div>
           </div>
         ) : setNote ? (
-          <button onClick={() => setEditingNote(true)} className="w-full mt-2.5 flex items-start gap-1.5 text-left rounded-lg px-2 py-1.5 transition active:scale-[0.99]" style={{ backgroundColor: accent + "12", border: `1px solid ${accent}28` }}>
+          <button onClick={() => setEditingNote(true)} className="w-full mt-2.5 flex items-start gap-1.5 text-left rounded-lg px-2 py-1.5 transition active:scale-[0.99]" style={{ backgroundColor: tint(accent, "12"), border: `1px solid ${tint(accent, "28")}` }}>
             <StickyNote size={11} className="mt-0.5 shrink-0" style={{ color: accent }} />
             <span className="text-[11px] leading-snug" style={{ color: accent, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{setNote}</span>
           </button>
@@ -4964,7 +4965,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
         )
       )}
       {editingPR && !cardio && (
-        <div className="mt-2 rounded-xl p-3 space-y-2 bounce-in" style={{ backgroundColor: "var(--panel-sunken)", border: `1px solid ${accent}30` }}>
+        <div className="mt-2 rounded-xl p-3 space-y-2 bounce-in" style={{ backgroundColor: "var(--panel-sunken)", border: `1px solid ${tint(accent, "30")}` }}>
           <p className="text-[10px] font-black uppercase tracking-[0.14em] flex items-center gap-1.5" style={{ color: accent }}><Edit3 size={11} /> Corregir récord</p>
           <div className="flex flex-wrap gap-2 items-center">
             <input type="number" inputMode="decimal" placeholder="Reps" value={editReps} onChange={(e) => setEditReps(e.target.value)} className="w-20 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm text-white" />
@@ -5040,7 +5041,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h3 className="font-bold text-white text-sm">{exercise.name}</h3>
-              <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded-lg font-bold" style={{ backgroundColor: accent + "18", color: accent }}>{exercise.muscle}</span>
+              <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded-lg font-bold" style={{ backgroundColor: tint(accent, "18"), color: accent }}>{exercise.muscle}</span>
               {exercise.cardio && <span className="text-[10px] bg-rose-400/15 text-rose-300 rounded-lg px-1.5 py-0.5 font-bold flex items-center gap-1"><Footprints size={9} /> CARDIO</span>}
               {deloadMode && <span className="text-[10px] bg-purple-500/15 text-purple-400 rounded-lg px-1.5 py-0.5 font-bold">DESCARGA</span>}
               {/* El ×1/×2 de mancuernas se configura al editar la rutina
@@ -5062,11 +5063,11 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
         {!exercise.cardio && !deloadMode && bestWorkingKg != null && settings.showWarmup !== false && (
           <div className="mb-2">
             {!showWarmup ? (
-              <button onClick={() => setShowWarmup(true)} className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-[11px] font-bold transition" style={{ backgroundColor: accent + "10", border: `1px solid ${accent}30`, color: accent }}>
+              <button onClick={() => setShowWarmup(true)} className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-[11px] font-bold transition" style={{ backgroundColor: tint(accent, "10"), border: `1px solid ${tint(accent, "30")}`, color: accent }}>
                 <Flame size={12} /> Ver calentamiento sugerido
               </button>
             ) : (
-              <div className="rounded-xl border p-3 space-y-2 bounce-in" style={{ borderColor: accent + "30", backgroundColor: accent + "0c" }}>
+              <div className="rounded-xl border p-3 space-y-2 bounce-in" style={{ borderColor: tint(accent, "30"), backgroundColor: tint(accent, "0c") }}>
                 <button onClick={() => setShowWarmup(false)} className="w-full flex items-center justify-center gap-1.5" style={{ color: accent }} aria-label="Ocultar calentamiento sugerido">
                   <Flame size={11} /><span className="text-[10px] font-black uppercase tracking-wider">Calentamiento sugerido</span><ChevronUp size={11} />
                 </button>
@@ -5145,7 +5146,7 @@ function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS,
       <div className="absolute -bottom-8 -left-8 w-28 h-28 rounded-full blur-2xl opacity-20 pointer-events-none" style={{ backgroundColor: phase }} />
       <div className="relative flex items-center justify-between mb-3.5">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0" style={{ backgroundColor: phase + "1c", color: phase, boxShadow: `0 0 0 1px ${phase}30 inset` }}>
+          <div className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0" style={{ backgroundColor: tint(phase, "1c"), color: phase, boxShadow: `0 0 0 1px ${tint(phase, "30")} inset` }}>
             {weekInfo.isDeload ? <Zap size={17} /> : <Flame size={17} />}
           </div>
           <div>
@@ -5153,7 +5154,7 @@ function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS,
             <p className="text-[11px] text-slate-500 leading-tight mt-0.5">Semana {weekInfo.weekInCycle} de {cycleWeeks}</p>
           </div>
         </div>
-        <div className="px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wide shrink-0" style={{ backgroundColor: phase + "1c", color: phase }}>{weekInfo.isDeload ? "Descarga" : "Entrenamiento"}</div>
+        <div className="px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wide shrink-0" style={{ backgroundColor: tint(phase, "1c"), color: phase }}>{weekInfo.isDeload ? "Descarga" : "Entrenamiento"}</div>
       </div>
 
       <div className="relative flex gap-1.5 flex-wrap">
@@ -5165,8 +5166,8 @@ function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS,
             style={yaAnimado ? undefined : { animation: `dayMark 0.38s cubic-bezier(0.34,1.4,0.64,1) ${wi * 45}ms both` }}
             className={`w-9 h-9 rounded-xl flex items-center justify-center text-[10px] font-black transition-all ${isCurrent ? "scale-110" : ""}`}
             style={isCurrent
-              ? { backgroundColor: dotColor, color: "#fff", boxShadow: `0 6px 16px -4px ${dotColor}aa` }
-              : { backgroundColor: dotColor + "1a", color: dotColor, border: `1px solid ${dotColor}30` }}
+              ? { backgroundColor: dotColor, color: "#fff", boxShadow: `0 6px 16px -4px ${tint(dotColor, "aa")}` }
+              : { backgroundColor: tint(dotColor, "1a"), color: dotColor, border: `1px solid ${tint(dotColor, "30")}` }}
           >
             {isDeload ? "D" : week}
           </div>
@@ -5194,7 +5195,7 @@ function SessionStartBar({ activeSession, onStart, onCancel, color = "#14B8A6" }
 
   if (!activeSession) {
     return (
-      <button onClick={onStart} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98] invite-pulse" style={{ backgroundColor: color, "--invite-glow": `${color}80` }}>
+      <button onClick={onStart} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98] invite-pulse" style={{ backgroundColor: color, "--invite-glow": `${tint(color, "80")}` }}>
         <Play size={15} /> Iniciar sesión
       </button>
     );
@@ -5202,14 +5203,14 @@ function SessionStartBar({ activeSession, onStart, onCancel, color = "#14B8A6" }
 
   const elapsedMin = Math.max(0, Math.floor((Date.now() - new Date(activeSession.startedAt).getTime()) / 60000));
   return (
-    <div className="flex items-center gap-3 rounded-2xl px-4 py-3" style={{ backgroundColor: color + "1a", border: `1px solid ${color}40` }}>
+    <div className="flex items-center gap-3 rounded-2xl px-4 py-3" style={{ backgroundColor: tint(color, "1a"), border: `1px solid ${tint(color, "40")}` }}>
       <span className="relative flex h-2.5 w-2.5 shrink-0">
         <span className="absolute inline-flex h-full w-full rounded-full opacity-75 animate-ping" style={{ backgroundColor: color }} />
         <span className="relative inline-flex rounded-full h-2.5 w-2.5" style={{ backgroundColor: color }} />
       </span>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-bold text-white truncate">Sesión en curso</p>
-        <p className="text-[11px] truncate" style={{ color: color + "cc" }}>{elapsedMin} min · arrancó a las {new Date(activeSession.startedAt).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}</p>
+        <p className="text-[11px] truncate" style={{ color: tint(color, "cc") }}>{elapsedMin} min · arrancó a las {new Date(activeSession.startedAt).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}</p>
       </div>
       <button onClick={onCancel} className="text-[11px] text-slate-500 hover:text-slate-300 font-semibold shrink-0 whitespace-nowrap">Cancelar</button>
     </div>
@@ -5355,17 +5356,17 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
       <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${DAY_ORDER.length}, 1fr)` }}>
         {DAY_ORDER.map((k) => (
           <button key={k} onClick={() => setActiveDay(k)} className="py-2.5 rounded-xl text-[10px] font-black uppercase transition-all active:scale-95 border text-center leading-tight"
-            style={activeDay === k ? { background: ROUTINE[k].color, borderColor: ROUTINE[k].color, color: "#fff", boxShadow: `0 4px 14px -4px ${ROUTINE[k].color}66` } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
+            style={activeDay === k ? { background: ROUTINE[k].color, borderColor: ROUTINE[k].color, color: "#fff", boxShadow: `0 4px 14px -4px ${tint(ROUTINE[k].color, "66")}` } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
             {ROUTINE[k].label}
           </button>
         ))}
       </div>
 
-      <div key={activeDay} className="relative overflow-hidden rounded-2xl border tab-fade-in" style={{ borderColor: day.color + "55", background: `linear-gradient(135deg, ${day.color}38, transparent 75%)` }}>
+      <div key={activeDay} className="relative overflow-hidden rounded-2xl border tab-fade-in" style={{ borderColor: tint(day.color, "55"), background: `linear-gradient(135deg, ${tint(day.color, "38")}, transparent 75%)` }}>
         <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full blur-3xl opacity-25 pointer-events-none" style={{ backgroundColor: day.color }} />
         <div className="relative p-5">
           {activeDay === suggestedDay && (
-            <div className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg mb-3" style={{ backgroundColor: day.color + "22", color: day.color }}>
+            <div className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg mb-3" style={{ backgroundColor: tint(day.color, "22"), color: day.color }}>
               <RotateCcw size={10} /> {scheduledDay === activeDay ? "Programado para hoy" : "Sugerido para hoy"}
             </div>
           )}
@@ -5412,7 +5413,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           // ellos, sólo al terminar la vuelta completa.
           const hasHeavyGroup = group.some((ex) => ex.sets.some((s) => isHeavyRepRange(s.repRange)));
           return (
-            <div key={`${activeDay}:${group.map((e) => e.id).join("-")}`} className="rounded-2xl border p-2.5 space-y-2.5" style={{ borderColor: day.color + "50", backgroundColor: day.color + "06" }}>
+            <div key={`${activeDay}:${group.map((e) => e.id).join("-")}`} className="rounded-2xl border p-2.5 space-y-2.5" style={{ borderColor: tint(day.color, "50"), backgroundColor: tint(day.color, "06") }}>
               <div className="flex items-center gap-1.5 px-1"><Link size={11} style={{ color: day.color }} /><span className="text-[10px] font-black uppercase tracking-wider" style={{ color: day.color }}>Superserie · {group.length} ejercicios</span></div>
               {group.map((ex) => <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadSets={isDeload ? getDeloadSets(ex) : null} deloadMode={isDeload} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} hideTimer sex={sex} age={age} />)}
               <div className="px-1"><RestTimer seconds={hasHeavyGroup ? settings.restLong : settings.restShort} accent={day.color} alertType={settings.alertType} timerId={`grp_${group.map((g) => g.id).join("_")}`} exerciseName={group.map((g) => g.name).filter(Boolean).join(" + ")} /></div>
@@ -5424,7 +5425,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
 
       {activeSession && (
         <div>
-          <button onClick={onEndSession} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98] shadow-lg" style={{ backgroundColor: day.color, boxShadow: `0 10px 24px -8px ${day.color}88` }}>
+          <button onClick={onEndSession} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98] shadow-lg" style={{ backgroundColor: day.color, boxShadow: `0 10px 24px -8px ${tint(day.color, "88")}` }}>
             <Check size={15} /> Finalizar sesión
           </button>
           <p className="text-center text-[10px] text-slate-600 mt-2">Se guarda como entrenamiento de hoy y se limpia lo que tenías escrito sin guardar — alimenta tu racha, calendario y gráficas.</p>
@@ -5456,14 +5457,14 @@ function SessionDetailCard({ session, onDelete }) {
   const improvements = session.improvedCount || 0;
 
   return (
-    <div className="rounded-3xl overflow-hidden bounce-in border" style={{ borderColor: accent + "35", background: "var(--panel-grad-slate)" }}>
+    <div className="rounded-3xl overflow-hidden bounce-in border" style={{ borderColor: tint(accent, "35"), background: "var(--panel-grad-slate)" }}>
       {/* Header con el color del día entrenado */}
       <div className="relative px-4 pt-4 pb-3 overflow-hidden">
         <div className="absolute -top-10 -right-8 w-36 h-36 rounded-full blur-3xl opacity-25 pointer-events-none" style={{ backgroundColor: accent }} />
         <div className="relative">
           <div className="flex gap-1.5 mb-2 flex-wrap">
             {session.dayKeys.map((dk) => ROUTINE[dk] && (
-              <span key={dk} className="text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded-lg" style={{ backgroundColor: ROUTINE[dk].color + "25", color: ROUTINE[dk].color }}>{ROUTINE[dk].label}</span>
+              <span key={dk} className="text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded-lg" style={{ backgroundColor: tint(ROUTINE[dk].color, "25"), color: ROUTINE[dk].color }}>{ROUTINE[dk].label}</span>
             ))}
           </div>
           <p className="text-base font-black text-white capitalize leading-tight pr-10">{dateLabel}</p>
@@ -5781,8 +5782,8 @@ function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [], weekSche
                 const mainColor = s ? ROUTINE[s.dayKeys[0]]?.color : null;
                 const bgStyle = s
                   ? (s.dayKeys.length > 1
-                    ? { background: `linear-gradient(135deg, ${mainColor}38, ${ROUTINE[s.dayKeys[1]]?.color || mainColor}38)`, border: `1px solid ${mainColor}55` }
-                    : { backgroundColor: mainColor + "30", border: `1px solid ${mainColor}55` })
+                    ? { background: `linear-gradient(135deg, ${tint(mainColor, "38")}, ${tint(ROUTINE[s.dayKeys[1]]?.color || mainColor, "38")})`, border: `1px solid ${tint(mainColor, "55")}` }
+                    : { backgroundColor: tint(mainColor, "30"), border: `1px solid ${tint(mainColor, "55")}` })
                   : {};
                 return (
                   <button key={i} onClick={() => s && setSelectedDate(isSelected ? null : d)} disabled={!s} style={{ ...bgStyle, animationDelay: `${Math.min(i, 34) * 12}ms` }}
@@ -5956,7 +5957,7 @@ function DeloadView({ logs, settings = DEFAULT_SETTINGS, deloadProgress = {}, se
           return (
             <button key={dk} onClick={() => setActiveDay(dk)}
               className="py-2.5 rounded-xl text-[10px] font-black uppercase transition-all active:scale-95 border text-center leading-tight"
-              style={isActive ? { backgroundColor: d.color + "22", borderColor: d.color + "55", color: d.color } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
+              style={isActive ? { backgroundColor: tint(d.color, "22"), borderColor: tint(d.color, "55"), color: d.color } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
               <span className="block">{d.label}</span>
               {withPR > 0 && <span className="text-[8px] font-black opacity-70">{withPR}/{d.exercises.length}</span>}
             </button>
@@ -5977,7 +5978,7 @@ function DeloadView({ logs, settings = DEFAULT_SETTINGS, deloadProgress = {}, se
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-bold text-white text-sm">{ex.name}</span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-lg font-bold" style={{ backgroundColor: day.color + "18", color: day.color }}>{ex.muscle}</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-lg font-bold" style={{ backgroundColor: tint(day.color, "18"), color: day.color }}>{ex.muscle}</span>
                   </div>
                   <p className="text-[10px] text-slate-500 mt-0.5">{ex.sets.length} → <span className="text-purple-400 font-bold">{deloadSets} series</span> en descarga</p>
                 </div>
@@ -5994,7 +5995,7 @@ function DeloadView({ logs, settings = DEFAULT_SETTINGS, deloadProgress = {}, se
                     const progressKey = `${ex.id}_${i}`;
                     const done = deloadProgress[progressKey] === today;
                     return (
-                      <div key={i} className="relative overflow-hidden rounded-2xl px-3.5 py-3 transition-all duration-200" style={{ background: done ? `linear-gradient(130deg, ${day.color}18, ${day.color}06)` : "linear-gradient(130deg, #A855F718, #A855F706)", border: `1px solid ${done ? day.color + "45" : "#A855F735"}` }}>
+                      <div key={i} className="relative overflow-hidden rounded-2xl px-3.5 py-3 transition-all duration-200" style={{ background: done ? `linear-gradient(130deg, ${tint(day.color, "18")}, ${tint(day.color, "06")})` : "linear-gradient(130deg, #A855F718, #A855F706)", border: `1px solid ${done ? tint(day.color, "45") : "#A855F735"}` }}>
                         <div className="absolute -top-6 -right-6 w-20 h-20 rounded-full blur-2xl pointer-events-none opacity-25" style={{ backgroundColor: done ? day.color : "#A855F7" }} />
                         <div className="absolute left-0 top-2 bottom-2 w-1 rounded-full" style={{ backgroundColor: done ? day.color : "#A855F7" }} />
                         <div className="relative flex items-center gap-2 mb-2.5">
@@ -6003,27 +6004,27 @@ function DeloadView({ logs, settings = DEFAULT_SETTINGS, deloadProgress = {}, se
                         </div>
                         {best && (ex.cardio ? (
                           <>
-                          <div className="relative rounded-xl px-3 py-2.5 mb-2.5 bg-slate-950/60 border" style={{ borderColor: done ? day.color + "35" : "#A855F730" }}>
-                            <span className="block text-[8px] font-black uppercase tracking-[0.16em] mb-1.5" style={{ color: done ? day.color + "aa" : "#C084FCaa" }}>Tiempo de descarga</span>
+                          <div className="relative rounded-xl px-3 py-2.5 mb-2.5 bg-slate-950/60 border" style={{ borderColor: done ? tint(day.color, "35") : "#A855F730" }}>
+                            <span className="block text-[8px] font-black uppercase tracking-[0.16em] mb-1.5" style={{ color: done ? tint(day.color, "aa") : "#C084FCaa" }}>Tiempo de descarga</span>
                             <div className="flex items-center gap-2">
                               <span className="text-[11px] font-bold text-slate-600 line-through tabular-nums shrink-0">{best.minutes} min</span>
                               <ArrowDown size={12} style={{ color: done ? day.color : "#C084FC" }} className="shrink-0" />
-                              <span className="text-xl font-black tabular-nums" style={{ color: done ? day.color : "#D8B4FE", textShadow: `0 0 16px ${done ? day.color : "#A855F7"}50` }}>{Math.max(1, Math.round((best.minutes || 0) * deloadPct))}<span className="opacity-60 text-xs ml-1">min</span></span>
+                              <span className="text-xl font-black tabular-nums" style={{ color: done ? day.color : "#D8B4FE", textShadow: `0 0 16px ${tint(done ? day.color : "#A855F7", "50")}` }}>{Math.max(1, Math.round((best.minutes || 0) * deloadPct))}<span className="opacity-60 text-xs ml-1">min</span></span>
                             </div>
                           </div>
                           {!done && <DeloadCardioTimer targetMinutes={Math.max(1, Math.round((best.minutes || 0) * deloadPct))} accent={day.color} onComplete={() => toggleDeloadDone(progressKey)} />}
                           </>
                         ) : (
-                          <div className="relative rounded-xl px-3 py-2.5 mb-2.5 bg-slate-950/60 border" style={{ borderColor: done ? day.color + "35" : "#A855F730" }}>
-                            <span className="block text-[8px] font-black uppercase tracking-[0.16em] mb-1.5" style={{ color: done ? day.color + "aa" : "#C084FCaa" }}>Peso de descarga</span>
+                          <div className="relative rounded-xl px-3 py-2.5 mb-2.5 bg-slate-950/60 border" style={{ borderColor: done ? tint(day.color, "35") : "#A855F730" }}>
+                            <span className="block text-[8px] font-black uppercase tracking-[0.16em] mb-1.5" style={{ color: done ? tint(day.color, "aa") : "#C084FCaa" }}>Peso de descarga</span>
                             <div className="flex items-center gap-2">
                               <span className="text-[11px] font-bold text-slate-600 line-through tabular-nums shrink-0">{best.reps}×{kgToDisplay(best.kg, unit)}{weightLabel(unit)}</span>
                               <ArrowDown size={12} style={{ color: done ? day.color : "#C084FC" }} className="shrink-0" />
-                              <span className="text-xl font-black tabular-nums" style={{ color: done ? day.color : "#D8B4FE", textShadow: `0 0 16px ${done ? day.color : "#A855F7"}50` }}>{best.reps}<span className="opacity-50 text-sm mx-0.5">×</span>{kgToDisplay(deloadKg, unit)}<span className="opacity-60 text-xs ml-0.5">{weightLabel(unit)}</span></span>
+                              <span className="text-xl font-black tabular-nums" style={{ color: done ? day.color : "#D8B4FE", textShadow: `0 0 16px ${tint(done ? day.color : "#A855F7", "50")}` }}>{best.reps}<span className="opacity-50 text-sm mx-0.5">×</span>{kgToDisplay(deloadKg, unit)}<span className="opacity-60 text-xs ml-0.5">{weightLabel(unit)}</span></span>
                             </div>
                           </div>
                         ))}
-                        <button onClick={() => toggleDeloadDone(progressKey)} className="relative w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-black transition-all active:scale-[0.98]" style={done ? { background: `linear-gradient(160deg, ${day.color}, ${day.color}b0)`, color: "#fff" } : { backgroundColor: "var(--row-surface)", border: "1px solid #33415580", color: "#94a3b8" }}>
+                        <button onClick={() => toggleDeloadDone(progressKey)} className="relative w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-black transition-all active:scale-[0.98]" style={done ? { background: `linear-gradient(160deg, ${day.color}, ${tint(day.color, "b0")})`, color: "#fff" } : { backgroundColor: "var(--row-surface)", border: "1px solid #33415580", color: "#94a3b8" }}>
                           {done ? <><span className="w-5 h-5 rounded-full bg-white/25 flex items-center justify-center"><Check size={12} strokeWidth={3} /></span> Hecha</> : "Marcar como hecha"}
                         </button>
                       </div>
@@ -6823,7 +6824,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
       <MuscleHighlighterBody ranks={ranks} selected={selected} onMuscleClick={goToMuscle} frontRef={frontBodyRef} backRef={backBodyRef} rankMode={mode} pulseMuscles={musculosQueSubieron} />
 
      {selInfo ? (
-        <div key={selected} ref={detailRef} className="relative overflow-hidden rounded-3xl p-[1.5px] bounce-in" style={{ background: selInfo.hasData ? `linear-gradient(140deg, ${selInfo.color}55, transparent 45%, transparent 60%, ${selInfo.color}30)` : "var(--panel-sunken)" }}>
+        <div key={selected} ref={detailRef} className="relative overflow-hidden rounded-3xl p-[1.5px] bounce-in" style={{ background: selInfo.hasData ? `linear-gradient(140deg, ${tint(selInfo.color, "55")}, transparent 45%, transparent 60%, ${tint(selInfo.color, "30")})` : "var(--panel-sunken)" }}>
           <div className="relative overflow-hidden rounded-[calc(1.5rem-1.5px)] p-4" style={{ background: "var(--panel-grad-blue)" }}>
             {selInfo.hasData && (
               <>
@@ -6834,7 +6835,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
 
             {/* Nombre del músculo como chip protagonista */}
             <div className="relative flex items-center justify-between gap-2 mb-3.5">
-              <span className="text-[11px] font-black uppercase tracking-[0.18em] px-3 py-1.5 rounded-xl" style={selInfo.hasData ? { color: selInfo.color, backgroundColor: selInfo.color + "18", border: `1px solid ${selInfo.color}35` } : { color: "#64748b", backgroundColor: "#1e293b66", border: "1px solid #1e293b" }}>{selInfo.label}</span>
+              <span className="text-[11px] font-black uppercase tracking-[0.18em] px-3 py-1.5 rounded-xl" style={selInfo.hasData ? { color: selInfo.color, backgroundColor: tint(selInfo.color, "18"), border: `1px solid ${tint(selInfo.color, "35")}` } : { color: "#64748b", backgroundColor: "#1e293b66", border: "1px solid #1e293b" }}>{selInfo.label}</span>
               {!selInfo.hasData && <span className="text-[11px] font-bold text-slate-500 px-2.5 py-1 rounded-lg bg-slate-800/60 shrink-0">Sin rango</span>}
             </div>
 
@@ -6842,11 +6843,11 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
               <>
                 {/* Badge + rango + marca en display grande */}
                 <div className="relative flex items-center gap-4 mb-4">
-                  <div className="shrink-0" style={{ filter: `drop-shadow(0 6px 18px ${selInfo.color}50)` }}>
+                  <div className="shrink-0" style={{ filter: `drop-shadow(0 6px 18px ${tint(selInfo.color, "50")})` }}>
                     <RankBadgeIcon tier={selInfo.tier} sub={selInfo.sub} color={selInfo.color} size={118} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-2xl font-black leading-none tracking-tight" style={{ color: selInfo.color, textShadow: `0 0 24px ${selInfo.color}40` }}>{selInfo.tier}{selInfo.sub ? ` ${selInfo.sub}` : ""}</p>
+                    <p className="text-2xl font-black leading-none tracking-tight" style={{ color: selInfo.color, textShadow: `0 0 24px ${tint(selInfo.color, "40")}` }}>{selInfo.tier}{selInfo.sub ? ` ${selInfo.sub}` : ""}</p>
                     {selInfo.bestKg ? (
                       <>
                         <p className="mt-2 text-[26px] font-black text-white leading-none tabular-nums">{selInfo.bestReps}<span className="text-slate-500 text-lg font-bold mx-0.5">×</span>{selInfo.bestKg}<span className="text-slate-400 text-base font-bold ml-0.5">kg</span></p>
@@ -6871,20 +6872,20 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
                       const pct = Math.min(100, Math.max(4, ((selInfo.best1RM - selInfo.threshold) / (selInfo.nextThreshold - selInfo.threshold)) * 100));
                       return (
                         <div className="relative h-3 bg-slate-800/80 rounded-full overflow-hidden">
-                          <div className="h-full rounded-full transition-all grow-bar relative" style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${selInfo.color}, ${nextTierInfo?.color || selInfo.color})`, boxShadow: `0 0 12px ${selInfo.color}70` }} />
+                          <div className="h-full rounded-full transition-all grow-bar relative" style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${selInfo.color}, ${nextTierInfo?.color || selInfo.color})`, boxShadow: `0 0 12px ${tint(selInfo.color, "70")}` }} />
                           <span className="absolute inset-0 flex items-center justify-center text-[8.5px] font-black text-white/90 tabular-nums" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.8)" }}>{Math.round(pct)}%</span>
                         </div>
                       );
                     })()}
                     {extraKgNeeded != null && (
-                      <div className="mt-3 flex items-center gap-2 rounded-xl px-3 py-2" style={{ backgroundColor: (nextTierInfo?.color || selInfo.color) + "14", border: `1px solid ${(nextTierInfo?.color || selInfo.color)}30` }}>
+                      <div className="mt-3 flex items-center gap-2 rounded-xl px-3 py-2" style={{ backgroundColor: tint(nextTierInfo?.color || selInfo.color, "14"), border: `1px solid ${tint(nextTierInfo?.color || selInfo.color, "30")}` }}>
                         <TrendingUp size={13} style={{ color: nextTierInfo?.color || selInfo.color }} className="shrink-0" />
                         <p className="text-[11px] text-slate-300 leading-snug">Sumá <span className="font-black text-white">{extraKgNeeded}kg</span> a tus {selInfo.bestReps} reps y subís de rango</p>
                       </div>
                     )}
                   </div>
                 ) : (
-                  <div className="relative rounded-2xl px-3 py-3.5 text-center" style={{ background: `linear-gradient(135deg, ${selInfo.color}20, ${selInfo.color}08)`, border: `1px solid ${selInfo.color}40` }}>
+                  <div className="relative rounded-2xl px-3 py-3.5 text-center" style={{ background: `linear-gradient(135deg, ${tint(selInfo.color, "20")}, ${tint(selInfo.color, "08")})`, border: `1px solid ${tint(selInfo.color, "40")}` }}>
                     <p className="text-sm font-black" style={{ color: selInfo.color }}>🏆 ¡Rango máximo alcanzado!</p>
                   </div>
                 )}
@@ -6963,7 +6964,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
                     <p className="text-[9.5px] font-black uppercase tracking-[0.15em] text-amber-400 mb-2 flex items-center gap-1.5"><Trophy size={11} /> Tus mejores</p>
                     <div className="space-y-1.5">
                       {analysis.tops.map((m) => (
-                        <button key={m.key} onClick={() => { setShowAnalysis(false); goToMuscle(m.key); }} className="w-full flex items-center gap-2.5 rounded-xl px-2.5 py-2 transition active:scale-[0.98] text-left" style={{ backgroundColor: m.r.color + "12", border: `1px solid ${m.r.color}30` }}>
+                        <button key={m.key} onClick={() => { setShowAnalysis(false); goToMuscle(m.key); }} className="w-full flex items-center gap-2.5 rounded-xl px-2.5 py-2 transition active:scale-[0.98] text-left" style={{ backgroundColor: tint(m.r.color, "12"), border: `1px solid ${tint(m.r.color, "30")}` }}>
                           <RankBadgeIcon tier={m.r.tier} sub="" color={m.r.color} size={40} />
                           <span className="flex-1 text-xs font-bold text-slate-200">{m.label}</span>
                           <span className="text-[10.5px] font-black shrink-0" style={{ color: m.r.color }}>{m.r.tier}{m.r.sub ? ` ${m.r.sub}` : ""}</span>
@@ -7264,9 +7265,9 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
                   // puntitos chicos abajo — de un vistazo se nota más.
                   const dayColors = [hasPhoto && "#FB7185", hasWeight && "#A855F7", hasMeasures && "#3B82F6"].filter(Boolean);
                   const bgStyle = dayColors.length > 1
-                    ? { background: `linear-gradient(135deg, ${dayColors.map((c) => c + "38").join(", ")})`, border: `1px solid ${dayColors[0]}55` }
+                    ? { background: `linear-gradient(135deg, ${dayColors.map((c) => tint(c, "38")).join(", ")})`, border: `1px solid ${tint(dayColors[0], "55")}` }
                     : dayColors.length === 1
-                      ? { backgroundColor: dayColors[0] + "30", border: `1px solid ${dayColors[0]}55` }
+                      ? { backgroundColor: tint(dayColors[0], "30"), border: `1px solid ${tint(dayColors[0], "55")}` }
                       : {};
                   const isCompareBase = compareBase && d === compareBase.date;
                   const compareSelectable = compareBase && hasPhoto && !isCompareBase;
@@ -7452,7 +7453,7 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
       <div className="grid grid-cols-4 gap-1 p-1 rounded-2xl bg-slate-900/60 border border-slate-800/50">
         {PROGRESS_SECTIONS.map((s) => (
           <button key={s.k} onClick={() => setActiveSection(s.k)} className="flex flex-col items-center justify-center gap-1 py-2 rounded-xl text-[10px] font-bold transition-all active:scale-95"
-            style={activeSection === s.k ? { background: s.color + "22", color: s.color, boxShadow: `inset 0 0 0 1px ${s.color}45` } : { color: "#64748b" }}>
+            style={activeSection === s.k ? { background: tint(s.color, "22"), color: s.color, boxShadow: `inset 0 0 0 1px ${tint(s.color, "45")}` } : { color: "#64748b" }}>
             {s.icon}<span>{s.l}</span>
           </button>
         ))}
@@ -8372,7 +8373,7 @@ function RoutinePreview({ routineDef }) {
         return (
           <div key={dk} className="rounded-xl border border-slate-800/60 bg-slate-950/40 overflow-hidden">
             {/* Cabecera del día: franja de color + nombre + números */}
-            <div className="flex items-center gap-2.5 px-3 py-2 border-b border-slate-800/50" style={{ backgroundColor: d.color + "0c" }}>
+            <div className="flex items-center gap-2.5 px-3 py-2 border-b border-slate-800/50" style={{ backgroundColor: tint(d.color, "0c") }}>
               <span className="w-1 h-6 rounded-full shrink-0" style={{ backgroundColor: d.color }} />
               <span className="text-[11px] font-black text-white uppercase tracking-wide flex-1 min-w-0 truncate">{d.label}</span>
               <span className="text-[9px] text-slate-500 shrink-0 tabular-nums">{d.exercises.length} ejerc. · {totalSets} series</span>
@@ -8431,13 +8432,13 @@ function PresetRoutineCard({ preset, isActive, onPreview }) {
   return (
     <div
       className={`bg-slate-900/50 border rounded-2xl overflow-hidden backdrop-blur-sm shadow-md shadow-black/20 transition-all hover:shadow-lg hover:shadow-black/30 ${recienActivada ? "activate-pulse" : ""}`}
-      style={{ borderColor: isActive ? accent + "60" : "rgba(30,41,59,0.5)", "--pulse-color": accent + "99" }}
+      style={{ borderColor: isActive ? tint(accent, "60") : "rgba(30,41,59,0.5)", "--pulse-color": tint(accent, "99") }}
     >
       {/* Tocar la tarjeta abre el POP-UP con todo (días, ejercicios, balance
           y el botón de usar). Antes se expandía inline mostrando lo mismo que
           el pop-up: información duplicada y más toques para cerrar todo. */}
       <button onClick={onPreview} className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-slate-800/30 transition active:opacity-80">
-        <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: accent + "1c", color: accent }}>
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: tint(accent, "1c"), color: accent }}>
           <Layers size={15} />
         </div>
         <div className="flex-1 min-w-0">
@@ -8460,7 +8461,7 @@ function SavedRoutineRow({ routine, isActive, onUse, onEdit, onShare, onArchive,
   return (
     <SwipeToArchive confirmText={`¿Quitar "${routine.name}" de tus rutinas? No se borra nada.`} onArchive={onArchive}>
       <div className={`stagger-item smooth-card rounded-2xl px-4 py-3.5 backdrop-blur-sm shadow-md transition-shadow hover:shadow-lg ${isActive ? "border-2" : "border border-slate-800/50 bg-slate-900/50"}`}
-        style={isActive ? { borderColor: accent + "60", background: `linear-gradient(135deg, ${accent}12, var(--panel-sunken))`, boxShadow: `0 4px 20px -4px ${accent}25` } : {}}>
+        style={isActive ? { borderColor: tint(accent, "60"), background: `linear-gradient(135deg, ${tint(accent, "12")}, var(--panel-sunken))`, boxShadow: `0 4px 20px -4px ${tint(accent, "25")}` } : {}}>
         <div className="flex items-center gap-3">
           <div className="w-2 h-10 rounded-full shrink-0" style={{ backgroundColor: accent, boxShadow: `0 0 10px -2px ${accent}` }} />
           {/* Tocar la rutina abre el POP-UP completo directamente: antes había
@@ -8469,7 +8470,7 @@ function SavedRoutineRow({ routine, isActive, onUse, onEdit, onShare, onArchive,
           <button onClick={onPreview} className="flex-1 min-w-0 text-left active:opacity-70 transition-opacity">
             <div className="flex items-center gap-2 flex-wrap">
               <p className="text-sm font-bold text-white truncate">{routine.name}</p>
-              {isActive && <span className="text-[9px] font-black px-2 py-0.5 rounded-full shrink-0" style={{ backgroundColor: accent + "25", color: accent, border: `1px solid ${accent}40` }}>ACTIVA</span>}
+              {isActive && <span className="text-[9px] font-black px-2 py-0.5 rounded-full shrink-0" style={{ backgroundColor: tint(accent, "25"), color: accent, border: `1px solid ${tint(accent, "40")}` }}>ACTIVA</span>}
             </div>
             <p className="text-[11px] text-slate-500">
               {dayCount} día{dayCount !== 1 ? "s" : ""}
@@ -8480,7 +8481,7 @@ function SavedRoutineRow({ routine, isActive, onUse, onEdit, onShare, onArchive,
               )}
             </p>
           </button>
-          {!isActive && <button onClick={onUse} className="px-3 py-1.5 rounded-lg text-xs font-bold shrink-0 transition" style={{ backgroundColor: accent + "18", color: accent }}>Activar</button>}
+          {!isActive && <button onClick={onUse} className="px-3 py-1.5 rounded-lg text-xs font-bold shrink-0 transition" style={{ backgroundColor: tint(accent, "18"), color: accent }}>Activar</button>}
           <button onClick={onShare} aria-label="Compartir" className="p-2 rounded-lg text-slate-500 hover:text-cyan-400 shrink-0"><Share2 size={14} /></button>
           <button onClick={onEdit} aria-label="Editar" className="p-2 rounded-lg text-slate-500 hover:text-indigo-400 shrink-0"><Edit3 size={14} /></button>
         </div>
@@ -8509,7 +8510,7 @@ function ExercisePickerPanel({ existingIds, onAdd, onAddCustom, onClose }) {
         <div className="flex gap-1.5 overflow-x-auto pb-2 -mx-1 px-1">
           {MUSCLE_GROUPS.map((g) => (
             <button key={g.key} onClick={() => { setGroup(g.key); setCustomMuscle(g.key); }} className="px-2.5 py-1 rounded-lg text-[10px] font-bold whitespace-nowrap transition-all border shrink-0"
-              style={group === g.key ? { backgroundColor: g.color + "22", borderColor: g.color + "55", color: g.color } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
+              style={group === g.key ? { backgroundColor: tint(g.color, "22"), borderColor: tint(g.color, "55"), color: g.color } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
               {g.label}
             </button>
           ))}
@@ -8538,7 +8539,7 @@ function ExercisePickerPanel({ existingIds, onAdd, onAddCustom, onClose }) {
           <div className="flex flex-wrap gap-1.5">
             {MUSCLE_GROUPS.filter((g) => g.key !== "cardio").map((g) => (
               <button key={g.key} onClick={() => setCustomMuscle(g.key)} className="px-2 py-1 rounded-lg text-[9px] font-bold border transition shrink-0"
-                style={customMuscle === g.key ? { backgroundColor: g.color + "22", borderColor: g.color + "55", color: g.color } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
+                style={customMuscle === g.key ? { backgroundColor: tint(g.color, "22"), borderColor: tint(g.color, "55"), color: g.color } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
                 {g.label}
               </button>
             ))}
@@ -8582,7 +8583,7 @@ function BuilderExerciseRow({ ex, onRemove, onConfigChange, isDragging = false, 
         boxShadow: isDragging ? "0 12px 28px -8px rgba(0,0,0,0.6), 0 0 0 1px #14B8A6" : "none",
         cursor: isDragging ? "grabbing" : "default",
         transition: "transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease",
-        "--flash-color": dayColor + "2e",
+        "--flash-color": tint(dayColor, "2e"),
       }}
     >
       <div className="flex items-center gap-2">
@@ -8860,9 +8861,9 @@ function BuilderDayCard({ day, dayIdx, totalDays, onRename, onRemove, onMoveDay,
   const existingIds = day.exercises.map((e) => e.id);
   const totalSets = day.exercises.reduce((a, e) => a + (e.sets?.length || 0), 0);
   return (
-    <div className="rounded-2xl p-3.5" style={{ backgroundColor: day.color + "0d", border: `1px solid ${day.color}35` }}>
+    <div className="rounded-2xl p-3.5" style={{ backgroundColor: tint(day.color, "0d"), border: `1px solid ${tint(day.color, "35")}` }}>
       <div className="flex items-center gap-2 mb-1">
-        <button onClick={() => setColorPickerOpen((o) => !o)} aria-label="Cambiar color del día" className="w-7 h-7 rounded-xl flex items-center justify-center text-[11px] font-black shrink-0 transition active:scale-90 ring-1 ring-inset ring-white/10" style={{ backgroundColor: day.color + "25", color: day.color }}>{dayIdx + 1}</button>
+        <button onClick={() => setColorPickerOpen((o) => !o)} aria-label="Cambiar color del día" className="w-7 h-7 rounded-xl flex items-center justify-center text-[11px] font-black shrink-0 transition active:scale-90 ring-1 ring-inset ring-white/10" style={{ backgroundColor: tint(day.color, "25"), color: day.color }}>{dayIdx + 1}</button>
         <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Nombre del día — tocá el número para cambiar el color</p>
       </div>
       {colorPickerOpen && (
@@ -8880,11 +8881,11 @@ function BuilderDayCard({ day, dayIdx, totalDays, onRename, onRemove, onMoveDay,
           <button onClick={() => onMoveDay(1)} disabled={dayIdx === totalDays - 1} className="p-0.5 text-slate-600 hover:text-slate-300 disabled:opacity-20"><ChevronDown size={13} /></button>
         </div>
         <div className="flex-1 relative min-w-0">
-          <input value={day.label} onChange={(e) => onRename(e.target.value.toUpperCase())} placeholder={`DÍA ${dayIdx + 1}`} className="w-full bg-slate-950/50 border border-slate-700/60 rounded-xl pl-3 pr-8 py-2 text-sm font-black text-white uppercase focus:outline-none transition" style={{ borderColor: day.color + "30" }} />
+          <input value={day.label} onChange={(e) => onRename(e.target.value.toUpperCase())} placeholder={`DÍA ${dayIdx + 1}`} className="w-full bg-slate-950/50 border border-slate-700/60 rounded-xl pl-3 pr-8 py-2 text-sm font-black text-white uppercase focus:outline-none transition" style={{ borderColor: tint(day.color, "30") }} />
           <Edit3 size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
         </div>
         {day.exercises.length > 0 && (
-          <span className="text-[10px] font-bold px-2 py-1.5 rounded-lg shrink-0" style={{ backgroundColor: day.color + "18", color: day.color }}>{day.exercises.length} ej. · {totalSets} series</span>
+          <span className="text-[10px] font-bold px-2 py-1.5 rounded-lg shrink-0" style={{ backgroundColor: tint(day.color, "18"), color: day.color }}>{day.exercises.length} ej. · {totalSets} series</span>
         )}
         {/* Duplicar el día completo: si tu Lunes y tu Jueves son parecidos,
             antes había que armarlos dos veces desde cero. */}
@@ -8897,8 +8898,8 @@ function BuilderDayCard({ day, dayIdx, totalDays, onRename, onRemove, onMoveDay,
       </div>
 
       {day.exercises.length === 0 && (
-        <div className="flex flex-col items-center gap-1.5 py-4 rounded-xl mb-2" style={{ backgroundColor: day.color + "08", border: `1px dashed ${day.color}30` }}>
-          <Dumbbell size={20} style={{ color: day.color + "80" }} />
+        <div className="flex flex-col items-center gap-1.5 py-4 rounded-xl mb-2" style={{ backgroundColor: tint(day.color, "08"), border: `1px dashed ${tint(day.color, "30")}` }}>
+          <Dumbbell size={20} style={{ color: tint(day.color, "80") }} />
           <p className="text-[11px] text-slate-500">Día vacío — agregá tu primer ejercicio</p>
         </div>
       )}
@@ -8934,7 +8935,7 @@ function BuilderDayCard({ day, dayIdx, totalDays, onRename, onRemove, onMoveDay,
             {i < day.exercises.length - 1 && (
               <button onClick={() => { vincularSuperserie(i); }}
                 className={`w-full flex items-center justify-center gap-1.5 my-1 py-2 rounded-lg text-[11px] font-bold transition-all active:scale-[0.98] border ${supersetNuevo === i && !ex.supersetNext ? "superset-draw" : ""}`}
-                style={ex.supersetNext ? { backgroundColor: day.color + "22", borderColor: day.color + "60", color: day.color } : { backgroundColor: "transparent", borderColor: "var(--chip-border)", color: "var(--chip-text)", borderStyle: "dashed" }}>
+                style={ex.supersetNext ? { backgroundColor: tint(day.color, "22"), borderColor: tint(day.color, "60"), color: day.color } : { backgroundColor: "transparent", borderColor: "var(--chip-border)", color: "var(--chip-text)", borderStyle: "dashed" }}>
                 <Link size={13} /> {ex.supersetNext ? "Superserie activada — tocá para separar" : "+ Vincular en superserie"}
               </button>
             )}
@@ -8943,7 +8944,7 @@ function BuilderDayCard({ day, dayIdx, totalDays, onRename, onRemove, onMoveDay,
       </div>
 
       {!pickerOpen ? (
-        <button onClick={() => setPickerOpen(true)} className="w-full flex items-center justify-center gap-1.5 mt-2.5 py-2.5 rounded-xl font-semibold text-xs transition active:scale-[0.98]" style={{ backgroundColor: day.color + "14", border: `1px solid ${day.color}35`, color: day.color }}><Plus size={13} /> Agregar ejercicio</button>
+        <button onClick={() => setPickerOpen(true)} className="w-full flex items-center justify-center gap-1.5 mt-2.5 py-2.5 rounded-xl font-semibold text-xs transition active:scale-[0.98]" style={{ backgroundColor: tint(day.color, "14"), border: `1px solid ${tint(day.color, "35")}`, color: day.color }}><Plus size={13} /> Agregar ejercicio</button>
       ) : (
         <ExercisePickerPanel existingIds={existingIds} onAdd={onAddExercise} onAddCustom={onAddCustomExercise} onClose={() => setPickerOpen(false)} />
       )}
@@ -10691,8 +10692,8 @@ function RoutinePreviewModal({ routineDef, routineName, onActivate, onClose, yaA
                   key={dk}
                   className="rounded-2xl border overflow-hidden transition-all"
                   style={{
-                    borderColor: esteAbierto ? day.color + "45" : "var(--chip-border)",
-                    backgroundColor: esteAbierto ? day.color + "0b" : "var(--panel-sunken)",
+                    borderColor: esteAbierto ? tint(day.color, "45") : "var(--chip-border)",
+                    backgroundColor: esteAbierto ? tint(day.color, "0b") : "var(--panel-sunken)",
                   }}
                 >
                   <button onClick={() => setAbierto(esteAbierto ? null : dk)} className="w-full flex items-center gap-3 px-3.5 py-3 text-left">
@@ -10715,7 +10716,7 @@ function RoutinePreviewModal({ routineDef, routineName, onActivate, onClose, yaA
                         const rango = ex.sets?.[0]?.repRange || null;
                         return (
                           <div key={`${dk}:${ex.id || ex.libId}:${i}`} className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 bg-black/20">
-                            <span className="w-4 h-4 rounded-md flex items-center justify-center text-[8px] font-black shrink-0 tabular-nums" style={{ backgroundColor: day.color + "25", color: day.color }}>
+                            <span className="w-4 h-4 rounded-md flex items-center justify-center text-[8px] font-black shrink-0 tabular-nums" style={{ backgroundColor: tint(day.color, "25"), color: day.color }}>
                               {i + 1}
                             </span>
                             <span className="flex-1 min-w-0 truncate text-[11px] text-slate-300">{lib?.name || ex.name || ex.libId}</span>
@@ -11616,6 +11617,20 @@ export default function App() {
 
   const profile = profiles[activeProfile], logs = profile?.logs || {}, drafts = profile?.drafts || {};
   const themeClass = getProfileSettings(profile).theme === "light" ? "light-mode" : "";
+  // tint() (utils.js) arma los "badges" de color según el tema — necesita
+  // saber cuál está activo, pero es una función de módulo (la llaman
+  // decenas de componentes sin recibir el tema por props), así que vive en
+  // una bandera del módulo en vez de contexto de React. Se actualiza acá
+  // mismo, DURANTE el render (no en un efecto): React renderiza de arriba
+  // hacia abajo, así que para cuando cualquier hijo llega a llamar tint(),
+  // la bandera ya quedó al día en este mismo pase — con un efecto, en
+  // cambio, los hijos alcanzan a renderizar una vez con el valor viejo Y
+  // encima no se vuelven a pintar solos después (mutar una variable de
+  // módulo no dispara un re-render), así que el tinte quedaba pegado al
+  // tema anterior hasta el próximo cambio de estado que tocara la app.
+  // Mismo patrón que ya usa applyRoutineModel() más abajo para ROUTINE/
+  // DAY_ORDER.
+  setThemeMode(themeClass === "light-mode");
 
   // Limpieza automática de récords-override obsoletos (datos fantasma). Corre
   // una vez cuando entrás con un perfil: si hay un override viejo que tu
@@ -12258,7 +12273,7 @@ export default function App() {
             {/* Durante una sesión activa, el chip de "entrenando X" ocupa el
                 lugar del "?" (así no lo tapa). Sin sesión, el "?" normal. */}
             {sessionTintColor && sessionDayLabel ? (
-              <div className="flex items-center gap-1.5 rounded-full pl-2 pr-2.5 py-1.5 shrink-0 session-chip-in" style={{ backgroundColor: `${sessionTintColor}1A`, border: `1px solid ${sessionTintColor}55` }}>
+              <div className="flex items-center gap-1.5 rounded-full pl-2 pr-2.5 py-1.5 shrink-0 session-chip-in" style={{ backgroundColor: `${tint(sessionTintColor, "1A")}`, border: `1px solid ${tint(sessionTintColor, "55")}` }}>
                 <span className="relative flex h-2 w-2">
                   <span className="absolute inline-flex h-full w-full rounded-full opacity-60 session-chip-ping" style={{ backgroundColor: sessionTintColor }} />
                   <span className="relative inline-flex rounded-full h-2 w-2" style={{ backgroundColor: sessionTintColor }} />
