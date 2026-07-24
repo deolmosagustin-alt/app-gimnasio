@@ -10,8 +10,8 @@ import {
   ListChecks, LogOut, X, Check, AlertTriangle, Calendar, Zap, Bell, GripVertical, Sliders, StickyNote, Eye,
   Mail, Clock, ChevronRight, Edit3, Info, Plus, Sun, Moon,
   Target, Award, Activity, ArrowDown, HelpCircle, List, LayoutGrid,
-  Sparkles, Layers, SlidersHorizontal, ShieldCheck, UserCog,
-  Share2, Download, Link2, Copy, BellOff, Send, Mic, Ruler, Camera, Link, Footprints, Star, SquarePlay, Upload, RefreshCw, Timer, Percent,
+  Sparkles, Layers, SlidersHorizontal, UserCog,
+  Share2, Download, Link2, Copy, BellOff, Send, Mic, Ruler, Camera, Link, Footprints, Star, SquarePlay, Upload, RefreshCw, Timer,
 } from "lucide-react";
 import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signOut, onAuthStateChanged } from "firebase/auth";
 import { Capacitor, registerPlugin } from "@capacitor/core";
@@ -37,7 +37,7 @@ import { doc, setDoc, getDoc, enableIndexedDbPersistence } from "firebase/firest
 import Model from "react-body-highlighter";
 import { auth, googleProvider, db } from "./firebase";
 import {
-  yt, mkSets, muteHexColor, cloneRoutineDef, debounce, kgToDisplay, displayToKg, weightLabel,
+  yt, mkSets, cloneRoutineDef, debounce, kgToDisplay, displayToKg, weightLabel,
   rpeColor, haptic, localDateStr, todayStr, formatTime, vol, estimate1RM, repRangeTop, isHeavyRepRange,
   tint, setThemeMode,
 } from "./utils";
@@ -425,6 +425,15 @@ const TRAIN_WEEKS = 7;
 const DELOAD_WEEKS = 1;
 const STAGNATION_DAYS = 21;
 
+// Mensaje inicial del Entrenador IA — mismo texto para la conversación
+// "nueva" (perfil recién creado) y para el reset manual (↺).
+const AI_CHAT_WELCOME = { role: "assistant", text: "¡Hola! 👋 Soy tu **Entrenador IA**.\n\nConozco tu rutina, tus marcas y tu progreso — todo lo que registrás en la app.\n\nPuedo ayudarte a:\n• **Crear o modificar rutinas** a tu medida\n• **Analizar tu progreso** y detectar puntos débiles\n• **Resolver dudas** de técnica, series y descanso\n\n¿Por dónde empezamos? 💪" };
+// Tope de mensajes guardados por perfil — la conversación se persiste (así
+// no se pierde al cerrar la app), pero sin límite crecería para siempre en
+// localStorage/Firestore. 60 mensajes son ~30 idas y vueltas, de sobra para
+// que el Entrenador IA mantenga contexto reciente sin inflar el perfil.
+const AI_CHAT_HISTORY_CAP = 60;
+
 // Actualizá esto con tu applicationId real apenas lo tengas (Play Console
 // → tu app → la URL de la ficha, o simplemente
 // com.tu_paquete.elegido) — se usa para el botón "Dejanos una reseña" que
@@ -443,7 +452,7 @@ const DEFAULT_SETTINGS = {
   // Qué mostrar en la ficha de registro (reps/kg). Todo apagado por
   // default: la ficha arranca mínima (solo reps/kg) y cada quien prende
   // lo que realmente va a usar, en vez de tener que apagar seis cosas.
-  showRpe: false, showWarmup: false, show1RMPercent: false, showCoaching: false, showExerciseNote: false, showPersonalNote: false,
+  showRpe: false, showWarmup: false, show1RMPercent: false, showCoaching: false, showExerciseNote: false, showPersonalNote: false, showStagnation: false,
   // Al guardar una serie, arrancar solo el cronómetro de descanso. Apagado
   // por default: es un cambio de comportamiento (no solo de qué se ve), así
   // que preferimos que lo prendas vos a que te aparezca activado de golpe.
@@ -3183,815 +3192,62 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default", 
 }
 
 /* ============================================================================
-   TUTORIAL GUIADO — modal de ayuda con forma de "tour", organizado en
-   capítulos (uno por sección de la app). Cada capítulo arranca con una
-   tarjeta de presentación y sigue con una tarjeta por cada función. Se abre:
-     a) manualmente, con el botón (?) del header (arranca en el capítulo de
-        la pestaña en la que estás), o
-     b) automáticamente la primera vez que un perfil nuevo termina (o
-        saltea) el asistente de marcas iniciales — funcionando como
-        onboarding completo de la app.
-
-   Cada paso puede declarar un "demo": una mini previsualización VIVA de la
-   parte de la app de la que se está hablando (no es una captura ni un ícono,
-   es el componente real corriendo en una sandbox aislada, con sus propios
-   datos de ejemplo). Esto reemplaza la explicación puramente textual por
-   "mostrar mientras se explica".
+   TUTORIAL GUIADO — modal de ayuda liviano: un párrafo corto por pestaña, sin
+   pasos ni demos en vivo (eso abultaba mucho para lo que aporta). Se abre con
+   el botón (?) del header, arrancando en la pestaña en la que estás.
 ============================================================================ */
 
-// Ejercicio y acento usados como "modelo" para las demos de la pestaña Rutina.
-const DEMO_EXERCISE = EXERCISE_BY_ID["press_banca"];
-const DEMO_ACCENT = ROUTINE.push.color;
-
-// Serie de datos de ejemplo para la demo del gráfico de evolución (Progreso).
-const DEMO_CHART_DATA = [
-  { date: "04-05", kg: 70, vol: 700, e1rm: 86 },
-  { date: "11-05", kg: 72.5, vol: 725, e1rm: 89 },
-  { date: "18-05", kg: 72.5, vol: 762, e1rm: 91 },
-  { date: "25-05", kg: 75, vol: 750, e1rm: 92 },
-  { date: "01-06", kg: 77.5, vol: 775, e1rm: 95 },
-  { date: "08-06", kg: 80, vol: 800, e1rm: 98 },
-];
-
-// Lista de ejercicios de ejemplo para la demo de selección (Progreso → Evolución).
-const DEMO_CAROUSEL_EXERCISES = ROUTINE.push.exercises.map((e) => ({ id: e.id, name: e.name, color: ROUTINE.push.color, sets: e.sets.length }));
-
-/* ---- Demo en vivo: pestaña Rutina (día, panel, tarjeta de ejercicio, reset) ---- */
-function RutinaDemo({ view }) {
-  const [demoDay, setDemoDay] = useState(() => DAY_ORDER[0]);
-  const [demoLogs, setDemoLogs] = useState({});
-  const [demoDrafts, setDemoDrafts] = useState({});
-  const [confirmReset, setConfirmReset] = useState(false);
-  const [demoSession, setDemoSession] = useState(null);
-
-  if (view === "session") {
-    return (
-      <SessionStartBar
-        activeSession={demoSession}
-        onStart={() => setDemoSession({ dayKey: demoDay, startedAt: new Date().toISOString() })}
-        onCancel={() => setDemoSession(null)}
-        color={ROUTINE[demoDay].color}
-      />
-    );
-  }
-
-  if (view === "daypicker") {
-    return (
-      <div>
-        <div className="flex gap-1.5 overflow-x-auto pb-1">
-          {DAY_ORDER.map((k) => (
-            <button key={k} onClick={() => setDemoDay(k)} className="px-3.5 py-2 rounded-xl text-xs font-bold uppercase whitespace-nowrap transition-all active:scale-95 border"
-              style={demoDay === k ? { background: ROUTINE[k].color, borderColor: ROUTINE[k].color, color: "#fff" } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
-              {ROUTINE[k].label}
-            </button>
-          ))}
-        </div>
-        <p className="text-[10px] text-slate-600 mt-2">Elegiste <span className="font-bold uppercase" style={{ color: ROUTINE[demoDay].color }}>{ROUTINE[demoDay].label}</span> — así de simple cambia el día.</p>
-      </div>
-    );
-  }
-
-  if (view === "panel") {
-    const day = ROUTINE[demoDay];
-    const totalSets = day.exercises.reduce((a, e) => a + e.sets.length, 0);
-    return (
-      <div className="relative overflow-hidden rounded-2xl border p-4" style={{ borderColor: tint(day.color, "55"), background: `linear-gradient(135deg, ${tint(day.color, "38")}, transparent 75%)` }}>
-        <div className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg mb-2" style={{ backgroundColor: tint(day.color, "22"), color: day.color }}>
-          <RotateCcw size={10} /> Sugerido para hoy
-        </div>
-        <h3 className="text-lg font-black text-white leading-tight uppercase">{day.label}</h3>
-        <p className="text-[11px] text-slate-400 mt-0.5">{day.description}</p>
-        <div className="grid grid-cols-3 gap-2 mt-3">
-          <div className="bg-black/20 rounded-xl p-2 text-center"><p className="text-base font-black text-white tabular-nums">43%</p><p className="text-[9px] text-slate-500 mt-0.5">Hoy</p></div>
-          <div className="bg-black/20 rounded-xl p-2 text-center"><p className="text-base font-black text-white tabular-nums">{day.exercises.length}</p><p className="text-[9px] text-slate-500 mt-0.5">Ejercicios</p></div>
-          <div className="bg-black/20 rounded-xl p-2 text-center"><p className="text-base font-black text-white tabular-nums">{totalSets}</p><p className="text-[9px] text-slate-500 mt-0.5">Series</p></div>
-        </div>
-      </div>
-    );
-  }
-
-  if (view === "reset") {
-    return (
-      <div>
-        {!confirmReset ? (
-          <button onClick={() => setConfirmReset(true)} className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-slate-700 text-slate-400 hover:text-slate-200 transition text-[11px] font-medium"><RotateCcw size={11} /> Resetear sesión de hoy</button>
-        ) : (
-          <div className="flex gap-2 items-center bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 bounce-in">
-            <p className="text-[11px] text-slate-400 flex-1">¿Borrar reps/kg de hoy? Los récords no cambian.</p>
-            <button onClick={() => setConfirmReset(false)} className="px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-400 text-xs">No</button>
-            <button onClick={() => setConfirmReset(false)} className="px-2.5 py-1.5 rounded-lg bg-rose-500/80 !text-white text-xs font-bold">Sí</button>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  // "card-closed" y "card-open" — la tarjeta real de ejercicio, funcionando.
-  const forceOpen = view === "card-open";
-  return (
-    <ExerciseCard
-      exercise={DEMO_EXERCISE}
-      accent={DEMO_ACCENT}
-      logs={demoLogs}
-      setLogs={setDemoLogs}
-      drafts={demoDrafts}
-      setDrafts={setDemoDrafts}
-      deloadSets={null}
-      deloadMode={false}
-      resetKey={0}
-      settings={DEFAULT_SETTINGS}
-      forceOpen={forceOpen}
-    />
-  );
-}
-
-/* ---- Demo en vivo: pestaña Progreso (stats, ciclo, gráfico, PRs, músculo, historial) ---- */
-function ProgresoDemo({ view }) {
-  const [metric, setMetric] = useState("peso");
-  const [demoExId, setDemoExId] = useState(DEMO_CAROUSEL_EXERCISES[0].id);
-
-  if (view === "ciclo") {
-    const mockStart = new Date();
-    mockStart.setDate(mockStart.getDate() - 9);
-    return <WeekCalendar cycleStart={mockStart} logs={{}} sessions={[]} settings={DEFAULT_SETTINGS} />;
-  }
-
-  if (view === "stats") {
-    const tiles = [
-      { val: 34, label: "Días" },
-      { val: "6🔥", label: "Racha" },
-      { val: 187, label: "Series" },
-      { val: "12.4k", label: "Kg×reps" },
-    ];
-    return (
-      <div className="grid grid-cols-4 gap-2">
-        {tiles.map(({ val, label }) => (
-          <div key={label} className="rounded-xl p-2.5 text-center bg-slate-900/50 border border-slate-800/50">
-            <p className="text-sm font-black text-white leading-none tabular-nums">{val}</p>
-            <p className="text-[9px] font-semibold text-slate-500 mt-1">{label}</p>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  if (view === "chart") {
-    const dataKey = metric === "peso" ? "kg" : metric === "vol" ? "vol" : "e1rm";
-    const label = metric === "peso" ? "Kg" : metric === "vol" ? "Volumen" : "1RM est.";
-    return (
-      <div className="space-y-2.5">
-        <ExerciseChipRow exercises={DEMO_CAROUSEL_EXERCISES} selId={demoExId} onSelect={setDemoExId} />
-        <div className="flex justify-end mt-1 mb-1">
-          <div className="flex bg-slate-950/60 rounded-xl p-0.5 border border-slate-800/60">
-            {[{ k: "peso", l: "Kg" }, { k: "vol", l: "Vol" }, { k: "1rm", l: "1RM" }].map((opt) => (
-              <button key={opt.k} onClick={() => setMetric(opt.k)} className={`px-2.5 py-1 rounded-[8px] text-[10px] font-bold transition-all ${metric === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
-            ))}
-          </div>
-        </div>
-        <div className="h-32">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={DEMO_CHART_DATA} margin={{ top: 5, right: 0, left: -25, bottom: 0 }}>
-              <defs>
-                <linearGradient id="gDemoChart" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#14B8A6" stopOpacity={0.35} /><stop offset="95%" stopColor="#14B8A6" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
-              <XAxis dataKey="date" stroke="var(--chart-axis)" fontSize={9} />
-              <YAxis stroke="var(--chart-axis)" fontSize={9} />
-              <Tooltip content={<CustomTooltip />} />
-              <Area type="monotone" dataKey={dataKey} stroke="#14B8A6" fill="url(#gDemoChart)" strokeWidth={2} dot={{ r: 2.5, fill: "#14B8A6", strokeWidth: 0 }} name={label} />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
-    );
-  }
-
-  if (view === "rank") {
-    const demoRanks = {
-      deltoide_anterior: { levelIdx: 8 }, pectoral_medio: { levelIdx: 11 }, biceps: { levelIdx: 5 },
-      antebrazos: { levelIdx: 2 }, core: { levelIdx: 14 }, cuadriceps: { levelIdx: 17 },
-    };
-    return (
-      <div className="space-y-1.5">
-        <MuscleHighlighterBody ranks={demoRanks} onMuscleClick={() => {}} frontRef={{ current: null }} backRef={{ current: null }} />
-        <p className="text-center text-[10px] text-slate-600">Cada músculo, pintado según tu rango ahí</p>
-      </div>
-    );
-  }
-
-  if (view === "muscle") {
-    const items = [{ name: "Pectoral", val: 100, color: "#14B8A6" }, { name: "Dorsal", val: 82, color: "#3B82F6" }, { name: "Cuádriceps", val: 64, color: "#F97316" }];
-    return (
-      <div className="space-y-2.5">
-        {items.map(({ name, val, color }) => (
-          <div key={name}>
-            <div className="flex items-center justify-between mb-1"><span className="text-[11px] font-bold text-slate-300">{name}</span><span className="text-[11px] font-black" style={{ color }}>{val.toLocaleString("es-AR")}</span></div>
-            <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden"><div className="h-full rounded-full" style={{ width: `${val}%`, backgroundColor: color }} /></div>
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  if (view === "calendar") {
-    const now = new Date();
-    const weeks = getMonthMatrix(now.getFullYear(), now.getMonth());
-    const trainedSample = new Set([3, 5, 9, 12, 16, 19, 23].map((d) => localDateStr(new Date(now.getFullYear(), now.getMonth(), d))));
-    return (
-      <div>
-        <div className="grid grid-cols-7 gap-1 mb-1">{WEEKDAY_LABELS.map((l, i) => <div key={i} className="text-center text-[8px] font-bold text-slate-600">{l}</div>)}</div>
-        <div className="grid grid-cols-7 gap-1">
-          {weeks.flat().map((d, i) => {
-            if (!d) return <div key={i} />;
-            const trained = trainedSample.has(d);
-            const dayNum = parseInt(d.slice(8, 10), 10);
-            return <div key={i} className={`aspect-square rounded-md flex items-center justify-center text-[9px] font-bold ${trained ? "bg-slate-700/80 text-slate-200" : "text-slate-700"}`}>{dayNum}</div>;
-          })}
-        </div>
-      </div>
-    );
-  }
-
-  // "resetall"
-  return (
-    <div className="flex gap-2">
-      <div className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-slate-700 text-slate-500 text-[11px] font-medium"><Trash2 size={11} /> Resetear todo</div>
-      <div className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-slate-700 text-slate-500 text-[11px] font-medium"><Calendar size={11} /> Borrar un día</div>
-    </div>
-  );
-}
-
-/* ---- Demo en vivo: pestaña Descarga ---- */
-function DescargaDemo({ view }) {
-  if (view === "header") {
-    return (
-      <div className="flex items-center justify-between bg-purple-500/10 border border-purple-500/20 rounded-xl px-3.5 py-3">
-        <div>
-          <p className="text-[10px] font-black uppercase tracking-widest text-purple-400">Semana de descarga</p>
-          <p className="text-[11px] text-purple-300/70 mt-0.5">Menos carga · Menos series</p>
-        </div>
-        <div className="w-11 h-11 rounded-xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center shrink-0">
-          <span className="text-base font-black text-purple-300">75%</span>
-        </div>
-      </div>
-    );
-  }
-
-  // "suggested"
-  return (
-    <div className="bg-slate-900/60 border border-slate-800/50 rounded-xl px-3.5 py-3">
-      <div className="flex items-center gap-2 mb-2.5"><span className="text-xs font-bold text-white">Press Banca</span><span className="text-[9px] px-1.5 py-0.5 rounded-lg font-bold bg-teal-500/18 text-teal-400">Pectoral</span></div>
-      <div className="flex items-center gap-3">
-        <span className="text-[10px] font-black text-slate-600 w-5 shrink-0">S1</span>
-        <span className="text-[10px] text-slate-600 bg-slate-800/60 rounded-lg px-2 py-1 shrink-0">3-5 reps</span>
-        <div className="flex items-center gap-2 flex-1 justify-end">
-          <span className="text-[11px] text-slate-600 line-through">5×100kg</span>
-          <div className="flex items-center gap-1"><ArrowDown size={10} className="text-purple-400" /><span className="text-sm font-black text-purple-300">5×75kg</span></div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ---- Demo en vivo: pestaña Perfil ---- */
-function PerfilDemo({ view }) {
-  const [trainW, setTrainW] = useState(7);
-  const [alertType, setAlertType] = useState("sound");
-  const [demoTheme, setDemoTheme] = useState("dark");
-  const [demoTextScale, setDemoTextScale] = useState(1);
-
-  if (view === "apariencia") {
-    return (
-      <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
-        {[{ k: "dark", l: "Oscuro", icon: <Moon size={13} /> }, { k: "light", l: "Claro", icon: <Sun size={13} /> }].map((opt) => (
-          <button key={opt.k} onClick={() => setDemoTheme(opt.k)} className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-all ${demoTheme === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.icon} {opt.l}</button>
-        ))}
-      </div>
-    );
-  }
-
-  if (view === "textsize") {
-    return (
-      <div className="space-y-2.5">
-        <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
-          {TEXT_SCALE_OPTIONS.map((opt) => (
-            <button key={opt.k} onClick={() => setDemoTextScale(opt.v)} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${demoTextScale === opt.v ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
-          ))}
-        </div>
-        <p className="text-center font-bold text-white transition-all" style={{ fontSize: `${demoTextScale}rem` }}>Así se ve un texto normal</p>
-        <p className="text-center text-slate-500 transition-all" style={{ fontSize: `${0.6875 * demoTextScale}rem` }}>Texto chico (consejos, badges) — éste lo agranda el control de abajo, "Letras chicas"</p>
-      </div>
-    );
-  }
-
-  if (view === "datos") {
-    return (
-      <div className="bg-slate-900/60 border border-slate-800/50 rounded-xl divide-y divide-slate-800/50 overflow-hidden">
-        {[{ icon: <Mail size={12} />, label: "Email", val: "ej@mail.com" }, { icon: <Clock size={12} />, label: "Unido el", val: "12 marzo 2026" }].map(({ icon, label, val }) => (
-          <div key={label} className="flex items-center gap-2.5 px-3 py-2.5"><span className="text-slate-600">{icon}</span><span className="text-slate-500 text-[11px] flex-1">{label}</span><span className="text-slate-300 text-[11px] font-medium">{val}</span></div>
-        ))}
-      </div>
-    );
-  }
-
-  if (view === "ciclo") {
-    return (
-      <div className="flex items-center justify-between bg-slate-900/60 border border-slate-800/50 rounded-xl px-3.5 py-3">
-        <div><p className="text-xs font-bold text-white">Inicio de ciclo</p><p className="text-[10px] text-slate-500 mt-0.5">Iniciado el 02/05/2026</p></div>
-        <span className="px-3 py-1.5 rounded-xl bg-slate-800 text-slate-300 text-[10px] font-semibold shrink-0">Cambiar</span>
-      </div>
-    );
-  }
-
-  if (view === "configdescarga") {
-    return (
-      <div className="bg-slate-950/40 rounded-xl p-3 max-w-[160px]">
-        <p className="text-[10px] text-slate-500 mb-2">Sem. entrenamiento</p>
-        <div className="flex items-center justify-between">
-          <button onClick={() => setTrainW((n) => Math.max(2, n - 1))} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95">−</button>
-          <span className="text-sm font-black text-white tabular-nums">{trainW}</span>
-          <button onClick={() => setTrainW((n) => Math.min(12, n + 1))} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95">+</button>
-        </div>
-      </div>
-    );
-  }
-
-  if (view === "descanso") {
-    return (
-      <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
-        {[{ k: "sound", l: "Sonido" }, { k: "vibration", l: "Vibración" }, { k: "both", l: "Ambos" }].map((opt) => (
-          <button key={opt.k} onClick={() => setAlertType(opt.k)} className={`flex-1 py-2 rounded-lg text-[10px] font-bold transition-all ${alertType === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
-        ))}
-      </div>
-    );
-  }
-
-  if (view === "backup") {
-    return (
-      <div className="flex items-center gap-2.5 bg-slate-900/40 border border-slate-800/40 rounded-xl px-3.5 py-3">
-        <ShieldCheck size={14} className="text-slate-500 shrink-0" />
-        <p className="text-[10px] text-slate-500">Copia de seguridad automática activa</p>
-      </div>
-    );
-  }
-
-  // "logout"
-  return (
-    <div className="space-y-2">
-      <div className="w-full flex items-center gap-2 justify-center py-2.5 rounded-xl border border-slate-700 text-slate-400 text-[11px] font-semibold"><LogOut size={12} /> Cerrar sesión</div>
-      <div className="w-full flex items-center gap-2 justify-center py-2.5 rounded-xl border border-rose-500/20 text-rose-500/70 text-[11px] font-semibold"><Trash2 size={12} /> Eliminar perfil</div>
-    </div>
-  );
-}
-
-/* ---- Demo en vivo: pestaña Rutinas ---- */
-function RutinasDemo({ view }) {
-  const [open, setOpen] = useState(false);
-  const [demoDayName, setDemoDayName] = useState("DÍA 1");
-
-  if (view === "active") {
-    return (
-      <div className="rounded-xl border border-teal-500/25 bg-teal-500/5 p-3">
-        <div className="flex items-center gap-1.5 mb-1"><Layers size={12} className="text-teal-400" /><span className="text-[9px] font-black uppercase tracking-widest text-teal-400">Tu rutina activa</span></div>
-        <p className="text-sm font-black text-white">Push / Pull / Legs</p>
-        <div className="flex items-center gap-1.5 mt-2">
-          <span className="text-[9px] font-bold px-2 py-0.5 rounded-lg bg-teal-500/20" style={{ color: muteHexColor("#14B8A6") }}>PUSH</span>
-          <span className="text-[9px] font-bold px-2 py-0.5 rounded-lg bg-blue-500/20" style={{ color: muteHexColor("#3B82F6") }}>PULL</span>
-          <span className="text-[9px] font-bold px-2 py-0.5 rounded-lg bg-orange-500/20" style={{ color: muteHexColor("#F97316") }}>LEGS</span>
-        </div>
-      </div>
-    );
-  }
-
-  if (view === "preset") {
-    return (
-      <div className="bg-slate-900/60 border border-slate-800/50 rounded-xl overflow-hidden">
-        <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center justify-between gap-2 px-3.5 py-3 text-left">
-          <div className="min-w-0">
-            <p className="text-xs font-bold text-white">Arnold Split</p>
-            <p className="text-[10px] text-slate-500 mt-0.5">Pecho y espalda juntos, hombros y brazos juntos…</p>
-          </div>
-          <ChevronDown size={14} className={`text-slate-600 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
-        </button>
-        {open && (
-          <div className="px-3.5 pb-3 text-[10px] text-slate-500 space-y-1 tab-fade-in">
-            <p>· Pecho y Espalda — 6 ejercicios</p>
-            <p>· Hombros y Brazos — 6 ejercicios</p>
-            <p>· Piernas — 5 ejercicios</p>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  if (view === "builder") {
-    return (
-      <div className="bg-slate-950/50 border border-slate-800/50 rounded-xl p-3">
-        <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Nombre del día — tocá para cambiarlo</p>
-        <div className="relative mb-2.5">
-          <input value={demoDayName} onChange={(e) => setDemoDayName(e.target.value)} className="w-full bg-slate-900/60 border border-slate-700/60 rounded-xl pl-3 pr-8 py-2 text-sm font-black text-white focus:outline-none focus:border-teal-500/60 transition" />
-          <Edit3 size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
-        </div>
-        <div className="flex gap-1.5 mb-2.5">
-          {["Pecho", "Espalda", "Hombros", "Bíceps"].map((g, i) => (
-            <span key={g} className={`px-2 py-1 rounded-lg text-[9px] font-bold ${i === 0 ? "bg-teal-500/20 text-teal-400" : "text-slate-600 border border-slate-800"}`}>{g}</span>
-          ))}
-        </div>
-        <div className="flex items-center gap-2.5 bg-slate-900/60 rounded-lg px-2.5 py-2">
-          <div className="flex-1 min-w-0"><p className="text-[10px] font-bold text-white truncate">Press Inclinado con Mancuernas</p><p className="text-[9px] text-slate-500">3 series · 8-10 reps</p></div>
-          <Plus size={13} className="text-teal-400 shrink-0" />
-        </div>
-      </div>
-    );
-  }
-
-  // "manage"
-  return (
-    <div className="bg-slate-900/60 border border-slate-800/50 rounded-xl px-3.5 py-3 flex items-center gap-2.5">
-      <div className="w-7 h-7 rounded-lg bg-slate-800/60 text-slate-400 flex items-center justify-center shrink-0"><Layers size={13} /></div>
-      <div className="flex-1 min-w-0"><p className="text-xs font-bold text-white truncate">Mi rutina de verano</p><p className="text-[10px] text-slate-500">3 días · creada por vos</p></div>
-      <span className="px-2 py-1 rounded-lg bg-teal-500/15 text-teal-400 text-[10px] font-bold shrink-0">Activar</span>
-      <Edit3 size={13} className="text-slate-500 shrink-0" />
-      <Trash2 size={13} className="text-slate-600 shrink-0" />
-    </div>
-  );
-}
-
-function DemoPreview({ kind, view }) {
-  if (kind === "rutina") return <RutinaDemo view={view} />;
-  if (kind === "rutinas") return <RutinasDemo view={view} />;
-  if (kind === "progreso") return <ProgresoDemo view={view} />;
-  if (kind === "descarga") return <DescargaDemo view={view} />;
-  if (kind === "perfil") return <PerfilDemo view={view} />;
-  return null;
-}
-
 const HELP_CHAPTERS = [
-  {
-    key: "_intro",
-    label: "Objetivo",
-    color: "#14B8A6",
-    icon: <Sparkles size={16} />,
-    steps: [
-      {
-        icon: <Flame size={20} />,
-        title: "¡Bienvenido a Modus Fit!",
-        text: "Un recorrido rápido por la app. Salí cuando quieras y volvé tocando el ? de arriba.",
-      },
-      {
-        icon: <Layers size={20} />,
-        title: "Cuatro secciones principales",
-        text: "4 pestañas abajo: Rutina, Progreso, Rutinas y Entrenador IA. Tu perfil está en el avatar de arriba.",
-      },
-      {
-        icon: <Target size={20} />,
-        title: "Primeros pasos",
-        text: "Al entrar verás 3 tareas iniciales: fecha de ciclo, tus datos y tu primera marca.",
-      },
-    ],
-  },
   {
     key: "rutina",
     label: "Rutina",
     color: "#14B8A6",
     icon: <Dumbbell size={16} />,
-    steps: [
-      {
-        icon: <Dumbbell size={20} />,
-        title: "Rutina: tu entrenamiento del día",
-        text: "Acá registrás cada sesión: elegís el día y anotás reps y kg de cada serie.",
-      },
-      {
-        icon: <Play size={20} />,
-        title: "Iniciar y finalizar sesión",
-        text: "\"Iniciar sesión\" al empezar y \"Finalizar sesión\" al terminar — así el día cuenta en tu historial.",
-        demo: { kind: "rutina", view: "session", caption: "Probá iniciar la sesión" },
-      },
-      {
-        icon: <ChevronDown size={20} />,
-        title: "Tarjetas de ejercicio",
-        text: "Tocá una tarjeta para ver el cronómetro, las series, notas y video. Tu récord aparece arriba.",
-        demo: { kind: "rutina", view: "card-closed", caption: "Tocá la tarjeta para desplegarla" },
-      },
-      {
-        icon: <StickyNote size={20} />,
-        title: "Notas por ejercicio",
-        text: "\"Agregar nota\" debajo de cada serie guarda recordatorios como el agarre o la máquina.",
-      },
-      {
-        icon: <Dumbbell size={20} />,
-        title: "¿Una o dos mancuernas?",
-        text: "En cada ejercicio de mancuerna elegís si usás una o dos, para calcular bien el peso total.",
-      },
-      {
-        icon: <Sliders size={20} />,
-        title: "Personalizá qué ves al registrar",
-        text: "En Perfil → \"Qué ves al registrar\" apagás lo que no uses, para una ficha más simple.",
-      },
-      {
-        icon: <Save size={20} />,
-        title: "Registrá tus series",
-        text: "Ingresá reps y kg y guardá. Desde tu segunda mejora, cada récord festeja con confetti.",
-        demo: { kind: "rutina", view: "card-open", caption: "Ingresá reps y kg, y tocá Guardar" },
-      },
-      {
-        icon: <Percent size={20} />,
-        title: "Entrená por % de 1RM",
-        text: "Ingresá el % de tu 1RM que querés usar y la app calcula el kg sola.",
-      },
-      {
-        icon: <Pause size={20} />,
-        title: "Cronómetro de descanso",
-        text: "Arriba de las series: temporizador de descanso con aviso sonoro y/o vibración.",
-        demo: { kind: "rutina", view: "card-open", caption: "El cronómetro está arriba de las series" },
-      },
-      {
-        icon: <Activity size={20} />,
-        title: "Cardio: cronómetro y cuenta regresiva",
-        text: "Para cardio elegís entre cronómetro libre o cuenta regresiva con objetivo en minutos.",
-      },
-      {
-        icon: <Flame size={20} />,
-        title: "Calentamiento sugerido",
-        text: "Con marca registrada, te sugerimos series de calentamiento al 50%, 70% y 85%.",
-      },
-      {
-        icon: <Share2 size={20} />,
-        title: "Compartir una marca nueva",
-        text: "Cada marca nueva abre una imagen lista para compartir (desactivable en Perfil).",
-      },
-      {
-        icon: <Zap size={20} />,
-        title: "Tu semana de descarga",
-        text: "Cada tantas semanas entrás en descarga: menos series y peso para bajar la fatiga.",
-        demo: { kind: "descarga", view: "header" },
-      },
-      {
-        icon: <ArrowDown size={20} />,
-        title: "Cargas sugeridas en descarga",
-        text: "Vas tildando cada serie con el peso ya reducido, calculado automáticamente.",
-        demo: { kind: "descarga", view: "suggested" },
-      },
-      {
-        icon: <RotateCcw size={20} />,
-        title: "Resetear el día",
-        text: "\"Resetear sesión de hoy\" borra solo lo de hoy si te equivocaste — tus récords quedan intactos.",
-        demo: { kind: "rutina", view: "reset", caption: "Tocá para ver cómo pide confirmación" },
-      },
-    ],
+    description: "Acá registrás cada sesión: elegí el día y anotá reps y kg de cada serie — la app detecta tus récords sola y festeja con confetti. Tenés cronómetro de descanso, calentamiento sugerido, entrenamiento por % de tu 1RM y notas por serie. En Perfil → \"Qué ves al registrar\" podés simplificar la ficha apagando lo que no uses. Si te equivocás, \"Resetear sesión de hoy\" borra solo lo de hoy sin tocar tus récords.",
   },
   {
     key: "progreso",
     label: "Progreso",
     color: "#3B82F6",
     icon: <BarChart3 size={16} />,
-    steps: [
-      {
-        icon: <Activity size={20} />,
-        title: "Progreso: tu evolución completa",
-        text: "Acá ves qué tan constante fuiste y cuánto mejoraste: gráficos, rankings e historial.",
-      },
-      {
-        icon: <Calendar size={20} />,
-        title: "Tu ciclo de entrenamiento",
-        text: "Arriba ves tu semana actual del ciclo y cuántos días entrenaste.",
-        demo: { kind: "progreso", view: "ciclo" },
-      },
-      {
-        icon: <Award size={20} />,
-        title: "El muñeco muscular",
-        text: "Cada músculo se pinta según tu rango, de Bronce a Maestro. Tocalo para ver el detalle.",
-      },
-      {
-        icon: <Zap size={20} />,
-        title: "Cómo se calculan los rangos",
-        text: "Tu rango sale de tu mejor marca en cada grupo muscular, y sube solo con cada récord.",
-      },
-      {
-        icon: <Sparkles size={20} />,
-        title: "Subida de rango",
-        text: "Al pasar de rango (ej. Oro → Esmeralda) aparece una animación de celebración.",
-      },
-      {
-        icon: <Ruler size={20} />,
-        title: "Medidas y fotos de progreso",
-        text: "Registrá peso, medidas y fotos, y compará dos fechas lado a lado.",
-      },
-      {
-        icon: <Flame size={20} />,
-        title: "Estadísticas generales",
-        text: "Días entrenados, racha, series totales y volumen acumulado, todo junto.",
-        demo: { kind: "progreso", view: "stats" },
-      },
-      {
-        icon: <Calendar size={20} />,
-        title: "Historial de sesiones",
-        text: "Calendario o lista con cada sesión — tocá una para ver el detalle serie por serie.",
-        demo: { kind: "progreso", view: "calendar" },
-      },
-      {
-        icon: <Share2 size={20} />,
-        title: "Imágenes para compartir",
-        text: "Generá una imagen con tu récord, tu resumen semanal o tu ranking muscular.",
-      },
-    ],
+    description: "Tu evolución completa: el muñeco muscular pinta cada músculo según tu rango (de Bronce a Maestro) y sube solo con cada récord nuevo. También ves tu ciclo de entrenamiento, estadísticas generales (días, racha, series, volumen), medidas y fotos comparables, y el historial de sesiones en calendario o lista. Todo lo podés compartir como imagen.",
   },
   {
     key: "rutinas",
     label: "Rutinas",
     color: "#A855F7",
     icon: <Layers size={16} />,
-    steps: [
-      {
-        icon: <Layers size={20} />,
-        title: "Rutinas: armá tu plan",
-        text: "Elegí una rutina preestablecida o creá la tuya desde cero.",
-        demo: { kind: "rutinas", view: "preset", caption: "Tocá la rutina para ver el detalle" },
-      },
-      {
-        icon: <Sparkles size={20} />,
-        title: "Creá la tuya",
-        text: "Ponele nombre, armá los días y agregá ejercicios por grupo muscular.",
-        demo: { kind: "rutinas", view: "builder", caption: "Probá cambiar el nombre del día" },
-      },
-      {
-        icon: <SlidersHorizontal size={20} />,
-        title: "Rangos distintos por serie",
-        text: "Cada serie puede tener su propio rango de reps — ideal para pirámides o back-off.",
-      },
-      {
-        icon: <GripVertical size={20} />,
-        title: "Reordená arrastrando",
-        text: "Mantené apretado un ejercicio y arrastralo para cambiarlo de orden.",
-      },
-      {
-        icon: <Link size={20} />,
-        title: "Superseries",
-        text: "Vinculá dos ejercicios para hacerlos uno tras otro, compartiendo el cronómetro.",
-      },
-      {
-        icon: <Edit3 size={20} />,
-        title: "Editá, activá o borrá tus rutinas",
-        text: "Lápiz para editar, \"Activar\" para usarla, deslizar para borrarla.",
-        demo: { kind: "rutinas", view: "manage" },
-      },
-      {
-        icon: <Download size={20} />,
-        title: "Importar desde un archivo",
-        text: "Subí un Excel, Word o PDF y la app arma la rutina sola.",
-      },
-    ],
+    description: "Elegí una rutina preestablecida, creá la tuya desde cero o importala desde un PDF, Excel o Word. Podés poner un rango de reps distinto por serie, vincular ejercicios en superserie y reordenar arrastrando. Editá, activá o borrá cualquier rutina cuando quieras.",
   },
   {
     key: "entrenador_ia",
     label: "IA",
     color: "#14B8A6",
     icon: <Sparkles size={16} />,
-    steps: [
-      {
-        icon: <Sparkles size={20} />,
-        title: "Entrenador IA: tu asistente personal",
-        text: "Conoce tus marcas, tu volumen y tus descansos reales — te responde con TUS datos.",
-      },
-      {
-        icon: <Layers size={20} />,
-        title: "Qué puede hacer",
-        text: "Crear o ajustar rutinas, analizar tu progreso, planificar tu día y resolver dudas de técnica.",
-      },
-      {
-        icon: <Target size={20} />,
-        title: "Chips de acceso rápido",
-        text: "Los chips debajo del texto insertan preguntas comunes con un toque.",
-      },
-      {
-        icon: <AlertTriangle size={20} />,
-        title: "Siempre pide confirmación",
-        text: "Antes de aplicar cualquier cambio te muestra una vista previa para confirmar o descartar.",
-      },
-      {
-        icon: <Mic size={20} />,
-        title: "Hablale en vez de escribir",
-        text: "Usá el micrófono para dictar tu pregunta en vez de escribirla.",
-      },
-      {
-        icon: <RotateCcw size={20} />,
-        title: "Nueva conversación",
-        text: "El ↺ arriba a la derecha empieza el chat de cero.",
-      },
-    ],
+    description: "Un coach que conoce tus marcas, tu volumen y tus descansos reales — te responde con TUS datos, no con generalidades. Puede crear o ajustar rutinas, analizar tu progreso, planificarte el día y resolver dudas de técnica, siempre mostrándote una vista previa antes de aplicar cualquier cambio. Los chips de abajo insertan preguntas comunes con un toque, y podés dictar por voz en vez de escribir.",
   },
   {
     key: "perfil",
     label: "Perfil",
     color: "#F59E0B",
     icon: <UserCog size={16} />,
-    steps: [
-      {
-        icon: <UserCog size={20} />,
-        title: "Perfil: tu cuenta y configuración",
-        text: "Tus datos, la configuración de la app y tu cuenta, todo acá.",
-      },
-      {
-        icon: <Camera size={20} />,
-        title: "Foto de perfil",
-        text: "Tocá la cámara sobre tu avatar para elegir una foto.",
-      },
-      {
-        icon: <Mail size={20} />,
-        title: "Tus datos y Google",
-        text: "Editá tus datos o vinculá tu cuenta con Google para acceder desde cualquier dispositivo.",
-        demo: { kind: "perfil", view: "datos" },
-      },
-      {
-        icon: <Calendar size={20} />,
-        title: "Ciclo y descarga",
-        text: "Configurá la duración de tu ciclo y de tu semana de descarga.",
-        demo: { kind: "perfil", view: "ciclo" },
-      },
-      {
-        icon: <Clock size={20} />,
-        title: "Descanso entre series",
-        text: "Elegí el aviso (sonido/vibración) y la duración del descanso entre series.",
-        demo: { kind: "perfil", view: "descanso", caption: "Probá cambiar el tipo de aviso" },
-      },
-      {
-        icon: <Bell size={20} />,
-        title: "Recordatorio de entrenamiento",
-        text: "Activá un aviso diario para los días que te toca entrenar.",
-      },
-      {
-        icon: <Sun size={20} />,
-        title: "Apariencia y unidad de peso",
-        text: "Elegí kg o lbs, y el tamaño de letra de la app.",
-        demo: { kind: "perfil", view: "apariencia", caption: "Tocá la sección para desplegarla" },
-      },
-      {
-        icon: <Download size={20} />,
-        title: "Exportar entrenamiento",
-        text: "Descargá tu resumen en PDF, Word o Excel.",
-      },
-      {
-        icon: <ShieldCheck size={20} />,
-        title: "Tus datos están respaldados",
-        text: "Tus registros tienen una copia local de respaldo, por las dudas.",
-      },
-      {
-        icon: <Info size={20} />,
-        title: "Política de privacidad",
-        text: "El link está al fondo del perfil y se abre sin salir de la app.",
-      },
-    ],
-  },
-  {
-    key: "_outro",
-    label: "Listo",
-    color: "#14B8A6",
-    icon: <Check size={16} />,
-    steps: [
-      {
-        icon: <Check size={20} />,
-        title: "¡Eso es todo!",
-        text: "Volvé a este tour cuando quieras tocando el ? arriba a la derecha.",
-      },
-    ],
+    description: "Tus datos, la configuración de la app y tu cuenta. Ahí configurás tu ciclo y descarga, el descanso entre series, recordatorios de entrenamiento, apariencia (tema, unidad de peso, tamaño de letra) y qué ves al registrar. También exportás tu entrenamiento a PDF, Word o Excel, y vinculás tu cuenta con Google para tener todo respaldado.",
   },
 ];
-// Versión "plana" de todos los pasos, con metadata de a qué capítulo
-// pertenece cada uno — esto es lo que recorre el modal con Atrás/Siguiente.
-const ALL_HELP_STEPS = HELP_CHAPTERS.flatMap((c, ci) =>
-  c.steps.map((s, si) => ({
-    ...s,
-    chapterIndex: ci,
-    chapterKey: c.key,
-    chapterLabel: c.label,
-    chapterColor: c.color,
-    isChapterIntro: si === 0,
-    stepInChapter: si,
-  }))
-);
 
 // ── INTRO DE BIENVENIDA (primera vez) ───────────────────────────────────────
-// Estilo "intro de app": 3 slides con un ícono grande, una idea por pantalla,
+// Estilo "intro de app": 2 slides con un ícono grande, una idea por pantalla,
 // puntos de progreso y botones grandes. La primera vez que activás una rutina
-// se muestra ESTO en vez del tutorial completo de 51 pasos (que abruma como
-// primer contacto). El tutorial detallado queda en el "?" y como opción acá.
-// Antes eran 5 slides — recortado a 3 (welcome → mecánica central → el
-// diferencial más fuerte) porque a esta altura ya elegiste rutina y activaste
-// un plan, así que "progreso" y "rutinas a tu medida" ya se sienten obvios.
+// se muestra ESTO en vez del tutorial completo (que queda en el "?", como
+// referencia opcional). Deliberadamente cortísima — 2 toques y estás
+// entrenando — porque a esta altura ya elegiste y activaste una rutina, así
+// que lo único que falta contar es cómo se registra y el diferencial fuerte.
 const WELCOME_SLIDES = [
   {
     icon: <Flame size={38} />,
     color: "#14B8A6",
     title: "¡Bienvenido a Modus Fit!",
-    text: "Tu gym tracker: registrá entrenamientos, seguí tu progreso y entrená con un plan a tu medida.",
-  },
-  {
-    icon: <Dumbbell size={38} />,
-    color: "#3B82F6",
-    title: "Registrá en segundos",
-    text: "Anotá reps y kilos con dos toques. La app detecta tus récords sola.",
+    text: "Registrá reps y kilos en segundos — la app detecta tus récords sola y arma tu progreso.",
   },
   {
     icon: <Sparkles size={38} />,
@@ -4215,143 +3471,62 @@ function WelcomeIntro({ onClose, onOpenTutorial }) {
 
 function HelpModal({ startTab, onClose }) {
   useAndroidBack(onClose);
-  const startIdx = startTab
-    ? Math.max(0, ALL_HELP_STEPS.findIndex((s) => s.chapterKey === startTab))
-    : 0;
+  const startIdx = startTab ? Math.max(0, HELP_CHAPTERS.findIndex((c) => c.key === startTab)) : 0;
   const [i, setI] = useState(startIdx);
-  const step = ALL_HELP_STEPS[i];
-  const isFirst = i === 0;
-  const isLast = i === ALL_HELP_STEPS.length - 1;
-  const chapter = HELP_CHAPTERS[step.chapterIndex];
-
-  const jumpToChapter = (ci) => {
-    const idx = ALL_HELP_STEPS.findIndex((s) => s.chapterIndex === ci);
-    if (idx >= 0) setI(idx);
-  };
+  const chapter = HELP_CHAPTERS[i];
 
   return (
     <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
       <div
         className="max-w-md w-full rounded-3xl modal-pop-in shadow-2xl shadow-black/70 flex flex-col"
-        style={{ background: "var(--panel-grad-cyan)", border: "1px solid rgba(20,184,166,0.2)", height: "min(92vh, 700px)" }}
+        style={{ background: "var(--panel-grad-cyan)", border: "1px solid rgba(20,184,166,0.2)", maxHeight: "min(88vh, 560px)" }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="relative px-5 pt-5 pb-3 shrink-0" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+        {/* Header con los chips de pestaña — tocá cualquiera para ver su
+            descripción, sin pasos ni orden fijo. */}
+        <div className="relative px-5 pt-5 pb-4 shrink-0" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
           <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-xl flex items-center justify-center transition-colors duration-300" style={{ backgroundColor: tint(chapter.color, "18"), color: chapter.color }}>
-                {chapter.icon}
-              </div>
-              <span className="text-xs font-black uppercase tracking-widest transition-colors duration-300" style={{ color: chapter.color }}>{chapter.label}</span>
-            </div>
+            <span className="text-sm font-black text-white">Cómo funciona Modus Fit</span>
             <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800/80 transition"><X size={17} /></button>
           </div>
-          {/* Chips de capítulo, estilo "niveles de juego": el actual lleva el
-              color de SU capítulo, los ya recorridos muestran un check. */}
           <div className="flex gap-1.5 overflow-x-auto pb-0.5 -mx-1 px-1">
             {HELP_CHAPTERS.map((c, ci) => {
-              const completado = ci < step.chapterIndex;
-              const actual = ci === step.chapterIndex;
+              const actual = ci === i;
               return (
                 <button
                   key={c.key}
-                  onClick={() => jumpToChapter(ci)}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold whitespace-nowrap transition-all shrink-0"
+                  onClick={() => setI(ci)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap transition-all shrink-0"
                   style={actual
                     ? { backgroundColor: tint(c.color, "20"), color: c.color, border: `1px solid ${tint(c.color, "40")}` }
-                    : completado
-                      ? { color: "#64748b", border: "1px solid transparent" }
-                      : { color: "#475569", border: "1px solid transparent" }}
+                    : { color: "#64748b", border: "1px solid transparent" }}
                 >
-                  {completado ? <Check size={10} className="text-teal-500" /> : c.icon}
-                  {c.label}
+                  {c.icon} {c.label}
                 </button>
               );
             })}
           </div>
-          {/* Barra de progreso estilo juego: cada capítulo se llena con SU
-              color, y el segmento del paso actual queda un poco más brillante. */}
-          <div className="flex gap-1.5 mt-3">
-            {HELP_CHAPTERS.map((c, ci) => (
-              <div key={c.key} className="flex-1 flex gap-0.5">
-                {c.steps.map((_, si) => {
-                  const globalIdx = ALL_HELP_STEPS.findIndex((s) => s.chapterIndex === ci && s.stepInChapter === si);
-                  const pasado = globalIdx < i;
-                  const actual = globalIdx === i;
-                  return (
-                    <div key={si} className="h-1 flex-1 rounded-full transition-all duration-300"
-                      style={{
-                        backgroundColor: actual ? c.color : pasado ? tint(c.color, "90") : "var(--surface-2)",
-                        boxShadow: actual ? `0 0 8px -1px ${c.color}` : "none",
-                      }} />
-                  );
-                })}
-              </div>
-            ))}
-          </div>
         </div>
 
-        {/* Área media scrolleable: demo + texto scrollean JUNTOS.
-            flex-1 + minHeight: 0 es lo que permite que overflow-y-auto
-            funcione dentro del flex-col limitado por max-h del modal. */}
-        <div className="flex-1 overflow-y-auto overscroll-contain" style={{ minHeight: 0, WebkitOverflowScrolling: "touch" }}>
-        {step.demo && (
-          <div key={`demo-${step.chapterKey}`} className="mx-5 mt-4 tab-fade-in">
-            {step.demo.caption && (
-              <p className="text-[10px] font-bold mb-2 flex items-center gap-1.5 text-teal-400">
-                <Sparkles size={10} /> {step.demo.caption}
-              </p>
-            )}
-            <div className="rounded-2xl border border-slate-800/60 overflow-hidden" style={{ backgroundColor: "var(--app-bg)" }}>
-              <DemoPreview kind={step.demo.kind} view={step.demo.view} />
+        {/* Cuerpo: ícono grande + un párrafo. Nada de pasos ni demos en vivo
+            — se cambia de pestaña tocando los chips de arriba. */}
+        <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-6" style={{ minHeight: 0 }}>
+          <div key={chapter.key} className="flex flex-col items-center text-center gap-3 tab-fade-in">
+            <div className="relative mt-1">
+              <div className="absolute inset-0 rounded-3xl blur-2xl scale-150 pointer-events-none" style={{ backgroundColor: tint(chapter.color, "20") }} />
+              <div className="relative w-16 h-16 rounded-3xl flex items-center justify-center elastic-in" style={{ backgroundColor: tint(chapter.color, "18"), border: `1px solid ${tint(chapter.color, "35")}`, color: chapter.color, boxShadow: `0 10px 30px -10px ${tint(chapter.color, "60")}` }}>
+                <span style={{ transform: "scale(1.8)" }}>{chapter.icon}</span>
+              </div>
             </div>
+            <h3 className="text-lg font-black text-white leading-tight">{chapter.label}</h3>
+            <p className="text-sm text-slate-400 leading-relaxed">{chapter.description}</p>
           </div>
-        )}
-
-        {/* Contenido del paso */}
-        <div key={i} className={`px-5 py-4 tab-fade-in ${step.isChapterIntro ? "flex flex-col items-center text-center gap-3" : "flex items-start gap-4"}`}>
-          {step.isChapterIntro ? (
-            <>
-              {/* Portada de capítulo, estilo pantalla de nivel: ícono grande
-                  sobre un halo del color del capítulo. */}
-              <div className="relative mt-2">
-                <div className="absolute inset-0 rounded-3xl blur-2xl scale-150 pointer-events-none" style={{ backgroundColor: tint(chapter.color, "20") }} />
-                <div className="relative w-16 h-16 rounded-3xl flex items-center justify-center elastic-in" style={{ backgroundColor: tint(chapter.color, "18"), border: `1px solid ${tint(chapter.color, "35")}`, color: chapter.color, boxShadow: `0 10px 30px -10px ${tint(chapter.color, "60")}` }}>
-                  {step.icon}
-                </div>
-              </div>
-              <h3 className="text-lg font-black text-white leading-tight">{step.title}</h3>
-              <p className="text-sm text-slate-400 leading-relaxed">{step.text}</p>
-            </>
-          ) : (
-            <>
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5 border transition-colors duration-300" style={{ backgroundColor: tint(chapter.color, "12"), borderColor: tint(chapter.color, "28"), color: chapter.color }}>
-                {step.icon}
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-black text-white mb-1.5">{step.title}</h3>
-                <p className="text-sm text-slate-400 leading-relaxed">{step.text}</p>
-              </div>
-            </>
-          )}
-        </div>
         </div>
 
-        <div className="flex items-center justify-between px-5 py-4 shrink-0" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-          <button onClick={() => setI((n) => Math.max(0, n - 1))} disabled={isFirst} className="px-4 py-2 rounded-xl text-xs font-bold transition border border-slate-800 text-slate-500 disabled:opacity-20 hover:text-white hover:border-slate-600">
-            Atrás
+        <div className="px-5 py-4 shrink-0" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+          <button onClick={onClose} className="w-full py-3 rounded-xl text-sm font-black !text-white transition active:scale-95" style={{ background: `linear-gradient(135deg, ${chapter.color}, ${tint(chapter.color, "b0")})`, boxShadow: `0 8px 22px -8px ${tint(chapter.color, "80")}` }}>
+            Entendido
           </button>
-          <span className="text-[10px] text-slate-600 font-medium tabular-nums">{i + 1} / {ALL_HELP_STEPS.length}</span>
-          {isLast ? (
-            <button onClick={onClose} className="px-6 py-2.5 rounded-xl text-xs font-black !text-white transition active:scale-95" style={{ background: `linear-gradient(135deg, ${chapter.color}, ${tint(chapter.color, "b0")})`, boxShadow: `0 8px 22px -8px ${tint(chapter.color, "80")}` }}>
-              ¡Listo! 🎉
-            </button>
-          ) : (
-            <button onClick={() => setI((n) => Math.min(ALL_HELP_STEPS.length - 1, n + 1))} className="px-6 py-2.5 rounded-xl text-xs font-black !text-white transition active:scale-95" style={{ background: `linear-gradient(135deg, ${chapter.color}, ${tint(chapter.color, "b0")})`, boxShadow: `0 8px 22px -8px ${tint(chapter.color, "80")}` }}>
-              Siguiente →
-            </button>
-          )}
         </div>
       </div>
     </div>
@@ -5181,7 +4356,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
               {/* El ×1/×2 de mancuernas se configura al editar la rutina
                   ("¿Con cuántas mancuernas?"), no acá: durante el
                   entrenamiento sumaba ruido y ya está definido. */}
-              {!deloadMode && stagnant && <span className="text-[10px] bg-rose-500/15 text-rose-400 rounded-lg px-1.5 py-0.5 font-bold flex items-center gap-1"><AlertTriangle size={9} /> ESTANCADO</span>}
+              {!deloadMode && stagnant && settings.showStagnation === true && <span className="text-[10px] bg-rose-500/15 text-rose-400 rounded-lg px-1.5 py-0.5 font-bold flex items-center gap-1"><AlertTriangle size={9} /> ESTANCADO</span>}
               {/* Las notas ahora son POR SERIE (ver SetRow): cada serie tiene
                   su propio "Agregar nota". Acá ya no va nada. */}
             </div>
@@ -5191,7 +4366,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
         <ChevronDown size={18} className={`text-slate-600 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
       </button>
       <div className={open ? "px-4 pb-4 pt-0 tab-fade-in" : "hidden"}>
-        {!deloadMode && stagnant && <div className="mb-3 text-[11px] text-rose-400/90 bg-rose-500/5 border border-rose-500/15 rounded-xl px-3 py-2 flex items-start gap-1.5"><Info size={12} className="mt-0.5 shrink-0" /><span>Hace {STAGNATION_DAYS}+ días sin superar el récord. Considerá cambiar reps, descanso o variante.</span></div>}
+        {!deloadMode && stagnant && settings.showStagnation === true && <div className="mb-3 text-[11px] text-rose-400/90 bg-rose-500/5 border border-rose-500/15 rounded-xl px-3 py-2 flex items-start gap-1.5"><Info size={12} className="mt-0.5 shrink-0" /><span>Hace {STAGNATION_DAYS}+ días sin superar el récord. Considerá cambiar reps, descanso o variante.</span></div>}
         {/* El cronómetro ya no vive fijo acá: se posiciona entre las series
             según timerSlot (más abajo, junto a las series). */}
         {!exercise.cardio && !deloadMode && bestWorkingKg != null && settings.showWarmup !== false && (
@@ -5868,20 +5043,24 @@ function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [], weekSche
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60 w-fit">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60 w-fit shrink-0">
           {[{ k: "calendar", icon: <LayoutGrid size={13} />, l: "Calendario" }, { k: "list", icon: <List size={13} />, l: "Lista" }].map((opt) => (
-            <button key={opt.k} onClick={() => setView(opt.k)} className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-[11px] font-bold transition-all ${view === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.icon}{opt.l}</button>
+            <button key={opt.k} onClick={() => setView(opt.k)} className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-[11px] font-bold transition-all whitespace-nowrap ${view === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.icon}{opt.l}</button>
           ))}
         </div>
-        {/* Días entrenados y racha — compactos, acoplados al historial */}
-        <div className="flex gap-1.5">
-          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900/60 border border-slate-800/60">
-            <Calendar size={11} className="text-blue-400" />
+        {/* Días entrenados y racha — compactos, acoplados al historial.
+            shrink-0 + whitespace-nowrap en cada chip: con racha/días de 3
+            dígitos (100+, nada raro en un usuario constante) el texto no se
+            puede achicar ni partir — si no entra en la fila, esta se
+            envuelve entera (flex-wrap arriba) en vez de aplastar el chip. */}
+        <div className="flex gap-1.5 shrink-0">
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900/60 border border-slate-800/60 shrink-0 whitespace-nowrap">
+            <Calendar size={11} className="text-blue-400 shrink-0" />
             <span className="text-xs font-black text-white tabular-nums">{miniStats.days}</span>
             <span className="text-[9px] text-slate-500 font-semibold">días</span>
           </div>
-          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900/60 border border-slate-800/60">
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900/60 border border-slate-800/60 shrink-0 whitespace-nowrap">
             <span className="text-[11px]">🔥</span>
             <span className={`text-xs font-black text-white tabular-nums inline-block ${rachaSubio ? "streak-jump" : "streak-beat streak-glow"}`}>{miniStats.streak}</span>
             <span className="text-[9px] text-slate-500 font-semibold">racha</span>
@@ -6824,7 +6003,7 @@ function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backR
   );
 }
 
-function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onGoToProfile, onGoToRoutines, sex, age }) {
+function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, onGoToProfile, onGoToRoutines, sex, age }) {
   const [selected, setSelected] = useState(null);
   const [showImage, setShowImage] = useState(false);
   const [showTierRef, setShowTierRef] = useState(false); // modal de referencia de rangos
@@ -6894,7 +6073,10 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onGoToProfile, onGo
 
   // Seleccionar un músculo (desde el muñeco o el análisis) y "redireccionar":
   // la tarjeta de detalle se centra sola en pantalla con una animación suave.
+  // Tocar el mismo músculo que ya está seleccionado lo deselecciona en vez
+  // de no hacer nada — así también sirve para cerrar la tarjeta de detalle.
   const goToMuscle = (k) => {
+    if (k === selected) { setSelected(null); return; }
     setSelected(k);
     setTimeout(() => {
       try {
@@ -6943,14 +6125,11 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onGoToProfile, onGo
       </div>
 
       <div>
-        {/* El selector General/Según-tu-contexto vivía siempre visible acá,
-            pero es una decisión avanzada que un usuario nuevo ni entiende
-            todavía — ahora es una configuración (en Perfil) y acá solo queda
-            un indicador chico de qué modo está activo. */}
-        <button onClick={onGoToProfile} className="w-full flex items-center justify-between gap-2 text-left px-1 py-1">
-          <span className="text-[10px] text-slate-500">Modo de cálculo: <span className="font-bold text-slate-400">{modeLabel}</span></span>
-          <span className="text-[10px] font-bold text-blue-400 flex items-center gap-0.5">Cambiar <ChevronRight size={12} /></span>
-        </button>
+        <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
+          {[{ k: "general", l: "General" }, { k: "relative", l: "Según tu contexto" }].map((opt) => (
+            <button key={opt.k} onClick={() => onUpdateSettings?.({ muscleRankMode: opt.k })} className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${mode === opt.k ? "bg-blue-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
+          ))}
+        </div>
         {mode === "relative" && needsWeight && (
           <button onClick={onGoToProfile} className="w-full flex items-center justify-between gap-2 bg-blue-500/10 border border-blue-500/25 rounded-xl px-3 py-2.5 text-left hover:bg-blue-500/15 transition mt-2">
             <p className="text-[11px] text-blue-300/90">Para calcular "Según tu contexto" necesitamos tu peso corporal — agregalo en tu perfil (sexo y edad son opcionales, pero afinan más el cálculo).</p>
@@ -8287,18 +7466,6 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
         <div><p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Reducción de series</p><div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">{[{ k: 2, l: "Mitad" }, { k: 3, l: "Tercio" }, { k: 4, l: "Cuarto" }].map((opt) => <button key={opt.k} onClick={() => updateSettings({ deloadSetDivisor: opt.k })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${settings.deloadSetDivisor === opt.k ? "bg-purple-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>)}</div></div>
       </CollapsibleSection>
 
-      <CollapsibleSection title="Cálculo de rango muscular" subtitle={settings.muscleRankMode === "relative" ? "Según tu contexto" : "General"} icon={<Award size={16} />} accent="#3B82F6">
-        <p className="text-[10px] text-slate-500 leading-snug mb-1">"General" compara tu marca en kg absolutos. "Según tu contexto" la ajusta a tu peso corporal (y sexo/edad si los cargaste) — más justo si estás empezando o si tu objetivo no es fuerza máxima.</p>
-        <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
-          {[{ k: "general", l: "General" }, { k: "relative", l: "Según tu contexto" }].map((opt) => (
-            <button key={opt.k} onClick={() => updateSettings({ muscleRankMode: opt.k })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${settings.muscleRankMode === opt.k || (opt.k === "general" && settings.muscleRankMode !== "relative") ? "bg-blue-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
-          ))}
-        </div>
-        {settings.muscleRankMode === "relative" && !settings.bodyWeightKg && (
-          <p className="text-[11px] text-blue-300/90 mt-2">Para calcular "Según tu contexto" necesitamos tu peso corporal — completalo en "Editar perfil" más arriba.</p>
-        )}
-      </CollapsibleSection>
-
       <CollapsibleSection title="Descanso entre series" subtitle={`${formatTime(settings.restShort)} – ${formatTime(settings.restLong)}`} icon={<Timer size={16} />} accent="#14B8A6">
         <div><p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Aviso al terminar</p><div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">{[{ k: "sound", l: "Sonido" }, { k: "vibration", l: "Vibración" }, { k: "both", l: "Ambos" }].map((opt) => <button key={opt.k} onClick={() => updateSettings({ alertType: opt.k })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${settings.alertType === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>)}</div></div>
         <div className="grid grid-cols-2 gap-3">
@@ -8308,7 +7475,7 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
         </div>
       </CollapsibleSection>
 
-      <CollapsibleSection sectionId="field-settings-section" forceOpenSignal={openSectionSignal.id === "field-settings-section" ? openSectionSignal.n : 0} title="Qué ves al registrar" subtitle={(() => { const on = [settings.showRpe !== false, settings.showWarmup !== false, settings.show1RMPercent !== false, settings.showCoaching !== false, settings.showExerciseNote !== false, settings.showPersonalNote !== false].filter(Boolean).length; return on === 6 ? "Todo activado" : `${on} de 6 opciones activadas`; })()} icon={<Sliders size={16} />} accent="#14B8A6">
+      <CollapsibleSection sectionId="field-settings-section" forceOpenSignal={openSectionSignal.id === "field-settings-section" ? openSectionSignal.n : 0} title="Qué ves al registrar" subtitle={(() => { const on = [settings.showRpe !== false, settings.showWarmup !== false, settings.show1RMPercent !== false, settings.showCoaching !== false, settings.showExerciseNote !== false, settings.showPersonalNote !== false, settings.showStagnation === true].filter(Boolean).length; return on === 7 ? "Todo activado" : `${on} de 7 opciones activadas`; })()} icon={<Sliders size={16} />} accent="#14B8A6">
         <div className="space-y-2">
           <p className="text-[10px] text-slate-500 leading-snug mb-1">Apagá lo que no uses y la ficha de registro queda más limpia. No se pierde ningún dato: podés volver a prenderlo cuando quieras.</p>
           {/* Recomendación: con las 6 prendidas la ficha se satura. */}
@@ -8330,6 +7497,7 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
             { key: "showCoaching", label: "Consejos al guardar", desc: "El mensaje 📈/✓/📉 comparando con tu marca." },
             { key: "showExerciseNote", label: "Consejos del ejercicio", desc: "La nota con la técnica debajo del nombre del ejercicio." },
             { key: "showPersonalNote", label: "Notas por serie", desc: "El botón para escribir un recordatorio en cada serie." },
+            { key: "showStagnation", label: "Aviso de estancamiento", desc: `El cartel "ESTANCADO" si llevás ${STAGNATION_DAYS}+ días sin superar el récord de un ejercicio.` },
             { key: "autoStartRestTimer", label: "Cronómetro automático", desc: "Al guardar la serie, arranca solo el descanso. No aplica dentro de superseries." },
           ].map(({ key, label, desc }) => {
             const on = settings[key] !== false;
@@ -9813,11 +8981,22 @@ Datos: ${JSON.stringify(context)}`;
   const handleConfirmPlan = (msgIndex) => {
     const plan = messages[msgIndex]?.plan;
     if (!plan) return;
+    // plan.confirm es una función viva de ESTA sesión — no sobrevive guardada
+    // (el historial se persiste en el perfil, y una función no es serializable).
+    // Si reabriste la app con una propuesta pendiente de la vez anterior, ya
+    // no hay nada que ejecutar: se lo decimos en vez de fallar en silencio.
+    if (typeof plan.confirm !== "function") {
+      setMessages((prev) => prev.map((m, i) => (i === msgIndex ? { ...m, planStatus: "expired" } : m)));
+      return;
+    }
     plan.confirm();
-    setMessages((prev) => prev.map((m, i) => (i === msgIndex ? { ...m, planStatus: "confirmed" } : m)));
+    // Al resolver, sacamos confirm() del objeto guardado: ya cumplió su
+    // función y una función no es serializable (rompía el respaldo en
+    // IndexedDB mientras el plan seguía "pending" en el historial guardado).
+    setMessages((prev) => prev.map((m, i) => (i === msgIndex ? { ...m, plan: { ...m.plan, confirm: undefined }, planStatus: "confirmed" } : m)));
   };
   const handleDiscardPlan = (msgIndex) => {
-    setMessages((prev) => prev.map((m, i) => (i === msgIndex ? { ...m, planStatus: "discarded" } : m)));
+    setMessages((prev) => prev.map((m, i) => (i === msgIndex ? { ...m, plan: { ...m.plan, confirm: undefined }, planStatus: "discarded" } : m)));
   };
 
   // Dictado por voz — Web Speech API, nativa del navegador (sin librerías
@@ -9932,7 +9111,7 @@ Datos: ${JSON.stringify(context)}`;
             <p className="relative text-xs text-teal-300/60 mt-0.5">Conoce tu historial real — preguntale lo que quieras</p>
           </div>
           {messages.length > 1 && (
-            <button onClick={() => setMessages(messages.slice(0, 1))} title="Nueva conversación" className="p-2 rounded-xl bg-slate-800/60 border border-slate-700/50 text-slate-400 hover:text-teal-400 transition shrink-0 active:scale-95">
+            <button onClick={() => setMessages([AI_CHAT_WELCOME])} title="Nueva conversación" className="p-2 rounded-xl bg-slate-800/60 border border-slate-700/50 text-slate-400 hover:text-teal-400 transition shrink-0 active:scale-95">
               <RotateCcw size={14} />
             </button>
           )}
@@ -9987,7 +9166,7 @@ Datos: ${JSON.stringify(context)}`;
                 ))}
               </div>
             )}
-            {m.plan && m.planStatus === "pending" && (
+            {m.plan && m.planStatus === "pending" && typeof m.plan.confirm === "function" && (
               <div className="mt-2 bg-slate-900/70 border border-teal-500/25 rounded-2xl p-3.5 max-w-[85%] bounce-in">
                 <p className="text-sm font-bold text-white mb-2.5">{m.plan.title}</p>
                 {m.plan.kind === "routine" ? (
@@ -10003,11 +9182,20 @@ Datos: ${JSON.stringify(context)}`;
                 </div>
               </div>
             )}
+            {/* Propuesta pendiente de una sesión anterior: la función que la
+                aplicaba no sobrevive guardada (ver handleConfirmPlan). Se
+                pisa sola apenas se detecta, sin esperar a que toques nada. */}
+            {m.plan && m.planStatus === "pending" && typeof m.plan.confirm !== "function" && (
+              <div className="mt-2 text-[11px] text-slate-500 max-w-[85%]">Esta propuesta quedó de una sesión anterior — pedísela de nuevo si todavía te interesa.</div>
+            )}
             {m.plan && m.planStatus === "confirmed" && (
               <div className="mt-2 flex items-center gap-1.5 text-[11px] text-emerald-400 font-semibold max-w-[85%]"><Check size={12} /> Listo, aplicado.</div>
             )}
             {m.plan && m.planStatus === "discarded" && (
               <div className="mt-2 text-[11px] text-slate-600 max-w-[85%]">Descartado.</div>
+            )}
+            {m.plan && m.planStatus === "expired" && (
+              <div className="mt-2 text-[11px] text-slate-500 max-w-[85%]">Esta propuesta quedó de una sesión anterior — pedísela de nuevo si todavía te interesa.</div>
             )}
           </div>
         ))}
@@ -11505,6 +10693,7 @@ function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
     { key: "showCoaching", label: "Consejos al guardar", desc: "Un mensaje corto comparando la serie con tu marca (📈 subiste, ✓ igualaste, 📉 bajaste)." },
     { key: "showExerciseNote", label: "Consejos del ejercicio", desc: "La nota con la técnica que aparece debajo del nombre del ejercicio." },
     { key: "showPersonalNote", label: "Notas por serie", desc: "El botón para escribir tu propio recordatorio en cada serie." },
+    { key: "showStagnation", label: "Aviso de estancamiento", desc: `El cartel "ESTANCADO" si llevás ${STAGNATION_DAYS}+ días sin superar el récord de un ejercicio.` },
     { key: "autoStartRestTimer", label: "Cronómetro automático", desc: "Al guardar la serie, arranca solo el descanso — no hace falta tocar play. (No aplica dentro de superseries.)" },
   ];
 
@@ -11725,9 +10914,23 @@ export default function App() {
   useEffect(() => { window.scrollTo({ top: 0 }); }, [tab]);
   // (Los permisos de notificación y el canal se piden en el efecto
   // requestNotifPermission más abajo — un solo lugar, sin duplicar.)
-  const [aiChatMessages, setAiChatMessages] = useState([
-    { role: "assistant", text: "¡Hola! 👋 Soy tu **Entrenador IA**.\n\nConozco tu rutina, tus marcas y tu progreso — todo lo que registrás en la app.\n\nPuedo ayudarte a:\n• **Crear o modificar rutinas** a tu medida\n• **Analizar tu progreso** y detectar puntos débiles\n• **Resolver dudas** de técnica, series y descanso\n\n¿Por dónde empezamos? 💪" },
-  ]);
+  // Historial del Entrenador IA: persistido en el perfil (como logs/drafts),
+  // no en estado efímero — así sobrevive a cerrar la app. Se cachea también
+  // en localStorage (vía saveProfiles) y se sincroniza a la nube igual que
+  // el resto del perfil. AI_CHAT_HISTORY_CAP evita que crezca sin límite.
+  const aiChatMessages = profiles[activeProfile]?.aiChatHistory?.length > 0 ? profiles[activeProfile].aiChatHistory : [AI_CHAT_WELCOME];
+  const setAiChatMessages = useCallback((newMessagesOrFn) => {
+    setProfiles((prev) => {
+      const cur = prev[activeProfile];
+      if (!cur) return prev;
+      const base = cur.aiChatHistory?.length > 0 ? cur.aiChatHistory : [AI_CHAT_WELCOME];
+      const next = typeof newMessagesOrFn === "function" ? newMessagesOrFn(base) : newMessagesOrFn;
+      const capped = next.length > AI_CHAT_HISTORY_CAP ? next.slice(next.length - AI_CHAT_HISTORY_CAP) : next;
+      const np = { ...prev, [activeProfile]: { ...cur, aiChatHistory: capped } };
+      saveProfiles(np);
+      return np;
+    });
+  }, [activeProfile]);
   const [cycleStart, setCycleStartState] = useState(loadCycleStart);
   const [showHelp, setShowHelp] = useState(false);
   const [helpStartTab, setHelpStartTab] = useState(null);
