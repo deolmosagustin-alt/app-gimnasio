@@ -23,6 +23,11 @@ import { Capacitor, registerPlugin } from "@capacitor/core";
 // crea el proxy correcto: en Android ejecuta la implementación Java; en
 // web rechaza con "not implemented" (capturado por los try/catch).
 const RestTimerNotification = registerPlugin("RestTimerNotification");
+// Puente del widget de pantalla de inicio "Hoy toca" — ver
+// TodayWidgetPlugin/TodayWidgetProvider (android/). En web, registerPlugin
+// devuelve un proxy que rechaza silenciosamente (por eso el .catch(() => {})
+// en cada llamada), así que este mismo código no rompe nada fuera de Android.
+const TodayWidget = registerPlugin("TodayWidget");
 import { FirebaseAuthentication } from "@capacitor-firebase/authentication";
 // @capacitor/local-notifications — se importa estáticamente; si el paquete
 // no está instalado el build falla con un error claro. Instalarlo primero:
@@ -281,7 +286,6 @@ async function syncProfileToCloud(uid, profile, requireAuth = false) {
     // puede volver a romper la sincronización.
     const limpio = JSON.parse(JSON.stringify({ ...data, _syncedAt: new Date().toISOString() }));
     await setDoc(doc(db, "users", uid), limpio);
-    console.log("[sync] Perfil subido a la nube OK");
   } catch (err) {
     // Antes el sync automático se tragaba TODO error en silencio, así que si
     // la subida fallaba (tamaño, red, permisos) el usuario nunca se enteraba y
@@ -427,7 +431,7 @@ const STAGNATION_DAYS = 21;
 // aparece al completar el primer ciclo. Mientras la app no esté publicada,
 // el link no encuentra nada — no rompe nada, pero tampoco sirve hasta que
 // lo reemplaces.
-const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.agustin.mirutina";
+const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.modusfit.fitness";
 
 const DEFAULT_SETTINGS = {
   alertType: "sound", restLong: REST_LONG, restShort: REST_SHORT,
@@ -435,9 +439,11 @@ const DEFAULT_SETTINGS = {
   theme: "dark", textScale: 1, smallTextScale: 1, autoShowPrShare: true, bodyWeightKg: 0, muscleRankMode: "general", allowZoom: false,
   weightUnit: "kg", // "kg" o "lbs"
   reminderEnabled: false, reminderTime: "18:00", // recordatorio de entrenamiento
-  // Qué mostrar en la ficha de registro (reps/kg). Todo activado por
-  // default; quien no use alguna opción puede apagarla y deja de estorbar.
-  showRpe: true, showWarmup: true, show1RMPercent: true, showCoaching: true, showExerciseNote: true, showPersonalNote: true,
+  weeklyRecapEnabled: true, // resumen semanal (ver handleEndSession/handleFinishDeloadSession)
+  // Qué mostrar en la ficha de registro (reps/kg). Todo apagado por
+  // default: la ficha arranca mínima (solo reps/kg) y cada quien prende
+  // lo que realmente va a usar, en vez de tener que apagar seis cosas.
+  showRpe: false, showWarmup: false, show1RMPercent: false, showCoaching: false, showExerciseNote: false, showPersonalNote: false,
   // Al guardar una serie, arrancar solo el cronómetro de descanso. Apagado
   // por default: es un cambio de comportamiento (no solo de qué se ve), así
   // que preferimos que lo prendas vos a que te aparezca activado de golpe.
@@ -943,17 +949,17 @@ const ANIMATION_CSS = `
    mucho NO escalaban con la config "Tamaño de texto" (que ajusta el
    font-size raíz y solo afecta unidades relativas). Acá los redefinimos en
    rem para que TODOS escalen en proporción cuando cambiás el tamaño. */
-.text-\[8px\]{font-size:0.5rem !important}
-.text-\[8\.5px\]{font-size:0.531rem !important}
-.text-\[9px\]{font-size:0.5625rem !important}
-.text-\[9\.5px\]{font-size:0.594rem !important}
-.text-\[10px\]{font-size:0.625rem !important}
-.text-\[10\.5px\]{font-size:0.656rem !important}
-.text-\[11px\]{font-size:0.6875rem !important}
-.text-\[12px\]{font-size:0.75rem !important}
-.text-\[13px\]{font-size:0.8125rem !important}
-.text-\[15px\]{font-size:0.9375rem !important}
-.text-\[26px\]{font-size:1.625rem !important}
+.text-[8px]{font-size:0.5rem !important}
+.text-[8.5px]{font-size:0.531rem !important}
+.text-[9px]{font-size:0.5625rem !important}
+.text-[9.5px]{font-size:0.594rem !important}
+.text-[10px]{font-size:0.625rem !important}
+.text-[10.5px]{font-size:0.656rem !important}
+.text-[11px]{font-size:0.6875rem !important}
+.text-[12px]{font-size:0.75rem !important}
+.text-[13px]{font-size:0.8125rem !important}
+.text-[15px]{font-size:0.9375rem !important}
+.text-[26px]{font-size:1.625rem !important}
 
 /* Hueco que deja la barra de navegación bajo el input del chat: en móvil
    la nav va abajo (4rem), en escritorio va al costado (0). */
@@ -2539,6 +2545,7 @@ function LoginScreen({ onLogin, allowAutoLogin = true }) {
   const [pinError, setPinError] = useState("");
   const [regName, setRegName] = useState(""); const [regMail, setRegMail] = useState(""); const [regPin, setRegPin] = useState("");
   const [regStep, setRegStep] = useState(1); const [regError, setRegError] = useState("");
+  const [googleLoading, setGoogleLoading] = useState(false);
   const deviceId = getDeviceId();
   const profileList = Object.keys(profiles).filter((n) => !profiles[n].archived);
   const archivedList = Object.keys(profiles).filter((n) => profiles[n].archived);
@@ -2603,6 +2610,8 @@ function LoginScreen({ onLogin, allowAutoLogin = true }) {
 
   // --- FUNCIÓN PARA INICIAR SESIÓN CON GOOGLE ---
   const handleGoogleLogin = async () => {
+    if (googleLoading) return;
+    setGoogleLoading(true);
     try {
       // 1. Abre el selector de cuenta de Google (popup en navegador, nativo en la app)
       const pluginUser = await googleSignIn();
@@ -2664,6 +2673,8 @@ function LoginScreen({ onLogin, allowAutoLogin = true }) {
     } catch (error) {
       console.error("Error al iniciar sesión con Google:", error);
       setRegError("Error al conectar con Google. Intentá de nuevo.");
+    } finally {
+      setGoogleLoading(false);
     }
   };
 
@@ -2687,7 +2698,7 @@ function LoginScreen({ onLogin, allowAutoLogin = true }) {
       <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-72 h-72 rounded-full bg-teal-500/10 blur-3xl pointer-events-none" />
       <div className="w-full max-w-sm relative">
         <div className="flex items-center gap-3 mb-8">
-          <button onClick={() => { if (regStep !== 1) { setRegStep(1); setRegError(""); } else { setPhase("list"); setRegError(""); } }} className="text-slate-500 hover:text-slate-300"><ChevronDown size={20} className="rotate-90" /></button>
+          <button onClick={() => { if (regStep !== 1) { setRegStep(1); setRegError(""); } else { setPhase("list"); setRegError(""); } }} aria-label="Volver" className="text-slate-500 hover:text-slate-300"><ChevronDown size={20} className="rotate-90" /></button>
           <h2 className="text-lg font-bold text-white">Crear perfil</h2>
         </div>
         <div className="space-y-4">
@@ -2715,19 +2726,23 @@ function LoginScreen({ onLogin, allowAutoLogin = true }) {
       <div className="w-full max-w-sm relative">
         <div className="flex flex-col items-center mb-10">
           <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-teal-500/30 to-teal-500/5 border border-teal-500/20 flex items-center justify-center mb-4 shadow-[0_0_40px_-10px_rgba(20,184,166,0.55)]"><Flame className="text-teal-500" size={30} /></div>
-          <h1 className="text-2xl font-black text-white tracking-tight">Mi Rutina</h1>
+          <h1 className="text-2xl font-black text-white tracking-tight">Modus Fit</h1>
           <p className="text-slate-500 text-sm mt-1">Seguimiento de cargas y progreso</p>
         </div>
 
         {/* --- BOTÓN DE GOOGLE --- */}
-        <button onClick={handleGoogleLogin} className="w-full mb-5 py-3.5 rounded-2xl bg-white text-slate-900 font-bold text-sm hover:bg-slate-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 shadow-lg shadow-white/10">
-          <svg className="w-5 h-5" viewBox="0 0 24 24">
-            <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-            <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-            <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-            <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-          </svg>
-          Continuar con Google
+        <button onClick={handleGoogleLogin} disabled={googleLoading} className="w-full mb-5 py-3.5 rounded-2xl bg-white text-slate-900 font-bold text-sm hover:bg-slate-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 shadow-lg shadow-white/10 disabled:opacity-70">
+          {googleLoading ? (
+            <RotateCcw className="w-5 h-5 animate-spin text-slate-500" />
+          ) : (
+            <svg className="w-5 h-5" viewBox="0 0 24 24">
+              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+            </svg>
+          )}
+          {googleLoading ? "Conectando..." : "Continuar con Google"}
         </button>
 
         {profileList.length > 0 && (<div className="mb-5"><p className="text-[11px] font-bold uppercase tracking-widest text-slate-600 mb-3">Perfiles en este dispositivo</p><div className="space-y-2">{profileList.map((name) => (
@@ -3031,7 +3046,6 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default", 
             ACTIVE_REST_TIMERS.__notifOwner = timerId; // este timer es dueño de la notif ahora
             try {
               await RestTimerNotification.start({ seconds: secsLeft, exerciseName: exerciseName || "" });
-              console.log("[notif] Plugin nativo OK — cronómetro en vivo (RestTimerPlugin)");
             } catch (pluginErr) {
               // Plugin no disponible (build viejo sin el Java) — fallback:
               // notificación estática con la hora de fin, mejor que nada.
@@ -3078,7 +3092,6 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default", 
                 schedule: { at: new Date(endTimeRef.current), allowWhileIdle: true },
               }],
             });
-            console.log("[notif] Aviso de fin programado para", new Date(endTimeRef.current).toLocaleTimeString());
           }
         } catch (e) { console.warn("[notif] No se pudo programar el aviso de fin:", e); }
         // Permisos + canal para la notificación FINAL de "descanso terminado"
@@ -3625,17 +3638,17 @@ const HELP_CHAPTERS = [
       {
         icon: <Flame size={20} />,
         title: "¡Bienvenido a Modus Fit!",
-        text: "Tour rápido por todas las funciones. Podés saltearlo en cualquier momento con la X y volver cuando quieras tocando el ? arriba a la derecha.",
+        text: "Un recorrido rápido por la app. Salí cuando quieras y volvé tocando el ? de arriba.",
       },
       {
         icon: <Layers size={20} />,
         title: "Cuatro secciones principales",
-        text: "Abajo tenés 4 pestañas: Rutina (donde entrenás), Progreso, Rutinas y Entrenador IA. Tu perfil y configuración los abrís tocando tu avatar arriba a la izquierda.",
+        text: "4 pestañas abajo: Rutina, Progreso, Rutinas y Entrenador IA. Tu perfil está en el avatar de arriba.",
       },
       {
         icon: <Target size={20} />,
         title: "Primeros pasos",
-        text: "Al entrar por primera vez verás una tarjeta con 3 tareas: configurar la fecha de inicio de ciclo, completar tus datos (sexo, edad, peso, altura) y registrar tu primera marca. Cuando completes todo, desaparece para siempre.",
+        text: "Al entrar verás 3 tareas iniciales: fecha de ciclo, tus datos y tu primera marca.",
       },
     ],
   },
@@ -3648,83 +3661,83 @@ const HELP_CHAPTERS = [
       {
         icon: <Dumbbell size={20} />,
         title: "Rutina: tu entrenamiento del día",
-        text: "Registrás cada sesión acá: elegís el día, ves los ejercicios con sus series y anotás reps y kg a medida que entrenás.",
+        text: "Acá registrás cada sesión: elegís el día y anotás reps y kg de cada serie.",
       },
       {
         icon: <Play size={20} />,
         title: "Iniciar y finalizar sesión",
-        text: "Tocá \"Iniciar sesión\" cuando arrancás a entrenar. Al terminar, \"Finalizar sesión\" registra que entrenaste hoy. Los datos se guardan aunque no inicies sesión, pero ese día no suma al historial.",
+        text: "\"Iniciar sesión\" al empezar y \"Finalizar sesión\" al terminar — así el día cuenta en tu historial.",
         demo: { kind: "rutina", view: "session", caption: "Probá iniciar la sesión" },
       },
       {
         icon: <ChevronDown size={20} />,
         title: "Tarjetas de ejercicio",
-        text: "Tocá una tarjeta para desplegarla. Ves el cronómetro, las series, la nota técnica y el video. Tu récord aparece en el recuadro del color del día. Si llevas 21+ días sin mejorarlo, te avisa que está estancado.",
+        text: "Tocá una tarjeta para ver el cronómetro, las series, notas y video. Tu récord aparece arriba.",
         demo: { kind: "rutina", view: "card-closed", caption: "Tocá la tarjeta para desplegarla" },
       },
       {
         icon: <StickyNote size={20} />,
         title: "Notas por ejercicio",
-        text: "Debajo de cada serie tenés \"Agregar nota\" para escribir tus recordatorios: \"agarre más cerrado\", \"el banco 3 está flojo\", \"probar pausa abajo\". Cada serie guarda la suya y se sincroniza con tu cuenta.",
+        text: "\"Agregar nota\" debajo de cada serie guarda recordatorios como el agarre o la máquina.",
       },
       {
         icon: <Dumbbell size={20} />,
         title: "¿Una o dos mancuernas?",
-        text: "Al editar la rutina, en cada ejercicio de mancuerna elegís si usás una o dos. Con dos de 20kg, tu rango cuenta 40kg de carga real en vez de 20.",
+        text: "En cada ejercicio de mancuerna elegís si usás una o dos, para calcular bien el peso total.",
       },
       {
         icon: <Sliders size={20} />,
         title: "Personalizá qué ves al registrar",
-        text: "Te recomendamos dejar prendido SOLO lo que vayas a usar: con las seis opciones activadas la ficha se llena de botones y cuesta encontrar lo importante. ¿No usás el RPE o el calentamiento? Apagalos y queda mucho más limpia. Está en Perfil → \"Qué ves al registrar\", con vista previa en vivo para que veas cómo queda mientras elegís.",
+        text: "En Perfil → \"Qué ves al registrar\" apagás lo que no uses, para una ficha más simple.",
       },
       {
         icon: <Save size={20} />,
         title: "Registrá tus series",
-        text: "Ingresás reps y kg y tocás guardar. La primera vez no muestra récord — desde la segunda mejora en adelante aparece el confetti.",
+        text: "Ingresá reps y kg y guardá. Desde tu segunda mejora, cada récord festeja con confetti.",
         demo: { kind: "rutina", view: "card-open", caption: "Ingresá reps y kg, y tocá Guardar" },
       },
       {
         icon: <Percent size={20} />,
         title: "Entrená por % de 1RM",
-        text: "Debajo del input de kg hay una fila \"% 1RM\" (solo cuando tenés marcas). Ingresás el porcentaje que querés trabajar (ej. 80) y la app calcula el kg automáticamente. A la derecha te muestra el % real del peso que escribiste.",
+        text: "Ingresá el % de tu 1RM que querés usar y la app calcula el kg sola.",
       },
       {
         icon: <Pause size={20} />,
         title: "Cronómetro de descanso",
-        text: "Arriba de las series está el temporizador. Avisa con sonido, vibración o ambos cuando arrancar la próxima serie. Si cambiás de app mientras corre, al volver se corrige contra la hora real.",
+        text: "Arriba de las series: temporizador de descanso con aviso sonoro y/o vibración.",
         demo: { kind: "rutina", view: "card-open", caption: "El cronómetro está arriba de las series" },
       },
       {
         icon: <Activity size={20} />,
         title: "Cardio: cronómetro y cuenta regresiva",
-        text: "Los ejercicios de cardio tienen dos modos: Cronómetro (arrancás, entrenás, parás y se guarda el tiempo) o Cuenta regresiva (ingresás el objetivo en minutos y cuando llega a 0 guarda solo con vibración).",
+        text: "Para cardio elegís entre cronómetro libre o cuenta regresiva con objetivo en minutos.",
       },
       {
         icon: <Flame size={20} />,
         title: "Calentamiento sugerido",
-        text: "Si ya tenés marca, debajo del cronómetro aparece \"Ver calentamiento sugerido\": 3 series a 50%, 70% y 85% de tu peso actual. Es solo una guía, no se registra.",
+        text: "Con marca registrada, te sugerimos series de calentamiento al 50%, 70% y 85%.",
       },
       {
         icon: <Share2 size={20} />,
         title: "Compartir una marca nueva",
-        text: "Al lograr una marca, se abre una imagen para compartir. Podés desactivar eso en Perfil → Compartir marcas si preferís controlarlo manualmente.",
+        text: "Cada marca nueva abre una imagen lista para compartir (desactivable en Perfil).",
       },
       {
         icon: <Zap size={20} />,
         title: "Tu semana de descarga",
-        text: "Cada cierta cantidad de semanas tu ciclo entra en descarga: menos series y menos peso para bajar la fatiga. La primera vez que abrís en esa semana te avisamos y te llevamos directo ahí.",
+        text: "Cada tantas semanas entrás en descarga: menos series y peso para bajar la fatiga.",
         demo: { kind: "descarga", view: "header" },
       },
       {
         icon: <ArrowDown size={20} />,
         title: "Cargas sugeridas en descarga",
-        text: "Ves tu mejor marca tachada y el peso reducido al lado. Cada ejercicio de cardio reduce los minutos. Podés ver los pesos en kg o lbs con el toggle arriba a la derecha. Tildás cada serie a medida que la hacés.",
+        text: "Vas tildando cada serie con el peso ya reducido, calculado automáticamente.",
         demo: { kind: "descarga", view: "suggested" },
       },
       {
         icon: <RotateCcw size={20} />,
         title: "Resetear el día",
-        text: "Si te equivocaste registrando algo, \"Resetear sesión de hoy\" borra solo los datos de hoy — los récords no se tocan.",
+        text: "\"Resetear sesión de hoy\" borra solo lo de hoy si te equivocaste — tus récords quedan intactos.",
         demo: { kind: "rutina", view: "reset", caption: "Tocá para ver cómo pide confirmación" },
       },
     ],
@@ -3738,50 +3751,50 @@ const HELP_CHAPTERS = [
       {
         icon: <Activity size={20} />,
         title: "Progreso: tu evolución completa",
-        text: "Junta todos tus registros para mostrarte qué tan constante fuiste y cuánto mejoraste, con gráficos, rankings musculares e historial.",
+        text: "Acá ves qué tan constante fuiste y cuánto mejoraste: gráficos, rankings e historial.",
       },
       {
         icon: <Calendar size={20} />,
         title: "Tu ciclo de entrenamiento",
-        text: "Arriba ves en qué semana de tu ciclo estás, si es semana de entrenamiento o descarga, y cuántos días entrenaste en cada semana.",
+        text: "Arriba ves tu semana actual del ciclo y cuántos días entrenaste.",
         demo: { kind: "progreso", view: "ciclo" },
       },
       {
         icon: <Award size={20} />,
         title: "El muñeco muscular",
-        text: "Es el mapa de tu cuerpo: cada músculo se pinta con el color de tu rango actual, de Bronce a Maestro. Podés girarlo para ver frente y espalda, y tocar cualquier músculo para abrir su detalle: tu mejor marca, con qué ejercicio la hiciste, el % hacia el próximo rango y la barra de progreso.",
+        text: "Cada músculo se pinta según tu rango, de Bronce a Maestro. Tocalo para ver el detalle.",
       },
       {
         icon: <Zap size={20} />,
         title: "Cómo se calculan los rangos",
-        text: "Cada grupo muscular toma tu mejor 1RM estimado (peso × reps, fórmula de Epley) entre TODOS los ejercicios que lo trabajan — gana el que dé el número más alto, y se recalcula solo con cada registro. Hay dos modos: General (kg absolutos) y Según tu contexto (ajustado a tu peso corporal, sexo y edad, configurables en Perfil).",
+        text: "Tu rango sale de tu mejor marca en cada grupo muscular, y sube solo con cada récord.",
       },
       {
         icon: <Sparkles size={20} />,
         title: "Subida de rango",
-        text: "Cuando una marca te hace pasar de tier (ej. Oro → Esmeralda), aparece un modal de celebración con el badge anterior y el nuevo. Ocurre solo al cruzar un tier, no en cada récord dentro del mismo.",
+        text: "Al pasar de rango (ej. Oro → Esmeralda) aparece una animación de celebración.",
       },
       {
         icon: <Ruler size={20} />,
         title: "Medidas y fotos de progreso",
-        text: "Registrá tu peso y medidas corporales, y sacá fotos de progreso. En el calendario de medidas podés tocar un día para ver el detalle, y \"Comparar con otro día\" pone dos fotos lado a lado con la diferencia de peso y de días entre ambas.",
+        text: "Registrá peso, medidas y fotos, y compará dos fechas lado a lado.",
       },
       {
         icon: <Flame size={20} />,
         title: "Estadísticas generales",
-        text: "Días entrenados, racha actual, total de series registradas y volumen acumulado (kg × reps).",
+        text: "Días entrenados, racha, series totales y volumen acumulado, todo junto.",
         demo: { kind: "progreso", view: "stats" },
       },
       {
         icon: <Calendar size={20} />,
         title: "Historial de sesiones",
-        text: "Calendario mensual con un punto de color por día entrenado, o lista con el detalle completo. Tocá cualquier sesión para ver cada serie con 🔥 en las que fueron récord.",
+        text: "Calendario o lista con cada sesión — tocá una para ver el detalle serie por serie.",
         demo: { kind: "progreso", view: "calendar" },
       },
       {
         icon: <Share2 size={20} />,
         title: "Imágenes para compartir",
-        text: "\"Crear imagen para compartir\" genera una imagen con tu mejor marca, un resumen de la semana o del mes, o tu ranking muscular completo.",
+        text: "Generá una imagen con tu récord, tu resumen semanal o tu ranking muscular.",
       },
     ],
   },
@@ -3794,40 +3807,40 @@ const HELP_CHAPTERS = [
       {
         icon: <Layers size={20} />,
         title: "Rutinas: armá tu plan",
-        text: "Elegís entre rutinas preestablecidas (Push/Pull/Legs, Arnold Split, Upper/Lower y más) o creás la tuya desde cero.",
+        text: "Elegí una rutina preestablecida o creá la tuya desde cero.",
         demo: { kind: "rutinas", view: "preset", caption: "Tocá la rutina para ver el detalle" },
       },
       {
         icon: <Sparkles size={20} />,
         title: "Creá la tuya",
-        text: "Ponele nombre, armá los días que quieras y agregá ejercicios por grupo muscular — incluido Cardio. El círculo numerado de cada día es un selector de color que se usa en toda la app.",
+        text: "Ponele nombre, armá los días y agregá ejercicios por grupo muscular.",
         demo: { kind: "rutinas", view: "builder", caption: "Probá cambiar el nombre del día" },
       },
       {
         icon: <SlidersHorizontal size={20} />,
         title: "Rangos distintos por serie",
-        text: "Al configurar un ejercicio en el builder podés poner un rango de reps distinto para cada serie. Así armás fácilmente series de back-off o pirámides (ej. S1: 4-6, S2: 8-10, S3: 12-15).",
+        text: "Cada serie puede tener su propio rango de reps — ideal para pirámides o back-off.",
       },
       {
         icon: <GripVertical size={20} />,
         title: "Reordená arrastrando",
-        text: "En el editor de rutinas, mantené apretado un ejercicio (desde cualquier parte) y deslizá: los demás se corren solos para mostrarte dónde va a caer. Soltá y listo. Las flechas siguen ahí si preferís tocar.",
+        text: "Mantené apretado un ejercicio y arrastralo para cambiarlo de orden.",
       },
       {
         icon: <Link size={20} />,
         title: "Superseries",
-        text: "Debajo de cada ejercicio hay un botón para vincularlo en superserie con el siguiente — se hacen uno tras otro sin descanso y comparten un solo cronómetro.",
+        text: "Vinculá dos ejercicios para hacerlos uno tras otro, compartiendo el cronómetro.",
       },
       {
         icon: <Edit3 size={20} />,
         title: "Editá, activá o borrá tus rutinas",
-        text: "Tocá el lápiz para modificar las que creaste, \"Activar\" para cambiar a esa, o deslizá hacia la derecha para quitarla. Las preestablecidas no se editan directamente, pero el lápiz te crea una copia personal.",
+        text: "Lápiz para editar, \"Activar\" para usarla, deslizar para borrarla.",
         demo: { kind: "rutinas", view: "manage" },
       },
       {
         icon: <Download size={20} />,
         title: "Importar desde un archivo",
-        text: "Si ya la tenés en Excel, Word o PDF, subís el archivo y la app detecta sola los días, ejercicios, series y reps. \"Detectar con IA\" funciona para formatos más libres.",
+        text: "Subí un Excel, Word o PDF y la app arma la rutina sola.",
       },
     ],
   },
@@ -3840,32 +3853,32 @@ const HELP_CHAPTERS = [
       {
         icon: <Sparkles size={20} />,
         title: "Entrenador IA: tu asistente personal",
-        text: "Conoce tu entrenamiento real: tus marcas con fecha, si venís subiendo o estancado en cada ejercicio, cuánto volumen le das a cada músculo y hace cuántos días no entrenás alguno. Preguntale \"¿por qué me estanqué en press banca?\" o \"armame el día de mañana\" y responde con TUS números, no con generalidades.",
+        text: "Conoce tus marcas, tu volumen y tus descansos reales — te responde con TUS datos.",
       },
       {
         icon: <Layers size={20} />,
         title: "Qué puede hacer",
-        text: "Crear o modificar rutinas a tu medida, analizar tu progreso y detectar puntos débiles, planificarte el entrenamiento del día, responder dudas de técnica y resolver preguntas sobre el ciclo y la descarga.",
+        text: "Crear o ajustar rutinas, analizar tu progreso, planificar tu día y resolver dudas de técnica.",
       },
       {
         icon: <Target size={20} />,
         title: "Chips de acceso rápido",
-        text: "Los chips debajo del campo de texto insertan prompts completos con un toque: Crear rutina, Analizar progreso, Punto débil, Plan de hoy, Ciclo y descarga.",
+        text: "Los chips debajo del texto insertan preguntas comunes con un toque.",
       },
       {
         icon: <AlertTriangle size={20} />,
         title: "Siempre pide confirmación",
-        text: "Cuando propone crear una rutina o cambiar algo del perfil, te muestra la vista previa completa con \"Confirmar\" o \"Descartar\" — nunca aplica cambios solo.",
+        text: "Antes de aplicar cualquier cambio te muestra una vista previa para confirmar o descartar.",
       },
       {
         icon: <Mic size={20} />,
         title: "Hablale en vez de escribir",
-        text: "El micrófono te deja dictar la pregunta. Cuando termines, tocá el ✓ para confirmar y enviá el mensaje normalmente.",
+        text: "Usá el micrófono para dictar tu pregunta en vez de escribirla.",
       },
       {
         icon: <RotateCcw size={20} />,
         title: "Nueva conversación",
-        text: "Tocá el ↺ arriba a la derecha del chat para empezar de cero. El historial sigue ahí si cambiás de pestaña y volvés — solo se borra al tocar ese botón.",
+        text: "El ↺ arriba a la derecha empieza el chat de cero.",
       },
     ],
   },
@@ -3878,56 +3891,56 @@ const HELP_CHAPTERS = [
       {
         icon: <UserCog size={20} />,
         title: "Perfil: tu cuenta y configuración",
-        text: "Tus datos, la configuración de la app (ciclos, descarga, descansos) y la administración de tu cuenta, todo en un lugar.",
+        text: "Tus datos, la configuración de la app y tu cuenta, todo acá.",
       },
       {
         icon: <Camera size={20} />,
         title: "Foto de perfil",
-        text: "Tocá el ícono de cámara sobre tu avatar para elegir una foto de la galería. Se guarda en tu dispositivo y aparece también en el menú lateral.",
+        text: "Tocá la cámara sobre tu avatar para elegir una foto.",
       },
       {
         icon: <Mail size={20} />,
         title: "Tus datos y Google",
-        text: "\"Editar perfil\" cambia email, sexo, edad y altura (afinan el ranking muscular). \"Vincular con Google\" te permite entrar desde cualquier dispositivo con todo tu historial. Los datos se sincronizan automáticamente.",
+        text: "Editá tus datos o vinculá tu cuenta con Google para acceder desde cualquier dispositivo.",
         demo: { kind: "perfil", view: "datos" },
       },
       {
         icon: <Calendar size={20} />,
         title: "Ciclo y descarga",
-        text: "Configurás la fecha de inicio, cuántas semanas entrenás antes de la descarga, cuánto dura y a qué % de tu récord entrenás en esa semana.",
+        text: "Configurá la duración de tu ciclo y de tu semana de descarga.",
         demo: { kind: "perfil", view: "ciclo" },
       },
       {
         icon: <Clock size={20} />,
         title: "Descanso entre series",
-        text: "Elegís si avisamos con sonido, vibración o ambos, y cuánto dura el descanso para ejercicios pesados y para el resto.",
+        text: "Elegí el aviso (sonido/vibración) y la duración del descanso entre series.",
         demo: { kind: "perfil", view: "descanso", caption: "Probá cambiar el tipo de aviso" },
       },
       {
         icon: <Bell size={20} />,
         title: "Recordatorio de entrenamiento",
-        text: "Activalo y elegí la hora: te avisa \"💪 Hoy toca Push\" solo los días que te toca entrenar según tu cronograma. Los días de descanso no te molesta.",
+        text: "Activá un aviso diario para los días que te toca entrenar.",
       },
       {
         icon: <Sun size={20} />,
         title: "Apariencia y unidad de peso",
-        text: "En Apariencia elegís kg o libras (lbs) — la app convierte todo automáticamente. También ajustás el tamaño de letra.",
+        text: "Elegí kg o lbs, y el tamaño de letra de la app.",
         demo: { kind: "perfil", view: "apariencia", caption: "Tocá la sección para desplegarla" },
       },
       {
         icon: <Download size={20} />,
         title: "Exportar entrenamiento",
-        text: "Descargá el resumen de hoy, la semana o el mes en PDF, Word o Excel — para mandárselo a tu entrenador.",
+        text: "Descargá tu resumen en PDF, Word o Excel.",
       },
       {
         icon: <ShieldCheck size={20} />,
         title: "Tus datos están respaldados",
-        text: "Además del dispositivo, tus registros tienen una segunda copia local. Si algo borra los datos del navegador, la app intenta recuperarlos sola al abrir de nuevo.",
+        text: "Tus registros tienen una copia local de respaldo, por las dudas.",
       },
       {
         icon: <Info size={20} />,
         title: "Política de privacidad",
-        text: "Al fondo del perfil encontrás el link a la política de privacidad, que se abre dentro de la app sin salir.",
+        text: "El link está al fondo del perfil y se abre sin salir de la app.",
       },
     ],
   },
@@ -3940,7 +3953,7 @@ const HELP_CHAPTERS = [
       {
         icon: <Check size={20} />,
         title: "¡Eso es todo!",
-        text: "Ya conocés todas las funciones de Modus Fit. Podés volver a este tour cuando quieras tocando el ? arriba a la derecha, en cualquier pestaña.",
+        text: "Volvé a este tour cuando quieras tocando el ? arriba a la derecha.",
       },
     ],
   },
@@ -3960,40 +3973,31 @@ const ALL_HELP_STEPS = HELP_CHAPTERS.flatMap((c, ci) =>
 );
 
 // ── INTRO DE BIENVENIDA (primera vez) ───────────────────────────────────────
-// Estilo "intro de app": 5 slides con un ícono grande, una idea por pantalla,
+// Estilo "intro de app": 3 slides con un ícono grande, una idea por pantalla,
 // puntos de progreso y botones grandes. La primera vez que activás una rutina
 // se muestra ESTO en vez del tutorial completo de 51 pasos (que abruma como
 // primer contacto). El tutorial detallado queda en el "?" y como opción acá.
+// Antes eran 5 slides — recortado a 3 (welcome → mecánica central → el
+// diferencial más fuerte) porque a esta altura ya elegiste rutina y activaste
+// un plan, así que "progreso" y "rutinas a tu medida" ya se sienten obvios.
 const WELCOME_SLIDES = [
   {
     icon: <Flame size={38} />,
     color: "#14B8A6",
     title: "¡Bienvenido a Modus Fit!",
-    text: "Tu gym tracker inteligente: registrá tus entrenamientos, mirá tu progreso muscular y entrená con un plan a tu medida.",
+    text: "Tu gym tracker: registrá entrenamientos, seguí tu progreso y entrená con un plan a tu medida.",
   },
   {
     icon: <Dumbbell size={38} />,
     color: "#3B82F6",
     title: "Registrá en segundos",
-    text: "Anotá reps y kilos de cada serie con dos toques. La app detecta tus récords sola y te avisa cuando los superás.",
-  },
-  {
-    icon: <TrendingUp size={38} />,
-    color: "#A855F7",
-    title: "Mirá tu progreso",
-    text: "Cada músculo sube de rango a medida que mejorás tus marcas. El muñeco te muestra de un vistazo qué está fuerte y qué falta.",
-  },
-  {
-    icon: <Layers size={38} />,
-    color: "#F59E0B",
-    title: "Rutinas a tu medida",
-    text: "Armá la tuya desde cero, usá una preestablecida o dejá que la IA te arme un plan respondiendo unas preguntas.",
+    text: "Anotá reps y kilos con dos toques. La app detecta tus récords sola.",
   },
   {
     icon: <Sparkles size={38} />,
     color: "#14B8A6",
     title: "Tu entrenador con IA",
-    text: "Un coach que ve TUS datos reales: tus marcas, tu volumen, tus días de descanso. Consejos concretos, no genéricos.",
+    text: "Un coach que ve tus datos reales y te da consejos concretos, no genéricos.",
   },
 ];
 
@@ -4103,6 +4107,52 @@ function SessionSummaryModal({ resumen, onClose }) {
   );
 }
 
+// Resumen semanal: aparece al finalizar una sesión que cae en domingo (o el
+// último día programado de la semana) — nunca antes, así siempre te agarra
+// DESPUÉS de haber entrenado ese día, no como una notificación a mitad de
+// tarde. Ver handleEndSession/handleFinishDeloadSession.
+function WeeklyRecapModal({ data, onClose }) {
+  useAndroidBack(onClose);
+  if (!data) return null;
+  return (
+    <div className="fixed inset-0 z-[140] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
+      <div
+        className="relative max-w-sm w-full rounded-3xl modal-pop-in shadow-2xl shadow-black/70 overflow-hidden"
+        style={{ background: "var(--panel-grad-slate)", border: "1px solid rgba(168,85,247,0.3)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="relative flex flex-col items-center pt-9 pb-5 px-6 text-center">
+          <div className="absolute -top-16 left-1/2 -translate-x-1/2 w-52 h-52 rounded-full bg-purple-500/20 blur-3xl pointer-events-none" />
+          <div className="relative w-16 h-16 rounded-full flex items-center justify-center mb-4 elastic-in bg-purple-500/18 border border-purple-500/40 text-purple-300" style={{ boxShadow: "0 12px 38px -12px rgba(168,85,247,0.7)" }}>
+            <TrendingUp size={28} />
+          </div>
+          <h2 className="relative text-lg font-black text-white leading-tight">¡Semana completa! 💪</h2>
+          <p className="relative text-[11px] text-slate-500 mt-1">Así te fue de lunes a domingo</p>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2 px-5">
+          {[
+            { v: data.dias, l: data.dias === 1 ? "día" : "días" },
+            { v: data.series, l: "series" },
+            { v: data.volumen, l: "kg de volumen" },
+          ].map((s) => (
+            <div key={s.l} className="bg-black/25 rounded-2xl py-3 text-center border border-white/[0.05]">
+              <CountUpNumber value={s.v} duration={900} decimals={0} className="text-base font-black text-white tabular-nums leading-none" />
+              <p className="text-[9px] text-slate-500 mt-1.5 leading-tight px-1">{s.l}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="px-5 py-5">
+          <button onClick={onClose} className="w-full py-3.5 rounded-2xl text-sm font-black !text-white transition active:scale-[0.98]" style={{ background: "linear-gradient(135deg,#A855F7,#7E22CE)", boxShadow: "0 10px 28px -10px rgba(168,85,247,0.7)" }}>
+            ¡A por la próxima! 🎯
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function WelcomeIntro({ onClose, onOpenTutorial }) {
   useAndroidBack(onClose);
   const [i, setI] = useState(0);
@@ -4195,7 +4245,7 @@ function HelpModal({ startTab, onClose }) {
               </div>
               <span className="text-xs font-black uppercase tracking-widest transition-colors duration-300" style={{ color: chapter.color }}>{chapter.label}</span>
             </div>
-            <button onClick={onClose} className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800/80 transition"><X size={17} /></button>
+            <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800/80 transition"><X size={17} /></button>
           </div>
           {/* Chips de capítulo, estilo "niveles de juego": el actual lleva el
               color de SU capítulo, los ya recorridos muestran un check. */}
@@ -4401,6 +4451,14 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   const reps = draft.reps ?? ""; const kg = draft.kg ?? ""; const rpe = draft.rpe ?? null;
   const minutes = draft.minutes ?? ""; const km = draft.km ?? "";
   const updateDraft = (patch) => { if (setDrafts) setDrafts((prev) => ({ ...prev, [key]: { ...(prev[key] || {}), ...patch } })); };
+  // Filas extra de un drop-set (bajás el peso y seguís, sin descansar) o de
+  // un rest-pause (mismo peso, mini-pausas cortas y seguís sumando reps).
+  // Viven en el draft como cualquier otro campo — se limpian solas al
+  // guardar la serie, junto con reps/kg, sin lógica nueva de reseteo.
+  const extraRows = draft.extra || [];
+  const addExtraRow = () => updateDraft({ extra: [...extraRows, { reps: "", kg: "" }] });
+  const updateExtraRow = (idx, patch) => updateDraft({ extra: extraRows.map((x, i) => (i === idx ? { ...x, ...patch } : x)) });
+  const removeExtraRow = (idx) => updateDraft({ extra: extraRows.filter((_, i) => i !== idx) });
   const [feedback, setFeedback] = useState(null);
   const [showRpeLocal, setShowRpeLocal] = useState(false);
   const showRpe = showRpeLocal || rpe != null;
@@ -4552,7 +4610,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
       // Si el cronómetro estuvo corriendo, usar el tiempo transcurrido
       const autoMinutes = cardioElapsed > 0 ? Math.round(cardioElapsed / 60 * 10) / 10 : null;
       const m = autoMinutes || parseFloat(minutes), d = km ? parseFloat(km) : null;
-      if (!m || isNaN(m)) { setFeedback({ type: "error", msg: "Iniciá el cronómetro o ingresá los minutos." }); return; }
+      if (!m || isNaN(m) || m < 0) { setFeedback({ type: "error", msg: "Iniciá el cronómetro o ingresá los minutos." }); return; }
       const isFirstEver = !currentPR;
       const prevMin = currentPR?.minutes || 0;
       // Guardamos el NOMBRE junto con la serie: el historial es una foto de
@@ -4595,7 +4653,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
       return;
     }
     const r = parseFloat(reps), kDisplay = parseFloat(kg);
-    if (!r || !kDisplay || isNaN(r) || isNaN(kDisplay)) { setFeedback({ type: "error", msg: "Completá reps y kg." }); return; }
+    if (!r || !kDisplay || isNaN(r) || isNaN(kDisplay) || r < 0 || kDisplay < 0) { setFeedback({ type: "error", msg: "Completá reps y kg." }); return; }
     const k = displayToKg(kDisplay, unit); // convierte lbs→kg si corresponde
     // Si no había ninguna marca previa, esto es la PRIMERA vez que se
     // registra esta serie — no es un "récord" todavía (no hay nada que
@@ -4616,6 +4674,17 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     if (exerciseMuscle) entry.exMuscle = exerciseMuscle;
     if (rpe != null) entry.rpe = rpe;
     if (!hasActiveSession) entry.noSession = true;
+    // Drop-set / rest-pause: las filas extra son un detalle informativo de
+    // ESTA serie — no participan del cálculo de récord/1RM/rango muscular
+    // (que sigue mirando solo reps/kg de arriba), pero quedan guardadas para
+    // verlas en el historial del día.
+    if (setDef.type === "dropset") {
+      const drops = extraRows.map((x) => ({ reps: parseFloat(x.reps), kg: displayToKg(parseFloat(x.kg), unit) })).filter((x) => x.reps > 0 && x.kg > 0);
+      if (drops.length) entry.drops = drops;
+    } else if (setDef.type === "restpause") {
+      const clusters = extraRows.map((x) => ({ reps: parseFloat(x.reps) })).filter((x) => x.reps > 0);
+      if (clusters.length) entry.clusters = clusters;
+    }
     const newHistory = [...history.filter((h) => h.date !== today), entry];
     let newLogs = { ...logs, [key]: newHistory };
     const isPR = !isFirstEver && new1RM > prev1RM;
@@ -4665,7 +4734,13 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     else if (isPR) { haptic([35, 25, 45]); setPrBurst((n) => n + 1); setFeedback({ type: "pr", msg: "¡Nueva marca! 🔥", suggestUp, noSession }); if (autoShowPrShare) setShowPRShare(true); }
     else { haptic(18); if (new1RM === prev1RM) setFeedback({ type: "tie", msg: "Igualaste tu marca 💪", suggestUp: false, noSession }); else setFeedback({ type: "down", msg: `-${(((prev1RM - new1RM) / prev1RM) * 100).toFixed(0)}% vs récord`, suggestUp: false, noSession }); }
   };
-  const savePR = () => { const r = parseFloat(editReps), k = parseFloat(editKg); if (!r || !k || isNaN(r) || isNaN(k)) return; setLogs({ ...logs, [prKey]: { kg: k, reps: r, date: today, manual: true } }); setEditingPR(false); };
+  const savePR = () => {
+    const r = parseFloat(editReps), kDisplay = parseFloat(editKg);
+    if (!r || !kDisplay || isNaN(r) || isNaN(kDisplay) || r < 0 || kDisplay < 0) return;
+    const k = displayToKg(kDisplay, unit); // el input está en la unidad del usuario, se guarda siempre en kg
+    setLogs({ ...logs, [prKey]: { kg: k, reps: r, date: today, manual: true } });
+    setEditingPR(false);
+  };
   return (
     <div className="relative rounded-xl px-3.5 py-3.5 mb-2.5 last:mb-0" style={{ backgroundColor: tint(accent, "0a"), border: `1px solid ${tint(accent, "25")}` }}>
       <PRBurst anchorRef={saveBtnRef} trigger={prBurst} />
@@ -4675,6 +4750,8 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 shrink-0">{cardio ? "SESIÓN" : `S${setIndex + 1}`}</span>
           {!cardio && <span className="text-[10px] bg-slate-800/80 text-slate-500 rounded-lg px-2 py-0.5 shrink-0">{setDef.repRange} reps</span>}
           {!cardio && isHeavyRepRange(setDef.repRange) && <span className="text-[10px] bg-amber-500/15 text-amber-400 rounded-lg px-2 py-0.5 font-bold shrink-0">FUERZA</span>}
+          {!cardio && setDef.type === "dropset" && <span className="text-[10px] bg-orange-500/15 text-orange-400 rounded-lg px-2 py-0.5 font-bold shrink-0">DROP-SET</span>}
+          {!cardio && setDef.type === "restpause" && <span className="text-[10px] bg-rose-500/15 text-rose-400 rounded-lg px-2 py-0.5 font-bold shrink-0">REST-PAUSE</span>}
         </div>
         {feedback && (
           <span className={`flex items-center gap-1.5 text-xs font-semibold min-w-0 ${feedback.type === "pr" ? "text-emerald-400 pr-pop" : feedback.type === "down" ? "text-rose-400" : feedback.type === "first" ? "text-teal-400" : "text-amber-400"}`}>
@@ -4685,7 +4762,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
       </div>
       {feedback?.suggestUp && <div className="mb-2.5 -mt-1 text-[11px] text-teal-400 flex items-center gap-1.5"><TrendingUp size={11} /> Superaste el rango · probá +2.5kg la próxima</div>}
       {feedback?.noSession && <div className="mb-2.5 -mt-1 text-[11px] text-amber-400 flex items-center gap-1.5"><AlertTriangle size={11} /> Tocá "Iniciar sesión" arriba para que este día cuente en tu historial</div>}
-      {deloadMode && suggestedKg && <div className="mb-2 text-[11px] text-purple-400 flex items-center gap-1.5"><Zap size={11} /> Descarga: {suggestedKg} kg sugerido ({Math.round(deloadKgFactor * 100)}%)</div>}
+      {deloadMode && suggestedKg && <div className="mb-2 text-[11px] text-purple-400 flex items-center gap-1.5"><Zap size={11} /> Descarga: {kgToDisplay(suggestedKg, unit)} {weightLabel(unit)} sugerido ({Math.round(deloadKgFactor * 100)}%)</div>}
 
       {/* El récord va PRIMERO, grande — es lo que estás tratando de
           superar en esta serie, así que tiene que verse antes de
@@ -4702,7 +4779,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
               </span>
             </p>
             {!cardio && (
-              <button onClick={() => { setEditReps(currentPR?.reps ?? ""); setEditKg(currentPR?.kg ?? ""); setEditingPR((e) => !e); }} aria-label="Corregir récord" className="relative flex items-center justify-center w-8 h-8 rounded-lg shrink-0 transition active:scale-90" style={{ backgroundColor: tint(accent, "22"), color: accent }}>
+              <button onClick={() => { setEditReps(currentPR?.reps ?? ""); setEditKg(currentPR ? kgToDisplay(currentPR.kg, unit) : ""); setEditingPR((e) => !e); }} aria-label="Corregir récord" className="relative flex items-center justify-center w-8 h-8 rounded-lg shrink-0 transition active:scale-90" style={{ backgroundColor: tint(accent, "22"), color: accent }}>
                 <Edit3 size={13} />
               </button>
             )}
@@ -4841,6 +4918,16 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
                 </div>
                 <button onClick={() => { updateDraft({ reps: String(todayEntry.reps), kg: String(kgToDisplay(todayEntry.kg, unit)), editing: true }); }} className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg shrink-0 transition active:scale-95" style={{ backgroundColor: tint(accent, "22"), color: accent }}>Editar</button>
               </div>
+              {todayEntry.drops?.length > 0 && (
+                <p className="text-[10px] text-orange-400/90 mt-2 pt-2 border-t" style={{ borderColor: tint(accent, "20") }}>
+                  Bajadas: {todayEntry.drops.map((d, i) => <span key={i}>{i > 0 && " · "}{d.reps}×{kgToDisplay(d.kg, unit)}{weightLabel(unit)}</span>)}
+                </p>
+              )}
+              {todayEntry.clusters?.length > 0 && (
+                <p className="text-[10px] text-rose-400/90 mt-2 pt-2 border-t" style={{ borderColor: tint(accent, "20") }}>
+                  Mini-series: {todayEntry.clusters.map((c, i) => <span key={i}>{i > 0 && " · "}{c.reps} reps</span>)}
+                </p>
+              )}
               {coaching && fieldSettings.showCoaching !== false && (
                 <div className="mt-2.5 pt-2.5 flex items-start gap-2 border-t" style={{ borderColor: tint(accent, "20") }}>
                   <span className="text-[13px] leading-none mt-0.5 shrink-0">{coaching.icon}</span>
@@ -4855,6 +4942,31 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
         }
         return (
           <div className="space-y-1.5">
+            {/* Progresión sugerida: ANTES de que cargues nada, no después.
+                Mira tu última vez en ESTA serie (no el récord histórico) y
+                sugiere el próximo paso lógico — subir peso si ya llenaste el
+                rango de reps, o sumar una rep más si todavía no. No se
+                muestra en descarga (ahí manda la sugerencia de descarga, que
+                pide MENOS peso, no más) ni sin historial (nada que sugerir). */}
+            {!deloadMode && history.length > 0 && (() => {
+              const last = history.reduce((a, b) => (a.date > b.date ? a : b));
+              const repTop = repRangeTop(setDef.repRange);
+              const hitTop = !isNaN(repTop) && last.reps >= repTop;
+              const sugReps = hitTop ? repTop : last.reps + 1;
+              const sugKg = hitTop ? last.kg + 2.5 : last.kg;
+              return (
+                <button
+                  onClick={() => updateDraft({ reps: String(sugReps), kg: String(kgToDisplay(sugKg, unit)) })}
+                  className="w-full flex items-center justify-between gap-2 rounded-xl px-3 py-2 transition active:scale-[0.99]"
+                  style={{ backgroundColor: tint(accent, "10"), border: `1px solid ${tint(accent, "28")}` }}
+                >
+                  <span className="flex items-center gap-1.5 text-[11px] font-bold" style={{ color: accent }}>
+                    <Target size={12} /> Probá hoy: {sugReps}×{kgToDisplay(sugKg, unit)}{weightLabel(unit)}
+                  </span>
+                  <span className="text-[10px] text-slate-500">Usar</span>
+                </button>
+              );
+            })()}
             {/* Fila de registro estilo "display digital": superficie sólida
                 cuyo borde SE ENCIENDE con el color del día al enfocar, y se
                 tiñe VERDE en vivo cuando lo que escribiste ya supera tu
@@ -4896,6 +5008,28 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
             </div>
               );
             })()}
+            {/* Filas extra de drop-set/rest-pause: se guardan junto con la
+                serie principal al tocar Guardar arriba. */}
+            {(setDef.type === "dropset" || setDef.type === "restpause") && (
+              <div className="space-y-1.5 pt-1">
+                {extraRows.map((row, i) => (
+                  <div key={i} className="flex items-center gap-1.5">
+                    <span className="text-[9px] text-slate-600 font-bold w-9 shrink-0">{setDef.type === "dropset" ? `Baja ${i + 1}` : `Mini ${i + 1}`}</span>
+                    <input type="number" inputMode="decimal" placeholder="reps" value={row.reps} onChange={(e) => updateExtraRow(i, { reps: e.target.value })} className="w-16 bg-slate-900/70 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-center text-white focus:outline-none" />
+                    {setDef.type === "dropset" && (
+                      <>
+                        <span className="text-slate-700 text-[10px]">×</span>
+                        <input type="number" inputMode="decimal" placeholder={weightLabel(unit)} value={row.kg} onChange={(e) => updateExtraRow(i, { kg: e.target.value })} className="w-16 bg-slate-900/70 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-center text-white focus:outline-none" />
+                      </>
+                    )}
+                    <button onClick={() => removeExtraRow(i)} aria-label="Quitar" className="text-slate-600 hover:text-rose-400 ml-auto shrink-0"><X size={13} /></button>
+                  </div>
+                ))}
+                <button onClick={addExtraRow} className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-slate-900/50 border border-dashed border-slate-800 text-slate-500 hover:text-slate-300 text-[10px] font-bold transition">
+                  <Plus size={11} /> {setDef.type === "dropset" ? "Agregar bajada" : "Agregar mini-serie"}
+                </button>
+              </div>
+            )}
             {/* % del 1RM — línea sutil integrada */}
             {currentPR && fieldSettings.show1RMPercent !== false && (() => {
               const pr1RM = estimate1RM(currentPR.kg, currentPR.reps);
@@ -4970,8 +5104,8 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           <div className="flex flex-wrap gap-2 items-center">
             <input type="number" inputMode="decimal" placeholder="Reps" value={editReps} onChange={(e) => setEditReps(e.target.value)} className="w-20 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm text-white" />
             <span className="text-slate-600 text-xs">reps ×</span>
-            <input type="number" inputMode="decimal" placeholder="Kg" value={editKg} onChange={(e) => setEditKg(e.target.value)} className="w-20 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm text-white" />
-            <span className="text-slate-600 text-xs">kg</span>
+            <input type="number" inputMode="decimal" placeholder={weightLabel(unit)} value={editKg} onChange={(e) => setEditKg(e.target.value)} className="w-20 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm text-white" />
+            <span className="text-slate-600 text-xs">{weightLabel(unit)}</span>
             <button onClick={savePR} className="px-3 py-1.5 rounded-lg !text-white text-xs font-bold" style={{ backgroundColor: accent }}>Guardar</button>
             {override && <button onClick={() => { const l = { ...logs }; delete l[prKey]; setLogs(l); setEditingPR(false); }} className="px-3 py-1.5 rounded-lg bg-slate-700 text-slate-200 text-xs">Quitar</button>}
             <button onClick={() => setEditingPR(false)} className="text-slate-500 text-xs">Cancelar</button>
@@ -4983,7 +5117,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
         <ShareImageModal
           title="Compartí tu marca"
           fileNamePrefix={`pr-${exerciseId}`}
-          shareTitle="Mi Rutina — Nueva marca"
+          shareTitle="Modus Fit — Nueva marca"
           shareText={`¡Nueva marca en ${exerciseName}! 🔥`}
           draw={(ctx, W, H) => drawPRShareCard(ctx, W, H, { exerciseName, muscle: exerciseMuscle, kg: parseFloat(kg) || currentPR?.kg, reps: parseFloat(reps) || currentPR?.reps, accent })}
           onClose={() => setShowPRShare(false)}
@@ -5251,7 +5385,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
   // nunca bloquea nada: siempre podés elegir cualquier día con los chips.
   const scheduledDay = useMemo(() => { const dk = weekSchedule?.[todayWeekdayKey()]; return dk && DAY_ORDER.includes(dk) ? dk : null; }, [weekSchedule]);
   const isRestToday = !!weekSchedule && !scheduledDay;
-  const fallbackSuggested = useMemo(() => getSuggestedDay(logs), []);
+  const fallbackSuggested = useMemo(() => getSuggestedDay(logs), [logs]);
   // Si hoy es descanso programado, NO se sugiere ningún día: mostrar una
   // sugerencia contradice el propio cronograma ("hoy descansás" + "hacé
   // Push" a la vez). El día activo igual arranca en el heurístico para que
@@ -5355,9 +5489,9 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
 
       <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${DAY_ORDER.length}, 1fr)` }}>
         {DAY_ORDER.map((k) => (
-          <button key={k} onClick={() => setActiveDay(k)} className="py-2.5 rounded-xl text-[10px] font-black uppercase transition-all active:scale-95 border text-center leading-tight"
+          <button key={k} onClick={() => setActiveDay(k)} title={ROUTINE[k].label} className="py-2.5 px-1 rounded-xl text-[10px] font-black uppercase transition-all active:scale-95 border text-center leading-tight min-w-0"
             style={activeDay === k ? { background: ROUTINE[k].color, borderColor: ROUTINE[k].color, color: "#fff", boxShadow: `0 4px 14px -4px ${tint(ROUTINE[k].color, "66")}` } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
-            {ROUTINE[k].label}
+            <span className="block truncate">{ROUTINE[k].label}</span>
           </button>
         ))}
       </div>
@@ -5677,7 +5811,7 @@ function ShareSummaryCard({ logs, trainingSessions = [] }) {
         <ShareImageModal
           title="Compartí tu marca"
           fileNamePrefix={`pr-${selEx.id}`}
-          shareTitle="Mi Rutina — Marca"
+          shareTitle="Modus Fit — Marca"
           shareText={`Mi marca en ${selEx.name} 🔥`}
           draw={(ctx, W, H) => drawPRShareCard(ctx, W, H, { exerciseName: selEx.name, muscle: selEx.muscle, kg: selPR.bestKg, reps: selPR.bestReps, accent: selEx.color })}
           onClose={() => setShowImage(false)}
@@ -5687,7 +5821,7 @@ function ShareSummaryCard({ logs, trainingSessions = [] }) {
         <ShareImageModal
           title="Compartí tu resumen"
           fileNamePrefix={`resumen-${period}`}
-          shareTitle="Mi Rutina — Resumen"
+          shareTitle="Modus Fit — Resumen"
           shareText="Mi resumen de entrenamiento 💪"
           draw={(ctx, W, H) => drawPeriodShareCard(ctx, W, H, { periodLabel, daysTrained: periodStats.daysTrained, totalSets: periodStats.totalSets, totalVol: periodStats.totalVol, calendarCells, accent: "#3B82F6" })}
           onClose={() => setShowImage(false)}
@@ -5955,10 +6089,10 @@ function DeloadView({ logs, settings = DEFAULT_SETTINGS, deloadProgress = {}, se
           const d = ROUTINE[dk], isActive = activeDay === dk;
           const withPR = d.exercises.filter((ex) => ex.sets.some((s, i) => logs[`${ex.id}_${i}_pr_override`] || (logs[`${ex.id}_${i}`] || []).length > 0)).length;
           return (
-            <button key={dk} onClick={() => setActiveDay(dk)}
-              className="py-2.5 rounded-xl text-[10px] font-black uppercase transition-all active:scale-95 border text-center leading-tight"
+            <button key={dk} onClick={() => setActiveDay(dk)} title={d.label}
+              className="py-2.5 px-1 rounded-xl text-[10px] font-black uppercase transition-all active:scale-95 border text-center leading-tight min-w-0"
               style={isActive ? { backgroundColor: tint(d.color, "22"), borderColor: tint(d.color, "55"), color: d.color } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
-              <span className="block">{d.label}</span>
+              <span className="block truncate">{d.label}</span>
               {withPR > 0 && <span className="text-[8px] font-black opacity-70">{withPR}/{d.exercises.length}</span>}
             </button>
           );
@@ -6690,7 +6824,7 @@ function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backR
   );
 }
 
-function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, onGoToProfile, onGoToRoutines, sex, age }) {
+function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onGoToProfile, onGoToRoutines, sex, age }) {
   const [selected, setSelected] = useState(null);
   const [showImage, setShowImage] = useState(false);
   const [showTierRef, setShowTierRef] = useState(false); // modal de referencia de rangos
@@ -6717,15 +6851,16 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
     return arr.length ? arr : null;
   });
   const bodyWeightKg = settings.bodyWeightKg || 0;
+  const dumbbellDouble = settings?.dumbbellDouble || null;
 
   const ranks = useMemo(() => {
     const out = {};
     MUSCLE_GROUPS.forEach((g) => {
-      const { best1RM, bestKg, bestReps, bestExerciseName, bestLoadFactor, bestWeight } = getBest1RMForMuscleGroup(g.key, logs, settings?.dumbbellDouble || null);
+      const { best1RM, bestKg, bestReps, bestExerciseName, bestLoadFactor, bestWeight } = getBest1RMForMuscleGroup(g.key, logs, dumbbellDouble);
       out[g.key] = { ...getMuscleRank(g.key, best1RM, mode, bodyWeightKg, sex, age), best1RM, bestKg, bestReps, bestExerciseName, bestLoadFactor, bestWeight, label: g.label };
     });
     return out;
-  }, [logs, mode, bodyWeightKg, sex, age]);
+  }, [logs, mode, bodyWeightKg, sex, age, dumbbellDouble]);
 
   const selInfo = selected ? ranks[selected] : null;
   // Para mostrar "te faltan X kg a tus mismas reps para llegar a {rango}"
@@ -6808,11 +6943,14 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
       </div>
 
       <div>
-        <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
-          {[{ k: "general", l: "General" }, { k: "relative", l: "Según tu contexto" }].map((opt) => (
-            <button key={opt.k} onClick={() => onUpdateSettings?.({ muscleRankMode: opt.k })} className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${mode === opt.k ? "bg-blue-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
-          ))}
-        </div>
+        {/* El selector General/Según-tu-contexto vivía siempre visible acá,
+            pero es una decisión avanzada que un usuario nuevo ni entiende
+            todavía — ahora es una configuración (en Perfil) y acá solo queda
+            un indicador chico de qué modo está activo. */}
+        <button onClick={onGoToProfile} className="w-full flex items-center justify-between gap-2 text-left px-1 py-1">
+          <span className="text-[10px] text-slate-500">Modo de cálculo: <span className="font-bold text-slate-400">{modeLabel}</span></span>
+          <span className="text-[10px] font-bold text-blue-400 flex items-center gap-0.5">Cambiar <ChevronRight size={12} /></span>
+        </button>
         {mode === "relative" && needsWeight && (
           <button onClick={onGoToProfile} className="w-full flex items-center justify-between gap-2 bg-blue-500/10 border border-blue-500/25 rounded-xl px-3 py-2.5 text-left hover:bg-blue-500/15 transition mt-2">
             <p className="text-[11px] text-blue-300/90">Para calcular "Según tu contexto" necesitamos tu peso corporal — agregalo en tu perfil (sexo y edad son opcionales, pero afinan más el cálculo).</p>
@@ -7039,7 +7177,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
         <ShareImageModal
           title="Compartí tus rangos"
           fileNamePrefix="mis-rangos-por-musculo"
-          shareTitle="Mi Rutina — Rangos por músculo"
+          shareTitle="Modus Fit — Rangos por músculo"
           shareText="Mirá mis rangos por músculo 💪"
           draw={(ctx, W, H) => drawMuscleRankShareCard(ctx, W, H, { ranks, modeLabel, accent: "#F59E0B" })}
           onClose={() => setShowImage(false)}
@@ -7109,6 +7247,7 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
   const [selType, setSelType] = useState("weight");
   const [inputVal, setInputVal] = useState("");
   const [addingPhoto, setAddingPhoto] = useState(false);
+  const [photoError, setPhotoError] = useState(false);
   const now = new Date();
   const [cursor, setCursor] = useState({ y: now.getFullYear(), m: now.getMonth() });
   const [selectedDate, setSelectedDate] = useState(null);
@@ -7119,10 +7258,10 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
   const [compareBase, setCompareBase] = useState(null);
   const [comparePair, setComparePair] = useState(null);
   const selMeta = MEASUREMENT_TYPES.find((t) => t.k === selType);
-  const selHistory = measurements[selType] || [];
+  const selHistory = useMemo(() => measurements[selType] || [], [measurements, selType]);
   const latest = getLatestMeasurement(selHistory);
   const days = latest ? daysSince(latest.date) : null;
-  const chartData = selHistory.slice().sort((a, b) => (a.date < b.date ? -1 : 1)).map((h) => ({ date: h.date.slice(5), val: h.value }));
+  const chartData = useMemo(() => selHistory.slice().sort((a, b) => (a.date < b.date ? -1 : 1)).map((h) => ({ date: h.date.slice(5), val: h.value })), [selHistory]);
 
   const handleAdd = () => {
     const v = parseFloat(inputVal);
@@ -7134,7 +7273,8 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
   const handlePhotoChange = async (file) => {
     if (!file) return;
     setAddingPhoto(true);
-    try { await onAddPhoto(file); } finally { setAddingPhoto(false); }
+    setPhotoError(false);
+    try { await onAddPhoto(file); } catch { setPhotoError(true); } finally { setAddingPhoto(false); }
   };
 
   // Un solo calendario para las tres cosas — igual que el de Historial,
@@ -7220,6 +7360,7 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
             <input type="file" accept="image/*" capture="environment" className="hidden" disabled={addingPhoto} onChange={(e) => { handlePhotoChange(e.target.files?.[0]); e.target.value = ""; }} />
           </label>
         </div>
+        {photoError && <p className="text-[11px] text-rose-400 mb-2.5 -mt-1.5">No pudimos guardar la foto. Probá de nuevo.</p>}
 
         {photosLoading ? (
           // Skeletons: formas que laten mientras llegan los datos. Se siente
@@ -7418,8 +7559,8 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
   const [selSet, setSelSet] = useState(0);
   const [metric, setMetric] = useState("grafico");
   const selEx = allExercises.find((e) => e.id === selId);
-  const history = (logs[`${selId}_${selSet}`] || []).slice().sort((a, b) => (a.date > b.date ? 1 : -1));
-  const chartData = history.map((h) => ({ date: h.date.slice(5), kg: h.kg, reps: h.reps, vol: vol(h.kg, h.reps), e1rm: estimate1RM(h.kg, h.reps), rpe: h.rpe ?? null }));
+  const history = useMemo(() => (logs[`${selId}_${selSet}`] || []).slice().sort((a, b) => (a.date > b.date ? 1 : -1)), [logs, selId, selSet]);
+  const chartData = useMemo(() => history.map((h) => ({ date: h.date.slice(5), kg: h.kg, reps: h.reps, vol: vol(h.kg, h.reps), e1rm: estimate1RM(h.kg, h.reps), rpe: h.rpe ?? null })), [history]);
 
   const [confirmResetProgress, setConfirmResetProgress] = useState(false);
   const [activeSection, setActiveSection] = useState("rank");
@@ -7629,6 +7770,19 @@ function buildExportRows(filteredSessions) {
   return rows;
 }
 
+// Resumen semanal (ver handleEndSession/handleFinishDeloadSession): mismos
+// helpers que ya arma "Exportar entrenamiento", así el número que ves en el
+// resumen es exactamente el mismo que verías si exportaras la semana.
+function computeWeekRecap(logs, trainingSessions) {
+  const sessions = buildSessionsIndex(logs, trainingSessions);
+  const filtered = getSessionsForPeriod(sessions, "week");
+  const rows = buildExportRows(filtered);
+  if (!rows.length) return null;
+  const dias = groupExportRowsByDate(rows).length;
+  const volumen = Math.round(rows.reduce((acc, r) => acc + vol(r.kg, r.reps), 0));
+  return { dias, series: rows.length, volumen };
+}
+
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -7641,7 +7795,7 @@ async function exportTrainingToPdf(rows, meta) {
   const autoTable = (await import("jspdf-autotable")).default;
   const doc = new jsPDF();
   doc.setFontSize(16);
-  doc.text("Mi Rutina — Resumen de entrenamiento", 14, 18);
+  doc.text("Modus Fit — Resumen de entrenamiento", 14, 18);
   doc.setFontSize(10);
   doc.setTextColor(110);
   doc.text(`${meta.profileName} · ${meta.periodLabel}`, 14, 25);
@@ -7671,7 +7825,7 @@ async function exportTrainingToWord(rows, meta) {
   const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, HeadingLevel, WidthType } = await import("docx");
   const groups = groupExportRowsByDate(rows);
   const children = [
-    new Paragraph({ text: "Mi Rutina — Resumen de entrenamiento", heading: HeadingLevel.HEADING_1 }),
+    new Paragraph({ text: "Modus Fit — Resumen de entrenamiento", heading: HeadingLevel.HEADING_1 }),
     new Paragraph({ children: [new TextRun({ text: `${meta.profileName} · ${meta.periodLabel}`, color: "666666" })], spacing: { after: 200 } }),
   ];
   groups.forEach((g) => {
@@ -7718,7 +7872,7 @@ async function exportRoutineToPdf(routineDef) {
   doc.text(routineDef.name || "Mi rutina", 14, 18);
   doc.setFontSize(10);
   doc.setTextColor(110);
-  doc.text("Generada con Mi Rutina", 14, 25);
+  doc.text("Generada con Modus Fit", 14, 25);
   doc.setTextColor(20);
   let y = 34;
   days.forEach((d) => {
@@ -7744,7 +7898,7 @@ async function exportRoutineToWord(routineDef) {
   const days = buildRoutineExportDays(routineDef);
   const children = [
     new Paragraph({ text: routineDef.name || "Mi rutina", heading: HeadingLevel.HEADING_1 }),
-    new Paragraph({ children: [new TextRun({ text: "Generada con Mi Rutina", color: "666666" })], spacing: { after: 200 } }),
+    new Paragraph({ children: [new TextRun({ text: "Generada con Modus Fit", color: "666666" })], spacing: { after: 200 } }),
   ];
   days.forEach((d) => {
     children.push(new Paragraph({ text: d.dayLabel, heading: HeadingLevel.HEADING_2, spacing: { before: 260, after: 100 } }));
@@ -8133,6 +8287,18 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
         <div><p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Reducción de series</p><div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">{[{ k: 2, l: "Mitad" }, { k: 3, l: "Tercio" }, { k: 4, l: "Cuarto" }].map((opt) => <button key={opt.k} onClick={() => updateSettings({ deloadSetDivisor: opt.k })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${settings.deloadSetDivisor === opt.k ? "bg-purple-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>)}</div></div>
       </CollapsibleSection>
 
+      <CollapsibleSection title="Cálculo de rango muscular" subtitle={settings.muscleRankMode === "relative" ? "Según tu contexto" : "General"} icon={<Award size={16} />} accent="#3B82F6">
+        <p className="text-[10px] text-slate-500 leading-snug mb-1">"General" compara tu marca en kg absolutos. "Según tu contexto" la ajusta a tu peso corporal (y sexo/edad si los cargaste) — más justo si estás empezando o si tu objetivo no es fuerza máxima.</p>
+        <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
+          {[{ k: "general", l: "General" }, { k: "relative", l: "Según tu contexto" }].map((opt) => (
+            <button key={opt.k} onClick={() => updateSettings({ muscleRankMode: opt.k })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${settings.muscleRankMode === opt.k || (opt.k === "general" && settings.muscleRankMode !== "relative") ? "bg-blue-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
+          ))}
+        </div>
+        {settings.muscleRankMode === "relative" && !settings.bodyWeightKg && (
+          <p className="text-[11px] text-blue-300/90 mt-2">Para calcular "Según tu contexto" necesitamos tu peso corporal — completalo en "Editar perfil" más arriba.</p>
+        )}
+      </CollapsibleSection>
+
       <CollapsibleSection title="Descanso entre series" subtitle={`${formatTime(settings.restShort)} – ${formatTime(settings.restLong)}`} icon={<Timer size={16} />} accent="#14B8A6">
         <div><p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Aviso al terminar</p><div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">{[{ k: "sound", l: "Sonido" }, { k: "vibration", l: "Vibración" }, { k: "both", l: "Ambos" }].map((opt) => <button key={opt.k} onClick={() => updateSettings({ alertType: opt.k })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${settings.alertType === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>)}</div></div>
         <div className="grid grid-cols-2 gap-3">
@@ -8200,6 +8366,15 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
               <p className="text-[10px] text-slate-600 mt-2">Si hoy ya pasó esa hora, el primer aviso llega el próximo día de rutina.</p>
             </div>
           )}
+          <button onClick={() => updateSettings({ weeklyRecapEnabled: !settings.weeklyRecapEnabled })} className="w-full flex items-center justify-between gap-3 rounded-xl px-3.5 py-3 transition active:scale-[0.99]" style={settings.weeklyRecapEnabled !== false ? { backgroundColor: "#F59E0B14", border: "1px solid #F59E0B40" } : { backgroundColor: "var(--row-surface)", border: "1px solid #33415580" }}>
+            <div className="text-left min-w-0">
+              <p className="text-xs font-bold" style={{ color: settings.weeklyRecapEnabled !== false ? "#FBBF24" : "#94a3b8" }}>Resumen semanal</p>
+              <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">Días, series y volumen de la semana — aparece al terminar de entrenar el domingo (o el domingo a la tarde si no entrenás ese día).</p>
+            </div>
+            <span className="w-11 h-6 rounded-full shrink-0 relative transition-colors" style={{ backgroundColor: settings.weeklyRecapEnabled !== false ? "#F59E0B" : "var(--surface-2)" }}>
+              <span className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all" style={{ left: settings.weeklyRecapEnabled !== false ? "22px" : "2px" }} />
+            </span>
+          </button>
         </div>
       </CollapsibleSection>
 
@@ -8272,7 +8447,7 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
               <Info size={16} className="text-teal-400" />
               <span className="text-sm font-bold text-white">Política de privacidad</span>
             </div>
-            <button onClick={() => setShowPrivacy(false)} className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white transition active:scale-90"><X size={16} /></button>
+            <button onClick={() => setShowPrivacy(false)} aria-label="Cerrar" className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white transition active:scale-90"><X size={16} /></button>
           </div>
           <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-5 space-y-5 text-slate-400 text-[13px] leading-relaxed">
             <p className="text-[11px] text-slate-600">Última actualización: julio de 2026</p>
@@ -8569,6 +8744,10 @@ function BuilderExerciseRow({ ex, onRemove, onConfigChange, isDragging = false, 
     const newSets = ex.sets.map((s, i) => i === setIdx ? { ...s, repRange: newRange } : s);
     onConfigChange({ sets: newSets });
   };
+  const handleSetType = (setIdx, newType) => {
+    const newSets = ex.sets.map((s, i) => i === setIdx ? { ...s, type: newType } : s);
+    onConfigChange({ sets: newSets });
+  };
 
   return (
     <div
@@ -8683,6 +8862,15 @@ function BuilderExerciseRow({ ex, onRemove, onConfigChange, isDragging = false, 
                       <div className="flex flex-wrap gap-1">
                         {REP_RANGE_OPTIONS.map((r) => (
                           <button key={r} onClick={() => handleSetRepRange(i, r)} className={`px-2 py-0.5 rounded-lg text-[9px] font-bold transition-all border ${s.repRange === r ? "bg-teal-500 border-teal-500 !text-white" : "border-slate-800 text-slate-500"}`}>{r}</button>
+                        ))}
+                      </div>
+                      {/* Tipo de serie: drop-set (misma serie, bajás el peso y
+                          seguís sin descansar) o rest-pause (mismo peso,
+                          mini-pausas de pocos segundos y seguís sumando reps).
+                          "Normal" es el comportamiento de siempre. */}
+                      <div className="flex flex-wrap gap-1">
+                        {[{ k: "normal", l: "Normal" }, { k: "dropset", l: "Drop-set" }, { k: "restpause", l: "Rest-pause" }].map((opt) => (
+                          <button key={opt.k} onClick={() => handleSetType(i, opt.k === "normal" ? undefined : opt.k)} className={`px-2 py-0.5 rounded-lg text-[9px] font-bold transition-all border ${(s.type || "normal") === opt.k ? "bg-amber-500 border-amber-500 !text-white" : "border-slate-800 text-slate-500"}`}>{opt.l}</button>
                         ))}
                       </div>
                     </div>
@@ -8877,8 +9065,8 @@ function BuilderDayCard({ day, dayIdx, totalDays, onRename, onRemove, onMoveDay,
       )}
       <div className="flex items-center gap-2 mb-3 ml-9">
         <div className="flex flex-col -my-1 shrink-0">
-          <button onClick={() => onMoveDay(-1)} disabled={dayIdx === 0} className="p-0.5 text-slate-600 hover:text-slate-300 disabled:opacity-20"><ChevronUp size={13} /></button>
-          <button onClick={() => onMoveDay(1)} disabled={dayIdx === totalDays - 1} className="p-0.5 text-slate-600 hover:text-slate-300 disabled:opacity-20"><ChevronDown size={13} /></button>
+          <button onClick={() => onMoveDay(-1)} disabled={dayIdx === 0} aria-label="Mover día arriba" className="p-1.5 text-slate-600 hover:text-slate-300 disabled:opacity-20"><ChevronUp size={13} /></button>
+          <button onClick={() => onMoveDay(1)} disabled={dayIdx === totalDays - 1} aria-label="Mover día abajo" className="p-1.5 text-slate-600 hover:text-slate-300 disabled:opacity-20"><ChevronDown size={13} /></button>
         </div>
         <div className="flex-1 relative min-w-0">
           <input value={day.label} onChange={(e) => onRename(e.target.value.toUpperCase())} placeholder={`DÍA ${dayIdx + 1}`} className="w-full bg-slate-950/50 border border-slate-700/60 rounded-xl pl-3 pr-8 py-2 text-sm font-black text-white uppercase focus:outline-none transition" style={{ borderColor: tint(day.color, "30") }} />
@@ -10121,10 +10309,19 @@ function WeeklyScheduleEditor({ dayOrder, days, schedule, onChange }) {
 
 function RoutineBuilder({ initialRoutine, onCancel, onSave, dumbbellDouble = null, onUpdateSettings = null }) {
   const isEditing = !!initialRoutine;
-  const [name, setName] = useState(initialRoutine?.name || "");
-  const [days, setDays] = useState(() => (initialRoutine ? builderDaysFromRoutineDef(initialRoutine) : [{ key: builderUid("day"), label: "DÍA 1", color: BUILDER_COLOR_PALETTE[0], exercises: [] }]));
-  const [schedule, setSchedule] = useState(() => getRoutineWeekSchedule(initialRoutine || { dayOrder: days.map((d) => d.key) }));
+  const [name, setNameRaw] = useState(initialRoutine?.name || "");
+  const [days, setDaysRaw] = useState(() => (initialRoutine ? builderDaysFromRoutineDef(initialRoutine) : [{ key: builderUid("day"), label: "DÍA 1", color: BUILDER_COLOR_PALETTE[0], exercises: [] }]));
+  const [schedule, setScheduleRaw] = useState(() => getRoutineWeekSchedule(initialRoutine || { dayOrder: days.map((d) => d.key) }));
   const [error, setError] = useState("");
+  // Para poder avisar antes de descartar cambios sin guardar (ver
+  // handleCancelClick más abajo) — cualquier edición real pasa por estos
+  // tres setters, así que alcanza con marcar "dirty" acá una sola vez.
+  const [dirty, setDirty] = useState(false);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const setName = (v) => { setNameRaw(v); setDirty(true); };
+  const setDays = (v) => { setDaysRaw(v); setDirty(true); };
+  const setSchedule = (v) => { setScheduleRaw(v); setDirty(true); };
+  const handleCancelClick = () => { if (dirty) setConfirmDiscard(true); else onCancel(); };
 
   const addDay = () => setDays((d) => [...d, { key: builderUid("day"), label: `DÍA ${d.length + 1}`, color: BUILDER_COLOR_PALETTE[d.length % BUILDER_COLOR_PALETTE.length], exercises: [] }]);
   // Duplicar un día con todos sus ejercicios y series.
@@ -10190,7 +10387,11 @@ function RoutineBuilder({ initialRoutine, onCancel, onSave, dumbbellDouble = nul
       ...e,
       sets: sets
         ? sets  // sets completos pasados directamente (edición per-set)
-        : Array.from({ length: setsCount }, (_, k) => ({ repRange: e.sets[k]?.repRange || repRange })),
+        // Al cambiar solo la cantidad de series hay que conservar el resto de
+        // la config de cada serie existente (tipo drop-set/rest-pause
+        // incluido) — antes esto reconstruía cada serie desde cero y la
+        // perdía apenas tocabas el +/- de cantidad de series.
+        : Array.from({ length: setsCount }, (_, k) => ({ ...e.sets[k], repRange: e.sets[k]?.repRange || repRange })),
     } : e)),
   })));
   // Encadena (o desencadena) este ejercicio con el siguiente de la lista
@@ -10221,7 +10422,7 @@ function RoutineBuilder({ initialRoutine, onCancel, onSave, dumbbellDouble = nul
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
-        <button onClick={onCancel} className="p-2 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition shrink-0"><ChevronDown size={18} className="rotate-90" /></button>
+        <button onClick={handleCancelClick} aria-label="Volver" className="p-2 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition shrink-0"><ChevronDown size={18} className="rotate-90" /></button>
         <h2 className="text-base font-black text-white">{isEditing ? "Editá tu rutina" : "Creá tu rutina"}</h2>
       </div>
 
@@ -10263,10 +10464,18 @@ function RoutineBuilder({ initialRoutine, onCancel, onSave, dumbbellDouble = nul
 
       {error && <p className="text-xs text-rose-400 text-center">{error}</p>}
 
-      <div className="flex gap-2 pt-1">
-        <button onClick={onCancel} className="flex-1 py-3.5 rounded-2xl bg-slate-800 text-slate-300 text-sm font-semibold">Cancelar</button>
-        <button onClick={handleSave} className="flex-1 py-3.5 rounded-2xl bg-teal-500 !text-white text-sm font-bold active:scale-[0.98] transition-all shadow-lg shadow-teal-500/20">{isEditing ? "Guardar cambios" : "Guardar rutina"}</button>
-      </div>
+      {!confirmDiscard ? (
+        <div className="flex gap-2 pt-1">
+          <button onClick={handleCancelClick} className="flex-1 py-3.5 rounded-2xl bg-slate-800 text-slate-300 text-sm font-semibold">Cancelar</button>
+          <button onClick={handleSave} className="flex-1 py-3.5 rounded-2xl bg-teal-500 !text-white text-sm font-bold active:scale-[0.98] transition-all shadow-lg shadow-teal-500/20">{isEditing ? "Guardar cambios" : "Guardar rutina"}</button>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 rounded-2xl bg-rose-500/10 border border-rose-500/30 px-3.5 py-3">
+          <p className="text-xs text-rose-300 flex-1">¿Descartar los cambios sin guardar?</p>
+          <button onClick={() => setConfirmDiscard(false)} className="px-3 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs font-semibold shrink-0">Seguir</button>
+          <button onClick={onCancel} className="px-3 py-1.5 rounded-lg bg-rose-500 !text-white text-xs font-bold shrink-0">Descartar</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -11167,7 +11376,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
         <ShareLinkModal
           title="Compartir rutina"
           shareTitle={`Mi rutina: ${shareTarget.name}`}
-          shareText={`Mirá mi rutina "${shareTarget.name}" en Mi Rutina 💪`}
+          shareText={`Mirá mi rutina "${shareTarget.name}" en Modus Fit 💪`}
           shareTarget={shareTarget}
           onClose={() => setShareTarget(null)}
         />
@@ -11250,7 +11459,7 @@ function SideNav({ tab, setTab, profileName }) {
     <div className="hidden lg:flex lg:flex-col lg:w-56 lg:shrink-0 lg:h-screen lg:sticky lg:top-0 border-r border-slate-800/50 bg-[#0a0a0f]/60 px-3 py-6">
       <div className="flex items-center gap-2.5 px-2 mb-8">
         <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-teal-500/30 to-teal-500/5 border border-teal-500/20 flex items-center justify-center shrink-0"><Flame className="text-teal-500" size={18} /></div>
-        <span className="font-black text-white text-sm tracking-tight">Mi Rutina</span>
+        <span className="font-black text-white text-sm tracking-tight">Modus Fit</span>
       </div>
       <button onClick={() => setTab("perfil")} className={`w-full flex items-center gap-3 px-3 py-2.5 mb-3 rounded-xl text-sm font-semibold transition-all ${tab === "perfil" ? "bg-teal-500/15 text-teal-400" : "text-slate-500 hover:text-slate-300 hover:bg-slate-900/60"}`}>
         {avatarUrl
@@ -11524,6 +11733,7 @@ export default function App() {
   const [helpStartTab, setHelpStartTab] = useState(null);
   const [showWelcome, setShowWelcome] = useState(false); // intro de la primera vez
   const [sessionSummary, setSessionSummary] = useState(null); // resumen al finalizar
+  const [weeklyRecap, setWeeklyRecap] = useState(null); // resumen semanal (ver checkWeeklyRecap)
   const [sessionStarted, setSessionStarted] = useState(false); // overlay "¡A entrenar!"
   const [recoveredNotice, setRecoveredNotice] = useState(false);
 
@@ -11551,7 +11761,13 @@ export default function App() {
   // Cuando eso ocurre, buscamos el perfil local que tenga ese uid y
   // lo activamos sin que el usuario tenga que tocar nada.
   useEffect(() => {
-    if (activeProfile) return; // ya está logueado, no hacer nada
+    // Sin esta dependencia, el listener quedaba suscripto para siempre desde
+    // el primer montaje: si alguien cerraba sesión mientras signOut(auth)
+    // fallaba (sin red), Firebase seguía "logueado" puertas adentro y un
+    // evento posterior (ej. refresh de token) volvía a activar el perfil
+    // solo, pisando un logout explícito. Reevaluar en cada cambio de
+    // activeProfile/justLoggedOut cierra ese listener viejo a tiempo.
+    if (activeProfile || justLoggedOut) return; // ya está logueado, o el usuario cerró sesión adrede: no re-loguear solo
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (!user) return;
       const p = loadProfiles();
@@ -11562,7 +11778,7 @@ export default function App() {
       }
     });
     return () => unsub();
-  }, []);
+  }, [activeProfile, justLoggedOut]);
 
   // Pedir permiso de notificaciones al montar la app.
   // En Android con Capacitor usamos LocalNotifications.requestPermissions()
@@ -11713,12 +11929,69 @@ export default function App() {
         }
         if (notifs.length) {
           await LocalNotifications.schedule({ notifications: notifs });
-          console.log(`[notif] ${notifs.length} recordatorios programados a las ${st.reminderTime}`);
         }
       } catch (e) { console.warn("[notif] recordatorio:", e); }
     })();
     // eslint-disable-next-line
   }, [profile?.settings?.reminderEnabled, profile?.settings?.reminderTime, profile?.weekSchedule, activeProfile]);
+
+  // RESUMEN SEMANAL — aviso nativo de RESPALDO: si domingo es día de
+  // entrenar según tu agenda, lo programamos tarde (22:00) por si no abrís
+  // la app ese día para que dispare el resumen "en vivo" (ver
+  // checkWeeklyRecap, que cancela este mismo id apenas se muestra en la
+  // app). Si domingo es descanso, no hace falta esperar nada — se programa
+  // a tu hora habitual de recordatorio. El texto es genérico porque esto se
+  // programa con días de anticipación, sin los números reales de la semana.
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    const st = getProfileSettings(profile);
+    (async () => {
+      try {
+        await LocalNotifications.cancel({ notifications: [{ id: 9300 }] }).catch(() => {});
+        if (!st.weeklyRecapEnabled) return;
+        const sched = profile?.weekSchedule || null;
+        const now = new Date();
+        const dow = (now.getDay() + 6) % 7; // 0=lunes .. 6=domingo
+        const sunday = new Date(now);
+        sunday.setDate(now.getDate() + (6 - dow));
+        if (sched && sched.sun) {
+          sunday.setHours(22, 0, 0, 0); // día de entrenar: esperamos a que probablemente ya hayas entrenado
+        } else {
+          const [hh, mm] = String(st.reminderTime || "18:00").split(":").map(Number);
+          sunday.setHours(hh || 18, mm || 0, 0, 0);
+        }
+        if (sunday.getTime() <= Date.now()) return; // ya pasó — la próxima corrida de este efecto reprograma para el domingo siguiente
+        await LocalNotifications.createChannel({ id: "modusfit-recap-v1", name: "Resumen semanal", description: "Cómo te fue en la semana", importance: 3, vibration: true }).catch(() => {});
+        await LocalNotifications.schedule({
+          notifications: [{
+            id: 9300, smallIcon: "ic_stat_modusfit",
+            title: "📊 Resumen de tu semana",
+            body: "Mirá cómo te fue esta semana en Progreso.",
+            channelId: "modusfit-recap-v1",
+            schedule: { at: sunday, allowWhileIdle: true },
+          }],
+        });
+      } catch (e) { console.warn("[notif] resumen semanal:", e); }
+    })();
+    // eslint-disable-next-line
+  }, [profile?.settings?.weeklyRecapEnabled, profile?.settings?.reminderTime, profile?.weekSchedule, activeProfile]);
+
+  // WIDGET "HOY TOCA" (pantalla de inicio, solo Android nativo): le mandamos
+  // el texto ya armado — el widget en sí no sabe nada de rutinas, solo
+  // muestra lo último que le mandamos (ver TodayWidgetPlugin). Se reenvía
+  // cada vez que cambia la agenda semanal o cuando terminás la sesión de hoy.
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform() || !profile) return;
+    const sched = profile.weekSchedule || null;
+    const dayKey = sched ? sched[todayWeekdayKey()] : null;
+    let label;
+    if (!dayKey) label = "Hoy: descanso 😌";
+    else {
+      const yaEntrenoHoy = (profile.trainingSessions || []).some((s) => s.date === todayStr());
+      label = yaEntrenoHoy ? "¡Ya entrenaste hoy! ✅" : `Hoy toca ${ROUTINE[dayKey]?.label || dayKey} 💪`;
+    }
+    TodayWidget.updateToday({ label }).catch(() => {});
+  }, [profile?.weekSchedule, profile?.trainingSessions, activeProfile]);
 
   // MIGRACIÓN AUTOMÁTICA DE LA FOTO DE PERFIL: las fotos puestas con
   // versiones anteriores quedaron SOLO en IndexedDB del dispositivo (nunca
@@ -11927,7 +12200,14 @@ export default function App() {
   // de descarga — guardado por fecha (no true/false) para que la próxima
   // semana de descarga, varias semanas después, arranque sin nada
   // tildado, sin necesitar un botón de reinicio aparte.
-  const setDeloadProgress = useCallback((newProgress) => { const np = { ...profiles, [activeProfile]: { ...profiles[activeProfile], deloadProgress: newProgress } }; setProfiles(np); saveProfiles(np); }, [profiles, activeProfile]);
+  const setDeloadProgress = useCallback((newProgress) => {
+    setProfiles((prev) => {
+      const cur = prev[activeProfile];
+      const np = { ...prev, [activeProfile]: { ...cur, deloadProgress: newProgress } };
+      saveProfiles(np);
+      return np;
+    });
+  }, [activeProfile]);
   // Registra una medición nueva (peso, cintura, pecho, brazo, pierna) con
   // la fecha de hoy — si ya había una de HOY para ese mismo tipo, la
   // reemplaza en vez de duplicarla (por si te equivocás y corregís). El
@@ -11978,6 +12258,7 @@ export default function App() {
       await idbPut(`photos_${activeProfile}`, next);
     } catch (err) {
       console.error("Error al guardar la foto de progreso:", err);
+      throw err; // re-lanzamos para que la pantalla que llamó pueda avisarle al usuario
     }
   };
   const handleDeletePhoto = (id) => {
@@ -12005,8 +12286,17 @@ export default function App() {
     try { await signOut(auth); } catch (err) { console.error("Error al cerrar sesión de Google:", err); }
     handleLogout();
   };
-  const handleDelete = () => { const np = { ...profiles }; delete np[activeProfile]; setProfiles(np); saveProfiles(np); saveActive(null); setActiveProfile(null); setJustLoggedOut(true); setShowHelp(false); setHelpStartTab(null); };
-  const handleUpdateProfile = (updates) => { const np = { ...profiles, [activeProfile]: { ...profiles[activeProfile], ...updates } }; setProfiles(np); saveProfiles(np); };
+  const handleDelete = () => {
+    setProfiles((prev) => { const np = { ...prev }; delete np[activeProfile]; saveProfiles(np); return np; });
+    saveActive(null); setActiveProfile(null); setJustLoggedOut(true); setShowHelp(false); setHelpStartTab(null);
+  };
+  const handleUpdateProfile = (updates) => {
+    setProfiles((prev) => {
+      const np = { ...prev, [activeProfile]: { ...prev[activeProfile], ...updates } };
+      saveProfiles(np);
+      return np;
+    });
+  };
   // Helper genérico para parchear cualquier campo de settings sin pisar el
   // resto — lo usa, por ejemplo, el selector "General" / "Según tu contexto"
   // y el campo de peso corporal en Progreso → Rango.
@@ -12135,10 +12425,23 @@ export default function App() {
     return { volumen: Math.round(volumen), series, ejercicios: ejercicios.size, prs, minutos };
   };
 
+  // Resumen semanal: dispara SOLO si hoy es domingo (fin de semana lun-dom)
+  // y el ajuste está activo. Se llama DESPUÉS de guardar la sesión de hoy,
+  // así siempre te agarra tras haber entrenado, nunca antes ni a mitad de
+  // semana. Cancela el aviso nativo de respaldo (ver el useEffect más abajo)
+  // para no duplicar el aviso si ya lo mostramos acá adentro.
+  const checkWeeklyRecap = (updatedTrainingSessions) => {
+    const st = getProfileSettings(profile);
+    if (!st.weeklyRecapEnabled || todayWeekdayKey() !== "sun") return;
+    const recap = computeWeekRecap(logs, updatedTrainingSessions);
+    if (recap) setWeeklyRecap(recap);
+    if (Capacitor.isNativePlatform()) LocalNotifications.cancel({ notifications: [{ id: 9300 }] }).catch(() => {});
+  };
   const handleEndSession = () => {
     // El resumen se arma ANTES de cerrar (después ya no existe activeSession
     // para calcular la duración). Solo se muestra si registraste algo.
     const resumen = armarResumenSesion();
+    let updatedTrainingSessions = null;
     setProfiles((prev) => {
       const p = prev[activeProfile];
       if (!p?.activeSession) return prev;
@@ -12146,11 +12449,13 @@ export default function App() {
       // "24 sesiones · usada hace 3 meses" en cada rutina.
       const finished = { date: todayStr(), dayKey: p.activeSession.dayKey, startedAt: p.activeSession.startedAt, endedAt: new Date().toISOString() };
       if (p.activeRoutineId) finished.routineId = p.activeRoutineId;
-      const np = { ...prev, [activeProfile]: { ...p, activeSession: null, trainingSessions: [...(p.trainingSessions || []), finished], drafts: {} } };
+      updatedTrainingSessions = [...(p.trainingSessions || []), finished];
+      const np = { ...prev, [activeProfile]: { ...p, activeSession: null, trainingSessions: updatedTrainingSessions, drafts: {} } };
       saveProfiles(np);
       return np;
     });
     if (resumen.series > 0) setSessionSummary(resumen);
+    if (updatedTrainingSessions) checkWeeklyRecap(updatedTrainingSessions);
   };
   const handleCancelSession = () => {
     setProfiles((prev) => {
@@ -12168,15 +12473,18 @@ export default function App() {
   // registrado en ningún lado: no contaba como día entrenado, no sumaba
   // a la racha, no aparecía en el calendario de Historial.
   const handleFinishDeloadSession = (dayKey) => {
+    let updatedTrainingSessions = null;
     setProfiles((prev) => {
       const p = prev[activeProfile];
       if (!p) return prev;
       const finished = { date: todayStr(), dayKey, startedAt: new Date().toISOString(), endedAt: new Date().toISOString(), deload: true };
       if (p.activeRoutineId) finished.routineId = p.activeRoutineId;
-      const np = { ...prev, [activeProfile]: { ...p, trainingSessions: [...(p.trainingSessions || []), finished] } };
+      updatedTrainingSessions = [...(p.trainingSessions || []), finished];
+      const np = { ...prev, [activeProfile]: { ...p, trainingSessions: updatedTrainingSessions } };
       saveProfiles(np);
       return np;
     });
+    if (updatedTrainingSessions) checkWeeklyRecap(updatedTrainingSessions);
   };
 
   // "Resetear todo el historial" (Progreso): antes sólo limpiaba `logs`, así
@@ -12300,6 +12608,7 @@ export default function App() {
       <BottomBar tab={tab} setTab={setTab} />
       {sessionStarted && <SessionStartOverlay onDone={() => setSessionStarted(false)} />}
       {sessionSummary && <SessionSummaryModal resumen={sessionSummary} onClose={() => setSessionSummary(null)} />}
+      {weeklyRecap && <WeeklyRecapModal data={weeklyRecap} onClose={() => setWeeklyRecap(null)} />}
       {showWelcome && <WelcomeIntro onClose={() => setShowWelcome(false)} onOpenTutorial={() => { setHelpStartTab(null); setShowHelp(true); }} />}
       {showHelp && <HelpModal startTab={helpStartTab} onClose={() => setShowHelp(false)} />}
       {showFieldIntro && (
@@ -12335,8 +12644,8 @@ export default function App() {
         <ShareImageModal
           title="Compartí tu ciclo"
           fileNamePrefix={`ciclo-${cycleCompleteNotice.cycleNumber}`}
-          shareTitle="Mi Rutina — Ciclo completo"
-          shareText={`¡Completé el Ciclo #${cycleCompleteNotice.cycleNumber} en Mi Rutina! 💪`}
+          shareTitle="Modus Fit — Ciclo completo"
+          shareText={`¡Completé el Ciclo #${cycleCompleteNotice.cycleNumber} en Modus Fit! 💪`}
           draw={(ctx, W, H) => drawCycleShareCard(ctx, W, H, { cycleNumber: cycleCompleteNotice.cycleNumber, ...computeCycleShareStats() })}
           onClose={() => { setShowCycleShareImage(false); setCycleCompleteNotice(null); }}
         />
@@ -12350,7 +12659,7 @@ function RecoveredBanner({ onClose }) {
   return (
     <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[150] bg-teal-500 !text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-teal-500/30 flex items-center gap-2 bounce-in">
       <Check size={14} /> Recuperamos tu copia de seguridad local
-      <button onClick={onClose} className="ml-1 opacity-80 hover:opacity-100"><X size={13} /></button>
+      <button onClick={onClose} aria-label="Cerrar" className="ml-1 opacity-80 hover:opacity-100"><X size={13} /></button>
     </div>
   );
 }
@@ -12359,7 +12668,7 @@ function DeloadNoticeBanner({ onClose }) {
   return (
     <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[150] bg-purple-500 !text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-purple-500/30 flex items-center gap-2 bounce-in max-w-[92vw]">
       <Zap size={14} className="shrink-0" /> Esta semana es de descarga — te llevamos a esa pestaña
-      <button onClick={onClose} className="ml-1 opacity-80 hover:opacity-100 shrink-0"><X size={13} /></button>
+      <button onClick={onClose} aria-label="Cerrar" className="ml-1 opacity-80 hover:opacity-100 shrink-0"><X size={13} /></button>
     </div>
   );
 }
@@ -12368,7 +12677,7 @@ function ImportRoutineErrorBanner({ onClose }) {
   return (
     <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[150] bg-rose-500 !text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-rose-500/30 flex items-center gap-2 bounce-in max-w-[92vw]">
       <AlertTriangle size={14} className="shrink-0" /> No pudimos abrir esa rutina compartida — puede que el enlace ya no exista.
-      <button onClick={onClose} className="ml-1 opacity-80 hover:opacity-100 shrink-0"><X size={13} /></button>
+      <button onClick={onClose} aria-label="Cerrar" className="ml-1 opacity-80 hover:opacity-100 shrink-0"><X size={13} /></button>
     </div>
   );
 }

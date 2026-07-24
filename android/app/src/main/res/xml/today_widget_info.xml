@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Metadata del widget "Hoy toca". minWidth/Height ~2x1 celdas (celda
+     estándar ~70dp) — chico a propósito, es una sola línea de texto.
+     updatePeriodMillis en 0 porque el refresco real lo dispara
+     TodayWidgetPlugin desde la app (agenda semanal / fin de sesión), no un
+     poll periódico del sistema — pero se deja igual por si el usuario no
+     abre la app en un tiempo y el sistema decide refrescar solo. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="180dp"
+    android:minHeight="70dp"
+    android:updatePeriodMillis="10800000"
+    android:initialLayout="@layout/today_widget"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen"
+    android:previewImage="@mipmap/ic_launcher"
+    android:label="@string/today_widget_label"
+    android:description="@string/today_widget_description">
+</appwidget-provider>

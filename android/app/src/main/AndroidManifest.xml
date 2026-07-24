@@ -28,6 +28,15 @@
         <provider android:name="androidx.core.content.FileProvider" android:authorities="${applicationId}.fileprovider" android:exported="false" android:grantUriPermissions="true">
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths"/>
         </provider>
+        <!--  Widget de pantalla de inicio "Hoy toca" — ver TodayWidgetProvider
+                     y TodayWidgetPlugin (el puente que la app JS usa para mandarle
+                     el texto del día).  -->
+        <receiver android:name=".TodayWidgetProvider" android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/today_widget_info"/>
+        </receiver>
         <!--  El <receiver .RestTimerActionReceiver> que estaba acá se ELIMINÓ:
                      declaraba una clase Java que no existe en el proyecto (quedó de
                      una versión vieja que planeaba botones +15s/Saltar en la
