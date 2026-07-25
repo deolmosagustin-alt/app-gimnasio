@@ -11,7 +11,7 @@ import {
   Mail, Clock, ChevronRight, Edit3, Info, Plus, Sun, Moon,
   Target, Award, Activity, ArrowDown, HelpCircle, List, LayoutGrid,
   Sparkles, Layers, SlidersHorizontal, UserCog,
-  Share2, Download, Link2, Copy, BellOff, Send, Mic, Ruler, Camera, Link, Footprints, Star, SquarePlay, Upload, RefreshCw, Timer,
+  Share2, Download, Link2, Copy, BellOff, Send, Mic, Ruler, Camera, Link, Footprints, Star, SquarePlay, Upload, RefreshCw, Timer, Percent,
 } from "lucide-react";
 import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signOut, onAuthStateChanged } from "firebase/auth";
 import { Capacitor, registerPlugin } from "@capacitor/core";
@@ -452,7 +452,7 @@ const DEFAULT_SETTINGS = {
   // Qué mostrar en la ficha de registro (reps/kg). Todo apagado por
   // default: la ficha arranca mínima (solo reps/kg) y cada quien prende
   // lo que realmente va a usar, en vez de tener que apagar seis cosas.
-  showRpe: false, showWarmup: false, show1RMPercent: false, showCoaching: false, showExerciseNote: false, showPersonalNote: false, showStagnation: false,
+  showRpe: false, showWarmup: false, show1RMPercent: false, showCoaching: false, showExerciseNote: false, showPersonalNote: false, showStagnation: false, showProgressionSuggestion: false,
   // Al guardar una serie, arrancar solo el cronómetro de descanso. Apagado
   // por default: es un cambio de comportamiento (no solo de qué se ve), así
   // que preferimos que lo prendas vos a que te aparezca activado de golpe.
@@ -4123,7 +4123,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
                 rango de reps, o sumar una rep más si todavía no. No se
                 muestra en descarga (ahí manda la sugerencia de descarga, que
                 pide MENOS peso, no más) ni sin historial (nada que sugerir). */}
-            {!deloadMode && history.length > 0 && (() => {
+            {!deloadMode && fieldSettings.showProgressionSuggestion === true && history.length > 0 && (() => {
               const last = history.reduce((a, b) => (a.date > b.date ? a : b));
               const repTop = repRangeTop(setDef.repRange);
               const hitTop = !isNaN(repTop) && last.reps >= repTop;
@@ -4666,7 +4666,13 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
         {DAY_ORDER.map((k) => (
           <button key={k} onClick={() => setActiveDay(k)} title={ROUTINE[k].label} className="py-2.5 px-1 rounded-xl text-[10px] font-black uppercase transition-all active:scale-95 border text-center leading-tight min-w-0"
             style={activeDay === k ? { background: ROUTINE[k].color, borderColor: ROUTINE[k].color, color: "#fff", boxShadow: `0 4px 14px -4px ${tint(ROUTINE[k].color, "66")}` } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
-            <span className="block truncate">{ROUTINE[k].label}</span>
+            {/* line-clamp-2 en vez de truncate: nombres combinados como
+                "Hombros/Brazos" tienen que poder leerse enteros aunque
+                ocupen 2 líneas — cortarlos a "HOMBRO/…" en una sola línea
+                los vuelve ilegibles. Recién si ni en 2 líneas entra (un
+                nombre propio larguísimo) se corta con "…", como red de
+                seguridad. */}
+            <span className="block" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{ROUTINE[k].label}</span>
           </button>
         ))}
       </div>
@@ -5044,16 +5050,23 @@ function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [], weekSche
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-2 flex-wrap">
+        {/* Calendario/Lista: antes tenían texto ("Calendario"/"Lista"), pero
+            ese texto era justo lo que le quitaba el lugar a los chips de
+            días/racha cuando la racha llega a 3 dígitos — con solo el ícono
+            (ya inequívoco: grilla vs. lista) sobra espacio de sobra para que
+            los chips crezcan sin que la fila necesite partirse en dos. */}
         <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60 w-fit shrink-0">
           {[{ k: "calendar", icon: <LayoutGrid size={13} />, l: "Calendario" }, { k: "list", icon: <List size={13} />, l: "Lista" }].map((opt) => (
-            <button key={opt.k} onClick={() => setView(opt.k)} className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-[11px] font-bold transition-all whitespace-nowrap ${view === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.icon}{opt.l}</button>
+            <button key={opt.k} onClick={() => setView(opt.k)} aria-label={opt.l} title={opt.l} className={`flex items-center px-3 py-2 rounded-lg transition-all ${view === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.icon}</button>
           ))}
         </div>
         {/* Días entrenados y racha — compactos, acoplados al historial.
-            shrink-0 + whitespace-nowrap en cada chip: con racha/días de 3
-            dígitos (100+, nada raro en un usuario constante) el texto no se
-            puede achicar ni partir — si no entra en la fila, esta se
-            envuelve entera (flex-wrap arriba) en vez de aplastar el chip. */}
+            shrink-0 + whitespace-nowrap en cada chip: el texto no se puede
+            achicar ni partir aunque el número llegue a 3 dígitos (100+ días
+            o de racha, nada raro en un usuario constante). El flex-wrap de
+            arriba queda solo como red de seguridad (texto agrandado al
+            máximo, etc.) — con el toggle de al lado ahora solo ícono, en el
+            uso normal esta fila nunca necesita partirse en dos. */}
         <div className="flex gap-1.5 shrink-0">
           <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900/60 border border-slate-800/60 shrink-0 whitespace-nowrap">
             <Calendar size={11} className="text-blue-400 shrink-0" />
@@ -5271,7 +5284,9 @@ function DeloadView({ logs, settings = DEFAULT_SETTINGS, deloadProgress = {}, se
             <button key={dk} onClick={() => setActiveDay(dk)} title={d.label}
               className="py-2.5 px-1 rounded-xl text-[10px] font-black uppercase transition-all active:scale-95 border text-center leading-tight min-w-0"
               style={isActive ? { backgroundColor: tint(d.color, "22"), borderColor: tint(d.color, "55"), color: d.color } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
-              <span className="block truncate">{d.label}</span>
+              {/* line-clamp-2: ver comentario en RoutineView — "Hombros/Brazos"
+                  tiene que leerse entero, aunque sea en 2 líneas. */}
+              <span className="block" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{d.label}</span>
               {withPR > 0 && <span className="text-[8px] font-black opacity-70">{withPR}/{d.exercises.length}</span>}
             </button>
           );
@@ -7160,6 +7175,32 @@ function ExportTrainingCard({ profileName, logs, trainingSessions = [] }) {
   );
 }
 
+// Fila de toggle reutilizable para Perfil — antes cada switch era su propio
+// bloque de JSX duplicado (10 veces entre "Qué ves al registrar" y los dos
+// de "Recordatorio de entrenamiento"), cada uno con su propio hardcodeo de
+// color. Un solo componente, con una placa de ícono a la izquierda (el
+// mismo lenguaje visual que ya usan las tarjetas de ejercicio y de rutina),
+// deja todos los switches de Perfil consistentes entre sí y con el resto
+// de la app de una sola vez.
+function ToggleRow({ icon, label, desc, on, onToggle, accent = "#14B8A6" }) {
+  return (
+    <button onClick={onToggle} className="w-full flex items-center gap-3 rounded-2xl px-3.5 py-3 transition active:scale-[0.99]" style={on ? { backgroundColor: tint(accent, "14"), border: `1px solid ${tint(accent, "40")}` } : { backgroundColor: "var(--row-surface)", border: "1px solid #33415580" }}>
+      {icon && (
+        <span className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-colors" style={{ backgroundColor: on ? tint(accent, "22") : "var(--surface-2)", color: on ? accent : "#64748b" }}>
+          {icon}
+        </span>
+      )}
+      <div className="text-left min-w-0 flex-1">
+        <p className="text-xs font-bold transition-colors" style={{ color: on ? accent : "#94a3b8" }}>{label}</p>
+        {desc && <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">{desc}</p>}
+      </div>
+      <span className="w-11 h-6 rounded-full shrink-0 relative transition-colors" style={{ backgroundColor: on ? accent : "var(--surface-2)" }}>
+        <span className="absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-all" style={{ left: on ? "22px" : "2px" }} />
+      </span>
+    </button>
+  );
+}
+
 /* ============================================================================
    PROFILE VIEW — adds an entry point to the setup hub + a backup status line
 ============================================================================ */
@@ -7181,7 +7222,14 @@ function CollapsibleSection({ title, subtitle, icon, defaultOpen = false, childr
   return (
     <div ref={selfRef} id={sectionId || undefined} className="bg-slate-900/50 border border-slate-800/50 rounded-2xl overflow-hidden backdrop-blur-sm shadow-md shadow-black/20">
       <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-slate-800/30 active:bg-slate-800/50">
-        {icon && <span className="shrink-0" style={{ color: accent || "var(--chip-text)" }}>{icon}</span>}
+        {/* Placa de ícono en vez de ícono suelto — mismo lenguaje visual que
+            ya usan las tarjetas de ejercicio/rutina y los ToggleRow de acá
+            abajo, en vez de quedar como el único ícono "pelado" de Perfil. */}
+        {icon && (
+          <span className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: tint(accent || "#64748b", "18"), color: accent || "var(--chip-text)" }}>
+            {icon}
+          </span>
+        )}
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold text-white">{title}</p>
           {subtitle && <p className="text-[11px] text-slate-500 mt-0.5 truncate">{subtitle}</p>}
@@ -7475,7 +7523,7 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
         </div>
       </CollapsibleSection>
 
-      <CollapsibleSection sectionId="field-settings-section" forceOpenSignal={openSectionSignal.id === "field-settings-section" ? openSectionSignal.n : 0} title="Qué ves al registrar" subtitle={(() => { const on = [settings.showRpe !== false, settings.showWarmup !== false, settings.show1RMPercent !== false, settings.showCoaching !== false, settings.showExerciseNote !== false, settings.showPersonalNote !== false, settings.showStagnation === true].filter(Boolean).length; return on === 7 ? "Todo activado" : `${on} de 7 opciones activadas`; })()} icon={<Sliders size={16} />} accent="#14B8A6">
+      <CollapsibleSection sectionId="field-settings-section" forceOpenSignal={openSectionSignal.id === "field-settings-section" ? openSectionSignal.n : 0} title="Qué ves al registrar" subtitle={(() => { const on = [settings.showRpe !== false, settings.showWarmup !== false, settings.show1RMPercent !== false, settings.showCoaching !== false, settings.showExerciseNote !== false, settings.showPersonalNote !== false, settings.showStagnation === true, settings.showProgressionSuggestion === true].filter(Boolean).length; return on === 8 ? "Todo activado" : `${on} de 8 opciones activadas`; })()} icon={<Sliders size={16} />} accent="#14B8A6">
         <div className="space-y-2">
           <p className="text-[10px] text-slate-500 leading-snug mb-1">Apagá lo que no uses y la ficha de registro queda más limpia. No se pierde ningún dato: podés volver a prenderlo cuando quieras.</p>
           {/* Recomendación: con las 6 prendidas la ficha se satura. */}
@@ -7491,42 +7539,29 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
             </button>
           )}
           {[
-            { key: "showWarmup", label: "Calentamiento sugerido", desc: "La rampa de series previas (50% → 70% → 85%)." },
-            { key: "showRpe", label: "Esfuerzo (RPE)", desc: "El botón para registrar qué tan duro fue." },
-            { key: "show1RMPercent", label: "Porcentaje de 1RM", desc: "A qué % de tu récord estás levantando." },
-            { key: "showCoaching", label: "Consejos al guardar", desc: "El mensaje 📈/✓/📉 comparando con tu marca." },
-            { key: "showExerciseNote", label: "Consejos del ejercicio", desc: "La nota con la técnica debajo del nombre del ejercicio." },
-            { key: "showPersonalNote", label: "Notas por serie", desc: "El botón para escribir un recordatorio en cada serie." },
-            { key: "showStagnation", label: "Aviso de estancamiento", desc: `El cartel "ESTANCADO" si llevás ${STAGNATION_DAYS}+ días sin superar el récord de un ejercicio.` },
-            { key: "autoStartRestTimer", label: "Cronómetro automático", desc: "Al guardar la serie, arranca solo el descanso. No aplica dentro de superseries." },
-          ].map(({ key, label, desc }) => {
+            { key: "showWarmup", icon: <Flame size={16} />, label: "Calentamiento sugerido", desc: "La rampa de series previas (50% → 70% → 85%)." },
+            { key: "showRpe", icon: <Activity size={16} />, label: "Esfuerzo (RPE)", desc: "El botón para registrar qué tan duro fue." },
+            { key: "show1RMPercent", icon: <Percent size={16} />, label: "Porcentaje de 1RM", desc: "A qué % de tu récord estás levantando." },
+            { key: "showCoaching", icon: <Info size={16} />, label: "Consejos al guardar", desc: "El mensaje 📈/✓/📉 comparando con tu marca." },
+            { key: "showExerciseNote", icon: <StickyNote size={16} />, label: "Consejos del ejercicio", desc: "La nota con la técnica debajo del nombre del ejercicio." },
+            { key: "showPersonalNote", icon: <Edit3 size={16} />, label: "Notas por serie", desc: "El botón para escribir un recordatorio en cada serie." },
+            { key: "showStagnation", icon: <AlertTriangle size={16} />, label: "Aviso de estancamiento", desc: `El cartel "ESTANCADO" si llevás ${STAGNATION_DAYS}+ días sin superar el récord de un ejercicio.` },
+            { key: "showProgressionSuggestion", icon: <Target size={16} />, label: "Progresión sugerida", desc: "El cartel \"Probá hoy: X×Ykg\" antes de cargar la serie, basado en tu última vez." },
+            { key: "autoStartRestTimer", icon: <Timer size={16} />, label: "Cronómetro automático", desc: "Al guardar la serie, arranca solo el descanso. No aplica dentro de superseries." },
+          ].map(({ key, icon, label, desc }) => {
             const on = settings[key] !== false;
-            return (
-              <button key={key} onClick={() => updateSettings({ [key]: !on })} className="w-full flex items-center justify-between gap-3 rounded-xl px-3.5 py-2.5 transition active:scale-[0.99]" style={on ? { backgroundColor: "#14B8A614", border: "1px solid #14B8A640" } : { backgroundColor: "var(--row-surface)", border: "1px solid #33415580" }}>
-                <div className="text-left min-w-0">
-                  <p className="text-xs font-bold" style={{ color: on ? "#2DD4BF" : "#94a3b8" }}>{label}</p>
-                  <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">{desc}</p>
-                </div>
-                <span className="w-11 h-6 rounded-full shrink-0 relative transition-colors" style={{ backgroundColor: on ? "#14B8A6" : "var(--surface-2)" }}>
-                  <span className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all" style={{ left: on ? "22px" : "2px" }} />
-                </span>
-              </button>
-            );
+            return <ToggleRow key={key} icon={icon} label={label} desc={desc} on={on} onToggle={() => updateSettings({ [key]: !on })} accent="#14B8A6" />;
           })}
         </div>
       </CollapsibleSection>
 
       <CollapsibleSection title="Recordatorio de entrenamiento" subtitle={settings.reminderEnabled ? `Todos los días de rutina a las ${settings.reminderTime}` : "Desactivado"} icon={<Bell size={16} />} accent="#F59E0B">
         <div className="space-y-3">
-          <button onClick={() => updateSettings({ reminderEnabled: !settings.reminderEnabled })} className="w-full flex items-center justify-between gap-3 rounded-xl px-3.5 py-3 transition active:scale-[0.99]" style={settings.reminderEnabled ? { backgroundColor: "#F59E0B14", border: "1px solid #F59E0B40" } : { backgroundColor: "var(--row-surface)", border: "1px solid #33415580" }}>
-            <div className="text-left min-w-0">
-              <p className="text-xs font-bold" style={{ color: settings.reminderEnabled ? "#FBBF24" : "#94a3b8" }}>Avisarme los días que entreno</p>
-              <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">Solo los días con rutina en tu agenda semanal — los de descanso no molestan.</p>
-            </div>
-            <span className="w-11 h-6 rounded-full shrink-0 relative transition-colors" style={{ backgroundColor: settings.reminderEnabled ? "#F59E0B" : "var(--surface-2)" }}>
-              <span className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all" style={{ left: settings.reminderEnabled ? "22px" : "2px" }} />
-            </span>
-          </button>
+          <ToggleRow
+            icon={<Bell size={16} />} label="Avisarme los días que entreno"
+            desc="Solo los días con rutina en tu agenda semanal — los de descanso no molestan."
+            on={settings.reminderEnabled} onToggle={() => updateSettings({ reminderEnabled: !settings.reminderEnabled })} accent="#F59E0B"
+          />
           {settings.reminderEnabled && (
             <div className="bounce-in">
               <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Hora del aviso</p>
@@ -7534,15 +7569,11 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
               <p className="text-[10px] text-slate-600 mt-2">Si hoy ya pasó esa hora, el primer aviso llega el próximo día de rutina.</p>
             </div>
           )}
-          <button onClick={() => updateSettings({ weeklyRecapEnabled: !settings.weeklyRecapEnabled })} className="w-full flex items-center justify-between gap-3 rounded-xl px-3.5 py-3 transition active:scale-[0.99]" style={settings.weeklyRecapEnabled !== false ? { backgroundColor: "#F59E0B14", border: "1px solid #F59E0B40" } : { backgroundColor: "var(--row-surface)", border: "1px solid #33415580" }}>
-            <div className="text-left min-w-0">
-              <p className="text-xs font-bold" style={{ color: settings.weeklyRecapEnabled !== false ? "#FBBF24" : "#94a3b8" }}>Resumen semanal</p>
-              <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">Días, series y volumen de la semana — aparece al terminar de entrenar el domingo (o el domingo a la tarde si no entrenás ese día).</p>
-            </div>
-            <span className="w-11 h-6 rounded-full shrink-0 relative transition-colors" style={{ backgroundColor: settings.weeklyRecapEnabled !== false ? "#F59E0B" : "var(--surface-2)" }}>
-              <span className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all" style={{ left: settings.weeklyRecapEnabled !== false ? "22px" : "2px" }} />
-            </span>
-          </button>
+          <ToggleRow
+            icon={<BarChart3 size={16} />} label="Resumen semanal"
+            desc="Días, series y volumen de la semana — aparece al terminar de entrenar el domingo (o el domingo a la tarde si no entrenás ese día)."
+            on={settings.weeklyRecapEnabled !== false} onToggle={() => updateSettings({ weeklyRecapEnabled: !(settings.weeklyRecapEnabled !== false) })} accent="#F59E0B"
+          />
         </div>
       </CollapsibleSection>
 
@@ -10694,6 +10725,7 @@ function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
     { key: "showExerciseNote", label: "Consejos del ejercicio", desc: "La nota con la técnica que aparece debajo del nombre del ejercicio." },
     { key: "showPersonalNote", label: "Notas por serie", desc: "El botón para escribir tu propio recordatorio en cada serie." },
     { key: "showStagnation", label: "Aviso de estancamiento", desc: `El cartel "ESTANCADO" si llevás ${STAGNATION_DAYS}+ días sin superar el récord de un ejercicio.` },
+    { key: "showProgressionSuggestion", label: "Progresión sugerida", desc: "El cartel \"Probá hoy: X×Ykg\" antes de cargar la serie, basado en tu última vez." },
     { key: "autoStartRestTimer", label: "Cronómetro automático", desc: "Al guardar la serie, arranca solo el descanso — no hace falta tocar play. (No aplica dentro de superseries.)" },
   ];
 
