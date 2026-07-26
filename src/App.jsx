@@ -3197,41 +3197,69 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default", 
    el botón (?) del header, arrancando en la pestaña en la que estás.
 ============================================================================ */
 
+// Cada capítulo: una frase de entrada + 3 bullets cortos. Antes era un
+// párrafo denso de 3-4 oraciones — mucho más rápido de escanear como lista
+// que de leer como bloque de texto.
 const HELP_CHAPTERS = [
   {
     key: "rutina",
     label: "Rutina",
     color: "#14B8A6",
     icon: <Dumbbell size={16} />,
-    description: "Acá registrás cada sesión: elegí el día y anotá reps y kg de cada serie — la app detecta tus récords sola y festeja con confetti. Tenés cronómetro de descanso, calentamiento sugerido, entrenamiento por % de tu 1RM y notas por serie. En Perfil → \"Qué ves al registrar\" podés simplificar la ficha apagando lo que no uses. Si te equivocás, \"Resetear sesión de hoy\" borra solo lo de hoy sin tocar tus récords.",
+    intro: "Acá registrás tu entrenamiento del día.",
+    bullets: [
+      "Anotá reps y kg — detecta tus récords sola",
+      "Cronómetro de descanso y calentamiento sugerido",
+      "\"Resetear sesión de hoy\" corrige un error sin tocar tus récords",
+    ],
   },
   {
     key: "progreso",
     label: "Progreso",
     color: "#3B82F6",
     icon: <BarChart3 size={16} />,
-    description: "Tu evolución completa: el muñeco muscular pinta cada músculo según tu rango (de Bronce a Maestro) y sube solo con cada récord nuevo. También ves tu ciclo de entrenamiento, estadísticas generales (días, racha, series, volumen), medidas y fotos comparables, y el historial de sesiones en calendario o lista. Todo lo podés compartir como imagen.",
+    intro: "Acá ves toda tu evolución.",
+    bullets: [
+      "El muñeco pinta cada músculo según tu rango",
+      "Estadísticas, medidas, fotos e historial de sesiones",
+      "Todo se puede compartir como imagen",
+    ],
   },
   {
     key: "rutinas",
     label: "Rutinas",
     color: "#A855F7",
     icon: <Layers size={16} />,
-    description: "Elegí una rutina preestablecida, creá la tuya desde cero o importala desde un PDF, Excel o Word. Podés poner un rango de reps distinto por serie, vincular ejercicios en superserie y reordenar arrastrando. Editá, activá o borrá cualquier rutina cuando quieras.",
+    intro: "Acá armás tu plan de entrenamiento.",
+    bullets: [
+      "Elegí una preestablecida, creá la tuya o importala",
+      "Rango de reps por serie y superseries",
+      "Reordená arrastrando, editá o borrá cuando quieras",
+    ],
   },
   {
     key: "entrenador_ia",
     label: "IA",
     color: "#14B8A6",
     icon: <Sparkles size={16} />,
-    description: "Un coach que conoce tus marcas, tu volumen y tus descansos reales — te responde con TUS datos, no con generalidades. Puede crear o ajustar rutinas, analizar tu progreso, planificarte el día y resolver dudas de técnica, siempre mostrándote una vista previa antes de aplicar cualquier cambio. Los chips de abajo insertan preguntas comunes con un toque, y podés dictar por voz en vez de escribir.",
+    intro: "Un coach que conoce tus datos reales.",
+    bullets: [
+      "Crea o ajusta rutinas y analiza tu progreso",
+      "Te muestra una vista previa antes de aplicar algo",
+      "Podés escribirle o dictarle por voz",
+    ],
   },
   {
     key: "perfil",
     label: "Perfil",
     color: "#F59E0B",
     icon: <UserCog size={16} />,
-    description: "Tus datos, la configuración de la app y tu cuenta. Ahí configurás tu ciclo y descarga, el descanso entre series, recordatorios de entrenamiento, apariencia (tema, unidad de peso, tamaño de letra) y qué ves al registrar. También exportás tu entrenamiento a PDF, Word o Excel, y vinculás tu cuenta con Google para tener todo respaldado.",
+    intro: "Tus datos, tu cuenta y la configuración de la app.",
+    bullets: [
+      "Ciclo, descarga, descansos y recordatorios",
+      "Apariencia: tema, unidad de peso, tamaño de letra",
+      "Exportá tu entrenamiento o vinculá Google",
+    ],
   },
 ];
 
@@ -3246,14 +3274,14 @@ const WELCOME_SLIDES = [
   {
     icon: <Flame size={38} />,
     color: "#14B8A6",
-    title: "¡Bienvenido a Modus Fit!",
-    text: "Registrá reps y kilos en segundos — la app detecta tus récords sola y arma tu progreso.",
+    title: "¡Bienvenido a Modus Fit! 💪",
+    text: "Anotá reps y kilos en segundos. Nosotros nos encargamos de detectar tus récords y armar tu progreso.",
   },
   {
     icon: <Sparkles size={38} />,
     color: "#14B8A6",
     title: "Tu entrenador con IA",
-    text: "Un coach que ve tus datos reales y te da consejos concretos, no genéricos.",
+    text: "Conoce tus datos reales y te da consejos concretos — nada de respuestas genéricas.",
   },
 ];
 
@@ -3508,10 +3536,13 @@ function HelpModal({ startTab, onClose }) {
           </div>
         </div>
 
-        {/* Cuerpo: ícono grande + un párrafo. Nada de pasos ni demos en vivo
-            — se cambia de pestaña tocando los chips de arriba. */}
+        {/* Cuerpo: ícono grande + una frase + 3 viñetas cortas. Nada de pasos
+            ni demos en vivo — se cambia de pestaña tocando los chips de
+            arriba. Viñetas en vez de un párrafo: se escanean de un vistazo
+            en vez de tener que leer un bloque entero para encontrar el dato
+            que buscabas. */}
         <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-6" style={{ minHeight: 0 }}>
-          <div key={chapter.key} className="flex flex-col items-center text-center gap-3 tab-fade-in">
+          <div key={chapter.key} className="flex flex-col items-center text-center gap-2.5 tab-fade-in">
             <div className="relative mt-1">
               <div className="absolute inset-0 rounded-3xl blur-2xl scale-150 pointer-events-none" style={{ backgroundColor: tint(chapter.color, "20") }} />
               <div className="relative w-16 h-16 rounded-3xl flex items-center justify-center elastic-in" style={{ backgroundColor: tint(chapter.color, "18"), border: `1px solid ${tint(chapter.color, "35")}`, color: chapter.color, boxShadow: `0 10px 30px -10px ${tint(chapter.color, "60")}` }}>
@@ -3519,7 +3550,15 @@ function HelpModal({ startTab, onClose }) {
               </div>
             </div>
             <h3 className="text-lg font-black text-white leading-tight">{chapter.label}</h3>
-            <p className="text-sm text-slate-400 leading-relaxed">{chapter.description}</p>
+            <p className="text-sm text-slate-400">{chapter.intro}</p>
+            <ul className="w-full text-left space-y-2.5 mt-2 rounded-2xl p-3.5" style={{ backgroundColor: "var(--panel-sunken)" }}>
+              {chapter.bullets.map((b, i) => (
+                <li key={i} className="flex items-start gap-2.5 text-[13px] text-slate-300 leading-snug">
+                  <span className="mt-1.5 w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: chapter.color }} />
+                  {b}
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
 
@@ -5071,7 +5110,7 @@ function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [], weekSche
           <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900/60 border border-slate-800/60 shrink-0 whitespace-nowrap">
             <Calendar size={11} className="text-blue-400 shrink-0" />
             <span className="text-xs font-black text-white tabular-nums">{miniStats.days}</span>
-            <span className="text-[9px] text-slate-500 font-semibold">días</span>
+            <span className="text-[9px] text-slate-500 font-semibold">{miniStats.days === 1 ? "día" : "días"}</span>
           </div>
           <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-900/60 border border-slate-800/60 shrink-0 whitespace-nowrap">
             <span className="text-[11px]">🔥</span>
@@ -7259,6 +7298,21 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
   const adjustRest = (key, delta) => updateSettings({ [key]: Math.min(600, Math.max(30, settings[key] + delta)) });
   const adjustSetting = (key, delta, min, max) => updateSettings({ [key]: Math.min(max, Math.max(min, settings[key] + delta)) });
   const adjustDeloadPct = (delta) => updateSettings({ deloadPct: Math.min(0.95, Math.max(0.5, Math.round((settings.deloadPct + delta) * 100) / 100)) });
+  // Navegación desde "Personalizar qué ves al registrar" (Rutina): antes
+  // scrolleaba hasta la sección y la abría (CollapsibleSection). Ahora esa
+  // fila es directamente el botón del modal de vista previa, así que el
+  // equivalente es scrollear hasta ahí Y abrir el modal de una — sin el
+  // paso extra de "encontrar la fila y después tocarla".
+  const fieldSettingsRowRef = useRef(null);
+  useEffect(() => {
+    if (openSectionSignal.id !== "field-settings-section" || openSectionSignal.n <= 0) return;
+    const t = setTimeout(() => {
+      try { fieldSettingsRowRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); } catch { /* ignorado a propósito */ }
+      onOpenFieldPreview?.();
+    }, 120);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openSectionSignal]);
   const handleDeleteConfirm = (pin) => { if (profile.pin && pin !== profile.pin) { setDeleteError("PIN incorrecto."); setTimeout(() => setDeleteError(""), 1500); } else { onDelete(); } };
   const initial = profileName.charAt(0).toUpperCase();
   const activeRoutineDef = resolveRoutineDef(profile?.routines?.[profile?.activeRoutineId], profile?.activeRoutineId);
@@ -7523,37 +7577,28 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
         </div>
       </CollapsibleSection>
 
-      <CollapsibleSection sectionId="field-settings-section" forceOpenSignal={openSectionSignal.id === "field-settings-section" ? openSectionSignal.n : 0} title="Qué ves al registrar" subtitle={(() => { const on = [settings.showRpe !== false, settings.showWarmup !== false, settings.show1RMPercent !== false, settings.showCoaching !== false, settings.showExerciseNote !== false, settings.showPersonalNote !== false, settings.showStagnation === true, settings.showProgressionSuggestion === true].filter(Boolean).length; return on === 8 ? "Todo activado" : `${on} de 8 opciones activadas`; })()} icon={<Sliders size={16} />} accent="#14B8A6">
-        <div className="space-y-2">
-          <p className="text-[10px] text-slate-500 leading-snug mb-1">Apagá lo que no uses y la ficha de registro queda más limpia. No se pierde ningún dato: podés volver a prenderlo cuando quieras.</p>
-          {/* Recomendación: con las 6 prendidas la ficha se satura. */}
-          <div className="flex items-start gap-2 rounded-xl px-2.5 py-2 mb-1" style={{ backgroundColor: "rgba(20,184,166,0.10)", border: "1px solid rgba(20,184,166,0.25)" }}>
-            <Info size={12} className="text-teal-400 mt-0.5 shrink-0" />
-            <p className="text-[10px] text-teal-200/90 leading-snug"><span className="font-black">Recomendado:</span> dejá prendido solo lo que uses. Con todo activado la ficha se llena de botones y cuesta encontrar lo importante.</p>
-          </div>
-          {/* Abre el modal con vista previa en vivo: los cambios se ven al
-              instante sobre una ficha de ejemplo. */}
-          {onOpenFieldPreview && (
-            <button onClick={onOpenFieldPreview} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-[11px] font-bold transition active:scale-[0.98] mb-1" style={{ backgroundColor: "rgba(20,184,166,0.12)", color: "#2dd4bf", border: "1px solid rgba(20,184,166,0.3)" }}>
-              <Eye size={13} /> Ver cambios en tiempo real
-            </button>
-          )}
-          {[
-            { key: "showWarmup", icon: <Flame size={16} />, label: "Calentamiento sugerido", desc: "La rampa de series previas (50% → 70% → 85%)." },
-            { key: "showRpe", icon: <Activity size={16} />, label: "Esfuerzo (RPE)", desc: "El botón para registrar qué tan duro fue." },
-            { key: "show1RMPercent", icon: <Percent size={16} />, label: "Porcentaje de 1RM", desc: "A qué % de tu récord estás levantando." },
-            { key: "showCoaching", icon: <Info size={16} />, label: "Consejos al guardar", desc: "El mensaje 📈/✓/📉 comparando con tu marca." },
-            { key: "showExerciseNote", icon: <StickyNote size={16} />, label: "Consejos del ejercicio", desc: "La nota con la técnica debajo del nombre del ejercicio." },
-            { key: "showPersonalNote", icon: <Edit3 size={16} />, label: "Notas por serie", desc: "El botón para escribir un recordatorio en cada serie." },
-            { key: "showStagnation", icon: <AlertTriangle size={16} />, label: "Aviso de estancamiento", desc: `El cartel "ESTANCADO" si llevás ${STAGNATION_DAYS}+ días sin superar el récord de un ejercicio.` },
-            { key: "showProgressionSuggestion", icon: <Target size={16} />, label: "Progresión sugerida", desc: "El cartel \"Probá hoy: X×Ykg\" antes de cargar la serie, basado en tu última vez." },
-            { key: "autoStartRestTimer", icon: <Timer size={16} />, label: "Cronómetro automático", desc: "Al guardar la serie, arranca solo el descanso. No aplica dentro de superseries." },
-          ].map(({ key, icon, label, desc }) => {
-            const on = settings[key] !== false;
-            return <ToggleRow key={key} icon={icon} label={label} desc={desc} on={on} onToggle={() => updateSettings({ [key]: !on })} accent="#14B8A6" />;
-          })}
+      {/* "Qué ves al registrar" ya no se expande acá adentro — son 8
+          opciones, demasiado para una lista ciega sin ver el efecto. Todo
+          eso vive en el modal de vista previa en vivo (ve el cambio sobre
+          una ficha de ejemplo mientras lo tocás), así que esta fila es
+          directamente el botón que lo abre. */}
+      <button
+        ref={fieldSettingsRowRef}
+        id="field-settings-section"
+        onClick={onOpenFieldPreview}
+        className="w-full bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 backdrop-blur-sm shadow-md shadow-black/20 flex items-center gap-3 text-left transition-colors hover:bg-slate-800/30 active:bg-slate-800/50"
+      >
+        <span className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: tint("#14B8A6", "18"), color: "#14B8A6" }}>
+          <Sliders size={16} />
+        </span>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-bold text-white">Qué ves al registrar</p>
+          <p className="text-[11px] text-slate-500 mt-0.5">
+            {(() => { const on = [settings.showRpe !== false, settings.showWarmup !== false, settings.show1RMPercent !== false, settings.showCoaching !== false, settings.showExerciseNote !== false, settings.showPersonalNote !== false, settings.showStagnation === true, settings.showProgressionSuggestion === true].filter(Boolean).length; return on === 8 ? "Todo activado" : `${on} de 8 activadas`; })()} · vista previa en vivo
+          </p>
         </div>
-      </CollapsibleSection>
+        <Eye size={16} className="text-slate-500 shrink-0" />
+      </button>
 
       <CollapsibleSection title="Recordatorio de entrenamiento" subtitle={settings.reminderEnabled ? `Todos los días de rutina a las ${settings.reminderTime}` : "Desactivado"} icon={<Bell size={16} />} accent="#F59E0B">
         <div className="space-y-3">
@@ -10718,15 +10763,15 @@ function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
   const s = settings || DEFAULT_SETTINGS;
   const on = (k) => s[k] !== false;
   const OPCIONES = [
-    { key: "showWarmup", label: "Calentamiento sugerido", desc: "Una rampa de series previas calculada desde tu marca (50% → 70% → 85%). Útil en ejercicios pesados." },
-    { key: "showRpe", label: "Esfuerzo (RPE)", desc: "Registrá del 1 al 10 qué tan duro fue. Sirve para saber si podés subir peso o conviene bajar." },
-    { key: "show1RMPercent", label: "Porcentaje de 1RM", desc: "A qué porcentaje de tu récord estás levantando ahora mismo." },
-    { key: "showCoaching", label: "Consejos al guardar", desc: "Un mensaje corto comparando la serie con tu marca (📈 subiste, ✓ igualaste, 📉 bajaste)." },
-    { key: "showExerciseNote", label: "Consejos del ejercicio", desc: "La nota con la técnica que aparece debajo del nombre del ejercicio." },
-    { key: "showPersonalNote", label: "Notas por serie", desc: "El botón para escribir tu propio recordatorio en cada serie." },
-    { key: "showStagnation", label: "Aviso de estancamiento", desc: `El cartel "ESTANCADO" si llevás ${STAGNATION_DAYS}+ días sin superar el récord de un ejercicio.` },
-    { key: "showProgressionSuggestion", label: "Progresión sugerida", desc: "El cartel \"Probá hoy: X×Ykg\" antes de cargar la serie, basado en tu última vez." },
-    { key: "autoStartRestTimer", label: "Cronómetro automático", desc: "Al guardar la serie, arranca solo el descanso — no hace falta tocar play. (No aplica dentro de superseries.)" },
+    { key: "showWarmup", icon: <Flame size={16} />, label: "Calentamiento sugerido", desc: "Una rampa de series previas calculada desde tu marca (50% → 70% → 85%). Útil en ejercicios pesados." },
+    { key: "showRpe", icon: <Activity size={16} />, label: "Esfuerzo (RPE)", desc: "Registrá del 1 al 10 qué tan duro fue. Sirve para saber si podés subir peso o conviene bajar." },
+    { key: "show1RMPercent", icon: <Percent size={16} />, label: "Porcentaje de 1RM", desc: "A qué porcentaje de tu récord estás levantando ahora mismo." },
+    { key: "showCoaching", icon: <Info size={16} />, label: "Consejos al guardar", desc: "Un mensaje corto comparando la serie con tu marca (📈 subiste, ✓ igualaste, 📉 bajaste)." },
+    { key: "showExerciseNote", icon: <StickyNote size={16} />, label: "Consejos del ejercicio", desc: "La nota con la técnica que aparece debajo del nombre del ejercicio." },
+    { key: "showPersonalNote", icon: <Edit3 size={16} />, label: "Notas por serie", desc: "El botón para escribir tu propio recordatorio en cada serie." },
+    { key: "showStagnation", icon: <AlertTriangle size={16} />, label: "Aviso de estancamiento", desc: `El cartel "ESTANCADO" si llevás ${STAGNATION_DAYS}+ días sin superar el récord de un ejercicio.` },
+    { key: "showProgressionSuggestion", icon: <Target size={16} />, label: "Progresión sugerida", desc: "El cartel \"Probá hoy: X×Ykg\" antes de cargar la serie, basado en tu última vez." },
+    { key: "autoStartRestTimer", icon: <Timer size={16} />, label: "Cronómetro automático", desc: "Al guardar la serie, arranca solo el descanso — no hace falta tocar play. (No aplica dentro de superseries.)" },
   ];
 
   return (
@@ -10817,20 +10862,9 @@ function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
 
           {/* ── SWITCHES ── */}
           <div className="space-y-2">
-            {OPCIONES.map((o) => {
-              const active = on(o.key);
-              return (
-                <button key={o.key} onClick={() => onUpdateSettings({ [o.key]: !active })} className="w-full flex items-start justify-between gap-3 rounded-xl px-3.5 py-2.5 text-left transition active:scale-[0.99]" style={active ? { backgroundColor: "#14B8A614", border: "1px solid #14B8A640" } : { backgroundColor: "var(--row-surface)", border: "1px solid #33415580" }}>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-bold" style={{ color: active ? "#2DD4BF" : "#94a3b8" }}>{o.label}</p>
-                    <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">{o.desc}</p>
-                  </div>
-                  <span className="w-11 h-6 rounded-full shrink-0 relative transition-colors mt-0.5" style={{ backgroundColor: active ? "#14B8A6" : "var(--surface-2)" }}>
-                    <span className="absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all" style={{ left: active ? "22px" : "2px" }} />
-                  </span>
-                </button>
-              );
-            })}
+            {OPCIONES.map((o) => (
+              <ToggleRow key={o.key} icon={o.icon} label={o.label} desc={o.desc} on={on(o.key)} onToggle={() => onUpdateSettings({ [o.key]: !on(o.key) })} accent="#14B8A6" />
+            ))}
           </div>
 
           <button onClick={onClose} className="w-full mt-4 py-3 rounded-2xl text-sm font-black !text-white transition active:scale-[0.98]" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>
