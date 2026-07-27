@@ -10642,29 +10642,44 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
             <div className="min-w-0 flex-1">
               <span className="text-[9px] font-black uppercase tracking-[0.16em] text-purple-300/90">Tu rutina activa</span>
               <h3 className="text-[17px] font-black text-white leading-tight truncate">{activeDef.name}</h3>
-              <p className="text-[10px] text-slate-400 mt-0.5 tabular-nums">
-                {activeStats.days} días · {activeStats.exercises} ejercicios · {activeStats.sets} series
-                {activeUso.sesiones > 0 && <span className="text-slate-500"> · {activeUso.sesiones} sesion{activeUso.sesiones !== 1 ? "es" : ""}</span>}
-              </p>
             </div>
             <button onClick={() => setShareTarget(activeDef)} aria-label="Compartir rutina activa" className="p-2 rounded-xl text-purple-200 hover:text-white hover:bg-white/10 transition shrink-0"><Share2 size={15} /></button>
           </div>
 
-          {/* Los días, en grilla SIMÉTRICA de 2 columnas: si son impares, el
-              último ocupa el ancho completo — nunca queda un 3 arriba y 1
-              abajo descolgado. El color del día es una franja vertical fina
-              (el lenguaje visual del resto de la app), no un puntito. */}
-          <div className="relative grid grid-cols-2 gap-1.5 mt-3.5">
+          {/* Los números, ahora en grande — antes eran una lineita de texto
+              perdida bajo el título. Mismo tratamiento que la vista previa
+              (RoutinePreviewModal), en tono violeta para no romper la paleta
+              del héroe. */}
+          <div className={`relative grid gap-1.5 mt-3.5 ${activeUso.sesiones > 0 ? "grid-cols-4" : "grid-cols-3"}`}>
+            {[
+              { v: activeStats.days, l: activeStats.days === 1 ? "Día" : "Días" },
+              { v: activeStats.exercises, l: "Ejercicios" },
+              { v: activeStats.sets, l: "Series" },
+              ...(activeUso.sesiones > 0 ? [{ v: activeUso.sesiones, l: activeUso.sesiones === 1 ? "Sesión" : "Sesiones" }] : []),
+            ].map((s) => (
+              <div key={s.l} className="rounded-xl py-2 text-center border border-purple-400/20 bg-black/25">
+                <p className="text-lg font-black text-white tabular-nums leading-none">{s.v}</p>
+                <p className="text-[8px] text-purple-300/70 mt-1 font-bold uppercase tracking-wide truncate px-0.5">{s.l}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Los días, a la misma altura que los números de arriba: grilla
+              SIMÉTRICA de 2 columnas (si son impares, el último ocupa el
+              ancho completo). El color de cada día queda como un puntito
+              discreto — identifica sin romper el violeta del héroe. */}
+          <p className="relative text-[9px] font-black uppercase tracking-[0.14em] text-purple-300/60 mt-3.5 mb-1.5 px-0.5">Tus días</p>
+          <div className="relative grid grid-cols-2 gap-1.5">
             {(() => {
               const orden = (activeDef.dayOrder || Object.keys(activeDef.days || {})).filter((dk) => activeDef.days?.[dk]);
               return orden.map((dk, i) => {
                 const d = activeDef.days[dk];
                 const ultimoImpar = i === orden.length - 1 && orden.length % 2 === 1;
                 return (
-                  <span key={dk} className={`flex items-center gap-2 pl-2 pr-2.5 py-2 rounded-xl text-[10px] font-bold bg-black/25 border border-white/[0.07] min-w-0 ${ultimoImpar ? "col-span-2" : ""}`}>
-                    <span className="w-1 self-stretch rounded-full shrink-0" style={{ backgroundColor: d.color, boxShadow: `0 0 6px -1px ${d.color}` }} />
-                    <span className="flex-1 min-w-0 leading-snug text-slate-300" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{d.label}</span>
-                    <span className="text-slate-500 tabular-nums shrink-0">{d.exercises?.length || 0}</span>
+                  <span key={dk} className={`flex items-center gap-2 px-2.5 py-2.5 rounded-xl text-[11px] font-bold bg-black/25 border border-purple-400/10 min-w-0 ${ultimoImpar ? "col-span-2" : ""}`}>
+                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: d.color, boxShadow: `0 0 5px -1px ${d.color}` }} />
+                    <span className="flex-1 min-w-0 leading-snug text-slate-200" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{d.label}</span>
+                    <span className="text-purple-300/60 tabular-nums shrink-0 text-[10px]">{d.exercises?.length || 0}</span>
                   </span>
                 );
               });
