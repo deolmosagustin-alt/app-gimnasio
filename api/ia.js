@@ -2,9 +2,14 @@
  * api/ia.js — función serverless de Vercel
  *
  * Maneja dos acciones:
- *  - { action: "chat", systemPrompt, history }  → chat del Entrenador IA
- *  - { action: "detect", text }                  → importar rutina con IA
+ *  - { action: "chat", systemPrompt, history }            → chat del Entrenador IA
+ *  - { action: "detect", text, images }                    → importar rutina con IA
+ *    `images` es opcional: array de { mimeType, data } (base64, sin el
+ *    prefijo "data:...;base64,") — fotos de la rutina, hasta 8. Gemini las
+ *    lee directo (multimodal), así que funciona con texto, fotos, o ambos
+ *    a la vez (por ejemplo, varias fotos que juntas son la rutina completa).
  *
+
  * ROBUSTEZ (fix del "la IA no contesta"): antes había UN solo modelo
  * hardcodeado (gemini-flash-latest). Google rota esos alias sin aviso y
  * las cuotas gratuitas se agotan por modelo — cuando pasaba cualquiera de
@@ -164,13 +169,23 @@ export default async function handler(req, res) {
     }
 
     if (body.action === "detect") {
-      const { text } = body;
-      if (typeof text !== "string" || !text.trim()) {
-        res.status(400).json({ error: "Falta el texto de la rutina." }); return;
+      const { text, images } = body;
+      const hasText = typeof text === "string" && text.trim().length > 0;
+      const safeImages = Array.isArray(images)
+        ? images.filter((img) => img && typeof img.data === "string" && typeof img.mimeType === "string").slice(0, 8)
+        : [];
+      if (!hasText && !safeImages.length) {
+        res.status(400).json({ error: "Falta el texto o las fotos de la rutina." }); return;
       }
-      const truncated = text.substring(0, 25000);
-      const prompt = [
-        "Analizá el siguiente texto y extraé la rutina de entrenamiento completa.",
+      // 100.000 caracteres (antes 25.000): con varios archivos combinados
+      // (varias hojas de Excel, PDFs de varias páginas, varios .txt) el texto
+      // junto supera fácil el límite viejo y se cortaba la rutina a la mitad.
+      // Los modelos de la cadena aguantan de sobra este tamaño de contexto.
+      const truncated = hasText ? text.substring(0, 100000) : "";
+      const promptLines = [
+        safeImages.length
+          ? "Analizá la rutina de entrenamiento en las imágenes y/o el texto que te paso a continuación y extraé la rutina COMPLETA."
+          : "Analizá el siguiente texto y extraé la rutina de entrenamiento completa.",
         "Devolvé ÚNICAMENTE un array JSON válido (sin texto adicional, sin markdown):",
         '[{"label": "Push", "exercises": [{"name": "Press Banca", "setsCount": 3, "repRange": "8-10"}]}]',
         "",
@@ -182,13 +197,15 @@ export default async function handler(req, res) {
         '- "3x8-10" o "3 series 8-10 reps" → setsCount=3, repRange="8-10"',
         "- Incluí TODOS los ejercicios, no omitas ninguno",
         '- Cardio (cinta, bici, elíptica): repRange = minutos (ej: "30")',
-        "",
-        "Texto:",
-        '"""',
-        truncated,
-        '"""',
-      ].join("\n");
-      const data = await callGemini({ contents: [{ parts: [{ text: prompt }] }] });
+        '- Si a un ejercicio le falta la cantidad de series y/o el rango de reps (no está escrito o no se lee bien en la foto), COMPLETALO vos con un valor típico y razonable en vez de dejarlo vacío o en 0 — 3 series de 8-10 reps para ejercicios normales, 3-4 series de 4-6 reps si es claramente un movimiento pesado/compuesto (press banca, sentadilla, peso muerto, etc. con pocas reps indicadas).',
+      ];
+      if (safeImages.length > 1 || (safeImages.length && hasText)) {
+        promptLines.push('- Puede que te pasen varias imágenes o fragmentos de texto por separado (por ejemplo, una foto por día de la rutina) — son partes de LA MISMA rutina: combiná todo en un solo array de días, no los proceses como rutinas independientes.');
+      }
+      if (hasText) { promptLines.push("", "Texto:", '"""', truncated, '"""'); }
+      const parts = [{ text: promptLines.join("\n") }];
+      safeImages.forEach((img) => { parts.push({ inlineData: { mimeType: img.mimeType, data: img.data } }); });
+      const data = await callGemini({ contents: [{ parts }] });
       const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
       res.status(200).json({ text: rawText });
       return;

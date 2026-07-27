@@ -520,7 +520,7 @@ export const PRESET_ROUTINES = [
     id: "classic_default",
     name: "PUSH / PULL / PIERNA + HOMBROS / BRAZOS",
     source: "preset",
-    description: "La rutina original de la app: empuje, tracción, pierna y un día extra de hombros y brazos.",
+    description: "Empuje, tracción, pierna y un día extra de hombros y brazos.",
     recommendation: "Pensada para entrenar 4 veces por semana, repitiendo el ciclo.",
     dayOrder: ["push", "pull", "legs", "sarm"],
     days: {
@@ -565,7 +565,7 @@ export const PRESET_ROUTINES = [
     id: "ppl",
     name: "PUSH / PULL / LEGS",
     source: "preset",
-    description: "Empuje, tracción y pierna en días separados. El split más popular para arrancar.",
+    description: "Empuje, tracción y pierna en días separados — el split más popular para arrancar.",
     recommendation: "Recomendado: 3 a 6 sesiones semanales (podés repetir el ciclo dos veces si entrenás 6 días).",
     dayOrder: ["push", "pull", "legs"],
     days: {
@@ -596,7 +596,7 @@ export const PRESET_ROUTINES = [
     id: "upper_lower",
     name: "UPPER / LOWER",
     source: "preset",
-    description: "Divide el cuerpo en tren superior e inferior. Simple y eficiente.",
+    description: "Torso un día, pierna el otro. Simple y eficiente.",
     recommendation: "Recomendado: 4 sesiones semanales alternando Torso y Pierna (ej: Lun Torso, Mar Pierna, Jue Torso, Vie Pierna).",
     dayOrder: ["upper", "lower"],
     days: {
@@ -623,7 +623,7 @@ export const PRESET_ROUTINES = [
     id: "arnold",
     name: "ARNOLD SPLIT",
     source: "preset",
-    description: "El clásico de Arnold Schwarzenegger: pecho y espalda juntos, hombros y brazos juntos, y pierna aparte.",
+    description: "El clásico de Arnold: pecho+espalda, hombros+brazos, y pierna aparte.",
     recommendation: "Para gente con buena base de entrenamiento: 3 a 6 sesiones semanales repitiendo el ciclo.",
     dayOrder: ["chest_back", "shoulders_arms", "legs"],
     days: {
@@ -656,7 +656,7 @@ export const PRESET_ROUTINES = [
     id: "bro_split",
     name: "BRO SPLIT",
     source: "preset",
-    description: "Un grupo muscular grande por día: pecho, espalda, hombros, brazos y piernas. El clásico del fisicoculturismo.",
+    description: "Un músculo grande por día — el clásico del fisicoculturismo.",
     recommendation: "Recomendado: 5 sesiones semanales, un grupo por día. Si entrenás hace poco, frecuencias de 2 veces por semana por músculo suelen rendir mejor — pero este formato sigue siendo válido y es el más tradicional para enfocarte a fondo en cada grupo.",
     dayOrder: ["chest", "back", "shoulders", "arms", "legs"],
     days: {
@@ -703,7 +703,7 @@ export const PRESET_ROUTINES = [
     id: "fullbody",
     name: "CUERPO COMPLETO",
     source: "preset",
-    description: "Trabajás todo el cuerpo en cada sesión, con tres días distintos para variar el estímulo.",
+    description: "Cuerpo completo cada sesión, con 3 variantes para no repetir.",
     recommendation: "Recomendado: 3 sesiones semanales no consecutivas (ej. Lunes, Miércoles, Viernes).",
     dayOrder: ["day_a", "day_b", "day_c"],
     days: {

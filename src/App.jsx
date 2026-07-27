@@ -11,7 +11,7 @@ import {
   Mail, Clock, ChevronRight, Edit3, Info, Plus, Sun, Moon,
   Target, Award, Activity, ArrowDown, HelpCircle, List, LayoutGrid,
   Sparkles, Layers, SlidersHorizontal, UserCog,
-  Share2, Download, Link2, Copy, BellOff, Send, Mic, Ruler, Camera, Link, Footprints, Star, SquarePlay, Upload, RefreshCw, Timer, Percent,
+  Share2, Download, Link2, Copy, BellOff, Send, Mic, Ruler, Camera, Link, Footprints, Star, SquarePlay, Upload, RefreshCw, Timer, Percent, Users,
 } from "lucide-react";
 import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signOut, onAuthStateChanged } from "firebase/auth";
 import { Capacitor, registerPlugin } from "@capacitor/core";
@@ -5411,7 +5411,7 @@ function DeloadView({ logs, settings = DEFAULT_SETTINGS, deloadProgress = {}, se
 
       <div className="flex items-start gap-3 bg-slate-900/40 border border-slate-800/40 rounded-2xl px-4 py-3.5">
         <Info size={14} className="text-slate-600 mt-0.5 shrink-0" />
-        <p className="text-[11px] text-slate-500 leading-relaxed">La descarga reduce el estrés acumulado sin perder las adaptaciones. Mantené la técnica y el ritmo, pero no busques marcas nuevas esta semana.</p>
+        <p className="text-[11px] text-slate-500 leading-relaxed">Baja el volumen para recuperarte — no busques marcas nuevas esta semana.</p>
       </div>
 
       {hasAnyDoneToday && (
@@ -5630,6 +5630,22 @@ function getMuscleRank(muscleKey, best1RM, mode = "general", bodyWeightKg = 0, s
   const threshold = thresholds[levelIdx];
   const nextThreshold = levelIdx < thresholds.length - 1 ? thresholds[levelIdx + 1] : null;
   return { ...info, levelIdx, threshold, nextThreshold, hasData: true };
+}
+
+// Percentil de fuerza ESTIMADO — no medimos población real (no tenemos esos
+// datos), pero el propio sistema de 18 escalones ya está calibrado para que
+// la mayoría caiga en los niveles bajos-medios y muy poca gente llegue a
+// Maestro, así que reusarlo como curva de percentil es razonable. Se
+// interpola entre el escalón actual y el siguiente según qué tan cerca esté
+// tu marca de subir de rango, para que no salte de a saltos bruscos.
+const RANK_PERCENTILE_BY_LEVEL = [12, 20, 28, 36, 44, 52, 60, 67, 74, 80, 85, 89, 92.5, 95, 97, 98.3, 99.2, 99.7];
+function estimateStrengthPercentile(rank) {
+  if (!rank || !rank.hasData || rank.levelIdx < 0 || !rank.best1RM) return null;
+  const base = RANK_PERCENTILE_BY_LEVEL[rank.levelIdx];
+  if (rank.nextThreshold == null || rank.threshold == null || rank.nextThreshold <= rank.threshold) return Math.round(base);
+  const nextP = rank.levelIdx + 1 < RANK_PERCENTILE_BY_LEVEL.length ? RANK_PERCENTILE_BY_LEVEL[rank.levelIdx + 1] : 99.9;
+  const frac = Math.min(1, Math.max(0, (rank.best1RM - rank.threshold) / (rank.nextThreshold - rank.threshold)));
+  return Math.round(base + (nextP - base) * frac);
 }
 
 // Mejor 1RM ESTIMADO (fórmula de Epley, igual que en Progreso) para un
@@ -6112,6 +6128,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
     : null;
   const needsWeight = mode === "relative" && !bodyWeightKg;
   const modeLabel = mode === "relative" && bodyWeightKg ? "Según tu contexto" : "General";
+  const strengthPercentile = mode === "relative" && bodyWeightKg > 0 ? estimateStrengthPercentile(selInfo) : null;
 
   // ANÁLISIS MUSCULAR: tus mejores, los que tenés que mejorar, y los que
   // no estás entrenando. Alimenta el modal del botón de análisis.
@@ -6229,6 +6246,13 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
                     )}
                   </div>
                 </div>
+
+                {strengthPercentile != null && (
+                  <div className="relative flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 mb-3.5" style={{ backgroundColor: tint(selInfo.color, "12"), border: `1px solid ${tint(selInfo.color, "28")}` }}>
+                    <Users size={14} style={{ color: selInfo.color }} className="shrink-0" />
+                    <p className="text-[11px] text-slate-300 leading-snug">Más fuerte que ~<span className="font-black text-white">{strengthPercentile}%</span> de gente con tu mismo perfil <span className="text-slate-500">(estimado)</span></p>
+                  </div>
+                )}
 
                 {selInfo.nextThreshold ? (
                   <div className="relative bg-slate-900/70 border border-slate-800/60 rounded-2xl p-3.5 backdrop-blur-sm">
@@ -7604,7 +7628,7 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
         <div className="space-y-3">
           <ToggleRow
             icon={<Bell size={16} />} label="Avisarme los días que entreno"
-            desc="Solo los días con rutina en tu agenda semanal — los de descanso no molestan."
+            desc="Solo los días con rutina, nunca en los de descanso."
             on={settings.reminderEnabled} onToggle={() => updateSettings({ reminderEnabled: !settings.reminderEnabled })} accent="#F59E0B"
           />
           {settings.reminderEnabled && (
@@ -7616,7 +7640,7 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
           )}
           <ToggleRow
             icon={<BarChart3 size={16} />} label="Resumen semanal"
-            desc="Días, series y volumen de la semana — aparece al terminar de entrenar el domingo (o el domingo a la tarde si no entrenás ese día)."
+            desc="Tu resumen de la semana, cada domingo."
             on={settings.weeklyRecapEnabled !== false} onToggle={() => updateSettings({ weeklyRecapEnabled: !(settings.weeklyRecapEnabled !== false) })} accent="#F59E0B"
           />
         </div>
@@ -7850,19 +7874,20 @@ function PresetRoutineCard({ preset, isActive, onPreview }) {
   }, [isActive]);
   return (
     <div
-      className={`bg-slate-900/50 border rounded-2xl overflow-hidden backdrop-blur-sm shadow-md shadow-black/20 transition-all hover:shadow-lg hover:shadow-black/30 ${recienActivada ? "activate-pulse" : ""}`}
-      style={{ borderColor: isActive ? tint(accent, "60") : "rgba(30,41,59,0.5)", "--pulse-color": tint(accent, "99") }}
+      className={`relative overflow-hidden border rounded-2xl backdrop-blur-sm shadow-md transition-all hover:shadow-lg ${isActive ? "border-2" : "border-slate-800/50 bg-slate-900/50 shadow-black/20 hover:shadow-black/30"} ${recienActivada ? "activate-pulse" : ""}`}
+      style={isActive ? { borderColor: tint(accent, "60"), background: `linear-gradient(135deg, ${tint(accent, "12")}, var(--panel-sunken))`, boxShadow: `0 4px 20px -4px ${tint(accent, "25")}`, "--pulse-color": tint(accent, "99") } : { "--pulse-color": tint(accent, "99") }}
     >
+      {isActive && <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full blur-2xl pointer-events-none opacity-30" style={{ backgroundColor: accent }} />}
       {/* Tocar la tarjeta abre el POP-UP con todo (días, ejercicios, balance
           y el botón de usar). Antes se expandía inline mostrando lo mismo que
           el pop-up: información duplicada y más toques para cerrar todo. */}
-      <button onClick={onPreview} className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-slate-800/30 transition active:opacity-80">
-        <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: tint(accent, "1c"), color: accent }}>
+      <button onClick={onPreview} className="relative w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-white/[0.03] transition active:opacity-80">
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: tint(accent, isActive ? "28" : "1c"), color: accent, boxShadow: isActive ? `0 4px 14px -3px ${tint(accent, "60")}` : "none" }}>
           <Layers size={15} />
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <h4 className="text-sm font-bold text-white truncate">{preset.name}</h4>
+            <h4 className="text-sm font-bold text-white leading-snug" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{preset.name}</h4>
             {isActive && <span className="text-[9px] font-black px-1.5 py-0.5 rounded-lg bg-purple-500/20 text-purple-400 shrink-0 badge-pop">ACTIVA</span>}
           </div>
           <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-2">{preset.description}</p>
@@ -7888,7 +7913,7 @@ function SavedRoutineRow({ routine, isActive, onUse, onEdit, onShare, onArchive,
               veces. Ahora todo vive en un solo lugar, mejor diseñado. */}
           <button onClick={onPreview} className="flex-1 min-w-0 text-left active:opacity-70 transition-opacity">
             <div className="flex items-center gap-2 flex-wrap">
-              <p className="text-sm font-bold text-white truncate">{routine.name}</p>
+              <p className="text-sm font-bold text-white leading-snug" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{routine.name}</p>
               {isActive && <span className="text-[9px] font-black px-2 py-0.5 rounded-full shrink-0" style={{ backgroundColor: tint(accent, "25"), color: accent, border: `1px solid ${tint(accent, "40")}` }}>ACTIVA</span>}
             </div>
             <p className="text-[11px] text-slate-500">
@@ -8870,6 +8895,7 @@ function EntrenadorIAChat({ profile, logs, profileName, messages, setMessages, s
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [editingIndex, setEditingIndex] = useState(null); // índice del mensaje propio que se está editando
+  const [showChangeLog, setShowChangeLog] = useState(false); // log de "qué aplicó la IA" — ver AIChangeLogModal
   const bottomRef = useRef(null);
   // Sin este guardado, el efecto de "bajar al último mensaje" también se
   // disparaba al recién entrar a la pestaña (con un solo mensaje de
@@ -8888,7 +8914,7 @@ function EntrenadorIAChat({ profile, logs, profileName, messages, setMessages, s
     // Si estamos editando: cortamos la conversación hasta el mensaje editado
     // (las respuestas siguientes ya no aplican) y lo reemplazamos por el nuevo.
     const base = replaceIndex != null ? messages.slice(0, replaceIndex) : messages;
-    const newMessages = [...base, { role: "user", text: userText }];
+    const newMessages = [...base, { role: "user", text: userText, date: new Date().toISOString() }];
     setMessages(newMessages);
     setInput("");
     setEditingIndex(null);
@@ -9021,7 +9047,7 @@ Datos: ${JSON.stringify(context)}`;
 
         const { text, action } = parseAction(rawReply);
         const plan = action ? buildActionPlan(action, { profile, settings, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement }) : null;
-        setMessages((prev) => [...prev, { role: "assistant", text, plan, planStatus: plan ? "pending" : null, sources }]);
+        setMessages((prev) => [...prev, { role: "assistant", text, plan, planStatus: plan ? "pending" : null, sources, date: new Date().toISOString() }]);
       } catch (err) {
         clearTimeout(timeoutId);
         console.error("Error al hablar con el entrenador IA:", err);
@@ -9069,7 +9095,10 @@ Datos: ${JSON.stringify(context)}`;
     // Al resolver, sacamos confirm() del objeto guardado: ya cumplió su
     // función y una función no es serializable (rompía el respaldo en
     // IndexedDB mientras el plan seguía "pending" en el historial guardado).
-    setMessages((prev) => prev.map((m, i) => (i === msgIndex ? { ...m, plan: { ...m.plan, confirm: undefined }, planStatus: "confirmed" } : m)));
+    // confirmedAt queda como la fecha real del cambio, para el log de "qué
+    // aplicó la IA" (ver AIChangeLogModal) — distinta de "date", que es
+    // cuándo se PROPUSO el cambio, no cuándo se confirmó.
+    setMessages((prev) => prev.map((m, i) => (i === msgIndex ? { ...m, plan: { ...m.plan, confirm: undefined }, planStatus: "confirmed", confirmedAt: new Date().toISOString() } : m)));
   };
   const handleDiscardPlan = (msgIndex) => {
     setMessages((prev) => prev.map((m, i) => (i === msgIndex ? { ...m, plan: { ...m.plan, confirm: undefined }, planStatus: "discarded" } : m)));
@@ -9186,6 +9215,11 @@ Datos: ${JSON.stringify(context)}`;
             <h2 className="relative text-xl font-black text-white leading-tight">Entrenador IA</h2>
             <p className="relative text-xs text-teal-300/60 mt-0.5">Conoce tu historial real — preguntale lo que quieras</p>
           </div>
+          {messages.some((m) => m.plan && m.planStatus === "confirmed") && (
+            <button onClick={() => setShowChangeLog(true)} title="Cambios aplicados" className="p-2 rounded-xl bg-slate-800/60 border border-slate-700/50 text-slate-400 hover:text-teal-400 transition shrink-0 active:scale-95">
+              <ListChecks size={14} />
+            </button>
+          )}
           {messages.length > 1 && (
             <button onClick={() => setMessages([AI_CHAT_WELCOME])} title="Nueva conversación" className="p-2 rounded-xl bg-slate-800/60 border border-slate-700/50 text-slate-400 hover:text-teal-400 transition shrink-0 active:scale-95">
               <RotateCcw size={14} />
@@ -9368,74 +9402,159 @@ Datos: ${JSON.stringify(context)}`;
         </div>,
         document.body
       )}
+      {showChangeLog && <AIChangeLogModal messages={messages} onClose={() => setShowChangeLog(false)} />}
     </div>
   );
 }
 
+// Log corto de "qué aplicó la IA" — filtra el chat entero (que puede ser
+// larguísimo) a solo los mensajes con una propuesta que confirmaste, para
+// no tener que scrollear todo buscando qué cambió.
+function AIChangeLogModal({ messages, onClose }) {
+  useAndroidBack(onClose);
+  const applied = messages.filter((m) => m.plan && m.planStatus === "confirmed").reverse();
+  return (
+    <div className="fixed inset-0 z-[145] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
+      <div className="bg-slate-900 border border-slate-700/60 rounded-3xl max-w-sm w-full max-h-[80vh] flex flex-col modal-pop-in shadow-2xl shadow-black/50" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-3 px-5 pt-5 pb-3 shrink-0" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+          <div className="w-10 h-10 rounded-2xl bg-teal-500/15 text-teal-400 flex items-center justify-center shrink-0"><ListChecks size={18} /></div>
+          <div className="flex-1 min-w-0"><h3 className="text-base font-black text-white leading-tight">Cambios aplicados</h3><p className="text-[11px] text-slate-500 mt-0.5">Lo que confirmaste que hiciera la IA</p></div>
+          <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition shrink-0"><X size={16} /></button>
+        </div>
+        <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-4 space-y-2.5">
+          {applied.length === 0 ? (
+            <div className="text-center py-10">
+              <ListChecks size={24} className="mx-auto mb-2 text-slate-700" />
+              <p className="text-sm text-slate-500">Todavía no confirmaste ningún cambio.</p>
+            </div>
+          ) : (
+            applied.map((m, i) => (
+              <div key={i} className="rounded-2xl bg-slate-950/50 border border-slate-800/60 px-3.5 py-3">
+                <div className="flex items-center gap-2">
+                  <span className="w-6 h-6 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center shrink-0"><Check size={12} /></span>
+                  <p className="text-sm font-bold text-white flex-1 min-w-0 truncate">{m.plan.title}</p>
+                </div>
+                {m.confirmedAt && (
+                  <p className="text-[10px] text-slate-600 mt-1.5 ml-8">
+                    {new Date(m.confirmedAt).toLocaleDateString("es-AR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                  </p>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function ImportRoutineModal({ onImport, onClose }) {
   useAndroidBack(onClose);
   const [text, setText] = useState("");
+  const [images, setImages] = useState([]); // [{ id, name, mimeType, data (base64 puro), previewUrl }]
+  const [textFileNames, setTextFileNames] = useState([]); // solo para mostrar qué se leyó
   const [routineName, setRoutineName] = useState("");
   const [parsed, setParsed] = useState(null);
   const [notice, setNotice] = useState("");
   const [loadingFile, setLoadingFile] = useState(false);
   const [isParsingAI, setIsParsingAI] = useState(false);
 
-  const handleFile = async (file) => {
-    if (!file) return;
-    const ext = file.name.split(".").pop().toLowerCase();
-    setNotice(""); setLoadingFile(true);
+  const hasAnySource = !!text.trim() || images.length > 0;
+
+  const applyDetectedDays = (days, fallbackName) => {
+    if (!Array.isArray(days) || !days.length) return false;
+    const parsedDays = days.map((d) => ({
+      label: String(d.label || "Día").toUpperCase(),
+      exercises: (d.exercises || []).map((ex) => {
+        const lib = matchExerciseToLibrary(ex.name);
+        // Si la IA no pudo completar series/reps (no debería, se lo pedimos
+        // explícitamente en el prompt), 3x8-10 es un default razonable — así
+        // nunca se cuela un ejercicio con 0 series o un rango vacío.
+        const sets = Array.from({ length: Math.max(1, Math.min(8, ex.setsCount || 3)) }, () => ({ repRange: ex.repRange || "8-10" }));
+        return lib ? { libId: lib.id, sets } : { id: builderUid("imported"), name: ex.name || "Ejercicio", muscle: "Personalizado", sets };
+      }),
+    }));
+    setParsed(buildImportedRoutineDef(parsedDays, routineName.trim() || fallbackName));
+    return true;
+  };
+
+  const runAIDetection = async (fallbackName) => {
+    setNotice("Detectando con IA…");
+    setIsParsingAI(true);
     try {
-      let extracted = "";
-      if (["xlsx", "xls"].includes(ext)) {
-        extracted = await extractTextFromExcelFile(file);
-      } else if (ext === "pdf") {
-        extracted = await extractTextFromPdfFile(file);
-      } else if (["csv", "txt"].includes(ext)) {
-        extracted = await file.text();
-      } else if (ext === "docx" || ext === "doc") {
-        setNotice("Para Word: abrí el archivo, copiá todo (Ctrl+A, Ctrl+C) y pegalo abajo.");
-        setLoadingFile(false); return;
-      } else {
-        setNotice("Formato no reconocido. Probá con .pdf, .xlsx, .xls, .csv o .txt.");
-        setLoadingFile(false); return;
-      }
-      setText(extracted);
-      // Intentar detección local primero (instantánea)
-      const local = parseRoutineFromText(extracted);
-      if (local.length) {
-        setParsed(buildImportedRoutineDef(local, routineName.trim() || file.name.replace(/\.[^.]+$/, "")));
-        setLoadingFile(false); return;
-      }
-      // Si la detección local no encuentra nada, usar IA automáticamente
-      setNotice("Detectando con IA…");
-      setIsParsingAI(true);
-      const res = await fetch("/api/ia", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "detect", text: extracted }) });
-      if (res.ok) {
-        const result = await res.json();
-        const rawText = result?.text || "";
-        const cleaned = rawText.replace(/```json|```/g, "").trim();
-        const days = JSON.parse(cleaned);
-        if (Array.isArray(days) && days.length) {
-          const parsedDays = days.map((d) => ({
-            label: String(d.label || "Día").toUpperCase(),
-            exercises: (d.exercises || []).map((ex) => {
-              const lib = matchExerciseToLibrary(ex.name);
-              const sets = Array.from({ length: Math.max(1, Math.min(8, ex.setsCount || 3)) }, () => ({ repRange: ex.repRange || "8-10" }));
-              return lib ? { libId: lib.id, sets } : { id: builderUid("imported"), name: ex.name || "Ejercicio", muscle: "Personalizado", sets };
-            }),
-          }));
-          setParsed(buildImportedRoutineDef(parsedDays, routineName.trim() || file.name.replace(/\.[^.]+$/, "")));
-          setNotice("");
-        } else { setNotice("La IA no pudo interpretar el archivo. Pegá el texto manualmente abajo."); }
-      } else { setNotice("No se pudo detectar automáticamente. Pegá el texto abajo y tocá \"Detectar rutina\"."); }
-    } catch {
-      setNotice("No pudimos leer ese archivo. Probá copiando el texto directamente.");
+      const response = await fetch("/api/ia", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "detect", text, images: images.map(({ mimeType, data }) => ({ mimeType, data })) }),
+      });
+      if (!response.ok) throw new Error("Error en el servidor");
+      const result = await response.json();
+      const rawText = result?.text;
+      if (!rawText) throw new Error("respuesta vacía");
+      const cleaned = rawText.replace(/```json|```/g, "").trim();
+      const days = JSON.parse(cleaned);
+      if (applyDetectedDays(days, fallbackName)) { setNotice(""); }
+      else { setNotice("La IA no pudo interpretar lo que subiste. Probá con una foto más nítida o pegá el texto manualmente."); }
+    } catch (err) {
+      console.error("Error detectando rutina con IA:", err);
+      setNotice("No pudimos detectar la rutina. Probá de nuevo, con una foto más clara, o pegá el texto abajo.");
     } finally {
-      setLoadingFile(false); setIsParsingAI(false);
+      setIsParsingAI(false);
     }
   };
+
+  // Multi-archivo: cada uno se suma a lo que ya había (texto concatenado,
+  // imágenes acumuladas) en vez de reemplazarlo — así podés subir, por
+  // ejemplo, una foto por día y que se combinen en una sola rutina.
+  const handleFiles = async (fileList) => {
+    const files = Array.from(fileList || []);
+    if (!files.length) return;
+    setNotice(""); setLoadingFile(true);
+    let addedText = "";
+    const addedImages = [];
+    try {
+      for (const file of files) {
+        if (file.type?.startsWith("image/")) {
+          // Tope de 6 fotos: de sobra para una rutina de 6 días (una foto
+          // por día) y lejos del límite de tamaño del pedido al servidor.
+          if (images.length + addedImages.length >= 8) { setNotice((n) => n || "Máximo 8 fotos por rutina — con eso alcanza de sobra."); continue; }
+          try {
+            const dataUrl = await resizeImageFile(file, 1600, 0.85);
+            const [, mimeType, data] = dataUrl.match(/^data:([^;]+);base64,(.*)$/) || [];
+            if (data) addedImages.push({ id: builderUid("import_img"), name: file.name, mimeType, data, previewUrl: dataUrl });
+          } catch { setNotice((n) => n || "No pudimos leer una de las fotos — probá con otra."); }
+          continue;
+        }
+        const ext = file.name.split(".").pop().toLowerCase();
+        if (["xlsx", "xls"].includes(ext)) addedText += `\n${await extractTextFromExcelFile(file)}`;
+        else if (ext === "pdf") addedText += `\n${await extractTextFromPdfFile(file)}`;
+        else if (["csv", "txt"].includes(ext)) addedText += `\n${await file.text()}`;
+        else if (ext === "docx" || ext === "doc") setNotice((n) => n || "Para Word: abrí el archivo, copiá todo (Ctrl+A, Ctrl+C) y pegalo abajo.");
+        else setNotice((n) => n || `"${file.name}" no es un formato reconocido (PDF, Excel, CSV, TXT o foto).`);
+        if (["xlsx", "xls", "pdf", "csv", "txt"].includes(ext)) setTextFileNames((prev) => [...prev, file.name]);
+      }
+      const newText = (text + addedText).trim();
+      if (addedText) setText(newText);
+      if (addedImages.length) setImages((prev) => [...prev, ...addedImages]);
+
+      const fallbackName = routineName.trim() || files[0].name.replace(/\.[^.]+$/, "");
+      // Con solo texto (sin fotos), probamos primero el detector local —
+      // es instantáneo y no depende de la IA. Con fotos de por medio, el
+      // detector local no sirve (no lee imágenes), así que vamos directo
+      // a la IA.
+      if (newText && !addedImages.length && !images.length) {
+        const local = parseRoutineFromText(newText);
+        if (local.length) { setParsed(buildImportedRoutineDef(local, fallbackName)); setLoadingFile(false); return; }
+      }
+      if (newText || addedImages.length || images.length) { await runAIDetection(fallbackName); }
+    } catch {
+      setNotice("No pudimos leer alguno de los archivos. Probá de nuevo o pegá el texto directamente.");
+    } finally {
+      setLoadingFile(false);
+    }
+  };
+
+  const removeImage = (id) => setImages((prev) => prev.filter((img) => img.id !== id));
 
   const handleProcess = () => {
     const parsedDays = parseRoutineFromText(text);
@@ -9445,45 +9564,11 @@ function ImportRoutineModal({ onImport, onClose }) {
   };
 
   // Detección con IA: en vez de patrones de texto, le pide a un modelo de
-  // lenguaje que entienda la rutina y devuelva días/ejercicios en JSON —
-  // útil para formatos más libres que el detector de patrones no capta.
-  // El pedido a Gemini lo hace /api/ia (función serverless de Vercel — ver
-  // api/ia.js) — la clave real nunca llega al navegador.
-  const handleProcessAI = async () => {
-    setIsParsingAI(true);
-    setNotice("");
-    try {
-      const response = await fetch("/api/ia", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "detect", text })
-      });
-
-      if (!response.ok) throw new Error("Error en el servidor");
-      const result = await response.json();
-
-      const rawText = result?.text;
-      if (!rawText) throw new Error("respuesta vacía");
-      const cleaned = rawText.replace(/```json|```/g, "").trim();
-      const days = JSON.parse(cleaned);
-      if (!Array.isArray(days) || !days.length) throw new Error("formato inesperado");
-
-      const parsedDays = days.map((d) => ({
-        label: String(d.label || "Día").toUpperCase(),
-        exercises: (d.exercises || []).map((ex) => {
-          const lib = matchExerciseToLibrary(ex.name);
-          const sets = Array.from({ length: Math.max(1, Math.min(8, ex.setsCount || 3)) }, () => ({ repRange: ex.repRange || "8-10" }));
-          return lib ? { libId: lib.id, sets } : { id: builderUid("imported"), name: ex.name || "Ejercicio", muscle: "Personalizado", sets };
-        }),
-      }));
-      setParsed(buildImportedRoutineDef(parsedDays, routineName.trim() || "Rutina importada"));
-    } catch (err) {
-      console.error("Error detectando rutina con IA:", err);
-      setNotice("No pudimos detectar la rutina. Asegurate de que el texto sea claro o probá copiarlo de nuevo.");
-    } finally {
-      setIsParsingAI(false);
-    }
-  };
+  // lenguaje que entienda la rutina (texto y/o fotos) y devuelva
+  // días/ejercicios en JSON, completando lo que falte. El pedido lo hace
+  // /api/ia (función serverless de Vercel — ver api/ia.js): la clave real
+  // nunca llega al navegador.
+  const handleProcessAI = () => runAIDetection(routineName.trim() || "Rutina importada");
 
   if (parsed) {
     return (
@@ -9493,7 +9578,7 @@ function ImportRoutineModal({ onImport, onClose }) {
             <div className="w-10 h-10 rounded-2xl bg-teal-500/15 text-teal-400 flex items-center justify-center shrink-0"><Sparkles size={18} /></div>
             <div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-widest text-teal-400">Vista previa</p><h3 className="text-base font-black text-white leading-tight truncate">{parsed.name}</h3></div>
           </div>
-          <p className="text-sm text-slate-400 mb-3">Así interpretamos tu archivo. Revisalo — si algo quedó mal, lo podés corregir después editando la rutina desde Rutinas.</p>
+          <p className="text-sm text-slate-400 mb-3">Así lo interpretamos — revisalo, después lo podés corregir desde Rutinas.</p>
           <RoutinePreview routineDef={parsed} />
           <div className="flex gap-2 mt-4">
             <button onClick={() => setParsed(null)} className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-400 text-sm font-semibold">Volver</button>
@@ -9507,25 +9592,64 @@ function ImportRoutineModal({ onImport, onClose }) {
   return (
     <div className="fixed inset-0 z-[130] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
       <div className="bg-slate-900 border border-slate-700/60 rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50 max-h-[92vh] overflow-y-auto overscroll-contain" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-base font-black text-white">Importar rutina</h3>
-          <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition"><X size={18} /></button>
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-10 h-10 rounded-2xl bg-teal-500/15 text-teal-400 flex items-center justify-center shrink-0"><Download size={18} className="rotate-180" /></div>
+          <div className="flex-1 min-w-0"><h3 className="text-base font-black text-white leading-tight">Importar rutina</h3><p className="text-[11px] text-slate-500 mt-0.5">Archivo, foto o texto — combinamos todo</p></div>
+          <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition shrink-0"><X size={18} /></button>
         </div>
-        <p className="text-[12px] text-slate-400 mb-3 leading-relaxed">Subí tu rutina en .pdf, .xlsx, .xls, .csv o .txt — la leemos directo. Para Word, copiá y pegá el texto acá abajo. Un ejercicio por línea (o por fila, si es una planilla), con un patrón tipo <span className="text-slate-300 font-semibold">"Press banca 3x8-10"</span>; el nombre del día (Push, Pecho, Día 1...) va solo en su propia línea.</p>
-        <label className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl border-2 border-dashed border-slate-700 text-slate-400 hover:text-white hover:border-teal-500/40 transition cursor-pointer text-sm font-semibold mb-3">
-          <Download size={15} className="rotate-180" /> {loadingFile ? "Leyendo archivo…" : "Subir archivo (PDF, Excel, CSV, TXT)"}
-          <input type="file" accept=".pdf,.xlsx,.xls,.csv,.txt,.docx,.doc" className="hidden" onChange={(e) => handleFile(e.target.files?.[0])} disabled={loadingFile} />
-        </label>
-        <textarea value={text} onChange={(e) => setText(e.target.value)} rows={8} placeholder={"Push\nPress banca 3x8-10\nPress militar 3x8-10\n\nPull\nDominadas 3x8-10\n..."} className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-teal-500/50 mb-3" />
+        <p className="text-[11px] text-slate-500 mb-3 leading-relaxed">Subí archivos (PDF, Excel, CSV, TXT) o fotos — la IA arma la rutina y completa lo que falte. Para Word, pegá el texto abajo.</p>
+
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          <label className="flex flex-col items-center justify-center gap-1.5 py-4 rounded-2xl border-2 border-dashed border-slate-700 text-slate-400 hover:text-white hover:border-teal-500/40 transition cursor-pointer text-center">
+            <Upload size={18} />
+            <span className="text-[11px] font-bold leading-tight">Subir archivos<br />o fotos</span>
+            <input type="file" accept=".pdf,.xlsx,.xls,.csv,.txt,.docx,.doc,image/*" multiple className="hidden" onChange={(e) => { handleFiles(e.target.files); e.target.value = ""; }} disabled={loadingFile || isParsingAI} />
+          </label>
+          <label className="flex flex-col items-center justify-center gap-1.5 py-4 rounded-2xl border-2 border-dashed border-slate-700 text-slate-400 hover:text-white hover:border-teal-500/40 transition cursor-pointer text-center">
+            <Camera size={18} />
+            <span className="text-[11px] font-bold leading-tight">Sacar una<br />foto</span>
+            <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { handleFiles(e.target.files); e.target.value = ""; }} disabled={loadingFile || isParsingAI} />
+          </label>
+        </div>
+
+        {(loadingFile || isParsingAI) && (
+          <div className="flex items-center gap-2 text-teal-400 text-[11px] font-bold mb-3"><RotateCcw size={12} className="animate-spin" /> {loadingFile ? "Leyendo…" : "Analizando con IA…"}</div>
+        )}
+
+        {(images.length > 0 || textFileNames.length > 0) && (
+          <div className="mb-3 space-y-2">
+            {images.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {images.map((img) => (
+                  <div key={img.id} className="relative w-14 h-14 rounded-xl overflow-hidden border border-slate-700 shrink-0">
+                    <img src={img.previewUrl} alt={img.name} className="w-full h-full object-cover" />
+                    <button onClick={() => removeImage(img.id)} aria-label="Quitar foto" className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/70 text-white flex items-center justify-center"><X size={10} /></button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {textFileNames.length > 0 && (
+              <p className="text-[10px] text-slate-500 flex items-center gap-1.5"><Check size={11} className="text-teal-400 shrink-0" /> Leído: {textFileNames.join(", ")}</p>
+            )}
+          </div>
+        )}
+
+        <details className="mb-3">
+          <summary className="text-[11px] text-slate-500 font-semibold cursor-pointer select-none">O pegá el texto a mano</summary>
+          <textarea value={text} onChange={(e) => setText(e.target.value)} rows={6} placeholder={"Push\nPress banca 3x8-10\nPress militar 3x8-10\n\nPull\nDominadas 3x8-10\n..."} className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-teal-500/50 mt-2" />
+        </details>
+
         <input value={routineName} onChange={(e) => setRoutineName(e.target.value)} placeholder="Nombre para la rutina (opcional)" className="w-full bg-slate-900/80 border border-slate-700/50 rounded-xl px-3 py-2.5 text-white text-sm mb-3 focus:outline-none focus:border-teal-500/60" />
         {notice && <p className="text-[11px] text-amber-400 mb-3 leading-relaxed">{notice}</p>}
-        <button onClick={handleProcess} disabled={!text.trim() || loadingFile} className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-sm font-bold transition-all active:scale-[0.98] ${text.trim() && !loadingFile ? "!text-white shadow-lg shadow-teal-500/20" : "bg-slate-800 text-slate-600"}`} style={text.trim() && !loadingFile ? { background: "linear-gradient(135deg,#14B8A6,#0E7490)" } : {}}>
-          <Sparkles size={15} /> Detectar rutina
+        <button onClick={handleProcessAI} disabled={!hasAnySource || loadingFile || isParsingAI} className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-sm font-bold transition-all active:scale-[0.98] ${hasAnySource && !loadingFile && !isParsingAI ? "!text-white shadow-lg shadow-teal-500/20" : "bg-slate-800 text-slate-600"}`} style={hasAnySource && !loadingFile && !isParsingAI ? { background: "linear-gradient(135deg,#14B8A6,#0E7490)" } : {}}>
+          {isParsingAI ? <><RotateCcw size={14} className="animate-spin" /> Analizando con IA...</> : <><Sparkles size={15} /> Detectar con IA</>}
         </button>
-        <button onClick={handleProcessAI} disabled={!text.trim() || loadingFile || isParsingAI} className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition text-sm font-semibold mt-2 disabled:opacity-50">
-          {isParsingAI ? <><RotateCcw size={14} className="animate-spin" /> Analizando rutina con Inteligencia Artificial...</> : <><Sparkles size={14} /> Detectar con IA</>}
-        </button>
-        <p className="text-[10px] text-slate-600 mt-2 text-center">"Detectar con IA" necesita estar conectado a internet y haber iniciado sesión — si falla, usá "Detectar rutina" de arriba.</p>
+        {!images.length && (
+          <button onClick={handleProcess} disabled={!text.trim() || loadingFile || isParsingAI} className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition text-sm font-semibold mt-2 disabled:opacity-50">
+            <SlidersHorizontal size={14} /> Detectar sin IA (más rápido)
+          </button>
+        )}
+        <p className="text-[10px] text-slate-600 mt-2 text-center">"Detectar con IA" necesita estar conectado a internet y haber iniciado sesión.</p>
       </div>
     </div>
   );
@@ -10381,7 +10505,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
         <div className="text-center pt-2 pb-1">
           <div className="w-14 h-14 rounded-2xl bg-purple-500/15 flex items-center justify-center mx-auto mb-3"><Calendar className="text-purple-500" size={26} /></div>
           <h2 className="text-lg font-black text-white">¿Qué días entrenás "{def.name}"?</h2>
-          <p className="text-sm text-slate-500 mt-1.5 leading-relaxed px-2">Ya armamos un cronograma por defecto de lunes a domingo — lo podés dejar así o cambiarlo. Esto te evita tener que venir después a configurarlo.</p>
+          <p className="text-sm text-slate-500 mt-1.5 leading-relaxed px-2">Ya armamos un cronograma por defecto — lo podés dejar así o cambiarlo.</p>
         </div>
         <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4">
           <WeeklyScheduleEditor dayOrder={def.dayOrder} days={def.days} schedule={def.weekSchedule} onChange={updatePendingScheduleDay} />
@@ -10424,7 +10548,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
         <div className="text-center pt-2 pb-1">
           <div className="w-14 h-14 rounded-2xl bg-purple-500/15 flex items-center justify-center mx-auto mb-3"><Layers className="text-purple-500" size={26} /></div>
           <h2 className="text-lg font-black text-white">¿Cómo vas a entrenar?</h2>
-          <p className="text-sm text-slate-500 mt-1.5 leading-relaxed px-2">Elegí una rutina ya armada, creá la tuya desde cero, o importá una que ya tengas escrita. La vas a poder cambiar cuando quieras.</p>
+          <p className="text-sm text-slate-500 mt-1.5 leading-relaxed px-2">Ya armada, creada por vos, o importada — la podés cambiar cuando quieras.</p>
         </div>
       )}
 
@@ -10537,8 +10661,9 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
                 const d = activeDef.days[dk];
                 const ultimoImpar = i === orden.length - 1 && orden.length % 2 === 1;
                 return (
-                  <span key={dk} className={`flex items-center gap-2 px-2.5 py-2 rounded-xl text-[10px] font-bold bg-black/25 border border-white/[0.07] min-w-0 ${ultimoImpar ? "col-span-2" : ""}`}>
-                    <span className="flex-1 min-w-0 truncate text-slate-300">{d.label}</span>
+                  <span key={dk} className={`flex items-center gap-2 pl-2 pr-2.5 py-2 rounded-xl text-[10px] font-bold bg-black/25 border border-white/[0.07] min-w-0 ${ultimoImpar ? "col-span-2" : ""}`}>
+                    <span className="w-1 self-stretch rounded-full shrink-0" style={{ backgroundColor: d.color, boxShadow: `0 0 6px -1px ${d.color}` }} />
+                    <span className="flex-1 min-w-0 leading-snug text-slate-300" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{d.label}</span>
                     <span className="text-slate-500 tabular-nums shrink-0">{d.exercises?.length || 0}</span>
                   </span>
                 );
@@ -10763,15 +10888,15 @@ function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
   const s = settings || DEFAULT_SETTINGS;
   const on = (k) => s[k] !== false;
   const OPCIONES = [
-    { key: "showWarmup", icon: <Flame size={16} />, label: "Calentamiento sugerido", desc: "Una rampa de series previas calculada desde tu marca (50% → 70% → 85%). Útil en ejercicios pesados." },
-    { key: "showRpe", icon: <Activity size={16} />, label: "Esfuerzo (RPE)", desc: "Registrá del 1 al 10 qué tan duro fue. Sirve para saber si podés subir peso o conviene bajar." },
-    { key: "show1RMPercent", icon: <Percent size={16} />, label: "Porcentaje de 1RM", desc: "A qué porcentaje de tu récord estás levantando ahora mismo." },
-    { key: "showCoaching", icon: <Info size={16} />, label: "Consejos al guardar", desc: "Un mensaje corto comparando la serie con tu marca (📈 subiste, ✓ igualaste, 📉 bajaste)." },
-    { key: "showExerciseNote", icon: <StickyNote size={16} />, label: "Consejos del ejercicio", desc: "La nota con la técnica que aparece debajo del nombre del ejercicio." },
-    { key: "showPersonalNote", icon: <Edit3 size={16} />, label: "Notas por serie", desc: "El botón para escribir tu propio recordatorio en cada serie." },
-    { key: "showStagnation", icon: <AlertTriangle size={16} />, label: "Aviso de estancamiento", desc: `El cartel "ESTANCADO" si llevás ${STAGNATION_DAYS}+ días sin superar el récord de un ejercicio.` },
-    { key: "showProgressionSuggestion", icon: <Target size={16} />, label: "Progresión sugerida", desc: "El cartel \"Probá hoy: X×Ykg\" antes de cargar la serie, basado en tu última vez." },
-    { key: "autoStartRestTimer", icon: <Timer size={16} />, label: "Cronómetro automático", desc: "Al guardar la serie, arranca solo el descanso — no hace falta tocar play. (No aplica dentro de superseries.)" },
+    { key: "showWarmup", icon: <Flame size={16} />, label: "Calentamiento sugerido", desc: "Series de entrada al 50-70-85% de tu marca." },
+    { key: "showRpe", icon: <Activity size={16} />, label: "Esfuerzo (RPE)", desc: "Del 1 al 10, qué tan dura fue la serie." },
+    { key: "show1RMPercent", icon: <Percent size={16} />, label: "Porcentaje de 1RM", desc: "Qué % de tu récord estás levantando." },
+    { key: "showCoaching", icon: <Info size={16} />, label: "Consejos al guardar", desc: "Te dice si subiste, igualaste o bajaste tu marca." },
+    { key: "showExerciseNote", icon: <StickyNote size={16} />, label: "Consejos del ejercicio", desc: "Tip de técnica bajo el nombre del ejercicio." },
+    { key: "showPersonalNote", icon: <Edit3 size={16} />, label: "Notas por serie", desc: "Tu propia nota en cada serie." },
+    { key: "showStagnation", icon: <AlertTriangle size={16} />, label: "Aviso de estancamiento", desc: `Avisa si llevás ${STAGNATION_DAYS}+ días sin mejorar la marca.` },
+    { key: "showProgressionSuggestion", icon: <Target size={16} />, label: "Progresión sugerida", desc: "Te sugiere cuánto probar hoy." },
+    { key: "autoStartRestTimer", icon: <Timer size={16} />, label: "Cronómetro automático", desc: "Arranca el descanso solo, al guardar la serie." },
   ];
 
   return (
@@ -10785,10 +10910,10 @@ function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
             </div>
             <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition shrink-0"><X size={16} /></button>
           </div>
-          <p className="text-[11px] text-slate-500 leading-snug">Elegí qué querés ver al registrar una serie. Mirá cómo cambia acá abajo en vivo — podés cambiarlo cuando quieras desde Perfil.</p>
+          <p className="text-[11px] text-slate-500 leading-snug">Elegí qué ver al registrar una serie — mirá el cambio en vivo, acá abajo.</p>
           <div className="mt-2.5 flex items-start gap-2 rounded-xl px-2.5 py-2" style={{ backgroundColor: "rgba(20,184,166,0.10)", border: "1px solid rgba(20,184,166,0.25)" }}>
             <Info size={12} className="text-teal-400 mt-0.5 shrink-0" />
-            <p className="text-[10.5px] text-teal-200/90 leading-snug"><span className="font-black">Nuestra recomendación:</span> dejá prendido solo lo que vayas a usar de verdad. Con todo activado la ficha se llena de botones y cuesta encontrar lo importante. Siempre podés volver a prender lo que te falte.</p>
+            <p className="text-[10.5px] text-teal-200/90 leading-snug"><span className="font-black">Tip:</span> activá solo lo que vayas a usar — menos botones, más claridad.</p>
           </div>
         </div>
 
@@ -10878,45 +11003,52 @@ function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
 
 function OnboardingTasksCard({ profile, cycleStart, logs, onGoToProfile, onDone, onOpenFieldSettings }) {
   const settings = profile ? getProfileSettings(profile) : DEFAULT_SETTINGS;
+  const [open, setOpen] = useState(false);
   const tasks = [
-    { key: "cycle", label: "Elegí tu fecha de inicio de ciclo", done: !!cycleStart, hint: "Perfil → Ciclo de entrenamiento" },
-    { key: "profile", label: "Completá tus datos (sexo, edad, peso, altura)", done: !!(profile?.sex && profile?.age && (settings.bodyWeightKg > 0) && profile?.heightCm), hint: "Perfil → Editar perfil y Medidas" },
-    { key: "firstLog", label: "Registrá tu primera marca en un ejercicio", done: Object.entries(logs || {}).some(([k, v]) => !k.endsWith("_pr_override") && Array.isArray(v) && v.length > 0), hint: "Rutina → guardá una serie" },
-    { key: "fields", label: "Elegí qué ves al registrar una serie", done: !!profile?.fieldSettingsSeen, hint: "Con vista previa en vivo", action: "fields" },
+    { key: "cycle", label: "Fecha de inicio de ciclo", done: !!cycleStart, hint: "Perfil → Ciclo de entrenamiento" },
+    { key: "profile", label: "Tus datos (sexo, edad, peso, altura)", done: !!(profile?.sex && profile?.age && (settings.bodyWeightKg > 0) && profile?.heightCm), hint: "Perfil → Editar perfil y Medidas" },
+    { key: "firstLog", label: "Tu primera marca en un ejercicio", done: Object.entries(logs || {}).some(([k, v]) => !k.endsWith("_pr_override") && Array.isArray(v) && v.length > 0), hint: "Rutina → guardá una serie" },
+    { key: "fields", label: "Qué ver al registrar una serie", done: !!profile?.fieldSettingsSeen, hint: "Con vista previa en vivo", action: "fields" },
   ];
   const doneCount = tasks.filter((t) => t.done).length;
   const allDone = doneCount === tasks.length;
   const hidden = !profile || profile.onboardingDone;
+  const nextTask = tasks.find((t) => !t.done);
 
   // Cuando todo está listo, marcarlo y no mostrar nunca más
   useEffect(() => { if (!hidden && allDone) onDone?.(); }, [allDone, hidden]);
   if (hidden || allDone) return null;
 
+  // Chico y colapsado por defecto — antes era una tarjeta siempre abierta con
+  // los 4 pasos a la vista, ocupando bastante lugar arriba de la rutina cada
+  // vez que abrías la app. Ahora es una sola fila (como el resto de los
+  // atajos colapsados de la app) que te dice el próximo paso, y se expande
+  // al tocarla si querés ver la lista completa.
   return (
     <div className="mb-4 rounded-2xl border border-teal-500/25 overflow-hidden bounce-in" style={{ background: "var(--panel-grad-emerald)" }}>
-      <div className="px-4 py-3 flex items-center gap-2.5 border-b border-slate-800/50">
+      <button onClick={() => setOpen((o) => !o)} className="w-full px-4 py-3 flex items-center gap-2.5 text-left">
         <div className="w-8 h-8 rounded-xl bg-teal-500/15 flex items-center justify-center shrink-0"><Target size={15} className="text-teal-400" /></div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-black text-white">Primeros pasos</p>
-          <p className="text-[10px] text-slate-500">{doneCount} de {tasks.length} completados</p>
+          <p className="text-[10px] text-slate-500 truncate">{doneCount}/{tasks.length} · {nextTask?.label}</p>
         </div>
-        <div className="flex gap-1">
-          {tasks.map((t) => <div key={t.key} className="w-2 h-2 rounded-full" style={{ backgroundColor: t.done ? "#14B8A6" : "var(--surface-2)" }} />)}
+        <ChevronDown size={15} className="text-slate-500 shrink-0 transition-transform" style={{ transform: open ? "rotate(180deg)" : "none" }} />
+      </button>
+      {open && (
+        <div className="px-4 pb-3 pt-0.5 space-y-2 border-t border-slate-800/50 bounce-in">
+          {tasks.map((t) => (
+            <button key={t.key} onClick={t.done ? undefined : (t.action === "fields" ? onOpenFieldSettings : onGoToProfile)} className={`w-full flex items-center gap-2.5 text-left rounded-xl px-2 py-1.5 mt-2 transition ${t.done ? "opacity-50" : "hover:bg-slate-800/40"}`}>
+              <div className={`w-5 h-5 rounded-lg flex items-center justify-center shrink-0 ${t.done ? "bg-teal-500" : "border border-slate-700"}`}>
+                {t.done && <Check size={12} className="text-white" />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className={`text-xs font-semibold ${t.done ? "text-slate-500 line-through" : "text-slate-300"}`}>{t.label}</p>
+                {!t.done && <p className="text-[9px] text-slate-600">{t.hint}</p>}
+              </div>
+            </button>
+          ))}
         </div>
-      </div>
-      <div className="px-4 py-2.5 space-y-2">
-        {tasks.map((t) => (
-          <button key={t.key} onClick={t.done ? undefined : (t.action === "fields" ? onOpenFieldSettings : onGoToProfile)} className={`w-full flex items-center gap-2.5 text-left rounded-xl px-2 py-1.5 transition ${t.done ? "opacity-50" : "hover:bg-slate-800/40"}`}>
-            <div className={`w-5 h-5 rounded-lg flex items-center justify-center shrink-0 ${t.done ? "bg-teal-500" : "border border-slate-700"}`}>
-              {t.done && <Check size={12} className="text-white" />}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className={`text-xs font-semibold ${t.done ? "text-slate-500 line-through" : "text-slate-300"}`}>{t.label}</p>
-              {!t.done && <p className="text-[9px] text-slate-600">{t.hint}</p>}
-            </div>
-          </button>
-        ))}
-      </div>
+      )}
     </div>
   );
 }
