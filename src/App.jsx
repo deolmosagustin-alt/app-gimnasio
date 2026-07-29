@@ -1139,6 +1139,16 @@ const ANIMATION_CSS = `
 }
 .timer-hop { animation: timerHop 0.34s cubic-bezier(0.34, 1.3, 0.64, 1) backwards; }
 
+/* Cronómetro de descanso al llegar a 0: un anillo verde que se expande y se
+   apaga, una sola vez — el "ping" visual de que terminó, además del cartel
+   con el nombre del ejercicio (ver RestTimer). */
+@keyframes restDoneFlash {
+  0%   { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.55); }
+  60%  { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+.rest-done-flash { animation: restDoneFlash 0.9s ease-out; }
+
 /* Overlay de inicio de sesión: se va solo a los 1.4s */
 @keyframes sessionStartFade { 0% { opacity: 0; } 12% { opacity: 1; } 82% { opacity: 1; } 100% { opacity: 0; } }
 .session-start-fade { animation: sessionStartFade 1.4s ease-in-out both; }
@@ -2988,7 +2998,13 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default", 
       } catch { /* ignorado a propósito */ }
     }
     if (alertType !== "sound") haptic([400, 150, 400, 150, 500, 150, 400]);
-    // Notificación del sistema al terminar el descanso
+    // Notificación del sistema al terminar el descanso — rework: antes decía
+    // siempre lo mismo ("Es hora de la próxima serie"), sin importar en qué
+    // ejercicio estabas. Ahora nombra el ejercicio (si lo sabemos) y usa el
+    // mismo teal de marca (iconColor) que ya tiene la notificación nativa en
+    // curso, para que ambas se sientan parte de la misma app.
+    const doneTitle = "🔥 ¡Descanso terminado!";
+    const doneBody = exerciseName ? `Volvé a ${exerciseName} 💪` : "Volvé a la serie 💪";
     try {
       if (Capacitor.isNativePlatform()) {
         // LocalNotifications en Android: aparece como notificación real del sistema,
@@ -3004,16 +3020,17 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default", 
           notifications: [{
             id: 9001,
             smallIcon: "ic_stat_modusfit",
-            title: "⏱️ Descanso terminado — Modus Fit",
-            body: "Es hora de la próxima serie 💪",
+            iconColor: "#14B8A6",
+            title: doneTitle,
+            body: doneBody,
             channelId: "modusfit-rest-done-v1",
             sound: alertType === "vibration" ? undefined : "default",
             schedule: { at: new Date(Date.now() + 100) },
           }],
         });
       } else if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-        new Notification("⏱️ Descanso terminado — Modus Fit", {
-          body: "Es hora de la próxima serie 💪",
+        new Notification(doneTitle, {
+          body: doneBody,
           silent: alertType === "vibration",
           tag: "rest-timer",
           renotify: true,
@@ -3031,9 +3048,10 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default", 
       fireAlert();
       endTimeRef.current = null;
       // Volver al tiempo original: antes quedaba clavado en 0:00 y había que
-      // tocarlo. Esperamos 1.2s para que alcances a VER que llegó a cero.
+      // tocarlo. Esperamos a que se vea el aviso "¡Volvé a la serie!" de abajo
+      // (ver render) antes de resetear.
       if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
-      resetTimerRef.current = setTimeout(() => { setRemaining(seconds); resetTimerRef.current = null; }, 1200);
+      resetTimerRef.current = setTimeout(() => { setRemaining(seconds); resetTimerRef.current = null; }, 1800);
     }
   };
 
@@ -3094,8 +3112,9 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default", 
               notifications: [{
                 id: 9001,
                 smallIcon: "ic_stat_modusfit",
-                title: "⏱️ ¡Descanso terminado!",
-                body: "Dale, volvé a la serie 💪",
+                iconColor: "#14B8A6",
+                title: "🔥 ¡Descanso terminado!",
+                body: exerciseName ? `Volvé a ${exerciseName} 💪` : "Volvé a la serie 💪",
                 channelId: "modusfit-rest-done-v1",
                 sound: alertType === "vibration" ? undefined : "default",
                 schedule: { at: new Date(endTimeRef.current), allowWhileIdle: true },
@@ -3148,45 +3167,64 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default", 
   const urgent = running && remaining <= 10 && remaining > 0;
   const done = remaining === 0;
   const barColor = done ? "#10B981" : urgent ? "#F59E0B" : accent;
+  // REWORK: antes, al llegar a cero, el cartel se ponía verde pero el fondo
+  // de la tarjeta quedaba igual que en reposo (running ya es false acá) —
+  // pasaba casi desapercibido si no estabas mirando justo el numerito. Ahora
+  // "done" también prende el fondo/borde en verde y, por un par de segundos,
+  // reemplaza el número por un aviso claro con el nombre del ejercicio — así
+  // avisa en pantalla lo mismo que la notificación, sin depender de que la
+  // hayas visto.
+  const highlighted = running || done;
   return (
-    <div className="relative rounded-2xl overflow-hidden px-3.5 py-2.5 transition-colors duration-300" style={{
-      backgroundColor: running ? tint(barColor, "0e") : "var(--timer-idle-bg)",
-      border: `1px solid ${running ? tint(barColor, "30") : "var(--timer-idle-border)"}`,
+    <div className={`relative rounded-2xl overflow-hidden px-3.5 py-2.5 transition-colors duration-300 ${done ? "rest-done-flash" : ""}`} style={{
+      backgroundColor: highlighted ? tint(barColor, "0e") : "var(--timer-idle-bg)",
+      border: `1px solid ${highlighted ? tint(barColor, "30") : "var(--timer-idle-border)"}`,
     }}>
-      <div className="flex items-center gap-2.5">
-        {/* Tiempo protagonista */}
-        <span
-          className={`text-2xl font-black tabular-nums shrink-0 transition-colors ${urgent ? "soft-pulse" : ""}`}
-          style={{ color: running || done ? barColor : "#94a3b8", textShadow: urgent ? `0 0 16px ${tint(barColor, "70")}` : "none" }}
-        >
-          {formatTime(remaining)}
-        </span>
+      {done ? (
+        <div className="flex items-center gap-2.5 bounce-in">
+          <span className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 badge-pop" style={{ backgroundColor: tint(barColor, "22"), color: barColor }}>
+            <Check size={17} />
+          </span>
+          <span className="text-sm font-black flex-1 min-w-0 truncate" style={{ color: barColor }}>
+            {exerciseName ? `¡Volvé a ${exerciseName}! 💪` : "¡Volvé a la serie! 💪"}
+          </span>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2.5">
+          {/* Tiempo protagonista */}
+          <span
+            className={`text-2xl font-black tabular-nums shrink-0 transition-colors ${urgent ? "soft-pulse" : ""}`}
+            style={{ color: running ? barColor : "#94a3b8", textShadow: urgent ? `0 0 16px ${tint(barColor, "70")}` : "none" }}
+          >
+            {formatTime(remaining)}
+          </span>
 
-        {/* Solo la barra que se vacía — sin palabras ni tiempo repetido. */}
-        <div className="flex-1 min-w-0 flex items-center">
-          <div className="w-full h-2 rounded-full overflow-hidden bg-slate-800/70">
-            <div
-              className="h-full rounded-full"
-              style={{
-                width: `${pct}%`,
-                background: `linear-gradient(90deg, ${tint(barColor, "90")}, ${barColor})`,
-                boxShadow: running ? `0 0 8px ${tint(barColor, "80")}` : "none",
-                transition: "width 0.95s linear, background 0.3s",
-              }}
-            />
+          {/* Solo la barra que se vacía — sin palabras ni tiempo repetido. */}
+          <div className="flex-1 min-w-0 flex items-center">
+            <div className="w-full h-2 rounded-full overflow-hidden bg-slate-800/70">
+              <div
+                className="h-full rounded-full"
+                style={{
+                  width: `${pct}%`,
+                  background: `linear-gradient(90deg, ${tint(barColor, "90")}, ${barColor})`,
+                  boxShadow: running ? `0 0 8px ${tint(barColor, "80")}` : "none",
+                  transition: "width 0.95s linear, background 0.3s",
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Controles */}
+          <div className="flex gap-1.5 shrink-0">
+            <button onClick={() => { haptic(15); setRunning((r) => !r); }} aria-label={running ? "Pausar" : "Iniciar"} className="w-9 h-9 rounded-xl flex items-center justify-center active:scale-90 transition" style={running ? { background: `linear-gradient(160deg, ${accent}, ${tint(accent, "b0")})`, color: "#fff" } : { backgroundColor: tint(accent, "1e"), color: accent, border: `1px solid ${tint(accent, "40")}` }}>
+              {running ? <Pause size={15} /> : <Play size={15} className="ml-0.5" />}
+            </button>
+            <button onClick={() => { setRunning(false); setRemaining(seconds); endTimeRef.current = null; firedRef.current = false; }} aria-label="Reiniciar" className="w-9 h-9 rounded-xl flex items-center justify-center active:scale-90 transition text-slate-500 hover:text-slate-300 bg-slate-800/50 border border-slate-700/50">
+              <RotateCcw size={13} />
+            </button>
           </div>
         </div>
-
-        {/* Controles */}
-        <div className="flex gap-1.5 shrink-0">
-          <button onClick={() => { haptic(15); setRunning((r) => !r); }} aria-label={running ? "Pausar" : "Iniciar"} className="w-9 h-9 rounded-xl flex items-center justify-center active:scale-90 transition" style={running ? { background: `linear-gradient(160deg, ${accent}, ${tint(accent, "b0")})`, color: "#fff" } : { backgroundColor: tint(accent, "1e"), color: accent, border: `1px solid ${tint(accent, "40")}` }}>
-            {running ? <Pause size={15} /> : <Play size={15} className="ml-0.5" />}
-          </button>
-          <button onClick={() => { setRunning(false); setRemaining(seconds); endTimeRef.current = null; firedRef.current = false; }} aria-label="Reiniciar" className="w-9 h-9 rounded-xl flex items-center justify-center active:scale-90 transition text-slate-500 hover:text-slate-300 bg-slate-800/50 border border-slate-700/50">
-            <RotateCcw size={13} />
-          </button>
-        </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -3627,7 +3665,7 @@ function RankUpModal({ from, to, muscleName, onClose }) {
   );
 }
 
-function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, accent, logs, setLogs, drafts = {}, setDrafts, deloadKgFactor = 1, deloadMode = false, autoShowPrShare = true, onDisableAutoShowPrShare, hasActiveSession = true, cardio = false, dumbbellDouble = null, fieldSettings = DEFAULT_SETTINGS, onUpdateSettings = null, sex = null, age = null, restTimerId = null, restSeconds = null }) {
+function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, accent, logs, setLogs, drafts = {}, setDrafts, deloadKgFactor = 1, deloadMode = false, autoShowPrShare = true, onDisableAutoShowPrShare, hasActiveSession = true, cardio = false, dumbbellDouble = null, fieldSettings = DEFAULT_SETTINGS, onUpdateSettings = null, sex = null, age = null, restTimerId = null, restSeconds = null, isLastSet = false }) {
   const globalUnit = useWeightUnit();
   // Unidad local: arranca desde la preferencia global, pero el usuario puede
   // cambiarla ejercicio por ejercicio con el toggle kg/lbs del input.
@@ -3814,8 +3852,16 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   // serie recién guardada lo recoge ya corriendo, sin tocar RestTimer para
   // nada. restTimerId viene null en cardio y en superseries (ahí el
   // descanso se comparte y no debe arrancar hasta completar la vuelta).
+  // BUG FIX: al guardar la ÚLTIMA serie del ejercicio (o del día), no hay
+  // ninguna serie siguiente para la que descansar — pero como al completar
+  // TODAS las series el cronómetro "vuelve a la posición de arriba"
+  // (timerSlot 0, ver ExerciseCard), antes igual arrancaba ahí un descanso
+  // invisible: renderizaba arriba de todo, lejos de donde mirabas al
+  // guardar la última serie, y terminaba avisando (sonido/vibración/
+  // notificación) sin que hubieras visto ningún cronómetro correr. Ahora,
+  // si es la última serie, directamente no se arranca nada.
   const autoStartRestTimer = () => {
-    if (fieldSettings.autoStartRestTimer === true && restTimerId && restSeconds) {
+    if (fieldSettings.autoStartRestTimer === true && restTimerId && restSeconds && !isLastSet) {
       ACTIVE_REST_TIMERS[restTimerId] = { endTime: Date.now() + restSeconds * 1000 };
     }
   };
@@ -4440,7 +4486,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
           <div className="mb-2 timer-hop"><RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={accent} alertType={settings.alertType} timerId={`ex_${exercise.id}`} exerciseName={exercise.name} /></div>
         )}
         {setsToShow.map((s, i) => <React.Fragment key={`${exercise.id}:frag:${i}`}>
-          <SetRow key={`${exercise.id}:${i}:${resetKey}`} exerciseId={exercise.id} exerciseName={exercise.name} exerciseMuscle={exercise.muscle} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadKgFactor={settings.deloadPct} deloadMode={deloadMode} resetKey={resetKey} autoShowPrShare={settings.autoShowPrShare ?? true} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={hasActiveSession} cardio={exercise.cardio} dumbbellDouble={settings?.dumbbellDouble || null} fieldSettings={settings} onUpdateSettings={onUpdateSettings} sex={sex} age={age} restTimerId={restTimerId} restSeconds={restSeconds} />
+          <SetRow key={`${exercise.id}:${i}:${resetKey}`} exerciseId={exercise.id} exerciseName={exercise.name} exerciseMuscle={exercise.muscle} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadKgFactor={settings.deloadPct} deloadMode={deloadMode} resetKey={resetKey} autoShowPrShare={settings.autoShowPrShare ?? true} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={hasActiveSession} cardio={exercise.cardio} dumbbellDouble={settings?.dumbbellDouble || null} fieldSettings={settings} onUpdateSettings={onUpdateSettings} sex={sex} age={age} restTimerId={restTimerId} restSeconds={restSeconds} isLastSet={i === setsToShow.length - 1} />
           {/* Debajo de la serie recién registrada: timerSlot = N significa
               "después de la serie N" (1-indexado). */}
           {timerSlot === i + 1 && (
@@ -7008,23 +7054,61 @@ function getSessionsForPeriod(sessions, period) {
 
 // Agrupa las filas ya achatadas de vuelta por fecha, en orden cronológico —
 // es como se ven mejor tanto en el PDF como en el Word (una sub-sección por
-// día entrenado, con su propia tablita de series).
+// día entrenado, con su propia tablita de series). También calcula el
+// promedio de RPE y el volumen de ESE día (los trae de las filas, no de la
+// sesión original, para no tener que arrastrar el objeto sesión completo).
 function groupExportRowsByDate(rows) {
   const map = {};
-  rows.forEach((r) => { if (!map[r.date]) map[r.date] = { date: r.date, dayLabel: r.dayLabel, rows: [] }; map[r.date].rows.push(r); });
-  return Object.values(map).sort((a, b) => (a.date < b.date ? -1 : 1)).map((g) => ({
-    ...g,
-    dateLabel: new Date(g.date + "T00:00:00").toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" }),
-  }));
+  rows.forEach((r) => {
+    if (!map[r.date]) map[r.date] = { date: r.date, dayLabel: r.dayLabel, durationMin: r.durationMin, completionPct: r.completionPct, rows: [] };
+    map[r.date].rows.push(r);
+  });
+  return Object.values(map).sort((a, b) => (a.date < b.date ? -1 : 1)).map((g) => {
+    const rpeVals = g.rows.filter((r) => r.rpe != null).map((r) => r.rpe);
+    return {
+      ...g,
+      dateLabel: new Date(g.date + "T00:00:00").toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" }),
+      avgRpe: rpeVals.length ? Math.round((rpeVals.reduce((a, b) => a + b, 0) / rpeVals.length) * 10) / 10 : null,
+      totalVol: Math.round(g.rows.reduce((acc, r) => acc + vol(r.kg, r.reps), 0)),
+    };
+  });
 }
 
-function buildExportRows(filteredSessions) {
+// Nota persistente de un ejercicio/serie (la misma que ves al registrar, ver
+// SetRow) — se agrega a cada fila exportada para que tu entrenador vea el
+// mismo comentario de técnica/recordatorio que vos tenés cargado.
+function resolveExportNote(exerciseNotes, exerciseId, setIndex) {
+  if (!exerciseNotes) return "";
+  const noteKey = `${exerciseId}_${setIndex}`;
+  return exerciseNotes[noteKey] ?? (setIndex === 0 ? (exerciseNotes[exerciseId] || "") : "") ?? "";
+}
+
+function buildExportRows(filteredSessions, exerciseNotes = {}) {
   const rows = [];
   filteredSessions.slice().sort((a, b) => (a.date < b.date ? -1 : 1)).forEach((s) => {
     const dayLabel = s.dayKeys.map((dk) => ROUTINE[dk]?.label || dk).join(" / ");
-    s.items.forEach((it) => { rows.push({ date: s.date, dayLabel, exercise: it.exerciseName, set: it.setIndex + 1, reps: it.reps, kg: it.kg, rpe: it.rpe }); });
+    s.items.forEach((it) => {
+      rows.push({
+        date: s.date, dayLabel, durationMin: s.durationMin, completionPct: s.completionPct,
+        exercise: it.exerciseName, muscle: it.exerciseMuscle || null, set: it.setIndex + 1,
+        reps: it.reps, kg: it.kg, minutes: it.minutes, km: it.km, rpe: it.rpe,
+        isImprovement: it.isImprovement, note: resolveExportNote(exerciseNotes, it.exerciseId, it.setIndex),
+      });
+    });
   });
   return rows;
+}
+
+// Cómo se lee cada serie: fuerza (reps/kg) o cardio (minutos/km) — ambos
+// comparten las mismas columnas en PDF/Word para no duplicar la tabla.
+function formatExportReps(r) {
+  if (r.minutes != null) return `${r.minutes} min`;
+  if (r.km != null) return `${r.km} km`;
+  return r.reps != null ? String(r.reps) : "—";
+}
+function formatExportKg(r) {
+  if (r.minutes != null || r.km != null) return "—";
+  return r.kg != null ? `${r.kg} kg` : "—";
 }
 
 // Resumen semanal (ver handleEndSession/handleFinishDeloadSession): mismos
@@ -7051,44 +7135,113 @@ async function exportTrainingToPdf(rows, meta) {
   const { jsPDF } = await import("jspdf");
   const autoTable = (await import("jspdf-autotable")).default;
   const doc = new jsPDF();
-  doc.setFontSize(16);
-  doc.text("Modus Fit — Resumen de entrenamiento", 14, 18);
+  const groups = groupExportRowsByDate(rows);
+  const totalVolumen = Math.round(rows.reduce((acc, r) => acc + vol(r.kg, r.reps), 0));
+  const rpeVals = rows.filter((r) => r.rpe != null).map((r) => r.rpe);
+  const avgRpe = rpeVals.length ? Math.round((rpeVals.reduce((a, b) => a + b, 0) / rpeVals.length) * 10) / 10 : null;
+
+  // Franja de marca arriba de todo — mismo teal del resto de la app.
+  doc.setFillColor(20, 184, 166);
+  doc.rect(0, 0, 210, 6, "F");
+  doc.setFontSize(17);
+  doc.setTextColor(20);
+  doc.text("Resumen de entrenamiento", 14, 22);
   doc.setFontSize(10);
   doc.setTextColor(110);
-  doc.text(`${meta.profileName} · ${meta.periodLabel}`, 14, 25);
-  doc.setTextColor(20);
-  let y = 34;
-  const groups = groupExportRowsByDate(rows);
+  doc.text(`${meta.profileName} · ${meta.periodLabel} · generado el ${new Date().toLocaleDateString("es-AR")}`, 14, 29);
+
+  // Caja de resumen: lo primero que un entrenador quiere ver de un vistazo,
+  // antes de entrar al detalle serie por serie.
+  const stats = [
+    ["Días entrenados", String(groups.length)],
+    ["Series totales", String(rows.length)],
+    ["Volumen total", `${totalVolumen.toLocaleString("es-AR")} kg`],
+    ["RPE promedio", avgRpe != null ? String(avgRpe) : "—"],
+  ];
+  const boxW = 43, boxGap = 3;
+  stats.forEach(([label, value], i) => {
+    const x = 14 + i * (boxW + boxGap);
+    doc.setDrawColor(225); doc.setFillColor(248, 250, 252);
+    doc.roundedRect(x, 35, boxW, 17, 2, 2, "FD");
+    doc.setFontSize(13); doc.setTextColor(20);
+    doc.text(value, x + boxW / 2, 44, { align: "center" });
+    doc.setFontSize(7); doc.setTextColor(120);
+    doc.text(label, x + boxW / 2, 49, { align: "center" });
+  });
+
+  let y = 62;
   groups.forEach((g) => {
-    if (y > 268) { doc.addPage(); y = 20; }
+    if (y > 258) { doc.addPage(); y = 20; }
     doc.setFontSize(11);
     doc.setTextColor(20);
     doc.text(`${g.dateLabel.charAt(0).toUpperCase()}${g.dateLabel.slice(1)} — ${g.dayLabel}`, 14, y);
-    y += 3;
+    const metaBits = [];
+    if (g.durationMin) metaBits.push(`${g.durationMin} min`);
+    if (g.completionPct != null) metaBits.push(`${g.completionPct}% completado`);
+    if (g.avgRpe != null) metaBits.push(`RPE prom. ${g.avgRpe}`);
+    if (metaBits.length) {
+      doc.setFontSize(8); doc.setTextColor(140);
+      doc.text(metaBits.join("  ·  "), 196, y, { align: "right" });
+    }
+    y += 4;
     autoTable(doc, {
       startY: y,
-      head: [["Ejercicio", "Serie", "Reps", "Kg", "RPE"]],
-      body: g.rows.map((r) => [r.exercise, `S${r.set}`, String(r.reps), `${r.kg} kg`, r.rpe != null ? String(r.rpe) : "—"]),
-      styles: { fontSize: 9 },
-      headStyles: { fillColor: [20, 184, 166] },
+      head: [["Ejercicio", "Músculo", "Serie", "Reps", "Kg", "RPE", "PR", "Nota"]],
+      body: g.rows.map((r) => [
+        r.exercise, r.muscle || "—", `S${r.set}`, formatExportReps(r), formatExportKg(r),
+        r.rpe != null ? String(r.rpe) : "—", r.isImprovement ? "PR" : "", r.note || "—",
+      ]),
+      styles: { fontSize: 8, cellPadding: 2 },
+      headStyles: { fillColor: [20, 184, 166], textColor: 255, fontStyle: "bold" },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      columnStyles: { 0: { cellWidth: 36 }, 1: { cellWidth: 24 }, 2: { cellWidth: 12 }, 3: { cellWidth: 14 }, 4: { cellWidth: 14 }, 5: { cellWidth: 11 }, 6: { cellWidth: 10 }, 7: { cellWidth: 41 } },
       margin: { left: 14, right: 14 },
     });
     y = doc.lastAutoTable.finalY + 10;
   });
+
+  // Pie de página con numeración y marca, en todas las páginas.
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let p = 1; p <= pageCount; p++) {
+    doc.setPage(p);
+    doc.setFontSize(8); doc.setTextColor(160);
+    doc.text(`Modus Fit · Página ${p} de ${pageCount}`, 105, 290, { align: "center" });
+  }
+
   doc.save(`${meta.filename}.pdf`);
 }
 
 async function exportTrainingToWord(rows, meta) {
   const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, HeadingLevel, WidthType } = await import("docx");
   const groups = groupExportRowsByDate(rows);
+  const totalVolumen = Math.round(rows.reduce((acc, r) => acc + vol(r.kg, r.reps), 0));
+  const rpeVals = rows.filter((r) => r.rpe != null).map((r) => r.rpe);
+  const avgRpe = rpeVals.length ? Math.round((rpeVals.reduce((a, b) => a + b, 0) / rpeVals.length) * 10) / 10 : null;
+
   const children = [
     new Paragraph({ text: "Modus Fit — Resumen de entrenamiento", heading: HeadingLevel.HEADING_1 }),
-    new Paragraph({ children: [new TextRun({ text: `${meta.profileName} · ${meta.periodLabel}`, color: "666666" })], spacing: { after: 200 } }),
+    new Paragraph({ children: [new TextRun({ text: `${meta.profileName} · ${meta.periodLabel} · generado el ${new Date().toLocaleDateString("es-AR")}`, color: "666666" })], spacing: { after: 160 } }),
+    new Paragraph({
+      children: [
+        new TextRun({ text: `${groups.length} día${groups.length === 1 ? "" : "s"} entrenados  ·  `, bold: true }),
+        new TextRun({ text: `${rows.length} series totales  ·  `, bold: true }),
+        new TextRun({ text: `${totalVolumen.toLocaleString("es-AR")} kg de volumen  ·  `, bold: true }),
+        new TextRun({ text: `RPE promedio ${avgRpe ?? "—"}`, bold: true }),
+      ],
+      spacing: { after: 200 },
+    }),
   ];
   groups.forEach((g) => {
-    children.push(new Paragraph({ text: `${g.dateLabel.charAt(0).toUpperCase()}${g.dateLabel.slice(1)} — ${g.dayLabel}`, heading: HeadingLevel.HEADING_2, spacing: { before: 260, after: 100 } }));
-    const headerRow = new TableRow({ children: ["Ejercicio", "Serie", "Reps", "Kg", "RPE"].map((h) => new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: h, bold: true })] })] })) });
-    const dataRows = g.rows.map((r) => new TableRow({ children: [r.exercise, `S${r.set}`, String(r.reps), `${r.kg} kg`, r.rpe != null ? String(r.rpe) : "—"].map((v) => new TableCell({ children: [new Paragraph(v)] })) }));
+    children.push(new Paragraph({ text: `${g.dateLabel.charAt(0).toUpperCase()}${g.dateLabel.slice(1)} — ${g.dayLabel}`, heading: HeadingLevel.HEADING_2, spacing: { before: 260, after: 40 } }));
+    const metaBits = [];
+    if (g.durationMin) metaBits.push(`${g.durationMin} min`);
+    if (g.completionPct != null) metaBits.push(`${g.completionPct}% completado`);
+    if (g.avgRpe != null) metaBits.push(`RPE prom. ${g.avgRpe}`);
+    if (metaBits.length) children.push(new Paragraph({ children: [new TextRun({ text: metaBits.join("  ·  "), color: "888888", italics: true })], spacing: { after: 100 } }));
+    const headerRow = new TableRow({ children: ["Ejercicio", "Músculo", "Serie", "Reps", "Kg", "RPE", "PR", "Nota"].map((h) => new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: h, bold: true })] })] })) });
+    const dataRows = g.rows.map((r) => new TableRow({ children: [
+      r.exercise, r.muscle || "—", `S${r.set}`, formatExportReps(r), formatExportKg(r), r.rpe != null ? String(r.rpe) : "—", r.isImprovement ? "PR" : "", r.note || "—",
+    ].map((v) => new TableCell({ children: [new Paragraph(v)] })) }));
     children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [headerRow, ...dataRows] }));
   });
   const doc = new Document({ sections: [{ children }] });
@@ -7098,11 +7251,39 @@ async function exportTrainingToWord(rows, meta) {
 
 async function exportTrainingToExcel(rows, meta) {
   const XLSX = await import("xlsx");
-  const header = ["Fecha", "Día", "Ejercicio", "Serie", "Reps", "Kg", "RPE"];
-  const data = rows.map((r) => [r.date, r.dayLabel, r.exercise, r.set, r.reps, r.kg, r.rpe ?? ""]);
-  const ws = XLSX.utils.aoa_to_sheet([header, ...data]);
+  const groups = groupExportRowsByDate(rows);
+  const totalVolumen = Math.round(rows.reduce((acc, r) => acc + vol(r.kg, r.reps), 0));
+  const rpeVals = rows.filter((r) => r.rpe != null).map((r) => r.rpe);
+  const avgRpe = rpeVals.length ? Math.round((rpeVals.reduce((a, b) => a + b, 0) / rpeVals.length) * 10) / 10 : null;
+
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Entrenamiento");
+
+  // Hoja "Resumen" — lo primero que ve un entrenador al abrir el archivo.
+  const wsResumen = XLSX.utils.aoa_to_sheet([
+    ["Modus Fit — Resumen de entrenamiento"],
+    [meta.profileName, meta.periodLabel],
+    [`Generado el ${new Date().toLocaleDateString("es-AR")}`],
+    [],
+    ["Días entrenados", groups.length],
+    ["Series totales", rows.length],
+    ["Volumen total (kg)", totalVolumen],
+    ["RPE promedio", avgRpe ?? "—"],
+  ]);
+  wsResumen["!cols"] = [{ wch: 24 }, { wch: 18 }];
+  XLSX.utils.book_append_sheet(wb, wsResumen, "Resumen");
+
+  // Hoja "Detalle" — cada métrica en su propia columna NUMÉRICA (reps, kg,
+  // minutos, km por separado) para que se pueda sumar/filtrar/graficar
+  // directo en Excel, sin tener que parsear texto tipo "8 reps".
+  const header = ["Fecha", "Día", "Ejercicio", "Músculo", "Serie", "Reps", "Kg", "Min (cardio)", "Km (cardio)", "RPE", "PR", "Nota"];
+  const data = rows.map((r) => [
+    r.date, r.dayLabel, r.exercise, r.muscle || "—", r.set,
+    r.reps ?? "", r.kg ?? "", r.minutes ?? "", r.km ?? "", r.rpe ?? "", r.isImprovement ? "PR" : "", r.note || "",
+  ]);
+  const wsDetalle = XLSX.utils.aoa_to_sheet([header, ...data]);
+  wsDetalle["!cols"] = [{ wch: 12 }, { wch: 16 }, { wch: 26 }, { wch: 16 }, { wch: 7 }, { wch: 7 }, { wch: 7 }, { wch: 12 }, { wch: 12 }, { wch: 6 }, { wch: 6 }, { wch: 32 }];
+  XLSX.utils.book_append_sheet(wb, wsDetalle, "Detalle");
+
   XLSX.writeFile(wb, `${meta.filename}.xlsx`);
 }
 
@@ -7189,13 +7370,13 @@ const EXPORT_PERIODS = [
 // Tarjeta de Perfil: elegís el período y el formato, y se descarga
 // directo — pensado para mandarle a tu entrenador el resumen sin tener que
 // armarlo a mano.
-function ExportTrainingCard({ profileName, logs, trainingSessions = [] }) {
+function ExportTrainingCard({ profileName, logs, trainingSessions = [], exerciseNotes = {} }) {
   const allSessions = useMemo(() => buildSessionsIndex(logs, trainingSessions), [logs, trainingSessions]);
   const [period, setPeriod] = useState("week");
   const [exporting, setExporting] = useState(null);
   const [error, setError] = useState("");
   const filtered = useMemo(() => getSessionsForPeriod(allSessions, period), [allSessions, period]);
-  const rows = useMemo(() => buildExportRows(filtered), [filtered]);
+  const rows = useMemo(() => buildExportRows(filtered, exerciseNotes), [filtered, exerciseNotes]);
   const periodLabel = EXPORT_PERIODS.find((p) => p.k === period)?.l || "";
 
   const handleExport = async (format) => {
@@ -7701,7 +7882,7 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
       </div>
 
       <div className="flex items-center gap-1.5 px-1 pt-2"><Download size={11} className="text-slate-600" /><p className="text-[10px] font-black uppercase tracking-widest text-slate-600">Datos</p></div>
-      <ExportTrainingCard profileName={profileName} logs={logs} />
+      <ExportTrainingCard profileName={profileName} logs={logs} trainingSessions={profile?.trainingSessions} exerciseNotes={settings.exerciseNotes} />
 
       <div className="flex items-center gap-2.5 px-1 text-[11px] text-slate-600">
         <Save size={12} className="text-slate-600 shrink-0" />
@@ -10677,7 +10858,6 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
                 const ultimoImpar = i === orden.length - 1 && orden.length % 2 === 1;
                 return (
                   <span key={dk} className={`flex items-center gap-2 px-2.5 py-2.5 rounded-xl text-[11px] font-bold bg-black/25 border border-purple-400/10 min-w-0 ${ultimoImpar ? "col-span-2" : ""}`}>
-                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: d.color, boxShadow: `0 0 5px -1px ${d.color}` }} />
                     <span className="flex-1 min-w-0 leading-snug text-slate-200" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{d.label}</span>
                     <span className="text-purple-300/60 tabular-nums shrink-0 text-[10px]">{d.exercises?.length || 0}</span>
                   </span>
