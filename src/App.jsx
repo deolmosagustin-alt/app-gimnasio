@@ -10366,20 +10366,26 @@ function BalanceMuscular({ routineDef, compacto = true }) {
 
   return (
     <div>
-      <div className="flex items-baseline justify-between mb-2">
-        <span className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-500">Balance muscular</span>
-        <span className="text-[9px] text-slate-600 tabular-nums">{totalSeries} series</span>
+      <div className="flex items-center gap-2.5 mb-3">
+        <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(168,85,247,0.15)", color: "#A855F7" }}>
+          <Activity size={13} />
+        </span>
+        <div className="flex-1 min-w-0 flex items-baseline justify-between gap-2">
+          <span className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Balance muscular</span>
+          <span className="text-[9px] text-slate-600 tabular-nums shrink-0">{totalSeries} series</span>
+        </div>
       </div>
-      <div className="space-y-1.5">
+      <div className="space-y-2">
         {mostrar.map((d, i) => (
-          <div key={d.grupo} className="flex items-center gap-2">
-            <span className="text-[10px] text-slate-400 w-[88px] shrink-0 truncate">{d.label}</span>
-            <div className="flex-1 h-1.5 rounded-full bg-slate-800/70 overflow-hidden">
+          <div key={d.grupo} className="flex items-center gap-2.5">
+            <span className="text-[10.5px] font-bold text-slate-400 w-[88px] shrink-0 truncate">{d.label}</span>
+            <div className="flex-1 h-2 rounded-full bg-slate-800/60 overflow-hidden">
               <div
                 className="h-full rounded-full grow-bar"
                 style={{
                   width: `${(d.series / max) * 100}%`,
-                  backgroundColor: d.color,
+                  background: `linear-gradient(90deg, ${tint(d.color, "88")}, ${d.color})`,
+                  boxShadow: `0 0 7px -1px ${tint(d.color, "70")}`,
                   animationDelay: `${i * 60}ms`,
                 }}
               />
@@ -10455,11 +10461,18 @@ function RoutinePreviewModal({ routineDef, routineName, onActivate, onClose, yaA
 
         {/* Cuerpo con scroll */}
         <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-4 space-y-4">
-          <div className="rounded-2xl bg-slate-950/50 border border-slate-800/60 p-3.5">
+          <div className="rounded-2xl border border-purple-500/15 p-3.5" style={{ backgroundColor: "var(--panel-sunken)" }}>
             <BalanceMuscular routineDef={routineDef} />
           </div>
 
-          <div className="space-y-2">
+          <div>
+            <div className="flex items-center gap-2.5 mb-2.5">
+              <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(168,85,247,0.15)", color: "#A855F7" }}>
+                <Calendar size={13} />
+              </span>
+              <span className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Tus días</span>
+            </div>
+            <div className="space-y-2">
             {dias.map((dk) => {
               const day = routineDef.days[dk];
               if (!day) return null;
@@ -10475,8 +10488,11 @@ function RoutinePreviewModal({ routineDef, routineName, onActivate, onClose, yaA
                   }}
                 >
                   <button onClick={() => setAbierto(esteAbierto ? null : dk)} className="w-full flex items-center gap-3 px-3.5 py-3 text-left">
-                    {/* Barra de color vertical: identifica el día sin inundar */}
-                    <span className="w-1 h-8 rounded-full shrink-0" style={{ backgroundColor: day.color }} />
+                    {/* Placa de ícono, mismo lenguaje visual que el resto de
+                        la app — antes era solo una franja fina de color. */}
+                    <span className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: tint(day.color, "1c"), color: day.color }}>
+                      <Dumbbell size={15} />
+                    </span>
                     <span className="flex-1 min-w-0">
                       <span className="block text-xs font-black text-white truncate">{day.label}</span>
                       <span className="block text-[10px] text-slate-500 tabular-nums">
@@ -10512,6 +10528,7 @@ function RoutinePreviewModal({ routineDef, routineName, onActivate, onClose, yaA
                 </div>
               );
             })}
+            </div>
           </div>
         </div>
 

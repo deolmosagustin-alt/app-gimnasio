@@ -58,10 +58,10 @@ public class RestTimerPlugin extends Plugin {
         String chipText = minutes > 0
                 ? String.format(Locale.getDefault(), "%d:%02d", minutes, secsRem)
                 : (secsRem + "s");
-        String title = "⏱️ Descanso";
+        String title = "⏱️ Descansando…";
         String body = (exerciseName != null && !exerciseName.isEmpty())
-                ? exerciseName
-                : "Recuperá · próxima serie";
+                ? "Volvés a " + exerciseName
+                : "Guardá fuerzas para la próxima 💪";
 
         Notification notification = null;
 
