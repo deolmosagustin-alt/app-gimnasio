@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback, createContext
 import { createPortal } from "react-dom";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer,
+  ResponsiveContainer, ReferenceLine,
 } from "recharts";
 import {
   Play, Pause, RotateCcw, TrendingUp, TrendingDown, Dumbbell,
@@ -434,6 +434,41 @@ const AI_CHAT_WELCOME = { role: "assistant", text: "¡Hola! 👋 Soy tu **Entren
 // que el Entrenador IA mantenga contexto reciente sin inflar el perfil.
 const AI_CHAT_HISTORY_CAP = 60;
 
+// Varias conversaciones guardadas por perfil (como el historial de chats de
+// Claude), no una sola que se pisaba con "Nueva conversación". Cada una:
+// { id, title, messages, updatedAt }. `getAiConversations` also migra en
+// caliente el formato viejo (un solo `aiChatHistory`) la primera vez que un
+// perfil viejo entra acá — sin tocar nada hasta que el usuario interactúe
+// (mandar un mensaje, crear una nueva, etc.), momento en el que recién se
+// persiste el resultado migrado.
+function deriveAiConvoTitle(messages) {
+  const firstUser = (messages || []).find((m) => m.role === "user");
+  if (!firstUser?.text) return "Nueva conversación";
+  const t = firstUser.text.trim().replace(/\s+/g, " ");
+  return t.length > 40 ? `${t.slice(0, 40)}…` : t;
+}
+// Devuelve el perfil sin el campo viejo `aiChatHistory` (ya migrado a
+// `aiConversations`) — con `delete` en vez de desestructurar-y-descartar
+// porque el binding descartado (`_old`) queda "no usado" y ESLint no lo deja
+// pasar (no-unused-vars).
+function withoutOldAiChatHistory(profile) {
+  if (!profile || !("aiChatHistory" in profile)) return profile;
+  const clean = { ...profile };
+  delete clean.aiChatHistory;
+  return clean;
+}
+function getAiConversations(profile) {
+  if (!profile) return [];
+  if (profile.aiConversations?.length) return profile.aiConversations;
+  const oldHistory = profile.aiChatHistory?.length > 0 ? profile.aiChatHistory : null;
+  return [{
+    id: "default",
+    title: oldHistory ? deriveAiConvoTitle(oldHistory) : "Nueva conversación",
+    messages: oldHistory || [AI_CHAT_WELCOME],
+    updatedAt: new Date().toISOString(),
+  }];
+}
+
 // Actualizá esto con tu applicationId real apenas lo tengas (Play Console
 // → tu app → la URL de la ficha, o simplemente
 // com.tu_paquete.elegido) — se usa para el botón "Dejanos una reseña" que
@@ -444,7 +479,7 @@ const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.modusf
 
 const DEFAULT_SETTINGS = {
   alertType: "sound", restLong: REST_LONG, restShort: REST_SHORT,
-  trainWeeks: TRAIN_WEEKS, deloadWeeks: DELOAD_WEEKS, deloadPct: 0.75, deloadSetDivisor: 2,
+  trainWeeks: TRAIN_WEEKS, deloadWeeks: DELOAD_WEEKS, deloadPct: 0.75, deloadSetDivisor: 2, deloadEnabled: true,
   theme: "dark", textScale: 1, smallTextScale: 1, autoShowPrShare: true, bodyWeightKg: 0, muscleRankMode: "general", allowZoom: false,
   weightUnit: "kg", // "kg" o "lbs"
   reminderEnabled: false, reminderTime: "18:00", // recordatorio de entrenamiento
@@ -453,6 +488,7 @@ const DEFAULT_SETTINGS = {
   // default: la ficha arranca mínima (solo reps/kg) y cada quien prende
   // lo que realmente va a usar, en vez de tener que apagar seis cosas.
   showRpe: false, showWarmup: false, show1RMPercent: false, showCoaching: false, showExerciseNote: false, showPersonalNote: false, showStagnation: false, showProgressionSuggestion: false,
+  rpeDisplayMode: "rpe", // "rpe" | "rir" — mismo dato guardado, solo cambia cómo se muestra
   // Al guardar una serie, arrancar solo el cronómetro de descanso. Apagado
   // por default: es un cambio de comportamiento (no solo de qué se ve), así
   // que preferimos que lo prendas vos a que te aparezca activado de golpe.
@@ -501,6 +537,19 @@ const RPE_SCALE = [
   { value: 9, desc: "1 en reserva" },
   { value: 10, desc: "Al fallo" },
 ];
+// RIR (repeticiones en reserva) es la forma "inversa" de decir lo mismo que
+// el RPE: RPE 10 = 0 en reserva, RPE 6 = 4+ en reserva. El dato SIEMPRE se
+// guarda como RPE (no se toca el resto de la app — exportar, cálculos,
+// etc.), esto solo cambia cómo se muestra según la preferencia elegida.
+function rirButtonLabel(rpeValue) {
+  const rir = 10 - rpeValue;
+  return rir >= 4 ? "4+" : String(rir);
+}
+function formatEffort(rpeValue, mode) {
+  if (rpeValue == null) return null;
+  if (mode === "rir") { const rir = Math.max(0, 10 - rpeValue); return `RIR ${rir}`; }
+  return `RPE ${rpeValue}`;
+}
 /* ============================== STORAGE: localStorage ============================== */
 
 const PROFILES_KEY = "gym_profiles_v2";
@@ -821,10 +870,16 @@ function getBestWorkingKg(exercise, logs) {
 
 function getWeekInfo(cycleStart, settings = DEFAULT_SETTINGS) {
   if (!cycleStart) return null;
-  const { trainWeeks = TRAIN_WEEKS, deloadWeeks = DELOAD_WEEKS } = settings;
-  const cycleWeeks = trainWeeks + deloadWeeks;
+  const { trainWeeks = TRAIN_WEEKS, deloadWeeks = DELOAD_WEEKS, deloadEnabled = true } = settings;
   const diffDays = Math.floor((new Date() - cycleStart) / 86400000);
   const totalWeek = Math.floor(diffDays / 7);
+  // Con la descarga apagada, el ciclo es continuo: cada "vuelta" dura
+  // trainWeeks nomás, nunca hay semana de descarga.
+  if (deloadEnabled === false) {
+    const weekInCycle = (totalWeek % trainWeeks) + 1;
+    return { totalWeek: totalWeek + 1, weekInCycle, isDeload: false, cycleNumber: Math.floor(totalWeek / trainWeeks) + 1, cycleWeeks: trainWeeks, trainWeeks, deloadWeeks };
+  }
+  const cycleWeeks = trainWeeks + deloadWeeks;
   const weekInCycle = (totalWeek % cycleWeeks) + 1;
   const isDeload = weekInCycle > trainWeeks;
   return { totalWeek: totalWeek + 1, weekInCycle, isDeload, cycleNumber: Math.floor(totalWeek / cycleWeeks) + 1, cycleWeeks, trainWeeks, deloadWeeks };
@@ -914,13 +969,20 @@ function buildSessionsIndex(logs, trainingSessions = []) {
         if (formal.startedAt && formal.endedAt) {
           durationMin = Math.max(1, Math.round((new Date(formal.endedAt) - new Date(formal.startedAt)) / 60000));
         }
-        // % completado: ejercicios del día programado con al menos una
-        // serie registrada esa fecha, sobre el total de ejercicios del día.
-        const dayDef = ROUTINE[formal.dayKey];
-        if (dayDef?.exercises?.length) {
+        // % completado: ejercicios del día con al menos una serie
+        // registrada esa fecha, sobre el total de ejercicios del día.
+        // BUG FIX: antes esto siempre miraba ROUTINE[dayKey] EN VIVO, así que
+        // el % de una sesión vieja cambiaba solo si después agregabas o
+        // sacabas ejercicios de ese día. Ahora se usa la foto guardada al
+        // finalizar esa sesión (`dayExerciseIds`, ver handleEndSession) —
+        // fija para siempre. Las sesiones de antes de este fix no tienen esa
+        // foto, así que caen al viejo comportamiento (mejor un dato variable
+        // que ninguno).
+        const dayExerciseIds = formal.dayExerciseIds || ROUTINE[formal.dayKey]?.exercises?.map((e) => e.id) || null;
+        if (dayExerciseIds?.length) {
           const doneIds = new Set(s.items.map((it) => it.exerciseId));
-          const total = dayDef.exercises.length;
-          const done = dayDef.exercises.filter((e) => doneIds.has(e.id)).length;
+          const total = dayExerciseIds.length;
+          const done = dayExerciseIds.filter((id) => doneIds.has(id)).length;
           completionPct = Math.round((done / total) * 100);
         }
       }
@@ -3665,7 +3727,7 @@ function RankUpModal({ from, to, muscleName, onClose }) {
   );
 }
 
-function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, accent, logs, setLogs, drafts = {}, setDrafts, deloadKgFactor = 1, deloadMode = false, autoShowPrShare = true, onDisableAutoShowPrShare, hasActiveSession = true, cardio = false, dumbbellDouble = null, fieldSettings = DEFAULT_SETTINGS, onUpdateSettings = null, sex = null, age = null, restTimerId = null, restSeconds = null, isLastSet = false }) {
+function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, accent, logs, setLogs, drafts = {}, setDrafts, autoShowPrShare = true, onDisableAutoShowPrShare, hasActiveSession = true, cardio = false, dumbbellDouble = null, fieldSettings = DEFAULT_SETTINGS, onUpdateSettings = null, sex = null, age = null, restTimerId = null, restSeconds = null, isLastSet = false }) {
   const globalUnit = useWeightUnit();
   // Unidad local: arranca desde la preferencia global, pero el usuario puede
   // cambiarla ejercicio por ejercicio con el toggle kg/lbs del input.
@@ -3698,7 +3760,6 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     if (!computedPR) return override;
     return estimate1RM(override.kg, override.reps) >= estimate1RM(computedPR.kg, computedPR.reps) ? override : computedPR;
   }, [override, computedPR]);
-  const suggestedKg = !cardio && currentPR && deloadMode ? Math.round(currentPR.kg * deloadKgFactor * 2) / 2 : null;
   const draft = drafts[key] || {};
   const reps = draft.reps ?? ""; const kg = draft.kg ?? ""; const rpe = draft.rpe ?? null;
   const minutes = draft.minutes ?? ""; const km = draft.km ?? "";
@@ -3913,7 +3974,9 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
       return;
     }
     const r = parseFloat(reps), kDisplay = parseFloat(kg);
-    if (!r || !kDisplay || isNaN(r) || isNaN(kDisplay) || r < 0 || kDisplay < 0) { setFeedback({ type: "error", msg: "Completá reps y kg." }); return; }
+    // kDisplay puede ser 0 (peso corporal, sin agregado) — solo se rechaza si
+    // está vacío (NaN) o es negativo, no si es cero.
+    if (!r || isNaN(r) || r < 0 || isNaN(kDisplay) || kDisplay < 0) { setFeedback({ type: "error", msg: "Completá reps y kg (podés poner 0 si es a peso corporal)." }); return; }
     const k = displayToKg(kDisplay, unit); // convierte lbs→kg si corresponde
     // Si no había ninguna marca previa, esto es la PRIMERA vez que se
     // registra esta serie — no es un "récord" todavía (no hay nada que
@@ -3947,7 +4010,11 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     }
     const newHistory = [...history.filter((h) => h.date !== today), entry];
     let newLogs = { ...logs, [key]: newHistory };
-    const isPR = !isFirstEver && new1RM > prev1RM;
+    // A peso corporal (0kg), el 1RM estimado siempre da 0 (la fórmula lo
+    // necesita como base) — comparar por 1RM nunca detectaría una mejora por
+    // más reps que hagas. Ahí el récord se mide directo por reps.
+    const isBodyweight = k === 0;
+    const isPR = !isFirstEver && (isBodyweight ? r > (currentPR?.reps || 0) : new1RM > prev1RM);
     // NO guardamos un override automático al hacer récord. El récord se
     // calcula SIEMPRE del historial real (que ya tiene todas tus series). El
     // override (`prKey`) queda reservado para cuando el usuario corrige la
@@ -3996,7 +4063,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   };
   const savePR = () => {
     const r = parseFloat(editReps), kDisplay = parseFloat(editKg);
-    if (!r || !kDisplay || isNaN(r) || isNaN(kDisplay) || r < 0 || kDisplay < 0) return;
+    if (!r || isNaN(r) || r < 0 || isNaN(kDisplay) || kDisplay < 0) return;
     const k = displayToKg(kDisplay, unit); // el input está en la unidad del usuario, se guarda siempre en kg
     setLogs({ ...logs, [prKey]: { kg: k, reps: r, date: today, manual: true } });
     setEditingPR(false);
@@ -4022,7 +4089,6 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
       </div>
       {feedback?.suggestUp && <div className="mb-2.5 -mt-1 text-[11px] text-teal-400 flex items-center gap-1.5"><TrendingUp size={11} /> Superaste el rango · probá +2.5kg la próxima</div>}
       {feedback?.noSession && <div className="mb-2.5 -mt-1 text-[11px] text-amber-400 flex items-center gap-1.5"><AlertTriangle size={11} /> Tocá "Iniciar sesión" arriba para que este día cuente en tu historial</div>}
-      {deloadMode && suggestedKg && <div className="mb-2 text-[11px] text-purple-400 flex items-center gap-1.5"><Zap size={11} /> Descarga: {kgToDisplay(suggestedKg, unit)} {weightLabel(unit)} sugerido ({Math.round(deloadKgFactor * 100)}%)</div>}
 
       {/* El récord va PRIMERO, grande — es lo que estás tratando de
           superar en esta serie, así que tiene que verse antes de
@@ -4174,7 +4240,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
                 <div className="flex-1 min-w-0 leading-none">
                   <span className="block text-[8.5px] font-black uppercase tracking-[0.16em] text-slate-500 mb-1">Guardado hoy</span>
                   <span className="text-lg font-black tabular-nums number-pop inline-block" style={{ color: accent, animationDelay: "0.12s" }}>{todayEntry.reps}<span className="opacity-50 text-sm mx-0.5">×</span>{kgToDisplay(todayEntry.kg, unit)}<span className="opacity-60 text-xs ml-0.5">{weightLabel(unit)}</span></span>
-                  {todayEntry.rpe && <span className="ml-2 text-[9.5px] px-1.5 py-0.5 rounded-md bg-slate-800/80 text-slate-400 align-middle">RPE {todayEntry.rpe}</span>}
+                  {todayEntry.rpe && <span className="ml-2 text-[9.5px] px-1.5 py-0.5 rounded-md bg-slate-800/80 text-slate-400 align-middle">{formatEffort(todayEntry.rpe, fieldSettings.rpeDisplayMode)}</span>}
                 </div>
                 <button onClick={() => { updateDraft({ reps: String(todayEntry.reps), kg: String(kgToDisplay(todayEntry.kg, unit)), editing: true }); }} className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg shrink-0 transition active:scale-95" style={{ backgroundColor: tint(accent, "22"), color: accent }}>Editar</button>
               </div>
@@ -4208,7 +4274,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
                 rango de reps, o sumar una rep más si todavía no. No se
                 muestra en descarga (ahí manda la sugerencia de descarga, que
                 pide MENOS peso, no más) ni sin historial (nada que sugerir). */}
-            {!deloadMode && fieldSettings.showProgressionSuggestion === true && history.length > 0 && (() => {
+            {fieldSettings.showProgressionSuggestion === true && history.length > 0 && (() => {
               const last = history.reduce((a, b) => (a.date > b.date ? a : b));
               const repTop = repRangeTop(setDef.repRange);
               const hitTop = !isNaN(repTop) && last.reps >= repTop;
@@ -4233,8 +4299,15 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
                 marca — sabés que va a ser récord antes de guardar. */}
             {(() => {
               const rNum = parseFloat(reps), kNum = parseFloat(kg);
-              const liveBeats = !cardio && !isNaN(rNum) && !isNaN(kNum) && rNum > 0 && kNum > 0 && currentPR?.kg
-                && estimate1RM(displayToKg(kNum, unit), rNum) > estimate1RM(currentPR.kg, currentPR.reps);
+              // A peso corporal (0kg) el 1RM estimado siempre da 0, así que
+              // ahí se compara directo por reps contra tu marca previa a
+              // también 0kg (no tiene sentido comparar bodyweight contra una
+              // marca con peso agregado, ni al revés).
+              const bodyweightNow = kNum === 0;
+              const liveBeats = !cardio && !isNaN(rNum) && !isNaN(kNum) && rNum > 0 && kNum >= 0 && currentPR
+                && (bodyweightNow
+                  ? currentPR.kg === 0 && rNum > currentPR.reps
+                  : currentPR.kg > 0 && estimate1RM(displayToKg(kNum, unit), rNum) > estimate1RM(currentPR.kg, currentPR.reps));
               const borderCol = liveBeats ? "#10B981" : rowFocus ? accent : "rgba(30,41,59,0.7)";
               const glow = liveBeats ? "0 0 16px -4px rgba(16,185,129,0.55)" : rowFocus ? `0 0 16px -4px ${tint(accent, "70")}` : "none";
               return (
@@ -4318,18 +4391,21 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           </div>
         );
       })()}
-      {fieldSettings.showRpe !== false && (!showRpe ? (
-        <button onClick={() => setShowRpeLocal(true)} className="w-full flex items-center justify-center gap-1.5 mt-2.5 py-2 rounded-lg bg-slate-900/50 border border-slate-800/70 text-slate-500 hover:text-slate-300 hover:border-slate-600 text-[11px] font-bold transition"><Activity size={11} /> Registrar esfuerzo (RPE)</button>
-      ) : (
-        <div className="mt-2.5 flex items-center gap-1.5 bounce-in bg-slate-900/60 rounded-lg px-2 py-2">
-          <span className="text-[10px] text-slate-600 font-semibold w-7 shrink-0">RPE</span>
-          {RPE_SCALE.map((rs) => (
-            <button key={rs.value} onClick={() => updateDraft({ rpe: rpe === rs.value ? null : rs.value })} title={rs.desc} className="w-7 h-7 rounded-lg text-[11px] font-bold transition-all active:scale-90 shrink-0" style={rpe === rs.value ? { backgroundColor: rpeColor(rs.value), color: "#0a0a0f" } : { backgroundColor: "var(--surface-2)", color: "var(--surface-2-text)" }}>{rs.value}</button>
-          ))}
-          {rpe != null && <span className="text-[10px] text-slate-500 ml-1 truncate">{RPE_SCALE.find((r) => r.value === rpe)?.desc}</span>}
-          <button onClick={() => { updateDraft({ rpe: null }); setShowRpeLocal(false); }} className="text-slate-600 hover:text-slate-400 ml-auto shrink-0"><X size={12} /></button>
-        </div>
-      ))}
+      {fieldSettings.showRpe !== false && (() => {
+        const isRir = fieldSettings.rpeDisplayMode === "rir";
+        return !showRpe ? (
+          <button onClick={() => setShowRpeLocal(true)} className="w-full flex items-center justify-center gap-1.5 mt-2.5 py-2 rounded-lg bg-slate-900/50 border border-slate-800/70 text-slate-500 hover:text-slate-300 hover:border-slate-600 text-[11px] font-bold transition"><Activity size={11} /> Registrar esfuerzo ({isRir ? "RIR" : "RPE"})</button>
+        ) : (
+          <div className="mt-2.5 flex items-center gap-1.5 bounce-in bg-slate-900/60 rounded-lg px-2 py-2">
+            <span className="text-[10px] text-slate-600 font-semibold w-7 shrink-0">{isRir ? "RIR" : "RPE"}</span>
+            {RPE_SCALE.map((rs) => (
+              <button key={rs.value} onClick={() => updateDraft({ rpe: rpe === rs.value ? null : rs.value })} title={rs.desc} className="w-7 h-7 rounded-lg text-[11px] font-bold transition-all active:scale-90 shrink-0" style={rpe === rs.value ? { backgroundColor: rpeColor(rs.value), color: "#0a0a0f" } : { backgroundColor: "var(--surface-2)", color: "var(--surface-2-text)" }}>{isRir ? rirButtonLabel(rs.value) : rs.value}</button>
+            ))}
+            {rpe != null && <span className="text-[10px] text-slate-500 ml-1 truncate">{RPE_SCALE.find((r) => r.value === rpe)?.desc}</span>}
+            <button onClick={() => { updateDraft({ rpe: null }); setShowRpeLocal(false); }} className="text-slate-600 hover:text-slate-400 ml-auto shrink-0"><X size={12} /></button>
+          </div>
+        );
+      })()}
       {/* Nota de esta serie: mismo patrón que el RPE — discreto cuando no hay
           nada, y se abre al tocarlo. Una nota por serie, no por ejercicio. */}
       {fieldSettings.showPersonalNote !== false && onUpdateSettings && (
@@ -4392,7 +4468,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
 /* ============================================================================
    EXERCISE CARD
 ============================================================================ */
-function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts, deloadSets, deloadMode, resetKey = 0, settings = DEFAULT_SETTINGS, forceOpen = false, onDisableAutoShowPrShare, hasActiveSession = true, hideTimer = false, onUpdateSettings = null, sex = null, age = null }) {
+function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts, resetKey = 0, settings = DEFAULT_SETTINGS, forceOpen = false, onDisableAutoShowPrShare, hasActiveSession = true, hideTimer = false, onUpdateSettings = null, sex = null, age = null }) {
   const [open, setOpen] = useState(false);
   const [showWarmup, setShowWarmup] = useState(false);
   // Nota personal del ejercicio (persiste en el perfil → sincroniza)
@@ -4401,7 +4477,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
   // RPE, descanso, video). No afecta el comportamiento normal de la app.
   useEffect(() => { if (forceOpen) setOpen(true); }, [forceOpen]);
   const hasHeavy = exercise.sets.some((s) => isHeavyRepRange(s.repRange));
-  const setsToShow = deloadSets ? exercise.sets.slice(0, deloadSets) : exercise.sets;
+  const setsToShow = exercise.sets;
   // Id del cronómetro que corresponde a ESTE ejercicio — null si es cardio o
   // si está dentro de una superserie (ahí el descanso es compartido y recién
   // arranca al completar la vuelta entera, no después de cada ejercicio; ver
@@ -4437,11 +4513,10 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
               <h3 className="font-bold text-white text-sm">{exercise.name}</h3>
               <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded-lg font-bold" style={{ backgroundColor: tint(accent, "18"), color: accent }}>{exercise.muscle}</span>
               {exercise.cardio && <span className="text-[10px] bg-rose-400/15 text-rose-300 rounded-lg px-1.5 py-0.5 font-bold flex items-center gap-1"><Footprints size={9} /> CARDIO</span>}
-              {deloadMode && <span className="text-[10px] bg-purple-500/15 text-purple-400 rounded-lg px-1.5 py-0.5 font-bold">DESCARGA</span>}
               {/* El ×1/×2 de mancuernas se configura al editar la rutina
                   ("¿Con cuántas mancuernas?"), no acá: durante el
                   entrenamiento sumaba ruido y ya está definido. */}
-              {!deloadMode && stagnant && settings.showStagnation === true && <span className="text-[10px] bg-rose-500/15 text-rose-400 rounded-lg px-1.5 py-0.5 font-bold flex items-center gap-1"><AlertTriangle size={9} /> ESTANCADO</span>}
+              {stagnant && settings.showStagnation === true && <span className="text-[10px] bg-rose-500/15 text-rose-400 rounded-lg px-1.5 py-0.5 font-bold flex items-center gap-1"><AlertTriangle size={9} /> ESTANCADO</span>}
               {/* Las notas ahora son POR SERIE (ver SetRow): cada serie tiene
                   su propio "Agregar nota". Acá ya no va nada. */}
             </div>
@@ -4451,10 +4526,10 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
         <ChevronDown size={18} className={`text-slate-600 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
       </button>
       <div className={open ? "px-4 pb-4 pt-0 tab-fade-in" : "hidden"}>
-        {!deloadMode && stagnant && settings.showStagnation === true && <div className="mb-3 text-[11px] text-rose-400/90 bg-rose-500/5 border border-rose-500/15 rounded-xl px-3 py-2 flex items-start gap-1.5"><Info size={12} className="mt-0.5 shrink-0" /><span>Hace {STAGNATION_DAYS}+ días sin superar el récord. Considerá cambiar reps, descanso o variante.</span></div>}
+        {stagnant && settings.showStagnation === true && <div className="mb-3 text-[11px] text-rose-400/90 bg-rose-500/5 border border-rose-500/15 rounded-xl px-3 py-2 flex items-start gap-1.5"><Info size={12} className="mt-0.5 shrink-0" /><span>Hace {STAGNATION_DAYS}+ días sin superar el récord. Considerá cambiar reps, descanso o variante.</span></div>}
         {/* El cronómetro ya no vive fijo acá: se posiciona entre las series
             según timerSlot (más abajo, junto a las series). */}
-        {!exercise.cardio && !deloadMode && bestWorkingKg != null && settings.showWarmup !== false && (
+        {!exercise.cardio && bestWorkingKg != null && settings.showWarmup !== false && (
           <div className="mb-2">
             {!showWarmup ? (
               <button onClick={() => setShowWarmup(true)} className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-[11px] font-bold transition" style={{ backgroundColor: tint(accent, "10"), border: `1px solid ${tint(accent, "30")}`, color: accent }}>
@@ -4486,7 +4561,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
           <div className="mb-2 timer-hop"><RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={accent} alertType={settings.alertType} timerId={`ex_${exercise.id}`} exerciseName={exercise.name} /></div>
         )}
         {setsToShow.map((s, i) => <React.Fragment key={`${exercise.id}:frag:${i}`}>
-          <SetRow key={`${exercise.id}:${i}:${resetKey}`} exerciseId={exercise.id} exerciseName={exercise.name} exerciseMuscle={exercise.muscle} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadKgFactor={settings.deloadPct} deloadMode={deloadMode} resetKey={resetKey} autoShowPrShare={settings.autoShowPrShare ?? true} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={hasActiveSession} cardio={exercise.cardio} dumbbellDouble={settings?.dumbbellDouble || null} fieldSettings={settings} onUpdateSettings={onUpdateSettings} sex={sex} age={age} restTimerId={restTimerId} restSeconds={restSeconds} isLastSet={i === setsToShow.length - 1} />
+          <SetRow key={`${exercise.id}:${i}:${resetKey}`} exerciseId={exercise.id} exerciseName={exercise.name} exerciseMuscle={exercise.muscle} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKey} autoShowPrShare={settings.autoShowPrShare ?? true} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={hasActiveSession} cardio={exercise.cardio} dumbbellDouble={settings?.dumbbellDouble || null} fieldSettings={settings} onUpdateSettings={onUpdateSettings} sex={sex} age={age} restTimerId={restTimerId} restSeconds={restSeconds} isLastSet={i === setsToShow.length - 1} />
           {/* Debajo de la serie recién registrada: timerSlot = N significa
               "después de la serie N" (1-indexado). */}
           {timerSlot === i + 1 && (
@@ -4638,7 +4713,7 @@ function groupExercisesIntoSupersets(exercises) {
   return groups;
 }
 
-function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, weekSchedule, activeSession, onStartSession, onEndSession, onCancelSession, onDisableAutoShowPrShare, onUpdateSettings = null, onGoToRoutines = null, onGoToSchedule = null, onGoToFieldSettings = null, todaySessionDayKey = null, sex = null, age = null }) {
+function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, weekSchedule, activeSession, onStartSession, onEndSession, onCancelSession, onDisableAutoShowPrShare, onUpdateSettings = null, onGoToRoutines = null, onGoToSchedule = null, onGoToFieldSettings = null, onGoToDescarga = null, todaySessionDayKey = null, sex = null, age = null }) {
   // El día programado para hoy según el cronograma semanal (lunes a domingo)
   // de la rutina activa. Si hoy es descanso programado (o no hay cronograma
   // todavía), cae al viejo heurístico de "último día entrenado + 1" — pero
@@ -4700,7 +4775,6 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
   const weekInfo = getWeekInfo(cycleStart, settings), isDeload = weekInfo?.isDeload, day = ROUTINE[activeDay];
   const [resetKeys, setResetKeys] = useState({});
   const [confirmReset, setConfirmReset] = useState(false);
-  const getDeloadSets = (ex) => Math.max(1, Math.ceil(ex.sets.length / settings.deloadSetDivisor));
 
   const today = todayStr();
   let totalSets = 0, doneToday = 0;
@@ -4773,7 +4847,18 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           <h2 className="text-xl font-black text-white leading-tight uppercase">{day.label}</h2>
           <p className="text-xs text-slate-400 mt-1">{day.description}</p>
           {day.isNew && <div className="mt-2 inline-flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] rounded-lg px-2.5 py-1">🆕 Empezás a registrar tus marcas desde hoy.</div>}
-          {isDeload && <div className="mt-3 flex items-start gap-2.5 bg-purple-500/10 border border-purple-500/20 rounded-xl px-3 py-2.5"><Zap size={14} className="text-purple-400 mt-0.5 shrink-0" /><p className="text-[11px] text-purple-300/90">Semana de descarga · Series ÷{settings.deloadSetDivisor} · Cargas al {Math.round(settings.deloadPct * 100)}%</p></div>}
+          {/* Antes esto reducía las series ACÁ MISMO (en Rutina) durante la
+              semana de descarga — quedaba una segunda versión de la
+              descarga superpuesta con la pestaña dedicada. Ahora es solo un
+              indicador + atajo: la descarga en sí se hace en su propia
+              pestaña, un solo lugar. */}
+          {isDeload && onGoToDescarga && (
+            <button onClick={onGoToDescarga} className="mt-3 w-full flex items-center gap-2.5 bg-purple-500/10 border border-purple-500/20 rounded-xl px-3 py-2.5 text-left transition active:scale-[0.99] hover:bg-purple-500/15">
+              <Zap size={14} className="text-purple-400 shrink-0" />
+              <p className="flex-1 text-[11px] text-purple-300/90">Esta semana es de descarga — entrená con series reducidas</p>
+              <ChevronRight size={13} className="text-purple-400 shrink-0" />
+            </button>
+          )}
           <div className="grid grid-cols-3 gap-2 mt-4">
             <div className="bg-black/20 rounded-xl p-2.5 text-center"><p className="text-xl font-black text-white tabular-nums">{pct}%</p><p className="text-[9px] text-slate-500 mt-0.5 flex items-center justify-center gap-1"><ListChecks size={9} />Hoy</p></div>
             <div className="bg-black/20 rounded-xl p-2.5 text-center"><p className="text-xl font-black text-white tabular-nums">{day.exercises.length}</p><p className="text-[9px] text-slate-500 mt-0.5 flex items-center justify-center gap-1"><Dumbbell size={9} />Ejercicios</p></div>
@@ -4805,7 +4890,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
         {groupExercisesIntoSupersets(day.exercises).map((group) => {
           if (group.length === 1) {
             const ex = group[0];
-            return <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadSets={isDeload ? getDeloadSets(ex) : null} deloadMode={isDeload} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} sex={sex} age={age} />;
+            return <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} sex={sex} age={age} />;
           }
           // Superserie: varios ejercicios encadenados comparten un solo
           // cronómetro al final del grupo, en vez de uno por ejercicio —
@@ -4815,7 +4900,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           return (
             <div key={`${activeDay}:${group.map((e) => e.id).join("-")}`} className="rounded-2xl border p-2.5 space-y-2.5" style={{ borderColor: tint(day.color, "50"), backgroundColor: tint(day.color, "06") }}>
               <div className="flex items-center gap-1.5 px-1"><Link size={11} style={{ color: day.color }} /><span className="text-[10px] font-black uppercase tracking-wider" style={{ color: day.color }}>Superserie · {group.length} ejercicios</span></div>
-              {group.map((ex) => <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} deloadSets={isDeload ? getDeloadSets(ex) : null} deloadMode={isDeload} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} hideTimer sex={sex} age={age} />)}
+              {group.map((ex) => <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} hideTimer sex={sex} age={age} />)}
               <div className="px-1"><RestTimer seconds={hasHeavyGroup ? settings.restLong : settings.restShort} accent={day.color} alertType={settings.alertType} timerId={`grp_${group.map((g) => g.id).join("_")}`} exerciseName={group.map((g) => g.name).filter(Boolean).join(" + ")} /></div>
               <p className="text-[10px] text-slate-600 px-1">Descansá recién después de completar los {group.length} ejercicios — ese es el cronómetro de arriba.</p>
             </div>
@@ -4838,8 +4923,11 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
 /* ============================================================================
    SESSION HISTORY — calendar + list views over buildSessionsIndex(logs)
 ============================================================================ */
-function SessionDetailCard({ session, onDelete }) {
+function SessionDetailCard({ session, onDelete, exerciseNotes = {}, rpeDisplayMode = "rpe" }) {
   const [confirmDel, setConfirmDel] = useState(false);
+  // Qué serie está "abierta" ahora mismo — se muestra su nota debajo de las
+  // pills de ese ejercicio, si tiene una. `${exName}:${i}` como clave.
+  const [expandedSet, setExpandedSet] = useState(null);
   const dateLabel = new Date(session.date + "T12:00:00").toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" });
   const mainDay = ROUTINE[session.dayKeys[0]];
   const accent = mainDay?.color || "#14B8A6";
@@ -4898,9 +4986,16 @@ function SessionDetailCard({ session, onDelete }) {
         </div>
       )}
 
-      {/* Ejercicios agrupados con sus series como pills */}
+      {/* Ejercicios agrupados con sus series como pills — tocar una pill
+          despliega su nota (si le pusiste una al registrar). El RPE ya no
+          lleva un color según el valor: es solo información, no un
+          semáforo — antes un RPE 9 se veía "alarmante" en rojo sin motivo. */}
       <div className="px-4 pb-4 space-y-2">
-        {grouped.map(([exName, items]) => (
+        {grouped.map(([exName, items]) => {
+          const openIdx = items.findIndex((_, i) => expandedSet === `${exName}:${i}`);
+          const openItem = openIdx >= 0 ? items[openIdx] : null;
+          const openNote = openItem ? resolveExportNote(exerciseNotes, openItem.exerciseId, openItem.setIndex) : "";
+          return (
           <div key={exName} className="rounded-xl bg-slate-900/70 border border-slate-800/60 px-3 py-2.5">
             <p className="text-xs font-bold text-white mb-1.5 truncate">{exName}</p>
             <div className="flex flex-wrap gap-1.5">
@@ -4921,19 +5016,31 @@ function SessionDetailCard({ session, onDelete }) {
                 const color = it.isImprovement ? "#6EE7B7" : below ? "#FCA5A5" : "#cbd5e1";
                 const bg = it.isImprovement ? "#10B98118" : below ? "#F43F5E14" : "var(--surface-2)";
                 const bd = it.isImprovement ? "#10B98135" : below ? "#F43F5E30" : "transparent";
+                const itemKey = `${exName}:${i}`;
                 return (
-                  <span key={i} className="text-[11px] font-bold px-2 py-1 rounded-lg tabular-nums inline-flex items-center gap-1 number-pop"
-                    style={{ color, backgroundColor: bg, border: `1px solid ${bd}`, animationDelay: `${Math.min(i, 10) * 40}ms` }}>
+                  <button key={i} onClick={() => setExpandedSet((cur) => (cur === itemKey ? null : itemKey))} className="text-[11px] font-bold px-2 py-1 rounded-lg tabular-nums inline-flex items-center gap-1 number-pop transition active:scale-95"
+                    style={{ color, backgroundColor: bg, border: `1px solid ${expandedSet === itemKey ? tint(color, "aa") : bd}`, animationDelay: `${Math.min(i, 10) * 40}ms` }}>
                     {isCardio ? `${it.minutes} min` : `${it.reps}×${it.kg}kg`}
                     {it.isImprovement && " 🔥"}
                     {below && <span className="text-[9px] font-black opacity-90">↓{100 - pct}%</span>}
-                    {!isCardio && it.rpe != null && <span className="text-[9px] font-black opacity-80" style={{ color: rpeColor(it.rpe) }}>· RPE {it.rpe}</span>}
-                  </span>
+                    {!isCardio && it.rpe != null && <span className="text-[9px] font-black text-slate-400">· {formatEffort(it.rpe, rpeDisplayMode)}</span>}
+                  </button>
                 );
               })}
             </div>
+            {openItem && (
+              <div className="mt-2 rounded-lg bg-slate-950/50 border border-slate-800/50 px-2.5 py-2 bounce-in flex items-start gap-1.5">
+                <StickyNote size={11} className="mt-0.5 shrink-0 text-slate-600" />
+                {openNote ? (
+                  <p className="text-[10.5px] text-slate-400 leading-snug">{openNote}</p>
+                ) : (
+                  <p className="text-[10.5px] text-slate-600 italic">Sin nota en esta serie.</p>
+                )}
+              </div>
+            )}
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Borrar día */}
@@ -5097,7 +5204,7 @@ function ShareSummaryCard({ logs, trainingSessions = [] }) {
   );
 }
 
-function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [], weekSchedule = null }) {
+function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [], weekSchedule = null, exerciseNotes = {}, rpeDisplayMode = "rpe" }) {
   const sessions = useMemo(() => buildSessionsIndex(logs, trainingSessions), [logs, trainingSessions]);
   // Días entrenados y racha — mudados acá desde el hero de Progreso,
   // en formato compacto acoplado al calendario.
@@ -5216,7 +5323,7 @@ function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [], weekSche
               <div className="max-w-md w-full max-h-[85vh] overflow-y-auto overscroll-contain rounded-3xl modal-pop-in" onClick={(e) => e.stopPropagation()}>
                 <div className="relative">
                   <button onClick={() => setSelectedDate(null)} aria-label="Cerrar" className="absolute top-3 right-3 z-10 p-2 rounded-xl bg-slate-800/90 text-slate-400 hover:text-white transition active:scale-90"><X size={15} /></button>
-                  <SessionDetailCard session={selectedSession} onDelete={(date) => { handleDeleteDay(date); setSelectedDate(null); }} />
+                  <SessionDetailCard session={selectedSession} onDelete={(date) => { handleDeleteDay(date); setSelectedDate(null); }} exerciseNotes={exerciseNotes} rpeDisplayMode={rpeDisplayMode} />
                 </div>
               </div>
             </div>
@@ -5229,7 +5336,7 @@ function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [], weekSche
               están fuera de pantalla y retrasarlas solo haría lenta la carga. */}
           {sessions.map((s, i) => (
             <div key={s.date} className="hist-enter" style={{ animationDelay: `${Math.min(i, 12) * 45}ms` }}>
-              <SessionDetailCard session={s} onDelete={handleDeleteDay} />
+              <SessionDetailCard session={s} onDelete={handleDeleteDay} exerciseNotes={exerciseNotes} rpeDisplayMode={rpeDisplayMode} />
             </div>
           ))}
         </div>
@@ -5291,7 +5398,7 @@ function DeloadCardioTimer({ targetMinutes, accent, onComplete }) {
   );
 }
 
-function DeloadView({ logs, settings = DEFAULT_SETTINGS, deloadProgress = {}, setDeloadProgress, onFinishDeloadSession }) {
+function DeloadView({ logs, setLogs, settings = DEFAULT_SETTINGS, deloadProgress = {}, setDeloadProgress, onFinishDeloadSession, activeSession = null, onStartSession = null, onCancelSession = null }) {
   const globalUnit = useWeightUnit();
   const [unit, setUnit] = useState(globalUnit);
   const { trainWeeks, deloadWeeks, deloadPct, deloadSetDivisor } = settings;
@@ -5303,12 +5410,29 @@ function DeloadView({ logs, settings = DEFAULT_SETTINGS, deloadProgress = {}, se
   // se guarda con la fecha de hoy, no como simple true/false, para que la
   // próxima semana de descarga (siete y pico semanas después) empiece
   // sin nada tildado, sin necesidad de un botón de "reiniciar" aparte.
-  const toggleDeloadDone = (key) => {
+  // BUG FIX: esto solo tildaba `deloadProgress` (una estructura aparte) —
+  // nunca escribía nada en `logs`. Como el Historial (buildSessionsIndex) se
+  // arma a partir de `logs`, la descarga jamás aparecía ahí ni sumaba a la
+  // racha, sin importar que "Finalizar sesión" sí guardara el registro
+  // formal en trainingSessions: ese registro solo se USA si ya hay una
+  // entrada en logs para esa fecha. Ahora, si se pasa `entry` (kg/reps o
+  // minutos de la serie reducida), también queda guardada como una serie
+  // real — la descarga participa del historial, la racha y el volumen
+  // igual que cualquier entrenamiento.
+  const toggleDeloadDone = (key, entry = null) => {
     if (!setDeloadProgress) return;
     const next = { ...deloadProgress };
-    if (next[key] === today) delete next[key];
+    const wasDone = next[key] === today;
+    if (wasDone) delete next[key];
     else next[key] = today;
     setDeloadProgress(next);
+    if (setLogs && entry) {
+      setLogs((prev) => {
+        const hist = (prev[key] || []).filter((h) => h.date !== today);
+        const nextHist = wasDone ? hist : [...hist, { ...entry, date: today, deload: true }];
+        return { ...prev, [key]: nextHist };
+      });
+    }
   };
   // Antes, entrenar desde la pestaña Descarga no quedaba registrado en
   // ningún lado — no contaba como "día entrenado", no sumaba a la racha,
@@ -5378,6 +5502,12 @@ function DeloadView({ logs, settings = DEFAULT_SETTINGS, deloadProgress = {}, se
         })}
       </div>
 
+      {/* Antes no había forma explícita de "arrancar" acá — a diferencia de
+          Rutina, que siempre tuvo Iniciar/Cancelar sesión. Mismo componente,
+          mismo comportamiento, para que la descarga se sienta parte de la
+          misma app y no un rincón aparte. */}
+      {onStartSession && <SessionStartBar activeSession={activeSession} onStart={() => onStartSession(activeDay, true)} onCancel={onCancelSession} color="#A855F7" />}
+
       <div key={activeDay} className="space-y-3 tab-fade-in">
         {day.exercises.map((ex) => {
           const deloadSets = Math.max(1, Math.ceil(ex.sets.length / deloadSetDivisor));
@@ -5425,7 +5555,7 @@ function DeloadView({ logs, settings = DEFAULT_SETTINGS, deloadProgress = {}, se
                               <span className="text-xl font-black tabular-nums" style={{ color: done ? day.color : "#D8B4FE", textShadow: `0 0 16px ${tint(done ? day.color : "#A855F7", "50")}` }}>{Math.max(1, Math.round((best.minutes || 0) * deloadPct))}<span className="opacity-60 text-xs ml-1">min</span></span>
                             </div>
                           </div>
-                          {!done && <DeloadCardioTimer targetMinutes={Math.max(1, Math.round((best.minutes || 0) * deloadPct))} accent={day.color} onComplete={() => toggleDeloadDone(progressKey)} />}
+                          {!done && <DeloadCardioTimer targetMinutes={Math.max(1, Math.round((best.minutes || 0) * deloadPct))} accent={day.color} onComplete={() => toggleDeloadDone(progressKey, { minutes: Math.max(1, Math.round((best.minutes || 0) * deloadPct)) })} />}
                           </>
                         ) : (
                           <div className="relative rounded-xl px-3 py-2.5 mb-2.5 bg-slate-950/60 border" style={{ borderColor: done ? tint(day.color, "35") : "#A855F730" }}>
@@ -5437,7 +5567,7 @@ function DeloadView({ logs, settings = DEFAULT_SETTINGS, deloadProgress = {}, se
                             </div>
                           </div>
                         ))}
-                        <button onClick={() => toggleDeloadDone(progressKey)} className="relative w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-black transition-all active:scale-[0.98]" style={done ? { background: `linear-gradient(160deg, ${day.color}, ${tint(day.color, "b0")})`, color: "#fff" } : { backgroundColor: "var(--row-surface)", border: "1px solid #33415580", color: "#94a3b8" }}>
+                        <button onClick={() => toggleDeloadDone(progressKey, ex.cardio ? { minutes: Math.max(1, Math.round((best.minutes || 0) * deloadPct)) } : { kg: deloadKg, reps: best.reps })} className="relative w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-black transition-all active:scale-[0.98]" style={done ? { background: `linear-gradient(160deg, ${day.color}, ${tint(day.color, "b0")})`, color: "#fff" } : { backgroundColor: "var(--row-surface)", border: "1px solid #33415580", color: "#94a3b8" }}>
                           {done ? <><span className="w-5 h-5 rounded-full bg-white/25 flex items-center justify-center"><Check size={12} strokeWidth={3} /></span> Hecha</> : "Marcar como hecha"}
                         </button>
                       </div>
@@ -5460,7 +5590,7 @@ function DeloadView({ logs, settings = DEFAULT_SETTINGS, deloadProgress = {}, se
         <p className="text-[11px] text-slate-500 leading-relaxed">Baja el volumen para recuperarte — no busques marcas nuevas esta semana.</p>
       </div>
 
-      {hasAnyDoneToday && (
+      {(hasAnyDoneToday || activeSession) && (
         <div>
           <button onClick={handleFinishSession} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl !text-white text-sm font-bold transition-all active:scale-[0.98] shadow-lg" style={{ backgroundColor: "#A855F7", boxShadow: "0 10px 24px -8px #A855F788" }}>
             <Check size={15} /> Finalizar sesión de descarga
@@ -5484,6 +5614,39 @@ const CustomTooltip = ({ active, payload, label }) => {
     </div>
   );
 };
+
+// Tooltip específico del gráfico de "Evolución por ejercicio": antes solo
+// mostraba "Kg: 82.4" (el 1RM estimado, rotulado como Kg) — ahora también
+// la serie real (reps×kg) y el RPE/RIR de ese día, que es la info que
+// realmente explica el número.
+function EvolutionTooltip({ active, payload, label, color, rpeDisplayMode }) {
+  if (!active || !payload?.length) return null;
+  const d = payload[0].payload;
+  return (
+    <div className="bg-[#0f0f1a] border border-slate-700/60 rounded-xl px-3 py-2.5 text-xs shadow-xl shadow-black/40">
+      <p className="text-slate-400 mb-1.5 font-medium">{label}</p>
+      <p className="font-black text-sm" style={{ color }}>{d.e1rm} kg <span className="text-slate-500 font-normal text-[10px]">1RM est.</span></p>
+      <p className="text-slate-400 mt-1">{d.reps} × {d.kg} kg</p>
+      {d.rpe != null && <p className="text-slate-500 mt-0.5">{formatEffort(d.rpe, rpeDisplayMode)}</p>}
+    </div>
+  );
+}
+
+// Punto del gráfico de evolución: el de tu mejor marca se dibuja con un halo
+// alrededor, para encontrarlo de un vistazo en la curva sin tener que pasar
+// el dedo por todos los puntos.
+function EvolutionDot({ cx, cy, isBest, color }) {
+  if (cx == null || cy == null) return null;
+  if (isBest) {
+    return (
+      <g>
+        <circle cx={cx} cy={cy} r={7} fill={color} opacity={0.25} />
+        <circle cx={cx} cy={cy} r={4} fill={color} stroke="#0a0a0f" strokeWidth={1.5} />
+      </g>
+    );
+  }
+  return <circle cx={cx} cy={cy} r={3} fill={color} />;
+}
 
 /* ============================================================================
    EXERCISE CHIP ROW — selector de ejercicio con el mismo lenguaje visual que
@@ -6864,6 +7027,9 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
   const selEx = allExercises.find((e) => e.id === selId);
   const history = useMemo(() => (logs[`${selId}_${selSet}`] || []).slice().sort((a, b) => (a.date > b.date ? 1 : -1)), [logs, selId, selSet]);
   const chartData = useMemo(() => history.map((h) => ({ date: h.date.slice(5), kg: h.kg, reps: h.reps, vol: vol(h.kg, h.reps), e1rm: estimate1RM(h.kg, h.reps), rpe: h.rpe ?? null })), [history]);
+  // La mejor marca de TODA la curva — sirve para la línea de referencia y
+  // para agrandar el punto correspondiente en el gráfico.
+  const chartBestE1rm = useMemo(() => (chartData.length ? Math.max(...chartData.map((d) => d.e1rm)) : null), [chartData]);
 
   const [confirmResetProgress, setConfirmResetProgress] = useState(false);
   const [activeSection, setActiveSection] = useState("rank");
@@ -6970,13 +7136,20 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
                       <XAxis dataKey="date" stroke="var(--chart-axis)" fontSize={10} />
                       <YAxis stroke="var(--chart-axis)" fontSize={10} domain={["auto", "auto"]} />
-                      <Tooltip content={<CustomTooltip />} />
+                      <Tooltip content={<EvolutionTooltip color={selEx?.color} rpeDisplayMode={settings.rpeDisplayMode} />} />
+                      {/* Línea de referencia en tu mejor marca — de un vistazo ves
+                          qué tan cerca (o lejos) estuvo cada sesión de tu techo
+                          actual, no solo si subió o bajó respecto a la anterior. */}
+                      {chartBestE1rm != null && (
+                        <ReferenceLine y={chartBestE1rm} stroke={tint(selEx?.color || "#14B8A6", "60")} strokeDasharray="4 4" label={{ value: `Mejor: ${chartBestE1rm}kg`, position: "insideTopRight", fill: tint(selEx?.color || "#14B8A6", "cc"), fontSize: 10, fontWeight: 700 }} />
+                      )}
                       {/* Se grafica SIEMPRE el 1RM estimado (combina reps y kilos: sube
                           o baja el peso, sube o baja las reps, y el número igual lo
                           refleja) — pero rotulado como "Kg" a propósito, sin mencionar
                           1RM acá. Quien quiera el número exacto por sesión tiene la
-                          pestaña "1RM" al lado. */}
-                      <Area type="monotone" dataKey="e1rm" stroke={selEx?.color || "#14B8A6"} fill="url(#gA)" strokeWidth={2.5} dot={{ r: 3, fill: selEx?.color, strokeWidth: 0 }} name="Kg" />
+                          pestaña "1RM" al lado. El punto de tu mejor sesión se dibuja
+                          más grande, para ubicarlo de un vistazo en la curva. */}
+                      <Area type="monotone" dataKey="e1rm" stroke={selEx?.color || "#14B8A6"} fill="url(#gA)" strokeWidth={2.5} dot={(props) => <EvolutionDot {...props} isBest={props.payload.e1rm === chartBestE1rm} color={selEx?.color} />} activeDot={{ r: 5, strokeWidth: 0 }} name="Kg" />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
@@ -7003,7 +7176,7 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
 
         {activeSection === "historial" && (
           <div className="rounded-2xl border border-cyan-500/20 bg-slate-900/50 shadow-md shadow-black/20 p-4">
-            <SessionHistoryView logs={logs} onDeleteDay={onDeleteDay} trainingSessions={sessions} weekSchedule={weekSchedule} />
+            <SessionHistoryView logs={logs} onDeleteDay={onDeleteDay} trainingSessions={sessions} weekSchedule={weekSchedule} exerciseNotes={settings.exerciseNotes} rpeDisplayMode={settings.rpeDisplayMode} />
           </div>
         )}
       </div>
@@ -7760,17 +7933,26 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
         </div>
       )}
 
-      <CollapsibleSection title="Configuración de descarga" subtitle={`Ciclo ${settings.trainWeeks}+${settings.deloadWeeks} sem · Carga ${Math.round(settings.deloadPct * 100)}%`} icon={<Zap size={16} />} accent="#A855F7">
-        <div className="grid grid-cols-2 gap-3">
-          {[{ key: "trainWeeks", label: "Sem. entrenamiento", min: 2, max: 12 }, { key: "deloadWeeks", label: "Sem. descarga", min: 1, max: 4 }].map(({ key, label, min, max }) => (
-            <div key={key} className="bg-slate-950/40 rounded-xl p-3"><p className="text-[10px] text-slate-500 mb-2">{label}</p><div className="flex items-center justify-between"><button onClick={() => adjustSetting(key, -1, min, max)} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95">−</button><span className="text-sm font-black text-white tabular-nums">{settings[key]}</span><button onClick={() => adjustSetting(key, 1, min, max)} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95">+</button></div></div>
-          ))}
-        </div>
-        <div className="bg-slate-950/40 rounded-xl p-3">
-          <div className="flex items-center justify-between mb-2"><p className="text-[10px] text-slate-500">Carga en descarga</p><span className="text-[11px] font-bold text-purple-400 tabular-nums">{Math.round(settings.deloadPct * 100)}%</span></div>
-          <div className="flex items-center gap-3"><button onClick={() => adjustDeloadPct(-0.05)} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95 shrink-0">−</button><div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden"><div className="h-full bg-purple-500 rounded-full transition-all" style={{ width: `${settings.deloadPct * 100}%` }} /></div><button onClick={() => adjustDeloadPct(0.05)} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95 shrink-0">+</button></div>
-        </div>
-        <div><p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Reducción de series</p><div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">{[{ k: 2, l: "Mitad" }, { k: 3, l: "Tercio" }, { k: 4, l: "Cuarto" }].map((opt) => <button key={opt.k} onClick={() => updateSettings({ deloadSetDivisor: opt.k })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${settings.deloadSetDivisor === opt.k ? "bg-purple-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>)}</div></div>
+      <CollapsibleSection title="Configuración de descarga" subtitle={settings.deloadEnabled === false ? "Desactivada" : `Ciclo ${settings.trainWeeks}+${settings.deloadWeeks} sem · Carga ${Math.round(settings.deloadPct * 100)}%`} icon={<Zap size={16} />} accent="#A855F7">
+        <ToggleRow
+          icon={<Zap size={16} />} label="Hacer semanas de descarga"
+          desc="Si lo apagás, tu ciclo es continuo — sin semana de recuperación automática."
+          on={settings.deloadEnabled !== false} onToggle={() => updateSettings({ deloadEnabled: !(settings.deloadEnabled !== false) })} accent="#A855F7"
+        />
+        {settings.deloadEnabled !== false && (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              {[{ key: "trainWeeks", label: "Sem. entrenamiento", min: 2, max: 12 }, { key: "deloadWeeks", label: "Sem. descarga", min: 1, max: 4 }].map(({ key, label, min, max }) => (
+                <div key={key} className="bg-slate-950/40 rounded-xl p-3"><p className="text-[10px] text-slate-500 mb-2">{label}</p><div className="flex items-center justify-between"><button onClick={() => adjustSetting(key, -1, min, max)} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95">−</button><span className="text-sm font-black text-white tabular-nums">{settings[key]}</span><button onClick={() => adjustSetting(key, 1, min, max)} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95">+</button></div></div>
+              ))}
+            </div>
+            <div className="bg-slate-950/40 rounded-xl p-3">
+              <div className="flex items-center justify-between mb-2"><p className="text-[10px] text-slate-500">Carga en descarga</p><span className="text-[11px] font-bold text-purple-400 tabular-nums">{Math.round(settings.deloadPct * 100)}%</span></div>
+              <div className="flex items-center gap-3"><button onClick={() => adjustDeloadPct(-0.05)} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95 shrink-0">−</button><div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden"><div className="h-full bg-purple-500 rounded-full transition-all" style={{ width: `${settings.deloadPct * 100}%` }} /></div><button onClick={() => adjustDeloadPct(0.05)} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95 shrink-0">+</button></div>
+            </div>
+            <div><p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Reducción de series</p><div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">{[{ k: 2, l: "Mitad" }, { k: 3, l: "Tercio" }, { k: 4, l: "Cuarto" }].map((opt) => <button key={opt.k} onClick={() => updateSettings({ deloadSetDivisor: opt.k })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${settings.deloadSetDivisor === opt.k ? "bg-purple-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>)}</div></div>
+          </>
+        )}
       </CollapsibleSection>
 
       <CollapsibleSection title="Descanso entre series" subtitle={`${formatTime(settings.restShort)} – ${formatTime(settings.restLong)}`} icon={<Timer size={16} />} accent="#14B8A6">
@@ -8604,6 +8786,28 @@ const BUILDER_COLOR_PALETTE = ["#14B8A6", "#3B82F6", "#F97316", "#A855F7", "#F43
 let _builderUidCounter = 0;
 function builderUid(prefix) { _builderUidCounter += 1; return `${prefix}_${Date.now()}_${_builderUidCounter}`; }
 
+// Antes, cada vez que escribías un ejercicio personalizado (no de la
+// biblioteca) recibía un id al azar nuevo — aunque ya hubieras tipeado ese
+// mismo nombre en otra rutina. Resultado: tus marcas "desaparecían" al
+// crear otra rutina con el mismo ejercicio a mano, porque quedaban
+// guardadas bajo un id distinto que nada volvía a mostrar. Ahora, antes de
+// generar un id nuevo, se busca si ya existe historial de un personalizado
+// con ese mismo nombre (comparando sin mayúsculas ni espacios de sobra) y,
+// si lo hay, se reutiliza — reconectando con las marcas de siempre.
+function findExistingCustomExerciseId(logs, name) {
+  const norm = name.trim().toLowerCase();
+  if (!norm) return null;
+  for (const [key, val] of Object.entries(logs || {})) {
+    const isOverride = key.endsWith("_pr_override");
+    const baseKey = isOverride ? key.replace(/_pr_override$/, "") : key;
+    const { exerciseId } = parseLogKey(baseKey);
+    if (!exerciseId.startsWith("custom_")) continue;
+    const entries = isOverride ? [val] : (Array.isArray(val) ? val : []);
+    if (entries.some((e) => e?.exName && e.exName.trim().toLowerCase() === norm)) return exerciseId;
+  }
+  return null;
+}
+
 // Convierte una rutina ya guardada (forma "cruda": dayOrder + days con
 // libId/sets, o id/name/muscle/sets para ejercicios propios) al formato
 // interno que usa el editor (RoutineBuilder), para poder editarla. Las
@@ -9072,23 +9276,22 @@ function trimLogsForAI(logs) {
   return out;
 }
 
-function EntrenadorIAChat({ profile, logs, profileName, messages, setMessages, settings, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement }) {
+function EntrenadorIAChat({ profile, logs, profileName, messages, setMessages, conversations = [], activeConversationId = null, onNewConversation, onSwitchConversation, onDeleteConversation, settings, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement }) {
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [editingIndex, setEditingIndex] = useState(null); // índice del mensaje propio que se está editando
   const [showChangeLog, setShowChangeLog] = useState(false); // log de "qué aplicó la IA" — ver AIChangeLogModal
+  const [showSidebar, setShowSidebar] = useState(false); // barra de conversaciones guardadas — ver AIConversationSidebar
   const bottomRef = useRef(null);
-  // Sin este guardado, el efecto de "bajar al último mensaje" también se
-  // disparaba al recién entrar a la pestaña (con un solo mensaje de
-  // bienvenida, sin nada para desplazar) — eso alcanzaba para que el
-  // navegador recalculara el alto visible de la pantalla un instante
-  // (por ejemplo, si el navegador del celular ajusta su propia barra),
-  // y la barra de escribir (fija abajo de todo) se veía saltar un
-  // microsegundo antes de asentarse. Ahora ese scroll inicial se saltea.
+  // Al ABRIR la pestaña, vamos directo al último mensaje (sin animación —
+  // "smooth" en un salto grande se ve lento y llamativo de más). En los
+  // mensajes que llegan DESPUÉS (nuevos, tuyos o de la IA), sí con scroll
+  // suave, para que se sienta el chat "creciendo" en vez de tele-transportar.
   const didMountRef = useRef(false);
   useEffect(() => {
-    if (!didMountRef.current) { didMountRef.current = true; return; }
-    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    const behavior = didMountRef.current ? "smooth" : "auto";
+    didMountRef.current = true;
+    bottomRef.current?.scrollIntoView({ behavior, block: "end" });
   }, [messages, isSending]);
 
   const enviarMensajeIA = async (userText, replaceIndex = null) => {
@@ -9396,13 +9599,19 @@ Datos: ${JSON.stringify(context)}`;
             <h2 className="relative text-xl font-black text-white leading-tight">Entrenador IA</h2>
             <p className="relative text-xs text-teal-300/60 mt-0.5">Conoce tu historial real — preguntale lo que quieras</p>
           </div>
+          {onSwitchConversation && (
+            <button onClick={() => setShowSidebar(true)} title="Tus conversaciones" className="relative p-2 rounded-xl bg-slate-800/60 border border-slate-700/50 text-slate-400 hover:text-teal-400 transition shrink-0 active:scale-95">
+              <List size={14} />
+              {conversations.length > 1 && <span className="absolute -top-1 -right-1 min-w-[14px] h-[14px] px-0.5 rounded-full bg-teal-500 text-[8px] font-black text-white flex items-center justify-center">{conversations.length}</span>}
+            </button>
+          )}
           {messages.some((m) => m.plan && m.planStatus === "confirmed") && (
             <button onClick={() => setShowChangeLog(true)} title="Cambios aplicados" className="p-2 rounded-xl bg-slate-800/60 border border-slate-700/50 text-slate-400 hover:text-teal-400 transition shrink-0 active:scale-95">
               <ListChecks size={14} />
             </button>
           )}
           {messages.length > 1 && (
-            <button onClick={() => setMessages([AI_CHAT_WELCOME])} title="Nueva conversación" className="p-2 rounded-xl bg-slate-800/60 border border-slate-700/50 text-slate-400 hover:text-teal-400 transition shrink-0 active:scale-95">
+            <button onClick={() => onNewConversation ? onNewConversation() : setMessages([AI_CHAT_WELCOME])} title="Nueva conversación" className="p-2 rounded-xl bg-slate-800/60 border border-slate-700/50 text-slate-400 hover:text-teal-400 transition shrink-0 active:scale-95">
               <RotateCcw size={14} />
             </button>
           )}
@@ -9584,6 +9793,70 @@ Datos: ${JSON.stringify(context)}`;
         document.body
       )}
       {showChangeLog && <AIChangeLogModal messages={messages} onClose={() => setShowChangeLog(false)} />}
+      {showSidebar && (
+        <AIConversationSidebar
+          conversations={conversations}
+          activeConversationId={activeConversationId}
+          onSelect={(id) => { onSwitchConversation?.(id); setShowSidebar(false); }}
+          onNew={() => { onNewConversation?.(); setShowSidebar(false); }}
+          onDelete={onDeleteConversation}
+          onClose={() => setShowSidebar(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+// Barra lateral con TODAS las conversaciones guardadas del Entrenador IA —
+// como el historial de chats de Claude. Antes "Nueva conversación" pisaba
+// la única que existía; ahora cada una queda guardada y se puede volver a
+// cualquiera desde acá. Se desliza desde la IZQUIERDA (a diferencia del
+// resto de los modales de la app, que aparecen centrados) porque es
+// literalmente una barra de navegación, no un diálogo puntual.
+function AIConversationSidebar({ conversations, activeConversationId, onSelect, onNew, onDelete, onClose }) {
+  useAndroidBack(onClose);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const sorted = conversations.slice().sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
+  return (
+    <div className="fixed inset-0 z-[150] bg-black/70 backdrop-blur-sm flex modal-bg-in modal-overlay" onClick={onClose}>
+      <div className="w-[82%] max-w-xs h-full bg-slate-900 border-r border-slate-700/60 flex flex-col shadow-2xl shadow-black/60 bounce-in" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-2.5 px-4 pt-5 pb-3 border-b border-slate-800/60 shrink-0">
+          <div className="w-8 h-8 rounded-xl bg-teal-500/15 text-teal-400 flex items-center justify-center shrink-0"><List size={15} /></div>
+          <p className="flex-1 text-sm font-black text-white">Tus conversaciones</p>
+          <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition shrink-0"><X size={16} /></button>
+        </div>
+        <div className="px-3 pt-3 shrink-0">
+          <button onClick={onNew} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold !text-white transition active:scale-[0.98]" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>
+            <Plus size={15} /> Nueva conversación
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto overscroll-contain px-3 py-3 space-y-1.5">
+          {sorted.map((c) => {
+            const isActive = c.id === activeConversationId;
+            const confirming = confirmDeleteId === c.id;
+            const dateLabel = c.updatedAt ? new Date(c.updatedAt).toLocaleDateString("es-AR", { day: "numeric", month: "short" }) : "";
+            return (
+              <button key={c.id} onClick={() => onSelect(c.id)} className="w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-left transition active:scale-[0.99]"
+                style={isActive ? { backgroundColor: "rgba(20,184,166,0.14)", border: "1px solid rgba(20,184,166,0.35)" } : { backgroundColor: "var(--row-surface)", border: "1px solid transparent" }}>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold truncate" style={{ color: isActive ? "#fff" : "#94a3b8" }}>{c.title}</p>
+                  {dateLabel && <p className="text-[10px] text-slate-600 mt-0.5">{dateLabel}</p>}
+                </div>
+                {onDelete && (
+                  confirming ? (
+                    <span className="flex items-center gap-1.5 shrink-0">
+                      <button onClick={(e) => { e.stopPropagation(); onDelete(c.id); }} className="text-[10px] font-black text-rose-400 px-1.5 py-1">Sí</button>
+                      <button onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(null); }} className="text-[10px] font-bold text-slate-500 px-1.5 py-1">No</button>
+                    </span>
+                  ) : (
+                    <span onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(c.id); }} role="button" aria-label="Borrar conversación" className="p-1.5 rounded-lg text-slate-600 hover:text-rose-400 transition shrink-0"><Trash2 size={13} /></span>
+                  )
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
@@ -9876,7 +10149,7 @@ function WeeklyScheduleEditor({ dayOrder, days, schedule, onChange }) {
   );
 }
 
-function RoutineBuilder({ initialRoutine, onCancel, onSave, dumbbellDouble = null, onUpdateSettings = null }) {
+function RoutineBuilder({ initialRoutine, onCancel, onSave, dumbbellDouble = null, onUpdateSettings = null, logs = {} }) {
   const isEditing = !!initialRoutine;
   const [name, setNameRaw] = useState(initialRoutine?.name || "");
   const [days, setDaysRaw] = useState(() => (initialRoutine ? builderDaysFromRoutineDef(initialRoutine) : [{ key: builderUid("day"), label: "DÍA 1", color: BUILDER_COLOR_PALETTE[0], exercises: [] }]));
@@ -9943,7 +10216,7 @@ function RoutineBuilder({ initialRoutine, onCancel, onSave, dumbbellDouble = nul
     return { ...day, exercises: [...day.exercises, { id: libEx.id, libId: libEx.id, name: libEx.name, muscle: libEx.muscle, sets, cardio: !!libEx.cardio, supersetNext: false }] };
   }));
   const addCustomExercise = (dayIdx, rawName, muscle = "Personalizado") => setDays((d) => d.map((day, i) => (i !== dayIdx ? day : {
-    ...day, exercises: [...day.exercises, { id: builderUid("custom"), libId: null, name: rawName, muscle, sets: mkSets(3, "8-10"), cardio: false, supersetNext: false }],
+    ...day, exercises: [...day.exercises, { id: findExistingCustomExerciseId(logs, rawName) || builderUid("custom"), libId: null, name: rawName, muscle, sets: mkSets(3, "8-10"), cardio: false, supersetNext: false }],
   })));
   const removeExercise = (dayIdx, exIdx) => setDays((d) => d.map((day, i) => (i === dayIdx ? { ...day, exercises: day.exercises.filter((_, j) => j !== exIdx) } : day)));
   const moveExercise = (dayIdx, exIdx, delta) => setDays((d) => d.map((day, i) => {
@@ -10718,6 +10991,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
       <RoutineBuilder
         dumbbellDouble={getProfileSettings(profile)?.dumbbellDouble || null}
         onUpdateSettings={(patch) => onUpdateProfile?.({ settings: { ...getProfileSettings(profile), ...patch } })}
+        logs={profile?.logs || {}}
         initialRoutine={editingRoutineId ? routines[editingRoutineId] : null}
         onCancel={() => { setMode("catalog"); setEditingRoutineId(null); }}
         onSave={(def) => {
@@ -11172,7 +11446,7 @@ function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
             {on("showRpe") && (
               <div className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-slate-900/60 border border-slate-800 mb-2 bounce-in">
                 <Activity size={9} className="text-slate-500" />
-                <span className="text-[10px] font-bold text-slate-500">Registrar esfuerzo (RPE)</span>
+                <span className="text-[10px] font-bold text-slate-500">Registrar esfuerzo ({s.rpeDisplayMode === "rir" ? "RIR" : "RPE"})</span>
               </div>
             )}
 
@@ -11200,7 +11474,19 @@ function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
           {/* ── SWITCHES ── */}
           <div className="space-y-2">
             {OPCIONES.map((o) => (
-              <ToggleRow key={o.key} icon={o.icon} label={o.label} desc={o.desc} on={on(o.key)} onToggle={() => onUpdateSettings({ [o.key]: !on(o.key) })} accent="#14B8A6" />
+              <React.Fragment key={o.key}>
+                <ToggleRow icon={o.icon} label={o.label} desc={o.desc} on={on(o.key)} onToggle={() => onUpdateSettings({ [o.key]: !on(o.key) })} accent="#14B8A6" />
+                {/* RIR (repeticiones en reserva) es el mismo dato mostrado al
+                    revés — algunos prefieren pensarlo así en vez de en RPE.
+                    Solo aparece si el esfuerzo está activado. */}
+                {o.key === "showRpe" && on("showRpe") && (
+                  <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60 ml-1">
+                    {[{ k: "rpe", l: "Mostrar como RPE" }, { k: "rir", l: "Mostrar como RIR" }].map((opt) => (
+                      <button key={opt.k} onClick={() => onUpdateSettings({ rpeDisplayMode: opt.k })} className={`flex-1 py-2 rounded-lg text-[11px] font-bold transition-all ${(s.rpeDisplayMode || "rpe") === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
+                    ))}
+                  </div>
+                )}
+              </React.Fragment>
             ))}
           </div>
 
@@ -11321,22 +11607,77 @@ export default function App() {
     setTab(targetTab);
     setOpenSectionSignal((s) => ({ id: sectionId, n: s.n + 1 }));
   };
-  useEffect(() => { window.scrollTo({ top: 0 }); }, [tab]);
+  // El Entrenador IA se excluye: ahí el mount-effect del propio chat
+  // (EntrenadorIAChat) baja hasta el último mensaje — llevar la VENTANA a 0
+  // arriba lo peleaba y se veía un salto arriba→abajo apenas se abría la
+  // pestaña.
+  useEffect(() => { if (tab !== "entrenador_ia") window.scrollTo({ top: 0 }); }, [tab]);
   // (Los permisos de notificación y el canal se piden en el efecto
   // requestNotifPermission más abajo — un solo lugar, sin duplicar.)
   // Historial del Entrenador IA: persistido en el perfil (como logs/drafts),
   // no en estado efímero — así sobrevive a cerrar la app. Se cachea también
   // en localStorage (vía saveProfiles) y se sincroniza a la nube igual que
   // el resto del perfil. AI_CHAT_HISTORY_CAP evita que crezca sin límite.
-  const aiChatMessages = profiles[activeProfile]?.aiChatHistory?.length > 0 ? profiles[activeProfile].aiChatHistory : [AI_CHAT_WELCOME];
+  // Ahora son VARIAS conversaciones guardadas (ver getAiConversations) — la
+  // activa es la que se edita/manda a Gemini; el resto vive en la barra
+  // lateral del chat (ver AIConversationSidebar).
+  const aiConversations = useMemo(() => getAiConversations(profiles[activeProfile]), [profiles, activeProfile]);
+  const activeAiConversationId = profiles[activeProfile]?.activeAiConversationId || aiConversations[0]?.id;
+  const aiChatMessages = (aiConversations.find((c) => c.id === activeAiConversationId) || aiConversations[0])?.messages || [AI_CHAT_WELCOME];
   const setAiChatMessages = useCallback((newMessagesOrFn) => {
     setProfiles((prev) => {
       const cur = prev[activeProfile];
       if (!cur) return prev;
-      const base = cur.aiChatHistory?.length > 0 ? cur.aiChatHistory : [AI_CHAT_WELCOME];
+      const convos = getAiConversations(cur);
+      const activeId = cur.activeAiConversationId || convos[0]?.id;
+      const targetIdx = Math.max(0, convos.findIndex((c) => c.id === activeId));
+      const base = convos[targetIdx]?.messages || [AI_CHAT_WELCOME];
       const next = typeof newMessagesOrFn === "function" ? newMessagesOrFn(base) : newMessagesOrFn;
       const capped = next.length > AI_CHAT_HISTORY_CAP ? next.slice(next.length - AI_CHAT_HISTORY_CAP) : next;
-      const np = { ...prev, [activeProfile]: { ...cur, aiChatHistory: capped } };
+      const updatedConvos = convos.map((c, i) => (i === targetIdx ? { ...c, messages: capped, title: deriveAiConvoTitle(capped), updatedAt: new Date().toISOString() } : c));
+      const np = { ...prev, [activeProfile]: { ...withoutOldAiChatHistory(cur), aiConversations: updatedConvos, activeAiConversationId: convos[targetIdx]?.id || activeId } };
+      saveProfiles(np);
+      return np;
+    });
+  }, [activeProfile]);
+  // Nueva conversación: antes ESTO pisaba la única conversación guardada
+  // (setMessages([AI_CHAT_WELCOME]) sin más). Ahora la actual queda guardada
+  // tal cual en la lista y arranca una en blanco al principio — como "New
+  // chat" en Claude.
+  const handleNewAiConversation = useCallback(() => {
+    setProfiles((prev) => {
+      const cur = prev[activeProfile];
+      if (!cur) return prev;
+      const convos = getAiConversations(cur);
+      const fresh = { id: builderUid("aiconv"), title: "Nueva conversación", messages: [AI_CHAT_WELCOME], updatedAt: new Date().toISOString() };
+      const np = { ...prev, [activeProfile]: { ...withoutOldAiChatHistory(cur), aiConversations: [fresh, ...convos], activeAiConversationId: fresh.id } };
+      saveProfiles(np);
+      return np;
+    });
+  }, [activeProfile]);
+  const handleSwitchAiConversation = useCallback((id) => {
+    setProfiles((prev) => {
+      const cur = prev[activeProfile];
+      if (!cur) return prev;
+      const np = { ...prev, [activeProfile]: { ...cur, activeAiConversationId: id } };
+      saveProfiles(np);
+      return np;
+    });
+  }, [activeProfile]);
+  const handleDeleteAiConversation = useCallback((id) => {
+    setProfiles((prev) => {
+      const cur = prev[activeProfile];
+      if (!cur) return prev;
+      const convos = getAiConversations(cur);
+      const remaining = convos.filter((c) => c.id !== id);
+      let finalConvos = remaining, activeId = cur.activeAiConversationId || convos[0]?.id;
+      if (!remaining.length) {
+        const fresh = { id: builderUid("aiconv"), title: "Nueva conversación", messages: [AI_CHAT_WELCOME], updatedAt: new Date().toISOString() };
+        finalConvos = [fresh]; activeId = fresh.id;
+      } else if (activeId === id) {
+        activeId = remaining[0].id;
+      }
+      const np = { ...prev, [activeProfile]: { ...withoutOldAiChatHistory(cur), aiConversations: finalConvos, activeAiConversationId: activeId } };
       saveProfiles(np);
       return np;
     });
@@ -11692,30 +12033,10 @@ export default function App() {
   // o descanso) — ver getRoutineWeekSchedule más arriba en el archivo.
   const weekSchedule = activeRoutineDef ? getRoutineWeekSchedule(activeRoutineDef) : {};
 
-  // Aviso automático (y no restrictivo) de semana de descarga: la primera
-  // vez que se abre la app durante una semana de descarga, te avisa y te
-  // lleva a esa pestaña — pero no bloquea nada, podés ir a cualquier otra
-  // pestaña apenas quieras. Se marca `dismissedDeloadCycle` para no repetir
-  // el aviso todos los días dentro de la misma semana de descarga.
-  const [deloadNotice, setDeloadNotice] = useState(false);
-  useEffect(() => {
-    if (!profile || !cycleStart) return;
-    const wi = getWeekInfo(cycleStart, getProfileSettings(profile));
-    if (wi?.isDeload && profile.dismissedDeloadCycle !== wi.cycleNumber) {
-      setTab("descarga");
-      setDeloadNotice(true);
-      setProfiles((prev) => {
-        const p = prev[activeProfile];
-        if (!p) return prev;
-        const np = { ...prev, [activeProfile]: { ...p, dismissedDeloadCycle: wi.cycleNumber } };
-        saveProfiles(np);
-        return np;
-      });
-      const t = setTimeout(() => setDeloadNotice(false), 7000);
-      return () => clearTimeout(t);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeProfile]);
+  // Antes acá había un aviso automático que te forzaba a la pestaña
+  // Descarga apenas abrías la app en semana de descarga. Se reemplazó por
+  // un indicador + atajo discreto dentro de Rutina (ver RoutineView) — no
+  // hace falta empujarte a otra pestaña para avisarte.
 
   // Festejo (con opción de compartir) cuando se completa un ciclo entero
   // (entrenamiento + descarga): se guarda `lastSeenCycleNumber` y, si en un
@@ -11983,8 +12304,10 @@ export default function App() {
   // serie individualmente — y además se limpian los drafts (lo que habías
   // tipeado y no guardado): hasta este momento se mantienen vivos, pero una
   // vez finalizada la sesión no tiene sentido seguir arrastrándolos.
-  const handleStartSession = (dayKey) => {
-    const np = { ...profiles, [activeProfile]: { ...profiles[activeProfile], activeSession: { dayKey, startedAt: new Date().toISOString() } } };
+  const handleStartSession = (dayKey, deload = false) => {
+    const activeSession = { dayKey, startedAt: new Date().toISOString() };
+    if (deload) activeSession.deload = true;
+    const np = { ...profiles, [activeProfile]: { ...profiles[activeProfile], activeSession } };
     setProfiles(np); saveProfiles(np);
     setSessionStarted(true); // overlay "¡A entrenar!"
     haptic([0, 40, 60, 40]);
@@ -12062,6 +12385,14 @@ export default function App() {
       // "24 sesiones · usada hace 3 meses" en cada rutina.
       const finished = { date: todayStr(), dayKey: p.activeSession.dayKey, startedAt: p.activeSession.startedAt, endedAt: new Date().toISOString() };
       if (p.activeRoutineId) finished.routineId = p.activeRoutineId;
+      // BUG FIX: el % completado se calculaba SIEMPRE contra la rutina
+      // ACTUAL (ROUTINE[dayKey] en vivo) — si después agregabas o sacabas
+      // ejercicios de ese día, el % de sesiones VIEJAS cambiaba solo, sin
+      // que hayas tocado nada de esa sesión. Ahora guardamos una foto de
+      // qué ejercicios tenía el día en ESE momento, así el % queda fijo
+      // para siempre (ver buildSessionsIndex, que la usa si existe).
+      const dayDefNow = ROUTINE[p.activeSession.dayKey];
+      if (dayDefNow?.exercises?.length) finished.dayExerciseIds = dayDefNow.exercises.map((e) => e.id);
       updatedTrainingSessions = [...(p.trainingSessions || []), finished];
       const np = { ...prev, [activeProfile]: { ...p, activeSession: null, trainingSessions: updatedTrainingSessions, drafts: {} } };
       saveProfiles(np);
@@ -12080,20 +12411,23 @@ export default function App() {
     });
   };
   // Mismo registro que handleEndSession (mismo "tipo" de entrada en
-  // trainingSessions), pero para la pestaña Descarga — que no tiene
-  // Iniciar/Cancelar, así que no depende de activeSession. Antes de
-  // esto, entrenar tu semana de descarga desde esa pestaña no quedaba
-  // registrado en ningún lado: no contaba como día entrenado, no sumaba
-  // a la racha, no aparecía en el calendario de Historial.
+  // trainingSessions), pero para la pestaña Descarga. Si la sesión se iba a
+  // marcar como hecha sin pasar por "Iniciar sesión" (uso viejo), usa la
+  // hora actual como inicio y fin; si SÍ la iniciaste (ver SessionStartBar en
+  // DeloadView), toma el startedAt real para que la duración no quede
+  // siempre en 0 minutos, y limpia activeSession al terminar.
   const handleFinishDeloadSession = (dayKey) => {
     let updatedTrainingSessions = null;
     setProfiles((prev) => {
       const p = prev[activeProfile];
       if (!p) return prev;
-      const finished = { date: todayStr(), dayKey, startedAt: new Date().toISOString(), endedAt: new Date().toISOString(), deload: true };
+      const startedAt = p.activeSession?.deload ? p.activeSession.startedAt : new Date().toISOString();
+      const finished = { date: todayStr(), dayKey, startedAt, endedAt: new Date().toISOString(), deload: true };
       if (p.activeRoutineId) finished.routineId = p.activeRoutineId;
+      const dayDefNow = ROUTINE[dayKey];
+      if (dayDefNow?.exercises?.length) finished.dayExerciseIds = dayDefNow.exercises.map((e) => e.id);
       updatedTrainingSessions = [...(p.trainingSessions || []), finished];
-      const np = { ...prev, [activeProfile]: { ...p, trainingSessions: updatedTrainingSessions } };
+      const np = { ...prev, [activeProfile]: { ...p, activeSession: null, trainingSessions: updatedTrainingSessions } };
       saveProfiles(np);
       return np;
     });
@@ -12175,8 +12509,7 @@ export default function App() {
       <div style={{ position: "fixed", inset: 0, backdropFilter: "saturate(0.88)", WebkitBackdropFilter: "saturate(0.88)", pointerEvents: "none", zIndex: 50 }} />
       <StyleInjector />
       {recoveredNotice && <RecoveredBanner onClose={() => setRecoveredNotice(false)} />}
-      {deloadNotice && <DeloadNoticeBanner onClose={() => setDeloadNotice(false)} />}
-      
+
       {importRoutineError && <ImportRoutineErrorBanner onClose={() => setImportRoutineError(false)} />}
       <SideNav tab={tab} setTab={setTab} profileName={activeProfile} />
       <div className="flex-1 min-w-0" style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
@@ -12210,10 +12543,10 @@ export default function App() {
           <div key={tab} className={tabSlideClass}>
             {tab === "rutinas" && <RoutinesView openScheduleSignal={openSectionSignal.id === "week-schedule" ? openSectionSignal.n : 0} openEditorSignal={openSectionSignal.id === "routine-editor" ? openSectionSignal.n : 0} profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleArchiveRoutine} onRestore={handleRestoreRoutine} onUpdateProfile={handleUpdateProfile} />}
             {tab === "rutina" && <OnboardingTasksCard profile={profile} cycleStart={cycleStart} logs={logs} onGoToProfile={() => setTab("perfil")} onOpenFieldSettings={() => setShowFieldIntro(true)} onDone={() => handleUpdateProfile({ onboardingDone: true })} />}
-            {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToRoutines={() => setTab("rutinas")} onGoToSchedule={() => goToSection("rutinas", "week-schedule")} onGoToFieldSettings={() => goToSection("perfil", "field-settings-section")} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} todaySessionDayKey={(profile?.trainingSessions || []).find((ts) => ts.date === todayStr())?.dayKey || profile?.activeSession?.dayKey || null} sex={profile?.sex} age={profile?.age} />}
+            {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToRoutines={() => setTab("rutinas")} onGoToSchedule={() => goToSection("rutinas", "week-schedule")} onGoToFieldSettings={() => goToSection("perfil", "field-settings-section")} onGoToDescarga={() => setTab("descarga")} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} todaySessionDayKey={(profile?.trainingSessions || []).find((ts) => ts.date === todayStr())?.dayKey || profile?.activeSession?.dayKey || null} sex={profile?.sex} age={profile?.age} />}
             {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} onGoToRoutines={() => goToSection("rutinas", "routine-editor")} weekSchedule={weekSchedule} sex={profile?.sex} age={profile?.age} onGoToDeload={() => setTab("descarga")} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} />}
-            {tab === "descarga" && <DeloadView logs={logs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} />}
-            {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} settings={getProfileSettings(profile)} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} />}
+            {tab === "descarga" && <DeloadView logs={logs} setLogs={setLogs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} activeSession={profile?.activeSession?.deload ? profile.activeSession : null} onStartSession={handleStartSession} onCancelSession={handleCancelSession} />}
+            {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} conversations={aiConversations} activeConversationId={activeAiConversationId} onNewConversation={handleNewAiConversation} onSwitchConversation={handleSwitchAiConversation} onDeleteConversation={handleDeleteAiConversation} settings={getProfileSettings(profile)} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} />}
             {tab === "perfil" && <ProfileView onOpenFieldPreview={() => setShowFieldIntro(true)} openSectionSignal={openSectionSignal} profileName={activeProfile} profiles={profiles} logs={logs} onSignOut={handleSignOut} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} />}
           </div>
         </main>
@@ -12273,15 +12606,6 @@ function RecoveredBanner({ onClose }) {
     <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[150] bg-teal-500 !text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-teal-500/30 flex items-center gap-2 bounce-in">
       <Check size={14} /> Recuperamos tu copia de seguridad local
       <button onClick={onClose} aria-label="Cerrar" className="ml-1 opacity-80 hover:opacity-100"><X size={13} /></button>
-    </div>
-  );
-}
-
-function DeloadNoticeBanner({ onClose }) {
-  return (
-    <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[150] bg-purple-500 !text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-purple-500/30 flex items-center gap-2 bounce-in max-w-[92vw]">
-      <Zap size={14} className="shrink-0" /> Esta semana es de descarga — te llevamos a esa pestaña
-      <button onClick={onClose} aria-label="Cerrar" className="ml-1 opacity-80 hover:opacity-100 shrink-0"><X size={13} /></button>
     </div>
   );
 }
