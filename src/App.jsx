@@ -9762,16 +9762,20 @@ Datos: ${JSON.stringify(context)}`;
 
   return (
     <div className="pb-32">
-      {/* Pestaña fija en el borde izquierdo — el botón del header (más abajo)
+      {/* Pestaña fija arriba a la izquierda — el botón del header (más abajo)
           puede pasar desapercibido entre los otros íconos; esto es una "barra
           extensible" imposible de no ver: siempre a mano mientras estás en
-          esta pestaña, se note o no la lista de arriba. */}
+          esta pestaña, se note o no la lista de arriba. Colgada justo debajo
+          del header (que ya respeta el notch/status bar con
+          env(safe-area-inset-top)) — nunca tapa el header ni el propio
+          notch, en vez de un top fijo que en algunos teléfonos quedaría
+          adentro del área no segura. */}
       {onSwitchConversation && (
         <button
           onClick={() => setShowSidebar(true)}
           aria-label="Tus conversaciones"
-          className="fixed left-0 top-1/2 -translate-y-1/2 z-40 flex items-center gap-1 pl-1.5 pr-2 py-3.5 rounded-r-2xl text-teal-400 shadow-lg shadow-black/40 active:scale-95 transition backdrop-blur-sm"
-          style={{ backgroundColor: "rgba(15,23,42,0.92)", border: "1px solid rgba(20,184,166,0.35)", borderLeft: "none" }}
+          className="fixed left-0 z-40 flex items-center gap-1 pl-1.5 pr-2 py-3 rounded-r-2xl text-teal-400 shadow-lg shadow-black/40 active:scale-95 transition backdrop-blur-sm"
+          style={{ top: "calc(env(safe-area-inset-top, 0px) + 70px)", backgroundColor: "rgba(15,23,42,0.92)", border: "1px solid rgba(20,184,166,0.35)", borderLeft: "none" }}
         >
           <ChevronRight size={14} />
           <List size={13} />
@@ -9811,16 +9815,20 @@ Datos: ${JSON.stringify(context)}`;
         </div>
       </div>
 
+      {/* Un color distinto por atajo — el mismo lenguaje de "cada categoría
+          tiene su acento" que ya usan Progreso (Rango/Historial/Ejercicios)
+          y Rutinas/Descarga, en vez de que los seis chips se vean como una
+          sola mancha teal. */}
       <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 mb-4">
         {[
-          { icon: <Layers size={11} />, label: "Crear rutina", prompt: "Armame una rutina nueva según mis objetivos" },
-          { icon: <BarChart3 size={11} />, label: "Analizar progreso", prompt: "Analizá mi progreso reciente: ¿en qué mejoré y qué tengo estancado?" },
-          { icon: <Target size={11} />, label: "Punto débil", prompt: "Mirando mis rangos por músculo, ¿cuál es mi punto más débil y cómo lo ataco?" },
-          { icon: <Zap size={11} />, label: "Plan de hoy", prompt: "¿Qué me toca entrenar hoy y con qué pesos me conviene arrancar?" },
-          { icon: <Calendar size={11} />, label: "Ciclo y descarga", prompt: "¿Cómo vengo en el ciclo actual? ¿Cuándo me toca la descarga?" },
-          { icon: <Save size={11} />, label: "Anotar una marca", prompt: "Anotame que hoy hice 8x80 en press banca" },
+          { icon: <Layers size={11} />, label: "Crear rutina", prompt: "Armame una rutina nueva según mis objetivos", color: "#A855F7" },
+          { icon: <BarChart3 size={11} />, label: "Analizar progreso", prompt: "Analizá mi progreso reciente: ¿en qué mejoré y qué tengo estancado?", color: "#3B82F6" },
+          { icon: <Target size={11} />, label: "Punto débil", prompt: "Mirando mis rangos por músculo, ¿cuál es mi punto más débil y cómo lo ataco?", color: "#F59E0B" },
+          { icon: <Zap size={11} />, label: "Plan de hoy", prompt: "¿Qué me toca entrenar hoy y con qué pesos me conviene arrancar?", color: "#14B8A6" },
+          { icon: <Calendar size={11} />, label: "Ciclo y descarga", prompt: "¿Cómo vengo en el ciclo actual? ¿Cuándo me toca la descarga?", color: "#F43F5E" },
+          { icon: <Save size={11} />, label: "Anotar una marca", prompt: "Anotame que hoy hice 8x80 en press banca", color: "#10B981" },
         ].map((c, i) => (
-          <button key={i} onClick={() => { setInput(c.prompt); }} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-teal-500/10 border border-teal-500/20 text-teal-300 text-[10px] font-bold whitespace-nowrap shrink-0 hover:bg-teal-500/20 transition active:scale-95">{c.icon}{c.label}</button>
+          <button key={i} onClick={() => { setInput(c.prompt); }} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold whitespace-nowrap shrink-0 transition active:scale-95" style={{ backgroundColor: tint(c.color, "14"), border: `1px solid ${tint(c.color, "30")}`, color: c.color }}>{c.icon}{c.label}</button>
         ))}
       </div>
 
@@ -9829,7 +9837,7 @@ Datos: ${JSON.stringify(context)}`;
           <div key={i} className="msg-in">
             <div className={`group flex items-end gap-2 ${m.role === "user" ? "justify-end" : "justify-start"}`}>
               {m.role === "assistant" && (
-                <div className="w-6 h-6 rounded-lg bg-teal-500/15 border border-teal-500/25 flex items-center justify-center shrink-0 mb-0.5">
+                <div className="w-6 h-6 rounded-lg bg-teal-500/15 border border-teal-500/25 flex items-center justify-center shrink-0 mb-0.5 shadow-md shadow-teal-500/10">
                   <Sparkles size={11} className="text-teal-400" />
                 </div>
               )}
@@ -9841,8 +9849,8 @@ Datos: ${JSON.stringify(context)}`;
                 </button>
               )}
               <div
-                className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${m.role === "user" ? "!text-white rounded-br-md" : "bg-slate-900/60 border border-slate-800/60 text-slate-200 rounded-bl-md"} ${editingIndex === i ? "ring-2 ring-teal-400/60" : ""}`}
-                style={m.role === "user" ? { background: "linear-gradient(135deg,#14B8A6,#0E7490)" } : {}}
+                className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${m.role === "user" ? "!text-white rounded-br-md shadow-lg shadow-teal-500/15" : "border border-slate-800/60 text-slate-200 rounded-bl-md shadow-md shadow-black/20"} ${editingIndex === i ? "ring-2 ring-teal-400/60" : ""}`}
+                style={m.role === "user" ? { background: "linear-gradient(135deg,#14B8A6,#0E7490)" } : { background: "var(--panel-grad-slate)" }}
               >
                 {m.role === "assistant" ? renderChatMarkdown(m.text) : m.text}
               </div>
@@ -9874,8 +9882,12 @@ Datos: ${JSON.stringify(context)}`;
               </div>
             )}
             {m.plan && m.planStatus === "pending" && typeof m.plan.confirm === "function" && (
-              <div className="mt-2 bg-slate-900/70 border border-teal-500/25 rounded-2xl p-3.5 max-w-[85%] bounce-in">
-                <p className="text-sm font-bold text-white mb-2.5">{m.plan.title}</p>
+              <div className="relative overflow-hidden mt-2 border border-teal-500/25 rounded-2xl p-3.5 max-w-[85%] bounce-in" style={{ background: "var(--panel-grad-slate)" }}>
+                <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full bg-teal-500/10 blur-2xl pointer-events-none" />
+                <div className="relative flex items-center gap-2 mb-2.5">
+                  <span className="w-6 h-6 rounded-lg bg-teal-500/15 border border-teal-500/25 flex items-center justify-center shrink-0"><Sparkles size={12} className="text-teal-400" /></span>
+                  <p className="text-sm font-bold text-white flex-1 min-w-0">{m.plan.title}</p>
+                </div>
                 {m.plan.kind === "routine" ? (
                   <div className="mb-3"><RoutinePreview routineDef={m.plan.routineDef} /></div>
                 ) : (
