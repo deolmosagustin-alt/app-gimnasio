@@ -951,7 +951,7 @@ function buildSessionsIndex(logs, trainingSessions = []) {
       // rutina actual, y si no hay ninguno (registro viejo de un ejercicio ya
       // borrado) lo derivamos del catálogo global o del propio id.
       const nombre = e.exName || ex?.name || EXERCISE_LIBRARY_BY_ID[exerciseId]?.name || exerciseId.replace(/_/g, " ");
-      s.items.push({ exerciseId, exerciseName: nombre, exerciseMuscle: e.exMuscle || ex?.muscle || null, dayKey: ex?.dayKey ?? null, setIndex, reps: e.reps, kg: e.kg, minutes: e.minutes ?? null, km: e.km ?? null, rpe: e.rpe ?? null, isImprovement, priorBest, pctOfBest, removedFromRoutine: !ex });
+      s.items.push({ exerciseId, exerciseName: nombre, exerciseMuscle: e.exMuscle || ex?.muscle || null, dayKey: ex?.dayKey ?? null, setIndex, reps: e.reps, kg: e.kg, minutes: e.minutes ?? null, km: e.km ?? null, rpe: e.rpe ?? null, isImprovement, priorBest, pctOfBest, removedFromRoutine: !ex, deload: !!e.deload });
       s.totalVolume += thisVol;
       if (e.rpe != null) { s.rpeSum += e.rpe; s.rpeCount++; }
     });
@@ -986,7 +986,7 @@ function buildSessionsIndex(logs, trainingSessions = []) {
           completionPct = Math.round((done / total) * 100);
         }
       }
-      return { ...s, dayKeys, durationMin, completionPct, totalSets: s.items.length, avgRpe: s.rpeCount ? Math.round((s.rpeSum / s.rpeCount) * 10) / 10 : null };
+      return { ...s, dayKeys, durationMin, completionPct, isDeload: !!formal?.deload, totalSets: s.items.length, avgRpe: s.rpeCount ? Math.round((s.rpeSum / s.rpeCount) * 10) / 10 : null };
     })
     .sort((a, b) => (a.date < b.date ? 1 : -1));
 }
@@ -4930,7 +4930,10 @@ function SessionDetailCard({ session, onDelete, exerciseNotes = {}, rpeDisplayMo
   const [expandedSet, setExpandedSet] = useState(null);
   const dateLabel = new Date(session.date + "T12:00:00").toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" });
   const mainDay = ROUTINE[session.dayKeys[0]];
-  const accent = mainDay?.color || "#14B8A6";
+  // Un día de descarga se distingue con el mismo violeta de esa pestaña —
+  // así se nota de un vistazo en el historial, en vez de mezclarse con
+  // cualquier otro entrenamiento normal.
+  const accent = session.isDeload ? "#A855F7" : (mainDay?.color || "#14B8A6");
   // Agrupar las series por ejercicio — en vez de una lista plana de
   // "ejercicio S1 / ejercicio S2", cada ejercicio es una tarjeta con sus
   // series adentro como pills. Mucho más legible de un vistazo.
@@ -4951,6 +4954,9 @@ function SessionDetailCard({ session, onDelete, exerciseNotes = {}, rpeDisplayMo
         <div className="absolute -top-10 -right-8 w-36 h-36 rounded-full blur-3xl opacity-25 pointer-events-none" style={{ backgroundColor: accent }} />
         <div className="relative">
           <div className="flex gap-1.5 mb-2 flex-wrap">
+            {session.isDeload && (
+              <span className="text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded-lg flex items-center gap-1" style={{ backgroundColor: tint("#A855F7", "25"), color: "#A855F7" }}><Zap size={10} /> Descarga</span>
+            )}
             {session.dayKeys.map((dk) => ROUTINE[dk] && (
               <span key={dk} className="text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded-lg" style={{ backgroundColor: tint(ROUTINE[dk].color, "25"), color: ROUTINE[dk].color }}>{ROUTINE[dk].label}</span>
             ))}
@@ -5012,10 +5018,13 @@ function SessionDetailCard({ session, onDelete, exerciseNotes = {}, rpeDisplayMo
                 const pct = it.pctOfBest;
                 // Rojo solo si bajaste de verdad (≤98%). Igualar o quedar a
                 // 1-2% por el redondeo de la fórmula NO es rojo: es "igualaste".
-                const below = !isCardio && pct != null && pct < 99;
-                const color = it.isImprovement ? "#6EE7B7" : below ? "#FCA5A5" : "#cbd5e1";
-                const bg = it.isImprovement ? "#10B98118" : below ? "#F43F5E14" : "var(--surface-2)";
-                const bd = it.isImprovement ? "#10B98135" : below ? "#F43F5E30" : "transparent";
+                // Una serie de DESCARGA nunca es "roja": el peso reducido es a
+                // propósito, no una caída de rendimiento — se distingue en
+                // violeta en vez de compararla contra tu marca normal.
+                const below = !isCardio && !it.deload && pct != null && pct < 99;
+                const color = it.deload ? "#C4B5FD" : it.isImprovement ? "#6EE7B7" : below ? "#FCA5A5" : "#cbd5e1";
+                const bg = it.deload ? "#A855F718" : it.isImprovement ? "#10B98118" : below ? "#F43F5E14" : "var(--surface-2)";
+                const bd = it.deload ? "#A855F735" : it.isImprovement ? "#10B98135" : below ? "#F43F5E30" : "transparent";
                 const itemKey = `${exName}:${i}`;
                 return (
                   <button key={i} onClick={() => setExpandedSet((cur) => (cur === itemKey ? null : itemKey))} className="text-[11px] font-bold px-2 py-1 rounded-lg tabular-nums inline-flex items-center gap-1 number-pop transition active:scale-95"
@@ -5398,12 +5407,16 @@ function DeloadCardioTimer({ targetMinutes, accent, onComplete }) {
   );
 }
 
-function DeloadView({ logs, setLogs, settings = DEFAULT_SETTINGS, deloadProgress = {}, setDeloadProgress, onFinishDeloadSession, activeSession = null, onStartSession = null, onCancelSession = null }) {
+function DeloadView({ logs, setLogs, settings = DEFAULT_SETTINGS, deloadProgress = {}, setDeloadProgress, onFinishDeloadSession, activeSession = null, onStartSession = null, onCancelSession = null, weekSchedule = null }) {
   const globalUnit = useWeightUnit();
   const [unit, setUnit] = useState(globalUnit);
   const { trainWeeks, deloadWeeks, deloadPct, deloadSetDivisor } = settings;
   const pctLabel = Math.round(deloadPct * 100);
-  const [activeDay, setActiveDay] = useState(DAY_ORDER[0]);
+  // BUG FIX: antes siempre arrancaba en el primer día (DAY_ORDER[0]), sin
+  // importar qué día de tu cronograma semanal te tocaba hoy — a diferencia
+  // de Rutina, que sí lo hace. Mismo cálculo acá.
+  const scheduledDay = useMemo(() => { const dk = weekSchedule?.[todayWeekdayKey()]; return dk && DAY_ORDER.includes(dk) ? dk : null; }, [weekSchedule]);
+  const [activeDay, setActiveDay] = useState(() => scheduledDay || DAY_ORDER[0]);
   const day = ROUTINE[activeDay];
   const today = todayStr();
   // Marcar una serie como hecha hoy (o desmarcarla si ya estaba marcada) —
@@ -7297,7 +7310,38 @@ function computeWeekRecap(logs, trainingSessions) {
   return { dias, series: rows.length, volumen };
 }
 
-function downloadBlob(blob, filename) {
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(String(reader.result).split(",")[1] || "");
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+// BUG FIX: en la app nativa (Android) esto no hacía NADA — un <a download>
+// depende de que el navegador tenga una carpeta de "Descargas" a la que
+// escribir, y el WebView de Capacitor no la tiene. Por eso exportar
+// PDF/Word/Excel no funcionaba en el celular (sin error visible: el archivo
+// simplemente nunca se generaba). Mismo patrón que ya usa ShareLinkModal
+// para las imágenes para compartir: escribir el archivo real al caché de la
+// app con @capacitor/filesystem y abrir la hoja de compartir nativa
+// (@capacitor/share) — desde ahí se guarda en Archivos, se manda por
+// WhatsApp, etc. En la web, sigue siendo la descarga de toda la vida.
+async function downloadBlob(blob, filename) {
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const base64 = await blobToBase64(blob);
+      const { Filesystem, Directory } = await import("@capacitor/filesystem");
+      const result = await Filesystem.writeFile({ path: filename, data: base64, directory: Directory.Cache });
+      const { Share } = await import("@capacitor/share");
+      await Share.share({ title: filename, files: [result.uri] });
+      return;
+    } catch (err) {
+      console.error("Exportar (nativo) falló:", err);
+      return;
+    }
+  }
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
@@ -7381,7 +7425,7 @@ async function exportTrainingToPdf(rows, meta) {
     doc.text(`Modus Fit · Página ${p} de ${pageCount}`, 105, 290, { align: "center" });
   }
 
-  doc.save(`${meta.filename}.pdf`);
+  await downloadBlob(doc.output("blob"), `${meta.filename}.pdf`);
 }
 
 async function exportTrainingToWord(rows, meta) {
@@ -7419,7 +7463,7 @@ async function exportTrainingToWord(rows, meta) {
   });
   const doc = new Document({ sections: [{ children }] });
   const blob = await Packer.toBlob(doc);
-  downloadBlob(blob, `${meta.filename}.docx`);
+  await downloadBlob(blob, `${meta.filename}.docx`);
 }
 
 async function exportTrainingToExcel(rows, meta) {
@@ -7457,7 +7501,8 @@ async function exportTrainingToExcel(rows, meta) {
   wsDetalle["!cols"] = [{ wch: 12 }, { wch: 16 }, { wch: 26 }, { wch: 16 }, { wch: 7 }, { wch: 7 }, { wch: 7 }, { wch: 12 }, { wch: 12 }, { wch: 6 }, { wch: 6 }, { wch: 32 }];
   XLSX.utils.book_append_sheet(wb, wsDetalle, "Detalle");
 
-  XLSX.writeFile(wb, `${meta.filename}.xlsx`);
+  const wbout = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+  await downloadBlob(new Blob([wbout], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), `${meta.filename}.xlsx`);
 }
 
 /* ============================================================================
@@ -7501,7 +7546,7 @@ async function exportRoutineToPdf(routineDef) {
     });
     y = doc.lastAutoTable.finalY + 10;
   });
-  doc.save(`${slugifyForFilename(routineDef.name)}.pdf`);
+  await downloadBlob(doc.output("blob"), `${slugifyForFilename(routineDef.name)}.pdf`);
 }
 
 async function exportRoutineToWord(routineDef) {
@@ -7519,7 +7564,7 @@ async function exportRoutineToWord(routineDef) {
   });
   const doc = new Document({ sections: [{ children }] });
   const blob = await Packer.toBlob(doc);
-  downloadBlob(blob, `${slugifyForFilename(routineDef.name)}.docx`);
+  await downloadBlob(blob, `${slugifyForFilename(routineDef.name)}.docx`);
 }
 
 async function exportRoutineToExcel(routineDef) {
@@ -7531,7 +7576,8 @@ async function exportRoutineToExcel(routineDef) {
   const ws = XLSX.utils.aoa_to_sheet([header, ...data]);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Rutina");
-  XLSX.writeFile(wb, `${slugifyForFilename(routineDef.name)}.xlsx`);
+  const wbout = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+  await downloadBlob(new Blob([wbout], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), `${slugifyForFilename(routineDef.name)}.xlsx`);
 }
 
 const EXPORT_PERIODS = [
@@ -9584,6 +9630,21 @@ Datos: ${JSON.stringify(context)}`;
 
   return (
     <div className="pb-32">
+      {/* Pestaña fija en el borde izquierdo — el botón del header (más abajo)
+          puede pasar desapercibido entre los otros íconos; esto es una "barra
+          extensible" imposible de no ver: siempre a mano mientras estás en
+          esta pestaña, se note o no la lista de arriba. */}
+      {onSwitchConversation && (
+        <button
+          onClick={() => setShowSidebar(true)}
+          aria-label="Tus conversaciones"
+          className="fixed left-0 top-1/2 -translate-y-1/2 z-40 flex items-center gap-1 pl-1.5 pr-2 py-3.5 rounded-r-2xl text-teal-400 shadow-lg shadow-black/40 active:scale-95 transition backdrop-blur-sm"
+          style={{ backgroundColor: "rgba(15,23,42,0.92)", border: "1px solid rgba(20,184,166,0.35)", borderLeft: "none" }}
+        >
+          <ChevronRight size={14} />
+          <List size={13} />
+        </button>
+      )}
       <div className="relative overflow-hidden rounded-2xl border border-teal-500/20 p-5 mb-3" style={{ background: "var(--grad-hero-teal)" }}>
         <div className="absolute -top-8 -right-6 w-32 h-32 rounded-full bg-teal-500/15 blur-2xl pointer-events-none" />
         <div className="absolute -bottom-6 -left-6 w-28 h-28 rounded-full bg-cyan-500/10 blur-2xl pointer-events-none" />
@@ -12545,7 +12606,7 @@ export default function App() {
             {tab === "rutina" && <OnboardingTasksCard profile={profile} cycleStart={cycleStart} logs={logs} onGoToProfile={() => setTab("perfil")} onOpenFieldSettings={() => setShowFieldIntro(true)} onDone={() => handleUpdateProfile({ onboardingDone: true })} />}
             {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToRoutines={() => setTab("rutinas")} onGoToSchedule={() => goToSection("rutinas", "week-schedule")} onGoToFieldSettings={() => goToSection("perfil", "field-settings-section")} onGoToDescarga={() => setTab("descarga")} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} todaySessionDayKey={(profile?.trainingSessions || []).find((ts) => ts.date === todayStr())?.dayKey || profile?.activeSession?.dayKey || null} sex={profile?.sex} age={profile?.age} />}
             {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} onGoToRoutines={() => goToSection("rutinas", "routine-editor")} weekSchedule={weekSchedule} sex={profile?.sex} age={profile?.age} onGoToDeload={() => setTab("descarga")} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} />}
-            {tab === "descarga" && <DeloadView logs={logs} setLogs={setLogs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} activeSession={profile?.activeSession?.deload ? profile.activeSession : null} onStartSession={handleStartSession} onCancelSession={handleCancelSession} />}
+            {tab === "descarga" && <DeloadView logs={logs} setLogs={setLogs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} activeSession={profile?.activeSession?.deload ? profile.activeSession : null} onStartSession={handleStartSession} onCancelSession={handleCancelSession} weekSchedule={weekSchedule} />}
             {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} conversations={aiConversations} activeConversationId={activeAiConversationId} onNewConversation={handleNewAiConversation} onSwitchConversation={handleSwitchAiConversation} onDeleteConversation={handleDeleteAiConversation} settings={getProfileSettings(profile)} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} />}
             {tab === "perfil" && <ProfileView onOpenFieldPreview={() => setShowFieldIntro(true)} openSectionSignal={openSectionSignal} profileName={activeProfile} profiles={profiles} logs={logs} onSignOut={handleSignOut} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} />}
           </div>
