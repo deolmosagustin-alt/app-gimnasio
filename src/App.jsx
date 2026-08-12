@@ -9111,7 +9111,7 @@ function parseAction(rawText) {
 // "activar_rutina" con un nombre que no existe), devuelve null — en ese
 // caso no se muestra ninguna tarjeta, sólo el texto del mensaje.
 function buildActionPlan(action, ctx) {
-  const { profile, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement } = ctx;
+  const { profile, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement, onLogSet } = ctx;
   if (action.type === "crear_rutina") {
     const days = (action.days || []).map((d) => ({
       label: String(d.label || "Día"),
@@ -9158,6 +9158,7 @@ function buildActionPlan(action, ctx) {
   }
   if (action.type === "config_ciclo") {
     const patch = {}; const items = [];
+    if (typeof action.deloadEnabled === "boolean") { patch.deloadEnabled = action.deloadEnabled; items.push(`Semanas de descarga: ${action.deloadEnabled ? "activadas" : "desactivadas (ciclo continuo)"}`); }
     if (action.trainWeeks) { patch.trainWeeks = Math.min(12, Math.max(2, action.trainWeeks)); items.push(`Semanas de entrenamiento: ${patch.trainWeeks}`); }
     if (action.deloadWeeks) { patch.deloadWeeks = Math.min(4, Math.max(1, action.deloadWeeks)); items.push(`Semanas de descarga: ${patch.deloadWeeks}`); }
     if (action.deloadPct) { patch.deloadPct = Math.min(0.95, Math.max(0.5, action.deloadPct)); items.push(`Carga en descarga: ${Math.round(patch.deloadPct * 100)}%`); }
@@ -9174,8 +9175,94 @@ function buildActionPlan(action, ctx) {
     if (["sound", "vibration", "both"].includes(action.alertType)) { patch.alertType = action.alertType; items.push(`Aviso al terminar: ${{ sound: "Sonido", vibration: "Vibración", both: "Ambos" }[action.alertType]}`); }
     if (action.restLong) { patch.restLong = Math.min(600, Math.max(30, action.restLong)); items.push(`Descanso ejercicios pesados: ${patch.restLong}s`); }
     if (action.restShort) { patch.restShort = Math.min(600, Math.max(30, action.restShort)); items.push(`Descanso resto: ${patch.restShort}s`); }
+    if (typeof action.autoStartRestTimer === "boolean") { patch.autoStartRestTimer = action.autoStartRestTimer; items.push(`Cronómetro automático: ${action.autoStartRestTimer ? "activado" : "desactivado"}`); }
     if (!items.length) return null;
     return { kind: "list", title: "Cambiar descanso entre series", items, confirmLabel: "Aplicar", confirm: () => onUpdateSettings(patch) };
+  }
+  if (action.type === "config_notificaciones") {
+    const patch = {}; const items = [];
+    if (typeof action.reminderEnabled === "boolean") { patch.reminderEnabled = action.reminderEnabled; items.push(`Avisos de entrenamiento: ${action.reminderEnabled ? "activados" : "desactivados"}`); }
+    if (action.reminderTime) { patch.reminderTime = action.reminderTime; items.push(`Hora del aviso: ${action.reminderTime}`); }
+    if (typeof action.weeklyRecapEnabled === "boolean") { patch.weeklyRecapEnabled = action.weeklyRecapEnabled; items.push(`Resumen semanal: ${action.weeklyRecapEnabled ? "activado" : "desactivado"}`); }
+    if (!items.length) return null;
+    return { kind: "list", title: "Cambiar notificaciones", items, confirmLabel: "Aplicar", confirm: () => onUpdateSettings(patch) };
+  }
+  if (action.type === "config_unidad") {
+    if (action.weightUnit !== "kg" && action.weightUnit !== "lbs") return null;
+    return { kind: "list", title: "Cambiar unidad de peso", items: [`Unidad: ${action.weightUnit}`], confirmLabel: "Aplicar", confirm: () => onUpdateSettings({ weightUnit: action.weightUnit }) };
+  }
+  // Qué ves al registrar una serie — mismos campos que el modal de Perfil
+  // ("Personalizá tu ficha"), expuestos acá para poder prenderlos/apagarlos
+  // por chat en vez de tener que ir a buscarlos.
+  if (action.type === "config_ficha") {
+    const FICHA_FIELDS = { showRpe: "Esfuerzo (RPE/RIR)", showWarmup: "Calentamiento sugerido", show1RMPercent: "Porcentaje de 1RM", showCoaching: "Consejos al guardar", showExerciseNote: "Consejos del ejercicio", showPersonalNote: "Notas por serie", showStagnation: "Aviso de estancamiento", showProgressionSuggestion: "Progresión sugerida" };
+    const patch = {}; const items = [];
+    Object.keys(FICHA_FIELDS).forEach((key) => {
+      if (typeof action[key] === "boolean") { patch[key] = action[key]; items.push(`${FICHA_FIELDS[key]}: ${action[key] ? "activado" : "desactivado"}`); }
+    });
+    if (action.rpeDisplayMode === "rpe" || action.rpeDisplayMode === "rir") { patch.rpeDisplayMode = action.rpeDisplayMode; items.push(`Mostrar esfuerzo como: ${action.rpeDisplayMode.toUpperCase()}`); }
+    if (!items.length) return null;
+    return { kind: "list", title: "Cambiar qué ves al registrar", items, confirmLabel: "Aplicar", confirm: () => onUpdateSettings(patch) };
+  }
+  // Medida corporal suelta (cintura, pecho, brazo, pierna) — el peso ya
+  // tiene su propio camino en editar_perfil (queda en el mismo historial).
+  if (action.type === "agregar_medida") {
+    const meta = MEASUREMENT_TYPES.find((t) => t.k === action.tipo);
+    const value = parseFloat(action.valor);
+    if (!meta || meta.k === "weight" || isNaN(value) || value <= 0) return null;
+    return { kind: "list", title: "Agregar medida", items: [`${meta.l}: ${value}${meta.unit}`], confirmLabel: "Guardar", confirm: () => onAddMeasurement?.(meta.k, value) };
+  }
+  // Registrar una marca directo por chat/voz — sin tocar Rutina. Se guarda
+  // en la MISMA serie (exerciseId_setIndex) que ve la app, así el récord,
+  // el rango muscular y el historial se actualizan solos.
+  if (action.type === "registrar_marca") {
+    const lib = matchExerciseToLibrary(action.exercise || "");
+    const reps = parseFloat(action.reps), kg = parseFloat(action.kg);
+    if (!lib || !reps || reps <= 0 || isNaN(kg) || kg < 0) return null;
+    const setIndex = Number.isInteger(action.setIndex) && action.setIndex >= 0 ? action.setIndex : 0;
+    const rpe = (typeof action.rpe === "number" && action.rpe >= 1 && action.rpe <= 10) ? action.rpe : null;
+    const key = `${lib.id}_${setIndex}`;
+    return {
+      kind: "list", title: "Registrar marca de hoy",
+      items: [`${lib.name} — S${setIndex + 1}: ${reps}×${kg}kg${rpe ? ` · RPE ${rpe}` : ""}`],
+      confirmLabel: "Guardar",
+      confirm: () => {
+        if (!onLogSet) return;
+        const entry = { date: todayStr(), reps, kg, exName: lib.name, exMuscle: lib.muscle };
+        if (rpe != null) entry.rpe = rpe;
+        onLogSet((prev) => ({ ...prev, [key]: [...(prev[key] || []).filter((h) => h.date !== entry.date), entry] }));
+      },
+    };
+  }
+  // Agregar o sacar un ejercicio de un día de TU rutina activa — a
+  // diferencia de crear_rutina (arma una nueva desde cero), esto edita la
+  // que ya tenés puesta.
+  if (action.type === "editar_rutina_activa") {
+    const activeId = profile?.activeRoutineId;
+    const activeDef = activeId ? resolveRoutineDef(profile?.routines?.[activeId], activeId) : null;
+    if (!activeDef || !onCreateRoutine) return null;
+    const wantedDay = String(action.day || "").toLowerCase().trim();
+    const dayKey = Object.keys(activeDef.days || {}).find((dk) => (activeDef.days[dk]?.label || "").toLowerCase().includes(wantedDay));
+    if (!dayKey) return null;
+    const day = activeDef.days[dayKey];
+    if (action.op === "agregar") {
+      const lib = matchExerciseToLibrary(action.exercise || "");
+      if (!lib) return null;
+      const setsCount = Math.max(1, Math.min(8, action.setsCount || 3));
+      const sets = Array.from({ length: setsCount }, () => ({ repRange: action.repRange || "8-10" }));
+      const newDef = { ...activeDef, days: { ...activeDef.days, [dayKey]: { ...day, exercises: [...(day.exercises || []), { libId: lib.id, sets }] } } };
+      return { kind: "list", title: `Agregar a "${day.label}"`, items: [`${lib.name}: ${setsCount} series de ${action.repRange || "8-10"}`], confirmLabel: "Agregar", confirm: () => onCreateRoutine(activeId, newDef) };
+    }
+    if (action.op === "quitar") {
+      const wanted = String(action.exercise || "").toLowerCase();
+      const exercises = day.exercises || [];
+      const idx = exercises.findIndex((e) => (EXERCISE_LIBRARY_BY_ID[e.libId || e.id]?.name || e.name || "").toLowerCase().includes(wanted));
+      if (idx < 0) return null;
+      const removedName = EXERCISE_LIBRARY_BY_ID[exercises[idx].libId || exercises[idx].id]?.name || exercises[idx].name;
+      const newDef = { ...activeDef, days: { ...activeDef.days, [dayKey]: { ...day, exercises: exercises.filter((_, i) => i !== idx) } } };
+      return { kind: "list", title: `Quitar de "${day.label}"`, items: [`Se saca "${removedName}"`], confirmLabel: "Quitar", confirm: () => onCreateRoutine(activeId, newDef) };
+    }
+    return null;
   }
   return null;
 }
@@ -9322,13 +9409,24 @@ function trimLogsForAI(logs) {
   return out;
 }
 
-function EntrenadorIAChat({ profile, logs, profileName, messages, setMessages, conversations = [], activeConversationId = null, onNewConversation, onSwitchConversation, onDeleteConversation, settings, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement }) {
+function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMessages, conversations = [], activeConversationId = null, onNewConversation, onSwitchConversation, onDeleteConversation, onRenameConversation, settings, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement }) {
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [editingIndex, setEditingIndex] = useState(null); // índice del mensaje propio que se está editando
   const [showChangeLog, setShowChangeLog] = useState(false); // log de "qué aplicó la IA" — ver AIChangeLogModal
   const [showSidebar, setShowSidebar] = useState(false); // barra de conversaciones guardadas — ver AIConversationSidebar
   const bottomRef = useRef(null);
+  // Para el botón "Detener": guardamos el controller del pedido en curso
+  // afuera de enviarMensajeIA (si no, no hay forma de llegar a él desde un
+  // click posterior). userAbortedRef distingue "lo cancelaste vos" de "se
+  // cortó por timeout" — en el primer caso no hace falta mostrar ningún
+  // mensaje de error, simplemente se corta.
+  const abortControllerRef = useRef(null);
+  const userAbortedRef = useRef(false);
+  const handleStopGenerating = () => {
+    userAbortedRef.current = true;
+    abortControllerRef.current?.abort();
+  };
   // Al ABRIR la pestaña, vamos directo al último mensaje (sin animación —
   // "smooth" en un salto grande se ve lento y llamativo de más). En los
   // mensajes que llegan DESPUÉS (nuevos, tuyos o de la IA), sí con scroll
@@ -9394,6 +9492,8 @@ function EntrenadorIAChat({ profile, logs, profileName, messages, setMessages, c
       };
       const systemPrompt = `Sos un entrenador personal y coach de fuerza con dominio profundo y actualizado de la ciencia del entrenamiento — no sólo frases motivacionales genéricas. Hablás en español rioplatense, breve y cercano.
 
+Tu alcance es estrictamente entrenamiento físico, nutrición deportiva, salud/recuperación relacionada al ejercicio, y el uso de esta app (Modus Fit). Si te preguntan algo totalmente ajeno a eso (programación, tareas, actualidad, otro tema sin relación), respondé en una sola frase que eso no es tu tema y redirigí amablemente hacia el entrenamiento — no lo resuelvas igual aunque sepas la respuesta.
+
 Aplicá estos marcos cuando sean relevantes para lo que te preguntan (no los recites si no vienen al caso):
 - Sobrecarga progresiva como motor del progreso a largo plazo — no es sólo "subir el peso": también cuenta más reps, más series, mejor técnica, o más frecuencia.
 - El volumen semanal por grupo muscular es el principal driver de hipertrofia dentro de rangos razonables; la intensidad (%1RM) y el RIR/RPE son las palancas principales de la fuerza máxima.
@@ -9423,12 +9523,18 @@ Si la persona te pide explícitamente hacer un cambio en la app, respondé prime
 Tipos disponibles:
 - crear_rutina: {"type":"crear_rutina","name":"...","days":[{"label":"Día 1","exercises":[{"name":"Press Banca","setsCount":3,"repRange":"8-10"}]}]}
 - activar_rutina: {"type":"activar_rutina","routineName":"nombre o parte del nombre de una rutina que ya tenga guardada (mirá la lista en rutinas)"}
+- editar_rutina_activa: {"type":"editar_rutina_activa","op":"agregar"|"quitar","day":"nombre o parte del nombre del día (ej. \\"push\\")","exercise":"nombre del ejercicio","setsCount":3,"repRange":"8-10"} — agrega o saca UN ejercicio de un día de la rutina que ya tiene activa (no crea una rutina nueva). "setsCount"/"repRange" solo aplican si op="agregar".
+- registrar_marca: {"type":"registrar_marca","exercise":"Press Banca","reps":8,"kg":80,"rpe":8} — carga una serie de HOY para ese ejercicio, como si la hubiera anotado a mano en Rutina. "rpe" es opcional (1-10). Usalo cuando te digan algo tipo "anotá que hice 8x80 en press banca".
 - editar_perfil: {"type":"editar_perfil","sex":"M"|"F","age":30,"bodyWeightKg":80,"email":"..."} (incluí sólo los campos que pidió cambiar)
-- config_ciclo: {"type":"config_ciclo","trainWeeks":4,"deloadWeeks":1,"deloadPct":0.6,"deloadSetDivisor":2} (deloadPct es la fracción de su récord, ej. 0.6 = 60%; deloadSetDivisor: 2 = mitad de series, 3 = un tercio, 4 = un cuarto)
+- agregar_medida: {"type":"agregar_medida","tipo":"waist"|"chest"|"arm"|"leg","valor":80} (en cm; para peso usá editar_perfil con bodyWeightKg, no esto)
+- config_ciclo: {"type":"config_ciclo","deloadEnabled":true,"trainWeeks":4,"deloadWeeks":1,"deloadPct":0.6,"deloadSetDivisor":2} (deloadEnabled apaga/prende la semana de descarga entera; deloadPct es la fracción de su récord, ej. 0.6 = 60%; deloadSetDivisor: 2 = mitad de series, 3 = un tercio, 4 = un cuarto)
 - config_apariencia: {"type":"config_apariencia","theme":"dark"|"light"}
-- config_descanso: {"type":"config_descanso","alertType":"sound"|"vibration"|"both","restLong":120,"restShort":60} (segundos)
+- config_unidad: {"type":"config_unidad","weightUnit":"kg"|"lbs"}
+- config_descanso: {"type":"config_descanso","alertType":"sound"|"vibration"|"both","restLong":120,"restShort":60,"autoStartRestTimer":true} (segundos; autoStartRestTimer arranca el descanso solo al guardar una serie)
+- config_notificaciones: {"type":"config_notificaciones","reminderEnabled":true,"reminderTime":"18:00","weeklyRecapEnabled":true}
+- config_ficha: {"type":"config_ficha","showRpe":true,"rpeDisplayMode":"rpe"|"rir","showWarmup":true,"show1RMPercent":true,"showCoaching":true,"showExerciseNote":true,"showPersonalNote":true,"showStagnation":true,"showProgressionSuggestion":true} — qué campos ve al registrar una serie (incluí solo los que pidió cambiar)
 
-Reglas importantes: nunca digas que ya aplicaste el cambio — la persona siempre tiene que confirmarlo desde un botón antes de que se aplique de verdad. Agregá el bloque ###ACCION### sólo si pidió ESE cambio puntual en este mensaje o el anterior, nunca como sugerencia general no pedida.
+Reglas importantes: nunca digas que ya aplicaste el cambio — la persona siempre tiene que confirmarlo desde un botón antes de que se aplique de verdad. Agregá el bloque ###ACCION### sólo si pidió ESE cambio puntual en este mensaje o el anterior, nunca como sugerencia general no pedida. Para registrar_marca y editar_rutina_activa, el nombre del ejercicio tiene que coincidir razonablemente con uno real de la biblioteca — si no estás segura de a cuál se refiere, preguntá antes de proponer la acción.
 
 Datos: ${JSON.stringify(context)}`;
       // Limitamos el historial a los últimos 10 mensajes — después de
@@ -9451,6 +9557,8 @@ Datos: ${JSON.stringify(context)}`;
       // propio límite de 60s, así que su mensaje de error siempre llega
       // antes que este corte.
       const controller = new AbortController();
+      abortControllerRef.current = controller;
+      userAbortedRef.current = false;
       const timeoutId = setTimeout(() => controller.abort(), 65000);
       try {
         const response = await fetch("/api/ia", {
@@ -9476,10 +9584,13 @@ Datos: ${JSON.stringify(context)}`;
         if (!rawReply) { setMessages((prev) => [...prev, { role: "assistant", text: "No se me ocurrió una respuesta — probá de nuevo." }]); return; }
 
         const { text, action } = parseAction(rawReply);
-        const plan = action ? buildActionPlan(action, { profile, settings, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement }) : null;
+        const plan = action ? buildActionPlan(action, { profile, settings, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement, onLogSet: setLogs }) : null;
         setMessages((prev) => [...prev, { role: "assistant", text, plan, planStatus: plan ? "pending" : null, sources, date: new Date().toISOString() }]);
       } catch (err) {
         clearTimeout(timeoutId);
+        // Si lo cortaste vos con "Detener", no hay error que mostrar — fue
+        // una acción tuya, no una falla. Solo se corta en silencio.
+        if (err.name === "AbortError" && userAbortedRef.current) return;
         console.error("Error al hablar con el entrenador IA:", err);
         const isTimeout = err.name === "AbortError";
         const serverMsg = err.cause === "server" ? err.message : null;
@@ -9493,6 +9604,7 @@ Datos: ${JSON.stringify(context)}`;
         }]);
       } finally {
         setIsSending(false);
+        abortControllerRef.current = null;
       }
   };
 
@@ -9509,6 +9621,26 @@ Datos: ${JSON.stringify(context)}`;
     setEditingIndex(i);
   };
   const cancelarEdicion = () => { setEditingIndex(null); setInput(""); };
+
+  // Copiar el texto de cualquier mensaje — función típica de chat de IA que
+  // faltaba (Claude, ChatGPT, Gemini la tienen todos).
+  const [copiedIndex, setCopiedIndex] = useState(null);
+  const handleCopyMessage = async (i, text) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedIndex(i);
+      setTimeout(() => setCopiedIndex((cur) => (cur === i ? null : cur)), 1500);
+    } catch { /* ignorado a propósito */ }
+  };
+  // Regenerar: reenvía el mismo mensaje del usuario que generó ESTA
+  // respuesta (el inmediato anterior), reemplazándola — mismo mecanismo que
+  // ya usa "Editar", solo que con el texto sin cambiar.
+  const handleRegenerate = (i) => {
+    if (isSending) return;
+    for (let j = i - 1; j >= 0; j--) {
+      if (messages[j].role === "user") { enviarMensajeIA(messages[j].text, j); return; }
+    }
+  };
 
   const handleConfirmPlan = (msgIndex) => {
     const plan = messages[msgIndex]?.plan;
@@ -9686,6 +9818,7 @@ Datos: ${JSON.stringify(context)}`;
           { icon: <Target size={11} />, label: "Punto débil", prompt: "Mirando mis rangos por músculo, ¿cuál es mi punto más débil y cómo lo ataco?" },
           { icon: <Zap size={11} />, label: "Plan de hoy", prompt: "¿Qué me toca entrenar hoy y con qué pesos me conviene arrancar?" },
           { icon: <Calendar size={11} />, label: "Ciclo y descarga", prompt: "¿Cómo vengo en el ciclo actual? ¿Cuándo me toca la descarga?" },
+          { icon: <Save size={11} />, label: "Anotar una marca", prompt: "Anotame que hoy hice 8x80 en press banca" },
         ].map((c, i) => (
           <button key={i} onClick={() => { setInput(c.prompt); }} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-teal-500/10 border border-teal-500/20 text-teal-300 text-[10px] font-bold whitespace-nowrap shrink-0 hover:bg-teal-500/20 transition active:scale-95">{c.icon}{c.label}</button>
         ))}
@@ -9713,6 +9846,19 @@ Datos: ${JSON.stringify(context)}`;
               >
                 {m.role === "assistant" ? renderChatMarkdown(m.text) : m.text}
               </div>
+            </div>
+            {/* Copiar (los dos roles) y regenerar (solo IA, si hay un mensaje
+                tuyo antes) — funciones típicas de cualquier chat de IA que
+                faltaban acá. */}
+            <div className={`flex items-center gap-1 mt-1 ${m.role === "user" ? "justify-end mr-1" : "justify-start ml-8"}`}>
+              <button onClick={() => handleCopyMessage(i, m.text)} aria-label="Copiar mensaje" className="p-1 rounded-lg text-slate-600 hover:text-slate-300 hover:bg-slate-800/60 transition">
+                {copiedIndex === i ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
+              </button>
+              {m.role === "assistant" && !isSending && messages.slice(0, i).some((mm) => mm.role === "user") && (
+                <button onClick={() => handleRegenerate(i)} aria-label="Regenerar respuesta" className="p-1 rounded-lg text-slate-600 hover:text-slate-300 hover:bg-slate-800/60 transition">
+                  <RefreshCw size={11} />
+                </button>
+              )}
             </div>
             {/* Fuentes reales que usó la IA (búsqueda con Google, ver
                 api/ia.js) — chips chicos con link, separados del
@@ -9780,6 +9926,9 @@ Datos: ${JSON.stringify(context)}`;
               ))}
             </div>
             <span className="text-[11px] text-slate-500 font-medium">Pensando<span className="thinking-dots" /> <span className="text-slate-600">· puede tardar hasta 30s</span></span>
+            <button onClick={handleStopGenerating} className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-700 text-slate-400 hover:text-white hover:border-slate-500 text-[11px] font-bold transition active:scale-95">
+              <X size={11} /> Detener
+            </button>
           </div>
         )}
         <div ref={bottomRef} />
@@ -9861,6 +10010,7 @@ Datos: ${JSON.stringify(context)}`;
           onSelect={(id) => { onSwitchConversation?.(id); setShowSidebar(false); }}
           onNew={() => { onNewConversation?.(); setShowSidebar(false); }}
           onDelete={onDeleteConversation}
+          onRename={onRenameConversation}
           onClose={() => setShowSidebar(false)}
         />
       )}
@@ -9874,10 +10024,17 @@ Datos: ${JSON.stringify(context)}`;
 // cualquiera desde acá. Se desliza desde la IZQUIERDA (a diferencia del
 // resto de los modales de la app, que aparecen centrados) porque es
 // literalmente una barra de navegación, no un diálogo puntual.
-function AIConversationSidebar({ conversations, activeConversationId, onSelect, onNew, onDelete, onClose }) {
+function AIConversationSidebar({ conversations, activeConversationId, onSelect, onNew, onDelete, onRename, onClose }) {
   useAndroidBack(onClose);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [renamingId, setRenamingId] = useState(null);
+  const [renameDraft, setRenameDraft] = useState("");
   const sorted = conversations.slice().sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
+  const startRename = (c) => { setRenamingId(c.id); setRenameDraft(c.title); };
+  const commitRename = () => {
+    if (renamingId && renameDraft.trim()) onRename?.(renamingId, renameDraft);
+    setRenamingId(null);
+  };
   return (
     <div className="fixed inset-0 z-[150] bg-black/70 backdrop-blur-sm flex modal-bg-in modal-overlay" onClick={onClose}>
       <div className="w-[82%] max-w-xs h-full bg-slate-900 border-r border-slate-700/60 flex flex-col shadow-2xl shadow-black/60 bounce-in" onClick={(e) => e.stopPropagation()}>
@@ -9895,7 +10052,23 @@ function AIConversationSidebar({ conversations, activeConversationId, onSelect, 
           {sorted.map((c) => {
             const isActive = c.id === activeConversationId;
             const confirming = confirmDeleteId === c.id;
+            const renaming = renamingId === c.id;
             const dateLabel = c.updatedAt ? new Date(c.updatedAt).toLocaleDateString("es-AR", { day: "numeric", month: "short" }) : "";
+            if (renaming) {
+              return (
+                <div key={c.id} className="w-full flex items-center gap-2 rounded-xl px-3 py-2" style={{ backgroundColor: "rgba(20,184,166,0.14)", border: "1px solid rgba(20,184,166,0.35)" }}>
+                  <input
+                    autoFocus
+                    value={renameDraft}
+                    onChange={(e) => setRenameDraft(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") commitRename(); if (e.key === "Escape") setRenamingId(null); }}
+                    onBlur={commitRename}
+                    className="flex-1 min-w-0 bg-transparent text-xs font-bold text-white focus:outline-none"
+                  />
+                  <button onClick={commitRename} aria-label="Guardar nombre" className="p-1 rounded-lg text-teal-400 shrink-0"><Check size={14} /></button>
+                </div>
+              );
+            }
             return (
               <button key={c.id} onClick={() => onSelect(c.id)} className="w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-left transition active:scale-[0.99]"
                 style={isActive ? { backgroundColor: "rgba(20,184,166,0.14)", border: "1px solid rgba(20,184,166,0.35)" } : { backgroundColor: "var(--row-surface)", border: "1px solid transparent" }}>
@@ -9903,6 +10076,9 @@ function AIConversationSidebar({ conversations, activeConversationId, onSelect, 
                   <p className="text-xs font-bold truncate" style={{ color: isActive ? "#fff" : "#94a3b8" }}>{c.title}</p>
                   {dateLabel && <p className="text-[10px] text-slate-600 mt-0.5">{dateLabel}</p>}
                 </div>
+                {onRename && !confirming && (
+                  <span onClick={(e) => { e.stopPropagation(); startRename(c); }} role="button" aria-label="Renombrar conversación" className="p-1.5 rounded-lg text-slate-600 hover:text-teal-300 transition shrink-0"><Edit3 size={12} /></span>
+                )}
                 {onDelete && (
                   confirming ? (
                     <span className="flex items-center gap-1.5 shrink-0">
@@ -11695,7 +11871,9 @@ export default function App() {
       const base = convos[targetIdx]?.messages || [AI_CHAT_WELCOME];
       const next = typeof newMessagesOrFn === "function" ? newMessagesOrFn(base) : newMessagesOrFn;
       const capped = next.length > AI_CHAT_HISTORY_CAP ? next.slice(next.length - AI_CHAT_HISTORY_CAP) : next;
-      const updatedConvos = convos.map((c, i) => (i === targetIdx ? { ...c, messages: capped, title: deriveAiConvoTitle(capped), updatedAt: new Date().toISOString() } : c));
+      // Si le pusiste vos un título a mano (ver handleRenameAiConversation),
+      // no lo pisamos con el auto-generado del primer mensaje.
+      const updatedConvos = convos.map((c, i) => (i === targetIdx ? { ...c, messages: capped, title: c.customTitle ? c.title : deriveAiConvoTitle(capped), updatedAt: new Date().toISOString() } : c));
       const np = { ...prev, [activeProfile]: { ...withoutOldAiChatHistory(cur), aiConversations: updatedConvos, activeAiConversationId: convos[targetIdx]?.id || activeId } };
       saveProfiles(np);
       return np;
@@ -11739,6 +11917,21 @@ export default function App() {
         activeId = remaining[0].id;
       }
       const np = { ...prev, [activeProfile]: { ...withoutOldAiChatHistory(cur), aiConversations: finalConvos, activeAiConversationId: activeId } };
+      saveProfiles(np);
+      return np;
+    });
+  }, [activeProfile]);
+  // Renombrar a mano — marca customTitle así setAiChatMessages ya no pisa
+  // este título con el auto-generado del primer mensaje.
+  const handleRenameAiConversation = useCallback((id, newTitle) => {
+    const trimmed = newTitle.trim();
+    if (!trimmed) return;
+    setProfiles((prev) => {
+      const cur = prev[activeProfile];
+      if (!cur) return prev;
+      const convos = getAiConversations(cur);
+      const updatedConvos = convos.map((c) => (c.id === id ? { ...c, title: trimmed.slice(0, 60), customTitle: true } : c));
+      const np = { ...prev, [activeProfile]: { ...withoutOldAiChatHistory(cur), aiConversations: updatedConvos } };
       saveProfiles(np);
       return np;
     });
@@ -12607,7 +12800,7 @@ export default function App() {
             {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToRoutines={() => setTab("rutinas")} onGoToSchedule={() => goToSection("rutinas", "week-schedule")} onGoToFieldSettings={() => goToSection("perfil", "field-settings-section")} onGoToDescarga={() => setTab("descarga")} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} todaySessionDayKey={(profile?.trainingSessions || []).find((ts) => ts.date === todayStr())?.dayKey || profile?.activeSession?.dayKey || null} sex={profile?.sex} age={profile?.age} />}
             {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} onGoToRoutines={() => goToSection("rutinas", "routine-editor")} weekSchedule={weekSchedule} sex={profile?.sex} age={profile?.age} onGoToDeload={() => setTab("descarga")} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} />}
             {tab === "descarga" && <DeloadView logs={logs} setLogs={setLogs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} activeSession={profile?.activeSession?.deload ? profile.activeSession : null} onStartSession={handleStartSession} onCancelSession={handleCancelSession} weekSchedule={weekSchedule} />}
-            {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} conversations={aiConversations} activeConversationId={activeAiConversationId} onNewConversation={handleNewAiConversation} onSwitchConversation={handleSwitchAiConversation} onDeleteConversation={handleDeleteAiConversation} settings={getProfileSettings(profile)} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} />}
+            {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} setLogs={setLogs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} conversations={aiConversations} activeConversationId={activeAiConversationId} onNewConversation={handleNewAiConversation} onSwitchConversation={handleSwitchAiConversation} onDeleteConversation={handleDeleteAiConversation} onRenameConversation={handleRenameAiConversation} settings={getProfileSettings(profile)} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} />}
             {tab === "perfil" && <ProfileView onOpenFieldPreview={() => setShowFieldIntro(true)} openSectionSignal={openSectionSignal} profileName={activeProfile} profiles={profiles} logs={logs} onSignOut={handleSignOut} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} />}
           </div>
         </main>
