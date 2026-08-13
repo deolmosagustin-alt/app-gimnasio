@@ -12,6 +12,7 @@ import {
   Target, Award, Activity, ArrowDown, HelpCircle, List, LayoutGrid,
   Sparkles, Layers, SlidersHorizontal, UserCog,
   Share2, Download, Link2, Copy, BellOff, Send, Mic, Ruler, Camera, Link, Footprints, Star, SquarePlay, Upload, RefreshCw, Timer, Percent, Users,
+  MessageCircle,
 } from "lucide-react";
 import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signOut, onAuthStateChanged } from "firebase/auth";
 import { Capacitor, registerPlugin } from "@capacitor/core";
@@ -980,6 +981,24 @@ function buildSessionsIndex(logs, trainingSessions = []) {
         // que ninguno).
         const dayExerciseIds = formal.dayExerciseIds || ROUTINE[formal.dayKey]?.exercises?.map((e) => e.id) || null;
         if (dayExerciseIds?.length) {
+          // BUG FIX: "items" se arma agrupando TODO lo que registraste esa
+          // FECHA, sin importar de qué día venía — si un ejercicio se repite
+          // en dos días (ej. sentadilla en Piernas 1 y Piernas 2) y tocaste
+          // marcas de los dos el mismo día (fácil en Descarga: los tabs de
+          // día no bloquean nada), la tarjeta de "Piernas 2" terminaba
+          // mostrando también ejercicios que sólo eran de "Piernas 1". Ahora
+          // se recorta a los ejercicios reales de ESTE día (misma foto que ya
+          // se usa para el % de arriba), y las cuentas (volumen, RPE
+          // promedio, mejoras) se recalculan sobre esa lista recortada para
+          // que todo quede consistente entre sí.
+          const idSet = new Set(dayExerciseIds);
+          s.items = s.items.filter((it) => idSet.has(it.exerciseId));
+          s.totalVolume = s.items.reduce((sum, it) => sum + vol(it.kg, it.reps), 0);
+          s.rpeSum = 0; s.rpeCount = 0; s.improvedCount = 0;
+          s.items.forEach((it) => {
+            if (it.rpe != null) { s.rpeSum += it.rpe; s.rpeCount++; }
+            if (it.isImprovement) s.improvedCount++;
+          });
           const doneIds = new Set(s.items.map((it) => it.exerciseId));
           const total = dayExerciseIds.length;
           const done = dayExerciseIds.filter((id) => doneIds.has(id)).length;
@@ -2905,7 +2924,28 @@ function LoginScreen({ onLogin, allowAutoLogin = true }) {
 // Registro global de descansos en curso — sobrevive al desmontaje del
 // componente (cambio de pestaña, scroll virtual, etc.). Cada timer se
 // identifica por timerId y guarda su hora real de finalización.
-const ACTIVE_REST_TIMERS = {};
+// BUG FIX: esto era un objeto puramente en memoria — sobrevivía a cambiar de
+// pestaña (el proceso de JS sigue vivo), pero NO a cerrar la app de verdad
+// (deslizarla fuera de recientes, o que Android mate el proceso en segundo
+// plano por memoria — algo común en WebViews). Al reabrir, el objeto volvía
+// a nacer vacío y el cronómetro se mostraba desde el principio otra vez, sin
+// importar cuánto tiempo real hubiera pasado. Ahora se espeja en
+// localStorage en cada cambio, y se relee al cargar el módulo — así el
+// cronómetro retoma la cuenta real (o se da cuenta de que ya terminó) apenas
+// volvés a abrir la app, igual que ya hacía con un simple cambio de pestaña.
+const ACTIVE_REST_TIMERS_KEY = "modusfit_active_rest_timers_v1";
+function loadActiveRestTimers() {
+  try {
+    const raw = localStorage.getItem(ACTIVE_REST_TIMERS_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch { return {}; }
+}
+const ACTIVE_REST_TIMERS = loadActiveRestTimers();
+function persistActiveRestTimers() {
+  try { localStorage.setItem(ACTIVE_REST_TIMERS_KEY, JSON.stringify(ACTIVE_REST_TIMERS)); } catch { /* ignorado a propósito */ }
+}
 
 // Número que "cuenta" hasta su valor final en vez de aparecer de golpe.
 // Se usa para los récords: ver el peso subir de 80 a 82.5 refuerza la
@@ -3023,6 +3063,7 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default", 
       setRunning(true);
     } else {
       delete ACTIVE_REST_TIMERS[timerId];
+      persistActiveRestTimers();
       setRemaining(seconds); setRunning(false); endTimeRef.current = null; firedRef.current = false;
     }
   }, [seconds, timerId]);
@@ -3031,6 +3072,7 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default", 
     if (firedRef.current) return;
     firedRef.current = true;
     delete ACTIVE_REST_TIMERS[timerId];
+    persistActiveRestTimers();
     if (alertType !== "vibration") {
       try {
         const a = new AudioContext();
@@ -3120,9 +3162,11 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default", 
   useEffect(() => {
     if (running) {
       if (!endTimeRef.current) { endTimeRef.current = Date.now() + remaining * 1000; firedRef.current = false; }
-      // Persistir en el registro global — si el componente se desmonta
-      // (cambio de pestaña), al volver retoma desde acá.
+      // Persistir en el registro global (y en localStorage) — si el
+      // componente se desmonta (cambio de pestaña) o la app se cierra del
+      // todo, al volver retoma desde acá.
       ACTIVE_REST_TIMERS[timerId] = { endTime: endTimeRef.current };
+      persistActiveRestTimers();
       (async () => {
         // Cronómetro EN VIVO en la barra de notificaciones: va PRIMERO y en
         // su propio try — antes estaba encadenado detrás del pedido de
@@ -3203,6 +3247,7 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default", 
     }
     endTimeRef.current = null;
     delete ACTIVE_REST_TIMERS[timerId];
+    persistActiveRestTimers();
     // Cancelar la notificación persistente Y el aviso de fin programado
     // si el timer se pausa/resetea — si no, el aviso sonaría igual a la
     // hora original aunque hayas frenado el descanso.
@@ -3924,6 +3969,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   const autoStartRestTimer = () => {
     if (fieldSettings.autoStartRestTimer === true && restTimerId && restSeconds && !isLastSet) {
       ACTIVE_REST_TIMERS[restTimerId] = { endTime: Date.now() + restSeconds * 1000 };
+      persistActiveRestTimers();
     }
   };
   const handleSave = () => {
@@ -4125,9 +4171,15 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
       {(() => {
         const key = `${exerciseId}_${setIndex}`;
         const history = logs[key] || [];
-        const todayEntry = history.find((h) => h.date === today);
+        // BUG FIX: si el mismo ejercicio también está en la semana de
+        // descarga (marca con "deload:true"), esa marca caía acá y la fila
+        // normal se mostraba como "ya guardada hoy" con el peso/tiempo
+        // REDUCIDO de la descarga — bloqueando la carga real y encima
+        // inflando el % de la rutina (ver RoutineView). Se ignoran las
+        // marcas de descarga para esta vista.
+        const todayEntry = history.find((h) => h.date === today && !h.deload);
         if (cardio) {
-          const todayCardio = (logs[`${exerciseId}_${setIndex}`] || []).find((h) => h.date === today);
+          const todayCardio = (logs[`${exerciseId}_${setIndex}`] || []).find((h) => h.date === today && !h.deload);
           if (todayCardio && hasActiveSession && !draft.editing) {
             return (
               <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ backgroundColor: tint(accent, "15"), border: `1px solid ${tint(accent, "30")}` }}>
@@ -4496,7 +4548,9 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
     let hechas = 0;
     for (let i = 0; i < setsToShow.length; i++) {
       const hist = logs[`${exercise.id}_${i}`] || [];
-      if (hist.some((h) => h.date === hoyStr)) hechas++;
+      // Ídem BUG FIX de arriba: una marca de descarga no cuenta como serie
+      // ya hecha hoy en la rutina normal.
+      if (hist.some((h) => h.date === hoyStr && !h.deload)) hechas++;
       else break;
     }
     return hechas >= setsToShow.length ? 0 : hechas;
@@ -4778,7 +4832,13 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
 
   const today = todayStr();
   let totalSets = 0, doneToday = 0;
-  day.exercises.forEach((ex) => ex.sets.forEach((s, i) => { totalSets++; const h = logs[`${ex.id}_${i}`] || []; if (h.some((x) => x.date === today)) doneToday++; }));
+  // BUG FIX: contaba CUALQUIER registro de hoy, incluidas las marcas de
+  // Descarga (mismo formato de log, con "deload:true") — si un ejercicio de
+  // hoy también estaba en la semana de descarga, tildarlo ahí hacía subir
+  // el % de la rutina NORMAL sin haber entrenado nada acá. La descarga tiene
+  // su propio progreso en la pestaña Descarga; este % es sólo de lo
+  // realmente registrado en Rutina.
+  day.exercises.forEach((ex) => ex.sets.forEach((s, i) => { totalSets++; const h = logs[`${ex.id}_${i}`] || []; if (h.some((x) => x.date === today && !x.deload)) doneToday++; }));
   // Si hoy entrenaste (o estás entrenando) un día ESPECÍFICO, los demás
   // días muestran 0% — antes, los ejercicios compartidos entre días (ej.
   // press militar en Push y en Hombro/Brazo) hacían aparecer un % fantasma
@@ -4789,7 +4849,11 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
   const handleResetDay = () => {
     const newLogs = { ...logs };
     const newDrafts = { ...drafts };
-    day.exercises.forEach((ex) => { ex.sets.forEach((_, i) => { const key = `${ex.id}_${i}`; if (newLogs[key]) { newLogs[key] = newLogs[key].filter((h) => h.date !== today); if (!newLogs[key].length) delete newLogs[key]; } delete newDrafts[key]; }); });
+    // Sólo se borran las marcas de HOY de la rutina normal — las de
+    // descarga (deload:true) se preservan, "reiniciar día" es para volver a
+    // intentar el entrenamiento normal, no para perder lo ya registrado en
+    // Descarga.
+    day.exercises.forEach((ex) => { ex.sets.forEach((_, i) => { const key = `${ex.id}_${i}`; if (newLogs[key]) { newLogs[key] = newLogs[key].filter((h) => h.date !== today || h.deload); if (!newLogs[key].length) delete newLogs[key]; } delete newDrafts[key]; }); });
     setLogs(newLogs); setDrafts(newDrafts); setResetKeys((prev) => ({ ...prev, [activeDay]: (prev[activeDay] || 0) + 1 })); setConfirmReset(false);
   };
 
@@ -9111,7 +9175,7 @@ function parseAction(rawText) {
 // "activar_rutina" con un nombre que no existe), devuelve null — en ese
 // caso no se muestra ninguna tarjeta, sólo el texto del mensaje.
 function buildActionPlan(action, ctx) {
-  const { profile, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement, onLogSet } = ctx;
+  const { profile, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement, onLogSet, onArchiveRoutine, onNavigate, onStartSession, onEndSession } = ctx;
   if (action.type === "crear_rutina") {
     const days = (action.days || []).map((d) => ({
       label: String(d.label || "Día"),
@@ -9264,6 +9328,77 @@ function buildActionPlan(action, ctx) {
     }
     return null;
   }
+  // Archivar/duplicar/renombrar una rutina GUARDADA (no la que está activa
+  // en pantalla, sino cualquiera de la lista) — sin borrar nada, "archivar"
+  // solo la saca de la vista principal (igual que deslizarla en Rutinas).
+  if (action.type === "gestionar_rutina") {
+    const wanted = String(action.routineName || "").toLowerCase().trim();
+    if (!wanted) return null;
+    let foundId = null, foundDef = null;
+    Object.entries(profile?.routines || {}).forEach(([id, def]) => {
+      if (!foundId && !def?.archived && def?.name?.toLowerCase().includes(wanted)) { foundId = id; foundDef = def; }
+    });
+    if (!foundId) return null;
+    if (action.op === "archivar") {
+      if (!onArchiveRoutine) return null;
+      return { kind: "list", title: `Archivar "${foundDef.name}"`, items: ["Se mueve a rutinas archivadas — no se borra nada, la podés recuperar cuando quieras."], confirmLabel: "Archivar", confirm: () => onArchiveRoutine(foundId) };
+    }
+    if (action.op === "duplicar") {
+      if (!onCreateRoutine) return null;
+      const newId = builderUid("custom_routine");
+      const clone = { ...cloneRoutineDef(foundDef), source: "custom", name: `${foundDef.name} (copia)` };
+      return { kind: "routine", title: `Duplicar "${foundDef.name}"`, routineDef: clone, confirmLabel: "Duplicar", confirm: () => onCreateRoutine(newId, clone) };
+    }
+    if (action.op === "renombrar") {
+      if (!onCreateRoutine) return null;
+      const newName = String(action.nuevoNombre || "").trim();
+      if (!newName) return null;
+      const renamed = { ...foundDef, name: newName };
+      return { kind: "list", title: `Renombrar "${foundDef.name}"`, items: [`Nuevo nombre: ${newName}`], confirmLabel: "Renombrar", confirm: () => onCreateRoutine(foundId, renamed) };
+    }
+    return null;
+  }
+  // Ir directo a una pestaña — la IA como atajo de navegación, no solo de
+  // datos: útil cuando la respuesta natural es "mirá tal pantalla".
+  if (action.type === "navegar") {
+    const TAB_LABELS = { rutina: "Rutina", progreso: "Progreso", rutinas: "Rutinas", descarga: "Descarga", perfil: "Perfil", entrenador_ia: "Entrenador IA" };
+    if (!onNavigate || !TAB_LABELS[action.destino]) return null;
+    return { kind: "list", title: `Ir a "${TAB_LABELS[action.destino]}"`, items: [`Te lleva directo a esa pestaña.`], confirmLabel: `Ir a ${TAB_LABELS[action.destino]}`, confirm: () => onNavigate(action.destino) };
+  }
+  // Arrancar el cronómetro de la sesión de hoy — lo mismo que tocar
+  // "Iniciar sesión" en Rutina, pero desde el chat.
+  if (action.type === "iniciar_sesion") {
+    if (!onStartSession) return null;
+    const activeId = profile?.activeRoutineId;
+    const activeDef = activeId ? resolveRoutineDef(profile?.routines?.[activeId], activeId) : null;
+    if (!activeDef) return null;
+    const wantedDay = String(action.day || "").toLowerCase().trim();
+    const dayKey = wantedDay
+      ? Object.keys(activeDef.days || {}).find((dk) => (activeDef.days[dk]?.label || "").toLowerCase().includes(wantedDay))
+      : activeDef.dayOrder?.[0];
+    if (!dayKey || !activeDef.days[dayKey]) return null;
+    const dayLabel = activeDef.days[dayKey].label;
+    return { kind: "list", title: `Iniciar sesión de "${dayLabel}"`, items: ["Arranca el cronómetro de tu entrenamiento de hoy."], confirmLabel: "Iniciar sesión", confirm: () => onStartSession(dayKey) };
+  }
+  if (action.type === "finalizar_sesion") {
+    if (!onEndSession || !profile?.activeSession) return null;
+    return { kind: "list", title: "Finalizar sesión de hoy", items: ["Se guarda tu entrenamiento en el historial y suma a tu racha."], confirmLabel: "Finalizar sesión", confirm: () => onEndSession() };
+  }
+  // Corregir un récord a mano (mismo mecanismo que el lápiz de "editar
+  // récord" en Progreso) — para cuando el historial no refleja tu marca
+  // real (por ejemplo, la cargaste antes de usar la app).
+  if (action.type === "corregir_record") {
+    const lib = matchExerciseToLibrary(action.exercise || "");
+    const reps = parseFloat(action.reps), kg = parseFloat(action.kg);
+    if (!lib || !reps || reps <= 0 || isNaN(kg) || kg < 0 || !onLogSet) return null;
+    const setIndex = Number.isInteger(action.setIndex) && action.setIndex >= 0 ? action.setIndex : 0;
+    const prKey = `${lib.id}_${setIndex}_pr_override`;
+    return {
+      kind: "list", title: "Corregir récord", items: [`${lib.name} — S${setIndex + 1}: ${reps}×${kg}kg`],
+      confirmLabel: "Guardar récord",
+      confirm: () => onLogSet((prev) => ({ ...prev, [prKey]: { kg, reps, date: todayStr(), manual: true } })),
+    };
+  }
   return null;
 }
 
@@ -9409,7 +9544,17 @@ function trimLogsForAI(logs) {
   return out;
 }
 
-function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMessages, conversations = [], activeConversationId = null, onNewConversation, onSwitchConversation, onDeleteConversation, onRenameConversation, settings, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement }) {
+function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMessages, conversations = [], activeConversationId = null, onNewConversation, onSwitchConversation, onDeleteConversation, onRenameConversation, settings, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement, onArchiveRoutine, onNavigate, onStartSession, onEndSession }) {
+  // Contexto para reconstruir un plan EN VIVO a partir de la "action" cruda
+  // (JSON plano, sí serializable) en vez de depender de la función confirm()
+  // guardada en el mensaje — esa función no sobrevive un reload ni el
+  // guardado en IndexedDB, así que si algo pendiente queda de "otra sesión"
+  // (cambiaste de conversación, cerraste la app), buildActionPlan(action,
+  // actionCtx) la reconstruye al vuelo con los handlers actuales.
+  const actionCtx = useMemo(() => ({
+    profile, settings, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement,
+    onLogSet: setLogs, onArchiveRoutine, onNavigate, onStartSession, onEndSession,
+  }), [profile, settings, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement, setLogs, onArchiveRoutine, onNavigate, onStartSession, onEndSession]);
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [editingIndex, setEditingIndex] = useState(null); // índice del mensaje propio que se está editando
@@ -9533,8 +9678,13 @@ Tipos disponibles:
 - config_descanso: {"type":"config_descanso","alertType":"sound"|"vibration"|"both","restLong":120,"restShort":60,"autoStartRestTimer":true} (segundos; autoStartRestTimer arranca el descanso solo al guardar una serie)
 - config_notificaciones: {"type":"config_notificaciones","reminderEnabled":true,"reminderTime":"18:00","weeklyRecapEnabled":true}
 - config_ficha: {"type":"config_ficha","showRpe":true,"rpeDisplayMode":"rpe"|"rir","showWarmup":true,"show1RMPercent":true,"showCoaching":true,"showExerciseNote":true,"showPersonalNote":true,"showStagnation":true,"showProgressionSuggestion":true} — qué campos ve al registrar una serie (incluí solo los que pidió cambiar)
+- navegar: {"type":"navegar","destino":"rutina"|"progreso"|"rutinas"|"descarga"|"perfil"|"entrenador_ia"} — la lleva directo a esa pestaña de la app. Usalo cuando pida "mostrame X" o "llevame a X".
+- iniciar_sesion: {"type":"iniciar_sesion","day":"nombre o parte del nombre del día (opcional)"} — arranca el cronómetro de su entrenamiento de hoy, como tocar "Iniciar sesión" en Rutina. Si no da el día, usa el primero de su rutina activa.
+- finalizar_sesion: {"type":"finalizar_sesion"} — cierra y guarda en el historial la sesión de hoy que ya tiene en curso. Sólo proponela si por el contexto ("activeSession" en los datos) ya hay una sesión activa.
+- gestionar_rutina: {"type":"gestionar_rutina","op":"archivar"|"duplicar"|"renombrar","routineName":"nombre o parte del nombre de una rutina guardada","nuevoNombre":"..."} — administra una rutina de su lista (no la activa en pantalla necesariamente). "nuevoNombre" sólo aplica si op="renombrar". Archivar no borra nada, sólo la saca de la vista principal.
+- corregir_record: {"type":"corregir_record","exercise":"Press Banca","reps":10,"kg":90,"setIndex":0} — corrige a mano el récord (PR) guardado de un ejercicio, para cuando el historial no refleja su marca real. "setIndex" es opcional (0 = primera serie del ejercicio).
 
-Reglas importantes: nunca digas que ya aplicaste el cambio — la persona siempre tiene que confirmarlo desde un botón antes de que se aplique de verdad. Agregá el bloque ###ACCION### sólo si pidió ESE cambio puntual en este mensaje o el anterior, nunca como sugerencia general no pedida. Para registrar_marca y editar_rutina_activa, el nombre del ejercicio tiene que coincidir razonablemente con uno real de la biblioteca — si no estás segura de a cuál se refiere, preguntá antes de proponer la acción.
+Reglas importantes: nunca digas que ya aplicaste el cambio — la persona siempre tiene que confirmarlo desde un botón antes de que se aplique de verdad. Agregá el bloque ###ACCION### sólo si pidió ESE cambio puntual en este mensaje o el anterior, nunca como sugerencia general no pedida. Para registrar_marca, editar_rutina_activa y corregir_record, el nombre del ejercicio tiene que coincidir razonablemente con uno real de la biblioteca — si no estás segura de a cuál se refiere, preguntá antes de proponer la acción. Para gestionar_rutina, el nombre de la rutina tiene que coincidir con una que ya tenga guardada — si hay dudas, preguntá cuál.
 
 Datos: ${JSON.stringify(context)}`;
       // Limitamos el historial a los últimos 10 mensajes — después de
@@ -9584,8 +9734,15 @@ Datos: ${JSON.stringify(context)}`;
         if (!rawReply) { setMessages((prev) => [...prev, { role: "assistant", text: "No se me ocurrió una respuesta — probá de nuevo." }]); return; }
 
         const { text, action } = parseAction(rawReply);
-        const plan = action ? buildActionPlan(action, { profile, settings, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement, onLogSet: setLogs }) : null;
-        setMessages((prev) => [...prev, { role: "assistant", text, plan, planStatus: plan ? "pending" : null, sources, date: new Date().toISOString() }]);
+        const plan = action ? buildActionPlan(action, actionCtx) : null;
+        // Guardamos "action" (JSON plano, tal cual lo mandó la IA) además del
+        // resumen de "plan" sin la función confirm — así el botón sigue
+        // funcionando aunque hayas cambiado de conversación o reabierto la
+        // app: se reconstruye con buildActionPlan(action, actionCtx) al
+        // renderizar, en vez de depender de una función que no sobrevive
+        // guardada (ver el bloque que dibuja el mensaje, más abajo).
+        const planSummary = plan ? { kind: plan.kind, title: plan.title, confirmLabel: plan.confirmLabel, items: plan.items, routineDef: plan.routineDef } : null;
+        setMessages((prev) => [...prev, { role: "assistant", text, plan: planSummary, action: plan ? action : null, planStatus: plan ? "pending" : null, sources, date: new Date().toISOString() }]);
       } catch (err) {
         clearTimeout(timeoutId);
         // Si lo cortaste vos con "Detener", no hay error que mostrar — fue
@@ -9643,27 +9800,23 @@ Datos: ${JSON.stringify(context)}`;
   };
 
   const handleConfirmPlan = (msgIndex) => {
-    const plan = messages[msgIndex]?.plan;
-    if (!plan) return;
-    // plan.confirm es una función viva de ESTA sesión — no sobrevive guardada
-    // (el historial se persiste en el perfil, y una función no es serializable).
-    // Si reabriste la app con una propuesta pendiente de la vez anterior, ya
-    // no hay nada que ejecutar: se lo decimos en vez de fallar en silencio.
-    if (typeof plan.confirm !== "function") {
-      setMessages((prev) => prev.map((m, i) => (i === msgIndex ? { ...m, planStatus: "expired" } : m)));
+    const m = messages[msgIndex];
+    // Reconstruimos el plan EN VIVO desde "action" (dato plano persistido)
+    // con los handlers actuales — funciona igual si el mensaje se acaba de
+    // crear que si viene de otra conversación o de una sesión anterior.
+    const livePlan = m?.action ? buildActionPlan(m.action, actionCtx) : null;
+    if (!livePlan || typeof livePlan.confirm !== "function") {
+      setMessages((prev) => prev.map((mm, i) => (i === msgIndex ? { ...mm, planStatus: "expired" } : mm)));
       return;
     }
-    plan.confirm();
-    // Al resolver, sacamos confirm() del objeto guardado: ya cumplió su
-    // función y una función no es serializable (rompía el respaldo en
-    // IndexedDB mientras el plan seguía "pending" en el historial guardado).
+    livePlan.confirm();
     // confirmedAt queda como la fecha real del cambio, para el log de "qué
     // aplicó la IA" (ver AIChangeLogModal) — distinta de "date", que es
     // cuándo se PROPUSO el cambio, no cuándo se confirmó.
-    setMessages((prev) => prev.map((m, i) => (i === msgIndex ? { ...m, plan: { ...m.plan, confirm: undefined }, planStatus: "confirmed", confirmedAt: new Date().toISOString() } : m)));
+    setMessages((prev) => prev.map((mm, i) => (i === msgIndex ? { ...mm, planStatus: "confirmed", confirmedAt: new Date().toISOString() } : mm)));
   };
   const handleDiscardPlan = (msgIndex) => {
-    setMessages((prev) => prev.map((m, i) => (i === msgIndex ? { ...m, plan: { ...m.plan, confirm: undefined }, planStatus: "discarded" } : m)));
+    setMessages((prev) => prev.map((m, i) => (i === msgIndex ? { ...m, planStatus: "discarded" } : m)));
   };
 
   // Dictado por voz — Web Speech API, nativa del navegador (sin librerías
@@ -9833,7 +9986,13 @@ Datos: ${JSON.stringify(context)}`;
       </div>
 
       <div className="space-y-3">
-        {messages.map((m, i) => (
+        {messages.map((m, i) => {
+          // Recalculado en cada render con los handlers ACTUALES — así el
+          // botón de una propuesta pendiente sigue vivo aunque venga de otra
+          // conversación o de una sesión anterior (ver el comentario junto a
+          // actionCtx, más arriba).
+          const livePlan = m.action && m.planStatus === "pending" ? buildActionPlan(m.action, actionCtx) : null;
+          return (
           <div key={i} className="msg-in">
             <div className={`group flex items-end gap-2 ${m.role === "user" ? "justify-end" : "justify-start"}`}>
               {m.role === "assistant" && (
@@ -9881,7 +10040,7 @@ Datos: ${JSON.stringify(context)}`;
                 ))}
               </div>
             )}
-            {m.plan && m.planStatus === "pending" && typeof m.plan.confirm === "function" && (
+            {m.plan && m.planStatus === "pending" && livePlan && typeof livePlan.confirm === "function" && (
               <div className="relative overflow-hidden mt-2 border border-teal-500/25 rounded-2xl p-3.5 max-w-[85%] bounce-in" style={{ background: "var(--panel-grad-slate)" }}>
                 <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full bg-teal-500/10 blur-2xl pointer-events-none" />
                 <div className="relative flex items-center gap-2 mb-2.5">
@@ -9901,11 +10060,14 @@ Datos: ${JSON.stringify(context)}`;
                 </div>
               </div>
             )}
-            {/* Propuesta pendiente de una sesión anterior: la función que la
-                aplicaba no sobrevive guardada (ver handleConfirmPlan). Se
-                pisa sola apenas se detecta, sin esperar a que toques nada. */}
-            {m.plan && m.planStatus === "pending" && typeof m.plan.confirm !== "function" && (
-              <div className="mt-2 text-[11px] text-slate-500 max-w-[85%]">Esta propuesta quedó de una sesión anterior — pedísela de nuevo si todavía te interesa.</div>
+            {/* Sólo llega acá si "action" no está (mensaje viejo, de antes de
+                poder reconstruir el plan) o si buildActionPlan ya no puede
+                resolverla (algo que referenciaba — un día, un ejercicio, una
+                rutina — cambió o se borró mientras tanto). */}
+            {m.plan && m.planStatus === "pending" && !livePlan && (
+              <div className="mt-2 text-[11px] text-slate-500 max-w-[85%]">
+                {m.action ? "Esta propuesta ya no es válida — algo cambió mientras tanto. Pedísela de nuevo si todavía te interesa." : "Esta propuesta quedó de una sesión anterior — pedísela de nuevo si todavía te interesa."}
+              </div>
             )}
             {m.plan && m.planStatus === "confirmed" && (
               <div className="mt-2 flex items-center gap-1.5 text-[11px] text-emerald-400 font-semibold max-w-[85%]"><Check size={12} /> Listo, aplicado.</div>
@@ -9917,7 +10079,8 @@ Datos: ${JSON.stringify(context)}`;
               <div className="mt-2 text-[11px] text-slate-500 max-w-[85%]">Esta propuesta quedó de una sesión anterior — pedísela de nuevo si todavía te interesa.</div>
             )}
           </div>
-        ))}
+          );
+        })}
         {isSending && (
           <div className="flex flex-col items-center justify-center py-8 gap-4">
             {/* Escena abierta (sin burbuja): la pesa "hace repeticiones" en el
@@ -10049,14 +10212,22 @@ function AIConversationSidebar({ conversations, activeConversationId, onSelect, 
   };
   return (
     <div className="fixed inset-0 z-[150] bg-black/70 backdrop-blur-sm flex modal-bg-in modal-overlay" onClick={onClose}>
-      <div className="w-[82%] max-w-xs h-full bg-slate-900 border-r border-slate-700/60 flex flex-col shadow-2xl shadow-black/60 bounce-in" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center gap-2.5 px-4 pt-5 pb-3 border-b border-slate-800/60 shrink-0">
-          <div className="w-8 h-8 rounded-xl bg-teal-500/15 text-teal-400 flex items-center justify-center shrink-0"><List size={15} /></div>
-          <p className="flex-1 text-sm font-black text-white">Tus conversaciones</p>
-          <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition shrink-0"><X size={16} /></button>
+      <div className="relative w-[82%] max-w-xs h-full flex flex-col shadow-2xl shadow-black/60 bounce-in overflow-hidden" style={{ backgroundColor: "#0b0f1a", borderRight: "1px solid rgba(20,184,166,0.18)" }} onClick={(e) => e.stopPropagation()}>
+        <div className="relative overflow-hidden px-4 pb-4 shrink-0" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 18px)", background: "var(--panel-grad-slate)", borderBottom: "1px solid rgba(20,184,166,0.14)" }}>
+          <div className="absolute -top-10 -left-8 w-32 h-32 rounded-full bg-teal-500/15 blur-3xl pointer-events-none" />
+          <div className="relative flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-md shadow-teal-500/20" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>
+              <List size={16} className="!text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-black text-white leading-tight">Tus conversaciones</p>
+              <p className="text-[10px] text-slate-500 font-semibold mt-0.5">{conversations.length} {conversations.length === 1 ? "chat guardado" : "chats guardados"}</p>
+            </div>
+            <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800/80 transition shrink-0"><X size={16} /></button>
+          </div>
         </div>
         <div className="px-3 pt-3 shrink-0">
-          <button onClick={onNew} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold !text-white transition active:scale-[0.98]" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>
+          <button onClick={onNew} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold !text-white transition active:scale-[0.98] shadow-lg shadow-teal-500/15" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>
             <Plus size={15} /> Nueva conversación
           </button>
         </div>
@@ -10066,6 +10237,7 @@ function AIConversationSidebar({ conversations, activeConversationId, onSelect, 
             const confirming = confirmDeleteId === c.id;
             const renaming = renamingId === c.id;
             const dateLabel = c.updatedAt ? new Date(c.updatedAt).toLocaleDateString("es-AR", { day: "numeric", month: "short" }) : "";
+            const lastMsg = (c.messages || []).slice(-1)[0]?.text?.replace(/\s+/g, " ").trim() || "";
             if (renaming) {
               return (
                 <div key={c.id} className="w-full flex items-center gap-2 rounded-xl px-3 py-2" style={{ backgroundColor: "rgba(20,184,166,0.14)", border: "1px solid rgba(20,184,166,0.35)" }}>
@@ -10082,11 +10254,15 @@ function AIConversationSidebar({ conversations, activeConversationId, onSelect, 
               );
             }
             return (
-              <button key={c.id} onClick={() => onSelect(c.id)} className="w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-left transition active:scale-[0.99]"
-                style={isActive ? { backgroundColor: "rgba(20,184,166,0.14)", border: "1px solid rgba(20,184,166,0.35)" } : { backgroundColor: "var(--row-surface)", border: "1px solid transparent" }}>
+              <button key={c.id} onClick={() => onSelect(c.id)} className="relative w-full flex items-center gap-2.5 rounded-xl pl-3 pr-2 py-2.5 text-left transition active:scale-[0.99] overflow-hidden"
+                style={isActive ? { background: "linear-gradient(135deg, rgba(20,184,166,0.16), rgba(20,184,166,0.05))", border: "1px solid rgba(20,184,166,0.35)" } : { backgroundColor: "var(--row-surface)", border: "1px solid transparent" }}>
+                {isActive && <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-teal-400" />}
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: isActive ? "rgba(20,184,166,0.2)" : "rgba(148,163,184,0.08)" }}>
+                  <MessageCircle size={12} className={isActive ? "text-teal-300" : "text-slate-600"} />
+                </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-bold truncate" style={{ color: isActive ? "#fff" : "#94a3b8" }}>{c.title}</p>
-                  {dateLabel && <p className="text-[10px] text-slate-600 mt-0.5">{dateLabel}</p>}
+                  <p className="text-[10px] text-slate-600 mt-0.5 truncate">{dateLabel}{lastMsg ? ` · ${lastMsg}` : ""}</p>
                 </div>
                 {onRename && !confirming && (
                   <span onClick={(e) => { e.stopPropagation(); startRename(c); }} role="button" aria-label="Renombrar conversación" className="p-1.5 rounded-lg text-slate-600 hover:text-teal-300 transition shrink-0"><Edit3 size={12} /></span>
@@ -12597,7 +12773,11 @@ export default function App() {
     const ejercicios = new Set();
     const prs = [];
     Object.entries(porEjercicio).forEach(([exId, entries]) => {
-      const deHoy = entries.filter((e) => e.date === hoy);
+      // BUG FIX: si marcaste algo en Descarga el mismo día, esas entradas
+      // (con "deload:true") se colaban acá y el resumen de la sesión NORMAL
+      // mostraba volumen/series/ejercicios que en realidad eran de la
+      // descarga, no de este entrenamiento.
+      const deHoy = entries.filter((e) => e.date === hoy && !e.deload);
       if (!deHoy.length) return;
       const lf = (dd && dd[exId]) || EXERCISE_LIBRARY_BY_ID[exId]?.loadFactor || 1;
       deHoy.forEach((e) => { volumen += e.kg * lf * e.reps; series++; });
@@ -12812,7 +12992,7 @@ export default function App() {
             {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToRoutines={() => setTab("rutinas")} onGoToSchedule={() => goToSection("rutinas", "week-schedule")} onGoToFieldSettings={() => goToSection("perfil", "field-settings-section")} onGoToDescarga={() => setTab("descarga")} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} todaySessionDayKey={(profile?.trainingSessions || []).find((ts) => ts.date === todayStr())?.dayKey || profile?.activeSession?.dayKey || null} sex={profile?.sex} age={profile?.age} />}
             {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} onGoToRoutines={() => goToSection("rutinas", "routine-editor")} weekSchedule={weekSchedule} sex={profile?.sex} age={profile?.age} onGoToDeload={() => setTab("descarga")} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} />}
             {tab === "descarga" && <DeloadView logs={logs} setLogs={setLogs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} activeSession={profile?.activeSession?.deload ? profile.activeSession : null} onStartSession={handleStartSession} onCancelSession={handleCancelSession} weekSchedule={weekSchedule} />}
-            {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} setLogs={setLogs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} conversations={aiConversations} activeConversationId={activeAiConversationId} onNewConversation={handleNewAiConversation} onSwitchConversation={handleSwitchAiConversation} onDeleteConversation={handleDeleteAiConversation} onRenameConversation={handleRenameAiConversation} settings={getProfileSettings(profile)} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} />}
+            {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} setLogs={setLogs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} conversations={aiConversations} activeConversationId={activeAiConversationId} onNewConversation={handleNewAiConversation} onSwitchConversation={handleSwitchAiConversation} onDeleteConversation={handleDeleteAiConversation} onRenameConversation={handleRenameAiConversation} settings={getProfileSettings(profile)} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} onArchiveRoutine={handleArchiveRoutine} onNavigate={setTab} onStartSession={handleStartSession} onEndSession={handleEndSession} />}
             {tab === "perfil" && <ProfileView onOpenFieldPreview={() => setShowFieldIntro(true)} openSectionSignal={openSectionSignal} profileName={activeProfile} profiles={profiles} logs={logs} onSignOut={handleSignOut} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} />}
           </div>
         </main>
