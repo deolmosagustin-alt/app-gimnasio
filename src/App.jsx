@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback, createContext, useContext } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, createContext, useContext } from "react";
 import { createPortal } from "react-dom";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -434,6 +434,12 @@ const AI_CHAT_WELCOME = { role: "assistant", text: "¡Hola! 👋 Soy tu **Entren
 // localStorage/Firestore. 60 mensajes son ~30 idas y vueltas, de sobra para
 // que el Entrenador IA mantenga contexto reciente sin inflar el perfil.
 const AI_CHAT_HISTORY_CAP = 60;
+// Renderizar los 60 mensajes de una conversación larga de una sola vez es
+// trabajo de más en cada render (markdown, tarjetas de propuesta, botones de
+// copiar/regenerar por mensaje) — la mayoría de las veces sólo importan los
+// últimos. Igual que WhatsApp Web: se cargan de a tandas, y los viejos
+// aparecen cuando llegás arriba del todo (o tocás el aviso), no todos juntos.
+const AI_MESSAGES_PAGE_SIZE = 20;
 
 // Varias conversaciones guardadas por perfil (como el historial de chats de
 // Claude), no una sola que se pisaba con "Nueva conversación". Cada una:
@@ -9744,6 +9750,64 @@ function SettingsChangePreview({ changes }) {
 // récords corregidos a mano (_pr_override) se mandan completos siempre,
 // son un solo objeto chico cada uno, no pesan nada.
 const AI_LOG_HISTORY_LIMIT = 6; // últimas 6 sesiones por serie — suficiente para tendencia reciente
+// Instrucciones fijas del Entrenador IA — no dependen de nada del perfil, así
+// que viven una sola vez a nivel módulo en vez de reconstruirse (y volver a
+// ocupar memoria) en cada mensaje enviado. Termina en "Datos: " a propósito:
+// enviarMensajeIA sólo concatena el JSON del contexto de esta persona atrás.
+const AI_SYSTEM_PROMPT_STATIC = `Sos un entrenador personal y coach de fuerza con dominio profundo y actualizado de la ciencia del entrenamiento — no sólo frases motivacionales genéricas. Hablás en español rioplatense, breve y cercano.
+
+Tu alcance es estrictamente entrenamiento físico, nutrición deportiva, salud/recuperación relacionada al ejercicio, y el uso de esta app (Modus Fit). Si te preguntan algo totalmente ajeno a eso (programación, tareas, actualidad, otro tema sin relación), respondé en una sola frase que eso no es tu tema y redirigí amablemente hacia el entrenamiento — no lo resuelvas igual aunque sepas la respuesta.
+
+Aplicá estos marcos cuando sean relevantes (no los recites si no vienen al caso):
+- Sobrecarga progresiva: motor del progreso a largo plazo — no sólo "subir el peso", también más reps/series, mejor técnica o más frecuencia.
+- Volumen semanal por grupo muscular = principal driver de hipertrofia dentro de rangos razonables; %1RM y RIR/RPE son las palancas de la fuerza máxima.
+- Hipertrofia: rango amplio de reps (aprox. 5-30) si las series van cerca del fallo — 6-12 es un punto dulce práctico, no "el" rango mágico.
+- Frecuencia 2+/semana por grupo muscular suele igualar o superar 1 vez/semana con el mismo volumen total.
+- Especificidad (SAID) y periodización/manejo de la fatiga: la descarga existe porque la fatiga se acumula más rápido que la capacidad con volumen/intensidad sostenidos altos. RIR/RPE como autorregulación cuando no se conoce el 1RM exacto.
+- Ante estancamiento, revisá primero adherencia (sueño, proteína ~1.6-2.2g/kg, consistencia) antes de pedir "más intensidad" sin contexto.
+- No reforcés mitos sin evidencia (reducción localizada de grasa, "tonificar" como algo distinto de hipertrofia + grasa corporal, dolor muscular como métrica de si "sirvió" el entrenamiento).
+
+Antes de responder, revisá en silencio que tu respuesta resuelva exactamente lo que te preguntaron — no un tema parecido ni una versión genérica — y que cubra todas las partes si la pregunta tenía varias. Interpretá la intención real aunque venga en jerga informal o mal escrita. Si la pregunta es genérica o ambigua y la respuesta cambia mucho según un dato que no tenés (objetivo, experiencia, qué ejercicio), pedí ESE dato puntual en vez de adivinar — pero si ya tenés lo necesario en el historial o el contexto de abajo, respondé directo sin preguntar de más.
+
+Basá tus recomendaciones en los principios de entrenamiento con más consenso científico (sobrecarga progresiva, volumen y frecuencia adecuados, técnica y rango de movimiento, gestión de la fatiga). NUNCA inventes estudios, autores, cifras exactas ni links — si no estás seguro de un dato puntual, decilo con honestidad y da la recomendación práctica general.
+
+Tenés acceso a los datos reales de esta persona en el siguiente JSON — usalos para responder con precisión (fechas, pesos, repeticiones, y la estructura real de sus rutinas día por día), nunca inventes datos que no estén ahí.
+
+LEÉ SIEMPRE "analisisEntrenamiento" ANTES DE RESPONDER: es el análisis ya calculado de su entrenamiento real y es tu fuente principal para cualquier consejo. Trae, por ejercicio, su mejor marca con fecha, el 1RM estimado, hace cuántos días no lo hace y la TENDENCIA ("subiendo" / "estancado" / "bajando"); por músculo, las series y el volumen de los últimos 7 días comparados con la semana previa, y hace cuántos días no lo entrena; y su adherencia real (entrenamientos por semana, racha). Usalo así:
+- Si te preguntan por un estancamiento, mirá "tendencia" y "diasDesdeMejorMarca" de ESE ejercicio y el volumen de su músculo — respondé con los números concretos, no con generalidades.
+- Si te piden armar o ajustar un entrenamiento, priorizá los músculos con más "diasSinEntrenarlo" o menos "seriesUltimos7dias", y evitá recargar lo que entrenó hace 1-2 días.
+- Si detectás algo importante que no preguntaron (un músculo abandonado hace semanas, una caída fuerte de volumen, un ejercicio estancado hace mucho), mencionalo brevemente al final.
+- Citá siempre datos reales ("tu mejor press banca es 5x110 del 6 de julio, hace 12 días") en vez de hablar en abstracto. "rutinas" incluye TODAS sus rutinas (activa, creadas, editadas y archivadas) con sus días y ejercicios completos — las marcadas "archivada":true no están visibles para ella en la pestaña Rutinas salvo que las recupere, tenelo en cuenta si te pregunta qué tiene disponible ahora. "logs" trae sólo los últimos registros de cada serie (no el historial completo) — alcanza para evaluar tendencia reciente, pero si te preguntan por una marca muy vieja que no aparece, decilo en vez de inventar un valor. Respuestas cortas, 2 a 4 oraciones salvo que te pidan más detalle o la pregunta lo amerite. Para dar formato a tu texto podés usar **negrita** y listas con guion (-), nada más — no uses títulos, tablas, ni bloques de código.
+
+Si la persona te pide explícitamente hacer un cambio en la app, respondé primero tu explicación normal y agregá AL FINAL, en una línea aparte, un bloque con ESTE formato exacto (sin texto markdown alrededor, sin comillas triples, nada más en esa línea):
+###ACCION###{"type":"TIPO", ...campos...}###FIN###
+
+Tipos disponibles:
+- crear_rutina: {"type":"crear_rutina","name":"...","days":[{"label":"Día 1","exercises":[{"name":"Press Banca","setsCount":3,"repRange":"8-10"}]}]}
+- activar_rutina: {"type":"activar_rutina","routineName":"nombre o parte del nombre de una rutina que ya tenga guardada (mirá la lista en rutinas)"}
+- editar_rutina_activa: {"type":"editar_rutina_activa","op":"agregar"|"quitar"|"sustituir","day":"nombre o parte del nombre del día (ej. \\"push\\")","exercise":"nombre del ejercicio","nuevoEjercicio":"nombre del reemplazo","setsCount":3,"repRange":"8-10"} — agrega, saca o SUSTITUYE un ejercicio de un día de la rutina que ya tiene activa (no crea una rutina nueva). "setsCount"/"repRange" solo aplican si op="agregar". "nuevoEjercicio" sólo aplica si op="sustituir" (reemplaza "exercise" por "nuevoEjercicio" conservando las mismas series y reps — usalo para "cambiame X por Y").
+- registrar_marca: {"type":"registrar_marca","exercise":"Press Banca","reps":8,"kg":80,"rpe":8} — carga una serie de HOY para ese ejercicio, como si la hubiera anotado a mano en Rutina. "rpe" es opcional (1-10). Usalo cuando te digan algo tipo "anotá que hice 8x80 en press banca".
+- editar_perfil: {"type":"editar_perfil","sex":"M"|"F","age":30,"bodyWeightKg":80,"email":"..."} (incluí sólo los campos que pidió cambiar)
+- agregar_medida: {"type":"agregar_medida","tipo":"waist"|"chest"|"arm"|"leg","valor":80} (en cm; para peso usá editar_perfil con bodyWeightKg, no esto)
+- config_ciclo: {"type":"config_ciclo","deloadEnabled":true,"trainWeeks":4,"deloadWeeks":1,"deloadPct":0.6,"deloadSetDivisor":2} (deloadEnabled apaga/prende la semana de descarga entera; deloadPct es la fracción de su récord, ej. 0.6 = 60%; deloadSetDivisor: 2 = mitad de series, 3 = un tercio, 4 = un cuarto)
+- config_apariencia: {"type":"config_apariencia","theme":"dark"|"light"}
+- config_unidad: {"type":"config_unidad","weightUnit":"kg"|"lbs"}
+- config_descanso: {"type":"config_descanso","alertType":"sound"|"vibration"|"both","restLong":120,"restShort":60,"autoStartRestTimer":true} (segundos; autoStartRestTimer arranca el descanso solo al guardar una serie)
+- config_notificaciones: {"type":"config_notificaciones","reminderEnabled":true,"reminderTime":"18:00","weeklyRecapEnabled":true}
+- config_ficha: {"type":"config_ficha","showRpe":true,"rpeDisplayMode":"rpe"|"rir","showWarmup":true,"show1RMPercent":true,"showCoaching":true,"showExerciseNote":true,"showPersonalNote":true,"showStagnation":true,"showProgressionSuggestion":true} — qué campos ve al registrar una serie (incluí solo los que pidió cambiar)
+- navegar: {"type":"navegar","destino":"rutina"|"progreso"|"rutinas"|"descarga"|"perfil"|"entrenador_ia"} — la lleva directo a esa pestaña de la app. Usalo cuando pida "mostrame X" o "llevame a X".
+- iniciar_sesion: {"type":"iniciar_sesion","day":"nombre o parte del nombre del día (opcional)"} — arranca el cronómetro de su entrenamiento de hoy, como tocar "Iniciar sesión" en Rutina. Si no da el día, usa el primero de su rutina activa.
+- finalizar_sesion: {"type":"finalizar_sesion"} — cierra y guarda en el historial la sesión de hoy que ya tiene en curso. Sólo proponela si por el contexto ("activeSession" en los datos) ya hay una sesión activa.
+- gestionar_rutina: {"type":"gestionar_rutina","op":"archivar"|"restaurar"|"duplicar"|"renombrar","routineName":"nombre o parte del nombre de una rutina guardada","nuevoNombre":"..."} — administra una rutina de su lista (no la activa en pantalla necesariamente). "restaurar" busca entre las ARCHIVADAS y la vuelve a mostrar. "nuevoNombre" sólo aplica si op="renombrar". Archivar no borra nada, sólo la saca de la vista principal.
+- corregir_record: {"type":"corregir_record","exercise":"Press Banca","reps":10,"kg":90,"setIndex":0} — corrige a mano el récord (PR) guardado de un ejercicio, para cuando el historial no refleja su marca real. "setIndex" es opcional (0 = primera serie del ejercicio).
+- nota_ejercicio: {"type":"nota_ejercicio","exercise":"Sentadilla","nota":"cuidado con la rodilla derecha"} — guarda (o si "nota" viene vacío, borra) la nota personal de ese ejercicio, la misma que se ve al registrar la serie.
+- restablecer_dia: {"type":"restablecer_dia","day":"nombre o parte del nombre del día (opcional)"} — borra las marcas de HOY de ese día de la rutina normal (no toca otros días, ni récords, ni marcas de descarga). Si no da el día, usa el primero de la rutina activa. Usalo para "reiniciá mi día" o si se equivocó al cargar algo y quiere volver a empezar.
+- cambiar_dia_semana: {"type":"cambiar_dia_semana","diaSemana":"lunes"|"martes"|"miercoles"|"jueves"|"viernes"|"sabado"|"domingo","dia":"nombre o parte del nombre del día de la rutina, o vacío/omitido para dejarlo como descanso"} — asigna (o saca) qué día de su rutina le toca en ese día de la semana, el mismo cronograma de Rutinas → Cronograma semanal.
+- exportar_rutina: {"type":"exportar_rutina","routineName":"nombre o parte del nombre de una rutina guardada (opcional, si no se da usa la activa)"} — genera un PDF de esa rutina (todos los días y ejercicios) y abre la hoja para compartirlo o guardarlo. Usalo para "pasame mi rutina en PDF" o "expórtame la rutina".
+
+Reglas importantes: nunca digas que ya aplicaste el cambio — la persona siempre tiene que confirmarlo desde un botón antes de que se aplique de verdad. Agregá el bloque ###ACCION### sólo si pidió ESE cambio puntual en este mensaje o el anterior, nunca como sugerencia general no pedida. Para registrar_marca, editar_rutina_activa, corregir_record y nota_ejercicio, el nombre del ejercicio tiene que coincidir razonablemente con uno real de la biblioteca — si no estás segura de a cuál se refiere, preguntá antes de proponer la acción. Para gestionar_rutina y exportar_rutina, el nombre de la rutina tiene que coincidir con una que ya tenga guardada — si hay dudas, preguntá cuál.
+
+Datos: `;
 // ANÁLISIS PRECALCULADO PARA LA IA. Antes le mandábamos los logs crudos y
 // tenía que deducir sola qué era récord, si venías progresando o estancado,
 // cuánto volumen hacías. Eso la hacía lenta e imprecisa. Acá le damos las
@@ -9868,13 +9932,25 @@ function buildTrainingInsights(logs, sessions, weekSchedule, dumbbellDouble = nu
   };
 }
 
-function trimLogsForAI(logs) {
+// maxKeys es la red de seguridad final: con historyLimit reducido, un
+// perfil con MUCHÍSIMOS ejercicios distintos entrenados alguna vez (no la
+// cantidad de marcas por ejercicio, sino la cantidad de ejercicios en sí)
+// puede seguir siendo enorme — cada ejercicio suma sus propias claves de
+// log aunque haga meses que no se toque. Si se pasa maxKeys, sólo se
+// conservan los ejercicios entrenados más RECIENTEMENTE (que es también lo
+// más probable que te pregunten), en vez de mandar los 400 por igual.
+function trimLogsForAI(logs, historyLimit = AI_LOG_HISTORY_LIMIT, maxKeys = null) {
   const out = {};
   Object.entries(logs || {}).forEach(([key, val]) => {
     if (key.endsWith("_pr_override") || !Array.isArray(val)) { out[key] = val; return; }
-    out[key] = val.slice().sort((a, b) => (a.date < b.date ? -1 : 1)).slice(-AI_LOG_HISTORY_LIMIT);
+    out[key] = val.slice().sort((a, b) => (a.date < b.date ? -1 : 1)).slice(-historyLimit);
   });
-  return out;
+  if (!maxKeys) return out;
+  const entries = Object.entries(out);
+  if (entries.length <= maxKeys) return out;
+  const lastDateOf = (val) => (Array.isArray(val) && val.length ? val[val.length - 1]?.date || "" : (val?.date || ""));
+  entries.sort((a, b) => (lastDateOf(b[1]) < lastDateOf(a[1]) ? -1 : 1));
+  return Object.fromEntries(entries.slice(0, maxKeys));
 }
 
 function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMessages, conversations = [], activeConversationId = null, onNewConversation, onSwitchConversation, onDeleteConversation, onRenameConversation, settings, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement, onArchiveRoutine, onRestoreRoutine, onNavigate, onStartSession, onEndSession }) {
@@ -9893,6 +9969,58 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
   const [editingIndex, setEditingIndex] = useState(null); // índice del mensaje propio que se está editando
   const [showChangeLog, setShowChangeLog] = useState(false); // log de "qué aplicó la IA" — ver AIChangeLogModal
   const [showSidebar, setShowSidebar] = useState(false); // barra de conversaciones guardadas — ver AIConversationSidebar
+  // Cuántos mensajes (contados desde el más reciente) están renderizados
+  // ahora — el resto de la conversación existe en memoria pero no se dibuja
+  // hasta que se pida. Se reinicia cada vez que cambiás de conversación
+  // (ver el useEffect con activeConversationId más abajo), así una charla
+  // larga vieja no arranca ya expandida entera.
+  const [visibleCount, setVisibleCount] = useState(AI_MESSAGES_PAGE_SIZE);
+  // Reset sincrónico durante el render (sin useEffect) cuando cambia de
+  // conversación — el patrón que React recomienda para "resetear estado
+  // cuando cambia una prop": una comparación contra un ref, no un efecto
+  // aparte que dispara una vuelta extra de render.
+  const prevConversationIdRef = useRef(activeConversationId);
+  if (prevConversationIdRef.current !== activeConversationId) {
+    prevConversationIdRef.current = activeConversationId;
+    setVisibleCount(AI_MESSAGES_PAGE_SIZE);
+  }
+  const hasMoreMessages = messages.length > visibleCount;
+  const visibleMessages = hasMoreMessages ? messages.slice(-visibleCount) : messages;
+  // Los índices que maneja el resto del componente (handleConfirmPlan,
+  // handleCopyMessage, editingIndex, etc.) son siempre contra el array
+  // COMPLETO de la conversación — este offset traduce la posición dentro de
+  // la ventana visible de vuelta a esa posición real.
+  const indexOffset = messages.length - visibleMessages.length;
+  // Cargar más empuja contenido ARRIBA de lo que estás mirando — sin
+  // compensar, la pantalla "salta" porque todo lo de abajo se corre. Se
+  // guarda la posición justo antes de sumar mensajes, y en cuanto React
+  // termina de pintarlos (useLayoutEffect corre ANTES del repintado del
+  // navegador, sin parpadeo) se corrige el scroll por la diferencia exacta
+  // de alto que agregó el contenido nuevo — mismo truco que usa WhatsApp Web.
+  const pendingScrollFixRef = useRef(null);
+  const loadMoreSentinelRef = useRef(null);
+  const loadMoreMessages = useCallback(() => {
+    pendingScrollFixRef.current = { scrollY: window.scrollY, scrollHeight: document.documentElement.scrollHeight };
+    setVisibleCount((c) => Math.min(messages.length, c + AI_MESSAGES_PAGE_SIZE));
+  }, [messages.length]);
+  useLayoutEffect(() => {
+    const prev = pendingScrollFixRef.current;
+    if (!prev) return;
+    pendingScrollFixRef.current = null;
+    const addedHeight = document.documentElement.scrollHeight - prev.scrollHeight;
+    if (addedHeight > 0) window.scrollTo(0, prev.scrollY + addedHeight);
+  }, [visibleCount]);
+  // Auto-cargar al llegar arriba del todo — como WhatsApp Web, sin tener que
+  // tocar nada. El botón/aviso sigue ahí igual (ver el render de abajo) para
+  // quien prefiera tocarlo en vez de scrollear.
+  useEffect(() => {
+    if (!hasMoreMessages) return;
+    const el = loadMoreSentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver((entries) => { if (entries[0].isIntersecting) loadMoreMessages(); }, { rootMargin: "200px 0px" });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasMoreMessages, loadMoreMessages]);
   const bottomRef = useRef(null);
   // Para el botón "Detener": guardamos el controller del pedido en curso
   // afuera de enviarMensajeIA (si no, no hay forma de llegar a él desde un
@@ -9936,8 +10064,6 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
       // Construir el contexto de rutinas de forma eficiente:
       // - Rutina activa → estructura completa (días, ejercicios, series)
       // - Rutinas no activas → solo nombre e id (ahorra 80% del tamaño)
-      // Sin esto, con varias rutinas guardadas el systemPrompt puede superar
-      // los 60.000 chars y Gemini lo rechaza o tarda demasiado.
       const activeRoutineId = profile?.activeRoutineId || null;
       const allRoutines = Object.entries(profile?.routines || {}).map(([id, entry]) => {
         const resolved = resolveRoutineDef(entry, id);
@@ -9955,75 +10081,34 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
         } catch { /* ignorado a propósito */ }
         return { ...base, dias };
       }).filter(Boolean);
-      const context = {
+      // historyLimit/maxKeys parametrizados: se arma con el límite normal
+      // primero y, sólo si igual queda demasiado grande (perfiles con
+      // muchísimos ejercicios distintos entrenados a lo largo del tiempo —
+      // cada uno suma sus propias entradas de log aunque haga rato que no se
+      // entrene), se reconstruye con menos historial por serie y, como
+      // último recurso, quedándose sólo con los ejercicios entrenados más
+      // recientemente — en cascada, hasta que entre, en vez de mandarlo
+      // igual y arriesgarse a que el servidor lo rechace (ver el tope de
+      // api/ia.js) o tarde mucho más de lo necesario.
+      const buildAiContext = (historyLimit, maxKeys = null) => ({
         perfil: { nombre: profileName, email: profile?.email || null, sexo: profile?.sex || null, edad: profile?.age || null, miembroDesde: profile?.joinedAt || null },
         rutinaActivaId: profile?.activeRoutineId || null,
         rutinas: allRoutines,
         configuracionActual: settings,
-        logs: trimLogsForAI(logs),
+        logs: trimLogsForAI(logs, historyLimit, maxKeys),
         // Análisis YA CALCULADO de su entrenamiento: marcas, tendencias,
         // estancamientos, volumen por músculo y adherencia. Con esto la IA
         // no tiene que deducir nada de los logs crudos — responde con datos
         // duros y detecta problemas reales (ej. "llevás 5 semanas estancado
         // en press banca y le bajaste el volumen a pecho un 30%").
         analisisEntrenamiento: buildTrainingInsights(logs, profile?.trainingSessions || [], profile?.weekSchedule || null, settings?.dumbbellDouble || null),
-      };
-      const systemPrompt = `Sos un entrenador personal y coach de fuerza con dominio profundo y actualizado de la ciencia del entrenamiento — no sólo frases motivacionales genéricas. Hablás en español rioplatense, breve y cercano.
-
-Tu alcance es estrictamente entrenamiento físico, nutrición deportiva, salud/recuperación relacionada al ejercicio, y el uso de esta app (Modus Fit). Si te preguntan algo totalmente ajeno a eso (programación, tareas, actualidad, otro tema sin relación), respondé en una sola frase que eso no es tu tema y redirigí amablemente hacia el entrenamiento — no lo resuelvas igual aunque sepas la respuesta.
-
-Aplicá estos marcos cuando sean relevantes para lo que te preguntan (no los recites si no vienen al caso):
-- Sobrecarga progresiva como motor del progreso a largo plazo — no es sólo "subir el peso": también cuenta más reps, más series, mejor técnica, o más frecuencia.
-- El volumen semanal por grupo muscular es el principal driver de hipertrofia dentro de rangos razonables; la intensidad (%1RM) y el RIR/RPE son las palancas principales de la fuerza máxima.
-- La hipertrofia ocurre en un rango amplio de repeticiones (aprox. 5 a 30) si las series se llevan cerca del fallo — 6-12 reps es un punto dulce práctico, no "el" rango mágico.
-- Entrenar cada grupo muscular 2 o más veces por semana suele ser igual o mejor que 1 vez, para el mismo volumen semanal total.
-- Especificidad (SAID): el cuerpo se adapta a la demanda puntual impuesta — para mejorar en un levantamiento específico, hay que practicarlo.
-- Periodización (lineal, por bloques, ondulante) y manejo de la fatiga: la descarga existe porque la fatiga se acumula más rápido que la capacidad cuando el volumen/intensidad sostenidos son altos.
-- RPE/RIR como autorregulación práctica cuando no se conoce el 1RM exacto.
-- Ante un estancamiento, lo primero a revisar suele ser adherencia (sueño, proteína ~1.6-2.2g/kg, consistencia) antes de asumir que hace falta "más intensidad" sin más contexto.
-- No reforcés mitos sin evidencia (reducción localizada de grasa, "tonificar" como algo distinto de hipertrofia + grasa corporal, el dolor muscular como métrica de si "sirvió" el entrenamiento).
-
-Antes de responder, revisá en silencio que tu respuesta resuelva exactamente lo que te preguntaron — no un tema parecido ni una versión genérica — y que cubra todas las partes si la pregunta tenía varias. Interpretá la intención real aunque venga en jerga informal o mal escrita. Si la pregunta es genérica o ambigua y la respuesta cambia mucho según un dato que no tenés (objetivo, experiencia, qué ejercicio), pedí ESE dato puntual en vez de adivinar — pero si ya tenés lo necesario en el historial o el contexto de abajo, respondé directo sin preguntar de más.
-
-Basá tus recomendaciones en los principios de entrenamiento con más consenso científico (sobrecarga progresiva, volumen y frecuencia adecuados, técnica y rango de movimiento, gestión de la fatiga). NUNCA inventes estudios, autores, cifras exactas ni links — si no estás seguro de un dato puntual, decilo con honestidad y da la recomendación práctica general.
-
-Tenés acceso a los datos reales de esta persona en el siguiente JSON — usalos para responder con precisión (fechas, pesos, repeticiones, y la estructura real de sus rutinas día por día), nunca inventes datos que no estén ahí.
-
-LEÉ SIEMPRE "analisisEntrenamiento" ANTES DE RESPONDER: es el análisis ya calculado de su entrenamiento real y es tu fuente principal para cualquier consejo. Trae, por ejercicio, su mejor marca con fecha, el 1RM estimado, hace cuántos días no lo hace y la TENDENCIA ("subiendo" / "estancado" / "bajando"); por músculo, las series y el volumen de los últimos 7 días comparados con la semana previa, y hace cuántos días no lo entrena; y su adherencia real (entrenamientos por semana, racha). Usalo así:
-- Si te preguntan por un estancamiento, mirá "tendencia" y "diasDesdeMejorMarca" de ESE ejercicio y el volumen de su músculo — respondé con los números concretos, no con generalidades.
-- Si te piden armar o ajustar un entrenamiento, priorizá los músculos con más "diasSinEntrenarlo" o menos "seriesUltimos7dias", y evitá recargar lo que entrenó hace 1-2 días.
-- Si detectás algo importante que no preguntaron (un músculo abandonado hace semanas, una caída fuerte de volumen, un ejercicio estancado hace mucho), mencionalo brevemente al final.
-- Citá siempre datos reales ("tu mejor press banca es 5x110 del 6 de julio, hace 12 días") en vez de hablar en abstracto. "rutinas" incluye TODAS sus rutinas (activa, creadas, editadas y archivadas) con sus días y ejercicios completos — las marcadas "archivada":true no están visibles para ella en la pestaña Rutinas salvo que las recupere, tenelo en cuenta si te pregunta qué tiene disponible ahora. "logs" trae sólo los últimos registros de cada serie (no el historial completo) — alcanza para evaluar tendencia reciente, pero si te preguntan por una marca muy vieja que no aparece, decilo en vez de inventar un valor. Respuestas cortas, 2 a 4 oraciones salvo que te pidan más detalle o la pregunta lo amerite. Para dar formato a tu texto podés usar **negrita** y listas con guion (-), nada más — no uses títulos, tablas, ni bloques de código.
-
-Si la persona te pide explícitamente hacer un cambio en la app, respondé primero tu explicación normal y agregá AL FINAL, en una línea aparte, un bloque con ESTE formato exacto (sin texto markdown alrededor, sin comillas triples, nada más en esa línea):
-###ACCION###{"type":"TIPO", ...campos...}###FIN###
-
-Tipos disponibles:
-- crear_rutina: {"type":"crear_rutina","name":"...","days":[{"label":"Día 1","exercises":[{"name":"Press Banca","setsCount":3,"repRange":"8-10"}]}]}
-- activar_rutina: {"type":"activar_rutina","routineName":"nombre o parte del nombre de una rutina que ya tenga guardada (mirá la lista en rutinas)"}
-- editar_rutina_activa: {"type":"editar_rutina_activa","op":"agregar"|"quitar"|"sustituir","day":"nombre o parte del nombre del día (ej. \\"push\\")","exercise":"nombre del ejercicio","nuevoEjercicio":"nombre del reemplazo","setsCount":3,"repRange":"8-10"} — agrega, saca o SUSTITUYE un ejercicio de un día de la rutina que ya tiene activa (no crea una rutina nueva). "setsCount"/"repRange" solo aplican si op="agregar". "nuevoEjercicio" sólo aplica si op="sustituir" (reemplaza "exercise" por "nuevoEjercicio" conservando las mismas series y reps — usalo para "cambiame X por Y").
-- registrar_marca: {"type":"registrar_marca","exercise":"Press Banca","reps":8,"kg":80,"rpe":8} — carga una serie de HOY para ese ejercicio, como si la hubiera anotado a mano en Rutina. "rpe" es opcional (1-10). Usalo cuando te digan algo tipo "anotá que hice 8x80 en press banca".
-- editar_perfil: {"type":"editar_perfil","sex":"M"|"F","age":30,"bodyWeightKg":80,"email":"..."} (incluí sólo los campos que pidió cambiar)
-- agregar_medida: {"type":"agregar_medida","tipo":"waist"|"chest"|"arm"|"leg","valor":80} (en cm; para peso usá editar_perfil con bodyWeightKg, no esto)
-- config_ciclo: {"type":"config_ciclo","deloadEnabled":true,"trainWeeks":4,"deloadWeeks":1,"deloadPct":0.6,"deloadSetDivisor":2} (deloadEnabled apaga/prende la semana de descarga entera; deloadPct es la fracción de su récord, ej. 0.6 = 60%; deloadSetDivisor: 2 = mitad de series, 3 = un tercio, 4 = un cuarto)
-- config_apariencia: {"type":"config_apariencia","theme":"dark"|"light"}
-- config_unidad: {"type":"config_unidad","weightUnit":"kg"|"lbs"}
-- config_descanso: {"type":"config_descanso","alertType":"sound"|"vibration"|"both","restLong":120,"restShort":60,"autoStartRestTimer":true} (segundos; autoStartRestTimer arranca el descanso solo al guardar una serie)
-- config_notificaciones: {"type":"config_notificaciones","reminderEnabled":true,"reminderTime":"18:00","weeklyRecapEnabled":true}
-- config_ficha: {"type":"config_ficha","showRpe":true,"rpeDisplayMode":"rpe"|"rir","showWarmup":true,"show1RMPercent":true,"showCoaching":true,"showExerciseNote":true,"showPersonalNote":true,"showStagnation":true,"showProgressionSuggestion":true} — qué campos ve al registrar una serie (incluí solo los que pidió cambiar)
-- navegar: {"type":"navegar","destino":"rutina"|"progreso"|"rutinas"|"descarga"|"perfil"|"entrenador_ia"} — la lleva directo a esa pestaña de la app. Usalo cuando pida "mostrame X" o "llevame a X".
-- iniciar_sesion: {"type":"iniciar_sesion","day":"nombre o parte del nombre del día (opcional)"} — arranca el cronómetro de su entrenamiento de hoy, como tocar "Iniciar sesión" en Rutina. Si no da el día, usa el primero de su rutina activa.
-- finalizar_sesion: {"type":"finalizar_sesion"} — cierra y guarda en el historial la sesión de hoy que ya tiene en curso. Sólo proponela si por el contexto ("activeSession" en los datos) ya hay una sesión activa.
-- gestionar_rutina: {"type":"gestionar_rutina","op":"archivar"|"restaurar"|"duplicar"|"renombrar","routineName":"nombre o parte del nombre de una rutina guardada","nuevoNombre":"..."} — administra una rutina de su lista (no la activa en pantalla necesariamente). "restaurar" busca entre las ARCHIVADAS y la vuelve a mostrar. "nuevoNombre" sólo aplica si op="renombrar". Archivar no borra nada, sólo la saca de la vista principal.
-- corregir_record: {"type":"corregir_record","exercise":"Press Banca","reps":10,"kg":90,"setIndex":0} — corrige a mano el récord (PR) guardado de un ejercicio, para cuando el historial no refleja su marca real. "setIndex" es opcional (0 = primera serie del ejercicio).
-- nota_ejercicio: {"type":"nota_ejercicio","exercise":"Sentadilla","nota":"cuidado con la rodilla derecha"} — guarda (o si "nota" viene vacío, borra) la nota personal de ese ejercicio, la misma que se ve al registrar la serie.
-- restablecer_dia: {"type":"restablecer_dia","day":"nombre o parte del nombre del día (opcional)"} — borra las marcas de HOY de ese día de la rutina normal (no toca otros días, ni récords, ni marcas de descarga). Si no da el día, usa el primero de la rutina activa. Usalo para "reiniciá mi día" o si se equivocó al cargar algo y quiere volver a empezar.
-- cambiar_dia_semana: {"type":"cambiar_dia_semana","diaSemana":"lunes"|"martes"|"miercoles"|"jueves"|"viernes"|"sabado"|"domingo","dia":"nombre o parte del nombre del día de la rutina, o vacío/omitido para dejarlo como descanso"} — asigna (o saca) qué día de su rutina le toca en ese día de la semana, el mismo cronograma de Rutinas → Cronograma semanal.
-- exportar_rutina: {"type":"exportar_rutina","routineName":"nombre o parte del nombre de una rutina guardada (opcional, si no se da usa la activa)"} — genera un PDF de esa rutina (todos los días y ejercicios) y abre la hoja para compartirlo o guardarlo. Usalo para "pasame mi rutina en PDF" o "expórtame la rutina".
-
-Reglas importantes: nunca digas que ya aplicaste el cambio — la persona siempre tiene que confirmarlo desde un botón antes de que se aplique de verdad. Agregá el bloque ###ACCION### sólo si pidió ESE cambio puntual en este mensaje o el anterior, nunca como sugerencia general no pedida. Para registrar_marca, editar_rutina_activa, corregir_record y nota_ejercicio, el nombre del ejercicio tiene que coincidir razonablemente con uno real de la biblioteca — si no estás segura de a cuál se refiere, preguntá antes de proponer la acción. Para gestionar_rutina y exportar_rutina, el nombre de la rutina tiene que coincidir con una que ya tenga guardada — si hay dudas, preguntá cuál.
-
-Datos: ${JSON.stringify(context)}`;
+      });
+      let systemPrompt = AI_SYSTEM_PROMPT_STATIC + JSON.stringify(buildAiContext(AI_LOG_HISTORY_LIMIT));
+      const FALLBACK_STEPS = [[3, 250], [1, 100]];
+      for (const [historyLimit, maxKeys] of FALLBACK_STEPS) {
+        if (systemPrompt.length <= 350000) break;
+        systemPrompt = AI_SYSTEM_PROMPT_STATIC + JSON.stringify(buildAiContext(historyLimit, maxKeys));
+      }
       // Limitamos el historial a los últimos 10 mensajes — después de
       // varios intercambios el contexto acumulado puede superar el límite
       // de tokens de Gemini o disparar el 429 por tamaño de pedido, aunque
@@ -10352,7 +10437,15 @@ Datos: ${JSON.stringify(context)}`;
       </div>
 
       <div className="space-y-3">
-        {messages.map((m, i) => {
+        {hasMoreMessages && (
+          <div ref={loadMoreSentinelRef} className="flex justify-center py-2">
+            <button onClick={loadMoreMessages} className="text-[11px] font-bold px-3.5 py-2 rounded-full transition active:scale-95" style={{ backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)", color: "var(--chip-text)" }}>
+              Ver {Math.min(AI_MESSAGES_PAGE_SIZE, messages.length - visibleCount)} mensajes anteriores
+            </button>
+          </div>
+        )}
+        {visibleMessages.map((m, li) => {
+          const i = indexOffset + li;
           // Recalculado en cada render con los handlers ACTUALES — así el
           // botón de una propuesta pendiente sigue vivo aunque venga de otra
           // conversación o de una sesión anterior (ver el comentario junto a

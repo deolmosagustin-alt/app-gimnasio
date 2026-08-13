@@ -146,7 +146,19 @@ export default async function handler(req, res) {
       if (typeof systemPrompt !== "string" || !Array.isArray(history)) {
         res.status(400).json({ error: "Faltan datos para procesar el pedido." }); return;
       }
-      if (systemPrompt.length > 60000 || JSON.stringify(history).length > 60000) {
+      // BUG FIX: 60.000 caracteres (~15.000 tokens) era un límite propio
+      // arbitrario, muy por debajo de lo que estos modelos realmente
+      // soportan (ventana de contexto de 1M tokens en gemini-1.5/2.0/2.5-
+      // flash). Con el análisis de entrenamiento + varias rutinas + el
+      // historial de series de un perfil activo, el systemPrompt superaba
+      // ese piso con facilidad — y en vez de simplemente tardar más, el
+      // pedido se rechazaba de entrada con "El mensaje es demasiado largo",
+      // que en el chat se veía como una respuesta rota. 400.000 caracteres
+      // (~100.000 tokens) sigue siendo una fracción chica de la ventana real
+      // y ya alcanza de sobra para cualquier perfil real; sigue actuando de
+      // freno ante un abuso directo del endpoint (alguien mandando un texto
+      // gigante a mano, sin pasar por la app).
+      if (systemPrompt.length > 400000 || JSON.stringify(history).length > 100000) {
         res.status(400).json({ error: "El mensaje es demasiado largo." }); return;
       }
       const data = await callGemini({
