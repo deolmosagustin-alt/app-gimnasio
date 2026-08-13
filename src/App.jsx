@@ -9195,6 +9195,27 @@ function parseAction(rawText) {
   }
 }
 
+// Mismo mecanismo que parseAction, para el bloque de "pregunta con
+// opciones" (ver ###PREGUNTA### en el systemPrompt) — la IA lo agrega
+// cuando conviene ofrecer 2 a 4 respuestas cortas para tocar en vez de
+// escribir, con "otra respuesta" siempre disponible para texto libre.
+function parseQuestion(rawText) {
+  const match = rawText.match(/###PREGUNTA###([\s\S]*?)###FIN###/);
+  if (!match) return { text: rawText, question: null };
+  const cleanText = rawText.replace(match[0], "").trim();
+  try {
+    const parsed = JSON.parse(match[1].trim());
+    const opciones = Array.isArray(parsed?.opciones)
+      ? parsed.opciones.map((o) => String(o || "").trim()).filter(Boolean).slice(0, 4)
+      : [];
+    if (opciones.length < 2) return { text: cleanText, question: null };
+    return { text: cleanText, question: { options: opciones } };
+  } catch (err) {
+    console.error("No se pudo interpretar la pregunta con opciones:", err);
+    return { text: cleanText, question: null };
+  }
+}
+
 // Para la vista previa de "registrar_marca": ¿esta marca sería un récord
 // nuevo? Sólo para decidir qué badge mostrar en la propuesta — el cálculo
 // real de PR al guardar de verdad sigue viviendo en SetRow/savePR, éste no
@@ -9782,6 +9803,10 @@ Tipos disponibles:
 
 Reglas importantes: nunca digas que ya aplicaste el cambio — la persona siempre tiene que confirmarlo desde un botón antes de que se aplique de verdad. Agregá el bloque ###ACCION### sólo si pidió ESE cambio puntual en este mensaje o el anterior, nunca como sugerencia general no pedida. Para registrar_marca, editar_rutina_activa, corregir_record y nota_ejercicio, el nombre del ejercicio tiene que coincidir razonablemente con uno real de la biblioteca — si no estás segura de a cuál se refiere, preguntá antes de proponer la acción. Para gestionar_rutina y exportar_rutina, el nombre de la rutina tiene que coincidir con una que ya tenga guardada — si hay dudas, preguntá cuál.
 
+Cuando necesites que elija entre pocas opciones concretas y cortas para avanzar (por ejemplo: "¿en qué querés enfocarte: fuerza, hipertrofia o resistencia?", "¿qué día armamos, push o pull?"), en vez de listarlas en el texto agregá AL FINAL, en una línea aparte, este bloque (mismas reglas de formato que ###ACCION###: sin markdown alrededor, nada más en esa línea):
+###PREGUNTA###{"opciones":["Opción A","Opción B","Opción C"]}###FIN###
+Esto dibuja botones tocables con esas opciones (2 a 4, cortas — una palabra o pocas) más un botón fijo de "otra respuesta" para texto libre, así no hace falta escribir. Usalo con criterio y MUY ocasionalmente — sólo cuando la pregunta realmente tenga un puñado de respuestas naturales y cortas; para todo lo demás (la mayoría de los casos) respondé como charla normal, sin este bloque. Nunca lo combines con ###ACCION### en el mismo mensaje.
+
 Datos: `;
 // ANÁLISIS PRECALCULADO PARA LA IA. Antes le mandábamos los logs crudos y
 // tenía que deducir sola qué era récord, si venías progresando o estancado,
@@ -9997,6 +10022,7 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
     return () => observer.disconnect();
   }, [hasMoreMessages, loadMoreMessages]);
   const bottomRef = useRef(null);
+  const chatInputRef = useRef(null); // para enfocarlo desde "otra respuesta" (ver handleCustomAnswer)
   // Para el botón "Detener": guardamos el controller del pedido en curso
   // afuera de enviarMensajeIA (si no, no hay forma de llegar a él desde un
   // click posterior). userAbortedRef distingue "lo cancelaste vos" de "se
@@ -10130,7 +10156,8 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
         const sources = Array.isArray(result?.sources) ? result.sources : [];
         if (!rawReply) { setMessages((prev) => [...prev, { role: "assistant", text: "No se me ocurrió una respuesta — probá de nuevo." }]); return; }
 
-        const { text, action } = parseAction(rawReply);
+        const { text: textAfterAction, action } = parseAction(rawReply);
+        const { text, question } = parseQuestion(textAfterAction);
         const plan = action ? buildActionPlan(action, actionCtx) : null;
         // Guardamos "action" (JSON plano, tal cual lo mandó la IA) además del
         // resumen de "plan" sin la función confirm — así el botón sigue
@@ -10145,7 +10172,7 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
         // sumarlo acá cada vez que se agrega un "kind" nuevo.
         const planSummary = plan ? { ...plan } : null;
         if (planSummary) delete planSummary.confirm;
-        setMessages((prev) => [...prev, { role: "assistant", text, plan: planSummary, action: plan ? action : null, planStatus: plan ? "pending" : null, sources, date: new Date().toISOString() }]);
+        setMessages((prev) => [...prev, { role: "assistant", text, plan: planSummary, action: plan ? action : null, planStatus: plan ? "pending" : null, question, sources, date: new Date().toISOString() }]);
       } catch (err) {
         clearTimeout(timeoutId);
         // Si lo cortaste vos con "Detener", no hay error que mostrar — fue
@@ -10220,6 +10247,51 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
   };
   const handleDiscardPlan = (msgIndex) => {
     setMessages((prev) => prev.map((m, i) => (i === msgIndex ? { ...m, planStatus: "discarded" } : m)));
+  };
+
+  // Pregunta con opciones tocables (ver ###PREGUNTA### en el systemPrompt, y
+  // el mismo componente reusado por el chip "Anotar una marca" más abajo):
+  // tocar una opción manda ESE texto como si lo hubieras escrito vos.
+  // "answeredWith" queda marcado en el mensaje para que los botones se vean
+  // usados (no clickeables de nuevo) una vez contestada.
+  const handleSelectQuestionOption = (msgIndex, optionText) => {
+    if (isSending) return;
+    setMessages((prev) => prev.map((m, i) => (i === msgIndex ? { ...m, question: { ...m.question, answeredWith: optionText } } : m)));
+    enviarMensajeIA(optionText);
+  };
+  // "Otra respuesta": no manda nada — sólo lleva el foco al input, como
+  // cuando tocás "Editar" en un mensaje propio, para escribir de una.
+  const handleCustomAnswer = (msgIndex) => {
+    setMessages((prev) => prev.map((m, i) => (i === msgIndex ? { ...m, question: { ...m.question, answeredWith: "__custom__" } } : m)));
+    chatInputRef.current?.focus();
+  };
+  // Accesos rápidos: los que ya tienen todo lo necesario para responder se
+  // mandan directo (antes había que tocar dos veces — llenar el input y
+  // encima enviar). "Anotar una marca" es el único que de verdad necesita
+  // que elijas algo (qué ejercicio) — en vez de un prompt de ejemplo para
+  // editar a mano, ofrece los ejercicios entrenados más recientemente como
+  // botones (mismo componente de "pregunta con opciones" que usa la IA) más
+  // "otra marca" para cualquier otro.
+  const handleQuickPrompt = (chip) => {
+    if (isSending) return;
+    if (chip.askExercise) {
+      const lastDateByExercise = {};
+      Object.entries(logs || {}).forEach(([key, val]) => {
+        if (key.endsWith("_pr_override") || !Array.isArray(val) || !val.length) return;
+        const { exerciseId } = parseLogKey(key);
+        const lastDate = val[val.length - 1]?.date || "";
+        if (!lastDateByExercise[exerciseId] || lastDate > lastDateByExercise[exerciseId]) lastDateByExercise[exerciseId] = lastDate;
+      });
+      const options = Object.entries(lastDateByExercise)
+        .sort((a, b) => (b[1] > a[1] ? 1 : -1))
+        .map(([exId]) => EXERCISE_LIBRARY_BY_ID[exId]?.name)
+        .filter(Boolean)
+        .slice(0, 3);
+      setMessages((prev) => [...prev, { role: "assistant", text: "¿Qué ejercicio querés anotar?", question: { options }, date: new Date().toISOString() }]);
+      return;
+    }
+    if (chip.autoSend) { enviarMensajeIA(chip.prompt); return; }
+    setInput(chip.prompt);
   };
 
   // Dictado por voz — Web Speech API, nativa del navegador (sin librerías
@@ -10382,15 +10454,15 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
       <div className="relative -mx-1 mb-4">
         <div className="flex gap-1.5 overflow-x-auto pb-1 px-1">
           {[
-            { icon: <Layers size={11} />, label: "Crear rutina", prompt: "Armame una rutina nueva según mis objetivos", color: "#A855F7" },
-            { icon: <BarChart3 size={11} />, label: "Analizar progreso", prompt: "Analizá mi progreso reciente: ¿en qué mejoré y qué tengo estancado?", color: "#3B82F6" },
-            { icon: <Target size={11} />, label: "Punto débil", prompt: "Mirando mis rangos por músculo, ¿cuál es mi punto más débil y cómo lo ataco?", color: "#F59E0B" },
-            { icon: <Zap size={11} />, label: "Plan de hoy", prompt: "¿Qué me toca entrenar hoy y con qué pesos me conviene arrancar?", color: "#14B8A6" },
-            { icon: <Calendar size={11} />, label: "Ciclo y descarga", prompt: "¿Cómo vengo en el ciclo actual? ¿Cuándo me toca la descarga?", color: "#F43F5E" },
-            { icon: <Save size={11} />, label: "Anotar una marca", prompt: "Anotame que hoy hice 8x80 en press banca", color: "#10B981" },
-            { icon: <FileDown size={11} />, label: "Exportar rutina", prompt: "Pasame mi rutina activa en PDF", color: "#06B6D4" },
+            { icon: <Layers size={11} />, label: "Crear rutina", prompt: "Armame una rutina nueva según mis objetivos", color: "#A855F7", autoSend: true },
+            { icon: <BarChart3 size={11} />, label: "Analizar progreso", prompt: "Analizá mi progreso reciente: ¿en qué mejoré y qué tengo estancado?", color: "#3B82F6", autoSend: true },
+            { icon: <Target size={11} />, label: "Punto débil", prompt: "Mirando mis rangos por músculo, ¿cuál es mi punto más débil y cómo lo ataco?", color: "#F59E0B", autoSend: true },
+            { icon: <Zap size={11} />, label: "Plan de hoy", prompt: "¿Qué me toca entrenar hoy y con qué pesos me conviene arrancar?", color: "#14B8A6", autoSend: true },
+            { icon: <Calendar size={11} />, label: "Ciclo y descarga", prompt: "¿Cómo vengo en el ciclo actual? ¿Cuándo me toca la descarga?", color: "#F43F5E", autoSend: true },
+            { icon: <Save size={11} />, label: "Anotar una marca", color: "#10B981", askExercise: true },
+            { icon: <FileDown size={11} />, label: "Exportar rutina", prompt: "Pasame mi rutina activa en PDF", color: "#06B6D4", autoSend: true },
           ].map((c, i) => (
-            <button key={i} onClick={() => { setInput(c.prompt); }} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold whitespace-nowrap shrink-0 transition active:scale-95" style={{ backgroundColor: tint(c.color, "14"), border: `1px solid ${tint(c.color, "30")}`, color: c.color }}>{c.icon}{c.label}</button>
+            <button key={i} onClick={() => handleQuickPrompt(c)} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold whitespace-nowrap shrink-0 transition active:scale-95" style={{ backgroundColor: tint(c.color, "14"), border: `1px solid ${tint(c.color, "30")}`, color: c.color }}>{c.icon}{c.label}</button>
           ))}
         </div>
         <div className="absolute top-0 right-0 bottom-1 w-8 pointer-events-none" style={{ background: "linear-gradient(to right, transparent, var(--app-bg))" }} />
@@ -10467,6 +10539,41 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
                     <Link2 size={9} className="shrink-0" />{s.title || "Fuente"}
                   </a>
                 ))}
+              </div>
+            )}
+            {/* Pregunta con opciones tocables — de la IA (###PREGUNTA###) o
+                del chip "Anotar una marca" (ver handleQuickPrompt). Tocar
+                una opción la manda como si la hubieras escrito; "otra
+                respuesta" sólo enfoca el input. Una vez contestada (de
+                cualquiera de las dos formas) los botones quedan marcados,
+                no clickeables de nuevo. */}
+            {m.question && (
+              <div className="mt-2 flex flex-wrap gap-1.5 max-w-[90%] ml-8">
+                {m.question.options.map((opt, j) => {
+                  const picked = m.question.answeredWith === opt;
+                  const disabled = !!m.question.answeredWith;
+                  return (
+                    <button
+                      key={j}
+                      disabled={disabled}
+                      onClick={() => handleSelectQuestionOption(i, opt)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-bold border transition ${disabled ? "opacity-50" : "active:scale-95"}`}
+                      style={picked
+                        ? { backgroundColor: "rgba(20,184,166,0.22)", borderColor: "rgba(20,184,166,0.5)", color: "#5eead4" }
+                        : { backgroundColor: "var(--row-surface)", borderColor: "var(--chip-border)", color: "var(--chip-text)" }}
+                    >
+                      {opt}
+                    </button>
+                  );
+                })}
+                <button
+                  disabled={!!m.question.answeredWith}
+                  onClick={() => handleCustomAnswer(i)}
+                  className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold border border-dashed transition ${m.question.answeredWith ? "opacity-50" : "active:scale-95"}`}
+                  style={{ borderColor: "var(--chip-border)", color: "var(--chip-text)" }}
+                >
+                  <Edit3 size={11} /> Otra respuesta
+                </button>
               </div>
             )}
             {m.plan && m.planStatus === "pending" && livePlan && typeof livePlan.confirm === "function" && (
@@ -10598,6 +10705,7 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
                 </button>
               )}
               <input
+                ref={chatInputRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") handleSend(); }}
