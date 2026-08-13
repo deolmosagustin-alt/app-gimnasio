@@ -12,7 +12,7 @@ import {
   Target, Award, Activity, ArrowDown, HelpCircle, List, LayoutGrid,
   Sparkles, Layers, SlidersHorizontal, UserCog,
   Share2, Download, Link2, Copy, BellOff, Send, Mic, Ruler, Camera, Link, Footprints, Star, SquarePlay, Upload, RefreshCw, Timer, Percent, Users,
-  MessageCircle,
+  MessageCircle, FileDown,
 } from "lucide-react";
 import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signOut, onAuthStateChanged } from "firebase/auth";
 import { Capacitor, registerPlugin } from "@capacitor/core";
@@ -1094,6 +1094,19 @@ const ANIMATION_CSS = `
 @keyframes invitePulse { 0%, 100% { box-shadow: 0 0 0 0 var(--invite-glow, rgba(20,184,166,0.5)); } 50% { box-shadow: 0 0 0 7px rgba(20,184,166,0); } }
 .invite-pulse { animation: invitePulse 2.4s ease-out infinite; }
 
+/* Fondo "aurora" del Entrenador IA: tres manchas de color grandes,
+   difuminadas, que derivan muy lento (28-40s por vuelta) — nunca en
+   sincronía entre sí, para que no se sienta un patrón repetitivo. Cada una
+   usa translate+scale (GPU, no repinta layout) y un delay negativo propio
+   para no arrancar las tres alineadas. */
+@keyframes auroraDrift1 { 0%,100% { transform: translate(-8%,-6%) scale(1); } 50% { transform: translate(10%,8%) scale(1.15); } }
+@keyframes auroraDrift2 { 0%,100% { transform: translate(6%,4%) scale(1.05); } 50% { transform: translate(-10%,-8%) scale(0.95); } }
+@keyframes auroraDrift3 { 0%,100% { transform: translate(-4%,8%) scale(0.98); } 50% { transform: translate(8%,-6%) scale(1.1); } }
+.aurora-blob-1 { animation: auroraDrift1 32s ease-in-out infinite; }
+.aurora-blob-2 { animation: auroraDrift2 38s ease-in-out infinite; animation-delay: -12s; }
+.aurora-blob-3 { animation: auroraDrift3 26s ease-in-out infinite; animation-delay: -20s; }
+@media (prefers-reduced-motion: reduce) { .aurora-blob-1, .aurora-blob-2, .aurora-blob-3 { animation: none; } }
+
 /* Entrada de las tarjetas al cambiar de día (según dirección) */
 @keyframes slideFromRight { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: translateX(0); } }
 @keyframes slideFromLeft { from { opacity: 0; transform: translateX(-18px); } to { opacity: 1; transform: translateX(0); } }
@@ -1678,12 +1691,28 @@ p, span, label, button { overflow-wrap: break-word; }
      (createPortal a document.body), así que no le llegan ni las clases
      .light-mode ni las variables que sólo se definen inline más arriba: por
      eso vive acá, en :root, donde sí es alcanzable desde cualquier lado. */
-  --chat-bar-idle: rgba(15,23,42,0.92);
+  --chat-bar-idle: rgba(15,23,42,0.72);
   --chat-bar-listening: rgba(6,78,59,0.55);
-  --chat-bar-editing: rgba(13,42,38,0.92);
-  --chat-bar-border-idle: rgba(30,41,59,0.6);
+  --chat-bar-editing: rgba(13,42,38,0.75);
+  --chat-bar-border-idle: rgba(255,255,255,0.1);
   --chat-bar-border-listening: rgba(16,185,129,0.4);
   --chat-bar-border-editing: rgba(20,184,166,0.4);
+  /* Burbuja de respuesta del Entrenador IA: un poco más clara que
+     --panel-grad-slate (que usan un montón de otros paneles) para que se
+     distinga del fondo de la app en vez de casi fundirse con él. */
+  --chat-bubble-assistant: linear-gradient(165deg, #16233d 0%, #0e1626 100%);
+  /* Fondo "aurora" del chat: tres manchas de color muy difuminadas que
+     derivan lento detrás de todo — reemplaza el negro plano por algo con
+     más atmósfera, sin competir con el texto (blur fuerte, opacidad baja). */
+  --aurora-1: rgba(20,184,166,0.30);
+  --aurora-2: rgba(168,85,247,0.24);
+  --aurora-3: rgba(6,182,212,0.22);
+  /* Paneles "vidrio esmerilado": semitransparentes + backdrop-blur (aplicado
+     en la clase), para que la aurora se note incluso detrás de la tarjeta y
+     las burbujas. */
+  --glass-panel-bg: rgba(15,23,42,0.55);
+  --glass-panel-border: rgba(255,255,255,0.08);
+  --glass-bubble-assistant: rgba(19,29,51,0.55);
 }
 .light-mode {
   --grad-hero-purple: linear-gradient(135deg, rgba(168,85,247,0.10), rgba(255,255,255,0.96) 55%, #ffffff);
@@ -1710,12 +1739,21 @@ p, span, label, button { overflow-wrap: break-word; }
   --timer-idle-bg: #f1f5f9;
   --timer-idle-border: #e2e8f0;
   --rankup-grad: linear-gradient(135deg, #ffffff, #f8fafc);
-  --chat-bar-idle: rgba(255,255,255,0.92);
-  --chat-bar-listening: rgba(209,250,229,0.92);
-  --chat-bar-editing: rgba(204,251,241,0.92);
-  --chat-bar-border-idle: rgba(203,213,225,0.8);
+  --chat-bar-idle: rgba(255,255,255,0.72);
+  --chat-bar-listening: rgba(209,250,229,0.85);
+  --chat-bar-editing: rgba(204,251,241,0.85);
+  --chat-bar-border-idle: rgba(15,23,42,0.08);
   --chat-bar-border-listening: rgba(16,185,129,0.35);
   --chat-bar-border-editing: rgba(20,184,166,0.35);
+  --chat-bubble-assistant: linear-gradient(165deg, #f8fafc 0%, #ffffff 100%);
+  /* En claro la aurora es apenas un lavado de color — nada de manchas
+     vívidas sobre blanco, que se vería sucio en vez de atmosférico. */
+  --aurora-1: rgba(20,184,166,0.14);
+  --aurora-2: rgba(168,85,247,0.11);
+  --aurora-3: rgba(6,182,212,0.10);
+  --glass-panel-bg: rgba(255,255,255,0.6);
+  --glass-panel-border: rgba(15,23,42,0.06);
+  --glass-bubble-assistant: rgba(255,255,255,0.65);
 }
 
 /* ============================================================================
@@ -5692,18 +5730,19 @@ const CustomTooltip = ({ active, payload, label }) => {
   );
 };
 
-// Tooltip específico del gráfico de "Evolución por ejercicio": antes solo
-// mostraba "Kg: 82.4" (el 1RM estimado, rotulado como Kg) — ahora también
-// la serie real (reps×kg) y el RPE/RIR de ese día, que es la info que
-// realmente explica el número.
+// Tooltip específico del gráfico de "Evolución por ejercicio": el CÁLCULO
+// de la curva sigue siendo el 1RM estimado (combina reps y kilos, es lo que
+// hace comparables sesiones con distinta carga/reps) — pero lo que se le
+// MUESTRA a la persona ahora es la serie real que hizo (reps×kg), en grande;
+// el 1RM estimado queda como el dato chico de referencia, no al revés.
 function EvolutionTooltip({ active, payload, label, color, rpeDisplayMode }) {
   if (!active || !payload?.length) return null;
   const d = payload[0].payload;
   return (
     <div className="bg-[#0f0f1a] border border-slate-700/60 rounded-xl px-3 py-2.5 text-xs shadow-xl shadow-black/40">
       <p className="text-slate-400 mb-1.5 font-medium">{label}</p>
-      <p className="font-black text-sm" style={{ color }}>{d.e1rm} kg <span className="text-slate-500 font-normal text-[10px]">1RM est.</span></p>
-      <p className="text-slate-400 mt-1">{d.reps} × {d.kg} kg</p>
+      <p className="font-black text-sm" style={{ color }}>{d.reps} × {d.kg} kg</p>
+      <p className="text-slate-500 mt-1">{d.e1rm} kg <span className="text-[10px]">1RM est.</span></p>
       {d.rpe != null && <p className="text-slate-500 mt-0.5">{formatEffort(d.rpe, rpeDisplayMode)}</p>}
     </div>
   );
@@ -7105,8 +7144,12 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
   const history = useMemo(() => (logs[`${selId}_${selSet}`] || []).slice().sort((a, b) => (a.date > b.date ? 1 : -1)), [logs, selId, selSet]);
   const chartData = useMemo(() => history.map((h) => ({ date: h.date.slice(5), kg: h.kg, reps: h.reps, vol: vol(h.kg, h.reps), e1rm: estimate1RM(h.kg, h.reps), rpe: h.rpe ?? null })), [history]);
   // La mejor marca de TODA la curva — sirve para la línea de referencia y
-  // para agrandar el punto correspondiente en el gráfico.
+  // para agrandar el punto correspondiente en el gráfico. El 1RM sigue
+  // siendo la base de comparación (chartBestE1rm decide CUÁL sesión es la
+  // mejor), pero el rótulo que ve la persona muestra la serie real de esa
+  // sesión (reps×kg), no el número estimado.
   const chartBestE1rm = useMemo(() => (chartData.length ? Math.max(...chartData.map((d) => d.e1rm)) : null), [chartData]);
+  const chartBestEntry = useMemo(() => chartData.find((d) => d.e1rm === chartBestE1rm) || null, [chartData, chartBestE1rm]);
 
   const [confirmResetProgress, setConfirmResetProgress] = useState(false);
   const [activeSection, setActiveSection] = useState("rank");
@@ -7218,14 +7261,16 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
                           qué tan cerca (o lejos) estuvo cada sesión de tu techo
                           actual, no solo si subió o bajó respecto a la anterior. */}
                       {chartBestE1rm != null && (
-                        <ReferenceLine y={chartBestE1rm} stroke={tint(selEx?.color || "#14B8A6", "60")} strokeDasharray="4 4" label={{ value: `Mejor: ${chartBestE1rm}kg`, position: "insideTopRight", fill: tint(selEx?.color || "#14B8A6", "cc"), fontSize: 10, fontWeight: 700 }} />
+                        <ReferenceLine y={chartBestE1rm} stroke={tint(selEx?.color || "#14B8A6", "60")} strokeDasharray="4 4" label={{ value: chartBestEntry ? `Mejor: ${chartBestEntry.reps}×${chartBestEntry.kg}kg` : "Mejor", position: "insideTopRight", fill: tint(selEx?.color || "#14B8A6", "cc"), fontSize: 10, fontWeight: 700 }} />
                       )}
-                      {/* Se grafica SIEMPRE el 1RM estimado (combina reps y kilos: sube
-                          o baja el peso, sube o baja las reps, y el número igual lo
-                          refleja) — pero rotulado como "Kg" a propósito, sin mencionar
-                          1RM acá. Quien quiera el número exacto por sesión tiene la
-                          pestaña "1RM" al lado. El punto de tu mejor sesión se dibuja
-                          más grande, para ubicarlo de un vistazo en la curva. */}
+                      {/* La curva se sigue posicionando con el 1RM estimado (combina reps
+                          y kilos: sube o baja el peso, sube o baja las reps, y el número
+                          igual lo refleja) — eso no cambia, es lo que hace comparables
+                          sesiones con distinta carga/reps. Lo que SÍ cambia es qué ve la
+                          persona al tocar un punto: el tooltip (EvolutionTooltip, arriba)
+                          ahora muestra en grande la serie real (reps×kg), con el 1RM
+                          estimado como dato chico de referencia. El punto de tu mejor
+                          sesión se dibuja más grande, para ubicarlo de un vistazo. */}
                       <Area type="monotone" dataKey="e1rm" stroke={selEx?.color || "#14B8A6"} fill="url(#gA)" strokeWidth={2.5} dot={(props) => <EvolutionDot {...props} isBest={props.payload.e1rm === chartBestE1rm} color={selEx?.color} />} activeDot={{ r: 5, strokeWidth: 0 }} name="Kg" />
                     </AreaChart>
                   </ResponsiveContainer>
@@ -9175,7 +9220,7 @@ function parseAction(rawText) {
 // "activar_rutina" con un nombre que no existe), devuelve null — en ese
 // caso no se muestra ninguna tarjeta, sólo el texto del mensaje.
 function buildActionPlan(action, ctx) {
-  const { profile, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement, onLogSet, onArchiveRoutine, onNavigate, onStartSession, onEndSession } = ctx;
+  const { profile, settings, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement, onLogSet, onArchiveRoutine, onRestoreRoutine, onNavigate, onStartSession, onEndSession } = ctx;
   if (action.type === "crear_rutina") {
     const days = (action.days || []).map((d) => ({
       label: String(d.label || "Día"),
@@ -9326,6 +9371,20 @@ function buildActionPlan(action, ctx) {
       const newDef = { ...activeDef, days: { ...activeDef.days, [dayKey]: { ...day, exercises: exercises.filter((_, i) => i !== idx) } } };
       return { kind: "list", title: `Quitar de "${day.label}"`, items: [`Se saca "${removedName}"`], confirmLabel: "Quitar", confirm: () => onCreateRoutine(activeId, newDef) };
     }
+    // Cambiar un ejercicio por otro sin tocar cuántas series ni el rango de
+    // reps que ya tenía configurado — "cambiame la sentadilla por prensa".
+    if (action.op === "sustituir") {
+      const wantedOld = String(action.exercise || "").toLowerCase();
+      const exercises = day.exercises || [];
+      const idx = exercises.findIndex((e) => (EXERCISE_LIBRARY_BY_ID[e.libId || e.id]?.name || e.name || "").toLowerCase().includes(wantedOld));
+      if (idx < 0) return null;
+      const oldName = EXERCISE_LIBRARY_BY_ID[exercises[idx].libId || exercises[idx].id]?.name || exercises[idx].name;
+      const lib = matchExerciseToLibrary(action.nuevoEjercicio || "");
+      if (!lib) return null;
+      const newExercises = exercises.map((e, i) => (i === idx ? { libId: lib.id, sets: e.sets } : e));
+      const newDef = { ...activeDef, days: { ...activeDef.days, [dayKey]: { ...day, exercises: newExercises } } };
+      return { kind: "list", title: `Sustituir en "${day.label}"`, items: [`"${oldName}" → "${lib.name}" (mismas series y reps)`], confirmLabel: "Sustituir", confirm: () => onCreateRoutine(activeId, newDef) };
+    }
     return null;
   }
   // Archivar/duplicar/renombrar una rutina GUARDADA (no la que está activa
@@ -9334,14 +9393,21 @@ function buildActionPlan(action, ctx) {
   if (action.type === "gestionar_rutina") {
     const wanted = String(action.routineName || "").toLowerCase().trim();
     if (!wanted) return null;
+    // "restaurar" busca entre las ARCHIVADAS (lo opuesto de los otros tres
+    // ops, que sólo miran la lista visible) — si no, nunca la encontraría.
+    const wantArchived = action.op === "restaurar";
     let foundId = null, foundDef = null;
     Object.entries(profile?.routines || {}).forEach(([id, def]) => {
-      if (!foundId && !def?.archived && def?.name?.toLowerCase().includes(wanted)) { foundId = id; foundDef = def; }
+      if (!foundId && !!def?.archived === wantArchived && def?.name?.toLowerCase().includes(wanted)) { foundId = id; foundDef = def; }
     });
     if (!foundId) return null;
     if (action.op === "archivar") {
       if (!onArchiveRoutine) return null;
       return { kind: "list", title: `Archivar "${foundDef.name}"`, items: ["Se mueve a rutinas archivadas — no se borra nada, la podés recuperar cuando quieras."], confirmLabel: "Archivar", confirm: () => onArchiveRoutine(foundId) };
+    }
+    if (action.op === "restaurar") {
+      if (!onRestoreRoutine) return null;
+      return { kind: "list", title: `Restaurar "${foundDef.name}"`, items: ["Vuelve a aparecer en tu lista de rutinas."], confirmLabel: "Restaurar", confirm: () => onRestoreRoutine(foundId) };
     }
     if (action.op === "duplicar") {
       if (!onCreateRoutine) return null;
@@ -9397,6 +9463,103 @@ function buildActionPlan(action, ctx) {
       kind: "list", title: "Corregir récord", items: [`${lib.name} — S${setIndex + 1}: ${reps}×${kg}kg`],
       confirmLabel: "Guardar récord",
       confirm: () => onLogSet((prev) => ({ ...prev, [prKey]: { kg, reps, date: todayStr(), manual: true } })),
+    };
+  }
+  // Nota personal de un ejercicio — mismo campo que "Agregar nota" en la
+  // ficha de la serie (ver SetRow); se guarda en la serie 1, que es la que
+  // las demás heredan si no tienen nota propia.
+  if (action.type === "nota_ejercicio") {
+    const lib = matchExerciseToLibrary(action.exercise || "");
+    if (!lib || !onUpdateSettings) return null;
+    const nota = String(action.nota || "").trim();
+    const noteKey = `${lib.id}_0`;
+    return {
+      kind: "list", title: "Nota de ejercicio",
+      items: [nota ? `"${lib.name}": ${nota}` : `Se borra la nota de "${lib.name}"`],
+      confirmLabel: nota ? "Guardar nota" : "Borrar nota",
+      confirm: () => {
+        const notas = { ...(settings?.exerciseNotes || {}) };
+        if (nota) notas[noteKey] = nota; else delete notas[noteKey];
+        onUpdateSettings({ exerciseNotes: notas });
+      },
+    };
+  }
+  // Reiniciar las marcas de HOY de un día puntual — mismo botón que
+  // "Reiniciar día" en Rutina. Sólo toca la rutina normal (no las marcas de
+  // descarga de ese mismo día, que se conservan aparte).
+  if (action.type === "restablecer_dia") {
+    if (!onLogSet) return null;
+    const activeId = profile?.activeRoutineId;
+    const activeDef = activeId ? resolveRoutineDef(profile?.routines?.[activeId], activeId) : null;
+    if (!activeDef) return null;
+    const wantedDay = String(action.day || "").toLowerCase().trim();
+    const dayKey = wantedDay
+      ? Object.keys(activeDef.days || {}).find((dk) => (activeDef.days[dk]?.label || "").toLowerCase().includes(wantedDay))
+      : activeDef.dayOrder?.[0];
+    if (!dayKey || !activeDef.days[dayKey]) return null;
+    const day = activeDef.days[dayKey];
+    const today = todayStr();
+    return {
+      kind: "list", title: `Reiniciar "${day.label}" de hoy`,
+      items: ["Borra las marcas de HOY de este día — no toca otros días ni tus récords."],
+      confirmLabel: "Reiniciar día",
+      confirm: () => {
+        onLogSet((prev) => {
+          const next = { ...prev };
+          (day.exercises || []).forEach((e) => {
+            const exId = e.libId || e.id;
+            (e.sets || []).forEach((_, i) => {
+              const key = `${exId}_${i}`;
+              if (!next[key]) return;
+              const filtered = next[key].filter((h) => h.date !== today || h.deload);
+              if (filtered.length) next[key] = filtered; else delete next[key];
+            });
+          });
+          return next;
+        });
+      },
+    };
+  }
+  // Asignar o sacar qué día de la rutina te toca en un día de la semana —
+  // el mismo cronograma que se edita en Rutinas → Cronograma semanal.
+  if (action.type === "cambiar_dia_semana") {
+    const activeId = profile?.activeRoutineId;
+    const activeDef = activeId ? resolveRoutineDef(profile?.routines?.[activeId], activeId) : null;
+    if (!activeDef || !onCreateRoutine) return null;
+    const WEEKDAY_NAME_TO_KEY = { lunes: "mon", martes: "tue", miercoles: "wed", "miércoles": "wed", jueves: "thu", viernes: "fri", sabado: "sat", "sábado": "sat", domingo: "sun" };
+    const wk = WEEKDAY_NAME_TO_KEY[String(action.diaSemana || "").toLowerCase().trim()];
+    if (!wk) return null;
+    let dayKey = null, dayLabel = "Descanso";
+    const wantedDay = String(action.dia || "").toLowerCase().trim();
+    if (wantedDay) {
+      dayKey = Object.keys(activeDef.days || {}).find((dk) => (activeDef.days[dk]?.label || "").toLowerCase().includes(wantedDay));
+      if (!dayKey) return null;
+      dayLabel = activeDef.days[dayKey].label;
+    }
+    const currentSchedule = activeDef.weekSchedule || defaultWeekSchedule(activeDef.dayOrder || []);
+    const newDef = { ...activeDef, weekSchedule: { ...currentSchedule, [wk]: dayKey } };
+    const wkLabel = WEEKDAY_SHORT_LABELS[WEEKDAY_KEYS.indexOf(wk)];
+    return { kind: "list", title: "Cambiar cronograma semanal", items: [`${wkLabel}: ${dayLabel}`], confirmLabel: "Guardar cambio", confirm: () => onCreateRoutine(activeId, newDef) };
+  }
+  // Exportar una rutina a PDF — dispara la misma hoja de compartir nativa
+  // que el botón de exportar en Rutinas (ver exportRoutineToPdf).
+  if (action.type === "exportar_rutina") {
+    const wanted = String(action.routineName || "").toLowerCase().trim();
+    const activeId = profile?.activeRoutineId;
+    let foundDef = activeId ? resolveRoutineDef(profile?.routines?.[activeId], activeId) : null;
+    if (wanted) {
+      let match = null;
+      Object.entries(profile?.routines || {}).forEach(([id, def]) => {
+        if (!match && !def?.archived && def?.name?.toLowerCase().includes(wanted)) match = { id, def };
+      });
+      if (match) foundDef = resolveRoutineDef(match.def, match.id);
+    }
+    if (!foundDef) return null;
+    return {
+      kind: "list", title: `Exportar "${foundDef.name}"`,
+      items: ["Se genera un PDF con todos los días y ejercicios, listo para compartir o guardar."],
+      confirmLabel: "Exportar PDF",
+      confirm: () => exportRoutineToPdf(foundDef),
     };
   }
   return null;
@@ -9544,7 +9707,7 @@ function trimLogsForAI(logs) {
   return out;
 }
 
-function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMessages, conversations = [], activeConversationId = null, onNewConversation, onSwitchConversation, onDeleteConversation, onRenameConversation, settings, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement, onArchiveRoutine, onNavigate, onStartSession, onEndSession }) {
+function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMessages, conversations = [], activeConversationId = null, onNewConversation, onSwitchConversation, onDeleteConversation, onRenameConversation, settings, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement, onArchiveRoutine, onRestoreRoutine, onNavigate, onStartSession, onEndSession }) {
   // Contexto para reconstruir un plan EN VIVO a partir de la "action" cruda
   // (JSON plano, sí serializable) en vez de depender de la función confirm()
   // guardada en el mensaje — esa función no sobrevive un reload ni el
@@ -9553,8 +9716,8 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
   // actionCtx) la reconstruye al vuelo con los handlers actuales.
   const actionCtx = useMemo(() => ({
     profile, settings, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement,
-    onLogSet: setLogs, onArchiveRoutine, onNavigate, onStartSession, onEndSession,
-  }), [profile, settings, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement, setLogs, onArchiveRoutine, onNavigate, onStartSession, onEndSession]);
+    onLogSet: setLogs, onArchiveRoutine, onRestoreRoutine, onNavigate, onStartSession, onEndSession,
+  }), [profile, settings, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement, setLogs, onArchiveRoutine, onRestoreRoutine, onNavigate, onStartSession, onEndSession]);
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [editingIndex, setEditingIndex] = useState(null); // índice del mensaje propio que se está editando
@@ -9668,7 +9831,7 @@ Si la persona te pide explícitamente hacer un cambio en la app, respondé prime
 Tipos disponibles:
 - crear_rutina: {"type":"crear_rutina","name":"...","days":[{"label":"Día 1","exercises":[{"name":"Press Banca","setsCount":3,"repRange":"8-10"}]}]}
 - activar_rutina: {"type":"activar_rutina","routineName":"nombre o parte del nombre de una rutina que ya tenga guardada (mirá la lista en rutinas)"}
-- editar_rutina_activa: {"type":"editar_rutina_activa","op":"agregar"|"quitar","day":"nombre o parte del nombre del día (ej. \\"push\\")","exercise":"nombre del ejercicio","setsCount":3,"repRange":"8-10"} — agrega o saca UN ejercicio de un día de la rutina que ya tiene activa (no crea una rutina nueva). "setsCount"/"repRange" solo aplican si op="agregar".
+- editar_rutina_activa: {"type":"editar_rutina_activa","op":"agregar"|"quitar"|"sustituir","day":"nombre o parte del nombre del día (ej. \\"push\\")","exercise":"nombre del ejercicio","nuevoEjercicio":"nombre del reemplazo","setsCount":3,"repRange":"8-10"} — agrega, saca o SUSTITUYE un ejercicio de un día de la rutina que ya tiene activa (no crea una rutina nueva). "setsCount"/"repRange" solo aplican si op="agregar". "nuevoEjercicio" sólo aplica si op="sustituir" (reemplaza "exercise" por "nuevoEjercicio" conservando las mismas series y reps — usalo para "cambiame X por Y").
 - registrar_marca: {"type":"registrar_marca","exercise":"Press Banca","reps":8,"kg":80,"rpe":8} — carga una serie de HOY para ese ejercicio, como si la hubiera anotado a mano en Rutina. "rpe" es opcional (1-10). Usalo cuando te digan algo tipo "anotá que hice 8x80 en press banca".
 - editar_perfil: {"type":"editar_perfil","sex":"M"|"F","age":30,"bodyWeightKg":80,"email":"..."} (incluí sólo los campos que pidió cambiar)
 - agregar_medida: {"type":"agregar_medida","tipo":"waist"|"chest"|"arm"|"leg","valor":80} (en cm; para peso usá editar_perfil con bodyWeightKg, no esto)
@@ -9681,10 +9844,14 @@ Tipos disponibles:
 - navegar: {"type":"navegar","destino":"rutina"|"progreso"|"rutinas"|"descarga"|"perfil"|"entrenador_ia"} — la lleva directo a esa pestaña de la app. Usalo cuando pida "mostrame X" o "llevame a X".
 - iniciar_sesion: {"type":"iniciar_sesion","day":"nombre o parte del nombre del día (opcional)"} — arranca el cronómetro de su entrenamiento de hoy, como tocar "Iniciar sesión" en Rutina. Si no da el día, usa el primero de su rutina activa.
 - finalizar_sesion: {"type":"finalizar_sesion"} — cierra y guarda en el historial la sesión de hoy que ya tiene en curso. Sólo proponela si por el contexto ("activeSession" en los datos) ya hay una sesión activa.
-- gestionar_rutina: {"type":"gestionar_rutina","op":"archivar"|"duplicar"|"renombrar","routineName":"nombre o parte del nombre de una rutina guardada","nuevoNombre":"..."} — administra una rutina de su lista (no la activa en pantalla necesariamente). "nuevoNombre" sólo aplica si op="renombrar". Archivar no borra nada, sólo la saca de la vista principal.
+- gestionar_rutina: {"type":"gestionar_rutina","op":"archivar"|"restaurar"|"duplicar"|"renombrar","routineName":"nombre o parte del nombre de una rutina guardada","nuevoNombre":"..."} — administra una rutina de su lista (no la activa en pantalla necesariamente). "restaurar" busca entre las ARCHIVADAS y la vuelve a mostrar. "nuevoNombre" sólo aplica si op="renombrar". Archivar no borra nada, sólo la saca de la vista principal.
 - corregir_record: {"type":"corregir_record","exercise":"Press Banca","reps":10,"kg":90,"setIndex":0} — corrige a mano el récord (PR) guardado de un ejercicio, para cuando el historial no refleja su marca real. "setIndex" es opcional (0 = primera serie del ejercicio).
+- nota_ejercicio: {"type":"nota_ejercicio","exercise":"Sentadilla","nota":"cuidado con la rodilla derecha"} — guarda (o si "nota" viene vacío, borra) la nota personal de ese ejercicio, la misma que se ve al registrar la serie.
+- restablecer_dia: {"type":"restablecer_dia","day":"nombre o parte del nombre del día (opcional)"} — borra las marcas de HOY de ese día de la rutina normal (no toca otros días, ni récords, ni marcas de descarga). Si no da el día, usa el primero de la rutina activa. Usalo para "reiniciá mi día" o si se equivocó al cargar algo y quiere volver a empezar.
+- cambiar_dia_semana: {"type":"cambiar_dia_semana","diaSemana":"lunes"|"martes"|"miercoles"|"jueves"|"viernes"|"sabado"|"domingo","dia":"nombre o parte del nombre del día de la rutina, o vacío/omitido para dejarlo como descanso"} — asigna (o saca) qué día de su rutina le toca en ese día de la semana, el mismo cronograma de Rutinas → Cronograma semanal.
+- exportar_rutina: {"type":"exportar_rutina","routineName":"nombre o parte del nombre de una rutina guardada (opcional, si no se da usa la activa)"} — genera un PDF de esa rutina (todos los días y ejercicios) y abre la hoja para compartirlo o guardarlo. Usalo para "pasame mi rutina en PDF" o "expórtame la rutina".
 
-Reglas importantes: nunca digas que ya aplicaste el cambio — la persona siempre tiene que confirmarlo desde un botón antes de que se aplique de verdad. Agregá el bloque ###ACCION### sólo si pidió ESE cambio puntual en este mensaje o el anterior, nunca como sugerencia general no pedida. Para registrar_marca, editar_rutina_activa y corregir_record, el nombre del ejercicio tiene que coincidir razonablemente con uno real de la biblioteca — si no estás segura de a cuál se refiere, preguntá antes de proponer la acción. Para gestionar_rutina, el nombre de la rutina tiene que coincidir con una que ya tenga guardada — si hay dudas, preguntá cuál.
+Reglas importantes: nunca digas que ya aplicaste el cambio — la persona siempre tiene que confirmarlo desde un botón antes de que se aplique de verdad. Agregá el bloque ###ACCION### sólo si pidió ESE cambio puntual en este mensaje o el anterior, nunca como sugerencia general no pedida. Para registrar_marca, editar_rutina_activa, corregir_record y nota_ejercicio, el nombre del ejercicio tiene que coincidir razonablemente con uno real de la biblioteca — si no estás segura de a cuál se refiere, preguntá antes de proponer la acción. Para gestionar_rutina y exportar_rutina, el nombre de la rutina tiene que coincidir con una que ya tenga guardada — si hay dudas, preguntá cuál.
 
 Datos: ${JSON.stringify(context)}`;
       // Limitamos el historial a los últimos 10 mensajes — después de
@@ -9914,7 +10081,20 @@ Datos: ${JSON.stringify(context)}`;
   };
 
   return (
-    <div className="pb-32">
+    <div className="relative pb-32">
+      {/* Fondo "aurora": tres manchas de color enormes y muy difuminadas,
+          derivando lento detrás de todo. Primer hijo, position:absolute sin
+          z-index propio — pinta detrás de la tarjeta/burbujas de abajo por
+          simple orden de DOM (misma capa de apilado), sin pelear con el
+          header ni con el input fijo (portaleado aparte, ver más abajo).
+          Sólo cubre la primera pantalla (h-[620px]): es un fondo ambiente
+          para lo que se ve al entrar, no algo que haya que sincronizar con
+          un chat larguísimo. */}
+      <div className="absolute inset-x-0 top-0 h-[620px] overflow-hidden pointer-events-none" aria-hidden="true">
+        <div className="aurora-blob-1 absolute -top-24 -left-16 w-72 h-72 rounded-full" style={{ backgroundColor: "var(--aurora-1)", filter: "blur(70px)" }} />
+        <div className="aurora-blob-2 absolute top-10 -right-20 w-80 h-80 rounded-full" style={{ backgroundColor: "var(--aurora-2)", filter: "blur(80px)" }} />
+        <div className="aurora-blob-3 absolute top-64 left-1/3 w-64 h-64 rounded-full" style={{ backgroundColor: "var(--aurora-3)", filter: "blur(70px)" }} />
+      </div>
       {/* Pestaña fija arriba a la izquierda — el botón del header (más abajo)
           puede pasar desapercibido entre los otros íconos; esto es una "barra
           extensible" imposible de no ver: siempre a mano mientras estás en
@@ -9927,16 +10107,19 @@ Datos: ${JSON.stringify(context)}`;
         <button
           onClick={() => setShowSidebar(true)}
           aria-label="Tus conversaciones"
-          className="fixed left-0 z-40 flex items-center gap-1 pl-1.5 pr-2 py-3 rounded-r-2xl text-teal-400 shadow-lg shadow-black/40 active:scale-95 transition backdrop-blur-sm"
-          style={{ top: "calc(env(safe-area-inset-top, 0px) + 70px)", backgroundColor: "rgba(15,23,42,0.92)", border: "1px solid rgba(20,184,166,0.35)", borderLeft: "none" }}
+          className="fixed left-0 z-40 flex items-center gap-1 pl-1.5 pr-2 py-3 rounded-r-2xl text-teal-400 shadow-lg shadow-black/40 active:scale-95 transition backdrop-blur-xl"
+          style={{ top: "calc(env(safe-area-inset-top, 0px) + 70px)", background: "var(--glass-panel-bg)", border: "1px solid rgba(20,184,166,0.35)", borderLeft: "none" }}
         >
           <ChevronRight size={14} />
           <List size={13} />
         </button>
       )}
-      <div className="relative overflow-hidden rounded-2xl border border-teal-500/20 p-5 mb-3" style={{ background: "var(--grad-hero-teal)" }}>
-        <div className="absolute -top-8 -right-6 w-32 h-32 rounded-full bg-teal-500/15 blur-2xl pointer-events-none" />
-        <div className="absolute -bottom-6 -left-6 w-28 h-28 rounded-full bg-cyan-500/10 blur-2xl pointer-events-none" />
+      {/* Vidrio esmerilado: fondo semitransparente + backdrop-blur, para que
+          la aurora de atrás se note A TRAVÉS de la tarjeta (un "wash" de
+          color) en vez de quedar tapada por un gradiente sólido. El borde
+          superior más claro (inset shadow) simula el filo de luz típico del
+          glassmorphism. */}
+      <div className="relative overflow-hidden rounded-2xl border border-white/10 p-5 mb-3 backdrop-blur-xl" style={{ background: "var(--glass-panel-bg)", boxShadow: "inset 0 1px 0 0 rgba(255,255,255,0.08), 0 8px 32px -12px rgba(0,0,0,0.4)" }}>
         <div className="relative flex items-center gap-3">
                     <div className="w-11 h-11 rounded-2xl bg-teal-500/20 border border-teal-500/30 flex items-center justify-center shrink-0 shadow-lg shadow-teal-500/20 elastic-in">
             <Sparkles size={20} className="text-teal-400 sparkle-spin" />
@@ -9972,17 +10155,24 @@ Datos: ${JSON.stringify(context)}`;
           tiene su acento" que ya usan Progreso (Rango/Historial/Ejercicios)
           y Rutinas/Descarga, en vez de que los seis chips se vean como una
           sola mancha teal. */}
-      <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 mb-4">
-        {[
-          { icon: <Layers size={11} />, label: "Crear rutina", prompt: "Armame una rutina nueva según mis objetivos", color: "#A855F7" },
-          { icon: <BarChart3 size={11} />, label: "Analizar progreso", prompt: "Analizá mi progreso reciente: ¿en qué mejoré y qué tengo estancado?", color: "#3B82F6" },
-          { icon: <Target size={11} />, label: "Punto débil", prompt: "Mirando mis rangos por músculo, ¿cuál es mi punto más débil y cómo lo ataco?", color: "#F59E0B" },
-          { icon: <Zap size={11} />, label: "Plan de hoy", prompt: "¿Qué me toca entrenar hoy y con qué pesos me conviene arrancar?", color: "#14B8A6" },
-          { icon: <Calendar size={11} />, label: "Ciclo y descarga", prompt: "¿Cómo vengo en el ciclo actual? ¿Cuándo me toca la descarga?", color: "#F43F5E" },
-          { icon: <Save size={11} />, label: "Anotar una marca", prompt: "Anotame que hoy hice 8x80 en press banca", color: "#10B981" },
-        ].map((c, i) => (
-          <button key={i} onClick={() => { setInput(c.prompt); }} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold whitespace-nowrap shrink-0 transition active:scale-95" style={{ backgroundColor: tint(c.color, "14"), border: `1px solid ${tint(c.color, "30")}`, color: c.color }}>{c.icon}{c.label}</button>
-        ))}
+      {/* Fade a la derecha: sin esto, el corte abrupto del último chip no
+          avisaba que la fila sigue — se veía como si faltara contenido en
+          vez de invitar a deslizar. */}
+      <div className="relative -mx-1 mb-4">
+        <div className="flex gap-1.5 overflow-x-auto pb-1 px-1">
+          {[
+            { icon: <Layers size={11} />, label: "Crear rutina", prompt: "Armame una rutina nueva según mis objetivos", color: "#A855F7" },
+            { icon: <BarChart3 size={11} />, label: "Analizar progreso", prompt: "Analizá mi progreso reciente: ¿en qué mejoré y qué tengo estancado?", color: "#3B82F6" },
+            { icon: <Target size={11} />, label: "Punto débil", prompt: "Mirando mis rangos por músculo, ¿cuál es mi punto más débil y cómo lo ataco?", color: "#F59E0B" },
+            { icon: <Zap size={11} />, label: "Plan de hoy", prompt: "¿Qué me toca entrenar hoy y con qué pesos me conviene arrancar?", color: "#14B8A6" },
+            { icon: <Calendar size={11} />, label: "Ciclo y descarga", prompt: "¿Cómo vengo en el ciclo actual? ¿Cuándo me toca la descarga?", color: "#F43F5E" },
+            { icon: <Save size={11} />, label: "Anotar una marca", prompt: "Anotame que hoy hice 8x80 en press banca", color: "#10B981" },
+            { icon: <FileDown size={11} />, label: "Exportar rutina", prompt: "Pasame mi rutina activa en PDF", color: "#06B6D4" },
+          ].map((c, i) => (
+            <button key={i} onClick={() => { setInput(c.prompt); }} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold whitespace-nowrap shrink-0 transition active:scale-95" style={{ backgroundColor: tint(c.color, "14"), border: `1px solid ${tint(c.color, "30")}`, color: c.color }}>{c.icon}{c.label}</button>
+          ))}
+        </div>
+        <div className="absolute top-0 right-0 bottom-1 w-8 pointer-events-none" style={{ background: "linear-gradient(to right, transparent, var(--app-bg))" }} />
       </div>
 
       <div className="space-y-3">
@@ -10008,24 +10198,28 @@ Datos: ${JSON.stringify(context)}`;
                 </button>
               )}
               <div
-                className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${m.role === "user" ? "!text-white rounded-br-md shadow-lg shadow-teal-500/15" : "border border-slate-800/60 text-slate-200 rounded-bl-md shadow-md shadow-black/20"} ${editingIndex === i ? "ring-2 ring-teal-400/60" : ""}`}
-                style={m.role === "user" ? { background: "linear-gradient(135deg,#14B8A6,#0E7490)" } : { background: "var(--panel-grad-slate)" }}
+                className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed backdrop-blur-md ${m.role === "user" ? "!text-white rounded-br-md border border-white/15 shadow-lg shadow-teal-500/15" : "border border-white/10 text-slate-200 rounded-bl-md shadow-md shadow-black/20"} ${editingIndex === i ? "ring-2 ring-teal-400/60" : ""}`}
+                style={m.role === "user" ? { background: "linear-gradient(135deg, rgba(20,184,166,0.82), rgba(14,116,144,0.82))", boxShadow: "inset 0 1px 0 0 rgba(255,255,255,0.15)" } : { background: "var(--glass-bubble-assistant)", borderLeft: "2px solid rgba(20,184,166,0.4)", boxShadow: "inset 0 1px 0 0 rgba(255,255,255,0.06)" }}
               >
                 {m.role === "assistant" ? renderChatMarkdown(m.text) : m.text}
               </div>
             </div>
             {/* Copiar (los dos roles) y regenerar (solo IA, si hay un mensaje
                 tuyo antes) — funciones típicas de cualquier chat de IA que
-                faltaban acá. */}
-            <div className={`flex items-center gap-1 mt-1 ${m.role === "user" ? "justify-end mr-1" : "justify-start ml-8"}`}>
-              <button onClick={() => handleCopyMessage(i, m.text)} aria-label="Copiar mensaje" className="p-1 rounded-lg text-slate-600 hover:text-slate-300 hover:bg-slate-800/60 transition">
-                {copiedIndex === i ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
-              </button>
-              {m.role === "assistant" && !isSending && messages.slice(0, i).some((mm) => mm.role === "user") && (
-                <button onClick={() => handleRegenerate(i)} aria-label="Regenerar respuesta" className="p-1 rounded-lg text-slate-600 hover:text-slate-300 hover:bg-slate-800/60 transition">
-                  <RefreshCw size={11} />
+                faltaban acá. Agrupados en una píldora chica en vez de íconos
+                sueltos flotando, para que se lean como una sola barra de
+                acciones y no como ruido suelto debajo del mensaje. */}
+            <div className={`flex items-center mt-1 ${m.role === "user" ? "justify-end mr-1" : "justify-start ml-8"}`}>
+              <div className="flex items-center gap-0.5 rounded-lg p-0.5" style={{ backgroundColor: "var(--row-surface)" }}>
+                <button onClick={() => handleCopyMessage(i, m.text)} aria-label="Copiar mensaje" className="p-1 rounded-md text-slate-500 hover:text-slate-200 hover:bg-slate-700/50 transition">
+                  {copiedIndex === i ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
                 </button>
-              )}
+                {m.role === "assistant" && !isSending && messages.slice(0, i).some((mm) => mm.role === "user") && (
+                  <button onClick={() => handleRegenerate(i)} aria-label="Regenerar respuesta" className="p-1 rounded-md text-slate-500 hover:text-slate-200 hover:bg-slate-700/50 transition">
+                    <RefreshCw size={11} />
+                  </button>
+                )}
+              </div>
             </div>
             {/* Fuentes reales que usó la IA (búsqueda con Google, ver
                 api/ia.js) — chips chicos con link, separados del
@@ -10041,7 +10235,7 @@ Datos: ${JSON.stringify(context)}`;
               </div>
             )}
             {m.plan && m.planStatus === "pending" && livePlan && typeof livePlan.confirm === "function" && (
-              <div className="relative overflow-hidden mt-2 border border-teal-500/25 rounded-2xl p-3.5 max-w-[85%] bounce-in" style={{ background: "var(--panel-grad-slate)" }}>
+              <div className="relative overflow-hidden mt-2 border border-teal-500/25 rounded-2xl p-3.5 max-w-[85%] bounce-in backdrop-blur-xl" style={{ background: "var(--glass-panel-bg)", boxShadow: "inset 0 1px 0 0 rgba(255,255,255,0.08)" }}>
                 <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full bg-teal-500/10 blur-2xl pointer-events-none" />
                 <div className="relative flex items-center gap-2 mb-2.5">
                   <span className="w-6 h-6 rounded-lg bg-teal-500/15 border border-teal-500/25 flex items-center justify-center shrink-0"><Sparkles size={12} className="text-teal-400" /></span>
@@ -12992,7 +13186,7 @@ export default function App() {
             {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToRoutines={() => setTab("rutinas")} onGoToSchedule={() => goToSection("rutinas", "week-schedule")} onGoToFieldSettings={() => goToSection("perfil", "field-settings-section")} onGoToDescarga={() => setTab("descarga")} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} todaySessionDayKey={(profile?.trainingSessions || []).find((ts) => ts.date === todayStr())?.dayKey || profile?.activeSession?.dayKey || null} sex={profile?.sex} age={profile?.age} />}
             {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} onGoToRoutines={() => goToSection("rutinas", "routine-editor")} weekSchedule={weekSchedule} sex={profile?.sex} age={profile?.age} onGoToDeload={() => setTab("descarga")} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} />}
             {tab === "descarga" && <DeloadView logs={logs} setLogs={setLogs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} activeSession={profile?.activeSession?.deload ? profile.activeSession : null} onStartSession={handleStartSession} onCancelSession={handleCancelSession} weekSchedule={weekSchedule} />}
-            {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} setLogs={setLogs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} conversations={aiConversations} activeConversationId={activeAiConversationId} onNewConversation={handleNewAiConversation} onSwitchConversation={handleSwitchAiConversation} onDeleteConversation={handleDeleteAiConversation} onRenameConversation={handleRenameAiConversation} settings={getProfileSettings(profile)} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} onArchiveRoutine={handleArchiveRoutine} onNavigate={setTab} onStartSession={handleStartSession} onEndSession={handleEndSession} />}
+            {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} setLogs={setLogs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} conversations={aiConversations} activeConversationId={activeAiConversationId} onNewConversation={handleNewAiConversation} onSwitchConversation={handleSwitchAiConversation} onDeleteConversation={handleDeleteAiConversation} onRenameConversation={handleRenameAiConversation} settings={getProfileSettings(profile)} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} onArchiveRoutine={handleArchiveRoutine} onRestoreRoutine={handleRestoreRoutine} onNavigate={setTab} onStartSession={handleStartSession} onEndSession={handleEndSession} />}
             {tab === "perfil" && <ProfileView onOpenFieldPreview={() => setShowFieldIntro(true)} openSectionSignal={openSectionSignal} profileName={activeProfile} profiles={profiles} logs={logs} onSignOut={handleSignOut} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} />}
           </div>
         </main>
