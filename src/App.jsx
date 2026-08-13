@@ -10596,9 +10596,16 @@ function AIConversationSidebar({ conversations, activeConversationId, onSelect, 
   };
   return (
     <div className="fixed inset-0 z-[150] bg-black/70 backdrop-blur-sm flex modal-bg-in modal-overlay" onClick={onClose}>
-      <div className="relative w-[82%] max-w-xs h-full flex flex-col shadow-2xl shadow-black/60 bounce-in overflow-hidden" style={{ backgroundColor: "#0b0f1a", borderRight: "1px solid rgba(20,184,166,0.18)" }} onClick={(e) => e.stopPropagation()}>
-        <div className="relative overflow-hidden px-4 pb-4 shrink-0" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 18px)", background: "var(--panel-grad-slate)", borderBottom: "1px solid rgba(20,184,166,0.14)" }}>
-          <div className="absolute -top-10 -left-8 w-32 h-32 rounded-full bg-teal-500/15 blur-3xl pointer-events-none" />
+      {/* Vidrio esmerilado, igual que la tarjeta y las burbujas del chat:
+          fondo semitransparente + backdrop-blur en vez del panel sólido de
+          antes, con las mismas manchas de color de la aurora (acá fijas, no
+          animadas — es un panel chico y quieto, no hace falta el movimiento)
+          para que se sienta la misma pestaña y no una ventana aparte. */}
+      <div className="relative w-[82%] max-w-xs h-full flex flex-col shadow-2xl shadow-black/60 bounce-in overflow-hidden backdrop-blur-xl" style={{ background: "var(--glass-panel-bg)", borderRight: "1px solid var(--glass-panel-border)" }} onClick={(e) => e.stopPropagation()}>
+        <div className="absolute -top-16 -left-10 w-56 h-56 rounded-full pointer-events-none" style={{ backgroundColor: "var(--aurora-1)", filter: "blur(70px)" }} />
+        <div className="absolute top-1/3 -right-16 w-48 h-48 rounded-full pointer-events-none" style={{ backgroundColor: "var(--aurora-2)", filter: "blur(70px)" }} />
+        <div className="absolute bottom-0 left-1/4 w-40 h-40 rounded-full pointer-events-none" style={{ backgroundColor: "var(--aurora-3)", filter: "blur(60px)" }} />
+        <div className="relative overflow-hidden px-4 pb-4 shrink-0" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 18px)", borderBottom: "1px solid var(--glass-panel-border)", boxShadow: "inset 0 -1px 0 0 rgba(255,255,255,0.04)" }}>
           <div className="relative flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-md shadow-teal-500/20" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>
               <List size={16} className="!text-white" />
