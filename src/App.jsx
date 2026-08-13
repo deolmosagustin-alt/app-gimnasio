@@ -9214,6 +9214,24 @@ function parseAction(rawText) {
   }
 }
 
+// Para la vista previa de "registrar_marca": ¿esta marca sería un récord
+// nuevo? Sólo para decidir qué badge mostrar en la propuesta — el cálculo
+// real de PR al guardar de verdad sigue viviendo en SetRow/savePR, éste no
+// lo reemplaza ni se usa para nada más que la tarjeta.
+function wouldBeNewPR(profile, exerciseId, setIndex, kg, reps) {
+  const key = `${exerciseId}_${setIndex}`;
+  const history = profile?.logs?.[key] || [];
+  const override = profile?.logs?.[`${key}_pr_override`];
+  if (!history.length && !override) return true;
+  let bestReps = override?.reps ?? 0;
+  let best1RM = override ? estimate1RM(override.kg, override.reps) : 0;
+  history.forEach((h) => {
+    const e = estimate1RM(h.kg, h.reps);
+    if (e > best1RM) { best1RM = e; bestReps = h.reps; }
+  });
+  return kg === 0 ? reps > bestReps : estimate1RM(kg, reps) > best1RM;
+}
+
 // A partir de la acción que propuso el modelo, arma el "plan": qué
 // mostrar en la tarjeta de confirmación, y qué función llamar si la
 // persona confirma. Si la acción no se puede interpretar (por ejemplo,
@@ -9273,11 +9291,12 @@ function buildActionPlan(action, ctx) {
     if (action.deloadPct) { patch.deloadPct = Math.min(0.95, Math.max(0.5, action.deloadPct)); items.push(`Carga en descarga: ${Math.round(patch.deloadPct * 100)}%`); }
     if (action.deloadSetDivisor) { patch.deloadSetDivisor = action.deloadSetDivisor; items.push(`Reducción de series: ÷${action.deloadSetDivisor}`); }
     if (!items.length) return null;
-    return { kind: "list", title: "Cambiar configuración de ciclo y descarga", items, confirmLabel: "Aplicar cambios", confirm: () => onUpdateSettings(patch) };
+    return { kind: "settings", title: "Cambiar configuración de ciclo y descarga", items, settingsChanges: buildSettingsChanges(patch), confirmLabel: "Aplicar cambios", confirm: () => onUpdateSettings(patch) };
   }
   if (action.type === "config_apariencia") {
     if (action.theme !== "dark" && action.theme !== "light") return null;
-    return { kind: "list", title: "Cambiar apariencia", items: [`Tema: ${action.theme === "light" ? "Claro" : "Oscuro"}`], confirmLabel: "Aplicar", confirm: () => onUpdateSettings({ theme: action.theme }) };
+    const patch = { theme: action.theme };
+    return { kind: "settings", title: "Cambiar apariencia", items: [`Tema: ${action.theme === "light" ? "Claro" : "Oscuro"}`], settingsChanges: buildSettingsChanges(patch), confirmLabel: "Aplicar", confirm: () => onUpdateSettings(patch) };
   }
   if (action.type === "config_descanso") {
     const patch = {}; const items = [];
@@ -9286,7 +9305,7 @@ function buildActionPlan(action, ctx) {
     if (action.restShort) { patch.restShort = Math.min(600, Math.max(30, action.restShort)); items.push(`Descanso resto: ${patch.restShort}s`); }
     if (typeof action.autoStartRestTimer === "boolean") { patch.autoStartRestTimer = action.autoStartRestTimer; items.push(`Cronómetro automático: ${action.autoStartRestTimer ? "activado" : "desactivado"}`); }
     if (!items.length) return null;
-    return { kind: "list", title: "Cambiar descanso entre series", items, confirmLabel: "Aplicar", confirm: () => onUpdateSettings(patch) };
+    return { kind: "settings", title: "Cambiar descanso entre series", items, settingsChanges: buildSettingsChanges(patch), confirmLabel: "Aplicar", confirm: () => onUpdateSettings(patch) };
   }
   if (action.type === "config_notificaciones") {
     const patch = {}; const items = [];
@@ -9294,11 +9313,12 @@ function buildActionPlan(action, ctx) {
     if (action.reminderTime) { patch.reminderTime = action.reminderTime; items.push(`Hora del aviso: ${action.reminderTime}`); }
     if (typeof action.weeklyRecapEnabled === "boolean") { patch.weeklyRecapEnabled = action.weeklyRecapEnabled; items.push(`Resumen semanal: ${action.weeklyRecapEnabled ? "activado" : "desactivado"}`); }
     if (!items.length) return null;
-    return { kind: "list", title: "Cambiar notificaciones", items, confirmLabel: "Aplicar", confirm: () => onUpdateSettings(patch) };
+    return { kind: "settings", title: "Cambiar notificaciones", items, settingsChanges: buildSettingsChanges(patch), confirmLabel: "Aplicar", confirm: () => onUpdateSettings(patch) };
   }
   if (action.type === "config_unidad") {
     if (action.weightUnit !== "kg" && action.weightUnit !== "lbs") return null;
-    return { kind: "list", title: "Cambiar unidad de peso", items: [`Unidad: ${action.weightUnit}`], confirmLabel: "Aplicar", confirm: () => onUpdateSettings({ weightUnit: action.weightUnit }) };
+    const patch = { weightUnit: action.weightUnit };
+    return { kind: "settings", title: "Cambiar unidad de peso", items: [`Unidad: ${action.weightUnit}`], settingsChanges: buildSettingsChanges(patch), confirmLabel: "Aplicar", confirm: () => onUpdateSettings(patch) };
   }
   // Qué ves al registrar una serie — mismos campos que el modal de Perfil
   // ("Personalizá tu ficha"), expuestos acá para poder prenderlos/apagarlos
@@ -9311,7 +9331,7 @@ function buildActionPlan(action, ctx) {
     });
     if (action.rpeDisplayMode === "rpe" || action.rpeDisplayMode === "rir") { patch.rpeDisplayMode = action.rpeDisplayMode; items.push(`Mostrar esfuerzo como: ${action.rpeDisplayMode.toUpperCase()}`); }
     if (!items.length) return null;
-    return { kind: "list", title: "Cambiar qué ves al registrar", items, confirmLabel: "Aplicar", confirm: () => onUpdateSettings(patch) };
+    return { kind: "settings", title: "Cambiar qué ves al registrar", items, settingsChanges: buildSettingsChanges(patch), confirmLabel: "Aplicar", confirm: () => onUpdateSettings(patch) };
   }
   // Medida corporal suelta (cintura, pecho, brazo, pierna) — el peso ya
   // tiene su propio camino en editar_perfil (queda en el mismo historial).
@@ -9332,8 +9352,9 @@ function buildActionPlan(action, ctx) {
     const rpe = (typeof action.rpe === "number" && action.rpe >= 1 && action.rpe <= 10) ? action.rpe : null;
     const key = `${lib.id}_${setIndex}`;
     return {
-      kind: "list", title: "Registrar marca de hoy",
+      kind: "set", title: "Registrar marca de hoy",
       items: [`${lib.name} — S${setIndex + 1}: ${reps}×${kg}kg${rpe ? ` · RPE ${rpe}` : ""}`],
+      setPreview: { exerciseName: lib.name, reps, kg, rpe, isNewPR: wouldBeNewPR(profile, lib.id, setIndex, kg, reps) },
       confirmLabel: "Guardar",
       confirm: () => {
         if (!onLogSet) return;
@@ -9354,36 +9375,46 @@ function buildActionPlan(action, ctx) {
     const dayKey = Object.keys(activeDef.days || {}).find((dk) => (activeDef.days[dk]?.label || "").toLowerCase().includes(wantedDay));
     if (!dayKey) return null;
     const day = activeDef.days[dayKey];
+    const exName = (e) => EXERCISE_LIBRARY_BY_ID[e.libId || e.id]?.name || e.name;
     if (action.op === "agregar") {
       const lib = matchExerciseToLibrary(action.exercise || "");
       if (!lib) return null;
       const setsCount = Math.max(1, Math.min(8, action.setsCount || 3));
-      const sets = Array.from({ length: setsCount }, () => ({ repRange: action.repRange || "8-10" }));
-      const newDef = { ...activeDef, days: { ...activeDef.days, [dayKey]: { ...day, exercises: [...(day.exercises || []), { libId: lib.id, sets }] } } };
-      return { kind: "list", title: `Agregar a "${day.label}"`, items: [`${lib.name}: ${setsCount} series de ${action.repRange || "8-10"}`], confirmLabel: "Agregar", confirm: () => onCreateRoutine(activeId, newDef) };
+      const repRange = action.repRange || "8-10";
+      const sets = Array.from({ length: setsCount }, () => ({ repRange }));
+      const exercises = day.exercises || [];
+      const newDef = { ...activeDef, days: { ...activeDef.days, [dayKey]: { ...day, exercises: [...exercises, { libId: lib.id, sets }] } } };
+      const diffItems = [...exercises.map((e) => ({ name: exName(e), status: "same" })), { name: lib.name, status: "added", detail: `${setsCount}×${repRange}` }];
+      return { kind: "diff", title: `Agregar a "${day.label}"`, items: [`${lib.name}: ${setsCount} series de ${repRange}`], diffPreview: { dayLabel: day.label, dayColor: day.color, items: diffItems }, confirmLabel: "Agregar", confirm: () => onCreateRoutine(activeId, newDef) };
     }
     if (action.op === "quitar") {
       const wanted = String(action.exercise || "").toLowerCase();
       const exercises = day.exercises || [];
-      const idx = exercises.findIndex((e) => (EXERCISE_LIBRARY_BY_ID[e.libId || e.id]?.name || e.name || "").toLowerCase().includes(wanted));
+      const idx = exercises.findIndex((e) => (exName(e) || "").toLowerCase().includes(wanted));
       if (idx < 0) return null;
-      const removedName = EXERCISE_LIBRARY_BY_ID[exercises[idx].libId || exercises[idx].id]?.name || exercises[idx].name;
+      const removedName = exName(exercises[idx]);
       const newDef = { ...activeDef, days: { ...activeDef.days, [dayKey]: { ...day, exercises: exercises.filter((_, i) => i !== idx) } } };
-      return { kind: "list", title: `Quitar de "${day.label}"`, items: [`Se saca "${removedName}"`], confirmLabel: "Quitar", confirm: () => onCreateRoutine(activeId, newDef) };
+      const diffItems = exercises.map((e, i) => ({ name: exName(e), status: i === idx ? "removed" : "same" }));
+      return { kind: "diff", title: `Quitar de "${day.label}"`, items: [`Se saca "${removedName}"`], diffPreview: { dayLabel: day.label, dayColor: day.color, items: diffItems }, confirmLabel: "Quitar", confirm: () => onCreateRoutine(activeId, newDef) };
     }
     // Cambiar un ejercicio por otro sin tocar cuántas series ni el rango de
     // reps que ya tenía configurado — "cambiame la sentadilla por prensa".
     if (action.op === "sustituir") {
       const wantedOld = String(action.exercise || "").toLowerCase();
       const exercises = day.exercises || [];
-      const idx = exercises.findIndex((e) => (EXERCISE_LIBRARY_BY_ID[e.libId || e.id]?.name || e.name || "").toLowerCase().includes(wantedOld));
+      const idx = exercises.findIndex((e) => (exName(e) || "").toLowerCase().includes(wantedOld));
       if (idx < 0) return null;
-      const oldName = EXERCISE_LIBRARY_BY_ID[exercises[idx].libId || exercises[idx].id]?.name || exercises[idx].name;
+      const oldName = exName(exercises[idx]);
       const lib = matchExerciseToLibrary(action.nuevoEjercicio || "");
       if (!lib) return null;
       const newExercises = exercises.map((e, i) => (i === idx ? { libId: lib.id, sets: e.sets } : e));
       const newDef = { ...activeDef, days: { ...activeDef.days, [dayKey]: { ...day, exercises: newExercises } } };
-      return { kind: "list", title: `Sustituir en "${day.label}"`, items: [`"${oldName}" → "${lib.name}" (mismas series y reps)`], confirmLabel: "Sustituir", confirm: () => onCreateRoutine(activeId, newDef) };
+      const diffItems = [];
+      exercises.forEach((e, i) => {
+        if (i === idx) { diffItems.push({ name: oldName, status: "before" }, { name: lib.name, status: "after" }); }
+        else diffItems.push({ name: exName(e), status: "same" });
+      });
+      return { kind: "diff", title: `Sustituir en "${day.label}"`, items: [`"${oldName}" → "${lib.name}" (mismas series y reps)`], diffPreview: { dayLabel: day.label, dayColor: day.color, items: diffItems }, confirmLabel: "Sustituir", confirm: () => onCreateRoutine(activeId, newDef) };
     }
     return null;
   }
@@ -9460,7 +9491,8 @@ function buildActionPlan(action, ctx) {
     const setIndex = Number.isInteger(action.setIndex) && action.setIndex >= 0 ? action.setIndex : 0;
     const prKey = `${lib.id}_${setIndex}_pr_override`;
     return {
-      kind: "list", title: "Corregir récord", items: [`${lib.name} — S${setIndex + 1}: ${reps}×${kg}kg`],
+      kind: "record", title: "Corregir récord", items: [`${lib.name} — S${setIndex + 1}: ${reps}×${kg}kg`],
+      recordPreview: { exerciseName: lib.name, reps, kg },
       confirmLabel: "Guardar récord",
       confirm: () => onLogSet((prev) => ({ ...prev, [prKey]: { kg, reps, date: todayStr(), manual: true } })),
     };
@@ -9563,6 +9595,144 @@ function buildActionPlan(action, ctx) {
     };
   }
   return null;
+}
+
+/* ============================================================================
+   VISTAS PREVIAS RICAS DE PROPUESTAS DE LA IA — antes, cualquier acción que
+   no fuera "crear_rutina" (con su RoutinePreview) se mostraba como una
+   lista de texto plano. Estas cubren las acciones más comunes con el mismo
+   lenguaje visual que ya usa el resto de la app (tarjeta de récord, día con
+   sus ejercicios, filas de ajustes), para que la propuesta se sienta parte
+   de la app en vez de un cartel de texto genérico.
+============================================================================ */
+
+// registrar_marca: la misma "tarjeta de récord" que ya se usa en SetRow,
+// con badge de récord nuevo si corresponde.
+function SetLogPreview({ exerciseName, reps, kg, rpe, isNewPR, unit = "kg", cardio = false, minutes = null, km = null }) {
+  const accent = isNewPR ? "#F59E0B" : "#14B8A6";
+  return (
+    <div className="relative overflow-hidden flex items-center gap-2.5 pl-3.5 pr-3 py-2.5 rounded-xl" style={{ background: `linear-gradient(120deg, ${tint(accent, "20")}, ${tint(accent, "0c")})`, border: `1px solid ${tint(accent, "45")}` }}>
+      {isNewPR && <div className="absolute -top-5 -left-5 w-16 h-16 rounded-full blur-2xl pointer-events-none opacity-30" style={{ backgroundColor: accent }} />}
+      {isNewPR ? <Trophy size={16} style={{ color: accent }} className="relative shrink-0 soft-pulse" /> : <Check size={16} style={{ color: accent }} className="relative shrink-0" />}
+      <div className="relative flex-1 min-w-0">
+        <p className="text-[10px] font-bold truncate" style={{ color: tint(accent, "aa") }}>{exerciseName}{isNewPR ? " · récord nuevo" : ""}</p>
+        <p className="text-lg font-black tabular-nums leading-tight" style={{ color: accent }}>
+          {cardio ? <>{minutes} min{km ? ` · ${km}km` : ""}</> : <>{reps}<span className="opacity-50 text-sm mx-0.5">×</span>{kg}<span className="opacity-60 text-xs ml-0.5">{unit}</span></>}
+        </p>
+      </div>
+      {rpe != null && <span className="relative text-[10px] font-bold px-2 py-1 rounded-lg shrink-0" style={{ backgroundColor: tint(accent, "18"), color: accent }}>RPE {rpe}</span>}
+    </div>
+  );
+}
+
+// editar_rutina_activa (agregar/quitar/sustituir): el día completo con el
+// cambio resaltado adentro — mismo formato de tarjeta que RoutinePreview,
+// para una sola línea de un solo día.
+function RoutineDiffPreview({ dayLabel, dayColor = "#14B8A6", items }) {
+  return (
+    <div className="rounded-xl border border-slate-800/60 bg-slate-950/40 overflow-hidden">
+      <div className="flex items-center gap-2.5 px-3 py-2 border-b border-slate-800/50" style={{ backgroundColor: tint(dayColor, "0c") }}>
+        <span className="w-1 h-6 rounded-full shrink-0" style={{ backgroundColor: dayColor }} />
+        <span className="text-[11px] font-black text-white uppercase tracking-wide flex-1 min-w-0 truncate">{dayLabel}</span>
+      </div>
+      <div className="px-3 py-2 space-y-1.5">
+        {items.map((it, i) => {
+          if (it.status === "added") return (
+            <div key={i} className="flex items-center gap-2 text-[10.5px] text-emerald-400">
+              <Plus size={11} className="shrink-0" strokeWidth={3} /><span className="flex-1 min-w-0 truncate font-bold">{it.name}</span>
+              {it.detail && <span className="shrink-0 opacity-70">{it.detail}</span>}
+            </div>
+          );
+          if (it.status === "removed") return (
+            <div key={i} className="flex items-center gap-2 text-[10.5px] text-rose-400/80">
+              <X size={11} className="shrink-0" strokeWidth={3} /><span className="flex-1 min-w-0 truncate line-through">{it.name}</span>
+            </div>
+          );
+          if (it.status === "before") return (
+            <div key={i} className="flex items-center gap-2 text-[10.5px] text-rose-400/70">
+              <span className="w-[11px] shrink-0 text-center font-black">−</span><span className="flex-1 min-w-0 truncate line-through">{it.name}</span>
+            </div>
+          );
+          if (it.status === "after") return (
+            <div key={i} className="flex items-center gap-2 text-[10.5px] text-emerald-400 -mt-0.5">
+              <ArrowDown size={11} className="shrink-0 -rotate-90" /><span className="flex-1 min-w-0 truncate font-bold">{it.name}</span>
+            </div>
+          );
+          return (
+            <div key={i} className="flex items-center gap-2 text-[10.5px] text-slate-500">
+              <span className="w-[11px] shrink-0" /><span className="flex-1 min-w-0 truncate">{it.name}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// corregir_record: la misma tarjeta dorada de récord, más chica.
+function RecordChangePreview({ exerciseName, reps, kg }) {
+  const accent = "#F59E0B";
+  return (
+    <div className="flex items-center gap-2.5 rounded-xl pl-3.5 pr-3 py-2.5" style={{ background: `linear-gradient(120deg, ${tint(accent, "20")}, ${tint(accent, "0c")})`, border: `1px solid ${tint(accent, "45")}` }}>
+      <Trophy size={16} style={{ color: accent }} className="shrink-0" />
+      <div className="flex-1 min-w-0">
+        <p className="text-[10px] font-bold truncate" style={{ color: tint(accent, "aa") }}>{exerciseName}</p>
+        <p className="text-lg font-black tabular-nums leading-tight" style={{ color: accent }}>{reps}<span className="opacity-50 text-sm mx-0.5">×</span>{kg}<span className="opacity-60 text-xs ml-0.5">kg</span></p>
+      </div>
+    </div>
+  );
+}
+
+// config_*: cada campo que cambia como una fila con ícono, mismo lenguaje
+// que las filas de ajustes de Perfil — de un vistazo se ve QUÉ cambia y a
+// QUÉ valor, no solo una frase.
+const SETTINGS_FIELD_META = {
+  reminderEnabled: { icon: <Bell size={12} />, label: "Recordatorio diario", format: (v) => (v ? "Activado" : "Desactivado") },
+  reminderTime: { icon: <Clock size={12} />, label: "Hora del recordatorio", format: (v) => v },
+  weeklyRecapEnabled: { icon: <Calendar size={12} />, label: "Resumen semanal", format: (v) => (v ? "Activado" : "Desactivado") },
+  weightUnit: { icon: <Percent size={12} />, label: "Unidad de peso", format: (v) => (v === "lbs" ? "Libras (lbs)" : "Kilos (kg)") },
+  theme: { icon: <Sun size={12} />, label: "Tema", format: (v) => (v === "light" ? "Claro" : "Oscuro") },
+  alertType: { icon: <Bell size={12} />, label: "Aviso de descanso", format: (v) => ({ sound: "Sonido", vibration: "Vibración", both: "Sonido y vibración" }[v] || v) },
+  restLong: { icon: <Timer size={12} />, label: "Descanso largo", format: (v) => `${v}s` },
+  restShort: { icon: <Timer size={12} />, label: "Descanso corto", format: (v) => `${v}s` },
+  autoStartRestTimer: { icon: <Play size={12} />, label: "Auto-iniciar descanso", format: (v) => (v ? "Activado" : "Desactivado") },
+  deloadEnabled: { icon: <Zap size={12} />, label: "Semana de descarga", format: (v) => (v ? "Activada" : "Desactivada") },
+  trainWeeks: { icon: <Calendar size={12} />, label: "Semanas de entrenamiento", format: (v) => `${v}` },
+  deloadWeeks: { icon: <Calendar size={12} />, label: "Semanas de descarga", format: (v) => `${v}` },
+  deloadPct: { icon: <Percent size={12} />, label: "Carga en descarga", format: (v) => `${Math.round(v * 100)}%` },
+  deloadSetDivisor: { icon: <Layers size={12} />, label: "Series en descarga", format: (v) => `÷${v}` },
+  showRpe: { icon: <Eye size={12} />, label: "Mostrar RPE", format: (v) => (v ? "Sí" : "No") },
+  rpeDisplayMode: { icon: <Eye size={12} />, label: "Modo de esfuerzo", format: (v) => (v === "rir" ? "RIR" : "RPE") },
+  showWarmup: { icon: <Flame size={12} />, label: "Calentamiento sugerido", format: (v) => (v ? "Sí" : "No") },
+  show1RMPercent: { icon: <Percent size={12} />, label: "% de 1RM", format: (v) => (v ? "Sí" : "No") },
+  showCoaching: { icon: <Sparkles size={12} />, label: "Consejos técnicos", format: (v) => (v ? "Sí" : "No") },
+  showExerciseNote: { icon: <StickyNote size={12} />, label: "Nota del ejercicio", format: (v) => (v ? "Sí" : "No") },
+  showPersonalNote: { icon: <StickyNote size={12} />, label: "Nota personal", format: (v) => (v ? "Sí" : "No") },
+  showStagnation: { icon: <AlertTriangle size={12} />, label: "Aviso de estancamiento", format: (v) => (v ? "Sí" : "No") },
+  showProgressionSuggestion: { icon: <TrendingUp size={12} />, label: "Sugerencia de progresión", format: (v) => (v ? "Sí" : "No") },
+};
+function buildSettingsChanges(action) {
+  const changes = [];
+  Object.entries(action || {}).forEach(([k, v]) => {
+    if (k === "type" || v == null) return;
+    const meta = SETTINGS_FIELD_META[k];
+    if (!meta) return;
+    changes.push({ icon: meta.icon, label: meta.label, value: meta.format(v) });
+  });
+  return changes;
+}
+function SettingsChangePreview({ changes }) {
+  return (
+    <div className="space-y-1.5">
+      {changes.map((c, i) => (
+        <div key={i} className="flex items-center gap-2.5 rounded-xl px-3 py-2" style={{ backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}>
+          <span className="w-6 h-6 rounded-lg bg-teal-500/15 border border-teal-500/25 flex items-center justify-center shrink-0 text-teal-400">{c.icon}</span>
+          <span className="flex-1 min-w-0 truncate text-[11px]" style={{ color: "var(--chip-text)" }}>{c.label}</span>
+          <span className="text-xs font-bold shrink-0" style={{ color: "var(--surface-2-text)" }}>{c.value}</span>
+        </div>
+      ))}
+    </div>
+  );
 }
 
 // Recorta el historial que se manda a la IA: para cada serie, sólo los
@@ -9908,7 +10078,13 @@ Datos: ${JSON.stringify(context)}`;
         // app: se reconstruye con buildActionPlan(action, actionCtx) al
         // renderizar, en vez de depender de una función que no sobrevive
         // guardada (ver el bloque que dibuja el mensaje, más abajo).
-        const planSummary = plan ? { kind: plan.kind, title: plan.title, confirmLabel: plan.confirmLabel, items: plan.items, routineDef: plan.routineDef } : null;
+        // Copiamos TODO lo que devuelve buildActionPlan menos "confirm" (la
+        // única parte no serializable) — así cualquier campo extra que use
+        // una vista previa rica (setPreview, diff, recordPreview,
+        // settingsChanges, etc.) queda guardado sin tener que acordarse de
+        // sumarlo acá cada vez que se agrega un "kind" nuevo.
+        const planSummary = plan ? { ...plan } : null;
+        if (planSummary) delete planSummary.confirm;
         setMessages((prev) => [...prev, { role: "assistant", text, plan: planSummary, action: plan ? action : null, planStatus: plan ? "pending" : null, sources, date: new Date().toISOString() }]);
       } catch (err) {
         clearTimeout(timeoutId);
@@ -10197,9 +10373,15 @@ Datos: ${JSON.stringify(context)}`;
                   <Edit3 size={13} />
                 </button>
               )}
+              {/* Borde parejo en las 4 esquinas (antes el filo izquierdo era
+                  más grueso que el resto — un acento de "tarjeta plana" que
+                  desentonaba con el vidrio esmerilado, donde el borde tiene
+                  que leerse como un solo filo de luz, no como una franja de
+                  color pegada a un lado). El matiz de marca ahora vive en el
+                  color del borde entero, no en un lado más grueso. */}
               <div
-                className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed backdrop-blur-md ${m.role === "user" ? "!text-white rounded-br-md border border-white/15 shadow-lg shadow-teal-500/15" : "border border-white/10 text-slate-200 rounded-bl-md shadow-md shadow-black/20"} ${editingIndex === i ? "ring-2 ring-teal-400/60" : ""}`}
-                style={m.role === "user" ? { background: "linear-gradient(135deg, rgba(20,184,166,0.82), rgba(14,116,144,0.82))", boxShadow: "inset 0 1px 0 0 rgba(255,255,255,0.15)" } : { background: "var(--glass-bubble-assistant)", borderLeft: "2px solid rgba(20,184,166,0.4)", boxShadow: "inset 0 1px 0 0 rgba(255,255,255,0.06)" }}
+                className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed backdrop-blur-md border ${m.role === "user" ? "!text-white rounded-br-md border-white/20 shadow-lg shadow-teal-500/15" : "border-teal-400/20 text-slate-200 rounded-bl-md shadow-md shadow-black/20"} ${editingIndex === i ? "ring-2 ring-teal-400/60" : ""}`}
+                style={m.role === "user" ? { background: "linear-gradient(135deg, rgba(20,184,166,0.82), rgba(14,116,144,0.82))", boxShadow: "inset 0 1px 0 0 rgba(255,255,255,0.18)" } : { background: "var(--glass-bubble-assistant)", boxShadow: "inset 0 1px 0 0 rgba(255,255,255,0.07)" }}
               >
                 {m.role === "assistant" ? renderChatMarkdown(m.text) : m.text}
               </div>
@@ -10243,6 +10425,14 @@ Datos: ${JSON.stringify(context)}`;
                 </div>
                 {m.plan.kind === "routine" ? (
                   <div className="mb-3"><RoutinePreview routineDef={m.plan.routineDef} /></div>
+                ) : m.plan.kind === "set" && m.plan.setPreview ? (
+                  <div className="mb-3"><SetLogPreview {...m.plan.setPreview} /></div>
+                ) : m.plan.kind === "diff" && m.plan.diffPreview ? (
+                  <div className="mb-3"><RoutineDiffPreview {...m.plan.diffPreview} /></div>
+                ) : m.plan.kind === "record" && m.plan.recordPreview ? (
+                  <div className="mb-3"><RecordChangePreview {...m.plan.recordPreview} /></div>
+                ) : m.plan.kind === "settings" && m.plan.settingsChanges?.length ? (
+                  <div className="mb-3"><SettingsChangePreview changes={m.plan.settingsChanges} /></div>
                 ) : (
                   <ul className="mb-3 space-y-1">
                     {m.plan.items.map((item, j) => <li key={j} className="text-[11px] text-slate-400 flex items-start gap-1.5"><span className="text-teal-400 mt-0.5">•</span>{item}</li>)}
