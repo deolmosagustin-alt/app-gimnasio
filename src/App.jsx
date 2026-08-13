@@ -1100,19 +1100,6 @@ const ANIMATION_CSS = `
 @keyframes invitePulse { 0%, 100% { box-shadow: 0 0 0 0 var(--invite-glow, rgba(20,184,166,0.5)); } 50% { box-shadow: 0 0 0 7px rgba(20,184,166,0); } }
 .invite-pulse { animation: invitePulse 2.4s ease-out infinite; }
 
-/* Fondo "aurora" del Entrenador IA: tres manchas de color grandes,
-   difuminadas, que derivan muy lento (28-40s por vuelta) — nunca en
-   sincronía entre sí, para que no se sienta un patrón repetitivo. Cada una
-   usa translate+scale (GPU, no repinta layout) y un delay negativo propio
-   para no arrancar las tres alineadas. */
-@keyframes auroraDrift1 { 0%,100% { transform: translate(-8%,-6%) scale(1); } 50% { transform: translate(10%,8%) scale(1.15); } }
-@keyframes auroraDrift2 { 0%,100% { transform: translate(6%,4%) scale(1.05); } 50% { transform: translate(-10%,-8%) scale(0.95); } }
-@keyframes auroraDrift3 { 0%,100% { transform: translate(-4%,8%) scale(0.98); } 50% { transform: translate(8%,-6%) scale(1.1); } }
-.aurora-blob-1 { animation: auroraDrift1 32s ease-in-out infinite; }
-.aurora-blob-2 { animation: auroraDrift2 38s ease-in-out infinite; animation-delay: -12s; }
-.aurora-blob-3 { animation: auroraDrift3 26s ease-in-out infinite; animation-delay: -20s; }
-@media (prefers-reduced-motion: reduce) { .aurora-blob-1, .aurora-blob-2, .aurora-blob-3 { animation: none; } }
-
 /* Entrada de las tarjetas al cambiar de día (según dirección) */
 @keyframes slideFromRight { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: translateX(0); } }
 @keyframes slideFromLeft { from { opacity: 0; transform: translateX(-18px); } to { opacity: 1; transform: translateX(0); } }
@@ -1707,15 +1694,8 @@ p, span, label, button { overflow-wrap: break-word; }
      --panel-grad-slate (que usan un montón de otros paneles) para que se
      distinga del fondo de la app en vez de casi fundirse con él. */
   --chat-bubble-assistant: linear-gradient(165deg, #16233d 0%, #0e1626 100%);
-  /* Fondo "aurora" del chat: tres manchas de color muy difuminadas que
-     derivan lento detrás de todo — reemplaza el negro plano por algo con
-     más atmósfera, sin competir con el texto (blur fuerte, opacidad baja). */
-  --aurora-1: rgba(20,184,166,0.30);
-  --aurora-2: rgba(168,85,247,0.24);
-  --aurora-3: rgba(6,182,212,0.22);
-  /* Paneles "vidrio esmerilado": semitransparentes + backdrop-blur (aplicado
-     en la clase), para que la aurora se note incluso detrás de la tarjeta y
-     las burbujas. */
+  /* Paneles "vidrio esmerilado" del Entrenador IA: semitransparentes +
+     backdrop-blur (aplicado en la clase). */
   --glass-panel-bg: rgba(15,23,42,0.55);
   --glass-panel-border: rgba(255,255,255,0.08);
   --glass-bubble-assistant: rgba(19,29,51,0.55);
@@ -1752,11 +1732,6 @@ p, span, label, button { overflow-wrap: break-word; }
   --chat-bar-border-listening: rgba(16,185,129,0.35);
   --chat-bar-border-editing: rgba(20,184,166,0.35);
   --chat-bubble-assistant: linear-gradient(165deg, #f8fafc 0%, #ffffff 100%);
-  /* En claro la aurora es apenas un lavado de color — nada de manchas
-     vívidas sobre blanco, que se vería sucio en vez de atmosférico. */
-  --aurora-1: rgba(20,184,166,0.14);
-  --aurora-2: rgba(168,85,247,0.11);
-  --aurora-3: rgba(6,182,212,0.10);
   --glass-panel-bg: rgba(255,255,255,0.6);
   --glass-panel-border: rgba(15,23,42,0.06);
   --glass-bubble-assistant: rgba(255,255,255,0.65);
@@ -10343,19 +10318,6 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
 
   return (
     <div className="relative pb-32">
-      {/* Fondo "aurora": tres manchas de color enormes y muy difuminadas,
-          derivando lento detrás de todo. Primer hijo, position:absolute sin
-          z-index propio — pinta detrás de la tarjeta/burbujas de abajo por
-          simple orden de DOM (misma capa de apilado), sin pelear con el
-          header ni con el input fijo (portaleado aparte, ver más abajo).
-          Sólo cubre la primera pantalla (h-[620px]): es un fondo ambiente
-          para lo que se ve al entrar, no algo que haya que sincronizar con
-          un chat larguísimo. */}
-      <div className="absolute inset-x-0 top-0 h-[620px] overflow-hidden pointer-events-none" aria-hidden="true">
-        <div className="aurora-blob-1 absolute -top-24 -left-16 w-72 h-72 rounded-full" style={{ backgroundColor: "var(--aurora-1)", filter: "blur(70px)" }} />
-        <div className="aurora-blob-2 absolute top-10 -right-20 w-80 h-80 rounded-full" style={{ backgroundColor: "var(--aurora-2)", filter: "blur(80px)" }} />
-        <div className="aurora-blob-3 absolute top-64 left-1/3 w-64 h-64 rounded-full" style={{ backgroundColor: "var(--aurora-3)", filter: "blur(70px)" }} />
-      </div>
       {/* Pestaña fija arriba a la izquierda — el botón del header (más abajo)
           puede pasar desapercibido entre los otros íconos; esto es una "barra
           extensible" imposible de no ver: siempre a mano mientras estás en
@@ -10375,11 +10337,9 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
           <List size={13} />
         </button>
       )}
-      {/* Vidrio esmerilado: fondo semitransparente + backdrop-blur, para que
-          la aurora de atrás se note A TRAVÉS de la tarjeta (un "wash" de
-          color) en vez de quedar tapada por un gradiente sólido. El borde
-          superior más claro (inset shadow) simula el filo de luz típico del
-          glassmorphism. */}
+      {/* Vidrio esmerilado: fondo semitransparente + backdrop-blur en vez de
+          un gradiente sólido. El borde superior más claro (inset shadow)
+          simula el filo de luz típico del glassmorphism. */}
       <div className="relative overflow-hidden rounded-2xl border border-white/10 p-5 mb-3 backdrop-blur-xl" style={{ background: "var(--glass-panel-bg)", boxShadow: "inset 0 1px 0 0 rgba(255,255,255,0.08), 0 8px 32px -12px rgba(0,0,0,0.4)" }}>
         <div className="relative flex items-center gap-3">
                     <div className="w-11 h-11 rounded-2xl bg-teal-500/20 border border-teal-500/30 flex items-center justify-center shrink-0 shadow-lg shadow-teal-500/20 elastic-in">
@@ -10691,13 +10651,8 @@ function AIConversationSidebar({ conversations, activeConversationId, onSelect, 
     <div className="fixed inset-0 z-[150] bg-black/70 backdrop-blur-sm flex modal-bg-in modal-overlay" onClick={onClose}>
       {/* Vidrio esmerilado, igual que la tarjeta y las burbujas del chat:
           fondo semitransparente + backdrop-blur en vez del panel sólido de
-          antes, con las mismas manchas de color de la aurora (acá fijas, no
-          animadas — es un panel chico y quieto, no hace falta el movimiento)
-          para que se sienta la misma pestaña y no una ventana aparte. */}
+          antes, para que se sienta la misma pestaña y no una ventana aparte. */}
       <div className="relative w-[82%] max-w-xs h-full flex flex-col shadow-2xl shadow-black/60 bounce-in overflow-hidden backdrop-blur-xl" style={{ background: "var(--glass-panel-bg)", borderRight: "1px solid var(--glass-panel-border)" }} onClick={(e) => e.stopPropagation()}>
-        <div className="absolute -top-16 -left-10 w-56 h-56 rounded-full pointer-events-none" style={{ backgroundColor: "var(--aurora-1)", filter: "blur(70px)" }} />
-        <div className="absolute top-1/3 -right-16 w-48 h-48 rounded-full pointer-events-none" style={{ backgroundColor: "var(--aurora-2)", filter: "blur(70px)" }} />
-        <div className="absolute bottom-0 left-1/4 w-40 h-40 rounded-full pointer-events-none" style={{ backgroundColor: "var(--aurora-3)", filter: "blur(60px)" }} />
         <div className="relative overflow-hidden px-4 pb-4 shrink-0" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 18px)", borderBottom: "1px solid var(--glass-panel-border)", boxShadow: "inset 0 -1px 0 0 rgba(255,255,255,0.04)" }}>
           <div className="relative flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-md shadow-teal-500/20" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>
