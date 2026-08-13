@@ -5711,38 +5711,31 @@ const CustomTooltip = ({ active, payload, label }) => {
   );
 };
 
-// Tooltip específico del gráfico de "Evolución por ejercicio": el CÁLCULO
-// de la curva sigue siendo el 1RM estimado (combina reps y kilos, es lo que
-// hace comparables sesiones con distinta carga/reps) — pero lo que se le
-// MUESTRA a la persona ahora es la serie real que hizo (reps×kg), en grande;
-// el 1RM estimado queda como el dato chico de referencia, no al revés.
-function EvolutionTooltip({ active, payload, label, color, rpeDisplayMode }) {
-  if (!active || !payload?.length) return null;
-  const d = payload[0].payload;
-  return (
-    <div className="bg-[#0f0f1a] border border-slate-700/60 rounded-xl px-3 py-2.5 text-xs shadow-xl shadow-black/40">
-      <p className="text-slate-400 mb-1.5 font-medium">{label}</p>
-      <p className="font-black text-sm" style={{ color }}>{d.reps} × {d.kg} kg</p>
-      <p className="text-slate-500 mt-1">{d.e1rm} kg <span className="text-[10px]">1RM est.</span></p>
-      {d.rpe != null && <p className="text-slate-500 mt-0.5">{formatEffort(d.rpe, rpeDisplayMode)}</p>}
-    </div>
-  );
-}
-
 // Punto del gráfico de evolución: el de tu mejor marca se dibuja con un halo
 // alrededor, para encontrarlo de un vistazo en la curva sin tener que pasar
-// el dedo por todos los puntos.
-function EvolutionDot({ cx, cy, isBest, color }) {
+// el dedo por todos los puntos. Sólo el punto en sí responde al toque (un
+// círculo invisible más grande alrededor, para que sea fácil de tocar en el
+// celular) — antes cualquier parte del gráfico disparaba el tooltip de
+// Recharts (y su recuadro/cursor), ahora sólo reacciona esto.
+// Las series de descarga se marcan con el mismo violeta que ya usa esa
+// pestaña en toda la app (Descarga, badge "⚡" en el historial) — un rombo
+// en vez de un círculo, así se distingue incluso sin color (por forma).
+const DELOAD_COLOR = "#A855F7";
+function EvolutionDot({ cx, cy, isBest, isActive, color, deload, index, onSelect }) {
   if (cx == null || cy == null) return null;
-  if (isBest) {
-    return (
-      <g>
-        <circle cx={cx} cy={cy} r={7} fill={color} opacity={0.25} />
-        <circle cx={cx} cy={cy} r={4} fill={color} stroke="#0a0a0f" strokeWidth={1.5} />
-      </g>
-    );
-  }
-  return <circle cx={cx} cy={cy} r={3} fill={color} />;
+  const dotColor = deload ? DELOAD_COLOR : color;
+  return (
+    <g style={{ cursor: "pointer" }} onClick={() => onSelect(index, cx, cy)}>
+      <circle cx={cx} cy={cy} r={14} fill="transparent" />
+      {isBest && <circle cx={cx} cy={cy} r={7} fill={dotColor} opacity={0.25} />}
+      {isActive && <circle cx={cx} cy={cy} r={9} fill="none" stroke={dotColor} strokeWidth={1.5} opacity={0.55} />}
+      {deload ? (
+        <rect x={cx - 3.2} y={cy - 3.2} width={6.4} height={6.4} rx={1.2} transform={`rotate(45 ${cx} ${cy})`} fill={dotColor} stroke="#0a0a0f" strokeWidth={isBest || isActive ? 1.5 : 1} />
+      ) : (
+        <circle cx={cx} cy={cy} r={isBest || isActive ? 4 : 3} fill={dotColor} stroke="#0a0a0f" strokeWidth={isBest || isActive ? 1.5 : 0} />
+      )}
+    </g>
+  );
 }
 
 /* ============================================================================
@@ -5759,8 +5752,14 @@ function ExerciseChipRow({ exercises, selId, onSelect, activeColor }) {
         const active = e.id === selId;
         const color = activeColor || e.color;
         return (
-          <button key={e.id} onClick={() => onSelect(e.id)} className="px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all active:scale-95 border shrink-0"
+          <button key={e.id} onClick={() => onSelect(e.id)} className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all active:scale-95 border shrink-0"
             style={active ? { background: color, borderColor: color, color: "#fff" } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
+            {/* Punto de "ya tenés marcas acá" — sólo si el que llama pasó
+                lastDate (ver ProgressView). Ayuda a encontrar de un vistazo,
+                entre 15-20 ejercicios, cuáles vale la pena mirar. */}
+            {"lastDate" in e && (
+              <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: e.lastDate ? (active ? "#fff" : color) : "transparent", border: e.lastDate ? "none" : `1px solid ${active ? "rgba(255,255,255,0.4)" : "var(--chip-border)"}` }} />
+            )}
             {e.name}
           </button>
         );
@@ -7116,14 +7115,46 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
 }
 
 function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS, onResetAll, onDeleteDay, onUpdateSettings, onGoToProfile, onGoToRoutines, weekSchedule = null, sex, age, onGoToDeload, measurements, onAddMeasurement, photos, photosLoading, onAddPhoto, onDeletePhoto }) {
-  const allExercises = useMemo(() => DAY_ORDER.flatMap((dk) => ROUTINE[dk].exercises.map((e) => ({ id: e.id, name: e.name, day: ROUTINE[dk].label, color: ROUTINE[dk].color, sets: e.sets.length, dayKey: dk }))), []);
+  // BUG FIX: antes esto listaba una entrada POR DÍA donde aparece cada
+  // ejercicio — si "Sentadilla" está en Piernas 1 Y Piernas 2, salían dos
+  // chips idénticos que llevaban al mismo lugar (el historial es por
+  // ejercicio, no por día). Ahora se arma un mapa único por id.
+  // También se calcula si tiene marcas registradas (y la fecha de la más
+  // reciente) para poder ordenar "lo que ya entrenaste" primero — con 15-20
+  // ejercicios en la rutina, buscar a mano el que te importa era el problema
+  // real de "la selección" antes de tocar nada del gráfico.
+  const allExercises = useMemo(() => {
+    const byId = new Map();
+    DAY_ORDER.forEach((dk) => {
+      ROUTINE[dk].exercises.forEach((e) => {
+        if (!byId.has(e.id)) byId.set(e.id, { id: e.id, name: e.name, day: ROUTINE[dk].label, color: ROUTINE[dk].color, sets: e.sets.length, dayKey: dk });
+      });
+    });
+    const list = Array.from(byId.values()).map((e) => {
+      let lastDate = null;
+      for (let i = 0; i < e.sets; i++) {
+        (logs[`${e.id}_${i}`] || []).forEach((h) => { if (h?.date && (!lastDate || h.date > lastDate)) lastDate = h.date; });
+      }
+      return { ...e, lastDate };
+    });
+    list.sort((a, b) => {
+      if (!!a.lastDate !== !!b.lastDate) return a.lastDate ? -1 : 1; // con marcas, primero
+      if (a.lastDate && b.lastDate) return a.lastDate < b.lastDate ? 1 : -1; // más reciente primero
+      return 0; // sin marcas: se mantiene el orden de la rutina
+    });
+    return list;
+  }, [logs]);
 
   const [selId, setSelId] = useState(allExercises[0]?.id);
   const [selSet, setSelSet] = useState(0);
   const [metric, setMetric] = useState("grafico");
   const selEx = allExercises.find((e) => e.id === selId);
+  // Detalle real de las series del ejercicio elegido (rango de reps por
+  // serie) — allExercises sólo guarda la CANTIDAD, esto trae la definición
+  // completa para mostrarla en el selector de serie.
+  const selExDef = selEx ? ROUTINE[selEx.dayKey]?.exercises.find((e) => e.id === selId) : null;
   const history = useMemo(() => (logs[`${selId}_${selSet}`] || []).slice().sort((a, b) => (a.date > b.date ? 1 : -1)), [logs, selId, selSet]);
-  const chartData = useMemo(() => history.map((h) => ({ date: h.date.slice(5), kg: h.kg, reps: h.reps, vol: vol(h.kg, h.reps), e1rm: estimate1RM(h.kg, h.reps), rpe: h.rpe ?? null })), [history]);
+  const chartData = useMemo(() => history.map((h) => ({ date: h.date.slice(5), kg: h.kg, reps: h.reps, vol: vol(h.kg, h.reps), e1rm: estimate1RM(h.kg, h.reps), rpe: h.rpe ?? null, deload: !!h.deload })), [history]);
   // La mejor marca de TODA la curva — sirve para la línea de referencia y
   // para agrandar el punto correspondiente en el gráfico. El 1RM sigue
   // siendo la base de comparación (chartBestE1rm decide CUÁL sesión es la
@@ -7131,6 +7162,19 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
   // sesión (reps×kg), no el número estimado.
   const chartBestE1rm = useMemo(() => (chartData.length ? Math.max(...chartData.map((d) => d.e1rm)) : null), [chartData]);
   const chartBestEntry = useMemo(() => chartData.find((d) => d.e1rm === chartBestE1rm) || null, [chartData, chartBestE1rm]);
+  // Punto tocado del gráfico de evolución — reemplaza el tooltip de Recharts
+  // (que se disparaba con tocar cualquier parte del gráfico, no sólo un
+  // punto real). "chartKey" queda guardado adentro del punto elegido, así
+  // invalidarlo al cambiar de ejercicio/serie es una simple comparación
+  // derivada (sin ref ni efecto aparte para "resetear" nada).
+  const chartKey = `${selId}_${selSet}`;
+  const [rawActivePoint, setRawActivePoint] = useState(null); // { index, cx, cy, width, chartKey }
+  const activePoint = rawActivePoint?.chartKey === chartKey ? rawActivePoint : null;
+  const chartContainerRef = useRef(null);
+  const handleSelectPoint = (index, cx, cy) => {
+    const width = chartContainerRef.current?.clientWidth || 300;
+    setRawActivePoint((prev) => (prev?.chartKey === chartKey && prev.index === index ? null : { index, cx, cy, width, chartKey }));
+  };
 
   const [confirmResetProgress, setConfirmResetProgress] = useState(false);
   const [activeSection, setActiveSection] = useState("rank");
@@ -7180,13 +7224,25 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
 
             <ExerciseChipRow exercises={allExercises} selId={selId} onSelect={(id) => { setSelId(id); setSelSet(0); }} activeColor="#F59E0B" />
 
+            {/* Cada botón ahora suma el rango de reps de esa serie (para
+                elegir sin adivinar qué es cada una) y un punto si ya tiene
+                marcas — mismo lenguaje que el punto de ExerciseChipRow. */}
             <div className="flex gap-2">
-              {Array.from({ length: selEx?.sets || 1 }).map((_, i) => (
-                <button key={i} onClick={() => setSelSet(i)} className="flex-1 py-2 rounded-xl text-xs font-bold transition-all border"
-                  style={selSet === i ? { backgroundColor: "#F59E0B", borderColor: "#F59E0B", color: "#fff" } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
-                  S{i + 1}
-                </button>
-              ))}
+              {Array.from({ length: selEx?.sets || 1 }).map((_, i) => {
+                const active = selSet === i;
+                const repRange = selExDef?.sets?.[i]?.repRange;
+                const hasData = (logs[`${selId}_${i}`] || []).length > 0;
+                return (
+                  <button key={i} onClick={() => setSelSet(i)} className="flex-1 py-1.5 rounded-xl text-xs font-bold transition-all border flex flex-col items-center gap-0.5"
+                    style={active ? { backgroundColor: "#F59E0B", borderColor: "#F59E0B", color: "#fff" } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
+                    <span className="flex items-center gap-1">
+                      S{i + 1}
+                      <span className="w-1 h-1 rounded-full shrink-0" style={{ backgroundColor: hasData ? (active ? "#fff" : "#F59E0B") : "transparent", border: hasData ? "none" : `1px solid ${active ? "rgba(255,255,255,0.4)" : "var(--chip-border)"}` }} />
+                    </span>
+                    {repRange && <span className="text-[9px] font-normal opacity-70">{repRange}</span>}
+                  </button>
+                );
+              })}
             </div>
 
             <div className="flex items-center justify-end">
@@ -7205,10 +7261,13 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
                     que leerla de un gráfico. Más reciente arriba. */}
                 <div className="space-y-1.5">
                   {chartData.slice().reverse().map((h, i) => (
-                    <div key={i} className="flex items-center justify-between rounded-xl px-3 py-2.5" style={{ backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}>
-                      <span className="text-[11px] text-slate-500 shrink-0">{h.date}</span>
+                    <div key={i} className="flex items-center justify-between rounded-xl px-3 py-2.5" style={h.deload ? { backgroundColor: tint(DELOAD_COLOR, "0c"), border: `1px solid ${tint(DELOAD_COLOR, "30")}` } : { backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}>
+                      <span className="flex items-center gap-1.5 text-[11px] text-slate-500 shrink-0">
+                        {h.date}
+                        {h.deload && <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md" style={{ backgroundColor: tint(DELOAD_COLOR, "22"), color: DELOAD_COLOR }}>⚡ DESCARGA</span>}
+                      </span>
                       <span className="text-[11px] text-slate-500 tabular-nums">{h.reps}×{h.kg}kg</span>
-                      <span className="text-sm font-black tabular-nums shrink-0" style={{ color: "#F59E0B" }}>{h.e1rm}kg</span>
+                      <span className="text-sm font-black tabular-nums shrink-0" style={{ color: h.deload ? DELOAD_COLOR : "#F59E0B" }}>{h.e1rm}kg</span>
                     </div>
                   ))}
                 </div>
@@ -7226,7 +7285,11 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
               </>
             ) : (
               <>
-                <div className="h-52">
+                {/* relative: para poder ubicar el tooltip custom (abajo) justo
+                    arriba del punto que tocaste, en vez del tooltip nativo de
+                    Recharts que reaccionaba con tocar CUALQUIER parte del
+                    gráfico (dibujando su propio recuadro/cursor). */}
+                <div className="relative h-52" ref={chartContainerRef}>
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={chartData} margin={{ top: 5, right: 0, left: -25, bottom: 0 }}>
                       <defs>
@@ -7237,7 +7300,6 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
                       <XAxis dataKey="date" stroke="var(--chart-axis)" fontSize={10} />
                       <YAxis stroke="var(--chart-axis)" fontSize={10} domain={["auto", "auto"]} />
-                      <Tooltip content={<EvolutionTooltip color={selEx?.color} rpeDisplayMode={settings.rpeDisplayMode} />} />
                       {/* Línea de referencia en tu mejor marca — de un vistazo ves
                           qué tan cerca (o lejos) estuvo cada sesión de tu techo
                           actual, no solo si subió o bajó respecto a la anterior. */}
@@ -7248,13 +7310,38 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
                           y kilos: sube o baja el peso, sube o baja las reps, y el número
                           igual lo refleja) — eso no cambia, es lo que hace comparables
                           sesiones con distinta carga/reps. Lo que SÍ cambia es qué ve la
-                          persona al tocar un punto: el tooltip (EvolutionTooltip, arriba)
-                          ahora muestra en grande la serie real (reps×kg), con el 1RM
-                          estimado como dato chico de referencia. El punto de tu mejor
-                          sesión se dibuja más grande, para ubicarlo de un vistazo. */}
-                      <Area type="monotone" dataKey="e1rm" stroke={selEx?.color || "#14B8A6"} fill="url(#gA)" strokeWidth={2.5} dot={(props) => <EvolutionDot {...props} isBest={props.payload.e1rm === chartBestE1rm} color={selEx?.color} />} activeDot={{ r: 5, strokeWidth: 0 }} name="Kg" />
+                          persona al tocar un punto: el tooltip custom (abajo) ahora
+                          muestra en grande la serie real (reps×kg), con el 1RM estimado
+                          como dato chico de referencia. El punto de tu mejor sesión se
+                          dibuja más grande, para ubicarlo de un vistazo. Sin Tooltip ni
+                          activeDot nativos de Recharts: sólo EvolutionDot reacciona al
+                          toque (ver más arriba), nada más del gráfico. */}
+                      <Area type="monotone" dataKey="e1rm" stroke={selEx?.color || "#14B8A6"} fill="url(#gA)" strokeWidth={2.5} isAnimationActive={false} dot={(props) => <EvolutionDot {...props} isBest={props.payload.e1rm === chartBestE1rm} isActive={activePoint?.index === props.index} deload={props.payload.deload} onSelect={handleSelectPoint} />} activeDot={false} name="Kg" />
                     </AreaChart>
                   </ResponsiveContainer>
+                  {activePoint && chartData[activePoint.index] && (() => {
+                    const d = chartData[activePoint.index];
+                    // Centrado horizontalmente sobre el punto, en píxeles reales
+                    // (cx ya viene en esa unidad, coincide con el ancho medido
+                    // del contenedor) — recortado 64px contra cada borde para
+                    // que la tarjeta no se corte en los extremos de la curva
+                    // (primer/último punto).
+                    const clampedLeft = Math.min(activePoint.width - 64, Math.max(64, activePoint.cx));
+                    return (
+                      <div
+                        className="absolute pointer-events-none bg-[#0f0f1a] border border-slate-700/60 rounded-xl px-3 py-2.5 text-xs shadow-xl shadow-black/40 z-10"
+                        style={{ left: clampedLeft, top: Math.max(0, activePoint.cy - 10), transform: "translate(-50%, -100%)", minWidth: "120px" }}
+                      >
+                        <div className="flex items-center gap-1.5 mb-1.5">
+                          <p className="text-slate-400 font-medium">{d.date}</p>
+                          {d.deload && <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md" style={{ backgroundColor: tint(DELOAD_COLOR, "22"), color: DELOAD_COLOR }}>⚡ DESCARGA</span>}
+                        </div>
+                        <p className="font-black text-sm" style={{ color: d.deload ? DELOAD_COLOR : selEx?.color }}>{d.reps} × {d.kg} kg</p>
+                        <p className="text-slate-500 mt-1">{d.e1rm} kg <span className="text-[10px]">1RM est.</span></p>
+                        {d.rpe != null && <p className="text-slate-500 mt-0.5">{formatEffort(d.rpe, settings.rpeDisplayMode)}</p>}
+                      </div>
+                    );
+                  })()}
                 </div>
                 {chartData.length >= 2 && (() => {
                   const f = chartData[0], l = chartData[chartData.length - 1];
