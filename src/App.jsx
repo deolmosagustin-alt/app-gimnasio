@@ -1436,6 +1436,15 @@ input, textarea, [contenteditable="true"] {
   user-select: text;
 }
 
+/* BUG FIX (gráfico de evolución): Recharts hace foco por accesibilidad en su
+   div contenedor (.recharts-wrapper) al tocar un punto, y sin esto el
+   navegador dibuja el recuadro de foco por defecto alrededor de TODO el
+   gráfico, tapando el borde y viéndose roto/bugueado en cada toque. */
+.recharts-wrapper:focus,
+.recharts-wrapper *:focus {
+  outline: none;
+}
+
 /* ============================================================================
    MODO CLARO — pensado para que se vea como el modo claro de cualquier app:
    fondo gris muy claro de página, tarjetas BLANCAS y opacas (no traslúcidas,
@@ -7037,12 +7046,6 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
                   );
                 })}
               </div>
-              <div className="flex items-center gap-3 mt-3 pt-3 border-t border-slate-800/50 flex-wrap">
-                <span className="flex items-center gap-1 text-[9px] text-slate-500"><span className="w-1.5 h-1.5 rounded-full bg-rose-400" /> Foto</span>
-                <span className="flex items-center gap-1 text-[9px] text-slate-500"><span className="w-1.5 h-1.5 rounded-full bg-purple-400" /> Peso</span>
-                <span className="flex items-center gap-1 text-[9px] text-slate-500"><span className="w-1.5 h-1.5 rounded-full bg-blue-400" /> Medidas</span>
-                <span className="flex items-center gap-1 text-[9px] text-slate-500"><Star size={9} className="text-amber-400 fill-amber-400" /> Día completo</span>
-              </div>
             </div>
 
             {!selectedEntry && !compareBase && <p className="text-center text-[11px] text-slate-600 py-2">Tocá un día con registro para ver el detalle.</p>}
@@ -7421,7 +7424,7 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
                     <AreaChart data={chartData} margin={{ top: 5, right: 0, left: -25, bottom: 0 }}>
                       <defs>
                         <linearGradient id="gA" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor={selEx?.color} stopOpacity={0.35} /><stop offset="95%" stopColor={selEx?.color} stopOpacity={0} />
+                          <stop offset="5%" stopColor={selEx?.color || "#14B8A6"} stopOpacity={0.35} /><stop offset="95%" stopColor={selEx?.color || "#14B8A6"} stopOpacity={0} />
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
@@ -7443,7 +7446,7 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
                           dibuja más grande, para ubicarlo de un vistazo. Sin Tooltip ni
                           activeDot nativos de Recharts: sólo EvolutionDot reacciona al
                           toque (ver más arriba), nada más del gráfico. */}
-                      <Area type="monotone" dataKey="e1rm" stroke={selEx?.color || "#14B8A6"} fill="url(#gA)" strokeWidth={2.5} isAnimationActive={false} dot={(props) => <EvolutionDot {...props} isBest={props.payload.e1rm === chartBestE1rm} isActive={activePoint?.index === props.index} deload={props.payload.deload} onSelect={handleSelectPoint} />} activeDot={false} name="Kg" />
+                      <Area type="monotone" dataKey="e1rm" stroke={selEx?.color || "#14B8A6"} fill="url(#gA)" strokeWidth={2.5} isAnimationActive={false} dot={(props) => <EvolutionDot {...props} color={selEx?.color || "#14B8A6"} isBest={props.payload.e1rm === chartBestE1rm} isActive={activePoint?.index === props.index} deload={props.payload.deload} onSelect={handleSelectPoint} />} activeDot={false} name="Kg" />
                     </AreaChart>
                   </ResponsiveContainer>
                   {activePoint && chartData[activePoint.index] && (() => {
@@ -10605,24 +10608,23 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
   return (
     <div className="relative pb-32">
       {/* Pestaña fija arriba a la izquierda, colgada justo debajo del header
-          (que ya respeta el notch/status bar con env(safe-area-inset-top)) —
+          (que ya respeta el notch/status bar con env(safe-area-inset-top)):
           nunca tapa el header ni el propio notch, en vez de un top fijo que
-          en algunos teléfonos quedaría adentro del área no segura. Antes
-          era sólo un ícono (poco claro qué hacía) y el mismo botón se
-          repetía DENTRO de la tarjeta de abajo — ahora es el único lugar
-          para abrir tus conversaciones, con etiqueta y el contador que
-          antes tenía el botón de la tarjeta. */}
+          en algunos teléfonos quedaría adentro del área no segura. Es el
+          único lugar para abrir tus conversaciones (el botón que repetía
+          esto adentro de la tarjeta de abajo se sacó). A propósito lo más
+          chica y discreta posible (sólo ícono, sin texto) para que no
+          moleste mientras leés el chat. */}
       {onSwitchConversation && (
         <button
           onClick={() => setShowSidebar(true)}
           aria-label="Tus conversaciones"
-          className="fixed left-0 z-40 flex items-center gap-1.5 pl-2 pr-3 py-2.5 rounded-r-2xl text-teal-400 shadow-lg shadow-black/40 active:scale-95 transition backdrop-blur-xl"
-          style={{ top: "calc(env(safe-area-inset-top, 0px) + 70px)", background: "var(--glass-panel-bg)", border: "1px solid rgba(20,184,166,0.35)", borderLeft: "none" }}
+          className="fixed left-0 z-40 flex items-center justify-center w-7 h-8 rounded-r-xl text-teal-400/80 shadow-md shadow-black/30 active:scale-90 transition backdrop-blur-xl"
+          style={{ top: "calc(env(safe-area-inset-top, 0px) + 70px)", background: "var(--glass-panel-bg)", border: "1px solid rgba(20,184,166,0.25)", borderLeft: "none" }}
         >
-          <MessageCircle size={14} />
-          <span className="text-[11px] font-bold">Chats</span>
+          <MessageCircle size={12} />
           {conversations.length > 1 && (
-            <span className="min-w-[16px] h-4 px-1 rounded-full bg-teal-500 text-[9px] font-black text-white flex items-center justify-center">{conversations.length}</span>
+            <span className="absolute -top-1 -right-1 min-w-[13px] h-[13px] px-0.5 rounded-full bg-teal-500 text-[7px] font-black text-white flex items-center justify-center">{conversations.length}</span>
           )}
         </button>
       )}
