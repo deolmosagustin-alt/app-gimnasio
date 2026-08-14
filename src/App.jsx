@@ -1961,20 +1961,28 @@ function ShareLinkModal({ title, shareTitle, shareText, shareTarget, onClose }) 
               <a href={redditUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center gap-1.5 py-2.5 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition"><Share2 size={13} className="text-orange-400" />Reddit</a>
             </div>
             <p className="text-[10px] text-slate-600 mb-3 text-center">Quien abra el enlace puede agregar la rutina a su app con un toque.</p>
-            {/* Exportar como archivo — al fondo, colapsado por defecto */}
-            {!showFileOptions ? (
-              <button onClick={() => setShowFileOptions(true)} className="w-full flex items-center justify-center gap-1.5 pt-3 border-t border-slate-800/60 text-slate-500 hover:text-slate-300 text-xs font-semibold transition"><Download size={12} /> Descargar como archivo (PDF, Word, Excel)</button>
-            ) : (
-              <div className="pt-3 border-t border-slate-800/60">
-                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Descargar</p>
-                <div className="grid grid-cols-3 gap-2">
-                  <button onClick={() => handleExportDoc("pdf")} disabled={!!exporting} className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition disabled:opacity-50">{exporting === "pdf" ? <RotateCcw size={14} className="animate-spin text-rose-400" /> : <Download size={14} className="text-rose-400" />}PDF</button>
-                  <button onClick={() => handleExportDoc("word")} disabled={!!exporting} className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition disabled:opacity-50">{exporting === "word" ? <RotateCcw size={14} className="animate-spin text-blue-400" /> : <Download size={14} className="text-blue-400" />}Word</button>
-                  <button onClick={() => handleExportDoc("excel")} disabled={!!exporting} className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition disabled:opacity-50">{exporting === "excel" ? <RotateCcw size={14} className="animate-spin text-emerald-400" /> : <Download size={14} className="text-emerald-400" />}Excel</button>
-                </div>
-              </div>
-            )}
           </>
+        )}
+        {/* BUG FIX: "Descargar como archivo" (PDF/Word/Excel) NO depende de
+            Firestore para nada, se arma entero con datos que ya están en el
+            dispositivo. Antes vivía adentro del bloque "{url && ...}", así
+            que si el enlace mágico fallaba o quedaba colgado (por ejemplo,
+            sin las reglas de seguridad de "shared_routines" configuradas en
+            Firebase, ver shareRoutineToFirestore) la persona nunca llegaba a
+            ver los botones de descarga: exportar quedaba roto sin que la
+            causa real tuviera nada que ver con exportar. Ahora se muestra
+            siempre, sin importar cómo vaya el enlace para compartir. */}
+        {!showFileOptions ? (
+          <button onClick={() => setShowFileOptions(true)} className="w-full flex items-center justify-center gap-1.5 pt-3 border-t border-slate-800/60 text-slate-500 hover:text-slate-300 text-xs font-semibold transition"><Download size={12} /> Descargar como archivo (PDF, Word, Excel)</button>
+        ) : (
+          <div className="pt-3 border-t border-slate-800/60">
+            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Descargar</p>
+            <div className="grid grid-cols-3 gap-2">
+              <button onClick={() => handleExportDoc("pdf")} disabled={!!exporting} className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition disabled:opacity-50">{exporting === "pdf" ? <RotateCcw size={14} className="animate-spin text-rose-400" /> : <Download size={14} className="text-rose-400" />}PDF</button>
+              <button onClick={() => handleExportDoc("word")} disabled={!!exporting} className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition disabled:opacity-50">{exporting === "word" ? <RotateCcw size={14} className="animate-spin text-blue-400" /> : <Download size={14} className="text-blue-400" />}Word</button>
+              <button onClick={() => handleExportDoc("excel")} disabled={!!exporting} className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition disabled:opacity-50">{exporting === "excel" ? <RotateCcw size={14} className="animate-spin text-emerald-400" /> : <Download size={14} className="text-emerald-400" />}Excel</button>
+            </div>
+          </div>
         )}
       </div>
     </div>
@@ -10895,21 +10903,26 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
                 <button onClick={cancelarEdicion} aria-label="Cancelar edición" className="p-1 rounded-lg text-slate-400 hover:text-white transition shrink-0"><X size={13} /></button>
               </div>
             )}
-            <div className="flex items-end gap-2">
+            <div className="flex items-stretch gap-2">
               {/* Botón de conversaciones pegado a la barra de mensaje (antes
                   era una pestaña aparte, flotando arriba a la izquierda):
                   vive en el mismo contenedor fijo que el input, así se mueve
                   y aparece siempre junto a él, en vez de en otro punto de la
-                  pantalla. */}
+                  pantalla. "aspect-square" con "items-stretch" NO alcanza acá
+                  (el motor resuelve el ancho del flex item antes de aplicar
+                  el estirado del alto, así que el cuadrado nunca terminaba
+                  de cuadrar): en vez de eso, la barra de mensaje se fija en
+                  h-12 y el botón usa ese mismo h-12 w-12, así los dos miden
+                  exactamente lo mismo pase lo que pase con el contenido. */}
               {onSwitchConversation && (
-                <button onClick={() => setShowSidebar(true)} aria-label="Tus conversaciones" className="relative shrink-0 p-2.5 rounded-2xl backdrop-blur-xl shadow-xl shadow-black/40 transition-all active:scale-95" style={{ backgroundColor: "var(--chat-bar-idle)", border: "1px solid var(--chat-bar-border-idle)", color: "#5eead4" }}>
+                <button onClick={() => setShowSidebar(true)} aria-label="Tus conversaciones" className="relative shrink-0 w-12 h-12 flex items-center justify-center rounded-2xl backdrop-blur-xl shadow-xl shadow-black/40 transition-all active:scale-95" style={{ backgroundColor: "var(--chat-bar-idle)", border: "1px solid var(--chat-bar-border-idle)", color: "#5eead4" }}>
                   <MessageCircle size={17} />
                   {conversations.length > 1 && (
                     <span className="absolute -top-1 -right-1 min-w-[15px] h-[15px] px-0.5 rounded-full bg-teal-500 text-[8px] font-black text-white flex items-center justify-center">{conversations.length}</span>
                   )}
                 </button>
               )}
-              <div className="flex-1 flex items-center gap-2 rounded-2xl p-1.5 backdrop-blur-xl shadow-xl shadow-black/40 transition-colors" style={{ backgroundColor: isListening ? "var(--chat-bar-listening)" : editingIndex != null ? "var(--chat-bar-editing)" : "var(--chat-bar-idle)", border: `1px solid ${isListening ? "var(--chat-bar-border-listening)" : editingIndex != null ? "var(--chat-bar-border-editing)" : "var(--chat-bar-border-idle)"}` }}>
+              <div className="flex-1 h-12 flex items-center gap-2 rounded-2xl p-1.5 backdrop-blur-xl shadow-xl shadow-black/40 transition-colors" style={{ backgroundColor: isListening ? "var(--chat-bar-listening)" : editingIndex != null ? "var(--chat-bar-editing)" : "var(--chat-bar-idle)", border: `1px solid ${isListening ? "var(--chat-bar-border-listening)" : editingIndex != null ? "var(--chat-bar-border-editing)" : "var(--chat-bar-border-idle)"}` }}>
                 {SpeechRecognitionAPI && (
                   <button onClick={handleMicToggle} aria-label={isListening ? "Confirmar, terminé de hablar" : "Hablar"} className="relative p-2.5 rounded-xl shrink-0 transition-all active:scale-95" style={isListening ? { background: "linear-gradient(160deg,#10B981,#059669)", color: "#fff" } : { color: "#94a3b8" }}>
                     {isListening && <span className="absolute inset-0 rounded-xl bg-emerald-400/40 animate-ping" />}
