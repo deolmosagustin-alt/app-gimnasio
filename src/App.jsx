@@ -1074,7 +1074,15 @@ const ANIMATION_CSS = `
   45%  { opacity: 1;    filter: brightness(2.1) saturate(1.5); }
   100% { opacity: 1;    filter: brightness(1)   saturate(1); }
 }
-.muscle-charge { animation: muscleCharge 0.55s cubic-bezier(0.33, 1, 0.68, 1) both; }
+/* BUG FIX: fill-mode "backwards" (no "both") — el final de esta animación
+   (opacity:1, filter normal) YA es el estado natural del elemento sin
+   animar, así que no se pierde nada visualmente al no retenerlo. "both"
+   dejaba un filter distinto de "none" pegado para siempre (aunque
+   visualmente idéntico), y un ancestro con transform/filter ≠ none rompe
+   el centrado de cualquier modal fixed que tenga adentro (mismo bug que
+   ya se había resuelto para .timer-hop, ver comentario más abajo, pero no
+   se había aplicado acá ni al resto de las animaciones de esta lista). */
+.muscle-charge { animation: muscleCharge 0.55s cubic-bezier(0.33, 1, 0.68, 1) backwards; }
 
 
 /* Subida de rango: el músculo late con su color */
@@ -1087,14 +1095,14 @@ const ANIMATION_CSS = `
 
 /* Salto sutil de los números al aparecer */
 @keyframes numberPop { 0% { transform: scale(0.8); opacity: 0; } 55% { transform: scale(1.08); } 100% { transform: scale(1); opacity: 1; } }
-.number-pop { animation: numberPop 0.45s cubic-bezier(0.34, 1.4, 0.64, 1) both; }
+.number-pop { animation: numberPop 0.45s cubic-bezier(0.34, 1.4, 0.64, 1) backwards; }
 
 /* Barra que se llena deslizándose. Anima transform (GPU) en vez de width
    (que fuerza recalcular el layout en CADA frame y hace tirones en
    teléfonos de gama media). El origen a la izquierda hace que crezca desde
    ahí, igual que antes. */
 @keyframes barFill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
-.bar-fill { transform-origin: left center; animation: barFill 0.9s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.bar-fill { transform-origin: left center; animation: barFill 0.9s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
 
 /* Pulso lento e invitante (botón de iniciar sesión) */
 @keyframes invitePulse { 0%, 100% { box-shadow: 0 0 0 0 var(--invite-glow, rgba(20,184,166,0.5)); } 50% { box-shadow: 0 0 0 7px rgba(20,184,166,0); } }
@@ -1103,18 +1111,18 @@ const ANIMATION_CSS = `
 /* Entrada de las tarjetas al cambiar de día (según dirección) */
 @keyframes slideFromRight { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: translateX(0); } }
 @keyframes slideFromLeft { from { opacity: 0; transform: translateX(-18px); } to { opacity: 1; transform: translateX(0); } }
-.slide-right { animation: slideFromRight 0.32s cubic-bezier(0.22, 1, 0.36, 1) both; }
-.slide-left { animation: slideFromLeft 0.32s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.slide-right { animation: slideFromRight 0.32s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+.slide-left { animation: slideFromLeft 0.32s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
 
 /* Latido de la racha + destello dorado si aumentó */
 @keyframes streakBeat { 0%, 100% { transform: scale(1); } 30% { transform: scale(1.22); } 55% { transform: scale(0.97); } }
-.streak-beat { animation: streakBeat 0.7s cubic-bezier(0.34, 1.4, 0.64, 1) 0.3s both; }
+.streak-beat { animation: streakBeat 0.7s cubic-bezier(0.34, 1.4, 0.64, 1) 0.3s backwards; }
 @keyframes streakGlow { 0%, 100% { filter: drop-shadow(0 0 0 rgba(251,191,36,0)); } 50% { filter: drop-shadow(0 0 9px rgba(251,191,36,0.9)); } }
 .streak-glow { animation: streakGlow 1.1s ease-in-out 0.3s 2; }
 
 /* Despliegue elástico de la tarjeta de detalle del músculo */
 @keyframes elasticIn { 0% { opacity: 0; transform: scale(0.95) translateY(8px); } 60% { transform: scale(1.015) translateY(-2px); } 100% { opacity: 1; transform: scale(1) translateY(0); } }
-.elastic-in { animation: elasticIn 0.42s cubic-bezier(0.34, 1.35, 0.64, 1) both; }
+.elastic-in { animation: elasticIn 0.42s cubic-bezier(0.34, 1.35, 0.64, 1) backwards; }
 
 /* Skeletons: formas grises que laten mientras cargan los datos */
 @keyframes skeletonShimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
@@ -1151,7 +1159,7 @@ const ANIMATION_CSS = `
 }
 .activate-pulse { animation: activatePulse 0.85s cubic-bezier(0.22, 1, 0.36, 1) both; }
 @keyframes badgePop { 0% { transform: scale(0); opacity: 0; } 60% { transform: scale(1.18); } 100% { transform: scale(1); opacity: 1; } }
-.badge-pop { animation: badgePop 0.45s cubic-bezier(0.34, 1.5, 0.64, 1) both; }
+.badge-pop { animation: badgePop 0.45s cubic-bezier(0.34, 1.5, 0.64, 1) backwards; }
 
 /* Superserie: el recuadro que agrupa se dibuja */
 @keyframes supersetDraw {
@@ -1172,11 +1180,11 @@ const ANIMATION_CSS = `
 /* ── OTROS ── */
 /* Las tarjetas se "despiertan" al iniciar la sesión */
 @keyframes wakeUp { 0%, 100% { transform: scale(1); } 45% { transform: scale(1.02); } }
-.wake-up { animation: wakeUp 0.45s cubic-bezier(0.34, 1.3, 0.64, 1) both; }
+.wake-up { animation: wakeUp 0.45s cubic-bezier(0.34, 1.3, 0.64, 1) backwards; }
 
 /* Días del calendario que se marcan en cascada */
 @keyframes dayMark { 0% { transform: scale(0); opacity: 0; } 65% { transform: scale(1.25); } 100% { transform: scale(1); opacity: 1; } }
-.day-mark { animation: dayMark 0.38s cubic-bezier(0.34, 1.4, 0.64, 1) both; }
+.day-mark { animation: dayMark 0.38s cubic-bezier(0.34, 1.4, 0.64, 1) backwards; }
 
 /* Transición suave del tema claro/oscuro (no un salto agresivo). Solo anima
    COLORES — nada de transform ni layout, para no interferir con el arrastre de
@@ -1196,7 +1204,7 @@ const ANIMATION_CSS = `
   60%  { transform: scale(0.94); }
   100% { transform: scale(1); text-shadow: none; }
 }
-.streak-jump { animation: streakJump 0.75s cubic-bezier(0.34, 1.4, 0.64, 1) 0.15s both; }
+.streak-jump { animation: streakJump 0.75s cubic-bezier(0.34, 1.4, 0.64, 1) 0.15s backwards; }
 
 /* Cambio de pestaña: la entrante se desliza sutilmente desde su dirección */
 @keyframes tabSlideRight { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: translateX(0); } }
@@ -1240,7 +1248,7 @@ const ANIMATION_CSS = `
 @keyframes sessionStartFade { 0% { opacity: 0; } 12% { opacity: 1; } 82% { opacity: 1; } 100% { opacity: 0; } }
 .session-start-fade { animation: sessionStartFade 1.4s ease-in-out both; }
 @keyframes sessionStartPop { 0% { transform: scale(0.4); opacity: 0; } 45% { transform: scale(1.12); opacity: 1; } 65% { transform: scale(0.98); } 100% { transform: scale(1); opacity: 1; } }
-.session-start-pop { animation: sessionStartPop 0.6s cubic-bezier(0.34, 1.5, 0.64, 1) both; }
+.session-start-pop { animation: sessionStartPop 0.6s cubic-bezier(0.34, 1.5, 0.64, 1) backwards; }
 @keyframes sessionStartText { 0% { transform: translateY(12px); opacity: 0; } 100% { transform: translateY(0); opacity: 1; } }
 .session-start-text { animation: sessionStartText 0.5s cubic-bezier(0.22, 1, 0.36, 1) 0.2s backwards; }
 
@@ -1289,14 +1297,14 @@ const ANIMATION_CSS = `
   60%  { transform: rotate(8deg) scale(1.15); opacity: 1; }
   100% { transform: rotate(0deg) scale(1); opacity: 1; }
 }
-.sparkle-spin { animation: sparkleSpin 0.6s cubic-bezier(0.34, 1.4, 0.64, 1) both; }
+.sparkle-spin { animation: sparkleSpin 0.6s cubic-bezier(0.34, 1.4, 0.64, 1) backwards; }
 
 /* Chip flotante de sesión activa: entra deslizándose desde arriba, suave */
 @keyframes sessionChipIn {
   from { opacity: 0; transform: translateY(-8px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-.session-chip-in { animation: sessionChipIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.session-chip-in { animation: sessionChipIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
 /* El puntito del chip "late" como un indicador de en-vivo: se expande y
    desvanece en bucle (igual que el ping de la barra de sesión en curso). */
 @keyframes sessionChipPing {
@@ -1365,7 +1373,18 @@ const ANIMATION_CSS = `
 /* ==== Animaciones nuevas ==== */
 /* Entrada escalonada para listas de tarjetas (ejercicios, rutinas) */
 @keyframes staggerIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-.stagger-item { animation: staggerIn 0.32s cubic-bezier(.2,.8,.3,1) both; }
+/* BUG FIX: fill-mode "backwards" (no "both"). Se usa en TODAS las tarjetas
+   de listas (ejercicios, rutinas), y con "both" el transform final
+   (translateY(0), visualmente idéntico a no tener transform) quedaba
+   pegado para siempre en cada tarjeta ya montada — eso convierte a
+   CUALQUIER tarjeta con esta clase en el "ancestro con transform" que
+   descentra un modal fixed abierto desde adentro (por ejemplo, el cartel
+   de "¡Nuevo rango!" al guardar una serie: aparecía recortado, tapado por
+   el header, imposible de cerrar tocando su botón). "backwards" mantiene
+   el mismo efecto de entrada (incluido el fill-mode "backwards" que evita
+   el flash-antes-del-delay en las tarjetas con retraso escalonado) sin
+   dejar nada residual una vez terminada. */
+.stagger-item { animation: staggerIn 0.32s cubic-bezier(.2,.8,.3,1) backwards; }
 .stagger-item:nth-child(1) { animation-delay: 0ms; }
 .stagger-item:nth-child(2) { animation-delay: 45ms; }
 .stagger-item:nth-child(3) { animation-delay: 90ms; }
@@ -1914,7 +1933,14 @@ function ShareLinkModal({ title, shareTitle, shareText, shareTarget, onClose }) 
   const waUrl = url ? `https://wa.me/?text=${encodeURIComponent(shareText + " " + url)}` : "#";
   const xUrl = url ? `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(url)}` : "#";
   const redditUrl = url ? `https://www.reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(shareTitle)}` : "#";
-  return (
+  // BUG FIX: se abre, entre otros lugares, desde SavedRoutineRow, que tiene
+  // backdrop-blur permanente (clase "stagger-item smooth-card ...
+  // backdrop-blur-sm") — ese blur arma un containing block para los
+  // descendientes fixed igual que un transform, y sin portal el modal
+  // salía recortado/descentrado. Mismo arreglo que RankUpModal y
+  // ShareImageModal: createPortal a document.body.
+  if (typeof document === "undefined") return null;
+  return createPortal(
     <div className="fixed inset-0 z-[120] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
       <div className="bg-slate-900 border border-slate-700/60 rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50 max-h-[92vh] overflow-y-auto overscroll-contain" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
@@ -1985,7 +2011,8 @@ function ShareLinkModal({ title, shareTitle, shareText, shareTarget, onClose }) 
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -2497,7 +2524,14 @@ function ShareImageModal({ title, fileNamePrefix, shareTitle, shareText, draw, o
     handleDownload();
   };
 
-  return (
+  // BUG FIX: se usa desde varios lugares, algunos adentro de tarjetas con
+  // backdrop-blur permanente (ExerciseCard/SetRow, "stagger-item") — igual
+  // que RankUpModal, ese blur arma un containing block para los
+  // descendientes fixed y descentra/recorta el modal. Portal a
+  // document.body para que salga siempre bien sin importar desde dónde se
+  // abra.
+  if (typeof document === "undefined") return null;
+  return createPortal(
     <div className="fixed inset-0 z-[130] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
       <div ref={scrollContainerRef} className="bg-slate-900 border border-slate-700/60 rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50 max-h-[92vh] overflow-y-auto overscroll-contain" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
@@ -2526,7 +2560,8 @@ function ShareImageModal({ title, fileNamePrefix, shareTitle, shareText, draw, o
         )}
         <p className="text-[10px] text-slate-600 mt-3 text-center">Para tu historia de Instagram: compartila directo, o descargala y subila desde la app.</p>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -3790,7 +3825,15 @@ function HelpModal({ startTab, onClose }) {
 // cada nuevo récord dentro del mismo tier.
 function RankUpModal({ from, to, muscleName, onClose }) {
   useAndroidBack(onClose);
-  return (
+  // BUG FIX: se abre desde adentro de la tarjeta del ejercicio (ExerciseCard,
+  // clase "stagger-item"), que tiene su propio backdrop-blur permanente —
+  // eso también arma un containing block para los descendientes fixed (no
+  // sólo un transform lo hace), así que sin portal el modal aparecía
+  // recortado, tapado por el header y con su botón "¡Vamos!" imposible de
+  // tocar. Igual que ExercisePickerModal y la barra del chat: sacarlo del
+  // árbol normal con createPortal a document.body.
+  if (typeof document === "undefined") return null;
+  return createPortal(
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-5 modal-overlay bg-black/85" style={{ backdropFilter: "blur(8px)" }}>
       <div className="relative w-full max-w-sm rounded-3xl overflow-hidden elastic-in" style={{ background: "var(--rankup-grad)", border: `2px solid ${tint(to.color, "40")}` }}>
         {/* Glow de fondo */}
@@ -3826,7 +3869,8 @@ function RankUpModal({ from, to, muscleName, onClose }) {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -4744,7 +4788,7 @@ function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS,
             key={week}
             // Cascada de entrada: las semanas se marcan una tras otra. Solo al
             // montar (yaAnimado); si no, parpadearían en cada render.
-            style={yaAnimado ? undefined : { animation: `dayMark 0.38s cubic-bezier(0.34,1.4,0.64,1) ${wi * 45}ms both` }}
+            style={yaAnimado ? undefined : { animation: `dayMark 0.38s cubic-bezier(0.34,1.4,0.64,1) ${wi * 45}ms backwards` }}
             className={`w-9 h-9 rounded-xl flex items-center justify-center text-[10px] font-black transition-all ${isCurrent ? "scale-110" : ""}`}
             style={isCurrent
               ? { backgroundColor: dotColor, color: "#fff", boxShadow: `0 6px 16px -4px ${tint(dotColor, "aa")}` }
@@ -4975,10 +5019,13 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
               indicador + atajo: la descarga en sí se hace en su propia
               pestaña, un solo lugar. */}
           {isDeload && onGoToDescarga && (
-            <button onClick={onGoToDescarga} className="mt-3 w-full flex items-center gap-2.5 bg-purple-500/10 border border-purple-500/20 rounded-xl px-3 py-2.5 text-left transition active:scale-[0.99] hover:bg-purple-500/15">
-              <Zap size={14} className="text-purple-400 shrink-0" />
-              <p className="flex-1 text-[11px] text-purple-300/90">Esta semana es de descarga: entrená con series reducidas</p>
-              <ChevronRight size={13} className="text-purple-400 shrink-0" />
+            // Color del día en vez de un violeta fijo: antes este atajo se
+            // veía igual sin importar en qué día estuvieras parado, ahora
+            // usa el mismo acento que el resto de la tarjeta (day.color).
+            <button onClick={onGoToDescarga} className="mt-3 w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-left transition active:scale-[0.99]" style={{ backgroundColor: tint(day.color, "12"), border: `1px solid ${tint(day.color, "30")}` }}>
+              <Zap size={14} className="shrink-0" style={{ color: day.color }} />
+              <p className="flex-1 text-[11px]" style={{ color: day.color }}>Esta semana es de descarga: entrená con series reducidas</p>
+              <ChevronRight size={13} className="shrink-0" style={{ color: day.color }} />
             </button>
           )}
           <div className="grid grid-cols-3 gap-2 mt-4">
@@ -5760,6 +5807,12 @@ const CustomTooltip = ({ active, payload, label }) => {
 // pestaña en toda la app (Descarga, badge "⚡" en el historial) — un rombo
 // en vez de un círculo, así se distingue incluso sin color (por forma).
 const DELOAD_COLOR = "#A855F7";
+// Color fijo del gráfico de evolución (línea, puntos, tooltip): el acento
+// naranja de la sección "Ejercicios", igual para cualquier ejercicio. Antes
+// usaba el color del día (selEx.color) y el gráfico cambiaba de color según
+// qué ejercicio mirabas — el color del día se sigue viendo, pero sólo en el
+// botón "Elegí un ejercicio" de más arriba.
+const EVOLUTION_CHART_COLOR = "#F59E0B";
 function EvolutionDot({ cx, cy, isBest, isActive, color, deload, index, onSelect }) {
   if (cx == null || cy == null) return null;
   const dotColor = deload ? DELOAD_COLOR : color;
@@ -7296,6 +7349,18 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
     const width = chartContainerRef.current?.clientWidth || 300;
     setRawActivePoint((prev) => (prev?.chartKey === chartKey && prev.index === index ? null : { index, cx, cy, width, chartKey }));
   };
+  // BUG FIX ("las palabras se cortan cerca del borde"): el tooltip se
+  // centraba siempre con un margen fijo de 64px contra cada borde, pero su
+  // ancho real (con RPE, fecha larga, etc.) podía superar esos 128px
+  // totales, así que en los puntos más pegados al borde el texto quedaba
+  // recortado por el "overflow: hidden" de la tarjeta. Ahora se mide el
+  // ancho real del tooltip ya renderizado (tooltipRef) y el margen contra
+  // cada borde se calcula a partir de ESE ancho, no de un número inventado.
+  const tooltipRef = useRef(null);
+  const [tooltipWidth, setTooltipWidth] = useState(140);
+  useLayoutEffect(() => {
+    if (activePoint && tooltipRef.current) setTooltipWidth(tooltipRef.current.offsetWidth);
+  }, [activePoint]);
 
   const [confirmResetProgress, setConfirmResetProgress] = useState(false);
   const [activeSection, setActiveSection] = useState("rank");
@@ -7431,10 +7496,15 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
                     gráfico (dibujando su propio recuadro/cursor). */}
                 <div className="relative h-52" ref={chartContainerRef}>
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={chartData} margin={{ top: 5, right: 0, left: -25, bottom: 0 }}>
+                    {/* BUG FIX: con "right: 0" el último punto quedaba con su
+                        centro justo en el borde derecho del SVG, así que la
+                        mitad de su área táctil (y a veces el punto mismo)
+                        caía fuera del recorte del gráfico y no se podía
+                        tocar. Un margen chico le da lugar para respirar. */}
+                    <AreaChart data={chartData} margin={{ top: 5, right: 8, left: -25, bottom: 0 }}>
                       <defs>
                         <linearGradient id="gA" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor={selEx?.color || "#14B8A6"} stopOpacity={0.35} /><stop offset="95%" stopColor={selEx?.color || "#14B8A6"} stopOpacity={0} />
+                          <stop offset="5%" stopColor={EVOLUTION_CHART_COLOR} stopOpacity={0.35} /><stop offset="95%" stopColor={EVOLUTION_CHART_COLOR} stopOpacity={0} />
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
@@ -7443,8 +7513,13 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
                       {/* Línea de referencia en tu mejor marca — de un vistazo ves
                           qué tan cerca (o lejos) estuvo cada sesión de tu techo
                           actual, no solo si subió o bajó respecto a la anterior. */}
+                      {/* pointerEvents: "none" en la línea Y en su etiqueta —
+                          si tu sesión más reciente es también tu mejor marca,
+                          esta línea/etiqueta cae justo arriba de ese punto y,
+                          sin esto, se comía el toque en vez de dejarlo pasar
+                          al punto de abajo. */}
                       {chartBestE1rm != null && (
-                        <ReferenceLine y={chartBestE1rm} stroke={tint(selEx?.color || "#14B8A6", "60")} strokeDasharray="4 4" label={{ value: chartBestEntry ? `Mejor: ${chartBestEntry.reps}×${chartBestEntry.kg}kg` : "Mejor", position: "insideTopRight", fill: tint(selEx?.color || "#14B8A6", "cc"), fontSize: 10, fontWeight: 700 }} />
+                        <ReferenceLine y={chartBestE1rm} stroke={tint(EVOLUTION_CHART_COLOR, "60")} strokeDasharray="4 4" style={{ pointerEvents: "none" }} label={{ value: chartBestEntry ? `Mejor: ${chartBestEntry.reps}×${chartBestEntry.kg}kg` : "Mejor", position: "insideTopRight", fill: tint(EVOLUTION_CHART_COLOR, "cc"), fontSize: 10, fontWeight: 700, style: { pointerEvents: "none" } }} />
                       )}
                       {/* La curva se sigue posicionando con el 1RM estimado (combina reps
                           y kilos: sube o baja el peso, sube o baja las reps, y el número
@@ -7455,20 +7530,28 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
                           como dato chico de referencia. El punto de tu mejor sesión se
                           dibuja más grande, para ubicarlo de un vistazo. Sin Tooltip ni
                           activeDot nativos de Recharts: sólo EvolutionDot reacciona al
-                          toque (ver más arriba), nada más del gráfico. */}
-                      <Area type="monotone" dataKey="e1rm" stroke={selEx?.color || "#14B8A6"} fill="url(#gA)" strokeWidth={2.5} isAnimationActive={false} dot={(props) => <EvolutionDot {...props} color={selEx?.color || "#14B8A6"} isBest={props.payload.e1rm === chartBestE1rm} isActive={activePoint?.index === props.index} deload={props.payload.deload} onSelect={handleSelectPoint} />} activeDot={false} name="Kg" />
+                          toque (ver más arriba), nada más del gráfico. Color fijo naranja
+                          (el acento de esta sección), no el color del día: eso lo sigue
+                          mostrando solo el botón "Elegí un ejercicio" de más arriba. */}
+                      <Area type="monotone" dataKey="e1rm" stroke={EVOLUTION_CHART_COLOR} fill="url(#gA)" strokeWidth={2.5} isAnimationActive={false} dot={(props) => <EvolutionDot {...props} color={EVOLUTION_CHART_COLOR} isBest={props.payload.e1rm === chartBestE1rm} isActive={activePoint?.index === props.index} deload={props.payload.deload} onSelect={handleSelectPoint} />} activeDot={false} name="Kg" />
                     </AreaChart>
                   </ResponsiveContainer>
                   {activePoint && chartData[activePoint.index] && (() => {
                     const d = chartData[activePoint.index];
                     // Centrado horizontalmente sobre el punto, en píxeles reales
                     // (cx ya viene en esa unidad, coincide con el ancho medido
-                    // del contenedor) — recortado 64px contra cada borde para
-                    // que la tarjeta no se corte en los extremos de la curva
-                    // (primer/último punto).
-                    const clampedLeft = Math.min(activePoint.width - 64, Math.max(64, activePoint.cx));
+                    // del contenedor) — recortado contra cada borde según el
+                    // ancho REAL del tooltip (tooltipWidth, medido después de
+                    // renderizarlo), no un número fijo inventado: con RPE o
+                    // fechas largas el tooltip es más ancho de lo que un
+                    // margen fijo de 64px alcanzaba a cubrir, y el texto
+                    // quedaba cortado por el borde de la tarjeta en los
+                    // puntos más pegados al principio o al final de la curva.
+                    const half = tooltipWidth / 2 + 4;
+                    const clampedLeft = Math.min(activePoint.width - half, Math.max(half, activePoint.cx));
                     return (
                       <div
+                        ref={tooltipRef}
                         className="absolute pointer-events-none bg-[#0f0f1a] border border-slate-700/60 rounded-xl px-3 py-2.5 text-xs shadow-xl shadow-black/40 z-10"
                         style={{ left: clampedLeft, top: Math.max(0, activePoint.cy - 10), transform: "translate(-50%, -100%)", minWidth: "120px" }}
                       >
@@ -7476,7 +7559,7 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
                           <p className="text-slate-400 font-medium">{d.date}</p>
                           {d.deload && <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md" style={{ backgroundColor: tint(DELOAD_COLOR, "22"), color: DELOAD_COLOR }}>⚡ DESCARGA</span>}
                         </div>
-                        <p className="font-black text-sm" style={{ color: d.deload ? DELOAD_COLOR : selEx?.color }}>{d.reps} × {d.kg} kg</p>
+                        <p className="font-black text-sm" style={{ color: d.deload ? DELOAD_COLOR : EVOLUTION_CHART_COLOR }}>{d.reps} × {d.kg} kg</p>
                         <p className="text-slate-500 mt-1">{d.e1rm} kg <span className="text-[10px]">1RM est.</span></p>
                         {d.rpe != null && <p className="text-slate-500 mt-0.5">{formatEffort(d.rpe, settings.rpeDisplayMode)}</p>}
                       </div>
