@@ -5761,7 +5761,13 @@ function EvolutionDot({ cx, cy, isBest, isActive, color, deload, index, onSelect
       {isBest && <circle cx={cx} cy={cy} r={7} fill={dotColor} opacity={0.25} />}
       {isActive && <circle cx={cx} cy={cy} r={9} fill="none" stroke={dotColor} strokeWidth={1.5} opacity={0.55} />}
       {deload ? (
-        <rect x={cx - 3.2} y={cy - 3.2} width={6.4} height={6.4} rx={1.2} transform={`rotate(45 ${cx} ${cy})`} fill={dotColor} stroke="#0a0a0f" strokeWidth={isBest || isActive ? 1.5 : 1} />
+        // Marcador de descarga: el mismo rayo que ya se usa en toda la app
+        // para "semana de descarga" (atajo de Rutina, tooltip, lista 1RM),
+        // en vez de un rombo que a este tamaño se leía como un punto más.
+        <>
+          <circle cx={cx} cy={cy} r={isBest || isActive ? 9 : 8} fill="#0a0a0f" stroke={dotColor} strokeWidth={isBest || isActive ? 1.5 : 1} />
+          <Zap x={cx - 5.5} y={cy - 5.5} width={11} height={11} color={dotColor} fill={dotColor} strokeWidth={1} />
+        </>
       ) : (
         <circle cx={cx} cy={cy} r={isBest || isActive ? 4 : 3} fill={dotColor} stroke="#0a0a0f" strokeWidth={isBest || isActive ? 1.5 : 0} />
       )}
@@ -7361,14 +7367,10 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
               {Array.from({ length: selEx?.sets || 1 }).map((_, i) => {
                 const active = selSet === i;
                 const repRange = selExDef?.sets?.[i]?.repRange;
-                const hasData = (logs[`${selId}_${i}`] || []).length > 0;
                 return (
                   <button key={i} onClick={() => setSelSet(i)} className="flex-1 py-1.5 rounded-xl text-xs font-bold transition-all border flex flex-col items-center gap-0.5"
                     style={active ? { backgroundColor: "#F59E0B", borderColor: "#F59E0B", color: "#fff" } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
-                    <span className="flex items-center gap-1">
-                      S{i + 1}
-                      <span className="w-1 h-1 rounded-full shrink-0" style={{ backgroundColor: hasData ? (active ? "#fff" : "#F59E0B") : "transparent", border: hasData ? "none" : `1px solid ${active ? "rgba(255,255,255,0.4)" : "var(--chip-border)"}` }} />
-                    </span>
+                    S{i + 1}
                     {repRange && <span className="text-[9px] font-normal opacity-70">{repRange}</span>}
                   </button>
                 );
@@ -10607,27 +10609,6 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
 
   return (
     <div className="relative pb-32">
-      {/* Pestaña fija arriba a la izquierda, colgada justo debajo del header
-          (que ya respeta el notch/status bar con env(safe-area-inset-top)):
-          nunca tapa el header ni el propio notch, en vez de un top fijo que
-          en algunos teléfonos quedaría adentro del área no segura. Es el
-          único lugar para abrir tus conversaciones (el botón que repetía
-          esto adentro de la tarjeta de abajo se sacó). A propósito lo más
-          chica y discreta posible (sólo ícono, sin texto) para que no
-          moleste mientras leés el chat. */}
-      {onSwitchConversation && (
-        <button
-          onClick={() => setShowSidebar(true)}
-          aria-label="Tus conversaciones"
-          className="fixed left-0 z-40 flex items-center justify-center w-7 h-8 rounded-r-xl text-teal-400/80 shadow-md shadow-black/30 active:scale-90 transition backdrop-blur-xl"
-          style={{ top: "calc(env(safe-area-inset-top, 0px) + 70px)", background: "var(--glass-panel-bg)", border: "1px solid rgba(20,184,166,0.25)", borderLeft: "none" }}
-        >
-          <MessageCircle size={12} />
-          {conversations.length > 1 && (
-            <span className="absolute -top-1 -right-1 min-w-[13px] h-[13px] px-0.5 rounded-full bg-teal-500 text-[7px] font-black text-white flex items-center justify-center">{conversations.length}</span>
-          )}
-        </button>
-      )}
       {/* Vidrio esmerilado: fondo semitransparente + backdrop-blur en vez de
           un gradiente sólido. El borde superior más claro (inset shadow)
           simula el filo de luz típico del glassmorphism. */}
@@ -10657,25 +10638,29 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
         </div>
       </div>
 
-      {/* Un color distinto por atajo — el mismo lenguaje de "cada categoría
+      {/* Rediseño "ícono primero", tipo dock de accesos directos, en vez de
+          la fila de chips de texto plano de antes: cada atajo es una
+          tarjeta con su color propio, ícono más grande en una placa y
+          snap-scroll (se acomoda solo al soltar, como un carrusel). Un
+          color distinto por atajo — el mismo lenguaje de "cada categoría
           tiene su acento" que ya usan Progreso (Rango/Historial/Ejercicios)
-          y Rutinas/Descarga, en vez de que los seis chips se vean como una
-          sola mancha teal. */}
-      {/* Fade a la derecha: sin esto, el corte abrupto del último chip no
-          avisaba que la fila sigue — se veía como si faltara contenido en
-          vez de invitar a deslizar. */}
+          y Rutinas/Descarga. Fade a la derecha: sin esto, el corte abrupto
+          de la última tarjeta no avisaba que la fila sigue. */}
       <div className="relative -mx-1 mb-4">
-        <div className="flex gap-1.5 overflow-x-auto pb-1 px-1">
+        <div className="flex gap-2 overflow-x-auto pb-1 px-1 snap-x snap-mandatory">
           {[
-            { icon: <Layers size={11} />, label: "Crear rutina", prompt: "Armame una rutina nueva según mis objetivos", color: "#A855F7", autoSend: true },
-            { icon: <BarChart3 size={11} />, label: "Analizar progreso", prompt: "Analizá mi progreso reciente: ¿en qué mejoré y qué tengo estancado?", color: "#3B82F6", autoSend: true },
-            { icon: <Target size={11} />, label: "Punto débil", prompt: "Mirando mis rangos por músculo, ¿cuál es mi punto más débil y cómo lo ataco?", color: "#F59E0B", autoSend: true },
-            { icon: <Zap size={11} />, label: "Plan de hoy", prompt: "¿Qué me toca entrenar hoy y con qué pesos me conviene arrancar?", color: "#14B8A6", autoSend: true },
-            { icon: <Calendar size={11} />, label: "Ciclo y descarga", prompt: "¿Cómo vengo en el ciclo actual? ¿Cuándo me toca la descarga?", color: "#F43F5E", autoSend: true },
-            { icon: <Save size={11} />, label: "Anotar una marca", color: "#10B981", askExercise: true },
-            { icon: <FileDown size={11} />, label: "Exportar rutina", prompt: "Pasame mi rutina activa en PDF", color: "#06B6D4", autoSend: true },
+            { icon: <Layers size={16} />, label: "Crear rutina", prompt: "Armame una rutina nueva según mis objetivos", color: "#A855F7", autoSend: true },
+            { icon: <BarChart3 size={16} />, label: "Analizar progreso", prompt: "Analizá mi progreso reciente: ¿en qué mejoré y qué tengo estancado?", color: "#3B82F6", autoSend: true },
+            { icon: <Target size={16} />, label: "Punto débil", prompt: "Mirando mis rangos por músculo, ¿cuál es mi punto más débil y cómo lo ataco?", color: "#F59E0B", autoSend: true },
+            { icon: <Zap size={16} />, label: "Plan de hoy", prompt: "¿Qué me toca entrenar hoy y con qué pesos me conviene arrancar?", color: "#14B8A6", autoSend: true },
+            { icon: <Calendar size={16} />, label: "Ciclo y descarga", prompt: "¿Cómo vengo en el ciclo actual? ¿Cuándo me toca la descarga?", color: "#F43F5E", autoSend: true },
+            { icon: <Save size={16} />, label: "Anotar una marca", color: "#10B981", askExercise: true },
+            { icon: <FileDown size={16} />, label: "Exportar rutina", prompt: "Pasame mi rutina activa en PDF", color: "#06B6D4", autoSend: true },
           ].map((c, i) => (
-            <button key={i} onClick={() => handleQuickPrompt(c)} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[10px] font-bold whitespace-nowrap shrink-0 transition active:scale-95" style={{ backgroundColor: tint(c.color, "14"), border: `1px solid ${tint(c.color, "30")}`, color: c.color }}>{c.icon}{c.label}</button>
+            <button key={i} onClick={() => handleQuickPrompt(c)} className="snap-start flex flex-col items-center gap-1.5 w-[74px] shrink-0 py-2.5 px-1 rounded-2xl transition active:scale-95" style={{ backgroundColor: tint(c.color, "0c"), border: `1px solid ${tint(c.color, "25")}` }}>
+              <span className="flex items-center justify-center w-9 h-9 rounded-xl shrink-0" style={{ backgroundColor: tint(c.color, "22"), color: c.color }}>{c.icon}</span>
+              <span className="text-[9px] font-bold leading-tight text-center" style={{ color: c.color }}>{c.label}</span>
+            </button>
           ))}
         </div>
         <div className="absolute top-0 right-0 bottom-1 w-8 pointer-events-none" style={{ background: "linear-gradient(to right, transparent, var(--app-bg))" }} />
@@ -10910,25 +10895,40 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
                 <button onClick={cancelarEdicion} aria-label="Cancelar edición" className="p-1 rounded-lg text-slate-400 hover:text-white transition shrink-0"><X size={13} /></button>
               </div>
             )}
-            <div className="flex items-center gap-2 rounded-2xl p-1.5 backdrop-blur-xl shadow-xl shadow-black/40 transition-colors" style={{ backgroundColor: isListening ? "var(--chat-bar-listening)" : editingIndex != null ? "var(--chat-bar-editing)" : "var(--chat-bar-idle)", border: `1px solid ${isListening ? "var(--chat-bar-border-listening)" : editingIndex != null ? "var(--chat-bar-border-editing)" : "var(--chat-bar-border-idle)"}` }}>
-              {SpeechRecognitionAPI && (
-                <button onClick={handleMicToggle} aria-label={isListening ? "Confirmar, terminé de hablar" : "Hablar"} className="relative p-2.5 rounded-xl shrink-0 transition-all active:scale-95" style={isListening ? { background: "linear-gradient(160deg,#10B981,#059669)", color: "#fff" } : { color: "#94a3b8" }}>
-                  {isListening && <span className="absolute inset-0 rounded-xl bg-emerald-400/40 animate-ping" />}
-                  <span className="relative">{isListening ? <Check size={16} /> : <Mic size={16} />}</span>
+            <div className="flex items-end gap-2">
+              {/* Botón de conversaciones pegado a la barra de mensaje (antes
+                  era una pestaña aparte, flotando arriba a la izquierda):
+                  vive en el mismo contenedor fijo que el input, así se mueve
+                  y aparece siempre junto a él, en vez de en otro punto de la
+                  pantalla. */}
+              {onSwitchConversation && (
+                <button onClick={() => setShowSidebar(true)} aria-label="Tus conversaciones" className="relative shrink-0 p-2.5 rounded-2xl backdrop-blur-xl shadow-xl shadow-black/40 transition-all active:scale-95" style={{ backgroundColor: "var(--chat-bar-idle)", border: "1px solid var(--chat-bar-border-idle)", color: "#5eead4" }}>
+                  <MessageCircle size={17} />
+                  {conversations.length > 1 && (
+                    <span className="absolute -top-1 -right-1 min-w-[15px] h-[15px] px-0.5 rounded-full bg-teal-500 text-[8px] font-black text-white flex items-center justify-center">{conversations.length}</span>
+                  )}
                 </button>
               )}
-              <input
-                ref={chatInputRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") handleSend(); }}
-                placeholder={isListening ? "Hablá tranquilo…" : "Preguntale algo a tu entrenador…"}
-                className="flex-1 bg-transparent px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none min-w-0"
-                disabled={isSending}
-              />
-              <button onClick={handleSend} disabled={!input.trim() || isSending} aria-label="Enviar" className="p-2.5 rounded-xl !text-white shrink-0 disabled:opacity-40 transition-all active:scale-95" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>
-                <Send size={16} />
-              </button>
+              <div className="flex-1 flex items-center gap-2 rounded-2xl p-1.5 backdrop-blur-xl shadow-xl shadow-black/40 transition-colors" style={{ backgroundColor: isListening ? "var(--chat-bar-listening)" : editingIndex != null ? "var(--chat-bar-editing)" : "var(--chat-bar-idle)", border: `1px solid ${isListening ? "var(--chat-bar-border-listening)" : editingIndex != null ? "var(--chat-bar-border-editing)" : "var(--chat-bar-border-idle)"}` }}>
+                {SpeechRecognitionAPI && (
+                  <button onClick={handleMicToggle} aria-label={isListening ? "Confirmar, terminé de hablar" : "Hablar"} className="relative p-2.5 rounded-xl shrink-0 transition-all active:scale-95" style={isListening ? { background: "linear-gradient(160deg,#10B981,#059669)", color: "#fff" } : { color: "#94a3b8" }}>
+                    {isListening && <span className="absolute inset-0 rounded-xl bg-emerald-400/40 animate-ping" />}
+                    <span className="relative">{isListening ? <Check size={16} /> : <Mic size={16} />}</span>
+                  </button>
+                )}
+                <input
+                  ref={chatInputRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleSend(); }}
+                  placeholder={isListening ? "Hablá tranquilo…" : "Preguntale algo a tu entrenador…"}
+                  className="flex-1 bg-transparent px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none min-w-0"
+                  disabled={isSending}
+                />
+                <button onClick={handleSend} disabled={!input.trim() || isSending} aria-label="Enviar" className="p-2.5 rounded-xl !text-white shrink-0 disabled:opacity-40 transition-all active:scale-95" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>
+                  <Send size={16} />
+                </button>
+              </div>
             </div>
             <p className="text-[9px] text-slate-600 text-center mt-1.5">Puede cometer errores. No reemplaza el consejo de un profesional de la salud.</p>
           </div>
