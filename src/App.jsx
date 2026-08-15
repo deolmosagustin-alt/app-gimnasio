@@ -390,9 +390,17 @@ function buildRoutineModel(routineDef) {
       return { id, name, muscle, nota, video, sets: entry.sets, custom: !lib, cardio, supersetNext: !!entry.supersetNext };
     });
     days[dk] = { ...d, exercises };
+    // BUG FIX: si el mismo ejercicio (mismo id) aparece en más de un día de
+    // la rutina, antes esto se pisaba en cada vuelta del forEach y quedaba
+    // resuelto SIEMPRE al último día de dayOrder — sin importar desde qué
+    // día lo entrenaste en realidad (ej. "Sentadilla" en Piernas 1 y
+    // Piernas 2 quedaba etiquetada como Piernas 2 aunque la marcaras desde
+    // Piernas 1). Ahora gana el PRIMER día donde aparece — mismo criterio
+    // que ya usa ProgressView (allExercises, más abajo) para elegir color y
+    // día de cada ejercicio, así los dos quedan consistentes entre sí.
     exercises.forEach((ex) => {
-      exerciseById[ex.id] = { ...ex, dayKey: dk };
-      ex.sets.forEach((_, i) => { keyToDay[`${ex.id}_${i}`] = dk; });
+      if (!exerciseById[ex.id]) exerciseById[ex.id] = { ...ex, dayKey: dk };
+      ex.sets.forEach((_, i) => { const k = `${ex.id}_${i}`; if (!(k in keyToDay)) keyToDay[k] = dk; });
     });
   });
   return { dayOrder, days, exerciseById, keyToDay };
@@ -890,6 +898,27 @@ function getWeekInfo(cycleStart, settings = DEFAULT_SETTINGS) {
   const weekInCycle = (totalWeek % cycleWeeks) + 1;
   const isDeload = weekInCycle > trainWeeks;
   return { totalWeek: totalWeek + 1, weekInCycle, isDeload, cycleNumber: Math.floor(totalWeek / cycleWeeks) + 1, cycleWeeks, trainWeeks, deloadWeeks };
+}
+
+// Igual cuenta que arriba (días desde cycleStart, en bloques de 7) pero para
+// una fecha cualquiera en vez de "ahora" — sirve para saber si dos fechas
+// cayeron en la MISMA semana del ciclo. Se usa en DeloadView para no dejar
+// registrar la descarga de un mismo ejercicio dos veces en la misma semana
+// cuando ese ejercicio aparece en más de un día de la rutina (ver
+// toggleDeloadDone).
+function getTotalWeekForDate(cycleStart, dateStr) {
+  if (!cycleStart || !dateStr) return null;
+  // OJO: "dateStr" es una fecha SIN hora ("YYYY-MM-DD", como todo lo que
+  // guarda logs). Parsearla directo con `new Date(dateStr)` la interpreta
+  // como medianoche UTC, mientras que cycleStart es un instante real (con
+  // la hora del día en que se creó el ciclo) — comparar los dos así podía
+  // desfasar casi un día entero según la zona horaria, empujando fechas al
+  // bloque de semana equivocado. Normalizamos ambos al mediodía LOCAL de su
+  // fecha calendario antes de restar, para comparar días completos.
+  const target = new Date(`${dateStr}T12:00:00`);
+  const start = new Date(cycleStart.getFullYear(), cycleStart.getMonth(), cycleStart.getDate(), 12);
+  const diffDays = Math.round((target - start) / 86400000);
+  return Number.isFinite(diffDays) ? Math.floor(diffDays / 7) : null;
 }
 
 /* ============================== SESSION HISTORY ==============================
@@ -3040,6 +3069,37 @@ function persistActiveRestTimers() {
   try { localStorage.setItem(ACTIVE_REST_TIMERS_KEY, JSON.stringify(ACTIVE_REST_TIMERS)); } catch { /* ignorado a propósito */ }
 }
 
+// BUG FIX ("el cronómetro de la bici se resetea al cerrar la app"): el
+// cronómetro de cardio (tanto en Rutina como en Descarga) vivía SOLO en
+// estado local del componente — cerrar la app de verdad (no solo cambiar de
+// pestaña) lo perdía por completo, igual que le pasaba antes al descanso
+// entre series. Mismo patrón que ACTIVE_REST_TIMERS: se guarda el momento
+// real en que arrancó (startedAt), no los segundos contados, así sobrevive
+// a que el navegador frene el setInterval en segundo plano; y se espeja en
+// localStorage para sobrevivir a cerrar la app de verdad.
+const ACTIVE_CARDIO_TIMERS_KEY = "modusfit_active_cardio_timers_v1";
+function loadActiveCardioTimers() {
+  try {
+    const raw = localStorage.getItem(ACTIVE_CARDIO_TIMERS_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch { return {}; }
+}
+const ACTIVE_CARDIO_TIMERS = loadActiveCardioTimers();
+function persistActiveCardioTimers() {
+  try { localStorage.setItem(ACTIVE_CARDIO_TIMERS_KEY, JSON.stringify(ACTIVE_CARDIO_TIMERS)); } catch { /* ignorado a propósito */ }
+}
+// Estado inicial de un cronómetro de cardio: si había uno persistido y
+// corriendo, retoma la cuenta real desde su startedAt; si estaba pausado,
+// retoma el tiempo congelado; si no hay nada, arranca de cero.
+function initCardioTimerState(timerId) {
+  const p = ACTIVE_CARDIO_TIMERS[timerId];
+  if (!p) return { mode: "stopwatch", running: false, elapsed: 0 };
+  if (p.running && p.startedAt) return { mode: p.mode || "stopwatch", running: true, elapsed: Math.floor((Date.now() - p.startedAt) / 1000) };
+  return { mode: p.mode || "stopwatch", running: false, elapsed: p.elapsed || 0 };
+}
+
 // Número que "cuenta" hasta su valor final en vez de aparecer de golpe.
 // Se usa para los récords: ver el peso subir de 80 a 82.5 refuerza la
 // sensación de progreso mucho más que verlo ya escrito.
@@ -3521,6 +3581,13 @@ const WELCOME_SLIDES = [
     title: "Tu entrenador con IA",
     text: "Conoce tus datos reales y te da consejos concretos, nada de respuestas genéricas.",
   },
+  {
+    icon: <Zap size={38} />,
+    color: "#A855F7",
+    title: "Semanas de descarga",
+    text: "Cada ciertas semanas de entrenamiento te proponemos una semana con menos carga, para recuperarte antes de la próxima. ¿La activamos? Lo podés cambiar cuando quieras desde tu perfil.",
+    interactive: "deload",
+  },
 ];
 
 // ── OVERLAY DE INICIO DE SESIÓN ─────────────────────────────────────────────
@@ -3675,11 +3742,11 @@ function WeeklyRecapModal({ data, onClose }) {
   );
 }
 
-function WelcomeIntro({ onClose, onOpenTutorial }) {
+function WelcomeIntro({ onClose, onOpenTutorial, onUpdateSettings = null }) {
   useAndroidBack(onClose);
   const [i, setI] = useState(0);
   const slide = WELCOME_SLIDES[i];
-  const isLast = i === WELCOME_SLIDES.length - 1;
+  const isDeloadSlide = slide.interactive === "deload";
   return (
     <div className="fixed inset-0 z-[110] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 modal-bg-in modal-overlay">
       <div
@@ -3713,14 +3780,36 @@ function WelcomeIntro({ onClose, onOpenTutorial }) {
 
         {/* Botones grandes, estilo intro de app */}
         <div className="px-5 pb-5 space-y-2">
-          <button
-            onClick={() => (isLast ? onClose() : setI((n) => n + 1))}
-            className="w-full py-3.5 rounded-2xl text-sm font-black !text-white transition active:scale-[0.98]"
-            style={{ background: `linear-gradient(135deg, ${slide.color}, ${tint(slide.color, "b0")})`, boxShadow: `0 10px 28px -10px ${tint(slide.color, "80")}` }}
-          >
-            {isLast ? "¡Empezar a entrenar!" : "Siguiente"}
-          </button>
-          {isLast ? (
+          {isDeloadSlide ? (
+            // Elegir acá mismo si querés las semanas de descarga (mismo
+            // ajuste que Perfil → Configuración de descarga, deloadEnabled)
+            // — con "Sí" ya activado por defecto (el comportamiento normal
+            // de la app), así que tocar cualquiera de las dos avanza.
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => { onUpdateSettings?.({ deloadEnabled: true }); onClose(); }}
+                className="py-3.5 rounded-2xl text-sm font-black !text-white transition active:scale-[0.98]"
+                style={{ background: `linear-gradient(135deg, ${slide.color}, ${tint(slide.color, "b0")})`, boxShadow: `0 10px 28px -10px ${tint(slide.color, "80")}` }}
+              >
+                Sí, quiero
+              </button>
+              <button
+                onClick={() => { onUpdateSettings?.({ deloadEnabled: false }); onClose(); }}
+                className="py-3.5 rounded-2xl text-sm font-bold text-slate-300 border border-slate-700 hover:bg-slate-800/60 transition active:scale-[0.98]"
+              >
+                No, prefiero no
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setI((n) => n + 1)}
+              className="w-full py-3.5 rounded-2xl text-sm font-black !text-white transition active:scale-[0.98]"
+              style={{ background: `linear-gradient(135deg, ${slide.color}, ${tint(slide.color, "b0")})`, boxShadow: `0 10px 28px -10px ${tint(slide.color, "80")}` }}
+            >
+              Siguiente
+            </button>
+          )}
+          {isDeloadSlide ? (
             <button onClick={() => { onClose(); onOpenTutorial?.(); }} className="w-full py-2.5 rounded-2xl text-xs font-bold text-slate-400 hover:text-white transition">
               Ver el tutorial completo
             </button>
@@ -3957,11 +4046,20 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   // Timer de cardio — dos modos:
   // "stopwatch": cuenta para ARRIBA (arrancás cuando empezás, parás cuando terminás)
   // "countdown": cuenta para ABAJO desde los minutos ingresados (objetivo)
-  const [cardioMode, setCardioMode] = useState("stopwatch"); // "stopwatch" | "countdown"
-  const [cardioRunning, setCardioRunning] = useState(false);
-  const [cardioElapsed, setCardioElapsed] = useState(0); // segundos transcurridos (stopwatch)
+  // BUG FIX: el cronómetro arrancaba siempre de cero, aunque hubiera uno
+  // corriendo o pausado guardado de antes de cerrar la app (ver
+  // ACTIVE_CARDIO_TIMERS / initCardioTimerState más arriba).
+  const cardioTimerId = `cardio_${exerciseId}_${setIndex}`;
+  const [cardioInit] = useState(() => initCardioTimerState(cardioTimerId));
+  const [cardioMode, setCardioMode] = useState(cardioInit.mode); // "stopwatch" | "countdown"
+  const [cardioRunning, setCardioRunning] = useState(cardioInit.running);
+  const [cardioElapsed, setCardioElapsed] = useState(cardioInit.elapsed); // segundos transcurridos (stopwatch)
   const [cardioLeft, setCardioLeft] = useState(0);       // segundos restantes (countdown)
   const cardioIntervalRef = useRef(null);
+  // Reinicio explícito (cambiar de modo, tocar "↺", borrar los minutos):
+  // limpia también lo persistido, para que no quede un tiempo viejo dando
+  // vueltas si cerrás la app justo después de reiniciar el cronómetro.
+  const clearPersistedCardioTimer = () => { delete ACTIVE_CARDIO_TIMERS[cardioTimerId]; persistActiveCardioTimers(); };
   // NOTIFICACIÓN NATIVA DEL CARDIO — misma función que el reloj de descanso:
   // · Cuenta regresiva: cronómetro vivo en la barra (plugin nativo) + aviso
   //   de fin PROGRAMADO con hora exacta (canal de vibración fuerte), que el
@@ -4030,8 +4128,29 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   }, [cardioRunning, cardioMode]);
 
   useEffect(() => {
-    if (!cardioRunning) { clearInterval(cardioIntervalRef.current); return; }
+    // BUG FIX: sin este chequeo, esta rama corría para CUALQUIER serie
+    // (fuerza incluida, no sólo cardio) y escribía una entrada vacía
+    // ({running:false, elapsed:0}) en ACTIVE_CARDIO_TIMERS por cada serie de
+    // cada ejercicio de la rutina — basura acumulándose en localStorage sin
+    // que nada la usara, ya que las series de fuerza nunca muestran este
+    // cronómetro.
+    if (!cardio) return;
+    if (!cardioRunning) {
+      clearInterval(cardioIntervalRef.current);
+      // Al pausar a mano queda guardado el tiempo congelado, para retomarlo
+      // si cerrás la app. El fin NATURAL (cardioFinishedRef) ya se guardó
+      // como serie hecha, así que no tiene sentido dejar nada pendiente acá.
+      if (!cardioFinishedRef.current) {
+        ACTIVE_CARDIO_TIMERS[cardioTimerId] = { mode: cardioMode, running: false, elapsed: cardioElapsed };
+      } else {
+        delete ACTIVE_CARDIO_TIMERS[cardioTimerId];
+      }
+      persistActiveCardioTimers();
+      return;
+    }
     const startedAt = Date.now() - cardioElapsed * 1000;
+    ACTIVE_CARDIO_TIMERS[cardioTimerId] = { mode: cardioMode, running: true, startedAt };
+    persistActiveCardioTimers();
     cardioIntervalRef.current = setInterval(() => {
       const elapsed = Math.floor((Date.now() - startedAt) / 1000);
       if (cardioMode === "stopwatch") {
@@ -4047,6 +4166,8 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           haptic([100, 50, 100, 50, 200]);
           // Guardar automáticamente
           setCardioElapsed(elapsed);
+          delete ACTIVE_CARDIO_TIMERS[cardioTimerId];
+          persistActiveCardioTimers();
           setTimeout(() => saveBtnRef.current?.click(), 300);
         }
       }
@@ -4296,10 +4417,10 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
             <div className="space-y-2.5">
               {/* Selector de modo */}
               <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
-                <button onClick={() => { setCardioMode("stopwatch"); setCardioRunning(false); setCardioElapsed(0); }} className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[10px] font-bold transition-all ${cardioMode === "stopwatch" ? "text-white" : "text-slate-500"}`} style={cardioMode === "stopwatch" ? { backgroundColor: accent } : {}}>
+                <button onClick={() => { setCardioMode("stopwatch"); setCardioRunning(false); setCardioElapsed(0); clearPersistedCardioTimer(); }} className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[10px] font-bold transition-all ${cardioMode === "stopwatch" ? "text-white" : "text-slate-500"}`} style={cardioMode === "stopwatch" ? { backgroundColor: accent } : {}}>
                   <Clock size={11} /> Cronómetro
                 </button>
-                <button onClick={() => { setCardioMode("countdown"); setCardioRunning(false); setCardioElapsed(0); }} className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[10px] font-bold transition-all ${cardioMode === "countdown" ? "text-white" : "text-slate-500"}`} style={cardioMode === "countdown" ? { backgroundColor: accent } : {}}>
+                <button onClick={() => { setCardioMode("countdown"); setCardioRunning(false); setCardioElapsed(0); clearPersistedCardioTimer(); }} className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[10px] font-bold transition-all ${cardioMode === "countdown" ? "text-white" : "text-slate-500"}`} style={cardioMode === "countdown" ? { backgroundColor: accent } : {}}>
                   <Timer size={11} /> Cuenta regresiva
                 </button>
               </div>
@@ -4317,7 +4438,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
                     <button onClick={() => setCardioRunning((r) => !r)} className="w-10 h-10 rounded-xl flex items-center justify-center text-white transition active:scale-90" style={{ backgroundColor: accent }}>
                       {cardioRunning ? <Pause size={16} /> : <Play size={16} />}
                     </button>
-                    <button onClick={() => { setCardioRunning(false); setCardioElapsed(0); }} className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 bg-slate-800 transition active:scale-90">
+                    <button onClick={() => { setCardioRunning(false); setCardioElapsed(0); clearPersistedCardioTimer(); }} className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 bg-slate-800 transition active:scale-90">
                       <RotateCcw size={13} />
                     </button>
                   </div>
@@ -4328,7 +4449,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
                   <div className="flex items-end gap-2">
                     <div className="flex-1">
                       <label className="text-[10px] text-slate-600 font-semibold uppercase tracking-wider mb-1.5 block">Minutos objetivo</label>
-                      <input type="number" inputMode="decimal" placeholder="30" value={minutes} onChange={(e) => { updateDraft({ minutes: e.target.value }); setCardioElapsed(0); setCardioRunning(false); }} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3.5 text-xl font-black text-center text-white focus:outline-none focus:border-teal-500/50 transition" />
+                      <input type="number" inputMode="decimal" placeholder="30" value={minutes} onChange={(e) => { updateDraft({ minutes: e.target.value }); setCardioElapsed(0); setCardioRunning(false); clearPersistedCardioTimer(); }} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3.5 text-xl font-black text-center text-white focus:outline-none focus:border-teal-500/50 transition" />
                     </div>
                     <div className="flex flex-col gap-1.5">
                       <button onClick={() => {
@@ -4338,7 +4459,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
                       }} className="w-10 h-10 rounded-xl flex items-center justify-center text-white transition active:scale-90" style={{ backgroundColor: accent }}>
                         {cardioRunning ? <Pause size={16} /> : <Play size={16} />}
                       </button>
-                      <button onClick={() => { setCardioRunning(false); setCardioElapsed(0); setCardioLeft(0); }} className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 bg-slate-800 transition active:scale-90">
+                      <button onClick={() => { setCardioRunning(false); setCardioElapsed(0); setCardioLeft(0); clearPersistedCardioTimer(); }} className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 bg-slate-800 transition active:scale-90">
                         <RotateCcw size={13} />
                       </button>
                     </div>
@@ -5530,23 +5651,31 @@ function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [], weekSche
 // semana de descarga — misma funcionalidad que en la rutina normal: modo
 // cronómetro (cuenta arriba) o cuenta regresiva desde los minutos reducidos.
 // Al llegar a 0 en cuenta regresiva, marca la serie como hecha con vibración.
-function DeloadCardioTimer({ targetMinutes, accent, onComplete }) {
-  const [mode, setMode] = useState("countdown"); // countdown | stopwatch
-  const [running, setRunning] = useState(false);
-  const [elapsed, setElapsed] = useState(0);
+function DeloadCardioTimer({ targetMinutes, accent, onComplete, timerId }) {
+  // BUG FIX: mismo problema y mismo arreglo que el cronómetro de cardio de
+  // la rutina normal (ver ACTIVE_CARDIO_TIMERS) — sin esto, cerrar la app
+  // de verdad reseteaba el cronómetro a cero.
+  const [init] = useState(() => initCardioTimerState(timerId));
+  const [mode, setMode] = useState(init.mode === "stopwatch" ? "stopwatch" : "countdown"); // countdown | stopwatch
+  const [running, setRunning] = useState(init.running);
+  const [elapsed, setElapsed] = useState(init.elapsed);
   const intervalRef = useRef(null);
   const fmt = (secs) => `${Math.floor(secs / 60)}:${String(Math.floor(secs % 60)).padStart(2, "0")}`;
   const targetSecs = Math.max(1, Math.round(targetMinutes * 60));
+  const clearPersisted = () => { delete ACTIVE_CARDIO_TIMERS[timerId]; persistActiveCardioTimers(); };
 
   useEffect(() => {
     if (!running) { clearInterval(intervalRef.current); return; }
     const startedAt = Date.now() - elapsed * 1000;
+    ACTIVE_CARDIO_TIMERS[timerId] = { mode, running: true, startedAt };
+    persistActiveCardioTimers();
     intervalRef.current = setInterval(() => {
       const el = Math.floor((Date.now() - startedAt) / 1000);
       setElapsed(el);
       if (mode === "countdown" && el >= targetSecs) {
         clearInterval(intervalRef.current);
         setRunning(false);
+        clearPersisted();
         haptic([100, 50, 100, 50, 200]);
         onComplete?.();
       }
@@ -5554,12 +5683,19 @@ function DeloadCardioTimer({ targetMinutes, accent, onComplete }) {
     return () => clearInterval(intervalRef.current);
   }, [running, mode, targetSecs]);
 
+  // Pausa manual: guarda el tiempo congelado para retomarlo después.
+  useEffect(() => {
+    if (running) return;
+    if (elapsed > 0) { ACTIVE_CARDIO_TIMERS[timerId] = { mode, running: false, elapsed }; persistActiveCardioTimers(); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [running]);
+
   const display = mode === "countdown" ? fmt(Math.max(0, targetSecs - elapsed)) : fmt(elapsed);
   return (
     <div className="mb-2.5 rounded-lg overflow-hidden border border-slate-800/60">
       <div className="flex bg-slate-900/60 p-0.5 gap-0.5">
-        <button onClick={() => { setMode("countdown"); setRunning(false); setElapsed(0); }} className={`flex-1 py-1.5 rounded-md text-[9px] font-bold transition-all ${mode === "countdown" ? "text-white" : "text-slate-600"}`} style={mode === "countdown" ? { backgroundColor: accent } : {}}>Cuenta regresiva</button>
-        <button onClick={() => { setMode("stopwatch"); setRunning(false); setElapsed(0); }} className={`flex-1 py-1.5 rounded-md text-[9px] font-bold transition-all ${mode === "stopwatch" ? "text-white" : "text-slate-600"}`} style={mode === "stopwatch" ? { backgroundColor: accent } : {}}>Cronómetro</button>
+        <button onClick={() => { setMode("countdown"); setRunning(false); setElapsed(0); clearPersisted(); }} className={`flex-1 py-1.5 rounded-md text-[9px] font-bold transition-all ${mode === "countdown" ? "text-white" : "text-slate-600"}`} style={mode === "countdown" ? { backgroundColor: accent } : {}}>Cuenta regresiva</button>
+        <button onClick={() => { setMode("stopwatch"); setRunning(false); setElapsed(0); clearPersisted(); }} className={`flex-1 py-1.5 rounded-md text-[9px] font-bold transition-all ${mode === "stopwatch" ? "text-white" : "text-slate-600"}`} style={mode === "stopwatch" ? { backgroundColor: accent } : {}}>Cronómetro</button>
       </div>
       <div className="flex items-center justify-between px-3 py-2 bg-slate-950/40">
         <span className="text-lg font-black tabular-nums" style={{ color: running ? accent : "#94a3b8" }}>{display}</span>
@@ -5568,7 +5704,7 @@ function DeloadCardioTimer({ targetMinutes, accent, onComplete }) {
             {running ? "Pausar" : elapsed > 0 ? "Seguir" : "Iniciar"}
           </button>
           {elapsed > 0 && !running && (
-            <button onClick={() => { setElapsed(0); }} className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold border border-slate-700 text-slate-400 transition active:scale-95">↺</button>
+            <button onClick={() => { setElapsed(0); clearPersisted(); }} className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold border border-slate-700 text-slate-400 transition active:scale-95">↺</button>
           )}
         </div>
       </div>
@@ -5576,7 +5712,7 @@ function DeloadCardioTimer({ targetMinutes, accent, onComplete }) {
   );
 }
 
-function DeloadView({ logs, setLogs, settings = DEFAULT_SETTINGS, deloadProgress = {}, setDeloadProgress, onFinishDeloadSession, activeSession = null, onStartSession = null, onCancelSession = null, weekSchedule = null }) {
+function DeloadView({ logs, setLogs, settings = DEFAULT_SETTINGS, deloadProgress = {}, setDeloadProgress, onFinishDeloadSession, activeSession = null, onStartSession = null, onCancelSession = null, weekSchedule = null, onClose = null, cycleStart = null }) {
   const globalUnit = useWeightUnit();
   const [unit, setUnit] = useState(globalUnit);
   const { trainWeeks, deloadWeeks, deloadPct, deloadSetDivisor } = settings;
@@ -5601,7 +5737,24 @@ function DeloadView({ logs, setLogs, settings = DEFAULT_SETTINGS, deloadProgress
   // minutos de la serie reducida), también queda guardada como una serie
   // real — la descarga participa del historial, la racha y el volumen
   // igual que cualquier entrenamiento.
-  const toggleDeloadDone = (key, entry = null) => {
+  // restInfo (opcional): { timerId, seconds } del descanso de ESTE
+  // ejercicio — al marcar (no al desmarcar) arranca el mismo descanso
+  // automático que ya existe en la rutina normal (mismo ajuste
+  // "Cronómetro automático", ver autoStartRestTimer en SetRow), así
+  // descarga se comporta igual que el resto de la app.
+  // Misma semana de descarga = mismo bloque de 7 días desde cycleStart que
+  // hoy (ver getTotalWeekForDate). Sirve para el BUG FIX de abajo: un
+  // ejercicio que aparece en más de un día de la rutina (ej. "Sentadilla"
+  // en Piernas 1 y Piernas 2) tiene el MISMO progressKey (id_serie) sin
+  // importar desde qué día lo mires, así que esto no depende de cuál día
+  // esté activo.
+  const isSameDeloadWeek = (dateStr) => {
+    if (!cycleStart || !dateStr) return false;
+    const a = getTotalWeekForDate(cycleStart, dateStr);
+    const b = getTotalWeekForDate(cycleStart, today);
+    return a != null && b != null && a === b;
+  };
+  const toggleDeloadDone = (key, entry = null, restInfo = null) => {
     if (!setDeloadProgress) return;
     const next = { ...deloadProgress };
     const wasDone = next[key] === today;
@@ -5610,10 +5763,23 @@ function DeloadView({ logs, setLogs, settings = DEFAULT_SETTINGS, deloadProgress
     setDeloadProgress(next);
     if (setLogs && entry) {
       setLogs((prev) => {
-        const hist = (prev[key] || []).filter((h) => h.date !== today);
+        // BUG FIX: filtrar solo "h.date !== today" no alcanzaba cuando un
+        // ejercicio compartido entre 2 días de la rutina se marcaba en
+        // Piernas 1 un día y, más adelante en la MISMA semana de descarga,
+        // se volvía a marcar desde Piernas 2 en otra fecha — como las
+        // fechas no coincidían, la serie de descarga vieja no se pisaba y
+        // quedaban dos registros de descarga seguidos para el mismo
+        // ejercicio (el "grafico se buguea" que reportó el usuario). Ahora
+        // también se saca cualquier registro de descarga previo de la
+        // MISMA semana, sin importar el día exacto, así solo queda uno.
+        const hist = (prev[key] || []).filter((h) => h.date !== today && !(h.deload && isSameDeloadWeek(h.date)));
         const nextHist = wasDone ? hist : [...hist, { ...entry, date: today, deload: true }];
         return { ...prev, [key]: nextHist };
       });
+    }
+    if (!wasDone && restInfo && settings.autoStartRestTimer === true) {
+      ACTIVE_REST_TIMERS[restInfo.timerId] = { endTime: Date.now() + restInfo.seconds * 1000 };
+      persistActiveRestTimers();
     }
   };
   // Antes, entrenar desde la pestaña Descarga no quedaba registrado en
@@ -5652,8 +5818,20 @@ function DeloadView({ logs, setLogs, settings = DEFAULT_SETTINGS, deloadProgress
               <h2 className="text-xl font-black text-white leading-tight">Recuperación activa</h2>
               <p className="text-xs text-purple-300/60 mt-1">Menos carga · Menos series · Mismas reps</p>
             </div>
-            <div className="w-14 h-14 rounded-2xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center shrink-0">
-              <span className="text-2xl font-black text-purple-300">{pctLabel}<span className="text-sm">%</span></span>
+            {/* Cerrar (sólo cuando la descarga está fija dentro de Rutina,
+                ver App()/showPinnedDeload, o al entrar directo por la
+                pestaña Descarga) al lado del círculo de porcentaje, no
+                superpuesto — en flujo normal, no absoluto, para no tapar
+                nada. */}
+            <div className="flex items-start gap-2 shrink-0">
+              {onClose && (
+                <button onClick={onClose} aria-label="Cerrar descarga fija" className="p-2 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-300 hover:text-white hover:bg-purple-500/20 transition active:scale-90">
+                  <X size={15} />
+                </button>
+              )}
+              <div className="w-14 h-14 rounded-2xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center shrink-0">
+                <span className="text-2xl font-black text-purple-300">{pctLabel}<span className="text-sm">%</span></span>
+              </div>
             </div>
           </div>
           <div className="grid grid-cols-3 gap-2">
@@ -5710,7 +5888,12 @@ function DeloadView({ logs, setLogs, settings = DEFAULT_SETTINGS, deloadProgress
               </div>
               {hasPR && (
                 <div className="px-4 pt-3">
-                  <RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={day.color} alertType={settings.alertType} timerId={`deload_${ex.id}`} exerciseName={ex.name} />
+                  {/* key con la cantidad de series ya tildadas hoy: fuerza a
+                      remontar el cronómetro cada vez que se marca una serie,
+                      así retoma el descanso recién escrito en
+                      ACTIVE_REST_TIMERS (ver toggleDeloadDone) — mismo
+                      truco que "se re-posiciona" en la rutina normal. */}
+                  <RestTimer key={ex.sets.slice(0, deloadSets).filter((_, i) => deloadProgress[`${ex.id}_${i}`] === today).length} seconds={hasHeavy ? settings.restLong : settings.restShort} accent={day.color} alertType={settings.alertType} timerId={`deload_${ex.id}`} exerciseName={ex.name} />
                 </div>
               )}
               <div className="px-4 py-3 space-y-2.5">
@@ -5737,7 +5920,7 @@ function DeloadView({ logs, setLogs, settings = DEFAULT_SETTINGS, deloadProgress
                               <span className="text-xl font-black tabular-nums" style={{ color: done ? day.color : "#D8B4FE", textShadow: `0 0 16px ${tint(done ? day.color : "#A855F7", "50")}` }}>{Math.max(1, Math.round((best.minutes || 0) * deloadPct))}<span className="opacity-60 text-xs ml-1">min</span></span>
                             </div>
                           </div>
-                          {!done && <DeloadCardioTimer targetMinutes={Math.max(1, Math.round((best.minutes || 0) * deloadPct))} accent={day.color} onComplete={() => toggleDeloadDone(progressKey, { minutes: Math.max(1, Math.round((best.minutes || 0) * deloadPct)) })} />}
+                          {!done && <DeloadCardioTimer timerId={`deload_cardio_${progressKey}`} targetMinutes={Math.max(1, Math.round((best.minutes || 0) * deloadPct))} accent={day.color} onComplete={() => toggleDeloadDone(progressKey, { minutes: Math.max(1, Math.round((best.minutes || 0) * deloadPct)) })} />}
                           </>
                         ) : (
                           <div className="relative rounded-xl px-3 py-2.5 mb-2.5 bg-slate-950/60 border" style={{ borderColor: done ? tint(day.color, "35") : "#A855F730" }}>
@@ -5749,7 +5932,7 @@ function DeloadView({ logs, setLogs, settings = DEFAULT_SETTINGS, deloadProgress
                             </div>
                           </div>
                         ))}
-                        <button onClick={() => toggleDeloadDone(progressKey, ex.cardio ? { minutes: Math.max(1, Math.round((best.minutes || 0) * deloadPct)) } : { kg: deloadKg, reps: best.reps })} className="relative w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-black transition-all active:scale-[0.98]" style={done ? { background: `linear-gradient(160deg, ${day.color}, ${tint(day.color, "b0")})`, color: "#fff" } : { backgroundColor: "var(--row-surface)", border: "1px solid #33415580", color: "#94a3b8" }}>
+                        <button onClick={() => toggleDeloadDone(progressKey, ex.cardio ? { minutes: Math.max(1, Math.round((best.minutes || 0) * deloadPct)) } : { kg: deloadKg, reps: best.reps }, ex.cardio ? null : { timerId: `deload_${ex.id}`, seconds: hasHeavy ? settings.restLong : settings.restShort })} className="relative w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-black transition-all active:scale-[0.98]" style={done ? { background: `linear-gradient(160deg, ${day.color}, ${tint(day.color, "b0")})`, color: "#fff" } : { backgroundColor: "var(--row-surface)", border: "1px solid #33415580", color: "#94a3b8" }}>
                           {done ? <><span className="w-5 h-5 rounded-full bg-white/25 flex items-center justify-center"><Check size={12} strokeWidth={3} /></span> Hecha</> : "Marcar como hecha"}
                         </button>
                       </div>
@@ -12841,6 +13024,15 @@ export default function App() {
     return null;
   });
   const [tab, setTab] = useState("rutina");
+  // En semana de descarga, la pestaña Rutina muestra Descarga fija en vez
+  // del entrenamiento normal (antes esto vivía solo como un atajo chico
+  // adentro de Rutina, fácil de pasar por alto). "deloadDismissed" es el
+  // botón de cerrar: vive en memoria nomás, así que cada vez que abrís la
+  // app de nuevo (no solo cambiar de pestaña) vuelve a aparecer fija —
+  // "cerrarla" es para esta sesión, no para siempre. (El cálculo real de
+  // isDeloadWeek va más abajo, una vez que "profile" y "cycleStart" ya
+  // están declarados.)
+  const [deloadDismissed, setDeloadDismissed] = useState(false);
 
   // ── El gesto "atrás" de Android funciona DENTRO de la app ────────────────
   // Metemos una entrada centinela en el historial del WebView. Cuando el
@@ -13084,6 +13276,8 @@ export default function App() {
   }, []);
 
   const profile = profiles[activeProfile], logs = profile?.logs || {}, drafts = profile?.drafts || {};
+  const isDeloadWeek = !!(profile && cycleStart && getWeekInfo(cycleStart, getProfileSettings(profile))?.isDeload);
+  const showPinnedDeload = tab === "rutina" && isDeloadWeek && !deloadDismissed;
   const themeClass = getProfileSettings(profile).theme === "light" ? "light-mode" : "";
   // tint() (utils.js) arma los "badges" de color según el tema — necesita
   // saber cuál está activo, pero es una función de módulo (la llaman
@@ -13844,10 +14038,17 @@ export default function App() {
         <main className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto px-4 py-4 pb-28 lg:pb-10 space-y-4" style={{ paddingBottom: "calc(7rem + env(safe-area-inset-bottom, 0px))" }}>
           <div key={tab} className={tabSlideClass}>
             {tab === "rutinas" && <RoutinesView openScheduleSignal={openSectionSignal.id === "week-schedule" ? openSectionSignal.n : 0} openEditorSignal={openSectionSignal.id === "routine-editor" ? openSectionSignal.n : 0} profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleArchiveRoutine} onRestore={handleRestoreRoutine} onUpdateProfile={handleUpdateProfile} />}
-            {tab === "rutina" && <OnboardingTasksCard profile={profile} cycleStart={cycleStart} logs={logs} onGoToProfile={() => setTab("perfil")} onOpenFieldSettings={() => setShowFieldIntro(true)} onDone={() => handleUpdateProfile({ onboardingDone: true })} />}
-            {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToRoutines={() => setTab("rutinas")} onGoToSchedule={() => goToSection("rutinas", "week-schedule")} onGoToFieldSettings={() => goToSection("perfil", "field-settings-section")} onGoToDescarga={() => setTab("descarga")} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} todaySessionDayKey={(profile?.trainingSessions || []).find((ts) => ts.date === todayStr())?.dayKey || profile?.activeSession?.dayKey || null} sex={profile?.sex} age={profile?.age} />}
-            {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} onGoToRoutines={() => goToSection("rutinas", "routine-editor")} weekSchedule={weekSchedule} sex={profile?.sex} age={profile?.age} onGoToDeload={() => setTab("descarga")} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} />}
-            {tab === "descarga" && <DeloadView logs={logs} setLogs={setLogs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} activeSession={profile?.activeSession?.deload ? profile.activeSession : null} onStartSession={handleStartSession} onCancelSession={handleCancelSession} weekSchedule={weekSchedule} />}
+            {tab === "rutina" && !showPinnedDeload && <OnboardingTasksCard profile={profile} cycleStart={cycleStart} logs={logs} onGoToProfile={() => setTab("perfil")} onOpenFieldSettings={() => setShowFieldIntro(true)} onDone={() => handleUpdateProfile({ onboardingDone: true })} />}
+            {/* Semana de descarga: se muestra fija acá mismo, en vez del
+                entrenamiento normal, con un botón para cerrarla (ver
+                showPinnedDeload/deloadDismissed más arriba) — antes había
+                que acordarse de tocar un atajo chico para verla. El atajo
+                que quedó adentro de RoutineView ahora sirve para volver a
+                fijarla si la cerraste. */}
+            {tab === "rutina" && showPinnedDeload && <DeloadView logs={logs} setLogs={setLogs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} activeSession={profile?.activeSession?.deload ? profile.activeSession : null} onStartSession={handleStartSession} onCancelSession={handleCancelSession} weekSchedule={weekSchedule} onClose={() => setDeloadDismissed(true)} cycleStart={cycleStart} />}
+            {tab === "rutina" && !showPinnedDeload && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToRoutines={() => setTab("rutinas")} onGoToSchedule={() => goToSection("rutinas", "week-schedule")} onGoToFieldSettings={() => goToSection("perfil", "field-settings-section")} onGoToDescarga={() => (isDeloadWeek ? setDeloadDismissed(false) : setTab("descarga"))} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} todaySessionDayKey={(profile?.trainingSessions || []).find((ts) => ts.date === todayStr())?.dayKey || profile?.activeSession?.dayKey || null} sex={profile?.sex} age={profile?.age} />}
+            {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} onGoToRoutines={() => goToSection("rutinas", "routine-editor")} weekSchedule={weekSchedule} sex={profile?.sex} age={profile?.age} onGoToDeload={() => { setDeloadDismissed(false); setTab("rutina"); }} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} />}
+            {tab === "descarga" && <DeloadView logs={logs} setLogs={setLogs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} activeSession={profile?.activeSession?.deload ? profile.activeSession : null} onStartSession={handleStartSession} onCancelSession={handleCancelSession} weekSchedule={weekSchedule} onClose={() => { setDeloadDismissed(true); setTab("rutina"); }} cycleStart={cycleStart} />}
             {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} setLogs={setLogs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} conversations={aiConversations} activeConversationId={activeAiConversationId} onNewConversation={handleNewAiConversation} onSwitchConversation={handleSwitchAiConversation} onDeleteConversation={handleDeleteAiConversation} onRenameConversation={handleRenameAiConversation} settings={getProfileSettings(profile)} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} onArchiveRoutine={handleArchiveRoutine} onRestoreRoutine={handleRestoreRoutine} onNavigate={setTab} onStartSession={handleStartSession} onEndSession={handleEndSession} />}
             {tab === "perfil" && <ProfileView onOpenFieldPreview={() => setShowFieldIntro(true)} openSectionSignal={openSectionSignal} profileName={activeProfile} profiles={profiles} logs={logs} onSignOut={handleSignOut} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} />}
           </div>
@@ -13857,7 +14058,7 @@ export default function App() {
       {sessionStarted && <SessionStartOverlay onDone={() => setSessionStarted(false)} />}
       {sessionSummary && <SessionSummaryModal resumen={sessionSummary} onClose={() => setSessionSummary(null)} />}
       {weeklyRecap && <WeeklyRecapModal data={weeklyRecap} onClose={() => setWeeklyRecap(null)} />}
-      {showWelcome && <WelcomeIntro onClose={() => setShowWelcome(false)} onOpenTutorial={() => { setHelpStartTab(null); setShowHelp(true); }} />}
+      {showWelcome && <WelcomeIntro onClose={() => setShowWelcome(false)} onOpenTutorial={() => { setHelpStartTab(null); setShowHelp(true); }} onUpdateSettings={handleUpdateSettings} />}
       {showHelp && <HelpModal startTab={helpStartTab} onClose={() => setShowHelp(false)} />}
       {showFieldIntro && (
         <FieldSettingsIntroModal
