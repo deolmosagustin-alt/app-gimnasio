@@ -12,7 +12,7 @@ import {
   Target, Award, Activity, ArrowDown, HelpCircle, List, LayoutGrid,
   Sparkles, Layers, SlidersHorizontal, UserCog,
   Share2, Download, Link2, Copy, BellOff, Send, Mic, Ruler, Camera, Link, Footprints, Star, SquarePlay, Upload, RefreshCw, Timer, Percent, Users,
-  MessageCircle, FileDown,
+  MessageCircle, FileDown, Search, UserPlus, UserCheck, AtSign, GraduationCap, ClipboardCheck,
 } from "lucide-react";
 import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signOut, onAuthStateChanged } from "firebase/auth";
 import { Capacitor, registerPlugin } from "@capacitor/core";
@@ -42,6 +42,16 @@ import {
   rpeColor, haptic, localDateStr, todayStr, formatTime, vol, estimate1RM, repRangeTop, isHeavyRepRange,
   tint, setThemeMode,
 } from "./utils";
+// Feature social (amigos + entrenador/alumno) — todo el acceso a Firestore
+// de esto vive en social.js, App.jsx solo llama y dibuja el resultado.
+import {
+  isValidUsername, normalizeUsername, checkUsernameAvailable, claimUsername, changeUsername, unpublishProfile, lookupUserByUsername,
+  syncPublicProfile, getPublicBasic, getPublicFull,
+  sendFriendRequest, respondToFriendRequest, removeFriend, listMyFriendships,
+  sendTrainerLinkRequest, respondToTrainerLink, removeTrainerLink, listTrainerLinksAsTrainer, listTrainerLinksAsStudent,
+  createRoutineProposal, createProgressionProposal, respondToRoutineProposal, listRoutineProposalsForStudent, listRoutineProposalsByTrainer,
+  cleanupSocialData,
+} from "./social";
 // Catálogo de ejercicios, grupos musculares y rutinas preestablecidas —
 // movidos a data.js para que este archivo quede más liviano. RANK_TIERS
 // sigue acá abajo, sin tocar.
@@ -210,7 +220,7 @@ function getCurrentUser() {
 // medidas, rutinas, configuración) sí sube completo.
 const CLOUD_PROFILE_FIELDS = [
   // Datos básicos del perfil
-  "name", "email", "sex", "age", "heightCm", "joinedAt", "googleUid", "tutorialSeen", "pin",
+  "name", "email", "sex", "age", "heightCm", "joinedAt", "googleUid", "tutorialSeen", "pin", "username",
   // Configuración y rutinas
   "settings", "activeRoutineId", "routines", "weekSchedule",
   // Historial de entrenamiento completo
@@ -223,12 +233,34 @@ const CLOUD_PROFILE_FIELDS = [
   // Estado de ciclo y descarga
   "cycleStart", "deloadProgress", "dismissedDeloadCycle", "lastSeenCycleNumber",
   // UI state
-  "dismissedMissedDayNotice", "onboardingDone",
+  "dismissedMissedDayNotice", "onboardingDone", "hasHadTrainerLink",
 ];
 function profileToCloud(profile) {
   const out = {};
   CLOUD_PROFILE_FIELDS.forEach((k) => { if (profile[k] !== undefined) out[k] = profile[k]; });
   return out;
+}
+
+// Mejor rango entre todos los grupos musculares — se guarda en
+// users/{uid}/public/basic (ver syncPublicProfile en social.js) para que
+// la lista de amigos pueda mostrar un badge de nivel sin tener que leer
+// el historial completo de cada persona sólo para pintar una fila.
+// Usa las mismas MUSCLE_GROUPS/getBest1RMForMuscleGroup/getMuscleRank que
+// MuscleRankView — funciones declaradas más abajo en este mismo archivo,
+// pero accesibles acá por el hoisting normal de "function" en JS.
+function computeTopRank(profile) {
+  try {
+    const settings = getProfileSettings(profile);
+    const bodyWeightKg = settings.bodyWeightKg || 0;
+    const mode = bodyWeightKg > 0 ? "relative" : "general";
+    let best = null;
+    MUSCLE_GROUPS.forEach((g) => {
+      const { best1RM } = getBest1RMForMuscleGroup(g.key, profile.logs || {}, settings.dumbbellDouble || null);
+      const rank = getMuscleRank(g.key, best1RM, mode, bodyWeightKg, profile.sex, profile.age);
+      if (rank.hasData && (!best || rank.levelIdx > best.levelIdx)) best = { tier: rank.tier, sub: rank.sub, color: rank.color, label: g.label };
+    });
+    return best;
+  } catch { return null; }
 }
 
 // Descarga el perfil completo desde Firestore.
@@ -287,6 +319,13 @@ async function syncProfileToCloud(uid, profile, requireAuth = false) {
     // puede volver a romper la sincronización.
     const limpio = JSON.parse(JSON.stringify({ ...data, _syncedAt: new Date().toISOString() }));
     await setDoc(doc(db, "users", uid), limpio);
+    // Espejo "público" para lo social — no-op adentro de syncPublicProfile
+    // si el perfil nunca eligió un @handle (la enorme mayoría). Nunca debe
+    // tirar abajo el sync principal si falla, por eso va después del
+    // await de arriba (ya se subió lo importante) y con su propio try/catch
+    // interno.
+    const activeRoutineSnapshot = resolveRoutineDef(profile.routines?.[profile.activeRoutineId], profile.activeRoutineId);
+    await syncPublicProfile(uid, profile, activeRoutineSnapshot, computeTopRank(profile));
   } catch (err) {
     // Antes el sync automático se tragaba TODO error en silencio, así que si
     // la subida fallaba (tamaño, red, permisos) el usuario nunca se enteraba y
@@ -508,6 +547,14 @@ const DEFAULT_SETTINGS = {
   // por default: es un cambio de comportamiento (no solo de qué se ve), así
   // que preferimos que lo prendas vos a que te aparezca activado de golpe.
   autoStartRestTimer: false,
+  // "record": perseguí siempre tu propio mejor registro (comportamiento de
+  // toda la vida). "planned": cada serie puede tener una meta cargada de
+  // antemano (a mano, o por tu entrenador) — ver plannedProgression en el
+  // propio set y getPlannedTargetForWeek más abajo. Se activa solo la
+  // primera vez que aparece un vínculo de entrenador aceptado (ver
+  // App(), efecto de detección de entrenador), pero siempre se puede
+  // cambiar a mano desde Perfil.
+  trainingMode: "record",
 };
 
 
@@ -898,6 +945,35 @@ function getWeekInfo(cycleStart, settings = DEFAULT_SETTINGS) {
   const weekInCycle = (totalWeek % cycleWeeks) + 1;
   const isDeload = weekInCycle > trainWeeks;
   return { totalWeek: totalWeek + 1, weekInCycle, isDeload, cycleNumber: Math.floor(totalWeek / cycleWeeks) + 1, cycleWeeks, trainWeeks, deloadWeeks };
+}
+
+// Meta cargada de antemano para ESTA semana del ciclo (modo "planned",
+// ver DEFAULT_SETTINGS.trainingMode) — `set.plannedProgression` es un
+// array `[{week, kg, reps}]` (o `{week, minutes}` para cardio), uno por
+// semana de entrenamiento (1..trainWeeks); se repite en cada vuelta del
+// ciclo, igual que el resto del sistema de semanas. null si no hay nada
+// cargado para la semana actual (en ese caso, SetRow cae al
+// comportamiento de "récord" de siempre — los dos modos conviven sin
+// romperse entre sí).
+function getPlannedTargetForWeek(set, weekInCycle) {
+  if (!Array.isArray(set?.plannedProgression) || !weekInCycle) return null;
+  return set.plannedProgression.find((p) => p.week === weekInCycle) || null;
+}
+
+// Aplica una propuesta de progresión (ver createProgressionProposal en
+// social.js) a UNA rutina — se actualizan TODAS las apariciones del mismo
+// ejercicio+serie (un ejercicio compartido entre dos días de la rutina
+// tiene una copia independiente por día, con el mismo id: hay que tocar
+// las dos para que la meta se vea sin importar desde qué día se mire).
+function applyProgressionToRoutine(routineDef, plan) {
+  const clone = cloneRoutineDef(routineDef);
+  clone.dayOrder.forEach((dk) => {
+    const ex = clone.days[dk]?.exercises?.find((e) => e.id === plan.exerciseId);
+    if (ex?.sets?.[plan.setIndex]) {
+      ex.sets[plan.setIndex] = { ...ex.sets[plan.setIndex], plannedProgression: plan.entries };
+    }
+  });
+  return clone;
 }
 
 // Igual cuenta que arriba (días desde cycleStart, en bloques de 7) pero para
@@ -1727,6 +1803,7 @@ input, textarea, [contenteditable="true"] {
   --grad-hero-purple: linear-gradient(135deg, rgba(168,85,247,0.42), rgba(15,23,42,0.82) 55%, rgba(15,23,42,0.6));
   --grad-hero-blue: linear-gradient(135deg, rgba(59,130,246,0.4), rgba(15,23,42,0.82) 55%, rgba(15,23,42,0.6));
   --grad-hero-teal: linear-gradient(135deg, rgba(20,184,166,0.4), rgba(15,23,42,0.82) 55%, rgba(15,23,42,0.6));
+  --grad-hero-indigo: linear-gradient(135deg, rgba(99,102,241,0.42), rgba(15,23,42,0.82) 55%, rgba(15,23,42,0.6));
   --grad-profile-avatar: linear-gradient(135deg, #0f172a, rgba(15,23,42,0.5));
   --ring-track: #1a1a2e;
   --chart-grid: #1a1a2e;
@@ -1783,6 +1860,7 @@ input, textarea, [contenteditable="true"] {
   --grad-hero-purple: linear-gradient(135deg, rgba(168,85,247,0.10), rgba(255,255,255,0.96) 55%, #ffffff);
   --grad-hero-blue: linear-gradient(135deg, rgba(59,130,246,0.10), rgba(255,255,255,0.96) 55%, #ffffff);
   --grad-hero-teal: linear-gradient(135deg, rgba(20,184,166,0.10), rgba(255,255,255,0.96) 55%, #ffffff);
+  --grad-hero-indigo: linear-gradient(135deg, rgba(99,102,241,0.10), rgba(255,255,255,0.96) 55%, #ffffff);
   --grad-profile-avatar: linear-gradient(135deg, #ffffff, #f8fafc);
   --ring-track: #eef2f6;
   --chart-grid: #eef2f6;
@@ -1897,6 +1975,7 @@ function ShareLinkModal({ title, shareTitle, shareText, shareTarget, onClose }) 
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState(false);
   const [exporting, setExporting] = useState(null);
+  const [exportError, setExportError] = useState(false);
   const [showFileOptions, setShowFileOptions] = useState(false);
   const urlInputRef = useRef(null);
 
@@ -1948,13 +2027,17 @@ function ShareLinkModal({ title, shareTitle, shareText, shareTarget, onClose }) 
     }
   };
   const handleExportDoc = async (kind) => {
-    setExporting(kind);
+    setExporting(kind); setExportError(false);
     try {
       if (kind === "pdf") await exportRoutineToPdf(shareTarget);
       else if (kind === "word") await exportRoutineToWord(shareTarget);
       else if (kind === "excel") await exportRoutineToExcel(shareTarget);
     } catch (err) {
+      // BUG FIX: antes esto solo hacía console.error — con el catch
+      // silencioso de downloadBlob ya arreglado, un fallo real (permisos,
+      // sin espacio) ahora sí llega hasta acá, así que hay que mostrarlo.
       console.error(`Error al exportar la rutina a ${kind}:`, err);
+      setExportError(true);
     } finally {
       setExporting(null);
     }
@@ -2037,6 +2120,7 @@ function ShareLinkModal({ title, shareTitle, shareText, shareTarget, onClose }) 
               <button onClick={() => handleExportDoc("word")} disabled={!!exporting} className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition disabled:opacity-50">{exporting === "word" ? <RotateCcw size={14} className="animate-spin text-blue-400" /> : <Download size={14} className="text-blue-400" />}Word</button>
               <button onClick={() => handleExportDoc("excel")} disabled={!!exporting} className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition disabled:opacity-50">{exporting === "excel" ? <RotateCcw size={14} className="animate-spin text-emerald-400" /> : <Download size={14} className="text-emerald-400" />}Excel</button>
             </div>
+            {exportError && <p className="text-[11px] text-rose-400 mt-2 text-center">No pudimos generar el archivo. Probá de nuevo.</p>}
           </div>
         )}
       </div>
@@ -3963,7 +4047,15 @@ function RankUpModal({ from, to, muscleName, onClose }) {
   );
 }
 
-function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, accent, logs, setLogs, drafts = {}, setDrafts, autoShowPrShare = true, onDisableAutoShowPrShare, hasActiveSession = true, cardio = false, dumbbellDouble = null, fieldSettings = DEFAULT_SETTINGS, onUpdateSettings = null, sex = null, age = null, restTimerId = null, restSeconds = null, isLastSet = false }) {
+function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, accent, logs, setLogs, drafts = {}, setDrafts, autoShowPrShare = true, onDisableAutoShowPrShare, hasActiveSession = true, cardio = false, dumbbellDouble = null, fieldSettings = DEFAULT_SETTINGS, onUpdateSettings = null, sex = null, age = null, restTimerId = null, restSeconds = null, isLastSet = false, weekInCycle = null }) {
+  // Modo "rutina planificada" (ver DEFAULT_SETTINGS.trainingMode): si hay
+  // una meta cargada para ESTA semana, se muestra "Marca a alcanzar" en
+  // vez de "Récord" — pensado para quien sigue un plan con cargas ya
+  // decididas (a mano o por su entrenador) en vez de perseguir siempre su
+  // propio mejor registro. Sin meta para esta semana, cae en el
+  // comportamiento de "récord" de siempre.
+  const plannedTarget = getPlannedTargetForWeek(setDef, weekInCycle);
+  const isPlannedMode = fieldSettings.trainingMode === "planned" && !!plannedTarget;
   const globalUnit = useWeightUnit();
   // Unidad local: arranca desde la preferencia global, pero el usuario puede
   // cambiarla ejercicio por ejercicio con el toggle kg/lbs del input.
@@ -4327,7 +4419,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     const repTop = repRangeTop(setDef.repRange);
     const suggestUp = !isNaN(repTop) && r > repTop;
     if (isFirstEver) { haptic(18); setFeedback({ type: "first", msg: "Primera marca registrada 📝", suggestUp, noSession }); }
-    else if (isPR) { haptic([35, 25, 45]); setPrBurst((n) => n + 1); setFeedback({ type: "pr", msg: "¡Nueva marca! 🔥", suggestUp, noSession }); if (autoShowPrShare) setShowPRShare(true); }
+    else if (isPR) { haptic([35, 25, 45]); setPrBurst((n) => n + 1); setFeedback({ type: "pr", msg: isPlannedMode ? "¡Alcanzaste tu marca! 🎯" : "¡Nueva marca! 🔥", suggestUp, noSession }); if (autoShowPrShare) setShowPRShare(true); }
     else { haptic(18); if (new1RM === prev1RM) setFeedback({ type: "tie", msg: "Igualaste tu marca 💪", suggestUp: false, noSession }); else setFeedback({ type: "down", msg: `-${(((prev1RM - new1RM) / prev1RM) * 100).toFixed(0)}% vs récord`, suggestUp: false, noSession }); }
   };
   const savePR = () => {
@@ -4359,21 +4451,24 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
       {feedback?.suggestUp && <div className="mb-2.5 -mt-1 text-[11px] text-teal-400 flex items-center gap-1.5"><TrendingUp size={11} /> Superaste el rango · probá +2.5kg la próxima</div>}
       {feedback?.noSession && <div className="mb-2.5 -mt-1 text-[11px] text-amber-400 flex items-center gap-1.5"><AlertTriangle size={11} /> Tocá "Iniciar sesión" arriba para que este día cuente en tu historial</div>}
 
-      {/* El récord va PRIMERO, grande — es lo que estás tratando de
-          superar en esta serie, así que tiene que verse antes de
-          ponerte a cargar números, no como una nota chica al final. */}
+      {/* El récord (o, en modo "planificado", la meta de esta semana) va
+          PRIMERO, grande — es lo que estás tratando de alcanzar en esta
+          serie, así que tiene que verse antes de ponerte a cargar
+          números, no como una nota chica al final. */}
       <div className="flex items-center gap-2 mb-3">
-        {currentPR ? (
+        {(currentPR || isPlannedMode) ? (
           <div className="relative overflow-hidden flex items-center gap-2.5 pl-3.5 pr-2 py-2.5 rounded-xl flex-1" style={{ background: `linear-gradient(120deg, ${tint(accent, "20")}, ${tint(accent, "0c")})`, border: `1px solid ${tint(accent, "45")}` }}>
             <div className="absolute -top-5 -left-5 w-16 h-16 rounded-full blur-2xl pointer-events-none opacity-30" style={{ backgroundColor: accent }} />
-            <Trophy size={15} style={{ color: accent }} className="shrink-0 soft-pulse relative" />
+            {isPlannedMode ? <Target size={15} style={{ color: accent }} className="shrink-0 relative" /> : <Trophy size={15} style={{ color: accent }} className="shrink-0 soft-pulse relative" />}
             <p className="flex-1 min-w-0 truncate relative leading-none">
-              <span className="block text-[8.5px] font-black uppercase tracking-[0.16em] mb-1" style={{ color: tint(accent, "aa") }}>Récord{override?.manual ? " · editado" : ""}</span>
+              <span className="block text-[8.5px] font-black uppercase tracking-[0.16em] mb-1" style={{ color: tint(accent, "aa") }}>{isPlannedMode ? "Marca a alcanzar" : `Récord${override?.manual ? " · editado" : ""}`}</span>
               <span className="text-xl font-black tabular-nums" style={{ color: accent, textShadow: `0 0 16px ${tint(accent, "50")}` }}>
-                {cardio ? <>{currentPR.minutes} min{currentPR.km ? ` · ${currentPR.km}km` : ""}</> : <>{currentPR.reps}<span className="opacity-50 text-sm mx-0.5">×</span>{kgToDisplay(currentPR.kg, unit)}<span className="opacity-60 text-xs ml-0.5">{weightLabel(unit)}</span></>}
+                {isPlannedMode
+                  ? (cardio ? <>{plannedTarget.minutes} min</> : <>{plannedTarget.reps}<span className="opacity-50 text-sm mx-0.5">×</span>{kgToDisplay(plannedTarget.kg, unit)}<span className="opacity-60 text-xs ml-0.5">{weightLabel(unit)}</span></>)
+                  : (cardio ? <>{currentPR.minutes} min{currentPR.km ? ` · ${currentPR.km}km` : ""}</> : <>{currentPR.reps}<span className="opacity-50 text-sm mx-0.5">×</span>{kgToDisplay(currentPR.kg, unit)}<span className="opacity-60 text-xs ml-0.5">{weightLabel(unit)}</span></>)}
               </span>
             </p>
-            {!cardio && (
+            {!cardio && !isPlannedMode && (
               <button onClick={() => { setEditReps(currentPR?.reps ?? ""); setEditKg(currentPR ? kgToDisplay(currentPR.kg, unit) : ""); setEditingPR((e) => !e); }} aria-label="Corregir récord" className="relative flex items-center justify-center w-8 h-8 rounded-lg shrink-0 transition active:scale-90" style={{ backgroundColor: tint(accent, "22"), color: accent }}>
                 <Edit3 size={13} />
               </button>
@@ -4743,7 +4838,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
 /* ============================================================================
    EXERCISE CARD
 ============================================================================ */
-function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts, resetKey = 0, settings = DEFAULT_SETTINGS, forceOpen = false, onDisableAutoShowPrShare, hasActiveSession = true, hideTimer = false, onUpdateSettings = null, sex = null, age = null }) {
+function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts, resetKey = 0, settings = DEFAULT_SETTINGS, forceOpen = false, onDisableAutoShowPrShare, hasActiveSession = true, hideTimer = false, onUpdateSettings = null, sex = null, age = null, weekInCycle = null }) {
   const [open, setOpen] = useState(false);
   const [showWarmup, setShowWarmup] = useState(false);
   // Nota personal del ejercicio (persiste en el perfil → sincroniza)
@@ -4838,7 +4933,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
           <div className="mb-2 timer-hop"><RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={accent} alertType={settings.alertType} timerId={`ex_${exercise.id}`} exerciseName={exercise.name} /></div>
         )}
         {setsToShow.map((s, i) => <React.Fragment key={`${exercise.id}:frag:${i}`}>
-          <SetRow key={`${exercise.id}:${i}:${resetKey}`} exerciseId={exercise.id} exerciseName={exercise.name} exerciseMuscle={exercise.muscle} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKey} autoShowPrShare={settings.autoShowPrShare ?? true} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={hasActiveSession} cardio={exercise.cardio} dumbbellDouble={settings?.dumbbellDouble || null} fieldSettings={settings} onUpdateSettings={onUpdateSettings} sex={sex} age={age} restTimerId={restTimerId} restSeconds={restSeconds} isLastSet={i === setsToShow.length - 1} />
+          <SetRow key={`${exercise.id}:${i}:${resetKey}`} exerciseId={exercise.id} exerciseName={exercise.name} exerciseMuscle={exercise.muscle} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKey} autoShowPrShare={settings.autoShowPrShare ?? true} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={hasActiveSession} cardio={exercise.cardio} dumbbellDouble={settings?.dumbbellDouble || null} fieldSettings={settings} onUpdateSettings={onUpdateSettings} sex={sex} age={age} restTimerId={restTimerId} restSeconds={restSeconds} isLastSet={i === setsToShow.length - 1} weekInCycle={weekInCycle} />
           {/* Debajo de la serie recién registrada: timerSlot = N significa
               "después de la serie N" (1-indexado). */}
           {timerSlot === i + 1 && (
@@ -4991,6 +5086,10 @@ function groupExercisesIntoSupersets(exercises) {
 }
 
 function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, weekSchedule, activeSession, onStartSession, onEndSession, onCancelSession, onDisableAutoShowPrShare, onUpdateSettings = null, onGoToRoutines = null, onGoToSchedule = null, onGoToFieldSettings = null, onGoToDescarga = null, todaySessionDayKey = null, sex = null, age = null }) {
+  // Semana actual del ciclo — sólo hace falta el número (weekInCycle), para
+  // que SetRow sepa si hay una meta cargada (modo "planned", ver
+  // getPlannedTargetForWeek) para ESTA semana puntual.
+  const weekInCycle = useMemo(() => getWeekInfo(cycleStart, settings)?.weekInCycle ?? null, [cycleStart, settings]);
   // El día programado para hoy según el cronograma semanal (lunes a domingo)
   // de la rutina activa. Si hoy es descanso programado (o no hay cronograma
   // todavía), cae al viejo heurístico de "último día entrenado + 1" — pero
@@ -5180,7 +5279,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
         {groupExercisesIntoSupersets(day.exercises).map((group) => {
           if (group.length === 1) {
             const ex = group[0];
-            return <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} sex={sex} age={age} />;
+            return <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} sex={sex} age={age} weekInCycle={weekInCycle} />;
           }
           // Superserie: varios ejercicios encadenados comparten un solo
           // cronómetro al final del grupo, en vez de uno por ejercicio —
@@ -5190,7 +5289,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           return (
             <div key={`${activeDay}:${group.map((e) => e.id).join("-")}`} className="rounded-2xl border p-2.5 space-y-2.5" style={{ borderColor: tint(day.color, "50"), backgroundColor: tint(day.color, "06") }}>
               <div className="flex items-center gap-1.5 px-1"><Link size={11} style={{ color: day.color }} /><span className="text-[10px] font-black uppercase tracking-wider" style={{ color: day.color }}>Superserie · {group.length} ejercicios</span></div>
-              {group.map((ex) => <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} hideTimer sex={sex} age={age} />)}
+              {group.map((ex) => <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} hideTimer sex={sex} age={age} weekInCycle={weekInCycle} />)}
               <div className="px-1"><RestTimer seconds={hasHeavyGroup ? settings.restLong : settings.restShort} accent={day.color} alertType={settings.alertType} timerId={`grp_${group.map((g) => g.id).join("_")}`} exerciseName={group.map((g) => g.name).filter(Boolean).join(" + ")} /></div>
               <p className="text-[10px] text-slate-600 px-1">Descansá recién después de completar los {group.length} ejercicios — ese es el cronómetro de arriba.</p>
             </div>
@@ -5996,6 +6095,15 @@ const DELOAD_COLOR = "#A855F7";
 // qué ejercicio mirabas — el color del día se sigue viendo, pero sólo en el
 // botón "Elegí un ejercicio" de más arriba.
 const EVOLUTION_CHART_COLOR = "#F59E0B";
+// Color característico de la pestaña Social — celeste, distinto del azul
+// de "Rango" y el cian de "Historial" en Progreso, y del resto de los
+// colores de héroe ya usados (teal=Rutina, azul=Progreso, violeta=Descarga).
+const SOCIAL_COLOR = "#38BDF8";
+// Color característico de Entrenador IA — antes usaba el mismo teal que
+// Rutina con un tratamiento visual distinto (vidrio esmerilado en vez de
+// degradé plano), lo que hacía sentir la pestaña "pegada pero distinta" a
+// la vez. Índigo no choca con ningún otro héroe de la app.
+const AI_COLOR = "#6366F1";
 function EvolutionDot({ cx, cy, isBest, isActive, color, deload, index, onSelect }) {
   if (cx == null || cy == null) return null;
   const dotColor = deload ? DELOAD_COLOR : color;
@@ -6454,7 +6562,122 @@ function muteHex(hex, amount = 0.65) {
   return `#${nr.toString(16).padStart(2, "0")}${ng.toString(16).padStart(2, "0")}${nb.toString(16).padStart(2, "0")}`;
 }
 
-function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backRef, rankMode = "general", pulseMuscles = null }) {
+/* ============================================================================
+   MUÑECO — VARIANTE MUJER. react-body-highlighter es un componente cerrado:
+   un solo SVG interno (silueta unisex) sin ninguna prop de sexo y sin forma
+   de inyectar un SVG propio (ver su código: sólo expone `type`
+   "anterior"/"posterior", nada de `bodyType`). Replicar EXACTAMENTE su
+   estructura interna de polígonos (los mismos índices que usan
+   ANTERIOR_POLY_SLUGS/POSTERIOR_POLY_SLUGS, con la cantidad exacta de
+   piezas por músculo) sería forkear un archivo de diseño que no tenemos —
+   inviable a mano. Este componente es 100% propio e independiente: formas
+   simples (elipses/polígonos) con proporciones de silueta femenina
+   (hombros más angostos que la cadera, cintura marcada), coloreadas con el
+   MISMO ranks/highlightedColors que ya usa MuscleHighlighterBody — el
+   cálculo de rango no cambia en nada, sólo el dibujo. Cada región mapea
+   DIRECTO a nuestra propia clave de músculo (sin la capa de "slugs" de la
+   librería, que ya no aplica acá), así que el click es mucho más simple:
+   un onClick por forma, sin buscar por índice de polígono.
+============================================================================ */
+const FEMALE_BODY_COLOR = "#334155";
+// Cada entrada: uno o más "keys" (el rango mostrado es el mejor de todas,
+// igual que ya hace getOurGroupKeysForSlug para las regiones fusionadas de
+// la librería) + las formas SVG que arman esa región.
+const FEMALE_FRONT_REGIONS = [
+  { keys: ["deltoide_anterior", "deltoide_lateral"], shapes: [{ t: "ellipse", cx: 24, cy: 33, rx: 7.5, ry: 8.5 }, { t: "ellipse", cx: 76, cy: 33, rx: 7.5, ry: 8.5 }] },
+  { keys: ["pectoral_superior", "pectoral_medio"], shapes: [{ t: "path", d: "M36,36 Q50,32 64,36 L64,58 Q50,64 36,58 Z" }] },
+  { keys: ["biceps"], shapes: [{ t: "ellipse", cx: 16, cy: 60, rx: 6, ry: 13 }, { t: "ellipse", cx: 84, cy: 60, rx: 6, ry: 13 }] },
+  { keys: ["antebrazos"], shapes: [{ t: "ellipse", cx: 12, cy: 90, rx: 5, ry: 14 }, { t: "ellipse", cx: 88, cy: 90, rx: 5, ry: 14 }] },
+  { keys: ["core"], shapes: [{ t: "path", d: "M40,60 Q50,57 60,60 L60,88 Q50,92 40,88 Z" }] },
+  { keys: ["oblicuos"], shapes: [{ t: "path", d: "M34,62 L40,60 L40,88 L35,86 Z" }, { t: "path", d: "M66,62 L60,60 L60,88 L65,86 Z" }] },
+  { keys: ["aductores"], shapes: [{ t: "path", d: "M44,108 L50,106 L50,128 L45,126 Z" }, { t: "path", d: "M56,108 L50,106 L50,128 L55,126 Z" }] },
+  { keys: ["cuadriceps"], shapes: [{ t: "ellipse", cx: 38, cy: 142, rx: 10.5, ry: 27 }, { t: "ellipse", cx: 62, cy: 142, rx: 10.5, ry: 27 }] },
+  { keys: ["tibial_anterior"], shapes: [{ t: "ellipse", cx: 38, cy: 188, rx: 5.5, ry: 17 }, { t: "ellipse", cx: 62, cy: 188, rx: 5.5, ry: 17 }] },
+];
+const FEMALE_BACK_REGIONS = [
+  { keys: ["trapecio"], shapes: [{ t: "path", d: "M40,24 Q50,20 60,24 L66,40 Q50,46 34,40 Z" }] },
+  { keys: ["deltoide_posterior"], shapes: [{ t: "ellipse", cx: 24, cy: 33, rx: 7.5, ry: 8.5 }, { t: "ellipse", cx: 76, cy: 33, rx: 7.5, ry: 8.5 }] },
+  { keys: ["dorsales"], shapes: [{ t: "path", d: "M35,40 Q50,46 65,40 L62,66 Q50,72 38,66 Z" }] },
+  { keys: ["triceps"], shapes: [{ t: "ellipse", cx: 16, cy: 60, rx: 6, ry: 13 }, { t: "ellipse", cx: 84, cy: 60, rx: 6, ry: 13 }] },
+  { keys: ["espalda_baja"], shapes: [{ t: "path", d: "M38,66 Q50,72 62,66 L60,86 Q50,90 40,86 Z" }] },
+  { keys: ["gluteo"], shapes: [{ t: "ellipse", cx: 39, cy: 100, rx: 12, ry: 12 }, { t: "ellipse", cx: 61, cy: 100, rx: 12, ry: 12 }] },
+  { keys: ["femoral"], shapes: [{ t: "ellipse", cx: 38, cy: 142, rx: 10.5, ry: 27 }, { t: "ellipse", cx: 62, cy: 142, rx: 10.5, ry: 27 }] },
+  { keys: ["pantorrillas"], shapes: [{ t: "ellipse", cx: 38, cy: 188, rx: 5.5, ry: 17 }, { t: "ellipse", cx: 62, cy: 188, rx: 5.5, ry: 17 }] },
+];
+// Silueta de base (siempre en FEMALE_BODY_COLOR, no interactiva) — hombros
+// más angostos que la cadera y cintura marcada, la diferencia visual clave
+// contra la silueta unisex de la librería.
+const FEMALE_BASE_SHAPES = [
+  { t: "ellipse", cx: 50, cy: 14, rx: 8.5, ry: 9.5 }, // cabeza
+  { t: "path", d: "M45,21 L55,21 L54,29 L46,29 Z" }, // cuello
+  { t: "path", d: "M22,32 Q50,24 78,32 L70,88 Q50,96 30,88 Z" }, // torso (hombro→cintura)
+  { t: "path", d: "M30,88 Q50,96 70,88 L74,104 Q50,114 26,104 Z" }, // cadera (más ancha que el torso)
+  { t: "ellipse", cx: 16, cy: 58, rx: 7, ry: 30 }, // brazo izq (hombro→muñeca)
+  { t: "ellipse", cx: 84, cy: 58, rx: 7, ry: 30 }, // brazo der
+  { t: "ellipse", cx: 12, cy: 92, rx: 4, ry: 6 }, // mano izq
+  { t: "ellipse", cx: 88, cy: 92, rx: 4, ry: 6 }, // mano der
+  { t: "path", d: "M27,102 L48,102 L44,208 L30,208 Z" }, // pierna izq
+  { t: "path", d: "M73,102 L52,102 L56,208 L70,208 Z" }, // pierna der
+  { t: "ellipse", cx: 36, cy: 212, rx: 8, ry: 4 }, // pie izq
+  { t: "ellipse", cx: 64, cy: 212, rx: 8, ry: 4 }, // pie der
+];
+
+function bestRankForKeys(keys, ranks) {
+  let best = null;
+  keys.forEach((k) => {
+    const lvl = ranks[k]?.levelIdx ?? -1;
+    if (lvl >= 0 && (!best || lvl > best.levelIdx)) best = { levelIdx: lvl, color: ranks[k]?.color };
+  });
+  return best;
+}
+
+function FemaleBodyView({ regions, ranks, highlightedColors, selected, onMuscleClick }) {
+  return (
+    <svg viewBox="0 0 100 220" className="rbh" style={MODEL_STYLE}>
+      {FEMALE_BASE_SHAPES.map((s, i) => (
+        s.t === "ellipse"
+          ? <ellipse key={i} cx={s.cx} cy={s.cy} rx={s.rx} ry={s.ry} fill={FEMALE_BODY_COLOR} />
+          : <path key={i} d={s.d} fill={FEMALE_BODY_COLOR} />
+      ))}
+      {regions.map((region, ri) => {
+        const best = bestRankForKeys(region.keys, ranks);
+        const isSelected = region.keys.includes(selected);
+        const fill = best ? highlightedColors[best.levelIdx] : FEMALE_BODY_COLOR;
+        return (
+          <g key={ri} onClick={() => onMuscleClick(region.keys.reduce((a, b) => ((ranks[b]?.levelIdx ?? -1) > (ranks[a]?.levelIdx ?? -1) ? b : a)))} style={{ cursor: "pointer" }}>
+            {region.shapes.map((s, si) => {
+              const common = { fill, stroke: isSelected ? "#f8fafc" : "none", strokeWidth: isSelected ? 1.6 : 0, style: isSelected ? { filter: "drop-shadow(0 0 3px rgba(248,250,252,0.85))" } : undefined, className: "female-body-region" };
+              return s.t === "ellipse"
+                ? <ellipse key={si} cx={s.cx} cy={s.cy} rx={s.rx} ry={s.ry} {...common} />
+                : <path key={si} d={s.d} {...common} />;
+            })}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+function FemaleBodyModel({ ranks, highlightedColors, selected, onMuscleClick, frontRef, backRef }) {
+  return (
+    <div className="flex gap-2 justify-center items-start">
+      <div className="flex-1 min-w-0 max-w-[180px]">
+        <div ref={frontRef} className="relative">
+          <FemaleBodyView regions={FEMALE_FRONT_REGIONS} ranks={ranks} highlightedColors={highlightedColors} selected={selected} onMuscleClick={onMuscleClick} />
+        </div>
+        <p className="text-center text-[10px] text-slate-600 mt-1">De frente</p>
+      </div>
+      <div className="flex-1 min-w-0 max-w-[180px]">
+        <div ref={backRef} className="relative">
+          <FemaleBodyView regions={FEMALE_BACK_REGIONS} ranks={ranks} highlightedColors={highlightedColors} selected={selected} onMuscleClick={onMuscleClick} />
+        </div>
+        <p className="text-center text-[10px] text-slate-600 mt-1">De espalda</p>
+      </div>
+    </div>
+  );
+}
+
+function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backRef, rankMode = "general", pulseMuscles = null, sex = null }) {
   // highlightedColors: versión suavizada de los colores de RANK_TIERS —
   // mezclada 65/35 con el fondo oscuro para que el muñeco no acapare
   // toda la atención visual de la pantalla.
@@ -6641,6 +6864,17 @@ function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backR
     }
   }, [data, selected, ranks, frontRef, backRef, highlightedColors]);
 
+  // Variante mujer: componente 100% propio (ver comentario grande arriba de
+  // FEMALE_FRONT_REGIONS) — los useEffects de arriba (animación de carga,
+  // latido de rango nuevo, contorno de selección, post-procesado de
+  // calves/neck) actúan sobre <polygon> del SVG de la librería; acá no hay
+  // ninguno (son <ellipse>/<path> propios), así que quedan como no-ops
+  // inofensivos en vez de tocarlos — el color/selección de esta variante
+  // se resuelve directo dentro de FemaleBodyView, sin depender de ellos.
+  if (sex === "F") {
+    return <FemaleBodyModel ranks={ranks} highlightedColors={highlightedColors} selected={selected} onMuscleClick={onMuscleClick} frontRef={frontRef} backRef={backRef} />;
+  }
+
   return (
     <div className="flex gap-2 justify-center items-start">
       <div className="flex-1 min-w-0 max-w-[180px]">
@@ -6795,7 +7029,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
         )}
       </div>
 
-      <MuscleHighlighterBody ranks={ranks} selected={selected} onMuscleClick={goToMuscle} frontRef={frontBodyRef} backRef={backBodyRef} rankMode={mode} pulseMuscles={musculosQueSubieron} />
+      <MuscleHighlighterBody ranks={ranks} selected={selected} onMuscleClick={goToMuscle} frontRef={frontBodyRef} backRef={backBodyRef} rankMode={mode} pulseMuscles={musculosQueSubieron} sex={sex} />
 
      {selInfo ? (
         <div key={selected} ref={detailRef} className="relative overflow-hidden rounded-3xl p-[1.5px] bounce-in" style={{ background: selInfo.hasData ? `linear-gradient(140deg, ${tint(selInfo.color, "55")}, transparent 45%, transparent 60%, ${tint(selInfo.color, "30")})` : "var(--panel-sunken)" }}>
@@ -7913,17 +8147,26 @@ function blobToBase64(blob) {
 // WhatsApp, etc. En la web, sigue siendo la descarga de toda la vida.
 async function downloadBlob(blob, filename) {
   if (Capacitor.isNativePlatform()) {
+    // BUG FIX: antes esto envolvía TODO (escribir el archivo Y compartirlo)
+    // en un solo try/catch que se tragaba cualquier error con solo un
+    // console.error — si Filesystem.writeFile fallaba de verdad (permisos,
+    // sin espacio), el botón de exportar volvía a su estado normal sin
+    // avisar nada, como si hubiese funcionado. Ahora ESO sí se deja
+    // propagar (lo captura handleExport y muestra "No pudimos generar el
+    // archivo"). Share.share() se sigue tolerando en silencio porque a esa
+    // altura el archivo YA se generó bien — que falle acá suele ser
+    // simplemente que la persona cerró la hoja de compartir sin elegir
+    // nada, no un error real que haya que mostrar.
+    const base64 = await blobToBase64(blob);
+    const { Filesystem, Directory } = await import("@capacitor/filesystem");
+    const result = await Filesystem.writeFile({ path: filename, data: base64, directory: Directory.Cache });
     try {
-      const base64 = await blobToBase64(blob);
-      const { Filesystem, Directory } = await import("@capacitor/filesystem");
-      const result = await Filesystem.writeFile({ path: filename, data: base64, directory: Directory.Cache });
       const { Share } = await import("@capacitor/share");
       await Share.share({ title: filename, files: [result.uri] });
-      return;
     } catch (err) {
-      console.error("Exportar (nativo) falló:", err);
-      return;
+      console.warn("Compartir (nativo) cancelado o falló:", err);
     }
+    return;
   }
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -8287,7 +8530,319 @@ function CollapsibleSection({ title, subtitle, icon, defaultOpen = false, childr
   );
 }
 
-function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdateProfile, cycleStart, onSetCycleStart, onGoToRoutines, openSectionSignal = { id: null, n: 0 }, onOpenFieldPreview = null }) {
+/* ============================================================================
+   SOCIAL — @usuario, amigos y entrenador/alumno. Todo el acceso a Firestore
+   vive en social.js; estos componentes solo llaman y dibujan el resultado.
+   Requiere cuenta de Google vinculada (profile.googleUid) — sin eso no hay
+   ninguna identidad de servidor con la que otra persona te pueda encontrar,
+   así que un perfil 100% local nunca puede participar de esto.
+============================================================================ */
+
+// Elegir/cambiar @usuario — paso previo indispensable para activar lo
+// social (sin @usuario, nadie te puede buscar ni mandar una solicitud).
+// Nota: no sincroniza `value` con `currentUsername` vía efecto a
+// propósito — en sus dos usos (SocialPreviewCard) este componente se
+// desmonta/remonta entero cada vez que `currentUsername` cambia de forma
+// relevante (pasa a tener uno, o se cierra el panel de ajustes), así que
+// el useState(currentUsername || "") de abajo ya arranca fresco solo.
+function UsernameSection({ uid, currentUsername, onSaved, onRemoved = null }) {
+  const [value, setValue] = useState(currentUsername || "");
+  const [status, setStatus] = useState(null); // null|checking|available|taken|invalid|saving|error
+  const [editing, setEditing] = useState(!currentUsername);
+
+  const debouncedCheck = useMemo(() => debounce(async (raw) => {
+    const lower = normalizeUsername(raw);
+    if (!isValidUsername(lower)) { setStatus("invalid"); return; }
+    if (lower === currentUsername) { setStatus(null); return; }
+    setStatus("checking");
+    try {
+      const available = await checkUsernameAvailable(lower);
+      setStatus(available ? "available" : "taken");
+    } catch {
+      // Firestore puede rechazar esto (permission-denied) si todavía no se
+      // pegaron las reglas nuevas en la consola — sin este catch, "status"
+      // se quedaba trabado en "checking" para siempre, sin forma de saber
+      // qué pasó ni de reintentar.
+      setStatus("error");
+    }
+  }, 500), [currentUsername]);
+
+  const handleChange = (e) => {
+    const raw = e.target.value.replace(/[^a-zA-Z0-9_]/g, "").toLowerCase().slice(0, 20);
+    setValue(raw);
+    if (!raw) { setStatus(null); return; }
+    debouncedCheck(raw);
+  };
+
+  const handleSave = async () => {
+    const lower = normalizeUsername(value);
+    if (!isValidUsername(lower) || status === "taken") return;
+    setStatus("saving");
+    try {
+      const saved = currentUsername ? await changeUsername(uid, currentUsername, lower) : await claimUsername(uid, lower);
+      setStatus(null);
+      setEditing(false);
+      onSaved(saved);
+    } catch (err) {
+      setStatus(err?.code === "permission-denied" ? "taken" : "error");
+    }
+  };
+
+  if (!editing) {
+    return (
+      <button onClick={() => setEditing(true)} className="flex items-center gap-1 text-sky-400 hover:text-sky-300 transition text-xs font-bold">
+        <AtSign size={11} /> {currentUsername} <Edit3 size={10} className="opacity-60" />
+      </button>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="relative">
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm font-bold">@</span>
+        <input value={value} onChange={handleChange} placeholder="tu_usuario" maxLength={20}
+          className="w-full bg-slate-800 border border-slate-700/50 rounded-xl pl-7 pr-4 py-2.5 text-white text-sm focus:outline-none focus:border-sky-500/50" />
+      </div>
+      <div className="flex items-center justify-between gap-2">
+        <p className={`text-[10.5px] ${status === "taken" || status === "invalid" || status === "error" ? "text-rose-400" : status === "available" ? "text-emerald-400" : "text-slate-600"}`}>
+          {status === "checking" && "Comprobando disponibilidad..."}
+          {status === "available" && "Disponible ✓"}
+          {status === "taken" && "Ese usuario ya existe"}
+          {status === "invalid" && "3 a 20 letras/números/guión bajo"}
+          {status === "error" && "No se pudo guardar, probá de nuevo"}
+          {status === "saving" && "Guardando..."}
+          {!status && "Así te van a poder encontrar tus amigos"}
+        </p>
+        <div className="flex gap-1.5 shrink-0">
+          {currentUsername && <button onClick={() => { setEditing(false); setValue(currentUsername); setStatus(null); }} className="px-3 py-1.5 rounded-lg text-[11px] font-bold text-slate-500 hover:text-slate-300">Cancelar</button>}
+          <button onClick={handleSave} disabled={status === "checking" || status === "saving" || status === "taken" || status === "invalid" || !value} className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-sky-500 !text-white disabled:opacity-40 disabled:cursor-not-allowed">Guardar</button>
+        </div>
+      </div>
+      {currentUsername && onRemoved && (
+        <button onClick={async () => { setStatus("saving"); await unpublishProfile(uid, currentUsername); setStatus(null); onRemoved(); }} className="text-[10.5px] text-slate-600 hover:text-rose-400 transition">Dejar de ser buscable (borra tu @usuario)</button>
+      )}
+    </div>
+  );
+}
+
+// Cuenta de amigos + solicitudes pendientes (amigo + entrenador, en
+// cualquiera de los dos sentidos) para el badge de la tarjeta de Perfil y
+// el ícono de Social. Se recalcula al montar/cambiar de perfil — no hace
+// falta tiempo real (coherente con el resto de la app, que ya sincroniza
+// manual/al abrir en vez de con onSnapshot).
+const EMPTY_SOCIAL_SUMMARY = { friendCount: 0, pendingCount: 0, loading: false };
+function useSocialSummary(uid) {
+  const [summary, setSummary] = useState({ friendCount: 0, pendingCount: 0, loading: true });
+  // Sin setState síncrono en el cuerpo del efecto (ni siquiera "no hay
+  // uid, no hay nada que pedir"): el caso !uid se resuelve devolviendo
+  // EMPTY_SOCIAL_SUMMARY directo al final, sin pasar por estado.
+  const refresh = useCallback(() => {
+    if (!uid) return;
+    Promise.all([listMyFriendships(uid), listTrainerLinksAsTrainer(uid), listTrainerLinksAsStudent(uid)])
+      .then(([friendships, asTrainer, asStudent]) => {
+        const friendCount = friendships.filter((f) => f.status === "accepted").length;
+        const pendingFriends = friendships.filter((f) => f.status === "pending" && f.requestedBy !== uid).length;
+        const pendingTrainer = [...asTrainer, ...asStudent].filter((l) => l.status === "pending" && l.requestedBy !== uid).length;
+        setSummary({ friendCount, pendingCount: pendingFriends + pendingTrainer, loading: false });
+      })
+      .catch(() => setSummary({ friendCount: 0, pendingCount: 0, loading: false }));
+  }, [uid]);
+  useEffect(() => { refresh(); }, [refresh]);
+  return uid ? { ...summary, refresh } : { ...EMPTY_SOCIAL_SUMMARY, refresh };
+}
+
+// Tarjeta de arriba de todo en Perfil: según qué tan "activado" está lo
+// social, muestra un paso distinto (vincular Google → elegir @usuario →
+// resumen con contador de amigos y solicitudes pendientes).
+function SocialPreviewCard({ profile, uid, onGoToSocial, onUpdateProfile }) {
+  const { friendCount, pendingCount } = useSocialSummary(profile?.username ? uid : null);
+  const [showSettings, setShowSettings] = useState(false);
+
+  if (!profile?.googleUid) {
+    return (
+      <div className="rounded-2xl border border-slate-800/50 bg-slate-900/50 px-4 py-3.5 flex items-center gap-3 backdrop-blur-sm shadow-md shadow-black/20">
+        <div className="w-9 h-9 rounded-xl bg-slate-800 flex items-center justify-center shrink-0 text-slate-600"><Users size={16} /></div>
+        <p className="text-xs text-slate-500 leading-snug flex-1">Vinculá tu cuenta de Google (más abajo) para agregar amigos y usar el modo entrenador.</p>
+      </div>
+    );
+  }
+
+  if (!profile?.username) {
+    return (
+      <div className="rounded-2xl border border-sky-500/20 bg-sky-500/5 px-4 py-3.5 space-y-2.5">
+        <div className="flex items-center gap-2">
+          <Users size={15} className="text-sky-400" />
+          <p className="text-xs font-bold text-sky-300">Activá lo social</p>
+        </div>
+        <p className="text-[11px] text-slate-500 -mt-1.5">Elegí un @usuario para que tus amigos y tu entrenador te puedan encontrar.</p>
+        <UsernameSection uid={uid} currentUsername={null} onSaved={(u) => onUpdateProfile({ username: u })} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-2xl border border-slate-800/50 bg-slate-900/50 backdrop-blur-sm shadow-md shadow-black/20 overflow-hidden">
+      <div className="flex items-center gap-3 px-4 py-3.5">
+        <button onClick={onGoToSocial} className="flex-1 flex items-center gap-3 min-w-0 text-left active:opacity-80 transition">
+          <div className="w-10 h-10 rounded-xl bg-sky-500/15 border border-sky-500/25 flex items-center justify-center shrink-0 text-sky-400"><Users size={17} /></div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-white flex items-center gap-1"><AtSign size={11} className="text-sky-400" />{profile.username}</p>
+            <p className="text-[11px] text-slate-500">{friendCount} {friendCount === 1 ? "amigo" : "amigos"} · Entrenador / alumnos</p>
+          </div>
+        </button>
+        {pendingCount > 0 && (
+          <span className="w-5 h-5 rounded-full bg-rose-500 text-white text-[10px] font-black flex items-center justify-center shrink-0">{pendingCount}</span>
+        )}
+        <button onClick={() => setShowSettings((v) => !v)} aria-label="Configurar @usuario" className="p-1.5 rounded-lg text-slate-600 hover:text-slate-300 transition shrink-0"><Edit3 size={13} /></button>
+        <button onClick={onGoToSocial} className="text-slate-600 shrink-0"><ChevronRight size={16} /></button>
+      </div>
+      {showSettings && (
+        <div className="px-4 pb-4 pt-1 border-t border-slate-800/50">
+          <UsernameSection uid={uid} currentUsername={profile.username} onSaved={(u) => { onUpdateProfile({ username: u }); setShowSettings(false); }} onRemoved={() => { onUpdateProfile({ username: null }); setShowSettings(false); }} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================================
+   RECORTE/POSICIÓN DE FOTO DE PERFIL — antes compressAvatarDataUrl siempre
+   recortaba un cuadrado CENTRADO de la imagen elegida, sin ninguna forma de
+   ajustar qué parte quedaba adentro (si la cara no estaba centrada en la
+   foto original, quedaba mal recortada sin remedio). Este modal deja
+   arrastrar para posicionar y un slider para acercar/alejar ANTES de
+   guardar — sin librerías nuevas, sólo canvas + eventos de puntero (mismo
+   mecanismo, unificado mouse/touch, que ya usa el resto de la app).
+============================================================================ */
+const AVATAR_CROP_VIEWPORT = 280; // tamaño (css px) del visor cuadrado
+const AVATAR_CROP_OUTPUT = 256; // mismo tamaño final que ya usaba compressAvatarDataUrl
+
+function AvatarCropModal({ src, onCancel, onConfirm }) {
+  useAndroidBack(onCancel);
+  const [natural, setNatural] = useState(null); // { w, h } de la imagen original
+  const [zoom, setZoom] = useState(1);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [saving, setSaving] = useState(false);
+  const dragRef = useRef(null); // { startX, startY, startOffX, startOffY } mientras se arrastra
+
+  useEffect(() => {
+    let alive = true;
+    const img = new Image();
+    img.onload = () => { if (alive) setNatural({ w: img.naturalWidth, h: img.naturalHeight }); };
+    img.src = src;
+    return () => { alive = false; };
+  }, [src]);
+
+  if (!natural) {
+    return (
+      <div className="fixed inset-0 z-[220] bg-black/80 backdrop-blur-sm flex items-center justify-center modal-overlay">
+        <RefreshCw size={26} className="text-slate-500 animate-spin" />
+      </div>
+    );
+  }
+
+  // baseScale: el zoom mínimo (1×) es EXACTAMENTE el recorte centrado de
+  // siempre — el lado menor de la imagen llena el visor. A partir de ahí,
+  // "zoom" es un multiplicador libre que el usuario controla.
+  const baseScale = AVATAR_CROP_VIEWPORT / Math.min(natural.w, natural.h);
+  const scale = baseScale * zoom;
+  const dispW = natural.w * scale, dispH = natural.h * scale;
+  const maxOffX = Math.max(0, (dispW - AVATAR_CROP_VIEWPORT) / 2);
+  const maxOffY = Math.max(0, (dispH - AVATAR_CROP_VIEWPORT) / 2);
+  const clamp = (v, max) => Math.min(max, Math.max(-max, v));
+
+  const handlePointerDown = (e) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    dragRef.current = { startX: e.clientX, startY: e.clientY, startOffX: offset.x, startOffY: offset.y };
+  };
+  const handlePointerMove = (e) => {
+    if (!dragRef.current) return;
+    const dx = e.clientX - dragRef.current.startX, dy = e.clientY - dragRef.current.startY;
+    setOffset({ x: clamp(dragRef.current.startOffX + dx, maxOffX), y: clamp(dragRef.current.startOffY + dy, maxOffY) });
+  };
+  const handlePointerUp = () => { dragRef.current = null; };
+
+  // Al cambiar el zoom el margen disponible cambia — si no se re-clampea,
+  // un offset que era válido con el zoom viejo puede dejar un borde vacío
+  // (o directamente quedar afuera de la imagen) con el zoom nuevo.
+  const handleZoomChange = (nextZoom) => {
+    const nextScale = baseScale * nextZoom;
+    const nextDispW = natural.w * nextScale, nextDispH = natural.h * nextScale;
+    const nextMaxX = Math.max(0, (nextDispW - AVATAR_CROP_VIEWPORT) / 2);
+    const nextMaxY = Math.max(0, (nextDispH - AVATAR_CROP_VIEWPORT) / 2);
+    setZoom(nextZoom);
+    setOffset((o) => ({ x: clamp(o.x, nextMaxX), y: clamp(o.y, nextMaxY) }));
+  };
+
+  const handleConfirm = async () => {
+    setSaving(true);
+    try {
+      const img = new Image();
+      await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; img.src = src; });
+      // Deshacer la transformación de pantalla para encontrar, en píxeles
+      // de la imagen ORIGINAL, qué rectángulo cuadrado corresponde a lo que
+      // se ve dentro del visor ahora mismo (ver derivación en el comentario
+      // de más arriba del archivo sobre este mismo cálculo).
+      const cropXDisp = (dispW - AVATAR_CROP_VIEWPORT) / 2 - offset.x;
+      const cropYDisp = (dispH - AVATAR_CROP_VIEWPORT) / 2 - offset.y;
+      const sx = cropXDisp / scale, sy = cropYDisp / scale, sSide = AVATAR_CROP_VIEWPORT / scale;
+      const canvas = document.createElement("canvas");
+      canvas.width = AVATAR_CROP_OUTPUT; canvas.height = AVATAR_CROP_OUTPUT;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, sx, sy, sSide, sSide, 0, 0, AVATAR_CROP_OUTPUT, AVATAR_CROP_OUTPUT);
+      onConfirm(canvas.toDataURL("image/jpeg", 0.82));
+    } catch {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[220] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay">
+      <div className="w-full max-w-sm bg-slate-900 border border-slate-700/60 rounded-3xl modal-pop-in shadow-2xl shadow-black/70 overflow-hidden">
+        <div className="flex items-center justify-between px-5 pt-5 pb-3">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-sky-400">Foto de perfil</p>
+            <h3 className="text-base font-black text-white leading-tight">Ajustá tu foto</h3>
+          </div>
+          <button onClick={onCancel} aria-label="Cancelar" className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white transition"><X size={15} /></button>
+        </div>
+        <div className="flex justify-center px-5">
+          <div
+            className="relative rounded-2xl overflow-hidden border border-slate-700/60 touch-none select-none cursor-grab active:cursor-grabbing"
+            style={{ width: AVATAR_CROP_VIEWPORT, height: AVATAR_CROP_VIEWPORT, background: "#0a0a0f" }}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
+          >
+            <img
+              src={src}
+              alt=""
+              draggable={false}
+              className="absolute pointer-events-none"
+              style={{ width: dispW, height: dispH, left: (AVATAR_CROP_VIEWPORT - dispW) / 2 + offset.x, top: (AVATAR_CROP_VIEWPORT - dispH) / 2 + offset.y }}
+            />
+            {/* Máscara circular sutil: sólo referencia visual de cómo se va
+                a ver el avatar (que siempre se muestra redondeado en la
+                app) — el archivo final sigue siendo cuadrado. */}
+            <div className="absolute inset-0 pointer-events-none" style={{ boxShadow: "inset 0 0 0 999px rgba(0,0,0,0.35)", borderRadius: "9999px", margin: 8 }} />
+          </div>
+        </div>
+        <p className="text-center text-[10.5px] text-slate-500 mt-2 px-5">Arrastrá para mover · deslizá para acercar o alejar</p>
+        <div className="flex items-center gap-3 px-6 mt-3">
+          <Search size={13} className="text-slate-600 shrink-0" />
+          <input type="range" min="1" max="3" step="0.01" value={zoom} onChange={(e) => handleZoomChange(parseFloat(e.target.value))} className="flex-1 accent-sky-500" />
+        </div>
+        <div className="flex gap-2 p-5 pt-4">
+          <button onClick={onCancel} className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-400 text-sm font-semibold">Cancelar</button>
+          <button onClick={handleConfirm} disabled={saving} className="flex-1 py-3 rounded-xl bg-sky-500 !text-white text-sm font-bold disabled:opacity-50">{saving ? "Guardando..." : "Guardar"}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdateProfile, cycleStart, onSetCycleStart, onGoToRoutines, onGoToSocial = null, openSectionSignal = { id: null, n: 0 }, onOpenFieldPreview = null }) {
   const profile = profiles[profileName];
   const [showDeletePin, setShowDeletePin] = useState(false); const [deleteError, setDeleteError] = useState("");
   const [editing, setEditing] = useState(false);
@@ -8347,25 +8902,37 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
     idbGet(`avatar_${profileName}`).then((data) => { if (data) setAvatarUrl(data); }).catch(() => {});
   }, [profileName, profile?.avatarData]);
 
-  // Comprime la imagen elegida (File) leyéndola como dataURL y pasándola por
-  // la misma compresión de arriba — una sola lógica para todo.
-  const compressAvatar = (file) => new Promise((resolve, reject) => {
+  // BUG FIX / PEDIDO: antes el archivo elegido se recortaba y comprimía
+  // DIRECTO (siempre un cuadrado centrado, sin forma de ajustarlo). Ahora
+  // sólo se lee como dataURL y se abre AvatarCropModal — el recorte/zoom
+  // final lo hace ese modal, con la misma salida de siempre (JPEG 256×256).
+  const [cropSrc, setCropSrc] = useState(null);
+  const readAsDataUrl = (file) => new Promise((resolve, reject) => {
     const reader = new FileReader();
-    reader.onload = (ev) => compressAvatarDataUrl(ev.target.result).then(resolve).catch(reject);
+    reader.onload = (ev) => resolve(ev.target.result);
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
 
   const handleAvatarChange = async (e) => {
     const file = e.target.files?.[0];
+    // Limpiar el input YA: si el usuario cancela el recorte y vuelve a
+    // elegir el MISMO archivo, el navegador no dispara "change" de nuevo
+    // a menos que el valor se haya reseteado antes.
+    e.target.value = "";
     if (!file) return;
     try {
-      const dataUrl = await compressAvatar(file);
-      setAvatarUrl(dataUrl);
-      idbPut(`avatar_${profileName}`, dataUrl).catch(() => {});
-      if (onUpdateProfile) onUpdateProfile({ avatarData: dataUrl }); // → se sincroniza
-      window.dispatchEvent(new Event("modusfit-avatar-updated"));
+      const dataUrl = await readAsDataUrl(file);
+      setCropSrc(dataUrl);
     } catch { /* imagen inválida: no hacer nada */ }
+  };
+
+  const handleCropConfirm = (dataUrl) => {
+    setCropSrc(null);
+    setAvatarUrl(dataUrl);
+    idbPut(`avatar_${profileName}`, dataUrl).catch(() => {});
+    if (onUpdateProfile) onUpdateProfile({ avatarData: dataUrl }); // → se sincroniza
+    window.dispatchEvent(new Event("modusfit-avatar-updated"));
   };
 
   const handleAvatarRemove = () => {
@@ -8454,10 +9021,13 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
           )}
           <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
         </div>
+        {cropSrc && <AvatarCropModal src={cropSrc} onCancel={() => setCropSrc(null)} onConfirm={handleCropConfirm} />}
         <h2 className="text-xl font-black text-white">{profileName}</h2>
         {profile?.email && <p className="text-sm text-slate-400 mt-1">{profile.email}</p>}
         <p className="text-[11px] text-slate-600 mt-1">Miembro desde {joinDate}</p>
       </div>
+
+      <SocialPreviewCard profile={profile} uid={profile?.googleUid} onGoToSocial={onGoToSocial} onUpdateProfile={onUpdateProfile} />
 
       <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl divide-y divide-slate-800/50 overflow-hidden backdrop-blur-sm shadow-md shadow-black/20">
         {[
@@ -8561,6 +9131,25 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
           </div>
         </div>
       )}
+
+      <CollapsibleSection title="Modo de entrenamiento" subtitle={settings.trainingMode === "planned" ? "Rutina planificada" : "Perseguir mi récord"} icon={<Target size={16} />} accent="#38BDF8">
+        <div className="space-y-2.5">
+          <button onClick={() => updateSettings({ trainingMode: "record" })} className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-left transition ${settings.trainingMode !== "planned" ? "bg-sky-500/15 border border-sky-500/40" : "bg-slate-800/50 border border-slate-700/40 hover:border-slate-600"}`}>
+            <Trophy size={16} className={settings.trainingMode !== "planned" ? "text-sky-400" : "text-slate-500"} />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-white">Perseguir mi récord</p>
+              <p className="text-[11px] text-slate-500">Cada serie muestra tu mejor marca — el objetivo es siempre superarte a vos mismo.</p>
+            </div>
+          </button>
+          <button onClick={() => updateSettings({ trainingMode: "planned" })} className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-left transition ${settings.trainingMode === "planned" ? "bg-sky-500/15 border border-sky-500/40" : "bg-slate-800/50 border border-slate-700/40 hover:border-slate-600"}`}>
+            <Target size={16} className={settings.trainingMode === "planned" ? "text-sky-400" : "text-slate-500"} />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-white">Rutina planificada</p>
+              <p className="text-[11px] text-slate-500">Cada serie muestra una "marca a alcanzar" cargada de antemano (a mano, o por tu entrenador) en vez de tu récord — pensado para planes con cargas ya decididas semana a semana.</p>
+            </div>
+          </button>
+        </div>
+      </CollapsibleSection>
 
       <CollapsibleSection title="Configuración de descarga" subtitle={settings.deloadEnabled === false ? "Desactivada" : `Ciclo ${settings.trainWeeks}+${settings.deloadWeeks} sem · Carga ${Math.round(settings.deloadPct * 100)}%`} icon={<Zap size={16} />} accent="#A855F7">
         <ToggleRow
@@ -8715,7 +9304,7 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
             {[
               { t: "1. Datos que recopilamos", b: "Datos de entrenamiento (series, pesos, récords), datos de perfil (nombre, email, sexo, edad, altura), medidas corporales y fotos de progreso (solo en tu dispositivo), y datos de cuenta Google si iniciás sesión con Google." },
               { t: "2. Cómo usamos los datos", b: "Para mostrarte tu historial, récords y progreso. Para sincronizar tu perfil entre dispositivos si iniciaste sesión con Google. Para generar recomendaciones del Entrenador IA (el texto se envía a la API de Google Gemini y no se almacena en nuestros servidores). Para mostrar anuncios relevantes a través de Google AdMob (solo en la versión gratuita)." },
-              { t: "3. Almacenamiento y seguridad", b: "Tus datos se guardan localmente en tu dispositivo (IndexedDB/localStorage). Si usás la sincronización, se almacenan en Firebase Firestore con acceso restringido a tu cuenta. Las fotos nunca se transmiten a ningún servidor. Toda comunicación usa HTTPS." },
+              { t: "3. Almacenamiento y seguridad", b: "Tus datos se guardan localmente en tu dispositivo (IndexedDB/localStorage). Si usás la sincronización, se almacenan en Firebase Firestore con acceso restringido a tu cuenta. Si elegís un @usuario para activar lo social, tu nombre y foto de perfil quedan visibles para cualquier usuario de la app (necesario para que te puedan buscar), y tu rutina activa, historial de entrenamientos, récords y medidas corporales quedan visibles únicamente para las personas que aceptes como amigos o como entrenador/alumno vinculado — podés dejar de compartirlos en cualquier momento quitando el @usuario. Las fotos de progreso nunca se suben a ningún servidor ni se comparten con nadie, bajo ninguna circunstancia. Toda comunicación usa HTTPS." },
               { t: "4. Terceros", b: "Usamos Google Firebase (autenticación y base de datos), Google Gemini API (IA), y Google AdMob (anuncios en la versión gratuita). Cada uno tiene su propia política de privacidad." },
               { t: "5. Anuncios y versión Pro", b: "La versión gratuita muestra anuncios de AdMob en momentos específicos. La versión Pro ($4.99 pago único) elimina todos los anuncios. Podés inhabilitar la personalización de anuncios en Ajustes → Google → Anuncios de tu dispositivo." },
               { t: "6. Retención de datos", b: "Los datos locales permanecen hasta que desinstalás la app o eliminás tu perfil. Los datos en la nube se eliminan cuando eliminás tu perfil desde la app." },
@@ -8748,6 +9337,861 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/* ============================================================================
+   SOCIAL — pestaña de amigos y entrenador/alumno. Todo el acceso a
+   Firestore vive en social.js; estos componentes solo llaman y dibujan.
+============================================================================ */
+
+const EMPTY_BASICS_MAP = {};
+// Trae los public/basic de una lista de uids en batch, cacheado por la
+// lista misma (uids.join) — evita re-pedir todo en cada re-render.
+function useUserBasics(uids) {
+  const key = uids.join(",");
+  const [basics, setBasics] = useState({});
+  useEffect(() => {
+    if (!uids.length) return;
+    let cancelled = false;
+    Promise.all(uids.map((u) => getPublicBasic(u).then((b) => [u, b]))).then((pairs) => {
+      if (!cancelled) setBasics(Object.fromEntries(pairs));
+    });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  return uids.length ? basics : EMPTY_BASICS_MAP;
+}
+
+// Fila reusable: avatar + nombre + @usuario (a partir de public/basic),
+// más lo que el llamador quiera agregar a la derecha.
+// NOTA: la fila entera NO es un solo <button> — algunas listas (alumnos,
+// entrenador) ponen un botón de "desvincular" en `children`, y anidar
+// <button> dentro de <button> es HTML inválido y rompe los clicks. Acá el
+// avatar+nombre es su propio botón cuando hay onClick, y `children` queda
+// como hermano, nunca anidado.
+function PublicUserCard({ uid, basic, onClick = null, children }) {
+  const avatarAndName = (
+    <>
+      {basic?.avatarData ? (
+        <img src={basic.avatarData} alt="" className="w-10 h-10 rounded-xl object-cover shrink-0" />
+      ) : (
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-black !text-white shrink-0" style={{ background: "linear-gradient(135deg,#38BDF8,#0284C7)" }}>
+          {(basic?.name || basic?.username || "?").charAt(0).toUpperCase()}
+        </div>
+      )}
+      <div className="flex-1 min-w-0 text-left">
+        <p className="text-sm font-bold text-white truncate flex items-center gap-1.5">
+          {basic?.name || "Usuario"}
+          {/* Badge de mejor rango — de un vistazo, sin entrar al perfil.
+              Viene precalculado en public/basic (ver computeTopRank en
+              App.jsx), no hace falta leer el historial completo acá. */}
+          {basic?.topRank && (
+            <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md shrink-0" style={{ backgroundColor: tint(basic.topRank.color, "22"), color: basic.topRank.color }}>
+              {basic.topRank.tier} {basic.topRank.sub}
+            </span>
+          )}
+        </p>
+        <p className="text-[11px] text-slate-500 flex items-center gap-0.5"><AtSign size={9} />{basic?.username || uid.slice(0, 8)}</p>
+      </div>
+    </>
+  );
+  return (
+    <div className="w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl bg-slate-900/50 border border-slate-800/50">
+      {onClick ? (
+        <button onClick={onClick} className="flex-1 flex items-center gap-3 min-w-0 hover:opacity-80 transition active:scale-[0.99]">{avatarAndName}</button>
+      ) : (
+        <div className="flex-1 flex items-center gap-3 min-w-0">{avatarAndName}</div>
+      )}
+      {children}
+    </div>
+  );
+}
+
+// Buscar a alguien por @usuario para agregarlo de amigo.
+function SocialSearchSection({ myUid, friendStatus, onSendFriendRequest }) {
+  const [raw, setRaw] = useState("");
+  const [state, setState] = useState("idle"); // idle|searching|found|not_found|self
+  const [found, setFound] = useState(null);
+
+  const handleSearch = async () => {
+    const q = raw.trim();
+    if (!q) return;
+    setState("searching"); setFound(null);
+    const hit = await lookupUserByUsername(q);
+    if (!hit) { setState("not_found"); return; }
+    if (hit.uid === myUid) { setState("self"); return; }
+    const basic = await getPublicBasic(hit.uid);
+    setFound({ uid: hit.uid, basic });
+    setState("found");
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" />
+          <input value={raw} onChange={(e) => setRaw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSearch()} placeholder="@usuario de tu amigo"
+            className="w-full bg-slate-800 border border-slate-700/50 rounded-xl pl-9 pr-3 py-2.5 text-white text-sm focus:outline-none focus:border-sky-500/50" />
+        </div>
+        <button onClick={handleSearch} disabled={!raw.trim() || state === "searching"} className="px-4 rounded-xl bg-sky-500 !text-white text-sm font-bold disabled:opacity-40">Buscar</button>
+      </div>
+      {state === "searching" && <p className="text-xs text-slate-500 text-center py-3">Buscando...</p>}
+      {state === "not_found" && <p className="text-xs text-slate-500 text-center py-3">No encontramos a nadie con ese @usuario.</p>}
+      {state === "self" && <p className="text-xs text-slate-500 text-center py-3">Ese sos vos 🙂</p>}
+      {state === "found" && found && (
+        <PublicUserCard uid={found.uid} basic={found.basic}>
+          {(() => {
+            const st = friendStatus(found.uid);
+            if (st === "accepted") return <span className="flex items-center gap-1 text-[10.5px] font-bold text-emerald-400 shrink-0"><UserCheck size={12} /> Ya son amigos</span>;
+            if (st === "pending_sent") return <span className="text-[10.5px] font-bold text-slate-500 shrink-0">Solicitud enviada</span>;
+            if (st === "pending_received") return <span className="text-[10.5px] font-bold text-amber-400 shrink-0">Te escribió</span>;
+            return (
+              <button onClick={() => onSendFriendRequest(found.uid)} className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-sky-500/15 border border-sky-500/30 text-sky-400 text-[11px] font-bold hover:bg-sky-500/25 transition">
+                <UserPlus size={12} /> Agregar
+              </button>
+            );
+          })()}
+        </PublicUserCard>
+      )}
+    </div>
+  );
+}
+
+// Tarjeta de una propuesta de rutina de un entrenador, del lado del
+// alumno: colapsada muestra quién la mandó, expandida deja ver la rutina
+// completa (RoutinePreview) y aceptar/rechazar.
+function RoutineProposalCard({ proposal, basic, onRespond }) {
+  const [expanded, setExpanded] = useState(false);
+  const [busy, setBusy] = useState(false);
+  // Dos tipos de propuesta comparten esta misma tarjeta/colección (ver
+  // createProgressionProposal en social.js): reemplazo de rutina completa
+  // (proposedRoutine) o meta semanal de un solo ejercicio/serie
+  // (progressionPlan) — se distinguen por cuál de los dos campos viene con
+  // datos, nunca los dos a la vez.
+  const isProgression = !!proposal.progressionPlan;
+  const accentColor = isProgression ? "#38BDF8" : "#14B8A6";
+  return (
+    <div className="rounded-2xl border overflow-hidden" style={{ borderColor: tint(accentColor, "25"), backgroundColor: tint(accentColor, "0a") }}>
+      <button onClick={() => setExpanded((v) => !v)} className="w-full flex items-center gap-3 px-3.5 py-3 text-left">
+        {basic?.avatarData ? <img src={basic.avatarData} alt="" className="w-9 h-9 rounded-xl object-cover shrink-0" /> : <div className="w-9 h-9 rounded-xl flex items-center justify-center text-sm font-black !text-white shrink-0" style={{ background: "linear-gradient(135deg,#A855F7,#7C3AED)" }}>{(basic?.name || "?").charAt(0).toUpperCase()}</div>}
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-bold text-white truncate">{basic?.name || "Tu entrenador"} te propuso {isProgression ? `metas para ${proposal.progressionPlan.exerciseName}` : "una rutina"}</p>
+          {proposal.note && <p className="text-[11px] text-slate-500 truncate">"{proposal.note}"</p>}
+        </div>
+        <ChevronDown size={15} className={`text-slate-600 shrink-0 transition-transform ${expanded ? "rotate-180" : ""}`} />
+      </button>
+      {expanded && (
+        <div className="px-3.5 pb-3.5 space-y-3">
+          {isProgression ? (
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {proposal.progressionPlan.entries.map((e) => (
+                <div key={e.week} className="shrink-0 rounded-xl border border-sky-500/25 bg-sky-500/10 px-3 py-2 text-center min-w-[64px]">
+                  <p className="text-[9px] font-black text-sky-400 uppercase">Sem {e.week}</p>
+                  <p className="text-sm font-black text-white">{e.reps}×{e.kg}kg</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <RoutinePreview routineDef={proposal.proposedRoutine} />
+          )}
+          <div className="flex gap-2">
+            <button disabled={busy} onClick={async () => { setBusy(true); await onRespond(false); }} className="flex-1 py-2.5 rounded-xl bg-slate-800 text-slate-400 text-xs font-bold disabled:opacity-50">Rechazar</button>
+            <button disabled={busy} onClick={async () => { setBusy(true); await onRespond(true); }} className="flex-1 py-2.5 rounded-xl !text-white text-xs font-bold disabled:opacity-50" style={{ backgroundColor: accentColor }}>{isProgression ? "Aceptar metas" : "Aceptar y activar"}</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Sub-sección "Entrenador": vincularse (con rol explícito), solicitudes
+// pendientes, lista de alumnos/entrenador ya aceptados, y las propuestas
+// de rutina pendientes (si el que mira es alumno de alguien).
+function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted, trainersAccepted, sentProposals, proposals, basics, onSendLink, onRespondLink, onRemoveLink, onRespondProposal, onViewStudent, onViewTrainer }) {
+  const [raw, setRaw] = useState("");
+  const [role, setRole] = useState("trainer"); // el rol que ELIJO para mí al mandar la solicitud
+  const [searchState, setSearchState] = useState("idle");
+  const [found, setFound] = useState(null);
+
+  const handleSearch = async () => {
+    const q = raw.trim();
+    if (!q) return;
+    setSearchState("searching"); setFound(null);
+    const hit = await lookupUserByUsername(q);
+    if (!hit) { setSearchState("not_found"); return; }
+    if (hit.uid === myUid) { setSearchState("self"); return; }
+    const basic = await getPublicBasic(hit.uid);
+    setFound({ uid: hit.uid, basic });
+    setSearchState("found");
+  };
+
+  return (
+    <div className="space-y-4">
+      {proposals.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-[10px] font-black uppercase tracking-widest text-teal-400 px-1">Propuestas de rutina</p>
+          {proposals.map((p) => (
+            <RoutineProposalCard key={p.id} proposal={p} basic={basics[p.trainerUid]} onRespond={(accept) => onRespondProposal(p, accept)} />
+          ))}
+        </div>
+      )}
+
+      <div className="rounded-2xl border border-slate-800/50 bg-slate-900/50 p-4 space-y-3">
+        <p className="text-xs font-bold text-white flex items-center gap-1.5"><GraduationCap size={14} className="text-purple-400" /> Vincular entrenador/alumno</p>
+        <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-700/50">
+          <button onClick={() => setRole("trainer")} className={`flex-1 py-2 rounded-lg text-[11px] font-bold transition-all ${role === "trainer" ? "bg-purple-500 !text-white" : "text-slate-500"}`}>Soy el entrenador</button>
+          <button onClick={() => setRole("student")} className={`flex-1 py-2 rounded-lg text-[11px] font-bold transition-all ${role === "student" ? "bg-purple-500 !text-white" : "text-slate-500"}`}>Soy el alumno</button>
+        </div>
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" />
+            <input value={raw} onChange={(e) => setRaw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSearch()} placeholder={role === "trainer" ? "@usuario de tu alumno" : "@usuario de tu entrenador"}
+              className="w-full bg-slate-800 border border-slate-700/50 rounded-xl pl-9 pr-3 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500/50" />
+          </div>
+          <button onClick={handleSearch} disabled={!raw.trim() || searchState === "searching"} className="px-4 rounded-xl bg-purple-500 !text-white text-sm font-bold disabled:opacity-40">Buscar</button>
+        </div>
+        {searchState === "not_found" && <p className="text-xs text-slate-500">No encontramos a nadie con ese @usuario.</p>}
+        {searchState === "self" && <p className="text-xs text-slate-500">Ese sos vos 🙂</p>}
+        {searchState === "found" && found && (
+          <PublicUserCard uid={found.uid} basic={found.basic}>
+            <button onClick={() => { onSendLink(found.uid, role); setFound(null); setRaw(""); setSearchState("idle"); }} className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-purple-500/15 border border-purple-500/30 text-purple-300 text-[11px] font-bold hover:bg-purple-500/25 transition">
+              <UserPlus size={12} /> Invitar
+            </button>
+          </PublicUserCard>
+        )}
+      </div>
+
+      {loading ? <p className="text-center text-slate-600 text-sm py-8">Cargando...</p> : (
+        <>
+          {trainerIncoming.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-[10px] font-black uppercase tracking-widest text-amber-400 px-1">Solicitudes recibidas</p>
+              {trainerIncoming.map((l) => (
+                <PublicUserCard key={l.id} uid={l.requestedBy} basic={basics[l.requestedBy]}>
+                  <div className="flex flex-col items-end gap-1.5 shrink-0">
+                    <span className="text-[9.5px] text-slate-500 text-right">{l.trainerUid === myUid ? "Quiere que seas su entrenador" : "Se ofrece como tu entrenador"}</span>
+                    <div className="flex gap-1.5">
+                      <button onClick={() => onRespondLink(l, true)} className="p-2 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400"><Check size={13} /></button>
+                      <button onClick={() => onRespondLink(l, false)} className="p-2 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-400"><X size={13} /></button>
+                    </div>
+                  </div>
+                </PublicUserCard>
+              ))}
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 px-1">Mis alumnos</p>
+            {studentsAccepted.length === 0 ? (
+              <p className="text-xs text-slate-600 px-1">Todavía no tenés alumnos vinculados.</p>
+            ) : studentsAccepted.map((l) => (
+              <PublicUserCard key={l.id} uid={l.studentUid} basic={basics[l.studentUid]} onClick={() => onViewStudent(l.studentUid)}>
+                <button onClick={(e) => { e.stopPropagation(); onRemoveLink(l); }} className="shrink-0 p-1.5 rounded-lg text-slate-600 hover:text-rose-400 transition" title="Desvincular"><X size={13} /></button>
+                <ChevronRight size={15} className="text-slate-600 shrink-0" />
+              </PublicUserCard>
+            ))}
+          </div>
+
+          {sentProposals.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 px-1">Propuestas enviadas</p>
+              {sentProposals.map((p) => (
+                <PublicUserCard key={p.id} uid={p.studentUid} basic={basics[p.studentUid]}>
+                  <span className={`text-[10.5px] font-bold shrink-0 ${p.status === "accepted" ? "text-emerald-400" : p.status === "rejected" ? "text-rose-400" : "text-slate-500"}`}>
+                    {p.status === "accepted" ? "Aceptada ✓" : p.status === "rejected" ? "Rechazada" : "Pendiente"}
+                  </span>
+                </PublicUserCard>
+              ))}
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 px-1">Mi entrenador</p>
+            {trainersAccepted.length === 0 ? (
+              <p className="text-xs text-slate-600 px-1">No tenés un entrenador vinculado.</p>
+            ) : trainersAccepted.map((l) => (
+              <PublicUserCard key={l.id} uid={l.trainerUid} basic={basics[l.trainerUid]} onClick={() => onViewTrainer(l.trainerUid)}>
+                <button onClick={(e) => { e.stopPropagation(); onRemoveLink(l); }} className="shrink-0 p-1.5 rounded-lg text-slate-600 hover:text-rose-400 transition" title="Desvincular"><X size={13} /></button>
+                <ChevronRight size={15} className="text-slate-600 shrink-0" />
+              </PublicUserCard>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// Resumen de rango por músculo de un amigo/alumno — mismo cálculo que
+// MuscleRankView (getBest1RMForMuscleGroup + getMuscleRank), pero sin
+// muñeco interactivo ni animaciones: MuscleRankView escribe a variables
+// mutables de módulo (RECENT_RANK_UPS) pensadas para "tu propio" progreso,
+// que acá arruinarían la próxima visita a TU PROPIO Progreso si se
+// dispararan con datos ajenos.
+// Le damos protagonismo al rango acá: es lo primero que un amigo o un
+// entrenador quiere ver de un vistazo ("¿qué tan fuerte viene?"), así que
+// el mejor músculo se destaca arriba en grande (mismo lenguaje de tarjeta
+// "hero" con glow que usa el resto de la app para lo más importante de
+// cada pantalla) y el resto queda abajo en una grilla más compacta.
+function FriendMuscleRankSummary({ logs, settings, sex, age }) {
+  const bodyWeightKg = settings?.bodyWeightKg || 0;
+  const mode = bodyWeightKg > 0 ? "relative" : "general";
+  const ranks = useMemo(() => MUSCLE_GROUPS.map((g) => {
+    const { best1RM, bestKg, bestReps } = getBest1RMForMuscleGroup(g.key, logs || {}, null);
+    return { key: g.key, label: g.label, bestKg, bestReps, ...getMuscleRank(g.key, best1RM, mode, bodyWeightKg, sex, age) };
+  }).filter((r) => r.hasData).sort((a, b) => b.levelIdx - a.levelIdx), [logs, mode, bodyWeightKg, sex, age]);
+
+  if (!ranks.length) return <p className="text-xs text-slate-600 text-center py-6">Todavía no registró marcas.</p>;
+  const [best, ...rest] = ranks;
+  return (
+    <div className="space-y-2.5">
+      <div className="relative overflow-hidden rounded-2xl border px-4 py-4 flex items-center gap-3.5" style={{ borderColor: tint(best.color, "45"), background: `linear-gradient(135deg, ${tint(best.color, "1c")}, transparent)` }}>
+        <div className="absolute -top-6 -right-6 w-24 h-24 rounded-full blur-2xl opacity-25 pointer-events-none" style={{ backgroundColor: best.color }} />
+        <div className="relative w-14 h-14 rounded-2xl flex items-center justify-center shrink-0" style={{ backgroundColor: tint(best.color, "22"), border: `1px solid ${tint(best.color, "55")}` }}>
+          <Trophy size={24} style={{ color: best.color }} />
+        </div>
+        <div className="relative min-w-0">
+          <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Mejor rango · {best.label}</p>
+          <p className="text-xl font-black leading-tight" style={{ color: best.color }}>{best.tier} {best.sub}</p>
+          <p className="text-[11px] text-slate-500">{best.bestReps}×{best.bestKg}kg</p>
+        </div>
+      </div>
+      {rest.length > 0 && (
+        <div className="grid grid-cols-2 gap-2">
+          {rest.map((r) => (
+            <div key={r.key} className="rounded-xl border px-3 py-2.5" style={{ borderColor: tint(r.color, "30"), backgroundColor: tint(r.color, "0a") }}>
+              <p className="text-[11px] text-slate-400 truncate">{r.label}</p>
+              <p className="text-sm font-black" style={{ color: r.color }}>{r.tier} {r.sub}</p>
+              <p className="text-[10px] text-slate-600">{r.bestReps}×{r.bestKg}kg</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Sesiones formales (Iniciar/Finalizar sesión) de un amigo/alumno — a
+// diferencia de SessionHistoryView (propia), esto NO puede usar
+// buildSessionsIndex/ROUTINE globales: esas variables reflejan SIEMPRE la
+// rutina de quien MIRA, no la de la persona que se está viendo. Acá se
+// resuelve color/nombre de día con un modelo construido a partir de la
+// FOTO de rutina que la otra persona comparte (activeRoutineSnapshot), sin
+// tocar el estado global. Por simplicidad solo se listan sesiones
+// FORMALES — entradas sueltas sin sesión iniciada no se muestran acá.
+function FriendSessionHistory({ trainingSessions = [], activeRoutineSnapshot }) {
+  const model = useMemo(() => (activeRoutineSnapshot ? buildRoutineModel(activeRoutineSnapshot) : null), [activeRoutineSnapshot]);
+  const sorted = useMemo(() => [...trainingSessions].sort((a, b) => (a.date < b.date ? 1 : -1)), [trainingSessions]);
+
+  if (!sorted.length) return <p className="text-xs text-slate-600 text-center py-6">Todavía no registró ninguna sesión.</p>;
+  return (
+    <div className="space-y-2">
+      {sorted.map((s, i) => {
+        const day = model?.days?.[s.dayKey];
+        const durationMin = s.startedAt && s.endedAt ? Math.max(1, Math.round((new Date(s.endedAt) - new Date(s.startedAt)) / 60000)) : null;
+        const dateLabel = new Date(s.date + "T12:00:00").toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" });
+        return (
+          <div key={`${s.date}_${i}`} className="flex items-center gap-3 rounded-xl border border-slate-800/50 bg-slate-900/50 px-3.5 py-2.5">
+            <span className="w-1.5 h-8 rounded-full shrink-0" style={{ backgroundColor: day?.color || "#475569" }} />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-white truncate">{day?.label || s.dayKey || "Entrenamiento"}</p>
+              <p className="text-[10.5px] text-slate-500 capitalize">{dateLabel}{durationMin ? ` · ${durationMin} min` : ""}</p>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// El entrenador elige una de SUS rutinas guardadas + una nota, y la manda
+// como propuesta — nunca escribe directo en el perfil del alumno (ver
+// createRoutineProposal en social.js y la regla de Firestore correspondiente).
+function RoutineProposalComposer({ myRoutines, onClose, onSubmit }) {
+  useAndroidBack(onClose);
+  const routineEntries = Object.entries(myRoutines || {});
+  const [selectedId, setSelectedId] = useState(routineEntries[0]?.[0] || null);
+  const [note, setNote] = useState("");
+  const [sending, setSending] = useState(false);
+  const selectedDef = selectedId ? resolveRoutineDef(myRoutines[selectedId], selectedId) : null;
+
+  const handleSubmit = async () => {
+    if (!selectedDef) return;
+    setSending(true);
+    try { await onSubmit(selectedDef, note.trim()); } finally { setSending(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[125] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
+      <div className="w-full max-w-md max-h-[86vh] overflow-y-auto overscroll-contain bg-slate-900 border border-slate-700/60 rounded-3xl modal-pop-in shadow-2xl shadow-black/70" onClick={(e) => e.stopPropagation()}>
+        <div className="p-5 space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-purple-500/20 border border-purple-500/30 text-purple-300 flex items-center justify-center shrink-0"><ClipboardCheck size={17} /></div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-black uppercase tracking-widest text-purple-400">Proponer rutina</p>
+              <h3 className="text-base font-black text-white leading-tight">Elegí una de tus rutinas</h3>
+            </div>
+            <button onClick={onClose} className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white transition"><X size={15} /></button>
+          </div>
+
+          {routineEntries.length === 0 ? (
+            <p className="text-sm text-slate-500">Todavía no creaste ninguna rutina propia para proponer. Armá una en la pestaña Rutinas primero.</p>
+          ) : (
+            <>
+              <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                {routineEntries.map(([id, def]) => (
+                  <button key={id} onClick={() => setSelectedId(id)} className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-left transition ${selectedId === id ? "bg-purple-500/15 border border-purple-500/40" : "bg-slate-800/50 border border-slate-700/40 hover:border-slate-600"}`}>
+                    <span className={`w-4 h-4 rounded-full border-2 shrink-0 ${selectedId === id ? "border-purple-400 bg-purple-400" : "border-slate-600"}`} />
+                    <span className="text-sm font-semibold text-white truncate">{def.name || id}</span>
+                  </button>
+                ))}
+              </div>
+              {selectedDef && <RoutinePreview routineDef={selectedDef} />}
+              <div>
+                <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Nota para tu alumno (opcional)</label>
+                <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} maxLength={200} placeholder="Ej: bajamos el volumen esta vez, sumá cardio los martes..."
+                  className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-3.5 py-2.5 text-white text-sm focus:outline-none resize-none" />
+              </div>
+              <button onClick={handleSubmit} disabled={!selectedDef || sending} className="w-full py-3 rounded-xl bg-purple-500 !text-white text-sm font-bold disabled:opacity-40">{sending ? "Enviando..." : "Enviar propuesta"}</button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// El entrenador carga la meta (kg×reps) de cada semana del ciclo para UN
+// ejercicio/serie puntual de la rutina ACTIVA del alumno — "modo rutina
+// planificada" (ver DEFAULT_SETTINGS.trainingMode y getPlannedTargetForWeek
+// en App.jsx). A diferencia de RoutineProposalComposer (que reemplaza la
+// rutina entera), esto sólo toca una serie: se puede repetir tantas veces
+// como ejercicios/series quiera planificar el entrenador.
+function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onSubmit }) {
+  useAndroidBack(onClose);
+  const model = useMemo(() => (routineSnapshot ? buildRoutineModel(routineSnapshot) : null), [routineSnapshot]);
+  const exercises = useMemo(() => Object.values(model?.exerciseById || {}), [model]);
+  const [exerciseId, setExerciseId] = useState(exercises[0]?.id || null);
+  const selectedExercise = exercises.find((e) => e.id === exerciseId) || null;
+  const [setIndex, setSetIndex] = useState(0);
+  const [entries, setEntries] = useState({}); // { [week]: { kg, reps } }
+  const [note, setNote] = useState("");
+  const [sending, setSending] = useState(false);
+  const weeks = Array.from({ length: Math.max(1, trainWeeks || TRAIN_WEEKS) }, (_, i) => i + 1);
+
+  const updateEntry = (week, patch) => setEntries((prev) => ({ ...prev, [week]: { ...(prev[week] || {}), ...patch } }));
+
+  const handleSubmit = async () => {
+    if (!selectedExercise) return;
+    const cleanEntries = weeks
+      .map((week) => {
+        const e = entries[week];
+        const kg = parseFloat(e?.kg), reps = parseInt(e?.reps, 10);
+        if (isNaN(kg) || isNaN(reps) || kg <= 0 || reps <= 0) return null;
+        return { week, kg, reps };
+      })
+      .filter(Boolean);
+    if (!cleanEntries.length) return;
+    setSending(true);
+    try {
+      await onSubmit({ exerciseId: selectedExercise.id, exerciseName: selectedExercise.name, setIndex, entries: cleanEntries }, note.trim());
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[125] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
+      <div className="w-full max-w-md max-h-[86vh] overflow-y-auto overscroll-contain bg-slate-900 border border-slate-700/60 rounded-3xl modal-pop-in shadow-2xl shadow-black/70" onClick={(e) => e.stopPropagation()}>
+        <div className="p-5 space-y-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-sky-500/20 border border-sky-500/30 text-sky-300 flex items-center justify-center shrink-0"><Target size={17} /></div>
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-black uppercase tracking-widest text-sky-400">Planificar progresión</p>
+              <h3 className="text-base font-black text-white leading-tight">Metas por semana</h3>
+            </div>
+            <button onClick={onClose} className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white transition"><X size={15} /></button>
+          </div>
+
+          {exercises.length === 0 ? (
+            <p className="text-sm text-slate-500">Tu alumno no tiene una rutina activa todavía.</p>
+          ) : (
+            <>
+              <div>
+                <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Ejercicio</label>
+                <select value={exerciseId || ""} onChange={(e) => { setExerciseId(e.target.value); setSetIndex(0); }} className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-3.5 py-2.5 text-white text-sm focus:outline-none">
+                  {exercises.map((ex) => <option key={ex.id} value={ex.id}>{ex.name}</option>)}
+                </select>
+              </div>
+              {selectedExercise && selectedExercise.sets.length > 1 && (
+                <div className="flex gap-1.5">
+                  {selectedExercise.sets.map((_, i) => (
+                    <button key={i} onClick={() => setSetIndex(i)} className={`flex-1 py-2 rounded-lg text-xs font-bold transition ${setIndex === i ? "bg-sky-500 !text-white" : "bg-slate-800 text-slate-400"}`}>Serie {i + 1}</button>
+                  ))}
+                </div>
+              )}
+              <div>
+                <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Meta por semana (dejá vacío lo que no quieras planificar)</label>
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {weeks.map((week) => (
+                    <div key={week} className="shrink-0 w-20 space-y-1">
+                      <p className="text-[9.5px] font-black text-center text-slate-500 uppercase">Sem {week}</p>
+                      <input value={entries[week]?.kg ?? ""} onChange={(e) => updateEntry(week, { kg: e.target.value })} type="number" inputMode="decimal" placeholder="kg" className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-2 py-1.5 text-white text-xs text-center focus:outline-none" />
+                      <input value={entries[week]?.reps ?? ""} onChange={(e) => updateEntry(week, { reps: e.target.value })} type="number" inputMode="numeric" placeholder="reps" className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-2 py-1.5 text-white text-xs text-center focus:outline-none" />
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Nota para tu alumno (opcional)</label>
+                <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} maxLength={200} placeholder="Ej: subí despacio, no fuerces la técnica..."
+                  className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-3.5 py-2.5 text-white text-sm focus:outline-none resize-none" />
+              </div>
+              <button onClick={handleSubmit} disabled={sending} className="w-full py-3 rounded-xl bg-sky-500 !text-white text-sm font-bold disabled:opacity-40">{sending ? "Enviando..." : "Enviar progresión"}</button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Perfil de solo lectura de un amigo/alumno/entrenador. Si no hay vínculo
+// aceptado (o la otra persona quitó su @usuario), getPublicFull devuelve
+// null y se muestra el estado "no comparte su perfil" en vez de romper.
+function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerson, onBack, onProposalSent }) {
+  const [basic, setBasic] = useState(null);
+  const [full, setFull] = useState(null);
+  const [state, setState] = useState("loading"); // loading|ok|forbidden
+  const [showComposer, setShowComposer] = useState(false);
+  const [showProgressionComposer, setShowProgressionComposer] = useState(false);
+  const [sentNote, setSentNote] = useState(false);
+
+  // Sin setState("loading") acá: el llamador monta este componente con
+  // key={uid} (ver SocialView), así que cambiar de persona lo REMONTA
+  // entero — el useState("loading") de arriba ya arranca fresco solo, sin
+  // necesidad de resetear nada a mano dentro del efecto.
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([getPublicBasic(uid), getPublicFull(uid)]).then(([b, f]) => {
+      if (cancelled) return;
+      setBasic(b);
+      setFull(f);
+      setState(f ? "ok" : "forbidden");
+    });
+    return () => { cancelled = true; };
+  }, [uid]);
+
+  const weekSchedule = useMemo(() => (full?.activeRoutineSnapshot ? getRoutineWeekSchedule(full.activeRoutineSnapshot) : null), [full]);
+  const cycleStart = full?.cycleStart ? new Date(full.cycleStart) : null;
+  const weekInfo = cycleStart ? getWeekInfo(cycleStart, { ...DEFAULT_SETTINGS, ...(full?.settings || {}) }) : null;
+  const dateSet = useMemo(() => new Set((full?.trainingSessions || []).map((s) => s.date)), [full]);
+  const streak = useMemo(() => computeSmartStreak(dateSet, weekSchedule), [dateSet, weekSchedule]);
+
+  return (
+    <div className="space-y-4">
+      <button onClick={onBack} className="flex items-center gap-1.5 text-slate-400 hover:text-white transition text-sm font-semibold"><ChevronLeft size={16} /> Volver</button>
+
+      <div className="rounded-2xl border border-slate-800/50 p-5 text-center" style={{ background: "var(--grad-profile-avatar)" }}>
+        <div className="w-16 h-16 mx-auto mb-2.5 rounded-3xl overflow-hidden">
+          {basic?.avatarData ? <img src={basic.avatarData} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-2xl font-black !text-white" style={{ background: "linear-gradient(135deg,#38BDF8,#0284C7)" }}>{(basic?.name || "?").charAt(0).toUpperCase()}</div>}
+        </div>
+        <h2 className="text-lg font-black text-white">{basic?.name || "Usuario"}</h2>
+        <p className="text-xs text-slate-500 flex items-center justify-center gap-1"><AtSign size={10} />{basic?.username}</p>
+      </div>
+
+      {state === "loading" && <p className="text-center text-slate-600 text-sm py-10">Cargando perfil...</p>}
+      {state === "forbidden" && (
+        <div className="text-center py-10 text-slate-600">
+          <Users size={28} className="mx-auto mb-2.5 opacity-30" />
+          <p className="text-sm">Esta persona no comparte su perfil con vos ahora mismo.</p>
+          <p className="text-xs mt-1 text-slate-700">Puede que haya quitado su @usuario o el vínculo haya cambiado.</p>
+        </div>
+      )}
+      {state === "ok" && (
+        <>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="rounded-xl border border-slate-800/50 bg-slate-900/50 px-3 py-3 text-center">
+              <p className="text-xl font-black text-orange-400">{streak}🔥</p>
+              <p className="text-[10px] text-slate-500 mt-0.5">Racha actual</p>
+            </div>
+            <div className="rounded-xl border border-slate-800/50 bg-slate-900/50 px-3 py-3 text-center">
+              <p className="text-xl font-black text-purple-400">{weekInfo ? `S${weekInfo.weekInCycle}` : "—"}</p>
+              <p className="text-[10px] text-slate-500 mt-0.5">{weekInfo?.isDeload ? "Semana de descarga" : "Semana de su ciclo"}</p>
+            </div>
+          </div>
+
+          {/* El rango va primero (después de racha/semana): es lo que más
+              importa de un vistazo, tanto para un amigo ("¿qué tal viene?")
+              como para un entrenador chequeando a su alumno. */}
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 px-1 mb-2">Rango por músculo</p>
+            <FriendMuscleRankSummary logs={full.logs} settings={full.settings} sex={full.sex} age={full.age} />
+          </div>
+
+          {isTrainerOfThisPerson && (
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={() => setShowComposer(true)} className="flex items-center gap-2 justify-center py-3 rounded-2xl bg-purple-500/15 border border-purple-500/30 text-purple-300 text-xs font-bold hover:bg-purple-500/25 transition active:scale-[0.98]">
+                <ClipboardCheck size={15} /> Proponer rutina
+              </button>
+              <button onClick={() => setShowProgressionComposer(true)} disabled={!full.activeRoutineSnapshot} className="flex items-center gap-2 justify-center py-3 rounded-2xl bg-sky-500/15 border border-sky-500/30 text-sky-300 text-xs font-bold hover:bg-sky-500/25 transition active:scale-[0.98] disabled:opacity-40">
+                <Target size={15} /> Planificar semana
+              </button>
+            </div>
+          )}
+          {sentNote && <p className="text-center text-xs text-emerald-400">Propuesta enviada — la va a ver la próxima vez que abra Social.</p>}
+
+          {full.activeRoutineSnapshot && (
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 px-1 mb-2">Rutina activa · {full.activeRoutineSnapshot.name}</p>
+              <RoutinePreview routineDef={full.activeRoutineSnapshot} />
+            </div>
+          )}
+
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 px-1 mb-2">Historial de sesiones</p>
+            <FriendSessionHistory trainingSessions={full.trainingSessions} activeRoutineSnapshot={full.activeRoutineSnapshot} />
+          </div>
+
+          {MEASUREMENT_TYPES.some((t) => (full.measurements?.[t.k] || []).length > 0) && (
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 px-1 mb-2">Medidas corporales</p>
+              <div className="grid grid-cols-2 gap-2">
+                {MEASUREMENT_TYPES.map((t) => {
+                  const last = getLatestMeasurement(full.measurements?.[t.k]);
+                  if (!last) return null;
+                  return (
+                    <div key={t.k} className="rounded-xl border border-slate-800/50 bg-slate-900/50 px-3 py-2.5">
+                      <p className="text-[11px] text-slate-500">{t.l}</p>
+                      <p className="text-sm font-bold text-white">{last.value}{t.unit}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {showComposer && (
+        <RoutineProposalComposer
+          myRoutines={viewerProfile?.routines || {}}
+          onClose={() => setShowComposer(false)}
+          onSubmit={async (routineDef, note) => {
+            await createRoutineProposal(viewerUid, uid, routineDef, note);
+            setShowComposer(false);
+            setSentNote(true);
+            onProposalSent?.();
+          }}
+        />
+      )}
+      {showProgressionComposer && full?.activeRoutineSnapshot && (
+        <ProgressionProposalComposer
+          routineSnapshot={full.activeRoutineSnapshot}
+          trainWeeks={full.settings?.trainWeeks}
+          onClose={() => setShowProgressionComposer(false)}
+          onSubmit={async (progressionPlan, note) => {
+            await createProgressionProposal(viewerUid, uid, progressionPlan, note);
+            setShowProgressionComposer(false);
+            setSentNote(true);
+            onProposalSent?.();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Pestaña "Social" completa: amigos (buscar/solicitudes/lista) y
+// entrenador/alumno (vincular/solicitudes/alumnos/propuestas). Al elegir a
+// alguien de una lista se muestra FriendProfileView en vez de navegar a
+// otra pestaña — mismo criterio "estado interno, no más tabs" que ya usa
+// RoutinesView/DeloadView para sus propias sub-pantallas.
+function SocialView({ profile, uid, onActivateRoutine }) {
+  const [section, setSection] = useState("amigos"); // amigos | buscar | entrenador
+  const [viewingUid, setViewingUid] = useState(null);
+  const [viewingAsTrainer, setViewingAsTrainer] = useState(false);
+
+  const [friendships, setFriendships] = useState([]);
+  const [trainerAsTrainer, setTrainerAsTrainer] = useState([]);
+  const [trainerAsStudent, setTrainerAsStudent] = useState([]);
+  const [proposals, setProposals] = useState([]);
+  const [sentProposals, setSentProposals] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Sin setLoading(true) síncrono acá a propósito: el estado ya arranca en
+  // `true` (useState(true) arriba), y las llamadas a refresh() DESPUÉS del
+  // primer load (tras aceptar/mandar una solicitud) actualizan las listas
+  // en el momento sin parpadeo de "Cargando..." — mejor UX, y evita
+  // disparar un setState síncrono dentro del efecto de montaje de abajo.
+  const refresh = useCallback(() => {
+    Promise.all([
+      listMyFriendships(uid),
+      listTrainerLinksAsTrainer(uid),
+      listTrainerLinksAsStudent(uid),
+      listRoutineProposalsForStudent(uid),
+      listRoutineProposalsByTrainer(uid),
+    ]).then(([f, at, as, pr, sentPr]) => {
+      setFriendships(f); setTrainerAsTrainer(at); setTrainerAsStudent(as); setProposals(pr); setSentProposals(sentPr);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, [uid]);
+  useEffect(() => { refresh(); }, [refresh]);
+
+  const otherUidOf = (f) => f.users.find((u) => u !== uid);
+  const friendAccepted = friendships.filter((f) => f.status === "accepted");
+  const friendIncoming = friendships.filter((f) => f.status === "pending" && f.requestedBy !== uid);
+  const friendOutgoing = friendships.filter((f) => f.status === "pending" && f.requestedBy === uid);
+
+  const trainerIncoming = [...trainerAsTrainer, ...trainerAsStudent].filter((l) => l.status === "pending" && l.requestedBy !== uid);
+  const studentsAccepted = trainerAsTrainer.filter((l) => l.status === "accepted");
+  const trainersAccepted = trainerAsStudent.filter((l) => l.status === "accepted");
+
+  const allUids = useMemo(() => {
+    const set = new Set();
+    friendships.forEach((f) => set.add(otherUidOf(f)));
+    trainerAsTrainer.forEach((l) => set.add(l.studentUid));
+    trainerAsStudent.forEach((l) => set.add(l.trainerUid));
+    proposals.forEach((p) => set.add(p.trainerUid));
+    sentProposals.forEach((p) => set.add(p.studentUid));
+    return Array.from(set);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [friendships, trainerAsTrainer, trainerAsStudent, proposals, sentProposals]);
+  const basics = useUserBasics(allUids);
+
+  const friendStatus = (otherUid) => {
+    const f = friendships.find((x) => x.users.includes(otherUid));
+    if (!f) return null;
+    if (f.status === "accepted") return "accepted";
+    return f.requestedBy === uid ? "pending_sent" : "pending_received";
+  };
+
+  const doSendFriendRequest = async (otherUid) => { await sendFriendRequest(uid, otherUid); refresh(); };
+  const doRespondFriend = async (otherUid, accept) => { await respondToFriendRequest(uid, otherUid, accept); refresh(); };
+  const doRemoveFriend = async (otherUid) => { await removeFriend(uid, otherUid); refresh(); };
+  const doSendTrainerLink = async (otherUid, myRole) => { await sendTrainerLinkRequest(uid, otherUid, myRole); refresh(); };
+  const doRespondTrainer = async (link, accept) => { await respondToTrainerLink(link.trainerUid, link.studentUid, accept); refresh(); };
+  const doRemoveTrainerLink = async (link) => { await removeTrainerLink(link.trainerUid, link.studentUid); refresh(); };
+
+  if (viewingUid) {
+    return (
+      <FriendProfileView
+        key={viewingUid}
+        uid={viewingUid} viewerUid={uid} viewerProfile={profile}
+        isTrainerOfThisPerson={viewingAsTrainer}
+        onBack={() => { setViewingUid(null); setViewingAsTrainer(false); }}
+        onProposalSent={refresh}
+      />
+    );
+  }
+
+  // Mismo lenguaje que PROGRESS_SECTIONS (Progreso): cada sub-sección con
+  // su propio acento sobre una base neutra — "Entrenador" se queda con el
+  // violeta que ya usa TrainerLinksSection (mismo criterio que Progreso,
+  // donde cada pestaña interna tiene su color sin que eso choque con la
+  // identidad general de la pestaña de arriba).
+  const SECTIONS = [
+    { k: "amigos", l: "Amigos", icon: <Users size={14} />, color: SOCIAL_COLOR },
+    { k: "buscar", l: "Buscar", icon: <Search size={14} />, color: SOCIAL_COLOR },
+    { k: "entrenador", l: "Entrenador", icon: <GraduationCap size={14} />, color: "#A855F7" },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-3 gap-1 p-1 rounded-2xl bg-slate-900/60 border border-slate-800/50">
+        {SECTIONS.map((s) => {
+          const badge = s.k === "amigos" ? friendIncoming.length : s.k === "entrenador" ? trainerIncoming.length + proposals.length : 0;
+          return (
+            <button key={s.k} onClick={() => setSection(s.k)} className="relative flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl text-[10.5px] font-bold transition-all active:scale-95"
+              style={section === s.k ? { background: tint(s.color, "22"), color: s.color, boxShadow: `inset 0 0 0 1px ${tint(s.color, "45")}` } : { color: "#64748b" }}>
+              {s.icon}<span>{s.l}</span>
+              {badge > 0 && <span className="absolute top-1 right-2.5 w-4 h-4 rounded-full bg-rose-500 text-white text-[9px] font-black flex items-center justify-center">{badge}</span>}
+            </button>
+          );
+        })}
+      </div>
+
+      <div key={section} className="tab-fade-in space-y-3">
+        {section === "buscar" && (
+          <SocialSearchSection myUid={uid} friendStatus={friendStatus} onSendFriendRequest={doSendFriendRequest} />
+        )}
+
+        {section === "amigos" && (
+          loading ? <p className="text-center text-slate-600 text-sm py-8">Cargando...</p> : (
+            <>
+              {friendIncoming.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-amber-400 px-1">Solicitudes recibidas</p>
+                  {friendIncoming.map((f) => { const other = otherUidOf(f); return (
+                    <PublicUserCard key={f.id} uid={other} basic={basics[other]}>
+                      <div className="flex gap-1.5 shrink-0">
+                        <button onClick={() => doRespondFriend(other, true)} className="p-2 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400"><Check size={13} /></button>
+                        <button onClick={() => doRespondFriend(other, false)} className="p-2 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-400"><X size={13} /></button>
+                      </div>
+                    </PublicUserCard>
+                  ); })}
+                </div>
+              )}
+              {friendOutgoing.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 px-1">Solicitudes enviadas</p>
+                  {friendOutgoing.map((f) => { const other = otherUidOf(f); return (
+                    <PublicUserCard key={f.id} uid={other} basic={basics[other]}>
+                      <button onClick={() => doRemoveFriend(other)} className="shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-bold text-slate-500 hover:text-rose-400 transition">Cancelar</button>
+                    </PublicUserCard>
+                  ); })}
+                </div>
+              )}
+              <div className="space-y-2">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 px-1">{friendAccepted.length > 0 ? `${friendAccepted.length} ${friendAccepted.length === 1 ? "amigo" : "amigos"}` : "Amigos"}</p>
+                {friendAccepted.length === 0 ? (
+                  <div className="text-center py-8 text-slate-600"><Users size={28} className="mx-auto mb-2.5 opacity-30" /><p className="text-sm">Todavía no tenés amigos agregados.</p><p className="text-xs mt-1 text-slate-700">Buscalos por su @usuario en "Buscar".</p></div>
+                ) : friendAccepted.map((f) => { const other = otherUidOf(f); return (
+                  <PublicUserCard key={f.id} uid={other} basic={basics[other]} onClick={() => setViewingUid(other)}>
+                    <ChevronRight size={15} className="text-slate-600 shrink-0" />
+                  </PublicUserCard>
+                ); })}
+              </div>
+            </>
+          )
+        )}
+
+        {section === "entrenador" && (
+          <TrainerLinksSection
+            myUid={uid}
+            loading={loading}
+            trainerIncoming={trainerIncoming}
+            studentsAccepted={studentsAccepted}
+            trainersAccepted={trainersAccepted}
+            sentProposals={sentProposals}
+            proposals={proposals}
+            basics={basics}
+            onSendLink={doSendTrainerLink}
+            onRespondLink={doRespondTrainer}
+            onRemoveLink={doRemoveTrainerLink}
+            onRespondProposal={async (p, accept) => {
+              await respondToRoutineProposal(p.id, accept);
+              if (accept) {
+                if (p.progressionPlan) {
+                  // Propuesta de progresión: se aplica a la rutina ACTIVA
+                  // actual (no reemplaza nada más) — ver
+                  // applyProgressionToRoutine, arriba en el archivo.
+                  const activeId = profile?.activeRoutineId;
+                  const activeDef = activeId ? resolveRoutineDef(profile.routines?.[activeId], activeId) : null;
+                  if (activeDef) onActivateRoutine(activeId, applyProgressionToRoutine(activeDef, p.progressionPlan));
+                } else if (p.proposedRoutine) {
+                  onActivateRoutine(builderUid("routine_proposal"), p.proposedRoutine);
+                }
+              }
+              refresh();
+            }}
+            onViewStudent={(u) => { setViewingUid(u); setViewingAsTrainer(true); }}
+            onViewTrainer={(u) => { setViewingUid(u); setViewingAsTrainer(false); }}
+          />
+        )}
+      </div>
     </div>
   );
 }
@@ -9735,9 +11179,12 @@ function wouldBeNewPR(profile, exerciseId, setIndex, kg, reps) {
 function buildActionPlan(action, ctx) {
   const { profile, settings, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement, onLogSet, onArchiveRoutine, onRestoreRoutine, onNavigate, onStartSession, onEndSession } = ctx;
   if (action.type === "crear_rutina") {
-    const days = (action.days || []).map((d) => ({
+    // BUG FIX: mismo caso que ImportRoutineModal/el wizard — filtrar
+    // días/ejercicios null antes de leer sus campos, para que un elemento
+    // mal formado en la respuesta de la IA no tire abajo toda la acción.
+    const days = (action.days || []).filter((d) => d && typeof d === "object").map((d) => ({
       label: String(d.label || "Día"),
-      exercises: (d.exercises || []).map((ex) => {
+      exercises: (d.exercises || []).filter((ex) => ex && typeof ex === "object").map((ex) => {
         const lib = matchExerciseToLibrary(ex.name);
         const sets = Array.from({ length: Math.max(1, Math.min(8, ex.setsCount || 3)) }, () => ({ repRange: ex.repRange || "8-10" }));
         return lib ? { libId: lib.id, sets } : { id: builderUid("imported"), name: ex.name || "Ejercicio", muscle: "Personalizado", sets };
@@ -10622,28 +12069,58 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
       // pedidos grandes morían a mitad de generación. El servidor tiene su
       // propio límite de 60s, así que su mensaje de error siempre llega
       // antes que este corte.
-      const controller = new AbortController();
-      abortControllerRef.current = controller;
       userAbortedRef.current = false;
-      const timeoutId = setTimeout(() => controller.abort(), 65000);
       try {
-        const response = await fetch("/api/ia", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "chat", systemPrompt, history }),
-          signal: controller.signal,
-        });
-        clearTimeout(timeoutId);
+        // Reintento automático (una sola vez, con una pequeña pausa): la
+        // mayoría de los "la IA no responde" eran una falla de RED/timeout
+        // puntual (una conexión que cortó un instante), no un problema real
+        // con Gemini — antes eso se mostraba como error directo. Ahora, si
+        // el primer intento falla por red/timeout (NO si el servidor ya
+        // contestó con un error "limpio" tipo cuota agotada, que reintentar
+        // no arregla), se reintenta solo antes de mostrarle nada al usuario.
+        // Todo el bloque (reintento + procesamiento de la respuesta) queda
+        // bajo UN SOLO try/catch/finally: si el reintento también falla,
+        // el `throw err` de abajo tiene que llegar al catch de más abajo
+        // (que muestra el mensaje y limpia isSending) — separarlo en dos
+        // bloques hacía que un fallo tras el reintento quedara sin atrapar
+        // y la conversación se quedaba trabada en "escribiendo...".
+        let result;
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          const controller = new AbortController();
+          abortControllerRef.current = controller;
+          const timeoutId = setTimeout(() => controller.abort(), 65000);
+          try {
+            const response = await fetch("/api/ia", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ action: "chat", systemPrompt, history }),
+              signal: controller.signal,
+            });
+            clearTimeout(timeoutId);
 
-        if (!response.ok) {
-          // El servidor ahora manda el motivo real en { error } (cuota
-          // agotada, clave inválida, IA caída...) — lo mostramos tal cual
-          // en vez de un "no me pude conectar" genérico que no dice nada.
-          const errBody = await response.json().catch(() => null);
-          const serverMsg = errBody?.error;
-          throw new Error(serverMsg || `Error ${response.status}`, { cause: serverMsg ? "server" : undefined });
+            if (!response.ok) {
+              // El servidor ahora manda el motivo real en { error } (cuota
+              // agotada, clave inválida, IA caída...) — lo mostramos tal cual
+              // en vez de un "no me pude conectar" genérico que no dice nada.
+              const errBody = await response.json().catch(() => null);
+              const serverMsg = errBody?.error;
+              throw new Error(serverMsg || `Error ${response.status}`, { cause: serverMsg ? "server" : undefined });
+            }
+            result = await response.json();
+            break;
+          } catch (err) {
+            clearTimeout(timeoutId);
+            if (err.name === "AbortError" && userAbortedRef.current) return;
+            if (attempt === 1 && err.cause !== "server") {
+              console.warn("[IA] primer intento falló, reintentando una vez:", err?.message || err);
+              await new Promise((r) => setTimeout(r, 1200));
+              continue;
+            }
+            throw err;
+          } finally {
+            abortControllerRef.current = null;
+          }
         }
-        const result = await response.json();
 
         const rawReply = result?.text;
         const sources = Array.isArray(result?.sources) ? result.sources : [];
@@ -10667,7 +12144,6 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
         if (planSummary) delete planSummary.confirm;
         setMessages((prev) => [...prev, { role: "assistant", text, plan: planSummary, action: plan ? action : null, planStatus: plan ? "pending" : null, question, sources, date: new Date().toISOString() }]);
       } catch (err) {
-        clearTimeout(timeoutId);
         // Si lo cortaste vos con "Detener", no hay error que mostrar — fue
         // una acción tuya, no una falla. Solo se corta en silencio.
         if (err.name === "AbortError" && userAbortedRef.current) return;
@@ -10883,29 +12359,33 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
 
   return (
     <div className="relative pb-32">
-      {/* Vidrio esmerilado: fondo semitransparente + backdrop-blur en vez de
-          un gradiente sólido. El borde superior más claro (inset shadow)
-          simula el filo de luz típico del glassmorphism. */}
-      <div className="relative overflow-hidden rounded-2xl border border-white/10 p-5 mb-3 backdrop-blur-xl" style={{ background: "var(--glass-panel-bg)", boxShadow: "inset 0 1px 0 0 rgba(255,255,255,0.08), 0 8px 32px -12px rgba(0,0,0,0.4)" }}>
+      {/* Antes esto era un panel de vidrio esmerilado neutro (glassmorphism),
+          distinto del degradé plano que usan los heroes de las demás
+          pestañas (Rutina/Progreso/Descarga) — se sentía "pegado pero
+          distinto" al resto de la app. Mismo formato ahora, con el índigo
+          característico de esta pestaña en vez de tenerlo sólo en detalles
+          sueltos. */}
+      <div className="relative overflow-hidden rounded-2xl border border-indigo-500/20 p-5 mb-3" style={{ background: "var(--grad-hero-indigo)" }}>
+        <div className="absolute -top-8 -right-8 w-32 h-32 rounded-full bg-indigo-500/15 blur-2xl pointer-events-none" />
         <div className="relative flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-2xl bg-teal-500/20 border border-teal-500/30 flex items-center justify-center shrink-0 shadow-lg shadow-teal-500/20 elastic-in">
-            <Sparkles size={20} className="text-teal-400 sparkle-spin" />
+          <div className="w-11 h-11 rounded-2xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center shrink-0 shadow-lg shadow-indigo-500/20 elastic-in">
+            <Sparkles size={20} className="text-indigo-400 sparkle-spin" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
-              <span className="text-[10px] font-black uppercase tracking-widest text-teal-400">Tu asistente</span>
-              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-teal-500/20 text-teal-400 font-bold border border-teal-500/20">BETA</span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-indigo-400">Tu asistente</span>
+              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400 font-bold border border-indigo-500/20">BETA</span>
             </div>
             <h2 className="relative text-xl font-black text-white leading-tight">Entrenador IA</h2>
-            <p className="relative text-xs text-teal-300/60 mt-0.5">Conoce tu historial real, preguntale lo que quieras</p>
+            <p className="relative text-xs text-indigo-300/60 mt-0.5">Conoce tu historial real, preguntale lo que quieras</p>
           </div>
           {messages.some((m) => m.plan && m.planStatus === "confirmed") && (
-            <button onClick={() => setShowChangeLog(true)} title="Cambios aplicados" className="p-2 rounded-xl bg-slate-800/60 border border-slate-700/50 text-slate-400 hover:text-teal-400 transition shrink-0 active:scale-95">
+            <button onClick={() => setShowChangeLog(true)} title="Cambios aplicados" className="p-2 rounded-xl bg-slate-800/60 border border-slate-700/50 text-slate-400 hover:text-indigo-400 transition shrink-0 active:scale-95">
               <ListChecks size={14} />
             </button>
           )}
           {messages.length > 1 && (
-            <button onClick={() => onNewConversation ? onNewConversation() : setMessages([AI_CHAT_WELCOME])} title="Nueva conversación" className="p-2 rounded-xl bg-slate-800/60 border border-slate-700/50 text-slate-400 hover:text-teal-400 transition shrink-0 active:scale-95">
+            <button onClick={() => onNewConversation ? onNewConversation() : setMessages([AI_CHAT_WELCOME])} title="Nueva conversación" className="p-2 rounded-xl bg-slate-800/60 border border-slate-700/50 text-slate-400 hover:text-indigo-400 transition shrink-0 active:scale-95">
               <RotateCcw size={14} />
             </button>
           )}
@@ -10959,26 +12439,31 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
           <div key={i} className="msg-in">
             <div className={`group flex items-end gap-2 ${m.role === "user" ? "justify-end" : "justify-start"}`}>
               {m.role === "assistant" && (
-                <div className="w-6 h-6 rounded-lg bg-teal-500/15 border border-teal-500/25 flex items-center justify-center shrink-0 mb-0.5 shadow-md shadow-teal-500/10">
-                  <Sparkles size={11} className="text-teal-400" />
+                <div className="w-6 h-6 rounded-lg bg-indigo-500/15 border border-indigo-500/25 flex items-center justify-center shrink-0 mb-0.5 shadow-md shadow-indigo-500/10">
+                  <Sparkles size={11} className="text-indigo-400" />
                 </div>
               )}
               {/* Editar: solo en mensajes propios, y solo si no está respondiendo.
                   Toca el lápiz → el texto vuelve al input para reescribirlo. */}
               {m.role === "user" && !isSending && (
-                <button onClick={() => handleEditMessage(i)} aria-label="Editar mensaje" className={`shrink-0 mb-1 p-1.5 rounded-lg text-slate-500 hover:text-teal-300 hover:bg-slate-800/60 transition ${editingIndex === i ? "text-teal-400" : ""}`}>
+                <button onClick={() => handleEditMessage(i)} aria-label="Editar mensaje" className={`shrink-0 mb-1 p-1.5 rounded-lg text-slate-500 hover:text-indigo-300 hover:bg-slate-800/60 transition ${editingIndex === i ? "text-indigo-400" : ""}`}>
                   <Edit3 size={13} />
                 </button>
               )}
-              {/* Borde parejo en las 4 esquinas (antes el filo izquierdo era
-                  más grueso que el resto — un acento de "tarjeta plana" que
-                  desentonaba con el vidrio esmerilado, donde el borde tiene
-                  que leerse como un solo filo de luz, no como una franja de
-                  color pegada a un lado). El matiz de marca ahora vive en el
-                  color del borde entero, no en un lado más grueso. */}
+              {/* Rediseño: antes el mensaje propio era un degradé sólido de
+                  teal al 82% de opacidad (bastante cargado) y el de la IA
+                  vidrio esmerilado con borde teal — los dos con mucho color
+                  encima. Ahora la superficie de AMBOS es neutra/tenue (misma
+                  tarjeta "gris" que ya usan los pills de Progreso), y el
+                  índigo característico de la pestaña queda concentrado en
+                  detalles puntuales: el ícono de la IA (arriba) y un filo
+                  angosto a la izquierda en sus burbujas, en vez de pintar
+                  toda la superficie. */}
               <div
-                className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed backdrop-blur-md border ${m.role === "user" ? "!text-white rounded-br-md border-white/20 shadow-lg shadow-teal-500/15" : "border-teal-400/20 text-slate-200 rounded-bl-md shadow-md shadow-black/20"} ${editingIndex === i ? "ring-2 ring-teal-400/60" : ""}`}
-                style={m.role === "user" ? { background: "linear-gradient(135deg, rgba(20,184,166,0.82), rgba(14,116,144,0.82))", boxShadow: "inset 0 1px 0 0 rgba(255,255,255,0.18)" } : { background: "var(--glass-bubble-assistant)", boxShadow: "inset 0 1px 0 0 rgba(255,255,255,0.07)" }}
+                className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed border ${m.role === "user" ? "!text-white rounded-br-md" : "text-slate-200 rounded-bl-md border-l-2"} ${editingIndex === i ? "ring-2 ring-indigo-400/60" : ""}`}
+                style={m.role === "user"
+                  ? { backgroundColor: "var(--row-surface)", borderColor: "var(--chip-border)" }
+                  : { backgroundColor: "var(--panel-sunken)", borderColor: "var(--chip-border)", borderLeftColor: "#6366F1" }}
               >
                 {m.role === "assistant" ? renderChatMarkdown(m.text) : m.text}
               </div>
@@ -11007,7 +12492,7 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
             {m.sources && m.sources.length > 0 && (
               <div className="mt-1.5 flex flex-wrap gap-1.5 max-w-[85%]">
                 {m.sources.map((s, j) => (
-                  <a key={j} href={s.uri} target="_blank" rel="noreferrer" className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800/60 border border-slate-700/50 text-[10px] text-slate-400 hover:text-teal-300 hover:border-teal-500/40 transition truncate max-w-[170px]">
+                  <a key={j} href={s.uri} target="_blank" rel="noreferrer" className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800/60 border border-slate-700/50 text-[10px] text-slate-400 hover:text-indigo-300 hover:border-indigo-500/40 transition truncate max-w-[170px]">
                     <Link2 size={9} className="shrink-0" />{s.title || "Fuente"}
                   </a>
                 ))}
@@ -11049,10 +12534,10 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
               </div>
             )}
             {m.plan && m.planStatus === "pending" && livePlan && typeof livePlan.confirm === "function" && (
-              <div className="relative overflow-hidden mt-2 border border-teal-500/25 rounded-2xl p-3.5 max-w-[85%] bounce-in backdrop-blur-xl" style={{ background: "var(--glass-panel-bg)", boxShadow: "inset 0 1px 0 0 rgba(255,255,255,0.08)" }}>
-                <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full bg-teal-500/10 blur-2xl pointer-events-none" />
+              <div className="relative overflow-hidden mt-2 border border-indigo-500/25 rounded-2xl p-3.5 max-w-[85%] bounce-in backdrop-blur-xl" style={{ background: "var(--glass-panel-bg)", boxShadow: "inset 0 1px 0 0 rgba(255,255,255,0.08)" }}>
+                <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full bg-indigo-500/10 blur-2xl pointer-events-none" />
                 <div className="relative flex items-center gap-2 mb-2.5">
-                  <span className="w-6 h-6 rounded-lg bg-teal-500/15 border border-teal-500/25 flex items-center justify-center shrink-0"><Sparkles size={12} className="text-teal-400" /></span>
+                  <span className="w-6 h-6 rounded-lg bg-indigo-500/15 border border-indigo-500/25 flex items-center justify-center shrink-0"><Sparkles size={12} className="text-indigo-400" /></span>
                   <p className="text-sm font-bold text-white flex-1 min-w-0">{m.plan.title}</p>
                 </div>
                 {m.plan.kind === "routine" ? (
@@ -11067,7 +12552,7 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
                   <div className="mb-3"><SettingsChangePreview changes={m.plan.settingsChanges} /></div>
                 ) : (
                   <ul className="mb-3 space-y-1">
-                    {m.plan.items.map((item, j) => <li key={j} className="text-[11px] text-slate-400 flex items-start gap-1.5"><span className="text-teal-400 mt-0.5">•</span>{item}</li>)}
+                    {m.plan.items.map((item, j) => <li key={j} className="text-[11px] text-slate-400 flex items-start gap-1.5"><span className="text-indigo-400 mt-0.5">•</span>{item}</li>)}
                   </ul>
                 )}
                 <div className="flex gap-2">
@@ -11103,17 +12588,17 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
                 centro de un halo que late, con un ecualizador de energía debajo
                 — como si el entrenador estuviera trabajando. */}
             <div className="relative flex items-center justify-center">
-              <span className="absolute w-20 h-20 rounded-full thinking-halo" style={{ background: "radial-gradient(circle, rgba(20,184,166,0.25), transparent 70%)" }} />
+              <span className="absolute w-20 h-20 rounded-full thinking-halo" style={{ background: "radial-gradient(circle, rgba(99,102,241,0.25), transparent 70%)" }} />
               <span className="absolute w-20 h-20 rounded-full thinking-wave" />
               <span className="absolute w-20 h-20 rounded-full thinking-wave" style={{ animationDelay: "0.9s" }} />
-              <div className="relative w-12 h-12 rounded-2xl bg-teal-500/15 border border-teal-500/30 flex items-center justify-center shadow-lg shadow-teal-500/20">
-                <Dumbbell size={22} className="text-teal-300 thinking-rep" />
+              <div className="relative w-12 h-12 rounded-2xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                <Dumbbell size={22} className="text-indigo-300 thinking-rep" />
               </div>
             </div>
             {/* Ecualizador: 5 barras que laten como música, con desfase */}
             <div className="flex items-end gap-1 h-4">
               {[0, 1, 2, 3, 4].map((k) => (
-                <span key={k} className="w-1 rounded-full bg-teal-400/80 thinking-eq" style={{ animationDelay: `${k * 0.12}s` }} />
+                <span key={k} className="w-1 rounded-full bg-indigo-400/80 thinking-eq" style={{ animationDelay: `${k * 0.12}s` }} />
               ))}
             </div>
             <span className="text-[11px] text-slate-500 font-medium">Pensando<span className="thinking-dots" /> <span className="text-slate-600">· puede tardar hasta 30s</span></span>
@@ -11163,9 +12648,9 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
               </div>
             )}
             {editingIndex != null && (
-              <div className="flex items-center gap-2 mb-1.5 px-3 py-2 rounded-xl bg-teal-500/10 border border-teal-500/25 msg-in">
-                <Edit3 size={12} className="text-teal-400 shrink-0" />
-                <span className="flex-1 text-[11px] text-teal-200 font-medium">Editando tu mensaje: al enviar se regenera la respuesta</span>
+              <div className="flex items-center gap-2 mb-1.5 px-3 py-2 rounded-xl bg-indigo-500/10 border border-indigo-500/25 msg-in">
+                <Edit3 size={12} className="text-indigo-400 shrink-0" />
+                <span className="flex-1 text-[11px] text-indigo-200 font-medium">Editando tu mensaje: al enviar se regenera la respuesta</span>
                 <button onClick={cancelarEdicion} aria-label="Cancelar edición" className="p-1 rounded-lg text-slate-400 hover:text-white transition shrink-0"><X size={13} /></button>
               </div>
             )}
@@ -11180,12 +12665,12 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
                   de cuadrar): en vez de eso, la barra de mensaje se fija en
                   h-12 y el botón usa ese mismo h-12 w-12, así los dos miden
                   exactamente lo mismo pase lo que pase con el contenido. */}
+              {/* BUG FIX (pedido): antes tenía un numerito (conversations.length)
+                  superpuesto arriba a la derecha — se sacó, el botón sigue
+                  abriendo la lista de conversaciones igual. */}
               {onSwitchConversation && (
-                <button onClick={() => setShowSidebar(true)} aria-label="Tus conversaciones" className="relative shrink-0 w-12 h-12 flex items-center justify-center rounded-2xl backdrop-blur-xl shadow-xl shadow-black/40 transition-all active:scale-95" style={{ backgroundColor: "var(--chat-bar-idle)", border: "1px solid var(--chat-bar-border-idle)", color: "#5eead4" }}>
+                <button onClick={() => setShowSidebar(true)} aria-label="Tus conversaciones" className="relative shrink-0 w-12 h-12 flex items-center justify-center rounded-2xl backdrop-blur-xl shadow-xl shadow-black/40 transition-all active:scale-95" style={{ backgroundColor: "var(--chat-bar-idle)", border: "1px solid var(--chat-bar-border-idle)", color: "#a5b4fc" }}>
                   <MessageCircle size={17} />
-                  {conversations.length > 1 && (
-                    <span className="absolute -top-1 -right-1 min-w-[15px] h-[15px] px-0.5 rounded-full bg-teal-500 text-[8px] font-black text-white flex items-center justify-center">{conversations.length}</span>
-                  )}
                 </button>
               )}
               <div className="flex-1 h-12 flex items-center gap-2 rounded-2xl p-1.5 backdrop-blur-xl shadow-xl shadow-black/40 transition-colors" style={{ backgroundColor: isListening ? "var(--chat-bar-listening)" : editingIndex != null ? "var(--chat-bar-editing)" : "var(--chat-bar-idle)", border: `1px solid ${isListening ? "var(--chat-bar-border-listening)" : editingIndex != null ? "var(--chat-bar-border-editing)" : "var(--chat-bar-border-idle)"}` }}>
@@ -11204,7 +12689,7 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
                   className="flex-1 bg-transparent px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none min-w-0"
                   disabled={isSending}
                 />
-                <button onClick={handleSend} disabled={!input.trim() || isSending} aria-label="Enviar" className="p-2.5 rounded-xl !text-white shrink-0 disabled:opacity-40 transition-all active:scale-95" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>
+                <button onClick={handleSend} disabled={!input.trim() || isSending} aria-label="Enviar" className="p-2.5 rounded-xl !text-white shrink-0 disabled:opacity-40 transition-all active:scale-95" style={{ background: "linear-gradient(135deg,#6366F1,#4338CA)" }}>
                   <Send size={16} />
                 </button>
               </div>
@@ -11255,7 +12740,7 @@ function AIConversationSidebar({ conversations, activeConversationId, onSelect, 
       <div className="relative w-[82%] max-w-xs h-full flex flex-col shadow-2xl shadow-black/60 bounce-in overflow-hidden backdrop-blur-xl" style={{ background: "var(--glass-panel-bg)", borderRight: "1px solid var(--glass-panel-border)" }} onClick={(e) => e.stopPropagation()}>
         <div className="relative overflow-hidden px-4 pb-4 shrink-0" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 18px)", borderBottom: "1px solid var(--glass-panel-border)", boxShadow: "inset 0 -1px 0 0 rgba(255,255,255,0.04)" }}>
           <div className="relative flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-md shadow-teal-500/20" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-md shadow-indigo-500/20" style={{ background: "linear-gradient(135deg,#6366F1,#4338CA)" }}>
               <List size={16} className="!text-white" />
             </div>
             <div className="flex-1 min-w-0">
@@ -11266,7 +12751,7 @@ function AIConversationSidebar({ conversations, activeConversationId, onSelect, 
           </div>
         </div>
         <div className="px-3 pt-3 shrink-0">
-          <button onClick={onNew} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold !text-white transition active:scale-[0.98] shadow-lg shadow-teal-500/15" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>
+          <button onClick={onNew} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold !text-white transition active:scale-[0.98] shadow-lg shadow-indigo-500/15" style={{ background: "linear-gradient(135deg,#6366F1,#4338CA)" }}>
             <Plus size={15} /> Nueva conversación
           </button>
         </div>
@@ -11279,7 +12764,7 @@ function AIConversationSidebar({ conversations, activeConversationId, onSelect, 
             const lastMsg = (c.messages || []).slice(-1)[0]?.text?.replace(/\s+/g, " ").trim() || "";
             if (renaming) {
               return (
-                <div key={c.id} className="w-full flex items-center gap-2 rounded-xl px-3 py-2" style={{ backgroundColor: "rgba(20,184,166,0.14)", border: "1px solid rgba(20,184,166,0.35)" }}>
+                <div key={c.id} className="w-full flex items-center gap-2 rounded-xl px-3 py-2" style={{ backgroundColor: "rgba(99,102,241,0.14)", border: "1px solid rgba(99,102,241,0.35)" }}>
                   <input
                     autoFocus
                     value={renameDraft}
@@ -11288,23 +12773,23 @@ function AIConversationSidebar({ conversations, activeConversationId, onSelect, 
                     onBlur={commitRename}
                     className="flex-1 min-w-0 bg-transparent text-xs font-bold text-white focus:outline-none"
                   />
-                  <button onClick={commitRename} aria-label="Guardar nombre" className="p-1 rounded-lg text-teal-400 shrink-0"><Check size={14} /></button>
+                  <button onClick={commitRename} aria-label="Guardar nombre" className="p-1 rounded-lg text-indigo-400 shrink-0"><Check size={14} /></button>
                 </div>
               );
             }
             return (
               <button key={c.id} onClick={() => onSelect(c.id)} className="relative w-full flex items-center gap-2.5 rounded-xl pl-3 pr-2 py-2.5 text-left transition active:scale-[0.99] overflow-hidden"
-                style={isActive ? { background: "linear-gradient(135deg, rgba(20,184,166,0.16), rgba(20,184,166,0.05))", border: "1px solid rgba(20,184,166,0.35)" } : { backgroundColor: "var(--row-surface)", border: "1px solid transparent" }}>
-                {isActive && <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-teal-400" />}
-                <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: isActive ? "rgba(20,184,166,0.2)" : "rgba(148,163,184,0.08)" }}>
-                  <MessageCircle size={12} className={isActive ? "text-teal-300" : "text-slate-600"} />
+                style={isActive ? { background: "linear-gradient(135deg, rgba(99,102,241,0.16), rgba(99,102,241,0.05))", border: "1px solid rgba(99,102,241,0.35)" } : { backgroundColor: "var(--row-surface)", border: "1px solid transparent" }}>
+                {isActive && <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-indigo-400" />}
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: isActive ? "rgba(99,102,241,0.2)" : "rgba(148,163,184,0.08)" }}>
+                  <MessageCircle size={12} className={isActive ? "text-indigo-300" : "text-slate-600"} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-bold truncate" style={{ color: isActive ? "#fff" : "#94a3b8" }}>{c.title}</p>
                   <p className="text-[10px] text-slate-600 mt-0.5 truncate">{dateLabel}{lastMsg ? ` · ${lastMsg}` : ""}</p>
                 </div>
                 {onRename && !confirming && (
-                  <span onClick={(e) => { e.stopPropagation(); startRename(c); }} role="button" aria-label="Renombrar conversación" className="p-1.5 rounded-lg text-slate-600 hover:text-teal-300 transition shrink-0"><Edit3 size={12} /></span>
+                  <span onClick={(e) => { e.stopPropagation(); startRename(c); }} role="button" aria-label="Renombrar conversación" className="p-1.5 rounded-lg text-slate-600 hover:text-indigo-300 transition shrink-0"><Edit3 size={12} /></span>
                 )}
                 {onDelete && (
                   confirming ? (
@@ -11381,9 +12866,14 @@ function ImportRoutineModal({ onImport, onClose }) {
 
   const applyDetectedDays = (days, fallbackName) => {
     if (!Array.isArray(days) || !days.length) return false;
-    const parsedDays = days.map((d) => ({
+    // BUG FIX: un elemento null/no-objeto acá (JSON válido pero mal
+    // formado, ej. la IA devuelve [null] o un día sin "exercises") tiraba
+    // una excepción leyendo ex.name más abajo — se perdía TODA la
+    // detección (incluidos los días válidos) y sólo se veía el error
+    // genérico "no pudimos detectar la rutina". Se filtran antes de mapear.
+    const parsedDays = days.filter((d) => d && typeof d === "object").map((d) => ({
       label: String(d.label || "Día").toUpperCase(),
-      exercises: (d.exercises || []).map((ex) => {
+      exercises: (d.exercises || []).filter((ex) => ex && typeof ex === "object").map((ex) => {
         const lib = matchExerciseToLibrary(ex.name);
         // Si la IA no pudo completar series/reps (no debería, se lo pedimos
         // explícitamente en el prompt), 3x8-10 es un default razonable — así
@@ -11865,9 +13355,27 @@ function PersonalizedRoutineWizard({ profile, onUpdateProfile, onCreateRoutine, 
       `Usá nombres de ejercicios comunes en español. El array debe tener exactamente ${a.daysPerWeek} días.`,
     ].join("\n");
     try {
-      const res = await fetch("/api/ia", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "chat", systemPrompt: "Sos un entrenador experto. Respondés ÚNICAMENTE con JSON válido, sin explicaciones ni bloques de código.", history: [{ role: "user", parts: [{ text: prompt }] }] }) });
-      if (!res.ok) throw new Error("server");
-      const data = await res.json();
+      // Reintento automático (una sola vez) ante una falla de red/timeout
+      // puntual — antes UNA sola conexión cortada te dejaba directo en "no
+      // pudimos generar la rutina" en el paso más importante del
+      // onboarding (justo después de responder todas las preguntas), sin
+      // darle a la app ninguna chance de resolverse sola.
+      let data = null;
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 65000);
+        try {
+          const res = await fetch("/api/ia", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "chat", systemPrompt: "Sos un entrenador experto. Respondés ÚNICAMENTE con JSON válido, sin explicaciones ni bloques de código.", history: [{ role: "user", parts: [{ text: prompt }] }] }), signal: controller.signal });
+          clearTimeout(timeoutId);
+          if (!res.ok) throw new Error("server");
+          data = await res.json();
+          break;
+        } catch (err) {
+          clearTimeout(timeoutId);
+          if (attempt === 1) { console.warn("[IA] wizard: primer intento falló, reintentando una vez:", err?.message || err); await new Promise((r) => setTimeout(r, 1200)); continue; }
+          throw err;
+        }
+      }
       const raw = data?.text || "";
       // Extracción ROBUSTA del JSON: Gemini a veces envuelve la respuesta
       // con texto ("Aquí está tu rutina: [...]") aunque se le pida JSON
@@ -11877,9 +13385,13 @@ function PersonalizedRoutineWizard({ profile, onUpdateProfile, onCreateRoutine, 
       if (first === -1 || last === -1 || last <= first) throw new Error("no-json");
       const days = JSON.parse(raw.slice(first, last + 1));
       if (!Array.isArray(days) || !days.length) throw new Error("empty");
-      const parsedDays = days.map((d) => ({
+      // BUG FIX: mismo caso que ImportRoutineModal — un día/ejercicio
+      // null en el array (JSON válido pero mal formado) tiraba acá y
+      // se perdía toda la rutina generada, mostrando el error genérico
+      // de "no pudimos generar la rutina" aunque el resto sí viniera bien.
+      const parsedDays = days.filter((d) => d && typeof d === "object").map((d) => ({
         label: String(d.label || "Día").toUpperCase(),
-        exercises: (d.exercises || []).map((ex) => {
+        exercises: (d.exercises || []).filter((ex) => ex && typeof ex === "object").map((ex) => {
           const lib = matchExerciseToLibrary(ex.name);
           const sets = Array.from({ length: Math.max(1, Math.min(8, ex.setsCount || 3)) }, () => ({ repRange: ex.repRange || "8-10" }));
           return lib ? { libId: lib.id, sets } : { id: builderUid("wizard"), name: ex.name || "Ejercicio", muscle: "Personalizado", sets };
@@ -11920,7 +13432,14 @@ function PersonalizedRoutineWizard({ profile, onUpdateProfile, onCreateRoutine, 
       </div>
 
       <div className="flex items-center justify-between">
-        <button onClick={step > 0 && !preview && !generating ? () => setStep((s) => s - 1) : onClose} className="flex items-center gap-1 text-slate-500 hover:text-white transition text-xs font-bold"><ChevronLeft size={14} /> {step > 0 && !preview && !generating ? "Anterior" : "Volver"}</button>
+        {/* BUG FIX: la condición no chequeaba "!genError" — al fallar la
+            generación (que ocurre con step > 0, después de responder todas
+            las preguntas), este botón decrementaba "step" en silencio pero
+            el panel de error de abajo se sigue mostrando igual (su
+            condición sólo depende de genError, no de step), así que
+            visualmente no pasaba nada y parecía que "Volver" no hacía
+            nada. Con el error activo, el botón ahora sí vuelve/cierra. */}
+        <button onClick={step > 0 && !preview && !generating && !genError ? () => setStep((s) => s - 1) : onClose} className="flex items-center gap-1 text-slate-500 hover:text-white transition text-xs font-bold"><ChevronLeft size={14} /> {step > 0 && !preview && !generating && !genError ? "Anterior" : "Volver"}</button>
         <span className="text-[10px] text-slate-600 font-bold">{preview ? "Revisá tu rutina" : generating ? "Generando..." : `${step + 1} / ${STEPS.length}`}</span>
       </div>
 
@@ -12742,13 +14261,18 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
 ============================================================================ */
 // Orden visual de las pestañas: define desde qué lado entra el contenido al
 // cambiar (si vas a una pestaña "más a la derecha", entra desde la derecha).
-const TAB_ORDER = ["rutina", "progreso", "descarga", "rutinas", "entrenador_ia", "perfil"];
+const TAB_ORDER = ["rutina", "progreso", "social", "descarga", "rutinas", "entrenador_ia", "perfil"];
 
+// "color" es opcional (por defecto teal, el resaltado de siempre) — sólo
+// Social lo pisa con su propio celeste, para que se note como una sección
+// con identidad propia apenas se la toca, sin cambiarle el color al resto
+// de la barra que nunca se pidió tocar.
 const NAV_TABS = [
   { key: "rutina", icon: <Dumbbell size={20} />, label: "Rutina" },
   { key: "progreso", icon: <BarChart3 size={20} />, label: "Progreso" },
+  { key: "social", icon: <Users size={20} />, label: "Social", color: SOCIAL_COLOR },
   { key: "rutinas", icon: <Layers size={20} />, label: "Rutinas" },
-  { key: "entrenador_ia", icon: <Sparkles size={20} />, label: "Entrenador IA" },
+  { key: "entrenador_ia", icon: <Sparkles size={20} />, label: "Entrenador IA", color: AI_COLOR },
 ];
 
 // Avatar del header móvil: muestra la foto de perfil si existe, con la
@@ -12774,10 +14298,10 @@ function BottomBar({ tab, setTab }) {
   return (
     <div className="lg:hidden fixed bottom-0 left-0 right-0 z-20 bg-slate-950/95 backdrop-blur-xl border-t border-slate-800/50" style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
       <div className="max-w-xl mx-auto flex">
-        {NAV_TABS.map(({ key, icon, label }) => (
+        {NAV_TABS.map(({ key, icon, label, color = "#14B8A6" }) => (
           <button key={key} onClick={() => setTab(key)} className="flex-1 flex flex-col items-center justify-center gap-1 py-3 transition-all active:scale-95">
-            <span className={`transition-all ${tab === key ? "text-teal-400" : "text-slate-600"}`}>{icon}</span>
-            <span className={`text-[9px] font-bold uppercase tracking-wider transition-all ${tab === key ? "text-teal-400" : "text-slate-700"}`}>{label}</span>
+            <span className="transition-all" style={{ color: tab === key ? color : "#475569" }}>{icon}</span>
+            <span className="text-[9px] font-bold uppercase tracking-wider transition-all" style={{ color: tab === key ? color : "#334155" }}>{label}</span>
           </button>
         ))}
       </div>
@@ -12808,9 +14332,10 @@ function SideNav({ tab, setTab, profileName }) {
         <span className="truncate">{profileName}</span>
       </button>
       <div className="space-y-1">
-        {NAV_TABS.map(({ key, icon, label }) => (
-          <button key={key} onClick={() => setTab(key)} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${tab === key ? "bg-teal-500/15 text-teal-400" : "text-slate-500 hover:text-slate-300 hover:bg-slate-900/60"}`}>
-            <span className={tab === key ? "text-teal-400" : "text-slate-600"}>{icon}</span>
+        {NAV_TABS.map(({ key, icon, label, color = "#14B8A6" }) => (
+          <button key={key} onClick={() => setTab(key)} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${tab === key ? "" : "text-slate-500 hover:text-slate-300 hover:bg-slate-900/60"}`}
+            style={tab === key ? { backgroundColor: tint(color, "22"), color } : {}}>
+            <span style={tab === key ? { color } : {}} className={tab !== key ? "text-slate-600" : ""}>{icon}</span>
             <span className="truncate">{label}</span>
           </button>
         ))}
@@ -12819,7 +14344,13 @@ function SideNav({ tab, setTab, profileName }) {
   );
 }
 
-const TAB_TITLES = { rutinas: "Rutinas", rutina: "Rutina", progreso: "Progreso", descarga: "Descarga", perfil: "Perfil", entrenador_ia: "Entrenador IA" };
+const TAB_TITLES = { rutinas: "Rutinas", rutina: "Rutina", progreso: "Progreso", descarga: "Descarga", perfil: "Perfil", entrenador_ia: "Entrenador IA", social: "Social" };
+// Pestañas "secundarias" (se entra desde otra, no desde la barra de abajo)
+// y a cuál vuelve el botón "atrás" del header en cada una. Social pasó a
+// ser una pestaña principal (barra de navegación, entre Progreso y
+// Rutinas) — ya no lleva flecha de "volver", muestra el avatar como el
+// resto de las pestañas principales.
+const SECONDARY_TAB_BACK = { perfil: "rutina" };
 
 /* ============================================================================
    APP ROOT
@@ -13713,6 +15244,12 @@ export default function App() {
     handleLogout();
   };
   const handleDelete = () => {
+    const p = profiles[activeProfile];
+    // Limpieza best-effort de lo social (username/public/*/vínculos) — si
+    // falla (sin red, etc.) no bloquea el borrado del perfil local, que es
+    // lo más importante acá; en el peor caso queda basura huérfana en la
+    // nube, mismo criterio que ya acepta el resto de la app para esto.
+    if (p?.googleUid) cleanupSocialData(p.googleUid, p.username || null).catch(() => {});
     setProfiles((prev) => { const np = { ...prev }; delete np[activeProfile]; saveProfiles(np); return np; });
     saveActive(null); setActiveProfile(null); setJustLoggedOut(true); setShowHelp(false); setHelpStartTab(null);
   };
@@ -13723,6 +15260,23 @@ export default function App() {
       return np;
     });
   };
+  // Modo "rutina planificada" automático (ver DEFAULT_SETTINGS.trainingMode):
+  // la PRIMERA vez que este perfil tiene un vínculo de entrenador aceptado,
+  // se cambia solo a "planned" — asumimos que quien tiene un entrenador
+  // prefiere seguir un plan con cargas ya decididas antes que perseguir su
+  // propio récord. `hasHadTrainerLink` evita repetir esto en cada login: si
+  // el usuario después lo vuelve a poner en "record" a mano, no se le
+  // fuerza de nuevo.
+  useEffect(() => {
+    if (!profile?.googleUid || profile.hasHadTrainerLink) return;
+    let cancelled = false;
+    listTrainerLinksAsStudent(profile.googleUid).then((links) => {
+      if (cancelled || !links.some((l) => l.status === "accepted")) return;
+      handleUpdateProfile({ hasHadTrainerLink: true, settings: { ...getProfileSettings(profile), trainingMode: "planned" } });
+    }).catch(() => {});
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.googleUid, profile?.hasHadTrainerLink]);
   // Helper genérico para parchear cualquier campo de settings sin pisar el
   // resto — lo usa, por ejemplo, el selector "General" / "Según tu contexto"
   // y el campo de peso corporal en Progreso → Rango.
@@ -14011,8 +15565,8 @@ export default function App() {
       <div className="flex-1 min-w-0" style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
         <header className="sticky z-10 bg-[#0a0a0f]/90 backdrop-blur-xl border-b border-slate-800/40" style={{ top: "env(safe-area-inset-top, 0px)" }}>
           <div className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto px-4 py-4 flex items-center gap-3">
-            {tab === "perfil" ? (
-              <button onClick={() => setTab("rutina")} aria-label="Volver" className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800/80 transition shrink-0 lg:hidden"><ChevronDown size={18} className="rotate-90" /></button>
+            {SECONDARY_TAB_BACK[tab] ? (
+              <button onClick={() => setTab(SECONDARY_TAB_BACK[tab])} aria-label="Volver" className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800/80 transition shrink-0 lg:hidden"><ChevronDown size={18} className="rotate-90" /></button>
             ) : (
               <HeaderAvatar profileName={activeProfile} onClick={() => setTab("perfil")} />
             )}
@@ -14050,7 +15604,8 @@ export default function App() {
             {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} onGoToRoutines={() => goToSection("rutinas", "routine-editor")} weekSchedule={weekSchedule} sex={profile?.sex} age={profile?.age} onGoToDeload={() => { setDeloadDismissed(false); setTab("rutina"); }} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} />}
             {tab === "descarga" && <DeloadView logs={logs} setLogs={setLogs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} activeSession={profile?.activeSession?.deload ? profile.activeSession : null} onStartSession={handleStartSession} onCancelSession={handleCancelSession} weekSchedule={weekSchedule} onClose={() => { setDeloadDismissed(true); setTab("rutina"); }} cycleStart={cycleStart} />}
             {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} setLogs={setLogs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} conversations={aiConversations} activeConversationId={activeAiConversationId} onNewConversation={handleNewAiConversation} onSwitchConversation={handleSwitchAiConversation} onDeleteConversation={handleDeleteAiConversation} onRenameConversation={handleRenameAiConversation} settings={getProfileSettings(profile)} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} onArchiveRoutine={handleArchiveRoutine} onRestoreRoutine={handleRestoreRoutine} onNavigate={setTab} onStartSession={handleStartSession} onEndSession={handleEndSession} />}
-            {tab === "perfil" && <ProfileView onOpenFieldPreview={() => setShowFieldIntro(true)} openSectionSignal={openSectionSignal} profileName={activeProfile} profiles={profiles} logs={logs} onSignOut={handleSignOut} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} />}
+            {tab === "perfil" && <ProfileView onOpenFieldPreview={() => setShowFieldIntro(true)} openSectionSignal={openSectionSignal} profileName={activeProfile} profiles={profiles} logs={logs} onSignOut={handleSignOut} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} onGoToSocial={() => setTab("social")} />}
+            {tab === "social" && <SocialView profile={profile} uid={profile?.googleUid} onActivateRoutine={handleActivateRoutine} />}
           </div>
         </main>
       </div>

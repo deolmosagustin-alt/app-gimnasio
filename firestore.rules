@@ -1,0 +1,180 @@
+rules_version = '2';
+
+// Reglas de seguridad de Firestore para Modus Fit.
+//
+// IMPORTANTE: esto reemplaza TODO el reglamento configurado hoy a mano en
+// la consola de Firebase (Firebase no "parchea" reglas, las reemplaza
+// enteras al guardar). Este archivo incluye tanto las reglas YA
+// existentes (users/{uid} y shared_routines, antes solo documentadas en
+// comentarios de App.jsx) como las nuevas de la feature social — pegar
+// SOLO "lo nuevo" rompería el login/sync/compartir-rutina actuales.
+//
+// Cómo aplicar: Firebase Console → Firestore Database → Reglas → pegar
+// el contenido completo de este archivo → Publicar.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    // ID determinístico de una amistad: "<uid menor>_<uid mayor>" en orden
+    // alfabético — así los dos lados llegan al mismo documento sin tener
+    // que consultar nada. DEBE reflejar exactamente friendshipId() en
+    // src/social.js.
+    function friendshipId(a, b) {
+      return a < b ? (a + '_' + b) : (b + '_' + a);
+    }
+    function friendshipPath(a, b) {
+      return /databases/$(database)/documents/friendships/$(friendshipId(a, b));
+    }
+    function isAcceptedFriend(otherUid) {
+      return isSignedIn()
+        && exists(friendshipPath(request.auth.uid, otherUid))
+        && get(friendshipPath(request.auth.uid, otherUid)).data.status == 'accepted';
+    }
+
+    function trainerLinkPath(trainerUid, studentUid) {
+      return /databases/$(database)/documents/trainerLinks/$(trainerUid + '_' + studentUid);
+    }
+    // true si YO soy el entrenador o el alumno ACEPTADO de "otherUid" (en
+    // cualquiera de los dos sentidos posibles del vínculo).
+    function isAcceptedTrainerOrStudentOf(otherUid) {
+      return isSignedIn() && (
+        (exists(trainerLinkPath(request.auth.uid, otherUid)) &&
+         get(trainerLinkPath(request.auth.uid, otherUid)).data.status == 'accepted') ||
+        (exists(trainerLinkPath(otherUid, request.auth.uid)) &&
+         get(trainerLinkPath(otherUid, request.auth.uid)).data.status == 'accepted')
+      );
+    }
+
+    // ============================== PERFIL PRINCIPAL ==============================
+    // Cada usuario lee/escribe ÚNICAMENTE su propio documento — ver
+    // fetchProfileFromCloud/syncProfileToCloud en App.jsx. Sin esta regla
+    // (o con una mal configurada) el login con Google y el sync entre
+    // dispositivos no funcionan.
+    match /users/{uid} {
+      allow read, write: if isOwner(uid);
+
+      // "basic": lo mínimo para mostrar a alguien en una búsqueda o una
+      // solicitud pendiente ANTES de ser amigos — visible para cualquier
+      // usuario autenticado. Nunca contiene datos de entrenamiento.
+      match /public/basic {
+        allow read: if isSignedIn();
+        allow write: if isOwner(uid);
+      }
+
+      // "full": rutina activa, historial completo, medidas — visible solo
+      // para amigos aceptados o el entrenador/alumno vinculado. Las fotos
+      // de progreso NUNCA llegan a Firestore (quedan en IndexedDB local),
+      // así que ni siquiera hace falta excluirlas acá.
+      match /public/full {
+        allow read: if isOwner(uid) || isAcceptedFriend(uid) || isAcceptedTrainerOrStudentOf(uid);
+        allow write: if isOwner(uid);
+      }
+    }
+
+    // ============================== USERNAMES (@handle único) ==============================
+    // El ID del documento (siempre en minúsculas) ES la fuente de
+    // unicidad: Firestore solo permite "create" si el ID todavía no
+    // existe, así que dos personas nunca pueden terminar dueñas del mismo
+    // @handle. Cambiar de @handle = borrar el viejo (delete) + crear el
+    // nuevo (create) — nunca un update in-place.
+    match /usernames/{usernameLower} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.resource.data.uid == request.auth.uid
+        && usernameLower == usernameLower.lower()
+        && usernameLower.matches('^[a-z0-9_]{3,20}$');
+      allow update: if false;
+      allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
+    }
+
+    // ============================== AMISTADES ==============================
+    match /friendships/{pairId} {
+      allow read: if isSignedIn() && request.auth.uid in resource.data.users;
+      allow create: if isSignedIn()
+        && request.auth.uid in request.resource.data.users
+        && request.resource.data.users.size() == 2
+        && request.resource.data.users[0] != request.resource.data.users[1]
+        && pairId == friendshipId(request.resource.data.users[0], request.resource.data.users[1])
+        && request.resource.data.requestedBy == request.auth.uid
+        && request.resource.data.status == 'pending';
+      // Solo quien NO mandó la solicitud puede aceptarla (evita
+      // auto-aceptarse la propia).
+      allow update: if isSignedIn()
+        && request.auth.uid in resource.data.users
+        && request.auth.uid != resource.data.requestedBy
+        && resource.data.status == 'pending'
+        && request.resource.data.status == 'accepted'
+        && request.resource.data.users == resource.data.users
+        && request.resource.data.requestedBy == resource.data.requestedBy;
+      // Cualquiera de los dos: rechazar/cancelar una pendiente, o
+      // terminar una amistad ya aceptada.
+      allow delete: if isSignedIn() && request.auth.uid in resource.data.users;
+    }
+
+    // ============================== VÍNCULO ENTRENADOR-ALUMNO ==============================
+    // ID = "<trainerUid>_<studentUid>" (roles explícitos, no par
+    // ordenado — acá los dos lados NO son intercambiables).
+    match /trainerLinks/{linkId} {
+      allow read: if isSignedIn()
+        && (request.auth.uid == resource.data.trainerUid || request.auth.uid == resource.data.studentUid);
+      allow create: if isSignedIn()
+        && linkId == (request.resource.data.trainerUid + '_' + request.resource.data.studentUid)
+        && request.resource.data.trainerUid != request.resource.data.studentUid
+        && (request.auth.uid == request.resource.data.trainerUid || request.auth.uid == request.resource.data.studentUid)
+        && request.resource.data.requestedBy == request.auth.uid
+        && request.resource.data.status == 'pending';
+      allow update: if isSignedIn()
+        && (request.auth.uid == resource.data.trainerUid || request.auth.uid == resource.data.studentUid)
+        && request.auth.uid != resource.data.requestedBy
+        && resource.data.status == 'pending'
+        && request.resource.data.status == 'accepted'
+        && request.resource.data.trainerUid == resource.data.trainerUid
+        && request.resource.data.studentUid == resource.data.studentUid;
+      allow delete: if isSignedIn()
+        && (request.auth.uid == resource.data.trainerUid || request.auth.uid == resource.data.studentUid);
+    }
+
+    // ============================== PROPUESTAS DE RUTINA ==============================
+    // El entrenador SIEMPRE crea la propuesta; el alumno solo acepta o
+    // rechaza (nunca puede cambiar la rutina propuesta al responder). El
+    // entrenador nunca escribe directo en users/{studentUid}.
+    match /routineProposals/{proposalId} {
+      allow read: if isSignedIn()
+        && (request.auth.uid == resource.data.trainerUid || request.auth.uid == resource.data.studentUid);
+      allow create: if isSignedIn()
+        && request.auth.uid == request.resource.data.trainerUid
+        && request.resource.data.status == 'pending'
+        && exists(trainerLinkPath(request.resource.data.trainerUid, request.resource.data.studentUid))
+        && get(trainerLinkPath(request.resource.data.trainerUid, request.resource.data.studentUid)).data.status == 'accepted';
+      allow update: if isSignedIn()
+        && request.auth.uid == resource.data.studentUid
+        && resource.data.status == 'pending'
+        && (request.resource.data.status == 'accepted' || request.resource.data.status == 'rejected')
+        && request.resource.data.trainerUid == resource.data.trainerUid
+        && request.resource.data.studentUid == resource.data.studentUid
+        && request.resource.data.proposedRoutine == resource.data.proposedRoutine;
+      // El entrenador puede retirar una propuesta que sigue pendiente.
+      allow delete: if isSignedIn()
+        && request.auth.uid == resource.data.trainerUid
+        && resource.data.status == 'pending';
+    }
+
+    // ============================== RUTINAS COMPARTIDAS POR ENLACE ==============================
+    // Ya existente — ver comentario arriba de shareRoutineToFirestore() en
+    // App.jsx. Lectura y creación públicas (sin sesión) porque cualquiera
+    // con el link tiene que poder verla; nunca se puede pisar/borrar una
+    // ya creada.
+    match /shared_routines/{shortId} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if false;
+    }
+  }
+}

@@ -38,8 +38,15 @@ let preferredModel = null;
 // tiene su propio Map en memoria, y se pierde si la función se enfría),
 // pero frena el abuso más obvio de una misma IP mientras el lambda esté
 // caliente, que es el caso común.
+// BUG FIX: 20 pedidos/10min se agotaba con una sesión de chat activa
+// normal (cada mensaje es un pedido) o al importar una rutina con varias
+// fotos (cada reintento/regeneración suma) — un uso legítimo terminaba
+// bloqueado por su propio límite, mostrando "la IA no responde" sin que
+// tuviera nada que ver con Gemini. Subido a un valor más generoso; sigue
+// frenando el abuso obvio de una IP desconocida pegándole directo a la
+// URL sin pasar por la app.
 const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
-const RATE_LIMIT_MAX = 20;
+const RATE_LIMIT_MAX = 60;
 const requestLog = new Map();
 
 function isRateLimited(ip) {
@@ -60,13 +67,15 @@ function getClientIp(req) {
   return req.socket?.remoteAddress || "unknown";
 }
 
-async function callModel(model, body, apiKey) {
+async function callModel(model, body, apiKey, timeoutMs) {
   const controller = new AbortController();
-  // 50s: las respuestas LARGAS (rutinas completas) en el free tier tardan
-  // 30-50s. Con 25s las matábamos a mitad de generación — por eso "hola"
-  // funcionaba y los pedidos grandes no. Los errores de modelo (404/429)
-  // responden en milisegundos, así que el timeout largo no los demora.
-  const timer = setTimeout(() => controller.abort(), 50000);
+  // Hasta 50s: las respuestas LARGAS (rutinas completas) en el free tier
+  // tardan 30-50s. Con 25s las matábamos a mitad de generación — por eso
+  // "hola" funcionaba y los pedidos grandes no. Los errores de modelo
+  // (404/429) responden en milisegundos, así que el timeout largo no los
+  // demora. `timeoutMs` viene acotado por callGemini para que la cadena
+  // de reintentos completa nunca exceda el límite de Vercel (ver abajo).
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
@@ -77,6 +86,20 @@ async function callModel(model, body, apiKey) {
     clearTimeout(timer);
   }
 }
+
+// Techo total de la cadena de reintentos, por debajo del maxDuration real
+// de Vercel (60s, ver más abajo). Antes cada modelo se probaba con 50s
+// fijos sin mirar cuánto tiempo ya se había gastado: si dos modelos
+// seguidos tardaban ~30-40s cada uno en responder (red lenta, no un error
+// limpio), la función entera pasaba los 60s y Vercel la mataba a la
+// fuerza — el cliente recibía un corte de conexión crudo en vez de un
+// error prolijo, que es probablemente el origen de varios "la IA no
+// responde" sin explicación. Ahora cada intento sólo recibe el tiempo que
+// REALMENTE queda antes del techo, y si no queda margen razonable para
+// otro intento, se corta con un error claro en vez de arrancar un pedido
+// que Vercel va a interrumpir a mitad de camino igual.
+const TOTAL_TIME_BUDGET_MS = 55000;
+const MIN_USEFUL_ATTEMPT_MS = 8000;
 
 async function callGemini(body) {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -90,12 +113,19 @@ async function callGemini(body) {
   const chain = preferredModel
     ? [preferredModel, ...MODEL_CHAIN.filter((m) => m !== preferredModel)]
     : MODEL_CHAIN;
+  const deadline = Date.now() + TOTAL_TIME_BUDGET_MS;
 
-  let lastStatus = null, lastDetail;
+  let lastStatus = null, lastDetail, ranOutOfTime = false;
   for (const model of chain) {
+    const remaining = deadline - Date.now();
+    // Sin tiempo útil para otro intento: cortar ACÁ con un error prolijo
+    // en vez de arrancar un pedido que casi seguro Vercel va a interrumpir
+    // a la fuerza antes de que responda (eso es lo que el cliente vería
+    // como un corte de conexión crudo, sin mensaje).
+    if (remaining < MIN_USEFUL_ATTEMPT_MS) { ranOutOfTime = true; break; }
     let response;
     try {
-      response = await callModel(model, body, apiKey);
+      response = await callModel(model, body, apiKey, Math.min(50000, remaining));
     } catch (netErr) {
       // Timeout o corte de red hacia Google: probar el siguiente modelo.
       lastStatus = 0; lastDetail = String(netErr?.message || netErr);
@@ -115,8 +145,9 @@ async function callGemini(body) {
     break; // 400/401/403: el problema no es del modelo, cortar acá
   }
 
-  const e = new Error(`Todos los modelos fallaron (último: ${lastStatus})`);
-  if (lastStatus === 429) e.userMessage = "La IA alcanzó el límite de uso gratuito por hoy. Probá de nuevo en un rato o mañana.";
+  const e = new Error(ranOutOfTime ? "Se agotó el tiempo disponible probando modelos" : `Todos los modelos fallaron (último: ${lastStatus})`);
+  if (ranOutOfTime) e.userMessage = "La IA está respondiendo lento ahora mismo. Probá de nuevo en un momento.";
+  else if (lastStatus === 429) e.userMessage = "La IA alcanzó el límite de uso gratuito por hoy. Probá de nuevo en un rato o mañana.";
   else if (lastStatus === 401 || lastStatus === 403) e.userMessage = "La clave de la IA no es válida o no tiene permisos (revisá GEMINI_API_KEY en Vercel).";
   else if (lastStatus === 0) e.userMessage = "No se pudo conectar con la IA (timeout). Probá de nuevo.";
   else e.userMessage = "La IA no está disponible en este momento. Probá de nuevo en unos minutos.";
