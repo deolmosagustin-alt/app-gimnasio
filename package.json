@@ -17,6 +17,7 @@
     "@capacitor/filesystem": "^8.1.2",
     "@capacitor/local-notifications": "^8.2.0",
     "@capacitor/share": "^8.0.1",
+    "@mjcdev/react-body-highlighter": "^0.0.4",
     "docx": "^9.7.1",
     "firebase": "^12.15.0",
     "jspdf": "^4.2.1",

@@ -36,6 +36,7 @@ import { FirebaseAuthentication } from "@capacitor-firebase/authentication";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { doc, setDoc, getDoc, enableIndexedDbPersistence } from "firebase/firestore";
 import Model from "react-body-highlighter";
+import FemaleBody from "@mjcdev/react-body-highlighter";
 import { auth, googleProvider, db } from "./firebase";
 import {
   yt, mkSets, cloneRoutineDef, debounce, kgToDisplay, displayToKg, weightLabel,
@@ -968,11 +969,35 @@ function getPlannedTargetForWeek(set, weekInCycle) {
 function applyProgressionToRoutine(routineDef, plan) {
   const clone = cloneRoutineDef(routineDef);
   clone.dayOrder.forEach((dk) => {
-    const ex = clone.days[dk]?.exercises?.find((e) => e.id === plan.exerciseId);
+    // BUG FIX: routineDef acá es el RAW routineEntry (resolveRoutineDef, no
+    // buildRoutineModel) — un ejercicio de catálogo referencia a la
+    // biblioteca por `libId`, no tiene un `.id` plano todavía (eso sólo lo
+    // resuelve buildRoutineModel al armar ROUTINE/EXERCISE_BY_ID para
+    // pintar la app). Comparar por e.id directo nunca encontraba nada en
+    // una rutina preestablecida — plannedProgression se guardaba en el
+    // aire, sin pisar ninguna serie real. Se resuelve el id efectivo con
+    // el mismo criterio que ya usa buildRoutineModel.
+    const ex = clone.days[dk]?.exercises?.find((entry) => {
+      const lib = entry.libId ? EXERCISE_LIBRARY_BY_ID[entry.libId] : null;
+      const effectiveId = entry.idOverride || (lib ? lib.id : entry.id);
+      return effectiveId === plan.exerciseId;
+    });
     if (ex?.sets?.[plan.setIndex]) {
       ex.sets[plan.setIndex] = { ...ex.sets[plan.setIndex], plannedProgression: plan.entries };
     }
   });
+  // BUG FIX: si la rutina activa es una preestablecida (source:"preset"),
+  // resolveRoutineDef() SIEMPRE vuelve a armar sus días/ejercicios desde el
+  // catálogo EN VIVO (ver el comentario grande arriba de esa función) —
+  // ignora por completo lo que esté guardado en profile.routines para esa
+  // rutina, salvo el weekSchedule. Guardar plannedProgression en una copia
+  // resuelta de una preestablecida sin sacarle el "source: preset" hacía
+  // que la próxima vez que se leyera la rutina, la meta recién cargada
+  // desapareciera en silencio (nunca llegaba a guardarse de verdad). Una
+  // vez que tiene progresión propia cargada, deja de ser "la preset tal
+  // cual" y pasa a ser una copia propia — mismo criterio que ya usa el
+  // resto de la app para "convertir" una preestablecida en algo editable.
+  if (clone.source === "preset") clone.source = "custom";
   return clone;
 }
 
@@ -1803,7 +1828,7 @@ input, textarea, [contenteditable="true"] {
   --grad-hero-purple: linear-gradient(135deg, rgba(168,85,247,0.42), rgba(15,23,42,0.82) 55%, rgba(15,23,42,0.6));
   --grad-hero-blue: linear-gradient(135deg, rgba(59,130,246,0.4), rgba(15,23,42,0.82) 55%, rgba(15,23,42,0.6));
   --grad-hero-teal: linear-gradient(135deg, rgba(20,184,166,0.4), rgba(15,23,42,0.82) 55%, rgba(15,23,42,0.6));
-  --grad-hero-indigo: linear-gradient(135deg, rgba(99,102,241,0.42), rgba(15,23,42,0.82) 55%, rgba(15,23,42,0.6));
+  --grad-hero-sky: linear-gradient(135deg, rgba(56,189,248,0.42), rgba(15,23,42,0.82) 55%, rgba(15,23,42,0.6));
   --grad-profile-avatar: linear-gradient(135deg, #0f172a, rgba(15,23,42,0.5));
   --ring-track: #1a1a2e;
   --chart-grid: #1a1a2e;
@@ -1860,7 +1885,7 @@ input, textarea, [contenteditable="true"] {
   --grad-hero-purple: linear-gradient(135deg, rgba(168,85,247,0.10), rgba(255,255,255,0.96) 55%, #ffffff);
   --grad-hero-blue: linear-gradient(135deg, rgba(59,130,246,0.10), rgba(255,255,255,0.96) 55%, #ffffff);
   --grad-hero-teal: linear-gradient(135deg, rgba(20,184,166,0.10), rgba(255,255,255,0.96) 55%, #ffffff);
-  --grad-hero-indigo: linear-gradient(135deg, rgba(99,102,241,0.10), rgba(255,255,255,0.96) 55%, #ffffff);
+  --grad-hero-sky: linear-gradient(135deg, rgba(56,189,248,0.10), rgba(255,255,255,0.96) 55%, #ffffff);
   --grad-profile-avatar: linear-gradient(135deg, #ffffff, #f8fafc);
   --ring-track: #eef2f6;
   --chart-grid: #eef2f6;
@@ -3610,7 +3635,7 @@ const HELP_CHAPTERS = [
   {
     key: "rutinas",
     label: "Rutinas",
-    color: "#A855F7",
+    color: "#38BDF8",
     icon: <Layers size={16} />,
     intro: "Acá armás tu plan de entrenamiento.",
     bullets: [
@@ -6098,12 +6123,7 @@ const EVOLUTION_CHART_COLOR = "#F59E0B";
 // Color característico de la pestaña Social — celeste, distinto del azul
 // de "Rango" y el cian de "Historial" en Progreso, y del resto de los
 // colores de héroe ya usados (teal=Rutina, azul=Progreso, violeta=Descarga).
-const SOCIAL_COLOR = "#38BDF8";
-// Color característico de Entrenador IA — antes usaba el mismo teal que
-// Rutina con un tratamiento visual distinto (vidrio esmerilado en vez de
-// degradé plano), lo que hacía sentir la pestaña "pegada pero distinta" a
-// la vez. Índigo no choca con ningún otro héroe de la app.
-const AI_COLOR = "#6366F1";
+const SOCIAL_COLOR = "#A855F7";
 function EvolutionDot({ cx, cy, isBest, isActive, color, deload, index, onSelect }) {
   if (cx == null || cy == null) return null;
   const dotColor = deload ? DELOAD_COLOR : color;
@@ -6563,64 +6583,40 @@ function muteHex(hex, amount = 0.65) {
 }
 
 /* ============================================================================
-   MUÑECO — VARIANTE MUJER. react-body-highlighter es un componente cerrado:
-   un solo SVG interno (silueta unisex) sin ninguna prop de sexo y sin forma
-   de inyectar un SVG propio (ver su código: sólo expone `type`
-   "anterior"/"posterior", nada de `bodyType`). Replicar EXACTAMENTE su
-   estructura interna de polígonos (los mismos índices que usan
-   ANTERIOR_POLY_SLUGS/POSTERIOR_POLY_SLUGS, con la cantidad exacta de
-   piezas por músculo) sería forkear un archivo de diseño que no tenemos —
-   inviable a mano. Este componente es 100% propio e independiente: formas
-   simples (elipses/polígonos) con proporciones de silueta femenina
-   (hombros más angostos que la cadera, cintura marcada), coloreadas con el
-   MISMO ranks/highlightedColors que ya usa MuscleHighlighterBody — el
-   cálculo de rango no cambia en nada, sólo el dibujo. Cada región mapea
-   DIRECTO a nuestra propia clave de músculo (sin la capa de "slugs" de la
-   librería, que ya no aplica acá), así que el click es mucho más simple:
-   un onClick por forma, sin buscar por índice de polígono.
+   MUÑECO — VARIANTE MUJER. react-body-highlighter (el que usa el muñeco
+   por defecto) es un componente cerrado: un solo SVG interno (silueta
+   unisex) sin ninguna prop de sexo. Antes esta variante era un dibujo 100%
+   propio a base de elipses/polígonos simples — se notaba muchísimo al
+   lado del muñeco por defecto (curvas reales, cabello, striations
+   musculares). Se reemplazó por @mjcdev/react-body-highlighter, que SÍ
+   trae una silueta femenina ilustrada con el mismo nivel de detalle que
+   la de por defecto (misma familia de arte), con prop `gender="female"` —
+   la razón concreta por la que se pidió instalar una librería nueva en
+   vez de seguir a mano.
+   Esta librería tiene una API más simple que la de por defecto: en vez de
+   `{name, muscles, frequency}` + un array de colores por frecuencia, cada
+   músculo lleva su color YA resuelto (`{slug, color}`) — nada de índices
+   de polígono. Por eso el click también es más simple: `onBodyPartClick`
+   devuelve directo el slug tocado, sin tener que buscarlo a mano en el
+   DOM del SVG (lo que sí hace falta para el muñeco de por defecto, que no
+   expone ningún callback propio).
+   Único hueco de esta librería: no tiene "deltoids" separado por
+   anterior/lateral/posterior, un solo slug para las tres cabezas — se
+   resuelve pintándolo con el mejor rango de anterior+lateral en la vista
+   de frente, y con el posterior en la de espalda (ver buildFemaleBodyData).
+   Tampoco expone stroke/outline por músculo para marcar la selección, así
+   que en vez de un borde blanco (como hace el muñeco por defecto) se
+   aclara el color hacia blanco un poco (ver mixWithWhite).
 ============================================================================ */
-const FEMALE_BODY_COLOR = "#334155";
-// Cada entrada: uno o más "keys" (el rango mostrado es el mejor de todas,
-// igual que ya hace getOurGroupKeysForSlug para las regiones fusionadas de
-// la librería) + las formas SVG que arman esa región.
-const FEMALE_FRONT_REGIONS = [
-  { keys: ["deltoide_anterior", "deltoide_lateral"], shapes: [{ t: "ellipse", cx: 24, cy: 33, rx: 7.5, ry: 8.5 }, { t: "ellipse", cx: 76, cy: 33, rx: 7.5, ry: 8.5 }] },
-  { keys: ["pectoral_superior", "pectoral_medio"], shapes: [{ t: "path", d: "M36,36 Q50,32 64,36 L64,58 Q50,64 36,58 Z" }] },
-  { keys: ["biceps"], shapes: [{ t: "ellipse", cx: 16, cy: 60, rx: 6, ry: 13 }, { t: "ellipse", cx: 84, cy: 60, rx: 6, ry: 13 }] },
-  { keys: ["antebrazos"], shapes: [{ t: "ellipse", cx: 12, cy: 90, rx: 5, ry: 14 }, { t: "ellipse", cx: 88, cy: 90, rx: 5, ry: 14 }] },
-  { keys: ["core"], shapes: [{ t: "path", d: "M40,60 Q50,57 60,60 L60,88 Q50,92 40,88 Z" }] },
-  { keys: ["oblicuos"], shapes: [{ t: "path", d: "M34,62 L40,60 L40,88 L35,86 Z" }, { t: "path", d: "M66,62 L60,60 L60,88 L65,86 Z" }] },
-  { keys: ["aductores"], shapes: [{ t: "path", d: "M44,108 L50,106 L50,128 L45,126 Z" }, { t: "path", d: "M56,108 L50,106 L50,128 L55,126 Z" }] },
-  { keys: ["cuadriceps"], shapes: [{ t: "ellipse", cx: 38, cy: 142, rx: 10.5, ry: 27 }, { t: "ellipse", cx: 62, cy: 142, rx: 10.5, ry: 27 }] },
-  { keys: ["tibial_anterior"], shapes: [{ t: "ellipse", cx: 38, cy: 188, rx: 5.5, ry: 17 }, { t: "ellipse", cx: 62, cy: 188, rx: 5.5, ry: 17 }] },
-];
-const FEMALE_BACK_REGIONS = [
-  { keys: ["trapecio"], shapes: [{ t: "path", d: "M40,24 Q50,20 60,24 L66,40 Q50,46 34,40 Z" }] },
-  { keys: ["deltoide_posterior"], shapes: [{ t: "ellipse", cx: 24, cy: 33, rx: 7.5, ry: 8.5 }, { t: "ellipse", cx: 76, cy: 33, rx: 7.5, ry: 8.5 }] },
-  { keys: ["dorsales"], shapes: [{ t: "path", d: "M35,40 Q50,46 65,40 L62,66 Q50,72 38,66 Z" }] },
-  { keys: ["triceps"], shapes: [{ t: "ellipse", cx: 16, cy: 60, rx: 6, ry: 13 }, { t: "ellipse", cx: 84, cy: 60, rx: 6, ry: 13 }] },
-  { keys: ["espalda_baja"], shapes: [{ t: "path", d: "M38,66 Q50,72 62,66 L60,86 Q50,90 40,86 Z" }] },
-  { keys: ["gluteo"], shapes: [{ t: "ellipse", cx: 39, cy: 100, rx: 12, ry: 12 }, { t: "ellipse", cx: 61, cy: 100, rx: 12, ry: 12 }] },
-  { keys: ["femoral"], shapes: [{ t: "ellipse", cx: 38, cy: 142, rx: 10.5, ry: 27 }, { t: "ellipse", cx: 62, cy: 142, rx: 10.5, ry: 27 }] },
-  { keys: ["pantorrillas"], shapes: [{ t: "ellipse", cx: 38, cy: 188, rx: 5.5, ry: 17 }, { t: "ellipse", cx: 62, cy: 188, rx: 5.5, ry: 17 }] },
-];
-// Silueta de base (siempre en FEMALE_BODY_COLOR, no interactiva) — hombros
-// más angostos que la cadera y cintura marcada, la diferencia visual clave
-// contra la silueta unisex de la librería.
-const FEMALE_BASE_SHAPES = [
-  { t: "ellipse", cx: 50, cy: 14, rx: 8.5, ry: 9.5 }, // cabeza
-  { t: "path", d: "M45,21 L55,21 L54,29 L46,29 Z" }, // cuello
-  { t: "path", d: "M22,32 Q50,24 78,32 L70,88 Q50,96 30,88 Z" }, // torso (hombro→cintura)
-  { t: "path", d: "M30,88 Q50,96 70,88 L74,104 Q50,114 26,104 Z" }, // cadera (más ancha que el torso)
-  { t: "ellipse", cx: 16, cy: 58, rx: 7, ry: 30 }, // brazo izq (hombro→muñeca)
-  { t: "ellipse", cx: 84, cy: 58, rx: 7, ry: 30 }, // brazo der
-  { t: "ellipse", cx: 12, cy: 92, rx: 4, ry: 6 }, // mano izq
-  { t: "ellipse", cx: 88, cy: 92, rx: 4, ry: 6 }, // mano der
-  { t: "path", d: "M27,102 L48,102 L44,208 L30,208 Z" }, // pierna izq
-  { t: "path", d: "M73,102 L52,102 L56,208 L70,208 Z" }, // pierna der
-  { t: "ellipse", cx: 36, cy: 212, rx: 8, ry: 4 }, // pie izq
-  { t: "ellipse", cx: 64, cy: 212, rx: 8, ry: 4 }, // pie der
-];
+const FEMALE_SLUG_MAP = {
+  pectoral_superior: "chest", pectoral_medio: "chest",
+  trapecio: "trapezius",
+  dorsales: "upper-back", espalda_baja: "lower-back",
+  biceps: "biceps", triceps: "triceps", antebrazos: "forearm",
+  cuadriceps: "quadriceps", femoral: "hamstring", gluteo: "gluteal", aductores: "adductors",
+  core: "abs", pantorrillas: "calves", oblicuos: "obliques",
+  tibial_anterior: "tibialis",
+};
 
 function bestRankForKeys(keys, ranks) {
   let best = null;
@@ -6631,45 +6627,90 @@ function bestRankForKeys(keys, ranks) {
   return best;
 }
 
-function FemaleBodyView({ regions, ranks, highlightedColors, selected, onMuscleClick }) {
-  return (
-    <svg viewBox="0 0 100 220" className="rbh" style={MODEL_STYLE}>
-      {FEMALE_BASE_SHAPES.map((s, i) => (
-        s.t === "ellipse"
-          ? <ellipse key={i} cx={s.cx} cy={s.cy} rx={s.rx} ry={s.ry} fill={FEMALE_BODY_COLOR} />
-          : <path key={i} d={s.d} fill={FEMALE_BODY_COLOR} />
-      ))}
-      {regions.map((region, ri) => {
-        const best = bestRankForKeys(region.keys, ranks);
-        const isSelected = region.keys.includes(selected);
-        const fill = best ? highlightedColors[best.levelIdx] : FEMALE_BODY_COLOR;
-        return (
-          <g key={ri} onClick={() => onMuscleClick(region.keys.reduce((a, b) => ((ranks[b]?.levelIdx ?? -1) > (ranks[a]?.levelIdx ?? -1) ? b : a)))} style={{ cursor: "pointer" }}>
-            {region.shapes.map((s, si) => {
-              const common = { fill, stroke: isSelected ? "#f8fafc" : "none", strokeWidth: isSelected ? 1.6 : 0, style: isSelected ? { filter: "drop-shadow(0 0 3px rgba(248,250,252,0.85))" } : undefined, className: "female-body-region" };
-              return s.t === "ellipse"
-                ? <ellipse key={si} cx={s.cx} cy={s.cy} rx={s.rx} ry={s.ry} {...common} />
-                : <path key={si} d={s.d} {...common} />;
-            })}
-          </g>
-        );
-      })}
-    </svg>
-  );
+function mixWithWhite(hex, amount) {
+  const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+  const nr = Math.round(r + (255 - r) * amount), ng = Math.round(g + (255 - g) * amount), nb = Math.round(b + (255 - b) * amount);
+  return `#${nr.toString(16).padStart(2, "0")}${ng.toString(16).padStart(2, "0")}${nb.toString(16).padStart(2, "0")}`;
+}
+
+// deltKeysForView: única excepción al mapa de arriba — depende de la vista.
+function deltKeysForView(view) { return view === "front" ? ["deltoide_anterior", "deltoide_lateral"] : ["deltoide_posterior"]; }
+function getFemaleGroupKeysForSlug(slug, view) {
+  if (slug === "deltoids") return deltKeysForView(view);
+  return Object.entries(FEMALE_SLUG_MAP).filter(([, s]) => s === slug).map(([k]) => k);
+}
+// Gris claro para marcar selección en un músculo SIN rango todavía — el
+// muñeco por defecto marca la selección con un borde blanco (independiente
+// del color de relleno), pero esta librería no expone stroke por músculo.
+// Sin esto, tocar un músculo que todavía no tiene marcas cargadas no
+// mostraba NINGÚN indicio de que el toque se registró.
+const FEMALE_SELECTED_NEUTRAL = "#94a3b8";
+
+// BUG (de la librería, no nuestro): a pesar de que su tipo declara
+// `BodyPart.color`, el color que realmente se pinta sale de
+// `colors[intensity - 1]` — el campo `color` propio de cada item se
+// ignora en el render (confirmado probando en vivo: con `color` puesto
+// pero sin `intensity`, TODOS los músculos salían con el mismo celeste
+// por defecto de la librería). Por eso acá se arma una única paleta
+// `colors` con TODAS las variantes posibles (normal / seleccionado-con-
+// rango / seleccionado-sin-rango) y cada músculo elige su entrada por
+// índice (`intensity`), igual de indirecto que el `frequency` que ya usa
+// el muñeco por defecto — no es capricho, es la única forma que expone
+// esta librería de pintar cada músculo con SU color.
+function useFemalePalette(highlightedColors) {
+  return useMemo(() => [
+    ...highlightedColors, // intensity 1..N: color normal de cada rango
+    ...highlightedColors.map((c) => mixWithWhite(c, 0.45)), // N+1..2N: mismo rango, pero seleccionado
+    FEMALE_SELECTED_NEUTRAL, // 2N+1: seleccionado y sin rango todavía
+  ], [highlightedColors]);
+}
+
+function buildFemaleBodyData(ranks, tiersCount, selected, view) {
+  const bySlug = new Map();
+  Object.entries(FEMALE_SLUG_MAP).forEach(([ourKey, slug]) => {
+    const lvl = ranks[ourKey]?.levelIdx ?? -1;
+    if (lvl < 0) return;
+    if (!bySlug.has(slug) || lvl > bySlug.get(slug)) bySlug.set(slug, lvl);
+  });
+  const deltBest = bestRankForKeys(deltKeysForView(view), ranks);
+  if (deltBest) bySlug.set("deltoids", deltBest.levelIdx);
+
+  const items = Array.from(bySlug.entries()).map(([slug, lvl]) => {
+    const keys = getFemaleGroupKeysForSlug(slug, view);
+    const isSelected = !!selected && keys.includes(selected);
+    return { slug, intensity: (isSelected ? tiersCount + lvl : lvl) + 1 };
+  });
+  if (selected) {
+    const selectedSlug = FEMALE_SLUG_MAP[selected] || (deltKeysForView(view).includes(selected) ? "deltoids" : null);
+    if (selectedSlug && !items.some((it) => it.slug === selectedSlug)) {
+      items.push({ slug: selectedSlug, intensity: tiersCount * 2 + 1 });
+    }
+  }
+  return items;
 }
 
 function FemaleBodyModel({ ranks, highlightedColors, selected, onMuscleClick, frontRef, backRef }) {
+  const palette = useFemalePalette(highlightedColors);
+  const tiersCount = highlightedColors.length;
+  const frontData = useMemo(() => buildFemaleBodyData(ranks, tiersCount, selected, "front"), [ranks, tiersCount, selected]);
+  const backData = useMemo(() => buildFemaleBodyData(ranks, tiersCount, selected, "back"), [ranks, tiersCount, selected]);
+  const handleClick = (view) => (bodyPart) => {
+    const keys = getFemaleGroupKeysForSlug(bodyPart?.slug, view);
+    if (!keys.length) return;
+    const best = keys.reduce((a, b) => ((ranks[b]?.levelIdx ?? -1) > (ranks[a]?.levelIdx ?? -1) ? b : a));
+    onMuscleClick(best);
+  };
   return (
     <div className="flex gap-2 justify-center items-start">
       <div className="flex-1 min-w-0 max-w-[180px]">
         <div ref={frontRef} className="relative">
-          <FemaleBodyView regions={FEMALE_FRONT_REGIONS} ranks={ranks} highlightedColors={highlightedColors} selected={selected} onMuscleClick={onMuscleClick} />
+          <FemaleBody data={frontData} colors={palette} gender="female" side="front" border="none" onBodyPartClick={handleClick("front")} />
         </div>
         <p className="text-center text-[10px] text-slate-600 mt-1">De frente</p>
       </div>
       <div className="flex-1 min-w-0 max-w-[180px]">
         <div ref={backRef} className="relative">
-          <FemaleBodyView regions={FEMALE_BACK_REGIONS} ranks={ranks} highlightedColors={highlightedColors} selected={selected} onMuscleClick={onMuscleClick} />
+          <FemaleBody data={backData} colors={palette} gender="female" side="back" border="none" onBodyPartClick={handleClick("back")} />
         </div>
         <p className="text-center text-[10px] text-slate-600 mt-1">De espalda</p>
       </div>
@@ -8716,6 +8757,8 @@ function SocialPreviewCard({ profile, uid, onGoToSocial, onUpdateProfile }) {
 ============================================================================ */
 const AVATAR_CROP_VIEWPORT = 280; // tamaño (css px) del visor cuadrado
 const AVATAR_CROP_OUTPUT = 256; // mismo tamaño final que ya usaba compressAvatarDataUrl
+const AVATAR_ZOOM_MIN = 1;
+const AVATAR_ZOOM_MAX = 3;
 
 function AvatarCropModal({ src, onCancel, onConfirm }) {
   useAndroidBack(onCancel);
@@ -8723,7 +8766,17 @@ function AvatarCropModal({ src, onCancel, onConfirm }) {
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [saving, setSaving] = useState(false);
-  const dragRef = useRef(null); // { startX, startY, startOffX, startOffY } mientras se arrastra
+  const dragRef = useRef(null); // { startX, startY, startOffX, startOffY } mientras se arrastra con 1 dedo
+  // BUG FIX (pedido: "el zoom funciona mal"): antes la ÚNICA forma de
+  // acercar/alejar era la barrita de abajo — pellizcar la foto con dos
+  // dedos (el gesto que cualquiera prueba primero en una imagen, por
+  // costumbre de cámara/galería) no hacía nada, porque el visor sólo
+  // escuchaba un puntero a la vez. Ahora se rastrean TODOS los punteros
+  // activos: con 2 encima, la distancia entre ellos maneja el zoom (y el
+  // arrastre de 1 dedo se desactiva mientras dure el pellizco, si no
+  // pelean entre sí); con 1 solo, sigue siendo arrastrar para mover.
+  const pinchRef = useRef(null); // { startDist, startZoom } mientras se pellizca con 2 dedos
+  const pointersRef = useRef(new Map()); // pointerId -> {x, y} de cada dedo/cursor apoyado
 
   useEffect(() => {
     let alive = true;
@@ -8750,28 +8803,57 @@ function AvatarCropModal({ src, onCancel, onConfirm }) {
   const maxOffX = Math.max(0, (dispW - AVATAR_CROP_VIEWPORT) / 2);
   const maxOffY = Math.max(0, (dispH - AVATAR_CROP_VIEWPORT) / 2);
   const clamp = (v, max) => Math.min(max, Math.max(-max, v));
-
-  const handlePointerDown = (e) => {
-    e.currentTarget.setPointerCapture(e.pointerId);
-    dragRef.current = { startX: e.clientX, startY: e.clientY, startOffX: offset.x, startOffY: offset.y };
-  };
-  const handlePointerMove = (e) => {
-    if (!dragRef.current) return;
-    const dx = e.clientX - dragRef.current.startX, dy = e.clientY - dragRef.current.startY;
-    setOffset({ x: clamp(dragRef.current.startOffX + dx, maxOffX), y: clamp(dragRef.current.startOffY + dy, maxOffY) });
-  };
-  const handlePointerUp = () => { dragRef.current = null; };
+  const clampZoom = (z) => Math.min(AVATAR_ZOOM_MAX, Math.max(AVATAR_ZOOM_MIN, z));
 
   // Al cambiar el zoom el margen disponible cambia — si no se re-clampea,
   // un offset que era válido con el zoom viejo puede dejar un borde vacío
   // (o directamente quedar afuera de la imagen) con el zoom nuevo.
-  const handleZoomChange = (nextZoom) => {
+  const handleZoomChange = (nextZoomRaw) => {
+    const nextZoom = clampZoom(nextZoomRaw);
     const nextScale = baseScale * nextZoom;
     const nextDispW = natural.w * nextScale, nextDispH = natural.h * nextScale;
     const nextMaxX = Math.max(0, (nextDispW - AVATAR_CROP_VIEWPORT) / 2);
     const nextMaxY = Math.max(0, (nextDispH - AVATAR_CROP_VIEWPORT) / 2);
     setZoom(nextZoom);
     setOffset((o) => ({ x: clamp(o.x, nextMaxX), y: clamp(o.y, nextMaxY) }));
+  };
+
+  const handlePointerDown = (e) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointersRef.current.size >= 2) {
+      dragRef.current = null;
+      const [p1, p2] = Array.from(pointersRef.current.values());
+      pinchRef.current = { startDist: Math.hypot(p1.x - p2.x, p1.y - p2.y) || 1, startZoom: zoom };
+    } else {
+      pinchRef.current = null;
+      dragRef.current = { startX: e.clientX, startY: e.clientY, startOffX: offset.x, startOffY: offset.y };
+    }
+  };
+  const handlePointerMove = (e) => {
+    if (pointersRef.current.has(e.pointerId)) pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pinchRef.current && pointersRef.current.size >= 2) {
+      const [p1, p2] = Array.from(pointersRef.current.values());
+      const dist = Math.hypot(p1.x - p2.x, p1.y - p2.y) || 1;
+      handleZoomChange(pinchRef.current.startZoom * (dist / pinchRef.current.startDist));
+      return;
+    }
+    if (!dragRef.current) return;
+    const dx = e.clientX - dragRef.current.startX, dy = e.clientY - dragRef.current.startY;
+    setOffset({ x: clamp(dragRef.current.startOffX + dx, maxOffX), y: clamp(dragRef.current.startOffY + dy, maxOffY) });
+  };
+  const handlePointerUp = (e) => {
+    pointersRef.current.delete(e.pointerId);
+    if (pointersRef.current.size >= 2) return; // sigue habiendo pellizco con los que quedan
+    pinchRef.current = null;
+    if (pointersRef.current.size === 1) {
+      // Se levantó uno de los dos dedos del pellizco: arranca un arrastre
+      // nuevo desde donde está el dedo que queda, para que no salte.
+      const pt = Array.from(pointersRef.current.values())[0];
+      dragRef.current = { startX: pt.x, startY: pt.y, startOffX: offset.x, startOffY: offset.y };
+    } else {
+      dragRef.current = null;
+    }
   };
 
   const handleConfirm = async () => {
@@ -8828,10 +8910,10 @@ function AvatarCropModal({ src, onCancel, onConfirm }) {
             <div className="absolute inset-0 pointer-events-none" style={{ boxShadow: "inset 0 0 0 999px rgba(0,0,0,0.35)", borderRadius: "9999px", margin: 8 }} />
           </div>
         </div>
-        <p className="text-center text-[10.5px] text-slate-500 mt-2 px-5">Arrastrá para mover · deslizá para acercar o alejar</p>
+        <p className="text-center text-[10.5px] text-slate-500 mt-2 px-5">Arrastrá para mover · pellizcá con dos dedos o usá la barra para acercar</p>
         <div className="flex items-center gap-3 px-6 mt-3">
           <Search size={13} className="text-slate-600 shrink-0" />
-          <input type="range" min="1" max="3" step="0.01" value={zoom} onChange={(e) => handleZoomChange(parseFloat(e.target.value))} className="flex-1 accent-sky-500" />
+          <input type="range" min={AVATAR_ZOOM_MIN} max={AVATAR_ZOOM_MAX} step="0.01" value={zoom} onChange={(e) => handleZoomChange(parseFloat(e.target.value))} className="flex-1 accent-sky-500" />
         </div>
         <div className="flex gap-2 p-5 pt-4">
           <button onClick={onCancel} className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-400 text-sm font-semibold">Cancelar</button>
@@ -8852,6 +8934,7 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
   const [editAge, setEditAge] = useState(profile?.age ? String(profile.age) : "");
   const [editHeight, setEditHeight] = useState(profile?.heightCm ? String(profile.heightCm) : "");
   const [showCycleSetup, setShowCycleSetup] = useState(false);
+  const [showSelfProgression, setShowSelfProgression] = useState(false);
   const [googleLinkError, setGoogleLinkError] = useState("");
   const [syncStatus, setSyncStatus] = useState(null); // null | "syncing" | "ok" | "error"
   const joinDate = profile?.joinedAt ? new Date(profile.joinedAt).toLocaleDateString("es-AR", { day: "numeric", month: "long", year: "numeric" }) : "—";
@@ -9148,8 +9231,27 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
               <p className="text-[11px] text-slate-500">Cada serie muestra una "marca a alcanzar" cargada de antemano (a mano, o por tu entrenador) en vez de tu récord — pensado para planes con cargas ya decididas semana a semana.</p>
             </div>
           </button>
+          {settings.trainingMode === "planned" && (
+            <button onClick={() => setShowSelfProgression(true)} disabled={!activeRoutineDef} className="w-full flex items-center gap-2.5 justify-center py-3 rounded-xl bg-sky-500 !text-white text-sm font-bold transition active:scale-[0.98] disabled:opacity-40">
+              <Sliders size={15} /> Planificar mi progresión
+            </button>
+          )}
+          {!activeRoutineDef && settings.trainingMode === "planned" && <p className="text-[10.5px] text-slate-600 text-center -mt-1">Activá una rutina primero, en la pestaña Rutinas.</p>}
         </div>
       </CollapsibleSection>
+      {showSelfProgression && activeRoutineDef && (
+        <ProgressionProposalComposer
+          mode="self"
+          routineSnapshot={activeRoutineDef}
+          trainWeeks={settings.trainWeeks}
+          onClose={() => setShowSelfProgression(false)}
+          onSubmit={async (plan) => {
+            const updated = applyProgressionToRoutine(activeRoutineDef, plan);
+            onUpdateProfile({ routines: { ...(profile.routines || {}), [profile.activeRoutineId]: updated } });
+            setShowSelfProgression(false);
+          }}
+        />
+      )}
 
       <CollapsibleSection title="Configuración de descarga" subtitle={settings.deloadEnabled === false ? "Desactivada" : `Ciclo ${settings.trainWeeks}+${settings.deloadWeeks} sem · Carga ${Math.round(settings.deloadPct * 100)}%`} icon={<Zap size={16} />} accent="#A855F7">
         <ToggleRow
@@ -9303,7 +9405,7 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
             <p>Modus Fit respeta tu privacidad. Esta política explica qué datos recopilamos, cómo los usamos y cuáles son tus derechos.</p>
             {[
               { t: "1. Datos que recopilamos", b: "Datos de entrenamiento (series, pesos, récords), datos de perfil (nombre, email, sexo, edad, altura), medidas corporales y fotos de progreso (solo en tu dispositivo), y datos de cuenta Google si iniciás sesión con Google." },
-              { t: "2. Cómo usamos los datos", b: "Para mostrarte tu historial, récords y progreso. Para sincronizar tu perfil entre dispositivos si iniciaste sesión con Google. Para generar recomendaciones del Entrenador IA (el texto se envía a la API de Google Gemini y no se almacena en nuestros servidores). Para mostrar anuncios relevantes a través de Google AdMob (solo en la versión gratuita)." },
+              { t: "2. Cómo usamos los datos", b: "Para mostrarte tu historial, récords y progreso. Para sincronizar tu perfil entre dispositivos si iniciaste sesión con Google. Para generar recomendaciones del Chatbot (el texto se envía a la API de Google Gemini y no se almacena en nuestros servidores). Para mostrar anuncios relevantes a través de Google AdMob (solo en la versión gratuita)." },
               { t: "3. Almacenamiento y seguridad", b: "Tus datos se guardan localmente en tu dispositivo (IndexedDB/localStorage). Si usás la sincronización, se almacenan en Firebase Firestore con acceso restringido a tu cuenta. Si elegís un @usuario para activar lo social, tu nombre y foto de perfil quedan visibles para cualquier usuario de la app (necesario para que te puedan buscar), y tu rutina activa, historial de entrenamientos, récords y medidas corporales quedan visibles únicamente para las personas que aceptes como amigos o como entrenador/alumno vinculado — podés dejar de compartirlos en cualquier momento quitando el @usuario. Las fotos de progreso nunca se suben a ningún servidor ni se comparten con nadie, bajo ninguna circunstancia. Toda comunicación usa HTTPS." },
               { t: "4. Terceros", b: "Usamos Google Firebase (autenticación y base de datos), Google Gemini API (IA), y Google AdMob (anuncios en la versión gratuita). Cada uno tiene su propia política de privacidad." },
               { t: "5. Anuncios y versión Pro", b: "La versión gratuita muestra anuncios de AdMob en momentos específicos. La versión Pro ($4.99 pago único) elimina todos los anuncios. Podés inhabilitar la personalización de anuncios en Ajustes → Google → Anuncios de tu dispositivo." },
@@ -9539,24 +9641,24 @@ function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted
       )}
 
       <div className="rounded-2xl border border-slate-800/50 bg-slate-900/50 p-4 space-y-3">
-        <p className="text-xs font-bold text-white flex items-center gap-1.5"><GraduationCap size={14} className="text-purple-400" /> Vincular entrenador/alumno</p>
+        <p className="text-xs font-bold text-white flex items-center gap-1.5"><GraduationCap size={14} className="text-indigo-400" /> Vincular entrenador/alumno</p>
         <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-700/50">
-          <button onClick={() => setRole("trainer")} className={`flex-1 py-2 rounded-lg text-[11px] font-bold transition-all ${role === "trainer" ? "bg-purple-500 !text-white" : "text-slate-500"}`}>Soy el entrenador</button>
-          <button onClick={() => setRole("student")} className={`flex-1 py-2 rounded-lg text-[11px] font-bold transition-all ${role === "student" ? "bg-purple-500 !text-white" : "text-slate-500"}`}>Soy el alumno</button>
+          <button onClick={() => setRole("trainer")} className={`flex-1 py-2 rounded-lg text-[11px] font-bold transition-all ${role === "trainer" ? "bg-indigo-500 !text-white" : "text-slate-500"}`}>Soy el entrenador</button>
+          <button onClick={() => setRole("student")} className={`flex-1 py-2 rounded-lg text-[11px] font-bold transition-all ${role === "student" ? "bg-indigo-500 !text-white" : "text-slate-500"}`}>Soy el alumno</button>
         </div>
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" />
             <input value={raw} onChange={(e) => setRaw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSearch()} placeholder={role === "trainer" ? "@usuario de tu alumno" : "@usuario de tu entrenador"}
-              className="w-full bg-slate-800 border border-slate-700/50 rounded-xl pl-9 pr-3 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500/50" />
+              className="w-full bg-slate-800 border border-slate-700/50 rounded-xl pl-9 pr-3 py-2.5 text-white text-sm focus:outline-none focus:border-indigo-500/50" />
           </div>
-          <button onClick={handleSearch} disabled={!raw.trim() || searchState === "searching"} className="px-4 rounded-xl bg-purple-500 !text-white text-sm font-bold disabled:opacity-40">Buscar</button>
+          <button onClick={handleSearch} disabled={!raw.trim() || searchState === "searching"} className="px-4 rounded-xl bg-indigo-500 !text-white text-sm font-bold disabled:opacity-40">Buscar</button>
         </div>
         {searchState === "not_found" && <p className="text-xs text-slate-500">No encontramos a nadie con ese @usuario.</p>}
         {searchState === "self" && <p className="text-xs text-slate-500">Ese sos vos 🙂</p>}
         {searchState === "found" && found && (
           <PublicUserCard uid={found.uid} basic={found.basic}>
-            <button onClick={() => { onSendLink(found.uid, role); setFound(null); setRaw(""); setSearchState("idle"); }} className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-purple-500/15 border border-purple-500/30 text-purple-300 text-[11px] font-bold hover:bg-purple-500/25 transition">
+            <button onClick={() => { onSendLink(found.uid, role); setFound(null); setRaw(""); setSearchState("idle"); }} className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-[11px] font-bold hover:bg-indigo-500/25 transition">
               <UserPlus size={12} /> Invitar
             </button>
           </PublicUserCard>
@@ -9728,9 +9830,9 @@ function RoutineProposalComposer({ myRoutines, onClose, onSubmit }) {
       <div className="w-full max-w-md max-h-[86vh] overflow-y-auto overscroll-contain bg-slate-900 border border-slate-700/60 rounded-3xl modal-pop-in shadow-2xl shadow-black/70" onClick={(e) => e.stopPropagation()}>
         <div className="p-5 space-y-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-purple-500/20 border border-purple-500/30 text-purple-300 flex items-center justify-center shrink-0"><ClipboardCheck size={17} /></div>
+            <div className="w-10 h-10 rounded-2xl bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 flex items-center justify-center shrink-0"><ClipboardCheck size={17} /></div>
             <div className="min-w-0 flex-1">
-              <p className="text-[10px] font-black uppercase tracking-widest text-purple-400">Proponer rutina</p>
+              <p className="text-[10px] font-black uppercase tracking-widest text-indigo-400">Proponer rutina</p>
               <h3 className="text-base font-black text-white leading-tight">Elegí una de tus rutinas</h3>
             </div>
             <button onClick={onClose} className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white transition"><X size={15} /></button>
@@ -9742,8 +9844,8 @@ function RoutineProposalComposer({ myRoutines, onClose, onSubmit }) {
             <>
               <div className="space-y-1.5 max-h-40 overflow-y-auto">
                 {routineEntries.map(([id, def]) => (
-                  <button key={id} onClick={() => setSelectedId(id)} className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-left transition ${selectedId === id ? "bg-purple-500/15 border border-purple-500/40" : "bg-slate-800/50 border border-slate-700/40 hover:border-slate-600"}`}>
-                    <span className={`w-4 h-4 rounded-full border-2 shrink-0 ${selectedId === id ? "border-purple-400 bg-purple-400" : "border-slate-600"}`} />
+                  <button key={id} onClick={() => setSelectedId(id)} className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-left transition ${selectedId === id ? "bg-indigo-500/15 border border-indigo-500/40" : "bg-slate-800/50 border border-slate-700/40 hover:border-slate-600"}`}>
+                    <span className={`w-4 h-4 rounded-full border-2 shrink-0 ${selectedId === id ? "border-indigo-400 bg-indigo-400" : "border-slate-600"}`} />
                     <span className="text-sm font-semibold text-white truncate">{def.name || id}</span>
                   </button>
                 ))}
@@ -9754,7 +9856,7 @@ function RoutineProposalComposer({ myRoutines, onClose, onSubmit }) {
                 <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} maxLength={200} placeholder="Ej: bajamos el volumen esta vez, sumá cardio los martes..."
                   className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-3.5 py-2.5 text-white text-sm focus:outline-none resize-none" />
               </div>
-              <button onClick={handleSubmit} disabled={!selectedDef || sending} className="w-full py-3 rounded-xl bg-purple-500 !text-white text-sm font-bold disabled:opacity-40">{sending ? "Enviando..." : "Enviar propuesta"}</button>
+              <button onClick={handleSubmit} disabled={!selectedDef || sending} className="w-full py-3 rounded-xl bg-indigo-500 !text-white text-sm font-bold disabled:opacity-40">{sending ? "Enviando..." : "Enviar propuesta"}</button>
             </>
           )}
         </div>
@@ -9763,32 +9865,67 @@ function RoutineProposalComposer({ myRoutines, onClose, onSubmit }) {
   );
 }
 
-// El entrenador carga la meta (kg×reps) de cada semana del ciclo para UN
-// ejercicio/serie puntual de la rutina ACTIVA del alumno — "modo rutina
-// planificada" (ver DEFAULT_SETTINGS.trainingMode y getPlannedTargetForWeek
-// en App.jsx). A diferencia de RoutineProposalComposer (que reemplaza la
-// rutina entera), esto sólo toca una serie: se puede repetir tantas veces
-// como ejercicios/series quiera planificar el entrenador.
-function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onSubmit }) {
+// Carga la meta (kg×reps) de cada semana del ciclo para UN ejercicio/serie
+// puntual de una rutina — "modo rutina planificada" (ver
+// DEFAULT_SETTINGS.trainingMode y getPlannedTargetForWeek en App.jsx). A
+// diferencia de RoutineProposalComposer (que reemplaza la rutina entera),
+// esto sólo toca una serie: se puede repetir tantas veces como
+// ejercicios/series se quieran planificar. Sirve para DOS casos con el
+// mismo formulario — sólo cambia qué hace `onSubmit` con el resultado:
+//  - mode="trainer" (desde FriendProfileView): el entrenador se la manda
+//    de propuesta a su alumno, que la acepta o no.
+//  - mode="self" (desde Perfil): armás tu propia progresión y se aplica
+//    directo a tu rutina activa, sin pasos intermedios.
+function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onSubmit, mode = "trainer" }) {
   useAndroidBack(onClose);
   const model = useMemo(() => (routineSnapshot ? buildRoutineModel(routineSnapshot) : null), [routineSnapshot]);
   const exercises = useMemo(() => Object.values(model?.exerciseById || {}), [model]);
   const [exerciseId, setExerciseId] = useState(exercises[0]?.id || null);
   const selectedExercise = exercises.find((e) => e.id === exerciseId) || null;
   const [setIndex, setSetIndex] = useState(0);
-  const [entries, setEntries] = useState({}); // { [week]: { kg, reps } }
+  // `entries` sólo guarda lo que la persona TOCÓ en esta sesión del
+  // formulario, por clave "exerciseId_setIndex_week" (no por semana sola)
+  // — así no hace falta ningún efecto para "resetear"/"precargar" al
+  // cambiar de ejercicio o serie: lo ya planificado se deriva directo del
+  // set en cada render (ver existingEntryFor más abajo), sin sincronizar
+  // dos estados a mano.
+  const [entries, setEntries] = useState({});
   const [note, setNote] = useState("");
   const [sending, setSending] = useState(false);
   const weeks = Array.from({ length: Math.max(1, trainWeeks || TRAIN_WEEKS) }, (_, i) => i + 1);
 
-  const updateEntry = (week, patch) => setEntries((prev) => ({ ...prev, [week]: { ...(prev[week] || {}), ...patch } }));
+  const entryKey = (week) => `${exerciseId}_${setIndex}_${week}`;
+  // Lo ya planificado para este ejercicio/serie/semana (si había una
+  // propuesta anterior) — se usa como valor por defecto de cada campo
+  // hasta que la persona lo edite.
+  const existingEntryFor = (week) => {
+    const existing = selectedExercise?.sets?.[setIndex]?.plannedProgression;
+    return Array.isArray(existing) ? existing.find((e) => e.week === week) : null;
+  };
+  const valueFor = (week, field) => {
+    const touched = entries[entryKey(week)];
+    if (touched && touched[field] !== undefined) return touched[field];
+    const existing = existingEntryFor(week);
+    return existing ? String(existing[field]) : "";
+  };
+  // BUG FIX: armar el valor base con valueFor() (que lee del cierre de
+  // render, no de "prev") podía perder lo recién tipeado si dos cambios
+  // (kg y reps) llegaban antes de que React re-renderizara entre uno y
+  // otro — el segundo update pisaba el primero con un valor viejo. Ahora
+  // todo el merge sale de "prev", que siempre refleja el último estado
+  // real en el momento en que se aplica.
+  const updateEntry = (week, patch) => setEntries((prev) => {
+    const key = entryKey(week);
+    const existing = existingEntryFor(week);
+    const base = prev[key] || { kg: existing ? String(existing.kg) : "", reps: existing ? String(existing.reps) : "" };
+    return { ...prev, [key]: { ...base, ...patch } };
+  });
 
   const handleSubmit = async () => {
     if (!selectedExercise) return;
     const cleanEntries = weeks
       .map((week) => {
-        const e = entries[week];
-        const kg = parseFloat(e?.kg), reps = parseInt(e?.reps, 10);
+        const kg = parseFloat(valueFor(week, "kg")), reps = parseInt(valueFor(week, "reps"), 10);
         if (isNaN(kg) || isNaN(reps) || kg <= 0 || reps <= 0) return null;
         return { week, kg, reps };
       })
@@ -9816,7 +9953,7 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
           </div>
 
           {exercises.length === 0 ? (
-            <p className="text-sm text-slate-500">Tu alumno no tiene una rutina activa todavía.</p>
+            <p className="text-sm text-slate-500">{mode === "self" ? "Activá una rutina primero, en la pestaña Rutinas." : "Tu alumno no tiene una rutina activa todavía."}</p>
           ) : (
             <>
               <div>
@@ -9838,18 +9975,20 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
                   {weeks.map((week) => (
                     <div key={week} className="shrink-0 w-20 space-y-1">
                       <p className="text-[9.5px] font-black text-center text-slate-500 uppercase">Sem {week}</p>
-                      <input value={entries[week]?.kg ?? ""} onChange={(e) => updateEntry(week, { kg: e.target.value })} type="number" inputMode="decimal" placeholder="kg" className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-2 py-1.5 text-white text-xs text-center focus:outline-none" />
-                      <input value={entries[week]?.reps ?? ""} onChange={(e) => updateEntry(week, { reps: e.target.value })} type="number" inputMode="numeric" placeholder="reps" className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-2 py-1.5 text-white text-xs text-center focus:outline-none" />
+                      <input value={valueFor(week, "kg")} onChange={(e) => updateEntry(week, { kg: e.target.value })} type="number" inputMode="decimal" placeholder="kg" className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-2 py-1.5 text-white text-xs text-center focus:outline-none" />
+                      <input value={valueFor(week, "reps")} onChange={(e) => updateEntry(week, { reps: e.target.value })} type="number" inputMode="numeric" placeholder="reps" className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-2 py-1.5 text-white text-xs text-center focus:outline-none" />
                     </div>
                   ))}
                 </div>
               </div>
-              <div>
-                <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Nota para tu alumno (opcional)</label>
-                <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} maxLength={200} placeholder="Ej: subí despacio, no fuerces la técnica..."
-                  className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-3.5 py-2.5 text-white text-sm focus:outline-none resize-none" />
-              </div>
-              <button onClick={handleSubmit} disabled={sending} className="w-full py-3 rounded-xl bg-sky-500 !text-white text-sm font-bold disabled:opacity-40">{sending ? "Enviando..." : "Enviar progresión"}</button>
+              {mode !== "self" && (
+                <div>
+                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Nota para tu alumno (opcional)</label>
+                  <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} maxLength={200} placeholder="Ej: subí despacio, no fuerces la técnica..."
+                    className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-3.5 py-2.5 text-white text-sm focus:outline-none resize-none" />
+                </div>
+              )}
+              <button onClick={handleSubmit} disabled={sending} className="w-full py-3 rounded-xl bg-sky-500 !text-white text-sm font-bold disabled:opacity-40">{sending ? "Guardando..." : mode === "self" ? "Guardar progresión" : "Enviar progresión"}</button>
             </>
           )}
         </div>
@@ -9933,7 +10072,7 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
 
           {isTrainerOfThisPerson && (
             <div className="grid grid-cols-2 gap-2">
-              <button onClick={() => setShowComposer(true)} className="flex items-center gap-2 justify-center py-3 rounded-2xl bg-purple-500/15 border border-purple-500/30 text-purple-300 text-xs font-bold hover:bg-purple-500/25 transition active:scale-[0.98]">
+              <button onClick={() => setShowComposer(true)} className="flex items-center gap-2 justify-center py-3 rounded-2xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-xs font-bold hover:bg-indigo-500/25 transition active:scale-[0.98]">
                 <ClipboardCheck size={15} /> Proponer rutina
               </button>
               <button onClick={() => setShowProgressionComposer(true)} disabled={!full.activeRoutineSnapshot} className="flex items-center gap-2 justify-center py-3 rounded-2xl bg-sky-500/15 border border-sky-500/30 text-sky-300 text-xs font-bold hover:bg-sky-500/25 transition active:scale-[0.98] disabled:opacity-40">
@@ -10089,13 +10228,14 @@ function SocialView({ profile, uid, onActivateRoutine }) {
 
   // Mismo lenguaje que PROGRESS_SECTIONS (Progreso): cada sub-sección con
   // su propio acento sobre una base neutra — "Entrenador" se queda con el
-  // violeta que ya usa TrainerLinksSection (mismo criterio que Progreso,
-  // donde cada pestaña interna tiene su color sin que eso choque con la
-  // identidad general de la pestaña de arriba).
+  // índigo que ya usa TrainerLinksSection, distinto a propósito del violeta
+  // general de la pestaña (mismo criterio que Progreso, donde cada pestaña
+  // interna tiene su color sin que eso choque con la identidad general de
+  // la pestaña de arriba).
   const SECTIONS = [
     { k: "amigos", l: "Amigos", icon: <Users size={14} />, color: SOCIAL_COLOR },
     { k: "buscar", l: "Buscar", icon: <Search size={14} />, color: SOCIAL_COLOR },
-    { k: "entrenador", l: "Entrenador", icon: <GraduationCap size={14} />, color: "#A855F7" },
+    { k: "entrenador", l: "Entrenador", icon: <GraduationCap size={14} />, color: "#6366F1" },
   ];
 
   return (
@@ -10324,7 +10464,7 @@ function PresetRoutineCard({ preset, isActive, onPreview }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <h4 className="text-sm font-bold text-white leading-snug" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{preset.name}</h4>
-            {isActive && <span className="text-[9px] font-black px-1.5 py-0.5 rounded-lg bg-purple-500/20 text-purple-400 shrink-0 badge-pop">ACTIVA</span>}
+            {isActive && <span className="text-[9px] font-black px-1.5 py-0.5 rounded-lg bg-sky-500/20 text-sky-400 shrink-0 badge-pop">ACTIVA</span>}
           </div>
           <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-2">{preset.description}</p>
           <p className="text-[10px] text-slate-600 mt-1.5">{ctx?.frecuencia || `${dayCount} día${dayCount === 1 ? "" : "s"}/semana`}</p>
@@ -10339,7 +10479,7 @@ function SavedRoutineRow({ routine, isActive, onUse, onEdit, onShare, onArchive,
   const dayCount = routine.dayOrder.length;
   const accent = isActive ? "#14B8A6" : "#6366F1"; // teal si activa, indigo si no
   return (
-    <SwipeToArchive confirmText={`¿Quitar "${routine.name}" de tus rutinas? No se borra nada.`} onArchive={onArchive}>
+    <SwipeToArchive confirmText={`¿Eliminar "${routine.name}"? No se puede deshacer.`} onArchive={onArchive}>
       <div className={`stagger-item smooth-card rounded-2xl px-4 py-3.5 backdrop-blur-sm shadow-md transition-shadow hover:shadow-lg ${isActive ? "border-2" : "border border-slate-800/50 bg-slate-900/50"}`}
         style={isActive ? { borderColor: tint(accent, "60"), background: `linear-gradient(135deg, ${tint(accent, "12")}, var(--panel-sunken))`, boxShadow: `0 4px 20px -4px ${tint(accent, "25")}` } : {}}>
         <div className="flex items-center gap-3">
@@ -11177,7 +11317,7 @@ function wouldBeNewPR(profile, exerciseId, setIndex, kg, reps) {
 // "activar_rutina" con un nombre que no existe), devuelve null — en ese
 // caso no se muestra ninguna tarjeta, sólo el texto del mensaje.
 function buildActionPlan(action, ctx) {
-  const { profile, settings, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement, onLogSet, onArchiveRoutine, onRestoreRoutine, onNavigate, onStartSession, onEndSession } = ctx;
+  const { profile, settings, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement, onLogSet, onDeleteRoutine, onNavigate, onStartSession, onEndSession } = ctx;
   if (action.type === "crear_rutina") {
     // BUG FIX: mismo caso que ImportRoutineModal/el wizard — filtrar
     // días/ejercicios null antes de leer sus campos, para que un elemento
@@ -11199,7 +11339,7 @@ function buildActionPlan(action, ctx) {
     if (!wanted) return null;
     let foundId = null, foundDef = null, isPreset = false;
     Object.entries(profile?.routines || {}).forEach(([id, def]) => {
-      if (!foundId && !def?.archived && def?.name?.toLowerCase().includes(wanted)) { foundId = id; foundDef = def; }
+      if (!foundId && def?.name?.toLowerCase().includes(wanted)) { foundId = id; foundDef = def; }
     });
     if (!foundId) {
       const preset = PRESET_ROUTINES.find((p) => p.name.toLowerCase().includes(wanted));
@@ -11360,27 +11500,19 @@ function buildActionPlan(action, ctx) {
     }
     return null;
   }
-  // Archivar/duplicar/renombrar una rutina GUARDADA (no la que está activa
-  // en pantalla, sino cualquiera de la lista) — sin borrar nada, "archivar"
-  // solo la saca de la vista principal (igual que deslizarla en Rutinas).
+  // Eliminar/duplicar/renombrar una rutina GUARDADA (no la que está activa
+  // en pantalla, sino cualquiera de la lista).
   if (action.type === "gestionar_rutina") {
     const wanted = String(action.routineName || "").toLowerCase().trim();
     if (!wanted) return null;
-    // "restaurar" busca entre las ARCHIVADAS (lo opuesto de los otros tres
-    // ops, que sólo miran la lista visible) — si no, nunca la encontraría.
-    const wantArchived = action.op === "restaurar";
     let foundId = null, foundDef = null;
     Object.entries(profile?.routines || {}).forEach(([id, def]) => {
-      if (!foundId && !!def?.archived === wantArchived && def?.name?.toLowerCase().includes(wanted)) { foundId = id; foundDef = def; }
+      if (!foundId && def?.name?.toLowerCase().includes(wanted)) { foundId = id; foundDef = def; }
     });
     if (!foundId) return null;
-    if (action.op === "archivar") {
-      if (!onArchiveRoutine) return null;
-      return { kind: "list", title: `Archivar "${foundDef.name}"`, items: ["Se mueve a rutinas archivadas, no se borra nada: la podés recuperar cuando quieras."], confirmLabel: "Archivar", confirm: () => onArchiveRoutine(foundId) };
-    }
-    if (action.op === "restaurar") {
-      if (!onRestoreRoutine) return null;
-      return { kind: "list", title: `Restaurar "${foundDef.name}"`, items: ["Vuelve a aparecer en tu lista de rutinas."], confirmLabel: "Restaurar", confirm: () => onRestoreRoutine(foundId) };
+    if (action.op === "eliminar") {
+      if (!onDeleteRoutine) return null;
+      return { kind: "list", title: `Eliminar "${foundDef.name}"`, items: ["Esta acción no se puede deshacer."], confirmLabel: "Eliminar", confirm: () => onDeleteRoutine(foundId) };
     }
     if (action.op === "duplicar") {
       if (!onCreateRoutine) return null;
@@ -11400,7 +11532,7 @@ function buildActionPlan(action, ctx) {
   // Ir directo a una pestaña — la IA como atajo de navegación, no solo de
   // datos: útil cuando la respuesta natural es "mirá tal pantalla".
   if (action.type === "navegar") {
-    const TAB_LABELS = { rutina: "Rutina", progreso: "Progreso", rutinas: "Rutinas", descarga: "Descarga", perfil: "Perfil", entrenador_ia: "Entrenador IA" };
+    const TAB_LABELS = { rutina: "Rutina", progreso: "Progreso", rutinas: "Rutinas", descarga: "Descarga", perfil: "Perfil", entrenador_ia: "Chatbot" };
     if (!onNavigate || !TAB_LABELS[action.destino]) return null;
     return { kind: "list", title: `Ir a "${TAB_LABELS[action.destino]}"`, items: [`Te lleva directo a esa pestaña.`], confirmLabel: `Ir a ${TAB_LABELS[action.destino]}`, confirm: () => onNavigate(action.destino) };
   }
@@ -11524,7 +11656,7 @@ function buildActionPlan(action, ctx) {
     if (wanted) {
       let match = null;
       Object.entries(profile?.routines || {}).forEach(([id, def]) => {
-        if (!match && !def?.archived && def?.name?.toLowerCase().includes(wanted)) match = { id, def };
+        if (!match && def?.name?.toLowerCase().includes(wanted)) match = { id, def };
       });
       if (match) foundDef = resolveRoutineDef(match.def, match.id);
     }
@@ -11713,7 +11845,7 @@ LEÉ SIEMPRE "analisisEntrenamiento" ANTES DE RESPONDER: es el análisis ya calc
 - Si te preguntan por un estancamiento, mirá "tendencia" y "diasDesdeMejorMarca" de ESE ejercicio y el volumen de su músculo. Respondé con los números concretos, no con generalidades.
 - Si te piden armar o ajustar un entrenamiento, priorizá los músculos con más "diasSinEntrenarlo" o menos "seriesUltimos7dias", y evitá recargar lo que entrenó hace 1-2 días.
 - Si detectás algo importante que no preguntaron (un músculo abandonado hace semanas, una caída fuerte de volumen, un ejercicio estancado hace mucho), mencionalo brevemente al final.
-- Citá siempre datos reales ("tu mejor press banca es 5x110 del 6 de julio, hace 12 días") en vez de hablar en abstracto. "rutinas" incluye TODAS sus rutinas (activa, creadas, editadas y archivadas) con sus días y ejercicios completos: las marcadas "archivada":true no están visibles para ella en la pestaña Rutinas salvo que las recupere, tenelo en cuenta si te pregunta qué tiene disponible ahora. "logs" trae sólo los últimos registros de cada serie (no el historial completo), alcanza para evaluar tendencia reciente, pero si te preguntan por una marca muy vieja que no aparece, decilo en vez de inventar un valor. Respuestas cortas, 2 a 4 oraciones salvo que te pidan más detalle o la pregunta lo amerite. Para dar formato a tu texto podés usar **negrita** y listas con guion (-), nada más: no uses títulos, tablas, ni bloques de código. NUNCA uses la raya "—" ni el guion medio "–" para unir ideas dentro de una oración: partí en dos oraciones con punto, o usá coma/dos puntos. Escribís para alguien leyendo en el celular, y así se lee más claro.
+- Citá siempre datos reales ("tu mejor press banca es 5x110 del 6 de julio, hace 12 días") en vez de hablar en abstracto. "rutinas" incluye TODAS sus rutinas (activa, creadas y editadas) con sus días y ejercicios completos. "logs" trae sólo los últimos registros de cada serie (no el historial completo), alcanza para evaluar tendencia reciente, pero si te preguntan por una marca muy vieja que no aparece, decilo en vez de inventar un valor. Respuestas cortas, 2 a 4 oraciones salvo que te pidan más detalle o la pregunta lo amerite. Para dar formato a tu texto podés usar **negrita** y listas con guion (-), nada más: no uses títulos, tablas, ni bloques de código. NUNCA uses la raya "—" ni el guion medio "–" para unir ideas dentro de una oración: partí en dos oraciones con punto, o usá coma/dos puntos. Escribís para alguien leyendo en el celular, y así se lee más claro.
 
 Si la persona te pide explícitamente hacer un cambio en la app, respondé primero tu explicación normal y agregá AL FINAL, en una línea aparte, un bloque con ESTE formato exacto (sin texto markdown alrededor, sin comillas triples, nada más en esa línea):
 ###ACCION###{"type":"TIPO", ...campos...}###FIN###
@@ -11734,7 +11866,7 @@ Tipos disponibles:
 - navegar: {"type":"navegar","destino":"rutina"|"progreso"|"rutinas"|"descarga"|"perfil"|"entrenador_ia"} — la lleva directo a esa pestaña de la app. Usalo cuando pida "mostrame X" o "llevame a X".
 - iniciar_sesion: {"type":"iniciar_sesion","day":"nombre o parte del nombre del día (opcional)"} — arranca el cronómetro de su entrenamiento de hoy, como tocar "Iniciar sesión" en Rutina. Si no da el día, usa el primero de su rutina activa.
 - finalizar_sesion: {"type":"finalizar_sesion"} — cierra y guarda en el historial la sesión de hoy que ya tiene en curso. Sólo proponela si por el contexto ("activeSession" en los datos) ya hay una sesión activa.
-- gestionar_rutina: {"type":"gestionar_rutina","op":"archivar"|"restaurar"|"duplicar"|"renombrar","routineName":"nombre o parte del nombre de una rutina guardada","nuevoNombre":"..."} — administra una rutina de su lista (no la activa en pantalla necesariamente). "restaurar" busca entre las ARCHIVADAS y la vuelve a mostrar. "nuevoNombre" sólo aplica si op="renombrar". Archivar no borra nada, sólo la saca de la vista principal.
+- gestionar_rutina: {"type":"gestionar_rutina","op":"eliminar"|"duplicar"|"renombrar","routineName":"nombre o parte del nombre de una rutina guardada","nuevoNombre":"..."} — administra una rutina de su lista (no la activa en pantalla necesariamente). "eliminar" la borra para siempre, avisale que no se puede deshacer. "nuevoNombre" sólo aplica si op="renombrar".
 - corregir_record: {"type":"corregir_record","exercise":"Press Banca","reps":10,"kg":90,"setIndex":0} — corrige a mano el récord (PR) guardado de un ejercicio, para cuando el historial no refleja su marca real. "setIndex" es opcional (0 = primera serie del ejercicio).
 - nota_ejercicio: {"type":"nota_ejercicio","exercise":"Sentadilla","nota":"cuidado con la rodilla derecha"} — guarda (o si "nota" viene vacío, borra) la nota personal de ese ejercicio, la misma que se ve al registrar la serie.
 - restablecer_dia: {"type":"restablecer_dia","day":"nombre o parte del nombre del día (opcional)"} — borra las marcas de HOY de ese día de la rutina normal (no toca otros días, ni récords, ni marcas de descarga). Si no da el día, usa el primero de la rutina activa. Usalo para "reiniciá mi día" o si se equivocó al cargar algo y quiere volver a empezar.
@@ -11893,7 +12025,7 @@ function trimLogsForAI(logs, historyLimit = AI_LOG_HISTORY_LIMIT, maxKeys = null
   return Object.fromEntries(entries.slice(0, maxKeys));
 }
 
-function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMessages, conversations = [], activeConversationId = null, onNewConversation, onSwitchConversation, onDeleteConversation, onRenameConversation, settings, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement, onArchiveRoutine, onRestoreRoutine, onNavigate, onStartSession, onEndSession }) {
+function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMessages, conversations = [], activeConversationId = null, onNewConversation, onSwitchConversation, onDeleteConversation, onRenameConversation, settings, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement, onDeleteRoutine, onNavigate, onStartSession, onEndSession }) {
   // Contexto para reconstruir un plan EN VIVO a partir de la "action" cruda
   // (JSON plano, sí serializable) en vez de depender de la función confirm()
   // guardada en el mensaje — esa función no sobrevive un reload ni el
@@ -11902,8 +12034,8 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
   // actionCtx) la reconstruye al vuelo con los handlers actuales.
   const actionCtx = useMemo(() => ({
     profile, settings, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement,
-    onLogSet: setLogs, onArchiveRoutine, onRestoreRoutine, onNavigate, onStartSession, onEndSession,
-  }), [profile, settings, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement, setLogs, onArchiveRoutine, onRestoreRoutine, onNavigate, onStartSession, onEndSession]);
+    onLogSet: setLogs, onDeleteRoutine, onNavigate, onStartSession, onEndSession,
+  }), [profile, settings, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement, setLogs, onDeleteRoutine, onNavigate, onStartSession, onEndSession]);
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [editingIndex, setEditingIndex] = useState(null); // índice del mensaje propio que se está editando
@@ -11997,7 +12129,7 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
       // Antes esto sólo le mandaba los NOMBRES de las rutinas guardadas —
       // por eso no podía ver qué ejercicios tenía cada una, sólo los
       // récords sueltos en logs. Ahora se resuelve cada rutina (incluida
-      // la activa, las creadas/editadas, y las archivadas) a su estructura
+      // la activa y las creadas/editadas) a su estructura
       // real día por día — lo mismo que ve la persona en la pestaña
       // Rutinas — y se manda completo. Lo único que sigue recortado es el
       // texto largo (nota técnica, video) de cada ejercicio: no aporta
@@ -12009,7 +12141,7 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
       const allRoutines = Object.entries(profile?.routines || {}).map(([id, entry]) => {
         const resolved = resolveRoutineDef(entry, id);
         if (!resolved) return null;
-        const base = { id, nombre: resolved.name, esLaActiva: id === activeRoutineId, archivada: !!entry.archived, origen: entry.source || "custom" };
+        const base = { id, nombre: resolved.name, esLaActiva: id === activeRoutineId, origen: entry.source || "custom" };
         // Solo expandir la rutina activa — las demás no necesitan detalle para responder preguntas sobre el entrenamiento actual
         if (id !== activeRoutineId) return base;
         let dias = [];
@@ -12359,61 +12491,56 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
 
   return (
     <div className="relative pb-32">
-      {/* Antes esto era un panel de vidrio esmerilado neutro (glassmorphism),
-          distinto del degradé plano que usan los heroes de las demás
-          pestañas (Rutina/Progreso/Descarga) — se sentía "pegado pero
-          distinto" al resto de la app. Mismo formato ahora, con el índigo
-          característico de esta pestaña en vez de tenerlo sólo en detalles
-          sueltos. */}
-      <div className="relative overflow-hidden rounded-2xl border border-indigo-500/20 p-5 mb-3" style={{ background: "var(--grad-hero-indigo)" }}>
-        <div className="absolute -top-8 -right-8 w-32 h-32 rounded-full bg-indigo-500/15 blur-2xl pointer-events-none" />
+      {/* Mismo formato de héroe plano que usan las demás pestañas (Rutina/
+          Progreso/Descarga), con el teal de siempre — Chatbot comparte
+          identidad de color con Rutina a propósito. */}
+      <div className="relative overflow-hidden rounded-2xl border border-teal-500/20 p-5 mb-3" style={{ background: "var(--grad-hero-teal)" }}>
+        <div className="absolute -top-8 -right-8 w-32 h-32 rounded-full bg-teal-500/15 blur-2xl pointer-events-none" />
         <div className="relative flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center shrink-0 shadow-lg shadow-indigo-500/20 elastic-in">
-            <Sparkles size={20} className="text-indigo-400 sparkle-spin" />
+          <div className="w-11 h-11 rounded-2xl bg-teal-500/20 border border-teal-500/30 flex items-center justify-center shrink-0 shadow-lg shadow-teal-500/20 elastic-in">
+            <Sparkles size={20} className="text-teal-400 sparkle-spin" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-0.5">
-              <span className="text-[10px] font-black uppercase tracking-widest text-indigo-400">Tu asistente</span>
-              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400 font-bold border border-indigo-500/20">BETA</span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-teal-400">Tu asistente</span>
+              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-teal-500/20 text-teal-400 font-bold border border-teal-500/20">BETA</span>
             </div>
-            <h2 className="relative text-xl font-black text-white leading-tight">Entrenador IA</h2>
-            <p className="relative text-xs text-indigo-300/60 mt-0.5">Conoce tu historial real, preguntale lo que quieras</p>
+            <h2 className="relative text-xl font-black text-white leading-tight">Chatbot</h2>
+            <p className="relative text-xs text-teal-300/60 mt-0.5">Conoce tu historial real, preguntale lo que quieras</p>
           </div>
           {messages.some((m) => m.plan && m.planStatus === "confirmed") && (
-            <button onClick={() => setShowChangeLog(true)} title="Cambios aplicados" className="p-2 rounded-xl bg-slate-800/60 border border-slate-700/50 text-slate-400 hover:text-indigo-400 transition shrink-0 active:scale-95">
+            <button onClick={() => setShowChangeLog(true)} title="Cambios aplicados" className="p-2 rounded-xl bg-slate-800/60 border border-slate-700/50 text-slate-400 hover:text-teal-400 transition shrink-0 active:scale-95">
               <ListChecks size={14} />
             </button>
           )}
           {messages.length > 1 && (
-            <button onClick={() => onNewConversation ? onNewConversation() : setMessages([AI_CHAT_WELCOME])} title="Nueva conversación" className="p-2 rounded-xl bg-slate-800/60 border border-slate-700/50 text-slate-400 hover:text-indigo-400 transition shrink-0 active:scale-95">
+            <button onClick={() => onNewConversation ? onNewConversation() : setMessages([AI_CHAT_WELCOME])} title="Nueva conversación" className="p-2 rounded-xl bg-slate-800/60 border border-slate-700/50 text-slate-400 hover:text-teal-400 transition shrink-0 active:scale-95">
               <RotateCcw size={14} />
             </button>
           )}
         </div>
       </div>
 
-      {/* Rediseño "ícono primero", tipo dock de accesos directos, en vez de
-          la fila de chips de texto plano de antes: cada atajo es una
-          tarjeta con su color propio, ícono más grande en una placa y
-          snap-scroll (se acomoda solo al soltar, como un carrusel). Un
-          color distinto por atajo — el mismo lenguaje de "cada categoría
-          tiene su acento" que ya usan Progreso (Rango/Historial/Ejercicios)
-          y Rutinas/Descarga. Fade a la derecha: sin esto, el corte abrupto
+      {/* Dock de accesos directos, tipo ícono primero. Antes cada atajo
+          tenía su propio color (como los pills de Progreso) — acá se sacó
+          a pedido: ahora todos comparten el teal característico de esta
+          pestaña, para que se lea como un solo grupo homogéneo en vez de
+          un arcoíris suelto. Fade a la derecha: sin esto, el corte abrupto
           de la última tarjeta no avisaba que la fila sigue. */}
       <div className="relative -mx-1 mb-4">
         <div className="flex gap-2 overflow-x-auto pb-1 px-1 snap-x snap-mandatory">
           {[
-            { icon: <Layers size={16} />, label: "Crear rutina", prompt: "Armame una rutina nueva según mis objetivos", color: "#A855F7", autoSend: true },
-            { icon: <BarChart3 size={16} />, label: "Analizar progreso", prompt: "Analizá mi progreso reciente: ¿en qué mejoré y qué tengo estancado?", color: "#3B82F6", autoSend: true },
-            { icon: <Target size={16} />, label: "Punto débil", prompt: "Mirando mis rangos por músculo, ¿cuál es mi punto más débil y cómo lo ataco?", color: "#F59E0B", autoSend: true },
-            { icon: <Zap size={16} />, label: "Plan de hoy", prompt: "¿Qué me toca entrenar hoy y con qué pesos me conviene arrancar?", color: "#14B8A6", autoSend: true },
-            { icon: <Calendar size={16} />, label: "Ciclo y descarga", prompt: "¿Cómo vengo en el ciclo actual? ¿Cuándo me toca la descarga?", color: "#F43F5E", autoSend: true },
-            { icon: <Save size={16} />, label: "Anotar una marca", color: "#10B981", askExercise: true },
-            { icon: <FileDown size={16} />, label: "Exportar rutina", prompt: "Pasame mi rutina activa en PDF", color: "#06B6D4", autoSend: true },
+            { icon: <Layers size={16} />, label: "Crear rutina", prompt: "Armame una rutina nueva según mis objetivos", autoSend: true },
+            { icon: <BarChart3 size={16} />, label: "Analizar progreso", prompt: "Analizá mi progreso reciente: ¿en qué mejoré y qué tengo estancado?", autoSend: true },
+            { icon: <Target size={16} />, label: "Punto débil", prompt: "Mirando mis rangos por músculo, ¿cuál es mi punto más débil y cómo lo ataco?", autoSend: true },
+            { icon: <Zap size={16} />, label: "Plan de hoy", prompt: "¿Qué me toca entrenar hoy y con qué pesos me conviene arrancar?", autoSend: true },
+            { icon: <Calendar size={16} />, label: "Ciclo y descarga", prompt: "¿Cómo vengo en el ciclo actual? ¿Cuándo me toca la descarga?", autoSend: true },
+            { icon: <Save size={16} />, label: "Anotar una marca", askExercise: true },
+            { icon: <FileDown size={16} />, label: "Exportar rutina", prompt: "Pasame mi rutina activa en PDF", autoSend: true },
           ].map((c, i) => (
-            <button key={i} onClick={() => handleQuickPrompt(c)} className="snap-start flex flex-col items-center gap-1.5 w-[74px] shrink-0 py-2.5 px-1 rounded-2xl transition active:scale-95" style={{ backgroundColor: tint(c.color, "0c"), border: `1px solid ${tint(c.color, "25")}` }}>
-              <span className="flex items-center justify-center w-9 h-9 rounded-xl shrink-0" style={{ backgroundColor: tint(c.color, "22"), color: c.color }}>{c.icon}</span>
-              <span className="text-[9px] font-bold leading-tight text-center" style={{ color: c.color }}>{c.label}</span>
+            <button key={i} onClick={() => handleQuickPrompt(c)} className="snap-start flex flex-col items-center gap-1.5 w-[74px] shrink-0 py-2.5 px-1 rounded-2xl transition active:scale-95 bg-teal-500/10 border border-teal-500/25">
+              <span className="flex items-center justify-center w-9 h-9 rounded-xl shrink-0 bg-teal-500/20 text-teal-400">{c.icon}</span>
+              <span className="text-[9px] font-bold leading-tight text-center text-teal-400">{c.label}</span>
             </button>
           ))}
         </div>
@@ -12439,14 +12566,14 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
           <div key={i} className="msg-in">
             <div className={`group flex items-end gap-2 ${m.role === "user" ? "justify-end" : "justify-start"}`}>
               {m.role === "assistant" && (
-                <div className="w-6 h-6 rounded-lg bg-indigo-500/15 border border-indigo-500/25 flex items-center justify-center shrink-0 mb-0.5 shadow-md shadow-indigo-500/10">
-                  <Sparkles size={11} className="text-indigo-400" />
+                <div className="w-6 h-6 rounded-lg bg-teal-500/15 border border-teal-500/25 flex items-center justify-center shrink-0 mb-0.5 shadow-md shadow-teal-500/10">
+                  <Sparkles size={11} className="text-teal-400" />
                 </div>
               )}
               {/* Editar: solo en mensajes propios, y solo si no está respondiendo.
                   Toca el lápiz → el texto vuelve al input para reescribirlo. */}
               {m.role === "user" && !isSending && (
-                <button onClick={() => handleEditMessage(i)} aria-label="Editar mensaje" className={`shrink-0 mb-1 p-1.5 rounded-lg text-slate-500 hover:text-indigo-300 hover:bg-slate-800/60 transition ${editingIndex === i ? "text-indigo-400" : ""}`}>
+                <button onClick={() => handleEditMessage(i)} aria-label="Editar mensaje" className={`shrink-0 mb-1 p-1.5 rounded-lg text-slate-500 hover:text-teal-300 hover:bg-slate-800/60 transition ${editingIndex === i ? "text-teal-400" : ""}`}>
                   <Edit3 size={13} />
                 </button>
               )}
@@ -12455,15 +12582,15 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
                   vidrio esmerilado con borde teal — los dos con mucho color
                   encima. Ahora la superficie de AMBOS es neutra/tenue (misma
                   tarjeta "gris" que ya usan los pills de Progreso), y el
-                  índigo característico de la pestaña queda concentrado en
+                  teal característico de la pestaña queda concentrado en
                   detalles puntuales: el ícono de la IA (arriba) y un filo
                   angosto a la izquierda en sus burbujas, en vez de pintar
                   toda la superficie. */}
               <div
-                className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed border ${m.role === "user" ? "!text-white rounded-br-md" : "text-slate-200 rounded-bl-md border-l-2"} ${editingIndex === i ? "ring-2 ring-indigo-400/60" : ""}`}
+                className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed border ${m.role === "user" ? "!text-white rounded-br-md" : "text-slate-200 rounded-bl-md border-l-2"} ${editingIndex === i ? "ring-2 ring-teal-400/60" : ""}`}
                 style={m.role === "user"
                   ? { backgroundColor: "var(--row-surface)", borderColor: "var(--chip-border)" }
-                  : { backgroundColor: "var(--panel-sunken)", borderColor: "var(--chip-border)", borderLeftColor: "#6366F1" }}
+                  : { backgroundColor: "var(--panel-sunken)", borderColor: "var(--chip-border)", borderLeftColor: "#14B8A6" }}
               >
                 {m.role === "assistant" ? renderChatMarkdown(m.text) : m.text}
               </div>
@@ -12492,7 +12619,7 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
             {m.sources && m.sources.length > 0 && (
               <div className="mt-1.5 flex flex-wrap gap-1.5 max-w-[85%]">
                 {m.sources.map((s, j) => (
-                  <a key={j} href={s.uri} target="_blank" rel="noreferrer" className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800/60 border border-slate-700/50 text-[10px] text-slate-400 hover:text-indigo-300 hover:border-indigo-500/40 transition truncate max-w-[170px]">
+                  <a key={j} href={s.uri} target="_blank" rel="noreferrer" className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800/60 border border-slate-700/50 text-[10px] text-slate-400 hover:text-teal-300 hover:border-teal-500/40 transition truncate max-w-[170px]">
                     <Link2 size={9} className="shrink-0" />{s.title || "Fuente"}
                   </a>
                 ))}
@@ -12534,10 +12661,10 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
               </div>
             )}
             {m.plan && m.planStatus === "pending" && livePlan && typeof livePlan.confirm === "function" && (
-              <div className="relative overflow-hidden mt-2 border border-indigo-500/25 rounded-2xl p-3.5 max-w-[85%] bounce-in backdrop-blur-xl" style={{ background: "var(--glass-panel-bg)", boxShadow: "inset 0 1px 0 0 rgba(255,255,255,0.08)" }}>
-                <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full bg-indigo-500/10 blur-2xl pointer-events-none" />
+              <div className="relative overflow-hidden mt-2 border border-teal-500/25 rounded-2xl p-3.5 max-w-[85%] bounce-in backdrop-blur-xl" style={{ background: "var(--glass-panel-bg)", boxShadow: "inset 0 1px 0 0 rgba(255,255,255,0.08)" }}>
+                <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full bg-teal-500/10 blur-2xl pointer-events-none" />
                 <div className="relative flex items-center gap-2 mb-2.5">
-                  <span className="w-6 h-6 rounded-lg bg-indigo-500/15 border border-indigo-500/25 flex items-center justify-center shrink-0"><Sparkles size={12} className="text-indigo-400" /></span>
+                  <span className="w-6 h-6 rounded-lg bg-teal-500/15 border border-teal-500/25 flex items-center justify-center shrink-0"><Sparkles size={12} className="text-teal-400" /></span>
                   <p className="text-sm font-bold text-white flex-1 min-w-0">{m.plan.title}</p>
                 </div>
                 {m.plan.kind === "routine" ? (
@@ -12552,7 +12679,7 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
                   <div className="mb-3"><SettingsChangePreview changes={m.plan.settingsChanges} /></div>
                 ) : (
                   <ul className="mb-3 space-y-1">
-                    {m.plan.items.map((item, j) => <li key={j} className="text-[11px] text-slate-400 flex items-start gap-1.5"><span className="text-indigo-400 mt-0.5">•</span>{item}</li>)}
+                    {m.plan.items.map((item, j) => <li key={j} className="text-[11px] text-slate-400 flex items-start gap-1.5"><span className="text-teal-400 mt-0.5">•</span>{item}</li>)}
                   </ul>
                 )}
                 <div className="flex gap-2">
@@ -12588,17 +12715,17 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
                 centro de un halo que late, con un ecualizador de energía debajo
                 — como si el entrenador estuviera trabajando. */}
             <div className="relative flex items-center justify-center">
-              <span className="absolute w-20 h-20 rounded-full thinking-halo" style={{ background: "radial-gradient(circle, rgba(99,102,241,0.25), transparent 70%)" }} />
+              <span className="absolute w-20 h-20 rounded-full thinking-halo" style={{ background: "radial-gradient(circle, rgba(20,184,166,0.25), transparent 70%)" }} />
               <span className="absolute w-20 h-20 rounded-full thinking-wave" />
               <span className="absolute w-20 h-20 rounded-full thinking-wave" style={{ animationDelay: "0.9s" }} />
-              <div className="relative w-12 h-12 rounded-2xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-                <Dumbbell size={22} className="text-indigo-300 thinking-rep" />
+              <div className="relative w-12 h-12 rounded-2xl bg-teal-500/15 border border-teal-500/30 flex items-center justify-center shadow-lg shadow-teal-500/20">
+                <Dumbbell size={22} className="text-teal-300 thinking-rep" />
               </div>
             </div>
             {/* Ecualizador: 5 barras que laten como música, con desfase */}
             <div className="flex items-end gap-1 h-4">
               {[0, 1, 2, 3, 4].map((k) => (
-                <span key={k} className="w-1 rounded-full bg-indigo-400/80 thinking-eq" style={{ animationDelay: `${k * 0.12}s` }} />
+                <span key={k} className="w-1 rounded-full bg-teal-400/80 thinking-eq" style={{ animationDelay: `${k * 0.12}s` }} />
               ))}
             </div>
             <span className="text-[11px] text-slate-500 font-medium">Pensando<span className="thinking-dots" /> <span className="text-slate-600">· puede tardar hasta 30s</span></span>
@@ -12648,9 +12775,9 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
               </div>
             )}
             {editingIndex != null && (
-              <div className="flex items-center gap-2 mb-1.5 px-3 py-2 rounded-xl bg-indigo-500/10 border border-indigo-500/25 msg-in">
-                <Edit3 size={12} className="text-indigo-400 shrink-0" />
-                <span className="flex-1 text-[11px] text-indigo-200 font-medium">Editando tu mensaje: al enviar se regenera la respuesta</span>
+              <div className="flex items-center gap-2 mb-1.5 px-3 py-2 rounded-xl bg-teal-500/10 border border-teal-500/25 msg-in">
+                <Edit3 size={12} className="text-teal-400 shrink-0" />
+                <span className="flex-1 text-[11px] text-teal-200 font-medium">Editando tu mensaje: al enviar se regenera la respuesta</span>
                 <button onClick={cancelarEdicion} aria-label="Cancelar edición" className="p-1 rounded-lg text-slate-400 hover:text-white transition shrink-0"><X size={13} /></button>
               </div>
             )}
@@ -12669,7 +12796,7 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
                   superpuesto arriba a la derecha — se sacó, el botón sigue
                   abriendo la lista de conversaciones igual. */}
               {onSwitchConversation && (
-                <button onClick={() => setShowSidebar(true)} aria-label="Tus conversaciones" className="relative shrink-0 w-12 h-12 flex items-center justify-center rounded-2xl backdrop-blur-xl shadow-xl shadow-black/40 transition-all active:scale-95" style={{ backgroundColor: "var(--chat-bar-idle)", border: "1px solid var(--chat-bar-border-idle)", color: "#a5b4fc" }}>
+                <button onClick={() => setShowSidebar(true)} aria-label="Tus conversaciones" className="relative shrink-0 w-12 h-12 flex items-center justify-center rounded-2xl backdrop-blur-xl shadow-xl shadow-black/40 transition-all active:scale-95" style={{ backgroundColor: "var(--chat-bar-idle)", border: "1px solid var(--chat-bar-border-idle)", color: "#5eead4" }}>
                   <MessageCircle size={17} />
                 </button>
               )}
@@ -12689,7 +12816,7 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
                   className="flex-1 bg-transparent px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none min-w-0"
                   disabled={isSending}
                 />
-                <button onClick={handleSend} disabled={!input.trim() || isSending} aria-label="Enviar" className="p-2.5 rounded-xl !text-white shrink-0 disabled:opacity-40 transition-all active:scale-95" style={{ background: "linear-gradient(135deg,#6366F1,#4338CA)" }}>
+                <button onClick={handleSend} disabled={!input.trim() || isSending} aria-label="Enviar" className="p-2.5 rounded-xl !text-white shrink-0 disabled:opacity-40 transition-all active:scale-95" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>
                   <Send size={16} />
                 </button>
               </div>
@@ -12740,7 +12867,7 @@ function AIConversationSidebar({ conversations, activeConversationId, onSelect, 
       <div className="relative w-[82%] max-w-xs h-full flex flex-col shadow-2xl shadow-black/60 bounce-in overflow-hidden backdrop-blur-xl" style={{ background: "var(--glass-panel-bg)", borderRight: "1px solid var(--glass-panel-border)" }} onClick={(e) => e.stopPropagation()}>
         <div className="relative overflow-hidden px-4 pb-4 shrink-0" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 18px)", borderBottom: "1px solid var(--glass-panel-border)", boxShadow: "inset 0 -1px 0 0 rgba(255,255,255,0.04)" }}>
           <div className="relative flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-md shadow-indigo-500/20" style={{ background: "linear-gradient(135deg,#6366F1,#4338CA)" }}>
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-md shadow-teal-500/20" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>
               <List size={16} className="!text-white" />
             </div>
             <div className="flex-1 min-w-0">
@@ -12751,7 +12878,7 @@ function AIConversationSidebar({ conversations, activeConversationId, onSelect, 
           </div>
         </div>
         <div className="px-3 pt-3 shrink-0">
-          <button onClick={onNew} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold !text-white transition active:scale-[0.98] shadow-lg shadow-indigo-500/15" style={{ background: "linear-gradient(135deg,#6366F1,#4338CA)" }}>
+          <button onClick={onNew} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold !text-white transition active:scale-[0.98] shadow-lg shadow-teal-500/15" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>
             <Plus size={15} /> Nueva conversación
           </button>
         </div>
@@ -12764,7 +12891,7 @@ function AIConversationSidebar({ conversations, activeConversationId, onSelect, 
             const lastMsg = (c.messages || []).slice(-1)[0]?.text?.replace(/\s+/g, " ").trim() || "";
             if (renaming) {
               return (
-                <div key={c.id} className="w-full flex items-center gap-2 rounded-xl px-3 py-2" style={{ backgroundColor: "rgba(99,102,241,0.14)", border: "1px solid rgba(99,102,241,0.35)" }}>
+                <div key={c.id} className="w-full flex items-center gap-2 rounded-xl px-3 py-2" style={{ backgroundColor: "rgba(20,184,166,0.14)", border: "1px solid rgba(20,184,166,0.35)" }}>
                   <input
                     autoFocus
                     value={renameDraft}
@@ -12773,23 +12900,23 @@ function AIConversationSidebar({ conversations, activeConversationId, onSelect, 
                     onBlur={commitRename}
                     className="flex-1 min-w-0 bg-transparent text-xs font-bold text-white focus:outline-none"
                   />
-                  <button onClick={commitRename} aria-label="Guardar nombre" className="p-1 rounded-lg text-indigo-400 shrink-0"><Check size={14} /></button>
+                  <button onClick={commitRename} aria-label="Guardar nombre" className="p-1 rounded-lg text-teal-400 shrink-0"><Check size={14} /></button>
                 </div>
               );
             }
             return (
               <button key={c.id} onClick={() => onSelect(c.id)} className="relative w-full flex items-center gap-2.5 rounded-xl pl-3 pr-2 py-2.5 text-left transition active:scale-[0.99] overflow-hidden"
-                style={isActive ? { background: "linear-gradient(135deg, rgba(99,102,241,0.16), rgba(99,102,241,0.05))", border: "1px solid rgba(99,102,241,0.35)" } : { backgroundColor: "var(--row-surface)", border: "1px solid transparent" }}>
-                {isActive && <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-indigo-400" />}
-                <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: isActive ? "rgba(99,102,241,0.2)" : "rgba(148,163,184,0.08)" }}>
-                  <MessageCircle size={12} className={isActive ? "text-indigo-300" : "text-slate-600"} />
+                style={isActive ? { background: "linear-gradient(135deg, rgba(20,184,166,0.16), rgba(20,184,166,0.05))", border: "1px solid rgba(20,184,166,0.35)" } : { backgroundColor: "var(--row-surface)", border: "1px solid transparent" }}>
+                {isActive && <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-teal-400" />}
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: isActive ? "rgba(20,184,166,0.2)" : "rgba(148,163,184,0.08)" }}>
+                  <MessageCircle size={12} className={isActive ? "text-teal-300" : "text-slate-600"} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-bold truncate" style={{ color: isActive ? "#fff" : "#94a3b8" }}>{c.title}</p>
                   <p className="text-[10px] text-slate-600 mt-0.5 truncate">{dateLabel}{lastMsg ? ` · ${lastMsg}` : ""}</p>
                 </div>
                 {onRename && !confirming && (
-                  <span onClick={(e) => { e.stopPropagation(); startRename(c); }} role="button" aria-label="Renombrar conversación" className="p-1.5 rounded-lg text-slate-600 hover:text-indigo-300 transition shrink-0"><Edit3 size={12} /></span>
+                  <span onClick={(e) => { e.stopPropagation(); startRename(c); }} role="button" aria-label="Renombrar conversación" className="p-1.5 rounded-lg text-slate-600 hover:text-teal-300 transition shrink-0"><Edit3 size={12} /></span>
                 )}
                 {onDelete && (
                   confirming ? (
@@ -13584,7 +13711,7 @@ function volumenPorMusculo(routineDef) {
 }
 
 // Cuántas sesiones hiciste con una rutina y cuándo fue la última. Con varias
-// rutinas archivadas, esto es lo que te permite acordarte de cuál era cuál.
+// rutinas guardadas, esto es lo que te permite acordarte de cuál era cuál.
 function usoDeRutina(routineId, sessions) {
   const propias = (sessions || []).filter((s) => s?.routineId === routineId && s?.date);
   if (!propias.length) return { sesiones: 0, ultimaVez: null, diasDesde: null };
@@ -13688,12 +13815,12 @@ function RoutinePreviewModal({ routineDef, routineName, onActivate, onClose, yaA
         className="w-full max-w-md max-h-[86vh] flex flex-col bg-slate-900 border border-slate-700/60 rounded-3xl overflow-hidden modal-pop-in shadow-2xl shadow-black/70"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Encabezado con un halo violeta suave, como el héroe */}
+        {/* Encabezado con un halo celeste suave, como el héroe */}
         <div className="relative px-5 pt-5 pb-4 border-b border-slate-800/60 shrink-0 overflow-hidden">
-          <div className="absolute -top-14 -right-10 w-36 h-36 rounded-full bg-purple-500/15 blur-3xl pointer-events-none" />
+          <div className="absolute -top-14 -right-10 w-36 h-36 rounded-full bg-sky-500/15 blur-3xl pointer-events-none" />
           <div className="relative flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <span className="text-[9px] font-black uppercase tracking-[0.16em] text-purple-400/80">Vista previa</span>
+              <span className="text-[9px] font-black uppercase tracking-[0.16em] text-sky-400/80">Vista previa</span>
               <p className="text-lg font-black text-white leading-tight mt-0.5 truncate">{routineName}</p>
             </div>
             <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition shrink-0">
@@ -13717,13 +13844,13 @@ function RoutinePreviewModal({ routineDef, routineName, onActivate, onClose, yaA
 
         {/* Cuerpo con scroll */}
         <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-4 space-y-4">
-          <div className="rounded-2xl border border-purple-500/15 p-3.5" style={{ backgroundColor: "var(--panel-sunken)" }}>
+          <div className="rounded-2xl border border-sky-500/15 p-3.5" style={{ backgroundColor: "var(--panel-sunken)" }}>
             <BalanceMuscular routineDef={routineDef} />
           </div>
 
           <div>
             <div className="flex items-center gap-2.5 mb-2.5">
-              <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(168,85,247,0.15)", color: "#A855F7" }}>
+              <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(56,189,248,0.15)", color: "#38BDF8" }}>
                 <Calendar size={13} />
               </span>
               <span className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Tus días</span>
@@ -13813,8 +13940,8 @@ function RoutinePreviewModal({ routineDef, routineName, onActivate, onClose, yaA
           ) : (
             <button
               onClick={() => { onActivate?.(); onClose(); }}
-              className="w-full py-3 rounded-2xl text-sm font-black !text-white transition active:scale-[0.98] shadow-lg shadow-purple-500/25 flex items-center justify-center gap-1.5"
-              style={{ background: "linear-gradient(135deg,#A855F7,#7C3AED)" }}
+              className="w-full py-3 rounded-2xl text-sm font-black !text-white transition active:scale-[0.98] shadow-lg shadow-sky-500/25 flex items-center justify-center gap-1.5"
+              style={{ background: "linear-gradient(135deg,#38BDF8,#0284C7)" }}
             >
               <Sparkles size={14} /> Usar esta rutina
             </button>
@@ -13825,7 +13952,7 @@ function RoutinePreviewModal({ routineDef, routineName, onActivate, onClose, yaA
   );
 }
 
-function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRestore, onUpdateProfile, openScheduleSignal = 0, openEditorSignal = 0 }) {
+function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpdateProfile, openScheduleSignal = 0, openEditorSignal = 0 }) {
   const [mode, setMode] = useState("catalog");
   const [showWizard, setShowWizard] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
@@ -13871,12 +13998,10 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
   const [shareTarget, setShareTarget] = useState(null);
   const [pendingActivation, setPendingActivation] = useState(null);
   const [showImport, setShowImport] = useState(false);
-  const [showArchivedRoutines, setShowArchivedRoutines] = useState(false);
   const routines = profile?.routines || {};
   const activeId = profile?.activeRoutineId;
   const activeDef = resolveRoutineDef(routines[activeId], activeId);
-  const customEntries = Object.entries(routines).filter(([, r]) => r.source !== "preset" && !r.archived);
-  const archivedEntries = Object.entries(routines).filter(([, r]) => r.source !== "preset" && r.archived);
+  const customEntries = Object.entries(routines).filter(([, r]) => r.source !== "preset");
 
   const activeStats = useMemo(() => {
     if (!activeDef) return { days: 0, exercises: 0, sets: 0 };
@@ -13957,14 +14082,14 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
     return (
       <div className="space-y-4">
         <div className="text-center pt-2 pb-1">
-          <div className="w-14 h-14 rounded-2xl bg-purple-500/15 flex items-center justify-center mx-auto mb-3"><Calendar className="text-purple-500" size={26} /></div>
+          <div className="w-14 h-14 rounded-2xl bg-sky-500/15 flex items-center justify-center mx-auto mb-3"><Calendar className="text-sky-500" size={26} /></div>
           <h2 className="text-lg font-black text-white">¿Qué días entrenás "{def.name}"?</h2>
           <p className="text-sm text-slate-500 mt-1.5 leading-relaxed px-2">Ya armamos un cronograma por defecto. Lo podés dejar así o cambiarlo.</p>
         </div>
         <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4">
           <WeeklyScheduleEditor dayOrder={def.dayOrder} days={def.days} schedule={def.weekSchedule} onChange={updatePendingScheduleDay} />
         </div>
-        <button onClick={confirmPendingActivation} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl !text-white text-sm font-bold transition-all active:scale-[0.98] shadow-lg shadow-purple-500/20" style={{ background: "linear-gradient(135deg,#A855F7,#7E22CE)" }}><Check size={15} /> Listo, empezar a entrenar</button>
+        <button onClick={confirmPendingActivation} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl !text-white text-sm font-bold transition-all active:scale-[0.98] shadow-lg shadow-sky-500/20" style={{ background: "linear-gradient(135deg,#38BDF8,#0284C7)" }}><Check size={15} /> Listo, empezar a entrenar</button>
       </div>
     );
   }
@@ -14001,7 +14126,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
     <div className="space-y-4">
       {forced && (
         <div className="text-center pt-2 pb-1">
-          <div className="w-14 h-14 rounded-2xl bg-purple-500/15 flex items-center justify-center mx-auto mb-3"><Layers className="text-purple-500" size={26} /></div>
+          <div className="w-14 h-14 rounded-2xl bg-sky-500/15 flex items-center justify-center mx-auto mb-3"><Layers className="text-sky-500" size={26} /></div>
           <h2 className="text-lg font-black text-white">¿Cómo vas a entrenar?</h2>
           <p className="text-sm text-slate-500 mt-1.5 leading-relaxed px-2">Ya armada, creada por vos, o importada. La podés cambiar cuando quieras.</p>
         </div>
@@ -14033,7 +14158,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
                   <ChevronRight size={14} className="text-teal-500 shrink-0" />
                 </button>
                 <button onClick={() => { setEditingRoutineId(null); setMode("builder"); }} className="w-full flex items-center gap-3 rounded-xl border border-slate-700/60 bg-slate-800/40 p-3.5 text-left transition active:scale-[0.98] hover:border-slate-500">
-                  <div className="w-9 h-9 rounded-xl bg-purple-500/15 flex items-center justify-center shrink-0"><Edit3 size={15} className="text-purple-400" /></div>
+                  <div className="w-9 h-9 rounded-xl bg-sky-500/15 flex items-center justify-center shrink-0"><Edit3 size={15} className="text-sky-400" /></div>
                   <div className="flex-1 min-w-0">
                     <p className="text-[13px] font-black text-white">Manualmente</p>
                     <p className="text-[10px] text-slate-500 mt-0.5">Elegí vos cada día, ejercicio y serie</p>
@@ -14045,15 +14170,15 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
           </div>
 
           {/* Opción 2: Preestablecidas */}
-          <button onClick={() => { setShowPresetsForced((s) => !s); setCreateOpen(false); }} className={`relative overflow-hidden w-full rounded-2xl border p-4 text-left transition active:scale-[0.99] ${showPresetsForced ? "border-purple-500/40" : "border-purple-500/25"}`} style={{ background: "var(--grad-hero-purple, linear-gradient(135deg,#1a1025,#0f172a))" }}>
-            <div className="absolute -top-8 -right-8 w-28 h-28 rounded-full bg-purple-500/15 blur-2xl pointer-events-none" />
+          <button onClick={() => { setShowPresetsForced((s) => !s); setCreateOpen(false); }} className={`relative overflow-hidden w-full rounded-2xl border p-4 text-left transition active:scale-[0.99] ${showPresetsForced ? "border-sky-500/40" : "border-sky-500/25"}`} style={{ background: "var(--grad-hero-sky, linear-gradient(135deg,#0c1f2a,#0f172a))" }}>
+            <div className="absolute -top-8 -right-8 w-28 h-28 rounded-full bg-sky-500/15 blur-2xl pointer-events-none" />
             <div className="relative flex items-center gap-3">
-              <div className="w-11 h-11 rounded-2xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center shrink-0"><Layers size={18} className="text-purple-400" /></div>
+              <div className="w-11 h-11 rounded-2xl bg-sky-500/20 border border-sky-500/30 flex items-center justify-center shrink-0"><Layers size={18} className="text-sky-400" /></div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-black text-white">Elegir una preestablecida</p>
-                <p className="text-[11px] text-purple-300/60 mt-0.5">Push/Pull/Legs, Arnold, Upper/Lower y más</p>
+                <p className="text-[11px] text-sky-300/60 mt-0.5">Push/Pull/Legs, Arnold, Upper/Lower y más</p>
               </div>
-              <ChevronDown size={16} className={`text-purple-500 shrink-0 transition-transform ${showPresetsForced ? "rotate-180" : ""}`} />
+              <ChevronDown size={16} className={`text-sky-500 shrink-0 transition-transform ${showPresetsForced ? "rotate-180" : ""}`} />
             </div>
           </button>
 
@@ -14072,15 +14197,15 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
       )}
 
       {!forced && (
-        <div className="relative overflow-hidden rounded-2xl border border-purple-500/20 p-5" style={{ background: "var(--grad-hero-purple)" }}>
-          <div className="absolute -top-8 -right-6 w-32 h-32 rounded-full bg-purple-500/15 blur-2xl pointer-events-none" />
-          <div className="absolute -bottom-6 -left-6 w-28 h-28 rounded-full bg-fuchsia-500/10 blur-2xl pointer-events-none" />
+        <div className="relative overflow-hidden rounded-2xl border border-sky-500/20 p-5" style={{ background: "var(--grad-hero-sky)" }}>
+          <div className="absolute -top-8 -right-6 w-32 h-32 rounded-full bg-sky-500/15 blur-2xl pointer-events-none" />
+          <div className="absolute -bottom-6 -left-6 w-28 h-28 rounded-full bg-cyan-500/10 blur-2xl pointer-events-none" />
           <div className="relative flex items-center gap-2 mb-1">
-            <Layers size={16} className="text-purple-400" />
-            <span className="text-[11px] font-black uppercase tracking-widest text-purple-400">Tu plan de entrenamiento</span>
+            <Layers size={16} className="text-sky-400" />
+            <span className="text-[11px] font-black uppercase tracking-widest text-sky-400">Tu plan de entrenamiento</span>
           </div>
           <h2 className="relative text-xl font-black text-white leading-tight">Rutinas</h2>
-          <p className="relative text-xs text-purple-300/60 mt-1">Elegí cómo entrenar: una rutina ya armada o una creada por vos</p>
+          <p className="relative text-xs text-sky-300/60 mt-1">Elegí cómo entrenar: una rutina ya armada o una creada por vos</p>
         </div>
       )}
 
@@ -14089,21 +14214,21 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
         // Antes era una tarjeta más entre otras. Ahora es lo primero y lo más
         // grande: ves sus días de un vistazo (con su color), y el detalle
         // (balance, cronograma) queda a un toque para no saturar.
-        <div className="relative overflow-hidden rounded-3xl border p-4 shadow-lg shadow-black/25 breathe" style={{ background: "var(--grad-hero-purple)", borderColor: "rgba(168,85,247,0.3)", "--breathe-color": "rgba(168,85,247,0.35)" }}>
-          <div className="absolute -top-12 -right-12 w-40 h-40 rounded-full bg-purple-500/20 blur-3xl pointer-events-none" />
+        <div className="relative overflow-hidden rounded-3xl border p-4 shadow-lg shadow-black/25 breathe" style={{ background: "var(--grad-hero-sky)", borderColor: "rgba(56,189,248,0.3)", "--breathe-color": "rgba(56,189,248,0.35)" }}>
+          <div className="absolute -top-12 -right-12 w-40 h-40 rounded-full bg-sky-500/20 blur-3xl pointer-events-none" />
 
           <div className="relative flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-purple-500/25 text-purple-200 flex items-center justify-center shrink-0 ring-1 ring-inset ring-white/10"><Dumbbell size={18} /></div>
+            <div className="w-11 h-11 rounded-2xl bg-sky-500/25 text-sky-200 flex items-center justify-center shrink-0 ring-1 ring-inset ring-white/10"><Dumbbell size={18} /></div>
             <div className="min-w-0 flex-1">
-              <span className="text-[9px] font-black uppercase tracking-[0.16em] text-purple-300/90">Tu rutina activa</span>
+              <span className="text-[9px] font-black uppercase tracking-[0.16em] text-sky-300/90">Tu rutina activa</span>
               <h3 className="text-[17px] font-black text-white leading-tight truncate">{activeDef.name}</h3>
             </div>
-            <button onClick={() => setShareTarget(activeDef)} aria-label="Compartir rutina activa" className="p-2 rounded-xl text-purple-200 hover:text-white hover:bg-white/10 transition shrink-0"><Share2 size={15} /></button>
+            <button onClick={() => setShareTarget(activeDef)} aria-label="Compartir rutina activa" className="p-2 rounded-xl text-sky-200 hover:text-white hover:bg-white/10 transition shrink-0"><Share2 size={15} /></button>
           </div>
 
           {/* Los números, ahora en grande — antes eran una lineita de texto
               perdida bajo el título. Mismo tratamiento que la vista previa
-              (RoutinePreviewModal), en tono violeta para no romper la paleta
+              (RoutinePreviewModal), en tono celeste para no romper la paleta
               del héroe. */}
           <div className={`relative grid gap-1.5 mt-3.5 ${activeUso.sesiones > 0 ? "grid-cols-4" : "grid-cols-3"}`}>
             {[
@@ -14112,9 +14237,9 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
               { v: activeStats.sets, l: "Series" },
               ...(activeUso.sesiones > 0 ? [{ v: activeUso.sesiones, l: activeUso.sesiones === 1 ? "Sesión" : "Sesiones" }] : []),
             ].map((s) => (
-              <div key={s.l} className="rounded-xl py-2 text-center border border-purple-400/20 bg-black/25">
+              <div key={s.l} className="rounded-xl py-2 text-center border border-sky-400/20 bg-black/25">
                 <p className="text-lg font-black text-white tabular-nums leading-none">{s.v}</p>
-                <p className="text-[8px] text-purple-300/70 mt-1 font-bold uppercase tracking-wide truncate px-0.5">{s.l}</p>
+                <p className="text-[8px] text-sky-300/70 mt-1 font-bold uppercase tracking-wide truncate px-0.5">{s.l}</p>
               </div>
             ))}
           </div>
@@ -14122,8 +14247,8 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
           {/* Los días, a la misma altura que los números de arriba: grilla
               SIMÉTRICA de 2 columnas (si son impares, el último ocupa el
               ancho completo). El color de cada día queda como un puntito
-              discreto — identifica sin romper el violeta del héroe. */}
-          <p className="relative text-[9px] font-black uppercase tracking-[0.14em] text-purple-300/60 mt-3.5 mb-1.5 px-0.5">Tus días</p>
+              discreto — identifica sin romper el celeste del héroe. */}
+          <p className="relative text-[9px] font-black uppercase tracking-[0.14em] text-sky-300/60 mt-3.5 mb-1.5 px-0.5">Tus días</p>
           <div className="relative grid grid-cols-2 gap-1.5">
             {(() => {
               const orden = (activeDef.dayOrder || Object.keys(activeDef.days || {})).filter((dk) => activeDef.days?.[dk]);
@@ -14131,9 +14256,9 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
                 const d = activeDef.days[dk];
                 const ultimoImpar = i === orden.length - 1 && orden.length % 2 === 1;
                 return (
-                  <span key={dk} className={`flex items-center gap-2 px-2.5 py-2.5 rounded-xl text-[11px] font-bold bg-black/25 border border-purple-400/10 min-w-0 ${ultimoImpar ? "col-span-2" : ""}`}>
+                  <span key={dk} className={`flex items-center gap-2 px-2.5 py-2.5 rounded-xl text-[11px] font-bold bg-black/25 border border-sky-400/10 min-w-0 ${ultimoImpar ? "col-span-2" : ""}`}>
                     <span className="flex-1 min-w-0 leading-snug text-slate-200" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{d.label}</span>
-                    <span className="text-purple-300/60 tabular-nums shrink-0 text-[10px]">{d.exercises?.length || 0}</span>
+                    <span className="text-sky-300/60 tabular-nums shrink-0 text-[10px]">{d.exercises?.length || 0}</span>
                   </span>
                 );
               });
@@ -14142,10 +14267,10 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
 
           {/* Acciones: dos botones parejos, sin ruido */}
           <div className="relative grid grid-cols-2 gap-2 mt-3.5">
-            <button onClick={() => setShowBalance((v) => !v)} className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-white/10 text-purple-200 hover:text-white hover:bg-white/5 transition text-[11px] font-bold">
+            <button onClick={() => setShowBalance((v) => !v)} className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-white/10 text-sky-200 hover:text-white hover:bg-white/5 transition text-[11px] font-bold">
               <Activity size={11} /> {showBalance ? "Ocultar" : "Balance"}
             </button>
-            <button ref={scheduleRef} onClick={() => setShowSchedule((s) => !s)} className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-white/10 text-purple-200 hover:text-white hover:bg-white/5 transition text-[11px] font-bold">
+            <button ref={scheduleRef} onClick={() => setShowSchedule((s) => !s)} className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-white/10 text-sky-200 hover:text-white hover:bg-white/5 transition text-[11px] font-bold">
               <Calendar size={11} /> {showSchedule ? "Ocultar" : "Cronograma"}
             </button>
           </div>
@@ -14179,26 +14304,6 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
         </div>
       )}
 
-      {archivedEntries.length > 0 && (
-        <div>
-          {!showArchivedRoutines ? (
-            <button onClick={() => setShowArchivedRoutines(true)} className="text-[11px] text-slate-600 hover:text-slate-400 font-semibold underline">Rutinas archivadas ({archivedEntries.length})</button>
-          ) : (
-            <div>
-              <div className="flex items-center gap-1.5 mb-2"><ListChecks size={13} className="text-slate-500" /><p className="text-xs font-black uppercase tracking-widest text-slate-500">Rutinas archivadas</p></div>
-              <div className="space-y-2">
-                {archivedEntries.map(([id, r]) => (
-                  <div key={id} className="flex items-center gap-3 bg-slate-900/30 border border-slate-800/40 rounded-2xl px-4 py-3">
-                    <p className="text-sm font-semibold text-slate-400 flex-1 min-w-0 truncate">{r.name}</p>
-                    <button onClick={() => onRestore(id)} className="px-3 py-1.5 rounded-lg bg-purple-500/15 text-purple-400 text-xs font-bold shrink-0">Restaurar</button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
       {(!forced || showPresetsForced) && (
       <div className={forced ? "tab-fade-in" : ""}>
         <div className="flex items-center gap-1.5 mb-2"><Sparkles size={13} className="text-slate-500" /><p className="text-xs font-black uppercase tracking-widest text-slate-500">Rutinas preestablecidas</p></div>
@@ -14212,7 +14317,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onRest
 
       {!forced && (
       <div className="flex gap-2">
-        <button onClick={() => { setEditingRoutineId(null); setMode("builder"); }} className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98] shadow-lg shadow-purple-500/20" style={{ background: "linear-gradient(135deg,#A855F7,#7E22CE)" }}><Sparkles size={15} /> Crear mi rutina</button>
+        <button onClick={() => { setEditingRoutineId(null); setMode("builder"); }} className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98] shadow-lg shadow-sky-500/20" style={{ background: "linear-gradient(135deg,#38BDF8,#0284C7)" }}><Sparkles size={15} /> Crear mi rutina</button>
         <button onClick={() => setShowImport(true)} className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition text-sm font-bold active:scale-[0.98]"><Download size={15} /> Importar rutina</button>
       </div>
       )}
@@ -14271,8 +14376,8 @@ const NAV_TABS = [
   { key: "rutina", icon: <Dumbbell size={20} />, label: "Rutina" },
   { key: "progreso", icon: <BarChart3 size={20} />, label: "Progreso" },
   { key: "social", icon: <Users size={20} />, label: "Social", color: SOCIAL_COLOR },
-  { key: "rutinas", icon: <Layers size={20} />, label: "Rutinas" },
-  { key: "entrenador_ia", icon: <Sparkles size={20} />, label: "Entrenador IA", color: AI_COLOR },
+  { key: "rutinas", icon: <Layers size={20} />, label: "Rutinas", color: "#38BDF8" },
+  { key: "entrenador_ia", icon: <Sparkles size={20} />, label: "Chatbot" },
 ];
 
 // Avatar del header móvil: muestra la foto de perfil si existe, con la
@@ -14344,7 +14449,7 @@ function SideNav({ tab, setTab, profileName }) {
   );
 }
 
-const TAB_TITLES = { rutinas: "Rutinas", rutina: "Rutina", progreso: "Progreso", descarga: "Descarga", perfil: "Perfil", entrenador_ia: "Entrenador IA", social: "Social" };
+const TAB_TITLES = { rutinas: "Rutinas", rutina: "Rutina", progreso: "Progreso", descarga: "Descarga", perfil: "Perfil", entrenador_ia: "Chatbot", social: "Social" };
 // Pestañas "secundarias" (se entra desde otra, no desde la barra de abajo)
 // y a cuál vuelve el botón "atrás" del header en cada una. Social pasó a
 // ser una pestaña principal (barra de navegación, entre Progreso y
@@ -15315,30 +15420,17 @@ export default function App() {
       return np;
     });
   };
-  // Antes esto borraba la rutina para siempre. Ahora, igual que con los
-  // perfiles, "quitar" una rutina creada por vos sólo la archiva — sigue
-  // ahí, con todos sus ejercicios, lista para recuperarla desde "Rutinas
-  // archivadas" en Rutinas. Si era la activa, te deja sin rutina activa
-  // (la pantalla de Rutinas se va a encargar de pedirte otra).
-  const handleArchiveRoutine = (routineId) => {
+  // "Quitar" una rutina creada por vos la borra para siempre (sin paso
+  // intermedio de archivo/restaurar). Si era la activa, te deja sin rutina
+  // activa (la pantalla de Rutinas se va a encargar de pedirte otra).
+  const handleDeleteRoutine = (routineId) => {
     setProfiles((prev) => {
       const p = prev[activeProfile];
       if (!p) return prev;
       const newRoutines = { ...(p.routines || {}) };
-      if (newRoutines[routineId]) newRoutines[routineId] = { ...newRoutines[routineId], archived: true };
+      delete newRoutines[routineId];
       const newActive = p.activeRoutineId === routineId ? null : p.activeRoutineId;
       const np = { ...prev, [activeProfile]: { ...p, routines: newRoutines, activeRoutineId: newActive } };
-      saveProfiles(np);
-      return np;
-    });
-  };
-  const handleRestoreRoutine = (routineId) => {
-    setProfiles((prev) => {
-      const p = prev[activeProfile];
-      if (!p) return prev;
-      const newRoutines = { ...(p.routines || {}) };
-      if (newRoutines[routineId]) newRoutines[routineId] = { ...newRoutines[routineId], archived: false };
-      const np = { ...prev, [activeProfile]: { ...p, routines: newRoutines } };
       saveProfiles(np);
       return np;
     });
@@ -15536,7 +15628,7 @@ export default function App() {
           <div className="flex justify-end mb-2">
             <button onClick={handleSignOut} className="text-[11px] text-slate-600 hover:text-slate-400 font-semibold flex items-center gap-1"><LogOut size={11} /> Cerrar sesión</button>
           </div>
-          <RoutinesView profile={profile} forced onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleArchiveRoutine} onRestore={handleRestoreRoutine} onUpdateProfile={handleUpdateProfile} />
+          <RoutinesView profile={profile} forced onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleDeleteRoutine} onUpdateProfile={handleUpdateProfile} />
         </div>
       </div>
       {importRoutine && <SharedRoutineImportModal routine={importRoutine} onImport={handleImportSharedRoutine} onDiscard={() => setImportRoutine(null)} />}
@@ -15591,7 +15683,7 @@ export default function App() {
         </header>
         <main className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto px-4 py-4 pb-28 lg:pb-10 space-y-4" style={{ paddingBottom: "calc(7rem + env(safe-area-inset-bottom, 0px))" }}>
           <div key={tab} className={tabSlideClass}>
-            {tab === "rutinas" && <RoutinesView openScheduleSignal={openSectionSignal.id === "week-schedule" ? openSectionSignal.n : 0} openEditorSignal={openSectionSignal.id === "routine-editor" ? openSectionSignal.n : 0} profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleArchiveRoutine} onRestore={handleRestoreRoutine} onUpdateProfile={handleUpdateProfile} />}
+            {tab === "rutinas" && <RoutinesView openScheduleSignal={openSectionSignal.id === "week-schedule" ? openSectionSignal.n : 0} openEditorSignal={openSectionSignal.id === "routine-editor" ? openSectionSignal.n : 0} profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleDeleteRoutine} onUpdateProfile={handleUpdateProfile} />}
             {tab === "rutina" && !showPinnedDeload && <OnboardingTasksCard profile={profile} cycleStart={cycleStart} logs={logs} onGoToProfile={() => setTab("perfil")} onOpenFieldSettings={() => setShowFieldIntro(true)} onDone={() => handleUpdateProfile({ onboardingDone: true })} />}
             {/* Semana de descarga: se muestra fija acá mismo, en vez del
                 entrenamiento normal, con un botón para cerrarla (ver
@@ -15603,7 +15695,7 @@ export default function App() {
             {tab === "rutina" && !showPinnedDeload && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToRoutines={() => setTab("rutinas")} onGoToSchedule={() => goToSection("rutinas", "week-schedule")} onGoToFieldSettings={() => goToSection("perfil", "field-settings-section")} onGoToDescarga={() => (isDeloadWeek ? setDeloadDismissed(false) : setTab("descarga"))} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} todaySessionDayKey={(profile?.trainingSessions || []).find((ts) => ts.date === todayStr())?.dayKey || profile?.activeSession?.dayKey || null} sex={profile?.sex} age={profile?.age} />}
             {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} onGoToRoutines={() => goToSection("rutinas", "routine-editor")} weekSchedule={weekSchedule} sex={profile?.sex} age={profile?.age} onGoToDeload={() => { setDeloadDismissed(false); setTab("rutina"); }} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} />}
             {tab === "descarga" && <DeloadView logs={logs} setLogs={setLogs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} activeSession={profile?.activeSession?.deload ? profile.activeSession : null} onStartSession={handleStartSession} onCancelSession={handleCancelSession} weekSchedule={weekSchedule} onClose={() => { setDeloadDismissed(true); setTab("rutina"); }} cycleStart={cycleStart} />}
-            {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} setLogs={setLogs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} conversations={aiConversations} activeConversationId={activeAiConversationId} onNewConversation={handleNewAiConversation} onSwitchConversation={handleSwitchAiConversation} onDeleteConversation={handleDeleteAiConversation} onRenameConversation={handleRenameAiConversation} settings={getProfileSettings(profile)} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} onArchiveRoutine={handleArchiveRoutine} onRestoreRoutine={handleRestoreRoutine} onNavigate={setTab} onStartSession={handleStartSession} onEndSession={handleEndSession} />}
+            {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} setLogs={setLogs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} conversations={aiConversations} activeConversationId={activeAiConversationId} onNewConversation={handleNewAiConversation} onSwitchConversation={handleSwitchAiConversation} onDeleteConversation={handleDeleteAiConversation} onRenameConversation={handleRenameAiConversation} settings={getProfileSettings(profile)} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} onDeleteRoutine={handleDeleteRoutine} onNavigate={setTab} onStartSession={handleStartSession} onEndSession={handleEndSession} />}
             {tab === "perfil" && <ProfileView onOpenFieldPreview={() => setShowFieldIntro(true)} openSectionSignal={openSectionSignal} profileName={activeProfile} profiles={profiles} logs={logs} onSignOut={handleSignOut} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} onGoToSocial={() => setTab("social")} />}
             {tab === "social" && <SocialView profile={profile} uid={profile?.googleUid} onActivateRoutine={handleActivateRoutine} />}
           </div>

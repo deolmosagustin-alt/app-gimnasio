@@ -21,10 +21,17 @@
  * llegan al usuario ahora explican QUÉ pasó de verdad.
  */
 
+// Se agregaron variantes "-lite" (más baratas en cuota, buen respaldo si
+// las versiones normales están agotadas) y "-001"/"-002" (nombres fijos de
+// versión, que Google no reasigna) además de los alias — más candidatos
+// en la cadena significa más chances de que ALGUNO siga vigente, sobre
+// todo si Google retira alias viejos con el tiempo.
 const MODEL_CHAIN = [
   "gemini-flash-latest",
   "gemini-2.5-flash",
+  "gemini-2.5-flash-lite",
   "gemini-2.0-flash",
+  "gemini-2.0-flash-lite",
   "gemini-1.5-flash",
 ];
 
@@ -115,17 +122,36 @@ async function callGemini(body) {
     : MODEL_CHAIN;
   const deadline = Date.now() + TOTAL_TIME_BUDGET_MS;
 
-  let lastStatus = null, lastDetail, ranOutOfTime = false;
-  for (const model of chain) {
+  // BUG FIX (diagnóstico): antes el mensaje final sólo miraba el status del
+  // ÚLTIMO modelo probado — si los primeros 3 modelos daban 429 (cuota
+  // agotada) pero el ÚLTIMO de la cadena ya no existe más y da 404, el
+  // usuario veía el mensaje genérico ("no disponible") en vez de enterarse
+  // de que el problema real era la cuota. Ahora se recuerda si CUALQUIER
+  // intento dio 429, sin importar cuál fue el último.
+  let lastStatus = null, lastDetail, ranOutOfTime = false, sawQuotaExhausted = false;
+  for (let i = 0; i < chain.length; i++) {
+    const model = chain[i];
     const remaining = deadline - Date.now();
     // Sin tiempo útil para otro intento: cortar ACÁ con un error prolijo
     // en vez de arrancar un pedido que casi seguro Vercel va a interrumpir
     // a la fuerza antes de que responda (eso es lo que el cliente vería
     // como un corte de conexión crudo, sin mensaje).
     if (remaining < MIN_USEFUL_ATTEMPT_MS) { ranOutOfTime = true; break; }
+    // BUG FIX (diagnóstico en producción): medido en vivo, el primer
+    // modelo de la cadena a veces no devuelve NI ERROR NI RESPUESTA — se
+    // queda colgado hasta el timeout completo (~50s) incluso con un
+    // pedido trivial ("hola"), lo que se comía TODO el presupuesto y
+    // dejaba a los otros 5 modelos de respaldo sin ninguna chance real
+    // (el bucle cortaba por falta de tiempo antes de probar el segundo).
+    // Al primer intento se le da un plazo corto para detectar ese
+    // "colgado" rápido y saltar de modelo; de ahí en adelante, ya se
+    // sabe que colgarse entero es real, así que a los siguientes se les
+    // da el presupuesto que quede completo (una rutina grande legítima
+    // puede tardar 30-50s en generarse).
+    const timeoutMs = i === 0 ? Math.min(12000, remaining) : Math.min(50000, remaining);
     let response;
     try {
-      response = await callModel(model, body, apiKey, Math.min(50000, remaining));
+      response = await callModel(model, body, apiKey, timeoutMs);
     } catch (netErr) {
       // Timeout o corte de red hacia Google: probar el siguiente modelo.
       lastStatus = 0; lastDetail = String(netErr?.message || netErr);
@@ -137,6 +163,7 @@ async function callGemini(body) {
       return response.json();
     }
     lastStatus = response.status;
+    if (lastStatus === 429) sawQuotaExhausted = true;
     lastDetail = await response.text().catch(() => "");
     console.error(`[ia] ${model} devolvió ${lastStatus}:`, lastDetail.slice(0, 300));
     // 404 = el alias ya no existe · 429 = cuota agotada de ESE modelo ·
@@ -147,10 +174,17 @@ async function callGemini(body) {
 
   const e = new Error(ranOutOfTime ? "Se agotó el tiempo disponible probando modelos" : `Todos los modelos fallaron (último: ${lastStatus})`);
   if (ranOutOfTime) e.userMessage = "La IA está respondiendo lento ahora mismo. Probá de nuevo en un momento.";
-  else if (lastStatus === 429) e.userMessage = "La IA alcanzó el límite de uso gratuito por hoy. Probá de nuevo en un rato o mañana.";
-  else if (lastStatus === 401 || lastStatus === 403) e.userMessage = "La clave de la IA no es válida o no tiene permisos (revisá GEMINI_API_KEY en Vercel).";
+  else if (sawQuotaExhausted) e.userMessage = "La IA alcanzó el límite de uso gratuito por hoy. Probá de nuevo en un rato o mañana.";
+  // Google devuelve 400 (no sólo 401/403) cuando la API key es inválida o
+  // le falta habilitar la API de Gemini en el proyecto de Google Cloud —
+  // antes esto cliaba directo al mensaje genérico, sin pistas de qué mirar.
+  else if (lastStatus === 400 || lastStatus === 401 || lastStatus === 403) e.userMessage = "La clave de la IA no es válida, no tiene permisos, o el pedido está mal formado (revisá GEMINI_API_KEY en Vercel y que la API de Gemini esté habilitada en ese proyecto de Google Cloud).";
   else if (lastStatus === 0) e.userMessage = "No se pudo conectar con la IA (timeout). Probá de nuevo.";
-  else e.userMessage = "La IA no está disponible en este momento. Probá de nuevo en unos minutos.";
+  // Incluye el código real: antes era imposible saber, desde afuera, si el
+  // problema era un modelo dado de baja (404), sobrecarga (503) u otra
+  // cosa — con el código a la vista alcanza para buscarlo en los logs de
+  // la función en Vercel sin tener que instrumentar nada de nuevo.
+  else e.userMessage = `La IA no está disponible en este momento (código ${lastStatus}). Probá de nuevo en unos minutos.`;
   throw e;
 }
 
