@@ -12,7 +12,7 @@ import {
   Target, Award, Activity, ArrowDown, HelpCircle, List, LayoutGrid,
   Sparkles, Layers, SlidersHorizontal, UserCog,
   Share2, Download, Link2, Copy, BellOff, Send, Mic, Ruler, Camera, Link, Footprints, Star, SquarePlay, Upload, RefreshCw, Timer, Percent, Users,
-  MessageCircle, FileDown, Search, UserPlus, UserCheck, AtSign, GraduationCap, ClipboardCheck,
+  MessageCircle, FileDown, Search, UserPlus, UserCheck, AtSign, GraduationCap, ClipboardCheck, Swords, Medal, QrCode, ArrowUpDown,
 } from "lucide-react";
 import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signOut, onAuthStateChanged } from "firebase/auth";
 import { Capacitor, registerPlugin } from "@capacitor/core";
@@ -2565,6 +2565,61 @@ function drawMuscleRankShareCard(ctx, W, H, { ranks, modeLabel, accent = "#F59E0
   ctx.font = `700 ${Math.round(W * 0.030)}px sans-serif`;
   ctx.fillText("De frente", startX + bodyW / 2, labelY);
   ctx.fillText("De espalda", startX + bodyW + gap + bodyW / 2, labelY);
+
+  drawWordmark(ctx, W, H, accent);
+}
+
+// Tarjeta "invitación" para que te agreguen — sin esto, la ÚNICA forma de
+// que alguien llegue a tu perfil era que ya conociera tu @usuario exacto
+// de antemano. Pensada para mandarla por WhatsApp/Instagram: nombre,
+// @usuario grande (lo que la otra persona necesita escribir en "Buscar")
+// y tu mejor rango como gancho, si tenés uno.
+function drawSocialProfileShareCard(ctx, W, H, { name, username, topRank, avatarInitial }) {
+  const accent = topRank?.color || "#A855F7";
+  drawShareCardBase(ctx, W, H, accent, "#38BDF8");
+  ctx.textAlign = "center";
+
+  ctx.fillStyle = tint(accent, "cc"); ctx.font = `800 ${Math.round(W * 0.052)}px sans-serif`;
+  ctx.fillText("AGREGAME EN", W / 2, Math.round(H * 0.13));
+  ctx.font = `800 ${Math.round(W * 0.09)}px sans-serif`;
+  ctx.fillStyle = "#f8fafc";
+  ctx.fillText("MODUS FIT", W / 2, Math.round(H * 0.205));
+
+  // Avatar circular con la inicial — mismo criterio que el resto de la
+  // app cuando no hay foto: un círculo con degradé y la inicial en blanco.
+  const avatarR = Math.round(W * 0.17), avatarCy = Math.round(H * 0.36);
+  const gAv = ctx.createLinearGradient(W / 2 - avatarR, avatarCy - avatarR, W / 2 + avatarR, avatarCy + avatarR);
+  gAv.addColorStop(0, tint(accent, "cc")); gAv.addColorStop(1, tint(accent, "70"));
+  ctx.fillStyle = gAv;
+  ctx.beginPath(); ctx.arc(W / 2, avatarCy, avatarR, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = "#ffffff"; ctx.font = `800 ${Math.round(avatarR * 1.1)}px sans-serif`;
+  ctx.fillText((avatarInitial || "?").toUpperCase(), W / 2, avatarCy + avatarR * 0.38);
+
+  ctx.fillStyle = "#f8fafc"; ctx.font = `800 ${Math.round(W * 0.06)}px sans-serif`;
+  ctx.fillText(name || "Alguien", W / 2, Math.round(H * 0.505));
+
+  // @usuario — lo más grande de la tarjeta después del nombre de la app:
+  // es literalmente el dato que la otra persona tiene que escribir.
+  const chipY = Math.round(H * 0.545), chipH = Math.round(H * 0.075);
+  ctx.font = `700 ${Math.round(W * 0.058)}px sans-serif`;
+  const chipText = `@${username || "usuario"}`;
+  const chipW = ctx.measureText(chipText).width + W * 0.09;
+  ctx.fillStyle = tint(accent, "1c");
+  canvasRoundRect(ctx, W / 2 - chipW / 2, chipY, chipW, chipH, chipH / 2); ctx.fill();
+  ctx.strokeStyle = tint(accent, "50"); ctx.lineWidth = 2;
+  canvasRoundRect(ctx, W / 2 - chipW / 2, chipY, chipW, chipH, chipH / 2); ctx.stroke();
+  ctx.fillStyle = accent;
+  ctx.fillText(chipText, W / 2, chipY + chipH * 0.68);
+
+  if (topRank) {
+    ctx.fillStyle = "#64748b"; ctx.font = `600 ${Math.round(W * 0.032)}px sans-serif`;
+    ctx.fillText(`Mejor rango · ${topRank.label}`, W / 2, Math.round(H * 0.70));
+    ctx.fillStyle = topRank.color; ctx.font = `800 ${Math.round(W * 0.075)}px sans-serif`;
+    ctx.fillText(`${topRank.tier} ${topRank.sub}`, W / 2, Math.round(H * 0.755));
+  }
+
+  ctx.fillStyle = "#64748b"; ctx.font = `600 ${Math.round(W * 0.034)}px sans-serif`;
+  ctx.fillText("Buscame por mi @usuario en la pestaña Social", W / 2, Math.round(H * 0.885));
 
   drawWordmark(ctx, W, H, accent);
 }
@@ -9490,8 +9545,8 @@ function PublicUserCard({ uid, basic, onClick = null, children }) {
               Viene precalculado en public/basic (ver computeTopRank en
               App.jsx), no hace falta leer el historial completo acá. */}
           {basic?.topRank && (
-            <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md shrink-0" style={{ backgroundColor: tint(basic.topRank.color, "22"), color: basic.topRank.color }}>
-              {basic.topRank.tier} {basic.topRank.sub}
+            <span className="inline-flex items-center gap-0.5 text-[9px] font-black px-1.5 py-0.5 rounded-md shrink-0" style={{ backgroundColor: tint(basic.topRank.color, "22"), color: basic.topRank.color }}>
+              <Medal size={9} className="shrink-0" />{basic.topRank.tier} {basic.topRank.sub}
             </span>
           )}
         </p>
@@ -9775,6 +9830,64 @@ function FriendMuscleRankSummary({ logs, settings, sex, age }) {
   );
 }
 
+// Compara tu rango con el de un amigo/alumno, músculo por músculo — cada
+// persona usa su PROPIO modo ("relativo" a su peso corporal si lo cargó,
+// "general" si no), el mismo criterio con el que cada quien ve su rango
+// en su propia pestaña Progreso: no hace falta forzar el mismo modo para
+// los dos, porque el TIER (bronce/plata/oro/...) es la misma escala
+// ordinal sin importar de qué modo salió.
+function buildRankComparison(myLogs, mySettings, mySex, myAge, theirLogs, theirSettings, theirSex, theirAge) {
+  const myBW = mySettings?.bodyWeightKg || 0, theirBW = theirSettings?.bodyWeightKg || 0;
+  const myMode = myBW > 0 ? "relative" : "general", theirMode = theirBW > 0 ? "relative" : "general";
+  return MUSCLE_GROUPS.map((g) => {
+    const my1RM = getBest1RMForMuscleGroup(g.key, myLogs || {}, null);
+    const their1RM = getBest1RMForMuscleGroup(g.key, theirLogs || {}, null);
+    const mine = my1RM.best1RM > 0 ? getMuscleRank(g.key, my1RM.best1RM, myMode, myBW, mySex, myAge) : null;
+    const theirs = their1RM.best1RM > 0 ? getMuscleRank(g.key, their1RM.best1RM, theirMode, theirBW, theirSex, theirAge) : null;
+    return { key: g.key, label: g.label, mine, theirs, myKg: my1RM.bestKg, myReps: my1RM.bestReps, theirKg: their1RM.bestKg, theirReps: their1RM.bestReps };
+  }).filter((r) => r.mine || r.theirs);
+}
+
+// Tarjeta "VOS vs ELLOS" por músculo — con un resumen arriba de en
+// cuántos vas adelante, para que se sienta como un picadito, no una
+// planilla de números.
+function RankComparisonList({ comparison, theirName }) {
+  const iWinCount = comparison.filter((r) => (r.mine?.levelIdx ?? -1) > (r.theirs?.levelIdx ?? -1)).length;
+  const theyWinCount = comparison.filter((r) => (r.theirs?.levelIdx ?? -1) > (r.mine?.levelIdx ?? -1)).length;
+  const tieCount = comparison.length - iWinCount - theyWinCount;
+  return (
+    <div className="space-y-2.5">
+      <div className="flex items-center justify-center gap-4 rounded-2xl border border-slate-800/50 bg-slate-900/50 py-3">
+        <div className="text-center"><p className="text-lg font-black text-teal-400">{iWinCount}</p><p className="text-[9px] text-slate-500 uppercase font-bold">Ganás</p></div>
+        <div className="w-px h-8 bg-slate-800" />
+        <div className="text-center"><p className="text-lg font-black text-slate-500">{tieCount}</p><p className="text-[9px] text-slate-600 uppercase font-bold">Empate</p></div>
+        <div className="w-px h-8 bg-slate-800" />
+        <div className="text-center"><p className="text-lg font-black text-sky-400">{theyWinCount}</p><p className="text-[9px] text-slate-500 uppercase font-bold">{theirName}</p></div>
+      </div>
+      {comparison.map((r) => {
+        const myLvl = r.mine?.levelIdx ?? -1, theirLvl = r.theirs?.levelIdx ?? -1;
+        const iWin = myLvl > theirLvl, theyWin = theirLvl > myLvl;
+        return (
+          <div key={r.key} className="rounded-xl border border-slate-800/50 bg-slate-900/40 px-3 py-2.5">
+            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wide mb-1.5 text-center">{r.label}</p>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 text-center rounded-lg py-1.5" style={{ backgroundColor: r.mine ? tint(r.mine.color, iWin ? "22" : "10") : "transparent", boxShadow: iWin ? `inset 0 0 0 1px ${tint(r.mine.color, "55")}` : "none" }}>
+                <p className="text-[9px] text-slate-600">Vos</p>
+                <p className="text-xs font-black" style={{ color: r.mine?.color || "#475569" }}>{r.mine ? `${r.mine.tier} ${r.mine.sub}` : "Sin marca"}</p>
+              </div>
+              <span className="text-[9px] text-slate-700 font-black shrink-0">VS</span>
+              <div className="flex-1 text-center rounded-lg py-1.5" style={{ backgroundColor: r.theirs ? tint(r.theirs.color, theyWin ? "22" : "10") : "transparent", boxShadow: theyWin ? `inset 0 0 0 1px ${tint(r.theirs.color, "55")}` : "none" }}>
+                <p className="text-[9px] text-slate-600 truncate px-1">{theirName}</p>
+                <p className="text-xs font-black" style={{ color: r.theirs?.color || "#475569" }}>{r.theirs ? `${r.theirs.tier} ${r.theirs.sub}` : "Sin marca"}</p>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // Sesiones formales (Iniciar/Finalizar sesión) de un amigo/alumno — a
 // diferencia de SessionHistoryView (propia), esto NO puede usar
 // buildSessionsIndex/ROUTINE globales: esas variables reflejan SIEMPRE la
@@ -10007,6 +10120,7 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
   const [showComposer, setShowComposer] = useState(false);
   const [showProgressionComposer, setShowProgressionComposer] = useState(false);
   const [sentNote, setSentNote] = useState(false);
+  const [comparing, setComparing] = useState(false);
 
   // Sin setState("loading") acá: el llamador monta este componente con
   // key={uid} (ver SocialView), así que cambiar de persona lo REMONTA
@@ -10064,10 +10178,25 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
 
           {/* El rango va primero (después de racha/semana): es lo que más
               importa de un vistazo, tanto para un amigo ("¿qué tal viene?")
-              como para un entrenador chequeando a su alumno. */}
+              como para un entrenador chequeando a su alumno. El toggle
+              "Comparar conmigo" reusa datos que YA tenemos en el cliente
+              (viewerProfile, tu propio perfil) — no hace falta pedirle
+              nada nuevo a Firestore para armar el picadito. */}
           <div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 px-1 mb-2">Rango por músculo</p>
-            <FriendMuscleRankSummary logs={full.logs} settings={full.settings} sex={full.sex} age={full.age} />
+            <div className="flex items-center justify-between mb-2 px-1">
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-600">{comparing ? `Vos vs ${basic?.name || "esta persona"}` : "Rango por músculo"}</p>
+              <button onClick={() => setComparing((c) => !c)} className={`flex items-center gap-1 text-[10.5px] font-bold px-2.5 py-1 rounded-full transition ${comparing ? "bg-teal-500/20 text-teal-400" : "text-slate-500 hover:text-slate-300"}`}>
+                <Swords size={11} /> {comparing ? "Ocultar" : "Comparar conmigo"}
+              </button>
+            </div>
+            {comparing ? (
+              <RankComparisonList
+                comparison={buildRankComparison(viewerProfile?.logs, getProfileSettings(viewerProfile), viewerProfile?.sex, viewerProfile?.age, full.logs, full.settings, full.sex, full.age)}
+                theirName={basic?.name || "Ellos"}
+              />
+            ) : (
+              <FriendMuscleRankSummary logs={full.logs} settings={full.settings} sex={full.sex} age={full.age} />
+            )}
           </div>
 
           {isTrainerOfThisPerson && (
@@ -10148,7 +10277,7 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
 // alguien de una lista se muestra FriendProfileView en vez de navegar a
 // otra pestaña — mismo criterio "estado interno, no más tabs" que ya usa
 // RoutinesView/DeloadView para sus propias sub-pantallas.
-function SocialView({ profile, uid, onActivateRoutine }) {
+function SocialView({ profile, profileName, uid, onActivateRoutine }) {
   const [section, setSection] = useState("amigos"); // amigos | buscar | entrenador
   const [viewingUid, setViewingUid] = useState(null);
   const [viewingAsTrainer, setViewingAsTrainer] = useState(false);
@@ -10159,6 +10288,7 @@ function SocialView({ profile, uid, onActivateRoutine }) {
   const [proposals, setProposals] = useState([]);
   const [sentProposals, setSentProposals] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [friendSort, setFriendSort] = useState("recientes"); // recientes | nombre | rango
 
   // Sin setLoading(true) síncrono acá a propósito: el estado ya arranca en
   // `true` (useState(true) arriba), y las llamadas a refresh() DESPUÉS del
@@ -10200,12 +10330,37 @@ function SocialView({ profile, uid, onActivateRoutine }) {
   }, [friendships, trainerAsTrainer, trainerAsStudent, proposals, sentProposals]);
   const basics = useUserBasics(allUids);
 
+  // Orden de la lista de amigos — "recientes" (default, más nuevo primero)
+  // usa la fecha de la amistad, que ya viene en el documento; "rango" usa
+  // el índice del tier dentro de RANK_TIERS como escala ordinal (Bronce I
+  // = 0 ... Maestro III = 17), el mismo campo que ya calcula
+  // computeTopRank y que viaja en public/basic (basic.topRank).
+  const rankOrdinal = (b) => {
+    if (!b?.topRank) return -1;
+    return RANK_TIERS.findIndex((t) => t.tier === b.topRank.tier && t.sub === b.topRank.sub);
+  };
+  const sortedFriendAccepted = useMemo(() => {
+    const arr = [...friendAccepted];
+    if (friendSort === "nombre") {
+      arr.sort((a, b) => (basics[otherUidOf(a)]?.name || "").localeCompare(basics[otherUidOf(b)]?.name || ""));
+    } else if (friendSort === "rango") {
+      arr.sort((a, b) => rankOrdinal(basics[otherUidOf(b)]) - rankOrdinal(basics[otherUidOf(a)]));
+    } else {
+      arr.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+    }
+    return arr;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [friendAccepted, friendSort, basics]);
+
   const friendStatus = (otherUid) => {
     const f = friendships.find((x) => x.users.includes(otherUid));
     if (!f) return null;
     if (f.status === "accepted") return "accepted";
     return f.requestedBy === uid ? "pending_sent" : "pending_received";
   };
+
+  const [showShareProfile, setShowShareProfile] = useState(false);
+  const myTopRank = useMemo(() => computeTopRank(profile), [profile]);
 
   const doSendFriendRequest = async (otherUid) => { await sendFriendRequest(uid, otherUid); refresh(); };
   const doRespondFriend = async (otherUid, accept) => { await respondToFriendRequest(uid, otherUid, accept); refresh(); };
@@ -10255,7 +10410,27 @@ function SocialView({ profile, uid, onActivateRoutine }) {
 
       <div key={section} className="tab-fade-in space-y-3">
         {section === "buscar" && (
-          <SocialSearchSection myUid={uid} friendStatus={friendStatus} onSendFriendRequest={doSendFriendRequest} />
+          <>
+            {/* Antes la ÚNICA forma de que alguien te agregara era que ya
+                supiera tu @usuario exacto — no había ningún empujón para
+                que la gente SE ENTERE de que existís acá. Esta tarjeta
+                genera una imagen lista para mandar por WhatsApp/Instagram
+                con tu @usuario grande, así conseguir el primer amigo no
+                depende de decírselo de palabra. */}
+            {profile?.username ? (
+              <button onClick={() => setShowShareProfile(true)} className="w-full flex items-center gap-3 rounded-2xl border border-sky-500/25 bg-sky-500/5 px-4 py-3.5 text-left transition active:scale-[0.98] hover:border-sky-500/40">
+                <div className="w-9 h-9 rounded-xl bg-sky-500/15 border border-sky-500/25 flex items-center justify-center shrink-0 text-sky-400"><QrCode size={16} /></div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-white">Compartir mi perfil</p>
+                  <p className="text-[11px] text-slate-500">Una tarjeta con tu @usuario para que te agreguen</p>
+                </div>
+                <Share2 size={15} className="text-slate-600 shrink-0" />
+              </button>
+            ) : (
+              <p className="text-[11px] text-slate-600 px-1">Elegí un @usuario en Perfil para que te puedan buscar y para poder compartir tu perfil.</p>
+            )}
+            <SocialSearchSection myUid={uid} friendStatus={friendStatus} onSendFriendRequest={doSendFriendRequest} />
+          </>
         )}
 
         {section === "amigos" && (
@@ -10285,13 +10460,27 @@ function SocialView({ profile, uid, onActivateRoutine }) {
                 </div>
               )}
               <div className="space-y-2">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 px-1">{friendAccepted.length > 0 ? `${friendAccepted.length} ${friendAccepted.length === 1 ? "amigo" : "amigos"}` : "Amigos"}</p>
+                <div className="flex items-center justify-between px-1">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-600">{friendAccepted.length > 0 ? `${friendAccepted.length} ${friendAccepted.length === 1 ? "amigo" : "amigos"}` : "Amigos"}</p>
+                  {friendAccepted.length > 1 && (
+                    <div className="flex items-center gap-1 text-slate-600">
+                      <ArrowUpDown size={10} />
+                      <select value={friendSort} onChange={(e) => setFriendSort(e.target.value)} className="bg-transparent text-[10px] font-bold text-slate-500 focus:outline-none">
+                        <option value="recientes">Recientes</option>
+                        <option value="nombre">Nombre</option>
+                        <option value="rango">Rango</option>
+                      </select>
+                    </div>
+                  )}
+                </div>
                 {friendAccepted.length === 0 ? (
                   <div className="text-center py-8 text-slate-600"><Users size={28} className="mx-auto mb-2.5 opacity-30" /><p className="text-sm">Todavía no tenés amigos agregados.</p><p className="text-xs mt-1 text-slate-700">Buscalos por su @usuario en "Buscar".</p></div>
-                ) : friendAccepted.map((f) => { const other = otherUidOf(f); return (
-                  <PublicUserCard key={f.id} uid={other} basic={basics[other]} onClick={() => setViewingUid(other)}>
-                    <ChevronRight size={15} className="text-slate-600 shrink-0" />
-                  </PublicUserCard>
+                ) : sortedFriendAccepted.map((f, i) => { const other = otherUidOf(f); return (
+                  <div key={f.id} className="stagger-item" style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}>
+                    <PublicUserCard uid={other} basic={basics[other]} onClick={() => setViewingUid(other)}>
+                      <ChevronRight size={15} className="text-slate-600 shrink-0" />
+                    </PublicUserCard>
+                  </div>
                 ); })}
               </div>
             </>
@@ -10332,6 +10521,17 @@ function SocialView({ profile, uid, onActivateRoutine }) {
           />
         )}
       </div>
+
+      {showShareProfile && (
+        <ShareImageModal
+          title="Compartí tu perfil"
+          fileNamePrefix="mi-perfil-modus-fit"
+          shareTitle="Modus Fit"
+          shareText={`Agregame en Modus Fit, buscame como @${profile?.username}`}
+          draw={(ctx, W, H) => drawSocialProfileShareCard(ctx, W, H, { name: profileName, username: profile?.username, topRank: myTopRank, avatarInitial: (profileName || profile?.username || "?").charAt(0) })}
+          onClose={() => setShowShareProfile(false)}
+        />
+      )}
     </div>
   );
 }
@@ -11571,6 +11771,50 @@ function buildActionPlan(action, ctx) {
       confirm: () => onLogSet((prev) => ({ ...prev, [prKey]: { kg, reps, date: todayStr(), manual: true } })),
     };
   }
+  // Cargar metas de peso×reps por semana para una serie puntual de un
+  // ejercicio de la rutina ACTIVA — el mismo mecanismo de "rutina
+  // planificada" que ya usan ProgressionProposalComposer (a mano, propia o
+  // de tu entrenador) y aplicar_progresion. Acá la IA arma la propuesta
+  // completa (todas las semanas del ciclo) a partir de lo que la persona
+  // le pida ("armame una progresión de press banca del 80 al 100 en 5
+  // semanas"), reusando applyProgressionToRoutine para que el resultado
+  // sea IDÉNTICO al de cargarlo a mano.
+  if (action.type === "planificar_progresion") {
+    const activeId = profile?.activeRoutineId;
+    const activeDef = activeId ? resolveRoutineDef(profile?.routines?.[activeId], activeId) : null;
+    if (!activeDef || !onActivateRoutine) return null;
+    const lib = matchExerciseToLibrary(action.exercise || "");
+    if (!lib) return null;
+    const setIndex = Number.isInteger(action.setIndex) && action.setIndex >= 0 ? action.setIndex : 0;
+    const trainWeeks = settings?.trainWeeks || TRAIN_WEEKS;
+    const entries = (Array.isArray(action.metas) ? action.metas : [])
+      .map((m) => {
+        const week = parseInt(m?.semana ?? m?.week, 10), kg = parseFloat(m?.kg), reps = parseInt(m?.reps, 10);
+        if (!week || week < 1 || week > trainWeeks || isNaN(kg) || kg <= 0 || isNaN(reps) || reps <= 0) return null;
+        return { week, kg, reps };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.week - b.week);
+    if (!entries.length) return null;
+    // El ejercicio+serie tienen que existir REALMENTE en la rutina activa —
+    // si no, applyProgressionToRoutine no encontraría dónde guardar la meta
+    // y el botón de confirmar no haría nada en silencio.
+    const model = buildRoutineModel(activeDef);
+    if (!model.exerciseById?.[lib.id]?.sets?.[setIndex]) return null;
+    const updatedDef = applyProgressionToRoutine(activeDef, { exerciseId: lib.id, setIndex, entries });
+    const needsModeSwitch = settings?.trainingMode !== "planned";
+    return {
+      kind: "progression",
+      title: `Planificar "${lib.name}"`,
+      items: entries.map((e) => `Semana ${e.week}: ${e.reps}×${e.kg}kg`),
+      progressionPreview: { exerciseName: lib.name, setIndex, entries },
+      confirmLabel: "Guardar meta",
+      confirm: () => {
+        onActivateRoutine(activeId, updatedDef);
+        if (needsModeSwitch && onUpdateSettings) onUpdateSettings({ trainingMode: "planned" });
+      },
+    };
+  }
   // Nota personal de un ejercicio — mismo campo que "Agregar nota" en la
   // ficha de la serie (ver SetRow); se guarda en la serie 1, que es la que
   // las demás heredan si no tienen nota propia.
@@ -11757,6 +12001,29 @@ function RecordChangePreview({ exerciseName, reps, kg }) {
   );
 }
 
+// planificar_progresion: tira horizontal de semanas con su meta — mismo
+// lenguaje visual (chips celestes) que ya usa ProgressionProposalComposer,
+// para que se sienta la misma feature aunque se cargue desde el chat.
+function ProgressionPlanPreview({ exerciseName, setIndex, entries }) {
+  const accent = "#38BDF8";
+  return (
+    <div className="rounded-xl border overflow-hidden" style={{ borderColor: tint(accent, "30"), backgroundColor: tint(accent, "08") }}>
+      <div className="flex items-center gap-2 px-3 py-2 border-b" style={{ borderColor: tint(accent, "20") }}>
+        <Target size={13} style={{ color: accent }} className="shrink-0" />
+        <span className="text-[11px] font-black text-white flex-1 min-w-0 truncate">{exerciseName} · Serie {setIndex + 1}</span>
+      </div>
+      <div className="flex gap-1.5 overflow-x-auto px-3 py-2.5">
+        {entries.map((e) => (
+          <div key={e.week} className="shrink-0 rounded-lg px-2.5 py-1.5 text-center min-w-[58px]" style={{ backgroundColor: tint(accent, "14"), border: `1px solid ${tint(accent, "30")}` }}>
+            <p className="text-[8.5px] font-black uppercase" style={{ color: accent }}>Sem {e.week}</p>
+            <p className="text-[12.5px] font-black text-white tabular-nums">{e.reps}×{e.kg}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // config_*: cada campo que cambia como una fila con ícono, mismo lenguaje
 // que las filas de ajustes de Perfil — de un vistazo se ve QUÉ cambia y a
 // QUÉ valor, no solo una frase.
@@ -11868,6 +12135,7 @@ Tipos disponibles:
 - finalizar_sesion: {"type":"finalizar_sesion"} — cierra y guarda en el historial la sesión de hoy que ya tiene en curso. Sólo proponela si por el contexto ("activeSession" en los datos) ya hay una sesión activa.
 - gestionar_rutina: {"type":"gestionar_rutina","op":"eliminar"|"duplicar"|"renombrar","routineName":"nombre o parte del nombre de una rutina guardada","nuevoNombre":"..."} — administra una rutina de su lista (no la activa en pantalla necesariamente). "eliminar" la borra para siempre, avisale que no se puede deshacer. "nuevoNombre" sólo aplica si op="renombrar".
 - corregir_record: {"type":"corregir_record","exercise":"Press Banca","reps":10,"kg":90,"setIndex":0} — corrige a mano el récord (PR) guardado de un ejercicio, para cuando el historial no refleja su marca real. "setIndex" es opcional (0 = primera serie del ejercicio).
+- planificar_progresion: {"type":"planificar_progresion","exercise":"Press Banca","setIndex":0,"metas":[{"semana":1,"kg":80,"reps":5},{"semana":2,"kg":82.5,"reps":5}]} — ayuda a planificar CUÁNTO PESO levantar cada semana del ciclo en una serie puntual de un ejercicio de SU RUTINA ACTIVA (no crea rutina, sólo carga a qué apuntar semana a semana — la sección "rutina planificada"/"marca a alcanzar" que ya existe en la app). Usalo cuando pida ayuda con la progresión de pesos ("armame una progresión de sentadilla del 80 al 100 en 6 semanas", "subime 2.5kg por semana en press militar"). El ejercicio tiene que estar en su rutina activa (mirá los días/ejercicios en el contexto) y "setIndex" identifica CUÁL de sus series (0 = primera) — si no da detalles de cuál, usá la primera y avisale. Cubrí TODAS las semanas de su ciclo que tenga sentido planificar (mirá "trainWeeks"/settings en el contexto), no sólo una o dos, salvo que pida un tramo puntual. Si no te da un punto de partida o de llegada, preguntá antes de inventar números.
 - nota_ejercicio: {"type":"nota_ejercicio","exercise":"Sentadilla","nota":"cuidado con la rodilla derecha"} — guarda (o si "nota" viene vacío, borra) la nota personal de ese ejercicio, la misma que se ve al registrar la serie.
 - restablecer_dia: {"type":"restablecer_dia","day":"nombre o parte del nombre del día (opcional)"} — borra las marcas de HOY de ese día de la rutina normal (no toca otros días, ni récords, ni marcas de descarga). Si no da el día, usa el primero de la rutina activa. Usalo para "reiniciá mi día" o si se equivocó al cargar algo y quiere volver a empezar.
 - cambiar_dia_semana: {"type":"cambiar_dia_semana","diaSemana":"lunes"|"martes"|"miercoles"|"jueves"|"viernes"|"sabado"|"domingo","dia":"nombre o parte del nombre del día de la rutina, o vacío/omitido para dejarlo como descanso"} — asigna (o saca) qué día de su rutina le toca en ese día de la semana, el mismo cronograma de Rutinas → Cronograma semanal.
@@ -12675,6 +12943,8 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
                   <div className="mb-3"><RoutineDiffPreview {...m.plan.diffPreview} /></div>
                 ) : m.plan.kind === "record" && m.plan.recordPreview ? (
                   <div className="mb-3"><RecordChangePreview {...m.plan.recordPreview} /></div>
+                ) : m.plan.kind === "progression" && m.plan.progressionPreview ? (
+                  <div className="mb-3"><ProgressionPlanPreview {...m.plan.progressionPreview} /></div>
                 ) : m.plan.kind === "settings" && m.plan.settingsChanges?.length ? (
                   <div className="mb-3"><SettingsChangePreview changes={m.plan.settingsChanges} /></div>
                 ) : (
@@ -12978,6 +13248,64 @@ function AIChangeLogModal({ messages, onClose }) {
   );
 }
 
+// Paso de revisión de UN ejercicio que la IA dejó sin resolver (sin
+// nombre, sin series o sin rango de reps) — mismo lenguaje visual que
+// PersonalizedRoutineWizard (progreso arriba, tarjeta con ícono y
+// pregunta, campos grandes) para que se sienta la misma "entrevista
+// guiada" que ya conocés de cuando armaste tu perfil la primera vez, en
+// vez de una alerta genérica de error.
+function ImportReviewStep({ dayLabel, ex, stepNumber, totalSteps, onConfirm, onRemove }) {
+  const [name, setName] = useState(ex.name || "");
+  const [setsCount, setSetsCount] = useState(ex.setsCount || 3);
+  const [repRange, setRepRange] = useState(ex.repRange || "8-10");
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] font-black uppercase tracking-widest text-teal-400">Paso {stepNumber} de {totalSteps}</span>
+        <span className="text-[10px] text-slate-600 truncate max-w-[45%]">{dayLabel}</span>
+      </div>
+      <div className="flex gap-1">
+        {Array.from({ length: totalSteps }).map((_, i) => (
+          <div key={i} className="flex-1 h-1 rounded-full transition-colors" style={{ backgroundColor: i < stepNumber ? "#14B8A6" : "var(--surface-2)" }} />
+        ))}
+      </div>
+      <div className="text-center pt-1">
+        <div className="w-12 h-12 rounded-2xl bg-teal-500/15 border border-teal-500/30 flex items-center justify-center mx-auto mb-3">
+          <AlertTriangle size={20} className="text-teal-400" />
+        </div>
+        <h3 className="text-base font-black text-white leading-tight">No terminamos de entender este ejercicio</h3>
+        <p className="text-xs text-slate-500 mt-1.5 px-2 leading-relaxed">Completá o corregí lo que haga falta antes de crear la rutina.</p>
+      </div>
+      <div className="space-y-3">
+        <div>
+          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1 block">Nombre del ejercicio</label>
+          <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej: Press Banca" className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-3.5 py-3 text-white text-sm focus:outline-none focus:border-teal-500/60" />
+        </div>
+        <div className="grid grid-cols-2 gap-2.5">
+          <div>
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1 block">Series</label>
+            <input type="number" inputMode="numeric" min="1" max="8" value={setsCount} onChange={(e) => setSetsCount(Math.max(1, Math.min(8, parseInt(e.target.value, 10) || 1)))} className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-3.5 py-3 text-white text-sm focus:outline-none focus:border-teal-500/60" />
+          </div>
+          <div>
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1 block">Rango de reps</label>
+            <input value={repRange} onChange={(e) => setRepRange(e.target.value)} placeholder="8-10" className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-3.5 py-3 text-white text-sm focus:outline-none focus:border-teal-500/60" />
+          </div>
+        </div>
+      </div>
+      <div className="flex gap-2">
+        <button onClick={onRemove} className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-400 text-sm font-semibold active:scale-[0.98] transition-all">Sacar ejercicio</button>
+        <button
+          onClick={() => onConfirm({ name: name.trim() || "Ejercicio", setsCount, repRange: repRange.trim() || "8-10", lib: matchExerciseToLibrary(name) })}
+          disabled={!name.trim()}
+          className="flex-1 py-3 rounded-xl bg-teal-500 !text-white text-sm font-bold active:scale-[0.98] transition-all disabled:opacity-40"
+        >
+          {stepNumber === totalSteps ? "Confirmar y crear" : "Confirmar y seguir"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ImportRoutineModal({ onImport, onClose }) {
   useAndroidBack(onClose);
   const [text, setText] = useState("");
@@ -12985,11 +13313,29 @@ function ImportRoutineModal({ onImport, onClose }) {
   const [textFileNames, setTextFileNames] = useState([]); // solo para mostrar qué se leyó
   const [routineName, setRoutineName] = useState("");
   const [parsed, setParsed] = useState(null);
+  // Cola de revisión estilo onboarding: cuando la IA deja algún ejercicio
+  // sin nombre, series o reps (ver prompt de "detect" en api/ia.js — ahora
+  // omite esos campos en vez de inventarlos), en vez de guardar un valor
+  // adivinado en silencio se pregunta uno por uno, igual que
+  // PersonalizedRoutineWizard pregunta paso a paso al crear tu perfil.
+  // { days, flagged: [{dayIdx, exIdx}], step, finalize } o null.
+  const [reviewQueue, setReviewQueue] = useState(null);
   const [notice, setNotice] = useState("");
   const [loadingFile, setLoadingFile] = useState(false);
   const [isParsingAI, setIsParsingAI] = useState(false);
 
   const hasAnySource = !!text.trim() || images.length > 0;
+
+  const finalizeImportedDays = (finalDays, name) => setParsed(buildImportedRoutineDef(
+    finalDays.map((d) => ({
+      label: d.label,
+      exercises: d.exercises.map((ex) => {
+        const sets = Array.from({ length: Math.max(1, Math.min(8, ex.setsCount || 3)) }, () => ({ repRange: ex.repRange || "8-10" }));
+        return ex.lib ? { libId: ex.lib.id, sets } : { id: builderUid("imported"), name: ex.name || "Ejercicio", muscle: "Personalizado", sets };
+      }),
+    })),
+    name
+  ));
 
   const applyDetectedDays = (days, fallbackName) => {
     if (!Array.isArray(days) || !days.length) return false;
@@ -12998,18 +13344,29 @@ function ImportRoutineModal({ onImport, onClose }) {
     // una excepción leyendo ex.name más abajo — se perdía TODA la
     // detección (incluidos los días válidos) y sólo se veía el error
     // genérico "no pudimos detectar la rutina". Se filtran antes de mapear.
-    const parsedDays = days.filter((d) => d && typeof d === "object").map((d) => ({
+    const cleanDays = days.filter((d) => d && typeof d === "object").map((d) => ({
       label: String(d.label || "Día").toUpperCase(),
       exercises: (d.exercises || []).filter((ex) => ex && typeof ex === "object").map((ex) => {
-        const lib = matchExerciseToLibrary(ex.name);
-        // Si la IA no pudo completar series/reps (no debería, se lo pedimos
-        // explícitamente en el prompt), 3x8-10 es un default razonable — así
-        // nunca se cuela un ejercicio con 0 series o un rango vacío.
-        const sets = Array.from({ length: Math.max(1, Math.min(8, ex.setsCount || 3)) }, () => ({ repRange: ex.repRange || "8-10" }));
-        return lib ? { libId: lib.id, sets } : { id: builderUid("imported"), name: ex.name || "Ejercicio", muscle: "Personalizado", sets };
+        const setsCount = Number.isInteger(ex.setsCount) && ex.setsCount > 0 ? ex.setsCount : null;
+        const repRange = typeof ex.repRange === "string" && ex.repRange.trim() ? ex.repRange.trim() : null;
+        const name = typeof ex.name === "string" ? ex.name.trim() : "";
+        return { name, lib: name ? matchExerciseToLibrary(name) : null, setsCount, repRange };
       }),
+    })).filter((d) => d.exercises.length);
+    if (!cleanDays.length) return false;
+
+    const name = routineName.trim() || fallbackName;
+    // Se pregunta por lo que la IA dejó sin resolver (nombre vacío, o
+    // series/reps que no pudo determinar) — un ejercicio que sí matcheó a
+    // la biblioteca con un nombre "raro" NO se marca: eso es normal (hay
+    // ejercicios reales que no están en la biblioteca) y ya queda bien
+    // resuelto como ejercicio personalizado, sin necesidad de preguntar.
+    const flagged = [];
+    cleanDays.forEach((d, dayIdx) => d.exercises.forEach((ex, exIdx) => {
+      if (!ex.name || !ex.setsCount || !ex.repRange) flagged.push({ dayIdx, exIdx });
     }));
-    setParsed(buildImportedRoutineDef(parsedDays, routineName.trim() || fallbackName));
+    if (flagged.length) setReviewQueue({ days: cleanDays, flagged, step: 0, finalize: (finalDays) => finalizeImportedDays(finalDays, name) });
+    else finalizeImportedDays(cleanDays, name);
     return true;
   };
 
@@ -13017,17 +13374,36 @@ function ImportRoutineModal({ onImport, onClose }) {
     setNotice("Detectando con IA…");
     setIsParsingAI(true);
     try {
-      const response = await fetch("/api/ia", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "detect", text, images: images.map(({ mimeType, data }) => ({ mimeType, data })) }),
-      });
-      if (!response.ok) throw new Error("Error en el servidor");
-      const result = await response.json();
-      const rawText = result?.text;
-      if (!rawText) throw new Error("respuesta vacía");
-      const cleaned = rawText.replace(/```json|```/g, "").trim();
-      const days = JSON.parse(cleaned);
+      // Reintento automático (una sola vez) ante una falla de red/timeout
+      // puntual — antes UNA sola conexión cortada dejaba directo en "no
+      // pudimos detectar la rutina" sin darle a la app ninguna chance de
+      // resolverse sola (mismo criterio que ya usa PersonalizedRoutineWizard
+      // para generar una rutina con IA).
+      let result = null;
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          const response = await fetch("/api/ia", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "detect", text, images: images.map(({ mimeType, data }) => ({ mimeType, data })) }),
+          });
+          if (!response.ok) throw new Error("server");
+          result = await response.json();
+          break;
+        } catch (err) {
+          if (attempt === 1) { console.warn("[import] primer intento falló, reintentando:", err?.message || err); await new Promise((r) => setTimeout(r, 1200)); continue; }
+          throw err;
+        }
+      }
+      const rawText = result?.text || "";
+      // Extracción ROBUSTA del JSON: Gemini a veces envuelve la respuesta
+      // con texto ("Aquí está tu rutina: [...]") aunque se le pida JSON
+      // puro — antes esto rompía JSON.parse directo y tiraba el error
+      // genérico siempre que pasaba. Tomamos del primer "[" al último "]"
+      // y parseamos sólo eso (mismo criterio que ya usa el wizard de IA).
+      const first = rawText.indexOf("["), last = rawText.lastIndexOf("]");
+      if (first === -1 || last === -1 || last <= first) throw new Error("no-json");
+      const days = JSON.parse(rawText.slice(first, last + 1));
       if (applyDetectedDays(days, fallbackName)) { setNotice(""); }
       else { setNotice("La IA no pudo interpretar lo que subiste. Probá con una foto más nítida o pegá el texto manualmente."); }
     } catch (err) {
@@ -13036,6 +13412,27 @@ function ImportRoutineModal({ onImport, onClose }) {
     } finally {
       setIsParsingAI(false);
     }
+  };
+
+  // Confirmar/corregir/sacar un ejercicio marcado durante la revisión —
+  // avanza al siguiente hueco o, si era el último, arma la rutina final.
+  const currentFlag = reviewQueue && reviewQueue.step < reviewQueue.flagged.length ? reviewQueue.flagged[reviewQueue.step] : null;
+  const advanceReview = (updatedDays) => {
+    const nextStep = reviewQueue.step + 1;
+    if (nextStep >= reviewQueue.flagged.length) { reviewQueue.finalize(updatedDays); setReviewQueue(null); }
+    else setReviewQueue({ ...reviewQueue, days: updatedDays, step: nextStep });
+  };
+  const handleReviewConfirm = (patch) => {
+    const updatedDays = reviewQueue.days.map((d, di) => di !== currentFlag.dayIdx ? d : {
+      ...d, exercises: d.exercises.map((ex, ei) => ei !== currentFlag.exIdx ? ex : { ...ex, ...patch }),
+    });
+    advanceReview(updatedDays);
+  };
+  const handleReviewRemove = () => {
+    const updatedDays = reviewQueue.days
+      .map((d, di) => di !== currentFlag.dayIdx ? d : { ...d, exercises: d.exercises.filter((_, ei) => ei !== currentFlag.exIdx) })
+      .filter((d) => d.exercises.length);
+    advanceReview(updatedDays);
   };
 
   // Multi-archivo: cada uno se suma a lo que ya había (texto concatenado,
@@ -13104,6 +13501,18 @@ function ImportRoutineModal({ onImport, onClose }) {
   // /api/ia (función serverless de Vercel — ver api/ia.js): la clave real
   // nunca llega al navegador.
   const handleProcessAI = () => runAIDetection(routineName.trim() || "Rutina importada");
+
+  if (currentFlag) {
+    const ex = reviewQueue.days[currentFlag.dayIdx].exercises[currentFlag.exIdx];
+    const dayLabel = reviewQueue.days[currentFlag.dayIdx].label;
+    return (
+      <div className="fixed inset-0 z-[130] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
+        <div className="bg-slate-900 border border-slate-700/60 rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50 max-h-[92vh] overflow-y-auto overscroll-contain" onClick={(e) => e.stopPropagation()}>
+          <ImportReviewStep key={reviewQueue.step} dayLabel={dayLabel} ex={ex} stepNumber={reviewQueue.step + 1} totalSteps={reviewQueue.flagged.length} onConfirm={handleReviewConfirm} onRemove={handleReviewRemove} />
+        </div>
+      </div>
+    );
+  }
 
   if (parsed) {
     return (
@@ -15697,7 +16106,7 @@ export default function App() {
             {tab === "descarga" && <DeloadView logs={logs} setLogs={setLogs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} activeSession={profile?.activeSession?.deload ? profile.activeSession : null} onStartSession={handleStartSession} onCancelSession={handleCancelSession} weekSchedule={weekSchedule} onClose={() => { setDeloadDismissed(true); setTab("rutina"); }} cycleStart={cycleStart} />}
             {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} setLogs={setLogs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} conversations={aiConversations} activeConversationId={activeAiConversationId} onNewConversation={handleNewAiConversation} onSwitchConversation={handleSwitchAiConversation} onDeleteConversation={handleDeleteAiConversation} onRenameConversation={handleRenameAiConversation} settings={getProfileSettings(profile)} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} onDeleteRoutine={handleDeleteRoutine} onNavigate={setTab} onStartSession={handleStartSession} onEndSession={handleEndSession} />}
             {tab === "perfil" && <ProfileView onOpenFieldPreview={() => setShowFieldIntro(true)} openSectionSignal={openSectionSignal} profileName={activeProfile} profiles={profiles} logs={logs} onSignOut={handleSignOut} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} onGoToSocial={() => setTab("social")} />}
-            {tab === "social" && <SocialView profile={profile} uid={profile?.googleUid} onActivateRoutine={handleActivateRoutine} />}
+            {tab === "social" && <SocialView profile={profile} profileName={activeProfile} uid={profile?.googleUid} onActivateRoutine={handleActivateRoutine} />}
           </div>
         </main>
       </div>

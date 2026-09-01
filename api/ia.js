@@ -263,18 +263,30 @@ export default async function handler(req, res) {
         safeImages.length
           ? "Analizá la rutina de entrenamiento en las imágenes y/o el texto que te paso a continuación y extraé la rutina COMPLETA."
           : "Analizá el siguiente texto y extraé la rutina de entrenamiento completa.",
+        // BUG FIX (pedido: "que se asegure de interpretarlo lo mejor
+        // posible"): sin esto, ante una foto borrosa, manuscrita, mal
+        // encuadrada o un texto desordenado, el modelo tendía a devolver
+        // un array vacío o rechazar la respuesta en vez de arriesgar una
+        // interpretación parcial — la app sólo podía mostrar "no pudimos
+        // detectar nada" sin ningún punto de partida para corregir.
+        "Hacé SIEMPRE tu mejor esfuerzo de interpretación, incluso si la foto está borrosa, mal encuadrada, es una letra manuscrita difícil, o el texto está desordenado o incompleto — nunca devuelvas un array vacío si hay AUNQUE SEA UN ejercicio reconocible. Interpretar de más (con dudas) es mejor que no interpretar nada.",
         "Devolvé ÚNICAMENTE un array JSON válido (sin texto adicional, sin markdown):",
         '[{"label": "Push", "exercises": [{"name": "Press Banca", "setsCount": 3, "repRange": "8-10"}]}]',
         "",
         "Reglas:",
         '- "label": nombre del día/sesión (Push, Pull, Legs, Día 1, Pecho, etc.)',
-        '- "name": nombre completo del ejercicio en español',
+        '- "name": nombre completo del ejercicio en español. Si es TOTALMENTE ilegible o no se puede determinar de ninguna forma, dejalo como cadena vacía "" en vez de inventar un nombre sin relación con lo que ves — la app se lo va a preguntar directo a la persona.',
         '- "setsCount": cantidad de series (1-8)',
         '- "repRange": rango de reps (ej: "8-10", "6-8", "5", "20")',
         '- "3x8-10" o "3 series 8-10 reps" → setsCount=3, repRange="8-10"',
-        "- Incluí TODOS los ejercicios, no omitas ninguno",
+        "- Incluí TODOS los ejercicios que puedas identificar, no omitas ninguno",
         '- Cardio (cinta, bici, elíptica): repRange = minutos (ej: "30")',
-        '- Si a un ejercicio le falta la cantidad de series y/o el rango de reps (no está escrito o no se lee bien en la foto), COMPLETALO vos con un valor típico y razonable en vez de dejarlo vacío o en 0 — 3 series de 8-10 reps para ejercicios normales, 3-4 series de 4-6 reps si es claramente un movimiento pesado/compuesto (press banca, sentadilla, peso muerto, etc. con pocas reps indicadas).',
+        // Antes se le pedía "completalo vos" con un valor típico cuando
+        // faltaba esto — la app nunca se enteraba de que era un valor
+        // inventado y no había forma de que la persona lo revisara. Ahora
+        // se omite el campo directamente: el cliente detecta el hueco y
+        // pregunta, en vez de guardar un número adivinado en silencio.
+        '- Si a un ejercicio le falta CLARAMENTE la cantidad de series y/o el rango de reps (no está escrito, no se lee, y no podés inferirlo con confianza del contexto — ej. mismo tipo de ejercicio con el mismo esquema en otro día), OMITÍ por completo esa clave ("setsCount" y/o "repRange") del objeto en vez de inventar un número. No adivines "por las dudas": omitir es preferible a un dato falso.',
       ];
       if (safeImages.length > 1 || (safeImages.length && hasText)) {
         promptLines.push('- Puede que te pasen varias imágenes o fragmentos de texto por separado (por ejemplo, una foto por día de la rutina) — son partes de LA MISMA rutina: combiná todo en un solo array de días, no los proceses como rutinas independientes.');
