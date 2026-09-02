@@ -13,7 +13,7 @@ import {
   Sparkles, Layers, SlidersHorizontal, UserCog,
   Share2, Download, Link2, Copy, BellOff, Send, Mic, Ruler, Camera, Link, Footprints, Star, SquarePlay, Upload, RefreshCw, Timer, Percent, Users,
   MessageCircle, FileDown, Search, UserPlus, UserCheck, UserMinus, AtSign, GraduationCap, ClipboardCheck, Swords, Medal, QrCode, ArrowUpDown,
-  Phone, Contact,
+  Phone, Contact, Minus,
 } from "lucide-react";
 import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signOut, onAuthStateChanged } from "firebase/auth";
 import { Capacitor, registerPlugin } from "@capacitor/core";
@@ -250,10 +250,16 @@ function profileToCloud(profile) {
   return out;
 }
 
-// Mejor rango entre todos los grupos musculares — se guarda en
-// users/{uid}/public/basic (ver syncPublicProfile en social.js) para que
-// la lista de amigos pueda mostrar un badge de nivel sin tener que leer
-// el historial completo de cada persona sólo para pintar una fila.
+// Rango PROMEDIO entre todos los grupos musculares con datos — se guarda en
+// users/{uid}/public/basic (ver syncPublicProfile en social.js) para que la
+// lista de amigos pueda mostrar un badge de nivel sin tener que leer el
+// historial completo de cada persona sólo para pintar una fila.
+// BUG FIX (pedido): antes se mostraba el MEJOR músculo (el más fuerte de
+// los 12), lo que premiaba a alguien fuerte en un solo lift aunque el
+// resto estuviera atrasado. El promedio de los levelIdx (0-17, el índice
+// dentro de RANK_TIERS) da un rango más representativo del cuerpo entero;
+// se redondea al escalón más cercano porque RANK_TIERS es una escala
+// discreta, no continua.
 // Usa las mismas MUSCLE_GROUPS/getBest1RMForMuscleGroup/getMuscleRank que
 // MuscleRankView — funciones declaradas más abajo en este mismo archivo,
 // pero accesibles acá por el hoisting normal de "function" en JS.
@@ -262,13 +268,16 @@ function computeTopRank(profile) {
     const settings = getProfileSettings(profile);
     const bodyWeightKg = settings.bodyWeightKg || 0;
     const mode = bodyWeightKg > 0 ? "relative" : "general";
-    let best = null;
+    const levelIdxs = [];
     MUSCLE_GROUPS.forEach((g) => {
       const { best1RM } = getBest1RMForMuscleGroup(g.key, profile.logs || {}, settings.dumbbellDouble || null);
       const rank = getMuscleRank(g.key, best1RM, mode, bodyWeightKg, profile.sex, profile.age);
-      if (rank.hasData && (!best || rank.levelIdx > best.levelIdx)) best = { tier: rank.tier, sub: rank.sub, color: rank.color, label: g.label, levelIdx: rank.levelIdx };
+      if (rank.hasData) levelIdxs.push(rank.levelIdx);
     });
-    return best;
+    if (!levelIdxs.length) return null;
+    const avgIdx = Math.round(levelIdxs.reduce((sum, v) => sum + v, 0) / levelIdxs.length);
+    const info = RANK_TIERS[avgIdx];
+    return { tier: info.tier, sub: info.sub, color: info.color, label: "Promedio", levelIdx: avgIdx };
   } catch { return null; }
 }
 
@@ -939,6 +948,114 @@ function getBestWorkingKg(exercise, logs) {
   return best;
 }
 
+/* ============================================================================
+   CALENTAMIENTO GENERAL — pedido explícito del usuario, aclarando que es
+   DISTINTO de WARMUP_STEPS de arriba: eso es la rampa de aproximación de UN
+   ejercicio (50/70/85% del peso de trabajo). Esto es los 10-15 minutos de
+   movilidad/activación/estiramiento dinámico de ANTES de arrancar toda la
+   sesión, sin depender de ningún peso cargado.
+   Los ejercicios se etiquetan por REGIÓN amplia (no por los 19 grupos
+   musculares exactos de MUSCLE_GROUPS) porque para elegir "qué mover antes
+   de entrenar" alcanza con saber si el día es de pierna/empuje/tracción/
+   core — no hace falta la granularidad fina que sí importa para el
+   registro de marcas.
+============================================================================ */
+const MOBILITY_DRILLS = [
+  { key: "jumping_jacks", name: "Saltos de tijera", dur: "45 seg", region: "general" },
+  { key: "cat_cow", name: "Gato-camello (columna)", dur: "45 seg", region: "general" },
+  { key: "arm_circles", name: "Círculos de brazos", dur: "30 seg c/lado", region: "empuje" },
+  { key: "band_pull_apart", name: "Jalón de banda o toalla al pecho", dur: "15 reps", region: "traccion" },
+  { key: "shoulder_dislocates", name: "Dislocados de hombro (palo o banda)", dur: "10 reps", region: "empuje" },
+  { key: "cuban_rotation", name: "Rotación externa de hombro", dur: "10 reps c/lado", region: "empuje" },
+  { key: "scapular_pushups", name: "Flexiones escapulares", dur: "10 reps", region: "traccion" },
+  { key: "hip_circles", name: "Círculos de cadera", dur: "30 seg c/lado", region: "piernas" },
+  { key: "leg_swings", name: "Balanceo de pierna (adelante/atrás y lateral)", dur: "10 c/lado" },
+  { key: "bodyweight_squat", name: "Sentadilla sin peso", dur: "15 reps", region: "piernas" },
+  { key: "lunges_walking", name: "Zancadas caminando", dur: "10 c/pierna", region: "piernas" },
+  { key: "glute_bridge", name: "Puente de glúteo", dur: "15 reps", region: "piernas" },
+  { key: "ankle_circles", name: "Círculos de tobillo", dur: "10 c/lado", region: "piernas" },
+  { key: "cat_cow_core", name: "Dead bug (activación de core)", dur: "10 c/lado", region: "core" },
+  { key: "bird_dog", name: "Bird-dog", dur: "10 c/lado", region: "core" },
+  { key: "torso_twists", name: "Rotaciones de torso de pie", dur: "30 seg", region: "core" },
+];
+// leg_swings no tiene "region" arriba a propósito: aplica a piernas Y sirve
+// de transición general, se agrega manual en REGION_DRILLS.
+const REGION_DRILLS = {
+  general: MOBILITY_DRILLS.filter((d) => d.region === "general"),
+  empuje: MOBILITY_DRILLS.filter((d) => d.region === "empuje"),
+  traccion: MOBILITY_DRILLS.filter((d) => d.region === "traccion"),
+  piernas: [...MOBILITY_DRILLS.filter((d) => d.region === "piernas"), MOBILITY_DRILLS.find((d) => d.key === "leg_swings")],
+  core: MOBILITY_DRILLS.filter((d) => d.region === "core"),
+};
+// Clasifica el día en regiones amplias mirando el texto de `muscle` de sus
+// ejercicios — funciona tanto con los grupos del catálogo como con
+// ejercicios propios (que guardan la ETIQUETA ya resuelta, ver
+// addCustomExercise), sin necesitar una tabla de mapeo exacta por key.
+function detectDayRegions(exercises) {
+  const text = (exercises || []).map((e) => (e.muscle || "").toLowerCase()).join(" ");
+  const regions = new Set();
+  if (/cuádr|femoral|glúte|pantorr|aductor|tibial|pierna/.test(text)) regions.add("piernas");
+  if (/pectoral|deltoide|tríceps|hombro/.test(text)) regions.add("empuje");
+  if (/dorsal|trapecio|bíceps|espalda/.test(text)) regions.add("traccion");
+  if (/core|abdomen|oblicuo/.test(text)) regions.add("core");
+  return regions;
+}
+// Arma la lista final: los generales primero + una vuelta "round-robin"
+// entre las regiones detectadas hasta llegar a 6 o quedarse sin más — apunta
+// a 10-15 minutos totales sin abrumar con una lista larguísima.
+function pickWarmupDrills(exercises) {
+  const regions = detectDayRegions(exercises);
+  const regionKeys = regions.size ? Array.from(regions) : ["piernas", "empuje"]; // sin match: genérico
+  const picked = [...REGION_DRILLS.general];
+  const pools = regionKeys.map((r) => [...(REGION_DRILLS[r] || [])]);
+  let keepGoing = true;
+  while (picked.length < 6 && keepGoing) {
+    keepGoing = false;
+    for (const pool of pools) {
+      if (picked.length >= 6) break;
+      const item = pool.shift();
+      if (item) { keepGoing = true; if (!picked.includes(item)) picked.push(item); }
+    }
+  }
+  return picked.slice(0, 6);
+}
+// Tarjeta colapsable de calentamiento general — mismo lenguaje visual que
+// "Ver calentamiento sugerido" (ExerciseCard), pero a nivel de TODA la
+// sesión: se muestra una vez, antes de la lista de ejercicios, con
+// checklist propio (sin persistir: es una guía, no un registro).
+function GeneralWarmupCard({ exercises, accent }) {
+  const [open, setOpen] = useState(false);
+  const [done, setDone] = useState({});
+  const drills = useMemo(() => pickWarmupDrills(exercises), [exercises]);
+  const doneCount = Object.values(done).filter(Boolean).length;
+
+  if (!drills.length) return null;
+  return (
+    <div className="rounded-2xl border overflow-hidden" style={{ borderColor: tint(accent, "30"), backgroundColor: tint(accent, "08") }}>
+      <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center gap-2.5 px-3.5 py-3 text-left transition active:scale-[0.99]">
+        <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: tint(accent, "20"), color: accent }}><Activity size={15} /></div>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-bold text-white">Calentamiento general</p>
+          <p className="text-[10px] text-slate-500">{drills.length} ejercicios de movilidad · ~10-15 min{doneCount > 0 ? ` · ${doneCount}/${drills.length} hechos` : ""}</p>
+        </div>
+        <ChevronDown size={16} className={`text-slate-600 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} style={{ color: accent }} />
+      </button>
+      {open && (
+        <div className="px-3.5 pb-3.5 space-y-1.5 bounce-in">
+          {drills.map((d) => (
+            <label key={d.key} className="flex items-center gap-2.5 py-1.5 cursor-pointer select-none">
+              <input type="checkbox" checked={!!done[d.key]} onChange={(e) => setDone((prev) => ({ ...prev, [d.key]: e.target.checked }))} className="w-4 h-4 shrink-0 rounded accent-current" style={{ color: accent }} />
+              <span className={`flex-1 text-xs ${done[d.key] ? "text-slate-600 line-through" : "text-slate-300"}`}>{d.name}</span>
+              <span className="text-[10px] text-slate-600 shrink-0">{d.dur}</span>
+            </label>
+          ))}
+          <p className="text-[9.5px] text-slate-600 pt-1">Guía general de movilidad — no hace falta completar todo, es sólo para no arrancar en frío.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function getWeekInfo(cycleStart, settings = DEFAULT_SETTINGS) {
   if (!cycleStart) return null;
   const { trainWeeks = TRAIN_WEEKS, deloadWeeks = DELOAD_WEEKS, deloadEnabled = true } = settings;
@@ -969,30 +1086,37 @@ function getPlannedTargetForWeek(set, weekInCycle) {
   return set.plannedProgression.find((p) => p.week === weekInCycle) || null;
 }
 
-// Aplica una propuesta de progresión (ver createProgressionProposal en
-// social.js) a UNA rutina — se actualizan TODAS las apariciones del mismo
+// Aplica una o varias propuestas de progresión (ver createProgressionProposal
+// en social.js) a UNA rutina — se actualizan TODAS las apariciones del mismo
 // ejercicio+serie (un ejercicio compartido entre dos días de la rutina
 // tiene una copia independiente por día, con el mismo id: hay que tocar
 // las dos para que la meta se vea sin importar desde qué día se mire).
-function applyProgressionToRoutine(routineDef, plan) {
+// `planOrPlans` acepta un solo plan {exerciseId,setIndex,entries} (como
+// siempre) O un array de varios — lo segundo lo usa ProgressionProposalComposer
+// cuando se activa "aplicar a todas las series" del ejercicio, para no
+// tener que repetir el flujo completo serie por serie.
+function applyProgressionToRoutine(routineDef, planOrPlans) {
+  const plans = Array.isArray(planOrPlans) ? planOrPlans : [planOrPlans];
   const clone = cloneRoutineDef(routineDef);
-  clone.dayOrder.forEach((dk) => {
-    // BUG FIX: routineDef acá es el RAW routineEntry (resolveRoutineDef, no
-    // buildRoutineModel) — un ejercicio de catálogo referencia a la
-    // biblioteca por `libId`, no tiene un `.id` plano todavía (eso sólo lo
-    // resuelve buildRoutineModel al armar ROUTINE/EXERCISE_BY_ID para
-    // pintar la app). Comparar por e.id directo nunca encontraba nada en
-    // una rutina preestablecida — plannedProgression se guardaba en el
-    // aire, sin pisar ninguna serie real. Se resuelve el id efectivo con
-    // el mismo criterio que ya usa buildRoutineModel.
-    const ex = clone.days[dk]?.exercises?.find((entry) => {
-      const lib = entry.libId ? EXERCISE_LIBRARY_BY_ID[entry.libId] : null;
-      const effectiveId = entry.idOverride || (lib ? lib.id : entry.id);
-      return effectiveId === plan.exerciseId;
+  plans.forEach((plan) => {
+    clone.dayOrder.forEach((dk) => {
+      // BUG FIX: routineDef acá es el RAW routineEntry (resolveRoutineDef, no
+      // buildRoutineModel) — un ejercicio de catálogo referencia a la
+      // biblioteca por `libId`, no tiene un `.id` plano todavía (eso sólo lo
+      // resuelve buildRoutineModel al armar ROUTINE/EXERCISE_BY_ID para
+      // pintar la app). Comparar por e.id directo nunca encontraba nada en
+      // una rutina preestablecida — plannedProgression se guardaba en el
+      // aire, sin pisar ninguna serie real. Se resuelve el id efectivo con
+      // el mismo criterio que ya usa buildRoutineModel.
+      const ex = clone.days[dk]?.exercises?.find((entry) => {
+        const lib = entry.libId ? EXERCISE_LIBRARY_BY_ID[entry.libId] : null;
+        const effectiveId = entry.idOverride || (lib ? lib.id : entry.id);
+        return effectiveId === plan.exerciseId;
+      });
+      if (ex?.sets?.[plan.setIndex]) {
+        ex.sets[plan.setIndex] = { ...ex.sets[plan.setIndex], plannedProgression: plan.entries };
+      }
     });
-    if (ex?.sets?.[plan.setIndex]) {
-      ex.sets[plan.setIndex] = { ...ex.sets[plan.setIndex], plannedProgression: plan.entries };
-    }
   });
   // BUG FIX: si la rutina activa es una preestablecida (source:"preset"),
   // resolveRoutineDef() SIEMPRE vuelve a armar sus días/ejercicios desde el
@@ -1007,6 +1131,59 @@ function applyProgressionToRoutine(routineDef, plan) {
   // resto de la app para "convertir" una preestablecida en algo editable.
   if (clone.source === "preset") clone.source = "custom";
   return clone;
+}
+
+/* ============================================================================
+   PLANTILLAS DE PROGRESIÓN SEMANAL — ProgressionProposalComposer las usa
+   para autocompletar las `weeks` semanas de una sola vez a partir de un
+   punto de partida (kg/reps) en vez de tipear cada semana a mano. Todas
+   devuelven el mismo shape que ya espera `entries`: [{week, kg, reps}].
+   Redondeo a 0.25kg en todas (mismo criterio que el resto de la app usa
+   para pesos con mancuernas/discos chicos).
+============================================================================ */
+const roundKg = (kg) => Math.round(kg * 4) / 4;
+
+// Progresión lineal clásica: mismo rango de reps todas las semanas, +kg fijo
+// cada semana. La más simple y la que más gente realmente sigue.
+function buildLinearProgression(weeks, startKg, reps, incrementKg) {
+  return weeks.map((week, i) => ({ week, kg: roundKg(startKg + i * incrementKg), reps }));
+}
+
+// Doble progresión: se sube REPS primero (startKg fijo) hasta un tope
+// (repsMax); al llegar ahí, sube el KG y las reps vuelven a repsMin — el
+// esquema más usado en powerlifting/hipertrofia para progresar sin
+// aumentar el peso todas las semanas.
+function buildDoubleProgression(weeks, startKg, repsMin, repsMax, incrementKg) {
+  let kg = startKg, reps = repsMin;
+  return weeks.map((week) => {
+    const entry = { week, kg, reps };
+    if (reps >= repsMax) { kg = roundKg(kg + incrementKg); reps = repsMin; } else { reps += 1; }
+    return entry;
+  });
+}
+
+// Ondulante (undulating): alterna semana "pesada" (más kg, menos reps) y
+// semana "liviana" (menos kg, más reps) — con una progresión leve de fondo
+// cada dos semanas para que no quede plana en el tiempo.
+function buildWaveProgression(weeks, startKg, reps, incrementKg) {
+  return weeks.map((week, i) => {
+    const base = roundKg(startKg + Math.floor(i / 2) * incrementKg);
+    const heavy = i % 2 === 0;
+    return { week, kg: heavy ? roundKg(base + incrementKg) : base, reps: heavy ? Math.max(1, reps - 2) : reps };
+  });
+}
+
+// Escalón cada 2 semanas: mismo peso dos semanas seguidas (para afianzar
+// técnica/adaptación) y recién ahí sube — más conservador que la lineal
+// pura para quien viene de lesión o es principiante.
+function buildStepProgression(weeks, startKg, reps, incrementKg) {
+  return weeks.map((week, i) => ({ week, kg: roundKg(startKg + Math.floor(i / 2) * incrementKg), reps }));
+}
+
+// Igual todas las semanas — útil como punto de partida neutro, o para
+// bloques de mantenimiento/técnica donde no se busca progresar todavía.
+function buildFlatProgression(weeks, startKg, reps) {
+  return weeks.map((week) => ({ week, kg: startKg, reps }));
 }
 
 // Igual cuenta que arriba (días desde cycleStart, en bloques de 7) pero para
@@ -4969,8 +5146,15 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
         <div className="flex items-center gap-3">
           <div className="w-2 h-8 rounded-full shrink-0" style={{ backgroundColor: accent, boxShadow: `0 0 10px -2px ${accent}` }} />
           <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="font-bold text-white text-sm">{exercise.name}</h3>
+            {/* BUG FIX (pedido: "que el músculo esté siempre abajo, así
+                queda más parejo"): antes nombre + chips vivían en el MISMO
+                flex-wrap — con un nombre corto el chip de músculo quedaba
+                pegado al lado, con uno largo el wrap lo mandaba a la línea
+                de abajo. Dos filas fijas (nombre arriba, chips abajo)
+                hace que TODAS las tarjetas se vean iguales sin importar
+                cuán largo sea el nombre del ejercicio. */}
+            <h3 className="font-bold text-white text-sm">{exercise.name}</h3>
+            <div className="flex items-center gap-2 flex-wrap mt-1">
               <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded-lg font-bold" style={{ backgroundColor: tint(accent, "18"), color: accent }}>{exercise.muscle}</span>
               {exercise.cardio && <span className="text-[10px] bg-rose-400/15 text-rose-300 rounded-lg px-1.5 py-0.5 font-bold flex items-center gap-1"><Footprints size={9} /> CARDIO</span>}
               {/* El ×1/×2 de mancuernas se configura al editar la rutina
@@ -5302,29 +5486,37 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
 
       {/* Antes esto sólo se podía cambiar desde Perfil — un atajo acá evita
           tener que salir de Rutina para pasar de "perseguir récord" a
-          "rutina planificada" (o viceversa). Segmentado de 2 en vez de una
-          tarjeta que abre un modal: un solo toque cambia el modo, sin paso
-          intermedio. */}
+          "rutina planificada" (o viceversa).
+          BUG FIX (pedido: "cambiá el tipo de recuadro"): antes era una
+          tarjeta neutra genérica (borde/fondo slate, acento teal) que no se
+          sentía parte de la pestaña Rutina — se ve exactamente igual a
+          cualquier otra tarjeta de configuración de la app. Ahora usa el
+          celeste característico de Rutina (mismo criterio que ya aplican
+          PresetRoutineCard/BalanceMuscular desde la limpieza de colores) y
+          una píldora deslizante en vez de que cada botón prenda su propio
+          fondo — mismo lenguaje que ya usa el selector de Social. */}
       {onUpdateSettings && (
-        <div className="rounded-2xl border border-slate-800/50 bg-slate-900/50 p-3.5">
-          <div className="flex items-center gap-1.5 mb-2.5">
-            <Target size={13} className="text-teal-400 shrink-0" />
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Modo de entrenamiento</p>
+        <div className="relative overflow-hidden rounded-2xl border border-sky-500/25 p-3.5" style={{ background: "linear-gradient(135deg, rgba(56,189,248,0.08), transparent)" }}>
+          <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full bg-sky-500/10 blur-2xl pointer-events-none" />
+          <div className="relative flex items-center gap-1.5 mb-2.5">
+            <Target size={13} className="text-sky-400 shrink-0" />
+            <p className="text-[10px] font-black uppercase tracking-widest text-sky-300/70">Modo de entrenamiento</p>
           </div>
-          <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-slate-950/50 border border-slate-800/50">
-            <button onClick={() => onUpdateSettings({ trainingMode: "record" })} className={`flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-bold transition active:scale-[0.97] ${settings.trainingMode !== "planned" ? "bg-teal-500/20 text-teal-400" : "text-slate-500 hover:text-slate-300"}`}>
+          <div className="relative grid grid-cols-2 gap-1 p-1 rounded-xl bg-slate-950/50 border border-sky-500/15">
+            <div className="absolute top-1 bottom-1 rounded-lg transition-all duration-300 ease-out pointer-events-none" style={{ left: settings.trainingMode === "planned" ? "calc(50% + 2px)" : "2px", width: "calc(50% - 4px)", backgroundColor: "rgba(56,189,248,0.18)", boxShadow: "inset 0 0 0 1px rgba(56,189,248,0.4)" }} />
+            <button onClick={() => onUpdateSettings({ trainingMode: "record" })} className={`relative z-[1] flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-bold transition active:scale-[0.97] ${settings.trainingMode !== "planned" ? "text-sky-300" : "text-slate-500 hover:text-slate-300"}`}>
               <Trophy size={14} /> Récord
             </button>
-            <button onClick={() => onUpdateSettings({ trainingMode: "planned" })} className={`flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-bold transition active:scale-[0.97] ${settings.trainingMode === "planned" ? "bg-teal-500/20 text-teal-400" : "text-slate-500 hover:text-slate-300"}`}>
+            <button onClick={() => onUpdateSettings({ trainingMode: "planned" })} className={`relative z-[1] flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-bold transition active:scale-[0.97] ${settings.trainingMode === "planned" ? "text-sky-300" : "text-slate-500 hover:text-slate-300"}`}>
               <Target size={14} /> Planificada
             </button>
           </div>
           {settings.trainingMode === "planned" && onApplyOwnProgression && (
-            <button onClick={() => setShowSelfProgression(true)} disabled={!activeRoutineDef} className="w-full flex items-center gap-2 justify-center py-2.5 mt-2.5 rounded-xl bg-teal-500 !text-white text-xs font-bold transition active:scale-[0.98] disabled:opacity-40">
+            <button onClick={() => setShowSelfProgression(true)} disabled={!activeRoutineDef} className="relative w-full flex items-center gap-2 justify-center py-2.5 mt-2.5 rounded-xl !text-white text-xs font-bold transition active:scale-[0.98] disabled:opacity-40" style={{ background: "linear-gradient(135deg,#38BDF8,#0284C7)" }}>
               <Sliders size={13} /> Planificar mi progresión
             </button>
           )}
-          {!activeRoutineDef && settings.trainingMode === "planned" && <p className="text-[10px] text-slate-600 text-center mt-1.5">Activá una rutina primero, en la pestaña Rutinas.</p>}
+          {!activeRoutineDef && settings.trainingMode === "planned" && <p className="relative text-[10px] text-slate-600 text-center mt-1.5">Activá una rutina primero, en la pestaña Rutinas.</p>}
         </div>
       )}
 
@@ -5390,6 +5582,12 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           viendo otro día, no mostramos "sesión en curso" ahí — pero la
           sesión real sigue viva en su día, no se resetea. */}
       <SessionStartBar activeSession={sessionForThisDay} onStart={() => onStartSession(activeDay)} onCancel={onCancelSession} color={day.color} />
+
+      {/* Calentamiento GENERAL de la sesión (movilidad/activación, 10-15
+          min) — distinto del calentamiento POR EJERCICIO que ya existe
+          dentro de cada ExerciseCard (esa es la rampa de aproximación al
+          peso de trabajo). Este va una sola vez, antes de arrancar. */}
+      <GeneralWarmupCard exercises={day.exercises} accent={day.color} />
 
       {/* La animación de deslizamiento se dispara reiniciando la clase por
           JS (ver el efecto de slideDir) en vez de con key={activeDay}: usar
@@ -6109,10 +6307,11 @@ function DeloadView({ logs, setLogs, settings = DEFAULT_SETTINGS, deloadProgress
               <div className="flex items-center gap-3 px-4 py-3.5 border-b border-slate-800/40">
                 <div className="w-1.5 h-6 rounded-full shrink-0" style={{ backgroundColor: day.color, boxShadow: `0 0 8px -2px ${day.color}` }} />
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold text-white text-sm">{ex.name}</span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-lg font-bold" style={{ backgroundColor: tint(day.color, "18"), color: day.color }}>{ex.muscle}</span>
-                  </div>
+                  {/* Mismo criterio que ExerciseCard: el chip de músculo
+                      siempre en su propia fila, no al lado del nombre —
+                      así no depende de si el nombre es corto o largo. */}
+                  <span className="font-bold text-white text-sm block">{ex.name}</span>
+                  <span className="inline-block text-[10px] px-1.5 py-0.5 rounded-lg font-bold mt-1" style={{ backgroundColor: tint(day.color, "18"), color: day.color }}>{ex.muscle}</span>
                   <p className="text-[10px] text-slate-500 mt-0.5">{ex.sets.length} → <span className="text-purple-400 font-bold">{deloadSets} series</span> en descarga</p>
                 </div>
               </div>
@@ -6230,6 +6429,57 @@ const EVOLUTION_CHART_COLOR = "#F59E0B";
 // de "Rango" y el cian de "Historial" en Progreso, y del resto de los
 // colores de héroe ya usados (teal=Rutina, azul=Progreso, violeta=Descarga).
 const SOCIAL_COLOR = "#A855F7";
+
+// ============================================================================
+// LOGROS — pedido: "le falta algo propio e innovador" a la pestaña Social.
+// Todo se deriva de datos que YA existen en el perfil/estado de SocialView
+// (nada de Firestore nuevo): días entrenados, amigos, rango promedio,
+// vínculo de entrenador, perfil público, modo de entrenamiento. Se muestran
+// como una tira de insignias (bloqueadas en gris, desbloqueadas a color) —
+// gamifica sin depender de ningún backend nuevo ni de arreglar el ranking
+// global primero.
+// ============================================================================
+const ACHIEVEMENTS = [
+  { key: "first_steps", label: "Primeros pasos", icon: <Footprints size={16} />, color: "#14B8A6", check: (c) => c.trainedDays >= 1 },
+  { key: "constancia_10", label: "10 días entrenados", icon: <Flame size={16} />, color: "#CD7F32", check: (c) => c.trainedDays >= 10 },
+  { key: "constancia_30", label: "30 días entrenados", icon: <Flame size={16} />, color: "#DCE3E8", check: (c) => c.trainedDays >= 30 },
+  { key: "constancia_100", label: "100 días entrenados", icon: <Flame size={16} />, color: "#FFD23F", check: (c) => c.trainedDays >= 100 },
+  { key: "sociable", label: "Primer amigo", icon: <Users size={16} />, color: "#A855F7", check: (c) => c.friendCount >= 1 },
+  { key: "circulo", label: "5 amigos", icon: <Users size={16} />, color: "#7C3AED", check: (c) => c.friendCount >= 5 },
+  { key: "rango_oro", label: "Rango Oro o más", icon: <Trophy size={16} />, color: "#FFD23F", check: (c) => (c.myTopRank?.levelIdx ?? -1) >= 6 },
+  { key: "rango_maestro", label: "Rango Maestro", icon: <Trophy size={16} />, color: "#FF3B3B", check: (c) => c.myTopRank?.tier === "Maestro" },
+  { key: "publico", label: "Perfil público", icon: <QrCode size={16} />, color: "#38BDF8", check: (c) => !!c.hasUsername },
+  { key: "equipo", label: "Entrenador vinculado", icon: <GraduationCap size={16} />, color: "#6366F1", check: (c) => c.hasTrainerLink },
+  { key: "planificador", label: "Rutina planificada", icon: <Target size={16} />, color: "#38BDF8", check: (c) => c.trainingMode === "planned" },
+];
+function computeAchievements(ctx) {
+  return ACHIEVEMENTS.map((a) => ({ ...a, unlocked: a.check(ctx) }));
+}
+// Tira horizontal de insignias — desbloqueadas a todo color con su fondo
+// tintado, bloqueadas en gris apagado (mismo lenguaje "gris = todavía no"
+// que ya usa el resto de la app para requisitos sin cumplir).
+function AchievementsStrip({ achievements }) {
+  const unlockedCount = achievements.filter((a) => a.unlocked).length;
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between px-1">
+        <p className="text-[10px] font-black uppercase tracking-widest text-slate-600">Logros</p>
+        <p className="text-[10px] font-bold text-slate-600">{unlockedCount}/{achievements.length}</p>
+      </div>
+      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+        {achievements.map((a) => (
+          <div key={a.key} title={a.label} className="shrink-0 w-16 flex flex-col items-center gap-1">
+            <div className="w-11 h-11 rounded-2xl flex items-center justify-center border transition-all"
+              style={a.unlocked ? { backgroundColor: tint(a.color, "1c"), borderColor: tint(a.color, "45"), color: a.color } : { backgroundColor: "rgba(51,65,85,0.25)", borderColor: "rgba(51,65,85,0.4)", color: "#475569" }}>
+              {a.icon}
+            </div>
+            <p className={`text-[8.5px] text-center leading-tight ${a.unlocked ? "text-slate-400 font-bold" : "text-slate-700"}`}>{a.label}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 function EvolutionDot({ cx, cy, isBest, isActive, color, deload, index, onSelect }) {
   if (cx == null || cy == null) return null;
   const dotColor = deload ? DELOAD_COLOR : color;
@@ -9762,14 +10012,17 @@ function useUserBasics(uids) {
 }
 
 const EMPTY_STREAKS_MAP = {};
-// Racha actual de una lista de uids (amigos aceptados / alumnos / tu
-// entrenador) — un vistazo rápido de "¿quién viene entrenando en serio?"
-// sin tener que entrar a cada perfil. Pide public/full (sólo visible para
-// vínculos aceptados; getPublicFull ya devuelve null en silencio si no hay
-// permiso) y aplica la misma racha "inteligente" que ya usa FriendProfileView.
+// Racha actual + entrenamientos de esta semana de una lista de uids
+// (amigos aceptados / alumnos / tu entrenador) — un vistazo rápido de
+// "¿quién viene entrenando en serio?" sin tener que entrar a cada perfil.
+// Pide public/full UNA vez por persona (sólo visible para vínculos
+// aceptados; getPublicFull ya devuelve null en silencio si no hay permiso)
+// y de esa misma respuesta saca AMBOS datos — el ranking "Esta semana" de
+// LeaderboardSection reusa este mismo pedido en vez de hacer uno aparte,
+// así no duplicamos lecturas de Firestore sólo por mostrar un dato más.
 function useUserStreaks(uids) {
   const key = uids.join(",");
-  const [streaks, setStreaks] = useState({});
+  const [activity, setActivity] = useState({});
   useEffect(() => {
     if (!uids.length) return;
     let cancelled = false;
@@ -9777,14 +10030,16 @@ function useUserStreaks(uids) {
       if (!full) return [u, null];
       const weekSchedule = full.activeRoutineSnapshot ? getRoutineWeekSchedule(full.activeRoutineSnapshot) : null;
       const dateSet = new Set((full.trainingSessions || []).map((s) => s.date));
-      return [u, computeSmartStreak(dateSet, weekSchedule)];
+      const streak = computeSmartStreak(dateSet, weekSchedule);
+      const sessionsThisWeek = getSessionsForPeriod(full.trainingSessions || [], "week").length;
+      return [u, { streak, sessionsThisWeek }];
     }))).then((pairs) => {
-      if (!cancelled) setStreaks(Object.fromEntries(pairs));
+      if (!cancelled) setActivity(Object.fromEntries(pairs));
     });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
-  return uids.length ? streaks : EMPTY_STREAKS_MAP;
+  return uids.length ? activity : EMPTY_STREAKS_MAP;
 }
 
 // Fila reusable: avatar + nombre + @usuario (a partir de public/basic),
@@ -9817,14 +10072,13 @@ function PublicUserCard({ uid, basic, streak = null, onClick = null, children })
       <div className="flex-1 min-w-0 text-left">
         <p className="text-sm font-bold text-white truncate flex items-center gap-1.5">
           {basic?.name || "Usuario"}
-          {/* Badge de mejor rango — de un vistazo, sin entrar al perfil.
-              Viene precalculado en public/basic (ver computeTopRank en
-              App.jsx), no hace falta leer el historial completo acá. */}
-          {basic?.topRank && (
-            <span className="inline-flex items-center gap-0.5 text-[9px] font-black px-1.5 py-0.5 rounded-md shrink-0" style={{ backgroundColor: tint(basic.topRank.color, "22"), color: basic.topRank.color }}>
-              <Medal size={9} className="shrink-0" />{basic.topRank.tier} {basic.topRank.sub}
-            </span>
-          )}
+          {/* Insignia de rango promedio — de un vistazo, sin entrar al
+              perfil ni leer texto. Viene precalculada en public/basic (ver
+              computeTopRank en App.jsx: promedio de los 12 grupos
+              musculares, no el mejor). Mismo ícono que ya usa Progreso,
+              para que se sienta la misma app en vez de un pill de texto
+              aparte. */}
+          {basic?.topRank && <RankBadgeIcon tier={basic.topRank.tier} sub={null} color={basic.topRank.color} size={22} />}
           {typeof streak === "number" && streak > 0 && (
             <span className="inline-flex items-center gap-0.5 text-[9px] font-black px-1.5 py-0.5 rounded-md shrink-0 bg-orange-500/15 text-orange-400">
               <Flame size={9} className="shrink-0" />{streak}
@@ -9897,8 +10151,8 @@ function ContactsSuggestions({ myUid, friendStatus, onSendFriendRequest }) {
   return (
     <div className="space-y-2.5">
       {state !== "results" && (
-        <button onClick={handleFind} disabled={state === "working"} className="w-full flex items-center gap-3 rounded-2xl border border-teal-500/25 bg-teal-500/5 px-4 py-3.5 text-left transition active:scale-[0.98] hover:border-teal-500/40 disabled:opacity-60">
-          <div className="w-9 h-9 rounded-xl bg-teal-500/15 border border-teal-500/25 flex items-center justify-center shrink-0 text-teal-400"><Contact size={16} /></div>
+        <button onClick={handleFind} disabled={state === "working"} className="w-full flex items-center gap-3 rounded-2xl border border-purple-500/25 bg-purple-500/5 px-4 py-3.5 text-left transition active:scale-[0.98] hover:border-purple-500/40 disabled:opacity-60">
+          <div className="w-9 h-9 rounded-xl bg-purple-500/15 border border-purple-500/25 flex items-center justify-center shrink-0 text-purple-400"><Contact size={16} /></div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-bold text-white">{state === "working" ? "Buscando..." : "Sugerir de mis contactos"}</p>
             <p className="text-[11px] text-slate-500">Encontrá amigos que ya usan la app</p>
@@ -10053,8 +10307,8 @@ function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted
   const sortedStudents = useMemo(() => {
     const arr = [...studentsAccepted];
     arr.sort((a, b) => {
-      const sa = streaks?.[a.studentUid];
-      const sb = streaks?.[b.studentUid];
+      const sa = streaks?.[a.studentUid]?.streak;
+      const sb = streaks?.[b.studentUid]?.streak;
       if (typeof sa !== "number" && typeof sb !== "number") return 0;
       if (typeof sa !== "number") return 1;
       if (typeof sb !== "number") return -1;
@@ -10126,7 +10380,7 @@ function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted
             {studentsAccepted.length === 0 ? (
               <p className="text-xs text-slate-600 px-1">Todavía no tenés alumnos vinculados.</p>
             ) : sortedStudents.map((l) => (
-              <PublicUserCard key={l.id} uid={l.studentUid} basic={basics[l.studentUid]} streak={streaks?.[l.studentUid]} onClick={() => onViewStudent(l.studentUid)}>
+              <PublicUserCard key={l.id} uid={l.studentUid} basic={basics[l.studentUid]} streak={streaks?.[l.studentUid]?.streak} onClick={() => onViewStudent(l.studentUid)}>
                 <button onClick={(e) => { e.stopPropagation(); onRemoveLink(l); }} className="shrink-0 p-1.5 rounded-lg text-slate-600 hover:text-rose-400 transition" title="Desvincular"><X size={13} /></button>
                 <ChevronRight size={15} className="text-slate-600 shrink-0" />
               </PublicUserCard>
@@ -10151,7 +10405,7 @@ function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted
             {trainersAccepted.length === 0 ? (
               <p className="text-xs text-slate-600 px-1">No tenés un entrenador vinculado.</p>
             ) : trainersAccepted.map((l) => (
-              <PublicUserCard key={l.id} uid={l.trainerUid} basic={basics[l.trainerUid]} streak={streaks?.[l.trainerUid]} onClick={() => onViewTrainer(l.trainerUid)}>
+              <PublicUserCard key={l.id} uid={l.trainerUid} basic={basics[l.trainerUid]} streak={streaks?.[l.trainerUid]?.streak} onClick={() => onViewTrainer(l.trainerUid)}>
                 <button onClick={(e) => { e.stopPropagation(); onRemoveLink(l); }} className="shrink-0 p-1.5 rounded-lg text-slate-600 hover:text-rose-400 transition" title="Desvincular"><X size={13} /></button>
                 <ChevronRight size={15} className="text-slate-600 shrink-0" />
               </PublicUserCard>
@@ -10274,7 +10528,7 @@ function RankComparisonList({ comparison, theirName }) {
 // mejor rango. El podio (1-3) se marca con una medalla en vez de un
 // número pelado, y "vos" se resalta para encontrarte de un vistazo en una
 // lista larga.
-function LeaderboardRow({ position, name, username, avatarData, topRank, isMe }) {
+function LeaderboardRow({ position, name, username, avatarData, topRank, sessionsThisWeek = null, isMe }) {
   const medalColor = position === 1 ? "#FFD23F" : position === 2 ? "#DCE3E8" : position === 3 ? "#CD7F32" : null;
   return (
     <div className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl border ${isMe ? "border-purple-500/40 bg-purple-500/10" : "border-slate-800/50 bg-slate-900/50"}`}>
@@ -10292,21 +10546,31 @@ function LeaderboardRow({ position, name, username, avatarData, topRank, isMe })
         <p className="text-sm font-bold text-white truncate">{isMe ? "Vos" : (name || "Usuario")}</p>
         <p className="text-[11px] text-slate-500 truncate">@{username || "..."}</p>
       </div>
-      {topRank && (
-        <span className="text-[10px] font-black px-2 py-1 rounded-lg shrink-0" style={{ backgroundColor: tint(topRank.color, "22"), color: topRank.color }}>{topRank.tier} {topRank.sub}</span>
-      )}
+      {sessionsThisWeek != null ? (
+        <span className="flex items-center gap-1 shrink-0 text-sm font-black text-orange-400"><Flame size={16} />{sessionsThisWeek}</span>
+      ) : topRank && <RankBadgeIcon tier={topRank.tier} sub={topRank.sub} color={topRank.color} size={30} />}
     </div>
   );
 }
 
 // Ranking de competencia — "Amigos" sale de datos que YA tenemos en el
-// cliente (basics de la lista de amigos, cero pedidos nuevos); "Global"
-// pide el top de TODOS los perfiles públicos de la app vía
-// listGlobalLeaderboard (ver social.js — collectionGroup query, necesita
-// un índice creado a mano en Firebase la primera vez). Se pide sólo una
-// vez por apertura de la pestaña (globalList !== null actúa de caché),
-// no cada vez que se toca el toggle.
-function LeaderboardSection({ uid, profile, myTopRank, friendAccepted, basics }) {
+// cliente (basics de la lista de amigos, cero pedidos nuevos).
+// El ranking "Global" (listGlobalLeaderboard, en social.js) está
+// TEMPORALMENTE apagado a pedido — la collectionGroup query todavía
+// devuelve "Missing or insufficient permissions" en producción (índice
+// recién creado, reglas por confirmar), así que por ahora no se pide ni se
+// muestra el toggle. GLOBAL_RANKING_ENABLED es el único switch a cambiar
+// para reactivarlo cuando esté resuelto del lado de Firestore — el resto
+// del código (listGlobalLeaderboard, LeaderboardRow ya soporta ambos)
+// sigue intacto.
+const GLOBAL_RANKING_ENABLED = false;
+// "Esta semana" ocupa el lugar del toggle "Global" mientras esté apagado —
+// en vez de que el selector directamente desaparezca (una pérdida neta),
+// se reemplaza por un ranking nuevo que SÍ funciona sin depender de ningún
+// índice de Firestore: quién entrenó más veces esta semana, usando la
+// MISMA lectura de public/full que ya pide `activity` (useUserStreaks) para
+// la racha — cero pedidos nuevos a Firestore por agregar esto.
+function LeaderboardSection({ uid, profile, myTopRank, friendAccepted, basics, activity }) {
   const [scope, setScope] = useState("amigos");
   const [globalList, setGlobalList] = useState(null);
   const [globalError, setGlobalError] = useState(false);
@@ -10316,7 +10580,7 @@ function LeaderboardSection({ uid, profile, myTopRank, friendAccepted, basics })
   const globalLoading = scope === "global" && globalList === null && !globalError;
 
   useEffect(() => {
-    if (scope !== "global" || globalList !== null) return;
+    if (!GLOBAL_RANKING_ENABLED || scope !== "global" || globalList !== null) return;
     let cancelled = false;
     listGlobalLeaderboard(50).then((list) => {
       if (cancelled) return;
@@ -10336,22 +10600,42 @@ function LeaderboardSection({ uid, profile, myTopRank, friendAccepted, basics })
     return [...mine, ...others].sort((a, b) => (b.topRank.levelIdx ?? -1) - (a.topRank.levelIdx ?? -1));
   }, [friendAccepted, basics, uid, myTopRank, profile]);
 
-  const list = scope === "amigos" ? friendsRanking : (globalList || []);
+  const weeklyRanking = useMemo(() => {
+    const mine = [{ uid, name: profile?.name, username: profile?.username, avatarData: profile?.avatarData, sessionsThisWeek: getSessionsForPeriod(profile?.trainingSessions || [], "week").length, isMe: true }];
+    const others = friendAccepted.map((f) => {
+      const other = f.users.find((u) => u !== uid);
+      const a = activity?.[other];
+      if (!a) return null; // todavía no llegó public/full (o sin permiso)
+      const b = basics[other];
+      return { uid: other, name: b?.name, username: b?.username, avatarData: b?.avatarData, sessionsThisWeek: a.sessionsThisWeek, isMe: false };
+    }).filter(Boolean);
+    return [...mine, ...others].sort((a, b) => b.sessionsThisWeek - a.sessionsThisWeek);
+  }, [friendAccepted, basics, activity, uid, profile]);
+
+  const list = scope === "amigos" ? friendsRanking : scope === "semana" ? weeklyRanking : (globalList || []);
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-1.5 p-1 rounded-2xl bg-slate-900/60 border border-slate-800/50">
-        <button onClick={() => setScope("amigos")} className={`py-2 rounded-xl text-xs font-bold transition ${scope === "amigos" ? "bg-purple-500/20 text-purple-400" : "text-slate-500"}`}>Amigos</button>
-        <button onClick={() => setScope("global")} className={`py-2 rounded-xl text-xs font-bold transition ${scope === "global" ? "bg-purple-500/20 text-purple-400" : "text-slate-500"}`}>Global</button>
+      <div className={`grid gap-1.5 p-1 rounded-2xl bg-slate-900/60 border border-slate-800/50`} style={{ gridTemplateColumns: GLOBAL_RANKING_ENABLED ? "repeat(3, 1fr)" : "repeat(2, 1fr)" }}>
+        <button onClick={() => setScope("amigos")} className={`py-2 rounded-xl text-xs font-bold transition ${scope === "amigos" ? "bg-purple-500/20 text-purple-400" : "text-slate-500"}`}>Mejor rango</button>
+        <button onClick={() => setScope("semana")} className={`flex items-center justify-center gap-1 py-2 rounded-xl text-xs font-bold transition ${scope === "semana" ? "bg-purple-500/20 text-purple-400" : "text-slate-500"}`}><Flame size={12} /> Esta semana</button>
+        {GLOBAL_RANKING_ENABLED && <button onClick={() => setScope("global")} className={`py-2 rounded-xl text-xs font-bold transition ${scope === "global" ? "bg-purple-500/20 text-purple-400" : "text-slate-500"}`}>Global</button>}
       </div>
       {scope === "amigos" && friendsRanking.length === 0 && (
         <div className="text-center py-8 text-slate-600"><Award size={28} className="mx-auto mb-2.5 opacity-30" /><p className="text-sm">Todavía no hay nadie con rango para mostrar acá.</p><p className="text-xs mt-1 text-slate-700">Agregá amigos y anotá tus marcas para aparecer.</p></div>
+      )}
+      {scope === "semana" && weeklyRanking.length <= 1 && (
+        <p className="text-center text-slate-600 text-sm py-8 px-4">Todavía no hay datos de tus amigos esta semana — puede tardar un momento en cargar.</p>
       )}
       {scope === "global" && globalLoading && <p className="text-center text-slate-600 text-sm py-8">Cargando ranking...</p>}
       {scope === "global" && globalError && <p className="text-center text-slate-600 text-sm py-8 px-4">No pudimos cargar el ranking global ahora mismo. Probá de nuevo más tarde.</p>}
       {scope === "global" && !globalLoading && !globalError && globalList?.length === 0 && <p className="text-center text-slate-600 text-sm py-8">Todavía no hay nadie en el ranking global.</p>}
       <div className="space-y-2">
-        {list.map((entry, i) => <LeaderboardRow key={entry.uid} position={i + 1} {...entry} />)}
+        {/* Fallback de key: un perfil local ("sin Google") no tiene
+            googleUid todavía, así que "vos" en la lista puede llegar con
+            uid undefined — sin el fallback, React tira "missing key"
+            apenas esa fila entra en el array. */}
+        {list.map((entry, i) => <LeaderboardRow key={entry.uid || (entry.isMe ? "me" : i)} position={i + 1} {...entry} />)}
       </div>
     </div>
   );
@@ -10458,6 +10742,34 @@ function RoutineProposalComposer({ myRoutines, onClose, onSubmit }) {
 //    de propuesta a su alumno, que la acepta o no.
 //  - mode="self" (desde Perfil): armás tu propia progresión y se aplica
 //    directo a tu rutina activa, sin pasos intermedios.
+// Plantillas disponibles en el composer — cada una sabe cómo construir las
+// `weeks` entradas a partir de un punto de partida. Centralizado en un
+// array (en vez de un switch largo en el JSX) para que agregar una
+// plantilla nueva el día de mañana sea sumar un objeto acá, nada más.
+const PROGRESSION_TEMPLATES = [
+  { key: "linear", label: "Lineal", icon: <TrendingUp size={13} />, hint: "+kg cada semana, mismas reps", build: (weeks, kg, reps, repsMax, inc) => buildLinearProgression(weeks, kg, reps, inc) },
+  { key: "double", label: "Doble progresión", icon: <Layers size={13} />, hint: "Sube reps hasta el tope y ahí sube el kg", build: (weeks, kg, reps, repsMax, inc) => buildDoubleProgression(weeks, kg, reps, repsMax, inc) },
+  { key: "wave", label: "Ondulante", icon: <Activity size={13} />, hint: "Alterna semana pesada/liviana", build: (weeks, kg, reps, repsMax, inc) => buildWaveProgression(weeks, kg, reps, inc) },
+  { key: "step", label: "Escalón c/2 sem", icon: <ListChecks size={13} />, hint: "Mismo peso 2 semanas, después sube", build: (weeks, kg, reps, repsMax, inc) => buildStepProgression(weeks, kg, reps, inc) },
+  { key: "flat", label: "Igual todas", icon: <Minus size={13} />, hint: "Mismo peso y reps toda la planificación", build: (weeks, kg, reps) => buildFlatProgression(weeks, kg, reps) },
+];
+
+// BUG FIX (pedido: "agregá muchas opciones de planificación semanal y
+// diseñá un nuevo interfaz más fácil, visual y práctica"): la versión
+// anterior sólo tenía una tira horizontal de casilleros vacíos, semana por
+// semana, sin ninguna ayuda para completarlos — para una rutina de 8+
+// semanas era tipear 16+ números a mano sin ninguna referencia visual de
+// si la progresión resultante tenía sentido. Ahora:
+//  - Plantillas rápidas (lineal, doble progresión, ondulante, escalón,
+//    plana) autocompletan TODAS las semanas de una key start kg/reps —
+//    siguen siendo editables a mano después de aplicar una.
+//  - Lista vertical en vez de tira horizontal: no se corta el contexto al
+//    haber más de 4-5 semanas, y cada fila muestra una barra visual
+//    (proporcional al kg de esa semana) + la diferencia contra la semana
+//    anterior, para chequear de un vistazo que la curva tenga sentido.
+//  - "Aplicar a todas las series de este ejercicio": antes había que
+//    repetir el formulario entero serie por serie para una rutina de 3-4
+//    series por ejercicio (el caso más común).
 function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onSubmit, mode = "trainer" }) {
   useAndroidBack(onClose);
   const model = useMemo(() => (routineSnapshot ? buildRoutineModel(routineSnapshot) : null), [routineSnapshot]);
@@ -10465,6 +10777,7 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
   const [exerciseId, setExerciseId] = useState(exercises[0]?.id || null);
   const selectedExercise = exercises.find((e) => e.id === exerciseId) || null;
   const [setIndex, setSetIndex] = useState(0);
+  const [applyToAllSets, setApplyToAllSets] = useState(false);
   // `entries` sólo guarda lo que la persona TOCÓ en esta sesión del
   // formulario, por clave "exerciseId_setIndex_week" (no por semana sola)
   // — así no hace falta ningún efecto para "resetear"/"precargar" al
@@ -10475,6 +10788,13 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
   const [note, setNote] = useState("");
   const [sending, setSending] = useState(false);
   const weeks = Array.from({ length: Math.max(1, trainWeeks || TRAIN_WEEKS) }, (_, i) => i + 1);
+
+  // Punto de partida para las plantillas rápidas — no se manda a ningún
+  // lado, sólo alimenta buildX() al tocar un botón de plantilla.
+  const [tplKg, setTplKg] = useState("");
+  const [tplReps, setTplReps] = useState("8");
+  const [tplRepsMax, setTplRepsMax] = useState("12");
+  const [tplInc, setTplInc] = useState("2.5");
 
   const entryKey = (week) => `${exerciseId}_${setIndex}_${week}`;
   // Lo ya planificado para este ejercicio/serie/semana (si había una
@@ -10503,6 +10823,31 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
     return { ...prev, [key]: { ...base, ...patch } };
   });
 
+  const applyTemplate = (tpl) => {
+    const kg = parseFloat(tplKg);
+    const reps = parseInt(tplReps, 10);
+    if (isNaN(kg) || kg <= 0 || isNaN(reps) || reps <= 0) return;
+    const repsMax = parseInt(tplRepsMax, 10) || reps + 1;
+    const inc = parseFloat(tplInc) || 0;
+    const built = tpl.build(weeks, kg, reps, repsMax, inc);
+    setEntries((prev) => {
+      const next = { ...prev };
+      built.forEach((e) => { next[entryKey(e.week)] = { kg: String(e.kg), reps: String(e.reps) }; });
+      return next;
+    });
+  };
+  const clearAll = () => setEntries((prev) => {
+    const next = { ...prev };
+    weeks.forEach((w) => { next[entryKey(w)] = { kg: "", reps: "" }; });
+    return next;
+  });
+
+  // Barra visual: alto proporcional al kg de esa semana contra el máximo
+  // cargado — un vistazo alcanza para notar una progresión rota (ej. un
+  // salto absurdo entre dos semanas) antes de guardar/enviar nada.
+  const weekKgs = weeks.map((w) => parseFloat(valueFor(w, "kg")) || 0);
+  const maxKg = Math.max(...weekKgs, 1);
+
   const handleSubmit = async () => {
     if (!selectedExercise) return;
     const cleanEntries = weeks
@@ -10513,9 +10858,11 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
       })
       .filter(Boolean);
     if (!cleanEntries.length) return;
+    const targetSetIndexes = applyToAllSets ? selectedExercise.sets.map((_, i) => i) : [setIndex];
+    const plans = targetSetIndexes.map((si) => ({ exerciseId: selectedExercise.id, exerciseName: selectedExercise.name, setIndex: si, entries: cleanEntries }));
     setSending(true);
     try {
-      await onSubmit({ exerciseId: selectedExercise.id, exerciseName: selectedExercise.name, setIndex, entries: cleanEntries }, note.trim());
+      await onSubmit(plans.length === 1 ? plans[0] : plans, note.trim());
     } finally {
       setSending(false);
     }
@@ -10545,22 +10892,72 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
                 </select>
               </div>
               {selectedExercise && selectedExercise.sets.length > 1 && (
-                <div className="flex gap-1.5">
-                  {selectedExercise.sets.map((_, i) => (
-                    <button key={i} onClick={() => setSetIndex(i)} className={`flex-1 py-2 rounded-lg text-xs font-bold transition ${setIndex === i ? "bg-sky-500 !text-white" : "bg-slate-800 text-slate-400"}`}>Serie {i + 1}</button>
-                  ))}
+                <div className="space-y-1.5">
+                  <div className="flex gap-1.5">
+                    {selectedExercise.sets.map((_, i) => (
+                      <button key={i} disabled={applyToAllSets} onClick={() => setSetIndex(i)} className={`flex-1 py-2 rounded-lg text-xs font-bold transition disabled:opacity-30 ${setIndex === i ? "bg-sky-500 !text-white" : "bg-slate-800 text-slate-400"}`}>Serie {i + 1}</button>
+                    ))}
+                  </div>
+                  <label className="flex items-center gap-2 px-1 py-1 cursor-pointer select-none">
+                    <input type="checkbox" checked={applyToAllSets} onChange={(e) => setApplyToAllSets(e.target.checked)} className="accent-sky-500 w-3.5 h-3.5" />
+                    <span className="text-[11px] text-slate-400">Aplicar esta misma planificación a las {selectedExercise.sets.length} series del ejercicio</span>
+                  </label>
                 </div>
               )}
+
+              {/* Plantillas rápidas — autocompletan las semanas de una,
+                  quedan editables a mano después. */}
+              <div className="rounded-2xl border border-sky-500/20 bg-sky-500/5 p-3.5 space-y-2.5">
+                <p className="text-[10px] font-black uppercase tracking-widest text-sky-300/80 flex items-center gap-1.5"><Sparkles size={12} /> Plantilla rápida</p>
+                <div className="grid grid-cols-3 gap-1.5">
+                  <div>
+                    <label className="text-[9px] text-slate-500 block mb-0.5">Kg inicial</label>
+                    <input value={tplKg} onChange={(e) => setTplKg(e.target.value)} type="number" inputMode="decimal" placeholder="60" className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-2 py-1.5 text-white text-xs text-center focus:outline-none" />
+                  </div>
+                  <div>
+                    <label className="text-[9px] text-slate-500 block mb-0.5">Reps</label>
+                    <input value={tplReps} onChange={(e) => setTplReps(e.target.value)} type="number" inputMode="numeric" className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-2 py-1.5 text-white text-xs text-center focus:outline-none" />
+                  </div>
+                  <div>
+                    <label className="text-[9px] text-slate-500 block mb-0.5">+kg/sem</label>
+                    <input value={tplInc} onChange={(e) => setTplInc(e.target.value)} type="number" inputMode="decimal" step="0.25" className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-2 py-1.5 text-white text-xs text-center focus:outline-none" />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-[9px] text-slate-500 shrink-0">Tope de reps (doble progresión)</label>
+                  <input value={tplRepsMax} onChange={(e) => setTplRepsMax(e.target.value)} type="number" inputMode="numeric" className="w-14 bg-slate-800 border border-slate-700/50 rounded-lg px-2 py-1 text-white text-xs text-center focus:outline-none" />
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {PROGRESSION_TEMPLATES.map((tpl) => (
+                    <button key={tpl.key} onClick={() => applyTemplate(tpl)} disabled={!tplKg || !tplReps} title={tpl.hint} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-sky-500/15 border border-sky-500/30 text-sky-300 text-[10.5px] font-bold hover:bg-sky-500/25 transition disabled:opacity-30 disabled:cursor-not-allowed">
+                      {tpl.icon} {tpl.label}
+                    </button>
+                  ))}
+                  <button onClick={clearAll} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-500 text-[10.5px] font-bold hover:text-rose-400 transition"><Trash2 size={12} /> Limpiar</button>
+                </div>
+              </div>
+
               <div>
                 <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Meta por semana (dejá vacío lo que no quieras planificar)</label>
-                <div className="flex gap-2 overflow-x-auto pb-1">
-                  {weeks.map((week) => (
-                    <div key={week} className="shrink-0 w-20 space-y-1">
-                      <p className="text-[9.5px] font-black text-center text-slate-500 uppercase">Sem {week}</p>
-                      <input value={valueFor(week, "kg")} onChange={(e) => updateEntry(week, { kg: e.target.value })} type="number" inputMode="decimal" placeholder="kg" className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-2 py-1.5 text-white text-xs text-center focus:outline-none" />
-                      <input value={valueFor(week, "reps")} onChange={(e) => updateEntry(week, { reps: e.target.value })} type="number" inputMode="numeric" placeholder="reps" className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-2 py-1.5 text-white text-xs text-center focus:outline-none" />
-                    </div>
-                  ))}
+                <div className="space-y-1.5">
+                  {weeks.map((week, i) => {
+                    const kg = weekKgs[i];
+                    const prevKg = i > 0 ? weekKgs[i - 1] : null;
+                    const delta = kg && prevKg ? Math.round((kg - prevKg) * 100) / 100 : null;
+                    return (
+                      <div key={week} className="flex items-center gap-2 rounded-xl bg-slate-800/40 border border-slate-700/40 p-2">
+                        <span className="w-11 shrink-0 text-[10px] font-black text-slate-500 uppercase">Sem {week}</span>
+                        <input value={valueFor(week, "kg")} onChange={(e) => updateEntry(week, { kg: e.target.value })} type="number" inputMode="decimal" placeholder="kg" className="w-16 shrink-0 bg-slate-900 border border-slate-700/50 rounded-lg px-2 py-1.5 text-white text-xs text-center focus:outline-none" />
+                        <input value={valueFor(week, "reps")} onChange={(e) => updateEntry(week, { reps: e.target.value })} type="number" inputMode="numeric" placeholder="reps" className="w-14 shrink-0 bg-slate-900 border border-slate-700/50 rounded-lg px-2 py-1.5 text-white text-xs text-center focus:outline-none" />
+                        <div className="flex-1 h-2 rounded-full bg-slate-900/80 overflow-hidden min-w-[24px]">
+                          {kg > 0 && <div className="h-full rounded-full bg-sky-500/70 transition-all" style={{ width: `${Math.max(6, (kg / maxKg) * 100)}%` }} />}
+                        </div>
+                        {delta != null && delta !== 0 && (
+                          <span className={`shrink-0 text-[9.5px] font-black w-11 text-right ${delta > 0 ? "text-emerald-400" : "text-amber-400"}`}>{delta > 0 ? "+" : ""}{delta}kg</span>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
               {mode !== "self" && (
@@ -10611,6 +11008,13 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
   const weekInfo = cycleStart ? getWeekInfo(cycleStart, { ...DEFAULT_SETTINGS, ...(full?.settings || {}) }) : null;
   const dateSet = useMemo(() => new Set((full?.trainingSessions || []).map((s) => s.date)), [full]);
   const streak = useMemo(() => computeSmartStreak(dateSet, weekSchedule), [dateSet, weekSchedule]);
+  // "Duelo semanal" — mismo dato (trainingSessions) que ya viaja en `full`
+  // para la racha, sin pedir nada nuevo a Firestore: cuántas veces entrenó
+  // cada uno ESTA semana (lunes a domingo, mismo criterio que
+  // getSessionsForPeriod usa en el resto de la app). Un contraste corto y
+  // competitivo, distinto de "Rango por músculo" (que es de fondo/histórico).
+  const mySessionsThisWeek = useMemo(() => getSessionsForPeriod(viewerProfile?.trainingSessions || [], "week").length, [viewerProfile]);
+  const theirSessionsThisWeek = useMemo(() => getSessionsForPeriod(full?.trainingSessions || [], "week").length, [full]);
 
   return (
     <div className="space-y-4">
@@ -10643,6 +11047,27 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
               <p className="text-xl font-black text-purple-400">{weekInfo ? `S${weekInfo.weekInCycle}` : "—"}</p>
               <p className="text-[10px] text-slate-500 mt-0.5">{weekInfo?.isDeload ? "Semana de descarga" : "Semana de su ciclo"}</p>
             </div>
+          </div>
+
+          {/* Duelo semanal — quién entrenó más veces ESTA semana, vos o
+              esta persona. Corto y competitivo a propósito, para que abrir
+              un perfil no sea sólo mirar números históricos. */}
+          <div className="rounded-2xl border border-slate-800/50 bg-slate-900/40 p-3.5">
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 mb-2 flex items-center gap-1.5"><Swords size={11} /> Duelo esta semana</p>
+            <div className="flex items-center gap-3">
+              <div className="flex-1 text-center">
+                <p className={`text-2xl font-black leading-none ${mySessionsThisWeek > theirSessionsThisWeek ? "text-emerald-400" : "text-white"}`}>{mySessionsThisWeek}</p>
+                <p className="text-[10px] text-slate-500 mt-1">Vos</p>
+              </div>
+              <span className="text-[10px] text-slate-700 font-black shrink-0">VS</span>
+              <div className="flex-1 text-center">
+                <p className={`text-2xl font-black leading-none ${theirSessionsThisWeek > mySessionsThisWeek ? "text-emerald-400" : "text-white"}`}>{theirSessionsThisWeek}</p>
+                <p className="text-[10px] text-slate-500 mt-1 truncate">{basic?.name || "Ellos"}</p>
+              </div>
+            </div>
+            <p className="text-[10px] text-slate-600 text-center mt-2">
+              {mySessionsThisWeek === theirSessionsThisWeek ? "Van empatados esta semana" : mySessionsThisWeek > theirSessionsThisWeek ? "Vas ganando esta semana 💪" : `${basic?.name || "Esta persona"} va ganando esta semana`}
+            </p>
           </div>
 
           {/* El rango va primero (después de racha/semana): es lo que más
@@ -10840,6 +11265,14 @@ function SocialView({ profile, profileName, uid, onActivateRoutine }) {
 
   const [showShareProfile, setShowShareProfile] = useState(false);
   const myTopRank = useMemo(() => computeTopRank(profile), [profile]);
+  const achievements = useMemo(() => computeAchievements({
+    trainedDays: getTrainedDateSet(profile?.logs || {}, profile?.trainingSessions || []).size,
+    friendCount: friendAccepted.length,
+    myTopRank,
+    hasUsername: !!profile?.username,
+    hasTrainerLink: studentsAccepted.length > 0 || trainersAccepted.length > 0,
+    trainingMode: getProfileSettings(profile)?.trainingMode,
+  }), [profile, friendAccepted.length, myTopRank, studentsAccepted.length, trainersAccepted.length]);
   // Antes no había NINGUNA forma de sacar a un amigo ya aceptado — el único
   // botón de "Cancelar" que existía era para una solicitud saliente
   // todavía pendiente. Two-tap (mismo criterio que borrar una conversación
@@ -10883,6 +11316,33 @@ function SocialView({ profile, profileName, uid, onActivateRoutine }) {
 
   return (
     <div className="space-y-4">
+      {/* Hero propio de la pestaña — antes Social arrancaba directo en el
+          selector de secciones, sin ningún momento de identidad como sí
+          tienen Rutina/Progreso/Descarga (cada una con su panel de
+          gradiente arriba). Mismo lenguaje acá: ícono + título + un dato
+          rápido, con el rango promedio bien visible como ícono (ver
+          computeTopRank más arriba: promedio de los 12 grupos, no el
+          mejor uno solo). */}
+      <div className="relative overflow-hidden rounded-2xl border border-purple-500/20 p-5" style={{ background: "var(--grad-hero-purple)" }}>
+        <div className="absolute -top-10 -right-6 w-36 h-36 rounded-full bg-purple-500/15 blur-3xl pointer-events-none" />
+        <div className="relative flex items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl overflow-hidden shrink-0 border border-purple-500/30 bg-purple-500/15 flex items-center justify-center">
+            {profile?.avatarData ? <img src={profile.avatarData} alt="" className="w-full h-full object-cover" /> : <Users size={20} className="text-purple-300" />}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-[10px] font-black uppercase tracking-widest text-purple-400">Social</p>
+            <h2 className="text-base font-black text-white leading-tight truncate">{profile?.name || "Tu comunidad fitness"}</h2>
+            <p className="text-[11px] text-slate-400">
+              {friendAccepted.length} {friendAccepted.length === 1 ? "amigo" : "amigos"}
+              {(studentsAccepted.length + trainersAccepted.length) > 0 ? ` · ${studentsAccepted.length + trainersAccepted.length} vínculo${(studentsAccepted.length + trainersAccepted.length) === 1 ? "" : "s"} de entrenador` : ""}
+            </p>
+          </div>
+          {myTopRank && <RankBadgeIcon tier={myTopRank.tier} sub={myTopRank.sub} color={myTopRank.color} size={46} />}
+        </div>
+      </div>
+
+      <AchievementsStrip achievements={achievements} />
+
       <div className="relative grid gap-1 p-1 rounded-2xl bg-slate-900/60 border border-slate-800/50" style={{ gridTemplateColumns: `repeat(${SECTIONS.length}, 1fr)` }}>
         {/* Píldora deslizante en vez de que cada botón prenda/apague su
             propio fondo de golpe — un solo elemento que se desliza y
@@ -10975,7 +11435,7 @@ function SocialView({ profile, profileName, uid, onActivateRoutine }) {
                   <div className="text-center py-8 text-slate-600"><Users size={28} className="mx-auto mb-2.5 opacity-30" /><p className="text-sm">Todavía no tenés amigos agregados.</p><p className="text-xs mt-1 text-slate-700">Buscalos por su @usuario en "Buscar".</p></div>
                 ) : sortedFriendAccepted.map((f, i) => { const other = otherUidOf(f); const confirming = confirmRemoveId === f.id; return (
                   <div key={f.id} className="stagger-item" style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}>
-                    <PublicUserCard uid={other} basic={basics[other]} streak={streaks[other]} onClick={confirming ? null : () => setViewingUid(other)}>
+                    <PublicUserCard uid={other} basic={basics[other]} streak={streaks[other]?.streak} onClick={confirming ? null : () => setViewingUid(other)}>
                       {confirming ? (
                         <span className="flex items-center gap-1.5 shrink-0">
                           <span className="text-[10px] text-slate-500 mr-0.5">¿Quitar?</span>
@@ -10997,7 +11457,7 @@ function SocialView({ profile, profileName, uid, onActivateRoutine }) {
         )}
 
         {section === "ranking" && (
-          <LeaderboardSection uid={uid} profile={profile} myTopRank={myTopRank} friendAccepted={friendAccepted} basics={basics} />
+          <LeaderboardSection uid={uid} profile={profile} myTopRank={myTopRank} friendAccepted={friendAccepted} basics={basics} activity={streaks} />
         )}
 
         {section === "entrenador" && (
@@ -11228,8 +11688,12 @@ function ExercisePickerPanel({ existingIds, onAdd, onAddCustom, onClose }) {
   const [group, setGroup] = useState(MUSCLE_GROUPS[0].key);
   const [search, setSearch] = useState("");
   const [customName, setCustomName] = useState("");
-  // Músculo del ejercicio personalizado — por defecto el grupo activo en el picker
-  const [customMuscle, setCustomMuscle] = useState(MUSCLE_GROUPS[0].key);
+  // Músculo del ejercicio personalizado — arranca en el primer músculo real
+  // (no "cardio", aunque sea MUSCLE_GROUPS[0]): antes, si alguien agregaba
+  // un ejercicio propio sin tocar ningún chip, quedaba silenciosamente
+  // marcado "cardio" (con muscle:"cardio" en minúscula, sin capitalizar) sin
+  // que el chip de Cardio se viera siquiera seleccionado en pantalla.
+  const [customMuscle, setCustomMuscle] = useState(MUSCLE_GROUPS.find((g) => g.key !== "cardio")?.key || MUSCLE_GROUPS[0].key);
   const pool = search.trim()
     ? EXERCISE_LIBRARY.filter((e) => e.name.toLowerCase().includes(search.trim().toLowerCase()))
     : EXERCISE_LIBRARY_BY_GROUP[group];
@@ -11271,7 +11735,13 @@ function ExercisePickerPanel({ existingIds, onAdd, onAddCustom, onClose }) {
         <div>
           <p className="text-[9px] text-slate-600 mb-1.5">Músculo principal:</p>
           <div className="flex flex-wrap gap-1.5">
-            {MUSCLE_GROUPS.filter((g) => g.key !== "cardio").map((g) => (
+            {/* BUG FIX (pedido: "simplificar cómo se arma el cardio en el
+                editor"): antes "Cardio" estaba excluido de acá — no había
+                forma de cargar un ejercicio propio (uno que no está en la
+                biblioteca) como cardio, quedaba siempre como fuerza con 3
+                series de 8-10 fijo. Ahora es un chip más; addCustomExercise
+                lo detecta y arma 1 sola sesión de tiempo en vez de series. */}
+            {MUSCLE_GROUPS.map((g) => (
               <button key={g.key} onClick={() => setCustomMuscle(g.key)} className="px-2 py-1 rounded-lg text-[9px] font-bold border transition shrink-0"
                 style={customMuscle === g.key ? { backgroundColor: tint(g.color, "22"), borderColor: tint(g.color, "55"), color: g.color } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
                 {g.label}
@@ -11295,6 +11765,14 @@ function BuilderExerciseRow({ ex, onRemove, onConfigChange, isDragging = false, 
   const [editing, setEditing] = useState(false);
   const repRange = ex.sets[0]?.repRange || "8-10";
   const setsCount = ex.sets.length;
+  // BUG FIX (pedido: "cardio, por defecto, una sola entrada de duración,
+  // sin pedir cantidad de series"): antes el stepper de "bloques" se
+  // mostraba SIEMPRE para cardio, igual que "cantidad de series" para
+  // fuerza — obligaba a pensar en intervalos aunque el 90% de los casos es
+  // una sesión continua. Ahora queda oculto atrás de un toggle opcional
+  // ("¿Por intervalos?"), arrancando plegado salvo que la rutina YA tenga
+  // más de un bloque cargado (import viejo, o alguien que ya lo usó).
+  const [showIntervals, setShowIntervals] = useState(setsCount > 1);
   const heavy = isHeavyRepRange(repRange);
   // ¿Todas las series tienen el mismo rango?
   const allSame = ex.sets.every((s) => s.repRange === repRange);
@@ -11399,15 +11877,33 @@ function BuilderExerciseRow({ ex, onRemove, onConfigChange, isDragging = false, 
               </p>
             </div>
           )}
-          {/* Cantidad de bloques/series */}
-          <div>
-            <p className="text-[10px] text-slate-500 mb-1.5">{ex.cardio ? "Bloques (intervalos)" : "Cantidad de series"}</p>
-            <div className="flex items-center gap-2">
-              <button onClick={() => onConfigChange({ setsCount: Math.max(1, setsCount - 1), repRange })} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm active:scale-95">−</button>
-              <span className="text-sm font-black text-white w-5 text-center tabular-nums">{setsCount}</span>
-              <button onClick={() => onConfigChange({ setsCount: Math.min(8, setsCount + 1), repRange })} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm active:scale-95">+</button>
+          {/* Cantidad de bloques/series — para cardio, oculto por defecto
+              atrás de un toggle (ver showIntervals más arriba). */}
+          {ex.cardio ? (
+            <div>
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input type="checkbox" checked={showIntervals} onChange={(e) => { const on = e.target.checked; setShowIntervals(on); if (!on) onConfigChange({ setsCount: 1, repRange }); }} className="accent-rose-400 w-3.5 h-3.5" />
+                <span className="text-[10.5px] text-slate-400">¿Es por intervalos? (varios bloques de tiempo)</span>
+              </label>
+              {showIntervals && (
+                <div className="flex items-center gap-2 mt-2">
+                  <button onClick={() => onConfigChange({ setsCount: Math.max(1, setsCount - 1), repRange })} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm active:scale-95">−</button>
+                  <span className="text-sm font-black text-white w-5 text-center tabular-nums">{setsCount}</span>
+                  <button onClick={() => onConfigChange({ setsCount: Math.min(8, setsCount + 1), repRange })} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm active:scale-95">+</button>
+                  <span className="text-[9.5px] text-slate-600">bloque{setsCount !== 1 ? "s" : ""}</span>
+                </div>
+              )}
             </div>
-          </div>
+          ) : (
+            <div>
+              <p className="text-[10px] text-slate-500 mb-1.5">Cantidad de series</p>
+              <div className="flex items-center gap-2">
+                <button onClick={() => onConfigChange({ setsCount: Math.max(1, setsCount - 1), repRange })} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm active:scale-95">−</button>
+                <span className="text-sm font-black text-white w-5 text-center tabular-nums">{setsCount}</span>
+                <button onClick={() => onConfigChange({ setsCount: Math.min(8, setsCount + 1), repRange })} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm active:scale-95">+</button>
+              </div>
+            </div>
+          )}
 
           {!ex.cardio && (
             <>
@@ -14296,8 +14792,24 @@ function RoutineBuilder({ initialRoutine, onCancel, onSave, dumbbellDouble = nul
     const sets = libEx.cardio ? mkSets(1, "") : mkSets(3, "8-10");
     return { ...day, exercises: [...day.exercises, { id: libEx.id, libId: libEx.id, name: libEx.name, muscle: libEx.muscle, sets, cardio: !!libEx.cardio, supersetNext: false }] };
   }));
-  const addCustomExercise = (dayIdx, rawName, muscle = "Personalizado") => setDays((d) => d.map((day, i) => (i !== dayIdx ? day : {
-    ...day, exercises: [...day.exercises, { id: findExistingCustomExerciseId(logs, rawName) || builderUid("custom"), libId: null, name: rawName, muscle, sets: mkSets(3, "8-10"), cardio: false, supersetNext: false }],
+  // BUG FIX: `muscleKey` es la KEY cruda de MUSCLE_GROUPS (ej.
+  // "deltoide_anterior"), no una etiqueta lista para mostrar — antes se
+  // guardaba tal cual y el chip de músculo de un ejercicio propio se veía
+  // en snake_case en vez de "Deltoide anterior". Además "cardio" ahora es
+  // una opción real en el picker (antes estaba excluida): si se elige acá,
+  // se arma como 1 sola sesión de tiempo en vez de 3 series de 8-10, igual
+  // que ya hace addExercise() con los cardio de la biblioteca.
+  const addCustomExercise = (dayIdx, rawName, muscleKey = "pectoral_superior") => setDays((d) => d.map((day, i) => (i !== dayIdx ? day : {
+    ...day,
+    exercises: [...day.exercises, {
+      id: findExistingCustomExerciseId(logs, rawName) || builderUid("custom"),
+      libId: null,
+      name: rawName,
+      muscle: MUSCLE_GROUP_BY_KEY[muscleKey]?.label || "Personalizado",
+      sets: muscleKey === "cardio" ? mkSets(1, "") : mkSets(3, "8-10"),
+      cardio: muscleKey === "cardio",
+      supersetNext: false,
+    }],
   })));
   const removeExercise = (dayIdx, exIdx) => setDays((d) => d.map((day, i) => (i === dayIdx ? { ...day, exercises: day.exercises.filter((_, j) => j !== exIdx) } : day)));
   const moveExercise = (dayIdx, exIdx, delta) => setDays((d) => d.map((day, i) => {
