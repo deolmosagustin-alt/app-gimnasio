@@ -11590,17 +11590,26 @@ function SocialView({ profile, profileName, uid, onActivateRoutine }) {
               la insignia flotaba sola, sin ningún marco — desbalanceado al
               lado del avatar, que sí tiene su propia caja. Ahora usa el
               mismo tamaño de caja (w-16 h-16) que el avatar, tintada con
-              el color del propio rango, más una etiqueta "Tu rango" abajo
-              para que se entienda qué es de un vistazo. */}
+              el color del propio rango.
+              BUG FIX (pedido: "queda descentrado con el ícono social"): la
+              etiqueta "Tu rango" ANTES vivía adentro del mismo botón (con
+              flex-col), lo que hacía que el botón entero (caja + texto)
+              fuera más alto que la caja del avatar — items-center en la
+              fila los centraba a los DOS como bloques completos, así que
+              la caja del rango terminaba más arriba que la del avatar en
+              vez de a la misma altura. Ahora el botón sólo contiene la
+              caja (misma altura exacta que el avatar) y la etiqueta va
+              AFUERA de la fila, como renglón propio debajo — así las dos
+              cajas quedan perfectamente alineadas. */}
           {myTopRank && (
-            <button onClick={() => setShowMyBody(true)} aria-label="Ver tu muñeco de rangos" className="shrink-0 flex flex-col items-center gap-1 active:scale-95 transition">
-              <div className="w-16 h-16 rounded-2xl flex items-center justify-center border" style={{ backgroundColor: tint(myTopRank.color, "18"), borderColor: tint(myTopRank.color, "45") }}>
-                <RankBadgeIcon tier={myTopRank.tier} sub={myTopRank.sub} color={myTopRank.color} size={42} />
-              </div>
-              <span className="text-[8.5px] font-black uppercase tracking-wider" style={{ color: myTopRank.color }}>Tu rango</span>
+            <button onClick={() => setShowMyBody(true)} aria-label="Ver tu muñeco de rangos" className="shrink-0 w-16 h-16 rounded-2xl flex items-center justify-center border active:scale-95 transition" style={{ backgroundColor: tint(myTopRank.color, "18"), borderColor: tint(myTopRank.color, "45") }}>
+              <RankBadgeIcon tier={myTopRank.tier} sub={myTopRank.sub} color={myTopRank.color} size={42} />
             </button>
           )}
         </div>
+        {myTopRank && (
+          <p className="relative text-[8.5px] font-black uppercase tracking-wider text-right mt-1" style={{ color: myTopRank.color }}>Tu rango</p>
+        )}
         <p className="relative text-xs text-purple-300/70 mt-3">Sumá amigos, competí en el ranking y compartí tu progreso con quien entrena con vos.</p>
         {profile?.username && (
           <button onClick={() => setShowShareProfile(true)} className="relative w-full flex items-center justify-center gap-1.5 mt-4 pt-3 border-t border-white/10 text-[10px] font-bold text-purple-300/75 hover:text-purple-300 transition">
