@@ -10348,8 +10348,8 @@ function ContactsSuggestions({ myUid, friendStatus, onSendFriendRequest }) {
   return (
     <div className="space-y-2.5">
       {state !== "results" && (
-        <button onClick={handleFind} disabled={state === "working"} className="w-full flex items-center gap-3 rounded-2xl border border-purple-500/25 bg-purple-500/5 px-4 py-3.5 text-left transition active:scale-[0.98] hover:border-purple-500/40 disabled:opacity-60">
-          <div className="w-9 h-9 rounded-xl bg-purple-500/15 border border-purple-500/25 flex items-center justify-center shrink-0 text-purple-400"><Contact size={16} /></div>
+        <button onClick={handleFind} disabled={state === "working"} className="w-full flex items-center gap-3 rounded-2xl border border-cyan-500/25 bg-cyan-500/5 px-4 py-3.5 text-left transition active:scale-[0.98] hover:border-cyan-500/40 disabled:opacity-60">
+          <div className="w-9 h-9 rounded-xl bg-cyan-500/15 border border-cyan-500/25 flex items-center justify-center shrink-0 text-cyan-400"><Contact size={16} /></div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-bold text-white">{state === "working" ? "Buscando..." : "Sugerir de mis contactos"}</p>
             <p className="text-[11px] text-slate-500">Encontrá amigos que ya usan la app</p>
@@ -10375,7 +10375,7 @@ function ContactsSuggestions({ myUid, friendStatus, onSendFriendRequest }) {
           </div>
           {results.map(({ uid, basic }) => (
             <PublicUserCard key={uid} uid={uid} basic={basic}>
-              <button onClick={() => onSendFriendRequest(uid)} className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-purple-500/15 border border-purple-500/30 text-purple-300 text-[11px] font-bold hover:bg-purple-500/25 transition">
+              <button onClick={() => onSendFriendRequest(uid)} className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-[11px] font-bold hover:bg-cyan-500/25 transition">
                 <UserPlus size={12} /> Agregar
               </button>
             </PublicUserCard>
@@ -10410,9 +10410,9 @@ function SocialSearchSection({ myUid, friendStatus, onSendFriendRequest }) {
         <div className="relative flex-1">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" />
           <input value={raw} onChange={(e) => setRaw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSearch()} placeholder="@usuario de tu amigo"
-            className="w-full bg-slate-800 border border-slate-700/50 rounded-xl pl-9 pr-3 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500/50" />
+            className="w-full bg-slate-800 border border-slate-700/50 rounded-xl pl-9 pr-3 py-2.5 text-white text-sm focus:outline-none focus:border-cyan-500/50" />
         </div>
-        <button onClick={handleSearch} disabled={!raw.trim() || state === "searching"} className="px-4 rounded-xl bg-purple-500 !text-white text-sm font-bold disabled:opacity-40">Buscar</button>
+        <button onClick={handleSearch} disabled={!raw.trim() || state === "searching"} className="px-4 rounded-xl bg-cyan-500 !text-white text-sm font-bold disabled:opacity-40">Buscar</button>
       </div>
       {state === "searching" && <p className="text-xs text-slate-500 text-center py-3">Buscando...</p>}
       {state === "not_found" && <p className="text-xs text-slate-500 text-center py-3">No encontramos a nadie con ese @usuario.</p>}
@@ -10425,7 +10425,7 @@ function SocialSearchSection({ myUid, friendStatus, onSendFriendRequest }) {
             if (st === "pending_sent") return <span className="text-[10.5px] font-bold text-slate-500 shrink-0">Solicitud enviada</span>;
             if (st === "pending_received") return <span className="text-[10.5px] font-bold text-amber-400 shrink-0">Te escribió</span>;
             return (
-              <button onClick={() => onSendFriendRequest(found.uid)} className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-purple-500/15 border border-purple-500/30 text-purple-400 text-[11px] font-bold hover:bg-purple-500/25 transition">
+              <button onClick={() => onSendFriendRequest(found.uid)} className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 text-[11px] font-bold hover:bg-cyan-500/25 transition">
                 <UserPlus size={12} /> Agregar
               </button>
             );
@@ -10532,24 +10532,24 @@ function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted
       )}
 
       <div className="rounded-2xl border border-slate-800/50 bg-slate-900/50 p-4 space-y-3">
-        <p className="text-xs font-bold text-white flex items-center gap-1.5"><GraduationCap size={14} className="text-purple-400" /> Vincular entrenador/alumno</p>
+        <p className="text-xs font-bold text-white flex items-center gap-1.5"><GraduationCap size={14} className="text-blue-400" /> Vincular entrenador/alumno</p>
         <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-700/50">
-          <button onClick={() => setRole("trainer")} className={`flex-1 py-2 rounded-lg text-[11px] font-bold transition-all ${role === "trainer" ? "bg-purple-500 !text-white" : "text-slate-500"}`}>Soy el entrenador</button>
-          <button onClick={() => setRole("student")} className={`flex-1 py-2 rounded-lg text-[11px] font-bold transition-all ${role === "student" ? "bg-purple-500 !text-white" : "text-slate-500"}`}>Soy el alumno</button>
+          <button onClick={() => setRole("trainer")} className={`flex-1 py-2 rounded-lg text-[11px] font-bold transition-all ${role === "trainer" ? "bg-blue-500 !text-white" : "text-slate-500"}`}>Soy el entrenador</button>
+          <button onClick={() => setRole("student")} className={`flex-1 py-2 rounded-lg text-[11px] font-bold transition-all ${role === "student" ? "bg-blue-500 !text-white" : "text-slate-500"}`}>Soy el alumno</button>
         </div>
         <div className="flex gap-2">
           <div className="relative flex-1">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" />
             <input value={raw} onChange={(e) => setRaw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSearch()} placeholder={role === "trainer" ? "@usuario de tu alumno" : "@usuario de tu entrenador"}
-              className="w-full bg-slate-800 border border-slate-700/50 rounded-xl pl-9 pr-3 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500/50" />
+              className="w-full bg-slate-800 border border-slate-700/50 rounded-xl pl-9 pr-3 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500/50" />
           </div>
-          <button onClick={handleSearch} disabled={!raw.trim() || searchState === "searching"} className="px-4 rounded-xl bg-purple-500 !text-white text-sm font-bold disabled:opacity-40">Buscar</button>
+          <button onClick={handleSearch} disabled={!raw.trim() || searchState === "searching"} className="px-4 rounded-xl bg-blue-500 !text-white text-sm font-bold disabled:opacity-40">Buscar</button>
         </div>
         {searchState === "not_found" && <p className="text-xs text-slate-500">No encontramos a nadie con ese @usuario.</p>}
         {searchState === "self" && <p className="text-xs text-slate-500">Ese sos vos 🙂</p>}
         {searchState === "found" && found && (
           <PublicUserCard uid={found.uid} basic={found.basic}>
-            <button onClick={() => { onSendLink(found.uid, role); setFound(null); setRaw(""); setSearchState("idle"); }} className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-purple-500/15 border border-purple-500/30 text-purple-300 text-[11px] font-bold hover:bg-purple-500/25 transition">
+            <button onClick={() => { onSendLink(found.uid, role); setFound(null); setRaw(""); setSearchState("idle"); }} className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-500/15 border border-blue-500/30 text-blue-300 text-[11px] font-bold hover:bg-blue-500/25 transition">
               <UserPlus size={12} /> Invitar
             </button>
           </PublicUserCard>
@@ -10708,7 +10708,7 @@ function LeaderboardRow({ position, name, username, avatarData, topRank, session
   const medalColor = position === 1 ? "#FFD23F" : position === 2 ? "#DCE3E8" : position === 3 ? "#CD7F32" : null;
   const Tag = onClick ? "button" : "div";
   return (
-    <Tag onClick={onClick} className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl border text-left transition ${onClick ? "active:scale-[0.99] hover:border-slate-600" : ""} ${isMe ? "border-purple-500/40 bg-purple-500/10" : "border-slate-800/50 bg-slate-900/50"}`}>
+    <Tag onClick={onClick} className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl border text-left transition ${onClick ? "active:scale-[0.99] hover:border-slate-600" : ""} ${isMe ? "border-orange-500/40 bg-orange-500/10" : "border-slate-800/50 bg-slate-900/50"}`}>
       <div className="w-6 text-center shrink-0">
         {medalColor ? <Medal size={18} style={{ color: medalColor }} /> : <span className="text-sm font-black text-slate-600">{position}</span>}
       </div>
@@ -10794,9 +10794,9 @@ function LeaderboardSection({ uid, profile, myTopRank, friendAccepted, basics, a
   return (
     <div className="space-y-3">
       <div className={`grid gap-1.5 p-1 rounded-2xl bg-slate-900/60 border border-slate-800/50`} style={{ gridTemplateColumns: GLOBAL_RANKING_ENABLED ? "repeat(3, 1fr)" : "repeat(2, 1fr)" }}>
-        <button onClick={() => setScope("amigos")} className={`py-2 rounded-xl text-xs font-bold transition ${scope === "amigos" ? "bg-purple-500/20 text-purple-400" : "text-slate-500"}`}>Mejor rango</button>
-        <button onClick={() => setScope("semana")} className={`flex items-center justify-center gap-1 py-2 rounded-xl text-xs font-bold transition ${scope === "semana" ? "bg-purple-500/20 text-purple-400" : "text-slate-500"}`}><Flame size={12} /> Esta semana</button>
-        {GLOBAL_RANKING_ENABLED && <button onClick={() => setScope("global")} className={`py-2 rounded-xl text-xs font-bold transition ${scope === "global" ? "bg-purple-500/20 text-purple-400" : "text-slate-500"}`}>Global</button>}
+        <button onClick={() => setScope("amigos")} className={`py-2 rounded-xl text-xs font-bold transition ${scope === "amigos" ? "bg-orange-500/20 text-orange-400" : "text-slate-500"}`}>Mejor rango</button>
+        <button onClick={() => setScope("semana")} className={`flex items-center justify-center gap-1 py-2 rounded-xl text-xs font-bold transition ${scope === "semana" ? "bg-orange-500/20 text-orange-400" : "text-slate-500"}`}><Flame size={12} /> Esta semana</button>
+        {GLOBAL_RANKING_ENABLED && <button onClick={() => setScope("global")} className={`py-2 rounded-xl text-xs font-bold transition ${scope === "global" ? "bg-orange-500/20 text-orange-400" : "text-slate-500"}`}>Global</button>}
       </div>
       {scope === "amigos" && friendsRanking.length === 0 && (
         <div className="text-center py-8 text-slate-600"><Award size={28} className="mx-auto mb-2.5 opacity-30" /><p className="text-sm">Todavía no hay nadie con rango para mostrar acá.</p><p className="text-xs mt-1 text-slate-700">Agregá amigos y anotá tus marcas para aparecer.</p></div>
@@ -10873,9 +10873,9 @@ function RoutineProposalComposer({ myRoutines, onClose, onSubmit }) {
       <div className="w-full max-w-md max-h-[86vh] overflow-y-auto overscroll-contain bg-slate-900 border border-slate-700/60 rounded-3xl modal-pop-in shadow-2xl shadow-black/70" onClick={(e) => e.stopPropagation()}>
         <div className="p-5 space-y-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-purple-500/20 border border-purple-500/30 text-purple-300 flex items-center justify-center shrink-0"><ClipboardCheck size={17} /></div>
+            <div className="w-10 h-10 rounded-2xl bg-blue-500/20 border border-blue-500/30 text-blue-300 flex items-center justify-center shrink-0"><ClipboardCheck size={17} /></div>
             <div className="min-w-0 flex-1">
-              <p className="text-[10px] font-black uppercase tracking-widest text-purple-400">Proponer rutina</p>
+              <p className="text-[10px] font-black uppercase tracking-widest text-blue-400">Proponer rutina</p>
               <h3 className="text-base font-black text-white leading-tight">Elegí una de tus rutinas</h3>
             </div>
             <button onClick={onClose} className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white transition"><X size={15} /></button>
@@ -10887,8 +10887,8 @@ function RoutineProposalComposer({ myRoutines, onClose, onSubmit }) {
             <>
               <div className="space-y-1.5 max-h-40 overflow-y-auto">
                 {routineEntries.map(([id, def]) => (
-                  <button key={id} onClick={() => setSelectedId(id)} className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-left transition ${selectedId === id ? "bg-purple-500/15 border border-purple-500/40" : "bg-slate-800/50 border border-slate-700/40 hover:border-slate-600"}`}>
-                    <span className={`w-4 h-4 rounded-full border-2 shrink-0 ${selectedId === id ? "border-purple-400 bg-purple-400" : "border-slate-600"}`} />
+                  <button key={id} onClick={() => setSelectedId(id)} className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-left transition ${selectedId === id ? "bg-blue-500/15 border border-blue-500/40" : "bg-slate-800/50 border border-slate-700/40 hover:border-slate-600"}`}>
+                    <span className={`w-4 h-4 rounded-full border-2 shrink-0 ${selectedId === id ? "border-blue-400 bg-blue-400" : "border-slate-600"}`} />
                     <span className="text-sm font-semibold text-white truncate">{def.name || id}</span>
                   </button>
                 ))}
@@ -10899,7 +10899,7 @@ function RoutineProposalComposer({ myRoutines, onClose, onSubmit }) {
                 <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} maxLength={200} placeholder="Ej: bajamos el volumen esta vez, sumá cardio los martes..."
                   className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-3.5 py-2.5 text-white text-sm focus:outline-none resize-none" />
               </div>
-              <button onClick={handleSubmit} disabled={!selectedDef || sending} className="w-full py-3 rounded-xl bg-purple-500 !text-white text-sm font-bold disabled:opacity-40">{sending ? "Enviando..." : "Enviar propuesta"}</button>
+              <button onClick={handleSubmit} disabled={!selectedDef || sending} className="w-full py-3 rounded-xl bg-blue-500 !text-white text-sm font-bold disabled:opacity-40">{sending ? "Enviando..." : "Enviar propuesta"}</button>
             </>
           )}
         </div>
@@ -11333,7 +11333,7 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
 
           {isTrainerOfThisPerson && (
             <div className="grid grid-cols-2 gap-2">
-              <button onClick={() => setShowComposer(true)} className="flex items-center gap-2 justify-center py-3 rounded-2xl bg-purple-500/15 border border-purple-500/30 text-purple-300 text-xs font-bold hover:bg-purple-500/25 transition active:scale-[0.98]">
+              <button onClick={() => setShowComposer(true)} className="flex items-center gap-2 justify-center py-3 rounded-2xl bg-blue-500/15 border border-blue-500/30 text-blue-300 text-xs font-bold hover:bg-blue-500/25 transition active:scale-[0.98]">
                 <ClipboardCheck size={15} /> Proponer rutina
               </button>
               <button onClick={() => setShowProgressionComposer(true)} disabled={!full.activeRoutineSnapshot} className="flex items-center gap-2 justify-center py-3 rounded-2xl bg-sky-500/15 border border-sky-500/30 text-sky-300 text-xs font-bold hover:bg-sky-500/25 transition active:scale-[0.98] disabled:opacity-40">
@@ -11537,16 +11537,17 @@ function SocialView({ profile, profileName, uid, onActivateRoutine }) {
     );
   }
 
-  // BUG FIX (pedido: "la sección de entrenador sigue sin ser violeta,
-  // mantengamos el violeta"): antes "Entrenador" usaba índigo (#6366F1)
-  // como acento propio, a propósito, para diferenciarse de "Amigos/Buscar/
-  // Ranking" — pero el pedido explícito es que TODA la pestaña Social sea
-  // violeta consistente, sin sub-colores por sección.
+  // Mismo lenguaje que PROGRESS_SECTIONS (Rango=azul, Historial=cian,
+  // Ejercicios=naranja, Medidas=violeta): pedido explícito de reusar esos
+  // mismos 4 colores acá — Amigos violeta (como ya estaba), Buscar cian
+  // (igual que Historial), Ranking naranja (igual que Ejercicios),
+  // Entrenador azul (igual que Rango). Reemplaza la ronda anterior, donde
+  // se había unificado todo a un solo violeta.
   const SECTIONS = [
     { k: "amigos", l: "Amigos", icon: <Users size={14} />, color: SOCIAL_COLOR },
-    { k: "buscar", l: "Buscar", icon: <Search size={14} />, color: SOCIAL_COLOR },
-    { k: "ranking", l: "Ranking", icon: <Award size={14} />, color: SOCIAL_COLOR },
-    { k: "entrenador", l: "Entrenador", icon: <GraduationCap size={14} />, color: SOCIAL_COLOR },
+    { k: "buscar", l: "Buscar", icon: <Search size={14} />, color: "#06B6D4" },
+    { k: "ranking", l: "Ranking", icon: <Award size={14} />, color: "#F59E0B" },
+    { k: "entrenador", l: "Entrenador", icon: <GraduationCap size={14} />, color: "#3B82F6" },
   ];
 
   const sectionIdx = Math.max(0, SECTIONS.findIndex((s) => s.k === section));
@@ -11633,8 +11634,8 @@ function SocialView({ profile, profileName, uid, onActivateRoutine }) {
                 con tu @usuario grande, así conseguir el primer amigo no
                 depende de decírselo de palabra. */}
             {profile?.username ? (
-              <button onClick={() => setShowShareProfile(true)} className="w-full flex items-center gap-3 rounded-2xl border border-purple-500/25 bg-purple-500/5 px-4 py-3.5 text-left transition active:scale-[0.98] hover:border-purple-500/40">
-                <div className="w-9 h-9 rounded-xl bg-purple-500/15 border border-purple-500/25 flex items-center justify-center shrink-0 text-purple-400"><QrCode size={16} /></div>
+              <button onClick={() => setShowShareProfile(true)} className="w-full flex items-center gap-3 rounded-2xl border border-cyan-500/25 bg-cyan-500/5 px-4 py-3.5 text-left transition active:scale-[0.98] hover:border-cyan-500/40">
+                <div className="w-9 h-9 rounded-xl bg-cyan-500/15 border border-cyan-500/25 flex items-center justify-center shrink-0 text-cyan-400"><QrCode size={16} /></div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-bold text-white">Compartir mi perfil</p>
                   <p className="text-[11px] text-slate-500">Una tarjeta con tu @usuario para que te agreguen</p>
