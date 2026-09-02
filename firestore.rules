@@ -94,6 +94,19 @@ service cloud.firestore {
       allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
     }
 
+    // ============================== TELÉFONOS (sugerir amigos de tus contactos) ==============================
+    // El ID del documento es un hash (ver hashPhoneKey en src/utils.js) de
+    // los últimos 9 dígitos del teléfono — nunca el número real. A
+    // diferencia de usernames, no exige unicidad estricta (una huella
+    // colisionada es sólo una sugerencia perdida, no un problema de
+    // seguridad), así que alcanza con exigir que cada quien sólo pueda
+    // escribir SU PROPIO uid en la clave, nunca el de otra persona.
+    match /phoneIndex/{phoneHash} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && request.resource.data.uid == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
+    }
+
     // ============================== AMISTADES ==============================
     match /friendships/{pairId} {
       allow read: if isSignedIn() && request.auth.uid in resource.data.users;

@@ -13,6 +13,7 @@ import {
   Sparkles, Layers, SlidersHorizontal, UserCog,
   Share2, Download, Link2, Copy, BellOff, Send, Mic, Ruler, Camera, Link, Footprints, Star, SquarePlay, Upload, RefreshCw, Timer, Percent, Users,
   MessageCircle, FileDown, Search, UserPlus, UserCheck, UserMinus, AtSign, GraduationCap, ClipboardCheck, Swords, Medal, QrCode, ArrowUpDown,
+  Phone, Contact,
 } from "lucide-react";
 import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signOut, onAuthStateChanged } from "firebase/auth";
 import { Capacitor, registerPlugin } from "@capacitor/core";
@@ -34,6 +35,12 @@ import { FirebaseAuthentication } from "@capacitor-firebase/authentication";
 // no está instalado el build falla con un error claro. Instalarlo primero:
 //   npm install @capacitor/local-notifications && npx cap sync android
 import { LocalNotifications } from "@capacitor/local-notifications";
+// @capacitor-community/contacts — sólo para LEER la agenda del teléfono
+// (sugerir amigos, ver ContactsSuggestions); en web el proxy generado por
+// Capacitor rechaza cada llamada ("not implemented"), por eso todo uso de
+// este import está detrás de un chequeo de Capacitor.isNativePlatform() y/o
+// un try/catch.
+import { Contacts } from "@capacitor-community/contacts";
 import { doc, setDoc, getDoc, enableIndexedDbPersistence } from "firebase/firestore";
 import Model from "react-body-highlighter";
 import FemaleBody from "@mjcdev/react-body-highlighter";
@@ -41,7 +48,7 @@ import { auth, googleProvider, db } from "./firebase";
 import {
   yt, mkSets, cloneRoutineDef, debounce, kgToDisplay, displayToKg, weightLabel,
   rpeColor, haptic, localDateStr, todayStr, formatTime, vol, estimate1RM, repRangeTop, isHeavyRepRange,
-  tint, setThemeMode,
+  tint, setThemeMode, normalizePhoneForMatching, hashPhoneKey,
 } from "./utils";
 // Feature social (amigos + entrenador/alumno) — todo el acceso a Firestore
 // de esto vive en social.js, App.jsx solo llama y dibuja el resultado.
@@ -51,7 +58,8 @@ import {
   sendFriendRequest, respondToFriendRequest, removeFriend, listMyFriendships,
   sendTrainerLinkRequest, respondToTrainerLink, removeTrainerLink, listTrainerLinksAsTrainer, listTrainerLinksAsStudent,
   createRoutineProposal, createProgressionProposal, respondToRoutineProposal, listRoutineProposalsForStudent, listRoutineProposalsByTrainer,
-  cleanupSocialData,
+  cleanupSocialData, listGlobalLeaderboard,
+  setDiscoverablePhone, clearDiscoverablePhone, findUidsByPhoneHashes,
 } from "./social";
 // Catálogo de ejercicios, grupos musculares y rutinas preestablecidas —
 // movidos a data.js para que este archivo quede más liviano. RANK_TIERS
@@ -258,7 +266,7 @@ function computeTopRank(profile) {
     MUSCLE_GROUPS.forEach((g) => {
       const { best1RM } = getBest1RMForMuscleGroup(g.key, profile.logs || {}, settings.dumbbellDouble || null);
       const rank = getMuscleRank(g.key, best1RM, mode, bodyWeightKg, profile.sex, profile.age);
-      if (rank.hasData && (!best || rank.levelIdx > best.levelIdx)) best = { tier: rank.tier, sub: rank.sub, color: rank.color, label: g.label };
+      if (rank.hasData && (!best || rank.levelIdx > best.levelIdx)) best = { tier: rank.tier, sub: rank.sub, color: rank.color, label: g.label, levelIdx: rank.levelIdx };
     });
     return best;
   } catch { return null; }
@@ -5189,8 +5197,8 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
   const [activeDay, setActiveDay] = useState(() => scheduledDay || (isRestToday ? DAY_ORDER[0] : fallbackSuggested));
   // Modo de entrenamiento accesible también desde acá (antes sólo estaba en
   // Perfil) — mismo par de opciones y el mismo atajo de "planificar mi
-  // progresión", para no tener que salir de Rutina a cambiarlo.
-  const [showTrainingModeModal, setShowTrainingModeModal] = useState(false);
+  // progresión", para no tener que salir de Rutina a cambiarlo. Segmentado
+  // de 2 botones en vez de un modal (ver el JSX más abajo).
   const [showSelfProgression, setShowSelfProgression] = useState(false);
   // Dirección del último cambio de día, para que las tarjetas entren
   // deslizándose desde el lado correcto (como pasar páginas).
@@ -5294,18 +5302,30 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
 
       {/* Antes esto sólo se podía cambiar desde Perfil — un atajo acá evita
           tener que salir de Rutina para pasar de "perseguir récord" a
-          "rutina planificada" (o viceversa). */}
+          "rutina planificada" (o viceversa). Segmentado de 2 en vez de una
+          tarjeta que abre un modal: un solo toque cambia el modo, sin paso
+          intermedio. */}
       {onUpdateSettings && (
-        <button onClick={() => setShowTrainingModeModal(true)} className="w-full flex items-center gap-3 rounded-2xl border border-slate-800/50 bg-slate-900/50 px-4 py-3.5 text-left transition active:scale-[0.99] hover:border-slate-700">
-          <div className="w-9 h-9 rounded-xl bg-teal-500/15 border border-teal-500/25 flex items-center justify-center shrink-0 text-teal-400">
-            {settings.trainingMode === "planned" ? <Target size={16} /> : <Trophy size={16} />}
+        <div className="rounded-2xl border border-slate-800/50 bg-slate-900/50 p-3.5">
+          <div className="flex items-center gap-1.5 mb-2.5">
+            <Target size={13} className="text-teal-400 shrink-0" />
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Modo de entrenamiento</p>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-white">Modo de entrenamiento</p>
-            <p className="text-[11px] text-slate-500">{settings.trainingMode === "planned" ? "Rutina planificada" : "Perseguir mi récord"}</p>
+          <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-slate-950/50 border border-slate-800/50">
+            <button onClick={() => onUpdateSettings({ trainingMode: "record" })} className={`flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-bold transition active:scale-[0.97] ${settings.trainingMode !== "planned" ? "bg-teal-500/20 text-teal-400" : "text-slate-500 hover:text-slate-300"}`}>
+              <Trophy size={14} /> Récord
+            </button>
+            <button onClick={() => onUpdateSettings({ trainingMode: "planned" })} className={`flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-bold transition active:scale-[0.97] ${settings.trainingMode === "planned" ? "bg-teal-500/20 text-teal-400" : "text-slate-500 hover:text-slate-300"}`}>
+              <Target size={14} /> Planificada
+            </button>
           </div>
-          <ChevronRight size={15} className="text-slate-600 shrink-0" />
-        </button>
+          {settings.trainingMode === "planned" && onApplyOwnProgression && (
+            <button onClick={() => setShowSelfProgression(true)} disabled={!activeRoutineDef} className="w-full flex items-center gap-2 justify-center py-2.5 mt-2.5 rounded-xl bg-teal-500 !text-white text-xs font-bold transition active:scale-[0.98] disabled:opacity-40">
+              <Sliders size={13} /> Planificar mi progresión
+            </button>
+          )}
+          {!activeRoutineDef && settings.trainingMode === "planned" && <p className="text-[10px] text-slate-600 text-center mt-1.5">Activá una rutina primero, en la pestaña Rutinas.</p>}
+        </div>
       )}
 
       <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${DAY_ORDER.length}, 1fr)` }}>
@@ -5407,42 +5427,6 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
         </div>
       )}
 
-      {/* Mismo contenido que "Modo de entrenamiento" en Perfil (ver
-          CollapsibleSection ahí) — acá vive en un modal en vez de inline
-          porque Rutina es una pantalla de carga rápida de series, no de
-          configuración. */}
-      {showTrainingModeModal && (
-        <div className="fixed inset-0 z-[140] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={() => setShowTrainingModeModal(false)}>
-          <div className="bg-slate-900 border border-slate-700/60 rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-black text-white">Modo de entrenamiento</h3>
-              <button onClick={() => setShowTrainingModeModal(false)} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition"><X size={18} /></button>
-            </div>
-            <div className="space-y-2.5">
-              <button onClick={() => onUpdateSettings({ trainingMode: "record" })} className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-left transition ${settings.trainingMode !== "planned" ? "bg-teal-500/15 border border-teal-500/40" : "bg-slate-800/50 border border-slate-700/40 hover:border-slate-600"}`}>
-                <Trophy size={16} className={settings.trainingMode !== "planned" ? "text-teal-400" : "text-slate-500"} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-white">Perseguir mi récord</p>
-                  <p className="text-[11px] text-slate-500">Cada serie muestra tu mejor marca — el objetivo es siempre superarte a vos mismo.</p>
-                </div>
-              </button>
-              <button onClick={() => onUpdateSettings({ trainingMode: "planned" })} className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-left transition ${settings.trainingMode === "planned" ? "bg-teal-500/15 border border-teal-500/40" : "bg-slate-800/50 border border-slate-700/40 hover:border-slate-600"}`}>
-                <Target size={16} className={settings.trainingMode === "planned" ? "text-teal-400" : "text-slate-500"} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-white">Rutina planificada</p>
-                  <p className="text-[11px] text-slate-500">Cada serie muestra una "marca a alcanzar" cargada de antemano (a mano, o por tu entrenador) en vez de tu récord.</p>
-                </div>
-              </button>
-              {settings.trainingMode === "planned" && onApplyOwnProgression && (
-                <button onClick={() => { setShowTrainingModeModal(false); setShowSelfProgression(true); }} disabled={!activeRoutineDef} className="w-full flex items-center gap-2.5 justify-center py-3 rounded-xl bg-teal-500 !text-white text-sm font-bold transition active:scale-[0.98] disabled:opacity-40">
-                  <Sliders size={15} /> Planificar mi progresión
-                </button>
-              )}
-              {!activeRoutineDef && settings.trainingMode === "planned" && <p className="text-[10.5px] text-slate-600 text-center -mt-1">Activá una rutina primero, en la pestaña Rutinas.</p>}
-            </div>
-          </div>
-        </div>
-      )}
       {showSelfProgression && activeRoutineDef && onApplyOwnProgression && (
         <ProgressionProposalComposer
           mode="self"
@@ -8883,6 +8867,77 @@ function UsernameSection({ uid, currentUsername, onSaved, onRemoved = null }) {
   );
 }
 
+// Activar "que te encuentren por tus contactos" (ver ContactsSuggestions,
+// en Social → Buscar) — mismo espíritu que UsernameSection pero opcional.
+// El teléfono real queda en tu perfil (privado, igual que el email); a
+// Firestore sólo llega un HASH de sus últimos 9 dígitos (hashPhoneKey, en
+// utils.js) — nunca el número tal cual.
+function PhoneDiscoverySection({ uid, currentPhone, onSaved, onRemoved }) {
+  const [value, setValue] = useState(currentPhone || "");
+  const [editing, setEditing] = useState(!currentPhone);
+  const [status, setStatus] = useState(null); // null|saving|invalid|error
+
+  const handleSave = async () => {
+    const key = normalizePhoneForMatching(value);
+    if (!key) { setStatus("invalid"); return; }
+    setStatus("saving");
+    try {
+      const newHash = await hashPhoneKey(key);
+      await setDiscoverablePhone(uid, newHash);
+      const oldKey = currentPhone ? normalizePhoneForMatching(currentPhone) : null;
+      if (oldKey) {
+        const oldHash = await hashPhoneKey(oldKey);
+        if (oldHash !== newHash) await clearDiscoverablePhone(oldHash);
+      }
+      setStatus(null);
+      setEditing(false);
+      onSaved(value.trim());
+    } catch {
+      setStatus("error");
+    }
+  };
+
+  const handleRemove = async () => {
+    setStatus("saving");
+    const key = currentPhone ? normalizePhoneForMatching(currentPhone) : null;
+    if (key) await clearDiscoverablePhone(await hashPhoneKey(key));
+    setStatus(null);
+    setValue("");
+    setEditing(true);
+    onRemoved();
+  };
+
+  if (!editing) {
+    return (
+      <button onClick={() => setEditing(true)} className="flex items-center gap-1 text-purple-400 hover:text-purple-300 transition text-xs font-bold">
+        <Phone size={11} /> {currentPhone} <Edit3 size={10} className="opacity-60" />
+      </button>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <input value={value} onChange={(e) => { setValue(e.target.value); setStatus(null); }} placeholder="Ej: 1123456789" type="tel" inputMode="tel"
+        className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500/50" />
+      <p className={`text-[10.5px] ${status === "invalid" || status === "error" ? "text-rose-400" : "text-slate-600"}`}>
+        {status === "invalid" && "Ingresá un número válido"}
+        {status === "error" && "No se pudo guardar, probá de nuevo"}
+        {status === "saving" && "Guardando..."}
+        {!status && "Así tus contactos que ya usan la app te van a poder sugerir como amigo"}
+      </p>
+      <div className="flex items-center justify-between gap-2">
+        {currentPhone ? (
+          <button onClick={handleRemove} disabled={status === "saving"} className="text-[10.5px] text-slate-600 hover:text-rose-400 transition">Dejar de ser descubrible por teléfono</button>
+        ) : <span />}
+        <div className="flex gap-1.5 shrink-0">
+          {currentPhone && <button onClick={() => { setEditing(false); setValue(currentPhone); setStatus(null); }} className="px-3 py-1.5 rounded-lg text-[11px] font-bold text-slate-500 hover:text-slate-300">Cancelar</button>}
+          <button onClick={handleSave} disabled={status === "saving" || !value.trim()} className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-purple-500 !text-white disabled:opacity-40 disabled:cursor-not-allowed">Guardar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Cuenta de amigos + solicitudes pendientes (amigo + entrenador, en
 // cualquiera de los dos sentidos) para el badge de la tarjeta de Perfil y
 // el ícono de Social. Se recalcula al montar/cambiar de perfil — no hace
@@ -8955,8 +9010,11 @@ function SocialPreviewCard({ profile, uid, onGoToSocial, onUpdateProfile }) {
         <button onClick={onGoToSocial} className="text-slate-600 shrink-0"><ChevronRight size={16} /></button>
       </div>
       {showSettings && (
-        <div className="px-4 pb-4 pt-1 border-t border-slate-800/50">
+        <div className="px-4 pb-4 pt-1 border-t border-slate-800/50 space-y-3">
           <UsernameSection uid={uid} currentUsername={profile.username} onSaved={(u) => { onUpdateProfile({ username: u }); setShowSettings(false); }} onRemoved={() => { onUpdateProfile({ username: null }); setShowSettings(false); }} />
+          <div className="pt-2 border-t border-slate-800/50">
+            <PhoneDiscoverySection uid={uid} currentPhone={profile.phone || null} onSaved={(phone) => onUpdateProfile({ phone })} onRemoved={() => onUpdateProfile({ phone: null })} />
+          </div>
         </div>
       )}
     </div>
@@ -9022,17 +9080,27 @@ function AvatarCropModal({ src, onCancel, onConfirm }) {
   const clamp = (v, max) => Math.min(max, Math.max(-max, v));
   const clampZoom = (z) => Math.min(AVATAR_ZOOM_MAX, Math.max(AVATAR_ZOOM_MIN, z));
 
-  // Al cambiar el zoom el margen disponible cambia — si no se re-clampea,
-  // un offset que era válido con el zoom viejo puede dejar un borde vacío
-  // (o directamente quedar afuera de la imagen) con el zoom nuevo.
+  // BUG FIX (pedido: "el zoom se aplasta hacia la izquierda"): antes, al
+  // cambiar el zoom, el offset (en píxeles de PANTALLA) se dejaba tal cual
+  // y sólo se re-clampeaba contra el nuevo máximo — pero ese máximo CRECE
+  // con el zoom, así que el mismo offset de siempre representaba una
+  // fracción cada vez más chica del recorrido disponible: la ventana de
+  // recorte se iba "recentrando" sola en cada cambio de zoom, sin que la
+  // persona lo pidiera. Si venías con la imagen corrida hacia un lado, esa
+  // recentrada se sentía como que la imagen "se corría" (o se aplastaba,
+  // si pasaba rápido con el pellizco de dos dedos) hacia el otro lado.
+  // Ahora el offset se ESCALA en la misma proporción que el zoom antes de
+  // clampearlo, así el punto que estabas mirando se queda exactamente
+  // donde estaba, acerques o alejes con lo que sea (barra o pellizco).
   const handleZoomChange = (nextZoomRaw) => {
     const nextZoom = clampZoom(nextZoomRaw);
+    const ratio = zoom > 0 ? nextZoom / zoom : 1;
     const nextScale = baseScale * nextZoom;
     const nextDispW = natural.w * nextScale, nextDispH = natural.h * nextScale;
     const nextMaxX = Math.max(0, (nextDispW - AVATAR_CROP_VIEWPORT) / 2);
     const nextMaxY = Math.max(0, (nextDispH - AVATAR_CROP_VIEWPORT) / 2);
     setZoom(nextZoom);
-    setOffset((o) => ({ x: clamp(o.x, nextMaxX), y: clamp(o.y, nextMaxY) }));
+    setOffset((o) => ({ x: clamp(o.x * ratio, nextMaxX), y: clamp(o.y * ratio, nextMaxY) }));
   };
 
   const handlePointerDown = (e) => {
@@ -9693,6 +9761,32 @@ function useUserBasics(uids) {
   return uids.length ? basics : EMPTY_BASICS_MAP;
 }
 
+const EMPTY_STREAKS_MAP = {};
+// Racha actual de una lista de uids (amigos aceptados / alumnos / tu
+// entrenador) — un vistazo rápido de "¿quién viene entrenando en serio?"
+// sin tener que entrar a cada perfil. Pide public/full (sólo visible para
+// vínculos aceptados; getPublicFull ya devuelve null en silencio si no hay
+// permiso) y aplica la misma racha "inteligente" que ya usa FriendProfileView.
+function useUserStreaks(uids) {
+  const key = uids.join(",");
+  const [streaks, setStreaks] = useState({});
+  useEffect(() => {
+    if (!uids.length) return;
+    let cancelled = false;
+    Promise.all(uids.map((u) => getPublicFull(u).then((full) => {
+      if (!full) return [u, null];
+      const weekSchedule = full.activeRoutineSnapshot ? getRoutineWeekSchedule(full.activeRoutineSnapshot) : null;
+      const dateSet = new Set((full.trainingSessions || []).map((s) => s.date));
+      return [u, computeSmartStreak(dateSet, weekSchedule)];
+    }))).then((pairs) => {
+      if (!cancelled) setStreaks(Object.fromEntries(pairs));
+    });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  return uids.length ? streaks : EMPTY_STREAKS_MAP;
+}
+
 // Fila reusable: avatar + nombre + @usuario (a partir de public/basic),
 // más lo que el llamador quiera agregar a la derecha.
 // NOTA: la fila entera NO es un solo <button> — algunas listas (alumnos,
@@ -9700,7 +9794,7 @@ function useUserBasics(uids) {
 // <button> dentro de <button> es HTML inválido y rompe los clicks. Acá el
 // avatar+nombre es su propio botón cuando hay onClick, y `children` queda
 // como hermano, nunca anidado.
-function PublicUserCard({ uid, basic, onClick = null, children }) {
+function PublicUserCard({ uid, basic, streak = null, onClick = null, children }) {
   // "Activo hace X" — dato que ya viaja gratis en public/basic (updatedAt
   // se pisa cada vez que esa persona sincroniza, ver syncPublicProfile),
   // sin pedir nada nuevo a Firestore. Punto verde si sincronizó hace poco
@@ -9731,6 +9825,11 @@ function PublicUserCard({ uid, basic, onClick = null, children }) {
               <Medal size={9} className="shrink-0" />{basic.topRank.tier} {basic.topRank.sub}
             </span>
           )}
+          {typeof streak === "number" && streak > 0 && (
+            <span className="inline-flex items-center gap-0.5 text-[9px] font-black px-1.5 py-0.5 rounded-md shrink-0 bg-orange-500/15 text-orange-400">
+              <Flame size={9} className="shrink-0" />{streak}
+            </span>
+          )}
         </p>
         <p className="text-[11px] text-slate-500 flex items-center gap-0.5"><AtSign size={9} />{basic?.username || uid.slice(0, 8)}</p>
         {lastActive && (
@@ -9750,6 +9849,82 @@ function PublicUserCard({ uid, basic, onClick = null, children }) {
         <div className="flex-1 flex items-center gap-3 min-w-0">{avatarAndName}</div>
       )}
       {children}
+    </div>
+  );
+}
+
+// Sugerir amigos a partir de la agenda de contactos del teléfono — mismo
+// patrón que usan la mayoría de las apps sociales. Sólo funciona en la app
+// nativa de Android (Capacitor.isNativePlatform()): en la web no hay forma
+// de leer la agenda del sistema, así que ahí se muestra un aviso en vez de
+// intentarlo y fallar en silencio.
+// Privacidad: la agenda NUNCA sale del teléfono hacia Firestore. Sólo se
+// manda un HASH de cada número (hashPhoneKey) para preguntar "¿hay alguien
+// con este teléfono?" — ni Firestore ni nadie más ve la agenda real, y sólo
+// aparecen sugerencias de gente que a su vez activó "descubrible por
+// teléfono" desde su propio perfil (PhoneDiscoverySection).
+function ContactsSuggestions({ myUid, friendStatus, onSendFriendRequest }) {
+  const [state, setState] = useState("idle"); // idle|working|not_native|denied|empty|results|error
+  const [results, setResults] = useState([]);
+
+  const handleFind = async () => {
+    if (!Capacitor.isNativePlatform()) { setState("not_native"); return; }
+    setState("working");
+    try {
+      let perm = await Contacts.checkPermissions();
+      if (perm.contacts !== "granted") perm = await Contacts.requestPermissions();
+      if (perm.contacts !== "granted") { setState("denied"); return; }
+
+      const { contacts } = await Contacts.getContacts({ projection: { name: true, phones: true } });
+      const keys = new Set();
+      contacts.forEach((c) => (c.phones || []).forEach((p) => {
+        const k = normalizePhoneForMatching(p.number);
+        if (k) keys.add(k);
+      }));
+      const hashes = await Promise.all(Array.from(keys).map(hashPhoneKey));
+      const uids = await findUidsByPhoneHashes(hashes);
+      const candidates = uids.filter((u) => u !== myUid && !friendStatus(u));
+      if (!candidates.length) { setState("empty"); return; }
+      const withBasics = await Promise.all(candidates.map((u) => getPublicBasic(u).then((b) => ({ uid: u, basic: b }))));
+      setResults(withBasics.filter((r) => r.basic));
+      setState("results");
+    } catch (err) {
+      console.error("[contacts] No se pudo sugerir amigos de la agenda:", err);
+      setState("error");
+    }
+  };
+
+  return (
+    <div className="space-y-2.5">
+      {state !== "results" && (
+        <button onClick={handleFind} disabled={state === "working"} className="w-full flex items-center gap-3 rounded-2xl border border-teal-500/25 bg-teal-500/5 px-4 py-3.5 text-left transition active:scale-[0.98] hover:border-teal-500/40 disabled:opacity-60">
+          <div className="w-9 h-9 rounded-xl bg-teal-500/15 border border-teal-500/25 flex items-center justify-center shrink-0 text-teal-400"><Contact size={16} /></div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-white">{state === "working" ? "Buscando..." : "Sugerir de mis contactos"}</p>
+            <p className="text-[11px] text-slate-500">Encontrá amigos que ya usan la app</p>
+          </div>
+          {state !== "working" && <ChevronRight size={15} className="text-slate-600 shrink-0" />}
+        </button>
+      )}
+      {state === "not_native" && <p className="text-[11px] text-slate-600 px-1">Esta función sólo está disponible en la app instalada en tu celular.</p>}
+      {state === "denied" && <p className="text-[11px] text-amber-400/80 px-1">No dimos permiso para leer tus contactos. Podés habilitarlo desde los ajustes de la app en tu celular.</p>}
+      {state === "empty" && <p className="text-[11px] text-slate-600 px-1">Ninguno de tus contactos usa Modus Fit todavía (o no activó "descubrible por teléfono" en su perfil).</p>}
+      {state === "error" && <p className="text-[11px] text-rose-400/80 px-1">No pudimos leer tus contactos. Probá de nuevo.</p>}
+      {state === "results" && (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between px-1">
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-600">{results.length} de tus contactos</p>
+            <button onClick={() => setState("idle")} className="text-[10.5px] text-slate-600 hover:text-slate-400">Ocultar</button>
+          </div>
+          {results.map(({ uid, basic }) => (
+            <PublicUserCard key={uid} uid={uid} basic={basic}>
+              <button onClick={() => onSendFriendRequest(uid)} className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-purple-500/15 border border-purple-500/30 text-purple-300 text-[11px] font-bold hover:bg-purple-500/25 transition">
+                <UserPlus size={12} /> Agregar
+              </button>
+            </PublicUserCard>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -9854,7 +10029,7 @@ function RoutineProposalCard({ proposal, basic, onRespond }) {
 // Sub-sección "Entrenador": vincularse (con rol explícito), solicitudes
 // pendientes, lista de alumnos/entrenador ya aceptados, y las propuestas
 // de rutina pendientes (si el que mira es alumno de alguien).
-function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted, trainersAccepted, sentProposals, proposals, basics, onSendLink, onRespondLink, onRemoveLink, onRespondProposal, onViewStudent, onViewTrainer }) {
+function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted, trainersAccepted, sentProposals, proposals, basics, streaks, onSendLink, onRespondLink, onRemoveLink, onRespondProposal, onViewStudent, onViewTrainer }) {
   const [raw, setRaw] = useState("");
   const [role, setRole] = useState("trainer"); // el rol que ELIJO para mí al mandar la solicitud
   const [searchState, setSearchState] = useState("idle");
@@ -9871,6 +10046,22 @@ function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted
     setFound({ uid: hit.uid, basic });
     setSearchState("found");
   };
+
+  // Quién necesita atención primero: racha más baja arriba (0 o sin datos
+  // al final es más grave que 3), así un entrenador con varios alumnos no
+  // tiene que abrir a cada uno para saber a quién seguirle el rastro.
+  const sortedStudents = useMemo(() => {
+    const arr = [...studentsAccepted];
+    arr.sort((a, b) => {
+      const sa = streaks?.[a.studentUid];
+      const sb = streaks?.[b.studentUid];
+      if (typeof sa !== "number" && typeof sb !== "number") return 0;
+      if (typeof sa !== "number") return 1;
+      if (typeof sb !== "number") return -1;
+      return sa - sb;
+    });
+    return arr;
+  }, [studentsAccepted, streaks]);
 
   return (
     <div className="space-y-4">
@@ -9928,11 +10119,14 @@ function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted
           )}
 
           <div className="space-y-2">
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 px-1">Mis alumnos</p>
+            <div className="flex items-center justify-between px-1">
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-600">Mis alumnos</p>
+              {sortedStudents.length > 1 && <p className="text-[9.5px] text-slate-700">Quién necesita atención primero</p>}
+            </div>
             {studentsAccepted.length === 0 ? (
               <p className="text-xs text-slate-600 px-1">Todavía no tenés alumnos vinculados.</p>
-            ) : studentsAccepted.map((l) => (
-              <PublicUserCard key={l.id} uid={l.studentUid} basic={basics[l.studentUid]} onClick={() => onViewStudent(l.studentUid)}>
+            ) : sortedStudents.map((l) => (
+              <PublicUserCard key={l.id} uid={l.studentUid} basic={basics[l.studentUid]} streak={streaks?.[l.studentUid]} onClick={() => onViewStudent(l.studentUid)}>
                 <button onClick={(e) => { e.stopPropagation(); onRemoveLink(l); }} className="shrink-0 p-1.5 rounded-lg text-slate-600 hover:text-rose-400 transition" title="Desvincular"><X size={13} /></button>
                 <ChevronRight size={15} className="text-slate-600 shrink-0" />
               </PublicUserCard>
@@ -9957,7 +10151,7 @@ function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted
             {trainersAccepted.length === 0 ? (
               <p className="text-xs text-slate-600 px-1">No tenés un entrenador vinculado.</p>
             ) : trainersAccepted.map((l) => (
-              <PublicUserCard key={l.id} uid={l.trainerUid} basic={basics[l.trainerUid]} onClick={() => onViewTrainer(l.trainerUid)}>
+              <PublicUserCard key={l.id} uid={l.trainerUid} basic={basics[l.trainerUid]} streak={streaks?.[l.trainerUid]} onClick={() => onViewTrainer(l.trainerUid)}>
                 <button onClick={(e) => { e.stopPropagation(); onRemoveLink(l); }} className="shrink-0 p-1.5 rounded-lg text-slate-600 hover:text-rose-400 transition" title="Desvincular"><X size={13} /></button>
                 <ChevronRight size={15} className="text-slate-600 shrink-0" />
               </PublicUserCard>
@@ -10072,6 +10266,93 @@ function RankComparisonList({ comparison, theirName }) {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+// Fila de un ranking (amigos o global) — posición + avatar + nombre + su
+// mejor rango. El podio (1-3) se marca con una medalla en vez de un
+// número pelado, y "vos" se resalta para encontrarte de un vistazo en una
+// lista larga.
+function LeaderboardRow({ position, name, username, avatarData, topRank, isMe }) {
+  const medalColor = position === 1 ? "#FFD23F" : position === 2 ? "#DCE3E8" : position === 3 ? "#CD7F32" : null;
+  return (
+    <div className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl border ${isMe ? "border-purple-500/40 bg-purple-500/10" : "border-slate-800/50 bg-slate-900/50"}`}>
+      <div className="w-6 text-center shrink-0">
+        {medalColor ? <Medal size={18} style={{ color: medalColor }} /> : <span className="text-sm font-black text-slate-600">{position}</span>}
+      </div>
+      {avatarData ? (
+        <img src={avatarData} alt="" className="w-9 h-9 rounded-xl object-cover shrink-0" />
+      ) : (
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center text-sm font-black !text-white shrink-0" style={{ background: "linear-gradient(135deg,#A855F7,#7C3AED)" }}>
+          {(name || username || "?").charAt(0).toUpperCase()}
+        </div>
+      )}
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-bold text-white truncate">{isMe ? "Vos" : (name || "Usuario")}</p>
+        <p className="text-[11px] text-slate-500 truncate">@{username || "..."}</p>
+      </div>
+      {topRank && (
+        <span className="text-[10px] font-black px-2 py-1 rounded-lg shrink-0" style={{ backgroundColor: tint(topRank.color, "22"), color: topRank.color }}>{topRank.tier} {topRank.sub}</span>
+      )}
+    </div>
+  );
+}
+
+// Ranking de competencia — "Amigos" sale de datos que YA tenemos en el
+// cliente (basics de la lista de amigos, cero pedidos nuevos); "Global"
+// pide el top de TODOS los perfiles públicos de la app vía
+// listGlobalLeaderboard (ver social.js — collectionGroup query, necesita
+// un índice creado a mano en Firebase la primera vez). Se pide sólo una
+// vez por apertura de la pestaña (globalList !== null actúa de caché),
+// no cada vez que se toca el toggle.
+function LeaderboardSection({ uid, profile, myTopRank, friendAccepted, basics }) {
+  const [scope, setScope] = useState("amigos");
+  const [globalList, setGlobalList] = useState(null);
+  const [globalError, setGlobalError] = useState(false);
+  // "Cargando" se deriva en vez de guardarse aparte: evita un setState
+  // síncrono adentro del efecto (y la posibilidad de que loading/data
+  // queden desincronizados entre sí).
+  const globalLoading = scope === "global" && globalList === null && !globalError;
+
+  useEffect(() => {
+    if (scope !== "global" || globalList !== null) return;
+    let cancelled = false;
+    listGlobalLeaderboard(50).then((list) => {
+      if (cancelled) return;
+      if (list === null) setGlobalError(true);
+      else setGlobalList(list);
+    });
+    return () => { cancelled = true; };
+  }, [scope, globalList]);
+
+  const friendsRanking = useMemo(() => {
+    const mine = myTopRank ? [{ uid, name: profile?.name, username: profile?.username, avatarData: profile?.avatarData, topRank: myTopRank, isMe: true }] : [];
+    const others = friendAccepted.map((f) => {
+      const other = f.users.find((u) => u !== uid);
+      const b = basics[other];
+      return { uid: other, name: b?.name, username: b?.username, avatarData: b?.avatarData, topRank: b?.topRank, isMe: false };
+    }).filter((e) => e.topRank);
+    return [...mine, ...others].sort((a, b) => (b.topRank.levelIdx ?? -1) - (a.topRank.levelIdx ?? -1));
+  }, [friendAccepted, basics, uid, myTopRank, profile]);
+
+  const list = scope === "amigos" ? friendsRanking : (globalList || []);
+
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-1.5 p-1 rounded-2xl bg-slate-900/60 border border-slate-800/50">
+        <button onClick={() => setScope("amigos")} className={`py-2 rounded-xl text-xs font-bold transition ${scope === "amigos" ? "bg-purple-500/20 text-purple-400" : "text-slate-500"}`}>Amigos</button>
+        <button onClick={() => setScope("global")} className={`py-2 rounded-xl text-xs font-bold transition ${scope === "global" ? "bg-purple-500/20 text-purple-400" : "text-slate-500"}`}>Global</button>
+      </div>
+      {scope === "amigos" && friendsRanking.length === 0 && (
+        <div className="text-center py-8 text-slate-600"><Award size={28} className="mx-auto mb-2.5 opacity-30" /><p className="text-sm">Todavía no hay nadie con rango para mostrar acá.</p><p className="text-xs mt-1 text-slate-700">Agregá amigos y anotá tus marcas para aparecer.</p></div>
+      )}
+      {scope === "global" && globalLoading && <p className="text-center text-slate-600 text-sm py-8">Cargando ranking...</p>}
+      {scope === "global" && globalError && <p className="text-center text-slate-600 text-sm py-8 px-4">No pudimos cargar el ranking global ahora mismo. Probá de nuevo más tarde.</p>}
+      {scope === "global" && !globalLoading && !globalError && globalList?.length === 0 && <p className="text-center text-slate-600 text-sm py-8">Todavía no hay nadie en el ranking global.</p>}
+      <div className="space-y-2">
+        {list.map((entry, i) => <LeaderboardRow key={entry.uid} position={i + 1} {...entry} />)}
+      </div>
     </div>
   );
 }
@@ -10518,6 +10799,16 @@ function SocialView({ profile, profileName, uid, onActivateRoutine }) {
   }, [friendships, trainerAsTrainer, trainerAsStudent, proposals, sentProposals]);
   const basics = useUserBasics(allUids);
 
+  // Racha inline — sólo para vínculos ACEPTADOS (los únicos con
+  // public/full visible; pedirla para solicitudes pendientes sólo
+  // gastaría una lectura que Firestore va a rechazar igual).
+  const streakUids = Array.from(new Set([
+    ...friendships.filter((f) => f.status === "accepted").map(otherUidOf),
+    ...trainerAsTrainer.filter((l) => l.status === "accepted").map((l) => l.studentUid),
+    ...trainerAsStudent.filter((l) => l.status === "accepted").map((l) => l.trainerUid),
+  ]));
+  const streaks = useUserStreaks(streakUids);
+
   // Orden de la lista de amigos — "recientes" (default, más nuevo primero)
   // usa la fecha de la amistad, que ya viene en el documento; "rango" usa
   // el índice del tier dentro de RANK_TIERS como escala ordinal (Bronce I
@@ -10583,6 +10874,7 @@ function SocialView({ profile, profileName, uid, onActivateRoutine }) {
   const SECTIONS = [
     { k: "amigos", l: "Amigos", icon: <Users size={14} />, color: SOCIAL_COLOR },
     { k: "buscar", l: "Buscar", icon: <Search size={14} />, color: SOCIAL_COLOR },
+    { k: "ranking", l: "Ranking", icon: <Award size={14} />, color: SOCIAL_COLOR },
     { k: "entrenador", l: "Entrenador", icon: <GraduationCap size={14} />, color: "#6366F1" },
   ];
 
@@ -10591,15 +10883,15 @@ function SocialView({ profile, profileName, uid, onActivateRoutine }) {
 
   return (
     <div className="space-y-4">
-      <div className="relative grid grid-cols-3 gap-1 p-1 rounded-2xl bg-slate-900/60 border border-slate-800/50">
+      <div className="relative grid gap-1 p-1 rounded-2xl bg-slate-900/60 border border-slate-800/50" style={{ gridTemplateColumns: `repeat(${SECTIONS.length}, 1fr)` }}>
         {/* Píldora deslizante en vez de que cada botón prenda/apague su
             propio fondo de golpe — un solo elemento que se desliza y
-            cambia de color (celeste en Amigos/Buscar, índigo en
+            cambia de color (celeste en Amigos/Buscar/Ranking, índigo en
             Entrenador) da la sensación de un selector físico, no de
-            3 botones independientes. */}
+            varios botones independientes. */}
         <div
           className="absolute top-1 bottom-1 rounded-xl transition-all duration-300 ease-out pointer-events-none"
-          style={{ left: `calc(${sectionIdx} / 3 * 100% + 2px)`, width: "calc(100% / 3 - 4px)", backgroundColor: tint(sectionColor, "22"), boxShadow: `inset 0 0 0 1px ${tint(sectionColor, "45")}` }}
+          style={{ left: `calc(${sectionIdx} / ${SECTIONS.length} * 100% + 2px)`, width: `calc(100% / ${SECTIONS.length} - 4px)`, backgroundColor: tint(sectionColor, "22"), boxShadow: `inset 0 0 0 1px ${tint(sectionColor, "45")}` }}
         />
         {SECTIONS.map((s) => {
           const badge = s.k === "amigos" ? friendIncoming.length : s.k === "entrenador" ? trainerIncoming.length + proposals.length : 0;
@@ -10634,6 +10926,7 @@ function SocialView({ profile, profileName, uid, onActivateRoutine }) {
             ) : (
               <p className="text-[11px] text-slate-600 px-1">Elegí un @usuario en Perfil para que te puedan buscar y para poder compartir tu perfil.</p>
             )}
+            <ContactsSuggestions myUid={uid} friendStatus={friendStatus} onSendFriendRequest={doSendFriendRequest} />
             <SocialSearchSection myUid={uid} friendStatus={friendStatus} onSendFriendRequest={doSendFriendRequest} />
           </>
         )}
@@ -10682,7 +10975,7 @@ function SocialView({ profile, profileName, uid, onActivateRoutine }) {
                   <div className="text-center py-8 text-slate-600"><Users size={28} className="mx-auto mb-2.5 opacity-30" /><p className="text-sm">Todavía no tenés amigos agregados.</p><p className="text-xs mt-1 text-slate-700">Buscalos por su @usuario en "Buscar".</p></div>
                 ) : sortedFriendAccepted.map((f, i) => { const other = otherUidOf(f); const confirming = confirmRemoveId === f.id; return (
                   <div key={f.id} className="stagger-item" style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}>
-                    <PublicUserCard uid={other} basic={basics[other]} onClick={confirming ? null : () => setViewingUid(other)}>
+                    <PublicUserCard uid={other} basic={basics[other]} streak={streaks[other]} onClick={confirming ? null : () => setViewingUid(other)}>
                       {confirming ? (
                         <span className="flex items-center gap-1.5 shrink-0">
                           <span className="text-[10px] text-slate-500 mr-0.5">¿Quitar?</span>
@@ -10703,6 +10996,10 @@ function SocialView({ profile, profileName, uid, onActivateRoutine }) {
           )
         )}
 
+        {section === "ranking" && (
+          <LeaderboardSection uid={uid} profile={profile} myTopRank={myTopRank} friendAccepted={friendAccepted} basics={basics} />
+        )}
+
         {section === "entrenador" && (
           <TrainerLinksSection
             myUid={uid}
@@ -10713,6 +11010,7 @@ function SocialView({ profile, profileName, uid, onActivateRoutine }) {
             sentProposals={sentProposals}
             proposals={proposals}
             basics={basics}
+            streaks={streaks}
             onSendLink={doSendTrainerLink}
             onRespondLink={doRespondTrainer}
             onRemoveLink={doRemoveTrainerLink}
@@ -10851,7 +11149,7 @@ const PRESET_CONTEXTO = {
 function PresetRoutineCard({ preset, isActive, onPreview }) {
   const dayCount = preset.dayOrder.length;
   const ctx = PRESET_CONTEXTO[preset.id] || null;
-  const accent = "#A855F7"; // violeta fijo — esta tarjeta es de Rutinas, no del día
+  const accent = "#38BDF8"; // celeste fijo — esta tarjeta es de Rutinas, no del día
   // Pulso al activar: solo en el momento exacto en que pasa a ser la activa.
   const [recienActivada, setRecienActivada] = useState(false);
   const antesActivaRef = useRef(isActive);
@@ -12553,6 +12851,13 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [editingIndex, setEditingIndex] = useState(null); // índice del mensaje propio que se está editando
+  // Editar con mantener presionado en vez de un lápiz al lado (pedido: más
+  // intuitivo, y sin el botón la burbuja queda más limpia) — un solo timer
+  // reutilizado para cualquier mensaje, porque sólo se puede presionar uno
+  // a la vez. pressedIndexRef guarda CUÁL para poder mostrarle un feedback
+  // visual (leve oscurecido) mientras se mantiene.
+  const longPressTimerRef = useRef(null);
+  const [pressingIndex, setPressingIndex] = useState(null);
   const [showChangeLog, setShowChangeLog] = useState(false); // log de "qué aplicó la IA" — ver AIChangeLogModal
   const [showSidebar, setShowSidebar] = useState(false); // barra de conversaciones guardadas — ver AIConversationSidebar
   // Cuántos mensajes (contados desde el más reciente) están renderizados
@@ -12824,6 +13129,26 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
   };
   const cancelarEdicion = () => { setEditingIndex(null); setInput(""); };
 
+  // Mantener presionada tu burbuja (500ms) para editarla, en vez de un
+  // lápiz al lado que ocupaba lugar y sólo servía para eso. Un vibrado
+  // corto confirma que "agarró" el mantenido, igual que el resto de
+  // gestos táctiles de la app.
+  const LONG_PRESS_MS = 500;
+  const startLongPress = (i) => {
+    if (isSending) return;
+    setPressingIndex(i);
+    longPressTimerRef.current = setTimeout(() => {
+      longPressTimerRef.current = null;
+      setPressingIndex(null);
+      haptic(15);
+      handleEditMessage(i);
+    }, LONG_PRESS_MS);
+  };
+  const cancelLongPress = () => {
+    if (longPressTimerRef.current) { clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; }
+    setPressingIndex(null);
+  };
+
   // Copiar el texto de cualquier mensaje — función típica de chat de IA que
   // faltaba (Claude, ChatGPT, Gemini la tienen todos).
   const [copiedIndex, setCopiedIndex] = useState(null);
@@ -13093,13 +13418,6 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
                   limpio sin ese elemento extra. El filo de color a la
                   izquierda de la burbuja (ver style de abajo) ya alcanza
                   para identificar que es un mensaje de la IA. */}
-              {/* Editar: solo en mensajes propios, y solo si no está respondiendo.
-                  Toca el lápiz → el texto vuelve al input para reescribirlo. */}
-              {m.role === "user" && !isSending && (
-                <button onClick={() => handleEditMessage(i)} aria-label="Editar mensaje" className={`shrink-0 mb-1 p-1.5 rounded-lg text-slate-500 hover:text-teal-300 hover:bg-slate-800/60 transition ${editingIndex === i ? "text-teal-400" : ""}`}>
-                  <Edit3 size={13} />
-                </button>
-              )}
               {/* Rediseño: antes el mensaje propio era un degradé sólido de
                   teal al 82% de opacidad (bastante cargado) y el de la IA
                   vidrio esmerilado con borde teal — los dos con mucho color
@@ -13109,8 +13427,19 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
                   detalles puntuales: el ícono de la IA (arriba) y un filo
                   angosto a la izquierda en sus burbujas, en vez de pintar
                   toda la superficie. */}
+              {/* BUG FIX (pedido): antes había un lápiz al lado de la
+                  burbuja para editar — se sacó (ocupaba lugar y ensuciaba
+                  la pantalla) y ahora mantener presionada TU burbuja hace
+                  lo mismo. onContextMenu se frena para que el navegador no
+                  muestre su menú nativo de "copiar/seleccionar" encima del
+                  mantenido en mobile. */}
               <div
-                className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed border ${m.role === "user" ? "!text-white rounded-br-md" : "text-slate-200 rounded-bl-md border-l-2"} ${editingIndex === i ? "ring-2 ring-teal-400/60" : ""}`}
+                onPointerDown={m.role === "user" && !isSending ? () => startLongPress(i) : undefined}
+                onPointerUp={m.role === "user" ? cancelLongPress : undefined}
+                onPointerLeave={m.role === "user" ? cancelLongPress : undefined}
+                onPointerCancel={m.role === "user" ? cancelLongPress : undefined}
+                onContextMenu={m.role === "user" ? (e) => e.preventDefault() : undefined}
+                className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed border transition-transform ${m.role === "user" ? "!text-white rounded-br-md select-none" : "text-slate-200 rounded-bl-md border-l-2"} ${editingIndex === i ? "ring-2 ring-teal-400/60" : ""} ${pressingIndex === i ? "scale-[0.97]" : ""}`}
                 style={m.role === "user"
                   ? { backgroundColor: "var(--row-surface)", borderColor: "var(--chip-border)" }
                   : { backgroundColor: "var(--panel-sunken)", borderColor: "var(--chip-border)", borderLeftColor: "#14B8A6" }}
@@ -13642,11 +13971,18 @@ function ImportRoutineModal({ onImport, onClose }) {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ action: "detect", text, images: images.map(({ mimeType, data }) => ({ mimeType, data })) }),
           });
-          if (!response.ok) throw new Error("server");
+          if (!response.ok) {
+            // BUG FIX: mismo caso que el wizard — antes se descartaba el
+            // cuerpo del error y siempre se mostraba el genérico de abajo,
+            // aunque el servidor mandara un motivo concreto y accionable.
+            const errBody = await response.json().catch(() => null);
+            const serverMsg = errBody?.error;
+            throw new Error(serverMsg || `Error ${response.status}`, { cause: serverMsg ? "server" : undefined });
+          }
           result = await response.json();
           break;
         } catch (err) {
-          if (attempt === 1) { console.warn("[import] primer intento falló, reintentando:", err?.message || err); await new Promise((r) => setTimeout(r, 1200)); continue; }
+          if (attempt === 1 && err.cause !== "server") { console.warn("[import] primer intento falló, reintentando:", err?.message || err); await new Promise((r) => setTimeout(r, 1200)); continue; }
           throw err;
         }
       }
@@ -13663,7 +13999,7 @@ function ImportRoutineModal({ onImport, onClose }) {
       else { setNotice("La IA no pudo interpretar lo que subiste. Probá con una foto más nítida o pegá el texto manualmente."); }
     } catch (err) {
       console.error("Error detectando rutina con IA:", err);
-      setNotice("No pudimos detectar la rutina. Probá de nuevo, con una foto más clara, o pegá el texto abajo.");
+      setNotice(err?.cause === "server" ? err.message : "No pudimos detectar la rutina. Probá de nuevo, con una foto más clara, o pegá el texto abajo.");
     } finally {
       setIsParsingAI(false);
     }
@@ -14158,12 +14494,24 @@ function PersonalizedRoutineWizard({ profile, onUpdateProfile, onCreateRoutine, 
         try {
           const res = await fetch("/api/ia", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "chat", systemPrompt: "Sos un entrenador experto. Respondés ÚNICAMENTE con JSON válido, sin explicaciones ni bloques de código.", history: [{ role: "user", parts: [{ text: prompt }] }] }), signal: controller.signal });
           clearTimeout(timeoutId);
-          if (!res.ok) throw new Error("server");
+          if (!res.ok) {
+            // BUG FIX: antes se tiraba un Error("server") genérico sin leer
+            // el cuerpo — el motivo real que manda el servidor (cuota
+            // agotada, clave inválida, modelo no disponible...) se perdía y
+            // siempre se mostraba "revisá tu conexión", que confunde cuando
+            // el problema no es de red. Mismo criterio que EntrenadorIAChat.
+            const errBody = await res.json().catch(() => null);
+            const serverMsg = errBody?.error;
+            throw new Error(serverMsg || `Error ${res.status}`, { cause: serverMsg ? "server" : undefined });
+          }
           data = await res.json();
           break;
         } catch (err) {
           clearTimeout(timeoutId);
-          if (attempt === 1) { console.warn("[IA] wizard: primer intento falló, reintentando una vez:", err?.message || err); await new Promise((r) => setTimeout(r, 1200)); continue; }
+          // Un error "limpio" del servidor (cuota agotada, clave inválida)
+          // no se arregla reintentando — sólo se reintenta ante una falla
+          // real de red/timeout.
+          if (attempt === 1 && err.cause !== "server") { console.warn("[IA] wizard: primer intento falló, reintentando una vez:", err?.message || err); await new Promise((r) => setTimeout(r, 1200)); continue; }
           throw err;
         }
       }
@@ -14191,7 +14539,10 @@ function PersonalizedRoutineWizard({ profile, onUpdateProfile, onCreateRoutine, 
       setPreview(buildImportedRoutineDef(parsedDays, "Mi rutina personalizada"));
     } catch (err) {
       console.error("Error generando rutina:", err);
-      setGenError("No pudimos generar la rutina. Revisá tu conexión e intentá de nuevo, o elegí una rutina prearmada y personalizala después.");
+      // Si el servidor mandó un motivo concreto (cuota, clave, modelo caído),
+      // se muestra tal cual — es más útil que el genérico y no siempre es un
+      // problema de conexión del lado del usuario.
+      setGenError(err?.cause === "server" ? err.message : "No pudimos generar la rutina. Revisá tu conexión e intentá de nuevo, o elegí una rutina prearmada y personalizala después.");
     } finally {
       setGenerating(false);
     }
@@ -14414,7 +14765,7 @@ function BalanceMuscular({ routineDef, compacto = true }) {
   return (
     <div>
       <div className="flex items-center gap-2.5 mb-3">
-        <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(168,85,247,0.15)", color: "#A855F7" }}>
+        <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(56,189,248,0.15)", color: "#38BDF8" }}>
           <Activity size={13} />
         </span>
         <div className="flex-1 min-w-0 flex items-baseline justify-between gap-2">
@@ -16036,7 +16387,12 @@ export default function App() {
     // falla (sin red, etc.) no bloquea el borrado del perfil local, que es
     // lo más importante acá; en el peor caso queda basura huérfana en la
     // nube, mismo criterio que ya acepta el resto de la app para esto.
-    if (p?.googleUid) cleanupSocialData(p.googleUid, p.username || null).catch(() => {});
+    if (p?.googleUid) {
+      const phoneKey = p.phone ? normalizePhoneForMatching(p.phone) : null;
+      (phoneKey ? hashPhoneKey(phoneKey) : Promise.resolve(null))
+        .then((hash) => cleanupSocialData(p.googleUid, p.username || null, hash))
+        .catch(() => {});
+    }
     setProfiles((prev) => { const np = { ...prev }; delete np[activeProfile]; saveProfiles(np); return np; });
     saveActive(null); setActiveProfile(null); setJustLoggedOut(true); setShowHelp(false); setHelpStartTab(null);
   };

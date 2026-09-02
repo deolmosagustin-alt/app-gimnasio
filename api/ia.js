@@ -22,17 +22,25 @@
  */
 
 // Se agregaron variantes "-lite" (más baratas en cuota, buen respaldo si
-// las versiones normales están agotadas) y "-001"/"-002" (nombres fijos de
-// versión, que Google no reasigna) además de los alias — más candidatos
-// en la cadena significa más chances de que ALGUNO siga vigente, sobre
-// todo si Google retira alias viejos con el tiempo.
+// las versiones normales están agotadas) además de los alias — más
+// candidatos en la cadena significa más chances de que ALGUNO siga
+// vigente, sobre todo si Google retira alias viejos con el tiempo.
+// BUG FIX (causa raíz de "la IA no funciona", confirmado probando el
+// endpoint en producción — devolvía 404 en TODOS los modelos): Google
+// retiró gemini-2.0-flash y gemini-2.0-flash-lite el 1/6/2026, y
+// gemini-1.5-flash es aún más viejo y ya no existe hace rato — la cadena
+// entera terminaba en modelos muertos. Se actualiza a la generación
+// vigente (2.5 sigue activo, 3.x es la generación nueva) y se agregan más
+// candidatos de respaldo para no volver a depender de que UN solo nombre
+// siga existiendo.
 const MODEL_CHAIN = [
   "gemini-flash-latest",
   "gemini-2.5-flash",
+  "gemini-3.5-flash",
   "gemini-2.5-flash-lite",
-  "gemini-2.0-flash",
-  "gemini-2.0-flash-lite",
-  "gemini-1.5-flash",
+  "gemini-3.5-flash-lite",
+  "gemini-3.6-flash",
+  "gemini-3.1-flash-lite",
 ];
 
 // Se recuerda el último modelo que funcionó (mientras el lambda viva) para

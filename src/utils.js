@@ -25,6 +25,32 @@ export function muteHexColor(hex, towardsGray = 0.45) {
 
 export function cloneRoutineDef(def) { return JSON.parse(JSON.stringify(def)); }
 
+// Clave de comparación para "sugerir amigos de mis contactos" — sin saber
+// el país de cada número (ni el tuyo ni el de tus contactos), no hay forma
+// de armar un E.164 real y confiable. En vez de eso, nos quedamos con los
+// últimos 9 dígitos: alcanza para no confundir números distintos (dos
+// celulares casi nunca comparten los últimos 9), pero tolera diferencias de
+// código de país, "0" o "9" inicial y separadores, que son la variación más
+// común entre "cómo lo guardaste vos" y "cómo lo guardó la otra persona".
+// null = no hay suficientes dígitos como para ser un número real (evita
+// matchear cosas cortas tipo "123" contra sí mismas).
+export function normalizePhoneForMatching(raw) {
+  const digits = String(raw || "").replace(/\D/g, "");
+  if (digits.length < 7) return null;
+  return digits.slice(-9);
+}
+
+// La clave de arriba son 9 dígitos reales de un teléfono — antes de mandarla
+// a un documento público de Firestore (phoneIndex) la hasheamos, así el ID
+// del documento no queda como una serie de dígitos reconocible. Sigue
+// siendo determinística (mismo teléfono → mismo hash), que es lo único que
+// hace falta para que el matching funcione.
+export async function hashPhoneKey(normalizedKey) {
+  const bytes = new TextEncoder().encode(normalizedKey);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 // Debounce util — devuelve una versión de la función que se llama como
 // máximo una vez cada `ms` ms, ignorando las llamadas intermedias.
 export function debounce(fn, ms) {

@@ -15,7 +15,7 @@
 //   trainerLinks/{trainerUid}_{studentUid} → { trainerUid, studentUid, status, requestedBy }.
 //   routineProposals/{autoId} → propuesta de rutina de un entrenador a un alumno.
 
-import { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, addDoc, query, where, getDocs } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, collectionGroup, addDoc, query, where, orderBy, limit, getDocs, documentId } from "firebase/firestore";
 import { db } from "./firebase";
 
 // ============================== USERNAME (@handle) ==============================
@@ -150,6 +150,77 @@ export async function getPublicFull(uid) {
     const snap = await getDoc(doc(db, "users", uid, "public", "full"));
     return snap.exists() ? snap.data() : null;
   } catch { return null; }
+}
+
+// ============================== RANKING GLOBAL ==============================
+// Top N de TODOS los perfiles públicos de la app (cualquiera con @usuario
+// elegido, sin importar si sos amigo/entrenador de esa persona) — a
+// diferencia de todo lo de arriba, esto lee de VARIOS usuarios a la vez con
+// una collectionGroup query sobre "basic" (el mismo documento que ya es
+// legible por cualquier usuario autenticado, ver firestore.rules — no hizo
+// falta ninguna regla nueva, sólo agregar `topRank.levelIdx` como campo
+// numérico ordenable en profileToPublicBasic).
+// OJO — REQUIERE un índice de Firestore que no se puede crear desde acá: la
+// PRIMERA vez que corra esta consulta en producción, Firestore va a tirar
+// un error con un LINK para crear el índice (Firestore → Índices →
+// "compuesto", Collection ID "basic", scope "Collection group", campo
+// "topRank.levelIdx" descendente) — hay que crearlo una sola vez desde la
+// consola de Firebase, no hay forma de evitarlo ni de hacerlo por código.
+export async function listGlobalLeaderboard(topN = 50) {
+  try {
+    const q = query(collectionGroup(db, "basic"), orderBy("topRank.levelIdx", "desc"), limit(topN));
+    const snap = await getDocs(q);
+    // El uid real es el segmento anterior a "public" en la ruta del
+    // documento (users/{uid}/public/basic) — la collectionGroup query no
+    // lo trae como campo propio, hay que sacarlo del path.
+    return snap.docs.map((d) => ({ uid: d.ref.parent.parent.id, ...d.data() })).filter((r) => r.topRank);
+  } catch (err) {
+    console.warn("[social] No se pudo leer el ranking global (¿falta crear el índice en Firestore?):", err?.message || err);
+    return null;
+  }
+}
+
+// ============================== TELÉFONO (sugerir amigos de tus contactos) ==============================
+// Índice opcional y separado de "usernames" (ese es obligatorio para
+// cualquier cosa social; esto es un plus que cada quien activa a mano
+// desde Perfil). La clave del documento ya viene hasheada desde el cliente
+// (hashPhoneKey, en utils.js) — Firestore nunca ve el teléfono real, sólo
+// una huella determinística de sus últimos 9 dígitos.
+// A diferencia de "usernames", acá no hace falta unicidad estricta:
+// dos números reales distintos podrían, en un caso muy raro, terminar en
+// la misma huella — si pasa, gana quien la escribió último (no es un
+// problema de seguridad, en el peor caso se pierde una sugerencia).
+
+export async function setDiscoverablePhone(uid, phoneHash) {
+  if (!phoneHash) return;
+  try { await setDoc(doc(db, "phoneIndex", phoneHash), { uid }); }
+  catch (err) { console.warn("[social] No se pudo activar el descubrimiento por teléfono:", err?.message || err); }
+}
+
+export async function clearDiscoverablePhone(phoneHash) {
+  if (!phoneHash) return;
+  try { await deleteDoc(doc(db, "phoneIndex", phoneHash)); }
+  catch { /* ignorado a propósito, mismo criterio que releaseUsername */ }
+}
+
+// Dado un array de huellas (una por cada teléfono de tus contactos, ya
+// normalizadas Y hasheadas del lado del cliente), devuelve los uids de la
+// app que coinciden. En tandas de 30 (límite de Firestore para "in" sobre
+// el ID del documento) — de sobra incluso para una agenda de contactos
+// grande, sin arriesgar reventar la cuota de lecturas de una sola.
+export async function findUidsByPhoneHashes(phoneHashes) {
+  const unique = Array.from(new Set((phoneHashes || []).filter(Boolean)));
+  const uids = new Set();
+  for (let i = 0; i < unique.length; i += 30) {
+    const chunk = unique.slice(i, i + 30);
+    try {
+      const snap = await getDocs(query(collection(db, "phoneIndex"), where(documentId(), "in", chunk)));
+      snap.docs.forEach((d) => { const u = d.data()?.uid; if (u) uids.add(u); });
+    } catch (err) {
+      console.warn("[social] No se pudo buscar coincidencias de teléfono:", err?.message || err);
+    }
+  }
+  return Array.from(uids);
 }
 
 // "Hacerme privado": suelta el @usuario y borra el espejo público, SIN
@@ -302,9 +373,10 @@ export async function listRoutineProposalsByTrainer(trainerUid) {
 // Best-effort: se llama desde handleDelete. Nunca debe bloquear ni tirar —
 // si algo falla, queda basura huérfana (mismo criterio que ya usa el resto
 // de la app para este tipo de limpieza).
-export async function cleanupSocialData(uid, usernameLower) {
+export async function cleanupSocialData(uid, usernameLower, phoneHash = null) {
   try {
     if (usernameLower) await releaseUsername(usernameLower);
+    if (phoneHash) await clearDiscoverablePhone(phoneHash);
     await deleteDoc(doc(db, "users", uid, "public", "basic"));
     await deleteDoc(doc(db, "users", uid, "public", "full"));
     const [asFriendA, asTrainer, asStudent] = await Promise.all([
