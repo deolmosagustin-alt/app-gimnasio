@@ -6464,56 +6464,35 @@ const EVOLUTION_CHART_COLOR = "#F59E0B";
 const SOCIAL_COLOR = "#A855F7";
 
 // ============================================================================
-// LOGROS — pedido: "le falta algo propio e innovador" a la pestaña Social.
-// Todo se deriva de datos que YA existen en el perfil/estado de SocialView
-// (nada de Firestore nuevo): días entrenados, amigos, rango promedio,
-// vínculo de entrenador, perfil público, modo de entrenamiento. Se muestran
-// como una tira de insignias (bloqueadas en gris, desbloqueadas a color) —
-// gamifica sin depender de ningún backend nuevo ni de arreglar el ranking
-// global primero.
-// ============================================================================
-// BUG FIX (pedido: "los logros tienen muchos colores, mantengamos el
-// violeta"): antes cada insignia tenía un color propio (bronce, plata,
-// dorado, índigo...) que se sentía desconectado del resto de la pestaña.
-// Ahora todas comparten el mismo SOCIAL_COLOR — la diferencia entre
-// desbloqueada/bloqueada ya la marca el contraste (a color vs. gris
-// apagado, ver AchievementsStrip), no hace falta un color distinto por
-// insignia para que se entienda.
-const ACHIEVEMENTS = [
-  { key: "first_steps", label: "Primeros pasos", icon: <Footprints size={16} />, color: SOCIAL_COLOR, check: (c) => c.trainedDays >= 1 },
-  { key: "constancia_10", label: "10 días entrenados", icon: <Flame size={16} />, color: SOCIAL_COLOR, check: (c) => c.trainedDays >= 10 },
-  { key: "constancia_30", label: "30 días entrenados", icon: <Flame size={16} />, color: SOCIAL_COLOR, check: (c) => c.trainedDays >= 30 },
-  { key: "constancia_100", label: "100 días entrenados", icon: <Flame size={16} />, color: SOCIAL_COLOR, check: (c) => c.trainedDays >= 100 },
-  { key: "sociable", label: "Primer amigo", icon: <Users size={16} />, color: SOCIAL_COLOR, check: (c) => c.friendCount >= 1 },
-  { key: "circulo", label: "5 amigos", icon: <Users size={16} />, color: SOCIAL_COLOR, check: (c) => c.friendCount >= 5 },
-  { key: "rango_oro", label: "Rango Oro o más", icon: <Trophy size={16} />, color: SOCIAL_COLOR, check: (c) => (c.myTopRank?.levelIdx ?? -1) >= 6 },
-  { key: "rango_maestro", label: "Rango Maestro", icon: <Trophy size={16} />, color: SOCIAL_COLOR, check: (c) => c.myTopRank?.tier === "Maestro" },
-  { key: "publico", label: "Perfil público", icon: <QrCode size={16} />, color: SOCIAL_COLOR, check: (c) => !!c.hasUsername },
-  { key: "equipo", label: "Entrenador vinculado", icon: <GraduationCap size={16} />, color: SOCIAL_COLOR, check: (c) => c.hasTrainerLink },
-  { key: "planificador", label: "Rutina planificada", icon: <Target size={16} />, color: SOCIAL_COLOR, check: (c) => c.trainingMode === "planned" },
-];
-function computeAchievements(ctx) {
-  return ACHIEVEMENTS.map((a) => ({ ...a, unlocked: a.check(ctx) }));
-}
-// Tira horizontal de insignias — desbloqueadas a todo color con su fondo
-// tintado, bloqueadas en gris apagado (mismo lenguaje "gris = todavía no"
-// que ya usa el resto de la app para requisitos sin cumplir).
-function AchievementsStrip({ achievements }) {
-  const unlockedCount = achievements.filter((a) => a.unlocked).length;
+// ESTADÍSTICAS DE PROGRESO — pedido: "también podrían mostrarse estadísticas
+// de progreso... si ocupa mucho espacio o satura, saquemos los logros".
+// Antes acá vivía una tira de 11 insignias (LOGROS) — se sacó del todo:
+// con esta tarjeta más el resto del hero (rango, amigos) la pestaña ya
+// tenía suficiente peso arriba de las secciones, y estos números en limpio
+// (racha, esta semana, total) son más accionables que una insignia
+// bloqueada/desbloqueada. Todo sale de datos que ya viajan en el perfil
+// (logs + trainingSessions), sin ninguna lectura nueva a Firestore.
+function SocialProgressStats({ profile }) {
+  const stats = useMemo(() => {
+    const dateSet = getTrainedDateSet(profile?.logs || {}, profile?.trainingSessions || []);
+    return {
+      streak: computeSmartStreak(dateSet, null),
+      thisWeek: getSessionsForPeriod(profile?.trainingSessions || [], "week").length,
+      total: dateSet.size,
+    };
+  }, [profile]);
   return (
     <div className="space-y-1.5">
-      <div className="flex items-center justify-between px-1">
-        <p className="text-[10px] font-black uppercase tracking-widest text-slate-600">Logros</p>
-        <p className="text-[10px] font-bold text-slate-600">{unlockedCount}/{achievements.length}</p>
-      </div>
-      <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-        {achievements.map((a) => (
-          <div key={a.key} title={a.label} className="shrink-0 w-16 flex flex-col items-center gap-1">
-            <div className="w-11 h-11 rounded-2xl flex items-center justify-center border transition-all"
-              style={a.unlocked ? { backgroundColor: tint(a.color, "1c"), borderColor: tint(a.color, "45"), color: a.color } : { backgroundColor: "rgba(51,65,85,0.25)", borderColor: "rgba(51,65,85,0.4)", color: "#475569" }}>
-              {a.icon}
-            </div>
-            <p className={`text-[8.5px] text-center leading-tight ${a.unlocked ? "text-slate-400 font-bold" : "text-slate-700"}`}>{a.label}</p>
+      <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 px-1">Tu progreso</p>
+      <div className="grid grid-cols-3 gap-2">
+        {[
+          { label: "Racha", val: `${stats.streak}d` },
+          { label: "Esta semana", val: `${stats.thisWeek}` },
+          { label: "Entrenados", val: `${stats.total}d` },
+        ].map(({ label, val }) => (
+          <div key={label} className="bg-purple-500/10 border border-purple-500/15 rounded-xl px-3 py-2 text-center">
+            <p className="text-sm font-black text-purple-200">{val}</p>
+            <p className="text-[10px] text-purple-500 mt-0.5">{label}</p>
           </div>
         ))}
       </div>
@@ -7462,6 +7441,63 @@ function MyBodyModal({ profile, onClose }) {
             </div>
             <MuscleExerciseList exercises={getExerciseBestsForMuscleGroup(selected, profile?.logs)} unit={getProfileSettings(profile)?.weightUnit || "kg"} />
           </div>
+        )}
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+// Pedido: al tocar el ícono de rango DEL HERO de Social (no el de Ranking
+// "Vos", que sigue abriendo el muñeco), en vez del muñeco mostrar una
+// explicación de por qué se asignó ese rango — de dónde sale el promedio y
+// qué músculo lo empuja para arriba o para abajo. Sin muñeco acá a propósito.
+function RankExplainModal({ profile, myTopRank, onClose }) {
+  useAndroidBack(onClose);
+  const breakdown = useMemo(() => {
+    const ranks = computeAllMuscleRanks(profile?.logs, getProfileSettings(profile), profile?.sex, profile?.age);
+    const withData = MUSCLE_GROUPS.map((g) => ({ key: g.key, label: g.label, ...ranks[g.key] })).filter((r) => r.hasData);
+    withData.sort((a, b) => b.levelIdx - a.levelIdx);
+    const untrainedCount = MUSCLE_GROUPS.length - withData.length;
+    return { withData, untrainedCount };
+  }, [profile]);
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div className="fixed inset-0 z-[120] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
+      <div className="w-full max-w-sm max-h-[86vh] overflow-y-auto overscroll-contain bg-slate-900 border border-purple-700/40 rounded-3xl modal-pop-in shadow-2xl shadow-black/70 p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-black text-white">¿Por qué este rango?</p>
+          <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition"><X size={17} /></button>
+        </div>
+        {myTopRank ? (
+          <>
+            <div className="flex items-center gap-3 rounded-2xl border px-4 py-3.5" style={{ borderColor: tint(myTopRank.color, "40"), backgroundColor: tint(myTopRank.color, "0c") }}>
+              <RankBadgeIcon tier={myTopRank.tier} sub={myTopRank.sub} color={myTopRank.color} size={44} />
+              <div className="min-w-0">
+                <p className="text-base font-black leading-tight" style={{ color: myTopRank.color }}>{myTopRank.tier} {myTopRank.sub}</p>
+                <p className="text-[11px] text-slate-500 leading-snug">Promedio de {breakdown.withData.length} músculo{breakdown.withData.length === 1 ? "" : "s"} con marcas</p>
+              </div>
+            </div>
+            <p className="text-xs text-slate-400 leading-relaxed">Este es el promedio entre tus rangos por músculo, no el mejor ni el peor — cuantos más grupos entrenes con marcas parejas, más representativo va a ser de todo tu cuerpo.</p>
+            {breakdown.withData.length > 0 && (
+              <div className="space-y-1.5">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 px-1">Rango por músculo</p>
+                <div className="space-y-1">
+                  {breakdown.withData.map((r) => (
+                    <div key={r.key} className="flex items-center justify-between rounded-lg bg-slate-800/50 px-3 py-2">
+                      <span className="text-xs text-slate-300">{r.label}</span>
+                      <span className="text-xs font-black" style={{ color: r.color }}>{r.tier} {r.sub}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {breakdown.untrainedCount > 0 && (
+              <p className="text-[10.5px] text-slate-600 leading-snug px-1">Todavía te falta cargar marcas de {breakdown.untrainedCount} grupo{breakdown.untrainedCount === 1 ? "" : "s"} muscular{breakdown.untrainedCount === 1 ? "" : "es"} — no cuentan para el promedio hasta que tengas al menos una.</p>
+            )}
+          </>
+        ) : (
+          <p className="text-sm text-slate-500 text-center py-4">Todavía no tenés marcas registradas — anotá tu primera serie en Rutina para empezar a ver tu rango acá.</p>
         )}
       </div>
     </div>,
@@ -11606,6 +11642,9 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
 
   const [showShareProfile, setShowShareProfile] = useState(false);
   const [showMyBody, setShowMyBody] = useState(false);
+  // Pedido: el ícono de rango del HERO abre una explicación (no el
+  // muñeco) — el muñeco queda reservado para la fila "Vos" de Ranking.
+  const [showRankExplain, setShowRankExplain] = useState(false);
   // Plantillas de rutina para mandar a alumnos — separadas de "Mis
   // rutinas" (esas son para tu propio entrenamiento). Ver TrainerTemplatesCard.
   const [showTemplateBuilder, setShowTemplateBuilder] = useState(false);
@@ -11614,14 +11653,6 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
   const [templateSentNote, setTemplateSentNote] = useState(false);
   const trainerRoutineTemplates = profile?.trainerRoutineTemplates || {};
   const myTopRank = useMemo(() => computeTopRank(profile), [profile]);
-  const achievements = useMemo(() => computeAchievements({
-    trainedDays: getTrainedDateSet(profile?.logs || {}, profile?.trainingSessions || []).size,
-    friendCount: friendAccepted.length,
-    myTopRank,
-    hasUsername: !!profile?.username,
-    hasTrainerLink: studentsAccepted.length > 0 || trainersAccepted.length > 0,
-    trainingMode: getProfileSettings(profile)?.trainingMode,
-  }), [profile, friendAccepted.length, myTopRank, studentsAccepted.length, trainersAccepted.length]);
   // Antes no había NINGUNA forma de sacar a un amigo ya aceptado — el único
   // botón de "Cancelar" que existía era para una solicitud saliente
   // todavía pendiente. Two-tap (mismo criterio que borrar una conversación
@@ -11714,33 +11745,20 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
               {(studentsAccepted.length + trainersAccepted.length) > 0 ? ` · ${studentsAccepted.length + trainersAccepted.length} vínculo${(studentsAccepted.length + trainersAccepted.length) === 1 ? "" : "s"} de entrenador` : ""}
             </p>
           </div>
-          {/* Idea del usuario: tocar tu propio rango también abre el
-              muñeco — mismo componente interactivo que ya usa Progreso,
-              para no tener que salir de Social a mirarlo.
-              BUG FIX (pedido: "agregale algún recuadro al rango"): antes
-              la insignia flotaba sola, sin ningún marco — desbalanceado al
-              lado del avatar, que sí tiene su propia caja. Ahora usa el
-              mismo tamaño de caja (w-16 h-16) que el avatar, tintada con
-              el color del propio rango.
-              BUG FIX (pedido: "queda descentrado con el ícono social"): la
-              etiqueta "Tu rango" ANTES vivía adentro del mismo botón (con
-              flex-col), lo que hacía que el botón entero (caja + texto)
-              fuera más alto que la caja del avatar — items-center en la
-              fila los centraba a los DOS como bloques completos, así que
-              la caja del rango terminaba más arriba que la del avatar en
-              vez de a la misma altura. Ahora el botón sólo contiene la
-              caja (misma altura exacta que el avatar) y la etiqueta va
-              AFUERA de la fila, como renglón propio debajo — así las dos
-              cajas quedan perfectamente alineadas. */}
+          {/* Pedido: sacar el recuadro/marco que tenía la insignia y la
+              etiqueta "Tu rango" — queda el ícono solo, sin caja, con el
+              nombre del rango (ej. "Diamante II") como texto debajo en vez
+              del circulito con el número romano superpuesto (sub={null}).
+              Tocarlo ahora abre una EXPLICACIÓN de por qué se asignó ese
+              rango (RankExplainModal) en vez del muñeco — el muñeco queda
+              reservado para la fila "Vos" de Ranking, sin cambios ahí. */}
           {myTopRank && (
-            <button onClick={() => setShowMyBody(true)} aria-label="Ver tu muñeco de rangos" className="shrink-0 w-16 h-16 rounded-2xl flex items-center justify-center border active:scale-95 transition" style={{ backgroundColor: tint(myTopRank.color, "18"), borderColor: tint(myTopRank.color, "45") }}>
-              <RankBadgeIcon tier={myTopRank.tier} sub={myTopRank.sub} color={myTopRank.color} size={42} />
+            <button onClick={() => setShowRankExplain(true)} aria-label="Por qué tenés este rango" className="shrink-0 flex flex-col items-center gap-0.5 active:scale-95 transition">
+              <RankBadgeIcon tier={myTopRank.tier} sub={null} color={myTopRank.color} size={42} />
+              <span className="text-[9px] font-black uppercase tracking-wide whitespace-nowrap" style={{ color: myTopRank.color }}>{myTopRank.tier} {myTopRank.sub}</span>
             </button>
           )}
         </div>
-        {myTopRank && (
-          <p className="relative text-[8.5px] font-black uppercase tracking-wider text-right mt-1" style={{ color: myTopRank.color }}>Tu rango</p>
-        )}
         <p className="relative text-xs text-purple-300/70 mt-3">Sumá amigos, competí en el ranking y compartí tu progreso con quien entrena con vos.</p>
         {profile?.username && (
           <button onClick={() => setShowShareProfile(true)} className="relative w-full flex items-center justify-center gap-1.5 mt-4 pt-3 border-t border-white/10 text-[10px] font-bold text-purple-300/75 hover:text-purple-300 transition">
@@ -11758,7 +11776,7 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
         onSend={(id, def) => setSendingTemplate({ id, def })}
       />
 
-      <AchievementsStrip achievements={achievements} />
+      <SocialProgressStats profile={profile} />
 
       <div className="relative grid gap-1 p-1 rounded-2xl bg-slate-900/60 border border-slate-800/50" style={{ gridTemplateColumns: `repeat(${SECTIONS.length}, 1fr)` }}>
         {/* Píldora deslizante en vez de que cada botón prenda/apague su
@@ -11925,6 +11943,7 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
         />
       )}
       {showMyBody && <MyBodyModal profile={profile} onClose={() => setShowMyBody(false)} />}
+      {showRankExplain && <RankExplainModal profile={profile} myTopRank={myTopRank} onClose={() => setShowRankExplain(false)} />}
       {sendingTemplate && (
         <SendTemplateModal
           template={sendingTemplate}
