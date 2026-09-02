@@ -1,0 +1,12 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "basic",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "topRank.levelIdx", "order": "DESCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
