@@ -7114,31 +7114,42 @@ function FemaleBodyModel({ ranks, highlightedColors, selected, onMuscleClick, fr
   );
 }
 
+// Versión suavizada de los colores de RANK_TIERS — mezclada 65/35 con el
+// fondo oscuro para que el muñeco no acapare toda la atención visual de la
+// pantalla. Es un valor 100% estático (RANK_TIERS nunca cambia), así que
+// una sola constante de módulo alcanza — antes vivía como useMemo adentro
+// de MuscleHighlighterBody, recalculado (inútilmente) por cada instancia;
+// ahora también la reusa MiniBodyView (comparación de muñecos con un amigo).
+const BODY_HIGHLIGHT_COLORS = RANK_TIERS.map((t) => muteHex(t.color, 0.72));
+
+// Convierte el objeto `ranks` (por grupo muscular nuestro) al formato de
+// "frequency" que espera react-body-highlighter — extraído de adentro de
+// MuscleHighlighterBody para poder reusarlo también en MiniBodyView, sin
+// duplicar la lógica de mapeo de slugs (trapecio→neck, tibial↔pantorrillas).
+function buildBodyHighlighterData(ranks) {
+  const bestLevelBySlug = {};
+  Object.entries(BODY_HIGHLIGHTER_SLUG_MAP).forEach(([ourKey, slug]) => {
+    const lvl = ranks[ourKey]?.levelIdx ?? -1;
+    if (lvl > (bestLevelBySlug[slug] ?? -1)) bestLevelBySlug[slug] = lvl;
+  });
+  // Trapecio pinta también el "neck" en la vista frontal
+  if (bestLevelBySlug["trapezius"] != null) {
+    bestLevelBySlug["neck"] = bestLevelBySlug["trapezius"];
+  }
+  // Tibial anterior: también usar calves (aparece en vista frontal y trasera,
+  // pero el useEffect de MuscleHighlighterBody fuerza neutro en trasera)
+  if (bestLevelBySlug["calves"] != null) {
+    bestLevelBySlug["left-soleus"] = bestLevelBySlug.calves;
+    bestLevelBySlug["right-soleus"] = bestLevelBySlug.calves;
+  }
+  return Object.entries(bestLevelBySlug)
+    .filter(([, lvl]) => lvl >= 0)
+    .map(([slug, lvl]) => ({ name: slug, muscles: [slug], frequency: lvl + 1 }));
+}
+
 function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backRef, rankMode = "general", pulseMuscles = null, sex = null }) {
-  // highlightedColors: versión suavizada de los colores de RANK_TIERS —
-  // mezclada 65/35 con el fondo oscuro para que el muñeco no acapare
-  // toda la atención visual de la pantalla.
-  const highlightedColors = useMemo(() => RANK_TIERS.map((t) => muteHex(t.color, 0.72)), []);
-  const data = useMemo(() => {
-    const bestLevelBySlug = {};
-    Object.entries(BODY_HIGHLIGHTER_SLUG_MAP).forEach(([ourKey, slug]) => {
-      const lvl = ranks[ourKey]?.levelIdx ?? -1;
-      if (lvl > (bestLevelBySlug[slug] ?? -1)) bestLevelBySlug[slug] = lvl;
-    });
-    // Trapecio pinta también el "neck" en la vista frontal
-    if (bestLevelBySlug["trapezius"] != null) {
-      bestLevelBySlug["neck"] = bestLevelBySlug["trapezius"];
-    }
-    // Tibial anterior: también usar calves (aparece en vista frontal y trasera,
-    // pero el useEffect de abajo fuerza neutro en trasera)
-    if (bestLevelBySlug["calves"] != null) {
-      bestLevelBySlug["left-soleus"] = bestLevelBySlug.calves;
-      bestLevelBySlug["right-soleus"] = bestLevelBySlug.calves;
-    }
-    return Object.entries(bestLevelBySlug)
-      .filter(([, lvl]) => lvl >= 0)
-      .map(([slug, lvl]) => ({ name: slug, muscles: [slug], frequency: lvl + 1 }));
-  }, [ranks]);
+  const highlightedColors = BODY_HIGHLIGHT_COLORS;
+  const data = useMemo(() => buildBodyHighlighterData(ranks), [ranks]);
 
   // Clic e identificación del músculo: antes esto comparaba colores de
   // relleno para adivinar qué tocaste, y fallaba todo el tiempo —
@@ -7327,6 +7338,87 @@ function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backR
         <p className="text-center text-[10px] text-slate-600 mt-1">De espalda</p>
       </div>
     </div>
+  );
+}
+
+// Muñeco chico, de un solo lado (de frente) y sin interacción — pensado
+// para comparar dos personas lado a lado (FriendBodyCompare, más abajo):
+// mostrar los CUATRO cuerpos de MuscleHighlighterBody (frente+espalda × 2
+// personas) no entra cómodo en una pantalla de celular, así que esta
+// versión se queda con lo esencial (un vistazo de frente alcanza para
+// comparar) y reusa la MISMA lógica de datos (buildBodyHighlighterData/
+// buildFemaleBodyData) que ya usa la vista completa, sin duplicarla.
+function MiniBodyView({ ranks, sex, label, accentColor = "#94a3b8" }) {
+  const data = useMemo(() => buildBodyHighlighterData(ranks), [ranks]);
+  const femalePalette = useFemalePalette(BODY_HIGHLIGHT_COLORS);
+  const femaleData = useMemo(() => buildFemaleBodyData(ranks, BODY_HIGHLIGHT_COLORS.length, null, "front"), [ranks]);
+  return (
+    <div className="flex-1 min-w-0 text-center">
+      <p className="text-[10px] font-black uppercase tracking-wider mb-1.5 truncate" style={{ color: accentColor }}>{label}</p>
+      <div className="max-w-[140px] mx-auto">
+        {sex === "F" ? (
+          <FemaleBody data={femaleData} colors={femalePalette} gender="female" side="front" border="none" onBodyPartClick={MODEL_NOOP_CLICK} />
+        ) : (
+          <Model data={data} type="anterior" bodyColor="#334155" highlightedColors={BODY_HIGHLIGHT_COLORS} onClick={MODEL_NOOP_CLICK} style={MODEL_STYLE} svgStyle={MODEL_STYLE} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Comparación visual "vos vs [nombre]" con muñecos lado a lado — pedido:
+// "que al tocar el perfil de un amigo (o el tuyo) se abra una parte con el
+// muñeco para comparar". Complementa a RankComparisonList (que ya compara
+// número a número): acá el objetivo es un vistazo rápido de "quién está
+// más parejo/desarrollado", no el detalle exacto de cada músculo.
+function FriendBodyCompare({ myRanks, mySex, theirRanks, theirSex, theirName }) {
+  return (
+    <div className="rounded-2xl border border-slate-800/50 bg-slate-900/40 p-4">
+      <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 mb-3 text-center">Muñecos lado a lado</p>
+      <div className="flex items-start gap-3 justify-center">
+        <MiniBodyView ranks={myRanks} sex={mySex} label="Vos" accentColor="#2DD4BF" />
+        <div className="w-px self-stretch bg-slate-800 shrink-0 mt-6" />
+        <MiniBodyView ranks={theirRanks} sex={theirSex} label={theirName || "Ellos"} accentColor="#C084FC" />
+      </div>
+    </div>
+  );
+}
+
+// Ver tu propio muñeco desde Social (pedido del usuario: "que al tocar el
+// rango, el tuyo también, se abra el muñeco") — mismo componente
+// interactivo que ya usa Progreso, en un modal liviano para no tener que
+// cambiar de pestaña. El detalle al tocar un músculo se queda simple
+// (tier + si tiene marca o no): el desglose completo de "cuánto te falta
+// para el próximo rango" sigue siendo cosa de MuscleRankView en Progreso.
+function MyBodyModal({ profile, onClose }) {
+  useAndroidBack(onClose);
+  const [selected, setSelected] = useState(null);
+  const frontRef = useRef(null);
+  const backRef = useRef(null);
+  const ranks = useMemo(() => computeAllMuscleRanks(profile?.logs, getProfileSettings(profile), profile?.sex, profile?.age), [profile]);
+  const selInfo = selected ? ranks[selected] : null;
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div className="fixed inset-0 z-[120] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
+      <div className="w-full max-w-sm max-h-[86vh] overflow-y-auto overscroll-contain bg-slate-900 border border-purple-700/40 rounded-3xl modal-pop-in shadow-2xl shadow-black/70 p-5 space-y-3" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-black text-white">Tu rango por músculo</p>
+          <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition"><X size={17} /></button>
+        </div>
+        <MuscleHighlighterBody ranks={ranks} selected={selected} onMuscleClick={(k) => setSelected((s) => (s === k ? null : k))} frontRef={frontRef} backRef={backRef} sex={profile?.sex} />
+        {selInfo && (
+          <div className="rounded-xl border px-3.5 py-3 text-center" style={{ borderColor: tint(selInfo.color, "40"), backgroundColor: tint(selInfo.color, "0c") }}>
+            <p className="text-[10px] text-slate-500">{selInfo.label}</p>
+            {selInfo.hasData ? (
+              <p className="text-base font-black" style={{ color: selInfo.color }}>{selInfo.tier} {selInfo.sub}</p>
+            ) : (
+              <p className="text-xs text-slate-600">Sin marca todavía</p>
+            )}
+          </div>
+        )}
+      </div>
+    </div>,
+    document.body
   );
 }
 
@@ -10530,6 +10622,22 @@ function FriendMuscleRankSummary({ logs, settings, sex, age }) {
   );
 }
 
+// Rango de CADA grupo muscular para una persona — mismo cálculo que ya usa
+// MuscleRankView para "vos" (extraído para reusarlo también con los datos
+// de un amigo/alumno, ver FriendBodyCompare, sin duplicar la lógica de
+// modo relativo/general).
+function computeAllMuscleRanks(logs, settings, sex, age) {
+  const bodyWeightKg = settings?.bodyWeightKg || 0;
+  const mode = bodyWeightKg > 0 ? "relative" : "general";
+  const dumbbellDouble = settings?.dumbbellDouble || null;
+  const out = {};
+  MUSCLE_GROUPS.forEach((g) => {
+    const { best1RM, bestKg, bestReps, bestExerciseName, bestLoadFactor, bestWeight } = getBest1RMForMuscleGroup(g.key, logs || {}, dumbbellDouble);
+    out[g.key] = { ...getMuscleRank(g.key, best1RM, mode, bodyWeightKg, sex, age), best1RM, bestKg, bestReps, bestExerciseName, bestLoadFactor, bestWeight, label: g.label };
+  });
+  return out;
+}
+
 // Compara tu rango con el de un amigo/alumno, músculo por músculo — cada
 // persona usa su PROPIO modo ("relativo" a su peso corporal si lo cargó,
 // "general" si no), el mismo criterio con el que cada quien ve su rango
@@ -11172,10 +11280,23 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
               </button>
             </div>
             {comparing ? (
-              <RankComparisonList
-                comparison={buildRankComparison(viewerProfile?.logs, getProfileSettings(viewerProfile), viewerProfile?.sex, viewerProfile?.age, full.logs, full.settings, full.sex, full.age)}
-                theirName={basic?.name || "Ellos"}
-              />
+              <div className="space-y-3">
+                {/* Idea del usuario: además de comparar número a número
+                    (RankComparisonList, abajo), un vistazo visual con los
+                    muñecos lado a lado — mismos datos, sin pedir nada nuevo
+                    a Firestore. */}
+                <FriendBodyCompare
+                  myRanks={computeAllMuscleRanks(viewerProfile?.logs, getProfileSettings(viewerProfile), viewerProfile?.sex, viewerProfile?.age)}
+                  mySex={viewerProfile?.sex}
+                  theirRanks={computeAllMuscleRanks(full.logs, full.settings, full.sex, full.age)}
+                  theirSex={full.sex}
+                  theirName={basic?.name}
+                />
+                <RankComparisonList
+                  comparison={buildRankComparison(viewerProfile?.logs, getProfileSettings(viewerProfile), viewerProfile?.sex, viewerProfile?.age, full.logs, full.settings, full.sex, full.age)}
+                  theirName={basic?.name || "Ellos"}
+                />
+              </div>
             ) : (
               <FriendMuscleRankSummary logs={full.logs} settings={full.settings} sex={full.sex} age={full.age} />
             )}
@@ -11352,6 +11473,7 @@ function SocialView({ profile, profileName, uid, onActivateRoutine }) {
   };
 
   const [showShareProfile, setShowShareProfile] = useState(false);
+  const [showMyBody, setShowMyBody] = useState(false);
   const myTopRank = useMemo(() => computeTopRank(profile), [profile]);
   const achievements = useMemo(() => computeAchievements({
     trainedDays: getTrainedDateSet(profile?.logs || {}, profile?.trainingSessions || []).size,
@@ -11431,7 +11553,14 @@ function SocialView({ profile, profileName, uid, onActivateRoutine }) {
               {(studentsAccepted.length + trainersAccepted.length) > 0 ? ` · ${studentsAccepted.length + trainersAccepted.length} vínculo${(studentsAccepted.length + trainersAccepted.length) === 1 ? "" : "s"} de entrenador` : ""}
             </p>
           </div>
-          {myTopRank && <RankBadgeIcon tier={myTopRank.tier} sub={myTopRank.sub} color={myTopRank.color} size={50} />}
+          {/* Idea del usuario: tocar tu propio rango también abre el
+              muñeco — mismo componente interactivo que ya usa Progreso,
+              para no tener que salir de Social a mirarlo. */}
+          {myTopRank && (
+            <button onClick={() => setShowMyBody(true)} aria-label="Ver tu muñeco de rangos" className="shrink-0 active:scale-95 transition">
+              <RankBadgeIcon tier={myTopRank.tier} sub={myTopRank.sub} color={myTopRank.color} size={50} />
+            </button>
+          )}
         </div>
         <p className="relative text-xs text-purple-300/70 mt-3">Sumá amigos, competí en el ranking y compartí tu progreso con quien entrena con vos.</p>
         {profile?.username && (
@@ -11606,6 +11735,7 @@ function SocialView({ profile, profileName, uid, onActivateRoutine }) {
           onClose={() => setShowShareProfile(false)}
         />
       )}
+      {showMyBody && <MyBodyModal profile={profile} onClose={() => setShowMyBody(false)} />}
     </div>
   );
 }
