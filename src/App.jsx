@@ -6852,6 +6852,52 @@ function getBest1RMForMuscleGroup(groupKey, logs, lfOverrides = null) {
   };
 }
 
+// Mejor marca de CADA EJERCICIO que aporta a un grupo muscular — a
+// diferencia de getBest1RMForMuscleGroup (que sólo devuelve el mejor
+// ejercicio, el que "representa" el rango del grupo), esto arma el
+// listado completo. Pedido: al tocar un músculo en el muñeco (tuyo o de
+// un amigo), desplegar las mejores marcas de cada ejercicio de ese
+// músculo, no sólo el ejercicio ganador. Funciona igual para tu perfil o
+// el de un amigo — sólo recibe `logs`, sin depender de estado propio.
+function getExerciseBestsForMuscleGroup(groupKey, logs) {
+  const { primary, always, secondary } = EXERCISE_LIBRARY_CONTRIBUTORS_BY_GROUP[groupKey] || { primary: new Map(), always: new Map(), secondary: new Map() };
+  const allContributors = new Map([...primary, ...always, ...secondary]);
+  const { logs: cleanLogs } = cleanObsoleteOverrides(logs || {});
+  const bestByExercise = new Map(); // exerciseId -> {kg, reps, rawRm}
+  Object.entries(cleanLogs).forEach(([key, val]) => {
+    const isOverride = key.endsWith("_pr_override");
+    const baseKey = isOverride ? key.replace(/_pr_override$/, "") : key;
+    const { exerciseId } = parseLogKey(baseKey);
+    if (!allContributors.has(exerciseId)) return;
+    const entries = isOverride ? [val] : (Array.isArray(val) ? val : []);
+    entries.forEach((e) => {
+      if (!e || !e.kg || !e.reps) return;
+      const rawRm = estimate1RM(e.kg, e.reps);
+      const cur = bestByExercise.get(exerciseId);
+      if (!cur || rawRm > cur.rawRm) bestByExercise.set(exerciseId, { kg: e.kg, reps: e.reps, rawRm });
+    });
+  });
+  return Array.from(bestByExercise.entries())
+    .map(([exerciseId, best]) => ({ exerciseId, name: EXERCISE_LIBRARY_BY_ID[exerciseId]?.name || exerciseId, kg: best.kg, reps: best.reps, rawRm: best.rawRm }))
+    .sort((a, b) => b.rawRm - a.rawRm);
+}
+
+// Lista de "mejor marca por ejercicio" de un músculo — usada tanto en tu
+// propio muñeco (MyBodyModal) como en el de un amigo (FriendProfileView).
+function MuscleExerciseList({ exercises, unit = "kg" }) {
+  if (!exercises.length) return <p className="text-xs text-slate-600 text-center py-3">Sin marcas registradas en este músculo todavía.</p>;
+  return (
+    <div className="space-y-1.5">
+      {exercises.map((ex) => (
+        <div key={ex.exerciseId} className="flex items-center justify-between gap-2 rounded-lg bg-slate-800/50 px-3 py-2">
+          <span className="text-xs text-slate-300 truncate">{ex.name}</span>
+          <span className="text-xs font-black text-white shrink-0 tabular-nums">{ex.reps}<span className="opacity-50 font-normal mx-0.5">×</span>{kgToDisplay(ex.kg, unit)}{weightLabel(unit)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // Insignias de rango — imágenes en /public/insignias/{tier}.png.
 // object-fit: contain (sin deformar). Dos ajustes por tier:
 //  - widthAdjust: bronce/plata venían más anchas que oro → se les reduce
@@ -7406,14 +7452,15 @@ function MyBodyModal({ profile, onClose }) {
           <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition"><X size={17} /></button>
         </div>
         <MuscleHighlighterBody ranks={ranks} selected={selected} onMuscleClick={(k) => setSelected((s) => (s === k ? null : k))} frontRef={frontRef} backRef={backRef} sex={profile?.sex} />
+        {/* Pedido: al tocar un músculo, desplegar las mejores marcas de
+            CADA ejercicio de ese músculo (no sólo el tier/rango). */}
         {selInfo && (
-          <div className="rounded-xl border px-3.5 py-3 text-center" style={{ borderColor: tint(selInfo.color, "40"), backgroundColor: tint(selInfo.color, "0c") }}>
-            <p className="text-[10px] text-slate-500">{selInfo.label}</p>
-            {selInfo.hasData ? (
-              <p className="text-base font-black" style={{ color: selInfo.color }}>{selInfo.tier} {selInfo.sub}</p>
-            ) : (
-              <p className="text-xs text-slate-600">Sin marca todavía</p>
-            )}
+          <div className="rounded-xl border px-3.5 py-3" style={{ borderColor: tint(selInfo.color, "40"), backgroundColor: tint(selInfo.color, "0c") }}>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[10px] font-bold text-slate-500">{selInfo.label}</p>
+              {selInfo.hasData && <p className="text-xs font-black" style={{ color: selInfo.color }}>{selInfo.tier} {selInfo.sub}</p>}
+            </div>
+            <MuscleExerciseList exercises={getExerciseBestsForMuscleGroup(selected, profile?.logs)} unit={getProfileSettings(profile)?.weightUnit || "kg"} />
           </div>
         )}
       </div>
@@ -10573,55 +10620,6 @@ function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted
   );
 }
 
-// Resumen de rango por músculo de un amigo/alumno — mismo cálculo que
-// MuscleRankView (getBest1RMForMuscleGroup + getMuscleRank), pero sin
-// muñeco interactivo ni animaciones: MuscleRankView escribe a variables
-// mutables de módulo (RECENT_RANK_UPS) pensadas para "tu propio" progreso,
-// que acá arruinarían la próxima visita a TU PROPIO Progreso si se
-// dispararan con datos ajenos.
-// Le damos protagonismo al rango acá: es lo primero que un amigo o un
-// entrenador quiere ver de un vistazo ("¿qué tan fuerte viene?"), así que
-// el mejor músculo se destaca arriba en grande (mismo lenguaje de tarjeta
-// "hero" con glow que usa el resto de la app para lo más importante de
-// cada pantalla) y el resto queda abajo en una grilla más compacta.
-function FriendMuscleRankSummary({ logs, settings, sex, age }) {
-  const bodyWeightKg = settings?.bodyWeightKg || 0;
-  const mode = bodyWeightKg > 0 ? "relative" : "general";
-  const ranks = useMemo(() => MUSCLE_GROUPS.map((g) => {
-    const { best1RM, bestKg, bestReps } = getBest1RMForMuscleGroup(g.key, logs || {}, null);
-    return { key: g.key, label: g.label, bestKg, bestReps, ...getMuscleRank(g.key, best1RM, mode, bodyWeightKg, sex, age) };
-  }).filter((r) => r.hasData).sort((a, b) => b.levelIdx - a.levelIdx), [logs, mode, bodyWeightKg, sex, age]);
-
-  if (!ranks.length) return <p className="text-xs text-slate-600 text-center py-6">Todavía no registró marcas.</p>;
-  const [best, ...rest] = ranks;
-  return (
-    <div className="space-y-2.5">
-      <div className="relative overflow-hidden rounded-2xl border px-4 py-4 flex items-center gap-3.5" style={{ borderColor: tint(best.color, "45"), background: `linear-gradient(135deg, ${tint(best.color, "1c")}, transparent)` }}>
-        <div className="absolute -top-6 -right-6 w-24 h-24 rounded-full blur-2xl opacity-25 pointer-events-none" style={{ backgroundColor: best.color }} />
-        <div className="relative w-14 h-14 rounded-2xl flex items-center justify-center shrink-0" style={{ backgroundColor: tint(best.color, "22"), border: `1px solid ${tint(best.color, "55")}` }}>
-          <Trophy size={24} style={{ color: best.color }} />
-        </div>
-        <div className="relative min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Mejor rango · {best.label}</p>
-          <p className="text-xl font-black leading-tight" style={{ color: best.color }}>{best.tier} {best.sub}</p>
-          <p className="text-[11px] text-slate-500">{best.bestReps}×{best.bestKg}kg</p>
-        </div>
-      </div>
-      {rest.length > 0 && (
-        <div className="grid grid-cols-2 gap-2">
-          {rest.map((r) => (
-            <div key={r.key} className="rounded-xl border px-3 py-2.5" style={{ borderColor: tint(r.color, "30"), backgroundColor: tint(r.color, "0a") }}>
-              <p className="text-[11px] text-slate-400 truncate">{r.label}</p>
-              <p className="text-sm font-black" style={{ color: r.color }}>{r.tier} {r.sub}</p>
-              <p className="text-[10px] text-slate-600">{r.bestReps}×{r.bestKg}kg</p>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // Rango de CADA grupo muscular para una persona — mismo cálculo que ya usa
 // MuscleRankView para "vos" (extraído para reusarlo también con los datos
 // de un amigo/alumno, ver FriendBodyCompare, sin duplicar la lógica de
@@ -10700,10 +10698,17 @@ function RankComparisonList({ comparison, theirName }) {
 // mejor rango. El podio (1-3) se marca con una medalla en vez de un
 // número pelado, y "vos" se resalta para encontrarte de un vistazo en una
 // lista larga.
-function LeaderboardRow({ position, name, username, avatarData, topRank, sessionsThisWeek = null, isMe }) {
+// Pedido: "al clickear tu perfil en la parte de ranking, o el de un
+// amigo" — toda la fila es clickeable (no tiene ningún botón anidado
+// adentro, así que un <button> entero es válido y más accesible que un
+// div con onClick). "Vos" abre tu propio muñeco (MyBodyModal); cualquier
+// otra fila navega al perfil completo de esa persona (FriendProfileView),
+// que ahora también muestra el muñeco de entrada.
+function LeaderboardRow({ position, name, username, avatarData, topRank, sessionsThisWeek = null, isMe, onClick = null }) {
   const medalColor = position === 1 ? "#FFD23F" : position === 2 ? "#DCE3E8" : position === 3 ? "#CD7F32" : null;
+  const Tag = onClick ? "button" : "div";
   return (
-    <div className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl border ${isMe ? "border-purple-500/40 bg-purple-500/10" : "border-slate-800/50 bg-slate-900/50"}`}>
+    <Tag onClick={onClick} className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl border text-left transition ${onClick ? "active:scale-[0.99] hover:border-slate-600" : ""} ${isMe ? "border-purple-500/40 bg-purple-500/10" : "border-slate-800/50 bg-slate-900/50"}`}>
       <div className="w-6 text-center shrink-0">
         {medalColor ? <Medal size={18} style={{ color: medalColor }} /> : <span className="text-sm font-black text-slate-600">{position}</span>}
       </div>
@@ -10721,7 +10726,7 @@ function LeaderboardRow({ position, name, username, avatarData, topRank, session
       {sessionsThisWeek != null ? (
         <span className="flex items-center gap-1 shrink-0 text-sm font-black text-orange-400"><Flame size={16} />{sessionsThisWeek}</span>
       ) : topRank && <RankBadgeIcon tier={topRank.tier} sub={topRank.sub} color={topRank.color} size={30} />}
-    </div>
+    </Tag>
   );
 }
 
@@ -10742,7 +10747,7 @@ const GLOBAL_RANKING_ENABLED = false;
 // índice de Firestore: quién entrenó más veces esta semana, usando la
 // MISMA lectura de public/full que ya pide `activity` (useUserStreaks) para
 // la racha — cero pedidos nuevos a Firestore por agregar esto.
-function LeaderboardSection({ uid, profile, myTopRank, friendAccepted, basics, activity }) {
+function LeaderboardSection({ uid, profile, myTopRank, friendAccepted, basics, activity, onViewPerson }) {
   const [scope, setScope] = useState("amigos");
   const [globalList, setGlobalList] = useState(null);
   const [globalError, setGlobalError] = useState(false);
@@ -10807,7 +10812,7 @@ function LeaderboardSection({ uid, profile, myTopRank, friendAccepted, basics, a
             googleUid todavía, así que "vos" en la lista puede llegar con
             uid undefined — sin el fallback, React tira "missing key"
             apenas esa fila entra en el array. */}
-        {list.map((entry, i) => <LeaderboardRow key={entry.uid || (entry.isMe ? "me" : i)} position={i + 1} {...entry} />)}
+        {list.map((entry, i) => <LeaderboardRow key={entry.uid || (entry.isMe ? "me" : i)} position={i + 1} {...entry} onClick={onViewPerson ? () => onViewPerson(entry.uid, entry.isMe) : null} />)}
       </div>
     </div>
   );
@@ -11183,6 +11188,14 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
   const [showProgressionComposer, setShowProgressionComposer] = useState(false);
   const [sentNote, setSentNote] = useState(false);
   const [comparing, setComparing] = useState(false);
+  // Pedido: "al clickear el perfil de un amigo que aparezca el muñeco, y
+  // al clickear cada músculo que se despliegue un listado con las mejores
+  // marcas de cada ejercicio" — selected/refs para el muñeco interactivo
+  // (mismo patrón que MyBodyModal, con la diferencia de que este vive
+  // siempre visible en el perfil, no atrás de un modal aparte).
+  const [selectedMuscle, setSelectedMuscle] = useState(null);
+  const friendFrontRef = useRef(null);
+  const friendBackRef = useRef(null);
 
   // Sin setState("loading") acá: el llamador monta este componente con
   // key={uid} (ver SocialView), así que cambiar de persona lo REMONTA
@@ -11211,6 +11224,9 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
   // competitivo, distinto de "Rango por músculo" (que es de fondo/histórico).
   const mySessionsThisWeek = useMemo(() => getSessionsForPeriod(viewerProfile?.trainingSessions || [], "week").length, [viewerProfile]);
   const theirSessionsThisWeek = useMemo(() => getSessionsForPeriod(full?.trainingSessions || [], "week").length, [full]);
+  const theirRanks = useMemo(() => computeAllMuscleRanks(full?.logs, full?.settings, full?.sex, full?.age), [full]);
+  const myRanksForCompare = useMemo(() => computeAllMuscleRanks(viewerProfile?.logs, getProfileSettings(viewerProfile), viewerProfile?.sex, viewerProfile?.age), [viewerProfile]);
+  const selectedMuscleInfo = selectedMuscle ? theirRanks[selectedMuscle] : null;
 
   return (
     <div className="space-y-4">
@@ -11286,9 +11302,9 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
                     muñecos lado a lado — mismos datos, sin pedir nada nuevo
                     a Firestore. */}
                 <FriendBodyCompare
-                  myRanks={computeAllMuscleRanks(viewerProfile?.logs, getProfileSettings(viewerProfile), viewerProfile?.sex, viewerProfile?.age)}
+                  myRanks={myRanksForCompare}
                   mySex={viewerProfile?.sex}
-                  theirRanks={computeAllMuscleRanks(full.logs, full.settings, full.sex, full.age)}
+                  theirRanks={theirRanks}
                   theirSex={full.sex}
                   theirName={basic?.name}
                 />
@@ -11298,7 +11314,20 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
                 />
               </div>
             ) : (
-              <FriendMuscleRankSummary logs={full.logs} settings={full.settings} sex={full.sex} age={full.age} />
+              <div>
+                <MuscleHighlighterBody ranks={theirRanks} selected={selectedMuscle} onMuscleClick={(k) => setSelectedMuscle((s) => (s === k ? null : k))} frontRef={friendFrontRef} backRef={friendBackRef} sex={full.sex} />
+                {/* Pedido: al tocar un músculo del muñeco, desplegar las
+                    mejores marcas de cada ejercicio de ese músculo. */}
+                {selectedMuscleInfo && (
+                  <div className="mt-3 rounded-xl border px-3.5 py-3" style={{ borderColor: tint(selectedMuscleInfo.color, "40"), backgroundColor: tint(selectedMuscleInfo.color, "0c") }}>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-[10px] font-bold text-slate-500">{selectedMuscleInfo.label}</p>
+                      {selectedMuscleInfo.hasData && <p className="text-xs font-black" style={{ color: selectedMuscleInfo.color }}>{selectedMuscleInfo.tier} {selectedMuscleInfo.sub}</p>}
+                    </div>
+                    <MuscleExerciseList exercises={getExerciseBestsForMuscleGroup(selectedMuscle, full.logs)} />
+                  </div>
+                )}
+              </div>
             )}
           </div>
 
@@ -11686,7 +11715,8 @@ function SocialView({ profile, profileName, uid, onActivateRoutine }) {
         )}
 
         {section === "ranking" && (
-          <LeaderboardSection uid={uid} profile={profile} myTopRank={myTopRank} friendAccepted={friendAccepted} basics={basics} activity={streaks} />
+          <LeaderboardSection uid={uid} profile={profile} myTopRank={myTopRank} friendAccepted={friendAccepted} basics={basics} activity={streaks}
+            onViewPerson={(personUid, isMe) => { if (isMe) setShowMyBody(true); else setViewingUid(personUid); }} />
         )}
 
         {section === "entrenador" && (
