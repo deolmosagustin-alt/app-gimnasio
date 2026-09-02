@@ -11585,10 +11585,19 @@ function SocialView({ profile, profileName, uid, onActivateRoutine }) {
           </div>
           {/* Idea del usuario: tocar tu propio rango también abre el
               muñeco — mismo componente interactivo que ya usa Progreso,
-              para no tener que salir de Social a mirarlo. */}
+              para no tener que salir de Social a mirarlo.
+              BUG FIX (pedido: "agregale algún recuadro al rango"): antes
+              la insignia flotaba sola, sin ningún marco — desbalanceado al
+              lado del avatar, que sí tiene su propia caja. Ahora usa el
+              mismo tamaño de caja (w-16 h-16) que el avatar, tintada con
+              el color del propio rango, más una etiqueta "Tu rango" abajo
+              para que se entienda qué es de un vistazo. */}
           {myTopRank && (
-            <button onClick={() => setShowMyBody(true)} aria-label="Ver tu muñeco de rangos" className="shrink-0 active:scale-95 transition">
-              <RankBadgeIcon tier={myTopRank.tier} sub={myTopRank.sub} color={myTopRank.color} size={50} />
+            <button onClick={() => setShowMyBody(true)} aria-label="Ver tu muñeco de rangos" className="shrink-0 flex flex-col items-center gap-1 active:scale-95 transition">
+              <div className="w-16 h-16 rounded-2xl flex items-center justify-center border" style={{ backgroundColor: tint(myTopRank.color, "18"), borderColor: tint(myTopRank.color, "45") }}>
+                <RankBadgeIcon tier={myTopRank.tier} sub={myTopRank.sub} color={myTopRank.color} size={42} />
+              </div>
+              <span className="text-[8.5px] font-black uppercase tracking-wider" style={{ color: myTopRank.color }}>Tu rango</span>
             </button>
           )}
         </div>
