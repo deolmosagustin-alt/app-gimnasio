@@ -10483,6 +10483,109 @@ function RoutineProposalCard({ proposal, basic, onRespond }) {
   );
 }
 
+// Elegir a QUÉ alumno mandarle una plantilla ya armada (TrainerTemplatesCard)
+// — atajo directo, sin tener que entrar al perfil del alumno primero como
+// exige hoy el flujo normal de "Proponer rutina". Reusa createRoutineProposal
+// tal cual, sólo cambia CÓMO se llega hasta ahí.
+function SendTemplateModal({ template, studentsAccepted, basics, myUid, onClose, onSent }) {
+  useAndroidBack(onClose);
+  const [selectedStudentUid, setSelectedStudentUid] = useState(studentsAccepted[0]?.studentUid || null);
+  const [note, setNote] = useState("");
+  const [sending, setSending] = useState(false);
+  const handleSubmit = async () => {
+    if (!selectedStudentUid) return;
+    setSending(true);
+    try {
+      await createRoutineProposal(myUid, selectedStudentUid, template.def, note.trim());
+      onSent();
+    } finally {
+      setSending(false);
+    }
+  };
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div className="fixed inset-0 z-[125] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
+      <div className="w-full max-w-sm max-h-[86vh] overflow-y-auto overscroll-contain bg-slate-900 border border-purple-700/40 rounded-3xl modal-pop-in shadow-2xl shadow-black/70 p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-purple-400">Enviar plantilla</p>
+            <h3 className="text-base font-black text-white leading-tight truncate">{template.def.name}</h3>
+          </div>
+          <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition"><X size={17} /></button>
+        </div>
+        {studentsAccepted.length === 0 ? (
+          <p className="text-sm text-slate-500">Todavía no tenés alumnos vinculados — vinculate con uno primero en Social → Entrenador.</p>
+        ) : (
+          <>
+            <div>
+              <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Alumno</label>
+              <div className="space-y-1.5">
+                {studentsAccepted.map((l) => {
+                  const b = basics[l.studentUid];
+                  const on = selectedStudentUid === l.studentUid;
+                  return (
+                    <button key={l.id} onClick={() => setSelectedStudentUid(l.studentUid)} className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-left transition ${on ? "bg-purple-500/15 border border-purple-500/40" : "bg-slate-800/50 border border-slate-700/40 hover:border-slate-600"}`}>
+                      <span className={`w-4 h-4 rounded-full border-2 shrink-0 ${on ? "border-purple-400 bg-purple-400" : "border-slate-600"}`} />
+                      <span className="text-sm text-white truncate">{b?.name || b?.username || "Alumno"}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div>
+              <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Nota (opcional)</label>
+              <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} maxLength={200} placeholder="Ej: arrancá la próxima semana..."
+                className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-3.5 py-2.5 text-white text-sm focus:outline-none resize-none" />
+            </div>
+            <button onClick={handleSubmit} disabled={sending || !selectedStudentUid} className="w-full py-3 rounded-xl bg-purple-500 !text-white text-sm font-bold disabled:opacity-40">{sending ? "Enviando..." : "Enviar propuesta"}</button>
+          </>
+        )}
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+// Pedido: "un recuadro entre el superior de Social y los logros, que sea
+// un acortador para la creación de rutinas [para alumnos], que se guarden
+// ahí y las puedas modificar" — plantillas GUARDADAS APARTE de "Mis
+// rutinas" (esas son para tu propio entrenamiento; una plantilla es
+// exclusivamente para mandar). Arma/edita con el mismo RoutineBuilder de
+// siempre, sólo cambia dónde se guarda el resultado. Misma textura que el
+// hero de arriba (var(--grad-hero-purple)), a pedido explícito.
+function TrainerTemplatesCard({ templates, onCreate, onEdit, onSend }) {
+  const entries = Object.entries(templates || {});
+  return (
+    <div className="relative overflow-hidden rounded-2xl border border-purple-500/20 p-4" style={{ background: "var(--grad-hero-purple)" }}>
+      <div className="absolute -top-8 -right-8 w-28 h-28 rounded-full bg-purple-500/15 blur-3xl pointer-events-none" />
+      <div className="relative flex items-center gap-2.5 mb-3">
+        <div className="w-9 h-9 rounded-xl bg-purple-500/15 border border-purple-500/25 flex items-center justify-center shrink-0 text-purple-300"><ClipboardCheck size={16} /></div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-bold text-white">Plantillas para tus alumnos</p>
+          <p className="text-[11px] text-purple-300/70">Armá una rutina una vez, mandala cuando quieras</p>
+        </div>
+      </div>
+      {entries.length > 0 && (
+        <div className="relative space-y-1.5 mb-3">
+          {entries.map(([id, def]) => (
+            <div key={id} className="flex items-center gap-2 rounded-xl bg-black/20 border border-white/5 px-3 py-2.5">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-white truncate">{def.name}</p>
+                <p className="text-[10px] text-slate-500">{def.dayOrder.length} día{def.dayOrder.length !== 1 ? "s" : ""}</p>
+              </div>
+              <button onClick={() => onSend(id, def)} aria-label="Enviar a un alumno" className="p-1.5 rounded-lg text-purple-300 hover:text-purple-200 hover:bg-purple-500/15 transition shrink-0"><Send size={14} /></button>
+              <button onClick={() => onEdit(id)} aria-label="Editar plantilla" className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition shrink-0"><Edit3 size={14} /></button>
+            </div>
+          ))}
+        </div>
+      )}
+      <button onClick={onCreate} className="relative w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-purple-500/30 text-purple-300 text-xs font-bold hover:bg-purple-500/10 transition active:scale-[0.98]">
+        <Plus size={13} /> Crear plantilla nueva
+      </button>
+    </div>
+  );
+}
+
 // Sub-sección "Entrenador": vincularse (con rol explícito), solicitudes
 // pendientes, lista de alumnos/entrenador ya aceptados, y las propuestas
 // de rutina pendientes (si el que mira es alumno de alguien).
@@ -11409,7 +11512,7 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
 // alguien de una lista se muestra FriendProfileView en vez de navegar a
 // otra pestaña — mismo criterio "estado interno, no más tabs" que ya usa
 // RoutinesView/DeloadView para sus propias sub-pantallas.
-function SocialView({ profile, profileName, uid, onActivateRoutine }) {
+function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProfile }) {
   const [section, setSection] = useState("amigos"); // amigos | buscar | entrenador
   const [viewingUid, setViewingUid] = useState(null);
   const [viewingAsTrainer, setViewingAsTrainer] = useState(false);
@@ -11503,6 +11606,13 @@ function SocialView({ profile, profileName, uid, onActivateRoutine }) {
 
   const [showShareProfile, setShowShareProfile] = useState(false);
   const [showMyBody, setShowMyBody] = useState(false);
+  // Plantillas de rutina para mandar a alumnos — separadas de "Mis
+  // rutinas" (esas son para tu propio entrenamiento). Ver TrainerTemplatesCard.
+  const [showTemplateBuilder, setShowTemplateBuilder] = useState(false);
+  const [editingTemplateId, setEditingTemplateId] = useState(null);
+  const [sendingTemplate, setSendingTemplate] = useState(null); // {id, def} | null
+  const [templateSentNote, setTemplateSentNote] = useState(false);
+  const trainerRoutineTemplates = profile?.trainerRoutineTemplates || {};
   const myTopRank = useMemo(() => computeTopRank(profile), [profile]);
   const achievements = useMemo(() => computeAchievements({
     trainedDays: getTrainedDateSet(profile?.logs || {}, profile?.trainingSessions || []).size,
@@ -11533,6 +11643,27 @@ function SocialView({ profile, profileName, uid, onActivateRoutine }) {
         isTrainerOfThisPerson={viewingAsTrainer}
         onBack={() => { setViewingUid(null); setViewingAsTrainer(false); }}
         onProposalSent={refresh}
+      />
+    );
+  }
+
+  // Crear/editar una plantilla — mismo RoutineBuilder de siempre, sólo que
+  // el resultado se guarda en trainerRoutineTemplates en vez de routines
+  // (no toca "Mis rutinas" ni activa nada).
+  if (showTemplateBuilder) {
+    return (
+      <RoutineBuilder
+        dumbbellDouble={getProfileSettings(profile)?.dumbbellDouble || null}
+        onUpdateSettings={(patch) => onUpdateProfile?.({ settings: { ...getProfileSettings(profile), ...patch } })}
+        logs={profile?.logs || {}}
+        initialRoutine={editingTemplateId ? trainerRoutineTemplates[editingTemplateId] : null}
+        onCancel={() => { setShowTemplateBuilder(false); setEditingTemplateId(null); }}
+        onSave={(def) => {
+          const id = editingTemplateId || builderUid("trainer_template");
+          onUpdateProfile?.({ trainerRoutineTemplates: { ...trainerRoutineTemplates, [id]: def } });
+          setShowTemplateBuilder(false);
+          setEditingTemplateId(null);
+        }}
       />
     );
   }
@@ -11617,6 +11748,15 @@ function SocialView({ profile, profileName, uid, onActivateRoutine }) {
           </button>
         )}
       </div>
+
+      {/* Pedido: "un recuadro entre el superior de Social y los logros,
+          acortador para la creación de rutinas [para alumnos]". */}
+      <TrainerTemplatesCard
+        templates={trainerRoutineTemplates}
+        onCreate={() => { setEditingTemplateId(null); setShowTemplateBuilder(true); }}
+        onEdit={(id) => { setEditingTemplateId(id); setShowTemplateBuilder(true); }}
+        onSend={(id, def) => setSendingTemplate({ id, def })}
+      />
 
       <AchievementsStrip achievements={achievements} />
 
@@ -11785,6 +11925,21 @@ function SocialView({ profile, profileName, uid, onActivateRoutine }) {
         />
       )}
       {showMyBody && <MyBodyModal profile={profile} onClose={() => setShowMyBody(false)} />}
+      {sendingTemplate && (
+        <SendTemplateModal
+          template={sendingTemplate}
+          studentsAccepted={studentsAccepted}
+          basics={basics}
+          myUid={uid}
+          onClose={() => setSendingTemplate(null)}
+          onSent={() => { setSendingTemplate(null); setTemplateSentNote(true); setTimeout(() => setTemplateSentNote(false), 2500); }}
+        />
+      )}
+      {templateSentNote && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[130] px-4 py-2.5 rounded-xl bg-emerald-500 !text-white text-sm font-bold shadow-lg shadow-emerald-500/30 bounce-in">
+          Propuesta enviada ✓
+        </div>
+      )}
     </div>
   );
 }
@@ -17534,7 +17689,7 @@ export default function App() {
             {tab === "descarga" && <DeloadView logs={logs} setLogs={setLogs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} activeSession={profile?.activeSession?.deload ? profile.activeSession : null} onStartSession={handleStartSession} onCancelSession={handleCancelSession} weekSchedule={weekSchedule} onClose={() => { setDeloadDismissed(true); setTab("rutina"); }} cycleStart={cycleStart} />}
             {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} setLogs={setLogs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} conversations={aiConversations} activeConversationId={activeAiConversationId} onNewConversation={handleNewAiConversation} onSwitchConversation={handleSwitchAiConversation} onDeleteConversation={handleDeleteAiConversation} onRenameConversation={handleRenameAiConversation} settings={getProfileSettings(profile)} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} onDeleteRoutine={handleDeleteRoutine} onNavigate={setTab} onStartSession={handleStartSession} onEndSession={handleEndSession} />}
             {tab === "perfil" && <ProfileView onOpenFieldPreview={() => setShowFieldIntro(true)} openSectionSignal={openSectionSignal} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} profileName={activeProfile} profiles={profiles} logs={logs} onSignOut={handleSignOut} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} onGoToSocial={() => setTab("social")} />}
-            {tab === "social" && <SocialView profile={profile} profileName={activeProfile} uid={profile?.googleUid} onActivateRoutine={handleActivateRoutine} />}
+            {tab === "social" && <SocialView profile={profile} profileName={activeProfile} uid={profile?.googleUid} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} />}
           </div>
         </main>
       </div>
