@@ -12,7 +12,7 @@ import {
   Target, Award, Activity, ArrowDown, HelpCircle, List, LayoutGrid,
   Sparkles, Layers, SlidersHorizontal, UserCog,
   Share2, Download, Link2, Copy, BellOff, Send, Mic, Ruler, Camera, Link, Footprints, Star, SquarePlay, Upload, RefreshCw, Timer, Percent, Users,
-  MessageCircle, FileDown, Search, UserPlus, UserCheck, AtSign, GraduationCap, ClipboardCheck, Swords, Medal, QrCode, ArrowUpDown,
+  MessageCircle, FileDown, Search, UserPlus, UserCheck, UserMinus, AtSign, GraduationCap, ClipboardCheck, Swords, Medal, QrCode, ArrowUpDown,
 } from "lucide-react";
 import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signOut, onAuthStateChanged } from "firebase/auth";
 import { Capacitor, registerPlugin } from "@capacitor/core";
@@ -5165,7 +5165,7 @@ function groupExercisesIntoSupersets(exercises) {
   return groups;
 }
 
-function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, weekSchedule, activeSession, onStartSession, onEndSession, onCancelSession, onDisableAutoShowPrShare, onUpdateSettings = null, onGoToRoutines = null, onGoToSchedule = null, onGoToFieldSettings = null, onGoToDescarga = null, todaySessionDayKey = null, sex = null, age = null }) {
+function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, weekSchedule, activeSession, onStartSession, onEndSession, onCancelSession, onDisableAutoShowPrShare, onUpdateSettings = null, onGoToRoutines = null, onGoToSchedule = null, onGoToFieldSettings = null, onGoToDescarga = null, todaySessionDayKey = null, sex = null, age = null, activeRoutineDef = null, onApplyOwnProgression = null }) {
   // Semana actual del ciclo — sólo hace falta el número (weekInCycle), para
   // que SetRow sepa si hay una meta cargada (modo "planned", ver
   // getPlannedTargetForWeek) para ESTA semana puntual.
@@ -5187,6 +5187,11 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
   // (ej. Hombro/Brazos) es arbitrario y confuso. El primer día es un punto
   // de partida neutro y predecible.
   const [activeDay, setActiveDay] = useState(() => scheduledDay || (isRestToday ? DAY_ORDER[0] : fallbackSuggested));
+  // Modo de entrenamiento accesible también desde acá (antes sólo estaba en
+  // Perfil) — mismo par de opciones y el mismo atajo de "planificar mi
+  // progresión", para no tener que salir de Rutina a cambiarlo.
+  const [showTrainingModeModal, setShowTrainingModeModal] = useState(false);
+  const [showSelfProgression, setShowSelfProgression] = useState(false);
   // Dirección del último cambio de día, para que las tarjetas entren
   // deslizándose desde el lado correcto (como pasar páginas).
   const gridRef = useRef(null);
@@ -5287,6 +5292,22 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
         </button>
       )}
 
+      {/* Antes esto sólo se podía cambiar desde Perfil — un atajo acá evita
+          tener que salir de Rutina para pasar de "perseguir récord" a
+          "rutina planificada" (o viceversa). */}
+      {onUpdateSettings && (
+        <button onClick={() => setShowTrainingModeModal(true)} className="w-full flex items-center gap-3 rounded-2xl border border-slate-800/50 bg-slate-900/50 px-4 py-3.5 text-left transition active:scale-[0.99] hover:border-slate-700">
+          <div className="w-9 h-9 rounded-xl bg-teal-500/15 border border-teal-500/25 flex items-center justify-center shrink-0 text-teal-400">
+            {settings.trainingMode === "planned" ? <Target size={16} /> : <Trophy size={16} />}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-white">Modo de entrenamiento</p>
+            <p className="text-[11px] text-slate-500">{settings.trainingMode === "planned" ? "Rutina planificada" : "Perseguir mi récord"}</p>
+          </div>
+          <ChevronRight size={15} className="text-slate-600 shrink-0" />
+        </button>
+      )}
+
       <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${DAY_ORDER.length}, 1fr)` }}>
         {DAY_ORDER.map((k) => (
           <button key={k} onClick={() => setActiveDay(k)} title={ROUTINE[k].label} className="py-2.5 px-1 rounded-xl text-[10px] font-black uppercase transition-all active:scale-95 border text-center leading-tight min-w-0"
@@ -5384,6 +5405,52 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           </button>
           <p className="text-center text-[10px] text-slate-600 mt-2">Se guarda como entrenamiento de hoy y se limpia lo que tenías escrito sin guardar. Alimenta tu racha, calendario y gráficas.</p>
         </div>
+      )}
+
+      {/* Mismo contenido que "Modo de entrenamiento" en Perfil (ver
+          CollapsibleSection ahí) — acá vive en un modal en vez de inline
+          porque Rutina es una pantalla de carga rápida de series, no de
+          configuración. */}
+      {showTrainingModeModal && (
+        <div className="fixed inset-0 z-[140] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={() => setShowTrainingModeModal(false)}>
+          <div className="bg-slate-900 border border-slate-700/60 rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-black text-white">Modo de entrenamiento</h3>
+              <button onClick={() => setShowTrainingModeModal(false)} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition"><X size={18} /></button>
+            </div>
+            <div className="space-y-2.5">
+              <button onClick={() => onUpdateSettings({ trainingMode: "record" })} className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-left transition ${settings.trainingMode !== "planned" ? "bg-teal-500/15 border border-teal-500/40" : "bg-slate-800/50 border border-slate-700/40 hover:border-slate-600"}`}>
+                <Trophy size={16} className={settings.trainingMode !== "planned" ? "text-teal-400" : "text-slate-500"} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-white">Perseguir mi récord</p>
+                  <p className="text-[11px] text-slate-500">Cada serie muestra tu mejor marca — el objetivo es siempre superarte a vos mismo.</p>
+                </div>
+              </button>
+              <button onClick={() => onUpdateSettings({ trainingMode: "planned" })} className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-left transition ${settings.trainingMode === "planned" ? "bg-teal-500/15 border border-teal-500/40" : "bg-slate-800/50 border border-slate-700/40 hover:border-slate-600"}`}>
+                <Target size={16} className={settings.trainingMode === "planned" ? "text-teal-400" : "text-slate-500"} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-white">Rutina planificada</p>
+                  <p className="text-[11px] text-slate-500">Cada serie muestra una "marca a alcanzar" cargada de antemano (a mano, o por tu entrenador) en vez de tu récord.</p>
+                </div>
+              </button>
+              {settings.trainingMode === "planned" && onApplyOwnProgression && (
+                <button onClick={() => { setShowTrainingModeModal(false); setShowSelfProgression(true); }} disabled={!activeRoutineDef} className="w-full flex items-center gap-2.5 justify-center py-3 rounded-xl bg-teal-500 !text-white text-sm font-bold transition active:scale-[0.98] disabled:opacity-40">
+                  <Sliders size={15} /> Planificar mi progresión
+                </button>
+              )}
+              {!activeRoutineDef && settings.trainingMode === "planned" && <p className="text-[10.5px] text-slate-600 text-center -mt-1">Activá una rutina primero, en la pestaña Rutinas.</p>}
+            </div>
+          </div>
+        </div>
+      )}
+      {showSelfProgression && activeRoutineDef && onApplyOwnProgression && (
+        <ProgressionProposalComposer
+          mode="self"
+          routineSnapshot={activeRoutineDef}
+          trainWeeks={settings.trainWeeks}
+          onClose={() => setShowSelfProgression(false)}
+          onSubmit={async (plan) => { onApplyOwnProgression(plan); setShowSelfProgression(false); }}
+        />
       )}
     </div>
   );
@@ -8433,11 +8500,33 @@ async function exportTrainingToExcel(rows, meta) {
    Word o Excel en vez de (o además de) mandar el link. Reutiliza
    buildRoutineModel para resolver nombre/músculo de cada ejercicio.
 ============================================================================ */
+// #rrggbb → [r,g,b] enteros — jsPDF pide los 3 canales sueltos para
+// setFillColor/setTextColor, no un string CSS.
+function hexToRgb(hex) {
+  const clean = (hex || "#14B8A6").replace("#", "");
+  const n = parseInt(clean, 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
 function buildRoutineExportDays(routineDef) {
   const model = buildRoutineModel(routineDef);
   return model.dayOrder.map((dk) => {
     const d = model.days[dk];
-    return { dayLabel: d.label, exercises: d.exercises.map((ex) => ({ name: ex.name, muscle: ex.muscle, sets: ex.sets.length, repRange: ex.sets[0]?.repRange || "—" })) };
+    return {
+      dayLabel: d.label,
+      dayColor: d.color || "#14B8A6",
+      exercises: d.exercises.map((ex) => {
+        // BUG FIX (diseño): antes se mostraba el rango de reps de la
+        // PRIMERA serie para las 8 series del ejercicio, aunque tuviera un
+        // esquema piramidal/top-set real (ej. "3-5, 3-5, 8-10") — el
+        // archivo exportado mentía sobre el plan real. Ahora, si todas las
+        // series comparten el mismo rango se muestra una sola vez (más
+        // legible); si no, se listan todas en orden.
+        const ranges = ex.sets.map((s) => s.repRange || "—");
+        const repRangeDisplay = ranges.every((r) => r === ranges[0]) ? ranges[0] : ranges.join(", ");
+        return { name: ex.name, muscle: ex.muscle, sets: ex.sets.length, repRangeDisplay };
+      }),
+    };
   });
 }
 
@@ -8445,43 +8534,97 @@ async function exportRoutineToPdf(routineDef) {
   const { jsPDF } = await import("jspdf");
   const autoTable = (await import("jspdf-autotable")).default;
   const days = buildRoutineExportDays(routineDef);
+  const totalExercises = days.reduce((a, d) => a + d.exercises.length, 0);
+  const totalSets = days.reduce((a, d) => a + d.exercises.reduce((b, ex) => b + ex.sets, 0), 0);
   const doc = new jsPDF();
-  doc.setFontSize(16);
-  doc.text(routineDef.name || "Mi rutina", 14, 18);
+
+  // Mismo lenguaje visual que exportTrainingToPdf (franja de marca + caja
+  // de resumen arriba de todo) — antes esta exportación era un documento
+  // bastante más pobre (sólo título + tablas planas) que la de
+  // entrenamiento, a pesar de venir de la misma app.
+  doc.setFillColor(20, 184, 166);
+  doc.rect(0, 0, 210, 6, "F");
+  doc.setFontSize(17);
+  doc.setTextColor(20);
+  doc.text(routineDef.name || "Mi rutina", 14, 22);
   doc.setFontSize(10);
   doc.setTextColor(110);
-  doc.text("Generada con Modus Fit", 14, 25);
-  doc.setTextColor(20);
-  let y = 34;
+  doc.text(`Generada con Modus Fit · ${new Date().toLocaleDateString("es-AR")}`, 14, 29);
+
+  const stats = [["Días", String(days.length)], ["Ejercicios", String(totalExercises)], ["Series totales", String(totalSets)]];
+  const boxW = 43, boxGap = 3;
+  stats.forEach(([label, value], i) => {
+    const x = 14 + i * (boxW + boxGap);
+    doc.setDrawColor(225); doc.setFillColor(248, 250, 252);
+    doc.roundedRect(x, 35, boxW, 17, 2, 2, "FD");
+    doc.setFontSize(13); doc.setTextColor(20);
+    doc.text(value, x + boxW / 2, 44, { align: "center" });
+    doc.setFontSize(7); doc.setTextColor(120);
+    doc.text(label, x + boxW / 2, 49, { align: "center" });
+  });
+
+  let y = 62;
   days.forEach((d) => {
-    if (y > 268) { doc.addPage(); y = 20; }
-    doc.setFontSize(12);
-    doc.text(d.dayLabel, 14, y);
-    y += 3;
+    if (y > 258) { doc.addPage(); y = 20; }
+    const rgb = hexToRgb(d.dayColor);
+    // Franja angosta con el color del día — el mismo acento que ya ves en
+    // Rutinas (BuilderDayCard/RoutinePreview) para identificar cada día,
+    // ahora también en el PDF.
+    doc.setFillColor(...rgb);
+    doc.roundedRect(14, y - 4.2, 3, 5.2, 0.8, 0.8, "F");
+    doc.setFontSize(12); doc.setTextColor(20);
+    doc.text(d.dayLabel, 20, y);
+    const setsInDay = d.exercises.reduce((a, ex) => a + ex.sets, 0);
+    doc.setFontSize(8); doc.setTextColor(140);
+    doc.text(`${d.exercises.length} ejercicio${d.exercises.length === 1 ? "" : "s"} · ${setsInDay} series`, 196, y, { align: "right" });
+    y += 4;
     autoTable(doc, {
       startY: y,
       head: [["Ejercicio", "Músculo", "Series", "Reps"]],
-      body: d.exercises.map((ex) => [ex.name, ex.muscle, String(ex.sets), ex.repRange]),
-      styles: { fontSize: 9 },
-      headStyles: { fillColor: [20, 184, 166] },
+      body: d.exercises.map((ex) => [ex.name, ex.muscle, String(ex.sets), ex.repRangeDisplay]),
+      styles: { fontSize: 9, cellPadding: 2.2 },
+      headStyles: { fillColor: rgb, textColor: 255, fontStyle: "bold" },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      columnStyles: { 0: { cellWidth: 68 }, 1: { cellWidth: 42 }, 2: { cellWidth: 22 }, 3: { cellWidth: 46 } },
       margin: { left: 14, right: 14 },
     });
     y = doc.lastAutoTable.finalY + 10;
   });
+
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let p = 1; p <= pageCount; p++) {
+    doc.setPage(p);
+    doc.setFontSize(8); doc.setTextColor(160);
+    doc.text(`Modus Fit · Página ${p} de ${pageCount}`, 105, 290, { align: "center" });
+  }
+
   await downloadBlob(doc.output("blob"), `${slugifyForFilename(routineDef.name)}.pdf`);
 }
 
 async function exportRoutineToWord(routineDef) {
   const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, HeadingLevel, WidthType } = await import("docx");
   const days = buildRoutineExportDays(routineDef);
+  const totalExercises = days.reduce((a, d) => a + d.exercises.length, 0);
+  const totalSets = days.reduce((a, d) => a + d.exercises.reduce((b, ex) => b + ex.sets, 0), 0);
   const children = [
     new Paragraph({ text: routineDef.name || "Mi rutina", heading: HeadingLevel.HEADING_1 }),
-    new Paragraph({ children: [new TextRun({ text: "Generada con Modus Fit", color: "666666" })], spacing: { after: 200 } }),
+    new Paragraph({ children: [new TextRun({ text: `Generada con Modus Fit · ${new Date().toLocaleDateString("es-AR")}`, color: "666666" })], spacing: { after: 160 } }),
+    new Paragraph({
+      children: [
+        new TextRun({ text: `${days.length} día${days.length === 1 ? "" : "s"}  ·  `, bold: true }),
+        new TextRun({ text: `${totalExercises} ejercicios  ·  `, bold: true }),
+        new TextRun({ text: `${totalSets} series totales`, bold: true }),
+      ],
+      spacing: { after: 200 },
+    }),
   ];
   days.forEach((d) => {
-    children.push(new Paragraph({ text: d.dayLabel, heading: HeadingLevel.HEADING_2, spacing: { before: 260, after: 100 } }));
+    const dayColorHex = (d.dayColor || "#14B8A6").replace("#", "");
+    children.push(new Paragraph({ children: [new TextRun({ text: d.dayLabel, bold: true, color: dayColorHex, size: 28 })], heading: HeadingLevel.HEADING_2, spacing: { before: 260, after: 40 } }));
+    const setsInDay = d.exercises.reduce((a, ex) => a + ex.sets, 0);
+    children.push(new Paragraph({ children: [new TextRun({ text: `${d.exercises.length} ejercicio${d.exercises.length === 1 ? "" : "s"} · ${setsInDay} series`, color: "888888", italics: true })], spacing: { after: 100 } }));
     const headerRow = new TableRow({ children: ["Ejercicio", "Músculo", "Series", "Reps"].map((h) => new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: h, bold: true })] })] })) });
-    const dataRows = d.exercises.map((ex) => new TableRow({ children: [ex.name, ex.muscle, String(ex.sets), ex.repRange].map((v) => new TableCell({ children: [new Paragraph(v)] })) }));
+    const dataRows = d.exercises.map((ex) => new TableRow({ children: [ex.name, ex.muscle, String(ex.sets), ex.repRangeDisplay].map((v) => new TableCell({ children: [new Paragraph(v)] })) }));
     children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [headerRow, ...dataRows] }));
   });
   const doc = new Document({ sections: [{ children }] });
@@ -8492,12 +8635,31 @@ async function exportRoutineToWord(routineDef) {
 async function exportRoutineToExcel(routineDef) {
   const XLSX = await import("xlsx");
   const days = buildRoutineExportDays(routineDef);
+  const totalExercises = days.reduce((a, d) => a + d.exercises.length, 0);
+  const totalSets = days.reduce((a, d) => a + d.exercises.reduce((b, ex) => b + ex.sets, 0), 0);
+  const wb = XLSX.utils.book_new();
+
+  // Hoja "Resumen" primero — mismo criterio que exportTrainingToExcel: lo
+  // primero que ve quien abre el archivo es un pantallazo general, no ya
+  // una planilla cruda de filas.
+  const wsResumen = XLSX.utils.aoa_to_sheet([
+    [routineDef.name || "Mi rutina"],
+    [`Generada con Modus Fit el ${new Date().toLocaleDateString("es-AR")}`],
+    [],
+    ["Días", days.length],
+    ["Ejercicios", totalExercises],
+    ["Series totales", totalSets],
+  ]);
+  wsResumen["!cols"] = [{ wch: 24 }, { wch: 18 }];
+  XLSX.utils.book_append_sheet(wb, wsResumen, "Resumen");
+
   const header = ["Día", "Ejercicio", "Músculo", "Series", "Reps"];
   const data = [];
-  days.forEach((d) => { d.exercises.forEach((ex) => { data.push([d.dayLabel, ex.name, ex.muscle, ex.sets, ex.repRange]); }); });
-  const ws = XLSX.utils.aoa_to_sheet([header, ...data]);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Rutina");
+  days.forEach((d) => { d.exercises.forEach((ex) => { data.push([d.dayLabel, ex.name, ex.muscle, ex.sets, ex.repRangeDisplay]); }); });
+  const wsRutina = XLSX.utils.aoa_to_sheet([header, ...data]);
+  wsRutina["!cols"] = [{ wch: 18 }, { wch: 28 }, { wch: 18 }, { wch: 9 }, { wch: 16 }];
+  XLSX.utils.book_append_sheet(wb, wsRutina, "Rutina");
+
   const wbout = XLSX.write(wb, { type: "array", bookType: "xlsx" });
   await downloadBlob(new Blob([wbout], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), `${slugifyForFilename(routineDef.name)}.xlsx`);
 }
@@ -8686,7 +8848,7 @@ function UsernameSection({ uid, currentUsername, onSaved, onRemoved = null }) {
 
   if (!editing) {
     return (
-      <button onClick={() => setEditing(true)} className="flex items-center gap-1 text-sky-400 hover:text-sky-300 transition text-xs font-bold">
+      <button onClick={() => setEditing(true)} className="flex items-center gap-1 text-purple-400 hover:text-purple-300 transition text-xs font-bold">
         <AtSign size={11} /> {currentUsername} <Edit3 size={10} className="opacity-60" />
       </button>
     );
@@ -8697,7 +8859,7 @@ function UsernameSection({ uid, currentUsername, onSaved, onRemoved = null }) {
       <div className="relative">
         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm font-bold">@</span>
         <input value={value} onChange={handleChange} placeholder="tu_usuario" maxLength={20}
-          className="w-full bg-slate-800 border border-slate-700/50 rounded-xl pl-7 pr-4 py-2.5 text-white text-sm focus:outline-none focus:border-sky-500/50" />
+          className="w-full bg-slate-800 border border-slate-700/50 rounded-xl pl-7 pr-4 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500/50" />
       </div>
       <div className="flex items-center justify-between gap-2">
         <p className={`text-[10.5px] ${status === "taken" || status === "invalid" || status === "error" ? "text-rose-400" : status === "available" ? "text-emerald-400" : "text-slate-600"}`}>
@@ -8711,7 +8873,7 @@ function UsernameSection({ uid, currentUsername, onSaved, onRemoved = null }) {
         </p>
         <div className="flex gap-1.5 shrink-0">
           {currentUsername && <button onClick={() => { setEditing(false); setValue(currentUsername); setStatus(null); }} className="px-3 py-1.5 rounded-lg text-[11px] font-bold text-slate-500 hover:text-slate-300">Cancelar</button>}
-          <button onClick={handleSave} disabled={status === "checking" || status === "saving" || status === "taken" || status === "invalid" || !value} className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-sky-500 !text-white disabled:opacity-40 disabled:cursor-not-allowed">Guardar</button>
+          <button onClick={handleSave} disabled={status === "checking" || status === "saving" || status === "taken" || status === "invalid" || !value} className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-purple-500 !text-white disabled:opacity-40 disabled:cursor-not-allowed">Guardar</button>
         </div>
       </div>
       {currentUsername && onRemoved && (
@@ -8765,10 +8927,10 @@ function SocialPreviewCard({ profile, uid, onGoToSocial, onUpdateProfile }) {
 
   if (!profile?.username) {
     return (
-      <div className="rounded-2xl border border-sky-500/20 bg-sky-500/5 px-4 py-3.5 space-y-2.5">
+      <div className="rounded-2xl border border-purple-500/20 bg-purple-500/5 px-4 py-3.5 space-y-2.5">
         <div className="flex items-center gap-2">
-          <Users size={15} className="text-sky-400" />
-          <p className="text-xs font-bold text-sky-300">Activá lo social</p>
+          <Users size={15} className="text-purple-400" />
+          <p className="text-xs font-bold text-purple-300">Activá lo social</p>
         </div>
         <p className="text-[11px] text-slate-500 -mt-1.5">Elegí un @usuario para que tus amigos y tu entrenador te puedan encontrar.</p>
         <UsernameSection uid={uid} currentUsername={null} onSaved={(u) => onUpdateProfile({ username: u })} />
@@ -8780,9 +8942,9 @@ function SocialPreviewCard({ profile, uid, onGoToSocial, onUpdateProfile }) {
     <div className="rounded-2xl border border-slate-800/50 bg-slate-900/50 backdrop-blur-sm shadow-md shadow-black/20 overflow-hidden">
       <div className="flex items-center gap-3 px-4 py-3.5">
         <button onClick={onGoToSocial} className="flex-1 flex items-center gap-3 min-w-0 text-left active:opacity-80 transition">
-          <div className="w-10 h-10 rounded-xl bg-sky-500/15 border border-sky-500/25 flex items-center justify-center shrink-0 text-sky-400"><Users size={17} /></div>
+          <div className="w-10 h-10 rounded-xl bg-purple-500/15 border border-purple-500/25 flex items-center justify-center shrink-0 text-purple-400"><Users size={17} /></div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-white flex items-center gap-1"><AtSign size={11} className="text-sky-400" />{profile.username}</p>
+            <p className="text-sm font-bold text-white flex items-center gap-1"><AtSign size={11} className="text-purple-400" />{profile.username}</p>
             <p className="text-[11px] text-slate-500">{friendCount} {friendCount === 1 ? "amigo" : "amigos"} · Entrenador / alumnos</p>
           </div>
         </button>
@@ -8979,7 +9141,7 @@ function AvatarCropModal({ src, onCancel, onConfirm }) {
   );
 }
 
-function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdateProfile, cycleStart, onSetCycleStart, onGoToRoutines, onGoToSocial = null, openSectionSignal = { id: null, n: 0 }, onOpenFieldPreview = null }) {
+function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdateProfile, cycleStart, onSetCycleStart, onGoToRoutines, onGoToSocial = null, openSectionSignal = { id: null, n: 0 }, onOpenFieldPreview = null, onSignalConsumed = null }) {
   const profile = profiles[profileName];
   const [showDeletePin, setShowDeletePin] = useState(false); const [deleteError, setDeleteError] = useState("");
   const [editing, setEditing] = useState(false);
@@ -9004,8 +9166,18 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
   // equivalente es scrollear hasta ahí Y abrir el modal de una — sin el
   // paso extra de "encontrar la fila y después tocarla".
   const fieldSettingsRowRef = useRef(null);
+  // BUG FIX (pedido: "se abre solo al tocar el ícono de perfil, no
+  // debería"): openSectionSignal vive en App, que nunca se desmonta —
+  // ProfileView SÍ se desmonta al cambiar de pestaña. Sin avisarle a App
+  // que la señal ya se usó, se quedaba con n>0 para siempre después de la
+  // PRIMERA vez que tocabas "Personalizar qué ves al registrar" desde
+  // Rutina, y CUALQUIER vuelta a Perfil después de eso (por el ícono del
+  // header, por la barra de abajo, da igual) volvía a disparar este
+  // efecto en el montaje, reabriendo el modal solo porque la señal vieja
+  // técnicamente seguía "prendida".
   useEffect(() => {
     if (openSectionSignal.id !== "field-settings-section" || openSectionSignal.n <= 0) return;
+    onSignalConsumed?.();
     const t = setTimeout(() => {
       try { fieldSettingsRowRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); } catch { /* ignorado a propósito */ }
       onOpenFieldPreview?.();
@@ -9529,12 +9701,22 @@ function useUserBasics(uids) {
 // avatar+nombre es su propio botón cuando hay onClick, y `children` queda
 // como hermano, nunca anidado.
 function PublicUserCard({ uid, basic, onClick = null, children }) {
+  // "Activo hace X" — dato que ya viaja gratis en public/basic (updatedAt
+  // se pisa cada vez que esa persona sincroniza, ver syncPublicProfile),
+  // sin pedir nada nuevo a Firestore. Punto verde si sincronizó hace poco
+  // (proxy razonable de "usa la app seguido"), gris si hace rato.
+  let lastActive = null;
+  if (basic?.updatedAt) {
+    const dias = Math.floor((new Date() - new Date(basic.updatedAt)) / 86400000);
+    const label = haceCuanto(dias);
+    if (label) lastActive = { label: `Activo ${label}`, recent: dias <= 3 };
+  }
   const avatarAndName = (
     <>
       {basic?.avatarData ? (
         <img src={basic.avatarData} alt="" className="w-10 h-10 rounded-xl object-cover shrink-0" />
       ) : (
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-black !text-white shrink-0" style={{ background: "linear-gradient(135deg,#38BDF8,#0284C7)" }}>
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-black !text-white shrink-0" style={{ background: "linear-gradient(135deg,#A855F7,#7C3AED)" }}>
           {(basic?.name || basic?.username || "?").charAt(0).toUpperCase()}
         </div>
       )}
@@ -9551,11 +9733,17 @@ function PublicUserCard({ uid, basic, onClick = null, children }) {
           )}
         </p>
         <p className="text-[11px] text-slate-500 flex items-center gap-0.5"><AtSign size={9} />{basic?.username || uid.slice(0, 8)}</p>
+        {lastActive && (
+          <p className="text-[10px] text-slate-600 flex items-center gap-1 mt-0.5">
+            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${lastActive.recent ? "bg-emerald-500" : "bg-slate-700"}`} />
+            {lastActive.label}
+          </p>
+        )}
       </div>
     </>
   );
   return (
-    <div className="w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl bg-slate-900/50 border border-slate-800/50">
+    <div className="w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl bg-slate-900/50 border border-slate-800/50 transition-colors hover:border-slate-700/60">
       {onClick ? (
         <button onClick={onClick} className="flex-1 flex items-center gap-3 min-w-0 hover:opacity-80 transition active:scale-[0.99]">{avatarAndName}</button>
       ) : (
@@ -9590,9 +9778,9 @@ function SocialSearchSection({ myUid, friendStatus, onSendFriendRequest }) {
         <div className="relative flex-1">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" />
           <input value={raw} onChange={(e) => setRaw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSearch()} placeholder="@usuario de tu amigo"
-            className="w-full bg-slate-800 border border-slate-700/50 rounded-xl pl-9 pr-3 py-2.5 text-white text-sm focus:outline-none focus:border-sky-500/50" />
+            className="w-full bg-slate-800 border border-slate-700/50 rounded-xl pl-9 pr-3 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500/50" />
         </div>
-        <button onClick={handleSearch} disabled={!raw.trim() || state === "searching"} className="px-4 rounded-xl bg-sky-500 !text-white text-sm font-bold disabled:opacity-40">Buscar</button>
+        <button onClick={handleSearch} disabled={!raw.trim() || state === "searching"} className="px-4 rounded-xl bg-purple-500 !text-white text-sm font-bold disabled:opacity-40">Buscar</button>
       </div>
       {state === "searching" && <p className="text-xs text-slate-500 text-center py-3">Buscando...</p>}
       {state === "not_found" && <p className="text-xs text-slate-500 text-center py-3">No encontramos a nadie con ese @usuario.</p>}
@@ -9605,7 +9793,7 @@ function SocialSearchSection({ myUid, friendStatus, onSendFriendRequest }) {
             if (st === "pending_sent") return <span className="text-[10.5px] font-bold text-slate-500 shrink-0">Solicitud enviada</span>;
             if (st === "pending_received") return <span className="text-[10.5px] font-bold text-amber-400 shrink-0">Te escribió</span>;
             return (
-              <button onClick={() => onSendFriendRequest(found.uid)} className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-sky-500/15 border border-sky-500/30 text-sky-400 text-[11px] font-bold hover:bg-sky-500/25 transition">
+              <button onClick={() => onSendFriendRequest(found.uid)} className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-purple-500/15 border border-purple-500/30 text-purple-400 text-[11px] font-bold hover:bg-purple-500/25 transition">
                 <UserPlus size={12} /> Agregar
               </button>
             );
@@ -10149,7 +10337,7 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
 
       <div className="rounded-2xl border border-slate-800/50 p-5 text-center" style={{ background: "var(--grad-profile-avatar)" }}>
         <div className="w-16 h-16 mx-auto mb-2.5 rounded-3xl overflow-hidden">
-          {basic?.avatarData ? <img src={basic.avatarData} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-2xl font-black !text-white" style={{ background: "linear-gradient(135deg,#38BDF8,#0284C7)" }}>{(basic?.name || "?").charAt(0).toUpperCase()}</div>}
+          {basic?.avatarData ? <img src={basic.avatarData} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-2xl font-black !text-white" style={{ background: "linear-gradient(135deg,#A855F7,#7C3AED)" }}>{(basic?.name || "?").charAt(0).toUpperCase()}</div>}
         </div>
         <h2 className="text-lg font-black text-white">{basic?.name || "Usuario"}</h2>
         <p className="text-xs text-slate-500 flex items-center justify-center gap-1"><AtSign size={10} />{basic?.username}</p>
@@ -10361,6 +10549,11 @@ function SocialView({ profile, profileName, uid, onActivateRoutine }) {
 
   const [showShareProfile, setShowShareProfile] = useState(false);
   const myTopRank = useMemo(() => computeTopRank(profile), [profile]);
+  // Antes no había NINGUNA forma de sacar a un amigo ya aceptado — el único
+  // botón de "Cancelar" que existía era para una solicitud saliente
+  // todavía pendiente. Two-tap (mismo criterio que borrar una conversación
+  // del Chatbot) para que sacar a alguien no sea un toque accidental.
+  const [confirmRemoveId, setConfirmRemoveId] = useState(null);
 
   const doSendFriendRequest = async (otherUid) => { await sendFriendRequest(uid, otherUid); refresh(); };
   const doRespondFriend = async (otherUid, accept) => { await respondToFriendRequest(uid, otherUid, accept); refresh(); };
@@ -10393,16 +10586,28 @@ function SocialView({ profile, profileName, uid, onActivateRoutine }) {
     { k: "entrenador", l: "Entrenador", icon: <GraduationCap size={14} />, color: "#6366F1" },
   ];
 
+  const sectionIdx = Math.max(0, SECTIONS.findIndex((s) => s.k === section));
+  const sectionColor = SECTIONS[sectionIdx]?.color || SOCIAL_COLOR;
+
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-3 gap-1 p-1 rounded-2xl bg-slate-900/60 border border-slate-800/50">
+      <div className="relative grid grid-cols-3 gap-1 p-1 rounded-2xl bg-slate-900/60 border border-slate-800/50">
+        {/* Píldora deslizante en vez de que cada botón prenda/apague su
+            propio fondo de golpe — un solo elemento que se desliza y
+            cambia de color (celeste en Amigos/Buscar, índigo en
+            Entrenador) da la sensación de un selector físico, no de
+            3 botones independientes. */}
+        <div
+          className="absolute top-1 bottom-1 rounded-xl transition-all duration-300 ease-out pointer-events-none"
+          style={{ left: `calc(${sectionIdx} / 3 * 100% + 2px)`, width: "calc(100% / 3 - 4px)", backgroundColor: tint(sectionColor, "22"), boxShadow: `inset 0 0 0 1px ${tint(sectionColor, "45")}` }}
+        />
         {SECTIONS.map((s) => {
           const badge = s.k === "amigos" ? friendIncoming.length : s.k === "entrenador" ? trainerIncoming.length + proposals.length : 0;
           return (
-            <button key={s.k} onClick={() => setSection(s.k)} className="relative flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl text-[10.5px] font-bold transition-all active:scale-95"
-              style={section === s.k ? { background: tint(s.color, "22"), color: s.color, boxShadow: `inset 0 0 0 1px ${tint(s.color, "45")}` } : { color: "#64748b" }}>
+            <button key={s.k} onClick={() => setSection(s.k)} className="relative z-[1] flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl text-[10.5px] font-bold transition-colors active:scale-95"
+              style={{ color: section === s.k ? s.color : "#64748b" }}>
               {s.icon}<span>{s.l}</span>
-              {badge > 0 && <span className="absolute top-1 right-2.5 w-4 h-4 rounded-full bg-rose-500 text-white text-[9px] font-black flex items-center justify-center">{badge}</span>}
+              {badge > 0 && <span className="absolute top-1 right-2.5 w-4 h-4 rounded-full bg-rose-500 text-white text-[9px] font-black flex items-center justify-center z-[2]">{badge}</span>}
             </button>
           );
         })}
@@ -10418,8 +10623,8 @@ function SocialView({ profile, profileName, uid, onActivateRoutine }) {
                 con tu @usuario grande, así conseguir el primer amigo no
                 depende de decírselo de palabra. */}
             {profile?.username ? (
-              <button onClick={() => setShowShareProfile(true)} className="w-full flex items-center gap-3 rounded-2xl border border-sky-500/25 bg-sky-500/5 px-4 py-3.5 text-left transition active:scale-[0.98] hover:border-sky-500/40">
-                <div className="w-9 h-9 rounded-xl bg-sky-500/15 border border-sky-500/25 flex items-center justify-center shrink-0 text-sky-400"><QrCode size={16} /></div>
+              <button onClick={() => setShowShareProfile(true)} className="w-full flex items-center gap-3 rounded-2xl border border-purple-500/25 bg-purple-500/5 px-4 py-3.5 text-left transition active:scale-[0.98] hover:border-purple-500/40">
+                <div className="w-9 h-9 rounded-xl bg-purple-500/15 border border-purple-500/25 flex items-center justify-center shrink-0 text-purple-400"><QrCode size={16} /></div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-bold text-white">Compartir mi perfil</p>
                   <p className="text-[11px] text-slate-500">Una tarjeta con tu @usuario para que te agreguen</p>
@@ -10475,10 +10680,21 @@ function SocialView({ profile, profileName, uid, onActivateRoutine }) {
                 </div>
                 {friendAccepted.length === 0 ? (
                   <div className="text-center py-8 text-slate-600"><Users size={28} className="mx-auto mb-2.5 opacity-30" /><p className="text-sm">Todavía no tenés amigos agregados.</p><p className="text-xs mt-1 text-slate-700">Buscalos por su @usuario en "Buscar".</p></div>
-                ) : sortedFriendAccepted.map((f, i) => { const other = otherUidOf(f); return (
+                ) : sortedFriendAccepted.map((f, i) => { const other = otherUidOf(f); const confirming = confirmRemoveId === f.id; return (
                   <div key={f.id} className="stagger-item" style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}>
-                    <PublicUserCard uid={other} basic={basics[other]} onClick={() => setViewingUid(other)}>
-                      <ChevronRight size={15} className="text-slate-600 shrink-0" />
+                    <PublicUserCard uid={other} basic={basics[other]} onClick={confirming ? null : () => setViewingUid(other)}>
+                      {confirming ? (
+                        <span className="flex items-center gap-1.5 shrink-0">
+                          <span className="text-[10px] text-slate-500 mr-0.5">¿Quitar?</span>
+                          <button onClick={() => { doRemoveFriend(other); setConfirmRemoveId(null); }} className="text-[10px] font-black text-rose-400 px-2 py-1.5 rounded-lg bg-rose-500/10">Sí</button>
+                          <button onClick={() => setConfirmRemoveId(null)} className="text-[10px] font-bold text-slate-500 px-2 py-1.5">No</button>
+                        </span>
+                      ) : (
+                        <>
+                          <button onClick={(e) => { e.stopPropagation(); setConfirmRemoveId(f.id); }} aria-label="Quitar amigo" className="p-1.5 rounded-lg text-slate-600 hover:text-rose-400 transition shrink-0"><UserMinus size={14} /></button>
+                          <ChevronRight size={15} className="text-slate-600 shrink-0" />
+                        </>
+                      )}
                     </PublicUserCard>
                   </div>
                 ); })}
@@ -11285,6 +11501,30 @@ function matchExerciseToLibrary(rawName) {
   return bestScore >= 4 ? best : null;
 }
 
+// Igual criterio que matchExerciseToLibrary (nombre exacto primero, si no
+// substring más largo en común) pero buscando SÓLO entre los ejercicios
+// que ya están en un modelo de rutina resuelto (buildRoutineModel) — el
+// universo correcto para acciones que necesitan que el ejercicio ya
+// exista en ESA rutina puntual (ej. planificar_progresion), donde
+// matchear contra la biblioteca global entera puede devolver una variante
+// real pero equivocada (ver el bug fix en planificar_progresion).
+function matchExerciseInRoutineModel(model, rawName) {
+  const norm = normalizeExerciseText(rawName);
+  if (!norm) return null;
+  const candidates = Object.values(model?.exerciseById || {});
+  let best = candidates.find((ex) => normalizeExerciseText(ex.name) === norm);
+  if (best) return best;
+  let bestScore = 0;
+  candidates.forEach((ex) => {
+    const en = normalizeExerciseText(ex.name);
+    if (en.includes(norm) || norm.includes(en)) {
+      const score = Math.min(en.length, norm.length);
+      if (score > bestScore) { bestScore = score; best = ex; }
+    }
+  });
+  return bestScore >= 4 ? best : null;
+}
+
 function isLikelyDayHeader(line, nextLine) {
   if (SETREP_REGEX.test(line)) return false;
   if (line.length > 40) return false;
@@ -11783,8 +12023,6 @@ function buildActionPlan(action, ctx) {
     const activeId = profile?.activeRoutineId;
     const activeDef = activeId ? resolveRoutineDef(profile?.routines?.[activeId], activeId) : null;
     if (!activeDef || !onActivateRoutine) return null;
-    const lib = matchExerciseToLibrary(action.exercise || "");
-    if (!lib) return null;
     const setIndex = Number.isInteger(action.setIndex) && action.setIndex >= 0 ? action.setIndex : 0;
     const trainWeeks = settings?.trainWeeks || TRAIN_WEEKS;
     const entries = (Array.isArray(action.metas) ? action.metas : [])
@@ -11796,18 +12034,26 @@ function buildActionPlan(action, ctx) {
       .filter(Boolean)
       .sort((a, b) => a.week - b.week);
     if (!entries.length) return null;
-    // El ejercicio+serie tienen que existir REALMENTE en la rutina activa —
-    // si no, applyProgressionToRoutine no encontraría dónde guardar la meta
-    // y el botón de confirmar no haría nada en silencio.
+    // BUG FIX (encontrado verificando la acción a fondo): antes esto
+    // buscaba "action.exercise" en la BIBLIOTECA GLOBAL (miles de
+    // variantes) y recién después chequeaba si ese id específico estaba en
+    // la rutina — con nombres genéricos ("Sentadilla") esto podía matchear
+    // una variante real pero DISTINTA a la que la persona realmente tiene
+    // en su rutina (ej. "Sentadilla en Multipower" en vez de "Sentadilla
+    // Búlgara"), fallando en silencio sin ningún aviso. Ahora se busca
+    // DIRECTO entre los ejercicios que ya están en su rutina activa — el
+    // universo correcto para esta acción, que sólo tiene sentido sobre
+    // algo que ya existe ahí.
     const model = buildRoutineModel(activeDef);
-    if (!model.exerciseById?.[lib.id]?.sets?.[setIndex]) return null;
-    const updatedDef = applyProgressionToRoutine(activeDef, { exerciseId: lib.id, setIndex, entries });
+    const exMatch = matchExerciseInRoutineModel(model, action.exercise || "");
+    if (!exMatch || !exMatch.sets?.[setIndex]) return null;
+    const updatedDef = applyProgressionToRoutine(activeDef, { exerciseId: exMatch.id, setIndex, entries });
     const needsModeSwitch = settings?.trainingMode !== "planned";
     return {
       kind: "progression",
-      title: `Planificar "${lib.name}"`,
+      title: `Planificar "${exMatch.name}"`,
       items: entries.map((e) => `Semana ${e.week}: ${e.reps}×${e.kg}kg`),
-      progressionPreview: { exerciseName: lib.name, setIndex, entries },
+      progressionPreview: { exerciseName: exMatch.name, setIndex, entries },
       confirmLabel: "Guardar meta",
       confirm: () => {
         onActivateRoutine(activeId, updatedDef);
@@ -12141,7 +12387,7 @@ Tipos disponibles:
 - cambiar_dia_semana: {"type":"cambiar_dia_semana","diaSemana":"lunes"|"martes"|"miercoles"|"jueves"|"viernes"|"sabado"|"domingo","dia":"nombre o parte del nombre del día de la rutina, o vacío/omitido para dejarlo como descanso"} — asigna (o saca) qué día de su rutina le toca en ese día de la semana, el mismo cronograma de Rutinas → Cronograma semanal.
 - exportar_rutina: {"type":"exportar_rutina","routineName":"nombre o parte del nombre de una rutina guardada (opcional, si no se da usa la activa)"} — genera un PDF de esa rutina (todos los días y ejercicios) y abre la hoja para compartirlo o guardarlo. Usalo para "pasame mi rutina en PDF" o "expórtame la rutina".
 
-Reglas importantes: nunca digas que ya aplicaste el cambio — la persona siempre tiene que confirmarlo desde un botón antes de que se aplique de verdad. Agregá el bloque ###ACCION### sólo si pidió ESE cambio puntual en este mensaje o el anterior, nunca como sugerencia general no pedida. Para registrar_marca, editar_rutina_activa, corregir_record y nota_ejercicio, el nombre del ejercicio tiene que coincidir razonablemente con uno real de la biblioteca — si no estás segura de a cuál se refiere, preguntá antes de proponer la acción. Para gestionar_rutina y exportar_rutina, el nombre de la rutina tiene que coincidir con una que ya tenga guardada — si hay dudas, preguntá cuál.
+Reglas importantes: nunca digas que ya aplicaste el cambio — la persona siempre tiene que confirmarlo desde un botón antes de que se aplique de verdad. Agregá el bloque ###ACCION### sólo si pidió ESE cambio puntual en este mensaje o el anterior, nunca como sugerencia general no pedida. Para registrar_marca, editar_rutina_activa, corregir_record, nota_ejercicio y planificar_progresion, el nombre del ejercicio tiene que ser EXACTAMENTE el mismo texto que aparece en sus "rutinas" (no un nombre genérico ni una variante parecida: si tiene "Sentadilla Búlgara" en su rutina y vos decís "Sentadilla", el botón de confirmar no va a encontrar nada y la persona se queda sin saber por qué) — si no estás segura de a cuál se refiere, preguntá antes de proponer la acción. Para gestionar_rutina y exportar_rutina, el nombre de la rutina tiene que coincidir con una que ya tenga guardada — si hay dudas, preguntá cuál.
 
 Cuando necesites que elija entre pocas opciones concretas y cortas para avanzar (por ejemplo: "¿en qué querés enfocarte: fuerza, hipertrofia o resistencia?", "¿qué día armamos, push o pull?"), en vez de listarlas en el texto agregá AL FINAL, en una línea aparte, este bloque (mismas reglas de formato que ###ACCION###: sin markdown alrededor, nada más en esa línea):
 ###PREGUNTA###{"opciones":["Opción A","Opción B","Opción C"]}###FIN###
@@ -12758,7 +13004,15 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
   };
 
   return (
-    <div className="relative pb-32">
+    // BUG FIX (encontrado verificando las acciones a fondo): con una
+    // conversación corta (pocos mensajes), el botón de confirmar/descartar
+    // del último mensaje podía terminar justo en la franja donde se
+    // superponen la barra de input fija (~68px) y la barra de navegación
+    // fija de abajo (~62px, z-20, por ENCIMA del chat) — pb-32 (128px) se
+    // quedaba corto contra esa franja combinada (~148-150px), así que el
+    // toque le llegaba al ícono de navegación de abajo en vez de al botón
+    // que se veía encima. pb-44 deja un margen real de sobra.
+    <div className="relative pb-44">
       {/* Mismo formato de héroe plano que usan las demás pestañas (Rutina/
           Progreso/Descarga), con el teal de siempre — Chatbot comparte
           identidad de color con Rutina a propósito. */}
@@ -12833,11 +13087,12 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
           return (
           <div key={i} className="msg-in">
             <div className={`group flex items-end gap-2 ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-              {m.role === "assistant" && (
-                <div className="w-6 h-6 rounded-lg bg-teal-500/15 border border-teal-500/25 flex items-center justify-center shrink-0 mb-0.5 shadow-md shadow-teal-500/10">
-                  <Sparkles size={11} className="text-teal-400" />
-                </div>
-              )}
+              {/* Antes acá iba un cuadradito con una estrellita (ícono de la
+                  IA) pegado a la burbuja — se sacó a pedido: la burbuja del
+                  asistente arranca directo pegada al borde izquierdo, más
+                  limpio sin ese elemento extra. El filo de color a la
+                  izquierda de la burbuja (ver style de abajo) ya alcanza
+                  para identificar que es un mensaje de la IA. */}
               {/* Editar: solo en mensajes propios, y solo si no está respondiendo.
                   Toca el lápiz → el texto vuelve al input para reescribirlo. */}
               {m.role === "user" && !isSending && (
@@ -12868,7 +13123,7 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
                 faltaban acá. Agrupados en una píldora chica en vez de íconos
                 sueltos flotando, para que se lean como una sola barra de
                 acciones y no como ruido suelto debajo del mensaje. */}
-            <div className={`flex items-center mt-1 ${m.role === "user" ? "justify-end mr-1" : "justify-start ml-8"}`}>
+            <div className={`flex items-center mt-1 ${m.role === "user" ? "justify-end mr-1" : "justify-start"}`}>
               <div className="flex items-center gap-0.5 rounded-lg p-0.5" style={{ backgroundColor: "var(--row-surface)" }}>
                 <button onClick={() => handleCopyMessage(i, m.text)} aria-label="Copiar mensaje" className="p-1 rounded-md text-slate-500 hover:text-slate-200 hover:bg-slate-700/50 transition">
                   {copiedIndex === i ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
@@ -12900,7 +13155,7 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
                 cualquiera de las dos formas) los botones quedan marcados,
                 no clickeables de nuevo. */}
             {m.question && (
-              <div className="mt-2 flex flex-wrap gap-1.5 max-w-[90%] ml-8">
+              <div className="mt-2 flex flex-wrap gap-1.5 max-w-[90%]">
                 {m.question.options.map((opt, j) => {
                   const picked = m.question.answeredWith === opt;
                   const disabled = !!m.question.answeredWith;
@@ -14361,7 +14616,7 @@ function RoutinePreviewModal({ routineDef, routineName, onActivate, onClose, yaA
   );
 }
 
-function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpdateProfile, openScheduleSignal = 0, openEditorSignal = 0 }) {
+function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpdateProfile, openScheduleSignal = 0, openEditorSignal = 0, onSignalConsumed = null }) {
   const [mode, setMode] = useState("catalog");
   const [showWizard, setShowWizard] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
@@ -14373,18 +14628,29 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
   const scheduleRef = useRef(null);
   // Al llegar desde el aviso "hoy es descanso" (que incrementa la señal),
   // abrimos el editor de días y scrolleamos hasta él.
+  // BUG FIX: "openSectionSignal" vive en el componente de arriba de TODO
+  // (App), que nunca se desmonta — pero RoutinesView SÍ se desmonta al
+  // cambiar de pestaña y se vuelve a montar de cero al volver. Sin avisarle
+  // a App que la señal ya se usó, quedaba con n>0 para siempre, y CADA
+  // vez que volvías a Rutinas (por cualquier camino, no sólo el aviso
+  // original) este efecto se disparaba de nuevo en el montaje, abriendo el
+  // cronograma solo porque la señal vieja seguía técnicamente "prendida".
   useEffect(() => {
     if (openScheduleSignal <= 0) return;
     setShowSchedule(true);
     const t = setTimeout(() => { try { scheduleRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); } catch { /* ignorado a propósito */ } }, 150);
+    onSignalConsumed?.();
     return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openScheduleSignal]);
 
   // Al llegar desde "agregar ejercicios de [músculo] a mi rutina" (en el
   // muñeco), abrimos DIRECTO el armador de la rutina activa — no la lista
-  // de rutinas, que obligaba a buscarla y tocar "Editar" a mano.
+  // de rutinas, que obligaba a buscarla y tocar "Editar" a mano. Mismo BUG
+  // FIX que arriba: avisar a App que ya se consumió la señal.
   useEffect(() => {
     if (openEditorSignal <= 0) return;
+    onSignalConsumed?.();
     const activeId = profile?.activeRoutineId;
     if (!activeId) return;
     const def = (profile?.routines || {})[activeId];
@@ -14781,11 +15047,18 @@ const TAB_ORDER = ["rutina", "progreso", "social", "descarga", "rutinas", "entre
 // Social lo pisa con su propio celeste, para que se note como una sección
 // con identidad propia apenas se la toca, sin cambiarle el color al resto
 // de la barra que nunca se pidió tocar.
+// BUG FIX (pedido): antes cada pestaña pintaba su ícono de abajo con SU
+// propio color (celeste en Rutinas, violeta en Social, etc.), heredado del
+// color de la pestaña. La barra de navegación es justamente lo único que
+// NO cambia de pantalla en pantalla — se pidió que se quede siempre con
+// el teal característico de la app (el mismo de Rutina, el logo, el
+// avatar por default), y que el color propio de cada pestaña quede sólo
+// adentro de su contenido (héroe, botones), no en el ícono de abajo.
 const NAV_TABS = [
   { key: "rutina", icon: <Dumbbell size={20} />, label: "Rutina" },
   { key: "progreso", icon: <BarChart3 size={20} />, label: "Progreso" },
-  { key: "social", icon: <Users size={20} />, label: "Social", color: SOCIAL_COLOR },
-  { key: "rutinas", icon: <Layers size={20} />, label: "Rutinas", color: "#38BDF8" },
+  { key: "social", icon: <Users size={20} />, label: "Social" },
+  { key: "rutinas", icon: <Layers size={20} />, label: "Rutinas" },
   { key: "entrenador_ia", icon: <Sparkles size={20} />, label: "Chatbot" },
 ];
 
@@ -16092,7 +16365,7 @@ export default function App() {
         </header>
         <main className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto px-4 py-4 pb-28 lg:pb-10 space-y-4" style={{ paddingBottom: "calc(7rem + env(safe-area-inset-bottom, 0px))" }}>
           <div key={tab} className={tabSlideClass}>
-            {tab === "rutinas" && <RoutinesView openScheduleSignal={openSectionSignal.id === "week-schedule" ? openSectionSignal.n : 0} openEditorSignal={openSectionSignal.id === "routine-editor" ? openSectionSignal.n : 0} profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleDeleteRoutine} onUpdateProfile={handleUpdateProfile} />}
+            {tab === "rutinas" && <RoutinesView openScheduleSignal={openSectionSignal.id === "week-schedule" ? openSectionSignal.n : 0} openEditorSignal={openSectionSignal.id === "routine-editor" ? openSectionSignal.n : 0} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleDeleteRoutine} onUpdateProfile={handleUpdateProfile} />}
             {tab === "rutina" && !showPinnedDeload && <OnboardingTasksCard profile={profile} cycleStart={cycleStart} logs={logs} onGoToProfile={() => setTab("perfil")} onOpenFieldSettings={() => setShowFieldIntro(true)} onDone={() => handleUpdateProfile({ onboardingDone: true })} />}
             {/* Semana de descarga: se muestra fija acá mismo, en vez del
                 entrenamiento normal, con un botón para cerrarla (ver
@@ -16101,11 +16374,11 @@ export default function App() {
                 que quedó adentro de RoutineView ahora sirve para volver a
                 fijarla si la cerraste. */}
             {tab === "rutina" && showPinnedDeload && <DeloadView logs={logs} setLogs={setLogs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} activeSession={profile?.activeSession?.deload ? profile.activeSession : null} onStartSession={handleStartSession} onCancelSession={handleCancelSession} weekSchedule={weekSchedule} onClose={() => setDeloadDismissed(true)} cycleStart={cycleStart} />}
-            {tab === "rutina" && !showPinnedDeload && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToRoutines={() => setTab("rutinas")} onGoToSchedule={() => goToSection("rutinas", "week-schedule")} onGoToFieldSettings={() => goToSection("perfil", "field-settings-section")} onGoToDescarga={() => (isDeloadWeek ? setDeloadDismissed(false) : setTab("descarga"))} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} todaySessionDayKey={(profile?.trainingSessions || []).find((ts) => ts.date === todayStr())?.dayKey || profile?.activeSession?.dayKey || null} sex={profile?.sex} age={profile?.age} />}
+            {tab === "rutina" && !showPinnedDeload && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToRoutines={() => setTab("rutinas")} onGoToSchedule={() => goToSection("rutinas", "week-schedule")} onGoToFieldSettings={() => goToSection("perfil", "field-settings-section")} onGoToDescarga={() => (isDeloadWeek ? setDeloadDismissed(false) : setTab("descarga"))} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} todaySessionDayKey={(profile?.trainingSessions || []).find((ts) => ts.date === todayStr())?.dayKey || profile?.activeSession?.dayKey || null} sex={profile?.sex} age={profile?.age} activeRoutineDef={activeRoutineDef} onApplyOwnProgression={(plan) => handleUpdateProfile({ routines: { ...(profile.routines || {}), [profile.activeRoutineId]: applyProgressionToRoutine(activeRoutineDef, plan) } })} />}
             {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} onGoToRoutines={() => goToSection("rutinas", "routine-editor")} weekSchedule={weekSchedule} sex={profile?.sex} age={profile?.age} onGoToDeload={() => { setDeloadDismissed(false); setTab("rutina"); }} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} />}
             {tab === "descarga" && <DeloadView logs={logs} setLogs={setLogs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} activeSession={profile?.activeSession?.deload ? profile.activeSession : null} onStartSession={handleStartSession} onCancelSession={handleCancelSession} weekSchedule={weekSchedule} onClose={() => { setDeloadDismissed(true); setTab("rutina"); }} cycleStart={cycleStart} />}
             {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} setLogs={setLogs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} conversations={aiConversations} activeConversationId={activeAiConversationId} onNewConversation={handleNewAiConversation} onSwitchConversation={handleSwitchAiConversation} onDeleteConversation={handleDeleteAiConversation} onRenameConversation={handleRenameAiConversation} settings={getProfileSettings(profile)} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} onDeleteRoutine={handleDeleteRoutine} onNavigate={setTab} onStartSession={handleStartSession} onEndSession={handleEndSession} />}
-            {tab === "perfil" && <ProfileView onOpenFieldPreview={() => setShowFieldIntro(true)} openSectionSignal={openSectionSignal} profileName={activeProfile} profiles={profiles} logs={logs} onSignOut={handleSignOut} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} onGoToSocial={() => setTab("social")} />}
+            {tab === "perfil" && <ProfileView onOpenFieldPreview={() => setShowFieldIntro(true)} openSectionSignal={openSectionSignal} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} profileName={activeProfile} profiles={profiles} logs={logs} onSignOut={handleSignOut} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} onGoToSocial={() => setTab("social")} />}
             {tab === "social" && <SocialView profile={profile} profileName={activeProfile} uid={profile?.googleUid} onActivateRoutine={handleActivateRoutine} />}
           </div>
         </main>
