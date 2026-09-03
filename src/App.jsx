@@ -8428,6 +8428,8 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
 
   const [confirmResetProgress, setConfirmResetProgress] = useState(false);
   const [activeSection, setActiveSection] = useState("rank");
+  const progressSectionIdx = Math.max(0, PROGRESS_SECTIONS.findIndex((s) => s.k === activeSection));
+  const progressSectionColor = PROGRESS_SECTIONS[progressSectionIdx]?.color || "#3B82F6";
 
   return (
     <div className="space-y-4">
@@ -8454,11 +8456,18 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
         </button>
       )}
 
-      {/* Selector de sección — segmentado tipo pill con ícono, más liviano */}
-      <div className="grid grid-cols-4 gap-1 p-1 rounded-2xl bg-slate-900/60 border border-slate-800/50">
+      {/* Selector de sección — misma píldora deslizante que ya usa el
+          selector de Social (Amigos/Buscar/Ranking/Entrenador): un solo
+          elemento que se desliza y cambia de color, en vez de que cada
+          botón prenda/apague su propio fondo de golpe. */}
+      <div className="relative grid grid-cols-4 gap-1 p-1 rounded-2xl bg-slate-900/60 border border-slate-800/50">
+        <div
+          className="absolute top-1 bottom-1 rounded-xl transition-all duration-300 ease-out pointer-events-none"
+          style={{ left: `calc(${progressSectionIdx} / ${PROGRESS_SECTIONS.length} * 100% + 2px)`, width: `calc(100% / ${PROGRESS_SECTIONS.length} - 4px)`, backgroundColor: tint(progressSectionColor, "22"), boxShadow: `inset 0 0 0 1px ${tint(progressSectionColor, "45")}` }}
+        />
         {PROGRESS_SECTIONS.map((s) => (
-          <button key={s.k} onClick={() => setActiveSection(s.k)} className="flex flex-col items-center justify-center gap-1 py-2 rounded-xl text-[10px] font-bold transition-all active:scale-95"
-            style={activeSection === s.k ? { background: tint(s.color, "22"), color: s.color, boxShadow: `inset 0 0 0 1px ${tint(s.color, "45")}` } : { color: "#64748b" }}>
+          <button key={s.k} onClick={() => setActiveSection(s.k)} className="relative z-[1] flex flex-col items-center justify-center gap-1 py-2 rounded-xl text-[10px] font-bold transition-colors active:scale-95"
+            style={{ color: activeSection === s.k ? s.color : "#64748b" }}>
             {s.icon}<span>{s.l}</span>
           </button>
         ))}
