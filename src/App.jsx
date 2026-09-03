@@ -5646,8 +5646,18 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
                 ocupen 2 líneas — cortarlos a "HOMBRO/…" en una sola línea
                 los vuelve ilegibles. Recién si ni en 2 líneas entra (un
                 nombre propio larguísimo) se corta con "…", como red de
-                seguridad. */}
-            <span className="block" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{ROUTINE[k].label}</span>
+                seguridad.
+                BUG FIX (pedido: "que sean del tamaño que tenían cuando
+                ocupaban 2 renglones"): antes el botón sólo se veía alto
+                cuando ALGÚN día de la grilla necesitaba 2 líneas (el grid
+                estira todos los botones de la fila a la altura del más
+                alto) — una rutina con nombres cortos ("Push"/"Pull"/
+                "Piernas") quedaba siempre en la versión chica. Ahora
+                minHeight reserva el alto de 2 líneas SIEMPRE, sin
+                importar el largo del nombre, y WebkitBoxPack centra el
+                texto de una sola línea en ese espacio — el que necesite
+                más todavía puede crecer hasta 2 líneas igual que antes. */}
+            <span className="block" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", WebkitBoxPack: "center", overflow: "hidden", minHeight: "25px" }}>{ROUTINE[k].label}</span>
           </button>
         ))}
       </div>
@@ -6404,9 +6414,11 @@ function DeloadView({ logs, setLogs, settings = DEFAULT_SETTINGS, deloadProgress
             <button key={dk} onClick={() => setActiveDay(dk)} title={d.label}
               className="py-2.5 px-1 rounded-xl text-[10px] font-black uppercase transition-all active:scale-95 border text-center leading-tight min-w-0"
               style={isActive ? { backgroundColor: tint(d.color, "22"), borderColor: tint(d.color, "55"), color: d.color } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
-              {/* line-clamp-2: ver comentario en RoutineView — "Hombros/Brazos"
-                  tiene que leerse entero, aunque sea en 2 líneas. */}
-              <span className="block" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{d.label}</span>
+              {/* line-clamp-2 + minHeight: ver comentario en RoutineView —
+                  "Hombros/Brazos" tiene que leerse entero aunque sea en 2
+                  líneas, Y el botón siempre reserva ese alto por defecto
+                  (no sólo cuando algún día de la grilla lo necesita). */}
+              <span className="block" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", WebkitBoxPack: "center", overflow: "hidden", minHeight: "25px" }}>{d.label}</span>
               {withPR > 0 && <span className="text-[8px] font-black opacity-70">{withPR}/{d.exercises.length}</span>}
             </button>
           );
