@@ -2046,7 +2046,6 @@ input, textarea, [contenteditable="true"] {
   --grad-hero-purple: linear-gradient(135deg, rgba(168,85,247,0.42), rgba(15,23,42,0.82) 55%, rgba(15,23,42,0.6));
   --grad-hero-blue: linear-gradient(135deg, rgba(59,130,246,0.4), rgba(15,23,42,0.82) 55%, rgba(15,23,42,0.6));
   --grad-hero-teal: linear-gradient(135deg, rgba(20,184,166,0.4), rgba(15,23,42,0.82) 55%, rgba(15,23,42,0.6));
-  --grad-hero-sky: linear-gradient(135deg, rgba(56,189,248,0.42), rgba(15,23,42,0.82) 55%, rgba(15,23,42,0.6));
   --grad-profile-avatar: linear-gradient(135deg, #0f172a, rgba(15,23,42,0.5));
   --ring-track: #1a1a2e;
   --chart-grid: #1a1a2e;
@@ -2103,7 +2102,6 @@ input, textarea, [contenteditable="true"] {
   --grad-hero-purple: linear-gradient(135deg, rgba(168,85,247,0.10), rgba(255,255,255,0.96) 55%, #ffffff);
   --grad-hero-blue: linear-gradient(135deg, rgba(59,130,246,0.10), rgba(255,255,255,0.96) 55%, #ffffff);
   --grad-hero-teal: linear-gradient(135deg, rgba(20,184,166,0.10), rgba(255,255,255,0.96) 55%, #ffffff);
-  --grad-hero-sky: linear-gradient(135deg, rgba(56,189,248,0.10), rgba(255,255,255,0.96) 55%, #ffffff);
   --grad-profile-avatar: linear-gradient(135deg, #ffffff, #f8fafc);
   --ring-track: #eef2f6;
   --chart-grid: #eef2f6;
@@ -16238,14 +16236,14 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
     return (
       <div className="space-y-4">
         <div className="text-center pt-2 pb-1">
-          <div className="w-14 h-14 rounded-2xl bg-sky-500/15 flex items-center justify-center mx-auto mb-3"><Calendar className="text-sky-500" size={26} /></div>
+          <div className="w-14 h-14 rounded-2xl bg-blue-500/15 flex items-center justify-center mx-auto mb-3"><Calendar className="text-blue-500" size={26} /></div>
           <h2 className="text-lg font-black text-white">¿Qué días entrenás "{def.name}"?</h2>
           <p className="text-sm text-slate-500 mt-1.5 leading-relaxed px-2">Ya armamos un cronograma por defecto. Lo podés dejar así o cambiarlo.</p>
         </div>
         <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4">
           <WeeklyScheduleEditor dayOrder={def.dayOrder} days={def.days} schedule={def.weekSchedule} onChange={updatePendingScheduleDay} />
         </div>
-        <button onClick={confirmPendingActivation} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl !text-white text-sm font-bold transition-all active:scale-[0.98] shadow-lg shadow-sky-500/20" style={{ background: "linear-gradient(135deg,#38BDF8,#0284C7)" }}><Check size={15} /> Listo, empezar a entrenar</button>
+        <button onClick={confirmPendingActivation} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl !text-white text-sm font-bold transition-all active:scale-[0.98] shadow-lg shadow-blue-500/20" style={{ background: "linear-gradient(135deg,#3B82F6,#1D4ED8)" }}><Check size={15} /> Listo, empezar a entrenar</button>
       </div>
     );
   }
@@ -16282,7 +16280,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
     <div className="space-y-4">
       {forced && (
         <div className="text-center pt-2 pb-1">
-          <div className="w-14 h-14 rounded-2xl bg-sky-500/15 flex items-center justify-center mx-auto mb-3"><Layers className="text-sky-500" size={26} /></div>
+          <div className="w-14 h-14 rounded-2xl bg-blue-500/15 flex items-center justify-center mx-auto mb-3"><Layers className="text-blue-500" size={26} /></div>
           <h2 className="text-lg font-black text-white">¿Cómo vas a entrenar?</h2>
           <p className="text-sm text-slate-500 mt-1.5 leading-relaxed px-2">Ya armada, creada por vos, o importada. La podés cambiar cuando quieras.</p>
         </div>
@@ -16314,7 +16312,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
                   <ChevronRight size={14} className="text-teal-500 shrink-0" />
                 </button>
                 <button onClick={() => { setEditingRoutineId(null); setMode("builder"); }} className="w-full flex items-center gap-3 rounded-xl border border-slate-700/60 bg-slate-800/40 p-3.5 text-left transition active:scale-[0.98] hover:border-slate-500">
-                  <div className="w-9 h-9 rounded-xl bg-sky-500/15 flex items-center justify-center shrink-0"><Edit3 size={15} className="text-sky-400" /></div>
+                  <div className="w-9 h-9 rounded-xl bg-blue-500/15 flex items-center justify-center shrink-0"><Edit3 size={15} className="text-blue-400" /></div>
                   <div className="flex-1 min-w-0">
                     <p className="text-[13px] font-black text-white">Manualmente</p>
                     <p className="text-[10px] text-slate-500 mt-0.5">Elegí vos cada día, ejercicio y serie</p>
@@ -16326,15 +16324,15 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
           </div>
 
           {/* Opción 2: Preestablecidas */}
-          <button onClick={() => { setShowPresetsForced((s) => !s); setCreateOpen(false); }} className={`relative overflow-hidden w-full rounded-2xl border p-4 text-left transition active:scale-[0.99] ${showPresetsForced ? "border-sky-500/40" : "border-sky-500/25"}`} style={{ background: "var(--grad-hero-sky, linear-gradient(135deg,#0c1f2a,#0f172a))" }}>
-            <div className="absolute -top-8 -right-8 w-28 h-28 rounded-full bg-sky-500/15 blur-2xl pointer-events-none" />
+          <button onClick={() => { setShowPresetsForced((s) => !s); setCreateOpen(false); }} className={`relative overflow-hidden w-full rounded-2xl border p-4 text-left transition active:scale-[0.99] ${showPresetsForced ? "border-blue-500/40" : "border-blue-500/25"}`} style={{ background: "var(--grad-hero-blue, linear-gradient(135deg,#0c1f2a,#0f172a))" }}>
+            <div className="absolute -top-8 -right-8 w-28 h-28 rounded-full bg-blue-500/15 blur-2xl pointer-events-none" />
             <div className="relative flex items-center gap-3">
-              <div className="w-11 h-11 rounded-2xl bg-sky-500/20 border border-sky-500/30 flex items-center justify-center shrink-0"><Layers size={18} className="text-sky-400" /></div>
+              <div className="w-11 h-11 rounded-2xl bg-blue-500/20 border border-blue-500/30 flex items-center justify-center shrink-0"><Layers size={18} className="text-blue-400" /></div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-black text-white">Elegir una preestablecida</p>
-                <p className="text-[11px] text-sky-300/60 mt-0.5">Push/Pull/Legs, Arnold, Upper/Lower y más</p>
+                <p className="text-[11px] text-blue-300/60 mt-0.5">Push/Pull/Legs, Arnold, Upper/Lower y más</p>
               </div>
-              <ChevronDown size={16} className={`text-sky-500 shrink-0 transition-transform ${showPresetsForced ? "rotate-180" : ""}`} />
+              <ChevronDown size={16} className={`text-blue-500 shrink-0 transition-transform ${showPresetsForced ? "rotate-180" : ""}`} />
             </div>
           </button>
 
@@ -16353,15 +16351,15 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
       )}
 
       {!forced && (
-        <div className="relative overflow-hidden rounded-2xl border border-sky-500/20 p-5" style={{ background: "var(--grad-hero-sky)" }}>
-          <div className="absolute -top-8 -right-6 w-32 h-32 rounded-full bg-sky-500/15 blur-2xl pointer-events-none" />
+        <div className="relative overflow-hidden rounded-2xl border border-blue-500/20 p-5" style={{ background: "var(--grad-hero-blue)" }}>
+          <div className="absolute -top-8 -right-6 w-32 h-32 rounded-full bg-blue-500/15 blur-2xl pointer-events-none" />
           <div className="absolute -bottom-6 -left-6 w-28 h-28 rounded-full bg-cyan-500/10 blur-2xl pointer-events-none" />
           <div className="relative flex items-center gap-2 mb-1">
-            <Layers size={16} className="text-sky-400" />
-            <span className="text-[11px] font-black uppercase tracking-widest text-sky-400">Tu plan de entrenamiento</span>
+            <Layers size={16} className="text-blue-400" />
+            <span className="text-[11px] font-black uppercase tracking-widest text-blue-400">Tu plan de entrenamiento</span>
           </div>
           <h2 className="relative text-xl font-black text-white leading-tight">Rutinas</h2>
-          <p className="relative text-xs text-sky-300/60 mt-1">Elegí cómo entrenar: una rutina ya armada o una creada por vos</p>
+          <p className="relative text-xs text-blue-300/60 mt-1">Elegí cómo entrenar: una rutina ya armada o una creada por vos</p>
         </div>
       )}
 
@@ -16370,16 +16368,16 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
         // Antes era una tarjeta más entre otras. Ahora es lo primero y lo más
         // grande: ves sus días de un vistazo (con su color), y el detalle
         // (balance, cronograma) queda a un toque para no saturar.
-        <div className="relative overflow-hidden rounded-3xl border p-4 shadow-lg shadow-black/25 breathe" style={{ background: "var(--grad-hero-sky)", borderColor: "rgba(56,189,248,0.3)", "--breathe-color": "rgba(56,189,248,0.35)" }}>
-          <div className="absolute -top-12 -right-12 w-40 h-40 rounded-full bg-sky-500/20 blur-3xl pointer-events-none" />
+        <div className="relative overflow-hidden rounded-3xl border p-4 shadow-lg shadow-black/25 breathe" style={{ background: "var(--grad-hero-blue)", borderColor: "rgba(59,130,246,0.3)", "--breathe-color": "rgba(59,130,246,0.35)" }}>
+          <div className="absolute -top-12 -right-12 w-40 h-40 rounded-full bg-blue-500/20 blur-3xl pointer-events-none" />
 
           <div className="relative flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-sky-500/25 text-sky-200 flex items-center justify-center shrink-0 ring-1 ring-inset ring-white/10"><Dumbbell size={18} /></div>
+            <div className="w-11 h-11 rounded-2xl bg-blue-500/25 text-blue-200 flex items-center justify-center shrink-0 ring-1 ring-inset ring-white/10"><Dumbbell size={18} /></div>
             <div className="min-w-0 flex-1">
-              <span className="text-[9px] font-black uppercase tracking-[0.16em] text-sky-300/90">Tu rutina activa</span>
+              <span className="text-[9px] font-black uppercase tracking-[0.16em] text-blue-300/90">Tu rutina activa</span>
               <h3 className="text-[17px] font-black text-white leading-tight truncate">{activeDef.name}</h3>
             </div>
-            <button onClick={() => setShareTarget(activeDef)} aria-label="Compartir rutina activa" className="p-2 rounded-xl text-sky-200 hover:text-white hover:bg-white/10 transition shrink-0"><Share2 size={15} /></button>
+            <button onClick={() => setShareTarget(activeDef)} aria-label="Compartir rutina activa" className="p-2 rounded-xl text-blue-200 hover:text-white hover:bg-white/10 transition shrink-0"><Share2 size={15} /></button>
           </div>
 
           {/* Los números, ahora en grande — antes eran una lineita de texto
@@ -16393,9 +16391,9 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
               { v: activeStats.sets, l: "Series" },
               ...(activeUso.sesiones > 0 ? [{ v: activeUso.sesiones, l: activeUso.sesiones === 1 ? "Sesión" : "Sesiones" }] : []),
             ].map((s) => (
-              <div key={s.l} className="rounded-xl py-2 text-center border border-sky-400/20 bg-black/25">
+              <div key={s.l} className="rounded-xl py-2 text-center border border-blue-400/20 bg-black/25">
                 <p className="text-lg font-black text-white tabular-nums leading-none">{s.v}</p>
-                <p className="text-[8px] text-sky-300/70 mt-1 font-bold uppercase tracking-wide truncate px-0.5">{s.l}</p>
+                <p className="text-[8px] text-blue-300/70 mt-1 font-bold uppercase tracking-wide truncate px-0.5">{s.l}</p>
               </div>
             ))}
           </div>
@@ -16404,7 +16402,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
               SIMÉTRICA de 2 columnas (si son impares, el último ocupa el
               ancho completo). El color de cada día queda como un puntito
               discreto — identifica sin romper el celeste del héroe. */}
-          <p className="relative text-[9px] font-black uppercase tracking-[0.14em] text-sky-300/60 mt-3.5 mb-1.5 px-0.5">Tus días</p>
+          <p className="relative text-[9px] font-black uppercase tracking-[0.14em] text-blue-300/60 mt-3.5 mb-1.5 px-0.5">Tus días</p>
           <div className="relative grid grid-cols-2 gap-1.5">
             {(() => {
               const orden = (activeDef.dayOrder || Object.keys(activeDef.days || {})).filter((dk) => activeDef.days?.[dk]);
@@ -16412,9 +16410,9 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
                 const d = activeDef.days[dk];
                 const ultimoImpar = i === orden.length - 1 && orden.length % 2 === 1;
                 return (
-                  <span key={dk} className={`flex items-center gap-2 px-2.5 py-2.5 rounded-xl text-[11px] font-bold bg-black/25 border border-sky-400/10 min-w-0 ${ultimoImpar ? "col-span-2" : ""}`}>
+                  <span key={dk} className={`flex items-center gap-2 px-2.5 py-2.5 rounded-xl text-[11px] font-bold bg-black/25 border border-blue-400/10 min-w-0 ${ultimoImpar ? "col-span-2" : ""}`}>
                     <span className="flex-1 min-w-0 leading-snug text-slate-200" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{d.label}</span>
-                    <span className="text-sky-300/60 tabular-nums shrink-0 text-[10px]">{d.exercises?.length || 0}</span>
+                    <span className="text-blue-300/60 tabular-nums shrink-0 text-[10px]">{d.exercises?.length || 0}</span>
                   </span>
                 );
               });
@@ -16423,10 +16421,10 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
 
           {/* Acciones: dos botones parejos, sin ruido */}
           <div className="relative grid grid-cols-2 gap-2 mt-3.5">
-            <button onClick={() => setShowBalance((v) => !v)} className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-white/10 text-sky-200 hover:text-white hover:bg-white/5 transition text-[11px] font-bold">
+            <button onClick={() => setShowBalance((v) => !v)} className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-white/10 text-blue-200 hover:text-white hover:bg-white/5 transition text-[11px] font-bold">
               <Activity size={11} /> {showBalance ? "Ocultar" : "Balance"}
             </button>
-            <button ref={scheduleRef} onClick={() => setShowSchedule((s) => !s)} className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-white/10 text-sky-200 hover:text-white hover:bg-white/5 transition text-[11px] font-bold">
+            <button ref={scheduleRef} onClick={() => setShowSchedule((s) => !s)} className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-white/10 text-blue-200 hover:text-white hover:bg-white/5 transition text-[11px] font-bold">
               <Calendar size={11} /> {showSchedule ? "Ocultar" : "Cronograma"}
             </button>
           </div>
@@ -16473,7 +16471,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
 
       {!forced && (
       <div className="flex gap-2">
-        <button onClick={() => { setEditingRoutineId(null); setMode("builder"); }} className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98] shadow-lg shadow-sky-500/20" style={{ background: "linear-gradient(135deg,#38BDF8,#0284C7)" }}><Sparkles size={15} /> Crear mi rutina</button>
+        <button onClick={() => { setEditingRoutineId(null); setMode("builder"); }} className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98] shadow-lg shadow-blue-500/20" style={{ background: "linear-gradient(135deg,#3B82F6,#1D4ED8)" }}><Sparkles size={15} /> Crear mi rutina</button>
         <button onClick={() => setShowImport(true)} className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition text-sm font-bold active:scale-[0.98]"><Download size={15} /> Importar rutina</button>
       </div>
       )}
