@@ -4832,8 +4832,17 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
               </div>
             );
           }
+          // Pedido: "cambiar sistema de cardio, que sea más sencillo" →
+          // aclarado después: mantener los dos modos y todos los controles,
+          // sólo prolijizar. Antes el selector, el timer y el km+guardar
+          // eran 3 bloques sueltos flotando uno debajo del otro — ahora
+          // viven adentro de UN solo panel con borde/tinte propio, para que
+          // se lea como una sola tarjeta de carga en vez de piezas
+          // separadas. El input de "Minutos objetivo" también pasa a tener
+          // el mismo tamaño que el de Km (antes era más grande sin motivo,
+          // el único par de inputs del mismo tipo que no hacía juego).
           return (
-            <div className="space-y-2.5">
+            <div className="space-y-2.5 rounded-2xl border p-3" style={{ borderColor: tint(accent, "20"), backgroundColor: tint(accent, "05") }}>
               {/* Selector de modo */}
               <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
                 <button onClick={() => { setCardioMode("stopwatch"); setCardioRunning(false); setCardioElapsed(0); clearPersistedCardioTimer(); }} className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[10px] font-bold transition-all ${cardioMode === "stopwatch" ? "text-white" : "text-slate-500"}`} style={cardioMode === "stopwatch" ? { backgroundColor: accent } : {}}>
@@ -4868,7 +4877,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
                   <div className="flex items-end gap-2">
                     <div className="flex-1">
                       <label className="text-[10px] text-slate-600 font-semibold uppercase tracking-wider mb-1.5 block">Minutos objetivo</label>
-                      <input type="number" inputMode="decimal" placeholder="30" value={minutes} onChange={(e) => { updateDraft({ minutes: e.target.value }); setCardioElapsed(0); setCardioRunning(false); clearPersistedCardioTimer(); }} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3.5 text-xl font-black text-center text-white focus:outline-none focus:border-teal-500/50 transition" />
+                      <input type="number" inputMode="decimal" placeholder="30" value={minutes} onChange={(e) => { updateDraft({ minutes: e.target.value }); setCardioElapsed(0); setCardioRunning(false); clearPersistedCardioTimer(); }} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3 text-lg font-black text-center text-white focus:outline-none focus:border-teal-500/50 transition" />
                     </div>
                     <div className="flex flex-col gap-1.5">
                       <button onClick={() => {
@@ -10639,35 +10648,39 @@ function SendTemplateModal({ template, studentsAccepted, basics, myUid, onClose,
 // ahí y las puedas modificar" — plantillas GUARDADAS APARTE de "Mis
 // rutinas" (esas son para tu propio entrenamiento; una plantilla es
 // exclusivamente para mandar). Arma/edita con el mismo RoutineBuilder de
-// siempre, sólo cambia dónde se guarda el resultado. Misma textura que el
-// hero de arriba (var(--grad-hero-purple)), a pedido explícito.
+// siempre, sólo cambia dónde se guarda el resultado.
+// REDISEÑO (pedido: "proponer otra idea para el diseño del recuadro"):
+// antes usaba la misma textura de degradé violeta grande que el hero de
+// arriba — quedaban dos cajas moradas casi idénticas apiladas, sin
+// identidad propia. Ahora es una tarjeta oscura estándar (mismo lenguaje
+// que el resto de Social/Progreso) con el violeta reservado sólo al
+// ícono y los acentos — se distingue del hero en vez de repetirlo.
 function TrainerTemplatesCard({ templates, onCreate, onEdit, onSend }) {
   const entries = Object.entries(templates || {});
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-purple-500/20 p-4" style={{ background: "var(--grad-hero-purple)" }}>
-      <div className="absolute -top-8 -right-8 w-28 h-28 rounded-full bg-purple-500/15 blur-3xl pointer-events-none" />
-      <div className="relative flex items-center gap-2.5 mb-3">
-        <div className="w-9 h-9 rounded-xl bg-purple-500/15 border border-purple-500/25 flex items-center justify-center shrink-0 text-purple-300"><ClipboardCheck size={16} /></div>
+    <div className="rounded-2xl border border-slate-800/50 bg-slate-900/60 p-4">
+      <div className="flex items-center gap-2.5 mb-3">
+        <div className="w-9 h-9 rounded-xl bg-purple-500/15 border border-purple-500/25 flex items-center justify-center shrink-0 text-purple-400"><ClipboardCheck size={16} /></div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold text-white">Plantillas para tus alumnos</p>
-          <p className="text-[11px] text-purple-300/70">Armá una rutina una vez, mandala cuando quieras</p>
+          <p className="text-[11px] text-slate-500">Armá una rutina una vez, mandala cuando quieras</p>
         </div>
       </div>
       {entries.length > 0 && (
-        <div className="relative space-y-1.5 mb-3">
+        <div className="space-y-1.5 mb-3">
           {entries.map(([id, def]) => (
-            <div key={id} className="flex items-center gap-2 rounded-xl bg-black/20 border border-white/5 px-3 py-2.5">
+            <div key={id} className="flex items-center gap-2 rounded-xl bg-slate-800/40 border border-slate-700/40 px-3 py-2.5">
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-bold text-white truncate">{def.name}</p>
                 <p className="text-[10px] text-slate-500">{def.dayOrder.length} día{def.dayOrder.length !== 1 ? "s" : ""}</p>
               </div>
-              <button onClick={() => onSend(id, def)} aria-label="Enviar a un alumno" className="p-1.5 rounded-lg text-purple-300 hover:text-purple-200 hover:bg-purple-500/15 transition shrink-0"><Send size={14} /></button>
+              <button onClick={() => onSend(id, def)} aria-label="Enviar a un alumno" className="p-1.5 rounded-lg text-purple-400 hover:text-purple-300 hover:bg-purple-500/15 transition shrink-0"><Send size={14} /></button>
               <button onClick={() => onEdit(id)} aria-label="Editar plantilla" className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition shrink-0"><Edit3 size={14} /></button>
             </div>
           ))}
         </div>
       )}
-      <button onClick={onCreate} className="relative w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-purple-500/30 text-purple-300 text-xs font-bold hover:bg-purple-500/10 transition active:scale-[0.98]">
+      <button onClick={onCreate} className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-purple-500/30 text-purple-400 text-xs font-bold hover:bg-purple-500/10 transition active:scale-[0.98]">
         <Plus size={13} /> Crear plantilla nueva
       </button>
     </div>
