@@ -1024,14 +1024,63 @@ function pickWarmupDrills(exercises) {
   }
   return picked.slice(0, 6);
 }
+
+// Pedido: "que haya una opción de generarlo con IA" — a diferencia de
+// pickWarmupDrills (heurística fija por región), la IA razona sobre los
+// ejercicios REALES de ese día puntual. Se la limita a elegir sólo entre
+// las keys de MOBILITY_DRILLS (nunca inventa ejercicios nuevos) para que
+// el resultado se pueda mostrar/editar con el mismo checklist de
+// siempre — mismo patrón de "chat de una sola pasada, pedí JSON puro"
+// que ya usa PersonalizedRoutineWizard.generateRoutine.
+async function generateWarmupWithAI(dayExercises, dayLabel) {
+  const catalog = MOBILITY_DRILLS.map((d) => `${d.key}: ${d.name} (${d.dur})`).join("\n");
+  const exList = (dayExercises || []).map((e) => `${e.name} (${e.muscle})`).join(", ") || "sin ejercicios cargados todavía";
+  const prompt = [
+    `Elegí entre 4 y 6 ejercicios de movilidad/activación para calentar ANTES de este día de entrenamiento: "${dayLabel}".`,
+    `Ejercicios de ese día: ${exList}.`,
+    `Sólo podés elegir de este catálogo fijo (usá la KEY exacta tal cual está escrita, nunca inventes otra):`,
+    catalog,
+    `Priorizá los músculos/movimientos que va a usar ese día. Devolvé ÚNICAMENTE un array JSON de keys, sin texto adicional ni markdown, por ejemplo: ["jumping_jacks","hip_circles"]`,
+  ].join("\n");
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
+  try {
+    const res = await fetch("/api/ia", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "chat", systemPrompt: "Sos un entrenador experto. Respondés ÚNICAMENTE con JSON válido, sin explicaciones ni bloques de código.", history: [{ role: "user", parts: [{ text: prompt }] }] }), signal: controller.signal });
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => null);
+      throw new Error(errBody?.error || `Error ${res.status}`);
+    }
+    const data = await res.json();
+    const raw = data?.text || "";
+    const first = raw.indexOf("["), last = raw.lastIndexOf("]");
+    if (first === -1 || last === -1 || last <= first) throw new Error("La IA no devolvió una lista válida.");
+    const keys = JSON.parse(raw.slice(first, last + 1));
+    const validKeys = Array.isArray(keys) ? keys.filter((k) => MOBILITY_DRILLS.some((d) => d.key === k)) : [];
+    if (!validKeys.length) throw new Error("La IA no devolvió ejercicios reconocibles.");
+    return validKeys;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 // Tarjeta colapsable de calentamiento general — mismo lenguaje visual que
 // "Ver calentamiento sugerido" (ExerciseCard), pero a nivel de TODA la
 // sesión: se muestra una vez, antes de la lista de ejercicios, con
 // checklist propio (sin persistir: es una guía, no un registro).
-function GeneralWarmupCard({ exercises, accent }) {
+// `warmupKeys`: lista explícita de keys de MOBILITY_DRILLS elegida en el
+// creador de rutinas (ver BuilderDayCard) — si está presente (incluso
+// vacía, para "sin calentamiento en este día") se usa tal cual, en ESE
+// orden. Si es undefined (rutinas viejas, o un día al que nunca se le
+// tocó el calentamiento) se cae al auto-armado de siempre (pickWarmupDrills).
+function GeneralWarmupCard({ exercises, warmupKeys, accent }) {
   const [open, setOpen] = useState(false);
   const [done, setDone] = useState({});
-  const drills = useMemo(() => pickWarmupDrills(exercises), [exercises]);
+  const drills = useMemo(() => {
+    if (Array.isArray(warmupKeys)) {
+      return warmupKeys.map((k) => MOBILITY_DRILLS.find((d) => d.key === k)).filter(Boolean);
+    }
+    return pickWarmupDrills(exercises);
+  }, [exercises, warmupKeys]);
   const doneCount = Object.values(done).filter(Boolean).length;
 
   if (!drills.length) return null;
@@ -5654,8 +5703,14 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
       {/* Calentamiento GENERAL de la sesión (movilidad/activación, 10-15
           min) — distinto del calentamiento POR EJERCICIO que ya existe
           dentro de cada ExerciseCard (esa es la rampa de aproximación al
-          peso de trabajo). Este va una sola vez, antes de arrancar. */}
-      <GeneralWarmupCard exercises={day.exercises} accent={day.color} />
+          peso de trabajo). Este va una sola vez, antes de arrancar.
+          A propósito NO se tapa con el switch "Calentamiento sugerido" de
+          Personalizar ficha (ese controla la rampa por ejercicio, que
+          arranca apagada por default junto con el resto de la ficha) —
+          esta tarjeta es una guía aparte, no un campo de registro, y se
+          probó que taparla dejaba a la mayoría de los perfiles (ficha
+          mínima por default) sin verla nunca. */}
+      <GeneralWarmupCard exercises={day.exercises} warmupKeys={day.warmup} accent={day.color} />
 
       {/* La animación de deslizamiento se dispara reiniciando la clase por
           JS (ver el efecto de slideDir) en vez de con key={activeDay}: usar
@@ -9752,12 +9807,22 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
   // header, por la barra de abajo, da igual) volvía a disparar este
   // efecto en el montaje, reabriendo el modal solo porque la señal vieja
   // técnicamente seguía "prendida".
+  // BUG FIX (pedido: "dejó de abrirse solo, no sé por qué"): ese fix de
+  // arriba había roto el open en sí — onSignalConsumed() se llamaba ACÁ
+  // arriba, ANTES del setTimeout. Eso actualiza openSectionSignal en App
+  // (id:null), lo que cambia la prop de este efecto y hace que React
+  // limpie (clearTimeout) y vuelva a correr el efecto YA, muy antes de
+  // que pasen los 120ms — el timeout que iba a scrollear y abrir el
+  // modal se cancelaba solo, sin llegar a ejecutarse nunca. Ahora
+  // onSignalConsumed se llama DESPUÉS, adentro del propio timeout, una
+  // vez que el scroll y el open ya se dispararon — recién ahí es seguro
+  // avisarle a App que se consumió.
   useEffect(() => {
     if (openSectionSignal.id !== "field-settings-section" || openSectionSignal.n <= 0) return;
-    onSignalConsumed?.();
     const t = setTimeout(() => {
       try { fieldSettingsRowRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); } catch { /* ignorado a propósito */ }
       onOpenFieldPreview?.();
+      onSignalConsumed?.();
     }, 120);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -12481,7 +12546,105 @@ function BuilderExerciseRow({ ex, onRemove, onConfigChange, isDragging = false, 
   );
 }
 
-function BuilderDayCard({ day, dayIdx, totalDays, onRename, onRemove, onMoveDay, onChangeColor, onAddExercise, onAddCustomExercise, onRemoveExercise, onMoveExercise, onConfigExercise, onToggleSuperset, dumbbellDouble = null, onUpdateSettings = null, onDuplicateDay = null }) {
+// Calentamiento por día dentro del creador de rutinas — pedido: elegir
+// los ejercicios a mano, duplicarlo a otros días, un calentamiento
+// distinto por día, y generarlo con IA. `day.warmup` ausente = automático
+// (pickWarmupDrills); en cuanto se toca cualquier casillero pasa a ser
+// una lista propia (ver setDayWarmup en RoutineBuilder).
+function BuilderWarmupSection({ day, onSetWarmup, otherDays = [], onCopyWarmupTo }) {
+  const [open, setOpen] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [genError, setGenError] = useState("");
+  const [showCopyTo, setShowCopyTo] = useState(false);
+  const [copyTargets, setCopyTargets] = useState([]);
+  const isCustom = Array.isArray(day.warmup);
+  const effectiveKeys = useMemo(() => (isCustom ? day.warmup : pickWarmupDrills(day.exercises).map((d) => d.key)), [isCustom, day.warmup, day.exercises]);
+
+  const toggleDrill = (key) => {
+    const next = effectiveKeys.includes(key) ? effectiveKeys.filter((k) => k !== key) : [...effectiveKeys, key];
+    onSetWarmup(next);
+  };
+  const handleGenerate = async () => {
+    setGenerating(true); setGenError("");
+    try {
+      const keys = await generateWarmupWithAI(day.exercises, day.label);
+      onSetWarmup(keys);
+      setOpen(true);
+    } catch (err) {
+      setGenError(err?.message || "No pudimos generar el calentamiento. Probá de nuevo.");
+    } finally {
+      setGenerating(false);
+    }
+  };
+  const toggleCopyTarget = (idx) => setCopyTargets((prev) => (prev.includes(idx) ? prev.filter((i) => i !== idx) : [...prev, idx]));
+  const confirmCopy = () => {
+    if (!copyTargets.length) return;
+    onCopyWarmupTo(copyTargets);
+    setCopyTargets([]);
+    setShowCopyTo(false);
+  };
+
+  return (
+    <div className="mt-2.5 rounded-xl border border-slate-700/40 bg-slate-950/40 overflow-hidden">
+      <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition active:scale-[0.99]">
+        <Flame size={14} className="text-orange-400 shrink-0" />
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-bold text-white">Calentamiento</p>
+          <p className="text-[10px] text-slate-500">{effectiveKeys.length} ejercicio{effectiveKeys.length !== 1 ? "s" : ""}{!isCustom ? " · automático" : ""}</p>
+        </div>
+        <ChevronDown size={14} className={`text-slate-600 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="px-3 pb-3 space-y-2 bounce-in">
+          <div className="flex gap-1.5">
+            <button onClick={handleGenerate} disabled={generating} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-bold bg-orange-500/15 border border-orange-500/30 text-orange-400 transition active:scale-[0.98] disabled:opacity-50">
+              <Sparkles size={12} /> {generating ? "Generando..." : "Generar con IA"}
+            </button>
+            {otherDays.length > 0 && (
+              <button onClick={() => setShowCopyTo((s) => !s)} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-bold bg-slate-800 border border-slate-700 text-slate-300 transition active:scale-[0.98]">
+                <Copy size={12} /> Copiar a otro día
+              </button>
+            )}
+          </div>
+          {genError && <p className="text-[10px] text-rose-400">{genError}</p>}
+          {showCopyTo && (
+            <div className="rounded-lg border border-slate-700/50 bg-slate-900/60 p-2.5 space-y-1.5 bounce-in">
+              <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wide">Copiar este calentamiento a:</p>
+              <div className="flex flex-wrap gap-1.5">
+                {otherDays.length > 1 && (
+                  <button onClick={() => setCopyTargets((prev) => (prev.length === otherDays.length ? [] : otherDays.map((d) => d.idx)))} className={`px-2.5 py-1.5 rounded-lg text-[10.5px] font-bold border transition ${copyTargets.length === otherDays.length ? "bg-orange-500/20 border-orange-500/40 text-orange-400" : "bg-slate-800 border-slate-700 text-slate-400"}`}>
+                    {copyTargets.length === otherDays.length ? "Ninguno" : "Todos"}
+                  </button>
+                )}
+                {otherDays.map((d) => (
+                  <button key={d.idx} onClick={() => toggleCopyTarget(d.idx)} className={`px-2.5 py-1.5 rounded-lg text-[10.5px] font-bold border transition ${copyTargets.includes(d.idx) ? "bg-orange-500/20 border-orange-500/40 text-orange-400" : "bg-slate-800 border-slate-700 text-slate-400"}`}>
+                    {d.label || "Día"}
+                  </button>
+                ))}
+              </div>
+              <button onClick={confirmCopy} disabled={!copyTargets.length} className="w-full py-1.5 rounded-lg text-[10.5px] font-bold bg-orange-500 !text-white disabled:opacity-40">Copiar</button>
+            </div>
+          )}
+          <div className="space-y-1">
+            {MOBILITY_DRILLS.map((d) => {
+              const on = effectiveKeys.includes(d.key);
+              return (
+                <label key={d.key} className="flex items-center gap-2 py-1 cursor-pointer select-none">
+                  <input type="checkbox" checked={on} onChange={() => toggleDrill(d.key)} className="w-3.5 h-3.5 shrink-0 rounded accent-orange-500" />
+                  <span className={`flex-1 text-[11px] ${on ? "text-white" : "text-slate-500"}`}>{d.name}</span>
+                  <span className="text-[9px] text-slate-600 shrink-0">{d.dur}</span>
+                </label>
+              );
+            })}
+          </div>
+          <p className="text-[9.5px] text-slate-600">{isCustom ? "Elegido a mano — se guarda con la rutina." : "Automático según los músculos del día — tocá cualquiera para personalizarlo."}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BuilderDayCard({ day, dayIdx, totalDays, otherDays = [], onRename, onRemove, onMoveDay, onChangeColor, onAddExercise, onAddCustomExercise, onRemoveExercise, onMoveExercise, onConfigExercise, onToggleSuperset, onSetWarmup = null, onCopyWarmupTo = null, dumbbellDouble = null, onUpdateSettings = null, onDuplicateDay = null }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [colorPickerOpen, setColorPickerOpen] = useState(false);
 
@@ -12736,6 +12899,9 @@ function BuilderDayCard({ day, dayIdx, totalDays, onRename, onRemove, onMoveDay,
           {day.exercises.length < 4 ? "Recomendado: entre 4 y 8 ejercicios por sesión." : day.exercises.length > 10 ? "Es bastante para una sola sesión, capaz conviene dividirlo en otro día." : "Buena cantidad de ejercicios para la sesión."}
         </p>
       )}
+      {day.exercises.length > 0 && onSetWarmup && (
+        <BuilderWarmupSection day={day} onSetWarmup={onSetWarmup} otherDays={otherDays} onCopyWarmupTo={onCopyWarmupTo} />
+      )}
     </div>
   );
 }
@@ -12783,6 +12949,7 @@ function builderDaysFromRoutineDef(routineDef) {
       key: dk,
       label: d.label,
       color: d.color,
+      warmup: Array.isArray(d.warmup) ? d.warmup : undefined,
       exercises: (d.exercises || []).map((entry) => {
         if (entry.libId) {
           const lib = EXERCISE_LIBRARY_BY_ID[entry.libId];
@@ -12833,6 +13000,30 @@ function matchExerciseToLibrary(rawName) {
     }
   });
   return bestScore >= 4 ? best : null;
+}
+
+// Mismo criterio que matchExerciseToLibrary, pero contra el catálogo FIJO
+// de MOBILITY_DRILLS (16 ejercicios de movilidad) — lo usa la acción
+// generar_calentamiento del chat para convertir los NOMBRES que devuelve
+// la IA en las keys que espera GeneralWarmupCard/day.warmup.
+function matchDrillsToKeys(rawNames) {
+  return (Array.isArray(rawNames) ? rawNames : [])
+    .map((raw) => {
+      const norm = normalizeExerciseText(raw);
+      if (!norm) return null;
+      let best = MOBILITY_DRILLS.find((d) => normalizeExerciseText(d.name) === norm);
+      if (best) return best.key;
+      let bestScore = 0, bestMatch = null;
+      MOBILITY_DRILLS.forEach((d) => {
+        const dn = normalizeExerciseText(d.name);
+        if (dn.includes(norm) || norm.includes(dn)) {
+          const score = Math.min(dn.length, norm.length);
+          if (score > bestScore) { bestScore = score; bestMatch = d; }
+        }
+      });
+      return bestScore >= 4 ? bestMatch.key : null;
+    })
+    .filter(Boolean);
 }
 
 // Igual criterio que matchExerciseToLibrary (nombre exacto primero, si no
@@ -13446,6 +13637,36 @@ function buildActionPlan(action, ctx) {
       },
     };
   }
+  // Pedido: "que se lo puedas pedir al chatbot" (el calentamiento) — arma
+  // la tarjeta "Calentamiento general" de un día de la rutina activa
+  // (ver GeneralWarmupCard/day.warmup). Mismo mecanismo que
+  // BuilderWarmupSection: guarda una lista de keys del catálogo fijo
+  // MOBILITY_DRILLS, convertida acá desde los NOMBRES que devuelve la IA.
+  if (action.type === "generar_calentamiento") {
+    const activeId = profile?.activeRoutineId;
+    const activeDef = activeId ? resolveRoutineDef(profile?.routines?.[activeId], activeId) : null;
+    if (!activeDef || !onActivateRoutine) return null;
+    const wantedDay = String(action.day || "").toLowerCase().trim();
+    const dayKey = wantedDay
+      ? Object.keys(activeDef.days || {}).find((dk) => (activeDef.days[dk]?.label || "").toLowerCase().includes(wantedDay))
+      : activeDef.dayOrder?.[0];
+    if (!dayKey || !activeDef.days[dayKey]) return null;
+    const keys = matchDrillsToKeys(action.drills);
+    if (!keys.length) return null;
+    const dayLabel = activeDef.days[dayKey].label;
+    const drillNames = keys.map((k) => MOBILITY_DRILLS.find((d) => d.key === k)?.name).filter(Boolean);
+    const clone = cloneRoutineDef(activeDef);
+    clone.days[dayKey] = { ...clone.days[dayKey], warmup: keys };
+    if (clone.source === "preset") clone.source = "custom";
+    return {
+      kind: "warmup",
+      title: `Calentamiento de "${dayLabel}"`,
+      items: drillNames,
+      warmupPreview: { dayLabel, drillNames },
+      confirmLabel: "Guardar calentamiento",
+      confirm: () => onActivateRoutine(activeId, clone),
+    };
+  }
   // Nota personal de un ejercicio — mismo campo que "Agregar nota" en la
   // ficha de la serie (ver SetRow); se guarda en la serie 1, que es la que
   // las demás heredan si no tienen nota propia.
@@ -13676,6 +13897,26 @@ function WeeklyPlanPreview({ week, entries }) {
   );
 }
 
+// generar_calentamiento: mismo formato de lista que WeeklyPlanPreview,
+// en naranja (mismo tono que el ícono de Calentamiento en Rutina/el
+// creador de rutinas) para diferenciarse de las demás propuestas.
+function WarmupPlanPreview({ dayLabel, drillNames }) {
+  const accent = "#F97316";
+  return (
+    <div className="rounded-xl border overflow-hidden" style={{ borderColor: tint(accent, "30"), backgroundColor: tint(accent, "08") }}>
+      <div className="flex items-center gap-2 px-3 py-2 border-b" style={{ borderColor: tint(accent, "20") }}>
+        <Flame size={13} style={{ color: accent }} className="shrink-0" />
+        <span className="text-[11px] font-black text-white flex-1 min-w-0 truncate">Calentamiento · {dayLabel}</span>
+      </div>
+      <div className="px-3 py-2 space-y-1">
+        {drillNames.map((name, i) => (
+          <p key={i} className="text-[11.5px] text-slate-300"><span style={{ color: accent }}>•</span> {name}</p>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // config_*: cada campo que cambia como una fila con ícono, mismo lenguaje
 // que las filas de ajustes de Perfil — de un vistazo se ve QUÉ cambia y a
 // QUÉ valor, no solo una frase.
@@ -13789,6 +14030,7 @@ Tipos disponibles:
 - corregir_record: {"type":"corregir_record","exercise":"Press Banca","reps":10,"kg":90,"setIndex":0} — corrige a mano el récord (PR) guardado de un ejercicio, para cuando el historial no refleja su marca real. "setIndex" es opcional (0 = primera serie del ejercicio).
 - planificar_progresion: {"type":"planificar_progresion","exercise":"Press Banca","setIndex":0,"metas":[{"semana":1,"kg":80,"reps":5},{"semana":2,"kg":82.5,"reps":5}]} — ayuda a planificar CUÁNTO PESO levantar cada semana del ciclo en una serie puntual de un ejercicio de SU RUTINA ACTIVA (no crea rutina, sólo carga a qué apuntar semana a semana — la sección "rutina planificada"/"marca a alcanzar" que ya existe en la app). Usalo cuando pida ayuda con la progresión de pesos ("armame una progresión de sentadilla del 80 al 100 en 6 semanas", "subime 2.5kg por semana en press militar"). El ejercicio tiene que estar en su rutina activa (mirá los días/ejercicios en el contexto) y "setIndex" identifica CUÁL de sus series (0 = primera) — si no da detalles de cuál, usá la primera y avisale. Cubrí TODAS las semanas de su ciclo que tenga sentido planificar (mirá "trainWeeks"/settings en el contexto), no sólo una o dos, salvo que pida un tramo puntual. Si no te da un punto de partida o de llegada, preguntá antes de inventar números.
 - planificar_semana: {"type":"planificar_semana","semana":3,"sets":[{"exercise":"Press Banca","setIndex":0,"kg":82.5,"reps":8},{"exercise":"Sentadilla","setIndex":0,"kg":100,"reps":5},{"exercise":"Cinta","setIndex":0,"minutes":20}]} — a diferencia de planificar_progresion (una serie puntual, muchas semanas), esto carga de una sola vez las metas de kg×reps (o "minutes" en vez de "kg"/"reps" si es un ejercicio de cardio) de VARIAS series de SU RUTINA ACTIVA para UNA SOLA semana — pensado para "planificame la semana"/"armame las cargas de esta semana", cuando quiere ver de entrada el plan de varios ejercicios juntos, no uno por uno. "semana" es opcional: si no la das, se usa la semana real de hoy (mirá "semanaActualDelCiclo" en el contexto) — especificala sólo si pidió explícitamente otra semana ("la que viene", "la semana 4"). Basate en su historial reciente y en "analisisEntrenamiento" del contexto para proponer números con sentido (progresión leve sobre lo último que hizo en cada serie, nunca un salto brusco ni copiar el récord de otro ejercicio) — si no tenés ningún dato de un ejercicio para basarte, no lo incluyas en "sets" en vez de inventar un número. Cubrí los ejercicios que la persona pida, o todos los de su rutina activa si no especifica cuáles.
+- generar_calentamiento: {"type":"generar_calentamiento","day":"nombre o parte del nombre del día (opcional, si no da usa el primero de su rutina activa)","drills":["Saltos de tijera","Círculos de cadera","Sentadilla sin peso"]} — arma la tarjeta "Calentamiento general" de un día de SU RUTINA ACTIVA (la guía de movilidad de 10-15 min que aparece ANTES de la lista de ejercicios de ese día, distinta de la rampa de aproximación por ejercicio). Elegí SIEMPRE entre 4 y 6 de estos ejercicios fijos — no inventes otros, tienen que ser EXACTAMENTE estos nombres: Saltos de tijera, Gato-camello (columna), Círculos de brazos, Jalón de banda o toalla al pecho, Dislocados de hombro (palo o banda), Rotación externa de hombro, Flexiones escapulares, Círculos de cadera, Balanceo de pierna (adelante/atrás y lateral), Sentadilla sin peso, Zancadas caminando, Puente de glúteo, Círculos de tobillo, Dead bug (activación de core), Bird-dog, Rotaciones de torso de pie. Priorizá los que activen los músculos que va a usar ese día (mirá sus ejercicios en el contexto). Usalo para "armame un calentamiento", "qué hago de entrada en [día]", etc.
 - nota_ejercicio: {"type":"nota_ejercicio","exercise":"Sentadilla","nota":"cuidado con la rodilla derecha"} — guarda (o si "nota" viene vacío, borra) la nota personal de ese ejercicio, la misma que se ve al registrar la serie.
 - restablecer_dia: {"type":"restablecer_dia","day":"nombre o parte del nombre del día (opcional)"} — borra las marcas de HOY de ese día de la rutina normal (no toca otros días, ni récords, ni marcas de descarga). Si no da el día, usa el primero de la rutina activa. Usalo para "reiniciá mi día" o si se equivocó al cargar algo y quiere volver a empezar.
 - cambiar_dia_semana: {"type":"cambiar_dia_semana","diaSemana":"lunes"|"martes"|"miercoles"|"jueves"|"viernes"|"sabado"|"domingo","dia":"nombre o parte del nombre del día de la rutina, o vacío/omitido para dejarlo como descanso"} — asigna (o saca) qué día de su rutina le toca en ese día de la semana, el mismo cronograma de Rutinas → Cronograma semanal.
@@ -14500,6 +14742,7 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
             { icon: <Target size={16} />, label: "Punto débil", prompt: "Mirando mis rangos por músculo, ¿cuál es mi punto más débil y cómo lo ataco?", autoSend: true },
             { icon: <Zap size={16} />, label: "Plan de hoy", prompt: "¿Qué me toca entrenar hoy y con qué pesos me conviene arrancar?", autoSend: true },
             { icon: <ClipboardCheck size={16} />, label: "Planificar semana", prompt: "Planificame las cargas de esta semana para toda mi rutina activa, basándote en mi historial reciente", autoSend: true },
+            { icon: <Flame size={16} />, label: "Calentamiento", prompt: "Armame un calentamiento general para mi día de hoy", autoSend: true },
             { icon: <Calendar size={16} />, label: "Ciclo y descarga", prompt: "¿Cómo vengo en el ciclo actual? ¿Cuándo me toca la descarga?", autoSend: true },
             { icon: <Save size={16} />, label: "Anotar una marca", askExercise: true },
             { icon: <FileDown size={16} />, label: "Exportar rutina", prompt: "Pasame mi rutina activa en PDF", autoSend: true },
@@ -14650,6 +14893,8 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
                   <div className="mb-3"><ProgressionPlanPreview {...m.plan.progressionPreview} /></div>
                 ) : m.plan.kind === "weeklyPlan" && m.plan.weeklyPlanPreview ? (
                   <div className="mb-3"><WeeklyPlanPreview {...m.plan.weeklyPlanPreview} /></div>
+                ) : m.plan.kind === "warmup" && m.plan.warmupPreview ? (
+                  <div className="mb-3"><WarmupPlanPreview {...m.plan.warmupPreview} /></div>
                 ) : m.plan.kind === "settings" && m.plan.settingsChanges?.length ? (
                   <div className="mb-3"><SettingsChangePreview changes={m.plan.settingsChanges} /></div>
                 ) : (
@@ -15384,6 +15629,7 @@ function RoutineBuilder({ initialRoutine, onCancel, onSave, dumbbellDouble = nul
         label: `${orig.label} (copia)`,
         color: BUILDER_COLOR_PALETTE[d.length % BUILDER_COLOR_PALETTE.length],
         exercises: cloneRoutineDef(orig.exercises || []),  // copia profunda, mismos ids
+        warmup: Array.isArray(orig.warmup) ? cloneRoutineDef(orig.warmup) : undefined,
       };
       const nuevo = [...d];
       nuevo.splice(idx + 1, 0, copia); // la copia va justo después del original
@@ -15462,6 +15708,25 @@ function RoutineBuilder({ initialRoutine, onCancel, onSave, dumbbellDouble = nul
     ...day, exercises: day.exercises.map((e, j) => (j === exIdx ? { ...e, supersetNext: !e.supersetNext } : e)),
   })));
 
+  // Calentamiento por día — pedido: "que se puedan elegir los ejercicios
+  // en el creador de rutinas... y que se le pueda asignar un
+  // calentamiento distinto a cada día". `keys` es un array de keys de
+  // MOBILITY_DRILLS (puede ser vacío, para "sin calentamiento acá").
+  const setDayWarmup = (dayIdx, keys) => setDays((d) => d.map((day, i) => (i !== dayIdx ? day : { ...day, warmup: keys })));
+  // Pedido: "que se pueda duplicar para hacer el mismo calentamiento
+  // todos los días" — copia la lista del día de origen a uno o más
+  // destinos. Si el origen todavía no tiene un calentamiento propio
+  // (sigue en automático), se copia el resultado del auto-armado actual
+  // en vez de "nada", para que "duplicar" siempre se sienta como
+  // "repetir lo que ya se ve", nunca como vaciar el destino.
+  const copyWarmupTo = (fromIdx, toIdxs) => {
+    const from = days[fromIdx];
+    if (!from) return;
+    const keys = Array.isArray(from.warmup) ? from.warmup : pickWarmupDrills(from.exercises).map((dr) => dr.key);
+    setDays((d) => d.map((day, i) => (toIdxs.includes(i) ? { ...day, warmup: [...keys] } : day)));
+    haptic(15);
+  };
+
   const handleSave = () => {
     if (!name.trim()) { setError("Ponele un nombre a tu rutina."); return; }
     if (!days.length) { setError("Agregá al menos un día."); return; }
@@ -15474,6 +15739,10 @@ function RoutineBuilder({ initialRoutine, onCancel, onSave, dumbbellDouble = nul
         description: "",
         color: d.color,
         exercises: d.exercises.map((e) => (e.libId ? { libId: e.libId, sets: e.sets, supersetNext: !!e.supersetNext } : { id: e.id, name: e.name, muscle: e.muscle, sets: e.sets, supersetNext: !!e.supersetNext })),
+        // Sólo se guarda si se tocó explícitamente (ver setDayWarmup) —
+        // Firestore rechaza undefined, así que un día que nunca se editó
+        // simplemente no manda el campo y sigue con el auto-armado.
+        ...(Array.isArray(d.warmup) ? { warmup: d.warmup } : {}),
       };
     });
     onSave({ name: name.trim(), source: "custom", description: "Rutina creada por vos.", recommendation: "", dayOrder, days: daysObj, weekSchedule: schedule });
@@ -15494,12 +15763,14 @@ function RoutineBuilder({ initialRoutine, onCancel, onSave, dumbbellDouble = nul
       <div className="space-y-3">
         {days.map((day, idx) => (
           <BuilderDayCard key={day.key} day={day} dayIdx={idx} totalDays={days.length}
+            otherDays={days.map((d, i) => ({ idx: i, label: d.label })).filter((d) => d.idx !== idx)}
             dumbbellDouble={dumbbellDouble} onUpdateSettings={onUpdateSettings}
             onDuplicateDay={() => duplicateDay(idx)}
             onRename={(label) => renameDay(idx, label)} onRemove={() => removeDay(idx)} onMoveDay={(delta) => moveDay(idx, delta)} onChangeColor={(color) => changeDayColor(idx, color)}
             onAddExercise={(libEx) => addExercise(idx, libEx)} onAddCustomExercise={(rawName, muscle) => addCustomExercise(idx, rawName, muscle)}
             onRemoveExercise={(exIdx) => removeExercise(idx, exIdx)} onMoveExercise={(exIdx, delta) => moveExercise(idx, exIdx, delta)}
-            onConfigExercise={(exIdx, cfg) => configExercise(idx, exIdx, cfg)} onToggleSuperset={(exIdx) => toggleSuperset(idx, exIdx)} />
+            onConfigExercise={(exIdx, cfg) => configExercise(idx, exIdx, cfg)} onToggleSuperset={(exIdx) => toggleSuperset(idx, exIdx)}
+            onSetWarmup={(keys) => setDayWarmup(idx, keys)} onCopyWarmupTo={(toIdxs) => copyWarmupTo(idx, toIdxs)} />
         ))}
       </div>
 
@@ -16123,11 +16394,21 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
   // vez que volvías a Rutinas (por cualquier camino, no sólo el aviso
   // original) este efecto se disparaba de nuevo en el montaje, abriendo el
   // cronograma solo porque la señal vieja seguía técnicamente "prendida".
+  // BUG FIX (mismo caso que el de "Personalizar qué ves al registrar" en
+  // Perfil): onSignalConsumed() estaba ANTES del setTimeout, así que
+  // actualizaba openSectionSignal en App de inmediato — eso cambia la
+  // prop de este efecto, React limpia (clearTimeout) y corre el efecto
+  // de nuevo YA, cancelando el scroll antes de que llegaran los 150ms.
+  // El cronograma igual se abría (setShowSchedule ya corrió antes),
+  // pero nunca scrolleaba hasta él. Ahora onSignalConsumed se llama
+  // adentro del propio timeout, después del scroll.
   useEffect(() => {
     if (openScheduleSignal <= 0) return;
     setShowSchedule(true);
-    const t = setTimeout(() => { try { scheduleRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); } catch { /* ignorado a propósito */ } }, 150);
-    onSignalConsumed?.();
+    const t = setTimeout(() => {
+      try { scheduleRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); } catch { /* ignorado a propósito */ }
+      onSignalConsumed?.();
+    }, 150);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openScheduleSignal]);
