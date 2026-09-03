@@ -1138,6 +1138,34 @@ function applyProgressionToRoutine(routineDef, planOrPlans) {
   return clone;
 }
 
+// Variante de applyProgressionToRoutine para "planificar mi semana": en vez
+// de reemplazar TODO el plannedProgression de una serie (que borraría
+// semanas futuras ya cargadas a mano o por planificar_progresion), cada
+// entrada de `weekPlans` toca UNA sola semana de UNA sola serie — se
+// reemplaza esa semana puntual si ya existía y se preservan todas las
+// demás. `weekPlans` es un array de {exerciseId, setIndex, week, kg, reps}
+// o {exerciseId, setIndex, week, minutes} para ejercicios de cardio.
+function applyWeeklyPlanToRoutine(routineDef, weekPlans) {
+  const clone = cloneRoutineDef(routineDef);
+  weekPlans.forEach((plan) => {
+    clone.dayOrder.forEach((dk) => {
+      const ex = clone.days[dk]?.exercises?.find((entry) => {
+        const lib = entry.libId ? EXERCISE_LIBRARY_BY_ID[entry.libId] : null;
+        const effectiveId = entry.idOverride || (lib ? lib.id : entry.id);
+        return effectiveId === plan.exerciseId;
+      });
+      if (ex?.sets?.[plan.setIndex]) {
+        const prevEntries = Array.isArray(ex.sets[plan.setIndex].plannedProgression) ? ex.sets[plan.setIndex].plannedProgression : [];
+        const entry = plan.minutes != null ? { week: plan.week, minutes: plan.minutes } : { week: plan.week, kg: plan.kg, reps: plan.reps };
+        const nextEntries = [...prevEntries.filter((p) => p.week !== plan.week), entry].sort((a, b) => a.week - b.week);
+        ex.sets[plan.setIndex] = { ...ex.sets[plan.setIndex], plannedProgression: nextEntries };
+      }
+    });
+  });
+  if (clone.source === "preset") clone.source = "custom";
+  return clone;
+}
+
 /* ============================================================================
    PLANTILLAS DE PROGRESIÓN SEMANAL — ProgressionProposalComposer las usa
    para autocompletar las `weeks` semanas de una sola vez a partir de un
@@ -10523,20 +10551,34 @@ function RoutineProposalCard({ proposal, basic, onRespond }) {
 // — atajo directo, sin tener que entrar al perfil del alumno primero como
 // exige hoy el flujo normal de "Proponer rutina". Reusa createRoutineProposal
 // tal cual, sólo cambia CÓMO se llega hasta ahí.
+// Pedido: "más facilidades con planificar rutinas de alumno" — antes sólo
+// se podía elegir UN alumno por envío, así que mandarle la misma plantilla
+// a varios obligaba a reabrir este modal una vez por cada uno. Ahora es
+// selección múltiple (checkboxes + "Todos"): un solo toque en "Enviar"
+// manda la propuesta a todos los elegidos en paralelo.
 function SendTemplateModal({ template, studentsAccepted, basics, myUid, onClose, onSent }) {
   useAndroidBack(onClose);
-  const [selectedStudentUid, setSelectedStudentUid] = useState(studentsAccepted[0]?.studentUid || null);
+  const [selectedUids, setSelectedUids] = useState(() => new Set(studentsAccepted[0] ? [studentsAccepted[0].studentUid] : []));
   const [note, setNote] = useState("");
   const [sending, setSending] = useState(false);
+  const [failedNames, setFailedNames] = useState([]);
+  const allSelected = studentsAccepted.length > 0 && selectedUids.size === studentsAccepted.length;
+  const toggleUid = (uid) => setSelectedUids((prev) => {
+    const next = new Set(prev);
+    if (next.has(uid)) next.delete(uid); else next.add(uid);
+    return next;
+  });
+  const toggleAll = () => setSelectedUids(allSelected ? new Set() : new Set(studentsAccepted.map((l) => l.studentUid)));
   const handleSubmit = async () => {
-    if (!selectedStudentUid) return;
+    if (!selectedUids.size) return;
     setSending(true);
-    try {
-      await createRoutineProposal(myUid, selectedStudentUid, template.def, note.trim());
-      onSent();
-    } finally {
-      setSending(false);
-    }
+    setFailedNames([]);
+    const targets = Array.from(selectedUids);
+    const results = await Promise.allSettled(targets.map((uid) => createRoutineProposal(myUid, uid, template.def, note.trim())));
+    const failed = targets.filter((uid, i) => results[i].status === "rejected").map((uid) => basics[uid]?.name || basics[uid]?.username || "un alumno");
+    setSending(false);
+    if (failed.length) { setFailedNames(failed); return; }
+    onSent();
   };
   if (typeof document === "undefined") return null;
   return createPortal(
@@ -10554,14 +10596,19 @@ function SendTemplateModal({ template, studentsAccepted, basics, myUid, onClose,
         ) : (
           <>
             <div>
-              <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Alumno</label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Alumnos</label>
+                {studentsAccepted.length > 1 && (
+                  <button onClick={toggleAll} className="text-[10px] font-bold text-purple-400 hover:text-purple-300 transition">{allSelected ? "Ninguno" : "Todos"}</button>
+                )}
+              </div>
               <div className="space-y-1.5">
                 {studentsAccepted.map((l) => {
                   const b = basics[l.studentUid];
-                  const on = selectedStudentUid === l.studentUid;
+                  const on = selectedUids.has(l.studentUid);
                   return (
-                    <button key={l.id} onClick={() => setSelectedStudentUid(l.studentUid)} className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-left transition ${on ? "bg-purple-500/15 border border-purple-500/40" : "bg-slate-800/50 border border-slate-700/40 hover:border-slate-600"}`}>
-                      <span className={`w-4 h-4 rounded-full border-2 shrink-0 ${on ? "border-purple-400 bg-purple-400" : "border-slate-600"}`} />
+                    <button key={l.id} onClick={() => toggleUid(l.studentUid)} className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-left transition ${on ? "bg-purple-500/15 border border-purple-500/40" : "bg-slate-800/50 border border-slate-700/40 hover:border-slate-600"}`}>
+                      <span className={`w-4 h-4 rounded-md border-2 shrink-0 flex items-center justify-center ${on ? "border-purple-400 bg-purple-400" : "border-slate-600"}`}>{on && <Check size={11} className="text-white" strokeWidth={3} />}</span>
                       <span className="text-sm text-white truncate">{b?.name || b?.username || "Alumno"}</span>
                     </button>
                   );
@@ -10573,7 +10620,12 @@ function SendTemplateModal({ template, studentsAccepted, basics, myUid, onClose,
               <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} maxLength={200} placeholder="Ej: arrancá la próxima semana..."
                 className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-3.5 py-2.5 text-white text-sm focus:outline-none resize-none" />
             </div>
-            <button onClick={handleSubmit} disabled={sending || !selectedStudentUid} className="w-full py-3 rounded-xl bg-purple-500 !text-white text-sm font-bold disabled:opacity-40">{sending ? "Enviando..." : "Enviar propuesta"}</button>
+            {failedNames.length > 0 && (
+              <p className="text-[11px] text-rose-400">No se pudo enviar a: {failedNames.join(", ")}. Probá de nuevo.</p>
+            )}
+            <button onClick={handleSubmit} disabled={sending || !selectedUids.size} className="w-full py-3 rounded-xl bg-purple-500 !text-white text-sm font-bold disabled:opacity-40">
+              {sending ? "Enviando..." : selectedUids.size > 1 ? `Enviar a ${selectedUids.size} alumnos` : "Enviar propuesta"}
+            </button>
           </>
         )}
       </div>
@@ -11759,7 +11811,9 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
             </button>
           )}
         </div>
-        <p className="relative text-xs text-purple-300/70 mt-3">Sumá amigos, competí en el ranking y compartí tu progreso con quien entrena con vos.</p>
+        {/* Pedido: "el texto es muy largo, máximo un renglón" — antes eran
+            dos frases completas que siempre pisaban una segunda línea. */}
+        <p className="relative text-xs text-purple-300/70 mt-3 truncate">Sumá amigos, competí y compartí tu progreso.</p>
         {profile?.username && (
           <button onClick={() => setShowShareProfile(true)} className="relative w-full flex items-center justify-center gap-1.5 mt-4 pt-3 border-t border-white/10 text-[10px] font-bold text-purple-300/75 hover:text-purple-300 transition">
             <QrCode size={11} /> Compartir mi perfil <ChevronRight size={11} />
@@ -11768,13 +11822,22 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
       </div>
 
       {/* Pedido: "un recuadro entre el superior de Social y los logros,
-          acortador para la creación de rutinas [para alumnos]". */}
-      <TrainerTemplatesCard
-        templates={trainerRoutineTemplates}
-        onCreate={() => { setEditingTemplateId(null); setShowTemplateBuilder(true); }}
-        onEdit={(id) => { setEditingTemplateId(id); setShowTemplateBuilder(true); }}
-        onSend={(id, def) => setSendingTemplate({ id, def })}
-      />
+          acortador para la creación de rutinas [para alumnos]".
+          BUG FIX (pedido: "más facilidades con planificar rutinas de
+          alumno"): antes esta tarjeta aparecía SIEMPRE, incluso para quien
+          nunca fue entrenador de nadie — invitaba a crear plantillas para
+          alumnos que no existen. Ahora sólo se muestra si ya tenés al
+          menos un alumno vinculado, o si ya armaste alguna plantilla antes
+          (para no esconderle su propio trabajo a alguien que después se
+          quedó sin alumnos). */}
+      {(studentsAccepted.length > 0 || Object.keys(trainerRoutineTemplates).length > 0) && (
+        <TrainerTemplatesCard
+          templates={trainerRoutineTemplates}
+          onCreate={() => { setEditingTemplateId(null); setShowTemplateBuilder(true); }}
+          onEdit={(id) => { setEditingTemplateId(id); setShowTemplateBuilder(true); }}
+          onSend={(id, def) => setSendingTemplate({ id, def })}
+        />
+      )}
 
       <SocialProgressStats profile={profile} />
 
@@ -12062,7 +12125,7 @@ const PRESET_CONTEXTO = {
 function PresetRoutineCard({ preset, isActive, onPreview }) {
   const dayCount = preset.dayOrder.length;
   const ctx = PRESET_CONTEXTO[preset.id] || null;
-  const accent = "#38BDF8"; // celeste fijo — esta tarjeta es de Rutinas, no del día
+  const accent = "#3B82F6"; // azul fijo (pedido: "cambiar el celeste de rutinas por azul") — esta tarjeta es de Rutinas, no del día
   // Pulso al activar: solo en el momento exacto en que pasa a ser la activa.
   const [recienActivada, setRecienActivada] = useState(false);
   const antesActivaRef = useRef(isActive);
@@ -12091,7 +12154,7 @@ function PresetRoutineCard({ preset, isActive, onPreview }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <h4 className="text-sm font-bold text-white leading-snug" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{preset.name}</h4>
-            {isActive && <span className="text-[9px] font-black px-1.5 py-0.5 rounded-lg bg-sky-500/20 text-sky-400 shrink-0 badge-pop">ACTIVA</span>}
+            {isActive && <span className="text-[9px] font-black px-1.5 py-0.5 rounded-lg bg-blue-500/20 text-blue-400 shrink-0 badge-pop">ACTIVA</span>}
           </div>
           <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-2">{preset.description}</p>
           <p className="text-[10px] text-slate-600 mt-1.5">{ctx?.frecuencia || `${dayCount} día${dayCount === 1 ? "" : "s"}/semana`}</p>
@@ -12106,8 +12169,9 @@ function SavedRoutineRow({ routine, isActive, onUse, onEdit, onShare, onArchive,
   const dayCount = routine.dayOrder.length;
   // BUG FIX (pedido: "que las no activas estén del celeste característico
   // de la pestaña"): antes las inactivas usaban índigo, sin relación con
-  // ningún color de la app — Rutinas (esta pestaña, plural) es celeste.
-  const accent = isActive ? "#14B8A6" : "#38BDF8"; // teal si activa, celeste (Rutinas) si no
+  // ningún color de la app — Rutinas (esta pestaña, plural) era celeste.
+  // Pedido posterior: "cambiar el celeste de rutinas por azul".
+  const accent = isActive ? "#14B8A6" : "#3B82F6"; // teal si activa, azul (Rutinas) si no
   return (
     <SwipeToArchive confirmText={`¿Eliminar "${routine.name}"? No se puede deshacer.`} onArchive={onArchive}>
       <div className={`stagger-item smooth-card rounded-2xl px-4 py-3.5 backdrop-blur-sm shadow-md transition-shadow hover:shadow-lg ${isActive ? "border-2" : "border border-slate-800/50 bg-slate-900/50"}`}
@@ -12133,7 +12197,7 @@ function SavedRoutineRow({ routine, isActive, onUse, onEdit, onShare, onArchive,
           </button>
           {!isActive && <button onClick={onUse} className="px-3 py-1.5 rounded-lg text-xs font-bold shrink-0 transition" style={{ backgroundColor: tint(accent, "18"), color: accent }}>Activar</button>}
           <button onClick={onShare} aria-label="Compartir" className="p-2 rounded-lg text-slate-500 hover:text-cyan-400 shrink-0"><Share2 size={14} /></button>
-          <button onClick={onEdit} aria-label="Editar" className="p-2 rounded-lg text-slate-500 hover:text-sky-400 shrink-0"><Edit3 size={14} /></button>
+          <button onClick={onEdit} aria-label="Editar" className="p-2 rounded-lg text-slate-500 hover:text-blue-400 shrink-0"><Edit3 size={14} /></button>
         </div>
       </div>
     </SwipeToArchive>
@@ -13007,7 +13071,7 @@ function wouldBeNewPR(profile, exerciseId, setIndex, kg, reps) {
 // "activar_rutina" con un nombre que no existe), devuelve null — en ese
 // caso no se muestra ninguna tarjeta, sólo el texto del mensaje.
 function buildActionPlan(action, ctx) {
-  const { profile, settings, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement, onLogSet, onDeleteRoutine, onNavigate, onStartSession, onEndSession } = ctx;
+  const { profile, settings, cycleStart, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement, onLogSet, onDeleteRoutine, onNavigate, onStartSession, onEndSession } = ctx;
   if (action.type === "crear_rutina") {
     // BUG FIX: mismo caso que ImportRoutineModal/el wizard — filtrar
     // días/ejercicios null antes de leer sus campos, para que un elemento
@@ -13311,6 +13375,57 @@ function buildActionPlan(action, ctx) {
       },
     };
   }
+  // Pedido: "poder pedirle a la IA que planifique mi semana (cargas)" —
+  // a diferencia de planificar_progresion (una serie puntual, muchas
+  // semanas del ciclo), esto carga MUCHAS series de la rutina activa de
+  // una sola vez, todas apuntando a LA MISMA semana (por defecto la
+  // semana real de hoy, calculada acá y no por la IA — ver
+  // "semanaActualDelCiclo" en el contexto). Usa applyWeeklyPlanToRoutine
+  // (no applyProgressionToRoutine) para no pisar progresiones multi-semana
+  // que ya existieran en esas mismas series.
+  if (action.type === "planificar_semana") {
+    const activeId = profile?.activeRoutineId;
+    const activeDef = activeId ? resolveRoutineDef(profile?.routines?.[activeId], activeId) : null;
+    if (!activeDef || !onActivateRoutine) return null;
+    const trainWeeks = settings?.trainWeeks || TRAIN_WEEKS;
+    const wi = cycleStart ? getWeekInfo(cycleStart, settings) : null;
+    let week = Number.isInteger(action.semana) ? action.semana : (wi?.weekInCycle || 1);
+    week = Math.max(1, Math.min(trainWeeks, week));
+    const model = buildRoutineModel(activeDef);
+    const items = [];
+    const weekPlans = (Array.isArray(action.sets) ? action.sets : [])
+      .map((s) => {
+        if (!s || typeof s !== "object") return null;
+        const setIndex = Number.isInteger(s.setIndex) && s.setIndex >= 0 ? s.setIndex : 0;
+        const exMatch = matchExerciseInRoutineModel(model, s.exercise || "");
+        if (!exMatch || !exMatch.sets?.[setIndex]) return null;
+        if (exMatch.cardio) {
+          const minutes = parseFloat(s.minutes);
+          if (isNaN(minutes) || minutes <= 0) return null;
+          items.push(`${exMatch.name}: ${minutes} min`);
+          return { exerciseId: exMatch.id, setIndex, week, minutes };
+        }
+        const kg = parseFloat(s.kg), reps = parseInt(s.reps, 10);
+        if (isNaN(kg) || kg <= 0 || isNaN(reps) || reps <= 0) return null;
+        items.push(`${exMatch.name} S${setIndex + 1}: ${reps}×${kg}kg`);
+        return { exerciseId: exMatch.id, setIndex, week, kg, reps };
+      })
+      .filter(Boolean);
+    if (!weekPlans.length) return null;
+    const updatedDef = applyWeeklyPlanToRoutine(activeDef, weekPlans);
+    const needsModeSwitch = settings?.trainingMode !== "planned";
+    return {
+      kind: "weeklyPlan",
+      title: `Plan de la semana ${week}`,
+      items,
+      weeklyPlanPreview: { week, entries: items },
+      confirmLabel: "Aplicar plan semanal",
+      confirm: () => {
+        onActivateRoutine(activeId, updatedDef);
+        if (needsModeSwitch && onUpdateSettings) onUpdateSettings({ trainingMode: "planned" });
+      },
+    };
+  }
   // Nota personal de un ejercicio — mismo campo que "Agregar nota" en la
   // ficha de la serie (ver SetRow); se guarda en la serie 1, que es la que
   // las demás heredan si no tienen nota propia.
@@ -13520,6 +13635,27 @@ function ProgressionPlanPreview({ exerciseName, setIndex, entries }) {
   );
 }
 
+// planificar_semana: a diferencia de ProgressionPlanPreview (una serie,
+// muchas semanas), acá es UNA semana con muchas series — se listan todas
+// verticalmente en vez de en chips horizontales, más legible cuando son
+// varios ejercicios de la rutina a la vez.
+function WeeklyPlanPreview({ week, entries }) {
+  const accent = "#38BDF8";
+  return (
+    <div className="rounded-xl border overflow-hidden" style={{ borderColor: tint(accent, "30"), backgroundColor: tint(accent, "08") }}>
+      <div className="flex items-center gap-2 px-3 py-2 border-b" style={{ borderColor: tint(accent, "20") }}>
+        <Target size={13} style={{ color: accent }} className="shrink-0" />
+        <span className="text-[11px] font-black text-white flex-1 min-w-0 truncate">Semana {week} del ciclo</span>
+      </div>
+      <div className="px-3 py-2 space-y-1">
+        {entries.map((label, i) => (
+          <p key={i} className="text-[11.5px] text-slate-300"><span style={{ color: accent }}>•</span> {label}</p>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // config_*: cada campo que cambia como una fila con ícono, mismo lenguaje
 // que las filas de ajustes de Perfil — de un vistazo se ve QUÉ cambia y a
 // QUÉ valor, no solo una frase.
@@ -13632,12 +13768,13 @@ Tipos disponibles:
 - gestionar_rutina: {"type":"gestionar_rutina","op":"eliminar"|"duplicar"|"renombrar","routineName":"nombre o parte del nombre de una rutina guardada","nuevoNombre":"..."} — administra una rutina de su lista (no la activa en pantalla necesariamente). "eliminar" la borra para siempre, avisale que no se puede deshacer. "nuevoNombre" sólo aplica si op="renombrar".
 - corregir_record: {"type":"corregir_record","exercise":"Press Banca","reps":10,"kg":90,"setIndex":0} — corrige a mano el récord (PR) guardado de un ejercicio, para cuando el historial no refleja su marca real. "setIndex" es opcional (0 = primera serie del ejercicio).
 - planificar_progresion: {"type":"planificar_progresion","exercise":"Press Banca","setIndex":0,"metas":[{"semana":1,"kg":80,"reps":5},{"semana":2,"kg":82.5,"reps":5}]} — ayuda a planificar CUÁNTO PESO levantar cada semana del ciclo en una serie puntual de un ejercicio de SU RUTINA ACTIVA (no crea rutina, sólo carga a qué apuntar semana a semana — la sección "rutina planificada"/"marca a alcanzar" que ya existe en la app). Usalo cuando pida ayuda con la progresión de pesos ("armame una progresión de sentadilla del 80 al 100 en 6 semanas", "subime 2.5kg por semana en press militar"). El ejercicio tiene que estar en su rutina activa (mirá los días/ejercicios en el contexto) y "setIndex" identifica CUÁL de sus series (0 = primera) — si no da detalles de cuál, usá la primera y avisale. Cubrí TODAS las semanas de su ciclo que tenga sentido planificar (mirá "trainWeeks"/settings en el contexto), no sólo una o dos, salvo que pida un tramo puntual. Si no te da un punto de partida o de llegada, preguntá antes de inventar números.
+- planificar_semana: {"type":"planificar_semana","semana":3,"sets":[{"exercise":"Press Banca","setIndex":0,"kg":82.5,"reps":8},{"exercise":"Sentadilla","setIndex":0,"kg":100,"reps":5},{"exercise":"Cinta","setIndex":0,"minutes":20}]} — a diferencia de planificar_progresion (una serie puntual, muchas semanas), esto carga de una sola vez las metas de kg×reps (o "minutes" en vez de "kg"/"reps" si es un ejercicio de cardio) de VARIAS series de SU RUTINA ACTIVA para UNA SOLA semana — pensado para "planificame la semana"/"armame las cargas de esta semana", cuando quiere ver de entrada el plan de varios ejercicios juntos, no uno por uno. "semana" es opcional: si no la das, se usa la semana real de hoy (mirá "semanaActualDelCiclo" en el contexto) — especificala sólo si pidió explícitamente otra semana ("la que viene", "la semana 4"). Basate en su historial reciente y en "analisisEntrenamiento" del contexto para proponer números con sentido (progresión leve sobre lo último que hizo en cada serie, nunca un salto brusco ni copiar el récord de otro ejercicio) — si no tenés ningún dato de un ejercicio para basarte, no lo incluyas en "sets" en vez de inventar un número. Cubrí los ejercicios que la persona pida, o todos los de su rutina activa si no especifica cuáles.
 - nota_ejercicio: {"type":"nota_ejercicio","exercise":"Sentadilla","nota":"cuidado con la rodilla derecha"} — guarda (o si "nota" viene vacío, borra) la nota personal de ese ejercicio, la misma que se ve al registrar la serie.
 - restablecer_dia: {"type":"restablecer_dia","day":"nombre o parte del nombre del día (opcional)"} — borra las marcas de HOY de ese día de la rutina normal (no toca otros días, ni récords, ni marcas de descarga). Si no da el día, usa el primero de la rutina activa. Usalo para "reiniciá mi día" o si se equivocó al cargar algo y quiere volver a empezar.
 - cambiar_dia_semana: {"type":"cambiar_dia_semana","diaSemana":"lunes"|"martes"|"miercoles"|"jueves"|"viernes"|"sabado"|"domingo","dia":"nombre o parte del nombre del día de la rutina, o vacío/omitido para dejarlo como descanso"} — asigna (o saca) qué día de su rutina le toca en ese día de la semana, el mismo cronograma de Rutinas → Cronograma semanal.
 - exportar_rutina: {"type":"exportar_rutina","routineName":"nombre o parte del nombre de una rutina guardada (opcional, si no se da usa la activa)"} — genera un PDF de esa rutina (todos los días y ejercicios) y abre la hoja para compartirlo o guardarlo. Usalo para "pasame mi rutina en PDF" o "expórtame la rutina".
 
-Reglas importantes: nunca digas que ya aplicaste el cambio — la persona siempre tiene que confirmarlo desde un botón antes de que se aplique de verdad. Agregá el bloque ###ACCION### sólo si pidió ESE cambio puntual en este mensaje o el anterior, nunca como sugerencia general no pedida. Para registrar_marca, editar_rutina_activa, corregir_record, nota_ejercicio y planificar_progresion, el nombre del ejercicio tiene que ser EXACTAMENTE el mismo texto que aparece en sus "rutinas" (no un nombre genérico ni una variante parecida: si tiene "Sentadilla Búlgara" en su rutina y vos decís "Sentadilla", el botón de confirmar no va a encontrar nada y la persona se queda sin saber por qué) — si no estás segura de a cuál se refiere, preguntá antes de proponer la acción. Para gestionar_rutina y exportar_rutina, el nombre de la rutina tiene que coincidir con una que ya tenga guardada — si hay dudas, preguntá cuál.
+Reglas importantes: nunca digas que ya aplicaste el cambio — la persona siempre tiene que confirmarlo desde un botón antes de que se aplique de verdad. Agregá el bloque ###ACCION### sólo si pidió ESE cambio puntual en este mensaje o el anterior, nunca como sugerencia general no pedida. Para registrar_marca, editar_rutina_activa, corregir_record, nota_ejercicio, planificar_progresion y planificar_semana, el nombre del ejercicio tiene que ser EXACTAMENTE el mismo texto que aparece en sus "rutinas" (no un nombre genérico ni una variante parecida: si tiene "Sentadilla Búlgara" en su rutina y vos decís "Sentadilla", el botón de confirmar no va a encontrar nada y la persona se queda sin saber por qué) — si no estás segura de a cuál se refiere, preguntá antes de proponer la acción. Para gestionar_rutina y exportar_rutina, el nombre de la rutina tiene que coincidir con una que ya tenga guardada — si hay dudas, preguntá cuál.
 
 Cuando necesites que elija entre pocas opciones concretas y cortas para avanzar (por ejemplo: "¿en qué querés enfocarte: fuerza, hipertrofia o resistencia?", "¿qué día armamos, push o pull?"), en vez de listarlas en el texto agregá AL FINAL, en una línea aparte, este bloque (mismas reglas de formato que ###ACCION###: sin markdown alrededor, nada más en esa línea):
 ###PREGUNTA###{"opciones":["Opción A","Opción B","Opción C"]}###FIN###
@@ -13789,7 +13926,7 @@ function trimLogsForAI(logs, historyLimit = AI_LOG_HISTORY_LIMIT, maxKeys = null
   return Object.fromEntries(entries.slice(0, maxKeys));
 }
 
-function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMessages, conversations = [], activeConversationId = null, onNewConversation, onSwitchConversation, onDeleteConversation, onRenameConversation, settings, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement, onDeleteRoutine, onNavigate, onStartSession, onEndSession }) {
+function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMessages, conversations = [], activeConversationId = null, onNewConversation, onSwitchConversation, onDeleteConversation, onRenameConversation, settings, cycleStart, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement, onDeleteRoutine, onNavigate, onStartSession, onEndSession }) {
   // Contexto para reconstruir un plan EN VIVO a partir de la "action" cruda
   // (JSON plano, sí serializable) en vez de depender de la función confirm()
   // guardada en el mensaje — esa función no sobrevive un reload ni el
@@ -13797,9 +13934,9 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
   // (cambiaste de conversación, cerraste la app), buildActionPlan(action,
   // actionCtx) la reconstruye al vuelo con los handlers actuales.
   const actionCtx = useMemo(() => ({
-    profile, settings, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement,
+    profile, settings, cycleStart, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement,
     onLogSet: setLogs, onDeleteRoutine, onNavigate, onStartSession, onEndSession,
-  }), [profile, settings, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement, setLogs, onDeleteRoutine, onNavigate, onStartSession, onEndSession]);
+  }), [profile, settings, cycleStart, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement, setLogs, onDeleteRoutine, onNavigate, onStartSession, onEndSession]);
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [editingIndex, setEditingIndex] = useState(null); // índice del mensaje propio que se está editando
@@ -13936,11 +14073,18 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
       // recientemente — en cascada, hasta que entre, en vez de mandarlo
       // igual y arriesgarse a que el servidor lo rechace (ver el tope de
       // api/ia.js) o tarde mucho más de lo necesario.
+      // Semana actual del ciclo: se la calcula LA APP (no se le pide a la IA
+      // que la deduzca) — planificar_semana la usa como default cuando no
+      // se pide explícitamente otra, así "planificame la semana" siempre
+      // apunta a la semana real de hoy sin que la IA tenga que adivinarla.
+      const weekInfoForAI = cycleStart ? getWeekInfo(cycleStart, settings) : null;
       const buildAiContext = (historyLimit, maxKeys = null) => ({
         perfil: { nombre: profileName, email: profile?.email || null, sexo: profile?.sex || null, edad: profile?.age || null, miembroDesde: profile?.joinedAt || null },
         rutinaActivaId: profile?.activeRoutineId || null,
         rutinas: allRoutines,
         configuracionActual: settings,
+        semanaActualDelCiclo: weekInfoForAI?.weekInCycle || null,
+        esSemanaDeDescarga: weekInfoForAI?.isDeload || false,
         logs: trimLogsForAI(logs, historyLimit, maxKeys),
         // Análisis YA CALCULADO de su entrenamiento: marcas, tendencias,
         // estancamientos, volumen por músculo y adherencia. Con esto la IA
@@ -14335,6 +14479,7 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
             { icon: <BarChart3 size={16} />, label: "Analizar progreso", prompt: "Analizá mi progreso reciente: ¿en qué mejoré y qué tengo estancado?", autoSend: true },
             { icon: <Target size={16} />, label: "Punto débil", prompt: "Mirando mis rangos por músculo, ¿cuál es mi punto más débil y cómo lo ataco?", autoSend: true },
             { icon: <Zap size={16} />, label: "Plan de hoy", prompt: "¿Qué me toca entrenar hoy y con qué pesos me conviene arrancar?", autoSend: true },
+            { icon: <ClipboardCheck size={16} />, label: "Planificar semana", prompt: "Planificame las cargas de esta semana para toda mi rutina activa, basándote en mi historial reciente", autoSend: true },
             { icon: <Calendar size={16} />, label: "Ciclo y descarga", prompt: "¿Cómo vengo en el ciclo actual? ¿Cuándo me toca la descarga?", autoSend: true },
             { icon: <Save size={16} />, label: "Anotar una marca", askExercise: true },
             { icon: <FileDown size={16} />, label: "Exportar rutina", prompt: "Pasame mi rutina activa en PDF", autoSend: true },
@@ -14483,6 +14628,8 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
                   <div className="mb-3"><RecordChangePreview {...m.plan.recordPreview} /></div>
                 ) : m.plan.kind === "progression" && m.plan.progressionPreview ? (
                   <div className="mb-3"><ProgressionPlanPreview {...m.plan.progressionPreview} /></div>
+                ) : m.plan.kind === "weeklyPlan" && m.plan.weeklyPlanPreview ? (
+                  <div className="mb-3"><WeeklyPlanPreview {...m.plan.weeklyPlanPreview} /></div>
                 ) : m.plan.kind === "settings" && m.plan.settingsChanges?.length ? (
                   <div className="mb-3"><SettingsChangePreview changes={m.plan.settingsChanges} /></div>
                 ) : (
@@ -17706,7 +17853,7 @@ export default function App() {
             {tab === "rutina" && !showPinnedDeload && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToRoutines={() => setTab("rutinas")} onGoToSchedule={() => goToSection("rutinas", "week-schedule")} onGoToFieldSettings={() => goToSection("perfil", "field-settings-section")} onGoToDescarga={() => (isDeloadWeek ? setDeloadDismissed(false) : setTab("descarga"))} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} todaySessionDayKey={(profile?.trainingSessions || []).find((ts) => ts.date === todayStr())?.dayKey || profile?.activeSession?.dayKey || null} sex={profile?.sex} age={profile?.age} activeRoutineDef={activeRoutineDef} onApplyOwnProgression={(plan) => handleUpdateProfile({ routines: { ...(profile.routines || {}), [profile.activeRoutineId]: applyProgressionToRoutine(activeRoutineDef, plan) } })} />}
             {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} onGoToRoutines={() => goToSection("rutinas", "routine-editor")} weekSchedule={weekSchedule} sex={profile?.sex} age={profile?.age} onGoToDeload={() => { setDeloadDismissed(false); setTab("rutina"); }} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} />}
             {tab === "descarga" && <DeloadView logs={logs} setLogs={setLogs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} activeSession={profile?.activeSession?.deload ? profile.activeSession : null} onStartSession={handleStartSession} onCancelSession={handleCancelSession} weekSchedule={weekSchedule} onClose={() => { setDeloadDismissed(true); setTab("rutina"); }} cycleStart={cycleStart} />}
-            {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} setLogs={setLogs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} conversations={aiConversations} activeConversationId={activeAiConversationId} onNewConversation={handleNewAiConversation} onSwitchConversation={handleSwitchAiConversation} onDeleteConversation={handleDeleteAiConversation} onRenameConversation={handleRenameAiConversation} settings={getProfileSettings(profile)} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} onDeleteRoutine={handleDeleteRoutine} onNavigate={setTab} onStartSession={handleStartSession} onEndSession={handleEndSession} />}
+            {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} setLogs={setLogs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} conversations={aiConversations} activeConversationId={activeAiConversationId} onNewConversation={handleNewAiConversation} onSwitchConversation={handleSwitchAiConversation} onDeleteConversation={handleDeleteAiConversation} onRenameConversation={handleRenameAiConversation} settings={getProfileSettings(profile)} cycleStart={cycleStart} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} onDeleteRoutine={handleDeleteRoutine} onNavigate={setTab} onStartSession={handleStartSession} onEndSession={handleEndSession} />}
             {tab === "perfil" && <ProfileView onOpenFieldPreview={() => setShowFieldIntro(true)} openSectionSignal={openSectionSignal} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} profileName={activeProfile} profiles={profiles} logs={logs} onSignOut={handleSignOut} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} onGoToSocial={() => setTab("social")} />}
             {tab === "social" && <SocialView profile={profile} profileName={activeProfile} uid={profile?.googleUid} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} />}
           </div>
