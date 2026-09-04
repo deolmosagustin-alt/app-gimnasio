@@ -948,8 +948,11 @@ function getStagnationInfo(exercise, logs) {
   return { stagnant, maxGapDays };
 }
 
-// Calentamiento sugerido: rampa clásica de fuerza (50% → 70% → 85% del
-// peso de trabajo), redondeada de a 2.5kg como el resto de la app. Se
+// "Aproximaciones" (antes "calentamiento sugerido" — pedido: "en realidad
+// son aproximaciones, no un calentamiento; dejemos calentamiento para lo
+// nuevo de movilidad, así evitamos confusiones"): rampa clásica de fuerza
+// (50% → 70% → 85% del peso de trabajo), redondeada de a 2.5kg como el
+// resto de la app. Se
 // basa en el kg más pesado registrado en CUALQUIERA de las series del
 // ejercicio (no en una serie puntual) — es lo más parecido a "tu peso de
 // trabajo de hoy" sin tener que pedirte que lo cargues de antemano.
@@ -1121,7 +1124,7 @@ async function generateWarmupWithAI(dayExercises, dayLabel) {
 }
 
 // Tarjeta colapsable de calentamiento general — mismo lenguaje visual que
-// "Ver calentamiento sugerido" (ExerciseCard), pero a nivel de TODA la
+// "Ver aproximaciones" (ExerciseCard), pero a nivel de TODA la
 // sesión: se muestra una vez, antes de la lista de ejercicios, con
 // checklist propio (sin persistir: es una guía, no un registro).
 // `warmupKeys`: lista explícita de keys de MOBILITY_DRILLS elegida en el
@@ -5598,12 +5601,12 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
           <div className="mb-2">
             {!showWarmup ? (
               <button onClick={() => setShowWarmup(true)} className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-[11px] font-bold transition" style={{ backgroundColor: tint(accent, "10"), border: `1px solid ${tint(accent, "30")}`, color: accent }}>
-                <Flame size={12} /> Ver calentamiento sugerido
+                <Flame size={12} /> Ver aproximaciones
               </button>
             ) : (
               <div className="rounded-xl border p-3 space-y-2 bounce-in" style={{ borderColor: tint(accent, "30"), backgroundColor: tint(accent, "0c") }}>
-                <button onClick={() => setShowWarmup(false)} className="w-full flex items-center justify-center gap-1.5" style={{ color: accent }} aria-label="Ocultar calentamiento sugerido">
-                  <Flame size={11} /><span className="text-[10px] font-black uppercase tracking-wider">Calentamiento sugerido</span><ChevronUp size={11} />
+                <button onClick={() => setShowWarmup(false)} className="w-full flex items-center justify-center gap-1.5" style={{ color: accent }} aria-label="Ocultar aproximaciones">
+                  <Flame size={11} /><span className="text-[10px] font-black uppercase tracking-wider">Aproximaciones</span><ChevronUp size={11} />
                 </button>
                 {WARMUP_STEPS.map((w, i) => {
                   const wKg = Math.round(bestWorkingKg * w.pct * 2) / 2;
@@ -6036,7 +6039,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           min) — distinto del calentamiento POR EJERCICIO que ya existe
           dentro de cada ExerciseCard (esa es la rampa de aproximación al
           peso de trabajo). Este va una sola vez, antes de arrancar.
-          A propósito NO se tapa con el switch "Calentamiento sugerido" de
+          A propósito NO se tapa con el switch "Aproximaciones" de
           Personalizar ficha (ese controla la rampa por ejercicio, que
           arranca apagada por default junto con el resto de la ficha) —
           esta tarjeta es una guía aparte, no un campo de registro, y se
@@ -6509,7 +6512,19 @@ function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [], weekSche
                 // se arma un degradé entre los colores en vez de un sólo
                 // tono — y siguen los puntitos abajo para distinguir cada
                 // uno por separado.
-                const mainColor = s ? ROUTINE[s.dayKeys[0]]?.color : null;
+                // BUG FIX (reporte: "se crashea si vas más de dos meses para
+                // atrás"): ROUTINE refleja la rutina ACTIVA de hoy — una
+                // sesión vieja puede tener dayKeys de un día que ya no
+                // existe ahí (lo borraste, le cambiaste el nombre, cambiaste
+                // de rutina) desde que se registró. Antes esto sólo estaba
+                // cubierto con "?." en un par de lugares y no en el de los
+                // puntitos de abajo, que reventaba con un TypeError apenas
+                // el calendario intentaba pintar ESE día — y como el resto
+                // del mes también fallaba al renderizar, la pantalla entera
+                // se rompía. Con un color de reserva en vez de romper, en el
+                // peor caso el punto queda gris en vez de tirar la app abajo.
+                const FALLBACK_DAY_COLOR = "#64748b";
+                const mainColor = s ? (ROUTINE[s.dayKeys[0]]?.color || FALLBACK_DAY_COLOR) : null;
                 const bgStyle = s
                   ? (s.dayKeys.length > 1
                     ? { background: `linear-gradient(135deg, ${tint(mainColor, "38")}, ${tint(ROUTINE[s.dayKeys[1]]?.color || mainColor, "38")})`, border: `1px solid ${tint(mainColor, "55")}` }
@@ -6519,7 +6534,7 @@ function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [], weekSche
                   <button key={i} onClick={() => s && setSelectedDate(isSelected ? null : d)} disabled={!s} style={{ ...bgStyle, animationDelay: `${Math.min(i, 34) * 12}ms` }}
                     className={`cell-pop aspect-square rounded-lg flex flex-col items-center justify-center gap-0.5 text-[11px] font-bold transition-all ${isSelected ? "ring-2 ring-teal-400" : ""} ${isToday && !s ? "border border-teal-500/50" : ""} ${s ? "text-white hover:brightness-125 active:scale-95" : "text-slate-700"}`}>
                     {dayNum}
-                    {s && <div className="flex gap-0.5">{s.dayKeys.slice(0, 3).map((dk) => <span key={dk} className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: ROUTINE[dk].color }} />)}</div>}
+                    {s && <div className="flex gap-0.5">{s.dayKeys.slice(0, 3).map((dk) => <span key={dk} className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: ROUTINE[dk]?.color || FALLBACK_DAY_COLOR }} />)}</div>}
                   </button>
                 );
               })}
@@ -7904,7 +7919,7 @@ function MyBodyModal({ profile, onClose }) {
         </div>
         {topRank ? (
           <div className="relative flex items-center gap-3 rounded-2xl border px-4 py-3" style={{ borderColor: tint(topRank.color, "40"), backgroundColor: tint(topRank.color, "0c") }}>
-            <RankBadgeIcon tier={topRank.tier} sub={topRank.sub} color={topRank.color} size={46} />
+            <RankBadgeIcon tier={topRank.tier} sub={null} color={topRank.color} size={46} />
             <div className="min-w-0 flex-1">
               <p className="text-base font-black leading-tight" style={{ color: topRank.color }}>{topRank.tier} {topRank.sub}</p>
               <p className="text-[10.5px] text-slate-500 leading-snug">Promedio de {trainedCount} músculo{trainedCount === 1 ? "" : "s"} con marcas</p>
@@ -7969,7 +7984,7 @@ function RankExplainModal({ profile, myTopRank, onClose }) {
         {myTopRank ? (
           <>
             <div className="flex items-center gap-3 rounded-2xl border px-4 py-3.5" style={{ borderColor: tint(myTopRank.color, "40"), backgroundColor: tint(myTopRank.color, "0c") }}>
-              <RankBadgeIcon tier={myTopRank.tier} sub={myTopRank.sub} color={myTopRank.color} size={44} />
+              <RankBadgeIcon tier={myTopRank.tier} sub={null} color={myTopRank.color} size={44} />
               <div className="min-w-0">
                 <p className="text-base font-black leading-tight" style={{ color: myTopRank.color }}>{myTopRank.tier} {myTopRank.sub}</p>
                 <p className="text-[11px] text-slate-500 leading-snug">Promedio de {breakdown.withData.length} músculo{breakdown.withData.length === 1 ? "" : "s"} con marcas</p>
@@ -8161,7 +8176,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
                 {/* Badge + rango + marca en display grande */}
                 <div className="relative flex items-center gap-4 mb-4">
                   <div className="shrink-0" style={{ filter: `drop-shadow(0 6px 18px ${tint(selInfo.color, "50")})` }}>
-                    <RankBadgeIcon tier={selInfo.tier} sub={selInfo.sub} color={selInfo.color} size={118} />
+                    <RankBadgeIcon tier={selInfo.tier} sub={null} color={selInfo.color} size={118} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-2xl font-black leading-none tracking-tight" style={{ color: selInfo.color, textShadow: `0 0 24px ${tint(selInfo.color, "40")}` }}>{selInfo.tier}{selInfo.sub ? ` ${selInfo.sub}` : ""}</p>
@@ -9535,6 +9550,7 @@ async function exportRoutineToPdf(routineDef) {
     doc.setFontSize(8); doc.setTextColor(140);
     doc.text(`${d.exercises.length} ejercicio${d.exercises.length === 1 ? "" : "s"} · ${setsInDay} series`, 196, y, { align: "right" });
     y += 4;
+    const startPage = doc.internal.getNumberOfPages();
     autoTable(doc, {
       startY: y,
       head: [["Ejercicio", "Músculo", "Series", "Reps"]],
@@ -9543,7 +9559,22 @@ async function exportRoutineToPdf(routineDef) {
       headStyles: { fillColor: rgb, textColor: 255, fontStyle: "bold" },
       alternateRowStyles: { fillColor: [248, 250, 252] },
       columnStyles: { 0: { cellWidth: 68 }, 1: { cellWidth: 42 }, 2: { cellWidth: 22 }, 3: { cellWidth: 46 } },
-      margin: { left: 14, right: 14 },
+      margin: { left: 14, right: 14, top: 24 },
+      // BUG FIX (encontrado auditando "exportación de PDF funciona mal"):
+      // si la tabla de un día no entraba entera en una página, la
+      // continuación arrancaba directo con la fila de encabezado de la
+      // tabla, sin repetir a qué día pertenecía — mirando sólo esa
+      // página no había forma de saberlo. Ahora se repite la franja de
+      // color + nombre del día arriba de cada página nueva que haga
+      // falta (la primera página ya lo tiene dibujado más arriba, así
+      // que se salta con startPage).
+      didDrawPage: (data) => {
+        if (data.pageNumber <= startPage) return;
+        doc.setFillColor(...rgb);
+        doc.roundedRect(14, 15.8, 3, 5.2, 0.8, 0.8, "F");
+        doc.setFontSize(12); doc.setTextColor(20);
+        doc.text(d.dayLabel, 20, 20);
+      },
     });
     y = doc.lastAutoTable.finalY + 10;
   });
@@ -12433,10 +12464,22 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
             </button>
           )}
         </div>
-        {profile?.username && (
+        {profile?.username ? (
           <button onClick={() => setShowShareProfile(true)} className="w-full flex items-center justify-center gap-1.5 mt-3.5 pt-3 border-t border-slate-800/60 text-[10px] font-bold text-purple-300/75 hover:text-purple-300 transition">
             <QrCode size={11} /> Compartir mi perfil <ChevronRight size={11} />
           </button>
+        ) : uid ? (
+          // Pedido: "si no tenés tu alias que te pida que pongas, en la
+          // sección social que aparezca" — antes esto era sólo una
+          // oración en la sección Buscar, ahora el prompt para elegirlo
+          // vive acá mismo, arriba de todo, con el input de verdad en vez
+          // de mandarte a buscarlo en Perfil.
+          <div className="mt-3.5 pt-3 border-t border-slate-800/60">
+            <p className="text-[11px] text-slate-500 mb-2">Elegí tu @usuario para que te puedan buscar y agregar.</p>
+            <UsernameSection uid={uid} currentUsername={null} onSaved={(u) => onUpdateProfile({ username: u })} />
+          </div>
+        ) : (
+          <p className="text-[11px] text-slate-500 mt-3.5 pt-3 border-t border-slate-800/60">Vinculá tu cuenta de Google en Perfil para poder elegir un @usuario y usar lo social.</p>
         )}
       </div>
 
@@ -12500,8 +12543,13 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
                 </div>
                 <Share2 size={15} className="text-slate-600 shrink-0" />
               </button>
+            ) : uid ? (
+              <div className="rounded-2xl border border-cyan-500/25 bg-cyan-500/5 px-4 py-3.5">
+                <p className="text-[11px] text-slate-400 mb-2">Elegí tu @usuario para que te puedan buscar y agregar.</p>
+                <UsernameSection uid={uid} currentUsername={null} onSaved={(u) => onUpdateProfile({ username: u })} />
+              </div>
             ) : (
-              <p className="text-[11px] text-slate-600 px-1">Elegí un @usuario en Perfil para que te puedan buscar y para poder compartir tu perfil.</p>
+              <p className="text-[11px] text-slate-600 px-1">Vinculá tu cuenta de Google en Perfil para poder elegir un @usuario y usar lo social.</p>
             )}
             <ContactsSuggestions myUid={uid} friendStatus={friendStatus} onSendFriendRequest={doSendFriendRequest} />
             <SocialSearchSection myUid={uid} friendStatus={friendStatus} onSendFriendRequest={doSendFriendRequest} />
@@ -13421,6 +13469,13 @@ function BuilderDayCard({ day, dayIdx, totalDays, otherDays = [], onRename, onRe
         {totalDays > 1 && <button onClick={onRemove} className="p-1.5 text-slate-600 hover:text-rose-400 shrink-0"><Trash2 size={14} /></button>}
       </div>
 
+      {/* Pedido: "que el calentamiento aparezca en la parte superior en
+          vez de la inferior" — antes vivía después de la lista de
+          ejercicios y el botón de agregar, al final de toda la tarjeta. */}
+      {day.exercises.length > 0 && onSetWarmup && (
+        <BuilderWarmupSection day={day} onSetWarmup={onSetWarmup} otherDays={otherDays} onCopyWarmupTo={onCopyWarmupTo} />
+      )}
+
       {day.exercises.length === 0 && (
         <div className="flex flex-col items-center gap-1.5 py-4 rounded-xl mb-2" style={{ backgroundColor: tint(day.color, "08"), border: `1px dashed ${tint(day.color, "30")}` }}>
           <Dumbbell size={20} style={{ color: tint(day.color, "80") }} />
@@ -13476,9 +13531,6 @@ function BuilderDayCard({ day, dayIdx, totalDays, otherDays = [], onRename, onRe
         <p className="text-[9px] text-slate-600 mt-2">
           {day.exercises.length < 4 ? "Recomendado: entre 4 y 8 ejercicios por sesión." : day.exercises.length > 10 ? "Es bastante para una sola sesión, capaz conviene dividirlo en otro día." : "Buena cantidad de ejercicios para la sesión."}
         </p>
-      )}
-      {day.exercises.length > 0 && onSetWarmup && (
-        <BuilderWarmupSection day={day} onSetWarmup={onSetWarmup} otherDays={otherDays} onCopyWarmupTo={onCopyWarmupTo} />
       )}
     </div>
   );
@@ -13987,7 +14039,7 @@ function buildActionPlan(action, ctx) {
   // ("Personalizá tu ficha"), expuestos acá para poder prenderlos/apagarlos
   // por chat en vez de tener que ir a buscarlos.
   if (action.type === "config_ficha") {
-    const FICHA_FIELDS = { showRpe: "Esfuerzo (RPE/RIR)", showWarmup: "Calentamiento sugerido", show1RMPercent: "Porcentaje de 1RM", showCoaching: "Consejos al guardar", showExerciseNote: "Consejos del ejercicio", showPersonalNote: "Notas por serie", showStagnation: "Aviso de estancamiento", showProgressionSuggestion: "Progresión sugerida" };
+    const FICHA_FIELDS = { showRpe: "Esfuerzo (RPE/RIR)", showWarmup: "Aproximaciones", show1RMPercent: "Porcentaje de 1RM", showCoaching: "Consejos al guardar", showExerciseNote: "Consejos del ejercicio", showPersonalNote: "Notas por serie", showStagnation: "Aviso de estancamiento", showProgressionSuggestion: "Progresión sugerida" };
     const patch = {}; const items = [];
     Object.keys(FICHA_FIELDS).forEach((key) => {
       if (typeof action[key] === "boolean") { patch[key] = action[key]; items.push(`${FICHA_FIELDS[key]}: ${action[key] ? "activado" : "desactivado"}`); }
@@ -14553,7 +14605,7 @@ const SETTINGS_FIELD_META = {
   deloadSetDivisor: { icon: <Layers size={12} />, label: "Series en descarga", format: (v) => `÷${v}` },
   showRpe: { icon: <Eye size={12} />, label: "Mostrar RPE", format: (v) => (v ? "Sí" : "No") },
   rpeDisplayMode: { icon: <Eye size={12} />, label: "Modo de esfuerzo", format: (v) => (v === "rir" ? "RIR" : "RPE") },
-  showWarmup: { icon: <Flame size={12} />, label: "Calentamiento sugerido", format: (v) => (v ? "Sí" : "No") },
+  showWarmup: { icon: <Flame size={12} />, label: "Aproximaciones", format: (v) => (v ? "Sí" : "No") },
   show1RMPercent: { icon: <Percent size={12} />, label: "% de 1RM", format: (v) => (v ? "Sí" : "No") },
   showCoaching: { icon: <Sparkles size={12} />, label: "Consejos técnicos", format: (v) => (v ? "Sí" : "No") },
   showExerciseNote: { icon: <StickyNote size={12} />, label: "Nota del ejercicio", format: (v) => (v ? "Sí" : "No") },
@@ -17382,7 +17434,12 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
               const dk = activeSchedule[wk] || null;
               const d = dk ? activeDef.days[dk] : null;
               const isToday = wk === todayWeekdayKey();
-              const chipColor = d ? d.color : "#64748b";
+              // Pedido: "que estén todos medio azules y el día en el que
+              // estás que se ponga del día que toca" — mismo criterio que
+              // WeekCalendar (todas las semanas entrenadas comparten el
+              // mismo azul, sin un color distinto por semana). Sólo HOY
+              // se destaca con el color propio del día que le toca.
+              const chipColor = isToday ? (d ? d.color : "#64748b") : (d ? "#3B82F6" : "#64748b");
               return (
                 <button key={wk} onClick={() => d && onGoToDay?.(dk)} disabled={!d} title={d ? d.label : "Descanso"} className="flex items-center justify-center">
                   <span className={`w-full aspect-square rounded-xl flex items-center justify-center text-[10px] font-black uppercase transition-all ${isToday ? "scale-110" : ""} ${d ? "active:scale-95" : ""}`}
@@ -17642,7 +17699,7 @@ function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
   const s = settings || DEFAULT_SETTINGS;
   const on = (k) => s[k] !== false;
   const OPCIONES = [
-    { key: "showWarmup", icon: <Flame size={16} />, label: "Calentamiento sugerido", desc: "Series de entrada al 50-70-85% de tu marca." },
+    { key: "showWarmup", icon: <Flame size={16} />, label: "Aproximaciones", desc: "Series de entrada al 50-70-85% de tu marca." },
     { key: "showRpe", icon: <Activity size={16} />, label: "Esfuerzo (RPE)", desc: "Del 1 al 10, qué tan dura fue la serie." },
     { key: "show1RMPercent", icon: <Percent size={16} />, label: "Porcentaje de 1RM", desc: "Qué % de tu récord estás levantando." },
     { key: "showCoaching", icon: <Info size={16} />, label: "Consejos al guardar", desc: "Te dice si subiste, igualaste o bajaste tu marca." },
@@ -17686,7 +17743,7 @@ function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
 
             {on("showWarmup") && (
               <div className="mb-2 rounded-xl px-2.5 py-2 bounce-in" style={{ backgroundColor: "#14B8A610", border: "1px solid #14B8A630" }}>
-                <p className="text-[10px] font-bold text-teal-400 flex items-center gap-1"><Flame size={9} /> Calentamiento: 40kg → 55kg → 70kg</p>
+                <p className="text-[10px] font-bold text-teal-400 flex items-center gap-1"><Flame size={9} /> Aproximaciones: 40kg → 55kg → 70kg</p>
               </div>
             )}
 
