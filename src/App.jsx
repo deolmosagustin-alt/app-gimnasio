@@ -17457,10 +17457,12 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
             })}
           </div>
 
-          {/* Lista de días de la rutina — ahora con el color propio de
-              cada día (antes todos en el mismo celeste parejo) y
-              tocables: van directo a esa sesión en la pestaña Rutina en
-              vez de ser sólo informativos. */}
+          {/* Lista de días de la rutina — pedido: "saquemosle los colores
+              pero mantengamos los puntitos" — vuelve al mismo fondo
+              neutro que ya usan las cajas de stats de arriba
+              (border-blue-400/20 bg-black/25), el puntito de color de
+              cada día queda como única marca de identidad. Tocables: van
+              directo a esa sesión en la pestaña Rutina. */}
           <div className="relative grid grid-cols-2 gap-1.5 mt-2.5">
             {(() => {
               const orden = (activeDef.dayOrder || Object.keys(activeDef.days || {})).filter((dk) => activeDef.days?.[dk]);
@@ -17468,11 +17470,10 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
                 const d = activeDef.days[dk];
                 const ultimoImpar = i === orden.length - 1 && orden.length % 2 === 1;
                 return (
-                  <button key={dk} onClick={() => onGoToDay?.(dk)} className={`flex items-center gap-2 px-2.5 py-2.5 rounded-xl text-[11px] font-bold min-w-0 transition active:scale-[0.97] ${ultimoImpar ? "col-span-2" : ""}`}
-                    style={{ backgroundColor: tint(d.color, "1c"), border: `1px solid ${tint(d.color, "40")}` }}>
+                  <button key={dk} onClick={() => onGoToDay?.(dk)} className={`flex items-center gap-2 px-2.5 py-2.5 rounded-xl text-[11px] font-bold min-w-0 transition active:scale-[0.97] border border-blue-400/20 bg-black/25 ${ultimoImpar ? "col-span-2" : ""}`}>
                     <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: d.color }} />
                     <span className="flex-1 min-w-0 leading-snug text-slate-100 text-left" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{d.label}</span>
-                    <span className="tabular-nums shrink-0 text-[10px]" style={{ color: tint(d.color, "cc") }}>{d.exercises?.length || 0}</span>
+                    <span className="tabular-nums shrink-0 text-[10px] text-blue-300/70">{d.exercises?.length || 0}</span>
                   </button>
                 );
               });
