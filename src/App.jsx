@@ -13329,6 +13329,19 @@ function spreadsheetRowToFreeTextLine(line) {
   return line;
 }
 
+// BUG FIX (auditoría de importación): el cardio en un PDF/planilla real casi
+// nunca viene en formato "NxM" ("Cinta 20 min", "Bicicleta - 30 minutos") —
+// SETREP_REGEX nunca matcheaba esas líneas, y como isLikelyDayHeader tampoco
+// las reconoce como encabezado de día, se descartaban en silencio: el
+// cardio del PDF/Excel importado directamente desaparecía, sin ningún aviso
+// de que faltaba algo. Este regex es el equivalente en minutos.
+const CARDIO_MINUTES_REGEX = /(\d+)\s*min(?:utos?)?\b/i;
+// Nombres de cardio comunes que puede traer un PDF sin matchear EXACTO
+// contra el catálogo (ej. "Caminadora" en vez de "Cinta — Caminar") — evita
+// perder la línea igual cuando el nombre no matchea pero claramente es
+// cardio, en vez de exigir una coincidencia exacta de la biblioteca.
+const CARDIO_NAME_HINT_REGEX = /cardio|cinta|caminadora|bicicleta|el[íi]ptic|remo|soga|correr|caminar|trote|assault ?bike|stairmaster|escaladora/i;
+
 // Parsea texto libre (extraído de un PDF/Excel, o pegado a mano) y devuelve
 // una lista de "días" con sus ejercicios ya resueltos.
 function parseRoutineFromText(rawText) {
@@ -13339,6 +13352,7 @@ function parseRoutineFromText(rawText) {
   let current = null;
   lines.forEach((line, i) => {
     const m = line.match(SETREP_REGEX);
+    const cardioMatch = !m ? line.match(CARDIO_MINUTES_REGEX) : null;
     if (m) {
       if (!current) { current = { label: "DÍA 1", exercises: [] }; days.push(current); }
       const setsCount = Math.max(1, Math.min(8, parseInt(m[1], 10) || 3));
@@ -13349,6 +13363,25 @@ function parseRoutineFromText(rawText) {
       current.exercises.push(lib
         ? { libId: lib.id, sets: mkSets(setsCount, repRange) }
         : { id: builderUid("imported"), name: namePart, muscle: "Personalizado", sets: mkSets(setsCount, repRange) });
+    } else if (cardioMatch) {
+      const namePart = line.slice(0, cardioMatch.index).replace(/[-:–]\s*$/, "").trim();
+      const lib = namePart ? matchExerciseToLibrary(namePart) : null;
+      if (lib?.cardio) {
+        if (!current) { current = { label: "DÍA 1", exercises: [] }; days.push(current); }
+        current.exercises.push({ libId: lib.id, sets: mkSets(1, ""), cardio: true });
+      } else if (!lib?.cardio && namePart && CARDIO_NAME_HINT_REGEX.test(namePart)) {
+        // No matcheó exacto contra el catálogo, pero el texto suena a
+        // cardio de verdad (evita perder "Caminadora 20 min" solo porque
+        // no se llama igual que el ejercicio de la biblioteca).
+        if (!current) { current = { label: "DÍA 1", exercises: [] }; days.push(current); }
+        current.exercises.push({ id: builderUid("imported"), name: namePart, muscle: "Personalizado", sets: mkSets(1, ""), cardio: true });
+      } else if (isLikelyDayHeader(line, lines[i + 1])) {
+        // "Plancha 1 min" y similares (ejercicio por tiempo que no es
+        // cardio de máquina) caen acá si además parecen encabezado — si
+        // no, se pierden igual que antes de este fix (caso no cubierto).
+        current = { label: line.replace(/[:：]\s*$/, "").toUpperCase(), exercises: [] };
+        days.push(current);
+      }
     } else if (isLikelyDayHeader(line, lines[i + 1])) {
       current = { label: line.replace(/[:：]\s*$/, "").toUpperCase(), exercises: [] };
       days.push(current);
@@ -13380,10 +13413,15 @@ async function extractTextFromExcelFile(file) {
 
 async function extractTextFromPdfFile(file) {
   const pdfjsLib = await import("pdfjs-dist");
-  // El worker corre la lectura en otro hilo — se apunta a la misma versión
-  // instalada vía CDN para no tener que configurar el bundler a mano.
+  // BUG FIX (encontrado subiendo un PDF real): la importación de PDF
+  // estaba COMPLETAMENTE rota — pdfjs-dist 6.x sólo publica su worker
+  // como ".mjs" (pdf.worker.min.mjs), no ".js". La URL vieja apuntaba a
+  // ".../pdf.worker.min.js", que cdnjs devuelve 404 para esta versión
+  // (confirmado a mano: la ".js" da 404, la ".mjs" da 200) — cualquier
+  // PDF subido caía siempre en el catch genérico "No pudimos leer
+  // alguno de los archivos", sin ninguna pista real del motivo.
   if (pdfjsLib.GlobalWorkerOptions && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
   }
   const buf = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
