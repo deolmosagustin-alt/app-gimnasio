@@ -11143,7 +11143,7 @@ const GLOBAL_RANKING_ENABLED = false;
 // índice de Firestore: quién entrenó más veces esta semana, usando la
 // MISMA lectura de public/full que ya pide `activity` (useUserStreaks) para
 // la racha — cero pedidos nuevos a Firestore por agregar esto.
-function LeaderboardSection({ uid, profile, myTopRank, friendAccepted, basics, activity, onViewPerson }) {
+function LeaderboardSection({ uid, profile, myTopRank, friendAccepted, basics, activity, onViewPerson, onGoToBuscar }) {
   const [scope, setScope] = useState("amigos");
   const [globalList, setGlobalList] = useState(null);
   const [globalError, setGlobalError] = useState(false);
@@ -11195,7 +11195,18 @@ function LeaderboardSection({ uid, profile, myTopRank, friendAccepted, basics, a
         {GLOBAL_RANKING_ENABLED && <button onClick={() => setScope("global")} className={`py-2 rounded-xl text-xs font-bold transition ${scope === "global" ? "bg-orange-500/20 text-orange-400" : "text-slate-500"}`}>Global</button>}
       </div>
       {scope === "amigos" && friendsRanking.length === 0 && (
-        <div className="text-center py-8 text-slate-600"><Award size={28} className="mx-auto mb-2.5 opacity-30" /><p className="text-sm">Todavía no hay nadie con rango para mostrar acá.</p><p className="text-xs mt-1 text-slate-700">Agregá amigos y anotá tus marcas para aparecer.</p></div>
+        // Pedido: "la pestaña se ve medio vacía" — mismo criterio que el
+        // estado vacío de Amigos: un botón directo en vez de sólo texto.
+        <div className="text-center py-7 px-4 rounded-2xl border border-slate-800/50 bg-slate-900/30">
+          <Award size={28} className="mx-auto mb-2.5 opacity-30 text-slate-600" />
+          <p className="text-sm text-slate-500">Todavía no hay nadie con rango para mostrar acá.</p>
+          <p className="text-xs mt-1 mb-4 text-slate-700">Agregá amigos y anotá tus marcas para aparecer.</p>
+          {onGoToBuscar && (
+            <button onClick={onGoToBuscar} className="flex items-center justify-center gap-1.5 py-2.5 px-5 mx-auto rounded-xl text-xs font-bold transition active:scale-[0.98] bg-orange-500/15 text-orange-400 border border-orange-500/35">
+              <Search size={13} /> Agregar amigos
+            </button>
+          )}
+        </div>
       )}
       {scope === "semana" && weeklyRanking.length <= 1 && (
         <p className="text-center text-slate-600 text-sm py-8 px-4">Todavía no hay datos de tus amigos esta semana — puede tardar un momento en cargar.</p>
@@ -12135,7 +12146,25 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
                   )}
                 </div>
                 {friendAccepted.length === 0 ? (
-                  <div className="text-center py-8 text-slate-600"><Users size={28} className="mx-auto mb-2.5 opacity-30" /><p className="text-sm">Todavía no tenés amigos agregados.</p><p className="text-xs mt-1 text-slate-700">Buscalos por su @usuario en "Buscar".</p></div>
+                  // Pedido: "la pestaña se ve medio vacía" — antes esto era
+                  // sólo texto, con toda la mitad de abajo de la pantalla
+                  // sin nada. Ahora suma botones directos: no hace falta
+                  // memorizarte que "Buscar" es otra pestaña, tocás y ya.
+                  <div className="text-center py-7 px-4 rounded-2xl border border-slate-800/50 bg-slate-900/30">
+                    <Users size={28} className="mx-auto mb-2.5 opacity-30 text-slate-600" />
+                    <p className="text-sm text-slate-500">Todavía no tenés amigos agregados.</p>
+                    <p className="text-xs mt-1 mb-4 text-slate-700">Buscalos por su @usuario, o compartí el tuyo para que te encuentren.</p>
+                    <div className="flex flex-col gap-2 max-w-[240px] mx-auto">
+                      <button onClick={() => setSection("buscar")} className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold transition active:scale-[0.98]" style={{ backgroundColor: tint(SOCIAL_COLOR, "18"), color: SOCIAL_COLOR, border: `1px solid ${tint(SOCIAL_COLOR, "40")}` }}>
+                        <Search size={13} /> Buscar amigos
+                      </button>
+                      {profile?.username && (
+                        <button onClick={() => setShowShareProfile(true)} className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold border border-slate-700 text-slate-300 transition active:scale-[0.98] hover:border-slate-600">
+                          <QrCode size={13} /> Compartir mi perfil
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 ) : sortedFriendAccepted.map((f, i) => { const other = otherUidOf(f); const confirming = confirmRemoveId === f.id; return (
                   <div key={f.id} className="stagger-item" style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}>
                     <PublicUserCard uid={other} basic={basics[other]} streak={streaks[other]?.streak} onClick={confirming ? null : () => setViewingUid(other)}>
@@ -12161,7 +12190,8 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
 
         {section === "ranking" && (
           <LeaderboardSection uid={uid} profile={profile} myTopRank={myTopRank} friendAccepted={friendAccepted} basics={basics} activity={streaks}
-            onViewPerson={(personUid, isMe) => { if (isMe) setShowMyBody(true); else setViewingUid(personUid); }} />
+            onViewPerson={(personUid, isMe) => { if (isMe) setShowMyBody(true); else setViewingUid(personUid); }}
+            onGoToBuscar={() => setSection("buscar")} />
         )}
 
         {section === "entrenador" && (
