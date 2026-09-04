@@ -281,6 +281,18 @@ function computeTopRank(profile) {
   } catch { return null; }
 }
 
+// Mismo cálculo que computeTopRank, pero a partir de un objeto de ranks YA
+// calculado (computeAllMuscleRanks) en vez de un profile completo — evita
+// recalcular todo desde cero cuando el llamador ya tiene los ranks a mano
+// (perfil de un amigo, batalla de comparación).
+function computeTopRankFromRanks(ranks) {
+  const withData = MUSCLE_GROUPS.map((g) => ranks?.[g.key]).filter((r) => r?.hasData);
+  if (!withData.length) return null;
+  const avgIdx = Math.round(withData.reduce((sum, r) => sum + r.levelIdx, 0) / withData.length);
+  const info = RANK_TIERS[avgIdx];
+  return { tier: info.tier, sub: info.sub, color: info.color, levelIdx: avgIdx };
+}
+
 // Descarga el perfil completo desde Firestore.
 async function fetchProfileFromCloud(uid) {
   try {
@@ -7931,6 +7943,11 @@ function BattleCompareCard({ myAvatarData, myName, mySex, mySessionsThisWeek, my
   const theyWinBattle = theirScore > myScore;
   const totalMuscles = comparison.length || 1;
   const myBarPct = Math.round(((iWinCount + tieCount / 2) / totalMuscles) * 100);
+  // Pedido: "el recuadro de los muñecos... quedó muy simple" — se le suma
+  // el rango de cada uno debajo de su nombre (antes no decía nada de eso
+  // acá, sólo abajo del todo en el desglose músculo por músculo).
+  const myTopRankBattle = useMemo(() => computeTopRankFromRanks(myRanks), [myRanks]);
+  const theirTopRankBattle = useMemo(() => computeTopRankFromRanks(theirRanks), [theirRanks]);
   return (
     <div className="space-y-3">
       {/* Header de batalla: avatares enfrentados + marcador combinado
@@ -8011,18 +8028,39 @@ function BattleCompareCard({ myAvatarData, myName, mySex, mySessionsThisWeek, my
       </div>
 
       {/* Muñecos enfrentados, con switch de frente/espalda para los dos a
-          la vez (lo que importa es comparar el mismo grupo muscular). */}
-      <div className="rounded-2xl border border-slate-800/50 bg-slate-900/40 p-4">
-        <div className="flex items-center justify-center mb-3">
+          la vez (lo que importa es comparar el mismo grupo muscular).
+          Pedido: "quedó muy simple" — antes era un fondo plano sin
+          ningún acento; ahora tiene el mismo lenguaje de "arena" que el
+          header (glows por bando, separador reforzado) y el rango de
+          cada uno debajo del nombre, no sólo el muñeco pelado. */}
+      <div className="relative overflow-hidden rounded-2xl border border-slate-700/50 p-4" style={{ background: "linear-gradient(90deg, rgba(45,212,191,0.08), rgba(15,23,42,0.5) 45%, rgba(15,23,42,0.5) 55%, rgba(192,132,252,0.08))" }}>
+        <div className="absolute -top-10 -left-10 w-32 h-32 rounded-full bg-teal-500/10 blur-3xl pointer-events-none" />
+        <div className="absolute -top-10 -right-10 w-32 h-32 rounded-full bg-fuchsia-500/10 blur-3xl pointer-events-none" />
+        <div className="relative flex items-center justify-center mb-3">
           <div className="flex bg-slate-950/60 rounded-lg p-0.5 border border-slate-800/60">
             <button onClick={() => setView("front")} className={`px-3 py-1 rounded-md text-[10px] font-bold transition ${view === "front" ? "bg-slate-700 text-white" : "text-slate-500 hover:text-slate-300"}`}>De frente</button>
             <button onClick={() => setView("back")} className={`px-3 py-1 rounded-md text-[10px] font-bold transition ${view === "back" ? "bg-slate-700 text-white" : "text-slate-500 hover:text-slate-300"}`}>De espalda</button>
           </div>
         </div>
-        <div className="flex items-start gap-3 justify-center">
-          <MiniBodyView ranks={myRanks} sex={mySex} label="Vos" accentColor="#2DD4BF" view={view} />
-          <div className="w-px self-stretch bg-slate-800 shrink-0 mt-6" />
-          <MiniBodyView ranks={theirRanks} sex={theirSex} label={theirName || "Ellos"} accentColor="#C084FC" view={view} />
+        <div className="relative flex items-start gap-2 justify-center">
+          <div className="flex-1 min-w-0">
+            <MiniBodyView ranks={myRanks} sex={mySex} label="Vos" accentColor="#2DD4BF" view={view} />
+            {myTopRankBattle && (
+              <p className="text-center text-[10.5px] font-black mt-1.5" style={{ color: myTopRankBattle.color }}>{myTopRankBattle.tier} {myTopRankBattle.sub}</p>
+            )}
+          </div>
+          <div className="shrink-0 flex flex-col items-center gap-1 mt-8">
+            <div className="w-7 h-7 rounded-full bg-amber-500/15 border border-amber-500/40 flex items-center justify-center">
+              <Swords size={13} className="text-amber-400" />
+            </div>
+            <div className="w-px flex-1 bg-gradient-to-b from-slate-700 via-slate-700 to-transparent" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <MiniBodyView ranks={theirRanks} sex={theirSex} label={theirName || "Ellos"} accentColor="#C084FC" view={view} />
+            {theirTopRankBattle && (
+              <p className="text-center text-[10.5px] font-black mt-1.5" style={{ color: theirTopRankBattle.color }}>{theirTopRankBattle.tier} {theirTopRankBattle.sub}</p>
+            )}
+          </div>
         </div>
       </div>
 
@@ -11815,6 +11853,49 @@ function LeaderboardSection({ uid, profile, myTopRank, friendAccepted, basics, a
   );
 }
 
+// Pedido: "dale más énfasis... a los días que viene entrenando" — tira
+// compacta de los últimos 14 días con el color del día que corresponda
+// (mismo criterio que el calendario de abajo, pero de un vistazo sin
+// tener que abrir/navegar ningún mes). Vive arriba de FriendSessionHistory
+// a propósito: es el resumen rápido, el calendario completo es el detalle.
+function FriendConsistencyStrip({ trainingSessions = [], activeRoutineSnapshot }) {
+  const model = useMemo(() => (activeRoutineSnapshot ? buildRoutineModel(activeRoutineSnapshot) : null), [activeRoutineSnapshot]);
+  const byDate = useMemo(() => { const m = {}; trainingSessions.forEach((s) => { m[s.date] = s; }); return m; }, [trainingSessions]);
+  const recentDays = useMemo(() => {
+    const days = [];
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const ds = localDateStr(d);
+      days.push({ date: ds, session: byDate[ds] || null });
+    }
+    return days;
+  }, [byDate]);
+  const trainedCount = recentDays.filter((d) => d.session).length;
+  if (!trainingSessions.length) return null;
+  return (
+    <div className="relative overflow-hidden rounded-2xl border border-blue-500/20 p-3.5" style={{ background: "linear-gradient(135deg, rgba(59,130,246,0.10), transparent 70%)" }}>
+      <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full bg-blue-500/15 blur-2xl pointer-events-none" />
+      <p className="relative text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2.5 flex items-center gap-1.5"><Calendar size={11} className="text-blue-400" /> Constancia (últimos 14 días)</p>
+      <div className="relative grid grid-cols-7 gap-1.5">
+        {recentDays.map(({ date, session }) => {
+          const dayDef = session ? model?.days?.[session.dayKey] : null;
+          const color = dayDef?.color || "#3B82F6";
+          return (
+            <div
+              key={date}
+              title={date}
+              className="aspect-square rounded-lg"
+              style={session ? { backgroundColor: tint(color, "cc") } : { backgroundColor: "rgba(51,65,85,0.4)" }}
+            />
+          );
+        })}
+      </div>
+      <p className="relative text-[10.5px] text-slate-500 text-center mt-2.5">{trainedCount} de 14 días entrenados</p>
+    </div>
+  );
+}
+
 // Sesiones formales (Iniciar/Finalizar sesión) de un amigo/alumno — a
 // diferencia de SessionHistoryView (propia), esto NO puede usar
 // buildSessionsIndex/ROUTINE globales: esas variables reflejan SIEMPRE la
@@ -12278,13 +12359,7 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
   // cálculo que myTopRank en el hero de Social, acá armado a partir de
   // theirRanks que ya está calculado) y cuál es su músculo más fuerte,
   // con la marca real que lo sostiene.
-  const theirTopRank = useMemo(() => {
-    const withData = MUSCLE_GROUPS.map((g) => theirRanks[g.key]).filter((r) => r?.hasData);
-    if (!withData.length) return null;
-    const avgIdx = Math.round(withData.reduce((sum, r) => sum + r.levelIdx, 0) / withData.length);
-    const info = RANK_TIERS[avgIdx];
-    return { tier: info.tier, sub: info.sub, color: info.color, levelIdx: avgIdx };
-  }, [theirRanks]);
+  const theirTopRank = useMemo(() => computeTopRankFromRanks(theirRanks), [theirRanks]);
   const theirBestMuscle = useMemo(() => {
     const withData = MUSCLE_GROUPS.map((g) => theirRanks[g.key]).filter((r) => r?.hasData && r.bestKg);
     if (!withData.length) return null;
@@ -12481,17 +12556,26 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
               )}
               {sentNote && <p className="text-center text-xs text-emerald-400">Propuesta enviada — la va a ver la próxima vez que abra Social.</p>}
 
+              {/* Pedido: "dale más énfasis a la rutina que está haciendo, a
+                  los días que viene entrenando" — antes esto era un título
+                  chico gris igual a cualquier otro, sin ningún acento. Ahora
+                  tiene el mismo lenguaje de "hero" con el azul propio de
+                  Rutinas, y suma cuántos días/semana tiene esa rutina. */}
               {full.activeRoutineSnapshot && (
-                <div>
-                  <div className="flex items-center justify-between gap-2 px-1 mb-2">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 min-w-0 truncate">Rutina activa · {full.activeRoutineSnapshot.name}</p>
+                <div className="relative overflow-hidden rounded-2xl border border-blue-500/25 p-3.5" style={{ background: "linear-gradient(135deg, rgba(59,130,246,0.12), transparent 65%)" }}>
+                  <div className="absolute -top-8 -right-8 w-28 h-28 rounded-full bg-blue-500/15 blur-2xl pointer-events-none" />
+                  <div className="relative flex items-center justify-between gap-2 mb-2.5">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-blue-400 flex items-center gap-1.5"><Layers size={11} /> Rutina activa</p>
+                      <p className="text-sm font-black text-white truncate mt-0.5">{full.activeRoutineSnapshot.name}</p>
+                    </div>
                     {onActivateRoutine && !routineActivated && (
-                      <button onClick={() => setConfirmingUseRoutine(true)} className="shrink-0 flex items-center gap-1 text-[10.5px] font-bold px-2.5 py-1 rounded-full bg-blue-500/15 text-blue-300 hover:bg-blue-500/25 transition"><Download size={11} /> Usar esta rutina</button>
+                      <button onClick={() => setConfirmingUseRoutine(true)} className="shrink-0 flex items-center gap-1 text-[10.5px] font-bold px-2.5 py-1.5 rounded-full bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 transition"><Download size={11} /> Usarla</button>
                     )}
                     {routineActivated && <span className="shrink-0 flex items-center gap-1 text-[10.5px] font-bold text-emerald-400"><Check size={12} /> Activada</span>}
                   </div>
                   {confirmingUseRoutine && (
-                    <div className="rounded-xl border border-blue-500/30 bg-blue-500/10 px-3.5 py-3 mb-2.5">
+                    <div className="relative rounded-xl border border-blue-500/30 bg-blue-950/40 px-3.5 py-3 mb-2.5">
                       <p className="text-[11.5px] text-blue-200/90 mb-2.5">Vas a reemplazar tu rutina activa por una COPIA de la de {basic?.name || "esta persona"} — la tuya no se borra, queda guardada aparte.</p>
                       <div className="flex gap-2">
                         <button onClick={() => setConfirmingUseRoutine(false)} className="flex-1 py-2 rounded-lg bg-slate-800 text-slate-400 text-xs font-bold">Cancelar</button>
@@ -12499,9 +12583,17 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
                       </div>
                     </div>
                   )}
-                  <RoutinePreview routineDef={full.activeRoutineSnapshot} />
+                  <div className="relative">
+                    <RoutinePreview routineDef={full.activeRoutineSnapshot} />
+                  </div>
                 </div>
               )}
+
+              {/* Pedido: "a los días que viene entrenando" — nueva tira de
+                  constancia (últimos 14 días, coloreado con el día que
+                  corresponda), un vistazo rápido de qué tan regular viene
+                  sin tener que abrir el calendario completo de abajo. */}
+              <FriendConsistencyStrip trainingSessions={full.trainingSessions} activeRoutineSnapshot={full.activeRoutineSnapshot} />
 
               <div>
                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 px-1 mb-2">Historial de sesiones</p>
