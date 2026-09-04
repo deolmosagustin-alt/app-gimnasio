@@ -5778,7 +5778,7 @@ function groupExercisesIntoSupersets(exercises) {
   return groups;
 }
 
-function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, weekSchedule, activeSession, onStartSession, onEndSession, onCancelSession, onDisableAutoShowPrShare, onUpdateSettings = null, onGoToRoutines = null, onGoToSchedule = null, onGoToFieldSettings = null, onGoToDescarga = null, todaySessionDayKey = null, sex = null, age = null, activeRoutineDef = null, onApplyOwnProgression = null }) {
+function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, weekSchedule, activeSession, onStartSession, onEndSession, onCancelSession, onDisableAutoShowPrShare, onUpdateSettings = null, onGoToRoutines = null, onGoToSchedule = null, onGoToFieldSettings = null, onGoToDescarga = null, todaySessionDayKey = null, sex = null, age = null, activeRoutineDef = null, onApplyOwnProgression = null, goToDaySignal = { id: null, n: 0 }, onSignalConsumed = null }) {
   // Semana actual del ciclo — sólo hace falta el número (weekInCycle), para
   // que SetRow sepa si hay una meta cargada (modo "planned", ver
   // getPlannedTargetForWeek) para ESTA semana puntual.
@@ -5799,7 +5799,20 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
   // de "último entrenado + 1": si hoy no toca nada, sugerir un día del medio
   // (ej. Hombro/Brazos) es arbitrario y confuso. El primer día es un punto
   // de partida neutro y predecible.
-  const [activeDay, setActiveDay] = useState(() => scheduledDay || (isRestToday ? DAY_ORDER[0] : fallbackSuggested));
+  // Pedido: "que los días del recuadro de rutina activa sean tocables" —
+  // tocar un día en Rutinas (RoutinesView) manda acá qué día abrir vía
+  // goToDaySignal (mismo mecanismo de señal que ya usa openSectionSignal
+  // para "ir al cronograma"/"ir al editor"), con prioridad sobre el día
+  // programado/sugerido de siempre.
+  const [activeDay, setActiveDay] = useState(() => (goToDaySignal.id === "go-to-day" && goToDaySignal.payload) || scheduledDay || (isRestToday ? DAY_ORDER[0] : fallbackSuggested));
+  // BUG FIX (mismo patrón que openScheduleSignal en RoutinesView): sin
+  // avisarle a App que la señal ya se consumió, queda prendida para
+  // siempre — cualquier otra forma de volver a esta pestaña (ej. la barra
+  // de abajo) volvería a saltar al mismo día viejo sin que nadie lo pidiera.
+  useEffect(() => {
+    if (goToDaySignal.id === "go-to-day" && goToDaySignal.n > 0) onSignalConsumed?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // Modo de entrenamiento accesible también desde acá (antes sólo estaba en
   // Perfil) — mismo par de opciones y el mismo atajo de "planificar mi
   // progresión", para no tener que salir de Rutina a cambiarlo. Segmentado
@@ -17040,7 +17053,7 @@ function RoutinePreviewModal({ routineDef, routineName, onActivate, onClose, yaA
   );
 }
 
-function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpdateProfile, openScheduleSignal = 0, openEditorSignal = 0, onSignalConsumed = null }) {
+function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpdateProfile, openScheduleSignal = 0, openEditorSignal = 0, onSignalConsumed = null, onGoToDay = null }) {
   const [mode, setMode] = useState("catalog");
   const [showWizard, setShowWizard] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
@@ -17356,22 +17369,47 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
             ))}
           </div>
 
-          {/* Los días, a la misma altura que los números de arriba: grilla
-              SIMÉTRICA de 2 columnas (si son impares, el último ocupa el
-              ancho completo). El color de cada día queda como un puntito
-              discreto — identifica sin romper el celeste del héroe. */}
-          <p className="relative text-[9px] font-black uppercase tracking-[0.14em] text-blue-300/60 mt-3.5 mb-1.5 px-0.5">Tus días</p>
-          <div className="relative grid grid-cols-2 gap-1.5">
+          {/* Tira semanal — pedido: "hacé más visual y práctico el
+              recuadro de rutina activa". Antes la única forma de saber qué
+              te toca hoy era abrir "Cronograma"; ahora se ve de un
+              vistazo, con el color propio del día que corresponda a cada
+              lunes-domingo (Descanso queda como celda vacía). */}
+          <p className="relative text-[9px] font-black uppercase tracking-[0.14em] text-blue-300/60 mt-3.5 mb-1.5 px-0.5">Tu semana</p>
+          <div className="relative grid grid-cols-7 gap-1">
+            {WEEKDAY_KEYS.map((wk, i) => {
+              const dk = activeSchedule[wk] || null;
+              const d = dk ? activeDef.days[dk] : null;
+              const isToday = wk === todayWeekdayKey();
+              return (
+                <button key={wk} onClick={() => d && onGoToDay?.(dk)} disabled={!d} title={d ? d.label : "Descanso"}
+                  className={`flex flex-col items-center gap-1 py-0.5 ${d ? "active:scale-95 transition" : "cursor-default"}`}>
+                  <span className={`text-[8px] font-black uppercase ${isToday ? "text-white" : "text-blue-300/50"}`}>{WEEKDAY_SHORT_LABELS[i][0]}</span>
+                  <span className="w-full aspect-square rounded-lg flex items-center justify-center" style={d
+                    ? { backgroundColor: d.color, boxShadow: isToday ? "0 0 0 2px rgba(255,255,255,0.85)" : "none" }
+                    : { backgroundColor: "rgba(0,0,0,0.25)", border: isToday ? "1.5px solid rgba(255,255,255,0.5)" : "1px solid rgba(96,165,250,0.15)" }}
+                  />
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Lista de días de la rutina — ahora con el color propio de
+              cada día (antes todos en el mismo celeste parejo) y
+              tocables: van directo a esa sesión en la pestaña Rutina en
+              vez de ser sólo informativos. */}
+          <div className="relative grid grid-cols-2 gap-1.5 mt-2.5">
             {(() => {
               const orden = (activeDef.dayOrder || Object.keys(activeDef.days || {})).filter((dk) => activeDef.days?.[dk]);
               return orden.map((dk, i) => {
                 const d = activeDef.days[dk];
                 const ultimoImpar = i === orden.length - 1 && orden.length % 2 === 1;
                 return (
-                  <span key={dk} className={`flex items-center gap-2 px-2.5 py-2.5 rounded-xl text-[11px] font-bold bg-black/25 border border-blue-400/10 min-w-0 ${ultimoImpar ? "col-span-2" : ""}`}>
-                    <span className="flex-1 min-w-0 leading-snug text-slate-200" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{d.label}</span>
-                    <span className="text-blue-300/60 tabular-nums shrink-0 text-[10px]">{d.exercises?.length || 0}</span>
-                  </span>
+                  <button key={dk} onClick={() => onGoToDay?.(dk)} className={`flex items-center gap-2 px-2.5 py-2.5 rounded-xl text-[11px] font-bold min-w-0 transition active:scale-[0.97] ${ultimoImpar ? "col-span-2" : ""}`}
+                    style={{ backgroundColor: tint(d.color, "1c"), border: `1px solid ${tint(d.color, "40")}` }}>
+                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: d.color }} />
+                    <span className="flex-1 min-w-0 leading-snug text-slate-100 text-left" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{d.label}</span>
+                    <span className="tabular-nums shrink-0 text-[10px]" style={{ color: tint(d.color, "cc") }}>{d.exercises?.length || 0}</span>
+                  </button>
                 );
               });
             })()}
@@ -17839,9 +17877,12 @@ export default function App() {
   // y se abre sola. Guardamos qué sección abrir por su id.
   const [openSectionSignal, setOpenSectionSignal] = useState({ id: null, n: 0 });
   const [showFieldIntro, setShowFieldIntro] = useState(false); // modal de "qué ves al registrar"
-  const goToSection = (targetTab, sectionId) => {
+  // payload opcional: dato extra que necesite la sección destino (ej. qué
+  // día abrir puntualmente) además de simplemente "abrite" — ver
+  // goToDaySignal en RoutineView, usado desde el recuadro de rutina activa.
+  const goToSection = (targetTab, sectionId, payload = null) => {
     setTab(targetTab);
-    setOpenSectionSignal((s) => ({ id: sectionId, n: s.n + 1 }));
+    setOpenSectionSignal((s) => ({ id: sectionId, n: s.n + 1, payload }));
   };
   // BUG FIX (pedido: "que el chatbot aparezca arriba del todo al abrirlo"):
   // antes el Entrenador IA se excluía acá porque su propio mount-effect
@@ -18818,7 +18859,7 @@ export default function App() {
         </header>
         <main className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto px-4 py-4 pb-28 lg:pb-10 space-y-4" style={{ paddingBottom: "calc(7rem + env(safe-area-inset-bottom, 0px))" }}>
           <div key={tab} className={tabSlideClass}>
-            {tab === "rutinas" && <RoutinesView openScheduleSignal={openSectionSignal.id === "week-schedule" ? openSectionSignal.n : 0} openEditorSignal={openSectionSignal.id === "routine-editor" ? openSectionSignal.n : 0} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleDeleteRoutine} onUpdateProfile={handleUpdateProfile} />}
+            {tab === "rutinas" && <RoutinesView openScheduleSignal={openSectionSignal.id === "week-schedule" ? openSectionSignal.n : 0} openEditorSignal={openSectionSignal.id === "routine-editor" ? openSectionSignal.n : 0} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleDeleteRoutine} onUpdateProfile={handleUpdateProfile} onGoToDay={(dayKey) => goToSection("rutina", "go-to-day", dayKey)} />}
             {tab === "rutina" && !showPinnedDeload && <OnboardingTasksCard profile={profile} cycleStart={cycleStart} logs={logs} onGoToProfile={() => setTab("perfil")} onOpenFieldSettings={() => setShowFieldIntro(true)} onDone={() => handleUpdateProfile({ onboardingDone: true })} />}
             {/* Semana de descarga: se muestra fija acá mismo, en vez del
                 entrenamiento normal, con un botón para cerrarla (ver
@@ -18827,7 +18868,7 @@ export default function App() {
                 que quedó adentro de RoutineView ahora sirve para volver a
                 fijarla si la cerraste. */}
             {tab === "rutina" && showPinnedDeload && <DeloadView logs={logs} setLogs={setLogs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} activeSession={profile?.activeSession?.deload ? profile.activeSession : null} onStartSession={handleStartSession} onCancelSession={handleCancelSession} weekSchedule={weekSchedule} onClose={() => setDeloadDismissed(true)} cycleStart={cycleStart} />}
-            {tab === "rutina" && !showPinnedDeload && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToRoutines={() => setTab("rutinas")} onGoToSchedule={() => goToSection("rutinas", "week-schedule")} onGoToFieldSettings={() => goToSection("perfil", "field-settings-section")} onGoToDescarga={() => (isDeloadWeek ? setDeloadDismissed(false) : setTab("descarga"))} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} todaySessionDayKey={(profile?.trainingSessions || []).find((ts) => ts.date === todayStr())?.dayKey || profile?.activeSession?.dayKey || null} sex={profile?.sex} age={profile?.age} activeRoutineDef={activeRoutineDef} onApplyOwnProgression={(plan) => handleUpdateProfile({ routines: { ...(profile.routines || {}), [profile.activeRoutineId]: applyProgressionToRoutine(activeRoutineDef, plan) } })} />}
+            {tab === "rutina" && !showPinnedDeload && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToRoutines={() => setTab("rutinas")} onGoToSchedule={() => goToSection("rutinas", "week-schedule")} onGoToFieldSettings={() => goToSection("perfil", "field-settings-section")} onGoToDescarga={() => (isDeloadWeek ? setDeloadDismissed(false) : setTab("descarga"))} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} todaySessionDayKey={(profile?.trainingSessions || []).find((ts) => ts.date === todayStr())?.dayKey || profile?.activeSession?.dayKey || null} sex={profile?.sex} age={profile?.age} activeRoutineDef={activeRoutineDef} onApplyOwnProgression={(plan) => handleUpdateProfile({ routines: { ...(profile.routines || {}), [profile.activeRoutineId]: applyProgressionToRoutine(activeRoutineDef, plan) } })} goToDaySignal={openSectionSignal.id === "go-to-day" ? openSectionSignal : { id: null, n: 0 }} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} />}
             {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} onGoToRoutines={() => goToSection("rutinas", "routine-editor")} weekSchedule={weekSchedule} sex={profile?.sex} age={profile?.age} onGoToDeload={() => { setDeloadDismissed(false); setTab("rutina"); }} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} />}
             {tab === "descarga" && <DeloadView logs={logs} setLogs={setLogs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} activeSession={profile?.activeSession?.deload ? profile.activeSession : null} onStartSession={handleStartSession} onCancelSession={handleCancelSession} weekSchedule={weekSchedule} onClose={() => { setDeloadDismissed(true); setTab("rutina"); }} cycleStart={cycleStart} />}
             {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} setLogs={setLogs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} conversations={aiConversations} activeConversationId={activeAiConversationId} onNewConversation={handleNewAiConversation} onSwitchConversation={handleSwitchAiConversation} onDeleteConversation={handleDeleteAiConversation} onRenameConversation={handleRenameAiConversation} settings={getProfileSettings(profile)} cycleStart={cycleStart} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} onDeleteRoutine={handleDeleteRoutine} onNavigate={setTab} onStartSession={handleStartSession} onEndSession={handleEndSession} />}
