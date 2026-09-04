@@ -965,64 +965,104 @@ function getBestWorkingKg(exercise, logs) {
    core — no hace falta la granularidad fina que sí importa para el
    registro de marcas.
 ============================================================================ */
+// Pedido: "agreguemos más ejercicios y que la IA detecte qué músculos
+// hacés ese día... si hacés hombros o pecho que te haga hacer movilidad
+// de hombros y calentamiento de manguito rotador". Antes las regiones
+// eran sólo 4 (general/empuje/tracción/piernas/core) — "empuje" mezclaba
+// pecho, hombro Y tríceps en una sola bolsa, así que un día de hombro
+// recibía lo mismo que un día de pecho. Ahora hombro/pecho/espalda/
+// brazos son regiones separadas, con el manguito rotador (rotación
+// externa E interna, face pull, Y-T-W) representado a fondo en hombro —
+// no sólo un par de ejercicios genéricos.
+// IMPORTANTE: nunca se renombran ni se borran keys existentes — quedan
+// guardadas tal cual en el `warmup` de rutinas ya creadas (ver
+// BuilderWarmupSection); sólo se agregan nuevas o se les ajusta el
+// `region` (eso no rompe nada, sólo cambia en qué bolsa cae para el
+// auto-armado).
 const MOBILITY_DRILLS = [
   { key: "jumping_jacks", name: "Saltos de tijera", dur: "45 seg", region: "general" },
   { key: "cat_cow", name: "Gato-camello (columna)", dur: "45 seg", region: "general" },
-  { key: "arm_circles", name: "Círculos de brazos", dur: "30 seg c/lado", region: "empuje" },
-  { key: "band_pull_apart", name: "Jalón de banda o toalla al pecho", dur: "15 reps", region: "traccion" },
-  { key: "shoulder_dislocates", name: "Dislocados de hombro (palo o banda)", dur: "10 reps", region: "empuje" },
-  { key: "cuban_rotation", name: "Rotación externa de hombro", dur: "10 reps c/lado", region: "empuje" },
-  { key: "scapular_pushups", name: "Flexiones escapulares", dur: "10 reps", region: "traccion" },
+  // Hombro — manguito rotador (ER/IR) + activación escapular, a fondo.
+  { key: "arm_circles", name: "Círculos de brazos", dur: "30 seg c/lado", region: "hombro" },
+  { key: "shoulder_dislocates", name: "Dislocados de hombro (palo o banda)", dur: "10 reps", region: "hombro" },
+  { key: "cuban_rotation", name: "Rotación externa de hombro (manguito rotador)", dur: "10 reps c/lado", region: "hombro" },
+  { key: "internal_rotation", name: "Rotación interna de hombro (manguito rotador)", dur: "10 reps c/lado", region: "hombro" },
+  { key: "face_pull", name: "Face pull con banda", dur: "12 reps", region: "hombro" },
+  { key: "ytw_raises", name: "Elevaciones Y-T-W (activación de hombro)", dur: "8 reps c/letra", region: "hombro" },
+  // Pecho
+  { key: "band_chest_fly", name: "Aperturas con banda (activación pectoral)", dur: "12 reps", region: "pecho" },
+  { key: "slow_pushups", name: "Flexiones lentas de activación", dur: "8 reps", region: "pecho" },
+  // Espalda
+  { key: "band_pull_apart", name: "Jalón de banda o toalla al pecho", dur: "15 reps", region: "espalda" },
+  { key: "scapular_pushups", name: "Flexiones escapulares", dur: "10 reps", region: "espalda" },
+  { key: "band_rows", name: "Remo con banda (activación dorsal)", dur: "12 reps", region: "espalda" },
+  { key: "superman", name: "Superman (extensión lumbar)", dur: "10 reps", region: "espalda" },
+  // Brazos (bíceps/tríceps aislados — antes no tenían nada propio)
+  { key: "band_curls", name: "Curl con banda liviana (activación de bíceps)", dur: "12 reps", region: "brazos" },
+  { key: "band_triceps_ext", name: "Extensión de tríceps con banda", dur: "12 reps", region: "brazos" },
+  // Piernas
   { key: "hip_circles", name: "Círculos de cadera", dur: "30 seg c/lado", region: "piernas" },
   { key: "leg_swings", name: "Balanceo de pierna (adelante/atrás y lateral)", dur: "10 c/lado" },
   { key: "bodyweight_squat", name: "Sentadilla sin peso", dur: "15 reps", region: "piernas" },
   { key: "lunges_walking", name: "Zancadas caminando", dur: "10 c/pierna", region: "piernas" },
   { key: "glute_bridge", name: "Puente de glúteo", dur: "15 reps", region: "piernas" },
+  { key: "monster_walk", name: "Monster walk con banda (activación de glúteo medio)", dur: "10 pasos c/lado", region: "piernas" },
   { key: "ankle_circles", name: "Círculos de tobillo", dur: "10 c/lado", region: "piernas" },
+  // Core
   { key: "cat_cow_core", name: "Dead bug (activación de core)", dur: "10 c/lado", region: "core" },
   { key: "bird_dog", name: "Bird-dog", dur: "10 c/lado", region: "core" },
   { key: "torso_twists", name: "Rotaciones de torso de pie", dur: "30 seg", region: "core" },
+  { key: "plank_hold", name: "Plancha (activación general de core)", dur: "20-30 seg", region: "core" },
 ];
 // leg_swings no tiene "region" arriba a propósito: aplica a piernas Y sirve
 // de transición general, se agrega manual en REGION_DRILLS.
 const REGION_DRILLS = {
   general: MOBILITY_DRILLS.filter((d) => d.region === "general"),
-  empuje: MOBILITY_DRILLS.filter((d) => d.region === "empuje"),
-  traccion: MOBILITY_DRILLS.filter((d) => d.region === "traccion"),
+  hombro: MOBILITY_DRILLS.filter((d) => d.region === "hombro"),
+  pecho: MOBILITY_DRILLS.filter((d) => d.region === "pecho"),
+  espalda: MOBILITY_DRILLS.filter((d) => d.region === "espalda"),
+  brazos: MOBILITY_DRILLS.filter((d) => d.region === "brazos"),
   piernas: [...MOBILITY_DRILLS.filter((d) => d.region === "piernas"), MOBILITY_DRILLS.find((d) => d.key === "leg_swings")],
   core: MOBILITY_DRILLS.filter((d) => d.region === "core"),
 };
-// Clasifica el día en regiones amplias mirando el texto de `muscle` de sus
-// ejercicios — funciona tanto con los grupos del catálogo como con
-// ejercicios propios (que guardan la ETIQUETA ya resuelta, ver
-// addCustomExercise), sin necesitar una tabla de mapeo exacta por key.
+// Clasifica el día en regiones — ahora hombro/pecho/espalda/brazos
+// separados (antes "empuje" mezclaba pecho+hombro+tríceps en una sola
+// bolsa) — mirando el texto de `muscle` de sus ejercicios. Funciona
+// tanto con los grupos del catálogo como con ejercicios propios (que
+// guardan la ETIQUETA ya resuelta, ver addCustomExercise), sin
+// necesitar una tabla de mapeo exacta por key.
 function detectDayRegions(exercises) {
   const text = (exercises || []).map((e) => (e.muscle || "").toLowerCase()).join(" ");
   const regions = new Set();
+  if (/pectoral/.test(text)) regions.add("pecho");
+  if (/deltoide|hombro/.test(text)) regions.add("hombro");
+  if (/dorsal|trapecio|espalda/.test(text)) regions.add("espalda");
+  if (/bíceps|tríceps|antebrazo/.test(text)) regions.add("brazos");
   if (/cuádr|femoral|glúte|pantorr|aductor|tibial|pierna/.test(text)) regions.add("piernas");
-  if (/pectoral|deltoide|tríceps|hombro/.test(text)) regions.add("empuje");
-  if (/dorsal|trapecio|bíceps|espalda/.test(text)) regions.add("traccion");
   if (/core|abdomen|oblicuo/.test(text)) regions.add("core");
   return regions;
 }
 // Arma la lista final: los generales primero + una vuelta "round-robin"
-// entre las regiones detectadas hasta llegar a 6 o quedarse sin más — apunta
-// a 10-15 minutos totales sin abrumar con una lista larguísima.
+// entre las regiones detectadas hasta llegar a 7 o quedarse sin más —
+// apunta a 10-15 minutos totales sin abrumar con una lista larguísima.
+// Tope subido de 6 a 7 (antes, un día de empuje que ahora reparte entre
+// 3 regiones — pecho/hombro/brazos — se quedaba corto de espacio para
+// representarlas todas).
 function pickWarmupDrills(exercises) {
   const regions = detectDayRegions(exercises);
-  const regionKeys = regions.size ? Array.from(regions) : ["piernas", "empuje"]; // sin match: genérico
+  const regionKeys = regions.size ? Array.from(regions) : ["piernas", "hombro"]; // sin match: genérico
   const picked = [...REGION_DRILLS.general];
   const pools = regionKeys.map((r) => [...(REGION_DRILLS[r] || [])]);
   let keepGoing = true;
-  while (picked.length < 6 && keepGoing) {
+  while (picked.length < 7 && keepGoing) {
     keepGoing = false;
     for (const pool of pools) {
-      if (picked.length >= 6) break;
+      if (picked.length >= 7) break;
       const item = pool.shift();
       if (item) { keepGoing = true; if (!picked.includes(item)) picked.push(item); }
     }
   }
-  return picked.slice(0, 6);
+  return picked.slice(0, 7);
 }
 
 // Pedido: "que haya una opción de generarlo con IA" — a diferencia de
@@ -1036,11 +1076,12 @@ async function generateWarmupWithAI(dayExercises, dayLabel) {
   const catalog = MOBILITY_DRILLS.map((d) => `${d.key}: ${d.name} (${d.dur})`).join("\n");
   const exList = (dayExercises || []).map((e) => `${e.name} (${e.muscle})`).join(", ") || "sin ejercicios cargados todavía";
   const prompt = [
-    `Elegí entre 4 y 6 ejercicios de movilidad/activación para calentar ANTES de este día de entrenamiento: "${dayLabel}".`,
+    `Elegí entre 4 y 7 ejercicios de movilidad/activación para calentar ANTES de este día de entrenamiento: "${dayLabel}".`,
     `Ejercicios de ese día: ${exList}.`,
     `Sólo podés elegir de este catálogo fijo (usá la KEY exacta tal cual está escrita, nunca inventes otra):`,
     catalog,
-    `Priorizá los músculos/movimientos que va a usar ese día. Devolvé ÚNICAMENTE un array JSON de keys, sin texto adicional ni markdown, por ejemplo: ["jumping_jacks","hip_circles"]`,
+    `Elegí ESPECÍFICO según qué músculo entrena ese día, no genérico: si es hombro o pecho, priorizá manguito rotador (rotación externa e interna) + face pull + Y-T-W en vez de sólo movilidad general; si es espalda, remo con banda + jalón de banda + superman; si es brazos aislado, las de bíceps/tríceps con banda; si es pierna, cadera/glúteo/tobillo.`,
+    `Devolvé ÚNICAMENTE un array JSON de keys, sin texto adicional ni markdown, por ejemplo: ["jumping_jacks","cuban_rotation","face_pull"]`,
   ].join("\n");
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 30000);
@@ -14109,7 +14150,7 @@ Tipos disponibles:
 - corregir_record: {"type":"corregir_record","exercise":"Press Banca","reps":10,"kg":90,"setIndex":0} — corrige a mano el récord (PR) guardado de un ejercicio, para cuando el historial no refleja su marca real. "setIndex" es opcional (0 = primera serie del ejercicio).
 - planificar_progresion: {"type":"planificar_progresion","exercise":"Press Banca","setIndex":0,"metas":[{"semana":1,"kg":80,"reps":5},{"semana":2,"kg":82.5,"reps":5}]} — ayuda a planificar CUÁNTO PESO levantar cada semana del ciclo en una serie puntual de un ejercicio de SU RUTINA ACTIVA (no crea rutina, sólo carga a qué apuntar semana a semana — la sección "rutina planificada"/"marca a alcanzar" que ya existe en la app). Usalo cuando pida ayuda con la progresión de pesos ("armame una progresión de sentadilla del 80 al 100 en 6 semanas", "subime 2.5kg por semana en press militar"). El ejercicio tiene que estar en su rutina activa (mirá los días/ejercicios en el contexto) y "setIndex" identifica CUÁL de sus series (0 = primera) — si no da detalles de cuál, usá la primera y avisale. Cubrí TODAS las semanas de su ciclo que tenga sentido planificar (mirá "trainWeeks"/settings en el contexto), no sólo una o dos, salvo que pida un tramo puntual. Si no te da un punto de partida o de llegada, preguntá antes de inventar números.
 - planificar_semana: {"type":"planificar_semana","semana":3,"sets":[{"exercise":"Press Banca","setIndex":0,"kg":82.5,"reps":8},{"exercise":"Sentadilla","setIndex":0,"kg":100,"reps":5},{"exercise":"Cinta","setIndex":0,"minutes":20}]} — a diferencia de planificar_progresion (una serie puntual, muchas semanas), esto carga de una sola vez las metas de kg×reps (o "minutes" en vez de "kg"/"reps" si es un ejercicio de cardio) de VARIAS series de SU RUTINA ACTIVA para UNA SOLA semana — pensado para "planificame la semana"/"armame las cargas de esta semana", cuando quiere ver de entrada el plan de varios ejercicios juntos, no uno por uno. "semana" es opcional: si no la das, se usa la semana real de hoy (mirá "semanaActualDelCiclo" en el contexto) — especificala sólo si pidió explícitamente otra semana ("la que viene", "la semana 4"). Basate en su historial reciente y en "analisisEntrenamiento" del contexto para proponer números con sentido (progresión leve sobre lo último que hizo en cada serie, nunca un salto brusco ni copiar el récord de otro ejercicio) — si no tenés ningún dato de un ejercicio para basarte, no lo incluyas en "sets" en vez de inventar un número. Cubrí los ejercicios que la persona pida, o todos los de su rutina activa si no especifica cuáles.
-- generar_calentamiento: {"type":"generar_calentamiento","day":"nombre o parte del nombre del día (opcional, si no da usa el primero de su rutina activa)","drills":["Saltos de tijera","Círculos de cadera","Sentadilla sin peso"]} — arma la tarjeta "Calentamiento general" de un día de SU RUTINA ACTIVA (la guía de movilidad de 10-15 min que aparece ANTES de la lista de ejercicios de ese día, distinta de la rampa de aproximación por ejercicio). Elegí SIEMPRE entre 4 y 6 de estos ejercicios fijos — no inventes otros, tienen que ser EXACTAMENTE estos nombres: Saltos de tijera, Gato-camello (columna), Círculos de brazos, Jalón de banda o toalla al pecho, Dislocados de hombro (palo o banda), Rotación externa de hombro, Flexiones escapulares, Círculos de cadera, Balanceo de pierna (adelante/atrás y lateral), Sentadilla sin peso, Zancadas caminando, Puente de glúteo, Círculos de tobillo, Dead bug (activación de core), Bird-dog, Rotaciones de torso de pie. Priorizá los que activen los músculos que va a usar ese día (mirá sus ejercicios en el contexto). Usalo para "armame un calentamiento", "qué hago de entrada en [día]", etc.
+- generar_calentamiento: {"type":"generar_calentamiento","day":"nombre o parte del nombre del día (opcional, si no da usa el primero de su rutina activa)","drills":["Saltos de tijera","Rotación externa de hombro (manguito rotador)","Face pull con banda"]} — arma la tarjeta "Calentamiento general" de un día de SU RUTINA ACTIVA (la guía de movilidad de 10-15 min que aparece ANTES de la lista de ejercicios de ese día, distinta de la rampa de aproximación por ejercicio). Elegí SIEMPRE entre 4 y 7 de estos ejercicios fijos — no inventes otros, tienen que ser EXACTAMENTE estos nombres: Saltos de tijera, Gato-camello (columna), Círculos de brazos, Dislocados de hombro (palo o banda), Rotación externa de hombro (manguito rotador), Rotación interna de hombro (manguito rotador), Face pull con banda, Elevaciones Y-T-W (activación de hombro), Aperturas con banda (activación pectoral), Flexiones lentas de activación, Jalón de banda o toalla al pecho, Flexiones escapulares, Remo con banda (activación dorsal), Superman (extensión lumbar), Curl con banda liviana (activación de bíceps), Extensión de tríceps con banda, Círculos de cadera, Balanceo de pierna (adelante/atrás y lateral), Sentadilla sin peso, Zancadas caminando, Puente de glúteo, Monster walk con banda (activación de glúteo medio), Círculos de tobillo, Dead bug (activación de core), Bird-dog, Rotaciones de torso de pie, Plancha (activación general de core). Mirá los ejercicios de ESE día en el contexto y elegí específico según qué músculo entrena, no genérico: día de hombro o pecho → priorizá los de manguito rotador (rotación externa E interna) + face pull + Y-T-W, no sólo movilidad general; día de espalda → remo con banda + jalón de banda + superman; día de brazos aislado → los de bíceps/tríceps con banda; día de pierna → cadera/glúteo/tobillo. Usalo para "armame un calentamiento", "qué hago de entrada en [día]", etc.
 - nota_ejercicio: {"type":"nota_ejercicio","exercise":"Sentadilla","nota":"cuidado con la rodilla derecha"} — guarda (o si "nota" viene vacío, borra) la nota personal de ese ejercicio, la misma que se ve al registrar la serie.
 - restablecer_dia: {"type":"restablecer_dia","day":"nombre o parte del nombre del día (opcional)"} — borra las marcas de HOY de ese día de la rutina normal (no toca otros días, ni récords, ni marcas de descarga). Si no da el día, usa el primero de la rutina activa. Usalo para "reiniciá mi día" o si se equivocó al cargar algo y quiere volver a empezar.
 - cambiar_dia_semana: {"type":"cambiar_dia_semana","diaSemana":"lunes"|"martes"|"miercoles"|"jueves"|"viernes"|"sabado"|"domingo","dia":"nombre o parte del nombre del día de la rutina, o vacío/omitido para dejarlo como descanso"} — asigna (o saca) qué día de su rutina le toca en ese día de la semana, el mismo cronograma de Rutinas → Cronograma semanal.
@@ -16902,12 +16943,20 @@ const TAB_ORDER = ["rutina", "progreso", "social", "descarga", "rutinas", "entre
 // el teal característico de la app (el mismo de Rutina, el logo, el
 // avatar por default), y que el color propio de cada pestaña quede sólo
 // adentro de su contenido (héroe, botones), no en el ícono de abajo.
+// BUG FIX (encontrado auditando por qué Social/Progreso/Rutinas se
+// sienten "apagadas"): ninguna entrada tenía su propio `color` — como
+// BottomBar destructura con default `color = "#14B8A6"` (teal), CADA
+// pestaña activa se pintaba teal en la barra de abajo, sin importar cuál
+// fuera. Sólo Rutina se veía "bien" de casualidad (su color real es
+// justo ese). Entrenador IA se deja en teal a propósito (comparte
+// identidad de color con Rutina, ver su propio hero) — las demás ahora
+// usan el mismo color que su hero real.
 const NAV_TABS = [
-  { key: "rutina", icon: <Dumbbell size={20} />, label: "Rutina" },
-  { key: "progreso", icon: <BarChart3 size={20} />, label: "Progreso" },
-  { key: "social", icon: <Users size={20} />, label: "Social" },
-  { key: "rutinas", icon: <Layers size={20} />, label: "Rutinas" },
-  { key: "entrenador_ia", icon: <Sparkles size={20} />, label: "Chatbot" },
+  { key: "rutina", icon: <Dumbbell size={20} />, label: "Rutina", color: "#14B8A6" },
+  { key: "progreso", icon: <BarChart3 size={20} />, label: "Progreso", color: "#3B82F6" },
+  { key: "social", icon: <Users size={20} />, label: "Social", color: "#A855F7" },
+  { key: "rutinas", icon: <Layers size={20} />, label: "Rutinas", color: "#3B82F6" },
+  { key: "entrenador_ia", icon: <Sparkles size={20} />, label: "Chatbot", color: "#14B8A6" },
 ];
 
 // Avatar del header móvil: muestra la foto de perfil si existe, con la
