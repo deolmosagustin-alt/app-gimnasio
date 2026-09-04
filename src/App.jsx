@@ -2325,7 +2325,7 @@ function PRBurst({ anchorRef, trigger }) {
       "logo" de la app abajo. Sin backend: todo se dibuja y se comparte/baja
       directamente desde el navegador.
 ============================================================================ */
-function ShareLinkModal({ title, shareTitle, shareText, shareTarget, onClose }) {
+function ShareLinkModal({ title, shareTitle, shareText, shareTarget, onClose, accent = "#3B82F6" }) {
   useAndroidBack(onClose);
   const [url, setUrl] = useState("");
   const [linkError, setLinkError] = useState(null);
@@ -2411,21 +2411,25 @@ function ShareLinkModal({ title, shareTitle, shareText, shareTarget, onClose }) 
   if (typeof document === "undefined") return null;
   return createPortal(
     <div className="fixed inset-0 z-[120] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
-      <div className="bg-slate-900 border border-slate-700/60 rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50 max-h-[92vh] overflow-y-auto overscroll-contain" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-base font-black text-white">{title}</h3>
-          <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition"><X size={18} /></button>
+      <div className="relative overflow-hidden bg-slate-900 border rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50 max-h-[92vh] overflow-y-auto overscroll-contain" style={{ borderColor: tint(accent, "35") }} onClick={(e) => e.stopPropagation()}>
+        <div className="absolute -top-20 -right-16 w-56 h-56 rounded-full blur-3xl pointer-events-none opacity-20" style={{ backgroundColor: accent }} />
+        <div className="relative flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: tint(accent, "18"), border: `1px solid ${tint(accent, "40")}`, color: accent }}><Share2 size={16} /></div>
+            <h3 className="text-base font-black text-white truncate">{title}</h3>
+          </div>
+          <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition shrink-0"><X size={18} /></button>
         </div>
 
         {!url && !linkError && (
-          <div className="flex flex-col items-center gap-3 py-8">
-            <div className="w-9 h-9 rounded-full border-[3px] border-teal-500/25 border-t-teal-500 animate-spin" />
+          <div className="relative flex flex-col items-center gap-3 py-8">
+            <div className="w-9 h-9 rounded-full border-[3px] animate-spin" style={{ borderColor: tint(accent, "25"), borderTopColor: accent }} />
             <p className="text-sm text-slate-400">Generando enlace mágico...</p>
           </div>
         )}
 
         {linkError && (
-          <div className="bg-rose-500/10 border border-rose-500/20 rounded-2xl p-4 mb-3">
+          <div className="relative bg-rose-500/10 border border-rose-500/20 rounded-2xl p-4 mb-3">
             <p className="text-sm text-rose-300 mb-3">
               {linkError === "permission-denied"
                 ? "Firestore todavía no tiene permiso para guardar rutinas compartidas. Hace falta ajustar las reglas de seguridad de la colección \"shared_routines\" en la consola de Firebase."
@@ -2436,27 +2440,38 @@ function ShareLinkModal({ title, shareTitle, shareText, shareTarget, onClose }) 
         )}
 
         {url && (
-          <>
+          <div className="relative">
             {/* Botón principal de compartir — prominente y arriba */}
             {canNativeShare && (
-              <button onClick={handleNativeShare} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl !text-white text-sm font-bold mb-3 transition-all active:scale-[0.98]" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>
+              <button onClick={handleNativeShare} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl !text-white text-sm font-bold mb-3 transition-all active:scale-[0.98]" style={{ background: `linear-gradient(135deg, ${accent}, ${tint(accent, "b0")})`, boxShadow: `0 10px 28px -10px ${tint(accent, "80")}` }}>
                 <Share2 size={15} /> Compartir
               </button>
             )}
             {/* Copiar enlace */}
             <button onClick={handleCopy} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition text-sm font-semibold mb-2">
-              {copied ? <><Check size={14} className="text-teal-400" /> ¡Copiado!</> : <><Copy size={14} /> Copiar enlace</>}
+              {copied ? <><Check size={14} className="text-emerald-400" /> ¡Copiado!</> : <><Copy size={14} /> Copiar enlace</>}
             </button>
             {copyError && <p className="text-[11px] text-amber-400 mb-2 text-center">No pudimos copiarlo. Tocá el enlace de abajo y copialo a mano.</p>}
-            <input ref={urlInputRef} value={url} readOnly onFocus={(e) => e.target.select()} className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-3 py-2.5 text-[11px] text-slate-400 mb-3 focus:outline-none focus:border-teal-500/50 truncate" />
-            {/* Redes sociales — colapsadas en fila compacta */}
-            <div className="grid grid-cols-3 gap-2 mb-3">
-              <a href={waUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center gap-1.5 py-2.5 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition"><Share2 size={13} className="text-emerald-400" />WhatsApp</a>
-              <a href={xUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center gap-1.5 py-2.5 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition"><Share2 size={13} className="text-slate-200" />X</a>
-              <a href={redditUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center gap-1.5 py-2.5 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition"><Share2 size={13} className="text-orange-400" />Reddit</a>
+            <input ref={urlInputRef} value={url} readOnly onFocus={(e) => e.target.select()} className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-3 py-2.5 text-[11px] text-slate-400 mb-3 focus:outline-none truncate" />
+            {/* Redes sociales — insignias circulares con el color propio de
+                cada red, en vez del cuadrado gris genérico de antes con un
+                único ícono (Share2) repetido y sólo el tinte cambiando. */}
+            <div className="grid grid-cols-3 gap-2.5 mb-3">
+              <a href={waUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center gap-1.5 py-3 rounded-2xl border border-slate-800/60 bg-slate-800/30 hover:bg-slate-800/60 transition active:scale-[0.97]">
+                <div className="w-9 h-9 rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/25" style={{ backgroundColor: "#25D366" }}><Phone size={16} className="text-white" fill="white" /></div>
+                <span className="text-[10px] font-bold text-slate-300">WhatsApp</span>
+              </a>
+              <a href={xUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center gap-1.5 py-3 rounded-2xl border border-slate-800/60 bg-slate-800/30 hover:bg-slate-800/60 transition active:scale-[0.97]">
+                <div className="w-9 h-9 rounded-full flex items-center justify-center bg-black border border-slate-700"><X size={15} className="text-white" strokeWidth={2.75} /></div>
+                <span className="text-[10px] font-bold text-slate-300">X</span>
+              </a>
+              <a href={redditUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center gap-1.5 py-3 rounded-2xl border border-slate-800/60 bg-slate-800/30 hover:bg-slate-800/60 transition active:scale-[0.97]">
+                <div className="w-9 h-9 rounded-full flex items-center justify-center shadow-lg shadow-orange-500/25" style={{ backgroundColor: "#FF4500" }}><Share2 size={15} className="text-white" /></div>
+                <span className="text-[10px] font-bold text-slate-300">Reddit</span>
+              </a>
             </div>
             <p className="text-[10px] text-slate-600 mb-3 text-center">Quien abra el enlace puede agregar la rutina a su app con un toque.</p>
-          </>
+          </div>
         )}
         {/* BUG FIX: "Descargar como archivo" (PDF/Word/Excel) NO depende de
             Firestore para nada, se arma entero con datos que ya están en el
@@ -2468,9 +2483,9 @@ function ShareLinkModal({ title, shareTitle, shareText, shareTarget, onClose }) 
             causa real tuviera nada que ver con exportar. Ahora se muestra
             siempre, sin importar cómo vaya el enlace para compartir. */}
         {!showFileOptions ? (
-          <button onClick={() => setShowFileOptions(true)} className="w-full flex items-center justify-center gap-1.5 pt-3 border-t border-slate-800/60 text-slate-500 hover:text-slate-300 text-xs font-semibold transition"><Download size={12} /> Descargar como archivo (PDF, Word, Excel)</button>
+          <button onClick={() => setShowFileOptions(true)} className="relative w-full flex items-center justify-center gap-1.5 pt-3 border-t border-slate-800/60 text-slate-500 hover:text-slate-300 text-xs font-semibold transition"><Download size={12} /> Descargar como archivo (PDF, Word, Excel)</button>
         ) : (
-          <div className="pt-3 border-t border-slate-800/60">
+          <div className="relative pt-3 border-t border-slate-800/60">
             <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Descargar</p>
             <div className="grid grid-cols-3 gap-2">
               <button onClick={() => handleExportDoc("pdf")} disabled={!!exporting} className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition disabled:opacity-50">{exporting === "pdf" ? <RotateCcw size={14} className="animate-spin text-rose-400" /> : <Download size={14} className="text-rose-400" />}PDF</button>
@@ -2510,6 +2525,41 @@ function resizeImageFile(file, maxDim = 1080, quality = 0.82) {
     img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("No se pudo leer la imagen")); };
     img.src = url;
   });
+}
+
+// Escanear el QR de un perfil ajeno para agregarlo como amigo, SIN pedir el
+// permiso CAMERA de Android: reutiliza el mismo mecanismo que ya usa el
+// resto de la app para "foto de perfil" y "sacar una foto" al importar una
+// rutina — un <input type="file" capture="environment">, que abre la app de
+// cámara del sistema vía un intent (el permiso lo maneja esa app aparte, no
+// la nuestra). Una vez que llega la foto, se decodifica el QR 100% en el
+// dispositivo con jsQR (sin subir nada a ningún lado).
+async function decodeQrFromImageFile(file) {
+  const jsQR = (await import("jsqr")).default;
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((resolve, reject) => {
+      const im = new Image();
+      im.onload = () => resolve(im);
+      im.onerror = () => reject(new Error("No pudimos abrir la foto"));
+      im.src = url;
+    });
+    const maxDim = 1000;
+    let { width, height } = img;
+    if (width > maxDim || height > maxDim) {
+      const scale = maxDim / Math.max(width, height);
+      width = Math.round(width * scale); height = Math.round(height * scale);
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = width; canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(img, 0, 0, width, height);
+    const { data } = ctx.getImageData(0, 0, width, height);
+    const result = jsQR(data, width, height);
+    return result?.data || null;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }
 
 function wrapCanvasText(ctx, text, x, y, maxWidth, lineHeight) {
@@ -2956,7 +3006,153 @@ function drawSocialProfileShareCard(ctx, W, H, { name, username, topRank, avatar
   drawWordmark(ctx, W, H, accent);
 }
 
-function ShareImageModal({ title, fileNamePrefix, shareTitle, shareText, draw, onClose, autoShowOptOutLabel, onOptOutAutoShow }) {
+// ============================== QR DE PERFIL ==============================
+// No hay una página pública "/u/@usuario" en este proyecto (sería una
+// feature aparte, con su propio ruteo y App Links nativos) — así que el QR
+// no codifica un link real: codifica un texto propio con un prefijo fijo,
+// que la propia app decodifica localmente al escanear (ver
+// parseProfileQrPayload, usado en SocialSearchSection). Nunca sale a
+// internet ni depende de que el que escanea tenga conexión en ese momento.
+const PROFILE_QR_PREFIX = "modusfit:friend:";
+function buildProfileQrPayload(username) {
+  return `${PROFILE_QR_PREFIX}${normalizeUsername(username)}`;
+}
+function parseProfileQrPayload(text) {
+  if (typeof text !== "string" || !text.startsWith(PROFILE_QR_PREFIX)) return null;
+  const username = normalizeUsername(text.slice(PROFILE_QR_PREFIX.length));
+  return isValidUsername(username) ? username : null;
+}
+
+// Tarjeta con el QR de tu perfil — mismo lenguaje visual que
+// drawSocialProfileShareCard (fondo con glow, "MODUS FIT" arriba, chip de
+// @usuario, wordmark abajo), pero el protagonista es el QR. Se dibuja
+// módulo por módulo con fillRect a partir de QRCode.create() en vez de
+// QRCode.toDataURL/toCanvas + drawImage: mismo motivo que el muñeco de
+// drawMuscleRankShareCard — un <img>/drawImage asincrónico se rompe en
+// algunos WebViews de Android (onload que nunca dispara), dibujar
+// rectángulos a mano nunca falla.
+async function drawSocialProfileQrCard(ctx, W, H, { name, username, accent }) {
+  drawShareCardBase(ctx, W, H, accent, "#38BDF8");
+  ctx.textAlign = "center";
+
+  ctx.fillStyle = tint(accent, "cc"); ctx.font = `800 ${Math.round(W * 0.05)}px sans-serif`;
+  ctx.fillText("ESCANEAME EN", W / 2, Math.round(H * 0.115));
+  ctx.font = `800 ${Math.round(W * 0.082)}px sans-serif`;
+  ctx.fillStyle = "#f8fafc";
+  ctx.fillText("MODUS FIT", W / 2, Math.round(H * 0.18));
+
+  const QRCode = (await import("qrcode")).default;
+  const qr = QRCode.create(buildProfileQrPayload(username), { errorCorrectionLevel: "M" });
+  const modules = qr.modules;
+  const size = modules.size;
+  const quiet = 2; // margen de módulos claros alrededor, recomendado por el estándar QR
+  const totalModules = size + quiet * 2;
+  const cell = Math.round(W * 0.62) / totalModules;
+  const qrSide = cell * totalModules;
+  const qrX = Math.round((W - qrSide) / 2);
+  const qrY = Math.round(H * 0.245);
+
+  // Placa blanca detrás: los lectores de QR necesitan buen contraste y el
+  // fondo de la tarjeta es oscuro.
+  ctx.save();
+  ctx.shadowColor = "rgba(0,0,0,0.35)"; ctx.shadowBlur = 26; ctx.shadowOffsetY = 10;
+  ctx.fillStyle = "#ffffff";
+  canvasRoundRect(ctx, qrX, qrY, qrSide, qrSide, 22);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.fillStyle = "#0f172a";
+  for (let r = 0; r < size; r++) {
+    for (let c = 0; c < size; c++) {
+      if (modules.get(r, c)) ctx.fillRect(qrX + (c + quiet) * cell, qrY + (r + quiet) * cell, Math.ceil(cell) + 0.5, Math.ceil(cell) + 0.5);
+    }
+  }
+
+  const belowY = qrY + qrSide + Math.round(H * 0.078);
+  ctx.fillStyle = "#f8fafc"; ctx.font = `800 ${Math.round(W * 0.055)}px sans-serif`;
+  ctx.fillText(name || "Alguien", W / 2, belowY);
+
+  const chipY = belowY + Math.round(H * 0.03), chipH = Math.round(H * 0.062);
+  ctx.font = `700 ${Math.round(W * 0.046)}px sans-serif`;
+  const chipText = `@${username || "usuario"}`;
+  const chipW = ctx.measureText(chipText).width + W * 0.08;
+  ctx.fillStyle = tint(accent, "1c");
+  canvasRoundRect(ctx, W / 2 - chipW / 2, chipY, chipW, chipH, chipH / 2); ctx.fill();
+  ctx.strokeStyle = tint(accent, "50"); ctx.lineWidth = 2;
+  canvasRoundRect(ctx, W / 2 - chipW / 2, chipY, chipW, chipH, chipH / 2); ctx.stroke();
+  ctx.fillStyle = accent;
+  ctx.fillText(chipText, W / 2, chipY + chipH * 0.68);
+
+  ctx.fillStyle = "#64748b"; ctx.font = `600 ${Math.round(W * 0.032)}px sans-serif`;
+  ctx.fillText("Social → Escanear código QR, en Modus Fit", W / 2, Math.round(H * 0.9));
+
+  drawWordmark(ctx, W, H, accent);
+}
+
+// Elige tarjeta o QR para compartir tu perfil — pedido explícito: "que te
+// dé la opción de generar ese QR o el link a enviar por WhatsApp,
+// Instagram, etc.", así que ambos caminos conviven acá en vez de que uno
+// reemplace al otro.
+function ProfileShareModal({ profileName, username, myTopRank, onClose }) {
+  useAndroidBack(onClose);
+  const [showCard, setShowCard] = useState(false);
+  const [showQr, setShowQr] = useState(false);
+  const accent = myTopRank?.color || "#A855F7";
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <>
+      <div className="fixed inset-0 z-[130] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
+        <div className="relative overflow-hidden bg-slate-900 border border-slate-700/60 rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50" onClick={(e) => e.stopPropagation()}>
+          <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full blur-3xl pointer-events-none opacity-20" style={{ backgroundColor: accent }} />
+          <div className="relative flex items-center justify-between mb-1">
+            <h3 className="text-base font-black text-white">Compartir mi perfil</h3>
+            <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition"><X size={18} /></button>
+          </div>
+          <p className="relative text-xs text-slate-500 mb-4">Elegí cómo querés que te agreguen.</p>
+          <div className="relative grid grid-cols-2 gap-3">
+            <button onClick={() => setShowCard(true)} className="flex flex-col items-center gap-2.5 rounded-2xl border border-slate-700/60 hover:border-teal-500/40 bg-slate-800/40 py-5 px-2.5 transition active:scale-[0.97]">
+              <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}><Share2 size={18} className="!text-white" /></div>
+              <span className="text-xs font-bold text-white text-center leading-snug">Tarjeta para compartir</span>
+              <span className="text-[9.5px] text-slate-500 text-center leading-snug">WhatsApp, Instagram y más</span>
+            </button>
+            <button onClick={() => setShowQr(true)} className="flex flex-col items-center gap-2.5 rounded-2xl border border-slate-700/60 hover:border-fuchsia-500/40 bg-slate-800/40 py-5 px-2.5 transition active:scale-[0.97]">
+              <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: "linear-gradient(135deg,#A855F7,#6D28D9)" }}><QrCode size={18} className="!text-white" /></div>
+              <span className="text-xs font-bold text-white text-center leading-snug">Código QR</span>
+              <span className="text-[9.5px] text-slate-500 text-center leading-snug">Para que te escaneen</span>
+            </button>
+          </div>
+        </div>
+      </div>
+      {showCard && (
+        <ShareImageModal
+          title="Compartí tu perfil"
+          subtitle="Tarjeta para WhatsApp, Instagram y más"
+          fileNamePrefix="mi-perfil-modus-fit"
+          shareTitle="Modus Fit"
+          shareText={`Agregame en Modus Fit, buscame como @${username}`}
+          accent={accent}
+          draw={(ctx, W, H) => drawSocialProfileShareCard(ctx, W, H, { name: profileName, username, topRank: myTopRank, avatarInitial: (profileName || username || "?").charAt(0) })}
+          onClose={() => setShowCard(false)}
+        />
+      )}
+      {showQr && (
+        <ShareImageModal
+          title="Tu código QR"
+          subtitle="Que te escaneen para agregarte al toque"
+          fileNamePrefix="mi-qr-modus-fit"
+          shareTitle="Modus Fit"
+          shareText={`Agregame en Modus Fit, escaneá mi código o buscame como @${username}`}
+          accent={accent}
+          draw={(ctx, W, H) => drawSocialProfileQrCard(ctx, W, H, { name: profileName, username, accent })}
+          onClose={() => setShowQr(false)}
+        />
+      )}
+    </>,
+    document.body
+  );
+}
+
+function ShareImageModal({ title, subtitle, fileNamePrefix, shareTitle, shareText, draw, onClose, autoShowOptOutLabel, onOptOutAutoShow, accent = "#14B8A6" }) {
   useAndroidBack(onClose);
   const canvasRef = useRef(null);
   const scrollContainerRef = useRef(null);
@@ -3058,32 +3254,42 @@ function ShareImageModal({ title, fileNamePrefix, shareTitle, shareText, draw, o
   if (typeof document === "undefined") return null;
   return createPortal(
     <div className="fixed inset-0 z-[130] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
-      <div ref={scrollContainerRef} className="bg-slate-900 border border-slate-700/60 rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50 max-h-[92vh] overflow-y-auto overscroll-contain" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-base font-black text-white">{title}</h3>
-          <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition"><X size={18} /></button>
+      <div ref={scrollContainerRef} className="relative overflow-hidden bg-slate-900 border rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50 max-h-[92vh] overflow-y-auto overscroll-contain" style={{ borderColor: tint(accent, "35") }} onClick={(e) => e.stopPropagation()}>
+        {/* Glow del color propio de este tipo de tarjeta (marca personal,
+            rango, perfil, QR...) — antes esta chrome era siempre gris
+            neutro sin importar qué se estuviera por compartir. */}
+        <div className="absolute -top-20 -right-16 w-56 h-56 rounded-full blur-3xl pointer-events-none opacity-20" style={{ backgroundColor: accent }} />
+        <div className="relative flex items-center justify-between gap-2 mb-3.5">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: tint(accent, "18"), border: `1px solid ${tint(accent, "40")}`, color: accent }}><Share2 size={16} /></div>
+            <div className="min-w-0">
+              <h3 className="text-base font-black text-white truncate">{title}</h3>
+              {subtitle && <p className="text-[10.5px] text-slate-500 truncate">{subtitle}</p>}
+            </div>
+          </div>
+          <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition shrink-0"><X size={18} /></button>
         </div>
         {autoShowOptOutLabel && (
-          <button onClick={onOptOutAutoShow} className="w-full flex items-center justify-between gap-2 bg-slate-800/70 border border-slate-700/60 rounded-xl px-3.5 py-2.5 mb-3.5 text-left hover:bg-slate-800 hover:border-slate-600 transition">
+          <button onClick={onOptOutAutoShow} className="relative w-full flex items-center justify-between gap-2 bg-slate-800/70 border border-slate-700/60 rounded-xl px-3.5 py-2.5 mb-3.5 text-left hover:bg-slate-800 hover:border-slate-600 transition">
             <span className="flex items-center gap-2.5 text-[12px] text-slate-300 font-medium"><BellOff size={15} className="text-slate-400 shrink-0" />{autoShowOptOutLabel}</span>
             <ChevronRight size={14} className="text-slate-600 shrink-0" />
           </button>
         )}
         <canvas ref={canvasRef} className="hidden" />
         {/* Botones siempre visibles primero — el preview es secundario */}
-        <div className="flex gap-2 mb-3">
-          <button onClick={handleShare} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl !text-white text-sm font-bold transition-all active:scale-[0.98]" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}><Share2 size={14} /> Compartir</button>
-          <button onClick={handleDownload} disabled={!previewUrl} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition text-sm font-semibold disabled:opacity-40"><Download size={14} /> Descargar</button>
+        <div className="relative flex gap-2 mb-3">
+          <button onClick={handleShare} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl !text-white text-sm font-bold transition-all active:scale-[0.98]" style={{ background: `linear-gradient(135deg, ${accent}, ${tint(accent, "b0")})`, boxShadow: `0 10px 28px -10px ${tint(accent, "80")}` }}><Share2 size={14} /> Compartir</button>
+          <button onClick={handleDownload} disabled={!previewUrl} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl border text-slate-300 hover:text-white transition text-sm font-semibold disabled:opacity-40" style={{ borderColor: tint(accent, "30") }}><Download size={14} /> Descargar</button>
         </div>
         {previewUrl ? (
-          <img src={previewUrl} alt="Vista previa para compartir" className="w-full rounded-2xl border border-slate-800/60" style={{ aspectRatio: "9 / 16", objectFit: "cover", maxHeight: "50vh" }} />
+          <img src={previewUrl} alt="Vista previa para compartir" className="relative w-full rounded-2xl border" style={{ aspectRatio: "9 / 16", objectFit: "cover", maxHeight: "50vh", borderColor: tint(accent, "30"), boxShadow: `0 16px 40px -12px ${tint(accent, "45")}` }} />
         ) : (
-          <div className="w-full rounded-2xl border border-slate-800/60 flex flex-col items-center justify-center gap-2 py-10" style={{ aspectRatio: "9 / 16", maxHeight: "50vh" }}>
-            <div className="w-7 h-7 rounded-full border-[3px] border-teal-500/25 border-t-teal-500 animate-spin" />
+          <div className="relative w-full rounded-2xl border flex flex-col items-center justify-center gap-2 py-10" style={{ aspectRatio: "9 / 16", maxHeight: "50vh", borderColor: tint(accent, "30") }}>
+            <div className="w-7 h-7 rounded-full border-[3px] animate-spin" style={{ borderColor: tint(accent, "25"), borderTopColor: accent }} />
             <p className="text-[11px] text-slate-500">Generando imagen...</p>
           </div>
         )}
-        <p className="text-[10px] text-slate-600 mt-3 text-center">Para tu historia de Instagram: compartila directo, o descargala y subila desde la app.</p>
+        <p className="relative text-[10px] text-slate-600 mt-3 text-center">Para tu historia de Instagram: compartila directo, o descargala y subila desde la app.</p>
       </div>
     </div>,
     document.body
@@ -5269,9 +5475,11 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
       {showPRShare && !cardio && (
         <ShareImageModal
           title="Compartí tu marca"
+          subtitle={exerciseName}
           fileNamePrefix={`pr-${exerciseId}`}
           shareTitle="Modus Fit · Nueva marca"
           shareText={`¡Nueva marca en ${exerciseName}! 🔥`}
+          accent={accent}
           draw={(ctx, W, H) => drawPRShareCard(ctx, W, H, { exerciseName, muscle: exerciseMuscle, kg: parseFloat(kg) || currentPR?.kg, reps: parseFloat(reps) || currentPR?.reps, accent })}
           onClose={() => setShowPRShare(false)}
           autoShowOptOutLabel={autoShowPrShare ? "No mostrar esto automáticamente la próxima vez" : null}
@@ -6151,9 +6359,11 @@ function ShareSummaryCard({ logs, trainingSessions = [] }) {
       {showImage && mode === "pr" && selEx && (
         <ShareImageModal
           title="Compartí tu marca"
+          subtitle={selEx.name}
           fileNamePrefix={`pr-${selEx.id}`}
           shareTitle="Modus Fit · Marca"
           shareText={`Mi marca en ${selEx.name} 🔥`}
+          accent={selEx.color}
           draw={(ctx, W, H) => drawPRShareCard(ctx, W, H, { exerciseName: selEx.name, muscle: selEx.muscle, kg: selPR.bestKg, reps: selPR.bestReps, accent: selEx.color })}
           onClose={() => setShowImage(false)}
         />
@@ -6161,9 +6371,11 @@ function ShareSummaryCard({ logs, trainingSessions = [] }) {
       {showImage && mode === "period" && (
         <ShareImageModal
           title="Compartí tu resumen"
+          subtitle={periodLabel}
           fileNamePrefix={`resumen-${period}`}
           shareTitle="Modus Fit · Resumen"
           shareText="Mi resumen de entrenamiento 💪"
+          accent="#3B82F6"
           draw={(ctx, W, H) => drawPeriodShareCard(ctx, W, H, { periodLabel, daysTrained: periodStats.daysTrained, totalSets: periodStats.totalSets, totalVol: periodStats.totalVol, calendarCells, accent: "#3B82F6" })}
           onClose={() => setShowImage(false)}
         />
@@ -7628,6 +7840,7 @@ function FriendBodyCompare({ myRanks, mySex, theirRanks, theirSex, theirName }) 
 function MyBodyModal({ profile, onClose }) {
   useAndroidBack(onClose);
   const [selected, setSelected] = useState(null);
+  const [showImage, setShowImage] = useState(false);
   const frontRef = useRef(null);
   const backRef = useRef(null);
   const ranks = useMemo(() => computeAllMuscleRanks(profile?.logs, getProfileSettings(profile), profile?.sex, profile?.age), [profile]);
@@ -7638,7 +7851,14 @@ function MyBodyModal({ profile, onClose }) {
       <div className="w-full max-w-sm max-h-[86vh] overflow-y-auto overscroll-contain bg-slate-900 border border-purple-700/40 rounded-3xl modal-pop-in shadow-2xl shadow-black/70 p-5 space-y-3" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <p className="text-sm font-black text-white">Tu rango por músculo</p>
-          <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition"><X size={17} /></button>
+          <div className="flex items-center gap-1 shrink-0">
+            {/* Pedido: "todas las opciones de compartir, metele mucho a
+                eso" — este muñeco (Social → Ranking → Vos) no tenía forma
+                de compartirse, a diferencia del mismo muñeco en Progreso
+                (MuscleRankView, más abajo en este archivo). */}
+            <button onClick={() => setShowImage(true)} aria-label="Compartir tu muñeco" className="p-2 rounded-xl bg-slate-800/60 text-slate-400 hover:text-fuchsia-400 transition border border-slate-700/50"><Share2 size={15} /></button>
+            <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition"><X size={17} /></button>
+          </div>
         </div>
         <MuscleHighlighterBody ranks={ranks} selected={selected} onMuscleClick={(k) => setSelected((s) => (s === k ? null : k))} frontRef={frontRef} backRef={backRef} sex={profile?.sex} />
         {/* Pedido: al tocar un músculo, desplegar las mejores marcas de
@@ -7653,6 +7873,18 @@ function MyBodyModal({ profile, onClose }) {
           </div>
         )}
       </div>
+      {showImage && (
+        <ShareImageModal
+          title="Compartí tu muñeco"
+          subtitle="Rango por músculo"
+          fileNamePrefix="mi-muñeco-modus-fit"
+          shareTitle="Modus Fit · Rangos por músculo"
+          shareText="Mirá mis rangos por músculo 💪"
+          accent="#A855F7"
+          draw={(ctx, W, H) => drawMuscleRankShareCard(ctx, W, H, { ranks, modeLabel: "General", accent: "#A855F7" })}
+          onClose={() => setShowImage(false)}
+        />
+      )}
     </div>,
     document.body
   );
@@ -8075,9 +8307,11 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
       {showImage && (
         <ShareImageModal
           title="Compartí tus rangos"
+          subtitle={modeLabel}
           fileNamePrefix="mis-rangos-por-musculo"
           shareTitle="Modus Fit · Rangos por músculo"
           shareText="Mirá mis rangos por músculo 💪"
+          accent="#F59E0B"
           draw={(ctx, W, H) => drawMuscleRankShareCard(ctx, W, H, { ranks, modeLabel, accent: "#F59E0B" })}
           onClose={() => setShowImage(false)}
         />
@@ -10651,14 +10885,19 @@ function ContactsSuggestions({ myUid, friendStatus, onSendFriendRequest }) {
   );
 }
 
-// Buscar a alguien por @usuario para agregarlo de amigo.
+// Buscar a alguien por @usuario para agregarlo de amigo, o escaneando su
+// código QR de perfil (ver decodeQrFromImageFile/parseProfileQrPayload) —
+// ambos caminos terminan en la misma búsqueda y la misma tarjeta de
+// resultado, sólo cambia cómo se llega al @usuario.
 function SocialSearchSection({ myUid, friendStatus, onSendFriendRequest }) {
   const [raw, setRaw] = useState("");
-  const [state, setState] = useState("idle"); // idle|searching|found|not_found|self
+  const [state, setState] = useState("idle"); // idle|searching|found|not_found|self|qr_error
   const [found, setFound] = useState(null);
+  const [scanning, setScanning] = useState(false);
+  const qrInputRef = useRef(null);
 
-  const handleSearch = async () => {
-    const q = raw.trim();
+  const runSearch = async (query) => {
+    const q = query.trim();
     if (!q) return;
     setState("searching"); setFound(null);
     const hit = await lookupUserByUsername(q);
@@ -10667,6 +10906,24 @@ function SocialSearchSection({ myUid, friendStatus, onSendFriendRequest }) {
     const basic = await getPublicBasic(hit.uid);
     setFound({ uid: hit.uid, basic });
     setState("found");
+  };
+  const handleSearch = () => runSearch(raw);
+
+  const handleQrPhoto = async (file) => {
+    if (!file) return;
+    setScanning(true); setState("idle"); setFound(null);
+    try {
+      const text = await decodeQrFromImageFile(file);
+      const username = text ? parseProfileQrPayload(text) : null;
+      if (!username) { setState("qr_error"); return; }
+      setRaw(username);
+      await runSearch(username);
+    } catch (err) {
+      console.error("Error escaneando el QR:", err);
+      setState("qr_error");
+    } finally {
+      setScanning(false);
+    }
   };
 
   return (
@@ -10679,9 +10936,14 @@ function SocialSearchSection({ myUid, friendStatus, onSendFriendRequest }) {
         </div>
         <button onClick={handleSearch} disabled={!raw.trim() || state === "searching"} className="px-4 rounded-xl bg-cyan-500 !text-white text-sm font-bold disabled:opacity-40">Buscar</button>
       </div>
+      <button onClick={() => qrInputRef.current?.click()} disabled={scanning} className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-fuchsia-500/30 text-fuchsia-300 hover:bg-fuchsia-500/10 transition text-xs font-bold disabled:opacity-50">
+        {scanning ? <RotateCcw size={13} className="animate-spin" /> : <QrCode size={13} />} {scanning ? "Leyendo el código..." : "Escanear código QR"}
+      </button>
+      <input ref={qrInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { handleQrPhoto(e.target.files?.[0]); e.target.value = ""; }} />
       {state === "searching" && <p className="text-xs text-slate-500 text-center py-3">Buscando...</p>}
       {state === "not_found" && <p className="text-xs text-slate-500 text-center py-3">No encontramos a nadie con ese @usuario.</p>}
       {state === "self" && <p className="text-xs text-slate-500 text-center py-3">Ese sos vos 🙂</p>}
+      {state === "qr_error" && <p className="text-xs text-amber-400 text-center py-3">No pudimos leer un código QR de perfil en esa foto. Probá acercar más la cámara y sacarla de nuevo.</p>}
       {state === "found" && found && (
         <PublicUserCard uid={found.uid} basic={found.basic}>
           {(() => {
@@ -12333,12 +12595,10 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
       </div>
 
       {showShareProfile && (
-        <ShareImageModal
-          title="Compartí tu perfil"
-          fileNamePrefix="mi-perfil-modus-fit"
-          shareTitle="Modus Fit"
-          shareText={`Agregame en Modus Fit, buscame como @${profile?.username}`}
-          draw={(ctx, W, H) => drawSocialProfileShareCard(ctx, W, H, { name: profileName, username: profile?.username, topRank: myTopRank, avatarInitial: (profileName || profile?.username || "?").charAt(0) })}
+        <ProfileShareModal
+          profileName={profileName}
+          username={profile?.username}
+          myTopRank={myTopRank}
           onClose={() => setShowShareProfile(false)}
         />
       )}
@@ -18564,9 +18824,11 @@ export default function App() {
       {showCycleShareImage && cycleCompleteNotice && (
         <ShareImageModal
           title="Compartí tu ciclo"
+          subtitle={`Ciclo #${cycleCompleteNotice.cycleNumber} completo`}
           fileNamePrefix={`ciclo-${cycleCompleteNotice.cycleNumber}`}
           shareTitle="Modus Fit · Ciclo completo"
           shareText={`¡Completé el Ciclo #${cycleCompleteNotice.cycleNumber} en Modus Fit! 💪`}
+          accent="#A855F7"
           draw={(ctx, W, H) => drawCycleShareCard(ctx, W, H, { cycleNumber: cycleCompleteNotice.cycleNumber, ...computeCycleShareStats() })}
           onClose={() => { setShowCycleShareImage(false); setCycleCompleteNotice(null); }}
         />
