@@ -12713,8 +12713,21 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
       {/* Tarjeta de perfil — el avatar/nombre/racha/rango que antes vivían
           adentro del hero de arriba. Mismo patrón de dos tarjetas apiladas
           que ya usa Progreso (hero + WeekCalendar debajo). */}
-      <div className="relative overflow-hidden rounded-2xl border border-purple-500/20 bg-slate-900/40 p-4">
-        <div className="flex items-center gap-3.5">
+      {/* Pedido: "métele la textura del principal [el hero de arriba],
+          pero agreguemos algo más al diseño, algo que involucre otros
+          colores pero en poca cantidad — al igual que el violeta de la
+          semana de descarga en Progreso, o el color de qué día es en
+          Rutinas" — mismo fondo/glows que el hero (grad-hero-purple), y
+          un tercer glow puntual con el color de TU rango (un dato que
+          cambia según tu estado, como la fase de la semana o el día que
+          toca) en vez de un violeta/fucsia fijo para todo el mundo. */}
+      <div className="relative overflow-hidden rounded-2xl border border-purple-500/20 p-4" style={{ background: "var(--grad-hero-purple)" }}>
+        <div className="absolute -top-8 -right-6 w-28 h-28 rounded-full bg-purple-500/15 blur-2xl pointer-events-none" />
+        <div className="absolute -bottom-6 -left-6 w-24 h-24 rounded-full bg-fuchsia-500/10 blur-2xl pointer-events-none" />
+        {myTopRank && (
+          <div className="absolute top-1/2 right-6 -translate-y-1/2 w-24 h-24 rounded-full blur-2xl pointer-events-none opacity-30" style={{ backgroundColor: myTopRank.color }} />
+        )}
+        <div className="relative flex items-center gap-3.5">
           <div className="w-14 h-14 rounded-2xl overflow-hidden shrink-0 border border-purple-500/30 bg-purple-500/15 flex items-center justify-center">
             {profile?.avatarData ? <img src={profile.avatarData} alt="" className="w-full h-full object-cover" /> : <Users size={24} className="text-purple-300" />}
           </div>
@@ -12740,7 +12753,7 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
           )}
         </div>
         {profile?.username ? (
-          <button onClick={() => setShowShareProfile(true)} className="w-full flex items-center justify-center gap-1.5 mt-3.5 pt-3 border-t border-slate-800/60 text-[10px] font-bold text-purple-300/75 hover:text-purple-300 transition">
+          <button onClick={() => setShowShareProfile(true)} className="relative w-full flex items-center justify-center gap-1.5 mt-3.5 pt-3 border-t border-white/10 text-[10px] font-bold text-purple-300/75 hover:text-purple-300 transition">
             <QrCode size={11} /> Compartir mi perfil <ChevronRight size={11} />
           </button>
         ) : uid ? (
@@ -12749,12 +12762,12 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
           // oración en la sección Buscar, ahora el prompt para elegirlo
           // vive acá mismo, arriba de todo, con el input de verdad en vez
           // de mandarte a buscarlo en Perfil.
-          <div className="mt-3.5 pt-3 border-t border-slate-800/60">
-            <p className="text-[11px] text-slate-500 mb-2">Elegí tu @usuario para que te puedan buscar y agregar.</p>
+          <div className="relative mt-3.5 pt-3 border-t border-white/10">
+            <p className="text-[11px] text-slate-400 mb-2">Elegí tu @usuario para que te puedan buscar y agregar.</p>
             <UsernameSection uid={uid} currentUsername={null} onSaved={(u) => onUpdateProfile({ username: u })} />
           </div>
         ) : (
-          <p className="text-[11px] text-slate-500 mt-3.5 pt-3 border-t border-slate-800/60">Vinculá tu cuenta de Google en Perfil para poder elegir un @usuario y usar lo social.</p>
+          <p className="relative text-[11px] text-slate-400 mt-3.5 pt-3 border-t border-white/10">Vinculá tu cuenta de Google en Perfil para poder elegir un @usuario y usar lo social.</p>
         )}
       </div>
 
