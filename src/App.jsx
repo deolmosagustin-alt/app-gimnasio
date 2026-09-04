@@ -13,7 +13,7 @@ import {
   Sparkles, Layers, SlidersHorizontal, UserCog,
   Share2, Download, Link2, Copy, BellOff, Send, Mic, Ruler, Camera, Link, Footprints, Star, SquarePlay, Upload, RefreshCw, Timer, Percent, Users,
   MessageCircle, FileDown, Search, UserPlus, UserCheck, UserMinus, AtSign, GraduationCap, ClipboardCheck, Swords, Medal, QrCode, ArrowUpDown,
-  Phone, Contact, Minus,
+  Phone, Contact, Minus, Crown,
 } from "lucide-react";
 import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signOut, onAuthStateChanged } from "firebase/auth";
 import { Capacitor, registerPlugin } from "@capacitor/core";
@@ -7904,31 +7904,91 @@ function MiniBodyView({ ranks, sex, label, accentColor = "#94a3b8", view = "fron
   );
 }
 
-// Comparación visual "vos vs [nombre]" con muñecos lado a lado — pedido:
-// "que al tocar el perfil de un amigo (o el tuyo) se abra una parte con el
-// muñeco para comparar". Complementa a RankComparisonList (que ya compara
-// número a número): acá el objetivo es un vistazo rápido de "quién está
-// más parejo/desarrollado", no el detalle exacto de cada músculo.
-// Pedido después: "mejorá ese display de comparación/batalla de marcas" +
-// switch de frente/espalda — el toggle cambia la vista de LOS DOS muñecos
-// a la vez (no cada uno por separado), porque acá lo que importa es
-// comparar el mismo grupo muscular en ambos, no ver cada uno por su cuenta.
-function FriendBodyCompare({ myRanks, mySex, theirRanks, theirSex, theirName }) {
+// Pedido: "hacé más visual el versus, que sea como una batalla. sólo
+// tiene que aparecer la comparativa" — antes esto eran 3 piezas sueltas
+// sin relación entre sí: el duelo semanal (sesiones esta semana, arriba
+// del todo, SIEMPRE visible aunque no estuvieras comparando), los
+// muñecos lado a lado, y la lista de "ganás/empate/perdés" por músculo
+// más abajo. Ahora es UNA sola escena de batalla: avatares enfrentados
+// con un marcador que junta semana + músculos, después los muñecos (con
+// el switch frente/espalda), y al final el desglose — reemplaza a
+// FriendBodyCompare, que quedaba corto para lo pedido.
+function BattleCompareCard({ myAvatarData, myName, mySex, mySessionsThisWeek, myRanks, theirAvatarData, theirName, theirSex, theirSessionsThisWeek, theirRanks, comparison }) {
   const [view, setView] = useState("front");
+  const iWinCount = comparison.filter((r) => (r.mine?.levelIdx ?? -1) > (r.theirs?.levelIdx ?? -1)).length;
+  const theyWinCount = comparison.filter((r) => (r.theirs?.levelIdx ?? -1) > (r.mine?.levelIdx ?? -1)).length;
+  const tieCount = comparison.length - iWinCount - theyWinCount;
+  const iWinWeek = mySessionsThisWeek > theirSessionsThisWeek;
+  const theyWinWeek = theirSessionsThisWeek > mySessionsThisWeek;
   return (
-    <div className="rounded-2xl border border-slate-800/50 bg-slate-900/40 p-4">
-      <div className="flex items-center justify-between mb-3">
-        <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 flex items-center gap-1.5"><Swords size={11} /> Muñecos lado a lado</p>
-        <div className="flex bg-slate-950/60 rounded-lg p-0.5 border border-slate-800/60 shrink-0">
-          <button onClick={() => setView("front")} className={`px-2.5 py-1 rounded-md text-[9.5px] font-bold transition ${view === "front" ? "bg-slate-700 text-white" : "text-slate-500 hover:text-slate-300"}`}>De frente</button>
-          <button onClick={() => setView("back")} className={`px-2.5 py-1 rounded-md text-[9.5px] font-bold transition ${view === "back" ? "bg-slate-700 text-white" : "text-slate-500 hover:text-slate-300"}`}>De espalda</button>
+    <div className="space-y-3">
+      {/* Header de batalla: avatares enfrentados + marcador combinado
+          (semana + músculos) — antes el duelo semanal era una cajita
+          aparte con números sueltos, sin ninguna puesta en escena. */}
+      <div className="relative overflow-hidden rounded-3xl border border-amber-500/25 p-4" style={{ background: "linear-gradient(160deg, #14141f, #08080d)" }}>
+        <div className="absolute -top-14 -left-14 w-44 h-44 rounded-full bg-teal-500/20 blur-3xl pointer-events-none" />
+        <div className="absolute -top-14 -right-14 w-44 h-44 rounded-full bg-fuchsia-500/20 blur-3xl pointer-events-none" />
+        <p className="relative text-center text-[10px] font-black uppercase tracking-[0.22em] text-amber-400 mb-3.5 flex items-center justify-center gap-1.5">
+          <Swords size={12} /> Batalla de marcas
+        </p>
+        <div className="relative flex items-center gap-2">
+          <div className="flex-1 text-center min-w-0">
+            <div className="w-16 h-16 mx-auto rounded-2xl overflow-hidden border-2 border-teal-400/70 shadow-xl shadow-teal-500/25">
+              {myAvatarData ? <img src={myAvatarData} className="w-full h-full object-cover" alt="" /> : <div className="w-full h-full flex items-center justify-center text-xl font-black !text-white" style={{ background: "linear-gradient(135deg,#2DD4BF,#0E7490)" }}>{(myName || "?").charAt(0).toUpperCase()}</div>}
+            </div>
+            <p className="text-xs font-black text-teal-300 mt-1.5 truncate">Vos</p>
+          </div>
+          <div className="shrink-0 w-9 h-9 rounded-full bg-amber-500/15 border border-amber-500/40 flex items-center justify-center">
+            <Zap size={16} className="text-amber-400" />
+          </div>
+          <div className="flex-1 text-center min-w-0">
+            <div className="w-16 h-16 mx-auto rounded-2xl overflow-hidden border-2 border-fuchsia-400/70 shadow-xl shadow-fuchsia-500/25">
+              {theirAvatarData ? <img src={theirAvatarData} className="w-full h-full object-cover" alt="" /> : <div className="w-full h-full flex items-center justify-center text-xl font-black !text-white" style={{ background: "linear-gradient(135deg,#C084FC,#7C3AED)" }}>{(theirName || "?").charAt(0).toUpperCase()}</div>}
+            </div>
+            <p className="text-xs font-black text-fuchsia-300 mt-1.5 truncate">{theirName || "Ellos"}</p>
+          </div>
+        </div>
+
+        <div className="relative grid grid-cols-3 gap-2 mt-4">
+          <div className="text-center rounded-xl bg-black/35 border border-teal-500/20 py-2.5">
+            <p className="text-xl font-black text-teal-300 leading-none">{iWinCount}</p>
+            <p className="text-[8px] text-slate-500 uppercase font-bold mt-1 tracking-wide">Ganás</p>
+          </div>
+          <div className="text-center rounded-xl bg-black/35 border border-slate-700/50 py-2.5">
+            <p className="text-xl font-black text-slate-400 leading-none">{tieCount}</p>
+            <p className="text-[8px] text-slate-600 uppercase font-bold mt-1 tracking-wide">Empate</p>
+          </div>
+          <div className="text-center rounded-xl bg-black/35 border border-fuchsia-500/20 py-2.5">
+            <p className="text-xl font-black text-fuchsia-300 leading-none">{theyWinCount}</p>
+            <p className="text-[8px] text-slate-500 uppercase font-bold mt-1 tracking-wide">Pierde</p>
+          </div>
+        </div>
+
+        <div className="relative flex items-center justify-center gap-2 mt-3 pt-3 border-t border-white/5">
+          <Flame size={12} className="text-orange-400 shrink-0" />
+          <p className={`text-[11px] font-bold ${iWinWeek ? "text-teal-300" : theyWinWeek ? "text-fuchsia-300" : "text-slate-500"}`}>
+            {mySessionsThisWeek} - {theirSessionsThisWeek} esta semana
+          </p>
         </div>
       </div>
-      <div className="flex items-start gap-3 justify-center">
-        <MiniBodyView ranks={myRanks} sex={mySex} label="Vos" accentColor="#2DD4BF" view={view} />
-        <div className="w-px self-stretch bg-slate-800 shrink-0 mt-6" />
-        <MiniBodyView ranks={theirRanks} sex={theirSex} label={theirName || "Ellos"} accentColor="#C084FC" view={view} />
+
+      {/* Muñecos enfrentados, con switch de frente/espalda para los dos a
+          la vez (lo que importa es comparar el mismo grupo muscular). */}
+      <div className="rounded-2xl border border-slate-800/50 bg-slate-900/40 p-4">
+        <div className="flex items-center justify-center mb-3">
+          <div className="flex bg-slate-950/60 rounded-lg p-0.5 border border-slate-800/60">
+            <button onClick={() => setView("front")} className={`px-3 py-1 rounded-md text-[10px] font-bold transition ${view === "front" ? "bg-slate-700 text-white" : "text-slate-500 hover:text-slate-300"}`}>De frente</button>
+            <button onClick={() => setView("back")} className={`px-3 py-1 rounded-md text-[10px] font-bold transition ${view === "back" ? "bg-slate-700 text-white" : "text-slate-500 hover:text-slate-300"}`}>De espalda</button>
+          </div>
+        </div>
+        <div className="flex items-start gap-3 justify-center">
+          <MiniBodyView ranks={myRanks} sex={mySex} label="Vos" accentColor="#2DD4BF" view={view} />
+          <div className="w-px self-stretch bg-slate-800 shrink-0 mt-6" />
+          <MiniBodyView ranks={theirRanks} sex={theirSex} label={theirName || "Ellos"} accentColor="#C084FC" view={view} />
+        </div>
       </div>
+
+      <RankComparisonList comparison={comparison} theirName={theirName || "Ellos"} />
     </div>
   );
 }
@@ -11547,22 +11607,15 @@ function buildRankComparison(myLogs, mySettings, mySex, myAge, theirLogs, theirS
   }).filter((r) => r.mine || r.theirs);
 }
 
-// Tarjeta "VOS vs ELLOS" por músculo — con un resumen arriba de en
-// cuántos vas adelante, para que se sienta como un picadito, no una
-// planilla de números.
+// Tarjeta "VOS vs ELLOS" por músculo. El resumen de "ganás/empate/
+// pierde" ya no vive acá (se subió al marcador de BattleCompareCard,
+// arriba de todo) — esto se enfoca en el desglose músculo por músculo,
+// con una corona junto a quien gana cada uno y los mismos colores
+// teal/fucsia de la batalla, en vez del celeste genérico de antes.
 function RankComparisonList({ comparison, theirName }) {
-  const iWinCount = comparison.filter((r) => (r.mine?.levelIdx ?? -1) > (r.theirs?.levelIdx ?? -1)).length;
-  const theyWinCount = comparison.filter((r) => (r.theirs?.levelIdx ?? -1) > (r.mine?.levelIdx ?? -1)).length;
-  const tieCount = comparison.length - iWinCount - theyWinCount;
   return (
-    <div className="space-y-2.5">
-      <div className="flex items-center justify-center gap-4 rounded-2xl border border-slate-800/50 bg-slate-900/50 py-3">
-        <div className="text-center"><p className="text-lg font-black text-teal-400">{iWinCount}</p><p className="text-[9px] text-slate-500 uppercase font-bold">Ganás</p></div>
-        <div className="w-px h-8 bg-slate-800" />
-        <div className="text-center"><p className="text-lg font-black text-slate-500">{tieCount}</p><p className="text-[9px] text-slate-600 uppercase font-bold">Empate</p></div>
-        <div className="w-px h-8 bg-slate-800" />
-        <div className="text-center"><p className="text-lg font-black text-sky-400">{theyWinCount}</p><p className="text-[9px] text-slate-500 uppercase font-bold">{theirName}</p></div>
-      </div>
+    <div className="space-y-2">
+      <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 px-1 flex items-center gap-1.5"><ListChecks size={11} /> Músculo por músculo</p>
       {comparison.map((r) => {
         const myLvl = r.mine?.levelIdx ?? -1, theirLvl = r.theirs?.levelIdx ?? -1;
         const iWin = myLvl > theirLvl, theyWin = theirLvl > myLvl;
@@ -11570,12 +11623,14 @@ function RankComparisonList({ comparison, theirName }) {
           <div key={r.key} className="rounded-xl border border-slate-800/50 bg-slate-900/40 px-3 py-2.5">
             <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wide mb-1.5 text-center">{r.label}</p>
             <div className="flex items-center gap-2">
-              <div className="flex-1 text-center rounded-lg py-1.5" style={{ backgroundColor: r.mine ? tint(r.mine.color, iWin ? "22" : "10") : "transparent", boxShadow: iWin ? `inset 0 0 0 1px ${tint(r.mine.color, "55")}` : "none" }}>
+              <div className="relative flex-1 text-center rounded-lg py-1.5" style={{ backgroundColor: r.mine ? tint("#2DD4BF", iWin ? "22" : "0a") : "transparent", boxShadow: iWin ? "inset 0 0 0 1px rgba(45,212,191,0.55)" : "none" }}>
+                {iWin && <Crown size={11} className="absolute -top-2 left-1/2 -translate-x-1/2 text-teal-300" />}
                 <p className="text-[9px] text-slate-600">Vos</p>
                 <p className="text-xs font-black" style={{ color: r.mine?.color || "#475569" }}>{r.mine ? `${r.mine.tier} ${r.mine.sub}` : "Sin marca"}</p>
               </div>
               <span className="text-[9px] text-slate-700 font-black shrink-0">VS</span>
-              <div className="flex-1 text-center rounded-lg py-1.5" style={{ backgroundColor: r.theirs ? tint(r.theirs.color, theyWin ? "22" : "10") : "transparent", boxShadow: theyWin ? `inset 0 0 0 1px ${tint(r.theirs.color, "55")}` : "none" }}>
+              <div className="relative flex-1 text-center rounded-lg py-1.5" style={{ backgroundColor: r.theirs ? tint("#C084FC", theyWin ? "22" : "0a") : "transparent", boxShadow: theyWin ? "inset 0 0 0 1px rgba(192,132,252,0.55)" : "none" }}>
+                {theyWin && <Crown size={11} className="absolute -top-2 left-1/2 -translate-x-1/2 text-fuchsia-300" />}
                 <p className="text-[9px] text-slate-600 truncate px-1">{theirName}</p>
                 <p className="text-xs font-black" style={{ color: r.theirs?.color || "#475569" }}>{r.theirs ? `${r.theirs.tier} ${r.theirs.sub}` : "Sin marca"}</p>
               </div>
@@ -12185,12 +12240,19 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
     <div className="space-y-4">
       <button onClick={onBack} className="flex items-center gap-1.5 text-slate-400 hover:text-white transition text-sm font-semibold"><ChevronLeft size={16} /> Volver</button>
 
-      <div className="rounded-2xl border border-slate-800/50 p-5 text-center" style={{ background: "var(--grad-profile-avatar)" }}>
-        <div className="w-16 h-16 mx-auto mb-2.5 rounded-3xl overflow-hidden">
+      {/* Pedido: "le falta bastante diseño a la visualización de perfil de
+          mis amigos" — antes era un recuadro chato (borde gris, fondo
+          plano) con un avatar chico; ahora tiene el mismo lenguaje de
+          "hero" que el resto de la app (glow, gradiente, borde con color,
+          avatar más grande con marco propio). */}
+      <div className="relative overflow-hidden rounded-3xl border border-purple-500/25 p-5 text-center" style={{ background: "linear-gradient(165deg, rgba(168,85,247,0.14), rgba(10,10,18,0.5))" }}>
+        <div className="absolute -top-12 -right-10 w-36 h-36 rounded-full bg-purple-500/20 blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-10 -left-10 w-28 h-28 rounded-full bg-fuchsia-500/10 blur-3xl pointer-events-none" />
+        <div className="relative w-20 h-20 mx-auto mb-3 rounded-3xl overflow-hidden border-2 border-purple-400/50 shadow-xl shadow-purple-500/25">
           {basic?.avatarData ? <img src={basic.avatarData} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-2xl font-black !text-white" style={{ background: "linear-gradient(135deg,#A855F7,#7C3AED)" }}>{(basic?.name || "?").charAt(0).toUpperCase()}</div>}
         </div>
-        <h2 className="text-lg font-black text-white">{basic?.name || "Usuario"}</h2>
-        <p className="text-xs text-slate-500 flex items-center justify-center gap-1"><AtSign size={10} />{basic?.username}</p>
+        <h2 className="relative text-xl font-black text-white">{basic?.name || "Usuario"}</h2>
+        <p className="relative text-xs text-purple-300/70 flex items-center justify-center gap-1 mt-0.5"><AtSign size={10} />{basic?.username}</p>
       </div>
 
       {state === "loading" && <p className="text-center text-slate-600 text-sm py-10">Cargando perfil...</p>}
@@ -12203,62 +12265,63 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
       )}
       {state === "ok" && (
         <>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-xl border border-slate-800/50 bg-slate-900/50 px-3 py-3 text-center">
-              <p className="text-xl font-black text-orange-400">{streak}🔥</p>
-              <p className="text-[10px] text-slate-500 mt-0.5">Racha actual</p>
-            </div>
-            <div className="rounded-xl border border-slate-800/50 bg-slate-900/50 px-3 py-3 text-center">
-              <p className="text-xl font-black text-purple-400">{weekInfo ? `S${weekInfo.weekInCycle}` : "—"}</p>
-              <p className="text-[10px] text-slate-500 mt-0.5">{weekInfo?.isDeload ? "Semana de descarga" : "Semana de su ciclo"}</p>
-            </div>
-          </div>
-
-          {/* Duelo semanal — quién entrenó más veces ESTA semana, vos o
-              esta persona. Corto y competitivo a propósito, para que abrir
-              un perfil no sea sólo mirar números históricos. */}
-          <div className="rounded-2xl border border-slate-800/50 bg-slate-900/40 p-3.5">
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 mb-2 flex items-center gap-1.5"><Swords size={11} /> Duelo esta semana</p>
-            <div className="flex items-center gap-3">
-              <div className="flex-1 text-center">
-                <p className={`text-2xl font-black leading-none ${mySessionsThisWeek > theirSessionsThisWeek ? "text-emerald-400" : "text-white"}`}>{mySessionsThisWeek}</p>
-                <p className="text-[10px] text-slate-500 mt-1">Vos</p>
-              </div>
-              <span className="text-[10px] text-slate-700 font-black shrink-0">VS</span>
-              <div className="flex-1 text-center">
-                <p className={`text-2xl font-black leading-none ${theirSessionsThisWeek > mySessionsThisWeek ? "text-emerald-400" : "text-white"}`}>{theirSessionsThisWeek}</p>
-                <p className="text-[10px] text-slate-500 mt-1 truncate">{basic?.name || "Ellos"}</p>
-              </div>
-            </div>
-            <p className="text-[10px] text-slate-600 text-center mt-2">
-              {mySessionsThisWeek === theirSessionsThisWeek ? "Van empatados esta semana" : mySessionsThisWeek > theirSessionsThisWeek ? "Vas ganando esta semana 💪" : `${basic?.name || "Esta persona"} va ganando esta semana`}
-            </p>
-          </div>
-
           {/* Pedido: "cuando lo seleccionás en el apartado de ranking que
-              se abra sólo la parte de comparar conmigo" — viniendo de
-              Ranking, el perfil se corta acá: nada de rutina activa,
-              historial ni medidas, sólo la comparación (con el toggle
-              "Ocultar" sacado, ya que "SOLO comparar" implica no ofrecer
-              la alternativa acá — para ver el muñeco individual está la
-              ruta de siempre desde Amigos). */}
-          {openComparing ? (
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 mb-2 px-1">Vos vs {basic?.name || "esta persona"}</p>
-              <div className="space-y-3">
-                <FriendBodyCompare
-                  myRanks={myRanksForCompare}
-                  mySex={viewerProfile?.sex}
-                  theirRanks={theirRanks}
-                  theirSex={full.sex}
-                  theirName={basic?.name}
-                />
-                <RankComparisonList
-                  comparison={buildRankComparison(viewerProfile?.logs, getProfileSettings(viewerProfile), viewerProfile?.sex, viewerProfile?.age, full.logs, full.settings, full.sex, full.age)}
-                  theirName={basic?.name || "Ellos"}
-                />
+              se abra sólo la parte de comparar conmigo... sólo tiene que
+              aparecer la comparativa" — viniendo de Ranking, todo lo de
+              acá (racha/semana, duelo semanal viejo, rutina, historial,
+              medidas) se salta entero: el nuevo BattleCompareCard ya
+              incluye el duelo semanal fusionado en su propio marcador,
+              así que mostrarlo dos veces sería redundante. */}
+          {!openComparing && (
+            <>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-xl border border-slate-800/50 bg-slate-900/50 px-3 py-3 text-center">
+                  <p className="text-xl font-black text-orange-400">{streak}🔥</p>
+                  <p className="text-[10px] text-slate-500 mt-0.5">Racha actual</p>
+                </div>
+                <div className="rounded-xl border border-slate-800/50 bg-slate-900/50 px-3 py-3 text-center">
+                  <p className="text-xl font-black text-purple-400">{weekInfo ? `S${weekInfo.weekInCycle}` : "—"}</p>
+                  <p className="text-[10px] text-slate-500 mt-0.5">{weekInfo?.isDeload ? "Semana de descarga" : "Semana de su ciclo"}</p>
+                </div>
               </div>
-            </div>
+
+              {/* Duelo semanal — quién entrenó más veces ESTA semana, vos o
+                  esta persona. Corto y competitivo a propósito, para que abrir
+                  un perfil no sea sólo mirar números históricos. */}
+              <div className="rounded-2xl border border-slate-800/50 bg-slate-900/40 p-3.5">
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 mb-2 flex items-center gap-1.5"><Swords size={11} /> Duelo esta semana</p>
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 text-center">
+                    <p className={`text-2xl font-black leading-none ${mySessionsThisWeek > theirSessionsThisWeek ? "text-emerald-400" : "text-white"}`}>{mySessionsThisWeek}</p>
+                    <p className="text-[10px] text-slate-500 mt-1">Vos</p>
+                  </div>
+                  <span className="text-[10px] text-slate-700 font-black shrink-0">VS</span>
+                  <div className="flex-1 text-center">
+                    <p className={`text-2xl font-black leading-none ${theirSessionsThisWeek > mySessionsThisWeek ? "text-emerald-400" : "text-white"}`}>{theirSessionsThisWeek}</p>
+                    <p className="text-[10px] text-slate-500 mt-1 truncate">{basic?.name || "Ellos"}</p>
+                  </div>
+                </div>
+                <p className="text-[10px] text-slate-600 text-center mt-2">
+                  {mySessionsThisWeek === theirSessionsThisWeek ? "Van empatados esta semana" : mySessionsThisWeek > theirSessionsThisWeek ? "Vas ganando esta semana 💪" : `${basic?.name || "Esta persona"} va ganando esta semana`}
+                </p>
+              </div>
+            </>
+          )}
+
+          {openComparing ? (
+            <BattleCompareCard
+              myAvatarData={viewerProfile?.avatarData}
+              myName={viewerProfile?.name}
+              mySex={viewerProfile?.sex}
+              mySessionsThisWeek={mySessionsThisWeek}
+              myRanks={myRanksForCompare}
+              theirAvatarData={basic?.avatarData}
+              theirName={basic?.name}
+              theirSex={full.sex}
+              theirSessionsThisWeek={theirSessionsThisWeek}
+              theirRanks={theirRanks}
+              comparison={buildRankComparison(viewerProfile?.logs, getProfileSettings(viewerProfile), viewerProfile?.sex, viewerProfile?.age, full.logs, full.settings, full.sex, full.age)}
+            />
           ) : (
             <>
               {/* El rango va primero (después de racha/semana): es lo que
@@ -12276,23 +12339,19 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
                   </button>
                 </div>
                 {comparing ? (
-                  <div className="space-y-3">
-                    {/* Idea del usuario: además de comparar número a número
-                        (RankComparisonList, abajo), un vistazo visual con los
-                        muñecos lado a lado — mismos datos, sin pedir nada nuevo
-                        a Firestore. */}
-                    <FriendBodyCompare
-                      myRanks={myRanksForCompare}
-                      mySex={viewerProfile?.sex}
-                      theirRanks={theirRanks}
-                      theirSex={full.sex}
-                      theirName={basic?.name}
-                    />
-                    <RankComparisonList
-                      comparison={buildRankComparison(viewerProfile?.logs, getProfileSettings(viewerProfile), viewerProfile?.sex, viewerProfile?.age, full.logs, full.settings, full.sex, full.age)}
-                      theirName={basic?.name || "Ellos"}
-                    />
-                  </div>
+                  <BattleCompareCard
+                    myAvatarData={viewerProfile?.avatarData}
+                    myName={viewerProfile?.name}
+                    mySex={viewerProfile?.sex}
+                    mySessionsThisWeek={mySessionsThisWeek}
+                    myRanks={myRanksForCompare}
+                    theirAvatarData={basic?.avatarData}
+                    theirName={basic?.name}
+                    theirSex={full.sex}
+                    theirSessionsThisWeek={theirSessionsThisWeek}
+                    theirRanks={theirRanks}
+                    comparison={buildRankComparison(viewerProfile?.logs, getProfileSettings(viewerProfile), viewerProfile?.sex, viewerProfile?.age, full.logs, full.settings, full.sex, full.age)}
+                  />
                 ) : (
                   <div>
                     <MuscleHighlighterBody ranks={theirRanks} selected={selectedMuscle} onMuscleClick={(k) => setSelectedMuscle((s) => (s === k ? null : k))} frontRef={friendFrontRef} backRef={friendBackRef} sex={full.sex} />
