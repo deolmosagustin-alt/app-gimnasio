@@ -10882,7 +10882,7 @@ function TrainerTemplatesCard({ templates, onCreate, onEdit, onSend }) {
 // Sub-sección "Entrenador": vincularse (con rol explícito), solicitudes
 // pendientes, lista de alumnos/entrenador ya aceptados, y las propuestas
 // de rutina pendientes (si el que mira es alumno de alguien).
-function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted, trainersAccepted, sentProposals, proposals, basics, streaks, onSendLink, onRespondLink, onRemoveLink, onRespondProposal, onViewStudent, onViewTrainer }) {
+function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted, trainersAccepted, sentProposals, proposals, basics, streaks, linkStatusWith, linkSendError, onSendLink, onRespondLink, onRemoveLink, onRespondProposal, onViewStudent, onViewTrainer }) {
   const [raw, setRaw] = useState("");
   const [role, setRole] = useState("trainer"); // el rol que ELIJO para mí al mandar la solicitud
   const [searchState, setSearchState] = useState("idle");
@@ -10943,13 +10943,41 @@ function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted
         </div>
         {searchState === "not_found" && <p className="text-xs text-slate-500">No encontramos a nadie con ese @usuario.</p>}
         {searchState === "self" && <p className="text-xs text-slate-500">Ese sos vos 🙂</p>}
-        {searchState === "found" && found && (
-          <PublicUserCard uid={found.uid} basic={found.basic}>
-            <button onClick={() => { onSendLink(found.uid, role); setFound(null); setRaw(""); setSearchState("idle"); }} className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-500/15 border border-blue-500/30 text-blue-300 text-[11px] font-bold hover:bg-blue-500/25 transition">
-              <UserPlus size={12} /> Invitar
-            </button>
-          </PublicUserCard>
-        )}
+        {/* BUG FIX (ver trainerLinkStatusWith en SocialView): antes acá
+            SIEMPRE se ofrecía "Invitar", sin mirar si ya había un vínculo
+            con esta persona — a diferencia del buscador de amigos, que sí
+            chequea friendStatus() primero. Si la otra persona ya te había
+            invitado con estos mismos roles, ese "Invitar" reescribía el
+            MISMO documento y Firestore lo rechazaba en silencio (para el
+            server ya no era una creación, era una actualización que no
+            cumplía la regla). Ahora se muestra el estado real: aceptar,
+            ya vinculados, o ya invitado — nunca un botón que puede fallar. */}
+        {searchState === "found" && found && (() => {
+          const link = linkStatusWith?.(found.uid);
+          if (link?.status === "accepted") {
+            return <PublicUserCard uid={found.uid} basic={found.basic}><span className="text-[10.5px] font-bold text-emerald-400 shrink-0">Ya vinculados</span></PublicUserCard>;
+          }
+          if (link?.status === "pending" && link.requestedBy === found.uid) {
+            return (
+              <PublicUserCard uid={found.uid} basic={found.basic}>
+                <button onClick={() => { onRespondLink(link, true); setFound(null); setRaw(""); setSearchState("idle"); }} className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[11px] font-bold hover:bg-emerald-500/25 transition">
+                  <Check size={12} /> Aceptar — {link.myRole === "trainer" ? "te pidió ser su entrenador" : "se ofreció como tu entrenador"}
+                </button>
+              </PublicUserCard>
+            );
+          }
+          if (link?.status === "pending" && link.requestedBy === myUid) {
+            return <PublicUserCard uid={found.uid} basic={found.basic}><span className="text-[10.5px] font-bold text-slate-500 shrink-0">Invitación enviada</span></PublicUserCard>;
+          }
+          return (
+            <PublicUserCard uid={found.uid} basic={found.basic}>
+              <button onClick={() => { onSendLink(found.uid, role); setFound(null); setRaw(""); setSearchState("idle"); }} className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-500/15 border border-blue-500/30 text-blue-300 text-[11px] font-bold hover:bg-blue-500/25 transition">
+                <UserPlus size={12} /> Invitar
+              </button>
+            </PublicUserCard>
+          );
+        })()}
+        {linkSendError && <p className="text-[11px] text-rose-400/90 px-1">{linkSendError}</p>}
       </div>
 
       {loading ? <p className="text-center text-slate-600 text-sm py-8">Cargando...</p> : (
@@ -11856,6 +11884,27 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
   const trainerIncoming = [...trainerAsTrainer, ...trainerAsStudent].filter((l) => l.status === "pending" && l.requestedBy !== uid);
   const studentsAccepted = trainerAsTrainer.filter((l) => l.status === "accepted");
   const trainersAccepted = trainerAsStudent.filter((l) => l.status === "accepted");
+  // BUG FIX: el buscador de "Vincular entrenador/alumno" ofrecía "Invitar"
+  // sin importar si YA había un vínculo (pendiente o aceptado) con esa
+  // persona — a diferencia del buscador de amigos, que sí chequea
+  // friendStatus() antes de mostrar el botón. El problema no era sólo
+  // estético: si la otra persona YA te había mandado una invitación
+  // pendiente con los mismos roles, tu "Invitar" reescribía el MISMO
+  // documento — para Firestore eso ya no es una creación sino una
+  // actualización, y la regla de update exige pasar directo a
+  // status:"accepted"; como sendTrainerLinkRequest manda "pending" de
+  // nuevo, el permiso se rechazaba EN SILENCIO (la promesa de onSendLink
+  // ni siquiera se esperaba) y el buscador se cerraba como si hubiera
+  // funcionado. Este helper le da a la UI la misma info que ya usa
+  // friendStatus, para mostrar "Aceptar"/"Ya vinculados"/"Invitación
+  // enviada" en vez de ofrecer un botón que puede fallar solo.
+  const trainerLinkStatusWith = (otherUid) => {
+    const asTrainer = trainerAsTrainer.find((l) => l.studentUid === otherUid);
+    if (asTrainer) return { ...asTrainer, myRole: "trainer" };
+    const asStudent = trainerAsStudent.find((l) => l.trainerUid === otherUid);
+    if (asStudent) return { ...asStudent, myRole: "student" };
+    return null;
+  };
 
   const allUids = useMemo(() => {
     const set = new Set();
@@ -11927,10 +11976,36 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
   // del Chatbot) para que sacar a alguien no sea un toque accidental.
   const [confirmRemoveId, setConfirmRemoveId] = useState(null);
 
-  const doSendFriendRequest = async (otherUid) => { await sendFriendRequest(uid, otherUid); refresh(); };
+  // Red de seguridad, mismo criterio que linkSendError más abajo: la UI de
+  // Buscar ya chequea friendStatus() antes de ofrecer "Agregar" (por eso
+  // esto no debería dispararse casi nunca), pero una solicitud cruzada
+  // justo en el medio de un refresh() todavía podría pisar el mismo
+  // documento y que Firestore la rechace en silencio si no se atrapa acá.
+  const doSendFriendRequest = async (otherUid) => {
+    try { await sendFriendRequest(uid, otherUid); refresh(); }
+    catch (err) { console.warn("[social] No se pudo enviar la solicitud de amistad:", err?.message || err); refresh(); }
+  };
   const doRespondFriend = async (otherUid, accept) => { await respondToFriendRequest(uid, otherUid, accept); refresh(); };
   const doRemoveFriend = async (otherUid) => { await removeFriend(uid, otherUid); refresh(); };
-  const doSendTrainerLink = async (otherUid, myRole) => { await sendTrainerLinkRequest(uid, otherUid, myRole); refresh(); };
+  // linkSendError: red de seguridad además del chequeo de la UI (ver
+  // trainerLinkStatusWith) — si de todos modos el permiso se rechaza (ej.
+  // dos invitaciones cruzadas casi al mismo tiempo, antes de que refresh()
+  // alcance a traer la del otro), esto lo muestra en vez de tragárselo.
+  const [linkSendError, setLinkSendError] = useState("");
+  // Ver el BUG FIX en onRespondProposal más abajo — avisa cuando aceptar
+  // una propuesta de rutina/progresión no pudo aplicarse de verdad.
+  const [proposalApplyWarning, setProposalApplyWarning] = useState("");
+  const doSendTrainerLink = async (otherUid, myRole) => {
+    try {
+      await sendTrainerLinkRequest(uid, otherUid, myRole);
+      setLinkSendError("");
+      refresh();
+    } catch (err) {
+      console.warn("[social] No se pudo enviar la invitación de entrenador/alumno:", err?.message || err);
+      setLinkSendError("Esa persona ya tiene un vínculo pendiente o aceptado con vos — revisá más abajo.");
+      refresh();
+    }
+  };
   const doRespondTrainer = async (link, accept) => { await respondToTrainerLink(link.trainerUid, link.studentUid, accept); refresh(); };
   const doRemoveTrainerLink = async (link) => { await removeTrainerLink(link.trainerUid, link.studentUid); refresh(); };
 
@@ -12194,6 +12269,14 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
             onGoToBuscar={() => setSection("buscar")} />
         )}
 
+        {section === "entrenador" && proposalApplyWarning && (
+          <div className="flex items-start gap-2 rounded-xl px-3.5 py-3 bg-amber-500/10 border border-amber-500/25">
+            <AlertTriangle size={14} className="text-amber-400 shrink-0 mt-0.5" />
+            <p className="text-[11.5px] text-amber-300/90 flex-1">{proposalApplyWarning}</p>
+            <button onClick={() => setProposalApplyWarning("")} aria-label="Cerrar aviso" className="text-amber-400/70 hover:text-amber-300 shrink-0"><X size={14} /></button>
+          </div>
+        )}
+
         {section === "entrenador" && (
           <TrainerLinksSection
             myUid={uid}
@@ -12205,22 +12288,41 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
             proposals={proposals}
             basics={basics}
             streaks={streaks}
+            linkStatusWith={trainerLinkStatusWith}
+            linkSendError={linkSendError}
             onSendLink={doSendTrainerLink}
             onRespondLink={doRespondTrainer}
             onRemoveLink={doRemoveTrainerLink}
             onRespondProposal={async (p, accept) => {
               await respondToRoutineProposal(p.id, accept);
               if (accept) {
+                // BUG FIX: antes, si no tenías rutina activa o el
+                // ejercicio/serie de la propuesta ya no existía ahí
+                // (cambiaste de rutina, o el entrenador armó la
+                // propuesta contra un ejercicio que ya no tenés), esto
+                // no hacía NADA — sin error, sin aviso — y la propuesta
+                // igual quedaba marcada "aceptada" en el servidor. La
+                // persona veía "aceptaste" pero su rutina no cambiaba,
+                // sin ninguna pista de por qué. Ahora se verifica que
+                // de verdad haya algo para aplicar antes de festejar.
+                let applied = false;
                 if (p.progressionPlan) {
                   // Propuesta de progresión: se aplica a la rutina ACTIVA
                   // actual (no reemplaza nada más) — ver
                   // applyProgressionToRoutine, arriba en el archivo.
                   const activeId = profile?.activeRoutineId;
                   const activeDef = activeId ? resolveRoutineDef(profile.routines?.[activeId], activeId) : null;
-                  if (activeDef) onActivateRoutine(activeId, applyProgressionToRoutine(activeDef, p.progressionPlan));
+                  if (activeDef) {
+                    const plans = Array.isArray(p.progressionPlan) ? p.progressionPlan : [p.progressionPlan];
+                    const model = buildRoutineModel(activeDef);
+                    applied = plans.some((plan) => model.exerciseById[plan.exerciseId]?.sets?.[plan.setIndex]);
+                    onActivateRoutine(activeId, applyProgressionToRoutine(activeDef, p.progressionPlan));
+                  }
                 } else if (p.proposedRoutine) {
                   onActivateRoutine(builderUid("routine_proposal"), p.proposedRoutine);
+                  applied = true;
                 }
+                setProposalApplyWarning(applied ? "" : "Aceptaste la propuesta, pero no pudimos aplicarla: no tenés esa rutina activa, o ese ejercicio ya no está en ella.");
               }
               refresh();
             }}

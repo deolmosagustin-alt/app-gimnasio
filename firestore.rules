@@ -166,13 +166,21 @@ service cloud.firestore {
         && request.resource.data.status == 'pending'
         && exists(trainerLinkPath(request.resource.data.trainerUid, request.resource.data.studentUid))
         && get(trainerLinkPath(request.resource.data.trainerUid, request.resource.data.studentUid)).data.status == 'accepted';
+      // BUG FIX (encontrado auditando): esto sólo fijaba proposedRoutine
+      // sin tocar — una propuesta de PROGRESIÓN (proposedRoutine: null,
+      // progressionPlan: {...}, ver createProgressionProposal en
+      // social.js) podía, en teoría, dejar pasar un update que cambiara
+      // progressionPlan al mismo tiempo que acepta/rechaza. La app nunca
+      // manda eso (respondToRoutineProposal sólo toca status/respondedAt),
+      // pero la regla debería exigirlo igual que ya exige proposedRoutine.
       allow update: if isSignedIn()
         && request.auth.uid == resource.data.studentUid
         && resource.data.status == 'pending'
         && (request.resource.data.status == 'accepted' || request.resource.data.status == 'rejected')
         && request.resource.data.trainerUid == resource.data.trainerUid
         && request.resource.data.studentUid == resource.data.studentUid
-        && request.resource.data.proposedRoutine == resource.data.proposedRoutine;
+        && request.resource.data.proposedRoutine == resource.data.proposedRoutine
+        && request.resource.data.progressionPlan == resource.data.progressionPlan;
       // El entrenador puede retirar una propuesta que sigue pendiente.
       allow delete: if isSignedIn()
         && request.auth.uid == resource.data.trainerUid
