@@ -21,31 +21,58 @@
  * llegan al usuario ahora explican QUÉ pasó de verdad.
  */
 
-// Se agregaron variantes "-lite" (más baratas en cuota, buen respaldo si
-// las versiones normales están agotadas) además de los alias — más
-// candidatos en la cadena significa más chances de que ALGUNO siga
-// vigente, sobre todo si Google retira alias viejos con el tiempo.
-// BUG FIX (causa raíz de "la IA no funciona", confirmado probando el
-// endpoint en producción — devolvía 404 en TODOS los modelos): Google
-// retiró gemini-2.0-flash y gemini-2.0-flash-lite el 1/6/2026, y
-// gemini-1.5-flash es aún más viejo y ya no existe hace rato — la cadena
-// entera terminaba en modelos muertos. Se actualiza a la generación
-// vigente (2.5 sigue activo, 3.x es la generación nueva) y se agregan más
-// candidatos de respaldo para no volver a depender de que UN solo nombre
-// siga existiendo.
-const MODEL_CHAIN = [
-  "gemini-flash-latest",
-  "gemini-2.5-flash",
-  "gemini-3.5-flash",
-  "gemini-2.5-flash-lite",
-  "gemini-3.5-flash-lite",
-  "gemini-3.6-flash",
-  "gemini-3.1-flash-lite",
-];
+// BUG FIX DE FONDO (causa real de que esto se rompiera de nuevo): la
+// cadena anterior tenía nombres de modelo HARDCODEADOS a mano (incluidos
+// varios inventados/adivinados sin confirmar que existieran de verdad,
+// tipo "gemini-3.5-flash"/"gemini-3.6-flash") — Google va retirando y
+// renombrando modelos con el tiempo, así que cualquier lista fija a mano
+// se pudre tarde o temprano, sin importar qué tan actualizada esté hoy.
+// La solución de fondo es dejar de adivinar nombres: "gemini-flash-latest"
+// es un alias ROTATIVO que Google mantiene apuntando siempre al modelo
+// flash estable vigente (no debería dar 404 nunca), y si aun así falla,
+// discoverModels() le pregunta a la propia API de Google qué modelos
+// existen HOY para esta cuenta (GET /v1beta/models) en vez de que nosotros
+// tengamos que mantener la lista al día a mano.
+const PRIMARY_MODEL = "gemini-flash-latest";
 
 // Se recuerda el último modelo que funcionó (mientras el lambda viva) para
 // arrancar por ese y no pagar reintentos en cada llamada.
 let preferredModel = null;
+
+// Lista de modelos vigentes, descubierta en vivo contra la API de Google
+// (no hardcodeada) — cacheada en memoria mientras el lambda esté caliente
+// para no pagar esta consulta extra en cada mensaje del chat.
+let discoveredModelsCache = null; // { models: string[], fetchedAt: number }
+const MODEL_LIST_CACHE_MS = 30 * 60 * 1000;
+
+async function discoverModels(apiKey) {
+  if (discoveredModelsCache && Date.now() - discoveredModelsCache.fetchedAt < MODEL_LIST_CACHE_MS) {
+    return discoveredModelsCache.models;
+  }
+  try {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+    if (!res.ok) return discoveredModelsCache?.models || [];
+    const data = await res.json();
+    const names = (data?.models || [])
+      // Sólo modelos que de verdad soportan generar texto/chat — la
+      // cuenta también puede tener modelos de embeddings, imagen, audio,
+      // etc. que no sirven para esto y sólo desperdiciarían un intento.
+      .filter((m) => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes("generateContent"))
+      .map((m) => String(m.name || "").replace(/^models\//, ""))
+      .filter((n) => n && /flash/i.test(n) && !/embed|vision|tts|image|aqa/i.test(n));
+    // Orden de preferencia: variantes "normales" antes que "-lite" (más
+    // capaces), y estables antes que "-exp"/"-preview" (menos garantía de
+    // que sigan disponibles mañana) — dentro de cada grupo se respeta el
+    // orden en que Google las devolvió (suele ser el más nuevo primero).
+    const rank = (n) => (/-lite/i.test(n) ? 2 : 0) + (/-(exp|preview)/i.test(n) ? 1 : 0);
+    names.sort((a, b) => rank(a) - rank(b));
+    discoveredModelsCache = { models: names, fetchedAt: Date.now() };
+    return names;
+  } catch (err) {
+    console.error("[ia] No se pudo consultar la lista de modelos vigentes:", err?.message || err);
+    return discoveredModelsCache?.models || [];
+  }
+}
 
 // Rate limit básico por IP: sin esto, cualquiera que conozca la URL puede
 // pegarle directo al endpoint (sin pasar por la app) y agotar la cuota
@@ -124,20 +151,26 @@ async function callGemini(body) {
     throw e;
   }
 
-  // Orden de intento: el que funcionó la última vez primero, después el resto.
-  const chain = preferredModel
-    ? [preferredModel, ...MODEL_CHAIN.filter((m) => m !== preferredModel)]
-    : MODEL_CHAIN;
+  // Cadena de intento: primero el que funcionó la última vez (si lo hay,
+  // cacheado mientras el lambda esté caliente) y el alias rotativo de
+  // Google — sólo si AMBOS fallan se paga la consulta extra de
+  // discoverModels() para sumar el resto de los modelos vigentes reales,
+  // en vez de pagar esa consulta de más en cada mensaje del chat.
+  const chain = [];
+  if (preferredModel) chain.push(preferredModel);
+  if (!chain.includes(PRIMARY_MODEL)) chain.push(PRIMARY_MODEL);
+  let discoveryTried = false;
   const deadline = Date.now() + TOTAL_TIME_BUDGET_MS;
 
   // BUG FIX (diagnóstico): antes el mensaje final sólo miraba el status del
-  // ÚLTIMO modelo probado — si los primeros 3 modelos daban 429 (cuota
+  // ÚLTIMO modelo probado — si los primeros intentos daban 429 (cuota
   // agotada) pero el ÚLTIMO de la cadena ya no existe más y da 404, el
   // usuario veía el mensaje genérico ("no disponible") en vez de enterarse
   // de que el problema real era la cuota. Ahora se recuerda si CUALQUIER
   // intento dio 429, sin importar cuál fue el último.
   let lastStatus = null, lastDetail, ranOutOfTime = false, sawQuotaExhausted = false;
-  for (let i = 0; i < chain.length; i++) {
+  let i = 0;
+  while (i < chain.length) {
     const model = chain[i];
     const remaining = deadline - Date.now();
     // Sin tiempo útil para otro intento: cortar ACÁ con un error prolijo
@@ -149,35 +182,48 @@ async function callGemini(body) {
     // modelo de la cadena a veces no devuelve NI ERROR NI RESPUESTA — se
     // queda colgado hasta el timeout completo (~50s) incluso con un
     // pedido trivial ("hola"), lo que se comía TODO el presupuesto y
-    // dejaba a los otros 5 modelos de respaldo sin ninguna chance real
-    // (el bucle cortaba por falta de tiempo antes de probar el segundo).
-    // Al primer intento se le da un plazo corto para detectar ese
-    // "colgado" rápido y saltar de modelo; de ahí en adelante, ya se
-    // sabe que colgarse entero es real, así que a los siguientes se les
-    // da el presupuesto que quede completo (una rutina grande legítima
-    // puede tardar 30-50s en generarse).
+    // dejaba a los modelos de respaldo sin ninguna chance real (el bucle
+    // cortaba por falta de tiempo antes de probar el segundo). Al primer
+    // intento se le da un plazo corto para detectar ese "colgado" rápido
+    // y saltar de modelo; de ahí en adelante, ya se sabe que colgarse
+    // entero es real, así que a los siguientes se les da el presupuesto
+    // que quede completo (una rutina grande legítima puede tardar 30-50s
+    // en generarse).
     const timeoutMs = i === 0 ? Math.min(12000, remaining) : Math.min(50000, remaining);
-    let response;
+    let response = null;
     try {
       response = await callModel(model, body, apiKey, timeoutMs);
     } catch (netErr) {
       // Timeout o corte de red hacia Google: probar el siguiente modelo.
       lastStatus = 0; lastDetail = String(netErr?.message || netErr);
       console.error(`[ia] ${model}: fallo de red/timeout →`, lastDetail);
-      continue;
     }
-    if (response.ok) {
+    if (response?.ok) {
       preferredModel = model;
       return response.json();
     }
-    lastStatus = response.status;
-    if (lastStatus === 429) sawQuotaExhausted = true;
-    lastDetail = await response.text().catch(() => "");
-    console.error(`[ia] ${model} devolvió ${lastStatus}:`, lastDetail.slice(0, 300));
-    // 404 = el alias ya no existe · 429 = cuota agotada de ESE modelo ·
-    // 500/503 = sobrecarga puntual. En todos, vale la pena el siguiente.
-    if ([404, 429, 500, 503].includes(lastStatus)) continue;
-    break; // 400/401/403: el problema no es del modelo, cortar acá
+    let stopEntirely = false;
+    if (response) {
+      lastStatus = response.status;
+      if (lastStatus === 429) sawQuotaExhausted = true;
+      lastDetail = await response.text().catch(() => "");
+      console.error(`[ia] ${model} devolvió ${lastStatus}:`, lastDetail.slice(0, 300));
+      // 404 = el alias ya no existe · 429 = cuota agotada de ESE modelo ·
+      // 500/503 = sobrecarga puntual. En todos, vale la pena el siguiente.
+      // 400/401/403: el problema no es del modelo (key inválida, pedido mal
+      // formado) — no tiene sentido seguir probando modelos distintos.
+      stopEntirely = ![404, 429, 500, 503].includes(lastStatus);
+    }
+    i++;
+    if (stopEntirely) break;
+    // Se acabó la cadena conocida sin éxito: antes de rendirnos, sumar los
+    // modelos vigentes REALES descubiertos contra la propia API de Google
+    // (una sola consulta por pedido, cacheada entre pedidos).
+    if (i >= chain.length && !discoveryTried) {
+      discoveryTried = true;
+      const discovered = await discoverModels(apiKey);
+      discovered.forEach((m) => { if (!chain.includes(m)) chain.push(m); });
+    }
   }
 
   const e = new Error(ranOutOfTime ? "Se agotó el tiempo disponible probando modelos" : `Todos los modelos fallaron (último: ${lastStatus})`);

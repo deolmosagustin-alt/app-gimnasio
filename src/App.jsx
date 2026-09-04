@@ -905,6 +905,22 @@ function defaultWeekSchedule(dayOrder) {
   return sched;
 }
 
+// Tira de días (Push/Pull/Legs, etc.): antes el texto de cada casillero
+// quedaba siempre al tamaño más chico posible (10px), pensado para el caso
+// de MÁS días — una rutina de 3 días con nombres cortos tenía de sobra
+// lugar para verse más grande y quedaba achicada sin necesidad. Ahora el
+// tamaño depende de cuántos días entran en la fila: más lugar por
+// casillero → letra más grande. minHeight se ajusta en la misma proporción
+// para que la reserva de "siempre 2 líneas" (ver RoutineView/HistoryView)
+// seguro alcance a las 2 líneas de ese tamaño de letra.
+function dayTabTextSizing(dayCount) {
+  if (dayCount <= 3) return { textClass: "text-sm", minHeight: 36 };
+  if (dayCount === 4) return { textClass: "text-xs", minHeight: 30 };
+  if (dayCount === 5) return { textClass: "text-[11px]", minHeight: 28 };
+  if (dayCount === 6) return { textClass: "text-[10.5px]", minHeight: 26 };
+  return { textClass: "text-[10px]", minHeight: 25 };
+}
+
 // Devuelve el cronograma de una rutina (el guardado, o uno por defecto
 // calculado al vuelo si todavía no se personalizó ninguno).
 function getRoutineWeekSchedule(routineDef) {
@@ -5928,8 +5944,8 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
       )}
 
       <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${DAY_ORDER.length}, 1fr)` }}>
-        {DAY_ORDER.map((k) => (
-          <button key={k} onClick={() => setActiveDay(k)} title={ROUTINE[k].label} className="py-2.5 px-1 rounded-xl text-[10px] font-black uppercase transition-all active:scale-95 border text-center leading-tight min-w-0"
+        {(() => { const { textClass, minHeight } = dayTabTextSizing(DAY_ORDER.length); return DAY_ORDER.map((k) => (
+          <button key={k} onClick={() => setActiveDay(k)} title={ROUTINE[k].label} className={`py-2.5 px-1 rounded-xl ${textClass} font-black uppercase transition-all active:scale-95 border text-center leading-tight min-w-0`}
             style={activeDay === k ? { background: ROUTINE[k].color, borderColor: ROUTINE[k].color, color: "#fff", boxShadow: `0 4px 14px -4px ${tint(ROUTINE[k].color, "66")}` } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
             {/* line-clamp-2 en vez de truncate: nombres combinados como
                 "Hombros/Brazos" tienen que poder leerse enteros aunque
@@ -5946,10 +5962,13 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
                 minHeight reserva el alto de 2 líneas SIEMPRE, sin
                 importar el largo del nombre, y WebkitBoxPack centra el
                 texto de una sola línea en ese espacio — el que necesite
-                más todavía puede crecer hasta 2 líneas igual que antes. */}
-            <span className="block" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", WebkitBoxPack: "center", overflow: "hidden", minHeight: "25px" }}>{ROUTINE[k].label}</span>
+                más todavía puede crecer hasta 2 líneas igual que antes.
+                Pedido después: "agranda las letras... que se ajusten según
+                la cantidad de días" — textClass/minHeight ahora vienen de
+                dayTabTextSizing en vez de un 10px/25px fijo. */}
+            <span className="block" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", WebkitBoxPack: "center", overflow: "hidden", minHeight: `${minHeight}px` }}>{ROUTINE[k].label}</span>
           </button>
-        ))}
+        )); })()}
       </div>
 
       <div key={activeDay} className="relative overflow-hidden rounded-2xl border tab-fade-in" style={{ borderColor: tint(day.color, "55"), background: `linear-gradient(135deg, ${tint(day.color, "38")}, transparent 75%)` }}>
@@ -6727,22 +6746,23 @@ function DeloadView({ logs, setLogs, settings = DEFAULT_SETTINGS, deloadProgress
       </div>
 
       <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${DAY_ORDER.length}, 1fr)` }}>
-        {DAY_ORDER.map((dk) => {
+        {(() => { const { textClass, minHeight } = dayTabTextSizing(DAY_ORDER.length); return DAY_ORDER.map((dk) => {
           const d = ROUTINE[dk], isActive = activeDay === dk;
           const withPR = d.exercises.filter((ex) => ex.sets.some((s, i) => logs[`${ex.id}_${i}_pr_override`] || (logs[`${ex.id}_${i}`] || []).length > 0)).length;
           return (
             <button key={dk} onClick={() => setActiveDay(dk)} title={d.label}
-              className="py-2.5 px-1 rounded-xl text-[10px] font-black uppercase transition-all active:scale-95 border text-center leading-tight min-w-0"
+              className={`py-2.5 px-1 rounded-xl ${textClass} font-black uppercase transition-all active:scale-95 border text-center leading-tight min-w-0`}
               style={isActive ? { backgroundColor: tint(d.color, "22"), borderColor: tint(d.color, "55"), color: d.color } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
               {/* line-clamp-2 + minHeight: ver comentario en RoutineView —
                   "Hombros/Brazos" tiene que leerse entero aunque sea en 2
                   líneas, Y el botón siempre reserva ese alto por defecto
-                  (no sólo cuando algún día de la grilla lo necesita). */}
-              <span className="block" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", WebkitBoxPack: "center", overflow: "hidden", minHeight: "25px" }}>{d.label}</span>
+                  (no sólo cuando algún día de la grilla lo necesita).
+                  textClass/minHeight: ver dayTabTextSizing. */}
+              <span className="block" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", WebkitBoxPack: "center", overflow: "hidden", minHeight: `${minHeight}px` }}>{d.label}</span>
               {withPR > 0 && <span className="text-[8px] font-black opacity-70">{withPR}/{d.exercises.length}</span>}
             </button>
           );
-        })}
+        }); })()}
       </div>
 
       {/* Antes no había forma explícita de "arrancar" acá — a diferencia de
@@ -7845,11 +7865,20 @@ function MyBodyModal({ profile, onClose }) {
   const backRef = useRef(null);
   const ranks = useMemo(() => computeAllMuscleRanks(profile?.logs, getProfileSettings(profile), profile?.sex, profile?.age), [profile]);
   const selInfo = selected ? ranks[selected] : null;
+  // Pedido: "al hacer click en mi perfil en la sección de mejor rango
+  // aparece sólo el muñeco, quedó medio vacío" — antes este modal era
+  // literalmente título + muñeco, sin nada arriba salvo que tocaras un
+  // músculo. Ahora arranca con un resumen (mismo dato que myTopRank en
+  // Social/RankExplainModal) para que siempre haya algo que leer, no sólo
+  // mirar el dibujo.
+  const topRank = useMemo(() => computeTopRank(profile), [profile]);
+  const trainedCount = useMemo(() => Object.values(ranks).filter((r) => r.hasData).length, [ranks]);
   if (typeof document === "undefined") return null;
   return createPortal(
     <div className="fixed inset-0 z-[120] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
-      <div className="w-full max-w-sm max-h-[86vh] overflow-y-auto overscroll-contain bg-slate-900 border border-purple-700/40 rounded-3xl modal-pop-in shadow-2xl shadow-black/70 p-5 space-y-3" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between">
+      <div className="relative overflow-hidden w-full max-w-sm max-h-[86vh] overflow-y-auto overscroll-contain bg-slate-900 border border-purple-700/40 rounded-3xl modal-pop-in shadow-2xl shadow-black/70 p-5 space-y-3" onClick={(e) => e.stopPropagation()}>
+        <div className="absolute -top-16 -right-14 w-48 h-48 rounded-full bg-purple-500/10 blur-3xl pointer-events-none" />
+        <div className="relative flex items-center justify-between">
           <p className="text-sm font-black text-white">Tu rango por músculo</p>
           <div className="flex items-center gap-1 shrink-0">
             {/* Pedido: "todas las opciones de compartir, metele mucho a
@@ -7860,17 +7889,30 @@ function MyBodyModal({ profile, onClose }) {
             <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition"><X size={17} /></button>
           </div>
         </div>
+        {topRank ? (
+          <div className="relative flex items-center gap-3 rounded-2xl border px-4 py-3" style={{ borderColor: tint(topRank.color, "40"), backgroundColor: tint(topRank.color, "0c") }}>
+            <RankBadgeIcon tier={topRank.tier} sub={topRank.sub} color={topRank.color} size={46} />
+            <div className="min-w-0 flex-1">
+              <p className="text-base font-black leading-tight" style={{ color: topRank.color }}>{topRank.tier} {topRank.sub}</p>
+              <p className="text-[10.5px] text-slate-500 leading-snug">Promedio de {trainedCount} músculo{trainedCount === 1 ? "" : "s"} con marcas</p>
+            </div>
+          </div>
+        ) : (
+          <p className="relative text-[11px] text-slate-500 px-1">Todavía no tenés marcas registradas — andá anotando series para que se arme tu rango.</p>
+        )}
         <MuscleHighlighterBody ranks={ranks} selected={selected} onMuscleClick={(k) => setSelected((s) => (s === k ? null : k))} frontRef={frontRef} backRef={backRef} sex={profile?.sex} />
         {/* Pedido: al tocar un músculo, desplegar las mejores marcas de
             CADA ejercicio de ese músculo (no sólo el tier/rango). */}
-        {selInfo && (
-          <div className="rounded-xl border px-3.5 py-3" style={{ borderColor: tint(selInfo.color, "40"), backgroundColor: tint(selInfo.color, "0c") }}>
+        {selInfo ? (
+          <div className="relative rounded-xl border px-3.5 py-3" style={{ borderColor: tint(selInfo.color, "40"), backgroundColor: tint(selInfo.color, "0c") }}>
             <div className="flex items-center justify-between mb-2">
               <p className="text-[10px] font-bold text-slate-500">{selInfo.label}</p>
               {selInfo.hasData && <p className="text-xs font-black" style={{ color: selInfo.color }}>{selInfo.tier} {selInfo.sub}</p>}
             </div>
             <MuscleExerciseList exercises={getExerciseBestsForMuscleGroup(selected, profile?.logs)} unit={getProfileSettings(profile)?.weightUnit || "kg"} />
           </div>
+        ) : (
+          <p className="relative text-[10.5px] text-slate-600 text-center">Tocá un músculo para ver tu mejor marca ahí</p>
         )}
       </div>
       {showImage && (
@@ -10821,8 +10863,14 @@ function ContactsSuggestions({ myUid, friendStatus, onSendFriendRequest }) {
         }
         throw permErr;
       }
-      if (perm.contacts !== "granted") perm = await Contacts.requestPermissions();
-      if (perm.contacts !== "granted") { setState("denied"); return; }
+      // BUG FIX: Android 14+ puede devolver "limited" (permiso de "elegir
+      // contactos" en vez de acceso completo) — antes cualquier valor que
+      // no fuera exactamente "granted" se trataba como rechazo total y
+      // mostraba "no dimos permiso", incluso cuando el usuario SÍ dio
+      // acceso a algunos contactos.
+      const isUsable = (p) => p?.contacts === "granted" || p?.contacts === "limited";
+      if (!isUsable(perm)) perm = await Contacts.requestPermissions();
+      if (!isUsable(perm)) { setState("denied"); return; }
 
       const { contacts } = await Contacts.getContacts({ projection: { name: true, phones: true } });
       const keys = new Set();
@@ -12322,29 +12370,37 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
 
   return (
     <div className="space-y-4">
-      {/* Hero propio de la pestaña — antes Social arrancaba directo en el
-          selector de secciones, sin ningún momento de identidad como sí
-          tienen Rutina/Progreso/Descarga (cada una con su panel de
-          gradiente arriba). Mismo lenguaje acá: ícono + título + un dato
-          rápido, con el rango promedio bien visible como ícono (ver
-          computeTopRank más arriba: promedio de los 12 grupos, no el
-          mejor uno solo).
-          BUG FIX (pedido: "agrandalo un poco, con una breve descripción, y
-          agrandá el ícono también"): antes era más chico y terminaba en el
-          dato de amigos, sin ninguna acción — ahora suma una bajada corta
-          (qué es esta pestaña) y un atajo abajo (compartir perfil) para que
-          se sienta "integrado" en vez de sólo decorativo, mismo patrón que
-          ya usa el hero de Rutina con "Personalizar qué ves al registrar". */}
+      {/* Hero propio de la pestaña — pedido: "el recuadro Social quedó
+          distinto en formato y diseño en comparación con las otras
+          pestañas". El intento anterior (ver historial) puso el AVATAR y
+          el NOMBRE del usuario como título grande — Rutina/Progreso/
+          Rutinas/Chatbot en cambio siempre usan el mismo esqueleto: ícono +
+          etiqueta chica, el NOMBRE DE LA PESTAÑA como título grande, y una
+          bajada de una línea debajo. Ahora Social sigue exactamente ese
+          mismo esqueleto (ver heroGrad de Rutina/Progreso más arriba en el
+          archivo) — el avatar/nombre/racha/rango pasan a su propia tarjeta
+          de perfil, debajo, en vez de vivir adentro de este hero. */}
       <div className="relative overflow-hidden rounded-2xl border border-purple-500/20 p-5" style={{ background: "var(--grad-hero-purple)" }}>
-        <div className="absolute -top-10 -right-6 w-36 h-36 rounded-full bg-purple-500/15 blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-8 -left-8 w-28 h-28 rounded-full bg-fuchsia-500/10 blur-3xl pointer-events-none" />
-        <div className="relative flex items-center gap-3.5">
-          <div className="w-16 h-16 rounded-2xl overflow-hidden shrink-0 border border-purple-500/30 bg-purple-500/15 flex items-center justify-center">
-            {profile?.avatarData ? <img src={profile.avatarData} alt="" className="w-full h-full object-cover" /> : <Users size={28} className="text-purple-300" />}
+        <div className="absolute -top-8 -right-6 w-32 h-32 rounded-full bg-purple-500/15 blur-2xl pointer-events-none" />
+        <div className="absolute -bottom-6 -left-6 w-28 h-28 rounded-full bg-fuchsia-500/10 blur-2xl pointer-events-none" />
+        <div className="relative flex items-center gap-2 mb-1">
+          <Users size={16} className="text-purple-400" />
+          <span className="text-[11px] font-black uppercase tracking-widest text-purple-400">Social</span>
+        </div>
+        <h2 className="relative text-xl font-black text-white leading-tight">Social</h2>
+        <p className="relative text-xs text-purple-300/60 mt-1">Sumá amigos, competí y compartí tu progreso</p>
+      </div>
+
+      {/* Tarjeta de perfil — el avatar/nombre/racha/rango que antes vivían
+          adentro del hero de arriba. Mismo patrón de dos tarjetas apiladas
+          que ya usa Progreso (hero + WeekCalendar debajo). */}
+      <div className="relative overflow-hidden rounded-2xl border border-purple-500/20 bg-slate-900/40 p-4">
+        <div className="flex items-center gap-3.5">
+          <div className="w-14 h-14 rounded-2xl overflow-hidden shrink-0 border border-purple-500/30 bg-purple-500/15 flex items-center justify-center">
+            {profile?.avatarData ? <img src={profile.avatarData} alt="" className="w-full h-full object-cover" /> : <Users size={24} className="text-purple-300" />}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-black uppercase tracking-widest text-purple-400">Social</p>
-            <h2 className="text-lg font-black text-white leading-tight truncate">{profile?.name || "Tu comunidad fitness"}</h2>
+            <h3 className="text-base font-black text-white leading-tight truncate">{profile?.name || "Tu comunidad fitness"}</h3>
             <p className="text-[11px] text-slate-400">
               {friendAccepted.length} {friendAccepted.length === 1 ? "amigo" : "amigos"}
               {(studentsAccepted.length + trainersAccepted.length) > 0 ? ` · ${studentsAccepted.length + trainersAccepted.length} vínculo${(studentsAccepted.length + trainersAccepted.length) === 1 ? "" : "s"} de entrenador` : ""}
@@ -12359,16 +12415,13 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
               reservado para la fila "Vos" de Ranking, sin cambios ahí. */}
           {myTopRank && (
             <button onClick={() => setShowRankExplain(true)} aria-label="Por qué tenés este rango" className="shrink-0 flex flex-col items-center gap-0.5 active:scale-95 transition">
-              <RankBadgeIcon tier={myTopRank.tier} sub={null} color={myTopRank.color} size={42} />
+              <RankBadgeIcon tier={myTopRank.tier} sub={null} color={myTopRank.color} size={40} />
               <span className="text-[9px] font-black uppercase tracking-wide whitespace-nowrap" style={{ color: myTopRank.color }}>{myTopRank.tier} {myTopRank.sub}</span>
             </button>
           )}
         </div>
-        {/* Pedido: "el texto es muy largo, máximo un renglón" — antes eran
-            dos frases completas que siempre pisaban una segunda línea. */}
-        <p className="relative text-xs text-purple-300/70 mt-3 truncate">Sumá amigos, competí y compartí tu progreso.</p>
         {profile?.username && (
-          <button onClick={() => setShowShareProfile(true)} className="relative w-full flex items-center justify-center gap-1.5 mt-4 pt-3 border-t border-white/10 text-[10px] font-bold text-purple-300/75 hover:text-purple-300 transition">
+          <button onClick={() => setShowShareProfile(true)} className="w-full flex items-center justify-center gap-1.5 mt-3.5 pt-3 border-t border-slate-800/60 text-[10px] font-bold text-purple-300/75 hover:text-purple-300 transition">
             <QrCode size={11} /> Compartir mi perfil <ChevronRight size={11} />
           </button>
         )}
@@ -17253,13 +17306,10 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
       )}
 
       {!forced && (
-        // Pedido: "Rutinas comparte el azul de Progreso — dejemos el color,
-        // reforcemos por otro lado". En vez de otro color, una textura
-        // propia: rayas diagonales finas (evocan las "capas" del ícono
-        // Layers de esta pestaña) por encima del mismo degradé azul de
-        // siempre — Progreso queda con su superficie lisa, Rutinas con
-        // relieve propio, sin tocar un solo valor de color.
-        <div className="relative overflow-hidden rounded-2xl border border-blue-500/20 p-5" style={{ background: "repeating-linear-gradient(135deg, rgba(59,130,246,0.12) 0px, rgba(59,130,246,0.12) 2px, transparent 2px, transparent 14px), var(--grad-hero-blue)" }}>
+        // Pedido: se probó una textura rayada acá (ver historial) para
+        // diferenciar de Progreso sin cambiar el azul compartido, pero no
+        // convenció — vuelta al degradé liso de siempre.
+        <div className="relative overflow-hidden rounded-2xl border border-blue-500/20 p-5" style={{ background: "var(--grad-hero-blue)" }}>
           <div className="absolute -top-8 -right-6 w-32 h-32 rounded-full bg-blue-500/15 blur-2xl pointer-events-none" />
           <div className="absolute -bottom-6 -left-6 w-28 h-28 rounded-full bg-cyan-500/10 blur-2xl pointer-events-none" />
           <div className="relative flex items-center gap-2 mb-1">
