@@ -15595,8 +15595,19 @@ function ImportRoutineModal({ onImport, onClose }) {
     finalDays.map((d) => ({
       label: d.label,
       exercises: d.exercises.map((ex) => {
-        const sets = Array.from({ length: Math.max(1, Math.min(8, ex.setsCount || 3)) }, () => ({ repRange: ex.repRange || "8-10" }));
-        return ex.lib ? { libId: ex.lib.id, sets } : { id: builderUid("imported"), name: ex.name || "Ejercicio", muscle: "Personalizado", sets };
+        // BUG FIX (auditoría de importación con IA): un ejercicio de
+        // cardio detectado por foto/texto (la IA pone los minutos en
+        // "repRange", ver el prompt de "detect" en api/ia.js) caía por
+        // esta misma rama que arma series×reps — terminaba con 2-3
+        // "sets" sueltos, cada uno con repRange="30" (los minutos
+        // tratados como si fueran reps), en vez de UNA sola sesión sin
+        // rango de reps (mismo criterio que ya usa el resto de la app:
+        // addExercise, el parser de texto, etc.). GeneralWarmupCard y el
+        // resto ya asumen que cardio = 1 solo set.
+        const sets = ex.cardio ? mkSets(1, "") : Array.from({ length: Math.max(1, Math.min(8, ex.setsCount || 3)) }, () => ({ repRange: ex.repRange || "8-10" }));
+        return ex.lib
+          ? { libId: ex.lib.id, sets, cardio: !!ex.cardio }
+          : { id: builderUid("imported"), name: ex.name || "Ejercicio", muscle: "Personalizado", sets, cardio: !!ex.cardio };
       }),
     })),
     name
@@ -15612,10 +15623,19 @@ function ImportRoutineModal({ onImport, onClose }) {
     const cleanDays = days.filter((d) => d && typeof d === "object").map((d) => ({
       label: String(d.label || "Día").toUpperCase(),
       exercises: (d.exercises || []).filter((ex) => ex && typeof ex === "object").map((ex) => {
+        const name = typeof ex.name === "string" ? ex.name.trim() : "";
+        const lib = name ? matchExerciseToLibrary(name) : null;
+        // Cardio se detecta por el match a la biblioteca (ej. "Cinta"
+        // matchea "Cinta — Caminar", que ya trae cardio:true) o, si no
+        // matcheó nada, por el nombre sonando claramente a cardio de
+        // máquina — mismo CARDIO_NAME_HINT_REGEX que ya usa el parser de
+        // texto, para no perder "Caminadora"/"Trote" sólo porque no
+        // matchean exacto contra el catálogo.
+        const isCardio = !!lib?.cardio || (!lib && CARDIO_NAME_HINT_REGEX.test(name));
+        if (isCardio) return { name, lib, setsCount: 1, repRange: null, cardio: true };
         const setsCount = Number.isInteger(ex.setsCount) && ex.setsCount > 0 ? ex.setsCount : null;
         const repRange = typeof ex.repRange === "string" && ex.repRange.trim() ? ex.repRange.trim() : null;
-        const name = typeof ex.name === "string" ? ex.name.trim() : "";
-        return { name, lib: name ? matchExerciseToLibrary(name) : null, setsCount, repRange };
+        return { name, lib, setsCount, repRange, cardio: false };
       }),
     })).filter((d) => d.exercises.length);
     if (!cleanDays.length) return false;
@@ -15626,8 +15646,11 @@ function ImportRoutineModal({ onImport, onClose }) {
     // la biblioteca con un nombre "raro" NO se marca: eso es normal (hay
     // ejercicios reales que no están en la biblioteca) y ya queda bien
     // resuelto como ejercicio personalizado, sin necesidad de preguntar.
+    // Cardio NUNCA se marca para revisión: "cuántas series" no tiene
+    // sentido para una sesión de cinta/bici, y ya queda resuelto arriba.
     const flagged = [];
     cleanDays.forEach((d, dayIdx) => d.exercises.forEach((ex, exIdx) => {
+      if (ex.cardio) return;
       if (!ex.name || !ex.setsCount || !ex.repRange) flagged.push({ dayIdx, exIdx });
     }));
     if (flagged.length) setReviewQueue({ days: cleanDays, flagged, step: 0, finalize: (finalDays) => finalizeImportedDays(finalDays, name) });
