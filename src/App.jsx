@@ -559,7 +559,7 @@ const DEFAULT_SETTINGS = {
   // Qué mostrar en la ficha de registro (reps/kg). Todo apagado por
   // default: la ficha arranca mínima (solo reps/kg) y cada quien prende
   // lo que realmente va a usar, en vez de tener que apagar seis cosas.
-  showRpe: false, showWarmup: false, show1RMPercent: false, showCoaching: false, showExerciseNote: false, showPersonalNote: false, showStagnation: false, showProgressionSuggestion: false,
+  showRpe: false, showWarmup: false, show1RMPercent: false, showCoaching: false, showExerciseNote: false, showPersonalNote: false, showStagnation: false, showProgressionSuggestion: false, showKm: false,
   rpeDisplayMode: "rpe", // "rpe" | "rir" — mismo dato guardado, solo cambia cómo se muestra
   // Al guardar una serie, arrancar solo el cronómetro de descanso. Apagado
   // por default: es un cambio de comportamiento (no solo de qué se ve), así
@@ -5243,10 +5243,14 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
                 </div>
               )}
 
-              {/* Km opcional y botón guardar */}
+              {/* Km opcional y botón guardar — pedido: "que km se tenga que
+                  habilitar en Personalizar qué vas a registrar", igual que
+                  el resto de los campos opcionales (arranca apagado). */}
               <div className="flex items-center gap-2">
-                <div className="flex-1"><label className="text-[10px] text-slate-600 font-semibold uppercase tracking-wider mb-1.5 block">Km <span className="text-slate-700 normal-case">(opc.)</span></label><input type="number" inputMode="decimal" placeholder="—" value={km} onChange={(e) => updateDraft({ km: e.target.value })} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3 text-lg font-black text-center text-white focus:outline-none focus:border-teal-500/50 transition" /></div>
-                <button ref={saveBtnRef} onClick={handleSave} className={`p-3.5 rounded-xl transition-all active:scale-90 font-bold !text-white flex items-center justify-center shrink-0 ${saved ? "bg-emerald-500" : "hover:opacity-90"}`} style={!saved ? { backgroundColor: accent } : {}}>
+                {fieldSettings.showKm !== false && (
+                  <div className="flex-1"><label className="text-[10px] text-slate-600 font-semibold uppercase tracking-wider mb-1.5 block">Km <span className="text-slate-700 normal-case">(opc.)</span></label><input type="number" inputMode="decimal" placeholder="—" value={km} onChange={(e) => updateDraft({ km: e.target.value })} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3 text-lg font-black text-center text-white focus:outline-none focus:border-teal-500/50 transition" /></div>
+                )}
+                <button ref={saveBtnRef} onClick={handleSave} className={`p-3.5 rounded-xl transition-all active:scale-90 font-bold !text-white flex items-center justify-center shrink-0 ${fieldSettings.showKm === false ? "flex-1" : ""} ${saved ? "bg-emerald-500" : "hover:opacity-90"}`} style={!saved ? { backgroundColor: accent } : {}}>
                   {saved ? <Check size={18} /> : <Save size={18} />}
                 </button>
               </div>
@@ -17708,6 +17712,7 @@ function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
     { key: "showStagnation", icon: <AlertTriangle size={16} />, label: "Aviso de estancamiento", desc: `Avisa si llevás ${STAGNATION_DAYS}+ días sin mejorar la marca.` },
     { key: "showProgressionSuggestion", icon: <Target size={16} />, label: "Progresión sugerida", desc: "Te sugiere cuánto probar hoy." },
     { key: "autoStartRestTimer", icon: <Timer size={16} />, label: "Cronómetro automático", desc: "Arranca el descanso solo, al guardar la serie." },
+    { key: "showKm", icon: <Footprints size={16} />, label: "Kilómetros (cardio)", desc: "Campo opcional de distancia al registrar cardio." },
   ];
 
   return (
