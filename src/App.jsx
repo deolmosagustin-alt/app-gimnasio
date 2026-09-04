@@ -16761,7 +16761,13 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
       )}
 
       {!forced && (
-        <div className="relative overflow-hidden rounded-2xl border border-blue-500/20 p-5" style={{ background: "var(--grad-hero-blue)" }}>
+        // Pedido: "Rutinas comparte el azul de Progreso — dejemos el color,
+        // reforcemos por otro lado". En vez de otro color, una textura
+        // propia: rayas diagonales finas (evocan las "capas" del ícono
+        // Layers de esta pestaña) por encima del mismo degradé azul de
+        // siempre — Progreso queda con su superficie lisa, Rutinas con
+        // relieve propio, sin tocar un solo valor de color.
+        <div className="relative overflow-hidden rounded-2xl border border-blue-500/20 p-5" style={{ background: "repeating-linear-gradient(135deg, rgba(59,130,246,0.12) 0px, rgba(59,130,246,0.12) 2px, transparent 2px, transparent 14px), var(--grad-hero-blue)" }}>
           <div className="absolute -top-8 -right-6 w-32 h-32 rounded-full bg-blue-500/15 blur-2xl pointer-events-none" />
           <div className="absolute -bottom-6 -left-6 w-28 h-28 rounded-full bg-cyan-500/10 blur-2xl pointer-events-none" />
           <div className="relative flex items-center gap-2 mb-1">
