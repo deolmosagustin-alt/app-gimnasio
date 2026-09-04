@@ -17369,25 +17369,28 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
             ))}
           </div>
 
-          {/* Tira semanal — pedido: "hacé más visual y práctico el
-              recuadro de rutina activa". Antes la única forma de saber qué
-              te toca hoy era abrir "Cronograma"; ahora se ve de un
-              vistazo, con el color propio del día que corresponda a cada
-              lunes-domingo (Descanso queda como celda vacía). */}
+          {/* Tira semanal — pedido: "no me gustó lo de los cuadrados de
+              colores, que sea una estética similar a la de los ciclos de
+              semana" (ver WeekCalendar, más arriba en el archivo: chips
+              redondeados con la letra/número adentro, sólido + agrandado
+              en el actual, tenue con borde en el resto). Misma lógica acá:
+              la letra del día de semana va ADENTRO del chip en vez de un
+              cuadrado de color liso sin nada adentro. */}
           <p className="relative text-[9px] font-black uppercase tracking-[0.14em] text-blue-300/60 mt-3.5 mb-1.5 px-0.5">Tu semana</p>
-          <div className="relative grid grid-cols-7 gap-1">
+          <div className="relative grid grid-cols-7 gap-1.5">
             {WEEKDAY_KEYS.map((wk, i) => {
               const dk = activeSchedule[wk] || null;
               const d = dk ? activeDef.days[dk] : null;
               const isToday = wk === todayWeekdayKey();
+              const chipColor = d ? d.color : "#64748b";
               return (
-                <button key={wk} onClick={() => d && onGoToDay?.(dk)} disabled={!d} title={d ? d.label : "Descanso"}
-                  className={`flex flex-col items-center gap-1 py-0.5 ${d ? "active:scale-95 transition" : "cursor-default"}`}>
-                  <span className={`text-[8px] font-black uppercase ${isToday ? "text-white" : "text-blue-300/50"}`}>{WEEKDAY_SHORT_LABELS[i][0]}</span>
-                  <span className="w-full aspect-square rounded-lg flex items-center justify-center" style={d
-                    ? { backgroundColor: d.color, boxShadow: isToday ? "0 0 0 2px rgba(255,255,255,0.85)" : "none" }
-                    : { backgroundColor: "rgba(0,0,0,0.25)", border: isToday ? "1.5px solid rgba(255,255,255,0.5)" : "1px solid rgba(96,165,250,0.15)" }}
-                  />
+                <button key={wk} onClick={() => d && onGoToDay?.(dk)} disabled={!d} title={d ? d.label : "Descanso"} className="flex items-center justify-center">
+                  <span className={`w-full aspect-square rounded-xl flex items-center justify-center text-[10px] font-black uppercase transition-all ${isToday ? "scale-110" : ""} ${d ? "active:scale-95" : ""}`}
+                    style={isToday
+                      ? { backgroundColor: chipColor, color: "#fff", boxShadow: `0 6px 16px -4px ${tint(chipColor, "aa")}` }
+                      : { backgroundColor: tint(chipColor, "1a"), color: chipColor, border: `1px solid ${tint(chipColor, "30")}` }}>
+                    {WEEKDAY_SHORT_LABELS[i][0]}
+                  </span>
                 </button>
               );
             })}
