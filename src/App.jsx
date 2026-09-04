@@ -2351,7 +2351,7 @@ function ShareLinkModal({ title, shareTitle, shareText, shareTarget, onClose, ac
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState(false);
   const [exporting, setExporting] = useState(null);
-  const [exportError, setExportError] = useState(false);
+  const [exportError, setExportError] = useState(null); // null | { stage: "generate"|"share", detail: string }
   const [showFileOptions, setShowFileOptions] = useState(false);
   const urlInputRef = useRef(null);
 
@@ -2403,7 +2403,7 @@ function ShareLinkModal({ title, shareTitle, shareText, shareTarget, onClose, ac
     }
   };
   const handleExportDoc = async (kind) => {
-    setExporting(kind); setExportError(false);
+    setExporting(kind); setExportError(null);
     try {
       if (kind === "pdf") await exportRoutineToPdf(shareTarget);
       else if (kind === "word") await exportRoutineToWord(shareTarget);
@@ -2411,9 +2411,13 @@ function ShareLinkModal({ title, shareTitle, shareText, shareTarget, onClose, ac
     } catch (err) {
       // BUG FIX: antes esto solo hacía console.error — con el catch
       // silencioso de downloadBlob ya arreglado, un fallo real (permisos,
-      // sin espacio) ahora sí llega hasta acá, así que hay que mostrarlo.
+      // sin espacio, o ahora también que falle compartir en Android) ahora
+      // sí llega hasta acá, así que hay que mostrarlo. Se distingue "se
+      // generó pero no se pudo compartir" (err.stage === "share", ver
+      // downloadBlob) de "no se pudo generar" — son causas distintas y un
+      // mensaje genérico único llevaba a pensar que el archivo ni se creó.
       console.error(`Error al exportar la rutina a ${kind}:`, err);
-      setExportError(true);
+      setExportError({ stage: err?.stage === "share" ? "share" : "generate", detail: String(err?.message || err || "") });
     } finally {
       setExporting(null);
     }
@@ -2511,7 +2515,16 @@ function ShareLinkModal({ title, shareTitle, shareText, shareTarget, onClose, ac
               <button onClick={() => handleExportDoc("word")} disabled={!!exporting} className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition disabled:opacity-50">{exporting === "word" ? <RotateCcw size={14} className="animate-spin text-blue-400" /> : <Download size={14} className="text-blue-400" />}Word</button>
               <button onClick={() => handleExportDoc("excel")} disabled={!!exporting} className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition disabled:opacity-50">{exporting === "excel" ? <RotateCcw size={14} className="animate-spin text-emerald-400" /> : <Download size={14} className="text-emerald-400" />}Excel</button>
             </div>
-            {exportError && <p className="text-[11px] text-rose-400 mt-2 text-center">No pudimos generar el archivo. Probá de nuevo.</p>}
+            {exportError && (
+              <div className="mt-2 text-center">
+                <p className="text-[11px] text-rose-400">
+                  {exportError.stage === "share"
+                    ? "El archivo se generó bien, pero no pudimos abrir la ventana para compartirlo o guardarlo. Probá de nuevo."
+                    : "No pudimos generar el archivo. Probá de nuevo."}
+                </p>
+                {exportError.detail && <p className="text-[9.5px] text-slate-700 mt-0.5 break-all">{exportError.detail}</p>}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -5945,13 +5958,24 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             <Target size={13} className="text-teal-400 shrink-0" />
             <p className="text-[10px] font-black uppercase tracking-widest text-teal-400">Modo de entrenamiento</p>
           </div>
+          {/* BUG FIX (pedido: "el recuadro de selección de modo de
+              entrenamiento no encastra bien con el espacio que tiene"): el
+              pill deslizante de fondo calculaba su posición/ancho a mano
+              (left/width en px) SIN contar bien el padding (p-1 = 4px) y
+              el gap (gap-1 = 4px) reales del contenedor — quedaba 2px
+              corrido y 2px angosto de más, así que nunca calzaba
+              exactamente con el borde del botón real, sobre todo en
+              "Récord". Números ajustados a la geometría real: cada
+              columna mide 50% menos el padding de ambos lados (8px) y el
+              gap entre columnas (4px), repartido entre las dos (6px cada
+              una) — no un valor aproximado a ojo. */}
           <div className="relative grid grid-cols-2 gap-1 p-1 rounded-xl bg-slate-950/50 border border-teal-500/15">
-            <div className="absolute top-1 bottom-1 rounded-lg transition-all duration-300 ease-out pointer-events-none" style={{ left: settings.trainingMode === "planned" ? "calc(50% + 2px)" : "2px", width: "calc(50% - 4px)", backgroundColor: "rgba(20,184,166,0.18)", boxShadow: "inset 0 0 0 1px rgba(20,184,166,0.4)" }} />
+            <div className="absolute top-1 bottom-1 rounded-lg transition-all duration-300 ease-out pointer-events-none" style={{ left: settings.trainingMode === "planned" ? "calc(50% + 2px)" : "4px", width: "calc(50% - 6px)", backgroundColor: "rgba(20,184,166,0.18)", boxShadow: "inset 0 0 0 1px rgba(20,184,166,0.4)" }} />
             <button onClick={() => onUpdateSettings({ trainingMode: "record" })} className={`relative z-[1] flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-bold transition active:scale-[0.97] ${settings.trainingMode !== "planned" ? "text-teal-300" : "text-slate-500 hover:text-slate-300"}`}>
-              <Trophy size={14} /> Récord
+              <Trophy size={14} /> <span>Récord</span>
             </button>
             <button onClick={() => onUpdateSettings({ trainingMode: "planned" })} className={`relative z-[1] flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-bold transition active:scale-[0.97] ${settings.trainingMode === "planned" ? "text-teal-300" : "text-slate-500 hover:text-slate-300"}`}>
-              <Target size={14} /> Planificada
+              <Target size={14} /> <span>Planificada</span>
             </button>
           </div>
           {settings.trainingMode === "planned" && onApplyOwnProgression && (
@@ -5985,8 +6009,17 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
                 más todavía puede crecer hasta 2 líneas igual que antes.
                 Pedido después: "agranda las letras... que se ajusten según
                 la cantidad de días" — textClass/minHeight ahora vienen de
-                dayTabTextSizing en vez de un 10px/25px fijo. */}
-            <span className="block" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", WebkitBoxPack: "center", overflow: "hidden", minHeight: `${minHeight}px` }}>{ROUTINE[k].label}</span>
+                dayTabTextSizing en vez de un 10px/25px fijo.
+                BUG FIX (pedido: "centrá el nombre de los días
+                horizontalmente"): el hack de line-clamp con
+                display:-webkit-box + box-orient:vertical usa box-pack
+                para el eje PRINCIPAL (acá, el vertical, centrando las
+                líneas dentro de minHeight) — el centrado horizontal
+                depende de heredar text-align del botón, algo que algunos
+                WebViews de Android no respetan bien dentro de este hack.
+                textAlign explícito en el propio span no depende de
+                heredarlo de nadie. */}
+            <span className="block" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", WebkitBoxPack: "center", overflow: "hidden", minHeight: `${minHeight}px`, textAlign: "center" }}>{ROUTINE[k].label}</span>
           </button>
         )); })()}
       </div>
@@ -6789,8 +6822,11 @@ function DeloadView({ logs, setLogs, settings = DEFAULT_SETTINGS, deloadProgress
                   "Hombros/Brazos" tiene que leerse entero aunque sea en 2
                   líneas, Y el botón siempre reserva ese alto por defecto
                   (no sólo cuando algún día de la grilla lo necesita).
-                  textClass/minHeight: ver dayTabTextSizing. */}
-              <span className="block" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", WebkitBoxPack: "center", overflow: "hidden", minHeight: `${minHeight}px` }}>{d.label}</span>
+                  textClass/minHeight: ver dayTabTextSizing.
+                  BUG FIX (pedido: "centrá el nombre de los días
+                  horizontalmente"): mismo motivo que en RoutineView —
+                  textAlign explícito en vez de depender de heredarlo. */}
+              <span className="block" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", WebkitBoxPack: "center", overflow: "hidden", minHeight: `${minHeight}px`, textAlign: "center" }}>{d.label}</span>
               {withPR > 0 && <span className="text-[8px] font-black opacity-70">{withPR}/{d.exercises.length}</span>}
             </button>
           );
@@ -7847,18 +7883,21 @@ function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backR
 // versión se queda con lo esencial (un vistazo de frente alcanza para
 // comparar) y reusa la MISMA lógica de datos (buildBodyHighlighterData/
 // buildFemaleBodyData) que ya usa la vista completa, sin duplicarla.
-function MiniBodyView({ ranks, sex, label, accentColor = "#94a3b8" }) {
+// Pedido: "que el muñeco se pueda switchear entre de frente y de espalda"
+// — antes esto sólo dibujaba la vista de frente, sin forma de ver la
+// espalda (dorsales, isquiotibiales, etc.) en la comparación con un amigo.
+function MiniBodyView({ ranks, sex, label, accentColor = "#94a3b8", view = "front" }) {
   const data = useMemo(() => buildBodyHighlighterData(ranks), [ranks]);
   const femalePalette = useFemalePalette(BODY_HIGHLIGHT_COLORS);
-  const femaleData = useMemo(() => buildFemaleBodyData(ranks, BODY_HIGHLIGHT_COLORS.length, null, "front"), [ranks]);
+  const femaleData = useMemo(() => buildFemaleBodyData(ranks, BODY_HIGHLIGHT_COLORS.length, null, view), [ranks, view]);
   return (
     <div className="flex-1 min-w-0 text-center">
       <p className="text-[10px] font-black uppercase tracking-wider mb-1.5 truncate" style={{ color: accentColor }}>{label}</p>
       <div className="max-w-[140px] mx-auto">
         {sex === "F" ? (
-          <FemaleBody data={femaleData} colors={femalePalette} gender="female" side="front" border="none" onBodyPartClick={MODEL_NOOP_CLICK} />
+          <FemaleBody data={femaleData} colors={femalePalette} gender="female" side={view} border="none" onBodyPartClick={MODEL_NOOP_CLICK} />
         ) : (
-          <Model data={data} type="anterior" bodyColor="#334155" highlightedColors={BODY_HIGHLIGHT_COLORS} onClick={MODEL_NOOP_CLICK} style={MODEL_STYLE} svgStyle={MODEL_STYLE} />
+          <Model data={data} type={view === "front" ? "anterior" : "posterior"} bodyColor="#334155" highlightedColors={BODY_HIGHLIGHT_COLORS} onClick={MODEL_NOOP_CLICK} style={MODEL_STYLE} svgStyle={MODEL_STYLE} />
         )}
       </div>
     </div>
@@ -7870,14 +7909,25 @@ function MiniBodyView({ ranks, sex, label, accentColor = "#94a3b8" }) {
 // muñeco para comparar". Complementa a RankComparisonList (que ya compara
 // número a número): acá el objetivo es un vistazo rápido de "quién está
 // más parejo/desarrollado", no el detalle exacto de cada músculo.
+// Pedido después: "mejorá ese display de comparación/batalla de marcas" +
+// switch de frente/espalda — el toggle cambia la vista de LOS DOS muñecos
+// a la vez (no cada uno por separado), porque acá lo que importa es
+// comparar el mismo grupo muscular en ambos, no ver cada uno por su cuenta.
 function FriendBodyCompare({ myRanks, mySex, theirRanks, theirSex, theirName }) {
+  const [view, setView] = useState("front");
   return (
     <div className="rounded-2xl border border-slate-800/50 bg-slate-900/40 p-4">
-      <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 mb-3 text-center">Muñecos lado a lado</p>
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 flex items-center gap-1.5"><Swords size={11} /> Muñecos lado a lado</p>
+        <div className="flex bg-slate-950/60 rounded-lg p-0.5 border border-slate-800/60 shrink-0">
+          <button onClick={() => setView("front")} className={`px-2.5 py-1 rounded-md text-[9.5px] font-bold transition ${view === "front" ? "bg-slate-700 text-white" : "text-slate-500 hover:text-slate-300"}`}>De frente</button>
+          <button onClick={() => setView("back")} className={`px-2.5 py-1 rounded-md text-[9.5px] font-bold transition ${view === "back" ? "bg-slate-700 text-white" : "text-slate-500 hover:text-slate-300"}`}>De espalda</button>
+        </div>
+      </div>
       <div className="flex items-start gap-3 justify-center">
-        <MiniBodyView ranks={myRanks} sex={mySex} label="Vos" accentColor="#2DD4BF" />
+        <MiniBodyView ranks={myRanks} sex={mySex} label="Vos" accentColor="#2DD4BF" view={view} />
         <div className="w-px self-stretch bg-slate-800 shrink-0 mt-6" />
-        <MiniBodyView ranks={theirRanks} sex={theirSex} label={theirName || "Ellos"} accentColor="#C084FC" />
+        <MiniBodyView ranks={theirRanks} sex={theirSex} label={theirName || "Ellos"} accentColor="#C084FC" view={view} />
       </div>
     </div>
   );
@@ -9290,20 +9340,52 @@ async function downloadBlob(blob, filename) {
     // en un solo try/catch que se tragaba cualquier error con solo un
     // console.error — si Filesystem.writeFile fallaba de verdad (permisos,
     // sin espacio), el botón de exportar volvía a su estado normal sin
-    // avisar nada, como si hubiese funcionado. Ahora ESO sí se deja
-    // propagar (lo captura handleExport y muestra "No pudimos generar el
-    // archivo"). Share.share() se sigue tolerando en silencio porque a esa
-    // altura el archivo YA se generó bien — que falle acá suele ser
-    // simplemente que la persona cerró la hoja de compartir sin elegir
-    // nada, no un error real que haya que mostrar.
+    // avisar nada, como si hubiese funcionado. Ahora eso se deja propagar
+    // (lo captura handleExport/handleExportDoc y muestra un error).
+    //
+    // Share.share() TAMBIÉN se relanza ahora (antes se tragaba entero,
+    // asumiendo que un fallo acá era siempre "cerró la hoja sin elegir
+    // nada"): en Android, un ACTION_SEND lanzado con startActivity() no le
+    // avisa a la app si el usuario terminó compartiendo o cerró la hoja
+    // sin elegir nada — Share.share() de Capacitor resuelve la promesa en
+    // CUALQUIERA de los dos casos, no la rechaza. Que este catch se
+    // dispare significa que el intent ni siquiera se pudo lanzar (por
+    // ejemplo, ningún destino instalado capaz de recibir el archivo), un
+    // caso real que antes quedaba completamente invisible — coincide con
+    // el reporte "cuando lo clikeo me saca de la app pero no pasa nada".
     const base64 = await blobToBase64(blob);
     const { Filesystem, Directory } = await import("@capacitor/filesystem");
     const result = await Filesystem.writeFile({ path: filename, data: base64, directory: Directory.Cache });
     try {
       const { Share } = await import("@capacitor/share");
-      await Share.share({ title: filename, files: [result.uri] });
+      // Pedido: "cuando lo clikeo me saca de la app pero no pasa nada" — el
+      // archivo SÍ se genera y la hoja de compartir de Android SÍ se abre
+      // (por eso la sensación de "salir de la app"), pero sin este título
+      // el diálogo del sistema no dice para qué sirve, así que quien no
+      // reconoce ninguna app de destino la cierra sin elegir nada y vuelve
+      // pensando que no pasó nada. dialogTitle es lo único que Share.share
+      // deja personalizar del lado de Android — no reemplaza avisarle esto
+      // mismo desde la propia app (ver aviso en ShareLinkModal/
+      // ExportTrainingCard, más abajo), pero ayuda a quien sí llega a ver
+      // el diálogo del sistema.
+      await Share.share({ title: filename, dialogTitle: "Elegí dónde guardarlo: Drive, Archivos, WhatsApp…", files: [result.uri] });
     } catch (err) {
+      // BUG FIX: esto se tragaba TODO en silencio asumiendo que cualquier
+      // fallo acá era "cerró la hoja sin elegir nada" — pero un fallo real
+      // (por ejemplo, ningún destino instalado capaz de recibir el
+      // archivo) también cae en este catch, y antes quedaba exactamente
+      // igual de silencioso que una cancelación normal. Ahora se relanza
+      // para que downloadBlob (y quien la llama, ver handleExportDoc/
+      // handleExport) sepa distinguir "no se pudo compartir" de "se
+      // compartió bien" en vez de asumir siempre lo segundo.
       console.warn("Compartir (nativo) cancelado o falló:", err);
+      // Marca de dónde vino el fallo — el archivo YA se escribió bien acá
+      // (Filesystem.writeFile de arriba no tiró), así que quien llame a
+      // downloadBlob puede avisar "se generó pero no se pudo compartir" en
+      // vez del genérico "no pudimos generar el archivo", que sería falso
+      // en este punto.
+      err.stage = "share";
+      throw err;
     }
     return;
   }
@@ -9684,7 +9766,14 @@ function ExportTrainingCard({ profileName, logs, trainingSessions = [], exercise
       else if (format === "excel") await exportTrainingToExcel(rows, meta);
     } catch (err) {
       console.error("Error exportando entrenamiento:", err);
-      setError("No pudimos generar el archivo. Probá de nuevo.");
+      // Mismo criterio que handleExportDoc en ShareLinkModal: distingue
+      // "se generó pero no se pudo compartir/guardar" (err.stage ===
+      // "share", ver downloadBlob) de "no se pudo generar" — antes un
+      // único mensaje genérico hacía pensar que el archivo ni se creó,
+      // cuando en Android el caso más probable es justo lo contrario.
+      setError(err?.stage === "share"
+        ? "El archivo se generó bien, pero no pudimos abrir la ventana para compartirlo o guardarlo. Probá de nuevo."
+        : "No pudimos generar el archivo. Probá de nuevo.");
     } finally {
       setExporting(null);
     }
@@ -10022,6 +10111,28 @@ function SocialPreviewCard({ profile, uid, onGoToSocial, onUpdateProfile }) {
           <UsernameSection uid={uid} currentUsername={profile.username} onSaved={(u) => { onUpdateProfile({ username: u }); setShowSettings(false); }} onRemoved={() => { onUpdateProfile({ username: null }); setShowSettings(false); }} />
           <div className="pt-2 border-t border-slate-800/50">
             <PhoneDiscoverySection uid={uid} currentPhone={profile.phone || null} onSaved={(phone) => onUpdateProfile({ phone })} onRemoved={() => onUpdateProfile({ phone: null })} />
+          </div>
+          {/* Pedido: "que en el perfil vos puedas decidir si mostrar tus
+              marcas y/o rutina a amigos, pero que por default esté en que
+              sí" — !== false en vez de === true: quien nunca tocó esto
+              sigue compartiendo igual que compartía antes de que este
+              toggle existiera (ver profileToPublicFull en social.js). */}
+          <div className="pt-2 border-t border-slate-800/50 space-y-2.5">
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 flex items-center gap-1.5"><Users size={11} /> Qué ven tus amigos</p>
+            {[
+              { key: "shareStatsWithFriends", label: "Tus marcas y racha" },
+              { key: "shareRoutineWithFriends", label: "Tu rutina activa" },
+            ].map(({ key, label }) => {
+              const enabled = profile.settings?.[key] !== false;
+              return (
+                <div key={key} className="flex items-center justify-between gap-2">
+                  <span className="text-xs text-slate-300">{label}</span>
+                  <button onClick={() => onUpdateProfile({ settings: { ...profile.settings, [key]: !enabled } })} className={`shrink-0 w-10 h-6 rounded-full transition-colors relative ${enabled ? "bg-teal-500" : "bg-slate-700"}`} aria-label={`${label}: ${enabled ? "activado" : "desactivado"}`}>
+                    <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all ${enabled ? "left-[18px]" : "left-0.5"}`} />
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -11619,27 +11730,66 @@ function LeaderboardSection({ uid, profile, myTopRank, friendAccepted, basics, a
 // FOTO de rutina que la otra persona comparte (activeRoutineSnapshot), sin
 // tocar el estado global. Por simplicidad solo se listan sesiones
 // FORMALES — entradas sueltas sin sesión iniciada no se muestran acá.
+// Pedido: "que el historial de sesiones dentro del perfil de tu amigo lo
+// muestre en formato de calendario, no como una lista" — mismo lenguaje
+// visual que el calendario propio (SessionHistoryView, en Progreso):
+// celdas del mes, coloreadas con el día entrenado, tocables para ver el
+// detalle abajo. Más simple que el propio a propósito: acá sólo tenemos
+// la metadata de la sesión (fecha, qué día de rutina, duración) — el
+// detalle serie por serie nunca sale de logs, que no se comparte con
+// amigos (ver getPublicFull en social.js).
 function FriendSessionHistory({ trainingSessions = [], activeRoutineSnapshot }) {
   const model = useMemo(() => (activeRoutineSnapshot ? buildRoutineModel(activeRoutineSnapshot) : null), [activeRoutineSnapshot]);
-  const sorted = useMemo(() => [...trainingSessions].sort((a, b) => (a.date < b.date ? 1 : -1)), [trainingSessions]);
+  const byDate = useMemo(() => { const m = {}; trainingSessions.forEach((s) => { m[s.date] = s; }); return m; }, [trainingSessions]);
+  const now = new Date();
+  const [cursor, setCursor] = useState({ y: now.getFullYear(), m: now.getMonth() });
+  const [selectedDate, setSelectedDate] = useState(null);
+  const weeks = useMemo(() => getMonthMatrix(cursor.y, cursor.m), [cursor]);
+  const selected = selectedDate ? byDate[selectedDate] : null;
 
-  if (!sorted.length) return <p className="text-xs text-slate-600 text-center py-6">Todavía no registró ninguna sesión.</p>;
+  if (!trainingSessions.length) return <p className="text-xs text-slate-600 text-center py-6">Todavía no registró ninguna sesión.</p>;
   return (
-    <div className="space-y-2">
-      {sorted.map((s, i) => {
-        const day = model?.days?.[s.dayKey];
-        const durationMin = s.startedAt && s.endedAt ? Math.max(1, Math.round((new Date(s.endedAt) - new Date(s.startedAt)) / 60000)) : null;
-        const dateLabel = new Date(s.date + "T12:00:00").toLocaleDateString("es-AR", { weekday: "short", day: "numeric", month: "short" });
-        return (
-          <div key={`${s.date}_${i}`} className="flex items-center gap-3 rounded-xl border border-slate-800/50 bg-slate-900/50 px-3.5 py-2.5">
-            <span className="w-1.5 h-8 rounded-full shrink-0" style={{ backgroundColor: day?.color || "#475569" }} />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-white truncate">{day?.label || s.dayKey || "Entrenamiento"}</p>
-              <p className="text-[10.5px] text-slate-500 capitalize">{dateLabel}{durationMin ? ` · ${durationMin} min` : ""}</p>
-            </div>
+    <div className="space-y-2.5">
+      <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 backdrop-blur-sm">
+        <div className="flex items-center justify-between mb-3">
+          <button onClick={() => setCursor((c) => { const m = c.m === 0 ? 11 : c.m - 1; const y = c.m === 0 ? c.y - 1 : c.y; return { y, m }; })} aria-label="Mes anterior" className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400"><ChevronLeft size={16} /></button>
+          <p className="text-sm font-bold text-white">{MONTH_LABELS[cursor.m]} {cursor.y}</p>
+          <button onClick={() => setCursor((c) => { const m = c.m === 11 ? 0 : c.m + 1; const y = c.m === 11 ? c.y + 1 : c.y; return { y, m }; })} aria-label="Mes siguiente" className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400"><ChevronRight size={16} /></button>
+        </div>
+        <div className="grid grid-cols-7 gap-1 mb-1.5">{WEEKDAY_LABELS.map((l, i) => <div key={i} className="text-center text-[9px] font-bold text-slate-600">{l}</div>)}</div>
+        <div className="grid grid-cols-7 gap-1">
+          {weeks.flat().map((d, i) => {
+            if (!d) return <div key={i} />;
+            const s = byDate[d];
+            const isToday = d === todayStr();
+            const isSelected = d === selectedDate;
+            const dayNum = parseInt(d.slice(8, 10), 10);
+            const dayDef = s ? model?.days?.[s.dayKey] : null;
+            const color = dayDef?.color || "#475569";
+            return (
+              <button key={i} onClick={() => s && setSelectedDate(isSelected ? null : d)} disabled={!s}
+                style={s ? { backgroundColor: tint(color, "30"), border: `1px solid ${tint(color, "55")}` } : undefined}
+                className={`aspect-square rounded-lg flex items-center justify-center text-[11px] font-bold transition-all ${isSelected ? "ring-2 ring-teal-400" : ""} ${isToday && !s ? "border border-teal-500/50" : ""} ${s ? "text-white hover:brightness-125 active:scale-95" : "text-slate-700"}`}>
+                {dayNum}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      {selected ? (
+        <div className="flex items-center gap-3 rounded-xl border border-slate-800/50 bg-slate-900/50 px-3.5 py-2.5">
+          <span className="w-1.5 h-8 rounded-full shrink-0" style={{ backgroundColor: model?.days?.[selected.dayKey]?.color || "#475569" }} />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-white truncate">{model?.days?.[selected.dayKey]?.label || selected.dayKey || "Entrenamiento"}</p>
+            <p className="text-[10.5px] text-slate-500 capitalize">
+              {new Date(selected.date + "T12:00:00").toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" })}
+              {selected.startedAt && selected.endedAt ? ` · ${Math.max(1, Math.round((new Date(selected.endedAt) - new Date(selected.startedAt)) / 60000))} min` : ""}
+            </p>
           </div>
-        );
-      })}
+        </div>
+      ) : (
+        <p className="text-center text-[11px] text-slate-600 py-1">Tocá un día con marca para ver el detalle.</p>
+      )}
     </div>
   );
 }
@@ -11973,14 +12123,24 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
 // Perfil de solo lectura de un amigo/alumno/entrenador. Si no hay vínculo
 // aceptado (o la otra persona quitó su @usuario), getPublicFull devuelve
 // null y se muestra el estado "no comparte su perfil" en vez de romper.
-function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerson, onBack, onProposalSent }) {
+function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerson, openComparing = false, onBack, onProposalSent, onActivateRoutine }) {
   const [basic, setBasic] = useState(null);
   const [full, setFull] = useState(null);
   const [state, setState] = useState("loading"); // loading|ok|forbidden
   const [showComposer, setShowComposer] = useState(false);
   const [showProgressionComposer, setShowProgressionComposer] = useState(false);
   const [sentNote, setSentNote] = useState(false);
-  const [comparing, setComparing] = useState(false);
+  // Pedido: "agreguemos la opción de agregar la rutina de mi amigo" —
+  // confirmación simple antes de activarla, ya que reemplaza tu rutina
+  // activa (mismo riesgo que activar cualquier otra rutina guardada).
+  const [confirmingUseRoutine, setConfirmingUseRoutine] = useState(false);
+  const [routineActivated, setRoutineActivated] = useState(false);
+  // Pedido: "cuando lo seleccionás en el apartado de ranking que se abra
+  // sólo la parte de comparar conmigo" — openComparing llega en true SOLO
+  // cuando SocialView abrió este perfil desde el Ranking (ver
+  // viewingOpenComparing ahí); desde Amigos o desde Entrenador/Alumno
+  // sigue arrancando en el muñeco individual de siempre.
+  const [comparing, setComparing] = useState(openComparing);
   // Pedido: "al clickear el perfil de un amigo que aparezca el muñeco, y
   // al clickear cada músculo que se despliegue un listado con las mejores
   // marcas de cada ejercicio" — selected/refs para el muñeco interactivo
@@ -12075,25 +12235,17 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
             </p>
           </div>
 
-          {/* El rango va primero (después de racha/semana): es lo que más
-              importa de un vistazo, tanto para un amigo ("¿qué tal viene?")
-              como para un entrenador chequeando a su alumno. El toggle
-              "Comparar conmigo" reusa datos que YA tenemos en el cliente
-              (viewerProfile, tu propio perfil) — no hace falta pedirle
-              nada nuevo a Firestore para armar el picadito. */}
-          <div>
-            <div className="flex items-center justify-between mb-2 px-1">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-600">{comparing ? `Vos vs ${basic?.name || "esta persona"}` : "Rango por músculo"}</p>
-              <button onClick={() => setComparing((c) => !c)} className={`flex items-center gap-1 text-[10.5px] font-bold px-2.5 py-1 rounded-full transition ${comparing ? "bg-teal-500/20 text-teal-400" : "text-slate-500 hover:text-slate-300"}`}>
-                <Swords size={11} /> {comparing ? "Ocultar" : "Comparar conmigo"}
-              </button>
-            </div>
-            {comparing ? (
+          {/* Pedido: "cuando lo seleccionás en el apartado de ranking que
+              se abra sólo la parte de comparar conmigo" — viniendo de
+              Ranking, el perfil se corta acá: nada de rutina activa,
+              historial ni medidas, sólo la comparación (con el toggle
+              "Ocultar" sacado, ya que "SOLO comparar" implica no ofrecer
+              la alternativa acá — para ver el muñeco individual está la
+              ruta de siempre desde Amigos). */}
+          {openComparing ? (
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 mb-2 px-1">Vos vs {basic?.name || "esta persona"}</p>
               <div className="space-y-3">
-                {/* Idea del usuario: además de comparar número a número
-                    (RankComparisonList, abajo), un vistazo visual con los
-                    muñecos lado a lado — mismos datos, sin pedir nada nuevo
-                    a Firestore. */}
                 <FriendBodyCompare
                   myRanks={myRanksForCompare}
                   mySex={viewerProfile?.sex}
@@ -12106,64 +12258,116 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
                   theirName={basic?.name || "Ellos"}
                 />
               </div>
-            ) : (
+            </div>
+          ) : (
+            <>
+              {/* El rango va primero (después de racha/semana): es lo que
+                  más importa de un vistazo, tanto para un amigo ("¿qué
+                  tal viene?") como para un entrenador chequeando a su
+                  alumno. El toggle "Comparar conmigo" reusa datos que YA
+                  tenemos en el cliente (viewerProfile, tu propio perfil)
+                  — no hace falta pedirle nada nuevo a Firestore para
+                  armar el picadito. */}
               <div>
-                <MuscleHighlighterBody ranks={theirRanks} selected={selectedMuscle} onMuscleClick={(k) => setSelectedMuscle((s) => (s === k ? null : k))} frontRef={friendFrontRef} backRef={friendBackRef} sex={full.sex} />
-                {/* Pedido: al tocar un músculo del muñeco, desplegar las
-                    mejores marcas de cada ejercicio de ese músculo. */}
-                {selectedMuscleInfo && (
-                  <div className="mt-3 rounded-xl border px-3.5 py-3" style={{ borderColor: tint(selectedMuscleInfo.color, "40"), backgroundColor: tint(selectedMuscleInfo.color, "0c") }}>
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-[10px] font-bold text-slate-500">{selectedMuscleInfo.label}</p>
-                      {selectedMuscleInfo.hasData && <p className="text-xs font-black" style={{ color: selectedMuscleInfo.color }}>{selectedMuscleInfo.tier} {selectedMuscleInfo.sub}</p>}
-                    </div>
-                    <MuscleExerciseList exercises={getExerciseBestsForMuscleGroup(selectedMuscle, full.logs)} />
+                <div className="flex items-center justify-between mb-2 px-1">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-600">{comparing ? `Vos vs ${basic?.name || "esta persona"}` : "Rango por músculo"}</p>
+                  <button onClick={() => setComparing((c) => !c)} className={`flex items-center gap-1 text-[10.5px] font-bold px-2.5 py-1 rounded-full transition ${comparing ? "bg-teal-500/20 text-teal-400" : "text-slate-500 hover:text-slate-300"}`}>
+                    <Swords size={11} /> {comparing ? "Ocultar" : "Comparar conmigo"}
+                  </button>
+                </div>
+                {comparing ? (
+                  <div className="space-y-3">
+                    {/* Idea del usuario: además de comparar número a número
+                        (RankComparisonList, abajo), un vistazo visual con los
+                        muñecos lado a lado — mismos datos, sin pedir nada nuevo
+                        a Firestore. */}
+                    <FriendBodyCompare
+                      myRanks={myRanksForCompare}
+                      mySex={viewerProfile?.sex}
+                      theirRanks={theirRanks}
+                      theirSex={full.sex}
+                      theirName={basic?.name}
+                    />
+                    <RankComparisonList
+                      comparison={buildRankComparison(viewerProfile?.logs, getProfileSettings(viewerProfile), viewerProfile?.sex, viewerProfile?.age, full.logs, full.settings, full.sex, full.age)}
+                      theirName={basic?.name || "Ellos"}
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <MuscleHighlighterBody ranks={theirRanks} selected={selectedMuscle} onMuscleClick={(k) => setSelectedMuscle((s) => (s === k ? null : k))} frontRef={friendFrontRef} backRef={friendBackRef} sex={full.sex} />
+                    {/* Pedido: al tocar un músculo del muñeco, desplegar las
+                        mejores marcas de cada ejercicio de ese músculo. */}
+                    {selectedMuscleInfo && (
+                      <div className="mt-3 rounded-xl border px-3.5 py-3" style={{ borderColor: tint(selectedMuscleInfo.color, "40"), backgroundColor: tint(selectedMuscleInfo.color, "0c") }}>
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-[10px] font-bold text-slate-500">{selectedMuscleInfo.label}</p>
+                          {selectedMuscleInfo.hasData && <p className="text-xs font-black" style={{ color: selectedMuscleInfo.color }}>{selectedMuscleInfo.tier} {selectedMuscleInfo.sub}</p>}
+                        </div>
+                        <MuscleExerciseList exercises={getExerciseBestsForMuscleGroup(selectedMuscle, full.logs)} />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
-            )}
-          </div>
 
-          {isTrainerOfThisPerson && (
-            <div className="grid grid-cols-2 gap-2">
-              <button onClick={() => setShowComposer(true)} className="flex items-center gap-2 justify-center py-3 rounded-2xl bg-blue-500/15 border border-blue-500/30 text-blue-300 text-xs font-bold hover:bg-blue-500/25 transition active:scale-[0.98]">
-                <ClipboardCheck size={15} /> Proponer rutina
-              </button>
-              <button onClick={() => setShowProgressionComposer(true)} disabled={!full.activeRoutineSnapshot} className="flex items-center gap-2 justify-center py-3 rounded-2xl bg-sky-500/15 border border-sky-500/30 text-sky-300 text-xs font-bold hover:bg-sky-500/25 transition active:scale-[0.98] disabled:opacity-40">
-                <Target size={15} /> Planificar semana
-              </button>
-            </div>
-          )}
-          {sentNote && <p className="text-center text-xs text-emerald-400">Propuesta enviada — la va a ver la próxima vez que abra Social.</p>}
+              {isTrainerOfThisPerson && (
+                <div className="grid grid-cols-2 gap-2">
+                  <button onClick={() => setShowComposer(true)} className="flex items-center gap-2 justify-center py-3 rounded-2xl bg-blue-500/15 border border-blue-500/30 text-blue-300 text-xs font-bold hover:bg-blue-500/25 transition active:scale-[0.98]">
+                    <ClipboardCheck size={15} /> Proponer rutina
+                  </button>
+                  <button onClick={() => setShowProgressionComposer(true)} disabled={!full.activeRoutineSnapshot} className="flex items-center gap-2 justify-center py-3 rounded-2xl bg-sky-500/15 border border-sky-500/30 text-sky-300 text-xs font-bold hover:bg-sky-500/25 transition active:scale-[0.98] disabled:opacity-40">
+                    <Target size={15} /> Planificar semana
+                  </button>
+                </div>
+              )}
+              {sentNote && <p className="text-center text-xs text-emerald-400">Propuesta enviada — la va a ver la próxima vez que abra Social.</p>}
 
-          {full.activeRoutineSnapshot && (
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 px-1 mb-2">Rutina activa · {full.activeRoutineSnapshot.name}</p>
-              <RoutinePreview routineDef={full.activeRoutineSnapshot} />
-            </div>
-          )}
+              {full.activeRoutineSnapshot && (
+                <div>
+                  <div className="flex items-center justify-between gap-2 px-1 mb-2">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 min-w-0 truncate">Rutina activa · {full.activeRoutineSnapshot.name}</p>
+                    {onActivateRoutine && !routineActivated && (
+                      <button onClick={() => setConfirmingUseRoutine(true)} className="shrink-0 flex items-center gap-1 text-[10.5px] font-bold px-2.5 py-1 rounded-full bg-blue-500/15 text-blue-300 hover:bg-blue-500/25 transition"><Download size={11} /> Usar esta rutina</button>
+                    )}
+                    {routineActivated && <span className="shrink-0 flex items-center gap-1 text-[10.5px] font-bold text-emerald-400"><Check size={12} /> Activada</span>}
+                  </div>
+                  {confirmingUseRoutine && (
+                    <div className="rounded-xl border border-blue-500/30 bg-blue-500/10 px-3.5 py-3 mb-2.5">
+                      <p className="text-[11.5px] text-blue-200/90 mb-2.5">Vas a reemplazar tu rutina activa por una COPIA de la de {basic?.name || "esta persona"} — la tuya no se borra, queda guardada aparte.</p>
+                      <div className="flex gap-2">
+                        <button onClick={() => setConfirmingUseRoutine(false)} className="flex-1 py-2 rounded-lg bg-slate-800 text-slate-400 text-xs font-bold">Cancelar</button>
+                        <button onClick={() => { onActivateRoutine(builderUid("friend_routine"), cloneRoutineDef(full.activeRoutineSnapshot)); setConfirmingUseRoutine(false); setRoutineActivated(true); }} className="flex-1 py-2 rounded-lg bg-blue-500 !text-white text-xs font-bold">Sí, usarla</button>
+                      </div>
+                    </div>
+                  )}
+                  <RoutinePreview routineDef={full.activeRoutineSnapshot} />
+                </div>
+              )}
 
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 px-1 mb-2">Historial de sesiones</p>
-            <FriendSessionHistory trainingSessions={full.trainingSessions} activeRoutineSnapshot={full.activeRoutineSnapshot} />
-          </div>
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 px-1 mb-2">Historial de sesiones</p>
+                <FriendSessionHistory trainingSessions={full.trainingSessions} activeRoutineSnapshot={full.activeRoutineSnapshot} />
+              </div>
 
-          {MEASUREMENT_TYPES.some((t) => (full.measurements?.[t.k] || []).length > 0) && (
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 px-1 mb-2">Medidas corporales</p>
-              <div className="grid grid-cols-2 gap-2">
-                {MEASUREMENT_TYPES.map((t) => {
-                  const last = getLatestMeasurement(full.measurements?.[t.k]);
-                  if (!last) return null;
-                  return (
-                    <div key={t.k} className="rounded-xl border border-slate-800/50 bg-slate-900/50 px-3 py-2.5">
-                      <p className="text-[11px] text-slate-500">{t.l}</p>
-                      <p className="text-sm font-bold text-white">{last.value}{t.unit}</p>
+              {MEASUREMENT_TYPES.some((t) => (full.measurements?.[t.k] || []).length > 0) && (
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 px-1 mb-2">Medidas corporales</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {MEASUREMENT_TYPES.map((t) => {
+                      const last = getLatestMeasurement(full.measurements?.[t.k]);
+                      if (!last) return null;
+                      return (
+                        <div key={t.k} className="rounded-xl border border-slate-800/50 bg-slate-900/50 px-3 py-2.5">
+                          <p className="text-[11px] text-slate-500">{t.l}</p>
+                          <p className="text-sm font-bold text-white">{last.value}{t.unit}</p>
                     </div>
                   );
                 })}
               </div>
             </div>
+          )}
+            </>
           )}
         </>
       )}
@@ -12206,6 +12410,12 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
   const [section, setSection] = useState("amigos"); // amigos | buscar | entrenador
   const [viewingUid, setViewingUid] = useState(null);
   const [viewingAsTrainer, setViewingAsTrainer] = useState(false);
+  // Pedido: "cuando lo seleccionás en el apartado de ranking que se abra
+  // sólo la parte de comparar conmigo" — sólo se prende desde
+  // LeaderboardSection (ver onViewPerson más abajo), no desde la lista de
+  // amigos ni desde entrenador/alumno, donde el perfil sigue arrancando en
+  // el muñeco individual de siempre.
+  const [viewingOpenComparing, setViewingOpenComparing] = useState(false);
 
   const [friendships, setFriendships] = useState([]);
   const [trainerAsTrainer, setTrainerAsTrainer] = useState([]);
@@ -12373,8 +12583,10 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
         key={viewingUid}
         uid={viewingUid} viewerUid={uid} viewerProfile={profile}
         isTrainerOfThisPerson={viewingAsTrainer}
-        onBack={() => { setViewingUid(null); setViewingAsTrainer(false); }}
+        openComparing={viewingOpenComparing}
+        onBack={() => { setViewingUid(null); setViewingAsTrainer(false); setViewingOpenComparing(false); }}
         onProposalSent={refresh}
+        onActivateRoutine={onActivateRoutine}
       />
     );
   }
@@ -12537,7 +12749,12 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
                 que la gente SE ENTERE de que existís acá. Esta tarjeta
                 genera una imagen lista para mandar por WhatsApp/Instagram
                 con tu @usuario grande, así conseguir el primer amigo no
-                depende de decírselo de palabra. */}
+                depende de decírselo de palabra.
+                Pedido: "que la barra de búsqueda esté como primera opción,
+                no última" — antes esta sección arrancaba con "Compartir mi
+                perfil" y la búsqueda quedaba al final, después de las
+                sugerencias de contactos. */}
+            <SocialSearchSection myUid={uid} friendStatus={friendStatus} onSendFriendRequest={doSendFriendRequest} />
             {profile?.username ? (
               <button onClick={() => setShowShareProfile(true)} className="w-full flex items-center gap-3 rounded-2xl border border-cyan-500/25 bg-cyan-500/5 px-4 py-3.5 text-left transition active:scale-[0.98] hover:border-cyan-500/40">
                 <div className="w-9 h-9 rounded-xl bg-cyan-500/15 border border-cyan-500/25 flex items-center justify-center shrink-0 text-cyan-400"><QrCode size={16} /></div>
@@ -12556,7 +12773,6 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
               <p className="text-[11px] text-slate-600 px-1">Vinculá tu cuenta de Google en Perfil para poder elegir un @usuario y usar lo social.</p>
             )}
             <ContactsSuggestions myUid={uid} friendStatus={friendStatus} onSendFriendRequest={doSendFriendRequest} />
-            <SocialSearchSection myUid={uid} friendStatus={friendStatus} onSendFriendRequest={doSendFriendRequest} />
           </>
         )}
 
@@ -12645,7 +12861,7 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
 
         {section === "ranking" && (
           <LeaderboardSection uid={uid} profile={profile} myTopRank={myTopRank} friendAccepted={friendAccepted} basics={basics} activity={streaks}
-            onViewPerson={(personUid, isMe) => { if (isMe) setShowMyBody(true); else setViewingUid(personUid); }}
+            onViewPerson={(personUid, isMe) => { if (isMe) setShowMyBody(true); else { setViewingOpenComparing(true); setViewingUid(personUid); } }}
             onGoToBuscar={() => setSection("buscar")} />
         )}
 
@@ -15418,7 +15634,13 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
               <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-teal-500/20 text-teal-400 font-bold border border-teal-500/20">BETA</span>
             </div>
             <h2 className="relative text-xl font-black text-white leading-tight">Chatbot</h2>
-            <p className="relative text-xs text-teal-300/60 mt-0.5">Conoce tu historial real, preguntale lo que quieras</p>
+            {/* Pedido: "el recuadro... del chatbot llega a dos renglones,
+                reducilo a uno" — acá el bloque de texto tiene MENOS ancho
+                que en los otros heroes (comparte la fila con el ícono de
+                la izquierda y, a veces, un botón extra a la derecha), así
+                que necesita quedar más corto que el resto para entrar en
+                una sola línea con ese espacio reducido. */}
+            <p className="relative text-xs text-teal-300/60 mt-0.5">Conoce tu historial, preguntá lo que quieras</p>
           </div>
           {messages.some((m) => m.plan && m.planStatus === "confirmed") && (
             <button onClick={() => setShowChangeLog(true)} title="Cambios aplicados" className="p-2 rounded-xl bg-slate-800/60 border border-slate-700/50 text-slate-400 hover:text-teal-400 transition shrink-0 active:scale-95">
@@ -17386,7 +17608,11 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
             <span className="text-[11px] font-black uppercase tracking-widest text-blue-400">Tu plan de entrenamiento</span>
           </div>
           <h2 className="relative text-xl font-black text-white leading-tight">Rutinas</h2>
-          <p className="relative text-xs text-blue-300/60 mt-1">Elegí cómo entrenar: una rutina ya armada o una creada por vos</p>
+          {/* Pedido: "el recuadro principal de Rutinas... llega a dos
+              renglones, reducilo a uno como el resto" — el texto anterior
+              era el más largo de todos los heroes (64 caracteres, contra
+              ~50-56 del resto), lo suficiente para partirse en 2 líneas. */}
+          <p className="relative text-xs text-blue-300/60 mt-1">Una rutina ya armada, o creá la tuya</p>
         </div>
       )}
 

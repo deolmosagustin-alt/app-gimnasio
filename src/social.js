@@ -95,21 +95,31 @@ function profileToPublicBasic(profile, topRank) {
 
 // `activeRoutineSnapshot` ya viene resuelto (resolveRoutineDef) desde
 // App.jsx — acá no se recalcula para no duplicar esa lógica.
+// Pedido: "que en el perfil vos puedas decidir si mostrar tus marcas y/o
+// rutina a amigos, pero que por default esté en que sí" — los dos flags
+// son opt-OUT (!== false, no === true): un perfil viejo que nunca tocó
+// esta opción sigue compartiendo exactamente igual que compartía antes de
+// que este toggle existiera, sin que a nadie se le apague solo.
 function profileToPublicFull(profile, activeRoutineSnapshot) {
   const s = profile.settings || {};
+  const shareStats = s.shareStatsWithFriends !== false;
+  const shareRoutine = s.shareRoutineWithFriends !== false;
   return {
-    activeRoutineSnapshot: activeRoutineSnapshot || null,
-    logs: profile.logs || {},
-    trainingSessions: profile.trainingSessions || [],
-    measurements: profile.measurements || {},
-    cycleStart: profile.cycleStart || null,
-    sex: profile.sex || null,
-    age: profile.age || null,
+    activeRoutineSnapshot: shareRoutine ? (activeRoutineSnapshot || null) : null,
+    // "Marcas" acá es logs/trainingSessions/measurements/cycleStart/
+    // sexo/edad juntos: sin logs igual se podría calcular un rango vacío
+    // con sexo+edad sueltos, así que se ocultan todos juntos o ninguno.
+    logs: shareStats ? (profile.logs || {}) : {},
+    trainingSessions: shareStats ? (profile.trainingSessions || []) : [],
+    measurements: shareStats ? (profile.measurements || {}) : {},
+    cycleStart: shareStats ? (profile.cycleStart || null) : null,
+    sex: shareStats ? (profile.sex || null) : null,
+    age: shareStats ? (profile.age || null) : null,
     // Solo lo necesario para recalcular PRs/racha/rango del lado del que
     // mira — no el objeto `settings` completo (evita filtrar cosas
     // irrelevantes como horario de recordatorios o ajustes de la IA).
     settings: {
-      bodyWeightKg: s.bodyWeightKg || 0,
+      bodyWeightKg: shareStats ? (s.bodyWeightKg || 0) : 0,
       trainWeeks: s.trainWeeks,
       deloadWeeks: s.deloadWeeks,
       deloadEnabled: s.deloadEnabled,
