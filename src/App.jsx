@@ -14555,6 +14555,21 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
   }, [hasMoreMessages, loadMoreMessages]);
   const bottomRef = useRef(null);
   const chatInputRef = useRef(null); // para enfocarlo desde "otra respuesta" (ver handleCustomAnswer)
+  // Auto-grow del textarea de escritura (pedido: "que se vaya agrandando
+  // hasta un límite, porque ahora es muy chico"): se resetea a "auto" antes
+  // de medir scrollHeight, si no el alto nunca baja al borrar texto. Vacío
+  // es un caso aparte: si se mide scrollHeight con el placeholder puesto y
+  // este envuelve en 2 líneas en pantallas angostas, la barra queda más
+  // alta de lo que estaba antes sin motivo — en ese caso simplemente se
+  // saca el alto inline y manda el "rows=1" (por eso también el placeholder
+  // se acortó, para que entre en una sola línea).
+  useEffect(() => {
+    const el = chatInputRef.current;
+    if (!el) return;
+    if (!input) { el.style.height = ""; return; }
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 120) + "px";
+  }, [input]);
   // Para el botón "Detener": guardamos el controller del pedido en curso
   // afuera de enviarMensajeIA (si no, no hay forma de llegar a él desde un
   // click posterior). userAbortedRef distingue "lo cancelaste vos" de "se
@@ -15316,17 +15331,15 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
                 <button onClick={cancelarEdicion} aria-label="Cancelar edición" className="p-1 rounded-lg text-slate-400 hover:text-white transition shrink-0"><X size={13} /></button>
               </div>
             )}
-            <div className="flex items-stretch gap-2">
+            <div className="flex items-end gap-2">
               {/* Botón de conversaciones pegado a la barra de mensaje (antes
                   era una pestaña aparte, flotando arriba a la izquierda):
                   vive en el mismo contenedor fijo que el input, así se mueve
                   y aparece siempre junto a él, en vez de en otro punto de la
-                  pantalla. "aspect-square" con "items-stretch" NO alcanza acá
-                  (el motor resuelve el ancho del flex item antes de aplicar
-                  el estirado del alto, así que el cuadrado nunca terminaba
-                  de cuadrar): en vez de eso, la barra de mensaje se fija en
-                  h-12 y el botón usa ese mismo h-12 w-12, así los dos miden
-                  exactamente lo mismo pase lo que pase con el contenido. */}
+                  pantalla. Ancla abajo ("items-end") en vez de estirarse
+                  ("items-stretch") porque la barra de mensaje ahora puede
+                  crecer en alto (textarea auto-grow) y el botón debe quedar
+                  siempre del mismo tamaño (w-12 h-12), pegado a la base. */}
               {/* BUG FIX (pedido): antes tenía un numerito (conversations.length)
                   superpuesto arriba a la derecha — se sacó, el botón sigue
                   abriendo la lista de conversaciones igual. */}
@@ -15335,20 +15348,21 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
                   <MessageCircle size={17} />
                 </button>
               )}
-              <div className="flex-1 h-12 flex items-center gap-2 rounded-2xl p-1.5 backdrop-blur-xl shadow-xl shadow-black/40 transition-colors" style={{ backgroundColor: isListening ? "var(--chat-bar-listening)" : editingIndex != null ? "var(--chat-bar-editing)" : "var(--chat-bar-idle)", border: `1px solid ${isListening ? "var(--chat-bar-border-listening)" : editingIndex != null ? "var(--chat-bar-border-editing)" : "var(--chat-bar-border-idle)"}` }}>
+              <div className="flex-1 min-h-12 flex items-end gap-2 rounded-2xl p-1.5 backdrop-blur-xl shadow-xl shadow-black/40 transition-colors" style={{ backgroundColor: isListening ? "var(--chat-bar-listening)" : editingIndex != null ? "var(--chat-bar-editing)" : "var(--chat-bar-idle)", border: `1px solid ${isListening ? "var(--chat-bar-border-listening)" : editingIndex != null ? "var(--chat-bar-border-editing)" : "var(--chat-bar-border-idle)"}` }}>
                 {SpeechRecognitionAPI && (
                   <button onClick={handleMicToggle} aria-label={isListening ? "Confirmar, terminé de hablar" : "Hablar"} className="relative p-2.5 rounded-xl shrink-0 transition-all active:scale-95" style={isListening ? { background: "linear-gradient(160deg,#10B981,#059669)", color: "#fff" } : { color: "#94a3b8" }}>
                     {isListening && <span className="absolute inset-0 rounded-xl bg-emerald-400/40 animate-ping" />}
                     <span className="relative">{isListening ? <Check size={16} /> : <Mic size={16} />}</span>
                   </button>
                 )}
-                <input
+                <textarea
                   ref={chatInputRef}
+                  rows={1}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") handleSend(); }}
-                  placeholder={isListening ? "Hablá tranquilo…" : "Preguntale algo a tu entrenador…"}
-                  className="flex-1 bg-transparent px-3 py-2 text-sm text-white placeholder:text-slate-600 focus:outline-none min-w-0"
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+                  placeholder={isListening ? "Hablá tranquilo…" : "Escribí tu mensaje…"}
+                  className="flex-1 bg-transparent px-3 py-2.5 text-sm text-white placeholder:text-slate-600 focus:outline-none min-w-0 resize-none leading-snug max-h-[120px] overflow-y-auto"
                   disabled={isSending}
                 />
                 <button onClick={handleSend} disabled={!input.trim() || isSending} aria-label="Enviar" className="p-2.5 rounded-xl !text-white shrink-0 disabled:opacity-40 transition-all active:scale-95" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>
