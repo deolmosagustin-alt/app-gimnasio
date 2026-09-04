@@ -14829,11 +14829,29 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
       setMessages((prev) => prev.map((mm, i) => (i === msgIndex ? { ...mm, planStatus: "expired" } : mm)));
       return;
     }
-    livePlan.confirm();
-    // confirmedAt queda como la fecha real del cambio, para el log de "qué
-    // aplicó la IA" (ver AIChangeLogModal) — distinta de "date", que es
-    // cuándo se PROPUSO el cambio, no cuándo se confirmó.
-    setMessages((prev) => prev.map((mm, i) => (i === msgIndex ? { ...mm, planStatus: "confirmed", confirmedAt: new Date().toISOString() } : mm)));
+    // BUG FIX (auditoría de exportación + IA): casi todas las acciones son
+    // sync (actualizan estado local, nunca fallan de verdad) — pero
+    // exportar_rutina es async DE VERDAD (genera un PDF/Word/Excel y lo
+    // descarga/comparte), y sí puede fallar (jsPDF, permisos de
+    // almacenamiento en el celu, etc.). Antes esto llamaba confirm() sin
+    // esperar nada: planStatus pasaba a "confirmed" al toque, así que un
+    // fallo real quedaba invisible — el chat mostraba "Listo, aplicado"
+    // aunque no se haya generado ni descargado nada. Ahora se espera el
+    // resultado (sea sync o async) antes de festejar, y se marca error si
+    // falla — mismo criterio que ya usa handleExportDoc para el mismo caso
+    // desde la pestaña Rutinas.
+    Promise.resolve()
+      .then(() => livePlan.confirm())
+      .then(() => {
+        // confirmedAt queda como la fecha real del cambio, para el log de
+        // "qué aplicó la IA" (ver AIChangeLogModal) — distinta de "date",
+        // que es cuándo se PROPUSO el cambio, no cuándo se confirmó.
+        setMessages((prev) => prev.map((mm, i) => (i === msgIndex ? { ...mm, planStatus: "confirmed", confirmedAt: new Date().toISOString() } : mm)));
+      })
+      .catch((err) => {
+        console.error("[chat] No se pudo aplicar la acción:", err);
+        setMessages((prev) => prev.map((mm, i) => (i === msgIndex ? { ...mm, planStatus: "error" } : mm)));
+      });
   };
   const handleDiscardPlan = (msgIndex) => {
     setMessages((prev) => prev.map((m, i) => (i === msgIndex ? { ...m, planStatus: "discarded" } : m)));
@@ -15209,6 +15227,13 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
             )}
             {m.plan && m.planStatus === "confirmed" && (
               <div className="mt-2 flex items-center gap-1.5 text-[11px] text-emerald-400 font-semibold max-w-[85%]"><Check size={12} /> Listo, aplicado.</div>
+            )}
+            {/* Ver el BUG FIX en handleConfirmPlan — antes esto no podía
+                pasar nunca (siempre se marcaba "confirmed" sin esperar
+                nada); ahora sí, para acciones async de verdad como
+                exportar_rutina. */}
+            {m.plan && m.planStatus === "error" && (
+              <div className="mt-2 flex items-center gap-1.5 text-[11px] text-rose-400 font-semibold max-w-[85%]"><X size={12} /> No se pudo aplicar. Probá de nuevo.</div>
             )}
             {m.plan && m.planStatus === "discarded" && (
               <div className="mt-2 text-[11px] text-slate-600 max-w-[85%]">Descartado.</div>
