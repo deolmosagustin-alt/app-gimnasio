@@ -1366,6 +1366,11 @@ function buildSessionsIndex(logs, trainingSessions = []) {
       let dayKeys = Array.from(s.dayKeys);
       let durationMin = null;
       let completionPct = null;
+      let missedExercises = [];
+      // Orden base (por número de serie) para sesiones SIN foto de día — el
+      // bloque de abajo lo reemplaza por uno mejor (orden real del día +
+      // serie) cuando sí hay foto disponible.
+      s.items.sort((a, b) => a.setIndex - b.setIndex);
       if (formal?.dayKey) {
         // La sesión formal manda: mostrás SOLO el día que realmente
         // entrenaste, no todos los días donde aparecen esos ejercicios.
@@ -1396,6 +1401,19 @@ function buildSessionsIndex(logs, trainingSessions = []) {
           // que todo quede consistente entre sí.
           const idSet = new Set(dayExerciseIds);
           s.items = s.items.filter((it) => idSet.has(it.exerciseId));
+          // BUG FIX (pedido: "el resumen en el historial, hacerlo más
+          // ordenado"): "items" salía en el orden en que Object.entries(logs)
+          // los iteraba (básicamente al azar según cuándo se creó cada
+          // ejercicio) — la tarjeta podía mostrar el ejercicio 4 del día
+          // ANTES que el 1. Ahora se ordena por la posición real del
+          // ejercicio en el día (misma foto dayExerciseIds) y, dentro de
+          // cada ejercicio, por número de serie — así siempre se lee en el
+          // mismo orden en que se entrenó.
+          const orderIdx = new Map(dayExerciseIds.map((id, i) => [id, i]));
+          s.items.sort((a, b) => {
+            const oa = orderIdx.get(a.exerciseId) ?? 999, ob = orderIdx.get(b.exerciseId) ?? 999;
+            return oa !== ob ? oa - ob : a.setIndex - b.setIndex;
+          });
           s.totalVolume = s.items.reduce((sum, it) => sum + vol(it.kg, it.reps), 0);
           s.rpeSum = 0; s.rpeCount = 0; s.improvedCount = 0;
           s.items.forEach((it) => {
@@ -1406,9 +1424,17 @@ function buildSessionsIndex(logs, trainingSessions = []) {
           const total = dayExerciseIds.length;
           const done = dayExerciseIds.filter((id) => doneIds.has(id)).length;
           completionPct = Math.round((done / total) * 100);
+          // Pedido: "que te muestre lo que no hiciste" — los ejercicios del
+          // día que quedaron sin ninguna serie registrada esa fecha. Sólo
+          // existe para sesiones con la foto dayExerciseIds (formales,
+          // finalizadas con "Iniciar sesión"); sesiones viejas sin foto
+          // simplemente no muestran esta lista.
+          missedExercises = dayExerciseIds
+            .filter((id) => !doneIds.has(id))
+            .map((id) => ({ id, name: EXERCISE_BY_ID[id]?.name || EXERCISE_LIBRARY_BY_ID[id]?.name || id.replace(/_/g, " ") }));
         }
       }
-      return { ...s, dayKeys, durationMin, completionPct, isDeload: !!formal?.deload, totalSets: s.items.length, avgRpe: s.rpeCount ? Math.round((s.rpeSum / s.rpeCount) * 10) / 10 : null };
+      return { ...s, dayKeys, durationMin, completionPct, missedExercises, isDeload: !!formal?.deload, totalSets: s.items.length, avgRpe: s.rpeCount ? Math.round((s.rpeSum / s.rpeCount) * 10) / 10 : null };
     })
     .sort((a, b) => (a.date < b.date ? 1 : -1));
 }
@@ -5255,6 +5281,14 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
   }, [logs, exercise.id, exercise.cardio, hideTimer, setsToShow.length, hoyStr]);
   const { stagnant } = useMemo(() => getStagnationInfo(exercise, logs), [exercise, logs]);
   const bestWorkingKg = !exercise.cardio ? getBestWorkingKg(exercise, logs) : null;
+  // Pedido: "algún indicador de que terminaste el ejercicio" — antes había
+  // que abrir CADA tarjeta y mirar serie por serie para saber si ya
+  // completaste todas hoy; ahora se ve de un vistazo con la tarjeta
+  // cerrada. Mismo criterio de "hecha hoy" que ya usa timerSlot arriba
+  // (fecha de hoy, sin contar marcas de descarga).
+  const allSetsDoneToday = useMemo(() => (
+    setsToShow.length > 0 && setsToShow.every((_, i) => (logs[`${exercise.id}_${i}`] || []).some((h) => h.date === hoyStr && !h.deload))
+  ), [logs, exercise.id, setsToShow, hoyStr]);
   return (
     <div className="stagger-item smooth-card bg-slate-900/50 border border-slate-800/50 rounded-2xl overflow-hidden backdrop-blur-sm shadow-md shadow-black/20 transition-shadow hover:shadow-lg hover:shadow-black/30">
       <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center justify-between px-4 py-4 hover:bg-slate-800/30 active:bg-slate-800/50 transition text-left">
@@ -5282,7 +5316,14 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
             {exercise.nota && settings.showExerciseNote !== false && <p className="text-[11px] text-slate-500 mt-0.5" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{exercise.nota}</p>}
           </div>
         </div>
-        <ChevronDown size={18} className={`text-slate-600 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+        <div className="flex items-center gap-2 shrink-0">
+          {allSetsDoneToday && (
+            <span className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center shrink-0" title="Completaste todas las series de hoy">
+              <Check size={12} className="text-white" strokeWidth={3} />
+            </span>
+          )}
+          <ChevronDown size={18} className={`text-slate-600 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+        </div>
       </button>
       <div className={open ? "px-4 pb-4 pt-0 tab-fade-in" : "hidden"}>
         {stagnant && settings.showStagnation === true && <div className="mb-3 text-[11px] text-rose-400/90 bg-rose-500/5 border border-rose-500/15 rounded-xl px-3 py-2 flex items-start gap-1.5"><Info size={12} className="mt-0.5 shrink-0" /><span>Hace {STAGNATION_DAYS}+ días sin superar el récord. Considerá cambiar reps, descanso o variante.</span></div>}
@@ -5843,6 +5884,25 @@ function SessionDetailCard({ session, onDelete, exerciseNotes = {}, rpeDisplayMo
         </div>
       )}
 
+      {/* Pedido: "que te muestre que no hiciste" — complementa el "% del
+          día" de arriba con el detalle de CUÁLES ejercicios quedaron
+          afuera. Sólo existe si la sesión tiene la foto dayExerciseIds
+          (ver buildSessionsIndex) — sesiones viejas sin esa foto no
+          muestran nada acá, en vez de un dato inventado. */}
+      {session.missedExercises?.length > 0 && (
+        <div className="mx-4 mb-3 rounded-xl px-3 py-2.5 bg-amber-500/10 border border-amber-500/20">
+          <div className="flex items-center gap-2 mb-1.5">
+            <AlertTriangle size={13} className="text-amber-400 shrink-0" />
+            <p className="text-[11px] font-bold text-amber-300">No hiciste {session.missedExercises.length} ejercicio{session.missedExercises.length === 1 ? "" : "s"} de ese día</p>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {session.missedExercises.map((m) => (
+              <span key={m.id} className="text-[10.5px] text-amber-300/80 bg-amber-500/10 border border-amber-500/25 rounded-lg px-2 py-1">{m.name}</span>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Ejercicios agrupados con sus series como pills — tocar una pill
           despliega su nota (si le pusiste una al registrar). El RPE ya no
           lleva un color según el valor: es solo información, no un
@@ -5880,6 +5940,13 @@ function SessionDetailCard({ session, onDelete, exerciseNotes = {}, rpeDisplayMo
                 return (
                   <button key={i} onClick={() => setExpandedSet((cur) => (cur === itemKey ? null : itemKey))} className="text-[11px] font-bold px-2 py-1 rounded-lg tabular-nums inline-flex items-center gap-1 number-pop transition active:scale-95"
                     style={{ color, backgroundColor: bg, border: `1px solid ${expandedSet === itemKey ? tint(color, "aa") : bd}`, animationDelay: `${Math.min(i, 10) * 40}ms` }}>
+                    {/* Pedido: "el resumen en el historial, más ordenado" —
+                        antes la pill sólo mostraba reps×kg, sin decir DE
+                        QUÉ SERIE era: con varias pills envueltas en 2-3
+                        líneas era imposible saber el orden real en que se
+                        hicieron. "S{n}" usa el número de serie real
+                        (it.setIndex), no la posición en la lista. */}
+                    <span className="opacity-60 font-black">S{it.setIndex + 1}</span>
                     {isCardio ? `${it.minutes} min` : `${it.reps}×${it.kg}kg`}
                     {it.isImprovement && " 🔥"}
                     {below && <span className="text-[9px] font-black opacity-90">↓{100 - pct}%</span>}
