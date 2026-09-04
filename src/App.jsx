@@ -7920,6 +7920,17 @@ function BattleCompareCard({ myAvatarData, myName, mySex, mySessionsThisWeek, my
   const tieCount = comparison.length - iWinCount - theyWinCount;
   const iWinWeek = mySessionsThisWeek > theirSessionsThisWeek;
   const theyWinWeek = theirSessionsThisWeek > mySessionsThisWeek;
+  // Pedido: "termina de diseñar el versus... le falta bastante" — antes
+  // se veía el desglose (ganás/empate/pierde + semana) pero nunca un
+  // VEREDICTO: quién gana la batalla EN GENERAL. El músculo pesa el
+  // doble que la semana (es el dato de fondo, la semana es más volátil)
+  // y el empate en músculos se reparte mitad y mitad para la barra.
+  const myScore = iWinCount * 2 + (iWinWeek ? 1 : 0);
+  const theirScore = theyWinCount * 2 + (theyWinWeek ? 1 : 0);
+  const iWinBattle = myScore > theirScore;
+  const theyWinBattle = theirScore > myScore;
+  const totalMuscles = comparison.length || 1;
+  const myBarPct = Math.round(((iWinCount + tieCount / 2) / totalMuscles) * 100);
   return (
     <div className="space-y-3">
       {/* Header de batalla: avatares enfrentados + marcador combinado
@@ -7928,13 +7939,17 @@ function BattleCompareCard({ myAvatarData, myName, mySex, mySessionsThisWeek, my
       <div className="relative overflow-hidden rounded-3xl border border-amber-500/25 p-4" style={{ background: "linear-gradient(160deg, #14141f, #08080d)" }}>
         <div className="absolute -top-14 -left-14 w-44 h-44 rounded-full bg-teal-500/20 blur-3xl pointer-events-none" />
         <div className="absolute -top-14 -right-14 w-44 h-44 rounded-full bg-fuchsia-500/20 blur-3xl pointer-events-none" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-24 rounded-full bg-amber-500/10 blur-2xl pointer-events-none" />
         <p className="relative text-center text-[10px] font-black uppercase tracking-[0.22em] text-amber-400 mb-3.5 flex items-center justify-center gap-1.5">
           <Swords size={12} /> Batalla de marcas
         </p>
         <div className="relative flex items-center gap-2">
           <div className="flex-1 text-center min-w-0">
-            <div className="w-16 h-16 mx-auto rounded-2xl overflow-hidden border-2 border-teal-400/70 shadow-xl shadow-teal-500/25">
-              {myAvatarData ? <img src={myAvatarData} className="w-full h-full object-cover" alt="" /> : <div className="w-full h-full flex items-center justify-center text-xl font-black !text-white" style={{ background: "linear-gradient(135deg,#2DD4BF,#0E7490)" }}>{(myName || "?").charAt(0).toUpperCase()}</div>}
+            <div className="relative inline-block">
+              {iWinBattle && <Crown size={18} className="absolute -top-3.5 left-1/2 -translate-x-1/2 text-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.7)]" />}
+              <div className="w-16 h-16 mx-auto rounded-2xl overflow-hidden border-2 shadow-xl" style={{ borderColor: iWinBattle ? "#FBBF24" : "rgba(45,212,191,0.7)", boxShadow: iWinBattle ? "0 0 0 3px rgba(251,191,36,0.35), 0 10px 25px -5px rgba(251,191,36,0.3)" : "0 10px 25px -5px rgba(45,212,191,0.25)" }}>
+                {myAvatarData ? <img src={myAvatarData} className="w-full h-full object-cover" alt="" /> : <div className="w-full h-full flex items-center justify-center text-xl font-black !text-white" style={{ background: "linear-gradient(135deg,#2DD4BF,#0E7490)" }}>{(myName || "?").charAt(0).toUpperCase()}</div>}
+              </div>
             </div>
             <p className="text-xs font-black text-teal-300 mt-1.5 truncate">Vos</p>
           </div>
@@ -7942,14 +7957,28 @@ function BattleCompareCard({ myAvatarData, myName, mySex, mySessionsThisWeek, my
             <Zap size={16} className="text-amber-400" />
           </div>
           <div className="flex-1 text-center min-w-0">
-            <div className="w-16 h-16 mx-auto rounded-2xl overflow-hidden border-2 border-fuchsia-400/70 shadow-xl shadow-fuchsia-500/25">
-              {theirAvatarData ? <img src={theirAvatarData} className="w-full h-full object-cover" alt="" /> : <div className="w-full h-full flex items-center justify-center text-xl font-black !text-white" style={{ background: "linear-gradient(135deg,#C084FC,#7C3AED)" }}>{(theirName || "?").charAt(0).toUpperCase()}</div>}
+            <div className="relative inline-block">
+              {theyWinBattle && <Crown size={18} className="absolute -top-3.5 left-1/2 -translate-x-1/2 text-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.7)]" />}
+              <div className="w-16 h-16 mx-auto rounded-2xl overflow-hidden border-2 shadow-xl" style={{ borderColor: theyWinBattle ? "#FBBF24" : "rgba(192,132,252,0.7)", boxShadow: theyWinBattle ? "0 0 0 3px rgba(251,191,36,0.35), 0 10px 25px -5px rgba(251,191,36,0.3)" : "0 10px 25px -5px rgba(192,132,252,0.25)" }}>
+                {theirAvatarData ? <img src={theirAvatarData} className="w-full h-full object-cover" alt="" /> : <div className="w-full h-full flex items-center justify-center text-xl font-black !text-white" style={{ background: "linear-gradient(135deg,#C084FC,#7C3AED)" }}>{(theirName || "?").charAt(0).toUpperCase()}</div>}
+              </div>
             </div>
             <p className="text-xs font-black text-fuchsia-300 mt-1.5 truncate">{theirName || "Ellos"}</p>
           </div>
         </div>
 
-        <div className="relative grid grid-cols-3 gap-2 mt-4">
+        {/* Barra de poder — mismo lenguaje que una barra de vida de juego
+            de pelea: el ancho de cada lado es proporcional a cuántos
+            músculos ganó cada quien (los empates se reparten mitad y
+            mitad). Antes el resultado sólo se leía en números sueltos. */}
+        <div className="relative mt-3.5">
+          <div className="h-2.5 rounded-full bg-black/40 overflow-hidden flex">
+            <div className="h-full bg-gradient-to-r from-teal-500 to-teal-300 transition-all duration-500" style={{ width: `${myBarPct}%` }} />
+            <div className="h-full bg-gradient-to-r from-fuchsia-300 to-fuchsia-500 transition-all duration-500" style={{ width: `${100 - myBarPct}%` }} />
+          </div>
+        </div>
+
+        <div className="relative grid grid-cols-3 gap-2 mt-3.5">
           <div className="text-center rounded-xl bg-black/35 border border-teal-500/20 py-2.5">
             <p className="text-xl font-black text-teal-300 leading-none">{iWinCount}</p>
             <p className="text-[8px] text-slate-500 uppercase font-bold mt-1 tracking-wide">Ganás</p>
@@ -7968,6 +7997,15 @@ function BattleCompareCard({ myAvatarData, myName, mySex, mySessionsThisWeek, my
           <Flame size={12} className="text-orange-400 shrink-0" />
           <p className={`text-[11px] font-bold ${iWinWeek ? "text-teal-300" : theyWinWeek ? "text-fuchsia-300" : "text-slate-500"}`}>
             {mySessionsThisWeek} - {theirSessionsThisWeek} esta semana
+          </p>
+        </div>
+
+        {/* Veredicto final: quién gana la batalla en general (músculos
+            pesan el doble que la semana, ver myScore/theirScore arriba). */}
+        <div className="relative flex items-center justify-center gap-1.5 mt-2.5 pt-2.5 border-t border-white/5">
+          <Trophy size={13} className={iWinBattle || theyWinBattle ? "text-amber-400" : "text-slate-600"} />
+          <p className="text-[12.5px] font-black" style={{ color: iWinBattle ? "#5eead4" : theyWinBattle ? "#e9b8fc" : "#94a3b8" }}>
+            {iWinBattle ? "¡Vas ganando la batalla!" : theyWinBattle ? `${theirName || "Esta persona"} va ganando la batalla` : "Batalla pareja, ¡a definir!"}
           </p>
         </div>
       </div>
@@ -12235,6 +12273,24 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
   const theirRanks = useMemo(() => computeAllMuscleRanks(full?.logs, full?.settings, full?.sex, full?.age), [full]);
   const myRanksForCompare = useMemo(() => computeAllMuscleRanks(viewerProfile?.logs, getProfileSettings(viewerProfile), viewerProfile?.sex, viewerProfile?.age), [viewerProfile]);
   const selectedMuscleInfo = selectedMuscle ? theirRanks[selectedMuscle] : null;
+  // Pedido: "agregale más cosas e info" — dos datos nuevos que antes no
+  // aparecían en ningún lado de este perfil: el rango PROMEDIO (mismo
+  // cálculo que myTopRank en el hero de Social, acá armado a partir de
+  // theirRanks que ya está calculado) y cuál es su músculo más fuerte,
+  // con la marca real que lo sostiene.
+  const theirTopRank = useMemo(() => {
+    const withData = MUSCLE_GROUPS.map((g) => theirRanks[g.key]).filter((r) => r?.hasData);
+    if (!withData.length) return null;
+    const avgIdx = Math.round(withData.reduce((sum, r) => sum + r.levelIdx, 0) / withData.length);
+    const info = RANK_TIERS[avgIdx];
+    return { tier: info.tier, sub: info.sub, color: info.color, levelIdx: avgIdx };
+  }, [theirRanks]);
+  const theirBestMuscle = useMemo(() => {
+    const withData = MUSCLE_GROUPS.map((g) => theirRanks[g.key]).filter((r) => r?.hasData && r.bestKg);
+    if (!withData.length) return null;
+    return withData.reduce((a, b) => (b.levelIdx > a.levelIdx ? b : a));
+  }, [theirRanks]);
+  const totalSessions = full?.trainingSessions?.length || 0;
 
   return (
     <div className="space-y-4">
@@ -12253,6 +12309,17 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
         </div>
         <h2 className="relative text-xl font-black text-white">{basic?.name || "Usuario"}</h2>
         <p className="relative text-xs text-purple-300/70 flex items-center justify-center gap-1 mt-0.5"><AtSign size={10} />{basic?.username}</p>
+        {/* Pedido: "agregale más cosas e info" — el rango promedio no
+            aparecía en ningún lado de este perfil antes (sólo el
+            detallado por músculo, más abajo, y sólo si tocabas el
+            muñeco). Ahora se ve de entrada, igual que en tu propio hero
+            de Social. */}
+        {theirTopRank && (
+          <div className="relative inline-flex items-center gap-1.5 mt-2.5 px-3 py-1 rounded-full" style={{ backgroundColor: tint(theirTopRank.color, "18"), border: `1px solid ${tint(theirTopRank.color, "40")}` }}>
+            <Trophy size={11} style={{ color: theirTopRank.color }} />
+            <span className="text-[11px] font-black" style={{ color: theirTopRank.color }}>{theirTopRank.tier} {theirTopRank.sub}</span>
+          </div>
+        )}
       </div>
 
       {state === "loading" && <p className="text-center text-slate-600 text-sm py-10">Cargando perfil...</p>}
@@ -12274,34 +12341,66 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
               así que mostrarlo dos veces sería redundante. */}
           {!openComparing && (
             <>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="rounded-xl border border-slate-800/50 bg-slate-900/50 px-3 py-3 text-center">
+              {/* Pedido: "agregale más cosas e info" — se suma una
+                  tercera caja (total de sesiones históricas, dato que
+                  antes no aparecía en ningún lado de este perfil) y cada
+                  una toma el color de su propio tema (naranja=racha,
+                  violeta=ciclo, celeste=histórico) en vez de las 3 en el
+                  mismo gris parejo de antes. */}
+              <div className="grid grid-cols-3 gap-2">
+                <div className="rounded-xl border border-orange-500/20 bg-orange-500/5 px-2.5 py-3 text-center">
                   <p className="text-xl font-black text-orange-400">{streak}🔥</p>
-                  <p className="text-[10px] text-slate-500 mt-0.5">Racha actual</p>
+                  <p className="text-[9.5px] text-slate-500 mt-0.5">Racha</p>
                 </div>
-                <div className="rounded-xl border border-slate-800/50 bg-slate-900/50 px-3 py-3 text-center">
+                <div className="rounded-xl border border-purple-500/20 bg-purple-500/5 px-2.5 py-3 text-center">
                   <p className="text-xl font-black text-purple-400">{weekInfo ? `S${weekInfo.weekInCycle}` : "—"}</p>
-                  <p className="text-[10px] text-slate-500 mt-0.5">{weekInfo?.isDeload ? "Semana de descarga" : "Semana de su ciclo"}</p>
+                  <p className="text-[9.5px] text-slate-500 mt-0.5">{weekInfo?.isDeload ? "Descarga" : "Su ciclo"}</p>
+                </div>
+                <div className="rounded-xl border border-sky-500/20 bg-sky-500/5 px-2.5 py-3 text-center">
+                  <p className="text-xl font-black text-sky-400">{totalSessions}</p>
+                  <p className="text-[9.5px] text-slate-500 mt-0.5">Entrenados</p>
                 </div>
               </div>
+
+              {/* Su mejor marca — nuevo, no existía en ningún lado antes:
+                  el músculo con el rango más alto, con la marca real que
+                  lo sostiene (kg×reps y en qué ejercicio). Le da al
+                  perfil algo concreto para leer de entrada, en vez de
+                  tener que tocar el muñeco músculo por músculo para
+                  encontrar su punto fuerte. */}
+              {theirBestMuscle && (
+                <div className="relative overflow-hidden rounded-2xl border p-3.5" style={{ borderColor: tint(theirBestMuscle.color, "35"), background: `linear-gradient(135deg, ${tint(theirBestMuscle.color, "14")}, transparent 70%)` }}>
+                  <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full blur-2xl opacity-25 pointer-events-none" style={{ backgroundColor: theirBestMuscle.color }} />
+                  <p className="relative text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1.5 flex items-center gap-1.5"><Star size={11} style={{ color: theirBestMuscle.color }} /> Su mejor marca</p>
+                  <div className="relative flex items-center gap-3">
+                    <RankBadgeIcon tier={theirBestMuscle.tier} sub={null} color={theirBestMuscle.color} size={44} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-lg font-black text-white leading-none tabular-nums">{theirBestMuscle.bestReps}<span className="text-slate-500 text-sm font-bold mx-0.5">×</span>{theirBestMuscle.bestKg}<span className="text-slate-400 text-xs font-bold ml-0.5">kg</span></p>
+                      <p className="text-[10.5px] text-slate-500 mt-1 truncate">{theirBestMuscle.bestExerciseName ? <>en <span className="text-slate-300 font-bold">{theirBestMuscle.bestExerciseName}</span></> : theirBestMuscle.label}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Duelo semanal — quién entrenó más veces ESTA semana, vos o
                   esta persona. Corto y competitivo a propósito, para que abrir
                   un perfil no sea sólo mirar números históricos. */}
-              <div className="rounded-2xl border border-slate-800/50 bg-slate-900/40 p-3.5">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 mb-2 flex items-center gap-1.5"><Swords size={11} /> Duelo esta semana</p>
-                <div className="flex items-center gap-3">
+              <div className="relative overflow-hidden rounded-2xl border border-slate-700/50 p-3.5" style={{ background: "linear-gradient(160deg, rgba(30,41,59,0.6), rgba(15,23,42,0.4))" }}>
+                <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full bg-teal-500/10 blur-3xl pointer-events-none" />
+                <div className="absolute -bottom-10 -left-10 w-24 h-24 rounded-full bg-fuchsia-500/10 blur-3xl pointer-events-none" />
+                <p className="relative text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 flex items-center gap-1.5"><Swords size={11} /> Duelo esta semana</p>
+                <div className="relative flex items-center gap-3">
                   <div className="flex-1 text-center">
-                    <p className={`text-2xl font-black leading-none ${mySessionsThisWeek > theirSessionsThisWeek ? "text-emerald-400" : "text-white"}`}>{mySessionsThisWeek}</p>
+                    <p className={`text-2xl font-black leading-none ${mySessionsThisWeek > theirSessionsThisWeek ? "text-teal-300" : "text-white"}`}>{mySessionsThisWeek}</p>
                     <p className="text-[10px] text-slate-500 mt-1">Vos</p>
                   </div>
-                  <span className="text-[10px] text-slate-700 font-black shrink-0">VS</span>
+                  <span className="text-[10px] text-slate-600 font-black shrink-0">VS</span>
                   <div className="flex-1 text-center">
-                    <p className={`text-2xl font-black leading-none ${theirSessionsThisWeek > mySessionsThisWeek ? "text-emerald-400" : "text-white"}`}>{theirSessionsThisWeek}</p>
+                    <p className={`text-2xl font-black leading-none ${theirSessionsThisWeek > mySessionsThisWeek ? "text-fuchsia-300" : "text-white"}`}>{theirSessionsThisWeek}</p>
                     <p className="text-[10px] text-slate-500 mt-1 truncate">{basic?.name || "Ellos"}</p>
                   </div>
                 </div>
-                <p className="text-[10px] text-slate-600 text-center mt-2">
+                <p className="relative text-[10px] text-slate-500 text-center mt-2">
                   {mySessionsThisWeek === theirSessionsThisWeek ? "Van empatados esta semana" : mySessionsThisWeek > theirSessionsThisWeek ? "Vas ganando esta semana 💪" : `${basic?.name || "Esta persona"} va ganando esta semana`}
                 </p>
               </div>
