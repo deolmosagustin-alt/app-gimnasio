@@ -11276,24 +11276,32 @@ function PublicUserCard({ uid, basic, streak = null, onClick = null, children })
     const label = haceCuanto(dias);
     if (label) lastActive = { label: `Activo ${label}`, recent: dias <= 3 };
   }
+  // Rediseño (pedido: "propone algo que quede más estético, y me gusta
+  // que cada amigo tenga su propio rectángulo separado") — cada fila sigue
+  // siendo su propia tarjeta suelta (eso se queda), pero ahora tiene el
+  // mismo lenguaje visual de "hero" que ya usa el resto de la app (tinte +
+  // resplandor de esquina en el color del RANGO de esa persona, en vez de
+  // un gris parejo idéntico para todos), avatar más grande con marco de
+  // ese mismo color, y un puntito de actividad SOBRE el avatar (como
+  // WhatsApp/Instagram) en vez de una tercera línea de texto aparte.
+  const accentColor = basic?.topRank?.color || "#8B5CF6";
   const avatarAndName = (
     <>
-      {basic?.avatarData ? (
-        <img src={basic.avatarData} alt="" className="w-10 h-10 rounded-xl object-cover shrink-0" />
-      ) : (
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-black !text-white shrink-0" style={{ background: "linear-gradient(135deg,#A855F7,#7C3AED)" }}>
-          {(basic?.name || basic?.username || "?").charAt(0).toUpperCase()}
-        </div>
-      )}
-      {/* Rediseño (pedido: "se ve el nombre, rango, racha, @ y activo
-          hace..., tratemos de hacer que se vea mejor") — antes el nombre,
-          la insignia de rango Y la racha vivían apretados en UNA sola
-          línea con `truncate` (que en un contenedor flex con varios hijos
-          no trunca bien el texto, sólo lo aprieta) — se leía como un
-          amontonamiento. Ahora el nombre tiene su propia línea limpia, la
-          insignia de rango pasa a un costado bien visible (mismo lugar
-          que ya usa LeaderboardRow), y @usuario + racha comparten una
-          segunda línea más chica en vez de competir con el nombre. */}
+      <div className="relative shrink-0">
+        {basic?.avatarData ? (
+          <img src={basic.avatarData} alt="" className="w-12 h-12 rounded-2xl object-cover border-2" style={{ borderColor: tint(accentColor, "55") }} />
+        ) : (
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-base font-black !text-white border-2" style={{ background: "linear-gradient(135deg,#A855F7,#7C3AED)", borderColor: tint(accentColor, "55") }}>
+            {(basic?.name || basic?.username || "?").charAt(0).toUpperCase()}
+          </div>
+        )}
+        {lastActive && (
+          <span
+            className={`absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border-2 border-slate-950 ${lastActive.recent ? "bg-emerald-500" : "bg-slate-600"}`}
+            title={lastActive.label}
+          />
+        )}
+      </div>
       <div className="flex-1 min-w-0 text-left">
         <p className="text-sm font-bold text-white truncate">{basic?.name || "Usuario"}</p>
         <div className="flex items-center gap-2 mt-0.5 min-w-0">
@@ -11304,28 +11312,25 @@ function PublicUserCard({ uid, basic, streak = null, onClick = null, children })
             </span>
           )}
         </div>
-        {lastActive && (
-          <p className="text-[10px] text-slate-600 flex items-center gap-1 mt-1">
-            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${lastActive.recent ? "bg-emerald-500" : "bg-slate-700"}`} />
-            {lastActive.label}
-          </p>
-        )}
       </div>
-      {/* Insignia de rango promedio — de un vistazo, sin entrar al perfil
-          ni leer texto. Viene precalculada en public/basic (ver
-          computeTopRank en App.jsx). Ahora vive a un costado bien
-          visible, no apretada contra el nombre. */}
+      {/* Insignia de rango promedio, con el nombre del tier debajo — mismo
+          par ícono+texto que ya usa el hero de Social y el de un amigo,
+          para que se sienta la misma app en vez de un ícono pelado. */}
       {basic?.topRank && (
-        <div className="shrink-0"><RankBadgeIcon tier={basic.topRank.tier} sub={null} color={basic.topRank.color} size={30} /></div>
+        <div className="shrink-0 flex flex-col items-center gap-0.5">
+          <RankBadgeIcon tier={basic.topRank.tier} sub={null} color={basic.topRank.color} size={32} />
+          <span className="text-[8px] font-black uppercase tracking-wide whitespace-nowrap" style={{ color: basic.topRank.color }}>{basic.topRank.tier} {basic.topRank.sub}</span>
+        </div>
       )}
     </>
   );
   return (
-    <div className="w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl bg-slate-900/50 border border-slate-800/50 transition-colors hover:border-slate-700/60">
+    <div className="relative overflow-hidden w-full flex items-center gap-3 px-3.5 py-3.5 rounded-2xl border transition-colors" style={{ borderColor: tint(accentColor, "22"), background: `linear-gradient(135deg, ${tint(accentColor, "10")}, rgba(15,23,42,0.55) 65%)` }}>
+      <div className="absolute -top-6 -right-6 w-20 h-20 rounded-full blur-2xl opacity-25 pointer-events-none" style={{ backgroundColor: accentColor }} />
       {onClick ? (
-        <button onClick={onClick} className="flex-1 flex items-center gap-3 min-w-0 hover:opacity-80 transition active:scale-[0.99]">{avatarAndName}</button>
+        <button onClick={onClick} className="relative flex-1 flex items-center gap-3 min-w-0 hover:opacity-90 transition active:scale-[0.99]">{avatarAndName}</button>
       ) : (
-        <div className="flex-1 flex items-center gap-3 min-w-0">{avatarAndName}</div>
+        <div className="relative flex-1 flex items-center gap-3 min-w-0">{avatarAndName}</div>
       )}
       {children}
     </div>
