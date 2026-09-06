@@ -12995,9 +12995,9 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
   );
 }
 
-// Cuántos candidatos de "aplausos rápidos" se muestran en la tira antes de
+// Cuántos candidatos de "aplausos rápidos" se muestran de entrada antes de
 // recortar el resto atrás de "Ver todos" (KudosListModal, más abajo).
-const KUDOS_STRIP_PREVIEW = 4;
+const KUDOS_STRIP_PREVIEW = 1;
 
 // Lista completa de "quién entrenó hace poco" — se abre desde el link "Ver
 // todos" de la tira de kudos cuando hay más candidatos de los que entran
@@ -13466,67 +13466,62 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
             rápidos y un aviso de "te están por alcanzar", con diseños
             contundentes (no sólo texto): tarjeta propia, color de marca,
             ícono grande, y accionables (aplaudir / ver el perfil).
-            REDISEÑO (pedido: "qué pasa si hay más de un amigo que entrenó
-            ayer u hoy" + "hacé que el recuadro de social sea menos alto,
-            que coincida con el del ciclo en progreso"): antes esto era una
-            sola tarjeta grande para UN candidato — ahora es una tira
-            horizontal con scroll de chips chicos, así entran varios amigos
-            a la vez sin que la tarjeta crezca en altura (siempre ocupa una
-            sola fila, sin importar cuántos entrenaron). */}
-        {kudosCandidates.length > 0 && (
-          <div className="relative overflow-hidden rounded-2xl border mt-3 p-3.5" style={{ borderColor: "rgba(252,76,2,0.45)", background: "linear-gradient(135deg, rgba(252,76,2,0.16), rgba(15,23,42,0.55) 70%)" }}>
-            <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full blur-2xl pointer-events-none" style={{ backgroundColor: "rgba(252,76,2,0.3)" }} />
-            <p className="relative text-[9.5px] font-black uppercase tracking-wide mb-2.5" style={{ color: "#FDBA74" }}>👏 Entrenaron hace poco</p>
-            {/* BUG FIX (pedido: "sigue angosto y chiquito"): al comprimir esto
-                en chips para que entraran varios amigos, el avatar y sobre
-                todo el botón de aplaudir quedaron demasiado chicos — un
-                bloque de 24px de alto con sólo el emoji ya no se sentía
-                "contundente" como pedía el diseño original. Mismo tamaño de
-                avatar que el resto de la app (14/14, el mismo que el hero de
-                Social) y un botón de aplaudir cuadrado y grande otra vez, en
-                vez de una barrita fina. */}
-            <div className="relative flex gap-3 overflow-x-auto -mx-0.5 px-0.5 pb-0.5">
-              {kudosCandidates.slice(0, KUDOS_STRIP_PREVIEW).map((c) => {
-                const sent = !!kudosSentMap[c.uid];
-                const sending = kudosSendingUid === c.uid;
-                return (
-                  <div key={c.uid} className="shrink-0 w-20 flex flex-col items-center gap-1.5">
-                    <button onClick={() => setViewingUid(c.uid)} className="relative active:opacity-80 transition" title={basics[c.uid]?.name || "Tu amigo"}>
-                      {basics[c.uid]?.avatarData ? (
-                        <img src={basics[c.uid].avatarData} alt="" className="w-14 h-14 rounded-2xl object-cover border-2" style={{ borderColor: "rgba(252,76,2,0.5)" }} />
-                      ) : (
-                        <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-lg font-black !text-white border-2" style={{ background: "linear-gradient(135deg,#FC4C02,#C2410C)", borderColor: "rgba(252,76,2,0.5)" }}>
-                          {(basics[c.uid]?.name || "?").charAt(0).toUpperCase()}
-                        </div>
-                      )}
-                      <span className="absolute -bottom-1 -right-1 px-1.5 h-4 rounded-full bg-slate-950 border border-orange-500/50 text-[7.5px] font-black flex items-center justify-center text-orange-300 whitespace-nowrap">{c.daysAgo === 0 ? "HOY" : "AYER"}</span>
-                    </button>
-                    <p className="text-[9px] text-slate-300 truncate w-full text-center">{basics[c.uid]?.name || "Amigo"}</p>
-                    <button
-                      onClick={() => handleSendKudos(c.uid)}
-                      disabled={sending || sent}
-                      className={`w-full h-9 rounded-xl text-lg font-black flex items-center justify-center transition-all active:scale-90 ${sent ? "opacity-90" : !sending ? "animate-pulse" : ""}`}
-                      style={sent ? { backgroundColor: "rgba(252,76,2,0.25)", color: "#FDBA74" } : { backgroundColor: "#FC4C02", color: "#fff" }}
-                    >
-                      {sent ? "✓" : "👏"}
-                    </button>
+            BUG FIX (pedido: "quiero que se parezca a la estética de la
+            primera vez que me mostraste esta idea, con el botón de aplaudir
+            a la derecha del todo") — el rediseño en tira de chips (pensado
+            para que entraran varios amigos sin crecer en altura) terminó
+            sintiéndose angosto y chico, muy lejos del diseño original.
+            Vuelve el mismo esqueleto de entonces — una sola fila ancha con
+            el avatar+info a la izquierda y el botón de aplaudir grande y
+            cuadrado pegado a la derecha — mostrando sólo al candidato más
+            reciente; si hay más de uno, "Ver todos" abre KudosListModal
+            (mismo esqueleto de fila, para cada uno de los demás). */}
+        {kudosCandidates.length > 0 && (() => {
+          const top = kudosCandidates[0];
+          const sent = !!kudosSentMap[top.uid];
+          const sending = kudosSendingUid === top.uid;
+          return (
+            <div className="relative overflow-hidden rounded-2xl border mt-3.5 p-3.5" style={{ borderColor: "rgba(252,76,2,0.45)", background: "linear-gradient(135deg, rgba(252,76,2,0.18), rgba(15,23,42,0.55) 70%)" }}>
+              <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full blur-2xl pointer-events-none" style={{ backgroundColor: "rgba(252,76,2,0.35)" }} />
+              <div className="relative flex items-center gap-3">
+                <button onClick={() => setViewingUid(top.uid)} className="flex items-center gap-2.5 flex-1 min-w-0 text-left active:opacity-80 transition">
+                  {basics[top.uid]?.avatarData ? (
+                    <img src={basics[top.uid].avatarData} alt="" className="w-11 h-11 rounded-2xl object-cover shrink-0 border-2" style={{ borderColor: "rgba(252,76,2,0.5)" }} />
+                  ) : (
+                    <div className="w-11 h-11 rounded-2xl flex items-center justify-center text-base font-black !text-white shrink-0 border-2" style={{ background: "linear-gradient(135deg,#FC4C02,#C2410C)", borderColor: "rgba(252,76,2,0.5)" }}>
+                      {(basics[top.uid]?.name || "?").charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-black uppercase tracking-wide" style={{ color: "#FDBA74" }}>{top.daysAgo === 0 ? "Entrenó hoy" : "Entrenó ayer"}</p>
+                    <p className="text-sm font-bold text-white truncate">{basics[top.uid]?.name || "Tu amigo"}</p>
+                    {top.latestSession?.dayLabel && <p className="text-[11px] text-slate-400 truncate">{top.latestSession.dayLabel}</p>}
                   </div>
-                );
-              })}
+                </button>
+                <button
+                  onClick={() => handleSendKudos(top.uid)}
+                  disabled={sending || sent}
+                  className={`shrink-0 flex flex-col items-center justify-center gap-0.5 w-16 h-16 rounded-2xl border-2 font-black transition-all active:scale-90 ${sent ? "opacity-90" : !sending ? "animate-pulse" : ""}`}
+                  style={sent ? { backgroundColor: "rgba(252,76,2,0.25)", borderColor: "#FC4C02", color: "#FDBA74" } : { backgroundColor: "#FC4C02", borderColor: "#FC4C02", color: "#fff" }}
+                >
+                  <span className="text-2xl leading-none">👏</span>
+                  <span className="text-[8.5px] leading-none">{sent ? "¡Listo!" : "Aplaudir"}</span>
+                </button>
+              </div>
+              {/* Pedido: "algo pequeño que haga saber que tenés más amigos...
+                  y que se abra algo para ver a todos, también que puedas ver
+                  su entrenamiento" — sólo aparece si hay más de un
+                  candidato; abre KudosListModal con el resto, cada uno con
+                  el mismo esqueleto de fila (avatar+info a la izquierda,
+                  aplaudir a la derecha) y el detalle de qué entrenó. */}
+              {kudosCandidates.length > KUDOS_STRIP_PREVIEW && (
+                <button onClick={() => setShowAllKudos(true)} className="relative w-full flex items-center justify-center gap-1 mt-3 pt-2.5 border-t border-orange-500/20 text-[9.5px] font-bold text-orange-300/80 hover:text-orange-300 transition">
+                  +{kudosCandidates.length - KUDOS_STRIP_PREVIEW} amigo{kudosCandidates.length - KUDOS_STRIP_PREVIEW === 1 ? "" : "s"} más entrenaron · Ver todos <ChevronRight size={11} />
+                </button>
+              )}
             </div>
-            {/* Pedido: "algo pequeño que haga saber que tenés más amigos...
-                y que se abra algo para ver a todos, también que puedas ver
-                su entrenamiento" — sólo aparece si hay más de los que ya
-                se ven en la tira; abre KudosListModal con el resto Y el
-                detalle del día que entrenó cada uno (acá no entra por
-                espacio, en el modal sí). */}
-            {kudosCandidates.length > KUDOS_STRIP_PREVIEW && (
-              <button onClick={() => setShowAllKudos(true)} className="relative w-full flex items-center justify-center gap-1 mt-2.5 pt-2 border-t border-orange-500/20 text-[9.5px] font-bold text-orange-300/80 hover:text-orange-300 transition">
-                +{kudosCandidates.length - KUDOS_STRIP_PREVIEW} amigo{kudosCandidates.length - KUDOS_STRIP_PREVIEW === 1 ? "" : "s"} más entrenaron · Ver todos <ChevronRight size={11} />
-              </button>
-            )}
-          </div>
-        )}
+          );
+        })()}
         {chaserFriend && (
           <button onClick={() => setViewingUid(chaserFriend.uid)} className="relative overflow-hidden w-full text-left rounded-2xl border mt-3 p-3 active:scale-[0.99] transition" style={{ borderColor: "rgba(244,63,94,0.5)", background: "linear-gradient(135deg, rgba(244,63,94,0.20), rgba(15,23,42,0.55) 70%)" }}>
             <div className="absolute -top-8 -left-8 w-24 h-24 rounded-full blur-2xl pointer-events-none animate-pulse" style={{ backgroundColor: "rgba(244,63,94,0.3)" }} />
