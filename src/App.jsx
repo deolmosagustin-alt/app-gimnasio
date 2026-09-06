@@ -8141,13 +8141,7 @@ function BattleCompareCard({ myAvatarData, myName, mySex, mySessionsThisWeek, my
   const theirScore = theyWinCount * 2 + (theyWinWeek ? 1 : 0);
   const iWinBattle = myScore > theirScore;
   const theyWinBattle = theirScore > myScore;
-  // BUG FIX (encontrado auditando): si ninguno de los dos tiene NINGÚN
-  // músculo con datos (comparison vacío), el fallback de abajo (totalMuscles=1)
-  // hacía que la barra se pintara 0% para mí / 100% para el otro — una
-  // "derrota total" visual para una comparación que en realidad no tiene
-  // ningún dato de ninguno de los dos lados. Se reparte 50/50 en ese caso.
   const totalMuscles = comparison.length || 1;
-  const myBarPct = comparison.length === 0 ? 50 : Math.round(((iWinCount + tieCount / 2) / totalMuscles) * 100);
   // Pedido: "el recuadro de los muñecos... quedó muy simple" — se le suma
   // el rango de cada uno debajo de su nombre (antes no decía nada de eso
   // acá, sólo abajo del todo en el desglose músculo por músculo).
@@ -8155,121 +8149,101 @@ function BattleCompareCard({ myAvatarData, myName, mySex, mySessionsThisWeek, my
   const theirTopRankBattle = useMemo(() => computeTopRankFromRanks(theirRanks), [theirRanks]);
   return (
     <div className="space-y-3">
-      {/* Header de batalla: avatares enfrentados + marcador combinado
-          (semana + músculos) — antes el duelo semanal era una cajita
-          aparte con números sueltos, sin ninguna puesta en escena. */}
-      <div className="relative overflow-hidden rounded-3xl border border-amber-500/25 p-4" style={{ background: "linear-gradient(160deg, #14141f, #08080d)" }}>
-        <div className="absolute -top-14 -left-14 w-44 h-44 rounded-full bg-teal-500/20 blur-3xl pointer-events-none" />
-        <div className="absolute -top-14 -right-14 w-44 h-44 rounded-full bg-fuchsia-500/20 blur-3xl pointer-events-none" />
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-24 rounded-full bg-amber-500/10 blur-2xl pointer-events-none" />
-        <p className="relative text-center text-[10px] font-black uppercase tracking-[0.22em] text-amber-400 mb-3.5 flex items-center justify-center gap-1.5">
+      {/* Rediseño completo del marcador — mismos conceptos (avatares
+          enfrentados, corona al que va ganando, resultado por músculo,
+          duelo semanal, veredicto), presentación nueva: retratos
+          circulares en vez de recuadros, y un ÚNICO marcador de 3 tramos
+          (gana/empate/pierde) en vez de una barra de poder + 3 cajas
+          repitiendo el mismo número dos veces. */}
+      <div className="relative overflow-hidden rounded-3xl border border-amber-500/25 p-4" style={{ background: "radial-gradient(ellipse at 50% -10%, rgba(251,191,36,0.10), transparent 55%), linear-gradient(160deg, #14141f, #08080d)" }}>
+        <p className="relative text-center text-[10px] font-black uppercase tracking-[0.22em] text-amber-400 mb-4 flex items-center justify-center gap-1.5">
           <Swords size={12} /> Batalla de marcas
         </p>
-        <div className="relative flex items-center gap-2">
-          <div className="flex-1 text-center min-w-0">
+        <div className="relative flex items-center justify-center gap-3">
+          <div className="flex-1 text-center min-w-0 max-w-[110px]">
             <div className="relative inline-block">
-              {iWinBattle && <Crown size={18} className="absolute -top-3.5 left-1/2 -translate-x-1/2 text-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.7)]" />}
-              <div className="w-16 h-16 mx-auto rounded-2xl overflow-hidden border-2 shadow-xl" style={{ borderColor: iWinBattle ? "#FBBF24" : "rgba(45,212,191,0.7)", boxShadow: iWinBattle ? "0 0 0 3px rgba(251,191,36,0.35), 0 10px 25px -5px rgba(251,191,36,0.3)" : "0 10px 25px -5px rgba(45,212,191,0.25)" }}>
+              {iWinBattle && <Crown size={16} className="absolute -top-3 left-1/2 -translate-x-1/2 text-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.7)]" />}
+              <div className="w-16 h-16 mx-auto rounded-full overflow-hidden border-[3px]" style={{ borderColor: iWinBattle ? "#FBBF24" : "#2DD4BF", boxShadow: iWinBattle ? "0 0 0 5px rgba(251,191,36,0.2), 0 8px 20px -6px rgba(251,191,36,0.4)" : "0 8px 20px -6px rgba(45,212,191,0.35)" }}>
                 {myAvatarData ? <img src={myAvatarData} className="w-full h-full object-cover" alt="" /> : <div className="w-full h-full flex items-center justify-center text-xl font-black !text-white" style={{ background: "linear-gradient(135deg,#2DD4BF,#0E7490)" }}>{(myName || "?").charAt(0).toUpperCase()}</div>}
               </div>
             </div>
             <p className="text-xs font-black text-teal-300 mt-1.5 truncate">Vos</p>
+            {myTopRankBattle && <p className="text-[9px] font-bold truncate" style={{ color: myTopRankBattle.color }}>{myTopRankBattle.tier} {myTopRankBattle.sub}</p>}
           </div>
-          <div className="shrink-0 w-9 h-9 rounded-full bg-amber-500/15 border border-amber-500/40 flex items-center justify-center">
-            <Zap size={16} className="text-amber-400" />
-          </div>
-          <div className="flex-1 text-center min-w-0">
+          <span className="shrink-0 text-[10px] font-black text-slate-600 uppercase tracking-wide">vs</span>
+          <div className="flex-1 text-center min-w-0 max-w-[110px]">
             <div className="relative inline-block">
-              {theyWinBattle && <Crown size={18} className="absolute -top-3.5 left-1/2 -translate-x-1/2 text-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.7)]" />}
-              <div className="w-16 h-16 mx-auto rounded-2xl overflow-hidden border-2 shadow-xl" style={{ borderColor: theyWinBattle ? "#FBBF24" : "rgba(192,132,252,0.7)", boxShadow: theyWinBattle ? "0 0 0 3px rgba(251,191,36,0.35), 0 10px 25px -5px rgba(251,191,36,0.3)" : "0 10px 25px -5px rgba(192,132,252,0.25)" }}>
+              {theyWinBattle && <Crown size={16} className="absolute -top-3 left-1/2 -translate-x-1/2 text-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.7)]" />}
+              <div className="w-16 h-16 mx-auto rounded-full overflow-hidden border-[3px]" style={{ borderColor: theyWinBattle ? "#FBBF24" : "#C084FC", boxShadow: theyWinBattle ? "0 0 0 5px rgba(251,191,36,0.2), 0 8px 20px -6px rgba(251,191,36,0.4)" : "0 8px 20px -6px rgba(192,132,252,0.35)" }}>
                 {theirAvatarData ? <img src={theirAvatarData} className="w-full h-full object-cover" alt="" /> : <div className="w-full h-full flex items-center justify-center text-xl font-black !text-white" style={{ background: "linear-gradient(135deg,#C084FC,#7C3AED)" }}>{(theirName || "?").charAt(0).toUpperCase()}</div>}
               </div>
             </div>
             <p className="text-xs font-black text-fuchsia-300 mt-1.5 truncate">{theirName || "Ellos"}</p>
+            {theirTopRankBattle && <p className="text-[9px] font-bold truncate" style={{ color: theirTopRankBattle.color }}>{theirTopRankBattle.tier} {theirTopRankBattle.sub}</p>}
           </div>
         </div>
 
-        {/* Barra de poder — mismo lenguaje que una barra de vida de juego
-            de pelea: el ancho de cada lado es proporcional a cuántos
-            músculos ganó cada quien (los empates se reparten mitad y
-            mitad). Antes el resultado sólo se leía en números sueltos. */}
-        <div className="relative mt-3.5">
-          <div className="h-2.5 rounded-full bg-black/40 overflow-hidden flex">
-            <div className="h-full bg-gradient-to-r from-teal-500 to-teal-300 transition-all duration-500" style={{ width: `${myBarPct}%` }} />
-            <div className="h-full bg-gradient-to-r from-fuchsia-300 to-fuchsia-500 transition-all duration-500" style={{ width: `${100 - myBarPct}%` }} />
+        {/* Marcador de 3 tramos: el ancho de cada franja ES el número de
+            músculos ganados/empatados/perdidos — reemplaza la barra de
+            poder + las 3 cajas sueltas de antes (mismo dato, una sola vez). */}
+        <div className="relative mt-4">
+          <div className="h-7 rounded-xl bg-black/40 overflow-hidden flex border border-white/5">
+            {iWinCount > 0 && <div className="h-full flex items-center justify-center text-[11px] font-black text-teal-950 bg-gradient-to-b from-teal-300 to-teal-400 transition-all duration-500" style={{ width: `${(iWinCount / totalMuscles) * 100}%` }}>{iWinCount}</div>}
+            {tieCount > 0 && <div className="h-full flex items-center justify-center text-[11px] font-black text-slate-300 bg-slate-700/70 transition-all duration-500" style={{ width: `${(tieCount / totalMuscles) * 100}%` }}>{tieCount}</div>}
+            {theyWinCount > 0 && <div className="h-full flex items-center justify-center text-[11px] font-black text-fuchsia-950 bg-gradient-to-b from-fuchsia-300 to-fuchsia-400 transition-all duration-500" style={{ width: `${(theyWinCount / totalMuscles) * 100}%` }}>{theyWinCount}</div>}
+            {comparison.length === 0 && <div className="h-full w-full flex items-center justify-center text-[10px] font-bold text-slate-600">Sin marcas para comparar todavía</div>}
+          </div>
+          <div className="flex items-center justify-between mt-1.5 px-0.5">
+            <span className="text-[8.5px] font-bold uppercase tracking-wide text-teal-400">Ganás</span>
+            <span className="text-[8.5px] font-bold uppercase tracking-wide text-slate-500">Empate</span>
+            <span className="text-[8.5px] font-bold uppercase tracking-wide text-fuchsia-400">Pierde</span>
           </div>
         </div>
 
-        <div className="relative grid grid-cols-3 gap-2 mt-3.5">
-          <div className="text-center rounded-xl bg-black/35 border border-teal-500/20 py-2.5">
-            <p className="text-xl font-black text-teal-300 leading-none">{iWinCount}</p>
-            <p className="text-[8px] text-slate-500 uppercase font-bold mt-1 tracking-wide">Ganás</p>
-          </div>
-          <div className="text-center rounded-xl bg-black/35 border border-slate-700/50 py-2.5">
-            <p className="text-xl font-black text-slate-400 leading-none">{tieCount}</p>
-            <p className="text-[8px] text-slate-600 uppercase font-bold mt-1 tracking-wide">Empate</p>
-          </div>
-          <div className="text-center rounded-xl bg-black/35 border border-fuchsia-500/20 py-2.5">
-            <p className="text-xl font-black text-fuchsia-300 leading-none">{theyWinCount}</p>
-            <p className="text-[8px] text-slate-500 uppercase font-bold mt-1 tracking-wide">Pierde</p>
-          </div>
-        </div>
-
-        <div className="relative flex items-center justify-center gap-2 mt-3 pt-3 border-t border-white/5">
-          <Flame size={12} className="text-orange-400 shrink-0" />
-          <p className={`text-[11px] font-bold ${iWinWeek ? "text-teal-300" : theyWinWeek ? "text-fuchsia-300" : "text-slate-500"}`}>
-            {mySessionsThisWeek} - {theirSessionsThisWeek} esta semana
-          </p>
-        </div>
-
-        {/* Veredicto final: quién gana la batalla en general (músculos
-            pesan el doble que la semana, ver myScore/theirScore arriba). */}
-        <div className="relative flex items-center justify-center gap-1.5 mt-2.5 pt-2.5 border-t border-white/5">
-          <Trophy size={13} className={iWinBattle || theyWinBattle ? "text-amber-400" : "text-slate-600"} />
-          <p className="text-[12.5px] font-black" style={{ color: iWinBattle ? "#5eead4" : theyWinBattle ? "#e9b8fc" : "#94a3b8" }}>
-            {iWinBattle ? "¡Vas ganando la batalla!" : theyWinBattle ? `${theirName || "Esta persona"} va ganando la batalla` : "Batalla pareja, ¡a definir!"}
-          </p>
+        {/* Semana + veredicto en una sola franja final, en vez de dos
+            separadores apilados. */}
+        <div className="relative flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1 mt-3.5 pt-3 border-t border-white/5">
+          <span className={`flex items-center gap-1 text-[10.5px] font-bold ${iWinWeek ? "text-teal-300" : theyWinWeek ? "text-fuchsia-300" : "text-slate-500"}`}>
+            <Flame size={11} className="text-orange-400" /> {mySessionsThisWeek}-{theirSessionsThisWeek} esta semana
+          </span>
+          <span className="text-slate-700 text-[10px]">·</span>
+          <span className="flex items-center gap-1 text-[11px] font-black" style={{ color: iWinBattle ? "#5eead4" : theyWinBattle ? "#e9b8fc" : "#94a3b8" }}>
+            <Trophy size={12} className={iWinBattle || theyWinBattle ? "text-amber-400" : "text-slate-600"} />
+            {iWinBattle ? "vas ganando" : theyWinBattle ? `${theirName || "esta persona"} gana` : "batalla pareja"}
+          </span>
         </div>
       </div>
 
-      {/* Muñecos enfrentados, con switch de frente/espalda para los dos a
-          la vez (lo que importa es comparar el mismo grupo muscular).
-          Pedido: "quedó muy simple" — antes era un fondo plano sin
-          ningún acento; ahora tiene el mismo lenguaje de "arena" que el
-          header (glows por bando, separador reforzado) y el rango de
-          cada uno debajo del nombre, no sólo el muñeco pelado. */}
-      <div className="relative overflow-hidden rounded-2xl border border-slate-700/50 p-4" style={{ background: "linear-gradient(90deg, rgba(45,212,191,0.08), rgba(15,23,42,0.5) 45%, rgba(15,23,42,0.5) 55%, rgba(192,132,252,0.08))" }}>
-        <div className="absolute -top-10 -left-10 w-32 h-32 rounded-full bg-teal-500/10 blur-3xl pointer-events-none" />
-        <div className="absolute -top-10 -right-10 w-32 h-32 rounded-full bg-fuchsia-500/10 blur-3xl pointer-events-none" />
+      {/* Arena de muñecos — rediseño: en vez de un fondo partido en dos
+          mitades de color, cada muñeco tiene su propio "pedestal" (un
+          resplandor elíptico en su color en la base, como un reflector),
+          sobre un fondo neutro común con una línea central. */}
+      <div className="relative overflow-hidden rounded-2xl border border-slate-700/50 p-4 bg-slate-950/50">
+        <div className="absolute inset-x-6 top-1/2 -translate-y-1/2 h-px bg-gradient-to-r from-transparent via-slate-700/70 to-transparent pointer-events-none" />
         <div className="relative flex items-center justify-center mb-3">
           <div className="flex bg-slate-950/60 rounded-lg p-0.5 border border-slate-800/60">
             <button onClick={() => setView("front")} className={`px-3 py-1 rounded-md text-[10px] font-bold transition ${view === "front" ? "bg-slate-700 text-white" : "text-slate-500 hover:text-slate-300"}`}>De frente</button>
             <button onClick={() => setView("back")} className={`px-3 py-1 rounded-md text-[10px] font-bold transition ${view === "back" ? "bg-slate-700 text-white" : "text-slate-500 hover:text-slate-300"}`}>De espalda</button>
           </div>
         </div>
-        <div className="relative flex items-start gap-2 justify-center">
-          <div className="flex-1 min-w-0">
+        <div className="relative flex items-center justify-center">
+          <div className="flex-1 min-w-0 relative">
+            <div className="absolute inset-x-6 bottom-1 h-5 rounded-[50%] bg-teal-500/25 blur-md pointer-events-none" />
             <MiniBodyView ranks={myRanks} sex={mySex} label="Vos" accentColor="#2DD4BF" view={view} />
-            {myTopRankBattle && (
-              <p className="text-center text-[10.5px] font-black mt-1.5" style={{ color: myTopRankBattle.color }}>{myTopRankBattle.tier} {myTopRankBattle.sub}</p>
-            )}
           </div>
-          <div className="shrink-0 flex flex-col items-center gap-1 mt-8">
-            <div className="w-7 h-7 rounded-full bg-amber-500/15 border border-amber-500/40 flex items-center justify-center">
-              <Swords size={13} className="text-amber-400" />
+          <div className="shrink-0 flex flex-col items-center gap-1 self-center mx-1">
+            <div className="w-8 h-8 rounded-full bg-amber-500/15 border border-amber-500/40 flex items-center justify-center shadow-lg shadow-amber-500/10">
+              <Swords size={14} className="text-amber-400" />
             </div>
-            <div className="w-px flex-1 bg-gradient-to-b from-slate-700 via-slate-700 to-transparent" />
           </div>
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 relative">
+            <div className="absolute inset-x-6 bottom-1 h-5 rounded-[50%] bg-fuchsia-500/25 blur-md pointer-events-none" />
             <MiniBodyView ranks={theirRanks} sex={theirSex} label={theirName || "Ellos"} accentColor="#C084FC" view={view} />
-            {theirTopRankBattle && (
-              <p className="text-center text-[10.5px] font-black mt-1.5" style={{ color: theirTopRankBattle.color }}>{theirTopRankBattle.tier} {theirTopRankBattle.sub}</p>
-            )}
           </div>
         </div>
       </div>
 
-      <RankComparisonList comparison={comparison} theirName={theirName || "Ellos"} />
+      <RankComparisonList comparison={comparison} />
     </div>
   );
 }
@@ -11931,27 +11905,40 @@ function buildRankComparison(myLogs, mySettings, mySex, myAge, theirLogs, theirS
 // arriba de todo) — esto se enfoca en el desglose músculo por músculo,
 // con una corona junto a quien gana cada uno y los mismos colores
 // teal/fucsia de la batalla, en vez del celeste genérico de antes.
-function RankComparisonList({ comparison, theirName }) {
+// Rediseño: antes cada músculo era dos cajas (Vos | Ellos) separadas por
+// "VS" — mismos conceptos (corona a quien gana, tier de cada uno, nombre
+// del músculo), presentación nueva de "tira y afloja": una barra que crece
+// desde el centro hacia cada lado, proporcional al propio nivel de rango
+// (0 a 17, el techo de RANK_TIERS) — de un vistazo se ve no sólo quién
+// gana sino CUÁNTO, algo que las dos cajas planas no mostraban.
+function RankComparisonList({ comparison }) {
   return (
     <div className="space-y-2">
       <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 px-1 flex items-center gap-1.5"><ListChecks size={11} /> Músculo por músculo</p>
       {comparison.map((r) => {
         const myLvl = r.mine?.levelIdx ?? -1, theirLvl = r.theirs?.levelIdx ?? -1;
         const iWin = myLvl > theirLvl, theyWin = theirLvl > myLvl;
+        const maxLevelIdx = RANK_TIERS.length - 1;
+        const myPct = myLvl >= 0 ? Math.max(10, Math.round((myLvl / maxLevelIdx) * 100)) : 0;
+        const theirPct = theirLvl >= 0 ? Math.max(10, Math.round((theirLvl / maxLevelIdx) * 100)) : 0;
         return (
           <div key={r.key} className="rounded-xl border border-slate-800/50 bg-slate-900/40 px-3 py-2.5">
-            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wide mb-1.5 text-center">{r.label}</p>
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1 text-center rounded-lg py-1.5" style={{ backgroundColor: r.mine ? tint("#2DD4BF", iWin ? "22" : "0a") : "transparent", boxShadow: iWin ? "inset 0 0 0 1px rgba(45,212,191,0.55)" : "none" }}>
-                {iWin && <Crown size={11} className="absolute -top-2 left-1/2 -translate-x-1/2 text-teal-300" />}
-                <p className="text-[9px] text-slate-600">Vos</p>
-                <p className="text-xs font-black" style={{ color: r.mine?.color || "#475569" }}>{r.mine ? `${r.mine.tier} ${r.mine.sub}` : "Sin marca"}</p>
+            <div className="flex items-center justify-between gap-2 mb-1.5">
+              <span className={`text-[10.5px] font-black flex items-center gap-1 min-w-0 ${iWin ? "text-teal-300" : "text-slate-600"}`}>
+                {iWin && <Crown size={10} className="shrink-0" />}<span className="truncate">{r.mine ? `${r.mine.tier} ${r.mine.sub}` : "—"}</span>
+              </span>
+              <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wide shrink-0 px-1 truncate max-w-[90px]">{r.label}</span>
+              <span className={`text-[10.5px] font-black flex items-center gap-1 min-w-0 justify-end ${theyWin ? "text-fuchsia-300" : "text-slate-600"}`}>
+                <span className="truncate">{r.theirs ? `${r.theirs.tier} ${r.theirs.sub}` : "—"}</span>{theyWin && <Crown size={10} className="shrink-0" />}
+              </span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="flex-1 flex justify-end h-1.5 rounded-full bg-black/30 overflow-hidden">
+                {myLvl >= 0 && <div className="h-full rounded-full bg-teal-400" style={{ width: `${myPct}%` }} />}
               </div>
-              <span className="text-[9px] text-slate-700 font-black shrink-0">VS</span>
-              <div className="relative flex-1 text-center rounded-lg py-1.5" style={{ backgroundColor: r.theirs ? tint("#C084FC", theyWin ? "22" : "0a") : "transparent", boxShadow: theyWin ? "inset 0 0 0 1px rgba(192,132,252,0.55)" : "none" }}>
-                {theyWin && <Crown size={11} className="absolute -top-2 left-1/2 -translate-x-1/2 text-fuchsia-300" />}
-                <p className="text-[9px] text-slate-600 truncate px-1">{theirName}</p>
-                <p className="text-xs font-black" style={{ color: r.theirs?.color || "#475569" }}>{r.theirs ? `${r.theirs.tier} ${r.theirs.sub}` : "Sin marca"}</p>
+              <div className="w-1 h-1 rounded-full bg-slate-700 shrink-0" />
+              <div className="flex-1 h-1.5 rounded-full bg-black/30 overflow-hidden">
+                {theirLvl >= 0 && <div className="h-full rounded-full bg-fuchsia-400" style={{ width: `${theirPct}%` }} />}
               </div>
             </div>
           </div>
@@ -12106,7 +12093,7 @@ function LeaderboardSection({ uid, profile, myTopRank, friendAccepted, basics, a
 // (mismo criterio que el calendario de abajo, pero de un vistazo sin
 // tener que abrir/navegar ningún mes). Vive arriba de FriendSessionHistory
 // a propósito: es el resumen rápido, el calendario completo es el detalle.
-function FriendConsistencyStrip({ trainingSessions = [], activeRoutineSnapshot }) {
+function FriendConsistencyStrip({ trainingSessions = [], activeRoutineSnapshot, embedded = false }) {
   const model = useMemo(() => (activeRoutineSnapshot ? buildRoutineModel(activeRoutineSnapshot) : null), [activeRoutineSnapshot]);
   const byDate = useMemo(() => { const m = {}; trainingSessions.forEach((s) => { m[s.date] = s; }); return m; }, [trainingSessions]);
   const recentDays = useMemo(() => {
@@ -12121,10 +12108,11 @@ function FriendConsistencyStrip({ trainingSessions = [], activeRoutineSnapshot }
   }, [byDate]);
   const trainedCount = recentDays.filter((d) => d.session).length;
   if (!trainingSessions.length) return null;
-  return (
-    <div className="relative overflow-hidden rounded-2xl border border-blue-500/20 p-3.5" style={{ background: "linear-gradient(135deg, rgba(59,130,246,0.10), transparent 70%)" }}>
-      <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full bg-blue-500/15 blur-2xl pointer-events-none" />
-      <p className="relative text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2.5 flex items-center gap-1.5"><Calendar size={11} className="text-blue-400" /> Constancia (últimos 14 días)</p>
+  // embedded: sin su propia tarjeta/glow/título — para meterlo DENTRO de
+  // otra tarjeta (ver "Entrenamiento" en FriendProfileView) en vez de que
+  // la constancia viva siempre en su propio recuadro azul aparte.
+  const grid = (
+    <>
       <div className="relative grid grid-cols-7 gap-1.5">
         {recentDays.map(({ date, session }) => {
           const dayDef = session ? model?.days?.[session.dayKey] : null;
@@ -12140,6 +12128,14 @@ function FriendConsistencyStrip({ trainingSessions = [], activeRoutineSnapshot }
         })}
       </div>
       <p className="relative text-[10.5px] text-slate-500 text-center mt-2.5">{trainedCount} de 14 días entrenados</p>
+    </>
+  );
+  if (embedded) return grid;
+  return (
+    <div className="relative overflow-hidden rounded-2xl border border-blue-500/20 p-3.5" style={{ background: "linear-gradient(135deg, rgba(59,130,246,0.10), transparent 70%)" }}>
+      <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full bg-blue-500/15 blur-2xl pointer-events-none" />
+      <p className="relative text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2.5 flex items-center gap-1.5"><Calendar size={11} className="text-blue-400" /> Constancia (últimos 14 días)</p>
+      {grid}
     </div>
   );
 }
@@ -12624,28 +12620,45 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
     <div className="space-y-4">
       <button onClick={onBack} className="flex items-center gap-1.5 text-slate-400 hover:text-white transition text-sm font-semibold"><ChevronLeft size={16} /> Volver</button>
 
-      {/* Pedido: "le falta bastante diseño a la visualización de perfil de
-          mis amigos" — antes era un recuadro chato (borde gris, fondo
-          plano) con un avatar chico; ahora tiene el mismo lenguaje de
-          "hero" que el resto de la app (glow, gradiente, borde con color,
-          avatar más grande con marco propio). */}
-      <div className="relative overflow-hidden rounded-3xl border border-purple-500/25 p-5 text-center" style={{ background: "linear-gradient(165deg, rgba(168,85,247,0.14), rgba(10,10,18,0.5))" }}>
-        <div className="absolute -top-12 -right-10 w-36 h-36 rounded-full bg-purple-500/20 blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-10 -left-10 w-28 h-28 rounded-full bg-fuchsia-500/10 blur-3xl pointer-events-none" />
-        <div className="relative w-20 h-20 mx-auto mb-3 rounded-3xl overflow-hidden border-2 border-purple-400/50 shadow-xl shadow-purple-500/25">
-          {basic?.avatarData ? <img src={basic.avatarData} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-2xl font-black !text-white" style={{ background: "linear-gradient(135deg,#A855F7,#7C3AED)" }}>{(basic?.name || "?").charAt(0).toUpperCase()}</div>}
+      {/* Rediseño completo del perfil de amigo — header unificado: antes
+          eran dos tarjetas separadas (hero centrado con avatar/nombre/rango
+          apilados + una grilla de 3 cajas repitiendo el mismo borde/fondo
+          más abajo). Ahora es UN solo bloque: identidad en fila (avatar +
+          nombre + rango a la derecha, en vez de todo apilado y centrado) y
+          el pulso semanal (racha/ciclo/entrenados) integrado abajo con
+          separadores finos, no cajas repetidas. */}
+      <div className="relative overflow-hidden rounded-3xl border border-purple-500/25 p-5" style={{ background: "linear-gradient(165deg, rgba(168,85,247,0.16), rgba(10,10,18,0.55))" }}>
+        <div className="absolute -top-14 -right-12 w-40 h-40 rounded-full bg-purple-500/20 blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-12 -left-12 w-32 h-32 rounded-full bg-fuchsia-500/10 blur-3xl pointer-events-none" />
+        <div className="relative flex items-center gap-3.5">
+          <div className="w-16 h-16 rounded-2xl overflow-hidden border-2 border-purple-400/50 shadow-xl shadow-purple-500/25 shrink-0">
+            {basic?.avatarData ? <img src={basic.avatarData} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-2xl font-black !text-white" style={{ background: "linear-gradient(135deg,#A855F7,#7C3AED)" }}>{(basic?.name || "?").charAt(0).toUpperCase()}</div>}
+          </div>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-lg font-black text-white truncate">{basic?.name || "Usuario"}</h2>
+            <p className="text-xs text-purple-300/70 flex items-center gap-1 mt-0.5"><AtSign size={10} />{basic?.username}</p>
+          </div>
+          {theirTopRank && (
+            <div className="shrink-0 flex flex-col items-center gap-0.5">
+              <RankBadgeIcon tier={theirTopRank.tier} sub={null} color={theirTopRank.color} size={38} />
+              <span className="text-[9px] font-black uppercase tracking-wide whitespace-nowrap" style={{ color: theirTopRank.color }}>{theirTopRank.tier} {theirTopRank.sub}</span>
+            </div>
+          )}
         </div>
-        <h2 className="relative text-xl font-black text-white">{basic?.name || "Usuario"}</h2>
-        <p className="relative text-xs text-purple-300/70 flex items-center justify-center gap-1 mt-0.5"><AtSign size={10} />{basic?.username}</p>
-        {/* Pedido: "agregale más cosas e info" — el rango promedio no
-            aparecía en ningún lado de este perfil antes (sólo el
-            detallado por músculo, más abajo, y sólo si tocabas el
-            muñeco). Ahora se ve de entrada, igual que en tu propio hero
-            de Social. */}
-        {theirTopRank && (
-          <div className="relative inline-flex items-center gap-1.5 mt-2.5 px-3 py-1 rounded-full" style={{ backgroundColor: tint(theirTopRank.color, "18"), border: `1px solid ${tint(theirTopRank.color, "40")}` }}>
-            <Trophy size={11} style={{ color: theirTopRank.color }} />
-            <span className="text-[11px] font-black" style={{ color: theirTopRank.color }}>{theirTopRank.tier} {theirTopRank.sub}</span>
+        {state === "ok" && !openComparing && (
+          <div className="relative grid grid-cols-3 mt-4 pt-3.5 border-t border-white/10">
+            <div className="text-center">
+              <p className="text-lg font-black text-orange-400 leading-none">{streak}🔥</p>
+              <p className="text-[9px] text-slate-500 mt-1 uppercase tracking-wide">Racha</p>
+            </div>
+            <div className="text-center border-x border-white/10">
+              <p className="text-lg font-black text-purple-300 leading-none">{weekInfo ? `S${weekInfo.weekInCycle}` : "—"}</p>
+              <p className="text-[9px] text-slate-500 mt-1 uppercase tracking-wide">{weekInfo?.isDeload ? "Descarga" : "Su ciclo"}</p>
+            </div>
+            <div className="text-center">
+              <p className="text-lg font-black text-sky-300 leading-none">{totalSessions}</p>
+              <p className="text-[9px] text-slate-500 mt-1 uppercase tracking-wide">Entrenados</p>
+            </div>
           </div>
         )}
       </div>
@@ -12668,71 +12681,46 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
               incluye el duelo semanal fusionado en su propio marcador,
               así que mostrarlo dos veces sería redundante. */}
           {!openComparing && (
-            <>
-              {/* Pedido: "agregale más cosas e info" — se suma una
-                  tercera caja (total de sesiones históricas, dato que
-                  antes no aparecía en ningún lado de este perfil) y cada
-                  una toma el color de su propio tema (naranja=racha,
-                  violeta=ciclo, celeste=histórico) en vez de las 3 en el
-                  mismo gris parejo de antes. */}
-              <div className="grid grid-cols-3 gap-2">
-                <div className="rounded-xl border border-orange-500/20 bg-orange-500/5 px-2.5 py-3 text-center">
-                  <p className="text-xl font-black text-orange-400">{streak}🔥</p>
-                  <p className="text-[9.5px] text-slate-500 mt-0.5">Racha</p>
-                </div>
-                <div className="rounded-xl border border-purple-500/20 bg-purple-500/5 px-2.5 py-3 text-center">
-                  <p className="text-xl font-black text-purple-400">{weekInfo ? `S${weekInfo.weekInCycle}` : "—"}</p>
-                  <p className="text-[9.5px] text-slate-500 mt-0.5">{weekInfo?.isDeload ? "Descarga" : "Su ciclo"}</p>
-                </div>
-                <div className="rounded-xl border border-sky-500/20 bg-sky-500/5 px-2.5 py-3 text-center">
-                  <p className="text-xl font-black text-sky-400">{totalSessions}</p>
-                  <p className="text-[9.5px] text-slate-500 mt-0.5">Entrenados</p>
-                </div>
-              </div>
-
-              {/* Su mejor marca — nuevo, no existía en ningún lado antes:
-                  el músculo con el rango más alto, con la marca real que
-                  lo sostiene (kg×reps y en qué ejercicio). Le da al
-                  perfil algo concreto para leer de entrada, en vez de
-                  tener que tocar el muñeco músculo por músculo para
-                  encontrar su punto fuerte. */}
+            <div className={theirBestMuscle ? "grid grid-cols-2 gap-2.5" : ""}>
+              {/* Su mejor marca — el músculo con el rango más alto, con la
+                  marca real que lo sostiene. Antes vivía en una tarjeta
+                  llena de ancho propia; ahora comparte fila con el duelo
+                  semanal (los dos son "datos rápidos", no hace falta que
+                  cada uno se lleve una tarjeta entera). */}
               {theirBestMuscle && (
-                <div className="relative overflow-hidden rounded-2xl border p-3.5" style={{ borderColor: tint(theirBestMuscle.color, "35"), background: `linear-gradient(135deg, ${tint(theirBestMuscle.color, "14")}, transparent 70%)` }}>
-                  <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full blur-2xl opacity-25 pointer-events-none" style={{ backgroundColor: theirBestMuscle.color }} />
-                  <p className="relative text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1.5 flex items-center gap-1.5"><Star size={11} style={{ color: theirBestMuscle.color }} /> Su mejor marca</p>
-                  <div className="relative flex items-center gap-3">
-                    <RankBadgeIcon tier={theirBestMuscle.tier} sub={null} color={theirBestMuscle.color} size={44} />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-lg font-black text-white leading-none tabular-nums">{theirBestMuscle.bestReps}<span className="text-slate-500 text-sm font-bold mx-0.5">×</span>{theirBestMuscle.bestKg}<span className="text-slate-400 text-xs font-bold ml-0.5">kg</span></p>
-                      <p className="text-[10.5px] text-slate-500 mt-1 truncate">{theirBestMuscle.bestExerciseName ? <>en <span className="text-slate-300 font-bold">{theirBestMuscle.bestExerciseName}</span></> : theirBestMuscle.label}</p>
+                <div className="relative overflow-hidden rounded-2xl border p-3" style={{ borderColor: tint(theirBestMuscle.color, "35"), background: `linear-gradient(160deg, ${tint(theirBestMuscle.color, "16")}, transparent 75%)` }}>
+                  <div className="absolute -top-6 -right-6 w-16 h-16 rounded-full blur-2xl opacity-25 pointer-events-none" style={{ backgroundColor: theirBestMuscle.color }} />
+                  <p className="relative text-[9px] font-black uppercase tracking-widest text-slate-500 mb-1.5 flex items-center gap-1"><Star size={10} style={{ color: theirBestMuscle.color }} /> Mejor marca</p>
+                  <div className="relative flex items-center gap-2">
+                    <RankBadgeIcon tier={theirBestMuscle.tier} sub={null} color={theirBestMuscle.color} size={34} />
+                    <div className="min-w-0">
+                      <p className="text-base font-black text-white leading-none tabular-nums">{theirBestMuscle.bestReps}<span className="text-slate-500 text-xs font-bold mx-0.5">×</span>{theirBestMuscle.bestKg}<span className="text-slate-400 text-[10px] font-bold ml-0.5">kg</span></p>
+                      <p className="text-[9.5px] text-slate-500 mt-0.5 truncate">{theirBestMuscle.bestExerciseName || theirBestMuscle.label}</p>
                     </div>
                   </div>
                 </div>
               )}
 
               {/* Duelo semanal — quién entrenó más veces ESTA semana, vos o
-                  esta persona. Corto y competitivo a propósito, para que abrir
-                  un perfil no sea sólo mirar números históricos. */}
-              <div className="relative overflow-hidden rounded-2xl border border-slate-700/50 p-3.5" style={{ background: "linear-gradient(160deg, rgba(30,41,59,0.6), rgba(15,23,42,0.4))" }}>
-                <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full bg-teal-500/10 blur-3xl pointer-events-none" />
-                <div className="absolute -bottom-10 -left-10 w-24 h-24 rounded-full bg-fuchsia-500/10 blur-3xl pointer-events-none" />
-                <p className="relative text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 flex items-center gap-1.5"><Swords size={11} /> Duelo esta semana</p>
-                <div className="relative flex items-center gap-3">
-                  <div className="flex-1 text-center">
-                    <p className={`text-2xl font-black leading-none ${mySessionsThisWeek > theirSessionsThisWeek ? "text-teal-300" : "text-white"}`}>{mySessionsThisWeek}</p>
-                    <p className="text-[10px] text-slate-500 mt-1">Vos</p>
+                  esta persona. Corto y competitivo a propósito. */}
+              <div className="relative overflow-hidden rounded-2xl border border-slate-700/50 p-3" style={{ background: "linear-gradient(160deg, rgba(30,41,59,0.6), rgba(15,23,42,0.4))" }}>
+                <p className="relative text-[9px] font-black uppercase tracking-widest text-slate-500 mb-1.5 flex items-center gap-1"><Swords size={10} /> Esta semana</p>
+                <div className="relative flex items-center justify-around gap-1">
+                  <div className="text-center">
+                    <p className={`text-xl font-black leading-none ${mySessionsThisWeek > theirSessionsThisWeek ? "text-teal-300" : "text-white"}`}>{mySessionsThisWeek}</p>
+                    <p className="text-[8.5px] text-slate-500 mt-1">Vos</p>
                   </div>
-                  <span className="text-[10px] text-slate-600 font-black shrink-0">VS</span>
-                  <div className="flex-1 text-center">
-                    <p className={`text-2xl font-black leading-none ${theirSessionsThisWeek > mySessionsThisWeek ? "text-fuchsia-300" : "text-white"}`}>{theirSessionsThisWeek}</p>
-                    <p className="text-[10px] text-slate-500 mt-1 truncate">{basic?.name || "Ellos"}</p>
+                  <span className="text-[9px] text-slate-700 font-black shrink-0">VS</span>
+                  <div className="text-center min-w-0">
+                    <p className={`text-xl font-black leading-none ${theirSessionsThisWeek > mySessionsThisWeek ? "text-fuchsia-300" : "text-white"}`}>{theirSessionsThisWeek}</p>
+                    <p className="text-[8.5px] text-slate-500 mt-1 truncate max-w-[64px]">{basic?.name || "Ellos"}</p>
                   </div>
                 </div>
-                <p className="relative text-[10px] text-slate-500 text-center mt-2">
-                  {mySessionsThisWeek === theirSessionsThisWeek ? "Van empatados esta semana" : mySessionsThisWeek > theirSessionsThisWeek ? "Vas ganando esta semana 💪" : `${basic?.name || "Esta persona"} va ganando esta semana`}
+                <p className="relative text-[9px] text-slate-500 text-center mt-1.5 truncate">
+                  {mySessionsThisWeek === theirSessionsThisWeek ? "Empatados" : mySessionsThisWeek > theirSessionsThisWeek ? "Vas ganando 💪" : `${basic?.name || "Esta persona"} gana`}
                 </p>
               </div>
-            </>
+            </div>
           )}
 
           {openComparing ? (
@@ -12758,11 +12746,11 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
                   tenemos en el cliente (viewerProfile, tu propio perfil)
                   — no hace falta pedirle nada nuevo a Firestore para
                   armar el picadito. */}
-              <div>
-                <div className="flex items-center justify-between mb-2 px-1">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-600">{comparing ? `Vos vs ${basic?.name || "esta persona"}` : "Rango por músculo"}</p>
-                  <button onClick={() => setComparing((c) => !c)} className={`flex items-center gap-1 text-[10.5px] font-bold px-2.5 py-1 rounded-full transition ${comparing ? "bg-teal-500/20 text-teal-400" : "text-slate-500 hover:text-slate-300"}`}>
-                    <Swords size={11} /> {comparing ? "Ocultar" : "Comparar conmigo"}
+              <div className="relative overflow-hidden rounded-2xl border border-purple-500/20 p-3.5" style={{ background: "linear-gradient(160deg, rgba(168,85,247,0.08), transparent 70%)" }}>
+                <div className="relative flex items-center justify-between mb-2.5 gap-2">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 flex items-center gap-1.5 min-w-0 truncate"><Dumbbell size={11} className="text-purple-400 shrink-0" />{comparing ? `Vos vs ${basic?.name || "esta persona"}` : "Rango por músculo"}</p>
+                  <button onClick={() => setComparing((c) => !c)} className={`shrink-0 flex items-center gap-1 text-[10.5px] font-bold px-2.5 py-1 rounded-full transition ${comparing ? "bg-teal-500/20 text-teal-400" : "bg-slate-800/60 text-slate-400 hover:text-slate-200"}`}>
+                    <Swords size={11} /> {comparing ? "Ocultar" : "Comparar"}
                   </button>
                 </div>
                 {comparing ? (
@@ -12839,14 +12827,24 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
                   <div className="relative">
                     <RoutinePreview routineDef={full.activeRoutineSnapshot} />
                   </div>
+                  {/* Rediseño: la constancia (últimos 14 días) ahora vive
+                      DENTRO de la misma tarjeta de la rutina activa (son el
+                      mismo tema — "cómo viene entrenando") en vez de una
+                      segunda tarjeta azul aparte inmediatamente debajo. */}
+                  {full.trainingSessions?.length > 0 && (
+                    <div className="relative mt-3.5 pt-3 border-t border-white/10">
+                      <p className="text-[9.5px] font-black uppercase tracking-widest text-slate-500 mb-2 flex items-center gap-1.5"><Calendar size={10} className="text-blue-400" /> Constancia (14 días)</p>
+                      <FriendConsistencyStrip trainingSessions={full.trainingSessions} activeRoutineSnapshot={full.activeRoutineSnapshot} embedded />
+                    </div>
+                  )}
                 </div>
               )}
-
-              {/* Pedido: "a los días que viene entrenando" — nueva tira de
-                  constancia (últimos 14 días, coloreado con el día que
-                  corresponda), un vistazo rápido de qué tan regular viene
-                  sin tener que abrir el calendario completo de abajo. */}
-              <FriendConsistencyStrip trainingSessions={full.trainingSessions} activeRoutineSnapshot={full.activeRoutineSnapshot} />
+              {/* Sin rutina activa pero con historial: la constancia queda
+                  en su propia tarjeta (no hay "rutina activa" con la que
+                  fusionarla). */}
+              {!full.activeRoutineSnapshot && (
+                <FriendConsistencyStrip trainingSessions={full.trainingSessions} activeRoutineSnapshot={full.activeRoutineSnapshot} />
+              )}
 
               <div>
                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 px-1 mb-2">Historial de sesiones</p>
@@ -13041,16 +13039,6 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
   const [templateSentNote, setTemplateSentNote] = useState(false);
   const trainerRoutineTemplates = profile?.trainerRoutineTemplates || {};
   const myTopRank = useMemo(() => computeTopRank(profile), [profile]);
-  // Pedido: "posición en el ranking" en la tarjeta de perfil — mismo orden
-  // que ya usa LeaderboardSection (buildFriendsRanking), sólo se busca el
-  // índice de "Vos" adentro. null si no hay rango propio o sos el único.
-  const myFriendRankPosition = useMemo(() => {
-    if (!myTopRank) return null;
-    const ranking = buildFriendsRanking(uid, profile, myTopRank, friendAccepted, basics);
-    if (ranking.length <= 1) return null;
-    const idx = ranking.findIndex((e) => e.isMe);
-    return idx >= 0 ? { position: idx + 1, total: ranking.length } : null;
-  }, [uid, profile, myTopRank, friendAccepted, basics]);
   // Antes no había NINGUNA forma de sacar a un amigo ya aceptado — el único
   // botón de "Cancelar" que existía era para una solicitud saliente
   // todavía pendiente. Two-tap (mismo criterio que borrar una conversación
@@ -13233,8 +13221,22 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
             </button>
           )}
         </div>
+        {/* Pedido: sacar "Tu ranking" (posición entre amigos), dejar sólo
+            la barra de progreso al siguiente rango, y subirla arriba de
+            "Compartir mi perfil". */}
+        {myTopRank?.progress && (
+          <div className="relative mt-3.5 pt-3 border-t border-white/10">
+            <div className="flex items-center justify-between mb-1 gap-1">
+              <span className="text-[8.5px] text-slate-500 uppercase tracking-wide truncate">Hacia {myTopRank.progress.nextTier} {myTopRank.progress.nextSub}</span>
+              <span className="text-[9px] font-bold shrink-0" style={{ color: myTopRank.progress.nextColor }}>{Math.round(myTopRank.progress.pct * 100)}%</span>
+            </div>
+            <div className="h-1.5 rounded-full bg-black/30 overflow-hidden">
+              <div className="h-full rounded-full transition-all" style={{ width: `${myTopRank.progress.pct * 100}%`, backgroundColor: myTopRank.progress.nextColor }} />
+            </div>
+          </div>
+        )}
         {profile?.username ? (
-          <button onClick={() => setShowShareProfile(true)} className="relative w-full flex items-center justify-center gap-1.5 mt-3.5 pt-3 border-t border-white/10 text-[10px] font-bold text-purple-300/75 hover:text-purple-300 transition">
+          <button onClick={() => setShowShareProfile(true)} className={`relative w-full flex items-center justify-center gap-1.5 pt-3 text-[10px] font-bold text-purple-300/75 hover:text-purple-300 transition ${myTopRank?.progress ? "mt-3" : "mt-3.5 border-t border-white/10"}`}>
             <QrCode size={11} /> Compartir mi perfil <ChevronRight size={11} />
           </button>
         ) : uid ? (
@@ -13243,38 +13245,12 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
           // oración en la sección Buscar, ahora el prompt para elegirlo
           // vive acá mismo, arriba de todo, con el input de verdad en vez
           // de mandarte a buscarlo en Perfil.
-          <div className="relative mt-3.5 pt-3 border-t border-white/10">
+          <div className={`relative pt-3 ${myTopRank?.progress ? "mt-3" : "mt-3.5 border-t border-white/10"}`}>
             <p className="text-[11px] text-slate-400 mb-2">Elegí tu @usuario para que te puedan buscar y agregar.</p>
             <UsernameSection uid={uid} currentUsername={null} onSaved={(u) => onUpdateProfile({ username: u })} />
           </div>
         ) : (
-          <p className="relative text-[11px] text-slate-400 mt-3.5 pt-3 border-t border-white/10">Vinculá tu cuenta de Google en Perfil para poder elegir un @usuario y usar lo social.</p>
-        )}
-        {/* Pedido: "ahí abajo le podríamos meter algo más" — dos ideas que
-            el usuario eligió: en qué posición estás de tu propio ranking
-            de amigos, y qué tan cerca estás de subir de rango (barra con
-            el % que falta para el próximo tier completo). */}
-        {myTopRank && (myFriendRankPosition || myTopRank.progress) && (
-          <div className="relative flex items-stretch gap-3 mt-3 pt-3 border-t border-white/10">
-            {myFriendRankPosition && (
-              <div className="text-center shrink-0">
-                <p className="text-sm font-black text-white leading-none">#{myFriendRankPosition.position}<span className="text-[10px] text-slate-500 font-normal">/{myFriendRankPosition.total}</span></p>
-                <p className="text-[8.5px] text-slate-500 mt-1 uppercase tracking-wide whitespace-nowrap">Tu ranking</p>
-              </div>
-            )}
-            {myFriendRankPosition && myTopRank.progress && <div className="w-px bg-white/10 shrink-0" />}
-            {myTopRank.progress && (
-              <div className="flex-1 min-w-0 flex flex-col justify-center">
-                <div className="flex items-center justify-between mb-1 gap-1">
-                  <span className="text-[8.5px] text-slate-500 uppercase tracking-wide truncate">Hacia {myTopRank.progress.nextTier} {myTopRank.progress.nextSub}</span>
-                  <span className="text-[9px] font-bold shrink-0" style={{ color: myTopRank.progress.nextColor }}>{Math.round(myTopRank.progress.pct * 100)}%</span>
-                </div>
-                <div className="h-1.5 rounded-full bg-black/30 overflow-hidden">
-                  <div className="h-full rounded-full transition-all" style={{ width: `${myTopRank.progress.pct * 100}%`, backgroundColor: myTopRank.progress.nextColor }} />
-                </div>
-              </div>
-            )}
-          </div>
+          <p className={`relative text-[11px] text-slate-400 pt-3 ${myTopRank?.progress ? "mt-3" : "mt-3.5 border-t border-white/10"}`}>Vinculá tu cuenta de Google en Perfil para poder elegir un @usuario y usar lo social.</p>
         )}
       </div>
 
