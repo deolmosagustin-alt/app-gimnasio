@@ -11301,30 +11301,39 @@ function PublicUserCard({ uid, basic, streak = null, onClick = null, children })
           {(basic?.name || basic?.username || "?").charAt(0).toUpperCase()}
         </div>
       )}
+      {/* Rediseño (pedido: "se ve el nombre, rango, racha, @ y activo
+          hace..., tratemos de hacer que se vea mejor") — antes el nombre,
+          la insignia de rango Y la racha vivían apretados en UNA sola
+          línea con `truncate` (que en un contenedor flex con varios hijos
+          no trunca bien el texto, sólo lo aprieta) — se leía como un
+          amontonamiento. Ahora el nombre tiene su propia línea limpia, la
+          insignia de rango pasa a un costado bien visible (mismo lugar
+          que ya usa LeaderboardRow), y @usuario + racha comparten una
+          segunda línea más chica en vez de competir con el nombre. */}
       <div className="flex-1 min-w-0 text-left">
-        <p className="text-sm font-bold text-white truncate flex items-center gap-1.5">
-          {basic?.name || "Usuario"}
-          {/* Insignia de rango promedio — de un vistazo, sin entrar al
-              perfil ni leer texto. Viene precalculada en public/basic (ver
-              computeTopRank en App.jsx: promedio de los 12 grupos
-              musculares, no el mejor). Mismo ícono que ya usa Progreso,
-              para que se sienta la misma app en vez de un pill de texto
-              aparte. */}
-          {basic?.topRank && <RankBadgeIcon tier={basic.topRank.tier} sub={null} color={basic.topRank.color} size={22} />}
+        <p className="text-sm font-bold text-white truncate">{basic?.name || "Usuario"}</p>
+        <div className="flex items-center gap-2 mt-0.5 min-w-0">
+          <span className="text-[11px] text-slate-500 flex items-center gap-0.5 min-w-0 truncate"><AtSign size={9} className="shrink-0" />{basic?.username || uid.slice(0, 8)}</span>
           {typeof streak === "number" && streak > 0 && (
-            <span className="inline-flex items-center gap-0.5 text-[9px] font-black px-1.5 py-0.5 rounded-md shrink-0 bg-orange-500/15 text-orange-400">
-              <Flame size={9} className="shrink-0" />{streak}
+            <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-orange-400 shrink-0">
+              <Flame size={10} className="shrink-0" />{streak}
             </span>
           )}
-        </p>
-        <p className="text-[11px] text-slate-500 flex items-center gap-0.5"><AtSign size={9} />{basic?.username || uid.slice(0, 8)}</p>
+        </div>
         {lastActive && (
-          <p className="text-[10px] text-slate-600 flex items-center gap-1 mt-0.5">
+          <p className="text-[10px] text-slate-600 flex items-center gap-1 mt-1">
             <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${lastActive.recent ? "bg-emerald-500" : "bg-slate-700"}`} />
             {lastActive.label}
           </p>
         )}
       </div>
+      {/* Insignia de rango promedio — de un vistazo, sin entrar al perfil
+          ni leer texto. Viene precalculada en public/basic (ver
+          computeTopRank en App.jsx). Ahora vive a un costado bien
+          visible, no apretada contra el nombre. */}
+      {basic?.topRank && (
+        <div className="shrink-0"><RankBadgeIcon tier={basic.topRank.tier} sub={null} color={basic.topRank.color} size={30} /></div>
+      )}
     </>
   );
   return (
@@ -13235,11 +13244,13 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
             </div>
           </div>
         )}
-        {profile?.username ? (
-          <button onClick={() => setShowShareProfile(true)} className={`relative w-full flex items-center justify-center gap-1.5 pt-3 text-[10px] font-bold text-purple-300/75 hover:text-purple-300 transition ${myTopRank?.progress ? "mt-3" : "mt-3.5 border-t border-white/10"}`}>
-            <QrCode size={11} /> Compartir mi perfil <ChevronRight size={11} />
-          </button>
-        ) : uid ? (
+        {/* Pedido: sacar el botón "Compartir mi perfil" de acá — ya
+            aparece en Buscar (tarjeta dedicada) y en Amigos (estado
+            vacío), así que acá era una tercera repetición del mismo
+            atajo. El prompt para elegir @usuario (si todavía no lo
+            tenés) se queda, porque no es "compartir" sino un paso previo
+            necesario para poder usar lo social. */}
+        {!profile?.username && (uid ? (
           // Pedido: "si no tenés tu alias que te pida que pongas, en la
           // sección social que aparezca" — antes esto era sólo una
           // oración en la sección Buscar, ahora el prompt para elegirlo
@@ -13251,7 +13262,7 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
           </div>
         ) : (
           <p className={`relative text-[11px] text-slate-400 pt-3 ${myTopRank?.progress ? "mt-3" : "mt-3.5 border-t border-white/10"}`}>Vinculá tu cuenta de Google en Perfil para poder elegir un @usuario y usar lo social.</p>
-        )}
+        ))}
       </div>
 
       {/* Pedido: "un recuadro entre el superior de Social y los logros,
