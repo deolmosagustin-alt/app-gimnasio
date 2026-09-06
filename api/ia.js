@@ -45,12 +45,22 @@ let preferredModel = null;
 let discoveredModelsCache = null; // { models: string[], fetchedAt: number }
 const MODEL_LIST_CACHE_MS = 30 * 60 * 1000;
 
-async function discoverModels(apiKey) {
+// BUG FIX (encontrado auditando): a diferencia de callModel(), este fetch
+// no tenía NINGÚN timeout — si el endpoint de modelos de Google se cuelga
+// (justo el escenario más probable cuando esto se termina llamando: una
+// caída/degradación amplia de Gemini), podía consumir todo lo que quedaba
+// del presupuesto de tiempo de callGemini e incluso exceder el límite duro
+// de Vercel (maxDuration=60s), produciendo exactamente el corte de
+// conexión crudo que todo el sistema de presupuesto de tiempo fue pensado
+// para evitar.
+async function discoverModels(apiKey, timeoutMs = 8000) {
   if (discoveredModelsCache && Date.now() - discoveredModelsCache.fetchedAt < MODEL_LIST_CACHE_MS) {
     return discoveredModelsCache.models;
   }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`, { signal: controller.signal });
     if (!res.ok) return discoveredModelsCache?.models || [];
     const data = await res.json();
     const names = (data?.models || [])
@@ -71,6 +81,8 @@ async function discoverModels(apiKey) {
   } catch (err) {
     console.error("[ia] No se pudo consultar la lista de modelos vigentes:", err?.message || err);
     return discoveredModelsCache?.models || [];
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -221,8 +233,15 @@ async function callGemini(body) {
     // (una sola consulta por pedido, cacheada entre pedidos).
     if (i >= chain.length && !discoveryTried) {
       discoveryTried = true;
-      const discovered = await discoverModels(apiKey);
-      discovered.forEach((m) => { if (!chain.includes(m)) chain.push(m); });
+      // Se le da sólo el tiempo que REALMENTE queda del presupuesto total
+      // (nunca más de 8s) — si ya no queda margen útil, directamente no se
+      // intenta y el bucle corta abajo por "ranOutOfTime" con un error
+      // prolijo, en vez de arriesgarse a un fetch sin cortar a tiempo.
+      const remainingForDiscovery = deadline - Date.now();
+      if (remainingForDiscovery > 2000) {
+        const discovered = await discoverModels(apiKey, Math.min(8000, remainingForDiscovery));
+        discovered.forEach((m) => { if (!chain.includes(m)) chain.push(m); });
+      }
     }
   }
 

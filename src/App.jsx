@@ -3861,6 +3861,22 @@ function persistActiveRestTimers() {
   try { localStorage.setItem(ACTIVE_REST_TIMERS_KEY, JSON.stringify(ACTIVE_REST_TIMERS)); } catch { /* ignorado a propósito */ }
 }
 
+// BUG FIX (encontrado auditando): la alarma nativa de "descanso terminado"
+// usaba SIEMPRE el mismo id fijo (9001) — si terminabas un set en el
+// ejercicio A (90s de descanso) y minutos después otro en el ejercicio B
+// (60s), el schedule() de B pisaba el de A en el sistema operativo
+// (Android reemplaza cualquier notificación programada con el mismo id).
+// Si backgroundeabas la app antes de que A llegara a sus 90s, esa alarma
+// simplemente nunca sonaba. Este hash determinístico le da a cada timerId
+// distinto un id propio (dentro de un rango que no choca con los ids fijos
+// 9001-9300 que ya usa el resto de la app), así timers concurrentes de
+// ejercicios distintos no se pisan entre sí.
+function notifIdForTimer(timerId, base) {
+  let h = 0;
+  for (let i = 0; i < String(timerId).length; i++) h = (h * 31 + timerId.charCodeAt(i)) | 0;
+  return base + (Math.abs(h) % 1000);
+}
+
 // BUG FIX ("el cronómetro de la bici se resetea al cerrar la app"): el
 // cronómetro de cardio (tanto en Rutina como en Descarga) vivía SOLO en
 // estado local del componente — cerrar la app de verdad (no solo cambiar de
@@ -4067,7 +4083,7 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default", 
         }
         await LocalNotifications.schedule({
           notifications: [{
-            id: 9001,
+            id: notifIdForTimer(timerId, 10000),
             smallIcon: "ic_stat_modusfit",
             iconColor: "#14B8A6",
             title: doneTitle,
@@ -4161,7 +4177,7 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default", 
             await LocalNotifications.createChannel({ id: "modusfit-rest-done-v1", name: "Fin del descanso", description: "Aviso al terminar el descanso entre series", importance: 5, vibration: true }).catch(() => {});
             await LocalNotifications.schedule({
               notifications: [{
-                id: 9001,
+                id: notifIdForTimer(timerId, 10000),
                 smallIcon: "ic_stat_modusfit",
                 iconColor: "#14B8A6",
                 title: "🔥 ¡Descanso terminado!",
@@ -4198,7 +4214,7 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default", 
     // hora original aunque hayas frenado el descanso.
     try {
       if (Capacitor.isNativePlatform()) {
-        LocalNotifications.cancel({ notifications: [{ id: 9001 }, { id: 9002 }] }).catch(() => {});
+        LocalNotifications.cancel({ notifications: [{ id: notifIdForTimer(timerId, 10000) }, { id: 9002 }] }).catch(() => {});
         if (ACTIVE_REST_TIMERS.__notifOwner === timerId) {
           RestTimerNotification.stop().catch(() => {});
           delete ACTIVE_REST_TIMERS.__notifOwner;
@@ -4883,7 +4899,10 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   // programado NO se cancela (cardioFinishedRef) — así siempre suena.
   useEffect(() => {
     if (!cardio) return;
-    const cardioNotifId = 9003;
+    // BUG FIX: mismo problema que en RestTimer — un id fijo (9003) hacía que
+    // dos cronómetros de cardio corriendo a la vez (dos ejercicios de cardio
+    // en el mismo día) se pisaran la alarma de fin entre sí.
+    const cardioNotifId = notifIdForTimer(cardioTimerId, 20000);
     if (cardioRunning) {
       cardioFinishedRef.current = false;
       (async () => {
@@ -4935,7 +4954,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     return () => {
       if (!Capacitor.isNativePlatform()) return;
       if (cardioMode === "stopwatch" && cardioRunning) {
-        LocalNotifications.cancel({ notifications: [{ id: 9003 }] }).catch(() => {});
+        LocalNotifications.cancel({ notifications: [{ id: notifIdForTimer(cardioTimerId, 20000) }] }).catch(() => {});
       }
     };
     // eslint-disable-next-line
@@ -5597,7 +5616,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
 /* ============================================================================
    EXERCISE CARD
 ============================================================================ */
-function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts, resetKey = 0, settings = DEFAULT_SETTINGS, forceOpen = false, onDisableAutoShowPrShare, hasActiveSession = true, hideTimer = false, onUpdateSettings = null, sex = null, age = null, weekInCycle = null }) {
+function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts, resetKey = 0, settings = DEFAULT_SETTINGS, forceOpen = false, onDisableAutoShowPrShare, hasActiveSession = true, hideTimer = false, onUpdateSettings = null, sex = null, age = null, weekInCycle = null, dayKey = null }) {
   const [open, setOpen] = useState(false);
   const [showWarmup, setShowWarmup] = useState(false);
   // Nota personal del ejercicio (persiste en el perfil → sincroniza)
@@ -5611,7 +5630,12 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
   // si está dentro de una superserie (ahí el descanso es compartido y recién
   // arranca al completar la vuelta entera, no después de cada ejercicio; ver
   // RoutineView). Se usa para el auto-inicio del descanso al guardar serie.
-  const restTimerId = (exercise.cardio || hideTimer) ? null : `ex_${exercise.id}`;
+  // BUG FIX (encontrado auditando): antes se armaba SOLO con exercise.id —
+  // como el mismo ejercicio del catálogo puede estar en dos días distintos
+  // de la rutina (ej. "Sentadilla" en Piernas A y Piernas B), un descanso
+  // en curso en un día se mostraba/interfería en el otro. Se agrega el día
+  // a la clave para que cada día tenga su propio cronómetro independiente.
+  const restTimerId = (exercise.cardio || hideTimer) ? null : `${dayKey || "_"}:ex_${exercise.id}`;
   const restSeconds = hasHeavy ? settings.restLong : settings.restShort;
 
   // ── POSICIÓN DEL CRONÓMETRO entre las series ──────────────────────────────
@@ -5711,14 +5735,14 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
         <div className="mt-1 mb-2" />
         {/* Arriba de todo: solo antes de empezar (o tras completar la última) */}
         {timerSlot === 0 && (
-          <div className="mb-2 timer-hop"><RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={accent} alertType={settings.alertType} timerId={`ex_${exercise.id}`} exerciseName={exercise.name} /></div>
+          <div className="mb-2 timer-hop"><RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={accent} alertType={settings.alertType} timerId={restTimerId} exerciseName={exercise.name} /></div>
         )}
         {setsToShow.map((s, i) => <React.Fragment key={`${exercise.id}:frag:${i}`}>
           <SetRow key={`${exercise.id}:${i}:${resetKey}`} exerciseId={exercise.id} exerciseName={exercise.name} exerciseMuscle={exercise.muscle} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKey} autoShowPrShare={settings.autoShowPrShare ?? true} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={hasActiveSession} cardio={exercise.cardio} dumbbellDouble={settings?.dumbbellDouble || null} fieldSettings={settings} onUpdateSettings={onUpdateSettings} sex={sex} age={age} restTimerId={restTimerId} restSeconds={restSeconds} isLastSet={i === setsToShow.length - 1} weekInCycle={weekInCycle} />
           {/* Debajo de la serie recién registrada: timerSlot = N significa
               "después de la serie N" (1-indexado). */}
           {timerSlot === i + 1 && (
-            <div className="my-2 timer-hop"><RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={accent} alertType={settings.alertType} timerId={`ex_${exercise.id}`} exerciseName={exercise.name} /></div>
+            <div className="my-2 timer-hop"><RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={accent} alertType={settings.alertType} timerId={restTimerId} exerciseName={exercise.name} /></div>
           )}
         </React.Fragment>)}
         {exercise.video && (
@@ -5783,13 +5807,20 @@ function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS,
         {weekDots.map(({ week, trained, isDeload }, wi) => { const isCurrent = week === weekInfo.weekInCycle; const dotColor = isDeload ? "#A855F7" : trained > 0 ? "#3B82F6" : neutralDot; return (
           <div
             key={week}
-            // Cascada de entrada: las semanas se marcan una tras otra. Solo al
-            // montar (yaAnimado); si no, parpadearían en cada render.
-            style={yaAnimado ? undefined : { animation: `dayMark 0.38s cubic-bezier(0.34,1.4,0.64,1) ${wi * 45}ms backwards` }}
             className={`w-9 h-9 rounded-xl flex items-center justify-center text-[10px] font-black transition-all ${isCurrent ? "scale-110" : ""}`}
-            style={isCurrent
-              ? { backgroundColor: dotColor, color: "#fff", boxShadow: `0 6px 16px -4px ${tint(dotColor, "aa")}` }
-              : { backgroundColor: tint(dotColor, "1a"), color: dotColor, border: `1px solid ${tint(dotColor, "30")}` }}
+            // BUG FIX (encontrado auditando): había dos props `style=` en el
+            // mismo elemento — JSX/Babel se quedan con la ÚLTIMA, así que la
+            // animación de entrada ("cascada", semana por semana) nunca se
+            // aplicaba, quedaba pisada en silencio por los colores. Se
+            // fusionan en un solo objeto.
+            style={{
+              ...(isCurrent
+                ? { backgroundColor: dotColor, color: "#fff", boxShadow: `0 6px 16px -4px ${tint(dotColor, "aa")}` }
+                : { backgroundColor: tint(dotColor, "1a"), color: dotColor, border: `1px solid ${tint(dotColor, "30")}` }),
+              // Cascada de entrada: las semanas se marcan una tras otra. Solo
+              // al montar (yaAnimado); si no, parpadearían en cada render.
+              ...(yaAnimado ? null : { animation: `dayMark 0.38s cubic-bezier(0.34,1.4,0.64,1) ${wi * 45}ms backwards` }),
+            }}
           >
             {isDeload ? "D" : week}
           </div>
@@ -6161,7 +6192,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
         {groupExercisesIntoSupersets(day.exercises).map((group) => {
           if (group.length === 1) {
             const ex = group[0];
-            return <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} sex={sex} age={age} weekInCycle={weekInCycle} />;
+            return <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} sex={sex} age={age} weekInCycle={weekInCycle} dayKey={activeDay} />;
           }
           // Superserie: varios ejercicios encadenados comparten un solo
           // cronómetro al final del grupo, en vez de uno por ejercicio —
@@ -6171,8 +6202,8 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           return (
             <div key={`${activeDay}:${group.map((e) => e.id).join("-")}`} className="rounded-2xl border p-2.5 space-y-2.5" style={{ borderColor: tint(day.color, "50"), backgroundColor: tint(day.color, "06") }}>
               <div className="flex items-center gap-1.5 px-1"><Link size={11} style={{ color: day.color }} /><span className="text-[10px] font-black uppercase tracking-wider" style={{ color: day.color }}>Superserie · {group.length} ejercicios</span></div>
-              {group.map((ex) => <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} hideTimer sex={sex} age={age} weekInCycle={weekInCycle} />)}
-              <div className="px-1"><RestTimer seconds={hasHeavyGroup ? settings.restLong : settings.restShort} accent={day.color} alertType={settings.alertType} timerId={`grp_${group.map((g) => g.id).join("_")}`} exerciseName={group.map((g) => g.name).filter(Boolean).join(" + ")} /></div>
+              {group.map((ex) => <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} hideTimer sex={sex} age={age} weekInCycle={weekInCycle} dayKey={activeDay} />)}
+              <div className="px-1"><RestTimer seconds={hasHeavyGroup ? settings.restLong : settings.restShort} accent={day.color} alertType={settings.alertType} timerId={`${activeDay}:grp_${group.map((g) => g.id).join("_")}`} exerciseName={group.map((g) => g.name).filter(Boolean).join(" + ")} /></div>
               <p className="text-[10px] text-slate-600 px-1">Descansá recién después de completar los {group.length} ejercicios — ese es el cronómetro de arriba.</p>
             </div>
           );
@@ -6910,7 +6941,7 @@ function DeloadView({ logs, setLogs, settings = DEFAULT_SETTINGS, deloadProgress
       <div key={activeDay} className="space-y-3 tab-fade-in">
         {day.exercises.map((ex) => {
           const deloadSets = Math.max(1, Math.ceil(ex.sets.length / deloadSetDivisor));
-          const bestPerSet = ex.sets.map((s, i) => { const h = logs[`${ex.id}_${i}`] || []; let best = s.pr ? { ...s.pr } : null; const ov = logs[`${ex.id}_${i}_pr_override`]; if (ov) best = ov; const pool = ov ? h : h; pool.forEach((e) => { const scoreE = ex.cardio ? (e.minutes || 0) : estimate1RM(e.kg, e.reps); const scoreB = best ? (ex.cardio ? (best.minutes || 0) : estimate1RM(best.kg, best.reps)) : -1; if (!best || scoreE > scoreB) best = e; }); return best; });
+          const bestPerSet = ex.sets.map((s, i) => { const h = logs[`${ex.id}_${i}`] || []; let best = s.pr ? { ...s.pr } : null; const ov = logs[`${ex.id}_${i}_pr_override`]; if (ov) best = ov; const pool = ov ? h : h; pool.forEach((e) => { const scoreE = ex.cardio ? (e.minutes || 0) : prScore(e.kg, e.reps); const scoreB = best ? (ex.cardio ? (best.minutes || 0) : prScore(best.kg, best.reps)) : -1; if (!best || scoreE > scoreB) best = e; }); return best; });
           const hasPR = bestPerSet.some(Boolean);
           const hasHeavy = ex.sets.slice(0, deloadSets).some((s) => isHeavyRepRange(s.repRange));
           return (
@@ -6933,7 +6964,7 @@ function DeloadView({ logs, setLogs, settings = DEFAULT_SETTINGS, deloadProgress
                       así retoma el descanso recién escrito en
                       ACTIVE_REST_TIMERS (ver toggleDeloadDone) — mismo
                       truco que "se re-posiciona" en la rutina normal. */}
-                  <RestTimer key={ex.sets.slice(0, deloadSets).filter((_, i) => deloadProgress[`${ex.id}_${i}`] === today).length} seconds={hasHeavy ? settings.restLong : settings.restShort} accent={day.color} alertType={settings.alertType} timerId={`deload_${ex.id}`} exerciseName={ex.name} />
+                  <RestTimer key={ex.sets.slice(0, deloadSets).filter((_, i) => deloadProgress[`${ex.id}_${i}`] === today).length} seconds={hasHeavy ? settings.restLong : settings.restShort} accent={day.color} alertType={settings.alertType} timerId={`deload_${activeDay}:${ex.id}`} exerciseName={ex.name} />
                 </div>
               )}
               <div className="px-4 py-3 space-y-2.5">
@@ -6960,7 +6991,7 @@ function DeloadView({ logs, setLogs, settings = DEFAULT_SETTINGS, deloadProgress
                               <span className="text-xl font-black tabular-nums" style={{ color: done ? day.color : "#D8B4FE", textShadow: `0 0 16px ${tint(done ? day.color : "#A855F7", "50")}` }}>{Math.max(1, Math.round((best.minutes || 0) * deloadPct))}<span className="opacity-60 text-xs ml-1">min</span></span>
                             </div>
                           </div>
-                          {!done && <DeloadCardioTimer timerId={`deload_cardio_${progressKey}`} targetMinutes={Math.max(1, Math.round((best.minutes || 0) * deloadPct))} accent={day.color} onComplete={() => toggleDeloadDone(progressKey, { minutes: Math.max(1, Math.round((best.minutes || 0) * deloadPct)) })} />}
+                          {!done && <DeloadCardioTimer timerId={`deload_cardio_${activeDay}:${progressKey}`} targetMinutes={Math.max(1, Math.round((best.minutes || 0) * deloadPct))} accent={day.color} onComplete={() => toggleDeloadDone(progressKey, { minutes: Math.max(1, Math.round((best.minutes || 0) * deloadPct)) })} />}
                           </>
                         ) : (
                           <div className="relative rounded-xl px-3 py-2.5 mb-2.5 bg-slate-950/60 border" style={{ borderColor: done ? tint(day.color, "35") : "#A855F730" }}>
