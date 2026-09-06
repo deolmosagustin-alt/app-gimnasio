@@ -13474,30 +13474,38 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
             a la vez sin que la tarjeta crezca en altura (siempre ocupa una
             sola fila, sin importar cuántos entrenaron). */}
         {kudosCandidates.length > 0 && (
-          <div className="relative overflow-hidden rounded-2xl border mt-3 p-3" style={{ borderColor: "rgba(252,76,2,0.45)", background: "linear-gradient(135deg, rgba(252,76,2,0.16), rgba(15,23,42,0.55) 70%)" }}>
+          <div className="relative overflow-hidden rounded-2xl border mt-3 p-3.5" style={{ borderColor: "rgba(252,76,2,0.45)", background: "linear-gradient(135deg, rgba(252,76,2,0.16), rgba(15,23,42,0.55) 70%)" }}>
             <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full blur-2xl pointer-events-none" style={{ backgroundColor: "rgba(252,76,2,0.3)" }} />
-            <p className="relative text-[9.5px] font-black uppercase tracking-wide mb-2" style={{ color: "#FDBA74" }}>👏 Entrenaron hace poco</p>
-            <div className="relative flex gap-2.5 overflow-x-auto -mx-0.5 px-0.5 pb-0.5">
+            <p className="relative text-[9.5px] font-black uppercase tracking-wide mb-2.5" style={{ color: "#FDBA74" }}>👏 Entrenaron hace poco</p>
+            {/* BUG FIX (pedido: "sigue angosto y chiquito"): al comprimir esto
+                en chips para que entraran varios amigos, el avatar y sobre
+                todo el botón de aplaudir quedaron demasiado chicos — un
+                bloque de 24px de alto con sólo el emoji ya no se sentía
+                "contundente" como pedía el diseño original. Mismo tamaño de
+                avatar que el resto de la app (14/14, el mismo que el hero de
+                Social) y un botón de aplaudir cuadrado y grande otra vez, en
+                vez de una barrita fina. */}
+            <div className="relative flex gap-3 overflow-x-auto -mx-0.5 px-0.5 pb-0.5">
               {kudosCandidates.slice(0, KUDOS_STRIP_PREVIEW).map((c) => {
                 const sent = !!kudosSentMap[c.uid];
                 const sending = kudosSendingUid === c.uid;
                 return (
-                  <div key={c.uid} className="shrink-0 w-16 flex flex-col items-center gap-1">
+                  <div key={c.uid} className="shrink-0 w-20 flex flex-col items-center gap-1.5">
                     <button onClick={() => setViewingUid(c.uid)} className="relative active:opacity-80 transition" title={basics[c.uid]?.name || "Tu amigo"}>
                       {basics[c.uid]?.avatarData ? (
-                        <img src={basics[c.uid].avatarData} alt="" className="w-11 h-11 rounded-2xl object-cover border-2" style={{ borderColor: "rgba(252,76,2,0.5)" }} />
+                        <img src={basics[c.uid].avatarData} alt="" className="w-14 h-14 rounded-2xl object-cover border-2" style={{ borderColor: "rgba(252,76,2,0.5)" }} />
                       ) : (
-                        <div className="w-11 h-11 rounded-2xl flex items-center justify-center text-sm font-black !text-white border-2" style={{ background: "linear-gradient(135deg,#FC4C02,#C2410C)", borderColor: "rgba(252,76,2,0.5)" }}>
+                        <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-lg font-black !text-white border-2" style={{ background: "linear-gradient(135deg,#FC4C02,#C2410C)", borderColor: "rgba(252,76,2,0.5)" }}>
                           {(basics[c.uid]?.name || "?").charAt(0).toUpperCase()}
                         </div>
                       )}
-                      <span className="absolute -bottom-1 -right-1 px-1 h-3.5 rounded-full bg-slate-950 border border-orange-500/50 text-[7px] font-black flex items-center justify-center text-orange-300 whitespace-nowrap">{c.daysAgo === 0 ? "HOY" : "AYER"}</span>
+                      <span className="absolute -bottom-1 -right-1 px-1.5 h-4 rounded-full bg-slate-950 border border-orange-500/50 text-[7.5px] font-black flex items-center justify-center text-orange-300 whitespace-nowrap">{c.daysAgo === 0 ? "HOY" : "AYER"}</span>
                     </button>
-                    <p className="text-[8.5px] text-slate-300 truncate w-full text-center">{basics[c.uid]?.name || "Amigo"}</p>
+                    <p className="text-[9px] text-slate-300 truncate w-full text-center">{basics[c.uid]?.name || "Amigo"}</p>
                     <button
                       onClick={() => handleSendKudos(c.uid)}
                       disabled={sending || sent}
-                      className={`w-full h-6 rounded-lg text-[11px] font-black flex items-center justify-center transition-all active:scale-90 ${sent ? "opacity-90" : !sending ? "animate-pulse" : ""}`}
+                      className={`w-full h-9 rounded-xl text-lg font-black flex items-center justify-center transition-all active:scale-90 ${sent ? "opacity-90" : !sending ? "animate-pulse" : ""}`}
                       style={sent ? { backgroundColor: "rgba(252,76,2,0.25)", color: "#FDBA74" } : { backgroundColor: "#FC4C02", color: "#fff" }}
                     >
                       {sent ? "✓" : "👏"}
