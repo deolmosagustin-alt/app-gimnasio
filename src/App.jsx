@@ -8140,8 +8140,16 @@ function BattleCompareCard({ myAvatarData, myName, mySex, mySessionsThisWeek, my
           circulares en vez de recuadros, y un ÚNICO marcador de 3 tramos
           (gana/empate/pierde) en vez de una barra de poder + 3 cajas
           repitiendo el mismo número dos veces. */}
-      <div className="relative overflow-hidden rounded-3xl border border-amber-500/25 p-4" style={{ background: "radial-gradient(ellipse at 50% -10%, rgba(251,191,36,0.10), transparent 55%), linear-gradient(160deg, #14141f, #08080d)" }}>
-        <p className="relative text-center text-[10px] font-black uppercase tracking-[0.22em] text-amber-400 mb-4 flex items-center justify-center gap-1.5">
+      {/* Pedido: "las batallas también podrían ser similares en cuanto a
+          colorimetría [al violeta]" — mismo criterio que ya se aplicó al
+          resto del perfil de un amigo (esta semana, historial, medidas):
+          el CHROME de la tarjeta (borde, resplandor, título) pasa a
+          violeta para que se sienta la misma identidad "amigos/social" en
+          vez de amarillo genérico. El amarillo/ámbar queda reservado
+          únicamente para lo que de verdad significa "victoria" (corona,
+          anillo del que va ganando, trofeo) — ese significado no cambia. */}
+      <div className="relative overflow-hidden rounded-3xl border border-purple-500/25 p-4" style={{ background: "radial-gradient(ellipse at 50% -10%, rgba(168,85,247,0.12), transparent 55%), linear-gradient(160deg, #14141f, #08080d)" }}>
+        <p className="relative text-center text-[10px] font-black uppercase tracking-[0.22em] text-purple-400 mb-4 flex items-center justify-center gap-1.5">
           <Swords size={12} /> Batalla de marcas
         </p>
         <div className="relative flex items-center justify-center gap-3">
@@ -8203,8 +8211,8 @@ function BattleCompareCard({ myAvatarData, myName, mySex, mySessionsThisWeek, my
           mitades de color, cada muñeco tiene su propio "pedestal" (un
           resplandor elíptico en su color en la base, como un reflector),
           sobre un fondo neutro común con una línea central. */}
-      <div className="relative overflow-hidden rounded-2xl border border-slate-700/50 p-4 bg-slate-950/50">
-        <div className="absolute inset-x-6 top-1/2 -translate-y-1/2 h-px bg-gradient-to-r from-transparent via-slate-700/70 to-transparent pointer-events-none" />
+      <div className="relative overflow-hidden rounded-2xl border border-purple-500/20 p-4 bg-purple-500/[0.04]">
+        <div className="absolute inset-x-6 top-1/2 -translate-y-1/2 h-px bg-gradient-to-r from-transparent via-purple-700/40 to-transparent pointer-events-none" />
         <div className="relative flex items-center justify-center mb-3">
           <div className="flex bg-slate-950/60 rounded-lg p-0.5 border border-slate-800/60">
             <button onClick={() => setView("front")} className={`px-3 py-1 rounded-md text-[10px] font-bold transition ${view === "front" ? "bg-slate-700 text-white" : "text-slate-500 hover:text-slate-300"}`}>De frente</button>
@@ -11939,7 +11947,7 @@ function RankComparisonList({ comparison }) {
         const myPct = myLvl >= 0 ? Math.max(10, Math.round((myLvl / maxLevelIdx) * 100)) : 0;
         const theirPct = theirLvl >= 0 ? Math.max(10, Math.round((theirLvl / maxLevelIdx) * 100)) : 0;
         return (
-          <div key={r.key} className="rounded-xl border border-slate-800/50 bg-slate-900/40 px-3 py-2.5">
+          <div key={r.key} className="rounded-xl border border-purple-500/15 bg-purple-500/[0.05] px-3 py-2.5">
             <div className="flex items-center justify-between gap-2 mb-1.5">
               <span className={`text-[10.5px] font-black flex items-center gap-1 min-w-0 ${iWin ? "text-teal-300" : "text-slate-600"}`}>
                 {iWin && <Crown size={10} className="shrink-0" />}<span className="truncate">{r.mine ? `${r.mine.tier} ${r.mine.sub}` : "—"}</span>
@@ -12987,6 +12995,67 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
   );
 }
 
+// Cuántos candidatos de "aplausos rápidos" se muestran en la tira antes de
+// recortar el resto atrás de "Ver todos" (KudosListModal, más abajo).
+const KUDOS_STRIP_PREVIEW = 4;
+
+// Lista completa de "quién entrenó hace poco" — se abre desde el link "Ver
+// todos" de la tira de kudos cuando hay más candidatos de los que entran
+// ahí. A diferencia de la tira (chips chicos, sólo lugar para avatar +
+// HOY/AYER), acá cada fila tiene lugar para mostrar QUÉ entrenó cada uno
+// (dayLabel/dayColor de su última sesión, mismo dato que ya calcula
+// useUserStreaks) — pedido: "que puedas ver su entrenamiento o algo así".
+function KudosListModal({ candidates, basics, kudosSentMap, kudosSendingUid, onSendKudos, onViewProfile, onClose }) {
+  useAndroidBack(onClose);
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div className="fixed inset-0 z-[120] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
+      <div className="w-full max-w-sm max-h-[80vh] overflow-y-auto overscroll-contain bg-slate-900 border border-orange-500/25 rounded-3xl modal-pop-in shadow-2xl shadow-black/70 p-5 space-y-3" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-black text-white flex items-center gap-1.5">👏 Entrenaron hace poco</p>
+          <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition"><X size={17} /></button>
+        </div>
+        <div className="space-y-2">
+          {candidates.map((c) => {
+            const b = basics[c.uid];
+            const sent = !!kudosSentMap[c.uid];
+            const sending = kudosSendingUid === c.uid;
+            return (
+              <div key={c.uid} className="flex items-center gap-3 rounded-2xl border border-orange-500/15 bg-orange-500/[0.04] px-3 py-2.5">
+                <button onClick={() => onViewProfile(c.uid)} className="flex items-center gap-2.5 flex-1 min-w-0 text-left active:opacity-80 transition">
+                  {b?.avatarData ? (
+                    <img src={b.avatarData} alt="" className="w-10 h-10 rounded-2xl object-cover shrink-0 border-2" style={{ borderColor: "rgba(252,76,2,0.5)" }} />
+                  ) : (
+                    <div className="w-10 h-10 rounded-2xl flex items-center justify-center text-sm font-black !text-white shrink-0 border-2" style={{ background: "linear-gradient(135deg,#FC4C02,#C2410C)", borderColor: "rgba(252,76,2,0.5)" }}>
+                      {(b?.name || "?").charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-white truncate">{b?.name || "Tu amigo"}</p>
+                    <p className="text-[10.5px] text-slate-400 flex items-center gap-1 truncate">
+                      {c.latestSession?.dayColor && <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: c.latestSession.dayColor }} />}
+                      {c.daysAgo === 0 ? "Entrenó hoy" : "Entrenó ayer"}{c.latestSession?.dayLabel ? ` · ${c.latestSession.dayLabel}` : ""}
+                    </p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => onSendKudos(c.uid)}
+                  disabled={sending || sent}
+                  className={`shrink-0 w-11 h-11 rounded-2xl border-2 font-black flex items-center justify-center text-lg transition-all active:scale-90 ${sent ? "opacity-90" : !sending ? "animate-pulse" : ""}`}
+                  style={sent ? { backgroundColor: "rgba(252,76,2,0.25)", borderColor: "#FC4C02", color: "#FDBA74" } : { backgroundColor: "#FC4C02", borderColor: "#FC4C02", color: "#fff" }}
+                >
+                  {sent ? "✓" : "👏"}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 // Pestaña "Social" completa: amigos (buscar/solicitudes/lista) y
 // entrenador/alumno (vincular/solicitudes/alumnos/propuestas). Al elegir a
 // alguien de una lista se muestra FriendProfileView en vez de navegar a
@@ -13147,8 +13216,9 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
   // entrenó ayer u hoy") — antes esto se quedaba con UN solo candidato (el
   // de la fecha más reciente) y los demás quedaban sin ningún aplauso
   // posible hasta el día siguiente, en silencio. Ordenados del más
-  // reciente al más viejo; tope de 6 para que la tira de abajo no crezca
-  // sin límite con muchos amigos activos a la vez.
+  // reciente al más viejo; tope de 20 sólo como red de seguridad (no como
+  // límite de diseño — la tira visible se recorta aparte, ver
+  // KUDOS_STRIP_PREVIEW más abajo, y "Ver todos" abre el resto).
   const kudosCandidates = useMemo(() => {
     const list = [];
     friendAccepted.forEach((f) => {
@@ -13160,8 +13230,15 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
       list.push({ uid: other, latestSession: latest, daysAgo });
     });
     list.sort((a, b) => (a.latestSession.date < b.latestSession.date ? 1 : -1));
-    return list.slice(0, 6);
+    return list.slice(0, 20);
   }, [friendAccepted, streaks, uid]);
+  // Pedido: "mantengamos la estética horizontal... añadiendo abajo algo
+  // pequeño que haga saber que tenés más amigos... y que se abra algo para
+  // ver a todos, también que puedas ver su entrenamiento" — la tira sigue
+  // mostrando los primeros KUDOS_STRIP_PREVIEW tal cual, y si hay más se
+  // suma un link chico abajo que abre KudosListModal con la lista
+  // completa (ahí sí entra el detalle del día que entrenó cada uno).
+  const [showAllKudos, setShowAllKudos] = useState(false);
   // El amigo con la racha más alta que todavía no te alcanzó, pero está
   // cerca (1-2 días) — "being chased", estilo Strava.
   const chaserFriend = useMemo(() => {
@@ -13401,7 +13478,7 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
             <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full blur-2xl pointer-events-none" style={{ backgroundColor: "rgba(252,76,2,0.3)" }} />
             <p className="relative text-[9.5px] font-black uppercase tracking-wide mb-2" style={{ color: "#FDBA74" }}>👏 Entrenaron hace poco</p>
             <div className="relative flex gap-2.5 overflow-x-auto -mx-0.5 px-0.5 pb-0.5">
-              {kudosCandidates.map((c) => {
+              {kudosCandidates.slice(0, KUDOS_STRIP_PREVIEW).map((c) => {
                 const sent = !!kudosSentMap[c.uid];
                 const sending = kudosSendingUid === c.uid;
                 return (
@@ -13429,6 +13506,17 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
                 );
               })}
             </div>
+            {/* Pedido: "algo pequeño que haga saber que tenés más amigos...
+                y que se abra algo para ver a todos, también que puedas ver
+                su entrenamiento" — sólo aparece si hay más de los que ya
+                se ven en la tira; abre KudosListModal con el resto Y el
+                detalle del día que entrenó cada uno (acá no entra por
+                espacio, en el modal sí). */}
+            {kudosCandidates.length > KUDOS_STRIP_PREVIEW && (
+              <button onClick={() => setShowAllKudos(true)} className="relative w-full flex items-center justify-center gap-1 mt-2.5 pt-2 border-t border-orange-500/20 text-[9.5px] font-bold text-orange-300/80 hover:text-orange-300 transition">
+                +{kudosCandidates.length - KUDOS_STRIP_PREVIEW} amigo{kudosCandidates.length - KUDOS_STRIP_PREVIEW === 1 ? "" : "s"} más entrenaron · Ver todos <ChevronRight size={11} />
+              </button>
+            )}
           </div>
         )}
         {chaserFriend && (
@@ -13721,6 +13809,17 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
       )}
       {showMyBody && <MyBodyModal profile={profile} onClose={() => setShowMyBody(false)} />}
       {showRankExplain && <RankExplainModal profile={profile} myTopRank={myTopRank} onClose={() => setShowRankExplain(false)} />}
+      {showAllKudos && (
+        <KudosListModal
+          candidates={kudosCandidates}
+          basics={basics}
+          kudosSentMap={kudosSentMap}
+          kudosSendingUid={kudosSendingUid}
+          onSendKudos={handleSendKudos}
+          onViewProfile={(otherUid) => { setViewingUid(otherUid); setShowAllKudos(false); }}
+          onClose={() => setShowAllKudos(false)}
+        />
+      )}
       {sendingTemplate && (
         <SendTemplateModal
           template={sendingTemplate}
