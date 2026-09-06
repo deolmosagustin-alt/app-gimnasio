@@ -8762,8 +8762,12 @@ function daysSince(dateStr) {
 // la app (fondo oscuro, tarjeta redondeada), sin nada de canvas porque acá
 // sólo se muestra la imagen tal cual quedó guardada.
 function PhotoViewerModal({ photo, onClose, onDelete }) {
-  useAndroidBack(onClose);
   const [confirmDel, setConfirmDel] = useState(false);
+  // BUG FIX (encontrado auditando): antes el botón atrás siempre cerraba
+  // TODO el modal, incluso con la confirmación de borrado abierta — debería
+  // solo cancelar esa confirmación, como tocar "No", no cerrar la foto
+  // entera de un tirón.
+  useAndroidBack(confirmDel ? () => setConfirmDel(false) : onClose);
   const dateLabel = new Date(photo.date + "T00:00:00").toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" });
   return (
     <div className="fixed inset-0 z-[140] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
@@ -16541,8 +16545,11 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
 // resto de los modales de la app, que aparecen centrados) porque es
 // literalmente una barra de navegación, no un diálogo puntual.
 function AIConversationSidebar({ conversations, activeConversationId, onSelect, onNew, onDelete, onRename, onClose }) {
-  useAndroidBack(onClose);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  // BUG FIX (encontrado auditando): antes el botón atrás cerraba toda la
+  // barra lateral aunque hubiera una confirmación de borrado abierta —
+  // ahora sólo la cancela, como tocar afuera de esa confirmación puntual.
+  useAndroidBack(confirmDeleteId != null ? () => setConfirmDeleteId(null) : onClose);
   const [renamingId, setRenamingId] = useState(null);
   const [renameDraft, setRenameDraft] = useState("");
   const sorted = conversations.slice().sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
@@ -19449,7 +19456,23 @@ export default function App() {
       if (!p) return prev;
       const wasFirstTime = !p.activeRoutineId;
       const newRoutines = routineDef ? { ...(p.routines || {}), [routineId]: routineDef } : (p.routines || {});
-      const updatedProfile = { ...p, routines: newRoutines, activeRoutineId: routineId, ...(wasFirstTime && p.tutorialSeen === false ? { tutorialSeen: true } : {}) };
+      // BUG FIX (encontrado auditando): si había una sesión en curso
+      // (activeSession) al activar OTRA rutina — por ejemplo al aceptar una
+      // rutina que te propuso tu entrenador — esa sesión quedaba huérfana:
+      // la barra de "sesión en progreso" sólo se muestra para el día
+      // activo DE LA RUTINA ACTUAL, así que dejaba de ser alcanzable para
+      // terminarla o cancelarla desde la UI normal. Se cierra sola (se
+      // guarda como sesión terminada, igual que "Finalizar sesión") antes
+      // de cambiar de rutina, para no perder ni dejar nada inalcanzable.
+      let updatedTrainingSessions = p.trainingSessions;
+      if (p.activeSession) {
+        const finished = { date: todayStr(), dayKey: p.activeSession.dayKey, startedAt: p.activeSession.startedAt, endedAt: new Date().toISOString() };
+        if (p.activeRoutineId) finished.routineId = p.activeRoutineId;
+        const dayDefNow = ROUTINE[p.activeSession.dayKey];
+        if (dayDefNow?.exercises?.length) finished.dayExerciseIds = dayDefNow.exercises.map((e) => e.id);
+        updatedTrainingSessions = [...(p.trainingSessions || []), finished];
+      }
+      const updatedProfile = { ...p, routines: newRoutines, activeRoutineId: routineId, activeSession: null, trainingSessions: updatedTrainingSessions, ...(wasFirstTime && p.tutorialSeen === false ? { tutorialSeen: true } : {}) };
       const np = { ...prev, [activeProfile]: updatedProfile };
       saveProfiles(np);
       // Primera vez: mostramos la INTRO corta (5 slides), no el tutorial de 51
