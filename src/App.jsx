@@ -3996,6 +3996,42 @@ function useAndroidBack(onClose) {
   }, []);
 }
 
+// Variante liviana de useAndroidBack para pantallas de PÁGINA COMPLETA (el
+// wizard de rutina personalizada, crear/editar rutina a mano, el perfil de
+// un amigo dentro de Social) — reemplazan el contenido de la pestaña en vez
+// de aparecer como un diálogo flotando ENCIMA de otra cosa, así que no hace
+// falta (ni conviene) "congelar" ningún fondo detrás: esta pantalla ES el
+// contenido, no un overlay. BUG FIX (encontrado auditando): antes estas
+// pantallas no registraban nada acá, así que el botón atrás de Android
+// caía directo en el comportamiento por defecto (saltar a la pestaña
+// Rutinas), descartando lo que estuvieras haciendo sin ningún aviso —
+// aunque la propia pantalla tuviera su botón "Cancelar"/"Volver" con
+// confirmación. Mismo patrón de ref estable que useAndroidBack, sin la
+// parte de congelarFondo/descongelarFondo.
+function useAndroidBackHandler(onBack) {
+  const onBackRef = useRef(onBack);
+  useLayoutEffect(() => { onBackRef.current = onBack; });
+  // "active" (no `onBack` directo) en el array de deps: algunos llamadores
+  // (ver RoutinesView/mode "scheduleSetup") le pasan `null` la mayor parte
+  // del tiempo y sólo una función real mientras esa pantalla puntual está
+  // activa — el hook se llama SIEMPRE (nunca condicionado, para no romper
+  // el orden de hooks), pero el registro en BACK_HANDLERS tiene que
+  // prenderse y apagarse junto con esa condición. Si dependiera de
+  // `onBack` en vez de `active`, un llamador que SIEMPRE pasa una función
+  // (el caso común) igual re-registraría en cada render con una función
+  // inline nueva — el mismo bug que useAndroidBack ya tuvo que corregir.
+  const active = typeof onBack === "function";
+  useEffect(() => {
+    if (!active) return;
+    const handler = () => onBackRef.current?.();
+    BACK_HANDLERS.push(handler);
+    return () => {
+      const i = BACK_HANDLERS.lastIndexOf(handler);
+      if (i !== -1) BACK_HANDLERS.splice(i, 1);
+    };
+  }, [active]);
+}
+
 function CountUpNumber({ value, from = null, duration = 700, decimals = 1, className = "", style = {} }) {
   const [shown, setShown] = useState(from ?? value);
   const rafRef = useRef(null);
@@ -12492,6 +12528,11 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
 // aceptado (o la otra persona quitó su @usuario), getPublicFull devuelve
 // null y se muestra el estado "no comparte su perfil" en vez de romper.
 function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerson, openComparing = false, onBack, onProposalSent, onActivateRoutine }) {
+  // BUG FIX (encontrado auditando): pantalla de página completa dentro de
+  // Social — sin esto, el botón atrás de Android salía directo de Social
+  // a la pestaña Rutinas en vez de volver a la lista de amigos (que es lo
+  // que hace el botón "Volver" de esta misma pantalla).
+  useAndroidBackHandler(onBack);
   const [basic, setBasic] = useState(null);
   const [full, setFull] = useState(null);
   const [state, setState] = useState("loading"); // loading|ok|forbidden
@@ -17113,6 +17154,7 @@ function RoutineBuilder({ initialRoutine, onCancel, onSave, dumbbellDouble = nul
   const setDays = (v) => { setDaysRaw(v); setDirty(true); };
   const setSchedule = (v) => { setScheduleRaw(v); setDirty(true); };
   const handleCancelClick = () => { if (dirty) setConfirmDiscard(true); else onCancel(); };
+  useAndroidBackHandler(confirmDiscard ? () => setConfirmDiscard(false) : handleCancelClick);
 
   const addDay = () => setDays((d) => [...d, { key: builderUid("day"), label: `DÍA ${d.length + 1}`, color: BUILDER_COLOR_PALETTE[d.length % BUILDER_COLOR_PALETTE.length], exercises: [] }]);
   // Duplicar un día con todos sus ejercicios y series.
@@ -17357,6 +17399,11 @@ function PersonalizedRoutineWizard({ profile, onUpdateProfile, onCreateRoutine, 
   ];
   const current = STEPS[step];
   const isLastQuestion = step === STEPS.length - 1;
+  // BUG FIX (encontrado auditando): pantalla de página completa, sin esto
+  // el botón atrás de Android salía del wizard entero (perdiendo todas las
+  // respuestas) en vez de ir a la pregunta anterior — misma condición que
+  // ya usa el botón "Anterior"/"Volver" de acá abajo.
+  useAndroidBackHandler(step > 0 && !preview && !generating && !genError ? () => setStep((s) => s - 1) : onClose);
 
   const advance = (next) => {
     setAnswers(next); setInputVal(""); setMultiSel([]);
@@ -17944,6 +17991,14 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
   const [shareTarget, setShareTarget] = useState(null);
   const [pendingActivation, setPendingActivation] = useState(null);
   const [showImport, setShowImport] = useState(false);
+  // BUG FIX (encontrado auditando): la pantalla de "¿qué días entrenás
+  // esta rutina?" (mode "scheduleSetup", más abajo) es de página completa
+  // y no tenía ningún botón de cancelar propio — el botón atrás de Android
+  // saltaba directo a la pestaña Rutinas en vez de volver al catálogo,
+  // perdiendo silenciosamente la rutina que se estaba por activar. El hook
+  // se llama siempre (nunca condicionado a un return temprano, para no
+  // romper el orden de hooks) pero sólo registra algo cuando corresponde.
+  useAndroidBackHandler(mode === "scheduleSetup" && pendingActivation ? () => { setPendingActivation(null); setMode("catalog"); } : null);
   const routines = profile?.routines || {};
   const activeId = profile?.activeRoutineId;
   const activeDef = resolveRoutineDef(routines[activeId], activeId);
