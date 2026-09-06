@@ -47,7 +47,7 @@ import FemaleBody from "@mjcdev/react-body-highlighter";
 import { auth, googleProvider, db } from "./firebase";
 import {
   yt, mkSets, cloneRoutineDef, debounce, kgToDisplay, displayToKg, weightLabel,
-  rpeColor, haptic, localDateStr, todayStr, formatTime, vol, estimate1RM, repRangeTop, isHeavyRepRange,
+  rpeColor, haptic, localDateStr, todayStr, formatTime, vol, estimate1RM, prScore, repRangeTop, isHeavyRepRange,
   tint, setThemeMode, normalizePhoneForMatching, hashPhoneKey,
 } from "./utils";
 // Feature social (amigos + entrenador/alumno) — todo el acceso a Firestore
@@ -844,15 +844,15 @@ function cleanObsoleteOverrides(logs) {
   Object.keys(logs).forEach((key) => {
     if (!key.endsWith("_pr_override")) return;
     const ov = logs[key];
-    if (!ov || !ov.kg || !ov.reps) return;
+    if (!ov || ov.kg == null || !ov.reps) return;
     // Los récords EDITADOS A MANO por el usuario (manual: true) no se tocan
     // acá jamás: son correcciones explícitas. Solo se liberan al superarlos
     // entrenando (handleSave) o con el botón "Quitar".
     if (ov.manual) return;
     const baseKey = key.replace(/_pr_override$/, "");
     const history = Array.isArray(logs[baseKey]) ? logs[baseKey] : [];
-    const ovRm = estimate1RM(ov.kg, ov.reps);
-    const historyBeatsIt = history.some((e) => e && e.kg && e.reps && estimate1RM(e.kg, e.reps) >= ovRm);
+    const ovRm = prScore(ov.kg, ov.reps);
+    const historyBeatsIt = history.some((e) => e && e.reps && prScore(e.kg, e.reps) >= ovRm);
     if (historyBeatsIt) { delete out[key]; changed = true; }
   });
   return { logs: out, changed };
@@ -963,13 +963,23 @@ function todayWeekdayKey(date = new Date()) {
 
 function getStagnationInfo(exercise, logs) {
   let stagnant = false, maxGapDays = 0;
+  const today = todayStr();
   exercise.sets.forEach((s, i) => {
     const key = `${exercise.id}_${i}`, hist = logs[key] || [];
-    if (hist.length === 0) return;
-    const overrideDate = logs[`${key}_pr_override`]?.date;
-    if (!overrideDate) return;
-    const lastTrainedDate = hist.reduce((max, h) => (h.date > max ? h.date : max), hist[0].date);
-    const gapDays = Math.round((new Date(lastTrainedDate) - new Date(overrideDate)) / 86400000);
+    const override = logs[`${key}_pr_override`];
+    const points = override ? [...hist, override] : hist;
+    if (points.length === 0) return;
+    // La fecha de la marca vigente: la más reciente entre las series que
+    // alcanzan tu mejor puntaje (por si la empataste más de una vez) — no
+    // depende de un override manual, que solo existe si corregiste el
+    // récord a mano (la mayoría de los récords se establecen entrenando).
+    let bestScore = -1, recordDate = null;
+    [...points].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0)).forEach((h) => {
+      const sc = prScore(h.kg, h.reps);
+      if (sc >= bestScore) { bestScore = sc; recordDate = h.date; }
+    });
+    if (!recordDate) return;
+    const gapDays = Math.round((new Date(today) - new Date(recordDate)) / 86400000);
     if (gapDays > maxGapDays) maxGapDays = gapDays;
     if (gapDays >= STAGNATION_DAYS) stagnant = true;
   });
@@ -1424,9 +1434,9 @@ function buildSessionsIndex(logs, trainingSessions = []) {
       // el porcentaje de abajo y que los récords del resto de la app), no por
       // volumen: así el fueguito verde y el porcentaje rojo nunca se
       // contradicen. Un 1RM mayor a todo lo anterior = récord nuevo ese día.
-      const priorBest1RM = sortedHist.filter((h) => h.date < e.date).reduce((max, h) => Math.max(max, estimate1RM(h.kg, h.reps)), 0);
+      const priorBest1RM = sortedHist.filter((h) => h.date < e.date).reduce((max, h) => Math.max(max, prScore(h.kg, h.reps)), 0);
       const thisVol = vol(e.kg, e.reps);
-      const isImprovement = estimate1RM(e.kg, e.reps) > 0 && estimate1RM(e.kg, e.reps) > priorBest1RM;
+      const isImprovement = prScore(e.kg, e.reps) > 0 && prScore(e.kg, e.reps) > priorBest1RM;
       const priorBest = priorBest1RM;
       // Porcentaje respecto a tu récord del ejercicio ANTES de este día. Se
       // usa el récord previo (no el que ya incluye lo de hoy) para que, si hoy
@@ -1436,7 +1446,7 @@ function buildSessionsIndex(logs, trainingSessions = []) {
       // El % se mide contra la MISMA base que isImprovement (el mejor 1RM
       // entrenado ANTES de hoy). Antes usaba otra base (que incluía el récord
       // manual), y por eso igualabas tu marca real pero el % te daba rojo.
-      const this1RM = estimate1RM(e.kg, e.reps);
+      const this1RM = prScore(e.kg, e.reps);
       const pctOfBest = priorBest1RM > 0 && this1RM > 0 ? Math.round((this1RM / priorBest1RM) * 100) : null;
       if (isImprovement) s.improvedCount++;
       // Nombre: primero el que quedó grabado en el registro, después el de la
@@ -4764,7 +4774,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     // volumen, 95×8 (760) le ganaba a 110×5 (550) y se mostraba la serie
     // más liviana como tu mejor marca — que es justo lo que se veía mal en
     // el muñeco y en el "A superar". Por 1RM, 110×5 (128) supera a 95×8 (120).
-    let best = setDef.pr ? { ...setDef.pr } : null; history.forEach((h) => { if (!best || estimate1RM(h.kg, h.reps) > estimate1RM(best.kg, best.reps)) best = { kg: h.kg, reps: h.reps }; }); return best;
+    let best = setDef.pr ? { ...setDef.pr } : null; history.forEach((h) => { if (!best || prScore(h.kg, h.reps) > prScore(best.kg, best.reps)) best = { kg: h.kg, reps: h.reps }; }); return best;
   }, [history, setDef.pr, cardio]);
   const currentPR = useMemo(() => {
     if (!override && !computedPR) return null;
@@ -4778,7 +4788,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     // dato viejo nunca esconde una marca real superior.
     if (!override) return computedPR;
     if (!computedPR) return override;
-    return estimate1RM(override.kg, override.reps) >= estimate1RM(computedPR.kg, computedPR.reps) ? override : computedPR;
+    return prScore(override.kg, override.reps) >= prScore(computedPR.kg, computedPR.reps) ? override : computedPR;
   }, [override, computedPR]);
   const draft = drafts[key] || {};
   const reps = draft.reps ?? ""; const kg = draft.kg ?? ""; const rpe = draft.rpe ?? null;
@@ -4983,8 +4993,10 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     if (cardio) {
       // Si el cronómetro estuvo corriendo, usar el tiempo transcurrido
       const autoMinutes = cardioElapsed > 0 ? Math.round(cardioElapsed / 60 * 10) / 10 : null;
-      const m = autoMinutes || parseFloat(minutes), d = km ? parseFloat(km) : null;
+      const m = autoMinutes || parseFloat(minutes), dRaw = km ? parseFloat(km) : null;
       if (!m || isNaN(m) || m < 0) { setFeedback({ type: "error", msg: "Iniciá el cronómetro o ingresá los minutos." }); return; }
+      if (dRaw != null && (isNaN(dRaw) || dRaw < 0)) { setFeedback({ type: "error", msg: "El campo Km no puede ser negativo." }); return; }
+      const d = dRaw;
       const isFirstEver = !currentPR;
       const prevMin = currentPR?.minutes || 0;
       // Guardamos el NOMBRE junto con la serie: el historial es una foto de
@@ -5041,7 +5053,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     // superar" que se muestra). Antes usaba volumen: guardar 95×8 tras un
     // 110×5 marcaba "récord" (760>550) aunque tu 1RM real no mejorara, y
     // encima cambiaba la marca mostrada a la serie más liviana.
-    const prev1RM = currentPR ? estimate1RM(currentPR.kg, currentPR.reps) : 0, new1RM = estimate1RM(k, r);
+    const prev1RM = currentPR ? prScore(currentPR.kg, currentPR.reps) : 0, new1RM = prScore(k, r);
     // noSession: registraste una marca SIN haber iniciado la sesión (por
     // ejemplo para cargar un récord viejo). El récord se guarda igual, pero
     // ese día NO cuenta como entrenado en el historial ni en la racha.
@@ -5079,8 +5091,8 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     // fantasma de una vez.
     if (override && (
       override.manual
-        ? new1RM > estimate1RM(override.kg, override.reps) // manual: solo lo libera una marca real que lo SUPERE
-        : newHistory.some((h) => estimate1RM(h.kg, h.reps) >= estimate1RM(override.kg, override.reps)) // legacy: el historial lo cubre
+        ? new1RM > prScore(override.kg, override.reps) // manual: solo lo libera una marca real que lo SUPERE
+        : newHistory.some((h) => prScore(h.kg, h.reps) >= prScore(override.kg, override.reps)) // legacy: el historial lo cubre
     )) {
       const cleaned = { ...newLogs }; delete cleaned[prKey]; newLogs = cleaned;
     }
@@ -8683,7 +8695,7 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
 
   const handleAdd = () => {
     const v = parseFloat(inputVal);
-    if (!v || isNaN(v)) return;
+    if (!v || isNaN(v) || v <= 0) return;
     onAddMeasurement(selType, v);
     setInputVal("");
   };
@@ -8752,7 +8764,7 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
       </div>
 
       <div className="flex items-center gap-2">
-        <input type="number" inputMode="decimal" value={inputVal} onChange={(e) => setInputVal(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }} placeholder={`Nuevo valor (${selMeta.unit})`} className="flex-1 bg-slate-950/60 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-purple-500/50" />
+        <input type="number" inputMode="decimal" min="0" value={inputVal} onChange={(e) => setInputVal(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }} placeholder={`Nuevo valor (${selMeta.unit})`} className="flex-1 bg-slate-950/60 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-purple-500/50" />
         <button onClick={handleAdd} disabled={!inputVal.trim()} className="px-4 py-2.5 rounded-xl !text-white text-sm font-bold disabled:opacity-40 transition-all active:scale-95" style={{ backgroundColor: "#A855F7" }}>Guardar</button>
       </div>
 
@@ -10786,7 +10798,7 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
           <input type="date" className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none" defaultValue={cycleStart ? localDateStr(new Date(cycleStart)) : todayStr()} id="cycle-date-input" />
           <div className="flex gap-2">
             <button onClick={() => setShowCycleSetup(false)} className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-400 text-sm font-semibold">Cancelar</button>
-            <button onClick={() => { const val = document.getElementById("cycle-date-input").value; if (val) { onSetCycleStart(new Date(val)); setShowCycleSetup(false); } }} className="flex-1 py-3 rounded-xl bg-teal-500 !text-white text-sm font-bold">Guardar</button>
+            <button onClick={() => { const val = document.getElementById("cycle-date-input").value; if (val) { const [y, m, d] = val.split("-").map(Number); onSetCycleStart(new Date(y, m - 1, d)); setShowCycleSetup(false); } }} className="flex-1 py-3 rounded-xl bg-teal-500 !text-white text-sm font-bold">Guardar</button>
           </div>
         </div>
       )}
@@ -18197,10 +18209,11 @@ function SideNav({ tab, setTab, profileName }) {
   const initial = profileName.charAt(0).toUpperCase();
   const [avatarUrl, setAvatarUrl] = useState(null);
   useEffect(() => {
-    const load = () => idbGet(`avatar_${profileName}`).then((d) => setAvatarUrl(d || null)).catch(() => {});
+    let alive = true;
+    const load = () => idbGet(`avatar_${profileName}`).then((d) => { if (alive) setAvatarUrl(d || null); }).catch(() => {});
     load();
     window.addEventListener("modusfit-avatar-updated", load);
-    return () => window.removeEventListener("modusfit-avatar-updated", load);
+    return () => { alive = false; window.removeEventListener("modusfit-avatar-updated", load); };
   }, [profileName]);
   return (
     <div className="hidden lg:flex lg:flex-col lg:w-56 lg:shrink-0 lg:h-screen lg:sticky lg:top-0 border-r border-slate-800/50 bg-[#0a0a0f]/60 px-3 py-6">
@@ -19090,12 +19103,15 @@ export default function App() {
   const [progressPhotos, setProgressPhotos] = useState([]);
   const [photosLoading, setPhotosLoading] = useState(true);
   useEffect(() => {
+    let alive = true;
     if (!activeProfile) { setProgressPhotos([]); return; }
     setPhotosLoading(true);
     idbGet(`photos_${activeProfile}`).then((stored) => {
+      if (!alive) return; // el perfil ya cambió: esta lectura quedó vieja, no pisar el perfil actual
       setProgressPhotos(stored || []);
       setPhotosLoading(false);
     });
+    return () => { alive = false; };
   }, [activeProfile]);
   const handleAddPhoto = async (file) => {
     try {
@@ -19354,8 +19370,19 @@ export default function App() {
     setProfiles((prev) => {
       const p = prev[activeProfile];
       if (!p) return prev;
+      const today = todayStr();
+      // Evita duplicar el registro si se toca "Finalizar" dos veces seguidas
+      // (doble tap, doble evento táctil en WebView) antes de que el botón
+      // desaparezca del todo — ya hay una sesión de descarga de este día hoy.
+      const alreadyFinished = (p.trainingSessions || []).some((s) => s.date === today && s.dayKey === dayKey && s.deload);
+      if (alreadyFinished) {
+        if (!p.activeSession) return prev;
+        const np = { ...prev, [activeProfile]: { ...p, activeSession: null } };
+        saveProfiles(np);
+        return np;
+      }
       const startedAt = p.activeSession?.deload ? p.activeSession.startedAt : new Date().toISOString();
-      const finished = { date: todayStr(), dayKey, startedAt, endedAt: new Date().toISOString(), deload: true };
+      const finished = { date: today, dayKey, startedAt, endedAt: new Date().toISOString(), deload: true };
       if (p.activeRoutineId) finished.routineId = p.activeRoutineId;
       const dayDefNow = ROUTINE[dayKey];
       if (dayDefNow?.exercises?.length) finished.dayExerciseIds = dayDefNow.exercises.map((e) => e.id);

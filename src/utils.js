@@ -91,6 +91,13 @@ export function todayStr() { return localDateStr(new Date()); }
 export function formatTime(s) { return `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`; }
 export function vol(kg, reps) { return (!kg || !reps) ? 0 : kg * reps; }
 export function estimate1RM(kg, reps) { return (!kg || !reps) ? 0 : Math.round(kg * (1 + reps / 30) * 10) / 10; }
+// Puntaje para decidir "cuál serie es mejor" a fines de récord/comparación —
+// NO es el 1RM estimado en kg (para eso seguí usando estimate1RM, pensada
+// para mostrarse en pantalla). A peso corporal (kg=0) estimate1RM siempre da
+// 0 porque necesita un peso como base, así que nunca detectaría una mejora
+// entre dos series a peso corporal por más reps que hagas de una a otra.
+// Ahí el criterio pasa a ser directamente las repeticiones.
+export function prScore(kg, reps) { if (!reps) return 0; return kg ? estimate1RM(kg, reps) : reps; }
 export function repRangeTop(repRange) { const parts = String(repRange).split("-"); return parseInt(parts[parts.length - 1], 10); }
 // Detecta series de fuerza automáticamente: si el techo del rango de
 // repeticiones es 6 o menos, se la considera "FUERZA" — sin que nadie tenga
