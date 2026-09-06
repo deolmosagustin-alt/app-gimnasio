@@ -60,6 +60,7 @@ import {
   createRoutineProposal, createProgressionProposal, respondToRoutineProposal, listRoutineProposalsForStudent, listRoutineProposalsByTrainer,
   cleanupSocialData, listGlobalLeaderboard,
   setDiscoverablePhone, clearDiscoverablePhone, findUidsByPhoneHashes,
+  hasSentKudosToday, sendKudos,
 } from "./social";
 // Catálogo de ejercicios, grupos musculares y rutinas preestablecidas —
 // movidos a data.js para que este archivo quede más liviano. RANK_TIERS
@@ -11248,7 +11249,19 @@ function useUserStreaks(uids) {
       const dateSet = new Set((full.trainingSessions || []).map((s) => s.date));
       const streak = computeSmartStreak(dateSet, weekSchedule);
       const sessionsThisWeek = getSessionsForPeriod(full.trainingSessions || [], "week").length;
-      return [u, { streak, sessionsThisWeek }];
+      // Pedido: "kudos/aplausos rápidos" — la sesión más reciente, con el
+      // nombre/color del día (si su rutina activa lo tiene), para poder
+      // destacar "de qué entrenó" sin pedirle nada más a Firestore: ya
+      // tenemos su `full` acá mismo.
+      let latestSession = null;
+      const sessions = full.trainingSessions || [];
+      if (sessions.length) {
+        const latest = sessions.reduce((a, b) => (b.date > a.date ? b : a));
+        const model = full.activeRoutineSnapshot ? buildRoutineModel(full.activeRoutineSnapshot) : null;
+        const dayDef = model?.days?.[latest.dayKey];
+        latestSession = { date: latest.date, dayLabel: dayDef?.label || null, dayColor: dayDef?.color || null };
+      }
+      return [u, { streak, sessionsThisWeek, latestSession }];
     }))).then((pairs) => {
       if (!cancelled) setActivity(Object.fromEntries(pairs));
     });
@@ -12944,7 +12957,16 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
   useEffect(() => { refresh(); }, [refresh]);
 
   const otherUidOf = (f) => f.users.find((u) => u !== uid);
-  const friendAccepted = friendships.filter((f) => f.status === "accepted");
+  // BUG FIX (encontrado probando kudos/chaser): esto era un .filter() sin
+  // useMemo — una referencia NUEVA en cada render. Como kudosCandidate y
+  // chaserFriend (más abajo) dependen de friendAccepted, y a su vez un
+  // useEffect depende de kudosCandidate para pedir hasSentKudosToday(),
+  // esa referencia nueva en cada render volvía a disparar el efecto en
+  // cada render, que al hacer setState volvía a renderizar — un loop
+  // infinito de renders + lecturas a Firestore que colgaba la pestaña
+  // Social entera. Memoizado por `friendships` (lo único de lo que
+  // depende de verdad), la referencia sólo cambia cuando el dato cambia.
+  const friendAccepted = useMemo(() => friendships.filter((f) => f.status === "accepted"), [friendships]);
   const friendIncoming = friendships.filter((f) => f.status === "pending" && f.requestedBy !== uid);
   const friendOutgoing = friendships.filter((f) => f.status === "pending" && f.requestedBy === uid);
 
@@ -13038,6 +13060,72 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
   const [templateSentNote, setTemplateSentNote] = useState(false);
   const trainerRoutineTemplates = profile?.trainerRoutineTemplates || {};
   const myTopRank = useMemo(() => computeTopRank(profile), [profile]);
+  // Pedido: "kudos/aplausos rápidos" y "te están por alcanzar" — dos ideas
+  // inspiradas en Strava para el recuadro de perfil de Social, elegidas
+  // por el usuario entre varias propuestas.
+  const myWeekSchedule = useMemo(() => {
+    const def = resolveRoutineDef(profile?.routines?.[profile?.activeRoutineId], profile?.activeRoutineId);
+    return def ? getRoutineWeekSchedule(def) : null;
+  }, [profile]);
+  const myStreak = useMemo(() => computeSmartStreak(getTrainedDateSet(profile?.logs || {}, profile?.trainingSessions || []), myWeekSchedule), [profile, myWeekSchedule]);
+  // El amigo con la actividad más reciente (dentro de los últimos 3 días —
+  // si no hay nada tan fresco, no hay nada que festejar todavía).
+  const kudosCandidate = useMemo(() => {
+    let best = null;
+    friendAccepted.forEach((f) => {
+      const other = f.users.find((u) => u !== uid);
+      const latest = streaks[other]?.latestSession;
+      if (!latest) return;
+      if (!best || latest.date > best.latestSession.date) best = { uid: other, latestSession: latest };
+    });
+    if (!best) return null;
+    const daysAgo = Math.floor((new Date() - new Date(`${best.latestSession.date}T00:00:00`)) / 86400000);
+    if (daysAgo > 3) return null;
+    return { ...best, daysAgo };
+  }, [friendAccepted, streaks, uid]);
+  // El amigo con la racha más alta que todavía no te alcanzó, pero está
+  // cerca (1-2 días) — "being chased", estilo Strava.
+  const chaserFriend = useMemo(() => {
+    if (!myStreak) return null;
+    let best = null;
+    friendAccepted.forEach((f) => {
+      const other = f.users.find((u) => u !== uid);
+      const theirStreak = streaks[other]?.streak || 0;
+      if (theirStreak >= myStreak || theirStreak < myStreak - 2) return;
+      if (!best || theirStreak > best.streak) best = { uid: other, streak: theirStreak };
+    });
+    return best;
+  }, [friendAccepted, streaks, myStreak, uid]);
+  // kudosState va etiquetado con SU PROPIO uid — al leerlo siempre se
+  // compara contra kudosCandidate?.uid actual (ver kudosSent/kudosSending
+  // más abajo), así un cambio de candidato (la lista de amigos cambia, o
+  // alguien más entrena algo más reciente) nunca muestra "ya aplaudido"
+  // pisado de un candidato viejo.
+  const [kudosState, setKudosState] = useState({ uid: null, sent: false, sending: false });
+  useEffect(() => {
+    const candidateUid = kudosCandidate?.uid || null;
+    if (!candidateUid || !uid) return;
+    let cancelled = false;
+    hasSentKudosToday(candidateUid, uid, todayStr()).then((sent) => {
+      if (!cancelled) setKudosState({ uid: candidateUid, sent, sending: false });
+    });
+    return () => { cancelled = true; };
+  }, [kudosCandidate, uid]);
+  const kudosSent = kudosState.uid === kudosCandidate?.uid && kudosState.sent;
+  const kudosSending = kudosState.uid === kudosCandidate?.uid && kudosState.sending;
+  const handleSendKudos = async () => {
+    if (!kudosCandidate || !uid || kudosSending || kudosSent) return;
+    const candidateUid = kudosCandidate.uid;
+    setKudosState({ uid: candidateUid, sent: false, sending: true });
+    try {
+      await sendKudos(candidateUid, uid, todayStr());
+      setKudosState({ uid: candidateUid, sent: true, sending: false });
+      haptic(20);
+    } catch (err) {
+      console.warn("[social] No se pudo mandar el aplauso:", err?.message || err);
+      setKudosState({ uid: candidateUid, sent: false, sending: false });
+    }
+  };
   // Antes no había NINGUNA forma de sacar a un amigo ya aceptado — el único
   // botón de "Cancelar" que existía era para una solicitud saliente
   // todavía pendiente. Two-tap (mismo criterio que borrar una conversación
@@ -13220,14 +13308,57 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
             </button>
           )}
         </div>
-        {/* Pedido: sacar "Tu ranking" y la barra de progreso al próximo
-            rango, y en su lugar proponer opciones más innovadoras — el
-            usuario eligió un desafío semanal (con festejo al completarlo,
-            en vez de un % abstracto) y un pulso social de "amigos en
-            racha ahora". */}
-        {/* Pedido: sacar el desafío semanal y "amigos en racha" de acá —
-            este espacio (entre la identidad de arriba y la línea de abajo)
-            queda pendiente de nuevas ideas a propuesta. */}
+        {/* Pedido: ideas "inspiradas en apps como Strava, enfocadas en lo
+            social" para este espacio (entre la identidad de arriba y la
+            línea del QR de abajo) — el usuario eligió kudos/aplausos
+            rápidos y un aviso de "te están por alcanzar", con diseños
+            contundentes (no sólo texto): tarjeta propia, color de marca,
+            ícono grande, y accionables (aplaudir / ver el perfil). */}
+        {kudosCandidate && (
+          <div className="relative overflow-hidden rounded-2xl border mt-3.5 p-3.5" style={{ borderColor: "rgba(252,76,2,0.45)", background: "linear-gradient(135deg, rgba(252,76,2,0.18), rgba(15,23,42,0.55) 70%)" }}>
+            <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full blur-2xl pointer-events-none" style={{ backgroundColor: "rgba(252,76,2,0.35)" }} />
+            <div className="relative flex items-center gap-3">
+              <button onClick={() => setViewingUid(kudosCandidate.uid)} className="flex items-center gap-2.5 flex-1 min-w-0 text-left active:opacity-80 transition">
+                {basics[kudosCandidate.uid]?.avatarData ? (
+                  <img src={basics[kudosCandidate.uid].avatarData} alt="" className="w-11 h-11 rounded-2xl object-cover shrink-0 border-2" style={{ borderColor: "rgba(252,76,2,0.5)" }} />
+                ) : (
+                  <div className="w-11 h-11 rounded-2xl flex items-center justify-center text-base font-black !text-white shrink-0 border-2" style={{ background: "linear-gradient(135deg,#FC4C02,#C2410C)", borderColor: "rgba(252,76,2,0.5)" }}>
+                    {(basics[kudosCandidate.uid]?.name || "?").charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black uppercase tracking-wide" style={{ color: "#FDBA74" }}>{kudosCandidate.daysAgo === 0 ? "Entrenó hoy" : "Entrenó ayer"}</p>
+                  <p className="text-sm font-bold text-white truncate">{basics[kudosCandidate.uid]?.name || "Tu amigo"}</p>
+                  {kudosCandidate.latestSession.dayLabel && <p className="text-[11px] text-slate-400 truncate">{kudosCandidate.latestSession.dayLabel}</p>}
+                </div>
+              </button>
+              <button
+                onClick={handleSendKudos}
+                disabled={kudosSending || kudosSent}
+                className={`shrink-0 flex flex-col items-center justify-center gap-0.5 w-16 h-16 rounded-2xl border-2 font-black transition-all active:scale-90 ${kudosSent ? "opacity-90" : !kudosSending ? "animate-pulse" : ""}`}
+                style={kudosSent ? { backgroundColor: "rgba(252,76,2,0.25)", borderColor: "#FC4C02", color: "#FDBA74" } : { backgroundColor: "#FC4C02", borderColor: "#FC4C02", color: "#fff" }}
+              >
+                <span className="text-2xl leading-none">👏</span>
+                <span className="text-[8.5px] leading-none">{kudosSent ? "¡Listo!" : "Aplaudir"}</span>
+              </button>
+            </div>
+          </div>
+        )}
+        {chaserFriend && (
+          <button onClick={() => setViewingUid(chaserFriend.uid)} className="relative overflow-hidden w-full text-left rounded-2xl border mt-3.5 p-3.5 active:scale-[0.99] transition" style={{ borderColor: "rgba(244,63,94,0.5)", background: "linear-gradient(135deg, rgba(244,63,94,0.20), rgba(15,23,42,0.55) 70%)" }}>
+            <div className="absolute -top-8 -left-8 w-24 h-24 rounded-full blur-2xl pointer-events-none animate-pulse" style={{ backgroundColor: "rgba(244,63,94,0.3)" }} />
+            <div className="relative flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 border-2" style={{ backgroundColor: "rgba(244,63,94,0.2)", borderColor: "rgba(244,63,94,0.55)" }}>
+                <Flame size={22} style={{ color: "#FB7185" }} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-black uppercase tracking-wide" style={{ color: "#FB7185" }}>¡Te están por alcanzar!</p>
+                <p className="text-[12.5px] text-slate-200 leading-snug"><span className="font-black text-white">{basics[chaserFriend.uid]?.name || "Tu amigo"}</span> tiene una racha de {chaserFriend.streak} días — la tuya: {myStreak}</p>
+              </div>
+              <ChevronRight size={16} className="text-rose-300/70 shrink-0" />
+            </div>
+          </button>
+        )}
         {profile?.username ? (
           // Pedido: "que vuelva lo del QR, pero solo que muestre el QR al
           // pulsarlo, el link no" — antes esto abría un selector (tarjeta

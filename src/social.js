@@ -398,6 +398,27 @@ export async function listRoutineProposalsByTrainer(trainerUid) {
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
+// ============================== KUDOS (aplausos rápidos) ==============================
+// Pedido: "kudos/aplausos rápidos" en el recuadro de Social, estilo
+// Strava — un gesto social liviano, uno por día por par de personas (ID
+// determinístico, mismo criterio que friendshipId/trainerLinkId: evita
+// tener que consultar nada para saber si ya existe). No hay un "listado de
+// quién te aplaudió" todavía (quedaría para más adelante) — por ahora sólo
+// hace falta saber "¿ya le aplaudí a esta persona hoy?" antes de mostrar
+// el botón habilitado.
+export function kudosId(toUid, fromUid, date) { return `${toUid}_${fromUid}_${date}`; }
+
+export async function hasSentKudosToday(toUid, fromUid, date) {
+  try {
+    const snap = await getDoc(doc(db, "kudos", kudosId(toUid, fromUid, date)));
+    return snap.exists();
+  } catch { return false; }
+}
+
+export async function sendKudos(toUid, fromUid, date) {
+  await setDoc(doc(db, "kudos", kudosId(toUid, fromUid, date)), { toUid, fromUid, date, createdAt: new Date().toISOString() });
+}
+
 // ============================== LIMPIEZA AL ELIMINAR PERFIL ==============================
 // Best-effort: se llama desde handleDelete. Nunca debe bloquear ni tirar —
 // si algo falla, queda basura huérfana (mismo criterio que ya usa el resto

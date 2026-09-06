@@ -211,6 +211,23 @@ service cloud.firestore {
         && resource.data.status == 'pending';
     }
 
+    // ============================== KUDOS (aplausos rápidos) ==============================
+    // ID = "<toUid>_<fromUid>_<fecha>" — uno por día por par de personas
+    // (mismo criterio que friendshipId/trainerLinkId: el propio ID ya
+    // evita duplicados, sin tener que consultar nada antes de crear).
+    // Sólo se puede aplaudir a un amigo ACEPTADO, y sólo en tu propio
+    // nombre (fromUid == tu uid) — nunca a vos mismo.
+    match /kudos/{kudosId} {
+      allow read: if isSignedIn()
+        && (request.auth.uid == resource.data.toUid || request.auth.uid == resource.data.fromUid);
+      allow create: if isSignedIn()
+        && request.auth.uid == request.resource.data.fromUid
+        && request.resource.data.toUid != request.auth.uid
+        && kudosId == (request.resource.data.toUid + '_' + request.resource.data.fromUid + '_' + request.resource.data.date)
+        && isAcceptedFriend(request.resource.data.toUid);
+      allow update, delete: if false;
+    }
+
     // ============================== RUTINAS COMPARTIDAS POR ENLACE ==============================
     // Ya existente — ver comentario arriba de shareRoutineToFirestore() en
     // App.jsx. Lectura y creación públicas (sin sesión) porque cualquiera
