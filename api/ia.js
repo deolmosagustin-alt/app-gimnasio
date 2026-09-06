@@ -341,7 +341,13 @@ export default async function handler(req, res) {
       // (varias hojas de Excel, PDFs de varias páginas, varios .txt) el texto
       // junto supera fácil el límite viejo y se cortaba la rutina a la mitad.
       // Los modelos de la cadena aguantan de sobra este tamaño de contexto.
-      const truncated = hasText ? text.substring(0, 100000) : "";
+      // BUG FIX (encontrado auditando): el texto del usuario se pega tal
+      // cual entre delimitadores """ más abajo — si ese texto trae su
+      // propia secuencia """, podría "cerrar" el bloque antes de tiempo y
+      // colar instrucciones propias que el modelo interprete como parte
+      // del prompt original (impacto bajo: la app igual valida la forma
+      // del JSON que devuelve después, pero es una capa de defensa barata).
+      const truncated = hasText ? text.substring(0, 100000).replace(/"""/g, "'''") : "";
       const promptLines = [
         safeImages.length
           ? "Analizá la rutina de entrenamiento en las imágenes y/o el texto que te paso a continuación y extraé la rutina COMPLETA."

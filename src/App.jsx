@@ -2645,7 +2645,14 @@ async function decodeQrFromImageFile(file) {
   }
 }
 
-function wrapCanvasText(ctx, text, x, y, maxWidth, lineHeight) {
+// maxLines (opcional): BUG FIX (encontrado auditando) — un nombre de
+// ejercicio personalizado sin espacios donde cortar, o con varias palabras
+// largas, podía superar las líneas que el layout de la tarjeta reservaba
+// (ver drawPRShareCard, que decía "máximo 2 líneas" en un comentario pero
+// nunca lo hacía cumplir) y superponerse con el chip de músculo dibujado
+// más abajo a una posición fija. Con maxLines, el texto que no entra se
+// corta con "…" en vez de seguir agregando líneas sin límite.
+function wrapCanvasText(ctx, text, x, y, maxWidth, lineHeight, maxLines = Infinity) {
   const words = String(text).split(" ");
   let line = "", lines = [];
   words.forEach((w) => {
@@ -2654,6 +2661,12 @@ function wrapCanvasText(ctx, text, x, y, maxWidth, lineHeight) {
     else line = test;
   });
   if (line) lines.push(line);
+  if (lines.length > maxLines) {
+    lines = lines.slice(0, maxLines);
+    let last = lines[lines.length - 1];
+    while (last.length > 1 && ctx.measureText(`${last}…`).width > maxWidth) last = last.slice(0, -1).trimEnd();
+    lines[lines.length - 1] = `${last.trimEnd()}…`;
+  }
   lines.forEach((l, i) => ctx.fillText(l, x, y + i * lineHeight));
   return lines.length;
 }
@@ -2726,7 +2739,7 @@ function drawPRShareCard(ctx, W, H, { exerciseName, muscle, kg, reps, accent = "
   let name = (exerciseName || "").toUpperCase();
   if (name.length > 44) name = name.slice(0, 43).trimEnd() + "…";
   ctx.fillStyle = "#f8fafc"; ctx.font = "800 34px system-ui";
-  wrapCanvasText(ctx, name, W / 2, 188, W - 72, 42);
+  wrapCanvasText(ctx, name, W / 2, 188, W - 72, 42, 2);
 
   // Chip de músculo — posición fija, debajo del área reservada del nombre.
   if (muscle) {
@@ -3361,7 +3374,12 @@ function ShareImageModal({ title, subtitle, fileNamePrefix, shareTitle, shareTex
         <canvas ref={canvasRef} className="hidden" />
         {/* Botones siempre visibles primero — el preview es secundario */}
         <div className="relative flex gap-2 mb-3">
-          <button onClick={handleShare} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl !text-white text-sm font-bold transition-all active:scale-[0.98]" style={{ background: `linear-gradient(135deg, ${accent}, ${tint(accent, "b0")})`, boxShadow: `0 10px 28px -10px ${tint(accent, "80")}` }}><Share2 size={14} /> Compartir</button>
+          {/* BUG FIX (encontrado auditando): a diferencia de "Descargar",
+              este botón no tenía ningún guard — si draw() falla (ej. sin
+              conexión mientras se genera el QR del perfil), previewUrl
+              nunca se completa pero "Compartir" seguía tocable, sin dar
+              ningún indicio de que no había nada real para compartir. */}
+          <button onClick={handleShare} disabled={!previewUrl} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl !text-white text-sm font-bold transition-all active:scale-[0.98] disabled:opacity-40" style={{ background: `linear-gradient(135deg, ${accent}, ${tint(accent, "b0")})`, boxShadow: `0 10px 28px -10px ${tint(accent, "80")}` }}><Share2 size={14} /> Compartir</button>
           <button onClick={handleDownload} disabled={!previewUrl} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl border text-slate-300 hover:text-white transition text-sm font-semibold disabled:opacity-40" style={{ borderColor: tint(accent, "30") }}><Download size={14} /> Descargar</button>
         </div>
         {previewUrl ? (
