@@ -12136,23 +12136,44 @@ function FriendConsistencyStrip({ trainingSessions = [], activeRoutineSnapshot, 
   // embedded: sin su propia tarjeta/glow/título — para meterlo DENTRO de
   // otra tarjeta (ver "Entrenamiento" en FriendProfileView) en vez de que
   // la constancia viva siempre en su propio recuadro azul aparte.
+  // Rediseño (pedido: "mejoremos el aspecto del gráfico de Constancia"):
+  // antes era una sola tira de 14 cuadraditos sin ninguna referencia — los
+  // días sin marca eran casi invisibles (sin borde) y no había forma de
+  // saber "cuál es hoy" de un vistazo. Ahora se separa en dos filas
+  // etiquetadas (semana pasada / esta semana), el día de HOY se resalta
+  // con un anillo, los días sin marca tienen un borde sutil para que se
+  // note la grilla, y los días entrenados usan un degradé en vez de un
+  // color plano para dar algo más de profundidad.
+  const todayD = todayStr();
+  const weekHalves = [recentDays.slice(0, 7), recentDays.slice(7)];
   const grid = (
     <>
-      <div className="relative grid grid-cols-7 gap-1.5">
-        {recentDays.map(({ date, session }) => {
-          const dayDef = session ? model?.days?.[session.dayKey] : null;
-          const color = dayDef?.color || "#3B82F6";
-          return (
-            <div
-              key={date}
-              title={date}
-              className="aspect-square rounded-lg"
-              style={session ? { backgroundColor: tint(color, "cc") } : { backgroundColor: "rgba(51,65,85,0.4)" }}
-            />
-          );
-        })}
+      <div className="relative space-y-2">
+        {weekHalves.map((week, wi) => (
+          <div key={wi}>
+            <p className="text-[8px] font-bold uppercase tracking-wide text-slate-600 mb-1">{wi === 0 ? "Semana pasada" : "Esta semana"}</p>
+            <div className="grid grid-cols-7 gap-1.5">
+              {week.map(({ date, session }) => {
+                const dayDef = session ? model?.days?.[session.dayKey] : null;
+                const color = dayDef?.color || "#3B82F6";
+                const isToday = date === todayD;
+                return (
+                  <div
+                    key={date}
+                    title={date}
+                    className={`aspect-square rounded-lg ${isToday ? "ring-2 ring-white/70" : ""}`}
+                    style={session ? { background: `linear-gradient(155deg, ${tint(color, "ee")}, ${tint(color, "88")})` } : { backgroundColor: "rgba(51,65,85,0.35)", border: "1px solid rgba(148,163,184,0.14)" }}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </div>
-      <p className="relative text-[10.5px] text-slate-500 text-center mt-2.5">{trainedCount} de 14 días entrenados</p>
+      <div className="relative flex items-center justify-center gap-1.5 mt-2.5">
+        {trainedCount >= 10 && <Flame size={11} className="text-orange-400" />}
+        <p className="text-[10.5px] text-slate-500">{trainedCount} de 14 días entrenados</p>
+      </div>
     </>
   );
   if (embedded) return grid;
@@ -12191,15 +12212,21 @@ function FriendSessionHistory({ trainingSessions = [], activeRoutineSnapshot }) 
   const selected = selectedDate ? byDate[selectedDate] : null;
 
   if (!trainingSessions.length) return <p className="text-xs text-slate-600 text-center py-6">Todavía no registró ninguna sesión.</p>;
+  // Pedido: "dale una tonalidad más violeta a ese recuadro (también al
+  // historial de sesiones...), solo del perfil de tus amigos" — este
+  // componente sólo se usa acá (perfil de un amigo), así que el tinte va
+  // directo sin necesidad de ningún prop nuevo. Los colores POR DÍA (el
+  // color de cada celda con marca, el acento del detalle de abajo) sigue
+  // siendo el color de la rutina de esa persona — eso es dato, no decorado.
   return (
     <div className="space-y-2.5">
-      <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 backdrop-blur-sm">
+      <div className="bg-purple-500/[0.06] border border-purple-500/20 rounded-2xl p-4 backdrop-blur-sm">
         <div className="flex items-center justify-between mb-3">
-          <button onClick={() => setCursor((c) => { const m = c.m === 0 ? 11 : c.m - 1; const y = c.m === 0 ? c.y - 1 : c.y; return { y, m }; })} aria-label="Mes anterior" className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400"><ChevronLeft size={16} /></button>
+          <button onClick={() => setCursor((c) => { const m = c.m === 0 ? 11 : c.m - 1; const y = c.m === 0 ? c.y - 1 : c.y; return { y, m }; })} aria-label="Mes anterior" className="p-1.5 rounded-lg hover:bg-purple-500/15 text-purple-300/70"><ChevronLeft size={16} /></button>
           <p className="text-sm font-bold text-white">{MONTH_LABELS[cursor.m]} {cursor.y}</p>
-          <button onClick={() => setCursor((c) => { const m = c.m === 11 ? 0 : c.m + 1; const y = c.m === 11 ? c.y + 1 : c.y; return { y, m }; })} aria-label="Mes siguiente" className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400"><ChevronRight size={16} /></button>
+          <button onClick={() => setCursor((c) => { const m = c.m === 11 ? 0 : c.m + 1; const y = c.m === 11 ? c.y + 1 : c.y; return { y, m }; })} aria-label="Mes siguiente" className="p-1.5 rounded-lg hover:bg-purple-500/15 text-purple-300/70"><ChevronRight size={16} /></button>
         </div>
-        <div className="grid grid-cols-7 gap-1 mb-1.5">{WEEKDAY_LABELS.map((l, i) => <div key={i} className="text-center text-[9px] font-bold text-slate-600">{l}</div>)}</div>
+        <div className="grid grid-cols-7 gap-1 mb-1.5">{WEEKDAY_LABELS.map((l, i) => <div key={i} className="text-center text-[9px] font-bold text-purple-300/40">{l}</div>)}</div>
         <div className="grid grid-cols-7 gap-1">
           {weeks.flat().map((d, i) => {
             if (!d) return <div key={i} />;
@@ -12212,7 +12239,7 @@ function FriendSessionHistory({ trainingSessions = [], activeRoutineSnapshot }) 
             return (
               <button key={i} onClick={() => s && setSelectedDate(isSelected ? null : d)} disabled={!s}
                 style={s ? { backgroundColor: tint(color, "30"), border: `1px solid ${tint(color, "55")}` } : undefined}
-                className={`aspect-square rounded-lg flex items-center justify-center text-[11px] font-bold transition-all ${isSelected ? "ring-2 ring-teal-400" : ""} ${isToday && !s ? "border border-teal-500/50" : ""} ${s ? "text-white hover:brightness-125 active:scale-95" : "text-slate-700"}`}>
+                className={`aspect-square rounded-lg flex items-center justify-center text-[11px] font-bold transition-all ${isSelected ? "ring-2 ring-purple-400" : ""} ${isToday && !s ? "border border-purple-500/50" : ""} ${s ? "text-white hover:brightness-125 active:scale-95" : "text-slate-700"}`}>
                 {dayNum}
               </button>
             );
@@ -12220,7 +12247,7 @@ function FriendSessionHistory({ trainingSessions = [], activeRoutineSnapshot }) 
         </div>
       </div>
       {selected ? (
-        <div className="flex items-center gap-3 rounded-xl border border-slate-800/50 bg-slate-900/50 px-3.5 py-2.5">
+        <div className="flex items-center gap-3 rounded-xl border border-purple-500/20 bg-purple-500/[0.06] px-3.5 py-2.5">
           <span className="w-1.5 h-8 rounded-full shrink-0" style={{ backgroundColor: model?.days?.[selected.dayKey]?.color || "#475569" }} />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-bold text-white truncate">{model?.days?.[selected.dayKey]?.label || selected.dayKey || "Entrenamiento"}</p>
@@ -12231,7 +12258,7 @@ function FriendSessionHistory({ trainingSessions = [], activeRoutineSnapshot }) 
           </div>
         </div>
       ) : (
-        <p className="text-center text-[11px] text-slate-600 py-1">Tocá un día con marca para ver el detalle.</p>
+        <p className="text-center text-[11px] text-purple-300/40 py-1">Tocá un día con marca para ver el detalle.</p>
       )}
     </div>
   );
@@ -12727,22 +12754,34 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
               )}
 
               {/* Duelo semanal — quién entrenó más veces ESTA semana, vos o
-                  esta persona. Corto y competitivo a propósito. */}
-              <div className="relative overflow-hidden rounded-2xl border border-slate-700/50 p-3" style={{ background: "linear-gradient(160deg, rgba(30,41,59,0.6), rgba(15,23,42,0.4))" }}>
-                <p className="relative text-[9px] font-black uppercase tracking-widest text-slate-500 mb-1.5 flex items-center gap-1"><Swords size={10} /> Esta semana</p>
-                <div className="relative flex items-center justify-around gap-1">
+                  esta persona. Corto y competitivo a propósito.
+                  BUG FIX (pedido: "los números y todo en general están
+                  descentrados") — antes era flex+justify-around con dos
+                  columnas de ANCHO distinto (la derecha tenía un truncate
+                  max-w-[64px] para el nombre del amigo, de largo variable),
+                  así que "justify-around" repartía el espacio disponible de
+                  forma asimétrica y el conjunto se veía corrido hacia un
+                  lado. Grid de 3 columnas (1fr/auto/1fr) fuerza a los dos
+                  lados a ocupar siempre el mismo ancho.
+                  Pedido: reemplazar el nombre del amigo por una etiqueta
+                  genérica ("Tu amigo") — de paso saca el ancho variable que
+                  causaba el descentrado, y tonalidad más violeta (identidad
+                  del perfil de amigos) en vez del gris neutro de siempre. */}
+              <div className="relative overflow-hidden rounded-2xl border border-purple-500/25 p-3" style={{ background: "linear-gradient(160deg, rgba(88,28,135,0.28), rgba(15,23,42,0.5))" }}>
+                <p className="relative text-[9px] font-black uppercase tracking-widest text-purple-300/70 mb-1.5 flex items-center gap-1"><Swords size={10} /> Esta semana</p>
+                <div className="relative grid grid-cols-[1fr_auto_1fr] items-center gap-1">
                   <div className="text-center">
                     <p className={`text-xl font-black leading-none ${mySessionsThisWeek > theirSessionsThisWeek ? "text-teal-300" : "text-white"}`}>{mySessionsThisWeek}</p>
                     <p className="text-[8.5px] text-slate-500 mt-1">Vos</p>
                   </div>
-                  <span className="text-[9px] text-slate-700 font-black shrink-0">VS</span>
-                  <div className="text-center min-w-0">
+                  <span className="text-[9px] text-slate-700 font-black shrink-0 px-1">VS</span>
+                  <div className="text-center">
                     <p className={`text-xl font-black leading-none ${theirSessionsThisWeek > mySessionsThisWeek ? "text-fuchsia-300" : "text-white"}`}>{theirSessionsThisWeek}</p>
-                    <p className="text-[8.5px] text-slate-500 mt-1 truncate max-w-[64px]">{basic?.name || "Ellos"}</p>
+                    <p className="text-[8.5px] text-slate-500 mt-1">Tu amigo</p>
                   </div>
                 </div>
                 <p className="relative text-[9px] text-slate-500 text-center mt-1.5 truncate">
-                  {mySessionsThisWeek === theirSessionsThisWeek ? "Empatados" : mySessionsThisWeek > theirSessionsThisWeek ? "Vas ganando 💪" : `${basic?.name || "Esta persona"} gana`}
+                  {mySessionsThisWeek === theirSessionsThisWeek ? "Empatados" : mySessionsThisWeek > theirSessionsThisWeek ? "Vas ganando 💪" : "Tu amigo gana"}
                 </p>
               </div>
             </div>
@@ -12879,20 +12918,41 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
               {MEASUREMENT_TYPES.some((t) => (full.measurements?.[t.k] || []).length > 0) && (
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 px-1 mb-2">Medidas corporales</p>
+                  {/* Rediseño (pedido: "mejoremos... la sección de medidas
+                      corporales" + tonalidad violeta): antes era una caja
+                      gris chata con sólo el último valor. Mismo lenguaje que
+                      ya usa "Tus medidas" (MeasurementsView, más arriba en
+                      el archivo) — tarjeta violeta + cuánto cambió desde el
+                      registro anterior + hace cuánto se cargó — así se lee
+                      de un vistazo si viene subiendo/bajando, no sólo el
+                      número pelado. El delta usa un violeta neutro (no
+                      rojo/verde): subir o bajar cintura o peso no es
+                      "bueno" o "malo" en sí mismo, depende del objetivo de
+                      cada uno. */}
                   <div className="grid grid-cols-2 gap-2">
                     {MEASUREMENT_TYPES.map((t) => {
-                      const last = getLatestMeasurement(full.measurements?.[t.k]);
+                      const hist = (full.measurements?.[t.k] || []).slice().sort((a, b) => (a.date < b.date ? 1 : -1));
+                      const last = hist[0];
                       if (!last) return null;
+                      const delta = hist[1] ? Math.round((last.value - hist[1].value) * 10) / 10 : null;
+                      const days = daysSince(last.date);
                       return (
-                        <div key={t.k} className="rounded-xl border border-slate-800/50 bg-slate-900/50 px-3 py-2.5">
-                          <p className="text-[11px] text-slate-500">{t.l}</p>
-                          <p className="text-sm font-bold text-white">{last.value}{t.unit}</p>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+                        <div key={t.k} className="rounded-2xl border border-purple-500/20 px-3.5 py-3" style={{ background: "linear-gradient(150deg, rgba(168,85,247,0.14), rgba(15,23,42,0.5))" }}>
+                          <p className="text-[9.5px] font-black uppercase tracking-wide text-purple-300/70 truncate">{t.l}</p>
+                          <p className="text-lg font-black text-white mt-1 tabular-nums">{last.value}<span className="text-[10px] font-normal text-slate-400 ml-0.5">{t.unit}</span></p>
+                          <div className="flex items-center justify-between mt-1 gap-1">
+                            <span className="text-[9px] font-bold flex items-center gap-0.5 text-purple-300/80 shrink-0">
+                              {delta != null && delta !== 0 && (delta > 0 ? <TrendingUp size={9} /> : <TrendingDown size={9} />)}
+                              {delta != null && delta !== 0 ? `${delta > 0 ? "+" : ""}${delta}${t.unit}` : ""}
+                            </span>
+                            {days != null && <span className="text-[8.5px] text-slate-600 truncate">hace {days === 0 ? "hoy" : days === 1 ? "1 día" : `${days} días`}</span>}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </>
           )}
         </>
