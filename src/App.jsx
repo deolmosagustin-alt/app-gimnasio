@@ -3970,16 +3970,30 @@ function descongelarFondo() {
 // el fondo mientras está abierto. Lo llaman todos los modales.
 // Uso: useAndroidBack(onClose) al principio del componente.
 function useAndroidBack(onClose) {
+  // BUG FIX (encontrado auditando): la mayoría de los ~38 llamadores pasan
+  // una función inline (`onClose={() => setShowX(false)}`), que es una
+  // referencia NUEVA en cada render — con `onClose` en el array de deps,
+  // el efecto se desmontaba y volvía a montar en CADA re-render del
+  // componente dueño del modal, no solo al abrir/cerrar. Si mientras tanto
+  // había otro modal abierto ENCIMA (anidado), ese desmonte+remonte movía
+  // el handler de este modal al TOPE de BACK_HANDLERS, adelante del que en
+  // realidad está visible arriba de todo — el siguiente botón atrás cerraba
+  // el modal de abajo en vez del que se está mirando. Con un ref, el
+  // efecto se registra UNA sola vez (según su identidad de montaje) y
+  // siempre invoca la versión más reciente de onClose.
+  const onCloseRef = useRef(onClose);
+  useLayoutEffect(() => { onCloseRef.current = onClose; });
   useEffect(() => {
-    if (typeof onClose !== "function") return;
-    BACK_HANDLERS.push(onClose);
+    if (typeof onCloseRef.current !== "function") return;
+    const handler = () => onCloseRef.current?.();
+    BACK_HANDLERS.push(handler);
     congelarFondo();
     return () => {
-      const i = BACK_HANDLERS.lastIndexOf(onClose);
+      const i = BACK_HANDLERS.lastIndexOf(handler);
       if (i !== -1) BACK_HANDLERS.splice(i, 1);
       descongelarFondo();
     };
-  }, [onClose]);
+  }, []);
 }
 
 function CountUpNumber({ value, from = null, duration = 700, decimals = 1, className = "", style = {} }) {
@@ -8028,8 +8042,13 @@ function BattleCompareCard({ myAvatarData, myName, mySex, mySessionsThisWeek, my
   const theirScore = theyWinCount * 2 + (theyWinWeek ? 1 : 0);
   const iWinBattle = myScore > theirScore;
   const theyWinBattle = theirScore > myScore;
+  // BUG FIX (encontrado auditando): si ninguno de los dos tiene NINGÚN
+  // músculo con datos (comparison vacío), el fallback de abajo (totalMuscles=1)
+  // hacía que la barra se pintara 0% para mí / 100% para el otro — una
+  // "derrota total" visual para una comparación que en realidad no tiene
+  // ningún dato de ninguno de los dos lados. Se reparte 50/50 en ese caso.
   const totalMuscles = comparison.length || 1;
-  const myBarPct = Math.round(((iWinCount + tieCount / 2) / totalMuscles) * 100);
+  const myBarPct = comparison.length === 0 ? 50 : Math.round(((iWinCount + tieCount / 2) / totalMuscles) * 100);
   // Pedido: "el recuadro de los muñecos... quedó muy simple" — se le suma
   // el rango de cada uno debajo de su nombre (antes no decía nada de eso
   // acá, sólo abajo del todo en el desglose músculo por músculo).
@@ -10345,18 +10364,27 @@ function SocialPreviewCard({ profile, uid, onGoToSocial, onUpdateProfile }) {
               sigue compartiendo igual que compartía antes de que este
               toggle existiera (ver profileToPublicFull en social.js). */}
           <div className="pt-2 border-t border-slate-800/50 space-y-2.5">
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 flex items-center gap-1.5"><Users size={11} /> Qué ven tus amigos</p>
+            {/* BUG FIX (encontrado auditando): el mismo documento público que
+                leen los amigos también lo lee tu entrenador/alumno vinculado
+                (ver firestore.rules) — el título decía "tus amigos" nada
+                más, así que apagar "Tu rutina activa" pensando solo en
+                amigos también le apagaba a tu entrenador la posibilidad de
+                planificarte la semana, sin ningún aviso de que pasaba eso. */}
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 flex items-center gap-1.5"><Users size={11} /> Qué ven tus amigos y tu entrenador/alumno</p>
             {[
               { key: "shareStatsWithFriends", label: "Tus marcas y racha" },
-              { key: "shareRoutineWithFriends", label: "Tu rutina activa" },
-            ].map(({ key, label }) => {
+              { key: "shareRoutineWithFriends", label: "Tu rutina activa", hint: "Si tenés un entrenador vinculado, apagar esto también le impide planificarte la semana." },
+            ].map(({ key, label, hint }) => {
               const enabled = profile.settings?.[key] !== false;
               return (
-                <div key={key} className="flex items-center justify-between gap-2">
-                  <span className="text-xs text-slate-300">{label}</span>
-                  <button onClick={() => onUpdateProfile({ settings: { ...profile.settings, [key]: !enabled } })} className={`shrink-0 w-10 h-6 rounded-full transition-colors relative ${enabled ? "bg-teal-500" : "bg-slate-700"}`} aria-label={`${label}: ${enabled ? "activado" : "desactivado"}`}>
-                    <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all ${enabled ? "left-[18px]" : "left-0.5"}`} />
-                  </button>
+                <div key={key} className="space-y-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs text-slate-300">{label}</span>
+                    <button onClick={() => onUpdateProfile({ settings: { ...profile.settings, [key]: !enabled } })} className={`shrink-0 w-10 h-6 rounded-full transition-colors relative ${enabled ? "bg-teal-500" : "bg-slate-700"}`} aria-label={`${label}: ${enabled ? "activado" : "desactivado"}`}>
+                      <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all ${enabled ? "left-[18px]" : "left-0.5"}`} />
+                    </button>
+                  </div>
+                  {hint && !enabled && <p className="text-[10px] text-amber-400/80">{hint}</p>}
                 </div>
               );
             })}

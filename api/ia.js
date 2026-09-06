@@ -112,6 +112,16 @@ function isRateLimited(ip) {
   }
   timestamps.push(now);
   requestLog.set(ip, timestamps);
+  // BUG FIX (encontrado auditando): sin esto, cada IP que alguna vez pegó
+  // acá quedaba como una entrada del Map PARA SIEMPRE (incluso vacía tras
+  // el filter de arriba) — una fuga de memoria lenta pero indefinida
+  // mientras la instancia serverless siga caliente. Se limpia el Map cada
+  // tanto para no acumular IPs viejas sin actividad reciente.
+  if (requestLog.size > 5000) {
+    for (const [key, ts] of requestLog) {
+      if (!ts.some((t) => now - t < RATE_LIMIT_WINDOW_MS)) requestLog.delete(key);
+    }
+  }
   return false;
 }
 
