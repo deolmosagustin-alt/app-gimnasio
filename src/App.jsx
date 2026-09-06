@@ -263,20 +263,6 @@ function profileToCloud(profile) {
 // Usa las mismas MUSCLE_GROUPS/getBest1RMForMuscleGroup/getMuscleRank que
 // MuscleRankView — funciones declaradas más abajo en este mismo archivo,
 // pero accesibles acá por el hoisting normal de "function" en JS.
-// Pedido: "progreso al siguiente rango" — el promedio de levelIdx SIEMPRE
-// se redondea (avgIdx) para elegir el tier a mostrar, pero el valor SIN
-// redondear (rawAvg) ya trae la info de qué tan cerca está el próximo
-// redondeo hacia arriba. Math.round considera "tier avgIdx" a todo el
-// rango [avgIdx-0.5, avgIdx+0.5) — el progreso DENTRO de ese rango hacia
-// el próximo tier completo es (rawAvg - avgIdx + 0.5), acotado a [0,1].
-// null si ya es el tier máximo (no hay "siguiente" a donde progresar).
-function computeRankProgress(rawAvg, avgIdx) {
-  const nextInfo = RANK_TIERS[avgIdx + 1];
-  if (!nextInfo) return null;
-  const pct = Math.max(0, Math.min(1, rawAvg - avgIdx + 0.5));
-  return { pct, nextTier: nextInfo.tier, nextSub: nextInfo.sub, nextColor: nextInfo.color };
-}
-
 function computeTopRank(profile) {
   try {
     const settings = getProfileSettings(profile);
@@ -289,10 +275,9 @@ function computeTopRank(profile) {
       if (rank.hasData) levelIdxs.push(rank.levelIdx);
     });
     if (!levelIdxs.length) return null;
-    const rawAvg = levelIdxs.reduce((sum, v) => sum + v, 0) / levelIdxs.length;
-    const avgIdx = Math.round(rawAvg);
+    const avgIdx = Math.round(levelIdxs.reduce((sum, v) => sum + v, 0) / levelIdxs.length);
     const info = RANK_TIERS[avgIdx];
-    return { tier: info.tier, sub: info.sub, color: info.color, label: "Promedio", levelIdx: avgIdx, progress: computeRankProgress(rawAvg, avgIdx) };
+    return { tier: info.tier, sub: info.sub, color: info.color, label: "Promedio", levelIdx: avgIdx };
   } catch { return null; }
 }
 
@@ -303,10 +288,9 @@ function computeTopRank(profile) {
 function computeTopRankFromRanks(ranks) {
   const withData = MUSCLE_GROUPS.map((g) => ranks?.[g.key]).filter((r) => r?.hasData);
   if (!withData.length) return null;
-  const rawAvg = withData.reduce((sum, r) => sum + r.levelIdx, 0) / withData.length;
-  const avgIdx = Math.round(rawAvg);
+  const avgIdx = Math.round(withData.reduce((sum, r) => sum + r.levelIdx, 0) / withData.length);
   const info = RANK_TIERS[avgIdx];
-  return { tier: info.tier, sub: info.sub, color: info.color, levelIdx: avgIdx, progress: computeRankProgress(rawAvg, avgIdx) };
+  return { tier: info.tier, sub: info.sub, color: info.color, levelIdx: avgIdx };
 }
 
 // Descarga el perfil completo desde Firestore.
@@ -13048,6 +13032,18 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
   const [templateSentNote, setTemplateSentNote] = useState(false);
   const trainerRoutineTemplates = profile?.trainerRoutineTemplates || {};
   const myTopRank = useMemo(() => computeTopRank(profile), [profile]);
+  // Pedido: "opciones más innovadoras" para el recuadro de perfil, en vez
+  // de la barra de progreso al próximo rango — el usuario eligió estas
+  // dos: un desafío semanal (con festejo al completarlo) y un pulso
+  // social de "amigos en racha ahora".
+  const myActiveRoutineDef = useMemo(() => resolveRoutineDef(profile?.routines?.[profile?.activeRoutineId], profile?.activeRoutineId), [profile]);
+  const weeklyTargetDays = useMemo(() => {
+    if (!myActiveRoutineDef) return 0;
+    const sched = getRoutineWeekSchedule(myActiveRoutineDef);
+    return Object.values(sched).filter(Boolean).length;
+  }, [myActiveRoutineDef]);
+  const mySessionsThisWeekSocial = useMemo(() => getSessionsForPeriod(profile?.trainingSessions || [], "week").length, [profile]);
+  const friendsInStreak = useMemo(() => friendAccepted.filter((f) => (streaks[f.users.find((u) => u !== uid)]?.streak || 0) > 0).length, [friendAccepted, streaks, uid]);
   // Antes no había NINGUNA forma de sacar a un amigo ya aceptado — el único
   // botón de "Cancelar" que existía era para una solicitud saliente
   // todavía pendiente. Two-tap (mismo criterio que borrar una conversación
@@ -13230,18 +13226,36 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
             </button>
           )}
         </div>
-        {/* Pedido: sacar "Tu ranking" (posición entre amigos), dejar sólo
-            la barra de progreso al siguiente rango, y subirla arriba de
-            "Compartir mi perfil". */}
-        {myTopRank?.progress && (
-          <div className="relative mt-3.5 pt-3 border-t border-white/10">
-            <div className="flex items-center justify-between mb-1 gap-1">
-              <span className="text-[8.5px] text-slate-500 uppercase tracking-wide truncate">Hacia {myTopRank.progress.nextTier} {myTopRank.progress.nextSub}</span>
-              <span className="text-[9px] font-bold shrink-0" style={{ color: myTopRank.progress.nextColor }}>{Math.round(myTopRank.progress.pct * 100)}%</span>
-            </div>
-            <div className="h-1.5 rounded-full bg-black/30 overflow-hidden">
-              <div className="h-full rounded-full transition-all" style={{ width: `${myTopRank.progress.pct * 100}%`, backgroundColor: myTopRank.progress.nextColor }} />
-            </div>
+        {/* Pedido: sacar "Tu ranking" y la barra de progreso al próximo
+            rango, y en su lugar proponer opciones más innovadoras — el
+            usuario eligió un desafío semanal (con festejo al completarlo,
+            en vez de un % abstracto) y un pulso social de "amigos en
+            racha ahora". */}
+        {(weeklyTargetDays > 0 || friendAccepted.length > 0) && (
+          <div className="relative mt-3.5 pt-3 border-t border-white/10 space-y-2.5">
+            {weeklyTargetDays > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-1 gap-1">
+                  <span className="text-[8.5px] text-slate-500 uppercase tracking-wide flex items-center gap-1"><Target size={9} className="shrink-0" /> Desafío semanal</span>
+                  <span className="text-[9px] font-black shrink-0" style={{ color: mySessionsThisWeekSocial >= weeklyTargetDays ? "#34D399" : "#C4B5FD" }}>
+                    {mySessionsThisWeekSocial >= weeklyTargetDays ? "¡Cumplido! 🏆" : `${mySessionsThisWeekSocial}/${weeklyTargetDays} días`}
+                  </span>
+                </div>
+                <div className="h-1.5 rounded-full bg-black/30 overflow-hidden">
+                  <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(100, (mySessionsThisWeekSocial / weeklyTargetDays) * 100)}%`, backgroundColor: mySessionsThisWeekSocial >= weeklyTargetDays ? "#34D399" : "#A855F7" }} />
+                </div>
+              </div>
+            )}
+            {friendAccepted.length > 0 && (
+              <button onClick={() => setSection("amigos")} className="w-full flex items-center gap-1.5 text-[10px] text-slate-400 hover:text-slate-200 transition text-left">
+                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${friendsInStreak > 0 ? "bg-orange-500" : "bg-slate-700"}`} />
+                {friendsInStreak > 0 ? (
+                  <span className="flex items-center gap-1 min-w-0"><Flame size={10} className="text-orange-400 shrink-0" /> <span className="truncate">{friendsInStreak} de {friendAccepted.length} amigos en racha ahora</span></span>
+                ) : (
+                  <span className="truncate">Ninguno de tus amigos está en racha ahora</span>
+                )}
+              </button>
+            )}
           </div>
         )}
         {/* Pedido: sacar el botón "Compartir mi perfil" de acá — ya
@@ -13256,12 +13270,12 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
           // oración en la sección Buscar, ahora el prompt para elegirlo
           // vive acá mismo, arriba de todo, con el input de verdad en vez
           // de mandarte a buscarlo en Perfil.
-          <div className={`relative pt-3 ${myTopRank?.progress ? "mt-3" : "mt-3.5 border-t border-white/10"}`}>
+          <div className={`relative pt-3 ${(weeklyTargetDays > 0 || friendAccepted.length > 0) ? "mt-3" : "mt-3.5 border-t border-white/10"}`}>
             <p className="text-[11px] text-slate-400 mb-2">Elegí tu @usuario para que te puedan buscar y agregar.</p>
             <UsernameSection uid={uid} currentUsername={null} onSaved={(u) => onUpdateProfile({ username: u })} />
           </div>
         ) : (
-          <p className={`relative text-[11px] text-slate-400 pt-3 ${myTopRank?.progress ? "mt-3" : "mt-3.5 border-t border-white/10"}`}>Vinculá tu cuenta de Google en Perfil para poder elegir un @usuario y usar lo social.</p>
+          <p className={`relative text-[11px] text-slate-400 pt-3 ${(weeklyTargetDays > 0 || friendAccepted.length > 0) ? "mt-3" : "mt-3.5 border-t border-white/10"}`}>Vinculá tu cuenta de Google en Perfil para poder elegir un @usuario y usar lo social.</p>
         ))}
       </div>
 
