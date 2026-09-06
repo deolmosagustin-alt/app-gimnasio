@@ -41,7 +41,7 @@ import { LocalNotifications } from "@capacitor/local-notifications";
 // este import está detrás de un chequeo de Capacitor.isNativePlatform() y/o
 // un try/catch.
 import { Contacts } from "@capacitor-community/contacts";
-import { doc, setDoc, getDoc, enableIndexedDbPersistence } from "firebase/firestore";
+import { doc, setDoc, getDoc, deleteDoc, enableIndexedDbPersistence } from "firebase/firestore";
 import Model from "react-body-highlighter";
 import FemaleBody from "@mjcdev/react-body-highlighter";
 import { auth, googleProvider, db } from "./firebase";
@@ -428,6 +428,19 @@ function mergeSessions(a = [], b = []) {
   });
   out.sort((x, y) => (x.date < y.date ? -1 : 1));
   return out;
+}
+
+// Si `base` ya existe como perfil local, devuelve una variante libre
+// ("Juan (2)", "Juan (3)", ...) en vez de pisarlo. Se usa al vincular una
+// cuenta de Google cuyo nombre coincide con un perfil local que en
+// realidad no tiene nada que ver (otra cuenta, u otro perfil local) —
+// sin esto, iniciar sesión con Google podía sobreescribir de un saque un
+// perfil local no relacionado que casualmente tenía el mismo nombre.
+function uniqueProfileName(base, profiles) {
+  if (!profiles[base]) return base;
+  let i = 2;
+  while (profiles[`${base} (${i})`]) i++;
+  return `${base} (${i})`;
 }
 
 function mergeProfiles(local, cloud) {
@@ -3628,7 +3641,11 @@ function LoginScreen({ onLogin, allowAutoLogin = true }) {
       const cloudProfile = await fetchProfileFromCloud(uid);
 
       if (matchEntry || cloudProfile) {
-        const [matchName, localProfile] = matchEntry || [cloudProfile?.name || name, null];
+        // Sin coincidencia por uid (matchEntry), el nombre candidato viene
+        // de la nube o de Google — si ya existe un perfil local con ESE
+        // nombre, es de otro contexto (no lo vinculamos a esta cuenta):
+        // se usa un nombre libre en vez de pisarlo.
+        const [matchName, localProfile] = matchEntry || [uniqueProfileName(cloudProfile?.name || name, profiles), null];
         const merged = mergeProfiles(localProfile, cloudProfile);
         const finalProfile = { ...merged, archived: false, googleUid: uid, email };
         const updated = { ...profiles, [matchName]: finalProfile };
@@ -3658,12 +3675,15 @@ function LoginScreen({ onLogin, allowAutoLogin = true }) {
         return;
       }
 
-      // Primera vez real: no hay ningún perfil local. Crear uno nuevo.
+      // Primera vez real: no hay ningún perfil local. Crear uno nuevo — con
+      // un nombre libre, por si ya existe un perfil local no relacionado
+      // que casualmente se llama igual que esta cuenta de Google.
+      const finalName = uniqueProfileName(name, profiles);
       const profileToSave = { pin: null, logs: {}, email, joinedAt: new Date().toISOString(), deviceId, tutorialSeen: false, googleUid: uid };
-      const updated = { ...profiles, [name]: profileToSave };
-      saveProfiles(updated); setProfilesState(updated); saveActive(name);
-      await syncProfileToCloud(uid, { ...profileToSave, name });
-      onLogin(name, updated);
+      const updated = { ...profiles, [finalName]: profileToSave };
+      saveProfiles(updated); setProfilesState(updated); saveActive(finalName);
+      await syncProfileToCloud(uid, { ...profileToSave, name: finalName });
+      onLogin(finalName, updated);
     } catch (error) {
       console.error("Error al iniciar sesión con Google:", error);
       setRegError("Error al conectar con Google. Intentá de nuevo.");
@@ -5556,7 +5576,15 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           shareTitle="Modus Fit · Nueva marca"
           shareText={`¡Nueva marca en ${exerciseName}! 🔥`}
           accent={accent}
-          draw={(ctx, W, H) => drawPRShareCard(ctx, W, H, { exerciseName, muscle: exerciseMuscle, kg: parseFloat(kg) || currentPR?.kg, reps: parseFloat(reps) || currentPR?.reps, accent })}
+          draw={(ctx, W, H) => {
+            // El draft (kg/reps que se están escribiendo) está en la unidad
+            // de MOSTRAR (puede ser lbs) — hay que pasarlo a kg real antes de
+            // dibujarlo, porque drawPRShareCard siempre rotula el número
+            // como "kg". currentPR.kg ya viene normalizado a kg real.
+            const draftKg = parseFloat(kg);
+            const kgVal = !isNaN(draftKg) ? displayToKg(draftKg, unit) : currentPR?.kg;
+            return drawPRShareCard(ctx, W, H, { exerciseName, muscle: exerciseMuscle, kg: kgVal, reps: parseFloat(reps) || currentPR?.reps, accent });
+          }}
           onClose={() => setShowPRShare(false)}
           autoShowOptOutLabel={autoShowPrShare ? "No mostrar esto automáticamente la próxima vez" : null}
           onOptOutAutoShow={() => { onDisableAutoShowPrShare?.(); setShowPRShare(false); }}
@@ -9800,7 +9828,6 @@ async function exportRoutineToPdf(routineDef) {
     doc.setFontSize(8); doc.setTextColor(140);
     doc.text(`${d.exercises.length} ejercicio${d.exercises.length === 1 ? "" : "s"} · ${setsInDay} series`, 196, y, { align: "right" });
     y += 4;
-    const startPage = doc.internal.getNumberOfPages();
     autoTable(doc, {
       startY: y,
       head: [["Ejercicio", "Músculo", "Series", "Reps"]],
@@ -9816,10 +9843,15 @@ async function exportRoutineToPdf(routineDef) {
       // tabla, sin repetir a qué día pertenecía — mirando sólo esa
       // página no había forma de saberlo. Ahora se repite la franja de
       // color + nombre del día arriba de cada página nueva que haga
-      // falta (la primera página ya lo tiene dibujado más arriba, así
-      // que se salta con startPage).
+      // falta. data.pageNumber es un contador PROPIO de esta tabla (arranca
+      // en 1 en cada llamada a autoTable, sin importar en qué página
+      // absoluta del documento caiga) — por eso alcanza con "distinto de
+      // 1" para identificar una página de continuación, sin necesidad de
+      // comparar contra el número de página absoluto del documento (que fue
+      // el bug: antes se comparaba con el conteo absoluto de páginas ANTES
+      // de esta tabla, que solo coincidía por casualidad para el primer día).
       didDrawPage: (data) => {
-        if (data.pageNumber <= startPage) return;
+        if (data.pageNumber === 1) return;
         doc.setFillColor(...rgb);
         doc.roundedRect(14, 15.8, 3, 5.2, 0.8, 0.8, "F");
         doc.setFontSize(12); doc.setTextColor(20);
@@ -10321,6 +10353,7 @@ const AVATAR_ZOOM_MAX = 3;
 function AvatarCropModal({ src, onCancel, onConfirm }) {
   useAndroidBack(onCancel);
   const [natural, setNatural] = useState(null); // { w, h } de la imagen original
+  const [loadError, setLoadError] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [saving, setSaving] = useState(false);
@@ -10340,9 +10373,22 @@ function AvatarCropModal({ src, onCancel, onConfirm }) {
     let alive = true;
     const img = new Image();
     img.onload = () => { if (alive) setNatural({ w: img.naturalWidth, h: img.naturalHeight }); };
+    // BUG FIX: sin esto, un archivo no-imagen/corrupto (o un HEIC que el
+    // WebView no sabe decodificar) dejaba este modal colgado para siempre
+    // en el spinner de carga, sin ningún botón visible para salir.
+    img.onerror = () => { if (alive) setLoadError(true); };
     img.src = src;
     return () => { alive = false; };
   }, [src]);
+
+  if (loadError) {
+    return (
+      <div className="fixed inset-0 z-[220] bg-black/80 backdrop-blur-sm flex flex-col items-center justify-center gap-4 modal-overlay p-6 text-center">
+        <p className="text-sm text-slate-300">No pudimos abrir esa imagen. Probá con otra foto.</p>
+        <button onClick={onCancel} className="px-4 py-2 rounded-xl bg-slate-800 text-slate-200 text-sm font-semibold">Cerrar</button>
+      </div>
+    );
+  }
 
   if (!natural) {
     return (
@@ -10665,9 +10711,16 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
       const firebaseUser = auth.currentUser || pluginUser;
       const uid = firebaseUser.uid;
       const email = firebaseUser.email || pluginUser.email || profile?.email;
-      const updatedFields = { googleUid: uid, email };
+      // BUG FIX: si esta cuenta de Google YA tiene datos en la nube (subidos
+      // desde OTRO dispositivo), hay que fusionarlos con los de este perfil
+      // antes de subir — antes esto pisaba la nube entera con un setDoc sin
+      // merge, así que un perfil local casi vacío podía borrar de un saque
+      // todo el historial que ya estaba sincronizado desde otro dispositivo.
+      const cloudProfile = await fetchProfileFromCloud(uid);
+      const merged = cloudProfile ? mergeProfiles(profile, cloudProfile) : profile;
+      const updatedFields = { ...merged, googleUid: uid, email };
       onUpdateProfile(updatedFields);
-      await syncProfileToCloud(uid, { ...profile, ...updatedFields, name: profileName });
+      await syncProfileToCloud(uid, { ...updatedFields, name: profileName });
     } catch (err) {
       console.error("Error al vincular con Google:", err);
       setGoogleLinkError("No se pudo vincular con Google. Intentá de nuevo.");
@@ -19161,7 +19214,20 @@ export default function App() {
       (phoneKey ? hashPhoneKey(phoneKey) : Promise.resolve(null))
         .then((hash) => cleanupSocialData(p.googleUid, p.username || null, hash))
         .catch(() => {});
+      // BUG FIX: acá solo se borraba lo "social" (username/públicos/
+      // vínculos) — el documento con el historial/rutinas completo
+      // (users/{uid}, el que sube syncProfileToCloud) nunca se tocaba, así
+      // que un perfil "borrado" resucitaba entero con todo su historial al
+      // volver a iniciar sesión con la misma cuenta de Google.
+      deleteDoc(doc(db, "users", p.googleUid)).catch(() => {});
     }
+    // BUG FIX: la foto de perfil y las fotos de progreso viven en IndexedDB
+    // bajo una clave que es solo el NOMBRE del perfil — sin borrarlas acá,
+    // un perfil nuevo creado después con el mismo nombre (común en un
+    // dispositivo compartido/familiar) heredaba silenciosamente las fotos
+    // del perfil ya borrado.
+    idbDelete(`avatar_${activeProfile}`).catch(() => {});
+    idbDelete(`photos_${activeProfile}`).catch(() => {});
     setProfiles((prev) => { const np = { ...prev }; delete np[activeProfile]; saveProfiles(np); return np; });
     saveActive(null); setActiveProfile(null); setJustLoggedOut(true); setShowHelp(false); setHelpStartTab(null);
   };
