@@ -65,7 +65,22 @@ service cloud.firestore {
       // usuario autenticado. Nunca contiene datos de entrenamiento.
       match /public/basic {
         allow read: if isSignedIn();
-        allow write: if isOwner(uid);
+        // BUG FIX (encontrado auditando): topRank lo calcula el CLIENTE a
+        // partir de su propio historial, y hasta ahora se podía escribir
+        // cualquier valor acá — cualquiera podía mandar un levelIdx
+        // absurdo (ej. 999) y aparecer primero en el ranking global y en
+        // el de sus amigos. Sin Cloud Functions no hay forma de
+        // RECALCULAR el rango server-side a partir de los logs, pero al
+        // menos se acota al rango de valores que puede devolver
+        // computeTopRank/computeTopRankFromRanks (RANK_TIERS tiene 18
+        // escalones, índices 0 a 17) — corta los valores imposibles.
+        allow write: if isOwner(uid) && (
+          !("topRank" in request.resource.data) ||
+          request.resource.data.topRank == null ||
+          (request.resource.data.topRank.levelIdx is int &&
+           request.resource.data.topRank.levelIdx >= 0 &&
+           request.resource.data.topRank.levelIdx <= 17)
+        );
       }
 
       // "full": rutina activa, historial completo, medidas — visible solo
@@ -173,6 +188,12 @@ service cloud.firestore {
       // progressionPlan al mismo tiempo que acepta/rechaza. La app nunca
       // manda eso (respondToRoutineProposal sólo toca status/respondedAt),
       // pero la regla debería exigirlo igual que ya exige proposedRoutine.
+      // BUG FIX (encontrado auditando): antes esto no volvía a chequear el
+      // vínculo entrenador-alumno, solo lo exigía en el "create" — si el
+      // alumno desvinculaba a su entrenador CON una propuesta todavía
+      // pendiente, la propuesta seguía siendo aceptable igual, aplicando
+      // una rutina de alguien que ya no era su entrenador. Ahora se vuelve
+      // a exigir el vínculo aceptado también al aceptar/rechazar.
       allow update: if isSignedIn()
         && request.auth.uid == resource.data.studentUid
         && resource.data.status == 'pending'
@@ -180,7 +201,10 @@ service cloud.firestore {
         && request.resource.data.trainerUid == resource.data.trainerUid
         && request.resource.data.studentUid == resource.data.studentUid
         && request.resource.data.proposedRoutine == resource.data.proposedRoutine
-        && request.resource.data.progressionPlan == resource.data.progressionPlan;
+        && request.resource.data.progressionPlan == resource.data.progressionPlan
+        && (request.resource.data.status == 'rejected' ||
+            (exists(trainerLinkPath(resource.data.trainerUid, resource.data.studentUid)) &&
+             get(trainerLinkPath(resource.data.trainerUid, resource.data.studentUid)).data.status == 'accepted'));
       // El entrenador puede retirar una propuesta que sigue pendiente.
       allow delete: if isSignedIn()
         && request.auth.uid == resource.data.trainerUid
@@ -193,7 +217,15 @@ service cloud.firestore {
     // con el link tiene que poder verla; nunca se puede pisar/borrar una
     // ya creada.
     match /shared_routines/{shortId} {
-      allow read: if true;
+      // BUG FIX (encontrado auditando): "allow read: if true" en Firestore
+      // habilita tanto "get" (traer ESTE documento puntual, lo que necesita
+      // quien tiene el link) como "list" (consultar la COLECCIÓN entera) —
+      // cualquiera podía enumerar TODAS las rutinas compartidas por
+      // cualquier usuario sin tener ningún link. Separar get/list en dos
+      // reglas mantiene el link funcionando (sigue siendo un "get" por id)
+      // pero corta la enumeración.
+      allow get: if true;
+      allow list: if false;
       allow create: if true;
       allow update, delete: if false;
     }

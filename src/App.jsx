@@ -12895,12 +12895,31 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
   // esto no debería dispararse casi nunca), pero una solicitud cruzada
   // justo en el medio de un refresh() todavía podría pisar el mismo
   // documento y que Firestore la rechace en silencio si no se atrapa acá.
+  // friendSendError: mismo criterio que linkSendError de abajo — si dos
+  // personas se agregan mutuamente casi al mismo tiempo, Firestore rechaza
+  // en silencio al segundo (la regla solo permite pending→pending del lado
+  // que la recibe). Antes eso no se avisaba (a diferencia del flujo de
+  // entrenador/alumno, que sí tiene su propio mensaje): quedaba como si el
+  // botón "Agregar" no hubiera hecho nada.
+  const [friendSendError, setFriendSendError] = useState("");
   const doSendFriendRequest = async (otherUid) => {
-    try { await sendFriendRequest(uid, otherUid); refresh(); }
-    catch (err) { console.warn("[social] No se pudo enviar la solicitud de amistad:", err?.message || err); refresh(); }
+    try { await sendFriendRequest(uid, otherUid); setFriendSendError(""); refresh(); }
+    catch (err) {
+      console.warn("[social] No se pudo enviar la solicitud de amistad:", err?.message || err);
+      setFriendSendError("Esa persona ya tiene una solicitud pendiente o aceptada con vos — revisá más abajo.");
+      refresh();
+    }
   };
-  const doRespondFriend = async (otherUid, accept) => { await respondToFriendRequest(uid, otherUid, accept); refresh(); };
-  const doRemoveFriend = async (otherUid) => { await removeFriend(uid, otherUid); refresh(); };
+  const doRespondFriend = async (otherUid, accept) => {
+    try { await respondToFriendRequest(uid, otherUid, accept); }
+    catch (err) { console.warn("[social] No se pudo responder la solicitud de amistad:", err?.message || err); }
+    refresh();
+  };
+  const doRemoveFriend = async (otherUid) => {
+    try { await removeFriend(uid, otherUid); }
+    catch (err) { console.warn("[social] No se pudo eliminar la amistad:", err?.message || err); }
+    refresh();
+  };
   // linkSendError: red de seguridad además del chequeo de la UI (ver
   // trainerLinkStatusWith) — si de todos modos el permiso se rechaza (ej.
   // dos invitaciones cruzadas casi al mismo tiempo, antes de que refresh()
@@ -12920,8 +12939,16 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
       refresh();
     }
   };
-  const doRespondTrainer = async (link, accept) => { await respondToTrainerLink(link.trainerUid, link.studentUid, accept); refresh(); };
-  const doRemoveTrainerLink = async (link) => { await removeTrainerLink(link.trainerUid, link.studentUid); refresh(); };
+  const doRespondTrainer = async (link, accept) => {
+    try { await respondToTrainerLink(link.trainerUid, link.studentUid, accept); }
+    catch (err) { console.warn("[social] No se pudo responder al vínculo de entrenador/alumno:", err?.message || err); }
+    refresh();
+  };
+  const doRemoveTrainerLink = async (link) => {
+    try { await removeTrainerLink(link.trainerUid, link.studentUid); }
+    catch (err) { console.warn("[social] No se pudo eliminar el vínculo de entrenador/alumno:", err?.message || err); }
+    refresh();
+  };
 
   if (viewingUid) {
     return (
@@ -13140,6 +13167,7 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
                 perfil" y la búsqueda quedaba al final, después de las
                 sugerencias de contactos. */}
             <SocialSearchSection myUid={uid} friendStatus={friendStatus} onSendFriendRequest={doSendFriendRequest} />
+            {friendSendError && <p className="text-[11px] text-rose-400/90 px-1">{friendSendError}</p>}
             {profile?.username ? (
               <button onClick={() => setShowShareProfile(true)} className="w-full flex items-center gap-3 rounded-2xl border border-cyan-500/25 bg-cyan-500/5 px-4 py-3.5 text-left transition active:scale-[0.98] hover:border-cyan-500/40">
                 <div className="w-9 h-9 rounded-xl bg-cyan-500/15 border border-cyan-500/25 flex items-center justify-center shrink-0 text-cyan-400"><QrCode size={16} /></div>
@@ -15473,7 +15501,15 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
     onLogSet: setLogs, onDeleteRoutine, onNavigate, onStartSession, onEndSession,
   }), [profile, settings, cycleStart, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement, setLogs, onDeleteRoutine, onNavigate, onStartSession, onEndSession]);
   const [input, setInput] = useState("");
-  const [isSending, setIsSending] = useState(false);
+  // BUG FIX (encontrado auditando): antes esto era un solo booleano
+  // compartido por TODAS las conversaciones — mandar un mensaje en una y
+  // cambiar a otra mientras se esperaba la respuesta dejaba la conversación
+  // nueva bloqueada ("escribiendo...") sin ningún pedido propio en curso.
+  // Ahora se guarda el SET de conversaciones con un pedido en vuelo, y
+  // `isSending` (para esta pantalla) sólo mira si la conversación ABIERTA
+  // ahora mismo es una de ellas.
+  const [sendingConvIds, setSendingConvIds] = useState(() => new Set());
+  const isSending = activeConversationId != null && sendingConvIds.has(activeConversationId);
   const [editingIndex, setEditingIndex] = useState(null); // índice del mensaje propio que se está editando
   // Editar con mantener presionado en vez de un lápiz al lado (pedido: más
   // intuitivo, y sin el botón la burbuja queda más limpia) — un solo timer
@@ -15498,6 +15534,15 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
   if (prevConversationIdRef.current !== activeConversationId) {
     prevConversationIdRef.current = activeConversationId;
     setVisibleCount(AI_MESSAGES_PAGE_SIZE);
+    // BUG FIX (encontrado auditando): editingIndex apunta a una posición
+    // dentro del array de mensajes de la conversación en la que se apretó
+    // "editar" — sin este reset, si cambiabas de conversación CON una
+    // edición a medias y mandabas el input, enviarMensajeIA cortaba la
+    // conversación NUEVA en ese índice viejo (potencialmente ajeno del
+    // todo) y perdía todo lo que hubiera después. Cambiar de conversación
+    // cancela cualquier edición en curso, como si hubieras tocado "Cancelar".
+    setEditingIndex(null);
+    setInput("");
   }
   const hasMoreMessages = messages.length > visibleCount;
   const visibleMessages = hasMoreMessages ? messages.slice(-visibleCount) : messages;
@@ -15578,14 +15623,19 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
   }, [messages, isSending]);
 
   const enviarMensajeIA = async (userText, replaceIndex = null) => {
+    // BUG FIX: se fija DE ENTRADA a qué conversación pertenece este envío —
+    // si mientras se espera la respuesta (puede tardar bastante) cambiás a
+    // otra conversación, la respuesta (o el error) tiene que seguir
+    // cayendo ACÁ, no en la que hayas abierto después. Ver setAiChatMessages.
+    const targetConvId = activeConversationId;
     // Si estamos editando: cortamos la conversación hasta el mensaje editado
     // (las respuestas siguientes ya no aplican) y lo reemplazamos por el nuevo.
     const base = replaceIndex != null ? messages.slice(0, replaceIndex) : messages;
     const newMessages = [...base, { role: "user", text: userText, date: new Date().toISOString() }];
-    setMessages(newMessages);
+    setMessages(newMessages, targetConvId);
     setInput("");
     setEditingIndex(null);
-    setIsSending(true);
+    setSendingConvIds((prev) => { const next = new Set(prev); next.add(targetConvId); return next; });
       // Antes esto sólo le mandaba los NOMBRES de las rutinas guardadas —
       // por eso no podía ver qué ejercicios tenía cada una, sólo los
       // récords sueltos en logs. Ahora se resuelve cada rutina (incluida
@@ -15723,7 +15773,7 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
 
         const rawReply = result?.text;
         const sources = Array.isArray(result?.sources) ? result.sources : [];
-        if (!rawReply) { setMessages((prev) => [...prev, { role: "assistant", text: "No se me ocurrió una respuesta. Probá de nuevo." }]); return; }
+        if (!rawReply) { setMessages((prev) => [...prev, { role: "assistant", text: "No se me ocurrió una respuesta. Probá de nuevo." }], targetConvId); return; }
 
         const { text: textAfterAction, action } = parseAction(rawReply);
         const { text, question } = parseQuestion(textAfterAction);
@@ -15741,7 +15791,7 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
         // sumarlo acá cada vez que se agrega un "kind" nuevo.
         const planSummary = plan ? { ...plan } : null;
         if (planSummary) delete planSummary.confirm;
-        setMessages((prev) => [...prev, { role: "assistant", text, plan: planSummary, action: plan ? action : null, planStatus: plan ? "pending" : null, question, sources, date: new Date().toISOString() }]);
+        setMessages((prev) => [...prev, { role: "assistant", text, plan: planSummary, action: plan ? action : null, planStatus: plan ? "pending" : null, question, sources, date: new Date().toISOString() }], targetConvId);
       } catch (err) {
         // Si lo cortaste vos con "Detener", no hay error que mostrar — fue
         // una acción tuya, no una falla. Solo se corta en silencio.
@@ -15756,9 +15806,9 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
             : serverMsg
               ? `${serverMsg} 🙏`
               : "Uy, no me pude conectar. Revisá tu conexión o probá de nuevo en un momento 🙏"
-        }]);
+        }], targetConvId);
       } finally {
-        setIsSending(false);
+        setSendingConvIds((prev) => { const next = new Set(prev); next.delete(targetConvId); return next; });
         abortControllerRef.current = null;
       }
   };
@@ -18585,11 +18635,36 @@ export default function App() {
   const aiConversations = useMemo(() => getAiConversations(profiles[activeProfile]), [profiles, activeProfile]);
   const activeAiConversationId = profiles[activeProfile]?.activeAiConversationId || aiConversations[0]?.id;
   const aiChatMessages = (aiConversations.find((c) => c.id === activeAiConversationId) || aiConversations[0])?.messages || [AI_CHAT_WELCOME];
-  const setAiChatMessages = useCallback((newMessagesOrFn) => {
+  // targetConvId (opcional): BUG FIX (encontrado auditando) — enviarMensajeIA
+  // es asíncrona (espera a Gemini). Sin esto, si cambiabas de conversación
+  // ANTES de que llegara la respuesta, ésta se escribía en la conversación
+  // que estuviera activa AL MOMENTO DE LLEGAR (se leía cur.activeAiConversationId
+  // "en vivo" acá adentro), no en la que realmente la había pedido — la
+  // respuesta (o el mensaje de error) aparecía en la charla equivocada, y la
+  // original se quedaba sin nada. Ahora enviarMensajeIA fija de entrada CUÁL
+  // conversación pidió el mensaje y todas sus escrituras van dirigidas ahí,
+  // sea o no la que estás mirando en este momento — y si esa conversación ya
+  // no existe (la borraste mientras esperabas), se descarta en silencio en
+  // vez de resucitarla o escribir en la que sea que esté activa ahora.
+  const setAiChatMessages = useCallback((newMessagesOrFn, targetConvId = null) => {
     setProfiles((prev) => {
       const cur = prev[activeProfile];
       if (!cur) return prev;
       const convos = getAiConversations(cur);
+      if (targetConvId) {
+        const idx = convos.findIndex((c) => c.id === targetConvId);
+        if (idx === -1) return prev;
+        const base = convos[idx].messages || [AI_CHAT_WELCOME];
+        const next = typeof newMessagesOrFn === "function" ? newMessagesOrFn(base) : newMessagesOrFn;
+        const capped = next.length > AI_CHAT_HISTORY_CAP ? next.slice(next.length - AI_CHAT_HISTORY_CAP) : next;
+        const updatedConvos = convos.map((c, i) => (i === idx ? { ...c, messages: capped, title: c.customTitle ? c.title : deriveAiConvoTitle(capped), updatedAt: new Date().toISOString() } : c));
+        // activeAiConversationId NO se toca: si ya no es la que está en
+        // pantalla, la respuesta se guarda en la de origen sin cambiar cuál
+        // estás mirando ahora.
+        const np = { ...prev, [activeProfile]: { ...withoutOldAiChatHistory(cur), aiConversations: updatedConvos } };
+        saveProfiles(np);
+        return np;
+      }
       const activeId = cur.activeAiConversationId || convos[0]?.id;
       const targetIdx = Math.max(0, convos.findIndex((c) => c.id === activeId));
       const base = convos[targetIdx]?.messages || [AI_CHAT_WELCOME];

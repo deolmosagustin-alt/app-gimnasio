@@ -20,8 +20,15 @@ import { db } from "./firebase";
 
 // ============================== USERNAME (@handle) ==============================
 
+// BUG FIX (encontrado auditando): el campo de búsqueda muestra el
+// placeholder "@usuario de tu amigo" y en todos lados se lista el @usuario
+// con el ícono de arroba delante — muy natural que alguien escriba el "@"
+// al buscar. Sin sacarlo acá, buscar "@juan" para el usuario real "juan"
+// nunca lo encontraba (el documento en Firestore vive en minúsculas SIN
+// arroba). Se saca cualquier cantidad de "@" iniciales (por si acaso
+// alguien escribe "@@juan" por error de tipeo).
 export function normalizeUsername(raw) {
-  return String(raw || "").trim().toLowerCase();
+  return String(raw || "").trim().toLowerCase().replace(/^@+/, "");
 }
 
 // 3 a 20 caracteres, solo minúsculas/números/guión bajo — mismo patrón que
@@ -280,7 +287,15 @@ export async function removeFriend(myUid, otherUid) {
   await deleteDoc(doc(db, "friendships", friendshipId(myUid, otherUid)));
 }
 
+// BUG FIX (encontrado auditando): un perfil local sin cuenta de Google no
+// tiene uid — `where(field, "==", undefined)` tira una excepción SÍNCRONA
+// del SDK de Firestore al construir la consulta (no una promesa
+// rechazada), así que sin este guard rompía TODO Promise.all que la
+// incluyera (incluida esta misma función, llamada desde cleanupSocialData
+// con un uid real, y las de más abajo desde SocialView con
+// profile?.googleUid, que para un perfil local es undefined).
 export async function listMyFriendships(uid) {
+  if (!uid) return [];
   const snap = await getDocs(query(collection(db, "friendships"), where("users", "array-contains", uid)));
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
@@ -314,11 +329,13 @@ export async function removeTrainerLink(trainerUid, studentUid) {
 }
 
 export async function listTrainerLinksAsTrainer(uid) {
+  if (!uid) return [];
   const snap = await getDocs(query(collection(db, "trainerLinks"), where("trainerUid", "==", uid)));
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
 export async function listTrainerLinksAsStudent(uid) {
+  if (!uid) return [];
   const snap = await getDocs(query(collection(db, "trainerLinks"), where("studentUid", "==", uid)));
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
@@ -370,11 +387,13 @@ export async function respondToRoutineProposal(proposalId, accept) {
 }
 
 export async function listRoutineProposalsForStudent(studentUid) {
+  if (!studentUid) return [];
   const snap = await getDocs(query(collection(db, "routineProposals"), where("studentUid", "==", studentUid), where("status", "==", "pending")));
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
 export async function listRoutineProposalsByTrainer(trainerUid) {
+  if (!trainerUid) return [];
   const snap = await getDocs(query(collection(db, "routineProposals"), where("trainerUid", "==", trainerUid)));
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
