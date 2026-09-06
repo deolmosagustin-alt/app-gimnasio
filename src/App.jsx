@@ -8140,22 +8140,24 @@ function BattleCompareCard({ myAvatarData, myName, mySex, mySessionsThisWeek, my
           circulares en vez de recuadros, y un ÚNICO marcador de 3 tramos
           (gana/empate/pierde) en vez de una barra de poder + 3 cajas
           repitiendo el mismo número dos veces. */}
-      {/* Pedido: "las batallas también podrían ser similares en cuanto a
-          colorimetría [al violeta]" — mismo criterio que ya se aplicó al
-          resto del perfil de un amigo (esta semana, historial, medidas):
-          el CHROME de la tarjeta (borde, resplandor, título) pasa a
-          violeta para que se sienta la misma identidad "amigos/social" en
-          vez de amarillo genérico. El amarillo/ámbar queda reservado
-          únicamente para lo que de verdad significa "victoria" (corona,
-          anillo del que va ganando, trofeo) — ese significado no cambia. */}
-      <div className="relative overflow-hidden rounded-3xl border border-purple-500/25 p-4" style={{ background: "radial-gradient(ellipse at 50% -10%, rgba(168,85,247,0.12), transparent 55%), linear-gradient(160deg, #14141f, #08080d)" }}>
-        <p className="relative text-center text-[10px] font-black uppercase tracking-[0.22em] text-purple-400 mb-4 flex items-center justify-center gap-1.5">
+      {/* BUG FIX (pedido: "sigue sin convencerme que hayan tantos colores...
+          se va del concepto y estética original de la app, solucionémoslo
+          con la misma gama original") — un intento anterior le había
+          puesto tonalidad violeta al chrome de esta tarjeta; combinado con
+          el violeta de fondo de Social + teal/fucsia de cada lado + el
+          ámbar de "victoria" ya era demasiada variedad. Vuelve al ámbar
+          original (la "batalla" siempre tuvo su propia identidad, distinta
+          de Social) — el violeta queda para el fondo de Social en general,
+          no repetido acá adentro. Suma animaciones de entrada (avatares,
+          corona, barras) para que se sienta más vivo sin agregar color. */}
+      <div className="relative overflow-hidden rounded-3xl border border-amber-500/25 p-4" style={{ background: "radial-gradient(ellipse at 50% -10%, rgba(251,191,36,0.10), transparent 55%), linear-gradient(160deg, #14141f, #08080d)" }}>
+        <p className="relative text-center text-[10px] font-black uppercase tracking-[0.22em] text-amber-400 mb-4 flex items-center justify-center gap-1.5">
           <Swords size={12} /> Batalla de marcas
         </p>
         <div className="relative flex items-center justify-center gap-3">
-          <div className="flex-1 text-center min-w-0 max-w-[110px]">
+          <div className="flex-1 text-center min-w-0 max-w-[110px] slide-left">
             <div className="relative inline-block">
-              {iWinBattle && <Crown size={16} className="absolute -top-3 left-1/2 -translate-x-1/2 text-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.7)]" />}
+              {iWinBattle && <Crown size={16} className="absolute -top-3 left-1/2 -translate-x-1/2 text-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.7)] badge-pop" />}
               <div className="w-16 h-16 mx-auto rounded-full overflow-hidden border-[3px]" style={{ borderColor: iWinBattle ? "#FBBF24" : "#2DD4BF", boxShadow: iWinBattle ? "0 0 0 5px rgba(251,191,36,0.2), 0 8px 20px -6px rgba(251,191,36,0.4)" : "0 8px 20px -6px rgba(45,212,191,0.35)" }}>
                 {myAvatarData ? <img src={myAvatarData} className="w-full h-full object-cover" alt="" /> : <div className="w-full h-full flex items-center justify-center text-xl font-black !text-white" style={{ background: "linear-gradient(135deg,#2DD4BF,#0E7490)" }}>{(myName || "?").charAt(0).toUpperCase()}</div>}
               </div>
@@ -8164,9 +8166,9 @@ function BattleCompareCard({ myAvatarData, myName, mySex, mySessionsThisWeek, my
             {myTopRankBattle && <p className="text-[9px] font-bold truncate" style={{ color: myTopRankBattle.color }}>{myTopRankBattle.tier} {myTopRankBattle.sub}</p>}
           </div>
           <span className="shrink-0 text-[10px] font-black text-slate-600 uppercase tracking-wide">vs</span>
-          <div className="flex-1 text-center min-w-0 max-w-[110px]">
+          <div className="flex-1 text-center min-w-0 max-w-[110px] slide-right">
             <div className="relative inline-block">
-              {theyWinBattle && <Crown size={16} className="absolute -top-3 left-1/2 -translate-x-1/2 text-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.7)]" />}
+              {theyWinBattle && <Crown size={16} className="absolute -top-3 left-1/2 -translate-x-1/2 text-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.7)] badge-pop" />}
               <div className="w-16 h-16 mx-auto rounded-full overflow-hidden border-[3px]" style={{ borderColor: theyWinBattle ? "#FBBF24" : "#C084FC", boxShadow: theyWinBattle ? "0 0 0 5px rgba(251,191,36,0.2), 0 8px 20px -6px rgba(251,191,36,0.4)" : "0 8px 20px -6px rgba(192,132,252,0.35)" }}>
                 {theirAvatarData ? <img src={theirAvatarData} className="w-full h-full object-cover" alt="" /> : <div className="w-full h-full flex items-center justify-center text-xl font-black !text-white" style={{ background: "linear-gradient(135deg,#C084FC,#7C3AED)" }}>{(theirName || "?").charAt(0).toUpperCase()}</div>}
               </div>
@@ -8178,12 +8180,14 @@ function BattleCompareCard({ myAvatarData, myName, mySex, mySessionsThisWeek, my
 
         {/* Marcador de 3 tramos: el ancho de cada franja ES el número de
             músculos ganados/empatados/perdidos — reemplaza la barra de
-            poder + las 3 cajas sueltas de antes (mismo dato, una sola vez). */}
+            poder + las 3 cajas sueltas de antes (mismo dato, una sola vez).
+            grow-bar: crecen desde 0 al montar, en vez de aparecer ya con
+            su ancho final de un salto. */}
         <div className="relative mt-4">
           <div className="h-7 rounded-xl bg-black/40 overflow-hidden flex border border-white/5">
-            {iWinCount > 0 && <div className="h-full flex items-center justify-center text-[11px] font-black text-teal-950 bg-gradient-to-b from-teal-300 to-teal-400 transition-all duration-500" style={{ width: `${(iWinCount / totalMuscles) * 100}%` }}>{iWinCount}</div>}
-            {tieCount > 0 && <div className="h-full flex items-center justify-center text-[11px] font-black text-slate-300 bg-slate-700/70 transition-all duration-500" style={{ width: `${(tieCount / totalMuscles) * 100}%` }}>{tieCount}</div>}
-            {theyWinCount > 0 && <div className="h-full flex items-center justify-center text-[11px] font-black text-fuchsia-950 bg-gradient-to-b from-fuchsia-300 to-fuchsia-400 transition-all duration-500" style={{ width: `${(theyWinCount / totalMuscles) * 100}%` }}>{theyWinCount}</div>}
+            {iWinCount > 0 && <div className="h-full flex items-center justify-center text-[11px] font-black text-teal-950 bg-gradient-to-b from-teal-300 to-teal-400 transition-all duration-500 grow-bar" style={{ width: `${(iWinCount / totalMuscles) * 100}%` }}>{iWinCount}</div>}
+            {tieCount > 0 && <div className="h-full flex items-center justify-center text-[11px] font-black text-slate-300 bg-slate-700/70 transition-all duration-500 grow-bar" style={{ width: `${(tieCount / totalMuscles) * 100}%` }}>{tieCount}</div>}
+            {theyWinCount > 0 && <div className="h-full flex items-center justify-center text-[11px] font-black text-fuchsia-950 bg-gradient-to-b from-fuchsia-300 to-fuchsia-400 transition-all duration-500 grow-bar" style={{ width: `${(theyWinCount / totalMuscles) * 100}%` }}>{theyWinCount}</div>}
             {comparison.length === 0 && <div className="h-full w-full flex items-center justify-center text-[10px] font-bold text-slate-600">Sin marcas para comparar todavía</div>}
           </div>
           <div className="flex items-center justify-between mt-1.5 px-0.5">
@@ -8201,7 +8205,7 @@ function BattleCompareCard({ myAvatarData, myName, mySex, mySessionsThisWeek, my
           </span>
           <span className="text-slate-700 text-[10px]">·</span>
           <span className="flex items-center gap-1 text-[11px] font-black" style={{ color: iWinBattle ? "#5eead4" : theyWinBattle ? "#e9b8fc" : "#94a3b8" }}>
-            <Trophy size={12} className={iWinBattle || theyWinBattle ? "text-amber-400" : "text-slate-600"} />
+            <Trophy size={12} className={`${iWinBattle || theyWinBattle ? "text-amber-400 sparkle-spin" : "text-slate-600"}`} />
             {iWinBattle ? "vas ganando" : theyWinBattle ? `${theirName || "esta persona"} gana` : "batalla pareja"}
           </span>
         </div>
@@ -8211,8 +8215,8 @@ function BattleCompareCard({ myAvatarData, myName, mySex, mySessionsThisWeek, my
           mitades de color, cada muñeco tiene su propio "pedestal" (un
           resplandor elíptico en su color en la base, como un reflector),
           sobre un fondo neutro común con una línea central. */}
-      <div className="relative overflow-hidden rounded-2xl border border-purple-500/20 p-4 bg-purple-500/[0.04]">
-        <div className="absolute inset-x-6 top-1/2 -translate-y-1/2 h-px bg-gradient-to-r from-transparent via-purple-700/40 to-transparent pointer-events-none" />
+      <div className="relative overflow-hidden rounded-2xl border border-slate-700/50 p-4 bg-slate-950/50">
+        <div className="absolute inset-x-6 top-1/2 -translate-y-1/2 h-px bg-gradient-to-r from-transparent via-slate-700/70 to-transparent pointer-events-none" />
         <div className="relative flex items-center justify-center mb-3">
           <div className="flex bg-slate-950/60 rounded-lg p-0.5 border border-slate-800/60">
             <button onClick={() => setView("front")} className={`px-3 py-1 rounded-md text-[10px] font-bold transition ${view === "front" ? "bg-slate-700 text-white" : "text-slate-500 hover:text-slate-300"}`}>De frente</button>
@@ -11940,14 +11944,14 @@ function RankComparisonList({ comparison }) {
   return (
     <div className="space-y-2">
       <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 px-1 flex items-center gap-1.5"><ListChecks size={11} /> Músculo por músculo</p>
-      {comparison.map((r) => {
+      {comparison.map((r, i) => {
         const myLvl = r.mine?.levelIdx ?? -1, theirLvl = r.theirs?.levelIdx ?? -1;
         const iWin = myLvl > theirLvl, theyWin = theirLvl > myLvl;
         const maxLevelIdx = RANK_TIERS.length - 1;
         const myPct = myLvl >= 0 ? Math.max(10, Math.round((myLvl / maxLevelIdx) * 100)) : 0;
         const theirPct = theirLvl >= 0 ? Math.max(10, Math.round((theirLvl / maxLevelIdx) * 100)) : 0;
         return (
-          <div key={r.key} className="rounded-xl border border-purple-500/15 bg-purple-500/[0.05] px-3 py-2.5">
+          <div key={r.key} className="rounded-xl border border-slate-800/50 bg-slate-900/40 px-3 py-2.5 stagger-item" style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}>
             <div className="flex items-center justify-between gap-2 mb-1.5">
               <span className={`text-[10.5px] font-black flex items-center gap-1 min-w-0 ${iWin ? "text-teal-300" : "text-slate-600"}`}>
                 {iWin && <Crown size={10} className="shrink-0" />}<span className="truncate">{r.mine ? `${r.mine.tier} ${r.mine.sub}` : "—"}</span>
@@ -11959,11 +11963,11 @@ function RankComparisonList({ comparison }) {
             </div>
             <div className="flex items-center gap-1">
               <div className="flex-1 flex justify-end h-1.5 rounded-full bg-black/30 overflow-hidden">
-                {myLvl >= 0 && <div className="h-full rounded-full bg-teal-400" style={{ width: `${myPct}%` }} />}
+                {myLvl >= 0 && <div className="h-full rounded-full bg-teal-400 grow-bar" style={{ width: `${myPct}%` }} />}
               </div>
               <div className="w-1 h-1 rounded-full bg-slate-700 shrink-0" />
               <div className="flex-1 h-1.5 rounded-full bg-black/30 overflow-hidden">
-                {theirLvl >= 0 && <div className="h-full rounded-full bg-fuchsia-400" style={{ width: `${theirPct}%` }} />}
+                {theirLvl >= 0 && <div className="h-full rounded-full bg-fuchsia-400 grow-bar" style={{ width: `${theirPct}%` }} />}
               </div>
             </div>
           </div>
@@ -12220,21 +12224,22 @@ function FriendSessionHistory({ trainingSessions = [], activeRoutineSnapshot }) 
   const selected = selectedDate ? byDate[selectedDate] : null;
 
   if (!trainingSessions.length) return <p className="text-xs text-slate-600 text-center py-6">Todavía no registró ninguna sesión.</p>;
-  // Pedido: "dale una tonalidad más violeta a ese recuadro (también al
-  // historial de sesiones...), solo del perfil de tus amigos" — este
-  // componente sólo se usa acá (perfil de un amigo), así que el tinte va
-  // directo sin necesidad de ningún prop nuevo. Los colores POR DÍA (el
-  // color de cada celda con marca, el acento del detalle de abajo) sigue
+  // BUG FIX (pedido: "sigue sin convencerme que hayan tantos colores...
+  // solucionémoslo con la misma gama original") — un intento anterior le
+  // había puesto tonalidad violeta a este recuadro; vuelve al gris neutro
+  // + acento teal que ya usa el resto de calendarios de la app (mismo
+  // criterio que el propio Historial en Progreso). Los colores POR DÍA (el
+  // color de cada celda con marca, el acento del detalle de abajo) siguen
   // siendo el color de la rutina de esa persona — eso es dato, no decorado.
   return (
-    <div className="space-y-2.5">
-      <div className="bg-purple-500/[0.06] border border-purple-500/20 rounded-2xl p-4 backdrop-blur-sm">
+    <div className="space-y-2.5 hist-enter">
+      <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 backdrop-blur-sm">
         <div className="flex items-center justify-between mb-3">
-          <button onClick={() => setCursor((c) => { const m = c.m === 0 ? 11 : c.m - 1; const y = c.m === 0 ? c.y - 1 : c.y; return { y, m }; })} aria-label="Mes anterior" className="p-1.5 rounded-lg hover:bg-purple-500/15 text-purple-300/70"><ChevronLeft size={16} /></button>
+          <button onClick={() => setCursor((c) => { const m = c.m === 0 ? 11 : c.m - 1; const y = c.m === 0 ? c.y - 1 : c.y; return { y, m }; })} aria-label="Mes anterior" className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400"><ChevronLeft size={16} /></button>
           <p className="text-sm font-bold text-white">{MONTH_LABELS[cursor.m]} {cursor.y}</p>
-          <button onClick={() => setCursor((c) => { const m = c.m === 11 ? 0 : c.m + 1; const y = c.m === 11 ? c.y + 1 : c.y; return { y, m }; })} aria-label="Mes siguiente" className="p-1.5 rounded-lg hover:bg-purple-500/15 text-purple-300/70"><ChevronRight size={16} /></button>
+          <button onClick={() => setCursor((c) => { const m = c.m === 11 ? 0 : c.m + 1; const y = c.m === 11 ? c.y + 1 : c.y; return { y, m }; })} aria-label="Mes siguiente" className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400"><ChevronRight size={16} /></button>
         </div>
-        <div className="grid grid-cols-7 gap-1 mb-1.5">{WEEKDAY_LABELS.map((l, i) => <div key={i} className="text-center text-[9px] font-bold text-purple-300/40">{l}</div>)}</div>
+        <div className="grid grid-cols-7 gap-1 mb-1.5">{WEEKDAY_LABELS.map((l, i) => <div key={i} className="text-center text-[9px] font-bold text-slate-600">{l}</div>)}</div>
         <div className="grid grid-cols-7 gap-1">
           {weeks.flat().map((d, i) => {
             if (!d) return <div key={i} />;
@@ -12246,8 +12251,8 @@ function FriendSessionHistory({ trainingSessions = [], activeRoutineSnapshot }) 
             const color = dayDef?.color || "#475569";
             return (
               <button key={i} onClick={() => s && setSelectedDate(isSelected ? null : d)} disabled={!s}
-                style={s ? { backgroundColor: tint(color, "30"), border: `1px solid ${tint(color, "55")}` } : undefined}
-                className={`aspect-square rounded-lg flex items-center justify-center text-[11px] font-bold transition-all ${isSelected ? "ring-2 ring-purple-400" : ""} ${isToday && !s ? "border border-purple-500/50" : ""} ${s ? "text-white hover:brightness-125 active:scale-95" : "text-slate-700"}`}>
+                style={{ ...(s ? { backgroundColor: tint(color, "30"), border: `1px solid ${tint(color, "55")}` } : null), animationDelay: `${Math.min(i, 20) * 7}ms` }}
+                className={`aspect-square rounded-lg flex items-center justify-center text-[11px] font-bold transition-all cell-pop ${isSelected ? "ring-2 ring-teal-400" : ""} ${isToday && !s ? "border border-teal-500/50" : ""} ${s ? "text-white hover:brightness-125 active:scale-95" : "text-slate-700"}`}>
                 {dayNum}
               </button>
             );
@@ -12255,7 +12260,7 @@ function FriendSessionHistory({ trainingSessions = [], activeRoutineSnapshot }) 
         </div>
       </div>
       {selected ? (
-        <div className="flex items-center gap-3 rounded-xl border border-purple-500/20 bg-purple-500/[0.06] px-3.5 py-2.5">
+        <div className="flex items-center gap-3 rounded-xl border border-slate-800/50 bg-slate-900/50 px-3.5 py-2.5 msg-in">
           <span className="w-1.5 h-8 rounded-full shrink-0" style={{ backgroundColor: model?.days?.[selected.dayKey]?.color || "#475569" }} />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-bold text-white truncate">{model?.days?.[selected.dayKey]?.label || selected.dayKey || "Entrenamiento"}</p>
@@ -12266,7 +12271,7 @@ function FriendSessionHistory({ trainingSessions = [], activeRoutineSnapshot }) 
           </div>
         </div>
       ) : (
-        <p className="text-center text-[11px] text-purple-300/40 py-1">Tocá un día con marca para ver el detalle.</p>
+        <p className="text-center text-[11px] text-slate-600 py-1">Tocá un día con marca para ver el detalle.</p>
       )}
     </div>
   );
@@ -12773,10 +12778,20 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
                   lados a ocupar siempre el mismo ancho.
                   Pedido: reemplazar el nombre del amigo por una etiqueta
                   genérica ("Tu amigo") — de paso saca el ancho variable que
-                  causaba el descentrado, y tonalidad más violeta (identidad
-                  del perfil de amigos) en vez del gris neutro de siempre. */}
-              <div className="relative overflow-hidden rounded-2xl border border-purple-500/25 p-3" style={{ background: "linear-gradient(160deg, rgba(88,28,135,0.28), rgba(15,23,42,0.5))" }}>
-                <p className="relative text-[9px] font-black uppercase tracking-widest text-purple-300/70 mb-1.5 flex items-center gap-1"><Swords size={10} /> Esta semana</p>
+                  causaba el descentrado.
+                  BUG FIX (pedido: "sigue sin convencerme que hayan tantos
+                  colores... se va del concepto y estética original de la
+                  app, solucionémoslo con la misma gama original") — un
+                  intento anterior le había puesto tonalidad violeta a este
+                  recuadro (y a otros de este perfil); combinado con el
+                  resto de tarjetas ya coloridas de esta pantalla (rutina
+                  activa en azul, kudos en naranja, "te están por alcanzar"
+                  en rojo) terminaba sintiéndose recargado. Vuelve al gris
+                  neutro original — el violeta queda reservado para la
+                  identidad de fondo de Social (hero, tarjeta de perfil),
+                  no repetido en cada tarjeta chica de adentro. */}
+              <div className="relative overflow-hidden rounded-2xl border border-slate-700/50 p-3" style={{ background: "linear-gradient(160deg, rgba(30,41,59,0.6), rgba(15,23,42,0.4))" }}>
+                <p className="relative text-[9px] font-black uppercase tracking-widest text-slate-500 mb-1.5 flex items-center gap-1"><Swords size={10} /> Esta semana</p>
                 <div className="relative grid grid-cols-[1fr_auto_1fr] items-center gap-1">
                   <div className="text-center">
                     <p className={`text-xl font-black leading-none ${mySessionsThisWeek > theirSessionsThisWeek ? "text-teal-300" : "text-white"}`}>{mySessionsThisWeek}</p>
@@ -12927,29 +12942,31 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 px-1 mb-2">Medidas corporales</p>
                   {/* Rediseño (pedido: "mejoremos... la sección de medidas
-                      corporales" + tonalidad violeta): antes era una caja
-                      gris chata con sólo el último valor. Mismo lenguaje que
-                      ya usa "Tus medidas" (MeasurementsView, más arriba en
-                      el archivo) — tarjeta violeta + cuánto cambió desde el
-                      registro anterior + hace cuánto se cargó — así se lee
+                      corporales"): antes era una caja gris chata con sólo
+                      el último valor — ahora suma cuánto cambió desde el
+                      registro anterior y hace cuánto se cargó, así se lee
                       de un vistazo si viene subiendo/bajando, no sólo el
-                      número pelado. El delta usa un violeta neutro (no
-                      rojo/verde): subir o bajar cintura o peso no es
-                      "bueno" o "malo" en sí mismo, depende del objetivo de
-                      cada uno. */}
+                      número pelado.
+                      BUG FIX (pedido: "sigue sin convencerme que hayan
+                      tantos colores... la misma gama original"): un intento
+                      anterior le puso tonalidad violeta a estas tarjetas —
+                      vuelve al gris neutro que ya usa el resto de tarjetas
+                      chicas de la app (el delta no es "bueno" ni "malo" en
+                      sí mismo, así que un color neutro le queda mejor que
+                      cualquier acento). */}
                   <div className="grid grid-cols-2 gap-2">
-                    {MEASUREMENT_TYPES.map((t) => {
+                    {MEASUREMENT_TYPES.map((t, i) => {
                       const hist = (full.measurements?.[t.k] || []).slice().sort((a, b) => (a.date < b.date ? 1 : -1));
                       const last = hist[0];
                       if (!last) return null;
                       const delta = hist[1] ? Math.round((last.value - hist[1].value) * 10) / 10 : null;
                       const days = daysSince(last.date);
                       return (
-                        <div key={t.k} className="rounded-2xl border border-purple-500/20 px-3.5 py-3" style={{ background: "linear-gradient(150deg, rgba(168,85,247,0.14), rgba(15,23,42,0.5))" }}>
-                          <p className="text-[9.5px] font-black uppercase tracking-wide text-purple-300/70 truncate">{t.l}</p>
+                        <div key={t.k} className="rounded-2xl border border-slate-800/50 bg-slate-900/50 px-3.5 py-3 stagger-item" style={{ animationDelay: `${i * 40}ms` }}>
+                          <p className="text-[9.5px] font-black uppercase tracking-wide text-slate-500 truncate">{t.l}</p>
                           <p className="text-lg font-black text-white mt-1 tabular-nums">{last.value}<span className="text-[10px] font-normal text-slate-400 ml-0.5">{t.unit}</span></p>
                           <div className="flex items-center justify-between mt-1 gap-1">
-                            <span className="text-[9px] font-bold flex items-center gap-0.5 text-purple-300/80 shrink-0">
+                            <span className="text-[9px] font-bold flex items-center gap-0.5 text-slate-500 shrink-0">
                               {delta != null && delta !== 0 && (delta > 0 ? <TrendingUp size={9} /> : <TrendingDown size={9} />)}
                               {delta != null && delta !== 0 ? `${delta > 0 ? "+" : ""}${delta}${t.unit}` : ""}
                             </span>
@@ -13016,12 +13033,12 @@ function KudosListModal({ candidates, basics, kudosSentMap, kudosSendingUid, onS
           <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition"><X size={17} /></button>
         </div>
         <div className="space-y-2">
-          {candidates.map((c) => {
+          {candidates.map((c, i) => {
             const b = basics[c.uid];
             const sent = !!kudosSentMap[c.uid];
             const sending = kudosSendingUid === c.uid;
             return (
-              <div key={c.uid} className="flex items-center gap-3 rounded-2xl border border-orange-500/15 bg-orange-500/[0.04] px-3 py-2.5">
+              <div key={c.uid} className="flex items-center gap-3 rounded-2xl border border-orange-500/15 bg-orange-500/[0.04] px-3 py-2.5 stagger-item" style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}>
                 <button onClick={() => onViewProfile(c.uid)} className="flex items-center gap-2.5 flex-1 min-w-0 text-left active:opacity-80 transition">
                   {b?.avatarData ? (
                     <img src={b.avatarData} alt="" className="w-10 h-10 rounded-2xl object-cover shrink-0 border-2" style={{ borderColor: "rgba(252,76,2,0.5)" }} />
@@ -13039,9 +13056,9 @@ function KudosListModal({ candidates, basics, kudosSentMap, kudosSendingUid, onS
                   </div>
                 </button>
                 <button
-                  onClick={() => onSendKudos(c.uid)}
+                  onClick={(e) => onSendKudos(c.uid, e.currentTarget)}
                   disabled={sending || sent}
-                  className={`shrink-0 w-11 h-11 rounded-2xl border-2 font-black flex items-center justify-center text-lg transition-all active:scale-90 ${sent ? "opacity-90" : !sending ? "animate-pulse" : ""}`}
+                  className={`shrink-0 w-11 h-11 rounded-2xl border-2 font-black flex items-center justify-center text-lg transition-all active:scale-90 ${sent ? "opacity-90 badge-pop" : !sending ? "animate-pulse" : ""}`}
                   style={sent ? { backgroundColor: "rgba(252,76,2,0.25)", borderColor: "#FC4C02", color: "#FDBA74" } : { backgroundColor: "#FC4C02", borderColor: "#FC4C02", color: "#fff" }}
                 >
                   {sent ? "✓" : "👏"}
@@ -13258,6 +13275,14 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
   // para un único candidato.
   const [kudosSentMap, setKudosSentMap] = useState({});
   const [kudosSendingUid, setKudosSendingUid] = useState(null);
+  // Pedido: "agreguemos una animación a cuando aplaudís" — mismo estallido
+  // de confeti que ya usa una serie/PR (PRBurst, reusado tal cual), anclado
+  // al botón de aplaudir que se tocó. kudosBurstRef apunta siempre al botón
+  // VISIBLE en ese momento (el de la tarjeta principal o el de la fila
+  // tocada en "Ver todos") — se reasigna en cada click, así el estallido
+  // siempre sale del lugar correcto sin necesitar un ref por candidato.
+  const kudosBurstRef = useRef(null);
+  const [kudosBurst, setKudosBurst] = useState(0);
   useEffect(() => {
     if (!uid || kudosCandidates.length === 0) return;
     let cancelled = false;
@@ -13265,12 +13290,14 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
       .then((pairs) => { if (!cancelled) setKudosSentMap(Object.fromEntries(pairs)); });
     return () => { cancelled = true; };
   }, [kudosCandidates, uid]);
-  const handleSendKudos = async (candidateUid) => {
+  const handleSendKudos = async (candidateUid, btnEl = null) => {
     if (!uid || kudosSendingUid || kudosSentMap[candidateUid]) return;
+    if (btnEl) kudosBurstRef.current = btnEl;
     setKudosSendingUid(candidateUid);
     try {
       await sendKudos(candidateUid, uid, todayStr());
       setKudosSentMap((m) => ({ ...m, [candidateUid]: true }));
+      setKudosBurst((n) => n + 1);
       haptic(20);
     } catch (err) {
       console.warn("[social] No se pudo mandar el aplauso:", err?.message || err);
@@ -13407,7 +13434,7 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
           mismo esqueleto (ver heroGrad de Rutina/Progreso más arriba en el
           archivo) — el avatar/nombre/racha/rango pasan a su propia tarjeta
           de perfil, debajo, en vez de vivir adentro de este hero. */}
-      <div className="relative overflow-hidden rounded-2xl border border-purple-500/20 p-5" style={{ background: "var(--grad-hero-purple)" }}>
+      <div className="relative overflow-hidden rounded-2xl border border-purple-500/20 p-5 elastic-in" style={{ background: "var(--grad-hero-purple)" }}>
         <div className="absolute -top-8 -right-6 w-32 h-32 rounded-full bg-purple-500/15 blur-2xl pointer-events-none" />
         <div className="absolute -bottom-6 -left-6 w-28 h-28 rounded-full bg-fuchsia-500/10 blur-2xl pointer-events-none" />
         <div className="relative flex items-center gap-2 mb-1">
@@ -13429,7 +13456,7 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
           un tercer glow puntual con el color de TU rango (un dato que
           cambia según tu estado, como la fase de la semana o el día que
           toca) en vez de un violeta/fucsia fijo para todo el mundo. */}
-      <div className="relative overflow-hidden rounded-2xl border border-purple-500/20 p-4" style={{ background: "var(--grad-hero-purple)" }}>
+      <div className="relative overflow-hidden rounded-2xl border border-purple-500/20 p-4 elastic-in" style={{ background: "var(--grad-hero-purple)", animationDelay: "60ms" }}>
         <div className="absolute -top-8 -right-6 w-28 h-28 rounded-full bg-purple-500/15 blur-2xl pointer-events-none" />
         <div className="absolute -bottom-6 -left-6 w-24 h-24 rounded-full bg-fuchsia-500/10 blur-2xl pointer-events-none" />
         {myTopRank && (
@@ -13454,7 +13481,7 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
               rango (RankExplainModal) en vez del muñeco — el muñeco queda
               reservado para la fila "Vos" de Ranking, sin cambios ahí. */}
           {myTopRank && (
-            <button onClick={() => setShowRankExplain(true)} aria-label="Por qué tenés este rango" className="shrink-0 flex flex-col items-center gap-0.5 active:scale-95 transition">
+            <button onClick={() => setShowRankExplain(true)} aria-label="Por qué tenés este rango" className="shrink-0 flex flex-col items-center gap-0.5 active:scale-95 transition badge-pop">
               <RankBadgeIcon tier={myTopRank.tier} sub={null} color={myTopRank.color} size={40} />
               <span className="text-[9px] font-black uppercase tracking-wide whitespace-nowrap" style={{ color: myTopRank.color }}>{myTopRank.tier} {myTopRank.sub}</span>
             </button>
@@ -13481,7 +13508,7 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
           const sent = !!kudosSentMap[top.uid];
           const sending = kudosSendingUid === top.uid;
           return (
-            <div className="relative overflow-hidden rounded-2xl border mt-3.5 p-3.5" style={{ borderColor: "rgba(252,76,2,0.45)", background: "linear-gradient(135deg, rgba(252,76,2,0.18), rgba(15,23,42,0.55) 70%)" }}>
+            <div className="relative overflow-hidden rounded-2xl border mt-3.5 p-3.5 elastic-in" style={{ borderColor: "rgba(252,76,2,0.45)", background: "linear-gradient(135deg, rgba(252,76,2,0.18), rgba(15,23,42,0.55) 70%)" }}>
               <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full blur-2xl pointer-events-none" style={{ backgroundColor: "rgba(252,76,2,0.35)" }} />
               <div className="relative flex items-center gap-3">
                 <button onClick={() => setViewingUid(top.uid)} className="flex items-center gap-2.5 flex-1 min-w-0 text-left active:opacity-80 transition">
@@ -13499,9 +13526,9 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
                   </div>
                 </button>
                 <button
-                  onClick={() => handleSendKudos(top.uid)}
+                  onClick={(e) => handleSendKudos(top.uid, e.currentTarget)}
                   disabled={sending || sent}
-                  className={`shrink-0 flex flex-col items-center justify-center gap-0.5 w-16 h-16 rounded-2xl border-2 font-black transition-all active:scale-90 ${sent ? "opacity-90" : !sending ? "animate-pulse" : ""}`}
+                  className={`shrink-0 flex flex-col items-center justify-center gap-0.5 w-16 h-16 rounded-2xl border-2 font-black transition-all active:scale-90 ${sent ? "opacity-90 badge-pop" : !sending ? "animate-pulse" : ""}`}
                   style={sent ? { backgroundColor: "rgba(252,76,2,0.25)", borderColor: "#FC4C02", color: "#FDBA74" } : { backgroundColor: "#FC4C02", borderColor: "#FC4C02", color: "#fff" }}
                 >
                   <span className="text-2xl leading-none">👏</span>
@@ -13523,10 +13550,10 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
           );
         })()}
         {chaserFriend && (
-          <button onClick={() => setViewingUid(chaserFriend.uid)} className="relative overflow-hidden w-full text-left rounded-2xl border mt-3 p-3 active:scale-[0.99] transition" style={{ borderColor: "rgba(244,63,94,0.5)", background: "linear-gradient(135deg, rgba(244,63,94,0.20), rgba(15,23,42,0.55) 70%)" }}>
+          <button onClick={() => setViewingUid(chaserFriend.uid)} className="relative overflow-hidden w-full text-left rounded-2xl border mt-3 p-3 active:scale-[0.99] transition elastic-in" style={{ borderColor: "rgba(244,63,94,0.5)", background: "linear-gradient(135deg, rgba(244,63,94,0.20), rgba(15,23,42,0.55) 70%)" }}>
             <div className="absolute -top-8 -left-8 w-24 h-24 rounded-full blur-2xl pointer-events-none animate-pulse" style={{ backgroundColor: "rgba(244,63,94,0.3)" }} />
             <div className="relative flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 border-2" style={{ backgroundColor: "rgba(244,63,94,0.2)", borderColor: "rgba(244,63,94,0.55)" }}>
+              <div className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 border-2 streak-beat" style={{ backgroundColor: "rgba(244,63,94,0.2)", borderColor: "rgba(244,63,94,0.55)" }}>
                 <Flame size={20} style={{ color: "#FB7185" }} />
               </div>
               <div className="min-w-0 flex-1">
@@ -13812,6 +13839,10 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
       )}
       {showMyBody && <MyBodyModal profile={profile} onClose={() => setShowMyBody(false)} />}
       {showRankExplain && <RankExplainModal profile={profile} myTopRank={myTopRank} onClose={() => setShowRankExplain(false)} />}
+      {/* Pedido: "agreguemos una animación a cuando aplaudís" — mismo
+          estallido de confeti que ya usa una serie/PR (PRBurst), anclado al
+          botón que se tocó (ver kudosBurstRef en handleSendKudos). */}
+      <PRBurst anchorRef={kudosBurstRef} trigger={kudosBurst} />
       {showAllKudos && (
         <KudosListModal
           candidates={kudosCandidates}
