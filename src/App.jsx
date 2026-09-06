@@ -11301,10 +11301,16 @@ function PublicUserCard({ uid, basic, streak = null, onClick = null, children })
   const avatarAndName = (
     <>
       <div className="relative shrink-0">
+        {/* BUG FIX (pedido: "el borde naranja, cambiémoslo"): antes el marco
+            del avatar tomaba el color del RANGO de la persona — con rangos
+            tipo Oro eso pintaba un borde naranja bastante llamativo justo
+            encima de la cara. El color de rango ya se ve en el resplandor
+            de esquina, el tinte de fondo y la insignia de abajo: el avatar
+            en sí queda con un marco neutro fijo. */}
         {basic?.avatarData ? (
-          <img src={basic.avatarData} alt="" className="w-12 h-12 rounded-2xl object-cover border-2" style={{ borderColor: tint(accentColor, "55") }} />
+          <img src={basic.avatarData} alt="" className="w-12 h-12 rounded-2xl object-cover border-2 border-slate-700/60" />
         ) : (
-          <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-base font-black !text-white border-2" style={{ background: "linear-gradient(135deg,#A855F7,#7C3AED)", borderColor: tint(accentColor, "55") }}>
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-base font-black !text-white border-2 border-slate-700/60" style={{ background: "linear-gradient(135deg,#A855F7,#7C3AED)" }}>
             {(basic?.name || basic?.username || "?").charAt(0).toUpperCase()}
           </div>
         )}
@@ -11990,7 +11996,15 @@ function LeaderboardRow({ position, name, username, avatarData, topRank, session
       </div>
       {sessionsThisWeek != null ? (
         <span className="flex items-center gap-1 shrink-0 text-sm font-black text-orange-400"><Flame size={16} />{sessionsThisWeek}</span>
-      ) : topRank && <RankBadgeIcon tier={topRank.tier} sub={topRank.sub} color={topRank.color} size={30} />}
+      ) : topRank && (
+        // Pedido: mismo criterio que el resto de la app — ícono solo (sin
+        // el numeral romano superpuesto) y el nombre del rango como texto
+        // debajo, en vez del circulito con el número romano.
+        <div className="shrink-0 flex flex-col items-center gap-0.5">
+          <RankBadgeIcon tier={topRank.tier} sub={null} color={topRank.color} size={30} />
+          <span className="text-[8px] font-black uppercase tracking-wide whitespace-nowrap" style={{ color: topRank.color }}>{topRank.tier} {topRank.sub}</span>
+        </div>
+      )}
     </Tag>
   );
 }
@@ -12958,9 +12972,9 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
 
   const otherUidOf = (f) => f.users.find((u) => u !== uid);
   // BUG FIX (encontrado probando kudos/chaser): esto era un .filter() sin
-  // useMemo — una referencia NUEVA en cada render. Como kudosCandidate y
+  // useMemo — una referencia NUEVA en cada render. Como kudosCandidates y
   // chaserFriend (más abajo) dependen de friendAccepted, y a su vez un
-  // useEffect depende de kudosCandidate para pedir hasSentKudosToday(),
+  // useEffect depende de kudosCandidates para pedir hasSentKudosToday(),
   // esa referencia nueva en cada render volvía a disparar el efecto en
   // cada render, que al hacer setState volvía a renderizar — un loop
   // infinito de renders + lecturas a Firestore que colgaba la pestaña
@@ -13068,20 +13082,25 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
     return def ? getRoutineWeekSchedule(def) : null;
   }, [profile]);
   const myStreak = useMemo(() => computeSmartStreak(getTrainedDateSet(profile?.logs || {}, profile?.trainingSessions || []), myWeekSchedule), [profile, myWeekSchedule]);
-  // El amigo con la actividad más reciente (dentro de los últimos 3 días —
-  // si no hay nada tan fresco, no hay nada que festejar todavía).
-  const kudosCandidate = useMemo(() => {
-    let best = null;
+  // Todos los amigos con actividad reciente (últimos 3 días), no sólo el
+  // más nuevo. BUG FIX (pedido: "qué pasa si hay más de un amigo que
+  // entrenó ayer u hoy") — antes esto se quedaba con UN solo candidato (el
+  // de la fecha más reciente) y los demás quedaban sin ningún aplauso
+  // posible hasta el día siguiente, en silencio. Ordenados del más
+  // reciente al más viejo; tope de 6 para que la tira de abajo no crezca
+  // sin límite con muchos amigos activos a la vez.
+  const kudosCandidates = useMemo(() => {
+    const list = [];
     friendAccepted.forEach((f) => {
       const other = f.users.find((u) => u !== uid);
       const latest = streaks[other]?.latestSession;
       if (!latest) return;
-      if (!best || latest.date > best.latestSession.date) best = { uid: other, latestSession: latest };
+      const daysAgo = Math.floor((new Date() - new Date(`${latest.date}T00:00:00`)) / 86400000);
+      if (daysAgo > 3) return;
+      list.push({ uid: other, latestSession: latest, daysAgo });
     });
-    if (!best) return null;
-    const daysAgo = Math.floor((new Date() - new Date(`${best.latestSession.date}T00:00:00`)) / 86400000);
-    if (daysAgo > 3) return null;
-    return { ...best, daysAgo };
+    list.sort((a, b) => (a.latestSession.date < b.latestSession.date ? 1 : -1));
+    return list.slice(0, 6);
   }, [friendAccepted, streaks, uid]);
   // El amigo con la racha más alta que todavía no te alcanzó, pero está
   // cerca (1-2 días) — "being chased", estilo Strava.
@@ -13096,34 +13115,30 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
     });
     return best;
   }, [friendAccepted, streaks, myStreak, uid]);
-  // kudosState va etiquetado con SU PROPIO uid — al leerlo siempre se
-  // compara contra kudosCandidate?.uid actual (ver kudosSent/kudosSending
-  // más abajo), así un cambio de candidato (la lista de amigos cambia, o
-  // alguien más entrena algo más reciente) nunca muestra "ya aplaudido"
-  // pisado de un candidato viejo.
-  const [kudosState, setKudosState] = useState({ uid: null, sent: false, sending: false });
+  // Un aplauso por amigo por día — ahora la tira puede mostrar varios
+  // candidatos a la vez, así que el estado de "ya aplaudido"/"mandando" se
+  // rastrea por uid (mapa) en vez de un solo {uid, sent, sending} pensado
+  // para un único candidato.
+  const [kudosSentMap, setKudosSentMap] = useState({});
+  const [kudosSendingUid, setKudosSendingUid] = useState(null);
   useEffect(() => {
-    const candidateUid = kudosCandidate?.uid || null;
-    if (!candidateUid || !uid) return;
+    if (!uid || kudosCandidates.length === 0) return;
     let cancelled = false;
-    hasSentKudosToday(candidateUid, uid, todayStr()).then((sent) => {
-      if (!cancelled) setKudosState({ uid: candidateUid, sent, sending: false });
-    });
+    Promise.all(kudosCandidates.map((c) => hasSentKudosToday(c.uid, uid, todayStr()).then((sent) => [c.uid, sent])))
+      .then((pairs) => { if (!cancelled) setKudosSentMap(Object.fromEntries(pairs)); });
     return () => { cancelled = true; };
-  }, [kudosCandidate, uid]);
-  const kudosSent = kudosState.uid === kudosCandidate?.uid && kudosState.sent;
-  const kudosSending = kudosState.uid === kudosCandidate?.uid && kudosState.sending;
-  const handleSendKudos = async () => {
-    if (!kudosCandidate || !uid || kudosSending || kudosSent) return;
-    const candidateUid = kudosCandidate.uid;
-    setKudosState({ uid: candidateUid, sent: false, sending: true });
+  }, [kudosCandidates, uid]);
+  const handleSendKudos = async (candidateUid) => {
+    if (!uid || kudosSendingUid || kudosSentMap[candidateUid]) return;
+    setKudosSendingUid(candidateUid);
     try {
       await sendKudos(candidateUid, uid, todayStr());
-      setKudosState({ uid: candidateUid, sent: true, sending: false });
+      setKudosSentMap((m) => ({ ...m, [candidateUid]: true }));
       haptic(20);
     } catch (err) {
       console.warn("[social] No se pudo mandar el aplauso:", err?.message || err);
-      setKudosState({ uid: candidateUid, sent: false, sending: false });
+    } finally {
+      setKudosSendingUid(null);
     }
   };
   // Antes no había NINGUNA forma de sacar a un amigo ya aceptado — el único
@@ -13313,43 +13328,55 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
             línea del QR de abajo) — el usuario eligió kudos/aplausos
             rápidos y un aviso de "te están por alcanzar", con diseños
             contundentes (no sólo texto): tarjeta propia, color de marca,
-            ícono grande, y accionables (aplaudir / ver el perfil). */}
-        {kudosCandidate && (
-          <div className="relative overflow-hidden rounded-2xl border mt-3.5 p-3.5" style={{ borderColor: "rgba(252,76,2,0.45)", background: "linear-gradient(135deg, rgba(252,76,2,0.18), rgba(15,23,42,0.55) 70%)" }}>
-            <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full blur-2xl pointer-events-none" style={{ backgroundColor: "rgba(252,76,2,0.35)" }} />
-            <div className="relative flex items-center gap-3">
-              <button onClick={() => setViewingUid(kudosCandidate.uid)} className="flex items-center gap-2.5 flex-1 min-w-0 text-left active:opacity-80 transition">
-                {basics[kudosCandidate.uid]?.avatarData ? (
-                  <img src={basics[kudosCandidate.uid].avatarData} alt="" className="w-11 h-11 rounded-2xl object-cover shrink-0 border-2" style={{ borderColor: "rgba(252,76,2,0.5)" }} />
-                ) : (
-                  <div className="w-11 h-11 rounded-2xl flex items-center justify-center text-base font-black !text-white shrink-0 border-2" style={{ background: "linear-gradient(135deg,#FC4C02,#C2410C)", borderColor: "rgba(252,76,2,0.5)" }}>
-                    {(basics[kudosCandidate.uid]?.name || "?").charAt(0).toUpperCase()}
+            ícono grande, y accionables (aplaudir / ver el perfil).
+            REDISEÑO (pedido: "qué pasa si hay más de un amigo que entrenó
+            ayer u hoy" + "hacé que el recuadro de social sea menos alto,
+            que coincida con el del ciclo en progreso"): antes esto era una
+            sola tarjeta grande para UN candidato — ahora es una tira
+            horizontal con scroll de chips chicos, así entran varios amigos
+            a la vez sin que la tarjeta crezca en altura (siempre ocupa una
+            sola fila, sin importar cuántos entrenaron). */}
+        {kudosCandidates.length > 0 && (
+          <div className="relative overflow-hidden rounded-2xl border mt-3 p-3" style={{ borderColor: "rgba(252,76,2,0.45)", background: "linear-gradient(135deg, rgba(252,76,2,0.16), rgba(15,23,42,0.55) 70%)" }}>
+            <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full blur-2xl pointer-events-none" style={{ backgroundColor: "rgba(252,76,2,0.3)" }} />
+            <p className="relative text-[9.5px] font-black uppercase tracking-wide mb-2" style={{ color: "#FDBA74" }}>👏 Entrenaron hace poco</p>
+            <div className="relative flex gap-2.5 overflow-x-auto -mx-0.5 px-0.5 pb-0.5">
+              {kudosCandidates.map((c) => {
+                const sent = !!kudosSentMap[c.uid];
+                const sending = kudosSendingUid === c.uid;
+                return (
+                  <div key={c.uid} className="shrink-0 w-16 flex flex-col items-center gap-1">
+                    <button onClick={() => setViewingUid(c.uid)} className="relative active:opacity-80 transition" title={basics[c.uid]?.name || "Tu amigo"}>
+                      {basics[c.uid]?.avatarData ? (
+                        <img src={basics[c.uid].avatarData} alt="" className="w-11 h-11 rounded-2xl object-cover border-2" style={{ borderColor: "rgba(252,76,2,0.5)" }} />
+                      ) : (
+                        <div className="w-11 h-11 rounded-2xl flex items-center justify-center text-sm font-black !text-white border-2" style={{ background: "linear-gradient(135deg,#FC4C02,#C2410C)", borderColor: "rgba(252,76,2,0.5)" }}>
+                          {(basics[c.uid]?.name || "?").charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <span className="absolute -bottom-1 -right-1 px-1 h-3.5 rounded-full bg-slate-950 border border-orange-500/50 text-[7px] font-black flex items-center justify-center text-orange-300 whitespace-nowrap">{c.daysAgo === 0 ? "HOY" : "AYER"}</span>
+                    </button>
+                    <p className="text-[8.5px] text-slate-300 truncate w-full text-center">{basics[c.uid]?.name || "Amigo"}</p>
+                    <button
+                      onClick={() => handleSendKudos(c.uid)}
+                      disabled={sending || sent}
+                      className={`w-full h-6 rounded-lg text-[11px] font-black flex items-center justify-center transition-all active:scale-90 ${sent ? "opacity-90" : !sending ? "animate-pulse" : ""}`}
+                      style={sent ? { backgroundColor: "rgba(252,76,2,0.25)", color: "#FDBA74" } : { backgroundColor: "#FC4C02", color: "#fff" }}
+                    >
+                      {sent ? "✓" : "👏"}
+                    </button>
                   </div>
-                )}
-                <div className="min-w-0">
-                  <p className="text-[10px] font-black uppercase tracking-wide" style={{ color: "#FDBA74" }}>{kudosCandidate.daysAgo === 0 ? "Entrenó hoy" : "Entrenó ayer"}</p>
-                  <p className="text-sm font-bold text-white truncate">{basics[kudosCandidate.uid]?.name || "Tu amigo"}</p>
-                  {kudosCandidate.latestSession.dayLabel && <p className="text-[11px] text-slate-400 truncate">{kudosCandidate.latestSession.dayLabel}</p>}
-                </div>
-              </button>
-              <button
-                onClick={handleSendKudos}
-                disabled={kudosSending || kudosSent}
-                className={`shrink-0 flex flex-col items-center justify-center gap-0.5 w-16 h-16 rounded-2xl border-2 font-black transition-all active:scale-90 ${kudosSent ? "opacity-90" : !kudosSending ? "animate-pulse" : ""}`}
-                style={kudosSent ? { backgroundColor: "rgba(252,76,2,0.25)", borderColor: "#FC4C02", color: "#FDBA74" } : { backgroundColor: "#FC4C02", borderColor: "#FC4C02", color: "#fff" }}
-              >
-                <span className="text-2xl leading-none">👏</span>
-                <span className="text-[8.5px] leading-none">{kudosSent ? "¡Listo!" : "Aplaudir"}</span>
-              </button>
+                );
+              })}
             </div>
           </div>
         )}
         {chaserFriend && (
-          <button onClick={() => setViewingUid(chaserFriend.uid)} className="relative overflow-hidden w-full text-left rounded-2xl border mt-3.5 p-3.5 active:scale-[0.99] transition" style={{ borderColor: "rgba(244,63,94,0.5)", background: "linear-gradient(135deg, rgba(244,63,94,0.20), rgba(15,23,42,0.55) 70%)" }}>
+          <button onClick={() => setViewingUid(chaserFriend.uid)} className="relative overflow-hidden w-full text-left rounded-2xl border mt-3 p-3 active:scale-[0.99] transition" style={{ borderColor: "rgba(244,63,94,0.5)", background: "linear-gradient(135deg, rgba(244,63,94,0.20), rgba(15,23,42,0.55) 70%)" }}>
             <div className="absolute -top-8 -left-8 w-24 h-24 rounded-full blur-2xl pointer-events-none animate-pulse" style={{ backgroundColor: "rgba(244,63,94,0.3)" }} />
             <div className="relative flex items-center gap-3">
-              <div className="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 border-2" style={{ backgroundColor: "rgba(244,63,94,0.2)", borderColor: "rgba(244,63,94,0.55)" }}>
-                <Flame size={22} style={{ color: "#FB7185" }} />
+              <div className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 border-2" style={{ backgroundColor: "rgba(244,63,94,0.2)", borderColor: "rgba(244,63,94,0.55)" }}>
+                <Flame size={20} style={{ color: "#FB7185" }} />
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-[10px] font-black uppercase tracking-wide" style={{ color: "#FB7185" }}>¡Te están por alcanzar!</p>
