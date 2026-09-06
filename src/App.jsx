@@ -7681,6 +7681,15 @@ function mixWithWhite(hex, amount) {
 function deltKeysForView(view) { return view === "front" ? ["deltoide_anterior", "deltoide_lateral"] : ["deltoide_posterior"]; }
 function getFemaleGroupKeysForSlug(slug, view) {
   if (slug === "deltoids") return deltKeysForView(view);
+  // BUG FIX (encontrado auditando): el asset de FRENTE de esta librería
+  // trae, además de "tibialis" (la espinilla), una segunda forma también
+  // llamada "calves" — un costado visible de la pantorrilla desde ese
+  // ángulo. FEMALE_SLUG_MAP mapea "calves" a pantorrillas (que en esta app
+  // es un grupo pensado como "solo espalda", ver buildFemaleBodyData), así
+  // que tocar esa forma de FRENTE terminaba abriendo el detalle de
+  // Pantorrillas — un grupo que visualmente no es al que corresponde esa
+  // vista. De frente, esa forma se trata como parte de tibial anterior.
+  if (slug === "calves" && view === "front") return ["tibial_anterior"];
   return Object.entries(FEMALE_SLUG_MAP).filter(([, s]) => s === slug).map(([k]) => k);
 }
 // Gris claro para marcar selección en un músculo SIN rango todavía — el
@@ -7712,6 +7721,13 @@ function useFemalePalette(highlightedColors) {
 function buildFemaleBodyData(ranks, tiersCount, selected, view) {
   const bySlug = new Map();
   Object.entries(FEMALE_SLUG_MAP).forEach(([ourKey, slug]) => {
+    // BUG FIX (encontrado auditando): el asset de FRENTE trae una forma
+    // "calves" propia (además de "tibialis") — sin excluir pantorrillas
+    // acá, esa forma se pintaba también de frente con el rango de
+    // pantorrillas (un grupo pensado como "solo espalda" en esta app),
+    // mezclando dos rangos distintos en la misma vista. Ver
+    // getFemaleGroupKeysForSlug para el mismo ajuste del lado del click.
+    if (view === "front" && ourKey === "pantorrillas") return;
     const lvl = ranks[ourKey]?.levelIdx ?? -1;
     if (lvl < 0) return;
     if (!bySlug.has(slug) || lvl > bySlug.get(slug)) bySlug.set(slug, lvl);
@@ -7726,7 +7742,12 @@ function buildFemaleBodyData(ranks, tiersCount, selected, view) {
   });
   if (selected) {
     const selectedSlug = FEMALE_SLUG_MAP[selected] || (deltKeysForView(view).includes(selected) ? "deltoids" : null);
-    if (selectedSlug && !items.some((it) => it.slug === selectedSlug)) {
+    // Mismo BUG FIX de arriba: si pantorrillas está seleccionada (se tocó
+    // en la vista de espalda) pero esto se está calculando para la vista
+    // de FRENTE, no hay que resucitar la forma "calves" del frente — sigue
+    // sin ser su vista.
+    const skipSelectedLeak = view === "front" && selected === "pantorrillas";
+    if (selectedSlug && !skipSelectedLeak && !items.some((it) => it.slug === selectedSlug)) {
       items.push({ slug: selectedSlug, intensity: tiersCount * 2 + 1 });
     }
   }
@@ -7774,9 +7795,21 @@ const BODY_HIGHLIGHT_COLORS = RANK_TIERS.map((t) => muteHex(t.color, 0.72));
 // "frequency" que espera react-body-highlighter — extraído de adentro de
 // MuscleHighlighterBody para poder reusarlo también en MiniBodyView, sin
 // duplicar la lógica de mapeo de slugs (trapecio→neck, tibial↔pantorrillas).
-function buildBodyHighlighterData(ranks) {
+// view (opcional): pantorrillas y tibial_anterior comparten el slug
+// "calves" de la librería (uno es la vista trasera real, el otro es cómo
+// se interpreta la vista frontal) — sin distinguir por vista, se toma el
+// MÁXIMO entre ambos, y ese valor "inflado" termina pintando la vista que
+// no corresponde con un rango que no es el suyo. `MuscleHighlighterBody`
+// (que dibuja las DOS vistas a la vez desde el mismo `data`) sigue usando
+// el comportamiento de siempre acá y corrige cada vista por separado con
+// un post-procesado de color (ver sus useEffect) — pero `MiniBodyView`
+// (que renderiza UNA sola vista por instancia, sin ese post-procesado)
+// necesita el dato ya correcto de entrada: le pasa su `view` acá.
+function buildBodyHighlighterData(ranks, view = null) {
   const bestLevelBySlug = {};
   Object.entries(BODY_HIGHLIGHTER_SLUG_MAP).forEach(([ourKey, slug]) => {
+    if (view === "front" && ourKey === "pantorrillas") return;
+    if (view === "back" && ourKey === "tibial_anterior") return;
     const lvl = ranks[ourKey]?.levelIdx ?? -1;
     if (lvl > (bestLevelBySlug[slug] ?? -1)) bestLevelBySlug[slug] = lvl;
   });
@@ -7951,11 +7984,23 @@ function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backR
         if (ANTERIOR_POLY_SLUGS[i] === "calves") p.style.fill = tibialColor;
       });
     }
-    // Vista trasera: el neck no es trapecio desde atrás — forzar neutro
+    // Vista trasera: el neck no es trapecio desde atrás — forzar neutro.
+    // BUG FIX (encontrado auditando): "calves" en `data` trae el MÁXIMO
+    // entre pantorrillas y tibial_anterior (ambos comparten el mismo slug
+    // de la librería, ver BODY_HIGHLIGHTER_SLUG_MAP) — el comentario de
+    // arriba decía que la vista trasera "ya lo maneja el data prop", pero
+    // en realidad mostraba ese máximo, no pantorrillas solo. Si tibial
+    // tenía un rango mayor, la vista trasera se pintaba con un rango que
+    // no correspondía a pantorrillas, aunque no tuvieras ninguna marca ahí.
+    // Se fuerza acá igual que ya se hace con tibial en la vista frontal.
     const backSvg = backRef.current?.querySelector("svg");
     if (backSvg) {
+      const pantorrillasLvl = ranks.pantorrillas?.levelIdx ?? -1;
+      const pantorrillasColor = pantorrillasLvl >= 0 ? highlightedColors[pantorrillasLvl] : "#334155";
       backSvg.querySelectorAll("polygon").forEach((p, i) => {
-        if (POSTERIOR_POLY_SLUGS[i] === "neck") p.style.fill = "#334155";
+        const slug = POSTERIOR_POLY_SLUGS[i];
+        if (slug === "neck") p.style.fill = "#334155";
+        else if (slug === "calves" || slug === "left-soleus" || slug === "right-soleus") p.style.fill = pantorrillasColor;
       });
     }
   }, [data, selected, ranks, frontRef, backRef, highlightedColors]);
@@ -8000,7 +8045,7 @@ function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backR
 // — antes esto sólo dibujaba la vista de frente, sin forma de ver la
 // espalda (dorsales, isquiotibiales, etc.) en la comparación con un amigo.
 function MiniBodyView({ ranks, sex, label, accentColor = "#94a3b8", view = "front" }) {
-  const data = useMemo(() => buildBodyHighlighterData(ranks), [ranks]);
+  const data = useMemo(() => buildBodyHighlighterData(ranks, view), [ranks, view]);
   const femalePalette = useFemalePalette(BODY_HIGHLIGHT_COLORS);
   const femaleData = useMemo(() => buildFemaleBodyData(ranks, BODY_HIGHLIGHT_COLORS.length, null, view), [ranks, view]);
   return (
