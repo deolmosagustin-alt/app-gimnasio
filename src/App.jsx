@@ -13027,7 +13027,7 @@ function KudosListModal({ candidates, basics, kudosSentMap, kudosSendingUid, onS
   if (typeof document === "undefined") return null;
   return createPortal(
     <div className="fixed inset-0 z-[120] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
-      <div className="w-full max-w-sm max-h-[80vh] overflow-y-auto overscroll-contain bg-slate-900 border border-orange-500/25 rounded-3xl modal-pop-in shadow-2xl shadow-black/70 p-5 space-y-3" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-sm max-h-[80vh] overflow-y-auto overscroll-contain bg-slate-900 border border-teal-500/25 rounded-3xl modal-pop-in shadow-2xl shadow-black/70 p-5 space-y-3" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <p className="text-sm font-black text-white flex items-center gap-1.5">👏 Entrenaron hace poco</p>
           <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition"><X size={17} /></button>
@@ -13038,12 +13038,12 @@ function KudosListModal({ candidates, basics, kudosSentMap, kudosSendingUid, onS
             const sent = !!kudosSentMap[c.uid];
             const sending = kudosSendingUid === c.uid;
             return (
-              <div key={c.uid} className="flex items-center gap-3 rounded-2xl border border-orange-500/15 bg-orange-500/[0.04] px-3 py-2.5 stagger-item" style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}>
+              <div key={c.uid} className="flex items-center gap-3 rounded-2xl border border-teal-500/15 bg-teal-500/[0.05] px-3 py-2.5 stagger-item" style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}>
                 <button onClick={() => onViewProfile(c.uid)} className="flex items-center gap-2.5 flex-1 min-w-0 text-left active:opacity-80 transition">
                   {b?.avatarData ? (
-                    <img src={b.avatarData} alt="" className="w-10 h-10 rounded-2xl object-cover shrink-0 border-2" style={{ borderColor: "rgba(252,76,2,0.5)" }} />
+                    <img src={b.avatarData} alt="" className="w-10 h-10 rounded-2xl object-cover shrink-0 border-2" style={{ borderColor: "rgba(20,184,166,0.5)" }} />
                   ) : (
-                    <div className="w-10 h-10 rounded-2xl flex items-center justify-center text-sm font-black !text-white shrink-0 border-2" style={{ background: "linear-gradient(135deg,#FC4C02,#C2410C)", borderColor: "rgba(252,76,2,0.5)" }}>
+                    <div className="w-10 h-10 rounded-2xl flex items-center justify-center text-sm font-black !text-white shrink-0 border-2" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)", borderColor: "rgba(20,184,166,0.5)" }}>
                       {(b?.name || "?").charAt(0).toUpperCase()}
                     </div>
                   )}
@@ -13059,7 +13059,7 @@ function KudosListModal({ candidates, basics, kudosSentMap, kudosSendingUid, onS
                   onClick={(e) => onSendKudos(c.uid, e.currentTarget)}
                   disabled={sending || sent}
                   className={`shrink-0 w-11 h-11 rounded-2xl border-2 font-black flex items-center justify-center text-lg transition-all active:scale-90 ${sent ? "opacity-90 badge-pop" : !sending ? "animate-pulse" : ""}`}
-                  style={sent ? { backgroundColor: "rgba(252,76,2,0.25)", borderColor: "#FC4C02", color: "#FDBA74" } : { backgroundColor: "#FC4C02", borderColor: "#FC4C02", color: "#fff" }}
+                  style={sent ? { backgroundColor: "rgba(20,184,166,0.22)", borderColor: "#14B8A6", color: "#5eead4" } : { backgroundColor: "#14B8A6", borderColor: "#14B8A6", color: "#fff" }}
                 >
                   {sent ? "✓" : "👏"}
                 </button>
@@ -13493,46 +13493,48 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
             rápidos y un aviso de "te están por alcanzar", con diseños
             contundentes (no sólo texto): tarjeta propia, color de marca,
             ícono grande, y accionables (aplaudir / ver el perfil).
-            BUG FIX (pedido: "quiero que se parezca a la estética de la
-            primera vez que me mostraste esta idea, con el botón de aplaudir
-            a la derecha del todo") — el rediseño en tira de chips (pensado
-            para que entraran varios amigos sin crecer en altura) terminó
-            sintiéndose angosto y chico, muy lejos del diseño original.
-            Vuelve el mismo esqueleto de entonces — una sola fila ancha con
-            el avatar+info a la izquierda y el botón de aplaudir grande y
-            cuadrado pegado a la derecha — mostrando sólo al candidato más
-            reciente; si hay más de uno, "Ver todos" abre KudosListModal
-            (mismo esqueleto de fila, para cada uno de los demás). */}
+            Vuelve el mismo esqueleto de "estética original" — una sola fila
+            ancha con el avatar+info a la izquierda y el botón de aplaudir
+            grande y cuadrado pegado a la derecha — mostrando sólo al
+            candidato más reciente; si hay más de uno, "Ver todos" abre
+            KudosListModal (mismo esqueleto de fila, para cada uno de los
+            demás).
+            Pedido: "achiquemos un poco... y cambiemos ese naranja por el
+            verde que utilizamos en la sección la rutina que tenés
+            activada" — el naranja estilo Strava se reemplaza por el mismo
+            teal/verde (#14B8A6) que ya identifica "Rutina activa"/"Tu
+            entrenamiento" en el resto de la app, y la tarjeta se achica un
+            poco (menos padding, avatar y botón de aplaudir más chicos). */}
         {kudosCandidates.length > 0 && (() => {
           const top = kudosCandidates[0];
           const sent = !!kudosSentMap[top.uid];
           const sending = kudosSendingUid === top.uid;
           return (
-            <div className="relative overflow-hidden rounded-2xl border mt-3.5 p-3.5 elastic-in" style={{ borderColor: "rgba(252,76,2,0.45)", background: "linear-gradient(135deg, rgba(252,76,2,0.18), rgba(15,23,42,0.55) 70%)" }}>
-              <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full blur-2xl pointer-events-none" style={{ backgroundColor: "rgba(252,76,2,0.35)" }} />
-              <div className="relative flex items-center gap-3">
-                <button onClick={() => setViewingUid(top.uid)} className="flex items-center gap-2.5 flex-1 min-w-0 text-left active:opacity-80 transition">
+            <div className="relative overflow-hidden rounded-2xl border mt-3 p-3 elastic-in" style={{ borderColor: "rgba(20,184,166,0.4)", background: "linear-gradient(135deg, rgba(20,184,166,0.16), rgba(15,23,42,0.55) 70%)" }}>
+              <div className="absolute -top-8 -right-8 w-20 h-20 rounded-full blur-2xl pointer-events-none" style={{ backgroundColor: "rgba(20,184,166,0.3)" }} />
+              <div className="relative flex items-center gap-2.5">
+                <button onClick={() => setViewingUid(top.uid)} className="flex items-center gap-2 flex-1 min-w-0 text-left active:opacity-80 transition">
                   {basics[top.uid]?.avatarData ? (
-                    <img src={basics[top.uid].avatarData} alt="" className="w-11 h-11 rounded-2xl object-cover shrink-0 border-2" style={{ borderColor: "rgba(252,76,2,0.5)" }} />
+                    <img src={basics[top.uid].avatarData} alt="" className="w-10 h-10 rounded-2xl object-cover shrink-0 border-2" style={{ borderColor: "rgba(20,184,166,0.5)" }} />
                   ) : (
-                    <div className="w-11 h-11 rounded-2xl flex items-center justify-center text-base font-black !text-white shrink-0 border-2" style={{ background: "linear-gradient(135deg,#FC4C02,#C2410C)", borderColor: "rgba(252,76,2,0.5)" }}>
+                    <div className="w-10 h-10 rounded-2xl flex items-center justify-center text-sm font-black !text-white shrink-0 border-2" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)", borderColor: "rgba(20,184,166,0.5)" }}>
                       {(basics[top.uid]?.name || "?").charAt(0).toUpperCase()}
                     </div>
                   )}
                   <div className="min-w-0">
-                    <p className="text-[10px] font-black uppercase tracking-wide" style={{ color: "#FDBA74" }}>{top.daysAgo === 0 ? "Entrenó hoy" : "Entrenó ayer"}</p>
+                    <p className="text-[9.5px] font-black uppercase tracking-wide" style={{ color: "#5eead4" }}>{top.daysAgo === 0 ? "Entrenó hoy" : "Entrenó ayer"}</p>
                     <p className="text-sm font-bold text-white truncate">{basics[top.uid]?.name || "Tu amigo"}</p>
-                    {top.latestSession?.dayLabel && <p className="text-[11px] text-slate-400 truncate">{top.latestSession.dayLabel}</p>}
+                    {top.latestSession?.dayLabel && <p className="text-[10.5px] text-slate-400 truncate">{top.latestSession.dayLabel}</p>}
                   </div>
                 </button>
                 <button
                   onClick={(e) => handleSendKudos(top.uid, e.currentTarget)}
                   disabled={sending || sent}
-                  className={`shrink-0 flex flex-col items-center justify-center gap-0.5 w-16 h-16 rounded-2xl border-2 font-black transition-all active:scale-90 ${sent ? "opacity-90 badge-pop" : !sending ? "animate-pulse" : ""}`}
-                  style={sent ? { backgroundColor: "rgba(252,76,2,0.25)", borderColor: "#FC4C02", color: "#FDBA74" } : { backgroundColor: "#FC4C02", borderColor: "#FC4C02", color: "#fff" }}
+                  className={`shrink-0 flex flex-col items-center justify-center gap-0.5 w-14 h-14 rounded-2xl border-2 font-black transition-all active:scale-90 ${sent ? "opacity-90 badge-pop" : !sending ? "animate-pulse" : ""}`}
+                  style={sent ? { backgroundColor: "rgba(20,184,166,0.22)", borderColor: "#14B8A6", color: "#5eead4" } : { backgroundColor: "#14B8A6", borderColor: "#14B8A6", color: "#fff" }}
                 >
-                  <span className="text-2xl leading-none">👏</span>
-                  <span className="text-[8.5px] leading-none">{sent ? "¡Listo!" : "Aplaudir"}</span>
+                  <span className="text-xl leading-none">👏</span>
+                  <span className="text-[8px] leading-none">{sent ? "¡Listo!" : "Aplaudir"}</span>
                 </button>
               </div>
               {/* Pedido: "algo pequeño que haga saber que tenés más amigos...
@@ -13542,7 +13544,7 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
                   el mismo esqueleto de fila (avatar+info a la izquierda,
                   aplaudir a la derecha) y el detalle de qué entrenó. */}
               {kudosCandidates.length > KUDOS_STRIP_PREVIEW && (
-                <button onClick={() => setShowAllKudos(true)} className="relative w-full flex items-center justify-center gap-1 mt-3 pt-2.5 border-t border-orange-500/20 text-[9.5px] font-bold text-orange-300/80 hover:text-orange-300 transition">
+                <button onClick={() => setShowAllKudos(true)} className="relative w-full flex items-center justify-center gap-1 mt-2.5 pt-2 border-t border-teal-500/20 text-[9px] font-bold text-teal-300/80 hover:text-teal-300 transition">
                   +{kudosCandidates.length - KUDOS_STRIP_PREVIEW} amigo{kudosCandidates.length - KUDOS_STRIP_PREVIEW === 1 ? "" : "s"} más entrenaron · Ver todos <ChevronRight size={11} />
                 </button>
               )}
