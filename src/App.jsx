@@ -13025,6 +13025,7 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
   };
 
   const [showShareProfile, setShowShareProfile] = useState(false);
+  const [showProfileQr, setShowProfileQr] = useState(false);
   const [showMyBody, setShowMyBody] = useState(false);
   // Pedido: el ícono de rango del HERO abre una explicación (no el
   // muñeco) — el muñeco queda reservado para la fila "Vos" de Ranking.
@@ -13037,18 +13038,6 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
   const [templateSentNote, setTemplateSentNote] = useState(false);
   const trainerRoutineTemplates = profile?.trainerRoutineTemplates || {};
   const myTopRank = useMemo(() => computeTopRank(profile), [profile]);
-  // Pedido: "opciones más innovadoras" para el recuadro de perfil, en vez
-  // de la barra de progreso al próximo rango — el usuario eligió estas
-  // dos: un desafío semanal (con festejo al completarlo) y un pulso
-  // social de "amigos en racha ahora".
-  const myActiveRoutineDef = useMemo(() => resolveRoutineDef(profile?.routines?.[profile?.activeRoutineId], profile?.activeRoutineId), [profile]);
-  const weeklyTargetDays = useMemo(() => {
-    if (!myActiveRoutineDef) return 0;
-    const sched = getRoutineWeekSchedule(myActiveRoutineDef);
-    return Object.values(sched).filter(Boolean).length;
-  }, [myActiveRoutineDef]);
-  const mySessionsThisWeekSocial = useMemo(() => getSessionsForPeriod(profile?.trainingSessions || [], "week").length, [profile]);
-  const friendsInStreak = useMemo(() => friendAccepted.filter((f) => (streaks[f.users.find((u) => u !== uid)]?.streak || 0) > 0).length, [friendAccepted, streaks, uid]);
   // Antes no había NINGUNA forma de sacar a un amigo ya aceptado — el único
   // botón de "Cancelar" que existía era para una solicitud saliente
   // todavía pendiente. Two-tap (mismo criterio que borrar una conversación
@@ -13236,52 +13225,30 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
             usuario eligió un desafío semanal (con festejo al completarlo,
             en vez de un % abstracto) y un pulso social de "amigos en
             racha ahora". */}
-        {(weeklyTargetDays > 0 || friendAccepted.length > 0) && (
-          <div className="relative mt-3.5 pt-3 border-t border-white/10 space-y-2.5">
-            {weeklyTargetDays > 0 && (
-              <div>
-                <div className="flex items-center justify-between mb-1 gap-1">
-                  <span className="text-[8.5px] text-slate-500 uppercase tracking-wide flex items-center gap-1"><Target size={9} className="shrink-0" /> Desafío semanal</span>
-                  <span className="text-[9px] font-black shrink-0" style={{ color: mySessionsThisWeekSocial >= weeklyTargetDays ? "#34D399" : "#C4B5FD" }}>
-                    {mySessionsThisWeekSocial >= weeklyTargetDays ? "¡Cumplido! 🏆" : `${mySessionsThisWeekSocial}/${weeklyTargetDays} días`}
-                  </span>
-                </div>
-                <div className="h-1.5 rounded-full bg-black/30 overflow-hidden">
-                  <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(100, (mySessionsThisWeekSocial / weeklyTargetDays) * 100)}%`, backgroundColor: mySessionsThisWeekSocial >= weeklyTargetDays ? "#34D399" : "#A855F7" }} />
-                </div>
-              </div>
-            )}
-            {friendAccepted.length > 0 && (
-              <button onClick={() => setSection("amigos")} className="w-full flex items-center gap-1.5 text-[10px] text-slate-400 hover:text-slate-200 transition text-left">
-                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${friendsInStreak > 0 ? "bg-orange-500" : "bg-slate-700"}`} />
-                {friendsInStreak > 0 ? (
-                  <span className="flex items-center gap-1 min-w-0"><Flame size={10} className="text-orange-400 shrink-0" /> <span className="truncate">{friendsInStreak} de {friendAccepted.length} amigos en racha ahora</span></span>
-                ) : (
-                  <span className="truncate">Ninguno de tus amigos está en racha ahora</span>
-                )}
-              </button>
-            )}
-          </div>
-        )}
-        {/* Pedido: sacar el botón "Compartir mi perfil" de acá — ya
-            aparece en Buscar (tarjeta dedicada) y en Amigos (estado
-            vacío), así que acá era una tercera repetición del mismo
-            atajo. El prompt para elegir @usuario (si todavía no lo
-            tenés) se queda, porque no es "compartir" sino un paso previo
-            necesario para poder usar lo social. */}
-        {!profile?.username && (uid ? (
+        {/* Pedido: sacar el desafío semanal y "amigos en racha" de acá —
+            este espacio (entre la identidad de arriba y la línea de abajo)
+            queda pendiente de nuevas ideas a propuesta. */}
+        {profile?.username ? (
+          // Pedido: "que vuelva lo del QR, pero solo que muestre el QR al
+          // pulsarlo, el link no" — antes esto abría un selector (tarjeta
+          // de texto O código QR); ahora va directo al QR, sin pasar por
+          // esa elección ni mostrar ningún link/tarjeta.
+          <button onClick={() => setShowProfileQr(true)} className="relative w-full flex items-center justify-center gap-1.5 mt-3.5 pt-3 border-t border-white/10 text-[10px] font-bold text-purple-300/75 hover:text-purple-300 transition">
+            <QrCode size={11} /> Mostrar mi código QR <ChevronRight size={11} />
+          </button>
+        ) : uid ? (
           // Pedido: "si no tenés tu alias que te pida que pongas, en la
           // sección social que aparezca" — antes esto era sólo una
           // oración en la sección Buscar, ahora el prompt para elegirlo
           // vive acá mismo, arriba de todo, con el input de verdad en vez
           // de mandarte a buscarlo en Perfil.
-          <div className={`relative pt-3 ${(weeklyTargetDays > 0 || friendAccepted.length > 0) ? "mt-3" : "mt-3.5 border-t border-white/10"}`}>
+          <div className="relative mt-3.5 pt-3 border-t border-white/10">
             <p className="text-[11px] text-slate-400 mb-2">Elegí tu @usuario para que te puedan buscar y agregar.</p>
             <UsernameSection uid={uid} currentUsername={null} onSaved={(u) => onUpdateProfile({ username: u })} />
           </div>
         ) : (
-          <p className={`relative text-[11px] text-slate-400 pt-3 ${(weeklyTargetDays > 0 || friendAccepted.length > 0) ? "mt-3" : "mt-3.5 border-t border-white/10"}`}>Vinculá tu cuenta de Google en Perfil para poder elegir un @usuario y usar lo social.</p>
-        ))}
+          <p className="relative text-[11px] text-slate-400 mt-3.5 pt-3 border-t border-white/10">Vinculá tu cuenta de Google en Perfil para poder elegir un @usuario y usar lo social.</p>
+        )}
       </div>
 
       {/* Pedido: "un recuadro entre el superior de Social y los logros,
@@ -13520,6 +13487,18 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
           username={profile?.username}
           myTopRank={myTopRank}
           onClose={() => setShowShareProfile(false)}
+        />
+      )}
+      {showProfileQr && (
+        <ShareImageModal
+          title="Tu código QR"
+          subtitle="Que te escaneen para agregarte al toque"
+          fileNamePrefix="mi-qr-modus-fit"
+          shareTitle="Modus Fit"
+          shareText={`Agregame en Modus Fit, escaneá mi código o buscame como @${profile?.username}`}
+          accent={myTopRank?.color || "#A855F7"}
+          draw={(ctx, W, H) => drawSocialProfileQrCard(ctx, W, H, { name: profileName, username: profile?.username, accent: myTopRank?.color || "#A855F7" })}
+          onClose={() => setShowProfileQr(false)}
         />
       )}
       {showMyBody && <MyBodyModal profile={profile} onClose={() => setShowMyBody(false)} />}
