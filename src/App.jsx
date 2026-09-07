@@ -6515,15 +6515,24 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
         )); })()}
       </div>
 
-      {/* Mismo lenguaje visual que "Rango por músculo" y las demás tarjetas
-          de Progreso: superficie neutra (slate-900/50 + blur + sombra), borde
-          fino del color del día como único acento, y una cabecera de placa de
-          ícono + título + subtítulo. El panel teñido que envolvía todo se
-          descartó: con una lista larga de ejercicios adentro pesaba
-          demasiado, y el color del día se lee mejor como acento que como
-          fondo. */}
-      <div key={activeDay} className="relative overflow-hidden rounded-2xl border bg-slate-900/50 backdrop-blur-sm shadow-md shadow-black/20 p-4 tab-fade-in" style={{ borderColor: tint(day.color, "25") }}>
-        <div className="relative">
+      {/* PANEL DEL DÍA — todo lo que pertenece al día elegido (resumen,
+          iniciar sesión, calentamiento y los ejercicios) vive dentro de un
+          mismo contenedor, para que se lea como un sector y no como una pila
+          de rectángulos sueltos.
+          El primer intento lo pintó con un degradado del color del día y eso
+          era el error: acá adentro van tarjetas propias (ejercicios,
+          calentamiento) y un fondo de color las aplastaba. Ahora usa el
+          lenguaje de "Rango por músculo": superficie neutra, borde fino del
+          color del día como ÚNICO acento y una cabecera de placa de ícono +
+          título + bajada. La superficie es más HUNDIDA que las tarjetas de
+          adentro (slate-950 en vez de slate-900), así lo de adentro flota
+          sobre el panel en vez de fundirse con él. */}
+      <div
+        key={activeDay}
+        className="relative rounded-2xl border backdrop-blur-sm shadow-md shadow-black/20 p-3 space-y-3 tab-fade-in"
+        style={{ borderColor: tint(day.color, "25"), backgroundColor: "rgba(2,6,23,0.45)", marginTop: 8 }}
+      >
+        <div className="relative px-1 pt-1">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: tint(day.color, "18"), color: day.color }}>
               <Dumbbell size={15} />
@@ -6592,7 +6601,6 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             </div>
           )}
         </div>
-      </div>
 
       {/* La sesión activa pertenece a UN día (el que iniciaste). Si estás
           viendo otro día, no mostramos "sesión en curso" ahí — pero la
@@ -6636,6 +6644,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             </div>
           );
         })}
+        </div>
       </div>
 
       {activeSession && (
@@ -10639,6 +10648,45 @@ function ExportCenterCard({ profileName = "", logs = {}, trainingSessions = [], 
   );
 }
 
+/* ============================================================================
+   FILA DE SECCIÓN — el bloque básico dentro de las tarjetas de Social
+   (Amigos/Buscar/Ranking/Entrenador). Antes cada una de estas filas era su
+   propia tarjeta, con borde y fondo del color de la sección; ahora que viven
+   DENTRO de la tarjeta de la sección, eso quedaba como una caja adentro de
+   otra caja (el "medio raro" del reporte). Acá la superficie es tenue y
+   neutra, y el color queda sólo en la placa del ícono — el mismo patrón que
+   ya usan ToggleRow en Perfil y las filas de ejercicio en Rutina.
+============================================================================ */
+function SectionRow({ icon, title, desc, accent = "#A855F7", onClick = null, right = null, disabled = false }) {
+  const Tag = onClick ? "button" : "div";
+  return (
+    <Tag
+      onClick={onClick || undefined}
+      disabled={onClick ? disabled : undefined}
+      className={`w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition disabled:opacity-60 ${onClick ? "active:scale-[0.99]" : ""}`}
+      style={{ backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}
+    >
+      {icon && (
+        <span className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: tint(accent, "18"), color: accent }}>
+          {icon}
+        </span>
+      )}
+      <span className="flex-1 min-w-0">
+        <span className="block text-sm font-bold text-white truncate">{title}</span>
+        {desc && <span className="block text-[11px] text-slate-500 leading-snug">{desc}</span>}
+      </span>
+      {right}
+    </Tag>
+  );
+}
+
+// Rótulo de sub-bloque dentro de una tarjeta de sección — un solo estilo
+// para "Solicitudes recibidas", "Mis alumnos", "Mi entrenador", etc., en vez
+// de que cada uno eligiera su propio tamaño y color.
+function SectionLabel({ children, accent = null }) {
+  return <p className="text-[9.5px] font-black uppercase tracking-widest px-0.5" style={{ color: accent || "#64748b" }}>{children}</p>;
+}
+
 // Fila de toggle reutilizable para Perfil — antes cada switch era su propio
 // bloque de JSX duplicado (10 veces entre "Qué ves al registrar" y los dos
 // de "Recordatorio de entrenamiento"), cada uno con su propio hardcodeo de
@@ -11891,7 +11939,12 @@ function PublicUserCard({ uid, basic, streak = null, onClick = null, children })
     </>
   );
   return (
-    <div className="relative overflow-hidden w-full flex items-center gap-3 px-3.5 py-3.5 rounded-2xl border transition-colors" style={{ borderColor: tint(accentColor, "22"), background: `linear-gradient(135deg, ${tint(accentColor, "10")}, rgba(15,23,42,0.55) 65%)` }}>
+    // El DEGRADADO sí lleva el color del rango (es un toque suave y ayuda a
+    // distinguir a cada persona), pero el BORDE queda neutro: con rangos
+    // tipo Oro o Bronce, un marco de ese color alrededor de cada fila
+    // pintaba la lista entera de naranja y peleaba con el color de la
+    // sección.
+    <div className="relative overflow-hidden w-full flex items-center gap-3 px-3.5 py-3.5 rounded-2xl border transition-colors" style={{ borderColor: "var(--chip-border)", background: `linear-gradient(135deg, ${tint(accentColor, "10")}, rgba(15,23,42,0.55) 65%)` }}>
       <div className="absolute -top-6 -right-6 w-20 h-20 rounded-full blur-2xl opacity-25 pointer-events-none" style={{ backgroundColor: accentColor }} />
       {onClick ? (
         <button onClick={onClick} className="relative flex-1 flex items-center gap-3 min-w-0 hover:opacity-90 transition active:scale-[0.99]">{avatarAndName}</button>
@@ -11982,14 +12035,15 @@ function ContactsSuggestions({ myUid, friendStatus, onSendFriendRequest }) {
   return (
     <div className="space-y-2.5">
       {state !== "results" && (
-        <button onClick={handleFind} disabled={state === "working"} className="w-full flex items-center gap-3 rounded-2xl border border-cyan-500/25 bg-cyan-500/5 px-4 py-3.5 text-left transition active:scale-[0.98] hover:border-cyan-500/40 disabled:opacity-60">
-          <div className="w-9 h-9 rounded-xl bg-cyan-500/15 border border-cyan-500/25 flex items-center justify-center shrink-0 text-cyan-400"><Contact size={16} /></div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-white">{state === "working" ? "Buscando..." : "Sugerir de mis contactos"}</p>
-            <p className="text-[11px] text-slate-500">Encontrá amigos que ya usan la app</p>
-          </div>
-          {state !== "working" && <ChevronRight size={15} className="text-slate-600 shrink-0" />}
-        </button>
+        <SectionRow
+          icon={<Contact size={15} />}
+          accent="#06B6D4"
+          title={state === "working" ? "Buscando..." : "Sugerir de mis contactos"}
+          desc="Encontrá amigos que ya usan la app"
+          onClick={handleFind}
+          disabled={state === "working"}
+          right={state !== "working" ? <ChevronRight size={14} className="text-slate-600 shrink-0" /> : null}
+        />
       )}
       {state === "not_native" && <p className="text-[11px] text-slate-600 px-1">Esta función sólo está disponible en la app instalada en tu celular.</p>}
       {state === "denied" && <p className="text-[11px] text-amber-400/80 px-1">No dimos permiso para leer tus contactos. Podés habilitarlo desde los ajustes de la app en tu celular.</p>}
@@ -12071,7 +12125,10 @@ function SocialSearchSection({ myUid, friendStatus, onSendFriendRequest }) {
         </div>
         <button onClick={handleSearch} disabled={!raw.trim() || state === "searching"} className="px-4 rounded-xl bg-cyan-500 !text-white text-sm font-bold disabled:opacity-40">Buscar</button>
       </div>
-      <button onClick={() => qrInputRef.current?.click()} disabled={scanning} className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-fuchsia-500/30 text-fuchsia-300 hover:bg-fuchsia-500/10 transition text-xs font-bold disabled:opacity-50">
+      {/* Antes este botón era fucsia dentro de una sección cian: un tercer
+          color sin ningún motivo, que era buena parte de lo que hacía sentir
+          la sección desprolija. Ahora acompaña al color de Buscar. */}
+      <button onClick={() => qrInputRef.current?.click()} disabled={scanning} className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-cyan-500/25 text-cyan-300/90 hover:bg-cyan-500/10 transition text-xs font-bold disabled:opacity-50">
         {scanning ? <RotateCcw size={13} className="animate-spin" /> : <QrCode size={13} />} {scanning ? "Leyendo el código..." : "Escanear código QR"}
       </button>
       <input ref={qrInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { handleQrPhoto(e.target.files?.[0]); e.target.value = ""; }} />
@@ -12317,15 +12374,19 @@ function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted
     <div className="space-y-4">
       {proposals.length > 0 && (
         <div className="space-y-2">
-          <p className="text-[10px] font-black uppercase tracking-widest text-teal-400 px-1">Propuestas de rutina</p>
+          <SectionLabel accent="#2DD4BF">Propuestas de rutina</SectionLabel>
           {proposals.map((p) => (
             <RoutineProposalCard key={p.id} proposal={p} basic={basics[p.trainerUid]} onRespond={(accept) => onRespondProposal(p, accept)} />
           ))}
         </div>
       )}
 
-      <div className="rounded-2xl border border-slate-800/50 bg-slate-900/50 p-4 space-y-3">
-        <p className="text-xs font-bold text-white flex items-center gap-1.5"><GraduationCap size={14} className="text-blue-400" /> Vincular entrenador/alumno</p>
+      {/* Sin tarjeta propia: esto ya vive DENTRO de la tarjeta de la sección
+          Entrenador, y una caja con borde adentro de otra con borde era
+          justo lo que se veía desprolijo. Queda como sub-bloque, con un
+          rótulo del mismo estilo que los demás. */}
+      <div className="space-y-2.5">
+        <SectionLabel>Vincular entrenador/alumno</SectionLabel>
         <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-700/50">
           <button onClick={() => setRole("trainer")} className={`flex-1 py-2 rounded-lg text-[11px] font-bold transition-all ${role === "trainer" ? "bg-blue-500 !text-white" : "text-slate-500"}`}>Soy el entrenador</button>
           <button onClick={() => setRole("student")} className={`flex-1 py-2 rounded-lg text-[11px] font-bold transition-all ${role === "student" ? "bg-blue-500 !text-white" : "text-slate-500"}`}>Soy el alumno</button>
@@ -12381,7 +12442,7 @@ function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted
         <>
           {trainerIncoming.length > 0 && (
             <div className="space-y-2">
-              <p className="text-[10px] font-black uppercase tracking-widest text-amber-400 px-1">Solicitudes recibidas</p>
+              <SectionLabel accent="#FBBF24">Solicitudes recibidas</SectionLabel>
               {trainerIncoming.map((l) => (
                 <PublicUserCard key={l.id} uid={l.requestedBy} basic={basics[l.requestedBy]}>
                   <div className="flex flex-col items-end gap-1.5 shrink-0">
@@ -12398,7 +12459,7 @@ function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted
 
           <div className="space-y-2">
             <div className="flex items-center justify-between px-1">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-600">Mis alumnos</p>
+              <SectionLabel>Mis alumnos</SectionLabel>
               {sortedStudents.length > 1 && <p className="text-[9.5px] text-slate-700">Quién necesita atención primero</p>}
             </div>
             {studentsAccepted.length === 0 ? (
@@ -12425,7 +12486,7 @@ function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted
           )}
 
           <div className="space-y-2">
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 px-1">Mi entrenador</p>
+            <SectionLabel>Mi entrenador</SectionLabel>
             {trainersAccepted.length === 0 ? (
               <p className="text-xs text-slate-600 px-1">No tenés un entrenador vinculado.</p>
             ) : trainersAccepted.map((l) => (
@@ -12667,11 +12728,11 @@ function RankComparisonList({ comparison, myLogs = null, theirLogs = null, their
 // div con onClick). "Vos" abre tu propio muñeco (MyBodyModal); cualquier
 // otra fila navega al perfil completo de esa persona (FriendProfileView),
 // que ahora también muestra el muñeco de entrada.
-function LeaderboardRow({ position, name, username, avatarData, topRank, sessionsThisWeek = null, isMe, onClick = null }) {
+function LeaderboardRow({ position, name, username, avatarData, topRank, sessionsThisWeek = null, isMe, onClick = null, accent = "#F59E0B" }) {
   const medalColor = position === 1 ? "#FFD23F" : position === 2 ? "#DCE3E8" : position === 3 ? "#CD7F32" : null;
   const Tag = onClick ? "button" : "div";
   return (
-    <Tag onClick={onClick} className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl border text-left transition ${onClick ? "active:scale-[0.99] hover:border-slate-600" : ""} ${isMe ? "border-orange-500/40 bg-orange-500/10" : "border-slate-800/50 bg-slate-900/50"}`}>
+    <Tag onClick={onClick} className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-2xl border text-left transition ${onClick ? "active:scale-[0.99] hover:border-slate-600" : ""} ${isMe ? "" : "border-slate-800/50 bg-slate-900/50"}`} style={isMe ? { borderColor: tint(accent, "45"), backgroundColor: tint(accent, "12") } : undefined}>
       <div className="w-6 text-center shrink-0">
         {medalColor ? <Medal size={18} style={{ color: medalColor }} /> : <span className="text-sm font-black text-slate-600">{position}</span>}
       </div>
@@ -12687,7 +12748,7 @@ function LeaderboardRow({ position, name, username, avatarData, topRank, session
         <p className="text-[11px] text-slate-500 truncate">@{username || "..."}</p>
       </div>
       {sessionsThisWeek != null ? (
-        <span className="flex items-center gap-1 shrink-0 text-sm font-black text-orange-400"><Flame size={16} />{sessionsThisWeek}</span>
+        <span className="flex items-center gap-1 shrink-0 text-sm font-black" style={{ color: accent }}><Flame size={16} />{sessionsThisWeek}</span>
       ) : topRank && (
         // Pedido: mismo criterio que el resto de la app — ícono solo (sin
         // el numeral romano superpuesto) y el nombre del rango como texto
@@ -12731,7 +12792,7 @@ function buildFriendsRanking(uid, profile, myTopRank, friendAccepted, basics) {
   return [...mine, ...others].sort((a, b) => (b.topRank.levelIdx ?? -1) - (a.topRank.levelIdx ?? -1));
 }
 
-function LeaderboardSection({ uid, profile, myTopRank, friendAccepted, basics, activity, onViewPerson, onGoToBuscar }) {
+function LeaderboardSection({ uid, profile, myTopRank, friendAccepted, basics, activity, onViewPerson, onGoToBuscar, accent = "#F59E0B" }) {
   const [scope, setScope] = useState("amigos");
   const [globalList, setGlobalList] = useState(null);
   const [globalError, setGlobalError] = useState(false);
@@ -12770,19 +12831,19 @@ function LeaderboardSection({ uid, profile, myTopRank, friendAccepted, basics, a
   return (
     <div className="space-y-3">
       <div className={`grid gap-1.5 p-1 rounded-2xl bg-slate-900/60 border border-slate-800/50`} style={{ gridTemplateColumns: GLOBAL_RANKING_ENABLED ? "repeat(3, 1fr)" : "repeat(2, 1fr)" }}>
-        <button onClick={() => setScope("amigos")} className={`py-2 rounded-xl text-xs font-bold transition ${scope === "amigos" ? "bg-orange-500/20 text-orange-400" : "text-slate-500"}`}>Mejor rango</button>
-        <button onClick={() => setScope("semana")} className={`flex items-center justify-center gap-1 py-2 rounded-xl text-xs font-bold transition ${scope === "semana" ? "bg-orange-500/20 text-orange-400" : "text-slate-500"}`}><Flame size={12} /> Esta semana</button>
-        {GLOBAL_RANKING_ENABLED && <button onClick={() => setScope("global")} className={`py-2 rounded-xl text-xs font-bold transition ${scope === "global" ? "bg-orange-500/20 text-orange-400" : "text-slate-500"}`}>Global</button>}
+        <button onClick={() => setScope("amigos")} className="py-2 rounded-xl text-xs font-bold transition" style={scope === "amigos" ? { backgroundColor: tint(accent, "22"), color: accent } : { color: "#64748b" }}>Mejor rango</button>
+        <button onClick={() => setScope("semana")} className="flex items-center justify-center gap-1 py-2 rounded-xl text-xs font-bold transition" style={scope === "semana" ? { backgroundColor: tint(accent, "22"), color: accent } : { color: "#64748b" }}><Flame size={12} /> Esta semana</button>
+        {GLOBAL_RANKING_ENABLED && <button onClick={() => setScope("global")} className="py-2 rounded-xl text-xs font-bold transition" style={scope === "global" ? { backgroundColor: tint(accent, "22"), color: accent } : { color: "#64748b" }}>Global</button>}
       </div>
       {scope === "amigos" && friendsRanking.length === 0 && (
         // Pedido: "la pestaña se ve medio vacía" — mismo criterio que el
         // estado vacío de Amigos: un botón directo en vez de sólo texto.
-        <div className="text-center py-7 px-4 rounded-2xl border border-slate-800/50 bg-slate-900/30">
+        <div className="text-center py-6 px-4">
           <Award size={28} className="mx-auto mb-2.5 opacity-30 text-slate-600" />
           <p className="text-sm text-slate-500">Todavía no hay nadie con rango para mostrar acá.</p>
           <p className="text-xs mt-1 mb-4 text-slate-700">Agregá amigos y anotá tus marcas para aparecer.</p>
           {onGoToBuscar && (
-            <button onClick={onGoToBuscar} className="flex items-center justify-center gap-1.5 py-2.5 px-5 mx-auto rounded-xl text-xs font-bold transition active:scale-[0.98] bg-orange-500/15 text-orange-400 border border-orange-500/35">
+            <button onClick={onGoToBuscar} className="flex items-center justify-center gap-1.5 py-2.5 px-5 mx-auto rounded-xl text-xs font-bold transition active:scale-[0.98]" style={{ backgroundColor: tint(accent, "18"), color: accent, border: `1px solid ${tint(accent, "38")}` }}>
               <Search size={13} /> Agregar amigos
             </button>
           )}
@@ -12799,7 +12860,7 @@ function LeaderboardSection({ uid, profile, myTopRank, friendAccepted, basics, a
             googleUid todavía, así que "vos" en la lista puede llegar con
             uid undefined — sin el fallback, React tira "missing key"
             apenas esa fila entra en el array. */}
-        {list.map((entry, i) => <LeaderboardRow key={entry.uid || (entry.isMe ? "me" : i)} position={i + 1} {...entry} onClick={onViewPerson ? () => onViewPerson(entry.uid, entry.isMe) : null} />)}
+        {list.map((entry, i) => <LeaderboardRow key={entry.uid || (entry.isMe ? "me" : i)} position={i + 1} {...entry} accent={accent} onClick={onViewPerson ? () => onViewPerson(entry.uid, entry.isMe) : null} />)}
       </div>
     </div>
   );
@@ -14499,16 +14560,16 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
             <SocialSearchSection myUid={uid} friendStatus={friendStatus} onSendFriendRequest={doSendFriendRequest} />
             {friendSendError && <p className="text-[11px] text-rose-400/90 px-1">{friendSendError}</p>}
             {profile?.username ? (
-              <button onClick={() => setShowShareProfile(true)} className="w-full flex items-center gap-3 rounded-2xl border border-cyan-500/25 bg-cyan-500/5 px-4 py-3.5 text-left transition active:scale-[0.98] hover:border-cyan-500/40">
-                <div className="w-9 h-9 rounded-xl bg-cyan-500/15 border border-cyan-500/25 flex items-center justify-center shrink-0 text-cyan-400"><QrCode size={16} /></div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-white">Compartir mi perfil</p>
-                  <p className="text-[11px] text-slate-500">Una tarjeta con tu @usuario para que te agreguen</p>
-                </div>
-                <Share2 size={15} className="text-slate-600 shrink-0" />
-              </button>
+              <SectionRow
+                icon={<QrCode size={15} />}
+                accent={sectionColor}
+                title="Compartir mi perfil"
+                desc="Una tarjeta con tu @usuario para que te agreguen"
+                onClick={() => setShowShareProfile(true)}
+                right={<Share2 size={14} className="text-slate-600 shrink-0" />}
+              />
             ) : uid ? (
-              <div className="rounded-2xl border border-cyan-500/25 bg-cyan-500/5 px-4 py-3.5">
+              <div className="rounded-xl px-3 py-2.5" style={{ backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}>
                 <p className="text-[11px] text-slate-400 mb-2">Elegí tu @usuario para que te puedan buscar y agregar.</p>
                 <UsernameSection uid={uid} currentUsername={null} onSaved={(u) => onUpdateProfile({ username: u })} />
               </div>
@@ -14524,7 +14585,7 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
             <>
               {friendIncoming.length > 0 && (
                 <div className="space-y-2">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-amber-400 px-1">Solicitudes recibidas</p>
+                  <SectionLabel accent="#FBBF24">Solicitudes recibidas</SectionLabel>
                   {friendIncoming.map((f) => { const other = otherUidOf(f); return (
                     <PublicUserCard key={f.id} uid={other} basic={basics[other]}>
                       <div className="flex gap-1.5 shrink-0">
@@ -14564,7 +14625,7 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
                   // sólo texto, con toda la mitad de abajo de la pantalla
                   // sin nada. Ahora suma botones directos: no hace falta
                   // memorizarte que "Buscar" es otra pestaña, tocás y ya.
-                  <div className="text-center py-7 px-4 rounded-2xl border border-slate-800/50 bg-slate-900/30">
+                  <div className="text-center py-6 px-4">
                     <Users size={28} className="mx-auto mb-2.5 opacity-30 text-slate-600" />
                     <p className="text-sm text-slate-500">Todavía no tenés amigos agregados.</p>
                     <p className="text-xs mt-1 mb-4 text-slate-700">Buscalos por su @usuario, o compartí el tuyo para que te encuentren.</p>
@@ -14603,7 +14664,7 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
         )}
 
         {section === "ranking" && (
-          <LeaderboardSection uid={uid} profile={profile} myTopRank={myTopRank} friendAccepted={friendAccepted} basics={basics} activity={streaks}
+          <LeaderboardSection uid={uid} profile={profile} myTopRank={myTopRank} friendAccepted={friendAccepted} basics={basics} activity={streaks} accent={sectionColor}
             onViewPerson={(personUid, isMe) => { if (isMe) setShowMyBody(true); else { setViewingOpenComparing(true); setViewingUid(personUid); } }}
             onGoToBuscar={() => setSection("buscar")} />
         )}
