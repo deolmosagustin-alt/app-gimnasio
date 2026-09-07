@@ -12,6 +12,10 @@ dist
 dist-ssr
 *.local
 
+# graphify: grafo del código generado localmente para navegación más eficiente,
+# no aporta nada a un commit (se regenera con /graphify . o "graphify update")
+graphify-out/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
