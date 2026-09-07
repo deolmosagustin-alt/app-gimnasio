@@ -13398,6 +13398,24 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
 // recortar el resto atrás de "Ver todos" (KudosListModal, más abajo).
 const KUDOS_STRIP_PREVIEW = 1;
 
+// Ventana para felicitar: hoy y ayer, nada más. Felicitar a alguien por un
+// entrenamiento de hace tres días no se siente como una felicitación, se
+// siente como que la app se confundió.
+const KUDOS_MAX_DAYS_AGO = 1;
+
+// Etiqueta del día del último entrenamiento — una sola fuente para la tira
+// y para KudosListModal. BUG FIX ("aparece que mi amigo entrenó ayer y no
+// entrenó"): cada una resolvía por su cuenta
+// `daysAgo === 0 ? "Entrenó hoy" : "Entrenó ayer"`, mientras la ventana de
+// candidatos aceptaba hasta 3 días atrás — así que un entrenamiento del
+// martes se anunciaba como "Entrenó ayer" un viernes. Ahora la ventana es
+// de 2 días Y la etiqueta dice la verdad aunque la ventana cambie.
+function kudosDayLabel(daysAgo) {
+  if (daysAgo <= 0) return "Entrenó hoy";
+  if (daysAgo === 1) return "Entrenó ayer";
+  return `Entrenó hace ${daysAgo} días`;
+}
+
 // Lista completa de "quién entrenó hace poco" — se abre desde el link "Ver
 // todos" de la tira de kudos cuando hay más candidatos de los que entran
 // ahí. A diferencia de la tira (chips chicos, sólo lugar para avatar +
@@ -13433,7 +13451,7 @@ function KudosListModal({ candidates, basics, kudosSentMap, kudosSendingUid, onS
                     <p className="text-sm font-bold text-white truncate">{b?.name || "Tu amigo"}</p>
                     <p className="text-[10.5px] text-slate-400 flex items-center gap-1 truncate">
                       {c.latestSession?.dayColor && <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: c.latestSession.dayColor }} />}
-                      {c.daysAgo === 0 ? "Entrenó hoy" : "Entrenó ayer"}{c.latestSession?.dayLabel ? ` · ${c.latestSession.dayLabel}` : ""}
+                      {kudosDayLabel(c.daysAgo)}{c.latestSession?.dayLabel ? ` · ${c.latestSession.dayLabel}` : ""}
                     </p>
                   </div>
                 </button>
@@ -13610,22 +13628,28 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
     return def ? getRoutineWeekSchedule(def) : null;
   }, [profile]);
   const myStreak = useMemo(() => computeSmartStreak(getTrainedDateSet(profile?.logs || {}, profile?.trainingSessions || []), myWeekSchedule), [profile, myWeekSchedule]);
-  // Todos los amigos con actividad reciente (últimos 3 días), no sólo el
-  // más nuevo. BUG FIX (pedido: "qué pasa si hay más de un amigo que
-  // entrenó ayer u hoy") — antes esto se quedaba con UN solo candidato (el
-  // de la fecha más reciente) y los demás quedaban sin ningún aplauso
-  // posible hasta el día siguiente, en silencio. Ordenados del más
-  // reciente al más viejo; tope de 20 sólo como red de seguridad (no como
-  // límite de diseño — la tira visible se recorta aparte, ver
-  // KUDOS_STRIP_PREVIEW más abajo, y "Ver todos" abre el resto).
+  // Todos los amigos que entrenaron dentro de la ventana para felicitar
+  // (KUDOS_MAX_DAYS_AGO: hoy y ayer), no sólo el más nuevo. BUG FIX
+  // (pedido: "qué pasa si hay más de un amigo que entrenó ayer u hoy") —
+  // antes esto se quedaba con UN solo candidato (el de la fecha más
+  // reciente) y los demás quedaban sin ningún aplauso posible hasta el día
+  // siguiente, en silencio. Ordenados del más reciente al más viejo; tope
+  // de 20 sólo como red de seguridad (no como límite de diseño — la tira
+  // visible se recorta aparte, ver KUDOS_STRIP_PREVIEW, y "Ver todos" abre
+  // el resto). Si nadie entrenó en la ventana, la lista queda vacía y la
+  // tarjeta entera no se dibuja.
   const kudosCandidates = useMemo(() => {
     const list = [];
     friendAccepted.forEach((f) => {
       const other = f.users.find((u) => u !== uid);
       const latest = streaks[other]?.latestSession;
-      if (!latest) return;
-      const daysAgo = Math.floor((new Date() - new Date(`${latest.date}T00:00:00`)) / 86400000);
-      if (daysAgo > 3) return;
+      if (!latest?.date) return;
+      // Fecha futura (relojes o husos horarios distintos entre teléfonos):
+      // se cuenta como hoy. Antes daba daysAgo negativo, pasaba el filtro y
+      // caía en el "else" de la etiqueta, anunciando un "entrenó ayer" que
+      // no había pasado.
+      const daysAgo = Math.max(0, Math.floor((new Date() - new Date(`${latest.date}T00:00:00`)) / 86400000));
+      if (daysAgo > KUDOS_MAX_DAYS_AGO) return;
       list.push({ uid: other, latestSession: latest, daysAgo });
     });
     list.sort((a, b) => (a.latestSession.date < b.latestSession.date ? 1 : -1));
@@ -13904,7 +13928,7 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
                     </div>
                   )}
                   <div className="min-w-0">
-                    <p className="text-[9.5px] font-black uppercase tracking-wide" style={{ color: "#5eead4" }}>{top.daysAgo === 0 ? "Entrenó hoy" : "Entrenó ayer"}</p>
+                    <p className="text-[9.5px] font-black uppercase tracking-wide" style={{ color: "#5eead4" }}>{kudosDayLabel(top.daysAgo)}</p>
                     <p className="text-sm font-bold text-white truncate">{basics[top.uid]?.name || "Tu amigo"}</p>
                     {top.latestSession?.dayLabel && <p className="text-[10.5px] text-slate-400 truncate">{top.latestSession.dayLabel}</p>}
                   </div>
