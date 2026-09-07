@@ -5258,7 +5258,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
             {isPlannedMode ? <Target size={15} style={{ color: accent }} className="shrink-0 relative" /> : <Trophy size={15} style={{ color: accent }} className="shrink-0 soft-pulse relative" />}
             <div className="flex-1 min-w-0 relative leading-none">
               <p className="truncate">
-                <span className="block text-[8.5px] font-black uppercase tracking-[0.16em] mb-1" style={{ color: tint(accent, "aa") }}>{isPlannedMode ? "Marca a alcanzar" : `Récord${override?.manual ? " · editado" : ""}`}</span>
+                <span className="block text-[8.5px] font-black uppercase tracking-[0.16em] mb-1" style={{ color: tint(accent, "aa") }}>{isPlannedMode ? "Meta planificada" : `Récord${override?.manual ? " · editado" : ""}`}</span>
                 <span className="text-xl font-black tabular-nums" style={{ color: accent, textShadow: `0 0 16px ${tint(accent, "50")}` }}>
                   {isPlannedMode
                     ? (cardio ? <>{plannedTarget.minutes} min</> : <>{plannedTarget.reps}<span className="opacity-50 text-sm mx-0.5">×</span>{kgToDisplay(plannedTarget.kg, unit)}<span className="opacity-60 text-xs ml-0.5">{weightLabel(unit)}</span></>)
@@ -5990,6 +5990,21 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
   // progresión", para no tener que salir de Rutina a cambiarlo. Segmentado
   // de 2 botones en vez de un modal (ver el JSX más abajo).
   const [showSelfProgression, setShowSelfProgression] = useState(false);
+  // BUG FIX (pedido: "cuando elegís uno u otro veo que no cambia nada") —
+  // pasar a "Planificada" no cambia NADA por sí solo: hace falta además
+  // cargar al menos una meta con "Planificar mi progresión" (sin eso,
+  // todas las series siguen cayendo al comportamiento de "récord" de
+  // siempre, a propósito — ver getPlannedTargetForWeek). Sin ningún aviso
+  // de que falta ese segundo paso, el toggle se sentía roto. hasAnyPlan
+  // detecta si la rutina activa ya tiene AL MENOS una meta cargada (en
+  // cualquier ejercicio/serie), para poder distinguir "todavía no cargaste
+  // nada" de "ya planificaste algo, solo que no esta serie puntual".
+  const hasAnyPlan = useMemo(() => {
+    if (!activeRoutineDef) return false;
+    return Object.values(activeRoutineDef.days || {}).some((d) =>
+      (d.exercises || []).some((ex) => (ex.sets || []).some((s) => Array.isArray(s.plannedProgression) && s.plannedProgression.length > 0))
+    );
+  }, [activeRoutineDef]);
   // Dirección del último cambio de día, para que las tarjetas entren
   // deslizándose desde el lado correcto (como pasar páginas).
   const gridRef = useRef(null);
@@ -6131,9 +6146,22 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             </button>
           </div>
           {settings.trainingMode === "planned" && onApplyOwnProgression && (
-            <button onClick={() => setShowSelfProgression(true)} disabled={!activeRoutineDef} className="relative w-full flex items-center gap-2 justify-center py-2.5 mt-2.5 rounded-xl !text-white text-xs font-bold transition active:scale-[0.98] disabled:opacity-40" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>
-              <Sliders size={13} /> Planificar mi progresión
-            </button>
+            <>
+              {/* Pedido: "cuando elegís uno u otro veo que no cambia nada" —
+                  sin ninguna meta cargada todavía, el toggle de arriba no
+                  tiene ningún efecto visible en ningún lado (a propósito:
+                  sin plan, cada serie sigue mostrando tu récord de
+                  siempre). Este aviso deja explícito el paso que falta, en
+                  vez de dejar que el silencio se sienta como que "no anda". */}
+              {!hasAnyPlan && (
+                <p className="relative text-[10.5px] text-teal-200/80 text-center mt-2.5 leading-snug">
+                  Todavía no cargaste ninguna meta — elegí un ejercicio abajo para ver la diferencia.
+                </p>
+              )}
+              <button onClick={() => setShowSelfProgression(true)} disabled={!activeRoutineDef} className={`relative w-full flex items-center gap-2 justify-center py-2.5 mt-2.5 rounded-xl !text-white text-xs font-bold transition active:scale-[0.98] disabled:opacity-40 ${!hasAnyPlan ? "invite-pulse" : ""}`} style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)", "--invite-glow": "rgba(20,184,166,0.6)" }}>
+                <Sliders size={13} /> {hasAnyPlan ? "Planificar mi progresión" : "Planificar mi primera meta"}
+              </button>
+            </>
           )}
           {!activeRoutineDef && settings.trainingMode === "planned" && <p className="relative text-[10px] text-slate-600 text-center mt-1.5">Activá una rutina primero, en la pestaña Rutinas.</p>}
         </div>
@@ -10729,6 +10757,14 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
   const initial = profileName.charAt(0).toUpperCase();
   const activeRoutineDef = resolveRoutineDef(profile?.routines?.[profile?.activeRoutineId], profile?.activeRoutineId);
   const savedRoutineCount = Object.keys(profile?.routines || {}).length;
+  // Mismo chequeo que RoutineView (ver hasAnyPlan ahí) — evita que el
+  // toggle de "Modo de entrenamiento" se sienta roto acá también.
+  const hasAnyPlan = useMemo(() => {
+    if (!activeRoutineDef) return false;
+    return Object.values(activeRoutineDef.days || {}).some((d) =>
+      (d.exercises || []).some((ex) => (ex.sets || []).some((s) => Array.isArray(s.plannedProgression) && s.plannedProgression.length > 0))
+    );
+  }, [activeRoutineDef]);
 
   // Foto de perfil. Se guarda comprimida (~256px) en DOS lugares: en el
   // perfil (campo avatarData → se SINCRONIZA a Firebase, así aparece en
@@ -11002,12 +11038,20 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
             <Target size={16} className={settings.trainingMode === "planned" ? "text-sky-400" : "text-slate-500"} />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold text-white">Rutina planificada</p>
-              <p className="text-[11px] text-slate-500">Cada serie muestra una "marca a alcanzar" cargada de antemano (a mano, o por tu entrenador) en vez de tu récord — pensado para planes con cargas ya decididas semana a semana.</p>
+              <p className="text-[11px] text-slate-500">Cada serie muestra una "meta planificada" cargada de antemano (a mano, o por tu entrenador) en vez de tu récord — pensado para planes con cargas ya decididas semana a semana.</p>
             </div>
           </button>
+          {/* Pedido: "cuando elegís uno u otro veo que no cambia nada" —
+              mismo aviso que RoutineView: elegir este modo no alcanza,
+              hace falta cargar al menos una meta para que se note. */}
+          {settings.trainingMode === "planned" && activeRoutineDef && !hasAnyPlan && (
+            <p className="text-[10.5px] text-sky-300/80 text-center leading-snug px-1">
+              Todavía no cargaste ninguna meta — sin eso, tus series siguen mostrando tu récord de siempre.
+            </p>
+          )}
           {settings.trainingMode === "planned" && (
-            <button onClick={() => setShowSelfProgression(true)} disabled={!activeRoutineDef} className="w-full flex items-center gap-2.5 justify-center py-3 rounded-xl bg-sky-500 !text-white text-sm font-bold transition active:scale-[0.98] disabled:opacity-40">
-              <Sliders size={15} /> Planificar mi progresión
+            <button onClick={() => setShowSelfProgression(true)} disabled={!activeRoutineDef} className={`w-full flex items-center gap-2.5 justify-center py-3 rounded-xl bg-sky-500 !text-white text-sm font-bold transition active:scale-[0.98] disabled:opacity-40 ${!hasAnyPlan ? "invite-pulse" : ""}`} style={{ "--invite-glow": "rgba(56,189,248,0.6)" }}>
+              <Sliders size={15} /> {hasAnyPlan ? "Planificar mi progresión" : "Planificar mi primera meta"}
             </button>
           )}
           {!activeRoutineDef && settings.trainingMode === "planned" && <p className="text-[10.5px] text-slate-600 text-center -mt-1">Activá una rutina primero, en la pestaña Rutinas.</p>}
@@ -12373,7 +12417,7 @@ const PROGRESSION_TEMPLATES = [
 //  - "Aplicar a todas las series de este ejercicio": antes había que
 //    repetir el formulario entero serie por serie para una rutina de 3-4
 //    series por ejercicio (el caso más común).
-function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onSubmit, mode = "trainer" }) {
+function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onSubmit, mode = "trainer", studentName = null }) {
   useAndroidBack(onClose);
   const model = useMemo(() => (routineSnapshot ? buildRoutineModel(routineSnapshot) : null), [routineSnapshot]);
   const exercises = useMemo(() => Object.values(model?.exerciseById || {}), [model]);
@@ -12390,6 +12434,10 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
   const [entries, setEntries] = useState({});
   const [note, setNote] = useState("");
   const [sending, setSending] = useState(false);
+  // Rediseño: RPE/fase pasan a un panel opcional plegado (por defecto
+  // cerrado) — la mayoría sólo carga kg×reps, y antes esos dos selects por
+  // semana ocupaban tanto lugar como los campos principales.
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const weeks = Array.from({ length: Math.max(1, trainWeeks || TRAIN_WEEKS) }, (_, i) => i + 1);
 
   // Punto de partida para las plantillas rápidas — no se manda a ningún
@@ -12453,6 +12501,19 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
   const weekKgs = weeks.map((w) => parseFloat(valueFor(w, "kg")) || 0);
   const maxKg = Math.max(...weekKgs, 1);
 
+  // Pedido: "estaría bueno que puedas planificar algunos ejercicios
+  // específicos" — esto YA se podía (el selector de ejercicio de abajo es
+  // por-ejercicio-y-serie desde el principio), pero no había ninguna forma
+  // de ver de un vistazo QUÉ ejercicios ya tenían algo cargado. Esta lista
+  // de chips arriba del selector resuelve eso: cuántas semanas tiene
+  // planificadas cada ejercicio, para saltar directo a editarlo.
+  const exercisePlannedWeeksCount = (ex) => {
+    let count = 0;
+    (ex.sets || []).forEach((s) => { if (Array.isArray(s.plannedProgression)) count += s.plannedProgression.length; });
+    return count;
+  };
+  const plannedExercises = exercises.filter((ex) => exercisePlannedWeeksCount(ex) > 0);
+
   const handleSubmit = async () => {
     if (!selectedExercise) return;
     const cleanEntries = weeks
@@ -12485,8 +12546,13 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-sky-500/20 border border-sky-500/30 text-sky-300 flex items-center justify-center shrink-0"><Target size={17} /></div>
             <div className="min-w-0 flex-1">
-              <p className="text-[10px] font-black uppercase tracking-widest text-sky-400">Planificar progresión</p>
-              <h3 className="text-base font-black text-white leading-tight">Metas por semana</h3>
+              <p className="text-[10px] font-black uppercase tracking-widest text-sky-400">{mode === "self" ? "Planificar mi progresión" : "Planificar progresión"}</p>
+              {/* Pedido: "rediseñá la sección de planificación manual tanto
+                  personalmente como para el entrenador hacia sus alumnos"
+                  — mismo componente para las dos, pero el título ahora
+                  distingue "para quién" es el plan en vez del genérico
+                  "Metas por semana" de siempre. */}
+              <h3 className="text-base font-black text-white leading-tight truncate">{mode === "self" ? "Metas por semana" : studentName ? `Plan para ${studentName}` : "Metas por semana"}</h3>
             </div>
             <button onClick={onClose} className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white transition"><X size={15} /></button>
           </div>
@@ -12495,10 +12561,27 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
             <p className="text-sm text-slate-500">{mode === "self" ? "Activá una rutina primero, en la pestaña Rutinas." : "Tu alumno no tiene una rutina activa todavía."}</p>
           ) : (
             <>
+              {/* Pedido: "estaría bueno que puedas planificar algunos
+                  ejercicios específicos" — esto ya se podía (selector de
+                  abajo), pero no había forma de ver de un vistazo qué
+                  ejercicios ya tenían algo cargado. Chips = acceso directo. */}
+              {plannedExercises.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  <span className="text-[10px] text-slate-500 self-center">Ya planificaste:</span>
+                  {plannedExercises.map((ex) => (
+                    <button key={ex.id} onClick={() => { setExerciseId(ex.id); setSetIndex(0); }} className={`px-2.5 py-1 rounded-lg text-[10.5px] font-bold transition flex items-center gap-1 ${exerciseId === ex.id ? "bg-sky-500 !text-white" : "bg-sky-500/15 text-sky-300 hover:bg-sky-500/25"}`}>
+                      <Check size={10} /> {ex.name}
+                    </button>
+                  ))}
+                </div>
+              )}
               <div>
                 <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Ejercicio</label>
                 <select value={exerciseId || ""} onChange={(e) => { setExerciseId(e.target.value); setSetIndex(0); }} className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-3.5 py-2.5 text-white text-sm focus:outline-none">
-                  {exercises.map((ex) => <option key={ex.id} value={ex.id}>{ex.name}</option>)}
+                  {exercises.map((ex) => {
+                    const n = exercisePlannedWeeksCount(ex);
+                    return <option key={ex.id} value={ex.id}>{ex.name}{n > 0 ? ` · ${n} sem. planificada${n === 1 ? "" : "s"}` : ""}</option>;
+                  })}
                 </select>
               </div>
               {selectedExercise && selectedExercise.sets.length > 1 && (
@@ -12547,46 +12630,64 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
                 </div>
               </div>
 
+              {/* Rediseño (pedido: "rediseñá la sección de planificación
+                  manual"): antes cada semana era una fila vertical con los
+                  dos selects de RPE/fase siempre visibles — una lista larga
+                  de scroll infinito. Ahora es una tira horizontal de
+                  tarjetas chicas (mismo lenguaje visual que otras tiras de
+                  la app, ej. los chips de día) — más rápida de escanear, y
+                  RPE/fase pasan a un panel plegable aparte para no repetir
+                  dos selects grandes por cada una de las semanas. */}
               <div>
                 <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Meta por semana (dejá vacío lo que no quieras planificar)</label>
-                <div className="space-y-1.5">
+                <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
                   {weeks.map((week, i) => {
                     const kg = weekKgs[i];
                     const prevKg = i > 0 ? weekKgs[i - 1] : null;
                     const delta = kg && prevKg ? Math.round((kg - prevKg) * 100) / 100 : null;
+                    const hasValue = kg > 0;
                     return (
-                      <div key={week} className="rounded-xl bg-slate-800/40 border border-slate-700/40 p-2 space-y-1.5">
-                        <div className="flex items-center gap-2">
-                          <span className="w-11 shrink-0 text-[10px] font-black text-slate-500 uppercase">Sem {week}</span>
-                          <input value={valueFor(week, "kg")} onChange={(e) => updateEntry(week, { kg: e.target.value })} type="number" inputMode="decimal" placeholder="kg" className="w-16 shrink-0 bg-slate-900 border border-slate-700/50 rounded-lg px-2 py-1.5 text-white text-xs text-center focus:outline-none" />
-                          <input value={valueFor(week, "reps")} onChange={(e) => updateEntry(week, { reps: e.target.value })} type="number" inputMode="numeric" placeholder="reps" className="w-14 shrink-0 bg-slate-900 border border-slate-700/50 rounded-lg px-2 py-1.5 text-white text-xs text-center focus:outline-none" />
-                          <div className="flex-1 h-2 rounded-full bg-slate-900/80 overflow-hidden min-w-[24px]">
-                            {kg > 0 && <div className="h-full rounded-full bg-sky-500/70 transition-all" style={{ width: `${Math.max(6, (kg / maxKg) * 100)}%` }} />}
-                          </div>
-                          {delta != null && delta !== 0 && (
-                            <span className={`shrink-0 text-[9.5px] font-black w-11 text-right ${delta > 0 ? "text-emerald-400" : "text-amber-400"}`}>{delta > 0 ? "+" : ""}{delta}kg</span>
-                          )}
+                      <div key={week} className={`shrink-0 w-24 rounded-2xl border p-2 space-y-1.5 transition-colors ${hasValue ? "bg-sky-500/10 border-sky-500/35" : "bg-slate-800/40 border-slate-700/40"}`}>
+                        <p className="text-[9px] font-black text-slate-500 uppercase text-center">Sem {week}</p>
+                        <input value={valueFor(week, "kg")} onChange={(e) => updateEntry(week, { kg: e.target.value })} type="number" inputMode="decimal" placeholder="kg" className="w-full bg-slate-900 border border-slate-700/50 rounded-lg px-1.5 py-1.5 text-white text-sm font-bold text-center focus:outline-none" />
+                        <input value={valueFor(week, "reps")} onChange={(e) => updateEntry(week, { reps: e.target.value })} type="number" inputMode="numeric" placeholder="reps" className="w-full bg-slate-900 border border-slate-700/50 rounded-lg px-1.5 py-1 text-white text-xs text-center focus:outline-none" />
+                        <div className="h-1.5 rounded-full bg-slate-900/80 overflow-hidden">
+                          {hasValue && <div className="h-full rounded-full bg-sky-500/70 transition-all" style={{ width: `${Math.max(10, (kg / maxKg) * 100)}%` }} />}
                         </div>
-                        {/* RIR/RPE y fase de mesociclo — pedido: "incluí
-                            conceptos que se usan generalmente en el
-                            entrenamiento personalizado". Opcionales: sin
-                            elegir nada, el plan sigue funcionando con sólo
-                            kg×reps, como antes. */}
-                        <div className="flex items-center gap-1.5 pl-[52px]">
-                          <select value={valueFor(week, "rpe")} onChange={(e) => updateEntry(week, { rpe: e.target.value })} className="flex-1 min-w-0 bg-slate-900 border border-slate-700/50 rounded-lg px-1.5 py-1 text-[10px] text-slate-400 focus:outline-none">
-                            <option value="">Sin RPE/RIR</option>
-                            {RPE_SCALE.map((rs) => <option key={rs.value} value={rs.value}>RPE {rs.value} · RIR {rirButtonLabel(rs.value)} ({rs.desc})</option>)}
-                          </select>
-                          <select value={valueFor(week, "phase")} onChange={(e) => updateEntry(week, { phase: e.target.value })} className="flex-1 min-w-0 bg-slate-900 border border-slate-700/50 rounded-lg px-1.5 py-1 text-[10px] text-slate-400 focus:outline-none">
-                            <option value="">Sin fase</option>
-                            {MESOCYCLE_PHASES.map((ph) => <option key={ph} value={ph}>{ph}</option>)}
-                          </select>
-                        </div>
+                        <p className={`text-[9px] font-black text-center h-3 ${delta != null && delta !== 0 ? (delta > 0 ? "text-emerald-400" : "text-amber-400") : "text-transparent"}`}>
+                          {delta != null && delta !== 0 ? `${delta > 0 ? "+" : ""}${delta}kg` : "·"}
+                        </p>
                       </div>
                     );
                   })}
                 </div>
               </div>
+
+              {/* RIR/RPE y fase de mesociclo — pedido: "incluí conceptos que
+                  se usan generalmente en el entrenamiento personalizado".
+                  Opcionales y plegados por defecto: sin tocar nada acá, el
+                  plan sigue funcionando con sólo kg×reps, como antes. */}
+              <button onClick={() => setShowAdvanced((v) => !v)} className="w-full flex items-center justify-between gap-2 px-1 py-1 text-[10.5px] font-bold text-slate-500 hover:text-slate-300 transition">
+                <span className="flex items-center gap-1.5"><Sliders size={11} /> RPE/RIR y fase de mesociclo (opcional)</span>
+                <ChevronDown size={13} className={`transition-transform ${showAdvanced ? "rotate-180" : ""}`} />
+              </button>
+              {showAdvanced && (
+                <div className="space-y-1.5 tab-fade-in">
+                  {weeks.map((week) => (
+                    <div key={week} className="flex items-center gap-1.5">
+                      <span className="w-11 shrink-0 text-[10px] font-black text-slate-500 uppercase">Sem {week}</span>
+                      <select value={valueFor(week, "rpe")} onChange={(e) => updateEntry(week, { rpe: e.target.value })} className="flex-1 min-w-0 bg-slate-900 border border-slate-700/50 rounded-lg px-1.5 py-1 text-[10px] text-slate-400 focus:outline-none">
+                        <option value="">Sin RPE/RIR</option>
+                        {RPE_SCALE.map((rs) => <option key={rs.value} value={rs.value}>RPE {rs.value} · RIR {rirButtonLabel(rs.value)} ({rs.desc})</option>)}
+                      </select>
+                      <select value={valueFor(week, "phase")} onChange={(e) => updateEntry(week, { phase: e.target.value })} className="flex-1 min-w-0 bg-slate-900 border border-slate-700/50 rounded-lg px-1.5 py-1 text-[10px] text-slate-400 focus:outline-none">
+                        <option value="">Sin fase</option>
+                        {MESOCYCLE_PHASES.map((ph) => <option key={ph} value={ph}>{ph}</option>)}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              )}
               {mode !== "self" && (
                 <div>
                   <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Nota para tu alumno (opcional)</label>
@@ -12999,6 +13100,7 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
         <ProgressionProposalComposer
           routineSnapshot={full.activeRoutineSnapshot}
           trainWeeks={full.settings?.trainWeeks}
+          studentName={basic?.name}
           onClose={() => setShowProgressionComposer(false)}
           onSubmit={async (progressionPlan, note) => {
             await createProgressionProposal(viewerUid, uid, progressionPlan, note);
