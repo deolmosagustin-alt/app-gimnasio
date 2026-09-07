@@ -5538,10 +5538,15 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           rótulo ES el cuándo. Tampoco lleva la diferencia contra la meta:
           con los dos números uno arriba del otro, se ve sin calcularla. */}
       {!compact && fieldSettings.showLastSession === true && lastSession && !cardio && (
-        <div className="flex items-center gap-1.5 -mt-1.5 mb-2.5 px-3 py-1.5 rounded-xl" style={{ backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}>
-          <History size={10} className="text-slate-600 shrink-0" />
-          <span className="text-[8.5px] font-black uppercase tracking-[0.14em] text-slate-600 truncate">{haceCuanto(daysSince(lastSession.date)) || "hoy"}</span>
-          <span className="text-[11px] font-bold tabular-nums text-slate-400 ml-auto shrink-0">
+        <div className="-mt-1.5 mb-2.5 px-3 py-2 rounded-xl leading-none" style={{ backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}>
+          {/* Rótulo arriba, número abajo, los dos pegados a la izquierda —
+              el mismo esqueleto que la tarjeta de referencia de acá arriba,
+              así los dos pesos quedan en la misma columna y se comparan
+              bajando la vista, sin cruzar la pantalla. */}
+          <span className="flex items-center gap-1 text-[8.5px] font-black uppercase tracking-[0.14em] text-slate-600 mb-1.5">
+            <History size={9} className="shrink-0" />{haceCuanto(daysSince(lastSession.date)) || "hoy"}
+          </span>
+          <span className="block text-[13px] font-bold tabular-nums text-slate-400">
             {lastSession.reps}<span className="opacity-40 mx-0.5">×</span>{kgToDisplay(lastSession.kg, unit)}<span className="opacity-50 text-[9px] ml-0.5">{weightLabel(unit)}</span>
           </span>
         </div>
