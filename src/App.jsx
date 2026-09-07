@@ -6515,52 +6515,39 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
         )); })()}
       </div>
 
-      {/* PANEL DEL DÍA — pedido: "que todo lo que está debajo de la selección
-          del día parezca un mismo sector, no rectángulos separados". Todo lo
-          que pertenece al día elegido (resumen, iniciar sesión, calentamiento
-          y los ejercicios) vive ahora DENTRO de un mismo contenedor, teñido
-          con el color de ese día y con el borde de arriba más marcado, que
-          hace de continuación de la pestaña que acabás de tocar. El degradado
-          se apaga hacia abajo para que la lista larga de ejercicios no quede
-          encerrada en una caja de colores de dos pantallas de alto. */}
-      <div
-        key={activeDay}
-        className="relative rounded-2xl border p-3 space-y-3 tab-fade-in"
-        style={{
-          // Más cerca de las pestañas que el resto de los bloques (que van a
-          // 16px): pegado al día que acabás de tocar, el panel se lee como su
-          // continuación y no como otra tarjeta suelta más.
-          marginTop: 8,
-          borderColor: tint(day.color, "33"),
-          borderTopColor: tint(day.color, "70"),
-          borderTopWidth: 2,
-          background: `linear-gradient(180deg, ${tint(day.color, "1a")} 0px, ${tint(day.color, "07")} 200px, transparent 420px)`,
-        }}
-      >
-        {/* Cabecera del panel: sin borde ni fondo propios — el color ya lo
-            pone el panel, y una tarjeta adentro de otra era justo lo que se
-            sentía como "rectángulos separados". */}
+      {/* Mismo lenguaje visual que "Rango por músculo" y las demás tarjetas
+          de Progreso: superficie neutra (slate-900/50 + blur + sombra), borde
+          fino del color del día como único acento, y una cabecera de placa de
+          ícono + título + subtítulo. El panel teñido que envolvía todo se
+          descartó: con una lista larga de ejercicios adentro pesaba
+          demasiado, y el color del día se lee mejor como acento que como
+          fondo. */}
+      <div key={activeDay} className="relative overflow-hidden rounded-2xl border bg-slate-900/50 backdrop-blur-sm shadow-md shadow-black/20 p-4 tab-fade-in" style={{ borderColor: tint(day.color, "25") }}>
         <div className="relative">
-          {activeDay === suggestedDay && (
-            <div className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg mb-2" style={{ backgroundColor: tint(day.color, "22"), color: day.color }}>
-              <RotateCcw size={10} /> {scheduledDay === activeDay ? "Programado para hoy" : "Sugerido para hoy"}
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: tint(day.color, "18"), color: day.color }}>
+              <Dumbbell size={15} />
             </div>
-          )}
-          <div className="flex items-start gap-2">
             <div className="flex-1 min-w-0">
-              <h2 className="text-xl font-black text-white leading-tight uppercase">{day.label}</h2>
-              <p className="text-xs text-slate-400 mt-0.5">{day.description}</p>
+              <p className="text-sm font-bold text-white truncate uppercase">{day.label}</p>
+              <p className="text-[11px] text-slate-500 truncate">{day.description}</p>
             </div>
             {/* "Resetear sesión de hoy" pasa de botón de ancho completo a un
-                ícono en la esquina: sirve para arreglar un error, no es algo
-                que necesites a mano cada día. El diálogo de confirmación es
-                el mismo. */}
+                ícono en la esquina — mismas acciones chicas que tiene "Rango
+                por músculo" a la derecha de su título. Sirve para arreglar un
+                error, no es algo que necesites a mano cada día; el diálogo de
+                confirmación es el mismo. */}
             {!confirmReset && (
-              <button onClick={() => setConfirmReset(true)} aria-label="Resetear sesión de hoy" title="Resetear sesión de hoy" className="shrink-0 flex items-center justify-center w-8 h-8 rounded-xl text-slate-500 hover:text-slate-300 transition active:scale-90" style={{ backgroundColor: tint(day.color, "12"), border: `1px solid ${tint(day.color, "28")}` }}>
+              <button onClick={() => setConfirmReset(true)} aria-label="Resetear sesión de hoy" title="Resetear sesión de hoy" className="shrink-0 flex items-center justify-center w-8 h-8 rounded-xl bg-slate-800/60 border border-slate-700/50 text-slate-400 hover:text-slate-200 transition active:scale-90">
                 <RotateCcw size={13} />
               </button>
             )}
           </div>
+          {activeDay === suggestedDay && (
+            <div className="mt-2.5 inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg" style={{ backgroundColor: tint(day.color, "18"), color: day.color }}>
+              <RotateCcw size={10} /> {scheduledDay === activeDay ? "Programado para hoy" : "Sugerido para hoy"}
+            </div>
+          )}
           {day.isNew && <div className="mt-2 inline-flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] rounded-lg px-2.5 py-1">🆕 Empezás a registrar tus marcas desde hoy.</div>}
           {/* Antes esto reducía las series ACÁ MISMO (en Rutina) durante la
               semana de descarga — quedaba una segunda versión de la
@@ -6583,18 +6570,18 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
               que lo ÚNICO que se mueve mientras entrenás. Ahora el progreso
               es una barra que se llena serie a serie —se lee sin leer un
               número— y los dos datos fijos bajan a texto chico al lado. */}
-          <div className="mt-3">
-            <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: "rgba(0,0,0,0.30)" }}>
-              <div className="h-full rounded-full transition-all duration-500 ease-out" style={{ width: `${pct}%`, backgroundColor: day.color, boxShadow: pct > 0 ? `0 0 10px ${tint(day.color, "80")}` : "none" }} />
+          {/* Fila de progreso en el mismo tono neutro de la tarjeta: los
+              números primero (que es lo que se lee) y la barra debajo como
+              refuerzo, sin fondo negro ni glow. */}
+          <div className="mt-3 rounded-xl px-3 py-2.5" style={{ backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}>
+            <div className="flex items-baseline gap-1.5 mb-1.5">
+              <span className="text-sm font-black tabular-nums" style={{ color: pct > 0 ? day.color : "#64748b" }}>{doneToday}/{totalSets}</span>
+              <span className="text-[11px] text-slate-500">series</span>
+              <span className="text-slate-700 text-[11px]">·</span>
+              <span className="text-[11px] text-slate-500 tabular-nums">{day.exercises.length} ejercicios</span>
             </div>
-            <div className="flex items-center gap-1.5 mt-1.5 text-[10px] text-slate-500">
-              <ListChecks size={10} className="shrink-0" style={{ color: pct > 0 ? day.color : undefined }} />
-              <span className="font-bold tabular-nums" style={{ color: pct > 0 ? day.color : "#94a3b8" }}>{doneToday}/{totalSets}</span>
-              <span>series de hoy</span>
-              <span className="text-slate-700">·</span>
-              <Dumbbell size={10} className="shrink-0" />
-              <span className="tabular-nums">{day.exercises.length}</span>
-              <span>ejercicios</span>
+            <div className="h-1.5 rounded-full overflow-hidden bg-slate-800/70">
+              <div className="h-full rounded-full transition-all duration-500 ease-out" style={{ width: `${pct}%`, backgroundColor: day.color }} />
             </div>
           </div>
           {confirmReset && (
@@ -6605,6 +6592,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             </div>
           )}
         </div>
+      </div>
 
       {/* La sesión activa pertenece a UN día (el que iniciaste). Si estás
           viendo otro día, no mostramos "sesión en curso" ahí — pero la
@@ -6648,7 +6636,6 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             </div>
           );
         })}
-        </div>
       </div>
 
       {activeSession && (
@@ -14260,14 +14247,15 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
   // Entrenador azul (igual que Rango). Reemplaza la ronda anterior, donde
   // se había unificado todo a un solo violeta.
   const SECTIONS = [
-    { k: "amigos", l: "Amigos", icon: <Users size={14} />, color: SOCIAL_COLOR },
-    { k: "buscar", l: "Buscar", icon: <Search size={14} />, color: "#06B6D4" },
-    { k: "ranking", l: "Ranking", icon: <Award size={14} />, color: "#F59E0B" },
-    { k: "entrenador", l: "Entrenador", icon: <GraduationCap size={14} />, color: "#3B82F6" },
+    { k: "amigos", l: "Amigos", icon: <Users size={14} />, color: SOCIAL_COLOR, sub: "Tus amigos y las solicitudes que te llegaron" },
+    { k: "buscar", l: "Buscar", icon: <Search size={14} />, color: "#06B6D4", sub: "Encontrá gente por @usuario, código QR o tus contactos" },
+    { k: "ranking", l: "Ranking", icon: <Award size={14} />, color: "#F59E0B", sub: "Cómo venís contra tus amigos y contra toda la app" },
+    { k: "entrenador", l: "Entrenador", icon: <GraduationCap size={14} />, color: "#3B82F6", sub: "Vinculate con tu entrenador o con tus alumnos" },
   ];
 
   const sectionIdx = Math.max(0, SECTIONS.findIndex((s) => s.k === section));
-  const sectionColor = SECTIONS[sectionIdx]?.color || SOCIAL_COLOR;
+  const sectionDef = SECTIONS[sectionIdx] || SECTIONS[0];
+  const sectionColor = sectionDef.color || SOCIAL_COLOR;
 
   return (
     <div className="space-y-4">
@@ -14478,7 +14466,24 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
         })}
       </div>
 
-      <div key={section} className="tab-fade-in space-y-3">
+      {/* Cada sección de Social vive en su propia tarjeta, con el mismo
+          lenguaje que "Rango por músculo" en Progreso: superficie neutra
+          (slate-900/50 + blur + sombra), borde fino como único acento, y una
+          cabecera de placa de ícono + título + bajada. El acento es el color
+          propio de cada sección — el mismo que ya tiene su pestaña arriba —
+          así el contenido queda visiblemente atado a la solapa que tocaste
+          en vez de flotar suelto debajo. */}
+      <div key={section} className="relative overflow-hidden rounded-2xl border bg-slate-900/50 backdrop-blur-sm shadow-md shadow-black/20 p-4 tab-fade-in" style={{ borderColor: tint(sectionColor, "25") }}>
+        <div className="flex items-center gap-2.5 mb-3">
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: tint(sectionColor, "18"), color: sectionColor }}>
+            {sectionDef.icon}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-white truncate">{sectionDef.l}</p>
+            <p className="text-[11px] text-slate-500 truncate">{sectionDef.sub}</p>
+          </div>
+        </div>
+        <div className="space-y-3">
         {section === "buscar" && (
           <>
             {/* Antes la ÚNICA forma de que alguien te agregara era que ya
@@ -14664,6 +14669,7 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
             onViewTrainer={(u) => { setViewingUid(u); setViewingAsTrainer(false); }}
           />
         )}
+        </div>
       </div>
 
       {showShareProfile && (
