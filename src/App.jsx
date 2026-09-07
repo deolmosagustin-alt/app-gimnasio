@@ -5,7 +5,7 @@ import {
   ResponsiveContainer, ReferenceLine,
 } from "recharts";
 import {
-  Play, Pause, RotateCcw, TrendingUp, TrendingDown, Dumbbell,
+  Play, Pause, RotateCcw, TrendingUp, TrendingDown, Dumbbell, History,
   ChevronDown, ChevronUp, ChevronLeft, Trophy, Flame, Save, Trash2, BarChart3,
   ListChecks, LogOut, X, Check, AlertTriangle, Calendar, Zap, Bell, GripVertical, Sliders, StickyNote, Eye,
   Mail, Clock, ChevronRight, Edit3, Info, Plus, Sun, Moon,
@@ -586,6 +586,17 @@ const DEFAULT_SETTINGS = {
   // default: la ficha arranca mínima (solo reps/kg) y cada quien prende
   // lo que realmente va a usar, en vez de tener que apagar seis cosas.
   showRpe: false, showWarmup: false, show1RMPercent: false, showCoaching: false, showExerciseNote: false, showPersonalNote: false, showStagnation: false, showProgressionSuggestion: false, showKm: false,
+  // Pedido: "lo de ver qué hiciste la vez pasada que sea una opción
+  // activable". Muestra, en cada serie, lo que hiciste en esa MISMA serie
+  // la última vez que entrenaste ese ejercicio (no tu récord histórico:
+  // para decidir la carga de hoy sirve más lo último que hiciste que una
+  // marca de hace meses — es el dato que Hevy/Strong ponen fijo en cada
+  // fila). Apagado por default, como el resto de los campos de la ficha.
+  showLastSession: false,
+  // Fila de registro compacta (una sola línea por serie) en vez de la
+  // tarjeta alta de siempre. Apagado por default para no cambiarle la
+  // pantalla de golpe a quien ya está acostumbrado a la actual.
+  compactSetRow: false,
   rpeDisplayMode: "rpe", // "rpe" | "rir" — mismo dato guardado, solo cambia cómo se muestra
   // Al guardar una serie, arrancar solo el cronómetro de descanso. Apagado
   // por default: es un cambio de comportamiento (no solo de qué se ve), así
@@ -2386,8 +2397,6 @@ function ShareLinkModal({ title, shareTitle, shareText, shareTarget, onClose, ac
   const [linkError, setLinkError] = useState(null);
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState(false);
-  const [exporting, setExporting] = useState(null);
-  const [exportError, setExportError] = useState(null); // null | { stage: "generate"|"share", detail: string }
   const [showFileOptions, setShowFileOptions] = useState(false);
   const urlInputRef = useRef(null);
 
@@ -2436,26 +2445,6 @@ function ShareLinkModal({ title, shareTitle, shareText, shareTarget, onClose, ac
       setCopyError(true);
       urlInputRef.current?.focus();
       urlInputRef.current?.select();
-    }
-  };
-  const handleExportDoc = async (kind) => {
-    setExporting(kind); setExportError(null);
-    try {
-      if (kind === "pdf") await exportRoutineToPdf(shareTarget);
-      else if (kind === "word") await exportRoutineToWord(shareTarget);
-      else if (kind === "excel") await exportRoutineToExcel(shareTarget);
-    } catch (err) {
-      // BUG FIX: antes esto solo hacía console.error — con el catch
-      // silencioso de downloadBlob ya arreglado, un fallo real (permisos,
-      // sin espacio, o ahora también que falle compartir en Android) ahora
-      // sí llega hasta acá, así que hay que mostrarlo. Se distingue "se
-      // generó pero no se pudo compartir" (err.stage === "share", ver
-      // downloadBlob) de "no se pudo generar" — son causas distintas y un
-      // mensaje genérico único llevaba a pensar que el archivo ni se creó.
-      console.error(`Error al exportar la rutina a ${kind}:`, err);
-      setExportError({ stage: err?.stage === "share" ? "share" : "generate", detail: String(err?.message || err || "") });
-    } finally {
-      setExporting(null);
     }
   };
   const waUrl = url ? `https://wa.me/?text=${encodeURIComponent(shareText + " " + url)}` : "#";
@@ -2541,26 +2530,15 @@ function ShareLinkModal({ title, shareTitle, shareText, shareTarget, onClose, ac
             ver los botones de descarga: exportar quedaba roto sin que la
             causa real tuviera nada que ver con exportar. Ahora se muestra
             siempre, sin importar cómo vaya el enlace para compartir. */}
+        {/* Mismo bloque de exportación que Perfil (ExportCenterCard), acá
+            fijado en "rutina" porque el contexto ya la eligió — así la fila
+            de formatos se ve y se comporta igual desde donde la abras. */}
         {!showFileOptions ? (
           <button onClick={() => setShowFileOptions(true)} className="relative w-full flex items-center justify-center gap-1.5 pt-3 border-t border-slate-800/60 text-slate-500 hover:text-slate-300 text-xs font-semibold transition"><Download size={12} /> Descargar como archivo (PDF, Word, Excel)</button>
         ) : (
           <div className="relative pt-3 border-t border-slate-800/60">
             <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Descargar</p>
-            <div className="grid grid-cols-3 gap-2">
-              <button onClick={() => handleExportDoc("pdf")} disabled={!!exporting} className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition disabled:opacity-50">{exporting === "pdf" ? <RotateCcw size={14} className="animate-spin text-rose-400" /> : <Download size={14} className="text-rose-400" />}PDF</button>
-              <button onClick={() => handleExportDoc("word")} disabled={!!exporting} className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition disabled:opacity-50">{exporting === "word" ? <RotateCcw size={14} className="animate-spin text-blue-400" /> : <Download size={14} className="text-blue-400" />}Word</button>
-              <button onClick={() => handleExportDoc("excel")} disabled={!!exporting} className="flex flex-col items-center gap-1.5 py-3 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 text-[10px] font-bold transition disabled:opacity-50">{exporting === "excel" ? <RotateCcw size={14} className="animate-spin text-emerald-400" /> : <Download size={14} className="text-emerald-400" />}Excel</button>
-            </div>
-            {exportError && (
-              <div className="mt-2 text-center">
-                <p className="text-[11px] text-rose-400">
-                  {exportError.stage === "share"
-                    ? "El archivo se generó bien, pero no pudimos abrir la ventana para compartirlo o guardarlo. Probá de nuevo."
-                    : "No pudimos generar el archivo. Probá de nuevo."}
-                </p>
-                {exportError.detail && <p className="text-[9.5px] text-slate-700 mt-0.5 break-all">{exportError.detail}</p>}
-              </div>
-            )}
+            <ExportCenterCard routineDef={shareTarget} only="routine" embedded />
           </div>
         )}
       </div>
@@ -4847,13 +4825,22 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   // comportamiento de "récord" de siempre.
   const plannedTarget = getPlannedTargetForWeek(setDef, weekInCycle);
   const isPlannedMode = fieldSettings.trainingMode === "planned" && !!plannedTarget;
+  // Fila compacta (fieldSettings.compactSetRow): misma lógica y los mismos
+  // campos, sólo que en una sola línea en vez de la tarjeta alta — ver los
+  // bloques marcados con `compact` más abajo.
+  const compact = fieldSettings.compactSetRow === true;
   const globalUnit = useWeightUnit();
   // Unidad local: arranca desde la preferencia global, pero el usuario puede
   // cambiarla ejercicio por ejercicio con el toggle kg/lbs del input.
   const [unit, setUnit] = useState(globalUnit);
   useEffect(() => { setUnit(globalUnit); }, [globalUnit]);
   const key = `${exerciseId}_${setIndex}`, prKey = `${key}_pr_override`, today = todayStr();
-  const history = logs[key] || [], override = logs[prKey];
+  // Memoizado: es la dependencia de varios useMemo de abajo (computedPR,
+  // lastSession) y, sin esto, `logs[key] || []` devuelve un array NUEVO en
+  // cada render cuando la serie todavía no tiene historial, recalculándolos
+  // siempre al pedo.
+  const history = useMemo(() => logs[key] || [], [logs, key]);
+  const override = logs[prKey];
   // Cardio no tiene una "carga" comparable (no hay kg×reps) — el récord
   // ahí es, simplemente, la sesión más larga en minutos. La distancia es
   // un dato extra que se guarda si lo cargás, pero no decide el récord.
@@ -4865,6 +4852,17 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     // el muñeco y en el "A superar". Por 1RM, 110×5 (128) supera a 95×8 (120).
     let best = setDef.pr ? { ...setDef.pr } : null; history.forEach((h) => { if (!best || prScore(h.kg, h.reps) > prScore(best.kg, best.reps)) best = { kg: h.kg, reps: h.reps }; }); return best;
   }, [history, setDef.pr, cardio]);
+  // Pedido: "ver qué hiciste la vez pasada" (opción activable,
+  // fieldSettings.showLastSession). Es lo ÚLTIMO que hiciste en ESTA misma
+  // serie, no tu récord histórico: para elegir la carga de hoy sirve más
+  // que una marca de hace meses. Se ignora lo de hoy (estás en el medio de
+  // esa sesión) y las marcas de la semana de descarga (pesos reducidos a
+  // propósito, no comparables).
+  const lastSession = useMemo(() => {
+    const past = history.filter((h) => h?.date && h.date !== today && !h.deload);
+    if (!past.length) return null;
+    return past.reduce((a, b) => (b.date > a.date ? b : a));
+  }, [history, today]);
   const currentPR = useMemo(() => {
     if (!override && !computedPR) return null;
     // Un récord EDITADO A MANO (manual: true) manda SIEMPRE mientras exista:
@@ -5226,7 +5224,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     setEditingPR(false);
   };
   return (
-    <div className="relative rounded-xl px-3.5 py-3.5 mb-2.5 last:mb-0" style={{ backgroundColor: tint(accent, "0a"), border: `1px solid ${tint(accent, "25")}` }}>
+    <div className={`relative rounded-xl last:mb-0 ${compact ? "px-2.5 py-2 mb-1.5" : "px-3.5 py-3.5 mb-2.5"}`} style={{ backgroundColor: tint(accent, "0a"), border: `1px solid ${tint(accent, "25")}` }}>
       <PRBurst anchorRef={saveBtnRef} trigger={prBurst} />
       <div className="absolute left-0 top-2 bottom-2 w-1 rounded-full" style={{ backgroundColor: accent }} />
       <div className="flex items-center justify-between gap-2 mb-2.5 flex-wrap">
@@ -5251,7 +5249,33 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           PRIMERO, grande — es lo que estás tratando de alcanzar en esta
           serie, así que tiene que verse antes de ponerte a cargar
           números, no como una nota chica al final. */}
-      <div className="flex items-center gap-2 mb-3">
+      {/* Modo compacto (fieldSettings.compactSetRow): en vez de la tarjeta
+          alta de arriba, una sola línea con lo mismo — la referencia (meta
+          o récord) y, si está activado, lo que hiciste la vez pasada. Cada
+          serie pasa de ~170px a ~70px, así entra el ejercicio entero en
+          pantalla sin scrollear (mismo criterio que Hevy/Strong). */}
+      {compact && (currentPR || isPlannedMode || (fieldSettings.showLastSession === true && lastSession)) && !cardio && (
+        <div className="flex items-center gap-2 mb-1.5 px-0.5 min-w-0">
+          {(currentPR || isPlannedMode) && (
+            <span className="flex items-center gap-1 min-w-0 shrink-0">
+              {isPlannedMode ? <Target size={11} style={{ color: accent }} className="shrink-0" /> : <Trophy size={11} style={{ color: accent }} className="shrink-0" />}
+              <span className="text-[9px] font-black uppercase tracking-wider" style={{ color: tint(accent, "aa") }}>{isPlannedMode ? "Plan" : "Récord"}</span>
+              <span className="text-[11px] font-black tabular-nums" style={{ color: accent }}>
+                {isPlannedMode
+                  ? `${plannedTarget.reps}×${kgToDisplay(plannedTarget.kg, unit)}`
+                  : `${currentPR.reps}×${kgToDisplay(currentPR.kg, unit)}`}
+                <span className="opacity-60 text-[9px] ml-0.5">{weightLabel(unit)}</span>
+              </span>
+            </span>
+          )}
+          {fieldSettings.showLastSession === true && lastSession && (
+            <span className="flex items-center gap-1 text-[10px] text-slate-500 min-w-0 truncate">
+              <History size={10} className="shrink-0" /> Ant {lastSession.reps}×{kgToDisplay(lastSession.kg, unit)}{weightLabel(unit)}
+            </span>
+          )}
+        </div>
+      )}
+      <div className={`flex items-center gap-2 ${compact ? "hidden" : "mb-3"}`}>
         {(currentPR || isPlannedMode) ? (
           <div className="relative overflow-hidden flex items-center gap-2.5 pl-3.5 pr-2 py-2.5 rounded-xl flex-1" style={{ background: `linear-gradient(120deg, ${tint(accent, "20")}, ${tint(accent, "0c")})`, border: `1px solid ${tint(accent, "45")}` }}>
             <div className="absolute -top-5 -left-5 w-16 h-16 rounded-full blur-2xl pointer-events-none opacity-30" style={{ backgroundColor: accent }} />
@@ -5289,6 +5313,17 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           </div>
         )}
       </div>
+      {/* Lo que hiciste la vez pasada en ESTA serie (opción activable) —
+          en el layout normal va como una línea aparte debajo de la
+          referencia; en el compacto ya está integrado arriba. */}
+      {!compact && fieldSettings.showLastSession === true && lastSession && !cardio && (
+        <div className="flex items-center gap-1.5 -mt-1.5 mb-2.5 px-1 text-[11px] text-slate-500">
+          <History size={11} className="shrink-0" />
+          <span>La vez pasada: <span className="font-bold text-slate-400 tabular-nums">{lastSession.reps}×{kgToDisplay(lastSession.kg, unit)}{weightLabel(unit)}</span></span>
+          <span className="text-slate-700">·</span>
+          <span className="text-slate-600">{haceCuanto(daysSince(lastSession.date)) || "hoy"}</span>
+        </div>
+      )}
 
         {/* Modo bloqueado: si ya guardaste una entrada hoy Y la sesión está
           activa, los inputs se reemplazan por la vista de solo lectura para
@@ -5505,12 +5540,12 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
             <div onFocus={() => setRowFocus(true)} onBlur={() => setRowFocus(false)}
                  className="flex items-stretch rounded-2xl bg-slate-950/70 overflow-hidden transition-all duration-200"
                  style={{ border: `1px solid ${borderCol}`, boxShadow: glow }}>
-              <div className="flex-1 flex flex-col items-center justify-center py-2.5">
-                <span className="text-[9px] text-slate-600 font-bold uppercase tracking-widest">Reps</span>
-                <input type="number" inputMode="decimal" placeholder="—" value={reps} onChange={(e) => updateDraft({ reps: e.target.value })} className="w-full bg-transparent text-2xl font-black text-center text-white focus:outline-none placeholder:text-slate-800" />
+              <div className={`flex-1 flex flex-col items-center justify-center ${compact ? "py-1" : "py-2.5"}`}>
+                {!compact && <span className="text-[9px] text-slate-600 font-bold uppercase tracking-widest">Reps</span>}
+                <input type="number" inputMode="decimal" placeholder={compact ? "reps" : "—"} value={reps} onChange={(e) => updateDraft({ reps: e.target.value })} className={`w-full bg-transparent font-black text-center text-white focus:outline-none placeholder:text-slate-700 ${compact ? "text-lg placeholder:text-[11px]" : "text-2xl placeholder:text-slate-800"}`} />
               </div>
               <div className="flex items-center text-slate-700 text-base font-light select-none">×</div>
-              <div className="flex-1 flex flex-col items-center justify-center py-2.5 relative">
+              <div className={`flex-1 flex flex-col items-center justify-center relative ${compact ? "py-1" : "py-2.5"}`}>
                 <button onClick={() => {
                   // Convertir el valor ya escrito a la nueva unidad, así no
                   // tenés que recalcular a mano lo que pusiste.
@@ -5521,12 +5556,12 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
                     updateDraft({ kg: String(kgToDisplay(inKg, newUnit)) });
                   }
                   setUnit(newUnit);
-                }} className="text-[9px] text-slate-600 font-bold uppercase tracking-widest hover:text-slate-400 transition">
+                }} className={`text-[9px] text-slate-600 font-bold uppercase tracking-widest hover:text-slate-400 transition ${compact ? "absolute right-1 top-0.5" : ""}`}>
                   {weightLabel(unit)} <span className="text-slate-700">⇄</span>
                 </button>
-                <input type="number" inputMode="decimal" placeholder="—" value={kg} onChange={(e) => updateDraft({ kg: e.target.value })} className="w-full bg-transparent text-2xl font-black text-center text-white focus:outline-none placeholder:text-slate-800" />
+                <input type="number" inputMode="decimal" placeholder={compact ? weightLabel(unit) : "—"} value={kg} onChange={(e) => updateDraft({ kg: e.target.value })} className={`w-full bg-transparent font-black text-center text-white focus:outline-none placeholder:text-slate-700 ${compact ? "text-lg placeholder:text-[11px]" : "text-2xl placeholder:text-slate-800"}`} />
               </div>
-              <button ref={saveBtnRef} onClick={handleSave} aria-label="Guardar serie" className={`w-14 flex items-center justify-center transition-all active:scale-95 !text-white ${saved ? "" : "hover:opacity-90"}`} style={saved ? { background: "linear-gradient(160deg, #10B981, #059669)" } : { background: `linear-gradient(160deg, ${accent}, ${tint(accent, "b0")})` }}>
+              <button ref={saveBtnRef} onClick={handleSave} aria-label="Guardar serie" className={`flex items-center justify-center transition-all active:scale-95 !text-white ${compact ? "w-12" : "w-14"} ${saved ? "" : "hover:opacity-90"}`} style={saved ? { background: "linear-gradient(160deg, #10B981, #059669)" } : { background: `linear-gradient(160deg, ${accent}, ${tint(accent, "b0")})` }}>
                 {saved ? <Check size={19} /> : <Save size={18} />}
               </button>
             </div>
@@ -9260,7 +9295,12 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
   }, [allExercises]);
 
   const [selId, setSelId] = useState(allExercises[0]?.id);
-  const [selSet, setSelSet] = useState(0);
+  // "all" = el ejercicio como un todo (la mejor serie de cada sesión), que
+  // es la pregunta real ("¿cómo viene mi press banca?"). Antes esto
+  // arrancaba en 0 y OBLIGABA a mirar serie por serie, fragmentando el
+  // dato: la serie 2 de un día podía ser de calentamiento y la 3 la pesada,
+  // y cada una daba una curva distinta y engañosa por separado.
+  const [selSet, setSelSet] = useState("all");
   const [metric, setMetric] = useState("grafico");
   const [showExercisePicker, setShowExercisePicker] = useState(false);
   const selEx = allExercises.find((e) => e.id === selId);
@@ -9268,7 +9308,23 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
   // serie) — allExercises sólo guarda la CANTIDAD, esto trae la definición
   // completa para mostrarla en el selector de serie.
   const selExDef = selEx ? ROUTINE[selEx.dayKey]?.exercises.find((e) => e.id === selId) : null;
-  const history = useMemo(() => (logs[`${selId}_${selSet}`] || []).slice().sort((a, b) => (a.date > b.date ? 1 : -1)), [logs, selId, selSet]);
+  const history = useMemo(() => {
+    if (selSet !== "all") return (logs[`${selId}_${selSet}`] || []).slice().sort((a, b) => (a.date > b.date ? 1 : -1));
+    // Vista "Todas": una entrada por SESIÓN, quedándose con la mejor serie
+    // de ese día (por 1RM estimado, el mismo criterio que usa el récord).
+    // Así la curva refleja la evolución del ejercicio y no la de un índice
+    // de serie suelto.
+    const nSets = selEx?.sets || 1;
+    const byDate = {};
+    for (let i = 0; i < nSets; i++) {
+      (logs[`${selId}_${i}`] || []).forEach((h) => {
+        if (!h?.date) return;
+        const prev = byDate[h.date];
+        if (!prev || prScore(h.kg, h.reps) > prScore(prev.kg, prev.reps)) byDate[h.date] = h;
+      });
+    }
+    return Object.values(byDate).sort((a, b) => (a.date > b.date ? 1 : -1));
+  }, [logs, selId, selSet, selEx]);
   const chartData = useMemo(() => history.map((h) => ({ date: h.date.slice(5), kg: h.kg, reps: h.reps, vol: vol(h.kg, h.reps), e1rm: estimate1RM(h.kg, h.reps), rpe: h.rpe ?? null, deload: !!h.deload })), [history]);
   // La mejor marca de TODA la curva — sirve para la línea de referencia y
   // para agrandar el punto correspondiente en el gráfico. El 1RM sigue
@@ -9378,7 +9434,7 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
               <ExercisePickerModal
                 groups={exercisesByDay}
                 selId={selId}
-                onSelect={(id) => { setSelId(id); setSelSet(0); setShowExercisePicker(false); }}
+                onSelect={(id) => { setSelId(id); setSelSet("all"); setShowExercisePicker(false); }}
                 onClose={() => setShowExercisePicker(false)}
               />
             )}
@@ -9386,7 +9442,15 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
             {/* Cada botón ahora suma el rango de reps de esa serie (para
                 elegir sin adivinar qué es cada una) y un punto si ya tiene
                 marcas — mismo lenguaje que el punto de ExerciseChipRow. */}
+            {/* "Todas" primero y por default: la curva del EJERCICIO (mejor
+                serie de cada sesión). Las series sueltas quedan como filtro
+                opcional, para cuando de verdad querés mirar una puntual. */}
             <div className="flex gap-2">
+              <button onClick={() => setSelSet("all")} className="flex-1 py-1.5 rounded-xl text-xs font-bold transition-all border flex flex-col items-center gap-0.5"
+                style={selSet === "all" ? { backgroundColor: "#F59E0B", borderColor: "#F59E0B", color: "#fff" } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
+                Todas
+                <span className="text-[9px] font-normal opacity-70">mejor serie</span>
+              </button>
               {Array.from({ length: selEx?.sets || 1 }).map((_, i) => {
                 const active = selSet === i;
                 const repRange = selExDef?.sets?.[i]?.repRange;
@@ -9409,7 +9473,7 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
             </div>
 
             {chartData.length === 0 ? (
-              <div className="text-center text-slate-600 py-10"><BarChart3 size={28} className="mx-auto mb-2.5 opacity-30" /><p className="text-sm">Sin registros para esta serie.</p><p className="text-xs mt-1 text-slate-700">Guardá series en la rutina para ver tu evolución aquí.</p></div>
+              <div className="text-center text-slate-600 py-10"><BarChart3 size={28} className="mx-auto mb-2.5 opacity-30" /><p className="text-sm">{selSet === "all" ? "Sin registros de este ejercicio." : "Sin registros para esta serie."}</p><p className="text-xs mt-1 text-slate-700">Guardá series en la rutina para ver tu evolución aquí.</p></div>
             ) : metric === "1rm" ? (
               <>
                 {/* Lista directa del 1RM estimado de cada sesión — más precisa
@@ -9685,7 +9749,7 @@ async function downloadBlob(blob, filename) {
     // console.error — si Filesystem.writeFile fallaba de verdad (permisos,
     // sin espacio), el botón de exportar volvía a su estado normal sin
     // avisar nada, como si hubiese funcionado. Ahora eso se deja propagar
-    // (lo captura handleExport/handleExportDoc y muestra un error).
+    // (lo captura ExportCenterCard.handleExport y muestra un error).
     //
     // Share.share() TAMBIÉN se relanza ahora (antes se tragaba entero,
     // asumiendo que un fallo acá era siempre "cerró la hoja sin elegir
@@ -9709,8 +9773,8 @@ async function downloadBlob(blob, filename) {
       // reconoce ninguna app de destino la cierra sin elegir nada y vuelve
       // pensando que no pasó nada. dialogTitle es lo único que Share.share
       // deja personalizar del lado de Android — no reemplaza avisarle esto
-      // mismo desde la propia app (ver aviso en ShareLinkModal/
-      // ExportTrainingCard, más abajo), pero ayuda a quien sí llega a ver
+      // mismo desde la propia app (ver aviso en ExportCenterCard, más
+      // abajo), pero ayuda a quien sí llega a ver
       // el diálogo del sistema.
       await Share.share({ title: filename, dialogTitle: "Elegí dónde guardarlo: Drive, Archivos, WhatsApp…", files: [result.uri] });
     } catch (err) {
@@ -9719,8 +9783,8 @@ async function downloadBlob(blob, filename) {
       // (por ejemplo, ningún destino instalado capaz de recibir el
       // archivo) también cae en este catch, y antes quedaba exactamente
       // igual de silencioso que una cancelación normal. Ahora se relanza
-      // para que downloadBlob (y quien la llama, ver handleExportDoc/
-      // handleExport) sepa distinguir "no se pudo compartir" de "se
+      // para que downloadBlob (y quien la llama, ver
+      // ExportCenterCard.handleExport) sepa distinguir "no se pudo compartir" de "se
       // compartió bien" en vez de asumir siempre lo segundo.
       console.warn("Compartir (nativo) cancelado o falló:", err);
       // Marca de dónde vino el fallo — el archivo YA se escribió bien acá
@@ -10095,7 +10159,56 @@ const EXPORT_PERIODS = [
 // Tarjeta de Perfil: elegís el período y el formato, y se descarga
 // directo — pensado para mandarle a tu entrenador el resumen sin tener que
 // armarlo a mano.
-function ExportTrainingCard({ profileName, logs, trainingSessions = [], exerciseNotes = {} }) {
+// Los tres formatos, con su color propio, en un solo lugar — antes cada
+// pantalla que exportaba redibujaba su propia fila de botones (una gris y
+// plana en Perfil, otra con colores en el modal de compartir), así que la
+// misma acción se veía distinta según desde dónde la abrieras.
+const EXPORT_FORMATS = [
+  { k: "pdf", l: "PDF", color: "#F43F5E" },
+  { k: "word", l: "Word", color: "#3B82F6" },
+  { k: "excel", l: "Excel", color: "#10B981" },
+];
+
+function ExportFormatGrid({ exporting, onPick, disabled = false }) {
+  return (
+    <div className="grid grid-cols-3 gap-2">
+      {EXPORT_FORMATS.map((f) => (
+        <button key={f.k} onClick={() => onPick(f.k)} disabled={disabled || !!exporting}
+          className="flex flex-col items-center gap-1.5 py-3 rounded-xl border text-[10px] font-bold text-slate-300 transition active:scale-[0.97] disabled:opacity-40"
+          style={{ backgroundColor: tint(f.color, "12"), borderColor: tint(f.color, "30") }}>
+          {exporting === f.k
+            ? <RotateCcw size={15} className="animate-spin" style={{ color: f.color }} />
+            : <Download size={15} style={{ color: f.color }} />}
+          {f.l}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// Mensaje de error compartido: distingue "no se pudo generar" de "se generó
+// pero no se pudo compartir/guardar" (err.stage === "share", ver
+// downloadBlob). Un mensaje genérico único hacía pensar que el archivo ni se
+// creó, cuando en Android el caso más probable es justo el contrario.
+function exportErrorMessage(err) {
+  return err?.stage === "share"
+    ? "El archivo se generó bien, pero no pudimos abrir la ventana para compartirlo o guardarlo. Probá de nuevo."
+    : "No pudimos generar el archivo. Probá de nuevo.";
+}
+
+/* ============================================================================
+   EXPORTAR — una sola puerta. Antes había tres, cada una con su propia mitad
+   del asunto: esta tarjeta en Perfil sólo exportaba lo ENTRENADO, el
+   "Descargar como archivo" del modal de compartir sólo la RUTINA, y el atajo
+   del chat pedía la rutina en PDF por IA. Ninguna avisaba que existían las
+   otras, así que "no puedo exportar mi rutina" era, casi siempre, no haberla
+   encontrado. Ahora un solo bloque con dos pestañas: QUÉ exportás (la rutina
+   o lo que entrenaste) y en qué formato. `only` lo deja mostrar una sola
+   pestaña sin la barra, para embeberlo donde el contexto ya la decide (el
+   modal de compartir una rutina puntual).
+============================================================================ */
+function ExportCenterCard({ profileName = "", logs = {}, trainingSessions = [], exerciseNotes = {}, routineDef = null, only = null, embedded = false }) {
+  const [what, setWhat] = useState(only || (routineDef ? "routine" : "training"));
   const allSessions = useMemo(() => buildSessionsIndex(logs, trainingSessions), [logs, trainingSessions]);
   const [period, setPeriod] = useState("week");
   const [exporting, setExporting] = useState(null);
@@ -10103,50 +10216,93 @@ function ExportTrainingCard({ profileName, logs, trainingSessions = [], exercise
   const filtered = useMemo(() => getSessionsForPeriod(allSessions, period), [allSessions, period]);
   const rows = useMemo(() => buildExportRows(filtered, exerciseNotes), [filtered, exerciseNotes]);
   const periodLabel = EXPORT_PERIODS.find((p) => p.k === period)?.l || "";
+  const trainedDays = useMemo(() => groupExportRowsByDate(rows).length, [rows]);
+  // Resumen de la rutina para que se vea QUÉ se va a bajar antes de bajarlo
+  // (días/ejercicios/series) — los mismos números que encabezan el PDF.
+  const routineStats = useMemo(() => {
+    if (!routineDef) return null;
+    try {
+      const days = buildRoutineExportDays(routineDef);
+      return {
+        days: days.length,
+        exercises: days.reduce((a, d) => a + d.exercises.length, 0),
+        sets: days.reduce((a, d) => a + d.exercises.reduce((b, ex) => b + ex.sets, 0), 0),
+      };
+    } catch { return null; }
+  }, [routineDef]);
 
   const handleExport = async (format) => {
-    if (!rows.length) { setError("No hay entrenamientos registrados en ese período."); return; }
     setError(""); setExporting(format);
-    const meta = { profileName, periodLabel, filename: `mi-rutina-${slugifyForFilename(profileName)}-${period}-${todayStr()}` };
     try {
-      if (format === "pdf") await exportTrainingToPdf(rows, meta);
-      else if (format === "word") await exportTrainingToWord(rows, meta);
-      else if (format === "excel") await exportTrainingToExcel(rows, meta);
+      if (what === "routine") {
+        if (format === "pdf") await exportRoutineToPdf(routineDef);
+        else if (format === "word") await exportRoutineToWord(routineDef);
+        else if (format === "excel") await exportRoutineToExcel(routineDef);
+      } else {
+        if (!rows.length) { setError("No hay entrenamientos registrados en ese período."); return; }
+        const meta = { profileName, periodLabel, filename: `mi-rutina-${slugifyForFilename(profileName)}-${period}-${todayStr()}` };
+        if (format === "pdf") await exportTrainingToPdf(rows, meta);
+        else if (format === "word") await exportTrainingToWord(rows, meta);
+        else if (format === "excel") await exportTrainingToExcel(rows, meta);
+      }
     } catch (err) {
-      console.error("Error exportando entrenamiento:", err);
-      // Mismo criterio que handleExportDoc en ShareLinkModal: distingue
-      // "se generó pero no se pudo compartir/guardar" (err.stage ===
-      // "share", ver downloadBlob) de "no se pudo generar" — antes un
-      // único mensaje genérico hacía pensar que el archivo ni se creó,
-      // cuando en Android el caso más probable es justo lo contrario.
-      setError(err?.stage === "share"
-        ? "El archivo se generó bien, pero no pudimos abrir la ventana para compartirlo o guardarlo. Probá de nuevo."
-        : "No pudimos generar el archivo. Probá de nuevo.");
+      console.error(`Error exportando ${what}:`, err);
+      setError(exportErrorMessage(err));
     } finally {
       setExporting(null);
     }
   };
 
+  const body = (
+    <>
+      {!only && (
+        <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
+          {[{ k: "routine", l: "Rutina", icon: <ListChecks size={13} /> }, { k: "training", l: "Entrenamiento", icon: <Dumbbell size={13} /> }].map((opt) => (
+            <button key={opt.k} onClick={() => { setWhat(opt.k); setError(""); }} disabled={opt.k === "routine" && !routineDef}
+              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-all disabled:opacity-40 ${what === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>
+              {opt.icon}{opt.l}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {what === "routine" ? (
+        <>
+          <div className="flex items-center gap-3 rounded-xl px-3 py-2.5" style={{ backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}>
+            <span className="w-8 h-8 rounded-xl bg-teal-500/15 text-teal-400 flex items-center justify-center shrink-0"><ListChecks size={15} /></span>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-bold text-white truncate">{routineDef?.name || "Sin rutina activa"}</p>
+              <p className="text-[10px] text-slate-500">
+                {routineStats ? `${routineStats.days} días · ${routineStats.exercises} ejercicios · ${routineStats.sets} series` : "Activá una rutina para poder exportarla."}
+              </p>
+            </div>
+          </div>
+          <p className="text-[10px] text-slate-600">El plan completo: días, ejercicios, series y rango de reps.</p>
+        </>
+      ) : (
+        <>
+          <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
+            {EXPORT_PERIODS.map((opt) => (
+              <button key={opt.k} onClick={() => { setPeriod(opt.k); setError(""); }} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${period === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
+            ))}
+          </div>
+          <p className="text-[10px] text-slate-600">{trainedDays > 0 ? `${trainedDays} día${trainedDays === 1 ? "" : "s"} entrenado${trainedDays === 1 ? "" : "s"} en este período — con los kg y reps de cada serie.` : "Sin entrenamientos registrados en este período."}</p>
+        </>
+      )}
+
+      <ExportFormatGrid exporting={exporting} onPick={handleExport} disabled={what === "routine" && !routineDef} />
+      {error && <p className="text-[11px] text-amber-400">{error}</p>}
+    </>
+  );
+
+  if (embedded) return <div className="space-y-3">{body}</div>;
   return (
     <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 backdrop-blur-sm shadow-md shadow-black/20 space-y-3.5">
       <div>
-        <p className="text-sm font-bold text-white">Exportar entrenamiento</p>
-        <p className="text-[11px] text-slate-500 mt-0.5">Descargá el resumen para mandarle a tu entrenador</p>
+        <p className="text-sm font-bold text-white">Exportar</p>
+        <p className="text-[11px] text-slate-500 mt-0.5">Bajá tu rutina o el resumen de lo que entrenaste, para mandárselo a quien quieras</p>
       </div>
-      <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
-        {EXPORT_PERIODS.map((opt) => (
-          <button key={opt.k} onClick={() => { setPeriod(opt.k); setError(""); }} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${period === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
-        ))}
-      </div>
-      <p className="text-[10px] text-slate-600">{rows.length > 0 ? `${groupExportRowsByDate(rows).length} día${groupExportRowsByDate(rows).length === 1 ? "" : "s"} entrenado${groupExportRowsByDate(rows).length === 1 ? "" : "s"} en este período.` : "Sin entrenamientos registrados en este período."}</p>
-      <div className="grid grid-cols-3 gap-2">
-        {[{ k: "pdf", l: "PDF" }, { k: "word", l: "Word" }, { k: "excel", l: "Excel" }].map((opt) => (
-          <button key={opt.k} onClick={() => handleExport(opt.k)} disabled={!!exporting} className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition text-xs font-bold disabled:opacity-50">
-            <Download size={13} /> {exporting === opt.k ? "..." : opt.l}
-          </button>
-        ))}
-      </div>
-      {error && <p className="text-[11px] text-amber-400">{error}</p>}
+      {body}
     </div>
   );
 }
@@ -11119,7 +11275,7 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold text-white">Qué ves al registrar</p>
           <p className="text-[11px] text-slate-500 mt-0.5">
-            {(() => { const on = [settings.showRpe !== false, settings.showWarmup !== false, settings.show1RMPercent !== false, settings.showCoaching !== false, settings.showExerciseNote !== false, settings.showPersonalNote !== false, settings.showStagnation === true, settings.showProgressionSuggestion === true].filter(Boolean).length; return on === 8 ? "Todo activado" : `${on} de 8 activadas`; })()} · vista previa en vivo
+            {(() => { const flags = [settings.showRpe !== false, settings.showWarmup !== false, settings.show1RMPercent !== false, settings.showCoaching !== false, settings.showExerciseNote !== false, settings.showPersonalNote !== false, settings.showStagnation === true, settings.showProgressionSuggestion === true, settings.showLastSession === true, settings.compactSetRow === true]; const on = flags.filter(Boolean).length; return on === flags.length ? "Todo activado" : `${on} de ${flags.length} activadas`; })()} · vista previa en vivo
           </p>
         </div>
         <Eye size={16} className="text-slate-500 shrink-0" />
@@ -11202,7 +11358,7 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
       </div>
 
       <div className="flex items-center gap-1.5 px-1 pt-2"><Download size={11} className="text-slate-600" /><p className="text-[10px] font-black uppercase tracking-widest text-slate-600">Datos</p></div>
-      <ExportTrainingCard profileName={profileName} logs={logs} trainingSessions={profile?.trainingSessions} exerciseNotes={settings.exerciseNotes} />
+      <ExportCenterCard profileName={profileName} logs={logs} trainingSessions={profile?.trainingSessions} exerciseNotes={settings.exerciseNotes} routineDef={activeRoutineDef} />
 
       <div className="flex items-center gap-2.5 px-1 text-[11px] text-slate-600">
         <Save size={12} className="text-slate-600 shrink-0" />
@@ -15378,7 +15534,7 @@ function buildActionPlan(action, ctx) {
   // ("Personalizá tu ficha"), expuestos acá para poder prenderlos/apagarlos
   // por chat en vez de tener que ir a buscarlos.
   if (action.type === "config_ficha") {
-    const FICHA_FIELDS = { showRpe: "Esfuerzo (RPE/RIR)", showWarmup: "Aproximaciones", show1RMPercent: "Porcentaje de 1RM", showCoaching: "Consejos al guardar", showExerciseNote: "Consejos del ejercicio", showPersonalNote: "Notas por serie", showStagnation: "Aviso de estancamiento", showProgressionSuggestion: "Progresión sugerida" };
+    const FICHA_FIELDS = { showRpe: "Esfuerzo (RPE/RIR)", showWarmup: "Aproximaciones", show1RMPercent: "Porcentaje de 1RM", showCoaching: "Consejos al guardar", showExerciseNote: "Consejos del ejercicio", showPersonalNote: "Notas por serie", showStagnation: "Aviso de estancamiento", showProgressionSuggestion: "Progresión sugerida", showLastSession: "Qué hiciste la vez pasada", compactSetRow: "Filas compactas" };
     const patch = {}; const items = [];
     Object.keys(FICHA_FIELDS).forEach((key) => {
       if (typeof action[key] === "boolean") { patch[key] = action[key]; items.push(`${FICHA_FIELDS[key]}: ${action[key] ? "activado" : "desactivado"}`); }
@@ -15978,6 +16134,8 @@ const SETTINGS_FIELD_META = {
   showPersonalNote: { icon: <StickyNote size={12} />, label: "Nota personal", format: (v) => (v ? "Sí" : "No") },
   showStagnation: { icon: <AlertTriangle size={12} />, label: "Aviso de estancamiento", format: (v) => (v ? "Sí" : "No") },
   showProgressionSuggestion: { icon: <TrendingUp size={12} />, label: "Sugerencia de progresión", format: (v) => (v ? "Sí" : "No") },
+  showLastSession: { icon: <History size={12} />, label: "Qué hiciste la vez pasada", format: (v) => (v ? "Sí" : "No") },
+  compactSetRow: { icon: <Layers size={12} />, label: "Filas compactas", format: (v) => (v ? "Sí" : "No") },
 };
 function buildSettingsChanges(action) {
   const changes = [];
@@ -16619,8 +16777,8 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
     // fallo real quedaba invisible — el chat mostraba "Listo, aplicado"
     // aunque no se haya generado ni descargado nada. Ahora se espera el
     // resultado (sea sync o async) antes de festejar, y se marca error si
-    // falla — mismo criterio que ya usa handleExportDoc para el mismo caso
-    // desde la pestaña Rutinas.
+    // falla — mismo criterio que ya usa ExportCenterCard para el mismo caso
+    // desde Perfil y la pestaña Rutinas.
     Promise.resolve()
       .then(() => livePlan.confirm())
       .then(() => {
@@ -19143,6 +19301,8 @@ function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
     { key: "showProgressionSuggestion", icon: <Target size={16} />, label: "Progresión sugerida", desc: "Te sugiere cuánto probar hoy." },
     { key: "autoStartRestTimer", icon: <Timer size={16} />, label: "Cronómetro automático", desc: "Arranca el descanso solo, al guardar la serie." },
     { key: "showKm", icon: <Footprints size={16} />, label: "Kilómetros (cardio)", desc: "Campo opcional de distancia al registrar cardio." },
+    { key: "showLastSession", icon: <History size={16} />, label: "Qué hiciste la vez pasada", desc: "En cada serie, lo último que levantaste ahí (no tu récord)." },
+    { key: "compactSetRow", icon: <Layers size={16} />, label: "Filas compactas", desc: "Cada serie en una sola línea: entra el ejercicio entero sin scrollear." },
   ];
 
   return (
@@ -20117,15 +20277,24 @@ export default function App() {
       // terminarla o cancelarla desde la UI normal. Se cierra sola (se
       // guarda como sesión terminada, igual que "Finalizar sesión") antes
       // de cambiar de rutina, para no perder ni dejar nada inalcanzable.
+      // BUG FIX (encontrado auditando la UX): esto cerraba la sesión en
+      // curso SIEMPRE, incluso cuando no se cambia de rutina sino que se
+      // actualiza la MISMA rutina activa — que es justo lo que hace el
+      // chatbot al aplicar una progresión (ver planificar_progresion) o al
+      // editar la rutina activa. Confirmar una planificación en medio de un
+      // entrenamiento te terminaba la sesión sin avisar. Ahora sólo se
+      // cierra cuando de verdad cambiás a OTRA rutina, que es el caso donde
+      // la sesión quedaría huérfana.
+      const isSwitchingRoutine = routineId !== p.activeRoutineId;
       let updatedTrainingSessions = p.trainingSessions;
-      if (p.activeSession) {
+      if (p.activeSession && isSwitchingRoutine) {
         const finished = { date: todayStr(), dayKey: p.activeSession.dayKey, startedAt: p.activeSession.startedAt, endedAt: new Date().toISOString() };
         if (p.activeRoutineId) finished.routineId = p.activeRoutineId;
         const dayDefNow = ROUTINE[p.activeSession.dayKey];
         if (dayDefNow?.exercises?.length) finished.dayExerciseIds = dayDefNow.exercises.map((e) => e.id);
         updatedTrainingSessions = [...(p.trainingSessions || []), finished];
       }
-      const updatedProfile = { ...p, routines: newRoutines, activeRoutineId: routineId, activeSession: null, trainingSessions: updatedTrainingSessions, ...(wasFirstTime && p.tutorialSeen === false ? { tutorialSeen: true } : {}) };
+      const updatedProfile = { ...p, routines: newRoutines, activeRoutineId: routineId, activeSession: isSwitchingRoutine ? null : p.activeSession, trainingSessions: updatedTrainingSessions, ...(wasFirstTime && p.tutorialSeen === false ? { tutorialSeen: true } : {}) };
       const np = { ...prev, [activeProfile]: updatedProfile };
       saveProfiles(np);
       // Primera vez: mostramos la INTRO corta (5 slides), no el tutorial de 51
