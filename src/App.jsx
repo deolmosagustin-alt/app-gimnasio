@@ -5329,19 +5329,29 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
               </p>
               {/* RIR/RPE y fase de mesociclo — conceptos de entrenamiento
                   personalizado que el plan semanal ahora puede incluir (ver
-                  ProgressionProposalComposer), además del peso y las reps.
-                  El récord no desaparece cuando hay meta: baja acá, chico,
-                  para no perder la referencia de cuánto podés de verdad. */}
-              {isPlannedMode && (plannedTarget.rpe != null || plannedTarget.phase || currentPR) && (
+                  ProgressionProposalComposer), además del peso y las reps. */}
+              {isPlannedMode && (plannedTarget.rpe != null || plannedTarget.phase) && (
                 <p className="truncate text-[10.5px] font-bold mt-0.5" style={{ color: tint(accent, "95") }}>
-                  {[
-                    plannedTarget.rpe != null ? formatEffort(plannedTarget.rpe, fieldSettings.rpeDisplayMode) : null,
-                    plannedTarget.phase || null,
-                    currentPR && !cardio ? `Tu récord ${currentPR.reps}×${kgToDisplay(currentPR.kg, unit)}${weightLabel(unit)}` : null,
-                  ].filter(Boolean).join(" · ")}
+                  {plannedTarget.rpe != null && formatEffort(plannedTarget.rpe, fieldSettings.rpeDisplayMode)}
+                  {plannedTarget.rpe != null && plannedTarget.phase && " · "}
+                  {plannedTarget.phase}
                 </p>
               )}
             </div>
+            {/* El récord no desaparece cuando hay meta, pero tampoco se
+                cuelga del RPE como una frase más ("RPE 8 · Tu récord
+                6×70kg" llenaba la tarjeta de texto). Va como una columna
+                chica al costado, con el mismo esqueleto rótulo+número que
+                la meta: dos números alineados se comparan de un vistazo,
+                una oración hay que leerla. */}
+            {isPlannedMode && currentPR && !cardio && (
+              <div className="relative shrink-0 text-right leading-none">
+                <span className="block text-[8px] font-black uppercase tracking-[0.14em] mb-1" style={{ color: tint(accent, "70") }}>Récord</span>
+                <span className="text-[13px] font-black tabular-nums" style={{ color: tint(accent, "cc") }}>
+                  {currentPR.reps}<span className="opacity-50 mx-px">×</span>{kgToDisplay(currentPR.kg, unit)}
+                </span>
+              </div>
+            )}
             {/* El lápiz corrige el RÉCORD (ver el panel "Corregir récord").
                 Antes se escondía en modo planificado, y como ahora una serie
                 con meta SIEMPRE se muestra planificada, esconderlo dejaría
