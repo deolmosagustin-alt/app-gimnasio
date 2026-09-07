@@ -14978,7 +14978,45 @@ function matchExerciseInRoutineModel(model, rawName) {
       if (score > bestScore) { bestScore = score; best = ex; }
     }
   });
-  return bestScore >= 4 ? best : null;
+  if (bestScore >= 4) return best;
+  // BUG FIX (reporte: "sigue sin cambiar lo de la planificación... cuando
+  // lo hago con ayuda del chatbot"): hasta acá sólo se aceptaba el nombre
+  // EXACTO o que uno contuviera al otro como substring. La IA suele
+  // devolver el nombre con palabras de más ("Press de Banca con Barra"
+  // contra "Press Banca" de la rutina): ninguno contiene al otro por el
+  // "de"/"con barra" del medio, así que no matcheaba nada y la acción se
+  // descartaba EN SILENCIO — el chat decía "te armo la progresión" y no
+  // aparecía ningún botón ni ningún aviso.
+  // Ahora, como último recurso, se comparan las PALABRAS con peso (se
+  // ignoran conectores tipo de/con/en/para), y sólo se acepta si hay UN
+  // solo ganador claro: si dos ejercicios de la rutina empatan (ej. la IA
+  // dijo sólo "press" y hay press banca y press militar), se devuelve null
+  // a propósito, para no volver al bug de elegir la variante equivocada.
+  const FILLER = new Set(["de", "del", "con", "en", "el", "la", "los", "las", "a", "para", "y", "e", "por"]);
+  const tokensOf = (s) => new Set(normalizeExerciseText(s).split(/\s+/).filter((t) => t.length > 1 && !FILLER.has(t)));
+  const wanted = tokensOf(rawName);
+  if (!wanted.size) return null;
+  const scored = candidates
+    .map((ex) => {
+      const exTokens = tokensOf(ex.name);
+      if (!exTokens.size) return null;
+      let shared = 0;
+      exTokens.forEach((t) => { if (wanted.has(t)) shared += 1; });
+      // Proporción de las palabras del ejercicio real que aparecen en lo
+      // que pidió la IA — "Press Banca" queda 2/2 contra "press de banca
+      // con barra"; "Press Militar" queda 1/2 (sólo "press").
+      return { ex, shared, ratio: shared / exTokens.size };
+    })
+    .filter((c) => c && c.shared > 0)
+    .sort((a, b) => b.ratio - a.ratio || b.shared - a.shared);
+  if (!scored.length) return null;
+  const top = scored[0];
+  const runnerUp = scored[1];
+  // Tiene que cubrir el ejercicio real casi entero y ganarle claramente al
+  // segundo — si no, es ambiguo y preferimos avisar antes que adivinar.
+  if (top.ratio < 0.8) return null;
+  if (runnerUp && runnerUp.ratio >= top.ratio) return null;
+  return top.ex;
 }
 
 function isLikelyDayHeader(line, nextLine) {
@@ -15540,7 +15578,21 @@ function buildActionPlan(action, ctx) {
     // algo que ya existe ahí.
     const model = buildRoutineModel(activeDef);
     const exMatch = matchExerciseInRoutineModel(model, action.exercise || "");
-    if (!exMatch || !exMatch.sets?.[setIndex]) return null;
+    // BUG FIX (reporte: la planificación por chatbot "no cambia nada"): si
+    // el ejercicio no se puede resolver, antes se devolvía null y el
+    // mensaje quedaba sin botón NI aviso — la IA decía "te armo la
+    // progresión" y no pasaba nada, sin ninguna pista de por qué. Ahora
+    // devuelve una tarjeta que explica qué pasó y lista los nombres reales
+    // de la rutina, para poder volver a pedirlo con el nombre correcto.
+    if (!exMatch || !exMatch.sets?.[setIndex]) {
+      return {
+        kind: "unresolved",
+        title: "No pude aplicar esta progresión",
+        items: !exMatch
+          ? [`No encontré "${action.exercise || "ese ejercicio"}" en tu rutina activa.`, `Los de tu rutina son: ${Object.values(model?.exerciseById || {}).map((e) => e.name).join(", ")}.`, "Pedísela de nuevo usando uno de esos nombres."]
+          : [`"${exMatch.name}" no tiene una serie ${setIndex + 1} (tiene ${exMatch.sets?.length || 0}).`, "Pedísela de nuevo indicando una serie que exista."],
+      };
+    }
     const updatedDef = applyProgressionToRoutine(activeDef, { exerciseId: exMatch.id, setIndex, entries });
     const needsModeSwitch = settings?.trainingMode !== "planned";
     return {
@@ -15591,7 +15643,20 @@ function buildActionPlan(action, ctx) {
         return { exerciseId: exMatch.id, setIndex, week, kg, reps };
       })
       .filter(Boolean);
-    if (!weekPlans.length) return null;
+    // Mismo criterio que planificar_progresion: si NINGÚN ejercicio del
+    // plan se pudo resolver, avisar en vez de descartar la acción sin
+    // decir nada.
+    if (!weekPlans.length) {
+      return {
+        kind: "unresolved",
+        title: "No pude aplicar el plan semanal",
+        items: [
+          "No reconocí ninguno de los ejercicios del plan dentro de tu rutina activa.",
+          `Los de tu rutina son: ${Object.values(model?.exerciseById || {}).map((e) => e.name).join(", ")}.`,
+          "Pedíselo de nuevo usando esos nombres.",
+        ],
+      };
+    }
     const updatedDef = applyWeeklyPlanToRoutine(activeDef, weekPlans);
     const needsModeSwitch = settings?.trainingMode !== "planned";
     return {
@@ -16902,6 +16967,20 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
                 >
                   <Edit3 size={11} /> Otra respuesta
                 </button>
+              </div>
+            )}
+            {/* Acción que la IA propuso pero no se pudo resolver (ej. un
+                ejercicio que no está en la rutina activa). Antes esto no
+                mostraba NADA — ver el BUG FIX en planificar_progresion. */}
+            {m.plan && livePlan?.kind === "unresolved" && (
+              <div className="mt-2 border border-amber-500/30 bg-amber-500/[0.07] rounded-2xl p-3.5 max-w-[85%] bounce-in">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="w-6 h-6 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center shrink-0"><AlertTriangle size={12} className="text-amber-400" /></span>
+                  <p className="text-sm font-bold text-amber-200 flex-1 min-w-0">{livePlan.title}</p>
+                </div>
+                <ul className="space-y-1">
+                  {livePlan.items.map((item, j) => <li key={j} className="text-[11px] text-amber-100/70 flex items-start gap-1.5"><span className="text-amber-400 mt-0.5">•</span>{item}</li>)}
+                </ul>
               </div>
             )}
             {m.plan && m.planStatus === "pending" && livePlan && typeof livePlan.confirm === "function" && (
