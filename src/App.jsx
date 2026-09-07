@@ -3386,17 +3386,38 @@ function ShareImageModal({ title, subtitle, fileNamePrefix, shareTitle, shareTex
     const result = await Filesystem.writeFile({ path: fileName, data: base64, directory: Directory.Cache });
     return result.uri;
   };
+  // BUG FIX (reporte: "al compartir te saca de la app pero no ocurre nada"):
+  // los dos handlers de abajo mandaban CUALQUIER fallo nativo a console.error
+  // y hacían `return`, sin decirle una palabra a quien tocó el botón. Y en
+  // Android eso se ve exactamente como lo describe el reporte: si el archivo
+  // no se puede adjuntar, @capacitor/share rechaza la llamada pero IGUAL
+  // sigue y abre la hoja de compartir (ver SharePlugin.share: shareFiles()
+  // hace call.reject() y `return`, pero eso vuelve del método privado, no de
+  // share(), así que el chooser se lanza igual con un intent sin archivo).
+  // Resultado: salís de la app, elegís un destino, no llega nada, y al
+  // volver no hay ni un mensaje. Ahora el error se muestra, con su detalle,
+  // y compartir cae al texto/enlace — que es justo lo que sí funciona.
+  const [shareError, setShareError] = useState(null); // null | { msg, detail }
+  const nativeShareError = (err) => {
+    const detail = String(err?.message || err || "");
+    // "Share canceled" es lo que devuelve el plugin cuando cerrás la hoja sin
+    // elegir nada: eso no es un error, no hay nada que avisar.
+    if (/canceled|cancelled/i.test(detail)) return true;
+    return false;
+  };
   const handleDownload = async () => {
     const canvas = canvasRef.current; if (!canvas) return;
     if (isNative) {
+      setShareError(null);
       try {
         const uri = await writeImageToCache();
-        if (uri) {
-          const { Share } = await import("@capacitor/share");
-          await Share.share({ title: shareTitle, files: [uri] });
-          return;
-        }
-      } catch (err) { console.error("Descarga nativa falló:", err); }
+        if (!uri) throw new Error("El archivo no se pudo escribir en el teléfono.");
+        const { Share } = await import("@capacitor/share");
+        await Share.share({ title: shareTitle, dialogTitle: "Elegí dónde guardarla", files: [uri] });
+      } catch (err) {
+        console.error("Descarga nativa falló:", err);
+        if (!nativeShareError(err)) setShareError({ msg: "No pudimos guardar la imagen en el teléfono.", detail: String(err?.message || err || "") });
+      }
       return;
     }
     const link = document.createElement("a");
@@ -3407,14 +3428,29 @@ function ShareImageModal({ title, subtitle, fileNamePrefix, shareTitle, shareTex
   const handleShare = async () => {
     const canvas = canvasRef.current; if (!canvas) return;
     if (isNative) {
+      setShareError(null);
       try {
         const uri = await writeImageToCache();
-        if (uri) {
+        if (!uri) throw new Error("El archivo no se pudo escribir en el teléfono.");
+        const { Share } = await import("@capacitor/share");
+        await Share.share({ title: shareTitle, text: shareText, files: [uri] });
+        return;
+      } catch (err) {
+        console.error("Share nativo falló:", err);
+        if (nativeShareError(err)) return;
+        // Respaldo: compartir sólo el texto. Adjuntar un archivo puede fallar
+        // por muchas razones fuera de nuestro alcance, pero mandar texto es
+        // el camino que sí anda (es el mismo que usa compartir una rutina),
+        // así que antes de rendirnos se intenta al menos que el mensaje
+        // salga.
+        try {
           const { Share } = await import("@capacitor/share");
-          await Share.share({ title: shareTitle, text: shareText, files: [uri] });
-          return;
+          await Share.share({ title: shareTitle, text: shareText });
+          setShareError({ msg: "No pudimos adjuntar la imagen, así que compartimos sólo el texto. Podés bajarla con \"Descargar\" y mandarla a mano.", detail: String(err?.message || err || "") });
+        } catch (err2) {
+          if (!nativeShareError(err2)) setShareError({ msg: "No pudimos compartir. Probá con \"Descargar\".", detail: String(err?.message || err || "") });
         }
-      } catch (err) { console.error("Share nativo falló:", err); }
+      }
       return;
     }
     try {
@@ -3461,8 +3497,36 @@ function ShareImageModal({ title, subtitle, fileNamePrefix, shareTitle, shareTex
           </button>
         )}
         <canvas ref={canvasRef} className="hidden" />
-        {/* Botones siempre visibles primero — el preview es secundario */}
-        <div className="relative flex gap-2 mb-3">
+        {/* BUG FIX ("todas las opciones de compartir muestran esa imagen rara
+            y descentrada"): esto tenía a la vez aspectRatio 9/16, w-full,
+            maxHeight 50vh y objectFit "cover". En cuanto el 50vh mordía el
+            alto, la caja dejaba de ser 9:16 — y "cover" resuelve eso
+            RECORTANDO desde el centro. En un teléfono típico se perdía cerca
+            de un tercio del alto: se comía el título de arriba y el
+            wordmark de abajo, y lo que quedaba era una franja del medio; de
+            ahí que se viera cortada y corrida. Ahora manda el alto (el
+            ancho sale del 9:16 de la imagen) y "contain" garantiza que se
+            vea la tarjeta ENTERA, que es de lo que se trata una vista
+            previa. Va arriba de los botones: primero mirás lo que vas a
+            compartir, después decidís. */}
+        {previewUrl ? (
+          <div className="relative flex justify-center mb-4">
+            <img
+              src={previewUrl}
+              alt="Vista previa de la imagen para compartir"
+              className="block rounded-2xl border"
+              style={{ height: "46vh", width: "auto", maxWidth: "100%", objectFit: "contain", borderColor: tint(accent, "30"), boxShadow: `0 18px 44px -14px ${tint(accent, "55")}` }}
+            />
+          </div>
+        ) : (
+          <div className="relative flex justify-center mb-4">
+            <div className="rounded-2xl border flex flex-col items-center justify-center gap-2" style={{ height: "46vh", aspectRatio: "9 / 16", borderColor: tint(accent, "30"), backgroundColor: "rgba(15,23,42,0.6)" }}>
+              <div className="w-7 h-7 rounded-full border-[3px] animate-spin" style={{ borderColor: tint(accent, "25"), borderTopColor: accent }} />
+              <p className="text-[11px] text-slate-500">Generando imagen...</p>
+            </div>
+          </div>
+        )}
+        <div className="relative flex gap-2">
           {/* BUG FIX (encontrado auditando): a diferencia de "Descargar",
               este botón no tenía ningún guard — si draw() falla (ej. sin
               conexión mientras se genera el QR del perfil), previewUrl
@@ -3471,12 +3535,10 @@ function ShareImageModal({ title, subtitle, fileNamePrefix, shareTitle, shareTex
           <button onClick={handleShare} disabled={!previewUrl} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl !text-white text-sm font-bold transition-all active:scale-[0.98] disabled:opacity-40" style={{ background: `linear-gradient(135deg, ${accent}, ${tint(accent, "b0")})`, boxShadow: `0 10px 28px -10px ${tint(accent, "80")}` }}><Share2 size={14} /> Compartir</button>
           <button onClick={handleDownload} disabled={!previewUrl} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl border text-slate-300 hover:text-white transition text-sm font-semibold disabled:opacity-40" style={{ borderColor: tint(accent, "30") }}><Download size={14} /> Descargar</button>
         </div>
-        {previewUrl ? (
-          <img src={previewUrl} alt="Vista previa para compartir" className="relative w-full rounded-2xl border" style={{ aspectRatio: "9 / 16", objectFit: "cover", maxHeight: "50vh", borderColor: tint(accent, "30"), boxShadow: `0 16px 40px -12px ${tint(accent, "45")}` }} />
-        ) : (
-          <div className="relative w-full rounded-2xl border flex flex-col items-center justify-center gap-2 py-10" style={{ aspectRatio: "9 / 16", maxHeight: "50vh", borderColor: tint(accent, "30") }}>
-            <div className="w-7 h-7 rounded-full border-[3px] animate-spin" style={{ borderColor: tint(accent, "25"), borderTopColor: accent }} />
-            <p className="text-[11px] text-slate-500">Generando imagen...</p>
+        {shareError && (
+          <div className="relative mt-3 rounded-xl bg-rose-500/10 border border-rose-500/25 px-3 py-2.5">
+            <p className="text-[11px] text-rose-300 leading-snug">{shareError.msg}</p>
+            {shareError.detail && <p className="text-[9.5px] text-slate-600 mt-1 break-all">{shareError.detail}</p>}
           </div>
         )}
         <p className="relative text-[10px] text-slate-600 mt-3 text-center">Para tu historia de Instagram: compartila directo, o descargala y subila desde la app.</p>
@@ -5009,20 +5071,6 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     if (!computedPR) return override;
     return prScore(override.kg, override.reps) >= prScore(computedPR.kg, computedPR.reps) ? override : computedPR;
   }, [override, computedPR]);
-  // Diferencia entre lo que hiciste la vez pasada y la referencia de arriba
-  // (la meta planificada si hay, si no tu récord). Es el dato con el que de
-  // verdad decidís la carga de hoy: "me faltan 2.5kg" se lee de un vistazo,
-  // restar dos números mentalmente no.
-  const lastSessionGap = (() => {
-    if (!lastSession || cardio) return null;
-    const refKg = plannedTarget?.kg ?? currentPR?.kg;
-    if (refKg == null || lastSession.kg == null) return null;
-    const d = Math.round((refKg - lastSession.kg) * 100) / 100;
-    if (!d) return { label: "igual", ahead: false, even: true };
-    return d > 0
-      ? { label: `−${kgToDisplay(d, unit)}${weightLabel(unit)}`, ahead: false, even: false }
-      : { label: `+${kgToDisplay(-d, unit)}${weightLabel(unit)}`, ahead: true, even: false };
-  })();
   const draft = drafts[key] || {};
   const reps = draft.reps ?? ""; const kg = draft.kg ?? ""; const rpe = draft.rpe ?? null;
   const minutes = draft.minutes ?? ""; const km = draft.km ?? "";
@@ -5483,28 +5531,19 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
       {/* Lo que hiciste la vez pasada en ESTA serie (opción activable) —
           en el layout normal va como una línea aparte debajo de la
           referencia; en el compacto ya está integrado arriba. */}
-      {/* Misma tarjeta redondeada que la referencia de arriba, pero en gris
-          y más baja: se lee como su hermana callada en vez de como una nota
-          suelta al pie. Placa de ícono + rótulo micro + el número grande y
-          tabular, el mismo lenguaje que ya usan las tarjetas de ejercicio. */}
+      {/* Una sola línea, lo más liviana posible. El rótulo "La vez pasada"
+          era redundante con el "hace 4 días" que iba al otro extremo, y la
+          placa de ícono le daba a la izquierda un peso que este dato no
+          merece: es la referencia callada, no la protagonista. Ahora el
+          rótulo ES el cuándo. Tampoco lleva la diferencia contra la meta:
+          con los dos números uno arriba del otro, se ve sin calcularla. */}
       {!compact && fieldSettings.showLastSession === true && lastSession && !cardio && (
-        <div className="flex items-center gap-2.5 -mt-1.5 mb-2.5 px-3 py-2 rounded-xl" style={{ backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}>
-          <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-slate-800/60 text-slate-500"><History size={13} /></span>
-          <span className="flex-1 min-w-0 leading-none">
-            <span className="block text-[8.5px] font-black uppercase tracking-[0.16em] text-slate-600 mb-1">La vez pasada</span>
-            <span className="text-sm font-black tabular-nums text-slate-300">
-              {lastSession.reps}<span className="opacity-40 mx-0.5">×</span>{kgToDisplay(lastSession.kg, unit)}<span className="opacity-50 text-[10px] ml-0.5">{weightLabel(unit)}</span>
-            </span>
+        <div className="flex items-center gap-1.5 -mt-1.5 mb-2.5 px-3 py-1.5 rounded-xl" style={{ backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}>
+          <History size={10} className="text-slate-600 shrink-0" />
+          <span className="text-[8.5px] font-black uppercase tracking-[0.14em] text-slate-600 truncate">{haceCuanto(daysSince(lastSession.date)) || "hoy"}</span>
+          <span className="text-[11px] font-bold tabular-nums text-slate-400 ml-auto shrink-0">
+            {lastSession.reps}<span className="opacity-40 mx-0.5">×</span>{kgToDisplay(lastSession.kg, unit)}<span className="opacity-50 text-[9px] ml-0.5">{weightLabel(unit)}</span>
           </span>
-          {lastSessionGap && !lastSessionGap.even && (
-            <span className="text-[10px] font-black tabular-nums px-1.5 py-1 rounded-lg shrink-0"
-              style={lastSessionGap.ahead
-                ? { backgroundColor: tint(accent, "18"), color: accent }
-                : { backgroundColor: "rgba(148,163,184,0.12)", color: "#94a3b8" }}>
-              {lastSessionGap.label}
-            </span>
-          )}
-          <span className="text-[10px] font-bold text-slate-600 shrink-0">{haceCuanto(daysSince(lastSession.date)) || "hoy"}</span>
         </div>
       )}
 
@@ -9970,6 +10009,11 @@ async function downloadBlob(blob, filename) {
       // ExportCenterCard.handleExport) sepa distinguir "no se pudo compartir" de "se
       // compartió bien" en vez de asumir siempre lo segundo.
       console.warn("Compartir (nativo) cancelado o falló:", err);
+      // Cerrar la hoja sin elegir nada no es un error: @capacitor/share
+      // rechaza con "Share canceled" y antes eso se mostraba como "no
+      // pudimos abrir la ventana para compartirlo", que es falso y encima
+      // preocupa al pedo. El archivo ya está escrito; no hay nada que avisar.
+      if (/cancel+ed/i.test(String(err?.message || err || ""))) return;
       // Marca de dónde vino el fallo — el archivo YA se escribió bien acá
       // (Filesystem.writeFile de arriba no tiró), así que quien llame a
       // downloadBlob puede avisar "se generó pero no se pudo compartir" en
