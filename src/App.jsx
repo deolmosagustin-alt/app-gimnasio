@@ -6515,16 +6515,52 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
         )); })()}
       </div>
 
-      <div key={activeDay} className="relative overflow-hidden rounded-2xl border tab-fade-in" style={{ borderColor: tint(day.color, "55"), background: `linear-gradient(135deg, ${tint(day.color, "38")}, transparent 75%)` }}>
-        <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full blur-3xl opacity-25 pointer-events-none" style={{ backgroundColor: day.color }} />
-        <div className="relative p-5">
+      {/* PANEL DEL DÍA — pedido: "que todo lo que está debajo de la selección
+          del día parezca un mismo sector, no rectángulos separados". Todo lo
+          que pertenece al día elegido (resumen, iniciar sesión, calentamiento
+          y los ejercicios) vive ahora DENTRO de un mismo contenedor, teñido
+          con el color de ese día y con el borde de arriba más marcado, que
+          hace de continuación de la pestaña que acabás de tocar. El degradado
+          se apaga hacia abajo para que la lista larga de ejercicios no quede
+          encerrada en una caja de colores de dos pantallas de alto. */}
+      <div
+        key={activeDay}
+        className="relative rounded-2xl border p-3 space-y-3 tab-fade-in"
+        style={{
+          // Más cerca de las pestañas que el resto de los bloques (que van a
+          // 16px): pegado al día que acabás de tocar, el panel se lee como su
+          // continuación y no como otra tarjeta suelta más.
+          marginTop: 8,
+          borderColor: tint(day.color, "33"),
+          borderTopColor: tint(day.color, "70"),
+          borderTopWidth: 2,
+          background: `linear-gradient(180deg, ${tint(day.color, "1a")} 0px, ${tint(day.color, "07")} 200px, transparent 420px)`,
+        }}
+      >
+        {/* Cabecera del panel: sin borde ni fondo propios — el color ya lo
+            pone el panel, y una tarjeta adentro de otra era justo lo que se
+            sentía como "rectángulos separados". */}
+        <div className="relative">
           {activeDay === suggestedDay && (
-            <div className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg mb-3" style={{ backgroundColor: tint(day.color, "22"), color: day.color }}>
+            <div className="inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg mb-2" style={{ backgroundColor: tint(day.color, "22"), color: day.color }}>
               <RotateCcw size={10} /> {scheduledDay === activeDay ? "Programado para hoy" : "Sugerido para hoy"}
             </div>
           )}
-          <h2 className="text-xl font-black text-white leading-tight uppercase">{day.label}</h2>
-          <p className="text-xs text-slate-400 mt-1">{day.description}</p>
+          <div className="flex items-start gap-2">
+            <div className="flex-1 min-w-0">
+              <h2 className="text-xl font-black text-white leading-tight uppercase">{day.label}</h2>
+              <p className="text-xs text-slate-400 mt-0.5">{day.description}</p>
+            </div>
+            {/* "Resetear sesión de hoy" pasa de botón de ancho completo a un
+                ícono en la esquina: sirve para arreglar un error, no es algo
+                que necesites a mano cada día. El diálogo de confirmación es
+                el mismo. */}
+            {!confirmReset && (
+              <button onClick={() => setConfirmReset(true)} aria-label="Resetear sesión de hoy" title="Resetear sesión de hoy" className="shrink-0 flex items-center justify-center w-8 h-8 rounded-xl text-slate-500 hover:text-slate-300 transition active:scale-90" style={{ backgroundColor: tint(day.color, "12"), border: `1px solid ${tint(day.color, "28")}` }}>
+                <RotateCcw size={13} />
+              </button>
+            )}
+          </div>
           {day.isNew && <div className="mt-2 inline-flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] rounded-lg px-2.5 py-1">🆕 Empezás a registrar tus marcas desde hoy.</div>}
           {/* Antes esto reducía las series ACÁ MISMO (en Rutina) durante la
               semana de descarga — quedaba una segunda versión de la
@@ -6541,22 +6577,34 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
               <ChevronRight size={13} className="shrink-0" style={{ color: day.color }} />
             </button>
           )}
-          <div className="grid grid-cols-3 gap-2 mt-4">
-            <div className="bg-black/20 rounded-xl p-2.5 text-center"><p className="text-xl font-black text-white tabular-nums">{pct}%</p><p className="text-[9px] text-slate-500 mt-0.5 flex items-center justify-center gap-1"><ListChecks size={9} />Hoy</p></div>
-            <div className="bg-black/20 rounded-xl p-2.5 text-center"><p className="text-xl font-black text-white tabular-nums">{day.exercises.length}</p><p className="text-[9px] text-slate-500 mt-0.5 flex items-center justify-center gap-1"><Dumbbell size={9} />Ejercicios</p></div>
-            <div className="bg-black/20 rounded-xl p-2.5 text-center"><p className="text-xl font-black text-white tabular-nums">{totalSets}</p><p className="text-[9px] text-slate-500 mt-0.5">Series</p></div>
+          {/* Antes esto eran tres cajas del mismo tamaño: el %, la cantidad
+              de ejercicios y la de series. Dos tercios del bloque eran datos
+              que no cambian nunca (los aprendés una vez), ocupando lo mismo
+              que lo ÚNICO que se mueve mientras entrenás. Ahora el progreso
+              es una barra que se llena serie a serie —se lee sin leer un
+              número— y los dos datos fijos bajan a texto chico al lado. */}
+          <div className="mt-3">
+            <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: "rgba(0,0,0,0.30)" }}>
+              <div className="h-full rounded-full transition-all duration-500 ease-out" style={{ width: `${pct}%`, backgroundColor: day.color, boxShadow: pct > 0 ? `0 0 10px ${tint(day.color, "80")}` : "none" }} />
+            </div>
+            <div className="flex items-center gap-1.5 mt-1.5 text-[10px] text-slate-500">
+              <ListChecks size={10} className="shrink-0" style={{ color: pct > 0 ? day.color : undefined }} />
+              <span className="font-bold tabular-nums" style={{ color: pct > 0 ? day.color : "#94a3b8" }}>{doneToday}/{totalSets}</span>
+              <span>series de hoy</span>
+              <span className="text-slate-700">·</span>
+              <Dumbbell size={10} className="shrink-0" />
+              <span className="tabular-nums">{day.exercises.length}</span>
+              <span>ejercicios</span>
+            </div>
           </div>
-          {!confirmReset ? (
-            <button onClick={() => setConfirmReset(true)} className="w-full flex items-center justify-center gap-1.5 mt-3 py-2 rounded-xl border border-white/5 text-slate-500 hover:text-slate-300 transition text-[11px] font-medium"><RotateCcw size={11} /> Resetear sesión de hoy</button>
-          ) : (
-            <div className="flex gap-2 items-center mt-3 bg-black/30 border border-white/10 rounded-xl px-3 py-2">
+          {confirmReset && (
+            <div className="flex gap-2 items-center mt-2.5 bg-black/30 border border-white/10 rounded-xl px-3 py-2">
               <p className="text-[11px] text-slate-400 flex-1">¿Borrar reps/kg de hoy (incluido lo sin guardar)? Los récords no cambian.</p>
               <button onClick={() => setConfirmReset(false)} className="px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-400 text-xs">No</button>
               <button onClick={handleResetDay} className="px-2.5 py-1.5 rounded-lg bg-rose-500/80 !text-white text-xs font-bold">Sí</button>
             </div>
           )}
         </div>
-      </div>
 
       {/* La sesión activa pertenece a UN día (el que iniciaste). Si estás
           viendo otro día, no mostramos "sesión en curso" ahí — pero la
@@ -6600,6 +6648,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             </div>
           );
         })}
+        </div>
       </div>
 
       {activeSession && (
