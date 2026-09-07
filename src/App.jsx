@@ -5508,7 +5508,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
       )}
       <div className={`flex items-center gap-2 ${compact ? "hidden" : "mb-3"}`}>
         {(currentPR || isPlannedMode) ? (
-          <div className="relative overflow-hidden flex items-center gap-2.5 pl-3.5 pr-2 py-2.5 rounded-xl flex-1" style={{ background: `linear-gradient(120deg, ${tint(accent, "20")}, ${tint(accent, "0c")})`, border: `1px solid ${tint(accent, "45")}` }}>
+          <div className="relative overflow-hidden flex items-center gap-2.5 pl-3.5 pr-2 py-[16px] rounded-xl flex-1" style={{ background: `linear-gradient(120deg, ${tint(accent, "20")}, ${tint(accent, "0c")})`, border: `1px solid ${tint(accent, "45")}` }}>
             <div className="absolute -top-5 -left-5 w-16 h-16 rounded-full blur-2xl pointer-events-none opacity-30" style={{ backgroundColor: accent }} />
             {/* Libreta = una carga decidida de antemano (a mano o por tu
                 entrenador); copa = tu propia mejor marca. El blanco (Target)
@@ -5516,8 +5516,15 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
                 "objetivo a superar", que es justo lo contrario. */}
             {isPlannedMode ? <ClipboardCheck size={15} style={{ color: accent }} className="shrink-0 relative" /> : <Trophy size={15} style={{ color: accent }} className="shrink-0 soft-pulse relative" />}
             <div className="flex-1 min-w-0 relative leading-none">
+              {/* Sin rótulo: el ícono de la izquierda ya dice cuál de los dos
+                  es (libreta = planificado, copa = récord). El alto de la
+                  tarjeta se mantiene con el padding de arriba (py-[16px] en
+                  vez de py-2.5), así sacar la palabra no encoge la fila ni
+                  descoloca el resto de la serie. */}
               <p className="truncate">
-                <span className="block text-[8.5px] font-black uppercase tracking-[0.16em] mb-1" style={{ color: tint(accent, "aa") }}>{isPlannedMode ? "Planificado" : `Récord${override?.manual ? " · editado" : ""}`}</span>
+                {override?.manual && !isPlannedMode && (
+                  <span className="block text-[8.5px] font-black uppercase tracking-[0.16em] mb-1" style={{ color: tint(accent, "aa") }}>Editado</span>
+                )}
                 <span className="text-xl font-black tabular-nums" style={{ color: accent, textShadow: `0 0 16px ${tint(accent, "50")}` }}>
                   {isPlannedMode
                     ? (cardio ? <>{plannedTarget.minutes} min</> : <>{plannedTarget.reps}<span className="opacity-50 text-sm mx-0.5">×</span>{kgToDisplay(plannedTarget.kg, unit)}<span className="opacity-60 text-xs ml-0.5">{weightLabel(unit)}</span></>)
@@ -6446,7 +6453,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
               <Trophy size={14} /> <span>Récord</span>
             </button>
             <button onClick={() => onUpdateSettings({ trainingMode: "planned" })} className={`relative z-[1] flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-bold transition active:scale-[0.97] ${settings.trainingMode === "planned" ? "text-teal-300" : "text-slate-500 hover:text-slate-300"}`}>
-              <Target size={14} /> <span>Planificada</span>
+              <ClipboardCheck size={14} /> <span>Planificada</span>
             </button>
           </div>
           {settings.trainingMode === "planned" && onApplyOwnProgression && (
@@ -11480,7 +11487,10 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
             </div>
           </button>
           <button onClick={() => updateSettings({ trainingMode: "planned" })} className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-left transition ${settings.trainingMode === "planned" ? "bg-sky-500/15 border border-sky-500/40" : "bg-slate-800/50 border border-slate-700/40 hover:border-slate-600"}`}>
-            <Target size={16} className={settings.trainingMode === "planned" ? "text-sky-400" : "text-slate-500"} />
+            {/* Mismo ícono que después ves en cada serie planificada: acá,
+                al lado del nombre del modo, es donde se aprende qué
+                significa la libreta. */}
+            <ClipboardCheck size={16} className={settings.trainingMode === "planned" ? "text-sky-400" : "text-slate-500"} />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold text-white">Rutina planificada</p>
               <p className="text-[11px] text-slate-500">Suma las herramientas para cargar metas semana a semana (a mano o de tu entrenador) y, al guardar, te festeja haber alcanzado la marca en vez de haberla superado.</p>
