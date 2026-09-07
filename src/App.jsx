@@ -1243,8 +1243,24 @@ function getWeekInfo(cycleStart, settings = DEFAULT_SETTINGS) {
 // comportamiento de "récord" de siempre — los dos modos conviven sin
 // romperse entre sí).
 function getPlannedTargetForWeek(set, weekInCycle) {
-  if (!Array.isArray(set?.plannedProgression) || !weekInCycle) return null;
-  return set.plannedProgression.find((p) => p.week === weekInCycle) || null;
+  const plan = set?.plannedProgression;
+  if (!Array.isArray(plan) || !plan.length) return null;
+  // BUG FIX ("planifico un ejercicio y sigue diciendo Récord"): esto pedía
+  // una coincidencia EXACTA de semana y, además, se rendía si weekInCycle
+  // era null. Las dos cosas hacían desaparecer el plan entero en los casos
+  // más comunes: sin fecha de inicio de ciclo cargada no hay "semana
+  // actual" (weekInCycle null → nunca se mostraba nada), y un plan de 4
+  // semanas dentro de un ciclo de 8 se evaporaba al llegar a la semana 5.
+  // La meta estaba bien guardada; simplemente no se mostraba nunca, y
+  // planificar parecía no hacer nada.
+  const week = weekInCycle || 1;
+  const exact = plan.find((p) => p.week === week);
+  if (exact) return exact;
+  // Plan más corto que el ciclo: se sostiene la última meta cargada.
+  const past = plan.filter((p) => p.week < week);
+  if (past.length) return past.reduce((a, b) => (b.week > a.week ? b : a));
+  // Plan que arranca más adelante: se muestra la primera meta cargada.
+  return plan.reduce((a, b) => (b.week < a.week ? b : a));
 }
 
 // Aplica una o varias propuestas de progresión (ver createProgressionProposal
@@ -4824,7 +4840,13 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   // propio mejor registro. Sin meta para esta semana, cae en el
   // comportamiento de "récord" de siempre.
   const plannedTarget = getPlannedTargetForWeek(setDef, weekInCycle);
-  const isPlannedMode = fieldSettings.trainingMode === "planned" && !!plannedTarget;
+  // Alcanza con que ESTA serie tenga una meta cargada. Antes también exigía
+  // que el modo global estuviera en "planned", así que quien planificaba un
+  // ejercicio suelto (o le aceptaba el plan al entrenador) seguía viendo
+  // "Récord" encima del número y concluía, con razón, que planificar no
+  // hacía nada. Si te tomaste el trabajo de cargar una meta para esta
+  // serie, la serie muestra la meta; el récord pasa a la línea de abajo.
+  const isPlannedMode = !!plannedTarget;
   // Fila compacta (fieldSettings.compactSetRow): misma lógica y los mismos
   // campos, sólo que en una sola línea en vez de la tarjeta alta — ver los
   // bloques marcados con `compact` más abajo.
@@ -4877,6 +4899,20 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     if (!computedPR) return override;
     return prScore(override.kg, override.reps) >= prScore(computedPR.kg, computedPR.reps) ? override : computedPR;
   }, [override, computedPR]);
+  // Diferencia entre lo que hiciste la vez pasada y la referencia de arriba
+  // (la meta planificada si hay, si no tu récord). Es el dato con el que de
+  // verdad decidís la carga de hoy: "me faltan 2.5kg" se lee de un vistazo,
+  // restar dos números mentalmente no.
+  const lastSessionGap = (() => {
+    if (!lastSession || cardio) return null;
+    const refKg = plannedTarget?.kg ?? currentPR?.kg;
+    if (refKg == null || lastSession.kg == null) return null;
+    const d = Math.round((refKg - lastSession.kg) * 100) / 100;
+    if (!d) return { label: "igual", ahead: false, even: true };
+    return d > 0
+      ? { label: `−${kgToDisplay(d, unit)}${weightLabel(unit)}`, ahead: false, even: false }
+      : { label: `+${kgToDisplay(-d, unit)}${weightLabel(unit)}`, ahead: true, even: false };
+  })();
   const draft = drafts[key] || {};
   const reps = draft.reps ?? ""; const kg = draft.kg ?? ""; const rpe = draft.rpe ?? null;
   const minutes = draft.minutes ?? ""; const km = draft.km ?? "";
@@ -5269,8 +5305,10 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
             </span>
           )}
           {fieldSettings.showLastSession === true && lastSession && (
-            <span className="flex items-center gap-1 text-[10px] text-slate-500 min-w-0 truncate">
-              <History size={10} className="shrink-0" /> Ant {lastSession.reps}×{kgToDisplay(lastSession.kg, unit)}{weightLabel(unit)}
+            <span className="flex items-center gap-1 min-w-0 truncate px-1.5 py-0.5 rounded-md" style={{ backgroundColor: "rgba(148,163,184,0.10)" }}>
+              <History size={9} className="shrink-0 text-slate-600" />
+              <span className="text-[9px] font-black uppercase tracking-wider text-slate-600">Ant</span>
+              <span className="text-[10px] font-black tabular-nums text-slate-400">{lastSession.reps}×{kgToDisplay(lastSession.kg, unit)}{weightLabel(unit)}</span>
             </span>
           )}
         </div>
@@ -5291,16 +5329,25 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
               </p>
               {/* RIR/RPE y fase de mesociclo — conceptos de entrenamiento
                   personalizado que el plan semanal ahora puede incluir (ver
-                  ProgressionProposalComposer), además del peso y las reps. */}
-              {isPlannedMode && (plannedTarget.rpe != null || plannedTarget.phase) && (
+                  ProgressionProposalComposer), además del peso y las reps.
+                  El récord no desaparece cuando hay meta: baja acá, chico,
+                  para no perder la referencia de cuánto podés de verdad. */}
+              {isPlannedMode && (plannedTarget.rpe != null || plannedTarget.phase || currentPR) && (
                 <p className="truncate text-[10.5px] font-bold mt-0.5" style={{ color: tint(accent, "95") }}>
-                  {plannedTarget.rpe != null && formatEffort(plannedTarget.rpe, fieldSettings.rpeDisplayMode)}
-                  {plannedTarget.rpe != null && plannedTarget.phase && " · "}
-                  {plannedTarget.phase}
+                  {[
+                    plannedTarget.rpe != null ? formatEffort(plannedTarget.rpe, fieldSettings.rpeDisplayMode) : null,
+                    plannedTarget.phase || null,
+                    currentPR && !cardio ? `Tu récord ${currentPR.reps}×${kgToDisplay(currentPR.kg, unit)}${weightLabel(unit)}` : null,
+                  ].filter(Boolean).join(" · ")}
                 </p>
               )}
             </div>
-            {!cardio && !isPlannedMode && (
+            {/* El lápiz corrige el RÉCORD (ver el panel "Corregir récord").
+                Antes se escondía en modo planificado, y como ahora una serie
+                con meta SIEMPRE se muestra planificada, esconderlo dejaría
+                sin forma de corregir un récord mal cargado. Se muestra
+                siempre que haya un récord que corregir. */}
+            {!cardio && !!currentPR && (
               <button onClick={() => { setEditReps(currentPR?.reps ?? ""); setEditKg(currentPR ? kgToDisplay(currentPR.kg, unit) : ""); setEditingPR((e) => !e); }} aria-label="Corregir récord" className="relative flex items-center justify-center w-8 h-8 rounded-lg shrink-0 transition active:scale-90" style={{ backgroundColor: tint(accent, "22"), color: accent }}>
                 <Edit3 size={13} />
               </button>
@@ -5316,12 +5363,28 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
       {/* Lo que hiciste la vez pasada en ESTA serie (opción activable) —
           en el layout normal va como una línea aparte debajo de la
           referencia; en el compacto ya está integrado arriba. */}
+      {/* Misma tarjeta redondeada que la referencia de arriba, pero en gris
+          y más baja: se lee como su hermana callada en vez de como una nota
+          suelta al pie. Placa de ícono + rótulo micro + el número grande y
+          tabular, el mismo lenguaje que ya usan las tarjetas de ejercicio. */}
       {!compact && fieldSettings.showLastSession === true && lastSession && !cardio && (
-        <div className="flex items-center gap-1.5 -mt-1.5 mb-2.5 px-1 text-[11px] text-slate-500">
-          <History size={11} className="shrink-0" />
-          <span>La vez pasada: <span className="font-bold text-slate-400 tabular-nums">{lastSession.reps}×{kgToDisplay(lastSession.kg, unit)}{weightLabel(unit)}</span></span>
-          <span className="text-slate-700">·</span>
-          <span className="text-slate-600">{haceCuanto(daysSince(lastSession.date)) || "hoy"}</span>
+        <div className="flex items-center gap-2.5 -mt-1.5 mb-2.5 px-3 py-2 rounded-xl" style={{ backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}>
+          <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-slate-800/60 text-slate-500"><History size={13} /></span>
+          <span className="flex-1 min-w-0 leading-none">
+            <span className="block text-[8.5px] font-black uppercase tracking-[0.16em] text-slate-600 mb-1">La vez pasada</span>
+            <span className="text-sm font-black tabular-nums text-slate-300">
+              {lastSession.reps}<span className="opacity-40 mx-0.5">×</span>{kgToDisplay(lastSession.kg, unit)}<span className="opacity-50 text-[10px] ml-0.5">{weightLabel(unit)}</span>
+            </span>
+          </span>
+          {lastSessionGap && !lastSessionGap.even && (
+            <span className="text-[10px] font-black tabular-nums px-1.5 py-1 rounded-lg shrink-0"
+              style={lastSessionGap.ahead
+                ? { backgroundColor: tint(accent, "18"), color: accent }
+                : { backgroundColor: "rgba(148,163,184,0.12)", color: "#94a3b8" }}>
+              {lastSessionGap.label}
+            </span>
+          )}
+          <span className="text-[10px] font-bold text-slate-600 shrink-0">{haceCuanto(daysSince(lastSession.date)) || "hoy"}</span>
         </div>
       )}
 
@@ -11187,14 +11250,14 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
             <Trophy size={16} className={settings.trainingMode !== "planned" ? "text-sky-400" : "text-slate-500"} />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold text-white">Perseguir mi récord</p>
-              <p className="text-[11px] text-slate-500">Cada serie muestra tu mejor marca — el objetivo es siempre superarte a vos mismo.</p>
+              <p className="text-[11px] text-slate-500">Cada serie muestra tu mejor marca — el objetivo es siempre superarte a vos mismo. Las series que tengan una meta cargada la siguen mostrando igual.</p>
             </div>
           </button>
           <button onClick={() => updateSettings({ trainingMode: "planned" })} className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-left transition ${settings.trainingMode === "planned" ? "bg-sky-500/15 border border-sky-500/40" : "bg-slate-800/50 border border-slate-700/40 hover:border-slate-600"}`}>
             <Target size={16} className={settings.trainingMode === "planned" ? "text-sky-400" : "text-slate-500"} />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold text-white">Rutina planificada</p>
-              <p className="text-[11px] text-slate-500">Cada serie planificada muestra "Planificado" con el peso cargado de antemano (a mano, o por tu entrenador) en vez de tu récord — pensado para planes con cargas ya decididas semana a semana.</p>
+              <p className="text-[11px] text-slate-500">Suma las herramientas para cargar metas semana a semana (a mano o de tu entrenador) y, al guardar, te festeja haber alcanzado la marca en vez de haberla superado.</p>
             </div>
           </button>
           {/* Pedido: "cuando elegís uno u otro veo que no cambia nada" —
