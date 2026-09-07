@@ -5346,9 +5346,9 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
                 una oración hay que leerla. */}
             {isPlannedMode && currentPR && !cardio && (
               <div className="relative shrink-0 text-right leading-none">
-                <span className="block text-[8px] font-black uppercase tracking-[0.14em] mb-1" style={{ color: tint(accent, "70") }}>Récord</span>
-                <span className="text-[13px] font-black tabular-nums" style={{ color: tint(accent, "cc") }}>
-                  {currentPR.reps}<span className="opacity-50 mx-px">×</span>{kgToDisplay(currentPR.kg, unit)}
+                <span className="block text-[7px] font-black uppercase tracking-[0.12em] mb-0.5" style={{ color: tint(accent, "50") }}>Récord</span>
+                <span className="text-[10px] font-bold tabular-nums" style={{ color: tint(accent, "85") }}>
+                  {currentPR.reps}<span className="opacity-40 mx-px">×</span>{kgToDisplay(currentPR.kg, unit)}
                 </span>
               </div>
             )}
@@ -8246,7 +8246,7 @@ function MiniBodyView({ ranks, sex, label, accentColor = "#94a3b8", view = "fron
 // con un marcador que junta semana + músculos, después los muñecos (con
 // el switch frente/espalda), y al final el desglose — reemplaza a
 // FriendBodyCompare, que quedaba corto para lo pedido.
-function BattleCompareCard({ myAvatarData, myName, mySex, mySessionsThisWeek, myRanks, theirAvatarData, theirName, theirSex, theirSessionsThisWeek, theirRanks, comparison }) {
+function BattleCompareCard({ myAvatarData, myName, mySex, mySessionsThisWeek, myRanks, theirAvatarData, theirName, theirSex, theirSessionsThisWeek, theirRanks, comparison, myLogs = null, theirLogs = null }) {
   const [view, setView] = useState("front");
   const iWinCount = comparison.filter((r) => (r.mine?.levelIdx ?? -1) > (r.theirs?.levelIdx ?? -1)).length;
   const theyWinCount = comparison.filter((r) => (r.theirs?.levelIdx ?? -1) > (r.mine?.levelIdx ?? -1)).length;
@@ -8376,7 +8376,7 @@ function BattleCompareCard({ myAvatarData, myName, mySex, mySessionsThisWeek, my
         </div>
       </div>
 
-      <RankComparisonList comparison={comparison} />
+      <RankComparisonList comparison={comparison} myLogs={myLogs} theirLogs={theirLogs} theirName={theirName} />
     </div>
   );
 }
@@ -12213,24 +12213,127 @@ function buildRankComparison(myLogs, mySettings, mySex, myAge, theirLogs, theirS
 // desde el centro hacia cada lado, proporcional al propio nivel de rango
 // (0 a 17, el techo de RANK_TIERS) — de un vistazo se ve no sólo quién
 // gana sino CUÁNTO, algo que las dos cajas planas no mostraban.
-function RankComparisonList({ comparison }) {
+// Detalle de UN músculo dentro de la batalla — pedido: "cuando clickees la
+// comparativa de músculos estaría bueno que te diga los ejercicios con
+// repeticiones y kg". La fila de la lista resume todo en un tier por lado;
+// esto abre lo que hay detrás de ese tier. Se arma con la UNIÓN de los
+// ejercicios de los dos (getExerciseBestsForMuscleGroup, el mismo helper
+// que usa el muñeco al tocar un músculo), así una fila muestra la mejor
+// marca de cada uno lado a lado — o "—" si esa persona no tiene ninguna.
+function MuscleBattleDetailModal({ groupKey, label, color, myLogs, theirLogs, theirName, mine, theirs, onClose }) {
+  useAndroidBack(onClose);
+  const unit = useWeightUnit();
+  const rows = useMemo(() => {
+    const byId = new Map();
+    getExerciseBestsForMuscleGroup(groupKey, myLogs || {}).forEach((e) => byId.set(e.exerciseId, { exerciseId: e.exerciseId, name: e.name, mine: e, theirs: null }));
+    getExerciseBestsForMuscleGroup(groupKey, theirLogs || {}).forEach((e) => {
+      const cur = byId.get(e.exerciseId);
+      if (cur) cur.theirs = e;
+      else byId.set(e.exerciseId, { exerciseId: e.exerciseId, name: e.name, mine: null, theirs: e });
+    });
+    // Ordenados por la marca más alta de la fila (venga de quien venga): el
+    // ejercicio más pesado del músculo es el que explica el rango.
+    return Array.from(byId.values()).sort((a, b) => Math.max(b.mine?.rawRm || 0, b.theirs?.rawRm || 0) - Math.max(a.mine?.rawRm || 0, a.theirs?.rawRm || 0));
+  }, [groupKey, myLogs, theirLogs]);
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div className="fixed inset-0 z-[130] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
+      <div className="relative overflow-hidden w-full max-w-sm max-h-[86vh] overflow-y-auto overscroll-contain bg-slate-900 border rounded-3xl modal-pop-in shadow-2xl shadow-black/70 p-5 space-y-3" style={{ borderColor: tint(color, "40") }} onClick={(e) => e.stopPropagation()}>
+        <div className="absolute -top-16 -right-14 w-48 h-48 rounded-full blur-3xl pointer-events-none opacity-20" style={{ backgroundColor: color }} />
+        <div className="relative flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="text-[9px] font-black uppercase tracking-widest" style={{ color }}>Músculo</p>
+            <p className="text-base font-black text-white leading-tight">{label}</p>
+          </div>
+          <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition shrink-0"><X size={17} /></button>
+        </div>
+
+        {/* Los dos tiers que la fila de la batalla resume, para no perder
+            el contexto de dónde se tocó. */}
+        <div className="relative grid grid-cols-2 gap-2">
+          <div className="rounded-xl border border-teal-500/30 bg-teal-500/10 px-3 py-2 min-w-0">
+            <p className="text-[8.5px] font-black uppercase tracking-widest text-teal-400/80">Vos</p>
+            <p className="text-xs font-black text-teal-300 truncate">{mine ? `${mine.tier} ${mine.sub}` : "Sin marca"}</p>
+          </div>
+          <div className="rounded-xl border border-fuchsia-500/30 bg-fuchsia-500/10 px-3 py-2 min-w-0">
+            <p className="text-[8.5px] font-black uppercase tracking-widest text-fuchsia-400/80 truncate">{theirName || "Ellos"}</p>
+            <p className="text-xs font-black text-fuchsia-300 truncate">{theirs ? `${theirs.tier} ${theirs.sub}` : "Sin marca"}</p>
+          </div>
+        </div>
+
+        {rows.length === 0 ? (
+          <p className="relative text-xs text-slate-600 text-center py-4">Ninguno de los dos tiene marcas en este músculo todavía.</p>
+        ) : (
+          <div className="relative space-y-1.5">
+            <p className="text-[9px] font-black uppercase tracking-widest text-slate-600 px-1">Mejor marca por ejercicio</p>
+            {rows.map((row) => {
+              const myRm = row.mine?.rawRm || 0, theirRm = row.theirs?.rawRm || 0;
+              const iWin = myRm > theirRm, theyWin = theirRm > myRm;
+              return (
+                <div key={row.exerciseId} className="rounded-xl bg-slate-800/40 border border-slate-800/60 px-3 py-2">
+                  <p className="text-[11px] text-slate-300 leading-snug mb-1.5">{row.name}</p>
+                  <div className="flex items-center gap-2">
+                    <span className={`flex-1 basis-0 min-w-0 flex items-center gap-1 text-xs font-black tabular-nums ${row.mine ? (iWin ? "text-teal-300" : "text-teal-400/60") : "text-slate-700"}`}>
+                      {iWin && <Crown size={10} className="shrink-0" />}
+                      {row.mine ? <>{row.mine.reps}<span className="opacity-40 font-normal mx-0.5">×</span>{kgToDisplay(row.mine.kg, unit)}<span className="opacity-50 text-[9px] ml-0.5">{weightLabel(unit)}</span></> : "—"}
+                    </span>
+                    <span className="w-px h-4 bg-slate-700/70 shrink-0" />
+                    <span className={`flex-1 basis-0 min-w-0 flex items-center justify-end gap-1 text-xs font-black tabular-nums ${row.theirs ? (theyWin ? "text-fuchsia-300" : "text-fuchsia-400/60") : "text-slate-700"}`}>
+                      {row.theirs ? <>{row.theirs.reps}<span className="opacity-40 font-normal mx-0.5">×</span>{kgToDisplay(row.theirs.kg, unit)}<span className="opacity-50 text-[9px] ml-0.5">{weightLabel(unit)}</span></> : "—"}
+                      {theyWin && <Crown size={10} className="shrink-0" />}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+function RankComparisonList({ comparison, myLogs = null, theirLogs = null, theirName = null }) {
+  const [openMuscle, setOpenMuscle] = useState(null);
+  const canOpenDetail = !!(myLogs || theirLogs);
   return (
     <div className="space-y-2">
       <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 px-1 flex items-center gap-1.5"><ListChecks size={11} /> Músculo por músculo</p>
+      {canOpenDetail && <p className="text-[9.5px] text-slate-600 px-1 -mt-1">Tocá un músculo para ver los ejercicios de cada uno.</p>}
       {comparison.map((r, i) => {
         const myLvl = r.mine?.levelIdx ?? -1, theirLvl = r.theirs?.levelIdx ?? -1;
         const iWin = myLvl > theirLvl, theyWin = theirLvl > myLvl;
         const maxLevelIdx = RANK_TIERS.length - 1;
         const myPct = myLvl >= 0 ? Math.max(10, Math.round((myLvl / maxLevelIdx) * 100)) : 0;
         const theirPct = theirLvl >= 0 ? Math.max(10, Math.round((theirLvl / maxLevelIdx) * 100)) : 0;
+        const Tag = canOpenDetail ? "button" : "div";
         return (
-          <div key={r.key} className="rounded-xl border border-slate-800/50 bg-slate-900/40 px-3 py-2.5 stagger-item" style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}>
-            <div className="flex items-center justify-between gap-2 mb-1.5">
-              <span className={`text-[10.5px] font-black flex items-center gap-1 min-w-0 ${iWin ? "text-teal-300" : "text-slate-600"}`}>
+          <Tag
+            key={r.key}
+            onClick={canOpenDetail ? () => setOpenMuscle(r) : undefined}
+            className={`w-full text-left rounded-xl border border-slate-800/50 bg-slate-900/40 px-3 py-2.5 stagger-item ${canOpenDetail ? "transition active:scale-[0.99] hover:border-slate-700" : ""}`}
+            style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}
+          >
+            {/* BUG FIX ("los músculos están descentrados y en algunos casos
+                incompletos"): el nombre iba apretado ENTRE los dos tiers,
+                con max-w-[90px] y truncate — "Pectoral medio/inferior" o
+                "Deltoide posterior" no entraban y se cortaban con "...", y
+                como los tiers de cada lado tienen anchos distintos ("Oro
+                II" vs "—") el nombre nunca quedaba realmente centrado.
+                Ahora tiene su propia línea, con todo el ancho de la
+                tarjeta: entra entero y está centrado de verdad. */}
+            <p className="text-[9px] font-black uppercase tracking-wide text-slate-500 text-center mb-1.5 flex items-center justify-center gap-1">
+              {r.label}
+              {canOpenDetail && <ChevronRight size={10} className="text-slate-600 shrink-0" />}
+            </p>
+            {/* Mitades iguales (flex-1 basis-0), así la corona y el tier de
+                cada lado quedan simétricos sin depender del largo del otro. */}
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className={`flex-1 basis-0 min-w-0 text-[10.5px] font-black flex items-center gap-1 ${iWin ? "text-teal-300" : "text-slate-600"}`}>
                 {iWin && <Crown size={10} className="shrink-0" />}<span className="truncate">{r.mine ? `${r.mine.tier} ${r.mine.sub}` : "—"}</span>
               </span>
-              <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wide shrink-0 px-1 truncate max-w-[90px]">{r.label}</span>
-              <span className={`text-[10.5px] font-black flex items-center gap-1 min-w-0 justify-end ${theyWin ? "text-fuchsia-300" : "text-slate-600"}`}>
+              <span className={`flex-1 basis-0 min-w-0 text-[10.5px] font-black flex items-center gap-1 justify-end ${theyWin ? "text-fuchsia-300" : "text-slate-600"}`}>
                 <span className="truncate">{r.theirs ? `${r.theirs.tier} ${r.theirs.sub}` : "—"}</span>{theyWin && <Crown size={10} className="shrink-0" />}
               </span>
             </div>
@@ -12243,9 +12346,22 @@ function RankComparisonList({ comparison }) {
                 {theirLvl >= 0 && <div className="h-full rounded-full bg-fuchsia-400 grow-bar" style={{ width: `${theirPct}%` }} />}
               </div>
             </div>
-          </div>
+          </Tag>
         );
       })}
+      {openMuscle && (
+        <MuscleBattleDetailModal
+          groupKey={openMuscle.key}
+          label={openMuscle.label}
+          color={MUSCLE_GROUP_BY_KEY[openMuscle.key]?.color || "#A855F7"}
+          myLogs={myLogs}
+          theirLogs={theirLogs}
+          theirName={theirName}
+          mine={openMuscle.mine}
+          theirs={openMuscle.theirs}
+          onClose={() => setOpenMuscle(null)}
+        />
+      )}
     </div>
   );
 }
@@ -13214,6 +13330,8 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
               theirSessionsThisWeek={theirSessionsThisWeek}
               theirRanks={theirRanks}
               comparison={buildRankComparison(viewerProfile?.logs, getProfileSettings(viewerProfile), viewerProfile?.sex, viewerProfile?.age, full.logs, full.settings, full.sex, full.age)}
+              myLogs={viewerProfile?.logs}
+              theirLogs={full.logs}
             />
           ) : (
             <>
@@ -13244,6 +13362,8 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
                     theirSessionsThisWeek={theirSessionsThisWeek}
                     theirRanks={theirRanks}
                     comparison={buildRankComparison(viewerProfile?.logs, getProfileSettings(viewerProfile), viewerProfile?.sex, viewerProfile?.age, full.logs, full.settings, full.sex, full.age)}
+                    myLogs={viewerProfile?.logs}
+                    theirLogs={full.logs}
                   />
                 ) : (
                   <div>
