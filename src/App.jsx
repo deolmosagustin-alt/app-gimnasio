@@ -5258,7 +5258,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
             {isPlannedMode ? <Target size={15} style={{ color: accent }} className="shrink-0 relative" /> : <Trophy size={15} style={{ color: accent }} className="shrink-0 soft-pulse relative" />}
             <div className="flex-1 min-w-0 relative leading-none">
               <p className="truncate">
-                <span className="block text-[8.5px] font-black uppercase tracking-[0.16em] mb-1" style={{ color: tint(accent, "aa") }}>{isPlannedMode ? "Meta planificada" : `Récord${override?.manual ? " · editado" : ""}`}</span>
+                <span className="block text-[8.5px] font-black uppercase tracking-[0.16em] mb-1" style={{ color: tint(accent, "aa") }}>{isPlannedMode ? "Planificado" : `Récord${override?.manual ? " · editado" : ""}`}</span>
                 <span className="text-xl font-black tabular-nums" style={{ color: accent, textShadow: `0 0 16px ${tint(accent, "50")}` }}>
                   {isPlannedMode
                     ? (cardio ? <>{plannedTarget.minutes} min</> : <>{plannedTarget.reps}<span className="opacity-50 text-sm mx-0.5">×</span>{kgToDisplay(plannedTarget.kg, unit)}<span className="opacity-60 text-xs ml-0.5">{weightLabel(unit)}</span></>)
@@ -11038,7 +11038,7 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
             <Target size={16} className={settings.trainingMode === "planned" ? "text-sky-400" : "text-slate-500"} />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold text-white">Rutina planificada</p>
-              <p className="text-[11px] text-slate-500">Cada serie muestra una "meta planificada" cargada de antemano (a mano, o por tu entrenador) en vez de tu récord — pensado para planes con cargas ya decididas semana a semana.</p>
+              <p className="text-[11px] text-slate-500">Cada serie planificada muestra "Planificado" con el peso cargado de antemano (a mano, o por tu entrenador) en vez de tu récord — pensado para planes con cargas ya decididas semana a semana.</p>
             </div>
           </button>
           {/* Pedido: "cuando elegís uno u otro veo que no cambia nada" —
@@ -12421,24 +12421,32 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
   useAndroidBack(onClose);
   const model = useMemo(() => (routineSnapshot ? buildRoutineModel(routineSnapshot) : null), [routineSnapshot]);
   const exercises = useMemo(() => Object.values(model?.exerciseById || {}), [model]);
-  const [exerciseId, setExerciseId] = useState(exercises[0]?.id || null);
-  const selectedExercise = exercises.find((e) => e.id === exerciseId) || null;
-  const [setIndex, setSetIndex] = useState(0);
-  const [applyToAllSets, setApplyToAllSets] = useState(false);
+  // REDISEÑO (pedido: "es medio ineficiente el tiempo que te lleva
+  // planificar una semana, ya que tenés que ir cambiando la serie, el
+  // ejercicio, etc"): antes esto era "elegí UN ejercicio → elegí UNA serie
+  // → llená sus semanas → guardá → volvé a abrir para el siguiente", o sea
+  // reabrir el flujo entero por cada ejercicio de la rutina.
+  // Ahora navega como las apps de programación de entrenadores
+  // (TrueCoach/Trainerize): elegís DÍA + SEMANA arriba, y abajo aparecen
+  // TODOS los ejercicios de ese día en una sola lista editable — se llena
+  // una semana completa de corrido, sin cambiar de pantalla ni de
+  // selector, y se guarda todo junto en un solo lote al final.
+  const dayOrder = model?.dayOrder || [];
+  const [dayKey, setDayKey] = useState(dayOrder[0] || null);
+  const dayExercises = useMemo(() => (dayKey ? (model?.days?.[dayKey]?.exercises || []) : []), [model, dayKey]);
+  const weeks = Array.from({ length: Math.max(1, trainWeeks || TRAIN_WEEKS) }, (_, i) => i + 1);
+  const [week, setWeek] = useState(1);
+  // Ejercicio abierto en detalle (para editar serie por serie y/o aplicar
+  // una plantilla multi-semana). Cerrado = se edita el ejercicio entero de
+  // una (todas sus series con el mismo valor), que es el caso común.
+  const [expandedId, setExpandedId] = useState(null);
   // `entries` sólo guarda lo que la persona TOCÓ en esta sesión del
-  // formulario, por clave "exerciseId_setIndex_week" (no por semana sola)
-  // — así no hace falta ningún efecto para "resetear"/"precargar" al
-  // cambiar de ejercicio o serie: lo ya planificado se deriva directo del
-  // set en cada render (ver existingEntryFor más abajo), sin sincronizar
-  // dos estados a mano.
+  // formulario, por clave "exerciseId_setIndex_week" — lo ya planificado
+  // se deriva directo del set en cada render (ver existingEntryOf), sin
+  // sincronizar dos estados a mano.
   const [entries, setEntries] = useState({});
   const [note, setNote] = useState("");
   const [sending, setSending] = useState(false);
-  // Rediseño: RPE/fase pasan a un panel opcional plegado (por defecto
-  // cerrado) — la mayoría sólo carga kg×reps, y antes esos dos selects por
-  // semana ocupaban tanto lugar como los campos principales.
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const weeks = Array.from({ length: Math.max(1, trainWeeks || TRAIN_WEEKS) }, (_, i) => i + 1);
 
   // Punto de partida para las plantillas rápidas — no se manda a ningún
   // lado, sólo alimenta buildX() al tocar un botón de plantilla.
@@ -12447,34 +12455,72 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
   const [tplRepsMax, setTplRepsMax] = useState("12");
   const [tplInc, setTplInc] = useState("2.5");
 
-  const entryKey = (week) => `${exerciseId}_${setIndex}_${week}`;
-  // Lo ya planificado para este ejercicio/serie/semana (si había una
-  // propuesta anterior) — se usa como valor por defecto de cada campo
-  // hasta que la persona lo edite.
-  const existingEntryFor = (week) => {
-    const existing = selectedExercise?.sets?.[setIndex]?.plannedProgression;
-    return Array.isArray(existing) ? existing.find((e) => e.week === week) : null;
+  const keyOf = (exId, si, w) => `${exId}_${si}_${w}`;
+  // Lo ya planificado para ese ejercicio/serie/semana (de una propuesta o
+  // planificación anterior) — es el valor por defecto de cada campo hasta
+  // que la persona lo edite.
+  const existingEntryOf = (ex, si, w) => {
+    const existing = ex?.sets?.[si]?.plannedProgression;
+    return Array.isArray(existing) ? existing.find((e) => e.week === w) : null;
   };
-  const valueFor = (week, field) => {
-    const touched = entries[entryKey(week)];
+  const valueOf = (ex, si, w, field) => {
+    const touched = entries[keyOf(ex.id, si, w)];
     if (touched && touched[field] !== undefined) return touched[field];
-    const existing = existingEntryFor(week);
-    return existing ? String(existing[field]) : "";
+    const existing = existingEntryOf(ex, si, w);
+    return existing && existing[field] != null ? String(existing[field]) : "";
   };
-  // BUG FIX: armar el valor base con valueFor() (que lee del cierre de
-  // render, no de "prev") podía perder lo recién tipeado si dos cambios
-  // (kg y reps) llegaban antes de que React re-renderizara entre uno y
-  // otro — el segundo update pisaba el primero con un valor viejo. Ahora
-  // todo el merge sale de "prev", que siempre refleja el último estado
-  // real en el momento en que se aplica.
-  const updateEntry = (week, patch) => setEntries((prev) => {
-    const key = entryKey(week);
-    const existing = existingEntryFor(week);
+  // Todo el merge sale de "prev" (no del cierre de render) para que dos
+  // cambios seguidos (kg y reps) no se pisen entre sí.
+  const updateOne = (ex, si, w, patch) => setEntries((prev) => {
+    const key = keyOf(ex.id, si, w);
+    const existing = existingEntryOf(ex, si, w);
     const base = prev[key] || { kg: existing ? String(existing.kg) : "", reps: existing ? String(existing.reps) : "" };
     return { ...prev, [key]: { ...base, ...patch } };
   });
+  // Camino rápido: editar el ejercicio "entero" escribe el mismo valor en
+  // TODAS sus series — así una semana de 6 ejercicios son 12 campos, no 36.
+  const updateAllSets = (ex, w, patch) => setEntries((prev) => {
+    const next = { ...prev };
+    (ex.sets || []).forEach((_, si) => {
+      const key = keyOf(ex.id, si, w);
+      const existing = existingEntryOf(ex, si, w);
+      const base = next[key] || { kg: existing ? String(existing.kg) : "", reps: existing ? String(existing.reps) : "" };
+      next[key] = { ...base, ...patch };
+    });
+    return next;
+  });
 
-  const applyTemplate = (tpl) => {
+  const isTouched = (exId, si, w) => entries[keyOf(exId, si, w)] !== undefined;
+  const exercisePlannedWeeksCount = (ex) => {
+    const set = new Set();
+    (ex.sets || []).forEach((s, si) => {
+      if (Array.isArray(s.plannedProgression)) s.plannedProgression.forEach((e) => set.add(e.week));
+      weeks.forEach((w) => { if (isTouched(ex.id, si, w) && parseFloat(valueOf(ex, si, w, "kg")) > 0) set.add(w); });
+    });
+    return set.size;
+  };
+
+  // Atajo clave para la velocidad: copia lo de la semana anterior a la
+  // actual, para TODOS los ejercicios del día — el flujo real es "misma
+  // base que la semana pasada, subo 2.5kg acá y allá", no cargar todo de
+  // cero cada semana.
+  const copyPreviousWeek = () => {
+    if (week <= 1) return;
+    setEntries((prev) => {
+      const next = { ...prev };
+      dayExercises.forEach((ex) => {
+        (ex.sets || []).forEach((_, si) => {
+          const from = { kg: valueOf(ex, si, week - 1, "kg"), reps: valueOf(ex, si, week - 1, "reps") };
+          if (!from.kg && !from.reps) return;
+          const key = keyOf(ex.id, si, week);
+          next[key] = { ...(next[key] || {}), ...from };
+        });
+      });
+      return next;
+    });
+  };
+
+  const applyTemplate = (ex, tpl) => {
     const kg = parseFloat(tplKg);
     const reps = parseInt(tplReps, 10);
     if (isNaN(kg) || kg <= 0 || isNaN(reps) || reps <= 0) return;
@@ -12485,55 +12531,57 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
       const next = { ...prev };
       // Merge, no reemplazo: aplicar una plantilla no debe borrar un
       // RPE/fase que ya se haya elegido a mano para esa semana.
-      built.forEach((e) => { next[entryKey(e.week)] = { ...(next[entryKey(e.week)] || {}), kg: String(e.kg), reps: String(e.reps) }; });
+      built.forEach((e) => {
+        (ex.sets || []).forEach((_, si) => {
+          const key = keyOf(ex.id, si, e.week);
+          next[key] = { ...(next[key] || {}), kg: String(e.kg), reps: String(e.reps) };
+        });
+      });
       return next;
     });
   };
-  const clearAll = () => setEntries((prev) => {
+  const clearExercise = (ex) => setEntries((prev) => {
     const next = { ...prev };
-    weeks.forEach((w) => { next[entryKey(w)] = { kg: "", reps: "", rpe: "", phase: "" }; });
+    (ex.sets || []).forEach((_, si) => {
+      weeks.forEach((w) => { next[keyOf(ex.id, si, w)] = { kg: "", reps: "", rpe: "", phase: "" }; });
+    });
     return next;
   });
 
-  // Barra visual: alto proporcional al kg de esa semana contra el máximo
-  // cargado — un vistazo alcanza para notar una progresión rota (ej. un
-  // salto absurdo entre dos semanas) antes de guardar/enviar nada.
-  const weekKgs = weeks.map((w) => parseFloat(valueFor(w, "kg")) || 0);
-  const maxKg = Math.max(...weekKgs, 1);
-
-  // Pedido: "estaría bueno que puedas planificar algunos ejercicios
-  // específicos" — esto YA se podía (el selector de ejercicio de abajo es
-  // por-ejercicio-y-serie desde el principio), pero no había ninguna forma
-  // de ver de un vistazo QUÉ ejercicios ya tenían algo cargado. Esta lista
-  // de chips arriba del selector resuelve eso: cuántas semanas tiene
-  // planificadas cada ejercicio, para saltar directo a editarlo.
-  const exercisePlannedWeeksCount = (ex) => {
-    let count = 0;
-    (ex.sets || []).forEach((s) => { if (Array.isArray(s.plannedProgression)) count += s.plannedProgression.length; });
-    return count;
+  // Lote completo a guardar: recorre TODOS los ejercicios de TODOS los
+  // días (no sólo el día abierto — se puede saltar de día sin perder lo
+  // cargado) y arma un plan por cada serie que tenga al menos una semana
+  // con valores. applyProgressionToRoutine ya acepta un array de planes de
+  // ejercicios distintos, así que todo entra en una sola operación.
+  const buildAllPlans = () => {
+    const plans = [];
+    exercises.forEach((ex) => {
+      (ex.sets || []).forEach((_, si) => {
+        const touchedAnyWeek = weeks.some((w) => isTouched(ex.id, si, w));
+        if (!touchedAnyWeek) return;
+        const cleanEntries = weeks.map((w) => {
+          const kg = parseFloat(valueOf(ex, si, w, "kg")), reps = parseInt(valueOf(ex, si, w, "reps"), 10);
+          if (isNaN(kg) || isNaN(reps) || kg <= 0 || reps <= 0) return null;
+          const entry = { week: w, kg, reps };
+          const rpeVal = valueOf(ex, si, w, "rpe");
+          if (rpeVal) entry.rpe = parseInt(rpeVal, 10);
+          const phaseVal = valueOf(ex, si, w, "phase");
+          if (phaseVal) entry.phase = phaseVal;
+          return entry;
+        }).filter(Boolean);
+        if (cleanEntries.length) plans.push({ exerciseId: ex.id, exerciseName: ex.name, setIndex: si, entries: cleanEntries });
+      });
+    });
+    return plans;
   };
-  const plannedExercises = exercises.filter((ex) => exercisePlannedWeeksCount(ex) > 0);
+  const pendingPlans = buildAllPlans();
+  const pendingExerciseCount = new Set(pendingPlans.map((p) => p.exerciseId)).size;
 
   const handleSubmit = async () => {
-    if (!selectedExercise) return;
-    const cleanEntries = weeks
-      .map((week) => {
-        const kg = parseFloat(valueFor(week, "kg")), reps = parseInt(valueFor(week, "reps"), 10);
-        if (isNaN(kg) || isNaN(reps) || kg <= 0 || reps <= 0) return null;
-        const entry = { week, kg, reps };
-        const rpeVal = valueFor(week, "rpe");
-        if (rpeVal) entry.rpe = parseInt(rpeVal, 10);
-        const phaseVal = valueFor(week, "phase");
-        if (phaseVal) entry.phase = phaseVal;
-        return entry;
-      })
-      .filter(Boolean);
-    if (!cleanEntries.length) return;
-    const targetSetIndexes = applyToAllSets ? selectedExercise.sets.map((_, i) => i) : [setIndex];
-    const plans = targetSetIndexes.map((si) => ({ exerciseId: selectedExercise.id, exerciseName: selectedExercise.name, setIndex: si, entries: cleanEntries }));
+    if (!pendingPlans.length) return;
     setSending(true);
     try {
-      await onSubmit(plans.length === 1 ? plans[0] : plans, note.trim());
+      await onSubmit(pendingPlans.length === 1 ? pendingPlans[0] : pendingPlans, note.trim());
     } finally {
       setSending(false);
     }
@@ -12561,133 +12609,142 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
             <p className="text-sm text-slate-500">{mode === "self" ? "Activá una rutina primero, en la pestaña Rutinas." : "Tu alumno no tiene una rutina activa todavía."}</p>
           ) : (
             <>
-              {/* Pedido: "estaría bueno que puedas planificar algunos
-                  ejercicios específicos" — esto ya se podía (selector de
-                  abajo), pero no había forma de ver de un vistazo qué
-                  ejercicios ya tenían algo cargado. Chips = acceso directo. */}
-              {plannedExercises.length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  <span className="text-[10px] text-slate-500 self-center">Ya planificaste:</span>
-                  {plannedExercises.map((ex) => (
-                    <button key={ex.id} onClick={() => { setExerciseId(ex.id); setSetIndex(0); }} className={`px-2.5 py-1 rounded-lg text-[10.5px] font-bold transition flex items-center gap-1 ${exerciseId === ex.id ? "bg-sky-500 !text-white" : "bg-sky-500/15 text-sky-300 hover:bg-sky-500/25"}`}>
-                      <Check size={10} /> {ex.name}
+              {/* Día: se planifica un día entero de corrido, no un ejercicio
+                  suelto por vez. */}
+              {dayOrder.length > 1 && (
+                <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${dayOrder.length}, 1fr)` }}>
+                  {dayOrder.map((dk) => (
+                    <button key={dk} onClick={() => { setDayKey(dk); setExpandedId(null); }} className={`py-2 rounded-xl text-[11px] font-black uppercase truncate transition active:scale-95 ${dayKey === dk ? "bg-sky-500 !text-white" : "bg-slate-800 text-slate-400 hover:text-slate-200"}`}>
+                      {model?.days?.[dk]?.label || dk}
                     </button>
                   ))}
                 </div>
               )}
-              <div>
-                <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Ejercicio</label>
-                <select value={exerciseId || ""} onChange={(e) => { setExerciseId(e.target.value); setSetIndex(0); }} className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-3.5 py-2.5 text-white text-sm focus:outline-none">
-                  {exercises.map((ex) => {
-                    const n = exercisePlannedWeeksCount(ex);
-                    return <option key={ex.id} value={ex.id}>{ex.name}{n > 0 ? ` · ${n} sem. planificada${n === 1 ? "" : "s"}` : ""}</option>;
-                  })}
-                </select>
-              </div>
-              {selectedExercise && selectedExercise.sets.length > 1 && (
-                <div className="space-y-1.5">
-                  <div className="flex gap-1.5">
-                    {selectedExercise.sets.map((_, i) => (
-                      <button key={i} disabled={applyToAllSets} onClick={() => setSetIndex(i)} className={`flex-1 py-2 rounded-lg text-xs font-bold transition disabled:opacity-30 ${setIndex === i ? "bg-sky-500 !text-white" : "bg-slate-800 text-slate-400"}`}>Serie {i + 1}</button>
-                    ))}
-                  </div>
-                  <label className="flex items-center gap-2 px-1 py-1 cursor-pointer select-none">
-                    <input type="checkbox" checked={applyToAllSets} onChange={(e) => setApplyToAllSets(e.target.checked)} className="accent-sky-500 w-3.5 h-3.5" />
-                    <span className="text-[11px] text-slate-400">Aplicar esta misma planificación a las {selectedExercise.sets.length} series del ejercicio</span>
-                  </label>
-                </div>
-              )}
 
-              {/* Plantillas rápidas — autocompletan las semanas de una,
-                  quedan editables a mano después. */}
-              <div className="rounded-2xl border border-sky-500/20 bg-sky-500/5 p-3.5 space-y-2.5">
-                <p className="text-[10px] font-black uppercase tracking-widest text-sky-300/80 flex items-center gap-1.5"><Sparkles size={12} /> Plantilla rápida</p>
-                <div className="grid grid-cols-3 gap-1.5">
-                  <div>
-                    <label className="text-[9px] text-slate-500 block mb-0.5">Kg inicial</label>
-                    <input value={tplKg} onChange={(e) => setTplKg(e.target.value)} type="number" inputMode="decimal" placeholder="60" className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-2 py-1.5 text-white text-xs text-center focus:outline-none" />
-                  </div>
-                  <div>
-                    <label className="text-[9px] text-slate-500 block mb-0.5">Reps</label>
-                    <input value={tplReps} onChange={(e) => setTplReps(e.target.value)} type="number" inputMode="numeric" className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-2 py-1.5 text-white text-xs text-center focus:outline-none" />
-                  </div>
-                  <div>
-                    <label className="text-[9px] text-slate-500 block mb-0.5">+kg/sem</label>
-                    <input value={tplInc} onChange={(e) => setTplInc(e.target.value)} type="number" inputMode="decimal" step="0.25" className="w-full bg-slate-800 border border-slate-700/50 rounded-lg px-2 py-1.5 text-white text-xs text-center focus:outline-none" />
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <label className="text-[9px] text-slate-500 shrink-0">Tope de reps (doble progresión)</label>
-                  <input value={tplRepsMax} onChange={(e) => setTplRepsMax(e.target.value)} type="number" inputMode="numeric" className="w-14 bg-slate-800 border border-slate-700/50 rounded-lg px-2 py-1 text-white text-xs text-center focus:outline-none" />
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {PROGRESSION_TEMPLATES.map((tpl) => (
-                    <button key={tpl.key} onClick={() => applyTemplate(tpl)} disabled={!tplKg || !tplReps} title={tpl.hint} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-sky-500/15 border border-sky-500/30 text-sky-300 text-[10.5px] font-bold hover:bg-sky-500/25 transition disabled:opacity-30 disabled:cursor-not-allowed">
-                      {tpl.icon} {tpl.label}
+              {/* Semana + "copiar la anterior": el atajo que hace que cargar
+                  la semana 2 en adelante sea un toque y ajustar, en vez de
+                  volver a tipear todo de cero. */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Semana del ciclo</label>
+                  {week > 1 && (
+                    <button onClick={copyPreviousWeek} className="flex items-center gap-1 px-2 py-1 rounded-lg bg-sky-500/15 border border-sky-500/30 text-sky-300 text-[10px] font-bold hover:bg-sky-500/25 transition">
+                      <Copy size={10} /> Copiar semana {week - 1}
                     </button>
+                  )}
+                </div>
+                <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
+                  {weeks.map((w) => (
+                    <button key={w} onClick={() => setWeek(w)} className={`shrink-0 w-11 py-2 rounded-xl text-[11px] font-black transition active:scale-95 ${week === w ? "bg-sky-500 !text-white" : "bg-slate-800 text-slate-400 hover:text-slate-200"}`}>S{w}</button>
                   ))}
-                  <button onClick={clearAll} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-500 text-[10.5px] font-bold hover:text-rose-400 transition"><Trash2 size={12} /> Limpiar</button>
                 </div>
               </div>
 
-              {/* Rediseño (pedido: "rediseñá la sección de planificación
-                  manual"): antes cada semana era una fila vertical con los
-                  dos selects de RPE/fase siempre visibles — una lista larga
-                  de scroll infinito. Ahora es una tira horizontal de
-                  tarjetas chicas (mismo lenguaje visual que otras tiras de
-                  la app, ej. los chips de día) — más rápida de escanear, y
-                  RPE/fase pasan a un panel plegable aparte para no repetir
-                  dos selects grandes por cada una de las semanas. */}
-              <div>
-                <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Meta por semana (dejá vacío lo que no quieras planificar)</label>
-                <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
-                  {weeks.map((week, i) => {
-                    const kg = weekKgs[i];
-                    const prevKg = i > 0 ? weekKgs[i - 1] : null;
-                    const delta = kg && prevKg ? Math.round((kg - prevKg) * 100) / 100 : null;
-                    const hasValue = kg > 0;
-                    return (
-                      <div key={week} className={`shrink-0 w-24 rounded-2xl border p-2 space-y-1.5 transition-colors ${hasValue ? "bg-sky-500/10 border-sky-500/35" : "bg-slate-800/40 border-slate-700/40"}`}>
-                        <p className="text-[9px] font-black text-slate-500 uppercase text-center">Sem {week}</p>
-                        <input value={valueFor(week, "kg")} onChange={(e) => updateEntry(week, { kg: e.target.value })} type="number" inputMode="decimal" placeholder="kg" className="w-full bg-slate-900 border border-slate-700/50 rounded-lg px-1.5 py-1.5 text-white text-sm font-bold text-center focus:outline-none" />
-                        <input value={valueFor(week, "reps")} onChange={(e) => updateEntry(week, { reps: e.target.value })} type="number" inputMode="numeric" placeholder="reps" className="w-full bg-slate-900 border border-slate-700/50 rounded-lg px-1.5 py-1 text-white text-xs text-center focus:outline-none" />
-                        <div className="h-1.5 rounded-full bg-slate-900/80 overflow-hidden">
-                          {hasValue && <div className="h-full rounded-full bg-sky-500/70 transition-all" style={{ width: `${Math.max(10, (kg / maxKg) * 100)}%` }} />}
+              {/* Todos los ejercicios del día, editables en la misma
+                  pantalla para la semana elegida. Tocar la flecha abre el
+                  detalle por serie + la plantilla multi-semana de ese
+                  ejercicio. */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block">Meta de cada ejercicio · Semana {week}</label>
+                {dayExercises.length === 0 && <p className="text-[11px] text-slate-600">Este día no tiene ejercicios.</p>}
+                {dayExercises.map((ex) => {
+                  const nSets = ex.sets?.length || 0;
+                  const expanded = expandedId === ex.id;
+                  const plannedWeeks = exercisePlannedWeeksCount(ex);
+                  const kg0 = valueOf(ex, 0, week, "kg");
+                  const reps0 = valueOf(ex, 0, week, "reps");
+                  const filled = parseFloat(kg0) > 0;
+                  return (
+                    <div key={ex.id} className={`rounded-2xl border transition-colors ${filled ? "bg-sky-500/10 border-sky-500/30" : "bg-slate-800/40 border-slate-700/40"}`}>
+                      <div className="flex items-center gap-2 p-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[12px] font-bold text-white truncate">{ex.name}</p>
+                          <p className="text-[9px] text-slate-500">{nSets} serie{nSets === 1 ? "" : "s"}{plannedWeeks > 0 ? ` · ${plannedWeeks} sem. planificada${plannedWeeks === 1 ? "" : "s"}` : ""}</p>
                         </div>
-                        <p className={`text-[9px] font-black text-center h-3 ${delta != null && delta !== 0 ? (delta > 0 ? "text-emerald-400" : "text-amber-400") : "text-transparent"}`}>
-                          {delta != null && delta !== 0 ? `${delta > 0 ? "+" : ""}${delta}kg` : "·"}
-                        </p>
+                        <input value={kg0} onChange={(e) => updateAllSets(ex, week, { kg: e.target.value })} type="number" inputMode="decimal" placeholder="kg" className="w-16 shrink-0 bg-slate-900 border border-slate-700/50 rounded-lg px-1.5 py-1.5 text-white text-sm font-bold text-center focus:outline-none" />
+                        <input value={reps0} onChange={(e) => updateAllSets(ex, week, { reps: e.target.value })} type="number" inputMode="numeric" placeholder="reps" className="w-14 shrink-0 bg-slate-900 border border-slate-700/50 rounded-lg px-1.5 py-1.5 text-white text-xs text-center focus:outline-none" />
+                        <button onClick={() => setExpandedId(expanded ? null : ex.id)} aria-label="Detalle por serie" className="p-1 rounded-lg text-slate-500 hover:text-sky-300 transition shrink-0">
+                          <ChevronDown size={15} className={`transition-transform ${expanded ? "rotate-180" : ""}`} />
+                        </button>
                       </div>
-                    );
-                  })}
-                </div>
+
+                      {expanded && (
+                        <div className="px-2 pb-2 space-y-2 tab-fade-in">
+                          {/* Serie por serie, sólo si querés separarlas */}
+                          {nSets > 1 && (
+                            <div className="space-y-1">
+                              {(ex.sets || []).map((_, si) => (
+                                <div key={si} className="flex items-center gap-1.5">
+                                  <span className="w-11 shrink-0 text-[9.5px] font-black text-slate-500 uppercase">S{si + 1}</span>
+                                  <input value={valueOf(ex, si, week, "kg")} onChange={(e) => updateOne(ex, si, week, { kg: e.target.value })} type="number" inputMode="decimal" placeholder="kg" className="w-16 shrink-0 bg-slate-900 border border-slate-700/50 rounded-lg px-1.5 py-1 text-white text-xs text-center focus:outline-none" />
+                                  <input value={valueOf(ex, si, week, "reps")} onChange={(e) => updateOne(ex, si, week, { reps: e.target.value })} type="number" inputMode="numeric" placeholder="reps" className="w-14 shrink-0 bg-slate-900 border border-slate-700/50 rounded-lg px-1.5 py-1 text-white text-xs text-center focus:outline-none" />
+                                  <select value={valueOf(ex, si, week, "rpe")} onChange={(e) => updateOne(ex, si, week, { rpe: e.target.value })} className="flex-1 min-w-0 bg-slate-900 border border-slate-700/50 rounded-lg px-1 py-1 text-[9.5px] text-slate-400 focus:outline-none">
+                                    <option value="">Sin RPE</option>
+                                    {RPE_SCALE.map((rs) => <option key={rs.value} value={rs.value}>RPE {rs.value} · RIR {rirButtonLabel(rs.value)}</option>)}
+                                  </select>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Fase de mesociclo: es una propiedad del bloque/
+                              semana, no de una serie suelta, así que va una
+                              sola vez por ejercicio y se aplica a todas sus
+                              series de esta semana. */}
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[9.5px] font-black text-slate-500 uppercase shrink-0">Fase</span>
+                            <select value={valueOf(ex, 0, week, "phase")} onChange={(e) => updateAllSets(ex, week, { phase: e.target.value })} className="flex-1 min-w-0 bg-slate-900 border border-slate-700/50 rounded-lg px-1.5 py-1 text-[10px] text-slate-400 focus:outline-none">
+                              <option value="">Sin fase</option>
+                              {MESOCYCLE_PHASES.map((ph) => <option key={ph} value={ph}>{ph}</option>)}
+                            </select>
+                            {nSets === 1 && (
+                              <select value={valueOf(ex, 0, week, "rpe")} onChange={(e) => updateAllSets(ex, week, { rpe: e.target.value })} className="flex-1 min-w-0 bg-slate-900 border border-slate-700/50 rounded-lg px-1.5 py-1 text-[10px] text-slate-400 focus:outline-none">
+                                <option value="">Sin RPE</option>
+                                {RPE_SCALE.map((rs) => <option key={rs.value} value={rs.value}>RPE {rs.value} · RIR {rirButtonLabel(rs.value)}</option>)}
+                              </select>
+                            )}
+                          </div>
+
+                          {/* Cómo viene la progresión de este ejercicio a lo
+                              largo de todo el ciclo — un vistazo alcanza para
+                              ver un salto raro sin ir semana por semana. */}
+                          <div className="flex gap-1 overflow-x-auto pb-0.5">
+                            {weeks.map((w) => {
+                              const v = parseFloat(valueOf(ex, 0, w, "kg")) || 0;
+                              return (
+                                <button key={w} onClick={() => setWeek(w)} className={`shrink-0 px-1.5 py-1 rounded-lg text-[9px] font-black transition ${w === week ? "bg-sky-500 !text-white" : v > 0 ? "bg-sky-500/15 text-sky-300" : "bg-slate-900 text-slate-600"}`}>
+                                  S{w}<span className="opacity-70 ml-0.5">{v > 0 ? v : "–"}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          {/* Plantilla rápida: llena TODAS las semanas de este
+                              ejercicio de una, y después se ajusta a mano. */}
+                          <div className="rounded-xl border border-sky-500/20 bg-sky-500/5 p-2 space-y-1.5">
+                            <p className="text-[9px] font-black uppercase tracking-widest text-sky-300/80 flex items-center gap-1"><Sparkles size={10} /> Llenar todas las semanas</p>
+                            <div className="grid grid-cols-4 gap-1">
+                              <input value={tplKg} onChange={(e) => setTplKg(e.target.value)} type="number" inputMode="decimal" placeholder="kg ini" className="w-full bg-slate-900 border border-slate-700/50 rounded-lg px-1 py-1 text-white text-[10px] text-center focus:outline-none" />
+                              <input value={tplReps} onChange={(e) => setTplReps(e.target.value)} type="number" inputMode="numeric" placeholder="reps" className="w-full bg-slate-900 border border-slate-700/50 rounded-lg px-1 py-1 text-white text-[10px] text-center focus:outline-none" />
+                              <input value={tplInc} onChange={(e) => setTplInc(e.target.value)} type="number" inputMode="decimal" step="0.25" placeholder="+kg" className="w-full bg-slate-900 border border-slate-700/50 rounded-lg px-1 py-1 text-white text-[10px] text-center focus:outline-none" />
+                              <input value={tplRepsMax} onChange={(e) => setTplRepsMax(e.target.value)} type="number" inputMode="numeric" placeholder="tope" className="w-full bg-slate-900 border border-slate-700/50 rounded-lg px-1 py-1 text-white text-[10px] text-center focus:outline-none" />
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {PROGRESSION_TEMPLATES.map((tpl) => (
+                                <button key={tpl.key} onClick={() => applyTemplate(ex, tpl)} disabled={!tplKg || !tplReps} title={tpl.hint} className="flex items-center gap-1 px-2 py-1 rounded-lg bg-sky-500/15 border border-sky-500/30 text-sky-300 text-[9.5px] font-bold hover:bg-sky-500/25 transition disabled:opacity-30 disabled:cursor-not-allowed">
+                                  {tpl.icon} {tpl.label}
+                                </button>
+                              ))}
+                              <button onClick={() => clearExercise(ex)} className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800 text-slate-500 text-[9.5px] font-bold hover:text-rose-400 transition"><Trash2 size={10} /> Limpiar</button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
 
-              {/* RIR/RPE y fase de mesociclo — pedido: "incluí conceptos que
-                  se usan generalmente en el entrenamiento personalizado".
-                  Opcionales y plegados por defecto: sin tocar nada acá, el
-                  plan sigue funcionando con sólo kg×reps, como antes. */}
-              <button onClick={() => setShowAdvanced((v) => !v)} className="w-full flex items-center justify-between gap-2 px-1 py-1 text-[10.5px] font-bold text-slate-500 hover:text-slate-300 transition">
-                <span className="flex items-center gap-1.5"><Sliders size={11} /> RPE/RIR y fase de mesociclo (opcional)</span>
-                <ChevronDown size={13} className={`transition-transform ${showAdvanced ? "rotate-180" : ""}`} />
-              </button>
-              {showAdvanced && (
-                <div className="space-y-1.5 tab-fade-in">
-                  {weeks.map((week) => (
-                    <div key={week} className="flex items-center gap-1.5">
-                      <span className="w-11 shrink-0 text-[10px] font-black text-slate-500 uppercase">Sem {week}</span>
-                      <select value={valueFor(week, "rpe")} onChange={(e) => updateEntry(week, { rpe: e.target.value })} className="flex-1 min-w-0 bg-slate-900 border border-slate-700/50 rounded-lg px-1.5 py-1 text-[10px] text-slate-400 focus:outline-none">
-                        <option value="">Sin RPE/RIR</option>
-                        {RPE_SCALE.map((rs) => <option key={rs.value} value={rs.value}>RPE {rs.value} · RIR {rirButtonLabel(rs.value)} ({rs.desc})</option>)}
-                      </select>
-                      <select value={valueFor(week, "phase")} onChange={(e) => updateEntry(week, { phase: e.target.value })} className="flex-1 min-w-0 bg-slate-900 border border-slate-700/50 rounded-lg px-1.5 py-1 text-[10px] text-slate-400 focus:outline-none">
-                        <option value="">Sin fase</option>
-                        {MESOCYCLE_PHASES.map((ph) => <option key={ph} value={ph}>{ph}</option>)}
-                      </select>
-                    </div>
-                  ))}
-                </div>
-              )}
               {mode !== "self" && (
                 <div>
                   <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Nota para tu alumno (opcional)</label>
@@ -12695,7 +12752,11 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
                     className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-3.5 py-2.5 text-white text-sm focus:outline-none resize-none" />
                 </div>
               )}
-              <button onClick={handleSubmit} disabled={sending} className="w-full py-3 rounded-xl bg-sky-500 !text-white text-sm font-bold disabled:opacity-40">{sending ? "Guardando..." : mode === "self" ? "Guardar progresión" : "Enviar progresión"}</button>
+              {/* Un solo guardado para TODO lo cargado (todos los días y
+                  semanas que hayas tocado), no uno por ejercicio. */}
+              <button onClick={handleSubmit} disabled={sending || !pendingPlans.length} className="w-full py-3 rounded-xl bg-sky-500 !text-white text-sm font-bold disabled:opacity-40">
+                {sending ? "Guardando..." : !pendingPlans.length ? "Cargá al menos una meta" : `${mode === "self" ? "Guardar" : "Enviar"} plan · ${pendingExerciseCount} ejercicio${pendingExerciseCount === 1 ? "" : "s"}`}
+              </button>
             </>
           )}
         </div>
