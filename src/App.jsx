@@ -5483,10 +5483,12 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           pantalla sin scrollear (mismo criterio que Hevy/Strong). */}
       {compact && (currentPR || isPlannedMode || (fieldSettings.showLastSession === true && lastSession)) && !cardio && (
         <div className="flex items-center gap-2 mb-1.5 px-0.5 min-w-0">
+          {/* Sin rótulo: en la fila compacta el ícono alcanza (libreta = lo
+              planificado, copa = tu récord) y cada palabra que se saca es
+              ancho que gana el número, que es lo que venís a leer. */}
           {(currentPR || isPlannedMode) && (
-            <span className="flex items-center gap-1 min-w-0 shrink-0">
-              {isPlannedMode ? <Target size={11} style={{ color: accent }} className="shrink-0" /> : <Trophy size={11} style={{ color: accent }} className="shrink-0" />}
-              <span className="text-[9px] font-black uppercase tracking-wider" style={{ color: tint(accent, "aa") }}>{isPlannedMode ? "Plan" : "Récord"}</span>
+            <span className="flex items-center gap-1 min-w-0 shrink-0" aria-label={isPlannedMode ? "Planificado" : "Récord"}>
+              {isPlannedMode ? <ClipboardCheck size={11} style={{ color: accent }} className="shrink-0" /> : <Trophy size={11} style={{ color: accent }} className="shrink-0" />}
               <span className="text-[11px] font-black tabular-nums" style={{ color: accent }}>
                 {isPlannedMode
                   ? `${plannedTarget.reps}×${kgToDisplay(plannedTarget.kg, unit)}`
@@ -5508,7 +5510,11 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
         {(currentPR || isPlannedMode) ? (
           <div className="relative overflow-hidden flex items-center gap-2.5 pl-3.5 pr-2 py-2.5 rounded-xl flex-1" style={{ background: `linear-gradient(120deg, ${tint(accent, "20")}, ${tint(accent, "0c")})`, border: `1px solid ${tint(accent, "45")}` }}>
             <div className="absolute -top-5 -left-5 w-16 h-16 rounded-full blur-2xl pointer-events-none opacity-30" style={{ backgroundColor: accent }} />
-            {isPlannedMode ? <Target size={15} style={{ color: accent }} className="shrink-0 relative" /> : <Trophy size={15} style={{ color: accent }} className="shrink-0 soft-pulse relative" />}
+            {/* Libreta = una carga decidida de antemano (a mano o por tu
+                entrenador); copa = tu propia mejor marca. El blanco (Target)
+                que se usaba antes para lo planificado no distinguía bien de
+                "objetivo a superar", que es justo lo contrario. */}
+            {isPlannedMode ? <ClipboardCheck size={15} style={{ color: accent }} className="shrink-0 relative" /> : <Trophy size={15} style={{ color: accent }} className="shrink-0 soft-pulse relative" />}
             <div className="flex-1 min-w-0 relative leading-none">
               <p className="truncate">
                 <span className="block text-[8.5px] font-black uppercase tracking-[0.16em] mb-1" style={{ color: tint(accent, "aa") }}>{isPlannedMode ? "Planificado" : `Récord${override?.manual ? " · editado" : ""}`}</span>
@@ -5536,8 +5542,8 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
                 la meta: dos números alineados se comparan de un vistazo,
                 una oración hay que leerla. */}
             {isPlannedMode && currentPR && !cardio && (
-              <div className="relative shrink-0 text-right leading-none">
-                <span className="block text-[7px] font-black uppercase tracking-[0.12em] mb-0.5" style={{ color: tint(accent, "50") }}>Récord</span>
+              <div className="relative shrink-0 flex items-center gap-1 leading-none" aria-label={`Tu récord: ${currentPR.reps}×${kgToDisplay(currentPR.kg, unit)}${weightLabel(unit)}`}>
+                <Trophy size={10} className="shrink-0" style={{ color: tint(accent, "60") }} />
                 <span className="text-[10px] font-bold tabular-nums" style={{ color: tint(accent, "85") }}>
                   {currentPR.reps}<span className="opacity-40 mx-px">×</span>{kgToDisplay(currentPR.kg, unit)}
                 </span>
@@ -5576,8 +5582,11 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
               el mismo esqueleto que la tarjeta de referencia de acá arriba,
               así los dos pesos quedan en la misma columna y se comparan
               bajando la vista, sin cruzar la pantalla. */}
+          {/* Sin el "hace": el relojito ya dice que es tiempo pasado, así que
+              la palabra sólo ocupaba lugar. "hoy" y "ayer" quedan enteros
+              porque ahí no hay ningún "hace" que sacar. */}
           <span className="flex items-center gap-1 text-[8.5px] font-black uppercase tracking-[0.14em] text-slate-600 mb-1.5">
-            <History size={9} className="shrink-0" />{haceCuanto(daysSince(lastSession.date)) || "hoy"}
+            <History size={9} className="shrink-0" />{(haceCuanto(daysSince(lastSession.date)) || "hoy").replace(/^hace /, "")}
           </span>
           <span className="block text-[13px] font-bold tabular-nums text-slate-400">
             {lastSession.reps}<span className="opacity-40 mx-0.5">×</span>{kgToDisplay(lastSession.kg, unit)}<span className="opacity-50 text-[9px] ml-0.5">{weightLabel(unit)}</span>
