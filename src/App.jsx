@@ -1197,7 +1197,7 @@ function GeneralWarmupCard({ exercises, warmupKeys, accent }) {
         <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: tint(accent, "20"), color: accent }}><Activity size={15} /></div>
         <div className="flex-1 min-w-0">
           <p className="text-xs font-bold text-white">Calentamiento general</p>
-          <p className="text-[10px] text-slate-500">{drills.length} ejercicios de movilidad · ~10-15 min{doneCount > 0 ? ` · ${doneCount}/${drills.length} hechos` : ""}</p>
+          <p className="text-[10px] text-slate-500">{drills.length} ejercicios de movilidad{doneCount > 0 ? ` · ${doneCount}/${drills.length} hechos` : ""}</p>
         </div>
         <ChevronDown size={16} className={`text-slate-600 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} style={{ color: accent }} />
       </button>
