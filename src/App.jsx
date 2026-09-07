@@ -3425,45 +3425,78 @@ function ShareImageModal({ title, subtitle, fileNamePrefix, shareTitle, shareTex
     link.href = canvas.toDataURL("image/png");
     link.click();
   };
+  // BUG FIX (reporte: "sigue sin funcionar la tarjeta para compartir mi
+  // perfil por WhatsApp", mientras que compartir una RUTINA sí anda). La
+  // diferencia entre las dos no era texto vs archivo, como parecía: es qué
+  // API usa cada una. Compartir una rutina usa navigator.share — la Web
+  // Share API del propio WebView — y en este teléfono está confirmado que
+  // funciona. Esto, en cambio, iba derecho al plugin de Capacitor. Así que
+  // ahora se intenta PRIMERO por la vía que ya sabemos que anda, con la
+  // imagen adjunta, y el plugin queda de respaldo. Último recurso: mandar
+  // sólo el texto, para que al menos el mensaje salga.
   const handleShare = async () => {
     const canvas = canvasRef.current; if (!canvas) return;
+    setShareError(null);
+    const attempts = [];
+    const note = (label, err) => {
+      const detail = String(err?.message || err || "");
+      console.warn(`[share] ${label} falló:`, err);
+      attempts.push(`${label}: ${detail}`);
+    };
+
+    let file = null;
+    try {
+      const blob = await new Promise((res) => canvas.toBlob(res, "image/png"));
+      if (blob) file = new File([blob], `${fileNamePrefix}.png`, { type: "image/png" });
+    } catch (err) { note("generar imagen", err); }
+
+    // 1) Web Share API con el archivo adjunto.
+    if (file && typeof navigator !== "undefined" && navigator.canShare?.({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: shareTitle, text: shareText });
+        return;
+      } catch (err) {
+        // AbortError = cerraste la hoja sin elegir. No es un fallo.
+        if (err?.name === "AbortError") return;
+        note("navigator.share con archivo", err);
+      }
+    } else if (file) {
+      attempts.push("navigator.share con archivo: no soportado en este WebView");
+    }
+
+    // 2) Plugin de Capacitor: escribe la imagen al caché y abre la hoja nativa.
     if (isNative) {
-      setShareError(null);
       try {
         const uri = await writeImageToCache();
-        if (!uri) throw new Error("El archivo no se pudo escribir en el teléfono.");
+        if (!uri) throw new Error("el archivo no se pudo escribir");
         const { Share } = await import("@capacitor/share");
         await Share.share({ title: shareTitle, text: shareText, files: [uri] });
         return;
       } catch (err) {
-        console.error("Share nativo falló:", err);
         if (nativeShareError(err)) return;
-        // Respaldo: compartir sólo el texto. Adjuntar un archivo puede fallar
-        // por muchas razones fuera de nuestro alcance, pero mandar texto es
-        // el camino que sí anda (es el mismo que usa compartir una rutina),
-        // así que antes de rendirnos se intenta al menos que el mensaje
-        // salga.
-        try {
-          const { Share } = await import("@capacitor/share");
-          await Share.share({ title: shareTitle, text: shareText });
-          setShareError({ msg: "No pudimos adjuntar la imagen, así que compartimos sólo el texto. Podés bajarla con \"Descargar\" y mandarla a mano.", detail: String(err?.message || err || "") });
-        } catch (err2) {
-          if (!nativeShareError(err2)) setShareError({ msg: "No pudimos compartir. Probá con \"Descargar\".", detail: String(err?.message || err || "") });
-        }
+        note("plugin de Capacitor", err);
       }
-      return;
     }
+
+    // 3) Sólo el texto — el mensaje sale aunque la imagen no.
     try {
-      const blob = await new Promise((res) => canvas.toBlob(res, "image/png"));
-      if (blob) {
-        const file = new File([blob], `${fileNamePrefix}.png`, { type: "image/png" });
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-          await navigator.share({ files: [file], title: shareTitle, text: shareText });
-          return;
-        }
+      if (typeof navigator !== "undefined" && navigator.share) {
+        await navigator.share({ title: shareTitle, text: shareText });
+      } else if (isNative) {
+        const { Share } = await import("@capacitor/share");
+        await Share.share({ title: shareTitle, text: shareText });
+      } else {
+        handleDownload();
+        return;
       }
-    } catch { return; }
-    handleDownload();
+      setShareError({ msg: "No pudimos adjuntar la imagen, así que compartimos sólo el texto. Podés bajarla con \"Descargar\" y mandarla a mano.", detail: attempts.join(" · ") });
+      return;
+    } catch (err) {
+      if (err?.name === "AbortError" || nativeShareError(err)) return;
+      note("compartir sólo texto", err);
+    }
+
+    setShareError({ msg: "No pudimos compartir. Probá con \"Descargar\" y mandala a mano.", detail: attempts.join(" · ") });
   };
 
   // BUG FIX: se usa desde varios lugares, algunos adentro de tarjetas con
@@ -9971,6 +10004,21 @@ function blobToBase64(blob) {
 // WhatsApp, etc. En la web, sigue siendo la descarga de toda la vida.
 async function downloadBlob(blob, filename) {
   if (Capacitor.isNativePlatform()) {
+    // Primero la Web Share API del propio WebView — es la MISMA vía que usa
+    // compartir una rutina (ShareLinkModal), la única confirmada funcionando
+    // en el dispositivo del reporte, y acá ya tenemos el Blob en la mano así
+    // que no hace falta pasar por el disco. Si el WebView no soporta
+    // adjuntar archivos, seguimos con el plugin de Capacitor de abajo.
+    try {
+      const file = new File([blob], filename, { type: blob.type || "application/octet-stream" });
+      if (typeof navigator !== "undefined" && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: filename });
+        return;
+      }
+    } catch (err) {
+      if (err?.name === "AbortError") return; // cerró la hoja sin elegir
+      console.warn("[export] navigator.share con archivo falló, sigo con el plugin:", err);
+    }
     // BUG FIX: antes esto envolvía TODO (escribir el archivo Y compartirlo)
     // en un solo try/catch que se tragaba cualquier error con solo un
     // console.error — si Filesystem.writeFile fallaba de verdad (permisos,
