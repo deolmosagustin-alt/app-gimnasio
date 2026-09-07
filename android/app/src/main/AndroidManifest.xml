@@ -12,12 +12,23 @@
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
     <!--  ID de publicidad (AdMob)  -->
     <uses-permission android:name="com.google.android.gms.permission.AD_ID"/>
-    <!--  Sugerir amigos de tus contactos (Social → Buscar). Sólo LECTURA:
-             la app nunca crea/modifica/borra contactos del teléfono, así que
-             WRITE_CONTACTS no se declara (el plugin la pide como parte del
-             mismo alias, pero al no estar en el manifest simplemente queda
-             denegada sola, sin afectar el pedido de READ_CONTACTS).  -->
+    <!--  Sugerir amigos de tus contactos (Social → Buscar).
+             La app SÓLO LEE: nunca crea, modifica ni borra contactos del
+             teléfono. Aun así hay que declarar WRITE_CONTACTS, y no es
+             opcional: @capacitor-community/contacts agrupa las dos en un
+             único alias ("contacts", ver ContactsPlugin.java) y Capacitor
+             valida que TODAS las del alias estén en el manifest antes de
+             pedir nada. Faltando una, requestPermissionForAlias falla de
+             entrada con "Missing the following permissions in
+             AndroidManifest.xml: android.permission.WRITE_CONTACTS" — que
+             es exactamente el error que hacía fallar "Sugerir de mis
+             contactos" (una versión anterior la omitía a propósito,
+             asumiendo que quedaría denegada sola; no queda denegada, rompe
+             el pedido entero). Para quien usa la app no cambia nada:
+             Android junta READ y WRITE_CONTACTS en el mismo grupo, así que
+             el diálogo que ve es el mismo de siempre.  -->
     <uses-permission android:name="android.permission.READ_CONTACTS"/>
+    <uses-permission android:name="android.permission.WRITE_CONTACTS"/>
     <!--  NOTA: se quitaron READ_MEDIA_IMAGES y READ_EXTERNAL_STORAGE a
              propósito. La foto de perfil y las fotos de progreso se eligen con
              el selector de archivos del sistema (input type="file" de la web),

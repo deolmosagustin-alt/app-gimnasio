@@ -3164,6 +3164,125 @@ async function drawSocialProfileQrCard(ctx, W, H, { name, username, accent }) {
   drawWordmark(ctx, W, H, accent);
 }
 
+/* ============================================================================
+   MOSTRAR TU QR — pedido: "el QR se ve raro, hagámoslo más estético y no
+   una imagen así rara". Antes esto abría ShareImageModal: una JPEG de
+   540×960 en formato story, comprimida al 88%, con el QR como un cuadradito
+   en el medio. Como asset para mandar por WhatsApp está bien; para que
+   alguien te escanee de la pantalla es el envase equivocado — chico,
+   recomprimido (peor de leer) y rodeado de una tarjeta que no hacía falta.
+   Ahora el QR se dibuja en DOM, grande y nítido: canvas a la resolución
+   real del dispositivo (devicePixelRatio) y con el módulo redondeado a un
+   número ENTERO de píxeles, así ninguno queda a medio píxel. La imagen para
+   compartir sigue existiendo, un botón más abajo.
+============================================================================ */
+function ProfileQrCode({ username, size = 236 }) {
+  const canvasRef = useRef(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const QRCode = (await import("qrcode")).default;
+        const qr = QRCode.create(buildProfileQrPayload(username), { errorCorrectionLevel: "M" });
+        const canvas = canvasRef.current;
+        if (cancelled || !canvas) return;
+        const dpr = Math.min(3, (typeof window !== "undefined" && window.devicePixelRatio) || 1);
+        const modules = qr.modules, n = modules.size;
+        const quiet = 2; // margen claro que pide el estándar QR
+        const total = n + quiet * 2;
+        // Módulo de tamaño entero: si cada cuadrito cae en píxeles enteros
+        // no hay bordes borrosos y el lector engancha a la primera. La
+        // grilla resultante se centra en el canvas.
+        const px = Math.max(1, Math.floor((size * dpr) / total));
+        const side = px * total;
+        canvas.width = side; canvas.height = side;
+        canvas.style.width = `${size}px`; canvas.style.height = `${size}px`;
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, side, side);
+        ctx.fillStyle = "#0f172a";
+        for (let r = 0; r < n; r++) {
+          for (let c = 0; c < n; c++) {
+            if (modules.get(r, c)) ctx.fillRect((c + quiet) * px, (r + quiet) * px, px, px);
+          }
+        }
+      } catch (err) {
+        console.error("No se pudo generar el código QR:", err);
+        if (!cancelled) setFailed(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [username, size]);
+  if (failed) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-2 rounded-2xl bg-slate-800/60 border border-slate-700/60 text-slate-500" style={{ width: size, height: size }}>
+        <AlertTriangle size={20} />
+        <p className="text-[11px] px-4 text-center">No pudimos generar el código. Buscate por @{username} mientras tanto.</p>
+      </div>
+    );
+  }
+  return <canvas ref={canvasRef} className="rounded-2xl block" style={{ width: size, height: size }} aria-label={`Código QR de @${username}`} />;
+}
+
+function ProfileQrModal({ profileName, username, accent = "#A855F7", onClose }) {
+  useAndroidBack(onClose);
+  const [showImage, setShowImage] = useState(false);
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <>
+      <div className="fixed inset-0 z-[130] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
+        <div className="relative overflow-hidden bg-slate-900 border rounded-3xl max-w-xs w-full p-5 modal-pop-in shadow-2xl shadow-black/50 max-h-[92vh] overflow-y-auto overscroll-contain" style={{ borderColor: tint(accent, "40") }} onClick={(e) => e.stopPropagation()}>
+          <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full blur-3xl pointer-events-none opacity-25" style={{ backgroundColor: accent }} />
+          <div className="relative flex items-start justify-between gap-2 mb-4">
+            <div className="min-w-0">
+              <p className="text-[9px] font-black uppercase tracking-widest" style={{ color: accent }}>Tu código QR</p>
+              <p className="text-base font-black text-white leading-tight">Que te escaneen</p>
+            </div>
+            <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition shrink-0"><X size={18} /></button>
+          </div>
+
+          {/* Placa blanca con aire propio: el QR necesita contraste y margen
+              claro alrededor, y sobre el fondo oscuro de la app una placa
+              con sombra lo despega en vez de dejarlo flotando. */}
+          <div className="relative flex justify-center mb-4">
+            <div className="p-3 rounded-3xl bg-white shadow-xl shadow-black/40">
+              <ProfileQrCode username={username} />
+            </div>
+          </div>
+
+          <div className="relative text-center mb-4">
+            <p className="text-sm font-black text-white truncate">{profileName || "Vos"}</p>
+            <span className="inline-flex items-center gap-1 mt-1.5 px-3 py-1 rounded-full text-xs font-bold border" style={{ backgroundColor: tint(accent, "18"), borderColor: tint(accent, "45"), color: accent }}>
+              <AtSign size={11} />{username}
+            </span>
+          </div>
+
+          <p className="relative text-[10.5px] text-slate-500 text-center leading-snug mb-3">
+            Que lo escaneen desde <span className="text-slate-400 font-semibold">Social → Buscar → Escanear código QR</span>.
+          </p>
+
+          <button onClick={() => setShowImage(true)} className="relative w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition text-xs font-bold">
+            <Share2 size={13} /> Compartir como imagen
+          </button>
+        </div>
+      </div>
+      {showImage && (
+        <ShareImageModal
+          title="Tu código QR"
+          subtitle="Tarjeta para WhatsApp, Instagram y más"
+          fileNamePrefix="mi-qr-modus-fit"
+          shareTitle="Modus Fit"
+          shareText={`Agregame en Modus Fit, escaneá mi código o buscame como @${username}`}
+          accent={accent}
+          draw={(ctx, W, H) => drawSocialProfileQrCard(ctx, W, H, { name: profileName, username, accent })}
+          onClose={() => setShowImage(false)}
+        />
+      )}
+    </>,
+    document.body
+  );
+}
+
 // Elige tarjeta o QR para compartir tu perfil — pedido explícito: "que te
 // dé la opción de generar ese QR o el link a enviar por WhatsApp,
 // Instagram, etc.", así que ambos caminos conviven acá en vez de que uno
@@ -3211,16 +3330,7 @@ function ProfileShareModal({ profileName, username, myTopRank, onClose }) {
         />
       )}
       {showQr && (
-        <ShareImageModal
-          title="Tu código QR"
-          subtitle="Que te escaneen para agregarte al toque"
-          fileNamePrefix="mi-qr-modus-fit"
-          shareTitle="Modus Fit"
-          shareText={`Agregame en Modus Fit, escaneá mi código o buscame como @${username}`}
-          accent={accent}
-          draw={(ctx, W, H) => drawSocialProfileQrCard(ctx, W, H, { name: profileName, username, accent })}
-          onClose={() => setShowQr(false)}
-        />
+        <ProfileQrModal profileName={profileName} username={username} accent={accent} onClose={() => setShowQr(false)} />
       )}
     </>,
     document.body
@@ -11675,6 +11785,17 @@ function ContactsSuggestions({ myUid, friendStatus, onSendFriendRequest }) {
           setState("not_installed");
           return;
         }
+        // Mismo caso, otra causa: el APK instalado se compiló con un
+        // AndroidManifest que no declaraba las dos permisos del alias
+        // "contacts" del plugin (READ_CONTACTS + WRITE_CONTACTS). Capacitor
+        // rechaza el pedido de entrada con "Missing the following
+        // permissions in AndroidManifest.xml: ..." — el manifest del repo ya
+        // las declara, así que si esto aparece es un APK viejo y la salida
+        // es la misma: actualizar la app, no reintentar.
+        if (msg.includes("missing the following permissions")) {
+          setState("not_installed");
+          return;
+        }
         throw permErr;
       }
       // BUG FIX: Android 14+ puede devolver "limited" (permiso de "elegir
@@ -12172,9 +12293,12 @@ function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted
 // MuscleRankView para "vos" (extraído para reusarlo también con los datos
 // de un amigo/alumno, ver FriendBodyCompare, sin duplicar la lógica de
 // modo relativo/general).
-function computeAllMuscleRanks(logs, settings, sex, age) {
+// `forceMode` fija la vara a mano ("general") en vez de deducirla del peso
+// corporal — lo usa la batalla, donde los dos lados TIENEN que medirse
+// igual (ver buildRankComparison).
+function computeAllMuscleRanks(logs, settings, sex, age, forceMode = null) {
   const bodyWeightKg = settings?.bodyWeightKg || 0;
-  const mode = bodyWeightKg > 0 ? "relative" : "general";
+  const mode = forceMode || (bodyWeightKg > 0 ? "relative" : "general");
   const dumbbellDouble = settings?.dumbbellDouble || null;
   const out = {};
   MUSCLE_GROUPS.forEach((g) => {
@@ -12184,20 +12308,30 @@ function computeAllMuscleRanks(logs, settings, sex, age) {
   return out;
 }
 
-// Compara tu rango con el de un amigo/alumno, músculo por músculo — cada
-// persona usa su PROPIO modo ("relativo" a su peso corporal si lo cargó,
-// "general" si no), el mismo criterio con el que cada quien ve su rango
-// en su propia pestaña Progreso: no hace falta forzar el mismo modo para
-// los dos, porque el TIER (bronce/plata/oro/...) es la misma escala
-// ordinal sin importar de qué modo salió.
-function buildRankComparison(myLogs, mySettings, mySex, myAge, theirLogs, theirSettings, theirSex, theirAge) {
-  const myBW = mySettings?.bodyWeightKg || 0, theirBW = theirSettings?.bodyWeightKg || 0;
-  const myMode = myBW > 0 ? "relative" : "general", theirMode = theirBW > 0 ? "relative" : "general";
+// Compara tu rango con el de un amigo/alumno, músculo por músculo, SIEMPRE
+// en contexto general (kg absolutos).
+//
+// BUG FIX (pedido: "que la comparativa sea en el contexto general, no según
+// tu contexto"): antes cada persona se medía con su PROPIO modo — "relativo"
+// a su peso corporal si lo tenía cargado, "general" si no. El comentario
+// viejo lo justificaba diciendo que el tier es la misma escala ordinal sin
+// importar de qué modo saliera, y eso es cierto para mirar el rango de UNO
+// pero no para comparar DOS: en modo relativo los umbrales se escalan por
+// peso corporal, sexo y edad (ver getMuscleRankThresholdsKg), así que dos
+// personas levantando exactamente lo mismo caían en tiers distintos, y se
+// podía "ganar" la batalla por pesar menos o ser más grande, no por
+// levantar más. Peor todavía, quién usaba qué vara dependía de si cada uno
+// había cargado su peso corporal, un detalle invisible desde la batalla.
+// El contexto propio sigue siendo el de cada quien en su Progreso; acá,
+// donde el punto es medirse contra otro, la vara es una sola.
+// (Por eso tampoco recibe ya settings/sexo/edad de ninguno de los dos: la
+// tabla general no los usa.)
+function buildRankComparison(myLogs, theirLogs) {
   return MUSCLE_GROUPS.map((g) => {
     const my1RM = getBest1RMForMuscleGroup(g.key, myLogs || {}, null);
     const their1RM = getBest1RMForMuscleGroup(g.key, theirLogs || {}, null);
-    const mine = my1RM.best1RM > 0 ? getMuscleRank(g.key, my1RM.best1RM, myMode, myBW, mySex, myAge) : null;
-    const theirs = their1RM.best1RM > 0 ? getMuscleRank(g.key, their1RM.best1RM, theirMode, theirBW, theirSex, theirAge) : null;
+    const mine = my1RM.best1RM > 0 ? getMuscleRank(g.key, my1RM.best1RM, "general") : null;
+    const theirs = their1RM.best1RM > 0 ? getMuscleRank(g.key, their1RM.best1RM, "general") : null;
     return { key: g.key, label: g.label, mine, theirs, myKg: my1RM.bestKg, myReps: my1RM.bestReps, theirKg: their1RM.bestKg, theirReps: their1RM.bestReps };
   }).filter((r) => r.mine || r.theirs);
 }
@@ -12300,7 +12434,12 @@ function RankComparisonList({ comparison, myLogs = null, theirLogs = null, their
   return (
     <div className="space-y-2">
       <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 px-1 flex items-center gap-1.5"><ListChecks size={11} /> Músculo por músculo</p>
-      {canOpenDetail && <p className="text-[9.5px] text-slate-600 px-1 -mt-1">Tocá un músculo para ver los ejercicios de cada uno.</p>}
+      {/* Que la vara sea explícita: el rango acá puede no coincidir con el
+          que cada uno ve en su propio Progreso, donde sí pesa el contexto
+          personal (peso corporal, sexo, edad). */}
+      <p className="text-[9.5px] text-slate-600 px-1 -mt-1">
+        En kg absolutos, la misma vara para los dos.{canOpenDetail ? " Tocá un músculo para ver los ejercicios." : ""}
+      </p>
       {comparison.map((r, i) => {
         const myLvl = r.mine?.levelIdx ?? -1, theirLvl = r.theirs?.levelIdx ?? -1;
         const iWin = myLvl > theirLvl, theyWin = theirLvl > myLvl;
@@ -13172,8 +13311,15 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
   // competitivo, distinto de "Rango por músculo" (que es de fondo/histórico).
   const mySessionsThisWeek = useMemo(() => getSessionsForPeriod(viewerProfile?.trainingSessions || [], "week").length, [viewerProfile]);
   const theirSessionsThisWeek = useMemo(() => getSessionsForPeriod(full?.trainingSessions || [], "week").length, [full]);
+  // Su rango tal como lo ve ÉL/ELLA en su propio Progreso (contexto propio):
+  // esto es su perfil, no una comparación.
   const theirRanks = useMemo(() => computeAllMuscleRanks(full?.logs, full?.settings, full?.sex, full?.age), [full]);
-  const myRanksForCompare = useMemo(() => computeAllMuscleRanks(viewerProfile?.logs, getProfileSettings(viewerProfile), viewerProfile?.sex, viewerProfile?.age), [viewerProfile]);
+  // Para la BATALLA, en cambio, los dos lados se miden con la MISMA vara
+  // (contexto general) — ver buildRankComparison. Si no, los muñecos, el
+  // veredicto y la lista podían contradecirse entre sí, cada uno calculado
+  // con umbrales distintos según quién tuviera cargado su peso corporal.
+  const myRanksForCompare = useMemo(() => computeAllMuscleRanks(viewerProfile?.logs, getProfileSettings(viewerProfile), viewerProfile?.sex, viewerProfile?.age, "general"), [viewerProfile]);
+  const theirRanksForCompare = useMemo(() => computeAllMuscleRanks(full?.logs, full?.settings, full?.sex, full?.age, "general"), [full]);
   const selectedMuscleInfo = selectedMuscle ? theirRanks[selectedMuscle] : null;
   // Pedido: "agregale más cosas e info" — dos datos nuevos que antes no
   // aparecían en ningún lado de este perfil: el rango PROMEDIO (mismo
@@ -13328,8 +13474,8 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
               theirName={basic?.name}
               theirSex={full.sex}
               theirSessionsThisWeek={theirSessionsThisWeek}
-              theirRanks={theirRanks}
-              comparison={buildRankComparison(viewerProfile?.logs, getProfileSettings(viewerProfile), viewerProfile?.sex, viewerProfile?.age, full.logs, full.settings, full.sex, full.age)}
+              theirRanks={theirRanksForCompare}
+              comparison={buildRankComparison(viewerProfile?.logs, full.logs)}
               myLogs={viewerProfile?.logs}
               theirLogs={full.logs}
             />
@@ -13360,8 +13506,8 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
                     theirName={basic?.name}
                     theirSex={full.sex}
                     theirSessionsThisWeek={theirSessionsThisWeek}
-                    theirRanks={theirRanks}
-                    comparison={buildRankComparison(viewerProfile?.logs, getProfileSettings(viewerProfile), viewerProfile?.sex, viewerProfile?.age, full.logs, full.settings, full.sex, full.age)}
+                    theirRanks={theirRanksForCompare}
+                    comparison={buildRankComparison(viewerProfile?.logs, full.logs)}
                     myLogs={viewerProfile?.logs}
                     theirLogs={full.logs}
                   />
@@ -14364,14 +14510,10 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
         />
       )}
       {showProfileQr && (
-        <ShareImageModal
-          title="Tu código QR"
-          subtitle="Que te escaneen para agregarte al toque"
-          fileNamePrefix="mi-qr-modus-fit"
-          shareTitle="Modus Fit"
-          shareText={`Agregame en Modus Fit, escaneá mi código o buscame como @${profile?.username}`}
+        <ProfileQrModal
+          profileName={profileName}
+          username={profile?.username}
           accent={myTopRank?.color || "#A855F7"}
-          draw={(ctx, W, H) => drawSocialProfileQrCard(ctx, W, H, { name: profileName, username: profile?.username, accent: myTopRank?.color || "#A855F7" })}
           onClose={() => setShowProfileQr(false)}
         />
       )}
