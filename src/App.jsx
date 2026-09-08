@@ -5702,7 +5702,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           return (
             <div className="space-y-2.5 rounded-2xl border p-3" style={{ borderColor: tint(accent, "20"), backgroundColor: tint(accent, "05") }}>
               {/* Selector de modo */}
-              <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
+              <div className="flex bg-black/40 rounded-xl p-1 border border-slate-700/50">
                 <button onClick={() => { setCardioMode("stopwatch"); setCardioRunning(false); setCardioElapsed(0); clearPersistedCardioTimer(); }} className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[10px] font-bold transition-all ${cardioMode === "stopwatch" ? "text-white" : "text-slate-500"}`} style={cardioMode === "stopwatch" ? { backgroundColor: accent } : {}}>
                   <Clock size={11} /> Cronómetro
                 </button>
@@ -6548,7 +6548,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           pasa de un bloque de color sólido a texto del color del día sobre
           un tinte suave, que es más liviano y no compite con el panel de
           abajo. */}
-      <div className="relative grid gap-1.5 p-1 rounded-2xl border" style={{ gridTemplateColumns: `repeat(${DAY_ORDER.length}, 1fr)`, borderColor: tint(day.color, "25"), background: `linear-gradient(${tint(day.color, "14")}, ${tint(day.color, "14")}), rgba(2,6,23,0.55)` }}>
+      <div className="relative grid gap-1.5 p-1 rounded-2xl bg-slate-900/60 border border-slate-800/50" style={{ gridTemplateColumns: `repeat(${DAY_ORDER.length}, 1fr)` }}>
         <div
           className="absolute top-1 bottom-1 rounded-xl transition-all duration-300 ease-out pointer-events-none"
           style={{
@@ -6619,7 +6619,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           // día. Con dos capas (tinte encima, oscuro debajo) el sector
           // entero queda con su tono sin dejar de ser más hundido que las
           // tarjetas que van adentro.
-          background: `linear-gradient(${tint(day.color, "14")}, ${tint(day.color, "14")}), rgba(2,6,23,0.55)`,
+          background: `linear-gradient(${tint(day.color, "14")}, ${tint(day.color, "14")}), rgba(2,6,23,0.62)`,
           marginTop: 8,
         }}
       >
@@ -7058,7 +7058,7 @@ function ShareSummaryCard({ logs, trainingSessions = [] }) {
 
       {mode === "period" && (
         <div className="space-y-2.5">
-          <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
+          <div className="flex bg-black/40 rounded-xl p-1 border border-slate-700/50">
             {SHARE_SUMMARY_PERIODS.map((opt) => (
               <button key={opt.k} onClick={() => setPeriod(opt.k)} className={`flex-1 py-2 rounded-lg text-[11px] font-bold transition-all ${period === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
             ))}
@@ -7142,7 +7142,7 @@ function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [], weekSche
             días/racha cuando la racha llega a 3 dígitos — con solo el ícono
             (ya inequívoco: grilla vs. lista) sobra espacio de sobra para que
             los chips crezcan sin que la fila necesite partirse en dos. */}
-        <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60 w-fit shrink-0">
+        <div className="flex bg-black/40 rounded-xl p-1 border border-slate-700/50 w-fit shrink-0">
           {[{ k: "calendar", icon: <LayoutGrid size={13} />, l: "Calendario" }, { k: "list", icon: <List size={13} />, l: "Lista" }].map((opt) => (
             <button key={opt.k} onClick={() => setView(opt.k)} aria-label={opt.l} title={opt.l} className="flex items-center px-3 py-2 rounded-lg transition-all" style={view === opt.k ? { backgroundColor: "#06B6D4", color: "#fff" } : { color: "#64748b" }}>{opt.icon}</button>
           ))}
@@ -8977,7 +8977,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
   };
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border shadow-md shadow-black/20 p-4 space-y-3" style={{ borderColor: tint("#3B82F6", "30"), background: `linear-gradient(${tint("#3B82F6", "14")}, ${tint("#3B82F6", "14")}), rgba(15,23,42,0.5)` }}>
+    <div className="relative overflow-hidden rounded-2xl border shadow-md shadow-black/20 p-4 space-y-3" style={{ borderColor: tint("#3B82F6", "30"), background: `linear-gradient(${tint("#3B82F6", "14")}, ${tint("#3B82F6", "14")}), rgba(2,6,23,0.62)` }}>
       {/* Glows decorativos de fondo */}
       <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
       <div className="absolute -bottom-8 -left-8 w-32 h-32 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
@@ -8997,7 +8997,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
       </div>
 
       <div>
-        <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
+        <div className="flex bg-black/40 rounded-xl p-1 border border-slate-700/50">
           {[{ k: "general", l: "General" }, { k: "relative", l: "Según tu contexto" }].map((opt) => (
             <button key={opt.k} onClick={() => onUpdateSettings?.({ muscleRankMode: opt.k })} className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${mode === opt.k ? "bg-blue-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
           ))}
@@ -9378,7 +9378,7 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
 
   return (
     <div className="relative overflow-hidden rounded-2xl border backdrop-blur-sm shadow-md shadow-black/20 p-4 space-y-3"
-      style={{ borderColor: tint("#A855F7", "30"), background: `linear-gradient(${tint("#A855F7", "14")}, ${tint("#A855F7", "14")}), rgba(15,23,42,0.5)` }}>
+      style={{ borderColor: tint("#A855F7", "30"), background: `linear-gradient(${tint("#A855F7", "14")}, ${tint("#A855F7", "14")}), rgba(2,6,23,0.62)` }}>
       <div className="flex items-center gap-2.5">
         <div className="w-8 h-8 rounded-xl bg-purple-500/15 text-purple-400 flex items-center justify-center shrink-0"><Ruler size={15} /></div>
         <p className="text-sm font-bold text-white">Tus medidas</p>
@@ -9467,7 +9467,7 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
                 <button onClick={() => setCompareBase(null)} className="text-[10px] font-bold text-slate-400 px-2 py-1 rounded-lg bg-slate-800">Cancelar</button>
               </div>
             )}
-            <div className="bg-slate-950/40 border border-slate-800/50 rounded-2xl p-3">
+            <div className="pt-1">
               <div className="flex items-center justify-between mb-2.5">
                 <button onClick={() => setCursor((c) => { const m = c.m === 0 ? 11 : c.m - 1; const y = c.m === 0 ? c.y - 1 : c.y; return { y, m }; })} className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400"><ChevronLeft size={16} /></button>
                 <p className="text-sm font-bold text-white">{MONTH_LABELS[cursor.m]} {cursor.y}</p>
@@ -9814,7 +9814,7 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
           selector de Social (Amigos/Buscar/Ranking/Entrenador): un solo
           elemento que se desliza y cambia de color, en vez de que cada
           botón prenda/apague su propio fondo de golpe. */}
-      <div className="relative grid grid-cols-4 gap-1 p-1 rounded-2xl border" style={{ borderColor: tint(progressSectionColor, "30"), background: `linear-gradient(${tint(progressSectionColor, "14")}, ${tint(progressSectionColor, "14")}), rgba(15,23,42,0.5)` }}>
+      <div className="relative grid grid-cols-4 gap-1 p-1 rounded-2xl bg-slate-900/60 border border-slate-800/50">
         <div
           className="absolute top-1 bottom-1 rounded-xl transition-all duration-300 ease-out pointer-events-none"
           style={{ left: `calc(${progressSectionIdx} / ${PROGRESS_SECTIONS.length} * 100% + 2px)`, width: `calc(100% / ${PROGRESS_SECTIONS.length} - 4px)`, backgroundColor: tint(progressSectionColor, "22"), boxShadow: `inset 0 0 0 1px ${tint(progressSectionColor, "45")}` }}
@@ -9836,7 +9836,7 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
       <div key={activeSection} className="tab-fade-in space-y-3">
         {activeSection === "chart" && (
           <div className="relative overflow-hidden rounded-2xl border backdrop-blur-sm shadow-md shadow-black/20 p-4 space-y-3"
-            style={{ borderColor: tint("#F59E0B", "30"), background: `linear-gradient(${tint("#F59E0B", "14")}, ${tint("#F59E0B", "14")}), rgba(15,23,42,0.5)` }}>
+            style={{ borderColor: tint("#F59E0B", "30"), background: `linear-gradient(${tint("#F59E0B", "14")}, ${tint("#F59E0B", "14")}), rgba(2,6,23,0.62)` }}>
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center shrink-0"><Activity size={15} /></div>
               <p className="text-sm font-bold text-white">Evolución por ejercicio</p>
@@ -10007,7 +10007,7 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
         )}
 
         {activeSection === "historial" && (
-          <div className="rounded-2xl border shadow-md shadow-black/20 p-4" style={{ borderColor: tint("#06B6D4", "30"), background: `linear-gradient(${tint("#06B6D4", "14")}, ${tint("#06B6D4", "14")}), rgba(15,23,42,0.5)` }}>
+          <div className="rounded-2xl border shadow-md shadow-black/20 p-4" style={{ borderColor: tint("#06B6D4", "30"), background: `linear-gradient(${tint("#06B6D4", "14")}, ${tint("#06B6D4", "14")}), rgba(2,6,23,0.62)` }}>
             <SessionHistoryView logs={logs} onDeleteDay={onDeleteDay} trainingSessions={sessions} weekSchedule={weekSchedule} exerciseNotes={settings.exerciseNotes} rpeDisplayMode={settings.rpeDisplayMode} />
           </div>
         )}
@@ -10681,7 +10681,7 @@ function ExportCenterCard({ profileName = "", logs = {}, trainingSessions = [], 
   const body = (
     <>
       {!only && (
-        <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
+        <div className="flex bg-black/40 rounded-xl p-1 border border-slate-700/50">
           {[{ k: "routine", l: "Rutina", icon: <ListChecks size={13} /> }, { k: "training", l: "Entrenamiento", icon: <Dumbbell size={13} /> }].map((opt) => (
             <button key={opt.k} onClick={() => { setWhat(opt.k); setError(""); }} disabled={opt.k === "routine" && !routineDef}
               className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-all disabled:opacity-40 ${what === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>
@@ -10706,7 +10706,7 @@ function ExportCenterCard({ profileName = "", logs = {}, trainingSessions = [], 
         </>
       ) : (
         <>
-          <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
+          <div className="flex bg-black/40 rounded-xl p-1 border border-slate-700/50">
             {EXPORT_PERIODS.map((opt) => (
               <button key={opt.k} onClick={() => { setPeriod(opt.k); setError(""); }} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${period === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
             ))}
@@ -11561,7 +11561,7 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
           </div>
           <div>
             <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Sexo</label>
-            <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-700/50">
+            <div className="flex bg-black/40 rounded-xl p-1 border border-slate-700/50">
               {[{ k: "M", l: "Masculino" }, { k: "F", l: "Femenino" }].map((opt) => (
                 <button key={opt.k} onClick={() => setEditSex(opt.k)} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${editSex === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
               ))}
@@ -11711,13 +11711,13 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
               <div className="flex items-center justify-between mb-2"><p className="text-[10px] text-slate-500">Carga en descarga</p><span className="text-[11px] font-bold text-purple-400 tabular-nums">{Math.round(settings.deloadPct * 100)}%</span></div>
               <div className="flex items-center gap-3"><button onClick={() => adjustDeloadPct(-0.05)} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95 shrink-0">−</button><div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden"><div className="h-full bg-purple-500 rounded-full transition-all" style={{ width: `${settings.deloadPct * 100}%` }} /></div><button onClick={() => adjustDeloadPct(0.05)} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95 shrink-0">+</button></div>
             </div>
-            <div><p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Reducción de series</p><div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">{[{ k: 2, l: "Mitad" }, { k: 3, l: "Tercio" }, { k: 4, l: "Cuarto" }].map((opt) => <button key={opt.k} onClick={() => updateSettings({ deloadSetDivisor: opt.k })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${settings.deloadSetDivisor === opt.k ? "bg-purple-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>)}</div></div>
+            <div><p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Reducción de series</p><div className="flex bg-black/40 rounded-xl p-1 border border-slate-700/50">{[{ k: 2, l: "Mitad" }, { k: 3, l: "Tercio" }, { k: 4, l: "Cuarto" }].map((opt) => <button key={opt.k} onClick={() => updateSettings({ deloadSetDivisor: opt.k })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${settings.deloadSetDivisor === opt.k ? "bg-purple-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>)}</div></div>
           </>
         )}
       </CollapsibleSection>
 
       <CollapsibleSection title="Descanso entre series" subtitle={`${formatTime(settings.restShort)} – ${formatTime(settings.restLong)}`} icon={<Timer size={16} />} accent="#14B8A6">
-        <div><p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Aviso al terminar</p><div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">{[{ k: "sound", l: "Sonido" }, { k: "vibration", l: "Vibración" }, { k: "both", l: "Ambos" }].map((opt) => <button key={opt.k} onClick={() => updateSettings({ alertType: opt.k })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${settings.alertType === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>)}</div></div>
+        <div><p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Aviso al terminar</p><div className="flex bg-black/40 rounded-xl p-1 border border-slate-700/50">{[{ k: "sound", l: "Sonido" }, { k: "vibration", l: "Vibración" }, { k: "both", l: "Ambos" }].map((opt) => <button key={opt.k} onClick={() => updateSettings({ alertType: opt.k })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${settings.alertType === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>)}</div></div>
         <div className="grid grid-cols-2 gap-3">
           {[{ key: "restLong", label: "Ejercicios pesados" }, { key: "restShort", label: "Resto" }].map(({ key, label }) => (
             <div key={key} className="bg-slate-950/40 rounded-xl p-3"><p className="text-[10px] text-slate-500 mb-2">{label}</p><div className="flex items-center justify-between"><button onClick={() => adjustRest(key, -15)} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95">−</button><span className="text-sm font-black text-white tabular-nums">{formatTime(settings[key])}</span><button onClick={() => adjustRest(key, 15)} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95">+</button></div></div>
@@ -11795,7 +11795,7 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
       <CollapsibleSection title="Apariencia y accesibilidad" subtitle="Tema, unidad de peso, tamaño de letra" icon={<Sun size={16} />} accent="#F59E0B">
         <div>
           <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Tema</p>
-          <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
+          <div className="flex bg-black/40 rounded-xl p-1 border border-slate-700/50">
             {[{ k: "dark", l: "Oscuro", icon: <Moon size={13} /> }, { k: "light", l: "Claro", icon: <Sun size={13} /> }].map((opt) => (
               <button key={opt.k} onClick={() => updateSettings({ theme: opt.k })} className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-all ${settings.theme === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.icon} {opt.l}</button>
             ))}
@@ -11803,7 +11803,7 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
         </div>
         <div>
           <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Unidad de peso</p>
-          <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
+          <div className="flex bg-black/40 rounded-xl p-1 border border-slate-700/50">
             {[{ k: "kg", l: "Kilogramos (kg)" }, { k: "lbs", l: "Libras (lbs)" }].map((opt) => (
               <button key={opt.k} onClick={() => updateSettings({ weightUnit: opt.k })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${settings.weightUnit === opt.k || (!settings.weightUnit && opt.k === "kg") ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
             ))}
@@ -11811,7 +11811,7 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
         </div>
         <div>
           <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Tamaño de letra</p>
-          <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
+          <div className="flex bg-black/40 rounded-xl p-1 border border-slate-700/50">
             {TEXT_SCALE_OPTIONS.map((opt) => (
               <button key={opt.k} onClick={() => updateSettings({ textScale: opt.v })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${(settings.textScale ?? 1) === opt.v ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
             ))}
@@ -11819,7 +11819,7 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
         </div>
         <div>
           <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Letras chicas</p>
-          <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
+          <div className="flex bg-black/40 rounded-xl p-1 border border-slate-700/50">
             {SMALL_TEXT_SCALE_OPTIONS.map((opt) => (
               <button key={opt.k} onClick={() => updateSettings({ smallTextScale: opt.v })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${(settings.smallTextScale ?? 1) === opt.v ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
             ))}
@@ -11827,7 +11827,7 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
         </div>
         <div>
           <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Zoom con los dedos</p>
-          <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
+          <div className="flex bg-black/40 rounded-xl p-1 border border-slate-700/50">
             {[{ v: false, l: "Desactivado" }, { v: true, l: "Activado" }].map((opt) => (
               <button key={String(opt.v)} onClick={() => updateSettings({ allowZoom: opt.v })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${(settings.allowZoom ?? false) === opt.v ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
             ))}
@@ -11839,7 +11839,7 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
       <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 backdrop-blur-sm shadow-md shadow-black/20">
         <p className="text-sm font-bold text-white mb-0.5">Compartir marcas</p>
         <p className="text-[11px] text-slate-500 mb-3">Al lograr una nueva marca, ¿mostramos la imagen para compartir automáticamente?</p>
-        <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
+        <div className="flex bg-black/40 rounded-xl p-1 border border-slate-700/50">
           {[{ v: true, l: "Sí, mostrarla" }, { v: false, l: "No, solo el ícono" }].map((opt) => (
             <button key={String(opt.v)} onClick={() => updateSettings({ autoShowPrShare: opt.v })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${(settings.autoShowPrShare ?? true) === opt.v ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
           ))}
@@ -12227,9 +12227,9 @@ function SocialSearchSection({ myUid, friendStatus, onSendFriendRequest }) {
         <div className="relative flex-1">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" />
           <input value={raw} onChange={(e) => setRaw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSearch()} placeholder="@usuario de tu amigo"
-            className="w-full bg-slate-800 border border-slate-700/50 rounded-xl pl-9 pr-3 py-2.5 text-white text-sm focus:outline-none focus:border-cyan-500/50" />
+            className="w-full bg-slate-950/70 border border-slate-700/60 rounded-xl pl-9 pr-3 py-2.5 text-white text-sm focus:outline-none focus:border-cyan-500/60" />
         </div>
-        <button onClick={handleSearch} disabled={!raw.trim() || state === "searching"} className="px-4 rounded-xl bg-cyan-500 !text-white text-sm font-bold disabled:opacity-40">Buscar</button>
+        <button onClick={handleSearch} disabled={!raw.trim() || state === "searching"} className="px-4 rounded-xl !text-white text-sm font-bold transition active:scale-[0.97] disabled:opacity-30" style={{ backgroundColor: "#06B6D4", boxShadow: "0 6px 16px -6px rgba(6,182,212,0.7)" }}>Buscar</button>
       </div>
       {/* Antes este botón era fucsia dentro de una sección cian: un tercer
           color sin ningún motivo, que era buena parte de lo que hacía sentir
@@ -12497,7 +12497,7 @@ function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted
           rótulo del mismo estilo que los demás. */}
       <div className="space-y-2.5">
         <SectionLabel>Vincular entrenador/alumno</SectionLabel>
-        <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-700/50">
+        <div className="flex bg-black/40 rounded-xl p-1 border border-slate-700/50">
           <button onClick={() => setRole("trainer")} className={`flex-1 py-2 rounded-lg text-[11px] font-bold transition-all ${role === "trainer" ? "bg-blue-500 !text-white" : "text-slate-500"}`}>Soy el entrenador</button>
           <button onClick={() => setRole("student")} className={`flex-1 py-2 rounded-lg text-[11px] font-bold transition-all ${role === "student" ? "bg-blue-500 !text-white" : "text-slate-500"}`}>Soy el alumno</button>
         </div>
@@ -12505,9 +12505,9 @@ function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted
           <div className="relative flex-1">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" />
             <input value={raw} onChange={(e) => setRaw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSearch()} placeholder={role === "trainer" ? "@usuario de tu alumno" : "@usuario de tu entrenador"}
-              className="w-full bg-slate-800 border border-slate-700/50 rounded-xl pl-9 pr-3 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500/50" />
+              className="w-full bg-slate-950/70 border border-slate-700/60 rounded-xl pl-9 pr-3 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500/60" />
           </div>
-          <button onClick={handleSearch} disabled={!raw.trim() || searchState === "searching"} className="px-4 rounded-xl bg-blue-500 !text-white text-sm font-bold disabled:opacity-40">Buscar</button>
+          <button onClick={handleSearch} disabled={!raw.trim() || searchState === "searching"} className="px-4 rounded-xl !text-white text-sm font-bold transition active:scale-[0.97] disabled:opacity-30" style={{ backgroundColor: "#3B82F6", boxShadow: "0 6px 16px -6px rgba(59,130,246,0.7)" }}>Buscar</button>
         </div>
         {searchState === "not_found" && <p className="text-xs text-slate-500">No encontramos a nadie con ese @usuario.</p>}
         {searchState === "self" && <p className="text-xs text-slate-500">Ese sos vos 🙂</p>}
@@ -14661,7 +14661,7 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
 
       <SocialProgressStats profile={profile} />
 
-      <div className="relative grid gap-1 p-1 rounded-2xl border" style={{ gridTemplateColumns: `repeat(${SECTIONS.length}, 1fr)`, borderColor: tint(sectionColor, "25"), background: `linear-gradient(${tint(sectionColor, "12")}, ${tint(sectionColor, "12")}), rgba(15,23,42,0.5)` }}>
+      <div className="relative grid gap-1 p-1 rounded-2xl bg-slate-900/60 border border-slate-800/50" style={{ gridTemplateColumns: `repeat(${SECTIONS.length}, 1fr)` }}>
         {/* Píldora deslizante en vez de que cada botón prenda/apague su
             propio fondo de golpe — un solo elemento que se desliza y
             cambia de color (celeste en Amigos/Buscar/Ranking, índigo en
@@ -14699,7 +14699,7 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
           // la sección no vive sólo en el borde y el ícono, tiñe todo el
           // sector. Dos capas (tinte encima, superficie neutra debajo) en vez
           // de un degradado, para que el tono no se apague hacia abajo.
-          background: `linear-gradient(${tint(sectionColor, "12")}, ${tint(sectionColor, "12")}), rgba(15,23,42,0.5)`,
+          background: `linear-gradient(${tint(sectionColor, "12")}, ${tint(sectionColor, "12")}), rgba(2,6,23,0.62)`,
         }}
       >
         <div className="flex items-center gap-2.5 mb-3">
@@ -15306,7 +15306,7 @@ function BuilderExerciseRow({ ex, onRemove, onConfigChange, isDragging = false, 
           {!ex.cardio && onToggleDumbbell && /mancuerna/i.test(ex.name || "") && (
             <div>
               <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">¿Con cuántas mancuernas?</p>
-              <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60">
+              <div className="flex bg-black/40 rounded-xl p-1 border border-slate-700/50">
                 {[{ v: 1, l: "Una", d: "El peso cuenta tal cual" }, { v: 2, l: "Dos", d: "El peso cuenta ×2" }].map((opt) => {
                   const on = (dumbbellFactor || 1) === opt.v;
                   return (
@@ -19856,7 +19856,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
           va adentro ya son tarjetas, así que flotan sobre una base más
           hundida en vez de fundirse con ella. */}
       {customEntries.length > 0 && (
-        <div className="rounded-2xl border p-3 space-y-3" style={{ borderColor: tint("#3B82F6", "25"), background: `linear-gradient(${tint("#3B82F6", "14")}, ${tint("#3B82F6", "14")}), rgba(2,6,23,0.55)` }}>
+        <div className="rounded-2xl border p-3 space-y-3" style={{ borderColor: tint("#3B82F6", "25"), background: `linear-gradient(${tint("#3B82F6", "14")}, ${tint("#3B82F6", "14")}), rgba(2,6,23,0.62)` }}>
           <div className="flex items-center gap-2.5 px-0.5 pt-0.5">
             <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: tint("#3B82F6", "18"), color: "#3B82F6" }}><ListChecks size={15} /></div>
             <div className="flex-1 min-w-0">
@@ -19876,7 +19876,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
       )}
 
       {(!forced || showPresetsForced) && (
-      <div className={`rounded-2xl border p-3 space-y-3 ${forced ? "tab-fade-in" : ""}`} style={{ borderColor: tint("#3B82F6", "25"), background: `linear-gradient(${tint("#3B82F6", "10")}, ${tint("#3B82F6", "10")}), rgba(2,6,23,0.6)` }}>
+      <div className={`rounded-2xl border p-3 space-y-3 ${forced ? "tab-fade-in" : ""}`} style={{ borderColor: tint("#3B82F6", "25"), background: `linear-gradient(${tint("#3B82F6", "10")}, ${tint("#3B82F6", "10")}), rgba(2,6,23,0.62)` }}>
         <div className="flex items-center gap-2.5 px-0.5 pt-0.5">
           <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: tint("#3B82F6", "18"), color: "#3B82F6" }}><Sparkles size={15} /></div>
           <div className="flex-1 min-w-0">
@@ -20176,7 +20176,7 @@ function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
                     revés — algunos prefieren pensarlo así en vez de en RPE.
                     Solo aparece si el esfuerzo está activado. */}
                 {o.key === "showRpe" && on("showRpe") && (
-                  <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60 ml-1">
+                  <div className="flex bg-black/40 rounded-xl p-1 border border-slate-700/50 ml-1">
                     {[{ k: "rpe", l: "Mostrar como RPE" }, { k: "rir", l: "Mostrar como RIR" }].map((opt) => (
                       <button key={opt.k} onClick={() => onUpdateSettings({ rpeDisplayMode: opt.k })} className={`flex-1 py-2 rounded-lg text-[11px] font-bold transition-all ${(s.rpeDisplayMode || "rpe") === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
                     ))}
