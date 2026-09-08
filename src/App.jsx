@@ -577,6 +577,9 @@ const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.modusf
 
 const DEFAULT_SETTINGS = {
   alertType: "sound", restLong: REST_LONG, restShort: REST_SHORT,
+  // Cronómetro extra AL TERMINAR un ejercicio, antes de pasar al siguiente
+  // (opción, apagada por default). Distinto del descanso entre series.
+  restBetweenExercises: false, restBetweenExercisesSec: 180,
   trainWeeks: TRAIN_WEEKS, deloadWeeks: DELOAD_WEEKS, deloadPct: 0.75, deloadSetDivisor: 2, deloadEnabled: true,
   theme: "dark", textScale: 1, smallTextScale: 1, autoShowPrShare: true, bodyWeightKg: 0, muscleRankMode: "general", allowZoom: false,
   weightUnit: "kg", // "kg" o "lbs"
@@ -1232,6 +1235,43 @@ function getWeekInfo(cycleStart, settings = DEFAULT_SETTINGS) {
   const weekInCycle = (totalWeek % cycleWeeks) + 1;
   const isDeload = weekInCycle > trainWeeks;
   return { totalWeek: totalWeek + 1, weekInCycle, isDeload, cycleNumber: Math.floor(totalWeek / cycleWeeks) + 1, cycleWeeks, trainWeeks, deloadWeeks };
+}
+
+/* ============================================================================
+   BUG FIX (reporte: "tenés 5 semanas, estás en la 4, le sumás una semana con
+   el chatbot o a mano, y tu semana actual pasa a la 3").
+
+   getWeekInfo deriva TODO de una sola fecha: weekInCycle es
+   (semanas transcurridas % largo del ciclo) + 1. Ese módulo se recalcula
+   entero cada vez, así que cambiar el largo del ciclo reescribe hacia atrás
+   en qué semana estás — y no es sólo un número: de ahí salen qué toca
+   entrenar, si es semana de descarga, y qué meta planificada muestra cada
+   serie (getPlannedTargetForWeek). Alargar el ciclo te podía mandar a una
+   semana anterior con las cargas de esa semana.
+
+   Ejemplo real del reporte: 8 semanas transcurridas, ciclo de 5 → estás en
+   la 4 (8%5+1). Pasás el ciclo a 6 semanas → 8%6+1 = 3.
+
+   La fecha de inicio es el único ancla que tiene el sistema, así que la
+   corrección es moverla: se corre los días necesarios para que HOY sigas en
+   la misma semana y en el mismo número de ciclo que antes del cambio.
+   Devuelve null si no hace falta tocar nada.
+============================================================================ */
+function reanchorCycleStart(cycleStart, oldSettings, newSettings) {
+  if (!cycleStart) return null;
+  const before = getWeekInfo(cycleStart, oldSettings);
+  const after = getWeekInfo(cycleStart, newSettings);
+  if (!before || !after) return null;
+  if (before.weekInCycle === after.weekInCycle && before.cycleNumber === after.cycleNumber) return null;
+  const newCycleWeeks = after.cycleWeeks;
+  // Si el ciclo se ACORTÓ y la semana en la que estabas ya no existe, se
+  // queda en la última del ciclo nuevo en vez de caerse fuera de rango.
+  const week = Math.min(before.weekInCycle, newCycleWeeks);
+  const targetTotal = (before.cycleNumber - 1) * newCycleWeeks + (week - 1);
+  const currentTotal = after.totalWeek - 1; // getWeekInfo devuelve totalWeek en base 1
+  const shiftWeeks = currentTotal - targetTotal;
+  if (!shiftWeeks) return null;
+  return new Date(new Date(cycleStart).getTime() + shiftWeeks * 7 * 86400000);
 }
 
 // Meta cargada de antemano para ESTA semana del ciclo (modo "planned",
@@ -6478,10 +6518,26 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
         </div>
       )}
 
-      <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${DAY_ORDER.length}, 1fr)` }}>
+      {/* Misma píldora deslizante que el selector de Progreso (Rango /
+          Historial / Ejercicios / Medidas) y el de Social: UN solo elemento
+          que se desliza y toma el color de la solapa elegida, en vez de que
+          cada botón prenda y apague su propio fondo lleno. El día activo
+          pasa de un bloque de color sólido a texto del color del día sobre
+          un tinte suave, que es más liviano y no compite con el panel de
+          abajo. */}
+      <div className="relative grid gap-1.5 p-1 rounded-2xl bg-slate-900/60 border border-slate-800/50" style={{ gridTemplateColumns: `repeat(${DAY_ORDER.length}, 1fr)` }}>
+        <div
+          className="absolute top-1 bottom-1 rounded-xl transition-all duration-300 ease-out pointer-events-none"
+          style={{
+            left: `calc(${Math.max(0, DAY_ORDER.indexOf(activeDay))} / ${DAY_ORDER.length} * 100% + 2px)`,
+            width: `calc(100% / ${DAY_ORDER.length} - 4px)`,
+            backgroundColor: tint(day.color, "22"),
+            boxShadow: `inset 0 0 0 1px ${tint(day.color, "45")}`,
+          }}
+        />
         {(() => { const { textClass, minHeight } = dayTabTextSizing(DAY_ORDER.length); return DAY_ORDER.map((k) => (
-          <button key={k} onClick={() => setActiveDay(k)} title={ROUTINE[k].label} className={`py-2.5 px-1 rounded-xl ${textClass} font-black uppercase transition-all active:scale-95 border text-center leading-tight min-w-0`}
-            style={activeDay === k ? { background: ROUTINE[k].color, borderColor: ROUTINE[k].color, color: "#fff", boxShadow: `0 4px 14px -4px ${tint(ROUTINE[k].color, "66")}` } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
+          <button key={k} onClick={() => setActiveDay(k)} title={ROUTINE[k].label} className={`relative z-[1] py-2.5 px-1 rounded-xl ${textClass} font-black uppercase transition-colors active:scale-95 text-center leading-tight min-w-0`}
+            style={{ color: activeDay === k ? ROUTINE[k].color : "#64748b" }}>
             {/* line-clamp-2 en vez de truncate: nombres combinados como
                 "Hombros/Brazos" tienen que poder leerse enteros aunque
                 ocupen 2 líneas — cortarlos a "HOMBRO/…" en una sola línea
@@ -6625,10 +6681,23 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           (si estaba abierta, la nota a medio escribir, el calentamiento
           desplegado). Así se anima igual pero sin destruir nada. */}
       <div ref={gridRef} className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-        {groupExercisesIntoSupersets(day.exercises).map((group) => {
+        {(() => { const groups = groupExercisesIntoSupersets(day.exercises); return groups.map((group, gi) => {
+          // Cronómetro ENTRE ejercicios (opción, ver
+          // settings.restBetweenExercises): aparece recién cuando terminaste
+          // todas las series de este ejercicio y todavía queda otro por
+          // delante — o sea, justo cuando estás por pasar al siguiente. No
+          // se muestra en el último, donde no hay "siguiente" al que llegar.
+          const groupDone = group.every((ex) => ex.sets.every((_, i) => (logs[`${ex.id}_${i}`] || []).some((h) => h.date === today && !h.deload)));
+          const showBetween = settings.restBetweenExercises === true && groupDone && gi < groups.length - 1 && !!sessionForThisDay;
+          const betweenTimer = showBetween ? (
+            <div key={`${activeDay}:between:${gi}`} className="timer-hop">
+              <RestTimer seconds={settings.restBetweenExercisesSec ?? 180} accent={day.color} alertType={settings.alertType} timerId={`${activeDay}:between_${gi}`} exerciseName={`Antes de ${groups[gi + 1]?.[0]?.name || "el próximo ejercicio"}`} />
+            </div>
+          ) : null;
           if (group.length === 1) {
             const ex = group[0];
-            return <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} sex={sex} age={age} weekInCycle={weekInCycle} dayKey={activeDay} />;
+            const card = <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} sex={sex} age={age} weekInCycle={weekInCycle} dayKey={activeDay} />;
+            return betweenTimer ? <React.Fragment key={`${activeDay}:wrap:${ex.id}`}>{card}{betweenTimer}</React.Fragment> : card;
           }
           // Superserie: varios ejercicios encadenados comparten un solo
           // cronómetro al final del grupo, en vez de uno por ejercicio —
@@ -6636,14 +6705,17 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           // ellos, sólo al terminar la vuelta completa.
           const hasHeavyGroup = group.some((ex) => ex.sets.some((s) => isHeavyRepRange(s.repRange)));
           return (
+            <React.Fragment key={`${activeDay}:wrap:${group.map((e) => e.id).join("-")}`}>
             <div key={`${activeDay}:${group.map((e) => e.id).join("-")}`} className="rounded-2xl border p-2.5 space-y-2.5" style={{ borderColor: tint(day.color, "50"), backgroundColor: tint(day.color, "06") }}>
               <div className="flex items-center gap-1.5 px-1"><Link size={11} style={{ color: day.color }} /><span className="text-[10px] font-black uppercase tracking-wider" style={{ color: day.color }}>Superserie · {group.length} ejercicios</span></div>
               {group.map((ex) => <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} hideTimer sex={sex} age={age} weekInCycle={weekInCycle} dayKey={activeDay} />)}
               <div className="px-1"><RestTimer seconds={hasHeavyGroup ? settings.restLong : settings.restShort} accent={day.color} alertType={settings.alertType} timerId={`${activeDay}:grp_${group.map((g) => g.id).join("_")}`} exerciseName={group.map((g) => g.name).filter(Boolean).join(" + ")} /></div>
-              <p className="text-[10px] text-slate-600 px-1">Descansá recién después de completar los {group.length} ejercicios — ese es el cronómetro de arriba.</p>
+              <p className="text-[10px] text-slate-600 px-1">Descansá recién después de completar los {group.length} ejercicios. Ese es el cronómetro de arriba.</p>
             </div>
+            {betweenTimer}
+            </React.Fragment>
           );
-        })}
+        }); })()}
         </div>
       </div>
 
@@ -8676,7 +8748,7 @@ function MyBodyModal({ profile, onClose }) {
             </div>
           </div>
         ) : (
-          <p className="relative text-[11px] text-slate-500 px-1">Todavía no tenés marcas registradas — andá anotando series para que se arme tu rango.</p>
+          <p className="relative text-[11px] text-slate-500 px-1">Todavía no tenés marcas registradas. Andá anotando series para que se arme tu rango.</p>
         )}
         <MuscleHighlighterBody ranks={ranks} selected={selected} onMuscleClick={(k) => setSelected((s) => (s === k ? null : k))} frontRef={frontRef} backRef={backRef} sex={profile?.sex} />
         {/* Pedido: al tocar un músculo, desplegar las mejores marcas de
@@ -11639,6 +11711,28 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
             <div key={key} className="bg-slate-950/40 rounded-xl p-3"><p className="text-[10px] text-slate-500 mb-2">{label}</p><div className="flex items-center justify-between"><button onClick={() => adjustRest(key, -15)} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95">−</button><span className="text-sm font-black text-white tabular-nums">{formatTime(settings[key])}</span><button onClick={() => adjustRest(key, 15)} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95">+</button></div></div>
           ))}
         </div>
+        {/* Pedido: "activar cronómetro entre ejercicios (como opción
+            extra)". Apagado por default: quien no lo pida no ve un timer más
+            entre tarjeta y tarjeta. Aparece recién cuando terminaste TODAS
+            las series de un ejercicio, que es el momento en que de verdad
+            estás por pasar al siguiente. */}
+        <ToggleRow
+          icon={<Timer size={15} />}
+          label="Descanso entre ejercicios"
+          desc={`Al terminar un ejercicio, arranca un cronómetro de ${formatTime(settings.restBetweenExercisesSec ?? 180)} antes del siguiente`}
+          on={settings.restBetweenExercises === true}
+          onToggle={() => updateSettings({ restBetweenExercises: !(settings.restBetweenExercises === true) })}
+        />
+        {settings.restBetweenExercises === true && (
+          <div className="bg-slate-950/40 rounded-xl p-3">
+            <p className="text-[10px] text-slate-500 mb-2">Cuánto dura</p>
+            <div className="flex items-center justify-between">
+              <button onClick={() => adjustRest("restBetweenExercisesSec", -15)} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95">−</button>
+              <span className="text-sm font-black text-white tabular-nums">{formatTime(settings.restBetweenExercisesSec ?? 180)}</span>
+              <button onClick={() => adjustRest("restBetweenExercisesSec", 15)} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95">+</button>
+            </div>
+          </div>
+        )}
       </CollapsibleSection>
 
       {/* "Qué ves al registrar" ya no se expande acá adentro — son 8
@@ -12247,7 +12341,7 @@ function SendTemplateModal({ template, studentsAccepted, basics, myUid, onClose,
           <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition"><X size={17} /></button>
         </div>
         {studentsAccepted.length === 0 ? (
-          <p className="text-sm text-slate-500">Todavía no tenés alumnos vinculados — vinculate con uno primero en Social → Entrenador.</p>
+          <p className="text-sm text-slate-500">Todavía no tenés alumnos vinculados. Vinculate con uno primero, en Social → Entrenador.</p>
         ) : (
           <>
             <div>
@@ -12850,7 +12944,7 @@ function LeaderboardSection({ uid, profile, myTopRank, friendAccepted, basics, a
         </div>
       )}
       {scope === "semana" && weeklyRanking.length <= 1 && (
-        <p className="text-center text-slate-600 text-sm py-8 px-4">Todavía no hay datos de tus amigos esta semana — puede tardar un momento en cargar.</p>
+        <p className="text-center text-slate-600 text-sm py-8 px-4">Todavía no hay datos de tus amigos esta semana. Puede tardar un momento en cargar.</p>
       )}
       {scope === "global" && globalLoading && <p className="text-center text-slate-600 text-sm py-8">Cargando ranking...</p>}
       {scope === "global" && globalError && <p className="text-center text-slate-600 text-sm py-8 px-4">No pudimos cargar el ranking global ahora mismo. Probá de nuevo más tarde.</p>}
@@ -13752,7 +13846,7 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
                   </button>
                 </div>
               )}
-              {sentNote && <p className="text-center text-xs text-emerald-400">Propuesta enviada — la va a ver la próxima vez que abra Social.</p>}
+              {sentNote && <p className="text-center text-xs text-emerald-400">Propuesta enviada. La va a ver la próxima vez que abra Social.</p>}
 
               {/* Pedido: "dale más énfasis a la rutina que está haciendo, a
                   los días que viene entrenando" — antes esto era un título
@@ -14159,6 +14253,12 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
     friendAccepted.forEach((f) => {
       const other = f.users.find((u) => u !== uid);
       const theirStreak = streaks[other]?.streak || 0;
+      // BUG FIX (reporte: "si alguien tiene una racha de 0 días no debería
+      // aparecer"): con tu racha en 1, la ventana `>= myStreak - 2` dejaba
+      // pasar el 0 y la app anunciaba que te estaba por alcanzar alguien que
+      // no venía entrenando hace nada. Para perseguirte hay que tener al
+      // menos un día.
+      if (theirStreak < 1) return;
       if (theirStreak >= myStreak || theirStreak < myStreak - 2) return;
       if (!best || theirStreak > best.streak) best = { uid: other, streak: theirStreak };
     });
@@ -14222,7 +14322,7 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
     try { await sendFriendRequest(uid, otherUid); setFriendSendError(""); refresh(); }
     catch (err) {
       console.warn("[social] No se pudo enviar la solicitud de amistad:", err?.message || err);
-      setFriendSendError("Esa persona ya tiene una solicitud pendiente o aceptada con vos — revisá más abajo.");
+      setFriendSendError("Esa persona ya tiene una solicitud pendiente o aceptada con vos. Revisá más abajo.");
       refresh();
     }
   };
@@ -14251,7 +14351,7 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
       refresh();
     } catch (err) {
       console.warn("[social] No se pudo enviar la invitación de entrenador/alumno:", err?.message || err);
-      setLinkSendError("Esa persona ya tiene un vínculo pendiente o aceptado con vos — revisá más abajo.");
+      setLinkSendError("Esa persona ya tiene un vínculo pendiente o aceptado con vos. Revisá más abajo.");
       refresh();
     }
   };
@@ -14456,7 +14556,12 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-[10px] font-black uppercase tracking-wide" style={{ color: "#FB7185" }}>¡Te están por alcanzar!</p>
-                <p className="text-[12.5px] text-slate-200 leading-snug"><span className="font-black text-white">{basics[chaserFriend.uid]?.name || "Tu amigo"}</span> tiene una racha de {chaserFriend.streak} días — la tuya: {myStreak}</p>
+                {/* Antes: "tiene una racha de 4 días — la tuya: 5". Dos
+                    datos pegados con un guion y dos puntos se leen como una
+                    ficha, no como una frase. Ahora es una oración sola. */}
+                <p className="text-[12.5px] text-slate-200 leading-snug">
+                  <span className="font-black text-white">{basics[chaserFriend.uid]?.name || "Tu amigo"}</span> lleva {chaserFriend.streak} {chaserFriend.streak === 1 ? "día" : "días"} seguidos y vos {myStreak}.
+                </p>
               </div>
               <ChevronRight size={16} className="text-rose-300/70 shrink-0" />
             </div>
@@ -15311,7 +15416,7 @@ function BuilderWarmupSection({ day, onSetWarmup, otherDays = [], onCopyWarmupTo
               );
             })}
           </div>
-          <p className="text-[9.5px] text-slate-600">{isCustom ? "Elegido a mano — se guarda con la rutina." : "Automático según los músculos del día — tocá cualquiera para personalizarlo."}</p>
+          <p className="text-[9.5px] text-slate-600">{isCustom ? "Elegido a mano. Se guarda con la rutina." : "Automático según los músculos del día. Tocá cualquiera para personalizarlo."}</p>
         </div>
       )}
     </div>
@@ -20822,6 +20927,18 @@ export default function App() {
     saveActive(null); setActiveProfile(null); setJustLoggedOut(true); setShowHelp(false); setHelpStartTab(null);
   };
   const handleUpdateProfile = (updates) => {
+    // Si el cambio toca el LARGO del ciclo (semanas de entrenamiento o de
+    // descarga), se corre la fecha de inicio para que hoy sigas en la misma
+    // semana — ver reanchorCycleStart, que no hace nada si no hace falta.
+    // Va acá y no en handleUpdateSettings a propósito: Perfil escribe
+    // `settings` llamando DIRECTO a esta función (ver ProfileView.
+    // updateSettings, que es de donde se cambia la configuración de
+    // descarga), así que ponerlo más arriba dejaba justo ese camino sin
+    // arreglar — el "o la modificás vos" del reporte.
+    if (updates?.settings && cycleStart) {
+      const shifted = reanchorCycleStart(cycleStart, getProfileSettings(profile), updates.settings);
+      if (shifted) { setCycleStartState(shifted); saveCycleStart(shifted); }
+    }
     setProfiles((prev) => {
       const np = { ...prev, [activeProfile]: { ...prev[activeProfile], ...updates } };
       saveProfiles(np);
