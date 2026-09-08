@@ -6462,11 +6462,6 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
         </div>
         <h2 className="relative text-xl font-black text-white leading-tight">Rutina</h2>
         <p className="relative text-xs text-teal-300/60 mt-1">Registrá tus series de hoy y seguí tu progreso día a día</p>
-        {onGoToFieldSettings && (
-          <button onClick={onGoToFieldSettings} className="relative w-full flex items-center justify-center gap-1.5 mt-4 pt-3 border-t border-white/10 text-[10px] font-bold text-teal-300/75 hover:text-teal-300 transition">
-            <Sliders size={11} /> Personalizar qué ves al registrar <ChevronRight size={11} />
-          </button>
-        )}
       </div>
 
       {isRestToday && (
@@ -6545,6 +6540,15 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             </>
           )}
           {!activeRoutineDef && settings.trainingMode === "planned" && <p className="relative text-[10px] text-slate-600 text-center mt-1.5">Activá una rutina primero, en la pestaña Rutinas.</p>}
+          {/* "Personalizar qué ves al registrar" se muda acá desde el hero de
+              arriba: las dos cosas de esta tarjeta deciden CÓMO vas a
+              registrar (contra qué número apuntás, y qué campos ves), así
+              que vivían separadas sin motivo. */}
+          {onGoToFieldSettings && (
+            <button onClick={onGoToFieldSettings} className="relative w-full flex items-center justify-center gap-1.5 mt-3 pt-2.5 border-t border-white/10 text-[10px] font-bold text-teal-300/75 hover:text-teal-300 transition">
+              <Sliders size={11} /> Personalizar qué ves al registrar <ChevronRight size={11} />
+            </button>
+          )}
         </div>
       )}
 
@@ -6565,9 +6569,16 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             boxShadow: `inset 0 0 0 1px ${tint(day.color, "45")}`,
           }}
         />
+        {/* Piso de 50px en el alto de cada solapa: es el alto de las de
+            Progreso (Rango/Historial/Ejercicios/Medidas) y de Social. Sin
+            él, dayTabTextSizing achica el alto reservado a medida que la
+            rutina tiene más días (con 7 días reserva 25px, o sea un botón de
+            45px), y con 4 días o más esta fila quedaba MÁS BAJA que la de
+            las otras pestañas. Con 2 o 3 días el cálculo ya da más de 50 y
+            el piso no cambia nada. */}
         {(() => { const { textClass, minHeight } = dayTabTextSizing(DAY_ORDER.length); return DAY_ORDER.map((k) => (
           <button key={k} onClick={() => setActiveDay(k)} title={ROUTINE[k].label} className={`relative z-[1] flex items-center justify-center py-2.5 px-1 rounded-xl ${textClass} font-black uppercase transition-colors active:scale-95 text-center leading-tight min-w-0`}
-            style={{ color: activeDay === k ? ROUTINE[k].color : "#64748b", minHeight: `${minHeight + 20}px` }}>
+            style={{ color: activeDay === k ? ROUTINE[k].color : "#64748b", minHeight: `${Math.max(minHeight + 20, 50)}px` }}>
             {/* line-clamp-2 en vez de truncate: nombres combinados como
                 "Hombros/Brazos" tienen que poder leerse enteros aunque
                 ocupen 2 líneas — cortarlos a "HOMBRO/…" en una sola línea
@@ -17246,11 +17257,31 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
   // Auto-cargar al llegar arriba del todo — como WhatsApp Web, sin tener que
   // tocar nada. El botón/aviso sigue ahí igual (ver el render de abajo) para
   // quien prefiera tocarlo en vez de scrollear.
+  // BUG FIX (reporte: "cuando abrís el chatbot no te autocentra arriba del
+  // todo"). Abrir la pestaña te deja en el tope, y el centinela de "cargar
+  // más" vive justo ahí: se activaba solo, cargaba los mensajes viejos y la
+  // compensación de scroll de arriba te bajaba exactamente el alto que
+  // acababa de agregar. Medido: abría en scrollY 914 en vez de 0, y no era
+  // el auto-scroll al último mensaje (desactivándolo pasaba igual).
+  // Ahora la carga automática espera a que scrollees DE VERDAD: se escucha
+  // wheel/touchmove, que sólo los produce un gesto tuyo (a diferencia del
+  // evento "scroll", que también dispara el scrollTo(0) de la pestaña). El
+  // botón manual de "cargar más" sigue andando desde el primer momento.
+  const userScrolledRef = useRef(false);
+  useEffect(() => {
+    const marcar = () => { userScrolledRef.current = true; };
+    window.addEventListener("wheel", marcar, { passive: true });
+    window.addEventListener("touchmove", marcar, { passive: true });
+    return () => {
+      window.removeEventListener("wheel", marcar);
+      window.removeEventListener("touchmove", marcar);
+    };
+  }, []);
   useEffect(() => {
     if (!hasMoreMessages) return;
     const el = loadMoreSentinelRef.current;
     if (!el) return;
-    const observer = new IntersectionObserver((entries) => { if (entries[0].isIntersecting) loadMoreMessages(); }, { rootMargin: "200px 0px" });
+    const observer = new IntersectionObserver((entries) => { if (entries[0].isIntersecting && userScrolledRef.current) loadMoreMessages(); }, { rootMargin: "200px 0px" });
     observer.observe(el);
     return () => observer.disconnect();
   }, [hasMoreMessages, loadMoreMessages]);
@@ -17289,11 +17320,28 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
   // sólo a partir de ahí (mensaje nuevo tuyo o de la IA) se activa el
   // auto-scroll suave hacia abajo, para que se sienta el chat "creciendo"
   // en vez de tele-transportarte a la última respuesta apenas entrás.
+  // BUG FIX (reporte: "cuando abrís el chatbot no te autocentra arriba del
+  // todo"). El guard de "primer render" no alcanzaba: el componente monta
+  // con la conversación de bienvenida y RECIÉN DESPUÉS entra la guardada en
+  // el perfil. Ese segundo render cambia `messages`, el efecto se dispara
+  // con didMountRef ya en true, y te manda al último mensaje — justo lo que
+  // el scroll-to-top de la pestaña acababa de evitar. Medido: abría en
+  // scrollY 916 en vez de 0.
+  // Ahora sólo baja cuando la conversación CRECE siendo la misma. Cargarla,
+  // cambiar de conversación o abrir la pestaña no cuentan: eso es "abrir un
+  // chat", y abrir tiene que dejarte arriba.
   const didMountRef = useRef(false);
+  const lastConvRef = useRef(null);
+  const lastLenRef = useRef(0);
   useEffect(() => {
+    const mismaConversacion = lastConvRef.current === activeConversationId;
+    const crecio = mismaConversacion && messages.length > lastLenRef.current;
+    lastConvRef.current = activeConversationId;
+    lastLenRef.current = messages.length;
     if (!didMountRef.current) { didMountRef.current = true; return; }
+    if (!crecio && !isSending) return;
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages, isSending]);
+  }, [messages, isSending, activeConversationId]);
 
   const enviarMensajeIA = async (userText, replaceIndex = null) => {
     // BUG FIX: se fija DE ENTRADA a qué conversación pertenece este envío —
@@ -17726,7 +17774,16 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
     // quedaba corto contra esa franja combinada (~148-150px), así que el
     // toque le llegaba al ícono de navegación de abajo en vez de al botón
     // que se veía encima. pb-44 deja un margen real de sobra.
-    <div className="relative pb-44">
+    // BUG FIX (reporte: "cuando abrís el chatbot no te autocentra arriba
+    // del todo"). No era el auto-scroll al último mensaje — desactivándolo
+    // seguía pasando igual. Es el SCROLL ANCHORING del navegador: la pestaña
+    // hace scrollTo(0) al abrirse, pero la conversación guardada en el
+    // perfil entra un render después, y al insertarse todo ese contenido el
+    // navegador "compensa" moviendo el scroll para dejar quieto lo que ya
+    // estaba visible. Medido: abría en scrollY 914 en vez de 0.
+    // overflowAnchor "none" le dice que no compense acá; el auto-scroll
+    // propio del chat (bajar al escribir) no depende de esto y sigue igual.
+    <div className="relative pb-44" style={{ overflowAnchor: "none" }}>
       {/* Mismo formato de héroe plano que usan las demás pestañas (Rutina/
           Progreso/Descarga), con el teal de siempre — Chatbot comparte
           identidad de color con Rutina a propósito. */}
