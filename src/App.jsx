@@ -9826,7 +9826,21 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
         ))}
       </div>
 
-      <div key={activeSection} className="tab-fade-in space-y-3">
+      {/* Mismo lavado del color de la sección que en Rutina y Social. Acá va
+          como panel HUNDIDO (base slate-950) y no como tarjeta elevada,
+          porque lo que entra adentro ya son tarjetas propias (el muñeco, el
+          gráfico, el calendario): sobre una base más hundida flotan, sobre
+          una del mismo tono se fundirían y volvería el efecto de caja dentro
+          de caja. */}
+      <div
+        key={activeSection}
+        className="tab-fade-in rounded-2xl border p-3 space-y-3"
+        style={{
+          borderColor: tint(progressSectionColor, "25"),
+          background: `linear-gradient(${tint(progressSectionColor, "14")}, ${tint(progressSectionColor, "14")}), rgba(2,6,23,0.55)`,
+          marginTop: 8,
+        }}
+      >
         {activeSection === "chart" && (
           <div className="relative overflow-hidden rounded-2xl border border-amber-500/20 bg-slate-900/50 backdrop-blur-sm shadow-md shadow-black/20 p-4 space-y-3">
             <div className="flex items-center gap-2.5">
@@ -14682,7 +14696,18 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
           propio de cada sección — el mismo que ya tiene su pestaña arriba —
           así el contenido queda visiblemente atado a la solapa que tocaste
           en vez de flotar suelto debajo. */}
-      <div key={section} className="relative overflow-hidden rounded-2xl border bg-slate-900/50 backdrop-blur-sm shadow-md shadow-black/20 p-4 tab-fade-in" style={{ borderColor: tint(sectionColor, "25") }}>
+      <div
+        key={section}
+        className="relative overflow-hidden rounded-2xl border backdrop-blur-sm shadow-md shadow-black/20 p-4 tab-fade-in"
+        style={{
+          borderColor: tint(sectionColor, "25"),
+          // Mismo lavado parejo que el panel del día en Rutina: el color de
+          // la sección no vive sólo en el borde y el ícono, tiñe todo el
+          // sector. Dos capas (tinte encima, superficie neutra debajo) en vez
+          // de un degradado, para que el tono no se apague hacia abajo.
+          background: `linear-gradient(${tint(sectionColor, "12")}, ${tint(sectionColor, "12")}), rgba(15,23,42,0.5)`,
+        }}
+      >
         <div className="flex items-center gap-2.5 mb-3">
           <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: tint(sectionColor, "18"), color: sectionColor }}>
             {sectionDef.icon}
@@ -19830,9 +19855,21 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
         </div>
       )}
 
+      {/* Las dos listas pasan a ser dos sectores propios, cada uno con su
+          color: antes eran dos rótulos grises sueltos con las tarjetas
+          colgando debajo, y a simple vista una lista larga parecía una sola.
+          Mismo panel hundido y teñido que Rutina, Progreso y Social — lo que
+          va adentro ya son tarjetas, así que flotan sobre una base más
+          hundida en vez de fundirse con ella. */}
       {customEntries.length > 0 && (
-        <div>
-          <div className="flex items-center gap-1.5 mb-2"><ListChecks size={13} className="text-slate-500" /><p className="text-xs font-black uppercase tracking-widest text-slate-500">Tus rutinas creadas</p></div>
+        <div className="rounded-2xl border p-3 space-y-3" style={{ borderColor: tint("#3B82F6", "25"), background: `linear-gradient(${tint("#3B82F6", "14")}, ${tint("#3B82F6", "14")}), rgba(2,6,23,0.55)` }}>
+          <div className="flex items-center gap-2.5 px-0.5 pt-0.5">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: tint("#3B82F6", "18"), color: "#3B82F6" }}><ListChecks size={15} /></div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold text-white">Tus rutinas creadas</p>
+              <p className="text-[11px] text-slate-500">{customEntries.length} guardada{customEntries.length === 1 ? "" : "s"} por vos</p>
+            </div>
+          </div>
           <div className="space-y-2">
             {customEntries.map(([id, r]) => (
               <SavedRoutineRow key={id} routine={r} isActive={id === activeId} onUse={() => handleUseClick(id, null)}
@@ -19845,8 +19882,14 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
       )}
 
       {(!forced || showPresetsForced) && (
-      <div className={forced ? "tab-fade-in" : ""}>
-        <div className="flex items-center gap-1.5 mb-2"><Sparkles size={13} className="text-slate-500" /><p className="text-xs font-black uppercase tracking-widest text-slate-500">Rutinas preestablecidas</p></div>
+      <div className={`rounded-2xl border p-3 space-y-3 ${forced ? "tab-fade-in" : ""}`} style={{ borderColor: tint("#06B6D4", "25"), background: `linear-gradient(${tint("#06B6D4", "14")}, ${tint("#06B6D4", "14")}), rgba(2,6,23,0.55)` }}>
+        <div className="flex items-center gap-2.5 px-0.5 pt-0.5">
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: tint("#06B6D4", "18"), color: "#06B6D4" }}><Sparkles size={15} /></div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-white">Rutinas preestablecidas</p>
+            <p className="text-[11px] text-slate-500">Armadas de fábrica. Activalas tal cual o copialas para editar</p>
+          </div>
+        </div>
         <div className="space-y-2">
           {PRESET_ROUTINES.map((preset) => (
             <PresetRoutineCard key={preset.id} preset={preset} isActive={preset.id === activeId} onPreview={() => setPreview({ def: preset, name: preset.name, id: preset.id, isPreset: true })} />

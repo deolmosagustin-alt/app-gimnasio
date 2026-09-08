@@ -211,7 +211,7 @@ export const EXERCISE_LIBRARY = [
   { id: "hip_thrust_unilateral", name: "Hip Thrust Unilateral", muscle: "Glúteo", group: "gluteo", secondary: [{ group: "femoral", weight: 0.2 }], nota: "Una pierna en el piso, la otra extendida. Corrige asimetrías.", videoQuery: "hip thrust unilateral técnica" },
   { id: "paseos_laterales_banda", name: "Paseos Laterales con Banda", muscle: "Glúteo medio", group: "gluteo", nota: "Banda por encima de las rodillas o tobillos.", videoQuery: "paseos laterales con banda técnica monster walk" },
   { id: "sentadilla_sumo", name: "Sentadilla Sumo", muscle: "Glúteo / Aductores", group: "gluteo", secondary: [{ group: "cuadriceps", weight: 0.3 }, { group: "femoral", weight: 0.15 }, { group: "aductores", weight: 0.3 }], nota: "Postura ancha con puntas afuera.", videoQuery: "sentadilla sumo técnica" },
-  { id: "hiperextension_invertida", name: "Hiperextensión Invertida", muscle: "Glúteo / Espalda baja", group: "espalda_baja", secondary: [{ group: "gluteo", weight: 0.3 }], nota: "Torso fijo, levantás las piernas en vez del torso — cuidá no usar impulso.", videoQuery: "hiperextensión invertida técnica reverse hyper" },
+  { id: "hiperextension_invertida", name: "Hiperextensión Invertida", muscle: "Glúteo / Espalda baja", group: "espalda_baja", secondary: [{ group: "gluteo", weight: 0.3 }], nota: "Torso fijo: levantás las piernas en vez del torso. Cuidá no usar impulso.", videoQuery: "hiperextensión invertida técnica reverse hyper" },
   { id: "plancha_copenhague", name: "Plancha Copenhague", muscle: "Aductores", group: "gluteo", nota: "Pierna de arriba apoyada en un banco.", videoQuery: "plancha copenhague técnica aductores" },
   { id: "aduccion_polea_baja", name: "Aducción de Cadera en Polea Baja", muscle: "Aductores", group: "gluteo", nota: "De pie, cruzá la pierna por delante del cuerpo en un arco controlado.", videoQuery: "aducción cadera polea baja técnica" },
   // Pantorrillas (catálogo extendido)
@@ -232,7 +232,7 @@ export const EXERCISE_LIBRARY = [
   { id: "dead_bug", name: "Dead Bug", muscle: "Core", group: "core", rankExcluded: true, nota: "Boca arriba: bajá brazo y pierna opuestos sin despegar la lumbar.", videoQuery: "dead bug técnica core" },
   { id: "lenador_polea", name: "Leñador en Polea", muscle: "Core / oblicuos", group: "oblicuos", secondary: [{ group: "deltoide_anterior", weight: 0.15 }], nota: "Movimiento diagonal de arriba a abajo (o viceversa).", videoQuery: "leñador polea técnica core woodchopper" },
   { id: "crunch_lateral", name: "Crunch Lateral", muscle: "Core / oblicuos", group: "oblicuos", nota: "Tumbado de costado, flexioná hacia el oblicuo sin tirar del cuello.", videoQuery: "crunch lateral técnica oblicuos" },
-  { id: "giros_torso_barra", name: "Giros de Torso con Barra", muscle: "Core / oblicuos", group: "core", nota: "Barra sobre los hombros, girá despacio y controlado — nunca de golpe.", videoQuery: "giros de torso con barra técnica core" },
+  { id: "giros_torso_barra", name: "Giros de Torso con Barra", muscle: "Core / oblicuos", group: "core", nota: "Barra sobre los hombros. Girá despacio y controlado, nunca de golpe.", videoQuery: "giros de torso con barra técnica core" },
   { id: "stomach_vacuum", name: "Stomach Vacuum", muscle: "Core (transverso)", group: "core", nota: "Exhalá todo el aire y metiendo el ombligo hacia la columna.", videoQuery: "stomach vacuum técnica transverso abdominal" },
   // Cardio — a diferencia del resto, no se registran en reps×kg sino en
   // minutos (y distancia, opcional). `cardio: true` es lo que le avisa a
@@ -247,7 +247,7 @@ export const EXERCISE_LIBRARY = [
   { id: "escaladora", name: "Escaladora (StairMaster)", muscle: "Cardio", group: "cardio", cardio: true, rankExcluded: true, nota: "Pasos cortos y constantes rinden mejor que pisotones largos y salteados.", videoQuery: "escaladora stairmaster técnica" },
   { id: "soga", name: "Soga (Saltar la Cuerda)", muscle: "Cardio", group: "cardio", cardio: true, rankExcluded: true, nota: "Saltos chicos apoyando la punta del pie.", videoQuery: "saltar la cuerda técnica" },
   { id: "bicicleta_aire", name: "Bicicleta de Aire (Assault Bike)", muscle: "Cardio", group: "cardio", cardio: true, rankExcluded: true, nota: "La intensidad sube con el esfuerzo; ideal para intervalos duros.", videoQuery: "assault bike air bike técnica" },
-  { id: "caminata_aire_libre", name: "Caminata / Trote al Aire Libre", muscle: "Cardio", group: "cardio", cardio: true, rankExcluded: true, nota: "Sin máquina — registrá el tiempo y.", videoQuery: "trote al aire libre técnica" },
+  { id: "caminata_aire_libre", name: "Caminata / Trote al Aire Libre", muscle: "Cardio", group: "cardio", cardio: true, rankExcluded: true, nota: "Sin máquina: registrá el tiempo.", videoQuery: "trote al aire libre técnica" },
 
   { id: "elevacion_tibial", name: "Elevación Tibial (Tibial Raise)", muscle: "Tibial anterior", group: "tibial_anterior", nota: "Talones en el piso, levantá las puntas lo más alto posible.", videoQuery: "tibial raise técnica tibialis anterior" },
   { id: "caminata_tibial", name: "Caminata sobre los Talones", muscle: "Tibial anterior", group: "tibial_anterior", rankExcluded: true, nota: "Caminá apoyando solo los talones, puntas al aire.", videoQuery: "heel walk tibialis anterior" },
@@ -565,7 +565,7 @@ export const PRESET_ROUTINES = [
     id: "ppl",
     name: "PUSH / PULL / LEGS",
     source: "preset",
-    description: "Empuje, tracción y pierna en días separados — el split más popular para arrancar.",
+    description: "Empuje, tracción y pierna en días separados. Es el split más popular para arrancar.",
     recommendation: "Recomendado: 3 a 6 sesiones semanales (podés repetir el ciclo dos veces si entrenás 6 días).",
     dayOrder: ["push", "pull", "legs"],
     days: {
@@ -656,7 +656,7 @@ export const PRESET_ROUTINES = [
     id: "bro_split",
     name: "BRO SPLIT",
     source: "preset",
-    description: "Un músculo grande por día — el clásico del fisicoculturismo.",
+    description: "Un músculo grande por día, el clásico del fisicoculturismo.",
     recommendation: "Recomendado: 5 sesiones semanales, un grupo por día. Si entrenás hace poco, frecuencias de 2 veces por semana por músculo suelen rendir mejor — pero este formato sigue siendo válido y es el más tradicional para enfocarte a fondo en cada grupo.",
     dayOrder: ["chest", "back", "shoulders", "arms", "legs"],
     days: {
