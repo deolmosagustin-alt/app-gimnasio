@@ -6532,12 +6532,15 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
                   Todavía no cargaste ninguna meta. Elegí un ejercicio abajo para ver la diferencia.
                 </p>
               )}
-              {/* Misma estética que "Iniciar sesión": color plano del día en
-                  vez de un degradado propio, alto y tipografía de acción
-                  principal, y el mismo latido cuando todavía no hiciste el
-                  paso que la tarjeta te está pidiendo. */}
-              <button onClick={() => setShowSelfProgression(true)} disabled={!activeRoutineDef} className={`relative w-full flex items-center justify-center gap-2 py-3.5 mt-2.5 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98] disabled:opacity-40 ${!hasAnyPlan ? "invite-pulse" : ""}`} style={{ backgroundColor: day.color, "--invite-glow": `${tint(day.color, "80")}` }}>
-                <Sliders size={15} /> {hasAnyPlan ? "Planificar mi progresión" : "Planificar mi primera meta"}
+              {/* Color plano como "Iniciar sesión", pero FIJO en el teal de
+                  esta tarjeta y no en day.color: es una acción sobre tu
+                  modo de entrenamiento, no sobre el día que estés mirando,
+                  así que cambiar de color al pasar de Push a Pull no
+                  significaba nada. Y más chico que "Iniciar sesión" a
+                  propósito: esa es la acción principal de la pantalla,
+                  ésta es secundaria. */}
+              <button onClick={() => setShowSelfProgression(true)} disabled={!activeRoutineDef} className={`relative w-full flex items-center justify-center gap-2 py-2.5 mt-2.5 rounded-xl text-white text-xs font-bold transition-all active:scale-[0.98] disabled:opacity-40 ${!hasAnyPlan ? "invite-pulse" : ""}`} style={{ backgroundColor: "#14B8A6", "--invite-glow": "rgba(20,184,166,0.6)" }}>
+                <Sliders size={13} /> {hasAnyPlan ? "Planificar mi progresión" : "Planificar mi primera meta"}
               </button>
             </>
           )}
@@ -11681,11 +11684,12 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
               Todavía no cargaste ninguna meta. Sin eso, tus series siguen mostrando tu récord de siempre.
             </p>
           )}
-          {/* Mismo formato que "Iniciar sesión" (y que su gemelo en Rutina):
-              color plano, rounded-2xl y py-3.5. */}
+          {/* Mismo tamaño y criterio que su gemelo en Rutina: color plano y
+              fijo (acá el celeste de la sección "Modo de entrenamiento"),
+              y contenido, porque es una acción secundaria. */}
           {settings.trainingMode === "planned" && (
-            <button onClick={() => setShowSelfProgression(true)} disabled={!activeRoutineDef} className={`w-full flex items-center gap-2 justify-center py-3.5 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98] disabled:opacity-40 ${!hasAnyPlan ? "invite-pulse" : ""}`} style={{ backgroundColor: "#38BDF8", "--invite-glow": "rgba(56,189,248,0.6)" }}>
-              <Sliders size={15} /> {hasAnyPlan ? "Planificar mi progresión" : "Planificar mi primera meta"}
+            <button onClick={() => setShowSelfProgression(true)} disabled={!activeRoutineDef} className={`w-full flex items-center gap-2 justify-center py-2.5 rounded-xl text-white text-xs font-bold transition-all active:scale-[0.98] disabled:opacity-40 ${!hasAnyPlan ? "invite-pulse" : ""}`} style={{ backgroundColor: "#38BDF8", "--invite-glow": "rgba(56,189,248,0.6)" }}>
+              <Sliders size={13} /> {hasAnyPlan ? "Planificar mi progresión" : "Planificar mi primera meta"}
             </button>
           )}
           {!activeRoutineDef && settings.trainingMode === "planned" && <p className="text-[10.5px] text-slate-600 text-center -mt-1">Activá una rutina primero, en la pestaña Rutinas.</p>}
@@ -12012,6 +12016,11 @@ function PublicUserCard({ uid, basic, streak = null, onClick = null, children })
   const accentColor = basic?.topRank?.color || "#8B5CF6";
   const avatarAndName = (
     <>
+      {/* Misma barrita que encabeza cada ejercicio en Rutina: w-2 h-9,
+          redondeada y con su propio resplandor, en línea con el resto de la
+          fila (antes era una tira fina pegada al borde, absolute). Acá el
+          color es el del rango de la persona. */}
+      <div className="w-2 h-9 rounded-full shrink-0" style={{ backgroundColor: accentColor, boxShadow: `0 0 10px -2px ${accentColor}` }} />
       <div className="relative shrink-0">
         {/* BUG FIX (pedido: "el borde naranja, cambiémoslo"): antes el marco
             del avatar tomaba el color del RANGO de la persona — con rangos
@@ -12058,13 +12067,13 @@ function PublicUserCard({ uid, basic, streak = null, onClick = null, children })
     </>
   );
   return (
-    // Superficie neutra y plana, como el resto de las filas de la app. El
-    // degradado diagonal y el resplandor de esquina que tenía antes eran
-    // mucho ruido para una fila de lista, y encima peleaban con el color de
-    // la sección. El color de la persona (su rango) queda en dos lugares
-    // puntuales: la barrita de la izquierda y la píldora de la derecha.
-    <div className="relative overflow-hidden w-full flex items-center gap-3 pl-4 pr-3 py-3 rounded-2xl border transition-colors" style={{ borderColor: "var(--chip-border)", backgroundColor: "var(--row-surface)" }}>
-      <span className="absolute left-1.5 top-3 bottom-3 w-1 rounded-full" style={{ backgroundColor: accentColor }} />
+    // Un lavado PAREJO y suave del color del rango sobre la superficie de
+    // fila, en vez del degradado diagonal con resplandor de esquina que
+    // tenía antes: da identidad a cada persona sin el ruido de un degradado
+    // en una fila de lista. El borde se queda neutro, para que una lista
+    // llena de rangos Oro no enmarque todo de naranja.
+    <div className="relative overflow-hidden w-full flex items-center gap-3 px-3 py-3 rounded-2xl border transition-colors"
+      style={{ borderColor: "var(--chip-border)", background: `linear-gradient(${tint(accentColor, "10")}, ${tint(accentColor, "10")}), var(--row-surface)` }}>
       {onClick ? (
         <button onClick={onClick} className="relative flex-1 flex items-center gap-3 min-w-0 hover:opacity-90 transition active:scale-[0.99]">{avatarAndName}</button>
       ) : (
