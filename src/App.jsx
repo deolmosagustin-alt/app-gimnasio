@@ -6619,7 +6619,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           // día. Con dos capas (tinte encima, oscuro debajo) el sector
           // entero queda con su tono sin dejar de ser más hundido que las
           // tarjetas que van adentro.
-          background: `linear-gradient(${tint(day.color, "14")}, ${tint(day.color, "14")}), rgba(2,6,23,0.62)`,
+          background: `linear-gradient(${tint(day.color, "0b")}, ${tint(day.color, "0b")}), rgba(2,6,23,0.62)`,
           marginTop: 8,
         }}
       >
@@ -7171,7 +7171,7 @@ function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [], weekSche
 
       {view === "calendar" ? (
         <div key="calendar" className="space-y-3 tab-fade-in">
-          <div className="pt-1">
+          <div className="rounded-2xl border border-slate-800/60 p-3.5" style={{ backgroundColor: "rgba(15,23,42,0.55)" }}>
             <div className="flex items-center justify-between mb-3">
               <button onClick={() => setCursor((c) => { const m = c.m === 0 ? 11 : c.m - 1; const y = c.m === 0 ? c.y - 1 : c.y; return { y, m }; })} className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400"><ChevronLeft size={16} /></button>
               <p className="text-sm font-bold text-white">{MONTH_LABELS[cursor.m]} {cursor.y}</p>
@@ -8977,7 +8977,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
   };
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border shadow-md shadow-black/20 p-4 space-y-3" style={{ borderColor: tint("#3B82F6", "30"), background: `linear-gradient(${tint("#3B82F6", "14")}, ${tint("#3B82F6", "14")}), rgba(2,6,23,0.62)` }}>
+    <div className="relative overflow-hidden rounded-2xl border shadow-md shadow-black/20 p-4 space-y-3" style={{ borderColor: tint("#3B82F6", "30"), background: `linear-gradient(${tint("#3B82F6", "0b")}, ${tint("#3B82F6", "0b")}), rgba(2,6,23,0.62)` }}>
       {/* Glows decorativos de fondo */}
       <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
       <div className="absolute -bottom-8 -left-8 w-32 h-32 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
@@ -9378,7 +9378,7 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
 
   return (
     <div className="relative overflow-hidden rounded-2xl border backdrop-blur-sm shadow-md shadow-black/20 p-4 space-y-3"
-      style={{ borderColor: tint("#A855F7", "30"), background: `linear-gradient(${tint("#A855F7", "14")}, ${tint("#A855F7", "14")}), rgba(2,6,23,0.62)` }}>
+      style={{ borderColor: tint("#A855F7", "30"), background: `linear-gradient(${tint("#A855F7", "0b")}, ${tint("#A855F7", "0b")}), rgba(2,6,23,0.62)` }}>
       <div className="flex items-center gap-2.5">
         <div className="w-8 h-8 rounded-xl bg-purple-500/15 text-purple-400 flex items-center justify-center shrink-0"><Ruler size={15} /></div>
         <p className="text-sm font-bold text-white">Tus medidas</p>
@@ -9467,7 +9467,7 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
                 <button onClick={() => setCompareBase(null)} className="text-[10px] font-bold text-slate-400 px-2 py-1 rounded-lg bg-slate-800">Cancelar</button>
               </div>
             )}
-            <div className="pt-1">
+            <div className="rounded-2xl border border-slate-800/60 p-3.5" style={{ backgroundColor: "rgba(15,23,42,0.55)" }}>
               <div className="flex items-center justify-between mb-2.5">
                 <button onClick={() => setCursor((c) => { const m = c.m === 0 ? 11 : c.m - 1; const y = c.m === 0 ? c.y - 1 : c.y; return { y, m }; })} className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400"><ChevronLeft size={16} /></button>
                 <p className="text-sm font-bold text-white">{MONTH_LABELS[cursor.m]} {cursor.y}</p>
@@ -9836,7 +9836,7 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
       <div key={activeSection} className="tab-fade-in space-y-3">
         {activeSection === "chart" && (
           <div className="relative overflow-hidden rounded-2xl border backdrop-blur-sm shadow-md shadow-black/20 p-4 space-y-3"
-            style={{ borderColor: tint("#F59E0B", "30"), background: `linear-gradient(${tint("#F59E0B", "14")}, ${tint("#F59E0B", "14")}), rgba(2,6,23,0.62)` }}>
+            style={{ borderColor: tint("#F59E0B", "30"), background: `linear-gradient(${tint("#F59E0B", "0b")}, ${tint("#F59E0B", "0b")}), rgba(2,6,23,0.62)` }}>
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center shrink-0"><Activity size={15} /></div>
               <p className="text-sm font-bold text-white">Evolución por ejercicio</p>
@@ -9848,7 +9848,12 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
                 botón con lo elegido (día + ejercicio) que abre una lista
                 agrupada por día, cada uno con su color — se elige por
                 categoría, no por orden de aparición. */}
-            <button onClick={() => setShowExercisePicker(true)} className="w-full flex items-center gap-3 rounded-2xl px-3.5 py-3 border transition active:scale-[0.99]" style={{ backgroundColor: "var(--row-surface)", borderColor: "var(--chip-border)" }}>
+            {/* El selector lleva el color del DÍA al que pertenece el
+                ejercicio (el mismo de la barrita de la izquierda y del
+                chevron), no el ámbar de la sección: sobre una superficie
+                gris quedaba desconectado de sus propios acentos. */}
+            <button onClick={() => setShowExercisePicker(true)} className="w-full flex items-center gap-3 rounded-2xl px-3.5 py-3 border transition active:scale-[0.99]"
+              style={{ backgroundColor: tint(selEx?.color || "#F59E0B", "14"), borderColor: tint(selEx?.color || "#F59E0B", "3a") }}>
               <span className="w-2 h-8 rounded-full shrink-0" style={{ backgroundColor: selEx?.color || "#F59E0B" }} />
               <span className="flex-1 min-w-0 text-left">
                 <span className="block text-[9px] font-black uppercase tracking-wide truncate" style={{ color: selEx?.color || "#F59E0B" }}>{selEx?.day}</span>
@@ -10007,7 +10012,7 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
         )}
 
         {activeSection === "historial" && (
-          <div className="rounded-2xl border shadow-md shadow-black/20 p-4" style={{ borderColor: tint("#06B6D4", "30"), background: `linear-gradient(${tint("#06B6D4", "14")}, ${tint("#06B6D4", "14")}), rgba(2,6,23,0.62)` }}>
+          <div className="rounded-2xl border shadow-md shadow-black/20 p-4" style={{ borderColor: tint("#06B6D4", "30"), background: `linear-gradient(${tint("#06B6D4", "0b")}, ${tint("#06B6D4", "0b")}), rgba(2,6,23,0.62)` }}>
             <SessionHistoryView logs={logs} onDeleteDay={onDeleteDay} trainingSessions={sessions} weekSchedule={weekSchedule} exerciseNotes={settings.exerciseNotes} rpeDisplayMode={settings.rpeDisplayMode} />
           </div>
         )}
@@ -14435,10 +14440,10 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
   // Entrenador azul (igual que Rango). Reemplaza la ronda anterior, donde
   // se había unificado todo a un solo violeta.
   const SECTIONS = [
-    { k: "amigos", l: "Amigos", icon: <Users size={14} />, color: SOCIAL_COLOR, sub: "Tus amigos y las solicitudes que te llegaron" },
-    { k: "buscar", l: "Buscar", icon: <Search size={14} />, color: "#06B6D4", sub: "Encontrá gente por @usuario, código QR o tus contactos" },
-    { k: "ranking", l: "Ranking", icon: <Award size={14} />, color: "#F59E0B", sub: "Cómo venís contra tus amigos y contra toda la app" },
-    { k: "entrenador", l: "Entrenador", icon: <GraduationCap size={14} />, color: "#3B82F6", sub: "Vinculate con tu entrenador o con tus alumnos" },
+    { k: "amigos", l: "Amigos", icon: <Users size={14} />, color: SOCIAL_COLOR },
+    { k: "buscar", l: "Buscar", icon: <Search size={14} />, color: "#06B6D4" },
+    { k: "ranking", l: "Ranking", icon: <Award size={14} />, color: "#F59E0B" },
+    { k: "entrenador", l: "Entrenador", icon: <GraduationCap size={14} />, color: "#3B82F6" },
   ];
 
   const sectionIdx = Math.max(0, SECTIONS.findIndex((s) => s.k === section));
@@ -14699,17 +14704,14 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
           // la sección no vive sólo en el borde y el ícono, tiñe todo el
           // sector. Dos capas (tinte encima, superficie neutra debajo) en vez
           // de un degradado, para que el tono no se apague hacia abajo.
-          background: `linear-gradient(${tint(sectionColor, "12")}, ${tint(sectionColor, "12")}), rgba(2,6,23,0.62)`,
+          background: `linear-gradient(${tint(sectionColor, "09")}, ${tint(sectionColor, "09")}), rgba(2,6,23,0.62)`,
         }}
       >
         <div className="flex items-center gap-2.5 mb-3">
           <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: tint(sectionColor, "18"), color: sectionColor }}>
             {sectionDef.icon}
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-white truncate">{sectionDef.l}</p>
-            <p className="text-[11px] text-slate-500 truncate">{sectionDef.sub}</p>
-          </div>
+          <p className="flex-1 min-w-0 text-sm font-bold text-white truncate">{sectionDef.l}</p>
         </div>
         <div className="space-y-3">
         {section === "buscar" && (
@@ -19856,7 +19858,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
           va adentro ya son tarjetas, así que flotan sobre una base más
           hundida en vez de fundirse con ella. */}
       {customEntries.length > 0 && (
-        <div className="rounded-2xl border p-3 space-y-3" style={{ borderColor: tint("#3B82F6", "25"), background: `linear-gradient(${tint("#3B82F6", "14")}, ${tint("#3B82F6", "14")}), rgba(2,6,23,0.62)` }}>
+        <div className="rounded-2xl border p-3 space-y-3" style={{ borderColor: tint("#3B82F6", "25"), background: `linear-gradient(${tint("#3B82F6", "0b")}, ${tint("#3B82F6", "0b")}), rgba(2,6,23,0.62)` }}>
           <div className="flex items-center gap-2.5 px-0.5 pt-0.5">
             <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: tint("#3B82F6", "18"), color: "#3B82F6" }}><ListChecks size={15} /></div>
             <div className="flex-1 min-w-0">
@@ -19876,7 +19878,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
       )}
 
       {(!forced || showPresetsForced) && (
-      <div className={`rounded-2xl border p-3 space-y-3 ${forced ? "tab-fade-in" : ""}`} style={{ borderColor: tint("#3B82F6", "25"), background: `linear-gradient(${tint("#3B82F6", "10")}, ${tint("#3B82F6", "10")}), rgba(2,6,23,0.62)` }}>
+      <div className={`rounded-2xl border p-3 space-y-3 ${forced ? "tab-fade-in" : ""}`} style={{ borderColor: tint("#3B82F6", "25"), background: `linear-gradient(${tint("#3B82F6", "08")}, ${tint("#3B82F6", "08")}), rgba(2,6,23,0.62)` }}>
         <div className="flex items-center gap-2.5 px-0.5 pt-0.5">
           <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: tint("#3B82F6", "18"), color: "#3B82F6" }}><Sparkles size={15} /></div>
           <div className="flex-1 min-w-0">
