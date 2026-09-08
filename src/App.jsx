@@ -6529,11 +6529,15 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
                   vez de dejar que el silencio se sienta como que "no anda". */}
               {!hasAnyPlan && (
                 <p className="relative text-[10.5px] text-teal-200/80 text-center mt-2.5 leading-snug">
-                  Todavía no cargaste ninguna meta — elegí un ejercicio abajo para ver la diferencia.
+                  Todavía no cargaste ninguna meta. Elegí un ejercicio abajo para ver la diferencia.
                 </p>
               )}
-              <button onClick={() => setShowSelfProgression(true)} disabled={!activeRoutineDef} className={`relative w-full flex items-center gap-2 justify-center py-2.5 mt-2.5 rounded-xl !text-white text-xs font-bold transition active:scale-[0.98] disabled:opacity-40 ${!hasAnyPlan ? "invite-pulse" : ""}`} style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)", "--invite-glow": "rgba(20,184,166,0.6)" }}>
-                <Sliders size={13} /> {hasAnyPlan ? "Planificar mi progresión" : "Planificar mi primera meta"}
+              {/* Misma estética que "Iniciar sesión": color plano del día en
+                  vez de un degradado propio, alto y tipografía de acción
+                  principal, y el mismo latido cuando todavía no hiciste el
+                  paso que la tarjeta te está pidiendo. */}
+              <button onClick={() => setShowSelfProgression(true)} disabled={!activeRoutineDef} className={`relative w-full flex items-center justify-center gap-2 py-3.5 mt-2.5 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98] disabled:opacity-40 ${!hasAnyPlan ? "invite-pulse" : ""}`} style={{ backgroundColor: day.color, "--invite-glow": `${tint(day.color, "80")}` }}>
+                <Sliders size={15} /> {hasAnyPlan ? "Planificar mi progresión" : "Planificar mi primera meta"}
               </button>
             </>
           )}
@@ -11674,11 +11678,13 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
               hace falta cargar al menos una meta para que se note. */}
           {settings.trainingMode === "planned" && activeRoutineDef && !hasAnyPlan && (
             <p className="text-[10.5px] text-sky-300/80 text-center leading-snug px-1">
-              Todavía no cargaste ninguna meta — sin eso, tus series siguen mostrando tu récord de siempre.
+              Todavía no cargaste ninguna meta. Sin eso, tus series siguen mostrando tu récord de siempre.
             </p>
           )}
+          {/* Mismo formato que "Iniciar sesión" (y que su gemelo en Rutina):
+              color plano, rounded-2xl y py-3.5. */}
           {settings.trainingMode === "planned" && (
-            <button onClick={() => setShowSelfProgression(true)} disabled={!activeRoutineDef} className={`w-full flex items-center gap-2.5 justify-center py-3 rounded-xl bg-sky-500 !text-white text-sm font-bold transition active:scale-[0.98] disabled:opacity-40 ${!hasAnyPlan ? "invite-pulse" : ""}`} style={{ "--invite-glow": "rgba(56,189,248,0.6)" }}>
+            <button onClick={() => setShowSelfProgression(true)} disabled={!activeRoutineDef} className={`w-full flex items-center gap-2 justify-center py-3.5 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98] disabled:opacity-40 ${!hasAnyPlan ? "invite-pulse" : ""}`} style={{ backgroundColor: "#38BDF8", "--invite-glow": "rgba(56,189,248,0.6)" }}>
               <Sliders size={15} /> {hasAnyPlan ? "Planificar mi progresión" : "Planificar mi primera meta"}
             </button>
           )}
@@ -12027,36 +12033,38 @@ function PublicUserCard({ uid, basic, streak = null, onClick = null, children })
           />
         )}
       </div>
+      {/* El rango pasa de un bloque apilado a la derecha (insignia grande +
+          tier debajo) a una píldora de una línea en la SEGUNDA fila, junto
+          al @usuario. A la derecha competía con el nombre y con los botones
+          de acción, y con eso un nombre normal como "Sofía Martínez" ya se
+          cortaba; acá el nombre se queda con todo el ancho. */}
       <div className="flex-1 min-w-0 text-left">
         <p className="text-sm font-bold text-white truncate">{basic?.name || "Usuario"}</p>
-        <div className="flex items-center gap-2 mt-0.5 min-w-0">
+        <div className="flex items-center gap-1.5 mt-1 min-w-0">
+          {basic?.topRank && (
+            <span className="shrink-0 inline-flex items-center gap-1 pl-0.5 pr-1.5 py-0.5 rounded-md" style={{ backgroundColor: tint(basic.topRank.color, "16"), border: `1px solid ${tint(basic.topRank.color, "33")}` }}>
+              <RankBadgeIcon tier={basic.topRank.tier} sub={null} color={basic.topRank.color} size={14} />
+              <span className="text-[8.5px] font-black uppercase tracking-wide whitespace-nowrap" style={{ color: basic.topRank.color }}>{basic.topRank.tier} {basic.topRank.sub}</span>
+            </span>
+          )}
           <span className="text-[11px] text-slate-500 flex items-center gap-0.5 min-w-0 truncate"><AtSign size={9} className="shrink-0" />{basic?.username || uid.slice(0, 8)}</span>
           {typeof streak === "number" && streak > 0 && (
             <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-orange-400 shrink-0">
-              <Flame size={10} className="shrink-0" />{streak}
+              <Flame size={10} className="shrink-0" />{streak} {streak === 1 ? "día" : "días"}
             </span>
           )}
         </div>
       </div>
-      {/* Insignia de rango promedio, con el nombre del tier debajo — mismo
-          par ícono+texto que ya usa el hero de Social y el de un amigo,
-          para que se sienta la misma app en vez de un ícono pelado. */}
-      {basic?.topRank && (
-        <div className="shrink-0 flex flex-col items-center gap-0.5">
-          <RankBadgeIcon tier={basic.topRank.tier} sub={null} color={basic.topRank.color} size={32} />
-          <span className="text-[8px] font-black uppercase tracking-wide whitespace-nowrap" style={{ color: basic.topRank.color }}>{basic.topRank.tier} {basic.topRank.sub}</span>
-        </div>
-      )}
     </>
   );
   return (
-    // El DEGRADADO sí lleva el color del rango (es un toque suave y ayuda a
-    // distinguir a cada persona), pero el BORDE queda neutro: con rangos
-    // tipo Oro o Bronce, un marco de ese color alrededor de cada fila
-    // pintaba la lista entera de naranja y peleaba con el color de la
-    // sección.
-    <div className="relative overflow-hidden w-full flex items-center gap-3 px-3.5 py-3.5 rounded-2xl border transition-colors" style={{ borderColor: "var(--chip-border)", background: `linear-gradient(135deg, ${tint(accentColor, "10")}, rgba(15,23,42,0.55) 65%)` }}>
-      <div className="absolute -top-6 -right-6 w-20 h-20 rounded-full blur-2xl opacity-25 pointer-events-none" style={{ backgroundColor: accentColor }} />
+    // Superficie neutra y plana, como el resto de las filas de la app. El
+    // degradado diagonal y el resplandor de esquina que tenía antes eran
+    // mucho ruido para una fila de lista, y encima peleaban con el color de
+    // la sección. El color de la persona (su rango) queda en dos lugares
+    // puntuales: la barrita de la izquierda y la píldora de la derecha.
+    <div className="relative overflow-hidden w-full flex items-center gap-3 pl-4 pr-3 py-3 rounded-2xl border transition-colors" style={{ borderColor: "var(--chip-border)", backgroundColor: "var(--row-surface)" }}>
+      <span className="absolute left-1.5 top-3 bottom-3 w-1 rounded-full" style={{ backgroundColor: accentColor }} />
       {onClick ? (
         <button onClick={onClick} className="relative flex-1 flex items-center gap-3 min-w-0 hover:opacity-90 transition active:scale-[0.99]">{avatarAndName}</button>
       ) : (
@@ -12843,7 +12851,7 @@ function RankComparisonList({ comparison, myLogs = null, theirLogs = null, their
 // div con onClick). "Vos" abre tu propio muñeco (MyBodyModal); cualquier
 // otra fila navega al perfil completo de esa persona (FriendProfileView),
 // que ahora también muestra el muñeco de entrada.
-function LeaderboardRow({ position, name, username, avatarData, topRank, sessionsThisWeek = null, isMe, onClick = null, accent = "#F59E0B" }) {
+function LeaderboardRow({ position, name, username, avatarData, topRank, streakDays = null, isMe, onClick = null, accent = "#F59E0B" }) {
   const medalColor = position === 1 ? "#FFD23F" : position === 2 ? "#DCE3E8" : position === 3 ? "#CD7F32" : null;
   const Tag = onClick ? "button" : "div";
   return (
@@ -12862,8 +12870,8 @@ function LeaderboardRow({ position, name, username, avatarData, topRank, session
         <p className="text-sm font-bold text-white truncate">{isMe ? "Vos" : (name || "Usuario")}</p>
         <p className="text-[11px] text-slate-500 truncate">@{username || "..."}</p>
       </div>
-      {sessionsThisWeek != null ? (
-        <span className="flex items-center gap-1 shrink-0 text-sm font-black" style={{ color: accent }}><Flame size={16} />{sessionsThisWeek}</span>
+      {streakDays != null ? (
+        <span className="flex items-center gap-1 shrink-0 text-sm font-black" style={{ color: accent }}><Flame size={16} />{streakDays}<span className="text-[10px] font-bold opacity-70 ml-0.5">{streakDays === 1 ? "día" : "días"}</span></span>
       ) : topRank && (
         // Pedido: mismo criterio que el resto de la app — ícono solo (sin
         // el numeral romano superpuesto) y el nombre del rango como texto
@@ -12929,26 +12937,31 @@ function LeaderboardSection({ uid, profile, myTopRank, friendAccepted, basics, a
 
   const friendsRanking = useMemo(() => buildFriendsRanking(uid, profile, myTopRank, friendAccepted, basics), [friendAccepted, basics, uid, myTopRank, profile]);
 
-  const weeklyRanking = useMemo(() => {
-    const mine = [{ uid, name: profile?.name, username: profile?.username, avatarData: profile?.avatarData, sessionsThisWeek: getSessionsForPeriod(profile?.trainingSessions || [], "week").length, isMe: true }];
+  const streakRanking = useMemo(() => {
+    const myWeekSchedule = (() => {
+      const def = resolveRoutineDef(profile?.routines?.[profile?.activeRoutineId], profile?.activeRoutineId);
+      return def ? getRoutineWeekSchedule(def) : null;
+    })();
+    const myStreak = computeSmartStreak(getTrainedDateSet(profile?.logs || {}, profile?.trainingSessions || []), myWeekSchedule);
+    const mine = [{ uid, name: profile?.name, username: profile?.username, avatarData: profile?.avatarData, streakDays: myStreak, isMe: true }];
     const others = friendAccepted.map((f) => {
       const other = f.users.find((u) => u !== uid);
       const a = activity?.[other];
       if (!a) return null; // todavía no llegó public/full (o sin permiso)
       const b = basics[other];
-      return { uid: other, name: b?.name, username: b?.username, avatarData: b?.avatarData, sessionsThisWeek: a.sessionsThisWeek, isMe: false };
+      return { uid: other, name: b?.name, username: b?.username, avatarData: b?.avatarData, streakDays: a.streak || 0, isMe: false };
     }).filter(Boolean);
-    return [...mine, ...others].sort((a, b) => b.sessionsThisWeek - a.sessionsThisWeek);
+    return [...mine, ...others].sort((a, b) => b.streakDays - a.streakDays);
   }, [friendAccepted, basics, activity, uid, profile]);
 
-  const list = scope === "amigos" ? friendsRanking : scope === "semana" ? weeklyRanking : (globalList || []);
+  const list = scope === "amigos" ? friendsRanking : scope === "semana" ? streakRanking : (globalList || []);
 
   return (
     <div className="space-y-3">
-      <div className={`grid gap-1.5 p-1 rounded-2xl bg-slate-900/60 border border-slate-800/50`} style={{ gridTemplateColumns: GLOBAL_RANKING_ENABLED ? "repeat(3, 1fr)" : "repeat(2, 1fr)" }}>
-        <button onClick={() => setScope("amigos")} className="py-2 rounded-xl text-xs font-bold transition" style={scope === "amigos" ? { backgroundColor: tint(accent, "22"), color: accent } : { color: "#64748b" }}>Mejor rango</button>
-        <button onClick={() => setScope("semana")} className="flex items-center justify-center gap-1 py-2 rounded-xl text-xs font-bold transition" style={scope === "semana" ? { backgroundColor: tint(accent, "22"), color: accent } : { color: "#64748b" }}><Flame size={12} /> Esta semana</button>
-        {GLOBAL_RANKING_ENABLED && <button onClick={() => setScope("global")} className="py-2 rounded-xl text-xs font-bold transition" style={scope === "global" ? { backgroundColor: tint(accent, "22"), color: accent } : { color: "#64748b" }}>Global</button>}
+      <div className="grid gap-1 p-1 rounded-xl bg-black/40 border border-slate-700/50" style={{ gridTemplateColumns: GLOBAL_RANKING_ENABLED ? "repeat(3, 1fr)" : "repeat(2, 1fr)" }}>
+        <button onClick={() => setScope("amigos")} className="py-1.5 rounded-lg text-xs font-bold transition-all" style={scope === "amigos" ? { backgroundColor: accent, color: "#fff" } : { color: "#64748b" }}>Mejor rango</button>
+        <button onClick={() => setScope("semana")} className="flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs font-bold transition-all" style={scope === "semana" ? { backgroundColor: accent, color: "#fff" } : { color: "#64748b" }}><Flame size={12} /> Racha</button>
+        {GLOBAL_RANKING_ENABLED && <button onClick={() => setScope("global")} className="py-1.5 rounded-lg text-xs font-bold transition-all" style={scope === "global" ? { backgroundColor: accent, color: "#fff" } : { color: "#64748b" }}>Global</button>}
       </div>
       {scope === "amigos" && friendsRanking.length === 0 && (
         // Pedido: "la pestaña se ve medio vacía" — mismo criterio que el
@@ -12964,7 +12977,7 @@ function LeaderboardSection({ uid, profile, myTopRank, friendAccepted, basics, a
           )}
         </div>
       )}
-      {scope === "semana" && weeklyRanking.length <= 1 && (
+      {scope === "semana" && streakRanking.length <= 1 && (
         <p className="text-center text-slate-600 text-sm py-8 px-4">Todavía no hay datos de tus amigos esta semana. Puede tardar un momento en cargar.</p>
       )}
       {scope === "global" && globalLoading && <p className="text-center text-slate-600 text-sm py-8">Cargando ranking...</p>}
@@ -19861,10 +19874,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
         <div className="rounded-2xl border p-3 space-y-3" style={{ borderColor: tint("#3B82F6", "25"), background: `linear-gradient(${tint("#3B82F6", "0b")}, ${tint("#3B82F6", "0b")}), rgba(2,6,23,0.62)` }}>
           <div className="flex items-center gap-2.5 px-0.5 pt-0.5">
             <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: tint("#3B82F6", "18"), color: "#3B82F6" }}><ListChecks size={15} /></div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-white">Tus rutinas creadas</p>
-              <p className="text-[11px] text-slate-500">{customEntries.length} guardada{customEntries.length === 1 ? "" : "s"} por vos</p>
-            </div>
+            <p className="flex-1 min-w-0 text-sm font-bold text-white">Tus rutinas creadas</p>
           </div>
           <div className="space-y-2">
             {customEntries.map(([id, r]) => (
@@ -19881,10 +19891,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
       <div className={`rounded-2xl border p-3 space-y-3 ${forced ? "tab-fade-in" : ""}`} style={{ borderColor: tint("#3B82F6", "25"), background: `linear-gradient(${tint("#3B82F6", "08")}, ${tint("#3B82F6", "08")}), rgba(2,6,23,0.62)` }}>
         <div className="flex items-center gap-2.5 px-0.5 pt-0.5">
           <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: tint("#3B82F6", "18"), color: "#3B82F6" }}><Sparkles size={15} /></div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-white">Rutinas preestablecidas</p>
-            <p className="text-[11px] text-slate-500">Armadas de fábrica. Activalas tal cual o copialas para editar</p>
-          </div>
+          <p className="flex-1 min-w-0 text-sm font-bold text-white">Rutinas preestablecidas</p>
         </div>
         <div className="space-y-2">
           {PRESET_ROUTINES.map((preset) => (
