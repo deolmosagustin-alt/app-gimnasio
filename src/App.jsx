@@ -6559,8 +6559,8 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           }}
         />
         {(() => { const { textClass, minHeight } = dayTabTextSizing(DAY_ORDER.length); return DAY_ORDER.map((k) => (
-          <button key={k} onClick={() => setActiveDay(k)} title={ROUTINE[k].label} className={`relative z-[1] py-2.5 px-1 rounded-xl ${textClass} font-black uppercase transition-colors active:scale-95 text-center leading-tight min-w-0`}
-            style={{ color: activeDay === k ? ROUTINE[k].color : "#64748b" }}>
+          <button key={k} onClick={() => setActiveDay(k)} title={ROUTINE[k].label} className={`relative z-[1] flex items-center justify-center py-2.5 px-1 rounded-xl ${textClass} font-black uppercase transition-colors active:scale-95 text-center leading-tight min-w-0`}
+            style={{ color: activeDay === k ? ROUTINE[k].color : "#64748b", minHeight: `${minHeight + 20}px` }}>
             {/* line-clamp-2 en vez de truncate: nombres combinados como
                 "Hombros/Brazos" tienen que poder leerse enteros aunque
                 ocupen 2 líneas — cortarlos a "HOMBRO/…" en una sola línea
@@ -6580,16 +6580,18 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
                 Pedido después: "agranda las letras... que se ajusten según
                 la cantidad de días" — textClass/minHeight ahora vienen de
                 dayTabTextSizing en vez de un 10px/25px fijo.
-                BUG FIX (pedido: "centrá el nombre de los días
-                horizontalmente"): el hack de line-clamp con
-                display:-webkit-box + box-orient:vertical usa box-pack
-                para el eje PRINCIPAL (acá, el vertical, centrando las
-                líneas dentro de minHeight) — el centrado horizontal
-                depende de heredar text-align del botón, algo que algunos
-                WebViews de Android no respetan bien dentro de este hack.
-                textAlign explícito en el propio span no depende de
-                heredarlo de nadie. */}
-            <span className="block" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", WebkitBoxPack: "center", overflow: "hidden", minHeight: `${minHeight}px`, textAlign: "center" }}>{ROUTINE[k].label}</span>
+                BUG FIX (pedido: "centrá las palabras vertical y
+                horizontalmente dentro de su recuadro"): el centrado
+                dependía de WebkitBoxPack dentro del propio hack de
+                line-clamp, con el minHeight puesto en el SPAN. Eso hacía
+                dos cosas mal: el span quedaba alto y el texto de una sola
+                línea se apoyaba arriba, y box-pack es una propiedad del
+                box model viejo de WebKit que los navegadores modernos ya
+                casi no respetan. Ahora el alto reservado vive en el BOTÓN
+                (minHeight + su padding) y el centrado lo hace flexbox
+                normal — items-center y justify-center — con el span
+                conservando el clamp de 2 líneas a su altura natural. */}
+            <span className="block" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", textAlign: "center" }}>{ROUTINE[k].label}</span>
           </button>
         )); })()}
       </div>
@@ -6609,7 +6611,17 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
       <div
         key={activeDay}
         className="relative rounded-2xl border backdrop-blur-sm shadow-md shadow-black/20 p-3 space-y-3 tab-fade-in"
-        style={{ borderColor: tint(day.color, "25"), backgroundColor: "rgba(2,6,23,0.45)", marginTop: 8 }}
+        style={{
+          borderColor: tint(day.color, "25"),
+          // Un lavado PAREJO del color del día sobre la base hundida, no un
+          // degradado: el degradado del primer intento se notaba arriba y
+          // desaparecía abajo, así que la mitad del panel no se sentía del
+          // día. Con dos capas (tinte encima, oscuro debajo) el sector
+          // entero queda con su tono sin dejar de ser más hundido que las
+          // tarjetas que van adentro.
+          background: `linear-gradient(${tint(day.color, "14")}, ${tint(day.color, "14")}), rgba(2,6,23,0.55)`,
+          marginTop: 8,
+        }}
       >
         <div className="relative px-1 pt-1">
           <div className="flex items-center gap-2.5">
@@ -9711,36 +9723,28 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
   }, [allExercises]);
 
   const [selId, setSelId] = useState(allExercises[0]?.id);
-  // "all" = el ejercicio como un todo (la mejor serie de cada sesión), que
-  // es la pregunta real ("¿cómo viene mi press banca?"). Antes esto
-  // arrancaba en 0 y OBLIGABA a mirar serie por serie, fragmentando el
-  // dato: la serie 2 de un día podía ser de calentamiento y la 3 la pesada,
-  // y cada una daba una curva distinta y engañosa por separado.
-  const [selSet, setSelSet] = useState("all");
   const [metric, setMetric] = useState("grafico");
   const [showExercisePicker, setShowExercisePicker] = useState(false);
   const selEx = allExercises.find((e) => e.id === selId);
-  // Detalle real de las series del ejercicio elegido (rango de reps por
-  // serie) — allExercises sólo guarda la CANTIDAD, esto trae la definición
-  // completa para mostrarla en el selector de serie.
-  const selExDef = selEx ? ROUTINE[selEx.dayKey]?.exercises.find((e) => e.id === selId) : null;
+  // La curva es SIEMPRE la mejor serie de cada sesión. El selector de serie
+  // (S1/S2/S3) se sacó: partía la evolución de un ejercicio en tantas curvas
+  // como series tuviera, y ninguna respondía la pregunta real ("¿cómo viene
+  // mi press banca?") — la serie 2 de un día podía ser de calentamiento y la
+  // 3 la pesada, así que cada índice daba una curva distinta y engañosa.
   const history = useMemo(() => {
-    if (selSet !== "all") return (logs[`${selId}_${selSet}`] || []).slice().sort((a, b) => (a.date > b.date ? 1 : -1));
-    // Vista "Todas": una entrada por SESIÓN, quedándose con la mejor serie
-    // de ese día (por 1RM estimado, el mismo criterio que usa el récord).
-    // Así la curva refleja la evolución del ejercicio y no la de un índice
-    // de serie suelto.
     const nSets = selEx?.sets || 1;
     const byDate = {};
     for (let i = 0; i < nSets; i++) {
       (logs[`${selId}_${i}`] || []).forEach((h) => {
         if (!h?.date) return;
         const prev = byDate[h.date];
+        // Mejor serie del día por 1RM estimado, el mismo criterio con el que
+        // se elige el récord.
         if (!prev || prScore(h.kg, h.reps) > prScore(prev.kg, prev.reps)) byDate[h.date] = h;
       });
     }
     return Object.values(byDate).sort((a, b) => (a.date > b.date ? 1 : -1));
-  }, [logs, selId, selSet, selEx]);
+  }, [logs, selId, selEx]);
   const chartData = useMemo(() => history.map((h) => ({ date: h.date.slice(5), kg: h.kg, reps: h.reps, vol: vol(h.kg, h.reps), e1rm: estimate1RM(h.kg, h.reps), rpe: h.rpe ?? null, deload: !!h.deload })), [history]);
   // La mejor marca de TODA la curva — sirve para la línea de referencia y
   // para agrandar el punto correspondiente en el gráfico. El 1RM sigue
@@ -9754,7 +9758,7 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
   // punto real). "chartKey" queda guardado adentro del punto elegido, así
   // invalidarlo al cambiar de ejercicio/serie es una simple comparación
   // derivada (sin ref ni efecto aparte para "resetear" nada).
-  const chartKey = `${selId}_${selSet}`;
+  const chartKey = selId;
   const [rawActivePoint, setRawActivePoint] = useState(null); // { index, cx, cy, width, chartKey }
   const activePoint = rawActivePoint?.chartKey === chartKey ? rawActivePoint : null;
   const chartContainerRef = useRef(null);
@@ -9850,36 +9854,13 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
               <ExercisePickerModal
                 groups={exercisesByDay}
                 selId={selId}
-                onSelect={(id) => { setSelId(id); setSelSet("all"); setShowExercisePicker(false); }}
+                onSelect={(id) => { setSelId(id); setShowExercisePicker(false); }}
                 onClose={() => setShowExercisePicker(false)}
               />
             )}
 
-            {/* Cada botón ahora suma el rango de reps de esa serie (para
-                elegir sin adivinar qué es cada una) y un punto si ya tiene
-                marcas — mismo lenguaje que el punto de ExerciseChipRow. */}
-            {/* "Todas" primero y por default: la curva del EJERCICIO (mejor
-                serie de cada sesión). Las series sueltas quedan como filtro
-                opcional, para cuando de verdad querés mirar una puntual. */}
-            <div className="flex gap-2">
-              <button onClick={() => setSelSet("all")} className="flex-1 py-1.5 rounded-xl text-xs font-bold transition-all border flex flex-col items-center gap-0.5"
-                style={selSet === "all" ? { backgroundColor: "#F59E0B", borderColor: "#F59E0B", color: "#fff" } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
-                Todas
-                <span className="text-[9px] font-normal opacity-70">mejor serie</span>
-              </button>
-              {Array.from({ length: selEx?.sets || 1 }).map((_, i) => {
-                const active = selSet === i;
-                const repRange = selExDef?.sets?.[i]?.repRange;
-                return (
-                  <button key={i} onClick={() => setSelSet(i)} className="flex-1 py-1.5 rounded-xl text-xs font-bold transition-all border flex flex-col items-center gap-0.5"
-                    style={active ? { backgroundColor: "#F59E0B", borderColor: "#F59E0B", color: "#fff" } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
-                    S{i + 1}
-                    {repRange && <span className="text-[9px] font-normal opacity-70">{repRange}</span>}
-                  </button>
-                );
-              })}
-            </div>
-
+            {/* La fila de S1/S2/S3 se fue: la curva es siempre la mejor
+                serie de cada sesión (ver `history` arriba). */}
             <div className="flex items-center justify-end">
               <div className="flex bg-slate-950/60 rounded-xl p-0.5 border border-slate-800/60">
                 {[{ k: "grafico", l: "Gráfico" }, { k: "1rm", l: "1RM" }].map((opt) => (
@@ -9889,7 +9870,7 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
             </div>
 
             {chartData.length === 0 ? (
-              <div className="text-center text-slate-600 py-10"><BarChart3 size={28} className="mx-auto mb-2.5 opacity-30" /><p className="text-sm">{selSet === "all" ? "Sin registros de este ejercicio." : "Sin registros para esta serie."}</p><p className="text-xs mt-1 text-slate-700">Guardá series en la rutina para ver tu evolución aquí.</p></div>
+              <div className="text-center text-slate-600 py-10"><BarChart3 size={28} className="mx-auto mb-2.5 opacity-30" /><p className="text-sm">Sin registros de este ejercicio.</p><p className="text-xs mt-1 text-slate-700">Guardá series en la rutina para ver tu evolución aquí.</p></div>
             ) : metric === "1rm" ? (
               <>
                 {/* Lista directa del 1RM estimado de cada sesión — más precisa
