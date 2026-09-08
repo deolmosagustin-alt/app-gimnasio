@@ -60,7 +60,7 @@ import {
   createRoutineProposal, createProgressionProposal, respondToRoutineProposal, listRoutineProposalsForStudent, listRoutineProposalsByTrainer,
   cleanupSocialData, listGlobalLeaderboard,
   setDiscoverablePhone, clearDiscoverablePhone, findUidsByPhoneHashes,
-  hasSentKudosToday, sendKudos,
+  hasSentKudosToday, sendKudos, listKudosReceived,
 } from "./social";
 // Catálogo de ejercicios, grupos musculares y rutinas preestablecidas —
 // movidos a data.js para que este archivo quede más liviano. RANK_TIERS
@@ -2636,6 +2636,16 @@ function resizeImageFile(file, maxDim = 1080, quality = 0.82) {
 // cámara del sistema vía un intent (el permiso lo maneja esa app aparte, no
 // la nuestra). Una vez que llega la foto, se decodifica el QR 100% en el
 // dispositivo con jsQR (sin subir nada a ningún lado).
+// BUG FIX (reporte: "el escaneo de QR para agregar a un amigo no funciona").
+// Antes esto hacía UN solo intento: achicaba la foto a 1000px de lado mayor
+// y se la pasaba a jsQR tal cual. Sacándole una foto a la pantalla de otro
+// teléfono, el QR ocupa una fracción chica del encuadre: después de achicar,
+// cada módulo del código queda en uno o dos píxeles y jsQR no engancha nada.
+// Y como el único aviso era "no pudimos leer el código", parecía roto.
+// Ahora se prueban varias pasadas, de la más probable a la menos, y se corta
+// en la primera que da: resolución alta completa, un recorte del centro
+// (donde la gente apunta), y por último la versión chica de antes. En cada
+// una se le pide a jsQR que pruebe también el código invertido.
 async function decodeQrFromImageFile(file) {
   const jsQR = (await import("jsqr")).default;
   const url = URL.createObjectURL(file);
@@ -2646,19 +2656,32 @@ async function decodeQrFromImageFile(file) {
       im.onerror = () => reject(new Error("No pudimos abrir la foto"));
       im.src = url;
     });
-    const maxDim = 1000;
-    let { width, height } = img;
-    if (width > maxDim || height > maxDim) {
-      const scale = maxDim / Math.max(width, height);
-      width = Math.round(width * scale); height = Math.round(height * scale);
-    }
     const canvas = document.createElement("canvas");
-    canvas.width = width; canvas.height = height;
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(img, 0, 0, width, height);
-    const { data } = ctx.getImageData(0, 0, width, height);
-    const result = jsQR(data, width, height);
-    return result?.data || null;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    // Dibuja una porción de la foto a un tamaño dado y se la pasa a jsQR.
+    const tryDecode = (sx, sy, sw, sh, maxDim) => {
+      if (sw < 20 || sh < 20) return null;
+      const scale = Math.min(1, maxDim / Math.max(sw, sh));
+      const w = Math.max(1, Math.round(sw * scale));
+      const h = Math.max(1, Math.round(sh * scale));
+      canvas.width = w; canvas.height = h;
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
+      const { data } = ctx.getImageData(0, 0, w, h);
+      return jsQR(data, w, h, { inversionAttempts: "attemptBoth" })?.data || null;
+    };
+    const W = img.naturalWidth || img.width;
+    const H = img.naturalHeight || img.height;
+    const half = { sx: Math.round(W * 0.2), sy: Math.round(H * 0.2), sw: Math.round(W * 0.6), sh: Math.round(H * 0.6) };
+    const intentos = [
+      [0, 0, W, H, 1600],                                        // foto entera, buena resolución
+      [half.sx, half.sy, half.sw, half.sh, 1200],                // recorte del centro
+      [0, 0, W, H, 1000],                                        // la pasada de siempre
+    ];
+    for (const [sx, sy, sw, sh, maxDim] of intentos) {
+      const hit = tryDecode(sx, sy, sw, sh, maxDim);
+      if (hit) return hit;
+    }
+    return null;
   } finally {
     URL.revokeObjectURL(url);
   }
@@ -12225,7 +12248,11 @@ function SocialSearchSection({ myUid, friendStatus, onSendFriendRequest }) {
       <button onClick={() => qrInputRef.current?.click()} disabled={scanning} className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-cyan-500/25 text-cyan-300/90 hover:bg-cyan-500/10 transition text-xs font-bold disabled:opacity-50">
         {scanning ? <RotateCcw size={13} className="animate-spin" /> : <QrCode size={13} />} {scanning ? "Leyendo el código..." : "Escanear código QR"}
       </button>
-      <input ref={qrInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { handleQrPhoto(e.target.files?.[0]); e.target.value = ""; }} />
+      {/* Sin `capture="environment"`: eso obligaba a sacar una foto con la
+          cámara en el momento. Lo más común es que te manden el QR por
+          WhatsApp y lo tengas en la galería, y así ni siquiera se podía
+          elegir. Sin el atributo, Android ofrece cámara Y galería. */}
+      <input ref={qrInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { handleQrPhoto(e.target.files?.[0]); e.target.value = ""; }} />
       {state === "searching" && <p className="text-xs text-slate-500 text-center py-3">Buscando...</p>}
       {state === "not_found" && <p className="text-xs text-slate-500 text-center py-3">No encontramos a nadie con ese @usuario.</p>}
       {state === "self" && <p className="text-xs text-slate-500 text-center py-3">Ese sos vos 🙂</p>}
@@ -14278,6 +14305,17 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
   // siempre sale del lugar correcto sin necesitar un ref por candidato.
   const kudosBurstRef = useRef(null);
   const [kudosBurst, setKudosBurst] = useState(0);
+  // Aplausos que RECIBISTE (ver listKudosReceived). Misma ventana de 2 días
+  // que para mandarlos, así se vacía sola sin necesitar marcar nada como
+  // leído.
+  const [kudosReceived, setKudosReceived] = useState([]);
+  useEffect(() => {
+    if (!uid) return;
+    let cancelled = false;
+    const desde = localDateStr(new Date(Date.now() - KUDOS_MAX_DAYS_AGO * 86400000));
+    listKudosReceived(uid, desde).then((list) => { if (!cancelled) setKudosReceived(list); });
+    return () => { cancelled = true; };
+  }, [uid]);
   useEffect(() => {
     if (!uid || kudosCandidates.length === 0) return;
     let cancelled = false;
@@ -14501,6 +14539,30 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
             teal/verde (#14B8A6) que ya identifica "Rutina activa"/"Tu
             entrenamiento" en el resto de la app, y la tarjeta se achica un
             poco (menos padding, avatar y botón de aplaudir más chicos). */}
+        {/* Los aplausos que TE mandaron. Antes esto no existía: aplaudir
+            escribía en Firestore y del otro lado no aparecía nada nunca, así
+            que el gesto no llegaba. */}
+        {kudosReceived.length > 0 && (() => {
+          const nombres = kudosReceived.map((k) => basics[k.fromUid]?.name).filter(Boolean);
+          const quien = nombres.length === 0 ? `${kudosReceived.length} ${kudosReceived.length === 1 ? "persona" : "personas"}`
+            : nombres.length === 1 ? nombres[0]
+            : nombres.length === 2 ? `${nombres[0]} y ${nombres[1]}`
+            : `${nombres[0]} y ${nombres.length - 1} más`;
+          return (
+            <div className="relative overflow-hidden rounded-2xl border mt-3 p-3 elastic-in" style={{ borderColor: "rgba(251,191,36,0.4)", background: "linear-gradient(135deg, rgba(251,191,36,0.16), rgba(15,23,42,0.55) 70%)" }}>
+              <div className="absolute -top-8 -right-8 w-20 h-20 rounded-full blur-2xl pointer-events-none" style={{ backgroundColor: "rgba(251,191,36,0.3)" }} />
+              <div className="relative flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 border-2 badge-pop" style={{ backgroundColor: "rgba(251,191,36,0.18)", borderColor: "rgba(251,191,36,0.5)" }}>
+                  <span className="text-xl leading-none">👏</span>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[9.5px] font-black uppercase tracking-wide" style={{ color: "#FBBF24" }}>Te aplaudieron</p>
+                  <p className="text-[12.5px] text-slate-200 leading-snug"><span className="font-black text-white">{quien}</span> {kudosReceived.length === 1 && nombres.length === 1 ? "festejó" : "festejaron"} tu entrenamiento.</p>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
         {kudosCandidates.length > 0 && (() => {
           const top = kudosCandidates[0];
           const sent = !!kudosSentMap[top.uid];
@@ -21309,7 +21371,7 @@ export default function App() {
                 fijarla si la cerraste. */}
             {tab === "rutina" && showPinnedDeload && <DeloadView logs={logs} setLogs={setLogs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} activeSession={profile?.activeSession?.deload ? profile.activeSession : null} onStartSession={handleStartSession} onCancelSession={handleCancelSession} weekSchedule={weekSchedule} onClose={() => setDeloadDismissed(true)} cycleStart={cycleStart} />}
             {tab === "rutina" && !showPinnedDeload && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToRoutines={() => setTab("rutinas")} onGoToSchedule={() => goToSection("rutinas", "week-schedule")} onGoToFieldSettings={() => goToSection("perfil", "field-settings-section")} onGoToDescarga={() => (isDeloadWeek ? setDeloadDismissed(false) : setTab("descarga"))} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} todaySessionDayKey={(profile?.trainingSessions || []).find((ts) => ts.date === todayStr())?.dayKey || profile?.activeSession?.dayKey || null} sex={profile?.sex} age={profile?.age} activeRoutineDef={activeRoutineDef} onApplyOwnProgression={(plan) => handleUpdateProfile({ routines: { ...(profile.routines || {}), [profile.activeRoutineId]: applyProgressionToRoutine(activeRoutineDef, plan) } })} goToDaySignal={openSectionSignal.id === "go-to-day" ? openSectionSignal : { id: null, n: 0 }} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} />}
-            {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} onGoToRoutines={() => goToSection("rutinas", "routine-editor")} weekSchedule={weekSchedule} sex={profile?.sex} age={profile?.age} onGoToDeload={() => { setDeloadDismissed(false); setTab("rutina"); }} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} />}
+            {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} onGoToRoutines={() => goToSection("rutinas", "routine-editor")} weekSchedule={weekSchedule} sex={profile?.sex} age={profile?.age} onGoToDeload={() => { if (isDeloadWeek) { setDeloadDismissed(false); setTab("rutina"); } else { setTab("descarga"); } }} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} />}
             {tab === "descarga" && <DeloadView logs={logs} setLogs={setLogs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} activeSession={profile?.activeSession?.deload ? profile.activeSession : null} onStartSession={handleStartSession} onCancelSession={handleCancelSession} weekSchedule={weekSchedule} onClose={() => { setDeloadDismissed(true); setTab("rutina"); }} cycleStart={cycleStart} />}
             {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} setLogs={setLogs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} conversations={aiConversations} activeConversationId={activeAiConversationId} onNewConversation={handleNewAiConversation} onSwitchConversation={handleSwitchAiConversation} onDeleteConversation={handleDeleteAiConversation} onRenameConversation={handleRenameAiConversation} settings={getProfileSettings(profile)} cycleStart={cycleStart} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} onDeleteRoutine={handleDeleteRoutine} onNavigate={setTab} onStartSession={handleStartSession} onEndSession={handleEndSession} />}
             {tab === "perfil" && <ProfileView onOpenFieldPreview={() => setShowFieldIntro(true)} openSectionSignal={openSectionSignal} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} profileName={activeProfile} profiles={profiles} logs={logs} onSignOut={handleSignOut} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} onGoToSocial={() => setTab("social")} />}

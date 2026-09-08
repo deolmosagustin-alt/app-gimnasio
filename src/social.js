@@ -419,6 +419,26 @@ export async function sendKudos(toUid, fromUid, date) {
   await setDoc(doc(db, "kudos", kudosId(toUid, fromUid, date)), { toUid, fromUid, date, createdAt: new Date().toISOString() });
 }
 
+// BUG FIX (reporte: "cuando alguien me aplaude no me aparece nada"). Los
+// aplausos eran de una sola vía: se escribían y nadie los leía nunca — el
+// comentario de arriba de kudosId lo dice, "no hay un listado de quién te
+// aplaudió todavía". Así que aplaudir no le llegaba a la otra persona de
+// ninguna forma. Esto trae los que RECIBISTE desde una fecha (se usa la
+// misma ventana de 2 días que para mandarlos, así se vacía sola sin
+// necesitar marcar nada como leído).
+// Las reglas ya permitían esta lectura (kudos: allow read si sos el toUid),
+// así que no hace falta publicar reglas nuevas.
+export async function listKudosReceived(uid, sinceDate) {
+  if (!uid) return [];
+  try {
+    const snap = await getDocs(query(collection(db, "kudos"), where("toUid", "==", uid), where("date", ">=", sinceDate)));
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  } catch (err) {
+    console.warn("[social] No se pudieron leer los aplausos recibidos:", err?.message || err);
+    return [];
+  }
+}
+
 // ============================== LIMPIEZA AL ELIMINAR PERFIL ==============================
 // Best-effort: se llama desde handleDelete. Nunca debe bloquear ni tirar —
 // si algo falla, queda basura huérfana (mismo criterio que ya usa el resto
