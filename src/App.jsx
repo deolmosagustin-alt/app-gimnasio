@@ -6548,7 +6548,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           pasa de un bloque de color sólido a texto del color del día sobre
           un tinte suave, que es más liviano y no compite con el panel de
           abajo. */}
-      <div className="relative grid gap-1.5 p-1 rounded-2xl bg-slate-900/60 border border-slate-800/50" style={{ gridTemplateColumns: `repeat(${DAY_ORDER.length}, 1fr)` }}>
+      <div className="relative grid gap-1.5 p-1 rounded-2xl border" style={{ gridTemplateColumns: `repeat(${DAY_ORDER.length}, 1fr)`, borderColor: tint(day.color, "25"), background: `linear-gradient(${tint(day.color, "14")}, ${tint(day.color, "14")}), rgba(2,6,23,0.55)` }}>
         <div
           className="absolute top-1 bottom-1 rounded-xl transition-all duration-300 ease-out pointer-events-none"
           style={{
@@ -7144,7 +7144,7 @@ function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [], weekSche
             los chips crezcan sin que la fila necesite partirse en dos. */}
         <div className="flex bg-slate-950/60 rounded-xl p-1 border border-slate-800/60 w-fit shrink-0">
           {[{ k: "calendar", icon: <LayoutGrid size={13} />, l: "Calendario" }, { k: "list", icon: <List size={13} />, l: "Lista" }].map((opt) => (
-            <button key={opt.k} onClick={() => setView(opt.k)} aria-label={opt.l} title={opt.l} className={`flex items-center px-3 py-2 rounded-lg transition-all ${view === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.icon}</button>
+            <button key={opt.k} onClick={() => setView(opt.k)} aria-label={opt.l} title={opt.l} className="flex items-center px-3 py-2 rounded-lg transition-all" style={view === opt.k ? { backgroundColor: "#06B6D4", color: "#fff" } : { color: "#64748b" }}>{opt.icon}</button>
           ))}
         </div>
         {/* Días entrenados y racha — compactos, acoplados al historial.
@@ -7171,7 +7171,7 @@ function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [], weekSche
 
       {view === "calendar" ? (
         <div key="calendar" className="space-y-3 tab-fade-in">
-          <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 backdrop-blur-sm">
+          <div className="pt-1">
             <div className="flex items-center justify-between mb-3">
               <button onClick={() => setCursor((c) => { const m = c.m === 0 ? 11 : c.m - 1; const y = c.m === 0 ? c.y - 1 : c.y; return { y, m }; })} className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400"><ChevronLeft size={16} /></button>
               <p className="text-sm font-bold text-white">{MONTH_LABELS[cursor.m]} {cursor.y}</p>
@@ -7212,7 +7212,7 @@ function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [], weekSche
                   : {};
                 return (
                   <button key={i} onClick={() => s && setSelectedDate(isSelected ? null : d)} disabled={!s} style={{ ...bgStyle, animationDelay: `${Math.min(i, 34) * 12}ms` }}
-                    className={`cell-pop aspect-square rounded-lg flex flex-col items-center justify-center gap-0.5 text-[11px] font-bold transition-all ${isSelected ? "ring-2 ring-teal-400" : ""} ${isToday && !s ? "border border-teal-500/50" : ""} ${s ? "text-white hover:brightness-125 active:scale-95" : "text-slate-700"}`}>
+                    className={`cell-pop aspect-square rounded-lg flex flex-col items-center justify-center gap-0.5 text-[11px] font-bold transition-all ${isSelected ? "ring-2 ring-cyan-400" : ""} ${isToday && !s ? "border border-cyan-500/50" : ""} ${s ? "text-white hover:brightness-125 active:scale-95" : "text-slate-700"}`}>
                     {dayNum}
                     {s && <div className="flex gap-0.5">{s.dayKeys.slice(0, 3).map((dk) => <span key={dk} className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: ROUTINE[dk]?.color || FALLBACK_DAY_COLOR }} />)}</div>}
                   </button>
@@ -8977,7 +8977,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
   };
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-blue-500/25 shadow-lg shadow-blue-500/5 p-4 space-y-3" style={{ background: "var(--panel-grad-blue)" }}>
+    <div className="relative overflow-hidden rounded-2xl border shadow-md shadow-black/20 p-4 space-y-3" style={{ borderColor: tint("#3B82F6", "30"), background: `linear-gradient(${tint("#3B82F6", "14")}, ${tint("#3B82F6", "14")}), rgba(15,23,42,0.5)` }}>
       {/* Glows decorativos de fondo */}
       <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
       <div className="absolute -bottom-8 -left-8 w-32 h-32 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
@@ -9377,7 +9377,8 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
   const measureTypesNoWeight = MEASUREMENT_TYPES.filter((t) => t.k !== "weight");
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-purple-500/20 bg-slate-900/50 backdrop-blur-sm shadow-md shadow-black/20 p-4 space-y-3">
+    <div className="relative overflow-hidden rounded-2xl border backdrop-blur-sm shadow-md shadow-black/20 p-4 space-y-3"
+      style={{ borderColor: tint("#A855F7", "30"), background: `linear-gradient(${tint("#A855F7", "14")}, ${tint("#A855F7", "14")}), rgba(15,23,42,0.5)` }}>
       <div className="flex items-center gap-2.5">
         <div className="w-8 h-8 rounded-xl bg-purple-500/15 text-purple-400 flex items-center justify-center shrink-0"><Ruler size={15} /></div>
         <p className="text-sm font-bold text-white">Tus medidas</p>
@@ -9813,7 +9814,7 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
           selector de Social (Amigos/Buscar/Ranking/Entrenador): un solo
           elemento que se desliza y cambia de color, en vez de que cada
           botón prenda/apague su propio fondo de golpe. */}
-      <div className="relative grid grid-cols-4 gap-1 p-1 rounded-2xl bg-slate-900/60 border border-slate-800/50">
+      <div className="relative grid grid-cols-4 gap-1 p-1 rounded-2xl border" style={{ borderColor: tint(progressSectionColor, "30"), background: `linear-gradient(${tint(progressSectionColor, "14")}, ${tint(progressSectionColor, "14")}), rgba(15,23,42,0.5)` }}>
         <div
           className="absolute top-1 bottom-1 rounded-xl transition-all duration-300 ease-out pointer-events-none"
           style={{ left: `calc(${progressSectionIdx} / ${PROGRESS_SECTIONS.length} * 100% + 2px)`, width: `calc(100% / ${PROGRESS_SECTIONS.length} - 4px)`, backgroundColor: tint(progressSectionColor, "22"), boxShadow: `inset 0 0 0 1px ${tint(progressSectionColor, "45")}` }}
@@ -9826,23 +9827,16 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
         ))}
       </div>
 
-      {/* Mismo lavado del color de la sección que en Rutina y Social. Acá va
-          como panel HUNDIDO (base slate-950) y no como tarjeta elevada,
-          porque lo que entra adentro ya son tarjetas propias (el muñeco, el
-          gráfico, el calendario): sobre una base más hundida flotan, sobre
-          una del mismo tono se fundirían y volvería el efecto de caja dentro
-          de caja. */}
-      <div
-        key={activeSection}
-        className="tab-fade-in rounded-2xl border p-3 space-y-3"
-        style={{
-          borderColor: tint(progressSectionColor, "25"),
-          background: `linear-gradient(${tint(progressSectionColor, "14")}, ${tint(progressSectionColor, "14")}), rgba(2,6,23,0.55)`,
-          marginTop: 8,
-        }}
-      >
+      {/* BUG FIX (pedido: "volviste a recuadrar dentro del anterior
+          recuadro"): el intento anterior metía TODA la sección adentro de un
+          panel teñido, pero cada sección ya venía con su propia tarjeta —
+          quedaba una caja llenando exactamente otra caja. Acá no hace falta
+          ningún contenedor extra: el lavado del color va sobre la tarjeta
+          que YA existía en cada sección (ver los `background` de abajo). */}
+      <div key={activeSection} className="tab-fade-in space-y-3">
         {activeSection === "chart" && (
-          <div className="relative overflow-hidden rounded-2xl border border-amber-500/20 bg-slate-900/50 backdrop-blur-sm shadow-md shadow-black/20 p-4 space-y-3">
+          <div className="relative overflow-hidden rounded-2xl border backdrop-blur-sm shadow-md shadow-black/20 p-4 space-y-3"
+            style={{ borderColor: tint("#F59E0B", "30"), background: `linear-gradient(${tint("#F59E0B", "14")}, ${tint("#F59E0B", "14")}), rgba(15,23,42,0.5)` }}>
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center shrink-0"><Activity size={15} /></div>
               <p className="text-sm font-bold text-white">Evolución por ejercicio</p>
@@ -10013,7 +10007,7 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
         )}
 
         {activeSection === "historial" && (
-          <div className="rounded-2xl border border-cyan-500/20 bg-slate-900/50 shadow-md shadow-black/20 p-4">
+          <div className="rounded-2xl border shadow-md shadow-black/20 p-4" style={{ borderColor: tint("#06B6D4", "30"), background: `linear-gradient(${tint("#06B6D4", "14")}, ${tint("#06B6D4", "14")}), rgba(15,23,42,0.5)` }}>
             <SessionHistoryView logs={logs} onDeleteDay={onDeleteDay} trainingSessions={sessions} weekSchedule={weekSchedule} exerciseNotes={settings.exerciseNotes} rpeDisplayMode={settings.rpeDisplayMode} />
           </div>
         )}
@@ -14667,7 +14661,7 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
 
       <SocialProgressStats profile={profile} />
 
-      <div className="relative grid gap-1 p-1 rounded-2xl bg-slate-900/60 border border-slate-800/50" style={{ gridTemplateColumns: `repeat(${SECTIONS.length}, 1fr)` }}>
+      <div className="relative grid gap-1 p-1 rounded-2xl border" style={{ gridTemplateColumns: `repeat(${SECTIONS.length}, 1fr)`, borderColor: tint(sectionColor, "25"), background: `linear-gradient(${tint(sectionColor, "12")}, ${tint(sectionColor, "12")}), rgba(15,23,42,0.5)` }}>
         {/* Píldora deslizante en vez de que cada botón prenda/apague su
             propio fondo de golpe — un solo elemento que se desliza y
             cambia de color (celeste en Amigos/Buscar/Ranking, índigo en
@@ -19882,9 +19876,9 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
       )}
 
       {(!forced || showPresetsForced) && (
-      <div className={`rounded-2xl border p-3 space-y-3 ${forced ? "tab-fade-in" : ""}`} style={{ borderColor: tint("#06B6D4", "25"), background: `linear-gradient(${tint("#06B6D4", "14")}, ${tint("#06B6D4", "14")}), rgba(2,6,23,0.55)` }}>
+      <div className={`rounded-2xl border p-3 space-y-3 ${forced ? "tab-fade-in" : ""}`} style={{ borderColor: tint("#3B82F6", "25"), background: `linear-gradient(${tint("#3B82F6", "10")}, ${tint("#3B82F6", "10")}), rgba(2,6,23,0.6)` }}>
         <div className="flex items-center gap-2.5 px-0.5 pt-0.5">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: tint("#06B6D4", "18"), color: "#06B6D4" }}><Sparkles size={15} /></div>
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: tint("#3B82F6", "18"), color: "#3B82F6" }}><Sparkles size={15} /></div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-bold text-white">Rutinas preestablecidas</p>
             <p className="text-[11px] text-slate-500">Armadas de fábrica. Activalas tal cual o copialas para editar</p>
