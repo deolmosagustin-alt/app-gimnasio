@@ -1980,6 +1980,21 @@ const ANIMATION_CSS = `
 /* Barra de progreso animada al montarse */
 @keyframes growBar { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 .grow-bar { transform-origin: left center; animation: growBar 0.7s cubic-bezier(.2,.8,.3,1); }
+/* Variante para la barra IZQUIERDA del "tira y afloja" de la batalla: crece
+   desde el centro hacia afuera, no desde el borde de la pantalla. Las dos
+   barras salen del mismo punto, que es lo que hace legible quién gana
+   terreno. */
+.grow-bar-r { transform-origin: right center; animation: growBar 0.7s cubic-bezier(.2,.8,.3,1); }
+/* Cuenta regresiva: un latido POR SEGUNDO en los últimos 10. El pulso
+   continuo de antes se veía "urgente" pero no marcaba el paso del tiempo;
+   éste se reinicia con cada segundo que baja (ver el key del número en
+   RestTimer), así el ritmo ES la cuenta. */
+@keyframes tickBeat {
+  0%   { transform: scale(1); }
+  18%  { transform: scale(1.13); }
+  100% { transform: scale(1); }
+}
+.tick-beat { animation: tickBeat 0.85s cubic-bezier(.2,.8,.3,1); }
 
 /* Feedback táctil universal en botones — más responsivo al tacto */
 button { transition: transform 0.12s ease, opacity 0.15s ease; }
@@ -4549,7 +4564,8 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default", 
         <div className="flex items-center gap-2.5">
           {/* Tiempo protagonista */}
           <span
-            className={`text-2xl font-black tabular-nums shrink-0 transition-colors ${urgent ? "soft-pulse" : ""}`}
+            key={urgent ? `t${remaining}` : "t"}
+            className={`text-2xl font-black tabular-nums shrink-0 transition-colors ${urgent ? "tick-beat" : ""}`}
             style={{ color: running ? barColor : "#94a3b8", textShadow: urgent ? `0 0 16px ${tint(barColor, "70")}` : "none" }}
           >
             {formatTime(remaining)}
@@ -6676,7 +6692,9 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
               refuerzo, sin fondo negro ni glow. */}
           <div className="mt-3 rounded-xl px-3 py-2.5" style={{ backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}>
             <div className="flex items-baseline gap-1.5 mb-1.5">
-              <span className="text-sm font-black tabular-nums" style={{ color: pct > 0 ? day.color : "#64748b" }}>{doneToday}/{totalSets}</span>
+              <span className="text-sm font-black tabular-nums flex items-baseline" style={{ color: pct > 0 ? day.color : "#64748b" }}>
+                <CountUpNumber value={doneToday} from={0} duration={550} decimals={0} className="tabular-nums" />/{totalSets}
+              </span>
               <span className="text-[11px] text-slate-500">series</span>
               <span className="text-slate-700 text-[11px]">·</span>
               <span className="text-[11px] text-slate-500 tabular-nums">{day.exercises.length} ejercicios</span>
@@ -7649,13 +7667,19 @@ function SocialProgressStats({ profile }) {
     <div className="space-y-1.5">
       <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 px-1">Tu progreso</p>
       <div className="grid grid-cols-3 gap-2">
+        {/* Los tres números cuentan desde 0 al entrar a Social (CountUpNumber,
+            el mismo que ya usaba el resumen de sesión): son el logro
+            acumulado, y verlos subir les da el peso que un número quieto no
+            transmite. 550ms, lo justo para notarlo sin hacerte esperar. */}
         {[
-          { label: "Racha", val: `${stats.streak}d` },
-          { label: "Esta semana", val: `${stats.thisWeek}` },
-          { label: "Entrenados", val: `${stats.total}d` },
-        ].map(({ label, val }) => (
+          { label: "Racha", val: stats.streak, sufijo: "d" },
+          { label: "Esta semana", val: stats.thisWeek, sufijo: "" },
+          { label: "Entrenados", val: stats.total, sufijo: "d" },
+        ].map(({ label, val, sufijo }) => (
           <div key={label} className="bg-purple-500/10 border border-purple-500/15 rounded-xl px-3 py-2 text-center">
-            <p className="text-sm font-black text-purple-200">{val}</p>
+            <p className="text-sm font-black text-purple-200 flex items-baseline justify-center">
+              <CountUpNumber value={val} from={0} duration={550} decimals={0} className="tabular-nums" />{sufijo}
+            </p>
             <p className="text-[10px] text-purple-500 mt-0.5">{label}</p>
           </div>
         ))}
@@ -9968,7 +9992,7 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
                           toque (ver más arriba), nada más del gráfico. Color fijo naranja
                           (el acento de esta sección), no el color del día: eso lo sigue
                           mostrando solo el botón "Elegí un ejercicio" de más arriba. */}
-                      <Area type="monotone" dataKey="e1rm" stroke={EVOLUTION_CHART_COLOR} fill="url(#gA)" strokeWidth={2.5} isAnimationActive={false} dot={(props) => <EvolutionDot {...props} color={EVOLUTION_CHART_COLOR} isBest={props.payload.e1rm === chartBestE1rm} isActive={activePoint?.index === props.index} deload={props.payload.deload} onSelect={handleSelectPoint} />} activeDot={false} name="Kg" />
+                      <Area type="monotone" dataKey="e1rm" stroke={EVOLUTION_CHART_COLOR} fill="url(#gA)" strokeWidth={2.5} isAnimationActive animationDuration={650} animationEasing="ease-out" dot={(props) => <EvolutionDot {...props} color={EVOLUTION_CHART_COLOR} isBest={props.payload.e1rm === chartBestE1rm} isActive={activePoint?.index === props.index} deload={props.payload.deload} onSelect={handleSelectPoint} />} activeDot={false} name="Kg" />
                     </AreaChart>
                   </ResponsiveContainer>
                   {activePoint && chartData[activePoint.index] && (() => {
@@ -10198,6 +10222,28 @@ function SectionRow({ icon, title, desc, accent = "#A855F7", onClick = null, rig
 // Rótulo de sub-bloque dentro de una tarjeta de sección — un solo estilo
 // para "Solicitudes recibidas", "Mis alumnos", "Mi entrenador", etc., en vez
 // de que cada uno eligiera su propio tamaño y color.
+// Esqueleto de una fila de persona mientras cargan los datos: la misma
+// silueta que va a aparecer (barrita, avatar, dos líneas de texto) en gris
+// con el brillo que ya define .skeleton. Reemplaza al "Cargando..." de
+// texto: se ve la forma de lo que viene en vez de una palabra en el vacío,
+// y la lista no salta de alto cuando llegan los datos.
+function PublicUserCardSkeleton({ filas = 3 }) {
+  return (
+    <div className="space-y-2" aria-hidden="true">
+      {Array.from({ length: filas }).map((_, i) => (
+        <div key={i} className="w-full flex items-center gap-3 px-3 py-3 rounded-2xl border" style={{ borderColor: "var(--chip-border)", backgroundColor: "var(--row-surface)", animationDelay: `${i * 90}ms` }}>
+          <div className="skeleton w-2 h-9 shrink-0" style={{ borderRadius: 999 }} />
+          <div className="skeleton w-12 h-12 shrink-0" style={{ borderRadius: "1rem" }} />
+          <div className="flex-1 min-w-0 space-y-2">
+            <div className="skeleton h-3.5" style={{ width: `${55 + ((i * 17) % 30)}%` }} />
+            <div className="skeleton h-2.5 w-2/5" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function SectionLabel({ children, accent = null }) {
   return <p className="text-[9.5px] font-black uppercase tracking-widest px-0.5" style={{ color: accent || "#64748b" }}>{children}</p>;
 }
@@ -11871,7 +11917,7 @@ function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted
         {linkSendError && <p className="text-[11px] text-rose-400/90 px-1">{linkSendError}</p>}
       </div>
 
-      {loading ? <p className="text-center text-slate-600 text-sm py-8">Cargando...</p> : (
+      {loading ? <PublicUserCardSkeleton filas={2} /> : (
         <>
           {trainerIncoming.length > 0 && (
             <div className="space-y-2">
@@ -12124,7 +12170,7 @@ function RankComparisonList({ comparison, myLogs = null, theirLogs = null, their
             </div>
             <div className="flex items-center gap-1">
               <div className="flex-1 flex justify-end h-1.5 rounded-full bg-black/30 overflow-hidden">
-                {myLvl >= 0 && <div className="h-full rounded-full bg-teal-400 grow-bar" style={{ width: `${myPct}%` }} />}
+                {myLvl >= 0 && <div className="h-full rounded-full bg-teal-400 grow-bar-r" style={{ width: `${myPct}%` }} />}
               </div>
               <div className="w-1 h-1 rounded-full bg-slate-700 shrink-0" />
               <div className="flex-1 h-1.5 rounded-full bg-black/30 overflow-hidden">
@@ -14072,7 +14118,7 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
         )}
 
         {section === "amigos" && (
-          loading ? <p className="text-center text-slate-600 text-sm py-8">Cargando...</p> : (
+          loading ? <PublicUserCardSkeleton /> : (
             <>
               {friendIncoming.length > 0 && (
                 <div className="space-y-2">
