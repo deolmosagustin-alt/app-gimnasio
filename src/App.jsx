@@ -4841,11 +4841,15 @@ const RECAP_ESTILOS = {
   anio: { titulo: "¡Año completo! 🏆", color: "#F59E0B", cta: "¡A por el próximo! 🎯" },
 };
 
-function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null }) {
+function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null, enCurso = false }) {
   useAndroidBack(onClose);
   if (!data) return null;
-  const est = RECAP_ESTILOS[periodo] || RECAP_ESTILOS.semana;
-  const bajada = est.bajada || `Así te fue en ${etiqueta || "el período"}`;
+  const base = RECAP_ESTILOS[periodo] || RECAP_ESTILOS.semana;
+  // El mismo modal sirve para un período ya cerrado y para el que está
+  // corriendo (lo abre el botón del historial). Decir "mes cerrado" de un
+  // mes a mitad de camino sería mentir, así que cambian título y texto.
+  const est = enCurso ? { ...base, titulo: "Cómo vas este mes 📆", cta: "Seguir así 💪" } : base;
+  const bajada = enCurso ? `Lo que llevás de ${etiqueta || "este mes"}` : (est.bajada || `Así te fue en ${etiqueta || "el período"}`);
   const tramos = data.tramos || [];
   const maxTramo = tramos.reduce((m, t) => Math.max(m, t.valor), 0);
   const mejorTramo = maxTramo > 0 ? tramos.findIndex((t) => t.valor === maxTramo) : -1;
@@ -4922,7 +4926,7 @@ function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null }
               <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: tint(est.color, "1c"), color: est.color }}><Flame size={14} /></span>
               <span className="flex-1 min-w-0">
                 <span className="block text-[9px] font-black uppercase tracking-wider text-slate-600">Tu mejor día</span>
-                <span className="block text-xs font-bold text-white truncate">{data.mejorDia.date.slice(8, 10)}/{data.mejorDia.date.slice(5, 7)} · {data.mejorDia.series} series</span>
+                <span className="block text-xs font-bold text-white truncate">{data.mejorDia.date.slice(8, 10)}/{data.mejorDia.date.slice(5, 7)} · {data.mejorDia.series} {data.mejorDia.series === 1 ? "serie" : "series"}</span>
               </span>
               <span className="text-xs font-black tabular-nums shrink-0" style={{ color: est.color }}>{fmtKg(data.mejorDia.volumen)} kg</span>
             </div>
@@ -4943,7 +4947,7 @@ function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null }
                 <span className="block text-[9px] font-black uppercase tracking-wider text-slate-600">Lo que más trabajaste</span>
                 <span className="block text-xs font-bold text-white truncate">{data.topMusculo.nombre}</span>
               </span>
-              <span className="text-xs font-black tabular-nums text-slate-400 shrink-0">{data.topMusculo.series} series</span>
+              <span className="text-xs font-black tabular-nums text-slate-400 shrink-0">{data.topMusculo.series} {data.topMusculo.series === 1 ? "serie" : "series"}</span>
             </div>
           )}
         </div>
@@ -7234,6 +7238,13 @@ function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [], weekSche
   const now = new Date();
   const [cursor, setCursor] = useState({ y: now.getFullYear(), m: now.getMonth() });
   const [selectedDate, setSelectedDate] = useState(null);
+  const [verResumenMes, setVerResumenMes] = useState(false);
+  // Resumen del mes que muestra el calendario ahora mismo (no el de hoy):
+  // el boton de abajo abre exactamente lo que estas mirando.
+  const resumenDelMes = useMemo(
+    () => computePrefixRecap(logs, trainingSessions, `${cursor.y}-${String(cursor.m + 1).padStart(2, "0")}`),
+    [logs, trainingSessions, cursor],
+  );
   const weeks = useMemo(() => getMonthMatrix(cursor.y, cursor.m), [cursor]);
   const selectedSession = selectedDate ? sessionByDate[selectedDate] : null;
   // El detalle del día también congela el fondo y responde al botón atrás.
@@ -7341,6 +7352,26 @@ function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [], weekSche
 
           </div>
           {!selectedSession && <p className="text-center text-[11px] text-slate-600 py-2">Tocá un día con marca para ver el detalle.</p>}
+          {/* Resumen del mes que estás mirando en el calendario, no del mes
+              actual: si retrocedés a agosto, el botón te muestra agosto. Es
+              el mismo resumen que aparece solo al cerrar el mes, pero acá lo
+              podés abrir cuando quieras. No se muestra si ese mes no tiene
+              nada registrado, para no abrir una ventana vacía. */}
+          {resumenDelMes && (
+            <button onClick={() => setVerResumenMes(true)} className="w-full flex items-center justify-center gap-2 mt-1 py-2.5 rounded-xl border text-xs font-bold transition active:scale-[0.98]"
+              style={{ backgroundColor: tint("#3B82F6", "12"), borderColor: tint("#3B82F6", "33"), color: "#60a5fa" }}>
+              <TrendingUp size={13} /> Ver resumen de {MONTH_LABELS[cursor.m].toLowerCase()}
+            </button>
+          )}
+          {verResumenMes && (
+            <WeeklyRecapModal
+              data={resumenDelMes}
+              periodo="mes"
+              etiqueta={`${MONTH_LABELS[cursor.m].toLowerCase()} de ${cursor.y}`}
+              enCurso={cursor.y === now.getFullYear() && cursor.m === now.getMonth()}
+              onClose={() => setVerResumenMes(false)}
+            />
+          )}
           {/* Detalle de la sesión como modal centrado — antes se desplegaba
               abajo del calendario y quedaba escondido; ahora aparece al
               frente, con fondo difuminado y cierre con toque afuera o X. */}
