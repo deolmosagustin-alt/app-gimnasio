@@ -4752,6 +4752,7 @@ function SessionStartOverlay({ onDone }) {
 // finalizar no mostraba nada — el mejor momento de la app pasaba en silencio.
 function SessionSummaryModal({ resumen, onClose }) {
   useAndroidBack(onClose);
+  const [verTodosPRs, setVerTodosPRs] = useState(false);
   // Destellos de celebración: posiciones/tiempos aleatorios pero fijos (una
   // sola vez) para que no se regeneren en cada render. Colores de la app.
   const [confeti] = useState(() => {
@@ -4805,18 +4806,50 @@ function SessionSummaryModal({ resumen, onClose }) {
           ))}
         </div>
 
+        {/* Reparto por músculo de ESTA sesión: la misma dona del resumen
+            semanal/mensual, acá contando sólo lo de hoy. Responde "¿qué
+            entrené realmente?" mejor que el nombre del día, porque un Push
+            puede terminar siendo casi todo pecho o casi todo hombro según
+            cuánto le metiste a cada cosa. */}
+        {resumen.musculos?.length > 1 && (
+          <div className="px-5 mt-4">
+            <p className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-600 mb-2">Qué trabajaste</p>
+            <div className="flex items-center gap-3 rounded-2xl bg-black/25 border border-white/[0.05] p-3">
+              <DonutMusculos datos={resumen.musculos} size={92} />
+              <div className="flex-1 min-w-0 space-y-1.5">
+                {resumen.musculos.map((m) => (
+                  <div key={m.nombre} className="flex items-center gap-2 min-w-0">
+                    <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: m.color }} />
+                    <span className="flex-1 min-w-0 text-[10.5px] text-slate-300 truncate">{m.nombre}</span>
+                    <span className="text-[10.5px] font-black tabular-nums shrink-0" style={{ color: m.color }}>{m.series}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Los récords del día, apareciendo uno a uno */}
         {resumen.prs.length > 0 && (
           <div className="px-5 mt-4 space-y-1.5">
             <p className="text-[9px] font-black uppercase tracking-[0.14em] text-amber-400/90">Récords de hoy</p>
-            {resumen.prs.slice(0, 5).map((pr, i) => (
-              <div key={pr.id} className="flex items-center gap-2.5 rounded-xl px-3 py-2 bg-amber-500/[0.07] border border-amber-500/20 badge-pop" style={{ animationDelay: `${400 + i * 220}ms` }}>
+            {(verTodosPRs ? resumen.prs : resumen.prs.slice(0, 5)).map((pr, i) => (
+                // Los que aparecen al expandir entran casi de una: con el
+                // escalonado de los primeros cinco (220ms cada uno) el sexto
+                // quedaba invisible un segundo y medio despues de tocar.
+              <div key={pr.id} className="flex items-center gap-2.5 rounded-xl px-3 py-2 bg-amber-500/[0.07] border border-amber-500/20 badge-pop" style={{ animationDelay: `${i < 5 ? 400 + i * 220 : (i - 5) * 60}ms` }}>
                 <span className="text-sm">🔥</span>
                 <span className="flex-1 min-w-0 truncate text-[11px] font-bold text-amber-200">{pr.nombre}</span>
                 <span className="text-[10px] text-amber-400/80 tabular-nums shrink-0">{pr.marca}</span>
               </div>
             ))}
-            {resumen.prs.length > 5 && <p className="text-[9px] text-slate-600 text-center">y {resumen.prs.length - 5} más</p>}
+            {/* "y N más" era texto muerto: si rompiste 9 récords querés ver
+                los 9, no que te digan que existen. */}
+            {resumen.prs.length > 5 && (
+              <button onClick={() => setVerTodosPRs((v) => !v)} className="w-full flex items-center justify-center gap-1 py-1.5 text-[10px] font-bold text-amber-400/70 hover:text-amber-300 transition">
+                {verTodosPRs ? <>Ver menos <ChevronUp size={11} /></> : <>y {resumen.prs.length - 5} más <ChevronDown size={11} /></>}
+              </button>
+            )}
           </div>
         )}
 
@@ -4849,6 +4882,13 @@ const RECAP_ESTILOS = {
 // modal que se abre una vez por mes. Cada arco es un círculo con
 // stroke-dasharray (largo del tramo / resto) y el desfase acumulado.
 function DonutMusculos({ datos, size = 108 }) {
+  // Los arcos arrancan en largo 0 y, apenas monta, pasan a su largo real:
+  // con la transicion de CSS eso se ve como la dona dibujandose sola,
+  // sector por sector. Va con estado y no con @keyframes porque el largo
+  // de cada arco depende de los datos, y una keyframe no puede llevar un
+  // valor distinto por elemento.
+  const [desplegada, setDesplegada] = useState(false);
+  useEffect(() => { const t = setTimeout(() => setDesplegada(true), 40); return () => clearTimeout(t); }, []);
   const total = datos.reduce((a, d) => a + d.series, 0);
   if (!total) return null;
   const r = (size - 14) / 2;
@@ -4871,10 +4911,10 @@ function DonutMusculos({ datos, size = 108 }) {
             key={i}
             cx={size / 2} cy={size / 2} r={r}
             fill="none" stroke={d.color} strokeWidth="12" strokeLinecap="butt"
-            strokeDasharray={`${Math.max(0, largo - 1.5)} ${circ}`}
+            strokeDasharray={desplegada ? `${Math.max(0, largo - 1.5)} ${circ}` : `0 ${circ}`}
             strokeDashoffset={-offset}
             transform={`rotate(-90 ${size / 2} ${size / 2})`}
-            style={{ animation: `donutIn 0.6s cubic-bezier(.2,.8,.3,1) ${i * 70}ms backwards` }}
+            style={{ transition: "stroke-dasharray 620ms cubic-bezier(.2,.8,.3,1)", transitionDelay: `${i * 110}ms` }}
           />
         );
       })}
@@ -4886,6 +4926,7 @@ function DonutMusculos({ datos, size = 108 }) {
 
 function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null, enCurso = false }) {
   useAndroidBack(onClose);
+  const [verTodasMarcas, setVerTodasMarcas] = useState(false);
   if (!data) return null;
   const base = RECAP_ESTILOS[periodo] || RECAP_ESTILOS.semana;
   // El mismo modal sirve para un período ya cerrado y para el que está
@@ -4998,15 +5039,19 @@ function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null, 
               <Trophy size={11} /> {data.records} {data.records === 1 ? "marca nueva" : "marcas nuevas"}
             </p>
             <div className="space-y-1.5">
-              {data.marcas.map((m, i) => (
+              {(verTodasMarcas ? (data.todasMarcas || data.marcas) : data.marcas).map((m, i) => (
                 <div key={i} className="flex items-center gap-2.5 rounded-xl px-3 py-2 stagger-item" style={{ backgroundColor: "rgba(251,191,36,0.09)", border: "1px solid rgba(251,191,36,0.22)", animationDelay: `${i * 60}ms` }}>
                   <span className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 bg-amber-500/20 text-amber-300 text-[10px] font-black">{i + 1}</span>
                   <span className="flex-1 min-w-0 text-xs font-bold text-white truncate">{m.exercise}</span>
                   <span className="text-xs font-black tabular-nums text-amber-300 shrink-0">{m.reps}×{m.kg}kg</span>
                 </div>
               ))}
+              {/* Antes esto era texto muerto: si rompiste 9 marcas querés
+                  verlas, no que te avisen que existen. */}
               {data.records > data.marcas.length && (
-                <p className="text-[10px] text-slate-600 text-center pt-0.5">y {data.records - data.marcas.length} más</p>
+                <button onClick={() => setVerTodasMarcas((v) => !v)} className="w-full flex items-center justify-center gap-1 py-1.5 text-[10px] font-bold text-amber-400/70 hover:text-amber-300 transition">
+                  {verTodasMarcas ? <>Ver menos <ChevronUp size={11} /></> : <>y {data.records - data.marcas.length} más <ChevronDown size={11} /></>}
+                </button>
               )}
             </div>
           </div>
@@ -10447,6 +10492,7 @@ function resumirSesiones(filtered, tramos = null) {
     volumen,
     records: marcas.length,
     marcas: marcas.slice(0, 4),
+    todasMarcas: marcas,
     musculos,
     mejorDia,
     topMusculo: musculos[0] || null,
@@ -21047,6 +21093,7 @@ export default function App() {
     let volumen = 0, series = 0;
     const ejercicios = new Set();
     const prs = [];
+    const porMusculo = {};
     Object.entries(porEjercicio).forEach(([exId, entries]) => {
       // BUG FIX: si marcaste algo en Descarga el mismo día, esas entradas
       // (con "deload:true") se colaban acá y el resumen de la sesión NORMAL
@@ -21057,6 +21104,10 @@ export default function App() {
       const lf = (dd && dd[exId]) || EXERCISE_LIBRARY_BY_ID[exId]?.loadFactor || 1;
       deHoy.forEach((e) => { volumen += e.kg * lf * e.reps; series++; });
       ejercicios.add(exId);
+      // Series por musculo, para la dona del resumen (mismo criterio que
+      // los resumenes de semana/mes/anio: se cuenta por SERIES, no por kilos).
+      const mus = EXERCISE_LIBRARY_BY_ID[exId]?.muscle || "Otros";
+      porMusculo[mus] = (porMusculo[mus] || 0) + deHoy.length;
       // ¿Superó hoy su mejor marca previa? El loadFactor se cancela (es el
       // mismo ejercicio de ambos lados), así que comparamos 1RM crudo. El
       // récord corregido a mano también cuenta como piso a superar.
@@ -21079,7 +21130,11 @@ export default function App() {
       const m = Math.round((Date.now() - new Date(inicio).getTime()) / 60000);
       if (m >= 0 && m < 24 * 60) minutos = m; // descarta duraciones absurdas (sesión olvidada abierta)
     }
-    return { volumen: Math.round(volumen), series, ejercicios: ejercicios.size, prs, minutos };
+    const paleta = ["#14B8A6", "#3B82F6", "#A855F7", "#F59E0B", "#F43F5E", "#06B6D4", "#84CC16", "#EC4899"];
+    const musculos = Object.entries(porMusculo)
+      .sort((a, b) => b[1] - a[1])
+      .map(([nombre, n], i) => ({ nombre, series: n, color: MUSCLE_GROUPS.find((g) => g.label === nombre)?.color || paleta[i % paleta.length] }));
+    return { volumen: Math.round(volumen), series, ejercicios: ejercicios.size, prs, minutos, musculos };
   };
 
   // Resumen semanal: dispara SOLO si hoy es domingo (fin de semana lun-dom)
