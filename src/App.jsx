@@ -1984,6 +1984,9 @@ const ANIMATION_CSS = `
    growBar anima scaleX, que en una barra vertical la ensancha en vez de
    levantarla. Ésta crece desde abajo, que es como se lee una columna. */
 @keyframes growBarUp { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+/* Los arcos de la dona de reparto por músculo entran girando desde el
+   principio del círculo, uno detrás de otro. */
+@keyframes donutIn { from { opacity: 0; transform: rotate(-25deg); } to { opacity: 1; transform: rotate(0); } }
 .grow-bar-up { transform-origin: bottom center; animation: growBarUp 0.55s cubic-bezier(.2,.8,.3,1) backwards; }
 /* Variante para la barra IZQUIERDA del "tira y afloja" de la batalla: crece
    desde el centro hacia afuera, no desde el borde de la pantalla. Las dos
@@ -4841,6 +4844,46 @@ const RECAP_ESTILOS = {
   anio: { titulo: "¡Año completo! 🏆", color: "#F59E0B", cta: "¡A por el próximo! 🎯" },
 };
 
+// Dona de reparto por músculo. SVG a mano en vez de una librería: son
+// cuatro arcos, y meter Recharts acá cargaría el chart entero dentro de un
+// modal que se abre una vez por mes. Cada arco es un círculo con
+// stroke-dasharray (largo del tramo / resto) y el desfase acumulado.
+function DonutMusculos({ datos, size = 108 }) {
+  const total = datos.reduce((a, d) => a + d.series, 0);
+  if (!total) return null;
+  const r = (size - 14) / 2;
+  const circ = 2 * Math.PI * r;
+  // Los tramos se calculan de una, con el desfase acumulado ya resuelto:
+  // ir sumando una variable adentro del .map() reasigna durante el render
+  // y React lo marca como impuro.
+  const arcos = datos.reduce((acc, d) => {
+    const previo = acc.length ? acc[acc.length - 1] : null;
+    acc.push({ ...d, largo: (d.series / total) * circ, offset: previo ? previo.offset + previo.largo : 0 });
+    return acc;
+  }, []);
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="shrink-0">
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(148,163,184,0.12)" strokeWidth="12" />
+      {arcos.map((d, i) => {
+        const { largo, offset } = d;
+        return (
+          <circle
+            key={i}
+            cx={size / 2} cy={size / 2} r={r}
+            fill="none" stroke={d.color} strokeWidth="12" strokeLinecap="butt"
+            strokeDasharray={`${Math.max(0, largo - 1.5)} ${circ}`}
+            strokeDashoffset={-offset}
+            transform={`rotate(-90 ${size / 2} ${size / 2})`}
+            style={{ animation: `donutIn 0.6s cubic-bezier(.2,.8,.3,1) ${i * 70}ms backwards` }}
+          />
+        );
+      })}
+      <text x="50%" y="47%" textAnchor="middle" className="fill-white" style={{ fontSize: 19, fontWeight: 900 }}>{total}</text>
+      <text x="50%" y="63%" textAnchor="middle" style={{ fontSize: 8.5, fill: "#64748b", fontWeight: 700 }}>SERIES</text>
+    </svg>
+  );
+}
+
 function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null, enCurso = false }) {
   useAndroidBack(onClose);
   if (!data) return null;
@@ -4854,6 +4897,14 @@ function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null, 
   const maxTramo = tramos.reduce((m, t) => Math.max(m, t.valor), 0);
   const mejorTramo = maxTramo > 0 ? tramos.findIndex((t) => t.valor === maxTramo) : -1;
   const fmtKg = (v) => (v >= 1000 ? `${(v / 1000).toFixed(v >= 10000 ? 0 : 1)}k` : String(v));
+  // La dona muestra los 5 músculos con más series y junta el resto en
+  // "Otros": con 15 grupos, los arcos finos no se distinguen y la leyenda
+  // se vuelve ilegible.
+  const musculos = data.musculos || [];
+  const donaDatos = musculos.length > 6
+    ? [...musculos.slice(0, 5), { nombre: "Otros", series: musculos.slice(5).reduce((a, m) => a + m.series, 0), color: "#475569" }]
+    : musculos;
+  const filaDato = { backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" };
   return (
     <div className="fixed inset-0 z-[140] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
       <div
@@ -4900,7 +4951,7 @@ function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null, 
             justamente lo que hay que ver, no algo para esconder. */}
         {maxTramo > 0 && (
           <div className="px-5 pt-4">
-            <p className="text-[9.5px] font-black uppercase tracking-widest text-slate-600 mb-2">Cómo lo repartiste</p>
+            <p className="text-[9.5px] font-black uppercase tracking-widest text-slate-600 mb-2">Cuándo entrenaste</p>
             <div className="flex items-end justify-between gap-1 h-20 rounded-2xl bg-black/25 border border-white/[0.05] px-2.5 pt-2.5 pb-1.5">
               {tramos.map((t, i) => (
                 <div key={i} className="flex-1 flex flex-col items-center justify-end h-full gap-1 min-w-0">
@@ -4918,11 +4969,53 @@ function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null, 
           </div>
         )}
 
-        {/* Tres datos concretos, no adornos: el día que más metiste, cuántos
-            récords rompiste y qué músculo se llevó más series. */}
-        <div className="px-5 pt-3 space-y-2">
+        {/* Dónde fue el trabajo: la dona responde "¿estoy equilibrado?", que
+            es la pregunta que ningún total contesta. */}
+        {donaDatos.length > 1 && (
+          <div className="px-5 pt-4">
+            <p className="text-[9.5px] font-black uppercase tracking-widest text-slate-600 mb-2">Dónde fue el trabajo</p>
+            <div className="flex items-center gap-3 rounded-2xl bg-black/25 border border-white/[0.05] p-3">
+              <DonutMusculos datos={donaDatos} />
+              <div className="flex-1 min-w-0 space-y-1.5">
+                {donaDatos.map((m) => (
+                  <div key={m.nombre} className="flex items-center gap-2 min-w-0">
+                    <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: m.color }} />
+                    <span className="flex-1 min-w-0 text-[10.5px] text-slate-300 truncate">{m.nombre}</span>
+                    <span className="text-[10.5px] font-black tabular-nums shrink-0" style={{ color: m.color }}>{Math.round((m.series / data.series) * 100)}%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Las marcas CONCRETAS, no un contador: qué levantaste y con cuánto.
+            Una por ejercicio (la mejor del período), si no una progresión de
+            cinco sesiones llenaba la lista con el mismo nombre. */}
+        {data.marcas?.length > 0 && (
+          <div className="px-5 pt-4">
+            <p className="text-[9.5px] font-black uppercase tracking-widest text-amber-500/80 mb-2 flex items-center gap-1.5">
+              <Trophy size={11} /> {data.records} {data.records === 1 ? "marca nueva" : "marcas nuevas"}
+            </p>
+            <div className="space-y-1.5">
+              {data.marcas.map((m, i) => (
+                <div key={i} className="flex items-center gap-2.5 rounded-xl px-3 py-2 stagger-item" style={{ backgroundColor: "rgba(251,191,36,0.09)", border: "1px solid rgba(251,191,36,0.22)", animationDelay: `${i * 60}ms` }}>
+                  <span className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 bg-amber-500/20 text-amber-300 text-[10px] font-black">{i + 1}</span>
+                  <span className="flex-1 min-w-0 text-xs font-bold text-white truncate">{m.exercise}</span>
+                  <span className="text-xs font-black tabular-nums text-amber-300 shrink-0">{m.reps}×{m.kg}kg</span>
+                </div>
+              ))}
+              {data.records > data.marcas.length && (
+                <p className="text-[10px] text-slate-600 text-center pt-0.5">y {data.records - data.marcas.length} más</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Datos sueltos que no justifican un gráfico pero sí una fila. */}
+        <div className="px-5 pt-4 space-y-2">
           {data.mejorDia && (
-            <div className="flex items-center gap-2.5 rounded-xl px-3 py-2.5" style={{ backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}>
+            <div className="flex items-center gap-2.5 rounded-xl px-3 py-2.5" style={filaDato}>
               <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: tint(est.color, "1c"), color: est.color }}><Flame size={14} /></span>
               <span className="flex-1 min-w-0">
                 <span className="block text-[9px] font-black uppercase tracking-wider text-slate-600">Tu mejor día</span>
@@ -4931,25 +5024,34 @@ function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null, 
               <span className="text-xs font-black tabular-nums shrink-0" style={{ color: est.color }}>{fmtKg(data.mejorDia.volumen)} kg</span>
             </div>
           )}
-          {data.records > 0 && (
-            <div className="flex items-center gap-2.5 rounded-xl px-3 py-2.5" style={{ backgroundColor: "rgba(251,191,36,0.10)", border: "1px solid rgba(251,191,36,0.25)" }}>
-              <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-amber-500/20 text-amber-300"><Trophy size={14} /></span>
-              <span className="flex-1 min-w-0">
-                <span className="block text-[9px] font-black uppercase tracking-wider text-amber-500/80">Marcas nuevas</span>
-                <span className="block text-xs font-bold text-white">Superaste tu récord {data.records} {data.records === 1 ? "vez" : "veces"}</span>
-              </span>
-            </div>
-          )}
-          {data.topMusculo && (
-            <div className="flex items-center gap-2.5 rounded-xl px-3 py-2.5" style={{ backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}>
+          {data.estrella && (
+            <div className="flex items-center gap-2.5 rounded-xl px-3 py-2.5" style={filaDato}>
               <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-slate-800/60 text-slate-400"><Dumbbell size={14} /></span>
               <span className="flex-1 min-w-0">
-                <span className="block text-[9px] font-black uppercase tracking-wider text-slate-600">Lo que más trabajaste</span>
-                <span className="block text-xs font-bold text-white truncate">{data.topMusculo.nombre}</span>
+                <span className="block text-[9px] font-black uppercase tracking-wider text-slate-600">Tu ejercicio estrella</span>
+                <span className="block text-xs font-bold text-white truncate">{data.estrella.nombre}</span>
               </span>
-              <span className="text-xs font-black tabular-nums text-slate-400 shrink-0">{data.topMusculo.series} {data.topMusculo.series === 1 ? "serie" : "series"}</span>
+              <span className="text-xs font-black tabular-nums text-slate-400 shrink-0">{data.estrella.dias} {data.estrella.dias === 1 ? "día" : "días"}</span>
             </div>
           )}
+          <div className="grid grid-cols-2 gap-2">
+            {data.minutos > 0 && (
+              <div className="flex items-center gap-2 rounded-xl px-3 py-2.5" style={filaDato}>
+                <Clock size={14} className="text-slate-500 shrink-0" />
+                <span className="min-w-0">
+                  <span className="block text-[9px] font-black uppercase tracking-wider text-slate-600">Tiempo</span>
+                  <span className="block text-xs font-bold text-white">{data.minutos >= 60 ? `${Math.floor(data.minutos / 60)}h ${data.minutos % 60}m` : `${data.minutos} min`}</span>
+                </span>
+              </div>
+            )}
+            <div className="flex items-center gap-2 rounded-xl px-3 py-2.5" style={filaDato}>
+              <ListChecks size={14} className="text-slate-500 shrink-0" />
+              <span className="min-w-0">
+                <span className="block text-[9px] font-black uppercase tracking-wider text-slate-600">Por sesión</span>
+                <span className="block text-xs font-bold text-white">{data.promedioSeries} series</span>
+              </span>
+            </div>
+          </div>
         </div>
 
         <div className="px-5 py-5">
@@ -10285,7 +10387,6 @@ function resumirSesiones(filtered, tramos = null) {
   if (!rows.length) return null;
   const porFecha = groupExportRowsByDate(rows);
   const volumen = Math.round(rows.reduce((acc, r) => acc + vol(r.kg, r.reps), 0));
-  const records = rows.filter((r) => r.isImprovement).length;
 
   // Mejor día: el de más volumen. Es el que la persona recuerda ("el día
   // que le metí"), y sirve de referencia concreta.
@@ -10295,24 +10396,66 @@ function resumirSesiones(filtered, tramos = null) {
     if (!mejorDia || v > mejorDia.volumen) mejorDia = { date: g.date, volumen: v, series: g.rows.length };
   });
 
-  // Músculo con más series. Se cuenta por SERIES y no por volumen a
-  // propósito: comparar kilos entre pecho y bíceps no dice nada, la
-  // cantidad de series sí es lo que repartiste.
+  // Reparto por músculo, ordenado y con color. Se cuenta por SERIES y no por
+  // volumen a propósito: comparar kilos entre pecho y bíceps no dice nada,
+  // la cantidad de series sí es lo que repartiste. Es la base de la dona.
   const porMusculo = {};
-  rows.forEach((r) => { const m = r.muscle || "Otros"; porMusculo[m] = (porMusculo[m] || 0) + 1; });
-  const topMusculo = Object.entries(porMusculo).sort((a, b) => b[1] - a[1])[0] || null;
+  rows.forEach((r) => {
+    const m = r.muscle || "Otros";
+    porMusculo[m] = (porMusculo[m] || 0) + 1;
+  });
+  const paleta = ["#14B8A6", "#3B82F6", "#A855F7", "#F59E0B", "#F43F5E", "#06B6D4", "#84CC16", "#EC4899"];
+  const musculos = Object.entries(porMusculo)
+    .sort((a, b) => b[1] - a[1])
+    .map(([nombre, series], i) => ({
+      nombre,
+      series,
+      pct: Math.round((series / rows.length) * 100),
+      color: MUSCLE_GROUPS.find((g) => g.label === nombre)?.color || paleta[i % paleta.length],
+    }));
+
+  // Las marcas concretas, no sólo cuántas: qué ejercicio y con cuánto. De
+  // cada ejercicio se guarda la MEJOR del período (por 1RM estimado), si no
+  // una progresión de cinco sesiones llenaba la lista con el mismo nombre.
+  const mejoresPorEjercicio = {};
+  rows.filter((r) => r.isImprovement && r.kg && r.reps).forEach((r) => {
+    const prev = mejoresPorEjercicio[r.exercise];
+    if (!prev || prScore(r.kg, r.reps) > prScore(prev.kg, prev.reps)) {
+      mejoresPorEjercicio[r.exercise] = { exercise: r.exercise, kg: r.kg, reps: r.reps, date: r.date };
+    }
+  });
+  const marcas = Object.values(mejoresPorEjercicio).sort((a, b) => prScore(b.kg, b.reps) - prScore(a.kg, a.reps));
+
+  // Ejercicio estrella: el que más días distintos apareció. "Más series" lo
+  // ganaría siempre el que tiene 4 series por rutina; los días dicen mejor
+  // a cuál volviste una y otra vez.
+  const diasPorEjercicio = {};
+  porFecha.forEach((g) => {
+    const vistos = new Set();
+    g.rows.forEach((r) => vistos.add(r.exercise));
+    vistos.forEach((e) => { diasPorEjercicio[e] = (diasPorEjercicio[e] || 0) + 1; });
+  });
+  const estrellaEntry = Object.entries(diasPorEjercicio).sort((a, b) => b[1] - a[1])[0] || null;
+
+  // Tiempo total entrenado, sólo de las sesiones que se abrieron y cerraron
+  // con el botón (las que tienen duración guardada).
+  const minutos = porFecha.reduce((acc, g) => acc + (g.durationMin || 0), 0);
 
   return {
     dias: porFecha.length,
     series: rows.length,
     volumen,
-    records,
+    records: marcas.length,
+    marcas: marcas.slice(0, 4),
+    musculos,
     mejorDia,
-    topMusculo: topMusculo ? { nombre: topMusculo[0], series: topMusculo[1] } : null,
+    topMusculo: musculos[0] || null,
+    estrella: estrellaEntry ? { nombre: estrellaEntry[0], dias: estrellaEntry[1] } : null,
+    minutos,
+    promedioSeries: Math.round(rows.length / porFecha.length),
     tramos: tramos ? tramos(porFecha) : null,
   };
 }
-
 // Distribución del volumen a lo largo del período, ya lista para dibujar.
 // Cada tramo es { etiqueta, valor } y los tramos sin entrenar quedan en 0
 // (que es justamente lo que hay que ver: los huecos).
