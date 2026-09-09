@@ -4826,23 +4826,35 @@ function SessionSummaryModal({ resumen, onClose }) {
 // último día programado de la semana) — nunca antes, así siempre te agarra
 // DESPUÉS de haber entrenado ese día, no como una notificación a mitad de
 // tarde. Ver handleEndSession/handleFinishDeloadSession.
-function WeeklyRecapModal({ data, onClose }) {
+// `periodo` decide sólo el título, la bajada y el color — los tres números
+// (días, series, volumen) se calculan igual para los tres (ver
+// resumirSesiones). El semanal es violeta como siempre; el mensual va en
+// azul y el anual en ámbar, para que se note de una cuál cerraste.
+const RECAP_ESTILOS = {
+  semana: { titulo: "¡Semana completa! 💪", bajada: "Así te fue de lunes a domingo", color: "#A855F7", cta: "¡A por la próxima! 🎯" },
+  mes: { titulo: "¡Mes cerrado! 📆", color: "#3B82F6", cta: "¡A por el que viene! 🎯" },
+  anio: { titulo: "¡Año completo! 🏆", color: "#F59E0B", cta: "¡A por el próximo! 🎯" },
+};
+
+function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null }) {
   useAndroidBack(onClose);
   if (!data) return null;
+  const est = RECAP_ESTILOS[periodo] || RECAP_ESTILOS.semana;
+  const bajada = est.bajada || `Así te fue en ${etiqueta || "el período"}`;
   return (
     <div className="fixed inset-0 z-[140] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
       <div
         className="relative max-w-sm w-full rounded-3xl modal-pop-in shadow-2xl shadow-black/70 overflow-hidden"
-        style={{ background: "var(--panel-grad-slate)", border: "1px solid rgba(168,85,247,0.3)" }}
+        style={{ background: "var(--panel-grad-slate)", border: `1px solid ${tint(est.color, "4d")}` }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="relative flex flex-col items-center pt-9 pb-5 px-6 text-center">
-          <div className="absolute -top-16 left-1/2 -translate-x-1/2 w-52 h-52 rounded-full bg-purple-500/20 blur-3xl pointer-events-none" />
-          <div className="relative w-16 h-16 rounded-full flex items-center justify-center mb-4 elastic-in bg-purple-500/18 border border-purple-500/40 text-purple-300" style={{ boxShadow: "0 12px 38px -12px rgba(168,85,247,0.7)" }}>
+          <div className="absolute -top-16 left-1/2 -translate-x-1/2 w-52 h-52 rounded-full blur-3xl pointer-events-none" style={{ backgroundColor: tint(est.color, "33") }} />
+          <div className="relative w-16 h-16 rounded-full flex items-center justify-center mb-4 elastic-in" style={{ backgroundColor: tint(est.color, "2e"), border: `1px solid ${tint(est.color, "66")}`, color: est.color, boxShadow: `0 12px 38px -12px ${tint(est.color, "b3")}` }}>
             <TrendingUp size={28} />
           </div>
-          <h2 className="relative text-lg font-black text-white leading-tight">¡Semana completa! 💪</h2>
-          <p className="relative text-[11px] text-slate-500 mt-1">Así te fue de lunes a domingo</p>
+          <h2 className="relative text-lg font-black text-white leading-tight">{est.titulo}</h2>
+          <p className="relative text-[11px] text-slate-500 mt-1">{bajada}</p>
         </div>
 
         <div className="grid grid-cols-3 gap-2 px-5">
@@ -4859,8 +4871,8 @@ function WeeklyRecapModal({ data, onClose }) {
         </div>
 
         <div className="px-5 py-5">
-          <button onClick={onClose} className="w-full py-3.5 rounded-2xl text-sm font-black !text-white transition active:scale-[0.98]" style={{ background: "linear-gradient(135deg,#A855F7,#7E22CE)", boxShadow: "0 10px 28px -10px rgba(168,85,247,0.7)" }}>
-            ¡A por la próxima! 🎯
+          <button onClick={onClose} className="w-full py-3.5 rounded-2xl text-sm font-black !text-white transition active:scale-[0.98]" style={{ background: `linear-gradient(135deg, ${est.color}, ${tint(est.color, "cc")})`, boxShadow: `0 10px 28px -10px ${tint(est.color, "b3")}` }}>
+            {est.cta}
           </button>
         </div>
       </div>
@@ -10094,6 +10106,13 @@ function getSessionsForPeriod(sessions, period) {
   return sessions;
 }
 
+// Sesiones de un mes ("2026-08") o de un año ("2026") concretos. Hace falta
+// aparte de getSessionsForPeriod porque los resúmenes mensual y anual miran
+// el período que YA TERMINÓ, no el que está corriendo.
+function getSessionsForPrefix(sessions, prefijo) {
+  return sessions.filter((s) => String(s.date || "").startsWith(prefijo));
+}
+
 // Agrupa las filas ya achatadas de vuelta por fecha, en orden cronológico —
 // es como se ven mejor tanto en el PDF como en el Word (una sub-sección por
 // día entrenado, con su propia tablita de series). También calcula el
@@ -10145,14 +10164,42 @@ function buildExportRows(filteredSessions, exerciseNotes = {}) {
 // Resumen semanal (ver handleEndSession/handleFinishDeloadSession): mismos
 // helpers que ya arma "Exportar entrenamiento", así el número que ves en el
 // resumen es exactamente el mismo que verías si exportaras la semana.
-function computeWeekRecap(logs, trainingSessions) {
-  const sessions = buildSessionsIndex(logs, trainingSessions);
-  const filtered = getSessionsForPeriod(sessions, "week");
+function resumirSesiones(filtered) {
   const rows = buildExportRows(filtered);
   if (!rows.length) return null;
   const dias = groupExportRowsByDate(rows).length;
   const volumen = Math.round(rows.reduce((acc, r) => acc + vol(r.kg, r.reps), 0));
   return { dias, series: rows.length, volumen };
+}
+
+function computeWeekRecap(logs, trainingSessions) {
+  return resumirSesiones(getSessionsForPeriod(buildSessionsIndex(logs, trainingSessions), "week"));
+}
+
+// Resumen del MES o del AÑO que acaba de cerrar. `prefijo` es "2026-08" o
+// "2026": el período completo ya terminado, no el que está corriendo.
+function computePrefixRecap(logs, trainingSessions, prefijo) {
+  return resumirSesiones(getSessionsForPrefix(buildSessionsIndex(logs, trainingSessions), prefijo));
+}
+
+// El mes anterior a hoy ("2026-08" si hoy es de septiembre) y el año
+// anterior ("2025"). Se calculan siempre respecto de HOY, así el resumen
+// aparece la primera vez que abrís la app en el período nuevo sin importar
+// cuántos días hayan pasado.
+function mesAnterior() {
+  const d = new Date();
+  d.setDate(1);
+  d.setMonth(d.getMonth() - 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+function anioAnterior() {
+  return String(new Date().getFullYear() - 1);
+}
+const NOMBRES_MES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+function etiquetaPeriodo(prefijo) {
+  if (/^\d{4}$/.test(prefijo)) return prefijo;
+  const [a, m] = prefijo.split("-");
+  return `${NOMBRES_MES[Number(m) - 1] || ""} de ${a}`;
 }
 
 
@@ -11265,8 +11312,8 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
             </div>
           )}
           <ToggleRow
-            icon={<BarChart3 size={16} />} label="Resumen semanal"
-            desc="Tu resumen de la semana, cada domingo."
+            icon={<BarChart3 size={16} />} label="Resúmenes de progreso"
+            desc="Cómo te fue en la semana, en el mes y en el año."
             on={settings.weeklyRecapEnabled !== false} onToggle={() => updateSettings({ weeklyRecapEnabled: !(settings.weeklyRecapEnabled !== false) })} accent="#F59E0B"
           />
         </div>
@@ -19828,6 +19875,12 @@ export default function App() {
   const [showWelcome, setShowWelcome] = useState(false); // intro de la primera vez
   const [sessionSummary, setSessionSummary] = useState(null); // resumen al finalizar
   const [weeklyRecap, setWeeklyRecap] = useState(null); // resumen semanal (ver checkWeeklyRecap)
+  // Resumen MENSUAL y ANUAL: { periodo, etiqueta, data }. A diferencia del
+  // semanal (que se dispara al terminar una sesión el domingo), estos miran
+  // el período que YA CERRÓ y aparecen la PRIMERA VEZ que abrís la app en el
+  // mes/año nuevo — así no dependen de que abras la app justo el 31 a la
+  // noche. Ver el efecto checkPeriodRecaps más abajo.
+  const [periodRecap, setPeriodRecap] = useState(null);
   const [sessionStarted, setSessionStarted] = useState(false); // overlay "¡A entrenar!"
   const [recoveredNotice, setRecoveredNotice] = useState(false);
 
@@ -20069,6 +20122,27 @@ export default function App() {
         });
       } catch (e) { console.warn("[notif] resumen semanal:", e); }
     })();
+    // RESÚMENES DE MES Y AÑO: se avisan el día 1 del período nuevo a las
+    // 11:00, cuando el anterior ya cerró de verdad. Tocarlos abre el resumen
+    // (ver el listener de notificaciones); si no abrís la app ese día, el
+    // resumen igual te espera adentro la próxima vez que entres (ver el
+    // efecto de lastSeenMonthRecap/lastSeenYearRecap).
+    (async () => {
+      try {
+        await LocalNotifications.cancel({ notifications: [{ id: 9301 }, { id: 9302 }] }).catch(() => {});
+        if (!st.weeklyRecapEnabled) return;
+        const ahora = new Date();
+        const primeroMes = new Date(ahora.getFullYear(), ahora.getMonth() + 1, 1, 11, 0, 0, 0);
+        const primeroAnio = new Date(ahora.getFullYear() + 1, 0, 1, 11, 0, 0, 0);
+        await LocalNotifications.createChannel({ id: "modusfit-recap-v1", name: "Resumen semanal", description: "Cómo te fue en la semana", importance: 3, vibration: true }).catch(() => {});
+        await LocalNotifications.schedule({
+          notifications: [
+            { id: 9301, smallIcon: "ic_stat_modusfit", title: "📆 Cerró el mes", body: "Mirá cómo te fue este mes.", channelId: "modusfit-recap-v1", schedule: { at: primeroMes, allowWhileIdle: true } },
+            { id: 9302, smallIcon: "ic_stat_modusfit", title: "🏆 Cerró el año", body: "Mirá todo lo que entrenaste este año.", channelId: "modusfit-recap-v1", schedule: { at: primeroAnio, allowWhileIdle: true } },
+          ],
+        });
+      } catch (e) { console.warn("[notif] resúmenes de mes/año:", e); }
+    })();
     // eslint-disable-next-line
   }, [profile?.settings?.weeklyRecapEnabled, profile?.settings?.reminderTime, profile?.weekSchedule, activeProfile]);
 
@@ -20086,6 +20160,7 @@ export default function App() {
   //                    cronómetro.
   // El listener se registra UNA vez y se limpia al desmontar; se lee el
   // perfil por ref para no re-registrarlo en cada cambio de estado.
+
   const notifCtxRef = useRef(null);
   // La ref se actualiza en un efecto, no durante el render (escribir una ref
   // mientras se renderiza rompe las reglas de React y el lint lo marca).
@@ -20100,6 +20175,14 @@ export default function App() {
         const ctx = notifCtxRef.current || {};
         const recap = computeWeekRecap(ctx.logs || {}, ctx.profile?.trainingSessions || []);
         if (recap) setWeeklyRecap(recap);
+        else setTab("progreso");
+        return;
+      }
+      if (id === 9301 || id === 9302) {
+        const ctx = notifCtxRef.current || {};
+        const prefijo = id === 9302 ? anioAnterior() : mesAnterior();
+        const data = computePrefixRecap(ctx.logs || {}, ctx.profile?.trainingSessions || [], prefijo);
+        if (data) setPeriodRecap({ periodo: id === 9302 ? "anio" : "mes", etiqueta: etiquetaPeriodo(prefijo), data });
         else setTab("progreso");
         return;
       }
@@ -20473,6 +20556,61 @@ export default function App() {
   const handleUpdateSettings = (patch) => handleUpdateProfile({ settings: { ...getProfileSettings(profile), ...patch } });
   const handleSetCycleStart = (d) => { setCycleStartState(d); saveCycleStart(d); };
 
+  // Resúmenes de MES y AÑO: se muestran una sola vez por período, la primera
+  // vez que abrís la app con el período ya cerrado. Qué período ya viste se
+  // guarda en el perfil (lastSeenMonthRecap / lastSeenYearRecap), así
+  // sobrevive a cerrar la app y no se repite. Si en ese mes o año no
+  // entrenaste nada, no hay nada que mostrar: se marca como visto igual,
+  // para no re-chequear en cada arranque.
+  const recapMostradoRef = useRef(false);
+  useEffect(() => {
+    if (!profile) return;
+    const st = getProfileSettings(profile);
+    if (!st.weeklyRecapEnabled) return;
+    const mes = mesAnterior();
+    const anio = anioAnterior();
+    // El año manda sobre el mes: si acaba de cambiar el año, ver primero el
+    // resumen grande y el del mes queda para el siguiente arranque.
+    const pendiente = profile.lastSeenYearRecap !== anio
+      ? { clave: "lastSeenYearRecap", valor: anio, periodo: "anio", prefijo: anio }
+      : profile.lastSeenMonthRecap !== mes
+        ? { clave: "lastSeenMonthRecap", valor: mes, periodo: "mes", prefijo: mes }
+        : null;
+    if (!pendiente) return;
+    // BUG FIX (encontrado probándolo): al marcar el año como visto, el efecto
+    // se vuelve a disparar y el resumen del MES pisaba al del AÑO en el mismo
+    // arranque — sólo veías el chico, justo el 1 de enero. Se muestra UN
+    // resumen por sesión de app; el otro te espera la próxima vez que abras.
+    // El candado se echa sólo si de verdad hay algo que mostrar: un período
+    // sin entrenamientos se marca como visto y deja pasar al siguiente, en
+    // vez de gastar el turno en una ventana que nunca se abrió.
+    if (recapMostradoRef.current) return;
+    const data = computePrefixRecap(logs, profile.trainingSessions || [], pendiente.prefijo);
+    // Diferido a propósito: mostrar el modal es un efecto secundario de
+    // "ya cerró el período", no algo que deba pintarse en el mismo ciclo de
+    // render que lo detecta.
+    if (data) recapMostradoRef.current = true;
+    // Sin cleanup a propósito. Este efecto depende de `profile`, que es un
+    // objeto nuevo en cada render, así que se re-ejecuta enseguida: un
+    // `return () => clearTimeout(t)` cancelaba el timeout ANTES de que
+    // llegara a correr y el resumen no aparecía nunca (encontrado
+    // instrumentando: los datos se calculaban bien, el timer moría antes).
+    // No hace falta limpiarlo: recapMostradoRef ya garantiza que se programe
+    // una sola vez, y App no se desmonta.
+    setTimeout(() => {
+      if (data) setPeriodRecap({ periodo: pendiente.periodo, etiqueta: etiquetaPeriodo(pendiente.prefijo), data });
+      handleUpdateProfile({ [pendiente.clave]: pendiente.valor });
+    }, 0);
+    // Depende de `profile` entero, no sólo de los dos marcadores: el efecto
+    // corre una primera vez con el perfil todavía sin cargar y sale por el
+    // `if (!profile)`. Con las dependencias acotadas a los marcadores (que
+    // siguen en undefined antes y después de cargar) no volvía a correr
+    // nunca, y el resumen no aparecía. Re-ejecutarlo seguido no cuesta nada:
+    // sale enseguida si no hay período pendiente, y recapMostradoRef evita
+    // que se muestre dos veces.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeProfile, profile]);
+
   // Activa una rutina (preestablecida recién clonada, recién creada, o una
   // ya guardada que sólo hay que volver a marcar como activa). Si es la
   // primera rutina que activa este perfil, dispara el tutorial guiado.
@@ -20826,6 +20964,7 @@ export default function App() {
       {sessionStarted && <SessionStartOverlay onDone={() => setSessionStarted(false)} />}
       {sessionSummary && <SessionSummaryModal resumen={sessionSummary} onClose={() => setSessionSummary(null)} />}
       {weeklyRecap && <WeeklyRecapModal data={weeklyRecap} onClose={() => setWeeklyRecap(null)} />}
+      {periodRecap && <WeeklyRecapModal data={periodRecap.data} periodo={periodRecap.periodo} etiqueta={periodRecap.etiqueta} onClose={() => setPeriodRecap(null)} />}
       {showWelcome && <WelcomeIntro onClose={() => setShowWelcome(false)} onOpenTutorial={() => { setHelpStartTab(null); setShowHelp(true); }} onUpdateSettings={handleUpdateSettings} />}
       {showHelp && <HelpModal startTab={helpStartTab} onClose={() => setShowHelp(false)} />}
       {showFieldIntro && (
