@@ -1980,6 +1980,11 @@ const ANIMATION_CSS = `
 /* Barra de progreso animada al montarse */
 @keyframes growBar { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 .grow-bar { transform-origin: left center; animation: growBar 0.7s cubic-bezier(.2,.8,.3,1); }
+/* Barras VERTICALES (el gráfico de "cómo lo repartiste" en los resúmenes):
+   growBar anima scaleX, que en una barra vertical la ensancha en vez de
+   levantarla. Ésta crece desde abajo, que es como se lee una columna. */
+@keyframes growBarUp { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+.grow-bar-up { transform-origin: bottom center; animation: growBarUp 0.55s cubic-bezier(.2,.8,.3,1) backwards; }
 /* Variante para la barra IZQUIERDA del "tira y afloja" de la batalla: crece
    desde el centro hacia afuera, no desde el borde de la pantalla. Las dos
    barras salen del mismo punto, que es lo que hace legible quién gana
@@ -4841,20 +4846,36 @@ function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null }
   if (!data) return null;
   const est = RECAP_ESTILOS[periodo] || RECAP_ESTILOS.semana;
   const bajada = est.bajada || `Así te fue en ${etiqueta || "el período"}`;
+  const tramos = data.tramos || [];
+  const maxTramo = tramos.reduce((m, t) => Math.max(m, t.valor), 0);
+  const mejorTramo = maxTramo > 0 ? tramos.findIndex((t) => t.valor === maxTramo) : -1;
+  const fmtKg = (v) => (v >= 1000 ? `${(v / 1000).toFixed(v >= 10000 ? 0 : 1)}k` : String(v));
   return (
     <div className="fixed inset-0 z-[140] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
       <div
-        className="relative max-w-sm w-full rounded-3xl modal-pop-in shadow-2xl shadow-black/70 overflow-hidden"
+        className="relative max-w-sm w-full max-h-[92vh] overflow-y-auto overscroll-contain rounded-3xl modal-pop-in shadow-2xl shadow-black/70"
         style={{ background: "var(--panel-grad-slate)", border: `1px solid ${tint(est.color, "4d")}` }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="relative flex flex-col items-center pt-9 pb-5 px-6 text-center">
+        <div className="relative flex flex-col items-center pt-9 pb-4 px-6 text-center">
           <div className="absolute -top-16 left-1/2 -translate-x-1/2 w-52 h-52 rounded-full blur-3xl pointer-events-none" style={{ backgroundColor: tint(est.color, "33") }} />
           <div className="relative w-16 h-16 rounded-full flex items-center justify-center mb-4 elastic-in" style={{ backgroundColor: tint(est.color, "2e"), border: `1px solid ${tint(est.color, "66")}`, color: est.color, boxShadow: `0 12px 38px -12px ${tint(est.color, "b3")}` }}>
             <TrendingUp size={28} />
           </div>
           <h2 className="relative text-lg font-black text-white leading-tight">{est.titulo}</h2>
           <p className="relative text-[11px] text-slate-500 mt-1">{bajada}</p>
+          {/* Contra el período anterior: convierte un número suelto en algo
+              que se puede leer de una. Sólo aparece si hubo período anterior
+              con datos, en vez de inventar un 0%. */}
+          {typeof data.vsAnterior === "number" && (
+            <span className="relative inline-flex items-center gap-1 mt-2.5 px-2.5 py-1 rounded-lg text-[11px] font-black"
+              style={data.vsAnterior >= 0
+                ? { backgroundColor: "rgba(16,185,129,0.14)", color: "#34d399", border: "1px solid rgba(16,185,129,0.3)" }
+                : { backgroundColor: "rgba(148,163,184,0.12)", color: "#94a3b8", border: "1px solid rgba(148,163,184,0.25)" }}>
+              {data.vsAnterior >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+              {data.vsAnterior >= 0 ? "+" : ""}{data.vsAnterior}% de volumen que {periodo === "anio" ? "el año pasado" : "el mes pasado"}
+            </span>
+          )}
         </div>
 
         <div className="grid grid-cols-3 gap-2 px-5">
@@ -4862,12 +4883,69 @@ function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null }
             { v: data.dias, l: data.dias === 1 ? "día" : "días" },
             { v: data.series, l: "series" },
             { v: data.volumen, l: "kg de volumen" },
-          ].map((s) => (
-            <div key={s.l} className="bg-black/25 rounded-2xl py-3 text-center border border-white/[0.05]">
-              <CountUpNumber value={s.v} duration={900} decimals={0} className="text-base font-black text-white tabular-nums leading-none" />
-              <p className="text-[9px] text-slate-500 mt-1.5 leading-tight px-1">{s.l}</p>
+          ].map((x) => (
+            <div key={x.l} className="bg-black/25 rounded-2xl py-3 text-center border border-white/[0.05]">
+              <CountUpNumber value={x.v} duration={900} decimals={0} className="text-base font-black text-white tabular-nums leading-none" />
+              <p className="text-[9px] text-slate-500 mt-1.5 leading-tight px-1">{x.l}</p>
             </div>
           ))}
+        </div>
+
+        {/* Cómo repartiste el trabajo a lo largo del período. Los tramos
+            vacíos quedan como barra apagada a propósito: los huecos son
+            justamente lo que hay que ver, no algo para esconder. */}
+        {maxTramo > 0 && (
+          <div className="px-5 pt-4">
+            <p className="text-[9.5px] font-black uppercase tracking-widest text-slate-600 mb-2">Cómo lo repartiste</p>
+            <div className="flex items-end justify-between gap-1 h-20 rounded-2xl bg-black/25 border border-white/[0.05] px-2.5 pt-2.5 pb-1.5">
+              {tramos.map((t, i) => (
+                <div key={i} className="flex-1 flex flex-col items-center justify-end h-full gap-1 min-w-0">
+                  <div className="w-full rounded-md grow-bar-up" title={`${t.valor} kg`}
+                    style={{
+                      height: `${t.valor > 0 ? Math.max(8, (t.valor / maxTramo) * 100) : 3}%`,
+                      backgroundColor: t.valor === 0 ? "rgba(148,163,184,0.16)" : i === mejorTramo ? est.color : tint(est.color, "66"),
+                      boxShadow: i === mejorTramo ? `0 0 12px ${tint(est.color, "80")}` : "none",
+                      animationDelay: `${i * 45}ms`,
+                    }} />
+                  <span className="text-[8px] font-bold shrink-0" style={{ color: i === mejorTramo ? est.color : "#475569" }}>{t.etiqueta}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Tres datos concretos, no adornos: el día que más metiste, cuántos
+            récords rompiste y qué músculo se llevó más series. */}
+        <div className="px-5 pt-3 space-y-2">
+          {data.mejorDia && (
+            <div className="flex items-center gap-2.5 rounded-xl px-3 py-2.5" style={{ backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}>
+              <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: tint(est.color, "1c"), color: est.color }}><Flame size={14} /></span>
+              <span className="flex-1 min-w-0">
+                <span className="block text-[9px] font-black uppercase tracking-wider text-slate-600">Tu mejor día</span>
+                <span className="block text-xs font-bold text-white truncate">{data.mejorDia.date.slice(8, 10)}/{data.mejorDia.date.slice(5, 7)} · {data.mejorDia.series} series</span>
+              </span>
+              <span className="text-xs font-black tabular-nums shrink-0" style={{ color: est.color }}>{fmtKg(data.mejorDia.volumen)} kg</span>
+            </div>
+          )}
+          {data.records > 0 && (
+            <div className="flex items-center gap-2.5 rounded-xl px-3 py-2.5" style={{ backgroundColor: "rgba(251,191,36,0.10)", border: "1px solid rgba(251,191,36,0.25)" }}>
+              <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-amber-500/20 text-amber-300"><Trophy size={14} /></span>
+              <span className="flex-1 min-w-0">
+                <span className="block text-[9px] font-black uppercase tracking-wider text-amber-500/80">Marcas nuevas</span>
+                <span className="block text-xs font-bold text-white">Superaste tu récord {data.records} {data.records === 1 ? "vez" : "veces"}</span>
+              </span>
+            </div>
+          )}
+          {data.topMusculo && (
+            <div className="flex items-center gap-2.5 rounded-xl px-3 py-2.5" style={{ backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}>
+              <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-slate-800/60 text-slate-400"><Dumbbell size={14} /></span>
+              <span className="flex-1 min-w-0">
+                <span className="block text-[9px] font-black uppercase tracking-wider text-slate-600">Lo que más trabajaste</span>
+                <span className="block text-xs font-bold text-white truncate">{data.topMusculo.nombre}</span>
+              </span>
+              <span className="text-xs font-black tabular-nums text-slate-400 shrink-0">{data.topMusculo.series} series</span>
+            </div>
+          )}
         </div>
 
         <div className="px-5 py-5">
@@ -10164,22 +10242,101 @@ function buildExportRows(filteredSessions, exerciseNotes = {}) {
 // Resumen semanal (ver handleEndSession/handleFinishDeloadSession): mismos
 // helpers que ya arma "Exportar entrenamiento", así el número que ves en el
 // resumen es exactamente el mismo que verías si exportaras la semana.
-function resumirSesiones(filtered) {
+// Resumen de un período. Además de los tres números de siempre (días,
+// series, volumen) saca lo que de verdad se puede leer y usar: cuántos
+// récords rompiste, cuál fue tu mejor día, qué músculo trabajaste más, y
+// cómo venís contra el período anterior. `tramos` es la distribución del
+// volumen a lo largo del período — los días de la semana, las semanas del
+// mes o los meses del año — que es lo que hace ver la CONSTANCIA, no sólo
+// el total.
+function resumirSesiones(filtered, tramos = null) {
   const rows = buildExportRows(filtered);
   if (!rows.length) return null;
-  const dias = groupExportRowsByDate(rows).length;
+  const porFecha = groupExportRowsByDate(rows);
   const volumen = Math.round(rows.reduce((acc, r) => acc + vol(r.kg, r.reps), 0));
-  return { dias, series: rows.length, volumen };
+  const records = rows.filter((r) => r.isImprovement).length;
+
+  // Mejor día: el de más volumen. Es el que la persona recuerda ("el día
+  // que le metí"), y sirve de referencia concreta.
+  let mejorDia = null;
+  porFecha.forEach((g) => {
+    const v = Math.round(g.rows.reduce((acc, r) => acc + vol(r.kg, r.reps), 0));
+    if (!mejorDia || v > mejorDia.volumen) mejorDia = { date: g.date, volumen: v, series: g.rows.length };
+  });
+
+  // Músculo con más series. Se cuenta por SERIES y no por volumen a
+  // propósito: comparar kilos entre pecho y bíceps no dice nada, la
+  // cantidad de series sí es lo que repartiste.
+  const porMusculo = {};
+  rows.forEach((r) => { const m = r.muscle || "Otros"; porMusculo[m] = (porMusculo[m] || 0) + 1; });
+  const topMusculo = Object.entries(porMusculo).sort((a, b) => b[1] - a[1])[0] || null;
+
+  return {
+    dias: porFecha.length,
+    series: rows.length,
+    volumen,
+    records,
+    mejorDia,
+    topMusculo: topMusculo ? { nombre: topMusculo[0], series: topMusculo[1] } : null,
+    tramos: tramos ? tramos(porFecha) : null,
+  };
+}
+
+// Distribución del volumen a lo largo del período, ya lista para dibujar.
+// Cada tramo es { etiqueta, valor } y los tramos sin entrenar quedan en 0
+// (que es justamente lo que hay que ver: los huecos).
+function tramosDeSemana(porFecha) {
+  const nombres = ["L", "M", "M", "J", "V", "S", "D"];
+  const out = nombres.map((etiqueta) => ({ etiqueta, valor: 0 }));
+  porFecha.forEach((g) => {
+    const d = new Date(`${g.date}T00:00:00`);
+    const i = (d.getDay() + 6) % 7; // 0 = lunes
+    out[i].valor += Math.round(g.rows.reduce((acc, r) => acc + vol(r.kg, r.reps), 0));
+  });
+  return out;
+}
+function tramosDeMes(porFecha) {
+  const out = [1, 2, 3, 4, 5].map((n) => ({ etiqueta: `S${n}`, valor: 0 }));
+  porFecha.forEach((g) => {
+    const dia = Number(g.date.slice(8, 10));
+    const i = Math.min(4, Math.floor((dia - 1) / 7));
+    out[i].valor += Math.round(g.rows.reduce((acc, r) => acc + vol(r.kg, r.reps), 0));
+  });
+  return out;
+}
+function tramosDeAnio(porFecha) {
+  const out = ["E", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"].map((etiqueta) => ({ etiqueta, valor: 0 }));
+  porFecha.forEach((g) => {
+    const i = Number(g.date.slice(5, 7)) - 1;
+    if (out[i]) out[i].valor += Math.round(g.rows.reduce((acc, r) => acc + vol(r.kg, r.reps), 0));
+  });
+  return out;
 }
 
 function computeWeekRecap(logs, trainingSessions) {
-  return resumirSesiones(getSessionsForPeriod(buildSessionsIndex(logs, trainingSessions), "week"));
+  return resumirSesiones(getSessionsForPeriod(buildSessionsIndex(logs, trainingSessions), "week"), tramosDeSemana);
 }
 
 // Resumen del MES o del AÑO que acaba de cerrar. `prefijo` es "2026-08" o
 // "2026": el período completo ya terminado, no el que está corriendo.
 function computePrefixRecap(logs, trainingSessions, prefijo) {
-  return resumirSesiones(getSessionsForPrefix(buildSessionsIndex(logs, trainingSessions), prefijo));
+  const esAnio = /^\d{4}$/.test(prefijo);
+  const idx = buildSessionsIndex(logs, trainingSessions);
+  const data = resumirSesiones(getSessionsForPrefix(idx, prefijo), esAnio ? tramosDeAnio : tramosDeMes);
+  if (!data) return null;
+  // Comparación contra el período anterior: el dato que convierte un número
+  // suelto ("1050 kg") en algo que se puede leer ("18% más que el mes
+  // pasado"). Si no hay período anterior con datos, no se muestra nada en
+  // vez de inventar un 0%.
+  const previo = esAnio
+    ? String(Number(prefijo) - 1)
+    : (() => { const [a, m] = prefijo.split("-").map(Number); const d = new Date(a, m - 2, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; })();
+  const anterior = resumirSesiones(getSessionsForPrefix(idx, previo));
+  if (anterior && anterior.volumen > 0) {
+    data.vsAnterior = Math.round(((data.volumen - anterior.volumen) / anterior.volumen) * 100);
+    data.diasAnterior = anterior.dias;
+  }
+  return data;
 }
 
 // El mes anterior a hoy ("2026-08" si hoy es de septiembre) y el año
