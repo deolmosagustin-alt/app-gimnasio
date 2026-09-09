@@ -20072,6 +20072,44 @@ export default function App() {
     // eslint-disable-next-line
   }, [profile?.settings?.weeklyRecapEnabled, profile?.settings?.reminderTime, profile?.weekSchedule, activeProfile]);
 
+  // BUG FIX (reporte: "el resumen semanal manda la notificación pero al
+  // clickearla no aparece nada"). No había NINGÚN listener de notificaciones
+  // en toda la app: tocar cualquier aviso abría la app en la pestaña donde
+  // la habías dejado y ahí terminaba. El del resumen encima dice "Mirá cómo
+  // te fue esta semana", así que prometía algo que no pasaba.
+  // Ahora cada aviso lleva a donde corresponde:
+  //   9300           → el resumen semanal, abierto de una (y si no hay nada
+  //                    que resumir, a Progreso, que es donde están los
+  //                    números).
+  //   9200..9206     → recordatorio de entrenar: a Rutina.
+  //   9002           → descanso terminado: a Rutina, donde está el
+  //                    cronómetro.
+  // El listener se registra UNA vez y se limpia al desmontar; se lee el
+  // perfil por ref para no re-registrarlo en cada cambio de estado.
+  const notifCtxRef = useRef(null);
+  // La ref se actualiza en un efecto, no durante el render (escribir una ref
+  // mientras se renderiza rompe las reglas de React y el lint lo marca).
+  useEffect(() => { notifCtxRef.current = { profile, logs }; });
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    let handle = null;
+    let vivo = true;
+    LocalNotifications.addListener("localNotificationActionPerformed", (evento) => {
+      const id = evento?.notification?.id;
+      if (id === 9300) {
+        const ctx = notifCtxRef.current || {};
+        const recap = computeWeekRecap(ctx.logs || {}, ctx.profile?.trainingSessions || []);
+        if (recap) setWeeklyRecap(recap);
+        else setTab("progreso");
+        return;
+      }
+      if (id === 9002 || (id >= 9200 && id <= 9206)) setTab("rutina");
+    }).then((h) => {
+      if (vivo) handle = h; else h.remove();
+    }).catch((e) => console.warn("[notif] no se pudo escuchar los toques:", e?.message || e));
+    return () => { vivo = false; handle?.remove(); };
+  }, []);
+
   // WIDGET "HOY TOCA" (pantalla de inicio, solo Android nativo): le mandamos
   // el texto ya armado — el widget en sí no sabe nada de rutinas, solo
   // muestra lo último que le mandamos (ver TodayWidgetPlugin). Se reenvía
