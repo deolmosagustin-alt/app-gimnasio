@@ -12,8 +12,8 @@ import {
   Target, Award, Activity, ArrowDown, HelpCircle, List, LayoutGrid,
   Sparkles, Layers, SlidersHorizontal, UserCog,
   Share2, Download, Link2, Copy, BellOff, Send, Mic, Ruler, Camera, Link, Footprints, Star, SquarePlay, Upload, RefreshCw, Timer, Percent, Users,
-  MessageCircle, FileDown, Search, UserPlus, UserCheck, UserMinus, AtSign, GraduationCap, ClipboardCheck, Swords, Medal, QrCode, ArrowUpDown,
-  Phone, Contact, Minus, Crown,
+  MessageCircle, Search, UserPlus, UserCheck, UserMinus, AtSign, GraduationCap, ClipboardCheck, Swords, Medal, QrCode, ArrowUpDown,
+  Phone, Minus, Crown,
 } from "lucide-react";
 import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signOut, onAuthStateChanged } from "firebase/auth";
 import { Capacitor, registerPlugin } from "@capacitor/core";
@@ -35,12 +35,6 @@ import { FirebaseAuthentication } from "@capacitor-firebase/authentication";
 // no está instalado el build falla con un error claro. Instalarlo primero:
 //   npm install @capacitor/local-notifications && npx cap sync android
 import { LocalNotifications } from "@capacitor/local-notifications";
-// @capacitor-community/contacts — sólo para LEER la agenda del teléfono
-// (sugerir amigos, ver ContactsSuggestions); en web el proxy generado por
-// Capacitor rechaza cada llamada ("not implemented"), por eso todo uso de
-// este import está detrás de un chequeo de Capacitor.isNativePlatform() y/o
-// un try/catch.
-import { Contacts } from "@capacitor-community/contacts";
 import { doc, setDoc, getDoc, deleteDoc, enableIndexedDbPersistence } from "firebase/firestore";
 import Model from "react-body-highlighter";
 import FemaleBody from "@mjcdev/react-body-highlighter";
@@ -59,7 +53,7 @@ import {
   sendTrainerLinkRequest, respondToTrainerLink, removeTrainerLink, listTrainerLinksAsTrainer, listTrainerLinksAsStudent,
   createRoutineProposal, createProgressionProposal, respondToRoutineProposal, listRoutineProposalsForStudent, listRoutineProposalsByTrainer,
   cleanupSocialData, listGlobalLeaderboard,
-  setDiscoverablePhone, clearDiscoverablePhone, findUidsByPhoneHashes,
+  setDiscoverablePhone, clearDiscoverablePhone,
   hasSentKudosToday, sendKudos, listKudosReceived,
 } from "./social";
 // Catálogo de ejercicios, grupos musculares y rutinas preestablecidas —
@@ -2453,7 +2447,6 @@ function ShareLinkModal({ title, shareTitle, shareText, shareTarget, onClose, ac
   const [linkError, setLinkError] = useState(null);
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState(false);
-  const [showFileOptions, setShowFileOptions] = useState(false);
   const urlInputRef = useRef(null);
 
   // El enlace ya no se armaba localmente (antes codificaba toda la rutina
@@ -2575,26 +2568,6 @@ function ShareLinkModal({ title, shareTitle, shareText, shareTarget, onClose, ac
               </a>
             </div>
             <p className="text-[10px] text-slate-600 mb-3 text-center">Quien abra el enlace puede agregar la rutina a su app con un toque.</p>
-          </div>
-        )}
-        {/* BUG FIX: "Descargar como archivo" (PDF/Word/Excel) NO depende de
-            Firestore para nada, se arma entero con datos que ya están en el
-            dispositivo. Antes vivía adentro del bloque "{url && ...}", así
-            que si el enlace mágico fallaba o quedaba colgado (por ejemplo,
-            sin las reglas de seguridad de "shared_routines" configuradas en
-            Firebase, ver shareRoutineToFirestore) la persona nunca llegaba a
-            ver los botones de descarga: exportar quedaba roto sin que la
-            causa real tuviera nada que ver con exportar. Ahora se muestra
-            siempre, sin importar cómo vaya el enlace para compartir. */}
-        {/* Mismo bloque de exportación que Perfil (ExportCenterCard), acá
-            fijado en "rutina" porque el contexto ya la eligió — así la fila
-            de formatos se ve y se comporta igual desde donde la abras. */}
-        {!showFileOptions ? (
-          <button onClick={() => setShowFileOptions(true)} className="relative w-full flex items-center justify-center gap-1.5 pt-3 border-t border-slate-800/60 text-slate-500 hover:text-slate-300 text-xs font-semibold transition"><Download size={12} /> Descargar como archivo (PDF, Word, Excel)</button>
-        ) : (
-          <div className="relative pt-3 border-t border-slate-800/60">
-            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Descargar</p>
-            <ExportCenterCard routineDef={shareTarget} only="routine" embedded />
           </div>
         )}
       </div>
@@ -10082,9 +10055,6 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
    con import() dinámico recién cuando se exporta, para no sumarle peso al
    resto de la app.
 ============================================================================ */
-function slugifyForFilename(s) {
-  return String(s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "perfil";
-}
 
 function getSessionsForPeriod(sessions, period) {
   const now = new Date();
@@ -10147,17 +10117,6 @@ function buildExportRows(filteredSessions, exerciseNotes = {}) {
   return rows;
 }
 
-// Cómo se lee cada serie: fuerza (reps/kg) o cardio (minutos/km) — ambos
-// comparten las mismas columnas en PDF/Word para no duplicar la tabla.
-function formatExportReps(r) {
-  if (r.minutes != null) return `${r.minutes} min`;
-  if (r.km != null) return `${r.km} km`;
-  return r.reps != null ? String(r.reps) : "—";
-}
-function formatExportKg(r) {
-  if (r.minutes != null || r.km != null) return "—";
-  return r.kg != null ? `${r.kg} kg` : "—";
-}
 
 // Resumen semanal (ver handleEndSession/handleFinishDeloadSession): mismos
 // helpers que ya arma "Exportar entrenamiento", así el número que ves en el
@@ -10172,261 +10131,10 @@ function computeWeekRecap(logs, trainingSessions) {
   return { dias, series: rows.length, volumen };
 }
 
-function blobToBase64(blob) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(String(reader.result).split(",")[1] || "");
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-}
 
-// BUG FIX: en la app nativa (Android) esto no hacía NADA — un <a download>
-// depende de que el navegador tenga una carpeta de "Descargas" a la que
-// escribir, y el WebView de Capacitor no la tiene. Por eso exportar
-// PDF/Word/Excel no funcionaba en el celular (sin error visible: el archivo
-// simplemente nunca se generaba). Mismo patrón que ya usa ShareLinkModal
-// para las imágenes para compartir: escribir el archivo real al caché de la
-// app con @capacitor/filesystem y abrir la hoja de compartir nativa
-// (@capacitor/share) — desde ahí se guarda en Archivos, se manda por
-// WhatsApp, etc. En la web, sigue siendo la descarga de toda la vida.
-async function downloadBlob(blob, filename) {
-  if (Capacitor.isNativePlatform()) {
-    // Primero la Web Share API del propio WebView — es la MISMA vía que usa
-    // compartir una rutina (ShareLinkModal), la única confirmada funcionando
-    // en el dispositivo del reporte, y acá ya tenemos el Blob en la mano así
-    // que no hace falta pasar por el disco. Si el WebView no soporta
-    // adjuntar archivos, seguimos con el plugin de Capacitor de abajo.
-    try {
-      const file = new File([blob], filename, { type: blob.type || "application/octet-stream" });
-      if (typeof navigator !== "undefined" && navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], title: filename });
-        return;
-      }
-    } catch (err) {
-      if (err?.name === "AbortError") return; // cerró la hoja sin elegir
-      console.warn("[export] navigator.share con archivo falló, sigo con el plugin:", err);
-    }
-    // BUG FIX: antes esto envolvía TODO (escribir el archivo Y compartirlo)
-    // en un solo try/catch que se tragaba cualquier error con solo un
-    // console.error — si Filesystem.writeFile fallaba de verdad (permisos,
-    // sin espacio), el botón de exportar volvía a su estado normal sin
-    // avisar nada, como si hubiese funcionado. Ahora eso se deja propagar
-    // (lo captura ExportCenterCard.handleExport y muestra un error).
-    //
-    // Share.share() TAMBIÉN se relanza ahora (antes se tragaba entero,
-    // asumiendo que un fallo acá era siempre "cerró la hoja sin elegir
-    // nada"): en Android, un ACTION_SEND lanzado con startActivity() no le
-    // avisa a la app si el usuario terminó compartiendo o cerró la hoja
-    // sin elegir nada — Share.share() de Capacitor resuelve la promesa en
-    // CUALQUIERA de los dos casos, no la rechaza. Que este catch se
-    // dispare significa que el intent ni siquiera se pudo lanzar (por
-    // ejemplo, ningún destino instalado capaz de recibir el archivo), un
-    // caso real que antes quedaba completamente invisible — coincide con
-    // el reporte "cuando lo clikeo me saca de la app pero no pasa nada".
-    const base64 = await blobToBase64(blob);
-    const { Filesystem, Directory } = await import("@capacitor/filesystem");
-    const result = await Filesystem.writeFile({ path: filename, data: base64, directory: Directory.Cache });
-    try {
-      const { Share } = await import("@capacitor/share");
-      // Pedido: "cuando lo clikeo me saca de la app pero no pasa nada" — el
-      // archivo SÍ se genera y la hoja de compartir de Android SÍ se abre
-      // (por eso la sensación de "salir de la app"), pero sin este título
-      // el diálogo del sistema no dice para qué sirve, así que quien no
-      // reconoce ninguna app de destino la cierra sin elegir nada y vuelve
-      // pensando que no pasó nada. dialogTitle es lo único que Share.share
-      // deja personalizar del lado de Android — no reemplaza avisarle esto
-      // mismo desde la propia app (ver aviso en ExportCenterCard, más
-      // abajo), pero ayuda a quien sí llega a ver
-      // el diálogo del sistema.
-      await Share.share({ title: filename, dialogTitle: "Elegí dónde guardarlo: Drive, Archivos, WhatsApp…", files: [result.uri] });
-    } catch (err) {
-      // BUG FIX: esto se tragaba TODO en silencio asumiendo que cualquier
-      // fallo acá era "cerró la hoja sin elegir nada" — pero un fallo real
-      // (por ejemplo, ningún destino instalado capaz de recibir el
-      // archivo) también cae en este catch, y antes quedaba exactamente
-      // igual de silencioso que una cancelación normal. Ahora se relanza
-      // para que downloadBlob (y quien la llama, ver
-      // ExportCenterCard.handleExport) sepa distinguir "no se pudo compartir" de "se
-      // compartió bien" en vez de asumir siempre lo segundo.
-      console.warn("Compartir (nativo) cancelado o falló:", err);
-      // Cerrar la hoja sin elegir nada no es un error: @capacitor/share
-      // rechaza con "Share canceled" y antes eso se mostraba como "no
-      // pudimos abrir la ventana para compartirlo", que es falso y encima
-      // preocupa al pedo. El archivo ya está escrito; no hay nada que avisar.
-      if (/cancel+ed/i.test(String(err?.message || err || ""))) return;
-      // Marca de dónde vino el fallo — el archivo YA se escribió bien acá
-      // (Filesystem.writeFile de arriba no tiró), así que quien llame a
-      // downloadBlob puede avisar "se generó pero no se pudo compartir" en
-      // vez del genérico "no pudimos generar el archivo", que sería falso
-      // en este punto.
-      err.stage = "share";
-      throw err;
-    }
-    return;
-  }
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1500);
-}
 
-async function exportTrainingToPdf(rows, meta) {
-  const { jsPDF } = await import("jspdf");
-  const autoTable = (await import("jspdf-autotable")).default;
-  const doc = new jsPDF();
-  const groups = groupExportRowsByDate(rows);
-  const totalVolumen = Math.round(rows.reduce((acc, r) => acc + vol(r.kg, r.reps), 0));
-  const rpeVals = rows.filter((r) => r.rpe != null).map((r) => r.rpe);
-  const avgRpe = rpeVals.length ? Math.round((rpeVals.reduce((a, b) => a + b, 0) / rpeVals.length) * 10) / 10 : null;
 
-  // Franja de marca arriba de todo — mismo teal del resto de la app.
-  doc.setFillColor(20, 184, 166);
-  doc.rect(0, 0, 210, 6, "F");
-  doc.setFontSize(17);
-  doc.setTextColor(20);
-  doc.text("Resumen de entrenamiento", 14, 22);
-  doc.setFontSize(10);
-  doc.setTextColor(110);
-  doc.text(`${meta.profileName} · ${meta.periodLabel} · generado el ${new Date().toLocaleDateString("es-AR")}`, 14, 29);
 
-  // Caja de resumen: lo primero que un entrenador quiere ver de un vistazo,
-  // antes de entrar al detalle serie por serie.
-  const stats = [
-    ["Días entrenados", String(groups.length)],
-    ["Series totales", String(rows.length)],
-    ["Volumen total", `${totalVolumen.toLocaleString("es-AR")} kg`],
-    ["RPE promedio", avgRpe != null ? String(avgRpe) : "—"],
-  ];
-  const boxW = 43, boxGap = 3;
-  stats.forEach(([label, value], i) => {
-    const x = 14 + i * (boxW + boxGap);
-    doc.setDrawColor(225); doc.setFillColor(248, 250, 252);
-    doc.roundedRect(x, 35, boxW, 17, 2, 2, "FD");
-    doc.setFontSize(13); doc.setTextColor(20);
-    doc.text(value, x + boxW / 2, 44, { align: "center" });
-    doc.setFontSize(7); doc.setTextColor(120);
-    doc.text(label, x + boxW / 2, 49, { align: "center" });
-  });
-
-  let y = 62;
-  groups.forEach((g) => {
-    if (y > 258) { doc.addPage(); y = 20; }
-    doc.setFontSize(11);
-    doc.setTextColor(20);
-    doc.text(`${g.dateLabel.charAt(0).toUpperCase()}${g.dateLabel.slice(1)} · ${g.dayLabel}`, 14, y);
-    const metaBits = [];
-    if (g.durationMin) metaBits.push(`${g.durationMin} min`);
-    if (g.completionPct != null) metaBits.push(`${g.completionPct}% completado`);
-    if (g.avgRpe != null) metaBits.push(`RPE prom. ${g.avgRpe}`);
-    if (metaBits.length) {
-      doc.setFontSize(8); doc.setTextColor(140);
-      doc.text(metaBits.join("  ·  "), 196, y, { align: "right" });
-    }
-    y += 4;
-    autoTable(doc, {
-      startY: y,
-      head: [["Ejercicio", "Músculo", "Serie", "Reps", "Kg", "RPE", "PR", "Nota"]],
-      body: g.rows.map((r) => [
-        r.exercise, r.muscle || "—", `S${r.set}`, formatExportReps(r), formatExportKg(r),
-        r.rpe != null ? String(r.rpe) : "—", r.isImprovement ? "PR" : "", r.note || "—",
-      ]),
-      styles: { fontSize: 8, cellPadding: 2 },
-      headStyles: { fillColor: [20, 184, 166], textColor: 255, fontStyle: "bold" },
-      alternateRowStyles: { fillColor: [248, 250, 252] },
-      columnStyles: { 0: { cellWidth: 36 }, 1: { cellWidth: 24 }, 2: { cellWidth: 12 }, 3: { cellWidth: 14 }, 4: { cellWidth: 14 }, 5: { cellWidth: 11 }, 6: { cellWidth: 10 }, 7: { cellWidth: 41 } },
-      margin: { left: 14, right: 14 },
-    });
-    y = doc.lastAutoTable.finalY + 10;
-  });
-
-  // Pie de página con numeración y marca, en todas las páginas.
-  const pageCount = doc.internal.getNumberOfPages();
-  for (let p = 1; p <= pageCount; p++) {
-    doc.setPage(p);
-    doc.setFontSize(8); doc.setTextColor(160);
-    doc.text(`Modus Fit · Página ${p} de ${pageCount}`, 105, 290, { align: "center" });
-  }
-
-  await downloadBlob(doc.output("blob"), `${meta.filename}.pdf`);
-}
-
-async function exportTrainingToWord(rows, meta) {
-  const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, HeadingLevel, WidthType } = await import("docx");
-  const groups = groupExportRowsByDate(rows);
-  const totalVolumen = Math.round(rows.reduce((acc, r) => acc + vol(r.kg, r.reps), 0));
-  const rpeVals = rows.filter((r) => r.rpe != null).map((r) => r.rpe);
-  const avgRpe = rpeVals.length ? Math.round((rpeVals.reduce((a, b) => a + b, 0) / rpeVals.length) * 10) / 10 : null;
-
-  const children = [
-    new Paragraph({ text: "Modus Fit · Resumen de entrenamiento", heading: HeadingLevel.HEADING_1 }),
-    new Paragraph({ children: [new TextRun({ text: `${meta.profileName} · ${meta.periodLabel} · generado el ${new Date().toLocaleDateString("es-AR")}`, color: "666666" })], spacing: { after: 160 } }),
-    new Paragraph({
-      children: [
-        new TextRun({ text: `${groups.length} día${groups.length === 1 ? "" : "s"} entrenados  ·  `, bold: true }),
-        new TextRun({ text: `${rows.length} series totales  ·  `, bold: true }),
-        new TextRun({ text: `${totalVolumen.toLocaleString("es-AR")} kg de volumen  ·  `, bold: true }),
-        new TextRun({ text: `RPE promedio ${avgRpe ?? "—"}`, bold: true }),
-      ],
-      spacing: { after: 200 },
-    }),
-  ];
-  groups.forEach((g) => {
-    children.push(new Paragraph({ text: `${g.dateLabel.charAt(0).toUpperCase()}${g.dateLabel.slice(1)} · ${g.dayLabel}`, heading: HeadingLevel.HEADING_2, spacing: { before: 260, after: 40 } }));
-    const metaBits = [];
-    if (g.durationMin) metaBits.push(`${g.durationMin} min`);
-    if (g.completionPct != null) metaBits.push(`${g.completionPct}% completado`);
-    if (g.avgRpe != null) metaBits.push(`RPE prom. ${g.avgRpe}`);
-    if (metaBits.length) children.push(new Paragraph({ children: [new TextRun({ text: metaBits.join("  ·  "), color: "888888", italics: true })], spacing: { after: 100 } }));
-    const headerRow = new TableRow({ children: ["Ejercicio", "Músculo", "Serie", "Reps", "Kg", "RPE", "PR", "Nota"].map((h) => new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: h, bold: true })] })] })) });
-    const dataRows = g.rows.map((r) => new TableRow({ children: [
-      r.exercise, r.muscle || "—", `S${r.set}`, formatExportReps(r), formatExportKg(r), r.rpe != null ? String(r.rpe) : "—", r.isImprovement ? "PR" : "", r.note || "—",
-    ].map((v) => new TableCell({ children: [new Paragraph(v)] })) }));
-    children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [headerRow, ...dataRows] }));
-  });
-  const doc = new Document({ sections: [{ children }] });
-  const blob = await Packer.toBlob(doc);
-  await downloadBlob(blob, `${meta.filename}.docx`);
-}
-
-async function exportTrainingToExcel(rows, meta) {
-  const XLSX = await import("xlsx");
-  const groups = groupExportRowsByDate(rows);
-  const totalVolumen = Math.round(rows.reduce((acc, r) => acc + vol(r.kg, r.reps), 0));
-  const rpeVals = rows.filter((r) => r.rpe != null).map((r) => r.rpe);
-  const avgRpe = rpeVals.length ? Math.round((rpeVals.reduce((a, b) => a + b, 0) / rpeVals.length) * 10) / 10 : null;
-
-  const wb = XLSX.utils.book_new();
-
-  // Hoja "Resumen" — lo primero que ve un entrenador al abrir el archivo.
-  const wsResumen = XLSX.utils.aoa_to_sheet([
-    ["Modus Fit · Resumen de entrenamiento"],
-    [meta.profileName, meta.periodLabel],
-    [`Generado el ${new Date().toLocaleDateString("es-AR")}`],
-    [],
-    ["Días entrenados", groups.length],
-    ["Series totales", rows.length],
-    ["Volumen total (kg)", totalVolumen],
-    ["RPE promedio", avgRpe ?? "—"],
-  ]);
-  wsResumen["!cols"] = [{ wch: 24 }, { wch: 18 }];
-  XLSX.utils.book_append_sheet(wb, wsResumen, "Resumen");
-
-  // Hoja "Detalle" — cada métrica en su propia columna NUMÉRICA (reps, kg,
-  // minutos, km por separado) para que se pueda sumar/filtrar/graficar
-  // directo en Excel, sin tener que parsear texto tipo "8 reps".
-  const header = ["Fecha", "Día", "Ejercicio", "Músculo", "Serie", "Reps", "Kg", "Min (cardio)", "Km (cardio)", "RPE", "PR", "Nota"];
-  const data = rows.map((r) => [
-    r.date, r.dayLabel, r.exercise, r.muscle || "—", r.set,
-    r.reps ?? "", r.kg ?? "", r.minutes ?? "", r.km ?? "", r.rpe ?? "", r.isImprovement ? "PR" : "", r.note || "",
-  ]);
-  const wsDetalle = XLSX.utils.aoa_to_sheet([header, ...data]);
-  wsDetalle["!cols"] = [{ wch: 12 }, { wch: 16 }, { wch: 26 }, { wch: 16 }, { wch: 7 }, { wch: 7 }, { wch: 7 }, { wch: 12 }, { wch: 12 }, { wch: 6 }, { wch: 6 }, { wch: 32 }];
-  XLSX.utils.book_append_sheet(wb, wsDetalle, "Detalle");
-
-  const wbout = XLSX.write(wb, { type: "array", bookType: "xlsx" });
-  await downloadBlob(new Blob([wbout], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), `${meta.filename}.xlsx`);
-}
 
 /* ============================================================================
    EXPORTAR LA RUTINA (no el entrenamiento) — pensado para cuando querés
@@ -10434,235 +10142,14 @@ async function exportTrainingToExcel(rows, meta) {
    Word o Excel en vez de (o además de) mandar el link. Reutiliza
    buildRoutineModel para resolver nombre/músculo de cada ejercicio.
 ============================================================================ */
-// #rrggbb → [r,g,b] enteros — jsPDF pide los 3 canales sueltos para
-// setFillColor/setTextColor, no un string CSS.
-function hexToRgb(hex) {
-  const clean = (hex || "#14B8A6").replace("#", "");
-  const n = parseInt(clean, 16);
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
-}
 
-function buildRoutineExportDays(routineDef) {
-  const model = buildRoutineModel(routineDef);
-  return model.dayOrder.map((dk) => {
-    const d = model.days[dk];
-    return {
-      dayLabel: d.label,
-      dayColor: d.color || "#14B8A6",
-      exercises: d.exercises.map((ex) => {
-        // BUG FIX (diseño): antes se mostraba el rango de reps de la
-        // PRIMERA serie para las 8 series del ejercicio, aunque tuviera un
-        // esquema piramidal/top-set real (ej. "3-5, 3-5, 8-10") — el
-        // archivo exportado mentía sobre el plan real. Ahora, si todas las
-        // series comparten el mismo rango se muestra una sola vez (más
-        // legible); si no, se listan todas en orden.
-        const ranges = ex.sets.map((s) => s.repRange || "—");
-        const repRangeDisplay = ranges.every((r) => r === ranges[0]) ? ranges[0] : ranges.join(", ");
-        return { name: ex.name, muscle: ex.muscle, sets: ex.sets.length, repRangeDisplay };
-      }),
-    };
-  });
-}
 
-async function exportRoutineToPdf(routineDef) {
-  const { jsPDF } = await import("jspdf");
-  const autoTable = (await import("jspdf-autotable")).default;
-  const days = buildRoutineExportDays(routineDef);
-  const totalExercises = days.reduce((a, d) => a + d.exercises.length, 0);
-  const totalSets = days.reduce((a, d) => a + d.exercises.reduce((b, ex) => b + ex.sets, 0), 0);
-  const doc = new jsPDF();
 
-  // Mismo lenguaje visual que exportTrainingToPdf (franja de marca + caja
-  // de resumen arriba de todo) — antes esta exportación era un documento
-  // bastante más pobre (sólo título + tablas planas) que la de
-  // entrenamiento, a pesar de venir de la misma app.
-  doc.setFillColor(20, 184, 166);
-  doc.rect(0, 0, 210, 6, "F");
-  doc.setFontSize(17);
-  doc.setTextColor(20);
-  doc.text(routineDef.name || "Mi rutina", 14, 22);
-  doc.setFontSize(10);
-  doc.setTextColor(110);
-  doc.text(`Generada con Modus Fit · ${new Date().toLocaleDateString("es-AR")}`, 14, 29);
 
-  const stats = [["Días", String(days.length)], ["Ejercicios", String(totalExercises)], ["Series totales", String(totalSets)]];
-  const boxW = 43, boxGap = 3;
-  stats.forEach(([label, value], i) => {
-    const x = 14 + i * (boxW + boxGap);
-    doc.setDrawColor(225); doc.setFillColor(248, 250, 252);
-    doc.roundedRect(x, 35, boxW, 17, 2, 2, "FD");
-    doc.setFontSize(13); doc.setTextColor(20);
-    doc.text(value, x + boxW / 2, 44, { align: "center" });
-    doc.setFontSize(7); doc.setTextColor(120);
-    doc.text(label, x + boxW / 2, 49, { align: "center" });
-  });
 
-  let y = 62;
-  days.forEach((d) => {
-    if (y > 258) { doc.addPage(); y = 20; }
-    const rgb = hexToRgb(d.dayColor);
-    // Franja angosta con el color del día — el mismo acento que ya ves en
-    // Rutinas (BuilderDayCard/RoutinePreview) para identificar cada día,
-    // ahora también en el PDF.
-    doc.setFillColor(...rgb);
-    doc.roundedRect(14, y - 4.2, 3, 5.2, 0.8, 0.8, "F");
-    doc.setFontSize(12); doc.setTextColor(20);
-    doc.text(d.dayLabel, 20, y);
-    const setsInDay = d.exercises.reduce((a, ex) => a + ex.sets, 0);
-    doc.setFontSize(8); doc.setTextColor(140);
-    doc.text(`${d.exercises.length} ejercicio${d.exercises.length === 1 ? "" : "s"} · ${setsInDay} series`, 196, y, { align: "right" });
-    y += 4;
-    autoTable(doc, {
-      startY: y,
-      head: [["Ejercicio", "Músculo", "Series", "Reps"]],
-      body: d.exercises.map((ex) => [ex.name, ex.muscle, String(ex.sets), ex.repRangeDisplay]),
-      styles: { fontSize: 9, cellPadding: 2.2 },
-      headStyles: { fillColor: rgb, textColor: 255, fontStyle: "bold" },
-      alternateRowStyles: { fillColor: [248, 250, 252] },
-      columnStyles: { 0: { cellWidth: 68 }, 1: { cellWidth: 42 }, 2: { cellWidth: 22 }, 3: { cellWidth: 46 } },
-      margin: { left: 14, right: 14, top: 24 },
-      // BUG FIX (encontrado auditando "exportación de PDF funciona mal"):
-      // si la tabla de un día no entraba entera en una página, la
-      // continuación arrancaba directo con la fila de encabezado de la
-      // tabla, sin repetir a qué día pertenecía — mirando sólo esa
-      // página no había forma de saberlo. Ahora se repite la franja de
-      // color + nombre del día arriba de cada página nueva que haga
-      // falta. data.pageNumber es un contador PROPIO de esta tabla (arranca
-      // en 1 en cada llamada a autoTable, sin importar en qué página
-      // absoluta del documento caiga) — por eso alcanza con "distinto de
-      // 1" para identificar una página de continuación, sin necesidad de
-      // comparar contra el número de página absoluto del documento (que fue
-      // el bug: antes se comparaba con el conteo absoluto de páginas ANTES
-      // de esta tabla, que solo coincidía por casualidad para el primer día).
-      didDrawPage: (data) => {
-        if (data.pageNumber === 1) return;
-        doc.setFillColor(...rgb);
-        doc.roundedRect(14, 15.8, 3, 5.2, 0.8, 0.8, "F");
-        doc.setFontSize(12); doc.setTextColor(20);
-        doc.text(d.dayLabel, 20, 20);
-      },
-    });
-    y = doc.lastAutoTable.finalY + 10;
-  });
 
-  const pageCount = doc.internal.getNumberOfPages();
-  for (let p = 1; p <= pageCount; p++) {
-    doc.setPage(p);
-    doc.setFontSize(8); doc.setTextColor(160);
-    doc.text(`Modus Fit · Página ${p} de ${pageCount}`, 105, 290, { align: "center" });
-  }
 
-  await downloadBlob(doc.output("blob"), `${slugifyForFilename(routineDef.name)}.pdf`);
-}
 
-async function exportRoutineToWord(routineDef) {
-  const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, HeadingLevel, WidthType } = await import("docx");
-  const days = buildRoutineExportDays(routineDef);
-  const totalExercises = days.reduce((a, d) => a + d.exercises.length, 0);
-  const totalSets = days.reduce((a, d) => a + d.exercises.reduce((b, ex) => b + ex.sets, 0), 0);
-  const children = [
-    new Paragraph({ text: routineDef.name || "Mi rutina", heading: HeadingLevel.HEADING_1 }),
-    new Paragraph({ children: [new TextRun({ text: `Generada con Modus Fit · ${new Date().toLocaleDateString("es-AR")}`, color: "666666" })], spacing: { after: 160 } }),
-    new Paragraph({
-      children: [
-        new TextRun({ text: `${days.length} día${days.length === 1 ? "" : "s"}  ·  `, bold: true }),
-        new TextRun({ text: `${totalExercises} ejercicios  ·  `, bold: true }),
-        new TextRun({ text: `${totalSets} series totales`, bold: true }),
-      ],
-      spacing: { after: 200 },
-    }),
-  ];
-  days.forEach((d) => {
-    const dayColorHex = (d.dayColor || "#14B8A6").replace("#", "");
-    children.push(new Paragraph({ children: [new TextRun({ text: d.dayLabel, bold: true, color: dayColorHex, size: 28 })], heading: HeadingLevel.HEADING_2, spacing: { before: 260, after: 40 } }));
-    const setsInDay = d.exercises.reduce((a, ex) => a + ex.sets, 0);
-    children.push(new Paragraph({ children: [new TextRun({ text: `${d.exercises.length} ejercicio${d.exercises.length === 1 ? "" : "s"} · ${setsInDay} series`, color: "888888", italics: true })], spacing: { after: 100 } }));
-    const headerRow = new TableRow({ children: ["Ejercicio", "Músculo", "Series", "Reps"].map((h) => new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: h, bold: true })] })] })) });
-    const dataRows = d.exercises.map((ex) => new TableRow({ children: [ex.name, ex.muscle, String(ex.sets), ex.repRangeDisplay].map((v) => new TableCell({ children: [new Paragraph(v)] })) }));
-    children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [headerRow, ...dataRows] }));
-  });
-  const doc = new Document({ sections: [{ children }] });
-  const blob = await Packer.toBlob(doc);
-  await downloadBlob(blob, `${slugifyForFilename(routineDef.name)}.docx`);
-}
-
-async function exportRoutineToExcel(routineDef) {
-  const XLSX = await import("xlsx");
-  const days = buildRoutineExportDays(routineDef);
-  const totalExercises = days.reduce((a, d) => a + d.exercises.length, 0);
-  const totalSets = days.reduce((a, d) => a + d.exercises.reduce((b, ex) => b + ex.sets, 0), 0);
-  const wb = XLSX.utils.book_new();
-
-  // Hoja "Resumen" primero — mismo criterio que exportTrainingToExcel: lo
-  // primero que ve quien abre el archivo es un pantallazo general, no ya
-  // una planilla cruda de filas.
-  const wsResumen = XLSX.utils.aoa_to_sheet([
-    [routineDef.name || "Mi rutina"],
-    [`Generada con Modus Fit el ${new Date().toLocaleDateString("es-AR")}`],
-    [],
-    ["Días", days.length],
-    ["Ejercicios", totalExercises],
-    ["Series totales", totalSets],
-  ]);
-  wsResumen["!cols"] = [{ wch: 24 }, { wch: 18 }];
-  XLSX.utils.book_append_sheet(wb, wsResumen, "Resumen");
-
-  const header = ["Día", "Ejercicio", "Músculo", "Series", "Reps"];
-  const data = [];
-  days.forEach((d) => { d.exercises.forEach((ex) => { data.push([d.dayLabel, ex.name, ex.muscle, ex.sets, ex.repRangeDisplay]); }); });
-  const wsRutina = XLSX.utils.aoa_to_sheet([header, ...data]);
-  wsRutina["!cols"] = [{ wch: 18 }, { wch: 28 }, { wch: 18 }, { wch: 9 }, { wch: 16 }];
-  XLSX.utils.book_append_sheet(wb, wsRutina, "Rutina");
-
-  const wbout = XLSX.write(wb, { type: "array", bookType: "xlsx" });
-  await downloadBlob(new Blob([wbout], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }), `${slugifyForFilename(routineDef.name)}.xlsx`);
-}
-
-const EXPORT_PERIODS = [
-  { k: "day", l: "Hoy" },
-  { k: "week", l: "Esta semana" },
-  { k: "month", l: "Este mes" },
-];
-
-// Tarjeta de Perfil: elegís el período y el formato, y se descarga
-// directo — pensado para mandarle a tu entrenador el resumen sin tener que
-// armarlo a mano.
-// Los tres formatos, con su color propio, en un solo lugar — antes cada
-// pantalla que exportaba redibujaba su propia fila de botones (una gris y
-// plana en Perfil, otra con colores en el modal de compartir), así que la
-// misma acción se veía distinta según desde dónde la abrieras.
-const EXPORT_FORMATS = [
-  { k: "pdf", l: "PDF", color: "#F43F5E" },
-  { k: "word", l: "Word", color: "#3B82F6" },
-  { k: "excel", l: "Excel", color: "#10B981" },
-];
-
-function ExportFormatGrid({ exporting, onPick, disabled = false }) {
-  return (
-    <div className="grid grid-cols-3 gap-2">
-      {EXPORT_FORMATS.map((f) => (
-        <button key={f.k} onClick={() => onPick(f.k)} disabled={disabled || !!exporting}
-          className="flex flex-col items-center gap-1.5 py-3 rounded-xl border text-[10px] font-bold text-slate-300 transition active:scale-[0.97] disabled:opacity-40"
-          style={{ backgroundColor: tint(f.color, "12"), borderColor: tint(f.color, "30") }}>
-          {exporting === f.k
-            ? <RotateCcw size={15} className="animate-spin" style={{ color: f.color }} />
-            : <Download size={15} style={{ color: f.color }} />}
-          {f.l}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-// Mensaje de error compartido: distingue "no se pudo generar" de "se generó
-// pero no se pudo compartir/guardar" (err.stage === "share", ver
-// downloadBlob). Un mensaje genérico único hacía pensar que el archivo ni se
-// creó, cuando en Android el caso más probable es justo el contrario.
-function exportErrorMessage(err) {
-  return err?.stage === "share"
-    ? "El archivo se generó bien, pero no pudimos abrir la ventana para compartirlo o guardarlo. Probá de nuevo."
-    : "No pudimos generar el archivo. Probá de nuevo.";
-}
 
 /* ============================================================================
    EXPORTAR — una sola puerta. Antes había tres, cada una con su propia mitad
@@ -10675,105 +10162,6 @@ function exportErrorMessage(err) {
    pestaña sin la barra, para embeberlo donde el contexto ya la decide (el
    modal de compartir una rutina puntual).
 ============================================================================ */
-function ExportCenterCard({ profileName = "", logs = {}, trainingSessions = [], exerciseNotes = {}, routineDef = null, only = null, embedded = false }) {
-  const [what, setWhat] = useState(only || (routineDef ? "routine" : "training"));
-  const allSessions = useMemo(() => buildSessionsIndex(logs, trainingSessions), [logs, trainingSessions]);
-  const [period, setPeriod] = useState("week");
-  const [exporting, setExporting] = useState(null);
-  const [error, setError] = useState("");
-  const filtered = useMemo(() => getSessionsForPeriod(allSessions, period), [allSessions, period]);
-  const rows = useMemo(() => buildExportRows(filtered, exerciseNotes), [filtered, exerciseNotes]);
-  const periodLabel = EXPORT_PERIODS.find((p) => p.k === period)?.l || "";
-  const trainedDays = useMemo(() => groupExportRowsByDate(rows).length, [rows]);
-  // Resumen de la rutina para que se vea QUÉ se va a bajar antes de bajarlo
-  // (días/ejercicios/series) — los mismos números que encabezan el PDF.
-  const routineStats = useMemo(() => {
-    if (!routineDef) return null;
-    try {
-      const days = buildRoutineExportDays(routineDef);
-      return {
-        days: days.length,
-        exercises: days.reduce((a, d) => a + d.exercises.length, 0),
-        sets: days.reduce((a, d) => a + d.exercises.reduce((b, ex) => b + ex.sets, 0), 0),
-      };
-    } catch { return null; }
-  }, [routineDef]);
-
-  const handleExport = async (format) => {
-    setError(""); setExporting(format);
-    try {
-      if (what === "routine") {
-        if (format === "pdf") await exportRoutineToPdf(routineDef);
-        else if (format === "word") await exportRoutineToWord(routineDef);
-        else if (format === "excel") await exportRoutineToExcel(routineDef);
-      } else {
-        if (!rows.length) { setError("No hay entrenamientos registrados en ese período."); return; }
-        const meta = { profileName, periodLabel, filename: `mi-rutina-${slugifyForFilename(profileName)}-${period}-${todayStr()}` };
-        if (format === "pdf") await exportTrainingToPdf(rows, meta);
-        else if (format === "word") await exportTrainingToWord(rows, meta);
-        else if (format === "excel") await exportTrainingToExcel(rows, meta);
-      }
-    } catch (err) {
-      console.error(`Error exportando ${what}:`, err);
-      setError(exportErrorMessage(err));
-    } finally {
-      setExporting(null);
-    }
-  };
-
-  const body = (
-    <>
-      {!only && (
-        <div className="flex bg-black/40 rounded-xl p-1 border border-slate-700/50">
-          {[{ k: "routine", l: "Rutina", icon: <ListChecks size={13} /> }, { k: "training", l: "Entrenamiento", icon: <Dumbbell size={13} /> }].map((opt) => (
-            <button key={opt.k} onClick={() => { setWhat(opt.k); setError(""); }} disabled={opt.k === "routine" && !routineDef}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-all disabled:opacity-40 ${what === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>
-              {opt.icon}{opt.l}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {what === "routine" ? (
-        <>
-          <div className="flex items-center gap-3 rounded-xl px-3 py-2.5" style={{ backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}>
-            <span className="w-8 h-8 rounded-xl bg-teal-500/15 text-teal-400 flex items-center justify-center shrink-0"><ListChecks size={15} /></span>
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-bold text-white truncate">{routineDef?.name || "Sin rutina activa"}</p>
-              <p className="text-[10px] text-slate-500">
-                {routineStats ? `${routineStats.days} días · ${routineStats.exercises} ejercicios · ${routineStats.sets} series` : "Activá una rutina para poder exportarla."}
-              </p>
-            </div>
-          </div>
-          <p className="text-[10px] text-slate-600">El plan completo: días, ejercicios, series y rango de reps.</p>
-        </>
-      ) : (
-        <>
-          <div className="flex bg-black/40 rounded-xl p-1 border border-slate-700/50">
-            {EXPORT_PERIODS.map((opt) => (
-              <button key={opt.k} onClick={() => { setPeriod(opt.k); setError(""); }} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${period === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
-            ))}
-          </div>
-          <p className="text-[10px] text-slate-600">{trainedDays > 0 ? `${trainedDays} día${trainedDays === 1 ? "" : "s"} entrenado${trainedDays === 1 ? "" : "s"} en este período — con los kg y reps de cada serie.` : "Sin entrenamientos registrados en este período."}</p>
-        </>
-      )}
-
-      <ExportFormatGrid exporting={exporting} onPick={handleExport} disabled={what === "routine" && !routineDef} />
-      {error && <p className="text-[11px] text-amber-400">{error}</p>}
-    </>
-  );
-
-  if (embedded) return <div className="space-y-3">{body}</div>;
-  return (
-    <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 backdrop-blur-sm shadow-md shadow-black/20 space-y-3.5">
-      <div>
-        <p className="text-sm font-bold text-white">Exportar</p>
-        <p className="text-[11px] text-slate-500 mt-0.5">Bajá tu rutina o el resumen de lo que entrenaste, para mandárselo a quien quieras</p>
-      </div>
-      {body}
-    </div>
-  );
-}
 
 /* ============================================================================
    FILA DE SECCIÓN — el bloque básico dentro de las tarjetas de Social
@@ -11362,7 +10750,7 @@ function AvatarCropModal({ src, onCancel, onConfirm }) {
   );
 }
 
-function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdateProfile, cycleStart, onSetCycleStart, onGoToRoutines, onGoToSocial = null, openSectionSignal = { id: null, n: 0 }, onOpenFieldPreview = null, onSignalConsumed = null }) {
+function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfile, cycleStart, onSetCycleStart, onGoToRoutines, onGoToSocial = null, openSectionSignal = { id: null, n: 0 }, onOpenFieldPreview = null, onSignalConsumed = null }) {
   const profile = profiles[profileName];
   const [showDeletePin, setShowDeletePin] = useState(false); const [deleteError, setDeleteError] = useState("");
   const [editing, setEditing] = useState(false);
@@ -11893,7 +11281,6 @@ function ProfileView({ profileName, profiles, logs, onSignOut, onDelete, onUpdat
       </div>
 
       <div className="flex items-center gap-1.5 px-1 pt-2"><Download size={11} className="text-slate-600" /><p className="text-[10px] font-black uppercase tracking-widest text-slate-600">Datos</p></div>
-      <ExportCenterCard profileName={profileName} logs={logs} trainingSessions={profile?.trainingSessions} exerciseNotes={settings.exerciseNotes} routineDef={activeRoutineDef} />
 
       <div className="flex items-center gap-2.5 px-1 text-[11px] text-slate-600">
         <Save size={12} className="text-slate-600 shrink-0" />
@@ -12115,123 +11502,6 @@ function PublicUserCard({ uid, basic, streak = null, onClick = null, children })
   );
 }
 
-// Sugerir amigos a partir de la agenda de contactos del teléfono — mismo
-// patrón que usan la mayoría de las apps sociales. Sólo funciona en la app
-// nativa de Android (Capacitor.isNativePlatform()): en la web no hay forma
-// de leer la agenda del sistema, así que ahí se muestra un aviso en vez de
-// intentarlo y fallar en silencio.
-// Privacidad: la agenda NUNCA sale del teléfono hacia Firestore. Sólo se
-// manda un HASH de cada número (hashPhoneKey) para preguntar "¿hay alguien
-// con este teléfono?" — ni Firestore ni nadie más ve la agenda real, y sólo
-// aparecen sugerencias de gente que a su vez activó "descubrible por
-// teléfono" desde su propio perfil (PhoneDiscoverySection).
-function ContactsSuggestions({ myUid, friendStatus, onSendFriendRequest }) {
-  const [state, setState] = useState("idle"); // idle|working|not_native|denied|not_installed|empty|results|error
-  const [results, setResults] = useState([]);
-  const [errorDetail, setErrorDetail] = useState("");
-
-  const handleFind = async () => {
-    if (!Capacitor.isNativePlatform()) { setState("not_native"); return; }
-    setState("working");
-    try {
-      let perm;
-      try {
-        perm = await Contacts.checkPermissions();
-      } catch (permErr) {
-        // BUG FIX (reporte: "da error" al pedir permiso de contactos): la
-        // causa más común es que el celular todavía tiene instalada una
-        // versión de la app compilada ANTES de este plugin — Capacitor
-        // tira un error de "no implementado" en vez de mostrar el diálogo
-        // de permiso. Se detecta explícitamente para dar un mensaje
-        // accionable ("actualizá la app") en vez del genérico de abajo.
-        const msg = String(permErr?.message || permErr).toLowerCase();
-        if (permErr?.code === "UNIMPLEMENTED" || msg.includes("not implemented") || msg.includes("not available")) {
-          setState("not_installed");
-          return;
-        }
-        // Mismo caso, otra causa: el APK instalado se compiló con un
-        // AndroidManifest que no declaraba las dos permisos del alias
-        // "contacts" del plugin (READ_CONTACTS + WRITE_CONTACTS). Capacitor
-        // rechaza el pedido de entrada con "Missing the following
-        // permissions in AndroidManifest.xml: ..." — el manifest del repo ya
-        // las declara, así que si esto aparece es un APK viejo y la salida
-        // es la misma: actualizar la app, no reintentar.
-        if (msg.includes("missing the following permissions")) {
-          setState("not_installed");
-          return;
-        }
-        throw permErr;
-      }
-      // BUG FIX: Android 14+ puede devolver "limited" (permiso de "elegir
-      // contactos" en vez de acceso completo) — antes cualquier valor que
-      // no fuera exactamente "granted" se trataba como rechazo total y
-      // mostraba "no dimos permiso", incluso cuando el usuario SÍ dio
-      // acceso a algunos contactos.
-      const isUsable = (p) => p?.contacts === "granted" || p?.contacts === "limited";
-      if (!isUsable(perm)) perm = await Contacts.requestPermissions();
-      if (!isUsable(perm)) { setState("denied"); return; }
-
-      const { contacts } = await Contacts.getContacts({ projection: { name: true, phones: true } });
-      const keys = new Set();
-      contacts.forEach((c) => (c.phones || []).forEach((p) => {
-        const k = normalizePhoneForMatching(p.number);
-        if (k) keys.add(k);
-      }));
-      const hashes = await Promise.all(Array.from(keys).map(hashPhoneKey));
-      const uids = await findUidsByPhoneHashes(hashes);
-      const candidates = uids.filter((u) => u !== myUid && !friendStatus(u));
-      if (!candidates.length) { setState("empty"); return; }
-      const withBasics = await Promise.all(candidates.map((u) => getPublicBasic(u).then((b) => ({ uid: u, basic: b }))));
-      setResults(withBasics.filter((r) => r.basic));
-      setState("results");
-    } catch (err) {
-      console.error("[contacts] No se pudo sugerir amigos de la agenda:", err);
-      setErrorDetail(String(err?.message || err || ""));
-      setState("error");
-    }
-  };
-
-  return (
-    <div className="space-y-2.5">
-      {state !== "results" && (
-        <SectionRow
-          icon={<Contact size={15} />}
-          accent="#06B6D4"
-          title={state === "working" ? "Buscando..." : "Sugerir de mis contactos"}
-          desc="Encontrá amigos que ya usan la app"
-          onClick={handleFind}
-          disabled={state === "working"}
-          right={state !== "working" ? <ChevronRight size={14} className="text-slate-600 shrink-0" /> : null}
-        />
-      )}
-      {state === "not_native" && <p className="text-[11px] text-slate-600 px-1">Esta función sólo está disponible en la app instalada en tu celular.</p>}
-      {state === "denied" && <p className="text-[11px] text-amber-400/80 px-1">No dimos permiso para leer tus contactos. Podés habilitarlo desde los ajustes de la app en tu celular.</p>}
-      {state === "empty" && <p className="text-[11px] text-slate-600 px-1">Ninguno de tus contactos usa Modus Fit todavía (o no activó "descubrible por teléfono" en su perfil).</p>}
-      {state === "not_installed" && <p className="text-[11px] text-amber-400/80 px-1">Esta versión de la app todavía no tiene esta función instalada — hace falta actualizar la app en tu celular (no alcanza con recargarla).</p>}
-      {state === "error" && (
-        <div className="px-1">
-          <p className="text-[11px] text-rose-400/80">No pudimos leer tus contactos. Probá de nuevo.</p>
-          {errorDetail && <p className="text-[9.5px] text-slate-700 mt-0.5 break-all">{errorDetail}</p>}
-        </div>
-      )}
-      {state === "results" && (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between px-1">
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-600">{results.length} de tus contactos</p>
-            <button onClick={() => setState("idle")} className="text-[10.5px] text-slate-600 hover:text-slate-400">Ocultar</button>
-          </div>
-          {results.map(({ uid, basic }) => (
-            <PublicUserCard key={uid} uid={uid} basic={basic}>
-              <button onClick={() => onSendFriendRequest(uid)} className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 text-[11px] font-bold hover:bg-cyan-500/25 transition">
-                <UserPlus size={12} /> Agregar
-              </button>
-            </PublicUserCard>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
 
 // Buscar a alguien por @usuario para agregarlo de amigo, o escaneando su
 // código QR de perfil (ver decodeQrFromImageFile/parseProfileQrPayload) —
@@ -14798,7 +14068,6 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
             ) : (
               <p className="text-[11px] text-slate-600 px-1">Vinculá tu cuenta de Google en Perfil para poder elegir un @usuario y usar lo social.</p>
             )}
-            <ContactsSuggestions myUid={uid} friendStatus={friendStatus} onSendFriendRequest={doSendFriendRequest} />
           </>
         )}
 
@@ -16746,27 +16015,6 @@ function buildActionPlan(action, ctx) {
     const wkLabel = WEEKDAY_SHORT_LABELS[WEEKDAY_KEYS.indexOf(wk)];
     return { kind: "list", title: "Cambiar cronograma semanal", items: [`${wkLabel}: ${dayLabel}`], confirmLabel: "Guardar cambio", confirm: () => onCreateRoutine(activeId, newDef) };
   }
-  // Exportar una rutina a PDF — dispara la misma hoja de compartir nativa
-  // que el botón de exportar en Rutinas (ver exportRoutineToPdf).
-  if (action.type === "exportar_rutina") {
-    const wanted = String(action.routineName || "").toLowerCase().trim();
-    const activeId = profile?.activeRoutineId;
-    let foundDef = activeId ? resolveRoutineDef(profile?.routines?.[activeId], activeId) : null;
-    if (wanted) {
-      let match = null;
-      Object.entries(profile?.routines || {}).forEach(([id, def]) => {
-        if (!match && def?.name?.toLowerCase().includes(wanted)) match = { id, def };
-      });
-      if (match) foundDef = resolveRoutineDef(match.def, match.id);
-    }
-    if (!foundDef) return null;
-    return {
-      kind: "list", title: `Exportar "${foundDef.name}"`,
-      items: ["Se genera un PDF con todos los días y ejercicios, listo para compartir o guardar."],
-      confirmLabel: "Exportar PDF",
-      confirm: () => exportRoutineToPdf(foundDef),
-    };
-  }
   return null;
 }
 
@@ -17039,9 +16287,8 @@ Tipos disponibles:
 - nota_ejercicio: {"type":"nota_ejercicio","exercise":"Sentadilla","nota":"cuidado con la rodilla derecha"} — guarda (o si "nota" viene vacío, borra) la nota personal de ese ejercicio, la misma que se ve al registrar la serie.
 - restablecer_dia: {"type":"restablecer_dia","day":"nombre o parte del nombre del día (opcional)"} — borra las marcas de HOY de ese día de la rutina normal (no toca otros días, ni récords, ni marcas de descarga). Si no da el día, usa el primero de la rutina activa. Usalo para "reiniciá mi día" o si se equivocó al cargar algo y quiere volver a empezar.
 - cambiar_dia_semana: {"type":"cambiar_dia_semana","diaSemana":"lunes"|"martes"|"miercoles"|"jueves"|"viernes"|"sabado"|"domingo","dia":"nombre o parte del nombre del día de la rutina, o vacío/omitido para dejarlo como descanso"} — asigna (o saca) qué día de su rutina le toca en ese día de la semana, el mismo cronograma de Rutinas → Cronograma semanal.
-- exportar_rutina: {"type":"exportar_rutina","routineName":"nombre o parte del nombre de una rutina guardada (opcional, si no se da usa la activa)"} — genera un PDF de esa rutina (todos los días y ejercicios) y abre la hoja para compartirlo o guardarlo. Usalo para "pasame mi rutina en PDF" o "expórtame la rutina".
 
-Reglas importantes: nunca digas que ya aplicaste el cambio — la persona siempre tiene que confirmarlo desde un botón antes de que se aplique de verdad. Agregá el bloque ###ACCION### sólo si pidió ESE cambio puntual en este mensaje o el anterior, nunca como sugerencia general no pedida. Para registrar_marca, editar_rutina_activa, corregir_record, nota_ejercicio, planificar_progresion y planificar_semana, el nombre del ejercicio tiene que ser EXACTAMENTE el mismo texto que aparece en sus "rutinas" (no un nombre genérico ni una variante parecida: si tiene "Sentadilla Búlgara" en su rutina y vos decís "Sentadilla", el botón de confirmar no va a encontrar nada y la persona se queda sin saber por qué) — si no estás segura de a cuál se refiere, preguntá antes de proponer la acción. Para gestionar_rutina y exportar_rutina, el nombre de la rutina tiene que coincidir con una que ya tenga guardada — si hay dudas, preguntá cuál.
+Reglas importantes: nunca digas que ya aplicaste el cambio — la persona siempre tiene que confirmarlo desde un botón antes de que se aplique de verdad. Agregá el bloque ###ACCION### sólo si pidió ESE cambio puntual en este mensaje o el anterior, nunca como sugerencia general no pedida. Para registrar_marca, editar_rutina_activa, corregir_record, nota_ejercicio, planificar_progresion y planificar_semana, el nombre del ejercicio tiene que ser EXACTAMENTE el mismo texto que aparece en sus "rutinas" (no un nombre genérico ni una variante parecida: si tiene "Sentadilla Búlgara" en su rutina y vos decís "Sentadilla", el botón de confirmar no va a encontrar nada y la persona se queda sin saber por qué) — si no estás segura de a cuál se refiere, preguntá antes de proponer la acción. Para gestionar_rutina, el nombre de la rutina tiene que coincidir con una que ya tenga guardada — si hay dudas, preguntá cuál.
 
 Cuando necesites que elija entre pocas opciones concretas y cortas para avanzar (por ejemplo: "¿en qué querés enfocarte: fuerza, hipertrofia o resistencia?", "¿qué día armamos, push o pull?"), en vez de listarlas en el texto agregá AL FINAL, en una línea aparte, este bloque (mismas reglas de formato que ###ACCION###: sin markdown alrededor, nada más en esa línea):
 ###PREGUNTA###{"opciones":["Opción A","Opción B","Opción C"]}###FIN###
@@ -17857,7 +17104,6 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
             { icon: <Flame size={16} />, label: "Calentamiento", prompt: "Armame un calentamiento general para mi día de hoy", autoSend: true },
             { icon: <Calendar size={16} />, label: "Ciclo y descarga", prompt: "¿Cómo vengo en el ciclo actual? ¿Cuándo me toca la descarga?", autoSend: true },
             { icon: <Save size={16} />, label: "Anotar una marca", askExercise: true },
-            { icon: <FileDown size={16} />, label: "Exportar rutina", prompt: "Pasame mi rutina activa en PDF", autoSend: true },
           ].map((c, i) => (
             <button key={i} onClick={() => handleQuickPrompt(c)} className="snap-start flex flex-col items-center gap-1.5 w-[74px] shrink-0 py-2.5 px-1 rounded-2xl transition active:scale-95 bg-teal-500/10 border border-teal-500/25">
               <span className="flex items-center justify-center w-9 h-9 rounded-xl shrink-0 bg-teal-500/20 text-teal-400">{c.icon}</span>
@@ -21487,7 +20733,7 @@ export default function App() {
             {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} onGoToRoutines={() => goToSection("rutinas", "routine-editor")} weekSchedule={weekSchedule} sex={profile?.sex} age={profile?.age} onGoToDeload={() => { if (isDeloadWeek) { setDeloadDismissed(false); setTab("rutina"); } else { setTab("descarga"); } }} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} />}
             {tab === "descarga" && <DeloadView logs={logs} setLogs={setLogs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} activeSession={profile?.activeSession?.deload ? profile.activeSession : null} onStartSession={handleStartSession} onCancelSession={handleCancelSession} weekSchedule={weekSchedule} onClose={() => { setDeloadDismissed(true); setTab("rutina"); }} cycleStart={cycleStart} />}
             {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} setLogs={setLogs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} conversations={aiConversations} activeConversationId={activeAiConversationId} onNewConversation={handleNewAiConversation} onSwitchConversation={handleSwitchAiConversation} onDeleteConversation={handleDeleteAiConversation} onRenameConversation={handleRenameAiConversation} settings={getProfileSettings(profile)} cycleStart={cycleStart} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} onDeleteRoutine={handleDeleteRoutine} onNavigate={setTab} onStartSession={handleStartSession} onEndSession={handleEndSession} />}
-            {tab === "perfil" && <ProfileView onOpenFieldPreview={() => setShowFieldIntro(true)} openSectionSignal={openSectionSignal} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} profileName={activeProfile} profiles={profiles} logs={logs} onSignOut={handleSignOut} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} onGoToSocial={() => setTab("social")} />}
+            {tab === "perfil" && <ProfileView onOpenFieldPreview={() => setShowFieldIntro(true)} openSectionSignal={openSectionSignal} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} profileName={activeProfile} profiles={profiles} onSignOut={handleSignOut} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} onGoToSocial={() => setTab("social")} />}
             {tab === "social" && <SocialView profile={profile} profileName={activeProfile} uid={profile?.googleUid} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} />}
           </div>
         </main>
