@@ -5100,7 +5100,7 @@ function RankUpModal({ from, to, muscleName, onClose }) {
   );
 }
 
-function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, accent, logs, setLogs, drafts = {}, setDrafts, autoShowPrShare = true, onDisableAutoShowPrShare, hasActiveSession = true, cardio = false, dumbbellDouble = null, fieldSettings = DEFAULT_SETTINGS, onUpdateSettings = null, sex = null, age = null, restTimerId = null, restSeconds = null, isLastSet = false, weekInCycle = null }) {
+function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, accent, logs, setLogs, drafts = {}, setDrafts, autoShowPrShare = true, onDisableAutoShowPrShare, hasActiveSession = true, cardio = false, dumbbellDouble = null, fieldSettings = DEFAULT_SETTINGS, onUpdateSettings = null, sex = null, age = null, restTimerId = null, restSeconds = null, isLastSet = false, weekInCycle = null, nextRestTimerId = null, nextRestSeconds = null }) {
   // Modo "rutina planificada" (ver DEFAULT_SETTINGS.trainingMode): si hay
   // una meta cargada para ESTA semana, se muestra "Marca a alcanzar" en
   // vez de "Récord" — pensado para quien sigue un plan con cargas ya
@@ -5366,6 +5366,16 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   const autoStartRestTimer = () => {
     if (fieldSettings.autoStartRestTimer === true && restTimerId && restSeconds && !isLastSet) {
       ACTIVE_REST_TIMERS[restTimerId] = { endTime: Date.now() + restSeconds * 1000 };
+      persistActiveRestTimers();
+      return;
+    }
+    // Descanso ENTRE ejercicios (opcion, ver settings.restBetweenExercises):
+    // al guardar la ULTIMA serie arranca el cronometro que el ejercicio
+    // SIGUIENTE ya tiene arriba de su tarjeta, en vez de dibujar uno nuevo
+    // entre medio. Esa tarjeta ademas se abre sola (ver forceOpen en
+    // RoutineView), asi el cronometro queda justo donde vas a mirar.
+    if (isLastSet && fieldSettings.restBetweenExercises === true && nextRestTimerId && nextRestSeconds) {
+      ACTIVE_REST_TIMERS[nextRestTimerId] = { endTime: Date.now() + nextRestSeconds * 1000 };
       persistActiveRestTimers();
     }
   };
@@ -6043,7 +6053,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
 /* ============================================================================
    EXERCISE CARD
 ============================================================================ */
-function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts, resetKey = 0, settings = DEFAULT_SETTINGS, forceOpen = false, onDisableAutoShowPrShare, hasActiveSession = true, hideTimer = false, onUpdateSettings = null, sex = null, age = null, weekInCycle = null, dayKey = null }) {
+function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts, resetKey = 0, settings = DEFAULT_SETTINGS, forceOpen = false, onDisableAutoShowPrShare, hasActiveSession = true, hideTimer = false, onUpdateSettings = null, sex = null, age = null, weekInCycle = null, dayKey = null, nextRestTimerId = null, nextRestSeconds = null }) {
   const [open, setOpen] = useState(false);
   const [showWarmup, setShowWarmup] = useState(false);
   // Nota personal del ejercicio (persiste en el perfil → sincroniza)
@@ -6165,7 +6175,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
           <div className="mb-2 timer-hop"><RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={accent} alertType={settings.alertType} timerId={restTimerId} exerciseName={exercise.name} /></div>
         )}
         {setsToShow.map((s, i) => <React.Fragment key={`${exercise.id}:frag:${i}`}>
-          <SetRow key={`${exercise.id}:${i}:${resetKey}`} exerciseId={exercise.id} exerciseName={exercise.name} exerciseMuscle={exercise.muscle} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKey} autoShowPrShare={settings.autoShowPrShare ?? true} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={hasActiveSession} cardio={exercise.cardio} dumbbellDouble={settings?.dumbbellDouble || null} fieldSettings={settings} onUpdateSettings={onUpdateSettings} sex={sex} age={age} restTimerId={restTimerId} restSeconds={restSeconds} isLastSet={i === setsToShow.length - 1} weekInCycle={weekInCycle} />
+          <SetRow key={`${exercise.id}:${i}:${resetKey}`} exerciseId={exercise.id} exerciseName={exercise.name} exerciseMuscle={exercise.muscle} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKey} autoShowPrShare={settings.autoShowPrShare ?? true} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={hasActiveSession} cardio={exercise.cardio} dumbbellDouble={settings?.dumbbellDouble || null} fieldSettings={settings} onUpdateSettings={onUpdateSettings} sex={sex} age={age} restTimerId={restTimerId} restSeconds={restSeconds} isLastSet={i === setsToShow.length - 1} weekInCycle={weekInCycle} nextRestTimerId={nextRestTimerId} nextRestSeconds={nextRestSeconds} />
           {/* Debajo de la serie recién registrada: timerSlot = N significa
               "después de la serie N" (1-indexado). */}
           {timerSlot === i + 1 && (
@@ -6734,41 +6744,51 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           (si estaba abierta, la nota a medio escribir, el calentamiento
           desplegado). Así se anima igual pero sin destruir nada. */}
       <div ref={gridRef} className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-        {(() => { const groups = groupExercisesIntoSupersets(day.exercises); return groups.map((group, gi) => {
-          // Cronómetro ENTRE ejercicios (opción, ver
-          // settings.restBetweenExercises): aparece recién cuando terminaste
-          // todas las series de este ejercicio y todavía queda otro por
-          // delante — o sea, justo cuando estás por pasar al siguiente. No
-          // se muestra en el último, donde no hay "siguiente" al que llegar.
-          const groupDone = group.every((ex) => ex.sets.every((_, i) => (logs[`${ex.id}_${i}`] || []).some((h) => h.date === today && !h.deload)));
-          const showBetween = settings.restBetweenExercises === true && groupDone && gi < groups.length - 1 && !!sessionForThisDay;
-          const betweenTimer = showBetween ? (
-            <div key={`${activeDay}:between:${gi}`} className="timer-hop">
-              <RestTimer seconds={settings.restBetweenExercisesSec ?? 180} accent={day.color} alertType={settings.alertType} timerId={`${activeDay}:between_${gi}`} exerciseName={`Antes de ${groups[gi + 1]?.[0]?.name || "el próximo ejercicio"}`} />
-            </div>
-          ) : null;
-          if (group.length === 1) {
-            const ex = group[0];
-            const card = <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} sex={sex} age={age} weekInCycle={weekInCycle} dayKey={activeDay} />;
-            return betweenTimer ? <React.Fragment key={`${activeDay}:wrap:${ex.id}`}>{card}{betweenTimer}</React.Fragment> : card;
-          }
-          // Superserie: varios ejercicios encadenados comparten un solo
-          // cronómetro al final del grupo, en vez de uno por ejercicio —
-          // la idea de la superserie es justamente no descansar entre
-          // ellos, sólo al terminar la vuelta completa.
-          const hasHeavyGroup = group.some((ex) => ex.sets.some((s) => isHeavyRepRange(s.repRange)));
-          return (
-            <React.Fragment key={`${activeDay}:wrap:${group.map((e) => e.id).join("-")}`}>
-            <div key={`${activeDay}:${group.map((e) => e.id).join("-")}`} className="rounded-2xl border p-2.5 space-y-2.5" style={{ borderColor: tint(day.color, "50"), backgroundColor: tint(day.color, "06") }}>
-              <div className="flex items-center gap-1.5 px-1"><Link size={11} style={{ color: day.color }} /><span className="text-[10px] font-black uppercase tracking-wider" style={{ color: day.color }}>Superserie · {group.length} ejercicios</span></div>
-              {group.map((ex) => <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} hideTimer sex={sex} age={age} weekInCycle={weekInCycle} dayKey={activeDay} />)}
-              <div className="px-1"><RestTimer seconds={hasHeavyGroup ? settings.restLong : settings.restShort} accent={day.color} alertType={settings.alertType} timerId={`${activeDay}:grp_${group.map((g) => g.id).join("_")}`} exerciseName={group.map((g) => g.name).filter(Boolean).join(" + ")} /></div>
-              <p className="text-[10px] text-slate-600 px-1">Descansá recién después de completar los {group.length} ejercicios. Ese es el cronómetro de arriba.</p>
-            </div>
-            {betweenTimer}
-            </React.Fragment>
-          );
-        }); })()}
+        {(() => {
+          const groups = groupExercisesIntoSupersets(day.exercises);
+          const estaCompleto = (g) => g.every((ex) => ex.sets.every((_, i) => (logs[`${ex.id}_${i}`] || []).some((h) => h.date === today && !h.deload)));
+          // Id del cronómetro PROPIO de un grupo — el mismo que ya usa su
+          // tarjeta (o la superserie entera). Es lo que permite que el
+          // descanso entre ejercicios reuse ese cronómetro en vez de crear
+          // uno aparte.
+          const timerIdDe = (g) => {
+            if (!g) return null;
+            if (g.length > 1) return `${activeDay}:grp_${g.map((x) => x.id).join("_")}`;
+            return g[0].cardio ? null : `${activeDay}:ex_${g[0].id}`;
+          };
+          return groups.map((group, gi) => {
+            // Descanso ENTRE ejercicios (opción, ver
+            // settings.restBetweenExercises). Antes esto dibujaba un
+            // cronómetro NUEVO entre tarjeta y tarjeta; ahora al guardar la
+            // última serie arranca el cronómetro que el ejercicio SIGUIENTE
+            // ya tiene arriba de todo, y esa tarjeta se abre sola. Un solo
+            // cronómetro, en el lugar al que vas a mirar.
+            const siguiente = groups[gi + 1];
+            const entreActivo = settings.restBetweenExercises === true && !!sessionForThisDay;
+            const nextRestTimerId = entreActivo ? timerIdDe(siguiente) : null;
+            const nextRestSeconds = settings.restBetweenExercisesSec ?? 180;
+            // Se abre sola la tarjeta del grupo que sigue al que acabás de
+            // terminar, mientras a ésta le falte trabajo.
+            const abrirSola = entreActivo && gi > 0 && estaCompleto(groups[gi - 1]) && !estaCompleto(group);
+            if (group.length === 1) {
+              const ex = group[0];
+              return <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} sex={sex} age={age} weekInCycle={weekInCycle} dayKey={activeDay} forceOpen={abrirSola} nextRestTimerId={nextRestTimerId} nextRestSeconds={nextRestSeconds} />;
+            }
+            // Superserie: varios ejercicios encadenados comparten un solo
+            // cronómetro al final del grupo, en vez de uno por ejercicio —
+            // la idea de la superserie es justamente no descansar entre
+            // ellos, sólo al terminar la vuelta completa.
+            const hasHeavyGroup = group.some((ex) => ex.sets.some((s) => isHeavyRepRange(s.repRange)));
+            return (
+              <div key={`${activeDay}:${group.map((e) => e.id).join("-")}`} className="rounded-2xl border p-2.5 space-y-2.5" style={{ borderColor: tint(day.color, "50"), backgroundColor: tint(day.color, "06") }}>
+                <div className="flex items-center gap-1.5 px-1"><Link size={11} style={{ color: day.color }} /><span className="text-[10px] font-black uppercase tracking-wider" style={{ color: day.color }}>Superserie · {group.length} ejercicios</span></div>
+                {group.map((ex, xi) => <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} hideTimer sex={sex} age={age} weekInCycle={weekInCycle} dayKey={activeDay} forceOpen={abrirSola} nextRestTimerId={xi === group.length - 1 ? nextRestTimerId : null} nextRestSeconds={nextRestSeconds} />)}
+                <div className="px-1"><RestTimer seconds={hasHeavyGroup ? settings.restLong : settings.restShort} accent={day.color} alertType={settings.alertType} timerId={`${activeDay}:grp_${group.map((g) => g.id).join("_")}`} exerciseName={group.map((g) => g.name).filter(Boolean).join(" + ")} /></div>
+                <p className="text-[10px] text-slate-600 px-1">Descansá recién después de completar los {group.length} ejercicios. Ese es el cronómetro de arriba.</p>
+              </div>
+            );
+          });
+        })()}
         </div>
       </div>
 
