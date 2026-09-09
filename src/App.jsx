@@ -7513,17 +7513,6 @@ function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [], weekSche
             </div>
 
           </div>
-          {/* Resumen del mes que estás mirando en el calendario, no del mes
-              actual: si retrocedés a agosto, el botón te muestra agosto. Es
-              el mismo resumen que aparece solo al cerrar el mes, pero acá lo
-              podés abrir cuando quieras. No se muestra si ese mes no tiene
-              nada registrado, para no abrir una ventana vacía. */}
-          {resumenDelMes && (
-            <button onClick={() => setVerResumenMes(true)} className="w-full flex items-center justify-center gap-2 mt-1 py-2.5 rounded-xl border text-xs font-bold transition active:scale-[0.98]"
-              style={{ backgroundColor: tint("#3B82F6", "12"), borderColor: tint("#3B82F6", "33"), color: "#60a5fa" }}>
-              <TrendingUp size={13} /> Ver resumen de {MONTH_LABELS[cursor.m].toLowerCase()}
-            </button>
-          )}
           {verResumenMes && (
             <WeeklyRecapModal
               data={resumenDelMes}
@@ -7532,6 +7521,17 @@ function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [], weekSche
               enCurso={cursor.y === now.getFullYear() && cursor.m === now.getMonth()}
               onClose={() => setVerResumenMes(false)}
             />
+          )}
+          {/* Resumen del mes que estás mirando en el calendario, no del mes
+          actual: si retrocedés a agosto, el botón te muestra agosto. Es
+          el mismo resumen que aparece solo al cerrar el mes, pero acá lo
+          podés abrir cuando quieras. No se muestra si ese mes no tiene
+          nada registrado, para no abrir una ventana vacía. */}
+          {resumenDelMes && (
+        <button onClick={() => setVerResumenMes(true)} className="w-full flex items-center justify-center gap-2 mt-1 py-2.5 rounded-xl border text-xs font-bold transition active:scale-[0.98]"
+          style={{ backgroundColor: tint("#3B82F6", "12"), borderColor: tint("#3B82F6", "33"), color: "#60a5fa" }}>
+          <TrendingUp size={13} /> Ver resumen de {MONTH_LABELS[cursor.m].toLowerCase()}
+        </button>
           )}
           {/* Detalle de la sesión como modal centrado — antes se desplegaba
               abajo del calendario y quedaba escondido; ahora aparece al
@@ -9624,6 +9624,26 @@ function PhotoViewerModal({ photo, onClose, onDelete }) {
   );
 }
 
+// Sparkline: la silueta de una serie corta de números, sin ejes ni
+// etiquetas. Va dentro de las píldoras de Medidas, donde no hay lugar para
+// un gráfico de verdad pero sí para la forma de la tendencia. Se normaliza
+// contra su propio mínimo y máximo, así una variación de 300 gramos en el
+// peso se ve igual de clara que una de 5 kg.
+function Sparkline({ valores, color = "#475569", ancho = 78, alto = 14 }) {
+  if (!valores || valores.length < 2) return null;
+  const min = Math.min(...valores);
+  const max = Math.max(...valores);
+  const rango = max - min || 1;
+  const paso = ancho / (valores.length - 1);
+  const puntos = valores.map((v, i) => `${(i * paso).toFixed(1)},${(alto - ((v - min) / rango) * alto).toFixed(1)}`);
+  return (
+    <svg width={ancho} height={alto} viewBox={`0 0 ${ancho} ${alto}`} className="mt-1 block" aria-hidden="true">
+      <polyline points={puntos.join(" ")} fill="none" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx={(ancho).toFixed(1)} cy={puntos[puntos.length - 1].split(",")[1]} r="2" fill={color} />
+    </svg>
+  );
+}
+
 function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], photosLoading, onAddPhoto, onDeletePhoto }) {
   const [selType, setSelType] = useState("weight");
   const [inputVal, setInputVal] = useState("");
@@ -9650,7 +9670,11 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
     const hist = (measurements[t.k] || []).slice().sort((a, b) => (a.date < b.date ? 1 : -1));
     const latestVal = hist[0] || null;
     const delta = hist[0] && hist[1] ? Math.round((hist[0].value - hist[1].value) * 10) / 10 : null;
-    return { ...t, latest: latestVal, delta };
+    // Los últimos 8 registros en orden cronológico, para el sparkline de
+    // la píldora: el último valor solo no dice si venís subiendo o bajando,
+    // y esa es justo la pregunta de una medida corporal.
+    const serie = hist.slice(0, 8).reverse().map((h) => h.value);
+    return { ...t, latest: latestVal, delta, serie };
   }), [measurements]);
 
   const handleAdd = () => {
@@ -9719,6 +9743,10 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
                 {t.delta != null && t.delta !== 0 && (t.delta > 0 ? <TrendingUp size={9} /> : <TrendingDown size={9} />)}
                 {t.delta != null ? `${t.delta > 0 ? "+" : ""}${t.delta}${t.unit}` : ""}
               </p>
+              {/* Sparkline: la forma de los últimos 8 registros. Ocupa 14px
+                  de alto y cuenta la tendencia sin que tengas que abrir la
+                  medida para ver su gráfico. */}
+              {t.serie?.length > 1 && <Sparkline valores={t.serie} color={active ? "#c4b5fd" : "#475569"} />}
             </button>
           );
         })}
@@ -9734,6 +9762,50 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
       ) : (
         <p className="text-[11px] text-slate-600">Todavía no registraste {selMeta.l.toLowerCase()}.</p>
       )}
+
+      {/* El número de hoy solo no dice nada: lo que importa de una medida es
+          el movimiento. Estas tres cajas contestan "¿desde dónde vengo?",
+          "¿cómo vengo este mes?" y "¿cuánto me moví en total?", que es lo
+          que uno mira cuando entra acá. */}
+      {(() => {
+        const serie = (measurements[selType] || []).slice().sort((a, b) => (a.date < b.date ? -1 : 1));
+        if (serie.length < 2) return null;
+        const primero = serie[0], ultimo = serie[serie.length - 1];
+        const totalDif = Math.round((ultimo.value - primero.value) * 10) / 10;
+        // Cambio en los últimos 30 días: se compara contra el registro más
+        // viejo dentro de esa ventana, no contra el anterior sin más, para
+        // que el número no dependa de cada cuánto te midas.
+        // La ventana se cuenta desde tu ÚLTIMO registro, no desde hoy: así
+        // el número no se degrada solo por dejar de medirte una semana, y
+        // además no hace falta leer el reloj durante el render.
+        const ref = new Date(`${ultimo.date}T00:00:00`);
+        ref.setDate(ref.getDate() - 30);
+        const hace30 = localDateStr(ref);
+        const enVentana = serie.filter((s) => s.date >= hace30);
+        const dif30 = enVentana.length >= 2 ? Math.round((ultimo.value - enVentana[0].value) * 10) / 10 : null;
+        const min = Math.min(...serie.map((s) => s.value));
+        const max = Math.max(...serie.map((s) => s.value));
+        const fmt = (n) => `${n > 0 ? "+" : ""}${n}${selMeta.unit}`;
+        // No se asume que subir sea bueno ni malo: en peso y cintura suele
+        // buscarse bajar, en pecho o brazo subir. El color va por el signo,
+        // neutro, y la lectura la pone la persona.
+        const colorDif = (n) => (n == null || n === 0 ? "#94a3b8" : n > 0 ? "#60a5fa" : "#c4b5fd");
+        const cajas = [
+          { l: "Desde el inicio", v: fmt(totalDif), c: colorDif(totalDif) },
+          { l: "Últimos 30 días", v: dif30 != null ? fmt(dif30) : "—", c: colorDif(dif30) },
+          { l: "Rango", v: `${min}–${max}`, c: "#94a3b8" },
+        ];
+        return (
+          <div className="grid grid-cols-3 gap-2">
+            {cajas.map((c) => (
+              <div key={c.l} className="rounded-xl px-2 py-2.5 text-center" style={{ backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}>
+                <p className="text-sm font-black tabular-nums leading-none" style={{ color: c.c }}>{c.v}</p>
+                <p className="text-[8.5px] text-slate-500 mt-1.5 leading-tight">{c.l}</p>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
 
       {chartData.length >= 2 && (
         <div className="h-36">
@@ -10217,13 +10289,17 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
                     </div>
                   ))}
                 </div>
+                {/* Debajo del gráfico, el contexto que la curva sola no da:
+                    dónde estás parado hoy, cuánto subiste, y hace cuánto que
+                    no rompés una marca. Sin esto había que interpretar la
+                    forma de la línea a ojo. */}
                 {chartData.length >= 2 && (() => {
                   const f = chartData[0], l = chartData[chartData.length - 1];
                   const diff = l.e1rm - f.e1rm, pct2 = f.e1rm ? ((diff / f.e1rm) * 100).toFixed(1) : 0, pos = diff >= 0;
                   return (
                     <div className={`flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-semibold ${pos ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/15" : "bg-rose-500/10 text-rose-400 border border-rose-500/15"}`}>
                       {pos ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-                      <div><span className="font-black">{pos ? "+" : ""}{pct2}% de 1RM estimado</span><span className="text-xs opacity-60 ml-1.5">· {chartData.length} sesiones</span></div>
+                      <div><span className="font-black">{pos ? "+" : ""}{pct2}% de kg</span><span className="text-xs opacity-60 ml-1.5">· {chartData.length} sesiones</span></div>
                     </div>
                   );
                 })()}
@@ -10307,13 +10383,58 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
                     );
                   })()}
                 </div>
+                {/* Debajo del gráfico, el contexto que la curva sola no da:
+                    dónde estás parado hoy, cuánto subiste, y hace cuánto que
+                    no rompés una marca. Sin esto había que interpretar la
+                    forma de la línea a ojo. */}
                 {chartData.length >= 2 && (() => {
                   const f = chartData[0], l = chartData[chartData.length - 1];
                   const diff = l.e1rm - f.e1rm, pct2 = f.e1rm ? ((diff / f.e1rm) * 100).toFixed(1) : 0, pos = diff >= 0;
+                  // Última sesión que fue récord: la que igualó el mejor 1RM
+                  // de toda la curva. De ahí sale "hace cuánto" y si estás
+                  // estancado.
+                  const iMejor = chartData.reduce((best, d, i) => (d.e1rm >= chartData[best].e1rm ? i : best), 0);
+                  const sesionesDesde = chartData.length - 1 - iMejor;
+                  const diasDesde = daysSince(history[iMejor]?.date);
+                  const kpis = [
+                    { l: "Tu récord", v: `${l.reps}×${kgToDisplay(l.kg, "kg")}`, u: "kg", c: EVOLUTION_CHART_COLOR },
+                    { l: "1RM estimado", v: Math.round(chartData[iMejor].e1rm), u: "kg", c: "#f8fafc" },
+                    { l: "Sesiones", v: chartData.length, u: "", c: "#f8fafc" },
+                  ];
                   return (
-                    <div className={`flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-semibold ${pos ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/15" : "bg-rose-500/10 text-rose-400 border border-rose-500/15"}`}>
-                      {pos ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-                      <div><span className="font-black">{pos ? "+" : ""}{pct2}% de kg</span><span className="text-xs opacity-60 ml-1.5">· {chartData.length} sesiones</span></div>
+                    <div className="space-y-2">
+                      <div className="grid grid-cols-3 gap-2">
+                        {kpis.map((k) => (
+                          <div key={k.l} className="rounded-xl px-2 py-2.5 text-center" style={{ backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}>
+                            <p className="text-sm font-black tabular-nums leading-none" style={{ color: k.c }}>
+                              {k.v}{k.u && <span className="text-[9px] opacity-60 ml-0.5">{k.u}</span>}
+                            </p>
+                            <p className="text-[8.5px] text-slate-500 mt-1.5 leading-tight">{k.l}</p>
+                          </div>
+                        ))}
+                      </div>
+                      <div className={`flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-semibold ${pos ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/15" : "bg-rose-500/10 text-rose-400 border border-rose-500/15"}`}>
+                        {pos ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                        <div><span className="font-black">{pos ? "+" : ""}{pct2}% de kg</span><span className="text-xs opacity-60 ml-1.5">desde la primera sesión</span></div>
+                      </div>
+                      {/* Hace cuánto que no rompés tu marca en este ejercicio.
+                          Con 3 sesiones o más sin superarla, el aviso pasa a
+                          ámbar: es la señal de que conviene cambiar algo. */}
+                      {sesionesDesde === 0 ? (
+                        <div className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/20">
+                          <Trophy size={14} className="shrink-0" />
+                          <span>Tu última sesión fue tu mejor marca 🔥</span>
+                        </div>
+                      ) : (
+                        <div className={`flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-semibold ${sesionesDesde >= 3 ? "bg-amber-500/10 text-amber-300/90 border border-amber-500/20" : "text-slate-400"}`}
+                          style={sesionesDesde >= 3 ? undefined : { backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}>
+                          {sesionesDesde >= 3 ? <AlertTriangle size={14} className="shrink-0" /> : <Clock size={14} className="shrink-0" />}
+                          <span>
+                            Tu mejor marca fue {diasDesde != null ? haceCuanto(diasDesde) : `${sesionesDesde} sesiones atrás`}
+                            <span className="opacity-60"> · {sesionesDesde} {sesionesDesde === 1 ? "sesión" : "sesiones"} sin superarla</span>
+                          </span>
+                        </div>
+                      )}
                     </div>
                   );
                 })()}
