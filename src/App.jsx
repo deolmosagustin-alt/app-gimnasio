@@ -4811,17 +4811,31 @@ function SessionSummaryModal({ resumen, onClose }) {
             entrené realmente?" mejor que el nombre del día, porque un Push
             puede terminar siendo casi todo pecho o casi todo hombro según
             cuánto le metiste a cada cosa. */}
-        {resumen.musculos?.length > 1 && (
+        {/* Contra la última vez que hiciste este mismo día de rutina: es la
+            pregunta natural al terminar ("¿vengo mejor que la vez pasada?")
+            y no había dónde responderla. */}
+        {resumen.vsUltima && (
+          <div className="px-5 mt-3 flex justify-center">
+            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-black"
+              style={resumen.vsUltima.pct >= 0
+                ? { backgroundColor: "rgba(16,185,129,0.14)", color: "#34d399", border: "1px solid rgba(16,185,129,0.3)" }
+                : { backgroundColor: "rgba(148,163,184,0.12)", color: "#94a3b8", border: "1px solid rgba(148,163,184,0.25)" }}>
+              {resumen.vsUltima.pct >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+              {resumen.vsUltima.pct >= 0 ? "+" : ""}{resumen.vsUltima.pct}% que tu último {resumen.vsUltima.dia}
+            </span>
+          </div>
+        )}
+        {resumen.reparto?.length > 1 && (
           <div className="px-5 mt-4">
-            <p className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-600 mb-2">Qué trabajaste</p>
+            <p className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-600 mb-2">En qué se te fue</p>
             <div className="flex items-center gap-3 rounded-2xl bg-black/25 border border-white/[0.05] p-3">
-              <DonutMusculos datos={resumen.musculos} size={92} />
+              <DonutMusculos datos={resumen.reparto} size={92} unidad="KG" />
               <div className="flex-1 min-w-0 space-y-1.5">
-                {resumen.musculos.map((m) => (
+                {resumen.reparto.map((m) => (
                   <div key={m.nombre} className="flex items-center gap-2 min-w-0">
                     <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: m.color }} />
                     <span className="flex-1 min-w-0 text-[10.5px] text-slate-300 truncate">{m.nombre}</span>
-                    <span className="text-[10.5px] font-black tabular-nums shrink-0" style={{ color: m.color }}>{m.series}</span>
+                    <span className="text-[10.5px] font-black tabular-nums shrink-0" style={{ color: m.color }}>{m.series >= 1000 ? (m.series / 1000).toFixed(1) + "k" : m.series}<span className="opacity-60 text-[8px] ml-0.5">kg</span></span>
                   </div>
                 ))}
               </div>
@@ -4881,7 +4895,7 @@ const RECAP_ESTILOS = {
 // cuatro arcos, y meter Recharts acá cargaría el chart entero dentro de un
 // modal que se abre una vez por mes. Cada arco es un círculo con
 // stroke-dasharray (largo del tramo / resto) y el desfase acumulado.
-function DonutMusculos({ datos, size = 108 }) {
+function DonutMusculos({ datos, size = 108, unidad = "SERIES" }) {
   // Los arcos arrancan en largo 0 y, apenas monta, pasan a su largo real:
   // con la transicion de CSS eso se ve como la dona dibujandose sola,
   // sector por sector. Va con estado y no con @keyframes porque el largo
@@ -4918,8 +4932,9 @@ function DonutMusculos({ datos, size = 108 }) {
           />
         );
       })}
-      <text x="50%" y="47%" textAnchor="middle" className="fill-white" style={{ fontSize: 19, fontWeight: 900 }}>{total}</text>
-      <text x="50%" y="63%" textAnchor="middle" style={{ fontSize: 8.5, fill: "#64748b", fontWeight: 700 }}>SERIES</text>
+      {/* El total se abrevia si es grande: en kg de volumen son cinco digitos y no entran en el agujero de la dona. */}
+      <text x="50%" y="47%" textAnchor="middle" className="fill-white" style={{ fontSize: total >= 10000 ? 16 : 19, fontWeight: 900 }}>{total >= 1000 ? (total / 1000).toFixed(1) + "k" : total}</text>
+      <text x="50%" y="63%" textAnchor="middle" style={{ fontSize: 8.5, fill: "#64748b", fontWeight: 700 }}>{unidad}</text>
     </svg>
   );
 }
@@ -7498,7 +7513,6 @@ function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [], weekSche
             </div>
 
           </div>
-          {!selectedSession && <p className="text-center text-[11px] text-slate-600 py-2">Tocá un día con marca para ver el detalle.</p>}
           {/* Resumen del mes que estás mirando en el calendario, no del mes
               actual: si retrocedés a agosto, el botón te muestra agosto. Es
               el mismo resumen que aparece solo al cerrar el mes, pero acá lo
@@ -21093,7 +21107,7 @@ export default function App() {
     let volumen = 0, series = 0;
     const ejercicios = new Set();
     const prs = [];
-    const porMusculo = {};
+    const porEjercicioVol = {};
     Object.entries(porEjercicio).forEach(([exId, entries]) => {
       // BUG FIX: si marcaste algo en Descarga el mismo día, esas entradas
       // (con "deload:true") se colaban acá y el resumen de la sesión NORMAL
@@ -21104,10 +21118,12 @@ export default function App() {
       const lf = (dd && dd[exId]) || EXERCISE_LIBRARY_BY_ID[exId]?.loadFactor || 1;
       deHoy.forEach((e) => { volumen += e.kg * lf * e.reps; series++; });
       ejercicios.add(exId);
-      // Series por musculo, para la dona del resumen (mismo criterio que
-      // los resumenes de semana/mes/anio: se cuenta por SERIES, no por kilos).
-      const mus = EXERCISE_LIBRARY_BY_ID[exId]?.muscle || "Otros";
-      porMusculo[mus] = (porMusculo[mus] || 0) + deHoy.length;
+      // Volumen de HOY por ejercicio, para la dona del resumen. Recién
+      // terminada la sesión, "qué músculo trabajaste" ya lo sabés; "en qué
+      // se te fue el entrenamiento" no, y eso es lo que se puede usar para
+      // decidir qué recortar o a qué meterle más la próxima.
+      const nombreEj = EXERCISE_LIBRARY_BY_ID[exId]?.name || deHoy[0].exName || exId.replace(/_/g, " ");
+      porEjercicioVol[nombreEj] = Math.round(deHoy.reduce((a, e) => a + e.kg * lf * e.reps, 0));
       // ¿Superó hoy su mejor marca previa? El loadFactor se cancela (es el
       // mismo ejercicio de ambos lados), así que comparamos 1RM crudo. El
       // récord corregido a mano también cuenta como piso a superar.
@@ -21131,10 +21147,26 @@ export default function App() {
       if (m >= 0 && m < 24 * 60) minutos = m; // descarta duraciones absurdas (sesión olvidada abierta)
     }
     const paleta = ["#14B8A6", "#3B82F6", "#A855F7", "#F59E0B", "#F43F5E", "#06B6D4", "#84CC16", "#EC4899"];
-    const musculos = Object.entries(porMusculo)
-      .sort((a, b) => b[1] - a[1])
-      .map(([nombre, n], i) => ({ nombre, series: n, color: MUSCLE_GROUPS.find((g) => g.label === nombre)?.color || paleta[i % paleta.length] }));
-    return { volumen: Math.round(volumen), series, ejercicios: ejercicios.size, prs, minutos, musculos };
+    // Los 5 ejercicios que más volumen se llevaron; el resto junto, para
+    // que la dona no termine en ocho arcos finos que no se distinguen.
+    const orden = Object.entries(porEjercicioVol).sort((a, b) => b[1] - a[1]);
+    const reparto = (orden.length > 6 ? [...orden.slice(0, 5), ["Otros", orden.slice(5).reduce((a, x) => a + x[1], 0)]] : orden)
+      .map(([nombre, v], idx) => ({ nombre, series: v, color: nombre === "Otros" ? "#475569" : paleta[idx % paleta.length] }));
+    // Comparación con la última vez que hiciste ESTE mismo día de rutina:
+    // es la pregunta natural al terminar ("¿vengo mejor que la vez
+    // pasada?"), y no hay dónde responderla hoy.
+    let vsUltima = null;
+    const dk = profile?.activeSession?.dayKey;
+    const previa = dk ? (profile?.trainingSessions || []).filter((t) => t.dayKey === dk && t.date < hoy).sort((a, b) => (a.date < b.date ? 1 : -1))[0] : null;
+    if (previa) {
+      let volPrevio = 0;
+      Object.entries(porEjercicio).forEach(([exId, entries]) => {
+        const lf2 = (dd && dd[exId]) || EXERCISE_LIBRARY_BY_ID[exId]?.loadFactor || 1;
+        entries.filter((e) => e.date === previa.date && !e.deload).forEach((e) => { volPrevio += e.kg * lf2 * e.reps; });
+      });
+      if (volPrevio > 0) vsUltima = { pct: Math.round(((volumen - volPrevio) / volPrevio) * 100), dia: ROUTINE[dk]?.label || dk };
+    }
+    return { volumen: Math.round(volumen), series, ejercicios: ejercicios.size, prs, minutos, reparto, vsUltima };
   };
 
   // Resumen semanal: dispara SOLO si hoy es domingo (fin de semana lun-dom)
