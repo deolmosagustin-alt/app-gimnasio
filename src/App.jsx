@@ -19752,9 +19752,9 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
 
           {/* Sólo el día que toca HOY, a todo el ancho (el mismo que ya tenía
               el último día cuando quedaba impar) y con el color del día
-              relleno, como el botón de "Planificar mi progresión". Los otros
-              días dejan de listarse: la pregunta "¿qué toca hoy?" se contesta
-              de una, sin buscar entre tres rectángulos iguales.
+              relleno, como el botón de "Planificar mi progresión". Sin rótulo ni
+              números: el nombre del día alcanza, y en la tarjeta que resume tu
+              plan lo que importa es a dónde vas, no cuántas series son.
               En un día de DESCANSO no hay un "hoy" que mostrar, así que ahí
               vuelve la lista completa — es la única forma de que la tarjeta
               no quede vacía y de no perder los atajos a cada día. */}
@@ -19764,15 +19764,10 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
               const todayDayKey = activeSchedule[todayWeekdayKey()] || null;
               const dHoy = todayDayKey ? activeDef.days[todayDayKey] : null;
               if (dHoy) {
-                const series = (dHoy.exercises || []).reduce((a, e) => a + (e.sets?.length || 0), 0);
                 return (
                   <button onClick={() => onGoToDay?.(todayDayKey)} className="col-span-2 flex items-center gap-2.5 px-3.5 py-3 rounded-xl text-left transition active:scale-[0.98]"
                     style={{ backgroundColor: dHoy.color, boxShadow: `0 8px 20px -8px ${tint(dHoy.color, "cc")}` }}>
-                    <span className="flex-1 min-w-0">
-                      <span className="block text-[9px] font-black uppercase tracking-[0.14em] text-white/70">Hoy toca</span>
-                      <span className="block text-sm font-black text-white truncate leading-tight">{dHoy.label}</span>
-                    </span>
-                    <span className="text-[10px] font-bold text-white/80 tabular-nums shrink-0">{dHoy.exercises?.length || 0} ej · {series} series</span>
+                    <span className="flex-1 min-w-0 text-sm font-black text-white truncate">{dHoy.label}</span>
                     <ChevronRight size={15} className="text-white/80 shrink-0" />
                   </button>
                 );
