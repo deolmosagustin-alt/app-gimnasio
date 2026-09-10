@@ -8676,7 +8676,23 @@ function DeloadView({ logs, setLogs, settings = DEFAULT_SETTINGS, deloadProgress
       <div key={activeDay} className="space-y-3 tab-fade-in">
         {day.exercises.map((ex) => {
           const deloadSets = Math.max(1, Math.ceil(ex.sets.length / deloadSetDivisor));
-          const bestPerSet = ex.sets.map((s, i) => { const h = logs[`${ex.id}_${i}`] || []; let best = s.pr ? { ...s.pr } : null; const ov = logs[`${ex.id}_${i}_pr_override`]; if (ov) best = ov; const pool = ov ? h : h; pool.forEach((e) => { const scoreE = ex.cardio ? (e.minutes || 0) : prScore(e.kg, e.reps); const scoreB = best ? (ex.cardio ? (best.minutes || 0) : prScore(best.kg, best.reps)) : -1; if (!best || scoreE > scoreB) best = e; }); return best; });
+          const bestPerSet = ex.sets.map((s, i) => {
+            // BUG FIX (encontrado auditando el modo planificado): la descarga
+            // siempre reducía un % de tu RÉCORD histórico. Con un plan eso
+            // puede no ser una descarga en absoluto: si tu récord es de un
+            // pico de hace meses y el bloque que venís haciendo trabaja bien
+            // por debajo, el "80% del récord" termina siendo MÁS pesado que
+            // tu última semana de trabajo. Se descarga desde lo que venías
+            // levantando de verdad: el pico del plan de este ciclo.
+            const plan = Array.isArray(s.plannedProgression) && !s.plannedPaused && settings.trainingMode === "planned" ? s.plannedProgression : null;
+            if (plan?.length) {
+              const pico = plan.reduce((a, b) => (ex.cardio
+                ? ((b.minutes || 0) > (a.minutes || 0) ? b : a)
+                : (prScore(b.kg, b.reps) > prScore(a.kg, a.reps) ? b : a)));
+              if (ex.cardio ? pico.minutes > 0 : pico.kg > 0) return { ...pico, delPlan: true };
+            }
+            const h = logs[`${ex.id}_${i}`] || []; let best = s.pr ? { ...s.pr } : null; const ov = logs[`${ex.id}_${i}_pr_override`]; if (ov) best = ov; const pool = ov ? h : h; pool.forEach((e) => { const scoreE = ex.cardio ? (e.minutes || 0) : prScore(e.kg, e.reps); const scoreB = best ? (ex.cardio ? (best.minutes || 0) : prScore(best.kg, best.reps)) : -1; if (!best || scoreE > scoreB) best = e; }); return best;
+          });
           const hasPR = bestPerSet.some(Boolean);
           const hasHeavy = ex.sets.slice(0, deloadSets).some((s) => isHeavyRepRange(s.repRange));
           return (
@@ -8730,7 +8746,7 @@ function DeloadView({ logs, setLogs, settings = DEFAULT_SETTINGS, deloadProgress
                           </>
                         ) : (
                           <div className="relative rounded-xl px-3 py-2.5 mb-2.5 bg-slate-950/60 border" style={{ borderColor: done ? tint(day.color, "35") : "#A855F730" }}>
-                            <span className="block text-[8px] font-black uppercase tracking-[0.16em] mb-1.5" style={{ color: done ? tint(day.color, "aa") : "#C084FCaa" }}>Peso de descarga</span>
+                            <span className="block text-[8px] font-black uppercase tracking-[0.16em] mb-1.5" style={{ color: done ? tint(day.color, "aa") : "#C084FCaa" }}>Peso de descarga{best.delPlan ? " · desde tu plan" : ""}</span>
                             <div className="flex items-center gap-2">
                               <span className="text-[11px] font-bold text-slate-600 line-through tabular-nums shrink-0">{best.reps}×{kgToDisplay(best.kg, unit)}{weightLabel(unit)}</span>
                               <ArrowDown size={12} style={{ color: done ? day.color : "#C084FC" }} className="shrink-0" />
