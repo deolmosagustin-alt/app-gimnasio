@@ -5461,6 +5461,31 @@ function RankUpModal({ from, to, muscleName, onClose }) {
   );
 }
 
+// BUG FIX (auditando el modo planificado): el mensaje al guardar una serie se
+// medía SIEMPRE contra el récord, aunque tuvieras una meta cargada para esa
+// semana. Salían dos cosas falsas, las dos en el peor momento posible:
+//  - superabas tu récord pero quedabas LEJOS de la meta → te felicitaba con
+//    "¡Alcanzaste tu marca!" sin que la hubieras alcanzado.
+//  - clavabas la meta EXACTA y, como tu récord era más alto (una serie pesada
+//    vieja), te decía "-7% vs récord": hacer justo lo que el plan pedía se
+//    leía como haber rendido menos de lo esperado.
+// Con una meta cargada el patrón de comparación es la META. Alcanzarla es
+// hacer al menos los kilos Y las reps pedidas — no un 1RM equivalente: 75×5
+// no es "haber hecho" 70×8, es otro trabajo.
+// Devuelve null si esta serie no tiene meta (ahí manda el récord de siempre).
+function describePlannedOutcome(target, hecho, isRecord, unit) {
+  if (!target) return null;
+  // Cardio: la meta son minutos, no kg×reps.
+  if (target.minutes != null) {
+    return (hecho.minutes || 0) >= target.minutes
+      ? { type: "pr", msg: "¡Alcanzaste tu marca! 🎯" }
+      : { type: "down", msg: `Te faltó para la meta (${target.minutes} min)` };
+  }
+  if ((hecho.kg || 0) + 0.001 >= (target.kg || 0) && (hecho.reps || 0) >= (target.reps || 0)) return { type: "pr", msg: "¡Alcanzaste tu marca! 🎯" };
+  if (isRecord) return { type: "pr", msg: "¡Nueva marca! 🔥" };
+  return { type: "down", msg: `Te faltó para la meta (${target.reps}×${kgToDisplay(target.kg, unit)}${weightLabel(unit)})` };
+}
+
 function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, accent, logs, setLogs, drafts = {}, setDrafts, autoShowPrShare = true, onDisableAutoShowPrShare, hasActiveSession = true, cardio = false, dumbbellDouble = null, fieldSettings = DEFAULT_SETTINGS, onUpdateSettings = null, sex = null, age = null, restTimerId = null, restSeconds = null, isLastSet = false, weekInCycle = null, nextRestTimerId = null, nextRestSeconds = null }) {
   // Modo "rutina planificada" (ver DEFAULT_SETTINGS.trainingMode): si hay
   // una meta cargada para ESTA semana, se muestra "Marca a alcanzar" en
@@ -5783,10 +5808,16 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
         }
       } catch { /* ignorado a propósito */ }
       const noSession = !hasActiveSession;
-      if (isFirstEver) { haptic(18); setFeedback({ type: "first", msg: "Primer registro 📝", noSession }); }
-      else if (isPR) { haptic([35, 25, 45]); setPrBurst((n) => n + 1); setFeedback({ type: "pr", msg: "¡Sesión más larga hasta ahora! 🔥", noSession }); }
-      else if (m === prevMin) { haptic(18); setFeedback({ type: "tie", msg: "Igualaste tu marca 💪", noSession }); }
-      else { haptic(18); setFeedback({ type: "down", msg: `-${(((prevMin - m) / prevMin) * 100).toFixed(0)}% vs récord`, noSession }); }
+      // Con una meta cargada, el patrón de comparación es la META y no el
+      // récord (ver describePlannedOutcome, arriba, para el porqué).
+      const fbC = describePlannedOutcome(getPlannedTargetForWeek(setDef, weekInCycle, fieldSettings.trainingMode), { minutes: m }, isPR, unit)
+        || (isFirstEver ? { type: "first", msg: "Primer registro 📝" }
+          : isPR ? { type: "pr", msg: "¡Sesión más larga hasta ahora! 🔥" }
+            : m === prevMin ? { type: "tie", msg: "Igualaste tu marca 💪" }
+              : { type: "down", msg: `-${(((prevMin - m) / prevMin) * 100).toFixed(0)}% vs récord` });
+      haptic(fbC.type === "pr" ? [35, 25, 45] : 18);
+      if (fbC.type === "pr") setPrBurst((n) => n + 1);
+      setFeedback({ type: fbC.type, msg: fbC.msg, noSession });
       return;
     }
     const r = parseFloat(reps), kDisplay = parseFloat(kg);
@@ -5873,9 +5904,27 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     // al guardar (incluido "¡Nueva marca!"). Ahora se calcula acá.
     const repTop = repRangeTop(setDef.repRange);
     const suggestUp = !isNaN(repTop) && r > repTop;
-    if (isFirstEver) { haptic(18); setFeedback({ type: "first", msg: "Primera marca registrada 📝", suggestUp, noSession }); }
-    else if (isPR) { haptic([35, 25, 45]); setPrBurst((n) => n + 1); setFeedback({ type: "pr", msg: isPlannedMode ? "¡Alcanzaste tu marca! 🎯" : "¡Nueva marca! 🔥", suggestUp, noSession }); if (autoShowPrShare) setShowPRShare(true); }
-    else { haptic(18); if (new1RM === prev1RM) setFeedback({ type: "tie", msg: "Igualaste tu marca 💪", suggestUp: false, noSession }); else setFeedback({ type: "down", msg: `-${(((prev1RM - new1RM) / prev1RM) * 100).toFixed(0)}% vs récord`, suggestUp: false, noSession }); }
+    // BUG FIX (auditando el modo planificado): el mensaje al guardar seguía
+    // midiéndose SIEMPRE contra el récord, aunque tuvieras una meta cargada.
+    // Salían dos cosas falsas, las dos en el peor momento posible:
+    //  - superabas tu récord pero quedabas LEJOS de la meta → te felicitaba
+    //    con "¡Alcanzaste tu marca!" sin que la hubieras alcanzado.
+    //  - clavabas la meta EXACTA, y como tu récord era más alto (una serie
+    //    pesada vieja), te decía "-7% vs récord": hacer justo lo que el plan
+    //    pedía se leía como haber rendido menos.
+    // Con una meta cargada, el patrón de comparación es la meta. Alcanzarla
+    // es hacer al menos los kilos Y las reps pedidas (no un 1RM equivalente:
+    // 75×5 no es "haber hecho" 70×8).
+    const fb = describePlannedOutcome(getPlannedTargetForWeek(setDef, weekInCycle, fieldSettings.trainingMode), { kg: k, reps: r }, isPR, unit)
+      || (isFirstEver ? { type: "first", msg: "Primera marca registrada 📝" }
+        : isPR ? { type: "pr", msg: "¡Nueva marca! 🔥" }
+          : new1RM === prev1RM ? { type: "tie", msg: "Igualaste tu marca 💪" }
+            : { type: "down", msg: `-${(((prev1RM - new1RM) / prev1RM) * 100).toFixed(0)}% vs récord` });
+    const esCelebracion = fb.type === "pr";
+    haptic(esCelebracion ? [35, 25, 45] : 18);
+    if (esCelebracion) setPrBurst((n) => n + 1);
+    setFeedback({ type: fb.type, msg: fb.msg, suggestUp: fb.type === "first" || esCelebracion ? suggestUp : false, noSession });
+    if (isPR && autoShowPrShare) setShowPRShare(true);
   };
   const savePR = () => {
     const r = parseFloat(editReps), kDisplay = parseFloat(editKg);
@@ -6472,7 +6521,11 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
     const sets = exercise.sets || [];
     const conPlan = sets.filter((s) => Array.isArray(s.plannedProgression) && s.plannedProgression.length > 0);
     if (!conPlan.length) return null;
-    return { sets: conPlan.length, paused: sets.some((s) => s.plannedPaused) };
+    // Todas las semanas del plan de la PRIMERA serie planificada: es lo que
+    // convierte "seguís un plan" en algo que se puede mirar — a dónde vas
+    // dentro del ciclo, sin abrir el planificador.
+    const semanas = [...conPlan[0].plannedProgression].sort((a, b) => a.week - b.week);
+    return { sets: conPlan.length, paused: sets.some((s) => s.plannedPaused), semanas };
   }, [exercise.sets]);
   // Si el modo general está en "Récord", ninguna serie persigue su meta
   // (ver getPlannedTargetForWeek) — el aviso de acá lo explica en vez de
@@ -6530,22 +6583,40 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
             Un día que no llegás a la meta, una vuelta a récord tras una
             lesión, o probar cómo venís sin la referencia del plan. */}
         {planInfo && onSetPlanPaused && (
-          <div className="mb-3 flex items-center gap-2 rounded-xl px-3 py-2" style={{ backgroundColor: planInfo.paused || planOffByMode ? "var(--row-surface)" : "rgba(56,189,248,0.10)", border: `1px solid ${planInfo.paused || planOffByMode ? "var(--chip-border)" : "rgba(56,189,248,0.28)"}` }}>
-            {planInfo.paused || planOffByMode ? <Trophy size={13} className="shrink-0 text-slate-400" /> : <ClipboardCheck size={13} className="shrink-0" style={{ color: "#38BDF8" }} />}
-            <p className="flex-1 min-w-0 text-[10.5px] leading-snug" style={{ color: planInfo.paused || planOffByMode ? "#94a3b8" : "#bae6fd" }}>
-              {planOffByMode
-                ? <>Tenés un plan cargado, pero tu modo general es <b>Récord</b>.</>
-                : planInfo.paused
-                  ? <>Este ejercicio persigue tu récord. Su plan sigue guardado.</>
-                  : <>Este ejercicio sigue el plan cargado ({planInfo.sets} serie{planInfo.sets === 1 ? "" : "s"}).</>}
-            </p>
-            {!planOffByMode && (
-              <button onClick={() => onSetPlanPaused(exercise.id, !planInfo.paused)} className="shrink-0 px-2.5 py-1.5 rounded-lg text-[10px] font-black transition active:scale-95"
-                style={planInfo.paused
-                  ? { backgroundColor: "rgba(56,189,248,0.18)", color: "#7dd3fc", border: "1px solid rgba(56,189,248,0.35)" }
-                  : { backgroundColor: "rgba(148,163,184,0.12)", color: "#cbd5e1", border: "1px solid rgba(148,163,184,0.22)" }}>
-                {planInfo.paused ? "Volver al plan" : "Pasar a récord"}
-              </button>
+          <div className="mb-3 rounded-xl px-3 py-2" style={{ backgroundColor: planInfo.paused || planOffByMode ? "var(--row-surface)" : "rgba(56,189,248,0.10)", border: `1px solid ${planInfo.paused || planOffByMode ? "var(--chip-border)" : "rgba(56,189,248,0.28)"}` }}>
+            <div className="flex items-center gap-2">
+              {planInfo.paused || planOffByMode ? <Trophy size={13} className="shrink-0 text-slate-400" /> : <ClipboardCheck size={13} className="shrink-0" style={{ color: "#38BDF8" }} />}
+              <p className="flex-1 min-w-0 text-[10.5px] leading-snug" style={{ color: planInfo.paused || planOffByMode ? "#94a3b8" : "#bae6fd" }}>
+                {planOffByMode
+                  ? <>Tenés un plan cargado, pero tu modo general es <b>Récord</b>.</>
+                  : planInfo.paused
+                    ? <>Este ejercicio persigue tu récord. Su plan sigue guardado.</>
+                    : <>Este ejercicio sigue el plan cargado ({planInfo.sets} serie{planInfo.sets === 1 ? "" : "s"}).</>}
+              </p>
+              {!planOffByMode && (
+                <button onClick={() => onSetPlanPaused(exercise.id, !planInfo.paused)} className="shrink-0 px-2.5 py-1.5 rounded-lg text-[10px] font-black transition active:scale-95"
+                  style={planInfo.paused
+                    ? { backgroundColor: "rgba(56,189,248,0.18)", color: "#7dd3fc", border: "1px solid rgba(56,189,248,0.35)" }
+                    : { backgroundColor: "rgba(148,163,184,0.12)", color: "#cbd5e1", border: "1px solid rgba(148,163,184,0.22)" }}>
+                  {planInfo.paused ? "Volver al plan" : "Pasar a récord"}
+                </button>
+              )}
+            </div>
+            {/* Todo el bloque de un vistazo, con la semana de hoy resaltada:
+                "sigo un plan" era una afirmación que no se podía verificar
+                sin salir a abrir el planificador. */}
+            {planInfo.semanas.length > 1 && (
+              <div className="flex gap-1 overflow-x-auto mt-1.5 pb-0.5">
+                {planInfo.semanas.map((e) => {
+                  const hoy = e.week === weekInCycle;
+                  return (
+                    <span key={e.week} className="shrink-0 px-1.5 py-0.5 rounded-md text-[9px] font-black tabular-nums" title={`Semana ${e.week}${e.phase ? ` · ${e.phase}` : ""}${e.rpe != null ? ` · RPE ${e.rpe}` : ""}`}
+                      style={hoy ? { backgroundColor: "#38BDF8", color: "#fff" } : { backgroundColor: "rgba(148,163,184,0.10)", color: "#94a3b8" }}>
+                      S{e.week}<span className="opacity-75 ml-0.5">{e.minutes != null ? `${e.minutes}'` : `${e.reps}×${e.kg}`}</span>
+                    </span>
+                  );
+                })}
+              </div>
             )}
           </div>
         )}
@@ -6794,7 +6865,10 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_
   const [objetivo, setObjetivo] = useState(settings.planObjetivo || "mixto");
   const [nivel, setNivel] = useState(settings.planNivel || "intermedio");
   const [dayKey, setDayKey] = useState("todos");
-  const [desdeSemana, setDesdeSemana] = useState(() => Math.max(1, weekInCycle || 1));
+  // Clamp al ciclo: en una semana de DESCARGA, weekInCycle se pasa de
+  // trainWeeks (ej. semana 5 de un ciclo de 4+1). Sin esto la tira no tenía
+  // ninguna semana marcada y el plan se pedía para una semana que no existe.
+  const [desdeSemana, setDesdeSemana] = useState(() => Math.min(Math.max(1, weekInCycle || 1), Math.max(1, trainWeeks || TRAIN_WEEKS)));
   const [excluidos, setExcluidos] = useState(() => new Set());
   const [verEjercicios, setVerEjercicios] = useState(false);
   const [verAjustes, setVerAjustes] = useState(false);
@@ -7455,7 +7529,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
               y un toque para gobernarlo. Antes había que abrir el
               planificador y recorrer ejercicio por ejercicio para saber
               siquiera qué estaba planificado. */}
-          {planResumen && (planResumen.planificados.length > 0 || planResumen.pausados.length > 0) && (
+          {settings.trainingMode === "planned" && planResumen && (planResumen.planificados.length > 0 || planResumen.pausados.length > 0) && (
             <button onClick={() => { setProgressionView("resumen"); setShowSelfProgression(true); }} className="relative w-full flex items-center gap-2 mt-2.5 px-3 py-2 rounded-xl transition active:scale-[0.99]" style={{ backgroundColor: "rgba(2,6,23,0.45)", border: "1px solid rgba(20,184,166,0.18)" }}>
               <ClipboardCheck size={13} className="shrink-0 text-teal-400" />
               <span className="flex-1 min-w-0 text-left text-[10.5px] leading-snug text-teal-100/85">
@@ -7469,7 +7543,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
               getPlannedTargetForWeek). Si tenés un plan cargado eso se puede
               leer como "se me borró el plan", así que se dice en voz alta y
               con la forma de arreglarlo al lado. */}
-          {settings.trainingMode !== "planned" && hasAnyPlan && (
+          {settings.trainingMode !== "planned" && (planResumen?.planificados.length || 0) > 0 && (
             <div className="relative flex items-center gap-2 mt-2 px-3 py-2 rounded-xl" style={{ backgroundColor: "rgba(245,158,11,0.10)", border: "1px solid rgba(245,158,11,0.28)" }}>
               <AlertTriangle size={12} className="shrink-0 text-amber-400" />
               <p className="flex-1 text-[10px] leading-snug text-amber-200/90">Tenés metas cargadas, pero en modo Récord no se persiguen.</p>
@@ -13976,6 +14050,11 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
     setTplReps(String(o.reps));
     setTplRepsMax(String(o.tope));
     setTplInc(String(o.inc));
+    // Se guarda YA, no al aplicar una plantilla: elegir el objetivo y cerrar
+    // sin llegar a guardar nada es un caso normal, y perder esa elección
+    // obliga a volver a hacerla la próxima vez. Va con los valores nuevos
+    // porque los setState de arriba todavía no se ven en este render.
+    onSavePrefs?.({ planObjetivo: k, planRepsBase: o.reps, planRepsTope: o.tope, planIncremento: o.inc });
   };
   const guardarPrefs = () => {
     if (!onSavePrefs) return;
@@ -14048,7 +14127,7 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
     const set = new Set();
     (ex.sets || []).forEach((s, si) => {
       if (Array.isArray(s.plannedProgression)) s.plannedProgression.forEach((e) => set.add(e.week));
-      weeks.forEach((w) => { if (isTouched(ex.id, si, w) && parseFloat(valueOf(ex, si, w, "kg")) > 0) set.add(w); });
+      weeks.forEach((w) => { if (isTouched(ex.id, si, w) && parseFloat(valueOf(ex, si, w, ex.cardio ? "minutes" : "kg")) > 0) set.add(w); });
     });
     return set.size;
   };
@@ -14065,8 +14144,10 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
       const next = { ...prev };
       dayExercises.forEach((ex) => {
         (ex.sets || []).forEach((_, si) => {
-          const from = { kg: valueOf(ex, si, week - 1, "kg"), reps: valueOf(ex, si, week - 1, "reps") };
-          if (!from.kg && !from.reps) return;
+          const from = ex.cardio
+            ? { minutes: valueOf(ex, si, week - 1, "minutes") }
+            : { kg: valueOf(ex, si, week - 1, "kg"), reps: valueOf(ex, si, week - 1, "reps") };
+          if (!from.minutes && !from.kg && !from.reps) return;
           const key = keyOf(ex.id, si, week);
           next[key] = { ...(next[key] || {}), ...from };
         });
@@ -14142,9 +14223,9 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
   // sacarle la meta a una serie una vez cargada. Ahora quitar es una
   // operación de verdad: borra el plan de la rutina (y de paso el borrador
   // de esta pantalla, para que el guardado siguiente no lo reponga).
-  const quitarPlan = (ex) => {
-    forgetDraft(ex);
-    onRemovePlan?.(ex.id);
+  const quitarPlan = (exId, nSets) => {
+    forgetDraft({ id: exId, sets: Array.from({ length: nSets || 0 }, () => null) });
+    onRemovePlan?.(exId);
     setConfirmQuitar(null);
   };
 
@@ -14160,6 +14241,14 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
         const touchedAnyWeek = weeks.some((w) => isTouched(ex.id, si, w));
         if (!touchedAnyWeek) return;
         const cleanEntries = weeks.map((w) => {
+          // El cardio no tiene kg×reps: su meta son minutos (mismo shape que
+          // ya lee getPlannedTargetForWeek y muestra SetRow). Sin esto, los
+          // ejercicios de cardio aparecían en la lista pidiendo kilos y
+          // repeticiones, y nada de lo que cargaras ahí se guardaba nunca.
+          if (ex.cardio) {
+            const minutes = parseInt(valueOf(ex, si, w, "minutes"), 10);
+            return isNaN(minutes) || minutes <= 0 ? null : { week: w, minutes };
+          }
           const kg = parseFloat(valueOf(ex, si, w, "kg")), reps = parseInt(valueOf(ex, si, w, "reps"), 10);
           if (isNaN(kg) || isNaN(reps) || kg <= 0 || reps <= 0) return null;
           const entry = { week: w, kg, reps };
@@ -14289,7 +14378,7 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
                               <div className="flex items-center gap-2 mt-2 pt-2 border-t border-white/5">
                                 <p className="flex-1 text-[10px] text-rose-300/90 leading-snug">Se borran las {e.semanas} semanas cargadas. No se puede deshacer.</p>
                                 <button onClick={() => setConfirmQuitar(null)} className="shrink-0 px-2 py-1 rounded-lg bg-slate-800 text-slate-400 text-[10px] font-bold">No</button>
-                                <button onClick={() => quitarPlan({ id: e.id, sets: Array.from({ length: e.sets }, () => ({})) })} className="shrink-0 px-2 py-1 rounded-lg bg-rose-500/20 border border-rose-500/40 text-rose-300 text-[10px] font-black">Quitar</button>
+                                <button onClick={() => quitarPlan(e.id, e.sets)} className="shrink-0 px-2 py-1 rounded-lg bg-rose-500/20 border border-rose-500/40 text-rose-300 text-[10px] font-black">Quitar</button>
                               </div>
                             )}
                           </div>
@@ -14409,7 +14498,7 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
                       const plannedWeeks = exercisePlannedWeeksCount(ex);
                       const kg0 = valueOf(ex, 0, week, "kg");
                       const reps0 = valueOf(ex, 0, week, "reps");
-                      const filled = parseFloat(kg0) > 0;
+                      const filled = parseFloat(ex.cardio ? valueOf(ex, 0, week, "minutes") : kg0) > 0;
                       const marcas = marcasPorEjercicio[ex.id] || {};
                       const guardado = exerciseTienePlanGuardado(ex);
                       const pausado = guardado && exercisePausado(ex);
@@ -14427,8 +14516,17 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
                                 {marcas.best ? ` · mejor ${marcas.best.reps}×${marcas.best.kg}kg` : ""}
                               </p>
                             </div>
-                            <input value={kg0} onChange={(e) => updateAllSets(ex, week, { kg: e.target.value })} type="number" inputMode="decimal" placeholder={marcas.best ? String(marcas.best.kg) : "kg"} className="w-16 shrink-0 bg-slate-900 border border-slate-700/50 rounded-lg px-1.5 py-1.5 text-white text-sm font-bold text-center focus:outline-none" />
-                            <input value={reps0} onChange={(e) => updateAllSets(ex, week, { reps: e.target.value })} type="number" inputMode="numeric" placeholder="reps" className="w-14 shrink-0 bg-slate-900 border border-slate-700/50 rounded-lg px-1.5 py-1.5 text-white text-xs text-center focus:outline-none" />
+                            {ex.cardio ? (
+                              <span className="flex items-center gap-1 shrink-0">
+                                <input value={valueOf(ex, 0, week, "minutes")} onChange={(e) => updateAllSets(ex, week, { minutes: e.target.value })} type="number" inputMode="numeric" placeholder="min" className="w-16 bg-slate-900 border border-slate-700/50 rounded-lg px-1.5 py-1.5 text-white text-sm font-bold text-center focus:outline-none" />
+                                <span className="text-[9.5px] font-bold text-slate-500">min</span>
+                              </span>
+                            ) : (
+                              <>
+                                <input value={kg0} onChange={(e) => updateAllSets(ex, week, { kg: e.target.value })} type="number" inputMode="decimal" placeholder={marcas.best ? String(marcas.best.kg) : "kg"} className="w-16 shrink-0 bg-slate-900 border border-slate-700/50 rounded-lg px-1.5 py-1.5 text-white text-sm font-bold text-center focus:outline-none" />
+                                <input value={reps0} onChange={(e) => updateAllSets(ex, week, { reps: e.target.value })} type="number" inputMode="numeric" placeholder="reps" className="w-14 shrink-0 bg-slate-900 border border-slate-700/50 rounded-lg px-1.5 py-1.5 text-white text-xs text-center focus:outline-none" />
+                              </>
+                            )}
                             <button onClick={() => setExpandedId(expanded ? null : ex.id)} aria-label="Detalle por serie" className="p-1 rounded-lg text-slate-500 hover:text-sky-300 transition shrink-0">
                               <ChevronDown size={15} className={`transition-transform ${expanded ? "rotate-180" : ""}`} />
                             </button>
@@ -14456,7 +14554,18 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
                               )}
 
                               {/* Serie por serie, sólo si querés separarlas */}
-                              {nSets > 1 && (
+                              {nSets > 1 && ex.cardio && (
+                                <div className="space-y-1">
+                                  {(ex.sets || []).map((_, si) => (
+                                    <div key={si} className="flex items-center gap-1.5">
+                                      <span className="w-11 shrink-0 text-[9.5px] font-black text-slate-500 uppercase">S{si + 1}</span>
+                                      <input value={valueOf(ex, si, week, "minutes")} onChange={(e) => updateOne(ex, si, week, { minutes: e.target.value })} type="number" inputMode="numeric" placeholder="min" className="w-16 shrink-0 bg-slate-900 border border-slate-700/50 rounded-lg px-1.5 py-1 text-white text-xs text-center focus:outline-none" />
+                                      <span className="text-[9.5px] text-slate-500">minutos</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {nSets > 1 && !ex.cardio && (
                                 <div className="space-y-1">
                                   {(ex.sets || []).map((_, si) => (
                                     <div key={si} className="flex items-center gap-1.5">
@@ -14476,7 +14585,7 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
                                   semana, no de una serie suelta, así que va una
                                   sola vez por ejercicio y se aplica a todas sus
                                   series de esta semana. */}
-                              <div className="flex items-center gap-1.5">
+                              <div className={`items-center gap-1.5 ${ex.cardio ? "hidden" : "flex"}`}>
                                 <span className="text-[9.5px] font-black text-slate-500 uppercase shrink-0">Fase</span>
                                 <select value={valueOf(ex, 0, week, "phase")} onChange={(e) => updateAllSets(ex, week, { phase: e.target.value })} className="flex-1 min-w-0 bg-slate-900 border border-slate-700/50 rounded-lg px-1.5 py-1 text-[10px] text-slate-400 focus:outline-none">
                                   <option value="">Sin fase</option>
@@ -14495,7 +14604,7 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
                                   ver un salto raro sin ir semana por semana. */}
                               <div className="flex gap-1 overflow-x-auto pb-0.5">
                                 {weeks.map((w) => {
-                                  const v = parseFloat(valueOf(ex, 0, w, "kg")) || 0;
+                                  const v = parseFloat(valueOf(ex, 0, w, ex.cardio ? "minutes" : "kg")) || 0;
                                   return (
                                     <button key={w} onClick={() => setWeek(w)} className={`shrink-0 px-1.5 py-1 rounded-lg text-[9px] font-black transition ${w === week ? "bg-sky-500 !text-white" : v > 0 ? "bg-sky-500/15 text-sky-300" : "bg-slate-900 text-slate-600"}`}>
                                       S{w}<span className="opacity-70 ml-0.5">{v > 0 ? v : "–"}</span>
@@ -14506,8 +14615,10 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
 
                               {/* Plantilla rápida: llena TODAS las semanas de este
                                   ejercicio de una, y después se ajusta a mano. El
-                                  kg de partida ya viene con tu mejor marca. */}
-                              <div className="rounded-xl border border-sky-500/20 bg-sky-500/5 p-2 space-y-1.5">
+                                  kg de partida ya viene con tu mejor marca. No va
+                                  en cardio: las plantillas progresan kilos, y ahí
+                                  la meta son minutos. */}
+                              <div className={`rounded-xl border border-sky-500/20 bg-sky-500/5 p-2 space-y-1.5 ${ex.cardio ? "hidden" : ""}`}>
                                 <div className="flex items-center gap-1.5">
                                   <p className="flex-1 text-[9px] font-black uppercase tracking-widest text-sky-300/80 flex items-center gap-1"><Sparkles size={10} /> Llenar todas las semanas</p>
                                   <span className="text-[9px] text-slate-500 shrink-0">desde</span>
@@ -14542,7 +14653,7 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
                                 )}
                                 {puedeGestionar && guardado && (
                                   confirmQuitar === ex.id ? (
-                                    <button onClick={() => quitarPlan(ex)} className="flex items-center gap-1 px-2 py-1 rounded-lg bg-rose-500/20 border border-rose-500/40 text-rose-300 text-[9.5px] font-black"><Trash2 size={10} /> Confirmar</button>
+                                    <button onClick={() => quitarPlan(ex.id, nSets)} className="flex items-center gap-1 px-2 py-1 rounded-lg bg-rose-500/20 border border-rose-500/40 text-rose-300 text-[9.5px] font-black"><Trash2 size={10} /> Confirmar</button>
                                   ) : (
                                     <button onClick={() => setConfirmQuitar(ex.id)} className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800 text-slate-500 text-[9.5px] font-bold hover:text-rose-400 transition"><Trash2 size={10} /> Quitar plan</button>
                                   )
@@ -22162,11 +22273,11 @@ export default function App() {
   // "planned": planificar y que después no se vea nada porque el interruptor
   // general seguía en "Récord" era exactamente el bug que hacía sentir que
   // planificar no servía para nada.
-  const handleApplyOwnProgression = (plan, extraSettings = null) => {
+  const handleApplyOwnProgression = (plan) => {
     if (!activeRoutineDef || !profile?.activeRoutineId) return;
     handleUpdateProfile({
       routines: { ...(profile.routines || {}), [profile.activeRoutineId]: applyProgressionToRoutine(activeRoutineDef, plan) },
-      settings: { ...getProfileSettings(profile), trainingMode: "planned", ...(extraSettings || {}) },
+      settings: { ...getProfileSettings(profile), trainingMode: "planned" },
     });
   };
   // Pasar un ejercicio de "sigue el plan" a "persigue mi récord" sin borrar
