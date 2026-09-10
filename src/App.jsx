@@ -19767,7 +19767,10 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
                 return (
                   <button onClick={() => onGoToDay?.(todayDayKey)} className="col-span-2 flex items-center gap-2.5 px-3.5 py-3 rounded-xl text-left transition active:scale-[0.98]"
                     style={{ backgroundColor: dHoy.color, boxShadow: `0 8px 20px -8px ${tint(dHoy.color, "cc")}` }}>
-                    <span className="flex-1 min-w-0 text-sm font-black text-white truncate">{dHoy.label}</span>
+                    {/* Misma tipografia que "Iniciar sesion": text-sm font-bold. En
+                        font-black y con nombres que ya vienen en mayuscula
+                        (LEGS, PUSH) el rectangulo gritaba de mas. */}
+                    <span className="flex-1 min-w-0 text-sm font-bold text-white truncate">{dHoy.label}</span>
                     <ChevronRight size={15} className="text-white/80 shrink-0" />
                   </button>
                 );
