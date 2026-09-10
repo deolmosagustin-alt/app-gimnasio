@@ -607,6 +607,19 @@ const DEFAULT_SETTINGS = {
   // App(), efecto de detección de entrenador), pero siempre se puede
   // cambiar a mano desde Perfil.
   trainingMode: "record",
+  // Preferencias de planificación — se recuerdan de una planificación a la
+  // siguiente (pedido: "que recuerde los objetivos y variables"). Antes cada
+  // vez que abrías el planificador (manual o con IA) arrancaba de cero con
+  // los defaults, y volvías a elegir lo mismo: si entrenás para hipertrofia
+  // hoy, seguís entrenando para hipertrofia la semana que viene.
+  planObjetivo: "mixto",        // fuerza | hipertrofia | mixto | mantenimiento
+  planPlazo: "ciclo",           // semana | mes | ciclo
+  planNivel: "intermedio",      // principiante | intermedio | avanzado
+  planIncremento: 2.5,          // salto de kg por semana en compuestos (punto de partida de las plantillas)
+  planRepsBase: 8,              // reps de referencia para las plantillas rápidas
+  planRepsTope: 12,             // tope de reps de la doble progresión
+  planRespetarRango: true,      // que la IA no se salga del rango de reps que ya tiene cada ejercicio
+  planSoloVacios: false,        // la IA sólo completa lo que no tenga meta cargada, sin pisar lo tuyo
 };
 
 
@@ -1276,7 +1289,18 @@ function reanchorCycleStart(cycleStart, oldSettings, newSettings) {
 // cargado para la semana actual (en ese caso, SetRow cae al
 // comportamiento de "récord" de siempre — los dos modos conviven sin
 // romperse entre sí).
-function getPlannedTargetForWeek(set, weekInCycle) {
+function getPlannedTargetForWeek(set, weekInCycle, trainingMode = "planned") {
+  // "Pasar este ejercicio a por récord" (ver setPlanPausedInRoutine): el plan
+  // sigue guardado tal cual, sólo se deja de perseguir. Es la diferencia
+  // entre "hoy no quiero seguir el plan de sentadilla" y "borrá el plan de
+  // sentadilla" — antes lo único posible era lo segundo, y perdías todo el
+  // bloque cargado para volver una semana a tu récord.
+  if (set?.plannedPaused) return null;
+  // Interruptor general: en modo "record" ninguna serie persigue su meta,
+  // aunque la tenga cargada. Lo que evita que esto se sienta roto ("planifico
+  // y sigue diciendo Récord") es que TODOS los caminos que guardan un plan
+  // dejan el modo en "planned" solos — ver applyProgressionPreservingMode.
+  if (trainingMode === "record") return null;
   const plan = set?.plannedProgression;
   if (!Array.isArray(plan) || !plan.length) return null;
   // BUG FIX ("planifico un ejercicio y sigue diciendo Récord"): esto pedía
@@ -1324,9 +1348,31 @@ function applyProgressionToRoutine(routineDef, planOrPlans) {
         const effectiveId = entry.idOverride || (lib ? lib.id : entry.id);
         return effectiveId === plan.exerciseId;
       });
-      if (ex?.sets?.[plan.setIndex]) {
-        ex.sets[plan.setIndex] = { ...ex.sets[plan.setIndex], plannedProgression: plan.entries };
+      if (!ex?.sets?.[plan.setIndex]) return;
+      const prev = ex.sets[plan.setIndex];
+      // Tres operaciones sobre la misma serie, todas por este único camino
+      // (no hay una segunda forma de escribir plannedProgression en la app):
+      //   { entries: [...] }  → cargar/reemplazar el plan
+      //   { entries: [] }     → QUITAR el plan (vuelve a perseguir el récord)
+      //   { paused: true }    → pasarlo a por récord SIN perder lo planificado
+      if (plan.paused != null && plan.entries == null) {
+        ex.sets[plan.setIndex] = { ...prev, plannedPaused: !!plan.paused };
+        return;
       }
+      if (Array.isArray(plan.entries) && plan.entries.length === 0) {
+        const next = { ...prev };
+        delete next.plannedProgression;
+        delete next.plannedPaused;
+        ex.sets[plan.setIndex] = next;
+        return;
+      }
+      // Cargar un plan nuevo reactiva la serie: si estaba en "por récord" y
+      // te tomaste el trabajo de planificarla otra vez, es porque la querés
+      // seguir — quedarse pausada en silencio sería el bug de siempre.
+      const next = { ...prev, plannedProgression: plan.entries };
+      if (plan.paused != null) next.plannedPaused = !!plan.paused;
+      else delete next.plannedPaused;
+      ex.sets[plan.setIndex] = next;
     });
   });
   // BUG FIX: si la rutina activa es una preestablecida (source:"preset"),
@@ -1370,6 +1416,70 @@ function applyWeeklyPlanToRoutine(routineDef, weekPlans) {
   });
   if (clone.source === "preset") clone.source = "custom";
   return clone;
+}
+
+// ── PASAR DE "PLANIFICADO" A "POR RÉCORD" Y AL REVÉS ────────────────────────
+// Pedido: "el poder quitar o pasar ejercicios de planificados a por récord de
+// manera sencilla". Las dos operaciones son distintas a propósito:
+//   pausar  → el plan queda guardado, sólo dejás de perseguirlo (reversible)
+//   quitar  → se borra el plan de esas series (no vuelve)
+// Las dos se arman como "planes" y viajan por applyProgressionToRoutine, que
+// es el único lugar de la app que toca plannedProgression.
+function planTargetsForExercise(routineDef, exerciseId) {
+  const targets = [];
+  const seen = new Set();
+  (routineDef?.dayOrder || []).forEach((dk) => {
+    (routineDef.days?.[dk]?.exercises || []).forEach((entry) => {
+      const lib = entry.libId ? EXERCISE_LIBRARY_BY_ID[entry.libId] : null;
+      const effectiveId = entry.idOverride || (lib ? lib.id : entry.id);
+      if (effectiveId !== exerciseId) return;
+      (entry.sets || []).forEach((_, si) => {
+        if (seen.has(si)) return;
+        seen.add(si);
+        targets.push({ exerciseId, setIndex: si });
+      });
+    });
+  });
+  return targets;
+}
+function setExercisePlanPaused(routineDef, exerciseId, paused) {
+  return applyProgressionToRoutine(routineDef, planTargetsForExercise(routineDef, exerciseId).map((t) => ({ ...t, paused })));
+}
+function removeExercisePlan(routineDef, exerciseId) {
+  return applyProgressionToRoutine(routineDef, planTargetsForExercise(routineDef, exerciseId).map((t) => ({ ...t, entries: [] })));
+}
+
+// Foto del estado de planificación de TODA la rutina — alimenta el resumen
+// "qué sigue plan y qué persigue récord" del planificador. Un ejercicio que
+// aparece en dos días es UNO solo acá (comparten id y, por lo tanto, plan).
+function summarizeRoutinePlan(model, weekInCycle = null) {
+  const todos = Object.values(model?.exerciseById || {}).map((ex) => {
+    const sets = ex.sets || [];
+    const conPlan = sets.filter((s) => Array.isArray(s.plannedProgression) && s.plannedProgression.length > 0);
+    const semanas = new Set();
+    conPlan.forEach((s) => s.plannedProgression.forEach((e) => semanas.add(e.week)));
+    return {
+      id: ex.id,
+      nombre: ex.name,
+      muscle: ex.muscle,
+      dia: model.days?.[ex.dayKey]?.label || ex.dayKey,
+      dayKey: ex.dayKey,
+      cardio: !!ex.cardio,
+      sets: sets.length,
+      setsConPlan: conPlan.length,
+      semanas: semanas.size,
+      pausado: conPlan.length > 0 && sets.some((s) => s.plannedPaused),
+      meta: conPlan.length && weekInCycle != null
+        ? getPlannedTargetForWeek({ ...conPlan[0], plannedPaused: false }, weekInCycle)
+        : null,
+    };
+  });
+  return {
+    todos,
+    planificados: todos.filter((e) => e.setsConPlan > 0 && !e.pausado),
+    pausados: todos.filter((e) => e.setsConPlan > 0 && e.pausado),
+    sinPlan: todos.filter((e) => e.setsConPlan === 0),
+  };
 }
 
 /* ============================================================================
@@ -5352,7 +5462,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   // decididas (a mano o por su entrenador) en vez de perseguir siempre su
   // propio mejor registro. Sin meta para esta semana, cae en el
   // comportamiento de "récord" de siempre.
-  const plannedTarget = getPlannedTargetForWeek(setDef, weekInCycle);
+  const plannedTarget = getPlannedTargetForWeek(setDef, weekInCycle, fieldSettings.trainingMode);
   // Alcanza con que ESTA serie tenga una meta cargada. Antes también exigía
   // que el modo global estuviera en "planned", así que quien planificaba un
   // ejercicio suelto (o le aceptaba el plan al entrenador) seguía viendo
@@ -6298,7 +6408,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
 /* ============================================================================
    EXERCISE CARD
 ============================================================================ */
-function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts, resetKey = 0, settings = DEFAULT_SETTINGS, forceOpen = false, onDisableAutoShowPrShare, hasActiveSession = true, hideTimer = false, onUpdateSettings = null, sex = null, age = null, weekInCycle = null, dayKey = null, nextRestTimerId = null, nextRestSeconds = null }) {
+function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts, resetKey = 0, settings = DEFAULT_SETTINGS, forceOpen = false, onDisableAutoShowPrShare, hasActiveSession = true, hideTimer = false, onUpdateSettings = null, onSetPlanPaused = null, sex = null, age = null, weekInCycle = null, dayKey = null, nextRestTimerId = null, nextRestSeconds = null }) {
   const [open, setOpen] = useState(false);
   const [showWarmup, setShowWarmup] = useState(false);
   // Nota personal del ejercicio (persiste en el perfil → sincroniza)
@@ -6348,6 +6458,20 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
   const allSetsDoneToday = useMemo(() => (
     setsToShow.length > 0 && setsToShow.every((_, i) => (logs[`${exercise.id}_${i}`] || []).some((h) => h.date === hoyStr && !h.deload))
   ), [logs, exercise.id, setsToShow, hoyStr]);
+  // Pedido: "el poder quitar o pasar ejercicios de planificados a por récord
+  // de manera sencilla". El lugar más natural para decidirlo es acá, con el
+  // ejercicio abierto y a punto de entrenarlo — no hay que salir a Perfil ni
+  // abrir el planificador para volver una semana a perseguir tu récord.
+  const planInfo = useMemo(() => {
+    const sets = exercise.sets || [];
+    const conPlan = sets.filter((s) => Array.isArray(s.plannedProgression) && s.plannedProgression.length > 0);
+    if (!conPlan.length) return null;
+    return { sets: conPlan.length, paused: sets.some((s) => s.plannedPaused) };
+  }, [exercise.sets]);
+  // Si el modo general está en "Récord", ninguna serie persigue su meta
+  // (ver getPlannedTargetForWeek) — el aviso de acá lo explica en vez de
+  // dejar que el plan parezca haberse perdido.
+  const planOffByMode = !!planInfo && settings.trainingMode === "record";
   return (
     <div className="stagger-item smooth-card bg-slate-900/50 border border-slate-800/50 rounded-2xl overflow-hidden backdrop-blur-sm shadow-md shadow-black/20 transition-shadow hover:shadow-lg hover:shadow-black/30">
       <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center justify-between px-4 py-4 hover:bg-slate-800/30 active:bg-slate-800/50 transition text-left">
@@ -6369,6 +6493,14 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
                   ("¿Con cuántas mancuernas?"), no acá: durante el
                   entrenamiento sumaba ruido y ya está definido. */}
               {stagnant && settings.showStagnation === true && <span className="text-[10px] bg-rose-500/15 text-rose-400 rounded-lg px-1.5 py-0.5 font-bold flex items-center gap-1"><AlertTriangle size={9} /> ESTANCADO</span>}
+              {/* Con la tarjeta cerrada ya se ve cuáles ejercicios siguen el
+                  plan y cuáles persiguen tu récord — antes había que abrir
+                  cada uno para enterarte. */}
+              {planInfo && (
+                planInfo.paused || planOffByMode
+                  ? <span className="text-[10px] bg-slate-700/40 text-slate-400 rounded-lg px-1.5 py-0.5 font-bold flex items-center gap-1" title="Este ejercicio tiene un plan guardado, pero ahora persigue tu récord"><Trophy size={9} /> POR RÉCORD</span>
+                  : <span className="text-[10px] rounded-lg px-1.5 py-0.5 font-bold flex items-center gap-1" style={{ backgroundColor: "rgba(56,189,248,0.15)", color: "#7dd3fc" }} title="Este ejercicio sigue tu plan"><ClipboardCheck size={9} /> PLAN</span>
+              )}
               {/* Las notas ahora son POR SERIE (ver SetRow): cada serie tiene
                   su propio "Agregar nota". Acá ya no va nada. */}
             </div>
@@ -6386,6 +6518,31 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
       </button>
       <div className={open ? "px-4 pb-4 pt-0 tab-fade-in" : "hidden"}>
         {stagnant && settings.showStagnation === true && <div className="mb-3 text-[11px] text-rose-400/90 bg-rose-500/5 border border-rose-500/15 rounded-xl px-3 py-2 flex items-start gap-1.5"><Info size={12} className="mt-0.5 shrink-0" /><span>Hace {STAGNATION_DAYS}+ días sin superar el récord. Considerá cambiar reps, descanso o variante.</span></div>}
+        {/* Pasar ESTE ejercicio de "sigue el plan" a "persigue mi récord" y
+            al revés, sin salir de la pantalla ni perder lo planificado: el
+            plan queda guardado, sólo se deja de perseguir (plannedPaused).
+            Un día que no llegás a la meta, una vuelta a récord tras una
+            lesión, o probar cómo venís sin la referencia del plan. */}
+        {planInfo && onSetPlanPaused && (
+          <div className="mb-3 flex items-center gap-2 rounded-xl px-3 py-2" style={{ backgroundColor: planInfo.paused || planOffByMode ? "var(--row-surface)" : "rgba(56,189,248,0.10)", border: `1px solid ${planInfo.paused || planOffByMode ? "var(--chip-border)" : "rgba(56,189,248,0.28)"}` }}>
+            {planInfo.paused || planOffByMode ? <Trophy size={13} className="shrink-0 text-slate-400" /> : <ClipboardCheck size={13} className="shrink-0" style={{ color: "#38BDF8" }} />}
+            <p className="flex-1 min-w-0 text-[10.5px] leading-snug" style={{ color: planInfo.paused || planOffByMode ? "#94a3b8" : "#bae6fd" }}>
+              {planOffByMode
+                ? <>Tenés un plan cargado, pero tu modo general es <b>Récord</b>.</>
+                : planInfo.paused
+                  ? <>Este ejercicio persigue tu récord. Su plan sigue guardado.</>
+                  : <>Este ejercicio sigue el plan cargado ({planInfo.sets} serie{planInfo.sets === 1 ? "" : "s"}).</>}
+            </p>
+            {!planOffByMode && (
+              <button onClick={() => onSetPlanPaused(exercise.id, !planInfo.paused)} className="shrink-0 px-2.5 py-1.5 rounded-lg text-[10px] font-black transition active:scale-95"
+                style={planInfo.paused
+                  ? { backgroundColor: "rgba(56,189,248,0.18)", color: "#7dd3fc", border: "1px solid rgba(56,189,248,0.35)" }
+                  : { backgroundColor: "rgba(148,163,184,0.12)", color: "#cbd5e1", border: "1px solid rgba(148,163,184,0.22)" }}>
+                {planInfo.paused ? "Volver al plan" : "Pasar a récord"}
+              </button>
+            )}
+          </div>
+        )}
         {/* El cronómetro ya no vive fijo acá: se posiciona entre las series
             según timerSlot (más abajo, junto a las series). */}
         {!exercise.cardio && bestWorkingKg != null && settings.showWarmup !== false && (
@@ -6878,7 +7035,7 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, onClose, onApply })
   );
 }
 
-function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, weekSchedule, activeSession, onStartSession, onEndSession, onCancelSession, onDisableAutoShowPrShare, onUpdateSettings = null, onGoToRoutines = null, onGoToSchedule = null, onGoToFieldSettings = null, onGoToDescarga = null, todaySessionDayKey = null, sex = null, age = null, activeRoutineDef = null, onApplyOwnProgression = null, goToDaySignal = { id: null, n: 0 }, onSignalConsumed = null }) {
+function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, weekSchedule, activeSession, onStartSession, onEndSession, onCancelSession, onDisableAutoShowPrShare, onUpdateSettings = null, onSetPlanPaused = null, onRemovePlan = null, onGoToRoutines = null, onGoToSchedule = null, onGoToFieldSettings = null, onGoToDescarga = null, todaySessionDayKey = null, sex = null, age = null, activeRoutineDef = null, onApplyOwnProgression = null, goToDaySignal = { id: null, n: 0 }, onSignalConsumed = null }) {
   // Semana actual del ciclo — sólo hace falta el número (weekInCycle), para
   // que SetRow sepa si hay una meta cargada (modo "planned", ver
   // getPlannedTargetForWeek) para ESTA semana puntual.
@@ -7328,7 +7485,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             const abrirSola = entreActivo && gi > 0 && estaCompleto(groups[gi - 1]) && !estaCompleto(group);
             if (group.length === 1) {
               const ex = group[0];
-              return <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} sex={sex} age={age} weekInCycle={weekInCycle} dayKey={activeDay} forceOpen={abrirSola} nextRestTimerId={nextRestTimerId} nextRestSeconds={nextRestSeconds} />;
+              return <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onSetPlanPaused={onSetPlanPaused} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} sex={sex} age={age} weekInCycle={weekInCycle} dayKey={activeDay} forceOpen={abrirSola} nextRestTimerId={nextRestTimerId} nextRestSeconds={nextRestSeconds} />;
             }
             // Superserie: varios ejercicios encadenados comparten un solo
             // cronómetro al final del grupo, en vez de uno por ejercicio —
@@ -7338,7 +7495,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             return (
               <div key={`${activeDay}:${group.map((e) => e.id).join("-")}`} className="rounded-2xl border p-2.5 space-y-2.5" style={{ borderColor: tint(day.color, "50"), backgroundColor: tint(day.color, "06") }}>
                 <div className="flex items-center gap-1.5 px-1"><Link size={11} style={{ color: day.color }} /><span className="text-[10px] font-black uppercase tracking-wider" style={{ color: day.color }}>Superserie · {group.length} ejercicios</span></div>
-                {group.map((ex, xi) => <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} hideTimer sex={sex} age={age} weekInCycle={weekInCycle} dayKey={activeDay} forceOpen={abrirSola} nextRestTimerId={xi === group.length - 1 ? nextRestTimerId : null} nextRestSeconds={nextRestSeconds} />)}
+                {group.map((ex, xi) => <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onSetPlanPaused={onSetPlanPaused} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} hideTimer sex={sex} age={age} weekInCycle={weekInCycle} dayKey={activeDay} forceOpen={abrirSola} nextRestTimerId={xi === group.length - 1 ? nextRestTimerId : null} nextRestSeconds={nextRestSeconds} />)}
                 <div className="px-1"><RestTimer seconds={hasHeavyGroup ? settings.restLong : settings.restShort} accent={day.color} alertType={settings.alertType} timerId={`${activeDay}:grp_${group.map((g) => g.id).join("_")}`} exerciseName={group.map((g) => g.name).filter(Boolean).join(" + ")} /></div>
                 <p className="text-[10px] text-slate-600 px-1">Descansá recién después de completar los {group.length} ejercicios. Ese es el cronómetro de arriba.</p>
               </div>
@@ -7371,6 +7528,12 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           mode="self"
           routineSnapshot={activeRoutineDef}
           trainWeeks={settings.trainWeeks}
+          logs={logs}
+          weekInCycle={weekInCycle}
+          planPrefs={settings}
+          onSavePrefs={onUpdateSettings}
+          onSetPlanPaused={onSetPlanPaused}
+          onRemovePlan={onRemovePlan}
           onClose={() => setShowSelfProgression(false)}
           onSubmit={async (plan) => { onApplyOwnProgression(plan); setShowSelfProgression(false); }}
         />
@@ -12042,10 +12205,19 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
           mode="self"
           routineSnapshot={activeRoutineDef}
           trainWeeks={settings.trainWeeks}
+          logs={profile?.logs || null}
+          weekInCycle={getWeekInfo(cycleStart, settings)?.weekInCycle ?? null}
+          planPrefs={settings}
+          onSavePrefs={updateSettings}
+          onSetPlanPaused={(exerciseId, paused) => onUpdateProfile({ routines: { ...(profile.routines || {}), [profile.activeRoutineId]: setExercisePlanPaused(activeRoutineDef, exerciseId, paused) } })}
+          onRemovePlan={(exerciseId) => onUpdateProfile({ routines: { ...(profile.routines || {}), [profile.activeRoutineId]: removeExercisePlan(activeRoutineDef, exerciseId) } })}
           onClose={() => setShowSelfProgression(false)}
           onSubmit={async (plan) => {
             const updated = applyProgressionToRoutine(activeRoutineDef, plan);
-            onUpdateProfile({ routines: { ...(profile.routines || {}), [profile.activeRoutineId]: updated } });
+            // Guardar una meta deja el modo en "planificada": si no, el plan
+            // recién cargado no se veía en ningún lado y parecía no haberse
+            // guardado (ver getPlannedTargetForWeek).
+            onUpdateProfile({ routines: { ...(profile.routines || {}), [profile.activeRoutineId]: updated }, settings: { ...settings, trainingMode: "planned" } });
             setShowSelfProgression(false);
           }}
         />
@@ -13475,7 +13647,20 @@ const PROGRESSION_TEMPLATES = [
 //  - "Aplicar a todas las series de este ejercicio": antes había que
 //    repetir el formulario entero serie por serie para una rutina de 3-4
 //    series por ejercicio (el caso más común).
-function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onSubmit, mode = "trainer", studentName = null }) {
+// Objetivos del plan: además de recordarse de una planificación a la
+// siguiente (settings.planObjetivo), cada uno trae sus propias variables de
+// partida — no es lo mismo planificar fuerza (pocas reps, saltos grandes)
+// que hipertrofia (más reps, saltos chicos). Los mismos cuatro que ofrece el
+// planificador con IA, para que las dos formas de planificar hablen igual.
+const PLAN_OBJETIVOS = [
+  { k: "fuerza", l: "Fuerza", d: "Pocas reps, cargas altas", color: "#F43F5E", reps: 5, tope: 6, inc: 2.5 },
+  { k: "hipertrofia", l: "Hipertrofia", d: "Reps medias, volumen alto", color: "#A855F7", reps: 10, tope: 12, inc: 2.5 },
+  { k: "mixto", l: "Mixto", d: "Compuestos pesados, aislados con más reps", color: "#3B82F6", reps: 8, tope: 12, inc: 2.5 },
+  { k: "mantenimiento", l: "Mantener", d: "Cargas planas, sin forzar", color: "#10B981", reps: 8, tope: 8, inc: 0 },
+];
+const planObjetivoDe = (k) => PLAN_OBJETIVOS.find((o) => o.k === k) || PLAN_OBJETIVOS[2];
+
+function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onSubmit, mode = "trainer", studentName = null, logs = null, weekInCycle = null, planPrefs = null, onSavePrefs = null, onSetPlanPaused = null, onRemovePlan = null }) {
   useAndroidBack(onClose);
   const model = useMemo(() => (routineSnapshot ? buildRoutineModel(routineSnapshot) : null), [routineSnapshot]);
   const exercises = useMemo(() => Object.values(model?.exerciseById || {}), [model]);
@@ -13492,8 +13677,18 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
   const dayOrder = model?.dayOrder || [];
   const [dayKey, setDayKey] = useState(dayOrder[0] || null);
   const dayExercises = useMemo(() => (dayKey ? (model?.days?.[dayKey]?.exercises || []) : []), [model, dayKey]);
-  const weeks = Array.from({ length: Math.max(1, trainWeeks || TRAIN_WEEKS) }, (_, i) => i + 1);
-  const [week, setWeek] = useState(1);
+  const weeks = useMemo(() => Array.from({ length: Math.max(1, trainWeeks || TRAIN_WEEKS) }, (_, i) => i + 1), [trainWeeks]);
+  // Arranca en la semana que estás viviendo, no siempre en la 1: lo más
+  // común es ajustar la semana en curso o cargar la que viene, y con un
+  // ciclo de 8 semanas eso eran varios toques antes de escribir el primer
+  // número. La tira de semanas sigue estando para ir a cualquier otra.
+  const [week, setWeek] = useState(() => Math.min(Math.max(1, weekInCycle || 1), Math.max(1, trainWeeks || TRAIN_WEEKS)));
+  // Editar (cargar metas) o Resumen (ver de un vistazo qué ejercicio sigue
+  // el plan y cuál persigue tu récord, y cambiarlo de un toque). El resumen
+  // es sólo para tu propia rutina: un entrenador propone metas, no maneja el
+  // interruptor plan/récord de su alumno.
+  const puedeGestionar = mode === "self" && !!onSetPlanPaused && !!onRemovePlan;
+  const [vista, setVista] = useState("editar");
   // Ejercicio abierto en detalle (para editar serie por serie y/o aplicar
   // una plantilla multi-semana). Cerrado = se edita el ejercicio entero de
   // una (todas sus series con el mismo valor), que es el caso común.
@@ -13505,13 +13700,62 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
   const [entries, setEntries] = useState({});
   const [note, setNote] = useState("");
   const [sending, setSending] = useState(false);
+  const [confirmQuitar, setConfirmQuitar] = useState(null); // exerciseId a punto de perder su plan
 
-  // Punto de partida para las plantillas rápidas — no se manda a ningún
-  // lado, sólo alimenta buildX() al tocar un botón de plantilla.
-  const [tplKg, setTplKg] = useState("");
-  const [tplReps, setTplReps] = useState("8");
-  const [tplRepsMax, setTplRepsMax] = useState("12");
-  const [tplInc, setTplInc] = useState("2.5");
+  // ── VARIABLES DEL PLAN (se recuerdan) ──────────────────────────────────
+  // Pedido: "que recuerde los objetivos y variables". Antes estos cuatro
+  // valores arrancaban fijos en cada apertura del modal y había que volver
+  // a elegirlos aunque lleves seis ciclos entrenando para lo mismo. Ahora
+  // salen de tu perfil y se guardan de vuelta al aplicar una plantilla o al
+  // guardar el plan (ver guardarPrefs).
+  const prefs = { ...DEFAULT_SETTINGS, ...(planPrefs || {}) };
+  const [objetivo, setObjetivo] = useState(prefs.planObjetivo);
+  const [tplReps, setTplReps] = useState(String(prefs.planRepsBase));
+  const [tplRepsMax, setTplRepsMax] = useState(String(prefs.planRepsTope));
+  const [tplInc, setTplInc] = useState(String(prefs.planIncremento));
+  const [showVars, setShowVars] = useState(false);
+  // El kg de partida de la plantilla es POR EJERCICIO (no tiene sentido
+  // arrancar el press de banca y el curl de bíceps en el mismo peso). Si no
+  // lo tocaste, se autocompleta con tu mejor marca real de ese ejercicio.
+  const [tplKgByEx, setTplKgByEx] = useState({});
+
+  const elegirObjetivo = (k) => {
+    const o = planObjetivoDe(k);
+    setObjetivo(k);
+    setTplReps(String(o.reps));
+    setTplRepsMax(String(o.tope));
+    setTplInc(String(o.inc));
+  };
+  const guardarPrefs = () => {
+    if (!onSavePrefs) return;
+    onSavePrefs({
+      planObjetivo: objetivo,
+      planRepsBase: parseInt(tplReps, 10) || DEFAULT_SETTINGS.planRepsBase,
+      planRepsTope: parseInt(tplRepsMax, 10) || DEFAULT_SETTINGS.planRepsTope,
+      planIncremento: parseFloat(tplInc) || 0,
+    });
+  };
+
+  // Tu mejor marca y lo último que hiciste en cada ejercicio — la referencia
+  // que faltaba: antes se planificaba mirando casilleros vacíos, sin saber
+  // desde qué número estabas partiendo, y había que salir a Progreso a
+  // buscarlo ejercicio por ejercicio.
+  const marcasPorEjercicio = useMemo(() => {
+    const map = {};
+    if (!logs) return map;
+    exercises.forEach((ex) => {
+      let best = null, last = null;
+      (ex.sets || []).forEach((_, si) => {
+        (logs[`${ex.id}_${si}`] || []).forEach((h) => {
+          if (!h?.kg || !h?.reps || h.deload) return;
+          if (!best || prScore(h.kg, h.reps) > prScore(best.kg, best.reps)) best = { kg: h.kg, reps: h.reps };
+          if (h.date && (!last || h.date > last.date)) last = { kg: h.kg, reps: h.reps, date: h.date };
+        });
+      });
+      map[ex.id] = { best, last };
+    });
+    return map;
+  }, [exercises, logs]);
 
   const keyOf = (exId, si, w) => `${exId}_${si}_${w}`;
   // Lo ya planificado para ese ejercicio/serie/semana (de una propuesta o
@@ -13557,6 +13801,8 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
     });
     return set.size;
   };
+  const exerciseTienePlanGuardado = (ex) => (ex.sets || []).some((s) => Array.isArray(s.plannedProgression) && s.plannedProgression.length > 0);
+  const exercisePausado = (ex) => (ex.sets || []).some((s) => s.plannedPaused);
 
   // Atajo clave para la velocidad: copia lo de la semana anterior a la
   // actual, para TODOS los ejercicios del día — el flujo real es "misma
@@ -13577,9 +13823,33 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
       return next;
     });
   };
+  // Pedido: "varios ejercicios a la vez de manera sencilla". Sube (o baja)
+  // de golpe el kg de TODOS los ejercicios del día en esta semana — es el
+  // gesto real de "esta semana subo 2.5kg en todo", que antes eran 6 u 8
+  // campos tipeados a mano uno por uno.
+  const bumpDay = (delta) => {
+    setEntries((prev) => {
+      const next = { ...prev };
+      dayExercises.forEach((ex) => {
+        (ex.sets || []).forEach((_, si) => {
+          const actual = parseFloat(valueOf(ex, si, week, "kg"));
+          if (isNaN(actual) || actual <= 0) return;
+          const key = keyOf(ex.id, si, week);
+          const reps = valueOf(ex, si, week, "reps");
+          next[key] = { ...(next[key] || {}), kg: String(Math.max(0, roundKg(actual + delta))), reps };
+        });
+      });
+      return next;
+    });
+  };
 
+  const tplKgDe = (ex) => {
+    if (tplKgByEx[ex.id] !== undefined) return tplKgByEx[ex.id];
+    const best = marcasPorEjercicio[ex.id]?.best;
+    return best ? String(best.kg) : "";
+  };
   const applyTemplate = (ex, tpl) => {
-    const kg = parseFloat(tplKg);
+    const kg = parseFloat(tplKgDe(ex));
     const reps = parseInt(tplReps, 10);
     if (isNaN(kg) || kg <= 0 || isNaN(reps) || reps <= 0) return;
     const repsMax = parseInt(tplRepsMax, 10) || reps + 1;
@@ -13597,14 +13867,35 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
       });
       return next;
     });
+    guardarPrefs();
   };
-  const clearExercise = (ex) => setEntries((prev) => {
+  // Aplicar la MISMA plantilla a todos los ejercicios del día, cada uno
+  // partiendo de su propia mejor marca. Un ciclo entero de un día completo
+  // en un toque, y después se ajusta lo que haga falta a mano.
+  const applyTemplateToDay = (tpl) => {
+    dayExercises.forEach((ex) => { if (!ex.cardio) applyTemplate(ex, tpl); });
+  };
+
+  // Borra SÓLO lo escrito en este formulario (no toca lo ya guardado en la
+  // rutina) — para eso está "Quitar plan", que es otra cosa y lo dice.
+  const forgetDraft = (ex) => setEntries((prev) => {
     const next = { ...prev };
-    (ex.sets || []).forEach((_, si) => {
-      weeks.forEach((w) => { next[keyOf(ex.id, si, w)] = { kg: "", reps: "", rpe: "", phase: "" }; });
-    });
+    (ex.sets || []).forEach((_, si) => { weeks.forEach((w) => { delete next[keyOf(ex.id, si, w)]; }); });
     return next;
   });
+  const tieneDraft = (ex) => (ex.sets || []).some((_, si) => weeks.some((w) => isTouched(ex.id, si, w)));
+  // BUG FIX (auditando el pedido "el poder quitar ejercicios de
+  // planificados"): "Limpiar" vaciaba los casilleros de la pantalla y nada
+  // más — buildAllPlans descarta las semanas sin valores, así que el plan
+  // guardado quedaba intacto y no había NINGUNA forma, en toda la app, de
+  // sacarle la meta a una serie una vez cargada. Ahora quitar es una
+  // operación de verdad: borra el plan de la rutina (y de paso el borrador
+  // de esta pantalla, para que el guardado siguiente no lo reponga).
+  const quitarPlan = (ex) => {
+    forgetDraft(ex);
+    onRemovePlan?.(ex.id);
+    setConfirmQuitar(null);
+  };
 
   // Lote completo a guardar: recorre TODOS los ejercicios de TODOS los
   // días (no sólo el día abierto — se puede saltar de día sin perder lo
@@ -13638,6 +13929,7 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
   const handleSubmit = async () => {
     if (!pendingPlans.length) return;
     setSending(true);
+    guardarPrefs();
     try {
       await onSubmit(pendingPlans.length === 1 ? pendingPlans[0] : pendingPlans, note.trim());
     } finally {
@@ -13645,6 +13937,11 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
     }
   };
 
+  // Resumen: el estado de planificación de TODA la rutina de un vistazo, con
+  // el interruptor plan/récord y el quitar al lado de cada ejercicio.
+  const resumen = useMemo(() => summarizeRoutinePlan(model, weekInCycle), [model, weekInCycle]);
+
+  const accent = "#38BDF8";
   return (
     <div className="fixed inset-0 z-[125] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
       <div className="w-full max-w-md max-h-[86vh] overflow-y-auto overscroll-contain bg-slate-900 border border-slate-700/60 rounded-3xl modal-pop-in shadow-2xl shadow-black/70" onClick={(e) => e.stopPropagation()}>
@@ -13652,12 +13949,12 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-sky-500/20 border border-sky-500/30 text-sky-300 flex items-center justify-center shrink-0"><Target size={17} /></div>
             <div className="min-w-0 flex-1">
-              <p className="text-[10px] font-black uppercase tracking-widest text-sky-400">{mode === "self" ? "Planificar mi progresión" : "Planificar progresión"}</p>
               {/* Pedido: "rediseñá la sección de planificación manual tanto
                   personalmente como para el entrenador hacia sus alumnos"
                   — mismo componente para las dos, pero el título ahora
                   distingue "para quién" es el plan en vez del genérico
                   "Metas por semana" de siempre. */}
+              <p className="text-[10px] font-black uppercase tracking-widest text-sky-400">{mode === "self" ? "Planificar mi progresión" : "Planificar progresión"}</p>
               <h3 className="text-base font-black text-white leading-tight truncate">{mode === "self" ? "Metas por semana" : studentName ? `Plan para ${studentName}` : "Metas por semana"}</h3>
             </div>
             <button onClick={onClose} className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white transition"><X size={15} /></button>
@@ -13667,154 +13964,360 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
             <p className="text-sm text-slate-500">{mode === "self" ? "Activá una rutina primero, en la pestaña Rutinas." : "Tu alumno no tiene una rutina activa todavía."}</p>
           ) : (
             <>
-              {/* Día: se planifica un día entero de corrido, no un ejercicio
-                  suelto por vez. */}
-              {dayOrder.length > 1 && (
-                <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${dayOrder.length}, 1fr)` }}>
-                  {dayOrder.map((dk) => (
-                    <button key={dk} onClick={() => { setDayKey(dk); setExpandedId(null); }} className={`py-2 rounded-xl text-[11px] font-black uppercase truncate transition active:scale-95 ${dayKey === dk ? "bg-sky-500 !text-white" : "bg-slate-800 text-slate-400 hover:text-slate-200"}`}>
-                      {model?.days?.[dk]?.label || dk}
+              {/* Dos pestañas: cargar metas, o mirar/gobernar el plan entero.
+                  El resumen es el que contesta "¿qué está siguiendo plan y
+                  qué no?" sin abrir ejercicio por ejercicio. */}
+              {puedeGestionar && (
+                <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-slate-950/60 border border-slate-800/60">
+                  {[{ k: "editar", l: "Cargar metas", i: <Sliders size={12} /> }, { k: "resumen", l: "Plan actual", i: <ListChecks size={12} /> }].map((t) => (
+                    <button key={t.k} onClick={() => setVista(t.k)} className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-black transition active:scale-[0.97] ${vista === t.k ? "bg-sky-500 !text-white" : "text-slate-400 hover:text-slate-200"}`}>
+                      {t.i} {t.l}
                     </button>
                   ))}
                 </div>
               )}
 
-              {/* Semana + "copiar la anterior": el atajo que hace que cargar
-                  la semana 2 en adelante sea un toque y ajustar, en vez de
-                  volver a tipear todo de cero. */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between gap-2">
-                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Semana del ciclo</label>
-                  {week > 1 && (
-                    <button onClick={copyPreviousWeek} className="flex items-center gap-1 px-2 py-1 rounded-lg bg-sky-500/15 border border-sky-500/30 text-sky-300 text-[10px] font-bold hover:bg-sky-500/25 transition">
-                      <Copy size={10} /> Copiar semana {week - 1}
-                    </button>
-                  )}
-                </div>
-                <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
-                  {weeks.map((w) => (
-                    <button key={w} onClick={() => setWeek(w)} className={`shrink-0 w-11 py-2 rounded-xl text-[11px] font-black transition active:scale-95 ${week === w ? "bg-sky-500 !text-white" : "bg-slate-800 text-slate-400 hover:text-slate-200"}`}>S{w}</button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Todos los ejercicios del día, editables en la misma
-                  pantalla para la semana elegida. Tocar la flecha abre el
-                  detalle por serie + la plantilla multi-semana de ese
-                  ejercicio. */}
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block">Meta de cada ejercicio · Semana {week}</label>
-                {dayExercises.length === 0 && <p className="text-[11px] text-slate-600">Este día no tiene ejercicios.</p>}
-                {dayExercises.map((ex) => {
-                  const nSets = ex.sets?.length || 0;
-                  const expanded = expandedId === ex.id;
-                  const plannedWeeks = exercisePlannedWeeksCount(ex);
-                  const kg0 = valueOf(ex, 0, week, "kg");
-                  const reps0 = valueOf(ex, 0, week, "reps");
-                  const filled = parseFloat(kg0) > 0;
-                  return (
-                    <div key={ex.id} className={`rounded-2xl border transition-colors ${filled ? "bg-sky-500/10 border-sky-500/30" : "bg-slate-800/40 border-slate-700/40"}`}>
-                      <div className="flex items-center gap-2 p-2">
-                        <div className="min-w-0 flex-1">
-                          <p className="text-[12px] font-bold text-white truncate">{ex.name}</p>
-                          <p className="text-[9px] text-slate-500">{nSets} serie{nSets === 1 ? "" : "s"}{plannedWeeks > 0 ? ` · ${plannedWeeks} sem. planificada${plannedWeeks === 1 ? "" : "s"}` : ""}</p>
-                        </div>
-                        <input value={kg0} onChange={(e) => updateAllSets(ex, week, { kg: e.target.value })} type="number" inputMode="decimal" placeholder="kg" className="w-16 shrink-0 bg-slate-900 border border-slate-700/50 rounded-lg px-1.5 py-1.5 text-white text-sm font-bold text-center focus:outline-none" />
-                        <input value={reps0} onChange={(e) => updateAllSets(ex, week, { reps: e.target.value })} type="number" inputMode="numeric" placeholder="reps" className="w-14 shrink-0 bg-slate-900 border border-slate-700/50 rounded-lg px-1.5 py-1.5 text-white text-xs text-center focus:outline-none" />
-                        <button onClick={() => setExpandedId(expanded ? null : ex.id)} aria-label="Detalle por serie" className="p-1 rounded-lg text-slate-500 hover:text-sky-300 transition shrink-0">
-                          <ChevronDown size={15} className={`transition-transform ${expanded ? "rotate-180" : ""}`} />
+              {vista === "resumen" && puedeGestionar ? (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {[
+                      { l: "Con plan", v: resumen.planificados.length, c: accent },
+                      { l: "Por récord", v: resumen.pausados.length, c: "#94a3b8" },
+                      { l: "Sin plan", v: resumen.sinPlan.length, c: "#64748b" },
+                    ].map((s) => (
+                      <div key={s.l} className="rounded-xl px-2 py-2 text-center" style={{ backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}>
+                        <p className="text-lg font-black tabular-nums leading-none" style={{ color: s.c }}>{s.v}</p>
+                        <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500 mt-1">{s.l}</p>
+                      </div>
+                    ))}
+                  </div>
+                  {resumen.planificados.length + resumen.pausados.length === 0 ? (
+                    <p className="text-[11.5px] text-slate-500 text-center py-4 leading-snug">
+                      Todavía no hay ninguna meta cargada.<br />Volvé a "Cargar metas" para armar tu primera.
+                    </p>
+                  ) : (
+                    <>
+                      {/* Acciones sobre todo el plan de una: volver a récord
+                          una semana entera (una lesión, un viaje, una semana
+                          floja) sin tener que tocar ejercicio por ejercicio,
+                          y sin perder nada de lo planificado. */}
+                      <div className="flex gap-1.5">
+                        <button onClick={() => resumen.planificados.forEach((e) => onSetPlanPaused(e.id, true))} disabled={!resumen.planificados.length}
+                          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[10.5px] font-bold transition active:scale-[0.98] disabled:opacity-30"
+                          style={{ backgroundColor: "rgba(148,163,184,0.12)", color: "#cbd5e1", border: "1px solid rgba(148,163,184,0.22)" }}>
+                          <Trophy size={11} /> Todos a récord
+                        </button>
+                        <button onClick={() => resumen.pausados.forEach((e) => onSetPlanPaused(e.id, false))} disabled={!resumen.pausados.length}
+                          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[10.5px] font-bold transition active:scale-[0.98] disabled:opacity-30"
+                          style={{ backgroundColor: tint(accent, "1c"), color: "#7dd3fc", border: `1px solid ${tint(accent, "45")}` }}>
+                          <ClipboardCheck size={11} /> Todos al plan
                         </button>
                       </div>
+                      <div className="space-y-1.5">
+                        {[...resumen.planificados, ...resumen.pausados].map((e) => (
+                          <div key={e.id} className="rounded-xl px-2.5 py-2" style={{ backgroundColor: e.pausado ? "var(--row-surface)" : tint(accent, "10"), border: `1px solid ${e.pausado ? "var(--chip-border)" : tint(accent, "2e")}` }}>
+                            <div className="flex items-center gap-2">
+                              <div className="min-w-0 flex-1">
+                                <p className="text-[12px] font-bold text-white truncate">{e.nombre}</p>
+                                <p className="text-[9px] text-slate-500 truncate">
+                                  {e.dia} · {e.setsConPlan}/{e.sets} serie{e.sets === 1 ? "" : "s"} · {e.semanas} sem.
+                                  {e.meta && !e.pausado ? ` · esta semana ${e.meta.reps}×${e.meta.kg}kg` : ""}
+                                </p>
+                              </div>
+                              <button onClick={() => onSetPlanPaused(e.id, !e.pausado)} className="shrink-0 px-2 py-1.5 rounded-lg text-[9.5px] font-black transition active:scale-95"
+                                style={e.pausado
+                                  ? { backgroundColor: tint(accent, "20"), color: "#7dd3fc", border: `1px solid ${tint(accent, "45")}` }
+                                  : { backgroundColor: "rgba(148,163,184,0.12)", color: "#cbd5e1", border: "1px solid rgba(148,163,184,0.22)" }}>
+                                {e.pausado ? "Al plan" : "A récord"}
+                              </button>
+                              <button onClick={() => setConfirmQuitar(confirmQuitar === e.id ? null : e.id)} aria-label={`Quitar el plan de ${e.nombre}`} className="shrink-0 p-1.5 rounded-lg text-slate-500 hover:text-rose-400 transition">
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+                            {confirmQuitar === e.id && (
+                              <div className="flex items-center gap-2 mt-2 pt-2 border-t border-white/5">
+                                <p className="flex-1 text-[10px] text-rose-300/90 leading-snug">Se borran las {e.semanas} semanas cargadas. No se puede deshacer.</p>
+                                <button onClick={() => setConfirmQuitar(null)} className="shrink-0 px-2 py-1 rounded-lg bg-slate-800 text-slate-400 text-[10px] font-bold">No</button>
+                                <button onClick={() => quitarPlan({ id: e.id, sets: Array.from({ length: e.sets }, () => ({})) })} className="shrink-0 px-2 py-1 rounded-lg bg-rose-500/20 border border-rose-500/40 text-rose-300 text-[10px] font-black">Quitar</button>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-[10px] text-slate-600 leading-snug">
+                        "A récord" guarda el plan pero deja de perseguirlo — la serie vuelve a mostrar tu mejor marca. La papelera sí lo borra.
+                      </p>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <>
+                  {/* Variables del plan: se recuerdan de una planificación a
+                      la siguiente. Van plegadas porque la mayoría de las
+                      veces ya están como las querés. */}
+                  <div className="rounded-xl border border-slate-800/60 bg-slate-950/40 overflow-hidden">
+                    <button onClick={() => setShowVars((v) => !v)} className="w-full flex items-center gap-2 px-3 py-2.5 text-left">
+                      <Target size={12} className="shrink-0" style={{ color: planObjetivoDe(objetivo).color }} />
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-[10px] font-black uppercase tracking-wider text-slate-500">Objetivo y variables</span>
+                        <span className="block text-[11px] font-bold text-white truncate">{planObjetivoDe(objetivo).l} · {tplReps}-{tplRepsMax} reps · +{tplInc}kg</span>
+                      </span>
+                      <ChevronDown size={14} className={`text-slate-500 shrink-0 transition-transform ${showVars ? "rotate-180" : ""}`} />
+                    </button>
+                    {showVars && (
+                      <div className="px-3 pb-3 space-y-2 tab-fade-in">
+                        <div className="grid grid-cols-2 gap-1.5">
+                          {PLAN_OBJETIVOS.map((o) => (
+                            <button key={o.k} onClick={() => elegirObjetivo(o.k)} className="rounded-lg px-2 py-1.5 text-left transition active:scale-[0.97]"
+                              style={objetivo === o.k ? { backgroundColor: tint(o.color, "1c"), border: `1px solid ${tint(o.color, "55")}` } : { backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}>
+                              <span className="block text-[10.5px] font-black" style={{ color: objetivo === o.k ? o.color : "#e2e8f0" }}>{o.l}</span>
+                              <span className="block text-[8.5px] text-slate-500 leading-tight">{o.d}</span>
+                            </button>
+                          ))}
+                        </div>
+                        <div className="grid grid-cols-3 gap-1.5">
+                          {[
+                            { l: "Reps", v: tplReps, set: setTplReps, step: "1" },
+                            { l: "Tope", v: tplRepsMax, set: setTplRepsMax, step: "1" },
+                            { l: "+kg/sem", v: tplInc, set: setTplInc, step: "0.25" },
+                          ].map((f) => (
+                            <label key={f.l} className="block">
+                              <span className="block text-[9px] font-bold uppercase tracking-wider text-slate-500 mb-1">{f.l}</span>
+                              <input value={f.v} onChange={(e) => f.set(e.target.value)} onBlur={guardarPrefs} type="number" inputMode="decimal" step={f.step}
+                                className="w-full bg-slate-900 border border-slate-700/50 rounded-lg px-1.5 py-1.5 text-white text-xs font-bold text-center focus:outline-none" />
+                            </label>
+                          ))}
+                        </div>
+                        <p className="text-[9.5px] text-slate-600 leading-snug">Alimentan las plantillas rápidas de cada ejercicio y se guardan para la próxima vez.</p>
+                      </div>
+                    )}
+                  </div>
 
-                      {expanded && (
-                        <div className="px-2 pb-2 space-y-2 tab-fade-in">
-                          {/* Serie por serie, sólo si querés separarlas */}
-                          {nSets > 1 && (
-                            <div className="space-y-1">
-                              {(ex.sets || []).map((_, si) => (
-                                <div key={si} className="flex items-center gap-1.5">
-                                  <span className="w-11 shrink-0 text-[9.5px] font-black text-slate-500 uppercase">S{si + 1}</span>
-                                  <input value={valueOf(ex, si, week, "kg")} onChange={(e) => updateOne(ex, si, week, { kg: e.target.value })} type="number" inputMode="decimal" placeholder="kg" className="w-16 shrink-0 bg-slate-900 border border-slate-700/50 rounded-lg px-1.5 py-1 text-white text-xs text-center focus:outline-none" />
-                                  <input value={valueOf(ex, si, week, "reps")} onChange={(e) => updateOne(ex, si, week, { reps: e.target.value })} type="number" inputMode="numeric" placeholder="reps" className="w-14 shrink-0 bg-slate-900 border border-slate-700/50 rounded-lg px-1.5 py-1 text-white text-xs text-center focus:outline-none" />
-                                  <select value={valueOf(ex, si, week, "rpe")} onChange={(e) => updateOne(ex, si, week, { rpe: e.target.value })} className="flex-1 min-w-0 bg-slate-900 border border-slate-700/50 rounded-lg px-1 py-1 text-[9.5px] text-slate-400 focus:outline-none">
+                  {/* Día: se planifica un día entero de corrido, no un ejercicio
+                      suelto por vez. */}
+                  {dayOrder.length > 1 && (
+                    <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${dayOrder.length}, 1fr)` }}>
+                      {dayOrder.map((dk) => (
+                        <button key={dk} onClick={() => { setDayKey(dk); setExpandedId(null); }} className={`py-2 rounded-xl text-[11px] font-black uppercase truncate transition active:scale-95 ${dayKey === dk ? "bg-sky-500 !text-white" : "bg-slate-800 text-slate-400 hover:text-slate-200"}`}>
+                          {model?.days?.[dk]?.label || dk}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Semana + "copiar la anterior": el atajo que hace que cargar
+                      la semana 2 en adelante sea un toque y ajustar, en vez de
+                      volver a tipear todo de cero. */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Semana del ciclo</label>
+                      {week > 1 && (
+                        <button onClick={copyPreviousWeek} className="flex items-center gap-1 px-2 py-1 rounded-lg bg-sky-500/15 border border-sky-500/30 text-sky-300 text-[10px] font-bold hover:bg-sky-500/25 transition">
+                          <Copy size={10} /> Copiar semana {week - 1}
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
+                      {weeks.map((w) => (
+                        <button key={w} onClick={() => setWeek(w)} className={`relative shrink-0 w-11 py-2 rounded-xl text-[11px] font-black transition active:scale-95 ${week === w ? "bg-sky-500 !text-white" : "bg-slate-800 text-slate-400 hover:text-slate-200"}`}>
+                          S{w}
+                          {/* Un punto marca la semana que estás viviendo: sin
+                              esto no había forma de saber, dentro del modal,
+                              cuál de las ocho casillas es "ahora". */}
+                          {w === weekInCycle && <span className="absolute left-1/2 -translate-x-1/2 bottom-1 w-1 h-1 rounded-full" style={{ backgroundColor: week === w ? "#fff" : accent }} />}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Ajustes de todo el día de una: subir/bajar el peso de la
+                      semana entera, o tirarle la misma plantilla a todos. */}
+                  {dayExercises.length > 1 && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[9.5px] font-black uppercase tracking-wider text-slate-500 shrink-0">Todo el día</span>
+                      <button onClick={() => bumpDay(-2.5)} className="px-2 py-1 rounded-lg bg-slate-800 text-slate-300 text-[10px] font-black hover:bg-slate-700 transition">−2.5</button>
+                      <button onClick={() => bumpDay(2.5)} className="px-2 py-1 rounded-lg bg-slate-800 text-slate-300 text-[10px] font-black hover:bg-slate-700 transition">+2.5</button>
+                      <button onClick={() => applyTemplateToDay(PROGRESSION_TEMPLATES[0])} title="Progresión lineal para todos los ejercicios del día, cada uno desde su mejor marca"
+                        className="flex-1 flex items-center justify-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold transition"
+                        style={{ backgroundColor: tint(accent, "16"), border: `1px solid ${tint(accent, "35")}`, color: "#7dd3fc" }}>
+                        <Sparkles size={10} /> Llenar el día entero
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Todos los ejercicios del día, editables en la misma
+                      pantalla para la semana elegida. Tocar la flecha abre el
+                      detalle por serie + la plantilla multi-semana de ese
+                      ejercicio. */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block">Meta de cada ejercicio · Semana {week}</label>
+                    {dayExercises.length === 0 && <p className="text-[11px] text-slate-600">Este día no tiene ejercicios.</p>}
+                    {dayExercises.map((ex) => {
+                      const nSets = ex.sets?.length || 0;
+                      const expanded = expandedId === ex.id;
+                      const plannedWeeks = exercisePlannedWeeksCount(ex);
+                      const kg0 = valueOf(ex, 0, week, "kg");
+                      const reps0 = valueOf(ex, 0, week, "reps");
+                      const filled = parseFloat(kg0) > 0;
+                      const marcas = marcasPorEjercicio[ex.id] || {};
+                      const guardado = exerciseTienePlanGuardado(ex);
+                      const pausado = guardado && exercisePausado(ex);
+                      return (
+                        <div key={ex.id} className={`rounded-2xl border transition-colors ${filled ? "bg-sky-500/10 border-sky-500/30" : "bg-slate-800/40 border-slate-700/40"}`}>
+                          <div className="flex items-center gap-2 p-2">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[12px] font-bold text-white truncate">{ex.name}</p>
+                              <p className="text-[9px] text-slate-500 truncate">
+                                {nSets} serie{nSets === 1 ? "" : "s"}
+                                {plannedWeeks > 0 ? ` · ${plannedWeeks} sem.` : ""}
+                                {pausado ? " · por récord" : ""}
+                                {/* La referencia que faltaba: desde qué número
+                                    estás partiendo, sin salir a buscarlo. */}
+                                {marcas.best ? ` · mejor ${marcas.best.reps}×${marcas.best.kg}kg` : ""}
+                              </p>
+                            </div>
+                            <input value={kg0} onChange={(e) => updateAllSets(ex, week, { kg: e.target.value })} type="number" inputMode="decimal" placeholder={marcas.best ? String(marcas.best.kg) : "kg"} className="w-16 shrink-0 bg-slate-900 border border-slate-700/50 rounded-lg px-1.5 py-1.5 text-white text-sm font-bold text-center focus:outline-none" />
+                            <input value={reps0} onChange={(e) => updateAllSets(ex, week, { reps: e.target.value })} type="number" inputMode="numeric" placeholder="reps" className="w-14 shrink-0 bg-slate-900 border border-slate-700/50 rounded-lg px-1.5 py-1.5 text-white text-xs text-center focus:outline-none" />
+                            <button onClick={() => setExpandedId(expanded ? null : ex.id)} aria-label="Detalle por serie" className="p-1 rounded-lg text-slate-500 hover:text-sky-300 transition shrink-0">
+                              <ChevronDown size={15} className={`transition-transform ${expanded ? "rotate-180" : ""}`} />
+                            </button>
+                          </div>
+
+                          {expanded && (
+                            <div className="px-2 pb-2 space-y-2 tab-fade-in">
+                              {/* De dónde venís: mejor marca y lo último que
+                                  hiciste. Tocarlos copia ese número al campo
+                                  de esta semana — planificar desde tu propio
+                                  historial, sin tipear. */}
+                              {(marcas.best || marcas.last) && (
+                                <div className="flex items-center gap-1.5">
+                                  {marcas.best && (
+                                    <button onClick={() => updateAllSets(ex, week, { kg: String(marcas.best.kg), reps: String(marcas.best.reps) })} className="flex items-center gap-1 px-2 py-1 rounded-lg text-[9.5px] font-bold transition active:scale-95" style={{ backgroundColor: tint(accent, "12"), border: `1px solid ${tint(accent, "2e")}`, color: "#7dd3fc" }}>
+                                      <Trophy size={9} /> Mejor {marcas.best.reps}×{marcas.best.kg}kg
+                                    </button>
+                                  )}
+                                  {marcas.last && (
+                                    <button onClick={() => updateAllSets(ex, week, { kg: String(marcas.last.kg), reps: String(marcas.last.reps) })} className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-900 border border-slate-700/50 text-slate-400 text-[9.5px] font-bold transition active:scale-95">
+                                      <History size={9} /> Última {marcas.last.reps}×{marcas.last.kg}kg
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Serie por serie, sólo si querés separarlas */}
+                              {nSets > 1 && (
+                                <div className="space-y-1">
+                                  {(ex.sets || []).map((_, si) => (
+                                    <div key={si} className="flex items-center gap-1.5">
+                                      <span className="w-11 shrink-0 text-[9.5px] font-black text-slate-500 uppercase">S{si + 1}</span>
+                                      <input value={valueOf(ex, si, week, "kg")} onChange={(e) => updateOne(ex, si, week, { kg: e.target.value })} type="number" inputMode="decimal" placeholder="kg" className="w-16 shrink-0 bg-slate-900 border border-slate-700/50 rounded-lg px-1.5 py-1 text-white text-xs text-center focus:outline-none" />
+                                      <input value={valueOf(ex, si, week, "reps")} onChange={(e) => updateOne(ex, si, week, { reps: e.target.value })} type="number" inputMode="numeric" placeholder="reps" className="w-14 shrink-0 bg-slate-900 border border-slate-700/50 rounded-lg px-1.5 py-1 text-white text-xs text-center focus:outline-none" />
+                                      <select value={valueOf(ex, si, week, "rpe")} onChange={(e) => updateOne(ex, si, week, { rpe: e.target.value })} className="flex-1 min-w-0 bg-slate-900 border border-slate-700/50 rounded-lg px-1 py-1 text-[9.5px] text-slate-400 focus:outline-none">
+                                        <option value="">Sin RPE</option>
+                                        {RPE_SCALE.map((rs) => <option key={rs.value} value={rs.value}>RPE {rs.value} · RIR {rirButtonLabel(rs.value)}</option>)}
+                                      </select>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* Fase de mesociclo: es una propiedad del bloque/
+                                  semana, no de una serie suelta, así que va una
+                                  sola vez por ejercicio y se aplica a todas sus
+                                  series de esta semana. */}
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[9.5px] font-black text-slate-500 uppercase shrink-0">Fase</span>
+                                <select value={valueOf(ex, 0, week, "phase")} onChange={(e) => updateAllSets(ex, week, { phase: e.target.value })} className="flex-1 min-w-0 bg-slate-900 border border-slate-700/50 rounded-lg px-1.5 py-1 text-[10px] text-slate-400 focus:outline-none">
+                                  <option value="">Sin fase</option>
+                                  {MESOCYCLE_PHASES.map((ph) => <option key={ph} value={ph}>{ph}</option>)}
+                                </select>
+                                {nSets === 1 && (
+                                  <select value={valueOf(ex, 0, week, "rpe")} onChange={(e) => updateAllSets(ex, week, { rpe: e.target.value })} className="flex-1 min-w-0 bg-slate-900 border border-slate-700/50 rounded-lg px-1.5 py-1 text-[10px] text-slate-400 focus:outline-none">
                                     <option value="">Sin RPE</option>
                                     {RPE_SCALE.map((rs) => <option key={rs.value} value={rs.value}>RPE {rs.value} · RIR {rirButtonLabel(rs.value)}</option>)}
                                   </select>
+                                )}
+                              </div>
+
+                              {/* Cómo viene la progresión de este ejercicio a lo
+                                  largo de todo el ciclo — un vistazo alcanza para
+                                  ver un salto raro sin ir semana por semana. */}
+                              <div className="flex gap-1 overflow-x-auto pb-0.5">
+                                {weeks.map((w) => {
+                                  const v = parseFloat(valueOf(ex, 0, w, "kg")) || 0;
+                                  return (
+                                    <button key={w} onClick={() => setWeek(w)} className={`shrink-0 px-1.5 py-1 rounded-lg text-[9px] font-black transition ${w === week ? "bg-sky-500 !text-white" : v > 0 ? "bg-sky-500/15 text-sky-300" : "bg-slate-900 text-slate-600"}`}>
+                                      S{w}<span className="opacity-70 ml-0.5">{v > 0 ? v : "–"}</span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+
+                              {/* Plantilla rápida: llena TODAS las semanas de este
+                                  ejercicio de una, y después se ajusta a mano. El
+                                  kg de partida ya viene con tu mejor marca. */}
+                              <div className="rounded-xl border border-sky-500/20 bg-sky-500/5 p-2 space-y-1.5">
+                                <div className="flex items-center gap-1.5">
+                                  <p className="flex-1 text-[9px] font-black uppercase tracking-widest text-sky-300/80 flex items-center gap-1"><Sparkles size={10} /> Llenar todas las semanas</p>
+                                  <span className="text-[9px] text-slate-500 shrink-0">desde</span>
+                                  <input value={tplKgDe(ex)} onChange={(e) => setTplKgByEx((prev) => ({ ...prev, [ex.id]: e.target.value }))} type="number" inputMode="decimal" placeholder="kg" className="w-14 shrink-0 bg-slate-900 border border-slate-700/50 rounded-lg px-1 py-1 text-white text-[10.5px] font-bold text-center focus:outline-none" />
                                 </div>
-                              ))}
+                                <div className="flex flex-wrap gap-1">
+                                  {PROGRESSION_TEMPLATES.map((tpl) => (
+                                    <button key={tpl.key} onClick={() => applyTemplate(ex, tpl)} disabled={!tplKgDe(ex) || !tplReps} title={tpl.hint} className="flex items-center gap-1 px-2 py-1 rounded-lg bg-sky-500/15 border border-sky-500/30 text-sky-300 text-[9.5px] font-bold hover:bg-sky-500/25 transition disabled:opacity-30 disabled:cursor-not-allowed">
+                                      {tpl.icon} {tpl.label}
+                                    </button>
+                                  ))}
+                                </div>
+                                <p className="text-[9px] text-slate-600">{planObjetivoDe(objetivo).l} · {tplReps}-{tplRepsMax} reps · +{tplInc}kg por semana. Se cambian arriba, en "Objetivo y variables".</p>
+                              </div>
+
+                              {/* Sacarle el plan a ESTE ejercicio, o pasarlo a
+                                  perseguir el récord sin perderlo. Las dos cosas
+                                  son distintas y ahora se pueden hacer las dos
+                                  (antes "Limpiar" no borraba nada de verdad). */}
+                              <div className="flex items-center gap-1.5">
+                                {puedeGestionar && guardado && (
+                                  <button onClick={() => onSetPlanPaused(ex.id, !pausado)} className="flex items-center gap-1 px-2 py-1 rounded-lg text-[9.5px] font-bold transition active:scale-95"
+                                    style={pausado
+                                      ? { backgroundColor: tint(accent, "1c"), color: "#7dd3fc", border: `1px solid ${tint(accent, "45")}` }
+                                      : { backgroundColor: "rgba(148,163,184,0.12)", color: "#cbd5e1", border: "1px solid rgba(148,163,184,0.22)" }}>
+                                    {pausado ? <><ClipboardCheck size={10} /> Volver al plan</> : <><Trophy size={10} /> Pasar a récord</>}
+                                  </button>
+                                )}
+                                <span className="flex-1" />
+                                {tieneDraft(ex) && (
+                                  <button onClick={() => forgetDraft(ex)} className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800 text-slate-500 text-[9.5px] font-bold hover:text-slate-300 transition"><X size={10} /> Deshacer</button>
+                                )}
+                                {puedeGestionar && guardado && (
+                                  confirmQuitar === ex.id ? (
+                                    <button onClick={() => quitarPlan(ex)} className="flex items-center gap-1 px-2 py-1 rounded-lg bg-rose-500/20 border border-rose-500/40 text-rose-300 text-[9.5px] font-black"><Trash2 size={10} /> Confirmar</button>
+                                  ) : (
+                                    <button onClick={() => setConfirmQuitar(ex.id)} className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800 text-slate-500 text-[9.5px] font-bold hover:text-rose-400 transition"><Trash2 size={10} /> Quitar plan</button>
+                                  )
+                                )}
+                              </div>
                             </div>
                           )}
-
-                          {/* Fase de mesociclo: es una propiedad del bloque/
-                              semana, no de una serie suelta, así que va una
-                              sola vez por ejercicio y se aplica a todas sus
-                              series de esta semana. */}
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[9.5px] font-black text-slate-500 uppercase shrink-0">Fase</span>
-                            <select value={valueOf(ex, 0, week, "phase")} onChange={(e) => updateAllSets(ex, week, { phase: e.target.value })} className="flex-1 min-w-0 bg-slate-900 border border-slate-700/50 rounded-lg px-1.5 py-1 text-[10px] text-slate-400 focus:outline-none">
-                              <option value="">Sin fase</option>
-                              {MESOCYCLE_PHASES.map((ph) => <option key={ph} value={ph}>{ph}</option>)}
-                            </select>
-                            {nSets === 1 && (
-                              <select value={valueOf(ex, 0, week, "rpe")} onChange={(e) => updateAllSets(ex, week, { rpe: e.target.value })} className="flex-1 min-w-0 bg-slate-900 border border-slate-700/50 rounded-lg px-1.5 py-1 text-[10px] text-slate-400 focus:outline-none">
-                                <option value="">Sin RPE</option>
-                                {RPE_SCALE.map((rs) => <option key={rs.value} value={rs.value}>RPE {rs.value} · RIR {rirButtonLabel(rs.value)}</option>)}
-                              </select>
-                            )}
-                          </div>
-
-                          {/* Cómo viene la progresión de este ejercicio a lo
-                              largo de todo el ciclo — un vistazo alcanza para
-                              ver un salto raro sin ir semana por semana. */}
-                          <div className="flex gap-1 overflow-x-auto pb-0.5">
-                            {weeks.map((w) => {
-                              const v = parseFloat(valueOf(ex, 0, w, "kg")) || 0;
-                              return (
-                                <button key={w} onClick={() => setWeek(w)} className={`shrink-0 px-1.5 py-1 rounded-lg text-[9px] font-black transition ${w === week ? "bg-sky-500 !text-white" : v > 0 ? "bg-sky-500/15 text-sky-300" : "bg-slate-900 text-slate-600"}`}>
-                                  S{w}<span className="opacity-70 ml-0.5">{v > 0 ? v : "–"}</span>
-                                </button>
-                              );
-                            })}
-                          </div>
-
-                          {/* Plantilla rápida: llena TODAS las semanas de este
-                              ejercicio de una, y después se ajusta a mano. */}
-                          <div className="rounded-xl border border-sky-500/20 bg-sky-500/5 p-2 space-y-1.5">
-                            <p className="text-[9px] font-black uppercase tracking-widest text-sky-300/80 flex items-center gap-1"><Sparkles size={10} /> Llenar todas las semanas</p>
-                            <div className="grid grid-cols-4 gap-1">
-                              <input value={tplKg} onChange={(e) => setTplKg(e.target.value)} type="number" inputMode="decimal" placeholder="kg ini" className="w-full bg-slate-900 border border-slate-700/50 rounded-lg px-1 py-1 text-white text-[10px] text-center focus:outline-none" />
-                              <input value={tplReps} onChange={(e) => setTplReps(e.target.value)} type="number" inputMode="numeric" placeholder="reps" className="w-full bg-slate-900 border border-slate-700/50 rounded-lg px-1 py-1 text-white text-[10px] text-center focus:outline-none" />
-                              <input value={tplInc} onChange={(e) => setTplInc(e.target.value)} type="number" inputMode="decimal" step="0.25" placeholder="+kg" className="w-full bg-slate-900 border border-slate-700/50 rounded-lg px-1 py-1 text-white text-[10px] text-center focus:outline-none" />
-                              <input value={tplRepsMax} onChange={(e) => setTplRepsMax(e.target.value)} type="number" inputMode="numeric" placeholder="tope" className="w-full bg-slate-900 border border-slate-700/50 rounded-lg px-1 py-1 text-white text-[10px] text-center focus:outline-none" />
-                            </div>
-                            <div className="flex flex-wrap gap-1">
-                              {PROGRESSION_TEMPLATES.map((tpl) => (
-                                <button key={tpl.key} onClick={() => applyTemplate(ex, tpl)} disabled={!tplKg || !tplReps} title={tpl.hint} className="flex items-center gap-1 px-2 py-1 rounded-lg bg-sky-500/15 border border-sky-500/30 text-sky-300 text-[9.5px] font-bold hover:bg-sky-500/25 transition disabled:opacity-30 disabled:cursor-not-allowed">
-                                  {tpl.icon} {tpl.label}
-                                </button>
-                              ))}
-                              <button onClick={() => clearExercise(ex)} className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800 text-slate-500 text-[9.5px] font-bold hover:text-rose-400 transition"><Trash2 size={10} /> Limpiar</button>
-                            </div>
-                          </div>
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+                      );
+                    })}
+                  </div>
 
-              {mode !== "self" && (
-                <div>
-                  <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Nota para tu alumno (opcional)</label>
-                  <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} maxLength={200} placeholder="Ej: subí despacio, no fuerces la técnica..."
-                    className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-3.5 py-2.5 text-white text-sm focus:outline-none resize-none" />
-                </div>
+                  {mode !== "self" && (
+                    <div>
+                      <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Nota para tu alumno (opcional)</label>
+                      <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} maxLength={200} placeholder="Ej: subí despacio, no fuerces la técnica..."
+                        className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-3.5 py-2.5 text-white text-sm focus:outline-none resize-none" />
+                    </div>
+                  )}
+                  {/* Un solo guardado para TODO lo cargado (todos los días y
+                      semanas que hayas tocado), no uno por ejercicio. */}
+                  <button onClick={handleSubmit} disabled={sending || !pendingPlans.length} className="w-full py-3 rounded-xl bg-sky-500 !text-white text-sm font-bold disabled:opacity-40">
+                    {sending ? "Guardando..." : !pendingPlans.length ? "Cargá al menos una meta" : `${mode === "self" ? "Guardar" : "Enviar"} plan · ${pendingExerciseCount} ejercicio${pendingExerciseCount === 1 ? "" : "s"}`}
+                  </button>
+                </>
               )}
-              {/* Un solo guardado para TODO lo cargado (todos los días y
-                  semanas que hayas tocado), no uno por ejercicio. */}
-              <button onClick={handleSubmit} disabled={sending || !pendingPlans.length} className="w-full py-3 rounded-xl bg-sky-500 !text-white text-sm font-bold disabled:opacity-40">
-                {sending ? "Guardando..." : !pendingPlans.length ? "Cargá al menos una meta" : `${mode === "self" ? "Guardar" : "Enviar"} plan · ${pendingExerciseCount} ejercicio${pendingExerciseCount === 1 ? "" : "s"}`}
-              </button>
             </>
           )}
         </div>
@@ -14230,6 +14733,7 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
         <ProgressionProposalComposer
           routineSnapshot={full.activeRoutineSnapshot}
           trainWeeks={full.settings?.trainWeeks}
+          logs={full?.logs || null}
           studentName={basic?.name}
           onClose={() => setShowProgressionComposer(false)}
           onSubmit={async (progressionPlan, note) => {
@@ -21396,6 +21900,29 @@ export default function App() {
   // resto — lo usa, por ejemplo, el selector "General" / "Según tu contexto"
   // y el campo de peso corporal en Progreso → Rango.
   const handleUpdateSettings = (patch) => handleUpdateProfile({ settings: { ...getProfileSettings(profile), ...patch } });
+  // Único camino por el que la app guarda metas en la rutina propia (a mano,
+  // con IA, o desde el chat). Además de escribir el plan, deja el modo en
+  // "planned": planificar y que después no se vea nada porque el interruptor
+  // general seguía en "Récord" era exactamente el bug que hacía sentir que
+  // planificar no servía para nada.
+  const handleApplyOwnProgression = (plan, extraSettings = null) => {
+    if (!activeRoutineDef || !profile?.activeRoutineId) return;
+    handleUpdateProfile({
+      routines: { ...(profile.routines || {}), [profile.activeRoutineId]: applyProgressionToRoutine(activeRoutineDef, plan) },
+      settings: { ...getProfileSettings(profile), trainingMode: "planned", ...(extraSettings || {}) },
+    });
+  };
+  // Pasar un ejercicio de "sigue el plan" a "persigue mi récord" sin borrar
+  // nada (ver setExercisePlanPaused). Se llama desde la tarjeta del
+  // ejercicio y desde el resumen del planificador.
+  const handleSetPlanPaused = (exerciseId, paused) => {
+    if (!activeRoutineDef || !profile?.activeRoutineId) return;
+    handleUpdateProfile({ routines: { ...(profile.routines || {}), [profile.activeRoutineId]: setExercisePlanPaused(activeRoutineDef, exerciseId, paused) } });
+  };
+  const handleRemovePlan = (exerciseId) => {
+    if (!activeRoutineDef || !profile?.activeRoutineId) return;
+    handleUpdateProfile({ routines: { ...(profile.routines || {}), [profile.activeRoutineId]: removeExercisePlan(activeRoutineDef, exerciseId) } });
+  };
   const handleSetCycleStart = (d) => { setCycleStartState(d); saveCycleStart(d); };
 
   // Resúmenes de MES y AÑO: se muestran una sola vez por período, la primera
@@ -21820,7 +22347,7 @@ export default function App() {
                 que quedó adentro de RoutineView ahora sirve para volver a
                 fijarla si la cerraste. */}
             {tab === "rutina" && showPinnedDeload && <DeloadView logs={logs} setLogs={setLogs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} activeSession={profile?.activeSession?.deload ? profile.activeSession : null} onStartSession={handleStartSession} onCancelSession={handleCancelSession} weekSchedule={weekSchedule} onClose={() => setDeloadDismissed(true)} cycleStart={cycleStart} />}
-            {tab === "rutina" && !showPinnedDeload && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToRoutines={() => setTab("rutinas")} onGoToSchedule={() => goToSection("rutinas", "week-schedule")} onGoToFieldSettings={() => goToSection("perfil", "field-settings-section")} onGoToDescarga={() => (isDeloadWeek ? setDeloadDismissed(false) : setTab("descarga"))} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} todaySessionDayKey={(profile?.trainingSessions || []).find((ts) => ts.date === todayStr())?.dayKey || profile?.activeSession?.dayKey || null} sex={profile?.sex} age={profile?.age} activeRoutineDef={activeRoutineDef} onApplyOwnProgression={(plan) => handleUpdateProfile({ routines: { ...(profile.routines || {}), [profile.activeRoutineId]: applyProgressionToRoutine(activeRoutineDef, plan) } })} goToDaySignal={openSectionSignal.id === "go-to-day" ? openSectionSignal : { id: null, n: 0 }} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} />}
+            {tab === "rutina" && !showPinnedDeload && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToRoutines={() => setTab("rutinas")} onGoToSchedule={() => goToSection("rutinas", "week-schedule")} onGoToFieldSettings={() => goToSection("perfil", "field-settings-section")} onGoToDescarga={() => (isDeloadWeek ? setDeloadDismissed(false) : setTab("descarga"))} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} todaySessionDayKey={(profile?.trainingSessions || []).find((ts) => ts.date === todayStr())?.dayKey || profile?.activeSession?.dayKey || null} sex={profile?.sex} age={profile?.age} activeRoutineDef={activeRoutineDef} onApplyOwnProgression={handleApplyOwnProgression} onSetPlanPaused={handleSetPlanPaused} onRemovePlan={handleRemovePlan} goToDaySignal={openSectionSignal.id === "go-to-day" ? openSectionSignal : { id: null, n: 0 }} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} />}
             {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} onGoToRoutines={() => goToSection("rutinas", "routine-editor")} weekSchedule={weekSchedule} sex={profile?.sex} age={profile?.age} onGoToDeload={() => { if (isDeloadWeek) { setDeloadDismissed(false); setTab("rutina"); } else { setTab("descarga"); } }} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} />}
             {tab === "descarga" && <DeloadView logs={logs} setLogs={setLogs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} activeSession={profile?.activeSession?.deload ? profile.activeSession : null} onStartSession={handleStartSession} onCancelSession={handleCancelSession} weekSchedule={weekSchedule} onClose={() => { setDeloadDismissed(true); setTab("rutina"); }} cycleStart={cycleStart} />}
             {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} setLogs={setLogs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} conversations={aiConversations} activeConversationId={activeAiConversationId} onNewConversation={handleNewAiConversation} onSwitchConversation={handleSwitchAiConversation} onDeleteConversation={handleDeleteAiConversation} onRenameConversation={handleRenameAiConversation} settings={getProfileSettings(profile)} cycleStart={cycleStart} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} onDeleteRoutine={handleDeleteRoutine} onNavigate={setTab} onStartSession={handleStartSession} onEndSession={handleEndSession} />}
