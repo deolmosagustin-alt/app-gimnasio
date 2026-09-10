@@ -4963,6 +4963,28 @@ function SessionSummaryModal({ resumen, onClose }) {
           </div>
         )}
 
+        {/* Metas del plan cumplidas hoy — bajo un plan es normal no romper
+            ningún récord, así que sin esto la sesión se veía vacía aunque
+            hubieras hecho exactamente lo que tocaba. */}
+        {resumen.metas?.total > 0 && (
+          <div className="px-5 mt-4">
+            <div className="flex items-center gap-2.5 rounded-2xl px-3.5 py-3" style={{ backgroundColor: resumen.metas.cumplidas === resumen.metas.total ? "rgba(56,189,248,0.14)" : "var(--row-surface)", border: `1px solid ${resumen.metas.cumplidas === resumen.metas.total ? "rgba(56,189,248,0.35)" : "var(--chip-border)"}` }}>
+              <ClipboardCheck size={17} className="shrink-0" style={{ color: "#38BDF8" }} />
+              <div className="flex-1 min-w-0">
+                <p className="text-[9px] font-black uppercase tracking-[0.14em] text-sky-400/90">Metas del plan</p>
+                <p className="text-[11.5px] text-slate-300 leading-snug">
+                  {resumen.metas.cumplidas === resumen.metas.total
+                    ? `Cumpliste las ${resumen.metas.total} de hoy.`
+                    : `Cumpliste ${resumen.metas.cumplidas} de ${resumen.metas.total}.`}
+                </p>
+              </div>
+              <span className="text-xl font-black tabular-nums shrink-0" style={{ color: "#38BDF8" }}>
+                {resumen.metas.cumplidas}<span className="text-xs opacity-60">/{resumen.metas.total}</span>
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* Los récords del día, apareciendo uno a uno */}
         {resumen.prs.length > 0 && (
           <div className="px-5 mt-4 space-y-1.5">
@@ -22599,7 +22621,40 @@ export default function App() {
       });
       if (volPrevio > 0) vsUltima = { pct: Math.round(((volumen - volPrevio) / volPrevio) * 100), dia: ROUTINE[dk]?.label || dk };
     }
-    return { volumen: Math.round(volumen), series, ejercicios: ejercicios.size, prs, minutos, reparto, vsUltima };
+    // METAS DE HOY (modo planificado). Sin esto el resumen sólo sabía
+    // celebrar RÉCORDS, y bajo un plan es normal no romper ninguno: un
+    // bloque de acumulación pide cargas por debajo de tu marca. Terminabas
+    // una sesión clavando 6 de 6 metas y la app te decía "0 marcas", como si
+    // no hubieras hecho nada. Se cuenta aparte, con el mismo criterio que el
+    // mensaje al guardar la serie (ver describePlannedOutcome).
+    const metas = { cumplidas: 0, total: 0 };
+    const stNow = getProfileSettings(profile);
+    const wiNow = cycleStart ? getWeekInfo(cycleStart, stNow) : null;
+    // Se resuelve la rutina ACÁ ADENTRO en vez de usar `activeRoutineDef`
+    // del render: esa variable es un objeto nuevo en cada render y cerrar
+    // sobre ella dentro de esta función rompe la compilación de React (y de
+    // paso destapa violaciones preexistentes en el mismo scope). Ver la nota
+    // equivalente en handleSave de SetRow.
+    const defNow = resolveRoutineDef(profile?.routines?.[profile?.activeRoutineId], profile?.activeRoutineId);
+    const modelNow = defNow ? buildRoutineModel(defNow) : null;
+    if (modelNow && wiNow) {
+      Object.entries(logs || {}).forEach(([key, val]) => {
+        if (key.endsWith("_pr_override") || !Array.isArray(val)) return;
+        const { exerciseId, setIndex } = parseLogKey(key);
+        const setDef = modelNow.exerciseById[exerciseId]?.sets?.[setIndex];
+        if (!setDef) return;
+        const target = getPlannedTargetForWeek(setDef, wiNow.weekInCycle, stNow.trainingMode);
+        if (!target) return;
+        const hecho = val.find((e) => e?.date === hoy && !e.deload);
+        if (!hecho) return;
+        metas.total++;
+        const ok = target.minutes != null
+          ? (hecho.minutes || 0) >= target.minutes
+          : (hecho.kg || 0) + 0.001 >= (target.kg || 0) && (hecho.reps || 0) >= (target.reps || 0);
+        if (ok) metas.cumplidas++;
+      });
+    }
+    return { volumen: Math.round(volumen), series, ejercicios: ejercicios.size, prs, minutos, reparto, vsUltima, metas };
   };
 
   // Resumen semanal: dispara SOLO si hoy es domingo (fin de semana lun-dom)
