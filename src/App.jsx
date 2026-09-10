@@ -1367,12 +1367,16 @@ function applyProgressionToRoutine(routineDef, planOrPlans) {
         ex.sets[plan.setIndex] = next;
         return;
       }
-      // Cargar un plan nuevo reactiva la serie: si estaba en "por récord" y
-      // te tomaste el trabajo de planificarla otra vez, es porque la querés
-      // seguir — quedarse pausada en silencio sería el bug de siempre.
+      // Cargar un plan nuevo reactiva el EJERCICIO entero: si estaba en "por
+      // récord" y te tomaste el trabajo de planificarlo otra vez, es porque
+      // lo querés seguir. Se limpia en todas sus series y no sólo en la que
+      // toca este plan, porque "seguir el plan" es una propiedad del
+      // ejercicio (así lo muestran su tarjeta y el resumen): dejar la serie 1
+      // activa y las otras dos pausadas daba una tarjeta que decía "por
+      // récord" mientras una de sus series perseguía una meta.
       const next = { ...prev, plannedProgression: plan.entries };
       if (plan.paused != null) next.plannedPaused = !!plan.paused;
-      else delete next.plannedPaused;
+      else { delete next.plannedPaused; ex.sets.forEach((s, i) => { if (i !== plan.setIndex) delete s.plannedPaused; }); }
       ex.sets[plan.setIndex] = next;
     });
   });
@@ -14361,7 +14365,7 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
                                 <p className="text-[12px] font-bold text-white truncate">{e.nombre}</p>
                                 <p className="text-[9px] text-slate-500 truncate">
                                   {e.dia} · {e.setsConPlan}/{e.sets} serie{e.sets === 1 ? "" : "s"} · {e.semanas} sem.
-                                  {e.meta && !e.pausado ? ` · esta semana ${e.meta.reps}×${e.meta.kg}kg` : ""}
+                                  {e.meta && !e.pausado ? ` · esta semana ${e.meta.minutes != null ? `${e.meta.minutes} min` : `${e.meta.reps}×${e.meta.kg}kg`}` : ""}
                                 </p>
                               </div>
                               <button onClick={() => onSetPlanPaused(e.id, !e.pausado)} className="shrink-0 px-2 py-1.5 rounded-lg text-[9.5px] font-black transition active:scale-95"
