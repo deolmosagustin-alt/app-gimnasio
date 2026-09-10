@@ -19750,26 +19750,40 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
             })}
           </div>
 
-          {/* Lista de días de la rutina — pedido: "saquemos los puntitos y
-              que cuando sea el día que toca, el día se ponga del color que
-              le toca" — sin puntito, en cambio el pill ENTERO del día
-              programado para HOY (mismo dato que ya usa la tira semanal:
-              activeSchedule[todayWeekdayKey()]) se tiñe con su color, el
-              resto queda neutro. Tocables: van directo a esa sesión en la
-              pestaña Rutina. */}
+          {/* Sólo el día que toca HOY, a todo el ancho (el mismo que ya tenía
+              el último día cuando quedaba impar) y con el color del día
+              relleno, como el botón de "Planificar mi progresión". Los otros
+              días dejan de listarse: la pregunta "¿qué toca hoy?" se contesta
+              de una, sin buscar entre tres rectángulos iguales.
+              En un día de DESCANSO no hay un "hoy" que mostrar, así que ahí
+              vuelve la lista completa — es la única forma de que la tarjeta
+              no quede vacía y de no perder los atajos a cada día. */}
           <div className="relative grid grid-cols-2 gap-1.5 mt-2.5">
             {(() => {
               const orden = (activeDef.dayOrder || Object.keys(activeDef.days || {})).filter((dk) => activeDef.days?.[dk]);
               const todayDayKey = activeSchedule[todayWeekdayKey()] || null;
+              const dHoy = todayDayKey ? activeDef.days[todayDayKey] : null;
+              if (dHoy) {
+                const series = (dHoy.exercises || []).reduce((a, e) => a + (e.sets?.length || 0), 0);
+                return (
+                  <button onClick={() => onGoToDay?.(todayDayKey)} className="col-span-2 flex items-center gap-2.5 px-3.5 py-3 rounded-xl text-left transition active:scale-[0.98]"
+                    style={{ backgroundColor: dHoy.color, boxShadow: `0 8px 20px -8px ${tint(dHoy.color, "cc")}` }}>
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-[9px] font-black uppercase tracking-[0.14em] text-white/70">Hoy toca</span>
+                      <span className="block text-sm font-black text-white truncate leading-tight">{dHoy.label}</span>
+                    </span>
+                    <span className="text-[10px] font-bold text-white/80 tabular-nums shrink-0">{dHoy.exercises?.length || 0} ej · {series} series</span>
+                    <ChevronRight size={15} className="text-white/80 shrink-0" />
+                  </button>
+                );
+              }
               return orden.map((dk, i) => {
                 const d = activeDef.days[dk];
-                const isToday = dk === todayDayKey;
                 const ultimoImpar = i === orden.length - 1 && orden.length % 2 === 1;
                 return (
-                  <button key={dk} onClick={() => onGoToDay?.(dk)} className={`flex items-center gap-2 px-2.5 py-2.5 rounded-xl text-[11px] font-bold min-w-0 transition active:scale-[0.97] ${isToday ? "" : "border border-blue-400/20 bg-black/25"} ${ultimoImpar ? "col-span-2" : ""}`}
-                    style={isToday ? { backgroundColor: tint(d.color, "22"), border: `1px solid ${tint(d.color, "50")}` } : undefined}>
-                    <span className="flex-1 min-w-0 leading-snug text-left" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", color: isToday ? "#fff" : "#f1f5f9" }}>{d.label}</span>
-                    <span className={`tabular-nums shrink-0 text-[10px] ${isToday ? "" : "text-blue-300/70"}`} style={isToday ? { color: tint(d.color, "ee") } : undefined}>{d.exercises?.length || 0}</span>
+                  <button key={dk} onClick={() => onGoToDay?.(dk)} className={`flex items-center gap-2 px-2.5 py-2.5 rounded-xl text-[11px] font-bold min-w-0 transition active:scale-[0.97] border border-blue-400/20 bg-black/25 ${ultimoImpar ? "col-span-2" : ""}`}>
+                    <span className="flex-1 min-w-0 leading-snug text-left" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", color: "#f1f5f9" }}>{d.label}</span>
+                    <span className="tabular-nums shrink-0 text-[10px] text-blue-300/70">{d.exercises?.length || 0}</span>
                   </button>
                 );
               });
