@@ -19700,89 +19700,134 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
             <button onClick={() => setShareTarget(activeDef)} aria-label="Compartir rutina activa" className="p-2 rounded-xl text-blue-200 hover:text-white hover:bg-white/10 transition shrink-0"><Share2 size={15} /></button>
           </div>
 
-          {/* Los números, ahora en grande — antes eran una lineita de texto
-              perdida bajo el título. Mismo tratamiento que la vista previa
-              (RoutinePreviewModal), en tono celeste para no romper la paleta
-              del héroe. */}
-          <div className={`relative grid gap-1.5 mt-3.5 ${activeUso.sesiones > 0 ? "grid-cols-4" : "grid-cols-3"}`}>
-            {[
-              { v: activeStats.days, l: activeStats.days === 1 ? "Día" : "Días" },
-              { v: activeStats.exercises, l: "Ejercicios" },
-              { v: activeStats.sets, l: "Series" },
-              ...(activeUso.sesiones > 0 ? [{ v: activeUso.sesiones, l: activeUso.sesiones === 1 ? "Sesión" : "Sesiones" }] : []),
-            ].map((s) => (
-              <div key={s.l} className="rounded-xl py-2 text-center border border-blue-400/20 bg-black/25">
-                <p className="text-lg font-black text-white tabular-nums leading-none">{s.v}</p>
-                <p className="text-[8px] text-blue-300/70 mt-1 font-bold uppercase tracking-wide truncate px-0.5">{s.l}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Tira semanal — pedido: "no me gustó lo de los cuadrados de
-              colores, que sea una estética similar a la de los ciclos de
-              semana" (ver WeekCalendar, más arriba en el archivo: chips
-              redondeados con la letra/número adentro, sólido + agrandado
-              en el actual, tenue con borde en el resto). Misma lógica acá:
-              la letra del día de semana va ADENTRO del chip en vez de un
-              cuadrado de color liso sin nada adentro. */}
-          <p className="relative text-[9px] font-black uppercase tracking-[0.14em] text-blue-300/60 mt-3.5 mb-1.5 px-0.5">Tu semana</p>
-          <div className="relative grid grid-cols-7 gap-1.5">
-            {WEEKDAY_KEYS.map((wk, i) => {
-              const dk = activeSchedule[wk] || null;
-              const d = dk ? activeDef.days[dk] : null;
-              const isToday = wk === todayWeekdayKey();
-              // Pedido: "que estén todos medio azules y el día en el que
-              // estás que se ponga del día que toca" — mismo criterio que
-              // WeekCalendar (todas las semanas entrenadas comparten el
-              // mismo azul, sin un color distinto por semana). Sólo HOY
-              // se destaca con el color propio del día que le toca.
-              const chipColor = isToday ? (d ? d.color : "#64748b") : (d ? "#3B82F6" : "#64748b");
+          {/* HOY TOCA — el protagonista de la tarjeta. Antes el día de hoy
+              era una fila más entre las otras, apenas teñida; ahora abre la
+              tarjeta con su color, sus números y un toque para ir. Es lo
+              único que cambia día a día y lo que venís a mirar. */}
+          {(() => {
+            const todayDayKey = activeSchedule[todayWeekdayKey()] || null;
+            const d = todayDayKey ? activeDef.days[todayDayKey] : null;
+            if (!d) {
               return (
-                <button key={wk} onClick={() => d && onGoToDay?.(dk)} disabled={!d} title={d ? d.label : "Descanso"} className="flex items-center justify-center">
-                  <span className={`w-full aspect-square rounded-xl flex items-center justify-center text-[10px] font-black uppercase transition-all ${isToday ? "scale-110" : ""} ${d ? "active:scale-95" : ""}`}
-                    style={isToday
-                      ? { backgroundColor: chipColor, color: "#fff", boxShadow: `0 6px 16px -4px ${tint(chipColor, "aa")}` }
-                      : { backgroundColor: tint(chipColor, "1a"), color: chipColor, border: `1px solid ${tint(chipColor, "30")}` }}>
-                    {WEEKDAY_SHORT_LABELS[i][0]}
+                <div className="relative flex items-center gap-3 mt-3.5 rounded-2xl px-3.5 py-3 border border-white/10 bg-black/20">
+                  <span className="w-9 h-9 rounded-xl bg-slate-700/40 text-slate-400 flex items-center justify-center shrink-0"><Moon size={16} /></span>
+                  <span className="min-w-0">
+                    <span className="block text-[9px] font-black uppercase tracking-[0.14em] text-blue-300/60">Hoy</span>
+                    <span className="block text-sm font-black text-slate-300">Descanso</span>
                   </span>
-                </button>
+                </div>
               );
-            })}
-          </div>
+            }
+            const series = (d.exercises || []).reduce((a, e) => a + (e.sets?.length || 0), 0);
+            return (
+              <button onClick={() => onGoToDay?.(todayDayKey)} className="relative w-full flex items-center gap-3 mt-3.5 rounded-2xl px-3.5 py-3 transition active:scale-[0.99] text-left"
+                style={{ background: `linear-gradient(135deg, ${tint(d.color, "30")}, ${tint(d.color, "0f")})`, border: `1px solid ${tint(d.color, "55")}` }}>
+                <span className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: tint(d.color, "33"), color: d.color }}><Dumbbell size={16} /></span>
+                <span className="flex-1 min-w-0">
+                  <span className="block text-[9px] font-black uppercase tracking-[0.14em]" style={{ color: tint(d.color, "cc") }}>Hoy toca</span>
+                  <span className="block text-base font-black text-white truncate leading-tight">{d.label}</span>
+                  <span className="block text-[10px] text-slate-400">{d.exercises?.length || 0} ejercicios · {series} series</span>
+                </span>
+                <ChevronRight size={16} className="shrink-0" style={{ color: d.color }} />
+              </button>
+            );
+          })()}
 
-          {/* Lista de días de la rutina — pedido: "saquemos los puntitos y
-              que cuando sea el día que toca, el día se ponga del color que
-              le toca" — sin puntito, en cambio el pill ENTERO del día
-              programado para HOY (mismo dato que ya usa la tira semanal:
-              activeSchedule[todayWeekdayKey()]) se tiñe con su color, el
-              resto queda neutro. Tocables: van directo a esa sesión en la
-              pestaña Rutina. */}
-          <div className="relative grid grid-cols-2 gap-1.5 mt-2.5">
+          {/* TU SEMANA — la tira ahora dice qué HICISTE, no sólo qué día es.
+              Entrenado: relleno del color de ese día con un tilde. Programado
+              y pendiente: contorno de ese color. Descanso: gris. Con eso ves
+              de un vistazo si vas al día o venís arrastrando la semana. */}
+          {(() => {
+            const hoyWk = todayWeekdayKey();
+            const lunes = new Date();
+            lunes.setDate(lunes.getDate() - ((lunes.getDay() + 6) % 7));
+            const fechaDe = (i) => { const x = new Date(lunes); x.setDate(lunes.getDate() + i); return localDateStr(x); };
+            const entrenados = new Set((profile?.trainingSessions || []).map((s) => s.date));
+            const programados = WEEKDAY_KEYS.filter((wk) => activeSchedule[wk]).length;
+            const hechos = WEEKDAY_KEYS.filter((wk, i) => activeSchedule[wk] && entrenados.has(fechaDe(i))).length;
+            return (
+              <>
+                <div className="relative flex items-baseline justify-between mt-3.5 mb-1.5 px-0.5">
+                  <p className="text-[9px] font-black uppercase tracking-[0.14em] text-blue-300/60">Tu semana</p>
+                  {programados > 0 && (
+                    <p className="text-[10px] font-bold tabular-nums" style={{ color: hechos >= programados ? "#34d399" : "#93c5fd" }}>
+                      {hechos} de {programados} {hechos === 1 ? "hecha" : "hechas"}
+                    </p>
+                  )}
+                </div>
+                <div className="relative grid grid-cols-7 gap-1.5">
+                  {WEEKDAY_KEYS.map((wk, i) => {
+                    const dk = activeSchedule[wk] || null;
+                    const d = dk ? activeDef.days[dk] : null;
+                    const isToday = wk === hoyWk;
+                    const hecho = !!d && entrenados.has(fechaDe(i));
+                    const color = d ? d.color : "#64748b";
+                    return (
+                      <button key={wk} onClick={() => d && onGoToDay?.(dk)} disabled={!d} title={d ? `${d.label}${hecho ? " · hecho" : ""}` : "Descanso"} className="flex items-center justify-center">
+                        <span className={`w-full aspect-square rounded-xl flex items-center justify-center text-[10px] font-black uppercase transition-all ${isToday ? "scale-110" : ""} ${d ? "active:scale-95" : ""}`}
+                          style={hecho
+                            ? { backgroundColor: color, color: "#fff", boxShadow: `0 6px 16px -4px ${tint(color, "aa")}` }
+                            : { backgroundColor: tint(color, isToday ? "26" : "14"), color, border: `1px solid ${tint(color, isToday ? "70" : "2a")}` }}>
+                          {hecho ? <Check size={12} strokeWidth={3.5} /> : WEEKDAY_SHORT_LABELS[i][0]}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {/* Barra de avance de la semana: el mismo dato que el "N de M"
+                    de arriba, pero de un vistazo y sin leer. */}
+                {programados > 0 && (
+                  <div className="relative h-1.5 rounded-full overflow-hidden mt-2" style={{ backgroundColor: "rgba(0,0,0,0.3)" }}>
+                    <div className="h-full rounded-full transition-all duration-500 ease-out" style={{ width: `${Math.min(100, (hechos / programados) * 100)}%`, backgroundColor: hechos >= programados ? "#10B981" : "#3B82F6" }} />
+                  </div>
+                )}
+              </>
+            );
+          })()}
+
+          {/* Los días de la rutina, con una barrita proporcional a sus series:
+              así se ve si está desbalanceada entre días sin tener que comparar
+              números. El de hoy ya es el bloque de arriba, acá va neutro. */}
+          <div className="relative space-y-1.5 mt-3">
             {(() => {
               const orden = (activeDef.dayOrder || Object.keys(activeDef.days || {})).filter((dk) => activeDef.days?.[dk]);
-              const todayDayKey = activeSchedule[todayWeekdayKey()] || null;
-              return orden.map((dk, i) => {
+              const seriesDe = (dk) => (activeDef.days[dk]?.exercises || []).reduce((a, e) => a + (e.sets?.length || 0), 0);
+              const maxSeries = Math.max(1, ...orden.map(seriesDe));
+              return orden.map((dk) => {
                 const d = activeDef.days[dk];
-                const isToday = dk === todayDayKey;
-                const ultimoImpar = i === orden.length - 1 && orden.length % 2 === 1;
+                const series = seriesDe(dk);
                 return (
-                  <button key={dk} onClick={() => onGoToDay?.(dk)} className={`flex items-center gap-2 px-2.5 py-2.5 rounded-xl text-[11px] font-bold min-w-0 transition active:scale-[0.97] ${isToday ? "" : "border border-blue-400/20 bg-black/25"} ${ultimoImpar ? "col-span-2" : ""}`}
-                    style={isToday ? { backgroundColor: tint(d.color, "22"), border: `1px solid ${tint(d.color, "50")}` } : undefined}>
-                    <span className="flex-1 min-w-0 leading-snug text-left" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", color: isToday ? "#fff" : "#f1f5f9" }}>{d.label}</span>
-                    <span className={`tabular-nums shrink-0 text-[10px] ${isToday ? "" : "text-blue-300/70"}`} style={isToday ? { color: tint(d.color, "ee") } : undefined}>{d.exercises?.length || 0}</span>
+                  <button key={dk} onClick={() => onGoToDay?.(dk)} className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl border border-blue-400/15 bg-black/25 transition active:scale-[0.99]">
+                    <span className="w-1 h-6 rounded-full shrink-0" style={{ backgroundColor: d.color }} />
+                    <span className="text-[11px] font-bold text-slate-100 truncate shrink-0 max-w-[38%] text-left">{d.label}</span>
+                    <span className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: "rgba(0,0,0,0.35)" }}>
+                      <span className="block h-full rounded-full grow-bar" style={{ width: `${(series / maxSeries) * 100}%`, backgroundColor: tint(d.color, "cc") }} />
+                    </span>
+                    <span className="text-[10px] font-black tabular-nums shrink-0" style={{ color: tint(d.color, "ee") }}>{series}</span>
                   </button>
                 );
               });
             })()}
           </div>
 
-          {/* Acciones: dos botones parejos, sin ruido */}
-          <div className="relative grid grid-cols-2 gap-2 mt-3.5">
-            <button onClick={() => setShowBalance((v) => !v)} className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-white/10 text-blue-200 hover:text-white hover:bg-white/5 transition text-[11px] font-bold">
-              <Activity size={11} /> {showBalance ? "Ocultar" : "Balance"}
+          {/* Los tres datos fijos de la rutina (días, ejercicios, series) bajan
+              a una línea: los aprendés una vez y no cambian nunca, no merecen
+              tres cajas grandes compitiendo con lo que sí se mueve. */}
+          <p className="relative text-[10px] text-blue-300/60 mt-2.5 px-0.5 text-center">
+            {activeStats.days} días · {activeStats.exercises} ejercicios · {activeStats.sets} series
+            {activeUso.sesiones > 0 && <> · {activeUso.sesiones} {activeUso.sesiones === 1 ? "sesión" : "sesiones"} con esta rutina</>}
+          </p>
+
+          {/* Acciones: el cronograma es lo que de verdad se toca (define tu
+              semana), el balance es una consulta ocasional. Dejan de pesar
+              lo mismo. */}
+          <div className="relative flex items-center gap-2 mt-3.5">
+            <button ref={scheduleRef} onClick={() => setShowSchedule((s) => !s)} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-[11px] font-black !text-white transition active:scale-[0.98]"
+              style={{ background: "linear-gradient(135deg,#3B82F6,#1D4ED8)", boxShadow: "0 8px 20px -8px rgba(59,130,246,0.8)" }}>
+              <Calendar size={12} /> {showSchedule ? "Ocultar cronograma" : "Cronograma"}
             </button>
-            <button ref={scheduleRef} onClick={() => setShowSchedule((s) => !s)} className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-white/10 text-blue-200 hover:text-white hover:bg-white/5 transition text-[11px] font-bold">
-              <Calendar size={11} /> {showSchedule ? "Ocultar" : "Cronograma"}
+            <button onClick={() => setShowBalance((v) => !v)} title="Balance muscular" className="shrink-0 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border border-white/10 text-blue-200 hover:text-white hover:bg-white/5 transition text-[11px] font-bold">
+              <Activity size={12} /> {showBalance ? "Ocultar" : "Balance"}
             </button>
           </div>
 
