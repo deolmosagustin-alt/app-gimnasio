@@ -6207,12 +6207,29 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           // Mensaje de coaching: compara lo hecho contra el rango objetivo
           // de la serie y sugiere qué hacer la próxima.
           const coaching = (() => {
+            const r = parseFloat(todayEntry.reps);
+            // BUG FIX (encontrado auditando el modo planificado): este consejo
+            // juzgaba SIEMPRE contra el rango de reps del ejercicio, que es
+            // una propiedad fija de la rutina. Con un plan de fuerza (meta de
+            // 5 reps) en un ejercicio cuyo rango dice "8-12", clavar la meta
+            // te devolvía "Quedaste corto: el objetivo eran 8-12 reps, bajá
+            // el peso" — el consejo contradecía al plan que la app misma te
+            // acababa de poner. Si hay meta para esta semana, se juzga contra
+            // la meta.
+            if (isPlannedMode && !cardio && plannedTarget.kg != null && !isNaN(r)) {
+              const metaKg = kgToDisplay(plannedTarget.kg, unit), hechoKg = kgToDisplay(todayEntry.kg, unit);
+              if (hechoKg + 0.001 >= metaKg && r >= plannedTarget.reps) {
+                return r > plannedTarget.reps || hechoKg > metaKg
+                  ? { icon: "📈", title: "Superaste la meta", body: `La meta era ${plannedTarget.reps}×${metaKg}${weightLabel(unit)}. Si se repite, subile a la meta de la semana que viene.`, color: "#34D399" }
+                  : { icon: "🎯", title: "Meta cumplida", body: `Clavaste ${plannedTarget.reps}×${metaKg}${weightLabel(unit)}, justo lo que pedía el plan.`, color: accent };
+              }
+              return { icon: "📉", title: "Te faltó para la meta", body: `La meta era ${plannedTarget.reps}×${metaKg}${weightLabel(unit)}. Si vuelve a pasar, replanificá esta semana más abajo.`, color: "#FBBF24" };
+            }
             const rr = String(setDef?.repRange || "");
             const m = rr.match(/(\d+)\s*[-–a]\s*(\d+)/);
             const single = rr.match(/^(\d+)$/);
             const lo = m ? parseInt(m[1], 10) : single ? parseInt(single[1], 10) : null;
             const hi = m ? parseInt(m[2], 10) : single ? parseInt(single[1], 10) : null;
-            const r = parseFloat(todayEntry.reps);
             if (lo == null || isNaN(r)) return null;
             // Consejo en dos partes: un titular corto que se lee de un vistazo
             // y un detalle con la acción concreta para la próxima vez.
@@ -6263,12 +6280,20 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
                 rango de reps, o sumar una rep más si todavía no. No se
                 muestra en descarga (ahí manda la sugerencia de descarga, que
                 pide MENOS peso, no más) ni sin historial (nada que sugerir). */}
-            {fieldSettings.showProgressionSuggestion === true && history.length > 0 && (() => {
-              const last = history.reduce((a, b) => (a.date > b.date ? a : b));
+            {fieldSettings.showProgressionSuggestion === true && (history.length > 0 || (isPlannedMode && !cardio)) && (() => {
+              // BUG FIX (encontrado auditando el modo planificado): esta
+              // sugerencia se derivaba SIEMPRE de tu última sesión, así que
+              // con una meta cargada la tarjeta mostraba dos números
+              // distintos peleándose — "Marca a alcanzar 8×70" arriba y
+              // "Probá hoy 8×67.5" acá abajo. Si hay meta para esta semana,
+              // la sugerencia ES la meta: ya está decidido qué toca hoy, y
+              // de paso el botón la carga de un toque.
+              const conMeta = isPlannedMode && !cardio && plannedTarget.kg != null;
+              const last = history.length ? history.reduce((a, b) => (a.date > b.date ? a : b)) : null;
               const repTop = repRangeTop(setDef.repRange);
-              const hitTop = !isNaN(repTop) && last.reps >= repTop;
-              const sugReps = hitTop ? repTop : last.reps + 1;
-              const sugKg = hitTop ? last.kg + 2.5 : last.kg;
+              const hitTop = !!last && !isNaN(repTop) && last.reps >= repTop;
+              const sugReps = conMeta ? plannedTarget.reps : (hitTop ? repTop : last.reps + 1);
+              const sugKg = conMeta ? plannedTarget.kg : (hitTop ? last.kg + 2.5 : last.kg);
               return (
                 <button
                   onClick={() => updateDraft({ reps: String(sugReps), kg: String(kgToDisplay(sugKg, unit)) })}
@@ -6276,7 +6301,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
                   style={{ backgroundColor: tint(accent, "10"), border: `1px solid ${tint(accent, "28")}` }}
                 >
                   <span className="flex items-center gap-1.5 text-[11px] font-bold" style={{ color: accent }}>
-                    <Target size={12} /> Probá hoy: {sugReps}×{kgToDisplay(sugKg, unit)}{weightLabel(unit)}
+                    {conMeta ? <ClipboardCheck size={12} /> : <Target size={12} />} {conMeta ? "Tu meta" : "Probá hoy"}: {sugReps}×{kgToDisplay(sugKg, unit)}{weightLabel(unit)}
                   </span>
                   <span className="text-[10px] text-slate-500">Usar</span>
                 </button>
@@ -6538,6 +6563,15 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
   // Misma unidad que muestra cada serie (ver SetRow): el plan se guarda
   // siempre en kg, pero quien entrena en libras tiene que leerlo en libras.
   const planUnit = useWeightUnit();
+  // BUG FIX (encontrado auditando el modo planificado): el aviso de
+  // "ESTANCADO" mira si hace STAGNATION_DAYS que no superás tu récord en
+  // este ejercicio y sugiere "cambiá reps, descanso o variante". Bajo un
+  // plan eso es ruido y a veces consejo malo: un bloque de acumulación (o
+  // directamente el objetivo "mantener") pide a propósito cargas por debajo
+  // de tu récord, así que el ejercicio SIEMPRE se ve estancado mientras
+  // hacés exactamente lo que corresponde. Si está siguiendo el plan, la
+  // pregunta "¿qué cambio?" ya está contestada.
+  const siguiendoPlan = !!planInfo && !planInfo.paused && !planOffByMode;
   return (
     <div className="stagger-item smooth-card bg-slate-900/50 border border-slate-800/50 rounded-2xl overflow-hidden backdrop-blur-sm shadow-md shadow-black/20 transition-shadow hover:shadow-lg hover:shadow-black/30">
       <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center justify-between px-4 py-4 hover:bg-slate-800/30 active:bg-slate-800/50 transition text-left">
@@ -6558,7 +6592,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
               {/* El ×1/×2 de mancuernas se configura al editar la rutina
                   ("¿Con cuántas mancuernas?"), no acá: durante el
                   entrenamiento sumaba ruido y ya está definido. */}
-              {stagnant && settings.showStagnation === true && <span className="text-[10px] bg-rose-500/15 text-rose-400 rounded-lg px-1.5 py-0.5 font-bold flex items-center gap-1"><AlertTriangle size={9} /> ESTANCADO</span>}
+              {stagnant && settings.showStagnation === true && !siguiendoPlan && <span className="text-[10px] bg-rose-500/15 text-rose-400 rounded-lg px-1.5 py-0.5 font-bold flex items-center gap-1"><AlertTriangle size={9} /> ESTANCADO</span>}
               {/* Con la tarjeta cerrada ya se ve cuáles ejercicios siguen el
                   plan y cuáles persiguen tu récord — antes había que abrir
                   cada uno para enterarte. Y el chip ES el interruptor: un
@@ -6592,7 +6626,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
         </div>
       </button>
       <div className={open ? "px-4 pb-4 pt-0 tab-fade-in" : "hidden"}>
-        {stagnant && settings.showStagnation === true && <div className="mb-3 text-[11px] text-rose-400/90 bg-rose-500/5 border border-rose-500/15 rounded-xl px-3 py-2 flex items-start gap-1.5"><Info size={12} className="mt-0.5 shrink-0" /><span>Hace {STAGNATION_DAYS}+ días sin superar el récord. Considerá cambiar reps, descanso o variante.</span></div>}
+        {stagnant && settings.showStagnation === true && !siguiendoPlan && <div className="mb-3 text-[11px] text-rose-400/90 bg-rose-500/5 border border-rose-500/15 rounded-xl px-3 py-2 flex items-start gap-1.5"><Info size={12} className="mt-0.5 shrink-0" /><span>Hace {STAGNATION_DAYS}+ días sin superar el récord. Considerá cambiar reps, descanso o variante.</span></div>}
         {/* Pasar ESTE ejercicio de "sigue el plan" a "persigue mi récord" y
             al revés, sin salir de la pantalla ni perder lo planificado: el
             plan queda guardado, sólo se deja de perseguir (plannedPaused).
@@ -15127,6 +15161,9 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
           routineSnapshot={full.activeRoutineSnapshot}
           trainWeeks={full.settings?.trainWeeks}
           logs={full?.logs || null}
+          // La semana del ciclo DEL ALUMNO, no la tuya: el planificador abre
+          // en la semana que está viviendo quien va a entrenar.
+          weekInCycle={weekInfo?.weekInCycle ?? null}
           studentName={basic?.name}
           onClose={() => setShowProgressionComposer(false)}
           onSubmit={async (progressionPlan, note) => {
@@ -17662,7 +17699,7 @@ function buildActionPlan(action, ctx) {
     return {
       kind: "progression",
       title: `Planificar "${exMatch.name}"`,
-      items: entries.map((e) => `Semana ${e.week}: ${e.reps}×${e.kg}kg`),
+      items: entries.map((e) => `Semana ${e.week}: ${e.reps}×${kgToDisplay(e.kg, settings?.weightUnit || "kg")}${weightLabel(settings?.weightUnit || "kg")}`),
       progressionPreview: { exerciseName: exMatch.name, setIndex, entries },
       confirmLabel: "Guardar meta",
       confirm: () => {
@@ -17703,7 +17740,7 @@ function buildActionPlan(action, ctx) {
         }
         const kg = parseFloat(s.kg), reps = parseInt(s.reps, 10);
         if (isNaN(kg) || kg <= 0 || isNaN(reps) || reps <= 0) return null;
-        items.push(`${exMatch.name} S${setIndex + 1}: ${reps}×${kg}kg`);
+        items.push(`${exMatch.name} S${setIndex + 1}: ${reps}×${kgToDisplay(kg, settings?.weightUnit || "kg")}${weightLabel(settings?.weightUnit || "kg")}`);
         return { exerciseId: exMatch.id, setIndex, week, kg, reps };
       })
       .filter(Boolean);
@@ -18106,6 +18143,7 @@ Tipos disponibles:
 - iniciar_sesion: {"type":"iniciar_sesion","day":"nombre o parte del nombre del día (opcional)"} — arranca el cronómetro de su entrenamiento de hoy, como tocar "Iniciar sesión" en Rutina. Si no da el día, usa el primero de su rutina activa.
 - finalizar_sesion: {"type":"finalizar_sesion"} — cierra y guarda en el historial la sesión de hoy que ya tiene en curso. Sólo proponela si por el contexto ("activeSession" en los datos) ya hay una sesión activa.
 - gestionar_rutina: {"type":"gestionar_rutina","op":"eliminar"|"duplicar"|"renombrar","routineName":"nombre o parte del nombre de una rutina guardada","nuevoNombre":"..."} — administra una rutina de su lista (no la activa en pantalla necesariamente). "eliminar" la borra para siempre, avisale que no se puede deshacer. "nuevoNombre" sólo aplica si op="renombrar".
+PLANIFICACIÓN: si un ejercicio del contexto trae "metasPlanificadas", esa persona YA tiene un plan cargado para él (kg y reps decididos de antemano para cada semana del ciclo, más RPE y fase si los cargó). Tenelo en cuenta siempre: (a) no le digas que está estancada en un ejercicio cuyo plan pide a propósito cargas por debajo de su récord — un bloque de acumulación o de mantenimiento se ve igual que un estancamiento en los logs; (b) si te pide replanificar algo que ya tiene plan, decíselo y proponé el cambio, no lo pises en silencio; (c) "siguiendoElPlan": false significa que pasó ese ejercicio a perseguir su récord sin borrar el plan. Y "trainingMode" de su configuración decide si las metas se persiguen: en "record" están guardadas pero apagadas.
 IMPORTANTE — UNIDADES: todos los pesos que aparecen en el contexto (historial, récords, medidas) y todos los que devuelvas en un campo "kg" están en KILOS, siempre, sin importar que "weightUnit" de su configuración diga "lbs". Esa opción sólo cambia cómo se le muestran los números en pantalla; la app los guarda y los lee en kilos. Si le hablás de un peso en el texto de tu respuesta, sí usá su unidad (convertí: 1kg = 2.20462 lbs), pero el JSON de la acción va SIEMPRE en kilos.
 - corregir_record: {"type":"corregir_record","exercise":"Press Banca","reps":10,"kg":90,"setIndex":0} — corrige a mano el récord (PR) guardado de un ejercicio, para cuando el historial no refleja su marca real. "setIndex" es opcional (0 = primera serie del ejercicio).
 - planificar_progresion: {"type":"planificar_progresion","exercise":"Press Banca","setIndex":0,"metas":[{"semana":1,"kg":80,"reps":5},{"semana":2,"kg":82.5,"reps":5}]} — ayuda a planificar CUÁNTO PESO levantar cada semana del ciclo en una serie puntual de un ejercicio de SU RUTINA ACTIVA (no crea rutina, sólo carga a qué apuntar semana a semana — la sección "rutina planificada"/"marca a alcanzar" que ya existe en la app). Usalo cuando pida ayuda con la progresión de pesos ("armame una progresión de sentadilla del 80 al 100 en 6 semanas", "subime 2.5kg por semana en press militar"). El ejercicio tiene que estar en su rutina activa (mirá los días/ejercicios en el contexto) y "setIndex" identifica CUÁL de sus series (0 = primera) — si no da detalles de cuál, usá la primera y avisale. Cubrí TODAS las semanas de su ciclo que tenga sentido planificar (mirá "trainWeeks"/settings en el contexto), no sólo una o dos, salvo que pida un tramo puntual. Si no te da un punto de partida o de llegada, preguntá antes de inventar números.
@@ -18474,7 +18512,24 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
           const model = buildRoutineModel(resolved);
           dias = model.dayOrder.map((dk) => {
             const d = model.days[dk];
-            return { dia: d.label, ejercicios: d.exercises.map((ex) => ({ nombre: ex.name, musculo: ex.muscle, series: ex.sets.length, repeticionesPorSerie: ex.sets.map((s) => s.repRange) })) };
+            return { dia: d.label, ejercicios: d.exercises.map((ex) => {
+              const base = { nombre: ex.name, musculo: ex.muscle, series: ex.sets.length, repeticionesPorSerie: ex.sets.map((s) => s.repRange) };
+              // BUG FIX (encontrado auditando): el contexto no incluía NADA
+              // de lo planificado, así que la IA no sabía que existía un
+              // plan. Le decía a la persona que estaba estancada en un
+              // ejercicio cuyo plan pide a propósito cargas por debajo de su
+              // récord, y al pedirle "planificame la semana" pisaba un plan
+              // existente sin siquiera mencionarlo.
+              const conPlan = (ex.sets || []).filter((s) => Array.isArray(s.plannedProgression) && s.plannedProgression.length > 0);
+              if (!conPlan.length) return base;
+              return {
+                ...base,
+                metasPlanificadas: conPlan[0].plannedProgression.map((e) => (e.minutes != null
+                  ? { semana: e.week, minutos: e.minutes }
+                  : { semana: e.week, kg: e.kg, reps: e.reps, ...(e.rpe != null ? { rpe: e.rpe } : {}), ...(e.phase ? { fase: e.phase } : {}) })),
+                siguiendoElPlan: !(ex.sets || []).some((s) => s.plannedPaused),
+              };
+            }) };
           });
         } catch { /* ignorado a propósito */ }
         return { ...base, dias };
