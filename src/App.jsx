@@ -620,6 +620,7 @@ const DEFAULT_SETTINGS = {
   planRepsTope: 12,             // tope de reps de la doble progresión
   planRespetarRango: true,      // que la IA no se salga del rango de reps que ya tiene cada ejercicio
   planSoloVacios: false,        // la IA sólo completa lo que no tenga meta cargada, sin pisar lo tuyo
+  planNota: "",                 // lo que la IA tiene que tener en cuenta sí o sí (lesiones, discos disponibles, días)
 };
 
 
@@ -1410,7 +1411,12 @@ function applyWeeklyPlanToRoutine(routineDef, weekPlans) {
         const prevEntries = Array.isArray(ex.sets[plan.setIndex].plannedProgression) ? ex.sets[plan.setIndex].plannedProgression : [];
         const entry = plan.minutes != null ? { week: plan.week, minutes: plan.minutes } : { week: plan.week, kg: plan.kg, reps: plan.reps };
         const nextEntries = [...prevEntries.filter((p) => p.week !== plan.week), entry].sort((a, b) => a.week - b.week);
-        ex.sets[plan.setIndex] = { ...ex.sets[plan.setIndex], plannedProgression: nextEntries };
+        const next = { ...ex.sets[plan.setIndex], plannedProgression: nextEntries };
+        // Mismo criterio que applyProgressionToRoutine: planificar de nuevo
+        // una serie que estaba "por récord" la reactiva. Dejarla pausada en
+        // silencio sería cargar una meta que no se persigue.
+        delete next.plannedPaused;
+        ex.sets[plan.setIndex] = next;
       }
     });
   });
@@ -6756,75 +6762,141 @@ const PLANIF_PLAZOS = [
   { k: "mes", l: "Un mes", d: "Cuatro semanas de progresión", semanas: 4 },
   { k: "ciclo", l: "Ciclo completo", d: "Todas las semanas de tu ciclo", semanas: null },
 ];
-const PLANIF_OBJETIVOS = [
-  { k: "fuerza", l: "Fuerza", d: "Pocas reps, cargas altas", color: "#F43F5E" },
-  { k: "hipertrofia", l: "Hipertrofia", d: "Reps medias, volumen alto", color: "#A855F7" },
-  { k: "mixto", l: "Mixto", d: "Compuestos pesados, aislados con más reps", color: "#3B82F6" },
+// Objetivos del plan: además de recordarse de una planificación a la
+// siguiente (settings.planObjetivo), cada uno trae sus propias variables de
+// partida — no es lo mismo planificar fuerza (pocas reps, saltos grandes)
+// que hipertrofia (más reps, saltos chicos). Los mismos cuatro para el
+// planificador manual y para el de IA, así las dos formas de planificar
+// hablan el mismo idioma y comparten lo que elegiste.
+const PLAN_OBJETIVOS = [
+  { k: "fuerza", l: "Fuerza", d: "Pocas reps, cargas altas", color: "#F43F5E", reps: 5, tope: 6, inc: 2.5, ia: "fuerza máxima: 3-6 reps por serie, cargas altas, descansos largos" },
+  { k: "hipertrofia", l: "Hipertrofia", d: "Reps medias, volumen alto", color: "#A855F7", reps: 10, tope: 12, inc: 2.5, ia: "hipertrofia: 8-12 reps por serie, volumen alto, progresión de a poco" },
+  { k: "mixto", l: "Mixto", d: "Compuestos pesados, aislados con más reps", color: "#3B82F6", reps: 8, tope: 12, inc: 2.5, ia: "mixto: 5-8 reps en los compuestos grandes y 10-12 en los aislados" },
+  { k: "mantenimiento", l: "Mantener", d: "Cargas planas, sin forzar", color: "#10B981", reps: 8, tope: 8, inc: 0, ia: "mantenimiento: sostener la carga actual sin progresar, para volver de una pausa o una lesión sin forzar" },
 ];
+const planObjetivoDe = (k) => PLAN_OBJETIVOS.find((o) => o.k === k) || PLAN_OBJETIVOS[2];
+// Cuánto se anima a subir la IA. Es la variable que más se equivoca sola: a
+// un principiante le sobra progresión lineal semanal y a un avanzado 5kg por
+// semana en press de banca lo estrella contra la pared en tres semanas.
+const PLAN_NIVELES = [
+  { k: "principiante", l: "Principiante", d: "Menos de 1 año entrenando", ia: "principiante (menos de un año entrenando): puede progresar rápido, subí en casi todas las semanas" },
+  { k: "intermedio", l: "Intermedio", d: "1 a 3 años", ia: "intermedio (1 a 3 años entrenando): la progresión ya no es semanal en todo, alterná semanas de subir con semanas de consolidar" },
+  { k: "avanzado", l: "Avanzado", d: "Más de 3 años", ia: "avanzado (más de 3 años entrenando): progresión muy lenta, saltos chicos y sólo donde haya margen real" },
+];
+const planNivelDe = (k) => PLAN_NIVELES.find((n) => n.k === k) || PLAN_NIVELES[1];
 
-function PlanificadorIAModal({ routineDef, trainWeeks, logs, onClose, onApply }) {
+function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_SETTINGS, weekInCycle = null, onClose, onApply, onSavePrefs = null }) {
   useAndroidBack(onClose);
-  const [plazo, setPlazo] = useState("ciclo");
-  const [objetivo, setObjetivo] = useState("mixto");
+  // Las tres decisiones de siempre arrancan como las dejaste la última vez
+  // (pedido: "que recuerde los objetivos y variables") — con una rutina y un
+  // objetivo estables, planificar el mes que viene es abrir y confirmar.
+  const [plazo, setPlazo] = useState(settings.planPlazo || "ciclo");
+  const [objetivo, setObjetivo] = useState(settings.planObjetivo || "mixto");
+  const [nivel, setNivel] = useState(settings.planNivel || "intermedio");
   const [dayKey, setDayKey] = useState("todos");
+  const [desdeSemana, setDesdeSemana] = useState(() => Math.max(1, weekInCycle || 1));
+  const [excluidos, setExcluidos] = useState(() => new Set());
+  const [verEjercicios, setVerEjercicios] = useState(false);
+  const [verAjustes, setVerAjustes] = useState(false);
+  const [respetarRango, setRespetarRango] = useState(settings.planRespetarRango !== false);
+  const [soloVacios, setSoloVacios] = useState(settings.planSoloVacios === true);
+  const [conRpe, setConRpe] = useState(true);
+  const [nota, setNota] = useState(settings.planNota || "");
   const [estado, setEstado] = useState("form"); // form | generando | preview | error
   const [error, setError] = useState("");
-  const [plan, setPlan] = useState(null); // [{ exerciseId, nombre, setIndex, entries }]
+  const [plan, setPlan] = useState(null); // { planes, noReconocidos }
+  const [descartados, setDescartados] = useState(() => new Set()); // ejercicios sacados en la vista previa
 
   const model = useMemo(() => (routineDef ? buildRoutineModel(routineDef) : null), [routineDef]);
-  const semanas = plazo === "ciclo" ? (trainWeeks || TRAIN_WEEKS) : PLANIF_PLAZOS.find((p) => p.k === plazo).semanas;
+  const ciclo = trainWeeks || TRAIN_WEEKS;
+  const semanas = plazo === "ciclo" ? ciclo : PLANIF_PLAZOS.find((p) => p.k === plazo).semanas;
   const dias = model?.dayOrder || [];
+  // El plan no puede desbordar el ciclo: si arrancás en la semana 6 de un
+  // ciclo de 8, "un mes" son 3 semanas, no 4 (la 9 no existe, el ciclo
+  // vuelve a empezar). Antes esto generaba metas para semanas inexistentes
+  // que después no se mostraban nunca.
+  const semanasReales = Math.max(1, Math.min(semanas, ciclo - desdeSemana + 1));
 
   // Los ejercicios que entran en el plan, con el mejor registro de cada uno:
   // sin ese número la IA no tiene desde dónde progresar y termina inventando
   // cargas que no tienen nada que ver con lo que levantás.
-  const seleccionados = useMemo(() => {
+  const candidatos = useMemo(() => {
     if (!model) return [];
     const out = [];
+    const vistos = new Set();
     (dayKey === "todos" ? model.dayOrder : [dayKey]).forEach((dk) => {
       (model.days[dk]?.exercises || []).forEach((ex) => {
         if (ex.cardio) return; // el cardio no se planifica en kg×reps
+        if (vistos.has(ex.id)) return;
+        vistos.add(ex.id);
         const nSets = ex.sets?.length || 0;
         let mejor = null;
+        const historial = [];
         for (let i = 0; i < nSets; i++) {
           (logs[`${ex.id}_${i}`] || []).forEach((h) => {
-            if (!h?.kg || !h?.reps) return;
+            if (!h?.kg || !h?.reps || h.deload) return;
             if (!mejor || prScore(h.kg, h.reps) > prScore(mejor.kg, mejor.reps)) mejor = { kg: h.kg, reps: h.reps };
+            if (h.date) historial.push(h);
           });
         }
-        out.push({ id: ex.id, nombre: ex.name, muscle: ex.muscle, dia: model.days[dk]?.label || dk, sets: nSets, mejor, repRange: ex.sets?.[0]?.repRange || null });
+        // Las últimas tres sesiones: le dicen a la IA si venís subiendo o
+        // estancado, que es lo que separa "seguí progresando" de "cambiá
+        // algo". Con sólo la mejor marca histórica no hay forma de saberlo.
+        const recientes = historial.sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 3).map((h) => `${h.reps}×${h.kg}kg`);
+        const yaPlanificado = (ex.sets || []).some((s) => Array.isArray(s.plannedProgression) && s.plannedProgression.length > 0);
+        out.push({ id: ex.id, nombre: ex.name, muscle: ex.muscle, dia: model.days[dk]?.label || dk, sets: nSets, mejor, recientes, yaPlanificado, repRange: ex.sets?.[0]?.repRange || null });
       });
     });
     return out;
   }, [model, dayKey, logs]);
 
+  const seleccionados = useMemo(() => candidatos.filter((e) => !excluidos.has(e.id) && !(soloVacios && e.yaPlanificado)), [candidatos, excluidos, soloVacios]);
+  const toggleEjercicio = (id) => setExcluidos((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+
+  const guardarPrefs = () => {
+    onSavePrefs?.({ planPlazo: plazo, planObjetivo: objetivo, planNivel: nivel, planRespetarRango: respetarRango, planSoloVacios: soloVacios, planNota: nota.trim() });
+  };
+
   const generar = async () => {
     setEstado("generando"); setError("");
-    const lista = seleccionados.map((e) =>
-      `- "${e.nombre}" (${e.muscle}, ${e.sets} series, rango ${e.repRange || "libre"}): ${e.mejor ? `su mejor marca es ${e.mejor.reps}×${e.mejor.kg}kg` : "sin marcas registradas todavía"}`
-    ).join("\n");
-    const obj = PLANIF_OBJETIVOS.find((o) => o.k === objetivo);
+    guardarPrefs();
+    const lista = seleccionados.map((e) => {
+      const partes = [`- "${e.nombre}" (${e.muscle}, ${e.sets} series${respetarRango && e.repRange ? `, rango objetivo ${e.repRange} reps` : ""})`];
+      partes.push(e.mejor ? `mejor marca ${e.mejor.reps}×${e.mejor.kg}kg` : "SIN marcas registradas");
+      if (e.recientes.length) partes.push(`últimas sesiones: ${e.recientes.join(", ")}`);
+      return partes.join(" · ");
+    }).join("\n");
+    const obj = planObjetivoDe(objetivo);
+    const niv = planNivelDe(nivel);
+    const semanaFinal = desdeSemana + semanasReales - 1;
+    const hayDescarga = settings.deloadEnabled !== false && (settings.deloadWeeks || 0) > 0;
     const prompt = [
-      `Armá un plan de sobrecarga progresiva de ${semanas} semana(s) para estos ejercicios.`,
+      `Armá un plan de sobrecarga progresiva para estos ejercicios, de la semana ${desdeSemana} a la ${semanaFinal} del ciclo (${semanasReales} semana(s) en total).`,
       ``,
       `EJERCICIOS (usá el nombre EXACTO entre comillas, no lo cambies):`,
       lista,
       ``,
-      `OBJETIVO: ${obj.l} — ${obj.d}.`,
+      `PERSONA: ${niv.ia}.`,
+      `OBJETIVO: ${obj.ia}.`,
+      hayDescarga ? `CICLO: son ${ciclo} semanas de trabajo y después ${settings.deloadWeeks} de descarga al ${Math.round((settings.deloadPct || 0.6) * 100)}% de la carga. La semana ${ciclo} es la última de trabajo: tiene que ser la más pesada del bloque, no una más.` : `CICLO: ${ciclo} semanas de trabajo seguidas, sin descarga programada.`,
       `UNIDAD: kilos. Redondeá a múltiplos de 2.5kg (o 1kg en aislados livianos); nunca propongas cargas que no se puedan armar con discos.`,
+      nota.trim() ? `\nA TENER EN CUENTA (lo dijo la persona, respetalo por encima de las reglas generales): ${nota.trim()}` : ``,
       ``,
       `REGLAS DE PLANIFICACIÓN (respetalas):`,
-      `1. Partí de la mejor marca de cada ejercicio. Si no tiene marcas, proponé una carga conservadora y aclarala como punto de partida.`,
-      `2. Sobrecarga progresiva REALISTA: en compuestos grandes (sentadilla, peso muerto, press banca) subir entre 2.5 y 5kg por semana; en aislados y ejercicios de hombro/brazo, entre 1 y 2.5kg. Nunca más de un 5% semanal.`,
-      `3. FATIGA: el RPE tiene que ir subiendo dentro del bloque (empezá en 7 y llegá a 9), no arrancar al máximo.`,
-      `4. FASES de mesociclo, si el plazo alcanza: primeras semanas "Acumulación" (más volumen, RPE 7-8), después "Intensificación" (más carga, RPE 8-9), la última de trabajo "Realización" (carga máxima, menos series). Con 1 o 2 semanas usá sólo "Acumulación".`,
-      `5. Dentro de un mismo ejercicio, las series pueden tener cargas distintas: la serie 1 suele ser la más pesada y las siguientes bajan un poco.`,
-      `6. Si un ejercicio no tiene marcas, no lo hagas progresar agresivo: dejalo casi plano para poder medirlo primero.`,
+      `1. Partí de la mejor marca de cada ejercicio. Si no tiene marcas, proponé una carga conservadora y dejala casi plana: primero hay que medirla.`,
+      `2. Mirá las últimas sesiones: si viene subiendo, seguí la misma pendiente; si repite el mismo peso hace tres sesiones, está estancado — bajá un escalón y subí las reps en vez del peso.`,
+      `3. Sobrecarga progresiva REALISTA: en compuestos grandes (sentadilla, peso muerto, press banca) entre 2.5 y 5kg por semana; en aislados y hombro/brazo, entre 1 y 2.5kg. Nunca más de un 5% semanal.`,
+      conRpe ? `4. FATIGA: el RPE tiene que ir subiendo dentro del bloque (empezá en 7 y llegá a 9), no arrancar al máximo.` : `4. FATIGA: no incluyas RPE, dejá ese campo afuera.`,
+      semanasReales >= 3
+        ? `5. FASES de mesociclo: primeras semanas "Acumulación" (más volumen, RPE 7-8), después "Intensificación" (más carga, RPE 8-9), la última "Realización" (carga máxima, menos series).`
+        : `5. FASES: con ${semanasReales} semana(s) usá sólo "Acumulación".`,
+      `6. Dentro de un mismo ejercicio, las series pueden tener cargas distintas: la serie 1 suele ser la más pesada y las siguientes bajan un poco.`,
+      respetarRango ? `7. Respetá el rango de reps objetivo de cada ejercicio cuando esté indicado arriba; no lo cambies para poder subir más kilos.` : `7. Podés mover el rango de reps si eso hace mejor la progresión.`,
       ``,
       `Devolvé ÚNICAMENTE un array JSON, sin texto ni markdown, con esta forma exacta:`,
-      `[{"ejercicio":"NOMBRE EXACTO","serie":1,"metas":[{"semana":1,"kg":60,"reps":8,"rpe":7,"fase":"Acumulación"}]}]`,
-      `"serie" empieza en 1. Incluí TODAS las series de cada ejercicio y TODAS las semanas del 1 al ${semanas}.`,
-    ].join("\n");
+      `[{"ejercicio":"NOMBRE EXACTO","serie":1,"metas":[{"semana":${desdeSemana},"kg":60,"reps":8${conRpe ? `,"rpe":7` : ""},"fase":"Acumulación"}]}]`,
+      `"serie" empieza en 1. Incluí TODAS las series de cada ejercicio y TODAS las semanas de la ${desdeSemana} a la ${semanaFinal}.`,
+    ].filter(Boolean).join("\n");
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 55000);
@@ -6847,19 +6919,23 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, onClose, onApply })
       // Se traduce lo que devolvió la IA a los ids reales de la rutina y se
       // descarta lo que no matchee: un nombre inventado nunca se aplica en
       // silencio sobre un ejercicio parecido.
+      const permitidos = new Set(seleccionados.map((e) => e.id));
       const planes = [];
       const noReconocidos = new Set();
       crudo.forEach((item) => {
         const ex = matchExerciseInRoutineModel(model, item?.ejercicio || "");
         if (!ex) { if (item?.ejercicio) noReconocidos.add(String(item.ejercicio)); return; }
+        // Si la IA se entusiasma y devuelve ejercicios que no pediste (otro
+        // día, o uno que sacaste de la lista), no se aplican: elegiste vos.
+        if (!permitidos.has(ex.id)) return;
         const setIndex = Math.max(0, (parseInt(item?.serie, 10) || 1) - 1);
         if (!ex.sets?.[setIndex]) return;
         const entries = (Array.isArray(item?.metas) ? item.metas : [])
           .map((m) => {
             const week = parseInt(m?.semana ?? m?.week, 10);
             const kg = parseFloat(m?.kg), reps = parseInt(m?.reps, 10);
-            if (!week || week < 1 || week > semanas || isNaN(kg) || kg <= 0 || isNaN(reps) || reps <= 0) return null;
-            const rpe = m?.rpe != null ? Math.min(10, Math.max(5, parseFloat(m.rpe))) : null;
+            if (!week || week < desdeSemana || week > semanaFinal || isNaN(kg) || kg <= 0 || isNaN(reps) || reps <= 0) return null;
+            const rpe = conRpe && m?.rpe != null ? Math.min(10, Math.max(5, parseFloat(m.rpe))) : null;
             const fase = MESOCYCLE_PHASES.includes(m?.fase) ? m.fase : null;
             return { week, kg, reps, ...(rpe != null ? { rpe } : {}), ...(fase ? { phase: fase } : {}) };
           })
@@ -6867,8 +6943,9 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, onClose, onApply })
           .sort((x, y) => x.week - y.week);
         if (entries.length) planes.push({ exerciseId: ex.id, nombre: ex.name, setIndex, entries });
       });
-      if (!planes.length) throw new Error("Ninguno de los ejercicios que devolvió la IA coincide con los de tu rutina. Probá de nuevo.");
+      if (!planes.length) throw new Error("Ninguno de los ejercicios que devolvió la IA coincide con los que elegiste. Probá de nuevo.");
       setPlan({ planes, noReconocidos: [...noReconocidos] });
+      setDescartados(new Set());
       setEstado("preview");
     } catch (e) {
       console.error("[planificador IA]", e);
@@ -6879,23 +6956,32 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, onClose, onApply })
     }
   };
 
-  const aplicar = () => {
-    onApply(plan.planes.map(({ exerciseId, setIndex, entries }) => ({ exerciseId, setIndex, entries })));
-    onClose();
-  };
-
   // Para la vista previa se agrupa por ejercicio: una fila por ejercicio con
   // la carga de cada semana, que es como se lee un plan de verdad.
   const porEjercicio = useMemo(() => {
     if (!plan) return [];
     const map = {};
     plan.planes.forEach((p) => {
-      if (!map[p.exerciseId]) map[p.exerciseId] = { nombre: p.nombre, series: [] };
+      if (!map[p.exerciseId]) map[p.exerciseId] = { id: p.exerciseId, nombre: p.nombre, series: [] };
       map[p.exerciseId].series.push(p);
     });
-    return Object.values(map).map((g) => ({ ...g, series: g.series.sort((a, b) => a.setIndex - b.setIndex) }));
-  }, [plan]);
+    return Object.values(map).map((g) => {
+      const s0 = [...g.series].sort((a, b) => a.setIndex - b.setIndex)[0];
+      const desde = s0?.entries?.[0]?.kg ?? null;
+      const hasta = s0?.entries?.[s0.entries.length - 1]?.kg ?? null;
+      const mejor = candidatos.find((c) => c.id === g.id)?.mejor || null;
+      return { ...g, series: [...g.series].sort((a, b) => a.setIndex - b.setIndex), desde, hasta, mejor };
+    });
+  }, [plan, candidatos]);
+  const aAplicar = useMemo(() => porEjercicio.filter((g) => !descartados.has(g.id)), [porEjercicio, descartados]);
 
+  const aplicar = () => {
+    const ids = new Set(aAplicar.map((g) => g.id));
+    onApply(plan.planes.filter((p) => ids.has(p.exerciseId)).map(({ exerciseId, setIndex, entries }) => ({ exerciseId, setIndex, entries })));
+    onClose();
+  };
+
+  const accent = "#38BDF8";
   if (typeof document === "undefined") return null;
   return createPortal(
     <div className="fixed inset-0 z-[150] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
@@ -6916,19 +7002,42 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, onClose, onApply })
               <div className="space-y-1.5 mt-2">
                 {PLANIF_PLAZOS.map((p) => {
                   const act = plazo === p.k;
-                  const n = p.k === "ciclo" ? (trainWeeks || TRAIN_WEEKS) : p.semanas;
+                  const n = p.k === "ciclo" ? ciclo : p.semanas;
                   return (
                     <button key={p.k} onClick={() => setPlazo(p.k)} className="w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition active:scale-[0.99]"
-                      style={act ? { backgroundColor: tint("#38BDF8", "1c"), border: "1px solid " + tint("#38BDF8", "55") } : { backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}>
+                      style={act ? { backgroundColor: tint(accent, "1c"), border: "1px solid " + tint(accent, "55") } : { backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}>
                       <span className="flex-1 min-w-0">
                         <span className="block text-xs font-bold text-white">{p.l}</span>
                         <span className="block text-[10.5px] text-slate-500">{p.d}</span>
                       </span>
-                      <span className="text-[10px] font-black tabular-nums shrink-0" style={{ color: act ? "#38BDF8" : "#64748b" }}>{n} sem</span>
+                      <span className="text-[10px] font-black tabular-nums shrink-0" style={{ color: act ? accent : "#64748b" }}>{n} sem</span>
                     </button>
                   );
                 })}
               </div>
+              {/* Desde qué semana del ciclo: sin esto sólo se podía planificar
+                  desde la 1, así que a mitad de ciclo el plan pisaba semanas
+                  que ya habías entrenado. */}
+              {ciclo > 1 && (
+                <div className="mt-2">
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Arrancar en</span>
+                    <span className="text-[10px] font-bold" style={{ color: accent }}>
+                      Semana {desdeSemana}{semanasReales > 1 ? ` a ${desdeSemana + semanasReales - 1}` : ""}
+                    </span>
+                  </div>
+                  <div className="flex gap-1.5 overflow-x-auto pb-1">
+                    {Array.from({ length: ciclo }, (_, i) => i + 1).map((w) => (
+                      <button key={w} onClick={() => setDesdeSemana(w)} className="relative shrink-0 w-10 py-1.5 rounded-lg text-[10.5px] font-black transition active:scale-95"
+                        style={desdeSemana === w ? { backgroundColor: accent, color: "#fff" } : { backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)", color: "var(--chip-text)" }}>
+                        S{w}
+                        {w === weekInCycle && <span className="absolute left-1/2 -translate-x-1/2 bottom-0.5 w-1 h-1 rounded-full" style={{ backgroundColor: desdeSemana === w ? "#fff" : accent }} />}
+                      </button>
+                    ))}
+                  </div>
+                  {weekInCycle && <p className="text-[9.5px] text-slate-600">El punto marca la semana que estás viviendo.</p>}
+                </div>
+              )}
             </div>
 
             <div>
@@ -6936,23 +7045,56 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, onClose, onApply })
               <div className="flex gap-1.5 mt-2 overflow-x-auto pb-1">
                 {[{ k: "todos", l: "Toda la rutina" }, ...dias.map((dk) => ({ k: dk, l: model.days[dk]?.label || dk }))].map((o) => (
                   <button key={o.k} onClick={() => setDayKey(o.k)} className="shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-bold transition"
-                    style={dayKey === o.k ? { backgroundColor: "#38BDF8", color: "#fff" } : { backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)", color: "var(--chip-text)" }}>
+                    style={dayKey === o.k ? { backgroundColor: accent, color: "#fff" } : { backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)", color: "var(--chip-text)" }}>
                     {o.l}
                   </button>
                 ))}
               </div>
-              <p className="text-[10.5px] text-slate-500 mt-2">
-                {seleccionados.length} ejercicio{seleccionados.length === 1 ? "" : "s"} · {seleccionados.filter((e) => e.mejor).length} con marcas para progresar
-              </p>
+              <button onClick={() => setVerEjercicios((v) => !v)} className="w-full flex items-center gap-1.5 mt-2 text-left">
+                <span className="flex-1 text-[10.5px] text-slate-500">
+                  {seleccionados.length} de {candidatos.length} ejercicio{candidatos.length === 1 ? "" : "s"} · {seleccionados.filter((e) => e.mejor).length} con marcas para progresar
+                </span>
+                <span className="text-[10.5px] font-bold shrink-0" style={{ color: accent }}>{verEjercicios ? "Ocultar" : "Elegir uno por uno"}</span>
+                <ChevronDown size={12} className={`shrink-0 transition-transform ${verEjercicios ? "rotate-180" : ""}`} style={{ color: accent }} />
+              </button>
+              {/* Elegir ejercicio por ejercicio: antes era todo el día o toda
+                  la rutina, sin puntos medios — y casi siempre hay uno o dos
+                  que no querés que toque (el que estás rehabilitando, el que
+                  ya planificaste a mano). */}
+              {verEjercicios && (
+                <div className="mt-2 space-y-1 tab-fade-in">
+                  <div className="flex gap-1.5">
+                    <button onClick={() => setExcluidos(new Set())} className="flex-1 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-[10px] font-bold hover:bg-slate-700 transition">Todos</button>
+                    <button onClick={() => setExcluidos(new Set(candidatos.map((e) => e.id)))} className="flex-1 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-[10px] font-bold hover:bg-slate-700 transition">Ninguno</button>
+                  </div>
+                  {candidatos.map((e) => {
+                    const on = !excluidos.has(e.id);
+                    return (
+                      <button key={e.id} onClick={() => toggleEjercicio(e.id)} className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left transition"
+                        style={on ? { backgroundColor: tint(accent, "12"), border: `1px solid ${tint(accent, "2e")}` } : { backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)", opacity: 0.55 }}>
+                        <span className="w-4 h-4 rounded-md shrink-0 flex items-center justify-center" style={on ? { backgroundColor: accent } : { border: "1px solid #475569" }}>
+                          {on && <Check size={11} className="text-white" strokeWidth={3.5} />}
+                        </span>
+                        <span className="flex-1 min-w-0">
+                          <span className="block text-[11px] font-bold text-white truncate">{e.nombre}</span>
+                          <span className="block text-[9px] text-slate-500 truncate">
+                            {e.dia} · {e.mejor ? `mejor ${e.mejor.reps}×${e.mejor.kg}kg` : "sin marcas"}{e.yaPlanificado ? " · ya planificado" : ""}
+                          </span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             <div>
               <SectionLabel>Objetivo</SectionLabel>
-              <div className="grid grid-cols-3 gap-1.5 mt-2">
-                {PLANIF_OBJETIVOS.map((o) => {
+              <div className="grid grid-cols-2 gap-1.5 mt-2">
+                {PLAN_OBJETIVOS.map((o) => {
                   const act = objetivo === o.k;
                   return (
-                    <button key={o.k} onClick={() => setObjetivo(o.k)} className="rounded-xl px-2 py-2.5 text-center transition active:scale-[0.97]"
+                    <button key={o.k} onClick={() => setObjetivo(o.k)} className="rounded-xl px-2 py-2 text-left transition active:scale-[0.97]"
                       style={act ? { backgroundColor: tint(o.color, "1c"), border: "1px solid " + tint(o.color, "55") } : { backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}>
                       <span className="block text-[11px] font-black" style={{ color: act ? o.color : "#e2e8f0" }}>{o.l}</span>
                       <span className="block text-[9px] text-slate-500 leading-tight mt-0.5">{o.d}</span>
@@ -6962,13 +7104,65 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, onClose, onApply })
               </div>
             </div>
 
+            <div>
+              <SectionLabel>Tu experiencia</SectionLabel>
+              <div className="grid grid-cols-3 gap-1.5 mt-2">
+                {PLAN_NIVELES.map((n) => {
+                  const act = nivel === n.k;
+                  return (
+                    <button key={n.k} onClick={() => setNivel(n.k)} className="rounded-xl px-1.5 py-2 text-center transition active:scale-[0.97]"
+                      style={act ? { backgroundColor: tint(accent, "1c"), border: `1px solid ${tint(accent, "55")}` } : { backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}>
+                      <span className="block text-[10.5px] font-black" style={{ color: act ? accent : "#e2e8f0" }}>{n.l}</span>
+                      <span className="block text-[8.5px] text-slate-500 leading-tight mt-0.5">{n.d}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Ajustes finos: lo que separa un plan genérico de uno tuyo. Van
+                plegados porque los defaults ya son razonables. */}
+            <div className="rounded-xl border border-slate-800/60 bg-slate-950/40 overflow-hidden">
+              <button onClick={() => setVerAjustes((v) => !v)} className="w-full flex items-center gap-2 px-3 py-2.5 text-left">
+                <Sliders size={12} className="shrink-0" style={{ color: accent }} />
+                <span className="flex-1 text-[11px] font-bold text-white">Ajustes finos</span>
+                <ChevronDown size={14} className={`text-slate-500 shrink-0 transition-transform ${verAjustes ? "rotate-180" : ""}`} />
+              </button>
+              {verAjustes && (
+                <div className="px-3 pb-3 space-y-2 tab-fade-in">
+                  {[
+                    { on: respetarRango, set: setRespetarRango, l: "Respetar el rango de reps", d: "No cambia el 8-12 de tu rutina para poder subir más kilos" },
+                    { on: soloVacios, set: setSoloVacios, l: "No pisar lo ya planificado", d: "Sólo completa los ejercicios que todavía no tienen meta" },
+                    { on: conRpe, set: setConRpe, l: "Incluir RPE y fases", d: "Suma el esfuerzo objetivo y la fase del mesociclo a cada semana" },
+                  ].map((t) => (
+                    <button key={t.l} onClick={() => t.set(!t.on)} className="w-full flex items-center gap-2.5 text-left">
+                      <span className="w-8 h-[18px] rounded-full shrink-0 relative transition-colors" style={{ backgroundColor: t.on ? accent : "#334155" }}>
+                        <span className="absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white transition-all" style={{ left: t.on ? "16px" : "2px" }} />
+                      </span>
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-[11px] font-bold text-white">{t.l}</span>
+                        <span className="block text-[9.5px] text-slate-500 leading-snug">{t.d}</span>
+                      </span>
+                    </button>
+                  ))}
+                  <div>
+                    <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Algo que tenga en cuenta</span>
+                    <textarea value={nota} onChange={(e) => setNota(e.target.value)} rows={2} maxLength={300}
+                      placeholder="Ej: vengo de una lesión de hombro, no tengo discos de 1.25kg, entreno 3 veces por semana..."
+                      className="w-full bg-slate-900 border border-slate-700/50 rounded-xl px-3 py-2 text-white text-[11.5px] focus:outline-none resize-none" />
+                    <p className="text-[9.5px] text-slate-600 mt-1">Se guarda para la próxima vez. Pesa más que las reglas generales.</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <p className="text-[10.5px] text-slate-500 leading-snug">
-              La IA arranca desde tu mejor marca de cada ejercicio y sube de a poco, subiendo el RPE dentro del bloque y bajando el volumen al final. Vas a poder ver el plan entero antes de aplicarlo.
+              Arranca desde tu mejor marca de cada ejercicio, mira tus últimas sesiones para saber si venís subiendo o estancado, y sube de a poco. Vas a poder ver el plan entero antes de aplicarlo.
             </p>
 
             <button onClick={generar} disabled={!seleccionados.length} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white text-sm font-bold transition active:scale-[0.98] disabled:opacity-40"
-              style={{ backgroundColor: "#38BDF8", boxShadow: "0 10px 26px -10px rgba(56,189,248,0.8)" }}>
-              <Sparkles size={15} /> Armar el plan
+              style={{ backgroundColor: accent, boxShadow: "0 10px 26px -10px rgba(56,189,248,0.8)" }}>
+              <Sparkles size={15} /> {seleccionados.length ? `Armar el plan · ${seleccionados.length} ejercicio${seleccionados.length === 1 ? "" : "s"}` : "Elegí al menos un ejercicio"}
             </button>
           </div>
         )}
@@ -6977,7 +7171,7 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, onClose, onApply })
           <div className="p-8 flex flex-col items-center gap-3 text-center">
             <div className="w-10 h-10 rounded-full border-[3px] border-sky-500/25 border-t-sky-400 animate-spin" />
             <p className="text-sm font-bold text-white">Armando tu plan…</p>
-            <p className="text-[11px] text-slate-500">{seleccionados.length} ejercicios × {semanas} semanas. Puede tardar unos segundos.</p>
+            <p className="text-[11px] text-slate-500">{seleccionados.length} ejercicios × {semanasReales} semanas. Puede tardar unos segundos.</p>
           </div>
         )}
 
@@ -6987,7 +7181,10 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, onClose, onApply })
               <AlertTriangle size={15} className="text-rose-400 shrink-0 mt-0.5" />
               <p className="text-[11.5px] text-rose-300/90 flex-1">{error}</p>
             </div>
-            <button onClick={() => setEstado("form")} className="w-full py-3 rounded-xl bg-slate-800 text-slate-200 text-sm font-bold">Volver</button>
+            <div className="flex gap-2">
+              <button onClick={() => setEstado("form")} className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-200 text-sm font-bold">Volver</button>
+              <button onClick={generar} className="flex-1 py-3 rounded-xl !text-white text-sm font-black" style={{ backgroundColor: accent }}>Reintentar</button>
+            </div>
           </div>
         )}
 
@@ -6996,7 +7193,7 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, onClose, onApply })
             <div className="flex items-center gap-2 rounded-xl px-3 py-2.5 bg-sky-500/10 border border-sky-500/25">
               <ClipboardCheck size={14} className="text-sky-400 shrink-0" />
               <p className="text-[11.5px] text-sky-200/90 flex-1">
-                {porEjercicio.length} ejercicio{porEjercicio.length === 1 ? "" : "s"} · {semanas} semana{semanas === 1 ? "" : "s"}. Revisalo antes de aplicar.
+                {aAplicar.length} ejercicio{aAplicar.length === 1 ? "" : "s"} · semanas {desdeSemana} a {desdeSemana + semanasReales - 1}. Tocá uno para sacarlo.
               </p>
             </div>
             {plan.noReconocidos.length > 0 && (
@@ -7005,27 +7202,47 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, onClose, onApply })
               </p>
             )}
             <div className="space-y-2">
-              {porEjercicio.map((g, i) => (
-                <div key={i} className="rounded-xl px-3 py-2.5" style={{ backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}>
-                  <p className="text-[11.5px] font-bold text-white truncate mb-1.5">{g.nombre}</p>
-                  {g.series.map((s) => (
-                    <div key={s.setIndex} className="flex items-center gap-1.5 mb-1 last:mb-0">
-                      <span className="text-[9px] font-black text-slate-600 shrink-0 w-5">S{s.setIndex + 1}</span>
-                      <div className="flex-1 flex gap-1 overflow-x-auto">
-                        {s.entries.map((e) => (
-                          <span key={e.week} className="shrink-0 px-1.5 py-0.5 rounded-md text-[9.5px] font-bold tabular-nums" style={{ backgroundColor: tint("#38BDF8", "14"), color: "#7dd3fc" }} title={e.phase || ""}>
-                            {e.reps}×{e.kg}
-                          </span>
-                        ))}
+              {porEjercicio.map((g) => {
+                const fuera = descartados.has(g.id);
+                const salto = g.desde != null && g.hasta != null ? g.hasta - g.desde : null;
+                return (
+                  <div key={g.id} className="rounded-xl px-3 py-2.5 transition" style={{ backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)", opacity: fuera ? 0.4 : 1 }}>
+                    <button onClick={() => setDescartados((prev) => { const n = new Set(prev); if (n.has(g.id)) n.delete(g.id); else n.add(g.id); return n; })} className="w-full flex items-center gap-2 mb-1.5 text-left">
+                      <span className="w-4 h-4 rounded-md shrink-0 flex items-center justify-center" style={!fuera ? { backgroundColor: accent } : { border: "1px solid #475569" }}>
+                        {!fuera && <Check size={11} className="text-white" strokeWidth={3.5} />}
+                      </span>
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-[11.5px] font-bold text-white truncate">{g.nombre}</span>
+                        {/* Lo que de verdad querés saber de un vistazo: de
+                            dónde a dónde te lleva, y cómo se para eso contra
+                            tu mejor marca de hoy. */}
+                        <span className="block text-[9.5px] text-slate-500 truncate">
+                          {g.desde}kg → {g.hasta}kg{salto != null && salto !== 0 ? ` (${salto > 0 ? "+" : ""}${roundKg(salto)}kg)` : ""}
+                          {g.mejor ? ` · tu mejor ${g.mejor.reps}×${g.mejor.kg}kg` : " · sin marcas previas"}
+                        </span>
+                      </span>
+                    </button>
+                    {g.series.map((s) => (
+                      <div key={s.setIndex} className="flex items-center gap-1.5 mb-1 last:mb-0">
+                        <span className="text-[9px] font-black text-slate-600 shrink-0 w-5">S{s.setIndex + 1}</span>
+                        <div className="flex-1 flex gap-1 overflow-x-auto">
+                          {s.entries.map((e) => (
+                            <span key={e.week} className="shrink-0 px-1.5 py-0.5 rounded-md text-[9.5px] font-bold tabular-nums" style={{ backgroundColor: tint(accent, "14"), color: "#7dd3fc" }} title={`Semana ${e.week}${e.phase ? ` · ${e.phase}` : ""}${e.rpe != null ? ` · RPE ${e.rpe}` : ""}`}>
+                              {e.reps}×{e.kg}
+                            </span>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              ))}
+                    ))}
+                  </div>
+                );
+              })}
             </div>
             <div className="flex gap-2 pt-1">
               <button onClick={() => setEstado("form")} className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-300 text-sm font-bold">Cambiar</button>
-              <button onClick={aplicar} className="flex-1 py-3 rounded-xl !text-white text-sm font-black transition active:scale-[0.98]" style={{ backgroundColor: "#38BDF8" }}>Aplicar plan</button>
+              <button onClick={aplicar} disabled={!aAplicar.length} className="flex-1 py-3 rounded-xl !text-white text-sm font-black transition active:scale-[0.98] disabled:opacity-40" style={{ backgroundColor: accent }}>
+                Aplicar {aAplicar.length ? `· ${aAplicar.length}` : ""}
+              </button>
             </div>
           </div>
         )}
@@ -7076,6 +7293,10 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
   // de 2 botones en vez de un modal (ver el JSX más abajo).
   const [showSelfProgression, setShowSelfProgression] = useState(false);
   const [showPlanificadorIA, setShowPlanificadorIA] = useState(false);
+  // Con qué pestaña abre el planificador manual: "editar" desde el botón de
+  // planificar, "resumen" desde la línea de estado del plan (que es una
+  // pregunta distinta: no "quiero cargar metas" sino "qué tengo cargado").
+  const [progressionView, setProgressionView] = useState("editar");
   // BUG FIX (pedido: "cuando elegís uno u otro veo que no cambia nada") —
   // pasar a "Planificada" no cambia NADA por sí solo: hace falta además
   // cargar al menos una meta con "Planificar mi progresión" (sin eso,
@@ -7091,6 +7312,9 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
       (d.exercises || []).some((ex) => (ex.sets || []).some((s) => Array.isArray(s.plannedProgression) && s.plannedProgression.length > 0))
     );
   }, [activeRoutineDef]);
+  // Cuántos ejercicios siguen el plan y cuántos volvieron a perseguir el
+  // récord — alimenta la línea de estado de la tarjeta de modo.
+  const planResumen = useMemo(() => (activeRoutineDef ? summarizeRoutinePlan(buildRoutineModel(activeRoutineDef), weekInCycle) : null), [activeRoutineDef, weekInCycle]);
   // Dirección del último cambio de día, para que las tarjetas entren
   // deslizándose desde el lado correcto (como pasar páginas).
   const gridRef = useRef(null);
@@ -7226,7 +7450,33 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
               <ClipboardCheck size={14} /> <span>Planificada</span>
             </button>
           </div>
-          {settings.trainingMode === "planned" && onApplyOwnProgression && (
+          {/* Pedido: "el poder quitar o pasar ejercicios de planificados a
+              por récord de manera sencilla" — el estado del plan a la vista,
+              y un toque para gobernarlo. Antes había que abrir el
+              planificador y recorrer ejercicio por ejercicio para saber
+              siquiera qué estaba planificado. */}
+          {planResumen && (planResumen.planificados.length > 0 || planResumen.pausados.length > 0) && (
+            <button onClick={() => { setProgressionView("resumen"); setShowSelfProgression(true); }} className="relative w-full flex items-center gap-2 mt-2.5 px-3 py-2 rounded-xl transition active:scale-[0.99]" style={{ backgroundColor: "rgba(2,6,23,0.45)", border: "1px solid rgba(20,184,166,0.18)" }}>
+              <ClipboardCheck size={13} className="shrink-0 text-teal-400" />
+              <span className="flex-1 min-w-0 text-left text-[10.5px] leading-snug text-teal-100/85">
+                <b className="tabular-nums">{planResumen.planificados.length}</b> {planResumen.planificados.length === 1 ? "ejercicio sigue" : "ejercicios siguen"} el plan
+                {planResumen.pausados.length > 0 && <> · <b className="tabular-nums">{planResumen.pausados.length}</b> por récord</>}
+              </span>
+              <ChevronRight size={13} className="shrink-0 text-teal-400/70" />
+            </button>
+          )}
+          {/* El interruptor general en "Récord" apaga TODAS las metas (ver
+              getPlannedTargetForWeek). Si tenés un plan cargado eso se puede
+              leer como "se me borró el plan", así que se dice en voz alta y
+              con la forma de arreglarlo al lado. */}
+          {settings.trainingMode !== "planned" && hasAnyPlan && (
+            <div className="relative flex items-center gap-2 mt-2 px-3 py-2 rounded-xl" style={{ backgroundColor: "rgba(245,158,11,0.10)", border: "1px solid rgba(245,158,11,0.28)" }}>
+              <AlertTriangle size={12} className="shrink-0 text-amber-400" />
+              <p className="flex-1 text-[10px] leading-snug text-amber-200/90">Tenés metas cargadas, pero en modo Récord no se persiguen.</p>
+              <button onClick={() => onUpdateSettings({ trainingMode: "planned" })} className="shrink-0 px-2 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-200 text-[9.5px] font-black">Activar</button>
+            </div>
+          )}
+          {onApplyOwnProgression && (
             <>
               {/* Pedido: "cuando elegís uno u otro veo que no cambia nada" —
                   sin ninguna meta cargada todavía, el toggle de arriba no
@@ -7234,19 +7484,20 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
                   sin plan, cada serie sigue mostrando tu récord de
                   siempre). Este aviso deja explícito el paso que falta, en
                   vez de dejar que el silencio se sienta como que "no anda". */}
-              {!hasAnyPlan && (
+              {!hasAnyPlan && settings.trainingMode === "planned" && (
                 <p className="relative text-[10.5px] text-teal-200/80 text-center mt-2.5 leading-snug">
-                  Todavía no cargaste ninguna meta. Elegí un ejercicio abajo para ver la diferencia.
+                  Todavía no cargaste ninguna meta. Planificá una para ver la diferencia.
                 </p>
               )}
-              {/* Color plano como "Iniciar sesión", pero FIJO en el teal de
-                  esta tarjeta y no en day.color: es una acción sobre tu
-                  modo de entrenamiento, no sobre el día que estés mirando,
-                  así que cambiar de color al pasar de Push a Pull no
-                  significaba nada. Y más chico que "Iniciar sesión" a
-                  propósito: esa es la acción principal de la pantalla,
-                  ésta es secundaria. */}
-              <button onClick={() => setShowSelfProgression(true)} disabled={!activeRoutineDef} className={`relative w-full flex items-center justify-center gap-2 py-2.5 mt-2.5 rounded-xl text-white text-xs font-bold transition-all active:scale-[0.98] disabled:opacity-40 ${!hasAnyPlan ? "invite-pulse" : ""}`} style={{ backgroundColor: "#14B8A6", "--invite-glow": "rgba(20,184,166,0.6)" }}>
+              {/* Los dos planificadores dejan de estar escondidos detrás del
+                  modo: antes había que acertar primero el toggle para verlos,
+                  y quien no lo hacía concluía que la app no planificaba. Al
+                  guardar una meta el modo pasa solo a "Planificada" (ver
+                  handleApplyOwnProgression), así que no hay orden que
+                  aprender. Color plano como "Iniciar sesión" pero FIJO en el
+                  teal de esta tarjeta, y más chico: la acción principal de la
+                  pantalla es entrenar, ésta es secundaria. */}
+              <button onClick={() => { setProgressionView("editar"); setShowSelfProgression(true); }} disabled={!activeRoutineDef} className={`relative w-full flex items-center justify-center gap-2 py-2.5 mt-2.5 rounded-xl text-white text-xs font-bold transition-all active:scale-[0.98] disabled:opacity-40 ${!hasAnyPlan && settings.trainingMode === "planned" ? "invite-pulse" : ""}`} style={{ backgroundColor: "#14B8A6", "--invite-glow": "rgba(20,184,166,0.6)" }}>
                 <Sliders size={13} /> {hasAnyPlan ? "Planificar mi progresión" : "Planificar mi primera meta"}
               </button>
               {/* Atajo al planificador con IA: el botón de arriba arma las
@@ -7519,6 +7770,9 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           routineDef={activeRoutineDef}
           trainWeeks={settings.trainWeeks}
           logs={logs}
+          settings={settings}
+          weekInCycle={weekInCycle}
+          onSavePrefs={onUpdateSettings}
           onClose={() => setShowPlanificadorIA(false)}
           onApply={(planes) => onApplyOwnProgression(planes)}
         />
@@ -7530,6 +7784,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           trainWeeks={settings.trainWeeks}
           logs={logs}
           weekInCycle={weekInCycle}
+          initialView={progressionView}
           planPrefs={settings}
           onSavePrefs={onUpdateSettings}
           onSetPlanPaused={onSetPlanPaused}
@@ -12189,15 +12444,24 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
               Todavía no cargaste ninguna meta. Sin eso, tus series siguen mostrando tu récord de siempre.
             </p>
           )}
+          {/* En modo Récord las metas cargadas dejan de perseguirse (ver
+              getPlannedTargetForWeek): se dice en voz alta, porque si no se
+              lee como que el plan se perdió. */}
+          {settings.trainingMode !== "planned" && hasAnyPlan && (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/25">
+              <AlertTriangle size={13} className="shrink-0 text-amber-400" />
+              <p className="flex-1 text-[10.5px] leading-snug text-amber-200/90">Tenés metas cargadas, pero en este modo no se persiguen. Siguen guardadas.</p>
+            </div>
+          )}
           {/* Mismo tamaño y criterio que su gemelo en Rutina: color plano y
               fijo (acá el celeste de la sección "Modo de entrenamiento"),
-              y contenido, porque es una acción secundaria. */}
-          {settings.trainingMode === "planned" && (
-            <button onClick={() => setShowSelfProgression(true)} disabled={!activeRoutineDef} className={`w-full flex items-center gap-2 justify-center py-2.5 rounded-xl text-white text-xs font-bold transition-all active:scale-[0.98] disabled:opacity-40 ${!hasAnyPlan ? "invite-pulse" : ""}`} style={{ backgroundColor: "#38BDF8", "--invite-glow": "rgba(56,189,248,0.6)" }}>
-              <Sliders size={13} /> {hasAnyPlan ? "Planificar mi progresión" : "Planificar mi primera meta"}
-            </button>
-          )}
-          {!activeRoutineDef && settings.trainingMode === "planned" && <p className="text-[10.5px] text-slate-600 text-center -mt-1">Activá una rutina primero, en la pestaña Rutinas.</p>}
+              y contenido, porque es una acción secundaria. Ya no depende del
+              modo elegido: guardar una meta lo pasa solo a "planificada",
+              así que no hay un orden que haya que acertar primero. */}
+          <button onClick={() => setShowSelfProgression(true)} disabled={!activeRoutineDef} className={`w-full flex items-center gap-2 justify-center py-2.5 rounded-xl text-white text-xs font-bold transition-all active:scale-[0.98] disabled:opacity-40 ${!hasAnyPlan && settings.trainingMode === "planned" ? "invite-pulse" : ""}`} style={{ backgroundColor: "#38BDF8", "--invite-glow": "rgba(56,189,248,0.6)" }}>
+            <Sliders size={13} /> {hasAnyPlan ? "Planificar mi progresión" : "Planificar mi primera meta"}
+          </button>
+          {!activeRoutineDef && <p className="text-[10.5px] text-slate-600 text-center -mt-1">Activá una rutina primero, en la pestaña Rutinas.</p>}
         </div>
       </CollapsibleSection>
       {showSelfProgression && activeRoutineDef && (
@@ -13647,20 +13911,7 @@ const PROGRESSION_TEMPLATES = [
 //  - "Aplicar a todas las series de este ejercicio": antes había que
 //    repetir el formulario entero serie por serie para una rutina de 3-4
 //    series por ejercicio (el caso más común).
-// Objetivos del plan: además de recordarse de una planificación a la
-// siguiente (settings.planObjetivo), cada uno trae sus propias variables de
-// partida — no es lo mismo planificar fuerza (pocas reps, saltos grandes)
-// que hipertrofia (más reps, saltos chicos). Los mismos cuatro que ofrece el
-// planificador con IA, para que las dos formas de planificar hablen igual.
-const PLAN_OBJETIVOS = [
-  { k: "fuerza", l: "Fuerza", d: "Pocas reps, cargas altas", color: "#F43F5E", reps: 5, tope: 6, inc: 2.5 },
-  { k: "hipertrofia", l: "Hipertrofia", d: "Reps medias, volumen alto", color: "#A855F7", reps: 10, tope: 12, inc: 2.5 },
-  { k: "mixto", l: "Mixto", d: "Compuestos pesados, aislados con más reps", color: "#3B82F6", reps: 8, tope: 12, inc: 2.5 },
-  { k: "mantenimiento", l: "Mantener", d: "Cargas planas, sin forzar", color: "#10B981", reps: 8, tope: 8, inc: 0 },
-];
-const planObjetivoDe = (k) => PLAN_OBJETIVOS.find((o) => o.k === k) || PLAN_OBJETIVOS[2];
-
-function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onSubmit, mode = "trainer", studentName = null, logs = null, weekInCycle = null, planPrefs = null, onSavePrefs = null, onSetPlanPaused = null, onRemovePlan = null }) {
+function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onSubmit, mode = "trainer", studentName = null, logs = null, weekInCycle = null, initialView = "editar", planPrefs = null, onSavePrefs = null, onSetPlanPaused = null, onRemovePlan = null }) {
   useAndroidBack(onClose);
   const model = useMemo(() => (routineSnapshot ? buildRoutineModel(routineSnapshot) : null), [routineSnapshot]);
   const exercises = useMemo(() => Object.values(model?.exerciseById || {}), [model]);
@@ -13688,7 +13939,7 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
   // es sólo para tu propia rutina: un entrenador propone metas, no maneja el
   // interruptor plan/récord de su alumno.
   const puedeGestionar = mode === "self" && !!onSetPlanPaused && !!onRemovePlan;
-  const [vista, setVista] = useState("editar");
+  const [vista, setVista] = useState(initialView);
   // Ejercicio abierto en detalle (para editar serie por serie y/o aplicar
   // una plantilla multi-semana). Cerrado = se edita el ejercicio entero de
   // una (todas sus series con el mismo valor), que es el caso común.
@@ -15635,6 +15886,12 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
                     const model = buildRoutineModel(activeDef);
                     applied = plans.some((plan) => model.exerciseById[plan.exerciseId]?.sets?.[plan.setIndex]);
                     onActivateRoutine(activeId, applyProgressionToRoutine(activeDef, p.progressionPlan));
+                    // Aceptar el plan de tu entrenador te pone en modo
+                    // planificado: si te quedabas en "Récord", las metas que
+                    // acabás de aceptar no se perseguían en ningún lado y el
+                    // trabajo de tu entrenador quedaba invisible (ver
+                    // getPlannedTargetForWeek).
+                    if (applied && onUpdateProfile) onUpdateProfile({ settings: { ...getProfileSettings(profile), trainingMode: "planned" } });
                   }
                 } else if (p.proposedRoutine) {
                   onActivateRoutine(builderUid("routine_proposal"), p.proposedRoutine);
