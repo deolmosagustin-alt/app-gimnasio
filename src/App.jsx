@@ -7306,8 +7306,20 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_
 
             <button onClick={generar} disabled={!seleccionados.length} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white text-sm font-bold transition active:scale-[0.98] disabled:opacity-40"
               style={{ backgroundColor: accent, boxShadow: "0 10px 26px -10px rgba(56,189,248,0.8)" }}>
-              <Sparkles size={15} /> {seleccionados.length ? `Armar el plan · ${seleccionados.length} ejercicio${seleccionados.length === 1 ? "" : "s"}` : "Elegí al menos un ejercicio"}
+              {/* Si el que dejó la lista vacía fue el filtro "no pisar lo ya
+                  planificado", decirlo: "elegí al menos un ejercicio" manda a
+                  buscar un problema que no está en la selección. */}
+              <Sparkles size={15} /> {seleccionados.length
+                ? `Armar el plan · ${seleccionados.length} ejercicio${seleccionados.length === 1 ? "" : "s"}`
+                : soloVacios && candidatos.length && candidatos.every((e) => e.yaPlanificado || excluidos.has(e.id))
+                  ? "Ya están todos planificados"
+                  : "Elegí al menos un ejercicio"}
             </button>
+            {!seleccionados.length && soloVacios && candidatos.length > 0 && candidatos.every((e) => e.yaPlanificado || excluidos.has(e.id)) && (
+              <p className="text-[10.5px] text-slate-500 text-center leading-snug -mt-1">
+                Tenés activado "No pisar lo ya planificado" en Ajustes finos. Apagalo para rehacer los planes que ya existen.
+              </p>
+            )}
           </div>
         )}
 
@@ -14282,7 +14294,7 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
     const best = marcasPorEjercicio[ex.id]?.best;
     return best ? String(best.kg) : "";
   };
-  const applyTemplate = (ex, tpl) => {
+  const applyTemplate = (ex, tpl, guardarTambien = true) => {
     const kg = parseFloat(tplKgDe(ex));
     const reps = parseInt(tplReps, 10);
     if (isNaN(kg) || kg <= 0 || isNaN(reps) || reps <= 0) return;
@@ -14301,13 +14313,17 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
       });
       return next;
     });
-    guardarPrefs();
+    if (guardarTambien) guardarPrefs();
   };
   // Aplicar la MISMA plantilla a todos los ejercicios del día, cada uno
   // partiendo de su propia mejor marca. Un ciclo entero de un día completo
   // en un toque, y después se ajusta lo que haga falta a mano.
+  // Las preferencias se guardan UNA vez al final y no una por ejercicio:
+  // cada guardado reescribe el perfil entero (y lo sincroniza), así que
+  // hacerlo ocho veces seguidas por un solo toque era puro desperdicio.
   const applyTemplateToDay = (tpl) => {
-    dayExercises.forEach((ex) => { if (!ex.cardio) applyTemplate(ex, tpl); });
+    dayExercises.forEach((ex) => { if (!ex.cardio) applyTemplate(ex, tpl, false); });
+    guardarPrefs();
   };
 
   // Borra SÓLO lo escrito en este formulario (no toca lo ya guardado en la
