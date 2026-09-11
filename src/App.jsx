@@ -7582,10 +7582,18 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
         <div className="relative overflow-hidden rounded-2xl border border-teal-500/20 p-3.5" style={{ background: "var(--grad-hero-teal)" }}>
           <div className="absolute -top-8 -right-6 w-24 h-24 rounded-full bg-teal-500/15 blur-2xl pointer-events-none" />
           <div className="absolute -bottom-6 -left-6 w-20 h-20 rounded-full bg-cyan-500/10 blur-2xl pointer-events-none" />
-          <div className="relative flex items-center gap-1.5 mb-2.5">
+          <div className="relative flex items-center gap-1.5 mb-1">
             <Target size={13} className="text-teal-400 shrink-0" />
             <p className="text-[10px] font-black uppercase tracking-widest text-teal-400">Modo de entrenamiento</p>
           </div>
+          {/* El alcance del interruptor, dicho en voz alta: sin esto no se
+              entendía en qué se diferencia de pasar un ejercicio suelto a
+              récord desde su chip, y el de arriba parecía sobrar. Este es de
+              toda la rutina y NO pisa lo que elegiste ejercicio por
+              ejercicio: al volver a "Planificada" cada uno queda como estaba. */}
+          <p className="relative text-[10px] text-teal-200/60 leading-snug mb-2.5">
+            Para toda la rutina. Cada ejercicio puede pasar a récord por su cuenta con su chip <b>PLAN</b>, y eso se respeta al volver acá.
+          </p>
           {/* BUG FIX (pedido: "el recuadro de selección de modo de
               entrenamiento no encastra bien con el espacio que tiene"): el
               pill deslizante de fondo calculaba su posición/ancho a mano
@@ -14456,22 +14464,23 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
                     </p>
                   ) : (
                     <>
-                      {/* Acciones sobre todo el plan de una: volver a récord
-                          una semana entera (una lesión, un viaje, una semana
-                          floja) sin tener que tocar ejercicio por ejercicio,
-                          y sin perder nada de lo planificado. */}
-                      <div className="flex gap-1.5">
-                        <button onClick={() => resumen.planificados.forEach((e) => onSetPlanPaused(e.id, true))} disabled={!resumen.planificados.length}
-                          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[10.5px] font-bold transition active:scale-[0.98] disabled:opacity-30"
-                          style={{ backgroundColor: "rgba(148,163,184,0.12)", color: "#cbd5e1", border: "1px solid rgba(148,163,184,0.22)" }}>
-                          <Trophy size={11} /> Todos a récord
-                        </button>
-                        <button onClick={() => resumen.pausados.forEach((e) => onSetPlanPaused(e.id, false))} disabled={!resumen.pausados.length}
-                          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[10.5px] font-bold transition active:scale-[0.98] disabled:opacity-30"
+                      {/* Acá había también un "Todos a récord", y era una
+                          segunda forma de hacer lo MISMO que el interruptor
+                          de modo de la pantalla de Rutina — sólo que peor:
+                          el interruptor apaga las metas sin tocar nada y se
+                          deshace de un toque, mientras que esto escribía la
+                          elección adentro de cada ejercicio. Dos caminos para
+                          la misma decisión es lo que hacía parecer que uno de
+                          los dos sobraba. Queda sólo la vuelta, que el
+                          interruptor NO puede hacer: deshacer de una todas
+                          las pausas que pusiste ejercicio por ejercicio. */}
+                      {resumen.pausados.length > 0 && (
+                        <button onClick={() => resumen.pausados.forEach((e) => onSetPlanPaused(e.id, false))}
+                          className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-[10.5px] font-bold transition active:scale-[0.98]"
                           style={{ backgroundColor: tint(accent, "1c"), color: "#7dd3fc", border: `1px solid ${tint(accent, "45")}` }}>
-                          <ClipboardCheck size={11} /> Todos al plan
+                          <ClipboardCheck size={11} /> {resumen.pausados.length === 1 ? "Devolver ese ejercicio al plan" : `Devolver los ${resumen.pausados.length} al plan`}
                         </button>
-                      </div>
+                      )}
                       <div className="space-y-1.5">
                         {[...resumen.planificados, ...resumen.pausados].map((e) => (
                           <div key={e.id} className="rounded-xl px-2.5 py-2" style={{ backgroundColor: e.pausado ? "var(--row-surface)" : tint(accent, "10"), border: `1px solid ${e.pausado ? "var(--chip-border)" : tint(accent, "2e")}` }}>
