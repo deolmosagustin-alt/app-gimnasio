@@ -13152,6 +13152,8 @@ function SocialSearchSection({ myUid, friendStatus, onSendFriendRequest }) {
 // alumno: colapsada muestra quién la mandó, expandida deja ver la rutina
 // completa (RoutinePreview) y aceptar/rechazar.
 function RoutineProposalCard({ proposal, basic, onRespond }) {
+  // El alumno lee el plan en SU unidad; viaja en kg, como siempre.
+  const unitProp = useWeightUnit();
   const [expanded, setExpanded] = useState(false);
   const [busy, setBusy] = useState(false);
   // Dos tipos de propuesta comparten esta misma tarjeta/colección (ver
@@ -13161,12 +13163,37 @@ function RoutineProposalCard({ proposal, basic, onRespond }) {
   // datos, nunca los dos a la vez.
   const isProgression = !!proposal.progressionPlan;
   const accentColor = isProgression ? "#38BDF8" : "#14B8A6";
+  // BUG FIX: esto asumía que progressionPlan era SIEMPRE un solo
+  // {exerciseName, entries}. Desde que el planificador manda todo junto, un
+  // entrenador que planifica más de un ejercicio (o más de una serie) manda
+  // un ARRAY — ver handleSubmit en ProgressionProposalComposer. Con un array,
+  // el título decía "te propuso metas para undefined" y, al desplegar la
+  // tarjeta, `.entries.map` reventaba: el alumno no podía ni mirar la
+  // propuesta, mucho menos aceptarla. Se normaliza a lista y se agrupa por
+  // ejercicio, que además es como se lee un plan de verdad.
+  const planes = useMemo(() => {
+    const p = proposal.progressionPlan;
+    if (!p) return [];
+    return (Array.isArray(p) ? p : [p]).filter((x) => x && Array.isArray(x.entries) && x.entries.length);
+  }, [proposal.progressionPlan]);
+  const porEjercicio = useMemo(() => {
+    const map = {};
+    planes.forEach((p) => {
+      const nombre = p.exerciseName || p.exerciseId || "Ejercicio";
+      (map[nombre] ||= []).push(p);
+    });
+    return Object.entries(map).map(([nombre, series]) => ({ nombre, series: [...series].sort((a, b) => (a.setIndex || 0) - (b.setIndex || 0)) }));
+  }, [planes]);
+  const semanas = useMemo(() => new Set(planes.flatMap((p) => p.entries.map((e) => e.week))).size, [planes]);
+  const tituloPlan = porEjercicio.length === 0 ? "un plan"
+    : porEjercicio.length === 1 ? `metas para ${porEjercicio[0].nombre}`
+      : `un plan para ${porEjercicio.length} ejercicios`;
   return (
     <div className="rounded-2xl border overflow-hidden" style={{ borderColor: tint(accentColor, "25"), backgroundColor: tint(accentColor, "0a") }}>
       <button onClick={() => setExpanded((v) => !v)} className="w-full flex items-center gap-3 px-3.5 py-3 text-left">
         {basic?.avatarData ? <img src={basic.avatarData} alt="" className="w-9 h-9 rounded-xl object-cover shrink-0" /> : <div className="w-9 h-9 rounded-xl flex items-center justify-center text-sm font-black !text-white shrink-0" style={{ background: "linear-gradient(135deg,#A855F7,#7C3AED)" }}>{(basic?.name || "?").charAt(0).toUpperCase()}</div>}
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-bold text-white truncate">{basic?.name || "Tu entrenador"} te propuso {isProgression ? `metas para ${proposal.progressionPlan.exerciseName}` : "una rutina"}</p>
+          <p className="text-sm font-bold text-white leading-snug" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{basic?.name || "Tu entrenador"} te propuso {isProgression ? tituloPlan : "una rutina"}</p>
           {proposal.note && <p className="text-[11px] text-slate-500 truncate">"{proposal.note}"</p>}
         </div>
         <ChevronDown size={15} className={`text-slate-600 shrink-0 transition-transform ${expanded ? "rotate-180" : ""}`} />
@@ -13174,11 +13201,25 @@ function RoutineProposalCard({ proposal, basic, onRespond }) {
       {expanded && (
         <div className="px-3.5 pb-3.5 space-y-3">
           {isProgression ? (
-            <div className="flex gap-2 overflow-x-auto pb-1">
-              {proposal.progressionPlan.entries.map((e) => (
-                <div key={e.week} className="shrink-0 rounded-xl border border-sky-500/25 bg-sky-500/10 px-3 py-2 text-center min-w-[64px]">
-                  <p className="text-[9px] font-black text-sky-400 uppercase">Sem {e.week}</p>
-                  <p className="text-sm font-black text-white">{e.reps}×{e.kg}kg</p>
+            <div className="space-y-2">
+              {porEjercicio.length > 1 && (
+                <p className="text-[10px] text-sky-300/80">{porEjercicio.length} ejercicios · {semanas} semana{semanas === 1 ? "" : "s"}</p>
+              )}
+              {porEjercicio.map((g) => (
+                <div key={g.nombre} className="rounded-xl px-3 py-2" style={{ backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}>
+                  <p className="text-[11.5px] font-bold text-white truncate mb-1.5">{g.nombre}</p>
+                  {g.series.map((s) => (
+                    <div key={s.setIndex ?? 0} className="flex items-center gap-1.5 mb-1 last:mb-0">
+                      {g.series.length > 1 && <span className="text-[9px] font-black text-slate-600 shrink-0 w-5">S{(s.setIndex || 0) + 1}</span>}
+                      <div className="flex-1 flex gap-1 overflow-x-auto">
+                        {s.entries.map((e) => (
+                          <span key={e.week} className="shrink-0 px-1.5 py-0.5 rounded-md text-[9.5px] font-bold tabular-nums bg-sky-500/15 text-sky-300" title={`Semana ${e.week}${e.phase ? ` · ${e.phase}` : ""}${e.rpe != null ? ` · RPE ${e.rpe}` : ""}`}>
+                            {e.minutes != null ? `${e.minutes} min` : `${e.reps}×${kgToDisplay(e.kg, unitProp)}${weightLabel(unitProp)}`}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>
@@ -13329,11 +13370,46 @@ function TrainerTemplatesCard({ templates, onCreate, onEdit, onSend }) {
 // Sub-sección "Entrenador": vincularse (con rol explícito), solicitudes
 // pendientes, lista de alumnos/entrenador ya aceptados, y las propuestas
 // de rutina pendientes (si el que mira es alumno de alguien).
+// Bloque vacío con forma, en vez de una línea de texto gris suelta: el
+// resto de la app contesta "acá no hay nada todavía" con un ícono y una
+// frase que dice qué hacer, y esta sección era la única que no.
+function TrainerEmpty({ icon, titulo, detalle }) {
+  return (
+    <div className="flex items-center gap-3 rounded-2xl px-3.5 py-3" style={{ backgroundColor: "var(--row-surface)", border: "1px dashed var(--chip-border)" }}>
+      <span className="w-9 h-9 rounded-xl bg-slate-800/60 text-slate-600 flex items-center justify-center shrink-0">{icon}</span>
+      <div className="min-w-0">
+        <p className="text-[12px] font-bold text-slate-400 leading-tight">{titulo}</p>
+        <p className="text-[10.5px] text-slate-600 leading-snug mt-0.5">{detalle}</p>
+      </div>
+    </div>
+  );
+}
+
+// Rótulo de sección con su cuenta al lado — "MIS ALUMNOS" no decía cuántos,
+// y con tres o más listas iguales una arriba de otra el número es lo primero
+// que se busca.
+function TrainerSectionLabel({ children, n = null, accent = null }) {
+  return (
+    <div className="flex items-center gap-1.5 px-0.5">
+      <p className="text-[9.5px] font-black uppercase tracking-widest" style={{ color: accent || "#64748b" }}>{children}</p>
+      {n != null && n > 0 && (
+        <span className="text-[9px] font-black tabular-nums rounded-full px-1.5 py-px" style={{ backgroundColor: tint(accent || "#64748b", "22"), color: accent || "#94a3b8" }}>{n}</span>
+      )}
+    </div>
+  );
+}
+
 function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted, trainersAccepted, sentProposals, proposals, basics, streaks, linkStatusWith, linkSendError, onSendLink, onRespondLink, onRemoveLink, onRespondProposal, onViewStudent, onViewTrainer }) {
   const [raw, setRaw] = useState("");
   const [role, setRole] = useState("trainer"); // el rol que ELIJO para mí al mandar la solicitud
   const [searchState, setSearchState] = useState("idle");
   const [found, setFound] = useState(null);
+  // REDISEÑO: el formulario para vincular estaba ARRIBA DE TODO, encima de
+  // tus alumnos y de tu entrenador. Es algo que usás una vez por persona,
+  // mientras que la lista la mirás siempre — empujaba lo importante abajo
+  // del pliegue. Ahora va al final y plegado, salvo que no tengas ningún
+  // vínculo todavía: ahí es lo único que hay para hacer.
+  const [vinculando, setVinculando] = useState(() => studentsAccepted.length + trainersAccepted.length + trainerIncoming.length === 0);
 
   const handleSearch = async () => {
     const q = raw.trim();
@@ -13363,127 +13439,106 @@ function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted
     return arr;
   }, [studentsAccepted, streaks]);
 
+  // El estado de la última propuesta que le mandaste a CADA alumno. Antes
+  // "Propuestas enviadas" era una lista aparte, así que el mismo alumno
+  // aparecía dos veces en la pantalla (una en la lista y otra en la de
+  // propuestas) y había que cruzarlas a ojo. Ahora es un chip en su fila.
+  const ultimaPropuestaPorAlumno = useMemo(() => {
+    const map = {};
+    (sentProposals || []).forEach((p) => {
+      const prev = map[p.studentUid];
+      if (!prev || (p.createdAt || "") > (prev.createdAt || "")) map[p.studentUid] = p;
+    });
+    return map;
+  }, [sentProposals]);
+
+  const chipPropuesta = (uid) => {
+    const p = ultimaPropuestaPorAlumno[uid];
+    if (!p) return null;
+    const estilos = {
+      pending: { l: "Enviado", t: "Le mandaste un plan y todavía no respondió", c: "#94a3b8", bg: "rgba(148,163,184,0.14)" },
+      accepted: { l: "Aceptado", t: "Aceptó el plan que le mandaste", c: "#34d399", bg: "rgba(52,211,153,0.14)" },
+      rejected: { l: "Rechazado", t: "Rechazó el plan que le mandaste", c: "#fb7185", bg: "rgba(251,113,133,0.14)" },
+    };
+    const e = estilos[p.status] || estilos.pending;
+    return <span title={e.t} className="shrink-0 text-[9px] font-black rounded-md px-1.5 py-0.5" style={{ backgroundColor: e.bg, color: e.c }}>{e.l}</span>;
+  };
+
+  const soyEntrenador = studentsAccepted.length > 0;
+  const tengoEntrenador = trainersAccepted.length > 0;
+
   return (
     <div className="space-y-4">
+      {/* LO QUE ESPERA UNA RESPUESTA, PRIMERO. Antes las propuestas y las
+          solicitudes estaban mezcladas entre el formulario y las listas, con
+          el mismo peso visual que todo lo demás. */}
       {proposals.length > 0 && (
         <div className="space-y-2">
-          <SectionLabel accent="#2DD4BF">Propuestas de rutina</SectionLabel>
+          <TrainerSectionLabel n={proposals.length} accent="#2DD4BF">Te esperan</TrainerSectionLabel>
           {proposals.map((p) => (
             <RoutineProposalCard key={p.id} proposal={p} basic={basics[p.trainerUid]} onRespond={(accept) => onRespondProposal(p, accept)} />
           ))}
         </div>
       )}
 
-      {/* Sin tarjeta propia: esto ya vive DENTRO de la tarjeta de la sección
-          Entrenador, y una caja con borde adentro de otra con borde era
-          justo lo que se veía desprolijo. Queda como sub-bloque, con un
-          rótulo del mismo estilo que los demás. */}
-      <div className="space-y-2.5">
-        <SectionLabel>Vincular entrenador/alumno</SectionLabel>
-        <div className="flex bg-black/40 rounded-xl p-1 border border-slate-700/50">
-          <button onClick={() => setRole("trainer")} className={`flex-1 py-2 rounded-lg text-[11px] font-bold transition-all ${role === "trainer" ? "bg-blue-500 !text-white" : "text-slate-500"}`}>Soy el entrenador</button>
-          <button onClick={() => setRole("student")} className={`flex-1 py-2 rounded-lg text-[11px] font-bold transition-all ${role === "student" ? "bg-blue-500 !text-white" : "text-slate-500"}`}>Soy el alumno</button>
-        </div>
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" />
-            <input value={raw} onChange={(e) => setRaw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSearch()} placeholder={role === "trainer" ? "@usuario de tu alumno" : "@usuario de tu entrenador"}
-              className="w-full bg-slate-950/70 border border-slate-700/60 rounded-xl pl-9 pr-3 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500/60" />
-          </div>
-          <button onClick={handleSearch} disabled={!raw.trim() || searchState === "searching"} className="px-4 rounded-xl !text-white text-sm font-bold transition active:scale-[0.97] disabled:opacity-30" style={{ backgroundColor: "#3B82F6", boxShadow: "0 6px 16px -6px rgba(59,130,246,0.7)" }}>Buscar</button>
-        </div>
-        {searchState === "not_found" && <p className="text-xs text-slate-500">No encontramos a nadie con ese @usuario.</p>}
-        {searchState === "self" && <p className="text-xs text-slate-500">Ese sos vos 🙂</p>}
-        {/* BUG FIX (ver trainerLinkStatusWith en SocialView): antes acá
-            SIEMPRE se ofrecía "Invitar", sin mirar si ya había un vínculo
-            con esta persona — a diferencia del buscador de amigos, que sí
-            chequea friendStatus() primero. Si la otra persona ya te había
-            invitado con estos mismos roles, ese "Invitar" reescribía el
-            MISMO documento y Firestore lo rechazaba en silencio (para el
-            server ya no era una creación, era una actualización que no
-            cumplía la regla). Ahora se muestra el estado real: aceptar,
-            ya vinculados, o ya invitado — nunca un botón que puede fallar. */}
-        {searchState === "found" && found && (() => {
-          const link = linkStatusWith?.(found.uid);
-          if (link?.status === "accepted") {
-            return <PublicUserCard uid={found.uid} basic={found.basic}><span className="text-[10.5px] font-bold text-emerald-400 shrink-0">Ya vinculados</span></PublicUserCard>;
-          }
-          if (link?.status === "pending" && link.requestedBy === found.uid) {
-            return (
-              <PublicUserCard uid={found.uid} basic={found.basic}>
-                <button onClick={() => { onRespondLink(link, true); setFound(null); setRaw(""); setSearchState("idle"); }} className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[11px] font-bold hover:bg-emerald-500/25 transition">
-                  <Check size={12} /> Aceptar — {link.myRole === "trainer" ? "te pidió ser su entrenador" : "se ofreció como tu entrenador"}
-                </button>
-              </PublicUserCard>
-            );
-          }
-          if (link?.status === "pending" && link.requestedBy === myUid) {
-            return <PublicUserCard uid={found.uid} basic={found.basic}><span className="text-[10.5px] font-bold text-slate-500 shrink-0">Invitación enviada</span></PublicUserCard>;
-          }
-          return (
-            <PublicUserCard uid={found.uid} basic={found.basic}>
-              <button onClick={() => { onSendLink(found.uid, role); setFound(null); setRaw(""); setSearchState("idle"); }} className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-500/15 border border-blue-500/30 text-blue-300 text-[11px] font-bold hover:bg-blue-500/25 transition">
-                <UserPlus size={12} /> Invitar
-              </button>
-            </PublicUserCard>
-          );
-        })()}
-        {linkSendError && <p className="text-[11px] text-rose-400/90 px-1">{linkSendError}</p>}
-      </div>
-
       {loading ? <PublicUserCardSkeleton filas={2} /> : (
         <>
           {trainerIncoming.length > 0 && (
             <div className="space-y-2">
-              <SectionLabel accent="#FBBF24">Solicitudes recibidas</SectionLabel>
+              <TrainerSectionLabel n={trainerIncoming.length} accent="#FBBF24">Solicitudes</TrainerSectionLabel>
               {trainerIncoming.map((l) => (
-                <PublicUserCard key={l.id} uid={l.requestedBy} basic={basics[l.requestedBy]}>
-                  <div className="flex flex-col items-end gap-1.5 shrink-0">
-                    <span className="text-[9.5px] text-slate-500 text-right">{l.trainerUid === myUid ? "Quiere que seas su entrenador" : "Se ofrece como tu entrenador"}</span>
-                    <div className="flex gap-1.5">
-                      <button onClick={() => onRespondLink(l, true)} className="p-2 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400"><Check size={13} /></button>
-                      <button onClick={() => onRespondLink(l, false)} className="p-2 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-400"><X size={13} /></button>
+                <div key={l.id} className="rounded-2xl px-3.5 py-3" style={{ backgroundColor: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.22)" }}>
+                  <div className="flex items-center gap-3">
+                    {basics[l.requestedBy]?.avatarData
+                      ? <img src={basics[l.requestedBy].avatarData} alt="" className="w-9 h-9 rounded-xl object-cover shrink-0" />
+                      : <span className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-300 flex items-center justify-center shrink-0 text-sm font-black">{(basics[l.requestedBy]?.name || "?").charAt(0).toUpperCase()}</span>}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-white truncate">{basics[l.requestedBy]?.name || "Alguien"}</p>
+                      {/* El "qué te está pidiendo" era una línea de 9px
+                          apretada contra los botones, a la derecha. Es lo
+                          único que hace falta leer para decidir: va debajo
+                          del nombre y a tamaño legible. */}
+                      <p className="text-[11px] text-amber-200/80 leading-snug">{l.trainerUid === myUid ? "Quiere que seas su entrenador" : "Se ofrece como tu entrenador"}</p>
                     </div>
                   </div>
-                </PublicUserCard>
+                  <div className="flex gap-2 mt-2.5">
+                    <button onClick={() => onRespondLink(l, false)} className="flex-1 py-2 rounded-xl bg-slate-800/80 text-slate-400 text-[11px] font-bold transition active:scale-[0.98]">Rechazar</button>
+                    <button onClick={() => onRespondLink(l, true)} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[11px] font-black !text-white transition active:scale-[0.98]" style={{ backgroundColor: "#10B981" }}>
+                      <Check size={13} /> Aceptar
+                    </button>
+                  </div>
+                </div>
               ))}
             </div>
           )}
 
+          {/* MI ENTRENADOR antes era la última lista de la pantalla, con el
+              mismo formato que "mis alumnos". Son dos cosas distintas: acá
+              hay UNA persona, la que te planifica, y merece una tarjeta con
+              su rol escrito en vez de una fila más. */}
           <div className="space-y-2">
-            <div className="flex items-center justify-between px-1">
-              <SectionLabel>Mis alumnos</SectionLabel>
-              {sortedStudents.length > 1 && <p className="text-[9.5px] text-slate-700">Quién necesita atención primero</p>}
-            </div>
-            {studentsAccepted.length === 0 ? (
-              <p className="text-xs text-slate-600 px-1">Todavía no tenés alumnos vinculados.</p>
-            ) : sortedStudents.map((l) => (
-              <PublicUserCard key={l.id} uid={l.studentUid} basic={basics[l.studentUid]} streak={streaks?.[l.studentUid]?.streak} onClick={() => onViewStudent(l.studentUid)}>
+            <TrainerSectionLabel accent={tengoEntrenador ? "#38BDF8" : null}>Mi entrenador</TrainerSectionLabel>
+            {tengoEntrenador ? trainersAccepted.map((l) => (
+              <PublicUserCard key={l.id} uid={l.trainerUid} basic={basics[l.trainerUid]} streak={streaks?.[l.trainerUid]?.streak} onClick={() => onViewTrainer(l.trainerUid)}>
+                <span className="shrink-0 text-[9px] font-black rounded-md px-1.5 py-0.5" style={{ backgroundColor: "rgba(56,189,248,0.15)", color: "#7dd3fc" }}>Te planifica</span>
                 <button onClick={(e) => { e.stopPropagation(); onRemoveLink(l); }} className="shrink-0 p-1.5 rounded-lg text-slate-600 hover:text-rose-400 transition" title="Desvincular"><X size={13} /></button>
                 <ChevronRight size={15} className="text-slate-600 shrink-0" />
               </PublicUserCard>
-            ))}
+            )) : (
+              <TrainerEmpty icon={<GraduationCap size={16} />} titulo="No tenés entrenador" detalle="Si alguien te arma la rutina, vinculalo abajo y va a poder mandarte metas." />
+            )}
           </div>
 
-          {sentProposals.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 px-1">Propuestas enviadas</p>
-              {sentProposals.map((p) => (
-                <PublicUserCard key={p.id} uid={p.studentUid} basic={basics[p.studentUid]}>
-                  <span className={`text-[10.5px] font-bold shrink-0 ${p.status === "accepted" ? "text-emerald-400" : p.status === "rejected" ? "text-rose-400" : "text-slate-500"}`}>
-                    {p.status === "accepted" ? "Aceptada ✓" : p.status === "rejected" ? "Rechazada" : "Pendiente"}
-                  </span>
-                </PublicUserCard>
-              ))}
-            </div>
-          )}
-
           <div className="space-y-2">
-            <SectionLabel>Mi entrenador</SectionLabel>
-            {trainersAccepted.length === 0 ? (
-              <p className="text-xs text-slate-600 px-1">No tenés un entrenador vinculado.</p>
-            ) : trainersAccepted.map((l) => (
-              <PublicUserCard key={l.id} uid={l.trainerUid} basic={basics[l.trainerUid]} streak={streaks?.[l.trainerUid]?.streak} onClick={() => onViewTrainer(l.trainerUid)}>
+            <div className="flex items-center justify-between gap-2">
+              <TrainerSectionLabel n={studentsAccepted.length} accent={soyEntrenador ? "#3B82F6" : null}>Mis alumnos</TrainerSectionLabel>
+              {sortedStudents.length > 1 && <p className="text-[9px] text-slate-700 shrink-0">Quien menos entrenó, primero</p>}
+            </div>
+            {studentsAccepted.length === 0 ? (
+              <TrainerEmpty icon={<Users size={16} />} titulo="Todavía no tenés alumnos" detalle="Vinculá a quien entrenás para ver cómo viene y planificarle la semana." />
+            ) : sortedStudents.map((l) => (
+              <PublicUserCard key={l.id} uid={l.studentUid} basic={basics[l.studentUid]} streak={streaks?.[l.studentUid]?.streak} onClick={() => onViewStudent(l.studentUid)}>
+                {chipPropuesta(l.studentUid)}
                 <button onClick={(e) => { e.stopPropagation(); onRemoveLink(l); }} className="shrink-0 p-1.5 rounded-lg text-slate-600 hover:text-rose-400 transition" title="Desvincular"><X size={13} /></button>
                 <ChevronRight size={15} className="text-slate-600 shrink-0" />
               </PublicUserCard>
@@ -13491,6 +13546,71 @@ function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted
           </div>
         </>
       )}
+
+      {/* VINCULAR, al final y plegado (ver `vinculando` arriba). */}
+      <div className="rounded-2xl overflow-hidden" style={{ backgroundColor: "var(--panel-sunken)", border: "1px solid var(--chip-border)" }}>
+        <button onClick={() => setVinculando((v) => !v)} className="w-full flex items-center gap-2.5 px-3.5 py-3 text-left">
+          <span className="w-8 h-8 rounded-xl bg-blue-500/15 text-blue-300 flex items-center justify-center shrink-0"><UserPlus size={15} /></span>
+          <span className="flex-1 min-w-0">
+            <span className="block text-[12px] font-bold text-white">Vincular entrenador o alumno</span>
+            <span className="block text-[10px] text-slate-500">Con su @usuario</span>
+          </span>
+          <ChevronDown size={15} className={`text-slate-600 shrink-0 transition-transform ${vinculando ? "rotate-180" : ""}`} />
+        </button>
+        {vinculando && (
+          <div className="px-3.5 pb-3.5 space-y-2.5 tab-fade-in">
+            <div className="flex bg-black/40 rounded-xl p-1 border border-slate-700/50">
+              <button onClick={() => setRole("trainer")} className={`flex-1 py-2 rounded-lg text-[11px] font-bold transition-all ${role === "trainer" ? "bg-blue-500 !text-white" : "text-slate-500"}`}>Soy el entrenador</button>
+              <button onClick={() => setRole("student")} className={`flex-1 py-2 rounded-lg text-[11px] font-bold transition-all ${role === "student" ? "bg-blue-500 !text-white" : "text-slate-500"}`}>Soy el alumno</button>
+            </div>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" />
+                <input value={raw} onChange={(e) => setRaw(e.target.value)} onKeyDown={(e) => e.key === "Enter" && handleSearch()} placeholder={role === "trainer" ? "@usuario de tu alumno" : "@usuario de tu entrenador"}
+                  className="w-full bg-slate-950/70 border border-slate-700/60 rounded-xl pl-9 pr-3 py-2.5 text-white text-sm focus:outline-none focus:border-blue-500/60" />
+              </div>
+              <button onClick={handleSearch} disabled={!raw.trim() || searchState === "searching"} className="px-4 rounded-xl !text-white text-sm font-bold transition active:scale-[0.97] disabled:opacity-30" style={{ backgroundColor: "#3B82F6", boxShadow: "0 6px 16px -6px rgba(59,130,246,0.7)" }}>Buscar</button>
+            </div>
+            {searchState === "not_found" && <p className="text-xs text-slate-500">No encontramos a nadie con ese @usuario.</p>}
+            {searchState === "self" && <p className="text-xs text-slate-500">Ese sos vos 🙂</p>}
+            {/* BUG FIX (ver trainerLinkStatusWith en SocialView): antes acá
+                SIEMPRE se ofrecía "Invitar", sin mirar si ya había un vínculo
+                con esta persona — a diferencia del buscador de amigos, que sí
+                chequea friendStatus() primero. Si la otra persona ya te había
+                invitado con estos mismos roles, ese "Invitar" reescribía el
+                MISMO documento y Firestore lo rechazaba en silencio (para el
+                server ya no era una creación, era una actualización que no
+                cumplía la regla). Ahora se muestra el estado real: aceptar,
+                ya vinculados, o ya invitado — nunca un botón que puede fallar. */}
+            {searchState === "found" && found && (() => {
+              const link = linkStatusWith?.(found.uid);
+              if (link?.status === "accepted") {
+                return <PublicUserCard uid={found.uid} basic={found.basic}><span className="text-[10.5px] font-bold text-emerald-400 shrink-0">Ya vinculados</span></PublicUserCard>;
+              }
+              if (link?.status === "pending" && link.requestedBy === found.uid) {
+                return (
+                  <PublicUserCard uid={found.uid} basic={found.basic}>
+                    <button onClick={() => { onRespondLink(link, true); setFound(null); setRaw(""); setSearchState("idle"); }} className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[11px] font-bold hover:bg-emerald-500/25 transition">
+                      <Check size={12} /> Aceptar — {link.myRole === "trainer" ? "te pidió ser su entrenador" : "se ofreció como tu entrenador"}
+                    </button>
+                  </PublicUserCard>
+                );
+              }
+              if (link?.status === "pending" && link.requestedBy === myUid) {
+                return <PublicUserCard uid={found.uid} basic={found.basic}><span className="text-[10.5px] font-bold text-slate-500 shrink-0">Invitación enviada</span></PublicUserCard>;
+              }
+              return (
+                <PublicUserCard uid={found.uid} basic={found.basic}>
+                  <button onClick={() => { onSendLink(found.uid, role); setFound(null); setRaw(""); setSearchState("idle"); }} className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-500/15 border border-blue-500/30 text-blue-300 text-[11px] font-bold hover:bg-blue-500/25 transition">
+                    <UserPlus size={12} /> Invitar
+                  </button>
+                </PublicUserCard>
+              );
+            })()}
+            {linkSendError && <p className="text-[11px] text-rose-400/90 px-1">{linkSendError}</p>}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
