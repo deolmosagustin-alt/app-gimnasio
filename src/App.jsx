@@ -7458,10 +7458,6 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
   // de 2 botones en vez de un modal (ver el JSX más abajo).
   const [showSelfProgression, setShowSelfProgression] = useState(false);
   const [showPlanificadorIA, setShowPlanificadorIA] = useState(false);
-  // Con qué pestaña abre el planificador manual: "editar" desde el botón de
-  // planificar, "resumen" desde la línea de estado del plan (que es una
-  // pregunta distinta: no "quiero cargar metas" sino "qué tengo cargado").
-  const [progressionView, setProgressionView] = useState("editar");
   // BUG FIX (pedido: "cuando elegís uno u otro veo que no cambia nada") —
   // pasar a "Planificada" no cambia NADA por sí solo: hace falta además
   // cargar al menos una meta con "Planificar mi progresión" (sin eso,
@@ -7618,21 +7614,6 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
               <ClipboardCheck size={14} /> <span>Planificada</span>
             </button>
           </div>
-          {/* Pedido: "el poder quitar o pasar ejercicios de planificados a
-              por récord de manera sencilla" — el estado del plan a la vista,
-              y un toque para gobernarlo. Antes había que abrir el
-              planificador y recorrer ejercicio por ejercicio para saber
-              siquiera qué estaba planificado. */}
-          {settings.trainingMode === "planned" && planResumen && (planResumen.planificados.length > 0 || planResumen.pausados.length > 0) && (
-            <button onClick={() => { setProgressionView("resumen"); setShowSelfProgression(true); }} className="relative w-full flex items-center gap-2 mt-2.5 px-3 py-2 rounded-xl transition active:scale-[0.99]" style={{ backgroundColor: "rgba(2,6,23,0.45)", border: "1px solid rgba(20,184,166,0.18)" }}>
-              <ClipboardCheck size={13} className="shrink-0 text-teal-400" />
-              <span className="flex-1 min-w-0 text-left text-[10.5px] leading-snug text-teal-100/85">
-                <b className="tabular-nums">{planResumen.planificados.length}</b> {planResumen.planificados.length === 1 ? "ejercicio sigue" : "ejercicios siguen"} el plan
-                {planResumen.pausados.length > 0 && <> · <b className="tabular-nums">{planResumen.pausados.length}</b> por récord</>}
-              </span>
-              <ChevronRight size={13} className="shrink-0 text-teal-400/70" />
-            </button>
-          )}
           {/* El interruptor general en "Récord" apaga TODAS las metas (ver
               getPlannedTargetForWeek). Si tenés un plan cargado eso se puede
               leer como "se me borró el plan", así que se dice en voz alta y
@@ -7665,7 +7646,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
                   aprender. Color plano como "Iniciar sesión" pero FIJO en el
                   teal de esta tarjeta, y más chico: la acción principal de la
                   pantalla es entrenar, ésta es secundaria. */}
-              <button onClick={() => { setProgressionView("editar"); setShowSelfProgression(true); }} disabled={!activeRoutineDef} className={`relative w-full flex items-center justify-center gap-2 py-2.5 mt-2.5 rounded-xl text-white text-xs font-bold transition-all active:scale-[0.98] disabled:opacity-40 ${!hasAnyPlan && settings.trainingMode === "planned" ? "invite-pulse" : ""}`} style={{ backgroundColor: "#14B8A6", "--invite-glow": "rgba(20,184,166,0.6)" }}>
+              <button onClick={() => setShowSelfProgression(true)} disabled={!activeRoutineDef} className={`relative w-full flex items-center justify-center gap-2 py-2.5 mt-2.5 rounded-xl text-white text-xs font-bold transition-all active:scale-[0.98] disabled:opacity-40 ${!hasAnyPlan && settings.trainingMode === "planned" ? "invite-pulse" : ""}`} style={{ backgroundColor: "#14B8A6", "--invite-glow": "rgba(20,184,166,0.6)" }}>
                 <Sliders size={13} /> {hasAnyPlan ? "Planificar mi progresión" : "Planificar mi primera meta"}
               </button>
               {/* El atajo al planificador con IA se mudó ADENTRO de
@@ -7947,7 +7928,6 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           trainWeeks={settings.trainWeeks}
           logs={logs}
           weekInCycle={weekInCycle}
-          initialView={progressionView}
           onOpenIA={() => { setShowSelfProgression(false); setShowPlanificadorIA(true); }}
           planPrefs={settings}
           onSavePrefs={onUpdateSettings}
