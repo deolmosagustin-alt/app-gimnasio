@@ -6514,7 +6514,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
 /* ============================================================================
    EXERCISE CARD
 ============================================================================ */
-function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts, resetKey = 0, settings = DEFAULT_SETTINGS, forceOpen = false, onDisableAutoShowPrShare, hasActiveSession = true, hideTimer = false, onUpdateSettings = null, onSetPlanPaused = null, sex = null, age = null, weekInCycle = null, dayKey = null, nextRestTimerId = null, nextRestSeconds = null }) {
+function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts, resetKey = 0, settings = DEFAULT_SETTINGS, forceOpen = false, onDisableAutoShowPrShare, hasActiveSession = true, hideTimer = false, onUpdateSettings = null, onSetPlanPaused = null, routineHasPlan = false, sex = null, age = null, weekInCycle = null, dayKey = null, nextRestTimerId = null, nextRestSeconds = null }) {
   const [open, setOpen] = useState(false);
   const [showWarmup, setShowWarmup] = useState(false);
   // Nota personal del ejercicio (persiste en el perfil → sincroniza)
@@ -6625,12 +6625,21 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
                   es un botón (abre/cierra la tarjeta) y un botón adentro de
                   otro es HTML inválido. stopPropagation evita que el toque
                   además despliegue el ejercicio. */}
-              {planInfo && (
-                planInfo.paused || planOffByMode
-                  ? <span className="text-[10px] bg-slate-700/40 text-slate-400 rounded-lg px-1.5 py-0.5 font-bold flex items-center gap-1" title="Este ejercicio tiene un plan guardado, pero ahora persigue tu récord"><Trophy size={9} /> POR RÉCORD</span>
-                  : onSetPlanPaused
+              {/* El chip lo llevan TODOS los ejercicios, no sólo los que
+                  tienen metas: si sólo lo tenían esos, la mitad de la lista
+                  no decía nada y no se entendía contra qué estabas
+                  entrenando en cada uno. Un ejercicio sin plan persigue tu
+                  récord igual que uno pausado — la diferencia (si hay algo
+                  guardado o no) va en el title. Sólo aparece en modo
+                  planificado y con al menos una meta en la rutina: sin plan
+                  en ningún lado, repetir "POR RÉCORD" en cada tarjeta es
+                  ruido que no informa nada. */}
+              {settings.trainingMode === "planned" && (planInfo || routineHasPlan) && (
+                planInfo && !planInfo.paused
+                  ? (onSetPlanPaused
                     ? <span role="button" tabIndex={-1} onClick={(e) => { e.stopPropagation(); onSetPlanPaused(exercise.id, true); }} className="text-[10px] rounded-lg px-1.5 py-0.5 font-bold flex items-center gap-1 transition active:scale-95 cursor-pointer" style={{ backgroundColor: "rgba(56,189,248,0.15)", color: "#7dd3fc" }} title="Sigue tu plan — tocá para pasarlo a por récord"><ClipboardCheck size={9} /> PLAN</span>
-                    : <span className="text-[10px] rounded-lg px-1.5 py-0.5 font-bold flex items-center gap-1" style={{ backgroundColor: "rgba(56,189,248,0.15)", color: "#7dd3fc" }} title="Este ejercicio sigue tu plan"><ClipboardCheck size={9} /> PLAN</span>
+                    : <span className="text-[10px] rounded-lg px-1.5 py-0.5 font-bold flex items-center gap-1" style={{ backgroundColor: "rgba(56,189,248,0.15)", color: "#7dd3fc" }} title="Este ejercicio sigue tu plan"><ClipboardCheck size={9} /> PLAN</span>)
+                  : <span className="text-[10px] bg-slate-700/40 text-slate-400 rounded-lg px-1.5 py-0.5 font-bold flex items-center gap-1" title={planInfo ? "Tiene un plan guardado, pero ahora persigue tu récord" : "Este ejercicio no tiene metas cargadas: persigue tu récord"}><Trophy size={9} /> POR RÉCORD</span>
               )}
               {/* Las notas ahora son POR SERIE (ver SetRow): cada serie tiene
                   su propio "Agregar nota". Acá ya no va nada. */}
@@ -7582,18 +7591,13 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
         <div className="relative overflow-hidden rounded-2xl border border-teal-500/20 p-3.5" style={{ background: "var(--grad-hero-teal)" }}>
           <div className="absolute -top-8 -right-6 w-24 h-24 rounded-full bg-teal-500/15 blur-2xl pointer-events-none" />
           <div className="absolute -bottom-6 -left-6 w-20 h-20 rounded-full bg-cyan-500/10 blur-2xl pointer-events-none" />
-          <div className="relative flex items-center gap-1.5 mb-1">
+          {/* El alcance ("para toda la rutina") ya no se explica en un
+              párrafo: va en el propio rótulo, que ocupa una línea que de
+              todos modos estaba ahí. */}
+          <div className="relative flex items-center gap-1.5 mb-2">
             <Target size={13} className="text-teal-400 shrink-0" />
-            <p className="text-[10px] font-black uppercase tracking-widest text-teal-400">Modo de entrenamiento</p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-teal-400">Modo · toda la rutina</p>
           </div>
-          {/* El alcance del interruptor, dicho en voz alta: sin esto no se
-              entendía en qué se diferencia de pasar un ejercicio suelto a
-              récord desde su chip, y el de arriba parecía sobrar. Este es de
-              toda la rutina y NO pisa lo que elegiste ejercicio por
-              ejercicio: al volver a "Planificada" cada uno queda como estaba. */}
-          <p className="relative text-[10px] text-teal-200/60 leading-snug mb-2.5">
-            Para toda la rutina. Cada ejercicio puede pasar a récord por su cuenta con su chip <b>PLAN</b>, y eso se respeta al volver acá.
-          </p>
           {/* BUG FIX (pedido: "el recuadro de selección de modo de
               entrenamiento no encastra bien con el espacio que tiene"): el
               pill deslizante de fondo calculaba su posición/ancho a mano
@@ -7664,15 +7668,10 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
               <button onClick={() => { setProgressionView("editar"); setShowSelfProgression(true); }} disabled={!activeRoutineDef} className={`relative w-full flex items-center justify-center gap-2 py-2.5 mt-2.5 rounded-xl text-white text-xs font-bold transition-all active:scale-[0.98] disabled:opacity-40 ${!hasAnyPlan && settings.trainingMode === "planned" ? "invite-pulse" : ""}`} style={{ backgroundColor: "#14B8A6", "--invite-glow": "rgba(20,184,166,0.6)" }}>
                 <Sliders size={13} /> {hasAnyPlan ? "Planificar mi progresión" : "Planificar mi primera meta"}
               </button>
-              {/* Atajo al planificador con IA: el botón de arriba arma las
-                  metas a mano, de a un ejercicio; éste te lleva a elegir
-                  plazo, ejercicios y objetivo, y la IA arma todo el bloque
-                  de una. Va debajo y más chico porque el manual sigue
-                  siendo el camino de control fino. */}
-              <button onClick={() => setShowPlanificadorIA(true)} disabled={!activeRoutineDef} className="relative w-full flex items-center justify-center gap-1.5 py-2 mt-1.5 rounded-xl text-[11px] font-bold transition active:scale-[0.98] disabled:opacity-40"
-                style={{ backgroundColor: tint("#38BDF8", "14"), border: `1px solid ${tint("#38BDF8", "3a")}`, color: "#7dd3fc" }}>
-                <Sparkles size={12} /> Que lo planifique la IA
-              </button>
+              {/* El atajo al planificador con IA se mudó ADENTRO de
+                  "Planificar mi progresión": las dos son la misma tarea (armar
+                  las metas), sólo cambia quién las escribe, así que competían
+                  por el mismo lugar en la tarjeta y la alargaban al pedo. */}
             </>
           )}
           {!activeRoutineDef && settings.trainingMode === "planned" && <p className="relative text-[10px] text-slate-600 text-center mt-1.5">Activá una rutina primero, en la pestaña Rutinas.</p>}
@@ -7900,7 +7899,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             const abrirSola = entreActivo && gi > 0 && estaCompleto(groups[gi - 1]) && !estaCompleto(group);
             if (group.length === 1) {
               const ex = group[0];
-              return <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onSetPlanPaused={onSetPlanPaused} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} sex={sex} age={age} weekInCycle={weekInCycle} dayKey={activeDay} forceOpen={abrirSola} nextRestTimerId={nextRestTimerId} nextRestSeconds={nextRestSeconds} />;
+              return <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onSetPlanPaused={onSetPlanPaused} routineHasPlan={hasAnyPlan} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} sex={sex} age={age} weekInCycle={weekInCycle} dayKey={activeDay} forceOpen={abrirSola} nextRestTimerId={nextRestTimerId} nextRestSeconds={nextRestSeconds} />;
             }
             // Superserie: varios ejercicios encadenados comparten un solo
             // cronómetro al final del grupo, en vez de uno por ejercicio —
@@ -7910,7 +7909,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             return (
               <div key={`${activeDay}:${group.map((e) => e.id).join("-")}`} className="rounded-2xl border p-2.5 space-y-2.5" style={{ borderColor: tint(day.color, "50"), backgroundColor: tint(day.color, "06") }}>
                 <div className="flex items-center gap-1.5 px-1"><Link size={11} style={{ color: day.color }} /><span className="text-[10px] font-black uppercase tracking-wider" style={{ color: day.color }}>Superserie · {group.length} ejercicios</span></div>
-                {group.map((ex, xi) => <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onSetPlanPaused={onSetPlanPaused} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} hideTimer sex={sex} age={age} weekInCycle={weekInCycle} dayKey={activeDay} forceOpen={abrirSola} nextRestTimerId={xi === group.length - 1 ? nextRestTimerId : null} nextRestSeconds={nextRestSeconds} />)}
+                {group.map((ex, xi) => <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onSetPlanPaused={onSetPlanPaused} routineHasPlan={hasAnyPlan} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} hideTimer sex={sex} age={age} weekInCycle={weekInCycle} dayKey={activeDay} forceOpen={abrirSola} nextRestTimerId={xi === group.length - 1 ? nextRestTimerId : null} nextRestSeconds={nextRestSeconds} />)}
                 <div className="px-1"><RestTimer seconds={hasHeavyGroup ? settings.restLong : settings.restShort} accent={day.color} alertType={settings.alertType} timerId={`${activeDay}:grp_${group.map((g) => g.id).join("_")}`} exerciseName={group.map((g) => g.name).filter(Boolean).join(" + ")} /></div>
                 <p className="text-[10px] text-slate-600 px-1">Descansá recién después de completar los {group.length} ejercicios. Ese es el cronómetro de arriba.</p>
               </div>
@@ -7949,6 +7948,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           logs={logs}
           weekInCycle={weekInCycle}
           initialView={progressionView}
+          onOpenIA={() => { setShowSelfProgression(false); setShowPlanificadorIA(true); }}
           planPrefs={settings}
           onSavePrefs={onUpdateSettings}
           onSetPlanPaused={onSetPlanPaused}
@@ -12282,6 +12282,11 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
   const [editHeight, setEditHeight] = useState(profile?.heightCm ? String(profile.heightCm) : "");
   const [showCycleSetup, setShowCycleSetup] = useState(false);
   const [showSelfProgression, setShowSelfProgression] = useState(false);
+  // El planificador con IA también se abre desde acá (vive adentro del
+  // planificador manual, ver onOpenIA): si sólo estuviera cableado en
+  // Rutina, el mismo modal mostraría u ocultaría ese atajo según por dónde
+  // hubieras entrado.
+  const [showPlanificadorIA, setShowPlanificadorIA] = useState(false);
   const [googleLinkError, setGoogleLinkError] = useState("");
   const [syncStatus, setSyncStatus] = useState(null); // null | "syncing" | "ok" | "error"
   const joinDate = profile?.joinedAt ? new Date(profile.joinedAt).toLocaleDateString("es-AR", { day: "numeric", month: "long", year: "numeric" }) : "—";
@@ -12653,6 +12658,7 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
           weekInCycle={getWeekInfo(cycleStart, settings)?.weekInCycle ?? null}
           planPrefs={settings}
           onSavePrefs={updateSettings}
+          onOpenIA={() => { setShowSelfProgression(false); setShowPlanificadorIA(true); }}
           onSetPlanPaused={(exerciseId, paused) => onUpdateProfile({ routines: { ...(profile.routines || {}), [profile.activeRoutineId]: setExercisePlanPaused(activeRoutineDef, exerciseId, paused) } })}
           onRemovePlan={(exerciseId) => onUpdateProfile({ routines: { ...(profile.routines || {}), [profile.activeRoutineId]: removeExercisePlan(activeRoutineDef, exerciseId) } })}
           onClose={() => setShowSelfProgression(false)}
@@ -12664,6 +12670,21 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
             onUpdateProfile({ routines: { ...(profile.routines || {}), [profile.activeRoutineId]: updated }, settings: { ...settings, trainingMode: "planned" } });
             setShowSelfProgression(false);
           }}
+        />
+      )}
+      {showPlanificadorIA && activeRoutineDef && (
+        <PlanificadorIAModal
+          routineDef={activeRoutineDef}
+          trainWeeks={settings.trainWeeks}
+          logs={profile?.logs || {}}
+          settings={settings}
+          weekInCycle={getWeekInfo(cycleStart, settings)?.weekInCycle ?? null}
+          onSavePrefs={updateSettings}
+          onClose={() => setShowPlanificadorIA(false)}
+          onApply={(planes) => onUpdateProfile({
+            routines: { ...(profile.routines || {}), [profile.activeRoutineId]: applyProgressionToRoutine(activeRoutineDef, planes) },
+            settings: { ...settings, trainingMode: "planned" },
+          })}
         />
       )}
 
@@ -14091,7 +14112,7 @@ const PROGRESSION_TEMPLATES = [
 //  - "Aplicar a todas las series de este ejercicio": antes había que
 //    repetir el formulario entero serie por serie para una rutina de 3-4
 //    series por ejercicio (el caso más común).
-function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onSubmit, mode = "trainer", studentName = null, logs = null, weekInCycle = null, initialView = "editar", planPrefs = null, onSavePrefs = null, onSetPlanPaused = null, onRemovePlan = null }) {
+function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onSubmit, mode = "trainer", studentName = null, logs = null, weekInCycle = null, initialView = "editar", onOpenIA = null, planPrefs = null, onSavePrefs = null, onSetPlanPaused = null, onRemovePlan = null }) {
   useAndroidBack(onClose);
   // BUG FIX: este planificador escribía el número tipeado DIRECTO en
   // `plannedProgression.kg`, que siempre está en kilos — no convertía nada.
@@ -14520,6 +14541,23 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
                 </div>
               ) : (
                 <>
+                  {/* Pedido: "lo de que lo planifique la IA esté dentro de
+                      planificar mi progresión". Las dos son la misma tarea
+                      (armar las metas), sólo cambia quién las escribe: acá
+                      arriba, antes de ponerse a tipear, es donde la pregunta
+                      "¿lo hago yo o que lo haga la IA?" tiene sentido. */}
+                  {onOpenIA && (
+                    <button onClick={onOpenIA} className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-left transition active:scale-[0.99]"
+                      style={{ backgroundColor: tint(accent, "14"), border: `1px solid ${tint(accent, "3a")}` }}>
+                      <Sparkles size={14} className="shrink-0" style={{ color: accent }} />
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-[11.5px] font-bold" style={{ color: "#bae6fd" }}>Que lo planifique la IA</span>
+                        <span className="block text-[9.5px] text-slate-500 leading-tight">Todo el bloque de una, desde tus marcas</span>
+                      </span>
+                      <ChevronRight size={14} className="shrink-0" style={{ color: tint(accent, "aa") }} />
+                    </button>
+                  )}
+
                   {/* Variables del plan: se recuerdan de una planificación a
                       la siguiente. Van plegadas porque la mayoría de las
                       veces ya están como las querés. */}
