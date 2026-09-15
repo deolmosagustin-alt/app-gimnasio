@@ -6639,7 +6639,23 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
                   ? (onSetPlanPaused
                     ? <span role="button" tabIndex={-1} onClick={(e) => { e.stopPropagation(); onSetPlanPaused(exercise.id, true); }} className="text-[10px] rounded-lg px-1.5 py-0.5 font-bold flex items-center gap-1 transition active:scale-95 cursor-pointer" style={{ backgroundColor: "rgba(56,189,248,0.15)", color: "#7dd3fc" }} title="Sigue tu plan — tocá para pasarlo a por récord"><ClipboardCheck size={9} /> PLAN</span>
                     : <span className="text-[10px] rounded-lg px-1.5 py-0.5 font-bold flex items-center gap-1" style={{ backgroundColor: "rgba(56,189,248,0.15)", color: "#7dd3fc" }} title="Este ejercicio sigue tu plan"><ClipboardCheck size={9} /> PLAN</span>)
-                  : <span className="text-[10px] bg-slate-700/40 text-slate-400 rounded-lg px-1.5 py-0.5 font-bold flex items-center gap-1" title={planInfo ? "Tiene un plan guardado, pero ahora persigue tu récord" : "Este ejercicio no tiene metas cargadas: persigue tu récord"}><Trophy size={9} /> POR RÉCORD</span>
+                  : (
+                    // Dos situaciones distintas que hasta acá se veían igual:
+                    // "tiene un plan, pausado" y "nunca tuvo metas". Las dos
+                    // entrenan por récord, pero sólo la primera es la que
+                    // devuelve "Devolver al plan" — y desde la lista no había
+                    // forma de saber cuál era cuál (el title no existe en el
+                    // celular). El pausado va con borde punteado, que es el
+                    // mismo lenguaje de "esto está ahí pero inactivo" que ya
+                    // usan los bloques vacíos de la sección Entrenador.
+                    <span className="text-[10px] text-slate-400 rounded-lg px-1.5 py-0.5 font-bold flex items-center gap-1"
+                      style={planInfo
+                        ? { backgroundColor: "rgba(51,65,85,0.25)", border: "1px dashed rgba(148,163,184,0.45)" }
+                        : { backgroundColor: "rgba(51,65,85,0.4)", border: "1px solid transparent" }}
+                      title={planInfo ? "Tiene un plan guardado, pero ahora persigue tu récord" : "Este ejercicio no tiene metas cargadas: persigue tu récord"}>
+                      <Trophy size={9} /> POR RÉCORD
+                    </span>
+                  )
               )}
               {/* Las notas ahora son POR SERIE (ver SetRow): cada serie tiene
                   su propio "Agregar nota". Acá ya no va nada. */}
@@ -7587,55 +7603,61 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
         <div className="relative overflow-hidden rounded-2xl border border-teal-500/20 p-3.5" style={{ background: "var(--grad-hero-teal)" }}>
           <div className="absolute -top-8 -right-6 w-24 h-24 rounded-full bg-teal-500/15 blur-2xl pointer-events-none" />
           <div className="absolute -bottom-6 -left-6 w-20 h-20 rounded-full bg-cyan-500/10 blur-2xl pointer-events-none" />
-          {/* El alcance ("para toda la rutina") ya no se explica en un
-              párrafo: va en el propio rótulo, que ocupa una línea que de
-              todos modos estaba ahí. */}
+          {/* Ya no es un "modo de entrenamiento" sino el lugar donde se
+              gobierna el plan, así que el rótulo dice eso. */}
           <div className="relative flex items-center gap-1.5 mb-2">
             <Target size={13} className="text-teal-400 shrink-0" />
-            <p className="text-[10px] font-black uppercase tracking-widest text-teal-400">Modo · toda la rutina</p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-teal-400">Tu plan</p>
           </div>
-          {/* BUG FIX (pedido: "el recuadro de selección de modo de
-              entrenamiento no encastra bien con el espacio que tiene"): el
-              pill deslizante de fondo calculaba su posición/ancho a mano
-              (left/width en px) SIN contar bien el padding (p-1 = 4px) y
-              el gap (gap-1 = 4px) reales del contenedor — quedaba 2px
-              corrido y 2px angosto de más, así que nunca calzaba
-              exactamente con el borde del botón real, sobre todo en
-              "Récord". Números ajustados a la geometría real: cada
-              columna mide 50% menos el padding de ambos lados (8px) y el
-              gap entre columnas (4px), repartido entre las dos (6px cada
-              una) — no un valor aproximado a ojo. */}
-          <div className="relative grid grid-cols-2 gap-1 p-1 rounded-xl bg-slate-950/50 border border-teal-500/15">
-            <div className="absolute top-1 bottom-1 rounded-lg transition-all duration-300 ease-out pointer-events-none" style={{ left: settings.trainingMode === "planned" ? "calc(50% + 2px)" : "4px", width: "calc(50% - 6px)", backgroundColor: "rgba(20,184,166,0.18)", boxShadow: "inset 0 0 0 1px rgba(20,184,166,0.4)" }} />
-            <button onClick={() => onUpdateSettings({ trainingMode: "record" })} className={`relative z-[1] flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-bold transition active:scale-[0.97] ${settings.trainingMode !== "planned" ? "text-teal-300" : "text-slate-500 hover:text-slate-300"}`}>
-              <Trophy size={14} /> <span>Récord</span>
-            </button>
-            <button onClick={() => onUpdateSettings({ trainingMode: "planned" })} className={`relative z-[1] flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-bold transition active:scale-[0.97] ${settings.trainingMode === "planned" ? "text-teal-300" : "text-slate-500 hover:text-slate-300"}`}>
-              <ClipboardCheck size={14} /> <span>Planificada</span>
-            </button>
-          </div>
-          {/* El interruptor general en "Récord" apaga TODAS las metas (ver
-              getPlannedTargetForWeek). Si tenés un plan cargado eso se puede
-              leer como "se me borró el plan", así que se dice en voz alta y
-              con la forma de arreglarlo al lado. */}
-          {settings.trainingMode !== "planned" && (planResumen?.planificados.length || 0) > 0 && (
-            <div className="relative flex items-center gap-2 mt-2 px-3 py-2 rounded-xl" style={{ backgroundColor: "rgba(245,158,11,0.10)", border: "1px solid rgba(245,158,11,0.28)" }}>
-              <AlertTriangle size={12} className="shrink-0 text-amber-400" />
-              <p className="flex-1 text-[10px] leading-snug text-amber-200/90">Tenés metas cargadas, pero en modo Récord no se persiguen.</p>
-              <button onClick={() => onUpdateSettings({ trainingMode: "planned" })} className="shrink-0 px-2 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-200 text-[9.5px] font-black">Activar</button>
-            </div>
-          )}
+          {/* REDISEÑO: acá había un segmentado "Récord | Planificada", o sea
+              un MODO. Los modos obligan a saber en cuál estás, y este se
+              notaba: seis lugares del código lo forzaban a "planned" solos
+              (guardar a mano, guardar desde Perfil, dos herramientas del
+              chatbot, aceptar el plan del entrenador, detectar que tenés
+              entrenador) y dos avisos en pantalla existían sólo para explicar
+              que el modo te estaba escondiendo el plan. Un control que
+              necesita seis autocorrecciones y dos advertencias para no
+              traicionarte no está pagando su lugar.
+              Ahora es una ACCIÓN sobre el plan, con el mismo verbo que el
+              chip de cada ejercicio pero otro alcance: pausar todo el plan /
+              pausar este ejercicio. Y si no hay ningún plan no aparece nada,
+              en vez de ofrecer una decisión que no significa nada.
+              El dato guardado sigue siendo settings.trainingMode, así que
+              todo lo que ya lo leía (la serie, la descarga, el resumen, el
+              contexto del chatbot) no se entera del cambio. */}
+          {hasAnyPlan && (() => {
+            const enPausa = settings.trainingMode !== "planned";
+            const nActivos = planResumen?.planificados.length || 0;
+            return (
+              <div className="relative flex items-center gap-2.5 rounded-xl px-3 py-2.5" style={{ backgroundColor: enPausa ? "rgba(2,6,23,0.45)" : "rgba(20,184,166,0.12)", border: `1px solid ${enPausa ? "rgba(148,163,184,0.18)" : "rgba(20,184,166,0.3)"}` }}>
+                {enPausa ? <Trophy size={15} className="shrink-0 text-slate-400" /> : <ClipboardCheck size={15} className="shrink-0 text-teal-300" />}
+                <div className="flex-1 min-w-0">
+                  <p className="text-[12px] font-bold leading-tight" style={{ color: enPausa ? "#cbd5e1" : "#fff" }}>{enPausa ? "Plan en pausa" : "Plan activo"}</p>
+                  <p className="text-[10px] leading-snug" style={{ color: enPausa ? "#64748b" : "rgba(153,246,228,0.75)" }}>
+                    {enPausa
+                      ? "Tus metas siguen guardadas, pero ahora perseguís tu récord."
+                      : nActivos > 0
+                        ? `${nActivos} ejercicio${nActivos === 1 ? "" : "s"} persigue${nActivos === 1 ? "" : "n"} sus metas`
+                        : "Todos tus ejercicios están en por récord"}
+                  </p>
+                </div>
+                <button onClick={() => onUpdateSettings({ trainingMode: enPausa ? "planned" : "record" })} className="shrink-0 px-2.5 py-1.5 rounded-lg text-[10px] font-black transition active:scale-95"
+                  style={enPausa
+                    ? { backgroundColor: "rgba(20,184,166,0.22)", color: "#5eead4", border: "1px solid rgba(20,184,166,0.45)" }
+                    : { backgroundColor: "rgba(148,163,184,0.12)", color: "#cbd5e1", border: "1px solid rgba(148,163,184,0.22)" }}>
+                  {enPausa ? "Reanudar" : "Pausar"}
+                </button>
+              </div>
+            );
+          })()}
           {onApplyOwnProgression && (
             <>
-              {/* Pedido: "cuando elegís uno u otro veo que no cambia nada" —
-                  sin ninguna meta cargada todavía, el toggle de arriba no
-                  tiene ningún efecto visible en ningún lado (a propósito:
-                  sin plan, cada serie sigue mostrando tu récord de
-                  siempre). Este aviso deja explícito el paso que falta, en
-                  vez de dejar que el silencio se sienta como que "no anda". */}
-              {!hasAnyPlan && settings.trainingMode === "planned" && (
-                <p className="relative text-[10.5px] text-teal-200/80 text-center mt-2.5 leading-snug">
-                  Todavía no cargaste ninguna meta. Planificá una para ver la diferencia.
+              {/* Sin ninguna meta cargada, cada serie sigue mostrando tu
+                  récord de siempre (a propósito). Decirlo evita que el
+                  silencio se sienta como que algo no anda. */}
+              {!hasAnyPlan && activeRoutineDef && (
+                <p className="relative text-[10.5px] text-teal-200/70 text-center mb-2.5 leading-snug">
+                  Todavía no tenés metas. Cada serie muestra tu récord.
                 </p>
               )}
               {/* Los dos planificadores dejan de estar escondidos detrás del
@@ -7655,7 +7677,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
                   por el mismo lugar en la tarjeta y la alargaban al pedo. */}
             </>
           )}
-          {!activeRoutineDef && settings.trainingMode === "planned" && <p className="relative text-[10px] text-slate-600 text-center mt-1.5">Activá una rutina primero, en la pestaña Rutinas.</p>}
+          {!activeRoutineDef && <p className="relative text-[10px] text-slate-600 text-center mt-1.5">Activá una rutina primero, en la pestaña Rutinas.</p>}
           {/* "Personalizar qué ves al registrar" se muda acá desde el hero de
               arriba: las dos cosas de esta tarjeta deciden CÓMO vas a
               registrar (contra qué número apuntás, y qué campos ves), así
@@ -12582,48 +12604,43 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
         </div>
       )}
 
-      <CollapsibleSection title="Modo de entrenamiento" subtitle={settings.trainingMode === "planned" ? "Rutina planificada" : "Perseguir mi récord"} icon={<Target size={16} />} accent="#38BDF8">
+      {/* Antes acá había dos tarjetas grandes, "Perseguir mi récord" y
+          "Rutina planificada", o sea la misma elección de modo que estaba en
+          Rutina — con el mismo problema (ver el comentario del rediseño
+          ahí). Ahora es la misma acción: pausar o reanudar el plan, y sólo
+          si hay uno. Sin plan no hay nada que elegir: todas tus series
+          persiguen tu récord, que es el comportamiento de siempre. */}
+      <CollapsibleSection title="Tu plan" subtitle={!hasAnyPlan ? "Sin metas cargadas" : settings.trainingMode === "planned" ? "Activo" : "En pausa"} icon={<Target size={16} />} accent="#38BDF8">
         <div className="space-y-2.5">
-          <button onClick={() => updateSettings({ trainingMode: "record" })} className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-left transition ${settings.trainingMode !== "planned" ? "bg-sky-500/15 border border-sky-500/40" : "bg-slate-800/50 border border-slate-700/40 hover:border-slate-600"}`}>
-            <Trophy size={16} className={settings.trainingMode !== "planned" ? "text-sky-400" : "text-slate-500"} />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-white">Perseguir mi récord</p>
-              <p className="text-[11px] text-slate-500">Cada serie muestra tu mejor marca — el objetivo es siempre superarte a vos mismo. Las series que tengan una meta cargada la siguen mostrando igual.</p>
-            </div>
-          </button>
-          <button onClick={() => updateSettings({ trainingMode: "planned" })} className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-left transition ${settings.trainingMode === "planned" ? "bg-sky-500/15 border border-sky-500/40" : "bg-slate-800/50 border border-slate-700/40 hover:border-slate-600"}`}>
-            {/* Mismo ícono que después ves en cada serie planificada: acá,
-                al lado del nombre del modo, es donde se aprende qué
-                significa la libreta. */}
-            <ClipboardCheck size={16} className={settings.trainingMode === "planned" ? "text-sky-400" : "text-slate-500"} />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-white">Rutina planificada</p>
-              <p className="text-[11px] text-slate-500">Suma las herramientas para cargar metas semana a semana (a mano o de tu entrenador) y, al guardar, te festeja haber alcanzado la marca en vez de haberla superado.</p>
-            </div>
-          </button>
-          {/* Pedido: "cuando elegís uno u otro veo que no cambia nada" —
-              mismo aviso que RoutineView: elegir este modo no alcanza,
-              hace falta cargar al menos una meta para que se note. */}
-          {settings.trainingMode === "planned" && activeRoutineDef && !hasAnyPlan && (
-            <p className="text-[10.5px] text-sky-300/80 text-center leading-snug px-1">
-              Todavía no cargaste ninguna meta. Sin eso, tus series siguen mostrando tu récord de siempre.
+          {hasAnyPlan ? (() => {
+            const enPausa = settings.trainingMode !== "planned";
+            return (
+              <div className="flex items-center gap-3 px-3.5 py-3 rounded-xl" style={{ backgroundColor: enPausa ? "var(--row-surface)" : "rgba(56,189,248,0.12)", border: `1px solid ${enPausa ? "var(--chip-border)" : "rgba(56,189,248,0.3)"}` }}>
+                {enPausa ? <Trophy size={16} className="shrink-0 text-slate-400" /> : <ClipboardCheck size={16} className="shrink-0 text-sky-400" />}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold text-white">{enPausa ? "Plan en pausa" : "Plan activo"}</p>
+                  <p className="text-[11px] text-slate-500 leading-snug">
+                    {enPausa
+                      ? "Tus metas siguen guardadas, pero cada serie muestra tu récord."
+                      : "Cada serie con meta cargada la muestra, y al guardar te festeja haber alcanzado la marca."}
+                  </p>
+                </div>
+                <button onClick={() => updateSettings({ trainingMode: enPausa ? "planned" : "record" })} className="shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-black transition active:scale-95"
+                  style={enPausa
+                    ? { backgroundColor: "rgba(56,189,248,0.2)", color: "#7dd3fc", border: "1px solid rgba(56,189,248,0.4)" }
+                    : { backgroundColor: "rgba(148,163,184,0.12)", color: "#cbd5e1", border: "1px solid rgba(148,163,184,0.22)" }}>
+                  {enPausa ? "Reanudar" : "Pausar"}
+                </button>
+              </div>
+            );
+          })() : (
+            <p className="text-[11px] text-slate-500 leading-snug px-1">
+              Todavía no cargaste metas. Cada serie muestra tu récord y el objetivo es superarlo. Si preferís seguir cargas decididas de antemano (tuyas o de tu entrenador), planificalas acá abajo.
             </p>
           )}
-          {/* En modo Récord las metas cargadas dejan de perseguirse (ver
-              getPlannedTargetForWeek): se dice en voz alta, porque si no se
-              lee como que el plan se perdió. */}
-          {settings.trainingMode !== "planned" && hasAnyPlan && (
-            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/25">
-              <AlertTriangle size={13} className="shrink-0 text-amber-400" />
-              <p className="flex-1 text-[10.5px] leading-snug text-amber-200/90">Tenés metas cargadas, pero en este modo no se persiguen. Siguen guardadas.</p>
-            </div>
-          )}
           {/* Mismo tamaño y criterio que su gemelo en Rutina: color plano y
-              fijo (acá el celeste de la sección "Modo de entrenamiento"),
-              y contenido, porque es una acción secundaria. Ya no depende del
-              modo elegido: guardar una meta lo pasa solo a "planificada",
-              así que no hay un orden que haya que acertar primero. */}
-          <button onClick={() => setShowSelfProgression(true)} disabled={!activeRoutineDef} className={`w-full flex items-center gap-2 justify-center py-2.5 rounded-xl text-white text-xs font-bold transition-all active:scale-[0.98] disabled:opacity-40 ${!hasAnyPlan && settings.trainingMode === "planned" ? "invite-pulse" : ""}`} style={{ backgroundColor: "#38BDF8", "--invite-glow": "rgba(56,189,248,0.6)" }}>
+              fijo, y contenido, porque es una acción secundaria. */}
+          <button onClick={() => setShowSelfProgression(true)} disabled={!activeRoutineDef} className={`w-full flex items-center gap-2 justify-center py-2.5 rounded-xl text-white text-xs font-bold transition-all active:scale-[0.98] disabled:opacity-40 ${!hasAnyPlan ? "invite-pulse" : ""}`} style={{ backgroundColor: "#38BDF8", "--invite-glow": "rgba(56,189,248,0.6)" }}>
             <Sliders size={13} /> {hasAnyPlan ? "Planificar mi progresión" : "Planificar mi primera meta"}
           </button>
           {!activeRoutineDef && <p className="text-[10.5px] text-slate-600 text-center -mt-1">Activá una rutina primero, en la pestaña Rutinas.</p>}
