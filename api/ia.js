@@ -131,23 +131,100 @@ function getClientIp(req) {
   return req.socket?.remoteAddress || "unknown";
 }
 
-async function callModel(model, body, apiKey, timeoutMs) {
+// BUG FIX (reporte: "la IA falla a veces, además es algo lenta"). El
+// problema medido: para saber si un modelo se había COLGADO, al primer
+// intento se le daba un techo de 12s. Pero con el lambda caliente la
+// cadena arranca con el modelo que ya funcionó (preferredModel), que
+// además suele ser el mismo que PRIMARY_MODEL — o sea, la cadena tenía UN
+// solo elemento y ese único intento quedaba capado a 12s. Cualquier
+// respuesta legítima de más de 12s (el chat con el contexto entero, una
+// rutina completa, un plan de 8 semanas) se abortaba a mitad, se pagaban
+// hasta 8s más de discoverModels() y recién ahí se empezaba de nuevo con
+// otro modelo. Eso es a la vez la lentitud ("tarda el doble") y la falla
+// ("se agotó el tiempo probando modelos").
+//
+// La raíz era no poder distinguir "colgado" de "tardando". Con
+// streamGenerateContent sí se puede: un modelo vivo manda el primer chunk
+// en uno o dos segundos y después sigue. Así que el reloj corto pasa a
+// medir sólo el PRIMER BYTE, y una vez que empezó a llegar texto se le
+// deja todo el presupuesto que quede. Un modelo colgado se detecta igual
+// de rápido que antes; uno que simplemente tarda ya no se mata.
+//
+// Devuelve { ok, data } | { ok:false, status, detail }. `data` tiene la
+// misma forma que traía generateContent, así que el resto del archivo y
+// el cliente no se enteran del cambio.
+async function callModelStreaming(model, body, apiKey, { ttfbMs, totalMs }) {
   const controller = new AbortController();
-  // Hasta 50s: las respuestas LARGAS (rutinas completas) en el free tier
-  // tardan 30-50s. Con 25s las matábamos a mitad de generación — por eso
-  // "hola" funcionaba y los pedidos grandes no. Los errores de modelo
-  // (404/429) responden en milisegundos, así que el timeout largo no los
-  // demora. `timeoutMs` viene acotado por callGemini para que la cadena
-  // de reintentos completa nunca exceda el límite de Vercel (ver abajo).
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let recibioAlgo = false;
+  let motivoCorte = null;
+  // Red de seguridad: abortar el AbortController DEBERÍA cortar también la
+  // lectura del cuerpo, pero si por lo que sea no se propaga (un proxy que
+  // deja el socket abierto sin mandar nada, un runtime que no encadena la
+  // señal al stream), el `await reader.read()` de abajo se queda esperando
+  // para siempre y la función vive hasta que Vercel la mata a los 60s —
+  // justo el corte de conexión crudo, sin mensaje, que todo el presupuesto
+  // de tiempo existe para evitar. Cada lectura corre contra este reloj.
+  let dispararCorte;
+  const corte = new Promise((_, rej) => { dispararCorte = rej; });
+  corte.catch(() => {}); // sin esto, cortar tras haber terminado bien deja un rechazo sin manejar
+  const abortar = (motivo) => {
+    motivoCorte = motivo;
+    controller.abort();
+    dispararCorte(new Error(motivo));
+  };
+  const ttfbTimer = setTimeout(() => { if (!recibioAlgo) abortar("sin respuesta"); }, ttfbMs);
+  const totalTimer = setTimeout(() => abortar("tiempo total"), totalMs);
   try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`,
       { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal: controller.signal }
     );
-    return response;
+    if (!res.ok) {
+      const detail = await res.text().catch(() => "");
+      return { ok: false, status: res.status, detail };
+    }
+    if (!res.body) return { ok: false, status: 0, detail: "respuesta sin cuerpo" };
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let texto = "";
+    let finishReason = null;
+    const groundingChunks = [];
+    for (;;) {
+      const { done, value } = await Promise.race([reader.read(), corte]);
+      if (done) break;
+      recibioAlgo = true;
+      clearTimeout(ttfbTimer);
+      buffer += decoder.decode(value, { stream: true });
+      // SSE: eventos separados por línea en blanco, cada uno con "data: {...}"
+      let nl;
+      while ((nl = buffer.indexOf("\n")) !== -1) {
+        const linea = buffer.slice(0, nl).trim();
+        buffer = buffer.slice(nl + 1);
+        if (!linea.startsWith("data:")) continue;
+        const crudo = linea.slice(5).trim();
+        if (!crudo || crudo === "[DONE]") continue;
+        let json;
+        try { json = JSON.parse(crudo); } catch { continue; }
+        const cand = json?.candidates?.[0];
+        // BUG FIX (encontrado en la misma auditoría): acá y en el handler se
+        // leía SÓLO parts[0].text. Gemini parte las respuestas largas en
+        // varios `parts`, así que una respuesta larga llegaba cortada al
+        // primer fragmento y se veía como "la IA contestó a medias".
+        (cand?.content?.parts || []).forEach((p) => { if (typeof p.text === "string") texto += p.text; });
+        if (cand?.finishReason) finishReason = cand.finishReason;
+        (cand?.groundingMetadata?.groundingChunks || []).forEach((c) => groundingChunks.push(c));
+      }
+    }
+    return { ok: true, data: { candidates: [{ content: { parts: [{ text: texto }] }, finishReason, groundingMetadata: { groundingChunks } }] } };
+  } catch (err) {
+    const e = new Error(motivoCorte ? `abortado (${motivoCorte})` : String(err?.message || err));
+    e.sinRespuesta = motivoCorte === "sin respuesta";
+    throw e;
   } finally {
-    clearTimeout(timer);
+    clearTimeout(ttfbTimer);
+    clearTimeout(totalTimer);
   }
 }
 
@@ -200,35 +277,33 @@ async function callGemini(body) {
     // a la fuerza antes de que responda (eso es lo que el cliente vería
     // como un corte de conexión crudo, sin mensaje).
     if (remaining < MIN_USEFUL_ATTEMPT_MS) { ranOutOfTime = true; break; }
-    // BUG FIX (diagnóstico en producción): medido en vivo, el primer
-    // modelo de la cadena a veces no devuelve NI ERROR NI RESPUESTA — se
-    // queda colgado hasta el timeout completo (~50s) incluso con un
-    // pedido trivial ("hola"), lo que se comía TODO el presupuesto y
-    // dejaba a los modelos de respaldo sin ninguna chance real (el bucle
-    // cortaba por falta de tiempo antes de probar el segundo). Al primer
-    // intento se le da un plazo corto para detectar ese "colgado" rápido
-    // y saltar de modelo; de ahí en adelante, ya se sabe que colgarse
-    // entero es real, así que a los siguientes se les da el presupuesto
-    // que quede completo (una rutina grande legítima puede tardar 30-50s
-    // en generarse).
-    const timeoutMs = i === 0 ? Math.min(12000, remaining) : Math.min(50000, remaining);
-    let response = null;
+    // El reloj corto mide sólo el PRIMER BYTE (ver callModelStreaming): un
+    // modelo colgado se detecta igual de rápido que antes, pero uno que
+    // simplemente está tardando ya no se mata a mitad de la respuesta.
+    // Antes este techo de 12s se le aplicaba al intento 0 ENTERO y, con el
+    // lambda caliente, el intento 0 es el único que hay (la cadena arranca
+    // con el modelo que ya funcionó, que suele ser el mismo PRIMARY_MODEL):
+    // toda respuesta legítima de más de 12s se abortaba y se empezaba de
+    // nuevo. Eso era a la vez la lentitud y la falla que se reportaron.
+    let res = null;
     try {
-      response = await callModel(model, body, apiKey, timeoutMs);
+      res = await callModelStreaming(model, body, apiKey, {
+        ttfbMs: Math.min(12000, remaining),
+        totalMs: remaining,
+      });
     } catch (netErr) {
-      // Timeout o corte de red hacia Google: probar el siguiente modelo.
       lastStatus = 0; lastDetail = String(netErr?.message || netErr);
-      console.error(`[ia] ${model}: fallo de red/timeout →`, lastDetail);
+      console.error(`[ia] ${model}: ${netErr?.sinRespuesta ? "no mandó nada en 12s (colgado)" : "fallo de red/timeout"} →`, lastDetail);
     }
-    if (response?.ok) {
+    if (res?.ok) {
       preferredModel = model;
-      return response.json();
+      return res.data;
     }
     let stopEntirely = false;
-    if (response) {
-      lastStatus = response.status;
+    if (res) {
+      lastStatus = res.status;
       if (lastStatus === 429) sawQuotaExhausted = true;
-      lastDetail = await response.text().catch(() => "");
+      lastDetail = res.detail || "";
       console.error(`[ia] ${model} devolvió ${lastStatus}:`, lastDetail.slice(0, 300));
       // 404 = el alias ya no existe · 429 = cuota agotada de ESE modelo ·
       // 500/503 = sobrecarga puntual. En todos, vale la pena el siguiente.
@@ -314,7 +389,22 @@ export default async function handler(req, res) {
         contents: history,
       });
       const candidate = data?.candidates?.[0];
-      const text = candidate?.content?.parts?.[0]?.text || "";
+      // Se unen TODAS las partes: Gemini parte las respuestas largas en
+      // varios `parts` y leer sólo el primero dejaba la respuesta cortada a
+      // mitad de frase, que se veía como "la IA contesta cualquier cosa".
+      const text = (candidate?.content?.parts || []).map((p) => p?.text || "").join("");
+      // Respuesta vacía con un motivo declarado (filtro de seguridad, tope
+      // de tokens, recitación): antes el cliente recibía un texto vacío sin
+      // ninguna explicación y mostraba un error genérico o nada.
+      if (!text.trim() && candidate?.finishReason && candidate.finishReason !== "STOP") {
+        const motivos = {
+          SAFETY: "La IA bloqueó su propia respuesta por sus filtros de seguridad. Probá reformular la pregunta.",
+          RECITATION: "La IA cortó la respuesta para no reproducir contenido con derechos. Probá pedírselo de otra forma.",
+          MAX_TOKENS: "La respuesta se pasó de largo y quedó cortada. Pedile algo más acotado.",
+        };
+        res.status(502).json({ error: motivos[candidate.finishReason] || `La IA cortó la respuesta (${candidate.finishReason}).` });
+        return;
+      }
       const chunks = candidate?.groundingMetadata?.groundingChunks || [];
       const seen = new Set();
       const sources = [];
@@ -384,7 +474,8 @@ export default async function handler(req, res) {
       const parts = [{ text: promptLines.join("\n") }];
       safeImages.forEach((img) => { parts.push({ inlineData: { mimeType: img.mimeType, data: img.data } }); });
       const data = await callGemini({ contents: [{ parts }] });
-      const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      // Ídem: las rutinas largas vienen en varias partes (ver arriba).
+      const rawText = (data?.candidates?.[0]?.content?.parts || []).map((p) => p?.text || "").join("");
       res.status(200).json({ text: rawText });
       return;
     }
