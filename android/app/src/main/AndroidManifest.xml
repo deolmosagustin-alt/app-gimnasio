@@ -12,23 +12,28 @@
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
     <!--  ID de publicidad (AdMob)  -->
     <uses-permission android:name="com.google.android.gms.permission.AD_ID"/>
-    <!--  Sugerir amigos de tus contactos (Social → Buscar).
-             La app SÓLO LEE: nunca crea, modifica ni borra contactos del
-             teléfono. Aun así hay que declarar WRITE_CONTACTS, y no es
-             opcional: @capacitor-community/contacts agrupa las dos en un
-             único alias ("contacts", ver ContactsPlugin.java) y Capacitor
-             valida que TODAS las del alias estén en el manifest antes de
-             pedir nada. Faltando una, requestPermissionForAlias falla de
-             entrada con "Missing the following permissions in
-             AndroidManifest.xml: android.permission.WRITE_CONTACTS" — que
-             es exactamente el error que hacía fallar "Sugerir de mis
-             contactos" (una versión anterior la omitía a propósito,
-             asumiendo que quedaría denegada sola; no queda denegada, rompe
-             el pedido entero). Para quien usa la app no cambia nada:
-             Android junta READ y WRITE_CONTACTS en el mismo grupo, así que
-             el diálogo que ve es el mismo de siempre.  -->
-    <uses-permission android:name="android.permission.READ_CONTACTS"/>
-    <uses-permission android:name="android.permission.WRITE_CONTACTS"/>
+    <!--  Cámara: escanear el QR del perfil de un amigo en vivo
+             (ver ScanQrCamera en App.jsx). Antes el QR se leía de una FOTO,
+             que no necesita permiso porque la saca otra app — pero era a
+             ciegas: sacabas la foto y recién después te decía que no había
+             podido leerla, sin forma de corregir el encuadre. La foto sigue
+             existiendo como camino de respaldo, así que si la persona niega
+             este permiso no se pierde ninguna función.  -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <!--  La cámara es opcional: sin esto, Play Store esconde la app de
+             todos los dispositivos que no tengan cámara (Android asume
+             required="true" al ver el permiso).  -->
+    <uses-feature android:name="android.hardware.camera" android:required="false"/>
+
+    <!--  SE QUITARON READ_CONTACTS y WRITE_CONTACTS: la función que las
+             usaba ("sugerir amigos de mis contactos") ya no existe en la
+             app. Dejarlas declaradas para una función que no existe no es
+             gratis: son permisos SENSIBLES, y Play Console obliga a
+             justificarlas con un formulario de acceso y una declaración de
+             seguridad de datos — trámite que se rechaza justamente cuando
+             la app no puede demostrar para qué las usa. "Que te encuentren
+             por tu teléfono" (PhoneDiscoverySection) NO las necesita: ese
+             número lo escribe la persona a mano y viaja hasheado.  -->
     <!--  NOTA: se quitaron READ_MEDIA_IMAGES y READ_EXTERNAL_STORAGE a
              propósito. La foto de perfil y las fotos de progreso se eligen con
              el selector de archivos del sistema (input type="file" de la web),

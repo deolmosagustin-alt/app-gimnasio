@@ -2751,19 +2751,72 @@ function resizeImageFile(file, maxDim = 1080, quality = 0.82) {
 // rutina — un <input type="file" capture="environment">, que abre la app de
 // cámara del sistema vía un intent (el permiso lo maneja esa app aparte, no
 // la nuestra). Una vez que llega la foto, se decodifica el QR 100% en el
-// dispositivo con jsQR (sin subir nada a ningún lado).
-// BUG FIX (reporte: "el escaneo de QR para agregar a un amigo no funciona").
-// Antes esto hacía UN solo intento: achicaba la foto a 1000px de lado mayor
-// y se la pasaba a jsQR tal cual. Sacándole una foto a la pantalla de otro
-// teléfono, el QR ocupa una fracción chica del encuadre: después de achicar,
-// cada módulo del código queda en uno o dos píxeles y jsQR no engancha nada.
-// Y como el único aviso era "no pudimos leer el código", parecía roto.
-// Ahora se prueban varias pasadas, de la más probable a la menos, y se corta
-// en la primera que da: resolución alta completa, un recorte del centro
-// (donde la gente apunta), y por último la versión chica de antes. En cada
-// una se le pide a jsQR que pruebe también el código invertido.
-async function decodeQrFromImageFile(file) {
+// BUG FIX (reporte: "el escaneo del QR no funciona"). Había dos problemas
+// encadenados, y el segundo es el de fondo:
+//
+//  1. jsQR es un decodificador puro de JS y se le escapan los casos reales:
+//     foto de una PANTALLA (moiré, brillo, contraste bajo), en ángulo, o con
+//     el código chico dentro del encuadre. El navegador de Android trae un
+//     decodificador NATIVO (BarcodeDetector) muy por encima en robustez y no
+//     cuesta nada usarlo primero, cayendo a jsQR donde no exista.
+//
+//  2. Era un escáner POR FOTO: sacabas una foto a ciegas y recién después
+//     te decía que no. Sin ver el resultado en vivo no hay forma de corregir
+//     el encuadre, y con un solo intento por foto la sensación es "no anda".
+//     Ver ScanQrCamera, más abajo: cámara en vivo, decodificando cuadro a
+//     cuadro, que es lo que la gente espera de un escáner.
+//
+// decodeQrFromBitmapSource: un intento de decodificación sobre cualquier
+// fuente dibujable (imagen o cuadro de video). Se le pasa un canvas para
+// reusar entre cuadros y no crear uno por frame.
+let barcodeDetectorCache;
+function getBarcodeDetector() {
+  if (barcodeDetectorCache !== undefined) return barcodeDetectorCache;
+  try {
+    barcodeDetectorCache = typeof BarcodeDetector !== "undefined" ? new BarcodeDetector({ formats: ["qr_code"] }) : null;
+  } catch { barcodeDetectorCache = null; }
+  return barcodeDetectorCache;
+}
+
+async function decodeQrNative(source) {
+  const det = getBarcodeDetector();
+  if (!det) return null;
+  try {
+    const hits = await det.detect(source);
+    return hits?.[0]?.rawValue || null;
+  } catch { return null; }
+}
+
+// Dibuja una porción de la fuente a un tamaño dado y la pasa por jsQR.
+async function decodeQrWithJsQR(source, canvas, sx, sy, sw, sh, maxDim) {
+  if (sw < 20 || sh < 20) return null;
   const jsQR = (await import("jsqr")).default;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  const scale = Math.min(1, maxDim / Math.max(sw, sh));
+  const w = Math.max(1, Math.round(sw * scale));
+  const h = Math.max(1, Math.round(sh * scale));
+  canvas.width = w; canvas.height = h;
+  ctx.drawImage(source, sx, sy, sw, sh, 0, 0, w, h);
+  const { data } = ctx.getImageData(0, 0, w, h);
+  return jsQR(data, w, h, { inversionAttempts: "attemptBoth" })?.data || null;
+}
+
+// Un cuadro de video en vivo: primero el decodificador nativo (rapidísimo)
+// y, si no hay, una sola pasada de jsQR sobre el cuadro entero. No se hacen
+// varias pasadas acá a propósito: en vivo llega otro cuadro enseguida, y
+// gastar 3 pasadas por cuadro bajaría los FPS justo cuando lo que ayuda es
+// mirar muchos cuadros distintos.
+async function decodeQrFromVideoFrame(video, canvas) {
+  const nativo = await decodeQrNative(video);
+  if (nativo) return nativo;
+  const w = video.videoWidth, h = video.videoHeight;
+  if (!w || !h) return null;
+  return decodeQrWithJsQR(video, canvas, 0, 0, w, h, 900);
+}
+
+// Una foto elegida de la galería (o sacada con la cámara del sistema): acá
+// sí conviene insistir, porque hay una sola oportunidad.
+async function decodeQrFromImageFile(file) {
   const url = URL.createObjectURL(file);
   try {
     const img = await new Promise((resolve, reject) => {
@@ -2772,29 +2825,19 @@ async function decodeQrFromImageFile(file) {
       im.onerror = () => reject(new Error("No pudimos abrir la foto"));
       im.src = url;
     });
+    const nativo = await decodeQrNative(img);
+    if (nativo) return nativo;
     const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d", { willReadFrequently: true });
-    // Dibuja una porción de la foto a un tamaño dado y se la pasa a jsQR.
-    const tryDecode = (sx, sy, sw, sh, maxDim) => {
-      if (sw < 20 || sh < 20) return null;
-      const scale = Math.min(1, maxDim / Math.max(sw, sh));
-      const w = Math.max(1, Math.round(sw * scale));
-      const h = Math.max(1, Math.round(sh * scale));
-      canvas.width = w; canvas.height = h;
-      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
-      const { data } = ctx.getImageData(0, 0, w, h);
-      return jsQR(data, w, h, { inversionAttempts: "attemptBoth" })?.data || null;
-    };
     const W = img.naturalWidth || img.width;
     const H = img.naturalHeight || img.height;
-    const half = { sx: Math.round(W * 0.2), sy: Math.round(H * 0.2), sw: Math.round(W * 0.6), sh: Math.round(H * 0.6) };
     const intentos = [
-      [0, 0, W, H, 1600],                                        // foto entera, buena resolución
-      [half.sx, half.sy, half.sw, half.sh, 1200],                // recorte del centro
-      [0, 0, W, H, 1000],                                        // la pasada de siempre
+      [0, 0, W, H, 1600],                                                                  // foto entera, buena resolución
+      [Math.round(W * 0.2), Math.round(H * 0.2), Math.round(W * 0.6), Math.round(H * 0.6), 1200], // recorte del centro
+      [Math.round(W * 0.05), Math.round(H * 0.05), Math.round(W * 0.9), Math.round(H * 0.9), 1000],
+      [0, 0, W, H, 1000],
     ];
     for (const [sx, sy, sw, sh, maxDim] of intentos) {
-      const hit = tryDecode(sx, sy, sw, sh, maxDim);
+      const hit = await decodeQrWithJsQR(img, canvas, sx, sy, sw, sh, maxDim);
       if (hit) return hit;
     }
     return null;
@@ -13060,6 +13103,137 @@ function PublicUserCard({ uid, basic, streak = null, onClick = null, children })
 }
 
 
+// Escáner de QR con la cámara EN VIVO. Lo que había antes era un escáner
+// "por foto": sacabas una foto a ciegas y recién después te decía que no
+// había podido leerla. Sin ver el resultado mientras apuntás no hay forma
+// de corregir el encuadre, y con un solo intento por foto la sensación es
+// —con razón— que no anda. Acá se decodifica cuadro a cuadro hasta
+// enganchar, que es lo que cualquiera espera de un escáner.
+//
+// Si la cámara no está disponible (permiso denegado, navegador sin
+// getUserMedia, contexto inseguro) no se rompe nada: se explica qué pasó y
+// queda el camino de la foto, que sigue existiendo.
+function ScanQrCamera({ onResult, onClose }) {
+  useAndroidBack(onClose);
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const [estado, setEstado] = useState("pidiendo"); // pidiendo | escaneando | error
+  const [detalle, setDetalle] = useState("");
+  // onResult en un ref: el efecto de abajo NO debe re-ejecutarse (y con él
+  // reabrir la cámara) sólo porque el padre recreó la función en un render.
+  const resultRef = useRef(onResult);
+  useEffect(() => { resultRef.current = onResult; });
+
+  useEffect(() => {
+    let stream = null;
+    let timer = null;
+    let vivo = true;
+    let leyendo = false;
+
+    const parar = () => {
+      vivo = false;
+      if (timer) clearInterval(timer);
+      if (stream) stream.getTracks().forEach((t) => t.stop());
+    };
+
+    const arrancar = async () => {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        if (vivo) { setEstado("error"); setDetalle("Este dispositivo no permite abrir la cámara desde la app."); }
+        return;
+      }
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false,
+        });
+      } catch (err) {
+        if (!vivo) return;
+        setEstado("error");
+        // NotAllowedError = la persona dijo que no (o Android no tiene el
+        // permiso declarado); NotFoundError = no hay cámara.
+        setDetalle(err?.name === "NotAllowedError"
+          ? "No nos diste permiso para usar la cámara. Podés habilitarlo en los ajustes del teléfono, o elegir una foto del código."
+          : err?.name === "NotFoundError"
+            ? "No encontramos una cámara en este dispositivo."
+            : "No pudimos abrir la cámara. Probá con una foto del código.");
+        return;
+      }
+      if (!vivo) { stream.getTracks().forEach((t) => t.stop()); return; }
+      const video = videoRef.current;
+      if (!video) { stream.getTracks().forEach((t) => t.stop()); return; }
+      video.srcObject = stream;
+      video.setAttribute("playsinline", "true");
+      try { await video.play(); } catch { /* algunos navegadores lo resuelven solos */ }
+      if (!vivo) return;
+      setEstado("escaneando");
+      // 150ms entre cuadros: suficiente para que se sienta instantáneo sin
+      // quemar batería decodificando a 60fps.
+      timer = setInterval(async () => {
+        if (leyendo || !vivo) return;
+        leyendo = true;
+        try {
+          const texto = await decodeQrFromVideoFrame(video, canvasRef.current);
+          if (texto && vivo) {
+            haptic(30);
+            parar();
+            resultRef.current?.(texto);
+          }
+        } catch { /* un cuadro ilegible no es un error */ } finally {
+          leyendo = false;
+        }
+      }, 150);
+    };
+
+    arrancar();
+    return parar;
+  }, []);
+
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div className="fixed inset-0 z-[150] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
+      <div className="relative w-full max-w-sm rounded-3xl overflow-hidden modal-pop-in bg-slate-900 border border-cyan-500/30" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-2.5 px-5 py-4 border-b border-slate-800/60">
+          <span className="w-9 h-9 rounded-xl bg-cyan-500/18 text-cyan-300 flex items-center justify-center shrink-0 border border-cyan-500/30"><QrCode size={16} /></span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-black text-white leading-tight">Escanear código</p>
+            <p className="text-[10.5px] text-slate-500">Apuntá al QR del perfil de tu amigo</p>
+          </div>
+          <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition shrink-0"><X size={17} /></button>
+        </div>
+
+        {estado === "error" ? (
+          <div className="p-6 text-center space-y-3">
+            <span className="w-12 h-12 rounded-2xl bg-amber-500/15 text-amber-400 flex items-center justify-center mx-auto"><AlertTriangle size={22} /></span>
+            <p className="text-[12.5px] text-slate-300 leading-snug">{detalle}</p>
+            <button onClick={onClose} className="w-full py-2.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-bold">Cerrar</button>
+          </div>
+        ) : (
+          <div className="relative bg-black" style={{ aspectRatio: "1 / 1" }}>
+            <video ref={videoRef} muted playsInline className="absolute inset-0 w-full h-full object-cover" />
+            <canvas ref={canvasRef} className="hidden" />
+            {/* Marco guía: el encuadre es justo lo que no se podía corregir
+                con el escaneo por foto. */}
+            <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+              <div className="relative" style={{ width: "62%", aspectRatio: "1 / 1" }}>
+                {[["top-0 left-0", "border-t-2 border-l-2 rounded-tl-xl"], ["top-0 right-0", "border-t-2 border-r-2 rounded-tr-xl"], ["bottom-0 left-0", "border-b-2 border-l-2 rounded-bl-xl"], ["bottom-0 right-0", "border-b-2 border-r-2 rounded-br-xl"]].map(([pos, borde]) => (
+                  <span key={pos} className={`absolute ${pos} ${borde} w-8 h-8 border-cyan-400`} />
+                ))}
+              </div>
+            </div>
+            {estado === "pidiendo" && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/60">
+                <div className="w-8 h-8 rounded-full border-[3px] border-cyan-500/25 border-t-cyan-400 animate-spin" />
+                <p className="text-[11px] text-slate-400">Abriendo la cámara…</p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 // Buscar a alguien por @usuario para agregarlo de amigo, o escaneando su
 // código QR de perfil (ver decodeQrFromImageFile/parseProfileQrPayload) —
 // ambos caminos terminan en la misma búsqueda y la misma tarjeta de
@@ -13069,6 +13243,9 @@ function SocialSearchSection({ myUid, friendStatus, onSendFriendRequest }) {
   const [state, setState] = useState("idle"); // idle|searching|found|not_found|self|qr_error
   const [found, setFound] = useState(null);
   const [scanning, setScanning] = useState(false);
+  // Cámara en vivo (el camino principal) y foto (el de respaldo).
+  const [camara, setCamara] = useState(false);
+  const hayCamara = typeof navigator !== "undefined" && !!navigator.mediaDevices?.getUserMedia;
   const qrInputRef = useRef(null);
 
   const runSearch = async (query) => {
@@ -13114,9 +13291,34 @@ function SocialSearchSection({ myUid, friendStatus, onSendFriendRequest }) {
       {/* Antes este botón era fucsia dentro de una sección cian: un tercer
           color sin ningún motivo, que era buena parte de lo que hacía sentir
           la sección desprolija. Ahora acompaña al color de Buscar. */}
-      <button onClick={() => qrInputRef.current?.click()} disabled={scanning} className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-cyan-500/25 text-cyan-300/90 hover:bg-cyan-500/10 transition text-xs font-bold disabled:opacity-50">
-        {scanning ? <RotateCcw size={13} className="animate-spin" /> : <QrCode size={13} />} {scanning ? "Leyendo el código..." : "Escanear código QR"}
-      </button>
+      {/* La cámara en vivo pasa a ser el camino principal (ver
+          ScanQrCamera): el escaneo por foto era a ciegas — sacabas la foto
+          y recién después te decía que no había podido. La foto queda de
+          respaldo, que además es el caso real de "me mandaron el QR por
+          WhatsApp y lo tengo en la galería". */}
+      <div className="flex gap-2">
+        {hayCamara && (
+          <button onClick={() => setCamara(true)} disabled={scanning} className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl !text-white transition text-xs font-bold disabled:opacity-50 active:scale-[0.98]"
+            style={{ backgroundColor: "#06B6D4", boxShadow: "0 6px 16px -6px rgba(6,182,212,0.7)" }}>
+            <QrCode size={13} /> Escanear código QR
+          </button>
+        )}
+        <button onClick={() => qrInputRef.current?.click()} disabled={scanning} className={`${hayCamara ? "shrink-0 px-3" : "flex-1"} flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-cyan-500/25 text-cyan-300/90 hover:bg-cyan-500/10 transition text-xs font-bold disabled:opacity-50`}>
+          {scanning ? <RotateCcw size={13} className="animate-spin" /> : <Camera size={13} />} {scanning ? "Leyendo…" : hayCamara ? "Foto" : "Escanear desde una foto"}
+        </button>
+      </div>
+      {camara && (
+        <ScanQrCamera
+          onClose={() => setCamara(false)}
+          onResult={async (texto) => {
+            setCamara(false);
+            const username = parseProfileQrPayload(texto);
+            if (!username) { setState("qr_error"); return; }
+            setRaw(username);
+            await runSearch(username);
+          }}
+        />
+      )}
       {/* Sin `capture="environment"`: eso obligaba a sacar una foto con la
           cámara en el momento. Lo más común es que te manden el QR por
           WhatsApp y lo tengas en la galería, y así ni siquiera se podía
