@@ -569,6 +569,28 @@ function getAiConversations(profile) {
 // lo reemplaces.
 const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.modusfit.fitness";
 
+// Dónde vive /api/ia (la función serverless de Vercel).
+//
+// Hoy la app de Android NO usa su propio código: capacitor.config.json
+// tiene server.url apuntando a la web, así que el WebView carga el sitio
+// remoto y `fetch(apiUrl("/api/ia"))` resuelve contra ese dominio solo. Si en algún
+// momento se saca ese server.url para que la app corra con sus archivos
+// empaquetados (lo recomendable de cara a Play Store: funciona sin
+// internet y deja de ser una cáscara que carga una web), el origen pasa a
+// ser `https://localhost` y TODA llamada relativa se rompería en silencio:
+// la IA dejaría de funcionar entera, sin ningún aviso más claro que "no
+// pudimos conectar". Resolviendo la base acá, ese cambio deja de ser una
+// trampa: en web sigue siendo relativa (mismo origen, sin CORS), y en
+// nativo apunta siempre al backend real.
+const API_ORIGIN = "https://app-gimnasio-two.vercel.app";
+function apiUrl(path) {
+  if (typeof window === "undefined") return path;
+  // En el navegador (o con server.url activo) el origen ya es el correcto.
+  if (!Capacitor.isNativePlatform()) return path;
+  if (window.location?.origin?.startsWith("http") && !/^https?:\/\/localhost/i.test(window.location.origin)) return path;
+  return API_ORIGIN + path;
+}
+
 const DEFAULT_SETTINGS = {
   alertType: "sound", restLong: REST_LONG, restShort: REST_SHORT,
   // Cronómetro extra AL TERMINAR un ejercicio, antes de pasar al siguiente
@@ -1163,7 +1185,7 @@ async function generateWarmupWithAI(dayExercises, dayLabel) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 30000);
   try {
-    const res = await fetch("/api/ia", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "chat", systemPrompt: "Sos un entrenador experto. Respondés ÚNICAMENTE con JSON válido, sin explicaciones ni bloques de código.", history: [{ role: "user", parts: [{ text: prompt }] }] }), signal: controller.signal });
+    const res = await fetch(apiUrl("/api/ia"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "chat", systemPrompt: "Sos un entrenador experto. Respondés ÚNICAMENTE con JSON válido, sin explicaciones ni bloques de código.", history: [{ role: "user", parts: [{ text: prompt }] }] }), signal: controller.signal });
     if (!res.ok) {
       const errBody = await res.json().catch(() => null);
       throw new Error(errBody?.error || `Error ${res.status}`);
@@ -7111,7 +7133,7 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 55000);
     try {
-      const res = await fetch("/api/ia", {
+      const res = await fetch(apiUrl("/api/ia"), {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action: "chat", systemPrompt: "Sos un entrenador de fuerza experto en periodización. Respondés ÚNICAMENTE con JSON válido, sin explicaciones ni bloques de código.", history: [{ role: "user", parts: [{ text: prompt }] }] }),
         signal: controller.signal,
@@ -19029,7 +19051,7 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
           abortControllerRef.current = controller;
           const timeoutId = setTimeout(() => controller.abort(), 65000);
           try {
-            const response = await fetch("/api/ia", {
+            const response = await fetch(apiUrl("/api/ia"), {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ action: "chat", systemPrompt, history }),
@@ -20038,7 +20060,7 @@ function ImportRoutineModal({ onImport, onClose }) {
       let result = null;
       for (let attempt = 1; attempt <= 2; attempt++) {
         try {
-          const response = await fetch("/api/ia", {
+          const response = await fetch(apiUrl("/api/ia"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ action: "detect", text, images: images.map(({ mimeType, data }) => ({ mimeType, data })) }),
@@ -20612,7 +20634,7 @@ function PersonalizedRoutineWizard({ profile, onUpdateProfile, onCreateRoutine, 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 65000);
         try {
-          const res = await fetch("/api/ia", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "chat", systemPrompt: "Sos un entrenador experto. Respondés ÚNICAMENTE con JSON válido, sin explicaciones ni bloques de código.", history: [{ role: "user", parts: [{ text: prompt }] }] }), signal: controller.signal });
+          const res = await fetch(apiUrl("/api/ia"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "chat", systemPrompt: "Sos un entrenador experto. Respondés ÚNICAMENTE con JSON válido, sin explicaciones ni bloques de código.", history: [{ role: "user", parts: [{ text: prompt }] }] }), signal: controller.signal });
           clearTimeout(timeoutId);
           if (!res.ok) {
             // BUG FIX: antes se tiraba un Error("server") genérico sin leer
