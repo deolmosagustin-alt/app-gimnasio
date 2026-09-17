@@ -100,7 +100,11 @@ service cloud.firestore {
     // @handle. Cambiar de @handle = borrar el viejo (delete) + crear el
     // nuevo (create) — nunca un update in-place.
     match /usernames/{usernameLower} {
-      allow read: if isSignedIn();
+      // Ídem: la app siempre resuelve un @usuario puntual por ID
+      // (lookupUserByUsername/isUsernameTaken usan getDoc), nunca lista la
+      // colección — no hay motivo para permitir bajarse el padrón entero.
+      allow get: if isSignedIn();
+      allow list: if false;
       allow create: if isSignedIn()
         && request.resource.data.uid == request.auth.uid
         && usernameLower == usernameLower.lower()
@@ -117,7 +121,15 @@ service cloud.firestore {
     // seguridad), así que alcanza con exigir que cada quien sólo pueda
     // escribir SU PROPIO uid en la clave, nunca el de otra persona.
     match /phoneIndex/{phoneHash} {
-      allow read: if isSignedIn();
+      // BUG FIX (auditando de cara al lanzamiento): "allow read" habilita
+      // también "list", o sea consultar la COLECCIÓN ENTERA. Cualquiera con
+      // una cuenta podía bajarse el índice completo hash→uid. Y el hash es
+      // de los últimos 9 dígitos de un teléfono: ese espacio (10^9) se
+      // recorre offline sin esfuerzo, así que enumerar esto equivale a
+      // des-anonimizar el teléfono de todos los usuarios. Separar get de
+      // list corta la enumeración sin romper ninguna búsqueda por hash.
+      allow get: if isSignedIn();
+      allow list: if false;
       allow write: if isSignedIn() && request.resource.data.uid == request.auth.uid;
       allow delete: if isSignedIn() && resource.data.uid == request.auth.uid;
     }

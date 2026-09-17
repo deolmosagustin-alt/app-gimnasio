@@ -15,7 +15,7 @@
 //   trainerLinks/{trainerUid}_{studentUid} → { trainerUid, studentUid, status, requestedBy }.
 //   routineProposals/{autoId} → propuesta de rutina de un entrenador a un alumno.
 
-import { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, collectionGroup, addDoc, query, where, orderBy, limit, getDocs, documentId } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, collectionGroup, addDoc, query, where, orderBy, limit, getDocs } from "firebase/firestore";
 import { db } from "./firebase";
 
 // ============================== USERNAME (@handle) ==============================
@@ -220,25 +220,10 @@ export async function clearDiscoverablePhone(phoneHash) {
   catch { /* ignorado a propósito, mismo criterio que releaseUsername */ }
 }
 
-// Dado un array de huellas (una por cada teléfono de tus contactos, ya
-// normalizadas Y hasheadas del lado del cliente), devuelve los uids de la
-// app que coinciden. En tandas de 30 (límite de Firestore para "in" sobre
-// el ID del documento) — de sobra incluso para una agenda de contactos
-// grande, sin arriesgar reventar la cuota de lecturas de una sola.
-export async function findUidsByPhoneHashes(phoneHashes) {
-  const unique = Array.from(new Set((phoneHashes || []).filter(Boolean)));
-  const uids = new Set();
-  for (let i = 0; i < unique.length; i += 30) {
-    const chunk = unique.slice(i, i + 30);
-    try {
-      const snap = await getDocs(query(collection(db, "phoneIndex"), where(documentId(), "in", chunk)));
-      snap.docs.forEach((d) => { const u = d.data()?.uid; if (u) uids.add(u); });
-    } catch (err) {
-      console.warn("[social] No se pudo buscar coincidencias de teléfono:", err?.message || err);
-    }
-  }
-  return Array.from(uids);
-}
+// Se quitó findUidsByPhoneHashes: buscaba usuarios por el hash de su
+// teléfono para "sugerir amigos de mis contactos", función que ya no existe
+// en la app. Quedaba como código muerto y, peor, obligaba a dejar la
+// colección phoneIndex enumerable en firestore.rules (ver la nota ahí).
 
 // "Hacerme privado": suelta el @usuario y borra el espejo público, SIN
 // tocar amistades/vínculos existentes (a diferencia de cleanupSocialData,
