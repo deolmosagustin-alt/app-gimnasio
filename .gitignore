@@ -26,3 +26,7 @@ graphify-out/
 *.njsproj
 *.sln
 *.sw?
+
+# Sondas temporales de QA (Playwright)
+_pw_*.mjs
+_t_*.mjs
