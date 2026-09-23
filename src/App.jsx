@@ -1183,7 +1183,12 @@ async function generateWarmupWithAI(dayExercises, dayLabel) {
     `Devolvé ÚNICAMENTE un array JSON de keys, sin texto adicional ni markdown, por ejemplo: ["jumping_jacks","cuban_rotation","face_pull"]`,
   ].join("\n");
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30000);
+  // El servidor se da hasta 55s de presupuesto (ver TOTAL_TIME_BUDGET_MS en
+  // api/ia.js) y todavía tiene que viajar la respuesta. Un reloj del cliente
+  // más corto que eso es una falla garantizada en el peor caso: la app corta
+  // un pedido que iba a contestar bien. Se alinean todos en 65s, como ya
+  // estaban el chat y el asistente de rutinas.
+  const timeoutId = setTimeout(() => controller.abort(), 65000);
   try {
     const res = await fetch(apiUrl("/api/ia"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "chat", systemPrompt: "Sos un entrenador experto. Respondés ÚNICAMENTE con JSON válido, sin explicaciones ni bloques de código.", history: [{ role: "user", parts: [{ text: prompt }] }] }), signal: controller.signal });
     if (!res.ok) {
@@ -7131,7 +7136,12 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_
     ].filter(Boolean).join("\n");
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 55000);
+    // El servidor se da hasta 55s de presupuesto (ver TOTAL_TIME_BUDGET_MS en
+    // api/ia.js) y todavía tiene que viajar la respuesta. Un reloj del cliente
+    // más corto que eso es una falla garantizada en el peor caso: la app corta
+    // un pedido que iba a contestar bien. Se alinean todos en 65s, como ya
+    // estaban el chat y el asistente de rutinas.
+    const timeoutId = setTimeout(() => controller.abort(), 65000);
     try {
       const res = await fetch(apiUrl("/api/ia"), {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -18733,11 +18743,27 @@ function buildTrainingInsights(logs, sessions, weekSchedule, dumbbellDouble = nu
 // log aunque haga meses que no se toque. Si se pasa maxKeys, sólo se
 // conservan los ejercicios entrenados más RECIENTEMENTE (que es también lo
 // más probable que te pregunten), en vez de mandar los 400 por igual.
+// Cada registro guardado repite exName y exMuscle (ver el entry de handleSave
+// en SetRow) — datos idénticos en las 20, 50 o 200 entradas del mismo
+// ejercicio. Para la IA es relleno puro: la CLAVE ya dice qué ejercicio y qué
+// serie es, y el nombre y el músculo le llegan aparte en "rutinas". En un
+// perfil con un año de uso eso solo son varios KB de contexto repetido, y el
+// tamaño del pedido es justo lo que hace fallar a la IA (ver
+// AI_PROMPT_MAX_CHARS). Se conserva todo lo que sí aporta: fecha, carga,
+// reps, esfuerzo, minutos de cardio y si fue semana de descarga.
+const CAMPOS_UTILES_PARA_IA = ["date", "kg", "reps", "rpe", "minutes", "km", "deload"];
+function compactarRegistroParaIA(h) {
+  if (!h || typeof h !== "object") return h;
+  const out = {};
+  CAMPOS_UTILES_PARA_IA.forEach((c) => { if (h[c] !== undefined && h[c] !== null) out[c] = h[c]; });
+  return out;
+}
+
 function trimLogsForAI(logs, historyLimit = AI_LOG_HISTORY_LIMIT, maxKeys = null) {
   const out = {};
   Object.entries(logs || {}).forEach(([key, val]) => {
     if (key.endsWith("_pr_override") || !Array.isArray(val)) { out[key] = val; return; }
-    out[key] = val.slice().sort((a, b) => (a.date < b.date ? -1 : 1)).slice(-historyLimit);
+    out[key] = val.slice().sort((a, b) => (a.date < b.date ? -1 : 1)).slice(-historyLimit).map(compactarRegistroParaIA);
   });
   if (!maxKeys) return out;
   const entries = Object.entries(out);
@@ -18990,7 +19016,7 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
       // se pide explícitamente otra, así "planificame la semana" siempre
       // apunta a la semana real de hoy sin que la IA tenga que adivinarla.
       const weekInfoForAI = cycleStart ? getWeekInfo(cycleStart, settings) : null;
-      const buildAiContext = (historyLimit, maxKeys = null) => ({
+      const buildAiContext = (historyLimit, maxKeys = null, sinAnalisis = false) => ({
         perfil: { nombre: profileName, email: profile?.email || null, sexo: profile?.sex || null, edad: profile?.age || null, miembroDesde: profile?.joinedAt || null },
         rutinaActivaId: profile?.activeRoutineId || null,
         rutinas: allRoutines,
@@ -19003,13 +19029,45 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
         // no tiene que deducir nada de los logs crudos — responde con datos
         // duros y detecta problemas reales (ej. "llevás 5 semanas estancado
         // en press banca y le bajaste el volumen a pecho un 30%").
-        analisisEntrenamiento: buildTrainingInsights(logs, profile?.trainingSessions || [], profile?.weekSchedule || null, settings?.dumbbellDouble || null),
+        // Es un análisis DERIVADO de los logs: si hay que achicar el pedido,
+        // esto se suelta antes que los logs crudos. La IA puede volver a
+        // deducirlo; lo que no puede es inventar las marcas que no le mandaste.
+        // Es un análisis DERIVADO de los logs. Si hubo que soltarlo para que
+        // el pedido entrara, se avisa en vez de dejarlo en null: el prompt le
+        // ordena a la IA leer "analisisEntrenamiento" antes de responder, y una
+        // instrucción que apunta a la nada la deja dando vueltas.
+        analisisEntrenamiento: sinAnalisis
+          ? "(no incluido en este pedido por tamaño — deducí lo que necesites de logs)"
+          : buildTrainingInsights(logs, profile?.trainingSessions || [], profile?.weekSchedule || null, settings?.dumbbellDouble || null),
       });
+      // BUG FIX (reporte: "cuando apretás el chatbot da error" + "la IA falla
+      // a veces"). Esta red de seguridad existía pero su umbral era de 350.000
+      // caracteres, y el límite REAL está ocho veces más abajo: midiendo
+      // contra el endpoint desplegado, el mismo minuto y con el mismo pedido,
+      //     7 KB → 200 en 2,9s  ·  21 KB → 200 en 4,1s  ·  34 KB → 200 en 5,1s
+      //    48 KB → 500 "límite de uso" a los 30s
+      // O sea que el recorte nunca se disparaba y el chat mandaba el pedido
+      // entero contra el acantilado. Un perfil con un año de uso arma ~40 KB:
+      // queda justo en el borde, así que anda o no anda según cuánto
+      // historial tengas — exactamente el "falla a veces" que se reportó, y
+      // por eso no se reproducía con un perfil nuevo.
+      // 28 KB deja margen cómodo y además responde casi el doble de rápido.
+      const AI_PROMPT_MAX_CHARS = 32000;
       let systemPrompt = AI_SYSTEM_PROMPT_STATIC + JSON.stringify(buildAiContext(AI_LOG_HISTORY_LIMIT));
-      const FALLBACK_STEPS = [[3, 250], [1, 100]];
-      for (const [historyLimit, maxKeys] of FALLBACK_STEPS) {
-        if (systemPrompt.length <= 350000) break;
-        systemPrompt = AI_SYSTEM_PROMPT_STATIC + JSON.stringify(buildAiContext(historyLimit, maxKeys));
+      // ORDEN DE SACRIFICIO, medido. El pedido completo de un perfil con un
+      // año de uso pesa 39,7 KB y se reparte así: instrucciones fijas 16,8 ·
+      // logs crudos 13,5 · análisis ya calculado 6,4 · rutinas 1,9 · ajustes
+      // 0,9. Lo primero que se suelta son las SESIONES VIEJAS de cada serie,
+      // no el análisis: ese análisis ES el destilado de esos mismos logs
+      // (marcas, estancamientos, volumen por músculo, adherencia) y el prompt
+      // le pide expresamente a la IA que lo lea antes de responder — vale
+      // mucho más por byte que las filas crudas de hace cuatro meses. Recién
+      // si aun así no entra se empiezan a dejar ejercicios afuera, y el
+      // análisis se suelta último.
+      const FALLBACK_STEPS = [[4, null, false], [3, null, false], [2, null, false], [1, null, false], [1, 200, false], [1, 60, true], [1, 25, true]];
+      for (const [historyLimit, maxKeys, sinAnalisis] of FALLBACK_STEPS) {
+        if (systemPrompt.length <= AI_PROMPT_MAX_CHARS) break;
+        systemPrompt = AI_SYSTEM_PROMPT_STATIC + JSON.stringify(buildAiContext(historyLimit, maxKeys, sinAnalisis));
       }
       // Limitamos el historial a los últimos 10 mensajes — después de
       // varios intercambios el contexto acumulado puede superar el límite

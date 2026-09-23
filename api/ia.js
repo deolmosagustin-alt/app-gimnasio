@@ -261,6 +261,26 @@ async function callGemini(body) {
   let discoveryTried = false;
   const deadline = Date.now() + TOTAL_TIME_BUDGET_MS;
 
+  // BUG FIX (reporte: "cuando apretás el chatbot da error" / "la IA falla a
+  // veces y es lenta"). "gemini-flash-latest" apunta hoy a un modelo de la
+  // familia 2.5, que PIENSA antes de responder — y esos tokens de
+  // razonamiento se generan ANTES del primer byte visible. O sea: cuanto más
+  // difícil la pregunta, más tarda en aparecer la primera letra. Medido
+  // contra producción con el contexto real del chat: una pregunta trivial
+  // contesta en 2-5s, pero "¿qué tal vengo entrenando?" no emitía NADA en
+  // más de 50s. El reloj de primer byte lo mataba una y otra vez y la
+  // persona recibía "la IA está respondiendo lento".
+  // Para un chat de gimnasio ese razonamiento extendido es latencia casi
+  // pura: la respuesta buena sale igual sin él. Se pide thinkingBudget 0.
+  // Si el modelo no conoce el campo devuelve 400, así que se reintenta una
+  // vez SIN él antes de dar el modelo por perdido (ver sinPensar más abajo).
+  const bodyBase = body;
+  const bodySinPensar = {
+    ...body,
+    generationConfig: { ...(body.generationConfig || {}), thinkingConfig: { thinkingBudget: 0 } },
+  };
+  const modelosQueNoAceptanElCampo = new Set();
+
   // BUG FIX (diagnóstico): antes el mensaje final sólo miraba el status del
   // ÚLTIMO modelo probado — si los primeros intentos daban 429 (cuota
   // agotada) pero el ÚLTIMO de la cadena ya no existe más y da 404, el
@@ -285,19 +305,31 @@ async function callGemini(body) {
     // con el modelo que ya funcionó, que suele ser el mismo PRIMARY_MODEL):
     // toda respuesta legítima de más de 12s se abortaba y se empezaba de
     // nuevo. Eso era a la vez la lentitud y la falla que se reportaron.
+    // Con thinkingBudget 0 la primera letra sale enseguida, así que 12s de
+    // margen para el primer byte vuelve a ser un techo razonable. Si hubo que
+    // caer al pedido CON razonamiento (el modelo no acepta el campo), se le
+    // da mucho más aire: ahí el silencio inicial es normal, no un cuelgue.
+    const sinPensar = !modelosQueNoAceptanElCampo.has(model);
+    const cuerpo = sinPensar ? bodySinPensar : bodyBase;
+    const ttfb = Math.min(sinPensar ? 12000 : 40000, remaining);
     let res = null;
     try {
-      res = await callModelStreaming(model, body, apiKey, {
-        ttfbMs: Math.min(12000, remaining),
-        totalMs: remaining,
-      });
+      res = await callModelStreaming(model, cuerpo, apiKey, { ttfbMs: ttfb, totalMs: remaining });
     } catch (netErr) {
       lastStatus = 0; lastDetail = String(netErr?.message || netErr);
-      console.error(`[ia] ${model}: ${netErr?.sinRespuesta ? "no mandó nada en 12s (colgado)" : "fallo de red/timeout"} →`, lastDetail);
+      console.error(`[ia] ${model}: ${netErr?.sinRespuesta ? `no mandó nada en ${Math.round(ttfb / 1000)}s (colgado)` : "fallo de red/timeout"} →`, lastDetail);
     }
     if (res?.ok) {
       preferredModel = model;
       return res.data;
+    }
+    // 400 con el campo de razonamiento puesto: este modelo no lo conoce. Se
+    // reintenta YA con el mismo modelo y el pedido de siempre, sin gastar un
+    // eslabón de la cadena ni el presupuesto de descubrimiento.
+    if (res && res.status === 400 && sinPensar) {
+      modelosQueNoAceptanElCampo.add(model);
+      console.error(`[ia] ${model}: no acepta thinkingConfig, reintentando sin él`);
+      continue;
     }
     let stopEntirely = false;
     if (res) {
