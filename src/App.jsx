@@ -13254,7 +13254,19 @@ function ScanQrCamera({ onResult, onClose }) {
             parar();
             resultRef.current?.(texto);
           }
-        } catch { /* un cuadro ilegible no es un error */ } finally {
+        } catch (err) {
+          // Un cuadro ilegible no es un error y se ignora. Pero si lo que
+          // falló es CARGAR el decodificador (un chunk viejo que ya no está
+          // en el servidor, ver main.jsx), eso no se arregla mirando el
+          // cuadro siguiente: sin decirlo, la cámara se quedaba prendida
+          // para siempre sin encontrar nunca nada. Eso es exactamente lo que
+          // se veía como "el escaneo no funciona".
+          if (/dynamically imported module|Importing a module script failed/i.test(String(err?.message || err))) {
+            parar();
+            setEstado("error");
+            setDetalle("No pudimos cargar el lector de códigos. Cerrá y volvé a abrir la app.");
+          }
+        } finally {
           leyendo = false;
         }
       }, 150);
