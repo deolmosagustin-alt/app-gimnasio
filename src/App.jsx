@@ -2467,6 +2467,24 @@ input, textarea, [contenteditable="true"] {
      veían como cajas oscuras. */
   --panel-sunken: rgba(2,6,23,0.7);
   --row-surface: rgba(15,23,42,0.6);
+  /* ESCALERA DE SUPERFICIES, OPACA Y ASCENDENTE.
+     Los dos tokens de arriba son translúcidos, y medido en pantalla eso deja
+     la jerarquía DADA VUELTA: la página es #0a0a0f (luminancia 10), una
+     tarjeta de sección compone a luminancia 6 —o sea más oscura que la
+     página, un pozo en vez de una tarjeta— y la fila de adentro compone a 17,
+     más clara que su propio contenedor. Como ningún nivel se distingue por
+     luz, cada nivel terminó pidiendo atención con TINTE: por eso Social tenía
+     cinco superficies violetas apiladas y siete resplandores.
+     Estos tres son opacos y suben de a poco, así la jerarquía la hace la luz
+     y el color queda libre para significar algo. */
+  --surface-1: #12151f;   /* tarjeta de sección, por encima de la página */
+  --surface-2: #1a1f2e;   /* fila dentro de la tarjeta */
+  --surface-3: #232938;   /* elemento activo / resaltado dentro de una fila */
+  --hairline: #2b3245;    /* el canto de 1px que hoy hacían los resplandores */
+  /* Hero propio de Social. No reusa --grad-hero-purple a propósito: ese
+     violeta (#A855F7) vuelve a ser exclusivo de Descarga y Medidas. Y baja
+     del 42% al 26% de tinte, porque al 42% sobre negro se iba a malva. */
+  --grad-hero-violet: linear-gradient(135deg, rgba(139,92,246,0.26), rgba(15,23,42,0.86) 55%, rgba(15,23,42,0.6));
   /* Degradés de paneles destacados (resumen de sesión, tarjetas del
      entrenador). Conservan el valor exacto que tenían escrito a mano. */
   --panel-grad-teal: linear-gradient(165deg,#0d1a17 0%,#0a0f1a 100%);
@@ -2515,6 +2533,13 @@ input, textarea, [contenteditable="true"] {
   --app-bg: #f8fafc;
   --panel-sunken: #f1f5f9;
   --row-surface: #f8fafc;
+  /* En claro la escalera va al revés (la página es lo más claro y cada nivel
+     baja un escalón), pero el principio es el mismo: la jerarquía la hace la
+     luz, no el tinte. */
+  --surface-1: #ffffff;
+  --surface-2: #f1f5f9;
+  --surface-3: #e2e8f0;
+  --hairline: #d8dfe9;
   /* En claro, el mismo matiz pero sobre blanco: apenas un velo de color en la
      esquina superior que se disuelve, en vez de un bloque oscuro. */
   --panel-grad-teal: linear-gradient(165deg, rgba(20,184,166,0.09) 0%, #ffffff 60%);
@@ -6527,7 +6552,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
               className="w-full bg-transparent text-[12px] text-slate-200 placeholder:text-slate-700 focus:outline-none resize-none leading-snug"
             />
             <div className="flex items-center gap-2 mt-1">
-              <button onClick={guardarNota} className="text-[11px] font-bold px-2.5 py-1 rounded-lg transition active:scale-95" style={{ backgroundColor: accent, color: "#fff" }}>Guardar</button>
+              <button onClick={guardarNota} className="text-[11px] font-bold px-2.5 py-1 rounded-lg transition active:scale-95" style={{ backgroundColor: "var(--surface-3)", color: "#fff" }}>Guardar</button>
               <button onClick={() => { setNoteDraft(setNote); setEditingNote(false); }} className="text-[11px] text-slate-500 hover:text-slate-300 transition">Cancelar</button>
             </div>
           </div>
@@ -7273,7 +7298,7 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_
                   <div className="flex gap-1.5 overflow-x-auto pb-1">
                     {Array.from({ length: ciclo }, (_, i) => i + 1).map((w) => (
                       <button key={w} onClick={() => setDesdeSemana(w)} className="relative shrink-0 w-10 py-1.5 rounded-lg text-[10.5px] font-black transition active:scale-95"
-                        style={desdeSemana === w ? { backgroundColor: accent, color: "#fff" } : { backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)", color: "var(--chip-text)" }}>
+                        style={desdeSemana === w ? { backgroundColor: "var(--surface-3)", color: "#fff" } : { backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)", color: "var(--chip-text)" }}>
                         S{w}
                         {w === weekInCycle && <span className="absolute left-1/2 -translate-x-1/2 bottom-0.5 w-1 h-1 rounded-full" style={{ backgroundColor: desdeSemana === w ? "#fff" : accent }} />}
                       </button>
@@ -7289,7 +7314,7 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_
               <div className="flex gap-1.5 mt-2 overflow-x-auto pb-1">
                 {[{ k: "todos", l: "Toda la rutina" }, ...dias.map((dk) => ({ k: dk, l: model.days[dk]?.label || dk }))].map((o) => (
                   <button key={o.k} onClick={() => setDayKey(o.k)} className="shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-bold transition"
-                    style={dayKey === o.k ? { backgroundColor: accent, color: "#fff" } : { backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)", color: "var(--chip-text)" }}>
+                    style={dayKey === o.k ? { backgroundColor: "var(--surface-3)", color: "#fff" } : { backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)", color: "var(--chip-text)" }}>
                     {o.l}
                   </button>
                 ))}
@@ -8918,7 +8943,20 @@ const EVOLUTION_CHART_COLOR = "#F59E0B";
 // Color característico de la pestaña Social — celeste, distinto del azul
 // de "Rango" y el cian de "Historial" en Progreso, y del resto de los
 // colores de héroe ya usados (teal=Rutina, azul=Progreso, violeta=Descarga).
-const SOCIAL_COLOR = "#A855F7";
+// El violeta de Social baja medio paso, de #A855F7 a #8B5CF6 (violet-500).
+// Tres motivos, en orden de peso:
+//  1. #A855F7 estaba asignado a DOS cosas a la vez (Medidas/Descarga y
+//     Social). Corriéndolo, cada uno vuelve a significar una sola.
+//  2. Social es la ÚNICA pantalla que muestra a otras personas, así que es la
+//     única donde entra la paleta de 18 colores de rango. #A855F7 cae cerca
+//     de la franja donde viven los tiers altos; #8B5CF6 es un paso más frío y
+//     se despega de las insignias en vez de pelearse con ellas.
+//  3. Sobre fondo casi negro, #A855F7 al 42% se iba a malva y vibraba.
+// SOCIAL_INK es la variante para TEXTO e íconos: los violetas saturados no
+// llegan a 4.5:1 como tipografía, y esta sí.
+const SOCIAL_COLOR = "#8B5CF6";
+const SOCIAL_INK = "#C4B5FD";
+const SOCIAL_SOLID = "#7C3AED"; // único relleno pleno, con texto blanco (5,7:1)
 
 // ============================================================================
 // ESTADÍSTICAS DE PROGRESO — pedido: "también podrían mostrarse estadísticas
@@ -8951,11 +8989,17 @@ function SocialProgressStats({ profile }) {
           { label: "Esta semana", val: stats.thisWeek, sufijo: "" },
           { label: "Entrenados", val: stats.total, sufijo: "d" },
         ].map(({ label, val, sufijo }) => (
-          <div key={label} className="bg-purple-500/10 border border-purple-500/15 rounded-xl px-3 py-2 text-center">
-            <p className="text-sm font-black text-purple-200 flex items-baseline justify-center">
+          // Tres tarjetas teñidas de violeta, con el número TAMBIÉN violeta,
+          // debajo de un hero violeta y una tarjeta violeta: eran la tercera
+          // y cuarta capa del mismo color y el número —que es el dato— no
+          // resaltaba sobre su propio fondo. Ahora la superficie es neutra y
+          // sube un escalón de luz, el número va en blanco (es lo que venís a
+          // leer) y el violeta se retira al rótulo.
+          <div key={label} className="rounded-xl px-3 py-2 text-center" style={{ backgroundColor: "var(--surface-1)", border: "1px solid var(--hairline)" }}>
+            <p className="text-sm font-black text-white flex items-baseline justify-center">
               <CountUpNumber value={val} from={0} duration={550} decimals={0} className="tabular-nums" />{sufijo}
             </p>
-            <p className="text-[10px] text-purple-500 mt-0.5">{label}</p>
+            <p className="text-[10px] mt-0.5" style={{ color: SOCIAL_INK }}>{label}</p>
           </div>
         ))}
       </div>
@@ -14180,9 +14224,9 @@ function LeaderboardSection({ uid, profile, myTopRank, friendAccepted, basics, a
   return (
     <div className="space-y-3">
       <div className="grid gap-1 p-1 rounded-xl bg-black/40 border border-slate-700/50" style={{ gridTemplateColumns: GLOBAL_RANKING_ENABLED ? "repeat(3, 1fr)" : "repeat(2, 1fr)" }}>
-        <button onClick={() => setScope("amigos")} className="py-1.5 rounded-lg text-xs font-bold transition-all" style={scope === "amigos" ? { backgroundColor: accent, color: "#fff" } : { color: "#64748b" }}>Mejor rango</button>
-        <button onClick={() => setScope("semana")} className="flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs font-bold transition-all" style={scope === "semana" ? { backgroundColor: accent, color: "#fff" } : { color: "#64748b" }}><Flame size={12} /> Racha</button>
-        {GLOBAL_RANKING_ENABLED && <button onClick={() => setScope("global")} className="py-1.5 rounded-lg text-xs font-bold transition-all" style={scope === "global" ? { backgroundColor: accent, color: "#fff" } : { color: "#64748b" }}>Global</button>}
+        <button onClick={() => setScope("amigos")} className="py-1.5 rounded-lg text-xs font-bold transition-all" style={scope === "amigos" ? { backgroundColor: "var(--surface-3)", color: "#fff" } : { color: "#64748b" }}>Mejor rango</button>
+        <button onClick={() => setScope("semana")} className="flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs font-bold transition-all" style={scope === "semana" ? { backgroundColor: "var(--surface-3)", color: "#fff" } : { color: "#64748b" }}><Flame size={12} /> Racha</button>
+        {GLOBAL_RANKING_ENABLED && <button onClick={() => setScope("global")} className="py-1.5 rounded-lg text-xs font-bold transition-all" style={scope === "global" ? { backgroundColor: "var(--surface-3)", color: "#fff" } : { color: "#64748b" }}>Global</button>}
       </div>
       {scope === "amigos" && friendsRanking.length === 0 && (
         // Pedido: "la pestaña se ve medio vacía" — mismo criterio que el
@@ -16080,7 +16124,13 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
 
   const sectionIdx = Math.max(0, SECTIONS.findIndex((s) => s.k === section));
   const sectionDef = SECTIONS[sectionIdx] || SECTIONS[0];
-  const sectionColor = sectionDef.color || SOCIAL_COLOR;
+  // UN SOLO ACENTO EN TODA LA PESTAÑA. Antes cada sub-sección traía el color
+  // de OTRA pestaña (cian = Historial, ámbar = Ejercicios, azul = Progreso) y
+  // eso repintaba el borde, el fondo, el ícono y la solapa entera cada vez
+  // que tocabas una. Cuatro identidades adentro de una: es la mitad de por
+  // qué Social se leía como un collage y no como una pantalla. Los íconos
+  // siguen distinguiendo cada sección; el color ya no.
+  const sectionColor = SOCIAL_COLOR;
 
   return (
     <div className="space-y-4">
@@ -16094,15 +16144,17 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
           mismo esqueleto (ver heroGrad de Rutina/Progreso más arriba en el
           archivo) — el avatar/nombre/racha/rango pasan a su propia tarjeta
           de perfil, debajo, en vez de vivir adentro de este hero. */}
-      <div className="relative overflow-hidden rounded-2xl border border-purple-500/20 p-5 elastic-in" style={{ background: "var(--grad-hero-purple)" }}>
-        <div className="absolute -top-8 -right-6 w-32 h-32 rounded-full bg-purple-500/15 blur-2xl pointer-events-none" />
-        <div className="absolute -bottom-6 -left-6 w-28 h-28 rounded-full bg-fuchsia-500/10 blur-2xl pointer-events-none" />
+      {/* Un solo resplandor, y un canto de 1px de verdad. El segundo glow era
+          FUCSIA — un color que no significa nada en la app y que, sumado al
+          violeta, convertía el borde superior en una mancha sin filo. */}
+      <div className="relative overflow-hidden rounded-2xl p-5 elastic-in" style={{ background: "var(--grad-hero-violet)", border: `1px solid ${tint(SOCIAL_COLOR, "3a")}` }}>
+        <div className="absolute -top-8 -right-6 w-32 h-32 rounded-full blur-2xl pointer-events-none" style={{ backgroundColor: tint(SOCIAL_COLOR, "22") }} />
         <div className="relative flex items-center gap-2 mb-1">
-          <Users size={16} className="text-purple-400" />
-          <span className="text-[11px] font-black uppercase tracking-widest text-purple-400">Social</span>
+          <Users size={16} style={{ color: SOCIAL_INK }} />
+          <span className="text-[11px] font-black uppercase tracking-widest" style={{ color: SOCIAL_INK }}>Social</span>
         </div>
         <h2 className="relative text-xl font-black text-white leading-tight">Social</h2>
-        <p className="relative text-xs text-purple-300/60 mt-1">Sumá amigos, competí y compartí tu progreso</p>
+        <p className="relative text-xs mt-1" style={{ color: "#94a3b8" }}>Sumá amigos, competí y compartí tu progreso</p>
       </div>
 
       {/* Tarjeta de perfil — el avatar/nombre/racha/rango que antes vivían
@@ -16116,15 +16168,20 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
           un tercer glow puntual con el color de TU rango (un dato que
           cambia según tu estado, como la fase de la semana o el día que
           toca) en vez de un violeta/fucsia fijo para todo el mundo. */}
-      <div className="relative overflow-hidden rounded-2xl border border-purple-500/20 p-4 elastic-in" style={{ background: "var(--grad-hero-purple)", animationDelay: "60ms" }}>
-        <div className="absolute -top-8 -right-6 w-28 h-28 rounded-full bg-purple-500/15 blur-2xl pointer-events-none" />
-        <div className="absolute -bottom-6 -left-6 w-24 h-24 rounded-full bg-fuchsia-500/10 blur-2xl pointer-events-none" />
+      {/* Esta tarjeta repetía el MISMO fondo y los MISMOS dos resplandores que
+          el hero de arriba: dos violetas idénticos pegados se leen como una
+          sola mancha alta, y ninguno de los dos se destaca. Ahora es una
+          superficie neutra que sube un escalón de luz respecto de la página
+          (ver --surface-1): se distingue del hero por LUZ, no por más tinte.
+          El único color que entra es el de TU rango, que es un dato tuyo y
+          cambia — el fucsia fijo no significaba nada y se va. */}
+      <div className="relative overflow-hidden rounded-2xl p-4 elastic-in" style={{ backgroundColor: "var(--surface-1)", border: "1px solid var(--hairline)", animationDelay: "60ms" }}>
         {myTopRank && (
-          <div className="absolute top-1/2 right-6 -translate-y-1/2 w-24 h-24 rounded-full blur-2xl pointer-events-none opacity-30" style={{ backgroundColor: myTopRank.color }} />
+          <div className="absolute top-1/2 right-6 -translate-y-1/2 w-24 h-24 rounded-full blur-2xl pointer-events-none opacity-25" style={{ backgroundColor: myTopRank.color }} />
         )}
         <div className="relative flex items-center gap-3.5">
-          <div className="w-14 h-14 rounded-2xl overflow-hidden shrink-0 border border-purple-500/30 bg-purple-500/15 flex items-center justify-center">
-            {profile?.avatarData ? <img src={profile.avatarData} alt="" className="w-full h-full object-cover" /> : <Users size={24} className="text-purple-300" />}
+          <div className="w-14 h-14 rounded-2xl overflow-hidden shrink-0 flex items-center justify-center" style={{ backgroundColor: tint(SOCIAL_COLOR, "1f"), border: `1px solid ${tint(SOCIAL_COLOR, "44")}` }}>
+            {profile?.avatarData ? <img src={profile.avatarData} alt="" className="w-full h-full object-cover" /> : <Users size={24} style={{ color: SOCIAL_INK }} />}
           </div>
           <div className="min-w-0 flex-1">
             <h3 className="text-base font-black text-white leading-tight truncate">{profile?.name || "Tu comunidad fitness"}</h3>
@@ -16306,13 +16363,13 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
             varios botones independientes. */}
         <div
           className="absolute top-1 bottom-1 rounded-xl transition-all duration-300 ease-out pointer-events-none"
-          style={{ left: `calc(${sectionIdx} / ${SECTIONS.length} * 100% + 2px)`, width: `calc(100% / ${SECTIONS.length} - 4px)`, backgroundColor: tint(sectionColor, "22"), boxShadow: `inset 0 0 0 1px ${tint(sectionColor, "45")}` }}
+          style={{ left: `calc(${sectionIdx} / ${SECTIONS.length} * 100% + 2px)`, width: `calc(100% / ${SECTIONS.length} - 4px)`, backgroundColor: SOCIAL_SOLID, boxShadow: `inset 0 0 0 1px ${tint(sectionColor, "45")}` }}
         />
         {SECTIONS.map((s) => {
           const badge = s.k === "amigos" ? friendIncoming.length : s.k === "entrenador" ? trainerIncoming.length + proposals.length : 0;
           return (
             <button key={s.k} onClick={() => setSection(s.k)} className="relative z-[1] flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl text-[10.5px] font-bold transition-colors active:scale-95"
-              style={{ color: section === s.k ? s.color : "#64748b" }}>
+              style={{ color: section === s.k ? "#ffffff" : "#64748b" }}>
               {s.icon}<span>{s.l}</span>
               {badge > 0 && <span className="absolute top-1 right-2.5 w-4 h-4 rounded-full bg-rose-500 text-white text-[9px] font-black flex items-center justify-center z-[2]">{badge}</span>}
             </button>
@@ -16331,12 +16388,15 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
         key={section}
         className="relative overflow-hidden rounded-2xl border backdrop-blur-sm shadow-md shadow-black/20 p-4 tab-fade-in"
         style={{
-          borderColor: tint(sectionColor, "25"),
-          // Mismo lavado parejo que el panel del día en Rutina: el color de
-          // la sección no vive sólo en el borde y el ícono, tiñe todo el
-          // sector. Dos capas (tinte encima, superficie neutra debajo) en vez
-          // de un degradado, para que el tono no se apague hacia abajo.
-          background: `linear-gradient(${tint(sectionColor, "09")}, ${tint(sectionColor, "09")}), rgba(2,6,23,0.62)`,
+          borderColor: "var(--hairline)",
+          // Acá estaba el peor problema medido de la pestaña: rgba(2,6,23,0.62)
+          // sobre una página #0a0a0f compone a luminancia 6 contra la 10 de la
+          // página. O sea que la tarjeta era MÁS OSCURA que el fondo: no se
+          // leía como una tarjeta sino como un pozo sin bordes, y el lavado de
+          // color encima era el único modo de notar que existía. Ahora sube un
+          // escalón de luz y tiene un canto de 1px: se distingue por LUZ, y el
+          // violeta queda libre para significar algo en vez de dibujar cajas.
+          backgroundColor: "var(--surface-1)",
         }}
       >
         <div className="flex items-center gap-2.5 mb-3">

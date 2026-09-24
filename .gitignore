@@ -30,3 +30,7 @@ graphify-out/
 # Sondas temporales de QA (Playwright)
 _pw_*.mjs
 _t_*.mjs
+_social_*.png
+_ent_*.png
+_plan_*.png
+_qr_*.png
