@@ -8967,28 +8967,60 @@ const SOCIAL_SOLID = "#7C3AED"; // único relleno pleno, con texto blanco (5,7:1
 // (racha, esta semana, total) son más accionables que una insignia
 // bloqueada/desbloqueada. Todo sale de datos que ya viajan en el perfil
 // (logs + trainingSessions), sin ninguna lectura nueva a Firestore.
-function SocialProgressStats({ profile }) {
-  const stats = useMemo(() => {
-    const dateSet = getTrainedDateSet(profile?.logs || {}, profile?.trainingSessions || []);
-    return {
-      streak: computeSmartStreak(dateSet, null),
-      thisWeek: getSessionsForPeriod(profile?.trainingSessions || [], "week").length,
-      total: dateSet.size,
-    };
-  }, [profile]);
+// Pedido: "en la sección de tu progreso podríamos meter otros datos". Acá
+// había tres números en solitario (racha, sesiones de la semana y días
+// entrenados en toda tu vida) que son exactamente los que ya te da la pestaña
+// Progreso: en una pantalla que existe para mostrarte junto a OTRA GENTE no
+// contestaban ninguna pregunta social. Y "días entrenados" es un contador de
+// por vida: se mueve una vez cada dos días y no te dice nada hoy.
+// Los tres de ahora miden tu lugar en el grupo, y salen de datos que
+// SocialView ya tiene en memoria: ni una lectura nueva a Firestore.
+// Sin amigos no hay grupo del cual formar parte, así que en vez de tres ceros
+// va la invitación a sumar al primero, que es lo único accionable ahí.
+function SocialProgressStats({ uid, profile, myTopRank, friendAccepted, basics, streaks, kudosRecibidos = 0, onGoToBuscar }) {
+  const datos = useMemo(() => {
+    const ranking = buildFriendsRanking(uid, profile, myTopRank, friendAccepted, basics);
+    const idx = ranking.findIndex((r) => r.isMe);
+    // sessionsThisWeek ya viene calculado por useUserStreaks con el mismo
+    // criterio (lunes a domingo) que usa el resto de la app.
+    const activos = friendAccepted.reduce((n, f) => {
+      const otro = f.users.find((u) => u !== uid);
+      return n + ((streaks?.[otro]?.sessionsThisWeek || 0) > 0 ? 1 : 0);
+    }, 0);
+    return { puesto: idx >= 0 ? idx + 1 : null, deCuantos: ranking.length, activos, amigos: friendAccepted.length };
+  }, [uid, profile, myTopRank, friendAccepted, basics, streaks]);
+
+  if (datos.amigos === 0) {
+    return (
+      <button onClick={onGoToBuscar} className="w-full flex items-center gap-3 rounded-xl px-3.5 py-3 text-left transition active:scale-[0.99]"
+        style={{ backgroundColor: "var(--surface-1)", border: `1px solid ${tint(SOCIAL_COLOR, "33")}` }}>
+        <span className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: tint(SOCIAL_COLOR, "1f"), color: SOCIAL_INK }}>
+          <UserPlus size={16} />
+        </span>
+        <span className="flex-1 min-w-0">
+          <span className="block text-[12.5px] font-bold text-white leading-tight">Sumá tu primer amigo</span>
+          <span className="block text-[10.5px] text-slate-500 leading-snug">Para ver cómo venís contra tu grupo</span>
+        </span>
+        <ChevronRight size={15} className="shrink-0" style={{ color: tint(SOCIAL_COLOR, "aa") }} />
+      </button>
+    );
+  }
   return (
     <div className="space-y-1.5">
-      <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 px-1">Tu progreso</p>
+      <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 px-1">Tu grupo esta semana</p>
       <div className="grid grid-cols-3 gap-2">
         {/* Los tres números cuentan desde 0 al entrar a Social (CountUpNumber,
             el mismo que ya usaba el resumen de sesión): son el logro
             acumulado, y verlos subir les da el peso que un número quieto no
             transmite. 550ms, lo justo para notarlo sin hacerte esperar. */}
         {[
-          { label: "Racha", val: stats.streak, sufijo: "d" },
-          { label: "Esta semana", val: stats.thisWeek, sufijo: "" },
-          { label: "Entrenados", val: stats.total, sufijo: "d" },
-        ].map(({ label, val, sufijo }) => (
+          // El puesto sale del MISMO orden por rango que usa la solapa
+          // Ranking (buildFriendsRanking), así que los dos no pueden decir
+          // cosas distintas.
+          { label: "Tu puesto", val: datos.puesto, sufijo: datos.puesto ? `º de ${datos.deCuantos}` : "", vacio: !datos.puesto },
+          { label: "Entrenaron", val: datos.activos, sufijo: ` de ${datos.amigos}`, vacio: false },
+          { label: "Aplausos", val: kudosRecibidos, sufijo: "", vacio: false },
+        ].map(({ label, val, sufijo, vacio }) => (
           // Tres tarjetas teñidas de violeta, con el número TAMBIÉN violeta,
           // debajo de un hero violeta y una tarjeta violeta: eran la tercera
           // y cuarta capa del mismo color y el número —que es el dato— no
@@ -8997,7 +9029,8 @@ function SocialProgressStats({ profile }) {
           // leer) y el violeta se retira al rótulo.
           <div key={label} className="rounded-xl px-3 py-2 text-center" style={{ backgroundColor: "var(--surface-1)", border: "1px solid var(--hairline)" }}>
             <p className="text-sm font-black text-white flex items-baseline justify-center">
-              <CountUpNumber value={val} from={0} duration={550} decimals={0} className="tabular-nums" />{sufijo}
+              {vacio ? <span className="text-slate-600">—</span> : <CountUpNumber value={val} from={0} duration={550} decimals={0} className="tabular-nums" />}
+              <span className="text-[11px] font-bold text-slate-500">{sufijo}</span>
             </p>
             <p className="text-[10px] mt-0.5" style={{ color: SOCIAL_INK }}>{label}</p>
           </div>
@@ -15714,6 +15747,47 @@ function kudosDayLabel(daysAgo) {
 // HOY/AYER), acá cada fila tiene lugar para mostrar QUÉ entrenó cada uno
 // (dayLabel/dayColor de su última sesión, mismo dato que ya calcula
 // useUserStreaks) — pedido: "que puedas ver su entrenamiento o algo así".
+// Una fila de la actividad de tu grupo: quién entrenó, qué día hizo, y el
+// botón para aplaudirle. Antes esta fila vivía sólo adentro de KudosListModal
+// y estaba teñida de TEAL — el color de la pestaña Rutina, metido dentro de
+// Social. Ahora es un componente aparte, con el acento de Social, y lo usan
+// tanto la sección Actividad como el modal.
+function ActividadRow({ c, basic, sent, sending, onSendKudos, onViewProfile, delay = 0 }) {
+  return (
+    <div className="flex items-center gap-3 rounded-2xl px-3 py-2.5 stagger-item" style={{ backgroundColor: "var(--surface-2)", border: "1px solid var(--hairline)", animationDelay: `${delay}ms` }}>
+      <button onClick={() => onViewProfile(c.uid)} className="flex items-center gap-2.5 flex-1 min-w-0 text-left active:opacity-80 transition">
+        {basic?.avatarData ? (
+          <img src={basic.avatarData} alt="" className="w-10 h-10 rounded-2xl object-cover shrink-0" />
+        ) : (
+          <div className="w-10 h-10 rounded-2xl flex items-center justify-center text-sm font-black !text-white shrink-0" style={{ backgroundColor: tint(SOCIAL_COLOR, "2a") }}>
+            {(basic?.name || "?").charAt(0).toUpperCase()}
+          </div>
+        )}
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-bold text-white truncate">{basic?.name || "Tu amigo"}</p>
+          {/* El punto de color es el del DÍA que entrenó (Push, Pull...), un
+              dato suyo — el único color que entra acá además del acento. */}
+          <p className="text-[10.5px] text-slate-400 flex items-center gap-1 truncate">
+            {c.latestSession?.dayColor && <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: c.latestSession.dayColor }} />}
+            {kudosDayLabel(c.daysAgo)}{c.latestSession?.dayLabel ? ` · ${c.latestSession.dayLabel}` : ""}
+          </p>
+        </div>
+      </button>
+      <button
+        onClick={(e) => onSendKudos(c.uid, e.currentTarget)}
+        disabled={sending || sent}
+        aria-label={sent ? "Ya le aplaudiste" : "Aplaudir"}
+        className={`shrink-0 w-11 h-11 rounded-2xl font-black flex items-center justify-center text-lg transition-all active:scale-90 ${sent ? "opacity-70" : ""}`}
+        style={sent
+          ? { backgroundColor: tint(SOCIAL_COLOR, "22"), border: `2px solid ${SOCIAL_COLOR}`, color: SOCIAL_INK }
+          : { backgroundColor: SOCIAL_SOLID, border: `2px solid ${SOCIAL_SOLID}`, color: "#fff" }}
+      >
+        {sent ? "✓" : "👏"}
+      </button>
+    </div>
+  );
+}
+
 function KudosListModal({ candidates, basics, kudosSentMap, kudosSendingUid, onSendKudos, onViewProfile, onClose }) {
   useAndroidBack(onClose);
   if (typeof document === "undefined") return null;
@@ -15954,6 +16028,9 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
   // suma un link chico abajo que abre KudosListModal con la lista
   // completa (ahí sí entra el detalle del día que entrenó cada uno).
   const [showAllKudos, setShowAllKudos] = useState(false);
+  // "Buscar" dejó de ser una solapa y pasó a ser una acción que se abre desde
+  // Amigos (ver SECTIONS).
+  const [showBuscar, setShowBuscar] = useState(false);
   // El amigo con la racha más alta que todavía no te alcanzó, pero está
   // cerca (1-2 días) — "being chased", estilo Strava.
   const chaserFriend = useMemo(() => {
@@ -16129,7 +16206,13 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
   // se había unificado todo a un solo violeta.
   const SECTIONS = [
     { k: "amigos", l: "Amigos", icon: <Users size={14} />, color: SOCIAL_COLOR },
-    { k: "buscar", l: "Buscar", icon: <Search size={14} />, color: "#06B6D4" },
+    // "Buscar" dejó de ser una sección: buscar a alguien por @usuario o QR es
+    // una ACCIÓN que hacés una vez por persona, no un lugar al que volvés —
+    // se ganaba una de las cuatro solapas para siempre y no daba ninguna
+    // razón de abrir Social dos veces en la semana. Pasa a un botón dentro de
+    // Amigos y su lugar lo toma Actividad, que es lo que sí cambia todos los
+    // días: quién de tu grupo entrenó, qué hizo, y a quién podés aplaudirle.
+    { k: "actividad", l: "Actividad", icon: <Activity size={14} /> },
     { k: "ranking", l: "Ranking", icon: <Award size={14} />, color: "#F59E0B" },
     { k: "entrenador", l: "Entrenador", icon: <GraduationCap size={14} />, color: "#3B82F6" },
   ];
@@ -16365,7 +16448,7 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
         />
       )}
 
-      <SocialProgressStats profile={profile} />
+      <SocialProgressStats uid={uid} profile={profile} myTopRank={myTopRank} friendAccepted={friendAccepted} basics={basics} streaks={streaks} kudosRecibidos={kudosReceived.length} onGoToBuscar={() => setSection("buscar")} />
 
       <div className="relative grid gap-1 p-1 rounded-2xl bg-slate-900/60 border border-slate-800/50" style={{ gridTemplateColumns: `repeat(${SECTIONS.length}, 1fr)` }}>
         {/* Píldora deslizante en vez de que cada botón prenda/apague su
@@ -16418,7 +16501,39 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
           <p className="flex-1 min-w-0 text-sm font-bold text-white truncate">{sectionDef.l}</p>
         </div>
         <div className="space-y-3">
-        {section === "buscar" && (
+        {section === "actividad" && (
+          kudosCandidates.length === 0 && !chaserFriend ? (
+            <div className="text-center py-6 px-4">
+              <Activity size={28} className="mx-auto mb-2.5 opacity-30 text-slate-600" />
+              <p className="text-sm text-slate-500">{friendAccepted.length === 0 ? "Todavía no tenés amigos." : "Nadie de tu grupo entrenó en los últimos días."}</p>
+              <p className="text-xs mt-1 text-slate-700">{friendAccepted.length === 0 ? "Sumá al primero para ver su actividad acá." : "Cuando entrenen, van a aparecer acá para que les aplaudas."}</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {chaserFriend && (
+                <button onClick={() => setViewingUid(chaserFriend.uid)} className="w-full flex items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition active:scale-[0.99]" style={{ backgroundColor: "var(--surface-2)", border: "1px solid rgba(251,113,133,0.3)" }}>
+                  <span className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 streak-beat" style={{ backgroundColor: "rgba(251,113,133,0.15)" }}>
+                    <Flame size={20} style={{ color: "#FB7185" }} />
+                  </span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-[9.5px] font-black uppercase tracking-wide" style={{ color: "#FB7185" }}>Te están por alcanzar</span>
+                    <span className="block text-[12.5px] text-slate-200 leading-snug truncate">
+                      <b className="text-white">{basics[chaserFriend.uid]?.name || "Un amigo"}</b> lleva {chaserFriend.streak} días seguidos
+                    </span>
+                  </span>
+                  <ChevronRight size={15} className="text-slate-600 shrink-0" />
+                </button>
+              )}
+              {kudosCandidates.map((c, i) => (
+                <ActividadRow key={c.uid} c={c} basic={basics[c.uid]} sent={!!kudosSentMap[c.uid]} sending={kudosSendingUid === c.uid}
+                  onSendKudos={handleSendKudos} onViewProfile={(u) => setViewingUid(u)} delay={i * 45} />
+              ))}
+            </div>
+          )
+        )}
+
+        {/* Se despliega dentro de Amigos, debajo de la fila que lo abre. */}
+        {showBuscar && section === "amigos" && (
           <>
             {/* Antes la ÚNICA forma de que alguien te agregara era que ya
                 supiera tu @usuario exacto — no había ningún empujón para
@@ -16455,6 +16570,16 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
         {section === "amigos" && (
           loading ? <PublicUserCardSkeleton /> : (
             <>
+              {/* La búsqueda vive acá, donde te hace falta: cuando estás
+                  mirando tu lista y te falta alguien. */}
+              <SectionRow
+                icon={<UserPlus size={15} />}
+                accent={SOCIAL_COLOR}
+                title="Buscar y agregar"
+                desc="Por @usuario o escaneando su código QR"
+                onClick={() => setShowBuscar((v) => !v)}
+                right={<ChevronDown size={14} className={`text-slate-600 shrink-0 transition-transform ${showBuscar ? "rotate-180" : ""}`} />}
+              />
               {friendIncoming.length > 0 && (
                 <div className="space-y-2">
                   <SectionLabel accent="#FBBF24">Solicitudes recibidas</SectionLabel>
