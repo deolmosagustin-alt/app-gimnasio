@@ -4875,7 +4875,7 @@ const HELP_CHAPTERS = [
   {
     key: "social",
     label: "Social",
-    color: "#A855F7", // mismo valor que SOCIAL_COLOR — no se puede referenciar acá porque HELP_CHAPTERS se evalúa antes en el archivo
+    color: "#8B5CF6", // mismo valor que SOCIAL_COLOR — no se puede referenciar acá porque HELP_CHAPTERS se evalúa antes en el archivo
     icon: <Users size={16} />,
     intro: "Conectá con amigos y con tu entrenador.",
     bullets: [
@@ -13167,7 +13167,7 @@ function PublicUserCard({ uid, basic, streak = null, onClick = null, children })
         {basic?.avatarData ? (
           <img src={basic.avatarData} alt="" className="w-12 h-12 rounded-2xl object-cover border-2 border-slate-700/60" />
         ) : (
-          <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-base font-black !text-white border-2 border-slate-700/60" style={{ background: "linear-gradient(135deg,#A855F7,#7C3AED)" }}>
+          <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-base font-black !text-white border-2 border-slate-700/60" style={{ background: "linear-gradient(135deg,#8B5CF6,#6D28D9)" }}>
             {(basic?.name || basic?.username || "?").charAt(0).toUpperCase()}
           </div>
         )}
@@ -13520,7 +13520,7 @@ function RoutineProposalCard({ proposal, basic, onRespond }) {
   return (
     <div className="rounded-2xl border overflow-hidden" style={{ borderColor: tint(accentColor, "25"), backgroundColor: tint(accentColor, "0a") }}>
       <button onClick={() => setExpanded((v) => !v)} className="w-full flex items-center gap-3 px-3.5 py-3 text-left">
-        {basic?.avatarData ? <img src={basic.avatarData} alt="" className="w-9 h-9 rounded-xl object-cover shrink-0" /> : <div className="w-9 h-9 rounded-xl flex items-center justify-center text-sm font-black !text-white shrink-0" style={{ background: "linear-gradient(135deg,#A855F7,#7C3AED)" }}>{(basic?.name || "?").charAt(0).toUpperCase()}</div>}
+        {basic?.avatarData ? <img src={basic.avatarData} alt="" className="w-9 h-9 rounded-xl object-cover shrink-0" /> : <div className="w-9 h-9 rounded-xl flex items-center justify-center text-sm font-black !text-white shrink-0" style={{ background: "linear-gradient(135deg,#8B5CF6,#6D28D9)" }}>{(basic?.name || "?").charAt(0).toUpperCase()}</div>}
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold text-white leading-snug" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{basic?.name || "Tu entrenador"} te propuso {isProgression ? tituloPlan : "una rutina"}</p>
           {proposal.note && <p className="text-[11px] text-slate-500 truncate">"{proposal.note}"</p>}
@@ -14181,7 +14181,7 @@ function LeaderboardRow({ position, name, username, avatarData, topRank, streakD
       {avatarData ? (
         <img src={avatarData} alt="" className="w-9 h-9 rounded-xl object-cover shrink-0" />
       ) : (
-        <div className="w-9 h-9 rounded-xl flex items-center justify-center text-sm font-black !text-white shrink-0" style={{ background: "linear-gradient(135deg,#A855F7,#7C3AED)" }}>
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center text-sm font-black !text-white shrink-0" style={{ background: "linear-gradient(135deg,#8B5CF6,#6D28D9)" }}>
           {(name || username || "?").charAt(0).toUpperCase()}
         </div>
       )}
@@ -15404,7 +15404,7 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
         <div className="absolute -bottom-12 -left-12 w-32 h-32 rounded-full bg-fuchsia-500/10 blur-3xl pointer-events-none" />
         <div className="relative flex items-center gap-3.5">
           <div className="w-16 h-16 rounded-2xl overflow-hidden border-2 border-purple-400/50 shadow-xl shadow-purple-500/25 shrink-0">
-            {basic?.avatarData ? <img src={basic.avatarData} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-2xl font-black !text-white" style={{ background: "linear-gradient(135deg,#A855F7,#7C3AED)" }}>{(basic?.name || "?").charAt(0).toUpperCase()}</div>}
+            {basic?.avatarData ? <img src={basic.avatarData} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-2xl font-black !text-white" style={{ background: "linear-gradient(135deg,#8B5CF6,#6D28D9)" }}>{(basic?.name || "?").charAt(0).toUpperCase()}</div>}
           </div>
           <div className="min-w-0 flex-1">
             <h2 className="text-lg font-black text-white truncate">{basic?.name || "Usuario"}</h2>
@@ -16752,7 +16752,7 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
         <ProfileQrModal
           profileName={profileName}
           username={profile?.username}
-          accent={myTopRank?.color || "#A855F7"}
+          accent={myTopRank?.color || SOCIAL_COLOR}
           onClose={() => setShowProfileQr(false)}
         />
       )}
@@ -21903,7 +21903,7 @@ const TAB_ORDER = ["rutina", "progreso", "social", "descarga", "rutinas", "entre
 const NAV_TABS = [
   { key: "rutina", icon: <Dumbbell size={20} />, label: "Rutina", color: "#14B8A6" },
   { key: "progreso", icon: <BarChart3 size={20} />, label: "Progreso", color: "#3B82F6" },
-  { key: "social", icon: <Users size={20} />, label: "Social", color: "#A855F7" },
+  { key: "social", icon: <Users size={20} />, label: "Social", color: SOCIAL_COLOR },
   { key: "rutinas", icon: <Layers size={20} />, label: "Rutinas", color: "#3B82F6" },
   { key: "entrenador_ia", icon: <Sparkles size={20} />, label: "Chatbot", color: "#14B8A6" },
 ];
