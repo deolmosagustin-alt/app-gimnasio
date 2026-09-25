@@ -8988,6 +8988,7 @@ function SocialProgressStats({ uid, profile, myTopRank, friendAccepted, basics, 
       return n + ((streaks?.[otro]?.sessionsThisWeek || 0) > 0 ? 1 : 0);
     }, 0);
     return { puesto: idx >= 0 ? idx + 1 : null, deCuantos: ranking.length, activos, amigos: friendAccepted.length };
+
   }, [uid, profile, myTopRank, friendAccepted, basics, streaks]);
 
   if (datos.amigos === 0) {
@@ -9017,22 +9018,30 @@ function SocialProgressStats({ uid, profile, myTopRank, friendAccepted, basics, 
           // El puesto sale del MISMO orden por rango que usa la solapa
           // Ranking (buildFriendsRanking), así que los dos no pueden decir
           // cosas distintas.
-          { label: "Tu puesto", val: datos.puesto, sufijo: datos.puesto ? `º de ${datos.deCuantos}` : "", vacio: !datos.puesto },
-          { label: "Entrenaron", val: datos.activos, sufijo: ` de ${datos.amigos}`, vacio: false },
-          { label: "Aplausos", val: kudosRecibidos, sufijo: "", vacio: false },
-        ].map(({ label, val, sufijo, vacio }) => (
+          { label: "Tu puesto", icon: <Award size={11} />, val: datos.puesto, unidad: "º", sufijo: datos.puesto ? ` de ${datos.deCuantos}` : "", vacio: !datos.puesto },
+          { label: "Entrenaron", icon: <Flame size={11} />, val: datos.activos, unidad: "", sufijo: ` de ${datos.amigos}`, vacio: false },
+          { label: "Aplausos", icon: <Users size={11} />, val: kudosRecibidos, unidad: "", sufijo: "", vacio: false },
+        ].map(({ label, icon, val, unidad, sufijo, vacio }) => (
           // Tres tarjetas teñidas de violeta, con el número TAMBIÉN violeta,
           // debajo de un hero violeta y una tarjeta violeta: eran la tercera
           // y cuarta capa del mismo color y el número —que es el dato— no
           // resaltaba sobre su propio fondo. Ahora la superficie es neutra y
           // sube un escalón de luz, el número va en blanco (es lo que venís a
           // leer) y el violeta se retira al rótulo.
-          <div key={label} className="rounded-xl px-3 py-2 text-center" style={{ backgroundColor: "var(--surface-1)", border: "1px solid var(--hairline)" }}>
-            <p className="text-sm font-black text-white flex items-baseline justify-center">
-              {vacio ? <span className="text-slate-600">—</span> : <CountUpNumber value={val} from={0} duration={550} decimals={0} className="tabular-nums" />}
-              <span className="text-[11px] font-bold text-slate-500">{sufijo}</span>
+          // El rótulo sube ARRIBA del número, chiquito y con su ícono: así se
+          // lee "qué es → cuánto", que es el orden en que se mira una tira de
+          // tres. Con el rótulo abajo hay que leer el número sin saber
+          // todavía de qué es. El número queda solo en su línea, grande y
+          // blanco, con el "de N" en gris al lado para que no le compita.
+          <div key={label} className="rounded-xl px-2.5 py-2.5" style={{ backgroundColor: "var(--surface-1)", border: "1px solid var(--hairline)" }}>
+            <p className="flex items-center gap-1 text-[9.5px] font-black uppercase tracking-wider mb-1" style={{ color: SOCIAL_INK }}>
+              <span className="shrink-0 opacity-80">{icon}</span>
+              <span className="truncate">{label}</span>
             </p>
-            <p className="text-[10px] mt-0.5" style={{ color: SOCIAL_INK }}>{label}</p>
+            <p className="text-lg font-black text-white flex items-baseline leading-none">
+              {vacio ? <span className="text-slate-600 text-base">—</span> : <><CountUpNumber value={val} from={0} duration={550} decimals={0} className="tabular-nums" />{unidad}</>}
+              <span className="text-[10.5px] font-bold text-slate-500 ml-1">{sufijo}</span>
+            </p>
           </div>
         ))}
       </div>
@@ -16458,13 +16467,13 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
             varios botones independientes. */}
         <div
           className="absolute top-1 bottom-1 rounded-xl transition-all duration-300 ease-out pointer-events-none"
-          style={{ left: `calc(${sectionIdx} / ${SECTIONS.length} * 100% + 2px)`, width: `calc(100% / ${SECTIONS.length} - 4px)`, backgroundColor: SOCIAL_SOLID, boxShadow: `inset 0 0 0 1px ${tint(sectionColor, "45")}` }}
+          style={{ left: `calc(${sectionIdx} / ${SECTIONS.length} * 100% + 2px)`, width: `calc(100% / ${SECTIONS.length} - 4px)`, backgroundColor: tint(SOCIAL_COLOR, "26"), boxShadow: `inset 0 0 0 1px ${tint(sectionColor, "45")}` }}
         />
         {SECTIONS.map((s) => {
           const badge = s.k === "amigos" ? friendIncoming.length : s.k === "entrenador" ? trainerIncoming.length + proposals.length : 0;
           return (
-            <button key={s.k} onClick={() => setSection(s.k)} className="relative z-[1] flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl text-[10.5px] font-bold transition-colors active:scale-95"
-              style={{ color: section === s.k ? "#ffffff" : "#64748b" }}>
+            <button key={s.k} onClick={() => setSection(s.k)} className="relative z-[1] flex flex-col items-center justify-center gap-1 py-2 rounded-xl text-[10.5px] font-bold transition-colors active:scale-95"
+              style={{ color: section === s.k ? SOCIAL_INK : "#64748b" }}>
               {s.icon}<span>{s.l}</span>
               {badge > 0 && <span className="absolute top-1 right-2.5 w-4 h-4 rounded-full bg-rose-500 text-white text-[9px] font-black flex items-center justify-center z-[2]">{badge}</span>}
             </button>
@@ -16533,40 +16542,6 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
         )}
 
         {/* Se despliega dentro de Amigos, debajo de la fila que lo abre. */}
-        {showBuscar && section === "amigos" && (
-          <>
-            {/* Antes la ÚNICA forma de que alguien te agregara era que ya
-                supiera tu @usuario exacto — no había ningún empujón para
-                que la gente SE ENTERE de que existís acá. Esta tarjeta
-                genera una imagen lista para mandar por WhatsApp/Instagram
-                con tu @usuario grande, así conseguir el primer amigo no
-                depende de decírselo de palabra.
-                Pedido: "que la barra de búsqueda esté como primera opción,
-                no última" — antes esta sección arrancaba con "Compartir mi
-                perfil" y la búsqueda quedaba al final, después de las
-                sugerencias de contactos. */}
-            <SocialSearchSection myUid={uid} friendStatus={friendStatus} onSendFriendRequest={doSendFriendRequest} />
-            {friendSendError && <p className="text-[11px] text-rose-400/90 px-1">{friendSendError}</p>}
-            {profile?.username ? (
-              <SectionRow
-                icon={<QrCode size={15} />}
-                accent={sectionColor}
-                title="Compartir mi perfil"
-                desc="Una tarjeta con tu @usuario para que te agreguen"
-                onClick={() => setShowShareProfile(true)}
-                right={<Share2 size={14} className="text-slate-600 shrink-0" />}
-              />
-            ) : uid ? (
-              <div className="rounded-xl px-3 py-2.5" style={{ backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}>
-                <p className="text-[11px] text-slate-400 mb-2">Elegí tu @usuario para que te puedan buscar y agregar.</p>
-                <UsernameSection uid={uid} currentUsername={null} onSaved={(u) => onUpdateProfile({ username: u })} />
-              </div>
-            ) : (
-              <p className="text-[11px] text-slate-600 px-1">Vinculá tu cuenta de Google en Perfil para poder elegir un @usuario y usar lo social.</p>
-            )}
-          </>
-        )}
-
         {section === "amigos" && (
           loading ? <PublicUserCardSkeleton /> : (
             <>
@@ -16580,6 +16555,31 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
                 onClick={() => setShowBuscar((v) => !v)}
                 right={<ChevronDown size={14} className={`text-slate-600 shrink-0 transition-transform ${showBuscar ? "rotate-180" : ""}`} />}
               />
+              {/* El panel se abre PEGADO a la fila que lo abrió y hundido un
+                  escalón (--panel-sunken), que es el gesto que dice "esto
+                  salió de acá". Antes flotaba suelto ARRIBA del botón, como
+                  contenido sin dueño: ese era todo el "se ve raro". */}
+              {showBuscar && (
+                <div className="-mt-1 rounded-xl p-3 space-y-2.5 tab-fade-in" style={{ backgroundColor: "var(--panel-sunken)", border: "1px solid var(--hairline)" }}>
+                  <SocialSearchSection myUid={uid} friendStatus={friendStatus} onSendFriendRequest={doSendFriendRequest} />
+                  {friendSendError && <p className="text-[11px] text-rose-400/90 px-1">{friendSendError}</p>}
+                  {profile?.username ? (
+                    // Compartir tu perfil es la otra mitad de "conseguir un
+                    // amigo": o lo buscás vos, o hacés que te encuentren.
+                    <button onClick={() => setShowShareProfile(true)} className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-bold transition active:scale-[0.98]"
+                      style={{ backgroundColor: tint(SOCIAL_COLOR, "16"), border: `1px solid ${tint(SOCIAL_COLOR, "33")}`, color: SOCIAL_INK }}>
+                      <QrCode size={12} /> Compartir mi perfil
+                    </button>
+                  ) : uid ? (
+                    <div className="rounded-lg px-3 py-2.5" style={{ backgroundColor: "var(--surface-2)", border: "1px solid var(--hairline)" }}>
+                      <p className="text-[11px] text-slate-400 mb-2">Elegí tu @usuario para que te puedan buscar y agregar.</p>
+                      <UsernameSection uid={uid} currentUsername={null} onSaved={(u) => onUpdateProfile({ username: u })} />
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-slate-600 px-1">Vinculá tu cuenta de Google en Perfil para poder elegir un @usuario y usar lo social.</p>
+                  )}
+                </div>
+              )}
               {friendIncoming.length > 0 && (
                 <div className="space-y-2">
                   <SectionLabel accent="#FBBF24">Solicitudes recibidas</SectionLabel>
@@ -16625,17 +16625,15 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
                   <div className="text-center py-6 px-4">
                     <Users size={28} className="mx-auto mb-2.5 opacity-30 text-slate-600" />
                     <p className="text-sm text-slate-500">Todavía no tenés amigos agregados.</p>
-                    <p className="text-xs mt-1 mb-4 text-slate-700">Buscalos por su @usuario, o compartí el tuyo para que te encuentren.</p>
-                    <div className="flex flex-col gap-2 max-w-[240px] mx-auto">
-                      <button onClick={() => setSection("buscar")} className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold transition active:scale-[0.98]" style={{ backgroundColor: tint(SOCIAL_COLOR, "18"), color: SOCIAL_COLOR, border: `1px solid ${tint(SOCIAL_COLOR, "40")}` }}>
-                        <Search size={13} /> Buscar amigos
-                      </button>
-                      {profile?.username && (
-                        <button onClick={() => setShowShareProfile(true)} className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold border border-slate-700 text-slate-300 transition active:scale-[0.98] hover:border-slate-600">
-                          <QrCode size={13} /> Compartir mi perfil
-                        </button>
-                      )}
-                    </div>
+                    {/* Los dos botones que había acá se fueron: "Buscar y
+                        agregar" ya está arriba de esta misma lista, y desde
+                        ahí se llega también a compartir tu perfil. Eran la
+                        segunda y tercera copia de la misma acción, apiladas.
+                        Y el de buscar encima había quedado ROTO: hacía
+                        setSection("buscar"), una sección que dejó de existir
+                        cuando Buscar pasó a ser un desplegable — te dejaba la
+                        pantalla sin contenido. */}
+                    <p className="text-xs mt-1 text-slate-700">Usá <b className="text-slate-500">Buscar y agregar</b>, acá arriba: por su @usuario o escaneando su QR.</p>
                   </div>
                 ) : sortedFriendAccepted.map((f, i) => { const other = otherUidOf(f); const confirming = confirmRemoveId === f.id; return (
                   <div key={f.id} className="stagger-item" style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}>
