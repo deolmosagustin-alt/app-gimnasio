@@ -10045,22 +10045,22 @@ function BattleCompareCard({ myAvatarData, myName, mySex, mySessionsThisWeek, my
           <div className="flex-1 text-center min-w-0 max-w-[110px] slide-left">
             <div className="relative inline-block">
               {iWinBattle && <Crown size={16} className="absolute -top-3 left-1/2 -translate-x-1/2 text-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.7)] badge-pop" />}
-              <div className="w-16 h-16 mx-auto rounded-full overflow-hidden border-[3px]" style={{ borderColor: iWinBattle ? "#FBBF24" : "#2DD4BF", boxShadow: iWinBattle ? "0 0 0 5px rgba(251,191,36,0.2), 0 8px 20px -6px rgba(251,191,36,0.4)" : "0 8px 20px -6px rgba(45,212,191,0.35)" }}>
-                {myAvatarData ? <img src={myAvatarData} className="w-full h-full object-cover" alt="" /> : <div className="w-full h-full flex items-center justify-center text-xl font-black !text-white" style={{ background: "linear-gradient(135deg,#2DD4BF,#0E7490)" }}>{(myName || "?").charAt(0).toUpperCase()}</div>}
+              <div className="w-16 h-16 mx-auto rounded-full overflow-hidden border-[3px]" style={{ borderColor: iWinBattle ? "#FBBF24" : "#FBBF24", boxShadow: iWinBattle ? "0 0 0 5px rgba(251,191,36,0.2), 0 8px 20px -6px rgba(251,191,36,0.4)" : "0 8px 20px -6px rgba(45,212,191,0.35)" }}>
+                {myAvatarData ? <img src={myAvatarData} className="w-full h-full object-cover" alt="" /> : <div className="w-full h-full flex items-center justify-center text-xl font-black !text-white" style={{ background: "linear-gradient(135deg,#FBBF24,#B45309)" }}>{(myName || "?").charAt(0).toUpperCase()}</div>}
               </div>
             </div>
-            <p className="text-xs font-black text-teal-300 mt-1.5 truncate">Vos</p>
+            <p className="text-xs font-black text-amber-200 mt-1.5 truncate">Vos</p>
             {myTopRankBattle && <p className="text-[9px] font-bold truncate" style={{ color: myTopRankBattle.color }}>{myTopRankBattle.tier} {myTopRankBattle.sub}</p>}
           </div>
           <span className="shrink-0 text-[10px] font-black text-slate-600 uppercase tracking-wide">vs</span>
           <div className="flex-1 text-center min-w-0 max-w-[110px] slide-right">
             <div className="relative inline-block">
               {theyWinBattle && <Crown size={16} className="absolute -top-3 left-1/2 -translate-x-1/2 text-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.7)] badge-pop" />}
-              <div className="w-16 h-16 mx-auto rounded-full overflow-hidden border-[3px]" style={{ borderColor: theyWinBattle ? "#FBBF24" : "#C084FC", boxShadow: theyWinBattle ? "0 0 0 5px rgba(251,191,36,0.2), 0 8px 20px -6px rgba(251,191,36,0.4)" : "0 8px 20px -6px rgba(192,132,252,0.35)" }}>
-                {theirAvatarData ? <img src={theirAvatarData} className="w-full h-full object-cover" alt="" /> : <div className="w-full h-full flex items-center justify-center text-xl font-black !text-white" style={{ background: "linear-gradient(135deg,#C084FC,#7C3AED)" }}>{(theirName || "?").charAt(0).toUpperCase()}</div>}
+              <div className="w-16 h-16 mx-auto rounded-full overflow-hidden border-[3px]" style={{ borderColor: theyWinBattle ? "#FBBF24" : "#94A3B8", boxShadow: theyWinBattle ? "0 0 0 5px rgba(251,191,36,0.2), 0 8px 20px -6px rgba(251,191,36,0.4)" : "0 8px 20px -6px rgba(192,132,252,0.35)" }}>
+                {theirAvatarData ? <img src={theirAvatarData} className="w-full h-full object-cover" alt="" /> : <div className="w-full h-full flex items-center justify-center text-xl font-black !text-white" style={{ background: "linear-gradient(135deg,#94A3B8,#475569)" }}>{(theirName || "?").charAt(0).toUpperCase()}</div>}
               </div>
             </div>
-            <p className="text-xs font-black text-fuchsia-300 mt-1.5 truncate">{theirName || "Ellos"}</p>
+            <p className="text-xs font-black text-slate-300 mt-1.5 truncate">{theirName || "Ellos"}</p>
             {theirTopRankBattle && <p className="text-[9px] font-bold truncate" style={{ color: theirTopRankBattle.color }}>{theirTopRankBattle.tier} {theirTopRankBattle.sub}</p>}
           </div>
         </div>
@@ -10072,22 +10072,22 @@ function BattleCompareCard({ myAvatarData, myName, mySex, mySessionsThisWeek, my
             su ancho final de un salto. */}
         <div className="relative mt-4">
           <div className="h-7 rounded-xl bg-black/40 overflow-hidden flex border border-white/5">
-            {iWinCount > 0 && <div className="h-full flex items-center justify-center text-[11px] font-black text-teal-950 bg-gradient-to-b from-teal-300 to-teal-400 transition-all duration-500 grow-bar" style={{ width: `${(iWinCount / totalMuscles) * 100}%` }}>{iWinCount}</div>}
+            {iWinCount > 0 && <div className="h-full flex items-center justify-center text-[11px] font-black text-amber-950 bg-gradient-to-b from-amber-300 to-amber-500 transition-all duration-500 grow-bar" style={{ width: `${(iWinCount / totalMuscles) * 100}%` }}>{iWinCount}</div>}
             {tieCount > 0 && <div className="h-full flex items-center justify-center text-[11px] font-black text-slate-300 bg-slate-700/70 transition-all duration-500 grow-bar" style={{ width: `${(tieCount / totalMuscles) * 100}%` }}>{tieCount}</div>}
-            {theyWinCount > 0 && <div className="h-full flex items-center justify-center text-[11px] font-black text-fuchsia-950 bg-gradient-to-b from-fuchsia-300 to-fuchsia-400 transition-all duration-500 grow-bar" style={{ width: `${(theyWinCount / totalMuscles) * 100}%` }}>{theyWinCount}</div>}
+            {theyWinCount > 0 && <div className="h-full flex items-center justify-center text-[11px] font-black text-slate-900 bg-gradient-to-b from-slate-300 to-slate-500 transition-all duration-500 grow-bar" style={{ width: `${(theyWinCount / totalMuscles) * 100}%` }}>{theyWinCount}</div>}
             {comparison.length === 0 && <div className="h-full w-full flex items-center justify-center text-[10px] font-bold text-slate-600">Sin marcas para comparar todavía</div>}
           </div>
           <div className="flex items-center justify-between mt-1.5 px-0.5">
-            <span className="text-[8.5px] font-bold uppercase tracking-wide text-teal-400">Ganás</span>
+            <span className="text-[8.5px] font-bold uppercase tracking-wide text-amber-400">Ganás</span>
             <span className="text-[8.5px] font-bold uppercase tracking-wide text-slate-500">Empate</span>
-            <span className="text-[8.5px] font-bold uppercase tracking-wide text-fuchsia-400">Pierde</span>
+            <span className="text-[8.5px] font-bold uppercase tracking-wide text-slate-400">Pierde</span>
           </div>
         </div>
 
         {/* Semana + veredicto en una sola franja final, en vez de dos
             separadores apilados. */}
         <div className="relative flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1 mt-3.5 pt-3 border-t border-white/5">
-          <span className={`flex items-center gap-1 text-[10.5px] font-bold ${iWinWeek ? "text-teal-300" : theyWinWeek ? "text-fuchsia-300" : "text-slate-500"}`}>
+          <span className={`flex items-center gap-1 text-[10.5px] font-bold ${iWinWeek ? "text-amber-200" : theyWinWeek ? "text-slate-300" : "text-slate-500"}`}>
             <Flame size={11} className="text-orange-400" /> {mySessionsThisWeek}-{theirSessionsThisWeek} esta semana
           </span>
           <span className="text-slate-700 text-[10px]">·</span>
@@ -10112,8 +10112,8 @@ function BattleCompareCard({ myAvatarData, myName, mySex, mySessionsThisWeek, my
         </div>
         <div className="relative flex items-center justify-center">
           <div className="flex-1 min-w-0 relative">
-            <div className="absolute inset-x-6 bottom-1 h-5 rounded-[50%] bg-teal-500/25 blur-md pointer-events-none" />
-            <MiniBodyView ranks={myRanks} sex={mySex} label="Vos" accentColor="#2DD4BF" view={view} />
+            <div className="absolute inset-x-6 bottom-1 h-5 rounded-[50%] bg-amber-500/25 blur-md pointer-events-none" />
+            <MiniBodyView ranks={myRanks} sex={mySex} label="Vos" accentColor="#FBBF24" view={view} />
           </div>
           <div className="shrink-0 flex flex-col items-center gap-1 self-center mx-1">
             <div className="w-8 h-8 rounded-full bg-amber-500/15 border border-amber-500/40 flex items-center justify-center shadow-lg shadow-amber-500/10">
@@ -10121,8 +10121,8 @@ function BattleCompareCard({ myAvatarData, myName, mySex, mySessionsThisWeek, my
             </div>
           </div>
           <div className="flex-1 min-w-0 relative">
-            <div className="absolute inset-x-6 bottom-1 h-5 rounded-[50%] bg-fuchsia-500/25 blur-md pointer-events-none" />
-            <MiniBodyView ranks={theirRanks} sex={theirSex} label={theirName || "Ellos"} accentColor="#C084FC" view={view} />
+            <div className="absolute inset-x-6 bottom-1 h-5 rounded-[50%] bg-slate-400/20 blur-md pointer-events-none" />
+            <MiniBodyView ranks={theirRanks} sex={theirSex} label={theirName || "Ellos"} accentColor="#94A3B8" view={view} />
           </div>
         </div>
       </div>
@@ -16288,7 +16288,13 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
             {profile?.avatarData ? <img src={profile.avatarData} alt="" className="w-full h-full object-cover" /> : <Users size={24} style={{ color: SOCIAL_INK }} />}
           </div>
           <div className="min-w-0 flex-1">
-            <h3 className="text-base font-black text-white leading-tight truncate">{profile?.name || "Tu comunidad fitness"}</h3>
+            {/* Acá decía TU NOMBRE, que ya está dos centímetros más arriba en
+                la cabecera de la app, debajo del título de la pestaña. Era la
+                tercera vez que aparecía tu identidad en la misma pantalla
+                (avatar de la cabecera, nombre de la cabecera, y esto). El
+                nombre no aporta nada: lo que la tarjeta tiene para decir es
+                de qué tamaño es tu grupo. */}
+            <h3 className="text-base font-black text-white leading-tight truncate">Tu comunidad</h3>
             <p className="text-[11px] text-slate-400">
               {friendAccepted.length} {friendAccepted.length === 1 ? "amigo" : "amigos"}
               {(studentsAccepted.length + trainersAccepted.length) > 0 ? ` · ${studentsAccepted.length + trainersAccepted.length} vínculo${(studentsAccepted.length + trainersAccepted.length) === 1 ? "" : "s"} de entrenador` : ""}
