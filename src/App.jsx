@@ -605,22 +605,32 @@ const DEFAULT_SETTINGS = {
   // default: la ficha arranca mínima (solo reps/kg) y cada quien prende
   // lo que realmente va a usar, en vez de tener que apagar seis cosas.
   showRpe: false, showWarmup: false, show1RMPercent: false, showCoaching: false, showExerciseNote: false, showPersonalNote: false, showStagnation: false, showProgressionSuggestion: false, showKm: false,
-  // Pedido: "lo de ver qué hiciste la vez pasada que sea una opción
-  // activable". Muestra, en cada serie, lo que hiciste en esa MISMA serie
-  // la última vez que entrenaste ese ejercicio (no tu récord histórico:
-  // para decidir la carga de hoy sirve más lo último que hiciste que una
-  // marca de hace meses — es el dato que Hevy/Strong ponen fijo en cada
-  // fila). Apagado por default, como el resto de los campos de la ficha.
-  showLastSession: false,
+  // Muestra, en cada serie, lo que hiciste en esa MISMA serie la última vez
+  // que entrenaste ese ejercicio (no tu récord histórico: para decidir la
+  // carga de hoy sirve más lo último que hiciste que una marca de hace
+  // meses).
+  // PRENDIDO de fábrica, a diferencia del resto de la ficha. Es la excepción
+  // a la regla de arriba y tiene motivo: investigando cómo resuelven esto
+  // Hevy, Strong, FitNotes y Jefit, este es el ÚNICO dato que todas ponen
+  // FIJO en cada fila, porque es con el que elegís el peso de hoy. Dejarlo
+  // apagado significaba que quien recién llega mira una ficha vacía y tiene
+  // que acordarse de memoria cuánto levantó la última vez — justo el
+  // problema que la app existe para resolver.
+  showLastSession: true,
   // Fila de registro compacta (una sola línea por serie) en vez de la
   // tarjeta alta de siempre. Apagado por default para no cambiarle la
   // pantalla de golpe a quien ya está acostumbrado a la actual.
   compactSetRow: false,
   rpeDisplayMode: "rpe", // "rpe" | "rir" — mismo dato guardado, solo cambia cómo se muestra
-  // Al guardar una serie, arrancar solo el cronómetro de descanso. Apagado
-  // por default: es un cambio de comportamiento (no solo de qué se ve), así
-  // que preferimos que lo prendas vos a que te aparezca activado de golpe.
-  autoStartRestTimer: false,
+  // Al guardar una serie, arrancar solo el cronómetro de descanso.
+  // PRENDIDO de fábrica. Antes estaba apagado con el criterio de "es un
+  // cambio de comportamiento, que lo prenda quien quiera", pero el efecto
+  // real era al revés: la app ya sabe que terminaste la serie (se lo acabás
+  // de decir) y aun así te pedía un toque más para empezar a contar el
+  // descanso — con el teléfono apoyado y las manos ocupadas. Todas las apps
+  // del rubro lo arrancan solo. Se apaga en un toque desde
+  // "Personalizar qué ves al registrar".
+  autoStartRestTimer: true,
   // "record": perseguí siempre tu propio mejor registro (comportamiento de
   // toda la vida). "planned": cada serie puede tener una meta cargada de
   // antemano (a mano, o por tu entrenador) — ver plannedProgression en el
@@ -724,12 +734,35 @@ function getDeviceId() {
 // pierda ni su rutina ni su historial. Un perfil realmente nuevo (creado ya
 // con esta versión) no tiene `maxesSetupDays`, así que se lo deja sin rutina
 // activa a propósito: la pantalla de Rutinas se va a encargar de pedírsela.
+// Dos ajustes que pasaron a venir PRENDIDOS de fábrica (ver showLastSession y
+// autoStartRestTimer en DEFAULT_SETTINGS) tienen que llegarle también a quien
+// ya venía usando la app. Y no llegan solos: getProfileSettings mezcla
+// DEFAULT_SETTINGS con lo guardado, pero updateSettings escribe el objeto
+// ENTERO — así que la primera vez que alguien tocó CUALQUIER ajuste, los doce
+// campos de la ficha quedaron congelados en false. Cambiar el default no le
+// movería nada a nadie que haya abierto la configuración una sola vez.
+// Se puede migrar sin pisarle la decisión a nadie porque estas dos NUNCA
+// estuvieron en true: no había forma de apagarlas a propósito, sólo de
+// dejarlas como venían. Quien sí las prendió, queda como está.
+const AJUSTES_PRENDIDOS_POR_DEFECTO = ["showLastSession", "autoStartRestTimer"];
+function migrarAjustesPrendidos(p) {
+  if (!p || p.defaultsFichaV2) return p;
+  const s = p.settings;
+  // Sin settings guardados, la mezcla con DEFAULT_SETTINGS ya da el valor
+  // nuevo: sólo hace falta dejar la marca para no volver a mirar.
+  if (!s) return { ...p, defaultsFichaV2: true };
+  const next = { ...s };
+  AJUSTES_PRENDIDOS_POR_DEFECTO.forEach((k) => { if (next[k] !== true) next[k] = true; });
+  return { ...p, settings: next, defaultsFichaV2: true };
+}
+
 function migrateProfile(p) {
-  if (p.routines && p.activeRoutineId) return p;
-  if (p.maxesSetupDays) {
-    return { ...p, routines: { [CLASSIC_PRESET.id]: cloneRoutineDef(CLASSIC_PRESET) }, activeRoutineId: CLASSIC_PRESET.id };
+  const conAjustes = migrarAjustesPrendidos(p);
+  if (conAjustes.routines && conAjustes.activeRoutineId) return conAjustes;
+  if (conAjustes.maxesSetupDays) {
+    return { ...conAjustes, routines: { [CLASSIC_PRESET.id]: cloneRoutineDef(CLASSIC_PRESET) }, activeRoutineId: CLASSIC_PRESET.id };
   }
-  return p;
+  return conAjustes;
 }
 
 function loadAndMigrateProfiles() {
@@ -7559,7 +7592,17 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
   // goToDaySignal (mismo mecanismo de señal que ya usa openSectionSignal
   // para "ir al cronograma"/"ir al editor"), con prioridad sobre el día
   // programado/sugerido de siempre.
-  const [activeDay, setActiveDay] = useState(() => (goToDaySignal.id === "go-to-day" && goToDaySignal.payload) || scheduledDay || (isRestToday ? DAY_ORDER[0] : fallbackSuggested));
+  // Pedido: "una vez que iniciás una sesión y te vas de la página, cuando
+  // vuelvas que te abra predeterminadamente esa sesión".
+  // RoutineView se DESMONTA al cambiar de pestaña, así que al volver este
+  // useState se vuelve a evaluar de cero y caía en el día programado de hoy.
+  // Si estabas entrenando Pull un día que el cronograma marca Push (te
+  // adelantaste, o arrancaste ayer y seguís), volvías a Rutina y te
+  // encontrabas OTRO día abierto, con la sesión en curso escondida atrás de
+  // un chip. La sesión abierta gana sobre el cronograma: mientras haya una,
+  // es lo único que estás haciendo.
+  const sesionAbiertaDayKey = activeSession?.dayKey && DAY_ORDER.includes(activeSession.dayKey) ? activeSession.dayKey : null;
+  const [activeDay, setActiveDay] = useState(() => (goToDaySignal.id === "go-to-day" && goToDaySignal.payload) || sesionAbiertaDayKey || scheduledDay || (isRestToday ? DAY_ORDER[0] : fallbackSuggested));
   // BUG FIX (mismo patrón que openScheduleSignal en RoutinesView): sin
   // avisarle a App que la señal ya se consumió, queda prendida para
   // siempre — cualquier otra forma de volver a esta pestaña (ej. la barra
