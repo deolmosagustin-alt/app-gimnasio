@@ -5707,10 +5707,42 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     if (!computedPR) return override;
     return prScore(override.kg, override.reps) >= prScore(computedPR.kg, computedPR.reps) ? override : computedPR;
   }, [override, computedPR]);
+  // Si ya guardaste esta serie hoy, la fila pasa a modo lectura — varios
+  // bloques de abajo lo necesitan antes de que se declare el local del
+  // render, así que se calcula una sola vez acá.
+  const yaRegistradaHoy = history.find((h) => h.date === today && !h.deload) || null;
   const draft = drafts[key] || {};
+  // SERIE PRECARGADA. Los dos campos arrancaban VACÍOS en cada serie de cada
+  // ejercicio de cada sesión: para anotar 8×70 había que abrir el teclado dos
+  // veces y tipear los mismos números que la vez pasada. Y la app YA sabe
+  // cuáles son (lastSession, acá abajo). Ahora la serie viene propuesta con
+  // lo último que hiciste en ESA misma serie y sólo confirmás; si cambiaste
+  // la carga, lo corregís con los ± o tipeando encima.
+  // Es una PROPUESTA, no un valor cargado: vive aparte del draft, así que si
+  // no tocás nada no se guarda sola (handleSave sigue exigiendo que haya
+  // números) y el draft sigue siendo sólo lo que escribiste vos.
+  // Sin historial (primera vez que hacés el ejercicio) no hay qué proponer y
+  // los campos quedan vacíos como siempre.
+  const sugerido = fieldSettings.prefillLastSession !== false && lastSession && !cardio
+    ? { reps: String(lastSession.reps), kg: String(kgToDisplay(lastSession.kg, unit)) }
+    : null;
   const reps = draft.reps ?? ""; const kg = draft.kg ?? ""; const rpe = draft.rpe ?? null;
   const minutes = draft.minutes ?? ""; const km = draft.km ?? "";
   const updateDraft = (patch) => { if (setDrafts) setDrafts((prev) => ({ ...prev, [key]: { ...(prev[key] || {}), ...patch } })); };
+  // Sumar o restar sin abrir el teclado. En Android el teclado numérico se
+  // come media pantalla y tapa el botón de guardar, y el 90% de los ajustes
+  // entre series son "una rep más" o "un disco más" — no vale abrirlo para
+  // eso. El paso del peso sigue la unidad: 2,5kg (el disco chico de cada
+  // lado) o 5 lbs. Parte de lo que ya haya escrito, o de lo propuesto.
+  const pasoKg = unit === "lbs" ? 5 : 2.5;
+  const ajustar = (campo, delta) => {
+    const actual = campo === "reps" ? (reps || sugerido?.reps || "0") : (kg || sugerido?.kg || "0");
+    const n = parseFloat(actual);
+    const base = isNaN(n) ? 0 : n;
+    const val = Math.max(0, campo === "reps" ? Math.round(base + delta) : Math.round((base + delta) * 4) / 4);
+    updateDraft({ [campo]: String(val) });
+    haptic(8);
+  };
   // Filas extra de un drop-set (bajás el peso y seguís, sin descansar) o de
   // un rest-pause (mismo peso, mini-pausas cortas y seguís sumando reps).
   // Viven en el draft como cualquier otro campo — se limpian solas al
@@ -6220,8 +6252,20 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           merece: es la referencia callada, no la protagonista. Ahora el
           rótulo ES el cuándo. Tampoco lleva la diferencia contra la meta:
           con los dos números uno arriba del otro, se ve sin calcularla. */}
+      {/* TOCAR ESTE BLOQUE REPITE LA SERIE. Antes era sólo un cartel, y el
+          primer intento de "serie precargada" le sumó al lado un chip
+          "Repetir 8×70kg" — con lo cual los mismos dos números aparecían
+          CUATRO veces en una serie (récord, esta tarjeta, el fantasma del
+          campo, y el chip). Fusionarlos deja un solo elemento haciendo los
+          dos trabajos: te dice qué hiciste la vez pasada y, si querés
+          repetirlo, lo carga de un toque. Cero altura nueva. */}
       {!compact && fieldSettings.showLastSession === true && lastSession && !cardio && (
-        <div className="-mt-1.5 mb-2.5 px-3 py-2 rounded-xl leading-none" style={{ backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}>
+        <button
+          onClick={() => { if (!yaRegistradaHoy) { updateDraft({ reps: String(lastSession.reps), kg: String(kgToDisplay(lastSession.kg, unit)) }); haptic(12); } }}
+          disabled={!!yaRegistradaHoy}
+          aria-label={yaRegistradaHoy ? undefined : `Repetir ${lastSession.reps} por ${kgToDisplay(lastSession.kg, unit)}${weightLabel(unit)}`}
+          className="w-full text-left -mt-1.5 mb-2.5 px-3 py-2 rounded-xl leading-none transition active:scale-[0.99] disabled:active:scale-100"
+          style={{ backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}>
           {/* Rótulo arriba, número abajo, los dos pegados a la izquierda —
               el mismo esqueleto que la tarjeta de referencia de acá arriba,
               así los dos pesos quedan en la misma columna y se comparan
@@ -6234,8 +6278,9 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           </span>
           <span className="block text-[13px] font-bold tabular-nums text-slate-400">
             {lastSession.reps}<span className="opacity-40 mx-0.5">×</span>{kgToDisplay(lastSession.kg, unit)}<span className="opacity-50 text-[9px] ml-0.5">{weightLabel(unit)}</span>
+            {!yaRegistradaHoy && <span className="ml-2 text-[9px] font-bold uppercase tracking-wider" style={{ color: tint(accent, "cc") }}>tocá para repetir</span>}
           </span>
-        </div>
+        </button>
       )}
 
         {/* Modo bloqueado: si ya guardaste una entrada hoy Y la sesión está
@@ -6251,7 +6296,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
         // REDUCIDO de la descarga — bloqueando la carga real y encima
         // inflando el % de la rutina (ver RoutineView). Se ignoran las
         // marcas de descarga para esta vista.
-        const todayEntry = history.find((h) => h.date === today && !h.deload);
+        const todayEntry = yaRegistradaHoy;
         if (cardio) {
           const todayCardio = (logs[`${exerciseId}_${setIndex}`] || []).find((h) => h.date === today && !h.deload);
           if (todayCardio && hasActiveSession && !draft.editing) {
@@ -6505,6 +6550,35 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
             </div>
               );
             })()}
+            {/* UNA FILA QUE CAMBIA DE OFICIO SEGÚN HAGA FALTA.
+                Vacía y con historial: ofrece repetir lo último que hiciste en
+                ESTA misma serie, de un toque. Con algo escrito: se vuelve los
+                ± para ajustar sin abrir el teclado (que en Android tapa el
+                botón de guardar). Es la misma fila, así que no suma altura a
+                la tarjeta ni una segunda cosa que mirar.
+                No aparece en cardio (ahí se cuentan minutos, no reps×kg) ni
+                en la fila compacta, que existe justamente para ocupar poco. */}
+            {!cardio && !compact && !todayEntry && (sugerido || reps || kg) && (
+              <div className="flex items-center gap-1.5 mt-1.5">
+                {(
+                  <>
+                    {[
+                      { campo: "reps", delta: -1, txt: "−1" },
+                      { campo: "reps", delta: 1, txt: "+1" },
+                      { campo: "kg", delta: -pasoKg, txt: `−${pasoKg}` },
+                      { campo: "kg", delta: pasoKg, txt: `+${pasoKg}` },
+                    ].map(({ campo, delta, txt }) => (
+                      <button key={campo + delta} onClick={() => ajustar(campo, delta)}
+                        aria-label={`${delta > 0 ? "Sumar" : "Restar"} ${Math.abs(delta)} ${campo === "reps" ? "repeticiones" : weightLabel(unit)}`}
+                        className="flex-1 py-1.5 rounded-xl text-[11px] font-black tabular-nums text-slate-300 transition active:scale-95"
+                        style={{ backgroundColor: "var(--surface-2)", border: "1px solid var(--hairline)" }}>
+                        {txt}<span className="text-[9px] font-bold text-slate-600 ml-0.5">{campo === "reps" ? "rep" : weightLabel(unit)}</span>
+                      </button>
+                    ))}
+                  </>
+                )}
+              </div>
+            )}
             {/* Filas extra de drop-set/rest-pause: se guardan junto con la
                 serie principal al tocar Guardar arriba. */}
             {(setDef.type === "dropset" || setDef.type === "restpause") && (
