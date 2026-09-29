@@ -16040,6 +16040,14 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
   // "Buscar" dejó de ser una solapa y pasó a ser una acción que se abre desde
   // Amigos (ver SECTIONS).
   const [showBuscar, setShowBuscar] = useState(false);
+  // BUG FIX: cuando Buscar dejó de ser una de las cuatro solapas y pasó a ser
+  // un desplegable dentro de Amigos, quedaron botones llamando a
+  // setSection("buscar") — una sección que ya no existe. sectionIdx daba -1,
+  // el Math.max(0, ...) marcaba Amigos en el selector, y el área de contenido
+  // no renderizaba NADA: indistinguible de que la app se colgó. Y uno de esos
+  // botones era el CTA principal de alguien recién llegado y sin amigos.
+  // Un solo camino para todos: ir a Amigos y abrir el desplegable.
+  const irABuscar = () => { setSection("amigos"); setShowBuscar(true); };
   // El amigo con la racha más alta que todavía no te alcanzó, pero está
   // cerca (1-2 días) — "being chased", estilo Strava.
   const chaserFriend = useMemo(() => {
@@ -16463,7 +16471,7 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
         />
       )}
 
-      <SocialProgressStats uid={uid} profile={profile} myTopRank={myTopRank} friendAccepted={friendAccepted} basics={basics} streaks={streaks} kudosRecibidos={kudosReceived.length} onGoToBuscar={() => setSection("buscar")} />
+      <SocialProgressStats uid={uid} profile={profile} myTopRank={myTopRank} friendAccepted={friendAccepted} basics={basics} streaks={streaks} kudosRecibidos={kudosReceived.length} onGoToBuscar={irABuscar} />
 
       <div className="relative grid gap-1 p-1 rounded-2xl bg-slate-900/60 border border-slate-800/50" style={{ gridTemplateColumns: `repeat(${SECTIONS.length}, 1fr)` }}>
         {/* Píldora deslizante en vez de que cada botón prenda/apague su
@@ -16667,7 +16675,7 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
         {section === "ranking" && (
           <LeaderboardSection uid={uid} profile={profile} myTopRank={myTopRank} friendAccepted={friendAccepted} basics={basics} activity={streaks} accent={sectionColor}
             onViewPerson={(personUid, isMe) => { if (isMe) setShowMyBody(true); else { setViewingOpenComparing(true); setViewingUid(personUid); } }}
-            onGoToBuscar={() => setSection("buscar")} />
+            onGoToBuscar={irABuscar} />
         )}
 
         {section === "entrenador" && proposalApplyWarning && (
