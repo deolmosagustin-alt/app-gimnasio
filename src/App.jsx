@@ -2498,8 +2498,19 @@ input, textarea, [contenteditable="true"] {
   /* Superficies "hundidas": paneles que se abren dentro de una tarjeta y
      filas de opciones. Estaban en estilo inline con rgba fijo y en claro se
      veían como cajas oscuras. */
-  --panel-sunken: rgba(2,6,23,0.7);
-  --row-surface: rgba(15,23,42,0.6);
+  /* Estos dos eran TRANSLÚCIDOS, y medido en pantalla eso dejaba la
+     jerarquía dada vuelta en TODA la app: sobre la página (#0a0a0f,
+     luminancia 10), --panel-sunken componía a 7 —más oscuro que el fondo, un
+     pozo en vez de un panel— y --row-surface a 17, más claro que la tarjeta
+     que lo contiene. Como ningún nivel se distinguía por luz, cada pantalla
+     terminó pidiendo atención con tinte de color, y por eso no se parecían
+     entre sí: cada una eligió su propio lavado.
+     Ahora son opacos y forman una sola escalera con --surface-1/2/3, así la
+     jerarquía la hace la luz en todas las pestañas por igual. Como son
+     tokens, el arreglo llega a los ~200 lugares que ya los usan sin tocar
+     ninguno. */
+  --panel-sunken: #0e1119;   /* panel que se abre DENTRO de una tarjeta: hundido respecto de ella, pero por encima de la página */
+  --row-surface: #1a1f2e;    /* fila dentro de una tarjeta: un escalón por encima (mismo valor que --surface-2) */
   /* ESCALERA DE SUPERFICIES, OPACA Y ASCENDENTE.
      Los dos tokens de arriba son translúcidos, y medido en pantalla eso deja
      la jerarquía DADA VUELTA: la página es #0a0a0f (luminancia 10), una
@@ -8465,7 +8476,7 @@ function ShareSummaryCard({ logs, trainingSessions = [] }) {
         <div className="space-y-2.5">
           <div className="flex bg-black/40 rounded-xl p-1 border border-slate-700/50">
             {SHARE_SUMMARY_PERIODS.map((opt) => (
-              <button key={opt.k} onClick={() => setPeriod(opt.k)} className={`flex-1 py-2 rounded-lg text-[11px] font-bold transition-all ${period === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
+              <button key={opt.k} onClick={() => setPeriod(opt.k)} className={`flex-1 py-2 rounded-lg text-[11px] font-bold transition-all ${period === opt.k ? "bg-teal-500/20 text-teal-300" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
             ))}
           </div>
           <p className="text-[11px] text-slate-500">{periodStats.daysTrained} día{periodStats.daysTrained === 1 ? "" : "s"} entrenado{periodStats.daysTrained === 1 ? "" : "s"} · {periodStats.totalVol.toLocaleString("es-AR")} kg×reps en este período.</p>
@@ -10513,7 +10524,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
       <div>
         <div className="flex bg-black/40 rounded-xl p-1 border border-slate-700/50">
           {[{ k: "general", l: "General" }, { k: "relative", l: "Según tu contexto" }].map((opt) => (
-            <button key={opt.k} onClick={() => onUpdateSettings?.({ muscleRankMode: opt.k })} className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${mode === opt.k ? "bg-blue-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
+            <button key={opt.k} onClick={() => onUpdateSettings?.({ muscleRankMode: opt.k })} className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${mode === opt.k ? "bg-blue-500/20 text-blue-300" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
           ))}
         </div>
         {mode === "relative" && needsWeight && (
@@ -11463,7 +11474,7 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
             <div className="flex items-center justify-end">
               <div className="flex bg-slate-950/60 rounded-xl p-0.5 border border-slate-800/60">
                 {[{ k: "grafico", l: "Gráfico" }, { k: "1rm", l: "1RM" }].map((opt) => (
-                  <button key={opt.k} onClick={() => setMetric(opt.k)} className={`px-2 py-1.5 rounded-[10px] text-[10px] font-bold transition-all ${metric === opt.k ? "bg-amber-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
+                  <button key={opt.k} onClick={() => setMetric(opt.k)} className={`px-2 py-1.5 rounded-[10px] text-[10px] font-bold transition-all ${metric === opt.k ? "bg-amber-500/20 text-amber-300" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
                 ))}
               </div>
             </div>
@@ -12801,7 +12812,7 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
             <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Sexo</label>
             <div className="flex bg-black/40 rounded-xl p-1 border border-slate-700/50">
               {[{ k: "M", l: "Masculino" }, { k: "F", l: "Femenino" }].map((opt) => (
-                <button key={opt.k} onClick={() => setEditSex(opt.k)} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${editSex === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
+                <button key={opt.k} onClick={() => setEditSex(opt.k)} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${editSex === opt.k ? "bg-teal-500/20 text-teal-300" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
               ))}
             </div>
             <p className="text-[10px] text-slate-600 mt-1.5">Se usa sólo para calibrar mejor el rango por músculo (la fuerza relativa típica varía según esto).</p>
@@ -12981,13 +12992,13 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
               <div className="flex items-center justify-between mb-2"><p className="text-[10px] text-slate-500">Carga en descarga</p><span className="text-[11px] font-bold text-purple-400 tabular-nums">{Math.round(settings.deloadPct * 100)}%</span></div>
               <div className="flex items-center gap-3"><button onClick={() => adjustDeloadPct(-0.05)} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95 shrink-0">−</button><div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden"><div className="h-full bg-purple-500 rounded-full transition-all" style={{ width: `${settings.deloadPct * 100}%` }} /></div><button onClick={() => adjustDeloadPct(0.05)} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95 shrink-0">+</button></div>
             </div>
-            <div><p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Reducción de series</p><div className="flex bg-black/40 rounded-xl p-1 border border-slate-700/50">{[{ k: 2, l: "Mitad" }, { k: 3, l: "Tercio" }, { k: 4, l: "Cuarto" }].map((opt) => <button key={opt.k} onClick={() => updateSettings({ deloadSetDivisor: opt.k })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${settings.deloadSetDivisor === opt.k ? "bg-purple-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>)}</div></div>
+            <div><p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Reducción de series</p><div className="flex bg-black/40 rounded-xl p-1 border border-slate-700/50">{[{ k: 2, l: "Mitad" }, { k: 3, l: "Tercio" }, { k: 4, l: "Cuarto" }].map((opt) => <button key={opt.k} onClick={() => updateSettings({ deloadSetDivisor: opt.k })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${settings.deloadSetDivisor === opt.k ? "bg-purple-500/20 text-purple-300" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>)}</div></div>
           </>
         )}
       </CollapsibleSection>
 
       <CollapsibleSection title="Descanso entre series" subtitle={`${formatTime(settings.restShort)} – ${formatTime(settings.restLong)}`} icon={<Timer size={16} />} accent="#14B8A6">
-        <div><p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Aviso al terminar</p><div className="flex bg-black/40 rounded-xl p-1 border border-slate-700/50">{[{ k: "sound", l: "Sonido" }, { k: "vibration", l: "Vibración" }, { k: "both", l: "Ambos" }].map((opt) => <button key={opt.k} onClick={() => updateSettings({ alertType: opt.k })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${settings.alertType === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>)}</div></div>
+        <div><p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Aviso al terminar</p><div className="flex bg-black/40 rounded-xl p-1 border border-slate-700/50">{[{ k: "sound", l: "Sonido" }, { k: "vibration", l: "Vibración" }, { k: "both", l: "Ambos" }].map((opt) => <button key={opt.k} onClick={() => updateSettings({ alertType: opt.k })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${settings.alertType === opt.k ? "bg-teal-500/20 text-teal-300" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>)}</div></div>
         <div className="grid grid-cols-2 gap-3">
           {[{ key: "restLong", label: "Ejercicios pesados" }, { key: "restShort", label: "Resto" }].map(({ key, label }) => (
             <div key={key} className="bg-slate-950/40 rounded-xl p-3"><p className="text-[10px] text-slate-500 mb-2">{label}</p><div className="flex items-center justify-between"><button onClick={() => adjustRest(key, -15)} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95">−</button><span className="text-sm font-black text-white tabular-nums">{formatTime(settings[key])}</span><button onClick={() => adjustRest(key, 15)} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95">+</button></div></div>
@@ -13067,7 +13078,7 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
           <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Tema</p>
           <div className="flex bg-black/40 rounded-xl p-1 border border-slate-700/50">
             {[{ k: "dark", l: "Oscuro", icon: <Moon size={13} /> }, { k: "light", l: "Claro", icon: <Sun size={13} /> }].map((opt) => (
-              <button key={opt.k} onClick={() => updateSettings({ theme: opt.k })} className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-all ${settings.theme === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.icon} {opt.l}</button>
+              <button key={opt.k} onClick={() => updateSettings({ theme: opt.k })} className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-all ${settings.theme === opt.k ? "bg-teal-500/20 text-teal-300" : "text-slate-500 hover:text-slate-300"}`}>{opt.icon} {opt.l}</button>
             ))}
           </div>
         </div>
@@ -13075,7 +13086,7 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
           <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Unidad de peso</p>
           <div className="flex bg-black/40 rounded-xl p-1 border border-slate-700/50">
             {[{ k: "kg", l: "Kilogramos (kg)" }, { k: "lbs", l: "Libras (lbs)" }].map((opt) => (
-              <button key={opt.k} onClick={() => updateSettings({ weightUnit: opt.k })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${settings.weightUnit === opt.k || (!settings.weightUnit && opt.k === "kg") ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
+              <button key={opt.k} onClick={() => updateSettings({ weightUnit: opt.k })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${settings.weightUnit === opt.k || (!settings.weightUnit && opt.k === "kg") ? "bg-teal-500/20 text-teal-300" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
             ))}
           </div>
         </div>
@@ -13083,7 +13094,7 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
           <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Tamaño de letra</p>
           <div className="flex bg-black/40 rounded-xl p-1 border border-slate-700/50">
             {TEXT_SCALE_OPTIONS.map((opt) => (
-              <button key={opt.k} onClick={() => updateSettings({ textScale: opt.v })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${(settings.textScale ?? 1) === opt.v ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
+              <button key={opt.k} onClick={() => updateSettings({ textScale: opt.v })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${(settings.textScale ?? 1) === opt.v ? "bg-teal-500/20 text-teal-300" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
             ))}
           </div>
         </div>
@@ -13091,7 +13102,7 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
           <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Letras chicas</p>
           <div className="flex bg-black/40 rounded-xl p-1 border border-slate-700/50">
             {SMALL_TEXT_SCALE_OPTIONS.map((opt) => (
-              <button key={opt.k} onClick={() => updateSettings({ smallTextScale: opt.v })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${(settings.smallTextScale ?? 1) === opt.v ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
+              <button key={opt.k} onClick={() => updateSettings({ smallTextScale: opt.v })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${(settings.smallTextScale ?? 1) === opt.v ? "bg-teal-500/20 text-teal-300" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
             ))}
           </div>
         </div>
@@ -13099,7 +13110,7 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
           <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Zoom con los dedos</p>
           <div className="flex bg-black/40 rounded-xl p-1 border border-slate-700/50">
             {[{ v: false, l: "Desactivado" }, { v: true, l: "Activado" }].map((opt) => (
-              <button key={String(opt.v)} onClick={() => updateSettings({ allowZoom: opt.v })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${(settings.allowZoom ?? false) === opt.v ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
+              <button key={String(opt.v)} onClick={() => updateSettings({ allowZoom: opt.v })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${(settings.allowZoom ?? false) === opt.v ? "bg-teal-500/20 text-teal-300" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
             ))}
           </div>
         </div>
@@ -13111,7 +13122,7 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
         <p className="text-[11px] text-slate-500 mb-3">Al lograr una nueva marca, ¿mostramos la imagen para compartir automáticamente?</p>
         <div className="flex bg-black/40 rounded-xl p-1 border border-slate-700/50">
           {[{ v: true, l: "Sí, mostrarla" }, { v: false, l: "No, solo el ícono" }].map((opt) => (
-            <button key={String(opt.v)} onClick={() => updateSettings({ autoShowPrShare: opt.v })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${(settings.autoShowPrShare ?? true) === opt.v ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
+            <button key={String(opt.v)} onClick={() => updateSettings({ autoShowPrShare: opt.v })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${(settings.autoShowPrShare ?? true) === opt.v ? "bg-teal-500/20 text-teal-300" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
           ))}
         </div>
       </div>
@@ -14007,8 +14018,8 @@ function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted
         {vinculando && (
           <div className="px-3.5 pb-3.5 space-y-2.5 tab-fade-in">
             <div className="flex bg-black/40 rounded-xl p-1 border border-slate-700/50">
-              <button onClick={() => setRole("trainer")} className={`flex-1 py-2 rounded-lg text-[11px] font-bold transition-all ${role === "trainer" ? "bg-blue-500 !text-white" : "text-slate-500"}`}>Soy el entrenador</button>
-              <button onClick={() => setRole("student")} className={`flex-1 py-2 rounded-lg text-[11px] font-bold transition-all ${role === "student" ? "bg-blue-500 !text-white" : "text-slate-500"}`}>Soy el alumno</button>
+              <button onClick={() => setRole("trainer")} className={`flex-1 py-2 rounded-lg text-[11px] font-bold transition-all ${role === "trainer" ? "bg-blue-500/20 text-blue-300" : "text-slate-500"}`}>Soy el entrenador</button>
+              <button onClick={() => setRole("student")} className={`flex-1 py-2 rounded-lg text-[11px] font-bold transition-all ${role === "student" ? "bg-blue-500/20 text-blue-300" : "text-slate-500"}`}>Soy el alumno</button>
             </div>
             <div className="flex gap-2">
               <div className="relative flex-1">
@@ -15025,7 +15036,7 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
               {puedeGestionar && (
                 <div className="grid grid-cols-2 gap-1 p-1 rounded-xl bg-slate-950/60 border border-slate-800/60">
                   {[{ k: "editar", l: "Cargar metas", i: <Sliders size={12} /> }, { k: "resumen", l: "Plan actual", i: <ListChecks size={12} /> }].map((t) => (
-                    <button key={t.k} onClick={() => setVista(t.k)} className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-black transition active:scale-[0.97] ${vista === t.k ? "bg-sky-500 !text-white" : "text-slate-400 hover:text-slate-200"}`}>
+                    <button key={t.k} onClick={() => setVista(t.k)} className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-[11px] font-black transition active:scale-[0.97] ${vista === t.k ? "bg-sky-500/20 text-sky-300" : "text-slate-400 hover:text-slate-200"}`}>
                       {t.i} {t.l}
                     </button>
                   ))}
@@ -15171,7 +15182,7 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
                   {dayOrder.length > 1 && (
                     <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${dayOrder.length}, 1fr)` }}>
                       {dayOrder.map((dk) => (
-                        <button key={dk} onClick={() => { setDayKey(dk); setExpandedId(null); }} className={`py-2 rounded-xl text-[11px] font-black uppercase truncate transition active:scale-95 ${dayKey === dk ? "bg-sky-500 !text-white" : "bg-slate-800 text-slate-400 hover:text-slate-200"}`}>
+                        <button key={dk} onClick={() => { setDayKey(dk); setExpandedId(null); }} className={`py-2 rounded-xl text-[11px] font-black uppercase truncate transition active:scale-95 ${dayKey === dk ? "bg-sky-500/20 text-sky-300" : "bg-slate-800 text-slate-400 hover:text-slate-200"}`}>
                           {model?.days?.[dk]?.label || dk}
                         </button>
                       ))}
@@ -15192,7 +15203,7 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
                     </div>
                     <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
                       {weeks.map((w) => (
-                        <button key={w} onClick={() => setWeek(w)} className={`relative shrink-0 w-11 py-2 rounded-xl text-[11px] font-black transition active:scale-95 ${week === w ? "bg-sky-500 !text-white" : "bg-slate-800 text-slate-400 hover:text-slate-200"}`}>
+                        <button key={w} onClick={() => setWeek(w)} className={`relative shrink-0 w-11 py-2 rounded-xl text-[11px] font-black transition active:scale-95 ${week === w ? "bg-sky-500/20 text-sky-300" : "bg-slate-800 text-slate-400 hover:text-slate-200"}`}>
                           S{w}
                           {/* Un punto marca la semana que estás viviendo: sin
                               esto no había forma de saber, dentro del modal,
@@ -15339,7 +15350,7 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
                                 {weeks.map((w) => {
                                   const v = parseFloat(valueOf(ex, 0, w, ex.cardio ? "minutes" : "kg")) || 0;
                                   return (
-                                    <button key={w} onClick={() => setWeek(w)} className={`shrink-0 px-1.5 py-1 rounded-lg text-[9px] font-black transition ${w === week ? "bg-sky-500 !text-white" : v > 0 ? "bg-sky-500/15 text-sky-300" : "bg-slate-900 text-slate-600"}`}>
+                                    <button key={w} onClick={() => setWeek(w)} className={`shrink-0 px-1.5 py-1 rounded-lg text-[9px] font-black transition ${w === week ? "bg-sky-500/20 text-sky-300" : v > 0 ? "bg-sky-500/15 text-sky-300" : "bg-slate-900 text-slate-600"}`}>
                                       S{w}<span className="opacity-70 ml-0.5">{v > 0 ? v : "–"}</span>
                                     </button>
                                   );
@@ -17276,7 +17287,7 @@ function BuilderExerciseRow({ ex, onRemove, onConfigChange, isDragging = false, 
                 {[{ v: 1, l: "Una", d: "El peso cuenta tal cual" }, { v: 2, l: "Dos", d: "El peso cuenta ×2" }].map((opt) => {
                   const on = (dumbbellFactor || 1) === opt.v;
                   return (
-                    <button key={opt.v} onClick={() => onToggleDumbbell(opt.v)} className={`flex-1 py-2 rounded-lg text-[11px] font-bold transition-all ${on ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>
+                    <button key={opt.v} onClick={() => onToggleDumbbell(opt.v)} className={`flex-1 py-2 rounded-lg text-[11px] font-bold transition-all ${on ? "bg-teal-500/20 text-teal-300" : "text-slate-500 hover:text-slate-300"}`}>
                       <span className="flex items-center justify-center gap-1"><Dumbbell size={10} /> {opt.l}</span>
                     </button>
                   );
@@ -22240,7 +22251,7 @@ function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
                 {o.key === "showRpe" && on("showRpe") && (
                   <div className="flex bg-black/40 rounded-xl p-1 border border-slate-700/50 ml-1">
                     {[{ k: "rpe", l: "Mostrar como RPE" }, { k: "rir", l: "Mostrar como RIR" }].map((opt) => (
-                      <button key={opt.k} onClick={() => onUpdateSettings({ rpeDisplayMode: opt.k })} className={`flex-1 py-2 rounded-lg text-[11px] font-bold transition-all ${(s.rpeDisplayMode || "rpe") === opt.k ? "bg-teal-500 !text-white" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
+                      <button key={opt.k} onClick={() => onUpdateSettings({ rpeDisplayMode: opt.k })} className={`flex-1 py-2 rounded-lg text-[11px] font-bold transition-all ${(s.rpeDisplayMode || "rpe") === opt.k ? "bg-teal-500/20 text-teal-300" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
                     ))}
                   </div>
                 )}
