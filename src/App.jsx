@@ -5726,7 +5726,15 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   const sugerido = fieldSettings.prefillLastSession !== false && lastSession && !cardio
     ? { reps: String(lastSession.reps), kg: String(kgToDisplay(lastSession.kg, unit)) }
     : null;
-  const reps = draft.reps ?? ""; const kg = draft.kg ?? ""; const rpe = draft.rpe ?? null;
+  // La serie viene AUTOCOMPLETADA con lo último que hiciste en ella. El
+  // intento anterior mostraba el número en gris y pedía un toque extra para
+  // aceptarlo — un paso de más para un dato que la app ya sabe, y encima
+  // agregaba un botón a una tarjeta que ya tiene bastante.
+  // `??` y no `||`: distingue "nunca lo toqué" (undefined → se propone) de
+  // "lo borré a propósito" (cadena vacía → se respeta el campo vacío).
+  const reps = draft.reps ?? sugerido?.reps ?? "";
+  const kg = draft.kg ?? sugerido?.kg ?? "";
+  const rpe = draft.rpe ?? null;
   const minutes = draft.minutes ?? ""; const km = draft.km ?? "";
   const updateDraft = (patch) => { if (setDrafts) setDrafts((prev) => ({ ...prev, [key]: { ...(prev[key] || {}), ...patch } })); };
   // Sumar o restar sin abrir el teclado. En Android el teclado numérico se
@@ -6252,19 +6260,13 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           merece: es la referencia callada, no la protagonista. Ahora el
           rótulo ES el cuándo. Tampoco lleva la diferencia contra la meta:
           con los dos números uno arriba del otro, se ve sin calcularla. */}
-      {/* TOCAR ESTE BLOQUE REPITE LA SERIE. Antes era sólo un cartel, y el
-          primer intento de "serie precargada" le sumó al lado un chip
-          "Repetir 8×70kg" — con lo cual los mismos dos números aparecían
-          CUATRO veces en una serie (récord, esta tarjeta, el fantasma del
-          campo, y el chip). Fusionarlos deja un solo elemento haciendo los
-          dos trabajos: te dice qué hiciste la vez pasada y, si querés
-          repetirlo, lo carga de un toque. Cero altura nueva. */}
+      {/* De dónde salen los números que ya están cargados en la serie: lo
+          que hiciste en ESTA misma serie la última vez, y hace cuánto. El
+          campo viene autocompletado con eso (ver ), así que acá
+          no hay ninguna acción que ofrecer — es el pie de página del dato. */}
       {!compact && fieldSettings.showLastSession === true && lastSession && !cardio && (
-        <button
-          onClick={() => { if (!yaRegistradaHoy) { updateDraft({ reps: String(lastSession.reps), kg: String(kgToDisplay(lastSession.kg, unit)) }); haptic(12); } }}
-          disabled={!!yaRegistradaHoy}
-          aria-label={yaRegistradaHoy ? undefined : `Repetir ${lastSession.reps} por ${kgToDisplay(lastSession.kg, unit)}${weightLabel(unit)}`}
-          className="w-full text-left -mt-1.5 mb-2.5 px-3 py-2 rounded-xl leading-none transition active:scale-[0.99] disabled:active:scale-100"
+        <div
+          className="-mt-1.5 mb-2.5 px-3 py-2 rounded-xl leading-none"
           style={{ backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}>
           {/* Rótulo arriba, número abajo, los dos pegados a la izquierda —
               el mismo esqueleto que la tarjeta de referencia de acá arriba,
@@ -6278,9 +6280,8 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           </span>
           <span className="block text-[13px] font-bold tabular-nums text-slate-400">
             {lastSession.reps}<span className="opacity-40 mx-0.5">×</span>{kgToDisplay(lastSession.kg, unit)}<span className="opacity-50 text-[9px] ml-0.5">{weightLabel(unit)}</span>
-            {!yaRegistradaHoy && <span className="ml-2 text-[9px] font-bold uppercase tracking-wider" style={{ color: tint(accent, "cc") }}>tocá para repetir</span>}
           </span>
-        </button>
+        </div>
       )}
 
         {/* Modo bloqueado: si ya guardaste una entrada hoy Y la sesión está
