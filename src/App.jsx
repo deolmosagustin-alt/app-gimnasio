@@ -604,6 +604,65 @@ function registrarFalloIA(origen, err, ms = null, promptChars = null) {
     localStorage.setItem("gym_fallos_ia_v1", JSON.stringify(previos.slice(0, 5)));
   } catch { /* si no se puede guardar, no es momento de insistir */ }
 }
+// Cupo diario de IA por persona.
+//
+// El cupo gratuito de Gemini es POR CLAVE, no por usuario: 250 pedidos al
+// día para toda la app (y 1.000 más en el modelo chico, ver LITE_MODEL en
+// api/ia.js). Sin un tope por persona eso no se reparte, se lo lleva el
+// primero que llegue: diez personas conversando un rato a la mañana dejan
+// sin IA a todos los demás hasta la medianoche, y ni ellas ni nadie tiene
+// forma de darse cuenta de por qué. Con el tope, el peor día de una
+// persona le cuesta el cupo a ella sola.
+// 25 alcanza de sobra para un día de uso real (el chat es lo que más
+// consume y una consulta entera son 3 o 4 mensajes) y deja que entren
+// muchas más personas antes de tocar el techo global.
+// Es un tope del lado del cliente: frena el uso intenso de buena fe, que
+// es justamente el escenario que preocupa. El abuso deliberado lo frena el
+// rate limit por IP del servidor.
+const IA_CUPO_DIARIO = 25;
+const IA_CUPO_KEY = "gym_cupo_ia_v1";
+function _hoyLocal() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+function leerCupoIA() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(IA_CUPO_KEY) || "null");
+    if (raw && raw.dia === _hoyLocal()) return { dia: raw.dia, usados: Number(raw.usados) || 0 };
+  } catch { /* dato corrupto: se arranca de cero, no es para romper nada */ }
+  return { dia: _hoyLocal(), usados: 0 };
+}
+function cupoIARestante() {
+  return Math.max(0, IA_CUPO_DIARIO - leerCupoIA().usados);
+}
+// Devuelve false si ya no queda cupo (y NO consume). Quien llama decide
+// qué mostrar; no se dispara el pedido.
+function consumirCupoIA() {
+  const { usados } = leerCupoIA();
+  if (usados >= IA_CUPO_DIARIO) return false;
+  try { localStorage.setItem(IA_CUPO_KEY, JSON.stringify({ dia: _hoyLocal(), usados: usados + 1 })); } catch { /* sin storage no hay cupo que llevar */ }
+  return true;
+}
+const MSG_SIN_CUPO_IA = `Llegaste a los ${IA_CUPO_DIARIO} pedidos de IA de hoy. El cupo se renueva mañana.`;
+
+// Única puerta de salida hacia la IA. Todas las llamadas pasan por acá para
+// que el cupo sea uno solo y no haya que acordarse de descontarlo en cada
+// una de las seis pantallas que usan IA — si mañana aparece una séptima, el
+// cupo la cubre sola.
+async function fetchIA(payload, opts = {}) {
+  if (!consumirCupoIA()) {
+    const e = new Error(MSG_SIN_CUPO_IA);
+    e.sinCupo = true;
+    throw e;
+  }
+  return fetch(apiUrl("/api/ia"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    ...opts,
+  });
+}
+
 function apiUrl(path) {
   if (typeof window === "undefined") return path;
   // En el navegador (o con server.url activo) el origen ya es el correcto.
@@ -1244,7 +1303,7 @@ async function generateWarmupWithAI(dayExercises, dayLabel) {
   // estaban el chat y el asistente de rutinas.
   const timeoutId = setTimeout(() => controller.abort(), 65000);
   try {
-    const res = await fetch(apiUrl("/api/ia"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "chat", systemPrompt: "Sos un entrenador experto. Respondés ÚNICAMENTE con JSON válido, sin explicaciones ni bloques de código.", history: [{ role: "user", parts: [{ text: prompt }] }] }), signal: controller.signal });
+    const res = await fetchIA({ action: "chat", systemPrompt: "Sos un entrenador experto. Respondés ÚNICAMENTE con JSON válido, sin explicaciones ni bloques de código.", history: [{ role: "user", parts: [{ text: prompt }] }] }, { signal: controller.signal });
     if (!res.ok) {
       const errBody = await res.json().catch(() => null);
       throw new Error(errBody?.error || `Error ${res.status}`);
@@ -7308,11 +7367,10 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_
     // estaban el chat y el asistente de rutinas.
     const timeoutId = setTimeout(() => controller.abort(), 65000);
     try {
-      const res = await fetch(apiUrl("/api/ia"), {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "chat", systemPrompt: "Sos un entrenador de fuerza experto en periodización. Respondés ÚNICAMENTE con JSON válido, sin explicaciones ni bloques de código.", history: [{ role: "user", parts: [{ text: prompt }] }] }),
-        signal: controller.signal,
-      });
+      const res = await fetchIA(
+        { action: "chat", systemPrompt: "Sos un entrenador de fuerza experto en periodización. Respondés ÚNICAMENTE con JSON válido, sin explicaciones ni bloques de código.", history: [{ role: "user", parts: [{ text: prompt }] }] },
+        { signal: controller.signal },
+      );
       if (!res.ok) {
         const errBody = await res.json().catch(() => null);
         throw new Error(errBody?.error || `Error ${res.status}`);
@@ -7357,7 +7415,7 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_
       setEstado("preview");
     } catch (e) {
       console.error("[planificador IA]", e);
-      registrarFalloIA("planificador", e, null, prompt?.length ?? null);
+      if (!e?.sinCupo) registrarFalloIA("planificador", e, null, prompt?.length ?? null);
       setError(e?.name === "AbortError" ? "La IA tardó demasiado. Probá con un plazo más corto o menos ejercicios." : (e?.message || "No pudimos armar el plan."));
       setEstado("error");
     } finally {
@@ -19153,6 +19211,10 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
   // `isSending` (para esta pantalla) sólo mira si la conversación ABIERTA
   // ahora mismo es una de ellas.
   const [sendingConvIds, setSendingConvIds] = useState(() => new Set());
+  // Cupo de IA que le queda a la persona hoy (ver IA_CUPO_DIARIO). Sólo se
+  // muestra cuando queda poco: avisar "te quedan 24" en cada mensaje sería
+  // ruido, enterarse recién cuando ya no queda es una sorpresa fea.
+  const [cupoRestante, setCupoRestante] = useState(cupoIARestante);
   const isSending = activeConversationId != null && sendingConvIds.has(activeConversationId);
   const [editingIndex, setEditingIndex] = useState(null); // índice del mensaje propio que se está editando
   // Editar con mantener presionado en vez de un lápiz al lado (pedido: más
@@ -19469,12 +19531,10 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
           abortControllerRef.current = controller;
           const timeoutId = setTimeout(() => controller.abort(), 65000);
           try {
-            const response = await fetch(apiUrl("/api/ia"), {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ action: "chat", systemPrompt, history }),
-              signal: controller.signal,
-            });
+            const response = await fetchIA(
+              { action: "chat", systemPrompt, history },
+              { signal: controller.signal },
+            );
             clearTimeout(timeoutId);
 
             if (!response.ok) {
@@ -19490,7 +19550,9 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
           } catch (err) {
             clearTimeout(timeoutId);
             if (err.name === "AbortError" && userAbortedRef.current) return;
-            if (attempt === 1 && err.cause !== "server") {
+            // Sin cupo no hay nada que reintentar: el pedido ni siquiera
+            // salió a la red.
+            if (attempt === 1 && err.cause !== "server" && !err.sinCupo) {
               console.warn("[IA] primer intento falló, reintentando una vez:", err?.message || err);
               await new Promise((r) => setTimeout(r, 1200));
               continue;
@@ -19526,6 +19588,12 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
         // Si lo cortaste vos con "Detener", no hay error que mostrar — fue
         // una acción tuya, no una falla. Solo se corta en silencio.
         if (err.name === "AbortError" && userAbortedRef.current) return;
+        // Quedarse sin cupo no es una falla de la IA: no ensucia la
+        // bitácora de fallos ni se disfraza de error de conexión.
+        if (err.sinCupo) {
+          setMessages((prev) => [...prev, { role: "assistant", text: `${MSG_SIN_CUPO_IA} 🙏` }], targetConvId);
+          return;
+        }
         console.error("Error al hablar con el entrenador IA:", err);
         registrarFalloIA("chat", err, null, systemPrompt?.length ?? null);
         const isTimeout = err.name === "AbortError";
@@ -19540,6 +19608,7 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
         }], targetConvId);
       } finally {
         setSendingConvIds((prev) => { const next = new Set(prev); next.delete(targetConvId); return next; });
+        setCupoRestante(cupoIARestante());
         abortControllerRef.current = null;
       }
   };
@@ -20162,6 +20231,11 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
                 </button>
               </div>
             </div>
+            {cupoRestante <= 5 && (
+              <p className="text-[9px] text-center mt-1.5" style={{ color: cupoRestante === 0 ? "#FCA5A5" : "#FCD34D" }}>
+                {cupoRestante === 0 ? `Sin pedidos de IA por hoy — el cupo se renueva mañana` : `Te ${cupoRestante === 1 ? "queda 1 pedido" : `quedan ${cupoRestante} pedidos`} de IA hoy`}
+              </p>
+            )}
             <p className="text-[9px] text-slate-600 text-center mt-1.5">Puede cometer errores. No reemplaza el consejo de un profesional de la salud.</p>
           </div>
         </div>,
@@ -20479,11 +20553,7 @@ function ImportRoutineModal({ onImport, onClose }) {
       let result = null;
       for (let attempt = 1; attempt <= 2; attempt++) {
         try {
-          const response = await fetch(apiUrl("/api/ia"), {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ action: "detect", text, images: images.map(({ mimeType, data }) => ({ mimeType, data })) }),
-          });
+          const response = await fetchIA({ action: "detect", text, images: images.map(({ mimeType, data }) => ({ mimeType, data })) });
           if (!response.ok) {
             // BUG FIX: mismo caso que el wizard — antes se descartaba el
             // cuerpo del error y siempre se mostraba el genérico de abajo,
@@ -20495,7 +20565,7 @@ function ImportRoutineModal({ onImport, onClose }) {
           result = await response.json();
           break;
         } catch (err) {
-          if (attempt === 1 && err.cause !== "server") { console.warn("[import] primer intento falló, reintentando:", err?.message || err); await new Promise((r) => setTimeout(r, 1200)); continue; }
+          if (attempt === 1 && err.cause !== "server" && !err.sinCupo) { console.warn("[import] primer intento falló, reintentando:", err?.message || err); await new Promise((r) => setTimeout(r, 1200)); continue; }
           throw err;
         }
       }
@@ -20512,7 +20582,7 @@ function ImportRoutineModal({ onImport, onClose }) {
       else { setNotice("La IA no pudo interpretar lo que subiste. Probá con una foto más nítida o pegá el texto manualmente."); }
     } catch (err) {
       console.error("Error detectando rutina con IA:", err);
-      setNotice(err?.cause === "server" ? err.message : "No pudimos detectar la rutina. Probá de nuevo, con una foto más clara, o pegá el texto abajo.");
+      setNotice(err?.sinCupo ? MSG_SIN_CUPO_IA : err?.cause === "server" ? err.message : "No pudimos detectar la rutina. Probá de nuevo, con una foto más clara, o pegá el texto abajo.");
     } finally {
       setIsParsingAI(false);
     }
@@ -21053,7 +21123,7 @@ function PersonalizedRoutineWizard({ profile, onUpdateProfile, onCreateRoutine, 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 65000);
         try {
-          const res = await fetch(apiUrl("/api/ia"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "chat", systemPrompt: "Sos un entrenador experto. Respondés ÚNICAMENTE con JSON válido, sin explicaciones ni bloques de código.", history: [{ role: "user", parts: [{ text: prompt }] }] }), signal: controller.signal });
+          const res = await fetchIA({ action: "chat", systemPrompt: "Sos un entrenador experto. Respondés ÚNICAMENTE con JSON válido, sin explicaciones ni bloques de código.", history: [{ role: "user", parts: [{ text: prompt }] }] }, { signal: controller.signal });
           clearTimeout(timeoutId);
           if (!res.ok) {
             // BUG FIX: antes se tiraba un Error("server") genérico sin leer

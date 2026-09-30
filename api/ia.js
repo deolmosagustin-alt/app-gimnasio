@@ -35,6 +35,18 @@
 // tengamos que mantener la lista al día a mano.
 const PRIMARY_MODEL = "gemini-flash-latest";
 
+// Segundo escalón FIJO de la cadena, y la palanca más grande que tenemos
+// para que la cuota gratuita aguante: en Gemini el cupo diario (RPD) es
+// POR MODELO, no por clave. Flash gratis da 250 pedidos/día para TODA la
+// app; flash-lite tiene su propio cupo aparte, cuatro veces más grande
+// (1.000/día). O sea que cuando Flash dice "cuota agotada" todavía queda
+// más del 80% de la capacidad diaria sin tocar, en otro modelo.
+// Antes eso igual se terminaba encontrando, pero por el camino largo:
+// había que agotar la cadena entera y recién ahí pagar la consulta de
+// discoverModels() para enterarse de que -lite existía. Ponerlo fijo acá
+// hace que el 429 de Flash degrade al instante, sin ese viaje de más.
+const LITE_MODEL = "gemini-flash-lite-latest";
+
 // Se recuerda el último modelo que funcionó (mientras el lambda viva) para
 // arrancar por ese y no pagar reintentos en cada llamada.
 let preferredModel = null;
@@ -258,6 +270,7 @@ async function callGemini(body) {
   const chain = [];
   if (preferredModel) chain.push(preferredModel);
   if (!chain.includes(PRIMARY_MODEL)) chain.push(PRIMARY_MODEL);
+  if (!chain.includes(LITE_MODEL)) chain.push(LITE_MODEL);
   let discoveryTried = false;
   const deadline = Date.now() + TOTAL_TIME_BUDGET_MS;
 
@@ -320,7 +333,15 @@ async function callGemini(body) {
       console.error(`[ia] ${model}: ${netErr?.sinRespuesta ? `no mandó nada en ${Math.round(ttfb / 1000)}s (colgado)` : "fallo de red/timeout"} →`, lastDetail);
     }
     if (res?.ok) {
-      preferredModel = model;
+      // -lite no se recuerda como preferido a propósito: no es una
+      // preferencia, es una degradación por cuota agotada. Si lo
+      // recordáramos, la cadena arrancaría por -lite mientras el lambda
+      // siga caliente y seguiríamos contestando con el modelo chico
+      // durante horas después de que el cupo de Flash se haya renovado.
+      // El costo de no recordarlo es un 429 de Flash por mensaje mientras
+      // dure la sequía — un viaje de ida y vuelta de milisegundos que
+      // encima no consume cuota, porque es justamente el rechazo de cuota.
+      if (model !== LITE_MODEL) preferredModel = model;
       return res.data;
     }
     // 400 con el campo de razonamiento puesto: este modelo no lo conoce. Se
