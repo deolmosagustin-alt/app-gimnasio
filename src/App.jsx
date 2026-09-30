@@ -3093,7 +3093,11 @@ function drawWordmark(ctx, W, H, accent) {
   ctx.restore();
 }
 
-function drawPRShareCard(ctx, W, H, { exerciseName, muscle, kg, reps, accent = "#14B8A6" }) {
+function drawPRShareCard(ctx, W, H, { exerciseName, muscle, kg, reps, accent = "#14B8A6", unit = "kg" }) {
+  // kg/reps entran SIEMPRE en kg reales (así se guardan) y se convierten
+  // recién al rotularlos: el 1RM y el volumen se calculan en kg y lo que
+  // se dibuja sale en la unidad de quien comparte.
+  const uLabel = weightLabel(unit);
   // Layout FIJO para el canvas real de 540×960 — la versión anterior usaba
   // posiciones acumulativas pensadas para un lienzo más grande: con nombres
   // largos todo se corría hacia abajo y los tiles quedaban cortados o fuera.
@@ -3128,23 +3132,23 @@ function drawPRShareCard(ctx, W, H, { exerciseName, muscle, kg, reps, accent = "
   }
 
   // Número de kg — protagonista, centrado en el tercio medio.
-  const kgStr = `${kg ?? 0}`;
+  const kgStr = `${kgToDisplay(kg ?? 0, unit)}`;
   ctx.font = `900 ${kgStr.length >= 3 ? 128 : 148}px system-ui`;
   const gKg = ctx.createLinearGradient(0, 340, 0, 500);
   gKg.addColorStop(0, "#ffffff"); gKg.addColorStop(1, accent);
   ctx.fillStyle = gKg;
   ctx.fillText(kgStr, W / 2, 492);
   ctx.fillStyle = "#64748b"; ctx.font = "600 24px system-ui";
-  ctx.fillText("kg", W / 2, 528);
+  ctx.fillText(uLabel, W / 2, 528);
 
   // Reps
   ctx.fillStyle = "#e2e8f0"; ctx.font = "700 30px system-ui";
   ctx.fillText(`${reps ?? 0} repeticiones`, W / 2, 596);
 
   // Tiles 1RM + Volumen
-  const est = estimate1RM(kg, reps);
+  const est = Math.round(kgToDisplay(estimate1RM(kg, reps), unit));
   const tileY = 660, tileGap = 20, tileW = (W - 80 - tileGap) / 2, tileH = 108;
-  [{ val: `${est} kg`, label: "1RM estimado" }, { val: `${Math.round((kg || 0) * (reps || 0))} kg`, label: "Volumen" }].forEach((t, i) => {
+  [{ val: `${est} ${uLabel}`, label: "1RM estimado" }, { val: `${Math.round(kgToDisplay((kg || 0) * (reps || 0), unit))} ${uLabel}`, label: "Volumen" }].forEach((t, i) => {
     const x = 40 + i * (tileW + tileGap);
     ctx.fillStyle = "rgba(255,255,255,0.05)";
     canvasRoundRect(ctx, x, tileY, tileW, tileH, 16); ctx.fill();
@@ -3159,7 +3163,8 @@ function drawPRShareCard(ctx, W, H, { exerciseName, muscle, kg, reps, accent = "
   drawWordmark(ctx, W, H, accent);
 }
 
-function drawCycleShareCard(ctx, W, H, { cycleNumber, daysTrained, totalVol, accent = "#A855F7" }) {
+function drawCycleShareCard(ctx, W, H, { cycleNumber, daysTrained, totalVol, accent = "#A855F7", unit = "kg" }) {
+  const volMostrado = Math.round(kgToDisplay(totalVol || 0, unit));
   // Layout para el canvas real de 540×960 (las coordenadas anteriores eran
   // de un lienzo del doble: la mitad de la tarjeta quedaba fuera de cuadro).
   drawShareCardBase(ctx, W, H, accent, "#06B6D4");
@@ -3172,7 +3177,7 @@ function drawCycleShareCard(ctx, W, H, { cycleNumber, daysTrained, totalVol, acc
   ctx.fillText(`Ciclo #${cycleNumber}`, W / 2, 360);
   const tiles = [
     { val: daysTrained, label: "DÍAS\nENTRENADOS" },
-    { val: totalVol > 999 ? `${(totalVol / 1000).toFixed(1)}k` : totalVol, label: "KG × REPS\nTOTALES" },
+    { val: volMostrado > 999 ? `${(volMostrado / 1000).toFixed(1)}k` : volMostrado, label: `${weightLabel(unit).toUpperCase()} × REPS\nTOTALES` },
   ];
   const tileY = 460, tileGap = 28, tileW = (W - 80 - tileGap) / 2, tileH = 170;
   tiles.forEach((t, i) => {
@@ -3199,7 +3204,8 @@ function drawCycleShareCard(ctx, W, H, { cycleNumber, daysTrained, totalVol, acc
 // configurables, una grilla de casilleros llenos/vacíos (igual a la del
 // calendario de Historial) cuando el período es semana o mes, y una
 // estadística más (series totales) para que no se sienta tan vacía.
-function drawPeriodShareCard(ctx, W, H, { periodLabel, daysTrained, totalSets, totalVol, calendarCells, accent = "#3B82F6" }) {
+function drawPeriodShareCard(ctx, W, H, { periodLabel, daysTrained, totalSets, totalVol, calendarCells, accent = "#3B82F6", unit = "kg" }) {
+  const volMostrado = Math.round(kgToDisplay(totalVol || 0, unit));
   // Layout para el canvas real de 540×960. La versión anterior usaba
   // coordenadas de un lienzo del doble (título en y=480, cierre en y≈1200):
   // la tarjeta salía cortada, con textos gigantes y la mitad fuera de
@@ -3249,7 +3255,7 @@ function drawPeriodShareCard(ctx, W, H, { periodLabel, daysTrained, totalSets, t
   const tiles = [
     { val: daysTrained, label: "DÍAS\nENTRENADOS" },
     { val: totalSets ?? 0, label: "SERIES\nTOTALES" },
-    { val: totalVol > 999 ? `${(totalVol / 1000).toFixed(1)}k` : totalVol, label: "KG × REPS\nTOTALES" },
+    { val: volMostrado > 999 ? `${(volMostrado / 1000).toFixed(1)}k` : volMostrado, label: `${weightLabel(unit).toUpperCase()} × REPS\nTOTALES` },
   ];
   const tileGap = 16, tileW = (W - 64 - tileGap * 2) / 3, tileH = 128;
   tiles.forEach((t, i) => {
@@ -5091,6 +5097,7 @@ function SessionStartOverlay({ onDone }) {
 // finalizar no mostraba nada — el mejor momento de la app pasaba en silencio.
 function SessionSummaryModal({ resumen, onClose }) {
   useAndroidBack(onClose);
+  const unit = useWeightUnit();
   const [verTodosPRs, setVerTodosPRs] = useState(false);
   // Destellos de celebración: posiciones/tiempos aleatorios pero fijos (una
   // sola vez) para que no se regeneren en cada render. Colores de la app.
@@ -5134,7 +5141,7 @@ function SessionSummaryModal({ resumen, onClose }) {
         {/* Los números del día, contando hacia arriba */}
         <div className="grid grid-cols-3 gap-2 px-5">
           {[
-            { v: resumen.volumen, l: "kg de volumen", dec: 0 },
+            { v: Math.round(kgToDisplay(resumen.volumen, unit)), l: `${weightLabel(unit)} de volumen`, dec: 0 },
             { v: resumen.series, l: resumen.series === 1 ? "serie" : "series", dec: 0 },
             { v: resumen.ejercicios, l: resumen.ejercicios === 1 ? "ejercicio" : "ejercicios", dec: 0 },
           ].map((s) => (
@@ -5168,13 +5175,13 @@ function SessionSummaryModal({ resumen, onClose }) {
           <div className="px-5 mt-4">
             <p className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-600 mb-2">En qué se te fue</p>
             <div className="flex items-center gap-3 rounded-2xl bg-black/25 border border-white/[0.05] p-3">
-              <DonutMusculos datos={resumen.reparto} size={92} unidad="KG" />
+              <DonutMusculos datos={resumen.reparto} size={92} unidad={weightLabel(unit).toUpperCase()} />
               <div className="flex-1 min-w-0 space-y-1.5">
                 {resumen.reparto.map((m) => (
                   <div key={m.nombre} className="flex items-center gap-2 min-w-0">
                     <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: m.color }} />
                     <span className="flex-1 min-w-0 text-[10.5px] text-slate-300 truncate">{m.nombre}</span>
-                    <span className="text-[10.5px] font-black tabular-nums shrink-0" style={{ color: m.color }}>{m.series >= 1000 ? (m.series / 1000).toFixed(1) + "k" : m.series}<span className="opacity-60 text-[8px] ml-0.5">kg</span></span>
+                    <span className="text-[10.5px] font-black tabular-nums shrink-0" style={{ color: m.color }}>{(() => { const v = Math.round(kgToDisplay(m.series, unit)); return v >= 1000 ? (v / 1000).toFixed(1) + "k" : v; })()}<span className="opacity-60 text-[8px] ml-0.5">{weightLabel(unit)}</span></span>
                   </div>
                 ))}
               </div>
@@ -5302,6 +5309,7 @@ function DonutMusculos({ datos, size = 108, unidad = "SERIES" }) {
 
 function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null, enCurso = false }) {
   useAndroidBack(onClose);
+  const unit = useWeightUnit();
   const [verTodasMarcas, setVerTodasMarcas] = useState(false);
   if (!data) return null;
   const base = RECAP_ESTILOS[periodo] || RECAP_ESTILOS.semana;
@@ -5354,7 +5362,7 @@ function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null, 
           {[
             { v: data.dias, l: data.dias === 1 ? "día" : "días" },
             { v: data.series, l: "series" },
-            { v: data.volumen, l: "kg de volumen" },
+            { v: Math.round(kgToDisplay(data.volumen, unit)), l: `${weightLabel(unit)} de volumen` },
           ].map((x) => (
             <div key={x.l} className="bg-black/25 rounded-2xl py-3 text-center border border-white/[0.05]">
               <CountUpNumber value={x.v} duration={900} decimals={0} className="text-base font-black text-white tabular-nums leading-none" />
@@ -5372,7 +5380,7 @@ function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null, 
             <div className="flex items-end justify-between gap-1 h-20 rounded-2xl bg-black/25 border border-white/[0.05] px-2.5 pt-2.5 pb-1.5">
               {tramos.map((t, i) => (
                 <div key={i} className="flex-1 flex flex-col items-center justify-end h-full gap-1 min-w-0">
-                  <div className="w-full rounded-md grow-bar-up" title={`${t.valor} kg`}
+                  <div className="w-full rounded-md grow-bar-up" title={`${Math.round(kgToDisplay(t.valor, unit))} ${weightLabel(unit)}`}
                     style={{
                       height: `${t.valor > 0 ? Math.max(8, (t.valor / maxTramo) * 100) : 3}%`,
                       backgroundColor: t.valor === 0 ? "rgba(148,163,184,0.16)" : i === mejorTramo ? est.color : tint(est.color, "66"),
@@ -5419,7 +5427,7 @@ function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null, 
                 <div key={i} className="flex items-center gap-2.5 rounded-xl px-3 py-2 stagger-item" style={{ backgroundColor: "rgba(251,191,36,0.09)", border: "1px solid rgba(251,191,36,0.22)", animationDelay: `${i * 60}ms` }}>
                   <span className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 bg-amber-500/20 text-amber-300 text-[10px] font-black">{i + 1}</span>
                   <span className="flex-1 min-w-0 text-xs font-bold text-white truncate">{m.exercise}</span>
-                  <span className="text-xs font-black tabular-nums text-amber-300 shrink-0">{m.reps}×{m.kg}kg</span>
+                  <span className="text-xs font-black tabular-nums text-amber-300 shrink-0">{m.reps}×{kgToDisplay(m.kg, unit)}{weightLabel(unit)}</span>
                 </div>
               ))}
               {/* Antes esto era texto muerto: si rompiste 9 marcas querés
@@ -5442,7 +5450,7 @@ function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null, 
                 <span className="block text-[9px] font-black uppercase tracking-wider text-slate-600">Tu mejor día</span>
                 <span className="block text-xs font-bold text-white truncate">{data.mejorDia.date.slice(8, 10)}/{data.mejorDia.date.slice(5, 7)} · {data.mejorDia.series} {data.mejorDia.series === 1 ? "serie" : "series"}</span>
               </span>
-              <span className="text-xs font-black tabular-nums shrink-0" style={{ color: est.color }}>{fmtKg(data.mejorDia.volumen)} kg</span>
+              <span className="text-xs font-black tabular-nums shrink-0" style={{ color: est.color }}>{fmtKg(Math.round(kgToDisplay(data.mejorDia.volumen, unit)))} {weightLabel(unit)}</span>
             </div>
           )}
           {data.estrella && (
@@ -6108,7 +6116,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     const r = parseFloat(reps), kDisplay = parseFloat(kg);
     // kDisplay puede ser 0 (peso corporal, sin agregado) — solo se rechaza si
     // está vacío (NaN) o es negativo, no si es cero.
-    if (!r || isNaN(r) || r < 0 || isNaN(kDisplay) || kDisplay < 0) { setFeedback({ type: "error", msg: "Completá reps y kg (podés poner 0 si es a peso corporal)." }); return; }
+    if (!r || isNaN(r) || r < 0 || isNaN(kDisplay) || kDisplay < 0) { setFeedback({ type: "error", msg: `Completá reps y ${weightLabel(unit)} (podés poner 0 si es a peso corporal).` }); return; }
     const k = displayToKg(kDisplay, unit); // convierte lbs→kg si corresponde
     // Si no había ninguna marca previa, esto es la PRIMERA vez que se
     // registra esta serie — no es un "récord" todavía (no hay nada que
@@ -6790,11 +6798,11 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           draw={(ctx, W, H) => {
             // El draft (kg/reps que se están escribiendo) está en la unidad
             // de MOSTRAR (puede ser lbs) — hay que pasarlo a kg real antes de
-            // dibujarlo, porque drawPRShareCard siempre rotula el número
-            // como "kg". currentPR.kg ya viene normalizado a kg real.
+            // dibujarlo: la tarjeta recibe siempre kg y convierte ella al
+            // rotular. currentPR.kg ya viene normalizado a kg real.
             const draftKg = parseFloat(kg);
             const kgVal = !isNaN(draftKg) ? displayToKg(draftKg, unit) : currentPR?.kg;
-            return drawPRShareCard(ctx, W, H, { exerciseName, muscle: exerciseMuscle, kg: kgVal, reps: parseFloat(reps) || currentPR?.reps, accent });
+            return drawPRShareCard(ctx, W, H, { exerciseName, muscle: exerciseMuscle, kg: kgVal, reps: parseFloat(reps) || currentPR?.reps, accent, unit });
           }}
           onClose={() => setShowPRShare(false)}
           autoShowOptOutLabel={autoShowPrShare ? "No mostrar esto automáticamente la próxima vez" : null}
@@ -8276,6 +8284,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
    SESSION HISTORY — calendar + list views over buildSessionsIndex(logs)
 ============================================================================ */
 function SessionDetailCard({ session, onDelete, exerciseNotes = {}, rpeDisplayMode = "rpe" }) {
+  const unit = useWeightUnit();
   const [confirmDel, setConfirmDel] = useState(false);
   // Qué serie está "abierta" ahora mismo — se muestra su nota debajo de las
   // pills de ese ejercicio, si tiene una. `${exName}:${i}` como clave.
@@ -8407,7 +8416,7 @@ function SessionDetailCard({ session, onDelete, exerciseNotes = {}, rpeDisplayMo
                         hicieron. "S{n}" usa el número de serie real
                         (it.setIndex), no la posición en la lista. */}
                     <span className="opacity-60 font-black">S{it.setIndex + 1}</span>
-                    {isCardio ? `${it.minutes} min` : `${it.reps}×${it.kg}kg`}
+                    {isCardio ? `${it.minutes} min` : `${it.reps}×${kgToDisplay(it.kg, unit)}${weightLabel(unit)}`}
                     {it.isImprovement && " 🔥"}
                     {below && <span className="text-[9px] font-black opacity-90">↓{100 - pct}%</span>}
                     {!isCardio && it.rpe != null && <span className="text-[9px] font-black text-slate-400">· {formatEffort(it.rpe, rpeDisplayMode)}</span>}
@@ -8462,6 +8471,7 @@ const SHARE_SUMMARY_PERIODS = [
 ];
 
 function ShareSummaryCard({ logs, trainingSessions = [] }) {
+  const unit = useWeightUnit();
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState(null); // "pr" | "period"
   const [period, setPeriod] = useState("week");
@@ -8541,7 +8551,7 @@ function ShareSummaryCard({ logs, trainingSessions = [] }) {
         <div className="space-y-2.5">
           <ExerciseChipRow exercises={allExercises} selId={selExId} onSelect={setSelExId} />
           {selEx && (selPR?.best1rm > 0 ? (
-            <p className="text-[11px] text-slate-500">Tu mejor marca en <span className="text-slate-300 font-bold">{selEx.name}</span>: {selPR.bestReps}×{selPR.bestKg}kg</p>
+            <p className="text-[11px] text-slate-500">Tu mejor marca en <span className="text-slate-300 font-bold">{selEx.name}</span>: {selPR.bestReps}×{kgToDisplay(selPR.bestKg, unit)}{weightLabel(unit)}</p>
           ) : (
             <p className="text-[11px] text-slate-600">Todavía no hay marcas registradas en este ejercicio.</p>
           ))}
@@ -8559,7 +8569,7 @@ function ShareSummaryCard({ logs, trainingSessions = [] }) {
               <button key={opt.k} onClick={() => setPeriod(opt.k)} className={`flex-1 py-2 rounded-lg text-[11px] font-bold transition-all ${period === opt.k ? "bg-teal-500/20 text-teal-300" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
             ))}
           </div>
-          <p className="text-[11px] text-slate-500">{periodStats.daysTrained} día{periodStats.daysTrained === 1 ? "" : "s"} entrenado{periodStats.daysTrained === 1 ? "" : "s"} · {periodStats.totalVol.toLocaleString("es-AR")} kg×reps en este período.</p>
+          <p className="text-[11px] text-slate-500">{periodStats.daysTrained} día{periodStats.daysTrained === 1 ? "" : "s"} entrenado{periodStats.daysTrained === 1 ? "" : "s"} · {Math.round(kgToDisplay(periodStats.totalVol, unit)).toLocaleString("es-AR")} {weightLabel(unit)}×reps en este período.</p>
           <div className="flex gap-2">
             <button onClick={() => setMode(null)} className="px-3 py-2.5 rounded-xl bg-slate-800 text-slate-400 text-xs font-semibold">Atrás</button>
             <button onClick={() => setShowImage(true)} disabled={!periodStats.daysTrained} className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-[0.98] ${periodStats.daysTrained ? "text-white shadow-lg shadow-teal-500/20" : "bg-slate-800 text-slate-600"}`} style={periodStats.daysTrained ? { background: "linear-gradient(135deg,#14B8A6,#0E7490)" } : {}}>Generar imagen</button>
@@ -8575,7 +8585,7 @@ function ShareSummaryCard({ logs, trainingSessions = [] }) {
           shareTitle="Modus Fit · Marca"
           shareText={`Mi marca en ${selEx.name} 🔥`}
           accent={selEx.color}
-          draw={(ctx, W, H) => drawPRShareCard(ctx, W, H, { exerciseName: selEx.name, muscle: selEx.muscle, kg: selPR.bestKg, reps: selPR.bestReps, accent: selEx.color })}
+          draw={(ctx, W, H) => drawPRShareCard(ctx, W, H, { exerciseName: selEx.name, muscle: selEx.muscle, kg: selPR.bestKg, reps: selPR.bestReps, accent: selEx.color, unit })}
           onClose={() => setShowImage(false)}
         />
       )}
@@ -8587,7 +8597,7 @@ function ShareSummaryCard({ logs, trainingSessions = [] }) {
           shareTitle="Modus Fit · Resumen"
           shareText="Mi resumen de entrenamiento 💪"
           accent="#3B82F6"
-          draw={(ctx, W, H) => drawPeriodShareCard(ctx, W, H, { periodLabel, daysTrained: periodStats.daysTrained, totalSets: periodStats.totalSets, totalVol: periodStats.totalVol, calendarCells, accent: "#3B82F6" })}
+          draw={(ctx, W, H) => drawPeriodShareCard(ctx, W, H, { periodLabel, daysTrained: periodStats.daysTrained, totalSets: periodStats.totalSets, totalVol: periodStats.totalVol, calendarCells, accent: "#3B82F6", unit })}
           onClose={() => setShowImage(false)}
         />
       )}
@@ -9621,7 +9631,12 @@ function getExerciseBestsForMuscleGroup(groupKey, logs) {
 
 // Lista de "mejor marca por ejercicio" de un músculo — usada tanto en tu
 // propio muñeco (MyBodyModal) como en el de un amigo (FriendProfileView).
-function MuscleExerciseList({ exercises, unit = "kg" }) {
+function MuscleExerciseList({ exercises, unit: unitProp = null }) {
+  // Sin prop, la unidad sale del contexto — antes caía en "kg" fijo y la
+  // lista de marcas dentro del perfil de un amigo se veía en kg aunque
+  // tuvieras la app en libras.
+  const ctxUnit = useWeightUnit();
+  const unit = unitProp || ctxUnit;
   if (!exercises.length) return <p className="text-xs text-slate-600 text-center py-3">Sin marcas registradas en este músculo todavía.</p>;
   return (
     <div className="space-y-1.5">
@@ -10480,6 +10495,7 @@ function RankExplainModal({ profile, myTopRank, onClose }) {
 }
 
 function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, onGoToProfile, onGoToRoutines, sex, age }) {
+  const unit = useWeightUnit();
   const [selected, setSelected] = useState(null);
   const [showImage, setShowImage] = useState(false);
   const [showTierRef, setShowTierRef] = useState(false); // modal de referencia de rangos
@@ -10644,7 +10660,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
                     <p className="text-2xl font-black leading-none tracking-tight" style={{ color: selInfo.color, textShadow: `0 0 24px ${tint(selInfo.color, "40")}` }}>{selInfo.tier}{selInfo.sub ? ` ${selInfo.sub}` : ""}</p>
                     {selInfo.bestKg ? (
                       <>
-                        <p className="mt-2 text-[26px] font-black text-white leading-none tabular-nums">{selInfo.bestReps}<span className="text-slate-500 text-lg font-bold mx-0.5">×</span>{selInfo.bestKg}<span className="text-slate-400 text-base font-bold ml-0.5">kg</span></p>
+                        <p className="mt-2 text-[26px] font-black text-white leading-none tabular-nums">{selInfo.bestReps}<span className="text-slate-500 text-lg font-bold mx-0.5">×</span>{kgToDisplay(selInfo.bestKg, unit)}<span className="text-slate-400 text-base font-bold ml-0.5">{weightLabel(unit)}</span></p>
                         <p className="text-[10.5px] text-slate-500 mt-1.5 leading-snug">{selInfo.bestExerciseName ? <>en <span className="text-slate-300 font-bold">{selInfo.bestExerciseName}</span></> : "Tu mejor marca"}{selInfo.bestLoadFactor > 1 ? <span className="text-slate-600"> · ×2 mancuernas</span> : null}</p>
                       </>
                     ) : (
@@ -10681,7 +10697,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
                     {extraKgNeeded != null && (
                       <div className="mt-3 flex items-center gap-2 rounded-xl px-3 py-2" style={{ backgroundColor: tint(nextTierInfo?.color || selInfo.color, "14"), border: `1px solid ${tint(nextTierInfo?.color || selInfo.color, "30")}` }}>
                         <TrendingUp size={13} style={{ color: nextTierInfo?.color || selInfo.color }} className="shrink-0" />
-                        <p className="text-[11px] text-slate-300 leading-snug">Sumá <span className="font-black text-white">{extraKgNeeded}kg</span> a tus {selInfo.bestReps} reps y subís de rango</p>
+                        <p className="text-[11px] text-slate-300 leading-snug">Sumá <span className="font-black text-white">{kgToDisplay(extraKgNeeded, unit)}{weightLabel(unit)}</span> a tus {selInfo.bestReps} reps y subís de rango</p>
                       </div>
                     )}
                   </div>
@@ -10933,6 +10949,14 @@ function Sparkline({ valores, color = "#475569", ancho = 78, alto = 14 }) {
 }
 
 function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], photosLoading, onAddPhoto, onDeletePhoto }) {
+  // El peso corporal se GUARDA siempre en kg (alimenta settings.bodyWeightKg,
+  // que es con lo que se calculan los rangos "según tu contexto") y se
+  // muestra en la unidad de quien mira. La conversión se hace una sola vez,
+  // acá arriba: de ahí para abajo todo el componente — tarjetas, gráfico,
+  // resumen, comparación de fotos — trabaja con números ya listos para
+  // mostrar. Las demás medidas son cm y no cambian nunca.
+  const unit = useWeightUnit();
+  const unidadDe = (tipo) => (tipo === "weight" ? weightLabel(unit) : MEASUREMENT_TYPES.find((t) => t.k === tipo)?.unit || "cm");
   const [selType, setSelType] = useState("weight");
   const [inputVal, setInputVal] = useState("");
   const [addingPhoto, setAddingPhoto] = useState(false);
@@ -10947,7 +10971,11 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
   const [compareBase, setCompareBase] = useState(null);
   const [comparePair, setComparePair] = useState(null);
   const selMeta = MEASUREMENT_TYPES.find((t) => t.k === selType);
-  const selHistory = useMemo(() => measurements[selType] || [], [measurements, selType]);
+  const selHistory = useMemo(
+    () => (measurements[selType] || []).map((h) => (selType === "weight" ? { ...h, value: kgToDisplay(h.value, unit) } : h)),
+    [measurements, selType, unit],
+  );
+  const selUnidad = unidadDe(selType);
   const latest = getLatestMeasurement(selHistory);
   const days = latest ? daysSince(latest.date) : null;
   const chartData = useMemo(() => selHistory.slice().sort((a, b) => (a.date < b.date ? -1 : 1)).map((h) => ({ date: h.date.slice(5), val: h.value })), [selHistory]);
@@ -10955,20 +10983,20 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
   // y el cambio contra el registro anterior, de un vistazo, sin tener que
   // entrar a cada una para saber si subió o bajó desde la última vez.
   const statCards = useMemo(() => MEASUREMENT_TYPES.map((t) => {
-    const hist = (measurements[t.k] || []).slice().sort((a, b) => (a.date < b.date ? 1 : -1));
+    const hist = (measurements[t.k] || []).map((h) => (t.k === "weight" ? { ...h, value: kgToDisplay(h.value, unit) } : h)).slice().sort((a, b) => (a.date < b.date ? 1 : -1));
     const latestVal = hist[0] || null;
     const delta = hist[0] && hist[1] ? Math.round((hist[0].value - hist[1].value) * 10) / 10 : null;
     // Los últimos 8 registros en orden cronológico, para el sparkline de
     // la píldora: el último valor solo no dice si venís subiendo o bajando,
     // y esa es justo la pregunta de una medida corporal.
     const serie = hist.slice(0, 8).reverse().map((h) => h.value);
-    return { ...t, latest: latestVal, delta, serie };
-  }), [measurements]);
+    return { ...t, unit: t.k === "weight" ? weightLabel(unit) : t.unit, latest: latestVal, delta, serie };
+  }), [measurements, unit]);
 
   const handleAdd = () => {
     const v = parseFloat(inputVal);
     if (!v || isNaN(v) || v <= 0) return;
-    onAddMeasurement(selType, v);
+    onAddMeasurement(selType, selType === "weight" ? displayToKg(v, unit) : v);
     setInputVal("");
   };
 
@@ -10988,7 +11016,7 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
     Object.entries(measurements).forEach(([type, entries]) => {
       (entries || []).forEach((e) => {
         if (!map[e.date]) map[e.date] = { weight: null, measures: {}, photos: [] };
-        if (type === "weight") map[e.date].weight = e.value;
+        if (type === "weight") map[e.date].weight = kgToDisplay(e.value, unit);
         else map[e.date].measures[type] = e.value;
       });
     });
@@ -10997,7 +11025,7 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
       map[p.date].photos.push(p);
     });
     return map;
-  }, [measurements, photos]);
+  }, [measurements, photos, unit]);
 
   const weeks = useMemo(() => getMonthMatrix(cursor.y, cursor.m), [cursor]);
   const hasAnyData = Object.keys(dailyIndex).length > 0;
@@ -11041,12 +11069,12 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
       </div>
 
       <div className="flex items-center gap-2">
-        <input type="number" inputMode="decimal" min="0" value={inputVal} onChange={(e) => setInputVal(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }} placeholder={`Nuevo valor (${selMeta.unit})`} className="flex-1 bg-slate-950/60 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-purple-500/50" />
+        <input type="number" inputMode="decimal" min="0" value={inputVal} onChange={(e) => setInputVal(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }} placeholder={`Nuevo valor (${selUnidad})`} className="flex-1 bg-slate-950/60 border border-slate-800 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-purple-500/50" />
         <button onClick={handleAdd} disabled={!inputVal.trim()} className="px-4 py-2.5 rounded-xl !text-white text-sm font-bold disabled:opacity-40 transition-all active:scale-95" style={{ backgroundColor: "#A855F7" }}>Guardar</button>
       </div>
 
       {latest ? (
-        <p className="text-[11px] text-slate-500">Último registro: <span className="text-slate-300 font-bold">{latest.value}{selMeta.unit}</span> · hace {days === 0 ? "hoy" : days === 1 ? "1 día" : `${days} días`}</p>
+        <p className="text-[11px] text-slate-500">Último registro: <span className="text-slate-300 font-bold">{latest.value}{selUnidad}</span> · hace {days === 0 ? "hoy" : days === 1 ? "1 día" : `${days} días`}</p>
       ) : (
         <p className="text-[11px] text-slate-600">Todavía no registraste {selMeta.l.toLowerCase()}.</p>
       )}
@@ -11056,7 +11084,10 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
           "¿cómo vengo este mes?" y "¿cuánto me moví en total?", que es lo
           que uno mira cuando entra acá. */}
       {(() => {
-        const serie = (measurements[selType] || []).slice().sort((a, b) => (a.date < b.date ? -1 : 1));
+        // Se parte de selHistory, que ya vino convertido: leer measurements
+        // crudo acá dejaba estas tres cajas en kilos mientras el resto de la
+        // pantalla mostraba libras.
+        const serie = selHistory.slice().sort((a, b) => (a.date < b.date ? -1 : 1));
         if (serie.length < 2) return null;
         const primero = serie[0], ultimo = serie[serie.length - 1];
         const totalDif = Math.round((ultimo.value - primero.value) * 10) / 10;
@@ -11073,7 +11104,7 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
         const dif30 = enVentana.length >= 2 ? Math.round((ultimo.value - enVentana[0].value) * 10) / 10 : null;
         const min = Math.min(...serie.map((s) => s.value));
         const max = Math.max(...serie.map((s) => s.value));
-        const fmt = (n) => `${n > 0 ? "+" : ""}${n}${selMeta.unit}`;
+        const fmt = (n) => `${n > 0 ? "+" : ""}${n}${selUnidad}`;
         // No se asume que subir sea bueno ni malo: en peso y cintura suele
         // buscarse bajar, en pecho o brazo subir. El color va por el signo,
         // neutro, y la lectura la pone la persona.
@@ -11108,7 +11139,7 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
               <XAxis dataKey="date" stroke="var(--chart-axis)" fontSize={10} />
               <YAxis stroke="var(--chart-axis)" fontSize={10} domain={["auto", "auto"]} />
               <Tooltip content={<CustomTooltip />} />
-              <Area type="monotone" dataKey="val" stroke="#A855F7" fill="url(#gMedidas)" strokeWidth={2.5} dot={{ r: 3, fill: "#A855F7", strokeWidth: 0 }} name={`${selMeta.l} (${selMeta.unit})`} />
+              <Area type="monotone" dataKey="val" stroke="#A855F7" fill="url(#gMedidas)" strokeWidth={2.5} dot={{ r: 3, fill: "#A855F7", strokeWidth: 0 }} name={`${selMeta.l} (${selUnidad})`} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -11218,7 +11249,7 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
                     {selectedEntry.weight != null && (
                       <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-purple-500/10 border border-purple-500/20 w-fit">
                         <span className="w-2 h-2 rounded-full bg-purple-400 shrink-0" />
-                        <span className="text-xs text-slate-300">Peso: <span className="font-bold text-white">{selectedEntry.weight}kg</span></span>
+                        <span className="text-xs text-slate-300">Peso: <span className="font-bold text-white">{selectedEntry.weight}{weightLabel(unit)}</span></span>
                       </div>
                     )}
                     {Object.keys(selectedEntry.measures).length > 0 && (
@@ -11269,7 +11300,7 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
                     <div className="px-3 pb-2 text-center">
                       <span className="text-[11px] font-bold text-rose-300">{diffDays} día{diffDays === 1 ? "" : "s"} de diferencia</span>
                       {weightDiff != null && weightDiff !== 0 && (
-                        <span className={`ml-2 text-[11px] font-bold ${weightDiff < 0 ? "text-emerald-400" : "text-amber-400"}`}>{weightDiff > 0 ? "+" : ""}{weightDiff}kg</span>
+                        <span className={`ml-2 text-[11px] font-bold ${weightDiff < 0 ? "text-emerald-400" : "text-amber-400"}`}>{weightDiff > 0 ? "+" : ""}{weightDiff}{weightLabel(unit)}</span>
                       )}
                     </div>
                     <div className="grid grid-cols-2 gap-2 px-3 pb-4">
@@ -11280,7 +11311,7 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
                           </div>
                           <div className="text-center">
                             <p className="text-[11px] font-bold text-white">{fmt(side.date)}</p>
-                            {side.entry.weight != null && <p className="text-[10px] text-slate-400">{side.entry.weight}kg</p>}
+                            {side.entry.weight != null && <p className="text-[10px] text-slate-400">{side.entry.weight}{weightLabel(unit)}</p>}
                           </div>
                         </div>
                       ))}
@@ -11355,6 +11386,12 @@ function ExercisePickerModal({ groups, selId, onSelect, onClose }) {
 }
 
 function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS, onResetAll, onDeleteDay, onUpdateSettings, onGoToProfile, onGoToRoutines, weekSchedule = null, sex, age, onGoToDeload, measurements, onAddMeasurement, photos, photosLoading, onAddPhoto, onDeletePhoto }) {
+  // Los logs se guardan en kg. chartData es lo único que lee la sección de
+  // evolución (lista, gráfico, tooltip y los tres KPI de abajo), así que
+  // la conversión se hace ahí y una sola vez. Los porcentajes no se tocan:
+  // una razón entre dos pesos da igual en kilos que en libras.
+  const unit = useWeightUnit();
+  const uLabel = weightLabel(unit);
   // BUG FIX: antes esto listaba una entrada POR DÍA donde aparece cada
   // ejercicio — si "Sentadilla" está en Piernas 1 Y Piernas 2, salían dos
   // chips idénticos que llevaban al mismo lugar (el historial es por
@@ -11423,7 +11460,7 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
     }
     return Object.values(byDate).sort((a, b) => (a.date > b.date ? 1 : -1));
   }, [logs, selId, selEx]);
-  const chartData = useMemo(() => history.map((h) => ({ date: h.date.slice(5), kg: h.kg, reps: h.reps, vol: vol(h.kg, h.reps), e1rm: estimate1RM(h.kg, h.reps), rpe: h.rpe ?? null, deload: !!h.deload })), [history]);
+  const chartData = useMemo(() => history.map((h) => ({ date: h.date.slice(5), kg: kgToDisplay(h.kg, unit), reps: h.reps, vol: Math.round(kgToDisplay(vol(h.kg, h.reps), unit)), e1rm: Math.round(kgToDisplay(estimate1RM(h.kg, h.reps), unit) * 10) / 10, rpe: h.rpe ?? null, deload: !!h.deload })), [history, unit]);
   // La mejor marca de TODA la curva — sirve para la línea de referencia y
   // para agrandar el punto correspondiente en el gráfico. El 1RM sigue
   // siendo la base de comparación (chartBestE1rm decide CUÁL sesión es la
@@ -11572,8 +11609,8 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
                         {h.date}
                         {h.deload && <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md" style={{ backgroundColor: tint(DELOAD_COLOR, "22"), color: DELOAD_COLOR }}>⚡ DESCARGA</span>}
                       </span>
-                      <span className="text-[11px] text-slate-500 tabular-nums">{h.reps}×{h.kg}kg</span>
-                      <span className="text-sm font-black tabular-nums shrink-0" style={{ color: h.deload ? DELOAD_COLOR : "#F59E0B" }}>{h.e1rm}kg</span>
+                      <span className="text-[11px] text-slate-500 tabular-nums">{h.reps}×{h.kg}{uLabel}</span>
+                      <span className="text-sm font-black tabular-nums shrink-0" style={{ color: h.deload ? DELOAD_COLOR : "#F59E0B" }}>{h.e1rm}{uLabel}</span>
                     </div>
                   ))}
                 </div>
@@ -11587,7 +11624,7 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
                   return (
                     <div className={`flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-semibold ${pos ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/15" : "bg-rose-500/10 text-rose-400 border border-rose-500/15"}`}>
                       {pos ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-                      <div><span className="font-black">{pos ? "+" : ""}{pct2}% de kg</span><span className="text-xs opacity-60 ml-1.5">· {chartData.length} sesiones</span></div>
+                      <div><span className="font-black">{pos ? "+" : ""}{pct2}% de carga</span><span className="text-xs opacity-60 ml-1.5">· {chartData.length} sesiones</span></div>
                     </div>
                   );
                 })()}
@@ -11624,7 +11661,7 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
                           sin esto, se comía el toque en vez de dejarlo pasar
                           al punto de abajo. */}
                       {chartBestE1rm != null && (
-                        <ReferenceLine y={chartBestE1rm} stroke={tint(EVOLUTION_CHART_COLOR, "60")} strokeDasharray="4 4" style={{ pointerEvents: "none" }} label={{ value: chartBestEntry ? `Mejor: ${chartBestEntry.reps}×${chartBestEntry.kg}kg` : "Mejor", position: "insideTopRight", fill: tint(EVOLUTION_CHART_COLOR, "cc"), fontSize: 10, fontWeight: 700, style: { pointerEvents: "none" } }} />
+                        <ReferenceLine y={chartBestE1rm} stroke={tint(EVOLUTION_CHART_COLOR, "60")} strokeDasharray="4 4" style={{ pointerEvents: "none" }} label={{ value: chartBestEntry ? `Mejor: ${chartBestEntry.reps}×${chartBestEntry.kg}${uLabel}` : "Mejor", position: "insideTopRight", fill: tint(EVOLUTION_CHART_COLOR, "cc"), fontSize: 10, fontWeight: 700, style: { pointerEvents: "none" } }} />
                       )}
                       {/* La curva se sigue posicionando con el 1RM estimado (combina reps
                           y kilos: sube o baja el peso, sube o baja las reps, y el número
@@ -11638,7 +11675,7 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
                           toque (ver más arriba), nada más del gráfico. Color fijo naranja
                           (el acento de esta sección), no el color del día: eso lo sigue
                           mostrando solo el botón "Elegí un ejercicio" de más arriba. */}
-                      <Area type="monotone" dataKey="e1rm" stroke={EVOLUTION_CHART_COLOR} fill="url(#gA)" strokeWidth={2.5} isAnimationActive animationDuration={650} animationEasing="ease-out" dot={(props) => <EvolutionDot {...props} color={EVOLUTION_CHART_COLOR} isBest={props.payload.e1rm === chartBestE1rm} isActive={activePoint?.index === props.index} deload={props.payload.deload} onSelect={handleSelectPoint} />} activeDot={false} name="Kg" />
+                      <Area type="monotone" dataKey="e1rm" stroke={EVOLUTION_CHART_COLOR} fill="url(#gA)" strokeWidth={2.5} isAnimationActive animationDuration={650} animationEasing="ease-out" dot={(props) => <EvolutionDot {...props} color={EVOLUTION_CHART_COLOR} isBest={props.payload.e1rm === chartBestE1rm} isActive={activePoint?.index === props.index} deload={props.payload.deload} onSelect={handleSelectPoint} />} activeDot={false} name={uLabel.toUpperCase()} />
                     </AreaChart>
                   </ResponsiveContainer>
                   {activePoint && chartData[activePoint.index] && (() => {
@@ -11664,8 +11701,8 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
                           <p className="text-slate-400 font-medium">{d.date}</p>
                           {d.deload && <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md" style={{ backgroundColor: tint(DELOAD_COLOR, "22"), color: DELOAD_COLOR }}>⚡ DESCARGA</span>}
                         </div>
-                        <p className="font-black text-sm" style={{ color: d.deload ? DELOAD_COLOR : EVOLUTION_CHART_COLOR }}>{d.reps} × {d.kg} kg</p>
-                        <p className="text-slate-500 mt-1">{d.e1rm} kg <span className="text-[10px]">1RM est.</span></p>
+                        <p className="font-black text-sm" style={{ color: d.deload ? DELOAD_COLOR : EVOLUTION_CHART_COLOR }}>{d.reps} × {d.kg} {uLabel}</p>
+                        <p className="text-slate-500 mt-1">{d.e1rm} {uLabel} <span className="text-[10px]">1RM est.</span></p>
                         {d.rpe != null && <p className="text-slate-500 mt-0.5">{formatEffort(d.rpe, settings.rpeDisplayMode)}</p>}
                       </div>
                     );
@@ -11685,8 +11722,8 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
                   const sesionesDesde = chartData.length - 1 - iMejor;
                   const diasDesde = daysSince(history[iMejor]?.date);
                   const kpis = [
-                    { l: "Tu récord", v: `${l.reps}×${kgToDisplay(l.kg, "kg")}`, u: "kg", c: EVOLUTION_CHART_COLOR },
-                    { l: "1RM estimado", v: Math.round(chartData[iMejor].e1rm), u: "kg", c: "#f8fafc" },
+                    { l: "Tu récord", v: `${l.reps}×${l.kg}`, u: uLabel, c: EVOLUTION_CHART_COLOR },
+                    { l: "1RM estimado", v: Math.round(chartData[iMejor].e1rm), u: uLabel, c: "#f8fafc" },
                     { l: "Sesiones", v: chartData.length, u: "", c: "#f8fafc" },
                   ];
                   return (
@@ -11703,7 +11740,7 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
                       </div>
                       <div className={`flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-semibold ${pos ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/15" : "bg-rose-500/10 text-rose-400 border border-rose-500/15"}`}>
                         {pos ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-                        <div><span className="font-black">{pos ? "+" : ""}{pct2}% de kg</span><span className="text-xs opacity-60 ml-1.5">desde la primera sesión</span></div>
+                        <div><span className="font-black">{pos ? "+" : ""}{pct2}% de carga</span><span className="text-xs opacity-60 ml-1.5">desde la primera sesión</span></div>
                       </div>
                       {/* Hace cuánto que no rompés tu marca en este ejercicio.
                           Con 3 sesiones o más sin superarla, el aviso pasa a
@@ -14747,7 +14784,7 @@ function RoutineProposalComposer({ myRoutines, onClose, onSubmit }) {
 // array (en vez de un switch largo en el JSX) para que agregar una
 // plantilla nueva el día de mañana sea sumar un objeto acá, nada más.
 const PROGRESSION_TEMPLATES = [
-  { key: "linear", label: "Lineal", icon: <TrendingUp size={13} />, hint: "+kg cada semana, mismas reps", build: (weeks, kg, reps, repsMax, inc) => buildLinearProgression(weeks, kg, reps, inc) },
+  { key: "linear", label: "Lineal", icon: <TrendingUp size={13} />, hint: "+peso cada semana, mismas reps", build: (weeks, kg, reps, repsMax, inc) => buildLinearProgression(weeks, kg, reps, inc) },
   { key: "double", label: "Doble progresión", icon: <Layers size={13} />, hint: "Sube reps hasta el tope y ahí sube el kg", build: (weeks, kg, reps, repsMax, inc) => buildDoubleProgression(weeks, kg, reps, repsMax, inc) },
   { key: "wave", label: "Ondulante", icon: <Activity size={13} />, hint: "Alterna semana pesada/liviana", build: (weeks, kg, reps, repsMax, inc) => buildWaveProgression(weeks, kg, reps, inc) },
   { key: "step", label: "Escalón c/2 sem", icon: <ListChecks size={13} />, hint: "Mismo peso 2 semanas, después sube", build: (weeks, kg, reps, repsMax, inc) => buildStepProgression(weeks, kg, reps, inc) },
@@ -15347,7 +15384,7 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
                               </span>
                             ) : (
                               <>
-                                <input value={kg0} onChange={(e) => updateAllSets(ex, week, { kg: e.target.value })} type="number" inputMode="decimal" placeholder={marcas.best ? String(marcas.best.kg) : "kg"} className="w-16 shrink-0 bg-slate-900 border border-slate-700/50 rounded-lg px-1.5 py-1.5 text-white text-sm font-bold text-center focus:outline-none" />
+                                <input value={kg0} onChange={(e) => updateAllSets(ex, week, { kg: e.target.value })} type="number" inputMode="decimal" placeholder={marcas.best ? String(marcas.best.kg) : weightLabel(unit)} className="w-16 shrink-0 bg-slate-900 border border-slate-700/50 rounded-lg px-1.5 py-1.5 text-white text-sm font-bold text-center focus:outline-none" />
                                 <input value={reps0} onChange={(e) => updateAllSets(ex, week, { reps: e.target.value })} type="number" inputMode="numeric" placeholder="reps" className="w-14 shrink-0 bg-slate-900 border border-slate-700/50 rounded-lg px-1.5 py-1.5 text-white text-xs text-center focus:outline-none" />
                               </>
                             )}
@@ -15521,6 +15558,9 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
   // a la pestaña Rutinas en vez de volver a la lista de amigos (que es lo
   // que hace el botón "Volver" de esta misma pantalla).
   useAndroidBackHandler(onBack);
+  // Las marcas de la otra persona están en kg, igual que las propias: se
+  // muestran en TU unidad, que es la única que sabés leer de un vistazo.
+  const unit = useWeightUnit();
   const [basic, setBasic] = useState(null);
   const [full, setFull] = useState(null);
   const [state, setState] = useState("loading"); // loading|ok|forbidden
@@ -15675,7 +15715,7 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
                   <div className="relative flex items-center gap-2">
                     <RankBadgeIcon tier={theirBestMuscle.tier} sub={null} color={theirBestMuscle.color} size={34} />
                     <div className="min-w-0">
-                      <p className="text-base font-black text-white leading-none tabular-nums">{theirBestMuscle.bestReps}<span className="text-slate-500 text-xs font-bold mx-0.5">×</span>{theirBestMuscle.bestKg}<span className="text-slate-400 text-[10px] font-bold ml-0.5">kg</span></p>
+                      <p className="text-base font-black text-white leading-none tabular-nums">{theirBestMuscle.bestReps}<span className="text-slate-500 text-xs font-bold mx-0.5">×</span>{kgToDisplay(theirBestMuscle.bestKg, unit)}<span className="text-slate-400 text-[10px] font-bold ml-0.5">{weightLabel(unit)}</span></p>
                       <p className="text-[9.5px] text-slate-500 mt-0.5 truncate">{theirBestMuscle.bestExerciseName || theirBestMuscle.label}</p>
                     </div>
                   </div>
@@ -17265,6 +17305,7 @@ function ExercisePickerPanel({ existingIds, onAdd, onAddCustom, onClose }) {
 const REP_RANGE_OPTIONS = ["1-3", "3-5", "4-6", "6-8", "8-10", "10-12", "12-15", "15-20"];
 
 function BuilderExerciseRow({ ex, onRemove, onConfigChange, isDragging = false, dumbbellFactor = null, onToggleDumbbell = null, recienAgregado = false, dayColor = "#14B8A6", onHandlePointerDown = null, onMoveUp = null, onMoveDown = null }) {
+  const unit = useWeightUnit();
   const [editing, setEditing] = useState(false);
   const repRange = ex.sets[0]?.repRange || "8-10";
   const setsCount = ex.sets.length;
@@ -17375,7 +17416,7 @@ function BuilderExerciseRow({ ex, onRemove, onConfigChange, isDragging = false, 
               </div>
               <p className="text-[9.5px] text-slate-600 mt-1.5">
                 {(dumbbellFactor || 1) === 2
-                  ? "Con dos de 20kg, tu rango cuenta 40kg de carga real."
+                  ? `Con dos de ${kgToDisplay(20, unit)}${weightLabel(unit)}, tu rango cuenta ${kgToDisplay(40, unit)}${weightLabel(unit)} de carga real.`
                   : "El peso que anotes es el que cuenta para tu rango."}
               </p>
             </div>
@@ -18300,7 +18341,9 @@ function buildActionPlan(action, ctx) {
     // onAddMeasurement, el mismo camino que si lo cargaras a mano en
     // Progreso → Medidas, así queda en su historial con fecha (y de paso
     // sigue actualizando settings.bodyWeightKg por detrás, como siempre).
-    if (action.bodyWeightKg) { newWeight = parseFloat(action.bodyWeightKg); items.push(`Peso corporal: ${newWeight}kg`); }
+    // La acción viaja SIEMPRE en kilos (así se lo pide el prompt), pero la
+    // confirmación que lee la persona va en su unidad.
+    if (action.bodyWeightKg) { newWeight = parseFloat(action.bodyWeightKg); const u = settings?.weightUnit || "kg"; items.push(`Peso corporal: ${kgToDisplay(newWeight, u)}${weightLabel(u)}`); }
     if (action.email) { patch.email = action.email; items.push(`Email: ${action.email}`); }
     if (!items.length) return null;
     return {
@@ -18378,8 +18421,8 @@ function buildActionPlan(action, ctx) {
     const key = `${lib.id}_${setIndex}`;
     return {
       kind: "set", title: "Registrar marca de hoy",
-      items: [`${lib.name} · S${setIndex + 1}: ${reps}×${kg}kg${rpe ? ` · RPE ${rpe}` : ""}`],
-      setPreview: { exerciseName: lib.name, reps, kg, rpe, isNewPR: wouldBeNewPR(profile, lib.id, setIndex, kg, reps) },
+      items: [`${lib.name} · S${setIndex + 1}: ${reps}×${kgToDisplay(kg, settings?.weightUnit || "kg")}${weightLabel(settings?.weightUnit || "kg")}${rpe ? ` · RPE ${rpe}` : ""}`],
+      setPreview: { exerciseName: lib.name, reps, kg, rpe, unit: settings?.weightUnit || "kg", isNewPR: wouldBeNewPR(profile, lib.id, setIndex, kg, reps) },
       confirmLabel: "Guardar",
       confirm: () => {
         if (!onLogSet) return;
@@ -18508,8 +18551,8 @@ function buildActionPlan(action, ctx) {
     const setIndex = Number.isInteger(action.setIndex) && action.setIndex >= 0 ? action.setIndex : 0;
     const prKey = `${lib.id}_${setIndex}_pr_override`;
     return {
-      kind: "record", title: "Corregir récord", items: [`${lib.name} · S${setIndex + 1}: ${reps}×${kg}kg`],
-      recordPreview: { exerciseName: lib.name, reps, kg },
+      kind: "record", title: "Corregir récord", items: [`${lib.name} · S${setIndex + 1}: ${reps}×${kgToDisplay(kg, settings?.weightUnit || "kg")}${weightLabel(settings?.weightUnit || "kg")}`],
+      recordPreview: { exerciseName: lib.name, reps, kg, unit: settings?.weightUnit || "kg" },
       confirmLabel: "Guardar récord",
       confirm: () => onLogSet((prev) => ({ ...prev, [prKey]: { kg, reps, date: todayStr(), manual: true } })),
     };
@@ -18771,7 +18814,7 @@ function SetLogPreview({ exerciseName, reps, kg, rpe, isNewPR, unit = "kg", card
       <div className="relative flex-1 min-w-0">
         <p className="text-[10px] font-bold truncate" style={{ color: tint(accent, "aa") }}>{exerciseName}{isNewPR ? " · récord nuevo" : ""}</p>
         <p className="text-lg font-black tabular-nums leading-tight" style={{ color: accent }}>
-          {cardio ? <>{minutes} min{km ? ` · ${km}km` : ""}</> : <>{reps}<span className="opacity-50 text-sm mx-0.5">×</span>{kg}<span className="opacity-60 text-xs ml-0.5">{unit}</span></>}
+          {cardio ? <>{minutes} min{km ? ` · ${km}km` : ""}</> : <>{reps}<span className="opacity-50 text-sm mx-0.5">×</span>{kgToDisplay(kg, unit)}<span className="opacity-60 text-xs ml-0.5">{weightLabel(unit)}</span></>}
         </p>
       </div>
       {rpe != null && <span className="relative text-[10px] font-bold px-2 py-1 rounded-lg shrink-0" style={{ backgroundColor: tint(accent, "18"), color: accent }}>RPE {rpe}</span>}
@@ -18824,14 +18867,14 @@ function RoutineDiffPreview({ dayLabel, dayColor = "#14B8A6", items }) {
 }
 
 // corregir_record: la misma tarjeta dorada de récord, más chica.
-function RecordChangePreview({ exerciseName, reps, kg }) {
+function RecordChangePreview({ exerciseName, reps, kg, unit = "kg" }) {
   const accent = "#F59E0B";
   return (
     <div className="flex items-center gap-2.5 rounded-xl pl-3.5 pr-3 py-2.5" style={{ background: `linear-gradient(120deg, ${tint(accent, "20")}, ${tint(accent, "0c")})`, border: `1px solid ${tint(accent, "45")}` }}>
       <Trophy size={16} style={{ color: accent }} className="shrink-0" />
       <div className="flex-1 min-w-0">
         <p className="text-[10px] font-bold truncate" style={{ color: tint(accent, "aa") }}>{exerciseName}</p>
-        <p className="text-lg font-black tabular-nums leading-tight" style={{ color: accent }}>{reps}<span className="opacity-50 text-sm mx-0.5">×</span>{kg}<span className="opacity-60 text-xs ml-0.5">kg</span></p>
+        <p className="text-lg font-black tabular-nums leading-tight" style={{ color: accent }}>{reps}<span className="opacity-50 text-sm mx-0.5">×</span>{kgToDisplay(kg, unit)}<span className="opacity-60 text-xs ml-0.5">{weightLabel(unit)}</span></p>
       </div>
     </div>
   );
@@ -21038,6 +21081,11 @@ function RoutineBuilder({ initialRoutine, onCancel, onSave, dumbbellDouble = nul
 // Asistente de rutina personalizada — preguntas visuales paso a paso,
 // autocompleta el perfil y genera la rutina con IA con preview confirmable.
 function PersonalizedRoutineWizard({ profile, onUpdateProfile, onCreateRoutine, onActivate, onClose }) {
+  // El peso se PREGUNTA en la unidad de la persona y se GUARDA en kg: es el
+  // número con el que se calculan los rangos "según tu contexto", y antes
+  // pedía "kg" a todo el mundo y guardaba tal cual lo que escribías — quien
+  // tenía la app en libras empezaba con un peso corporal el doble de grande.
+  const unit = useWeightUnit();
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState({
     sex: profile?.sex || null, age: profile?.age || "", weight: "", height: profile?.heightCm || "",
@@ -21055,7 +21103,7 @@ function PersonalizedRoutineWizard({ profile, onUpdateProfile, onCreateRoutine, 
     { key: "age", icon: <Calendar size={18} />, q: "¿Cuántos años tenés?", hint: "",
       input: { placeholder: "Ej: 25", unit: "años" } },
     { key: "weight", icon: <Activity size={18} />, q: "¿Cuánto pesás?", hint: "Se usa para el ranking muscular y las cargas iniciales",
-      input: { placeholder: "Ej: 75", unit: "kg" } },
+      input: { placeholder: unit === "lbs" ? "Ej: 165" : "Ej: 75", unit: weightLabel(unit) } },
     { key: "height", icon: <Ruler size={18} />, q: "¿Cuánto medís?", hint: "",
       input: { placeholder: "Ej: 175", unit: "cm" } },
     { key: "experience", icon: <Award size={18} />, q: "¿Cuál es tu nivel de experiencia?", hint: "Sé honesto: la rutina se ajusta a tu nivel real",
@@ -21095,7 +21143,7 @@ function PersonalizedRoutineWizard({ profile, onUpdateProfile, onCreateRoutine, 
     if (a.sex) profileUpdates.sex = a.sex;
     if (a.age) profileUpdates.age = parseInt(a.age, 10) || null;
     if (a.height) profileUpdates.heightCm = parseInt(a.height, 10) || null;
-    if (a.weight) profileUpdates.settings = { ...(getProfileSettings(profile)), bodyWeightKg: parseFloat(a.weight) || 0, sex: a.sex || null };
+    if (a.weight) profileUpdates.settings = { ...(getProfileSettings(profile)), bodyWeightKg: displayToKg(parseFloat(a.weight) || 0, unit), sex: a.sex || null };
     onUpdateProfile?.(profileUpdates);
 
     const goalLabels = { hipertrofia: "hipertrofia (ganar músculo)", fuerza: "fuerza máxima", potencia: "potencia explosiva", grasa: "pérdida de grasa", resistencia: "resistencia muscular", salud: "salud general" };
@@ -21103,7 +21151,7 @@ function PersonalizedRoutineWizard({ profile, onUpdateProfile, onCreateRoutine, 
     const placeTxt = { gym: "gimnasio completo con máquinas, barras y mancuernas", casa_equipada: "casa con mancuernas y equipo básico", casa: "solo con peso corporal, sin equipamiento" }[a.place] || "gimnasio";
     const focusTxt = (a.focus || []).length ? `Priorizar estos grupos musculares con más volumen: ${a.focus.join(", ")}.` : "";
     const prompt = [
-      `Creá una rutina de gimnasio personalizada para: ${a.sex === "F" ? "mujer" : "hombre"} de ${a.age} años, ${a.weight} kg, ${a.height} cm, nivel ${a.experience}.`,
+      `Creá una rutina de gimnasio personalizada para: ${a.sex === "F" ? "mujer" : "hombre"} de ${a.age} años, ${Math.round(displayToKg(parseFloat(a.weight) || 0, unit))} kg, ${a.height} cm, nivel ${a.experience}.`,
       `Entrena ${a.daysPerWeek} días por semana, ${a.minutes} minutos por sesión, en ${placeTxt}.`,
       `Objetivos: ${goalsTxt}. ${focusTxt}`,
       `Ajustá la cantidad de ejercicios al tiempo disponible (aprox 1 ejercicio cada 10-12 min).`,
@@ -22229,6 +22277,10 @@ const SECONDARY_TAB_BACK = { perfil: "rutina" };
 // nombre de la opción. Aparece como tarea del onboarding y también desde
 // Perfil cuando quieras cambiarlo.
 function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
+  // La ficha de ejemplo tiene que verse igual que la de verdad: si la app
+  // está en libras, los números del ejemplo también.
+  const unit = useWeightUnit();
+  const ej = (kg) => `${kgToDisplay(kg, unit)}${weightLabel(unit)}`;
   useAndroidBack(onClose);
   const s = settings || DEFAULT_SETTINGS;
   const on = (k) => s[k] !== false;
@@ -22280,13 +22332,13 @@ function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
 
             {on("showWarmup") && (
               <div className="mb-2 rounded-xl px-2.5 py-2 bounce-in" style={{ backgroundColor: "#14B8A610", border: "1px solid #14B8A630" }}>
-                <p className="text-[10px] font-bold text-teal-400 flex items-center gap-1"><Flame size={9} /> Aproximaciones: 40kg → 55kg → 70kg</p>
+                <p className="text-[10px] font-bold text-teal-400 flex items-center gap-1"><Flame size={9} /> Aproximaciones: {ej(40)} → {ej(55)} → {ej(70)}</p>
               </div>
             )}
 
             <div className="rounded-xl px-2.5 py-2 mb-2" style={{ background: "linear-gradient(120deg,#14B8A620,#14B8A60c)", border: "1px solid #14B8A645" }}>
               <span className="block text-[8px] font-black uppercase tracking-[0.16em] text-teal-400/70 mb-0.5">Récord</span>
-              <span className="text-base font-black text-teal-400 tabular-nums">8<span className="opacity-50 text-xs mx-0.5">×</span>80<span className="opacity-60 text-[10px] ml-0.5">kg</span></span>
+              <span className="text-base font-black text-teal-400 tabular-nums">8<span className="opacity-50 text-xs mx-0.5">×</span>{kgToDisplay(80, unit)}<span className="opacity-60 text-[10px] ml-0.5">{weightLabel(unit)}</span></span>
             </div>
 
             <div className="flex items-stretch rounded-xl bg-slate-950/80 border border-slate-800 overflow-hidden mb-2">
@@ -23459,6 +23511,9 @@ export default function App() {
   const armarResumenSesion = () => {
     const hoy = todayStr();
     const dd = getProfileSettings(profile)?.dumbbellDouble || null;
+    // El resumen viaja en kg (el modal convierte lo que muestra), pero
+    // "marca" ya es texto armado: se rotula acá en la unidad de la persona.
+    const uResumen = getProfileSettings(profile)?.weightUnit || "kg";
     const porEjercicio = {};
     Object.entries(logs || {}).forEach(([key, val]) => {
       if (key.endsWith("_pr_override") || !Array.isArray(val)) return;
@@ -23500,7 +23555,7 @@ export default function App() {
         let mejorHoy = null;
         deHoy.forEach((e) => { const rm = estimate1RM(e.kg, e.reps); if (rm > piso && (!mejorHoy || rm > mejorHoy.rm)) mejorHoy = { rm, e }; });
         if (mejorHoy) {
-          prs.push({ id: exId, nombre: EXERCISE_LIBRARY_BY_ID[exId]?.name || (deHoy[0].exName || exId.replace(/_/g, " ")), marca: `${mejorHoy.e.reps}×${mejorHoy.e.kg}kg` });
+          prs.push({ id: exId, nombre: EXERCISE_LIBRARY_BY_ID[exId]?.name || (deHoy[0].exName || exId.replace(/_/g, " ")), marca: `${mejorHoy.e.reps}×${kgToDisplay(mejorHoy.e.kg, uResumen)}${weightLabel(uResumen)}` });
         }
       }
     });
@@ -23819,7 +23874,7 @@ export default function App() {
           shareTitle="Modus Fit · Ciclo completo"
           shareText={`¡Completé el Ciclo #${cycleCompleteNotice.cycleNumber} en Modus Fit! 💪`}
           accent="#A855F7"
-          draw={(ctx, W, H) => drawCycleShareCard(ctx, W, H, { cycleNumber: cycleCompleteNotice.cycleNumber, ...computeCycleShareStats() })}
+          draw={(ctx, W, H) => drawCycleShareCard(ctx, W, H, { cycleNumber: cycleCompleteNotice.cycleNumber, ...computeCycleShareStats(), unit: activeWeightUnit })}
           onClose={() => { setShowCycleShareImage(false); setCycleCompleteNotice(null); }}
         />
       )}
