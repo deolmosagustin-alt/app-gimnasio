@@ -583,6 +583,27 @@ const PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.modusf
 // trampa: en web sigue siendo relativa (mismo origen, sin CORS), y en
 // nativo apunta siempre al backend real.
 const API_ORIGIN = "https://app-gimnasio-two.vercel.app";
+
+// Bitácora de fallos de la IA. Cuando alguien reporta "la IA no anda" no hay
+// forma de saber cuál de las seis llamadas falló, ni por qué: el servidor
+// distingue bien los casos (cuota agotada, modelo caído, tardó demasiado,
+// clave inválida) pero ese detalle se pierde apenas se cierra el cartel.
+// Acá quedan los últimos cinco, con origen, tamaño del pedido y cuánto tardó
+// — se leen desde la consola del dispositivo, o pidiéndoselos a la persona.
+function registrarFalloIA(origen, err, ms = null, promptChars = null) {
+  try {
+    const previos = JSON.parse(localStorage.getItem("gym_fallos_ia_v1") || "[]");
+    previos.unshift({
+      at: new Date().toISOString(),
+      origen,
+      msg: String(err?.message || err).slice(0, 200),
+      abortado: err?.name === "AbortError",
+      ms,
+      promptKB: promptChars != null ? Math.round(promptChars / 1024 * 10) / 10 : null,
+    });
+    localStorage.setItem("gym_fallos_ia_v1", JSON.stringify(previos.slice(0, 5)));
+  } catch { /* si no se puede guardar, no es momento de insistir */ }
+}
 function apiUrl(path) {
   if (typeof window === "undefined") return path;
   // En el navegador (o con server.url activo) el origen ya es el correcto.
@@ -6933,11 +6954,11 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
                     <div key={i} className="flex items-center gap-3">
                       <span className="text-[10px] font-black w-10 shrink-0" style={{ color: accent }}>{Math.round(w.pct * 100)}%</span>
                       <span className="text-[11px] text-slate-500 bg-slate-800/60 rounded-lg px-2 py-1 shrink-0">{w.reps} reps</span>
-                      <span className="text-sm font-black flex-1 text-right" style={{ color: accent }}>{wKg}kg</span>
+                      <span className="text-sm font-black flex-1 text-right" style={{ color: accent }}>{kgToDisplay(wKg, planUnit)}{weightLabel(planUnit)}</span>
                     </div>
                   );
                 })}
-                <p className="text-[9px] text-slate-600 pt-1">Basado en tu mejor marca actual ({bestWorkingKg}kg) — es sólo una guía, no se guarda como serie.</p>
+                <p className="text-[9px] text-slate-600 pt-1">Basado en tu mejor marca actual ({kgToDisplay(bestWorkingKg, planUnit)}{weightLabel(planUnit)}) — es sólo una guía, no se guarda como serie.</p>
               </div>
             )}
           </div>
@@ -7336,6 +7357,7 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_
       setEstado("preview");
     } catch (e) {
       console.error("[planificador IA]", e);
+      registrarFalloIA("planificador", e, null, prompt?.length ?? null);
       setError(e?.name === "AbortError" ? "La IA tardó demasiado. Probá con un plazo más corto o menos ejercicios." : (e?.message || "No pudimos armar el plan."));
       setEstado("error");
     } finally {
@@ -19505,6 +19527,7 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
         // una acción tuya, no una falla. Solo se corta en silencio.
         if (err.name === "AbortError" && userAbortedRef.current) return;
         console.error("Error al hablar con el entrenador IA:", err);
+        registrarFalloIA("chat", err, null, systemPrompt?.length ?? null);
         const isTimeout = err.name === "AbortError";
         const serverMsg = err.cause === "server" ? err.message : null;
         setMessages((prev) => [...prev, {
