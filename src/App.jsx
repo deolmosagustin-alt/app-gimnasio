@@ -19021,32 +19021,45 @@ function WarmupPlanPreview({ dayLabel, drillNames }) {
 // config_*: cada campo que cambia como una fila con ícono, mismo lenguaje
 // que las filas de ajustes de Perfil — de un vistazo se ve QUÉ cambia y a
 // QUÉ valor, no solo una frase.
+// El ícono se guarda como COMPONENTE, no como elemento ya creado.
+//
+// BUG (reporte: "sigue fallando el chatbot, dice algo se rompió", error #31
+// de React con "object with keys {type, key, ref, props}"): acá decía
+// `icon: <Bell size={12} />`. Ese elemento viajaba dentro de
+// plan.settingsChanges, que se guarda con el mensaje del chat — y al
+// guardarse pasa por JSON. JSON.stringify se come el Symbol $$typeof que es
+// lo único que distingue a un elemento de React de un objeto cualquiera, así
+// que al releer la conversación volvía {type, key, ref, props} pelado.
+// Renderizar eso revienta la app entera, no sólo el chat.
+// Por eso ahora en el mensaje guardado va la CLAVE del ajuste (un string) y
+// el ícono se resuelve recién al dibujar. Nada que no sobreviva a JSON entra
+// en algo que se persiste.
 const SETTINGS_FIELD_META = {
-  reminderEnabled: { icon: <Bell size={12} />, label: "Recordatorio diario", format: (v) => (v ? "Activado" : "Desactivado") },
-  reminderTime: { icon: <Clock size={12} />, label: "Hora del recordatorio", format: (v) => v },
-  weeklyRecapEnabled: { icon: <Calendar size={12} />, label: "Resumen semanal", format: (v) => (v ? "Activado" : "Desactivado") },
-  weightUnit: { icon: <Percent size={12} />, label: "Unidad de peso", format: (v) => (v === "lbs" ? "Libras (lbs)" : "Kilos (kg)") },
-  theme: { icon: <Sun size={12} />, label: "Tema", format: (v) => (v === "light" ? "Claro" : "Oscuro") },
-  alertType: { icon: <Bell size={12} />, label: "Aviso de descanso", format: (v) => ({ sound: "Sonido", vibration: "Vibración", both: "Sonido y vibración" }[v] || v) },
-  restLong: { icon: <Timer size={12} />, label: "Descanso largo", format: (v) => `${v}s` },
-  restShort: { icon: <Timer size={12} />, label: "Descanso corto", format: (v) => `${v}s` },
-  autoStartRestTimer: { icon: <Play size={12} />, label: "Auto-iniciar descanso", format: (v) => (v ? "Activado" : "Desactivado") },
-  deloadEnabled: { icon: <Zap size={12} />, label: "Semana de descarga", format: (v) => (v ? "Activada" : "Desactivada") },
-  trainWeeks: { icon: <Calendar size={12} />, label: "Semanas de entrenamiento", format: (v) => `${v}` },
-  deloadWeeks: { icon: <Calendar size={12} />, label: "Semanas de descarga", format: (v) => `${v}` },
-  deloadPct: { icon: <Percent size={12} />, label: "Carga en descarga", format: (v) => `${Math.round(v * 100)}%` },
-  deloadSetDivisor: { icon: <Layers size={12} />, label: "Series en descarga", format: (v) => `÷${v}` },
-  showRpe: { icon: <Eye size={12} />, label: "Mostrar RPE", format: (v) => (v ? "Sí" : "No") },
-  rpeDisplayMode: { icon: <Eye size={12} />, label: "Modo de esfuerzo", format: (v) => (v === "rir" ? "RIR" : "RPE") },
-  showWarmup: { icon: <Flame size={12} />, label: "Aproximaciones", format: (v) => (v ? "Sí" : "No") },
-  show1RMPercent: { icon: <Percent size={12} />, label: "% de 1RM", format: (v) => (v ? "Sí" : "No") },
-  showCoaching: { icon: <Sparkles size={12} />, label: "Consejos técnicos", format: (v) => (v ? "Sí" : "No") },
-  showExerciseNote: { icon: <StickyNote size={12} />, label: "Nota del ejercicio", format: (v) => (v ? "Sí" : "No") },
-  showPersonalNote: { icon: <StickyNote size={12} />, label: "Nota personal", format: (v) => (v ? "Sí" : "No") },
-  showStagnation: { icon: <AlertTriangle size={12} />, label: "Aviso de estancamiento", format: (v) => (v ? "Sí" : "No") },
-  showProgressionSuggestion: { icon: <TrendingUp size={12} />, label: "Sugerencia de progresión", format: (v) => (v ? "Sí" : "No") },
-  showLastSession: { icon: <History size={12} />, label: "Qué hiciste la vez pasada", format: (v) => (v ? "Sí" : "No") },
-  compactSetRow: { icon: <Layers size={12} />, label: "Filas compactas", format: (v) => (v ? "Sí" : "No") },
+  reminderEnabled: { icon: Bell, label: "Recordatorio diario", format: (v) => (v ? "Activado" : "Desactivado") },
+  reminderTime: { icon: Clock, label: "Hora del recordatorio", format: (v) => v },
+  weeklyRecapEnabled: { icon: Calendar, label: "Resumen semanal", format: (v) => (v ? "Activado" : "Desactivado") },
+  weightUnit: { icon: Percent, label: "Unidad de peso", format: (v) => (v === "lbs" ? "Libras (lbs)" : "Kilos (kg)") },
+  theme: { icon: Sun, label: "Tema", format: (v) => (v === "light" ? "Claro" : "Oscuro") },
+  alertType: { icon: Bell, label: "Aviso de descanso", format: (v) => ({ sound: "Sonido", vibration: "Vibración", both: "Sonido y vibración" }[v] || v) },
+  restLong: { icon: Timer, label: "Descanso largo", format: (v) => `${v}s` },
+  restShort: { icon: Timer, label: "Descanso corto", format: (v) => `${v}s` },
+  autoStartRestTimer: { icon: Play, label: "Auto-iniciar descanso", format: (v) => (v ? "Activado" : "Desactivado") },
+  deloadEnabled: { icon: Zap, label: "Semana de descarga", format: (v) => (v ? "Activada" : "Desactivada") },
+  trainWeeks: { icon: Calendar, label: "Semanas de entrenamiento", format: (v) => `${v}` },
+  deloadWeeks: { icon: Calendar, label: "Semanas de descarga", format: (v) => `${v}` },
+  deloadPct: { icon: Percent, label: "Carga en descarga", format: (v) => `${Math.round(v * 100)}%` },
+  deloadSetDivisor: { icon: Layers, label: "Series en descarga", format: (v) => `÷${v}` },
+  showRpe: { icon: Eye, label: "Mostrar RPE", format: (v) => (v ? "Sí" : "No") },
+  rpeDisplayMode: { icon: Eye, label: "Modo de esfuerzo", format: (v) => (v === "rir" ? "RIR" : "RPE") },
+  showWarmup: { icon: Flame, label: "Aproximaciones", format: (v) => (v ? "Sí" : "No") },
+  show1RMPercent: { icon: Percent, label: "% de 1RM", format: (v) => (v ? "Sí" : "No") },
+  showCoaching: { icon: Sparkles, label: "Consejos técnicos", format: (v) => (v ? "Sí" : "No") },
+  showExerciseNote: { icon: StickyNote, label: "Nota del ejercicio", format: (v) => (v ? "Sí" : "No") },
+  showPersonalNote: { icon: StickyNote, label: "Nota personal", format: (v) => (v ? "Sí" : "No") },
+  showStagnation: { icon: AlertTriangle, label: "Aviso de estancamiento", format: (v) => (v ? "Sí" : "No") },
+  showProgressionSuggestion: { icon: TrendingUp, label: "Sugerencia de progresión", format: (v) => (v ? "Sí" : "No") },
+  showLastSession: { icon: History, label: "Qué hiciste la vez pasada", format: (v) => (v ? "Sí" : "No") },
+  compactSetRow: { icon: Layers, label: "Filas compactas", format: (v) => (v ? "Sí" : "No") },
 };
 function buildSettingsChanges(action) {
   const changes = [];
@@ -19054,20 +19067,28 @@ function buildSettingsChanges(action) {
     if (k === "type" || v == null) return;
     const meta = SETTINGS_FIELD_META[k];
     if (!meta) return;
-    changes.push({ icon: meta.icon, label: meta.label, value: meta.format(v) });
+    // Sólo strings: esto se guarda con el mensaje y tiene que sobrevivir a
+    // JSON (ver el comentario de SETTINGS_FIELD_META).
+    changes.push({ campo: k, label: meta.label, value: meta.format(v) });
   });
   return changes;
 }
 function SettingsChangePreview({ changes }) {
   return (
     <div className="space-y-1.5">
-      {changes.map((c, i) => (
-        <div key={i} className="flex items-center gap-2.5 rounded-xl px-3 py-2" style={{ backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}>
-          <span className="w-6 h-6 rounded-lg bg-teal-500/15 border border-teal-500/25 flex items-center justify-center shrink-0 text-teal-400">{c.icon}</span>
-          <span className="flex-1 min-w-0 truncate text-[11px]" style={{ color: "var(--chip-text)" }}>{c.label}</span>
-          <span className="text-xs font-bold shrink-0" style={{ color: "var(--surface-2-text)" }}>{c.value}</span>
-        </div>
-      ))}
+      {changes.map((c, i) => {
+        // Las conversaciones guardadas ANTES del arreglo traen un c.icon roto
+        // y sin c.campo: se ignora el ícono viejo por completo y esas filas
+        // caen en el genérico en vez de tirar abajo la app.
+        const Icono = SETTINGS_FIELD_META[c.campo]?.icon || SlidersHorizontal;
+        return (
+          <div key={i} className="flex items-center gap-2.5 rounded-xl px-3 py-2" style={{ backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}>
+            <span className="w-6 h-6 rounded-lg bg-teal-500/15 border border-teal-500/25 flex items-center justify-center shrink-0 text-teal-400"><Icono size={12} /></span>
+            <span className="flex-1 min-w-0 truncate text-[11px]" style={{ color: "var(--chip-text)" }}>{c.label}</span>
+            <span className="text-xs font-bold shrink-0" style={{ color: "var(--surface-2-text)" }}>{c.value}</span>
+          </div>
+        );
+      })}
     </div>
   );
 }
