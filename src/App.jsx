@@ -2153,6 +2153,29 @@ const ANIMATION_CSS = `
 }
 .session-chip-ping { animation: sessionChipPing 1.8s cubic-bezier(0, 0, 0.2, 1) infinite; }
 
+/* Barra de sesión en curso, anclada arriba de la navegación de abajo.
+   La posición vive acá y no en una clase de Tailwind porque necesita env()
+   (el área segura del celular) y además cambia en escritorio, donde la
+   barra de navegación de abajo no existe: en un style inline no se podría
+   sobreescribir con lg:. 62px es el alto real de BottomBar. */
+.session-bar-dock {
+  position: fixed;
+  left: 0; right: 0;
+  z-index: 30;
+  bottom: calc(62px + env(safe-area-inset-bottom, 0px));
+}
+@media (min-width: 1024px) { .session-bar-dock { bottom: 18px; } }
+/* La barra de sesión se superpone con la barra de mensaje del chat, que se
+   dibuja en un portal colgado de <body> — por eso el hueco extra se declara
+   acá, sobre <html>, y no con una clase dentro del árbol de la app. */
+.hay-sesion { --chat-nav-gap: 9rem; }
+@media (min-width: 1024px) { .hay-sesion { --chat-nav-gap: 5.5rem; } }
+@keyframes sessionBarIn {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.session-bar-in { animation: sessionBarIn 0.34s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+
 /* Confeti del resumen de fin de sesión: cae de arriba girando y se desvanece */
 @keyframes confettiFall {
   0%   { transform: translateY(-20px) rotate(0deg); opacity: 0; }
@@ -2179,7 +2202,7 @@ const ANIMATION_CSS = `
   .badge-pop, .superset-draw, .dot-bounce, .msg-in, .wake-up, .day-mark,
   .breathe, .hist-enter, .streak-jump, .tab-slide-right, .tab-slide-left,
   .timer-hop, .session-start-pop, .session-start-text, .session-chip-in,
-  .cell-pop, .sparkle-spin, .session-chip-ping { animation: none !important; }
+  .cell-pop, .sparkle-spin, .session-chip-ping, .session-bar-in { animation: none !important; }
   .confetti-piece { display: none !important; }
   /* El fade del overlay se mantiene: es lo que lo hace desaparecer solo */
   .theme-fade, .theme-fade * { transition: none !important; }
@@ -6816,14 +6839,45 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
 /* ============================================================================
    EXERCISE CARD
 ============================================================================ */
-function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts, resetKey = 0, settings = DEFAULT_SETTINGS, forceOpen = false, onDisableAutoShowPrShare, hasActiveSession = true, hideTimer = false, onUpdateSettings = null, onSetPlanPaused = null, routineHasPlan = false, sex = null, age = null, weekInCycle = null, dayKey = null, nextRestTimerId = null, nextRestSeconds = null }) {
+function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts, resetKey = 0, settings = DEFAULT_SETTINGS, forceOpen = false, autoCollapse = false, scrollAlAbrir = false, onDisableAutoShowPrShare, hasActiveSession = true, hideTimer = false, onUpdateSettings = null, onSetPlanPaused = null, routineHasPlan = false, sex = null, age = null, weekInCycle = null, dayKey = null, nextRestTimerId = null, nextRestSeconds = null }) {
   const [open, setOpen] = useState(false);
   const [showWarmup, setShowWarmup] = useState(false);
-  // Nota personal del ejercicio (persiste en el perfil → sincroniza)
-  // forceOpen se usa solo desde las demos del tutorial guiado, para abrir la
-  // tarjeta automáticamente cuando el paso explica algo de adentro (reps/kg,
-  // RPE, descanso, video). No afecta el comportamiento normal de la app.
-  useEffect(() => { if (forceOpen) setOpen(true); }, [forceOpen]);
+  const cardRef = useRef(null);
+  // forceOpen marca "este es el ejercicio en el que estás": lo usan las demos
+  // del tutorial guiado y, durante una sesión, RoutineView para abrir sola la
+  // tarjeta del ejercicio que toca (ver focoGrupoIdx). Sólo ABRE — nunca
+  // fuerza el cierre — así que si la cerrás a mano se queda cerrada.
+  // autoCollapse es el otro lado de lo mismo: el ejercicio que ya termináste
+  // se pliega cuando el foco pasa al siguiente, así la lista no crece sin
+  // límite a medida que avanzás. Las dos señales viven en un solo efecto y
+  // una sola llamada a setOpen: cuando ninguna aplica no se toca nada, así
+  // que abrir o cerrar a mano gana y se queda como lo dejaste.
+  useEffect(() => {
+    if (!forceOpen && !autoCollapse) return;
+    setOpen(forceOpen);
+  }, [forceOpen, autoCollapse]);
+  // ...y la tarjeta que se abre sola se trae a la pantalla. Sin esto, abrir
+  // el cuarto ejercicio de un día largo no servía de nada: quedaba abierto
+  // seiscientos píxeles más abajo. El retardo deja que el despliegue acomode
+  // la altura primero, así el scroll cae donde tiene que caer.
+  useEffect(() => {
+    if (!forceOpen || !scrollAlAbrir) return;
+    const id = setTimeout(() => {
+      const el = cardRef.current;
+      if (!el || typeof window === "undefined") return;
+      try {
+        // El encabezado es sticky: sin descontarlo, el nombre del ejercicio
+        // queda tapado justo por la franja que dice en qué pestaña estás.
+        // Se mide en vez de hardcodearse porque la app tiene control de
+        // tamaño de letra y esa franja crece con él.
+        const header = document.querySelector("header");
+        const alto = header ? header.getBoundingClientRect().height : 0;
+        const y = el.getBoundingClientRect().top + window.scrollY - alto - 10;
+        window.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
+      } catch { /* sin scroll suave no pasa nada grave */ }
+    }, 280);
+    return () => clearTimeout(id);
+  }, [forceOpen, scrollAlAbrir]);
   const hasHeavy = exercise.sets.some((s) => isHeavyRepRange(s.repRange));
   const setsToShow = exercise.sets;
   // Id del cronómetro que corresponde a ESTE ejercicio — null si es cardio o
@@ -6897,7 +6951,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
   // pregunta "¿qué cambio?" ya está contestada.
   const siguiendoPlan = !!planInfo && !planInfo.paused && !planOffByMode;
   return (
-    <div className="stagger-item smooth-card bg-slate-900/50 border border-slate-800/50 rounded-2xl overflow-hidden backdrop-blur-sm shadow-md shadow-black/20 transition-shadow hover:shadow-lg hover:shadow-black/30">
+    <div ref={cardRef} className="stagger-item smooth-card bg-slate-900/50 border border-slate-800/50 rounded-2xl overflow-hidden backdrop-blur-sm shadow-md shadow-black/20 transition-shadow hover:shadow-lg hover:shadow-black/30">
       <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center justify-between px-4 py-4 hover:bg-slate-800/30 active:bg-slate-800/50 transition text-left">
         <div className="flex items-center gap-3">
           <div className="w-2 h-8 rounded-full shrink-0" style={{ backgroundColor: accent, boxShadow: `0 0 10px -2px ${accent}` }} />
@@ -7740,7 +7794,7 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_
   );
 }
 
-function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, weekSchedule, activeSession, onStartSession, onEndSession, onCancelSession, onDisableAutoShowPrShare, onUpdateSettings = null, onSetPlanPaused = null, onRemovePlan = null, onGoToRoutines = null, onGoToSchedule = null, onGoToFieldSettings = null, onGoToDescarga = null, todaySessionDayKey = null, sex = null, age = null, activeRoutineDef = null, onApplyOwnProgression = null, goToDaySignal = { id: null, n: 0 }, onSignalConsumed = null }) {
+function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, weekSchedule, activeSession, onStartSession, onCancelSession, onDisableAutoShowPrShare, onUpdateSettings = null, onSetPlanPaused = null, onRemovePlan = null, onGoToRoutines = null, onGoToSchedule = null, onGoToFieldSettings = null, onGoToDescarga = null, todaySessionDayKey = null, sex = null, age = null, activeRoutineDef = null, onApplyOwnProgression = null, goToDaySignal = { id: null, n: 0 }, onSignalConsumed = null }) {
   // Semana actual del ciclo — sólo hace falta el número (weekInCycle), para
   // que SetRow sepa si hay una meta cargada (modo "planned", ver
   // getPlannedTargetForWeek) para ESTA semana puntual.
@@ -7869,6 +7923,18 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
   // en días que no entrenaste, y el "resetear" del día activo no lo sacaba.
   const rawPct = totalSets ? Math.round((doneToday / totalSets) * 100) : 0;
   const pct = (todaySessionDayKey && todaySessionDayKey !== activeDay) ? 0 : rawPct;
+
+  // ¿En qué ejercicio estás? El primer grupo que todavía tiene series sin
+  // registrar hoy. Es el eje del auto-abrir: esa tarjeta se despliega sola,
+  // se trae a la pantalla, y al completarla el foco pasa a la siguiente.
+  // Vale -1 sin sesión en curso: fuera de una sesión nadie te lleva de la
+  // mano, estás mirando la rutina, no entrenando.
+  const focoGrupoIdx = useMemo(() => {
+    if (!sessionForThisDay) return -1;
+    const grupos = groupExercisesIntoSupersets(day.exercises);
+    const completo = (g) => g.every((ex) => ex.sets.every((_, i) => (logs[`${ex.id}_${i}`] || []).some((h) => h.date === today && !h.deload)));
+    return grupos.findIndex((g) => !completo(g));
+  }, [sessionForThisDay, day.exercises, logs, today]);
 
   const handleResetDay = () => {
     const newLogs = { ...logs };
@@ -8214,12 +8280,20 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             const entreActivo = settings.restBetweenExercises === true && !!sessionForThisDay;
             const nextRestTimerId = entreActivo ? timerIdDe(siguiente) : null;
             const nextRestSeconds = settings.restBetweenExercisesSec ?? 180;
-            // Se abre sola la tarjeta del grupo que sigue al que acabás de
-            // terminar, mientras a ésta le falte trabajo.
-            const abrirSola = entreActivo && gi > 0 && estaCompleto(groups[gi - 1]) && !estaCompleto(group);
+            // El ejercicio en el que estás: se abre solo y se trae a la
+            // pantalla. Antes esto dependía de tener prendido el descanso
+            // ENTRE ejercicios (una opción que viene apagada), y encima sólo
+            // se aplicaba del segundo en adelante: al iniciar una sesión no
+            // se abría nada y había que ir tocando tarjeta por tarjeta. Son
+            // dos cosas distintas — una es un cronómetro, la otra es saber
+            // dónde estás — así que el auto-abrir ahora vale durante toda la
+            // sesión, desde el primer ejercicio.
+            const esFoco = gi === focoGrupoIdx;
+            // Y el que dejaste atrás terminado se pliega.
+            const plegar = focoGrupoIdx >= 0 && gi < focoGrupoIdx && estaCompleto(group);
             if (group.length === 1) {
               const ex = group[0];
-              return <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onSetPlanPaused={onSetPlanPaused} routineHasPlan={hasAnyPlan} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} sex={sex} age={age} weekInCycle={weekInCycle} dayKey={activeDay} forceOpen={abrirSola} nextRestTimerId={nextRestTimerId} nextRestSeconds={nextRestSeconds} />;
+              return <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onSetPlanPaused={onSetPlanPaused} routineHasPlan={hasAnyPlan} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} sex={sex} age={age} weekInCycle={weekInCycle} dayKey={activeDay} forceOpen={esFoco} autoCollapse={plegar} scrollAlAbrir nextRestTimerId={nextRestTimerId} nextRestSeconds={nextRestSeconds} />;
             }
             // Superserie: varios ejercicios encadenados comparten un solo
             // cronómetro al final del grupo, en vez de uno por ejercicio —
@@ -8229,7 +8303,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             return (
               <div key={`${activeDay}:${group.map((e) => e.id).join("-")}`} className="rounded-2xl border p-2.5 space-y-2.5" style={{ borderColor: tint(day.color, "50"), backgroundColor: tint(day.color, "06") }}>
                 <div className="flex items-center gap-1.5 px-1"><Link size={11} style={{ color: day.color }} /><span className="text-[10px] font-black uppercase tracking-wider" style={{ color: day.color }}>Superserie · {group.length} ejercicios</span></div>
-                {group.map((ex, xi) => <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onSetPlanPaused={onSetPlanPaused} routineHasPlan={hasAnyPlan} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} hideTimer sex={sex} age={age} weekInCycle={weekInCycle} dayKey={activeDay} forceOpen={abrirSola} nextRestTimerId={xi === group.length - 1 ? nextRestTimerId : null} nextRestSeconds={nextRestSeconds} />)}
+                {group.map((ex, xi) => <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onSetPlanPaused={onSetPlanPaused} routineHasPlan={hasAnyPlan} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} hideTimer sex={sex} age={age} weekInCycle={weekInCycle} dayKey={activeDay} forceOpen={esFoco} autoCollapse={plegar} scrollAlAbrir={xi === 0} nextRestTimerId={xi === group.length - 1 ? nextRestTimerId : null} nextRestSeconds={nextRestSeconds} />)}
                 <div className="px-1"><RestTimer seconds={hasHeavyGroup ? settings.restLong : settings.restShort} accent={day.color} alertType={settings.alertType} timerId={`${activeDay}:grp_${group.map((g) => g.id).join("_")}`} exerciseName={group.map((g) => g.name).filter(Boolean).join(" + ")} /></div>
                 <p className="text-[10px] text-slate-600 px-1">Descansá recién después de completar los {group.length} ejercicios. Ese es el cronómetro de arriba.</p>
               </div>
@@ -8239,14 +8313,11 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
         </div>
       </div>
 
-      {activeSession && (
-        <div>
-          <button onClick={onEndSession} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98] shadow-lg" style={{ backgroundColor: day.color, boxShadow: `0 10px 24px -8px ${tint(day.color, "88")}` }}>
-            <Check size={15} /> Finalizar sesión
-          </button>
-          <p className="text-center text-[10px] text-slate-600 mt-2">Se guarda como entrenamiento de hoy y se limpia lo que tenías escrito sin guardar. Alimenta tu racha, calendario y gráficas.</p>
-        </div>
-      )}
+      {/* "Finalizar sesión" ya no vive acá abajo: es la barra fija de abajo
+          (ver ActiveSessionBar, al nivel de App), que además lleva el
+          cronómetro y el avance. Repetirlo al pie daría dos botones para lo
+          mismo. El aire para que la última tarjeta no quede tapada lo pone
+          <main>, que lo necesita en todas las pestañas, no sólo en esta. */}
 
       {showPlanificadorIA && activeRoutineDef && onApplyOwnProgression && (
         <PlanificadorIAModal
@@ -9118,7 +9189,10 @@ function DeloadView({ logs, setLogs, settings = DEFAULT_SETTINGS, deloadProgress
         <p className="text-[11px] text-slate-500 leading-relaxed">Baja el volumen para recuperarte: no busques marcas nuevas esta semana.</p>
       </div>
 
-      {(hasAnyDoneToday || activeSession) && (
+      {/* Con una sesión de descarga en curso el botón lo pone la barra fija
+          de abajo (ActiveSessionBar): acá queda sólo para el caso de haber
+          tildado series SIN iniciar sesión, que la barra no cubre. */}
+      {hasAnyDoneToday && !activeSession && (
         <div>
           <button onClick={handleFinishSession} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl !text-white text-sm font-bold transition-all active:scale-[0.98] shadow-lg" style={{ backgroundColor: "#A855F7", boxShadow: "0 10px 24px -8px #A855F788" }}>
             <Check size={15} /> Finalizar sesión de descarga
@@ -22205,6 +22279,126 @@ function HeaderAvatar({ profileName, onClick }) {
   );
 }
 
+/* ============================================================================
+   BARRA DE SESIÓN EN CURSO — fija arriba de la navegación de abajo.
+
+   Pedido: "que el botón de finalizar sesión quede como fijo". Antes vivía al
+   PIE de la lista de ejercicios: para terminar una sesión de cinco
+   ejercicios había que scrollear la pantalla entera, y el único rastro de
+   que estabas entrenando era un chip chico en el encabezado, que también se
+   iba con el scroll.
+
+   Vive al nivel de App (no dentro de RoutineView) por dos razones:
+    1. `<main>` se anima con transform al cambiar de pestaña, y un ancestro
+       con transform rompe position:fixed — la barra quedaría a la deriva.
+    2. Así la sesión te sigue por toda la app: desde Progreso o el chat
+       también ves el cronómetro corriendo y podés volver de un toque.
+
+   "Finalizar" pide confirmación en el lugar en vez de abrir un modal: ahora
+   que el botón está siempre a un toque de distancia, un roce accidental
+   cerraría la sesión y borraría lo que tenías escrito sin guardar. La
+   confirmación se cancela sola a los 5s para no quedar trabada.
+============================================================================ */
+function ActiveSessionBar({ startedAt, dayLabel, color, done, total, conProgreso, enRutina, onEnd, onGoToRoutine }) {
+  // El tiempo transcurrido se guarda en estado y lo actualiza el intervalo.
+  // Leer el reloj durante el render es impuro (y el linter de React Compiler
+  // lo rechaza): el primer valor llega en el siguiente turno del event loop
+  // — imperceptible, y así el render no depende de la hora.
+  const [ms, setMs] = useState(0);
+  const [confirmando, setConfirmando] = useState(false);
+  useEffect(() => {
+    const calcular = () => setMs(Math.max(0, Date.now() - new Date(startedAt).getTime()));
+    const id = setInterval(calcular, 1000);
+    const primero = setTimeout(calcular, 0);
+    return () => { clearInterval(id); clearTimeout(primero); };
+  }, [startedAt]);
+  useEffect(() => {
+    if (!confirmando) return;
+    const id = setTimeout(() => setConfirmando(false), 5000);
+    return () => clearTimeout(id);
+  }, [confirmando]);
+
+  const hs = Math.floor(ms / 3600000), min = Math.floor(ms / 60000) % 60, seg = Math.floor(ms / 1000) % 60;
+  // El reloj corre al segundo a propósito: es la señal de que la sesión está
+  // viva. Pasada la hora se agrega el campo de horas en vez de seguir
+  // contando minutos hasta 90.
+  const reloj = hs > 0
+    ? `${hs}:${String(min).padStart(2, "0")}:${String(seg).padStart(2, "0")}`
+    : `${min}:${String(seg).padStart(2, "0")}`;
+  const pct = total ? Math.round((done / total) * 100) : 0;
+  const completo = conProgreso && total > 0 && done >= total;
+
+  return (
+    <div className="session-bar-dock px-3 pointer-events-none">
+      <div className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto pointer-events-auto session-bar-in">
+        <div
+          className="rounded-2xl backdrop-blur-xl shadow-2xl shadow-black/50 overflow-hidden"
+          style={{ backgroundColor: "rgba(10,10,15,0.92)", border: `1px solid ${tint(color, "55")}` }}
+        >
+          {confirmando ? (
+            <div className="flex items-center gap-2 px-3 py-2.5">
+              <div className="flex-1 min-w-0">
+                <p className="text-[12px] font-bold text-white leading-tight">¿Finalizar la sesión?</p>
+                <p className="text-[10px] text-slate-500 leading-tight mt-0.5">
+                  {conProgreso && total > 0 && done < total
+                    ? `Te quedan ${total - done} de ${total} series. `
+                    : ""}
+                  Se guarda en tu historial y se borra lo que escribiste sin guardar.
+                </p>
+              </div>
+              <button onClick={() => setConfirmando(false)} className="px-3 py-2 rounded-xl bg-slate-800 text-slate-400 text-[11px] font-bold shrink-0 transition active:scale-95">No</button>
+              <button onClick={onEnd} className="px-3 py-2 rounded-xl !text-white text-[11px] font-black shrink-0 transition active:scale-95" style={{ backgroundColor: color }}>Sí, finalizar</button>
+            </div>
+          ) : (
+            <div className="flex items-stretch">
+              {/* Cuerpo: toca para volver a Rutina (si no estás ahí ya) */}
+              <button
+                onClick={enRutina ? undefined : onGoToRoutine}
+                disabled={enRutina}
+                aria-label={enRutina ? undefined : "Volver a tu entrenamiento"}
+                className="flex-1 min-w-0 flex items-center gap-2.5 pl-3 pr-2 py-2.5 text-left transition active:scale-[0.99] disabled:active:scale-100"
+              >
+                <span className="relative flex h-2.5 w-2.5 shrink-0">
+                  <span className="absolute inline-flex h-full w-full rounded-full session-chip-ping" style={{ backgroundColor: color }} />
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5" style={{ backgroundColor: color }} />
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-[13px] font-black tabular-nums text-white shrink-0">{reloj}</span>
+                    {dayLabel && <span className="text-[10px] font-bold uppercase tracking-wider truncate" style={{ color: tint(color, "cc") }}>{dayLabel}</span>}
+                    {!enRutina && <ChevronDown size={12} className="text-slate-600 shrink-0 -rotate-90" />}
+                  </div>
+                  {conProgreso && total > 0 ? (
+                    <div className="flex items-center gap-2 mt-1">
+                      <div className="flex-1 h-1 rounded-full overflow-hidden bg-slate-800">
+                        <div className="h-full rounded-full transition-all duration-500 ease-out" style={{ width: `${pct}%`, backgroundColor: color }} />
+                      </div>
+                      <span className="text-[9.5px] font-bold tabular-nums shrink-0" style={{ color: completo ? color : "#64748b" }}>{done}/{total}</span>
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-slate-500 leading-tight mt-0.5">Sesión en curso</p>
+                  )}
+                </div>
+              </button>
+              {/* Finalizar: cuando ya completaste todo pasa a relleno pleno —
+                  es el único paso que te queda. */}
+              <button
+                onClick={() => setConfirmando(true)}
+                className="shrink-0 flex items-center gap-1.5 px-3.5 my-1.5 mr-1.5 rounded-xl text-[11.5px] font-black transition active:scale-95"
+                style={completo
+                  ? { backgroundColor: color, color: "#fff" }
+                  : { backgroundColor: tint(color, "1f"), color, border: `1px solid ${tint(color, "45")}` }}
+              >
+                <Check size={13} /> Finalizar
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function BottomBar({ tab, setTab }) {
   return (
     <div className="lg:hidden fixed bottom-0 left-0 right-0 z-20 bg-slate-950/95 backdrop-blur-xl border-t border-slate-800/50" style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
@@ -23075,6 +23269,34 @@ export default function App() {
   const sessionDayLabel = _sesDayKey
     ? (ROUTINE?.[_sesDayKey]?.label || activeRoutineDef?.days?.[_sesDayKey]?.label || null)
     : null;
+  // Progreso de la sesión en curso, para la barra fija de abajo. Mismo
+  // criterio de "serie hecha hoy" que usa RoutineView (fecha de hoy y sin
+  // contar marcas de descarga). En una sesión de descarga el avance no se
+  // mide por estas series — esa vista lleva su propio progreso — así que
+  // ahí la barra muestra el cronómetro sin la barrita.
+  // ¿Hay una sesión en curso? Decide si se dibuja la barra fija y, con ella,
+  // cuánto aire necesita el contenido para no quedar tapado — en todas las
+  // pestañas, no sólo en Rutina, porque la barra te sigue por toda la app.
+  const haySesionActiva = !!profile?.activeSession?.startedAt;
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const raiz = document.documentElement;
+    raiz.classList.toggle("hay-sesion", haySesionActiva);
+    return () => raiz.classList.remove("hay-sesion");
+  }, [haySesionActiva]);
+  const sessionProgress = useMemo(() => {
+    const dk = profile?.activeSession?.dayKey;
+    const dia = dk ? ROUTINE?.[dk] : null;
+    if (!dia?.exercises?.length) return { done: 0, total: 0 };
+    const hoy = todayStr();
+    let done = 0, total = 0;
+    dia.exercises.forEach((ex) => (ex.sets || []).forEach((_, i) => {
+      total++;
+      if ((logs[`${ex.id}_${i}`] || []).some((h) => h.date === hoy && !h.deload)) done++;
+    }));
+    return { done, total };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [logs, profile?.activeSession?.dayKey, activeRoutineDef]);
   const needsRoutinePick = !!profile && !profile.activeRoutineId;
   // Cronograma semanal de la rutina activa (lunes a domingo → día de rutina
   // o descanso) — ver getRoutineWeekSchedule más arriba en el archivo.
@@ -23502,6 +23724,12 @@ export default function App() {
     if (deload) activeSession.deload = true;
     const np = { ...profiles, [activeProfile]: { ...profiles[activeProfile], activeSession } };
     setProfiles(np); saveProfiles(np);
+    // Una sesión se puede arrancar desde el chat ("arrancá mi entrenamiento")
+    // o desde la propuesta de un entrenador, sin estar en Rutina. Antes la
+    // sesión quedaba corriendo en una pestaña que no estás mirando; ahora la
+    // app te lleva a donde vas a entrenar, que es lo único que vas a hacer
+    // los próximos cuarenta minutos.
+    if (tab !== "rutina" && tab !== "descarga") setTab(deload ? "descarga" : "rutina");
     setSessionStarted(true); // overlay "¡A entrenar!"
     haptic([0, 40, 60, 40]);
   };
@@ -23810,7 +24038,7 @@ export default function App() {
             )}
           </div>
         </header>
-        <main className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto px-4 py-4 pb-28 lg:pb-10 space-y-4" style={{ paddingBottom: "calc(7rem + env(safe-area-inset-bottom, 0px))" }}>
+        <main className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto px-4 py-4 pb-28 lg:pb-10 space-y-4" style={{ paddingBottom: `calc(${haySesionActiva ? "11.5rem" : "7rem"} + env(safe-area-inset-bottom, 0px))` }}>
           <div key={tab} className={tabSlideClass}>
             {tab === "rutinas" && <RoutinesView openScheduleSignal={openSectionSignal.id === "week-schedule" ? openSectionSignal.n : 0} openEditorSignal={openSectionSignal.id === "routine-editor" ? openSectionSignal.n : 0} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleDeleteRoutine} onUpdateProfile={handleUpdateProfile} onGoToDay={(dayKey) => goToSection("rutina", "go-to-day", dayKey)} />}
             {tab === "rutina" && !showPinnedDeload && <OnboardingTasksCard profile={profile} cycleStart={cycleStart} logs={logs} onGoToProfile={() => setTab("perfil")} onOpenFieldSettings={() => setShowFieldIntro(true)} onDone={() => handleUpdateProfile({ onboardingDone: true })} />}
@@ -23821,7 +24049,7 @@ export default function App() {
                 que quedó adentro de RoutineView ahora sirve para volver a
                 fijarla si la cerraste. */}
             {tab === "rutina" && showPinnedDeload && <DeloadView logs={logs} setLogs={setLogs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} activeSession={profile?.activeSession?.deload ? profile.activeSession : null} onStartSession={handleStartSession} onCancelSession={handleCancelSession} weekSchedule={weekSchedule} onClose={() => setDeloadDismissed(true)} cycleStart={cycleStart} />}
-            {tab === "rutina" && !showPinnedDeload && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToRoutines={() => setTab("rutinas")} onGoToSchedule={() => goToSection("rutinas", "week-schedule")} onGoToFieldSettings={() => goToSection("perfil", "field-settings-section")} onGoToDescarga={() => (isDeloadWeek ? setDeloadDismissed(false) : setTab("descarga"))} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onEndSession={handleEndSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} todaySessionDayKey={(profile?.trainingSessions || []).find((ts) => ts.date === todayStr())?.dayKey || profile?.activeSession?.dayKey || null} sex={profile?.sex} age={profile?.age} activeRoutineDef={activeRoutineDef} onApplyOwnProgression={handleApplyOwnProgression} onSetPlanPaused={handleSetPlanPaused} onRemovePlan={handleRemovePlan} goToDaySignal={openSectionSignal.id === "go-to-day" ? openSectionSignal : { id: null, n: 0 }} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} />}
+            {tab === "rutina" && !showPinnedDeload && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToRoutines={() => setTab("rutinas")} onGoToSchedule={() => goToSection("rutinas", "week-schedule")} onGoToFieldSettings={() => goToSection("perfil", "field-settings-section")} onGoToDescarga={() => (isDeloadWeek ? setDeloadDismissed(false) : setTab("descarga"))} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} todaySessionDayKey={(profile?.trainingSessions || []).find((ts) => ts.date === todayStr())?.dayKey || profile?.activeSession?.dayKey || null} sex={profile?.sex} age={profile?.age} activeRoutineDef={activeRoutineDef} onApplyOwnProgression={handleApplyOwnProgression} onSetPlanPaused={handleSetPlanPaused} onRemovePlan={handleRemovePlan} goToDaySignal={openSectionSignal.id === "go-to-day" ? openSectionSignal : { id: null, n: 0 }} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} />}
             {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} onGoToRoutines={() => goToSection("rutinas", "routine-editor")} weekSchedule={weekSchedule} sex={profile?.sex} age={profile?.age} onGoToDeload={() => { if (isDeloadWeek) { setDeloadDismissed(false); setTab("rutina"); } else { setTab("descarga"); } }} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} />}
             {tab === "descarga" && <DeloadView logs={logs} setLogs={setLogs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} activeSession={profile?.activeSession?.deload ? profile.activeSession : null} onStartSession={handleStartSession} onCancelSession={handleCancelSession} weekSchedule={weekSchedule} onClose={() => { setDeloadDismissed(true); setTab("rutina"); }} cycleStart={cycleStart} />}
             {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} setLogs={setLogs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} conversations={aiConversations} activeConversationId={activeAiConversationId} onNewConversation={handleNewAiConversation} onSwitchConversation={handleSwitchAiConversation} onDeleteConversation={handleDeleteAiConversation} onRenameConversation={handleRenameAiConversation} settings={getProfileSettings(profile)} cycleStart={cycleStart} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} onDeleteRoutine={handleDeleteRoutine} onNavigate={setTab} onStartSession={handleStartSession} onEndSession={handleEndSession} />}
@@ -23831,6 +24059,22 @@ export default function App() {
         </main>
       </div>
       <BottomBar tab={tab} setTab={setTab} />
+      {/* Sesión en curso: cronómetro, avance y "Finalizar" siempre a mano,
+          en cualquier pestaña. El overlay de arranque la taparía con su
+          propia animación, así que entra cuando ese se va. */}
+      {haySesionActiva && !sessionStarted && (
+        <ActiveSessionBar
+          startedAt={profile.activeSession.startedAt}
+          dayLabel={sessionDayLabel}
+          color={sessionTintColor || "#14B8A6"}
+          done={sessionProgress.done}
+          total={sessionProgress.total}
+          conProgreso={!profile.activeSession.deload}
+          enRutina={tab === "rutina" || tab === "descarga"}
+          onGoToRoutine={() => setTab(profile.activeSession.deload ? "descarga" : "rutina")}
+          onEnd={() => (profile.activeSession.deload ? handleFinishDeloadSession(profile.activeSession.dayKey) : handleEndSession())}
+        />
+      )}
       {sessionStarted && <SessionStartOverlay onDone={() => setSessionStarted(false)} />}
       {sessionSummary && <SessionSummaryModal resumen={sessionSummary} onClose={() => setSessionSummary(null)} />}
       {weeklyRecap && <WeeklyRecapModal data={weeklyRecap} onClose={() => setWeeklyRecap(null)} />}
