@@ -13,7 +13,7 @@ import {
   Sparkles, Layers, SlidersHorizontal, UserCog,
   Share2, Download, Link2, Copy, BellOff, Send, Mic, Ruler, Camera, Link, Footprints, Star, SquarePlay, Upload, RefreshCw, Timer, Percent, Users,
   MessageCircle, Search, UserPlus, UserCheck, UserMinus, AtSign, GraduationCap, ClipboardCheck, Swords, Medal, QrCode, ArrowUpDown,
-  Phone, Minus, Crown,
+  Phone, Minus, Crown, Maximize2,
 } from "lucide-react";
 import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signOut, onAuthStateChanged } from "firebase/auth";
 import { Capacitor, registerPlugin } from "@capacitor/core";
@@ -676,6 +676,7 @@ const DEFAULT_SETTINGS = {
   // Cronómetro extra AL TERMINAR un ejercicio, antes de pasar al siguiente
   // (opción, apagada por default). Distinto del descanso entre series.
   restBetweenExercises: false, restBetweenExercisesSec: 180,
+  fullscreenRest: true,         // el descanso toma la pantalla mientras entrenás
   trainWeeks: TRAIN_WEEKS, deloadWeeks: DELOAD_WEEKS, deloadPct: 0.75, deloadSetDivisor: 2, deloadEnabled: true,
   theme: "dark", textScale: 1, smallTextScale: 1, autoShowPrShare: true, bodyWeightKg: 0, muscleRankMode: "general", allowZoom: false,
   weightUnit: "kg", // "kg" o "lbs"
@@ -2176,6 +2177,38 @@ const ANIMATION_CSS = `
 }
 .session-bar-in { animation: sessionBarIn 0.34s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
 
+/* ── DESCANSO A PANTALLA COMPLETA ──────────────────────────────────────────
+   El anillo "respira" a doce ciclos por minuto (5s cada uno): es el ritmo
+   que se usa para bajar pulsaciones, así que no es decoración — seguírlo
+   con la respiración hace el trabajo que el descanso tiene que hacer. */
+@keyframes restBreathe {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.045); }
+}
+.rest-breathe { animation: restBreathe 5s ease-in-out infinite; transform-origin: center; }
+@keyframes restHalo {
+  0%, 100% { opacity: 0.30; transform: scale(1); }
+  50%      { opacity: 0.55; transform: scale(1.12); }
+}
+.rest-halo { animation: restHalo 5s ease-in-out infinite; transform-origin: center; }
+/* Últimos diez segundos: el número late una vez por segundo */
+@keyframes restTick {
+  0%   { transform: scale(1.1); }
+  30%  { transform: scale(1); }
+  100% { transform: scale(1); }
+}
+.rest-tick { animation: restTick 1s cubic-bezier(0.22, 1, 0.36, 1) infinite; transform-origin: center; }
+@keyframes restEnter {
+  from { opacity: 0; transform: scale(0.94); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.rest-enter { animation: restEnter 0.3s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+@keyframes restBurst {
+  0%   { opacity: 0.8; transform: scale(0.8); }
+  100% { opacity: 0; transform: scale(1.9); }
+}
+.rest-burst { animation: restBurst 0.75s cubic-bezier(0.16, 1, 0.3, 1) forwards; transform-origin: center; }
+
 /* Confeti del resumen de fin de sesión: cae de arriba girando y se desvanece */
 @keyframes confettiFall {
   0%   { transform: translateY(-20px) rotate(0deg); opacity: 0; }
@@ -2202,7 +2235,8 @@ const ANIMATION_CSS = `
   .badge-pop, .superset-draw, .dot-bounce, .msg-in, .wake-up, .day-mark,
   .breathe, .hist-enter, .streak-jump, .tab-slide-right, .tab-slide-left,
   .timer-hop, .session-start-pop, .session-start-text, .session-chip-in,
-  .cell-pop, .sparkle-spin, .session-chip-ping, .session-bar-in { animation: none !important; }
+  .cell-pop, .sparkle-spin, .session-chip-ping, .session-bar-in,
+  .rest-breathe, .rest-halo, .rest-tick, .rest-enter, .rest-burst { animation: none !important; }
   .confetti-piece { display: none !important; }
   /* El fade del overlay se mantiene: es lo que lo hace desaparecer solo */
   .theme-fade, .theme-fade * { transition: none !important; }
@@ -4683,6 +4717,223 @@ function CountUpNumber({ value, from = null, duration = 700, decimals = 1, class
   return <span className={`tabular-nums ${className}`} style={style}>{txt}</span>;
 }
 
+/* ============================================================================
+   DESCANSO A PANTALLA COMPLETA
+
+   Sumado, el descanso entre series es la mitad del tiempo que pasás en el
+   gimnasio, y hasta ahora era una barrita de cuatro píxeles adentro de una
+   tarjeta. Tres cosas no funcionaban por culpa de eso:
+
+    1. No se lee de lejos. Dejás el teléfono en el banco, te parás, y para
+       saber cuánto falta tenés que volver a agarrarlo y enfocar la vista en
+       un número de once píxeles.
+    2. Esos noventa segundos eran tiempo muerto. Acá se usan para decirte qué
+       viene: qué serie, cuántas repes y cuánto peso, así cargás la barra
+       ANTES de que suene en vez de después.
+    3. Ajustar el descanso obligaba a salir a ajustes. Ahora −15s, +15s y
+       saltear están donde ya estás mirando.
+
+   El anillo respira a doce ciclos por minuto, que es el ritmo con el que baja
+   el pulso: no es un adorno, es exactamente lo que el descanso tiene que
+   lograr. Seguirlo con la respiración es la diferencia entre descansar y
+   esperar.
+
+   Lee ACTIVE_REST_TIMERS, el mismo registro global que ya usa RestTimer: no
+   hay dos relojes, el de la tarjeta sigue siendo la fuente de verdad y éste
+   es otra forma de mirarlo. Cerrarlo no detiene nada.
+
+   Son dos componentes a propósito: el de afuera lleva el reloj y el de
+   adentro se monta sólo cuando hay algo que mostrar, porque useAndroidBack
+   congela el fondo y se queda con el botón atrás mientras viva.
+============================================================================ */
+function RestFocusOverlay({ activo, onApagarParaSiempre }) {
+  const [info, setInfo] = useState(null);
+  const [restante, setRestante] = useState(0);
+  const descartadosRef = useRef(new Set());
+
+  useEffect(() => {
+    // Apagado: no se limpia el estado acá (sería un setState sincrónico
+    // dentro del efecto). Alcanza con no dibujar nada — ver abajo — y el
+    // intervalo lo refresca solo al volver a encenderse.
+    if (!activo) return;
+    const mirar = () => {
+      const ahora = Date.now();
+      let mejor = null;
+      Object.entries(ACTIVE_REST_TIMERS).forEach(([id, v]) => {
+        if (id.startsWith("__") || !v || !v.endTime) return;
+        // Se lo sigue mostrando 1,4s pasado el cero: ese momento es el que
+        // importa de todo el descanso y desaparecer de golpe lo desperdicia.
+        if (v.endTime <= ahora - FINAL_DESCANSO_MS) return;
+        if (descartadosRef.current.has(id)) return;
+        if (!mejor || v.endTime > mejor.endTime) mejor = { timerId: id, ...v };
+      });
+      setInfo(mejor);
+      setRestante(mejor ? Math.max(0, Math.ceil((mejor.endTime - ahora) / 1000)) : 0);
+    };
+    // La primera lectura va en un timeout y no en línea: leer el reloj y
+    // setear estado en el mismo tick del efecto encadena renders.
+    const primera = setTimeout(mirar, 0);
+    const id = setInterval(mirar, 250);
+    return () => { clearTimeout(primera); clearInterval(id); };
+  }, [activo]);
+
+  // Los ids descartados se olvidan cuando ese descanso ya terminó, para que
+  // cerrar uno no apague también el siguiente.
+  useEffect(() => {
+    const id = setInterval(() => {
+      const ahora = Date.now();
+      descartadosRef.current.forEach((t) => {
+        const v = ACTIVE_REST_TIMERS[t];
+        if (!v || v.endTime <= ahora) descartadosRef.current.delete(t);
+      });
+    }, 4000);
+    return () => clearInterval(id);
+  }, []);
+
+  if (!activo || !info) return null;
+
+  const descartar = () => { descartadosRef.current.add(info.timerId); setInfo(null); };
+  const ajustar = (delta) => {
+    const v = ACTIVE_REST_TIMERS[info.timerId];
+    if (!v) return;
+    v.endTime = Math.max(Date.now() + 1000, v.endTime + delta * 1000);
+    if (delta > 0 && v.total) v.total += delta;
+    persistActiveRestTimers();
+    haptic(12);
+  };
+  const saltear = () => {
+    const v = ACTIVE_REST_TIMERS[info.timerId];
+    if (v) { v.endTime = Date.now(); persistActiveRestTimers(); }
+    haptic(18);
+    descartar();
+  };
+
+  return (
+    <RestFocusScreen
+      key={info.timerId}
+      info={info}
+      restante={restante}
+      onCerrar={descartar}
+      onAjustar={ajustar}
+      onSaltear={saltear}
+      onApagar={() => { descartar(); onApagarParaSiempre?.(); }}
+    />
+  );
+}
+
+// Cuánto se queda en pantalla el momento de "¡dale!" después del cero.
+// Dos segundos y medio: lo justo para leer qué serie viene y con cuánto, que
+// es para lo que existe esa pantalla. Después se va sola — "Volver a la
+// serie" está para quien no quiera esperar.
+const FINAL_DESCANSO_MS = 2600;
+
+function RestFocusScreen({ info, restante, onCerrar, onAjustar, onSaltear, onApagar }) {
+  useAndroidBack(onCerrar);
+  const terminado = restante <= 0;
+  const total = info.total || Math.max(restante, 1);
+  const progreso = terminado ? 0 : Math.min(1, Math.max(0, restante / total));
+  const porAcabar = restante <= 10 && !terminado;
+  const base = info.color || "#14B8A6";
+  const color = terminado ? base : (porAcabar ? "#F59E0B" : base);
+  const mm = Math.floor(restante / 60), ss = restante % 60;
+  const reloj = mm > 0 ? `${mm}:${String(ss).padStart(2, "0")}` : String(ss);
+  const R = 128, C = 2 * Math.PI * R;
+  const sig = info.siguiente || null;
+
+  return (
+    <div
+      className="fixed inset-0 z-[120] flex flex-col items-center justify-center px-6 rest-enter modal-overlay"
+      style={{ background: `radial-gradient(120% 80% at 50% 38%, ${tint(color, terminado ? "3a" : "26")}, rgba(6,8,13,0.97) 62%), #06080d` }}
+    >
+      {/* Cerrar NO detiene el descanso: sólo se deja de ver así */}
+      <button
+        onClick={onCerrar}
+        aria-label="Volver a la rutina"
+        className="absolute top-4 right-4 w-10 h-10 rounded-2xl flex items-center justify-center text-slate-500 hover:text-white transition active:scale-90"
+        style={{ backgroundColor: "rgba(148,163,184,0.1)" }}
+      >
+        <X size={18} />
+      </button>
+
+      <p className="text-[11px] font-black uppercase tracking-[0.3em]" style={{ color: tint(color, "cc") }}>
+        {terminado ? "Se terminó" : "Descanso"}
+      </p>
+      {info.ejercicio && <p className="text-[13px] text-slate-500 mt-1.5 text-center max-w-[260px] truncate">{info.ejercicio}</p>}
+
+      <div className="relative my-7 flex items-center justify-center">
+        <div
+          className="absolute rounded-full rest-halo pointer-events-none"
+          style={{ width: 300, height: 300, background: `radial-gradient(circle, ${tint(color, "55")}, transparent 68%)`, filter: "blur(22px)" }}
+        />
+        {terminado && <div className="absolute rounded-full rest-burst pointer-events-none" style={{ width: 286, height: 286, border: `3px solid ${color}` }} />}
+        <svg width="300" height="300" viewBox="0 0 300 300" className="rest-breathe relative">
+          <circle cx="150" cy="150" r={R} fill="none" stroke="rgba(148,163,184,0.13)" strokeWidth="10" />
+          {!terminado && (
+            <circle
+              cx="150" cy="150" r={R} fill="none" stroke={color} strokeWidth="10" strokeLinecap="round"
+              strokeDasharray={C} strokeDashoffset={C * (1 - progreso)}
+              transform="rotate(-90 150 150)"
+              style={{ transition: "stroke-dashoffset 0.25s linear, stroke 0.4s ease", filter: `drop-shadow(0 0 14px ${tint(color, "aa")})` }}
+            />
+          )}
+        </svg>
+        <div className="absolute flex flex-col items-center pointer-events-none">
+          {terminado ? (
+            <span className="font-black leading-none" style={{ fontSize: 60, color: "#fff", textShadow: `0 0 40px ${tint(color, "aa")}` }}>¡Dale!</span>
+          ) : (
+            <>
+              <span
+                className={`font-black tabular-nums leading-none ${porAcabar ? "rest-tick" : ""}`}
+                style={{ fontSize: mm > 0 ? 76 : 92, color: "#fff", textShadow: `0 0 36px ${tint(color, "88")}` }}
+              >
+                {reloj}
+              </span>
+              <span className="text-[10px] font-black uppercase tracking-[0.24em] text-slate-600 mt-2">
+                {mm > 0 ? "minutos" : "segundos"}
+              </span>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Lo que viene: el motivo real de que esto ocupe la pantalla */}
+      <div className="w-full max-w-[320px] rounded-2xl px-4 py-3" style={{ backgroundColor: "rgba(148,163,184,0.07)", border: `1px solid ${tint(color, "30")}` }}>
+        <p className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-600 mb-1">{terminado ? "Te toca" : "Después de este descanso"}</p>
+        {sig ? (
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <span className="text-[13px] font-black text-white shrink-0">{sig.nombre || `Serie ${sig.serie}`}</span>
+            {sig.reps != null && sig.kg != null ? (
+              <span className="text-[15px] font-black tabular-nums" style={{ color }}>
+                {sig.reps}<span className="opacity-50 text-xs mx-0.5">×</span>{sig.kg}<span className="opacity-60 text-[11px] ml-0.5">{sig.unidad || "kg"}</span>
+              </span>
+            ) : (
+              <span className="text-[12px] text-slate-500">{sig.rango || "la que sigue"}</span>
+            )}
+            {sig.esMeta && <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md shrink-0" style={{ backgroundColor: tint(color, "22"), color }}>meta</span>}
+          </div>
+        ) : (
+          <p className="text-[13px] font-bold text-white">Último descanso de este ejercicio 💪</p>
+        )}
+      </div>
+
+      {/* Controles grandes: se tocan con la mano transpirada y sin apuntar */}
+      {terminado ? (
+        <button onClick={onCerrar} className="mt-5 w-full max-w-[320px] py-3.5 rounded-2xl text-[13px] font-black !text-white transition active:scale-95" style={{ backgroundColor: color }}>Volver a la serie</button>
+      ) : (
+        <div className="flex items-center gap-2.5 mt-5 w-full max-w-[320px]">
+          <button onClick={() => onAjustar(-15)} className="flex-1 py-3.5 rounded-2xl text-[13px] font-black text-slate-300 transition active:scale-95" style={{ backgroundColor: "rgba(148,163,184,0.1)", border: "1px solid rgba(148,163,184,0.18)" }}>−15s</button>
+          <button onClick={() => onAjustar(15)} className="flex-1 py-3.5 rounded-2xl text-[13px] font-black text-slate-300 transition active:scale-95" style={{ backgroundColor: "rgba(148,163,184,0.1)", border: "1px solid rgba(148,163,184,0.18)" }}>+15s</button>
+          <button onClick={onSaltear} className="flex-[1.4] py-3.5 rounded-2xl text-[13px] font-black !text-white transition active:scale-95" style={{ backgroundColor: color }}>Saltear</button>
+        </div>
+      )}
+
+      <button onClick={onApagar} className="mt-6 text-[10.5px] text-slate-600 hover:text-slate-400 transition">
+        No mostrar el descanso a pantalla completa
+      </button>
+    </div>
+  );
+}
+
 function RestTimer({ seconds, accent, alertType = "sound", timerId = "default", exerciseName = "" }) {
   const persisted = ACTIVE_REST_TIMERS[timerId];
   const stillRunning = persisted && persisted.endTime > Date.now();
@@ -4805,7 +5056,10 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default", 
       // Persistir en el registro global (y en localStorage) — si el
       // componente se desmonta (cambio de pestaña) o la app se cierra del
       // todo, al volver retoma desde acá.
-      ACTIVE_REST_TIMERS[timerId] = { endTime: endTimeRef.current };
+      // Se conserva lo que ya hubiera guardado junto al descanso (de qué
+      // ejercicio es, cuánto dura, qué serie viene después): pisarlo con un
+      // objeto nuevo dejaba a la pantalla completa sin nada que contar.
+      ACTIVE_REST_TIMERS[timerId] = { ...(ACTIVE_REST_TIMERS[timerId] || {}), endTime: endTimeRef.current, total: ACTIVE_REST_TIMERS[timerId]?.total || seconds, ejercicio: ACTIVE_REST_TIMERS[timerId]?.ejercicio || exerciseName || null, color: ACTIVE_REST_TIMERS[timerId]?.color || accent };
       persistActiveRestTimers();
       (async () => {
         // Cronómetro EN VIVO en la barra de notificaciones: va PRIMERO y en
@@ -5762,7 +6016,7 @@ function describePlannedOutcome(target, hecho, isRecord, unit) {
   return { type: "down", msg: `Te faltó para la meta (${target.reps}×${kgToDisplay(target.kg, unit)}${weightLabel(unit)})` };
 }
 
-function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, accent, logs, setLogs, drafts = {}, setDrafts, autoShowPrShare = true, onDisableAutoShowPrShare, hasActiveSession = true, cardio = false, dumbbellDouble = null, fieldSettings = DEFAULT_SETTINGS, onUpdateSettings = null, sex = null, age = null, restTimerId = null, restSeconds = null, isLastSet = false, weekInCycle = null, nextRestTimerId = null, nextRestSeconds = null }) {
+function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, accent, logs, setLogs, drafts = {}, setDrafts, autoShowPrShare = true, onDisableAutoShowPrShare, hasActiveSession = true, cardio = false, dumbbellDouble = null, fieldSettings = DEFAULT_SETTINGS, onUpdateSettings = null, sex = null, age = null, restTimerId = null, restSeconds = null, isLastSet = false, weekInCycle = null, nextRestTimerId = null, nextRestSeconds = null, siguienteSerie = null, siguienteEjercicio = null }) {
   // Modo "rutina planificada" (ver DEFAULT_SETTINGS.trainingMode): si hay
   // una meta cargada para ESTA semana, se muestra "Marca a alcanzar" en
   // vez de "Récord" — pensado para quien sigue un plan con cargas ya
@@ -6066,8 +6320,12 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   // notificación) sin que hubieras visto ningún cronómetro correr. Ahora,
   // si es la última serie, directamente no se arranca nada.
   const autoStartRestTimer = () => {
+    // Junto al descanso se guarda su contexto (cuánto dura, de qué ejercicio
+    // es y qué serie viene después). RestTimer sólo mira endTime y lo demás
+    // lo ignora; lo usa la pantalla completa (RestFocusOverlay) para poder
+    // decirte qué cargar antes de que el reloj llegue a cero.
     if (fieldSettings.autoStartRestTimer === true && restTimerId && restSeconds && !isLastSet) {
-      ACTIVE_REST_TIMERS[restTimerId] = { endTime: Date.now() + restSeconds * 1000 };
+      ACTIVE_REST_TIMERS[restTimerId] = { endTime: Date.now() + restSeconds * 1000, total: restSeconds, color: accent, ejercicio: exerciseName || null, siguiente: siguienteSerie };
       persistActiveRestTimers();
       return;
     }
@@ -6077,7 +6335,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     // entre medio. Esa tarjeta ademas se abre sola (ver forceOpen en
     // RoutineView), asi el cronometro queda justo donde vas a mirar.
     if (isLastSet && fieldSettings.restBetweenExercises === true && nextRestTimerId && nextRestSeconds) {
-      ACTIVE_REST_TIMERS[nextRestTimerId] = { endTime: Date.now() + nextRestSeconds * 1000 };
+      ACTIVE_REST_TIMERS[nextRestTimerId] = { endTime: Date.now() + nextRestSeconds * 1000, total: nextRestSeconds, color: accent, ejercicio: exerciseName || null, siguiente: siguienteEjercicio };
       persistActiveRestTimers();
     }
   };
@@ -6839,7 +7097,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
 /* ============================================================================
    EXERCISE CARD
 ============================================================================ */
-function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts, resetKey = 0, settings = DEFAULT_SETTINGS, forceOpen = false, autoCollapse = false, scrollAlAbrir = false, onDisableAutoShowPrShare, hasActiveSession = true, hideTimer = false, onUpdateSettings = null, onSetPlanPaused = null, routineHasPlan = false, sex = null, age = null, weekInCycle = null, dayKey = null, nextRestTimerId = null, nextRestSeconds = null }) {
+function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts, resetKey = 0, settings = DEFAULT_SETTINGS, forceOpen = false, autoCollapse = false, scrollAlAbrir = false, onDisableAutoShowPrShare, hasActiveSession = true, hideTimer = false, onUpdateSettings = null, onSetPlanPaused = null, routineHasPlan = false, sex = null, age = null, weekInCycle = null, dayKey = null, nextRestTimerId = null, nextRestSeconds = null, siguienteEjercicio = null }) {
   const [open, setOpen] = useState(false);
   const [showWarmup, setShowWarmup] = useState(false);
   const cardRef = useRef(null);
@@ -6950,6 +7208,25 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
   // hacés exactamente lo que corresponde. Si está siguiendo el plan, la
   // pregunta "¿qué cambio?" ya está contestada.
   const siguiendoPlan = !!planInfo && !planInfo.paused && !planOffByMode;
+  // Qué viene después de la serie i — lo usa la pantalla completa del
+  // descanso para decirte cuánto cargar mientras el reloj corre. Si hay una
+  // meta para esta semana manda la meta; si no, el récord de esa serie, que
+  // es contra qué vas a competir. Sin ninguno de los dos queda el rango de
+  // repeticiones, que igual es más que nada.
+  const pistaSerieSiguiente = (i) => {
+    const prox = setsToShow[i + 1];
+    if (!prox || exercise.cardio) return null;
+    const base = { serie: i + 2, rango: prox.repRange ? `${prox.repRange} reps` : null, unidad: weightLabel(planUnit) };
+    const meta = getPlannedTargetForWeek(prox, weekInCycle, settings.trainingMode);
+    if (meta && meta.kg != null && meta.reps != null) {
+      return { ...base, reps: meta.reps, kg: kgToDisplay(meta.kg, planUnit), esMeta: true };
+    }
+    const hist = logs[`${exercise.id}_${i + 1}`] || [];
+    let mejor = null;
+    hist.forEach((h) => { if (h?.kg != null && h?.reps && (!mejor || prScore(h.kg, h.reps) > prScore(mejor.kg, mejor.reps))) mejor = h; });
+    if (mejor) return { ...base, reps: mejor.reps, kg: kgToDisplay(mejor.kg, planUnit) };
+    return base;
+  };
   return (
     <div ref={cardRef} className="stagger-item smooth-card bg-slate-900/50 border border-slate-800/50 rounded-2xl overflow-hidden backdrop-blur-sm shadow-md shadow-black/20 transition-shadow hover:shadow-lg hover:shadow-black/30">
       <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center justify-between px-4 py-4 hover:bg-slate-800/30 active:bg-slate-800/50 transition text-left">
@@ -7090,7 +7367,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
           <div className="mb-2 timer-hop"><RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={accent} alertType={settings.alertType} timerId={restTimerId} exerciseName={exercise.name} /></div>
         )}
         {setsToShow.map((s, i) => <React.Fragment key={`${exercise.id}:frag:${i}`}>
-          <SetRow key={`${exercise.id}:${i}:${resetKey}`} exerciseId={exercise.id} exerciseName={exercise.name} exerciseMuscle={exercise.muscle} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKey} autoShowPrShare={settings.autoShowPrShare ?? true} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={hasActiveSession} cardio={exercise.cardio} dumbbellDouble={settings?.dumbbellDouble || null} fieldSettings={settings} onUpdateSettings={onUpdateSettings} sex={sex} age={age} restTimerId={restTimerId} restSeconds={restSeconds} isLastSet={i === setsToShow.length - 1} weekInCycle={weekInCycle} nextRestTimerId={nextRestTimerId} nextRestSeconds={nextRestSeconds} />
+          <SetRow key={`${exercise.id}:${i}:${resetKey}`} exerciseId={exercise.id} exerciseName={exercise.name} exerciseMuscle={exercise.muscle} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKey} autoShowPrShare={settings.autoShowPrShare ?? true} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={hasActiveSession} cardio={exercise.cardio} dumbbellDouble={settings?.dumbbellDouble || null} fieldSettings={settings} onUpdateSettings={onUpdateSettings} sex={sex} age={age} restTimerId={restTimerId} restSeconds={restSeconds} isLastSet={i === setsToShow.length - 1} weekInCycle={weekInCycle} nextRestTimerId={nextRestTimerId} nextRestSeconds={nextRestSeconds} siguienteSerie={pistaSerieSiguiente(i)} siguienteEjercicio={siguienteEjercicio} />
           {/* Debajo de la serie recién registrada: timerSlot = N significa
               "después de la serie N" (1-indexado). */}
           {timerSlot === i + 1 && (
@@ -8288,12 +8565,17 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             // dos cosas distintas — una es un cronómetro, la otra es saber
             // dónde estás — así que el auto-abrir ahora vale durante toda la
             // sesión, desde el primer ejercicio.
+            // Para el descanso ENTRE ejercicios, lo que viene es el próximo
+            // ejercicio, no la próxima serie.
+            const pistaProxEjercicio = siguiente?.[0]
+              ? { nombre: siguiente[0].name, serie: 1, rango: siguiente[0].sets?.[0]?.repRange ? `${siguiente[0].sets[0].repRange} reps` : null }
+              : null;
             const esFoco = gi === focoGrupoIdx;
             // Y el que dejaste atrás terminado se pliega.
             const plegar = focoGrupoIdx >= 0 && gi < focoGrupoIdx && estaCompleto(group);
             if (group.length === 1) {
               const ex = group[0];
-              return <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onSetPlanPaused={onSetPlanPaused} routineHasPlan={hasAnyPlan} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} sex={sex} age={age} weekInCycle={weekInCycle} dayKey={activeDay} forceOpen={esFoco} autoCollapse={plegar} scrollAlAbrir nextRestTimerId={nextRestTimerId} nextRestSeconds={nextRestSeconds} />;
+              return <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onSetPlanPaused={onSetPlanPaused} routineHasPlan={hasAnyPlan} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} sex={sex} age={age} weekInCycle={weekInCycle} dayKey={activeDay} forceOpen={esFoco} autoCollapse={plegar} scrollAlAbrir nextRestTimerId={nextRestTimerId} nextRestSeconds={nextRestSeconds} siguienteEjercicio={pistaProxEjercicio} />;
             }
             // Superserie: varios ejercicios encadenados comparten un solo
             // cronómetro al final del grupo, en vez de uno por ejercicio —
@@ -8303,7 +8585,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             return (
               <div key={`${activeDay}:${group.map((e) => e.id).join("-")}`} className="rounded-2xl border p-2.5 space-y-2.5" style={{ borderColor: tint(day.color, "50"), backgroundColor: tint(day.color, "06") }}>
                 <div className="flex items-center gap-1.5 px-1"><Link size={11} style={{ color: day.color }} /><span className="text-[10px] font-black uppercase tracking-wider" style={{ color: day.color }}>Superserie · {group.length} ejercicios</span></div>
-                {group.map((ex, xi) => <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onSetPlanPaused={onSetPlanPaused} routineHasPlan={hasAnyPlan} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} hideTimer sex={sex} age={age} weekInCycle={weekInCycle} dayKey={activeDay} forceOpen={esFoco} autoCollapse={plegar} scrollAlAbrir={xi === 0} nextRestTimerId={xi === group.length - 1 ? nextRestTimerId : null} nextRestSeconds={nextRestSeconds} />)}
+                {group.map((ex, xi) => <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onSetPlanPaused={onSetPlanPaused} routineHasPlan={hasAnyPlan} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} hideTimer sex={sex} age={age} weekInCycle={weekInCycle} dayKey={activeDay} forceOpen={esFoco} autoCollapse={plegar} scrollAlAbrir={xi === 0} nextRestTimerId={xi === group.length - 1 ? nextRestTimerId : null} nextRestSeconds={nextRestSeconds} siguienteEjercicio={pistaProxEjercicio} />)}
                 <div className="px-1"><RestTimer seconds={hasHeavyGroup ? settings.restLong : settings.restShort} accent={day.color} alertType={settings.alertType} timerId={`${activeDay}:grp_${group.map((g) => g.id).join("_")}`} exerciseName={group.map((g) => g.name).filter(Boolean).join(" + ")} /></div>
                 <p className="text-[10px] text-slate-600 px-1">Descansá recién después de completar los {group.length} ejercicios. Ese es el cronómetro de arriba.</p>
               </div>
@@ -13200,6 +13482,13 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
             entre tarjeta y tarjeta. Aparece recién cuando terminaste TODAS
             las series de un ejercicio, que es el momento en que de verdad
             estás por pasar al siguiente. */}
+        <ToggleRow
+          icon={<Maximize2 size={15} />}
+          label="Descanso a pantalla completa"
+          desc="Mientras entrenás, el descanso ocupa la pantalla: se lee de lejos, te dice qué cargar después y se ajusta sin salir"
+          on={settings.fullscreenRest !== false}
+          onToggle={() => updateSettings({ fullscreenRest: settings.fullscreenRest === false })}
+        />
         <ToggleRow
           icon={<Timer size={15} />}
           label="Descanso entre ejercicios"
@@ -24080,6 +24369,13 @@ export default function App() {
         </main>
       </div>
       <BottomBar tab={tab} setTab={setTab} />
+      {/* Descanso a pantalla completa: sólo mientras hay una sesión en curso
+          — registrar una marca suelta fuera de una sesión no debería
+          tomarte la pantalla. */}
+      <RestFocusOverlay
+        activo={haySesionActiva && getProfileSettings(profile).fullscreenRest !== false}
+        onApagarParaSiempre={() => handleUpdateSettings({ fullscreenRest: false })}
+      />
       {/* Sesión en curso: cronómetro, avance y "Finalizar" siempre a mano,
           en cualquier pestaña. El overlay de arranque la taparía con su
           propia animación, así que entra cuando ese se va. */}
