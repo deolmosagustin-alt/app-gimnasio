@@ -13803,7 +13803,7 @@ function useUserStreaks(uids) {
 // <button> dentro de <button> es HTML inválido y rompe los clicks. Acá el
 // avatar+nombre es su propio botón cuando hay onClick, y `children` queda
 // como hermano, nunca anidado.
-function PublicUserCard({ uid, basic, streak = null, onClick = null, children }) {
+function PublicUserCard({ uid, basic, streak = null, onClick = null, mostrarUsuario = true, children }) {
   // "Activo hace X" — dato que ya viaja gratis en public/basic (updatedAt
   // se pisa cada vez que esa persona sincroniza, ver syncPublicProfile),
   // sin pedir nada nuevo a Firestore. Punto verde si sincronizó hace poco
@@ -13823,6 +13823,11 @@ function PublicUserCard({ uid, basic, streak = null, onClick = null, children })
   // ese mismo color, y un puntito de actividad SOBRE el avatar (como
   // WhatsApp/Instagram) en vez de una tercera línea de texto aparte.
   const accentColor = basic?.topRank?.color || "#8B5CF6";
+  // El arroba se esconde sólo si queda ALGO en esa segunda línea. Un amigo
+  // sin rango, sin racha y que nunca sincronizó la dejaría vacía y la fila
+  // se vería rota: ahí vuelve el @, que es mejor que un hueco.
+  const tieneRacha = typeof streak === "number" && streak > 0;
+  const mostrarArroba = mostrarUsuario || (!basic?.topRank && !tieneRacha && !lastActive);
   const avatarAndName = (
     <>
       {/* Misma barrita que encabeza cada ejercicio en Rutina: w-2 h-9,
@@ -13865,8 +13870,23 @@ function PublicUserCard({ uid, basic, streak = null, onClick = null, children })
               <span className="text-[8.5px] font-black uppercase tracking-wide whitespace-nowrap" style={{ color: basic.topRank.color }}>{basic.topRank.tier} {basic.topRank.sub}</span>
             </span>
           )}
-          <span className="text-[11px] text-slate-500 flex items-center gap-0.5 min-w-0 truncate"><AtSign size={9} className="shrink-0" />{basic?.username || uid.slice(0, 8)}</span>
-          {typeof streak === "number" && streak > 0 && (
+          {/* El @usuario sirve para ENCONTRAR a alguien, no para reconocerlo:
+              en la lista de amigos ya sabés quién es cada uno por el nombre y
+              la foto, y repetir el arroba en cada fila era ruido. Sigue
+              estando donde hace falta — en Buscar, en las solicitudes (ahí
+              puede ser alguien que no tenés agendado y la fila no se abre) y
+              en el perfil de la persona, a un toque de distancia. */}
+          {mostrarArroba && (
+            <span className="text-[11px] text-slate-500 flex items-center gap-0.5 min-w-0 truncate"><AtSign size={9} className="shrink-0" />{basic?.username || uid.slice(0, 8)}</span>
+          )}
+          {/* Sin arroba, sin rango y sin racha esa segunda línea quedaría
+              vacía. "Activo hace X" la llena con algo que se puede usar, y de
+              paso rescata un dato que hasta ahora vivía sólo en el title del
+              puntito del avatar — o sea, invisible en un celular. */}
+          {!mostrarArroba && !basic?.topRank && !tieneRacha && lastActive && (
+            <span className="text-[11px] text-slate-500 min-w-0 truncate">{lastActive.label}</span>
+          )}
+          {tieneRacha && (
             <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-orange-400 shrink-0">
               <Flame size={10} className="shrink-0" />{streak} {streak === 1 ? "día" : "días"}
             </span>
@@ -14521,7 +14541,7 @@ function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted
           <div className="space-y-2">
             <TrainerSectionLabel accent={tengoEntrenador ? "#38BDF8" : null}>Mi entrenador</TrainerSectionLabel>
             {tengoEntrenador ? trainersAccepted.map((l) => (
-              <PublicUserCard key={l.id} uid={l.trainerUid} basic={basics[l.trainerUid]} streak={streaks?.[l.trainerUid]?.streak} onClick={() => onViewTrainer(l.trainerUid)}>
+              <PublicUserCard key={l.id} uid={l.trainerUid} basic={basics[l.trainerUid]} streak={streaks?.[l.trainerUid]?.streak} mostrarUsuario={false} onClick={() => onViewTrainer(l.trainerUid)}>
                 <span className="shrink-0 text-[9px] font-black rounded-md px-1.5 py-0.5" style={{ backgroundColor: "rgba(56,189,248,0.15)", color: "#7dd3fc" }}>Te planifica</span>
                 <button onClick={(e) => { e.stopPropagation(); onRemoveLink(l); }} className="shrink-0 p-1.5 rounded-lg text-slate-600 hover:text-rose-400 transition" title="Desvincular"><X size={13} /></button>
                 <ChevronRight size={15} className="text-slate-600 shrink-0" />
@@ -14539,7 +14559,7 @@ function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted
             {studentsAccepted.length === 0 ? (
               <TrainerEmpty icon={<Users size={16} />} titulo="Todavía no tenés alumnos" detalle="Vinculá a quien entrenás para ver cómo viene y planificarle la semana." />
             ) : sortedStudents.map((l) => (
-              <PublicUserCard key={l.id} uid={l.studentUid} basic={basics[l.studentUid]} streak={streaks?.[l.studentUid]?.streak} onClick={() => onViewStudent(l.studentUid)}>
+              <PublicUserCard key={l.id} uid={l.studentUid} basic={basics[l.studentUid]} streak={streaks?.[l.studentUid]?.streak} mostrarUsuario={false} onClick={() => onViewStudent(l.studentUid)}>
                 {chipPropuesta(l.studentUid)}
                 <button onClick={(e) => { e.stopPropagation(); onRemoveLink(l); }} className="shrink-0 p-1.5 rounded-lg text-slate-600 hover:text-rose-400 transition" title="Desvincular"><X size={13} /></button>
                 <ChevronRight size={15} className="text-slate-600 shrink-0" />
@@ -17327,7 +17347,7 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
                   </div>
                 ) : sortedFriendAccepted.map((f, i) => { const other = otherUidOf(f); const confirming = confirmRemoveId === f.id; return (
                   <div key={f.id} className="stagger-item" style={{ animationDelay: `${Math.min(i, 8) * 40}ms` }}>
-                    <PublicUserCard uid={other} basic={basics[other]} streak={streaks[other]?.streak} onClick={confirming ? null : () => setViewingUid(other)}>
+                    <PublicUserCard uid={other} basic={basics[other]} streak={streaks[other]?.streak} mostrarUsuario={false} onClick={confirming ? null : () => setViewingUid(other)}>
                       {confirming ? (
                         <span className="flex items-center gap-1.5 shrink-0">
                           <span className="text-[10px] text-slate-500 mr-0.5">¿Quitar?</span>
