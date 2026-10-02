@@ -8147,7 +8147,7 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_
   );
 }
 
-function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, weekSchedule, activeSession, onStartSession, onDisableAutoShowPrShare, onUpdateSettings = null, onSetPlanPaused = null, onRemovePlan = null, onGoToRoutines = null, onGoToSchedule = null, onGoToFieldSettings = null, onGoToDescarga = null, todaySessionDayKey = null, sex = null, age = null, activeRoutineDef = null, onApplyOwnProgression = null, goToDaySignal = { id: null, n: 0 }, onSignalConsumed = null }) {
+function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, weekSchedule, activeSession, onStartSession, onDisableAutoShowPrShare, onUpdateSettings = null, onSetPlanPaused = null, onRemovePlan = null, onGoToRoutines = null, onGoToSchedule = null, onGoToFieldSettings = null, onGoToDescarga = null, sex = null, age = null, activeRoutineDef = null, onApplyOwnProgression = null, goToDaySignal = { id: null, n: 0 }, onSignalConsumed = null }) {
   // Semana actual del ciclo — sólo hace falta el número (weekInCycle), para
   // que SetRow sepa si hay una meta cargada (modo "planned", ver
   // getPlannedTargetForWeek) para ESTA semana puntual.
@@ -8262,20 +8262,6 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
   const [confirmReset, setConfirmReset] = useState(false);
 
   const today = todayStr();
-  let totalSets = 0, doneToday = 0;
-  // BUG FIX: contaba CUALQUIER registro de hoy, incluidas las marcas de
-  // Descarga (mismo formato de log, con "deload:true") — si un ejercicio de
-  // hoy también estaba en la semana de descarga, tildarlo ahí hacía subir
-  // el % de la rutina NORMAL sin haber entrenado nada acá. La descarga tiene
-  // su propio progreso en la pestaña Descarga; este % es sólo de lo
-  // realmente registrado en Rutina.
-  day.exercises.forEach((ex) => ex.sets.forEach((s, i) => { totalSets++; const h = logs[`${ex.id}_${i}`] || []; if (h.some((x) => x.date === today && !x.deload)) doneToday++; }));
-  // Si hoy entrenaste (o estás entrenando) un día ESPECÍFICO, los demás
-  // días muestran 0% — antes, los ejercicios compartidos entre días (ej.
-  // press militar en Push y en Hombro/Brazo) hacían aparecer un % fantasma
-  // en días que no entrenaste, y el "resetear" del día activo no lo sacaba.
-  const rawPct = totalSets ? Math.round((doneToday / totalSets) * 100) : 0;
-  const pct = (todaySessionDayKey && todaySessionDayKey !== activeDay) ? 0 : rawPct;
 
   const handleResetDay = () => {
     const newLogs = { ...logs };
@@ -8550,28 +8536,11 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
               que lo ÚNICO que se mueve mientras entrenás. Ahora el progreso
               es una barra que se llena serie a serie —se lee sin leer un
               número— y los dos datos fijos bajan a texto chico al lado. */}
-          {/* Fila de progreso en el mismo tono neutro de la tarjeta: los
-              números primero (que es lo que se lee) y la barra debajo como
-              refuerzo, sin fondo negro ni glow. */}
-          {/* Mismo caso que el recuadro de "sesión en curso": mientras
-              entrenás, el avance de series ya lo lleva la barra fija de
-              abajo, a la vista todo el tiempo. Acá queda para cuando NO hay
-              sesión, que es cuando sirve para ver qué tiene el día. */}
-          {!sessionForThisDay && (
-          <div className="mt-3 rounded-xl px-3 py-2.5" style={{ backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}>
-            <div className="flex items-baseline gap-1.5 mb-1.5">
-              <span className="text-sm font-black tabular-nums flex items-baseline" style={{ color: pct > 0 ? day.color : "#64748b" }}>
-                <CountUpNumber value={doneToday} from={0} duration={550} decimals={0} className="tabular-nums" />/{totalSets}
-              </span>
-              <span className="text-[11px] text-slate-500">series</span>
-              <span className="text-slate-700 text-[11px]">·</span>
-              <span className="text-[11px] text-slate-500 tabular-nums">{day.exercises.length} ejercicios</span>
-            </div>
-            <div className="h-1.5 rounded-full overflow-hidden bg-slate-800/70">
-              <div className="h-full rounded-full transition-all duration-500 ease-out" style={{ width: `${pct}%`, backgroundColor: day.color }} />
-            </div>
-          </div>
-          )}
+          {/* Acá había un recuadro con "X/15 series · 5 ejercicios" y una
+              barra de avance. Se fue entero: mientras entrenás el avance lo
+              lleva la barra fija de abajo, y cuántas series y ejercicios
+              tiene el día ya lo dice Rutinas, que es donde se arma. Repetirlo
+              acá era una tercera copia del mismo dato. */}
           {confirmReset && (
             <div className="flex gap-2 items-center mt-2.5 bg-black/30 border border-white/10 rounded-xl px-3 py-2">
               <p className="text-[11px] text-slate-400 flex-1">¿Borrar reps/kg de hoy (incluido lo sin guardar)? Los récords no cambian.</p>
@@ -9626,7 +9595,7 @@ function SocialProgressStats({ uid, profile, myTopRank, friendAccepted, basics, 
       const otro = f.users.find((u) => u !== uid);
       return n + ((streaks?.[otro]?.sessionsThisWeek || 0) > 0 ? 1 : 0);
     }, 0);
-    return { puesto: idx >= 0 ? idx + 1 : null, deCuantos: ranking.length, activos, amigos: friendAccepted.length };
+    return { puesto: idx >= 0 ? idx + 1 : null, activos, amigos: friendAccepted.length };
 
   }, [uid, profile, myTopRank, friendAccepted, basics, streaks]);
 
@@ -9657,10 +9626,13 @@ function SocialProgressStats({ uid, profile, myTopRank, friendAccepted, basics, 
           // El puesto sale del MISMO orden por rango que usa la solapa
           // Ranking (buildFriendsRanking), así que los dos no pueden decir
           // cosas distintas.
-          { label: "Tu puesto", icon: <Award size={11} />, val: datos.puesto, unidad: "º", sufijo: datos.puesto ? ` de ${datos.deCuantos}` : "", vacio: !datos.puesto },
-          { label: "Entrenaron", icon: <Flame size={11} />, val: datos.activos, unidad: "", sufijo: ` de ${datos.amigos}`, vacio: false },
-          { label: "Aplausos", icon: <Users size={11} />, val: kudosRecibidos, unidad: "", sufijo: "", vacio: false },
-        ].map(({ label, icon, val, unidad, sufijo, vacio }) => (
+          // Sin el "de N": cuánta gente hay en tu grupo ya lo dice la tarjeta
+          // de arriba ("5 amigos"), así que repetirlo en dos de los tres
+          // números sólo le restaba aire al dato que venís a leer.
+          { label: "Tu puesto", icon: <Award size={11} />, val: datos.puesto, unidad: "º", vacio: !datos.puesto },
+          { label: "Entrenaron", icon: <Flame size={11} />, val: datos.activos, unidad: "", vacio: false },
+          { label: "Aplausos", icon: <Users size={11} />, val: kudosRecibidos, unidad: "", vacio: false },
+        ].map(({ label, icon, val, unidad, vacio }) => (
           // Tres tarjetas teñidas de violeta, con el número TAMBIÉN violeta,
           // debajo de un hero violeta y una tarjeta violeta: eran la tercera
           // y cuarta capa del mismo color y el número —que es el dato— no
@@ -9671,7 +9643,7 @@ function SocialProgressStats({ uid, profile, myTopRank, friendAccepted, basics, 
           // lee "qué es → cuánto", que es el orden en que se mira una tira de
           // tres. Con el rótulo abajo hay que leer el número sin saber
           // todavía de qué es. El número queda solo en su línea, grande y
-          // blanco, con el "de N" en gris al lado para que no le compita.
+          // blanco.
           <div key={label} className="rounded-xl px-2.5 py-2.5" style={{ backgroundColor: "var(--surface-1)", border: "1px solid var(--hairline)" }}>
             <p className="flex items-center gap-1 text-[9.5px] font-black uppercase tracking-wider mb-1" style={{ color: SOCIAL_INK }}>
               <span className="shrink-0 opacity-80">{icon}</span>
@@ -9679,7 +9651,6 @@ function SocialProgressStats({ uid, profile, myTopRank, friendAccepted, basics, 
             </p>
             <p className="text-lg font-black text-white flex items-baseline leading-none">
               {vacio ? <span className="text-slate-600 text-base">—</span> : <><CountUpNumber value={val} from={0} duration={550} decimals={0} className="tabular-nums" />{unidad}</>}
-              <span className="text-[10.5px] font-bold text-slate-500 ml-1">{sufijo}</span>
             </p>
           </div>
         ))}
@@ -24454,7 +24425,7 @@ export default function App() {
                 que quedó adentro de RoutineView ahora sirve para volver a
                 fijarla si la cerraste. */}
             {tab === "rutina" && showPinnedDeload && <DeloadView logs={logs} setLogs={setLogs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} activeSession={profile?.activeSession?.deload ? profile.activeSession : null} onStartSession={handleStartSession} weekSchedule={weekSchedule} onClose={() => setDeloadDismissed(true)} cycleStart={cycleStart} />}
-            {tab === "rutina" && !showPinnedDeload && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToRoutines={() => setTab("rutinas")} onGoToSchedule={() => goToSection("rutinas", "week-schedule")} onGoToFieldSettings={() => goToSection("perfil", "field-settings-section")} onGoToDescarga={() => (isDeloadWeek ? setDeloadDismissed(false) : setTab("descarga"))} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} todaySessionDayKey={(profile?.trainingSessions || []).find((ts) => ts.date === todayStr())?.dayKey || profile?.activeSession?.dayKey || null} sex={profile?.sex} age={profile?.age} activeRoutineDef={activeRoutineDef} onApplyOwnProgression={handleApplyOwnProgression} onSetPlanPaused={handleSetPlanPaused} onRemovePlan={handleRemovePlan} goToDaySignal={openSectionSignal.id === "go-to-day" ? openSectionSignal : { id: null, n: 0 }} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} />}
+            {tab === "rutina" && !showPinnedDeload && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToRoutines={() => setTab("rutinas")} onGoToSchedule={() => goToSection("rutinas", "week-schedule")} onGoToFieldSettings={() => goToSection("perfil", "field-settings-section")} onGoToDescarga={() => (isDeloadWeek ? setDeloadDismissed(false) : setTab("descarga"))} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} sex={profile?.sex} age={profile?.age} activeRoutineDef={activeRoutineDef} onApplyOwnProgression={handleApplyOwnProgression} onSetPlanPaused={handleSetPlanPaused} onRemovePlan={handleRemovePlan} goToDaySignal={openSectionSignal.id === "go-to-day" ? openSectionSignal : { id: null, n: 0 }} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} />}
             {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} onGoToRoutines={() => goToSection("rutinas", "routine-editor")} weekSchedule={weekSchedule} sex={profile?.sex} age={profile?.age} onGoToDeload={() => { if (isDeloadWeek) { setDeloadDismissed(false); setTab("rutina"); } else { setTab("descarga"); } }} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} />}
             {tab === "descarga" && <DeloadView logs={logs} setLogs={setLogs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} activeSession={profile?.activeSession?.deload ? profile.activeSession : null} onStartSession={handleStartSession} weekSchedule={weekSchedule} onClose={() => { setDeloadDismissed(true); setTab("rutina"); }} cycleStart={cycleStart} />}
             {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} setLogs={setLogs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} conversations={aiConversations} activeConversationId={activeAiConversationId} onNewConversation={handleNewAiConversation} onSwitchConversation={handleSwitchAiConversation} onDeleteConversation={handleDeleteAiConversation} onRenameConversation={handleRenameAiConversation} settings={getProfileSettings(profile)} cycleStart={cycleStart} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} onDeleteRoutine={handleDeleteRoutine} onNavigate={setTab} onStartSession={handleStartSession} onEndSession={handleEndSession} />}
