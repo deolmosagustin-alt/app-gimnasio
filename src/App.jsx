@@ -4934,6 +4934,184 @@ function RestFocusScreen({ info, restante, onCerrar, onAjustar, onSaltear, onApa
   );
 }
 
+// Aviso de fin de descanso (sonido, vibración y notificación del sistema).
+//
+// Vive a nivel de módulo y no adentro de RestTimer porque el dueño del
+// cronómetro puede no estar montado cuando llega a cero: el descanso ENTRE
+// ejercicios arranca el reloj del ejercicio SIGUIENTE, cuya tarjeta
+// normalmente está cerrada, así que no había ningún componente vivo que
+// disparara el aviso — el cronómetro corría y simplemente nunca sonaba.
+// Ese era el "a veces falla el cronómetro entre ejercicios".
+// El Set evita que suene dos veces si el componente y el vigilante global
+// (ver VigilanteDescansos) llegan al cero casi juntos.
+const AVISOS_DISPARADOS = new Set();
+async function avisarFinDeDescanso(timerId, { alertType = "sound", exerciseName = "" } = {}) {
+  if (AVISOS_DISPARADOS.has(timerId)) return;
+  AVISOS_DISPARADOS.add(timerId);
+  // Se limpia para que el PRÓXIMO descanso de ese mismo ejercicio pueda
+  // volver a avisar.
+  setTimeout(() => AVISOS_DISPARADOS.delete(timerId), 5000);
+  // Se MARCA en vez de borrarse: la pantalla completa sigue mostrando unos
+  // segundos más el momento de "¡dale!" leyendo esta misma entrada, y
+  // borrarla acá la hacía desaparecer justo en el único instante que
+  // importá. El vigilante la limpia después.
+  if (ACTIVE_REST_TIMERS[timerId]) {
+    ACTIVE_REST_TIMERS[timerId].avisado = true;
+    persistActiveRestTimers();
+  }
+  if (alertType !== "vibration") {
+    try {
+      const a = new AudioContext();
+      // Arpegio ascendente tipo "campanita" (Do-Mi-Sol de la 5ª octava): tres
+      // notas cortas que suben, con ataque rápido y caída suave. Más agradable
+      // que el doble beep plano y se distingue mejor del ruido del gimnasio.
+      // El envelope con rampas evita el "click" de cortar la onda de golpe.
+      [523.25, 659.25, 783.99].forEach((freq, k) => {
+        const t0 = a.currentTime + k * 0.13;
+        const o = a.createOscillator(), g = a.createGain();
+        o.type = "sine";
+        o.frequency.value = freq;
+        o.connect(g); g.connect(a.destination);
+        g.gain.setValueAtTime(0.0001, t0);
+        g.gain.exponentialRampToValueAtTime(0.28, t0 + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.32);
+        o.start(t0);
+        o.stop(t0 + 0.34);
+      });
+      // Antes esto se acumulaba: cada serie creaba un AudioContext nuevo
+      // y nunca se cerraba. Los navegadores tienen un límite de
+      // contextos simultáneos (chico en iOS Safari en particular) —
+      // pasado ese límite, el sonido deja de sonar sin ningún error
+      // visible. Se cierra solo, ~700ms después (los dos beeps de
+      // 280ms con 220ms de diferencia entre uno y otro ya terminaron).
+      setTimeout(() => { a.close().catch(() => { }); }, 900);
+    } catch { /* ignorado a propósito */ }
+  }
+  if (alertType !== "sound") haptic([400, 150, 400, 150, 500, 150, 400]);
+  // Notificación del sistema al terminar el descanso — rework: antes decía
+  // siempre lo mismo ("Es hora de la próxima serie"), sin importar en qué
+  // ejercicio estabas. Ahora nombra el ejercicio (si lo sabemos) y usa el
+  // mismo teal de marca (iconColor) que ya tiene la notificación nativa en
+  // curso, para que ambas se sientan parte de la misma app.
+  const doneTitle = "🔥 ¡Descanso terminado!";
+  const doneBody = exerciseName ? `Volvé a ${exerciseName} 💪` : "Volvé a la serie 💪";
+  try {
+    if (Capacitor.isNativePlatform()) {
+      // LocalNotifications en Android: aparece como notificación real del sistema,
+      // incluso con la pantalla apagada o la app en segundo plano.
+      await LocalNotifications.cancel({ notifications: [{ id: 9002 }] }).catch(() => {});
+      // Solo apagar la notif nativa si ESTE timer sigue siendo el dueño —
+      // si otro cronómetro la tomó, no se la pisamos.
+      if (ACTIVE_REST_TIMERS.__notifOwner === timerId) {
+        await RestTimerNotification.stop().catch(() => {});
+        delete ACTIVE_REST_TIMERS.__notifOwner;
+      }
+      await LocalNotifications.schedule({
+        notifications: [{
+          id: notifIdForTimer(timerId, 10000),
+          smallIcon: "ic_stat_modusfit",
+          iconColor: "#14B8A6",
+          title: doneTitle,
+          body: doneBody,
+          channelId: "modusfit-rest-done-v1",
+          sound: alertType === "vibration" ? undefined : "default",
+          schedule: { at: new Date(Date.now() + 100) },
+        }],
+      });
+    } else if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+      new Notification(doneTitle, {
+        body: doneBody,
+        silent: alertType === "vibration",
+        tag: "rest-timer",
+        renotify: true,
+      });
+    }
+  } catch { /* ignorado a propósito */ }
+}
+
+// Vigilante de descansos: el único que garantiza que un descanso avise.
+//
+// El cronómetro de una tarjeta sólo existe mientras esa tarjeta está
+// abierta, y el descanso ENTRE ejercicios arranca el reloj del ejercicio
+// SIGUIENTE, que casi siempre está cerrado: ahí no había nadie vivo para
+// darse cuenta de que llegó a cero, y el aviso simplemente no sonaba.
+// Esto corre siempre, mire la pantalla que mire, y de paso limpia las
+// entradas viejas del registro.
+function VigilanteDescansos({ alertType = "sound" }) {
+  useEffect(() => {
+    const id = setInterval(() => {
+      const ahora = Date.now();
+      Object.entries(ACTIVE_REST_TIMERS).forEach(([tid, v]) => {
+        if (tid.startsWith("__") || !v || !v.endTime || v.endTime > ahora) return;
+        if (!v.avisado) { avisarFinDeDescanso(tid, { alertType, exerciseName: v.ejercicio || "" }); return; }
+        if (v.endTime <= ahora - 6000) { delete ACTIVE_REST_TIMERS[tid]; persistActiveRestTimers(); }
+      });
+    }, 500);
+    return () => clearInterval(id);
+  }, [alertType]);
+  return null;
+}
+
+// Apagar TODO lo que sigue corriendo cuando la sesión se cierra.
+//
+// Pedido: "que cuando finalizas la sesión ya no sigan corriendo los
+// cronómetros de la app ni los de las notificaciones". Antes terminar la
+// sesión no tocaba ningún reloj: el descanso que tenías en curso seguía
+// contando, la notificación persistente quedaba en la barra, y el aviso de
+// "descanso terminado" sonaba minutos después, con la app cerrada y el
+// entrenamiento ya guardado.
+function detenerCronometrosDeSesion() {
+  const ids = [];
+  Object.keys(ACTIVE_REST_TIMERS).forEach((k) => {
+    if (!k.startsWith("__")) ids.push(notifIdForTimer(k, 10000));
+    delete ACTIVE_REST_TIMERS[k];
+  });
+  Object.keys(ACTIVE_CARDIO_TIMERS).forEach((k) => {
+    if (!k.startsWith("__")) ids.push(notifIdForTimer(k, 20000));
+    delete ACTIVE_CARDIO_TIMERS[k];
+  });
+  persistActiveRestTimers();
+  persistActiveCardioTimers();
+  AVISOS_DISPARADOS.clear();
+  try {
+    if (Capacitor.isNativePlatform()) {
+      RestTimerNotification.stop().catch(() => {});
+      const todos = [...new Set([...ids, 9002])].map((id) => ({ id }));
+      if (todos.length) LocalNotifications.cancel({ notifications: todos }).catch(() => {});
+    }
+  } catch { /* ignorado a propósito */ }
+}
+
+// Descanso en curso visto desde una tarjeta CERRADA.
+//
+// Reporte: "a veces falla el cronómetro entre ejercicios". No fallaba el
+// reloj: fallaba que no se veía. Ese descanso arranca el cronómetro del
+// ejercicio SIGUIENTE, y ese cronómetro sólo existe mientras su tarjeta está
+// abierta — con la tarjeta cerrada (que es lo normal) no había nada en
+// pantalla y parecía que no había arrancado. Ahora la cabecera lo muestra.
+// No duplica nada: cuando la tarjeta está abierta manda el cronómetro
+// grande de adentro y este chip no se dibuja.
+function ChipDescansoEnCurso({ timerId, color }) {
+  const [restante, setRestante] = useState(0);
+  useEffect(() => {
+    if (!timerId) return;
+    const mirar = () => {
+      const v = ACTIVE_REST_TIMERS[timerId];
+      setRestante(v?.endTime ? Math.max(0, Math.ceil((v.endTime - Date.now()) / 1000)) : 0);
+    };
+    const primera = setTimeout(mirar, 0);
+    const id = setInterval(mirar, 500);
+    return () => { clearTimeout(primera); clearInterval(id); };
+  }, [timerId]);
+  if (restante <= 0) return null;
+  const mm = Math.floor(restante / 60), ss = restante % 60;
+  return (
+    <span className="text-[10px] rounded-lg px-1.5 py-0.5 font-black tabular-nums flex items-center gap-1" style={{ backgroundColor: tint(color, "1f"), color }}>
+      <Timer size={9} /> {mm}:{String(ss).padStart(2, "0")}
+    </span>
+  );
+}
+
 function RestTimer({ seconds, accent, alertType = "sound", timerId = "default", exerciseName = "" }) {
   const persisted = ACTIVE_REST_TIMERS[timerId];
   const stillRunning = persisted && persisted.endTime > Date.now();
@@ -4959,79 +5137,10 @@ function RestTimer({ seconds, accent, alertType = "sound", timerId = "default", 
     }
   }, [seconds, timerId]);
 
-  const fireAlert = async () => {
+  const fireAlert = () => {
     if (firedRef.current) return;
     firedRef.current = true;
-    delete ACTIVE_REST_TIMERS[timerId];
-    persistActiveRestTimers();
-    if (alertType !== "vibration") {
-      try {
-        const a = new AudioContext();
-        // Arpegio ascendente tipo "campanita" (Do-Mi-Sol de la 5ª octava): tres
-        // notas cortas que suben, con ataque rápido y caída suave. Más agradable
-        // que el doble beep plano y se distingue mejor del ruido del gimnasio.
-        // El envelope con rampas evita el "click" de cortar la onda de golpe.
-        [523.25, 659.25, 783.99].forEach((freq, k) => {
-          const t0 = a.currentTime + k * 0.13;
-          const o = a.createOscillator(), g = a.createGain();
-          o.type = "sine";
-          o.frequency.value = freq;
-          o.connect(g); g.connect(a.destination);
-          g.gain.setValueAtTime(0.0001, t0);
-          g.gain.exponentialRampToValueAtTime(0.28, t0 + 0.02);
-          g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.32);
-          o.start(t0);
-          o.stop(t0 + 0.34);
-        });
-        // Antes esto se acumulaba: cada serie creaba un AudioContext nuevo
-        // y nunca se cerraba. Los navegadores tienen un límite de
-        // contextos simultáneos (chico en iOS Safari en particular) —
-        // pasado ese límite, el sonido deja de sonar sin ningún error
-        // visible. Se cierra solo, ~700ms después (los dos beeps de
-        // 280ms con 220ms de diferencia entre uno y otro ya terminaron).
-        setTimeout(() => { a.close().catch(() => { }); }, 900);
-      } catch { /* ignorado a propósito */ }
-    }
-    if (alertType !== "sound") haptic([400, 150, 400, 150, 500, 150, 400]);
-    // Notificación del sistema al terminar el descanso — rework: antes decía
-    // siempre lo mismo ("Es hora de la próxima serie"), sin importar en qué
-    // ejercicio estabas. Ahora nombra el ejercicio (si lo sabemos) y usa el
-    // mismo teal de marca (iconColor) que ya tiene la notificación nativa en
-    // curso, para que ambas se sientan parte de la misma app.
-    const doneTitle = "🔥 ¡Descanso terminado!";
-    const doneBody = exerciseName ? `Volvé a ${exerciseName} 💪` : "Volvé a la serie 💪";
-    try {
-      if (Capacitor.isNativePlatform()) {
-        // LocalNotifications en Android: aparece como notificación real del sistema,
-        // incluso con la pantalla apagada o la app en segundo plano.
-        await LocalNotifications.cancel({ notifications: [{ id: 9002 }] }).catch(() => {});
-        // Solo apagar la notif nativa si ESTE timer sigue siendo el dueño —
-        // si otro cronómetro la tomó, no se la pisamos.
-        if (ACTIVE_REST_TIMERS.__notifOwner === timerId) {
-          await RestTimerNotification.stop().catch(() => {});
-          delete ACTIVE_REST_TIMERS.__notifOwner;
-        }
-        await LocalNotifications.schedule({
-          notifications: [{
-            id: notifIdForTimer(timerId, 10000),
-            smallIcon: "ic_stat_modusfit",
-            iconColor: "#14B8A6",
-            title: doneTitle,
-            body: doneBody,
-            channelId: "modusfit-rest-done-v1",
-            sound: alertType === "vibration" ? undefined : "default",
-            schedule: { at: new Date(Date.now() + 100) },
-          }],
-        });
-      } else if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-        new Notification(doneTitle, {
-          body: doneBody,
-          silent: alertType === "vibration",
-          tag: "rest-timer",
-          renotify: true,
-        });
-      }
-    } catch { /* ignorado a propósito */ }
+    avisarFinDeDescanso(timerId, { alertType, exerciseName });
   };
 
   const recompute = () => {
@@ -6320,6 +6429,16 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   // notificación) sin que hubieras visto ningún cronómetro correr. Ahora,
   // si es la última serie, directamente no se arranca nada.
   const autoStartRestTimer = () => {
+    // Guardar una serie significa que el descanso anterior DE ESTE ejercicio
+    // ya se terminó: volviste a entrenar. Antes quedaba corriendo igual, así
+    // que al guardar la última serie te quedaban dos relojes en marcha — el
+    // viejo y el de entre ejercicios — y sonaba el equivocado en medio del
+    // ejercicio siguiente. Parte de "a veces falla el cronómetro entre
+    // ejercicios".
+    if (restTimerId && ACTIVE_REST_TIMERS[restTimerId]) {
+      delete ACTIVE_REST_TIMERS[restTimerId];
+      persistActiveRestTimers();
+    }
     // Junto al descanso se guarda su contexto (cuánto dura, de qué ejercicio
     // es y qué serie viene después). RestTimer sólo mira endTime y lo demás
     // lo ignora; lo usa la pantalla completa (RestFocusOverlay) para poder
@@ -7097,45 +7216,16 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
 /* ============================================================================
    EXERCISE CARD
 ============================================================================ */
-function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts, resetKey = 0, settings = DEFAULT_SETTINGS, forceOpen = false, autoCollapse = false, scrollAlAbrir = false, onDisableAutoShowPrShare, hasActiveSession = true, hideTimer = false, onUpdateSettings = null, onSetPlanPaused = null, routineHasPlan = false, sex = null, age = null, weekInCycle = null, dayKey = null, nextRestTimerId = null, nextRestSeconds = null, siguienteEjercicio = null }) {
+function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts, resetKey = 0, settings = DEFAULT_SETTINGS, autoCollapse = false, onDisableAutoShowPrShare, hasActiveSession = true, hideTimer = false, onUpdateSettings = null, onSetPlanPaused = null, routineHasPlan = false, sex = null, age = null, weekInCycle = null, dayKey = null, nextRestTimerId = null, nextRestSeconds = null, siguienteEjercicio = null }) {
   const [open, setOpen] = useState(false);
   const [showWarmup, setShowWarmup] = useState(false);
-  const cardRef = useRef(null);
-  // forceOpen marca "este es el ejercicio en el que estás": lo usan las demos
-  // del tutorial guiado y, durante una sesión, RoutineView para abrir sola la
-  // tarjeta del ejercicio que toca (ver focoGrupoIdx). Sólo ABRE — nunca
-  // fuerza el cierre — así que si la cerrás a mano se queda cerrada.
-  // autoCollapse es el otro lado de lo mismo: el ejercicio que ya termináste
-  // se pliega cuando el foco pasa al siguiente, así la lista no crece sin
-  // límite a medida que avanzás. Las dos señales viven en un solo efecto y
-  // una sola llamada a setOpen: cuando ninguna aplica no se toca nada, así
-  // que abrir o cerrar a mano gana y se queda como lo dejaste.
-  useEffect(() => {
-    if (!forceOpen && !autoCollapse) return;
-    setOpen(forceOpen);
-  }, [forceOpen, autoCollapse]);
-  // ...y la tarjeta que se abre sola se trae a la pantalla. Sin esto, abrir
-  // el cuarto ejercicio de un día largo no servía de nada: quedaba abierto
-  // seiscientos píxeles más abajo. El retardo deja que el despliegue acomode
-  // la altura primero, así el scroll cae donde tiene que caer.
-  useEffect(() => {
-    if (!forceOpen || !scrollAlAbrir) return;
-    const id = setTimeout(() => {
-      const el = cardRef.current;
-      if (!el || typeof window === "undefined") return;
-      try {
-        // El encabezado es sticky: sin descontarlo, el nombre del ejercicio
-        // queda tapado justo por la franja que dice en qué pestaña estás.
-        // Se mide en vez de hardcodearse porque la app tiene control de
-        // tamaño de letra y esa franja crece con él.
-        const header = document.querySelector("header");
-        const alto = header ? header.getBoundingClientRect().height : 0;
-        const y = el.getBoundingClientRect().top + window.scrollY - alto - 10;
-        window.scrollTo({ top: Math.max(0, y), behavior: "smooth" });
-      } catch { /* sin scroll suave no pasa nada grave */ }
-    }, 280);
-    return () => clearTimeout(id);
-  }, [forceOpen, scrollAlAbrir]);
+  // Pedido: "que no se abran más automáticamente los ejercicios, sí que se
+  // cierren cuando los completaste". La apertura automática (y el scroll que
+  // la acompañaba) se fueron: deciden ellos qué mirás y a dónde salta la
+  // pantalla, y eso molesta más de lo que ayuda. El plegado se queda, que es
+  // la mitad útil: la lista no crece sin límite a medida que avanzás.
+  // Cierra UNA sola vez — si lo reabrís para corregir algo, se queda abierto.
+  useEffect(() => { if (autoCollapse) setOpen(false); }, [autoCollapse]);
   const hasHeavy = exercise.sets.some((s) => isHeavyRepRange(s.repRange));
   const setsToShow = exercise.sets;
   // Id del cronómetro que corresponde a ESTE ejercicio — null si es cardio o
@@ -7228,7 +7318,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
     return base;
   };
   return (
-    <div ref={cardRef} className="stagger-item smooth-card bg-slate-900/50 border border-slate-800/50 rounded-2xl overflow-hidden backdrop-blur-sm shadow-md shadow-black/20 transition-shadow hover:shadow-lg hover:shadow-black/30">
+    <div className="stagger-item smooth-card bg-slate-900/50 border border-slate-800/50 rounded-2xl overflow-hidden backdrop-blur-sm shadow-md shadow-black/20 transition-shadow hover:shadow-lg hover:shadow-black/30">
       <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center justify-between px-4 py-4 hover:bg-slate-800/30 active:bg-slate-800/50 transition text-left">
         <div className="flex items-center gap-3">
           <div className="w-2 h-8 rounded-full shrink-0" style={{ backgroundColor: accent, boxShadow: `0 0 10px -2px ${accent}` }} />
@@ -7244,6 +7334,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
             <div className="flex items-center gap-2 flex-wrap mt-1">
               <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded-lg font-bold" style={{ backgroundColor: tint(accent, "18"), color: accent }}>{exercise.muscle}</span>
               {exercise.cardio && <span className="text-[10px] bg-rose-400/15 text-rose-300 rounded-lg px-1.5 py-0.5 font-bold flex items-center gap-1"><Footprints size={9} /> CARDIO</span>}
+              {!open && restTimerId && <ChipDescansoEnCurso timerId={restTimerId} color={accent} />}
               {/* El ×1/×2 de mancuernas se configura al editar la rutina
                   ("¿Con cuántas mancuernas?"), no acá: durante el
                   entrenamiento sumaba ruido y ya está definido. */}
@@ -7467,35 +7558,20 @@ function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS,
    SESSION BAR — botón de Iniciar sesión (arriba) / estado en curso con
    tiempo transcurrido. El de Finalizar sesión vive abajo, en RoutineView.
 ============================================================================ */
-function SessionStartBar({ activeSession, onStart, onCancel, color = "#14B8A6" }) {
-  const [, forceTick] = useState(0);
-  useEffect(() => {
-    if (!activeSession) return;
-    const id = setInterval(() => forceTick((n) => n + 1), 1000);
-    return () => clearInterval(id);
-  }, [activeSession]);
-
-  if (!activeSession) {
-    return (
-      <button onClick={onStart} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98] invite-pulse" style={{ backgroundColor: color, "--invite-glow": `${tint(color, "80")}` }}>
-        <Play size={15} /> Iniciar sesión
-      </button>
-    );
-  }
-
-  const elapsedMin = Math.max(0, Math.floor((Date.now() - new Date(activeSession.startedAt).getTime()) / 60000));
+function SessionStartBar({ activeSession, onStart, color = "#14B8A6" }) {
+  // Con una sesión en curso este componente no dibuja nada.
+  //
+  // Reporte: "se repite el cronómetro, capaz sacar el recuadro de sesión en
+  // curso arriba". Tenía razón: desde que existe la barra fija de abajo
+  // (ActiveSessionBar), el mismo tiempo transcurrido se contaba en dos
+  // lugares a la vez, y encima el de arriba se iba con el scroll. El de
+  // abajo gana porque está siempre a la vista. Lo único que quedaba sólo
+  // acá, cancelar la sesión, se mudó al paso de confirmación de esa barra.
+  if (activeSession) return null;
   return (
-    <div className="flex items-center gap-3 rounded-2xl px-4 py-3" style={{ backgroundColor: tint(color, "1a"), border: `1px solid ${tint(color, "40")}` }}>
-      <span className="relative flex h-2.5 w-2.5 shrink-0">
-        <span className="absolute inline-flex h-full w-full rounded-full opacity-75 animate-ping" style={{ backgroundColor: color }} />
-        <span className="relative inline-flex rounded-full h-2.5 w-2.5" style={{ backgroundColor: color }} />
-      </span>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-bold text-white truncate">Sesión en curso</p>
-        <p className="text-[11px] truncate" style={{ color: tint(color, "cc") }}>{elapsedMin} min · arrancó a las {new Date(activeSession.startedAt).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}</p>
-      </div>
-      <button onClick={onCancel} className="text-[11px] text-slate-500 hover:text-slate-300 font-semibold shrink-0 whitespace-nowrap">Cancelar</button>
-    </div>
+    <button onClick={onStart} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98] invite-pulse" style={{ backgroundColor: color, "--invite-glow": `${tint(color, "80")}` }}>
+      <Play size={15} /> Iniciar sesión
+    </button>
   );
 }
 
@@ -8071,7 +8147,7 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_
   );
 }
 
-function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, weekSchedule, activeSession, onStartSession, onCancelSession, onDisableAutoShowPrShare, onUpdateSettings = null, onSetPlanPaused = null, onRemovePlan = null, onGoToRoutines = null, onGoToSchedule = null, onGoToFieldSettings = null, onGoToDescarga = null, todaySessionDayKey = null, sex = null, age = null, activeRoutineDef = null, onApplyOwnProgression = null, goToDaySignal = { id: null, n: 0 }, onSignalConsumed = null }) {
+function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, weekSchedule, activeSession, onStartSession, onDisableAutoShowPrShare, onUpdateSettings = null, onSetPlanPaused = null, onRemovePlan = null, onGoToRoutines = null, onGoToSchedule = null, onGoToFieldSettings = null, onGoToDescarga = null, todaySessionDayKey = null, sex = null, age = null, activeRoutineDef = null, onApplyOwnProgression = null, goToDaySignal = { id: null, n: 0 }, onSignalConsumed = null }) {
   // Semana actual del ciclo — sólo hace falta el número (weekInCycle), para
   // que SetRow sepa si hay una meta cargada (modo "planned", ver
   // getPlannedTargetForWeek) para ESTA semana puntual.
@@ -8200,18 +8276,6 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
   // en días que no entrenaste, y el "resetear" del día activo no lo sacaba.
   const rawPct = totalSets ? Math.round((doneToday / totalSets) * 100) : 0;
   const pct = (todaySessionDayKey && todaySessionDayKey !== activeDay) ? 0 : rawPct;
-
-  // ¿En qué ejercicio estás? El primer grupo que todavía tiene series sin
-  // registrar hoy. Es el eje del auto-abrir: esa tarjeta se despliega sola,
-  // se trae a la pantalla, y al completarla el foco pasa a la siguiente.
-  // Vale -1 sin sesión en curso: fuera de una sesión nadie te lleva de la
-  // mano, estás mirando la rutina, no entrenando.
-  const focoGrupoIdx = useMemo(() => {
-    if (!sessionForThisDay) return -1;
-    const grupos = groupExercisesIntoSupersets(day.exercises);
-    const completo = (g) => g.every((ex) => ex.sets.every((_, i) => (logs[`${ex.id}_${i}`] || []).some((h) => h.date === today && !h.deload)));
-    return grupos.findIndex((g) => !completo(g));
-  }, [sessionForThisDay, day.exercises, logs, today]);
 
   const handleResetDay = () => {
     const newLogs = { ...logs };
@@ -8489,6 +8553,11 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           {/* Fila de progreso en el mismo tono neutro de la tarjeta: los
               números primero (que es lo que se lee) y la barra debajo como
               refuerzo, sin fondo negro ni glow. */}
+          {/* Mismo caso que el recuadro de "sesión en curso": mientras
+              entrenás, el avance de series ya lo lleva la barra fija de
+              abajo, a la vista todo el tiempo. Acá queda para cuando NO hay
+              sesión, que es cuando sirve para ver qué tiene el día. */}
+          {!sessionForThisDay && (
           <div className="mt-3 rounded-xl px-3 py-2.5" style={{ backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}>
             <div className="flex items-baseline gap-1.5 mb-1.5">
               <span className="text-sm font-black tabular-nums flex items-baseline" style={{ color: pct > 0 ? day.color : "#64748b" }}>
@@ -8502,6 +8571,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
               <div className="h-full rounded-full transition-all duration-500 ease-out" style={{ width: `${pct}%`, backgroundColor: day.color }} />
             </div>
           </div>
+          )}
           {confirmReset && (
             <div className="flex gap-2 items-center mt-2.5 bg-black/30 border border-white/10 rounded-xl px-3 py-2">
               <p className="text-[11px] text-slate-400 flex-1">¿Borrar reps/kg de hoy (incluido lo sin guardar)? Los récords no cambian.</p>
@@ -8514,7 +8584,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
       {/* La sesión activa pertenece a UN día (el que iniciaste). Si estás
           viendo otro día, no mostramos "sesión en curso" ahí — pero la
           sesión real sigue viva en su día, no se resetea. */}
-      <SessionStartBar activeSession={sessionForThisDay} onStart={() => onStartSession(activeDay)} onCancel={onCancelSession} color={day.color} />
+      <SessionStartBar activeSession={sessionForThisDay} onStart={() => onStartSession(activeDay)} color={day.color} />
 
       {/* Calentamiento GENERAL de la sesión (movilidad/activación, 10-15
           min) — distinto del calentamiento POR EJERCICIO que ya existe
@@ -8557,25 +8627,19 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             const entreActivo = settings.restBetweenExercises === true && !!sessionForThisDay;
             const nextRestTimerId = entreActivo ? timerIdDe(siguiente) : null;
             const nextRestSeconds = settings.restBetweenExercisesSec ?? 180;
-            // El ejercicio en el que estás: se abre solo y se trae a la
-            // pantalla. Antes esto dependía de tener prendido el descanso
-            // ENTRE ejercicios (una opción que viene apagada), y encima sólo
-            // se aplicaba del segundo en adelante: al iniciar una sesión no
-            // se abría nada y había que ir tocando tarjeta por tarjeta. Son
-            // dos cosas distintas — una es un cronómetro, la otra es saber
-            // dónde estás — así que el auto-abrir ahora vale durante toda la
-            // sesión, desde el primer ejercicio.
             // Para el descanso ENTRE ejercicios, lo que viene es el próximo
             // ejercicio, no la próxima serie.
             const pistaProxEjercicio = siguiente?.[0]
               ? { nombre: siguiente[0].name, serie: 1, rango: siguiente[0].sets?.[0]?.repRange ? `${siguiente[0].sets[0].repRange} reps` : null }
               : null;
-            const esFoco = gi === focoGrupoIdx;
-            // Y el que dejaste atrás terminado se pliega.
-            const plegar = focoGrupoIdx >= 0 && gi < focoGrupoIdx && estaCompleto(group);
+            // Terminaste todas sus series: la tarjeta se pliega sola.
+            // Pedido: "que no se abran más automáticamente los ejercicios, sí
+            // que se cierren cuando los completaste". No hay apertura
+            // automática: el único que decide qué estás mirando sos vos.
+            const plegar = !!sessionForThisDay && estaCompleto(group);
             if (group.length === 1) {
               const ex = group[0];
-              return <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onSetPlanPaused={onSetPlanPaused} routineHasPlan={hasAnyPlan} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} sex={sex} age={age} weekInCycle={weekInCycle} dayKey={activeDay} forceOpen={esFoco} autoCollapse={plegar} scrollAlAbrir nextRestTimerId={nextRestTimerId} nextRestSeconds={nextRestSeconds} siguienteEjercicio={pistaProxEjercicio} />;
+              return <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onSetPlanPaused={onSetPlanPaused} routineHasPlan={hasAnyPlan} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} sex={sex} age={age} weekInCycle={weekInCycle} dayKey={activeDay} autoCollapse={plegar} nextRestTimerId={nextRestTimerId} nextRestSeconds={nextRestSeconds} siguienteEjercicio={pistaProxEjercicio} />;
             }
             // Superserie: varios ejercicios encadenados comparten un solo
             // cronómetro al final del grupo, en vez de uno por ejercicio —
@@ -8585,7 +8649,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             return (
               <div key={`${activeDay}:${group.map((e) => e.id).join("-")}`} className="rounded-2xl border p-2.5 space-y-2.5" style={{ borderColor: tint(day.color, "50"), backgroundColor: tint(day.color, "06") }}>
                 <div className="flex items-center gap-1.5 px-1"><Link size={11} style={{ color: day.color }} /><span className="text-[10px] font-black uppercase tracking-wider" style={{ color: day.color }}>Superserie · {group.length} ejercicios</span></div>
-                {group.map((ex, xi) => <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onSetPlanPaused={onSetPlanPaused} routineHasPlan={hasAnyPlan} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} hideTimer sex={sex} age={age} weekInCycle={weekInCycle} dayKey={activeDay} forceOpen={esFoco} autoCollapse={plegar} scrollAlAbrir={xi === 0} nextRestTimerId={xi === group.length - 1 ? nextRestTimerId : null} nextRestSeconds={nextRestSeconds} siguienteEjercicio={pistaProxEjercicio} />)}
+                {group.map((ex, xi) => <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onSetPlanPaused={onSetPlanPaused} routineHasPlan={hasAnyPlan} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} hideTimer sex={sex} age={age} weekInCycle={weekInCycle} dayKey={activeDay} autoCollapse={plegar} nextRestTimerId={xi === group.length - 1 ? nextRestTimerId : null} nextRestSeconds={nextRestSeconds} siguienteEjercicio={pistaProxEjercicio} />)}
                 <div className="px-1"><RestTimer seconds={hasHeavyGroup ? settings.restLong : settings.restShort} accent={day.color} alertType={settings.alertType} timerId={`${activeDay}:grp_${group.map((g) => g.id).join("_")}`} exerciseName={group.map((g) => g.name).filter(Boolean).join(" + ")} /></div>
                 <p className="text-[10px] text-slate-600 px-1">Descansá recién después de completar los {group.length} ejercicios. Ese es el cronómetro de arriba.</p>
               </div>
@@ -9205,7 +9269,7 @@ function DeloadCardioTimer({ targetMinutes, accent, onComplete, timerId }) {
   );
 }
 
-function DeloadView({ logs, setLogs, settings = DEFAULT_SETTINGS, deloadProgress = {}, setDeloadProgress, onFinishDeloadSession, activeSession = null, onStartSession = null, onCancelSession = null, weekSchedule = null, onClose = null, cycleStart = null }) {
+function DeloadView({ logs, setLogs, settings = DEFAULT_SETTINGS, deloadProgress = {}, setDeloadProgress, onFinishDeloadSession, activeSession = null, onStartSession = null, weekSchedule = null, onClose = null, cycleStart = null }) {
   const globalUnit = useWeightUnit();
   const [unit, setUnit] = useState(globalUnit);
   const { trainWeeks, deloadWeeks, deloadPct, deloadSetDivisor } = settings;
@@ -9365,7 +9429,7 @@ function DeloadView({ logs, setLogs, settings = DEFAULT_SETTINGS, deloadProgress
           Rutina, que siempre tuvo Iniciar/Cancelar sesión. Mismo componente,
           mismo comportamiento, para que la descarga se sienta parte de la
           misma app y no un rincón aparte. */}
-      {onStartSession && <SessionStartBar activeSession={activeSession} onStart={() => onStartSession(activeDay, true)} onCancel={onCancelSession} color="#A855F7" />}
+      {onStartSession && <SessionStartBar activeSession={activeSession} onStart={() => onStartSession(activeDay, true)} color="#A855F7" />}
 
       <div key={activeDay} className="space-y-3 tab-fade-in">
         {day.exercises.map((ex) => {
@@ -22609,7 +22673,7 @@ function HeaderAvatar({ profileName, onClick }) {
    cerraría la sesión y borraría lo que tenías escrito sin guardar. La
    confirmación se cancela sola a los 5s para no quedar trabada.
 ============================================================================ */
-function ActiveSessionBar({ startedAt, dayLabel, color, done, total, conProgreso, enRutina, onEnd, onGoToRoutine }) {
+function ActiveSessionBar({ startedAt, dayLabel, color, done, total, conProgreso, enRutina, onEnd, onCancel, onGoToRoutine }) {
   // El tiempo transcurrido se guarda en estado y lo actualiza el intervalo.
   // Leer el reloj durante el render es impuro (y el linter de React Compiler
   // lo rechaza): el primer valor llega en el siguiente turno del event loop
@@ -22655,6 +22719,11 @@ function ActiveSessionBar({ startedAt, dayLabel, color, done, total, conProgreso
                     : ""}
                   Se guarda en tu historial y se borra lo que escribiste sin guardar.
                 </p>
+                {onCancel && (
+                  <button onClick={onCancel} className="text-[10px] text-slate-600 hover:text-rose-400 transition mt-0.5">
+                    O descartala, sin que cuente como entrenamiento
+                  </button>
+                )}
               </div>
               <button onClick={() => setConfirmando(false)} className="px-3 py-2 rounded-xl bg-slate-800 text-slate-400 text-[11px] font-bold shrink-0 transition active:scale-95">No</button>
               <button onClick={onEnd} className="px-3 py-2 rounded-xl !text-white text-[11px] font-black shrink-0 transition active:scale-95" style={{ backgroundColor: color }}>Sí, finalizar</button>
@@ -24172,6 +24241,10 @@ export default function App() {
     if (Capacitor.isNativePlatform()) LocalNotifications.cancel({ notifications: [{ id: 9300 }] }).catch(() => {});
   };
   const handleEndSession = () => {
+    // Pedido: "que cuando finalizas la sesión ya no sigan corriendo los
+    // cronómetros de la app ni los de las notificaciones". Va PRIMERO, antes
+    // de tocar el perfil: si algo falla más abajo, igual quedaron apagados.
+    detenerCronometrosDeSesion();
     // El resumen se arma ANTES de cerrar (después ya no existe activeSession
     // para calcular la duración). Solo se muestra si registraste algo.
     const resumen = armarResumenSesion();
@@ -24200,6 +24273,7 @@ export default function App() {
     if (updatedTrainingSessions) checkWeeklyRecap(updatedTrainingSessions);
   };
   const handleCancelSession = () => {
+    detenerCronometrosDeSesion();
     setProfiles((prev) => {
       const p = prev[activeProfile];
       if (!p?.activeSession) return prev;
@@ -24215,6 +24289,7 @@ export default function App() {
   // DeloadView), toma el startedAt real para que la duración no quede
   // siempre en 0 minutos, y limpia activeSession al terminar.
   const handleFinishDeloadSession = (dayKey) => {
+    detenerCronometrosDeSesion();
     let updatedTrainingSessions = null;
     setProfiles((prev) => {
       const p = prev[activeProfile];
@@ -24358,10 +24433,10 @@ export default function App() {
                 que acordarse de tocar un atajo chico para verla. El atajo
                 que quedó adentro de RoutineView ahora sirve para volver a
                 fijarla si la cerraste. */}
-            {tab === "rutina" && showPinnedDeload && <DeloadView logs={logs} setLogs={setLogs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} activeSession={profile?.activeSession?.deload ? profile.activeSession : null} onStartSession={handleStartSession} onCancelSession={handleCancelSession} weekSchedule={weekSchedule} onClose={() => setDeloadDismissed(true)} cycleStart={cycleStart} />}
-            {tab === "rutina" && !showPinnedDeload && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToRoutines={() => setTab("rutinas")} onGoToSchedule={() => goToSection("rutinas", "week-schedule")} onGoToFieldSettings={() => goToSection("perfil", "field-settings-section")} onGoToDescarga={() => (isDeloadWeek ? setDeloadDismissed(false) : setTab("descarga"))} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onCancelSession={handleCancelSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} todaySessionDayKey={(profile?.trainingSessions || []).find((ts) => ts.date === todayStr())?.dayKey || profile?.activeSession?.dayKey || null} sex={profile?.sex} age={profile?.age} activeRoutineDef={activeRoutineDef} onApplyOwnProgression={handleApplyOwnProgression} onSetPlanPaused={handleSetPlanPaused} onRemovePlan={handleRemovePlan} goToDaySignal={openSectionSignal.id === "go-to-day" ? openSectionSignal : { id: null, n: 0 }} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} />}
+            {tab === "rutina" && showPinnedDeload && <DeloadView logs={logs} setLogs={setLogs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} activeSession={profile?.activeSession?.deload ? profile.activeSession : null} onStartSession={handleStartSession} weekSchedule={weekSchedule} onClose={() => setDeloadDismissed(true)} cycleStart={cycleStart} />}
+            {tab === "rutina" && !showPinnedDeload && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToRoutines={() => setTab("rutinas")} onGoToSchedule={() => goToSection("rutinas", "week-schedule")} onGoToFieldSettings={() => goToSection("perfil", "field-settings-section")} onGoToDescarga={() => (isDeloadWeek ? setDeloadDismissed(false) : setTab("descarga"))} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} todaySessionDayKey={(profile?.trainingSessions || []).find((ts) => ts.date === todayStr())?.dayKey || profile?.activeSession?.dayKey || null} sex={profile?.sex} age={profile?.age} activeRoutineDef={activeRoutineDef} onApplyOwnProgression={handleApplyOwnProgression} onSetPlanPaused={handleSetPlanPaused} onRemovePlan={handleRemovePlan} goToDaySignal={openSectionSignal.id === "go-to-day" ? openSectionSignal : { id: null, n: 0 }} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} />}
             {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} onGoToRoutines={() => goToSection("rutinas", "routine-editor")} weekSchedule={weekSchedule} sex={profile?.sex} age={profile?.age} onGoToDeload={() => { if (isDeloadWeek) { setDeloadDismissed(false); setTab("rutina"); } else { setTab("descarga"); } }} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} />}
-            {tab === "descarga" && <DeloadView logs={logs} setLogs={setLogs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} activeSession={profile?.activeSession?.deload ? profile.activeSession : null} onStartSession={handleStartSession} onCancelSession={handleCancelSession} weekSchedule={weekSchedule} onClose={() => { setDeloadDismissed(true); setTab("rutina"); }} cycleStart={cycleStart} />}
+            {tab === "descarga" && <DeloadView logs={logs} setLogs={setLogs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} activeSession={profile?.activeSession?.deload ? profile.activeSession : null} onStartSession={handleStartSession} weekSchedule={weekSchedule} onClose={() => { setDeloadDismissed(true); setTab("rutina"); }} cycleStart={cycleStart} />}
             {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} setLogs={setLogs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} conversations={aiConversations} activeConversationId={activeAiConversationId} onNewConversation={handleNewAiConversation} onSwitchConversation={handleSwitchAiConversation} onDeleteConversation={handleDeleteAiConversation} onRenameConversation={handleRenameAiConversation} settings={getProfileSettings(profile)} cycleStart={cycleStart} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} onDeleteRoutine={handleDeleteRoutine} onNavigate={setTab} onStartSession={handleStartSession} onEndSession={handleEndSession} />}
             {tab === "perfil" && <ProfileView onOpenFieldPreview={() => setShowFieldIntro(true)} openSectionSignal={openSectionSignal} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} profileName={activeProfile} profiles={profiles} onSignOut={handleSignOut} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} onGoToSocial={() => setTab("social")} />}
             {tab === "social" && <SocialView profile={profile} profileName={activeProfile} uid={profile?.googleUid} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} />}
@@ -24372,6 +24447,9 @@ export default function App() {
       {/* Descanso a pantalla completa: sólo mientras hay una sesión en curso
           — registrar una marca suelta fuera de una sesión no debería
           tomarte la pantalla. */}
+      {/* Siempre montado: es el único que garantiza que un descanso avise
+          aunque la tarjeta dueña del cronómetro esté cerrada. */}
+      <VigilanteDescansos alertType={getProfileSettings(profile).alertType} />
       <RestFocusOverlay
         activo={haySesionActiva && getProfileSettings(profile).fullscreenRest !== false}
         onApagarParaSiempre={() => handleUpdateSettings({ fullscreenRest: false })}
@@ -24390,6 +24468,7 @@ export default function App() {
           enRutina={tab === "rutina" || tab === "descarga"}
           onGoToRoutine={() => setTab(profile.activeSession.deload ? "descarga" : "rutina")}
           onEnd={() => (profile.activeSession.deload ? handleFinishDeloadSession(profile.activeSession.dayKey) : handleEndSession())}
+          onCancel={handleCancelSession}
         />
       )}
       {sessionStarted && <SessionStartOverlay onDone={() => setSessionStarted(false)} />}
