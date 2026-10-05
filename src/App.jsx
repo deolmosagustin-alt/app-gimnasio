@@ -4934,6 +4934,41 @@ function RestFocusScreen({ info, restante, onCerrar, onAjustar, onSaltear, onApa
   );
 }
 
+// UN solo AudioContext para toda la vida de la app, desbloqueado con el
+// primer toque de la persona.
+//
+// Antes se creaba uno nuevo adentro del aviso de fin de descanso y se cerraba
+// a los 900ms. En Chrome anda; en Safari (o sea, en todo iPhone) no suena
+// NUNCA, y sin tirar ningún error: un AudioContext que nace fuera de un
+// gesto del usuario nace "suspended", y el aviso corre en el callback de un
+// cronómetro, que no es un gesto. Los osciladores se programan, el navegador
+// los ignora y el descanso termina en silencio.
+// Reusar uno solo arregla eso y de paso el problema que el código viejo ya
+// documentaba: iOS Safari tiene un límite bajo de contextos simultáneos y,
+// pasado ese límite, el sonido se apaga para siempre sin aviso.
+let ctxAudio = null;
+function obtenerAudioContext() {
+  if (typeof window === "undefined") return null;
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return null;
+  if (!ctxAudio || ctxAudio.state === "closed") {
+    try { ctxAudio = new AC(); } catch { return null; }
+  }
+  return ctxAudio;
+}
+// Los oyentes se quedan puestos a propósito en vez de usar { once: true }:
+// iOS vuelve a suspender el contexto cada vez que la app pasa a segundo
+// plano, así que hace falta poder reanudarlo más de una vez.
+if (typeof window !== "undefined") {
+  const desbloquear = () => {
+    const a = obtenerAudioContext();
+    if (a && a.state === "suspended") a.resume().catch(() => {});
+  };
+  ["pointerdown", "touchend", "keydown"].forEach((ev) => {
+    window.addEventListener(ev, desbloquear, { capture: true, passive: true });
+  });
+}
+
 // Aviso de fin de descanso (sonido, vibración y notificación del sistema).
 //
 // Vive a nivel de módulo y no adentro de RestTimer porque el dueño del
@@ -4961,7 +4996,10 @@ async function avisarFinDeDescanso(timerId, { alertType = "sound", exerciseName 
   }
   if (alertType !== "vibration") {
     try {
-      const a = new AudioContext();
+      const a = obtenerAudioContext();
+      if (!a) throw new Error("sin audio");
+      // Por si iOS lo suspendió mientras la app estaba en segundo plano.
+      if (a.state === "suspended") a.resume().catch(() => {});
       // Arpegio ascendente tipo "campanita" (Do-Mi-Sol de la 5ª octava): tres
       // notas cortas que suben, con ataque rápido y caída suave. Más agradable
       // que el doble beep plano y se distingue mejor del ruido del gimnasio.
@@ -4978,13 +5016,9 @@ async function avisarFinDeDescanso(timerId, { alertType = "sound", exerciseName 
         o.start(t0);
         o.stop(t0 + 0.34);
       });
-      // Antes esto se acumulaba: cada serie creaba un AudioContext nuevo
-      // y nunca se cerraba. Los navegadores tienen un límite de
-      // contextos simultáneos (chico en iOS Safari en particular) —
-      // pasado ese límite, el sonido deja de sonar sin ningún error
-      // visible. Se cierra solo, ~700ms después (los dos beeps de
-      // 280ms con 220ms de diferencia entre uno y otro ya terminaron).
-      setTimeout(() => { a.close().catch(() => { }); }, 900);
+      // No se cierra: el contexto es único y se reusa toda la sesión (ver
+      // obtenerAudioContext). Cerrarlo obligaría a crear otro en el próximo
+      // descanso, y ese otro volvería a nacer suspendido.
     } catch { /* ignorado a propósito */ }
   }
   if (alertType !== "sound") haptic([400, 150, 400, 150, 500, 150, 400]);
