@@ -1,20 +1,29 @@
 {
+  "id": "/",
+  "name": "Modus Fit · Entrenamientos y progreso",
   "short_name": "Modus Fit",
-  "name": "Modus Fit",
+  "description": "Anotá series, repeticiones y kilos. Récords automáticos, progresión semana a semana y un entrenador con IA que conoce tu historial.",
+  "lang": "es-AR",
+  "dir": "ltr",
+  "categories": ["health", "fitness", "sports"],
   "icons": [
     {
-      "src": "/logo192.png",
-      "sizes": "192x192",
-      "type": "image/png"
+      "src": "/logo512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
     },
     {
       "src": "/logo512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "theme_color": "#0a0a0f",
   "background_color": "#0a0a0f"
 }

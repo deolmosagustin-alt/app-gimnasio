@@ -24348,7 +24348,7 @@ export default function App() {
     });
   }, [activeProfile]);
 
-  if (!activeProfile) return (<><StyleInjector />{recoveredNotice && <RecoveredBanner onClose={() => setRecoveredNotice(false)} />}<LoginScreen onLogin={handleLogin} allowAutoLogin={!justLoggedOut} /></>);
+  if (!activeProfile) return (<><StyleInjector /><InstalarEnIosBanner />{recoveredNotice && <RecoveredBanner onClose={() => setRecoveredNotice(false)} />}<LoginScreen onLogin={handleLogin} allowAutoLogin={!justLoggedOut} /></>);
 
   if (needsRoutinePick) return (
     <>
@@ -24383,6 +24383,7 @@ export default function App() {
           El overlay no bloquea toques y queda debajo de los modales. */}
       <div style={{ position: "fixed", inset: 0, backdropFilter: "saturate(0.88)", WebkitBackdropFilter: "saturate(0.88)", pointerEvents: "none", zIndex: 50 }} />
       <StyleInjector />
+      <InstalarEnIosBanner />
       {recoveredNotice && <RecoveredBanner onClose={() => setRecoveredNotice(false)} />}
 
       {importRoutineError && <ImportRoutineErrorBanner onClose={() => setImportRoutineError(false)} />}
@@ -24511,6 +24512,88 @@ export default function App() {
       )}
     </div>
     </WeightUnitCtx.Provider>
+  );
+}
+
+/* ============================================================================
+   "AGREGÁ MODUS FIT A TU INICIO" — sólo para iPhone y iPad
+
+   Android y las computadoras tienen un botón de instalar que el navegador
+   ofrece solo. iOS no: Safari nunca lo propone y la única forma es Compartir
+   → "Agregar a pantalla de inicio", escondida detrás de un menú que la
+   mayoría no abre nunca. Sin este aviso, quien entra desde un iPhone usa la
+   app como una pestaña más, la pierde al cerrar Safari y no vuelve.
+
+   Importa más de lo que parece: instalada, la app se abre a pantalla
+   completa, sin la barra del navegador, queda con su ícono entre las demás
+   y recién ahí iOS le deja mandar notificaciones (16.4 en adelante).
+
+   Aparece sólo si se dan las tres: es iOS, es Safari, y todavía no está
+   instalada. Se puede cerrar y no vuelve a aparecer.
+============================================================================ */
+const AVISO_IOS_KEY = "modusfit_aviso_instalar_ios_v1";
+
+function esIosEnSafariSinInstalar() {
+  if (typeof window === "undefined" || typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  // El iPad moderno se declara "Macintosh": se lo distingue porque la Mac no
+  // tiene pantalla táctil.
+  const esIos = /iPad|iPhone|iPod/.test(ua) || (/Macintosh/.test(ua) && (navigator.maxTouchPoints || 0) > 1);
+  if (!esIos) return false;
+  // Ya instalada: iOS la marca con standalone en navigator (no en matchMedia,
+  // que recién lo soporta en versiones nuevas — se chequean las dos).
+  const instalada = window.navigator.standalone === true
+    || (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches);
+  if (instalada) return false;
+  // Chrome, Firefox y Edge en iOS usan el motor de Safari por debajo, pero
+  // NINGUNO deja agregar a la pantalla de inicio. Mostrarles las
+  // instrucciones de Safari sería mandarlos a buscar un botón que no existe.
+  if (/CriOS|FxiOS|EdgiOS|OPiOS|Instagram|FBAN|FBAV/.test(ua)) return false;
+  return true;
+}
+
+function InstalarEnIosBanner() {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    let vivo = true;
+    // En un timeout y no en línea: setState sincrónico dentro de un efecto
+    // encadena renders. Además le da unos segundos a la persona para ver de
+    // qué se trata la app antes de pedirle que la instale.
+    const id = setTimeout(() => {
+      if (!vivo) return;
+      let yaLoVio = false;
+      try { yaLoVio = localStorage.getItem(AVISO_IOS_KEY) === "1"; } catch { /* sin storage, se muestra */ }
+      if (!yaLoVio && esIosEnSafariSinInstalar()) setVisible(true);
+    }, 2500);
+    return () => { vivo = false; clearTimeout(id); };
+  }, []);
+  const cerrar = () => {
+    setVisible(false);
+    try { localStorage.setItem(AVISO_IOS_KEY, "1"); } catch { /* ignorado a propósito */ }
+  };
+  if (!visible) return null;
+  return (
+    <div className="fixed left-0 right-0 top-0 z-[150] px-3 pt-3 pointer-events-none" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 12px)" }}>
+      <div className="max-w-xl mx-auto pointer-events-auto rounded-2xl p-3.5 shadow-2xl shadow-black/50 bounce-in"
+        style={{ backgroundColor: "rgba(10,10,15,0.96)", border: "1px solid rgba(20,184,166,0.45)", backdropFilter: "blur(12px)" }}>
+        <div className="flex items-start gap-3">
+          <span className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(20,184,166,0.18)", color: "#2dd4bf" }}>
+            <Download size={16} />
+          </span>
+          <div className="flex-1 min-w-0">
+            <p className="text-[13px] font-black text-white leading-tight">Agregala a tu inicio</p>
+            <p className="text-[11px] text-slate-400 leading-snug mt-1">
+              Tocá <ArrowUpDown size={10} className="inline -rotate-90 mx-0.5 text-teal-300" />
+              <b className="text-slate-300">Compartir</b> abajo, y después <b className="text-slate-300">“Agregar a pantalla de inicio”</b>.
+              Se abre a pantalla completa y te queda con las demás apps.
+            </p>
+          </div>
+          <button onClick={cerrar} aria-label="Ahora no" className="shrink-0 p-1.5 rounded-lg text-slate-500 hover:text-white transition active:scale-90">
+            <X size={15} />
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

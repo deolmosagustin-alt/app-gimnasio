@@ -1,18 +1,64 @@
 <!doctype html>
-<html lang="en">
+<html lang="es-AR">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <!-- Lo que ve Google. Sin description, el buscador inventa el resumen con
+         lo primero que encuentra en la página — que acá es la pantalla de
+         login, o sea nada. El título lleva el nombre PRIMERO (quien ya lo
+         conoce lo busca así) y qué hace la app después. -->
+    <title>Modus Fit · Registrá tus entrenamientos y seguí tu progreso</title>
+    <meta name="description" content="App de gimnasio para anotar series, repeticiones y kilos. Detecta tus récords sola, te arma la progresión semana a semana y tiene un entrenador con IA que conoce tu historial. Gratis, en el celular y desde el navegador." />
+    <link rel="canonical" href="https://app-gimnasio-two.vercel.app/" />
+
+    <!-- Vista previa al compartir el link. Para una app de gimnasio esto pesa
+         más que el buscador: casi todo el que la pruebe va a llegar por un
+         link que le pasaron por WhatsApp, y sin estas etiquetas ese mensaje
+         es una URL pelada que no invita a tocar nada. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Modus Fit" />
+    <meta property="og:title" content="Modus Fit · Registrá tus entrenamientos y seguí tu progreso" />
+    <meta property="og:description" content="Anotá series, repes y kilos en segundos. Récords automáticos, progresión semana a semana y un entrenador con IA que conoce tu historial." />
+    <meta property="og:url" content="https://app-gimnasio-two.vercel.app/" />
+    <meta property="og:image" content="https://app-gimnasio-two.vercel.app/logo512.png" />
+    <meta property="og:locale" content="es_AR" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Modus Fit · Registrá tus entrenamientos y seguí tu progreso" />
+    <meta name="twitter:description" content="Anotá series, repes y kilos en segundos. Récords automáticos y un entrenador con IA que conoce tu historial." />
+    <meta name="twitter:image" content="https://app-gimnasio-two.vercel.app/logo512.png" />
+
+    <!-- iPhone. iOS ignora casi todo el manifest: el ícono del escritorio, el
+         nombre debajo y el color de la barra de estado salen de ACÁ, no de
+         manifest.json. Sin apple-touch-icon, iOS se guarda una captura de la
+         pantalla como ícono.
+         black-translucent deja el contenido pasar por debajo de la barra de
+         estado, que es lo que la app ya espera: el escudo de arriba y los
+         paddings usan env(safe-area-inset-top). -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Modus Fit" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="apple-touch-icon" href="/logo512.png" />
     <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="theme-color" content="#0a0a0f" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="manifest" href="/manifest.json" />
-    <title>Modus Fit</title>
     <style>
       html, body { background: #0a0a0f !important; margin: 0; padding: 0; }
     </style>
   </head>
   <body>
     <div id="root"></div>
+    <!-- Lo único que Google ve sin ejecutar JavaScript. La app se dibuja
+         entera con React, así que el HTML que llega del servidor está vacío:
+         si el robot no corre el JS (pasa, sobre todo en sitios nuevos sin
+         links que apunten a ellos), sin esto no hay NADA que indexar.
+         Se borra apenas React monta, así que nadie lo ve. -->
+    <noscript>
+      <h1>Modus Fit · Registrá tus entrenamientos y seguí tu progreso</h1>
+      <p>Modus Fit es una app de gimnasio para anotar series, repeticiones y kilos. Detecta tus récords sola, arma tu progresión semana a semana, lleva tus medidas y tus fotos de progreso, y suma un entrenador con inteligencia artificial que conoce tu historial real.</p>
+      <p>Funciona en el navegador y se puede agregar a la pantalla de inicio del celular, tanto en Android como en iPhone. Necesita JavaScript activado.</p>
+    </noscript>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

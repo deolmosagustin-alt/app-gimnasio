@@ -1,0 +1,11 @@
+# Sin este archivo Vercel devuelve un 404 en /robots.txt. No impide que
+# Google entre, pero es lo primero que pide un rastreador y es donde se le
+# dice dónde está el mapa del sitio.
+User-agent: *
+Allow: /
+
+# /api/ia es la función que habla con Gemini: sólo acepta POST y no tiene
+# nada que indexar. Que no se gaste presupuesto de rastreo ahí.
+Disallow: /api/
+
+Sitemap: https://app-gimnasio-two.vercel.app/sitemap.xml
