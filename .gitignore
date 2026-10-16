@@ -34,3 +34,6 @@ _social_*.png
 _ent_*.png
 _plan_*.png
 _qr_*.png
+
+# taste-skill: capturas y archivos de trabajo que generan sus scripts (inspect, draw)
+.taste-skill/
