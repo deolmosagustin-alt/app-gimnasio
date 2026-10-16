@@ -8,7 +8,9 @@
     "build": "vite build --emptyOutDir",
     "lint": "eslint .",
     "preview": "vite preview",
-    "dominio": "node scripts/cambiar-dominio.mjs"
+    "dominio": "node scripts/cambiar-dominio.mjs",
+    "capturas": "node scripts/capturas.mjs",
+    "imagen": "node scripts/generar-imagen.mjs"
   },
   "dependencies": {
     "@capacitor-firebase/authentication": "^8.3.0",

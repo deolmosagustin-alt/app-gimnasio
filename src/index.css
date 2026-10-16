@@ -1,1 +1,6 @@
 @import "tailwindcss";
+/* Tailwind lee todo el repo buscando clases, y las skills de diseño traen
+   documentación llena de ejemplos (max-w-[1400px], z-[9999]...). Sin esto,
+   esas clases que la app no usa terminan en el CSS de producción. */
+@source not "../.agents";
+@source not "../.claude";

@@ -37,3 +37,6 @@ _qr_*.png
 
 # taste-skill: capturas y archivos de trabajo que generan sus scripts (inspect, draw)
 .taste-skill/
+
+# superdesign: contexto y estado de trabajo que genera su CLI al usarla
+.superdesign/
