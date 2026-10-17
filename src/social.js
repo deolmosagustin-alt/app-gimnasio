@@ -18,6 +18,12 @@
 import { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, collectionGroup, addDoc, query, where, orderBy, limit, getDocs } from "firebase/firestore";
 import { db } from "./firebase";
 
+// Social de muestra, sólo en desarrollo (ver social-demo.js): con la marca
+// en el localStorage, estas funciones contestan con amigos de prueba en vez
+// de ir a Firestore. En la versión publicada import.meta.env.DEV es false y
+// estas ramas desaparecen, con su import() incluido.
+const demoSocialMarcado = () => typeof localStorage !== "undefined" && localStorage.getItem("modusfit_demo_social") === "1";
+
 // ============================== USERNAME (@handle) ==============================
 
 // BUG FIX (encontrado auditando): el campo de búsqueda muestra el
@@ -153,6 +159,7 @@ export async function syncPublicProfile(uid, profile, activeRoutineSnapshot, top
 }
 
 export async function getPublicBasic(uid) {
+  if (import.meta.env.DEV && demoSocialMarcado()) return (await import("./social-demo.js")).getPublicBasic(uid);
   try {
     const snap = await getDoc(doc(db, "users", uid, "public", "basic"));
     return snap.exists() ? snap.data() : null;
@@ -163,6 +170,7 @@ export async function getPublicBasic(uid) {
 // @handle) — el llamador lo muestra como "esta persona no comparte su
 // perfil" en vez de reventar.
 export async function getPublicFull(uid) {
+  if (import.meta.env.DEV && demoSocialMarcado()) return (await import("./social-demo.js")).getPublicFull(uid);
   try {
     const snap = await getDoc(doc(db, "users", uid, "public", "full"));
     return snap.exists() ? snap.data() : null;
@@ -281,6 +289,7 @@ export async function removeFriend(myUid, otherUid) {
 // profile?.googleUid, que para un perfil local es undefined).
 export async function listMyFriendships(uid) {
   if (!uid) return [];
+  if (import.meta.env.DEV && demoSocialMarcado()) return (await import("./social-demo.js")).listMyFriendships(uid);
   const snap = await getDocs(query(collection(db, "friendships"), where("users", "array-contains", uid)));
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
@@ -314,12 +323,14 @@ export async function removeTrainerLink(trainerUid, studentUid) {
 }
 
 export async function listTrainerLinksAsTrainer(uid) {
+  if (import.meta.env.DEV && demoSocialMarcado()) return [];
   if (!uid) return [];
   const snap = await getDocs(query(collection(db, "trainerLinks"), where("trainerUid", "==", uid)));
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
 export async function listTrainerLinksAsStudent(uid) {
+  if (import.meta.env.DEV && demoSocialMarcado()) return [];
   if (!uid) return [];
   const snap = await getDocs(query(collection(db, "trainerLinks"), where("studentUid", "==", uid)));
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -372,12 +383,14 @@ export async function respondToRoutineProposal(proposalId, accept) {
 }
 
 export async function listRoutineProposalsForStudent(studentUid) {
+  if (import.meta.env.DEV && demoSocialMarcado()) return [];
   if (!studentUid) return [];
   const snap = await getDocs(query(collection(db, "routineProposals"), where("studentUid", "==", studentUid), where("status", "==", "pending")));
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
 export async function listRoutineProposalsByTrainer(trainerUid) {
+  if (import.meta.env.DEV && demoSocialMarcado()) return [];
   if (!trainerUid) return [];
   const snap = await getDocs(query(collection(db, "routineProposals"), where("trainerUid", "==", trainerUid)));
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -394,6 +407,7 @@ export async function listRoutineProposalsByTrainer(trainerUid) {
 export function kudosId(toUid, fromUid, date) { return `${toUid}_${fromUid}_${date}`; }
 
 export async function hasSentKudosToday(toUid, fromUid, date) {
+  if (import.meta.env.DEV && demoSocialMarcado()) return false;
   try {
     const snap = await getDoc(doc(db, "kudos", kudosId(toUid, fromUid, date)));
     return snap.exists();
@@ -401,6 +415,7 @@ export async function hasSentKudosToday(toUid, fromUid, date) {
 }
 
 export async function sendKudos(toUid, fromUid, date) {
+  if (import.meta.env.DEV && demoSocialMarcado()) return;
   await setDoc(doc(db, "kudos", kudosId(toUid, fromUid, date)), { toUid, fromUid, date, createdAt: new Date().toISOString() });
 }
 
@@ -415,6 +430,7 @@ export async function sendKudos(toUid, fromUid, date) {
 // así que no hace falta publicar reglas nuevas.
 export async function listKudosReceived(uid, sinceDate) {
   if (!uid) return [];
+  if (import.meta.env.DEV && demoSocialMarcado()) return (await import("./social-demo.js")).listKudosReceived(uid);
   try {
     const snap = await getDocs(query(collection(db, "kudos"), where("toUid", "==", uid), where("date", ">=", sinceDate)));
     return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
