@@ -1,9 +1,10 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-// Fuentes empaquetadas con la app: el WebView de Android y la app instalada
-// en el iPhone las tienen aunque no haya internet en el gimnasio.
-import '@fontsource-variable/geist'
-import '@fontsource-variable/archivo/wdth.css'
+// Fuente empaquetada con la app: el WebView de Android y la app instalada en
+// el iPhone la tienen aunque no haya internet en el gimnasio. Es la versión
+// con los ejes de peso y de redondez (ROND), la que usan los números grandes
+// (ver fuente.css: sólo los alfabetos latinos).
+import './fuente.css'
 import './index.css'
 import App from './App.jsx'
 import ErrorBoundary from './ErrorBoundary.jsx'

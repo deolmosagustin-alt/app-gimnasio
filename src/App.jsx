@@ -1,5 +1,10 @@
-import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, createContext, useContext, useSyncExternalStore } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, createContext, useContext, useSyncExternalStore, useId } from "react";
 import { createPortal } from "react-dom";
+// Terminación: los dígitos de los relojes ruedan (NumberFlow) y las series se
+// acomodan deslizándose al guardar (Motion), en vez de saltar.
+import NumberFlow, { NumberFlowGroup } from "@number-flow/react";
+import { LazyMotion, m, MotionConfig } from "motion/react";
+const cargarAnimaciones = () => import("./animaciones.js").then((r) => r.default);
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine,
@@ -1373,12 +1378,12 @@ function GeneralWarmupCard({ exercises, warmupKeys, accent }) {
 
   if (!drills.length) return null;
   return (
-    <div className="rounded-2xl border overflow-hidden" style={{ borderColor: tint(accent, "30"), backgroundColor: tint(accent, "08") }}>
-      <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center gap-2.5 px-3.5 py-3 text-left transition active:scale-[0.99]">
-        <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: tint(accent, "20"), color: accent }}><Activity size={15} /></div>
+    <div className="tarjeta-tonal overflow-hidden" style={{ "--c": accent }}>
+      <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center gap-3 px-3.5 py-3 text-left transition active:scale-[0.99]">
+        <span className="galleta icono-galleta" aria-hidden="true"><Activity size={16} /></span>
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-bold text-white">Calentamiento general</p>
-          <p className="text-[10px] text-slate-500">{drills.length} ejercicios de movilidad{doneCount > 0 ? ` · ${doneCount}/${drills.length} hechos` : ""}</p>
+          <p className="text-[14.5px] font-bold text-white leading-tight">Calentamiento general</p>
+          <p className="text-[12px] text-slate-500 mt-0.5">{drills.length} ejercicios de movilidad{doneCount > 0 ? ` · ${doneCount}/${drills.length} hechos` : ""}</p>
         </div>
         <ChevronDown size={16} className={`text-slate-600 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} style={{ color: accent }} />
       </button>
@@ -1910,6 +1915,27 @@ const MONTH_LABELS = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Ju
    "pop", tab fade-ins, and modal transitions. Pure CSS, no animation library.
    Move this into a stylesheet if your build already has one; it works as-is.
 ============================================================================ */
+// LA GALLETA — la forma propia del diseño "Color de día": un círculo
+// festoneado de nueve lóbulos, como las formas de Material 3 Expressive. Se
+// usa como máscara (CSS) para la serie, el ejercicio y los avatares que
+// completan algo. El radio sube y baja como un coseno: lóbulos suaves, sin
+// puntas.
+function caminoGalleta(lobulos = 9, amplitud = 0.07, puntos = 144) {
+  const radio = 50 / (1 + amplitud);
+  let d = "";
+  for (let i = 0; i <= puntos; i++) {
+    const t = (i / puntos) * Math.PI * 2;
+    const r = radio * (1 + amplitud * Math.cos(lobulos * t));
+    d += `${i ? "L" : "M"}${(50 + r * Math.sin(t)).toFixed(2)} ${(50 - r * Math.cos(t)).toFixed(2)}`;
+  }
+  return d + "Z";
+}
+const svgComoUrl = (svg) => `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+const GALLETA_URI = svgComoUrl(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="${caminoGalleta()}"/></svg>`);
+// Un largo de onda (24×12) que empalma consigo mismo: repetida en x hace la
+// línea ondulada del cronómetro de descanso.
+const ONDA_URI = svgComoUrl('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 12"><path d="M0 6 Q6 0.5 12 6 T24 6" fill="none" stroke="#000" stroke-width="3" stroke-linecap="round"/></svg>');
+
 const ANIMATION_CSS = `
 /* Los tamaños de fuente arbitrarios en px (text-[10px], etc.) que usamos
    mucho NO escalaban con la config "Tamaño de texto" (que ajusta el
@@ -2192,7 +2218,7 @@ const ANIMATION_CSS = `
   position: fixed;
   left: 0; right: 0;
   z-index: 30;
-  bottom: calc(var(--tabbar-h, 64px) + 10px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(var(--tabbar-h, 68px) + 6px + env(safe-area-inset-bottom, 0px));
   padding-bottom: 8px;
 }
 @media (min-width: 1024px) { .session-bar-dock { bottom: 10px; } }
@@ -2416,13 +2442,13 @@ input, textarea, [contenteditable="true"] {
    espacio, para cuando son elementos distintos) y la compuesta sin espacio
    (para cuando coinciden en el mismo elemento). */
 .light-mode .bg-\\[\\#0c0d10\\],
-.light-mode.bg-\\[\\#0c0d10\\] { background-color: #f9fafa !important; }
+.light-mode.bg-\\[\\#0c0d10\\] { background-color: var(--app-bg) !important; }
 .light-mode .bg-\\[\\#0c0d10\\]\\/60,
 .light-mode.bg-\\[\\#0c0d10\\]\\/60 { background-color: rgba(248,250,252,0.85) !important; }
 .light-mode .bg-\\[\\#0c0d10\\]\\/90,
 .light-mode.bg-\\[\\#0c0d10\\]\\/90 { background-color: rgba(248,250,252,0.96) !important; }
 .light-mode .bg-\\[\\#0e1113\\],
-.light-mode.bg-\\[\\#0e1113\\] { background-color: #ffffff !important; }
+.light-mode.bg-\\[\\#0e1113\\] { background-color: var(--surface-1) !important; }
 
 /* Tarjetas / superficies principales — blanco PURO y sólido (no rgba), para
    que destaquen limpias sobre el fondo gris, sin tonos grisáceos al
@@ -2433,7 +2459,7 @@ input, textarea, [contenteditable="true"] {
 .light-mode .bg-slate-900\\/50,
 .light-mode .bg-slate-900\\/60,
 .light-mode .bg-slate-900\\/70,
-.light-mode .bg-slate-900\\/80 { background-color: #ffffff !important; }
+.light-mode .bg-slate-900\\/80 { background-color: var(--surface-1) !important; }
 
 /* Superficies "recesadas" (paneles internos, inputs) — un gris casi
    imperceptible, apenas un paso por debajo del blanco de la tarjeta que las
@@ -2444,7 +2470,7 @@ input, textarea, [contenteditable="true"] {
 .light-mode .bg-slate-950\\/60,
 .light-mode .bg-slate-950\\/70,
 .light-mode .bg-slate-950\\/80,
-.light-mode .bg-slate-950\\/95 { background-color: #f3f5f6 !important; }
+.light-mode .bg-slate-950\\/95 { background-color: var(--panel-sunken) !important; }
 
 /* Superficies secundarias (chips, botones, inputs) — grises sólidos suaves */
 .light-mode .bg-slate-800,
@@ -2454,9 +2480,9 @@ input, textarea, [contenteditable="true"] {
 .light-mode .bg-slate-800\\/60,
 .light-mode .bg-slate-800\\/70,
 .light-mode .bg-slate-800\\/80,
-.light-mode .bg-slate-800\\/90 { background-color: #eef2f6 !important; }
+.light-mode .bg-slate-800\\/90 { background-color: var(--surface-2) !important; }
 .light-mode .bg-slate-700,
-.light-mode .bg-slate-700\\/80 { background-color: #e6e8ea !important; }
+.light-mode .bg-slate-700\\/80 { background-color: var(--surface-3) !important; }
 .light-mode .hover\\:bg-slate-700:hover,
 .light-mode .hover\\:bg-slate-700\\/80:hover { background-color: #d8e0e9 !important; }
 .light-mode .hover\\:bg-slate-800:hover,
@@ -2473,6 +2499,7 @@ input, textarea, [contenteditable="true"] {
 .light-mode .bg-black\\/20 { background-color: rgba(241,245,249,0.9) !important; }
 .light-mode .bg-black\\/25 { background-color: rgba(236,241,247,0.92) !important; }
 .light-mode .bg-black\\/30 { background-color: rgba(230,232,234,0.95) !important; }
+.light-mode .bg-black\\/40 { background-color: var(--surface-2) !important; }
 /* Velo de los modales: sigue oscureciendo (si no, el modal blanco se pierde
    sobre el fondo claro), pero en un slate suave en vez de negro puro. */
 .light-mode .bg-black\\/55 { background-color: rgba(20,24,29,0.32) !important; }
@@ -2490,19 +2517,19 @@ input, textarea, [contenteditable="true"] {
    "gris casi negro" (#14181d), y lo que era apenas visible pasa a un gris
    medio (#6e7379) y más claro, manteniendo la misma jerarquía relativa. */
 .light-mode .text-white,
-.light-mode.text-white { color: #14181d !important; }
+.light-mode.text-white { color: #17181a !important; }
 .light-mode .text-white\\/80 { color: rgba(20,24,29,0.75) !important; }
-.light-mode .hover\\:text-white:hover { color: #14181d !important; }
+.light-mode .hover\\:text-white:hover { color: #17181a !important; }
 .light-mode .text-slate-100,
-.light-mode .text-slate-200 { color: #25292e !important; }
-.light-mode .text-slate-300 { color: #3c4146 !important; }
-.light-mode .text-slate-400 { color: #50555a !important; }
-.light-mode .text-slate-500 { color: #6e7379 !important; }
-.light-mode .text-slate-600 { color: #8593a8 !important; }
-.light-mode .text-slate-700 { color: #a2aec0 !important; }
-.light-mode .hover\\:text-slate-200:hover { color: #25292e !important; }
-.light-mode .hover\\:text-slate-300:hover { color: #3c4146 !important; }
-.light-mode .hover\\:text-slate-400:hover { color: #50555a !important; }
+.light-mode .text-slate-200 { color: #26282b !important; }
+.light-mode .text-slate-300 { color: #3b3d41 !important; }
+.light-mode .text-slate-400 { color: #4f5156 !important; }
+.light-mode .text-slate-500 { color: #6b6e73 !important; }
+.light-mode .text-slate-600 { color: #898c91 !important; }
+.light-mode .text-slate-700 { color: #a6a9ae !important; }
+.light-mode .hover\\:text-slate-200:hover { color: #26282b !important; }
+.light-mode .hover\\:text-slate-300:hover { color: #3b3d41 !important; }
+.light-mode .hover\\:text-slate-400:hover { color: #4f5156 !important; }
 
 /* Textos de acento en tonos claros (200/300/400) — se eligieron para leerse
    sobre fondos casi negros y pierden casi todo el contraste sobre fondos
@@ -2557,19 +2584,19 @@ input, textarea, [contenteditable="true"] {
 .light-mode .border-slate-800\\/50,
 .light-mode .border-slate-800\\/60,
 .light-mode .border-slate-800\\/70,
-.light-mode .border-slate-800\\/80 { border-color: #e6e8ea !important; }
+.light-mode .border-slate-800\\/80 { border-color: var(--hairline) !important; }
 .light-mode .border-slate-700,
 .light-mode .border-slate-700\\/40,
 .light-mode .border-slate-700\\/50,
 .light-mode .border-slate-700\\/60,
 .light-mode .border-slate-700\\/70 { border-color: #d1d4d7 !important; }
 .light-mode .border-slate-600 { border-color: #9da2a8 !important; }
-.light-mode .border-slate-500 { border-color: #6e7379 !important; }
+.light-mode .border-slate-500 { border-color: #6b6e73 !important; }
 .light-mode .hover\\:border-slate-500:hover { border-color: #9da2a8 !important; }
-.light-mode .hover\\:border-slate-600:hover { border-color: #6e7379 !important; }
+.light-mode .hover\\:border-slate-600:hover { border-color: #6b6e73 !important; }
 .light-mode .focus\\:border-slate-700:focus { border-color: #9da2a8 !important; }
 .light-mode .divide-slate-800\\/50 > :not([hidden]) ~ :not([hidden]),
-.light-mode .divide-slate-800 > :not([hidden]) ~ :not([hidden]) { border-color: #e6e8ea !important; }
+.light-mode .divide-slate-800 > :not([hidden]) ~ :not([hidden]) { border-color: var(--hairline) !important; }
 
 /* ── ELEVACIÓN EN MODO CLARO ────────────────────────────────────────────────
    El negro translúcido pensado para fondo oscuro se ve como una mancha gris
@@ -2619,23 +2646,22 @@ input, textarea, [contenteditable="true"] {
 :root {
   /* Grafito (20,22,27) en vez del azul marino (15,23,42) de antes: ver la
      escala slate en index.css, que cambió por el mismo motivo. */
-  --grad-hero-purple: linear-gradient(135deg, rgba(168,85,247,0.2), rgba(20,22,27,0.9) 55%, rgba(20,22,27,0.8));
-  --grad-hero-blue: linear-gradient(135deg, rgba(59,130,246,0.17), rgba(20,22,27,0.9) 55%, rgba(20,22,27,0.8));
-  --grad-hero-teal: linear-gradient(135deg, rgba(20,184,166,0.18), rgba(20,22,27,0.9) 55%, rgba(20,22,27,0.8));
-  --grad-profile-avatar: linear-gradient(135deg, #16181d, rgba(22,24,29,0.5));
-  --ring-track: #1d2026;
-  --chart-grid: #1d2026;
-  --chart-axis: #3a3f48;
-  --chip-border: #24272e;
-  --chip-text: #6b7280;
-  --surface-2: #1b1e24;
-  --surface-2-text: #8a909b;
+  --grad-hero-purple: linear-gradient(135deg, rgba(168,85,247,0.18), var(--surface-1) 60%);
+  --grad-hero-blue: linear-gradient(135deg, rgba(59,130,246,0.16), var(--surface-1) 60%);
+  --grad-hero-teal: linear-gradient(135deg, rgba(20,184,166,0.16), var(--surface-1) 60%);
+  --grad-profile-avatar: linear-gradient(135deg, var(--surface-2), var(--surface-1));
+  --ring-track: color-mix(in oklab, var(--tono) 8%, #202125);
+  --chart-grid: color-mix(in oklab, var(--tono) 6%, #1e1f23);
+  --chart-axis: #4a4c51;
+  --chip-border: var(--hairline);
+  --chip-text: #8a8d93;
+  --surface-2-text: #9a9da2;
   --small-text-scale: 1;
   /* Fondo base de la app. Lo usan los pocos lugares que necesitan el color
      "de la página" en estilo inline (escudo de la status bar, pantallas a
      pantalla completa). Antes estaba escrito a mano como #0c0d10 y en modo
      claro dejaba franjas negras. */
-  --app-bg: #0c0d10;
+  --app-bg: color-mix(in oklab, var(--tono) 4%, #0d0e10);
   /* Superficies "hundidas": paneles que se abren dentro de una tarjeta y
      filas de opciones. Estaban en estilo inline con rgba fijo y en claro se
      veían como cajas oscuras. */
@@ -2650,8 +2676,8 @@ input, textarea, [contenteditable="true"] {
      jerarquía la hace la luz en todas las pestañas por igual. Como son
      tokens, el arreglo llega a los ~200 lugares que ya los usan sin tocar
      ninguno. */
-  --panel-sunken: #111317;   /* panel que se abre DENTRO de una tarjeta: hundido respecto de ella, pero por encima de la página */
-  --row-surface: #1b1e24;    /* fila dentro de una tarjeta: un escalón por encima (mismo valor que --surface-2) */
+  --panel-sunken: color-mix(in oklab, var(--tono) 4.5%, #111215);   /* panel que se abre DENTRO de una tarjeta: hundido respecto de ella, pero por encima de la página */
+  --row-surface: var(--surface-2);    /* fila dentro de una tarjeta: un escalón por encima */
   /* ESCALERA DE SUPERFICIES, OPACA Y ASCENDENTE.
      Los dos tokens de arriba son translúcidos, y medido en pantalla eso deja
      la jerarquía DADA VUELTA: la página es #0c0d10 (luminancia 10), una
@@ -2662,27 +2688,30 @@ input, textarea, [contenteditable="true"] {
      cinco superficies violetas apiladas y siete resplandores.
      Estos tres son opacos y suben de a poco, así la jerarquía la hace la luz
      y el color queda libre para significar algo. */
-  --surface-1: #14161b;   /* tarjeta de sección, por encima de la página */
-  --surface-2: #1b1e24;   /* fila dentro de la tarjeta */
-  --surface-3: #252930;   /* elemento activo / resaltado dentro de una fila */
-  --hairline: #2a2e36;    /* el canto de 1px que hoy hacían los resplandores */
+  /* "Color de día": cada nivel lleva un poco más del color de lo que estás
+     mirando (--tono), así la pantalla toma el clima del día sin pintar
+     nada de un color fuerte. */
+  --surface-1: color-mix(in oklab, var(--tono) 5.5%, #161719);   /* tarjeta de sección, por encima de la página */
+  --surface-2: color-mix(in oklab, var(--tono) 7%, #1d1e21);   /* fila dentro de la tarjeta */
+  --surface-3: color-mix(in oklab, var(--tono) 9%, #27282c);  /* elemento activo / resaltado dentro de una fila */
+  --hairline: color-mix(in oklab, var(--tono) 8%, #2b2c31);   /* el canto de 1px */
   /* Hero propio de Social. No reusa --grad-hero-purple a propósito: ese
      violeta (#A855F7) vuelve a ser exclusivo de Descarga y Medidas. Y baja
      del 42% al 26% de tinte, porque al 42% sobre negro se iba a malva. */
   --grad-hero-violet: linear-gradient(135deg, rgba(139,92,246,0.22), rgba(20,22,27,0.88) 55%, rgba(20,22,27,0.66));
   /* Degradés de paneles destacados (resumen de sesión, tarjetas del
      entrenador): el mismo matiz de siempre, ahora sobre grafito. */
-  --panel-grad-teal: linear-gradient(165deg,#0f1b19 0%,#111317 100%);
-  --panel-grad-cyan: linear-gradient(165deg,#10191d 0%,#111317 100%);
-  --panel-grad-slate: linear-gradient(170deg,#16181d 0%,#111317 100%);
-  --panel-grad-blue: linear-gradient(165deg, #10151d 0%, #111317 100%);
-  --panel-grad-emerald: linear-gradient(160deg,#0f1d1b,#14161b);
+  --panel-grad-teal: linear-gradient(165deg, color-mix(in oklab, #14B8A6 10%, var(--surface-1)) 0%, var(--surface-1) 100%);
+  --panel-grad-cyan: linear-gradient(165deg, color-mix(in oklab, #06B6D4 10%, var(--surface-1)) 0%, var(--surface-1) 100%);
+  --panel-grad-slate: linear-gradient(170deg, var(--surface-2) 0%, var(--surface-1) 100%);
+  --panel-grad-blue: linear-gradient(165deg, color-mix(in oklab, #3B82F6 10%, var(--surface-1)) 0%, var(--surface-1) 100%);
+  --panel-grad-emerald: linear-gradient(160deg, color-mix(in oklab, #10B981 10%, var(--surface-1)), var(--surface-1));
   /* Cronómetro de descanso en reposo (cuando corre toma el color del día). */
-  --timer-idle-bg: #15171c;
-  --timer-idle-border: #24272e;
+  --timer-idle-bg: var(--surface-2);
+  --timer-idle-border: var(--hairline);
   /* Modal de "subiste de rango" — el color del tier ya se aplica encima como
      glow/borde, esto es sólo la base neutra detrás. */
-  --rankup-grad: linear-gradient(135deg, #121418, #1b1e24);
+  --rankup-grad: linear-gradient(135deg, var(--surface-1), var(--surface-2));
   /* Barra de mensaje del Entrenador IA — se porta afuera del árbol temeado
      (createPortal a document.body), así que no le llegan ni las clases
      .light-mode ni las variables que sólo se definen inline más arriba: por
@@ -2704,37 +2733,36 @@ input, textarea, [contenteditable="true"] {
   --glass-bubble-assistant: rgba(19,29,51,0.55);
 }
 .light-mode {
-  --grad-hero-purple: linear-gradient(135deg, rgba(168,85,247,0.10), rgba(255,255,255,0.96) 55%, #ffffff);
-  --grad-hero-blue: linear-gradient(135deg, rgba(59,130,246,0.10), rgba(255,255,255,0.96) 55%, #ffffff);
-  --grad-hero-teal: linear-gradient(135deg, rgba(20,184,166,0.10), rgba(255,255,255,0.96) 55%, #ffffff);
-  --grad-profile-avatar: linear-gradient(135deg, #ffffff, #f9fafa);
-  --ring-track: #eef2f6;
-  --chart-grid: #eef2f6;
-  --chart-axis: #9da2a8;
-  --chip-border: #e6e8ea;
-  --chip-text: #6e7379;
-  --surface-2: #eef2f6;
-  --surface-2-text: #50555a;
-  --app-bg: #f9fafa;
-  --panel-sunken: #f3f5f6;
-  --row-surface: #f9fafa;
+  --grad-hero-purple: linear-gradient(135deg, rgba(168,85,247,0.10), var(--surface-1) 60%);
+  --grad-hero-blue: linear-gradient(135deg, rgba(59,130,246,0.10), var(--surface-1) 60%);
+  --grad-hero-teal: linear-gradient(135deg, rgba(20,184,166,0.10), var(--surface-1) 60%);
+  --grad-profile-avatar: linear-gradient(135deg, var(--surface-1), var(--surface-2));
+  --ring-track: color-mix(in oklab, var(--tono) 7%, #ececea);
+  --chart-grid: color-mix(in oklab, var(--tono) 5%, #efefec);
+  --chart-axis: #9a9da2;
+  --chip-border: var(--hairline);
+  --chip-text: #6c6f74;
+  --surface-2-text: #505257;
+  --app-bg: color-mix(in oklab, var(--tono) 6%, #f5f5f2);
+  --panel-sunken: color-mix(in oklab, var(--tono) 5%, #f3f3f0);
+  --row-surface: color-mix(in oklab, var(--tono) 3%, #f9f9f7);
   /* En claro la escalera va al revés (la página es lo más claro y cada nivel
      baja un escalón), pero el principio es el mismo: la jerarquía la hace la
      luz, no el tinte. */
-  --surface-1: #ffffff;
-  --surface-2: #f3f5f6;
-  --surface-3: #e6e8ea;
-  --hairline: #d8dfe9;
+  --surface-1: color-mix(in oklab, var(--tono) 2%, #ffffff);
+  --surface-2: color-mix(in oklab, var(--tono) 6%, #f1f1ee);
+  --surface-3: color-mix(in oklab, var(--tono) 10%, #e5e5e1);
+  --hairline: color-mix(in oklab, var(--tono) 12%, #dcdcd7);
   /* En claro, el mismo matiz pero sobre blanco: apenas un velo de color en la
      esquina superior que se disuelve, en vez de un bloque oscuro. */
-  --panel-grad-teal: linear-gradient(165deg, rgba(20,184,166,0.09) 0%, #ffffff 60%);
-  --panel-grad-cyan: linear-gradient(165deg, rgba(6,182,212,0.09) 0%, #ffffff 60%);
-  --panel-grad-slate: linear-gradient(170deg, rgba(110,115,121,0.08) 0%, #ffffff 60%);
-  --panel-grad-blue: linear-gradient(165deg, rgba(59,130,246,0.08) 0%, #ffffff 60%);
-  --panel-grad-emerald: linear-gradient(160deg, rgba(16,185,129,0.10), #ffffff 65%);
-  --timer-idle-bg: #f3f5f6;
-  --timer-idle-border: #e6e8ea;
-  --rankup-grad: linear-gradient(135deg, #ffffff, #f9fafa);
+  --panel-grad-teal: linear-gradient(165deg, rgba(20,184,166,0.09) 0%, var(--surface-1) 60%);
+  --panel-grad-cyan: linear-gradient(165deg, rgba(6,182,212,0.09) 0%, var(--surface-1) 60%);
+  --panel-grad-slate: linear-gradient(170deg, var(--surface-2) 0%, var(--surface-1) 60%);
+  --panel-grad-blue: linear-gradient(165deg, rgba(59,130,246,0.08) 0%, var(--surface-1) 60%);
+  --panel-grad-emerald: linear-gradient(160deg, rgba(16,185,129,0.10), var(--surface-1) 65%);
+  --timer-idle-bg: var(--surface-2);
+  --timer-idle-border: var(--hairline);
+  --rankup-grad: linear-gradient(135deg, var(--surface-1), var(--surface-2));
   --chat-bar-idle: rgba(255,255,255,0.72);
   --chat-bar-listening: rgba(209,250,229,0.85);
   --chat-bar-editing: rgba(204,251,241,0.85);
@@ -2776,226 +2804,296 @@ input, textarea, [contenteditable="true"] {
 .text-\\[26px\\] { font-size: calc(26px * var(--small-text-scale, 1)) !important; }
 
 /* ============================================================================
-   SISTEMA VISUAL — tipografía, foco, íconos y las piezas fijas de la app
-   (barra de arriba, título de cada pestaña, barra de abajo, dock de sesión
-   y cronómetros).
+   SISTEMA VISUAL — "Color de día"
 
-   La idea: una pizarra de entrenamiento, no un panel de control. Fondo
-   grafito, UN acento (el teal de la marca) para todo lo que es de la app, y
-   el color de cada día sólo para lo que es de ese día. Dos letras: Geist
-   para leer y Archivo para lo que se mira de lejos — títulos, rótulos, el
-   reloj, los kilos.
+   La app se tiñe del día que entrenás. Cada día de la rutina ya tenía su
+   color; ahora ese color es el clima de la pantalla entera —un tinte suave
+   en el fondo y en las superficies, el relleno de lo que se toca— en vez de
+   un acento suelto. En las otras pestañas manda el color de la pestaña (lo
+   escribe la app en <html> como --tono, ver ponerTono).
+   Una sola letra, Google Sans Flex, con los números grandes redondeados
+   (eje ROND). Formas blandas, botones en píldora y una forma propia: la
+   galleta (un círculo festoneado) para la serie, el ejercicio y la persona.
+   La pieza que se recuerda sigue siendo la barra cargada.
+
+   Recetas para cualquier color X (el del día, el de la pestaña):
+     · relleno fuerte (botón principal): en oscuro, X con 24% de blanco; en
+       claro, X puro. Siempre con letra oscura: X al 22% sobre casi negro.
+     · contenedor (fondo tonal): X al 15% sobre la superficie.
+     · texto de color: en oscuro, X con 45% de blanco; en claro, con 38% de
+       negro. Así se lee cualquier color que elija la persona.
 
    Esto va AL FINAL y sin @layer a propósito: Tailwind 4 pone sus clases en
-   una capa, y lo que está fuera de capa les gana. Así estas reglas mandan
-   sobre tracking-widest, font-black, etc., en toda la app a la vez.
+   una capa, y lo que está fuera de capa les gana.
 ============================================================================ */
+@property --tono { syntax: "<color>"; inherits: true; initial-value: #14B8A6; }
 :root {
+  --tono: #14B8A6;
   --accent: #14B8A6;
-  --accent-ink: #2dd4bf;            /* el acento como texto, sobre oscuro */
-  --accent-soft: rgba(20,184,166,0.15);
-  --text-strong: #f3f4f5;
-  --text-muted: #a1a6ad;
-  --text-faint: #6f747c;
-  --bar-bg: rgba(12,13,16,0.93);
-  --tabbar-bg: rgba(20,22,27,0.95);
-  --tabbar-h: 64px;
+  --accent-ink: #5eead4;
+  --accent-soft: color-mix(in oklab, #14B8A6 16%, transparent);
+  --text-strong: #f3f3f1;
+  --text-muted: #a8aaaf;
+  --text-faint: #75787e;
+  --bar-bg: color-mix(in oklab, var(--app-bg) 88%, transparent);
+  --tabbar-bg: color-mix(in oklab, var(--tono) 8%, #141518);
+  --tabbar-h: 68px;
   /* Alto del dock de abajo (descanso en curso + sesión). Lo escribe el
      propio dock al cambiar de tamaño, y lo leen el aire de abajo de la
      página y la barra del chat, que tienen que quedar por encima. */
   --dock-alto: 0px;
+  --social-tinta: #C4B5FD;
+  --tinta-oscura: #08090b;
+  --disco-fantasma: rgba(255,255,255,0.075);
+  /* Resortes: suben rápido, se pasan un poco y vuelven. Sólo para lo que
+     responde a un toque (apretar, guardar una serie, elegir un día). */
+  --resorte: linear(0, 0.006, 0.025 2.8%, 0.101 6.1%, 0.539 18.9%, 0.721 25.3%, 0.849 31.5%, 0.937 38.1%, 0.968 41.8%, 0.991 45.7%, 1.006 50.1%, 1.015 55%, 1.017 63.9%, 1.001 85.9%, 1);
+  --resorte-vivo: linear(0, 0.009, 0.035 2.1%, 0.141, 0.281 6.7%, 0.723 12.9%, 0.938 16.7%, 1.017, 1.077, 1.121, 1.149 24.3%, 1.159, 1.163, 1.161, 1.154 29.9%, 1.129 32.8%, 1.051 39.6%, 1.017 43.1%, 0.991, 0.977 51%, 0.974 53.8%, 0.975 57.1%, 0.997 69.8%, 1.003 76.9%, 1.004 83.8%, 1);
+  --forma-galleta: ${GALLETA_URI};
+  --forma-onda: ${ONDA_URI};
 }
-:root { --social-tinta: #C4B5FD; }
-/* En claro, los colores de cada pestaña (teal, ámbar, lila) no llegan al
-   contraste mínimo como texto chico sobre blanco: se oscurecen. */
-.light-mode .titulo-pagina .ceja { color: color-mix(in srgb, var(--ceja) 60%, #000); }
+/* En claro, los colores de cada pestaña no llegan al contraste mínimo como
+   texto chico sobre blanco: se oscurecen. */
 .light-mode {
   --social-tinta: #6D28D9;
-  --accent-ink: #0d9488;
-  --accent-soft: rgba(20,184,166,0.13);
-  --text-strong: #121519;
-  --text-muted: #5d636b;
-  --text-faint: #8b9098;
-  --bar-bg: rgba(249,250,250,0.94);
-  --tabbar-bg: rgba(255,255,255,0.95);
+  --accent-ink: #0f766e;
+  --accent-soft: color-mix(in oklab, #14B8A6 13%, transparent);
+  --text-strong: #17181a;
+  --text-muted: #55585d;
+  --text-faint: #85888d;
+  --bar-bg: color-mix(in oklab, var(--app-bg) 90%, transparent);
+  --tabbar-bg: color-mix(in oklab, var(--tono) 5%, #fbfbf9);
+  --disco-fantasma: rgba(20,22,26,0.07);
 }
 
 html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; }
-::selection { background: rgba(20,184,166,0.32); }
+::selection { background: color-mix(in oklab, var(--tono) 38%, transparent); }
 
-/* Títulos: Archivo ancha y apretada. */
+/* Títulos: pesados, apretados y con las puntas apenas redondeadas. */
 h1, h2, .font-display {
   font-family: var(--font-display);
-  font-stretch: 112%;
-  letter-spacing: -0.012em;
+  letter-spacing: -0.018em;
+  font-variation-settings: "ROND" 60;
 }
-/* Rótulos en mayúscula. Eran la firma de la app pero con espaciado de
-   máquina de escribir (tracking-widest = 0.1em) y en la misma letra que el
-   texto: se leían como etiquetas sueltas. En Archivo y con menos aire
-   pasan a ser un tipo de letra propio, el de los marcadores. */
-.uppercase {
-  font-family: var(--font-display);
-  font-stretch: 94%;
-  letter-spacing: 0.045em;
-}
-.uppercase.font-black { font-weight: 800; }
-/* Números grandes: Archivo angosta. Entran más grandes en el mismo lugar y
-   se leen de lejos, con el teléfono apoyado en el banco. */
+/* SIN MAYÚSCULAS SOSTENIDAS. Los rótulos ya estaban escritos como oración
+   ("Tu plan", "Racha") y se pasaban a mayúscula con espaciado de máquina de
+   escribir. Ahora se leen como se escribieron. La letra chica sube un pelo:
+   en minúscula se ve más chica que en mayúscula al mismo tamaño. */
+.uppercase { text-transform: none; letter-spacing: 0 !important; font-weight: 650; }
+.uppercase.font-black, .uppercase.font-extrabold { font-weight: 700; }
+.uppercase.text-\\[8px\\] { font-size: calc(9.5px * var(--small-text-scale, 1)) !important; }
+.uppercase.text-\\[8\\.5px\\] { font-size: calc(10px * var(--small-text-scale, 1)) !important; }
+.uppercase.text-\\[9px\\] { font-size: calc(10.5px * var(--small-text-scale, 1)) !important; }
+.uppercase.text-\\[9\\.5px\\] { font-size: calc(11px * var(--small-text-scale, 1)) !important; }
+.uppercase.text-\\[10px\\] { font-size: calc(11.5px * var(--small-text-scale, 1)) !important; }
+.uppercase.text-\\[10\\.5px\\] { font-size: calc(12px * var(--small-text-scale, 1)) !important; }
+.uppercase.text-\\[11px\\] { font-size: calc(12px * var(--small-text-scale, 1)) !important; }
+/* Números grandes: redondos y de ancho fijo, para que el reloj no baile. */
 .tabular-nums:is(.text-base, .text-lg, .text-xl, .text-2xl, .text-3xl, .text-4xl, .text-5xl, .text-6xl),
 .num-display {
   font-family: var(--font-display);
-  font-stretch: 86%;
-  letter-spacing: -0.01em;
+  font-variation-settings: "ROND" 100;
   font-variant-numeric: tabular-nums;
+  letter-spacing: -0.015em;
 }
 
-/* Foco visible para quien navega con teclado (y lector de pantalla). Antes
-   no había ninguno propio: salía el anillo amarillo del navegador. */
-:focus-visible { outline: 2px solid var(--accent-ink); outline-offset: 2px; border-radius: 6px; }
+/* Foco visible para quien navega con teclado (y lector de pantalla). */
+:focus-visible { outline: 2px solid var(--accent-ink); outline-offset: 2px; border-radius: 8px; }
 input:focus-visible, textarea:focus-visible, select:focus-visible { outline: none; }
+.lucide[stroke-width="2"] { stroke-width: 1.9px; }
 
-/* Íconos un pelo más finos (lucide viene en 2). Sólo los que usan el trazo
-   por defecto: los que lo eligieron a propósito (el tilde de "guardado", en
-   3) se quedan como están. */
-.lucide[stroke-width="2"] { stroke-width: 1.85px; }
+/* LA GALLETA: un círculo festoneado de nueve lóbulos (ver caminoGalleta).
+   Es la forma de lo que se completa: la serie, el ejercicio, el avatar de
+   quien entrenó. La forma vive en ::before, así puede girar sin que gire el
+   número de adentro. */
+.galleta { position: relative; isolation: isolate; display: inline-grid; place-items: center; flex: none; }
+.galleta::before, .galleta.hueca::after {
+  content: ""; position: absolute; inset: 0; z-index: -1;
+  -webkit-mask: var(--forma-galleta) center / contain no-repeat; mask: var(--forma-galleta) center / contain no-repeat;
+  background: var(--galleta-fondo, var(--surface-3));
+  transition: transform .6s var(--resorte-vivo), background-color .25s ease;
+}
+.galleta.hueca::before { background: var(--galleta-borde, var(--hairline)); }
+.galleta.hueca::after { inset: 2px; background: var(--galleta-fondo, var(--surface-1)); }
+.galleta.girada::before { transform: rotate(40deg); }
 
-/* Fondo de la app: un resplandor teal arriba a la izquierda, donde va el
-   título. Sin esto el grafito liso se ve plano y "de plantilla". Es una
-   imagen de fondo del propio contenedor y scrollea con la página: nada fijo
-   que repintar.
+/* Botón principal en píldora, con el color de lo que estás mirando. Al
+   apretarlo se aplasta un poco y las puntas se cierran (el resorte). */
+.boton-pildora {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 52px; padding: 0 22px; border-radius: 999px;
+  font-weight: 700; font-size: 0.9375rem; letter-spacing: -0.005em;
+  color: color-mix(in oklab, var(--c, var(--tono)) 22%, var(--tinta-oscura));
+  background: color-mix(in oklab, var(--c, var(--tono)) 76%, white);
+  transition: border-radius .4s var(--resorte), transform .25s var(--resorte), filter .2s ease;
+}
+.boton-pildora:active { border-radius: 18px; transform: scale(.975); }
+.light-mode .boton-pildora { background: var(--c, var(--tono)); }
+
+/* FONDO: el clima del día. Arriba, donde va el título, un velo del color de
+   lo que estás mirando que se apaga antes de las tarjetas. Es imagen de
+   fondo del propio contenedor y scrollea con la página: nada fijo que
+   repintar.
    OJO: no usar un pseudo-elemento con z-index negativo, que necesita
    "isolation: isolate" en el contenedor. Eso encierra a TODA la app en su
    propia capa, barra de abajo y dock incluidos, y lo que se dibuja afuera
-   (la barra del chat, que va en un portal sobre <body>) les queda encima y
-   las tapa. */
+   (la barra del chat, que va en un portal sobre <body>) les queda encima. */
 .app-fondo {
-  background-image:
-    radial-gradient(110% 75% at 0% 0%, rgba(20,184,166,0.11), transparent 62%),
-    radial-gradient(70% 55% at 100% 0%, rgba(148,163,184,0.05), transparent 65%);
+  background-color: var(--app-bg);
+  background-image: radial-gradient(130% 70% at 20% -12%, color-mix(in oklab, var(--tono) 19%, transparent), transparent 68%);
   background-repeat: no-repeat;
-  background-size: 100% 460px;
+  background-size: 100% 560px;
 }
 .light-mode.app-fondo {
-  background-image: radial-gradient(110% 75% at 0% 0%, rgba(20,184,166,0.08), transparent 62%);
+  background-image: radial-gradient(130% 70% at 20% -12%, color-mix(in oklab, var(--tono) 16%, transparent), transparent 68%);
 }
 
 /* ── BARRA DE ARRIBA ─────────────────────────────────────────────────────
    Transparente arriba de todo (el título grande de la página hace de
-   encabezado); al scrollear toma fondo, borde y el título achicado. */
+   encabezado); al scrollear toma el fondo y el título achicado. */
 .app-bar {
   position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20;
-  border-bottom: 1px solid transparent;
-  transition: background-color .25s ease, border-color .25s ease;
+  transition: background-color .25s ease, box-shadow .25s ease;
 }
 .app-bar[data-compacta="true"] {
   background-color: var(--bar-bg);
-  -webkit-backdrop-filter: blur(18px) saturate(1.3); backdrop-filter: blur(18px) saturate(1.3);
-  border-bottom-color: var(--hairline);
+  -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+  box-shadow: 0 1px 0 var(--hairline);
 }
 .app-bar-titulo {
-  font-family: var(--font-display); font-stretch: 108%; font-weight: 800;
-  font-size: 1rem; letter-spacing: -0.01em; color: var(--text-strong);
+  font-weight: 700; font-size: 1.0625rem; letter-spacing: -0.012em; color: var(--text-strong);
+  font-variation-settings: "ROND" 60;
   opacity: 0; transform: translateY(6px);
-  transition: opacity .2s ease, transform .28s cubic-bezier(.2,.8,.3,1);
+  transition: opacity .2s ease, transform .35s var(--resorte);
 }
 .app-bar[data-compacta="true"] .app-bar-titulo { opacity: 1; transform: none; }
+.boton-redondo {
+  width: 40px; height: 40px; border-radius: 999px; flex: none;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-muted); background: var(--surface-2);
+  transition: border-radius .35s var(--resorte), color .2s ease;
+}
+.boton-redondo:active { border-radius: 14px; }
 
-/* ── TÍTULO DE CADA PESTAÑA ────────────────────────────────────────────── */
-.titulo-pagina { padding: 2px 2px 18px; }
-.titulo-pagina .ceja {
-  color: var(--ceja);
-  display: flex; align-items: center; gap: 6px;
-  font-family: var(--font-display); font-stretch: 104%; font-weight: 700;
-  font-size: 0.6875rem; letter-spacing: 0.09em; text-transform: uppercase;
+/* ── TÍTULO DE CADA PESTAÑA ──────────────────────────────────────────────
+   Una vez, grande, y sin rótulo encima: el color ya dice dónde estás. */
+.titulo-pagina { padding: 4px 2px 20px; }
+.titulo-pagina h1 {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  color: var(--text-strong);
+  font-size: 2.5rem; line-height: 1; font-weight: 760; letter-spacing: -0.035em;
+  font-variation-settings: "ROND" 70;
 }
 .titulo-pagina .ceja-beta {
-  margin-left: 2px; padding: 1px 6px; border-radius: 6px; font-size: 0.5625rem;
-  letter-spacing: 0.06em; background: rgba(20,184,166,0.16); color: var(--accent-ink);
+  padding: 4px 9px; border-radius: 999px; font-size: 0.75rem; font-weight: 650; letter-spacing: 0;
+  background: color-mix(in oklab, var(--tono) 20%, transparent);
+  color: color-mix(in oklab, var(--tono) 55%, white);
 }
-.titulo-pagina h1 {
-  margin-top: 8px; color: var(--text-strong);
-  font-size: 2.125rem; line-height: 1; font-weight: 800;
-  font-stretch: 116%; letter-spacing: -0.025em;
-}
+.light-mode .titulo-pagina .ceja-beta { color: color-mix(in oklab, var(--tono) 62%, black); }
 .titulo-pagina .bajada {
-  margin-top: 8px; font-size: 0.84rem; line-height: 1.35; color: var(--text-muted);
-  max-width: 48ch; text-wrap: pretty;
+  margin-top: 8px; font-size: 0.9375rem; line-height: 1.4; color: var(--text-muted);
+  max-width: 46ch; text-wrap: pretty;
 }
 
-/* ── BARRA DE ABAJO ────────────────────────────────────────────────────── */
-/* Flota: una cápsula separada de los bordes, como la barra de iOS 26, en
-   vez de una franja pegada abajo. El contenido pasa por detrás, desenfocado. */
+/* ── BARRA DE ABAJO ──────────────────────────────────────────────────────
+   Apoyada abajo de todo, del ancho de la pantalla, como la de Android. La
+   pestaña elegida lleva una píldora rellena del color de la pestaña que se
+   estira al tocarla. */
 .barra-pestanas {
-  position: fixed; z-index: 20;
-  left: 12px; right: 12px; bottom: calc(10px + env(safe-area-inset-bottom, 0px));
-  max-width: 520px; margin: 0 auto;
+  position: fixed; z-index: 20; left: 0; right: 0; bottom: 0;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
   background: var(--tabbar-bg);
-  -webkit-backdrop-filter: blur(22px) saturate(1.5); backdrop-filter: blur(22px) saturate(1.5);
-  border: 1px solid var(--hairline); border-radius: 26px;
-  box-shadow: 0 18px 40px -18px rgba(0,0,0,0.85), 0 2px 8px rgba(0,0,0,0.3);
+  box-shadow: 0 -1px 0 var(--hairline);
 }
-.light-mode .barra-pestanas { box-shadow: 0 14px 34px -16px rgba(20,24,29,0.28), 0 1px 4px rgba(20,24,29,0.08); }
 @media (min-width: 1024px) { .barra-pestanas { display: none; } }
 .barra-pestanas button {
   flex: 1; min-width: 0; height: var(--tabbar-h);
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
-  color: var(--text-faint);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
+  color: var(--text-muted);
 }
 .barra-pestanas .indicador {
-  width: 56px; height: 30px; border-radius: 999px;
+  width: 52px; height: 32px; border-radius: 999px;
   display: flex; align-items: center; justify-content: center;
-  transition: background-color .25s ease, color .2s ease;
+  transition: width .5s var(--resorte), background-color .25s ease, color .2s ease;
 }
-.barra-pestanas .etiqueta {
-  font-size: 0.6875rem; font-weight: 600; line-height: 1; letter-spacing: 0.005em;
-  transition: color .2s ease;
-}
+.barra-pestanas .etiqueta { font-size: 0.75rem; font-weight: 550; line-height: 1; letter-spacing: 0; transition: color .2s ease; }
 .barra-pestanas [aria-current="page"] .indicador {
-  color: var(--tab-color, var(--accent));
-  background: var(--accent-soft);
-  background: color-mix(in srgb, var(--tab-color, var(--accent)) 17%, transparent);
+  width: 64px;
+  color: color-mix(in oklab, var(--tab-color) 22%, var(--tinta-oscura));
+  background: color-mix(in oklab, var(--tab-color) 76%, white);
 }
-.barra-pestanas [aria-current="page"] .etiqueta { color: var(--text-strong); }
-.barra-pestanas [aria-current="page"] .lucide { stroke-width: 2.1px; }
-/* El foco de teclado va en la píldora, no en un rectángulo alrededor de todo. */
+.light-mode .barra-pestanas [aria-current="page"] .indicador {
+  color: color-mix(in oklab, var(--tab-color) 62%, black);
+  background: color-mix(in oklab, var(--tab-color) 24%, white);
+}
+.barra-pestanas [aria-current="page"] .etiqueta { color: var(--text-strong); font-weight: 700; }
+.barra-pestanas [aria-current="page"] .lucide { stroke-width: 2.2px; }
 .barra-pestanas button:focus-visible { outline: none; }
 .barra-pestanas button:focus-visible .indicador { outline: 2px solid var(--accent-ink); outline-offset: 2px; }
 
-/* SIN MANCHAS. Casi cada panel traía dos círculos borrosos de color atrás
-   (38 en total): el sello más reconocible del diseño genérico, y una capa
-   de blur más que pintar en cada scroll. En las pantallas se apagan todos
-   de una; se quedan sólo en los modales de festejo (resumen de sesión,
-   récords), donde un resplandor sí dice algo. */
+/* SIN MANCHAS. Casi cada panel traía dos círculos borrosos de color atrás:
+   el sello del diseño genérico y una capa de blur más que pintar en cada
+   scroll. En las pantallas se apagan todos de una; se quedan sólo en los
+   modales de festejo (resumen de sesión, récords), donde sí dicen algo. */
 .app-fondo .absolute.rounded-full.pointer-events-none:is(.blur-xl, .blur-2xl, .blur-3xl) { display: none; }
 .app-fondo .modal-overlay .absolute.rounded-full.pointer-events-none:is(.blur-xl, .blur-2xl, .blur-3xl) { display: block; }
 
 /* ── DOCK DE ABAJO (descanso en curso + sesión) ────────────────────────── */
 :root {
-  --dock-bg: rgba(20,22,27,0.94);
-  --dock-sombra: 0 14px 34px -14px rgba(0,0,0,0.75), 0 2px 6px rgba(0,0,0,0.35);
+  --dock-bg: color-mix(in oklab, var(--tono) 9%, #1a1b1e);
+  --dock-sombra: 0 14px 34px -14px rgba(0,0,0,0.8), 0 2px 6px rgba(0,0,0,0.35);
 }
 .light-mode {
-  --dock-bg: rgba(255,255,255,0.96);
-  --dock-sombra: 0 12px 30px -12px rgba(20,24,29,0.22), 0 1px 3px rgba(20,24,29,0.08);
+  --dock-bg: color-mix(in oklab, var(--tono) 4%, #ffffff);
+  --dock-sombra: 0 12px 30px -12px rgba(28,28,24,0.24), 0 1px 3px rgba(28,28,24,0.08);
 }
 .dock-tarjeta {
   position: relative; overflow: hidden;
   background: var(--dock-bg);
   border: 1px solid var(--hairline);
-  border-radius: 18px;
+  border-radius: 26px;
   box-shadow: var(--dock-sombra);
-  -webkit-backdrop-filter: blur(18px) saturate(1.3); backdrop-filter: blur(18px) saturate(1.3);
 }
+.sesion-dock-reloj { font-size: 1.45rem; line-height: 1; font-weight: 750; color: var(--text-strong); }
+.sesion-dock-dia {
+  font-size: 0.8125rem; font-weight: 650; min-width: 0;
+  color: color-mix(in oklab, var(--c) 55%, white);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.light-mode .sesion-dock-dia { color: color-mix(in oklab, var(--c) 62%, black); }
+.sesion-dock-latido { --galleta-fondo: var(--c); width: 14px; height: 14px; animation: latidoGalleta 2.4s ease-in-out infinite; }
+@keyframes latidoGalleta { 0%, 100% { transform: rotate(0) scale(1); } 50% { transform: rotate(40deg) scale(.86); } }
+.boton-finalizar {
+  flex: none; align-self: center; margin-right: 10px;
+  display: flex; align-items: center; gap: 6px; height: 44px; padding: 0 16px; border-radius: 999px;
+  font-size: 0.8125rem; font-weight: 700;
+  color: color-mix(in oklab, var(--c) 55%, white);
+  background: color-mix(in oklab, var(--c) 18%, transparent);
+  transition: border-radius .35s var(--resorte), transform .2s ease;
+}
+.light-mode .boton-finalizar { color: color-mix(in oklab, var(--c) 62%, black); }
+.boton-finalizar:active { border-radius: 14px; transform: scale(.97); }
+.boton-finalizar.listo {
+  color: color-mix(in oklab, var(--c) 22%, var(--tinta-oscura));
+  background: color-mix(in oklab, var(--c) 76%, white);
+}
+.light-mode .boton-finalizar.listo { background: var(--c); }
 
-/* ── CRONÓMETRO DE DESCANSO ─────────────────────────────────────────────── */
+/* ── CRONÓMETRO DE DESCANSO ─────────────────────────────────────────────
+   Corriendo es un contenedor del color del día con el tiempo grande y una
+   onda que se acorta: una barra que se mueve hace sentir más corta la
+   espera que una quieta (lo midió Google para Material 3 Expressive). */
 .descanso {
   display: flex; align-items: center; gap: 10px;
-  border-radius: 14px; border: 1px solid var(--hairline);
-  padding: 8px 8px 8px 12px;
-  transition: background-color .3s ease, border-color .3s ease;
+  border-radius: 22px; padding: 8px 8px 8px 14px;
+  transition: background-color .3s ease;
 }
-.descanso-quieto { background: var(--timer-idle-bg); border-color: var(--timer-idle-border); }
-.descanso-activo { flex-direction: column; align-items: stretch; gap: 10px; padding: 10px 10px 12px 12px; }
+.descanso-quieto { background: var(--surface-2); }
+.descanso-activo {
+  flex-direction: column; align-items: stretch; gap: 10px; padding: 12px 12px 14px 16px;
+  background: color-mix(in oklab, var(--c, var(--tono)) 15%, var(--surface-1));
+}
+.light-mode .descanso-activo { background: color-mix(in oklab, var(--c, var(--tono)) 13%, #ffffff); }
 /* En pantallas muy angostas los controles bajan a su propio renglón: así
    el tiempo y su rótulo no se cortan. */
 @media (max-width: 359px) {
@@ -3003,355 +3101,458 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
   .descanso-controles { width: 100%; justify-content: space-between; }
 }
 .descanso-listo { padding: 8px 8px 8px 10px; }
+.descanso-rotulo { font-size: 0.8125rem; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .descanso-tiempo {
-  margin-top: 4px; font-size: 2.15rem; line-height: 0.95; font-weight: 800;
+  margin-top: 2px; font-size: 2.35rem; line-height: 0.95; font-weight: 760; white-space: nowrap;
   transition: color .3s ease;
 }
-/* 44px de alto: el mínimo cómodo para un dedo, y en el gimnasio los dedos
-   están transpirados y apurados. Ancho mínimo y no fijo: con la letra
-   agrandada (Perfil → Tamaño de letra) el "−15" tiene que entrar igual. */
+/* 44px de alto: el mínimo cómodo para un dedo transpirado y apurado. Ancho
+   mínimo y no fijo: con la letra agrandada el "−15" tiene que entrar igual. */
 .descanso-boton {
-  min-width: 42px; height: 44px; padding: 0 6px; border-radius: 12px;
+  min-width: 44px; height: 44px; padding: 0 7px; border-radius: 999px;
   display: flex; align-items: center; justify-content: center;
-  font-family: var(--font-display); font-stretch: 90%; font-weight: 800; font-size: 0.8125rem;
-  font-variant-numeric: tabular-nums;
+  font-weight: 700; font-size: 0.875rem; font-variant-numeric: tabular-nums;
   color: var(--text-strong);
-  background: var(--surface-2); border: 1px solid var(--hairline);
+  background: color-mix(in oklab, var(--c, var(--tono)) 12%, var(--surface-2));
+  transition: border-radius .35s var(--resorte), transform .2s ease;
 }
-.descanso-boton-principal { color: #fff; border-color: transparent; min-width: 48px; }
-.descanso-barra {
-  height: 5px; border-radius: 999px; overflow: hidden;
-  background: rgba(148,163,184,0.16);
+.descanso-boton:active { border-radius: 14px; transform: scale(.96); }
+.descanso-boton-principal {
+  min-width: 56px;
+  color: color-mix(in oklab, var(--c, var(--tono)) 22%, var(--tinta-oscura));
+  background: color-mix(in oklab, var(--c, var(--tono)) 76%, white);
 }
-.descanso-barra > div {
-  height: 100%; border-radius: inherit;
-  transform-origin: left center;
-  transition: transform .25s linear, background-color .3s ease;
-}
-.descanso-barra-dock { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; border-radius: 0; }
+.light-mode .descanso-boton-principal { background: var(--c, var(--tono)); }
 .dock-descanso-embebido { border-bottom: 1px solid var(--hairline); }
 @media (max-width: 360px) {
-  .descanso-boton { min-width: 36px; height: 42px; padding: 0 4px; }
-  .descanso-boton-principal { min-width: 42px; }
-  .descanso-tiempo { font-size: 1.85rem; }
+  .descanso-boton { min-width: 38px; height: 42px; padding: 0 5px; }
+  .descanso-boton-principal { min-width: 46px; }
+  .descanso-tiempo { font-size: 2.2rem; }
 }
+/* La onda: lo que queda es una línea ondulada que corre; lo que ya pasó,
+   una línea quieta y tenue. */
+.onda { display: flex; align-items: center; gap: 5px; height: 12px; }
+.onda-llena {
+  height: 12px; flex: none; min-width: 0;
+  background: var(--onda-color, var(--c, var(--tono)));
+  -webkit-mask: var(--forma-onda) repeat-x 0 50% / 24px 12px; mask: var(--forma-onda) repeat-x 0 50% / 24px 12px;
+  animation: ondaCorre 1.1s linear infinite;
+  transition: width .9s linear;
+}
+.onda.quieta .onda-llena { animation: none; }
+.onda-vacia { flex: 1; height: 4px; border-radius: 999px; background: color-mix(in oklab, var(--onda-color, var(--c, var(--tono))) 22%, transparent); }
+@keyframes ondaCorre { to { -webkit-mask-position: 24px 50%; mask-position: 24px 50%; } }
 
 /* ── CRONÓMETRO DE CARDIO ───────────────────────────────────────────────── */
 .segmentado {
-  display: flex; gap: 2px; padding: 3px; border-radius: 12px;
-  background: var(--panel-sunken); border: 1px solid var(--hairline);
+  display: flex; gap: 3px; padding: 3px; border-radius: 999px;
+  background: var(--surface-2);
 }
 .segmentado > button {
-  flex: 1; min-width: 0; height: 34px; border-radius: 9px;
+  flex: 1; min-width: 0; height: 36px; border-radius: 999px;
   display: flex; align-items: center; justify-content: center; gap: 6px;
-  font-size: 0.6875rem; font-weight: 700; color: var(--text-muted);
+  font-size: 0.75rem; font-weight: 650; color: var(--text-muted);
   transition: background-color .2s ease, color .2s ease;
 }
-.segmentado > button.activo { color: #fff; }
+.segmentado > button.activo {
+  color: color-mix(in oklab, var(--c, var(--tono)) 22%, var(--tinta-oscura)) !important;
+  background: color-mix(in oklab, var(--c, var(--tono)) 76%, white) !important;
+}
+.light-mode .segmentado > button.activo { background: var(--c, var(--tono)) !important; }
 .cardio-reloj {
-  border: 1px solid var(--hairline); border-radius: 14px;
-  padding: 10px 10px 12px 12px;
-  transition: background-color .3s ease, border-color .3s ease;
+  border-radius: 22px; padding: 12px 12px 14px 16px;
+  background: var(--surface-2);
+  transition: background-color .3s ease;
 }
 
 /* ── SOLAPAS DE DÍA (Rutina y Descarga) ─────────────────────────────────
-   La solapa es un contenedor: 100cqi es su ancho real. La letra se achica
-   lo justo para que la palabra más larga (--largo, en letras) entre entera:
-   Archivo angosta en mayúscula ocupa ~0,6em por letra. Nunca se parte una
-   palabra (overflow-wrap normal): sólo en espacios o después de una barra. */
-.dia-solapa { container-type: inline-size; }
+   Botones unidos, como un grupo de Material 3 Expressive: puntas chicas
+   hacia adentro, redondas en los extremos, y el día elegido se vuelve una
+   píldora llena de su color. La solapa es un contenedor: 100cqi es su
+   ancho real, y la letra se achica lo justo para que la palabra más larga
+   (--largo, en letras) entre entera. Nunca se parte una palabra. */
+.selector-dias { display: flex; gap: 3px; }
+.dia-solapa {
+  container-type: inline-size;
+  flex: 1 1 0; min-width: 0;
+  border-radius: 10px;
+  background: var(--surface-1); color: var(--text-muted);
+  transition: border-radius .5s var(--resorte), background-color .25s ease, color .2s ease, transform .2s ease;
+}
+.selector-dias > .dia-solapa:first-child { border-top-left-radius: 999px; border-bottom-left-radius: 999px; }
+.selector-dias > .dia-solapa:last-child { border-top-right-radius: 999px; border-bottom-right-radius: 999px; }
+.dia-solapa[aria-selected="true"], .dia-solapa.elegida {
+  border-radius: 999px;
+  color: color-mix(in oklab, var(--dia) 22%, var(--tinta-oscura)) !important;
+  background: color-mix(in oklab, var(--dia) 76%, white) !important;
+}
+.light-mode .dia-solapa[aria-selected="true"], .light-mode .dia-solapa.elegida {
+  color: color-mix(in oklab, var(--dia) 22%, var(--tinta-oscura)) !important;
+  background: var(--dia) !important;
+}
+.dia-solapa-hoy { position: absolute; top: 7px; right: 9px; width: 6px; height: 6px; border-radius: 999px; background: var(--dia); }
+.dia-solapa[aria-selected="true"] .dia-solapa-hoy { background: currentColor; }
 .dia-solapa-texto {
   display: block; text-align: center;
-  font-family: var(--font-display); font-stretch: 84%; font-weight: 800;
-  text-transform: uppercase; letter-spacing: 0.02em; line-height: 1.08;
-  font-size: var(--fs-max, 0.8rem);
-  font-size: min(var(--fs-max, 0.9rem), calc(100cqi / var(--largo, 6) * 1.6));
+  font-weight: 650; letter-spacing: -0.005em; line-height: 1.1;
+  font-size: var(--fs-max, 0.9rem);
+  font-size: min(var(--fs-max, 0.95rem), calc(100cqi / var(--largo, 6) * 1.5));
   overflow-wrap: normal; word-break: normal; hyphens: manual;
   text-wrap: balance;
 }
 
 /* ── RUTINA: el día, sus ejercicios y cada serie ────────────────────────── */
-.selector-dias { border-radius: 16px; background: var(--surface-1); border: 1px solid var(--hairline); }
-/* El día ya no es una caja con borde: un lavado de su color detrás de la
-   cabecera que se apaga antes de los ejercicios. Se sigue leyendo como un
-   sector, sin sumar un nivel más de caja alrededor de cada tarjeta. */
-.dia-seccion {
-  border-radius: 22px;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--c) 11%, transparent) 0, color-mix(in srgb, var(--c) 4%, transparent) 120px, transparent 240px);
+/* El día: un contenedor de su color, con el nombre enorme, la barra
+   cargada y el botón para empezar. Es lo primero que se ve y lo que más
+   color tiene de la pantalla, a propósito. */
+.dia-hero {
+  position: relative; overflow: hidden; container-type: inline-size;
+  border-radius: 30px; padding: 14px 16px 16px;
+  background: color-mix(in oklab, var(--c) 15%, var(--surface-1));
 }
+.light-mode .dia-hero { background: color-mix(in oklab, var(--c) 14%, #ffffff); }
+.dia-chip {
+  margin: 2px 0 8px; display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px; border-radius: 999px;
+  font-size: 0.75rem; font-weight: 650;
+  color: color-mix(in oklab, var(--c) 55%, white);
+  background: color-mix(in oklab, var(--c) 20%, transparent);
+}
+.light-mode .dia-chip { color: color-mix(in oklab, var(--c) 62%, black); }
 .dia-titulo {
-  display: flex; align-items: center; gap: 10px;
-  font-size: 1.75rem; line-height: 1; font-weight: 800; text-transform: uppercase;
-  font-stretch: 110%; letter-spacing: -0.005em; color: var(--text-strong);
-  overflow-wrap: anywhere;
+  margin: 4px 44px 0 0;
+  font-size: 2.75rem;
+  font-size: min(2.75rem, calc(100cqi / var(--largo, 6) * 1.5));
+  line-height: 0.98; font-weight: 800; letter-spacing: -0.04em;
+  font-variation-settings: "ROND" 100;
+  color: color-mix(in oklab, var(--c) 28%, var(--text-strong));
+  overflow-wrap: normal; word-break: normal; text-wrap: balance;
 }
-.dia-titulo::before {
-  content: ""; flex: none; width: 10px; height: 10px; border-radius: 3px; background: var(--c);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--c) 22%, transparent);
-}
-.tarjeta-plan { border-radius: 18px; padding: 14px; background: var(--surface-1); border: 1px solid var(--hairline); }
+.light-mode .dia-titulo { color: color-mix(in oklab, var(--c) 45%, black); }
+.dia-bajada { margin-top: 6px; font-size: 0.875rem; line-height: 1.4; color: var(--text-muted); text-wrap: pretty; }
+.dia-barra { margin-top: 12px; }
+.dia-barra-texto { margin-top: 4px; font-size: 0.8125rem; font-weight: 550; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.dia-barra-ayuda { margin-top: 1px; font-size: 0.75rem; color: var(--text-faint); }
+.dia-barra-texto b { font-weight: 750; color: var(--text-strong); font-variation-settings: "ROND" 100; font-size: 1.05rem; }
+.dia-hero .boton-pildora { width: 100%; margin-top: 14px; }
 
+.tarjeta-plan { border-radius: 26px; padding: 16px; background: var(--surface-1); }
+/* Tarjetas sin borde: las separa del fondo su superficie (y, si tienen un
+   color propio, un tinte de ese color). */
+.tarjeta-tonal { border-radius: 26px; background: color-mix(in oklab, var(--c, var(--tono)) 8%, var(--surface-1)); }
+.light-mode .tarjeta-tonal { background: color-mix(in oklab, var(--c, var(--tono)) 7%, #ffffff); }
+.seccion-plegable { border-radius: 26px; background: var(--surface-1); }
+.icono-galleta {
+  width: 40px; height: 40px;
+  --galleta-fondo: color-mix(in oklab, var(--c, var(--tono)) 20%, transparent);
+  color: color-mix(in oklab, var(--c, var(--tono)) 55%, white);
+}
+.light-mode .icono-galleta { color: color-mix(in oklab, var(--c, var(--tono)) 62%, black); }
+
+/* La tarjeta de cada ejercicio. Sin borde: la separa del fondo su propia
+   superficie. Abierta, sube un tono y toma un filo del color del día. */
 .ejercicio {
-  background: var(--surface-1); border: 1px solid var(--hairline); border-radius: 18px; overflow: hidden;
-  transition: border-color .25s ease, box-shadow .25s ease;
+  background: var(--surface-1); border-radius: 26px; overflow: hidden;
+  transition: background-color .25s ease, box-shadow .25s ease;
 }
 .ejercicio.abierto {
-  border-color: color-mix(in srgb, var(--c) 38%, var(--hairline));
-  box-shadow: 0 18px 40px -26px color-mix(in srgb, var(--c) 70%, transparent);
+  background: color-mix(in oklab, var(--c) 5%, var(--surface-1));
+  box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--c) 32%, transparent);
 }
 .ejercicio-cabecera { transition: background-color .15s ease; }
-.ejercicio-cabecera:active { background-color: rgba(148,163,184,0.06); }
+.ejercicio-cabecera:active { background-color: color-mix(in oklab, var(--text-strong) 4%, transparent); }
 .ejercicio-numero {
-  flex: none; width: 34px; text-align: center;
-  font-family: var(--font-display); font-stretch: 82%; font-weight: 800; font-size: 1.45rem; line-height: 1;
-  color: var(--c); letter-spacing: -0.02em;
+  width: 40px; height: 40px;
+  --galleta-fondo: color-mix(in oklab, var(--c) 22%, var(--surface-2));
+  font-weight: 750; font-size: 1rem; font-variation-settings: "ROND" 100; font-variant-numeric: tabular-nums;
+  color: color-mix(in oklab, var(--c) 55%, white);
 }
-.ejercicio-nombre { font-size: 0.9375rem; font-weight: 600; line-height: 1.25; color: var(--text-strong); letter-spacing: -0.005em; }
-/* Hecho: el ejercicio se apaga un tono, así los que faltan resaltan solos. */
-.ejercicio.completo .ejercicio-numero { color: var(--text-faint); }
+.light-mode .ejercicio-numero { --galleta-fondo: color-mix(in oklab, var(--c) 20%, #ffffff); color: color-mix(in oklab, var(--c) 62%, black); }
+.ejercicio.completo .ejercicio-numero {
+  --galleta-fondo: color-mix(in oklab, var(--c) 76%, white);
+  color: color-mix(in oklab, var(--c) 22%, var(--tinta-oscura));
+}
+.light-mode .ejercicio.completo .ejercicio-numero { --galleta-fondo: var(--c); color: color-mix(in oklab, var(--c) 22%, var(--tinta-oscura)); }
+.ejercicio-nombre { font-size: 1rem; font-weight: 650; line-height: 1.25; color: var(--text-strong); letter-spacing: -0.008em; text-wrap: pretty; }
+.ejercicio-musculo {
+  display: inline-flex; align-items: center; height: 22px; padding: 0 9px; border-radius: 999px;
+  font-size: 0.75rem; font-weight: 600;
+  color: color-mix(in oklab, var(--c) 55%, white);
+  background: color-mix(in oklab, var(--c) 16%, transparent);
+}
+.light-mode .ejercicio-musculo { color: color-mix(in oklab, var(--c) 62%, black); }
 .ejercicio.completo .ejercicio-nombre { color: var(--text-muted); }
-.series-puntos { display: inline-flex; gap: 4px; }
-.series-puntos i { width: 7px; height: 7px; border-radius: 999px; background: var(--hairline); }
-.series-puntos i.hecha { background: var(--c); }
+/* Las series de un ejercicio cerrado: un disquito por serie, con los mismos
+   colores de la barra cargada. Lleno = hecha hoy. */
+.series-discos { display: inline-flex; align-items: center; gap: 2px; }
+.series-discos i { width: 6px; height: 16px; border-radius: 2.5px; background: var(--disco-fantasma); }
+.series-discos i.hecha { background: var(--disco); }
 
-/* ── PLANILLA DE SERIES ───────────────────────────────────────────────────
-   Una fila por serie, alineada en columnas con el encabezado de la tarjeta:
-   número · objetivo · reps × kilos · ✓. Lo de ayuda va debajo, sangrado
-   hasta la columna del objetivo (--sangria-serie). */
-:root {
-  --cols-serie: 24px minmax(0, 1fr) 54px 10px 58px 46px;
-  --sangria-serie: 30px;
+/* ── LA SERIE ────────────────────────────────────────────────────────────
+   Una sola serie a la vez está "en foco": la que toca ahora (o la que
+   estás corrigiendo). Esa se abre con el tablero grande —reps × kilos,
+   tu marca y la vez pasada a la vista, los ± y guardar—, como la versión
+   de los campos grandes que funcionaba. Las demás son renglones de una
+   línea: las hechas muestran lo que hiciste, las que faltan su objetivo.
+   Así un ejercicio de cuatro series entra en una pantalla. */
+.series-lista { display: flex; flex-direction: column; gap: 6px; }
+.serie { min-width: 0; }
+.serie-linea {
+  width: 100%; min-height: 50px; display: flex; align-items: center; gap: 12px;
+  padding: 5px 12px 5px 6px; border-radius: 18px; text-align: left;
+  background: var(--surface-2);
+  transition: background-color .2s ease, border-radius .35s var(--resorte);
 }
-@media (max-width: 340px) {
-  :root { --cols-serie: 20px minmax(0, 1fr) 46px 8px 52px 42px; --sangria-serie: 26px; }
-}
-.tabla-encabezado {
-  display: grid; grid-template-columns: var(--cols-serie); column-gap: 6px; align-items: center;
-  padding: 8px 0 6px; border-bottom: 1px solid var(--hairline);
-  font-size: 0.6875rem; font-weight: 600; color: var(--text-faint);
-}
-.tabla-encabezado > span:first-child { text-align: center; }
-.tabla-unidad {
-  display: inline-flex; align-items: center; justify-content: center; gap: 3px;
-  height: 26px; border-radius: 8px; font-weight: 700; font-size: 0.6875rem; color: var(--c);
-  background: var(--accent-soft);
-  background: color-mix(in srgb, var(--c) 13%, transparent);
-}
-.serie { border-top: 1px solid var(--hairline); padding: 6px 0; }
-.tabla-encabezado + .serie { border-top: 0; }
-.serie-fila {
-  display: grid; grid-template-columns: var(--cols-serie); column-gap: 6px; align-items: center;
-  padding: 4px; margin: 0 -4px; border-radius: 14px;
-  transition: background-color .25s ease, box-shadow .2s ease;
-}
-.serie-hecha .serie-fila { background: color-mix(in srgb, var(--c) 10%, transparent); }
-.serie-n {
-  font-family: var(--font-display); font-stretch: 86%; font-weight: 800; font-size: 1.05rem;
-  text-align: center; color: var(--text-faint); font-variant-numeric: tabular-nums;
-}
-.serie-activa .serie-n, .serie-hecha .serie-n { color: var(--c); }
-.serie-ref { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; line-height: 1.2; }
-.serie-ref-rango {
-  display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px;
-  font-size: 0.75rem; font-weight: 600; color: var(--text-strong);
-}
-.serie-ref-meta {
-  display: inline-flex; align-items: center; gap: 4px; min-height: 18px;
-  font-size: 0.75rem; font-weight: 800; font-variant-numeric: tabular-nums; text-align: left;
-}
-.serie-ref-ant {
-  display: inline-flex; align-items: center; gap: 4px;
-  font-size: 0.6875rem; font-weight: 600; color: var(--text-faint); font-variant-numeric: tabular-nums;
-}
-.serie-campo {
-  width: 100%; height: 46px; border-radius: 12px; text-align: center;
-  background: var(--panel-sunken); border: 1px solid var(--hairline); color: var(--text-strong);
-  font-family: var(--font-display); font-stretch: 86%; font-weight: 800; font-size: 1.35rem;
-  font-variant-numeric: tabular-nums; -moz-appearance: textfield; appearance: textfield;
-  transition: border-color .15s ease, background-color .15s ease;
-}
-.serie-campo::-webkit-outer-spin-button, .serie-campo::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-.serie-campo:focus { outline: none; border-color: var(--c); background: color-mix(in srgb, var(--c) 9%, var(--panel-sunken)); }
-.serie-campo::placeholder { color: var(--text-faint); opacity: .55; }
-.serie-por { text-align: center; color: var(--text-faint); font-size: 0.8rem; }
-.serie-valor {
-  grid-column: 3 / span 3; height: 46px; border-radius: 12px;
-  display: flex; align-items: center; justify-content: center; gap: 5px;
-  font-family: var(--font-display); font-stretch: 86%; font-weight: 800; font-size: 1.35rem;
-  color: var(--c); font-variant-numeric: tabular-nums;
-}
-.serie-valor .serie-por { font-size: 0.85rem; }
+.serie-linea:active { border-radius: 12px; }
+.serie-hecha .serie-linea { background: color-mix(in oklab, var(--c) 13%, var(--surface-2)); }
+.serie-galleta { width: 38px; height: 38px; font-weight: 750; font-size: 0.9375rem; font-variation-settings: "ROND" 100; font-variant-numeric: tabular-nums; }
+.serie-galleta.hueca { --galleta-borde: color-mix(in oklab, var(--text-strong) 22%, transparent); --galleta-fondo: var(--surface-2); color: var(--text-muted); }
+.serie-galleta.llena { --galleta-fondo: color-mix(in oklab, var(--c) 76%, white); color: color-mix(in oklab, var(--c) 22%, var(--tinta-oscura)); }
+.light-mode .serie-galleta.llena { --galleta-fondo: var(--c); }
+.serie-galleta.activa { --galleta-fondo: color-mix(in oklab, var(--c) 76%, white); color: color-mix(in oklab, var(--c) 22%, var(--tinta-oscura)); }
+.light-mode .serie-galleta.activa { --galleta-fondo: var(--c); }
+.serie-linea-valor { display: inline-flex; align-items: baseline; gap: 4px; font-variation-settings: "ROND" 100; font-variant-numeric: tabular-nums; }
+.serie-linea-valor b { font-size: 1.3rem; font-weight: 750; color: var(--text-strong); line-height: 1; }
+.serie-linea-valor i { font-style: normal; font-size: 0.875rem; color: var(--text-faint); }
+.serie-linea-valor small { font-size: 0.8125rem; font-weight: 600; color: var(--text-muted); }
+.serie-linea-meta { display: flex; flex-direction: column; gap: 1px; min-width: 0; line-height: 1.2; }
+.serie-linea-meta b { font-size: 0.9375rem; font-weight: 650; color: var(--text-strong); }
+.serie-linea-meta span { display: inline-flex; align-items: center; gap: 4px; font-size: 0.8125rem; font-weight: 500; color: var(--text-muted); }
+.serie-linea-fin { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; flex: none; font-size: 0.8125rem; font-weight: 600; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.serie-mejora { display: inline-flex; align-items: center; gap: 3px; height: 24px; padding: 0 8px; border-radius: 999px; font-size: 0.75rem; font-weight: 700; color: #6ee7b7; background: rgba(16,185,129,0.14); }
+.light-mode .serie-mejora { color: #047857; background: rgba(16,185,129,0.14); }
 .serie-valor-rpe {
-  font-family: var(--font-sans); font-stretch: 100%; font-size: 0.625rem; font-weight: 700;
-  padding: 2px 5px; border-radius: 6px; background: var(--surface-2); color: var(--text-muted); margin-left: 3px;
+  font-size: 0.6875rem; font-weight: 700; padding: 2px 7px; border-radius: 999px;
+  background: var(--surface-3); color: var(--text-muted); margin-left: 4px; align-self: center;
+  font-variation-settings: "ROND" 0;
 }
-.serie-check {
-  width: 100%; height: 46px; border-radius: 12px;
+.serie-aviso { font-size: 0.8125rem; line-height: 1.4; margin: 6px 4px 2px 52px; text-wrap: pretty; }
+
+/* La serie en foco. */
+.serie-foco {
+  border-radius: 24px; padding: 12px;
+  background: color-mix(in oklab, var(--c) 11%, var(--surface-2));
+  box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--c) 30%, transparent);
+  animation: focoEntra .45s var(--resorte) backwards;
+}
+.light-mode .serie-foco { background: color-mix(in oklab, var(--c) 9%, #ffffff); }
+@keyframes focoEntra { from { transform: scale(.97); opacity: .4; } }
+.serie-foco.va-record { box-shadow: inset 0 0 0 2px #10B981, 0 0 22px -8px rgba(16,185,129,0.6); }
+.foco-cabecera { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.foco-titulo { display: flex; align-items: baseline; gap: 8px; min-width: 0; font-size: 1rem; font-weight: 700; color: var(--text-strong); }
+.foco-titulo span { font-size: 0.875rem; font-weight: 550; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.foco-chip { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 9px; border-radius: 999px; font-size: 0.75rem; font-weight: 650; }
+.foco-cancelar { margin-left: auto; height: 32px; padding: 0 12px; border-radius: 999px; font-size: 0.8125rem; font-weight: 650; color: var(--text-muted); background: var(--surface-3); }
+/* El marcador: contra qué jugás (tu récord o la meta) y la vez pasada, en
+   dos columnas con el mismo esqueleto, para comparar bajando la vista. */
+.foco-marcador { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }
+.marcador-celda {
+  min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
+  padding: 8px 11px 9px; border-radius: 16px; text-align: left;
+  background: color-mix(in oklab, var(--c) 8%, var(--surface-1));
+}
+.marcador-celda:only-child { grid-column: 1 / -1; }
+.marcador-vacio { flex-direction: row; align-items: center; gap: 8px; padding: 10px 12px; font-size: 0.8125rem; font-weight: 550; color: var(--text-muted); }
+.marcador-rotulo { display: inline-flex; align-items: center; gap: 5px; font-size: 0.75rem; font-weight: 600; color: var(--text-muted); white-space: nowrap; }
+.marcador-valor { display: inline-flex; align-items: baseline; gap: 3px; font-size: 1.3rem; line-height: 1; font-weight: 750; font-variation-settings: "ROND" 100; font-variant-numeric: tabular-nums; color: color-mix(in oklab, var(--c) 45%, white); }
+.light-mode .marcador-valor { color: color-mix(in oklab, var(--c) 58%, black); }
+.marcador-valor i { font-style: normal; font-size: 0.8125rem; opacity: .6; }
+.marcador-valor small { font-size: 0.75rem; font-weight: 650; opacity: .75; }
+.marcador-celda.secundaria .marcador-valor { color: var(--text-strong); }
+.marcador-extra { font-size: 0.75rem; font-weight: 550; color: var(--text-muted); }
+/* El tablero: los dos números grandes y guardar. */
+.foco-tablero {
+  display: grid; grid-template-columns: minmax(0, 1fr) 12px minmax(0, 1fr) 64px;
+  align-items: stretch; gap: 8px 6px; margin-top: 10px;
+}
+.foco-campo { position: relative; min-width: 0; }
+.foco-input {
+  width: 100%; height: 76px; padding: 20px 4px 4px; border-radius: 20px; text-align: center;
+  background: var(--panel-sunken); color: var(--text-strong);
+  border: 1.5px solid transparent;
+  font-size: 2.1rem; font-weight: 750; font-variation-settings: "ROND" 100; font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
+  -moz-appearance: textfield; appearance: textfield;
+  transition: border-color .15s ease, background-color .15s ease, border-radius .35s var(--resorte);
+}
+.foco-input::-webkit-outer-spin-button, .foco-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.foco-input:focus { outline: none; border-color: color-mix(in oklab, var(--c) 80%, white); border-radius: 16px; background: color-mix(in oklab, var(--c) 7%, var(--panel-sunken)); }
+.light-mode .foco-input { background: color-mix(in oklab, var(--c) 4%, #ffffff); }
+.light-mode .foco-input:focus { border-color: var(--c); }
+.foco-input::placeholder { color: var(--text-faint); opacity: .5; }
+.foco-campo-rotulo {
+  position: absolute; top: 8px; left: 0; right: 0; z-index: 1;
+  display: flex; align-items: center; justify-content: center; gap: 3px;
+  font-size: 0.75rem; font-weight: 600; color: var(--text-muted); pointer-events: none;
+}
+button.foco-campo-rotulo { pointer-events: auto; left: 50%; right: auto; transform: translateX(-50%); top: 4px; height: 24px; padding: 0 9px; border-radius: 999px; color: color-mix(in oklab, var(--c) 55%, white); }
+.light-mode button.foco-campo-rotulo { color: color-mix(in oklab, var(--c) 62%, black); }
+button.foco-campo-rotulo:active { background: color-mix(in oklab, var(--c) 16%, transparent); }
+.foco-por { align-self: center; text-align: center; color: var(--text-faint); font-size: 1rem; }
+.foco-guardar {
+  height: 76px; border-radius: 24px;
   display: flex; align-items: center; justify-content: center;
-  color: var(--c); background: var(--accent-soft);
-  background: color-mix(in srgb, var(--c) 14%, transparent);
-  border: 1px solid color-mix(in srgb, var(--c) 40%, transparent);
-  transition: background-color .2s ease, color .2s ease;
+  color: color-mix(in oklab, var(--c) 22%, var(--tinta-oscura));
+  background: color-mix(in oklab, var(--c) 76%, white);
+  transition: border-radius .4s var(--resorte), transform .25s var(--resorte), background-color .2s ease;
 }
-.serie-check.hecha { background: var(--c); color: #fff; border-color: transparent; }
-.serie-aviso { font-size: 0.75rem; line-height: 1.35; margin: 4px 0 2px var(--sangria-serie); }
-.serie-ajustes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 6px 0 2px var(--sangria-serie); }
-.serie-ajustes button {
-  height: 36px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--hairline);
-  font-family: var(--font-display); font-stretch: 90%; font-weight: 800; font-size: 0.8125rem;
-  color: var(--text-strong); font-variant-numeric: tabular-nums; white-space: nowrap;
+.light-mode .foco-guardar { background: var(--c); }
+.foco-guardar:active { border-radius: 32px; transform: scale(.95); }
+.serie-foco.va-record .foco-guardar, .foco-guardar.hecha { background: #34d399; color: #022c22; }
+.foco-ajustes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
+.foco-ajustes button {
+  height: 38px; border-radius: 999px;
+  font-size: 0.875rem; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text-strong);
+  background: color-mix(in oklab, var(--c) 9%, var(--surface-1));
+  transition: border-radius .35s var(--resorte), transform .2s ease;
 }
-.serie-ajustes button span { font-family: var(--font-sans); font-stretch: 100%; font-weight: 600; font-size: 0.625rem; color: var(--text-faint); margin-left: 2px; }
+.foco-ajustes button:active { border-radius: 12px; transform: scale(.96); }
+.foco-ajustes button small { font-size: 0.6875rem; font-weight: 600; color: var(--text-faint); margin-left: 2px; }
+.foco-record { display: flex; align-items: center; gap: 6px; margin: 8px 2px 0; font-size: 0.8125rem; font-weight: 650; color: #6ee7b7; }
+.light-mode .foco-record { color: #047857; }
+.serie-foco .serie-aviso { margin: 8px 2px 0; }
+.foco-extras { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.foco-extras > * { flex: 1 1 140px; }
 .serie-sugerencia {
-  display: flex; align-items: center; gap: 6px; width: calc(100% - var(--sangria-serie)); margin: 6px 0 0 var(--sangria-serie);
-  padding: 8px 10px; border-radius: 10px; border: 1px solid; font-size: 0.75rem; font-weight: 600;
+  display: flex; align-items: center; gap: 6px; width: 100%; margin-top: 8px;
+  padding: 9px 12px; border-radius: 16px; font-size: 0.8125rem; font-weight: 600;
+  color: color-mix(in oklab, var(--c) 55%, white);
+  background: color-mix(in oklab, var(--c) 12%, transparent);
 }
+.light-mode .serie-sugerencia { color: color-mix(in oklab, var(--c) 62%, black); }
 .serie-boton-suave {
   display: flex; align-items: center; justify-content: center; gap: 6px;
-  width: calc(100% - var(--sangria-serie)); margin: 6px 0 0 var(--sangria-serie); height: 36px; border-radius: 10px;
-  background: var(--panel-sunken); border: 1px dashed var(--hairline); color: var(--text-muted);
-  font-size: 0.75rem; font-weight: 600;
+  width: 100%; height: 38px; border-radius: 999px;
+  background: color-mix(in oklab, var(--c, var(--tono)) 7%, var(--surface-1)); color: var(--text-muted);
+  font-size: 0.8125rem; font-weight: 600;
 }
 .serie-chip {
-  display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px; border-radius: 7px;
-  font-size: 0.75rem; font-weight: 800; font-variant-numeric: tabular-nums;
+  display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 9px; border-radius: 999px;
+  font-size: 0.75rem; font-weight: 700; font-variant-numeric: tabular-nums;
 }
-.serie-cardio { padding: 12px 0; }
-.serie-rotulo {
-  font-family: var(--font-display); font-weight: 800; font-size: 0.75rem;
-  text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-strong);
-}
+.serie-cardio { padding: 4px 0 2px; }
+.serie-rotulo { font-weight: 700; font-size: 0.9375rem; color: var(--text-strong); }
 
-/* ── PORTADA (login) ────────────────────────────────────────────────────── */
-.login-disco {
-  position: absolute; width: 620px; height: 620px; right: -300px; top: -230px;
-  border-radius: 50%; pointer-events: none;
-  background:
-    radial-gradient(circle, transparent 0 20%, rgba(255,255,255,0.06) 20.2% 20.7%, transparent 20.9% 33%,
-      rgba(20,184,166,0.30) 33.2% 33.9%, transparent 34.1% 48%,
-      rgba(255,255,255,0.05) 48.2% 48.6%, transparent 48.8% 63%,
-      rgba(20,184,166,0.10) 63.2% 66%, transparent 66.2%),
-    radial-gradient(circle, rgba(20,184,166,0.16), transparent 62%);
+/* ── PORTADA (login) ──────────────────────────────────────────────────── */
+.login-galleta {
+  position: absolute; width: 560px; height: 560px; right: -250px; top: -220px; pointer-events: none;
+  --galleta-fondo: color-mix(in oklab, #14B8A6 16%, transparent);
+  animation: galletaGira 60s linear infinite;
 }
-.login-marca {
-  font-family: var(--font-display); font-stretch: 112%; font-weight: 800;
-  font-size: 1.05rem; letter-spacing: -0.01em; color: #fff;
-}
+.login-galleta.chica { width: 220px; height: 220px; right: auto; left: -90px; top: auto; bottom: 120px; --galleta-fondo: color-mix(in oklab, #F4C430 12%, transparent); animation-duration: 45s; animation-direction: reverse; }
+@keyframes galletaGira { to { transform: rotate(360deg); } }
+.login-marca { font-weight: 750; font-size: 1.05rem; letter-spacing: -0.01em; color: #fff; font-variation-settings: "ROND" 60; }
 .login-titulo {
-  font-size: 3rem; line-height: 0.95; font-weight: 800;
-  font-stretch: 118%; letter-spacing: -0.035em; color: #fff;
+  font-size: 3.25rem; line-height: 0.95; font-weight: 800;
+  letter-spacing: -0.045em; color: #fff; font-variation-settings: "ROND" 100;
 }
 .login-bajada {
-  margin-top: 18px; max-width: 30ch; font-size: 0.95rem; line-height: 1.45;
-  color: #a1a6ad; text-wrap: pretty;
+  margin-top: 18px; max-width: 30ch; font-size: 1rem; line-height: 1.45;
+  color: #a8aaaf; text-wrap: pretty;
 }
 
-/* ── LA BARRA CARGADA ───────────────────────────────────────────────────── */
+/* ── LA BARRA CARGADA ───────────────────────────────────────────────────
+   Una barra olímpica de verdad: mangas cromadas, topes, el agarre con su
+   moleteado y collarines del color del día que se corren a medida que
+   cargás. Los discos tienen volumen (luz arriba, sombra abajo) y su tamaño
+   real: los pesados, gruesos y altos adentro; el blanco de 5, chico afuera.
+   Lo que falta se ve como discos fantasma, sin el punteado de antes. */
 .barra-cargada { display: block; width: 100%; overflow: visible; }
-.barra-eje { fill: #8a8f97; }
-.barra-agarre { fill: #6b7079; }
-.barra-collar { fill: #b8bcc2; }
-.light-mode .barra-eje { fill: #9aa0a8; }
-.light-mode .barra-agarre { fill: #7b8089; }
-.light-mode .barra-collar { fill: #6b7079; }
-.disco { stroke: rgba(0,0,0,0.28); stroke-width: 0.6; }
-.disco-hueco { fill: none; stroke: var(--hairline); stroke-width: 1.1; stroke-dasharray: 2.2 2; }
-.disco-entra { transform-box: fill-box; transform-origin: center; animation: discoEntra .5s cubic-bezier(.34,1.45,.64,1) backwards; }
-@keyframes discoEntra { from { transform: translateX(var(--desde, -9px)) scaleY(.55); opacity: 0; } to { transform: none; opacity: 1; } }
-.barra-cargada.completa { filter: drop-shadow(0 0 6px rgba(244,196,48,0.35)); }
-.dia-barra { margin-top: 14px; }
-.dia-barra-texto { margin-top: 6px; text-align: center; font-size: 0.75rem; font-weight: 600; color: var(--text-muted); font-variant-numeric: tabular-nums; }
-.dia-cabecera { overflow: hidden; border-radius: 22px 22px 0 0; }
-.dia-fondo {
-  position: absolute; right: -8px; top: -18px; pointer-events: none; user-select: none;
-  font-family: var(--font-display); font-weight: 900; font-stretch: 125%; font-size: 6rem; line-height: 1;
-  text-transform: uppercase; letter-spacing: -0.045em; white-space: nowrap;
-  color: transparent; -webkit-text-stroke: 1.2px color-mix(in srgb, var(--c) 24%, transparent);
+.acero-claro { stop-color: #e2e4e7; }
+.acero-medio { stop-color: #a9adb3; }
+.acero-oscuro { stop-color: #6c7076; }
+.light-mode .acero-claro { stop-color: #c9ccd0; }
+.light-mode .acero-medio { stop-color: #8f9399; }
+.light-mode .acero-oscuro { stop-color: #5d6167; }
+.moleteado { stroke: rgba(0,0,0,0.38); stroke-width: 0.7; }
+.disco { stroke: rgba(0,0,0,0.3); stroke-width: 0.6; }
+.disco-labio { fill: none; stroke: rgba(255,255,255,0.22); stroke-width: 0.8; }
+.disco-fantasma { fill: var(--disco-fantasma); }
+.collarin { fill: color-mix(in oklab, var(--c, var(--tono)) 76%, white); transition: transform .55s var(--resorte); }
+.light-mode .collarin { fill: var(--c, var(--tono)); }
+.disco-entra { transform-box: fill-box; transform-origin: center; animation: discoEntra .7s var(--resorte-vivo) backwards; }
+@keyframes discoEntra { from { transform: translateX(var(--desde, -24px)); opacity: 0; } 30% { opacity: 1; } to { transform: none; opacity: 1; } }
+.barra-cargada.completa .collarin { filter: drop-shadow(0 0 4px color-mix(in oklab, var(--c, var(--tono)) 70%, transparent)); }
+@media (prefers-reduced-motion: reduce) {
+  .disco-entra, .onda-llena, .serie-foco, .sesion-dock-latido, .login-galleta { animation: none !important; }
+  .collarin, .galleta::before { transition: none !important; }
 }
-@media (prefers-reduced-motion: reduce) { .disco-entra { animation: none !important; } }
 
 /* ── SOCIAL ─────────────────────────────────────────────────────────────── */
-/* La tarjeta de atleta: superficie de siempre, teñida del color de TU rango
-   en diagonal con rayas finas, como el frente de una figurita. */
+/* La tarjeta de atleta: un contenedor del color de TU rango, con el avatar
+   en galleta, como el frente de una figurita. */
 .atleta {
-  position: relative; overflow: hidden; border-radius: 22px; padding: 16px;
-  background: var(--surface-1);
-  border: 1px solid var(--hairline);
-  border-color: color-mix(in srgb, var(--rango) 42%, var(--hairline));
+  position: relative; overflow: hidden; border-radius: 28px; padding: 16px;
+  background: color-mix(in oklab, var(--rango) 12%, var(--surface-1));
 }
+.light-mode .atleta { background: color-mix(in oklab, var(--rango) 10%, #ffffff); }
 .atleta-fondo {
-  position: absolute; inset: 0; pointer-events: none;
-  background:
-    linear-gradient(125deg, color-mix(in srgb, var(--rango) 28%, transparent) 0%, transparent 58%),
-    repeating-linear-gradient(125deg, color-mix(in srgb, var(--rango) 10%, transparent) 0 2px, transparent 2px 13px);
-  -webkit-mask-image: linear-gradient(110deg, #000 0%, #000 32%, transparent 78%);
-  mask-image: linear-gradient(110deg, #000 0%, #000 32%, transparent 78%);
+  position: absolute; width: 230px; height: 230px; right: -70px; top: -80px; pointer-events: none;
+  -webkit-mask: var(--forma-galleta) center / contain no-repeat; mask: var(--forma-galleta) center / contain no-repeat;
+  background: color-mix(in oklab, var(--rango) 14%, transparent);
 }
 .atleta-avatar {
-  width: 58px; height: 58px; border-radius: 19px; overflow: hidden; flex: none;
+  width: 62px; height: 62px; flex: none; overflow: hidden;
   display: flex; align-items: center; justify-content: center;
-  font-family: var(--font-display); font-weight: 800; font-size: 1.5rem; color: #fff;
-  background: linear-gradient(135deg, var(--rango), color-mix(in srgb, var(--rango) 50%, #000));
-  box-shadow: 0 0 0 2px var(--surface-1), 0 0 0 4px color-mix(in srgb, var(--rango) 65%, transparent);
+  font-weight: 800; font-size: 1.5rem; color: var(--tinta-oscura); font-variation-settings: "ROND" 100;
+  background: color-mix(in oklab, var(--rango) 76%, white);
+  -webkit-mask: var(--forma-galleta) center / contain no-repeat; mask: var(--forma-galleta) center / contain no-repeat;
 }
+.atleta-avatar > img { width: 100%; height: 100%; object-fit: cover; }
 .atleta-nombre {
-  font-family: var(--font-display); font-stretch: 106%; font-weight: 800; font-size: 1.15rem;
+  font-weight: 750; font-size: 1.2rem; font-variation-settings: "ROND" 60;
   line-height: 1.1; color: var(--text-strong); overflow-wrap: anywhere;
 }
 .atleta-rango { display: flex; flex-direction: column; align-items: center; gap: 2px; flex: none; }
-.atleta-rango span { font-size: 0.6875rem; font-weight: 800; color: var(--rango); white-space: nowrap; }
+.atleta-rango span { font-size: 0.75rem; font-weight: 700; color: var(--rango); white-space: nowrap; }
 .atleta-stats {
-  position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--hairline);
+  position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px;
+  margin-top: 14px;
 }
-.atleta-stats > div { min-width: 0; }
-.atleta-stats > div + div { border-left: 1px solid var(--hairline); padding-left: 12px; }
-.atleta-stat-rotulo { display: flex; align-items: center; gap: 4px; font-size: 0.6875rem; font-weight: 600; color: var(--text-muted); }
+.atleta-stats > div { min-width: 0; padding: 10px 11px; border-radius: 18px; background: color-mix(in oklab, var(--text-strong) 5%, transparent); }
+.atleta-stat-rotulo { display: flex; align-items: center; gap: 4px; font-size: 0.75rem; font-weight: 600; color: var(--text-muted); }
 .atleta-stat-valor {
-  margin-top: 5px; font-family: var(--font-display); font-stretch: 86%; font-weight: 800;
-  font-size: 1.85rem; line-height: 1; color: var(--text-strong); font-variant-numeric: tabular-nums;
+  margin-top: 5px; font-weight: 760; font-variation-settings: "ROND" 100;
+  font-size: 1.75rem; line-height: 1; color: var(--text-strong); font-variant-numeric: tabular-nums;
 }
-.atleta-stat-valor small { font-family: var(--font-sans); font-stretch: 100%; font-size: 0.75rem; font-weight: 700; color: var(--text-muted); margin-left: 3px; }
+.atleta-stat-valor small { font-size: 0.75rem; font-weight: 650; color: var(--text-muted); margin-left: 3px; }
 .atleta-accion {
   position: relative; display: flex; align-items: center; gap: 8px; width: 100%;
-  margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--hairline);
-  font-size: 0.8125rem; font-weight: 600; color: var(--text-strong); text-align: left;
+  margin-top: 12px; padding: 12px 14px; border-radius: 999px;
+  font-size: 0.8125rem; font-weight: 650; color: var(--text-strong); text-align: left;
+  background: color-mix(in oklab, var(--text-strong) 6%, transparent);
 }
-/* Historias: aros cuadrados (no círculos) con el color del día que
-   entrenaron; apagados cuando ya les aplaudiste. */
+/* Historias: aros en galleta con el color del día que entrenaron; apagados
+   cuando ya les aplaudiste. */
 .historias { display: flex; gap: 14px; overflow-x: auto; padding: 4px 2px 6px; scroll-snap-type: x proximity; }
-.historia { position: relative; flex: none; width: 70px; display: flex; flex-direction: column; align-items: center; scroll-snap-align: start; }
-.historia-aro {
-  width: 66px; height: 66px; border-radius: 23px; padding: 3px;
-  background: conic-gradient(from 210deg, var(--dia), color-mix(in srgb, var(--dia) 35%, #ffffff), var(--dia));
-}
-.historia-aro.vista { background: var(--hairline); }
+.historia { position: relative; flex: none; width: 72px; display: flex; flex-direction: column; align-items: center; scroll-snap-align: start; }
+.historia-aro { width: 68px; height: 68px; --galleta-fondo: var(--dia); }
+.historia-aro.vista { --galleta-fondo: var(--hairline); }
 .historia-aro > img, .historia-aro > span {
-  width: 100%; height: 100%; border-radius: 20px; object-fit: cover;
+  width: 58px; height: 58px; object-fit: cover;
   display: flex; align-items: center; justify-content: center;
-  background: var(--surface-2); border: 2px solid var(--app-bg);
-  font-family: var(--font-display); font-weight: 800; font-size: 1.3rem; color: var(--text-strong);
+  -webkit-mask: var(--forma-galleta) center / contain no-repeat; mask: var(--forma-galleta) center / contain no-repeat;
+  background: var(--surface-2);
+  font-weight: 800; font-size: 1.3rem; color: var(--text-strong); font-variation-settings: "ROND" 100;
 }
 .historia-aplauso {
-  position: absolute; top: 42px; right: -2px; width: 32px; height: 32px; border-radius: 11px;
+  position: absolute; top: 44px; right: -2px; width: 32px; height: 32px; border-radius: 999px;
   display: flex; align-items: center; justify-content: center; font-size: 15px;
-  background: #7C3AED; color: #fff; border: 2px solid var(--app-bg);
-  transition: transform .15s ease;
+  background: #8B5CF6; color: #fff; border: 2px solid var(--app-bg);
+  transition: transform .3s var(--resorte);
 }
+.historia-aplauso:active { transform: scale(.9); }
 .historia-aplauso.hecho { background: var(--surface-3); color: var(--text-muted); }
-.historia-nombre { margin-top: 8px; max-width: 70px; text-align: center; font-size: 0.75rem; font-weight: 600; color: var(--text-strong); line-height: 1.15; overflow-wrap: anywhere; }
-.historia-cuando { margin-top: 1px; max-width: 70px; text-align: center; font-size: 0.625rem; color: var(--text-faint); line-height: 1.2; }
+.historia-nombre { margin-top: 8px; max-width: 72px; text-align: center; font-size: 0.75rem; font-weight: 650; color: var(--text-strong); line-height: 1.15; overflow-wrap: anywhere; }
+.historia-cuando { margin-top: 1px; max-width: 72px; text-align: center; font-size: 0.6875rem; color: var(--text-faint); line-height: 1.2; }
 /* Avisos: renglones de notificación. */
 .aviso-social {
   display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
-  padding: 10px 12px; border-radius: 16px; background: var(--surface-1);
-  border: 1px solid var(--hairline);
-  border-color: color-mix(in srgb, var(--c) 34%, var(--hairline));
+  padding: 10px 12px; border-radius: 22px;
+  background: color-mix(in oklab, var(--c) 10%, var(--surface-1));
 }
 .aviso-social-icono {
-  width: 38px; height: 38px; border-radius: 12px; flex: none;
+  width: 40px; height: 40px; flex: none;
   display: flex; align-items: center; justify-content: center; font-size: 18px;
-  color: var(--c); background: color-mix(in srgb, var(--c) 16%, transparent);
+  color: var(--c); --galleta-fondo: color-mix(in oklab, var(--c) 20%, transparent);
 }
 .aviso-social p { flex: 1; min-width: 0; font-size: 0.8125rem; line-height: 1.35; color: var(--text-muted); }
 .aviso-social b { color: var(--text-strong); }
@@ -3359,27 +3560,30 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 .podio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: end; gap: 8px; padding-top: 6px; }
 .podio-lugar { display: flex; flex-direction: column; align-items: center; min-width: 0; text-align: center; }
 .podio-avatar {
-  position: relative; width: 52px; height: 52px; border-radius: 18px; margin-bottom: 6px;
-  display: flex; align-items: center; justify-content: center; background: var(--surface-2);
-  box-shadow: 0 0 0 2px var(--surface-1), 0 0 0 4px var(--medalla);
-  font-family: var(--font-display); font-weight: 800; font-size: 1.2rem; color: var(--text-strong);
+  position: relative; width: 54px; height: 54px; margin-bottom: 6px;
+  display: flex; align-items: center; justify-content: center;
+  --galleta-fondo: var(--medalla);
+  font-weight: 800; font-size: 1.2rem; color: var(--text-strong); font-variation-settings: "ROND" 100;
 }
-.podio-1 .podio-avatar { width: 62px; height: 62px; border-radius: 21px; }
-.podio-avatar > img { width: 100%; height: 100%; border-radius: inherit; object-fit: cover; }
+.podio-1 .podio-avatar { width: 66px; height: 66px; }
+.podio-avatar > span, .podio-avatar > img {
+  width: calc(100% - 6px); height: calc(100% - 6px); object-fit: cover;
+  display: flex; align-items: center; justify-content: center; background: var(--surface-2);
+  -webkit-mask: var(--forma-galleta) center / contain no-repeat; mask: var(--forma-galleta) center / contain no-repeat;
+}
 .podio-medalla {
   position: absolute; bottom: -7px; left: 50%; transform: translateX(-50%);
-  width: 22px; height: 22px; border-radius: 8px; display: flex; align-items: center; justify-content: center;
-  background: var(--medalla); color: #1b1e24;
+  width: 24px; height: 24px; border-radius: 999px; display: flex; align-items: center; justify-content: center;
+  background: var(--medalla); color: #1b1e24; border: 2px solid var(--surface-1);
 }
 .podio-nombre { margin-top: 6px; max-width: 100%; font-size: 0.75rem; font-weight: 700; color: var(--text-strong); line-height: 1.15; overflow-wrap: anywhere; }
 .podio-lugar.yo .podio-nombre { color: var(--accent-ink); }
-.podio-dato { display: inline-flex; align-items: center; gap: 3px; margin-top: 2px; font-size: 0.6875rem; font-weight: 800; }
+.podio-dato { display: inline-flex; align-items: center; gap: 3px; margin-top: 2px; font-size: 0.75rem; font-weight: 750; font-variation-settings: "ROND" 100; }
 .podio-escalon {
-  margin-top: 8px; width: 100%; border-radius: 12px 12px 4px 4px;
+  margin-top: 8px; width: 100%; border-radius: 18px 18px 6px 6px;
   display: flex; align-items: flex-start; justify-content: center; padding-top: 6px;
-  font-family: var(--font-display); font-stretch: 86%; font-weight: 800; font-size: 1.4rem; color: var(--medalla);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--medalla) 22%, transparent), color-mix(in srgb, var(--medalla) 6%, transparent));
-  border: 1px solid color-mix(in srgb, var(--medalla) 35%, transparent);
+  font-weight: 800; font-size: 1.4rem; color: var(--medalla); font-variation-settings: "ROND" 100;
+  background: color-mix(in oklab, var(--medalla) 16%, transparent);
 }
 .podio-1 .podio-escalon { height: 64px; }
 .podio-2 .podio-escalon { height: 46px; }
@@ -3387,8 +3591,147 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 
 /* ── SUPERSERIE ─────────────────────────────────────────────────────────── */
 .superserie {
-  border: 1px solid var(--hairline); border-radius: 18px; padding: 10px;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--c) 7%, transparent), transparent 70%);
+  border-radius: 30px; padding: 10px;
+  background: color-mix(in oklab, var(--c) 8%, transparent);
+}
+/* ── PIEZAS CHICAS ────────────────────────────────────────────────────── */
+/* Tu avatar, arriba a la izquierda: en galleta, del color de la pestaña. */
+.avatar-galleta {
+  width: 40px; height: 40px; flex: none; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 1.05rem; font-variation-settings: "ROND" 100;
+  color: color-mix(in oklab, var(--tono) 22%, var(--tinta-oscura));
+  background: color-mix(in oklab, var(--tono) 76%, white);
+  -webkit-mask: var(--forma-galleta) center / contain no-repeat; mask: var(--forma-galleta) center / contain no-repeat;
+  transition: transform .35s var(--resorte);
+}
+.avatar-galleta:active { transform: scale(.92) rotate(-20deg); }
+.light-mode .avatar-galleta { background: var(--tono); }
+/* El chip de "estás entrenando" de la barra de arriba. */
+.chip-sesion {
+  display: flex; align-items: center; gap: 8px; flex: none; max-width: 52%;
+  height: 36px; padding: 0 13px 0 11px; border-radius: 999px;
+  background: color-mix(in oklab, var(--c) 16%, transparent);
+}
+/* Estados del cronómetro (descanso y cardio). */
+.descanso-listo { background: color-mix(in oklab, var(--c) 16%, var(--surface-1)); }
+.light-mode .descanso-listo { background: color-mix(in oklab, var(--c) 14%, #ffffff); }
+.descanso-galleta {
+  width: 38px; height: 38px;
+  --galleta-fondo: color-mix(in oklab, var(--c) 76%, white);
+  color: color-mix(in oklab, var(--c) 22%, var(--tinta-oscura));
+}
+.light-mode .descanso-galleta { --galleta-fondo: var(--c); }
+.descanso-listo-texto { font-size: 0.9375rem; font-weight: 700; color: color-mix(in oklab, var(--c) 55%, white); }
+.light-mode .descanso-listo-texto { color: color-mix(in oklab, var(--c) 62%, black); }
+.descanso-rotulo { color: color-mix(in oklab, var(--c, var(--tono)) 55%, white); }
+.light-mode .descanso-rotulo { color: color-mix(in oklab, var(--c, var(--tono)) 62%, black); }
+.descanso-rotulo.en-pausa { color: var(--text-faint); }
+.descanso-rotulo-nombre { font-weight: 550; color: var(--text-muted); }
+.descanso-tiempo { color: color-mix(in oklab, var(--c, var(--tono)) 25%, var(--text-strong)); }
+.descanso-tiempo.en-pausa { color: var(--text-muted); }
+.descanso-tiempo.apagado { color: var(--text-faint); }
+.descanso-tiempo.quieto { color: var(--text-strong); }
+.descanso-tiempo-dock { font-size: 2.05rem; }
+.descanso-iniciar {
+  display: flex; align-items: center; gap: 6px; flex: none;
+  height: 40px; padding: 0 16px 0 13px; border-radius: 999px;
+  font-size: 0.8125rem; font-weight: 700;
+  color: color-mix(in oklab, var(--c) 22%, var(--tinta-oscura));
+  background: color-mix(in oklab, var(--c) 76%, white);
+  transition: border-radius .35s var(--resorte), transform .2s ease;
+}
+.descanso-iniciar:active { border-radius: 14px; transform: scale(.96); }
+.light-mode .descanso-iniciar { background: var(--c); }
+.cardio-reloj.en-marcha { background: color-mix(in oklab, var(--c, var(--tono)) 15%, var(--surface-1)); }
+.light-mode .cardio-reloj.en-marcha { background: color-mix(in oklab, var(--c, var(--tono)) 13%, #ffffff); }
+/* La cabecera del día. */
+.dia-reset { position: absolute; top: 14px; right: 14px; z-index: 1; width: 38px; height: 38px; background: color-mix(in oklab, var(--c) 14%, transparent); color: var(--text-muted); }
+.dia-aviso {
+  width: 100%; display: flex; align-items: center; gap: 10px; text-align: left;
+  padding: 11px 14px; border-radius: 18px; font-size: 0.8125rem; font-weight: 600;
+  color: color-mix(in oklab, var(--c) 55%, white);
+  background: color-mix(in oklab, var(--c) 16%, transparent);
+}
+.light-mode .dia-aviso { color: color-mix(in oklab, var(--c) 62%, black); }
+/* Esfuerzo y nota de la serie en foco: cerrados son dos botones lado a
+   lado; abiertos ocupan el renglón entero. */
+.foco-extras > .extra-abierto { flex-basis: 100%; }
+.serie-nota {
+  display: flex; align-items: flex-start; gap: 7px; width: 100%; text-align: left;
+  padding: 9px 12px; border-radius: 16px; font-size: 0.8125rem; line-height: 1.4;
+  color: color-mix(in oklab, var(--c) 55%, white);
+  background: color-mix(in oklab, var(--c) 12%, transparent);
+}
+.light-mode .serie-nota { color: color-mix(in oklab, var(--c) 62%, black); }
+.serie-linea:disabled { opacity: 1; cursor: default; }
+.collarin { transition: x .55s var(--resorte); }
+/* Portada. */
+.login-logo {
+  width: 40px; height: 40px;
+  --galleta-fondo: color-mix(in oklab, #14B8A6 76%, white);
+  color: color-mix(in oklab, #14B8A6 22%, var(--tinta-oscura));
+}
+.login-perfil-inicial {
+  width: 42px; height: 42px; font-weight: 800; font-size: 1.1rem; font-variation-settings: "ROND" 100;
+  --galleta-fondo: color-mix(in oklab, #14B8A6 76%, white);
+  color: color-mix(in oklab, #14B8A6 22%, var(--tinta-oscura));
+}
+.login-barra { max-width: 340px; margin: 0 0 26px -4px; }
+/* El cuerpo de la tarjeta de ejercicio se abre y se cierra deslizándose
+   (filas de grilla de 0fr a 1fr). Cerrado deja de dibujarse
+   (content-visibility), así no cuesta nada aunque siga montado; el cambio
+   a "hidden" espera a que termine de cerrarse. */
+.ejercicio-cuerpo { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .42s cubic-bezier(.2,.8,.2,1); }
+.ejercicio-cuerpo.abierto { grid-template-rows: 1fr; }
+.ejercicio-cuerpo-interior { min-height: 0; overflow: hidden; }
+.ejercicio-cuerpo:not(.abierto) .ejercicio-cuerpo-interior { content-visibility: hidden; transition: content-visibility .42s allow-discrete; }
+/* Los dígitos que ruedan (NumberFlow): la máscara de arriba y abajo, chica. */
+.reloj-gira { display: inline-flex; align-items: baseline; }
+number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height: 1em; }
+/* Los últimos 10 segundos: el reloj late a cada segundo. */
+.descanso-tiempo.urgente { animation: tickBeat 1s cubic-bezier(.2,.8,.3,1) infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .ejercicio-cuerpo { transition: none; }
+  .descanso-tiempo.urgente { animation: none; }
+}
+/* Pestañas internas (Progreso, Social): botones unidos, como los días. */
+.pestanas-internas { display: flex; gap: 3px; }
+.pestana-interna {
+  flex: 1 1 0; min-width: 0; min-height: 60px; padding: 8px 4px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  border-radius: 10px; background: var(--surface-1); color: var(--text-muted);
+  font-size: 0.75rem; font-weight: 600; line-height: 1.1; text-align: center;
+  transition: border-radius .5s var(--resorte), background-color .25s ease, color .2s ease, transform .2s ease;
+}
+.pestana-interna:active { transform: scale(.96); }
+.pestanas-internas > .pestana-interna:first-child { border-top-left-radius: 999px; border-bottom-left-radius: 999px; }
+.pestanas-internas > .pestana-interna:last-child { border-top-right-radius: 999px; border-bottom-right-radius: 999px; }
+.pestana-interna[aria-selected="true"] {
+  border-radius: 999px; font-weight: 700;
+  color: color-mix(in oklab, var(--c) 22%, var(--tinta-oscura));
+  background: color-mix(in oklab, var(--c) 76%, white);
+}
+.light-mode .pestana-interna[aria-selected="true"] { background: var(--c); }
+/* La serie de la semana de descarga. */
+.descarga-serie { border-radius: 24px; padding: 12px; background: color-mix(in oklab, var(--c) 11%, var(--surface-2)); }
+.light-mode .descarga-serie { background: color-mix(in oklab, var(--c) 9%, #ffffff); }
+/* Botón secundario en píldora, tonal del color que lo contiene. */
+.boton-tonal {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 46px; padding: 0 18px; border-radius: 999px;
+  font-size: 0.875rem; font-weight: 650;
+  color: color-mix(in oklab, var(--c, var(--tono)) 55%, white);
+  background: color-mix(in oklab, var(--c, var(--tono)) 18%, transparent);
+  transition: border-radius .4s var(--resorte), transform .25s var(--resorte);
+}
+.boton-tonal:active { border-radius: 16px; transform: scale(.975); }
+.light-mode .boton-tonal { color: color-mix(in oklab, var(--c, var(--tono)) 62%, black); }
+/* En escritorio el avatar y el botón de volver viven en la barra lateral:
+   estas clases fijan su display, así que el lg:hidden de Tailwind (que va en
+   una capa) no alcanza a esconderlos. */
+@media (min-width: 1024px) {
+  .avatar-galleta.lg\\:hidden, .boton-redondo.lg\\:hidden { display: none; }
 }
 `;
 
@@ -4979,7 +5322,7 @@ function LoginScreen({ onLogin, allowAutoLogin = true }) {
 
   if (phase === "pin") return (
     <div className="login min-h-[100dvh] bg-[#0c0d10] flex flex-col items-center justify-center px-4 relative overflow-hidden">
-      <div className="login-disco" aria-hidden="true" />
+      <div className="galleta login-galleta" aria-hidden="true" />
       <div className="w-full max-w-xs relative">
         <div className="flex flex-col items-center mb-6">
           <div className="w-14 h-14 rounded-2xl bg-teal-500/15 flex items-center justify-center mb-3"><Flame className="text-teal-500" size={28} /></div>
@@ -4992,7 +5335,7 @@ function LoginScreen({ onLogin, allowAutoLogin = true }) {
 
   if (phase === "register") return (
     <div className="login min-h-[100dvh] bg-[#0c0d10] flex flex-col items-center justify-center px-4 py-8 relative overflow-hidden">
-      <div className="login-disco" aria-hidden="true" />
+      <div className="galleta login-galleta" aria-hidden="true" />
       <div className="w-full max-w-sm relative">
         <div className="flex items-center gap-3 mb-8">
           <button onClick={() => { if (regStep !== 1) { setRegStep(1); setRegError(""); } else { setPhase("list"); setRegError(""); } }} aria-label="Volver" className="text-slate-500 hover:text-slate-300"><ChevronDown size={20} className="rotate-90" /></button>
@@ -5017,26 +5360,26 @@ function LoginScreen({ onLogin, allowAutoLogin = true }) {
     </div>
   );
 
-  // Portada: la marca arriba, una frase grande que dice qué hace la app, y
-  // las acciones abajo, donde llega el pulgar. Antes era un ícono centrado,
-  // el nombre y "Seguimiento de cargas y progreso": correcto, pero igual a
-  // la portada de cualquier app. Los anillos del fondo son un disco de pesas
-  // visto de frente, en CSS puro.
+  // Portada: la marca arriba, la barra cargándose disco por disco (la pieza
+  // propia de la app), una frase grande que dice qué hace, y las acciones
+  // abajo, donde llega el pulgar. Atrás, una galleta enorme que gira muy
+  // despacio: la forma de lo que se completa.
   return (
     <div className="login min-h-[100dvh] bg-[#0c0d10] flex flex-col px-6 relative overflow-hidden" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 22px)", paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 24px)" }}>
-      <div className="login-disco" aria-hidden="true" />
+      <div className="galleta login-galleta" aria-hidden="true" />
       <div className="w-full max-w-sm mx-auto relative flex-1 flex flex-col">
         <div className="flex items-center gap-2.5">
-          <span className="w-9 h-9 rounded-xl flex items-center justify-center bg-teal-500/15 border border-teal-500/25 shrink-0"><Flame className="text-teal-400" size={18} /></span>
+          <span className="galleta login-logo"><Flame size={19} /></span>
           <span className="login-marca">Modus Fit</span>
         </div>
-        <div className="flex-1 flex flex-col justify-center py-10 min-h-[240px]">
-          <h1 className="login-titulo">Cada serie<br /><span className="text-teal-400">cuenta.</span></h1>
+        <div className="flex-1 flex flex-col justify-center py-10 min-h-[260px]">
+          <BarraCargada hechas={10} total={10} alto={66} detalle escalonado etiqueta="Una barra cargada con diez discos" className="login-barra" />
+          <h1 className="login-titulo">Cada serie<br />cuenta.</h1>
           <p className="login-bajada">Anotá reps y kilos en segundos. La app detecta tus récords y arma tu progreso, semana a semana.</p>
         </div>
 
         {/* --- BOTÓN DE GOOGLE --- */}
-        <button onClick={handleGoogleLogin} disabled={googleLoading} className="w-full mb-3 h-14 rounded-2xl bg-white text-slate-900 font-bold text-[15px] hover:bg-slate-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-70">
+        <button onClick={handleGoogleLogin} disabled={googleLoading} className="w-full mb-3 h-14 rounded-full bg-white text-slate-900 font-bold text-[15px] hover:bg-slate-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-70">
           {googleLoading ? (
             <RotateCcw className="w-5 h-5 animate-spin text-slate-500" />
           ) : (
@@ -5053,7 +5396,7 @@ function LoginScreen({ onLogin, allowAutoLogin = true }) {
         {profileList.length > 0 && (<div className="mb-4 mt-2"><p className="text-[11px] font-bold uppercase text-slate-500 mb-2.5">Perfiles en este dispositivo</p><div className="space-y-2">{profileList.map((name) => (
           <SwipeToArchive key={name} confirmText={`¿Quitar a ${name} de esta lista? No se borra nada.`} onArchive={() => handleArchiveProfile(name)}>
             <button onClick={() => tryLogin(name)} className="w-full flex items-center gap-3.5 bg-slate-900/60 border border-slate-800/60 hover:border-teal-500/30 rounded-2xl px-4 py-3.5 transition-all active:scale-[0.98] text-left group">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg font-black shrink-0" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)", color: "white" }}>{name.charAt(0).toUpperCase()}</div>
+              <div className="galleta login-perfil-inicial">{name.charAt(0).toUpperCase()}</div>
               <div className="flex-1 min-w-0">
                 <p className="text-white font-semibold text-sm truncate">{name}</p>
                 <p className="text-[11px] text-slate-500">{profiles[name].googleUid ? "Vinculado a Google" : profiles[name].pin ? "🔒 Con PIN" : "Sin PIN"}</p>
@@ -5101,7 +5444,7 @@ function LoginScreen({ onLogin, allowAutoLogin = true }) {
             )}
           </div>
         )}
-        <button onClick={() => setPhase("register")} className="w-full h-14 rounded-2xl border border-slate-700/80 bg-slate-900/40 text-slate-200 hover:text-white hover:border-teal-500/40 transition-all text-[15px] font-semibold flex items-center justify-center gap-2"><Plus size={17} /> Crear perfil sin Google</button>
+        <button onClick={() => setPhase("register")} className="w-full h-14 rounded-full bg-white/[0.07] text-slate-200 hover:text-white transition-all text-[15px] font-semibold flex items-center justify-center gap-2 active:scale-[0.98]"><Plus size={17} /> Crear perfil sin Google</button>
         <p className="text-[11.5px] text-slate-500 text-center mt-3 leading-snug">Sin cuenta también funciona: tus datos quedan en este teléfono.</p>
         {regError && <p className="text-rose-400 text-xs mt-3 text-center">{regError}</p>}
       </div>
@@ -5374,33 +5717,32 @@ function PanelCronoCardio({ accent, modo, corriendo, transcurrido, objetivoSeg =
   const rotulo = corriendo ? (cuenta ? "Te falta" : "Llevás") : empezado ? "En pausa" : cuenta ? (sinObjetivo ? "Elegí cuántos minutos" : "Objetivo") : "Listo para arrancar";
   const tiempo = cuenta ? (empezado ? faltan : objetivoSeg) : transcurrido;
   return (
-    <div className="space-y-2.5">
+    <div className="space-y-2.5" style={{ "--c": accent }}>
       <div className="segmentado" role="tablist" aria-label="Modo del cronómetro">
-        {[{ k: "stopwatch", l: "Cronómetro", icono: <Clock size={12} /> }, { k: "countdown", l: "Cuenta regresiva", icono: <Timer size={12} /> }].map((o) => (
-          <button key={o.k} role="tab" aria-selected={modo === o.k} onClick={() => onCambiarModo(o.k)}
-            className={modo === o.k ? "activo" : ""} style={modo === o.k ? { backgroundColor: accent } : undefined}>
+        {[{ k: "stopwatch", l: "Cronómetro", icono: <Clock size={13} /> }, { k: "countdown", l: "Cuenta regresiva", icono: <Timer size={13} /> }].map((o) => (
+          <button key={o.k} role="tab" aria-selected={modo === o.k} onClick={() => onCambiarModo(o.k)} className={modo === o.k ? "activo" : ""}>
             {o.icono} {o.l}
           </button>
         ))}
       </div>
       {cuenta && !empezado && entradaObjetivo}
-      <div className="cardio-reloj" style={{ borderColor: tint(accent, empezado ? "40" : "22"), backgroundColor: tint(accent, empezado ? "10" : "06") }}>
+      <div className={`cardio-reloj ${empezado ? "en-marcha" : ""}`}>
         <div className="flex items-center gap-2">
           <div className="flex-1 min-w-0">
-            <p className="text-[10px] font-black uppercase truncate" style={{ color: corriendo ? tint(accent, "dd") : "var(--text-faint)" }}>{rotulo}</p>
-            <p className="num-display descanso-tiempo" style={{ color: corriendo ? accent : empezado ? "var(--text-muted)" : sinObjetivo ? "var(--text-faint)" : "var(--text-strong)" }}>{relojLargo(tiempo)}</p>
+            <p className={`descanso-rotulo ${corriendo ? "" : "en-pausa"}`}>{rotulo}</p>
+            <p role="timer" aria-label={relojLargo(tiempo)} className={`num-display descanso-tiempo ${corriendo ? "" : empezado ? "en-pausa" : sinObjetivo ? "apagado" : "quieto"}`}><RelojQueGira segundos={tiempo} sube={!cuenta} /></p>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
             {cuenta && empezado && onAjustarObjetivo && <BotonDescanso onClick={() => onAjustarObjetivo(-60)} label="Un minuto menos de objetivo">−1′</BotonDescanso>}
-            <BotonDescanso principal color={accent} disabled={sinObjetivo} onClick={corriendo ? onPausar : onArrancar} label={corriendo ? "Pausar" : empezado ? "Seguir" : "Arrancar"}>
-              {corriendo ? <Pause size={15} className="fill-current" /> : <Play size={15} className="fill-current ml-0.5" />}
+            <BotonDescanso principal disabled={sinObjetivo} onClick={corriendo ? onPausar : onArrancar} label={corriendo ? "Pausar" : empezado ? "Seguir" : "Arrancar"}>
+              {corriendo ? <Pause size={16} className="fill-current" /> : <Play size={16} className="fill-current ml-0.5" />}
             </BotonDescanso>
             {cuenta && empezado && onAjustarObjetivo && <BotonDescanso onClick={() => onAjustarObjetivo(60)} label="Un minuto más de objetivo">+1′</BotonDescanso>}
-            {empezado && !corriendo && <BotonDescanso onClick={onReiniciar} label="Volver a cero"><RotateCcw size={14} /></BotonDescanso>}
+            {empezado && !corriendo && <BotonDescanso onClick={onReiniciar} label="Volver a cero"><RotateCcw size={15} /></BotonDescanso>}
           </div>
         </div>
         {cuenta && objetivoSeg > 0 && empezado && (
-          <div className="descanso-barra mt-2.5" aria-hidden="true"><div style={{ transform: `scaleX(${fraccion})`, backgroundColor: accent }} /></div>
+          <div className="mt-2.5"><Onda fraccion={1 - fraccion} quieta={!corriendo} /></div>
         )}
       </div>
     </div>
@@ -6024,8 +6366,9 @@ function ChipDescansoEnCurso({ timerId, color }) {
   );
 }
 
-// Botón chico de los controles del descanso (−15, +15, saltear).
-function BotonDescanso({ onClick, label, children, principal = false, color, disabled = false }) {
+// Botón chico de los controles del descanso (−15, +15, saltear). El color
+// lo toma del --c del cronómetro que lo contiene.
+function BotonDescanso({ onClick, label, children, principal = false, disabled = false }) {
   return (
     <button
       onClick={() => { if (disabled) return; haptic(10); onClick(); }}
@@ -6033,10 +6376,45 @@ function BotonDescanso({ onClick, label, children, principal = false, color, dis
       aria-disabled={disabled || undefined}
       title={label}
       className={`descanso-boton ${principal ? "descanso-boton-principal" : ""} ${disabled ? "opacity-40" : ""}`}
-      style={principal ? { backgroundColor: color } : undefined}
     >
       {children}
     </button>
+  );
+}
+
+// UN RELOJ QUE GIRA: los dígitos ruedan al cambiar (NumberFlow), como en un
+// cronómetro de verdad, en vez de saltar de un número al otro. Minutos y
+// segundos son dos números sincronizados (NumberFlowGroup), así el 1:00 →
+// 0:59 rueda junto. Es sólo lo que se ve: el texto real lo lleva en
+// aria-label el elemento que lo contiene (role="timer").
+const DOS_CIFRAS = { minimumIntegerDigits: 2 };
+const DECENA_DE_SEGUNDOS = { 1: { max: 5 } };
+function RelojQueGira({ segundos, sube = false }) {
+  const s = Math.max(0, Math.floor(segundos || 0));
+  const h = Math.floor(s / 3600), seg = s % 60;
+  const min = h > 0 ? Math.floor(s / 60) % 60 : Math.floor(s / 60);
+  const tendencia = sube ? 1 : -1;
+  return (
+    <NumberFlowGroup>
+      <span className="reloj-gira" aria-hidden="true">
+        {h > 0 && <><NumberFlow value={h} trend={tendencia} />:</>}
+        <NumberFlow value={min} trend={tendencia} format={h > 0 ? DOS_CIFRAS : undefined} digits={h > 0 ? DECENA_DE_SEGUNDOS : undefined} />
+        :
+        <NumberFlow value={seg} trend={tendencia} format={DOS_CIFRAS} digits={DECENA_DE_SEGUNDOS} />
+      </span>
+    </NumberFlowGroup>
+  );
+}
+
+// La onda del descanso: lo que queda corre como una línea ondulada; lo que
+// ya pasó es una línea quieta y tenue. En pausa la onda se queda quieta.
+function Onda({ fraccion = 1, quieta = false }) {
+  const pct = Math.max(0, Math.min(1, fraccion)) * 100;
+  return (
+    <div className={`onda ${quieta ? "quieta" : ""}`} aria-hidden="true">
+      <div className="onda-llena" style={{ width: `${pct}%` }} />
+      {pct < 100 && <div className="onda-vacia" />}
+    </div>
   );
 }
 
@@ -6059,28 +6437,25 @@ function RestTimer({ seconds, accent, timerId = "default", exerciseName = "" }) 
   if (estado === "done") {
     const { enPantalla } = textoFinDeDescanso(datos);
     return (
-      <div ref={raizRef} className="descanso descanso-listo rest-done-flash" role="status" aria-live="polite" style={{ backgroundColor: tint(color, "14"), borderColor: tint(color, "45") }}>
-        <span className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 badge-pop" style={{ backgroundColor: tint(color, "26"), color }}>
-          <Check size={17} />
-        </span>
-        <span className="text-sm font-black flex-1 min-w-0 truncate" style={{ color }}>¡{enPantalla}! 💪</span>
-        <button onClick={() => terminarDescanso(timerId)} aria-label="Cerrar el aviso" className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-slate-500 hover:text-slate-300 transition"><X size={15} /></button>
+      <div ref={raizRef} className="descanso descanso-listo rest-done-flash" role="status" aria-live="polite" style={{ "--c": color }}>
+        <span className="galleta descanso-galleta badge-pop" aria-hidden="true"><Check size={17} strokeWidth={2.6} /></span>
+        <span className="descanso-listo-texto flex-1 min-w-0 truncate">¡{enPantalla}! 💪</span>
+        <button onClick={() => terminarDescanso(timerId)} aria-label="Cerrar el aviso" className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-slate-500 hover:text-slate-300 transition"><X size={16} /></button>
       </div>
     );
   }
 
   if (estado === "idle") {
     return (
-      <div ref={raizRef} className="descanso descanso-quieto">
-        <Timer size={15} className="shrink-0 text-slate-500" />
-        <span className="text-[12px] font-semibold text-slate-400">Descanso</span>
-        <span className="num-display text-lg font-bold text-slate-300 leading-none">{relojCorto(seconds)}</span>
+      <div ref={raizRef} className="descanso descanso-quieto" style={{ "--c": accent }}>
+        <Timer size={16} className="shrink-0 text-slate-500" />
+        <span className="text-[13px] font-semibold text-slate-400">Descanso</span>
+        <span className="num-display text-lg font-bold text-slate-200 leading-none">{relojCorto(seconds)}</span>
         <button
           onClick={() => { haptic(15); iniciarDescanso(timerId, { segundos: seconds, ejercicio: exerciseName || null, color: accent }); }}
-          className="ml-auto flex items-center gap-1.5 h-9 pl-3 pr-3.5 rounded-xl text-[12px] font-bold transition active:scale-95 shrink-0"
-          style={{ backgroundColor: tint(accent, "1e"), color: accent, border: `1px solid ${tint(accent, "40")}` }}
+          className="descanso-iniciar ml-auto"
         >
-          <Play size={13} className="fill-current" /> Iniciar
+          <Play size={14} className="fill-current" /> Iniciar
         </button>
       </div>
     );
@@ -6089,26 +6464,24 @@ function RestTimer({ seconds, accent, timerId = "default", exerciseName = "" }) 
   const enPausa = estado === "paused";
   const rotulo = enPausa ? "En pausa" : datos?.siguiente ? "Antes de empezar" : "Descanso";
   return (
-    <div ref={raizRef} className="descanso descanso-activo" style={{ backgroundColor: tint(color, "0f"), borderColor: tint(color, "38") }}>
+    <div ref={raizRef} className="descanso descanso-activo" style={{ "--c": color }}>
       <div className="flex items-center gap-2 w-full min-w-0">
         <div className="flex-1 min-w-0">
-          <p className="text-[10px] font-black uppercase truncate" style={{ color: enPausa ? "var(--text-faint)" : tint(color, "dd") }}>{rotulo}</p>
-          <p key={urgente ? `t${restante}` : "t"} className={`num-display descanso-tiempo ${urgente ? "tick-beat" : ""}`} style={{ color: enPausa ? "var(--text-muted)" : color }}>
-            {relojCorto(restante)}
+          <p className={`descanso-rotulo ${enPausa ? "en-pausa" : ""}`}>{rotulo}</p>
+          <p role="timer" aria-label={relojCorto(restante)} className={`num-display descanso-tiempo ${urgente ? "urgente" : ""} ${enPausa ? "en-pausa" : ""}`}>
+            <RelojQueGira segundos={restante} />
           </p>
         </div>
         <div className="descanso-controles flex items-center gap-1.5 shrink-0">
           <BotonDescanso onClick={() => ajustarDescanso(timerId, -15)} label="Restar 15 segundos">−15</BotonDescanso>
-          <BotonDescanso principal color={color} onClick={() => (enPausa ? reanudarDescanso(timerId) : pausarDescanso(timerId))} label={enPausa ? "Seguir el descanso" : "Pausar el descanso"}>
-            {enPausa ? <Play size={15} className="fill-current ml-0.5" /> : <Pause size={15} className="fill-current" />}
+          <BotonDescanso principal onClick={() => (enPausa ? reanudarDescanso(timerId) : pausarDescanso(timerId))} label={enPausa ? "Seguir el descanso" : "Pausar el descanso"}>
+            {enPausa ? <Play size={16} className="fill-current ml-0.5" /> : <Pause size={16} className="fill-current" />}
           </BotonDescanso>
           <BotonDescanso onClick={() => ajustarDescanso(timerId, 15)} label="Sumar 15 segundos">+15</BotonDescanso>
-          <BotonDescanso onClick={() => terminarDescanso(timerId)} label="Terminar el descanso"><SkipForward size={15} /></BotonDescanso>
+          <BotonDescanso onClick={() => terminarDescanso(timerId)} label="Terminar el descanso"><SkipForward size={16} /></BotonDescanso>
         </div>
       </div>
-      <div className="descanso-barra" aria-hidden="true">
-        <div style={{ transform: `scaleX(${fraccion})`, backgroundColor: color }} />
-      </div>
+      <Onda fraccion={fraccion} quieta={enPausa} />
     </div>
   );
 }
@@ -6134,44 +6507,40 @@ function FilaDescansoDock({ timerId, embebido = false }) {
   const enPausa = estado === "paused";
   const nombre = datos?.siguiente || datos?.ejercicio || "";
   const envolver = (contenido) => (embebido
-    ? <div className="dock-descanso dock-descanso-embebido relative" role={estado === "done" ? "status" : undefined} aria-live={estado === "done" ? "polite" : undefined}>{contenido}</div>
-    : <div className="dock-tarjeta dock-descanso session-bar-in" role={estado === "done" ? "status" : undefined} aria-live={estado === "done" ? "polite" : undefined} style={{ borderColor: tint(color, "50") }}>{contenido}</div>);
+    ? <div className="dock-descanso dock-descanso-embebido relative" role={estado === "done" ? "status" : undefined} aria-live={estado === "done" ? "polite" : undefined} style={{ "--c": color }}>{contenido}</div>
+    : <div className="dock-tarjeta dock-descanso session-bar-in" role={estado === "done" ? "status" : undefined} aria-live={estado === "done" ? "polite" : undefined} style={{ "--c": color }}>{contenido}</div>);
   if (estado === "done") {
     const { enPantalla } = textoFinDeDescanso(datos);
     return envolver(
-      <div className="flex items-center gap-3 px-3.5 py-3">
-        <span className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 badge-pop" style={{ backgroundColor: tint(color, "26"), color }}><Check size={16} /></span>
-        <span className="flex-1 min-w-0 truncate text-[13px] font-black" style={{ color }}>¡{enPantalla}! 💪</span>
-        <button onClick={() => terminarDescanso(timerId)} aria-label="Cerrar el aviso" className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-slate-500 hover:text-slate-300 transition"><X size={15} /></button>
+      <div className="flex items-center gap-3 px-4 py-3">
+        <span className="galleta descanso-galleta badge-pop" aria-hidden="true"><Check size={16} strokeWidth={2.6} /></span>
+        <span className="descanso-listo-texto flex-1 min-w-0 truncate">¡{enPantalla}! 💪</span>
+        <button onClick={() => terminarDescanso(timerId)} aria-label="Cerrar el aviso" className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-slate-500 hover:text-slate-300 transition"><X size={16} /></button>
       </div>,
     );
   }
   // Dos renglones: arriba qué descanso es (con el nombre entero, que en un
   // solo renglón con los controles se cortaba a "Press Ban…"), abajo el
-  // reloj y los controles.
+  // reloj y los controles; al pie, la onda.
   return envolver(
-    <>
-      <div className="pl-3.5 pr-2 pt-2.5 pb-2.5">
-        <p className="text-[10.5px] font-black uppercase truncate pr-1.5" style={{ color: enPausa ? "var(--text-faint)" : tint(color, "dd") }}>
-          {enPausa ? "Descanso en pausa" : datos?.siguiente ? "Sigue" : "Descanso"}
-          {nombre && <span className="normal-case font-semibold" style={{ fontFamily: "var(--font-sans)", letterSpacing: 0 }}> · {nombre}</span>}
-        </p>
-        <div className="flex items-center gap-2 mt-1">
-          <p key={urgente ? `t${restante}` : "t"} className={`flex-1 min-w-0 num-display text-[1.9rem] leading-none font-extrabold ${urgente ? "tick-beat" : ""}`} style={{ color: enPausa ? "var(--text-muted)" : color }}>{relojCorto(restante)}</p>
-          <div className="flex items-center gap-1.5 shrink-0">
-            <BotonDescanso onClick={() => ajustarDescanso(timerId, -15)} label="Restar 15 segundos">−15</BotonDescanso>
-            <BotonDescanso principal color={color} onClick={() => (enPausa ? reanudarDescanso(timerId) : pausarDescanso(timerId))} label={enPausa ? "Seguir el descanso" : "Pausar el descanso"}>
-              {enPausa ? <Play size={15} className="fill-current ml-0.5" /> : <Pause size={15} className="fill-current" />}
-            </BotonDescanso>
-            <BotonDescanso onClick={() => ajustarDescanso(timerId, 15)} label="Sumar 15 segundos">+15</BotonDescanso>
-            <BotonDescanso onClick={() => terminarDescanso(timerId)} label="Terminar el descanso"><SkipForward size={15} /></BotonDescanso>
-          </div>
+    <div className="pl-4 pr-2.5 pt-3 pb-3">
+      <p className={`descanso-rotulo pr-1.5 ${enPausa ? "en-pausa" : ""}`}>
+        {enPausa ? "Descanso en pausa" : datos?.siguiente ? "Sigue" : "Descanso"}
+        {nombre && <span className="descanso-rotulo-nombre"> · {nombre}</span>}
+      </p>
+      <div className="flex items-center gap-2 mt-0.5">
+        <p role="timer" aria-label={relojCorto(restante)} className={`flex-1 min-w-0 num-display descanso-tiempo descanso-tiempo-dock ${urgente ? "urgente" : ""} ${enPausa ? "en-pausa" : ""}`}><RelojQueGira segundos={restante} /></p>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <BotonDescanso onClick={() => ajustarDescanso(timerId, -15)} label="Restar 15 segundos">−15</BotonDescanso>
+          <BotonDescanso principal onClick={() => (enPausa ? reanudarDescanso(timerId) : pausarDescanso(timerId))} label={enPausa ? "Seguir el descanso" : "Pausar el descanso"}>
+            {enPausa ? <Play size={16} className="fill-current ml-0.5" /> : <Pause size={16} className="fill-current" />}
+          </BotonDescanso>
+          <BotonDescanso onClick={() => ajustarDescanso(timerId, 15)} label="Sumar 15 segundos">+15</BotonDescanso>
+          <BotonDescanso onClick={() => terminarDescanso(timerId)} label="Terminar el descanso"><SkipForward size={16} /></BotonDescanso>
         </div>
       </div>
-      <div className="descanso-barra descanso-barra-dock" aria-hidden="true">
-        <div style={{ transform: `scaleX(${fraccion})`, backgroundColor: color }} />
-      </div>
-    </>,
+      <div className="mt-2"><Onda fraccion={fraccion} quieta={enPausa} /></div>
+    </div>,
   );
 }
 
@@ -6961,7 +7330,7 @@ function describePlannedOutcome(target, hecho, isRecord, unit) {
   return { type: "down", msg: `Te faltó para la meta (${target.reps}×${kgToDisplay(target.kg, unit)}${weightLabel(unit)})` };
 }
 
-function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, accent, logs, setLogs, drafts = {}, setDrafts, autoShowPrShare = true, onDisableAutoShowPrShare, hasActiveSession = true, cardio = false, dumbbellDouble = null, fieldSettings = DEFAULT_SETTINGS, onUpdateSettings = null, sex = null, age = null, restTimerId = null, restSeconds = null, isLastSet = false, weekInCycle = null, nextRestTimerId = null, nextRestSeconds = null, nextExerciseName = null, activa = true }) {
+function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, accent, logs, setLogs, drafts = {}, setDrafts, autoShowPrShare = true, onDisableAutoShowPrShare, hasActiveSession = true, cardio = false, dumbbellDouble = null, fieldSettings = DEFAULT_SETTINGS, onUpdateSettings = null, sex = null, age = null, restTimerId = null, restSeconds = null, isLastSet = false, weekInCycle = null, nextRestTimerId = null, nextRestSeconds = null, nextExerciseName = null, activa = true, onEnfocar = null }) {
   // Modo "rutina planificada" (ver DEFAULT_SETTINGS.trainingMode): si hay
   // una meta cargada para ESTA semana, se muestra "Marca a alcanzar" en
   // vez de "Récord" — pensado para quien sigue un plan con cargas ya
@@ -7347,18 +7716,29 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     setLogs({ ...logs, [prKey]: { kg: k, reps: r, date: today, manual: true } });
     setEditingPR(false);
   };
-  // ── PLANILLA DE SERIES ──────────────────────────────────────────────────
-  // Reporte: "quedó un poco grande la sección cuando expandís una serie".
-  // Cada serie era una tarjeta de ~250px (rótulo, caja de récord, caja de
-  // "la vez pasada", campos grandes y fila de ±): un ejercicio de 4 series
-  // no entraba en la pantalla. Ahora es una fila de planilla, como en Hevy y
-  // Strong: número, objetivo, reps × kilos y ✓, alineados en columnas con el
-  // encabezado de la tarjeta (ver ExerciseCard). Lo de ayuda (±, sugerencia,
-  // esfuerzo, nota) aparece sólo en la serie que toca ahora (`activa`).
-  // Una serie guardada se ve teñida con lo que hiciste; tocarla la edita.
+  // ── LA SERIE EN FOCO ────────────────────────────────────────────────────
+  // Dos pedidos que tiraban para lados opuestos: "quedó un poco grande la
+  // sección cuando expandís una serie" (cada serie era una tarjeta de
+  // ~250px: un ejercicio de cuatro no entraba en la pantalla) y, después de
+  // pasarlas a filas de planilla, "la de antes estaba bien encaminada" (los
+  // campos grandes, la marca a la vista, los ±).
+  // Las dos cosas a la vez: UNA serie por ejercicio está en foco —la que
+  // toca ahora (`activa`) o la que estás corrigiendo— y se abre con el
+  // tablero grande de antes, más compacto. Las demás son renglones de una
+  // línea: las hechas con lo que hiciste, las que faltan con su objetivo.
+  // Tocar un renglón lo pone en foco (o lo abre para corregirlo).
   const guardadaHoy = !!yaRegistradaHoy && hasActiveSession && !draft.editing;
   const editarGuardada = () => updateDraft({ reps: String(yaRegistradaHoy.reps), kg: String(kgToDisplay(yaRegistradaHoy.kg, unit)), editing: true });
+  const cancelarEdicion = () => { if (setDrafts) setDrafts((prev) => { const n = { ...prev }; delete n[key]; return n; }); };
   const abrirCorreccion = () => { setEditReps(currentPR?.reps ?? ""); setEditKg(currentPR ? kgToDisplay(currentPR.kg, unit) : ""); setEditingPR((e) => !e); };
+  // kg ⇄ lbs: cambia la unidad de TODA la app (ver el comentario de `unit`),
+  // y convierte lo que ya estaba escrito sin guardar.
+  const cambiarUnidad = onUpdateSettings ? () => {
+    const nueva = unit === "kg" ? "lbs" : "kg";
+    if (setDrafts) setDrafts((prev) => convertirBorradoresDeUnidad(prev, unit, nueva));
+    onUpdateSettings({ weightUnit: nueva });
+    haptic(12);
+  } : null;
   const lineaFeedback = feedback && (
     <p className={`serie-aviso ${feedback.type === "pr" ? "text-emerald-400 pr-pop" : feedback.type === "down" ? "text-rose-400" : feedback.type === "first" ? "text-teal-400" : "text-amber-400"}`}>
       {feedback.msg}
@@ -7406,18 +7786,18 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     !showRpe ? (
       <button onClick={() => setShowRpeLocal(true)} className="serie-boton-suave"><Activity size={12} /> Registrar esfuerzo ({isRir ? "RIR" : "RPE"})</button>
     ) : (
-      <div className="mt-2 flex items-center gap-1.5 bounce-in rounded-lg px-2 py-2 overflow-x-auto" style={{ backgroundColor: "var(--panel-sunken)" }}>
-        <span className="text-[10.5px] text-slate-500 font-semibold w-7 shrink-0">{isRir ? "RIR" : "RPE"}</span>
+      <div className="extra-abierto flex items-center gap-1.5 bounce-in rounded-2xl px-2 py-2 overflow-x-auto" style={{ backgroundColor: "var(--panel-sunken)" }}>
+        <span className="text-[11.5px] text-slate-500 font-semibold w-8 shrink-0 pl-1">{isRir ? "RIR" : "RPE"}</span>
         {RPE_SCALE.map((rs) => (
-          <button key={rs.value} onClick={() => updateDraft({ rpe: rpe === rs.value ? null : rs.value })} title={rs.desc} className="w-8 h-8 rounded-lg text-[11.5px] font-bold transition-all active:scale-90 shrink-0" style={rpe === rs.value ? { backgroundColor: rpeColor(rs.value), color: "#0c0d10" } : { backgroundColor: "var(--surface-2)", color: "var(--surface-2-text)" }}>{isRir ? rirButtonLabel(rs.value) : rs.value}</button>
+          <button key={rs.value} onClick={() => updateDraft({ rpe: rpe === rs.value ? null : rs.value })} title={rs.desc} className="w-9 h-9 rounded-full text-[12px] font-bold transition-all active:scale-90 shrink-0" style={rpe === rs.value ? { backgroundColor: rpeColor(rs.value), color: "#0c0d10" } : { backgroundColor: "var(--surface-2)", color: "var(--surface-2-text)" }}>{isRir ? rirButtonLabel(rs.value) : rs.value}</button>
         ))}
-        <button onClick={() => { updateDraft({ rpe: null }); setShowRpeLocal(false); }} aria-label="Quitar el esfuerzo" className="text-slate-500 hover:text-slate-300 ml-auto shrink-0 w-8 h-8 flex items-center justify-center"><X size={13} /></button>
+        <button onClick={() => { updateDraft({ rpe: null }); setShowRpeLocal(false); }} aria-label="Quitar el esfuerzo" className="text-slate-500 hover:text-slate-300 ml-auto shrink-0 w-9 h-9 flex items-center justify-center"><X size={14} /></button>
       </div>
     )
   );
   const bloqueNota = fieldSettings.showPersonalNote !== false && onUpdateSettings && (
     editingNote ? (
-      <div className="mt-2 bounce-in rounded-lg p-2" style={{ backgroundColor: "var(--panel-sunken)", border: `1px solid ${tint(accent, "30")}` }}>
+      <div className="extra-abierto bounce-in rounded-2xl p-2.5" style={{ backgroundColor: "var(--panel-sunken)" }}>
         <textarea
           value={noteDraft}
           onChange={(e) => setNoteDraft(e.target.value)}
@@ -7434,25 +7814,27 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
         </div>
       </div>
     ) : setNote ? (
-      <button onClick={() => setEditingNote(true)} className="w-full mt-2 flex items-start gap-1.5 text-left rounded-lg px-2.5 py-1.5 transition active:scale-[0.99]" style={{ backgroundColor: tint(accent, "12"), border: `1px solid ${tint(accent, "28")}` }}>
-        <StickyNote size={12} className="mt-0.5 shrink-0" style={{ color: accent }} />
-        <span className="text-[11.5px] leading-snug" style={{ color: accent }}>{setNote}</span>
+      <button onClick={() => setEditingNote(true)} className="extra-abierto serie-nota">
+        <StickyNote size={13} className="mt-0.5 shrink-0" />
+        <span>{setNote}</span>
       </button>
     ) : activa && !guardadaHoy ? (
       <button onClick={() => setEditingNote(true)} className="serie-boton-suave"><StickyNote size={12} /> Agregar nota</button>
     ) : null
   );
   const panelCorreccion = editingPR && !cardio && (
-    <div className="mt-2 rounded-xl p-3 space-y-2 bounce-in" style={{ backgroundColor: "var(--panel-sunken)", border: `1px solid ${tint(accent, "30")}` }}>
-      <p className="text-[11px] font-bold flex items-center gap-1.5" style={{ color: accent }}><Edit3 size={12} /> Corregir récord</p>
+    <div className="mt-2 rounded-2xl p-3 space-y-2.5 bounce-in" style={{ backgroundColor: "var(--panel-sunken)" }}>
+      <p className="text-[12.5px] font-bold flex items-center gap-1.5 text-slate-200"><Edit3 size={13} /> Corregir récord</p>
       <div className="flex flex-wrap gap-2 items-center">
-        <input type="number" inputMode="decimal" placeholder="Reps" aria-label="Reps del récord" value={editReps} onChange={(e) => setEditReps(e.target.value)} className="w-20 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm text-white" />
-        <span className="text-slate-500 text-xs">reps ×</span>
-        <input type="number" inputMode="decimal" placeholder={weightLabel(unit)} aria-label={`Peso del récord en ${weightLabel(unit)}`} value={editKg} onChange={(e) => setEditKg(e.target.value)} className="w-20 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm text-white" />
-        <span className="text-slate-500 text-xs">{weightLabel(unit)}</span>
-        <button onClick={savePR} className="px-3 h-8 rounded-lg !text-white text-xs font-bold" style={{ backgroundColor: accent }}>Guardar</button>
-        {override && <button onClick={() => { const l = { ...logs }; delete l[prKey]; setLogs(l); setEditingPR(false); }} className="px-3 h-8 rounded-lg bg-slate-700 text-slate-200 text-xs">Quitar</button>}
-        <button onClick={() => setEditingPR(false)} className="text-slate-500 text-xs px-2 h-8">Cancelar</button>
+        <input type="number" inputMode="decimal" placeholder="Reps" aria-label="Reps del récord" value={editReps} onChange={(e) => setEditReps(e.target.value)} className="w-20 h-10 bg-slate-800 rounded-xl px-2 text-center text-[15px] font-semibold text-white focus:outline-none" />
+        <span className="text-slate-500 text-[13px]">reps ×</span>
+        <input type="number" inputMode="decimal" placeholder={weightLabel(unit)} aria-label={`Peso del récord en ${weightLabel(unit)}`} value={editKg} onChange={(e) => setEditKg(e.target.value)} className="w-20 h-10 bg-slate-800 rounded-xl px-2 text-center text-[15px] font-semibold text-white focus:outline-none" />
+        <span className="text-slate-500 text-[13px]">{weightLabel(unit)}</span>
+      </div>
+      <div className="flex flex-wrap gap-2 items-center">
+        <button onClick={savePR} className="boton-pildora" style={{ minHeight: 38, padding: "0 16px", fontSize: 13 }}>Guardar</button>
+        {override && <button onClick={() => { const l = { ...logs }; delete l[prKey]; setLogs(l); setEditingPR(false); }} className="px-4 h-[38px] rounded-full bg-slate-700 text-slate-200 text-[13px] font-semibold">Quitar</button>}
+        <button onClick={() => setEditingPR(false)} className="text-slate-500 text-[13px] font-semibold px-3 h-[38px]">Cancelar</button>
       </div>
     </div>
   );
@@ -7479,11 +7861,15 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
         {lineaFeedback}
         {avisosExtra}
         {todayCardio && hasActiveSession && !draft.editing ? (
-          <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ backgroundColor: tint(accent, "15"), border: `1px solid ${tint(accent, "30")}` }}>
-            <Check size={15} style={{ color: accent }} className="shrink-0" />
-            <span className="text-sm font-black" style={{ color: accent }}>{todayCardio.minutes} min{todayCardio.km ? ` · ${todayCardio.km} km` : ""}</span>
-            <span className="text-[11px] text-slate-500 ml-1">guardado hoy</span>
-            <button onClick={() => updateDraft({ minutes: String(todayCardio.minutes), km: String(todayCardio.km || ""), editing: true })} className="ml-auto text-[11.5px] font-bold px-3 h-8 rounded-lg transition" style={{ backgroundColor: tint(accent, "20"), color: accent }}>Editar</button>
+          <div className="serie-hecha">
+            <div className="serie-linea">
+              <span className="galleta serie-galleta llena girada" aria-hidden="true"><Check size={16} strokeWidth={3} /></span>
+              <span className="serie-linea-valor">
+                <b>{todayCardio.minutes}</b><small>min</small>
+                {todayCardio.km ? <><i>·</i><b>{todayCardio.km}</b><small>km</small></> : null}
+              </span>
+              <button onClick={() => updateDraft({ minutes: String(todayCardio.minutes), km: String(todayCardio.km || ""), editing: true })} className="ml-auto text-[12.5px] font-semibold px-3.5 h-9 rounded-full transition text-slate-300" style={{ backgroundColor: "var(--surface-3)" }}>Editar</button>
+            </div>
           </div>
         ) : (
           <div className="space-y-2.5">
@@ -7530,7 +7916,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
                   <input type="number" inputMode="decimal" placeholder="—" value={km} onChange={(e) => updateDraft({ km: e.target.value })} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-2.5 num-display text-xl font-extrabold text-center text-white focus:outline-none focus:border-teal-500/50 transition" />
                 </div>
               )}
-              <button ref={saveBtnRef} onClick={handleSave} aria-label="Guardar cardio" className={`h-[50px] px-5 rounded-xl transition-all active:scale-95 font-black text-sm !text-white flex items-center justify-center gap-2 shrink-0 ${filaSoloGuardar ? "flex-1" : ""} ${saved ? "bg-emerald-500" : "hover:opacity-90"}`} style={!saved ? { backgroundColor: accent } : {}}>
+              <button ref={saveBtnRef} onClick={handleSave} aria-label="Guardar cardio" className={`boton-pildora shrink-0 ${filaSoloGuardar ? "flex-1" : ""}`} style={saved ? { background: "#34d399", color: "#022c22" } : undefined}>
                 {saved ? <Check size={18} /> : <Save size={17} />} {saved ? "Listo" : "Guardar"}
               </button>
             </div>
@@ -7543,16 +7929,18 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     );
   }
 
-  // ── FUERZA: la fila de la planilla ──────────────────────────────────────
+  // ── FUERZA ───────────────────────────────────────────────────────────────
   const rNum = parseFloat(reps), kNum = parseFloat(kg);
-  // En vivo, antes de guardar: si lo que escribiste ya supera tu marca, la
-  // fila se enciende en verde (sabés que va a ser récord). A peso corporal
-  // (0kg) el 1RM estimado da 0, así que ahí se compara por reps.
-  const liveBeats = !guardadaHoy && !isNaN(rNum) && !isNaN(kNum) && rNum > 0 && kNum >= 0 && !!currentPR
+  const u = weightLabel(unit);
+  const hechaHoy = !!yaRegistradaHoy;
+  const enFoco = !guardadaHoy && (activa || !!draft.editing);
+  // En vivo, antes de guardar: si lo que escribiste ya supera tu marca, el
+  // tablero se enciende en verde (sabés que va a ser récord). A peso
+  // corporal (0kg) el 1RM estimado da 0, así que ahí se compara por reps.
+  const liveBeats = enFoco && !isNaN(rNum) && !isNaN(kNum) && rNum > 0 && kNum >= 0 && !!currentPR
     && (kNum === 0
       ? currentPR.kg === 0 && rNum > currentPR.reps
       : currentPR.kg > 0 && estimate1RM(displayToKg(kNum, unit), rNum) > estimate1RM(currentPR.kg, currentPR.reps));
-  const anillo = liveBeats ? "0 0 0 1.5px #10B981, 0 0 18px -6px rgba(16,185,129,0.6)" : rowFocus ? `0 0 0 1.5px ${tint(accent, "aa")}` : undefined;
   const rango = String(setDef.repRange || "").replace(/-/g, "–");
   const pesada = isHeavyRepRange(setDef.repRange);
   // Consejo al guardar (opción): contra la meta si hay una, si no contra el
@@ -7566,10 +7954,10 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
       const metaKg = kgToDisplay(plannedTarget.kg, unit), hechoKg = kgToDisplay(yaRegistradaHoy.kg, unit);
       if (hechoKg + 0.001 >= metaKg && r >= plannedTarget.reps) {
         return r > plannedTarget.reps || hechoKg > metaKg
-          ? { icon: "📈", title: "Superaste la meta", body: `La meta era ${plannedTarget.reps}×${metaKg}${weightLabel(unit)}. Si se repite, subile a la meta de la semana que viene.`, color: "#34D399" }
-          : { icon: "🎯", title: "Meta cumplida", body: `Clavaste ${plannedTarget.reps}×${metaKg}${weightLabel(unit)}, justo lo que pedía el plan.`, color: accent };
+          ? { icon: "📈", title: "Superaste la meta", body: `La meta era ${plannedTarget.reps}×${metaKg}${u}. Si se repite, subile a la meta de la semana que viene.`, color: "#34D399" }
+          : { icon: "🎯", title: "Meta cumplida", body: `Clavaste ${plannedTarget.reps}×${metaKg}${u}, justo lo que pedía el plan.`, color: accent };
       }
-      return { icon: "📉", title: "Te faltó para la meta", body: `La meta era ${plannedTarget.reps}×${metaKg}${weightLabel(unit)}. Si vuelve a pasar, replanificá esta semana más abajo.`, color: "#FBBF24" };
+      return { icon: "📉", title: "Te faltó para la meta", body: `La meta era ${plannedTarget.reps}×${metaKg}${u}. Si vuelve a pasar, replanificá esta semana más abajo.`, color: "#FBBF24" };
     }
     const rr = String(setDef?.repRange || "");
     const m = rr.match(/(\d+)\s*[-–a]\s*(\d+)/);
@@ -7581,79 +7969,177 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     if (r < lo) return { icon: "📉", title: "Quedaste corto", body: `El objetivo eran ${lo}-${hi} reps. Bajá un poco el peso y buscá el rango.`, color: "#FBBF24" };
     return { icon: "🎯", title: "En el punto justo", body: `Clavaste el rango de ${rr}. Sostenelo o buscá una rep más.`, color: accent };
   })() : null;
-  return (
-    <div className={`serie ${activa ? "serie-activa" : ""} ${guardadaHoy ? "serie-hecha" : ""}`} style={{ "--c": accent }}>
-      <PRBurst anchorRef={saveBtnRef} trigger={prBurst} />
-      <div className="serie-fila" style={anillo ? { boxShadow: anillo } : undefined} onFocus={() => setRowFocus(true)} onBlur={() => setRowFocus(false)}>
-        <span className="serie-n" aria-hidden="true">{setIndex + 1}</span>
-        {/* Objetivo: el rango de reps arriba; abajo, contra qué número
-            apuntás (la meta planificada o tu récord, que se toca para
-            corregirlo) y lo que hiciste la vez pasada en esta misma serie. */}
-        <div className="serie-ref">
-          <span className="serie-ref-rango">
-            {rango} reps
-            {pesada && <Zap size={11} className="text-amber-400 shrink-0" aria-label="Serie de fuerza" />}
-            {setDef.type === "dropset" && <span className="text-orange-400"> · drop</span>}
-            {setDef.type === "restpause" && <span className="text-rose-400"> · rest-pause</span>}
+
+  // ── RENGLÓN: una serie hecha, o una que todavía no toca ────────────────
+  if (!enFoco) {
+    const hecho = hechaHoy ? { reps: yaRegistradaHoy.reps, kg: kgToDisplay(yaRegistradaHoy.kg, unit) } : null;
+    // Lo que le sumaste a la vez pasada, si le sumaste: el empujoncito de
+    // ver que avanzás, serie por serie (Alpha Progression lo muestra igual).
+    const mejora = hechaHoy && lastSession ? (
+      yaRegistradaHoy.kg > lastSession.kg + 0.001
+        ? `+${Math.round(kgToDisplay(yaRegistradaHoy.kg - lastSession.kg, unit) * 100) / 100} ${u}`
+        : Math.abs(yaRegistradaHoy.kg - lastSession.kg) < 0.001 && yaRegistradaHoy.reps > lastSession.reps
+          ? `+${yaRegistradaHoy.reps - lastSession.reps} rep${yaRegistradaHoy.reps - lastSession.reps === 1 ? "" : "s"}`
+          : null
+    ) : null;
+    // A la derecha de una serie que falta, el número contra el que vas: la
+    // meta, tu récord o lo de la vez pasada (en ese orden).
+    const referencia = !hechaHoy && (isPlannedMode && plannedTarget.kg != null
+      ? { icono: <ClipboardCheck size={13} />, texto: `${plannedTarget.reps}×${kgToDisplay(plannedTarget.kg, unit)}` }
+      : currentPR
+        ? { icono: <Trophy size={13} />, texto: `${currentPR.reps}×${kgToDisplay(currentPR.kg, unit)}` }
+        : lastSession
+          ? { icono: <History size={13} />, texto: `${lastSession.reps}×${kgToDisplay(lastSession.kg, unit)}` }
+          : null);
+    const alTocar = hechaHoy ? editarGuardada : onEnfocar;
+    return (
+      <div className={`serie ${hechaHoy ? "serie-hecha" : "serie-pendiente"}`} style={{ "--c": accent }}>
+        <PRBurst anchorRef={saveBtnRef} trigger={prBurst} />
+        <button
+          ref={saveBtnRef}
+          onClick={alTocar || undefined}
+          disabled={!alTocar}
+          className="serie-linea"
+          aria-label={hechaHoy
+            ? `Serie ${setIndex + 1}: ${hecho.reps} reps con ${hecho.kg} ${u}. Tocá para editarla`
+            : `Serie ${setIndex + 1}: ${rango} reps. Tocá para anotarla`}
+        >
+          <span className={`galleta serie-galleta ${hechaHoy ? "llena girada" : "hueca"}`} aria-hidden="true">
+            {hechaHoy ? <Check size={16} strokeWidth={3} className={saved ? "draw-check" : ""} /> : setIndex + 1}
           </span>
-          {isPlannedMode ? (
-            <span className="serie-ref-meta" style={{ color: accent }} aria-label={`Meta: ${plannedTarget.reps}×${kgToDisplay(plannedTarget.kg, unit)}${weightLabel(unit)}`}>
-              <ClipboardCheck size={11} className="shrink-0" />{plannedTarget.reps}×{kgToDisplay(plannedTarget.kg, unit)}
-              {plannedTarget.rpe != null && <span className="opacity-75 font-semibold"> {formatEffort(plannedTarget.rpe, fieldSettings.rpeDisplayMode)}</span>}
+          {hechaHoy ? (
+            <span className="serie-linea-valor">
+              <b>{hecho.reps}</b><i>×</i><b>{hecho.kg}</b><small>{u}</small>
+              {yaRegistradaHoy.rpe && <span className="serie-valor-rpe">{formatEffort(yaRegistradaHoy.rpe, fieldSettings.rpeDisplayMode)}</span>}
             </span>
-          ) : currentPR ? (
-            <button onClick={abrirCorreccion} className="serie-ref-meta" style={{ color: accent }} aria-label={`Tu récord: ${currentPR.reps}×${kgToDisplay(currentPR.kg, unit)}${weightLabel(unit)}. Tocá para corregirlo`}>
-              <Trophy size={11} className="shrink-0" />{currentPR.reps}×{kgToDisplay(currentPR.kg, unit)}{override?.manual && <Edit3 size={9} className="shrink-0 opacity-70" />}
-            </button>
           ) : (
-            <span className="serie-ref-ant">Primera vez</span>
-          )}
-          {isPlannedMode && currentPR ? (
-            <button onClick={abrirCorreccion} className="serie-ref-ant" aria-label={`Tu récord: ${currentPR.reps}×${kgToDisplay(currentPR.kg, unit)}${weightLabel(unit)}. Tocá para corregirlo`}>
-              <Trophy size={10} className="shrink-0" />{currentPR.reps}×{kgToDisplay(currentPR.kg, unit)}
-            </button>
-          ) : fieldSettings.showLastSession === true && lastSession ? (
-            <span className="serie-ref-ant" title={`La vez pasada (${(haceCuanto(daysSince(lastSession.date)) || "hoy")})`}>
-              <History size={10} className="shrink-0" />{lastSession.reps}×{kgToDisplay(lastSession.kg, unit)}
+            <span className="serie-linea-meta">
+              <b>Serie {setIndex + 1}</b>
+              <span>
+                {rango} reps
+                {pesada && <Zap size={12} className="text-amber-400 shrink-0" aria-label="Serie de fuerza" />}
+                {setDef.type === "dropset" && <span className="text-orange-400">drop-set</span>}
+                {setDef.type === "restpause" && <span className="text-rose-400">rest-pause</span>}
+              </span>
             </span>
-          ) : null}
-        </div>
-        {guardadaHoy ? (
-          <button onClick={editarGuardada} className="serie-valor" aria-label={`Serie ${setIndex + 1}: ${yaRegistradaHoy.reps} reps con ${kgToDisplay(yaRegistradaHoy.kg, unit)} ${weightLabel(unit)}. Tocá para editarla`}>
-            <span>{yaRegistradaHoy.reps}</span><span className="serie-por">×</span><span>{kgToDisplay(yaRegistradaHoy.kg, unit)}</span>
-            {yaRegistradaHoy.rpe && <span className="serie-valor-rpe">{formatEffort(yaRegistradaHoy.rpe, fieldSettings.rpeDisplayMode)}</span>}
-          </button>
-        ) : (
-          <>
-            <input type="number" inputMode="decimal" enterKeyHint="next" aria-label="Repeticiones" placeholder="—" value={reps} onFocus={seleccionarAlEnfocar} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); kgInputRef.current?.focus(); } }} onChange={(e) => updateDraft({ reps: e.target.value })} className="serie-campo" />
-            <span className="serie-por" aria-hidden="true">×</span>
-            <input ref={kgInputRef} type="number" inputMode="decimal" enterKeyHint="done" aria-label={`Peso en ${weightLabel(unit)}`} placeholder="—" value={kg} onFocus={seleccionarAlEnfocar} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); saveBtnRef.current?.click(); } }} onChange={(e) => updateDraft({ kg: e.target.value })} className="serie-campo" />
-          </>
-        )}
-        <button ref={saveBtnRef} onClick={guardadaHoy ? editarGuardada : handleSave} aria-label={guardadaHoy ? `Editar la serie ${setIndex + 1}` : "Guardar serie"} className={`serie-check ${guardadaHoy || saved ? "hecha" : ""}`}>
-          <Check size={20} strokeWidth={2.8} className={saved ? "draw-check" : ""} />
+          )}
+          <span className="serie-linea-fin">
+            {mejora && <span className="serie-mejora"><TrendingUp size={12} /> {mejora}</span>}
+            {referencia && <>{referencia.icono}{referencia.texto}</>}
+          </span>
         </button>
+        {hechaHoy && lineaFeedback}
+        {hechaHoy && avisosExtra}
+        {hechaHoy && yaRegistradaHoy.drops?.length > 0 && (
+          <p className="serie-aviso text-orange-400/90">Bajadas: {yaRegistradaHoy.drops.map((d, i) => <span key={i}>{i > 0 && " · "}{d.reps}×{kgToDisplay(d.kg, unit)}{u}</span>)}</p>
+        )}
+        {hechaHoy && yaRegistradaHoy.clusters?.length > 0 && (
+          <p className="serie-aviso text-rose-400/90">Mini-series: {yaRegistradaHoy.clusters.map((c, i) => <span key={i}>{i > 0 && " · "}{c.reps} reps</span>)}</p>
+        )}
+        {coaching && (
+          <div className="serie-aviso flex items-start gap-1.5">
+            <span className="text-[13px] leading-none mt-0.5 shrink-0">{coaching.icon}</span>
+            <span className="min-w-0"><b style={{ color: coaching.color }}>{coaching.title}.</b> <span className="text-slate-400">{coaching.body}</span></span>
+          </div>
+        )}
+        {panelCorreccion}
+        {modales}
+      </div>
+    );
+  }
+
+  // ── EN FOCO: el tablero ─────────────────────────────────────────────────
+  return (
+    <div className={`serie serie-foco ${liveBeats ? "va-record" : ""}`} style={{ "--c": accent }}>
+      <PRBurst anchorRef={saveBtnRef} trigger={prBurst} />
+      <div className="foco-cabecera">
+        <span className="galleta serie-galleta activa" aria-hidden="true">{setIndex + 1}</span>
+        <p className="foco-titulo">Serie {setIndex + 1}<span>{rango} reps</span></p>
+        {pesada && <span className="foco-chip text-amber-400" style={{ backgroundColor: "rgba(245,158,11,0.14)" }}><Zap size={12} /> Fuerza</span>}
+        {setDef.type === "dropset" && <span className="foco-chip text-orange-400" style={{ backgroundColor: "rgba(249,115,22,0.14)" }}>Drop-set</span>}
+        {setDef.type === "restpause" && <span className="foco-chip text-rose-400" style={{ backgroundColor: "rgba(244,63,94,0.14)" }}>Rest-pause</span>}
+        {draft.editing && <button onClick={cancelarEdicion} className="foco-cancelar">Cancelar</button>}
       </div>
 
+      {/* El marcador: contra qué número jugás —la meta de esta semana o tu
+          récord, que se toca para corregirlo— y lo que hiciste la vez
+          pasada, uno al lado del otro. */}
+      <div className="foco-marcador">
+        {isPlannedMode ? (
+          <div className="marcador-celda" aria-label={`Meta: ${plannedTarget.reps}×${kgToDisplay(plannedTarget.kg, unit)}${u}`}>
+            <span className="marcador-rotulo"><ClipboardCheck size={13} /> Meta de hoy</span>
+            <span className="marcador-valor">{plannedTarget.reps}<i>×</i>{kgToDisplay(plannedTarget.kg, unit)}<small>{u}</small></span>
+            {(plannedTarget.rpe != null || plannedTarget.phase) && (
+              <span className="marcador-extra">{[plannedTarget.rpe != null ? formatEffort(plannedTarget.rpe, fieldSettings.rpeDisplayMode) : null, plannedTarget.phase].filter(Boolean).join(" · ")}</span>
+            )}
+          </div>
+        ) : currentPR ? (
+          <button onClick={abrirCorreccion} className="marcador-celda" aria-label={`Tu récord: ${currentPR.reps}×${kgToDisplay(currentPR.kg, unit)}${u}. Tocá para corregirlo`}>
+            <span className="marcador-rotulo"><Trophy size={13} /> Tu récord{override?.manual && <Edit3 size={11} className="opacity-70" />}</span>
+            <span className="marcador-valor">{currentPR.reps}<i>×</i>{kgToDisplay(currentPR.kg, unit)}<small>{u}</small></span>
+          </button>
+        ) : (
+          <div className="marcador-celda marcador-vacio">
+            <Target size={14} className="shrink-0" />
+            <span>Sin marca aún: esta va a ser la primera</span>
+          </div>
+        )}
+        {isPlannedMode && currentPR ? (
+          <button onClick={abrirCorreccion} className="marcador-celda secundaria" aria-label={`Tu récord: ${currentPR.reps}×${kgToDisplay(currentPR.kg, unit)}${u}. Tocá para corregirlo`}>
+            <span className="marcador-rotulo"><Trophy size={13} /> Tu récord</span>
+            <span className="marcador-valor">{currentPR.reps}<i>×</i>{kgToDisplay(currentPR.kg, unit)}<small>{u}</small></span>
+          </button>
+        ) : fieldSettings.showLastSession === true && lastSession ? (
+          <div className="marcador-celda secundaria">
+            <span className="marcador-rotulo"><History size={13} /> {(() => { const t = haceCuanto(daysSince(lastSession.date)) || "hoy"; return t.charAt(0).toUpperCase() + t.slice(1); })()}</span>
+            <span className="marcador-valor">{lastSession.reps}<i>×</i>{kgToDisplay(lastSession.kg, unit)}<small>{u}</small></span>
+          </div>
+        ) : null}
+      </div>
+
+      {/* El tablero: reps × kilos en grande y guardar. Vienen propuestos
+          con lo de la vez pasada (ver `sugerido`): si no cambió nada, es un
+          solo toque. El borde se enciende con el color del día al escribir,
+          y en verde si lo escrito ya es récord. */}
+      <div className="foco-tablero" onFocus={() => setRowFocus(true)} onBlur={() => setRowFocus(false)} data-enfocado={rowFocus || undefined}>
+        <div className="foco-campo">
+          <input type="number" inputMode="decimal" enterKeyHint="next" aria-label="Repeticiones" placeholder="—" value={reps} onFocus={seleccionarAlEnfocar} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); kgInputRef.current?.focus(); } }} onChange={(e) => updateDraft({ reps: e.target.value })} className="foco-input" />
+          <span className="foco-campo-rotulo" aria-hidden="true">Reps</span>
+        </div>
+        <span className="foco-por" aria-hidden="true">×</span>
+        <div className="foco-campo">
+          <input ref={kgInputRef} type="number" inputMode="decimal" enterKeyHint="done" aria-label={`Peso en ${u}`} placeholder="—" value={kg} onFocus={seleccionarAlEnfocar} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); saveBtnRef.current?.click(); } }} onChange={(e) => updateDraft({ kg: e.target.value })} className="foco-input" />
+          {cambiarUnidad
+            ? <button onClick={cambiarUnidad} aria-label={`Pasar a ${unit === "kg" ? "libras" : "kilos"} en toda la app`} className="foco-campo-rotulo">{u}<ArrowUpDown size={11} className="rotate-90" /></button>
+            : <span className="foco-campo-rotulo" aria-hidden="true">{u}</span>}
+        </div>
+        <button ref={saveBtnRef} onClick={handleSave} aria-label="Guardar serie" className={`foco-guardar ${saved ? "hecha" : ""}`}>
+          <Check size={28} strokeWidth={2.8} className={saved ? "draw-check" : ""} />
+        </button>
+        {/* ± sin abrir el teclado: en Android el teclado tapa medio
+            ejercicio, y el 90% de los ajustes entre series son "una rep
+            más" o "un disco más". Cada par va debajo de su número. */}
+        {(sugerido || reps || kg) && (
+          <>
+            <div className="foco-ajustes">
+              <button onClick={() => ajustar("reps", -1)} aria-label="Restar 1 repeticiones">−1</button>
+              <button onClick={() => ajustar("reps", 1)} aria-label="Sumar 1 repeticiones">+1</button>
+            </div>
+            <span aria-hidden="true" />
+            <div className="foco-ajustes">
+              <button onClick={() => ajustar("kg", -pasoKg)} aria-label={`Restar ${pasoKg} ${u}`}>−{pasoKg}</button>
+              <button onClick={() => ajustar("kg", pasoKg)} aria-label={`Sumar ${pasoKg} ${u}`}>+{pasoKg}</button>
+            </div>
+          </>
+        )}
+      </div>
+      {liveBeats && <p className="foco-record"><Trophy size={13} /> Si la guardás así, es récord</p>}
       {lineaFeedback}
       {avisosExtra}
-      {guardadaHoy && yaRegistradaHoy.drops?.length > 0 && (
-        <p className="serie-aviso text-orange-400/90">Bajadas: {yaRegistradaHoy.drops.map((d, i) => <span key={i}>{i > 0 && " · "}{d.reps}×{kgToDisplay(d.kg, unit)}{weightLabel(unit)}</span>)}</p>
-      )}
-      {guardadaHoy && yaRegistradaHoy.clusters?.length > 0 && (
-        <p className="serie-aviso text-rose-400/90">Mini-series: {yaRegistradaHoy.clusters.map((c, i) => <span key={i}>{i > 0 && " · "}{c.reps} reps</span>)}</p>
-      )}
-      {coaching && (
-        <div className="serie-aviso flex items-start gap-1.5">
-          <span className="text-[13px] leading-none mt-0.5 shrink-0">{coaching.icon}</span>
-          <span className="min-w-0"><b style={{ color: coaching.color }}>{coaching.title}.</b> <span className="text-slate-400">{coaching.body}</span></span>
-        </div>
-      )}
 
-      {/* Lo de ayuda, sólo en la serie que toca ahora y sin guardar. */}
-      {!guardadaHoy && activa && fieldSettings.showProgressionSuggestion === true && (history.length > 0 || isPlannedMode) && (() => {
-        // Con una meta para esta semana, la sugerencia ES la meta (antes
-        // mostraba dos números distintos peleándose).
+      {/* Sugerencia de progresión (opción): con una meta para esta semana,
+          la sugerencia ES la meta (antes mostraba dos números peleándose). */}
+      {fieldSettings.showProgressionSuggestion === true && (history.length > 0 || isPlannedMode) && (() => {
         const conMeta = isPlannedMode && plannedTarget.kg != null;
         const last = history.length ? history.reduce((a, b) => (a.date > b.date ? a : b)) : null;
         const repTop = repRangeTop(setDef.repRange);
@@ -7662,64 +8148,48 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
         // El salto es el disco chico de la unidad en uso (2,5 kg o 5 lbs).
         const sugKg = conMeta ? plannedTarget.kg : (hitTop ? last.kg + displayToKg(pasoKg, unit) : last.kg);
         return (
-          <button onClick={() => updateDraft({ reps: String(sugReps), kg: String(kgToDisplay(sugKg, unit)) })} className="serie-sugerencia" style={{ color: accent, backgroundColor: tint(accent, "12"), borderColor: tint(accent, "30") }}>
-            {conMeta ? <ClipboardCheck size={13} /> : <Target size={13} />}
-            <span className="flex-1 text-left">{conMeta ? "Tu meta" : "Probá hoy"}: <b>{sugReps}×{kgToDisplay(sugKg, unit)}{weightLabel(unit)}</b></span>
-            <span className="text-[11px] text-slate-400">Usar</span>
+          <button onClick={() => updateDraft({ reps: String(sugReps), kg: String(kgToDisplay(sugKg, unit)) })} className="serie-sugerencia">
+            {conMeta ? <ClipboardCheck size={14} /> : <Target size={14} />}
+            <span className="flex-1 text-left">{conMeta ? "Tu meta" : "Probá hoy"}: <b>{sugReps}×{kgToDisplay(sugKg, unit)}{u}</b></span>
+            <span className="text-[12px] text-slate-400">Usar</span>
           </button>
         );
       })()}
-      {/* ± sin abrir el teclado: en Android el teclado tapa medio ejercicio,
-          y el 90% de los ajustes entre series son "una rep más" o "un disco
-          más". El paso del peso sigue la unidad (2,5 kg o 5 lbs). */}
-      {!guardadaHoy && activa && (sugerido || reps || kg) && (
-        <div className="serie-ajustes">
-          {[
-            { campo: "reps", delta: -1, txt: "−1", u: "rep" },
-            { campo: "reps", delta: 1, txt: "+1", u: "rep" },
-            { campo: "kg", delta: -pasoKg, txt: `−${pasoKg}`, u: weightLabel(unit) },
-            { campo: "kg", delta: pasoKg, txt: `+${pasoKg}`, u: weightLabel(unit) },
-          ].map(({ campo, delta, txt, u }) => (
-            <button key={campo + delta} onClick={() => ajustar(campo, delta)}
-              aria-label={`${delta > 0 ? "Sumar" : "Restar"} ${Math.abs(delta)} ${campo === "reps" ? "repeticiones" : weightLabel(unit)}`}>
-              {txt}<span>{u}</span>
-            </button>
-          ))}
-        </div>
-      )}
+
       {/* Drop-set / rest-pause: filas extra que se guardan con la serie. */}
-      {!guardadaHoy && (setDef.type === "dropset" || setDef.type === "restpause") && (
-        <div className="space-y-1.5 pt-2 pl-[30px]">
+      {(setDef.type === "dropset" || setDef.type === "restpause") && (
+        <div className="space-y-1.5 pt-2">
           {extraRows.map((row, i) => (
             <div key={i} className="flex items-center gap-1.5">
-              <span className="text-[10.5px] text-slate-500 font-bold w-12 shrink-0">{setDef.type === "dropset" ? `Baja ${i + 1}` : `Mini ${i + 1}`}</span>
-              <input type="number" inputMode="decimal" placeholder="reps" aria-label={`Reps de la ${setDef.type === "dropset" ? "bajada" : "mini-serie"} ${i + 1}`} value={row.reps} onChange={(e) => updateExtraRow(i, { reps: e.target.value })} className="w-16 bg-slate-900/70 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-center text-white focus:outline-none" />
+              <span className="text-[11.5px] text-slate-500 font-semibold w-14 shrink-0">{setDef.type === "dropset" ? `Baja ${i + 1}` : `Mini ${i + 1}`}</span>
+              <input type="number" inputMode="decimal" placeholder="reps" aria-label={`Reps de la ${setDef.type === "dropset" ? "bajada" : "mini-serie"} ${i + 1}`} value={row.reps} onChange={(e) => updateExtraRow(i, { reps: e.target.value })} className="w-16 h-9 bg-slate-900/70 rounded-xl px-2 text-[13px] text-center text-white focus:outline-none" />
               {setDef.type === "dropset" && (
                 <>
-                  <span className="text-slate-600 text-[10px]">×</span>
-                  <input type="number" inputMode="decimal" placeholder={weightLabel(unit)} aria-label={`Peso de la bajada ${i + 1}`} value={row.kg} onChange={(e) => updateExtraRow(i, { kg: e.target.value })} className="w-16 bg-slate-900/70 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-center text-white focus:outline-none" />
+                  <span className="text-slate-600 text-[11px]">×</span>
+                  <input type="number" inputMode="decimal" placeholder={u} aria-label={`Peso de la bajada ${i + 1}`} value={row.kg} onChange={(e) => updateExtraRow(i, { kg: e.target.value })} className="w-16 h-9 bg-slate-900/70 rounded-xl px-2 text-[13px] text-center text-white focus:outline-none" />
                 </>
               )}
-              <button onClick={() => removeExtraRow(i)} aria-label="Quitar" className="text-slate-500 hover:text-rose-400 ml-auto shrink-0 w-8 h-8 flex items-center justify-center"><X size={14} /></button>
+              <button onClick={() => removeExtraRow(i)} aria-label="Quitar" className="text-slate-500 hover:text-rose-400 ml-auto shrink-0 w-9 h-9 flex items-center justify-center"><X size={15} /></button>
             </div>
           ))}
-          <button onClick={addExtraRow} className="serie-boton-suave mt-0">
-            <Plus size={12} /> {setDef.type === "dropset" ? "Agregar bajada" : "Agregar mini-serie"}
+          <button onClick={addExtraRow} className="serie-boton-suave">
+            <Plus size={13} /> {setDef.type === "dropset" ? "Agregar bajada" : "Agregar mini-serie"}
           </button>
         </div>
       )}
-      {/* % del 1RM (opción) */}
-      {!guardadaHoy && activa && currentPR && fieldSettings.show1RMPercent !== false && (() => {
+
+      {/* % del 1RM (opción): escribís un porcentaje y te carga el peso. */}
+      {currentPR && fieldSettings.show1RMPercent !== false && (() => {
         const pr1RM = estimate1RM(currentPR.kg, currentPR.reps);
         const currentPct = (kg && !isNaN(parseFloat(kg)) && pr1RM > 0)
           ? Math.round((estimate1RM(displayToKg(parseFloat(kg), unit), parseFloat(reps) || 1) / pr1RM) * 100)
           : null;
         return (
-          <div className="flex items-center gap-2 pl-[30px] pt-1.5">
-            <span className="text-[10.5px] text-slate-500">% de tu 1RM</span>
+          <div className="flex items-center gap-2 pt-2.5 px-1">
+            <span className="text-[12px] text-slate-500">% de tu 1RM</span>
             <input
               type="number" inputMode="numeric" placeholder="—" aria-label="Porcentaje de tu 1RM"
-              className="w-12 bg-transparent border-b border-slate-700 text-[11px] font-bold text-center text-slate-300 focus:outline-none focus:border-slate-500 transition"
+              className="w-14 h-8 rounded-full bg-slate-900/60 text-[12.5px] font-bold text-center text-slate-200 focus:outline-none"
               onFocus={(e) => e.target.select()}
               onChange={(e) => {
                 const pct = parseFloat(e.target.value);
@@ -7729,12 +8199,11 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
                 }
               }}
             />
-            {currentPct && <span className="text-[10.5px] text-slate-500 tabular-nums">ahora ~{currentPct}%</span>}
+            {currentPct && <span className="text-[12px] text-slate-500 tabular-nums">ahora ~{currentPct}%</span>}
           </div>
         );
       })()}
-      {bloqueEsfuerzo}
-      {bloqueNota}
+      {(bloqueEsfuerzo || bloqueNota) && <div className="foco-extras">{bloqueEsfuerzo}{bloqueNota}</div>}
       {panelCorreccion}
       {modales}
     </div>
@@ -7742,44 +8211,123 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
 }
 
 // LA BARRA CARGADA — el avance del día como una barra olímpica: cada serie
-// que anotás le suma un disco. Los discos usan los colores de competición
-// (rojo 25, azul 20, amarillo 15, verde 10, blanco 5), los que reconoce
-// cualquiera que levanta, y se cargan como de verdad: los grandes adentro,
-// los chicos afuera, uno de cada lado por turno. Lo que falta se ve como un
-// hueco punteado, así de un vistazo sabés cuánto te queda.
-// Es el único lugar de la app con tanto color junto, a propósito: es lo que
-// se mueve cuando entrenás.
-const COLORES_DISCO = ["#E5383B", "#2F6FED", "#F4C430", "#2BA35F", "#E9E9E4"];
-function BarraCargada({ hechas = 0, total = 0, alto = 30, etiqueta = null, className = "" }) {
+// que anotás le carga un disco. Es la pieza propia de la app (pedido: "me
+// gustó el concepto, mejorá el diseño"), así que ahora es una barra de
+// verdad:
+//   · Los discos usan los colores de competición (rojo 25, azul 20,
+//     amarillo 15, verde 10, blanco 5) y su forma real: los pesados gruesos
+//     y altos adentro, el blanco de 5 chico y finito afuera. Tienen volumen
+//     —luz arriba, sombra abajo— y el labio del borde.
+//   · Mangas cromadas, topes, el agarre con su moleteado (en la grande) y
+//     collarines del color del día, que se corren hasta el último disco
+//     cargado de cada lado.
+//   · Se carga como en el gimnasio: alternando lados, de adentro hacia
+//     afuera, y el disco nuevo entra deslizándose por la manga.
+//   · Lo que falta son discos fantasma, apenas marcados (antes era un
+//     punteado que se leía como un código de barras).
+const COLORES_DISCO = ["#E5383B", "#2F6FED", "#F4C430", "#2BA35F", "#ECECE6"];
+// Ancho y alto de cada disco, relativos al rojo.
+const FORMA_DISCO = [
+  { ancho: 1, alto: 1 },
+  { ancho: 0.86, alto: 1 },
+  { ancho: 0.74, alto: 0.88 },
+  { ancho: 0.62, alto: 0.78 },
+  { ancho: 0.5, alto: 0.58 },
+];
+// Qué disco va en cada lugar de un lado, de adentro hacia afuera: los
+// pesados primero, como se carga una barra. Hasta cinco, uno de cada; con
+// más, se repiten los pesados.
+function discosDeUnLado(n) {
+  if (n <= 5) return Array.from({ length: n }, (_, i) => i);
+  return Array.from({ length: n }, (_, i) => Math.min(4, Math.floor((i * 5) / n)));
+}
+function mezclarHex(a, b, t) {
+  const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
+  const canal = (p, s) => (p >> s) & 255;
+  const m = (s) => Math.round(canal(pa, s) + (canal(pb, s) - canal(pa, s)) * t);
+  return `#${((1 << 24) | (m(16) << 16) | (m(8) << 8) | m(0)).toString(16).slice(1)}`;
+}
+// Los degradés de cada disco salen una sola vez, no en cada render.
+const DEGRADE_DISCO = COLORES_DISCO.map((c) => [mezclarHex(c, "#ffffff", 0.3), c, mezclarHex(c, "#000000", 0.34)]);
+function BarraCargada({ hechas = 0, total = 0, alto = 30, etiqueta = null, className = "", detalle = false, escalonado = false }) {
+  // Ids propios para los degradés: con dos barras en pantalla (la del día y
+  // la del dock), ids repetidos hacen que una pinte con los de la otra.
+  const uid = `bc${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
   const t = Math.max(0, Math.round(total));
   if (!t) return null;
-  const W = 300, H = 40, cy = H / 2;
+  const W = 320, H = 64, cy = H / 2;
+  const cargados = Math.min(Math.max(0, hechas), t);
   const porLado = Math.ceil(t / 2);
-  const agarreIni = W / 2 - 36, agarreFin = W / 2 + 36;
-  const collarIzq = agarreIni - 11, collarDer = agarreFin + 6;
-  const gap = 1.6;
-  const disponible = collarIzq - 4;
-  const ancho = Math.max(3, Math.min(11, disponible / porLado - gap));
-  const paso = porLado > 6 ? 2 : 3.2;
+  const tipos = discosDeUnLado(porLado);
+  const agarreIni = W / 2 - 50, agarreFin = W / 2 + 50;
+  const tope = 7;
+  const mangaIzqFin = agarreIni - tope, mangaDerIni = agarreFin + tope;
+  const largoManga = mangaIzqFin - 4;
+  const clip = 6, gapClip = 2, gap = 1.4;
+  const sumaAnchos = tipos.reduce((s, k) => s + FORMA_DISCO[k].ancho, 0);
+  const base = Math.max(2.4, Math.min(18, (largoManga - clip - gapClip - 4 - gap * (porLado - 1)) / sumaAnchos));
+  const altoMax = H - 4;
+  // Dónde va cada lugar de un lado: distancia desde el tope hacia afuera.
+  const lugares = [];
+  let desde = 1;
+  tipos.forEach((k) => { const w = base * FORMA_DISCO[k].ancho; lugares.push({ k, w, desde }); desde += w + gap; });
   const discos = [];
-  for (let k = 0; k < t; k++) {
-    const izquierda = k % 2 === 0;
-    const i = Math.floor(k / 2); // posición contando desde adentro
-    const h = Math.max(12, H - 2 - i * paso);
-    const x = izquierda ? collarIzq - (i + 1) * (ancho + gap) : collarDer + 5 + gap + i * (ancho + gap);
-    discos.push({ k, x, y: cy - h / 2, h, color: COLORES_DISCO[i % COLORES_DISCO.length], cargado: k < hechas, izquierda });
+  for (let n = 0; n < t; n++) {
+    const izquierda = n % 2 === 0;
+    const l = lugares[Math.floor(n / 2)];
+    const h = altoMax * FORMA_DISCO[l.k].alto;
+    discos.push({ n, k: l.k, w: l.w, h, x: izquierda ? mangaIzqFin - l.desde - l.w : mangaDerIni + l.desde, y: cy - h / 2, izquierda, cargado: n < cargados });
   }
-  const radio = Math.min(2.4, ancho / 2.5);
+  const ultimoDe = (izq) => discos.filter((d) => d.cargado && d.izquierda === izq).pop() || null;
+  const uIzq = ultimoDe(true), uDer = ultimoDe(false);
+  const radio = (w) => Math.min(3, w / 2.6);
+  const acero = `url(#${uid}-acero)`;
+  const mitadAgarre = (agarreFin - agarreIni) / 2;
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className={`barra-cargada ${hechas >= t ? "completa" : ""} ${className}`} style={{ height: alto }} role="img" aria-label={etiqueta || `${Math.min(hechas, t)} de ${t} series`}>
-      <rect x="2" y={cy - 1.6} width={W - 4} height="3.2" rx="1.6" className="barra-eje" />
-      <rect x={agarreIni} y={cy - 2.6} width={agarreFin - agarreIni} height="5.2" rx="2.2" className="barra-agarre" />
-      <rect x={collarIzq} y={cy - 6.5} width="5" height="13" rx="1.4" className="barra-collar" />
-      <rect x={collarDer} y={cy - 6.5} width="5" height="13" rx="1.4" className="barra-collar" />
-      {discos.map((d) => (d.cargado
-        ? <rect key={`d${d.k}`} x={d.x} y={d.y} width={ancho} height={d.h} rx={radio} fill={d.color} className="disco disco-entra" style={{ "--desde": d.izquierda ? "-9px" : "9px" }} />
-        : <rect key={`h${d.k}`} x={d.x + 0.6} y={d.y + 0.6} width={Math.max(1, ancho - 1.2)} height={d.h - 1.2} rx={radio} className="disco-hueco" />
-      ))}
+    <svg viewBox={`0 0 ${W} ${H}`} className={`barra-cargada ${cargados >= t ? "completa" : ""} ${className}`} style={{ height: alto }} role="img" aria-label={etiqueta || `${cargados} de ${t} series`}>
+      <defs>
+        <linearGradient id={`${uid}-acero`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" className="acero-claro" />
+          <stop offset=".55" className="acero-medio" />
+          <stop offset="1" className="acero-oscuro" />
+        </linearGradient>
+        {DEGRADE_DISCO.map(([claro, medio, oscuro], k) => (
+          <linearGradient key={k} id={`${uid}-d${k}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor={claro} />
+            <stop offset=".42" stopColor={medio} />
+            <stop offset="1" stopColor={oscuro} />
+          </linearGradient>
+        ))}
+        {detalle && (
+          <pattern id={`${uid}-mol`} width="2.4" height="2.4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <line x1="0" y1="0" x2="0" y2="2.4" className="moleteado" />
+          </pattern>
+        )}
+      </defs>
+      {/* La barra: mangas, agarre (con moleteado en la grande) y topes. */}
+      <rect x="4" y={cy - 6} width={largoManga} height="12" rx="3" fill={acero} />
+      <rect x={mangaDerIni} y={cy - 6} width={largoManga} height="12" rx="3" fill={acero} />
+      <rect x={agarreIni} y={cy - 3.6} width={agarreFin - agarreIni} height="7.2" rx="3.6" fill={acero} />
+      {detalle && (
+        <>
+          <rect x={agarreIni + 5} y={cy - 3.6} width={mitadAgarre - 13} height="7.2" fill={`url(#${uid}-mol)`} />
+          <rect x={W / 2 + 8} y={cy - 3.6} width={mitadAgarre - 13} height="7.2" fill={`url(#${uid}-mol)`} />
+        </>
+      )}
+      <rect x={mangaIzqFin} y={cy - 11} width={tope} height="22" rx="2.4" fill={acero} />
+      <rect x={agarreFin} y={cy - 11} width={tope} height="22" rx="2.4" fill={acero} />
+      {/* Los discos: cargados con volumen, los que faltan como fantasmas. */}
+      {discos.map((d) => (d.cargado ? (
+        <g key={`d${d.n}`} className="disco-entra" style={{ "--desde": d.izquierda ? "-28px" : "28px", ...(escalonado ? { animationDelay: `${200 + d.n * 90}ms` } : null) }}>
+          <rect x={d.x} y={d.y} width={d.w} height={d.h} rx={radio(d.w)} fill={`url(#${uid}-d${d.k})`} className="disco" />
+          {d.w >= 7 && <rect x={d.x + 1.3} y={d.y + 1.3} width={d.w - 2.6} height={d.h - 2.6} rx={Math.max(0.6, radio(d.w) - 1)} className="disco-labio" />}
+        </g>
+      ) : (
+        <rect key={`f${d.n}`} x={d.x} y={d.y} width={d.w} height={d.h} rx={radio(d.w)} className="disco-fantasma" />
+      )))}
+      {/* Los collarines, contra el último disco cargado de cada lado. */}
+      {uIzq && <rect x={uIzq.x - gapClip - clip} y={cy - 8} width={clip} height="16" rx="2" className="collarin" />}
+      {uDer && <rect x={uDer.x + uDer.w + gapClip} y={cy - 8} width={clip} height="16" rx="2" className="collarin" />}
     </svg>
   );
 }
@@ -7805,6 +8353,8 @@ function convertirBorradoresDeUnidad(prev, de, a) {
 /* ============================================================================
    EXERCISE CARD
 ============================================================================ */
+// Cómo se acomodan las series al guardar: rápido y con un rebote mínimo.
+const RESORTE_LISTA = { type: "spring", bounce: 0.16, duration: 0.5 };
 function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts, resetKey = 0, settings = DEFAULT_SETTINGS, autoCollapse = false, onDisableAutoShowPrShare, hasActiveSession = true, hideTimer = false, onUpdateSettings = null, onSetPlanPaused = null, routineHasPlan = false, sex = null, age = null, weekInCycle = null, dayKey = null, nextRestTimerId = null, nextRestSeconds = null, nextExerciseName = null, supersetRestTimerId = null, supersetRestSeconds = null, orden = null }) {
   const [open, setOpen] = useState(false);
   const [showWarmup, setShowWarmup] = useState(false);
@@ -7864,9 +8414,16 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
     setsToShow.map((_, i) => (logs[`${exercise.id}_${i}`] || []).some((h) => h.date === hoyStr && !h.deload))
   ), [logs, exercise.id, setsToShow, hoyStr]);
   const allSetsDoneToday = seriesHechas.length > 0 && seriesHechas.every(Boolean);
-  // La serie que toca ahora: la primera sin hacer. Es la única que muestra
-  // los ±, la sugerencia y los botones de esfuerzo y nota.
+  // La serie EN FOCO: la única que se abre con el tablero grande (reps ×
+  // kilos, tu marca, los ± y guardar). Es la que toca ahora —la primera sin
+  // hacer— o la que tocaste para anotarla fuera de orden. Las demás son
+  // renglones de una línea.
   const primeraPendiente = seriesHechas.indexOf(false);
+  const [focoElegido, setFocoElegido] = useState(null);
+  const foco = focoElegido != null && !seriesHechas[focoElegido] ? focoElegido : primeraPendiente;
+  // Los disquitos de la cabecera usan los mismos colores que la barra
+  // cargada, en el mismo orden en que se cargan.
+  const tiposMini = discosDeUnLado(setsToShow.length);
   // Pedido: "el poder quitar o pasar ejercicios de planificados a por récord
   // de manera sencilla". El lugar más natural para decidirlo es acá, con el
   // ejercicio abierto y a punto de entrenarlo — no hay que salir a Perfil ni
@@ -7902,8 +8459,10 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
       <button onClick={() => setOpen((o) => !o)} aria-expanded={open} className="ejercicio-cabecera w-full flex items-center gap-3 pl-3 pr-3.5 py-3.5 text-left">
         {/* El número de orden reemplaza a la barrita de color: dice lo
             mismo (de qué día es, por el color) y además en qué lugar va. */}
+        {/* El número de orden, en una galleta del color del día. Con todas
+            las series hechas, la galleta se llena, gira y muestra el tilde. */}
         {orden != null
-          ? <span className="ejercicio-numero" aria-hidden="true">{String(orden).padStart(2, "0")}</span>
+          ? <span className={`galleta ejercicio-numero ${allSetsDoneToday ? "girada" : ""}`} aria-hidden="true">{allSetsDoneToday ? <Check size={18} strokeWidth={3} /> : orden}</span>
           : <span className="w-1.5 h-8 rounded-full shrink-0" style={{ backgroundColor: accent }} aria-hidden="true" />}
         <div className="flex-1 min-w-0">
           <div>
@@ -7916,7 +8475,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
                 cuán largo sea el nombre del ejercicio. */}
             <h3 className="ejercicio-nombre">{exercise.name}</h3>
             <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
-              <span className="text-[11px] px-1.5 py-0.5 rounded-md font-semibold" style={{ backgroundColor: tint(accent, "18"), color: accent }}>{exercise.muscle}</span>
+              <span className="ejercicio-musculo">{exercise.muscle}</span>
               {/* Si el músculo ya dice "Cardio", el chip de cardio repetía la palabra. */}
               {exercise.cardio && String(exercise.muscle || "").toLowerCase() !== "cardio" && <span className="text-[10px] bg-rose-400/15 text-rose-300 rounded-md px-1.5 py-0.5 font-bold flex items-center gap-1"><Footprints size={9} /> CARDIO</span>}
               {!open && restTimerId && <ChipDescansoEnCurso timerId={restTimerId} color={accent} />}
@@ -7973,19 +8532,22 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
           </div>
         </div>
         <div className="flex items-center gap-2.5 shrink-0">
-          {allSetsDoneToday ? (
-            <span className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center shrink-0" title="Completaste todas las series de hoy">
-              <Check size={13} className="text-white" strokeWidth={3} />
-            </span>
-          ) : !exercise.cardio && seriesHechas.length > 0 && (
-            <span className="series-puntos" aria-label={`${seriesHechas.filter(Boolean).length} de ${seriesHechas.length} series hechas hoy`}>
-              {seriesHechas.map((hecha, i) => <i key={i} className={hecha ? "hecha" : ""} />)}
+          {/* Un disquito por serie, con los colores de la barra cargada:
+              lleno = hecha hoy. Con la tarjeta cerrada sabés por dónde ibas. */}
+          {!exercise.cardio && seriesHechas.length > 0 && (
+            <span className="series-discos" role="img" aria-label={allSetsDoneToday ? "Completaste todas las series de hoy" : `${seriesHechas.filter(Boolean).length} de ${seriesHechas.length} series hechas hoy`}>
+              {seriesHechas.map((hecha, i) => <i key={i} className={hecha ? "hecha" : ""} style={hecha ? { "--disco": COLORES_DISCO[tiposMini[i]] } : undefined} />)}
             </span>
           )}
           <ChevronDown size={18} className={`text-slate-500 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
         </div>
       </button>
-      <div className={open ? "px-3.5 pb-3.5 pt-0 tab-fade-in" : "hidden"}>
+      {/* El cuerpo se abre y se cierra deslizándose (ver .ejercicio-cuerpo).
+          Queda montado aunque esté cerrado —así no se pierde nada de lo que
+          tenía abierto adentro—, pero inerte y sin dibujarse. */}
+      <div className={`ejercicio-cuerpo ${open ? "abierto" : ""}`} inert={!open}>
+      <div className="ejercicio-cuerpo-interior">
+      <div className="px-3.5 pb-3.5 pt-0">
         {stagnant && settings.showStagnation === true && !siguiendoPlan && <div className="mb-3 text-[11px] text-rose-400/90 bg-rose-500/5 border border-rose-500/15 rounded-xl px-3 py-2 flex items-start gap-1.5"><Info size={12} className="mt-0.5 shrink-0" /><span>Hace {STAGNATION_DAYS}+ días sin superar el récord. Considerá cambiar reps, descanso o variante.</span></div>}
         {/* Pasar ESTE ejercicio de "sigue el plan" a "persigue mi récord" y
             al revés, sin salir de la pantalla ni perder lo planificado: el
@@ -8041,43 +8603,35 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
             )}
           </div>
         )}
-        {/* Arriba de todo: solo antes de empezar (o tras completar la última) */}
-        {timerSlot === 0 && (
-          <div className="mb-2 mt-1 timer-hop"><RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={accent} timerId={restTimerId} exerciseName={exercise.name} /></div>
-        )}
-        {/* Encabezado de la planilla: las columnas de todas las series se
-            alinean con él. El cambio kg ⇄ lbs vive acá, una vez por tarjeta,
-            y no repetido en cada serie. */}
-        {!exercise.cardio && (
-          <div className="tabla-encabezado">
-            <span aria-hidden="true">#</span>
-            <span>Objetivo</span>
-            <span className="text-center">Reps</span>
-            <span aria-hidden="true" />
-            <button
-              onClick={() => { const nueva = planUnit === "kg" ? "lbs" : "kg"; if (setDrafts) setDrafts((prev) => convertirBorradoresDeUnidad(prev, planUnit, nueva)); onUpdateSettings?.({ weightUnit: nueva }); haptic(12); }}
-              aria-label={`Pasar a ${planUnit === "kg" ? "libras" : "kilos"} en toda la app`}
-              className="tabla-unidad">
-              {weightLabel(planUnit)}<ArrowUpDown size={10} className="rotate-90" />
-            </button>
-            <span aria-hidden="true" />
-          </div>
-        )}
-        {setsToShow.map((s, i) => <React.Fragment key={`${exercise.id}:frag:${i}`}>
-          <SetRow key={`${exercise.id}:${i}:${resetKey}`} exerciseId={exercise.id} exerciseName={exercise.name} exerciseMuscle={exercise.muscle} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKey} autoShowPrShare={settings.autoShowPrShare ?? true} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={hasActiveSession} cardio={exercise.cardio} dumbbellDouble={settings?.dumbbellDouble || null} fieldSettings={settings} onUpdateSettings={onUpdateSettings} sex={sex} age={age} restTimerId={restTimerId} restSeconds={restSeconds} isLastSet={i === setsToShow.length - 1} weekInCycle={weekInCycle} nextRestTimerId={nextRestTimerId} nextRestSeconds={nextRestSeconds} nextExerciseName={nextExerciseName} activa={i === primeraPendiente} />
-          {/* Debajo de la serie recién registrada: timerSlot = N significa
-              "después de la serie N" (1-indexado). */}
-          {timerSlot === i + 1 && (
-            <div className="my-2 timer-hop"><RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={accent} timerId={restTimerId} exerciseName={exercise.name} /></div>
+        {/* Las series, una debajo de la otra. El descanso se mete entre la
+            última hecha y la que toca (timerSlot = N: después de la serie
+            N); antes de empezar, y al terminar todas, va arriba de todo. */}
+        {/* Al guardar, la serie hecha se cierra, la que sigue se abre y el
+            descanso aparece entre las dos: lo demás se acomoda deslizándose
+            (Motion) en vez de saltar. Sólo se mide cuando cambia la serie en
+            foco o el lugar del descanso, no a cada tecla. */}
+        <div className="series-lista">
+          {timerSlot === 0 && (
+            <m.div layout="position" layoutDependency={`${foco}|${timerSlot}`} transition={RESORTE_LISTA}><div className="timer-hop"><RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={accent} timerId={restTimerId} exerciseName={exercise.name} /></div></m.div>
           )}
-        </React.Fragment>)}
+          {setsToShow.map((s, i) => <React.Fragment key={`${exercise.id}:frag:${i}`}>
+            <m.div layout="position" layoutDependency={`${foco}|${timerSlot}`} transition={RESORTE_LISTA}>
+            <SetRow key={`${exercise.id}:${i}:${resetKey}`} exerciseId={exercise.id} exerciseName={exercise.name} exerciseMuscle={exercise.muscle} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKey} autoShowPrShare={settings.autoShowPrShare ?? true} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={hasActiveSession} cardio={exercise.cardio} dumbbellDouble={settings?.dumbbellDouble || null} fieldSettings={settings} onUpdateSettings={onUpdateSettings} sex={sex} age={age} restTimerId={restTimerId} restSeconds={restSeconds} isLastSet={i === setsToShow.length - 1} weekInCycle={weekInCycle} nextRestTimerId={nextRestTimerId} nextRestSeconds={nextRestSeconds} nextExerciseName={nextExerciseName} activa={i === foco} onEnfocar={() => setFocoElegido(i)} />
+            </m.div>
+            {timerSlot === i + 1 && (
+              <m.div layout="position" layoutDependency={`${foco}|${timerSlot}`} transition={RESORTE_LISTA}><div className="timer-hop"><RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={accent} timerId={restTimerId} exerciseName={exercise.name} /></div></m.div>
+            )}
+          </React.Fragment>)}
+        </div>
         {exercise.video && (
           <div className="pt-3">
-            <a href={exercise.video} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 py-3 rounded-xl border border-slate-800 text-slate-400 hover:border-slate-600 hover:text-white transition text-sm font-medium active:scale-[0.98]">
+            <a href={exercise.video} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 h-11 rounded-full text-slate-400 hover:text-white transition text-[13.5px] font-semibold active:scale-[0.98]" style={{ backgroundColor: "var(--surface-2)" }}>
               <SquarePlay size={17} /> Ver técnica en YouTube
             </a>
           </div>
         )}
+      </div>
+      </div>
       </div>
     </div>
   );
@@ -8175,8 +8729,8 @@ function SessionStartBar({ activeSession, onStart, color = "#14B8A6" }) {
   // acá, cancelar la sesión, se mudó al paso de confirmación de esa barra.
   if (activeSession) return null;
   return (
-    <button onClick={onStart} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98] invite-pulse" style={{ backgroundColor: color, "--invite-glow": `${tint(color, "80")}` }}>
-      <Play size={15} /> Iniciar sesión
+    <button onClick={onStart} className="boton-pildora invite-pulse" style={{ "--c": color, "--invite-glow": `${tint(color, "80")}` }}>
+      <Play size={16} className="fill-current" /> Iniciar sesión
     </button>
   );
 }
@@ -8864,6 +9418,8 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
     return () => clearTimeout(limpiar);
   }, [sessionForThisDay]);
   const weekInfo = getWeekInfo(cycleStart, settings), isDeload = weekInfo?.isDeload, day = ROUTINE[activeDay];
+  // "Color de día": el día que estás mirando tiñe la app entera.
+  useEffect(() => { ponerTono(day?.color); }, [day?.color]);
   // Series hechas hoy en el día que estás mirando, para la barra cargada.
   // Mismo criterio de "hecha hoy" que las tarjetas (sin marcas de descarga).
   const avanceDia = useMemo(() => {
@@ -8894,7 +9450,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
   return (
     <div className="space-y-4">
       {isRestToday && (
-        <button onClick={() => (onGoToSchedule || onGoToRoutines)?.()} className="w-full flex items-center gap-3 rounded-2xl px-3.5 py-3 text-left transition active:scale-[0.99]" style={{ backgroundColor: "var(--surface-1)", border: "1px solid var(--hairline)" }}>
+        <button onClick={() => (onGoToSchedule || onGoToRoutines)?.()} className="w-full flex items-center gap-3 rounded-[26px] px-3.5 py-3 text-left transition active:scale-[0.99]" style={{ backgroundColor: "var(--surface-1)" }}>
           <span className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 bg-slate-800/70 text-slate-400"><Calendar size={15} /></span>
           <div className="flex-1 min-w-0">
             <p className="text-[12.5px] font-semibold text-slate-200 leading-snug">Hoy es día de descanso</p>
@@ -8904,169 +9460,84 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
         </button>
       )}
 
-      {/* Misma píldora deslizante que el selector de Progreso (Rango /
-          Historial / Ejercicios / Medidas) y el de Social: UN solo elemento
-          que se desliza y toma el color de la solapa elegida, en vez de que
-          cada botón prenda y apague su propio fondo lleno. El día activo
-          pasa de un bloque de color sólido a texto del color del día sobre
-          un tinte suave, que es más liviano y no compite con el panel de
-          abajo. */}
-      <div className="selector-dias relative grid gap-1 p-1" style={{ gridTemplateColumns: `repeat(${DAY_ORDER.length}, 1fr)` }} role="tablist" aria-label="Días de tu rutina">
-        <div
-          className="absolute top-1 bottom-1 rounded-xl transition-all duration-300 ease-out pointer-events-none"
-          style={{
-            left: `calc(${Math.max(0, DAY_ORDER.indexOf(activeDay))} / ${DAY_ORDER.length} * 100% + 2px)`,
-            width: `calc(100% / ${DAY_ORDER.length} - 4px)`,
-            backgroundColor: tint(day.color, "24"),
-            boxShadow: `inset 0 0 0 1px ${tint(day.color, "50")}`,
-          }}
-        />
-        {/* Piso de 50px en el alto de cada solapa: es el alto de las de
-            Progreso (Rango/Historial/Ejercicios/Medidas) y de Social. Sin
-            él, dayTabTextSizing achica el alto reservado a medida que la
-            rutina tiene más días (con 7 días reserva 25px, o sea un botón de
-            45px), y con 4 días o más esta fila quedaba MÁS BAJA que la de
-            las otras pestañas. Con 2 o 3 días el cálculo ya da más de 50 y
-            el piso no cambia nada. */}
-        {(() => { const { textClass, minHeight } = dayTabTextSizing(DAY_ORDER.length); return DAY_ORDER.map((k) => (
-          <button key={k} onClick={() => setActiveDay(k)} title={ROUTINE[k].label} role="tab" aria-selected={activeDay === k} className={`dia-solapa relative z-[1] flex items-center justify-center py-2.5 px-1.5 rounded-xl ${textClass} transition-colors active:scale-95 text-center min-w-0`}
-            style={{ color: activeDay === k ? ROUTINE[k].color : "var(--text-faint)", minHeight: `${Math.max(minHeight + 20, 50)}px` }}>
+      {/* Los días: botones unidos, como un grupo de Material 3 Expressive.
+          El elegido se vuelve una píldora llena de su color (el resorte
+          cierra las puntas). Antes era una píldora que se deslizaba sobre
+          un riel; ahora cada día lleva su propio color aunque no esté
+          elegido (el puntito de "toca hoy" y el relleno al tocarlo), y el
+          elegido tiñe la pantalla entera (ver ponerTono). */}
+      <div className="selector-dias" role="tablist" aria-label="Días de tu rutina">
+        {(() => { const { minHeight } = dayTabTextSizing(DAY_ORDER.length); return DAY_ORDER.map((k) => (
+          <button key={k} onClick={() => setActiveDay(k)} title={ROUTINE[k].label} role="tab" aria-selected={activeDay === k}
+            className="dia-solapa relative flex items-center justify-center py-2.5 px-2 text-center min-w-0 active:scale-95"
+            style={{ "--dia": ROUTINE[k].color, minHeight: `${Math.max(minHeight + 22, 52)}px` }}>
             {/* El día que toca hoy lleva un punto: se ve sin tener que
                 abrirlo, aunque estés mirando otro. */}
-            {k === suggestedDay && <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full" style={{ backgroundColor: ROUTINE[k].color }} aria-label="Toca hoy" />}
-            {/* line-clamp-2 en vez de truncate: nombres combinados como
-                "Hombros/Brazos" tienen que poder leerse enteros aunque
-                ocupen 2 líneas — cortarlos a "HOMBRO/…" en una sola línea
-                los vuelve ilegibles. Recién si ni en 2 líneas entra (un
-                nombre propio larguísimo) se corta con "…", como red de
-                seguridad.
-                BUG FIX (pedido: "que sean del tamaño que tenían cuando
-                ocupaban 2 renglones"): antes el botón sólo se veía alto
-                cuando ALGÚN día de la grilla necesitaba 2 líneas (el grid
-                estira todos los botones de la fila a la altura del más
-                alto) — una rutina con nombres cortos ("Push"/"Pull"/
-                "Piernas") quedaba siempre en la versión chica. Ahora
-                minHeight reserva el alto de 2 líneas SIEMPRE, sin
-                importar el largo del nombre, y WebkitBoxPack centra el
-                texto de una sola línea en ese espacio — el que necesite
-                más todavía puede crecer hasta 2 líneas igual que antes.
-                Pedido después: "agranda las letras... que se ajusten según
-                la cantidad de días" — textClass/minHeight ahora vienen de
-                dayTabTextSizing en vez de un 10px/25px fijo.
-                BUG FIX (pedido: "centrá las palabras vertical y
-                horizontalmente dentro de su recuadro"): el centrado
-                dependía de WebkitBoxPack dentro del propio hack de
-                line-clamp, con el minHeight puesto en el SPAN. Eso hacía
-                dos cosas mal: el span quedaba alto y el texto de una sola
-                línea se apoyaba arriba, y box-pack es una propiedad del
-                box model viejo de WebKit que los navegadores modernos ya
-                casi no respetan. Ahora el alto reservado vive en el BOTÓN
-                (minHeight + su padding) y el centrado lo hace flexbox
-                normal — items-center y justify-center — con el span
-                conservando el clamp de 2 líneas a su altura natural. */}
+            {k === suggestedDay && <span className="dia-solapa-hoy" aria-label="Toca hoy" />}
+            {/* El tamaño de la letra sale de la palabra MÁS LARGA y del
+                ancho real de la solapa (ver .dia-solapa-texto): la palabra
+                siempre entra entera, nunca "HOMBRO / S /…". */}
             {(() => { const { texto, larga } = etiquetaDeDia(ROUTINE[k].label); return <span className="dia-solapa-texto" style={{ "--largo": larga, "--fs-max": tamanoMaxSolapa(DAY_ORDER.length) }}>{texto}</span>; })()}
           </button>
         )); })()}
       </div>
 
-      {/* PANEL DEL DÍA — todo lo que pertenece al día elegido (resumen,
-          iniciar sesión, calentamiento y los ejercicios) vive dentro de un
-          mismo contenedor, para que se lea como un sector y no como una pila
-          de rectángulos sueltos.
-          El primer intento lo pintó con un degradado del color del día y eso
-          era el error: acá adentro van tarjetas propias (ejercicios,
-          calentamiento) y un fondo de color las aplastaba. Ahora usa el
-          lenguaje de "Rango por músculo": superficie neutra, borde fino del
-          color del día como ÚNICO acento y una cabecera de placa de ícono +
-          título + bajada. La superficie es más HUNDIDA que las tarjetas de
-          adentro (slate-950 en vez de slate-900), así lo de adentro flota
-          sobre el panel en vez de fundirse con él. */}
+      {/* EL DÍA — un contenedor de su color con el nombre enorme, la barra
+          cargada y el botón para empezar. Es lo que más color tiene de la
+          pantalla, a propósito: lo primero que se ve es qué toca hoy y
+          cuánto te falta. Abajo, el calentamiento y los ejercicios. */}
       <section
         key={activeDay}
         className="dia-seccion relative space-y-3 tab-fade-in"
         style={{ "--c": day.color }}
         aria-label={`Día ${day.label}`}
       >
-        <div className="dia-cabecera relative px-3.5 pt-3.5">
-          {/* El nombre del día, enorme y calado, de fondo: la cabecera se
-              reconoce de lejos por su palabra y su color, como el dorsal de
-              una camiseta. Es decoración pura (aria-hidden). */}
-          <span className="dia-fondo" aria-hidden="true">{day.label}</span>
-          <div className="relative flex items-start gap-3">
-            <div className="flex-1 min-w-0">
-              <h2 className="dia-titulo">{day.label}</h2>
-              <p className="text-[12.5px] text-slate-400 mt-1.5 leading-snug">{day.description}</p>
-            </div>
-            {/* "Resetear sesión de hoy" pasa de botón de ancho completo a un
-                ícono en la esquina — mismas acciones chicas que tiene "Rango
-                por músculo" a la derecha de su título. Sirve para arreglar un
-                error, no es algo que necesites a mano cada día; el diálogo de
-                confirmación es el mismo. */}
-            {!confirmReset && (
-              <button onClick={() => setConfirmReset(true)} aria-label="Resetear sesión de hoy" title="Resetear sesión de hoy" className="shrink-0 flex items-center justify-center w-9 h-9 rounded-xl bg-slate-800/60 border border-slate-700/40 text-slate-400 hover:text-slate-200 transition active:scale-90">
-                <RotateCcw size={14} />
-              </button>
-            )}
-          </div>
-          {activeDay === suggestedDay && (
-            <div className="mt-3 inline-flex items-center gap-1.5 text-[10.5px] font-bold uppercase px-2.5 py-1 rounded-lg" style={{ backgroundColor: tint(day.color, "1a"), color: day.color }}>
-              <Calendar size={11} /> {scheduledDay === activeDay ? "Programado para hoy" : "Sugerido para hoy"}
-            </div>
-          )}
-          {/* La barra del día: un disco por serie. Abajo, en una línea, lo
-              que significa (la primera vez) o cuánto llevás. */}
-          {avanceDia.total > 0 && (
-            <div className="dia-barra relative">
-              <BarraCargada hechas={avanceDia.hechas} total={avanceDia.total} alto={46} />
-              <p className="dia-barra-texto">
-                {avanceDia.hechas === 0
-                  ? `${avanceDia.total} series: cada una que anotás suma un disco`
-                  : avanceDia.hechas >= avanceDia.total
-                    ? `Barra completa: ${avanceDia.total} de ${avanceDia.total} series`
-                    : `${avanceDia.hechas} de ${avanceDia.total} series`}
-              </p>
-            </div>
-          )}
-          {day.isNew && <div className="mt-2 inline-flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] rounded-lg px-2.5 py-1">🆕 Empezás a registrar tus marcas desde hoy.</div>}
-          {/* Antes esto reducía las series ACÁ MISMO (en Rutina) durante la
-              semana de descarga — quedaba una segunda versión de la
-              descarga superpuesta con la pestaña dedicada. Ahora es solo un
-              indicador + atajo: la descarga en sí se hace en su propia
-              pestaña, un solo lugar. */}
-          {isDeload && onGoToDescarga && (
-            // Color del día en vez de un violeta fijo: antes este atajo se
-            // veía igual sin importar en qué día estuvieras parado, ahora
-            // usa el mismo acento que el resto de la tarjeta (day.color).
-            <button onClick={onGoToDescarga} className="mt-3 w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-left transition active:scale-[0.99]" style={{ backgroundColor: tint(day.color, "12"), border: `1px solid ${tint(day.color, "30")}` }}>
-              <Zap size={14} className="shrink-0" style={{ color: day.color }} />
-              <p className="flex-1 text-[11px]" style={{ color: day.color }}>Esta semana es de descarga: entrená con series reducidas</p>
-              <ChevronRight size={13} className="shrink-0" style={{ color: day.color }} />
+        <div className="dia-hero">
+          {/* "Resetear sesión de hoy": un ícono en la esquina. Sirve para
+              arreglar un error, no es algo que necesites a mano cada día; el
+              diálogo de confirmación es el mismo. */}
+          {!confirmReset && (
+            <button onClick={() => setConfirmReset(true)} aria-label="Resetear sesión de hoy" title="Resetear sesión de hoy" className="boton-redondo dia-reset">
+              <RotateCcw size={15} />
             </button>
           )}
-          {/* Antes esto eran tres cajas del mismo tamaño: el %, la cantidad
-              de ejercicios y la de series. Dos tercios del bloque eran datos
-              que no cambian nunca (los aprendés una vez), ocupando lo mismo
-              que lo ÚNICO que se mueve mientras entrenás. Ahora el progreso
-              es una barra que se llena serie a serie —se lee sin leer un
-              número— y los dos datos fijos bajan a texto chico al lado. */}
-          {/* Acá había un recuadro con "X/15 series · 5 ejercicios" y una
-              barra de avance. Se fue entero: mientras entrenás el avance lo
-              lleva la barra fija de abajo, y cuántas series y ejercicios
-              tiene el día ya lo dice Rutinas, que es donde se arma. Repetirlo
-              acá era una tercera copia del mismo dato. */}
-          {confirmReset && (
-            <div className="flex gap-2 items-center mt-2.5 bg-black/30 border border-white/10 rounded-xl px-3 py-2">
-              <p className="text-[11px] text-slate-400 flex-1">¿Borrar reps/kg de hoy (incluido lo sin guardar)? Los récords no cambian.</p>
-              <button onClick={() => setConfirmReset(false)} className="px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-400 text-xs">No</button>
-              <button onClick={handleResetDay} className="px-2.5 py-1.5 rounded-lg bg-rose-500/80 !text-white text-xs font-bold">Sí</button>
+          {activeDay === suggestedDay && (
+            <span className="dia-chip"><Calendar size={12} /> {scheduledDay === activeDay ? "Programado para hoy" : "Sugerido para hoy"}</span>
+          )}
+          {(() => { const { larga } = etiquetaDeDia(day.label); return <h2 className="dia-titulo" style={{ "--largo": larga }}>{day.label}</h2>; })()}
+          {day.description && <p className="dia-bajada">{day.description}</p>}
+          {/* La barra del día: un disco por serie. Abajo, cuánto llevás (y,
+              la primera vez, qué significa). */}
+          {avanceDia.total > 0 && (
+            <div className="dia-barra">
+              <BarraCargada hechas={avanceDia.hechas} total={avanceDia.total} alto="clamp(60px, 17cqi, 108px)" detalle />
+              <p className="dia-barra-texto">
+                <b><NumberFlow value={Math.min(avanceDia.hechas, avanceDia.total)} /></b> de {avanceDia.total} series{avanceDia.hechas >= avanceDia.total ? ": barra completa" : ""}
+              </p>
+              {avanceDia.hechas === 0 && <p className="dia-barra-ayuda">Cada serie que anotás carga un disco.</p>}
             </div>
           )}
+          {day.isNew && <div className="mt-3 inline-flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 text-[12px] rounded-full px-3 py-1.5">🆕 Empezás a registrar tus marcas desde hoy.</div>}
+          {/* La descarga se hace en su propia pestaña: acá sólo el atajo. */}
+          {isDeload && onGoToDescarga && (
+            <button onClick={onGoToDescarga} className="dia-aviso mt-3">
+              <Zap size={15} className="shrink-0" />
+              <span className="flex-1">Esta semana es de descarga: entrená con series reducidas</span>
+              <ChevronRight size={15} className="shrink-0" />
+            </button>
+          )}
+          {confirmReset && (
+            <div className="flex gap-2 items-center mt-3 rounded-2xl px-3.5 py-2.5" style={{ backgroundColor: "var(--panel-sunken)" }}>
+              <p className="text-[12px] text-slate-400 flex-1">¿Borrar reps/kg de hoy (incluido lo sin guardar)? Los récords no cambian.</p>
+              <button onClick={() => setConfirmReset(false)} className="px-3.5 h-9 rounded-full bg-slate-800 text-slate-300 text-[12.5px] font-semibold">No</button>
+              <button onClick={handleResetDay} className="px-3.5 h-9 rounded-full bg-rose-500/85 !text-white text-[12.5px] font-bold">Sí</button>
+            </div>
+          )}
+          {/* La sesión activa pertenece a UN día (el que iniciaste). Si estás
+              viendo otro día, no mostramos "sesión en curso" ahí — pero la
+              sesión real sigue viva en su día, no se resetea. */}
+          <SessionStartBar activeSession={sessionForThisDay} onStart={() => onStartSession(activeDay)} color={day.color} />
         </div>
-
-      {/* La sesión activa pertenece a UN día (el que iniciaste). Si estás
-          viendo otro día, no mostramos "sesión en curso" ahí — pero la
-          sesión real sigue viva en su día, no se resetea. */}
-      <SessionStartBar activeSession={sessionForThisDay} onStart={() => onStartSession(activeDay)} color={day.color} />
 
       {/* Calentamiento GENERAL de la sesión (movilidad/activación, 10-15
           min) — distinto del calentamiento POR EJERCICIO que ya existe
@@ -9198,7 +9669,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
                   Todavía no tenés metas: cada serie te muestra tu récord. Si querés, armá cuánto levantar en cada semana del ciclo.
                 </p>
               )}
-              <button onClick={() => setShowSelfProgression(true)} disabled={!activeRoutineDef} className={`w-full flex items-center justify-center gap-2 h-11 mt-3 rounded-xl text-[13px] font-bold transition-all active:scale-[0.98] disabled:opacity-40 ${!hasAnyPlan && settings.trainingMode === "planned" ? "invite-pulse" : ""}`} style={{ backgroundColor: "rgba(20,184,166,0.16)", color: "var(--accent-ink)", border: "1px solid rgba(20,184,166,0.4)", "--invite-glow": "rgba(20,184,166,0.6)" }}>
+              <button onClick={() => setShowSelfProgression(true)} disabled={!activeRoutineDef} className={`boton-tonal w-full mt-3 disabled:opacity-40 ${!hasAnyPlan && settings.trainingMode === "planned" ? "invite-pulse" : ""}`} style={{ "--c": "#14B8A6" }}>
                 <Sliders size={14} /> {hasAnyPlan ? "Planificar mi progresión" : "Planificar mi primera meta"}
               </button>
             </>
@@ -9981,13 +10452,13 @@ function DeloadView({ logs, setLogs, settings = DEFAULT_SETTINGS, deloadProgress
               {/* Misma cabecera que la tarjeta de la rutina normal (número de
                   orden, nombre y músculo en su propia fila), así la descarga
                   se lee como la misma app y no como otra pantalla. */}
-              <div className="flex items-center gap-3 pl-3 pr-3.5 py-3.5 border-b border-slate-800/60">
-                <span className="ejercicio-numero" aria-hidden="true">{String(exIdx + 1).padStart(2, "0")}</span>
+              <div className="flex items-center gap-3 pl-3 pr-3.5 py-3.5">
+                <span className="galleta ejercicio-numero" aria-hidden="true">{exIdx + 1}</span>
                 <div className="flex-1 min-w-0">
                   <h3 className="ejercicio-nombre">{ex.name}</h3>
                   <div className="flex items-center gap-2 flex-wrap mt-1.5">
-                    <span className="text-[11px] px-1.5 py-0.5 rounded-md font-semibold" style={{ backgroundColor: tint(day.color, "18"), color: day.color }}>{ex.muscle}</span>
-                    <span className="text-[11px] text-slate-500">{ex.sets.length} → <span className="text-purple-400 font-bold">{deloadSets} series</span></span>
+                    <span className="ejercicio-musculo">{ex.muscle}</span>
+                    <span className="text-[12px] text-slate-500">{ex.sets.length} → <span className="text-purple-400 font-bold">{deloadSets} series</span></span>
                   </div>
                 </div>
               </div>
@@ -10008,37 +10479,35 @@ function DeloadView({ logs, setLogs, settings = DEFAULT_SETTINGS, deloadProgress
                     const progressKey = `${ex.id}_${i}`;
                     const done = deloadProgress[progressKey] === today;
                     return (
-                      <div key={i} className="relative overflow-hidden rounded-2xl px-3.5 py-3 transition-all duration-200" style={{ background: done ? `linear-gradient(130deg, ${tint(day.color, "18")}, ${tint(day.color, "06")})` : "linear-gradient(130deg, #A855F718, #A855F706)", border: `1px solid ${done ? tint(day.color, "45") : "#A855F735"}` }}>
-                        <div className="absolute -top-6 -right-6 w-20 h-20 rounded-full blur-2xl pointer-events-none opacity-25" style={{ backgroundColor: done ? day.color : "#A855F7" }} />
-                        <div className="absolute left-0 top-2 bottom-2 w-1 rounded-full" style={{ backgroundColor: done ? day.color : "#A855F7" }} />
-                        <div className="relative flex items-center gap-2 mb-2.5">
-                          <span className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-500">Serie {i + 1}</span>
-                          <span className="text-[9.5px] bg-slate-800/70 text-slate-500 rounded-md px-1.5 py-0.5 font-bold">{s.repRange} reps</span>
+                      // Misma serie que en la rutina, en el violeta de la descarga
+                      // mientras falta y en el color del día cuando está hecha.
+                      <div key={i} className={`descarga-serie ${done ? "hecha" : ""}`} style={{ "--c": done ? day.color : "#A855F7" }}>
+                        <div className="foco-cabecera mb-2.5">
+                          <span className={`galleta serie-galleta ${done ? "llena girada" : "activa"}`} aria-hidden="true">{done ? <Check size={15} strokeWidth={3} /> : i + 1}</span>
+                          <p className="foco-titulo">Serie {i + 1}<span>{s.repRange} reps</span></p>
                         </div>
                         {best && (ex.cardio ? (
                           <>
-                          <div className="relative rounded-xl px-3 py-2.5 mb-2.5 bg-slate-950/60 border" style={{ borderColor: done ? tint(day.color, "35") : "#A855F730" }}>
-                            <span className="block text-[8px] font-black uppercase tracking-[0.16em] mb-1.5" style={{ color: done ? tint(day.color, "aa") : "#C084FCaa" }}>Tiempo de descarga</span>
-                            <div className="flex items-center gap-2">
-                              <span className="text-[11px] font-bold text-slate-600 line-through tabular-nums shrink-0">{best.minutes} min</span>
-                              <ArrowDown size={12} style={{ color: done ? day.color : "#C084FC" }} className="shrink-0" />
-                              <span className="text-xl font-black tabular-nums" style={{ color: done ? day.color : "#D8B4FE", textShadow: `0 0 16px ${tint(done ? day.color : "#A855F7", "50")}` }}>{Math.max(1, Math.round((best.minutes || 0) * deloadPct))}<span className="opacity-60 text-xs ml-1">min</span></span>
-                            </div>
+                          <div className="marcador-celda mb-2.5">
+                            <span className="marcador-rotulo"><ArrowDown size={13} /> Tiempo de descarga</span>
+                            <span className="flex items-baseline gap-2">
+                              <s className="text-[12px] font-semibold text-slate-500 tabular-nums">{best.minutes} min</s>
+                              <span className="marcador-valor">{Math.max(1, Math.round((best.minutes || 0) * deloadPct))}<small>min</small></span>
+                            </span>
                           </div>
                           {!done && <DeloadCardioTimer timerId={`deload_cardio_${activeDay}:${progressKey}`} targetMinutes={Math.max(1, Math.round((best.minutes || 0) * deloadPct))} accent={day.color} onComplete={() => toggleDeloadDone(progressKey, { minutes: Math.max(1, Math.round((best.minutes || 0) * deloadPct)) })} />}
                           </>
                         ) : (
-                          <div className="relative rounded-xl px-3 py-2.5 mb-2.5 bg-slate-950/60 border" style={{ borderColor: done ? tint(day.color, "35") : "#A855F730" }}>
-                            <span className="block text-[8px] font-black uppercase tracking-[0.16em] mb-1.5" style={{ color: done ? tint(day.color, "aa") : "#C084FCaa" }}>Peso de descarga{best.delPlan ? " · desde tu plan" : ""}</span>
-                            <div className="flex items-center gap-2">
-                              <span className="text-[11px] font-bold text-slate-600 line-through tabular-nums shrink-0">{best.reps}×{kgToDisplay(best.kg, unit)}{weightLabel(unit)}</span>
-                              <ArrowDown size={12} style={{ color: done ? day.color : "#C084FC" }} className="shrink-0" />
-                              <span className="text-xl font-black tabular-nums" style={{ color: done ? day.color : "#D8B4FE", textShadow: `0 0 16px ${tint(done ? day.color : "#A855F7", "50")}` }}>{best.reps}<span className="opacity-50 text-sm mx-0.5">×</span>{kgToDisplay(deloadKg, unit)}<span className="opacity-60 text-xs ml-0.5">{weightLabel(unit)}</span></span>
-                            </div>
+                          <div className="marcador-celda mb-2.5">
+                            <span className="marcador-rotulo"><ArrowDown size={13} /> Peso de descarga{best.delPlan ? ", desde tu plan" : ""}</span>
+                            <span className="flex items-baseline gap-2">
+                              <s className="text-[12px] font-semibold text-slate-500 tabular-nums">{best.reps}×{kgToDisplay(best.kg, unit)}{weightLabel(unit)}</s>
+                              <span className="marcador-valor">{best.reps}<i>×</i>{kgToDisplay(deloadKg, unit)}<small>{weightLabel(unit)}</small></span>
+                            </span>
                           </div>
                         ))}
-                        <button onClick={() => toggleDeloadDone(progressKey, ex.cardio ? { minutes: Math.max(1, Math.round((best.minutes || 0) * deloadPct)) } : { kg: deloadKg, reps: best.reps }, ex.cardio ? null : { timerId: `deload_${activeDay}:${ex.id}`, seconds: hasHeavy ? settings.restLong : settings.restShort, name: ex.name, color: day.color })} className="relative w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-black transition-all active:scale-[0.98]" style={done ? { background: `linear-gradient(160deg, ${day.color}, ${tint(day.color, "b0")})`, color: "#fff" } : { backgroundColor: "var(--row-surface)", border: "1px solid #3c414680", color: "#9da2a8" }}>
-                          {done ? <><span className="w-5 h-5 rounded-full bg-white/25 flex items-center justify-center"><Check size={12} strokeWidth={3} /></span> Hecha</> : "Marcar como hecha"}
+                        <button onClick={() => toggleDeloadDone(progressKey, ex.cardio ? { minutes: Math.max(1, Math.round((best.minutes || 0) * deloadPct)) } : { kg: deloadKg, reps: best.reps }, ex.cardio ? null : { timerId: `deload_${activeDay}:${ex.id}`, seconds: hasHeavy ? settings.restLong : settings.restShort, name: ex.name, color: day.color })} className={done ? "boton-pildora w-full" : "boton-tonal w-full"}>
+                          {done ? <><Check size={16} strokeWidth={3} /> Hecha</> : "Marcar como hecha"}
                         </button>
                       </div>
                     );
@@ -11548,29 +12017,26 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
   };
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border shadow-md shadow-black/20 p-4 space-y-3" style={{ borderColor: tint("#3B82F6", "30"), background: `linear-gradient(${tint("#3B82F6", "0b")}, ${tint("#3B82F6", "0b")}), var(--panel-sunken)` }}>
-      {/* Glows decorativos de fondo */}
-      <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-8 -left-8 w-32 h-32 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
+    <div className="tarjeta-tonal relative overflow-hidden p-4 space-y-3" style={{ "--c": "#3B82F6" }}>
       <div className="relative flex items-center justify-between gap-2 mb-1">
-        <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500/25 to-indigo-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center shrink-0"><Award size={16} /></div>
-          <div>
-            <p className="text-sm font-black text-white">Rango por músculo</p>
-            <p className="text-[9px] text-slate-500">Tocá un músculo para ver su detalle</p>
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span className="galleta icono-galleta" aria-hidden="true"><Award size={17} /></span>
+          <div className="min-w-0">
+            <p className="text-[15px] font-bold text-white leading-tight">Rango por músculo</p>
+            <p className="text-[12px] text-slate-500 leading-snug mt-0.5">Tocá un músculo para ver su detalle</p>
           </div>
         </div>
-        <div className="flex gap-1.5 shrink-0">
-          <button onClick={() => setShowAnalysis(true)} aria-label="Análisis muscular" className="p-2 rounded-xl bg-slate-800/60 text-slate-400 hover:text-teal-400 transition border border-slate-700/50"><BarChart3 size={15} /></button>
-          <button onClick={() => setShowTierRef(true)} aria-label="Ver la escala de rangos" className="p-2 rounded-xl bg-slate-800/60 text-slate-400 hover:text-amber-400 transition border border-slate-700/50"><Trophy size={15} /></button>
-          <button onClick={() => setShowImage(true)} aria-label="Compartir tus rangos" className="p-2 rounded-xl bg-slate-800/60 text-slate-400 hover:text-blue-400 transition border border-slate-700/50"><Share2 size={15} /></button>
+        <div className="flex gap-1 shrink-0">
+          <button onClick={() => setShowAnalysis(true)} aria-label="Análisis muscular" className="boton-redondo !w-9 !h-9"><BarChart3 size={16} /></button>
+          <button onClick={() => setShowTierRef(true)} aria-label="Ver la escala de rangos" className="boton-redondo !w-9 !h-9"><Trophy size={16} /></button>
+          <button onClick={() => setShowImage(true)} aria-label="Compartir tus rangos" className="boton-redondo !w-9 !h-9"><Share2 size={16} /></button>
         </div>
       </div>
 
       <div>
-        <div className="flex bg-black/40 rounded-xl p-1 border border-slate-700/50">
+        <div className="segmentado" role="tablist" aria-label="Cómo se calcula tu rango">
           {[{ k: "general", l: "General" }, { k: "relative", l: "Según tu contexto" }].map((opt) => (
-            <button key={opt.k} onClick={() => onUpdateSettings?.({ muscleRankMode: opt.k })} className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${mode === opt.k ? "bg-blue-500/20 text-blue-300" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
+            <button key={opt.k} role="tab" aria-selected={mode === opt.k} onClick={() => onUpdateSettings?.({ muscleRankMode: opt.k })} className={mode === opt.k ? "activo" : ""}>{opt.l}</button>
           ))}
         </div>
         {mode === "relative" && needsWeight && (
@@ -12446,8 +12912,6 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
 
   const [confirmResetProgress, setConfirmResetProgress] = useState(false);
   const [activeSection, setActiveSection] = useState("rank");
-  const progressSectionIdx = Math.max(0, PROGRESS_SECTIONS.findIndex((s) => s.k === activeSection));
-  const progressSectionColor = PROGRESS_SECTIONS[progressSectionIdx]?.color || "#3B82F6";
 
   return (
     <div className="space-y-4">
@@ -12466,14 +12930,9 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
           selector de Social (Amigos/Buscar/Ranking/Entrenador): un solo
           elemento que se desliza y cambia de color, en vez de que cada
           botón prenda/apague su propio fondo de golpe. */}
-      <div className="relative grid grid-cols-4 gap-1 p-1 rounded-2xl bg-slate-900/60 border border-slate-800/50">
-        <div
-          className="absolute top-1 bottom-1 rounded-xl transition-all duration-300 ease-out pointer-events-none"
-          style={{ left: `calc(${progressSectionIdx} / ${PROGRESS_SECTIONS.length} * 100% + 2px)`, width: `calc(100% / ${PROGRESS_SECTIONS.length} - 4px)`, backgroundColor: tint(progressSectionColor, "22"), boxShadow: `inset 0 0 0 1px ${tint(progressSectionColor, "45")}` }}
-        />
+      <div className="pestanas-internas" role="tablist" aria-label="Secciones de Progreso">
         {PROGRESS_SECTIONS.map((s) => (
-          <button key={s.k} onClick={() => setActiveSection(s.k)} className="relative z-[1] flex flex-col items-center justify-center gap-1 py-2 rounded-xl text-[10px] font-bold transition-colors active:scale-95"
-            style={{ color: activeSection === s.k ? s.color : "#6e7379" }}>
+          <button key={s.k} role="tab" aria-selected={activeSection === s.k} onClick={() => setActiveSection(s.k)} className="pestana-interna" style={{ "--c": s.color }}>
             {s.icon}<span>{s.l}</span>
           </button>
         ))}
@@ -13115,7 +13574,7 @@ function CollapsibleSection({ title, subtitle, icon, defaultOpen = false, childr
     return () => clearTimeout(t);
   }, [forceOpenSignal]);
   return (
-    <div ref={selfRef} id={sectionId || undefined} className="bg-slate-900/50 border border-slate-800/50 rounded-2xl overflow-hidden backdrop-blur-sm shadow-md shadow-black/20">
+    <div ref={selfRef} id={sectionId || undefined} className="seccion-plegable overflow-hidden">
       <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-slate-800/30 active:bg-slate-800/50">
         {/* Placa de ícono en vez de ícono suelto — mismo lenguaje visual que
             ya usan las tarjetas de ejercicio/rutina y los ToggleRow de acá
@@ -13131,7 +13590,7 @@ function CollapsibleSection({ title, subtitle, icon, defaultOpen = false, childr
         </div>
         <ChevronDown size={16} className={`text-slate-600 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
       </button>
-      {open && <div className="px-4 pb-4 pt-1 space-y-3.5 border-t border-slate-800/50">{children}</div>}
+      {open && <div className="px-4 pb-4 pt-1 space-y-3.5">{children}</div>}
     </div>
   );
 }
@@ -13822,17 +14281,18 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
 
   return (
     <div className="space-y-4">
-      <div className="border border-slate-800/50 rounded-2xl p-5 text-center shadow-md shadow-black/20" style={{ background: "var(--grad-profile-avatar)" }}>
-        <div className="relative w-20 h-20 mx-auto mb-3 elastic-in">
+      <div className="tarjeta-tonal p-5 text-center">
+        <div className="relative w-24 h-24 mx-auto mb-3 elastic-in">
+          {/* Tu foto (o tu inicial) en galleta, como en la barra de arriba. */}
           {avatarUrl
-            ? <img src={avatarUrl} alt="Foto de perfil" className="w-20 h-20 rounded-3xl object-cover" />
-            : <div className="w-20 h-20 rounded-3xl flex items-center justify-center text-3xl font-black !text-white" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>{initial}</div>
+            ? <img src={avatarUrl} alt="Foto de perfil" className="avatar-galleta !w-24 !h-24 object-cover" />
+            : <div className="avatar-galleta !w-24 !h-24 !text-[2.2rem]">{initial}</div>
           }
-          <button onClick={handleAvatarClick} className="absolute -bottom-1.5 -right-1.5 w-8 h-8 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center hover:bg-slate-700 transition active:scale-90" title="Cambiar foto de perfil">
-            <Camera size={14} className="text-teal-400" />
+          <button onClick={handleAvatarClick} className="absolute -bottom-1 -right-1 w-9 h-9 rounded-full bg-slate-800 flex items-center justify-center hover:bg-slate-700 transition active:scale-90" style={{ boxShadow: "0 0 0 3px var(--surface-1)" }} title="Cambiar foto de perfil" aria-label="Cambiar foto de perfil">
+            <Camera size={15} className="text-teal-400" />
           </button>
           {avatarUrl && (
-            <button onClick={handleAvatarRemove} className="absolute -bottom-1.5 -left-1.5 w-8 h-8 rounded-xl bg-slate-800 border border-slate-700 flex items-center justify-center hover:bg-red-900/40 transition active:scale-90" title="Quitar foto de perfil">
+            <button onClick={handleAvatarRemove} className="absolute -bottom-1 -left-1 w-9 h-9 rounded-full bg-slate-800 flex items-center justify-center hover:bg-red-900/40 transition active:scale-90" style={{ boxShadow: "0 0 0 3px var(--surface-1)" }} title="Quitar foto de perfil" aria-label="Quitar foto de perfil">
               <X size={14} className="text-red-400" />
             </button>
           )}
@@ -15530,7 +15990,7 @@ function LeaderboardSection({ uid, profile, myTopRank, friendAccepted, basics, a
             const Tag = onViewPerson ? "button" : "div";
             return (
               <Tag key={e.uid || (e.isMe ? "me" : idx)} role="listitem" onClick={onViewPerson ? () => onViewPerson(e.uid, e.isMe) : undefined} className={`podio-lugar podio-${pos} ${e.isMe ? "yo" : ""}`} style={{ "--medalla": medalla }} aria-label={`${pos}º, ${nombre}`}>
-                <span className="podio-avatar">
+                <span className="galleta podio-avatar">
                   {e.avatarData ? <img src={e.avatarData} alt="" /> : <span aria-hidden="true">{String(e.name || e.username || "?").charAt(0).toUpperCase()}</span>}
                   <span className="podio-medalla" aria-hidden="true"><Medal size={13} /></span>
                 </span>
@@ -17528,7 +17988,6 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
         ];
         return (
           <section className="atleta elastic-in" style={{ "--rango": color }} aria-label="Tu ficha">
-            <div className="atleta-fondo" aria-hidden="true" />
             <div className="relative flex items-center gap-3.5">
               <div className="atleta-avatar">
                 {profile?.avatarData ? <img src={profile.avatarData} alt="" className="w-full h-full object-cover" /> : <span aria-hidden="true">{String(profile?.name || profileName || "?").charAt(0).toUpperCase()}</span>}
@@ -17604,7 +18063,7 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
               const sending = kudosSendingUid === c.uid;
               return (
                 <div key={c.uid} className="historia">
-                  <button onClick={() => setViewingUid(c.uid)} className={`historia-aro ${sent ? "vista" : ""}`} style={{ "--dia": c.latestSession?.dayColor || SOCIAL_COLOR }} aria-label={`Ver el perfil de ${nombre}`}>
+                  <button onClick={() => setViewingUid(c.uid)} className={`galleta historia-aro ${sent ? "vista" : ""}`} style={{ "--dia": c.latestSession?.dayColor || SOCIAL_COLOR }} aria-label={`Ver el perfil de ${nombre}`}>
                     {b?.avatarData ? <img src={b.avatarData} alt="" /> : <span aria-hidden="true">{nombre.charAt(0).toUpperCase()}</span>}
                   </button>
                   <button onClick={(e) => handleSendKudos(c.uid, e.currentTarget)} disabled={sending || sent} className={`historia-aplauso ${sent ? "hecho" : ""}`} aria-label={sent ? `Ya le aplaudiste a ${nombre}` : `Aplaudir a ${nombre}`}>
@@ -17634,14 +18093,14 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
               : `${nombres[0]} y ${nombres.length - 1} más`;
             return (
               <div className="aviso-social" style={{ "--c": "#FBBF24" }}>
-                <span className="aviso-social-icono" aria-hidden="true">👏</span>
+                <span className="galleta aviso-social-icono" aria-hidden="true">👏</span>
                 <p><b>{quien}</b> {kudosReceived.length === 1 && nombres.length === 1 ? "festejó" : "festejaron"} tu entrenamiento.</p>
               </div>
             );
           })()}
           {chaserFriend && (
             <button onClick={() => setViewingUid(chaserFriend.uid)} className="aviso-social" style={{ "--c": "#FB7185" }}>
-              <span className="aviso-social-icono streak-beat" aria-hidden="true"><Flame size={18} /></span>
+              <span className="galleta aviso-social-icono streak-beat" aria-hidden="true"><Flame size={18} /></span>
               <p><b>{basics[chaserFriend.uid]?.name || "Tu amigo"}</b> lleva {chaserFriend.streak} {chaserFriend.streak === 1 ? "día" : "días"} seguidos y vos {myStreak}: te está por alcanzar.</p>
               <ChevronRight size={15} className="text-slate-500 shrink-0" />
             </button>
@@ -17669,23 +18128,15 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
 
       {friendAccepted.length === 0 && <SocialProgressStats uid={uid} profile={profile} myTopRank={myTopRank} friendAccepted={friendAccepted} basics={basics} streaks={streaks} kudosRecibidos={kudosReceived.length} onGoToBuscar={irABuscar} />}
 
-      <div className="relative grid gap-1 p-1 rounded-2xl bg-slate-900/60 border border-slate-800/50" style={{ gridTemplateColumns: `repeat(${SECTIONS.length}, 1fr)` }}>
-        {/* Píldora deslizante en vez de que cada botón prenda/apague su
-            propio fondo de golpe — un solo elemento que se desliza y
-            cambia de color (celeste en Amigos/Buscar/Ranking, índigo en
-            Entrenador) da la sensación de un selector físico, no de
-            varios botones independientes. */}
-        <div
-          className="absolute top-1 bottom-1 rounded-xl transition-all duration-300 ease-out pointer-events-none"
-          style={{ left: `calc(${sectionIdx} / ${SECTIONS.length} * 100% + 2px)`, width: `calc(100% / ${SECTIONS.length} - 4px)`, backgroundColor: tint(SOCIAL_COLOR, "26"), boxShadow: `inset 0 0 0 1px ${tint(sectionColor, "45")}` }}
-        />
+      {/* Botones unidos (el mismo grupo que los días en Rutina): la sección
+          elegida se vuelve una píldora llena. */}
+      <div className="pestanas-internas" role="tablist" aria-label="Secciones de Social">
         {SECTIONS.map((s) => {
           const badge = s.k === "amigos" ? friendIncoming.length : s.k === "entrenador" ? trainerIncoming.length + proposals.length : 0;
           return (
-            <button key={s.k} onClick={() => setSection(s.k)} className="relative z-[1] flex flex-col items-center justify-center gap-1 py-2 rounded-xl text-[10.5px] font-bold transition-colors active:scale-95"
-              style={{ color: section === s.k ? SOCIAL_INK : "var(--text-faint)" }}>
+            <button key={s.k} role="tab" aria-selected={section === s.k} onClick={() => setSection(s.k)} className="pestana-interna relative" style={{ "--c": SOCIAL_COLOR }}>
               {s.icon}<span>{s.l}</span>
-              {badge > 0 && <span className="absolute top-1 right-2.5 w-4 h-4 rounded-full bg-rose-500 text-white text-[9px] font-black flex items-center justify-center z-[2]">{badge}</span>}
+              {badge > 0 && <span className="absolute top-1.5 right-2.5 w-[18px] h-[18px] rounded-full bg-rose-500 text-white text-[10px] font-black flex items-center justify-center z-[2]">{badge}</span>}
             </button>
           );
         })}
@@ -23126,7 +23577,7 @@ function HeaderAvatar({ profileName, onClick }) {
     return () => { alive = false; window.removeEventListener("modusfit-avatar-updated", load); };
   }, [profileName]);
   return (
-    <button onClick={onClick} aria-label="Tu perfil" className="w-8 h-8 rounded-xl overflow-hidden flex items-center justify-center text-base font-black !text-white shrink-0 lg:hidden active:scale-90 transition" style={!avatarUrl ? { background: "linear-gradient(135deg,#14B8A6,#0E7490)" } : {}}>
+    <button onClick={onClick} aria-label="Tu perfil" className="avatar-galleta lg:hidden">
       {avatarUrl ? <img src={avatarUrl} className="w-full h-full object-cover" alt="" /> : profileName.charAt(0).toUpperCase()}
     </button>
   );
@@ -23183,12 +23634,12 @@ function ActiveSessionBar({ startedAt, dayLabel, color, done, total, conProgreso
   // Sólo la tarjeta: el lugar en la pantalla lo pone DockInferior, que la
   // apila con el descanso en curso.
   return (
-    <div className="dock-tarjeta session-bar-in" style={{ borderColor: tint(color, "45") }}>
+    <div className="dock-tarjeta session-bar-in" style={{ "--c": color }}>
       {confirmando ? (
-        <div className="flex items-center gap-2 px-3.5 py-3">
+        <div className="flex items-center gap-2 px-4 py-3">
           <div className="flex-1 min-w-0">
-            <p className="text-[13px] font-bold text-white leading-tight">¿Finalizar la sesión?</p>
-            <p className="text-[10.5px] text-slate-500 leading-snug mt-0.5">
+            <p className="text-[14px] font-bold text-white leading-tight">¿Finalizar la sesión?</p>
+            <p className="text-[11.5px] text-slate-500 leading-snug mt-0.5">
               {conProgreso && total > 0 && done < total
                 ? `Te quedan ${total - done} de ${total} series. `
                 : ""}
@@ -23200,8 +23651,8 @@ function ActiveSessionBar({ startedAt, dayLabel, color, done, total, conProgreso
               </button>
             )}
           </div>
-          <button onClick={() => setConfirmando(false)} className="h-10 px-3.5 rounded-xl bg-slate-800 text-slate-300 text-[12px] font-bold shrink-0 transition active:scale-95">No</button>
-          <button onClick={onEnd} className="h-10 px-3.5 rounded-xl !text-white text-[12px] font-black shrink-0 transition active:scale-95" style={{ backgroundColor: color }}>Sí, finalizar</button>
+          <button onClick={() => setConfirmando(false)} className="h-10 px-4 rounded-full bg-slate-800 text-slate-300 text-[13px] font-semibold shrink-0 transition active:scale-95">No</button>
+          <button onClick={onEnd} className="boton-pildora shrink-0" style={{ minHeight: 40, padding: "0 16px", fontSize: 13 }}>Sí, finalizar</button>
         </div>
       ) : (
         <>
@@ -23212,38 +23663,30 @@ function ActiveSessionBar({ startedAt, dayLabel, color, done, total, conProgreso
             onClick={enRutina ? undefined : onGoToRoutine}
             disabled={enRutina}
             aria-label={enRutina ? undefined : "Volver a tu entrenamiento"}
-            className="flex-1 min-w-0 flex items-center gap-3 pl-3.5 pr-2 py-2.5 text-left transition active:scale-[0.99] disabled:active:scale-100"
+            className="flex-1 min-w-0 flex items-center gap-3 pl-4 pr-2 py-2.5 text-left transition active:scale-[0.99] disabled:active:scale-100"
           >
-            <span className="relative flex h-2.5 w-2.5 shrink-0">
-              <span className="absolute inline-flex h-full w-full rounded-full session-chip-ping" style={{ backgroundColor: color }} />
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5" style={{ backgroundColor: color }} />
-            </span>
+            {/* La galleta del día que late: la sesión está viva. */}
+            <span className="galleta sesion-dock-latido" aria-hidden="true" />
             <div className="flex-1 min-w-0">
-              <div className="flex items-baseline gap-2">
-                <span className="num-display text-[1.3rem] leading-none font-extrabold text-white shrink-0">{reloj}</span>
-                {dayLabel && <span className="text-[10.5px] font-bold uppercase truncate" style={{ color: tint(color, "dd") }}>{dayLabel}</span>}
-                {!enRutina && <ChevronRight size={13} className="text-slate-500 shrink-0 self-center" />}
+              <div className="flex items-baseline gap-2 min-w-0">
+                <span role="timer" aria-label={reloj} className="num-display sesion-dock-reloj shrink-0"><RelojQueGira segundos={Math.floor(ms / 1000)} sube /></span>
+                {dayLabel && <span className="sesion-dock-dia">{dayLabel}</span>}
+                {!enRutina && <ChevronRight size={14} className="text-slate-500 shrink-0 self-center" />}
               </div>
               {conProgreso && total > 0 ? (
                 <div className="flex items-center gap-2 mt-1">
-                  <BarraCargada hechas={done} total={total} alto={22} className="flex-1 min-w-0" />
-                  <span className="text-[10.5px] font-bold tabular-nums shrink-0" style={{ color: completo ? color : "var(--text-muted)" }}>{done}/{total}</span>
+                  <BarraCargada hechas={done} total={total} alto={24} className="flex-1 min-w-0" />
+                  <span className="text-[12px] font-bold tabular-nums shrink-0" aria-label={`${done} de ${total} series`} style={{ color: completo ? "var(--text-strong)" : "var(--text-muted)" }}><NumberFlow value={done} aria-hidden="true" />/{total}</span>
                 </div>
               ) : (
-                <p className="text-[10.5px] text-slate-500 leading-tight mt-1">Sesión en curso</p>
+                <p className="text-[11.5px] text-slate-500 leading-tight mt-1">Sesión en curso</p>
               )}
             </div>
           </button>
           {/* Finalizar: cuando ya completaste todo pasa a relleno pleno —
               es el único paso que te queda. */}
-          <button
-            onClick={() => setConfirmando(true)}
-            className="shrink-0 flex items-center gap-1.5 px-4 my-2 mr-2 rounded-xl text-[12px] font-black transition active:scale-95"
-            style={completo
-              ? { backgroundColor: color, color: "#fff" }
-              : { backgroundColor: tint(color, "1f"), color, border: `1px solid ${tint(color, "45")}` }}
-          >
-            <Check size={14} /> Finalizar
+          <button onClick={() => setConfirmando(true)} className={`boton-finalizar ${completo ? "listo" : ""}`}>
+            <Check size={15} /> Finalizar
           </button>
         </div>
         </>
@@ -23341,14 +23784,27 @@ function BottomBar({ tab, setTab }) {
 // barra de arriba (ver App: barraCompacta), como los títulos de iOS.
 // Mantiene lo que tenía de bueno el hero: el rótulo con el color de cada
 // pestaña y la bajada corta que se fue puliendo pedido a pedido.
+// Sin el rótulo de color que iba arriba ("TU ENTRENAMIENTO"): ahora el color
+// de la pestaña tiñe la pantalla entera (ver ponerTono), y un rótulo más
+// encima del título sólo repetía dónde estás.
 const TAB_INTRO = {
-  rutina: { ceja: "Tu entrenamiento", icono: Dumbbell, color: "#14B8A6" },
-  progreso: { ceja: "Tu evolución", icono: Activity, color: "#3B82F6", bajada: "Marcas, volumen y constancia a lo largo del tiempo" },
-  rutinas: { ceja: "Tu plan de entrenamiento", icono: Layers, color: "#3B82F6", bajada: "Una rutina ya armada, o creá la tuya" },
-  social: { ceja: "Tu comunidad", icono: Users, color: SOCIAL_INK, bajada: "Sumá amigos, competí y compartí tu progreso" },
-  entrenador_ia: { ceja: "Tu asistente", icono: Sparkles, color: "#14B8A6", bajada: "Conoce tu historial, preguntá lo que quieras", beta: true },
-  perfil: { ceja: "Tu cuenta", icono: UserCog, color: "#F59E0B", bajada: "Tus datos, tus ajustes y tu cuenta" },
+  rutina: {},
+  progreso: { bajada: "Marcas, volumen y constancia a lo largo del tiempo" },
+  rutinas: { bajada: "Una rutina ya armada, o creá la tuya" },
+  social: { bajada: "Sumá amigos, competí y compartí tu progreso" },
+  entrenador_ia: { bajada: "Conoce tu historial, preguntá lo que quieras", beta: true },
+  perfil: { bajada: "Tus datos, tus ajustes y tu cuenta" },
 };
+// "COLOR DE DÍA": lo que estás mirando tiñe la app. En Rutina, el color del
+// día elegido (lo pone RoutineView); en el resto, el de la pestaña. Se
+// escribe en <html> porque de --tono dependen los grises de Tailwind
+// (index.css) y las superficies (--surface-1/2/3), que viven en :root.
+const TONO_MARCA = "#14B8A6";
+const TONO_DE_PESTANA = { progreso: "#3B82F6", rutinas: "#3B82F6", social: SOCIAL_COLOR, entrenador_ia: "#14B8A6", perfil: "#14B8A6", descarga: "#A855F7" };
+function ponerTono(color) {
+  if (typeof document === "undefined") return;
+  document.documentElement.style.setProperty("--tono", color || TONO_MARCA);
+}
 // En Rutina la bajada es la fecha: entrenando, "qué día es hoy" sirve más
 // que una frase que ya leíste cien veces.
 function fechaDeHoyLarga() {
@@ -23358,15 +23814,9 @@ function fechaDeHoyLarga() {
 function TituloPestana({ tab }) {
   const intro = TAB_INTRO[tab];
   if (!intro) return null;
-  const Icono = intro.icono;
   return (
     <div className="titulo-pagina">
-      <p className="ceja" style={{ "--ceja": intro.color }}>
-        <Icono size={13} aria-hidden="true" />
-        {intro.ceja}
-        {intro.beta && <span className="ceja-beta">Beta</span>}
-      </p>
-      <h1>{TAB_TITLES[tab]}</h1>
+      <h1>{TAB_TITLES[tab]}{intro.beta && <span className="ceja-beta">Beta</span>}</h1>
       <p className="bajada">{tab === "rutina" ? fechaDeHoyLarga() : intro.bajada}</p>
     </div>
   );
@@ -23383,12 +23833,12 @@ function SideNav({ tab, setTab, profileName }) {
     return () => { alive = false; window.removeEventListener("modusfit-avatar-updated", load); };
   }, [profileName]);
   return (
-    <div className="hidden lg:flex lg:flex-col lg:w-56 lg:shrink-0 lg:h-screen lg:sticky lg:top-0 border-r border-slate-800/50 bg-[#0c0d10]/60 px-3 py-6">
+    <div className="hidden lg:flex lg:flex-col lg:w-60 lg:shrink-0 lg:h-screen lg:sticky lg:top-0 px-3 py-6" style={{ backgroundColor: "var(--tabbar-bg)" }}>
       <div className="flex items-center gap-2.5 px-2 mb-8">
-        <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-teal-500/30 to-teal-500/5 border border-teal-500/20 flex items-center justify-center shrink-0"><Flame className="text-teal-500" size={18} /></div>
-        <span className="font-black text-white text-sm tracking-tight">Modus Fit</span>
+        <span className="galleta login-logo"><Flame size={18} /></span>
+        <span className="font-bold text-white text-[15px] tracking-tight">Modus Fit</span>
       </div>
-      <button onClick={() => setTab("perfil")} className={`w-full flex items-center gap-3 px-3 py-2.5 mb-3 rounded-xl text-sm font-semibold transition-all ${tab === "perfil" ? "bg-teal-500/15 text-teal-400" : "text-slate-500 hover:text-slate-300 hover:bg-slate-900/60"}`}>
+      <button onClick={() => setTab("perfil")} className={`w-full flex items-center gap-3 px-3 py-2.5 mb-3 rounded-full text-sm font-semibold transition-all ${tab === "perfil" ? "bg-teal-500/15 text-teal-400" : "text-slate-400 hover:text-slate-200 hover:bg-slate-900/60"}`}>
         {avatarUrl
           ? <img src={avatarUrl} className="w-6 h-6 rounded-lg object-cover shrink-0" alt="" />
           : <div className="w-6 h-6 rounded-lg flex items-center justify-center text-[11px] font-black !text-white shrink-0" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>{initial}</div>
@@ -23397,8 +23847,8 @@ function SideNav({ tab, setTab, profileName }) {
       </button>
       <div className="space-y-1">
         {NAV_TABS.map(({ key, icon, label, color = "#14B8A6" }) => (
-          <button key={key} onClick={() => setTab(key)} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${tab === key ? "" : "text-slate-500 hover:text-slate-300 hover:bg-slate-900/60"}`}
-            style={tab === key ? { backgroundColor: tint(color, "22"), color } : {}}>
+          <button key={key} onClick={() => setTab(key)} className={`w-full flex items-center gap-3 px-3 h-11 rounded-full text-sm font-semibold transition-all ${tab === key ? "" : "text-slate-400 hover:text-slate-200 hover:bg-slate-900/60"}`}
+            style={tab === key ? { backgroundColor: "color-mix(in oklab, " + color + " 22%, transparent)", color: "var(--text-strong)" } : {}}>
             <span style={tab === key ? { color } : {}} className={tab !== key ? "text-slate-600" : ""}>{icon}</span>
             <span className="truncate">{label}</span>
           </button>
@@ -23471,14 +23921,14 @@ function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
         <div className="px-5 py-4">
           {/* ── VISTA PREVIA EN VIVO ── */}
           <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-600 mb-2">Así se va a ver</p>
-          {/* La ficha de ejemplo es la MISMA fila de planilla que se ve al
+          {/* La ficha de ejemplo es la MISMA serie en foco que se ve al
               entrenar (mismas clases): lo que prendés acá aparece igual allá. */}
           <div className="ejercicio p-3 mb-5" style={{ "--c": "#14B8A6" }}>
-            <div className="flex items-center gap-2.5">
-              <span className="ejercicio-numero" style={{ width: 26, fontSize: "1.2rem" }}>01</span>
+            <div className="flex items-center gap-3">
+              <span className="galleta ejercicio-numero" aria-hidden="true">1</span>
               <div className="min-w-0">
                 <p className="ejercicio-nombre">Press Banca</p>
-                <span className="inline-block mt-1 text-[10px] px-1.5 py-0.5 rounded-md font-bold bg-teal-500/15 text-teal-400">Pectoral</span>
+                <span className="ejercicio-musculo mt-1">Pectoral</span>
               </div>
             </div>
             {on("showExerciseNote") && (
@@ -23489,27 +23939,38 @@ function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
                 <p className="text-[11px] font-bold text-teal-400 flex items-center gap-1"><Flame size={11} /> Aproximaciones: {ej(40)} → {ej(55)} → {ej(70)}</p>
               </div>
             )}
-            <div className="tabla-encabezado mt-1">
-              <span aria-hidden="true">#</span><span>Objetivo</span><span className="text-center">Reps</span><span aria-hidden="true" /><span className="text-center">{weightLabel(unit)}</span><span aria-hidden="true" />
-            </div>
-            <div className="serie serie-activa" style={{ "--c": "#14B8A6" }}>
-              <div className="serie-fila">
-                <span className="serie-n">1</span>
-                <div className="serie-ref">
-                  <span className="serie-ref-rango">8–10 reps</span>
-                  <span className="serie-ref-meta" style={{ color: "#14B8A6" }}><Trophy size={11} />8×{kgToDisplay(80, unit)}</span>
-                  {on("showLastSession") && <span className="serie-ref-ant bounce-in"><History size={10} />8×{kgToDisplay(77.5, unit)}</span>}
-                </div>
-                <span className="serie-campo flex items-center justify-center">8</span>
-                <span className="serie-por">×</span>
-                <span className="serie-campo flex items-center justify-center">{kgToDisplay(82.5, unit)}</span>
-                <span className="serie-check"><Check size={18} strokeWidth={2.8} /></span>
+            <div className="serie serie-foco mt-3" style={{ "--c": "#14B8A6", animation: "none" }}>
+              <div className="foco-cabecera">
+                <span className="galleta serie-galleta activa" aria-hidden="true">1</span>
+                <p className="foco-titulo">Serie 1<span>8–10 reps</span></p>
               </div>
-              {on("show1RMPercent") && <p className="serie-aviso text-slate-500 bounce-in">103% de tu 1RM</p>}
-              {on("showCoaching") && <p className="serie-aviso bounce-in"><b className="text-emerald-400">Te sobró rango.</b> <span className="text-slate-400">La próxima subile el peso.</span></p>}
-              {on("showRpe") && <div className="serie-boton-suave bounce-in"><Activity size={12} /> Registrar esfuerzo ({s.rpeDisplayMode === "rir" ? "RIR" : "RPE"})</div>}
-              {on("showPersonalNote") && <div className="serie-boton-suave bounce-in"><StickyNote size={12} /> Agregar nota</div>}
+              <div className="foco-marcador">
+                <div className="marcador-celda">
+                  <span className="marcador-rotulo"><Trophy size={13} /> Tu récord</span>
+                  <span className="marcador-valor">8<i>×</i>{kgToDisplay(80, unit)}<small>{weightLabel(unit)}</small></span>
+                </div>
+                {on("showLastSession") && (
+                  <div className="marcador-celda secundaria bounce-in">
+                    <span className="marcador-rotulo"><History size={13} /> Hace 4 días</span>
+                    <span className="marcador-valor">8<i>×</i>{kgToDisplay(77.5, unit)}<small>{weightLabel(unit)}</small></span>
+                  </div>
+                )}
+              </div>
+              <div className="foco-tablero" aria-hidden="true">
+                <div className="foco-campo"><span className="foco-input flex items-center justify-center">8</span><span className="foco-campo-rotulo">Reps</span></div>
+                <span className="foco-por">×</span>
+                <div className="foco-campo"><span className="foco-input flex items-center justify-center">{kgToDisplay(82.5, unit)}</span><span className="foco-campo-rotulo">{weightLabel(unit)}</span></div>
+                <span className="foco-guardar"><Check size={26} strokeWidth={2.8} /></span>
+              </div>
+              {on("show1RMPercent") && <p className="text-[12px] text-slate-500 pt-2.5 px-1 bounce-in">% de tu 1RM: ahora ~103%</p>}
+              {(on("showRpe") || on("showPersonalNote")) && (
+                <div className="foco-extras">
+                  {on("showRpe") && <div className="serie-boton-suave bounce-in"><Activity size={13} /> Registrar esfuerzo ({s.rpeDisplayMode === "rir" ? "RIR" : "RPE"})</div>}
+                  {on("showPersonalNote") && <div className="serie-boton-suave bounce-in"><StickyNote size={13} /> Agregar nota</div>}
+                </div>
+              )}
             </div>
+            {on("showCoaching") && <p className="text-[12.5px] leading-snug mt-2.5 px-1 bounce-in"><b className="text-emerald-400">Te sobró rango.</b> <span className="text-slate-400">La próxima subile el peso.</span></p>}
             {!on("showWarmup") && !on("showRpe") && !on("show1RMPercent") && !on("showCoaching") && !on("showExerciseNote") && !on("showPersonalNote") && (
               <p className="text-[11px] text-slate-500 text-center mt-2">Ficha mínima: reps, kilos y tu récord.</p>
             )}
@@ -23524,9 +23985,9 @@ function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
                     revés — algunos prefieren pensarlo así en vez de en RPE.
                     Solo aparece si el esfuerzo está activado. */}
                 {o.key === "showRpe" && on("showRpe") && (
-                  <div className="flex bg-black/40 rounded-xl p-1 border border-slate-700/50 ml-1">
+                  <div className="segmentado ml-1" style={{ "--c": "#14B8A6" }}>
                     {[{ k: "rpe", l: "Mostrar como RPE" }, { k: "rir", l: "Mostrar como RIR" }].map((opt) => (
-                      <button key={opt.k} onClick={() => onUpdateSettings({ rpeDisplayMode: opt.k })} className={`flex-1 py-2 rounded-lg text-[11px] font-bold transition-all ${(s.rpeDisplayMode || "rpe") === opt.k ? "bg-teal-500/20 text-teal-300" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>
+                      <button key={opt.k} onClick={() => onUpdateSettings({ rpeDisplayMode: opt.k })} className={(s.rpeDisplayMode || "rpe") === opt.k ? "activo" : ""}>{opt.l}</button>
                     ))}
                   </div>
                 )}
@@ -23534,7 +23995,7 @@ function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
             ))}
           </div>
 
-          <button onClick={onClose} className="w-full mt-4 py-3 rounded-2xl text-sm font-black !text-white transition active:scale-[0.98]" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>
+          <button onClick={onClose} className="boton-pildora w-full mt-4" style={{ "--c": "#14B8A6" }}>
             Listo, empecemos 💪
           </button>
         </div>
@@ -23567,7 +24028,7 @@ function OnboardingTasksCard({ profile, cycleStart, logs, onGoToProfile, onDone,
   // atajos colapsados de la app) que te dice el próximo paso, y se expande
   // al tocarla si querés ver la lista completa.
   return (
-    <div className="mb-4 rounded-2xl border border-teal-500/25 overflow-hidden bounce-in" style={{ background: "var(--panel-grad-emerald)" }}>
+    <div className="mb-4 tarjeta-tonal overflow-hidden bounce-in" style={{ "--c": "var(--tono)" }}>
       <button onClick={() => setOpen((o) => !o)} className="w-full px-4 py-3 flex items-center gap-2.5 text-left">
         <div className="w-8 h-8 rounded-xl bg-teal-500/15 flex items-center justify-center shrink-0"><Target size={15} className="text-teal-400" /></div>
         <div className="flex-1 min-w-0">
@@ -23913,6 +24374,12 @@ export default function App() {
   const profile = profiles[activeProfile], logs = profile?.logs || {}, drafts = profile?.drafts || {};
   const isDeloadWeek = !!(profile && cycleStart && getWeekInfo(cycleStart, getProfileSettings(profile))?.isDeload);
   const showPinnedDeload = tab === "rutina" && isDeloadWeek && !deloadDismissed;
+  // En Rutina el tinte lo pone el día que estás mirando (RoutineView); en
+  // las demás pestañas, el color de la pestaña.
+  useEffect(() => {
+    if (tab === "rutina" && !showPinnedDeload) return;
+    ponerTono(showPinnedDeload ? TONO_DE_PESTANA.descarga : TONO_DE_PESTANA[tab]);
+  }, [tab, showPinnedDeload]);
   const themeClass = getProfileSettings(profile).theme === "light" ? "light-mode" : "";
   // tint() (utils.js) arma los "badges" de color según el tema — necesita
   // saber cuál está activo, pero es una función de módulo (la llaman
@@ -24956,17 +25423,17 @@ export default function App() {
   const activeWeightUnit = getProfileSettings(profiles[activeProfile]).weightUnit ?? "kg";
   return (
     <WeightUnitCtx.Provider value={activeWeightUnit}>
+    <LazyMotion features={cargarAnimaciones} strict>
+    <MotionConfig reducedMotion="user">
     <div className={`app-fondo min-h-screen bg-[#0c0d10] text-white font-sans lg:flex ${themeClass}`} style={{ "--small-text-scale": smallTextScale }}>
       {/* Escudo fijo de la status bar — cubre la zona de batería/hora sin
           importar cuánto hayas scrolleado. El color es siempre #0c0d10. */}
       <div style={{ position: "fixed", top: 0, left: 0, right: 0, height: "env(safe-area-inset-top, 0px)", backgroundColor: "var(--app-bg)", zIndex: 9999 }} />
 
-      {/* Desaturación global: un overlay con backdrop-filter en vez de
-          filter en el contenedor — filter en un ancestro convierte a ese
-          ancestro en el containing block de position:fixed y ROMPE todos
-          los modales (aparecían en el medio del documento, no del viewport).
-          El overlay no bloquea toques y queda debajo de los modales. */}
-      <div style={{ position: "fixed", inset: 0, backdropFilter: "saturate(0.88)", WebkitBackdropFilter: "saturate(0.88)", pointerEvents: "none", zIndex: 50 }} />
+      {/* Acá había un velo de pantalla completa que le bajaba 12% la
+          saturación a todo (backdrop-filter): con el sistema "Color de día"
+          los colores ya vienen calibrados para no gritar, y ese velo era una
+          capa más que el celular tenía que recomponer en cada scroll. */}
       <StyleInjector />
       <InstalarEnIosBanner />
       {recoveredNotice && <RecoveredBanner onClose={() => setRecoveredNotice(false)} />}
@@ -24977,7 +25444,7 @@ export default function App() {
         <header className="app-bar" data-compacta={barraCompacta || !TAB_INTRO[tab] ? "true" : "false"}>
           <div className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto px-4 h-14 flex items-center gap-3">
             {SECONDARY_TAB_BACK[tab] ? (
-              <button onClick={() => setTab(SECONDARY_TAB_BACK[tab])} aria-label="Volver" className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-300 hover:text-white bg-slate-800/50 border border-slate-700/40 transition shrink-0 lg:hidden"><ChevronDown size={18} className="rotate-90" /></button>
+              <button onClick={() => setTab(SECONDARY_TAB_BACK[tab])} aria-label="Volver" className="boton-redondo lg:hidden"><ChevronDown size={18} className="rotate-90" /></button>
             ) : (
               <HeaderAvatar profileName={activeProfile} onClick={() => setTab("perfil")} />
             )}
@@ -24987,15 +25454,12 @@ export default function App() {
             {/* Durante una sesión activa, el chip de "entrenando X" ocupa el
                 lugar del "?" (así no lo tapa). Sin sesión, el "?" normal. */}
             {sessionTintColor && sessionDayLabel ? (
-              <div className="flex items-center gap-1.5 rounded-full pl-2.5 pr-3 py-1.5 shrink-0 session-chip-in" style={{ backgroundColor: `${tint(sessionTintColor, "1A")}`, border: `1px solid ${tint(sessionTintColor, "45")}` }}>
-                <span className="relative flex h-2 w-2">
-                  <span className="absolute inline-flex h-full w-full rounded-full opacity-60 session-chip-ping" style={{ backgroundColor: sessionTintColor }} />
-                  <span className="relative inline-flex rounded-full h-2 w-2" style={{ backgroundColor: sessionTintColor }} />
-                </span>
-                <span className="text-[10.5px] font-bold uppercase whitespace-nowrap" style={{ color: sessionTintColor }}>{sessionDayLabel}</span>
+              <div className="chip-sesion session-chip-in" style={{ "--c": sessionTintColor }}>
+                <span className="galleta sesion-dock-latido" aria-hidden="true" />
+                <span className="sesion-dock-dia">{sessionDayLabel}</span>
               </div>
             ) : (
-              tab !== "perfil" && <button onClick={() => { setHelpStartTab(tab); setShowHelp(true); }} aria-label="Ayuda" className="w-9 h-9 rounded-xl bg-slate-800/50 border border-slate-700/40 flex items-center justify-center text-slate-400 hover:text-teal-400 hover:border-teal-500/30 transition active:scale-90 shrink-0"><HelpCircle size={17} /></button>
+              tab !== "perfil" && <button onClick={() => { setHelpStartTab(tab); setShowHelp(true); }} aria-label="Ayuda" className="boton-redondo"><HelpCircle size={18} /></button>
             )}
           </div>
         </header>
@@ -25098,6 +25562,8 @@ export default function App() {
         />
       )}
     </div>
+    </MotionConfig>
+    </LazyMotion>
     </WeightUnitCtx.Provider>
   );
 }

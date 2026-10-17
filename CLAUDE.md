@@ -13,6 +13,13 @@ Hay 29 skills en `.claude/skills/`, que es donde las lee Claude Code: 19 de dise
 | Textos de la app: botones, errores, estados vacíos, bienvenida | `design:ux-copy` |
 | Revisar que colores, espaciados y componentes sean coherentes | `design:design-system` |
 | Pulir una pantalla ya hecha: estados vacíos, errores, casos borde, movimiento | `impeccable` |
+| Página pública o landing (no pantallas de app) | `design-taste-frontend` (la v1 y la v2-experimental son versiones viejas) |
+| Una estética puntual | `minimalist-ui`, `industrial-brutalist-ui` o `high-end-visual-design`, una sola |
+| Diseñar a partir de imágenes generadas | `image-to-code`, `imagegen-frontend-mobile`, `imagegen-frontend-web`, `brandkit`: generan con `npm run imagen` |
+| Un DESIGN.md para Google Stitch | `stitch-design-taste` |
+| Diseñar en el canvas de superdesign.dev | `superdesign` |
+| Landings con animaciones GSAP | `gpt-taste` |
+| Que no se recorte código largo | `full-output-enforcement` |
 
 ## Funcionalidad: qué skill usar
 
@@ -28,13 +35,6 @@ Hay 29 skills en `.claude/skills/`, que es donde las lee Claude Code: 19 de dise
 | Contenido tapado por el notch, la barra de estado o la de gestos | `safe-area-handling` |
 | Lector de pantalla y tamaño de letra del sistema en el celular | `capacitor-accessibility` |
 | Buscar una skill que todavía no está | `find-skills` (`npx skills find <tema>`) |
-| Página pública o landing (no pantallas de app) | `design-taste-frontend` (la v1 y la v2-experimental son versiones viejas) |
-| Una estética puntual | `minimalist-ui`, `industrial-brutalist-ui` o `high-end-visual-design`, una sola |
-| Diseñar a partir de imágenes generadas | `image-to-code`, `imagegen-frontend-mobile`, `imagegen-frontend-web`, `brandkit`: generan con `npm run imagen` |
-| Un DESIGN.md para Google Stitch | `stitch-design-taste` |
-| Diseñar en el canvas de superdesign.dev | `superdesign` |
-| Landings con animaciones GSAP | `gpt-taste` |
-| Que no se recorte código largo | `full-output-enforcement` |
 
 Las que empiezan con `design:` (y las `engineering:` y `marketing:`) no están en el repo: son plugins de la cuenta de claude.ai y se actualizan solos. Para bugs sirven `engineering:debug` y `engineering:code-review`.
 
@@ -50,20 +50,25 @@ No edites el contenido de las skills del repo: se actualizan desde sus repos con
 
 ## Carpetas con documentación y el CSS
 
-Tailwind escanea todo el repo buscando clases, salvo lo que ignora git. `src/index.css` excluye `.agents` y `.claude` con `@source not`, porque las skills traen ejemplos de clases que terminaban en el CSS de producción. Si sumás otra carpeta con documentación así, excluila también: el CSS de producción pesa 107 KB, y si sube sin que cambie la app, es eso. ESLint también ignora esas carpetas (`eslint.config.js`).
+Tailwind escanea todo el repo buscando clases, salvo lo que ignora git. `src/index.css` excluye `.agents` y `.claude` con `@source not`, porque las skills traen ejemplos de clases que terminaban en el CSS de producción. Si sumás otra carpeta con documentación así, excluila también: el CSS de producción pesa 108 KB, y si sube sin que cambie la app, es eso. ESLint también ignora esas carpetas (`eslint.config.js`).
 
-## Sistema visual
+## Sistema visual: "Color de día"
 
-Antes de diseñar algo nuevo, mirá lo que ya hay. Vive en dos lugares:
+Antes de diseñar algo nuevo, mirá lo que ya hay. Vive en tres lugares:
 
-- **`src/index.css`** (`@theme`): las fuentes y la escala `slate` de Tailwind redefinida como grafito. Cambiar ahí cambia todas las pantallas.
-- **`ANIMATION_CSS` en `src/App.jsx`**, bloque "SISTEMA VISUAL" al final: los tokens (`--surface-1/2/3`, `--hairline`, `--panel-sunken`, `--text-strong/muted/faint`, `--accent`) con su versión en `.light-mode`, y las piezas fijas: barra de arriba, título de pestaña, barra de abajo, dock, cronómetros y tarjetas de ejercicio.
+- **`src/index.css`** (`@theme`): la fuente, la escala `slate` de Tailwind teñida con `--tono` y las esquinas. Cambiar ahí cambia todas las pantallas.
+- **`src/fuente.css`**: Google Sans Flex empaquetada (pesos y redondez), sólo latín y latín extendido.
+- **`ANIMATION_CSS` en `src/App.jsx`**, bloque "SISTEMA VISUAL" al final: los tokens (`--tono`, `--surface-1/2/3`, `--hairline`, `--panel-sunken`, `--text-strong/muted/faint`, `--resorte`, `--forma-galleta`) con su versión en `.light-mode`, y las piezas: barras de arriba y de abajo, dock, cronómetros, días, la serie en foco y la barra cargada.
 
 Las reglas:
 
-- **Letras:** Geist para leer y Archivo para títulos, rótulos en mayúscula y números grandes. Para un número grande, usá la clase `num-display`.
-- **Color:** un acento, el teal. Los colores de cada día y de cada pestaña sirven solo para lo que es de ese día o de esa pestaña.
-- **Sin manchas borrosas:** nada de círculos con `blur` detrás de los paneles. Una regla global las apaga en las pantallas y las deja solo en los modales de festejo.
-- **Nada oscuro fijo en estilos en línea:** un fondo como `rgba(5,7,11,…)` se ve como una mancha en modo claro. Usá un token. Lo mismo para colores de texto pensados para fondo oscuro: `SOCIAL_INK` es la variable `--social-tinta`, que tiene su versión clara.
-- **Palabras enteras:** en lugares angostos (solapas de días, chips) no partas palabras ni las cortes con "…". Para los días: `etiquetaDeDia` + `.dia-solapa-texto`, que ajustan la letra a la palabra más larga.
-- **Piezas propias de la app:** la barra cargada (`BarraCargada`, un disco por serie con los colores de competición) y la planilla de series (`.serie-fila`, columnas en `--cols-serie`). Reusalas en vez de inventar otra barra de progreso u otra fila.
+- **El color lo pone el día:** `--tono` es el color de lo que estás mirando (`ponerTono`): el del día en Rutina, el de la pestaña en las demás. Tiñe apenas el fondo y las superficies; el color pleno va sólo en lo que se toca. Un elemento con color propio lleva `--c` y usa las recetas del comentario del bloque: relleno fuerte con letra oscura, contenedor tonal, texto de color.
+- **Letras:** Google Sans Flex. Números grandes con `num-display` (redondos, eje ROND). Sin mayúsculas sostenidas: `.uppercase` ya no transforma, así que los rótulos se escriben como oración.
+- **Formas:** contenedores de 26 a 30px, botones en píldora (`.boton-pildora`, `.boton-tonal`, `.boton-redondo`) y grupos de botones unidos (`.selector-dias`, `.pestanas-internas`, `.segmentado`). La galleta (`.galleta`) es la forma de lo completado: la serie, el ejercicio, el avatar. No la uses de adorno.
+- **Tarjetas sin borde:** las separa su superficie (`.tarjeta-tonal`, `.seccion-plegable`). Los bordes quedan para campos y foco.
+- **La serie:** una sola en foco por ejercicio (el tablero grande con la marca a la vista) y las demás en renglones (`.serie-linea`). Reusalo en vez de inventar otra fila.
+- **La barra cargada** (`BarraCargada`) es la pieza propia: un disco de competición por serie, con su tamaño real. No inventes otra barra de progreso; la onda (`Onda`) es sólo para la espera del descanso.
+- **Movimiento:** los resortes (`--resorte`) sólo para lo que responde a un toque. Motion (`m.div`, que carga diferido con `LazyMotion`) para reacomodar listas; NumberFlow (`RelojQueGira`) para relojes y contadores. Todo respeta "reducir movimiento".
+- **Sin manchas borrosas:** nada de círculos con `blur` detrás de los paneles. Una regla global las apaga en las pantallas y las deja sólo en los modales de festejo.
+- **Nada oscuro fijo en estilos en línea:** un fondo como `rgba(5,7,11,…)` se ve como una mancha en modo claro. Usá un token. `SOCIAL_INK` es la variable `--social-tinta`, que tiene su versión clara.
+- **Palabras enteras:** en lugares angostos (solapas de días, chips, el nombre del día) no partas palabras ni las cortes con "…". Para los días: `etiquetaDeDia` + `.dia-solapa-texto`, que ajustan la letra a la palabra más larga.
