@@ -7,6 +7,24 @@
       "skillPath": "skills/brandkit/SKILL.md",
       "computedHash": "f2b8e1f285f363ce07610d764e5b5e3d815bbde8bea29e4a1a8c75a3beb73bd6"
     },
+    "capacitor-accessibility": {
+      "source": "cap-go/capgo-skills",
+      "sourceType": "github",
+      "skillPath": "skills/capacitor-accessibility/SKILL.md",
+      "computedHash": "fea6c4c18ec848a200ad30173def5308f8b8600b3a718d520fbd5a6fa15412e7"
+    },
+    "capacitor-best-practices": {
+      "source": "cap-go/capgo-skills",
+      "sourceType": "github",
+      "skillPath": "skills/capacitor-best-practices/SKILL.md",
+      "computedHash": "a9a331f48d73a3d61e4db4670ca93b1ddfbbf942bae5f804fe04be613533aae5"
+    },
+    "debugging-capacitor": {
+      "source": "cap-go/capgo-skills",
+      "sourceType": "github",
+      "skillPath": "skills/debugging-capacitor/SKILL.md",
+      "computedHash": "27f15e076d49fd4eab7d636324ba81784b085f21191a8168f8c643d69ce57e66"
+    },
     "design-taste-frontend": {
       "source": "Leonxlnx/taste-skill",
       "sourceType": "github",
@@ -24,6 +42,30 @@
       "sourceType": "github",
       "skillPath": "skills/taste-skill-v2-experimental/SKILL.md",
       "computedHash": "1618e10f20b22914c6f0db6b55c76ed49caf6284e28d0fa5bca3e533aee22673"
+    },
+    "find-skills": {
+      "source": "vercel-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/find-skills/SKILL.md",
+      "computedHash": "b146008599c31057cef1c145774cea5d5afb30e8f43fa802e47a4b461419aaaf"
+    },
+    "firebase-auth-basics": {
+      "source": "firebase/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/firebase-auth-basics/SKILL.md",
+      "computedHash": "ea315ad88b6ae71e985736b6958a0d7819b56fc3cb86786a868eed5e4315d735"
+    },
+    "firebase-firestore": {
+      "source": "firebase/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/firebase-firestore/SKILL.md",
+      "computedHash": "462374260347e515548d6c5845c1777da677e2b221f179a7add1b32fa58aae47"
+    },
+    "firebase-security-rules-auditor": {
+      "source": "firebase/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/firebase-security-rules-auditor/SKILL.md",
+      "computedHash": "c910ebaa427236f3b6d5e72112c85c44676dc9046787988dbd07c5573cca7f1b"
     },
     "frontend-design": {
       "source": "anthropics/skills",
@@ -67,6 +109,12 @@
       "skillPath": "skills/imagegen-frontend-web/SKILL.md",
       "computedHash": "27255c7c50181e58add156b2aa2bd5325285b85f04027e4c8b73742d98d7be0a"
     },
+    "impeccable": {
+      "source": "pbakaus/impeccable",
+      "sourceType": "github",
+      "skillPath": ".agents/skills/impeccable/SKILL.md",
+      "computedHash": "f57225c428f86792ed4fe05029a16c41892c8569523b4212e2f3c7d7067738c9"
+    },
     "industrial-brutalist-ui": {
       "source": "Leonxlnx/taste-skill",
       "sourceType": "github",
@@ -84,6 +132,12 @@
       "sourceType": "github",
       "skillPath": "skills/redesign-skill/SKILL.md",
       "computedHash": "d39f2dfb1c6e4026a288b203e42cee265cf97321b412ea76c402d399f4ec99e0"
+    },
+    "safe-area-handling": {
+      "source": "cap-go/capgo-skills",
+      "sourceType": "github",
+      "skillPath": "skills/safe-area-handling/SKILL.md",
+      "computedHash": "7ec364496e68373cf9e5d563358236d2dca0c4d92c543b4ed260aedda5731ebb"
     },
     "stitch-design-taste": {
       "source": "Leonxlnx/taste-skill",
@@ -103,11 +157,23 @@
       "skillPath": ".claude/skills/ui-ux-pro-max/SKILL.md",
       "computedHash": "7ac62d931e52dbc7c309ed8ee067101969db2454709339b02daa583e80e98d5f"
     },
+    "vercel-react-best-practices": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/react-best-practices/SKILL.md",
+      "computedHash": "6b526d013e28073246a36f99b529bc43745d30832ecfa8217b359c34f260ca6b"
+    },
     "web-design-guidelines": {
       "source": "vercel-labs/agent-skills",
       "sourceType": "github",
       "skillPath": "skills/web-design-guidelines/SKILL.md",
       "computedHash": "d8e7d3afe37dcc8a97b99ffb5afdb4d0919ae0092ea8b68f44eb201f035e33ac"
+    },
+    "webapp-testing": {
+      "source": "anthropics/skills",
+      "sourceType": "github",
+      "skillPath": "skills/webapp-testing/SKILL.md",
+      "computedHash": "3f14af7f5690695209c22fbf8c8d133769a86d64892602c09bb13f135e14e857"
     }
   }
 }

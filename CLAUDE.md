@@ -2,7 +2,7 @@
 
 ## Diseño: qué skill usar
 
-Hay 18 skills de diseño en `.claude/skills/`, que es donde las lee Claude Code. Quince también están en `.agents/skills/`, la carpeta que usan otros agentes. Usá **una por tarea**: varias se contradicen. Por ejemplo, `design-taste-frontend` prohíbe gradientes, glassmorphism y sombras, y `redesign-existing-projects` los recomienda.
+Hay 29 skills en `.claude/skills/`, que es donde las lee Claude Code: 19 de diseño y 10 de funcionalidad (tabla más abajo). Quince de diseño también están en `.agents/skills/`, la carpeta que usan otros agentes. Usá **una por tarea**: varias se contradicen. Por ejemplo, `design-taste-frontend` prohíbe gradientes, glassmorphism y sombras, y `redesign-existing-projects` los recomienda.
 
 | Para | Skill |
 |---|---|
@@ -12,6 +12,22 @@ Hay 18 skills de diseño en `.claude/skills/`, que es donde las lee Claude Code.
 | Crítica de una pantalla: jerarquía, usabilidad, consistencia | `design:design-critique` (con capturas de `npm run capturas`) |
 | Textos de la app: botones, errores, estados vacíos, bienvenida | `design:ux-copy` |
 | Revisar que colores, espaciados y componentes sean coherentes | `design:design-system` |
+| Pulir una pantalla ya hecha: estados vacíos, errores, casos borde, movimiento | `impeccable` |
+
+## Funcionalidad: qué skill usar
+
+| Para | Skill |
+|---|---|
+| Escribir o revisar componentes React, rendimiento, re-renders | `vercel-react-best-practices` |
+| Consultas, modelo de datos e índices de Firestore | `firebase-firestore` |
+| Login y cuentas | `firebase-auth-basics` |
+| Revisar `firestore.rules` antes de cambiarlas | `firebase-security-rules-auditor` |
+| Probar un flujo de punta a punta en el navegador | `webapp-testing` (Playwright, con `npm run dev`) |
+| La app de Android: configuración y plugins de Capacitor | `capacitor-best-practices` |
+| Pantalla en blanco, cuelgues o plugins que fallan en el celular | `debugging-capacitor` |
+| Contenido tapado por el notch, la barra de estado o la de gestos | `safe-area-handling` |
+| Lector de pantalla y tamaño de letra del sistema en el celular | `capacitor-accessibility` |
+| Buscar una skill que todavía no está | `find-skills` (`npx skills find <tema>`) |
 | Página pública o landing (no pantallas de app) | `design-taste-frontend` (la v1 y la v2-experimental son versiones viejas) |
 | Una estética puntual | `minimalist-ui`, `industrial-brutalist-ui` o `high-end-visual-design`, una sola |
 | Diseñar a partir de imágenes generadas | `image-to-code`, `imagegen-frontend-mobile`, `imagegen-frontend-web`, `brandkit`: generan con `npm run imagen` |
