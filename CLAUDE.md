@@ -8,7 +8,10 @@ Hay 18 skills de diseño en `.claude/skills/`, que es donde las lee Claude Code.
 |---|---|
 | Mejorar las pantallas de la app (casi todo el trabajo) | `redesign-existing-projects`, y antes de entregar el checklist de `ui-ux-pro-max` (`references/pro-rules.md`) |
 | Dirección visual general: paleta, tipografía, criterio | `frontend-design`, o `ui-ux-pro-max` con `--design-system` |
-| Auditoría de accesibilidad y experiencia de uso | `web-design-guidelines` |
+| Auditoría de accesibilidad y experiencia de uso | `web-design-guidelines` sobre el código; `design:accessibility-review` para WCAG AA (contraste, tamaño de toque, lector de pantalla) |
+| Crítica de una pantalla: jerarquía, usabilidad, consistencia | `design:design-critique` (con capturas de `npm run capturas`) |
+| Textos de la app: botones, errores, estados vacíos, bienvenida | `design:ux-copy` |
+| Revisar que colores, espaciados y componentes sean coherentes | `design:design-system` |
 | Página pública o landing (no pantallas de app) | `design-taste-frontend` (la v1 y la v2-experimental son versiones viejas) |
 | Una estética puntual | `minimalist-ui`, `industrial-brutalist-ui` o `high-end-visual-design`, una sola |
 | Diseñar a partir de imágenes generadas | `image-to-code`, `imagegen-frontend-mobile`, `imagegen-frontend-web`, `brandkit`: generan con `npm run imagen` |
@@ -17,7 +20,9 @@ Hay 18 skills de diseño en `.claude/skills/`, que es donde las lee Claude Code.
 | Landings con animaciones GSAP | `gpt-taste` |
 | Que no se recorte código largo | `full-output-enforcement` |
 
-No edites el contenido de las skills: se actualizan desde sus repos con `npx skills update`. En Windows quedan copiadas y no enlazadas, así que si una no se actualiza, reinstalala con `npx skills add <repo> -s <skill> -a claude-code -y` (los repos están en `skills-lock.json`).
+Las que empiezan con `design:` (y las `engineering:` y `marketing:`) no están en el repo: son plugins de la cuenta de claude.ai y se actualizan solos. Para bugs sirven `engineering:debug` y `engineering:code-review`.
+
+No edites el contenido de las skills del repo: se actualizan desde sus repos con `npx skills update`. En Windows quedan copiadas y no enlazadas, así que si una no se actualiza, reinstalala con `npx skills add <repo> -s <skill> -a claude-code -y` (los repos están en `skills-lock.json`).
 
 ## Herramientas
 
