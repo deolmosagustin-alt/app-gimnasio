@@ -50,4 +50,18 @@ No edites el contenido de las skills del repo: se actualizan desde sus repos con
 
 ## Carpetas con documentación y el CSS
 
-Tailwind escanea todo el repo buscando clases, salvo lo que ignora git. `src/index.css` excluye `.agents` y `.claude` con `@source not`, porque las skills traen ejemplos de clases que terminaban en el CSS de producción. Si sumás otra carpeta con documentación así, excluila también: el CSS de producción pesa 106 KB, y si sube sin que cambie la app, es eso. ESLint también ignora esas carpetas (`eslint.config.js`).
+Tailwind escanea todo el repo buscando clases, salvo lo que ignora git. `src/index.css` excluye `.agents` y `.claude` con `@source not`, porque las skills traen ejemplos de clases que terminaban en el CSS de producción. Si sumás otra carpeta con documentación así, excluila también: el CSS de producción pesa 108 KB, y si sube sin que cambie la app, es eso. ESLint también ignora esas carpetas (`eslint.config.js`).
+
+## Sistema visual
+
+Antes de diseñar algo nuevo, mirá lo que ya hay. Vive en dos lugares:
+
+- **`src/index.css`** (`@theme`): las fuentes y la escala `slate` de Tailwind redefinida como grafito. Cambiar ahí cambia todas las pantallas.
+- **`ANIMATION_CSS` en `src/App.jsx`**, bloque "SISTEMA VISUAL" al final: los tokens (`--surface-1/2/3`, `--hairline`, `--panel-sunken`, `--text-strong/muted/faint`, `--accent`) con su versión en `.light-mode`, y las piezas fijas: barra de arriba, título de pestaña, barra de abajo, dock, cronómetros y tarjetas de ejercicio.
+
+Las reglas:
+
+- **Letras:** Geist para leer y Archivo para títulos, rótulos en mayúscula y números grandes. Para un número grande, usá la clase `num-display`.
+- **Color:** un acento, el teal. Los colores de cada día y de cada pestaña sirven solo para lo que es de ese día o de esa pestaña.
+- **Sin manchas borrosas:** nada de círculos con `blur` detrás de los paneles. Una regla global las apaga en las pantallas y las deja solo en los modales de festejo.
+- **Nada oscuro fijo en estilos en línea:** un fondo como `rgba(5,7,11,…)` se ve como una mancha en modo claro. Usá un token.

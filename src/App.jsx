@@ -2212,7 +2212,9 @@ const ANIMATION_CSS = `
   .badge-pop, .superset-draw, .dot-bounce, .msg-in, .wake-up, .day-mark,
   .breathe, .hist-enter, .streak-jump, .tab-slide-right, .tab-slide-left,
   .timer-hop, .session-start-pop, .session-start-text, .session-chip-in,
-  .cell-pop, .sparkle-spin, .session-chip-ping, .session-bar-in { animation: none !important; }
+  .cell-pop, .sparkle-spin, .session-chip-ping, .session-bar-in,
+  .tick-beat, .rest-done-flash { animation: none !important; }
+  .descanso-barra > div, .app-bar-titulo { transition: none !important; }
   .confetti-piece { display: none !important; }
   /* El fade del overlay se mantiene: es lo que lo hace desaparecer solo */
   .theme-fade, .theme-fade * { transition: none !important; }
@@ -2829,18 +2831,23 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 .lucide[stroke-width="2"] { stroke-width: 1.85px; }
 
 /* Fondo de la app: un resplandor teal arriba a la izquierda, donde va el
-   título. Sin esto el grafito liso se ve plano y "de plantilla". Va en un
-   pseudo-elemento que scrollea con la página: nada fijo que repintar. */
-.app-fondo { position: relative; isolation: isolate; }
-.app-fondo::before {
-  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 460px;
-  pointer-events: none; z-index: -1;
-  background:
+   título. Sin esto el grafito liso se ve plano y "de plantilla". Es una
+   imagen de fondo del propio contenedor y scrollea con la página: nada fijo
+   que repintar.
+   OJO: no usar un pseudo-elemento con z-index negativo, que necesita
+   "isolation: isolate" en el contenedor. Eso encierra a TODA la app en su
+   propia capa, barra de abajo y dock incluidos, y lo que se dibuja afuera
+   (la barra del chat, que va en un portal sobre <body>) les queda encima y
+   las tapa. */
+.app-fondo {
+  background-image:
     radial-gradient(110% 75% at 0% 0%, rgba(20,184,166,0.11), transparent 62%),
     radial-gradient(70% 55% at 100% 0%, rgba(148,163,184,0.05), transparent 65%);
+  background-repeat: no-repeat;
+  background-size: 100% 460px;
 }
-.light-mode.app-fondo::before {
-  background: radial-gradient(110% 75% at 0% 0%, rgba(20,184,166,0.08), transparent 62%);
+.light-mode.app-fondo {
+  background-image: radial-gradient(110% 75% at 0% 0%, rgba(20,184,166,0.08), transparent 62%);
 }
 
 /* ── BARRA DE ARRIBA ─────────────────────────────────────────────────────
@@ -2882,7 +2889,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 }
 .titulo-pagina .bajada {
   margin-top: 8px; font-size: 0.84rem; line-height: 1.35; color: var(--text-muted);
-  max-width: 34ch; text-wrap: pretty;
+  max-width: 48ch; text-wrap: pretty;
 }
 
 /* ── BARRA DE ABAJO ────────────────────────────────────────────────────── */
@@ -2959,15 +2966,18 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
   margin-top: 4px; font-size: 2.15rem; line-height: 0.95; font-weight: 800;
   transition: color .3s ease;
 }
+/* 44px de alto: el mínimo cómodo para un dedo, y en el gimnasio los dedos
+   están transpirados y apurados. Ancho mínimo y no fijo: con la letra
+   agrandada (Perfil → Tamaño de letra) el "−15" tiene que entrar igual. */
 .descanso-boton {
-  width: 38px; height: 38px; border-radius: 11px;
+  min-width: 42px; height: 44px; padding: 0 6px; border-radius: 12px;
   display: flex; align-items: center; justify-content: center;
   font-family: var(--font-display); font-stretch: 90%; font-weight: 800; font-size: 0.8125rem;
   font-variant-numeric: tabular-nums;
   color: var(--text-strong);
   background: var(--surface-2); border: 1px solid var(--hairline);
 }
-.descanso-boton-principal { color: #fff; border-color: transparent; width: 44px; }
+.descanso-boton-principal { color: #fff; border-color: transparent; min-width: 48px; }
 .descanso-barra {
   height: 5px; border-radius: 999px; overflow: hidden;
   background: rgba(148,163,184,0.16);
@@ -2980,9 +2990,9 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 .descanso-barra-dock { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; border-radius: 0; }
 .dock-descanso-embebido { border-bottom: 1px solid var(--hairline); }
 @media (max-width: 360px) {
-  .descanso-boton { width: 34px; height: 36px; }
-  .descanso-boton-principal { width: 40px; }
-  .descanso-tiempo { font-size: 1.9rem; }
+  .descanso-boton { min-width: 36px; height: 42px; padding: 0 4px; }
+  .descanso-boton-principal { min-width: 42px; }
+  .descanso-tiempo { font-size: 1.85rem; }
 }
 
 /* ── CRONÓMETRO DE CARDIO ───────────────────────────────────────────────── */
@@ -5786,7 +5796,7 @@ function RestTimer({ seconds, accent, timerId = "default", exerciseName = "" }) 
   }
 
   const enPausa = estado === "paused";
-  const rotulo = enPausa ? "En pausa" : datos?.siguiente ? "Antes de empezar" : "Descansando";
+  const rotulo = enPausa ? "En pausa" : datos?.siguiente ? "Antes de empezar" : "Descanso";
   return (
     <div ref={raizRef} className="descanso descanso-activo" style={{ backgroundColor: tint(color, "0f"), borderColor: tint(color, "38") }}>
       <div className="flex items-center gap-2 w-full min-w-0">
@@ -5893,7 +5903,8 @@ const HELP_CHAPTERS = [
     bullets: [
       "Anotá reps y kg: detecta tus récords sola",
       "Elegí entre perseguir tu récord o seguir una planificación semana a semana (con RIR/RPE incluido)",
-      "Calentamiento general de movilidad, cronómetro de descanso y calentamiento por ejercicio",
+      "El descanso arranca solo al guardar la serie: sumale o restale 15 s, o saltealo. Si cerrás la tarjeta, te sigue en la barra de abajo",
+      "Calentamiento general de movilidad y calentamiento por ejercicio",
       "\"Resetear sesión de hoy\" corrige un error sin tocar tus récords",
     ],
   },
@@ -6848,6 +6859,15 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   const [showPRShare, setShowPRShare] = useState(false);
   const [rankUpInfo, setRankUpInfo] = useState(null); // { from, to, muscleName }
   const saveBtnRef = useRef(null);
+  const kgInputRef = useRef(null);
+  // Al tocar un campo se selecciona lo que tiene: la serie viene propuesta
+  // con lo de la vez pasada, y para cambiar "8" por "10" había que borrar
+  // antes de escribir. Ahora se escribe encima. (En un timeout: iOS pone el
+  // cursor después del foco y deshace una selección hecha en el mismo paso.)
+  // Sólo si el campo SIGUE con el foco: select() también enfoca, y si en el
+  // medio pasaste al otro campo (Enter), le robaba el foco de vuelta y los
+  // dos campos se lo pasaban en ronda para siempre.
+  const seleccionarAlEnfocar = (e) => { const el = e.target; setTimeout(() => { if (document.activeElement !== el) return; try { el.select(); } catch { /* ignorado a propósito */ } }, 0); };
   // Cronómetro de cardio (ver useCronoCardio): mide SIEMPRE el tiempo real,
   // así pausar, seguir y guardar antes de terminar hacen lo que dicen.
   const cardioTimerId = `cardio_${exerciseId}_${setIndex}`;
@@ -7440,7 +7460,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
                  style={{ border: `1px solid ${borderCol}`, boxShadow: glow }}>
               <div className={`flex-1 flex flex-col items-center justify-center ${compact ? "py-1" : "py-2.5"}`}>
                 {!compact && <span className="text-[9px] text-slate-600 font-bold uppercase tracking-widest">Reps</span>}
-                <input type="number" inputMode="decimal" aria-label="Repeticiones" placeholder={compact ? "reps" : "—"} value={reps} onChange={(e) => updateDraft({ reps: e.target.value })} className={`registro-input w-full bg-transparent text-center text-white focus:outline-none placeholder:text-slate-700 ${compact ? "text-[1.35rem] placeholder:text-[11px]" : "text-[2rem]"}`} />
+                <input type="number" inputMode="decimal" enterKeyHint="next" aria-label="Repeticiones" placeholder={compact ? "reps" : "—"} value={reps} onFocus={seleccionarAlEnfocar} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); kgInputRef.current?.focus(); } }} onChange={(e) => updateDraft({ reps: e.target.value })} className={`registro-input w-full bg-transparent text-center text-white focus:outline-none placeholder:text-slate-700 ${compact ? "text-[1.35rem] placeholder:text-[11px]" : "text-[2rem]"}`} />
               </div>
               <div className="flex items-center text-slate-700 text-base font-light select-none">×</div>
               <div className={`flex-1 flex flex-col items-center justify-center relative ${compact ? "py-1" : "py-2.5"}`}>
@@ -7449,7 +7469,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
                   style={{ color: tint(accent, "99") }}>
                   {weightLabel(unit)} <span className="text-slate-700">⇄</span>
                 </button>
-                <input type="number" inputMode="decimal" aria-label={`Peso en ${weightLabel(unit)}`} placeholder={compact ? weightLabel(unit) : "—"} value={kg} onChange={(e) => updateDraft({ kg: e.target.value })} className={`registro-input w-full bg-transparent text-center text-white focus:outline-none placeholder:text-slate-700 ${compact ? "text-[1.35rem] placeholder:text-[11px]" : "text-[2rem]"}`} />
+                <input ref={kgInputRef} type="number" inputMode="decimal" enterKeyHint="done" aria-label={`Peso en ${weightLabel(unit)}`} placeholder={compact ? weightLabel(unit) : "—"} value={kg} onFocus={seleccionarAlEnfocar} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); saveBtnRef.current?.click(); } }} onChange={(e) => updateDraft({ kg: e.target.value })} className={`registro-input w-full bg-transparent text-center text-white focus:outline-none placeholder:text-slate-700 ${compact ? "text-[1.35rem] placeholder:text-[11px]" : "text-[2rem]"}`} />
               </div>
               <button ref={saveBtnRef} onClick={handleSave} aria-label="Guardar serie" className={`flex items-center justify-center transition-all active:scale-95 !text-white ${compact ? "w-12" : "w-16"} ${saved ? "" : "hover:opacity-90"}`} style={{ backgroundColor: saved ? "#10B981" : accent }}>
                 <Check size={22} strokeWidth={2.6} />
@@ -9724,7 +9744,7 @@ function DeloadView({ logs, setLogs, settings = DEFAULT_SETTINGS, deloadProgress
       {onStartSession && <SessionStartBar activeSession={activeSession} onStart={() => onStartSession(activeDay, true)} color="#A855F7" />}
 
       <div key={activeDay} className="space-y-3 tab-fade-in">
-        {day.exercises.map((ex) => {
+        {day.exercises.map((ex, exIdx) => {
           const deloadSets = Math.max(1, Math.ceil(ex.sets.length / deloadSetDivisor));
           const bestPerSet = ex.sets.map((s, i) => {
             // BUG FIX (encontrado auditando el modo planificado): la descarga
@@ -9746,16 +9766,18 @@ function DeloadView({ logs, setLogs, settings = DEFAULT_SETTINGS, deloadProgress
           const hasPR = bestPerSet.some(Boolean);
           const hasHeavy = ex.sets.slice(0, deloadSets).some((s) => isHeavyRepRange(s.repRange));
           return (
-            <div key={ex.id} className="bg-slate-900/50 border border-slate-800/50 rounded-2xl overflow-hidden backdrop-blur-sm">
-              <div className="flex items-center gap-3 px-4 py-3.5 border-b border-slate-800/40">
-                <div className="w-1.5 h-6 rounded-full shrink-0" style={{ backgroundColor: day.color, boxShadow: `0 0 8px -2px ${day.color}` }} />
+            <div key={ex.id} className="ejercicio abierto" style={{ "--c": day.color }}>
+              {/* Misma cabecera que la tarjeta de la rutina normal (número de
+                  orden, nombre y músculo en su propia fila), así la descarga
+                  se lee como la misma app y no como otra pantalla. */}
+              <div className="flex items-center gap-3 pl-3 pr-3.5 py-3.5 border-b border-slate-800/60">
+                <span className="ejercicio-numero" aria-hidden="true">{String(exIdx + 1).padStart(2, "0")}</span>
                 <div className="flex-1 min-w-0">
-                  {/* Mismo criterio que ExerciseCard: el chip de músculo
-                      siempre en su propia fila, no al lado del nombre —
-                      así no depende de si el nombre es corto o largo. */}
-                  <span className="font-bold text-white text-sm block">{ex.name}</span>
-                  <span className="inline-block text-[10px] px-1.5 py-0.5 rounded-lg font-bold mt-1" style={{ backgroundColor: tint(day.color, "18"), color: day.color }}>{ex.muscle}</span>
-                  <p className="text-[10px] text-slate-500 mt-0.5">{ex.sets.length} → <span className="text-purple-400 font-bold">{deloadSets} series</span> en descarga</p>
+                  <h3 className="ejercicio-nombre">{ex.name}</h3>
+                  <div className="flex items-center gap-2 flex-wrap mt-1.5">
+                    <span className="text-[10px] uppercase px-1.5 py-0.5 rounded-md font-bold" style={{ backgroundColor: tint(day.color, "18"), color: day.color }}>{ex.muscle}</span>
+                    <span className="text-[11px] text-slate-500">{ex.sets.length} → <span className="text-purple-400 font-bold">{deloadSets} series</span></span>
+                  </div>
                 </div>
               </div>
               {hasPR && (
