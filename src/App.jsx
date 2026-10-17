@@ -1110,6 +1110,30 @@ function dayTabTextSizing(dayCount) {
   return { textClass: "text-[10px]", minHeight: 25 };
 }
 
+// Nombre de un día en su solapa, sin cortar nunca una palabra.
+//
+// Reporte: "que no se corten las palabras". Con 4 días o más, en un
+// teléfono angosto, "HOMBROS / BRAZOS" se leía "HOMBRO / S /…": la palabra
+// no entraba en el ancho de la solapa, se partía por la mitad y encima el
+// límite de 2 renglones le cortaba el final.
+// Ahora: el renglón sólo se puede partir en un espacio o después de una
+// barra (el \u200B), y el tamaño de la letra sale de la palabra MÁS LARGA y
+// del ancho real de la solapa (ver .dia-solapa-texto): la palabra siempre
+// entra entera, aunque eso la haga un poco más chica.
+function etiquetaDeDia(label) {
+  const texto = String(label || "");
+  const palabras = texto.split(/[\s/]+/).filter(Boolean);
+  const larga = palabras.reduce((m, w) => Math.max(m, w.length), 1);
+  return { texto: texto.replace(/\/\s*/g, "/\u200B"), larga };
+}
+// Tope del tamaño según cuántos días hay (más días, solapas más angostas).
+function tamanoMaxSolapa(dayCount) {
+  if (dayCount <= 3) return "0.95rem";
+  if (dayCount === 4) return "0.86rem";
+  if (dayCount === 5) return "0.78rem";
+  return "0.72rem";
+}
+
 // Devuelve el cronograma de una rutina (el guardado, o uno por defecto
 // calculado al vuelo si todavía no se personalizó ninguno).
 function getRoutineWeekSchedule(routineDef) {
@@ -2168,7 +2192,7 @@ const ANIMATION_CSS = `
   position: fixed;
   left: 0; right: 0;
   z-index: 30;
-  bottom: calc(var(--tabbar-h, 64px) + env(safe-area-inset-bottom, 0px));
+  bottom: calc(var(--tabbar-h, 64px) + 10px + env(safe-area-inset-bottom, 0px));
   padding-bottom: 8px;
 }
 @media (min-width: 1024px) { .session-bar-dock { bottom: 10px; } }
@@ -2177,7 +2201,7 @@ const ANIMATION_CSS = `
    sobre <html>. Antes era un número fijo según hubiera sesión o no; ahora
    suma el alto real del dock (descanso en curso + sesión), que el dock
    escribe en --dock-alto. */
-:root { --chat-nav-gap: calc(4rem + var(--dock-alto, 0px)); }
+:root { --chat-nav-gap: calc(4.75rem + var(--dock-alto, 0px)); }
 @media (min-width: 1024px) { :root { --chat-nav-gap: var(--dock-alto, 0px); } }
 @keyframes sessionBarIn {
   from { opacity: 0; transform: translateY(14px); }
@@ -2774,21 +2798,26 @@ input, textarea, [contenteditable="true"] {
   --text-muted: #a1a6ad;
   --text-faint: #6f747c;
   --bar-bg: rgba(12,13,16,0.93);
-  --tabbar-bg: rgba(15,16,20,0.97);
+  --tabbar-bg: rgba(20,22,27,0.95);
   --tabbar-h: 64px;
   /* Alto del dock de abajo (descanso en curso + sesión). Lo escribe el
      propio dock al cambiar de tamaño, y lo leen el aire de abajo de la
      página y la barra del chat, que tienen que quedar por encima. */
   --dock-alto: 0px;
 }
+:root { --social-tinta: #C4B5FD; }
+/* En claro, los colores de cada pestaña (teal, ámbar, lila) no llegan al
+   contraste mínimo como texto chico sobre blanco: se oscurecen. */
+.light-mode .titulo-pagina .ceja { color: color-mix(in srgb, var(--ceja) 60%, #000); }
 .light-mode {
+  --social-tinta: #6D28D9;
   --accent-ink: #0d9488;
   --accent-soft: rgba(20,184,166,0.13);
   --text-strong: #121519;
   --text-muted: #5d636b;
   --text-faint: #8b9098;
   --bar-bg: rgba(249,250,250,0.94);
-  --tabbar-bg: rgba(255,255,255,0.97);
+  --tabbar-bg: rgba(255,255,255,0.95);
 }
 
 html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; }
@@ -2806,8 +2835,8 @@ h1, h2, .font-display {
    pasan a ser un tipo de letra propio, el de los marcadores. */
 .uppercase {
   font-family: var(--font-display);
-  font-stretch: 104%;
-  letter-spacing: 0.05em;
+  font-stretch: 94%;
+  letter-spacing: 0.045em;
 }
 .uppercase.font-black { font-weight: 800; }
 /* Números grandes: Archivo angosta. Entran más grandes en el mismo lugar y
@@ -2874,6 +2903,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 /* ── TÍTULO DE CADA PESTAÑA ────────────────────────────────────────────── */
 .titulo-pagina { padding: 2px 2px 18px; }
 .titulo-pagina .ceja {
+  color: var(--ceja);
   display: flex; align-items: center; gap: 6px;
   font-family: var(--font-display); font-stretch: 104%; font-weight: 700;
   font-size: 0.6875rem; letter-spacing: 0.09em; text-transform: uppercase;
@@ -2893,13 +2923,18 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 }
 
 /* ── BARRA DE ABAJO ────────────────────────────────────────────────────── */
+/* Flota: una cápsula separada de los bordes, como la barra de iOS 26, en
+   vez de una franja pegada abajo. El contenido pasa por detrás, desenfocado. */
 .barra-pestanas {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+  position: fixed; z-index: 20;
+  left: 12px; right: 12px; bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  max-width: 520px; margin: 0 auto;
   background: var(--tabbar-bg);
-  -webkit-backdrop-filter: blur(20px) saturate(1.4); backdrop-filter: blur(20px) saturate(1.4);
-  border-top: 1px solid var(--hairline);
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  -webkit-backdrop-filter: blur(22px) saturate(1.5); backdrop-filter: blur(22px) saturate(1.5);
+  border: 1px solid var(--hairline); border-radius: 26px;
+  box-shadow: 0 18px 40px -18px rgba(0,0,0,0.85), 0 2px 8px rgba(0,0,0,0.3);
 }
+.light-mode .barra-pestanas { box-shadow: 0 14px 34px -16px rgba(20,24,29,0.28), 0 1px 4px rgba(20,24,29,0.08); }
 @media (min-width: 1024px) { .barra-pestanas { display: none; } }
 .barra-pestanas button {
   flex: 1; min-width: 0; height: var(--tabbar-h);
@@ -2961,6 +2996,12 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 }
 .descanso-quieto { background: var(--timer-idle-bg); border-color: var(--timer-idle-border); }
 .descanso-activo { flex-direction: column; align-items: stretch; gap: 10px; padding: 10px 10px 12px 12px; }
+/* En pantallas muy angostas los controles bajan a su propio renglón: así
+   el tiempo y su rótulo no se cortan. */
+@media (max-width: 359px) {
+  .descanso-activo > div:first-child { flex-wrap: wrap; row-gap: 8px; }
+  .descanso-controles { width: 100%; justify-content: space-between; }
+}
 .descanso-listo { padding: 8px 8px 8px 10px; }
 .descanso-tiempo {
   margin-top: 4px; font-size: 2.15rem; line-height: 0.95; font-weight: 800;
@@ -3013,6 +3054,22 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
   transition: background-color .3s ease, border-color .3s ease;
 }
 
+/* ── SOLAPAS DE DÍA (Rutina y Descarga) ─────────────────────────────────
+   La solapa es un contenedor: 100cqi es su ancho real. La letra se achica
+   lo justo para que la palabra más larga (--largo, en letras) entre entera:
+   Archivo angosta en mayúscula ocupa ~0,6em por letra. Nunca se parte una
+   palabra (overflow-wrap normal): sólo en espacios o después de una barra. */
+.dia-solapa { container-type: inline-size; }
+.dia-solapa-texto {
+  display: block; text-align: center;
+  font-family: var(--font-display); font-stretch: 84%; font-weight: 800;
+  text-transform: uppercase; letter-spacing: 0.02em; line-height: 1.08;
+  font-size: var(--fs-max, 0.8rem);
+  font-size: min(var(--fs-max, 0.9rem), calc(100cqi / var(--largo, 6) * 1.6));
+  overflow-wrap: normal; word-break: normal; hyphens: manual;
+  text-wrap: balance;
+}
+
 /* ── RUTINA: el día, sus ejercicios y cada serie ────────────────────────── */
 .selector-dias { border-radius: 16px; background: var(--surface-1); border: 1px solid var(--hairline); }
 /* El día ya no es una caja con borde: un lavado de su color detrás de la
@@ -3057,17 +3114,112 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 .series-puntos i { width: 7px; height: 7px; border-radius: 999px; background: var(--hairline); }
 .series-puntos i.hecha { background: var(--c); }
 
-/* La serie: sin caja propia. Una línea fina la separa de la anterior, como
-   los renglones de una planilla de entrenamiento. */
-.serie { border-top: 1px solid var(--hairline); }
+/* ── PLANILLA DE SERIES ───────────────────────────────────────────────────
+   Una fila por serie, alineada en columnas con el encabezado de la tarjeta:
+   número · objetivo · reps × kilos · ✓. Lo de ayuda va debajo, sangrado
+   hasta la columna del objetivo (--sangria-serie). */
+:root {
+  --cols-serie: 24px minmax(0, 1fr) 54px 10px 58px 46px;
+  --sangria-serie: 30px;
+}
+@media (max-width: 340px) {
+  :root { --cols-serie: 20px minmax(0, 1fr) 46px 8px 52px 42px; --sangria-serie: 26px; }
+}
+.tabla-encabezado {
+  display: grid; grid-template-columns: var(--cols-serie); column-gap: 6px; align-items: center;
+  padding: 8px 0 6px; border-bottom: 1px solid var(--hairline);
+  font-size: 0.6875rem; font-weight: 600; color: var(--text-faint);
+}
+.tabla-encabezado > span:first-child { text-align: center; }
+.tabla-unidad {
+  display: inline-flex; align-items: center; justify-content: center; gap: 3px;
+  height: 26px; border-radius: 8px; font-weight: 700; font-size: 0.6875rem; color: var(--c);
+  background: var(--accent-soft);
+  background: color-mix(in srgb, var(--c) 13%, transparent);
+}
+.serie { border-top: 1px solid var(--hairline); padding: 6px 0; }
+.tabla-encabezado + .serie { border-top: 0; }
+.serie-fila {
+  display: grid; grid-template-columns: var(--cols-serie); column-gap: 6px; align-items: center;
+  padding: 4px; margin: 0 -4px; border-radius: 14px;
+  transition: background-color .25s ease, box-shadow .2s ease;
+}
+.serie-hecha .serie-fila { background: color-mix(in srgb, var(--c) 10%, transparent); }
+.serie-n {
+  font-family: var(--font-display); font-stretch: 86%; font-weight: 800; font-size: 1.05rem;
+  text-align: center; color: var(--text-faint); font-variant-numeric: tabular-nums;
+}
+.serie-activa .serie-n, .serie-hecha .serie-n { color: var(--c); }
+.serie-ref { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; line-height: 1.2; }
+.serie-ref-rango {
+  display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px;
+  font-size: 0.75rem; font-weight: 600; color: var(--text-strong);
+}
+.serie-ref-meta {
+  display: inline-flex; align-items: center; gap: 4px; min-height: 18px;
+  font-size: 0.75rem; font-weight: 800; font-variant-numeric: tabular-nums; text-align: left;
+}
+.serie-ref-ant {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 0.6875rem; font-weight: 600; color: var(--text-faint); font-variant-numeric: tabular-nums;
+}
+.serie-campo {
+  width: 100%; height: 46px; border-radius: 12px; text-align: center;
+  background: var(--panel-sunken); border: 1px solid var(--hairline); color: var(--text-strong);
+  font-family: var(--font-display); font-stretch: 86%; font-weight: 800; font-size: 1.35rem;
+  font-variant-numeric: tabular-nums; -moz-appearance: textfield; appearance: textfield;
+  transition: border-color .15s ease, background-color .15s ease;
+}
+.serie-campo::-webkit-outer-spin-button, .serie-campo::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.serie-campo:focus { outline: none; border-color: var(--c); background: color-mix(in srgb, var(--c) 9%, var(--panel-sunken)); }
+.serie-campo::placeholder { color: var(--text-faint); opacity: .55; }
+.serie-por { text-align: center; color: var(--text-faint); font-size: 0.8rem; }
+.serie-valor {
+  grid-column: 3 / span 3; height: 46px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+  font-family: var(--font-display); font-stretch: 86%; font-weight: 800; font-size: 1.35rem;
+  color: var(--c); font-variant-numeric: tabular-nums;
+}
+.serie-valor .serie-por { font-size: 0.85rem; }
+.serie-valor-rpe {
+  font-family: var(--font-sans); font-stretch: 100%; font-size: 0.625rem; font-weight: 700;
+  padding: 2px 5px; border-radius: 6px; background: var(--surface-2); color: var(--text-muted); margin-left: 3px;
+}
+.serie-check {
+  width: 100%; height: 46px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--c); background: var(--accent-soft);
+  background: color-mix(in srgb, var(--c) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--c) 40%, transparent);
+  transition: background-color .2s ease, color .2s ease;
+}
+.serie-check.hecha { background: var(--c); color: #fff; border-color: transparent; }
+.serie-aviso { font-size: 0.75rem; line-height: 1.35; margin: 4px 0 2px var(--sangria-serie); }
+.serie-ajustes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin: 6px 0 2px var(--sangria-serie); }
+.serie-ajustes button {
+  height: 36px; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--hairline);
+  font-family: var(--font-display); font-stretch: 90%; font-weight: 800; font-size: 0.8125rem;
+  color: var(--text-strong); font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.serie-ajustes button span { font-family: var(--font-sans); font-stretch: 100%; font-weight: 600; font-size: 0.625rem; color: var(--text-faint); margin-left: 2px; }
+.serie-sugerencia {
+  display: flex; align-items: center; gap: 6px; width: calc(100% - var(--sangria-serie)); margin: 6px 0 0 var(--sangria-serie);
+  padding: 8px 10px; border-radius: 10px; border: 1px solid; font-size: 0.75rem; font-weight: 600;
+}
+.serie-boton-suave {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  width: calc(100% - var(--sangria-serie)); margin: 6px 0 0 var(--sangria-serie); height: 36px; border-radius: 10px;
+  background: var(--panel-sunken); border: 1px dashed var(--hairline); color: var(--text-muted);
+  font-size: 0.75rem; font-weight: 600;
+}
+.serie-chip {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px; border-radius: 7px;
+  font-size: 0.75rem; font-weight: 800; font-variant-numeric: tabular-nums;
+}
+.serie-cardio { padding: 12px 0; }
 .serie-rotulo {
   font-family: var(--font-display); font-weight: 800; font-size: 0.75rem;
   text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-strong);
-}
-.registro { background: var(--panel-sunken); }
-.registro-input {
-  font-family: var(--font-display); font-stretch: 86%; font-weight: 800;
-  letter-spacing: -0.01em; font-variant-numeric: tabular-nums;
 }
 
 /* ── PORTADA (login) ────────────────────────────────────────────────────── */
@@ -3093,6 +3245,145 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
   margin-top: 18px; max-width: 30ch; font-size: 0.95rem; line-height: 1.45;
   color: #a1a6ad; text-wrap: pretty;
 }
+
+/* ── LA BARRA CARGADA ───────────────────────────────────────────────────── */
+.barra-cargada { display: block; width: 100%; overflow: visible; }
+.barra-eje { fill: #8a8f97; }
+.barra-agarre { fill: #6b7079; }
+.barra-collar { fill: #b8bcc2; }
+.light-mode .barra-eje { fill: #9aa0a8; }
+.light-mode .barra-agarre { fill: #7b8089; }
+.light-mode .barra-collar { fill: #6b7079; }
+.disco { stroke: rgba(0,0,0,0.28); stroke-width: 0.6; }
+.disco-hueco { fill: none; stroke: var(--hairline); stroke-width: 1.1; stroke-dasharray: 2.2 2; }
+.disco-entra { transform-box: fill-box; transform-origin: center; animation: discoEntra .5s cubic-bezier(.34,1.45,.64,1) backwards; }
+@keyframes discoEntra { from { transform: translateX(var(--desde, -9px)) scaleY(.55); opacity: 0; } to { transform: none; opacity: 1; } }
+.barra-cargada.completa { filter: drop-shadow(0 0 6px rgba(244,196,48,0.35)); }
+.dia-barra { margin-top: 14px; }
+.dia-barra-texto { margin-top: 6px; text-align: center; font-size: 0.75rem; font-weight: 600; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.dia-cabecera { overflow: hidden; border-radius: 22px 22px 0 0; }
+.dia-fondo {
+  position: absolute; right: -8px; top: -18px; pointer-events: none; user-select: none;
+  font-family: var(--font-display); font-weight: 900; font-stretch: 125%; font-size: 6rem; line-height: 1;
+  text-transform: uppercase; letter-spacing: -0.045em; white-space: nowrap;
+  color: transparent; -webkit-text-stroke: 1.2px color-mix(in srgb, var(--c) 24%, transparent);
+}
+@media (prefers-reduced-motion: reduce) { .disco-entra { animation: none !important; } }
+
+/* ── SOCIAL ─────────────────────────────────────────────────────────────── */
+/* La tarjeta de atleta: superficie de siempre, teñida del color de TU rango
+   en diagonal con rayas finas, como el frente de una figurita. */
+.atleta {
+  position: relative; overflow: hidden; border-radius: 22px; padding: 16px;
+  background: var(--surface-1);
+  border: 1px solid var(--hairline);
+  border-color: color-mix(in srgb, var(--rango) 42%, var(--hairline));
+}
+.atleta-fondo {
+  position: absolute; inset: 0; pointer-events: none;
+  background:
+    linear-gradient(125deg, color-mix(in srgb, var(--rango) 28%, transparent) 0%, transparent 58%),
+    repeating-linear-gradient(125deg, color-mix(in srgb, var(--rango) 10%, transparent) 0 2px, transparent 2px 13px);
+  -webkit-mask-image: linear-gradient(110deg, #000 0%, #000 32%, transparent 78%);
+  mask-image: linear-gradient(110deg, #000 0%, #000 32%, transparent 78%);
+}
+.atleta-avatar {
+  width: 58px; height: 58px; border-radius: 19px; overflow: hidden; flex: none;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-display); font-weight: 800; font-size: 1.5rem; color: #fff;
+  background: linear-gradient(135deg, var(--rango), color-mix(in srgb, var(--rango) 50%, #000));
+  box-shadow: 0 0 0 2px var(--surface-1), 0 0 0 4px color-mix(in srgb, var(--rango) 65%, transparent);
+}
+.atleta-nombre {
+  font-family: var(--font-display); font-stretch: 106%; font-weight: 800; font-size: 1.15rem;
+  line-height: 1.1; color: var(--text-strong); overflow-wrap: anywhere;
+}
+.atleta-rango { display: flex; flex-direction: column; align-items: center; gap: 2px; flex: none; }
+.atleta-rango span { font-size: 0.6875rem; font-weight: 800; color: var(--rango); white-space: nowrap; }
+.atleta-stats {
+  position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--hairline);
+}
+.atleta-stats > div { min-width: 0; }
+.atleta-stats > div + div { border-left: 1px solid var(--hairline); padding-left: 12px; }
+.atleta-stat-rotulo { display: flex; align-items: center; gap: 4px; font-size: 0.6875rem; font-weight: 600; color: var(--text-muted); }
+.atleta-stat-valor {
+  margin-top: 5px; font-family: var(--font-display); font-stretch: 86%; font-weight: 800;
+  font-size: 1.85rem; line-height: 1; color: var(--text-strong); font-variant-numeric: tabular-nums;
+}
+.atleta-stat-valor small { font-family: var(--font-sans); font-stretch: 100%; font-size: 0.75rem; font-weight: 700; color: var(--text-muted); margin-left: 3px; }
+.atleta-accion {
+  position: relative; display: flex; align-items: center; gap: 8px; width: 100%;
+  margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--hairline);
+  font-size: 0.8125rem; font-weight: 600; color: var(--text-strong); text-align: left;
+}
+/* Historias: aros cuadrados (no círculos) con el color del día que
+   entrenaron; apagados cuando ya les aplaudiste. */
+.historias { display: flex; gap: 14px; overflow-x: auto; padding: 4px 2px 6px; scroll-snap-type: x proximity; }
+.historia { position: relative; flex: none; width: 70px; display: flex; flex-direction: column; align-items: center; scroll-snap-align: start; }
+.historia-aro {
+  width: 66px; height: 66px; border-radius: 23px; padding: 3px;
+  background: conic-gradient(from 210deg, var(--dia), color-mix(in srgb, var(--dia) 35%, #ffffff), var(--dia));
+}
+.historia-aro.vista { background: var(--hairline); }
+.historia-aro > img, .historia-aro > span {
+  width: 100%; height: 100%; border-radius: 20px; object-fit: cover;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface-2); border: 2px solid var(--app-bg);
+  font-family: var(--font-display); font-weight: 800; font-size: 1.3rem; color: var(--text-strong);
+}
+.historia-aplauso {
+  position: absolute; top: 42px; right: -2px; width: 32px; height: 32px; border-radius: 11px;
+  display: flex; align-items: center; justify-content: center; font-size: 15px;
+  background: #7C3AED; color: #fff; border: 2px solid var(--app-bg);
+  transition: transform .15s ease;
+}
+.historia-aplauso.hecho { background: var(--surface-3); color: var(--text-muted); }
+.historia-nombre { margin-top: 8px; max-width: 70px; text-align: center; font-size: 0.75rem; font-weight: 600; color: var(--text-strong); line-height: 1.15; overflow-wrap: anywhere; }
+.historia-cuando { margin-top: 1px; max-width: 70px; text-align: center; font-size: 0.625rem; color: var(--text-faint); line-height: 1.2; }
+/* Avisos: renglones de notificación. */
+.aviso-social {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  padding: 10px 12px; border-radius: 16px; background: var(--surface-1);
+  border: 1px solid var(--hairline);
+  border-color: color-mix(in srgb, var(--c) 34%, var(--hairline));
+}
+.aviso-social-icono {
+  width: 38px; height: 38px; border-radius: 12px; flex: none;
+  display: flex; align-items: center; justify-content: center; font-size: 18px;
+  color: var(--c); background: color-mix(in srgb, var(--c) 16%, transparent);
+}
+.aviso-social p { flex: 1; min-width: 0; font-size: 0.8125rem; line-height: 1.35; color: var(--text-muted); }
+.aviso-social b { color: var(--text-strong); }
+/* Podio del Ranking. */
+.podio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: end; gap: 8px; padding-top: 6px; }
+.podio-lugar { display: flex; flex-direction: column; align-items: center; min-width: 0; text-align: center; }
+.podio-avatar {
+  position: relative; width: 52px; height: 52px; border-radius: 18px; margin-bottom: 6px;
+  display: flex; align-items: center; justify-content: center; background: var(--surface-2);
+  box-shadow: 0 0 0 2px var(--surface-1), 0 0 0 4px var(--medalla);
+  font-family: var(--font-display); font-weight: 800; font-size: 1.2rem; color: var(--text-strong);
+}
+.podio-1 .podio-avatar { width: 62px; height: 62px; border-radius: 21px; }
+.podio-avatar > img { width: 100%; height: 100%; border-radius: inherit; object-fit: cover; }
+.podio-medalla {
+  position: absolute; bottom: -7px; left: 50%; transform: translateX(-50%);
+  width: 22px; height: 22px; border-radius: 8px; display: flex; align-items: center; justify-content: center;
+  background: var(--medalla); color: #1b1e24;
+}
+.podio-nombre { margin-top: 6px; max-width: 100%; font-size: 0.75rem; font-weight: 700; color: var(--text-strong); line-height: 1.15; overflow-wrap: anywhere; }
+.podio-lugar.yo .podio-nombre { color: var(--accent-ink); }
+.podio-dato { display: inline-flex; align-items: center; gap: 3px; margin-top: 2px; font-size: 0.6875rem; font-weight: 800; }
+.podio-escalon {
+  margin-top: 8px; width: 100%; border-radius: 12px 12px 4px 4px;
+  display: flex; align-items: flex-start; justify-content: center; padding-top: 6px;
+  font-family: var(--font-display); font-stretch: 86%; font-weight: 800; font-size: 1.4rem; color: var(--medalla);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--medalla) 22%, transparent), color-mix(in srgb, var(--medalla) 6%, transparent));
+  border: 1px solid color-mix(in srgb, var(--medalla) 35%, transparent);
+}
+.podio-1 .podio-escalon { height: 64px; }
+.podio-2 .podio-escalon { height: 46px; }
+.podio-3 .podio-escalon { height: 34px; }
 
 /* ── SUPERSERIE ─────────────────────────────────────────────────────────── */
 .superserie {
@@ -5806,7 +6097,7 @@ function RestTimer({ seconds, accent, timerId = "default", exerciseName = "" }) 
             {relojCorto(restante)}
           </p>
         </div>
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="descanso-controles flex items-center gap-1.5 shrink-0">
           <BotonDescanso onClick={() => ajustarDescanso(timerId, -15)} label="Restar 15 segundos">−15</BotonDescanso>
           <BotonDescanso principal color={color} onClick={() => (enPausa ? reanudarDescanso(timerId) : pausarDescanso(timerId))} label={enPausa ? "Seguir el descanso" : "Pausar el descanso"}>
             {enPausa ? <Play size={15} className="fill-current ml-0.5" /> : <Pause size={15} className="fill-current" />}
@@ -6670,7 +6961,7 @@ function describePlannedOutcome(target, hecho, isRecord, unit) {
   return { type: "down", msg: `Te faltó para la meta (${target.reps}×${kgToDisplay(target.kg, unit)}${weightLabel(unit)})` };
 }
 
-function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, accent, logs, setLogs, drafts = {}, setDrafts, autoShowPrShare = true, onDisableAutoShowPrShare, hasActiveSession = true, cardio = false, dumbbellDouble = null, fieldSettings = DEFAULT_SETTINGS, onUpdateSettings = null, sex = null, age = null, restTimerId = null, restSeconds = null, isLastSet = false, weekInCycle = null, nextRestTimerId = null, nextRestSeconds = null, nextExerciseName = null }) {
+function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, accent, logs, setLogs, drafts = {}, setDrafts, autoShowPrShare = true, onDisableAutoShowPrShare, hasActiveSession = true, cardio = false, dumbbellDouble = null, fieldSettings = DEFAULT_SETTINGS, onUpdateSettings = null, sex = null, age = null, restTimerId = null, restSeconds = null, isLastSet = false, weekInCycle = null, nextRestTimerId = null, nextRestSeconds = null, nextExerciseName = null, activa = true }) {
   // Modo "rutina planificada" (ver DEFAULT_SETTINGS.trainingMode): si hay
   // una meta cargada para ESTA semana, se muestra "Marca a alcanzar" en
   // vez de "Récord" — pensado para quien sigue un plan con cargas ya
@@ -6685,10 +6976,6 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   // hacía nada. Si te tomaste el trabajo de cargar una meta para esta
   // serie, la serie muestra la meta; el récord pasa a la línea de abajo.
   const isPlannedMode = !!plannedTarget;
-  // Fila compacta (fieldSettings.compactSetRow): misma lógica y los mismos
-  // campos, sólo que en una sola línea en vez de la tarjeta alta — ver los
-  // bloques marcados con `compact` más abajo.
-  const compact = fieldSettings.compactSetRow === true;
   const globalUnit = useWeightUnit();
   // Unidad local: arranca desde la preferencia global, pero el usuario puede
   // cambiarla ejercicio por ejercicio con el toggle kg/lbs del input.
@@ -6796,34 +7083,6 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   // Viven en el draft como cualquier otro campo — se limpian solas al
   // guardar la serie, junto con reps/kg, sin lógica nueva de reseteo.
   const extraRows = draft.extra || [];
-  // Cambiar de unidad convierte TAMBIÉN lo que ya está escrito y sin
-  // guardar, en todas las filas y no sólo en ésta: los borradores viven en
-  // la unidad de pantalla, así que un "60" que eran kilos pasaría a
-  // significar 60 libras sin que nadie lo haya tocado.
-  const cambiarUnidad = () => {
-    const nueva = unit === "kg" ? "lbs" : "kg";
-    const convertir = (v) => {
-      const n = parseFloat(v);
-      return isNaN(n) ? v : String(kgToDisplay(displayToKg(n, unit), nueva));
-    };
-    if (setDrafts) {
-      setDrafts((prev) => {
-        const next = {};
-        Object.entries(prev || {}).forEach(([k, d]) => {
-          if (!d || typeof d !== "object") { next[k] = d; return; }
-          next[k] = {
-            ...d,
-            ...(d.kg !== undefined && d.kg !== "" ? { kg: convertir(d.kg) } : {}),
-            ...(Array.isArray(d.extra) ? { extra: d.extra.map((x) => (x && x.kg !== undefined && x.kg !== "" ? { ...x, kg: convertir(x.kg) } : x)) } : {}),
-          };
-        });
-        return next;
-      });
-    }
-    onUpdateSettings?.({ weightUnit: nueva });
-    haptic(12);
-  };
-
   const addExtraRow = () => updateDraft({ extra: [...extraRows, { reps: "", kg: "" }] });
   const updateExtraRow = (idx, patch) => updateDraft({ extra: extraRows.map((x, i) => (i === idx ? { ...x, ...patch } : x)) });
   const removeExtraRow = (idx) => updateDraft({ extra: extraRows.filter((_, i) => i !== idx) });
@@ -7088,531 +7347,32 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     setLogs({ ...logs, [prKey]: { kg: k, reps: r, date: today, manual: true } });
     setEditingPR(false);
   };
-  return (
-    <div className={`serie relative ${compact ? "py-2" : "py-3.5"}`} style={{ "--c": accent }}>
-      <PRBurst anchorRef={saveBtnRef} trigger={prBurst} />
-      <div className="flex items-center justify-between gap-2 mb-2.5 flex-wrap">
-        <div className="flex items-center gap-2 flex-wrap min-w-0">
-          <span className="serie-rotulo shrink-0">{cardio ? "Sesión" : `Serie ${setIndex + 1}`}</span>
-          {!cardio && <span className="text-[11.5px] font-medium text-slate-500 shrink-0 tabular-nums">{setDef.repRange} reps</span>}
-          {!cardio && isHeavyRepRange(setDef.repRange) && <span className="text-[10px] bg-amber-500/15 text-amber-400 rounded-lg px-2 py-0.5 font-bold shrink-0">FUERZA</span>}
-          {!cardio && setDef.type === "dropset" && <span className="text-[10px] bg-orange-500/15 text-orange-400 rounded-lg px-2 py-0.5 font-bold shrink-0">DROP-SET</span>}
-          {!cardio && setDef.type === "restpause" && <span className="text-[10px] bg-rose-500/15 text-rose-400 rounded-lg px-2 py-0.5 font-bold shrink-0">REST-PAUSE</span>}
-        </div>
-        {feedback && (
-          <span className={`flex items-center gap-1.5 text-xs font-semibold min-w-0 ${feedback.type === "pr" ? "text-emerald-400 pr-pop" : feedback.type === "down" ? "text-rose-400" : feedback.type === "first" ? "text-teal-400" : "text-amber-400"}`}>
-            {feedback.msg}
-            {feedback.type === "pr" && !cardio && <button onClick={() => setShowPRShare(true)} aria-label="Compartir esta marca" className="text-emerald-300 hover:text-emerald-100 active:scale-90 transition"><Share2 size={13} /></button>}
-          </span>
-        )}
-      </div>
-      {feedback?.suggestUp && <div className="mb-2.5 -mt-1 text-[11px] text-teal-400 flex items-center gap-1.5"><TrendingUp size={11} /> Superaste el rango · probá +{pasoKg}{weightLabel(unit)} la próxima</div>}
-      {feedback?.noSession && <div className="mb-2.5 -mt-1 text-[11px] text-amber-400 flex items-center gap-1.5"><AlertTriangle size={11} /> Tocá "Iniciar sesión" arriba para que este día cuente en tu historial</div>}
-
-      {/* El récord (o, en modo "planificado", la meta de esta semana) va
-          PRIMERO, grande — es lo que estás tratando de alcanzar en esta
-          serie, así que tiene que verse antes de ponerte a cargar
-          números, no como una nota chica al final. */}
-      {/* Modo compacto (fieldSettings.compactSetRow): en vez de la tarjeta
-          alta de arriba, una sola línea con lo mismo — la referencia (meta
-          o récord) y, si está activado, lo que hiciste la vez pasada. Cada
-          serie pasa de ~170px a ~70px, así entra el ejercicio entero en
-          pantalla sin scrollear (mismo criterio que Hevy/Strong). */}
-      {compact && (currentPR || isPlannedMode || (fieldSettings.showLastSession === true && lastSession)) && !cardio && (
-        <div className="flex items-center gap-2 mb-1.5 px-0.5 min-w-0">
-          {/* Sin rótulo: en la fila compacta el ícono alcanza (libreta = lo
-              planificado, copa = tu récord) y cada palabra que se saca es
-              ancho que gana el número, que es lo que venís a leer. */}
-          {(currentPR || isPlannedMode) && (
-            <span className="flex items-center gap-1 min-w-0 shrink-0" aria-label={isPlannedMode ? "Planificado" : "Récord"}>
-              {isPlannedMode ? <ClipboardCheck size={11} style={{ color: accent }} className="shrink-0" /> : <Trophy size={11} style={{ color: accent }} className="shrink-0" />}
-              <span className="text-[11px] font-black tabular-nums" style={{ color: accent }}>
-                {isPlannedMode
-                  ? `${plannedTarget.reps}×${kgToDisplay(plannedTarget.kg, unit)}`
-                  : `${currentPR.reps}×${kgToDisplay(currentPR.kg, unit)}`}
-                <span className="opacity-60 text-[9px] ml-0.5">{weightLabel(unit)}</span>
-              </span>
-            </span>
-          )}
-          {fieldSettings.showLastSession === true && lastSession && (
-            <span className="flex items-center gap-1 min-w-0 truncate px-1.5 py-0.5 rounded-md" style={{ backgroundColor: "rgba(157,162,168,0.10)" }}>
-              <History size={9} className="shrink-0 text-slate-600" />
-              <span className="text-[9px] font-black uppercase tracking-wider text-slate-600">Ant</span>
-              <span className="text-[10px] font-black tabular-nums text-slate-400">{lastSession.reps}×{kgToDisplay(lastSession.kg, unit)}{weightLabel(unit)}</span>
-            </span>
-          )}
-        </div>
-      )}
-      <div className={`flex items-center gap-2 ${compact ? "hidden" : "mb-3"}`}>
-        {(currentPR || isPlannedMode) ? (
-          <div className="relative overflow-hidden flex items-center gap-2.5 pl-3.5 pr-2 py-3 rounded-xl flex-1" style={{ backgroundColor: tint(accent, "12"), border: `1px solid ${tint(accent, "36")}` }}>
-            {/* Libreta = una carga decidida de antemano (a mano o por tu
-                entrenador); copa = tu propia mejor marca. El blanco (Target)
-                que se usaba antes para lo planificado no distinguía bien de
-                "objetivo a superar", que es justo lo contrario. */}
-            {isPlannedMode ? <ClipboardCheck size={16} style={{ color: accent }} className="shrink-0 relative" /> : <Trophy size={16} style={{ color: accent }} className="shrink-0 relative" />}
-            <div className="flex-1 min-w-0 relative leading-none">
-              {/* Sin rótulo: el ícono de la izquierda ya dice cuál de los dos
-                  es (libreta = planificado, copa = récord). El alto de la
-                  tarjeta se mantiene con el padding de arriba (py-[16px] en
-                  vez de py-2.5), así sacar la palabra no encoge la fila ni
-                  descoloca el resto de la serie. */}
-              <p className="truncate">
-                {override?.manual && !isPlannedMode && (
-                  <span className="block text-[8.5px] font-black uppercase tracking-[0.16em] mb-1" style={{ color: tint(accent, "aa") }}>Editado</span>
-                )}
-                <span className="num-display text-[1.7rem] leading-none font-extrabold" style={{ color: accent }}>
-                  {isPlannedMode
-                    ? (cardio ? <>{plannedTarget.minutes} min</> : <>{plannedTarget.reps}<span className="opacity-50 text-sm mx-0.5">×</span>{kgToDisplay(plannedTarget.kg, unit)}<span className="opacity-60 text-xs ml-0.5">{weightLabel(unit)}</span></>)
-                    : (cardio ? <>{currentPR.minutes} min{currentPR.km ? ` · ${currentPR.km}km` : ""}</> : <>{currentPR.reps}<span className="opacity-50 text-sm mx-0.5">×</span>{kgToDisplay(currentPR.kg, unit)}<span className="opacity-60 text-xs ml-0.5">{weightLabel(unit)}</span></>)}
-                </span>
-              </p>
-              {/* RIR/RPE y fase de mesociclo — conceptos de entrenamiento
-                  personalizado que el plan semanal ahora puede incluir (ver
-                  ProgressionProposalComposer), además del peso y las reps. */}
-              {isPlannedMode && (plannedTarget.rpe != null || plannedTarget.phase) && (
-                <p className="truncate text-[10.5px] font-bold mt-0.5" style={{ color: tint(accent, "95") }}>
-                  {plannedTarget.rpe != null && formatEffort(plannedTarget.rpe, fieldSettings.rpeDisplayMode)}
-                  {plannedTarget.rpe != null && plannedTarget.phase && " · "}
-                  {plannedTarget.phase}
-                </p>
-              )}
-            </div>
-            {/* El récord no desaparece cuando hay meta, pero tampoco se
-                cuelga del RPE como una frase más ("RPE 8 · Tu récord
-                6×70kg" llenaba la tarjeta de texto). Va como una columna
-                chica al costado, con el mismo esqueleto rótulo+número que
-                la meta: dos números alineados se comparan de un vistazo,
-                una oración hay que leerla. */}
-            {isPlannedMode && currentPR && !cardio && (
-              <div className="relative shrink-0 flex items-center gap-1 leading-none" aria-label={`Tu récord: ${currentPR.reps}×${kgToDisplay(currentPR.kg, unit)}${weightLabel(unit)}`}>
-                <Trophy size={10} className="shrink-0" style={{ color: tint(accent, "60") }} />
-                <span className="text-[10px] font-bold tabular-nums" style={{ color: tint(accent, "85") }}>
-                  {currentPR.reps}<span className="opacity-40 mx-px">×</span>{kgToDisplay(currentPR.kg, unit)}
-                </span>
-              </div>
-            )}
-            {/* El lápiz corrige el RÉCORD (ver el panel "Corregir récord").
-                Antes se escondía en modo planificado, y como ahora una serie
-                con meta SIEMPRE se muestra planificada, esconderlo dejaría
-                sin forma de corregir un récord mal cargado. Se muestra
-                siempre que haya un récord que corregir. */}
-            {!cardio && !!currentPR && (
-              <button onClick={() => { setEditReps(currentPR?.reps ?? ""); setEditKg(currentPR ? kgToDisplay(currentPR.kg, unit) : ""); setEditingPR((e) => !e); }} aria-label="Corregir récord" className="relative flex items-center justify-center w-8 h-8 rounded-lg shrink-0 transition active:scale-90" style={{ backgroundColor: tint(accent, "22"), color: accent }}>
-                <Edit3 size={13} />
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-xl flex-1" style={{ backgroundColor: "var(--panel-sunken)", border: "1px dashed var(--hairline)" }}>
-            <Target size={16} className="text-slate-500 shrink-0" />
-            <p className="text-[12.5px] text-slate-400">Sin marca aún: esta va a ser tu primera</p>
-          </div>
-        )}
-      </div>
-      {/* Lo que hiciste la vez pasada en ESTA serie (opción activable) —
-          en el layout normal va como una línea aparte debajo de la
-          referencia; en el compacto ya está integrado arriba. */}
-      {/* Una sola línea, lo más liviana posible. El rótulo "La vez pasada"
-          era redundante con el "hace 4 días" que iba al otro extremo, y la
-          placa de ícono le daba a la izquierda un peso que este dato no
-          merece: es la referencia callada, no la protagonista. Ahora el
-          rótulo ES el cuándo. Tampoco lleva la diferencia contra la meta:
-          con los dos números uno arriba del otro, se ve sin calcularla. */}
-      {/* De dónde salen los números que ya están cargados en la serie: lo
-          que hiciste en ESTA misma serie la última vez, y hace cuánto. El
-          campo viene autocompletado con eso (ver ), así que acá
-          no hay ninguna acción que ofrecer — es el pie de página del dato. */}
-      {!compact && fieldSettings.showLastSession === true && lastSession && !cardio && (
-        <div
-          className="-mt-1.5 mb-2.5 px-3 py-2 rounded-xl leading-none"
-          style={{ backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}>
-          {/* Rótulo arriba, número abajo, los dos pegados a la izquierda —
-              el mismo esqueleto que la tarjeta de referencia de acá arriba,
-              así los dos pesos quedan en la misma columna y se comparan
-              bajando la vista, sin cruzar la pantalla. */}
-          {/* Sin el "hace": el relojito ya dice que es tiempo pasado, así que
-              la palabra sólo ocupaba lugar. "hoy" y "ayer" quedan enteros
-              porque ahí no hay ningún "hace" que sacar. */}
-          <span className="flex items-center gap-1 text-[8.5px] font-black uppercase tracking-[0.14em] text-slate-600 mb-1.5">
-            <History size={9} className="shrink-0" />{(haceCuanto(daysSince(lastSession.date)) || "hoy").replace(/^hace /, "")}
-          </span>
-          <span className="block text-[13px] font-bold tabular-nums text-slate-400">
-            {lastSession.reps}<span className="opacity-40 mx-0.5">×</span>{kgToDisplay(lastSession.kg, unit)}<span className="opacity-50 text-[9px] ml-0.5">{weightLabel(unit)}</span>
-          </span>
-        </div>
-      )}
-
-        {/* Modo bloqueado: si ya guardaste una entrada hoy Y la sesión está
-          activa, los inputs se reemplazan por la vista de solo lectura para
-          evitar guardar dos veces sin querer. Sin sesión iniciada (o después
-          de finalizar) los inputs quedan desbloqueados siempre. */}
-      {(() => {
-        const key = `${exerciseId}_${setIndex}`;
-        const history = logs[key] || [];
-        // BUG FIX: si el mismo ejercicio también está en la semana de
-        // descarga (marca con "deload:true"), esa marca caía acá y la fila
-        // normal se mostraba como "ya guardada hoy" con el peso/tiempo
-        // REDUCIDO de la descarga — bloqueando la carga real y encima
-        // inflando el % de la rutina (ver RoutineView). Se ignoran las
-        // marcas de descarga para esta vista.
-        const todayEntry = yaRegistradaHoy;
-        if (cardio) {
-          const todayCardio = (logs[`${exerciseId}_${setIndex}`] || []).find((h) => h.date === today && !h.deload);
-          if (todayCardio && hasActiveSession && !draft.editing) {
-            return (
-              <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ backgroundColor: tint(accent, "15"), border: `1px solid ${tint(accent, "30")}` }}>
-                <Check size={14} style={{ color: accent }} className="shrink-0" />
-                <span className="text-sm font-black" style={{ color: accent }}>{todayCardio.minutes} min{todayCardio.km ? ` · ${todayCardio.km} km` : ""}</span>
-                <span className="text-[10px] text-slate-500 ml-1">guardado hoy</span>
-                <button onClick={() => updateDraft({ minutes: String(todayCardio.minutes), km: String(todayCardio.km || ""), editing: true })} className="ml-auto text-[10px] font-bold px-2 py-1 rounded-lg transition" style={{ backgroundColor: tint(accent, "20"), color: accent }}>Editar</button>
-              </div>
-            );
-          }
-          // Pedido: "cambiar sistema de cardio, que sea más sencillo" →
-          // aclarado después: mantener los dos modos y todos los controles,
-          // sólo prolijizar. El reloj y sus controles viven en
-          // PanelCronoCardio (el mismo que usa la descarga); abajo, lo que se
-          // anota y el botón de guardar.
-          const cardioManual = cardioMode === "stopwatch" && !cardioRunning && cardioElapsed === 0;
-          const filaSoloGuardar = !cardioManual && fieldSettings.showKm === false;
-          return (
-            <div className="space-y-2.5">
-              <PanelCronoCardio
-                accent={accent}
-                modo={cardioMode}
-                corriendo={cardioRunning}
-                transcurrido={cardioElapsed}
-                objetivoSeg={cardioObjetivoSeg}
-                onCambiarModo={cambiarModoCardio}
-                onArrancar={arrancarCardio}
-                onPausar={pausarCardio}
-                onReiniciar={reiniciarCardio}
-                onAjustarObjetivo={(delta) => {
-                  const nuevo = Math.max(60, cardioObjetivoSeg + delta);
-                  if (nuevo <= cardioElapsed) return;
-                  updateDraft({ minutes: String(Math.round((nuevo / 60) * 10) / 10) });
-                  reprogramarCardio(nuevo);
-                }}
-                entradaObjetivo={(
-                  <label className="flex items-center gap-2.5 rounded-xl pl-3.5 pr-3 py-1.5" style={{ backgroundColor: "var(--panel-sunken)", border: "1px solid var(--hairline)" }}>
-                    <span className="text-[12px] font-semibold text-slate-400 flex-1">Minutos objetivo</span>
-                    <input type="number" inputMode="decimal" placeholder="30" value={minutes} onChange={(e) => updateDraft({ minutes: e.target.value })} className="w-20 bg-transparent text-right num-display text-[1.75rem] font-extrabold text-white focus:outline-none placeholder:text-slate-700" />
-                  </label>
-                )}
-              />
-
-              {/* Lo que se anota y el botón de guardar. Con el cronómetro sin
-                  usar se pueden tipear los minutos a mano: antes, para anotar
-                  un cardio que hiciste sin el reloj, había que pasar a cuenta
-                  regresiva y escribirlos como si fueran el "objetivo".
-                  Km: pedido "que se tenga que habilitar en Personalizar qué
-                  vas a registrar", igual que el resto de lo opcional. */}
-              <div className="flex items-end gap-2">
-                {cardioManual && (
-                  <div className="flex-1 min-w-0">
-                    <label className="text-[10px] text-slate-500 font-bold uppercase mb-1.5 block truncate">Minutos <span className="text-slate-600 normal-case font-semibold">(sin reloj)</span></label>
-                    <input type="number" inputMode="decimal" placeholder="—" value={minutes} onChange={(e) => updateDraft({ minutes: e.target.value })} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-2.5 num-display text-xl font-extrabold text-center text-white focus:outline-none focus:border-teal-500/50 transition" />
-                  </div>
-                )}
-                {fieldSettings.showKm !== false && (
-                  <div className="flex-1 min-w-0">
-                    <label className="text-[10px] text-slate-500 font-bold uppercase mb-1.5 block">Km <span className="text-slate-600 normal-case font-semibold">(opc.)</span></label>
-                    <input type="number" inputMode="decimal" placeholder="—" value={km} onChange={(e) => updateDraft({ km: e.target.value })} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-2.5 num-display text-xl font-extrabold text-center text-white focus:outline-none focus:border-teal-500/50 transition" />
-                  </div>
-                )}
-                <button ref={saveBtnRef} onClick={handleSave} aria-label="Guardar cardio" className={`h-[50px] px-5 rounded-xl transition-all active:scale-95 font-black text-sm !text-white flex items-center justify-center gap-2 shrink-0 ${filaSoloGuardar ? "flex-1" : ""} ${saved ? "bg-emerald-500" : "hover:opacity-90"}`} style={!saved ? { backgroundColor: accent } : {}}>
-                  {saved ? <Check size={18} /> : <Save size={17} />} {saved ? "Listo" : "Guardar"}
-                </button>
-              </div>
-            </div>
-          );
-        }
-        // El bloque "guardado hoy" solo se muestra si el draft está vacío —
-        // sin el chequeo de !reps && !kg, el botón Editar seteaba el draft
-        // pero esta rama seguía ganando y los inputs nunca aparecían.
-        if (todayEntry && hasActiveSession && !draft.editing) {
-          // Mensaje de coaching: compara lo hecho contra el rango objetivo
-          // de la serie y sugiere qué hacer la próxima.
-          const coaching = (() => {
-            const r = parseFloat(todayEntry.reps);
-            // BUG FIX (encontrado auditando el modo planificado): este consejo
-            // juzgaba SIEMPRE contra el rango de reps del ejercicio, que es
-            // una propiedad fija de la rutina. Con un plan de fuerza (meta de
-            // 5 reps) en un ejercicio cuyo rango dice "8-12", clavar la meta
-            // te devolvía "Quedaste corto: el objetivo eran 8-12 reps, bajá
-            // el peso" — el consejo contradecía al plan que la app misma te
-            // acababa de poner. Si hay meta para esta semana, se juzga contra
-            // la meta.
-            if (isPlannedMode && !cardio && plannedTarget.kg != null && !isNaN(r)) {
-              const metaKg = kgToDisplay(plannedTarget.kg, unit), hechoKg = kgToDisplay(todayEntry.kg, unit);
-              if (hechoKg + 0.001 >= metaKg && r >= plannedTarget.reps) {
-                return r > plannedTarget.reps || hechoKg > metaKg
-                  ? { icon: "📈", title: "Superaste la meta", body: `La meta era ${plannedTarget.reps}×${metaKg}${weightLabel(unit)}. Si se repite, subile a la meta de la semana que viene.`, color: "#34D399" }
-                  : { icon: "🎯", title: "Meta cumplida", body: `Clavaste ${plannedTarget.reps}×${metaKg}${weightLabel(unit)}, justo lo que pedía el plan.`, color: accent };
-              }
-              return { icon: "📉", title: "Te faltó para la meta", body: `La meta era ${plannedTarget.reps}×${metaKg}${weightLabel(unit)}. Si vuelve a pasar, replanificá esta semana más abajo.`, color: "#FBBF24" };
-            }
-            const rr = String(setDef?.repRange || "");
-            const m = rr.match(/(\d+)\s*[-–a]\s*(\d+)/);
-            const single = rr.match(/^(\d+)$/);
-            const lo = m ? parseInt(m[1], 10) : single ? parseInt(single[1], 10) : null;
-            const hi = m ? parseInt(m[2], 10) : single ? parseInt(single[1], 10) : null;
-            if (lo == null || isNaN(r)) return null;
-            // Consejo en dos partes: un titular corto que se lee de un vistazo
-            // y un detalle con la acción concreta para la próxima vez.
-            if (r > hi) return { icon: "📈", title: "Te sobró rango", body: `Pasaste las ${hi} reps del objetivo. La próxima subile el peso.`, color: "#34D399" };
-            if (r < lo) return { icon: "📉", title: "Quedaste corto", body: `El objetivo eran ${lo}-${hi} reps. Bajá un poco el peso y buscá el rango.`, color: "#FBBF24" };
-            return { icon: "🎯", title: "En el punto justo", body: `Clavaste el rango de ${rr}. Sostenelo o buscá una rep más.`, color: accent };
-          })();
-          return (
-            <div className="relative overflow-hidden rounded-2xl px-3 py-3 bounce-in" style={{ background: `linear-gradient(130deg, ${tint(accent, "16")}, ${tint(accent, "06")})`, border: `1px solid ${tint(accent, "35")}` }}>
-              <div className="flex items-center gap-2.5">
-                <span className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 number-pop" style={{ backgroundColor: accent }}>
-                  <Check size={14} className="text-white draw-check" strokeWidth={3} />
-                </span>
-                <div className="flex-1 min-w-0 leading-none">
-                  <span className="block text-[8.5px] font-black uppercase tracking-[0.16em] text-slate-500 mb-1">Guardado hoy</span>
-                  <span className="text-lg font-black tabular-nums number-pop inline-block" style={{ color: accent, animationDelay: "0.12s" }}>{todayEntry.reps}<span className="opacity-50 text-sm mx-0.5">×</span>{kgToDisplay(todayEntry.kg, unit)}<span className="opacity-60 text-xs ml-0.5">{weightLabel(unit)}</span></span>
-                  {todayEntry.rpe && <span className="ml-2 text-[9.5px] px-1.5 py-0.5 rounded-md bg-slate-800/80 text-slate-400 align-middle">{formatEffort(todayEntry.rpe, fieldSettings.rpeDisplayMode)}</span>}
-                </div>
-                <button onClick={() => { updateDraft({ reps: String(todayEntry.reps), kg: String(kgToDisplay(todayEntry.kg, unit)), editing: true }); }} className="text-[10px] font-bold px-2.5 py-1.5 rounded-lg shrink-0 transition active:scale-95" style={{ backgroundColor: tint(accent, "22"), color: accent }}>Editar</button>
-              </div>
-              {todayEntry.drops?.length > 0 && (
-                <p className="text-[10px] text-orange-400/90 mt-2 pt-2 border-t" style={{ borderColor: tint(accent, "20") }}>
-                  Bajadas: {todayEntry.drops.map((d, i) => <span key={i}>{i > 0 && " · "}{d.reps}×{kgToDisplay(d.kg, unit)}{weightLabel(unit)}</span>)}
-                </p>
-              )}
-              {todayEntry.clusters?.length > 0 && (
-                <p className="text-[10px] text-rose-400/90 mt-2 pt-2 border-t" style={{ borderColor: tint(accent, "20") }}>
-                  Mini-series: {todayEntry.clusters.map((c, i) => <span key={i}>{i > 0 && " · "}{c.reps} reps</span>)}
-                </p>
-              )}
-              {coaching && fieldSettings.showCoaching !== false && (
-                <div className="mt-2.5 pt-2.5 flex items-start gap-2 border-t" style={{ borderColor: tint(accent, "20") }}>
-                  <span className="text-[13px] leading-none mt-0.5 shrink-0">{coaching.icon}</span>
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-black leading-tight" style={{ color: coaching.color }}>{coaching.title}</p>
-                    <p className="text-[10px] text-slate-400 leading-snug mt-0.5">{coaching.body}</p>
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        }
-        return (
-          <div className="space-y-1.5">
-            {/* Progresión sugerida: ANTES de que cargues nada, no después.
-                Mira tu última vez en ESTA serie (no el récord histórico) y
-                sugiere el próximo paso lógico — subir peso si ya llenaste el
-                rango de reps, o sumar una rep más si todavía no. No se
-                muestra en descarga (ahí manda la sugerencia de descarga, que
-                pide MENOS peso, no más) ni sin historial (nada que sugerir). */}
-            {fieldSettings.showProgressionSuggestion === true && (history.length > 0 || (isPlannedMode && !cardio)) && (() => {
-              // BUG FIX (encontrado auditando el modo planificado): esta
-              // sugerencia se derivaba SIEMPRE de tu última sesión, así que
-              // con una meta cargada la tarjeta mostraba dos números
-              // distintos peleándose — "Marca a alcanzar 8×70" arriba y
-              // "Probá hoy 8×67.5" acá abajo. Si hay meta para esta semana,
-              // la sugerencia ES la meta: ya está decidido qué toca hoy, y
-              // de paso el botón la carga de un toque.
-              const conMeta = isPlannedMode && !cardio && plannedTarget.kg != null;
-              const last = history.length ? history.reduce((a, b) => (a.date > b.date ? a : b)) : null;
-              const repTop = repRangeTop(setDef.repRange);
-              const hitTop = !!last && !isNaN(repTop) && last.reps >= repTop;
-              const sugReps = conMeta ? plannedTarget.reps : (hitTop ? repTop : last.reps + 1);
-              // El salto es el disco chico de la unidad en uso (2,5 kg o 5 lbs):
-              // en libras, sumar 2,5 kg daba un 5,5 que no existe en ningún gimnasio.
-              const sugKg = conMeta ? plannedTarget.kg : (hitTop ? last.kg + displayToKg(pasoKg, unit) : last.kg);
-              return (
-                <button
-                  onClick={() => updateDraft({ reps: String(sugReps), kg: String(kgToDisplay(sugKg, unit)) })}
-                  className="w-full flex items-center justify-between gap-2 rounded-xl px-3 py-2 transition active:scale-[0.99]"
-                  style={{ backgroundColor: tint(accent, "10"), border: `1px solid ${tint(accent, "28")}` }}
-                >
-                  <span className="flex items-center gap-1.5 text-[11px] font-bold" style={{ color: accent }}>
-                    {conMeta ? <ClipboardCheck size={12} /> : <Target size={12} />} {conMeta ? "Tu meta" : "Probá hoy"}: {sugReps}×{kgToDisplay(sugKg, unit)}{weightLabel(unit)}
-                  </span>
-                  <span className="text-[10px] text-slate-500">Usar</span>
-                </button>
-              );
-            })()}
-            {/* Fila de registro estilo "display digital": superficie sólida
-                cuyo borde SE ENCIENDE con el color del día al enfocar, y se
-                tiñe VERDE en vivo cuando lo que escribiste ya supera tu
-                marca — sabés que va a ser récord antes de guardar. */}
-            {(() => {
-              const rNum = parseFloat(reps), kNum = parseFloat(kg);
-              // A peso corporal (0kg) el 1RM estimado siempre da 0, así que
-              // ahí se compara directo por reps contra tu marca previa a
-              // también 0kg (no tiene sentido comparar bodyweight contra una
-              // marca con peso agregado, ni al revés).
-              const bodyweightNow = kNum === 0;
-              const liveBeats = !cardio && !isNaN(rNum) && !isNaN(kNum) && rNum > 0 && kNum >= 0 && currentPR
-                && (bodyweightNow
-                  ? currentPR.kg === 0 && rNum > currentPR.reps
-                  : currentPR.kg > 0 && estimate1RM(displayToKg(kNum, unit), rNum) > estimate1RM(currentPR.kg, currentPR.reps));
-              const borderCol = liveBeats ? "#10B981" : rowFocus ? accent : "var(--hairline)";
-              const glow = liveBeats ? "0 0 16px -4px rgba(16,185,129,0.55)" : rowFocus ? `0 0 16px -4px ${tint(accent, "70")}` : "none";
-              return (
-            <div onFocus={() => setRowFocus(true)} onBlur={() => setRowFocus(false)}
-                 className="registro flex items-stretch rounded-2xl overflow-hidden transition-all duration-200"
-                 style={{ border: `1px solid ${borderCol}`, boxShadow: glow }}>
-              <div className={`flex-1 flex flex-col items-center justify-center ${compact ? "py-1" : "py-2.5"}`}>
-                {!compact && <span className="text-[9px] text-slate-600 font-bold uppercase tracking-widest">Reps</span>}
-                <input type="number" inputMode="decimal" enterKeyHint="next" aria-label="Repeticiones" placeholder={compact ? "reps" : "—"} value={reps} onFocus={seleccionarAlEnfocar} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); kgInputRef.current?.focus(); } }} onChange={(e) => updateDraft({ reps: e.target.value })} className={`registro-input w-full bg-transparent text-center text-white focus:outline-none placeholder:text-slate-700 ${compact ? "text-[1.35rem] placeholder:text-[11px]" : "text-[2rem]"}`} />
-              </div>
-              <div className="flex items-center text-slate-700 text-base font-light select-none">×</div>
-              <div className={`flex-1 flex flex-col items-center justify-center relative ${compact ? "py-1" : "py-2.5"}`}>
-                <button onClick={cambiarUnidad} aria-label={`Cambiar a ${unit === "kg" ? "libras" : "kilos"} en toda la app`}
-                  className={`text-[9px] font-bold uppercase tracking-widest transition ${compact ? "absolute right-1 top-0.5" : ""}`}
-                  style={{ color: tint(accent, "99") }}>
-                  {weightLabel(unit)} <span className="text-slate-700">⇄</span>
-                </button>
-                <input ref={kgInputRef} type="number" inputMode="decimal" enterKeyHint="done" aria-label={`Peso en ${weightLabel(unit)}`} placeholder={compact ? weightLabel(unit) : "—"} value={kg} onFocus={seleccionarAlEnfocar} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); saveBtnRef.current?.click(); } }} onChange={(e) => updateDraft({ kg: e.target.value })} className={`registro-input w-full bg-transparent text-center text-white focus:outline-none placeholder:text-slate-700 ${compact ? "text-[1.35rem] placeholder:text-[11px]" : "text-[2rem]"}`} />
-              </div>
-              <button ref={saveBtnRef} onClick={handleSave} aria-label="Guardar serie" className={`flex items-center justify-center transition-all active:scale-95 !text-white ${compact ? "w-12" : "w-16"} ${saved ? "" : "hover:opacity-90"}`} style={{ backgroundColor: saved ? "#10B981" : accent }}>
-                <Check size={22} strokeWidth={2.6} />
-              </button>
-            </div>
-              );
-            })()}
-            {/* UNA FILA QUE CAMBIA DE OFICIO SEGÚN HAGA FALTA.
-                Vacía y con historial: ofrece repetir lo último que hiciste en
-                ESTA misma serie, de un toque. Con algo escrito: se vuelve los
-                ± para ajustar sin abrir el teclado (que en Android tapa el
-                botón de guardar). Es la misma fila, así que no suma altura a
-                la tarjeta ni una segunda cosa que mirar.
-                No aparece en cardio (ahí se cuentan minutos, no reps×kg) ni
-                en la fila compacta, que existe justamente para ocupar poco. */}
-            {!cardio && !compact && !todayEntry && (sugerido || reps || kg) && (
-              <div className="flex items-center gap-1.5 mt-1.5">
-                {(
-                  <>
-                    {[
-                      { campo: "reps", delta: -1, txt: "−1" },
-                      { campo: "reps", delta: 1, txt: "+1" },
-                      { campo: "kg", delta: -pasoKg, txt: `−${pasoKg}` },
-                      { campo: "kg", delta: pasoKg, txt: `+${pasoKg}` },
-                    ].map(({ campo, delta, txt }) => (
-                      <button key={campo + delta} onClick={() => ajustar(campo, delta)}
-                        aria-label={`${delta > 0 ? "Sumar" : "Restar"} ${Math.abs(delta)} ${campo === "reps" ? "repeticiones" : weightLabel(unit)}`}
-                        className="flex-1 py-1.5 rounded-xl text-[11px] font-black tabular-nums text-slate-300 transition active:scale-95"
-                        style={{ backgroundColor: "var(--surface-2)", border: "1px solid var(--hairline)" }}>
-                        {txt}<span className="text-[9px] font-bold text-slate-600 ml-0.5">{campo === "reps" ? "rep" : weightLabel(unit)}</span>
-                      </button>
-                    ))}
-                  </>
-                )}
-              </div>
-            )}
-            {/* Filas extra de drop-set/rest-pause: se guardan junto con la
-                serie principal al tocar Guardar arriba. */}
-            {(setDef.type === "dropset" || setDef.type === "restpause") && (
-              <div className="space-y-1.5 pt-1">
-                {extraRows.map((row, i) => (
-                  <div key={i} className="flex items-center gap-1.5">
-                    <span className="text-[9px] text-slate-600 font-bold w-9 shrink-0">{setDef.type === "dropset" ? `Baja ${i + 1}` : `Mini ${i + 1}`}</span>
-                    <input type="number" inputMode="decimal" placeholder="reps" value={row.reps} onChange={(e) => updateExtraRow(i, { reps: e.target.value })} className="w-16 bg-slate-900/70 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-center text-white focus:outline-none" />
-                    {setDef.type === "dropset" && (
-                      <>
-                        <span className="text-slate-700 text-[10px]">×</span>
-                        <input type="number" inputMode="decimal" placeholder={weightLabel(unit)} value={row.kg} onChange={(e) => updateExtraRow(i, { kg: e.target.value })} className="w-16 bg-slate-900/70 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-center text-white focus:outline-none" />
-                      </>
-                    )}
-                    <button onClick={() => removeExtraRow(i)} aria-label="Quitar" className="text-slate-600 hover:text-rose-400 ml-auto shrink-0"><X size={13} /></button>
-                  </div>
-                ))}
-                <button onClick={addExtraRow} className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-slate-900/50 border border-dashed border-slate-800 text-slate-500 hover:text-slate-300 text-[10px] font-bold transition">
-                  <Plus size={11} /> {setDef.type === "dropset" ? "Agregar bajada" : "Agregar mini-serie"}
-                </button>
-              </div>
-            )}
-            {/* % del 1RM — línea sutil integrada */}
-            {currentPR && fieldSettings.show1RMPercent !== false && (() => {
-              const pr1RM = estimate1RM(currentPR.kg, currentPR.reps);
-              const currentPct = (kg && !isNaN(parseFloat(kg)) && pr1RM > 0)
-                ? Math.round((estimate1RM(displayToKg(parseFloat(kg), unit), parseFloat(reps) || 1) / pr1RM) * 100)
-                : null;
-              return (
-                <div className="flex items-center justify-center gap-2">
-                  <span className="text-[9px] text-slate-700">% 1RM</span>
-                  <input
-                    type="number" inputMode="numeric" placeholder="—"
-                    className="w-10 bg-transparent border-b border-slate-800/80 text-[10px] font-bold text-center text-slate-500 focus:outline-none focus:border-slate-600 transition"
-                    onFocus={(e) => e.target.select()}
-                    onChange={(e) => {
-                      const pct = parseFloat(e.target.value);
-                      if (!isNaN(pct) && pct > 0 && pr1RM > 0) {
-                        const targetKg = kgToDisplay(Math.round(pr1RM * pct / 100 * 2) / 2, unit);
-                        updateDraft({ kg: String(targetKg) });
-                      }
-                    }}
-                  />
-                  {currentPct && <span className="text-[9px] text-slate-700 tabular-nums">~{currentPct}%</span>}
-                </div>
-              );
-            })()}
-          </div>
-        );
-      })()}
-      {fieldSettings.showRpe !== false && (() => {
-        const isRir = fieldSettings.rpeDisplayMode === "rir";
-        return !showRpe ? (
-          <button onClick={() => setShowRpeLocal(true)} className="w-full flex items-center justify-center gap-1.5 mt-2.5 py-2 rounded-lg bg-slate-900/50 border border-slate-800/70 text-slate-500 hover:text-slate-300 hover:border-slate-600 text-[11px] font-bold transition"><Activity size={11} /> Registrar esfuerzo ({isRir ? "RIR" : "RPE"})</button>
-        ) : (
-          <div className="mt-2.5 flex items-center gap-1.5 bounce-in bg-slate-900/60 rounded-lg px-2 py-2">
-            <span className="text-[10px] text-slate-600 font-semibold w-7 shrink-0">{isRir ? "RIR" : "RPE"}</span>
-            {RPE_SCALE.map((rs) => (
-              <button key={rs.value} onClick={() => updateDraft({ rpe: rpe === rs.value ? null : rs.value })} title={rs.desc} className="w-7 h-7 rounded-lg text-[11px] font-bold transition-all active:scale-90 shrink-0" style={rpe === rs.value ? { backgroundColor: rpeColor(rs.value), color: "#0c0d10" } : { backgroundColor: "var(--surface-2)", color: "var(--surface-2-text)" }}>{isRir ? rirButtonLabel(rs.value) : rs.value}</button>
-            ))}
-            {rpe != null && <span className="text-[10px] text-slate-500 ml-1 truncate">{RPE_SCALE.find((r) => r.value === rpe)?.desc}</span>}
-            <button onClick={() => { updateDraft({ rpe: null }); setShowRpeLocal(false); }} className="text-slate-600 hover:text-slate-400 ml-auto shrink-0"><X size={12} /></button>
-          </div>
-        );
-      })()}
-      {/* Nota de esta serie: mismo patrón que el RPE — discreto cuando no hay
-          nada, y se abre al tocarlo. Una nota por serie, no por ejercicio. */}
-      {fieldSettings.showPersonalNote !== false && onUpdateSettings && (
-        editingNote ? (
-          <div className="mt-2.5 bounce-in rounded-lg p-2" style={{ backgroundColor: "var(--panel-sunken)", border: `1px solid ${tint(accent, "30")}` }}>
-            <textarea
-              value={noteDraft}
-              onChange={(e) => setNoteDraft(e.target.value)}
-              placeholder="Agarre más cerrado · pausa abajo…"
-              rows={2}
-              maxLength={200}
-              autoFocus
-              className="w-full bg-transparent text-[12px] text-slate-200 placeholder:text-slate-700 focus:outline-none resize-none leading-snug"
-            />
-            <div className="flex items-center gap-2 mt-1">
-              <button onClick={guardarNota} className="text-[11px] font-bold px-2.5 py-1 rounded-lg transition active:scale-95" style={{ backgroundColor: "var(--surface-3)", color: "#fff" }}>Guardar</button>
-              <button onClick={() => { setNoteDraft(setNote); setEditingNote(false); }} className="text-[11px] text-slate-500 hover:text-slate-300 transition">Cancelar</button>
-            </div>
-          </div>
-        ) : setNote ? (
-          <button onClick={() => setEditingNote(true)} className="w-full mt-2.5 flex items-start gap-1.5 text-left rounded-lg px-2 py-1.5 transition active:scale-[0.99]" style={{ backgroundColor: tint(accent, "12"), border: `1px solid ${tint(accent, "28")}` }}>
-            <StickyNote size={11} className="mt-0.5 shrink-0" style={{ color: accent }} />
-            <span className="text-[11px] leading-snug" style={{ color: accent, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{setNote}</span>
-          </button>
-        ) : (
-          <button onClick={() => setEditingNote(true)} className="w-full flex items-center justify-center gap-1.5 mt-2.5 py-2 rounded-lg bg-slate-900/50 border border-slate-800/70 text-slate-500 hover:text-slate-300 hover:border-slate-600 text-[11px] font-bold transition"><StickyNote size={11} /> Agregar nota</button>
-        )
-      )}
-      {editingPR && !cardio && (
-        <div className="mt-2 rounded-xl p-3 space-y-2 bounce-in" style={{ backgroundColor: "var(--panel-sunken)", border: `1px solid ${tint(accent, "30")}` }}>
-          <p className="text-[10px] font-black uppercase tracking-[0.14em] flex items-center gap-1.5" style={{ color: accent }}><Edit3 size={11} /> Corregir récord</p>
-          <div className="flex flex-wrap gap-2 items-center">
-            <input type="number" inputMode="decimal" placeholder="Reps" value={editReps} onChange={(e) => setEditReps(e.target.value)} className="w-20 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm text-white" />
-            <span className="text-slate-600 text-xs">reps ×</span>
-            <input type="number" inputMode="decimal" placeholder={weightLabel(unit)} value={editKg} onChange={(e) => setEditKg(e.target.value)} className="w-20 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm text-white" />
-            <span className="text-slate-600 text-xs">{weightLabel(unit)}</span>
-            <button onClick={savePR} className="px-3 py-1.5 rounded-lg !text-white text-xs font-bold" style={{ backgroundColor: accent }}>Guardar</button>
-            {override && <button onClick={() => { const l = { ...logs }; delete l[prKey]; setLogs(l); setEditingPR(false); }} className="px-3 py-1.5 rounded-lg bg-slate-700 text-slate-200 text-xs">Quitar</button>}
-            <button onClick={() => setEditingPR(false)} className="text-slate-500 text-xs">Cancelar</button>
-          </div>
-        </div>
-      )}
+  // ── PLANILLA DE SERIES ──────────────────────────────────────────────────
+  // Reporte: "quedó un poco grande la sección cuando expandís una serie".
+  // Cada serie era una tarjeta de ~250px (rótulo, caja de récord, caja de
+  // "la vez pasada", campos grandes y fila de ±): un ejercicio de 4 series
+  // no entraba en la pantalla. Ahora es una fila de planilla, como en Hevy y
+  // Strong: número, objetivo, reps × kilos y ✓, alineados en columnas con el
+  // encabezado de la tarjeta (ver ExerciseCard). Lo de ayuda (±, sugerencia,
+  // esfuerzo, nota) aparece sólo en la serie que toca ahora (`activa`).
+  // Una serie guardada se ve teñida con lo que hiciste; tocarla la edita.
+  const guardadaHoy = !!yaRegistradaHoy && hasActiveSession && !draft.editing;
+  const editarGuardada = () => updateDraft({ reps: String(yaRegistradaHoy.reps), kg: String(kgToDisplay(yaRegistradaHoy.kg, unit)), editing: true });
+  const abrirCorreccion = () => { setEditReps(currentPR?.reps ?? ""); setEditKg(currentPR ? kgToDisplay(currentPR.kg, unit) : ""); setEditingPR((e) => !e); };
+  const lineaFeedback = feedback && (
+    <p className={`serie-aviso ${feedback.type === "pr" ? "text-emerald-400 pr-pop" : feedback.type === "down" ? "text-rose-400" : feedback.type === "first" ? "text-teal-400" : "text-amber-400"}`}>
+      {feedback.msg}
+      {feedback.type === "pr" && !cardio && <button onClick={() => setShowPRShare(true)} aria-label="Compartir esta marca" className="ml-1.5 inline-flex align-middle text-emerald-300 hover:text-emerald-100 active:scale-90 transition"><Share2 size={13} /></button>}
+    </p>
+  );
+  const avisosExtra = (
+    <>
+      {feedback?.suggestUp && <p className="serie-aviso text-teal-400"><TrendingUp size={12} className="inline -mt-0.5 mr-1" />Superaste el rango: probá +{pasoKg}{weightLabel(unit)} la próxima</p>}
+      {feedback?.noSession && <p className="serie-aviso text-amber-400"><AlertTriangle size={12} className="inline -mt-0.5 mr-1" />Tocá "Iniciar sesión" arriba para que este día cuente en tu historial</p>}
+    </>
+  );
+  const modales = (
+    <>
       {rankUpInfo && <RankUpModal from={rankUpInfo.from} to={rankUpInfo.to} muscleName={rankUpInfo.muscleName} onClose={() => setRankUpInfo(null)} />}
       {showPRShare && !cardio && (
         <ShareImageModal
@@ -7636,8 +7396,410 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           onOptOutAutoShow={() => { onDisableAutoShowPrShare?.(); setShowPRShare(false); }}
         />
       )}
+    </>
+  );
+  // Esfuerzo (RPE/RIR) y nota: mismo patrón de siempre (discretos hasta que
+  // los tocás), pero el botón para AGREGAR sólo en la serie que toca ahora;
+  // en las demás aparecen únicamente si ya tienen algo.
+  const isRir = fieldSettings.rpeDisplayMode === "rir";
+  const bloqueEsfuerzo = fieldSettings.showRpe !== false && (showRpe || (activa && !guardadaHoy)) && (
+    !showRpe ? (
+      <button onClick={() => setShowRpeLocal(true)} className="serie-boton-suave"><Activity size={12} /> Registrar esfuerzo ({isRir ? "RIR" : "RPE"})</button>
+    ) : (
+      <div className="mt-2 flex items-center gap-1.5 bounce-in rounded-lg px-2 py-2 overflow-x-auto" style={{ backgroundColor: "var(--panel-sunken)" }}>
+        <span className="text-[10.5px] text-slate-500 font-semibold w-7 shrink-0">{isRir ? "RIR" : "RPE"}</span>
+        {RPE_SCALE.map((rs) => (
+          <button key={rs.value} onClick={() => updateDraft({ rpe: rpe === rs.value ? null : rs.value })} title={rs.desc} className="w-8 h-8 rounded-lg text-[11.5px] font-bold transition-all active:scale-90 shrink-0" style={rpe === rs.value ? { backgroundColor: rpeColor(rs.value), color: "#0c0d10" } : { backgroundColor: "var(--surface-2)", color: "var(--surface-2-text)" }}>{isRir ? rirButtonLabel(rs.value) : rs.value}</button>
+        ))}
+        <button onClick={() => { updateDraft({ rpe: null }); setShowRpeLocal(false); }} aria-label="Quitar el esfuerzo" className="text-slate-500 hover:text-slate-300 ml-auto shrink-0 w-8 h-8 flex items-center justify-center"><X size={13} /></button>
+      </div>
+    )
+  );
+  const bloqueNota = fieldSettings.showPersonalNote !== false && onUpdateSettings && (
+    editingNote ? (
+      <div className="mt-2 bounce-in rounded-lg p-2" style={{ backgroundColor: "var(--panel-sunken)", border: `1px solid ${tint(accent, "30")}` }}>
+        <textarea
+          value={noteDraft}
+          onChange={(e) => setNoteDraft(e.target.value)}
+          placeholder="Agarre más cerrado · pausa abajo…"
+          rows={2}
+          maxLength={200}
+          autoFocus
+          aria-label={`Nota de la serie ${setIndex + 1}`}
+          className="w-full bg-transparent text-[12.5px] text-slate-200 placeholder:text-slate-600 focus:outline-none resize-none leading-snug"
+        />
+        <div className="flex items-center gap-2 mt-1">
+          <button onClick={guardarNota} className="text-[12px] font-bold px-3 h-8 rounded-lg transition active:scale-95" style={{ backgroundColor: "var(--surface-3)", color: "var(--text-strong)" }}>Guardar</button>
+          <button onClick={() => { setNoteDraft(setNote); setEditingNote(false); }} className="text-[12px] text-slate-500 hover:text-slate-300 transition px-2 h-8">Cancelar</button>
+        </div>
+      </div>
+    ) : setNote ? (
+      <button onClick={() => setEditingNote(true)} className="w-full mt-2 flex items-start gap-1.5 text-left rounded-lg px-2.5 py-1.5 transition active:scale-[0.99]" style={{ backgroundColor: tint(accent, "12"), border: `1px solid ${tint(accent, "28")}` }}>
+        <StickyNote size={12} className="mt-0.5 shrink-0" style={{ color: accent }} />
+        <span className="text-[11.5px] leading-snug" style={{ color: accent }}>{setNote}</span>
+      </button>
+    ) : activa && !guardadaHoy ? (
+      <button onClick={() => setEditingNote(true)} className="serie-boton-suave"><StickyNote size={12} /> Agregar nota</button>
+    ) : null
+  );
+  const panelCorreccion = editingPR && !cardio && (
+    <div className="mt-2 rounded-xl p-3 space-y-2 bounce-in" style={{ backgroundColor: "var(--panel-sunken)", border: `1px solid ${tint(accent, "30")}` }}>
+      <p className="text-[11px] font-bold flex items-center gap-1.5" style={{ color: accent }}><Edit3 size={12} /> Corregir récord</p>
+      <div className="flex flex-wrap gap-2 items-center">
+        <input type="number" inputMode="decimal" placeholder="Reps" aria-label="Reps del récord" value={editReps} onChange={(e) => setEditReps(e.target.value)} className="w-20 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm text-white" />
+        <span className="text-slate-500 text-xs">reps ×</span>
+        <input type="number" inputMode="decimal" placeholder={weightLabel(unit)} aria-label={`Peso del récord en ${weightLabel(unit)}`} value={editKg} onChange={(e) => setEditKg(e.target.value)} className="w-20 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-sm text-white" />
+        <span className="text-slate-500 text-xs">{weightLabel(unit)}</span>
+        <button onClick={savePR} className="px-3 h-8 rounded-lg !text-white text-xs font-bold" style={{ backgroundColor: accent }}>Guardar</button>
+        {override && <button onClick={() => { const l = { ...logs }; delete l[prKey]; setLogs(l); setEditingPR(false); }} className="px-3 h-8 rounded-lg bg-slate-700 text-slate-200 text-xs">Quitar</button>}
+        <button onClick={() => setEditingPR(false)} className="text-slate-500 text-xs px-2 h-8">Cancelar</button>
+      </div>
     </div>
   );
+
+  // ── CARDIO: el panel del cronómetro, con una cabecera de una línea ──────
+  if (cardio) {
+    const todayCardio = (logs[`${exerciseId}_${setIndex}`] || []).find((h) => h.date === today && !h.deload);
+    const cardioManual = cardioMode === "stopwatch" && !cardioRunning && cardioElapsed === 0;
+    const filaSoloGuardar = !cardioManual && fieldSettings.showKm === false;
+    return (
+      <div className="serie serie-cardio" style={{ "--c": accent }}>
+        <PRBurst anchorRef={saveBtnRef} trigger={prBurst} />
+        <div className="flex items-center gap-2 flex-wrap mb-2.5">
+          <span className="serie-rotulo">Sesión</span>
+          {isPlannedMode && plannedTarget?.minutes != null && (
+            <span className="serie-chip" style={{ color: accent, backgroundColor: tint(accent, "16") }}><ClipboardCheck size={12} /> {plannedTarget.minutes} min</span>
+          )}
+          {currentPR?.minutes ? (
+            <span className="serie-chip" style={{ color: accent, backgroundColor: tint(accent, "16") }} aria-label={`Tu récord: ${currentPR.minutes} minutos`}><Trophy size={12} /> {currentPR.minutes} min{currentPR.km ? ` · ${currentPR.km} km` : ""}</span>
+          ) : (
+            <span className="text-[11.5px] text-slate-500">Primera vez</span>
+          )}
+        </div>
+        {lineaFeedback}
+        {avisosExtra}
+        {todayCardio && hasActiveSession && !draft.editing ? (
+          <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ backgroundColor: tint(accent, "15"), border: `1px solid ${tint(accent, "30")}` }}>
+            <Check size={15} style={{ color: accent }} className="shrink-0" />
+            <span className="text-sm font-black" style={{ color: accent }}>{todayCardio.minutes} min{todayCardio.km ? ` · ${todayCardio.km} km` : ""}</span>
+            <span className="text-[11px] text-slate-500 ml-1">guardado hoy</span>
+            <button onClick={() => updateDraft({ minutes: String(todayCardio.minutes), km: String(todayCardio.km || ""), editing: true })} className="ml-auto text-[11.5px] font-bold px-3 h-8 rounded-lg transition" style={{ backgroundColor: tint(accent, "20"), color: accent }}>Editar</button>
+          </div>
+        ) : (
+          <div className="space-y-2.5">
+            {/* Pedido: "cambiar sistema de cardio, que sea más sencillo" →
+                aclarado después: mantener los dos modos y todos los
+                controles, sólo prolijizar. El reloj vive en PanelCronoCardio
+                (el mismo de la descarga); abajo, lo que se anota y guardar. */}
+            <PanelCronoCardio
+              accent={accent}
+              modo={cardioMode}
+              corriendo={cardioRunning}
+              transcurrido={cardioElapsed}
+              objetivoSeg={cardioObjetivoSeg}
+              onCambiarModo={cambiarModoCardio}
+              onArrancar={arrancarCardio}
+              onPausar={pausarCardio}
+              onReiniciar={reiniciarCardio}
+              onAjustarObjetivo={(delta) => {
+                const nuevo = Math.max(60, cardioObjetivoSeg + delta);
+                if (nuevo <= cardioElapsed) return;
+                updateDraft({ minutes: String(Math.round((nuevo / 60) * 10) / 10) });
+                reprogramarCardio(nuevo);
+              }}
+              entradaObjetivo={(
+                <label className="flex items-center gap-2.5 rounded-xl pl-3.5 pr-3 py-1.5" style={{ backgroundColor: "var(--panel-sunken)", border: "1px solid var(--hairline)" }}>
+                  <span className="text-[12px] font-semibold text-slate-400 flex-1">Minutos objetivo</span>
+                  <input type="number" inputMode="decimal" placeholder="30" value={minutes} onChange={(e) => updateDraft({ minutes: e.target.value })} className="w-20 bg-transparent text-right num-display text-[1.75rem] font-extrabold text-white focus:outline-none placeholder:text-slate-700" />
+                </label>
+              )}
+            />
+            {/* Con el cronómetro sin usar se pueden tipear los minutos a mano.
+                Km: pedido "que se tenga que habilitar en Personalizar qué
+                vas a registrar", igual que el resto de lo opcional. */}
+            <div className="flex items-end gap-2">
+              {cardioManual && (
+                <div className="flex-1 min-w-0">
+                  <label className="text-[11px] text-slate-500 font-semibold mb-1.5 block">Minutos <span className="text-slate-600">(sin reloj)</span></label>
+                  <input type="number" inputMode="decimal" placeholder="—" value={minutes} onChange={(e) => updateDraft({ minutes: e.target.value })} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-2.5 num-display text-xl font-extrabold text-center text-white focus:outline-none focus:border-teal-500/50 transition" />
+                </div>
+              )}
+              {fieldSettings.showKm !== false && (
+                <div className="flex-1 min-w-0">
+                  <label className="text-[11px] text-slate-500 font-semibold mb-1.5 block">Km <span className="text-slate-600">(opcional)</span></label>
+                  <input type="number" inputMode="decimal" placeholder="—" value={km} onChange={(e) => updateDraft({ km: e.target.value })} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-2.5 num-display text-xl font-extrabold text-center text-white focus:outline-none focus:border-teal-500/50 transition" />
+                </div>
+              )}
+              <button ref={saveBtnRef} onClick={handleSave} aria-label="Guardar cardio" className={`h-[50px] px-5 rounded-xl transition-all active:scale-95 font-black text-sm !text-white flex items-center justify-center gap-2 shrink-0 ${filaSoloGuardar ? "flex-1" : ""} ${saved ? "bg-emerald-500" : "hover:opacity-90"}`} style={!saved ? { backgroundColor: accent } : {}}>
+                {saved ? <Check size={18} /> : <Save size={17} />} {saved ? "Listo" : "Guardar"}
+              </button>
+            </div>
+          </div>
+        )}
+        {bloqueEsfuerzo}
+        {bloqueNota}
+        {modales}
+      </div>
+    );
+  }
+
+  // ── FUERZA: la fila de la planilla ──────────────────────────────────────
+  const rNum = parseFloat(reps), kNum = parseFloat(kg);
+  // En vivo, antes de guardar: si lo que escribiste ya supera tu marca, la
+  // fila se enciende en verde (sabés que va a ser récord). A peso corporal
+  // (0kg) el 1RM estimado da 0, así que ahí se compara por reps.
+  const liveBeats = !guardadaHoy && !isNaN(rNum) && !isNaN(kNum) && rNum > 0 && kNum >= 0 && !!currentPR
+    && (kNum === 0
+      ? currentPR.kg === 0 && rNum > currentPR.reps
+      : currentPR.kg > 0 && estimate1RM(displayToKg(kNum, unit), rNum) > estimate1RM(currentPR.kg, currentPR.reps));
+  const anillo = liveBeats ? "0 0 0 1.5px #10B981, 0 0 18px -6px rgba(16,185,129,0.6)" : rowFocus ? `0 0 0 1.5px ${tint(accent, "aa")}` : undefined;
+  const rango = String(setDef.repRange || "").replace(/-/g, "–");
+  const pesada = isHeavyRepRange(setDef.repRange);
+  // Consejo al guardar (opción): contra la meta si hay una, si no contra el
+  // rango de reps de la serie.
+  const coaching = guardadaHoy && fieldSettings.showCoaching !== false ? (() => {
+    const r = parseFloat(yaRegistradaHoy.reps);
+    // BUG FIX (encontrado auditando el modo planificado): con una meta para
+    // esta semana, se juzga contra la meta y no contra el rango de reps fijo
+    // de la rutina (que contradecía al plan).
+    if (isPlannedMode && plannedTarget.kg != null && !isNaN(r)) {
+      const metaKg = kgToDisplay(plannedTarget.kg, unit), hechoKg = kgToDisplay(yaRegistradaHoy.kg, unit);
+      if (hechoKg + 0.001 >= metaKg && r >= plannedTarget.reps) {
+        return r > plannedTarget.reps || hechoKg > metaKg
+          ? { icon: "📈", title: "Superaste la meta", body: `La meta era ${plannedTarget.reps}×${metaKg}${weightLabel(unit)}. Si se repite, subile a la meta de la semana que viene.`, color: "#34D399" }
+          : { icon: "🎯", title: "Meta cumplida", body: `Clavaste ${plannedTarget.reps}×${metaKg}${weightLabel(unit)}, justo lo que pedía el plan.`, color: accent };
+      }
+      return { icon: "📉", title: "Te faltó para la meta", body: `La meta era ${plannedTarget.reps}×${metaKg}${weightLabel(unit)}. Si vuelve a pasar, replanificá esta semana más abajo.`, color: "#FBBF24" };
+    }
+    const rr = String(setDef?.repRange || "");
+    const m = rr.match(/(\d+)\s*[-–a]\s*(\d+)/);
+    const single = rr.match(/^(\d+)$/);
+    const lo = m ? parseInt(m[1], 10) : single ? parseInt(single[1], 10) : null;
+    const hi = m ? parseInt(m[2], 10) : single ? parseInt(single[1], 10) : null;
+    if (lo == null || isNaN(r)) return null;
+    if (r > hi) return { icon: "📈", title: "Te sobró rango", body: `Pasaste las ${hi} reps del objetivo. La próxima subile el peso.`, color: "#34D399" };
+    if (r < lo) return { icon: "📉", title: "Quedaste corto", body: `El objetivo eran ${lo}-${hi} reps. Bajá un poco el peso y buscá el rango.`, color: "#FBBF24" };
+    return { icon: "🎯", title: "En el punto justo", body: `Clavaste el rango de ${rr}. Sostenelo o buscá una rep más.`, color: accent };
+  })() : null;
+  return (
+    <div className={`serie ${activa ? "serie-activa" : ""} ${guardadaHoy ? "serie-hecha" : ""}`} style={{ "--c": accent }}>
+      <PRBurst anchorRef={saveBtnRef} trigger={prBurst} />
+      <div className="serie-fila" style={anillo ? { boxShadow: anillo } : undefined} onFocus={() => setRowFocus(true)} onBlur={() => setRowFocus(false)}>
+        <span className="serie-n" aria-hidden="true">{setIndex + 1}</span>
+        {/* Objetivo: el rango de reps arriba; abajo, contra qué número
+            apuntás (la meta planificada o tu récord, que se toca para
+            corregirlo) y lo que hiciste la vez pasada en esta misma serie. */}
+        <div className="serie-ref">
+          <span className="serie-ref-rango">
+            {rango} reps
+            {pesada && <Zap size={11} className="text-amber-400 shrink-0" aria-label="Serie de fuerza" />}
+            {setDef.type === "dropset" && <span className="text-orange-400"> · drop</span>}
+            {setDef.type === "restpause" && <span className="text-rose-400"> · rest-pause</span>}
+          </span>
+          {isPlannedMode ? (
+            <span className="serie-ref-meta" style={{ color: accent }} aria-label={`Meta: ${plannedTarget.reps}×${kgToDisplay(plannedTarget.kg, unit)}${weightLabel(unit)}`}>
+              <ClipboardCheck size={11} className="shrink-0" />{plannedTarget.reps}×{kgToDisplay(plannedTarget.kg, unit)}
+              {plannedTarget.rpe != null && <span className="opacity-75 font-semibold"> {formatEffort(plannedTarget.rpe, fieldSettings.rpeDisplayMode)}</span>}
+            </span>
+          ) : currentPR ? (
+            <button onClick={abrirCorreccion} className="serie-ref-meta" style={{ color: accent }} aria-label={`Tu récord: ${currentPR.reps}×${kgToDisplay(currentPR.kg, unit)}${weightLabel(unit)}. Tocá para corregirlo`}>
+              <Trophy size={11} className="shrink-0" />{currentPR.reps}×{kgToDisplay(currentPR.kg, unit)}{override?.manual && <Edit3 size={9} className="shrink-0 opacity-70" />}
+            </button>
+          ) : (
+            <span className="serie-ref-ant">Primera vez</span>
+          )}
+          {isPlannedMode && currentPR ? (
+            <button onClick={abrirCorreccion} className="serie-ref-ant" aria-label={`Tu récord: ${currentPR.reps}×${kgToDisplay(currentPR.kg, unit)}${weightLabel(unit)}. Tocá para corregirlo`}>
+              <Trophy size={10} className="shrink-0" />{currentPR.reps}×{kgToDisplay(currentPR.kg, unit)}
+            </button>
+          ) : fieldSettings.showLastSession === true && lastSession ? (
+            <span className="serie-ref-ant" title={`La vez pasada (${(haceCuanto(daysSince(lastSession.date)) || "hoy")})`}>
+              <History size={10} className="shrink-0" />{lastSession.reps}×{kgToDisplay(lastSession.kg, unit)}
+            </span>
+          ) : null}
+        </div>
+        {guardadaHoy ? (
+          <button onClick={editarGuardada} className="serie-valor" aria-label={`Serie ${setIndex + 1}: ${yaRegistradaHoy.reps} reps con ${kgToDisplay(yaRegistradaHoy.kg, unit)} ${weightLabel(unit)}. Tocá para editarla`}>
+            <span>{yaRegistradaHoy.reps}</span><span className="serie-por">×</span><span>{kgToDisplay(yaRegistradaHoy.kg, unit)}</span>
+            {yaRegistradaHoy.rpe && <span className="serie-valor-rpe">{formatEffort(yaRegistradaHoy.rpe, fieldSettings.rpeDisplayMode)}</span>}
+          </button>
+        ) : (
+          <>
+            <input type="number" inputMode="decimal" enterKeyHint="next" aria-label="Repeticiones" placeholder="—" value={reps} onFocus={seleccionarAlEnfocar} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); kgInputRef.current?.focus(); } }} onChange={(e) => updateDraft({ reps: e.target.value })} className="serie-campo" />
+            <span className="serie-por" aria-hidden="true">×</span>
+            <input ref={kgInputRef} type="number" inputMode="decimal" enterKeyHint="done" aria-label={`Peso en ${weightLabel(unit)}`} placeholder="—" value={kg} onFocus={seleccionarAlEnfocar} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); saveBtnRef.current?.click(); } }} onChange={(e) => updateDraft({ kg: e.target.value })} className="serie-campo" />
+          </>
+        )}
+        <button ref={saveBtnRef} onClick={guardadaHoy ? editarGuardada : handleSave} aria-label={guardadaHoy ? `Editar la serie ${setIndex + 1}` : "Guardar serie"} className={`serie-check ${guardadaHoy || saved ? "hecha" : ""}`}>
+          <Check size={20} strokeWidth={2.8} className={saved ? "draw-check" : ""} />
+        </button>
+      </div>
+
+      {lineaFeedback}
+      {avisosExtra}
+      {guardadaHoy && yaRegistradaHoy.drops?.length > 0 && (
+        <p className="serie-aviso text-orange-400/90">Bajadas: {yaRegistradaHoy.drops.map((d, i) => <span key={i}>{i > 0 && " · "}{d.reps}×{kgToDisplay(d.kg, unit)}{weightLabel(unit)}</span>)}</p>
+      )}
+      {guardadaHoy && yaRegistradaHoy.clusters?.length > 0 && (
+        <p className="serie-aviso text-rose-400/90">Mini-series: {yaRegistradaHoy.clusters.map((c, i) => <span key={i}>{i > 0 && " · "}{c.reps} reps</span>)}</p>
+      )}
+      {coaching && (
+        <div className="serie-aviso flex items-start gap-1.5">
+          <span className="text-[13px] leading-none mt-0.5 shrink-0">{coaching.icon}</span>
+          <span className="min-w-0"><b style={{ color: coaching.color }}>{coaching.title}.</b> <span className="text-slate-400">{coaching.body}</span></span>
+        </div>
+      )}
+
+      {/* Lo de ayuda, sólo en la serie que toca ahora y sin guardar. */}
+      {!guardadaHoy && activa && fieldSettings.showProgressionSuggestion === true && (history.length > 0 || isPlannedMode) && (() => {
+        // Con una meta para esta semana, la sugerencia ES la meta (antes
+        // mostraba dos números distintos peleándose).
+        const conMeta = isPlannedMode && plannedTarget.kg != null;
+        const last = history.length ? history.reduce((a, b) => (a.date > b.date ? a : b)) : null;
+        const repTop = repRangeTop(setDef.repRange);
+        const hitTop = !!last && !isNaN(repTop) && last.reps >= repTop;
+        const sugReps = conMeta ? plannedTarget.reps : (hitTop ? repTop : last.reps + 1);
+        // El salto es el disco chico de la unidad en uso (2,5 kg o 5 lbs).
+        const sugKg = conMeta ? plannedTarget.kg : (hitTop ? last.kg + displayToKg(pasoKg, unit) : last.kg);
+        return (
+          <button onClick={() => updateDraft({ reps: String(sugReps), kg: String(kgToDisplay(sugKg, unit)) })} className="serie-sugerencia" style={{ color: accent, backgroundColor: tint(accent, "12"), borderColor: tint(accent, "30") }}>
+            {conMeta ? <ClipboardCheck size={13} /> : <Target size={13} />}
+            <span className="flex-1 text-left">{conMeta ? "Tu meta" : "Probá hoy"}: <b>{sugReps}×{kgToDisplay(sugKg, unit)}{weightLabel(unit)}</b></span>
+            <span className="text-[11px] text-slate-400">Usar</span>
+          </button>
+        );
+      })()}
+      {/* ± sin abrir el teclado: en Android el teclado tapa medio ejercicio,
+          y el 90% de los ajustes entre series son "una rep más" o "un disco
+          más". El paso del peso sigue la unidad (2,5 kg o 5 lbs). */}
+      {!guardadaHoy && activa && (sugerido || reps || kg) && (
+        <div className="serie-ajustes">
+          {[
+            { campo: "reps", delta: -1, txt: "−1", u: "rep" },
+            { campo: "reps", delta: 1, txt: "+1", u: "rep" },
+            { campo: "kg", delta: -pasoKg, txt: `−${pasoKg}`, u: weightLabel(unit) },
+            { campo: "kg", delta: pasoKg, txt: `+${pasoKg}`, u: weightLabel(unit) },
+          ].map(({ campo, delta, txt, u }) => (
+            <button key={campo + delta} onClick={() => ajustar(campo, delta)}
+              aria-label={`${delta > 0 ? "Sumar" : "Restar"} ${Math.abs(delta)} ${campo === "reps" ? "repeticiones" : weightLabel(unit)}`}>
+              {txt}<span>{u}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {/* Drop-set / rest-pause: filas extra que se guardan con la serie. */}
+      {!guardadaHoy && (setDef.type === "dropset" || setDef.type === "restpause") && (
+        <div className="space-y-1.5 pt-2 pl-[30px]">
+          {extraRows.map((row, i) => (
+            <div key={i} className="flex items-center gap-1.5">
+              <span className="text-[10.5px] text-slate-500 font-bold w-12 shrink-0">{setDef.type === "dropset" ? `Baja ${i + 1}` : `Mini ${i + 1}`}</span>
+              <input type="number" inputMode="decimal" placeholder="reps" aria-label={`Reps de la ${setDef.type === "dropset" ? "bajada" : "mini-serie"} ${i + 1}`} value={row.reps} onChange={(e) => updateExtraRow(i, { reps: e.target.value })} className="w-16 bg-slate-900/70 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-center text-white focus:outline-none" />
+              {setDef.type === "dropset" && (
+                <>
+                  <span className="text-slate-600 text-[10px]">×</span>
+                  <input type="number" inputMode="decimal" placeholder={weightLabel(unit)} aria-label={`Peso de la bajada ${i + 1}`} value={row.kg} onChange={(e) => updateExtraRow(i, { kg: e.target.value })} className="w-16 bg-slate-900/70 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-center text-white focus:outline-none" />
+                </>
+              )}
+              <button onClick={() => removeExtraRow(i)} aria-label="Quitar" className="text-slate-500 hover:text-rose-400 ml-auto shrink-0 w-8 h-8 flex items-center justify-center"><X size={14} /></button>
+            </div>
+          ))}
+          <button onClick={addExtraRow} className="serie-boton-suave mt-0">
+            <Plus size={12} /> {setDef.type === "dropset" ? "Agregar bajada" : "Agregar mini-serie"}
+          </button>
+        </div>
+      )}
+      {/* % del 1RM (opción) */}
+      {!guardadaHoy && activa && currentPR && fieldSettings.show1RMPercent !== false && (() => {
+        const pr1RM = estimate1RM(currentPR.kg, currentPR.reps);
+        const currentPct = (kg && !isNaN(parseFloat(kg)) && pr1RM > 0)
+          ? Math.round((estimate1RM(displayToKg(parseFloat(kg), unit), parseFloat(reps) || 1) / pr1RM) * 100)
+          : null;
+        return (
+          <div className="flex items-center gap-2 pl-[30px] pt-1.5">
+            <span className="text-[10.5px] text-slate-500">% de tu 1RM</span>
+            <input
+              type="number" inputMode="numeric" placeholder="—" aria-label="Porcentaje de tu 1RM"
+              className="w-12 bg-transparent border-b border-slate-700 text-[11px] font-bold text-center text-slate-300 focus:outline-none focus:border-slate-500 transition"
+              onFocus={(e) => e.target.select()}
+              onChange={(e) => {
+                const pct = parseFloat(e.target.value);
+                if (!isNaN(pct) && pct > 0 && pr1RM > 0) {
+                  const targetKg = kgToDisplay(Math.round(pr1RM * pct / 100 * 2) / 2, unit);
+                  updateDraft({ kg: String(targetKg) });
+                }
+              }}
+            />
+            {currentPct && <span className="text-[10.5px] text-slate-500 tabular-nums">ahora ~{currentPct}%</span>}
+          </div>
+        );
+      })()}
+      {bloqueEsfuerzo}
+      {bloqueNota}
+      {panelCorreccion}
+      {modales}
+    </div>
+  );
+}
+
+// LA BARRA CARGADA — el avance del día como una barra olímpica: cada serie
+// que anotás le suma un disco. Los discos usan los colores de competición
+// (rojo 25, azul 20, amarillo 15, verde 10, blanco 5), los que reconoce
+// cualquiera que levanta, y se cargan como de verdad: los grandes adentro,
+// los chicos afuera, uno de cada lado por turno. Lo que falta se ve como un
+// hueco punteado, así de un vistazo sabés cuánto te queda.
+// Es el único lugar de la app con tanto color junto, a propósito: es lo que
+// se mueve cuando entrenás.
+const COLORES_DISCO = ["#E5383B", "#2F6FED", "#F4C430", "#2BA35F", "#E9E9E4"];
+function BarraCargada({ hechas = 0, total = 0, alto = 30, etiqueta = null, className = "" }) {
+  const t = Math.max(0, Math.round(total));
+  if (!t) return null;
+  const W = 300, H = 40, cy = H / 2;
+  const porLado = Math.ceil(t / 2);
+  const agarreIni = W / 2 - 36, agarreFin = W / 2 + 36;
+  const collarIzq = agarreIni - 11, collarDer = agarreFin + 6;
+  const gap = 1.6;
+  const disponible = collarIzq - 4;
+  const ancho = Math.max(3, Math.min(11, disponible / porLado - gap));
+  const paso = porLado > 6 ? 2 : 3.2;
+  const discos = [];
+  for (let k = 0; k < t; k++) {
+    const izquierda = k % 2 === 0;
+    const i = Math.floor(k / 2); // posición contando desde adentro
+    const h = Math.max(12, H - 2 - i * paso);
+    const x = izquierda ? collarIzq - (i + 1) * (ancho + gap) : collarDer + 5 + gap + i * (ancho + gap);
+    discos.push({ k, x, y: cy - h / 2, h, color: COLORES_DISCO[i % COLORES_DISCO.length], cargado: k < hechas, izquierda });
+  }
+  const radio = Math.min(2.4, ancho / 2.5);
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className={`barra-cargada ${hechas >= t ? "completa" : ""} ${className}`} style={{ height: alto }} role="img" aria-label={etiqueta || `${Math.min(hechas, t)} de ${t} series`}>
+      <rect x="2" y={cy - 1.6} width={W - 4} height="3.2" rx="1.6" className="barra-eje" />
+      <rect x={agarreIni} y={cy - 2.6} width={agarreFin - agarreIni} height="5.2" rx="2.2" className="barra-agarre" />
+      <rect x={collarIzq} y={cy - 6.5} width="5" height="13" rx="1.4" className="barra-collar" />
+      <rect x={collarDer} y={cy - 6.5} width="5" height="13" rx="1.4" className="barra-collar" />
+      {discos.map((d) => (d.cargado
+        ? <rect key={`d${d.k}`} x={d.x} y={d.y} width={ancho} height={d.h} rx={radio} fill={d.color} className="disco disco-entra" style={{ "--desde": d.izquierda ? "-9px" : "9px" }} />
+        : <rect key={`h${d.k}`} x={d.x + 0.6} y={d.y + 0.6} width={Math.max(1, ancho - 1.2)} height={d.h - 1.2} rx={radio} className="disco-hueco" />
+      ))}
+    </svg>
+  );
+}
+
+// Cambiar de unidad convierte TAMBIÉN lo que ya está escrito y sin guardar,
+// en todas las series y no sólo en una: los borradores viven en la unidad de
+// pantalla, así que un "60" que eran kilos pasaría a significar 60 libras
+// sin que nadie lo haya tocado.
+function convertirBorradoresDeUnidad(prev, de, a) {
+  const convertir = (v) => { const n = parseFloat(v); return isNaN(n) ? v : String(kgToDisplay(displayToKg(n, de), a)); };
+  const next = {};
+  Object.entries(prev || {}).forEach(([k, d]) => {
+    if (!d || typeof d !== "object") { next[k] = d; return; }
+    next[k] = {
+      ...d,
+      ...(d.kg !== undefined && d.kg !== "" ? { kg: convertir(d.kg) } : {}),
+      ...(Array.isArray(d.extra) ? { extra: d.extra.map((x) => (x && x.kg !== undefined && x.kg !== "" ? { ...x, kg: convertir(x.kg) } : x)) } : {}),
+    };
+  });
+  return next;
 }
 
 /* ============================================================================
@@ -7702,6 +7864,9 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
     setsToShow.map((_, i) => (logs[`${exercise.id}_${i}`] || []).some((h) => h.date === hoyStr && !h.deload))
   ), [logs, exercise.id, setsToShow, hoyStr]);
   const allSetsDoneToday = seriesHechas.length > 0 && seriesHechas.every(Boolean);
+  // La serie que toca ahora: la primera sin hacer. Es la única que muestra
+  // los ±, la sugerencia y los botones de esfuerzo y nota.
+  const primeraPendiente = seriesHechas.indexOf(false);
   // Pedido: "el poder quitar o pasar ejercicios de planificados a por récord
   // de manera sencilla". El lugar más natural para decidirlo es acá, con el
   // ejercicio abierto y a punto de entrenarlo — no hay que salir a Perfil ni
@@ -7751,7 +7916,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
                 cuán largo sea el nombre del ejercicio. */}
             <h3 className="ejercicio-nombre">{exercise.name}</h3>
             <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
-              <span className="text-[10px] uppercase px-1.5 py-0.5 rounded-md font-bold" style={{ backgroundColor: tint(accent, "18"), color: accent }}>{exercise.muscle}</span>
+              <span className="text-[11px] px-1.5 py-0.5 rounded-md font-semibold" style={{ backgroundColor: tint(accent, "18"), color: accent }}>{exercise.muscle}</span>
               {/* Si el músculo ya dice "Cardio", el chip de cardio repetía la palabra. */}
               {exercise.cardio && String(exercise.muscle || "").toLowerCase() !== "cardio" && <span className="text-[10px] bg-rose-400/15 text-rose-300 rounded-md px-1.5 py-0.5 font-bold flex items-center gap-1"><Footprints size={9} /> CARDIO</span>}
               {!open && restTimerId && <ChipDescansoEnCurso timerId={restTimerId} color={accent} />}
@@ -7876,13 +8041,30 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
             )}
           </div>
         )}
-        <div className="mt-1 mb-2" />
         {/* Arriba de todo: solo antes de empezar (o tras completar la última) */}
         {timerSlot === 0 && (
-          <div className="mb-2 timer-hop"><RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={accent} timerId={restTimerId} exerciseName={exercise.name} /></div>
+          <div className="mb-2 mt-1 timer-hop"><RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={accent} timerId={restTimerId} exerciseName={exercise.name} /></div>
+        )}
+        {/* Encabezado de la planilla: las columnas de todas las series se
+            alinean con él. El cambio kg ⇄ lbs vive acá, una vez por tarjeta,
+            y no repetido en cada serie. */}
+        {!exercise.cardio && (
+          <div className="tabla-encabezado">
+            <span aria-hidden="true">#</span>
+            <span>Objetivo</span>
+            <span className="text-center">Reps</span>
+            <span aria-hidden="true" />
+            <button
+              onClick={() => { const nueva = planUnit === "kg" ? "lbs" : "kg"; if (setDrafts) setDrafts((prev) => convertirBorradoresDeUnidad(prev, planUnit, nueva)); onUpdateSettings?.({ weightUnit: nueva }); haptic(12); }}
+              aria-label={`Pasar a ${planUnit === "kg" ? "libras" : "kilos"} en toda la app`}
+              className="tabla-unidad">
+              {weightLabel(planUnit)}<ArrowUpDown size={10} className="rotate-90" />
+            </button>
+            <span aria-hidden="true" />
+          </div>
         )}
         {setsToShow.map((s, i) => <React.Fragment key={`${exercise.id}:frag:${i}`}>
-          <SetRow key={`${exercise.id}:${i}:${resetKey}`} exerciseId={exercise.id} exerciseName={exercise.name} exerciseMuscle={exercise.muscle} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKey} autoShowPrShare={settings.autoShowPrShare ?? true} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={hasActiveSession} cardio={exercise.cardio} dumbbellDouble={settings?.dumbbellDouble || null} fieldSettings={settings} onUpdateSettings={onUpdateSettings} sex={sex} age={age} restTimerId={restTimerId} restSeconds={restSeconds} isLastSet={i === setsToShow.length - 1} weekInCycle={weekInCycle} nextRestTimerId={nextRestTimerId} nextRestSeconds={nextRestSeconds} nextExerciseName={nextExerciseName} />
+          <SetRow key={`${exercise.id}:${i}:${resetKey}`} exerciseId={exercise.id} exerciseName={exercise.name} exerciseMuscle={exercise.muscle} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKey} autoShowPrShare={settings.autoShowPrShare ?? true} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={hasActiveSession} cardio={exercise.cardio} dumbbellDouble={settings?.dumbbellDouble || null} fieldSettings={settings} onUpdateSettings={onUpdateSettings} sex={sex} age={age} restTimerId={restTimerId} restSeconds={restSeconds} isLastSet={i === setsToShow.length - 1} weekInCycle={weekInCycle} nextRestTimerId={nextRestTimerId} nextRestSeconds={nextRestSeconds} nextExerciseName={nextExerciseName} activa={i === primeraPendiente} />
           {/* Debajo de la serie recién registrada: timerSlot = N significa
               "después de la serie N" (1-indexado). */}
           {timerSlot === i + 1 && (
@@ -8682,6 +8864,17 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
     return () => clearTimeout(limpiar);
   }, [sessionForThisDay]);
   const weekInfo = getWeekInfo(cycleStart, settings), isDeload = weekInfo?.isDeload, day = ROUTINE[activeDay];
+  // Series hechas hoy en el día que estás mirando, para la barra cargada.
+  // Mismo criterio de "hecha hoy" que las tarjetas (sin marcas de descarga).
+  const avanceDia = useMemo(() => {
+    const hoy = todayStr();
+    let total = 0, hechas = 0;
+    (day?.exercises || []).forEach((ex) => (ex.sets || []).forEach((_, i) => {
+      total++;
+      if ((logs[`${ex.id}_${i}`] || []).some((h) => h.date === hoy && !h.deload)) hechas++;
+    }));
+    return { total, hechas };
+  }, [day, logs]);
   const [resetKeys, setResetKeys] = useState({});
   const [confirmReset, setConfirmReset] = useState(false);
 
@@ -8736,7 +8929,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             las otras pestañas. Con 2 o 3 días el cálculo ya da más de 50 y
             el piso no cambia nada. */}
         {(() => { const { textClass, minHeight } = dayTabTextSizing(DAY_ORDER.length); return DAY_ORDER.map((k) => (
-          <button key={k} onClick={() => setActiveDay(k)} title={ROUTINE[k].label} role="tab" aria-selected={activeDay === k} className={`relative z-[1] flex items-center justify-center py-2.5 px-1 rounded-xl ${textClass} font-black uppercase transition-colors active:scale-95 text-center leading-tight min-w-0`}
+          <button key={k} onClick={() => setActiveDay(k)} title={ROUTINE[k].label} role="tab" aria-selected={activeDay === k} className={`dia-solapa relative z-[1] flex items-center justify-center py-2.5 px-1.5 rounded-xl ${textClass} transition-colors active:scale-95 text-center min-w-0`}
             style={{ color: activeDay === k ? ROUTINE[k].color : "var(--text-faint)", minHeight: `${Math.max(minHeight + 20, 50)}px` }}>
             {/* El día que toca hoy lleva un punto: se ve sin tener que
                 abrirlo, aunque estés mirando otro. */}
@@ -8771,7 +8964,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
                 (minHeight + su padding) y el centrado lo hace flexbox
                 normal — items-center y justify-center — con el span
                 conservando el clamp de 2 líneas a su altura natural. */}
-            <span className="block" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", textAlign: "center" }}>{ROUTINE[k].label}</span>
+            {(() => { const { texto, larga } = etiquetaDeDia(ROUTINE[k].label); return <span className="dia-solapa-texto" style={{ "--largo": larga, "--fs-max": tamanoMaxSolapa(DAY_ORDER.length) }}>{texto}</span>; })()}
           </button>
         )); })()}
       </div>
@@ -8794,11 +8987,15 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
         style={{ "--c": day.color }}
         aria-label={`Día ${day.label}`}
       >
-        <div className="relative px-3.5 pt-3.5">
-          <div className="flex items-start gap-3">
+        <div className="dia-cabecera relative px-3.5 pt-3.5">
+          {/* El nombre del día, enorme y calado, de fondo: la cabecera se
+              reconoce de lejos por su palabra y su color, como el dorsal de
+              una camiseta. Es decoración pura (aria-hidden). */}
+          <span className="dia-fondo" aria-hidden="true">{day.label}</span>
+          <div className="relative flex items-start gap-3">
             <div className="flex-1 min-w-0">
               <h2 className="dia-titulo">{day.label}</h2>
-              <p className="text-[12.5px] text-slate-400 mt-1.5 truncate">{day.description}</p>
+              <p className="text-[12.5px] text-slate-400 mt-1.5 leading-snug">{day.description}</p>
             </div>
             {/* "Resetear sesión de hoy" pasa de botón de ancho completo a un
                 ícono en la esquina — mismas acciones chicas que tiene "Rango
@@ -8814,6 +9011,20 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           {activeDay === suggestedDay && (
             <div className="mt-3 inline-flex items-center gap-1.5 text-[10.5px] font-bold uppercase px-2.5 py-1 rounded-lg" style={{ backgroundColor: tint(day.color, "1a"), color: day.color }}>
               <Calendar size={11} /> {scheduledDay === activeDay ? "Programado para hoy" : "Sugerido para hoy"}
+            </div>
+          )}
+          {/* La barra del día: un disco por serie. Abajo, en una línea, lo
+              que significa (la primera vez) o cuánto llevás. */}
+          {avanceDia.total > 0 && (
+            <div className="dia-barra relative">
+              <BarraCargada hechas={avanceDia.hechas} total={avanceDia.total} alto={46} />
+              <p className="dia-barra-texto">
+                {avanceDia.hechas === 0
+                  ? `${avanceDia.total} series: cada una que anotás suma un disco`
+                  : avanceDia.hechas >= avanceDia.total
+                    ? `Barra completa: ${avanceDia.total} de ${avanceDia.total} series`
+                    : `${avanceDia.hechas} de ${avanceDia.total} series`}
+              </p>
             </div>
           )}
           {day.isNew && <div className="mt-2 inline-flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] rounded-lg px-2.5 py-1">🆕 Empezás a registrar tus marcas desde hoy.</div>}
@@ -9720,7 +9931,7 @@ function DeloadView({ logs, setLogs, settings = DEFAULT_SETTINGS, deloadProgress
           const withPR = d.exercises.filter((ex) => ex.sets.some((s, i) => logs[`${ex.id}_${i}_pr_override`] || (logs[`${ex.id}_${i}`] || []).length > 0)).length;
           return (
             <button key={dk} onClick={() => setActiveDay(dk)} title={d.label}
-              className={`py-2.5 px-1 rounded-xl ${textClass} font-black uppercase transition-all active:scale-95 border text-center leading-tight min-w-0`}
+              className={`dia-solapa py-2.5 px-1.5 rounded-xl ${textClass} transition-all active:scale-95 border text-center min-w-0 flex flex-col items-center justify-center gap-1`}
               style={isActive ? { backgroundColor: tint(d.color, "22"), borderColor: tint(d.color, "55"), color: d.color } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
               {/* line-clamp-2 + minHeight: ver comentario en RoutineView —
                   "Hombros/Brazos" tiene que leerse entero aunque sea en 2
@@ -9730,7 +9941,7 @@ function DeloadView({ logs, setLogs, settings = DEFAULT_SETTINGS, deloadProgress
                   BUG FIX (pedido: "centrá el nombre de los días
                   horizontalmente"): mismo motivo que en RoutineView —
                   textAlign explícito en vez de depender de heredarlo. */}
-              <span className="block" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", WebkitBoxPack: "center", overflow: "hidden", minHeight: `${minHeight}px`, textAlign: "center" }}>{d.label}</span>
+              {(() => { const { texto, larga } = etiquetaDeDia(d.label); return <span className="dia-solapa-texto flex items-center justify-center" style={{ "--largo": larga, "--fs-max": tamanoMaxSolapa(DAY_ORDER.length), minHeight: `${minHeight}px` }}>{texto}</span>; })()}
               {withPR > 0 && <span className="text-[8px] font-black opacity-70">{withPR}/{d.exercises.length}</span>}
             </button>
           );
@@ -9775,7 +9986,7 @@ function DeloadView({ logs, setLogs, settings = DEFAULT_SETTINGS, deloadProgress
                 <div className="flex-1 min-w-0">
                   <h3 className="ejercicio-nombre">{ex.name}</h3>
                   <div className="flex items-center gap-2 flex-wrap mt-1.5">
-                    <span className="text-[10px] uppercase px-1.5 py-0.5 rounded-md font-bold" style={{ backgroundColor: tint(day.color, "18"), color: day.color }}>{ex.muscle}</span>
+                    <span className="text-[11px] px-1.5 py-0.5 rounded-md font-semibold" style={{ backgroundColor: tint(day.color, "18"), color: day.color }}>{ex.muscle}</span>
                     <span className="text-[11px] text-slate-500">{ex.sets.length} → <span className="text-purple-400 font-bold">{deloadSets} series</span></span>
                   </div>
                 </div>
@@ -9908,7 +10119,10 @@ const EVOLUTION_CHART_COLOR = "#F59E0B";
 // SOCIAL_INK es la variante para TEXTO e íconos: los violetas saturados no
 // llegan a 4.5:1 como tipografía, y esta sí.
 const SOCIAL_COLOR = "#8B5CF6";
-const SOCIAL_INK = "#C4B5FD";
+// Es una variable de CSS y no un hex fijo: el lila claro que se lee sobre
+// grafito desaparece sobre blanco (en modo claro, el "Amigos" activo de las
+// solapas no se veía). Ver --social-tinta en ANIMATION_CSS.
+const SOCIAL_INK = "var(--social-tinta)";
 const SOCIAL_SOLID = "#7C3AED"; // único relleno pleno, con texto blanco (5,7:1)
 
 // ============================================================================
@@ -12913,7 +13127,7 @@ function CollapsibleSection({ title, subtitle, icon, defaultOpen = false, childr
         )}
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold text-white">{title}</p>
-          {subtitle && <p className="text-[11px] text-slate-500 mt-0.5 truncate">{subtitle}</p>}
+          {subtitle && <p className="text-[11.5px] text-slate-500 mt-0.5 leading-snug">{subtitle}</p>}
         </div>
         <ChevronDown size={16} className={`text-slate-600 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
       </button>
@@ -13897,7 +14111,7 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold text-white">Qué ves al registrar</p>
           <p className="text-[11px] text-slate-500 mt-0.5">
-            {(() => { const flags = [settings.showRpe !== false, settings.showWarmup !== false, settings.show1RMPercent !== false, settings.showCoaching !== false, settings.showExerciseNote !== false, settings.showPersonalNote !== false, settings.showStagnation === true, settings.showProgressionSuggestion === true, settings.showLastSession === true, settings.compactSetRow === true]; const on = flags.filter(Boolean).length; return on === flags.length ? "Todo activado" : `${on} de ${flags.length} activadas`; })()} · vista previa en vivo
+            {(() => { const flags = [settings.showRpe !== false, settings.showWarmup !== false, settings.show1RMPercent !== false, settings.showCoaching !== false, settings.showExerciseNote !== false, settings.showPersonalNote !== false, settings.showStagnation === true, settings.showProgressionSuggestion === true, settings.showLastSession === true]; const on = flags.filter(Boolean).length; return on === flags.length ? "Todo activado" : `${on} de ${flags.length} activadas`; })()} · vista previa en vivo
           </p>
         </div>
         <Eye size={16} className="text-slate-500 shrink-0" />
@@ -14606,7 +14820,7 @@ function SendTemplateModal({ template, studentsAccepted, basics, myUid, onClose,
         <div className="flex items-center justify-between">
           <div>
             <p className="text-[10px] font-black uppercase tracking-widest text-purple-400">Enviar plantilla</p>
-            <h3 className="text-base font-black text-white leading-tight truncate">{template.def.name}</h3>
+            <h3 className="text-base font-black text-white leading-tight text-balance">{template.def.name}</h3>
           </div>
           <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition"><X size={17} /></button>
         </div>
@@ -14681,7 +14895,7 @@ function TrainerTemplatesCard({ templates, onCreate, onEdit, onSend }) {
           {entries.map(([id, def]) => (
             <div key={id} className="flex items-center gap-2 rounded-xl bg-slate-800/40 border border-slate-700/40 px-3 py-2.5">
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-bold text-white truncate">{def.name}</p>
+                <p className="text-xs font-bold text-white leading-snug">{def.name}</p>
                 <p className="text-[10px] text-slate-500">{def.dayOrder.length} día{def.dayOrder.length !== 1 ? "s" : ""}</p>
               </div>
               <button onClick={() => onSend(id, def)} aria-label="Enviar a un alumno" className="p-1.5 rounded-lg text-purple-400 hover:text-purple-300 hover:bg-purple-500/15 transition shrink-0"><Send size={14} /></button>
@@ -15303,12 +15517,39 @@ function LeaderboardSection({ uid, profile, myTopRank, friendAccepted, basics, a
       {scope === "global" && globalLoading && <p className="text-center text-slate-600 text-sm py-8">Cargando ranking...</p>}
       {scope === "global" && globalError && <p className="text-center text-slate-600 text-sm py-8 px-4">No pudimos cargar el ranking global ahora mismo. Probá de nuevo más tarde.</p>}
       {scope === "global" && !globalLoading && !globalError && globalList?.length === 0 && <p className="text-center text-slate-600 text-sm py-8">Todavía no hay nadie en el ranking global.</p>}
+      {/* PODIO: con tres o más, los primeros tres suben a un podio (el
+          primero al medio y más alto, como en una premiación) y el resto
+          sigue en la lista de siempre. */}
+      {list.length >= 3 && (
+        <div className="podio" role="list" aria-label="Los tres primeros">
+          {[1, 0, 2].map((idx) => {
+            const e = list[idx];
+            const pos = idx + 1;
+            const medalla = pos === 1 ? "#FFD23F" : pos === 2 ? "#DCE3E8" : "#CD7F32";
+            const nombre = e.isMe ? "Vos" : (e.name || "Usuario");
+            const Tag = onViewPerson ? "button" : "div";
+            return (
+              <Tag key={e.uid || (e.isMe ? "me" : idx)} role="listitem" onClick={onViewPerson ? () => onViewPerson(e.uid, e.isMe) : undefined} className={`podio-lugar podio-${pos} ${e.isMe ? "yo" : ""}`} style={{ "--medalla": medalla }} aria-label={`${pos}º, ${nombre}`}>
+                <span className="podio-avatar">
+                  {e.avatarData ? <img src={e.avatarData} alt="" /> : <span aria-hidden="true">{String(e.name || e.username || "?").charAt(0).toUpperCase()}</span>}
+                  <span className="podio-medalla" aria-hidden="true"><Medal size={13} /></span>
+                </span>
+                <span className="podio-nombre">{nombre}</span>
+                {e.streakDays != null
+                  ? <span className="podio-dato" style={{ color: accent }}><Flame size={11} />{e.streakDays} {e.streakDays === 1 ? "día" : "días"}</span>
+                  : e.topRank && <span className="podio-dato" style={{ color: e.topRank.color }}>{e.topRank.tier} {e.topRank.sub}</span>}
+                <span className="podio-escalon" aria-hidden="true">{pos}</span>
+              </Tag>
+            );
+          })}
+        </div>
+      )}
       <div className="space-y-2">
         {/* Fallback de key: un perfil local ("sin Google") no tiene
             googleUid todavía, así que "vos" en la lista puede llegar con
             uid undefined — sin el fallback, React tira "missing key"
             apenas esa fila entra en el array. */}
-        {list.map((entry, i) => <LeaderboardRow key={entry.uid || (entry.isMe ? "me" : i)} position={i + 1} {...entry} accent={accent} onClick={onViewPerson ? () => onViewPerson(entry.uid, entry.isMe) : null} />)}
+        {list.map((entry, i) => (list.length >= 3 && i < 3) ? null : <LeaderboardRow key={entry.uid || (entry.isMe ? "me" : i)} position={i + 1} {...entry} accent={accent} onClick={onViewPerson ? () => onViewPerson(entry.uid, entry.isMe) : null} />)}
       </div>
     </div>
   );
@@ -16734,7 +16975,6 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
 
 // Cuántos candidatos de "aplausos rápidos" se muestran de entrada antes de
 // recortar el resto atrás de "Ver todos" (KudosListModal, más abajo).
-const KUDOS_STRIP_PREVIEW = 1;
 
 // Ventana para felicitar: hoy y ayer, nada más. Felicitar a alguien por un
 // entrenamiento de hace tres días no se siente como una felicitación, se
@@ -16857,7 +17097,7 @@ function KudosListModal({ candidates, basics, kudosSentMap, kudosSendingUid, onS
 // alguien de una lista se muestra FriendProfileView en vez de navegar a
 // otra pestaña — mismo criterio "estado interno, no más tabs" que ya usa
 // RoutinesView/DeloadView para sus propias sub-pantallas.
-function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProfile }) {
+function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProfile, onGoToProfile = null }) {
   const [section, setSection] = useState("amigos"); // amigos | buscar | entrenador
   const [viewingUid, setViewingUid] = useState(null);
   const [viewingAsTrainer, setViewingAsTrainer] = useState(false);
@@ -17184,6 +17424,20 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
     refresh();
   };
 
+  // Tu puesto entre tus amigos: el mismo orden por rango que la solapa
+  // Ranking (buildFriendsRanking), así los dos no pueden decir cosas
+  // distintas. Y cuántos de tus amigos entrenaron esta semana (lunes a
+  // domingo, como el resto de la app).
+  const puestoEnGrupo = useMemo(() => {
+    if (!friendAccepted.length) return null;
+    const idx = buildFriendsRanking(uid, profile, myTopRank, friendAccepted, basics).findIndex((r) => r.isMe);
+    return idx >= 0 ? idx + 1 : null;
+  }, [uid, profile, myTopRank, friendAccepted, basics]);
+  const entrenaronSemana = useMemo(() => friendAccepted.reduce((n, f) => {
+    const otro = f.users.find((u) => u !== uid);
+    return n + ((streaks?.[otro]?.sessionsThisWeek || 0) > 0 ? 1 : 0);
+  }, 0), [friendAccepted, streaks, uid]);
+
   if (viewingUid) {
     return (
       <FriendProfileView
@@ -17250,191 +17504,150 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
 
   return (
     <div className="space-y-4">
-      {/* El hero de Social (rótulo + "Social" + bajada) se fue: lo dice el
-          título grande de la página (TituloPestana), con el mismo rótulo y
-          la misma bajada. Ver historial para los pedidos que lo formaron. */}
-      {/* Tarjeta de perfil — el avatar/nombre/racha/rango, lo primero de
-          la pestaña. */}
-      {/* Pedido: "métele la textura del principal [el hero de arriba],
-          pero agreguemos algo más al diseño, algo que involucre otros
-          colores pero en poca cantidad — al igual que el violeta de la
-          semana de descarga en Progreso, o el color de qué día es en
-          Rutinas" — mismo fondo/glows que el hero (grad-hero-purple), y
-          un tercer glow puntual con el color de TU rango (un dato que
-          cambia según tu estado, como la fase de la semana o el día que
-          toca) en vez de un violeta/fucsia fijo para todo el mundo. */}
-      {/* Esta tarjeta repetía el MISMO fondo y los MISMOS dos resplandores que
-          el hero de arriba: dos violetas idénticos pegados se leen como una
-          sola mancha alta, y ninguno de los dos se destaca. Ahora es una
-          superficie neutra que sube un escalón de luz respecto de la página
-          (ver --surface-1): se distingue del hero por LUZ, no por más tinte.
-          El único color que entra es el de TU rango, que es un dato tuyo y
-          cambia — el fucsia fijo no significaba nada y se va. */}
-      <div className="relative overflow-hidden rounded-2xl p-4 elastic-in" style={{ backgroundColor: "var(--surface-1)", border: "1px solid var(--hairline)", animationDelay: "60ms" }}>
-        {myTopRank && (
-          <div className="absolute top-1/2 right-6 -translate-y-1/2 w-24 h-24 rounded-full blur-2xl pointer-events-none opacity-25" style={{ backgroundColor: myTopRank.color }} />
-        )}
-        <div className="relative flex items-center gap-3.5">
-          <div className="w-14 h-14 rounded-2xl overflow-hidden shrink-0 flex items-center justify-center" style={{ backgroundColor: tint(SOCIAL_COLOR, "1f"), border: `1px solid ${tint(SOCIAL_COLOR, "44")}` }}>
-            {profile?.avatarData ? <img src={profile.avatarData} alt="" className="w-full h-full object-cover" /> : <Users size={24} style={{ color: SOCIAL_INK }} />}
-          </div>
-          <div className="min-w-0 flex-1">
-            {/* Acá decía TU NOMBRE, que ya está dos centímetros más arriba en
-                la cabecera de la app, debajo del título de la pestaña. Era la
-                tercera vez que aparecía tu identidad en la misma pantalla
-                (avatar de la cabecera, nombre de la cabecera, y esto). El
-                nombre no aporta nada: lo que la tarjeta tiene para decir es
-                de qué tamaño es tu grupo. */}
-            <h3 className="text-base font-black text-white leading-tight truncate">Tu comunidad</h3>
-            <p className="text-[11px] text-slate-400">
-              {friendAccepted.length} {friendAccepted.length === 1 ? "amigo" : "amigos"}
-              {(studentsAccepted.length + trainersAccepted.length) > 0 ? ` · ${studentsAccepted.length + trainersAccepted.length} vínculo${(studentsAccepted.length + trainersAccepted.length) === 1 ? "" : "s"} de entrenador` : ""}
-            </p>
-          </div>
-          {/* Pedido: sacar el recuadro/marco que tenía la insignia y la
-              etiqueta "Tu rango" — queda el ícono solo, sin caja, con el
-              nombre del rango (ej. "Diamante II") como texto debajo en vez
-              del circulito con el número romano superpuesto (sub={null}).
-              Tocarlo ahora abre una EXPLICACIÓN de por qué se asignó ese
-              rango (RankExplainModal) en vez del muñeco — el muñeco queda
-              reservado para la fila "Vos" de Ranking, sin cambios ahí. */}
-          {myTopRank && (
-            <button onClick={() => setShowRankExplain(true)} aria-label="Por qué tenés este rango" className="shrink-0 flex flex-col items-center gap-0.5 active:scale-95 transition badge-pop">
-              <RankBadgeIcon tier={myTopRank.tier} sub={null} color={myTopRank.color} size={40} />
-              <span className="text-[9px] font-black uppercase tracking-wide whitespace-nowrap" style={{ color: myTopRank.color }}>{myTopRank.tier} {myTopRank.sub}</span>
-            </button>
-          )}
-        </div>
-        {/* Pedido: ideas "inspiradas en apps como Strava, enfocadas en lo
-            social" para este espacio (entre la identidad de arriba y la
-            línea del QR de abajo) — el usuario eligió kudos/aplausos
-            rápidos y un aviso de "te están por alcanzar", con diseños
-            contundentes (no sólo texto): tarjeta propia, color de marca,
-            ícono grande, y accionables (aplaudir / ver el perfil).
-            Vuelve el mismo esqueleto de "estética original" — una sola fila
-            ancha con el avatar+info a la izquierda y el botón de aplaudir
-            grande y cuadrado pegado a la derecha — mostrando sólo al
-            candidato más reciente; si hay más de uno, "Ver todos" abre
-            KudosListModal (mismo esqueleto de fila, para cada uno de los
-            demás).
-            Pedido: "achiquemos un poco... y cambiemos ese naranja por el
-            verde que utilizamos en la sección la rutina que tenés
-            activada" — el naranja estilo Strava se reemplaza por el mismo
-            teal/verde (#14B8A6) que ya identifica "Rutina activa"/"Tu
-            entrenamiento" en el resto de la app, y la tarjeta se achica un
-            poco (menos padding, avatar y botón de aplaudir más chicos). */}
-        {/* Los aplausos que TE mandaron. Antes esto no existía: aplaudir
-            escribía en Firestore y del otro lado no aparecía nada nunca, así
-            que el gesto no llegaba. */}
-        {kudosReceived.length > 0 && (() => {
-          const nombres = kudosReceived.map((k) => basics[k.fromUid]?.name).filter(Boolean);
-          const quien = nombres.length === 0 ? `${kudosReceived.length} ${kudosReceived.length === 1 ? "persona" : "personas"}`
-            : nombres.length === 1 ? nombres[0]
-            : nombres.length === 2 ? `${nombres[0]} y ${nombres[1]}`
-            : `${nombres[0]} y ${nombres.length - 1} más`;
-          return (
-            <div className="relative overflow-hidden rounded-2xl border mt-3 p-3 elastic-in" style={{ borderColor: "rgba(251,191,36,0.4)", background: "linear-gradient(135deg, rgba(251,191,36,0.16), rgba(20,24,29,0.55) 70%)" }}>
-              <div className="absolute -top-8 -right-8 w-20 h-20 rounded-full blur-2xl pointer-events-none" style={{ backgroundColor: "rgba(251,191,36,0.3)" }} />
-              <div className="relative flex items-center gap-2.5">
-                <div className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 border-2 badge-pop" style={{ backgroundColor: "rgba(251,191,36,0.18)", borderColor: "rgba(251,191,36,0.5)" }}>
-                  <span className="text-xl leading-none">👏</span>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[9.5px] font-black uppercase tracking-wide" style={{ color: "#FBBF24" }}>Te aplaudieron</p>
-                  <p className="text-[12.5px] text-slate-200 leading-snug"><span className="font-black text-white">{quien}</span> {kudosReceived.length === 1 && nombres.length === 1 ? "festejó" : "festejaron"} tu entrenamiento.</p>
-                </div>
+      {/* TARJETA DE ATLETA — lo primero de Social, en vez de "Tu comunidad".
+          Es tu ficha, como la de un jugador: tu foto, cómo te buscan
+          (@usuario), tu rango con su color (la tarjeta entera lo toma: un
+          Oro se ve dorado, un Diamante celeste) y tres números grandes que
+          cambian con lo que hacés — tu racha, tu puesto entre tus amigos y
+          los aplausos que recibiste.
+          Antes acá NO iba tu nombre porque ya estaba en la cabecera de la
+          app; la cabecera nueva ya no lo muestra, así que vuelve, y como tu
+          @usuario cuando lo tenés (que es lo que otros buscan).
+          Los tres números son los que antes tenía "Tu grupo esta semana"
+          en una fila aparte (y "Entrenaron" pasó a la fila de historias). */}
+      {(() => {
+        const color = myTopRank?.color || SOCIAL_COLOR;
+        const nombreVisible = profile?.username ? `@${profile.username}` : (profile?.name || profileName || "Vos");
+        const vinculos = studentsAccepted.length + trainersAccepted.length;
+        const stats = [
+          { k: "racha", label: "Racha", valor: myStreak || 0, unidad: myStreak === 1 ? "día" : "días", icono: <Flame size={12} /> },
+          friendAccepted.length > 0
+            ? { k: "puesto", label: "Tu puesto", valor: puestoEnGrupo, unidad: "º", icono: <Award size={12} /> }
+            : { k: "amigos", label: "Amigos", valor: 0, unidad: "", icono: <Users size={12} /> },
+          { k: "aplausos", label: "Aplausos", valor: kudosReceived.length, unidad: "", icono: <span className="text-[11px] leading-none" aria-hidden="true">👏</span> },
+        ];
+        return (
+          <section className="atleta elastic-in" style={{ "--rango": color }} aria-label="Tu ficha">
+            <div className="atleta-fondo" aria-hidden="true" />
+            <div className="relative flex items-center gap-3.5">
+              <div className="atleta-avatar">
+                {profile?.avatarData ? <img src={profile.avatarData} alt="" className="w-full h-full object-cover" /> : <span aria-hidden="true">{String(profile?.name || profileName || "?").charAt(0).toUpperCase()}</span>}
               </div>
-            </div>
-          );
-        })()}
-        {kudosCandidates.length > 0 && (() => {
-          const top = kudosCandidates[0];
-          const sent = !!kudosSentMap[top.uid];
-          const sending = kudosSendingUid === top.uid;
-          return (
-            <div className="relative overflow-hidden rounded-2xl border mt-3 p-3 elastic-in" style={{ borderColor: "rgba(20,184,166,0.4)", background: "linear-gradient(135deg, rgba(20,184,166,0.16), rgba(20,24,29,0.55) 70%)" }}>
-              <div className="absolute -top-8 -right-8 w-20 h-20 rounded-full blur-2xl pointer-events-none" style={{ backgroundColor: "rgba(20,184,166,0.3)" }} />
-              <div className="relative flex items-center gap-2.5">
-                <button onClick={() => setViewingUid(top.uid)} className="flex items-center gap-2 flex-1 min-w-0 text-left active:opacity-80 transition">
-                  {basics[top.uid]?.avatarData ? (
-                    <img src={basics[top.uid].avatarData} alt="" className="w-10 h-10 rounded-2xl object-cover shrink-0 border-2" style={{ borderColor: "rgba(20,184,166,0.5)" }} />
-                  ) : (
-                    <div className="w-10 h-10 rounded-2xl flex items-center justify-center text-sm font-black !text-white shrink-0 border-2" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)", borderColor: "rgba(20,184,166,0.5)" }}>
-                      {(basics[top.uid]?.name || "?").charAt(0).toUpperCase()}
-                    </div>
-                  )}
-                  <div className="min-w-0">
-                    <p className="text-[9.5px] font-black uppercase tracking-wide" style={{ color: "#5eead4" }}>{kudosDayLabel(top.daysAgo)}</p>
-                    <p className="text-sm font-bold text-white truncate">{basics[top.uid]?.name || "Tu amigo"}</p>
-                    {top.latestSession?.dayLabel && <p className="text-[10.5px] text-slate-400 truncate">{top.latestSession.dayLabel}</p>}
-                  </div>
-                </button>
-                <button
-                  onClick={(e) => handleSendKudos(top.uid, e.currentTarget)}
-                  disabled={sending || sent}
-                  className={`shrink-0 flex flex-col items-center justify-center gap-0.5 w-14 h-14 rounded-2xl border-2 font-black transition-all active:scale-90 ${sent ? "opacity-90 badge-pop" : !sending ? "animate-pulse" : ""}`}
-                  style={sent ? { backgroundColor: "rgba(20,184,166,0.22)", borderColor: "#14B8A6", color: "#5eead4" } : { backgroundColor: "#14B8A6", borderColor: "#14B8A6", color: "#fff" }}
-                >
-                  <span className="text-xl leading-none">👏</span>
-                  <span className="text-[8px] leading-none">{sent ? "¡Listo!" : "Aplaudir"}</span>
-                </button>
+              <div className="min-w-0 flex-1">
+                <p className="atleta-nombre">{nombreVisible}</p>
+                <p className="text-[12px] text-slate-400 mt-1 leading-snug">
+                  {friendAccepted.length} {friendAccepted.length === 1 ? "amigo" : "amigos"}
+                  {vinculos > 0 ? ` · ${vinculos} vínculo${vinculos === 1 ? "" : "s"} de entrenador` : ""}
+                </p>
               </div>
-              {/* Pedido: "algo pequeño que haga saber que tenés más amigos...
-                  y que se abra algo para ver a todos, también que puedas ver
-                  su entrenamiento" — sólo aparece si hay más de un
-                  candidato; abre KudosListModal con el resto, cada uno con
-                  el mismo esqueleto de fila (avatar+info a la izquierda,
-                  aplaudir a la derecha) y el detalle de qué entrenó. */}
-              {kudosCandidates.length > KUDOS_STRIP_PREVIEW && (
-                <button onClick={() => setShowAllKudos(true)} className="relative w-full flex items-center justify-center gap-1 mt-2.5 pt-2 border-t border-teal-500/20 text-[9px] font-bold text-teal-300/80 hover:text-teal-300 transition">
-                  +{kudosCandidates.length - KUDOS_STRIP_PREVIEW} amigo{kudosCandidates.length - KUDOS_STRIP_PREVIEW === 1 ? "" : "s"} más entrenaron · Ver todos <ChevronRight size={11} />
+              {/* Tocarlo explica por qué tenés ese rango (RankExplainModal). */}
+              {myTopRank && (
+                <button onClick={() => setShowRankExplain(true)} aria-label={`Tu rango: ${myTopRank.tier} ${myTopRank.sub}. Tocá para ver por qué`} className="atleta-rango badge-pop">
+                  <RankBadgeIcon tier={myTopRank.tier} sub={null} color={myTopRank.color} size={46} />
+                  <span>{myTopRank.tier} {myTopRank.sub}</span>
                 </button>
               )}
             </div>
-          );
-        })()}
-        {chaserFriend && (
-          <button onClick={() => setViewingUid(chaserFriend.uid)} className="relative overflow-hidden w-full text-left rounded-2xl border mt-3 p-3 active:scale-[0.99] transition elastic-in" style={{ borderColor: "rgba(244,63,94,0.5)", background: "linear-gradient(135deg, rgba(244,63,94,0.20), rgba(20,24,29,0.55) 70%)" }}>
-            <div className="absolute -top-8 -left-8 w-24 h-24 rounded-full blur-2xl pointer-events-none animate-pulse" style={{ backgroundColor: "rgba(244,63,94,0.3)" }} />
-            <div className="relative flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 border-2 streak-beat" style={{ backgroundColor: "rgba(244,63,94,0.2)", borderColor: "rgba(244,63,94,0.55)" }}>
-                <Flame size={20} style={{ color: "#FB7185" }} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-[10px] font-black uppercase tracking-wide" style={{ color: "#FB7185" }}>¡Te están por alcanzar!</p>
-                {/* Antes: "tiene una racha de 4 días — la tuya: 5". Dos
-                    datos pegados con un guion y dos puntos se leen como una
-                    ficha, no como una frase. Ahora es una oración sola. */}
-                <p className="text-[12.5px] text-slate-200 leading-snug">
-                  <span className="font-black text-white">{basics[chaserFriend.uid]?.name || "Tu amigo"}</span> lleva {chaserFriend.streak} {chaserFriend.streak === 1 ? "día" : "días"} seguidos y vos {myStreak}.
-                </p>
-              </div>
-              <ChevronRight size={16} className="text-rose-300/70 shrink-0" />
+            <div className="atleta-stats">
+              {stats.map((st) => (
+                <div key={st.k}>
+                  <p className="atleta-stat-rotulo">{st.icono}<span>{st.label}</span></p>
+                  <p className="atleta-stat-valor">
+                    {st.valor == null || (st.k === "puesto" && !st.valor)
+                      ? <span className="text-slate-600">—</span>
+                      : <><CountUpNumber value={st.valor} from={0} duration={550} decimals={0} />{st.unidad && <small>{st.unidad}</small>}</>}
+                  </p>
+                </div>
+              ))}
             </div>
-          </button>
-        )}
-        {profile?.username ? (
-          // Pedido: "que vuelva lo del QR, pero solo que muestre el QR al
-          // pulsarlo, el link no" — antes esto abría un selector (tarjeta
-          // de texto O código QR); ahora va directo al QR, sin pasar por
-          // esa elección ni mostrar ningún link/tarjeta.
-          <button onClick={() => setShowProfileQr(true)} className="relative w-full flex items-center justify-center gap-1.5 mt-3.5 pt-3 border-t border-white/10 text-[10px] font-bold text-purple-300/75 hover:text-purple-300 transition">
-            <QrCode size={11} /> Mostrar mi código QR <ChevronRight size={11} />
-          </button>
-        ) : uid ? (
-          // Pedido: "si no tenés tu alias que te pida que pongas, en la
-          // sección social que aparezca" — antes esto era sólo una
-          // oración en la sección Buscar, ahora el prompt para elegirlo
-          // vive acá mismo, arriba de todo, con el input de verdad en vez
-          // de mandarte a buscarlo en Perfil.
-          <div className="relative mt-3.5 pt-3 border-t border-white/10">
-            <p className="text-[11px] text-slate-400 mb-2">Elegí tu @usuario para que te puedan buscar y agregar.</p>
-            <UsernameSection uid={uid} currentUsername={null} onSaved={(u) => onUpdateProfile({ username: u })} />
+            {/* Pedido: "que vuelva lo del QR, pero solo que muestre el QR al
+                pulsarlo, el link no". Sin @usuario, se elige acá mismo; sin
+                Google, el botón te lleva a Perfil a vincularlo. */}
+            {profile?.username ? (
+              <button onClick={() => setShowProfileQr(true)} className="atleta-accion">
+                <QrCode size={15} style={{ color }} /> Mostrar mi código QR <ChevronRight size={15} className="ml-auto text-slate-500" />
+              </button>
+            ) : uid ? (
+              <div className="relative mt-3 pt-3 border-t border-white/10">
+                <p className="text-[12px] text-slate-400 mb-2">Elegí tu @usuario para que te puedan buscar y agregar.</p>
+                <UsernameSection uid={uid} currentUsername={null} onSaved={(u) => onUpdateProfile({ username: u })} />
+              </div>
+            ) : (
+              <button onClick={onGoToProfile || undefined} disabled={!onGoToProfile} className="atleta-accion">
+                <Link2 size={15} style={{ color }} />
+                <span className="flex-1 min-w-0 text-left">Vinculá tu cuenta de Google para usar lo social</span>
+                <ChevronRight size={15} className="text-slate-500 shrink-0" />
+              </button>
+            )}
+          </section>
+        );
+      })()}
+
+      {/* ENTRENARON — los amigos que entrenaron hoy o ayer, en fila, como
+          las historias de Instagram: el aro toma el color del día que
+          entrenaron (Push, Pull…) y se apaga cuando ya les aplaudiste.
+          Tocás la foto para ver su perfil, y el 👏 para aplaudirle.
+          Antes era una tarjeta grande con UN solo amigo y un "Ver todos"
+          que abría otra ventana; acá entran todos y se ve de un vistazo
+          quién se movió. */}
+      {kudosCandidates.length > 0 && (
+        <section aria-label="Amigos que entrenaron">
+          <div className="flex items-baseline justify-between gap-2 px-1 mb-2">
+            <p className="text-[14px] font-bold text-white">Entrenaron</p>
+            {friendAccepted.length > 0 && <p className="text-[11.5px] text-slate-500 text-right">{entrenaronSemana} de {friendAccepted.length} esta semana</p>}
           </div>
-        ) : (
-          <p className="relative text-[11px] text-slate-400 mt-3.5 pt-3 border-t border-white/10">Vinculá tu cuenta de Google en Perfil para poder elegir un @usuario y usar lo social.</p>
-        )}
-      </div>
+          <div className="historias">
+            {kudosCandidates.map((c) => {
+              const b = basics[c.uid];
+              const nombre = b?.name || "Tu amigo";
+              const sent = !!kudosSentMap[c.uid];
+              const sending = kudosSendingUid === c.uid;
+              return (
+                <div key={c.uid} className="historia">
+                  <button onClick={() => setViewingUid(c.uid)} className={`historia-aro ${sent ? "vista" : ""}`} style={{ "--dia": c.latestSession?.dayColor || SOCIAL_COLOR }} aria-label={`Ver el perfil de ${nombre}`}>
+                    {b?.avatarData ? <img src={b.avatarData} alt="" /> : <span aria-hidden="true">{nombre.charAt(0).toUpperCase()}</span>}
+                  </button>
+                  <button onClick={(e) => handleSendKudos(c.uid, e.currentTarget)} disabled={sending || sent} className={`historia-aplauso ${sent ? "hecho" : ""}`} aria-label={sent ? `Ya le aplaudiste a ${nombre}` : `Aplaudir a ${nombre}`}>
+                    {sent ? <Check size={14} strokeWidth={3} /> : <span aria-hidden="true">👏</span>}
+                  </button>
+                  <p className="historia-nombre">{nombre.split(" ")[0]}</p>
+                  <p className="historia-cuando">{c.daysAgo <= 0 ? "hoy" : c.daysAgo === 1 ? "ayer" : `hace ${c.daysAgo} d`}{c.latestSession?.dayLabel ? ` · ${c.latestSession.dayLabel}` : ""}</p>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* AVISOS — lo que te pasó a vos: quién te aplaudió (antes no existía:
+          aplaudir escribía en Firestore y del otro lado no aparecía nada) y
+          quién te viene alcanzando en la racha ("being chased", estilo
+          Strava). Renglones de notificación, sin las manchas de color que
+          tenían como tarjetas. */}
+      {(kudosReceived.length > 0 || chaserFriend) && (
+        <div className="space-y-2">
+          {kudosReceived.length > 0 && (() => {
+            const nombres = kudosReceived.map((k) => basics[k.fromUid]?.name).filter(Boolean);
+            const quien = nombres.length === 0 ? `${kudosReceived.length} ${kudosReceived.length === 1 ? "persona" : "personas"}`
+              : nombres.length === 1 ? nombres[0]
+              : nombres.length === 2 ? `${nombres[0]} y ${nombres[1]}`
+              : `${nombres[0]} y ${nombres.length - 1} más`;
+            return (
+              <div className="aviso-social" style={{ "--c": "#FBBF24" }}>
+                <span className="aviso-social-icono" aria-hidden="true">👏</span>
+                <p><b>{quien}</b> {kudosReceived.length === 1 && nombres.length === 1 ? "festejó" : "festejaron"} tu entrenamiento.</p>
+              </div>
+            );
+          })()}
+          {chaserFriend && (
+            <button onClick={() => setViewingUid(chaserFriend.uid)} className="aviso-social" style={{ "--c": "#FB7185" }}>
+              <span className="aviso-social-icono streak-beat" aria-hidden="true"><Flame size={18} /></span>
+              <p><b>{basics[chaserFriend.uid]?.name || "Tu amigo"}</b> lleva {chaserFriend.streak} {chaserFriend.streak === 1 ? "día" : "días"} seguidos y vos {myStreak}: te está por alcanzar.</p>
+              <ChevronRight size={15} className="text-slate-500 shrink-0" />
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Pedido: "un recuadro entre el superior de Social y los logros,
           acortador para la creación de rutinas [para alumnos]".
@@ -17454,7 +17667,7 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
         />
       )}
 
-      <SocialProgressStats uid={uid} profile={profile} myTopRank={myTopRank} friendAccepted={friendAccepted} basics={basics} streaks={streaks} kudosRecibidos={kudosReceived.length} onGoToBuscar={irABuscar} />
+      {friendAccepted.length === 0 && <SocialProgressStats uid={uid} profile={profile} myTopRank={myTopRank} friendAccepted={friendAccepted} basics={basics} streaks={streaks} kudosRecibidos={kudosReceived.length} onGoToBuscar={irABuscar} />}
 
       <div className="relative grid gap-1 p-1 rounded-2xl bg-slate-900/60 border border-slate-800/50" style={{ gridTemplateColumns: `repeat(${SECTIONS.length}, 1fr)` }}>
         {/* Píldora deslizante en vez de que cada botón prenda/apague su
@@ -17470,7 +17683,7 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
           const badge = s.k === "amigos" ? friendIncoming.length : s.k === "entrenador" ? trainerIncoming.length + proposals.length : 0;
           return (
             <button key={s.k} onClick={() => setSection(s.k)} className="relative z-[1] flex flex-col items-center justify-center gap-1 py-2 rounded-xl text-[10.5px] font-bold transition-colors active:scale-95"
-              style={{ color: section === s.k ? SOCIAL_INK : "#6e7379" }}>
+              style={{ color: section === s.k ? SOCIAL_INK : "var(--text-faint)" }}>
               {s.icon}<span>{s.l}</span>
               {badge > 0 && <span className="absolute top-1 right-2.5 w-4 h-4 rounded-full bg-rose-500 text-white text-[9px] font-black flex items-center justify-center z-[2]">{badge}</span>}
             </button>
@@ -17500,12 +17713,9 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
           backgroundColor: "var(--surface-1)",
         }}
       >
-        <div className="flex items-center gap-2.5 mb-3">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: tint(sectionColor, "18"), color: sectionColor }}>
-            {sectionDef.icon}
-          </div>
-          <p className="flex-1 min-w-0 text-sm font-bold text-white truncate">{sectionDef.l}</p>
-        </div>
+        {/* Sin título propio: "Amigos", "Ranking"… ya lo dice la solapa
+            pintada justo arriba. */}
+        <h3 className="sr-only">{sectionDef.l}</h3>
         <div className="space-y-3">
         {section === "actividad" && (
           kudosCandidates.length === 0 && !chaserFriend ? (
@@ -17910,10 +18120,10 @@ function PresetRoutineCard({ preset, isActive, onPreview }) {
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <h4 className="text-sm font-bold text-white leading-snug" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{preset.name}</h4>
+            <h4 className="text-sm font-bold text-white leading-snug text-balance">{preset.name}</h4>
             {isActive && <span className="text-[9px] font-black px-1.5 py-0.5 rounded-lg bg-blue-500/20 text-blue-400 shrink-0 badge-pop">ACTIVA</span>}
           </div>
-          <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-2">{preset.description}</p>
+          <p className="text-[11.5px] text-slate-500 mt-1 leading-snug text-pretty">{preset.description}</p>
           <p className="text-[10px] text-slate-600 mt-1.5">{ctx?.frecuencia || `${dayCount} día${dayCount === 1 ? "" : "s"}/semana`}</p>
         </div>
         <ChevronRight size={15} className="text-slate-600 shrink-0" />
@@ -17940,7 +18150,7 @@ function SavedRoutineRow({ routine, isActive, onUse, onEdit, onShare, onArchive,
               veces. Ahora todo vive en un solo lugar, mejor diseñado. */}
           <button onClick={onPreview} className="flex-1 min-w-0 text-left active:opacity-70 transition-opacity">
             <div className="flex items-center gap-2 flex-wrap">
-              <p className="text-sm font-bold text-white leading-snug" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{routine.name}</p>
+              <p className="text-sm font-bold text-white leading-snug text-balance">{routine.name}</p>
               {isActive && <span className="text-[9px] font-black px-2 py-0.5 rounded-full shrink-0" style={{ backgroundColor: tint(accent, "25"), color: accent, border: `1px solid ${tint(accent, "40")}` }}>ACTIVA</span>}
             </div>
             <p className="text-[11px] text-slate-500">
@@ -22252,7 +22462,7 @@ function RoutinePreviewModal({ routineDef, routineName, onActivate, onClose, yaA
           <div className="relative flex items-start justify-between gap-3">
             <div className="min-w-0">
               <span className="text-[9px] font-black uppercase tracking-[0.16em] text-sky-400/80">Vista previa</span>
-              <p className="text-lg font-black text-white leading-tight mt-0.5 truncate">{routineName}</p>
+              <p className="text-lg font-black text-white leading-tight mt-0.5 text-balance">{routineName}</p>
             </div>
             <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition shrink-0">
               <X size={16} />
@@ -22308,7 +22518,7 @@ function RoutinePreviewModal({ routineDef, routineName, onActivate, onClose, yaA
                       <Dumbbell size={15} />
                     </span>
                     <span className="flex-1 min-w-0">
-                      <span className="block text-xs font-black text-white truncate">{day.label}</span>
+                      <span className="block text-xs font-black text-white text-balance">{day.label}</span>
                       <span className="block text-[10px] text-slate-500 tabular-nums">
                         {day.exercises?.length || 0} ejercicios · {seriesDia} series
                       </span>
@@ -22327,7 +22537,7 @@ function RoutinePreviewModal({ routineDef, routineName, onActivate, onClose, yaA
                             <span className="w-4 h-4 rounded-md flex items-center justify-center text-[8px] font-black shrink-0 tabular-nums" style={{ backgroundColor: tint(day.color, "25"), color: day.color }}>
                               {i + 1}
                             </span>
-                            <span className="flex-1 min-w-0 truncate text-[11px] text-slate-300">{lib?.name || ex.name || ex.libId}</span>
+                            <span className="flex-1 min-w-0 text-[11.5px] text-slate-300 leading-snug">{lib?.name || ex.name || ex.libId}</span>
                             <span className="text-[10px] text-slate-500 tabular-nums shrink-0">
                               {sets}{rango ? `×${rango}` : ""}
                             </span>
@@ -22668,7 +22878,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
             <div className="w-11 h-11 rounded-2xl bg-blue-500/25 text-blue-200 flex items-center justify-center shrink-0 ring-1 ring-inset ring-white/10"><Dumbbell size={18} /></div>
             <div className="min-w-0 flex-1">
               <span className="text-[9px] font-black uppercase tracking-[0.16em] text-blue-300/90">Tu rutina activa</span>
-              <h3 className="text-[17px] font-black text-white leading-tight truncate">{activeDef.name}</h3>
+              <h3 className="text-[17px] font-black text-white leading-tight text-balance">{activeDef.name}</h3>
             </div>
             <button onClick={() => setShareTarget(activeDef)} aria-label="Compartir rutina activa" className="p-2 rounded-xl text-blue-200 hover:text-white hover:bg-white/10 transition shrink-0"><Share2 size={15} /></button>
           </div>
@@ -22968,7 +23178,6 @@ function ActiveSessionBar({ startedAt, dayLabel, color, done, total, conProgreso
   const reloj = hs > 0
     ? `${hs}:${String(min).padStart(2, "0")}:${String(seg).padStart(2, "0")}`
     : `${min}:${String(seg).padStart(2, "0")}`;
-  const pct = total ? Math.round((done / total) * 100) : 0;
   const completo = conProgreso && total > 0 && done >= total;
 
   // Sólo la tarjeta: el lugar en la pantalla lo pone DockInferior, que la
@@ -23016,10 +23225,8 @@ function ActiveSessionBar({ startedAt, dayLabel, color, done, total, conProgreso
                 {!enRutina && <ChevronRight size={13} className="text-slate-500 shrink-0 self-center" />}
               </div>
               {conProgreso && total > 0 ? (
-                <div className="flex items-center gap-2 mt-1.5">
-                  <div className="flex-1 h-1.5 rounded-full overflow-hidden bg-slate-800">
-                    <div className="h-full rounded-full transition-all duration-500 ease-out" style={{ width: `${pct}%`, backgroundColor: color }} />
-                  </div>
+                <div className="flex items-center gap-2 mt-1">
+                  <BarraCargada hechas={done} total={total} alto={22} className="flex-1 min-w-0" />
                   <span className="text-[10.5px] font-bold tabular-nums shrink-0" style={{ color: completo ? color : "var(--text-muted)" }}>{done}/{total}</span>
                 </div>
               ) : (
@@ -23154,7 +23361,7 @@ function TituloPestana({ tab }) {
   const Icono = intro.icono;
   return (
     <div className="titulo-pagina">
-      <p className="ceja" style={{ color: intro.color }}>
+      <p className="ceja" style={{ "--ceja": intro.color }}>
         <Icono size={13} aria-hidden="true" />
         {intro.ceja}
         {intro.beta && <span className="ceja-beta">Beta</span>}
@@ -23241,7 +23448,6 @@ function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
     { key: "autoStartRestTimer", icon: <Timer size={16} />, label: "Cronómetro automático", desc: "Arranca el descanso solo, al guardar la serie." },
     { key: "showKm", icon: <Footprints size={16} />, label: "Kilómetros (cardio)", desc: "Campo opcional de distancia al registrar cardio." },
     { key: "showLastSession", icon: <History size={16} />, label: "Qué hiciste la vez pasada", desc: "En cada serie, lo último que levantaste ahí (no tu récord)." },
-    { key: "compactSetRow", icon: <Layers size={16} />, label: "Filas compactas", desc: "Cada serie en una sola línea: entra el ejercicio entero sin scrollear." },
   ];
 
   return (
@@ -23265,68 +23471,47 @@ function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
         <div className="px-5 py-4">
           {/* ── VISTA PREVIA EN VIVO ── */}
           <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-600 mb-2">Así se va a ver</p>
-          <div className="rounded-2xl bg-slate-950/70 border border-slate-800 p-3 mb-5">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-xs font-bold text-white">Press Banca</span>
-              <span className="text-[9px] px-1.5 py-0.5 rounded-md font-bold bg-teal-500/15 text-teal-400">Pectoral</span>
+          {/* La ficha de ejemplo es la MISMA fila de planilla que se ve al
+              entrenar (mismas clases): lo que prendés acá aparece igual allá. */}
+          <div className="ejercicio p-3 mb-5" style={{ "--c": "#14B8A6" }}>
+            <div className="flex items-center gap-2.5">
+              <span className="ejercicio-numero" style={{ width: 26, fontSize: "1.2rem" }}>01</span>
+              <div className="min-w-0">
+                <p className="ejercicio-nombre">Press Banca</p>
+                <span className="inline-block mt-1 text-[10px] px-1.5 py-0.5 rounded-md font-bold bg-teal-500/15 text-teal-400">Pectoral</span>
+              </div>
             </div>
             {on("showExerciseNote") && (
-              <p className="text-[10px] text-slate-500 mb-2 bounce-in leading-snug">Bajá la barra al pecho sin rebotar y mantené los omóplatos juntos.</p>
+              <p className="text-[11px] text-slate-500 mt-2 bounce-in leading-snug">Bajá la barra al pecho sin rebotar y mantené los omóplatos juntos.</p>
             )}
-            {!on("showExerciseNote") && <div className="mb-1.5" />}
-
             {on("showWarmup") && (
-              <div className="mb-2 rounded-xl px-2.5 py-2 bounce-in" style={{ backgroundColor: "#14B8A610", border: "1px solid #14B8A630" }}>
-                <p className="text-[10px] font-bold text-teal-400 flex items-center gap-1"><Flame size={9} /> Aproximaciones: {ej(40)} → {ej(55)} → {ej(70)}</p>
+              <div className="mt-2 rounded-xl px-2.5 py-2 bounce-in" style={{ backgroundColor: "rgba(20,184,166,0.07)", border: "1px solid rgba(20,184,166,0.2)" }}>
+                <p className="text-[11px] font-bold text-teal-400 flex items-center gap-1"><Flame size={11} /> Aproximaciones: {ej(40)} → {ej(55)} → {ej(70)}</p>
               </div>
             )}
-
-            <div className="rounded-xl px-2.5 py-2 mb-2" style={{ background: "linear-gradient(120deg,#14B8A620,#14B8A60c)", border: "1px solid #14B8A645" }}>
-              <span className="block text-[8px] font-black uppercase tracking-[0.16em] text-teal-400/70 mb-0.5">Récord</span>
-              <span className="text-base font-black text-teal-400 tabular-nums">8<span className="opacity-50 text-xs mx-0.5">×</span>{kgToDisplay(80, unit)}<span className="opacity-60 text-[10px] ml-0.5">{weightLabel(unit)}</span></span>
+            <div className="tabla-encabezado mt-1">
+              <span aria-hidden="true">#</span><span>Objetivo</span><span className="text-center">Reps</span><span aria-hidden="true" /><span className="text-center">{weightLabel(unit)}</span><span aria-hidden="true" />
             </div>
-
-            <div className="flex items-stretch rounded-xl bg-slate-950/80 border border-slate-800 overflow-hidden mb-2">
-              <div className="flex-1 px-2.5 py-1.5 text-center border-r border-slate-800">
-                <span className="block text-[8px] font-black uppercase tracking-wider text-slate-600">Reps</span>
-                <span className="text-sm font-black text-white tabular-nums">8</span>
-              </div>
-              <div className="flex-1 px-2.5 py-1.5 text-center">
-                <span className="block text-[8px] font-black uppercase tracking-wider text-slate-600">Kg</span>
-                <span className="text-sm font-black text-white tabular-nums">82.5</span>
-              </div>
-              <span className="w-10 flex items-center justify-center !text-white" style={{ background: "linear-gradient(160deg,#14B8A6,#14B8A6b0)" }}><Save size={13} /></span>
-            </div>
-
-            {on("show1RMPercent") && (
-              <p className="text-[9px] text-slate-600 text-center mb-2 bounce-in">103% de tu 1RM · <span className="text-slate-500">% 1RM</span></p>
-            )}
-
-            {on("showRpe") && (
-              <div className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-slate-900/60 border border-slate-800 mb-2 bounce-in">
-                <Activity size={9} className="text-slate-500" />
-                <span className="text-[10px] font-bold text-slate-500">Registrar esfuerzo ({s.rpeDisplayMode === "rir" ? "RIR" : "RPE"})</span>
-              </div>
-            )}
-
-            {on("showCoaching") && (
-              <div className="flex items-start gap-2 bounce-in">
-                <span className="text-[13px] leading-none mt-0.5">📈</span>
-                <div>
-                  <p className="text-[11px] font-black text-emerald-400 leading-tight">Te sobró rango</p>
-                  <p className="text-[10px] text-slate-400 leading-snug mt-0.5">Pasaste las 10 reps del objetivo. La próxima subile el peso.</p>
+            <div className="serie serie-activa" style={{ "--c": "#14B8A6" }}>
+              <div className="serie-fila">
+                <span className="serie-n">1</span>
+                <div className="serie-ref">
+                  <span className="serie-ref-rango">8–10 reps</span>
+                  <span className="serie-ref-meta" style={{ color: "#14B8A6" }}><Trophy size={11} />8×{kgToDisplay(80, unit)}</span>
+                  {on("showLastSession") && <span className="serie-ref-ant bounce-in"><History size={10} />8×{kgToDisplay(77.5, unit)}</span>}
                 </div>
+                <span className="serie-campo flex items-center justify-center">8</span>
+                <span className="serie-por">×</span>
+                <span className="serie-campo flex items-center justify-center">{kgToDisplay(82.5, unit)}</span>
+                <span className="serie-check"><Check size={18} strokeWidth={2.8} /></span>
               </div>
-            )}
-
-            {on("showPersonalNote") && (
-              <div className="mt-2 bounce-in">
-                <div className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-slate-900/50 border border-slate-800/70 text-slate-500 text-[10px] font-bold"><StickyNote size={10} /> Agregar nota</div>
-              </div>
-            )}
-
+              {on("show1RMPercent") && <p className="serie-aviso text-slate-500 bounce-in">103% de tu 1RM</p>}
+              {on("showCoaching") && <p className="serie-aviso bounce-in"><b className="text-emerald-400">Te sobró rango.</b> <span className="text-slate-400">La próxima subile el peso.</span></p>}
+              {on("showRpe") && <div className="serie-boton-suave bounce-in"><Activity size={12} /> Registrar esfuerzo ({s.rpeDisplayMode === "rir" ? "RIR" : "RPE"})</div>}
+              {on("showPersonalNote") && <div className="serie-boton-suave bounce-in"><StickyNote size={12} /> Agregar nota</div>}
+            </div>
             {!on("showWarmup") && !on("showRpe") && !on("show1RMPercent") && !on("showCoaching") && !on("showExerciseNote") && !on("showPersonalNote") && (
-              <p className="text-[9.5px] text-slate-600 text-center italic">Ficha mínima: solo reps, kg y tu récord.</p>
+              <p className="text-[11px] text-slate-500 text-center mt-2">Ficha mínima: reps, kilos y tu récord.</p>
             )}
           </div>
 
@@ -24834,7 +25019,7 @@ export default function App() {
             {tab === "descarga" && <DeloadView logs={logs} setLogs={setLogs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} activeSession={profile?.activeSession?.deload ? profile.activeSession : null} onStartSession={handleStartSession} weekSchedule={weekSchedule} onClose={() => { setDeloadDismissed(true); setTab("rutina"); }} cycleStart={cycleStart} />}
             {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} setLogs={setLogs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} conversations={aiConversations} activeConversationId={activeAiConversationId} onNewConversation={handleNewAiConversation} onSwitchConversation={handleSwitchAiConversation} onDeleteConversation={handleDeleteAiConversation} onRenameConversation={handleRenameAiConversation} settings={getProfileSettings(profile)} cycleStart={cycleStart} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} onDeleteRoutine={handleDeleteRoutine} onNavigate={setTab} onStartSession={handleStartSession} onEndSession={handleEndSession} />}
             {tab === "perfil" && <ProfileView onOpenFieldPreview={() => setShowFieldIntro(true)} openSectionSignal={openSectionSignal} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} profileName={activeProfile} profiles={profiles} onSignOut={handleSignOut} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} onGoToSocial={() => setTab("social")} />}
-            {tab === "social" && <SocialView profile={profile} profileName={activeProfile} uid={profile?.googleUid} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} />}
+            {tab === "social" && <SocialView onGoToProfile={() => setTab("perfil")} profile={profile} profileName={activeProfile} uid={profile?.googleUid} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} />}
           </div>
         </main>
       </div>

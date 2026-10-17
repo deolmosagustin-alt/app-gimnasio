@@ -50,7 +50,7 @@ No edites el contenido de las skills del repo: se actualizan desde sus repos con
 
 ## Carpetas con documentación y el CSS
 
-Tailwind escanea todo el repo buscando clases, salvo lo que ignora git. `src/index.css` excluye `.agents` y `.claude` con `@source not`, porque las skills traen ejemplos de clases que terminaban en el CSS de producción. Si sumás otra carpeta con documentación así, excluila también: el CSS de producción pesa 108 KB, y si sube sin que cambie la app, es eso. ESLint también ignora esas carpetas (`eslint.config.js`).
+Tailwind escanea todo el repo buscando clases, salvo lo que ignora git. `src/index.css` excluye `.agents` y `.claude` con `@source not`, porque las skills traen ejemplos de clases que terminaban en el CSS de producción. Si sumás otra carpeta con documentación así, excluila también: el CSS de producción pesa 107 KB, y si sube sin que cambie la app, es eso. ESLint también ignora esas carpetas (`eslint.config.js`).
 
 ## Sistema visual
 
@@ -64,4 +64,6 @@ Las reglas:
 - **Letras:** Geist para leer y Archivo para títulos, rótulos en mayúscula y números grandes. Para un número grande, usá la clase `num-display`.
 - **Color:** un acento, el teal. Los colores de cada día y de cada pestaña sirven solo para lo que es de ese día o de esa pestaña.
 - **Sin manchas borrosas:** nada de círculos con `blur` detrás de los paneles. Una regla global las apaga en las pantallas y las deja solo en los modales de festejo.
-- **Nada oscuro fijo en estilos en línea:** un fondo como `rgba(5,7,11,…)` se ve como una mancha en modo claro. Usá un token.
+- **Nada oscuro fijo en estilos en línea:** un fondo como `rgba(5,7,11,…)` se ve como una mancha en modo claro. Usá un token. Lo mismo para colores de texto pensados para fondo oscuro: `SOCIAL_INK` es la variable `--social-tinta`, que tiene su versión clara.
+- **Palabras enteras:** en lugares angostos (solapas de días, chips) no partas palabras ni las cortes con "…". Para los días: `etiquetaDeDia` + `.dia-solapa-texto`, que ajustan la letra a la palabra más larga.
+- **Piezas propias de la app:** la barra cargada (`BarraCargada`, un disco por serie con los colores de competición) y la planilla de series (`.serie-fila`, columnas en `--cols-serie`). Reusalas en vez de inventar otra barra de progreso u otra fila.
