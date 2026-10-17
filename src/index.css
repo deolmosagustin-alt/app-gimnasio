@@ -4,3 +4,46 @@
    esas clases que la app no usa terminan en el CSS de producción. */
 @source not "../.agents";
 @source not "../.claude";
+
+/* SISTEMA VISUAL
+   La app está escrita con las clases de Tailwind de siempre (bg-slate-900,
+   text-slate-500, rounded-2xl...) en miles de lugares. En vez de tocar cada
+   uno, acá se redefine lo que esas clases significan, y el cambio llega a
+   todas las pantallas a la vez. El modo claro no se entera: pisa estas
+   clases con colores propios (ver ANIMATION_CSS en App.jsx). */
+@theme {
+  /* Geist para leer, Archivo para lo que se mira de lejos: títulos, el
+     cronómetro, los kilos. Archivo tiene eje de ancho, así que los números
+     van angostos (entran más grandes en el mismo lugar) y los títulos,
+     anchos. Las dos vienen empaquetadas con la app (ver main.jsx): no
+     dependen de Google Fonts ni de tener internet. */
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Archivo Variable", "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+
+  /* GRAFITO EN VEZ DE AZUL MARINO. Los slate de Tailwind tienen un tinte
+     azul que, apilado en fondo, tarjetas, bordes y textos, dejaba toda la
+     app teñida de navy: el look de "plantilla". Misma escala de luz, casi
+     sin color, así el teal de la marca y los colores de cada día son lo
+     único que tiñe algo.
+     Los grises de texto (400-600) además suben de luz: el 500 y el 600 se
+     usan en textos de 10-11px y no llegaban al contraste mínimo de lectura
+     sobre el fondo oscuro. */
+  --color-slate-50: oklch(98.5% 0.002 250);
+  --color-slate-100: oklch(96.6% 0.004 250);
+  --color-slate-200: oklch(92.6% 0.007 250);
+  --color-slate-300: oklch(86.5% 0.010 250);
+  --color-slate-400: oklch(74% 0.013 250);
+  --color-slate-500: oklch(62% 0.015 250);
+  --color-slate-600: oklch(50% 0.014 250);
+  --color-slate-700: oklch(38.5% 0.013 250);
+  --color-slate-800: oklch(27.5% 0.011 250);
+  --color-slate-900: oklch(20.5% 0.009 250);
+  --color-slate-950: oklch(14.5% 0.007 250);
+
+  /* Esquinas un poco más firmes: 16px en cada tarjeta, botón y chip hacía
+     todo igual de blando. Contenedores a 14, lo de adentro a 10. */
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.625rem;
+  --radius-2xl: 0.875rem;
+  --radius-3xl: 1.25rem;
+}

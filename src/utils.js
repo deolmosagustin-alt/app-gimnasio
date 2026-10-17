@@ -67,7 +67,7 @@ export function displayToKg(val, unit) { return unit === "lbs" ? Math.round((val
 export function weightLabel(unit) { return unit === "lbs" ? "lbs" : "kg"; }
 
 export function rpeColor(v) {
-  if (v == null) return "#475569";
+  if (v == null) return "#50555a";
   if (v >= 9) return "#F43F5E";
   if (v >= 8) return "#F59E0B";
   if (v >= 7) return "#14B8A6";

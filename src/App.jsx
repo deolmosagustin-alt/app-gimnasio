@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, createContext, useContext } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, createContext, useContext, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -13,7 +13,7 @@ import {
   Sparkles, Layers, SlidersHorizontal, UserCog,
   Share2, Download, Link2, Copy, BellOff, Send, Mic, Ruler, Camera, Link, Footprints, Star, SquarePlay, Upload, RefreshCw, Timer, Percent, Users,
   MessageCircle, Search, UserPlus, UserCheck, UserMinus, AtSign, GraduationCap, ClipboardCheck, Swords, Medal, QrCode, ArrowUpDown,
-  Phone, Minus, Crown,
+  Phone, Minus, Crown, SkipForward,
 } from "lucide-react";
 import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signOut, onAuthStateChanged } from "firebase/auth";
 import { Capacitor, registerPlugin } from "@capacitor/core";
@@ -673,9 +673,15 @@ function apiUrl(path) {
 
 const DEFAULT_SETTINGS = {
   alertType: "sound", restLong: REST_LONG, restShort: REST_SHORT,
-  // Cronómetro extra AL TERMINAR un ejercicio, antes de pasar al siguiente
-  // (opción, apagada por default). Distinto del descanso entre series.
-  restBetweenExercises: false, restBetweenExercisesSec: 180,
+  // Cronómetro AL TERMINAR un ejercicio, antes de pasar al siguiente.
+  // Distinto del descanso entre series. Arrancaba apagado porque se veía
+  // sólo como un chip en la tarjeta cerrada del ejercicio siguiente y sin
+  // notificación del sistema; con el dock de abajo y el aviso programado ya
+  // se ve y suena como cualquier descanso, así que pasa a venir prendido.
+  restBetweenExercises: true, restBetweenExercisesSec: 180,
+  // Pantalla encendida mientras hay una sesión en curso (ver
+  // useMantenerPantalla).
+  keepScreenOn: true,
   trainWeeks: TRAIN_WEEKS, deloadWeeks: DELOAD_WEEKS, deloadPct: 0.75, deloadSetDivisor: 2, deloadEnabled: true,
   theme: "dark", textScale: 1, smallTextScale: 1, autoShowPrShare: true, bodyWeightKg: 0, muscleRankMode: "general", allowZoom: false,
   weightUnit: "kg", // "kg" o "lbs"
@@ -1967,7 +1973,7 @@ const ANIMATION_CSS = `
 /* Skeletons: formas grises que laten mientras cargan los datos */
 @keyframes skeletonShimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
 .skeleton {
-  background: linear-gradient(90deg, rgba(30,41,59,0.6) 25%, rgba(51,65,85,0.85) 50%, rgba(30,41,59,0.6) 75%);
+  background: linear-gradient(90deg, rgba(37,41,46,0.6) 25%, rgba(60,65,70,0.85) 50%, rgba(37,41,46,0.6) 75%);
   background-size: 200% 100%;
   animation: skeletonShimmer 1.4s ease-in-out infinite;
   border-radius: 0.75rem;
@@ -2162,14 +2168,17 @@ const ANIMATION_CSS = `
   position: fixed;
   left: 0; right: 0;
   z-index: 30;
-  bottom: calc(62px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(var(--tabbar-h, 64px) + env(safe-area-inset-bottom, 0px));
+  padding-bottom: 8px;
 }
-@media (min-width: 1024px) { .session-bar-dock { bottom: 18px; } }
+@media (min-width: 1024px) { .session-bar-dock { bottom: 10px; } }
 /* La barra de sesión se superpone con la barra de mensaje del chat, que se
-   dibuja en un portal colgado de <body> — por eso el hueco extra se declara
-   acá, sobre <html>, y no con una clase dentro del árbol de la app. */
-.hay-sesion { --chat-nav-gap: 9rem; }
-@media (min-width: 1024px) { .hay-sesion { --chat-nav-gap: 5.5rem; } }
+   dibuja en un portal colgado de <body> — por eso el hueco se declara acá,
+   sobre <html>. Antes era un número fijo según hubiera sesión o no; ahora
+   suma el alto real del dock (descanso en curso + sesión), que el dock
+   escribe en --dock-alto. */
+:root { --chat-nav-gap: calc(4rem + var(--dock-alto, 0px)); }
+@media (min-width: 1024px) { :root { --chat-nav-gap: var(--dock-alto, 0px); } }
 @keyframes sessionBarIn {
   from { opacity: 0; transform: translateY(14px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -2380,14 +2389,14 @@ input, textarea, [contenteditable="true"] {
    cambiaran. Por eso van DOS variantes de cada regla: la de siempre (con
    espacio, para cuando son elementos distintos) y la compuesta sin espacio
    (para cuando coinciden en el mismo elemento). */
-.light-mode .bg-\\[\\#0a0a0f\\],
-.light-mode.bg-\\[\\#0a0a0f\\] { background-color: #f8fafc !important; }
-.light-mode .bg-\\[\\#0a0a0f\\]\\/60,
-.light-mode.bg-\\[\\#0a0a0f\\]\\/60 { background-color: rgba(248,250,252,0.85) !important; }
-.light-mode .bg-\\[\\#0a0a0f\\]\\/90,
-.light-mode.bg-\\[\\#0a0a0f\\]\\/90 { background-color: rgba(248,250,252,0.96) !important; }
-.light-mode .bg-\\[\\#0f0f1a\\],
-.light-mode.bg-\\[\\#0f0f1a\\] { background-color: #ffffff !important; }
+.light-mode .bg-\\[\\#0c0d10\\],
+.light-mode.bg-\\[\\#0c0d10\\] { background-color: #f9fafa !important; }
+.light-mode .bg-\\[\\#0c0d10\\]\\/60,
+.light-mode.bg-\\[\\#0c0d10\\]\\/60 { background-color: rgba(248,250,252,0.85) !important; }
+.light-mode .bg-\\[\\#0c0d10\\]\\/90,
+.light-mode.bg-\\[\\#0c0d10\\]\\/90 { background-color: rgba(248,250,252,0.96) !important; }
+.light-mode .bg-\\[\\#0e1113\\],
+.light-mode.bg-\\[\\#0e1113\\] { background-color: #ffffff !important; }
 
 /* Tarjetas / superficies principales — blanco PURO y sólido (no rgba), para
    que destaquen limpias sobre el fondo gris, sin tonos grisáceos al
@@ -2409,7 +2418,7 @@ input, textarea, [contenteditable="true"] {
 .light-mode .bg-slate-950\\/60,
 .light-mode .bg-slate-950\\/70,
 .light-mode .bg-slate-950\\/80,
-.light-mode .bg-slate-950\\/95 { background-color: #f1f5f9 !important; }
+.light-mode .bg-slate-950\\/95 { background-color: #f3f5f6 !important; }
 
 /* Superficies secundarias (chips, botones, inputs) — grises sólidos suaves */
 .light-mode .bg-slate-800,
@@ -2421,15 +2430,15 @@ input, textarea, [contenteditable="true"] {
 .light-mode .bg-slate-800\\/80,
 .light-mode .bg-slate-800\\/90 { background-color: #eef2f6 !important; }
 .light-mode .bg-slate-700,
-.light-mode .bg-slate-700\\/80 { background-color: #e2e8f0 !important; }
+.light-mode .bg-slate-700\\/80 { background-color: #e6e8ea !important; }
 .light-mode .hover\\:bg-slate-700:hover,
 .light-mode .hover\\:bg-slate-700\\/80:hover { background-color: #d8e0e9 !important; }
 .light-mode .hover\\:bg-slate-800:hover,
 .light-mode .hover\\:bg-slate-800\\/30:hover,
 .light-mode .hover\\:bg-slate-800\\/60:hover,
-.light-mode .hover\\:bg-slate-800\\/80:hover { background-color: #e2e8f0 !important; }
-.light-mode .hover\\:bg-slate-900\\/60:hover { background-color: #f1f5f9 !important; }
-.light-mode .active\\:bg-slate-800:active { background-color: #e2e8f0 !important; }
+.light-mode .hover\\:bg-slate-800\\/80:hover { background-color: #e6e8ea !important; }
+.light-mode .hover\\:bg-slate-900\\/60:hover { background-color: #f3f5f6 !important; }
+.light-mode .active\\:bg-slate-800:active { background-color: #e6e8ea !important; }
 
 /* Recuadros (stat tiles) dentro de paneles con degradé de color, y
    recuadros de alerta tintados (confirmaciones de borrado) — en claro pasan
@@ -2437,37 +2446,37 @@ input, textarea, [contenteditable="true"] {
    y el de alerta a un rosa pastel en vez del rojo oscuro translúcido. */
 .light-mode .bg-black\\/20 { background-color: rgba(241,245,249,0.9) !important; }
 .light-mode .bg-black\\/25 { background-color: rgba(236,241,247,0.92) !important; }
-.light-mode .bg-black\\/30 { background-color: rgba(226,232,240,0.95) !important; }
+.light-mode .bg-black\\/30 { background-color: rgba(230,232,234,0.95) !important; }
 /* Velo de los modales: sigue oscureciendo (si no, el modal blanco se pierde
    sobre el fondo claro), pero en un slate suave en vez de negro puro. */
-.light-mode .bg-black\\/55 { background-color: rgba(15,23,42,0.32) !important; }
-.light-mode .bg-black\\/70 { background-color: rgba(15,23,42,0.42) !important; }
-.light-mode .bg-black\\/75 { background-color: rgba(15,23,42,0.45) !important; }
-.light-mode .bg-black\\/80 { background-color: rgba(15,23,42,0.48) !important; }
-.light-mode .bg-black\\/85 { background-color: rgba(15,23,42,0.52) !important; }
+.light-mode .bg-black\\/55 { background-color: rgba(20,24,29,0.32) !important; }
+.light-mode .bg-black\\/70 { background-color: rgba(20,24,29,0.42) !important; }
+.light-mode .bg-black\\/75 { background-color: rgba(20,24,29,0.45) !important; }
+.light-mode .bg-black\\/80 { background-color: rgba(20,24,29,0.48) !important; }
+.light-mode .bg-black\\/85 { background-color: rgba(20,24,29,0.52) !important; }
 .light-mode .bg-rose-950\\/30 { background-color: rgba(254,226,226,0.85) !important; }
-.light-mode .border-white\\/5 { border-color: rgba(15,23,42,0.05) !important; }
-.light-mode .border-white\\/10 { border-color: rgba(15,23,42,0.08) !important; }
+.light-mode .border-white\\/5 { border-color: rgba(20,24,29,0.05) !important; }
+.light-mode .border-white\\/10 { border-color: rgba(20,24,29,0.08) !important; }
 .light-mode .border-white\\/\\[0\\.05\\],
-.light-mode .border-white\\/\\[0\\.07\\] { border-color: rgba(15,23,42,0.06) !important; }
+.light-mode .border-white\\/\\[0\\.07\\] { border-color: rgba(20,24,29,0.06) !important; }
 
 /* Texto — jerarquía invertida: lo que en oscuro era "casi blanco" pasa a
-   "gris casi negro" (#0f172a), y lo que era apenas visible pasa a un gris
-   medio (#64748b) y más claro, manteniendo la misma jerarquía relativa. */
+   "gris casi negro" (#14181d), y lo que era apenas visible pasa a un gris
+   medio (#6e7379) y más claro, manteniendo la misma jerarquía relativa. */
 .light-mode .text-white,
-.light-mode.text-white { color: #0f172a !important; }
-.light-mode .text-white\\/80 { color: rgba(15,23,42,0.75) !important; }
-.light-mode .hover\\:text-white:hover { color: #0f172a !important; }
+.light-mode.text-white { color: #14181d !important; }
+.light-mode .text-white\\/80 { color: rgba(20,24,29,0.75) !important; }
+.light-mode .hover\\:text-white:hover { color: #14181d !important; }
 .light-mode .text-slate-100,
-.light-mode .text-slate-200 { color: #1e293b !important; }
-.light-mode .text-slate-300 { color: #334155 !important; }
-.light-mode .text-slate-400 { color: #475569 !important; }
-.light-mode .text-slate-500 { color: #64748b !important; }
+.light-mode .text-slate-200 { color: #25292e !important; }
+.light-mode .text-slate-300 { color: #3c4146 !important; }
+.light-mode .text-slate-400 { color: #50555a !important; }
+.light-mode .text-slate-500 { color: #6e7379 !important; }
 .light-mode .text-slate-600 { color: #8593a8 !important; }
 .light-mode .text-slate-700 { color: #a2aec0 !important; }
-.light-mode .hover\\:text-slate-200:hover { color: #1e293b !important; }
-.light-mode .hover\\:text-slate-300:hover { color: #334155 !important; }
-.light-mode .hover\\:text-slate-400:hover { color: #475569 !important; }
+.light-mode .hover\\:text-slate-200:hover { color: #25292e !important; }
+.light-mode .hover\\:text-slate-300:hover { color: #3c4146 !important; }
+.light-mode .hover\\:text-slate-400:hover { color: #50555a !important; }
 
 /* Textos de acento en tonos claros (200/300/400) — se eligieron para leerse
    sobre fondos casi negros y pierden casi todo el contraste sobre fondos
@@ -2510,7 +2519,7 @@ input, textarea, [contenteditable="true"] {
 /* Placeholder "—" del input de reps/kg: pensado para ser casi invisible
    sobre el input oscuro — con el mismo gris oscuro fijo, en claro se veía
    como un guión bien marcado (el input pasa a blanco y el color no). */
-.light-mode .placeholder\\:text-slate-800::placeholder { color: #cbd5e1 !important; }
+.light-mode .placeholder\\:text-slate-800::placeholder { color: #d1d4d7 !important; }
 .light-mode .text-amber-400 { color: #b45309 !important; }
 .light-mode .text-emerald-400 { color: #059669 !important; }
 .light-mode .text-blue-400 { color: #1d4ed8 !important; }
@@ -2522,19 +2531,19 @@ input, textarea, [contenteditable="true"] {
 .light-mode .border-slate-800\\/50,
 .light-mode .border-slate-800\\/60,
 .light-mode .border-slate-800\\/70,
-.light-mode .border-slate-800\\/80 { border-color: #e2e8f0 !important; }
+.light-mode .border-slate-800\\/80 { border-color: #e6e8ea !important; }
 .light-mode .border-slate-700,
 .light-mode .border-slate-700\\/40,
 .light-mode .border-slate-700\\/50,
 .light-mode .border-slate-700\\/60,
-.light-mode .border-slate-700\\/70 { border-color: #cbd5e1 !important; }
-.light-mode .border-slate-600 { border-color: #94a3b8 !important; }
-.light-mode .border-slate-500 { border-color: #64748b !important; }
-.light-mode .hover\\:border-slate-500:hover { border-color: #94a3b8 !important; }
-.light-mode .hover\\:border-slate-600:hover { border-color: #64748b !important; }
-.light-mode .focus\\:border-slate-700:focus { border-color: #94a3b8 !important; }
+.light-mode .border-slate-700\\/70 { border-color: #d1d4d7 !important; }
+.light-mode .border-slate-600 { border-color: #9da2a8 !important; }
+.light-mode .border-slate-500 { border-color: #6e7379 !important; }
+.light-mode .hover\\:border-slate-500:hover { border-color: #9da2a8 !important; }
+.light-mode .hover\\:border-slate-600:hover { border-color: #6e7379 !important; }
+.light-mode .focus\\:border-slate-700:focus { border-color: #9da2a8 !important; }
 .light-mode .divide-slate-800\\/50 > :not([hidden]) ~ :not([hidden]),
-.light-mode .divide-slate-800 > :not([hidden]) ~ :not([hidden]) { border-color: #e2e8f0 !important; }
+.light-mode .divide-slate-800 > :not([hidden]) ~ :not([hidden]) { border-color: #e6e8ea !important; }
 
 /* ── ELEVACIÓN EN MODO CLARO ────────────────────────────────────────────────
    El negro translúcido pensado para fondo oscuro se ve como una mancha gris
@@ -2546,19 +2555,19 @@ input, textarea, [contenteditable="true"] {
    El color no es negro sino azul-gris muy diluido (15,23,42 = slate-900), que
    sobre blanco lee como sombra natural y no como gris sucio. */
 .light-mode .shadow-sm {
-  box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 1px 3px rgba(15,23,42,0.03) !important;
+  box-shadow: 0 1px 2px rgba(20,24,29,0.04), 0 1px 3px rgba(20,24,29,0.03) !important;
 }
 .light-mode .shadow-md {
-  box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 3px 8px -2px rgba(15,23,42,0.06) !important;
+  box-shadow: 0 1px 2px rgba(20,24,29,0.04), 0 3px 8px -2px rgba(20,24,29,0.06) !important;
 }
 .light-mode .shadow-lg {
-  box-shadow: 0 1px 3px rgba(15,23,42,0.04), 0 6px 16px -4px rgba(15,23,42,0.08) !important;
+  box-shadow: 0 1px 3px rgba(20,24,29,0.04), 0 6px 16px -4px rgba(20,24,29,0.08) !important;
 }
 .light-mode .shadow-xl {
-  box-shadow: 0 2px 4px rgba(15,23,42,0.04), 0 12px 28px -8px rgba(15,23,42,0.10) !important;
+  box-shadow: 0 2px 4px rgba(20,24,29,0.04), 0 12px 28px -8px rgba(20,24,29,0.10) !important;
 }
 .light-mode .shadow-2xl {
-  box-shadow: 0 4px 8px rgba(15,23,42,0.05), 0 20px 44px -12px rgba(15,23,42,0.14) !important;
+  box-shadow: 0 4px 8px rgba(20,24,29,0.05), 0 20px 44px -12px rgba(20,24,29,0.14) !important;
 }
 /* Las clases de color de sombra (shadow-black/N) solo aportaban el tono, que
    ahora ya viene resuelto arriba: acá se neutralizan para que no reinyecten
@@ -2569,7 +2578,7 @@ input, textarea, [contenteditable="true"] {
 .light-mode .shadow-black\\/40,
 .light-mode .shadow-black\\/50,
 .light-mode .shadow-black\\/60,
-.light-mode .shadow-black\\/70 { --tw-shadow-color: rgba(15,23,42,0.08) !important; }
+.light-mode .shadow-black\\/70 { --tw-shadow-color: rgba(20,24,29,0.08) !important; }
 
 /* Tarjetas con degradé propio (hero de Rutinas/Descarga/Progreso/Perfil) —
    ver variables --grad-* aplicadas vía estilo inline en esos componentes.
@@ -2582,28 +2591,30 @@ input, textarea, [contenteditable="true"] {
    gráficos, chips de día/serie inactivos) — ahora salen de aquí, así
    también cambian solos al cambiar de tema. */
 :root {
-  --grad-hero-purple: linear-gradient(135deg, rgba(168,85,247,0.42), rgba(15,23,42,0.82) 55%, rgba(15,23,42,0.6));
-  --grad-hero-blue: linear-gradient(135deg, rgba(59,130,246,0.4), rgba(15,23,42,0.82) 55%, rgba(15,23,42,0.6));
-  --grad-hero-teal: linear-gradient(135deg, rgba(20,184,166,0.4), rgba(15,23,42,0.82) 55%, rgba(15,23,42,0.6));
-  --grad-profile-avatar: linear-gradient(135deg, #0f172a, rgba(15,23,42,0.5));
-  --ring-track: #1a1a2e;
-  --chart-grid: #1a1a2e;
-  --chart-axis: #334155;
-  --chip-border: #1e2035;
-  --chip-text: #475569;
-  --surface-2: #1e293b;
-  --surface-2-text: #64748b;
+  /* Grafito (20,22,27) en vez del azul marino (15,23,42) de antes: ver la
+     escala slate en index.css, que cambió por el mismo motivo. */
+  --grad-hero-purple: linear-gradient(135deg, rgba(168,85,247,0.2), rgba(20,22,27,0.9) 55%, rgba(20,22,27,0.8));
+  --grad-hero-blue: linear-gradient(135deg, rgba(59,130,246,0.17), rgba(20,22,27,0.9) 55%, rgba(20,22,27,0.8));
+  --grad-hero-teal: linear-gradient(135deg, rgba(20,184,166,0.18), rgba(20,22,27,0.9) 55%, rgba(20,22,27,0.8));
+  --grad-profile-avatar: linear-gradient(135deg, #16181d, rgba(22,24,29,0.5));
+  --ring-track: #1d2026;
+  --chart-grid: #1d2026;
+  --chart-axis: #3a3f48;
+  --chip-border: #24272e;
+  --chip-text: #6b7280;
+  --surface-2: #1b1e24;
+  --surface-2-text: #8a909b;
   --small-text-scale: 1;
   /* Fondo base de la app. Lo usan los pocos lugares que necesitan el color
      "de la página" en estilo inline (escudo de la status bar, pantallas a
-     pantalla completa). Antes estaba escrito a mano como #0a0a0f y en modo
+     pantalla completa). Antes estaba escrito a mano como #0c0d10 y en modo
      claro dejaba franjas negras. */
-  --app-bg: #0a0a0f;
+  --app-bg: #0c0d10;
   /* Superficies "hundidas": paneles que se abren dentro de una tarjeta y
      filas de opciones. Estaban en estilo inline con rgba fijo y en claro se
      veían como cajas oscuras. */
   /* Estos dos eran TRANSLÚCIDOS, y medido en pantalla eso dejaba la
-     jerarquía dada vuelta en TODA la app: sobre la página (#0a0a0f,
+     jerarquía dada vuelta en TODA la app: sobre la página (#0c0d10,
      luminancia 10), --panel-sunken componía a 7 —más oscuro que el fondo, un
      pozo en vez de un panel— y --row-surface a 17, más claro que la tarjeta
      que lo contiene. Como ningún nivel se distinguía por luz, cada pantalla
@@ -2613,11 +2624,11 @@ input, textarea, [contenteditable="true"] {
      jerarquía la hace la luz en todas las pestañas por igual. Como son
      tokens, el arreglo llega a los ~200 lugares que ya los usan sin tocar
      ninguno. */
-  --panel-sunken: #0e1119;   /* panel que se abre DENTRO de una tarjeta: hundido respecto de ella, pero por encima de la página */
-  --row-surface: #1a1f2e;    /* fila dentro de una tarjeta: un escalón por encima (mismo valor que --surface-2) */
+  --panel-sunken: #111317;   /* panel que se abre DENTRO de una tarjeta: hundido respecto de ella, pero por encima de la página */
+  --row-surface: #1b1e24;    /* fila dentro de una tarjeta: un escalón por encima (mismo valor que --surface-2) */
   /* ESCALERA DE SUPERFICIES, OPACA Y ASCENDENTE.
      Los dos tokens de arriba son translúcidos, y medido en pantalla eso deja
-     la jerarquía DADA VUELTA: la página es #0a0a0f (luminancia 10), una
+     la jerarquía DADA VUELTA: la página es #0c0d10 (luminancia 10), una
      tarjeta de sección compone a luminancia 6 —o sea más oscura que la
      página, un pozo en vez de una tarjeta— y la fila de adentro compone a 17,
      más clara que su propio contenedor. Como ningún nivel se distingue por
@@ -2625,32 +2636,32 @@ input, textarea, [contenteditable="true"] {
      cinco superficies violetas apiladas y siete resplandores.
      Estos tres son opacos y suben de a poco, así la jerarquía la hace la luz
      y el color queda libre para significar algo. */
-  --surface-1: #12151f;   /* tarjeta de sección, por encima de la página */
-  --surface-2: #1a1f2e;   /* fila dentro de la tarjeta */
-  --surface-3: #232938;   /* elemento activo / resaltado dentro de una fila */
-  --hairline: #2b3245;    /* el canto de 1px que hoy hacían los resplandores */
+  --surface-1: #14161b;   /* tarjeta de sección, por encima de la página */
+  --surface-2: #1b1e24;   /* fila dentro de la tarjeta */
+  --surface-3: #252930;   /* elemento activo / resaltado dentro de una fila */
+  --hairline: #2a2e36;    /* el canto de 1px que hoy hacían los resplandores */
   /* Hero propio de Social. No reusa --grad-hero-purple a propósito: ese
      violeta (#A855F7) vuelve a ser exclusivo de Descarga y Medidas. Y baja
      del 42% al 26% de tinte, porque al 42% sobre negro se iba a malva. */
-  --grad-hero-violet: linear-gradient(135deg, rgba(139,92,246,0.26), rgba(15,23,42,0.86) 55%, rgba(15,23,42,0.6));
+  --grad-hero-violet: linear-gradient(135deg, rgba(139,92,246,0.22), rgba(20,22,27,0.88) 55%, rgba(20,22,27,0.66));
   /* Degradés de paneles destacados (resumen de sesión, tarjetas del
-     entrenador). Conservan el valor exacto que tenían escrito a mano. */
-  --panel-grad-teal: linear-gradient(165deg,#0d1a17 0%,#0a0f1a 100%);
-  --panel-grad-cyan: linear-gradient(165deg,#0f1a1f 0%,#0a0f1a 100%);
-  --panel-grad-slate: linear-gradient(170deg,#0f172a 0%,#0a0f1a 100%);
-  --panel-grad-blue: linear-gradient(165deg, #0c1420 0%, #0a0f1a 100%);
-  --panel-grad-emerald: linear-gradient(160deg,#0d1f1e,#0f172a);
+     entrenador): el mismo matiz de siempre, ahora sobre grafito. */
+  --panel-grad-teal: linear-gradient(165deg,#0f1b19 0%,#111317 100%);
+  --panel-grad-cyan: linear-gradient(165deg,#10191d 0%,#111317 100%);
+  --panel-grad-slate: linear-gradient(170deg,#16181d 0%,#111317 100%);
+  --panel-grad-blue: linear-gradient(165deg, #10151d 0%, #111317 100%);
+  --panel-grad-emerald: linear-gradient(160deg,#0f1d1b,#14161b);
   /* Cronómetro de descanso en reposo (cuando corre toma el color del día). */
-  --timer-idle-bg: rgba(15,23,42,0.5);
-  --timer-idle-border: rgba(30,41,59,0.6);
+  --timer-idle-bg: #15171c;
+  --timer-idle-border: #24272e;
   /* Modal de "subiste de rango" — el color del tier ya se aplica encima como
      glow/borde, esto es sólo la base neutra detrás. */
-  --rankup-grad: linear-gradient(135deg, #0f0f1a, #1a1a2e);
+  --rankup-grad: linear-gradient(135deg, #121418, #1b1e24);
   /* Barra de mensaje del Entrenador IA — se porta afuera del árbol temeado
      (createPortal a document.body), así que no le llegan ni las clases
      .light-mode ni las variables que sólo se definen inline más arriba: por
      eso vive acá, en :root, donde sí es alcanzable desde cualquier lado. */
-  --chat-bar-idle: rgba(15,23,42,0.72);
+  --chat-bar-idle: rgba(20,24,29,0.72);
   --chat-bar-listening: rgba(6,78,59,0.55);
   --chat-bar-editing: rgba(13,42,38,0.75);
   --chat-bar-border-idle: rgba(255,255,255,0.1);
@@ -2662,7 +2673,7 @@ input, textarea, [contenteditable="true"] {
   --chat-bubble-assistant: linear-gradient(165deg, #16233d 0%, #0e1626 100%);
   /* Paneles "vidrio esmerilado" del Entrenador IA: semitransparentes +
      backdrop-blur (aplicado en la clase). */
-  --glass-panel-bg: rgba(15,23,42,0.55);
+  --glass-panel-bg: rgba(20,24,29,0.55);
   --glass-panel-border: rgba(255,255,255,0.08);
   --glass-bubble-assistant: rgba(19,29,51,0.55);
 }
@@ -2670,43 +2681,43 @@ input, textarea, [contenteditable="true"] {
   --grad-hero-purple: linear-gradient(135deg, rgba(168,85,247,0.10), rgba(255,255,255,0.96) 55%, #ffffff);
   --grad-hero-blue: linear-gradient(135deg, rgba(59,130,246,0.10), rgba(255,255,255,0.96) 55%, #ffffff);
   --grad-hero-teal: linear-gradient(135deg, rgba(20,184,166,0.10), rgba(255,255,255,0.96) 55%, #ffffff);
-  --grad-profile-avatar: linear-gradient(135deg, #ffffff, #f8fafc);
+  --grad-profile-avatar: linear-gradient(135deg, #ffffff, #f9fafa);
   --ring-track: #eef2f6;
   --chart-grid: #eef2f6;
-  --chart-axis: #94a3b8;
-  --chip-border: #e2e8f0;
-  --chip-text: #64748b;
+  --chart-axis: #9da2a8;
+  --chip-border: #e6e8ea;
+  --chip-text: #6e7379;
   --surface-2: #eef2f6;
-  --surface-2-text: #475569;
-  --app-bg: #f8fafc;
-  --panel-sunken: #f1f5f9;
-  --row-surface: #f8fafc;
+  --surface-2-text: #50555a;
+  --app-bg: #f9fafa;
+  --panel-sunken: #f3f5f6;
+  --row-surface: #f9fafa;
   /* En claro la escalera va al revés (la página es lo más claro y cada nivel
      baja un escalón), pero el principio es el mismo: la jerarquía la hace la
      luz, no el tinte. */
   --surface-1: #ffffff;
-  --surface-2: #f1f5f9;
-  --surface-3: #e2e8f0;
+  --surface-2: #f3f5f6;
+  --surface-3: #e6e8ea;
   --hairline: #d8dfe9;
   /* En claro, el mismo matiz pero sobre blanco: apenas un velo de color en la
      esquina superior que se disuelve, en vez de un bloque oscuro. */
   --panel-grad-teal: linear-gradient(165deg, rgba(20,184,166,0.09) 0%, #ffffff 60%);
   --panel-grad-cyan: linear-gradient(165deg, rgba(6,182,212,0.09) 0%, #ffffff 60%);
-  --panel-grad-slate: linear-gradient(170deg, rgba(100,116,139,0.08) 0%, #ffffff 60%);
+  --panel-grad-slate: linear-gradient(170deg, rgba(110,115,121,0.08) 0%, #ffffff 60%);
   --panel-grad-blue: linear-gradient(165deg, rgba(59,130,246,0.08) 0%, #ffffff 60%);
   --panel-grad-emerald: linear-gradient(160deg, rgba(16,185,129,0.10), #ffffff 65%);
-  --timer-idle-bg: #f1f5f9;
-  --timer-idle-border: #e2e8f0;
-  --rankup-grad: linear-gradient(135deg, #ffffff, #f8fafc);
+  --timer-idle-bg: #f3f5f6;
+  --timer-idle-border: #e6e8ea;
+  --rankup-grad: linear-gradient(135deg, #ffffff, #f9fafa);
   --chat-bar-idle: rgba(255,255,255,0.72);
   --chat-bar-listening: rgba(209,250,229,0.85);
   --chat-bar-editing: rgba(204,251,241,0.85);
-  --chat-bar-border-idle: rgba(15,23,42,0.08);
+  --chat-bar-border-idle: rgba(20,24,29,0.08);
   --chat-bar-border-listening: rgba(16,185,129,0.35);
   --chat-bar-border-editing: rgba(20,184,166,0.35);
-  --chat-bubble-assistant: linear-gradient(165deg, #f8fafc 0%, #ffffff 100%);
+  --chat-bubble-assistant: linear-gradient(165deg, #f9fafa 0%, #ffffff 100%);
   --glass-panel-bg: rgba(255,255,255,0.6);
-  --glass-panel-border: rgba(15,23,42,0.06);
+  --glass-panel-border: rgba(20,24,29,0.06);
   --glass-bubble-assistant: rgba(255,255,255,0.65);
 }
 
@@ -2737,6 +2748,347 @@ input, textarea, [contenteditable="true"] {
 .text-\\[13px\\] { font-size: calc(13px * var(--small-text-scale, 1)) !important; }
 .text-\\[17px\\] { font-size: calc(17px * var(--small-text-scale, 1)) !important; }
 .text-\\[26px\\] { font-size: calc(26px * var(--small-text-scale, 1)) !important; }
+
+/* ============================================================================
+   SISTEMA VISUAL — tipografía, foco, íconos y las piezas fijas de la app
+   (barra de arriba, título de cada pestaña, barra de abajo, dock de sesión
+   y cronómetros).
+
+   La idea: una pizarra de entrenamiento, no un panel de control. Fondo
+   grafito, UN acento (el teal de la marca) para todo lo que es de la app, y
+   el color de cada día sólo para lo que es de ese día. Dos letras: Geist
+   para leer y Archivo para lo que se mira de lejos — títulos, rótulos, el
+   reloj, los kilos.
+
+   Esto va AL FINAL y sin @layer a propósito: Tailwind 4 pone sus clases en
+   una capa, y lo que está fuera de capa les gana. Así estas reglas mandan
+   sobre tracking-widest, font-black, etc., en toda la app a la vez.
+============================================================================ */
+:root {
+  --accent: #14B8A6;
+  --accent-ink: #2dd4bf;            /* el acento como texto, sobre oscuro */
+  --accent-soft: rgba(20,184,166,0.15);
+  --text-strong: #f3f4f5;
+  --text-muted: #a1a6ad;
+  --text-faint: #6f747c;
+  --bar-bg: rgba(12,13,16,0.93);
+  --tabbar-bg: rgba(15,16,20,0.97);
+  --tabbar-h: 64px;
+  /* Alto del dock de abajo (descanso en curso + sesión). Lo escribe el
+     propio dock al cambiar de tamaño, y lo leen el aire de abajo de la
+     página y la barra del chat, que tienen que quedar por encima. */
+  --dock-alto: 0px;
+}
+.light-mode {
+  --accent-ink: #0d9488;
+  --accent-soft: rgba(20,184,166,0.13);
+  --text-strong: #121519;
+  --text-muted: #5d636b;
+  --text-faint: #8b9098;
+  --bar-bg: rgba(249,250,250,0.94);
+  --tabbar-bg: rgba(255,255,255,0.97);
+}
+
+html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; }
+::selection { background: rgba(20,184,166,0.32); }
+
+/* Títulos: Archivo ancha y apretada. */
+h1, h2, .font-display {
+  font-family: var(--font-display);
+  font-stretch: 112%;
+  letter-spacing: -0.012em;
+}
+/* Rótulos en mayúscula. Eran la firma de la app pero con espaciado de
+   máquina de escribir (tracking-widest = 0.1em) y en la misma letra que el
+   texto: se leían como etiquetas sueltas. En Archivo y con menos aire
+   pasan a ser un tipo de letra propio, el de los marcadores. */
+.uppercase {
+  font-family: var(--font-display);
+  font-stretch: 104%;
+  letter-spacing: 0.05em;
+}
+.uppercase.font-black { font-weight: 800; }
+/* Números grandes: Archivo angosta. Entran más grandes en el mismo lugar y
+   se leen de lejos, con el teléfono apoyado en el banco. */
+.tabular-nums:is(.text-base, .text-lg, .text-xl, .text-2xl, .text-3xl, .text-4xl, .text-5xl, .text-6xl),
+.num-display {
+  font-family: var(--font-display);
+  font-stretch: 86%;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Foco visible para quien navega con teclado (y lector de pantalla). Antes
+   no había ninguno propio: salía el anillo amarillo del navegador. */
+:focus-visible { outline: 2px solid var(--accent-ink); outline-offset: 2px; border-radius: 6px; }
+input:focus-visible, textarea:focus-visible, select:focus-visible { outline: none; }
+
+/* Íconos un pelo más finos (lucide viene en 2). Sólo los que usan el trazo
+   por defecto: los que lo eligieron a propósito (el tilde de "guardado", en
+   3) se quedan como están. */
+.lucide[stroke-width="2"] { stroke-width: 1.85px; }
+
+/* Fondo de la app: un resplandor teal arriba a la izquierda, donde va el
+   título. Sin esto el grafito liso se ve plano y "de plantilla". Va en un
+   pseudo-elemento que scrollea con la página: nada fijo que repintar. */
+.app-fondo { position: relative; isolation: isolate; }
+.app-fondo::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 460px;
+  pointer-events: none; z-index: -1;
+  background:
+    radial-gradient(110% 75% at 0% 0%, rgba(20,184,166,0.11), transparent 62%),
+    radial-gradient(70% 55% at 100% 0%, rgba(148,163,184,0.05), transparent 65%);
+}
+.light-mode.app-fondo::before {
+  background: radial-gradient(110% 75% at 0% 0%, rgba(20,184,166,0.08), transparent 62%);
+}
+
+/* ── BARRA DE ARRIBA ─────────────────────────────────────────────────────
+   Transparente arriba de todo (el título grande de la página hace de
+   encabezado); al scrollear toma fondo, borde y el título achicado. */
+.app-bar {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20;
+  border-bottom: 1px solid transparent;
+  transition: background-color .25s ease, border-color .25s ease;
+}
+.app-bar[data-compacta="true"] {
+  background-color: var(--bar-bg);
+  -webkit-backdrop-filter: blur(18px) saturate(1.3); backdrop-filter: blur(18px) saturate(1.3);
+  border-bottom-color: var(--hairline);
+}
+.app-bar-titulo {
+  font-family: var(--font-display); font-stretch: 108%; font-weight: 800;
+  font-size: 1rem; letter-spacing: -0.01em; color: var(--text-strong);
+  opacity: 0; transform: translateY(6px);
+  transition: opacity .2s ease, transform .28s cubic-bezier(.2,.8,.3,1);
+}
+.app-bar[data-compacta="true"] .app-bar-titulo { opacity: 1; transform: none; }
+
+/* ── TÍTULO DE CADA PESTAÑA ────────────────────────────────────────────── */
+.titulo-pagina { padding: 2px 2px 18px; }
+.titulo-pagina .ceja {
+  display: flex; align-items: center; gap: 6px;
+  font-family: var(--font-display); font-stretch: 104%; font-weight: 700;
+  font-size: 0.6875rem; letter-spacing: 0.09em; text-transform: uppercase;
+}
+.titulo-pagina .ceja-beta {
+  margin-left: 2px; padding: 1px 6px; border-radius: 6px; font-size: 0.5625rem;
+  letter-spacing: 0.06em; background: rgba(20,184,166,0.16); color: var(--accent-ink);
+}
+.titulo-pagina h1 {
+  margin-top: 8px; color: var(--text-strong);
+  font-size: 2.125rem; line-height: 1; font-weight: 800;
+  font-stretch: 116%; letter-spacing: -0.025em;
+}
+.titulo-pagina .bajada {
+  margin-top: 8px; font-size: 0.84rem; line-height: 1.35; color: var(--text-muted);
+  max-width: 34ch; text-wrap: pretty;
+}
+
+/* ── BARRA DE ABAJO ────────────────────────────────────────────────────── */
+.barra-pestanas {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+  background: var(--tabbar-bg);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4); backdrop-filter: blur(20px) saturate(1.4);
+  border-top: 1px solid var(--hairline);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (min-width: 1024px) { .barra-pestanas { display: none; } }
+.barra-pestanas button {
+  flex: 1; min-width: 0; height: var(--tabbar-h);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  color: var(--text-faint);
+}
+.barra-pestanas .indicador {
+  width: 56px; height: 30px; border-radius: 999px;
+  display: flex; align-items: center; justify-content: center;
+  transition: background-color .25s ease, color .2s ease;
+}
+.barra-pestanas .etiqueta {
+  font-size: 0.6875rem; font-weight: 600; line-height: 1; letter-spacing: 0.005em;
+  transition: color .2s ease;
+}
+.barra-pestanas [aria-current="page"] .indicador {
+  color: var(--tab-color, var(--accent));
+  background: var(--accent-soft);
+  background: color-mix(in srgb, var(--tab-color, var(--accent)) 17%, transparent);
+}
+.barra-pestanas [aria-current="page"] .etiqueta { color: var(--text-strong); }
+.barra-pestanas [aria-current="page"] .lucide { stroke-width: 2.1px; }
+/* El foco de teclado va en la píldora, no en un rectángulo alrededor de todo. */
+.barra-pestanas button:focus-visible { outline: none; }
+.barra-pestanas button:focus-visible .indicador { outline: 2px solid var(--accent-ink); outline-offset: 2px; }
+
+/* SIN MANCHAS. Casi cada panel traía dos círculos borrosos de color atrás
+   (38 en total): el sello más reconocible del diseño genérico, y una capa
+   de blur más que pintar en cada scroll. En las pantallas se apagan todos
+   de una; se quedan sólo en los modales de festejo (resumen de sesión,
+   récords), donde un resplandor sí dice algo. */
+.app-fondo .absolute.rounded-full.pointer-events-none:is(.blur-xl, .blur-2xl, .blur-3xl) { display: none; }
+.app-fondo .modal-overlay .absolute.rounded-full.pointer-events-none:is(.blur-xl, .blur-2xl, .blur-3xl) { display: block; }
+
+/* ── DOCK DE ABAJO (descanso en curso + sesión) ────────────────────────── */
+:root {
+  --dock-bg: rgba(20,22,27,0.94);
+  --dock-sombra: 0 14px 34px -14px rgba(0,0,0,0.75), 0 2px 6px rgba(0,0,0,0.35);
+}
+.light-mode {
+  --dock-bg: rgba(255,255,255,0.96);
+  --dock-sombra: 0 12px 30px -12px rgba(20,24,29,0.22), 0 1px 3px rgba(20,24,29,0.08);
+}
+.dock-tarjeta {
+  position: relative; overflow: hidden;
+  background: var(--dock-bg);
+  border: 1px solid var(--hairline);
+  border-radius: 18px;
+  box-shadow: var(--dock-sombra);
+  -webkit-backdrop-filter: blur(18px) saturate(1.3); backdrop-filter: blur(18px) saturate(1.3);
+}
+
+/* ── CRONÓMETRO DE DESCANSO ─────────────────────────────────────────────── */
+.descanso {
+  display: flex; align-items: center; gap: 10px;
+  border-radius: 14px; border: 1px solid var(--hairline);
+  padding: 8px 8px 8px 12px;
+  transition: background-color .3s ease, border-color .3s ease;
+}
+.descanso-quieto { background: var(--timer-idle-bg); border-color: var(--timer-idle-border); }
+.descanso-activo { flex-direction: column; align-items: stretch; gap: 10px; padding: 10px 10px 12px 12px; }
+.descanso-listo { padding: 8px 8px 8px 10px; }
+.descanso-tiempo {
+  margin-top: 4px; font-size: 2.15rem; line-height: 0.95; font-weight: 800;
+  transition: color .3s ease;
+}
+.descanso-boton {
+  width: 38px; height: 38px; border-radius: 11px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-display); font-stretch: 90%; font-weight: 800; font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-strong);
+  background: var(--surface-2); border: 1px solid var(--hairline);
+}
+.descanso-boton-principal { color: #fff; border-color: transparent; width: 44px; }
+.descanso-barra {
+  height: 5px; border-radius: 999px; overflow: hidden;
+  background: rgba(148,163,184,0.16);
+}
+.descanso-barra > div {
+  height: 100%; border-radius: inherit;
+  transform-origin: left center;
+  transition: transform .25s linear, background-color .3s ease;
+}
+.descanso-barra-dock { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; border-radius: 0; }
+.dock-descanso-embebido { border-bottom: 1px solid var(--hairline); }
+@media (max-width: 360px) {
+  .descanso-boton { width: 34px; height: 36px; }
+  .descanso-boton-principal { width: 40px; }
+  .descanso-tiempo { font-size: 1.9rem; }
+}
+
+/* ── CRONÓMETRO DE CARDIO ───────────────────────────────────────────────── */
+.segmentado {
+  display: flex; gap: 2px; padding: 3px; border-radius: 12px;
+  background: var(--panel-sunken); border: 1px solid var(--hairline);
+}
+.segmentado > button {
+  flex: 1; min-width: 0; height: 34px; border-radius: 9px;
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  font-size: 0.6875rem; font-weight: 700; color: var(--text-muted);
+  transition: background-color .2s ease, color .2s ease;
+}
+.segmentado > button.activo { color: #fff; }
+.cardio-reloj {
+  border: 1px solid var(--hairline); border-radius: 14px;
+  padding: 10px 10px 12px 12px;
+  transition: background-color .3s ease, border-color .3s ease;
+}
+
+/* ── RUTINA: el día, sus ejercicios y cada serie ────────────────────────── */
+.selector-dias { border-radius: 16px; background: var(--surface-1); border: 1px solid var(--hairline); }
+/* El día ya no es una caja con borde: un lavado de su color detrás de la
+   cabecera que se apaga antes de los ejercicios. Se sigue leyendo como un
+   sector, sin sumar un nivel más de caja alrededor de cada tarjeta. */
+.dia-seccion {
+  border-radius: 22px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--c) 11%, transparent) 0, color-mix(in srgb, var(--c) 4%, transparent) 120px, transparent 240px);
+}
+.dia-titulo {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 1.75rem; line-height: 1; font-weight: 800; text-transform: uppercase;
+  font-stretch: 110%; letter-spacing: -0.005em; color: var(--text-strong);
+  overflow-wrap: anywhere;
+}
+.dia-titulo::before {
+  content: ""; flex: none; width: 10px; height: 10px; border-radius: 3px; background: var(--c);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--c) 22%, transparent);
+}
+.tarjeta-plan { border-radius: 18px; padding: 14px; background: var(--surface-1); border: 1px solid var(--hairline); }
+
+.ejercicio {
+  background: var(--surface-1); border: 1px solid var(--hairline); border-radius: 18px; overflow: hidden;
+  transition: border-color .25s ease, box-shadow .25s ease;
+}
+.ejercicio.abierto {
+  border-color: color-mix(in srgb, var(--c) 38%, var(--hairline));
+  box-shadow: 0 18px 40px -26px color-mix(in srgb, var(--c) 70%, transparent);
+}
+.ejercicio-cabecera { transition: background-color .15s ease; }
+.ejercicio-cabecera:active { background-color: rgba(148,163,184,0.06); }
+.ejercicio-numero {
+  flex: none; width: 34px; text-align: center;
+  font-family: var(--font-display); font-stretch: 82%; font-weight: 800; font-size: 1.45rem; line-height: 1;
+  color: var(--c); letter-spacing: -0.02em;
+}
+.ejercicio-nombre { font-size: 0.9375rem; font-weight: 600; line-height: 1.25; color: var(--text-strong); letter-spacing: -0.005em; }
+/* Hecho: el ejercicio se apaga un tono, así los que faltan resaltan solos. */
+.ejercicio.completo .ejercicio-numero { color: var(--text-faint); }
+.ejercicio.completo .ejercicio-nombre { color: var(--text-muted); }
+.series-puntos { display: inline-flex; gap: 4px; }
+.series-puntos i { width: 7px; height: 7px; border-radius: 999px; background: var(--hairline); }
+.series-puntos i.hecha { background: var(--c); }
+
+/* La serie: sin caja propia. Una línea fina la separa de la anterior, como
+   los renglones de una planilla de entrenamiento. */
+.serie { border-top: 1px solid var(--hairline); }
+.serie-rotulo {
+  font-family: var(--font-display); font-weight: 800; font-size: 0.75rem;
+  text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-strong);
+}
+.registro { background: var(--panel-sunken); }
+.registro-input {
+  font-family: var(--font-display); font-stretch: 86%; font-weight: 800;
+  letter-spacing: -0.01em; font-variant-numeric: tabular-nums;
+}
+
+/* ── PORTADA (login) ────────────────────────────────────────────────────── */
+.login-disco {
+  position: absolute; width: 620px; height: 620px; right: -300px; top: -230px;
+  border-radius: 50%; pointer-events: none;
+  background:
+    radial-gradient(circle, transparent 0 20%, rgba(255,255,255,0.06) 20.2% 20.7%, transparent 20.9% 33%,
+      rgba(20,184,166,0.30) 33.2% 33.9%, transparent 34.1% 48%,
+      rgba(255,255,255,0.05) 48.2% 48.6%, transparent 48.8% 63%,
+      rgba(20,184,166,0.10) 63.2% 66%, transparent 66.2%),
+    radial-gradient(circle, rgba(20,184,166,0.16), transparent 62%);
+}
+.login-marca {
+  font-family: var(--font-display); font-stretch: 112%; font-weight: 800;
+  font-size: 1.05rem; letter-spacing: -0.01em; color: #fff;
+}
+.login-titulo {
+  font-size: 3rem; line-height: 0.95; font-weight: 800;
+  font-stretch: 118%; letter-spacing: -0.035em; color: #fff;
+}
+.login-bajada {
+  margin-top: 18px; max-width: 30ch; font-size: 0.95rem; line-height: 1.45;
+  color: #a1a6ad; text-wrap: pretty;
+}
+
+/* ── SUPERSERIE ─────────────────────────────────────────────────────────── */
+.superserie {
+  border: 1px solid var(--hairline); border-radius: 18px; padding: 10px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--c) 7%, transparent), transparent 70%);
+}
 `;
 
 function StyleInjector() {
@@ -3087,7 +3439,7 @@ function canvasRoundRect(ctx, x, y, w, h, r) {
 function drawShareCardBase(ctx, W, H, accent, accent2) {
   // Fondo
   const bg = ctx.createLinearGradient(0, 0, 0, H);
-  bg.addColorStop(0, "#0f0f1a"); bg.addColorStop(1, "#07070f");
+  bg.addColorStop(0, "#0e1113"); bg.addColorStop(1, "#07070f");
   ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
   // Glow top-left
   const g1 = ctx.createRadialGradient(W * 0.15, H * 0.12, 0, W * 0.15, H * 0.12, W * 0.55);
@@ -3143,7 +3495,7 @@ function drawPRShareCard(ctx, W, H, { exerciseName, muscle, kg, reps, accent = "
   // Nombre del ejercicio — truncado a un largo seguro, máximo 2 líneas.
   let name = (exerciseName || "").toUpperCase();
   if (name.length > 44) name = name.slice(0, 43).trimEnd() + "…";
-  ctx.fillStyle = "#f8fafc"; ctx.font = "800 34px system-ui";
+  ctx.fillStyle = "#f9fafa"; ctx.font = "800 34px system-ui";
   wrapCanvasText(ctx, name, W / 2, 188, W - 72, 42, 2);
 
   // Chip de músculo — posición fija, debajo del área reservada del nombre.
@@ -3162,11 +3514,11 @@ function drawPRShareCard(ctx, W, H, { exerciseName, muscle, kg, reps, accent = "
   gKg.addColorStop(0, "#ffffff"); gKg.addColorStop(1, accent);
   ctx.fillStyle = gKg;
   ctx.fillText(kgStr, W / 2, 492);
-  ctx.fillStyle = "#64748b"; ctx.font = "600 24px system-ui";
+  ctx.fillStyle = "#6e7379"; ctx.font = "600 24px system-ui";
   ctx.fillText(uLabel, W / 2, 528);
 
   // Reps
-  ctx.fillStyle = "#e2e8f0"; ctx.font = "700 30px system-ui";
+  ctx.fillStyle = "#e6e8ea"; ctx.font = "700 30px system-ui";
   ctx.fillText(`${reps ?? 0} repeticiones`, W / 2, 596);
 
   // Tiles 1RM + Volumen
@@ -3180,7 +3532,7 @@ function drawPRShareCard(ctx, W, H, { exerciseName, muscle, kg, reps, accent = "
     canvasRoundRect(ctx, x, tileY, tileW, tileH, 16); ctx.stroke();
     ctx.fillStyle = "#ffffff"; ctx.font = "800 32px system-ui";
     ctx.fillText(t.val, x + tileW / 2, tileY + 56);
-    ctx.fillStyle = "#64748b"; ctx.font = "500 16px system-ui";
+    ctx.fillStyle = "#6e7379"; ctx.font = "500 16px system-ui";
     ctx.fillText(t.label, x + tileW / 2, tileY + 86);
   });
 
@@ -3196,7 +3548,7 @@ function drawCycleShareCard(ctx, W, H, { cycleNumber, daysTrained, totalVol, acc
   ctx.fillStyle = accent;
   ctx.font = "800 26px sans-serif";
   ctx.fillText("🎉 CICLO COMPLETO", W / 2, 250);
-  ctx.fillStyle = "#f8fafc";
+  ctx.fillStyle = "#f9fafa";
   ctx.font = "900 76px sans-serif";
   ctx.fillText(`Ciclo #${cycleNumber}`, W / 2, 360);
   const tiles = [
@@ -3208,14 +3560,14 @@ function drawCycleShareCard(ctx, W, H, { cycleNumber, daysTrained, totalVol, acc
     const x = 40 + i * (tileW + tileGap);
     ctx.fillStyle = "rgba(255,255,255,0.06)";
     canvasRoundRect(ctx, x, tileY, tileW, tileH, 20); ctx.fill();
-    ctx.fillStyle = "#f8fafc";
+    ctx.fillStyle = "#f9fafa";
     ctx.font = "900 54px sans-serif";
     ctx.fillText(`${t.val}`, x + tileW / 2, tileY + 82);
-    ctx.fillStyle = "#94a3b8";
+    ctx.fillStyle = "#9da2a8";
     ctx.font = "700 17px sans-serif";
     t.label.split("\n").forEach((l, li) => ctx.fillText(l, x + tileW / 2, tileY + 118 + li * 22));
   });
-  ctx.fillStyle = "#cbd5e1";
+  ctx.fillStyle = "#d1d4d7";
   ctx.font = "700 26px sans-serif";
   ctx.fillText("7 semanas de entrenamiento y descarga 💪", W / 2, 740);
   drawWordmark(ctx, W, H, accent);
@@ -3241,7 +3593,7 @@ function drawPeriodShareCard(ctx, W, H, { periodLabel, daysTrained, totalSets, t
   ctx.font = "800 22px sans-serif";
   ctx.fillText("💪 RESUMEN DE ENTRENAMIENTO", W / 2, 150);
 
-  ctx.fillStyle = "#f8fafc";
+  ctx.fillStyle = "#f9fafa";
   ctx.font = "900 42px sans-serif";
   let label = (periodLabel || "").toUpperCase();
   if (label.length > 40) label = label.slice(0, 39).trimEnd() + "…";
@@ -3286,15 +3638,15 @@ function drawPeriodShareCard(ctx, W, H, { periodLabel, daysTrained, totalSets, t
     const x = 32 + i * (tileW + tileGap);
     ctx.fillStyle = "rgba(255,255,255,0.06)";
     canvasRoundRect(ctx, x, tileY, tileW, tileH, 16); ctx.fill();
-    ctx.fillStyle = "#f8fafc";
+    ctx.fillStyle = "#f9fafa";
     ctx.font = "900 34px sans-serif";
     ctx.fillText(`${t.val}`, x + tileW / 2, tileY + 58);
-    ctx.fillStyle = "#94a3b8";
+    ctx.fillStyle = "#9da2a8";
     ctx.font = "700 13px sans-serif";
     t.label.split("\n").forEach((l, li) => ctx.fillText(l, x + tileW / 2, tileY + 86 + li * 17));
   });
 
-  ctx.fillStyle = "#cbd5e1";
+  ctx.fillStyle = "#d1d4d7";
   ctx.font = "700 24px sans-serif";
   ctx.fillText(daysTrained > 0 ? "¡Seguí así! 💪" : "A entrenar 💪", W / 2, tileY + tileH + 60);
   drawWordmark(ctx, W, H, accent);
@@ -3389,7 +3741,7 @@ function drawMuscleRankShareCard(ctx, W, H, { ranks, modeLabel, accent = "#F59E0
   ctx.fillStyle = accent;
   ctx.font = `800 ${Math.round(W * 0.052)}px sans-serif`;
   ctx.fillText("MIS RANGOS", W / 2, Math.round(H * 0.13));
-  ctx.fillStyle = "#94a3b8";
+  ctx.fillStyle = "#9da2a8";
   ctx.font = `700 ${Math.round(W * 0.036)}px sans-serif`;
   ctx.fillText(modeLabel, W / 2, Math.round(H * 0.158));
 
@@ -3397,7 +3749,7 @@ function drawMuscleRankShareCard(ctx, W, H, { ranks, modeLabel, accent = "#F59E0
   // sin drawImage. La conversión SVG→Image fallaba en los WebViews de
   // Android (el onload nunca disparaba o dibujaba 0×0) y por eso la
   // imagen del muñeco no se generaba nunca en el teléfono.
-  const NEUTRAL = "#334155";
+  const NEUTRAL = "#3c4146";
   const bodyW = Math.round(W * 0.36);
   const bodyH = bodyW * 2;
   const gap = Math.round(W * 0.08);
@@ -3446,7 +3798,7 @@ function drawMuscleRankShareCard(ctx, W, H, { ranks, modeLabel, accent = "#F59E0
   drawView(POSTERIOR_POLY_ORDER, POSTERIOR_POLY_POINTS, "back", startX + bodyW + gap);
 
   const labelY = bodyY + bodyH + Math.round(H * 0.035);
-  ctx.fillStyle = "#cbd5e1";
+  ctx.fillStyle = "#d1d4d7";
   ctx.font = `700 ${Math.round(W * 0.030)}px sans-serif`;
   ctx.fillText("De frente", startX + bodyW / 2, labelY);
   ctx.fillText("De espalda", startX + bodyW + gap + bodyW / 2, labelY);
@@ -3467,7 +3819,7 @@ function drawSocialProfileShareCard(ctx, W, H, { name, username, topRank, avatar
   ctx.fillStyle = tint(accent, "cc"); ctx.font = `800 ${Math.round(W * 0.052)}px sans-serif`;
   ctx.fillText("AGREGAME EN", W / 2, Math.round(H * 0.13));
   ctx.font = `800 ${Math.round(W * 0.09)}px sans-serif`;
-  ctx.fillStyle = "#f8fafc";
+  ctx.fillStyle = "#f9fafa";
   ctx.fillText("MODUS FIT", W / 2, Math.round(H * 0.205));
 
   // Avatar circular con la inicial — mismo criterio que el resto de la
@@ -3480,7 +3832,7 @@ function drawSocialProfileShareCard(ctx, W, H, { name, username, topRank, avatar
   ctx.fillStyle = "#ffffff"; ctx.font = `800 ${Math.round(avatarR * 1.1)}px sans-serif`;
   ctx.fillText((avatarInitial || "?").toUpperCase(), W / 2, avatarCy + avatarR * 0.38);
 
-  ctx.fillStyle = "#f8fafc"; ctx.font = `800 ${Math.round(W * 0.06)}px sans-serif`;
+  ctx.fillStyle = "#f9fafa"; ctx.font = `800 ${Math.round(W * 0.06)}px sans-serif`;
   ctx.fillText(name || "Alguien", W / 2, Math.round(H * 0.505));
 
   // @usuario — lo más grande de la tarjeta después del nombre de la app:
@@ -3497,13 +3849,13 @@ function drawSocialProfileShareCard(ctx, W, H, { name, username, topRank, avatar
   ctx.fillText(chipText, W / 2, chipY + chipH * 0.68);
 
   if (topRank) {
-    ctx.fillStyle = "#64748b"; ctx.font = `600 ${Math.round(W * 0.032)}px sans-serif`;
+    ctx.fillStyle = "#6e7379"; ctx.font = `600 ${Math.round(W * 0.032)}px sans-serif`;
     ctx.fillText(`Mejor rango · ${topRank.label}`, W / 2, Math.round(H * 0.70));
     ctx.fillStyle = topRank.color; ctx.font = `800 ${Math.round(W * 0.075)}px sans-serif`;
     ctx.fillText(`${topRank.tier} ${topRank.sub}`, W / 2, Math.round(H * 0.755));
   }
 
-  ctx.fillStyle = "#64748b"; ctx.font = `600 ${Math.round(W * 0.034)}px sans-serif`;
+  ctx.fillStyle = "#6e7379"; ctx.font = `600 ${Math.round(W * 0.034)}px sans-serif`;
   ctx.fillText("Buscame por mi @usuario en la pestaña Social", W / 2, Math.round(H * 0.885));
 
   drawWordmark(ctx, W, H, accent);
@@ -3541,7 +3893,7 @@ async function drawSocialProfileQrCard(ctx, W, H, { name, username, accent }) {
   ctx.fillStyle = tint(accent, "cc"); ctx.font = `800 ${Math.round(W * 0.05)}px sans-serif`;
   ctx.fillText("ESCANEAME EN", W / 2, Math.round(H * 0.115));
   ctx.font = `800 ${Math.round(W * 0.082)}px sans-serif`;
-  ctx.fillStyle = "#f8fafc";
+  ctx.fillStyle = "#f9fafa";
   ctx.fillText("MODUS FIT", W / 2, Math.round(H * 0.18));
 
   const QRCode = (await import("qrcode")).default;
@@ -3564,7 +3916,7 @@ async function drawSocialProfileQrCard(ctx, W, H, { name, username, accent }) {
   ctx.fill();
   ctx.restore();
 
-  ctx.fillStyle = "#0f172a";
+  ctx.fillStyle = "#14181d";
   for (let r = 0; r < size; r++) {
     for (let c = 0; c < size; c++) {
       if (modules.get(r, c)) ctx.fillRect(qrX + (c + quiet) * cell, qrY + (r + quiet) * cell, Math.ceil(cell) + 0.5, Math.ceil(cell) + 0.5);
@@ -3572,7 +3924,7 @@ async function drawSocialProfileQrCard(ctx, W, H, { name, username, accent }) {
   }
 
   const belowY = qrY + qrSide + Math.round(H * 0.078);
-  ctx.fillStyle = "#f8fafc"; ctx.font = `800 ${Math.round(W * 0.055)}px sans-serif`;
+  ctx.fillStyle = "#f9fafa"; ctx.font = `800 ${Math.round(W * 0.055)}px sans-serif`;
   ctx.fillText(name || "Alguien", W / 2, belowY);
 
   const chipY = belowY + Math.round(H * 0.03), chipH = Math.round(H * 0.062);
@@ -3586,7 +3938,7 @@ async function drawSocialProfileQrCard(ctx, W, H, { name, username, accent }) {
   ctx.fillStyle = accent;
   ctx.fillText(chipText, W / 2, chipY + chipH * 0.68);
 
-  ctx.fillStyle = "#64748b"; ctx.font = `600 ${Math.round(W * 0.032)}px sans-serif`;
+  ctx.fillStyle = "#6e7379"; ctx.font = `600 ${Math.round(W * 0.032)}px sans-serif`;
   ctx.fillText("Social → Escanear código QR, en Modus Fit", W / 2, Math.round(H * 0.9));
 
   drawWordmark(ctx, W, H, accent);
@@ -3628,7 +3980,7 @@ function ProfileQrCode({ username, size = 236 }) {
         canvas.style.width = `${size}px`; canvas.style.height = `${size}px`;
         const ctx = canvas.getContext("2d");
         ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, side, side);
-        ctx.fillStyle = "#0f172a";
+        ctx.fillStyle = "#14181d";
         for (let r = 0; r < n; r++) {
           for (let c = 0; c < n; c++) {
             if (modules.get(r, c)) ctx.fillRect((c + quiet) * px, (r + quiet) * px, px, px);
@@ -3981,7 +4333,7 @@ function ShareImageModal({ title, subtitle, fileNamePrefix, shareTitle, shareTex
           </div>
         ) : (
           <div className="relative flex justify-center mb-4">
-            <div className="rounded-2xl border flex flex-col items-center justify-center gap-2" style={{ height: "46vh", aspectRatio: "9 / 16", borderColor: tint(accent, "30"), backgroundColor: "rgba(15,23,42,0.6)" }}>
+            <div className="rounded-2xl border flex flex-col items-center justify-center gap-2" style={{ height: "46vh", aspectRatio: "9 / 16", borderColor: tint(accent, "30"), backgroundColor: "rgba(20,24,29,0.6)" }}>
               <div className="w-7 h-7 rounded-full border-[3px] animate-spin" style={{ borderColor: tint(accent, "25"), borderTopColor: accent }} />
               <p className="text-[11px] text-slate-500">Generando imagen...</p>
             </div>
@@ -4066,7 +4418,7 @@ function SwipeToArchive({ children, onArchive, confirmText, revealWidth = 84 }) 
         onPointerCancel={handlePointerUp}
         onClickCapture={handleClickCapture}
         style={{ transform: `translateX(${dragX}px)`, transition: draggingRef.current ? "none" : "transform 0.2s ease", touchAction: "pan-y" }}
-        className="relative bg-[#0a0a0f] rounded-2xl"
+        className="relative bg-[#0c0d10] rounded-2xl"
       >
         {children}
       </div>
@@ -4325,8 +4677,8 @@ function LoginScreen({ onLogin, allowAutoLogin = true }) {
   useEffect(() => { if (allowAutoLogin && deviceProfile && !profiles[deviceProfile].pin) { saveActive(deviceProfile); onLogin(deviceProfile, profiles); } }, []);
 
   if (phase === "pin") return (
-    <div className="min-h-screen bg-[#0a0a0f] flex flex-col items-center justify-center px-4 relative overflow-hidden">
-      <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-72 h-72 rounded-full bg-teal-500/10 blur-3xl pointer-events-none" />
+    <div className="login min-h-[100dvh] bg-[#0c0d10] flex flex-col items-center justify-center px-4 relative overflow-hidden">
+      <div className="login-disco" aria-hidden="true" />
       <div className="w-full max-w-xs relative">
         <div className="flex flex-col items-center mb-6">
           <div className="w-14 h-14 rounded-2xl bg-teal-500/15 flex items-center justify-center mb-3"><Flame className="text-teal-500" size={28} /></div>
@@ -4338,8 +4690,8 @@ function LoginScreen({ onLogin, allowAutoLogin = true }) {
   );
 
   if (phase === "register") return (
-    <div className="min-h-screen bg-[#0a0a0f] flex flex-col items-center justify-center px-4 py-8 relative overflow-hidden">
-      <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-72 h-72 rounded-full bg-teal-500/10 blur-3xl pointer-events-none" />
+    <div className="login min-h-[100dvh] bg-[#0c0d10] flex flex-col items-center justify-center px-4 py-8 relative overflow-hidden">
+      <div className="login-disco" aria-hidden="true" />
       <div className="w-full max-w-sm relative">
         <div className="flex items-center gap-3 mb-8">
           <button onClick={() => { if (regStep !== 1) { setRegStep(1); setRegError(""); } else { setPhase("list"); setRegError(""); } }} aria-label="Volver" className="text-slate-500 hover:text-slate-300"><ChevronDown size={20} className="rotate-90" /></button>
@@ -4364,18 +4716,26 @@ function LoginScreen({ onLogin, allowAutoLogin = true }) {
     </div>
   );
 
+  // Portada: la marca arriba, una frase grande que dice qué hace la app, y
+  // las acciones abajo, donde llega el pulgar. Antes era un ícono centrado,
+  // el nombre y "Seguimiento de cargas y progreso": correcto, pero igual a
+  // la portada de cualquier app. Los anillos del fondo son un disco de pesas
+  // visto de frente, en CSS puro.
   return (
-    <div className="min-h-screen bg-[#0a0a0f] flex flex-col items-center justify-center px-4 relative overflow-hidden">
-      <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-96 h-96 rounded-full bg-teal-500/10 blur-3xl pointer-events-none" />
-      <div className="w-full max-w-sm relative">
-        <div className="flex flex-col items-center mb-10">
-          <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-teal-500/30 to-teal-500/5 border border-teal-500/20 flex items-center justify-center mb-4 shadow-[0_0_40px_-10px_rgba(20,184,166,0.55)]"><Flame className="text-teal-500" size={30} /></div>
-          <h1 className="text-2xl font-black text-white tracking-tight">Modus Fit</h1>
-          <p className="text-slate-500 text-sm mt-1">Seguimiento de cargas y progreso</p>
+    <div className="login min-h-[100dvh] bg-[#0c0d10] flex flex-col px-6 relative overflow-hidden" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 22px)", paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 24px)" }}>
+      <div className="login-disco" aria-hidden="true" />
+      <div className="w-full max-w-sm mx-auto relative flex-1 flex flex-col">
+        <div className="flex items-center gap-2.5">
+          <span className="w-9 h-9 rounded-xl flex items-center justify-center bg-teal-500/15 border border-teal-500/25 shrink-0"><Flame className="text-teal-400" size={18} /></span>
+          <span className="login-marca">Modus Fit</span>
+        </div>
+        <div className="flex-1 flex flex-col justify-center py-10 min-h-[240px]">
+          <h1 className="login-titulo">Cada serie<br /><span className="text-teal-400">cuenta.</span></h1>
+          <p className="login-bajada">Anotá reps y kilos en segundos. La app detecta tus récords y arma tu progreso, semana a semana.</p>
         </div>
 
         {/* --- BOTÓN DE GOOGLE --- */}
-        <button onClick={handleGoogleLogin} disabled={googleLoading} className="w-full mb-5 py-3.5 rounded-2xl bg-white text-slate-900 font-bold text-sm hover:bg-slate-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 shadow-lg shadow-white/10 disabled:opacity-70">
+        <button onClick={handleGoogleLogin} disabled={googleLoading} className="w-full mb-3 h-14 rounded-2xl bg-white text-slate-900 font-bold text-[15px] hover:bg-slate-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-70">
           {googleLoading ? (
             <RotateCcw className="w-5 h-5 animate-spin text-slate-500" />
           ) : (
@@ -4389,7 +4749,7 @@ function LoginScreen({ onLogin, allowAutoLogin = true }) {
           {googleLoading ? "Conectando..." : "Continuar con Google"}
         </button>
 
-        {profileList.length > 0 && (<div className="mb-5"><p className="text-[11px] font-bold uppercase tracking-widest text-slate-600 mb-3">Perfiles en este dispositivo</p><div className="space-y-2">{profileList.map((name) => (
+        {profileList.length > 0 && (<div className="mb-4 mt-2"><p className="text-[11px] font-bold uppercase text-slate-500 mb-2.5">Perfiles en este dispositivo</p><div className="space-y-2">{profileList.map((name) => (
           <SwipeToArchive key={name} confirmText={`¿Quitar a ${name} de esta lista? No se borra nada.`} onArchive={() => handleArchiveProfile(name)}>
             <button onClick={() => tryLogin(name)} className="w-full flex items-center gap-3.5 bg-slate-900/60 border border-slate-800/60 hover:border-teal-500/30 rounded-2xl px-4 py-3.5 transition-all active:scale-[0.98] text-left group">
               <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg font-black shrink-0" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)", color: "white" }}>{name.charAt(0).toUpperCase()}</div>
@@ -4440,7 +4800,8 @@ function LoginScreen({ onLogin, allowAutoLogin = true }) {
             )}
           </div>
         )}
-        <button onClick={() => setPhase("register")} className="w-full py-4 rounded-2xl border border-dashed border-slate-700 text-slate-400 hover:text-white hover:border-teal-500/40 transition-all text-sm font-semibold flex items-center justify-center gap-2">+ Crear perfil sin Google</button>
+        <button onClick={() => setPhase("register")} className="w-full h-14 rounded-2xl border border-slate-700/80 bg-slate-900/40 text-slate-200 hover:text-white hover:border-teal-500/40 transition-all text-[15px] font-semibold flex items-center justify-center gap-2"><Plus size={17} /> Crear perfil sin Google</button>
+        <p className="text-[11.5px] text-slate-500 text-center mt-3 leading-snug">Sin cuenta también funciona: tus datos quedan en este teléfono.</p>
         {regError && <p className="text-rose-400 text-xs mt-3 text-center">{regError}</p>}
       </div>
     </div>
@@ -4531,11 +4892,218 @@ function persistActiveCardioTimers() {
 // Estado inicial de un cronómetro de cardio: si había uno persistido y
 // corriendo, retoma la cuenta real desde su startedAt; si estaba pausado,
 // retoma el tiempo congelado; si no hay nada, arranca de cero.
-function initCardioTimerState(timerId) {
+function initCardioTimerState(timerId, modoInicial = "stopwatch") {
   const p = ACTIVE_CARDIO_TIMERS[timerId];
-  if (!p) return { mode: "stopwatch", running: false, elapsed: 0 };
-  if (p.running && p.startedAt) return { mode: p.mode || "stopwatch", running: true, elapsed: Math.floor((Date.now() - p.startedAt) / 1000) };
-  return { mode: p.mode || "stopwatch", running: false, elapsed: p.elapsed || 0 };
+  if (!p) return { mode: modoInicial, running: false, elapsed: 0, startedAt: null };
+  if (p.running && p.startedAt) return { mode: p.mode || modoInicial, running: true, elapsed: Math.floor((Date.now() - p.startedAt) / 1000), startedAt: p.startedAt };
+  return { mode: p.mode || modoInicial, running: false, elapsed: p.elapsed || 0, startedAt: null };
+}
+
+// "1:05:30" pasada la hora, "24:07" antes: un cardio largo no puede
+// mostrarse como "65:30".
+function relojLargo(seg) {
+  const s = Math.max(0, Math.round(seg));
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), ss = s % 60;
+  return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${String(ss).padStart(2, "0")}` : `${m}:${String(ss).padStart(2, "0")}`;
+}
+
+// Avisos del sistema del cardio, con el mismo criterio que los descansos:
+// la cuenta regresiva muestra el reloj en vivo y deja programado el aviso de
+// fin con la hora exacta (suena aunque Android congele la app); el
+// cronómetro que cuenta para arriba deja una notificación fija de "Cardio
+// en curso" para volver de un toque.
+async function programarAvisosCardio(timerId, { modo, faltanSeg = 0, nombre = "" }) {
+  if (!timerId || !Capacitor.isNativePlatform()) return;
+  const notifId = notifIdForTimer(timerId, 20000);
+  try {
+    if (modo === "countdown") {
+      const s = Math.max(1, Math.round(faltanSeg));
+      ACTIVE_REST_TIMERS.__notifOwner = timerId;
+      await RestTimerNotification.start({ seconds: s, exerciseName: nombre || "Cardio" }).catch(() => {});
+      await LocalNotifications.createChannel({ id: "modusfit-rest-done-v1", name: "Fin del descanso", description: "Aviso al terminar", importance: 5, vibration: true }).catch(() => {});
+      await LocalNotifications.schedule({
+        notifications: [{
+          id: notifId, smallIcon: "ic_stat_modusfit",
+          title: "🏁 ¡Cardio completado!", body: `${nombre || "Sesión"}: llegaste al objetivo 💪`,
+          channelId: "modusfit-rest-done-v1", sound: "default",
+          schedule: { at: new Date(Date.now() + s * 1000), allowWhileIdle: true },
+        }],
+      });
+    } else {
+      await LocalNotifications.schedule({
+        notifications: [{
+          id: notifId, smallIcon: "ic_stat_modusfit",
+          title: "⏱️ Cardio en curso", body: `${nombre || "Sesión"} · tocá para volver`,
+          channelId: "ponos-rest-timer", ongoing: true, autoCancel: false,
+          schedule: { at: new Date(Date.now() + 300) },
+        }],
+      });
+    }
+  } catch (e) { console.warn("[notif] cardio:", e); }
+}
+// dejarAvisoDeFin: al terminar SOLA la cuenta regresiva, el aviso programado
+// se deja (suena a su hora exacta); sólo se baja el reloj en vivo.
+function cancelarAvisosCardio(timerId, { dejarAvisoDeFin = false } = {}) {
+  if (!timerId || !Capacitor.isNativePlatform()) return;
+  try {
+    if (!dejarAvisoDeFin) LocalNotifications.cancel({ notifications: [{ id: notifIdForTimer(timerId, 20000) }] }).catch(() => {});
+    if (ACTIVE_REST_TIMERS.__notifOwner === timerId) {
+      RestTimerNotification.stop().catch(() => {});
+      delete ACTIVE_REST_TIMERS.__notifOwner;
+    }
+  } catch { /* ignorado a propósito */ }
+}
+
+// CRONÓMETRO DE CARDIO — uno solo para la rutina y para la descarga.
+//
+// Dos modos: "stopwatch" cuenta para arriba (arrancás, entrenás, parás) y
+// "countdown" cuenta para abajo desde un objetivo. Lo que cambia respecto de
+// antes es que SIEMPRE se mide el tiempo transcurrido real, en los dos
+// modos. La cuenta regresiva de la rutina sólo llevaba "cuánto falta", y de
+// ahí salían tres bugs:
+//   · al pausarla, el tiempo que faltaba desaparecía de la pantalla;
+//   · al darle Play otra vez, volvía a empezar desde el principio;
+//   · al guardar antes de que terminara, se registraban los minutos del
+//     OBJETIVO y no los que hiciste.
+// Persiste en ACTIVE_CARDIO_TIMERS (mismo formato de siempre), así cerrar la
+// app no lo pierde: corriendo guarda cuándo arrancó, pausado cuánto llevaba.
+function useCronoCardio(timerId, { objetivoSeg = 0, nombre = "", alTerminar = null, modoInicial = "stopwatch" } = {}) {
+  const [inicial] = useState(() => (timerId ? initCardioTimerState(timerId, modoInicial) : { mode: modoInicial, running: false, elapsed: 0, startedAt: null }));
+  const [modo, setModo] = useState(inicial.mode);
+  const [corriendo, setCorriendo] = useState(inicial.running);
+  const [transcurrido, setTranscurrido] = useState(inicial.elapsed);
+  const inicioRef = useRef(inicial.running ? inicial.startedAt : null);
+  const objetivoRef = useRef(objetivoSeg);
+  const alTerminarRef = useRef(alTerminar);
+  useLayoutEffect(() => { objetivoRef.current = objetivoSeg; alTerminarRef.current = alTerminar; });
+  const guardar = (entrada) => {
+    if (!timerId) return;
+    if (entrada) ACTIVE_CARDIO_TIMERS[timerId] = entrada; else delete ACTIVE_CARDIO_TIMERS[timerId];
+    persistActiveCardioTimers();
+  };
+  useEffect(() => {
+    if (!corriendo || !timerId) return;
+    const tick = () => {
+      const inicio = inicioRef.current;
+      if (!inicio) return;
+      const t = Math.floor((Date.now() - inicio) / 1000);
+      const objetivo = objetivoRef.current;
+      if (modo === "countdown" && objetivo > 0 && t >= objetivo) {
+        inicioRef.current = null;
+        setTranscurrido(objetivo);
+        setCorriendo(false);
+        delete ACTIVE_CARDIO_TIMERS[timerId];
+        persistActiveCardioTimers();
+        cancelarAvisosCardio(timerId, { dejarAvisoDeFin: true });
+        haptic([100, 50, 100, 50, 200]);
+        alTerminarRef.current?.(objetivo);
+        return;
+      }
+      setTranscurrido(t);
+    };
+    const primero = setTimeout(tick, 0);
+    const id = setInterval(tick, 500);
+    const alVolver = () => { if (document.visibilityState === "visible") tick(); };
+    document.addEventListener("visibilitychange", alVolver);
+    return () => {
+      clearTimeout(primero);
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", alVolver);
+      // Al irte de la pantalla con el cronómetro para arriba andando, su
+      // notificación fija "Cardio en curso" quedaba pegada en la barra para
+      // siempre. La cuenta regresiva no se toca: su aviso tiene que sonar.
+      if (modo === "stopwatch" && Capacitor.isNativePlatform()) {
+        LocalNotifications.cancel({ notifications: [{ id: notifIdForTimer(timerId, 20000) }] }).catch(() => {});
+      }
+    };
+  }, [corriendo, modo, timerId]);
+  const medirAhora = () => (inicioRef.current ? Math.floor((Date.now() - inicioRef.current) / 1000) : transcurrido);
+  const arrancar = () => {
+    if (!timerId) return;
+    const objetivo = objetivoRef.current;
+    if (modo === "countdown" && (!(objetivo > 0) || objetivo <= transcurrido)) return;
+    const inicio = Date.now() - transcurrido * 1000;
+    inicioRef.current = inicio;
+    guardar({ mode: modo, running: true, startedAt: inicio });
+    setCorriendo(true);
+    haptic(15);
+    programarAvisosCardio(timerId, { modo, faltanSeg: modo === "countdown" ? objetivo - transcurrido : 0, nombre });
+  };
+  const pausar = () => {
+    const t = medirAhora();
+    inicioRef.current = null;
+    setTranscurrido(t);
+    setCorriendo(false);
+    guardar(t > 0 ? { mode: modo, running: false, elapsed: t } : null);
+    cancelarAvisosCardio(timerId);
+    haptic(15);
+  };
+  const reiniciar = () => {
+    inicioRef.current = null;
+    setTranscurrido(0);
+    setCorriendo(false);
+    guardar(null);
+    cancelarAvisosCardio(timerId);
+  };
+  const cambiarModo = (m) => {
+    if (m === modo) return;
+    reiniciar();
+    setModo(m);
+  };
+  // El objetivo se movió con el reloj andando (±1 minuto): el aviso de fin
+  // del sistema se reprograma a la hora nueva.
+  const reprogramar = (nuevoObjetivoSeg) => {
+    if (!corriendo || modo !== "countdown") return;
+    const t = medirAhora();
+    if (nuevoObjetivoSeg > t) programarAvisosCardio(timerId, { modo, faltanSeg: nuevoObjetivoSeg - t, nombre });
+  };
+  return { modo, corriendo, transcurrido, arrancar, pausar, reiniciar, cambiarModo, reprogramar };
+}
+
+// Cómo se ve el cronómetro de cardio: el selector de modo, y debajo un
+// reloj grande con sus controles. En cuenta regresiva, con el reloj
+// andando, se puede estirar o acortar el objetivo de a un minuto sin
+// reiniciar (te sentís bien y querés cinco minutos más, o al revés).
+function PanelCronoCardio({ accent, modo, corriendo, transcurrido, objetivoSeg = 0, onCambiarModo, onArrancar, onPausar, onReiniciar, onAjustarObjetivo = null, entradaObjetivo = null }) {
+  const cuenta = modo === "countdown";
+  const empezado = corriendo || transcurrido > 0;
+  const sinObjetivo = cuenta && !(objetivoSeg > 0);
+  const faltan = Math.max(0, objetivoSeg - transcurrido);
+  const fraccion = cuenta && objetivoSeg > 0 ? Math.min(1, transcurrido / objetivoSeg) : 0;
+  const rotulo = corriendo ? (cuenta ? "Te falta" : "Llevás") : empezado ? "En pausa" : cuenta ? (sinObjetivo ? "Elegí cuántos minutos" : "Objetivo") : "Listo para arrancar";
+  const tiempo = cuenta ? (empezado ? faltan : objetivoSeg) : transcurrido;
+  return (
+    <div className="space-y-2.5">
+      <div className="segmentado" role="tablist" aria-label="Modo del cronómetro">
+        {[{ k: "stopwatch", l: "Cronómetro", icono: <Clock size={12} /> }, { k: "countdown", l: "Cuenta regresiva", icono: <Timer size={12} /> }].map((o) => (
+          <button key={o.k} role="tab" aria-selected={modo === o.k} onClick={() => onCambiarModo(o.k)}
+            className={modo === o.k ? "activo" : ""} style={modo === o.k ? { backgroundColor: accent } : undefined}>
+            {o.icono} {o.l}
+          </button>
+        ))}
+      </div>
+      {cuenta && !empezado && entradaObjetivo}
+      <div className="cardio-reloj" style={{ borderColor: tint(accent, empezado ? "40" : "22"), backgroundColor: tint(accent, empezado ? "10" : "06") }}>
+        <div className="flex items-center gap-2">
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] font-black uppercase truncate" style={{ color: corriendo ? tint(accent, "dd") : "var(--text-faint)" }}>{rotulo}</p>
+            <p className="num-display descanso-tiempo" style={{ color: corriendo ? accent : empezado ? "var(--text-muted)" : sinObjetivo ? "var(--text-faint)" : "var(--text-strong)" }}>{relojLargo(tiempo)}</p>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {cuenta && empezado && onAjustarObjetivo && <BotonDescanso onClick={() => onAjustarObjetivo(-60)} label="Un minuto menos de objetivo">−1′</BotonDescanso>}
+            <BotonDescanso principal color={accent} disabled={sinObjetivo} onClick={corriendo ? onPausar : onArrancar} label={corriendo ? "Pausar" : empezado ? "Seguir" : "Arrancar"}>
+              {corriendo ? <Pause size={15} className="fill-current" /> : <Play size={15} className="fill-current ml-0.5" />}
+            </BotonDescanso>
+            {cuenta && empezado && onAjustarObjetivo && <BotonDescanso onClick={() => onAjustarObjetivo(60)} label="Un minuto más de objetivo">+1′</BotonDescanso>}
+            {empezado && !corriendo && <BotonDescanso onClick={onReiniciar} label="Volver a cero"><RotateCcw size={14} /></BotonDescanso>}
+          </div>
+        </div>
+        {cuenta && objetivoSeg > 0 && empezado && (
+          <div className="descanso-barra mt-2.5" aria-hidden="true"><div style={{ transform: `scaleX(${fraccion})`, backgroundColor: accent }} /></div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 // Número que "cuenta" hasta su valor final en vez de aparecer de golpe.
@@ -4719,41 +5287,338 @@ if (typeof window !== "undefined") {
   });
 }
 
-// Aviso de fin de descanso (sonido, vibración y notificación del sistema).
+/* ============================================================================
+   DESCANSOS — un solo lugar que manda
+
+   Antes cada tarjeta tenía su propio cronómetro con su propio estado, y tres
+   lugares más (guardar una serie, el descanso entre ejercicios, la descarga)
+   escribían el registro global cada uno a su manera. De ahí salían los bugs:
+   · El descanso ENTRE ejercicios corría sin notificación del sistema: el
+     cronómetro en vivo y el aviso de fin los programaba sólo el cronómetro
+     de una tarjeta ABIERTA, y ese descanso arranca en la tarjeta del
+     ejercicio siguiente, que casi siempre está cerrada. Con el teléfono
+     bloqueado, no sonaba hasta que abrieras la app.
+   · Pausar un descanso y cerrar la tarjeta perdía la pausa: el tiempo que
+     faltaba vivía en el estado del componente.
+   · No había forma de sumar o restar tiempo, ni de saltear el descanso, sin
+     reiniciarlo.
+   Ahora el registro (ACTIVE_REST_TIMERS, el mismo de siempre y con el mismo
+   formato guardado) se toca SÓLO con las funciones de acá, que además
+   programan los avisos nativos y les avisan a las pantallas que lo miran.
+
+   Cada entrada es { endTime, total, inicio, ejercicio, siguiente, color }
+   mientras corre, o { pausa, total, ... } en pausa (pausa = segundos que
+   faltaban). Un descanso que llegó a cero queda unos segundos con su
+   endTime vencido: es el momento de "¡Volvé a la serie!".
+============================================================================ */
+const OYENTES_DESCANSO = new Set();
+let VERSION_DESCANSOS = 0;
+function avisarCambioDescansos() {
+  VERSION_DESCANSOS++;
+  OYENTES_DESCANSO.forEach((f) => { try { f(); } catch { /* ignorado a propósito */ } });
+}
+function suscribirDescansos(f) { OYENTES_DESCANSO.add(f); return () => { OYENTES_DESCANSO.delete(f); }; }
+function leerVersionDescansos() { return VERSION_DESCANSOS; }
+
+// Cómo avisa el fin (sonido, vibración o las dos). Lo fija el perfil a
+// través de VigilanteDescansos y lo usan los avisos que se programan en el
+// sistema al arrancar cada descanso.
+let ALERTA_DESCANSO = "sound";
+
+// Cronómetros de tarjeta que se están viendo en este momento. El dock de
+// abajo muestra un descanso sólo si su cronómetro NO está en pantalla: el
+// mismo reloj dos veces, uno arriba del otro, es ruido.
+const DESCANSOS_EN_PANTALLA = new Map(); // timerId → cuántos lo muestran
+
+// "2:47" y no "02:47": el cero de adelante no dice nada y le resta tamaño
+// al número que importa.
+function relojCorto(seg) {
+  const s = Math.max(0, Math.round(seg));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+}
+
+// Qué dice el aviso de fin. Entre ejercicios ya no repite el ejercicio que
+// acabás de terminar ("Volvé a Press Banca" cuando lo que sigue es Remo):
+// nombra el que viene.
+function textoFinDeDescanso(v) {
+  const titulo = "🔥 ¡Descanso terminado!";
+  if (v?.siguiente) return { titulo, cuerpo: `Seguí con ${v.siguiente} 💪`, enPantalla: `Seguí con ${v.siguiente}` };
+  if (v?.ejercicio) return { titulo, cuerpo: `Volvé a ${v.ejercicio} 💪`, enPantalla: `Volvé a ${v.ejercicio}` };
+  return { titulo, cuerpo: "Volvé a la serie 💪", enPantalla: "Volvé a la serie" };
+}
+
+// Avisos del sistema para un descanso que corre: el cronómetro en vivo en
+// la barra de notificaciones y el aviso de fin, programado de antemano con
+// la hora exacta para que suene aunque Android tenga la app congelada.
+// Se puede llamar de nuevo (al sumar o restar tiempo): el plugin actualiza
+// la misma notificación y el aviso de fin se reprograma con el mismo id.
+async function programarAvisosDescanso(timerId) {
+  const v = ACTIVE_REST_TIMERS[timerId];
+  if (!v?.endTime) return;
+  const fin = v.endTime;
+  // Entre un await y el siguiente la persona puede haber pausado, salteado
+  // o ajustado el descanso: si cambió, este llamado ya no manda.
+  const sigueIgual = () => ACTIVE_REST_TIMERS[timerId]?.endTime === fin;
+  if (!Capacitor.isNativePlatform()) {
+    // En la web el aviso lo da la propia página (VigilanteDescansos); sólo
+    // se pide permiso, una vez, para la notificación del final.
+    try {
+      if (typeof Notification !== "undefined" && Notification.permission === "default") Notification.requestPermission().catch(() => {});
+    } catch { /* ignorado a propósito */ }
+    return;
+  }
+  const { titulo, cuerpo } = textoFinDeDescanso(v);
+  const nombre = v.siguiente || v.ejercicio || "";
+  // Cronómetro EN VIVO: va primero y en su propio try, así un fallo en otro
+  // paso no lo deja sin mostrarse.
+  try {
+    const segundos = Math.max(1, Math.ceil((fin - Date.now()) / 1000));
+    ACTIVE_REST_TIMERS.__notifOwner = timerId;
+    try {
+      await RestTimerNotification.start({ seconds: segundos, exerciseName: nombre });
+    } catch (pluginErr) {
+      // Build viejo sin el plugin en Java: notificación fija con la hora de
+      // fin, mejor que nada. Si ves este log, hay que recompilar el APK.
+      console.warn("[notif] Plugin nativo NO disponible, usando fallback estático:", pluginErr?.message || pluginErr);
+      if (!sigueIgual()) return;
+      const termina = new Date(fin);
+      const hh = String(termina.getHours()).padStart(2, "0");
+      const mm = String(termina.getMinutes()).padStart(2, "0");
+      await LocalNotifications.schedule({
+        notifications: [{
+          id: 9002,
+          title: "⏱️ Descanso en curso · Modus Fit",
+          body: `La próxima serie arranca a las ${hh}:${mm}`,
+          channelId: "ponos-rest-timer",
+          ongoing: true,
+          autoCancel: false,
+          smallIcon: "ic_stat_modusfit",
+        }],
+      });
+    }
+  } catch (err) { console.error("Cronómetro nativo:", err); }
+  // Aviso de FIN con hora exacta. allowWhileIdle atraviesa el modo Doze.
+  // El canal de vibración fuerte lo crea el plugin nativo; acá se crea igual
+  // por si el build es viejo (Android respeta al primero que lo crea).
+  try {
+    if (!sigueIgual()) return;
+    await LocalNotifications.createChannel({ id: "modusfit-rest-done-v1", name: "Fin del descanso", description: "Aviso al terminar el descanso entre series", importance: 5, vibration: true }).catch(() => {});
+    await LocalNotifications.cancel({ notifications: [{ id: notifIdForTimer(timerId, 10000) }] }).catch(() => {});
+    if (!sigueIgual()) return;
+    await LocalNotifications.schedule({
+      notifications: [{
+        id: notifIdForTimer(timerId, 10000),
+        smallIcon: "ic_stat_modusfit",
+        iconColor: "#14B8A6",
+        title: titulo,
+        body: cuerpo,
+        channelId: "modusfit-rest-done-v1",
+        sound: ALERTA_DESCANSO === "vibration" ? undefined : "default",
+        schedule: { at: new Date(fin), allowWhileIdle: true },
+      }],
+    });
+  } catch (e) { console.warn("[notif] No se pudo programar el aviso de fin:", e); }
+  try {
+    const { display } = await LocalNotifications.requestPermissions();
+    if (display === "granted") {
+      await LocalNotifications.createChannel({ id: "ponos-rest-timer", name: "Descanso entre series", importance: 5, vibration: true });
+    }
+  } catch { /* ignorado a propósito */ }
+}
+
+// Al pausar, saltear o terminar: fuera el cronómetro de la barra y el aviso
+// de fin que ya estaba programado (si no, sonaría a la hora original).
+function cancelarAvisosDescanso(timerId) {
+  if (!Capacitor.isNativePlatform()) return;
+  try {
+    LocalNotifications.cancel({ notifications: [{ id: notifIdForTimer(timerId, 10000) }, { id: 9002 }] }).catch(() => {});
+    // Sólo se baja el cronómetro en vivo si es de ESTE descanso: si otro lo
+    // tomó después, no se le pisa.
+    if (ACTIVE_REST_TIMERS.__notifOwner === timerId) {
+      RestTimerNotification.stop().catch(() => {});
+      delete ACTIVE_REST_TIMERS.__notifOwner;
+    }
+  } catch { /* ignorado a propósito */ }
+}
+
+function iniciarDescanso(timerId, { segundos, ejercicio = null, siguiente = null, color = null } = {}) {
+  const s = Math.round(Number(segundos) || 0);
+  if (!timerId || s <= 0) return;
+  const ahora = Date.now();
+  ACTIVE_REST_TIMERS[timerId] = { endTime: ahora + s * 1000, total: s, inicio: ahora, ejercicio: ejercicio || null, siguiente: siguiente || null, color: color || null };
+  AVISOS_DISPARADOS.delete(timerId);
+  persistActiveRestTimers();
+  avisarCambioDescansos();
+  programarAvisosDescanso(timerId);
+}
+
+function terminarDescanso(timerId) {
+  if (!timerId || !ACTIVE_REST_TIMERS[timerId]) return;
+  delete ACTIVE_REST_TIMERS[timerId];
+  persistActiveRestTimers();
+  cancelarAvisosDescanso(timerId);
+  avisarCambioDescansos();
+}
+
+function pausarDescanso(timerId) {
+  const v = ACTIVE_REST_TIMERS[timerId];
+  const ahora = Date.now();
+  if (!v?.endTime || v.endTime <= ahora) return; // ya terminó: no hay qué pausar
+  const siguienteEntrada = { ...v, pausa: Math.max(1, Math.ceil((v.endTime - ahora) / 1000)) };
+  delete siguienteEntrada.endTime;
+  ACTIVE_REST_TIMERS[timerId] = siguienteEntrada;
+  persistActiveRestTimers();
+  cancelarAvisosDescanso(timerId);
+  avisarCambioDescansos();
+}
+
+function reanudarDescanso(timerId) {
+  const v = ACTIVE_REST_TIMERS[timerId];
+  if (!v || v.pausa == null) return;
+  const siguienteEntrada = { ...v, endTime: Date.now() + v.pausa * 1000 };
+  delete siguienteEntrada.pausa;
+  ACTIVE_REST_TIMERS[timerId] = siguienteEntrada;
+  AVISOS_DISPARADOS.delete(timerId);
+  persistActiveRestTimers();
+  avisarCambioDescansos();
+  programarAvisosDescanso(timerId);
+}
+
+// Sumar o restar tiempo sin reiniciar. Nunca baja de 5 segundos: restarle
+// al descanso hasta dejarlo en cero es "saltearlo", y para eso está su
+// propio botón.
+function ajustarDescanso(timerId, deltaSeg) {
+  const v = ACTIVE_REST_TIMERS[timerId];
+  if (!v) return;
+  if (v.pausa != null) {
+    const pausa = Math.max(5, v.pausa + deltaSeg);
+    ACTIVE_REST_TIMERS[timerId] = { ...v, pausa, total: Math.max(pausa, (v.total || 0) + deltaSeg) };
+  } else if (v.endTime) {
+    const ahora = Date.now();
+    if (v.endTime <= ahora) return; // terminó: para seguir descansando se arranca otro
+    const fin = Math.max(ahora + 5000, v.endTime + deltaSeg * 1000);
+    ACTIVE_REST_TIMERS[timerId] = { ...v, endTime: fin, total: Math.max(Math.ceil((fin - ahora) / 1000), (v.total || 0) + deltaSeg) };
+  } else {
+    return;
+  }
+  persistActiveRestTimers();
+  avisarCambioDescansos();
+  if (ACTIVE_REST_TIMERS[timerId]?.endTime) programarAvisosDescanso(timerId);
+}
+
+// Foto del descanso para dibujarlo. fraccion = lo que falta sobre el total
+// (1 recién arrancado, 0 terminado), para la barra que se vacía.
+function estadoDescanso(v) {
+  if (!v) return { estado: "idle", restante: 0, total: 0, fraccion: 0 };
+  if (v.pausa != null) {
+    const total = Math.max(v.total || 0, v.pausa);
+    return { estado: "paused", restante: v.pausa, total, fraccion: total ? v.pausa / total : 1 };
+  }
+  if (!v.endTime) return { estado: "idle", restante: 0, total: 0, fraccion: 0 };
+  const msFalta = v.endTime - Date.now();
+  if (msFalta <= 0) return { estado: "done", restante: 0, total: v.total || 0, fraccion: 0 };
+  const total = Math.max(v.total || 0, Math.ceil(msFalta / 1000));
+  return { estado: "running", restante: Math.ceil(msFalta / 1000), total, fraccion: Math.min(1, msFalta / (total * 1000)) };
+}
+
+// Hook: el estado de UN descanso, al cuarto de segundo mientras corre (la
+// barra avanza suave) y quieto el resto del tiempo.
+function useRelojDescanso(timerId) {
+  useSyncExternalStore(suscribirDescansos, leerVersionDescansos, leerVersionDescansos);
+  const v = timerId ? ACTIVE_REST_TIMERS[timerId] : null;
+  const corriendo = !!v?.endTime;
+  const [, setPulso] = useState(0);
+  useEffect(() => {
+    if (!corriendo) return;
+    const latir = () => setPulso((n) => n + 1);
+    const id = setInterval(latir, 250);
+    // Al volver de otra app el intervalo pudo haber estado frenado: se
+    // redibuja enseguida con la hora real, no al próximo cuarto de segundo.
+    document.addEventListener("visibilitychange", latir);
+    return () => { clearInterval(id); document.removeEventListener("visibilitychange", latir); };
+  }, [corriendo]);
+  return { ...estadoDescanso(v), datos: v || null };
+}
+
+// El descanso que corresponde mostrar en el dock: el último que arrancó de
+// los que no tienen su cronómetro a la vista.
+function descansoParaElDock() {
+  let elegido = null, inicioElegido = -1;
+  Object.entries(ACTIVE_REST_TIMERS).forEach(([tid, v]) => {
+    if (tid.startsWith("__") || !v || (v.endTime == null && v.pausa == null)) return;
+    if ((DESCANSOS_EN_PANTALLA.get(tid) || 0) > 0) return;
+    const inicio = v.inicio || (v.endTime ? v.endTime - (v.total || 0) * 1000 : 0);
+    if (inicio > inicioElegido) { elegido = tid; inicioElegido = inicio; }
+  });
+  return elegido;
+}
+
+// Marca si un cronómetro de tarjeta está a la vista, para que el dock no lo
+// repita. El margen de abajo descuenta el dock y la barra de pestañas: un
+// reloj tapado por ellos no se está viendo.
+function useDescansoALaVista(ref, timerId) {
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || !timerId || typeof IntersectionObserver === "undefined") return;
+    let visible = false;
+    const marcar = (si) => {
+      if (si === visible) return;
+      visible = si;
+      const n = (DESCANSOS_EN_PANTALLA.get(timerId) || 0) + (si ? 1 : -1);
+      if (n > 0) DESCANSOS_EN_PANTALLA.set(timerId, n); else DESCANSOS_EN_PANTALLA.delete(timerId);
+      avisarCambioDescansos();
+    };
+    const io = new IntersectionObserver(([e]) => marcar(e.isIntersecting), { rootMargin: "-56px 0px -170px 0px" });
+    io.observe(el);
+    return () => { io.disconnect(); marcar(false); };
+  }, [ref, timerId]);
+}
+
+// Aviso de fin de descanso (sonido, vibración y notificación).
 //
-// Vive a nivel de módulo y no adentro de RestTimer porque el dueño del
-// cronómetro puede no estar montado cuando llega a cero: el descanso ENTRE
-// ejercicios arranca el reloj del ejercicio SIGUIENTE, cuya tarjeta
-// normalmente está cerrada, así que no había ningún componente vivo que
-// disparara el aviso — el cronómetro corría y simplemente nunca sonaba.
-// Ese era el "a veces falla el cronómetro entre ejercicios".
-// El Set evita que suene dos veces si el componente y el vigilante global
-// (ver VigilanteDescansos) llegan al cero casi juntos.
+// Vive a nivel de módulo y no adentro del cronómetro porque el dueño del
+// descanso puede no estar montado cuando llega a cero (el de entre
+// ejercicios es de la tarjeta SIGUIENTE, casi siempre cerrada). Lo dispara
+// VigilanteDescansos, que corre siempre. El Set evita que suene dos veces.
 const AVISOS_DISPARADOS = new Set();
-async function avisarFinDeDescanso(timerId, { alertType = "sound", exerciseName = "" } = {}) {
+async function avisarFinDeDescanso(timerId, { alertType = "sound" } = {}) {
   if (AVISOS_DISPARADOS.has(timerId)) return;
   AVISOS_DISPARADOS.add(timerId);
-  // Se limpia para que el PRÓXIMO descanso de ese mismo ejercicio pueda
-  // volver a avisar.
+  // Se limpia para que el PRÓXIMO descanso de ese mismo reloj pueda avisar.
   setTimeout(() => AVISOS_DISPARADOS.delete(timerId), 5000);
-  // Se MARCA en vez de borrarse: la pantalla completa sigue mostrando unos
-  // segundos más el momento de "¡dale!" leyendo esta misma entrada, y
-  // borrarla acá la hacía desaparecer justo en el único instante que
-  // importá. El vigilante la limpia después.
-  if (ACTIVE_REST_TIMERS[timerId]) {
-    ACTIVE_REST_TIMERS[timerId].avisado = true;
+  const v = ACTIVE_REST_TIMERS[timerId];
+  // Si la app vuelve de segundo plano y el descanso terminó hace rato, el
+  // sistema ya avisó con la notificación programada: sonar de nuevo sería
+  // un aviso doble y atrasado.
+  const atrasado = !!v?.endTime && Date.now() - v.endTime > 2500;
+  // Se MARCA en vez de borrarse: la tarjeta y el dock muestran unos
+  // segundos el "¡Volvé a la serie!" leyendo esta misma entrada. El
+  // vigilante la limpia después.
+  if (v) {
+    v.avisado = true;
     persistActiveRestTimers();
+    avisarCambioDescansos();
   }
+  const nativo = Capacitor.isNativePlatform();
+  try {
+    if (nativo) {
+      LocalNotifications.cancel({ notifications: [{ id: 9002 }] }).catch(() => {});
+      if (ACTIVE_REST_TIMERS.__notifOwner === timerId) {
+        RestTimerNotification.stop().catch(() => {});
+        delete ACTIVE_REST_TIMERS.__notifOwner;
+      }
+    }
+  } catch { /* ignorado a propósito */ }
+  if (atrasado) return;
   if (alertType !== "vibration") {
     try {
       const a = obtenerAudioContext();
       if (!a) throw new Error("sin audio");
       // Por si iOS lo suspendió mientras la app estaba en segundo plano.
       if (a.state === "suspended") a.resume().catch(() => {});
-      // Arpegio ascendente tipo "campanita" (Do-Mi-Sol de la 5ª octava): tres
-      // notas cortas que suben, con ataque rápido y caída suave. Más agradable
-      // que el doble beep plano y se distingue mejor del ruido del gimnasio.
-      // El envelope con rampas evita el "click" de cortar la onda de golpe.
+      // Arpegio ascendente tipo "campanita" (Do-Mi-Sol): tres notas cortas
+      // que suben, con ataque rápido y caída suave. Se distingue mejor del
+      // ruido del gimnasio que un beep plano, y las rampas evitan el click.
       [523.25, 659.25, 783.99].forEach((freq, k) => {
         const t0 = a.currentTime + k * 0.13;
         const o = a.createOscillator(), g = a.createGain();
@@ -4766,49 +5631,19 @@ async function avisarFinDeDescanso(timerId, { alertType = "sound", exerciseName 
         o.start(t0);
         o.stop(t0 + 0.34);
       });
-      // No se cierra: el contexto es único y se reusa toda la sesión (ver
-      // obtenerAudioContext). Cerrarlo obligaría a crear otro en el próximo
-      // descanso, y ese otro volvería a nacer suspendido.
+      // No se cierra: el contexto es único y se reusa (ver
+      // obtenerAudioContext). Cerrarlo haría nacer suspendido al próximo.
     } catch { /* ignorado a propósito */ }
   }
   if (alertType !== "sound") haptic([400, 150, 400, 150, 500, 150, 400]);
-  // Notificación del sistema al terminar el descanso — rework: antes decía
-  // siempre lo mismo ("Es hora de la próxima serie"), sin importar en qué
-  // ejercicio estabas. Ahora nombra el ejercicio (si lo sabemos) y usa el
-  // mismo teal de marca (iconColor) que ya tiene la notificación nativa en
-  // curso, para que ambas se sientan parte de la misma app.
-  const doneTitle = "🔥 ¡Descanso terminado!";
-  const doneBody = exerciseName ? `Volvé a ${exerciseName} 💪` : "Volvé a la serie 💪";
+  // En el celular la notificación del sistema ya está programada desde que
+  // arrancó el descanso, con la hora exacta: repetirla acá la hacía sonar
+  // dos veces. En la web, sólo si la pestaña no está a la vista — con la
+  // app en pantalla, el aviso ya está en la pantalla.
   try {
-    if (Capacitor.isNativePlatform()) {
-      // LocalNotifications en Android: aparece como notificación real del sistema,
-      // incluso con la pantalla apagada o la app en segundo plano.
-      await LocalNotifications.cancel({ notifications: [{ id: 9002 }] }).catch(() => {});
-      // Solo apagar la notif nativa si ESTE timer sigue siendo el dueño —
-      // si otro cronómetro la tomó, no se la pisamos.
-      if (ACTIVE_REST_TIMERS.__notifOwner === timerId) {
-        await RestTimerNotification.stop().catch(() => {});
-        delete ACTIVE_REST_TIMERS.__notifOwner;
-      }
-      await LocalNotifications.schedule({
-        notifications: [{
-          id: notifIdForTimer(timerId, 10000),
-          smallIcon: "ic_stat_modusfit",
-          iconColor: "#14B8A6",
-          title: doneTitle,
-          body: doneBody,
-          channelId: "modusfit-rest-done-v1",
-          sound: alertType === "vibration" ? undefined : "default",
-          schedule: { at: new Date(Date.now() + 100) },
-        }],
-      });
-    } else if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-      new Notification(doneTitle, {
-        body: doneBody,
-        silent: alertType === "vibration",
-        tag: "rest-timer",
-        renotify: true,
-      });
+    if (!nativo && typeof Notification !== "undefined" && Notification.permission === "granted" && document.visibilityState === "hidden") {
+      const { titulo, cuerpo } = textoFinDeDescanso(v);
+      new Notification(titulo, { body: cuerpo, silent: alertType === "vibration", tag: "rest-timer", renotify: true });
     }
   } catch { /* ignorado a propósito */ }
 }
@@ -4816,23 +5651,32 @@ async function avisarFinDeDescanso(timerId, { alertType = "sound", exerciseName 
 // Vigilante de descansos: el único que garantiza que un descanso avise.
 //
 // El cronómetro de una tarjeta sólo existe mientras esa tarjeta está
-// abierta, y el descanso ENTRE ejercicios arranca el reloj del ejercicio
-// SIGUIENTE, que casi siempre está cerrado: ahí no había nadie vivo para
-// darse cuenta de que llegó a cero, y el aviso simplemente no sonaba.
-// Esto corre siempre, mire la pantalla que mire, y de paso limpia las
-// entradas viejas del registro.
+// abierta. Esto corre siempre, mire la pantalla que mire: dispara el aviso
+// al llegar a cero y limpia las entradas viejas del registro.
 function VigilanteDescansos({ alertType = "sound" }) {
+  useEffect(() => { ALERTA_DESCANSO = alertType; }, [alertType]);
   useEffect(() => {
     const id = setInterval(() => {
       const ahora = Date.now();
+      let cambio = false;
       Object.entries(ACTIVE_REST_TIMERS).forEach(([tid, v]) => {
-        if (tid.startsWith("__") || !v || !v.endTime || v.endTime > ahora) return;
-        if (!v.avisado) { avisarFinDeDescanso(tid, { alertType, exerciseName: v.ejercicio || "" }); return; }
-        if (v.endTime <= ahora - 6000) { delete ACTIVE_REST_TIMERS[tid]; persistActiveRestTimers(); }
+        if (tid.startsWith("__") || !v) return;
+        // Una pausa olvidada no puede quedar para siempre en el dock.
+        if (v.pausa != null) {
+          if (v.inicio && ahora - v.inicio > 3 * 3600 * 1000) { delete ACTIVE_REST_TIMERS[tid]; cambio = true; }
+          return;
+        }
+        if (!v.endTime || v.endTime > ahora) return;
+        // Terminó hace rato (la app estaba cerrada): el aviso ya lo dio el
+        // sistema. Se limpia sin sonar.
+        if (ahora - v.endTime > 120000) { delete ACTIVE_REST_TIMERS[tid]; cambio = true; return; }
+        if (!v.avisado) { avisarFinDeDescanso(tid, { alertType: ALERTA_DESCANSO }); return; }
+        if (v.endTime <= ahora - 6000) { delete ACTIVE_REST_TIMERS[tid]; cambio = true; }
       });
+      if (cambio) { persistActiveRestTimers(); avisarCambioDescansos(); }
     }, 500);
     return () => clearInterval(id);
-  }, [alertType]);
+  }, []);
   return null;
 }
 
@@ -4840,10 +5684,9 @@ function VigilanteDescansos({ alertType = "sound" }) {
 //
 // Pedido: "que cuando finalizas la sesión ya no sigan corriendo los
 // cronómetros de la app ni los de las notificaciones". Antes terminar la
-// sesión no tocaba ningún reloj: el descanso que tenías en curso seguía
-// contando, la notificación persistente quedaba en la barra, y el aviso de
-// "descanso terminado" sonaba minutos después, con la app cerrada y el
-// entrenamiento ya guardado.
+// sesión no tocaba ningún reloj: el descanso en curso seguía contando, la
+// notificación persistente quedaba en la barra y el aviso de fin sonaba
+// minutos después, con el entrenamiento ya guardado.
 function detenerCronometrosDeSesion() {
   const ids = [];
   Object.keys(ACTIVE_REST_TIMERS).forEach((k) => {
@@ -4857,6 +5700,7 @@ function detenerCronometrosDeSesion() {
   persistActiveRestTimers();
   persistActiveCardioTimers();
   AVISOS_DISPARADOS.clear();
+  avisarCambioDescansos();
   try {
     if (Capacitor.isNativePlatform()) {
       RestTimerNotification.stop().catch(() => {});
@@ -4866,261 +5710,167 @@ function detenerCronometrosDeSesion() {
   } catch { /* ignorado a propósito */ }
 }
 
-// Descanso en curso visto desde una tarjeta CERRADA.
-//
-// Reporte: "a veces falla el cronómetro entre ejercicios". No fallaba el
-// reloj: fallaba que no se veía. Ese descanso arranca el cronómetro del
-// ejercicio SIGUIENTE, y ese cronómetro sólo existe mientras su tarjeta está
-// abierta — con la tarjeta cerrada (que es lo normal) no había nada en
-// pantalla y parecía que no había arrancado. Ahora la cabecera lo muestra.
-// No duplica nada: cuando la tarjeta está abierta manda el cronómetro
-// grande de adentro y este chip no se dibuja.
+// Descanso en curso visto desde una tarjeta CERRADA: la cabecera lo muestra.
+// Con la tarjeta abierta manda el cronómetro grande de adentro y este chip
+// no se dibuja.
 function ChipDescansoEnCurso({ timerId, color }) {
-  const [restante, setRestante] = useState(0);
-  useEffect(() => {
-    if (!timerId) return;
-    const mirar = () => {
-      const v = ACTIVE_REST_TIMERS[timerId];
-      setRestante(v?.endTime ? Math.max(0, Math.ceil((v.endTime - Date.now()) / 1000)) : 0);
-    };
-    const primera = setTimeout(mirar, 0);
-    const id = setInterval(mirar, 500);
-    return () => { clearTimeout(primera); clearInterval(id); };
-  }, [timerId]);
-  if (restante <= 0) return null;
-  const mm = Math.floor(restante / 60), ss = restante % 60;
+  const { estado, restante } = useRelojDescanso(timerId);
+  if (estado !== "running" && estado !== "paused") return null;
   return (
-    <span className="text-[10px] rounded-lg px-1.5 py-0.5 font-black tabular-nums flex items-center gap-1" style={{ backgroundColor: tint(color, "1f"), color }}>
-      <Timer size={9} /> {mm}:{String(ss).padStart(2, "0")}
+    <span className="text-[10.5px] rounded-lg px-1.5 py-0.5 font-bold tabular-nums flex items-center gap-1" style={{ backgroundColor: tint(color, "1f"), color }}>
+      {estado === "paused" ? <Pause size={9} /> : <Timer size={9} />} {relojCorto(restante)}
     </span>
   );
 }
 
-function RestTimer({ seconds, accent, alertType = "sound", timerId = "default", exerciseName = "" }) {
-  const persisted = ACTIVE_REST_TIMERS[timerId];
-  const stillRunning = persisted && persisted.endTime > Date.now();
-  const [remaining, setRemaining] = useState(stillRunning ? Math.ceil((persisted.endTime - Date.now()) / 1000) : seconds);
-  const [running, setRunning] = useState(!!stillRunning);
-  const endTimeRef = useRef(stillRunning ? persisted.endTime : null);
-  const intervalRef = useRef();
-  const firedRef = useRef(false);
-  const resetTimerRef = useRef(null); // devuelve el reloj a los minutos originales al terminar
-  useEffect(() => () => { if (resetTimerRef.current) clearTimeout(resetTimerRef.current); }, []);
-  useEffect(() => {
-    // Si hay un descanso en curso persistido para este timer, retomarlo;
-    // si no, resetear normalmente cuando cambian los segundos base.
-    const p = ACTIVE_REST_TIMERS[timerId];
-    if (p && p.endTime > Date.now()) {
-      endTimeRef.current = p.endTime;
-      setRemaining(Math.ceil((p.endTime - Date.now()) / 1000));
-      setRunning(true);
-    } else {
-      delete ACTIVE_REST_TIMERS[timerId];
-      persistActiveRestTimers();
-      setRemaining(seconds); setRunning(false); endTimeRef.current = null; firedRef.current = false;
-    }
-  }, [seconds, timerId]);
-
-  const fireAlert = () => {
-    if (firedRef.current) return;
-    firedRef.current = true;
-    avisarFinDeDescanso(timerId, { alertType, exerciseName });
-  };
-
-  const recompute = () => {
-    if (!endTimeRef.current) return;
-    const left = Math.max(0, Math.round((endTimeRef.current - Date.now()) / 1000));
-    setRemaining(left);
-    if (left <= 0) {
-      setRunning(false);
-      fireAlert();
-      endTimeRef.current = null;
-      // Volver al tiempo original: antes quedaba clavado en 0:00 y había que
-      // tocarlo. Esperamos a que se vea el aviso "¡Volvé a la serie!" de abajo
-      // (ver render) antes de resetear.
-      if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
-      resetTimerRef.current = setTimeout(() => { setRemaining(seconds); resetTimerRef.current = null; }, 1800);
-    }
-  };
-
-  useEffect(() => {
-    if (running) {
-      if (!endTimeRef.current) { endTimeRef.current = Date.now() + remaining * 1000; firedRef.current = false; }
-      // Persistir en el registro global (y en localStorage) — si el
-      // componente se desmonta (cambio de pestaña) o la app se cierra del
-      // todo, al volver retoma desde acá.
-      // Se conserva lo que ya hubiera guardado junto al descanso (de qué
-      // ejercicio es, cuánto dura, qué serie viene después): pisarlo con un
-      // objeto nuevo dejaba a la pantalla completa sin nada que contar.
-      ACTIVE_REST_TIMERS[timerId] = { ...(ACTIVE_REST_TIMERS[timerId] || {}), endTime: endTimeRef.current, total: ACTIVE_REST_TIMERS[timerId]?.total || seconds, ejercicio: ACTIVE_REST_TIMERS[timerId]?.ejercicio || exerciseName || null, color: ACTIVE_REST_TIMERS[timerId]?.color || accent };
-      persistActiveRestTimers();
-      (async () => {
-        // Cronómetro EN VIVO en la barra de notificaciones: va PRIMERO y en
-        // su propio try — antes estaba encadenado detrás del pedido de
-        // permisos de LocalNotifications, y si cualquier paso previo
-        // fallaba, el catch silencioso se tragaba todo y el plugin nativo
-        // nunca llegaba a ejecutarse.
-        try {
-          if (Capacitor.isNativePlatform()) {
-            const secsLeft = Math.max(1, Math.ceil((endTimeRef.current - Date.now()) / 1000));
-            ACTIVE_REST_TIMERS.__notifOwner = timerId; // este timer es dueño de la notif ahora
-            try {
-              await RestTimerNotification.start({ seconds: secsLeft, exerciseName: exerciseName || "" });
-            } catch (pluginErr) {
-              // Plugin no disponible (build viejo sin el Java) — fallback:
-              // notificación estática con la hora de fin, mejor que nada.
-              // Si ves este log, la app instalada NO tiene el RestTimerPlugin
-              // compilado adentro: hay que recompilar el .aab/APK e instalar.
-              console.warn("[notif] Plugin nativo NO disponible, usando fallback estático:", pluginErr?.message || pluginErr);
-              const endsAt = new Date(endTimeRef.current);
-              const hh = String(endsAt.getHours()).padStart(2, "0");
-              const mm = String(endsAt.getMinutes()).padStart(2, "0");
-              await LocalNotifications.schedule({
-                notifications: [{
-                  id: 9002,
-                  title: "⏱️ Descanso en curso · Modus Fit",
-                  body: `La próxima serie arranca a las ${hh}:${mm}`,
-                  channelId: "ponos-rest-timer",
-                  ongoing: true,
-                  autoCancel: false,
-                  smallIcon: "ic_stat_modusfit",
-                }],
-              });
-            }
-          }
-        } catch (err) { console.error("Cronómetro nativo:", err); }
-        // LA NOTIFICACIÓN DE FIN, PROGRAMADA DESDE EL INICIO con hora
-        // exacta: la dispara EL SISTEMA aunque la app esté congelada en
-        // segundo plano. Antes se creaba recién cuando el JS detectaba el
-        // fin — y si estabas scrolleando Instagram, Android congela el JS
-        // de la WebView: ni vibración ni aviso hasta reabrir la app. Con
-        // allowWhileIdle atraviesa también el modo Doze. Usa el canal
-        // "modusfit-rest-done-v1" (vibración fuerte tipo alarma, creado
-        // con patrón custom desde el plugin nativo; acá se crea igual por
-        // si el build nativo es viejo — Android usa el primero que llegue).
-        try {
-          if (Capacitor.isNativePlatform()) {
-            await LocalNotifications.createChannel({ id: "modusfit-rest-done-v1", name: "Fin del descanso", description: "Aviso al terminar el descanso entre series", importance: 5, vibration: true }).catch(() => {});
-            await LocalNotifications.schedule({
-              notifications: [{
-                id: notifIdForTimer(timerId, 10000),
-                smallIcon: "ic_stat_modusfit",
-                iconColor: "#14B8A6",
-                title: "🔥 ¡Descanso terminado!",
-                body: exerciseName ? `Volvé a ${exerciseName} 💪` : "Volvé a la serie 💪",
-                channelId: "modusfit-rest-done-v1",
-                sound: alertType === "vibration" ? undefined : "default",
-                schedule: { at: new Date(endTimeRef.current), allowWhileIdle: true },
-              }],
-            });
-          }
-        } catch (e) { console.warn("[notif] No se pudo programar el aviso de fin:", e); }
-        // Permisos + canal para la notificación FINAL de "descanso terminado"
-        try {
-          if (Capacitor.isNativePlatform()) {
-            const { display } = await LocalNotifications.requestPermissions();
-            if (display === "granted") {
-              await LocalNotifications.createChannel({ id: "ponos-rest-timer", name: "Descanso entre series", importance: 5, vibration: true });
-            }
-          } else if (typeof Notification !== "undefined" && Notification.permission === "default") {
-            Notification.requestPermission().catch(() => {});
-          }
-        } catch { /* ignorado a propósito */ }
-      })();
-      intervalRef.current = setInterval(recompute, 500);
-      const onVisible = () => { if (document.visibilityState === "visible") recompute(); };
-      document.addEventListener("visibilitychange", onVisible);
-      return () => { clearInterval(intervalRef.current); document.removeEventListener("visibilitychange", onVisible); };
-    }
-    endTimeRef.current = null;
-    delete ACTIVE_REST_TIMERS[timerId];
-    persistActiveRestTimers();
-    // Cancelar la notificación persistente Y el aviso de fin programado
-    // si el timer se pausa/resetea — si no, el aviso sonaría igual a la
-    // hora original aunque hayas frenado el descanso.
-    try {
-      if (Capacitor.isNativePlatform()) {
-        LocalNotifications.cancel({ notifications: [{ id: notifIdForTimer(timerId, 10000) }, { id: 9002 }] }).catch(() => {});
-        if (ACTIVE_REST_TIMERS.__notifOwner === timerId) {
-          RestTimerNotification.stop().catch(() => {});
-          delete ACTIVE_REST_TIMERS.__notifOwner;
-        }
-      }
-    } catch { /* ignorado a propósito */ }
-    // eslint-disable-next-line
-  }, [running]);
-
-  // Guarda contra división por cero: si un ejercicio quedara configurado con
-  // 0 segundos de descanso, (remaining/0)*100 da NaN y la barra desaparece.
-  const pct = seconds > 0 ? Math.max(0, Math.min(100, (remaining / seconds) * 100)) : 0;
-  // Cronómetro estilo "barra de energía": el tiempo grande a la izquierda y
-  // una barra que se vacía ocupando todo el ancho. En los últimos 10 segundos
-  // se tiñe de ámbar y late; al terminar se pone verde. Sin adornos ni
-  // círculos: se lee de un vistazo desde lejos, que es lo que importa cuando
-  // estás por volver a la serie.
-  const urgent = running && remaining <= 10 && remaining > 0;
-  const done = remaining === 0;
-  const barColor = done ? "#10B981" : urgent ? "#F59E0B" : accent;
-  // REWORK: antes, al llegar a cero, el cartel se ponía verde pero el fondo
-  // de la tarjeta quedaba igual que en reposo (running ya es false acá) —
-  // pasaba casi desapercibido si no estabas mirando justo el numerito. Ahora
-  // "done" también prende el fondo/borde en verde y, por un par de segundos,
-  // reemplaza el número por un aviso claro con el nombre del ejercicio — así
-  // avisa en pantalla lo mismo que la notificación, sin depender de que la
-  // hayas visto.
-  const highlighted = running || done;
+// Botón chico de los controles del descanso (−15, +15, saltear).
+function BotonDescanso({ onClick, label, children, principal = false, color, disabled = false }) {
   return (
-    <div className={`relative rounded-2xl overflow-hidden px-3.5 py-2.5 transition-colors duration-300 ${done ? "rest-done-flash" : ""}`} style={{
-      backgroundColor: highlighted ? tint(barColor, "0e") : "var(--timer-idle-bg)",
-      border: `1px solid ${highlighted ? tint(barColor, "30") : "var(--timer-idle-border)"}`,
-    }}>
-      {done ? (
-        <div className="flex items-center gap-2.5 bounce-in">
-          <span className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 badge-pop" style={{ backgroundColor: tint(barColor, "22"), color: barColor }}>
-            <Check size={17} />
-          </span>
-          <span className="text-sm font-black flex-1 min-w-0 truncate" style={{ color: barColor }}>
-            {exerciseName ? `¡Volvé a ${exerciseName}! 💪` : "¡Volvé a la serie! 💪"}
-          </span>
-        </div>
-      ) : (
-        <div className="flex items-center gap-2.5">
-          {/* Tiempo protagonista */}
-          <span
-            key={urgent ? `t${remaining}` : "t"}
-            className={`text-2xl font-black tabular-nums shrink-0 transition-colors ${urgent ? "tick-beat" : ""}`}
-            style={{ color: running ? barColor : "#94a3b8", textShadow: urgent ? `0 0 16px ${tint(barColor, "70")}` : "none" }}
-          >
-            {formatTime(remaining)}
-          </span>
+    <button
+      onClick={() => { if (disabled) return; haptic(10); onClick(); }}
+      aria-label={label}
+      aria-disabled={disabled || undefined}
+      title={label}
+      className={`descanso-boton ${principal ? "descanso-boton-principal" : ""} ${disabled ? "opacity-40" : ""}`}
+      style={principal ? { backgroundColor: color } : undefined}
+    >
+      {children}
+    </button>
+  );
+}
 
-          {/* Solo la barra que se vacía — sin palabras ni tiempo repetido. */}
-          <div className="flex-1 min-w-0 flex items-center">
-            <div className="w-full h-2 rounded-full overflow-hidden bg-slate-800/70">
-              <div
-                className="h-full rounded-full"
-                style={{
-                  width: `${pct}%`,
-                  background: `linear-gradient(90deg, ${tint(barColor, "90")}, ${barColor})`,
-                  boxShadow: running ? `0 0 8px ${tint(barColor, "80")}` : "none",
-                  transition: "width 0.95s linear, background 0.3s",
-                }}
-              />
-            </div>
-          </div>
+// Cronómetro de descanso de una tarjeta (o de una superserie). Es sólo una
+// vista del registro: arrancarlo, pausarlo o ajustarlo pasa por las
+// funciones de arriba, así que el dock, el chip de la cabecera y la
+// notificación del sistema se enteran solos.
+//   · Quieto: una fila baja con la duración y "Iniciar".
+//   · Corriendo: el tiempo grande, la barra que se vacía y los controles —
+//     −15 / pausa / +15 / saltear. En los últimos 10 segundos se pone ámbar
+//     y late a cada segundo.
+//   · Al llegar a cero: verde, con a qué volver ("Volvé a Press banca").
+function RestTimer({ seconds, accent, timerId = "default", exerciseName = "" }) {
+  const raizRef = useRef(null);
+  useDescansoALaVista(raizRef, timerId);
+  const { estado, restante, fraccion, datos } = useRelojDescanso(timerId);
+  const urgente = estado === "running" && restante <= 10;
+  const color = estado === "done" ? "#10B981" : urgente ? "#F59E0B" : accent;
 
-          {/* Controles */}
-          <div className="flex gap-1.5 shrink-0">
-            <button onClick={() => { haptic(15); setRunning((r) => !r); }} aria-label={running ? "Pausar" : "Iniciar"} className="w-9 h-9 rounded-xl flex items-center justify-center active:scale-90 transition" style={running ? { background: `linear-gradient(160deg, ${accent}, ${tint(accent, "b0")})`, color: "#fff" } : { backgroundColor: tint(accent, "1e"), color: accent, border: `1px solid ${tint(accent, "40")}` }}>
-              {running ? <Pause size={15} /> : <Play size={15} className="ml-0.5" />}
-            </button>
-            <button onClick={() => { setRunning(false); setRemaining(seconds); endTimeRef.current = null; firedRef.current = false; }} aria-label="Reiniciar" className="w-9 h-9 rounded-xl flex items-center justify-center active:scale-90 transition text-slate-500 hover:text-slate-300 bg-slate-800/50 border border-slate-700/50">
-              <RotateCcw size={13} />
-            </button>
-          </div>
+  if (estado === "done") {
+    const { enPantalla } = textoFinDeDescanso(datos);
+    return (
+      <div ref={raizRef} className="descanso descanso-listo rest-done-flash" role="status" aria-live="polite" style={{ backgroundColor: tint(color, "14"), borderColor: tint(color, "45") }}>
+        <span className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 badge-pop" style={{ backgroundColor: tint(color, "26"), color }}>
+          <Check size={17} />
+        </span>
+        <span className="text-sm font-black flex-1 min-w-0 truncate" style={{ color }}>¡{enPantalla}! 💪</span>
+        <button onClick={() => terminarDescanso(timerId)} aria-label="Cerrar el aviso" className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-slate-500 hover:text-slate-300 transition"><X size={15} /></button>
+      </div>
+    );
+  }
+
+  if (estado === "idle") {
+    return (
+      <div ref={raizRef} className="descanso descanso-quieto">
+        <Timer size={15} className="shrink-0 text-slate-500" />
+        <span className="text-[12px] font-semibold text-slate-400">Descanso</span>
+        <span className="num-display text-lg font-bold text-slate-300 leading-none">{relojCorto(seconds)}</span>
+        <button
+          onClick={() => { haptic(15); iniciarDescanso(timerId, { segundos: seconds, ejercicio: exerciseName || null, color: accent }); }}
+          className="ml-auto flex items-center gap-1.5 h-9 pl-3 pr-3.5 rounded-xl text-[12px] font-bold transition active:scale-95 shrink-0"
+          style={{ backgroundColor: tint(accent, "1e"), color: accent, border: `1px solid ${tint(accent, "40")}` }}
+        >
+          <Play size={13} className="fill-current" /> Iniciar
+        </button>
+      </div>
+    );
+  }
+
+  const enPausa = estado === "paused";
+  const rotulo = enPausa ? "En pausa" : datos?.siguiente ? "Antes de empezar" : "Descansando";
+  return (
+    <div ref={raizRef} className="descanso descanso-activo" style={{ backgroundColor: tint(color, "0f"), borderColor: tint(color, "38") }}>
+      <div className="flex items-center gap-2 w-full min-w-0">
+        <div className="flex-1 min-w-0">
+          <p className="text-[10px] font-black uppercase truncate" style={{ color: enPausa ? "var(--text-faint)" : tint(color, "dd") }}>{rotulo}</p>
+          <p key={urgente ? `t${restante}` : "t"} className={`num-display descanso-tiempo ${urgente ? "tick-beat" : ""}`} style={{ color: enPausa ? "var(--text-muted)" : color }}>
+            {relojCorto(restante)}
+          </p>
         </div>
-      )}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <BotonDescanso onClick={() => ajustarDescanso(timerId, -15)} label="Restar 15 segundos">−15</BotonDescanso>
+          <BotonDescanso principal color={color} onClick={() => (enPausa ? reanudarDescanso(timerId) : pausarDescanso(timerId))} label={enPausa ? "Seguir el descanso" : "Pausar el descanso"}>
+            {enPausa ? <Play size={15} className="fill-current ml-0.5" /> : <Pause size={15} className="fill-current" />}
+          </BotonDescanso>
+          <BotonDescanso onClick={() => ajustarDescanso(timerId, 15)} label="Sumar 15 segundos">+15</BotonDescanso>
+          <BotonDescanso onClick={() => terminarDescanso(timerId)} label="Terminar el descanso"><SkipForward size={15} /></BotonDescanso>
+        </div>
+      </div>
+      <div className="descanso-barra" aria-hidden="true">
+        <div style={{ transform: `scaleX(${fraccion})`, backgroundColor: color }} />
+      </div>
     </div>
+  );
+}
+
+// El descanso en curso, en el dock de abajo, cuando su cronómetro no está en
+// pantalla: con todas las tarjetas cerradas, desde otra pestaña o después
+// de scrollear. Era la mitad que faltaba del descanso entre ejercicios:
+// arrancaba bien, pero en una tarjeta cerrada sólo se veía como un chip.
+function DescansoEnDock({ embebido = false }) {
+  useSyncExternalStore(suscribirDescansos, leerVersionDescansos, leerVersionDescansos);
+  const timerId = descansoParaElDock();
+  if (!timerId) return null;
+  return <FilaDescansoDock key={timerId} timerId={timerId} embebido={embebido} />;
+}
+// embebido: va adentro de la tarjeta de la sesión (una sola pieza, con una
+// línea que las separa) en vez de ser una tarjeta propia apilada encima.
+function FilaDescansoDock({ timerId, embebido = false }) {
+  const { estado, restante, fraccion, datos } = useRelojDescanso(timerId);
+  if (estado === "idle") return null;
+  const urgente = estado === "running" && restante <= 10;
+  const base = datos?.color || "#14B8A6";
+  const color = estado === "done" ? "#10B981" : urgente ? "#F59E0B" : base;
+  const enPausa = estado === "paused";
+  const nombre = datos?.siguiente || datos?.ejercicio || "";
+  const envolver = (contenido) => (embebido
+    ? <div className="dock-descanso dock-descanso-embebido relative" role={estado === "done" ? "status" : undefined} aria-live={estado === "done" ? "polite" : undefined}>{contenido}</div>
+    : <div className="dock-tarjeta dock-descanso session-bar-in" role={estado === "done" ? "status" : undefined} aria-live={estado === "done" ? "polite" : undefined} style={{ borderColor: tint(color, "50") }}>{contenido}</div>);
+  if (estado === "done") {
+    const { enPantalla } = textoFinDeDescanso(datos);
+    return envolver(
+      <div className="flex items-center gap-3 px-3.5 py-3">
+        <span className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 badge-pop" style={{ backgroundColor: tint(color, "26"), color }}><Check size={16} /></span>
+        <span className="flex-1 min-w-0 truncate text-[13px] font-black" style={{ color }}>¡{enPantalla}! 💪</span>
+        <button onClick={() => terminarDescanso(timerId)} aria-label="Cerrar el aviso" className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-slate-500 hover:text-slate-300 transition"><X size={15} /></button>
+      </div>,
+    );
+  }
+  // Dos renglones: arriba qué descanso es (con el nombre entero, que en un
+  // solo renglón con los controles se cortaba a "Press Ban…"), abajo el
+  // reloj y los controles.
+  return envolver(
+    <>
+      <div className="pl-3.5 pr-2 pt-2.5 pb-2.5">
+        <p className="text-[10.5px] font-black uppercase truncate pr-1.5" style={{ color: enPausa ? "var(--text-faint)" : tint(color, "dd") }}>
+          {enPausa ? "Descanso en pausa" : datos?.siguiente ? "Sigue" : "Descanso"}
+          {nombre && <span className="normal-case font-semibold" style={{ fontFamily: "var(--font-sans)", letterSpacing: 0 }}> · {nombre}</span>}
+        </p>
+        <div className="flex items-center gap-2 mt-1">
+          <p key={urgente ? `t${restante}` : "t"} className={`flex-1 min-w-0 num-display text-[1.9rem] leading-none font-extrabold ${urgente ? "tick-beat" : ""}`} style={{ color: enPausa ? "var(--text-muted)" : color }}>{relojCorto(restante)}</p>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <BotonDescanso onClick={() => ajustarDescanso(timerId, -15)} label="Restar 15 segundos">−15</BotonDescanso>
+            <BotonDescanso principal color={color} onClick={() => (enPausa ? reanudarDescanso(timerId) : pausarDescanso(timerId))} label={enPausa ? "Seguir el descanso" : "Pausar el descanso"}>
+              {enPausa ? <Play size={15} className="fill-current ml-0.5" /> : <Pause size={15} className="fill-current" />}
+            </BotonDescanso>
+            <BotonDescanso onClick={() => ajustarDescanso(timerId, 15)} label="Sumar 15 segundos">+15</BotonDescanso>
+            <BotonDescanso onClick={() => terminarDescanso(timerId)} label="Terminar el descanso"><SkipForward size={15} /></BotonDescanso>
+          </div>
+        </div>
+      </div>
+      <div className="descanso-barra descanso-barra-dock" aria-hidden="true">
+        <div style={{ transform: `scaleX(${fraccion})`, backgroundColor: color }} />
+      </div>
+    </>,
   );
 }
 
@@ -5335,7 +6085,7 @@ function SessionSummaryModal({ resumen, onClose }) {
             <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-black"
               style={resumen.vsUltima.pct >= 0
                 ? { backgroundColor: "rgba(16,185,129,0.14)", color: "#34d399", border: "1px solid rgba(16,185,129,0.3)" }
-                : { backgroundColor: "rgba(148,163,184,0.12)", color: "#94a3b8", border: "1px solid rgba(148,163,184,0.25)" }}>
+                : { backgroundColor: "rgba(157,162,168,0.12)", color: "#9da2a8", border: "1px solid rgba(157,162,168,0.25)" }}>
               {resumen.vsUltima.pct >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
               {resumen.vsUltima.pct >= 0 ? "+" : ""}{resumen.vsUltima.pct}% que tu último {resumen.vsUltima.dia}
             </span>
@@ -5455,7 +6205,7 @@ function DonutMusculos({ datos, size = 108, unidad = "SERIES" }) {
   }, []);
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="shrink-0">
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(148,163,184,0.12)" strokeWidth="12" />
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(157,162,168,0.12)" strokeWidth="12" />
       {arcos.map((d, i) => {
         const { largo, offset } = d;
         return (
@@ -5472,7 +6222,7 @@ function DonutMusculos({ datos, size = 108, unidad = "SERIES" }) {
       })}
       {/* El total se abrevia si es grande: en kg de volumen son cinco digitos y no entran en el agujero de la dona. */}
       <text x="50%" y="47%" textAnchor="middle" className="fill-white" style={{ fontSize: total >= 10000 ? 16 : 19, fontWeight: 900 }}>{total >= 1000 ? (total / 1000).toFixed(1) + "k" : total}</text>
-      <text x="50%" y="63%" textAnchor="middle" style={{ fontSize: 8.5, fill: "#64748b", fontWeight: 700 }}>{unidad}</text>
+      <text x="50%" y="63%" textAnchor="middle" style={{ fontSize: 8.5, fill: "#6e7379", fontWeight: 700 }}>{unidad}</text>
     </svg>
   );
 }
@@ -5497,7 +6247,7 @@ function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null, 
   // se vuelve ilegible.
   const musculos = data.musculos || [];
   const donaDatos = musculos.length > 6
-    ? [...musculos.slice(0, 5), { nombre: "Otros", series: musculos.slice(5).reduce((a, m) => a + m.series, 0), color: "#475569" }]
+    ? [...musculos.slice(0, 5), { nombre: "Otros", series: musculos.slice(5).reduce((a, m) => a + m.series, 0), color: "#50555a" }]
     : musculos;
   const filaDato = { backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" };
   return (
@@ -5521,7 +6271,7 @@ function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null, 
             <span className="relative inline-flex items-center gap-1 mt-2.5 px-2.5 py-1 rounded-lg text-[11px] font-black"
               style={data.vsAnterior >= 0
                 ? { backgroundColor: "rgba(16,185,129,0.14)", color: "#34d399", border: "1px solid rgba(16,185,129,0.3)" }
-                : { backgroundColor: "rgba(148,163,184,0.12)", color: "#94a3b8", border: "1px solid rgba(148,163,184,0.25)" }}>
+                : { backgroundColor: "rgba(157,162,168,0.12)", color: "#9da2a8", border: "1px solid rgba(157,162,168,0.25)" }}>
               {data.vsAnterior >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
               {data.vsAnterior >= 0 ? "+" : ""}{data.vsAnterior}% de volumen que {periodo === "anio" ? "el año pasado" : "el mes pasado"}
             </span>
@@ -5553,11 +6303,11 @@ function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null, 
                   <div className="w-full rounded-md grow-bar-up" title={`${Math.round(kgToDisplay(t.valor, unit))} ${weightLabel(unit)}`}
                     style={{
                       height: `${t.valor > 0 ? Math.max(8, (t.valor / maxTramo) * 100) : 3}%`,
-                      backgroundColor: t.valor === 0 ? "rgba(148,163,184,0.16)" : i === mejorTramo ? est.color : tint(est.color, "66"),
+                      backgroundColor: t.valor === 0 ? "rgba(157,162,168,0.16)" : i === mejorTramo ? est.color : tint(est.color, "66"),
                       boxShadow: i === mejorTramo ? `0 0 12px ${tint(est.color, "80")}` : "none",
                       animationDelay: `${i * 45}ms`,
                     }} />
-                  <span className="text-[8px] font-bold shrink-0" style={{ color: i === mejorTramo ? est.color : "#475569" }}>{t.etiqueta}</span>
+                  <span className="text-[8px] font-bold shrink-0" style={{ color: i === mejorTramo ? est.color : "#50555a" }}>{t.etiqueta}</span>
                 </div>
               ))}
             </div>
@@ -5775,7 +6525,7 @@ function HelpModal({ startTab, onClose }) {
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap transition-all shrink-0"
                   style={actual
                     ? { backgroundColor: tint(c.color, "20"), color: c.color, border: `1px solid ${tint(c.color, "40")}` }
-                    : { color: "#64748b", border: "1px solid transparent" }}
+                    : { color: "#6e7379", border: "1px solid transparent" }}
                 >
                   {c.icon} {c.label}
                 </button>
@@ -5909,7 +6659,7 @@ function describePlannedOutcome(target, hecho, isRecord, unit) {
   return { type: "down", msg: `Te faltó para la meta (${target.reps}×${kgToDisplay(target.kg, unit)}${weightLabel(unit)})` };
 }
 
-function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, accent, logs, setLogs, drafts = {}, setDrafts, autoShowPrShare = true, onDisableAutoShowPrShare, hasActiveSession = true, cardio = false, dumbbellDouble = null, fieldSettings = DEFAULT_SETTINGS, onUpdateSettings = null, sex = null, age = null, restTimerId = null, restSeconds = null, isLastSet = false, weekInCycle = null, nextRestTimerId = null, nextRestSeconds = null }) {
+function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, accent, logs, setLogs, drafts = {}, setDrafts, autoShowPrShare = true, onDisableAutoShowPrShare, hasActiveSession = true, cardio = false, dumbbellDouble = null, fieldSettings = DEFAULT_SETTINGS, onUpdateSettings = null, sex = null, age = null, restTimerId = null, restSeconds = null, isLastSet = false, weekInCycle = null, nextRestTimerId = null, nextRestSeconds = null, nextExerciseName = null }) {
   // Modo "rutina planificada" (ver DEFAULT_SETTINGS.trainingMode): si hay
   // una meta cargada para ESTA semana, se muestra "Marca a alcanzar" en
   // vez de "Récord" — pensado para quien sigue un plan con cargas ya
@@ -6093,148 +6843,25 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   };
   const [editingPR, setEditingPR] = useState(false);
   const [rowFocus, setRowFocus] = useState(false); // enciende el borde al enfocar
-  const cardioFinishedRef = useRef(false); // el countdown llegó a 0 solo (no pausa manual)
   const [editReps, setEditReps] = useState(""); const [editKg, setEditKg] = useState(""); const [saved, setSaved] = useState(false);
   const [prBurst, setPrBurst] = useState(0);
   const [showPRShare, setShowPRShare] = useState(false);
   const [rankUpInfo, setRankUpInfo] = useState(null); // { from, to, muscleName }
   const saveBtnRef = useRef(null);
-  // Cronómetro regresivo para cardio — cuenta desde los minutos ingresados
-  // hasta 0 y marca la serie como hecha automáticamente al llegar a 0.
-  // Timer de cardio — dos modos:
-  // "stopwatch": cuenta para ARRIBA (arrancás cuando empezás, parás cuando terminás)
-  // "countdown": cuenta para ABAJO desde los minutos ingresados (objetivo)
-  // BUG FIX: el cronómetro arrancaba siempre de cero, aunque hubiera uno
-  // corriendo o pausado guardado de antes de cerrar la app (ver
-  // ACTIVE_CARDIO_TIMERS / initCardioTimerState más arriba).
+  // Cronómetro de cardio (ver useCronoCardio): mide SIEMPRE el tiempo real,
+  // así pausar, seguir y guardar antes de terminar hacen lo que dicen.
   const cardioTimerId = `cardio_${exerciseId}_${setIndex}`;
-  const [cardioInit] = useState(() => initCardioTimerState(cardioTimerId));
-  const [cardioMode, setCardioMode] = useState(cardioInit.mode); // "stopwatch" | "countdown"
-  const [cardioRunning, setCardioRunning] = useState(cardioInit.running);
-  const [cardioElapsed, setCardioElapsed] = useState(cardioInit.elapsed); // segundos transcurridos (stopwatch)
-  const [cardioLeft, setCardioLeft] = useState(0);       // segundos restantes (countdown)
-  const cardioIntervalRef = useRef(null);
-  // Reinicio explícito (cambiar de modo, tocar "↺", borrar los minutos):
-  // limpia también lo persistido, para que no quede un tiempo viejo dando
-  // vueltas si cerrás la app justo después de reiniciar el cronómetro.
-  const clearPersistedCardioTimer = () => { delete ACTIVE_CARDIO_TIMERS[cardioTimerId]; persistActiveCardioTimers(); };
-  // NOTIFICACIÓN NATIVA DEL CARDIO — misma función que el reloj de descanso:
-  // · Cuenta regresiva: cronómetro vivo en la barra (plugin nativo) + aviso
-  //   de fin PROGRAMADO con hora exacta (canal de vibración fuerte), que el
-  //   sistema dispara aunque la app esté congelada en segundo plano.
-  // · Cronómetro ascendente: notificación persistente "Cardio en curso".
-  // Al pausar a mano se limpia todo; si el countdown termina solo, el aviso
-  // programado NO se cancela (cardioFinishedRef) — así siempre suena.
-  useEffect(() => {
-    if (!cardio) return;
-    // BUG FIX: mismo problema que en RestTimer — un id fijo (9003) hacía que
-    // dos cronómetros de cardio corriendo a la vez (dos ejercicios de cardio
-    // en el mismo día) se pisaran la alarma de fin entre sí.
-    const cardioNotifId = notifIdForTimer(cardioTimerId, 20000);
-    if (cardioRunning) {
-      cardioFinishedRef.current = false;
-      (async () => {
-        try {
-          if (!Capacitor.isNativePlatform()) return;
-          if (cardioMode === "countdown") {
-            const targetLeft = Math.max(1, Math.round((parseFloat(minutes) * 60 || 0) - cardioElapsed));
-            ACTIVE_REST_TIMERS.__notifOwner = `cardio_${exerciseId}`;
-            await RestTimerNotification.start({ seconds: targetLeft, exerciseName: exerciseName || "Cardio" }).catch(() => {});
-            await LocalNotifications.createChannel({ id: "modusfit-rest-done-v1", name: "Fin del descanso", description: "Aviso al terminar", importance: 5, vibration: true }).catch(() => {});
-            await LocalNotifications.schedule({
-              notifications: [{
-                id: cardioNotifId, smallIcon: "ic_stat_modusfit",
-                title: "🏁 ¡Cardio completado!", body: `${exerciseName || "Sesión"}: llegaste al objetivo 💪`,
-                channelId: "modusfit-rest-done-v1", sound: "default",
-                schedule: { at: new Date(Date.now() + targetLeft * 1000), allowWhileIdle: true },
-              }],
-            });
-          } else {
-            await LocalNotifications.schedule({
-              notifications: [{
-                id: cardioNotifId, smallIcon: "ic_stat_modusfit",
-                title: "⏱️ Cardio en curso", body: `${exerciseName || "Sesión"} · tocá para volver`,
-                channelId: "ponos-rest-timer", ongoing: true, autoCancel: false,
-                schedule: { at: new Date(Date.now() + 300) },
-              }],
-            });
-          }
-        } catch (e) { console.warn("[notif] cardio:", e); }
-      })();
-    } else {
-      try {
-        if (Capacitor.isNativePlatform()) {
-          // Pausa manual: limpiar todo. Fin natural: dejar vivo el aviso
-          // programado (suena a su hora exacta) y solo bajar el cronómetro.
-          if (!cardioFinishedRef.current) LocalNotifications.cancel({ notifications: [{ id: cardioNotifId }] }).catch(() => {});
-          if (ACTIVE_REST_TIMERS.__notifOwner === `cardio_${exerciseId}`) {
-            RestTimerNotification.stop().catch(() => {});
-            delete ACTIVE_REST_TIMERS.__notifOwner;
-          }
-        }
-      } catch { /* ignorado a propósito */ }
-      cardioFinishedRef.current = false;
-    }
-    // Cleanup al desmontar: si te vas de la pantalla con el CRONÓMETRO
-    // ascendente corriendo, su notificación "Cardio en curso" (ongoing) se
-    // quedaba pegada en la barra para siempre. La cuenta regresiva NO se
-    // cancela acá: su aviso de fin debe sonar a la hora exacta aunque salgas.
-    return () => {
-      if (!Capacitor.isNativePlatform()) return;
-      if (cardioMode === "stopwatch" && cardioRunning) {
-        LocalNotifications.cancel({ notifications: [{ id: notifIdForTimer(cardioTimerId, 20000) }] }).catch(() => {});
-      }
-    };
-    // eslint-disable-next-line
-  }, [cardioRunning, cardioMode]);
-
-  useEffect(() => {
-    // BUG FIX: sin este chequeo, esta rama corría para CUALQUIER serie
-    // (fuerza incluida, no sólo cardio) y escribía una entrada vacía
-    // ({running:false, elapsed:0}) en ACTIVE_CARDIO_TIMERS por cada serie de
-    // cada ejercicio de la rutina — basura acumulándose en localStorage sin
-    // que nada la usara, ya que las series de fuerza nunca muestran este
-    // cronómetro.
-    if (!cardio) return;
-    if (!cardioRunning) {
-      clearInterval(cardioIntervalRef.current);
-      // Al pausar a mano queda guardado el tiempo congelado, para retomarlo
-      // si cerrás la app. El fin NATURAL (cardioFinishedRef) ya se guardó
-      // como serie hecha, así que no tiene sentido dejar nada pendiente acá.
-      if (!cardioFinishedRef.current) {
-        ACTIVE_CARDIO_TIMERS[cardioTimerId] = { mode: cardioMode, running: false, elapsed: cardioElapsed };
-      } else {
-        delete ACTIVE_CARDIO_TIMERS[cardioTimerId];
-      }
-      persistActiveCardioTimers();
-      return;
-    }
-    const startedAt = Date.now() - cardioElapsed * 1000;
-    ACTIVE_CARDIO_TIMERS[cardioTimerId] = { mode: cardioMode, running: true, startedAt };
-    persistActiveCardioTimers();
-    cardioIntervalRef.current = setInterval(() => {
-      const elapsed = Math.floor((Date.now() - startedAt) / 1000);
-      if (cardioMode === "stopwatch") {
-        setCardioElapsed(elapsed);
-      } else {
-        const targetSecs = parseFloat(minutes) * 60 || 0;
-        const left = Math.max(0, targetSecs - elapsed);
-        setCardioLeft(left);
-        if (left === 0) {
-          clearInterval(cardioIntervalRef.current);
-          cardioFinishedRef.current = true; // fin NATURAL: no cancelar el aviso programado
-          setCardioRunning(false);
-          haptic([100, 50, 100, 50, 200]);
-          // Guardar automáticamente
-          setCardioElapsed(elapsed);
-          delete ACTIVE_CARDIO_TIMERS[cardioTimerId];
-          persistActiveCardioTimers();
-          setTimeout(() => saveBtnRef.current?.click(), 300);
-        }
-      }
-    }, 500);
-    return () => clearInterval(cardioIntervalRef.current);
-  }, [cardioRunning, cardioMode]);
+  const cardioObjetivoSeg = Math.round((parseFloat(minutes) || 0) * 60);
+  const {
+    modo: cardioMode, corriendo: cardioRunning, transcurrido: cardioElapsed,
+    arrancar: arrancarCardio, pausar: pausarCardio, reiniciar: reiniciarCardio,
+    cambiarModo: cambiarModoCardio, reprogramar: reprogramarCardio,
+  } = useCronoCardio(cardio ? cardioTimerId : null, {
+    objetivoSeg: cardioObjetivoSeg,
+    nombre: exerciseName,
+    // Al llegar a cero sola, la cuenta regresiva guarda la serie (como antes).
+    alTerminar: () => setTimeout(() => saveBtnRef.current?.click(), 300),
+  });
   // Si "Cronómetro automático" está activo, al guardar arranca solo el
   // descanso de ESTE ejercicio — escribimos directo en ACTIVE_REST_TIMERS
   // (el mismo registro global que ya usa RestTimer para sobrevivir a
@@ -6257,27 +6884,20 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     // viejo y el de entre ejercicios — y sonaba el equivocado en medio del
     // ejercicio siguiente. Parte de "a veces falla el cronómetro entre
     // ejercicios".
-    if (restTimerId && ACTIVE_REST_TIMERS[restTimerId]) {
-      delete ACTIVE_REST_TIMERS[restTimerId];
-      persistActiveRestTimers();
-    }
-    // Junto al descanso se guarda de qué ejercicio es. RestTimer sólo mira
-    // endTime y lo ignora; lo usa VigilanteDescansos para que la
-    // notificación diga "Volvé a Press Banca" cuando la tarjeta dueña del
-    // cronómetro ni siquiera está montada.
+    if (restTimerId) terminarDescanso(restTimerId);
+    // Todo pasa por iniciarDescanso: además de guardar el descanso, programa
+    // la notificación del sistema (antes sólo lo hacía el cronómetro de una
+    // tarjeta abierta) y avisa al dock de abajo.
     if (fieldSettings.autoStartRestTimer === true && restTimerId && restSeconds && !isLastSet) {
-      ACTIVE_REST_TIMERS[restTimerId] = { endTime: Date.now() + restSeconds * 1000, ejercicio: exerciseName || null };
-      persistActiveRestTimers();
+      iniciarDescanso(restTimerId, { segundos: restSeconds, ejercicio: exerciseName || null, color: accent });
       return;
     }
-    // Descanso ENTRE ejercicios (opcion, ver settings.restBetweenExercises):
-    // al guardar la ULTIMA serie arranca el cronometro que el ejercicio
-    // SIGUIENTE ya tiene arriba de su tarjeta, en vez de dibujar uno nuevo
-    // entre medio. Esa tarjeta cerrada lo muestra en su cabecera (ver
-    // ChipDescansoEnCurso).
+    // Descanso ENTRE ejercicios (opción, ver settings.restBetweenExercises):
+    // al guardar la ÚLTIMA serie arranca el cronómetro que el ejercicio
+    // SIGUIENTE ya tiene arriba de su tarjeta. Con su nombre: el aviso dice
+    // "Seguí con Remo", no "Volvé a Press Banca" (el que terminaste).
     if (isLastSet && fieldSettings.restBetweenExercises === true && nextRestTimerId && nextRestSeconds) {
-      ACTIVE_REST_TIMERS[nextRestTimerId] = { endTime: Date.now() + nextRestSeconds * 1000, ejercicio: exerciseName || null };
-      persistActiveRestTimers();
+      iniciarDescanso(nextRestTimerId, { segundos: nextRestSeconds, ejercicio: exerciseName || null, siguiente: nextExerciseName || null, color: accent });
     }
   };
   const handleSave = () => {
@@ -6449,13 +7069,12 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     setEditingPR(false);
   };
   return (
-    <div className={`relative rounded-xl last:mb-0 ${compact ? "px-2.5 py-2 mb-1.5" : "px-3.5 py-3.5 mb-2.5"}`} style={{ backgroundColor: tint(accent, "0a"), border: `1px solid ${tint(accent, "25")}` }}>
+    <div className={`serie relative ${compact ? "py-2" : "py-3.5"}`} style={{ "--c": accent }}>
       <PRBurst anchorRef={saveBtnRef} trigger={prBurst} />
-      <div className="absolute left-0 top-2 bottom-2 w-1 rounded-full" style={{ backgroundColor: accent }} />
       <div className="flex items-center justify-between gap-2 mb-2.5 flex-wrap">
         <div className="flex items-center gap-2 flex-wrap min-w-0">
-          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 shrink-0">{cardio ? "SESIÓN" : `S${setIndex + 1}`}</span>
-          {!cardio && <span className="text-[10px] bg-slate-800/80 text-slate-500 rounded-lg px-2 py-0.5 shrink-0">{setDef.repRange} reps</span>}
+          <span className="serie-rotulo shrink-0">{cardio ? "Sesión" : `Serie ${setIndex + 1}`}</span>
+          {!cardio && <span className="text-[11.5px] font-medium text-slate-500 shrink-0 tabular-nums">{setDef.repRange} reps</span>}
           {!cardio && isHeavyRepRange(setDef.repRange) && <span className="text-[10px] bg-amber-500/15 text-amber-400 rounded-lg px-2 py-0.5 font-bold shrink-0">FUERZA</span>}
           {!cardio && setDef.type === "dropset" && <span className="text-[10px] bg-orange-500/15 text-orange-400 rounded-lg px-2 py-0.5 font-bold shrink-0">DROP-SET</span>}
           {!cardio && setDef.type === "restpause" && <span className="text-[10px] bg-rose-500/15 text-rose-400 rounded-lg px-2 py-0.5 font-bold shrink-0">REST-PAUSE</span>}
@@ -6467,7 +7086,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           </span>
         )}
       </div>
-      {feedback?.suggestUp && <div className="mb-2.5 -mt-1 text-[11px] text-teal-400 flex items-center gap-1.5"><TrendingUp size={11} /> Superaste el rango · probá +2.5kg la próxima</div>}
+      {feedback?.suggestUp && <div className="mb-2.5 -mt-1 text-[11px] text-teal-400 flex items-center gap-1.5"><TrendingUp size={11} /> Superaste el rango · probá +{pasoKg}{weightLabel(unit)} la próxima</div>}
       {feedback?.noSession && <div className="mb-2.5 -mt-1 text-[11px] text-amber-400 flex items-center gap-1.5"><AlertTriangle size={11} /> Tocá "Iniciar sesión" arriba para que este día cuente en tu historial</div>}
 
       {/* El récord (o, en modo "planificado", la meta de esta semana) va
@@ -6496,7 +7115,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
             </span>
           )}
           {fieldSettings.showLastSession === true && lastSession && (
-            <span className="flex items-center gap-1 min-w-0 truncate px-1.5 py-0.5 rounded-md" style={{ backgroundColor: "rgba(148,163,184,0.10)" }}>
+            <span className="flex items-center gap-1 min-w-0 truncate px-1.5 py-0.5 rounded-md" style={{ backgroundColor: "rgba(157,162,168,0.10)" }}>
               <History size={9} className="shrink-0 text-slate-600" />
               <span className="text-[9px] font-black uppercase tracking-wider text-slate-600">Ant</span>
               <span className="text-[10px] font-black tabular-nums text-slate-400">{lastSession.reps}×{kgToDisplay(lastSession.kg, unit)}{weightLabel(unit)}</span>
@@ -6506,13 +7125,12 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
       )}
       <div className={`flex items-center gap-2 ${compact ? "hidden" : "mb-3"}`}>
         {(currentPR || isPlannedMode) ? (
-          <div className="relative overflow-hidden flex items-center gap-2.5 pl-3.5 pr-2 py-[16px] rounded-xl flex-1" style={{ background: `linear-gradient(120deg, ${tint(accent, "20")}, ${tint(accent, "0c")})`, border: `1px solid ${tint(accent, "45")}` }}>
-            <div className="absolute -top-5 -left-5 w-16 h-16 rounded-full blur-2xl pointer-events-none opacity-30" style={{ backgroundColor: accent }} />
+          <div className="relative overflow-hidden flex items-center gap-2.5 pl-3.5 pr-2 py-3 rounded-xl flex-1" style={{ backgroundColor: tint(accent, "12"), border: `1px solid ${tint(accent, "36")}` }}>
             {/* Libreta = una carga decidida de antemano (a mano o por tu
                 entrenador); copa = tu propia mejor marca. El blanco (Target)
                 que se usaba antes para lo planificado no distinguía bien de
                 "objetivo a superar", que es justo lo contrario. */}
-            {isPlannedMode ? <ClipboardCheck size={15} style={{ color: accent }} className="shrink-0 relative" /> : <Trophy size={15} style={{ color: accent }} className="shrink-0 soft-pulse relative" />}
+            {isPlannedMode ? <ClipboardCheck size={16} style={{ color: accent }} className="shrink-0 relative" /> : <Trophy size={16} style={{ color: accent }} className="shrink-0 relative" />}
             <div className="flex-1 min-w-0 relative leading-none">
               {/* Sin rótulo: el ícono de la izquierda ya dice cuál de los dos
                   es (libreta = planificado, copa = récord). El alto de la
@@ -6523,7 +7141,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
                 {override?.manual && !isPlannedMode && (
                   <span className="block text-[8.5px] font-black uppercase tracking-[0.16em] mb-1" style={{ color: tint(accent, "aa") }}>Editado</span>
                 )}
-                <span className="text-xl font-black tabular-nums" style={{ color: accent, textShadow: `0 0 16px ${tint(accent, "50")}` }}>
+                <span className="num-display text-[1.7rem] leading-none font-extrabold" style={{ color: accent }}>
                   {isPlannedMode
                     ? (cardio ? <>{plannedTarget.minutes} min</> : <>{plannedTarget.reps}<span className="opacity-50 text-sm mx-0.5">×</span>{kgToDisplay(plannedTarget.kg, unit)}<span className="opacity-60 text-xs ml-0.5">{weightLabel(unit)}</span></>)
                     : (cardio ? <>{currentPR.minutes} min{currentPR.km ? ` · ${currentPR.km}km` : ""}</> : <>{currentPR.reps}<span className="opacity-50 text-sm mx-0.5">×</span>{kgToDisplay(currentPR.kg, unit)}<span className="opacity-60 text-xs ml-0.5">{weightLabel(unit)}</span></>)}
@@ -6566,9 +7184,9 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
             )}
           </div>
         ) : (
-          <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl flex-1 bg-slate-800/40 border border-slate-700/40">
-            <Target size={15} className="text-slate-600 shrink-0" />
-            <p className="text-xs text-slate-500">Sin marca aún: esta va a ser tu primera</p>
+          <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-xl flex-1" style={{ backgroundColor: "var(--panel-sunken)", border: "1px dashed var(--hairline)" }}>
+            <Target size={16} className="text-slate-500 shrink-0" />
+            <p className="text-[12.5px] text-slate-400">Sin marca aún: esta va a ser tu primera</p>
           </div>
         )}
       </div>
@@ -6633,85 +7251,58 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           }
           // Pedido: "cambiar sistema de cardio, que sea más sencillo" →
           // aclarado después: mantener los dos modos y todos los controles,
-          // sólo prolijizar. Antes el selector, el timer y el km+guardar
-          // eran 3 bloques sueltos flotando uno debajo del otro — ahora
-          // viven adentro de UN solo panel con borde/tinte propio, para que
-          // se lea como una sola tarjeta de carga en vez de piezas
-          // separadas. El input de "Minutos objetivo" también pasa a tener
-          // el mismo tamaño que el de Km (antes era más grande sin motivo,
-          // el único par de inputs del mismo tipo que no hacía juego).
+          // sólo prolijizar. El reloj y sus controles viven en
+          // PanelCronoCardio (el mismo que usa la descarga); abajo, lo que se
+          // anota y el botón de guardar.
+          const cardioManual = cardioMode === "stopwatch" && !cardioRunning && cardioElapsed === 0;
+          const filaSoloGuardar = !cardioManual && fieldSettings.showKm === false;
           return (
-            <div className="space-y-2.5 rounded-2xl border p-3" style={{ borderColor: tint(accent, "20"), backgroundColor: tint(accent, "05") }}>
-              {/* Selector de modo */}
-              <div className="flex bg-black/40 rounded-xl p-1 border border-slate-700/50">
-                <button onClick={() => { setCardioMode("stopwatch"); setCardioRunning(false); setCardioElapsed(0); clearPersistedCardioTimer(); }} className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[10px] font-bold transition-all ${cardioMode === "stopwatch" ? "text-white" : "text-slate-500"}`} style={cardioMode === "stopwatch" ? { backgroundColor: accent } : {}}>
-                  <Clock size={11} /> Cronómetro
-                </button>
-                <button onClick={() => { setCardioMode("countdown"); setCardioRunning(false); setCardioElapsed(0); clearPersistedCardioTimer(); }} className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-[10px] font-bold transition-all ${cardioMode === "countdown" ? "text-white" : "text-slate-500"}`} style={cardioMode === "countdown" ? { backgroundColor: accent } : {}}>
-                  <Timer size={11} /> Cuenta regresiva
-                </button>
-              </div>
-
-              {cardioMode === "stopwatch" ? (
-                /* MODO CRONÓMETRO — arrancás, entrenás, parás, se guarda el tiempo */
-                <div className="flex items-center gap-3">
-                  <div className="flex-1 flex flex-col items-center justify-center rounded-xl py-2.5 border" style={{ backgroundColor: tint(accent, "10"), borderColor: tint(accent, "30") }}>
-                    <span className="text-xl font-black tabular-nums" style={{ color: cardioRunning || cardioElapsed > 0 ? accent : "#475569" }}>
-                      {Math.floor(cardioElapsed / 60).toString().padStart(2, "0")}:{(cardioElapsed % 60).toString().padStart(2, "0")}
-                    </span>
-                    <span className="text-[9px] text-slate-600 mt-0.5">{cardioRunning ? "corriendo…" : cardioElapsed > 0 ? "pausado" : "listo"}</span>
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <button onClick={() => setCardioRunning((r) => !r)} className="w-10 h-10 rounded-xl flex items-center justify-center text-white transition active:scale-90" style={{ backgroundColor: accent }}>
-                      {cardioRunning ? <Pause size={16} /> : <Play size={16} />}
-                    </button>
-                    <button onClick={() => { setCardioRunning(false); setCardioElapsed(0); clearPersistedCardioTimer(); }} className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 bg-slate-800 transition active:scale-90">
-                      <RotateCcw size={13} />
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                /* MODO CUENTA REGRESIVA — ingresás el objetivo, cuenta hasta 0 y guarda */
-                <div className="space-y-2">
-                  <div className="flex items-end gap-2">
-                    <div className="flex-1">
-                      <label className="text-[10px] text-slate-600 font-semibold uppercase tracking-wider mb-1.5 block">Minutos objetivo</label>
-                      <input type="number" inputMode="decimal" placeholder="30" value={minutes} onChange={(e) => { updateDraft({ minutes: e.target.value }); setCardioElapsed(0); setCardioRunning(false); clearPersistedCardioTimer(); }} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3 text-lg font-black text-center text-white focus:outline-none focus:border-teal-500/50 transition" />
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <button onClick={() => {
-                        if (!minutes || isNaN(parseFloat(minutes))) return;
-                        if (cardioRunning) { setCardioRunning(false); }
-                        else { setCardioElapsed(0); setCardioLeft(parseFloat(minutes) * 60); setCardioRunning(true); }
-                      }} className="w-10 h-10 rounded-xl flex items-center justify-center text-white transition active:scale-90" style={{ backgroundColor: accent }}>
-                        {cardioRunning ? <Pause size={16} /> : <Play size={16} />}
-                      </button>
-                      <button onClick={() => { setCardioRunning(false); setCardioElapsed(0); setCardioLeft(0); clearPersistedCardioTimer(); }} className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 bg-slate-800 transition active:scale-90">
-                        <RotateCcw size={13} />
-                      </button>
-                    </div>
-                  </div>
-                  {(cardioRunning || cardioElapsed > 0) && (
-                    <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl" style={{ backgroundColor: tint(accent, "12"), border: `1px solid ${tint(accent, "30")}` }}>
-                      <Timer size={14} style={{ color: accent }} className="shrink-0" />
-                      <span className="text-xl font-black tabular-nums" style={{ color: accent }}>
-                        {Math.floor(cardioLeft / 60).toString().padStart(2, "0")}:{(cardioLeft % 60).toString().padStart(2, "0")}
-                      </span>
-                      <span className="text-[9px] text-slate-500 ml-1">{cardioRunning ? "corriendo…" : "pausado"}</span>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Km opcional y botón guardar — pedido: "que km se tenga que
-                  habilitar en Personalizar qué vas a registrar", igual que
-                  el resto de los campos opcionales (arranca apagado). */}
-              <div className="flex items-center gap-2">
-                {fieldSettings.showKm !== false && (
-                  <div className="flex-1"><label className="text-[10px] text-slate-600 font-semibold uppercase tracking-wider mb-1.5 block">Km <span className="text-slate-700 normal-case">(opc.)</span></label><input type="number" inputMode="decimal" placeholder="—" value={km} onChange={(e) => updateDraft({ km: e.target.value })} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-3 text-lg font-black text-center text-white focus:outline-none focus:border-teal-500/50 transition" /></div>
+            <div className="space-y-2.5">
+              <PanelCronoCardio
+                accent={accent}
+                modo={cardioMode}
+                corriendo={cardioRunning}
+                transcurrido={cardioElapsed}
+                objetivoSeg={cardioObjetivoSeg}
+                onCambiarModo={cambiarModoCardio}
+                onArrancar={arrancarCardio}
+                onPausar={pausarCardio}
+                onReiniciar={reiniciarCardio}
+                onAjustarObjetivo={(delta) => {
+                  const nuevo = Math.max(60, cardioObjetivoSeg + delta);
+                  if (nuevo <= cardioElapsed) return;
+                  updateDraft({ minutes: String(Math.round((nuevo / 60) * 10) / 10) });
+                  reprogramarCardio(nuevo);
+                }}
+                entradaObjetivo={(
+                  <label className="flex items-center gap-2.5 rounded-xl pl-3.5 pr-3 py-1.5" style={{ backgroundColor: "var(--panel-sunken)", border: "1px solid var(--hairline)" }}>
+                    <span className="text-[12px] font-semibold text-slate-400 flex-1">Minutos objetivo</span>
+                    <input type="number" inputMode="decimal" placeholder="30" value={minutes} onChange={(e) => updateDraft({ minutes: e.target.value })} className="w-20 bg-transparent text-right num-display text-[1.75rem] font-extrabold text-white focus:outline-none placeholder:text-slate-700" />
+                  </label>
                 )}
-                <button ref={saveBtnRef} onClick={handleSave} className={`p-3.5 rounded-xl transition-all active:scale-90 font-bold !text-white flex items-center justify-center shrink-0 ${fieldSettings.showKm === false ? "flex-1" : ""} ${saved ? "bg-emerald-500" : "hover:opacity-90"}`} style={!saved ? { backgroundColor: accent } : {}}>
-                  {saved ? <Check size={18} /> : <Save size={18} />}
+              />
+
+              {/* Lo que se anota y el botón de guardar. Con el cronómetro sin
+                  usar se pueden tipear los minutos a mano: antes, para anotar
+                  un cardio que hiciste sin el reloj, había que pasar a cuenta
+                  regresiva y escribirlos como si fueran el "objetivo".
+                  Km: pedido "que se tenga que habilitar en Personalizar qué
+                  vas a registrar", igual que el resto de lo opcional. */}
+              <div className="flex items-end gap-2">
+                {cardioManual && (
+                  <div className="flex-1 min-w-0">
+                    <label className="text-[10px] text-slate-500 font-bold uppercase mb-1.5 block truncate">Minutos <span className="text-slate-600 normal-case font-semibold">(sin reloj)</span></label>
+                    <input type="number" inputMode="decimal" placeholder="—" value={minutes} onChange={(e) => updateDraft({ minutes: e.target.value })} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-2.5 num-display text-xl font-extrabold text-center text-white focus:outline-none focus:border-teal-500/50 transition" />
+                  </div>
+                )}
+                {fieldSettings.showKm !== false && (
+                  <div className="flex-1 min-w-0">
+                    <label className="text-[10px] text-slate-500 font-bold uppercase mb-1.5 block">Km <span className="text-slate-600 normal-case font-semibold">(opc.)</span></label>
+                    <input type="number" inputMode="decimal" placeholder="—" value={km} onChange={(e) => updateDraft({ km: e.target.value })} className="w-full bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-2.5 num-display text-xl font-extrabold text-center text-white focus:outline-none focus:border-teal-500/50 transition" />
+                  </div>
+                )}
+                <button ref={saveBtnRef} onClick={handleSave} aria-label="Guardar cardio" className={`h-[50px] px-5 rounded-xl transition-all active:scale-95 font-black text-sm !text-white flex items-center justify-center gap-2 shrink-0 ${filaSoloGuardar ? "flex-1" : ""} ${saved ? "bg-emerald-500" : "hover:opacity-90"}`} style={!saved ? { backgroundColor: accent } : {}}>
+                  {saved ? <Check size={18} /> : <Save size={17} />} {saved ? "Listo" : "Guardar"}
                 </button>
               </div>
             </div>
@@ -6810,7 +7401,9 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
               const repTop = repRangeTop(setDef.repRange);
               const hitTop = !!last && !isNaN(repTop) && last.reps >= repTop;
               const sugReps = conMeta ? plannedTarget.reps : (hitTop ? repTop : last.reps + 1);
-              const sugKg = conMeta ? plannedTarget.kg : (hitTop ? last.kg + 2.5 : last.kg);
+              // El salto es el disco chico de la unidad en uso (2,5 kg o 5 lbs):
+              // en libras, sumar 2,5 kg daba un 5,5 que no existe en ningún gimnasio.
+              const sugKg = conMeta ? plannedTarget.kg : (hitTop ? last.kg + displayToKg(pasoKg, unit) : last.kg);
               return (
                 <button
                   onClick={() => updateDraft({ reps: String(sugReps), kg: String(kgToDisplay(sugKg, unit)) })}
@@ -6839,15 +7432,15 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
                 && (bodyweightNow
                   ? currentPR.kg === 0 && rNum > currentPR.reps
                   : currentPR.kg > 0 && estimate1RM(displayToKg(kNum, unit), rNum) > estimate1RM(currentPR.kg, currentPR.reps));
-              const borderCol = liveBeats ? "#10B981" : rowFocus ? accent : "rgba(30,41,59,0.7)";
+              const borderCol = liveBeats ? "#10B981" : rowFocus ? accent : "var(--hairline)";
               const glow = liveBeats ? "0 0 16px -4px rgba(16,185,129,0.55)" : rowFocus ? `0 0 16px -4px ${tint(accent, "70")}` : "none";
               return (
             <div onFocus={() => setRowFocus(true)} onBlur={() => setRowFocus(false)}
-                 className="flex items-stretch rounded-2xl bg-slate-950/70 overflow-hidden transition-all duration-200"
+                 className="registro flex items-stretch rounded-2xl overflow-hidden transition-all duration-200"
                  style={{ border: `1px solid ${borderCol}`, boxShadow: glow }}>
               <div className={`flex-1 flex flex-col items-center justify-center ${compact ? "py-1" : "py-2.5"}`}>
                 {!compact && <span className="text-[9px] text-slate-600 font-bold uppercase tracking-widest">Reps</span>}
-                <input type="number" inputMode="decimal" placeholder={compact ? "reps" : "—"} value={reps} onChange={(e) => updateDraft({ reps: e.target.value })} className={`w-full bg-transparent font-black text-center text-white focus:outline-none placeholder:text-slate-700 ${compact ? "text-lg placeholder:text-[11px]" : "text-2xl placeholder:text-slate-800"}`} />
+                <input type="number" inputMode="decimal" aria-label="Repeticiones" placeholder={compact ? "reps" : "—"} value={reps} onChange={(e) => updateDraft({ reps: e.target.value })} className={`registro-input w-full bg-transparent text-center text-white focus:outline-none placeholder:text-slate-700 ${compact ? "text-[1.35rem] placeholder:text-[11px]" : "text-[2rem]"}`} />
               </div>
               <div className="flex items-center text-slate-700 text-base font-light select-none">×</div>
               <div className={`flex-1 flex flex-col items-center justify-center relative ${compact ? "py-1" : "py-2.5"}`}>
@@ -6856,10 +7449,10 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
                   style={{ color: tint(accent, "99") }}>
                   {weightLabel(unit)} <span className="text-slate-700">⇄</span>
                 </button>
-                <input type="number" inputMode="decimal" placeholder={compact ? weightLabel(unit) : "—"} value={kg} onChange={(e) => updateDraft({ kg: e.target.value })} className={`w-full bg-transparent font-black text-center text-white focus:outline-none placeholder:text-slate-700 ${compact ? "text-lg placeholder:text-[11px]" : "text-2xl placeholder:text-slate-800"}`} />
+                <input type="number" inputMode="decimal" aria-label={`Peso en ${weightLabel(unit)}`} placeholder={compact ? weightLabel(unit) : "—"} value={kg} onChange={(e) => updateDraft({ kg: e.target.value })} className={`registro-input w-full bg-transparent text-center text-white focus:outline-none placeholder:text-slate-700 ${compact ? "text-[1.35rem] placeholder:text-[11px]" : "text-[2rem]"}`} />
               </div>
-              <button ref={saveBtnRef} onClick={handleSave} aria-label="Guardar serie" className={`flex items-center justify-center transition-all active:scale-95 !text-white ${compact ? "w-12" : "w-14"} ${saved ? "" : "hover:opacity-90"}`} style={saved ? { background: "linear-gradient(160deg, #10B981, #059669)" } : { background: `linear-gradient(160deg, ${accent}, ${tint(accent, "b0")})` }}>
-                {saved ? <Check size={19} /> : <Save size={18} />}
+              <button ref={saveBtnRef} onClick={handleSave} aria-label="Guardar serie" className={`flex items-center justify-center transition-all active:scale-95 !text-white ${compact ? "w-12" : "w-16"} ${saved ? "" : "hover:opacity-90"}`} style={{ backgroundColor: saved ? "#10B981" : accent }}>
+                <Check size={22} strokeWidth={2.6} />
               </button>
             </div>
               );
@@ -6951,7 +7544,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           <div className="mt-2.5 flex items-center gap-1.5 bounce-in bg-slate-900/60 rounded-lg px-2 py-2">
             <span className="text-[10px] text-slate-600 font-semibold w-7 shrink-0">{isRir ? "RIR" : "RPE"}</span>
             {RPE_SCALE.map((rs) => (
-              <button key={rs.value} onClick={() => updateDraft({ rpe: rpe === rs.value ? null : rs.value })} title={rs.desc} className="w-7 h-7 rounded-lg text-[11px] font-bold transition-all active:scale-90 shrink-0" style={rpe === rs.value ? { backgroundColor: rpeColor(rs.value), color: "#0a0a0f" } : { backgroundColor: "var(--surface-2)", color: "var(--surface-2-text)" }}>{isRir ? rirButtonLabel(rs.value) : rs.value}</button>
+              <button key={rs.value} onClick={() => updateDraft({ rpe: rpe === rs.value ? null : rs.value })} title={rs.desc} className="w-7 h-7 rounded-lg text-[11px] font-bold transition-all active:scale-90 shrink-0" style={rpe === rs.value ? { backgroundColor: rpeColor(rs.value), color: "#0c0d10" } : { backgroundColor: "var(--surface-2)", color: "var(--surface-2-text)" }}>{isRir ? rirButtonLabel(rs.value) : rs.value}</button>
             ))}
             {rpe != null && <span className="text-[10px] text-slate-500 ml-1 truncate">{RPE_SCALE.find((r) => r.value === rpe)?.desc}</span>}
             <button onClick={() => { updateDraft({ rpe: null }); setShowRpeLocal(false); }} className="text-slate-600 hover:text-slate-400 ml-auto shrink-0"><X size={12} /></button>
@@ -7030,7 +7623,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
 /* ============================================================================
    EXERCISE CARD
 ============================================================================ */
-function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts, resetKey = 0, settings = DEFAULT_SETTINGS, autoCollapse = false, onDisableAutoShowPrShare, hasActiveSession = true, hideTimer = false, onUpdateSettings = null, onSetPlanPaused = null, routineHasPlan = false, sex = null, age = null, weekInCycle = null, dayKey = null, nextRestTimerId = null, nextRestSeconds = null }) {
+function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts, resetKey = 0, settings = DEFAULT_SETTINGS, autoCollapse = false, onDisableAutoShowPrShare, hasActiveSession = true, hideTimer = false, onUpdateSettings = null, onSetPlanPaused = null, routineHasPlan = false, sex = null, age = null, weekInCycle = null, dayKey = null, nextRestTimerId = null, nextRestSeconds = null, nextExerciseName = null, supersetRestTimerId = null, supersetRestSeconds = null, orden = null }) {
   const [open, setOpen] = useState(false);
   const [showWarmup, setShowWarmup] = useState(false);
   // Pedido: "que no se abran más automáticamente los ejercicios, sí que se
@@ -7051,8 +7644,12 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
   // de la rutina (ej. "Sentadilla" en Piernas A y Piernas B), un descanso
   // en curso en un día se mostraba/interfería en el otro. Se agrega el día
   // a la clave para que cada día tenga su propio cronómetro independiente.
-  const restTimerId = (exercise.cardio || hideTimer) ? null : `${dayKey || "_"}:ex_${exercise.id}`;
-  const restSeconds = hasHeavy ? settings.restLong : settings.restShort;
+  // En una superserie el descanso es el del GRUPO: sólo lo recibe el último
+  // ejercicio de la vuelta (ver RoutineView), así guardar su serie arranca
+  // el descanso compartido. Antes, dentro de una superserie el descanso
+  // automático no arrancaba nunca.
+  const restTimerId = exercise.cardio ? null : hideTimer ? (supersetRestTimerId || null) : `${dayKey || "_"}:ex_${exercise.id}`;
+  const restSeconds = hideTimer && supersetRestSeconds ? supersetRestSeconds : hasHeavy ? settings.restLong : settings.restShort;
 
   // ── POSICIÓN DEL CRONÓMETRO entre las series ──────────────────────────────
   // Contamos cuántas series desde el principio ya están registradas HOY (racha
@@ -7079,9 +7676,12 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
   // completaste todas hoy; ahora se ve de un vistazo con la tarjeta
   // cerrada. Mismo criterio de "hecha hoy" que ya usa timerSlot arriba
   // (fecha de hoy, sin contar marcas de descarga).
-  const allSetsDoneToday = useMemo(() => (
-    setsToShow.length > 0 && setsToShow.every((_, i) => (logs[`${exercise.id}_${i}`] || []).some((h) => h.date === hoyStr && !h.deload))
+  // Serie por serie, cuáles ya están hechas hoy: con la tarjeta cerrada se
+  // ven como puntos (2 de 4 llenos), así sabés por dónde ibas sin abrirla.
+  const seriesHechas = useMemo(() => (
+    setsToShow.map((_, i) => (logs[`${exercise.id}_${i}`] || []).some((h) => h.date === hoyStr && !h.deload))
   ), [logs, exercise.id, setsToShow, hoyStr]);
+  const allSetsDoneToday = seriesHechas.length > 0 && seriesHechas.every(Boolean);
   // Pedido: "el poder quitar o pasar ejercicios de planificados a por récord
   // de manera sencilla". El lugar más natural para decidirlo es acá, con el
   // ejercicio abierto y a punto de entrenarlo — no hay que salir a Perfil ni
@@ -7113,10 +7713,14 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
   // pregunta "¿qué cambio?" ya está contestada.
   const siguiendoPlan = !!planInfo && !planInfo.paused && !planOffByMode;
   return (
-    <div className="stagger-item smooth-card bg-slate-900/50 border border-slate-800/50 rounded-2xl overflow-hidden backdrop-blur-sm shadow-md shadow-black/20 transition-shadow hover:shadow-lg hover:shadow-black/30">
-      <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center justify-between px-4 py-4 hover:bg-slate-800/30 active:bg-slate-800/50 transition text-left">
-        <div className="flex items-center gap-3">
-          <div className="w-2 h-8 rounded-full shrink-0" style={{ backgroundColor: accent, boxShadow: `0 0 10px -2px ${accent}` }} />
+    <div className={`ejercicio stagger-item ${open ? "abierto" : ""} ${allSetsDoneToday ? "completo" : ""}`} style={{ "--c": accent }}>
+      <button onClick={() => setOpen((o) => !o)} aria-expanded={open} className="ejercicio-cabecera w-full flex items-center gap-3 pl-3 pr-3.5 py-3.5 text-left">
+        {/* El número de orden reemplaza a la barrita de color: dice lo
+            mismo (de qué día es, por el color) y además en qué lugar va. */}
+        {orden != null
+          ? <span className="ejercicio-numero" aria-hidden="true">{String(orden).padStart(2, "0")}</span>
+          : <span className="w-1.5 h-8 rounded-full shrink-0" style={{ backgroundColor: accent }} aria-hidden="true" />}
+        <div className="flex-1 min-w-0">
           <div>
             {/* BUG FIX (pedido: "que el músculo esté siempre abajo, así
                 queda más parejo"): antes nombre + chips vivían en el MISMO
@@ -7125,10 +7729,11 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
                 de abajo. Dos filas fijas (nombre arriba, chips abajo)
                 hace que TODAS las tarjetas se vean iguales sin importar
                 cuán largo sea el nombre del ejercicio. */}
-            <h3 className="font-bold text-white text-sm">{exercise.name}</h3>
-            <div className="flex items-center gap-2 flex-wrap mt-1">
-              <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded-lg font-bold" style={{ backgroundColor: tint(accent, "18"), color: accent }}>{exercise.muscle}</span>
-              {exercise.cardio && <span className="text-[10px] bg-rose-400/15 text-rose-300 rounded-lg px-1.5 py-0.5 font-bold flex items-center gap-1"><Footprints size={9} /> CARDIO</span>}
+            <h3 className="ejercicio-nombre">{exercise.name}</h3>
+            <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
+              <span className="text-[10px] uppercase px-1.5 py-0.5 rounded-md font-bold" style={{ backgroundColor: tint(accent, "18"), color: accent }}>{exercise.muscle}</span>
+              {/* Si el músculo ya dice "Cardio", el chip de cardio repetía la palabra. */}
+              {exercise.cardio && String(exercise.muscle || "").toLowerCase() !== "cardio" && <span className="text-[10px] bg-rose-400/15 text-rose-300 rounded-md px-1.5 py-0.5 font-bold flex items-center gap-1"><Footprints size={9} /> CARDIO</span>}
               {!open && restTimerId && <ChipDescansoEnCurso timerId={restTimerId} color={accent} />}
               {/* El ×1/×2 de mancuernas se configura al editar la rutina
                   ("¿Con cuántas mancuernas?"), no acá: durante el
@@ -7169,8 +7774,8 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
                     // usan los bloques vacíos de la sección Entrenador.
                     <span className="text-[10px] text-slate-400 rounded-lg px-1.5 py-0.5 font-bold flex items-center gap-1"
                       style={planInfo
-                        ? { backgroundColor: "rgba(51,65,85,0.25)", border: "1px dashed rgba(148,163,184,0.45)" }
-                        : { backgroundColor: "rgba(51,65,85,0.4)", border: "1px solid transparent" }}
+                        ? { backgroundColor: "rgba(60,65,70,0.25)", border: "1px dashed rgba(157,162,168,0.45)" }
+                        : { backgroundColor: "rgba(60,65,70,0.4)", border: "1px solid transparent" }}
                       title={planInfo ? "Tiene un plan guardado, pero ahora persigue tu récord" : "Este ejercicio no tiene metas cargadas: persigue tu récord"}>
                       <Trophy size={9} /> POR RÉCORD
                     </span>
@@ -7182,16 +7787,20 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
             {exercise.nota && settings.showExerciseNote !== false && <p className="text-[11px] text-slate-500 mt-0.5" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{exercise.nota}</p>}
           </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {allSetsDoneToday && (
-            <span className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center shrink-0" title="Completaste todas las series de hoy">
-              <Check size={12} className="text-white" strokeWidth={3} />
+        <div className="flex items-center gap-2.5 shrink-0">
+          {allSetsDoneToday ? (
+            <span className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center shrink-0" title="Completaste todas las series de hoy">
+              <Check size={13} className="text-white" strokeWidth={3} />
+            </span>
+          ) : !exercise.cardio && seriesHechas.length > 0 && (
+            <span className="series-puntos" aria-label={`${seriesHechas.filter(Boolean).length} de ${seriesHechas.length} series hechas hoy`}>
+              {seriesHechas.map((hecha, i) => <i key={i} className={hecha ? "hecha" : ""} />)}
             </span>
           )}
-          <ChevronDown size={18} className={`text-slate-600 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
+          <ChevronDown size={18} className={`text-slate-500 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
         </div>
       </button>
-      <div className={open ? "px-4 pb-4 pt-0 tab-fade-in" : "hidden"}>
+      <div className={open ? "px-3.5 pb-3.5 pt-0 tab-fade-in" : "hidden"}>
         {stagnant && settings.showStagnation === true && !siguiendoPlan && <div className="mb-3 text-[11px] text-rose-400/90 bg-rose-500/5 border border-rose-500/15 rounded-xl px-3 py-2 flex items-start gap-1.5"><Info size={12} className="mt-0.5 shrink-0" /><span>Hace {STAGNATION_DAYS}+ días sin superar el récord. Considerá cambiar reps, descanso o variante.</span></div>}
         {/* Pasar ESTE ejercicio de "sigue el plan" a "persigue mi récord" y
             al revés, sin salir de la pantalla ni perder lo planificado: el
@@ -7211,7 +7820,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
                 const hoy = e.week === weekInCycle;
                 return (
                   <span key={e.week} className="shrink-0 px-1.5 py-0.5 rounded-md text-[9px] font-black tabular-nums" title={`Semana ${e.week}${e.phase ? ` · ${e.phase}` : ""}${e.rpe != null ? ` · RPE ${e.rpe}` : ""}`}
-                    style={hoy ? { backgroundColor: "#38BDF8", color: "#fff" } : { backgroundColor: "rgba(148,163,184,0.10)", color: "#94a3b8" }}>
+                    style={hoy ? { backgroundColor: "#38BDF8", color: "#fff" } : { backgroundColor: "rgba(157,162,168,0.10)", color: "#9da2a8" }}>
                     S{e.week}<span className="opacity-75 ml-0.5">{e.minutes != null ? `${e.minutes}'` : `${e.reps}×${kgToDisplay(e.kg, planUnit)}`}</span>
                   </span>
                 );
@@ -7250,14 +7859,14 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
         <div className="mt-1 mb-2" />
         {/* Arriba de todo: solo antes de empezar (o tras completar la última) */}
         {timerSlot === 0 && (
-          <div className="mb-2 timer-hop"><RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={accent} alertType={settings.alertType} timerId={restTimerId} exerciseName={exercise.name} /></div>
+          <div className="mb-2 timer-hop"><RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={accent} timerId={restTimerId} exerciseName={exercise.name} /></div>
         )}
         {setsToShow.map((s, i) => <React.Fragment key={`${exercise.id}:frag:${i}`}>
-          <SetRow key={`${exercise.id}:${i}:${resetKey}`} exerciseId={exercise.id} exerciseName={exercise.name} exerciseMuscle={exercise.muscle} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKey} autoShowPrShare={settings.autoShowPrShare ?? true} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={hasActiveSession} cardio={exercise.cardio} dumbbellDouble={settings?.dumbbellDouble || null} fieldSettings={settings} onUpdateSettings={onUpdateSettings} sex={sex} age={age} restTimerId={restTimerId} restSeconds={restSeconds} isLastSet={i === setsToShow.length - 1} weekInCycle={weekInCycle} nextRestTimerId={nextRestTimerId} nextRestSeconds={nextRestSeconds} />
+          <SetRow key={`${exercise.id}:${i}:${resetKey}`} exerciseId={exercise.id} exerciseName={exercise.name} exerciseMuscle={exercise.muscle} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKey} autoShowPrShare={settings.autoShowPrShare ?? true} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={hasActiveSession} cardio={exercise.cardio} dumbbellDouble={settings?.dumbbellDouble || null} fieldSettings={settings} onUpdateSettings={onUpdateSettings} sex={sex} age={age} restTimerId={restTimerId} restSeconds={restSeconds} isLastSet={i === setsToShow.length - 1} weekInCycle={weekInCycle} nextRestTimerId={nextRestTimerId} nextRestSeconds={nextRestSeconds} nextExerciseName={nextExerciseName} />
           {/* Debajo de la serie recién registrada: timerSlot = N significa
               "después de la serie N" (1-indexado). */}
           {timerSlot === i + 1 && (
-            <div className="my-2 timer-hop"><RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={accent} alertType={settings.alertType} timerId={restTimerId} exerciseName={exercise.name} /></div>
+            <div className="my-2 timer-hop"><RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={accent} timerId={restTimerId} exerciseName={exercise.name} /></div>
           )}
         </React.Fragment>)}
         {exercise.video && (
@@ -7296,7 +7905,7 @@ function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS,
   if (!cycleStart || !weekInfo) return null;
   const { cycleWeeks, trainWeeks } = weekInfo;
   const isLight = settings.theme === "light";
-  const neutralDot = isLight ? "#94a3b8" : "#475569";
+  const neutralDot = isLight ? "#9da2a8" : "#50555a";
   const weekDots = Array.from({ length: cycleWeeks }, (_, wi) => { const ws = new Date(cycleStart); ws.setDate(ws.getDate() + wi * 7); const days = Array.from({ length: 7 }, (_, di) => { const d = new Date(ws); d.setDate(d.getDate() + di); return localDateStr(d); }); return { week: wi + 1, days, trained: days.filter((d) => trainedDays.has(d)).length, isDeload: wi + 1 > trainWeeks }; });
   const phase = weekInfo.isDeload ? "#A855F7" : "#3B82F6";
   const heroGrad = weekInfo.isDeload ? "var(--grad-hero-purple)" : "var(--grad-hero-blue)";
@@ -7688,7 +8297,7 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_
                         <span className="block text-xs font-bold text-white">{p.l}</span>
                         <span className="block text-[10.5px] text-slate-500">{p.d}</span>
                       </span>
-                      <span className="text-[10px] font-black tabular-nums shrink-0" style={{ color: act ? accent : "#64748b" }}>{n} sem</span>
+                      <span className="text-[10px] font-black tabular-nums shrink-0" style={{ color: act ? accent : "#6e7379" }}>{n} sem</span>
                     </button>
                   );
                 })}
@@ -7750,7 +8359,7 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_
                     return (
                       <button key={e.id} onClick={() => toggleEjercicio(e.id)} className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left transition"
                         style={on ? { backgroundColor: tint(accent, "12"), border: `1px solid ${tint(accent, "2e")}` } : { backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)", opacity: 0.55 }}>
-                        <span className="w-4 h-4 rounded-md shrink-0 flex items-center justify-center" style={on ? { backgroundColor: accent } : { border: "1px solid #475569" }}>
+                        <span className="w-4 h-4 rounded-md shrink-0 flex items-center justify-center" style={on ? { backgroundColor: accent } : { border: "1px solid #50555a" }}>
                           {on && <Check size={11} className="text-white" strokeWidth={3.5} />}
                         </span>
                         <span className="flex-1 min-w-0">
@@ -7774,7 +8383,7 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_
                   return (
                     <button key={o.k} onClick={() => setObjetivo(o.k)} className="rounded-xl px-2 py-2 text-left transition active:scale-[0.97]"
                       style={act ? { backgroundColor: tint(o.color, "1c"), border: "1px solid " + tint(o.color, "55") } : { backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}>
-                      <span className="block text-[11px] font-black" style={{ color: act ? o.color : "#e2e8f0" }}>{o.l}</span>
+                      <span className="block text-[11px] font-black" style={{ color: act ? o.color : "#e6e8ea" }}>{o.l}</span>
                       <span className="block text-[9px] text-slate-500 leading-tight mt-0.5">{o.d}</span>
                     </button>
                   );
@@ -7790,7 +8399,7 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_
                   return (
                     <button key={n.k} onClick={() => setNivel(n.k)} className="rounded-xl px-1.5 py-2 text-center transition active:scale-[0.97]"
                       style={act ? { backgroundColor: tint(accent, "1c"), border: `1px solid ${tint(accent, "55")}` } : { backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}>
-                      <span className="block text-[10.5px] font-black" style={{ color: act ? accent : "#e2e8f0" }}>{n.l}</span>
+                      <span className="block text-[10.5px] font-black" style={{ color: act ? accent : "#e6e8ea" }}>{n.l}</span>
                       <span className="block text-[8.5px] text-slate-500 leading-tight mt-0.5">{n.d}</span>
                     </button>
                   );
@@ -7814,7 +8423,7 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_
                     { on: conRpe, set: setConRpe, l: "Incluir RPE y fases", d: "Suma el esfuerzo objetivo y la fase del mesociclo a cada semana" },
                   ].map((t) => (
                     <button key={t.l} onClick={() => t.set(!t.on)} className="w-full flex items-center gap-2.5 text-left">
-                      <span className="w-8 h-[18px] rounded-full shrink-0 relative transition-colors" style={{ backgroundColor: t.on ? accent : "#334155" }}>
+                      <span className="w-8 h-[18px] rounded-full shrink-0 relative transition-colors" style={{ backgroundColor: t.on ? accent : "#3c4146" }}>
                         <span className="absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white transition-all" style={{ left: t.on ? "16px" : "2px" }} />
                       </span>
                       <span className="flex-1 min-w-0">
@@ -7898,7 +8507,7 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_
                 return (
                   <div key={g.id} className="rounded-xl px-3 py-2.5 transition" style={{ backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)", opacity: fuera ? 0.4 : 1 }}>
                     <button onClick={() => setDescartados((prev) => { const n = new Set(prev); if (n.has(g.id)) n.delete(g.id); else n.add(g.id); return n; })} className="w-full flex items-center gap-2 mb-1.5 text-left">
-                      <span className="w-4 h-4 rounded-md shrink-0 flex items-center justify-center" style={!fuera ? { backgroundColor: accent } : { border: "1px solid #475569" }}>
+                      <span className="w-4 h-4 rounded-md shrink-0 flex items-center justify-center" style={!fuera ? { backgroundColor: accent } : { border: "1px solid #50555a" }}>
                         {!fuera && <Check size={11} className="text-white" strokeWidth={3.5} />}
                       </span>
                       <span className="flex-1 min-w-0">
@@ -8071,128 +8680,15 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
 
   return (
     <div className="space-y-4">
-      <div className="relative overflow-hidden rounded-2xl border border-teal-500/20 p-5" style={{ background: "var(--grad-hero-teal)" }}>
-        <div className="absolute -top-8 -right-6 w-32 h-32 rounded-full bg-teal-500/15 blur-2xl pointer-events-none" />
-        <div className="absolute -bottom-6 -left-6 w-28 h-28 rounded-full bg-cyan-500/10 blur-2xl pointer-events-none" />
-        <div className="relative flex items-center gap-2 mb-1">
-          <Dumbbell size={16} className="text-teal-400" />
-          <span className="text-[11px] font-black uppercase tracking-widest text-teal-400">Tu entrenamiento</span>
-        </div>
-        <h2 className="relative text-xl font-black text-white leading-tight">Rutina</h2>
-        <p className="relative text-xs text-teal-300/60 mt-1">Registrá tus series de hoy y seguí tu progreso día a día</p>
-      </div>
-
       {isRestToday && (
-        <button onClick={() => (onGoToSchedule || onGoToRoutines)?.()} className="w-full flex items-start gap-2.5 bg-slate-900/50 border border-slate-800/50 rounded-xl px-3.5 py-2.5 text-left transition active:scale-[0.99] hover:border-slate-700">
-          <Calendar size={13} className="text-slate-500 mt-0.5 shrink-0" />
+        <button onClick={() => (onGoToSchedule || onGoToRoutines)?.()} className="w-full flex items-center gap-3 rounded-2xl px-3.5 py-3 text-left transition active:scale-[0.99]" style={{ backgroundColor: "var(--surface-1)", border: "1px solid var(--hairline)" }}>
+          <span className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0 bg-slate-800/70 text-slate-400"><Calendar size={15} /></span>
           <div className="flex-1 min-w-0">
-            <p className="text-[11px] text-slate-400">Hoy es descanso según tu cronograma semanal, pero entrená el día que quieras: esto es solo una guía.</p>
-            <p className="text-[10px] text-slate-600 mt-1 flex items-center gap-1">Tocá acá para editar tu cronograma <ChevronRight size={11} /></p>
+            <p className="text-[12.5px] font-semibold text-slate-200 leading-snug">Hoy es día de descanso</p>
+            <p className="text-[11px] text-slate-500 leading-snug mt-0.5">Es una guía: si querés, entrená igual. Tocá para editar tu semana.</p>
           </div>
+          <ChevronRight size={15} className="text-slate-500 shrink-0" />
         </button>
-      )}
-
-      {/* Antes esto sólo se podía cambiar desde Perfil — un atajo acá evita
-          tener que salir de Rutina para pasar de "perseguir récord" a
-          "rutina planificada" (o viceversa).
-          BUG FIX (pedido: "no es del color de la app ni de la pestaña de
-          Rutina, agregale la textura del recuadro superior"): el celeste
-          usado antes es en realidad el color propio de la pestaña
-          RUTINAS (plural, catálogo de rutinas) — Rutina (singular, esta
-          pantalla) es teal, igual que el hero "Tu entrenamiento" de arriba
-          y que los íconos de la barra inferior. Ahora usa exactamente el
-          mismo fondo (var(--grad-hero-teal)) y el mismo par de círculos
-          desenfocados teal+cian que ese hero, para que se sienta la MISMA
-          tarjeta en vez de una tarjeta de configuración aparte. */}
-      {onUpdateSettings && (
-        <div className="relative overflow-hidden rounded-2xl border border-teal-500/20 p-3.5" style={{ background: "var(--grad-hero-teal)" }}>
-          <div className="absolute -top-8 -right-6 w-24 h-24 rounded-full bg-teal-500/15 blur-2xl pointer-events-none" />
-          <div className="absolute -bottom-6 -left-6 w-20 h-20 rounded-full bg-cyan-500/10 blur-2xl pointer-events-none" />
-          {/* Ya no es un "modo de entrenamiento" sino el lugar donde se
-              gobierna el plan, así que el rótulo dice eso. */}
-          <div className="relative flex items-center gap-1.5 mb-2">
-            <Target size={13} className="text-teal-400 shrink-0" />
-            <p className="text-[10px] font-black uppercase tracking-widest text-teal-400">Tu plan</p>
-          </div>
-          {/* REDISEÑO: acá había un segmentado "Récord | Planificada", o sea
-              un MODO. Los modos obligan a saber en cuál estás, y este se
-              notaba: seis lugares del código lo forzaban a "planned" solos
-              (guardar a mano, guardar desde Perfil, dos herramientas del
-              chatbot, aceptar el plan del entrenador, detectar que tenés
-              entrenador) y dos avisos en pantalla existían sólo para explicar
-              que el modo te estaba escondiendo el plan. Un control que
-              necesita seis autocorrecciones y dos advertencias para no
-              traicionarte no está pagando su lugar.
-              Ahora es una ACCIÓN sobre el plan, con el mismo verbo que el
-              chip de cada ejercicio pero otro alcance: pausar todo el plan /
-              pausar este ejercicio. Y si no hay ningún plan no aparece nada,
-              en vez de ofrecer una decisión que no significa nada.
-              El dato guardado sigue siendo settings.trainingMode, así que
-              todo lo que ya lo leía (la serie, la descarga, el resumen, el
-              contexto del chatbot) no se entera del cambio. */}
-          {hasAnyPlan && (() => {
-            const enPausa = settings.trainingMode !== "planned";
-            const nActivos = planResumen?.planificados.length || 0;
-            return (
-              <div className="relative flex items-center gap-2.5 rounded-xl px-3 py-2.5" style={{ backgroundColor: enPausa ? "rgba(2,6,23,0.45)" : "rgba(20,184,166,0.12)", border: `1px solid ${enPausa ? "rgba(148,163,184,0.18)" : "rgba(20,184,166,0.3)"}` }}>
-                {enPausa ? <Trophy size={15} className="shrink-0 text-slate-400" /> : <ClipboardCheck size={15} className="shrink-0 text-teal-300" />}
-                <div className="flex-1 min-w-0">
-                  <p className="text-[12px] font-bold leading-tight" style={{ color: enPausa ? "#cbd5e1" : "#fff" }}>{enPausa ? "Plan en pausa" : "Plan activo"}</p>
-                  <p className="text-[10px] leading-snug" style={{ color: enPausa ? "#64748b" : "rgba(153,246,228,0.75)" }}>
-                    {enPausa
-                      ? "Tus metas siguen guardadas, pero ahora perseguís tu récord."
-                      : nActivos > 0
-                        ? `${nActivos} ejercicio${nActivos === 1 ? "" : "s"} persigue${nActivos === 1 ? "" : "n"} sus metas`
-                        : "Todos tus ejercicios están en por récord"}
-                  </p>
-                </div>
-                <button onClick={() => onUpdateSettings({ trainingMode: enPausa ? "planned" : "record" })} className="shrink-0 px-2.5 py-1.5 rounded-lg text-[10px] font-black transition active:scale-95"
-                  style={enPausa
-                    ? { backgroundColor: "rgba(20,184,166,0.22)", color: "#5eead4", border: "1px solid rgba(20,184,166,0.45)" }
-                    : { backgroundColor: "rgba(148,163,184,0.12)", color: "#cbd5e1", border: "1px solid rgba(148,163,184,0.22)" }}>
-                  {enPausa ? "Reanudar" : "Pausar"}
-                </button>
-              </div>
-            );
-          })()}
-          {onApplyOwnProgression && (
-            <>
-              {/* Sin ninguna meta cargada, cada serie sigue mostrando tu
-                  récord de siempre (a propósito). Decirlo evita que el
-                  silencio se sienta como que algo no anda. */}
-              {!hasAnyPlan && activeRoutineDef && (
-                <p className="relative text-[10.5px] text-teal-200/70 text-center mb-2.5 leading-snug">
-                  Todavía no tenés metas. Cada serie muestra tu récord.
-                </p>
-              )}
-              {/* Los dos planificadores dejan de estar escondidos detrás del
-                  modo: antes había que acertar primero el toggle para verlos,
-                  y quien no lo hacía concluía que la app no planificaba. Al
-                  guardar una meta el modo pasa solo a "Planificada" (ver
-                  handleApplyOwnProgression), así que no hay orden que
-                  aprender. Color plano como "Iniciar sesión" pero FIJO en el
-                  teal de esta tarjeta, y más chico: la acción principal de la
-                  pantalla es entrenar, ésta es secundaria. */}
-              <button onClick={() => setShowSelfProgression(true)} disabled={!activeRoutineDef} className={`relative w-full flex items-center justify-center gap-2 py-2.5 mt-2.5 rounded-xl text-white text-xs font-bold transition-all active:scale-[0.98] disabled:opacity-40 ${!hasAnyPlan && settings.trainingMode === "planned" ? "invite-pulse" : ""}`} style={{ backgroundColor: "#14B8A6", "--invite-glow": "rgba(20,184,166,0.6)" }}>
-                <Sliders size={13} /> {hasAnyPlan ? "Planificar mi progresión" : "Planificar mi primera meta"}
-              </button>
-              {/* El atajo al planificador con IA se mudó ADENTRO de
-                  "Planificar mi progresión": las dos son la misma tarea (armar
-                  las metas), sólo cambia quién las escribe, así que competían
-                  por el mismo lugar en la tarjeta y la alargaban al pedo. */}
-            </>
-          )}
-          {!activeRoutineDef && <p className="relative text-[10px] text-slate-600 text-center mt-1.5">Activá una rutina primero, en la pestaña Rutinas.</p>}
-          {/* "Personalizar qué ves al registrar" se muda acá desde el hero de
-              arriba: las dos cosas de esta tarjeta deciden CÓMO vas a
-              registrar (contra qué número apuntás, y qué campos ves), así
-              que vivían separadas sin motivo. */}
-          {onGoToFieldSettings && (
-            <button onClick={onGoToFieldSettings} className="relative w-full flex items-center justify-center gap-1.5 mt-3 pt-2.5 border-t border-white/10 text-[10px] font-bold text-teal-300/75 hover:text-teal-300 transition">
-              <Sliders size={11} /> Personalizar qué ves al registrar <ChevronRight size={11} />
-            </button>
-          )}
-        </div>
       )}
 
       {/* Misma píldora deslizante que el selector de Progreso (Rango /
@@ -8202,14 +8698,14 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           pasa de un bloque de color sólido a texto del color del día sobre
           un tinte suave, que es más liviano y no compite con el panel de
           abajo. */}
-      <div className="relative grid gap-1.5 p-1 rounded-2xl bg-slate-900/60 border border-slate-800/50" style={{ gridTemplateColumns: `repeat(${DAY_ORDER.length}, 1fr)` }}>
+      <div className="selector-dias relative grid gap-1 p-1" style={{ gridTemplateColumns: `repeat(${DAY_ORDER.length}, 1fr)` }} role="tablist" aria-label="Días de tu rutina">
         <div
           className="absolute top-1 bottom-1 rounded-xl transition-all duration-300 ease-out pointer-events-none"
           style={{
             left: `calc(${Math.max(0, DAY_ORDER.indexOf(activeDay))} / ${DAY_ORDER.length} * 100% + 2px)`,
             width: `calc(100% / ${DAY_ORDER.length} - 4px)`,
-            backgroundColor: tint(day.color, "22"),
-            boxShadow: `inset 0 0 0 1px ${tint(day.color, "45")}`,
+            backgroundColor: tint(day.color, "24"),
+            boxShadow: `inset 0 0 0 1px ${tint(day.color, "50")}`,
           }}
         />
         {/* Piso de 50px en el alto de cada solapa: es el alto de las de
@@ -8220,8 +8716,11 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             las otras pestañas. Con 2 o 3 días el cálculo ya da más de 50 y
             el piso no cambia nada. */}
         {(() => { const { textClass, minHeight } = dayTabTextSizing(DAY_ORDER.length); return DAY_ORDER.map((k) => (
-          <button key={k} onClick={() => setActiveDay(k)} title={ROUTINE[k].label} className={`relative z-[1] flex items-center justify-center py-2.5 px-1 rounded-xl ${textClass} font-black uppercase transition-colors active:scale-95 text-center leading-tight min-w-0`}
-            style={{ color: activeDay === k ? ROUTINE[k].color : "#64748b", minHeight: `${Math.max(minHeight + 20, 50)}px` }}>
+          <button key={k} onClick={() => setActiveDay(k)} title={ROUTINE[k].label} role="tab" aria-selected={activeDay === k} className={`relative z-[1] flex items-center justify-center py-2.5 px-1 rounded-xl ${textClass} font-black uppercase transition-colors active:scale-95 text-center leading-tight min-w-0`}
+            style={{ color: activeDay === k ? ROUTINE[k].color : "var(--text-faint)", minHeight: `${Math.max(minHeight + 20, 50)}px` }}>
+            {/* El día que toca hoy lleva un punto: se ve sin tener que
+                abrirlo, aunque estés mirando otro. */}
+            {k === suggestedDay && <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full" style={{ backgroundColor: ROUTINE[k].color }} aria-label="Toca hoy" />}
             {/* line-clamp-2 en vez de truncate: nombres combinados como
                 "Hombros/Brazos" tienen que poder leerse enteros aunque
                 ocupen 2 líneas — cortarlos a "HOMBRO/…" en una sola línea
@@ -8269,29 +8768,17 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           título + bajada. La superficie es más HUNDIDA que las tarjetas de
           adentro (slate-950 en vez de slate-900), así lo de adentro flota
           sobre el panel en vez de fundirse con él. */}
-      <div
+      <section
         key={activeDay}
-        className="relative rounded-2xl border backdrop-blur-sm shadow-md shadow-black/20 p-3 space-y-3 tab-fade-in"
-        style={{
-          borderColor: tint(day.color, "25"),
-          // Un lavado PAREJO del color del día sobre la base hundida, no un
-          // degradado: el degradado del primer intento se notaba arriba y
-          // desaparecía abajo, así que la mitad del panel no se sentía del
-          // día. Con dos capas (tinte encima, oscuro debajo) el sector
-          // entero queda con su tono sin dejar de ser más hundido que las
-          // tarjetas que van adentro.
-          background: `linear-gradient(${tint(day.color, "0b")}, ${tint(day.color, "0b")}), rgba(2,6,23,0.62)`,
-          marginTop: 8,
-        }}
+        className="dia-seccion relative space-y-3 tab-fade-in"
+        style={{ "--c": day.color }}
+        aria-label={`Día ${day.label}`}
       >
-        <div className="relative px-1 pt-1">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: tint(day.color, "18"), color: day.color }}>
-              <Dumbbell size={15} />
-            </div>
+        <div className="relative px-3.5 pt-3.5">
+          <div className="flex items-start gap-3">
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-white truncate uppercase">{day.label}</p>
-              <p className="text-[11px] text-slate-500 truncate">{day.description}</p>
+              <h2 className="dia-titulo">{day.label}</h2>
+              <p className="text-[12.5px] text-slate-400 mt-1.5 truncate">{day.description}</p>
             </div>
             {/* "Resetear sesión de hoy" pasa de botón de ancho completo a un
                 ícono en la esquina — mismas acciones chicas que tiene "Rango
@@ -8299,14 +8786,14 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
                 error, no es algo que necesites a mano cada día; el diálogo de
                 confirmación es el mismo. */}
             {!confirmReset && (
-              <button onClick={() => setConfirmReset(true)} aria-label="Resetear sesión de hoy" title="Resetear sesión de hoy" className="shrink-0 flex items-center justify-center w-8 h-8 rounded-xl bg-slate-800/60 border border-slate-700/50 text-slate-400 hover:text-slate-200 transition active:scale-90">
-                <RotateCcw size={13} />
+              <button onClick={() => setConfirmReset(true)} aria-label="Resetear sesión de hoy" title="Resetear sesión de hoy" className="shrink-0 flex items-center justify-center w-9 h-9 rounded-xl bg-slate-800/60 border border-slate-700/40 text-slate-400 hover:text-slate-200 transition active:scale-90">
+                <RotateCcw size={14} />
               </button>
             )}
           </div>
           {activeDay === suggestedDay && (
-            <div className="mt-2.5 inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-lg" style={{ backgroundColor: tint(day.color, "18"), color: day.color }}>
-              <RotateCcw size={10} /> {scheduledDay === activeDay ? "Programado para hoy" : "Sugerido para hoy"}
+            <div className="mt-3 inline-flex items-center gap-1.5 text-[10.5px] font-bold uppercase px-2.5 py-1 rounded-lg" style={{ backgroundColor: tint(day.color, "1a"), color: day.color }}>
+              <Calendar size={11} /> {scheduledDay === activeDay ? "Programado para hoy" : "Sugerido para hoy"}
             </div>
           )}
           {day.isNew && <div className="mt-2 inline-flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] rounded-lg px-2.5 py-1">🆕 Empezás a registrar tus marcas desde hoy.</div>}
@@ -8375,11 +8862,17 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           // tarjeta (o la superserie entera). Es lo que permite que el
           // descanso entre ejercicios reuse ese cronómetro en vez de crear
           // uno aparte.
+          // Un cardio no tiene cronómetro de tarjeta, pero el descanso ANTES de
+          // él igual sirve: con el dock de abajo se ve aunque no tenga dónde
+          // dibujarse adentro de una tarjeta, así que lleva un id propio.
           const timerIdDe = (g) => {
             if (!g) return null;
             if (g.length > 1) return `${activeDay}:grp_${g.map((x) => x.id).join("_")}`;
-            return g[0].cardio ? null : `${activeDay}:ex_${g[0].id}`;
+            return g[0].cardio ? `${activeDay}:antes_${g[0].id}` : `${activeDay}:ex_${g[0].id}`;
           };
+          // Número de cada ejercicio en el día (01, 02…): las superseries
+          // cuentan cada ejercicio, igual que se cuentan al hacerlas.
+          const primeroDe = groups.map((_, i) => 1 + groups.slice(0, i).reduce((n, g) => n + g.length, 0));
           return groups.map((group, gi) => {
             // Descanso ENTRE ejercicios (opción, ver
             // settings.restBetweenExercises). Antes esto dibujaba un
@@ -8391,6 +8884,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             const entreActivo = settings.restBetweenExercises === true && !!sessionForThisDay;
             const nextRestTimerId = entreActivo ? timerIdDe(siguiente) : null;
             const nextRestSeconds = settings.restBetweenExercisesSec ?? 180;
+            const nextExerciseName = siguiente ? siguiente.map((g) => g.name).filter(Boolean).join(" + ") : null;
             // Terminaste todas sus series: la tarjeta se pliega sola.
             // Pedido: "que no se abran más automáticamente los ejercicios, sí
             // que se cierren cuando los completaste". No hay apertura
@@ -8398,25 +8892,96 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             const plegar = !!sessionForThisDay && estaCompleto(group);
             if (group.length === 1) {
               const ex = group[0];
-              return <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onSetPlanPaused={onSetPlanPaused} routineHasPlan={hasAnyPlan} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} sex={sex} age={age} weekInCycle={weekInCycle} dayKey={activeDay} autoCollapse={plegar} nextRestTimerId={nextRestTimerId} nextRestSeconds={nextRestSeconds} />;
+              return <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onSetPlanPaused={onSetPlanPaused} routineHasPlan={hasAnyPlan} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} sex={sex} age={age} weekInCycle={weekInCycle} dayKey={activeDay} autoCollapse={plegar} nextRestTimerId={nextRestTimerId} nextRestSeconds={nextRestSeconds} nextExerciseName={nextExerciseName} orden={primeroDe[gi]} />;
             }
             // Superserie: varios ejercicios encadenados comparten un solo
             // cronómetro al final del grupo, en vez de uno por ejercicio —
             // la idea de la superserie es justamente no descansar entre
             // ellos, sólo al terminar la vuelta completa.
             const hasHeavyGroup = group.some((ex) => ex.sets.some((s) => isHeavyRepRange(s.repRange)));
+            const grupoTimerId = `${activeDay}:grp_${group.map((g) => g.id).join("_")}`;
+            const grupoSegundos = hasHeavyGroup ? settings.restLong : settings.restShort;
             return (
-              <div key={`${activeDay}:${group.map((e) => e.id).join("-")}`} className="rounded-2xl border p-2.5 space-y-2.5" style={{ borderColor: tint(day.color, "50"), backgroundColor: tint(day.color, "06") }}>
-                <div className="flex items-center gap-1.5 px-1"><Link size={11} style={{ color: day.color }} /><span className="text-[10px] font-black uppercase tracking-wider" style={{ color: day.color }}>Superserie · {group.length} ejercicios</span></div>
-                {group.map((ex, xi) => <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onSetPlanPaused={onSetPlanPaused} routineHasPlan={hasAnyPlan} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} hideTimer sex={sex} age={age} weekInCycle={weekInCycle} dayKey={activeDay} autoCollapse={plegar} nextRestTimerId={xi === group.length - 1 ? nextRestTimerId : null} nextRestSeconds={nextRestSeconds} />)}
-                <div className="px-1"><RestTimer seconds={hasHeavyGroup ? settings.restLong : settings.restShort} accent={day.color} alertType={settings.alertType} timerId={`${activeDay}:grp_${group.map((g) => g.id).join("_")}`} exerciseName={group.map((g) => g.name).filter(Boolean).join(" + ")} /></div>
-                <p className="text-[10px] text-slate-600 px-1">Descansá recién después de completar los {group.length} ejercicios. Ese es el cronómetro de arriba.</p>
+              <div key={`${activeDay}:${group.map((e) => e.id).join("-")}`} className="superserie space-y-2" style={{ "--c": day.color, borderColor: tint(day.color, "45") }}>
+                <div className="flex items-center gap-1.5 px-1 pt-0.5"><Link size={12} style={{ color: day.color }} /><span className="text-[10.5px] font-black uppercase" style={{ color: day.color }}>Superserie · {group.length} ejercicios</span></div>
+                {group.map((ex, xi) => <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onSetPlanPaused={onSetPlanPaused} routineHasPlan={hasAnyPlan} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} hideTimer sex={sex} age={age} weekInCycle={weekInCycle} dayKey={activeDay} autoCollapse={plegar} nextRestTimerId={xi === group.length - 1 ? nextRestTimerId : null} nextRestSeconds={nextRestSeconds} nextExerciseName={xi === group.length - 1 ? nextExerciseName : null} supersetRestTimerId={xi === group.length - 1 ? grupoTimerId : null} supersetRestSeconds={grupoSegundos} orden={primeroDe[gi] + xi} />)}
+                <RestTimer seconds={grupoSegundos} accent={day.color} timerId={grupoTimerId} exerciseName={group.map((g) => g.name).filter(Boolean).join(" + ")} />
+                <p className="text-[10.5px] text-slate-500 px-1 pb-0.5">Descansá recién al completar la vuelta de los {group.length}.{settings.autoStartRestTimer === true ? " Arranca solo al guardar la serie del último." : ""}</p>
               </div>
             );
           });
         })()}
         </div>
-      </div>
+      </section>
+
+      {/* TU PLAN — cómo registrás: contra qué número apuntás (tu récord o
+          metas planificadas) y qué campos ves en cada serie.
+          Vivía ARRIBA de los días, con el mismo degradé y las manchas del
+          hero: lo primero que veías al abrir la app era configuración, y el
+          entrenamiento de hoy quedaba en la segunda pantalla. Ahora va al
+          pie, en una tarjeta tranquila: se encuentra igual de fácil (sigue
+          en Rutina, que es lo que se pidió) y no se interpone entre vos y
+          la primera serie.
+          REDISEÑO previo que se mantiene: no es un "modo" (Récord |
+          Planificada) sino una ACCIÓN sobre el plan — pausarlo o
+          reanudarlo — y si no hay ningún plan no se ofrece esa decisión.
+          El dato guardado sigue siendo settings.trainingMode. */}
+      {onUpdateSettings && (
+        <section className="tarjeta-plan" aria-label="Tu plan">
+          <div className="flex items-center gap-2 mb-3">
+            <Target size={14} className="text-teal-400 shrink-0" />
+            <p className="text-[11px] font-black uppercase text-teal-400">Tu plan</p>
+          </div>
+          {hasAnyPlan && (() => {
+            const enPausa = settings.trainingMode !== "planned";
+            const nActivos = planResumen?.planificados.length || 0;
+            return (
+              <div className="flex items-center gap-3 rounded-xl px-3 py-2.5" style={{ backgroundColor: enPausa ? "var(--panel-sunken)" : "rgba(20,184,166,0.12)", border: `1px solid ${enPausa ? "var(--hairline)" : "rgba(20,184,166,0.32)"}` }}>
+                {enPausa ? <Trophy size={16} className="shrink-0 text-slate-400" /> : <ClipboardCheck size={16} className="shrink-0 text-teal-300" />}
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] font-bold leading-tight text-white">{enPausa ? "Plan en pausa" : "Plan activo"}</p>
+                  <p className="text-[11px] leading-snug mt-0.5 text-slate-400">
+                    {enPausa
+                      ? "Tus metas siguen guardadas, pero ahora perseguís tu récord."
+                      : nActivos > 0
+                        ? `${nActivos} ejercicio${nActivos === 1 ? "" : "s"} persigue${nActivos === 1 ? "" : "n"} sus metas`
+                        : "Todos tus ejercicios están en por récord"}
+                  </p>
+                </div>
+                <button onClick={() => onUpdateSettings({ trainingMode: enPausa ? "planned" : "record" })} className="shrink-0 h-9 px-3 rounded-lg text-[11.5px] font-black transition active:scale-95"
+                  style={enPausa
+                    ? { backgroundColor: "rgba(20,184,166,0.2)", color: "var(--accent-ink)", border: "1px solid rgba(20,184,166,0.45)" }
+                    : { backgroundColor: "var(--surface-2)", color: "var(--text-strong)", border: "1px solid var(--hairline)" }}>
+                  {enPausa ? "Reanudar" : "Pausar"}
+                </button>
+              </div>
+            );
+          })()}
+          {onApplyOwnProgression && (
+            <>
+              {/* Sin metas, cada serie muestra tu récord de siempre (a
+                  propósito). Decirlo evita que el silencio se sienta como
+                  que algo no anda. */}
+              {!hasAnyPlan && activeRoutineDef && (
+                <p className="text-[12px] text-slate-400 leading-snug">
+                  Todavía no tenés metas: cada serie te muestra tu récord. Si querés, armá cuánto levantar en cada semana del ciclo.
+                </p>
+              )}
+              <button onClick={() => setShowSelfProgression(true)} disabled={!activeRoutineDef} className={`w-full flex items-center justify-center gap-2 h-11 mt-3 rounded-xl text-[13px] font-bold transition-all active:scale-[0.98] disabled:opacity-40 ${!hasAnyPlan && settings.trainingMode === "planned" ? "invite-pulse" : ""}`} style={{ backgroundColor: "rgba(20,184,166,0.16)", color: "var(--accent-ink)", border: "1px solid rgba(20,184,166,0.4)", "--invite-glow": "rgba(20,184,166,0.6)" }}>
+                <Sliders size={14} /> {hasAnyPlan ? "Planificar mi progresión" : "Planificar mi primera meta"}
+              </button>
+            </>
+          )}
+          {!activeRoutineDef && <p className="text-[11px] text-slate-500 mt-2">Activá una rutina primero, en la pestaña Rutinas.</p>}
+          {/* Las dos cosas de esta tarjeta deciden CÓMO registrás (contra qué
+              número apuntás y qué campos ves), así que van juntas. */}
+          {onGoToFieldSettings && (
+            <button onClick={onGoToFieldSettings} className="w-full flex items-center gap-2 mt-3 pt-3 border-t border-slate-800/80 text-[12px] font-semibold text-slate-300 hover:text-white transition">
+              <Eye size={14} className="text-slate-500" /> <span className="flex-1 text-left">Personalizar qué ves al registrar</span> <ChevronRight size={14} className="text-slate-500" />
+            </button>
+          )}
+        </section>
+      )}
 
       {/* "Finalizar sesión" ya no vive acá abajo: es la barra fija de abajo
           (ver ActiveSessionBar, al nivel de App), que además lleva el
@@ -8509,7 +9074,7 @@ function SessionDetailCard({ session, onDelete, exerciseNotes = {}, rpeDisplayMo
           <p className="text-[8px] font-bold text-slate-500 uppercase tracking-wider mt-1">series</p>
         </div>
         <div className="rounded-xl bg-black/25 border border-slate-800/50 py-2 text-center">
-          <p className="text-lg font-black tabular-nums leading-none" style={{ color: session.durationMin != null ? "#fff" : "#334155" }}>
+          <p className="text-lg font-black tabular-nums leading-none" style={{ color: session.durationMin != null ? "#fff" : "#3c4146" }}>
             {session.durationMin != null ? (session.durationMin >= 60 ? `${Math.floor(session.durationMin / 60)}h${String(session.durationMin % 60).padStart(2, "0")}` : `${session.durationMin}m`) : "—"}
           </p>
           <p className="text-[8px] font-bold text-slate-500 uppercase tracking-wider mt-1">duración</p>
@@ -8578,7 +9143,7 @@ function SessionDetailCard({ session, onDelete, exerciseNotes = {}, rpeDisplayMo
                 // propósito, no una caída de rendimiento — se distingue en
                 // violeta en vez de compararla contra tu marca normal.
                 const below = !isCardio && !it.deload && pct != null && pct < 99;
-                const color = it.deload ? "#C4B5FD" : it.isImprovement ? "#6EE7B7" : below ? "#FCA5A5" : "#cbd5e1";
+                const color = it.deload ? "#C4B5FD" : it.isImprovement ? "#6EE7B7" : below ? "#FCA5A5" : "#d1d4d7";
                 const bg = it.deload ? "#A855F718" : it.isImprovement ? "#10B98118" : below ? "#F43F5E14" : "var(--surface-2)";
                 const bd = it.deload ? "#A855F735" : it.isImprovement ? "#10B98135" : below ? "#F43F5E30" : "transparent";
                 const itemKey = `${exName}:${i}`;
@@ -8833,7 +9398,7 @@ function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [], weekSche
             los chips crezcan sin que la fila necesite partirse en dos. */}
         <div className="flex bg-black/40 rounded-xl p-1 border border-slate-700/50 w-fit shrink-0">
           {[{ k: "calendar", icon: <LayoutGrid size={13} />, l: "Calendario" }, { k: "list", icon: <List size={13} />, l: "Lista" }].map((opt) => (
-            <button key={opt.k} onClick={() => setView(opt.k)} aria-label={opt.l} title={opt.l} className="flex items-center px-3 py-2 rounded-lg transition-all" style={view === opt.k ? { backgroundColor: "#06B6D4", color: "#fff" } : { color: "#64748b" }}>{opt.icon}</button>
+            <button key={opt.k} onClick={() => setView(opt.k)} aria-label={opt.l} title={opt.l} className="flex items-center px-3 py-2 rounded-lg transition-all" style={view === opt.k ? { backgroundColor: "#06B6D4", color: "#fff" } : { color: "#6e7379" }}>{opt.icon}</button>
           ))}
         </div>
         {/* Días entrenados y racha — compactos, acoplados al historial.
@@ -8860,7 +9425,7 @@ function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [], weekSche
 
       {view === "calendar" ? (
         <div key="calendar" className="space-y-3 tab-fade-in">
-          <div className="rounded-2xl border border-slate-800/60 p-3.5" style={{ backgroundColor: "rgba(15,23,42,0.55)" }}>
+          <div className="rounded-2xl border border-slate-800/60 p-3.5" style={{ backgroundColor: "rgba(20,24,29,0.55)" }}>
             <div className="flex items-center justify-between mb-3">
               <button onClick={() => setCursor((c) => { const m = c.m === 0 ? 11 : c.m - 1; const y = c.m === 0 ? c.y - 1 : c.y; return { y, m }; })} className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400"><ChevronLeft size={16} /></button>
               <p className="text-sm font-bold text-white">{MONTH_LABELS[cursor.m]} {cursor.y}</p>
@@ -8892,7 +9457,7 @@ function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [], weekSche
                 // del mes también fallaba al renderizar, la pantalla entera
                 // se rompía. Con un color de reserva en vez de romper, en el
                 // peor caso el punto queda gris en vez de tirar la app abajo.
-                const FALLBACK_DAY_COLOR = "#64748b";
+                const FALLBACK_DAY_COLOR = "#6e7379";
                 const mainColor = s ? (ROUTINE[s.dayKeys[0]]?.color || FALLBACK_DAY_COLOR) : null;
                 const bgStyle = s
                   ? (s.dayKeys.length > 1
@@ -8968,62 +9533,28 @@ function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [], weekSche
 // cronómetro (cuenta arriba) o cuenta regresiva desde los minutos reducidos.
 // Al llegar a 0 en cuenta regresiva, marca la serie como hecha con vibración.
 function DeloadCardioTimer({ targetMinutes, accent, onComplete, timerId }) {
-  // BUG FIX: mismo problema y mismo arreglo que el cronómetro de cardio de
-  // la rutina normal (ver ACTIVE_CARDIO_TIMERS) — sin esto, cerrar la app
-  // de verdad reseteaba el cronómetro a cero.
-  const [init] = useState(() => initCardioTimerState(timerId));
-  const [mode, setMode] = useState(init.mode === "stopwatch" ? "stopwatch" : "countdown"); // countdown | stopwatch
-  const [running, setRunning] = useState(init.running);
-  const [elapsed, setElapsed] = useState(init.elapsed);
-  const intervalRef = useRef(null);
-  const fmt = (secs) => `${Math.floor(secs / 60)}:${String(Math.floor(secs % 60)).padStart(2, "0")}`;
-  const targetSecs = Math.max(1, Math.round(targetMinutes * 60));
-  const clearPersisted = () => { delete ACTIVE_CARDIO_TIMERS[timerId]; persistActiveCardioTimers(); };
-
-  useEffect(() => {
-    if (!running) { clearInterval(intervalRef.current); return; }
-    const startedAt = Date.now() - elapsed * 1000;
-    ACTIVE_CARDIO_TIMERS[timerId] = { mode, running: true, startedAt };
-    persistActiveCardioTimers();
-    intervalRef.current = setInterval(() => {
-      const el = Math.floor((Date.now() - startedAt) / 1000);
-      setElapsed(el);
-      if (mode === "countdown" && el >= targetSecs) {
-        clearInterval(intervalRef.current);
-        setRunning(false);
-        clearPersisted();
-        haptic([100, 50, 100, 50, 200]);
-        onComplete?.();
-      }
-    }, 500);
-    return () => clearInterval(intervalRef.current);
-  }, [running, mode, targetSecs]);
-
-  // Pausa manual: guarda el tiempo congelado para retomarlo después.
-  useEffect(() => {
-    if (running) return;
-    if (elapsed > 0) { ACTIVE_CARDIO_TIMERS[timerId] = { mode, running: false, elapsed }; persistActiveCardioTimers(); }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [running]);
-
-  const display = mode === "countdown" ? fmt(Math.max(0, targetSecs - elapsed)) : fmt(elapsed);
+  // El mismo cronómetro que la rutina normal (ver useCronoCardio), que
+  // arranca en cuenta regresiva hacia los minutos reducidos de la descarga.
+  const objetivoSeg = Math.max(60, Math.round(targetMinutes * 60));
+  const { modo, corriendo, transcurrido, arrancar, pausar, reiniciar, cambiarModo } = useCronoCardio(timerId, {
+    objetivoSeg,
+    nombre: "Cardio de descarga",
+    modoInicial: "countdown",
+    alTerminar: () => onComplete?.(),
+  });
   return (
-    <div className="mb-2.5 rounded-lg overflow-hidden border border-slate-800/60">
-      <div className="flex bg-slate-900/60 p-0.5 gap-0.5">
-        <button onClick={() => { setMode("countdown"); setRunning(false); setElapsed(0); clearPersisted(); }} className={`flex-1 py-1.5 rounded-md text-[9px] font-bold transition-all ${mode === "countdown" ? "text-white" : "text-slate-600"}`} style={mode === "countdown" ? { backgroundColor: accent } : {}}>Cuenta regresiva</button>
-        <button onClick={() => { setMode("stopwatch"); setRunning(false); setElapsed(0); clearPersisted(); }} className={`flex-1 py-1.5 rounded-md text-[9px] font-bold transition-all ${mode === "stopwatch" ? "text-white" : "text-slate-600"}`} style={mode === "stopwatch" ? { backgroundColor: accent } : {}}>Cronómetro</button>
-      </div>
-      <div className="flex items-center justify-between px-3 py-2 bg-slate-950/40">
-        <span className="text-lg font-black tabular-nums" style={{ color: running ? accent : "#94a3b8" }}>{display}</span>
-        <div className="flex gap-1.5">
-          <button onClick={() => setRunning((r) => !r)} className="px-3 py-1.5 rounded-lg text-[10px] font-bold text-white transition active:scale-95" style={{ backgroundColor: accent }}>
-            {running ? "Pausar" : elapsed > 0 ? "Seguir" : "Iniciar"}
-          </button>
-          {elapsed > 0 && !running && (
-            <button onClick={() => { setElapsed(0); clearPersisted(); }} className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold border border-slate-700 text-slate-400 transition active:scale-95">↺</button>
-          )}
-        </div>
-      </div>
+    <div className="mb-2.5">
+      <PanelCronoCardio
+        accent={accent}
+        modo={modo}
+        corriendo={corriendo}
+        transcurrido={transcurrido}
+        objetivoSeg={objetivoSeg}
+        onCambiarModo={cambiarModo}
+        onArrancar={arrancar}
+        onPausar={pausar}
+        onReiniciar={reiniciar}
+      />
     </div>
   );
 }
@@ -9093,9 +9624,11 @@ function DeloadView({ logs, setLogs, settings = DEFAULT_SETTINGS, deloadProgress
         return { ...prev, [key]: nextHist };
       });
     }
+    // BUG FIX: antes arrancaba el descanso con otro id ("deload_<ejercicio>")
+    // que el del cronómetro de la tarjeta ("deload_<día>:<ejercicio>"): el
+    // descanso corría y avisaba, pero el reloj de la pantalla no se movía.
     if (!wasDone && restInfo && settings.autoStartRestTimer === true) {
-      ACTIVE_REST_TIMERS[restInfo.timerId] = { endTime: Date.now() + restInfo.seconds * 1000 };
-      persistActiveRestTimers();
+      iniciarDescanso(restInfo.timerId, { segundos: restInfo.seconds, ejercicio: restInfo.name || null, color: restInfo.color || null });
     }
   };
   // Antes, entrenar desde la pestaña Descarga no quedaba registrado en
@@ -9232,7 +9765,7 @@ function DeloadView({ logs, setLogs, settings = DEFAULT_SETTINGS, deloadProgress
                       así retoma el descanso recién escrito en
                       ACTIVE_REST_TIMERS (ver toggleDeloadDone) — mismo
                       truco que "se re-posiciona" en la rutina normal. */}
-                  <RestTimer key={ex.sets.slice(0, deloadSets).filter((_, i) => deloadProgress[`${ex.id}_${i}`] === today).length} seconds={hasHeavy ? settings.restLong : settings.restShort} accent={day.color} alertType={settings.alertType} timerId={`deload_${activeDay}:${ex.id}`} exerciseName={ex.name} />
+                  <RestTimer key={ex.sets.slice(0, deloadSets).filter((_, i) => deloadProgress[`${ex.id}_${i}`] === today).length} seconds={hasHeavy ? settings.restLong : settings.restShort} accent={day.color} timerId={`deload_${activeDay}:${ex.id}`} exerciseName={ex.name} />
                 </div>
               )}
               <div className="px-4 py-3 space-y-2.5">
@@ -9271,7 +9804,7 @@ function DeloadView({ logs, setLogs, settings = DEFAULT_SETTINGS, deloadProgress
                             </div>
                           </div>
                         ))}
-                        <button onClick={() => toggleDeloadDone(progressKey, ex.cardio ? { minutes: Math.max(1, Math.round((best.minutes || 0) * deloadPct)) } : { kg: deloadKg, reps: best.reps }, ex.cardio ? null : { timerId: `deload_${ex.id}`, seconds: hasHeavy ? settings.restLong : settings.restShort })} className="relative w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-black transition-all active:scale-[0.98]" style={done ? { background: `linear-gradient(160deg, ${day.color}, ${tint(day.color, "b0")})`, color: "#fff" } : { backgroundColor: "var(--row-surface)", border: "1px solid #33415580", color: "#94a3b8" }}>
+                        <button onClick={() => toggleDeloadDone(progressKey, ex.cardio ? { minutes: Math.max(1, Math.round((best.minutes || 0) * deloadPct)) } : { kg: deloadKg, reps: best.reps }, ex.cardio ? null : { timerId: `deload_${activeDay}:${ex.id}`, seconds: hasHeavy ? settings.restLong : settings.restShort, name: ex.name, color: day.color })} className="relative w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-black transition-all active:scale-[0.98]" style={done ? { background: `linear-gradient(160deg, ${day.color}, ${tint(day.color, "b0")})`, color: "#fff" } : { backgroundColor: "var(--row-surface)", border: "1px solid #3c414680", color: "#9da2a8" }}>
                           {done ? <><span className="w-5 h-5 rounded-full bg-white/25 flex items-center justify-center"><Check size={12} strokeWidth={3} /></span> Hecha</> : "Marcar como hecha"}
                         </button>
                       </div>
@@ -9315,7 +9848,7 @@ function DeloadView({ logs, setLogs, settings = DEFAULT_SETTINGS, deloadProgress
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-[#0f0f1a] border border-slate-700/60 rounded-xl px-3 py-2.5 text-xs shadow-xl shadow-black/40">
+    <div className="bg-[#0e1113] border border-slate-700/60 rounded-xl px-3 py-2.5 text-xs shadow-xl shadow-black/40">
       <p className="text-slate-400 mb-1.5 font-medium">{label}</p>
       {payload.map((p) => <p key={p.name} style={{ color: p.color }} className="font-bold">{p.name}: {p.value}</p>)}
     </div>
@@ -9461,11 +9994,11 @@ function EvolutionDot({ cx, cy, isBest, isActive, color, deload, index, onSelect
         // para "semana de descarga" (atajo de Rutina, tooltip, lista 1RM),
         // en vez de un rombo que a este tamaño se leía como un punto más.
         <>
-          <circle cx={cx} cy={cy} r={isBest || isActive ? 9 : 8} fill="#0a0a0f" stroke={dotColor} strokeWidth={isBest || isActive ? 1.5 : 1} />
+          <circle cx={cx} cy={cy} r={isBest || isActive ? 9 : 8} fill="#0c0d10" stroke={dotColor} strokeWidth={isBest || isActive ? 1.5 : 1} />
           <Zap x={cx - 5.5} y={cy - 5.5} width={11} height={11} color={dotColor} fill={dotColor} strokeWidth={1} />
         </>
       ) : (
-        <circle cx={cx} cy={cy} r={isBest || isActive ? 4 : 3} fill={dotColor} stroke="#0a0a0f" strokeWidth={isBest || isActive ? 1.5 : 0} />
+        <circle cx={cx} cy={cy} r={isBest || isActive ? 4 : 3} fill={dotColor} stroke="#0c0d10" strokeWidth={isBest || isActive ? 1.5 : 0} />
       )}
     </g>
   );
@@ -9534,7 +10067,7 @@ const RANK_TIERS = [
   { tier: "Bronce", sub: "I", color: "#8B5A2B" },
   { tier: "Bronce", sub: "II", color: "#A8692F" },
   { tier: "Bronce", sub: "III", color: "#CD7F32" },
-  { tier: "Plata", sub: "I", color: "#94A3B8" },
+  { tier: "Plata", sub: "I", color: "#9da2a8" },
   { tier: "Plata", sub: "II", color: "#B8C2CC" },
   { tier: "Plata", sub: "III", color: "#DCE3E8" },
   { tier: "Oro", sub: "I", color: "#C99A2E" },
@@ -9654,7 +10187,7 @@ function getMuscleRankThresholdsKg(muscleKey, mode, bodyWeightKg, sex, age) {
 function getMuscleRank(muscleKey, best1RM, mode = "general", bodyWeightKg = 0, sex = null, age = null) {
   const thresholds = getMuscleRankThresholdsKg(muscleKey, mode, bodyWeightKg, sex, age);
   if (!best1RM || best1RM <= 0) {
-    return { tier: "Bronce", sub: "I", color: "#475569", levelIdx: -1, threshold: 0, nextThreshold: thresholds[0], hasData: false };
+    return { tier: "Bronce", sub: "I", color: "#50555a", levelIdx: -1, threshold: 0, nextThreshold: thresholds[0], hasData: false };
   }
   let levelIdx = -1;
   for (let i = 0; i < thresholds.length; i++) { if (best1RM >= thresholds[i]) levelIdx = i; }
@@ -9880,7 +10413,7 @@ function RankBadgeIcon({ tier, sub, color, size = 32 }) {
           display: "flex", alignItems: "center", justifyContent: "center",
           fontSize: Math.max(8, Math.round(s * 0.19)), fontWeight: 800, color: "#fff",
           background: "linear-gradient(135deg,#14B8A6,#0E7490)", borderRadius: "50%",
-          border: `${Math.max(1.5, Math.round(s * 0.025))}px solid #0a0a0f`,
+          border: `${Math.max(1.5, Math.round(s * 0.025))}px solid #0c0d10`,
           boxShadow: "0 1px 3px rgba(0,0,0,0.5)",
         }}>{sub}</span>
       )}
@@ -9945,12 +10478,12 @@ function getSlugsForOurGroup(ourKey) {
 const MODEL_NOOP_CLICK = () => {};
 const MODEL_STYLE = { width: "100%" };
 
-// Mezcla un color hex con el color del cuerpo del muñeco (#334155)
+// Mezcla un color hex con el color del cuerpo del muñeco (#3c4146)
 // para reducir la saturación y bajar la intensidad visual sin cambiar
 // los colores de los badges/cards de rango — 0.65 = 65% original, 35% fondo.
 function muteHex(hex, amount = 0.65) {
   const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
-  const br = 51, bg = 65, bb = 85; // body color #334155
+  const br = 51, bg = 65, bb = 85; // body color #3c4146
   const nr = Math.round(r * amount + br * (1 - amount));
   const ng = Math.round(g * amount + bg * (1 - amount));
   const nb = Math.round(b * amount + bb * (1 - amount));
@@ -10028,7 +10561,7 @@ function getFemaleGroupKeysForSlug(slug, view) {
 // del color de relleno), pero esta librería no expone stroke por músculo.
 // Sin esto, tocar un músculo que todavía no tiene marcas cargadas no
 // mostraba NINGÚN indicio de que el toque se registró.
-const FEMALE_SELECTED_NEUTRAL = "#94a3b8";
+const FEMALE_SELECTED_NEUTRAL = "#9da2a8";
 
 // BUG (de la librería, no nuestro): a pesar de que su tipo declara
 // `BodyPart.color`, el color que realmente se pinta sale de
@@ -10292,7 +10825,7 @@ function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backR
         } else {
           isSel = selected && slugs.includes(slug);
         }
-        p.style.stroke = isSel ? "#f8fafc" : "none";
+        p.style.stroke = isSel ? "#f9fafa" : "none";
         p.style.strokeWidth = isSel ? "1.6" : "0";
         p.style.filter = isSel ? "drop-shadow(0 0 3px rgba(248,250,252,0.85))" : "none";
       });
@@ -10310,7 +10843,7 @@ function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backR
     const frontSvg = frontRef.current?.querySelector("svg");
     if (frontSvg) {
       const tibialLvl = ranks.tibial_anterior?.levelIdx ?? -1;
-      const tibialColor = tibialLvl >= 0 ? highlightedColors[tibialLvl] : "#334155";
+      const tibialColor = tibialLvl >= 0 ? highlightedColors[tibialLvl] : "#3c4146";
       frontSvg.querySelectorAll("polygon").forEach((p, i) => {
         if (ANTERIOR_POLY_SLUGS[i] === "calves") p.style.fill = tibialColor;
       });
@@ -10327,10 +10860,10 @@ function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backR
     const backSvg = backRef.current?.querySelector("svg");
     if (backSvg) {
       const pantorrillasLvl = ranks.pantorrillas?.levelIdx ?? -1;
-      const pantorrillasColor = pantorrillasLvl >= 0 ? highlightedColors[pantorrillasLvl] : "#334155";
+      const pantorrillasColor = pantorrillasLvl >= 0 ? highlightedColors[pantorrillasLvl] : "#3c4146";
       backSvg.querySelectorAll("polygon").forEach((p, i) => {
         const slug = POSTERIOR_POLY_SLUGS[i];
-        if (slug === "neck") p.style.fill = "#334155";
+        if (slug === "neck") p.style.fill = "#3c4146";
         else if (slug === "calves" || slug === "left-soleus" || slug === "right-soleus") p.style.fill = pantorrillasColor;
       });
     }
@@ -10351,13 +10884,13 @@ function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backR
     <div className="flex gap-2 justify-center items-start">
       <div className="flex-1 min-w-0 max-w-[180px]">
         <div ref={frontRef} onClick={handlePolygonClick("front")} className="relative">
-          <Model data={data} type="anterior" bodyColor="#334155" highlightedColors={highlightedColors} onClick={MODEL_NOOP_CLICK} style={MODEL_STYLE} svgStyle={MODEL_STYLE} />
+          <Model data={data} type="anterior" bodyColor="#3c4146" highlightedColors={highlightedColors} onClick={MODEL_NOOP_CLICK} style={MODEL_STYLE} svgStyle={MODEL_STYLE} />
         </div>
         <p className="text-center text-[10px] text-slate-600 mt-1">De frente</p>
       </div>
       <div className="flex-1 min-w-0 max-w-[180px]">
         <div ref={backRef} onClick={handlePolygonClick("back")} className="relative">
-          <Model data={data} type="posterior" bodyColor="#334155" highlightedColors={highlightedColors} onClick={MODEL_NOOP_CLICK} style={MODEL_STYLE} svgStyle={MODEL_STYLE} />
+          <Model data={data} type="posterior" bodyColor="#3c4146" highlightedColors={highlightedColors} onClick={MODEL_NOOP_CLICK} style={MODEL_STYLE} svgStyle={MODEL_STYLE} />
         </div>
         <p className="text-center text-[10px] text-slate-600 mt-1">De espalda</p>
       </div>
@@ -10375,7 +10908,7 @@ function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backR
 // Pedido: "que el muñeco se pueda switchear entre de frente y de espalda"
 // — antes esto sólo dibujaba la vista de frente, sin forma de ver la
 // espalda (dorsales, isquiotibiales, etc.) en la comparación con un amigo.
-function MiniBodyView({ ranks, sex, label, accentColor = "#94a3b8", view = "front" }) {
+function MiniBodyView({ ranks, sex, label, accentColor = "#9da2a8", view = "front" }) {
   const data = useMemo(() => buildBodyHighlighterData(ranks, view), [ranks, view]);
   const femalePalette = useFemalePalette(BODY_HIGHLIGHT_COLORS);
   const femaleData = useMemo(() => buildFemaleBodyData(ranks, BODY_HIGHLIGHT_COLORS.length, null, view), [ranks, view]);
@@ -10386,7 +10919,7 @@ function MiniBodyView({ ranks, sex, label, accentColor = "#94a3b8", view = "fron
         {sex === "F" ? (
           <FemaleBody data={femaleData} colors={femalePalette} gender="female" side={view} border="none" onBodyPartClick={MODEL_NOOP_CLICK} />
         ) : (
-          <Model data={data} type={view === "front" ? "anterior" : "posterior"} bodyColor="#334155" highlightedColors={BODY_HIGHLIGHT_COLORS} onClick={MODEL_NOOP_CLICK} style={MODEL_STYLE} svgStyle={MODEL_STYLE} />
+          <Model data={data} type={view === "front" ? "anterior" : "posterior"} bodyColor="#3c4146" highlightedColors={BODY_HIGHLIGHT_COLORS} onClick={MODEL_NOOP_CLICK} style={MODEL_STYLE} svgStyle={MODEL_STYLE} />
         )}
       </div>
     </div>
@@ -10461,8 +10994,8 @@ function BattleCompareCard({ myAvatarData, myName, mySex, mySessionsThisWeek, my
           <div className="flex-1 text-center min-w-0 max-w-[110px] slide-right">
             <div className="relative inline-block">
               {theyWinBattle && <Crown size={16} className="absolute -top-3 left-1/2 -translate-x-1/2 text-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.7)] badge-pop" />}
-              <div className="w-16 h-16 mx-auto rounded-full overflow-hidden border-[3px]" style={{ borderColor: theyWinBattle ? "#FBBF24" : "#94A3B8", boxShadow: theyWinBattle ? "0 0 0 5px rgba(251,191,36,0.2), 0 8px 20px -6px rgba(251,191,36,0.4)" : "0 8px 20px -6px rgba(192,132,252,0.35)" }}>
-                {theirAvatarData ? <img src={theirAvatarData} className="w-full h-full object-cover" alt="" /> : <div className="w-full h-full flex items-center justify-center text-xl font-black !text-white" style={{ background: "linear-gradient(135deg,#94A3B8,#475569)" }}>{(theirName || "?").charAt(0).toUpperCase()}</div>}
+              <div className="w-16 h-16 mx-auto rounded-full overflow-hidden border-[3px]" style={{ borderColor: theyWinBattle ? "#FBBF24" : "#9da2a8", boxShadow: theyWinBattle ? "0 0 0 5px rgba(251,191,36,0.2), 0 8px 20px -6px rgba(251,191,36,0.4)" : "0 8px 20px -6px rgba(192,132,252,0.35)" }}>
+                {theirAvatarData ? <img src={theirAvatarData} className="w-full h-full object-cover" alt="" /> : <div className="w-full h-full flex items-center justify-center text-xl font-black !text-white" style={{ background: "linear-gradient(135deg,#9da2a8,#50555a)" }}>{(theirName || "?").charAt(0).toUpperCase()}</div>}
               </div>
             </div>
             <p className="text-xs font-black text-slate-300 mt-1.5 truncate">{theirName || "Ellos"}</p>
@@ -10496,7 +11029,7 @@ function BattleCompareCard({ myAvatarData, myName, mySex, mySessionsThisWeek, my
             <Flame size={11} className="text-orange-400" /> {mySessionsThisWeek}-{theirSessionsThisWeek} esta semana
           </span>
           <span className="text-slate-700 text-[10px]">·</span>
-          <span className="flex items-center gap-1 text-[11px] font-black" style={{ color: iWinBattle ? "#5eead4" : theyWinBattle ? "#e9b8fc" : "#94a3b8" }}>
+          <span className="flex items-center gap-1 text-[11px] font-black" style={{ color: iWinBattle ? "#5eead4" : theyWinBattle ? "#e9b8fc" : "#9da2a8" }}>
             <Trophy size={12} className={`${iWinBattle || theyWinBattle ? "text-amber-400 sparkle-spin" : "text-slate-600"}`} />
             {iWinBattle ? "vas ganando" : theyWinBattle ? `${theirName || "esta persona"} gana` : "batalla pareja"}
           </span>
@@ -10527,7 +11060,7 @@ function BattleCompareCard({ myAvatarData, myName, mySex, mySessionsThisWeek, my
           </div>
           <div className="flex-1 min-w-0 relative">
             <div className="absolute inset-x-6 bottom-1 h-5 rounded-[50%] bg-slate-400/20 blur-md pointer-events-none" />
-            <MiniBodyView ranks={theirRanks} sex={theirSex} label={theirName || "Ellos"} accentColor="#94A3B8" view={view} />
+            <MiniBodyView ranks={theirRanks} sex={theirSex} label={theirName || "Ellos"} accentColor="#9da2a8" view={view} />
           </div>
         </div>
       </div>
@@ -10779,7 +11312,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
   };
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border shadow-md shadow-black/20 p-4 space-y-3" style={{ borderColor: tint("#3B82F6", "30"), background: `linear-gradient(${tint("#3B82F6", "0b")}, ${tint("#3B82F6", "0b")}), rgba(2,6,23,0.62)` }}>
+    <div className="relative overflow-hidden rounded-2xl border shadow-md shadow-black/20 p-4 space-y-3" style={{ borderColor: tint("#3B82F6", "30"), background: `linear-gradient(${tint("#3B82F6", "0b")}, ${tint("#3B82F6", "0b")}), var(--panel-sunken)` }}>
       {/* Glows decorativos de fondo */}
       <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
       <div className="absolute -bottom-8 -left-8 w-32 h-32 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
@@ -10826,7 +11359,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
 
             {/* Nombre del músculo como chip protagonista */}
             <div className="relative flex items-center justify-between gap-2 mb-3.5">
-              <span className="text-[11px] font-black uppercase tracking-[0.18em] px-3 py-1.5 rounded-xl" style={selInfo.hasData ? { color: selInfo.color, backgroundColor: tint(selInfo.color, "18"), border: `1px solid ${tint(selInfo.color, "35")}` } : { color: "#64748b", backgroundColor: "#1e293b66", border: "1px solid #1e293b" }}>{selInfo.label}</span>
+              <span className="text-[11px] font-black uppercase tracking-[0.18em] px-3 py-1.5 rounded-xl" style={selInfo.hasData ? { color: selInfo.color, backgroundColor: tint(selInfo.color, "18"), border: `1px solid ${tint(selInfo.color, "35")}` } : { color: "#6e7379", backgroundColor: "#25292e66", border: "1px solid #25292e" }}>{selInfo.label}</span>
               {!selInfo.hasData && <span className="text-[11px] font-bold text-slate-500 px-2.5 py-1 rounded-lg bg-slate-800/60 shrink-0">Sin rango</span>}
             </div>
 
@@ -11114,7 +11647,7 @@ function PhotoViewerModal({ photo, onClose, onDelete }) {
 // un gráfico de verdad pero sí para la forma de la tendencia. Se normaliza
 // contra su propio mínimo y máximo, así una variación de 300 gramos en el
 // peso se ve igual de clara que una de 5 kg.
-function Sparkline({ valores, color = "#475569", ancho = 78, alto = 14 }) {
+function Sparkline({ valores, color = "#50555a", ancho = 78, alto = 14 }) {
   if (!valores || valores.length < 2) return null;
   const min = Math.min(...valores);
   const max = Math.max(...valores);
@@ -11216,7 +11749,7 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
 
   return (
     <div className="relative overflow-hidden rounded-2xl border backdrop-blur-sm shadow-md shadow-black/20 p-4 space-y-3"
-      style={{ borderColor: tint("#A855F7", "30"), background: `linear-gradient(${tint("#A855F7", "0b")}, ${tint("#A855F7", "0b")}), rgba(2,6,23,0.62)` }}>
+      style={{ borderColor: tint("#A855F7", "30"), background: `linear-gradient(${tint("#A855F7", "0b")}, ${tint("#A855F7", "0b")}), var(--panel-sunken)` }}>
       <div className="flex items-center gap-2.5">
         <div className="w-8 h-8 rounded-xl bg-purple-500/15 text-purple-400 flex items-center justify-center shrink-0"><Ruler size={15} /></div>
         <p className="text-sm font-bold text-white">Tus medidas</p>
@@ -11236,14 +11769,14 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
               <p className="text-base font-black mt-1 tabular-nums" style={{ color: active ? "#fff" : "var(--surface-2-text)" }}>
                 {t.latest ? t.latest.value : "—"}<span className="text-[10px] font-normal opacity-60 ml-0.5">{t.unit}</span>
               </p>
-              <p className="text-[9px] font-bold mt-1 flex items-center gap-0.5 h-3" style={{ color: active ? "#c4b5fd" : "#64748b" }}>
+              <p className="text-[9px] font-bold mt-1 flex items-center gap-0.5 h-3" style={{ color: active ? "#c4b5fd" : "#6e7379" }}>
                 {t.delta != null && t.delta !== 0 && (t.delta > 0 ? <TrendingUp size={9} /> : <TrendingDown size={9} />)}
                 {t.delta != null ? `${t.delta > 0 ? "+" : ""}${t.delta}${t.unit}` : ""}
               </p>
               {/* Sparkline: la forma de los últimos 8 registros. Ocupa 14px
                   de alto y cuenta la tendencia sin que tengas que abrir la
                   medida para ver su gráfico. */}
-              {t.serie?.length > 1 && <Sparkline valores={t.serie} color={active ? "#c4b5fd" : "#475569"} />}
+              {t.serie?.length > 1 && <Sparkline valores={t.serie} color={active ? "#c4b5fd" : "#50555a"} />}
             </button>
           );
         })}
@@ -11289,11 +11822,11 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
         // No se asume que subir sea bueno ni malo: en peso y cintura suele
         // buscarse bajar, en pecho o brazo subir. El color va por el signo,
         // neutro, y la lectura la pone la persona.
-        const colorDif = (n) => (n == null || n === 0 ? "#94a3b8" : n > 0 ? "#60a5fa" : "#c4b5fd");
+        const colorDif = (n) => (n == null || n === 0 ? "#9da2a8" : n > 0 ? "#60a5fa" : "#c4b5fd");
         const cajas = [
           { l: "Desde el inicio", v: fmt(totalDif), c: colorDif(totalDif) },
           { l: "Últimos 30 días", v: dif30 != null ? fmt(dif30) : "—", c: colorDif(dif30) },
-          { l: "Rango", v: `${min}–${max}`, c: "#94a3b8" },
+          { l: "Rango", v: `${min}–${max}`, c: "#9da2a8" },
         ];
         return (
           <div className="grid grid-cols-3 gap-2">
@@ -11356,7 +11889,7 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
                 <button onClick={() => setCompareBase(null)} className="text-[10px] font-bold text-slate-400 px-2 py-1 rounded-lg bg-slate-800">Cancelar</button>
               </div>
             )}
-            <div className="rounded-2xl border border-slate-800/60 p-3.5" style={{ backgroundColor: "rgba(15,23,42,0.55)" }}>
+            <div className="rounded-2xl border border-slate-800/60 p-3.5" style={{ backgroundColor: "rgba(20,24,29,0.55)" }}>
               <div className="flex items-center justify-between mb-2.5">
                 <button onClick={() => setCursor((c) => { const m = c.m === 0 ? 11 : c.m - 1; const y = c.m === 0 ? c.y - 1 : c.y; return { y, m }; })} className="p-1.5 rounded-lg hover:bg-slate-800 text-slate-400"><ChevronLeft size={16} /></button>
                 <p className="text-sm font-bold text-white">{MONTH_LABELS[cursor.m]} {cursor.y}</p>
@@ -11682,18 +12215,6 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
 
   return (
     <div className="space-y-4">
-      {/* Hero — el azul es el color característico de Progreso (como el violeta lo es de Descarga) */}
-      <div className="relative overflow-hidden rounded-2xl border border-blue-500/20 p-5" style={{ background: "var(--grad-hero-blue)" }}>
-        <div className="absolute -top-8 -right-6 w-32 h-32 rounded-full bg-blue-500/15 blur-2xl pointer-events-none" />
-        <div className="absolute -bottom-6 -left-6 w-28 h-28 rounded-full bg-cyan-500/10 blur-2xl pointer-events-none" />
-        <div className="relative flex items-center gap-2 mb-1">
-          <Activity size={16} className="text-blue-400" />
-          <span className="text-[11px] font-black uppercase tracking-widest text-blue-400">Tu evolución</span>
-        </div>
-        <h2 className="relative text-xl font-black text-white leading-tight">Progreso</h2>
-        <p className="relative text-xs text-blue-300/60 mt-1">Marcas, volumen y constancia a lo largo del tiempo</p>
-      </div>
-
       {/* Ciclo actual */}
       {cycleStart ? (
         <WeekCalendar cycleStart={cycleStart} logs={logs} sessions={sessions} settings={settings} onGoToDeload={onGoToDeload} />
@@ -11716,7 +12237,7 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
         />
         {PROGRESS_SECTIONS.map((s) => (
           <button key={s.k} onClick={() => setActiveSection(s.k)} className="relative z-[1] flex flex-col items-center justify-center gap-1 py-2 rounded-xl text-[10px] font-bold transition-colors active:scale-95"
-            style={{ color: activeSection === s.k ? s.color : "#64748b" }}>
+            style={{ color: activeSection === s.k ? s.color : "#6e7379" }}>
             {s.icon}<span>{s.l}</span>
           </button>
         ))}
@@ -11731,7 +12252,7 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
       <div key={activeSection} className="tab-fade-in space-y-3">
         {activeSection === "chart" && (
           <div className="relative overflow-hidden rounded-2xl border backdrop-blur-sm shadow-md shadow-black/20 p-4 space-y-3"
-            style={{ borderColor: tint("#F59E0B", "30"), background: `linear-gradient(${tint("#F59E0B", "0b")}, ${tint("#F59E0B", "0b")}), rgba(2,6,23,0.62)` }}>
+            style={{ borderColor: tint("#F59E0B", "30"), background: `linear-gradient(${tint("#F59E0B", "0b")}, ${tint("#F59E0B", "0b")}), var(--panel-sunken)` }}>
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center shrink-0"><Activity size={15} /></div>
               <p className="text-sm font-bold text-white">Evolución por ejercicio</p>
@@ -11875,7 +12396,7 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
                     return (
                       <div
                         ref={tooltipRef}
-                        className="absolute pointer-events-none bg-[#0f0f1a] border border-slate-700/60 rounded-xl px-3 py-2.5 text-xs shadow-xl shadow-black/40 z-10"
+                        className="absolute pointer-events-none bg-[#0e1113] border border-slate-700/60 rounded-xl px-3 py-2.5 text-xs shadow-xl shadow-black/40 z-10"
                         style={{ left: clampedLeft, top: Math.max(0, activePoint.cy - 10), transform: "translate(-50%, -100%)", minWidth: "120px" }}
                       >
                         <div className="flex items-center gap-1.5 mb-1.5">
@@ -11904,8 +12425,8 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
                   const diasDesde = daysSince(history[iMejor]?.date);
                   const kpis = [
                     { l: "Tu récord", v: `${l.reps}×${l.kg}`, u: uLabel, c: EVOLUTION_CHART_COLOR },
-                    { l: "1RM estimado", v: Math.round(chartData[iMejor].e1rm), u: uLabel, c: "#f8fafc" },
-                    { l: "Sesiones", v: chartData.length, u: "", c: "#f8fafc" },
+                    { l: "1RM estimado", v: Math.round(chartData[iMejor].e1rm), u: uLabel, c: "#f9fafa" },
+                    { l: "Sesiones", v: chartData.length, u: "", c: "#f9fafa" },
                   ];
                   return (
                     <div className="space-y-2">
@@ -11956,7 +12477,7 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
         )}
 
         {activeSection === "historial" && (
-          <div className="rounded-2xl border shadow-md shadow-black/20 p-4" style={{ borderColor: tint("#06B6D4", "30"), background: `linear-gradient(${tint("#06B6D4", "0b")}, ${tint("#06B6D4", "0b")}), rgba(2,6,23,0.62)` }}>
+          <div className="rounded-2xl border shadow-md shadow-black/20 p-4" style={{ borderColor: tint("#06B6D4", "30"), background: `linear-gradient(${tint("#06B6D4", "0b")}, ${tint("#06B6D4", "0b")}), var(--panel-sunken)` }}>
             <SessionHistoryView logs={logs} onDeleteDay={onDeleteDay} trainingSessions={sessions} weekSchedule={weekSchedule} exerciseNotes={settings.exerciseNotes} rpeDisplayMode={settings.rpeDisplayMode} />
           </div>
         )}
@@ -12310,7 +12831,7 @@ function PublicUserCardSkeleton({ filas = 3 }) {
 }
 
 function SectionLabel({ children, accent = null }) {
-  return <p className="text-[9.5px] font-black uppercase tracking-widest px-0.5" style={{ color: accent || "#64748b" }}>{children}</p>;
+  return <p className="text-[9.5px] font-black uppercase tracking-widest px-0.5" style={{ color: accent || "#6e7379" }}>{children}</p>;
 }
 
 // Fila de toggle reutilizable para Perfil — antes cada switch era su propio
@@ -12322,14 +12843,14 @@ function SectionLabel({ children, accent = null }) {
 // de la app de una sola vez.
 function ToggleRow({ icon, label, desc, on, onToggle, accent = "#14B8A6" }) {
   return (
-    <button onClick={onToggle} className="w-full flex items-center gap-3 rounded-2xl px-3.5 py-3 transition active:scale-[0.99]" style={on ? { backgroundColor: tint(accent, "14"), border: `1px solid ${tint(accent, "40")}` } : { backgroundColor: "var(--row-surface)", border: "1px solid #33415580" }}>
+    <button onClick={onToggle} className="w-full flex items-center gap-3 rounded-2xl px-3.5 py-3 transition active:scale-[0.99]" style={on ? { backgroundColor: tint(accent, "14"), border: `1px solid ${tint(accent, "40")}` } : { backgroundColor: "var(--row-surface)", border: "1px solid #3c414680" }}>
       {icon && (
-        <span className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-colors" style={{ backgroundColor: on ? tint(accent, "22") : "var(--surface-2)", color: on ? accent : "#64748b" }}>
+        <span className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-colors" style={{ backgroundColor: on ? tint(accent, "22") : "var(--surface-2)", color: on ? accent : "#6e7379" }}>
           {icon}
         </span>
       )}
       <div className="text-left min-w-0 flex-1">
-        <p className="text-xs font-bold transition-colors" style={{ color: on ? accent : "#94a3b8" }}>{label}</p>
+        <p className="text-xs font-bold transition-colors" style={{ color: on ? accent : "#9da2a8" }}>{label}</p>
         {desc && <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">{desc}</p>}
       </div>
       <span className="w-11 h-6 rounded-full shrink-0 relative transition-colors" style={{ backgroundColor: on ? accent : "var(--surface-2)" }}>
@@ -12364,7 +12885,7 @@ function CollapsibleSection({ title, subtitle, icon, defaultOpen = false, childr
             ya usan las tarjetas de ejercicio/rutina y los ToggleRow de acá
             abajo, en vez de quedar como el único ícono "pelado" de Perfil. */}
         {icon && (
-          <span className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: tint(accent || "#64748b", "18"), color: accent || "var(--chip-text)" }}>
+          <span className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: tint(accent || "#6e7379", "18"), color: accent || "var(--chip-text)" }}>
             {icon}
           </span>
         )}
@@ -12828,7 +13349,7 @@ function AvatarCropModal({ src, onCancel, onConfirm }) {
         <div className="flex justify-center px-5">
           <div
             className="relative rounded-2xl overflow-hidden border border-slate-700/60 touch-none select-none cursor-grab active:cursor-grabbing"
-            style={{ width: AVATAR_CROP_VIEWPORT, height: AVATAR_CROP_VIEWPORT, background: "#0a0a0f" }}
+            style={{ width: AVATAR_CROP_VIEWPORT, height: AVATAR_CROP_VIEWPORT, background: "#0c0d10" }}
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
@@ -13216,7 +13737,7 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
                 <button onClick={() => updateSettings({ trainingMode: enPausa ? "planned" : "record" })} className="shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-black transition active:scale-95"
                   style={enPausa
                     ? { backgroundColor: "rgba(56,189,248,0.2)", color: "#7dd3fc", border: "1px solid rgba(56,189,248,0.4)" }
-                    : { backgroundColor: "rgba(148,163,184,0.12)", color: "#cbd5e1", border: "1px solid rgba(148,163,184,0.22)" }}>
+                    : { backgroundColor: "rgba(157,162,168,0.12)", color: "#d1d4d7", border: "1px solid rgba(157,162,168,0.22)" }}>
                   {enPausa ? "Reanudar" : "Pausar"}
                 </button>
               </div>
@@ -13295,7 +13816,7 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
         )}
       </CollapsibleSection>
 
-      <CollapsibleSection title="Descanso entre series" subtitle={`${formatTime(settings.restShort)} – ${formatTime(settings.restLong)}`} icon={<Timer size={16} />} accent="#14B8A6">
+      <CollapsibleSection title="Descansos" subtitle={`${formatTime(settings.restShort)} – ${formatTime(settings.restLong)}`} icon={<Timer size={16} />} accent="#14B8A6">
         <div><p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Aviso al terminar</p><div className="flex bg-black/40 rounded-xl p-1 border border-slate-700/50">{[{ k: "sound", l: "Sonido" }, { k: "vibration", l: "Vibración" }, { k: "both", l: "Ambos" }].map((opt) => <button key={opt.k} onClick={() => updateSettings({ alertType: opt.k })} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${settings.alertType === opt.k ? "bg-teal-500/20 text-teal-300" : "text-slate-500 hover:text-slate-300"}`}>{opt.l}</button>)}</div></div>
         <div className="grid grid-cols-2 gap-3">
           {[{ key: "restLong", label: "Ejercicios pesados" }, { key: "restShort", label: "Resto" }].map(({ key, label }) => (
@@ -13303,10 +13824,10 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
           ))}
         </div>
         {/* Pedido: "activar cronómetro entre ejercicios (como opción
-            extra)". Apagado por default: quien no lo pida no ve un timer más
-            entre tarjeta y tarjeta. Aparece recién cuando terminaste TODAS
-            las series de un ejercicio, que es el momento en que de verdad
-            estás por pasar al siguiente. */}
+            extra)". Arranca recién cuando terminaste TODAS las series de un
+            ejercicio, que es el momento en que de verdad estás por pasar al
+            siguiente, y se ve en el dock de abajo con el nombre de lo que
+            viene. Viene prendido (ver DEFAULT_SETTINGS) y se apaga acá. */}
         <ToggleRow
           icon={<Timer size={15} />}
           label="Descanso entre ejercicios"
@@ -13323,6 +13844,17 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
               <button onClick={() => adjustRest("restBetweenExercisesSec", 15)} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95">+</button>
             </div>
           </div>
+        )}
+        {/* Sólo donde el navegador lo permite (Android, iPhone 16.4+ y
+            escritorio): ofrecer un interruptor que no hace nada confunde. */}
+        {typeof navigator !== "undefined" && "wakeLock" in navigator && (
+          <ToggleRow
+            icon={<Sun size={15} />}
+            label="Pantalla encendida en la sesión"
+            desc="Mientras entrenás no se apaga: ves el descanso y anotás sin desbloquear el teléfono."
+            on={settings.keepScreenOn !== false}
+            onToggle={() => updateSettings({ keepScreenOn: settings.keepScreenOn === false })}
+          />
         )}
       </CollapsibleSection>
 
@@ -14167,9 +14699,9 @@ function TrainerEmpty({ icon, titulo, detalle }) {
 function TrainerSectionLabel({ children, n = null, accent = null }) {
   return (
     <div className="flex items-center gap-1.5 px-0.5">
-      <p className="text-[9.5px] font-black uppercase tracking-widest" style={{ color: accent || "#64748b" }}>{children}</p>
+      <p className="text-[9.5px] font-black uppercase tracking-widest" style={{ color: accent || "#6e7379" }}>{children}</p>
       {n != null && n > 0 && (
-        <span className="text-[9px] font-black tabular-nums rounded-full px-1.5 py-px" style={{ backgroundColor: tint(accent || "#64748b", "22"), color: accent || "#94a3b8" }}>{n}</span>
+        <span className="text-[9px] font-black tabular-nums rounded-full px-1.5 py-px" style={{ backgroundColor: tint(accent || "#6e7379", "22"), color: accent || "#9da2a8" }}>{n}</span>
       )}
     </div>
   );
@@ -14232,7 +14764,7 @@ function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted
     const p = ultimaPropuestaPorAlumno[uid];
     if (!p) return null;
     const estilos = {
-      pending: { l: "Enviado", t: "Le mandaste un plan y todavía no respondió", c: "#94a3b8", bg: "rgba(148,163,184,0.14)" },
+      pending: { l: "Enviado", t: "Le mandaste un plan y todavía no respondió", c: "#9da2a8", bg: "rgba(157,162,168,0.14)" },
       accepted: { l: "Aceptado", t: "Aceptó el plan que le mandaste", c: "#34d399", bg: "rgba(52,211,153,0.14)" },
       rejected: { l: "Rechazado", t: "Rechazó el plan que le mandaste", c: "#fb7185", bg: "rgba(251,113,133,0.14)" },
     };
@@ -14725,9 +15257,9 @@ function LeaderboardSection({ uid, profile, myTopRank, friendAccepted, basics, a
   return (
     <div className="space-y-3">
       <div className="grid gap-1 p-1 rounded-xl bg-black/40 border border-slate-700/50" style={{ gridTemplateColumns: GLOBAL_RANKING_ENABLED ? "repeat(3, 1fr)" : "repeat(2, 1fr)" }}>
-        <button onClick={() => setScope("amigos")} className="py-1.5 rounded-lg text-xs font-bold transition-all" style={scope === "amigos" ? { backgroundColor: "var(--surface-3)", color: "#fff" } : { color: "#64748b" }}>Mejor rango</button>
-        <button onClick={() => setScope("semana")} className="flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs font-bold transition-all" style={scope === "semana" ? { backgroundColor: "var(--surface-3)", color: "#fff" } : { color: "#64748b" }}><Flame size={12} /> Racha</button>
-        {GLOBAL_RANKING_ENABLED && <button onClick={() => setScope("global")} className="py-1.5 rounded-lg text-xs font-bold transition-all" style={scope === "global" ? { backgroundColor: "var(--surface-3)", color: "#fff" } : { color: "#64748b" }}>Global</button>}
+        <button onClick={() => setScope("amigos")} className="py-1.5 rounded-lg text-xs font-bold transition-all" style={scope === "amigos" ? { backgroundColor: "var(--surface-3)", color: "#fff" } : { color: "#6e7379" }}>Mejor rango</button>
+        <button onClick={() => setScope("semana")} className="flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs font-bold transition-all" style={scope === "semana" ? { backgroundColor: "var(--surface-3)", color: "#fff" } : { color: "#6e7379" }}><Flame size={12} /> Racha</button>
+        {GLOBAL_RANKING_ENABLED && <button onClick={() => setScope("global")} className="py-1.5 rounded-lg text-xs font-bold transition-all" style={scope === "global" ? { backgroundColor: "var(--surface-3)", color: "#fff" } : { color: "#6e7379" }}>Global</button>}
       </div>
       {scope === "amigos" && friendsRanking.length === 0 && (
         // Pedido: "la pestaña se ve medio vacía" — mismo criterio que el
@@ -14809,7 +15341,7 @@ function FriendConsistencyStrip({ trainingSessions = [], activeRoutineSnapshot, 
                     key={date}
                     title={date}
                     className={`aspect-square rounded-lg ${isToday ? "ring-2 ring-white/70" : ""}`}
-                    style={session ? { background: `linear-gradient(155deg, ${tint(color, "ee")}, ${tint(color, "88")})` } : { backgroundColor: "rgba(51,65,85,0.35)", border: "1px solid rgba(148,163,184,0.14)" }}
+                    style={session ? { background: `linear-gradient(155deg, ${tint(color, "ee")}, ${tint(color, "88")})` } : { backgroundColor: "rgba(60,65,70,0.35)", border: "1px solid rgba(157,162,168,0.14)" }}
                   />
                 );
               })}
@@ -14883,7 +15415,7 @@ function FriendSessionHistory({ trainingSessions = [], activeRoutineSnapshot }) 
             const isSelected = d === selectedDate;
             const dayNum = parseInt(d.slice(8, 10), 10);
             const dayDef = s ? model?.days?.[s.dayKey] : null;
-            const color = dayDef?.color || "#475569";
+            const color = dayDef?.color || "#50555a";
             return (
               <button key={i} onClick={() => s && setSelectedDate(isSelected ? null : d)} disabled={!s}
                 style={{ ...(s ? { backgroundColor: tint(color, "30"), border: `1px solid ${tint(color, "55")}` } : null), animationDelay: `${Math.min(i, 20) * 7}ms` }}
@@ -14896,7 +15428,7 @@ function FriendSessionHistory({ trainingSessions = [], activeRoutineSnapshot }) 
       </div>
       {selected ? (
         <div className="flex items-center gap-3 rounded-xl border border-slate-800/50 bg-slate-900/50 px-3.5 py-2.5 msg-in">
-          <span className="w-1.5 h-8 rounded-full shrink-0" style={{ backgroundColor: model?.days?.[selected.dayKey]?.color || "#475569" }} />
+          <span className="w-1.5 h-8 rounded-full shrink-0" style={{ backgroundColor: model?.days?.[selected.dayKey]?.color || "#50555a" }} />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-bold text-white truncate">{model?.days?.[selected.dayKey]?.label || selected.dayKey || "Entrenamiento"}</p>
             <p className="text-[10.5px] text-slate-500 capitalize">
@@ -15366,8 +15898,8 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
                   <div className="grid grid-cols-3 gap-1.5">
                     {[
                       { l: "Con plan", v: resumen.planificados.length, c: accent },
-                      { l: "Por récord", v: resumen.pausados.length, c: "#94a3b8" },
-                      { l: "Sin plan", v: resumen.sinPlan.length, c: "#64748b" },
+                      { l: "Por récord", v: resumen.pausados.length, c: "#9da2a8" },
+                      { l: "Sin plan", v: resumen.sinPlan.length, c: "#6e7379" },
                     ].map((s) => (
                       <div key={s.l} className="rounded-xl px-2 py-2 text-center" style={{ backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}>
                         <p className="text-lg font-black tabular-nums leading-none" style={{ color: s.c }}>{s.v}</p>
@@ -15412,7 +15944,7 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
                               <button onClick={() => onSetPlanPaused(e.id, !e.pausado)} className="shrink-0 px-2 py-1.5 rounded-lg text-[9.5px] font-black transition active:scale-95"
                                 style={e.pausado
                                   ? { backgroundColor: tint(accent, "20"), color: "#7dd3fc", border: `1px solid ${tint(accent, "45")}` }
-                                  : { backgroundColor: "rgba(148,163,184,0.12)", color: "#cbd5e1", border: "1px solid rgba(148,163,184,0.22)" }}>
+                                  : { backgroundColor: "rgba(157,162,168,0.12)", color: "#d1d4d7", border: "1px solid rgba(157,162,168,0.22)" }}>
                                 {e.pausado ? "Al plan" : "A récord"}
                               </button>
                               <button onClick={() => setConfirmQuitar(confirmQuitar === e.id ? null : e.id)} aria-label={`Quitar el plan de ${e.nombre}`} className="shrink-0 p-1.5 rounded-lg text-slate-500 hover:text-rose-400 transition">
@@ -15472,7 +16004,7 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
                           {PLAN_OBJETIVOS.map((o) => (
                             <button key={o.k} onClick={() => elegirObjetivo(o.k)} className="rounded-lg px-2 py-1.5 text-left transition active:scale-[0.97]"
                               style={objetivo === o.k ? { backgroundColor: tint(o.color, "1c"), border: `1px solid ${tint(o.color, "55")}` } : { backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}>
-                              <span className="block text-[10.5px] font-black" style={{ color: objetivo === o.k ? o.color : "#e2e8f0" }}>{o.l}</span>
+                              <span className="block text-[10.5px] font-black" style={{ color: objetivo === o.k ? o.color : "#e6e8ea" }}>{o.l}</span>
                               <span className="block text-[8.5px] text-slate-500 leading-tight">{o.d}</span>
                             </button>
                           ))}
@@ -15705,7 +16237,7 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
                                   <button onClick={() => onSetPlanPaused(ex.id, !pausado)} className="flex items-center gap-1 px-2 py-1 rounded-lg text-[9.5px] font-bold transition active:scale-95"
                                     style={pausado
                                       ? { backgroundColor: tint(accent, "1c"), color: "#7dd3fc", border: `1px solid ${tint(accent, "45")}` }
-                                      : { backgroundColor: "rgba(148,163,184,0.12)", color: "#cbd5e1", border: "1px solid rgba(148,163,184,0.22)" }}>
+                                      : { backgroundColor: "rgba(157,162,168,0.12)", color: "#d1d4d7", border: "1px solid rgba(157,162,168,0.22)" }}>
                                     {pausado ? <><ClipboardCheck size={10} /> Volver al plan</> : <><Trophy size={10} /> Pasar a récord</>}
                                   </button>
                                 )}
@@ -15947,7 +16479,7 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
                   neutro original — el violeta queda reservado para la
                   identidad de fondo de Social (hero, tarjeta de perfil),
                   no repetido en cada tarjeta chica de adentro. */}
-              <div className="relative overflow-hidden rounded-2xl border border-slate-700/50 p-3" style={{ background: "linear-gradient(160deg, rgba(30,41,59,0.6), rgba(15,23,42,0.4))" }}>
+              <div className="relative overflow-hidden rounded-2xl border border-slate-700/50 p-3" style={{ background: "linear-gradient(160deg, rgba(37,41,46,0.6), rgba(20,24,29,0.4))" }}>
                 <p className="relative text-[9px] font-black uppercase tracking-widest text-slate-500 mb-1.5 flex items-center gap-1"><Swords size={10} /> Esta semana</p>
                 <div className="relative grid grid-cols-[1fr_auto_1fr] items-center gap-1">
                   <div className="text-center">
@@ -16696,32 +17228,11 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
 
   return (
     <div className="space-y-4">
-      {/* Hero propio de la pestaña — pedido: "el recuadro Social quedó
-          distinto en formato y diseño en comparación con las otras
-          pestañas". El intento anterior (ver historial) puso el AVATAR y
-          el NOMBRE del usuario como título grande — Rutina/Progreso/
-          Rutinas/Chatbot en cambio siempre usan el mismo esqueleto: ícono +
-          etiqueta chica, el NOMBRE DE LA PESTAÑA como título grande, y una
-          bajada de una línea debajo. Ahora Social sigue exactamente ese
-          mismo esqueleto (ver heroGrad de Rutina/Progreso más arriba en el
-          archivo) — el avatar/nombre/racha/rango pasan a su propia tarjeta
-          de perfil, debajo, en vez de vivir adentro de este hero. */}
-      {/* Un solo resplandor, y un canto de 1px de verdad. El segundo glow era
-          FUCSIA — un color que no significa nada en la app y que, sumado al
-          violeta, convertía el borde superior en una mancha sin filo. */}
-      <div className="relative overflow-hidden rounded-2xl p-5 elastic-in" style={{ background: "var(--grad-hero-violet)", border: `1px solid ${tint(SOCIAL_COLOR, "3a")}` }}>
-        <div className="absolute -top-8 -right-6 w-32 h-32 rounded-full blur-2xl pointer-events-none" style={{ backgroundColor: tint(SOCIAL_COLOR, "22") }} />
-        <div className="relative flex items-center gap-2 mb-1">
-          <Users size={16} style={{ color: SOCIAL_INK }} />
-          <span className="text-[11px] font-black uppercase tracking-widest" style={{ color: SOCIAL_INK }}>Social</span>
-        </div>
-        <h2 className="relative text-xl font-black text-white leading-tight">Social</h2>
-        <p className="relative text-xs mt-1" style={{ color: "#94a3b8" }}>Sumá amigos, competí y compartí tu progreso</p>
-      </div>
-
-      {/* Tarjeta de perfil — el avatar/nombre/racha/rango que antes vivían
-          adentro del hero de arriba. Mismo patrón de dos tarjetas apiladas
-          que ya usa Progreso (hero + WeekCalendar debajo). */}
+      {/* El hero de Social (rótulo + "Social" + bajada) se fue: lo dice el
+          título grande de la página (TituloPestana), con el mismo rótulo y
+          la misma bajada. Ver historial para los pedidos que lo formaron. */}
+      {/* Tarjeta de perfil — el avatar/nombre/racha/rango, lo primero de
+          la pestaña. */}
       {/* Pedido: "métele la textura del principal [el hero de arriba],
           pero agreguemos algo más al diseño, algo que involucre otros
           colores pero en poca cantidad — al igual que el violeta de la
@@ -16800,7 +17311,7 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
             : nombres.length === 2 ? `${nombres[0]} y ${nombres[1]}`
             : `${nombres[0]} y ${nombres.length - 1} más`;
           return (
-            <div className="relative overflow-hidden rounded-2xl border mt-3 p-3 elastic-in" style={{ borderColor: "rgba(251,191,36,0.4)", background: "linear-gradient(135deg, rgba(251,191,36,0.16), rgba(15,23,42,0.55) 70%)" }}>
+            <div className="relative overflow-hidden rounded-2xl border mt-3 p-3 elastic-in" style={{ borderColor: "rgba(251,191,36,0.4)", background: "linear-gradient(135deg, rgba(251,191,36,0.16), rgba(20,24,29,0.55) 70%)" }}>
               <div className="absolute -top-8 -right-8 w-20 h-20 rounded-full blur-2xl pointer-events-none" style={{ backgroundColor: "rgba(251,191,36,0.3)" }} />
               <div className="relative flex items-center gap-2.5">
                 <div className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 border-2 badge-pop" style={{ backgroundColor: "rgba(251,191,36,0.18)", borderColor: "rgba(251,191,36,0.5)" }}>
@@ -16819,7 +17330,7 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
           const sent = !!kudosSentMap[top.uid];
           const sending = kudosSendingUid === top.uid;
           return (
-            <div className="relative overflow-hidden rounded-2xl border mt-3 p-3 elastic-in" style={{ borderColor: "rgba(20,184,166,0.4)", background: "linear-gradient(135deg, rgba(20,184,166,0.16), rgba(15,23,42,0.55) 70%)" }}>
+            <div className="relative overflow-hidden rounded-2xl border mt-3 p-3 elastic-in" style={{ borderColor: "rgba(20,184,166,0.4)", background: "linear-gradient(135deg, rgba(20,184,166,0.16), rgba(20,24,29,0.55) 70%)" }}>
               <div className="absolute -top-8 -right-8 w-20 h-20 rounded-full blur-2xl pointer-events-none" style={{ backgroundColor: "rgba(20,184,166,0.3)" }} />
               <div className="relative flex items-center gap-2.5">
                 <button onClick={() => setViewingUid(top.uid)} className="flex items-center gap-2 flex-1 min-w-0 text-left active:opacity-80 transition">
@@ -16861,7 +17372,7 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
           );
         })()}
         {chaserFriend && (
-          <button onClick={() => setViewingUid(chaserFriend.uid)} className="relative overflow-hidden w-full text-left rounded-2xl border mt-3 p-3 active:scale-[0.99] transition elastic-in" style={{ borderColor: "rgba(244,63,94,0.5)", background: "linear-gradient(135deg, rgba(244,63,94,0.20), rgba(15,23,42,0.55) 70%)" }}>
+          <button onClick={() => setViewingUid(chaserFriend.uid)} className="relative overflow-hidden w-full text-left rounded-2xl border mt-3 p-3 active:scale-[0.99] transition elastic-in" style={{ borderColor: "rgba(244,63,94,0.5)", background: "linear-gradient(135deg, rgba(244,63,94,0.20), rgba(20,24,29,0.55) 70%)" }}>
             <div className="absolute -top-8 -left-8 w-24 h-24 rounded-full blur-2xl pointer-events-none animate-pulse" style={{ backgroundColor: "rgba(244,63,94,0.3)" }} />
             <div className="relative flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 border-2 streak-beat" style={{ backgroundColor: "rgba(244,63,94,0.2)", borderColor: "rgba(244,63,94,0.55)" }}>
@@ -16937,7 +17448,7 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
           const badge = s.k === "amigos" ? friendIncoming.length : s.k === "entrenador" ? trainerIncoming.length + proposals.length : 0;
           return (
             <button key={s.k} onClick={() => setSection(s.k)} className="relative z-[1] flex flex-col items-center justify-center gap-1 py-2 rounded-xl text-[10.5px] font-bold transition-colors active:scale-95"
-              style={{ color: section === s.k ? SOCIAL_INK : "#64748b" }}>
+              style={{ color: section === s.k ? SOCIAL_INK : "#6e7379" }}>
               {s.icon}<span>{s.l}</span>
               {badge > 0 && <span className="absolute top-1 right-2.5 w-4 h-4 rounded-full bg-rose-500 text-white text-[9px] font-black flex items-center justify-center z-[2]">{badge}</span>}
             </button>
@@ -16957,8 +17468,8 @@ function SocialView({ profile, profileName, uid, onActivateRoutine, onUpdateProf
         className="relative overflow-hidden rounded-2xl border backdrop-blur-sm shadow-md shadow-black/20 p-4 tab-fade-in"
         style={{
           borderColor: "var(--hairline)",
-          // Acá estaba el peor problema medido de la pestaña: rgba(2,6,23,0.62)
-          // sobre una página #0a0a0f compone a luminancia 6 contra la 10 de la
+          // Acá estaba el peor problema medido de la pestaña: rgba(5,7,11,0.62)
+          // sobre una página #0c0d10 compone a luminancia 6 contra la 10 de la
           // página. O sea que la tarjeta era MÁS OSCURA que el fondo: no se
           // leía como una tarjeta sino como un pozo sin bordes, y el lavado de
           // color encima era el único modo de notar que existía. Ahora sube un
@@ -17535,7 +18046,7 @@ function BuilderExerciseRow({ ex, onRemove, onConfigChange, isDragging = false, 
     <div
       className={`bg-slate-900/60 border rounded-xl px-3 py-2.5 transition-all duration-150${recienAgregado ? " row-flash" : ""}`}
       style={{
-        borderColor: isDragging ? "#14B8A6" : "rgba(30,41,59,0.5)",
+        borderColor: isDragging ? "#14B8A6" : "rgba(37,41,46,0.5)",
         // La fila que arrastrás se "levanta": escala apenas, sombra fuerte y
         // se despega del fondo. Las demás se corren solas (el padre les aplica
         // el translateY), así ves el hueco abrirse en tiempo real.
@@ -20128,41 +20639,23 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
     // overflowAnchor "none" le dice que no compense acá; el auto-scroll
     // propio del chat (bajar al escribir) no depende de esto y sigue igual.
     <div className="relative pb-44" style={{ overflowAnchor: "none" }}>
-      {/* Mismo formato de héroe plano que usan las demás pestañas (Rutina/
-          Progreso/Descarga), con el teal de siempre — Chatbot comparte
-          identidad de color con Rutina a propósito. */}
-      <div className="relative overflow-hidden rounded-2xl border border-teal-500/20 p-5 mb-3" style={{ background: "var(--grad-hero-teal)" }}>
-        <div className="absolute -top-8 -right-8 w-32 h-32 rounded-full bg-teal-500/15 blur-2xl pointer-events-none" />
-        <div className="relative flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl bg-teal-500/20 border border-teal-500/30 flex items-center justify-center shrink-0 shadow-lg shadow-teal-500/20 elastic-in">
-            <Sparkles size={20} className="text-teal-400 sparkle-spin" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-0.5">
-              <span className="text-[10px] font-black uppercase tracking-widest text-teal-400">Tu asistente</span>
-              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-teal-500/20 text-teal-400 font-bold border border-teal-500/20">BETA</span>
-            </div>
-            <h2 className="relative text-xl font-black text-white leading-tight">Chatbot</h2>
-            {/* Pedido: "el recuadro... del chatbot llega a dos renglones,
-                reducilo a uno" — acá el bloque de texto tiene MENOS ancho
-                que en los otros heroes (comparte la fila con el ícono de
-                la izquierda y, a veces, un botón extra a la derecha), así
-                que necesita quedar más corto que el resto para entrar en
-                una sola línea con ese espacio reducido. */}
-            <p className="relative text-xs text-teal-300/60 mt-0.5">Conoce tu historial, preguntá lo que quieras</p>
-          </div>
+      {/* El hero de esta pestaña se fue (el título grande ya está en la
+          página, ver TituloPestana). Sus dos acciones quedan acá, con texto
+          además del ícono: sueltas, un ícono solo no dice qué hace. */}
+      {(messages.some((m) => m.plan && m.planStatus === "confirmed") || messages.length > 1) && (
+        <div className="flex items-center justify-end gap-2 -mt-1 mb-3">
           {messages.some((m) => m.plan && m.planStatus === "confirmed") && (
-            <button onClick={() => setShowChangeLog(true)} title="Cambios aplicados" className="p-2 rounded-xl bg-slate-800/60 border border-slate-700/50 text-slate-400 hover:text-teal-400 transition shrink-0 active:scale-95">
-              <ListChecks size={14} />
+            <button onClick={() => setShowChangeLog(true)} className="h-9 px-3 rounded-xl flex items-center gap-1.5 text-[12px] font-semibold bg-slate-800/50 border border-slate-700/40 text-slate-300 hover:text-teal-400 transition active:scale-95">
+              <ListChecks size={14} /> Cambios aplicados
             </button>
           )}
           {messages.length > 1 && (
-            <button onClick={() => onNewConversation ? onNewConversation() : setMessages([AI_CHAT_WELCOME])} title="Nueva conversación" className="p-2 rounded-xl bg-slate-800/60 border border-slate-700/50 text-slate-400 hover:text-teal-400 transition shrink-0 active:scale-95">
-              <RotateCcw size={14} />
+            <button onClick={() => onNewConversation ? onNewConversation() : setMessages([AI_CHAT_WELCOME])} className="h-9 px-3 rounded-xl flex items-center gap-1.5 text-[12px] font-semibold bg-slate-800/50 border border-slate-700/40 text-slate-300 hover:text-teal-400 transition active:scale-95">
+              <RotateCcw size={14} /> Nueva conversación
             </button>
           )}
         </div>
-      </div>
+      )}
 
       {/* Dock de accesos directos, tipo ícono primero. Antes cada atajo
           tenía su propio color (como los pills de Progreso) — acá se sacó
@@ -20476,7 +20969,7 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
               )}
               <div className="flex-1 min-h-12 flex items-end gap-2 rounded-2xl p-1.5 backdrop-blur-xl shadow-xl shadow-black/40 transition-colors" style={{ backgroundColor: isListening ? "var(--chat-bar-listening)" : editingIndex != null ? "var(--chat-bar-editing)" : "var(--chat-bar-idle)", border: `1px solid ${isListening ? "var(--chat-bar-border-listening)" : editingIndex != null ? "var(--chat-bar-border-editing)" : "var(--chat-bar-border-idle)"}` }}>
                 {SpeechRecognitionAPI && (
-                  <button onClick={handleMicToggle} aria-label={isListening ? "Confirmar, terminé de hablar" : "Hablar"} className="relative p-2.5 rounded-xl shrink-0 transition-all active:scale-95" style={isListening ? { background: "linear-gradient(160deg,#10B981,#059669)", color: "#fff" } : { color: "#94a3b8" }}>
+                  <button onClick={handleMicToggle} aria-label={isListening ? "Confirmar, terminé de hablar" : "Hablar"} className="relative p-2.5 rounded-xl shrink-0 transition-all active:scale-95" style={isListening ? { background: "linear-gradient(160deg,#10B981,#059669)", color: "#fff" } : { color: "#9da2a8" }}>
                     {isListening && <span className="absolute inset-0 rounded-xl bg-emerald-400/40 animate-ping" />}
                     <span className="relative">{isListening ? <Check size={16} /> : <Mic size={16} />}</span>
                   </button>
@@ -20591,11 +21084,11 @@ function AIConversationSidebar({ conversations, activeConversationId, onSelect, 
               <button key={c.id} onClick={() => onSelect(c.id)} className="relative w-full flex items-center gap-2.5 rounded-xl pl-3 pr-2 py-2.5 text-left transition active:scale-[0.99] overflow-hidden"
                 style={isActive ? { background: "linear-gradient(135deg, rgba(20,184,166,0.16), rgba(20,184,166,0.05))", border: "1px solid rgba(20,184,166,0.35)" } : { backgroundColor: "var(--row-surface)", border: "1px solid transparent" }}>
                 {isActive && <span className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-teal-400" />}
-                <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: isActive ? "rgba(20,184,166,0.2)" : "rgba(148,163,184,0.08)" }}>
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: isActive ? "rgba(20,184,166,0.2)" : "rgba(157,162,168,0.08)" }}>
                   <MessageCircle size={12} className={isActive ? "text-teal-300" : "text-slate-600"} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold truncate" style={{ color: isActive ? "#fff" : "#94a3b8" }}>{c.title}</p>
+                  <p className="text-xs font-bold truncate" style={{ color: isActive ? "#fff" : "#9da2a8" }}>{c.title}</p>
                   <p className="text-[10px] text-slate-600 mt-0.5 truncate">{dateLabel}{lastMsg ? ` · ${lastMsg}` : ""}</p>
                 </div>
                 {onRename && !confirming && (
@@ -21620,7 +22113,7 @@ function volumenPorMusculo(routineDef) {
     .map(([g, series]) => ({
       grupo: g,
       label: MUSCLE_GROUP_BY_KEY[g]?.label || g,
-      color: MUSCLE_GROUP_BY_KEY[g]?.color || "#64748b",
+      color: MUSCLE_GROUP_BY_KEY[g]?.color || "#6e7379",
       series,
     }))
     .sort((a, b) => b.series - a.series);
@@ -22115,7 +22608,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
           </div>
 
           {/* Opción 2: Preestablecidas */}
-          <button onClick={() => { setShowPresetsForced((s) => !s); setCreateOpen(false); }} className={`relative overflow-hidden w-full rounded-2xl border p-4 text-left transition active:scale-[0.99] ${showPresetsForced ? "border-blue-500/40" : "border-blue-500/25"}`} style={{ background: "var(--grad-hero-blue, linear-gradient(135deg,#0c1f2a,#0f172a))" }}>
+          <button onClick={() => { setShowPresetsForced((s) => !s); setCreateOpen(false); }} className={`relative overflow-hidden w-full rounded-2xl border p-4 text-left transition active:scale-[0.99] ${showPresetsForced ? "border-blue-500/40" : "border-blue-500/25"}`} style={{ background: "var(--grad-hero-blue, linear-gradient(135deg,#0c1f2a,#14181d))" }}>
             <div className="absolute -top-8 -right-8 w-28 h-28 rounded-full bg-blue-500/15 blur-2xl pointer-events-none" />
             <div className="relative flex items-center gap-3">
               <div className="w-11 h-11 rounded-2xl bg-blue-500/20 border border-blue-500/30 flex items-center justify-center shrink-0"><Layers size={18} className="text-blue-400" /></div>
@@ -22138,26 +22631,6 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
               <ChevronRight size={16} className="text-slate-600 shrink-0" />
             </div>
           </button>
-        </div>
-      )}
-
-      {!forced && (
-        // Pedido: se probó una textura rayada acá (ver historial) para
-        // diferenciar de Progreso sin cambiar el azul compartido, pero no
-        // convenció — vuelta al degradé liso de siempre.
-        <div className="relative overflow-hidden rounded-2xl border border-blue-500/20 p-5" style={{ background: "var(--grad-hero-blue)" }}>
-          <div className="absolute -top-8 -right-6 w-32 h-32 rounded-full bg-blue-500/15 blur-2xl pointer-events-none" />
-          <div className="absolute -bottom-6 -left-6 w-28 h-28 rounded-full bg-cyan-500/10 blur-2xl pointer-events-none" />
-          <div className="relative flex items-center gap-2 mb-1">
-            <Layers size={16} className="text-blue-400" />
-            <span className="text-[11px] font-black uppercase tracking-widest text-blue-400">Tu plan de entrenamiento</span>
-          </div>
-          <h2 className="relative text-xl font-black text-white leading-tight">Rutinas</h2>
-          {/* Pedido: "el recuadro principal de Rutinas... llega a dos
-              renglones, reducilo a uno como el resto" — el texto anterior
-              era el más largo de todos los heroes (64 caracteres, contra
-              ~50-56 del resto), lo suficiente para partirse en 2 líneas. */}
-          <p className="relative text-xs text-blue-300/60 mt-1">Una rutina ya armada, o creá la tuya</p>
         </div>
       )}
 
@@ -22214,7 +22687,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
               // WeekCalendar (todas las semanas entrenadas comparten el
               // mismo azul, sin un color distinto por semana). Sólo HOY
               // se destaca con el color propio del día que le toca.
-              const chipColor = isToday ? (d ? d.color : "#64748b") : (d ? "#3B82F6" : "#64748b");
+              const chipColor = isToday ? (d ? d.color : "#6e7379") : (d ? "#3B82F6" : "#6e7379");
               return (
                 <button key={wk} onClick={() => d && onGoToDay?.(dk)} disabled={!d} title={d ? d.label : "Descanso"} className="flex items-center justify-center">
                   <span className={`w-full aspect-square rounded-xl flex items-center justify-center text-[10px] font-black uppercase transition-all ${isToday ? "scale-110" : ""} ${d ? "active:scale-95" : ""}`}
@@ -22258,7 +22731,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
                 const ultimoImpar = i === orden.length - 1 && orden.length % 2 === 1;
                 return (
                   <button key={dk} onClick={() => onGoToDay?.(dk)} className={`flex items-center gap-2 px-2.5 py-2.5 rounded-xl text-[11px] font-bold min-w-0 transition active:scale-[0.97] border border-blue-400/20 bg-black/25 ${ultimoImpar ? "col-span-2" : ""}`}>
-                    <span className="flex-1 min-w-0 leading-snug text-left" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", color: "#f1f5f9" }}>{d.label}</span>
+                    <span className="flex-1 min-w-0 leading-snug text-left" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden", color: "#f3f5f6" }}>{d.label}</span>
                     <span className="tabular-nums shrink-0 text-[10px] text-blue-300/70">{d.exercises?.length || 0}</span>
                   </button>
                 );
@@ -22298,7 +22771,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
           va adentro ya son tarjetas, así que flotan sobre una base más
           hundida en vez de fundirse con ella. */}
       {customEntries.length > 0 && (
-        <div className="rounded-2xl border p-3 space-y-3" style={{ borderColor: tint("#3B82F6", "25"), background: `linear-gradient(${tint("#3B82F6", "0b")}, ${tint("#3B82F6", "0b")}), rgba(2,6,23,0.62)` }}>
+        <div className="rounded-2xl border p-3 space-y-3" style={{ borderColor: tint("#3B82F6", "25"), background: `linear-gradient(${tint("#3B82F6", "0b")}, ${tint("#3B82F6", "0b")}), var(--panel-sunken)` }}>
           <div className="flex items-center gap-2.5 px-0.5 pt-0.5">
             <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: tint("#3B82F6", "18"), color: "#3B82F6" }}><ListChecks size={15} /></div>
             <p className="flex-1 min-w-0 text-sm font-bold text-white">Tus rutinas creadas</p>
@@ -22315,7 +22788,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
       )}
 
       {(!forced || showPresetsForced) && (
-      <div className={`rounded-2xl border p-3 space-y-3 ${forced ? "tab-fade-in" : ""}`} style={{ borderColor: tint("#3B82F6", "25"), background: `linear-gradient(${tint("#3B82F6", "08")}, ${tint("#3B82F6", "08")}), rgba(2,6,23,0.62)` }}>
+      <div className={`rounded-2xl border p-3 space-y-3 ${forced ? "tab-fade-in" : ""}`} style={{ borderColor: tint("#3B82F6", "25"), background: `linear-gradient(${tint("#3B82F6", "08")}, ${tint("#3B82F6", "08")}), var(--panel-sunken)` }}>
         <div className="flex items-center gap-2.5 px-0.5 pt-0.5">
           <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: tint("#3B82F6", "18"), color: "#3B82F6" }}><Sparkles size={15} /></div>
           <p className="flex-1 min-w-0 text-sm font-bold text-white">Rutinas preestablecidas</p>
@@ -22447,7 +22920,7 @@ function HeaderAvatar({ profileName, onClick }) {
    cerraría la sesión y borraría lo que tenías escrito sin guardar. La
    confirmación se cancela sola a los 5s para no quedar trabada.
 ============================================================================ */
-function ActiveSessionBar({ startedAt, dayLabel, color, done, total, conProgreso, enRutina, onEnd, onCancel, onGoToRoutine }) {
+function ActiveSessionBar({ startedAt, dayLabel, color, done, total, conProgreso, enRutina, onEnd, onCancel, onGoToRoutine, descanso = null }) {
   // El tiempo transcurrido se guarda en estado y lo actualiza el intervalo.
   // Leer el reloj durante el render es impuro (y el linter de React Compiler
   // lo rechaza): el primer valor llega en el siguiente turno del event loop
@@ -22476,93 +22949,196 @@ function ActiveSessionBar({ startedAt, dayLabel, color, done, total, conProgreso
   const pct = total ? Math.round((done / total) * 100) : 0;
   const completo = conProgreso && total > 0 && done >= total;
 
+  // Sólo la tarjeta: el lugar en la pantalla lo pone DockInferior, que la
+  // apila con el descanso en curso.
   return (
-    <div className="session-bar-dock px-3 pointer-events-none">
-      <div className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto pointer-events-auto session-bar-in">
-        <div
-          className="rounded-2xl backdrop-blur-xl shadow-2xl shadow-black/50 overflow-hidden"
-          style={{ backgroundColor: "rgba(10,10,15,0.92)", border: `1px solid ${tint(color, "55")}` }}
-        >
-          {confirmando ? (
-            <div className="flex items-center gap-2 px-3 py-2.5">
-              <div className="flex-1 min-w-0">
-                <p className="text-[12px] font-bold text-white leading-tight">¿Finalizar la sesión?</p>
-                <p className="text-[10px] text-slate-500 leading-tight mt-0.5">
-                  {conProgreso && total > 0 && done < total
-                    ? `Te quedan ${total - done} de ${total} series. `
-                    : ""}
-                  Se guarda en tu historial y se borra lo que escribiste sin guardar.
-                </p>
-                {onCancel && (
-                  <button onClick={onCancel} className="text-[10px] text-slate-600 hover:text-rose-400 transition mt-0.5">
-                    O descartala, sin que cuente como entrenamiento
-                  </button>
-                )}
-              </div>
-              <button onClick={() => setConfirmando(false)} className="px-3 py-2 rounded-xl bg-slate-800 text-slate-400 text-[11px] font-bold shrink-0 transition active:scale-95">No</button>
-              <button onClick={onEnd} className="px-3 py-2 rounded-xl !text-white text-[11px] font-black shrink-0 transition active:scale-95" style={{ backgroundColor: color }}>Sí, finalizar</button>
-            </div>
-          ) : (
-            <div className="flex items-stretch">
-              {/* Cuerpo: toca para volver a Rutina (si no estás ahí ya) */}
-              <button
-                onClick={enRutina ? undefined : onGoToRoutine}
-                disabled={enRutina}
-                aria-label={enRutina ? undefined : "Volver a tu entrenamiento"}
-                className="flex-1 min-w-0 flex items-center gap-2.5 pl-3 pr-2 py-2.5 text-left transition active:scale-[0.99] disabled:active:scale-100"
-              >
-                <span className="relative flex h-2.5 w-2.5 shrink-0">
-                  <span className="absolute inline-flex h-full w-full rounded-full session-chip-ping" style={{ backgroundColor: color }} />
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5" style={{ backgroundColor: color }} />
-                </span>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="text-[13px] font-black tabular-nums text-white shrink-0">{reloj}</span>
-                    {dayLabel && <span className="text-[10px] font-bold uppercase tracking-wider truncate" style={{ color: tint(color, "cc") }}>{dayLabel}</span>}
-                    {!enRutina && <ChevronDown size={12} className="text-slate-600 shrink-0 -rotate-90" />}
-                  </div>
-                  {conProgreso && total > 0 ? (
-                    <div className="flex items-center gap-2 mt-1">
-                      <div className="flex-1 h-1 rounded-full overflow-hidden bg-slate-800">
-                        <div className="h-full rounded-full transition-all duration-500 ease-out" style={{ width: `${pct}%`, backgroundColor: color }} />
-                      </div>
-                      <span className="text-[9.5px] font-bold tabular-nums shrink-0" style={{ color: completo ? color : "#64748b" }}>{done}/{total}</span>
-                    </div>
-                  ) : (
-                    <p className="text-[10px] text-slate-500 leading-tight mt-0.5">Sesión en curso</p>
-                  )}
-                </div>
+    <div className="dock-tarjeta session-bar-in" style={{ borderColor: tint(color, "45") }}>
+      {confirmando ? (
+        <div className="flex items-center gap-2 px-3.5 py-3">
+          <div className="flex-1 min-w-0">
+            <p className="text-[13px] font-bold text-white leading-tight">¿Finalizar la sesión?</p>
+            <p className="text-[10.5px] text-slate-500 leading-snug mt-0.5">
+              {conProgreso && total > 0 && done < total
+                ? `Te quedan ${total - done} de ${total} series. `
+                : ""}
+              Se guarda en tu historial y se borra lo que escribiste sin guardar.
+            </p>
+            {onCancel && (
+              <button onClick={onCancel} className="text-[10.5px] text-slate-500 hover:text-rose-400 transition mt-1 underline underline-offset-2 decoration-slate-700">
+                O descartala, sin que cuente como entrenamiento
               </button>
-              {/* Finalizar: cuando ya completaste todo pasa a relleno pleno —
-                  es el único paso que te queda. */}
-              <button
-                onClick={() => setConfirmando(true)}
-                className="shrink-0 flex items-center gap-1.5 px-3.5 my-1.5 mr-1.5 rounded-xl text-[11.5px] font-black transition active:scale-95"
-                style={completo
-                  ? { backgroundColor: color, color: "#fff" }
-                  : { backgroundColor: tint(color, "1f"), color, border: `1px solid ${tint(color, "45")}` }}
-              >
-                <Check size={13} /> Finalizar
-              </button>
-            </div>
-          )}
+            )}
+          </div>
+          <button onClick={() => setConfirmando(false)} className="h-10 px-3.5 rounded-xl bg-slate-800 text-slate-300 text-[12px] font-bold shrink-0 transition active:scale-95">No</button>
+          <button onClick={onEnd} className="h-10 px-3.5 rounded-xl !text-white text-[12px] font-black shrink-0 transition active:scale-95" style={{ backgroundColor: color }}>Sí, finalizar</button>
         </div>
+      ) : (
+        <>
+        {descanso}
+        <div className="flex items-stretch">
+          {/* Cuerpo: toca para volver a Rutina (si no estás ahí ya) */}
+          <button
+            onClick={enRutina ? undefined : onGoToRoutine}
+            disabled={enRutina}
+            aria-label={enRutina ? undefined : "Volver a tu entrenamiento"}
+            className="flex-1 min-w-0 flex items-center gap-3 pl-3.5 pr-2 py-2.5 text-left transition active:scale-[0.99] disabled:active:scale-100"
+          >
+            <span className="relative flex h-2.5 w-2.5 shrink-0">
+              <span className="absolute inline-flex h-full w-full rounded-full session-chip-ping" style={{ backgroundColor: color }} />
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5" style={{ backgroundColor: color }} />
+            </span>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-baseline gap-2">
+                <span className="num-display text-[1.3rem] leading-none font-extrabold text-white shrink-0">{reloj}</span>
+                {dayLabel && <span className="text-[10.5px] font-bold uppercase truncate" style={{ color: tint(color, "dd") }}>{dayLabel}</span>}
+                {!enRutina && <ChevronRight size={13} className="text-slate-500 shrink-0 self-center" />}
+              </div>
+              {conProgreso && total > 0 ? (
+                <div className="flex items-center gap-2 mt-1.5">
+                  <div className="flex-1 h-1.5 rounded-full overflow-hidden bg-slate-800">
+                    <div className="h-full rounded-full transition-all duration-500 ease-out" style={{ width: `${pct}%`, backgroundColor: color }} />
+                  </div>
+                  <span className="text-[10.5px] font-bold tabular-nums shrink-0" style={{ color: completo ? color : "var(--text-muted)" }}>{done}/{total}</span>
+                </div>
+              ) : (
+                <p className="text-[10.5px] text-slate-500 leading-tight mt-1">Sesión en curso</p>
+              )}
+            </div>
+          </button>
+          {/* Finalizar: cuando ya completaste todo pasa a relleno pleno —
+              es el único paso que te queda. */}
+          <button
+            onClick={() => setConfirmando(true)}
+            className="shrink-0 flex items-center gap-1.5 px-4 my-2 mr-2 rounded-xl text-[12px] font-black transition active:scale-95"
+            style={completo
+              ? { backgroundColor: color, color: "#fff" }
+              : { backgroundColor: tint(color, "1f"), color, border: `1px solid ${tint(color, "45")}` }}
+          >
+            <Check size={14} /> Finalizar
+          </button>
+        </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// El dock de abajo: el descanso en curso (cuando su cronómetro no está a la
+// vista) arriba, y la sesión debajo, una sobre otra y siempre a un toque.
+// Escribe su alto real en --dock-alto: con eso la página deja el aire justo
+// para que no tape la última tarjeta, y la barra del chat se corre arriba.
+// Antes ese aire era un número fijo según hubiera sesión o no, que con el
+// descanso en el dock ya no alcanzaría.
+function DockInferior({ children }) {
+  const ref = useRef(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || typeof document === "undefined") return;
+    const raiz = document.documentElement;
+    const medir = () => {
+      const alto = el.firstElementChild?.getBoundingClientRect().height || 0;
+      raiz.style.setProperty("--dock-alto", alto > 0 ? `${Math.round(alto + 8)}px` : "0px");
+    };
+    medir();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(medir) : null;
+    if (ro) { ro.observe(el); if (el.firstElementChild) ro.observe(el.firstElementChild); }
+    return () => { ro?.disconnect(); raiz.style.setProperty("--dock-alto", "0px"); };
+  }, []);
+  return (
+    <div ref={ref} className="session-bar-dock px-3 pointer-events-none">
+      <div className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto pointer-events-auto flex flex-col gap-2 empty:hidden">
+        {children}
       </div>
     </div>
   );
 }
 
+// Mantener la pantalla encendida durante la sesión (opción, prendida de
+// fábrica). Con el teléfono apoyado en el banco, la pantalla se apagaba
+// entre serie y serie: había que desbloquearlo para ver el descanso o
+// anotar la serie. El sistema suelta el bloqueo cada vez que la app pasa a
+// segundo plano, así que se vuelve a pedir al volver.
+function useMantenerPantalla(activo) {
+  useEffect(() => {
+    if (!activo || typeof navigator === "undefined" || !navigator.wakeLock?.request) return;
+    let bloqueo = null;
+    let vivo = true;
+    const pedir = async () => {
+      if (document.visibilityState !== "visible") return;
+      try {
+        const b = await navigator.wakeLock.request("screen");
+        if (!vivo) { b.release().catch(() => {}); return; }
+        bloqueo = b;
+      } catch { /* sin permiso o sin batería suficiente: no es para insistir */ }
+    };
+    pedir();
+    document.addEventListener("visibilitychange", pedir);
+    return () => {
+      vivo = false;
+      document.removeEventListener("visibilitychange", pedir);
+      bloqueo?.release().catch(() => {});
+    };
+  }, [activo]);
+}
+
+// Barra de abajo. Antes cada pestaña era un ícono y un rótulo en mayúscula
+// de 9px, y la activa se distinguía sólo por el color — de un vistazo, con
+// el teléfono en la mano y entre series, había que buscarla. Ahora la activa
+// lleva una píldora detrás del ícono (el patrón de Android y de iOS 18) y el
+// rótulo pasa a minúscula y más grande, que se lee sin esfuerzo.
+// Cada pestaña conserva su color propio (ver NAV_TABS): la píldora lo toma.
 function BottomBar({ tab, setTab }) {
   return (
-    <div className="lg:hidden fixed bottom-0 left-0 right-0 z-20 bg-slate-950/95 backdrop-blur-xl border-t border-slate-800/50" style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
+    <nav className="barra-pestanas" aria-label="Secciones de la app">
       <div className="max-w-xl mx-auto flex">
         {NAV_TABS.map(({ key, icon, label, color = "#14B8A6" }) => (
-          <button key={key} onClick={() => setTab(key)} className="flex-1 flex flex-col items-center justify-center gap-1 py-3 transition-all active:scale-95">
-            <span className="transition-all" style={{ color: tab === key ? color : "#475569" }}>{icon}</span>
-            <span className="text-[9px] font-bold uppercase tracking-wider transition-all" style={{ color: tab === key ? color : "#334155" }}>{label}</span>
+          <button key={key} onClick={() => setTab(key)} aria-current={tab === key ? "page" : undefined} style={{ "--tab-color": color }}>
+            <span className="indicador" aria-hidden="true">{icon}</span>
+            <span className="etiqueta">{label}</span>
           </button>
         ))}
       </div>
+    </nav>
+  );
+}
+
+// Título de cada pestaña, en grande y como parte de la página.
+//
+// Antes cada pestaña abría con una tarjeta "hero" (rótulo + título +
+// bajada, sobre un degradé con dos manchas de color) que repetía el mismo
+// título que ya estaba en la barra de arriba: "Rutina" dos veces, una
+// encima de la otra, y la primera pantalla gastada en decir dónde estás.
+// Ahora el título vive UNA vez, grande, y al scrollear se muda achicado a la
+// barra de arriba (ver App: barraCompacta), como los títulos de iOS.
+// Mantiene lo que tenía de bueno el hero: el rótulo con el color de cada
+// pestaña y la bajada corta que se fue puliendo pedido a pedido.
+const TAB_INTRO = {
+  rutina: { ceja: "Tu entrenamiento", icono: Dumbbell, color: "#14B8A6" },
+  progreso: { ceja: "Tu evolución", icono: Activity, color: "#3B82F6", bajada: "Marcas, volumen y constancia a lo largo del tiempo" },
+  rutinas: { ceja: "Tu plan de entrenamiento", icono: Layers, color: "#3B82F6", bajada: "Una rutina ya armada, o creá la tuya" },
+  social: { ceja: "Tu comunidad", icono: Users, color: SOCIAL_INK, bajada: "Sumá amigos, competí y compartí tu progreso" },
+  entrenador_ia: { ceja: "Tu asistente", icono: Sparkles, color: "#14B8A6", bajada: "Conoce tu historial, preguntá lo que quieras", beta: true },
+  perfil: { ceja: "Tu cuenta", icono: UserCog, color: "#F59E0B", bajada: "Tus datos, tus ajustes y tu cuenta" },
+};
+// En Rutina la bajada es la fecha: entrenando, "qué día es hoy" sirve más
+// que una frase que ya leíste cien veces.
+function fechaDeHoyLarga() {
+  const t = new Date().toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" });
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+function TituloPestana({ tab }) {
+  const intro = TAB_INTRO[tab];
+  if (!intro) return null;
+  const Icono = intro.icono;
+  return (
+    <div className="titulo-pagina">
+      <p className="ceja" style={{ color: intro.color }}>
+        <Icono size={13} aria-hidden="true" />
+        {intro.ceja}
+        {intro.beta && <span className="ceja-beta">Beta</span>}
+      </p>
+      <h1>{TAB_TITLES[tab]}</h1>
+      <p className="bajada">{tab === "rutina" ? fechaDeHoyLarga() : intro.bajada}</p>
     </div>
   );
 }
@@ -22578,7 +23154,7 @@ function SideNav({ tab, setTab, profileName }) {
     return () => { alive = false; window.removeEventListener("modusfit-avatar-updated", load); };
   }, [profileName]);
   return (
-    <div className="hidden lg:flex lg:flex-col lg:w-56 lg:shrink-0 lg:h-screen lg:sticky lg:top-0 border-r border-slate-800/50 bg-[#0a0a0f]/60 px-3 py-6">
+    <div className="hidden lg:flex lg:flex-col lg:w-56 lg:shrink-0 lg:h-screen lg:sticky lg:top-0 border-r border-slate-800/50 bg-[#0c0d10]/60 px-3 py-6">
       <div className="flex items-center gap-2.5 px-2 mb-8">
         <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-teal-500/30 to-teal-500/5 border border-teal-500/20 flex items-center justify-center shrink-0"><Flame className="text-teal-500" size={18} /></div>
         <span className="font-black text-white text-sm tracking-tight">Modus Fit</span>
@@ -22850,6 +23426,24 @@ export default function App() {
     return nueva >= vieja ? "tab-slide-right" : "tab-slide-left";
   }, [tab]);
   useEffect(() => { prevTabRef.current = tab; }, [tab]);
+  // La barra de arriba se "arma" (fondo, borde y el título achicado) recién
+  // cuando el título grande de la pestaña se fue de la pantalla. Arriba de
+  // todo es transparente y el título se lee una sola vez.
+  const [barraCompacta, setBarraCompacta] = useState(false);
+  useEffect(() => {
+    let raf = 0;
+    const medir = () => {
+      raf = 0;
+      // Con un modal abierto el body queda fijo y scrollY vale 0: no es que
+      // hayas vuelto arriba, así que la barra no cambia.
+      if (document.body.style.position === "fixed") return;
+      setBarraCompacta(window.scrollY > 64);
+    };
+    const onScroll = () => { if (!raf) raf = requestAnimationFrame(medir); };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    raf = requestAnimationFrame(medir);
+    return () => { window.removeEventListener("scroll", onScroll); if (raf) cancelAnimationFrame(raf); };
+  }, [tab]);
   useEffect(() => {
     try { window.history.pushState({ __sentinela: true }, ""); } catch { /* ignorado a propósito */ }
     const onPop = () => {
@@ -23431,6 +24025,7 @@ export default function App() {
   // cuánto aire necesita el contenido para no quedar tapado — en todas las
   // pestañas, no sólo en Rutina, porque la barra te sigue por toda la app.
   const haySesionActiva = !!profile?.activeSession?.startedAt;
+  useMantenerPantalla(haySesionActiva && getProfileSettings(profile).keepScreenOn !== false);
   useEffect(() => {
     if (typeof document === "undefined") return;
     const raiz = document.documentElement;
@@ -23951,7 +24546,7 @@ export default function App() {
     // que la dona no termine en ocho arcos finos que no se distinguen.
     const orden = Object.entries(porEjercicioVol).sort((a, b) => b[1] - a[1]);
     const reparto = (orden.length > 6 ? [...orden.slice(0, 5), ["Otros", orden.slice(5).reduce((a, x) => a + x[1], 0)]] : orden)
-      .map(([nombre, v], idx) => ({ nombre, series: v, color: nombre === "Otros" ? "#475569" : paleta[idx % paleta.length] }));
+      .map(([nombre, v], idx) => ({ nombre, series: v, color: nombre === "Otros" ? "#50555a" : paleta[idx % paleta.length] }));
     // Comparación con la última vez que hiciste ESTE mismo día de rutina:
     // es la pregunta natural al terminar ("¿vengo mejor que la vez
     // pasada?"), y no hay dónde responderla hoy.
@@ -24138,7 +24733,7 @@ export default function App() {
       <StyleInjector />
       {recoveredNotice && <RecoveredBanner onClose={() => setRecoveredNotice(false)} />}
       {importRoutineError && <ImportRoutineErrorBanner onClose={() => setImportRoutineError(false)} />}
-      <div className={`relative min-h-screen bg-[#0a0a0f] px-4 py-6 theme-fade ${themeClass}`} style={{ "--small-text-scale": smallTextScale }}>
+      <div className={`app-fondo relative min-h-screen bg-[#0c0d10] px-4 py-6 theme-fade ${themeClass}`} style={{ "--small-text-scale": smallTextScale }}>
         <div style={{ height: "env(safe-area-inset-top, 0px)" }} />
         <div className="max-w-xl mx-auto">
           <div className="flex justify-end mb-2">
@@ -24154,9 +24749,9 @@ export default function App() {
   const activeWeightUnit = getProfileSettings(profiles[activeProfile]).weightUnit ?? "kg";
   return (
     <WeightUnitCtx.Provider value={activeWeightUnit}>
-    <div className={`min-h-screen bg-[#0a0a0f] text-white font-sans lg:flex ${themeClass}`} style={{ "--small-text-scale": smallTextScale }}>
+    <div className={`app-fondo min-h-screen bg-[#0c0d10] text-white font-sans lg:flex ${themeClass}`} style={{ "--small-text-scale": smallTextScale }}>
       {/* Escudo fijo de la status bar — cubre la zona de batería/hora sin
-          importar cuánto hayas scrolleado. El color es siempre #0a0a0f. */}
+          importar cuánto hayas scrolleado. El color es siempre #0c0d10. */}
       <div style={{ position: "fixed", top: 0, left: 0, right: 0, height: "env(safe-area-inset-top, 0px)", backgroundColor: "var(--app-bg)", zIndex: 9999 }} />
 
       {/* Desaturación global: un overlay con backdrop-filter en vez de
@@ -24172,34 +24767,37 @@ export default function App() {
       {importRoutineError && <ImportRoutineErrorBanner onClose={() => setImportRoutineError(false)} />}
       <SideNav tab={tab} setTab={setTab} profileName={activeProfile} />
       <div className="flex-1 min-w-0" style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
-        <header className="sticky z-10 bg-[#0a0a0f]/90 backdrop-blur-xl border-b border-slate-800/40" style={{ top: "env(safe-area-inset-top, 0px)" }}>
-          <div className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto px-4 py-4 flex items-center gap-3">
+        <header className="app-bar" data-compacta={barraCompacta || !TAB_INTRO[tab] ? "true" : "false"}>
+          <div className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto px-4 h-14 flex items-center gap-3">
             {SECONDARY_TAB_BACK[tab] ? (
-              <button onClick={() => setTab(SECONDARY_TAB_BACK[tab])} aria-label="Volver" className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800/80 transition shrink-0 lg:hidden"><ChevronDown size={18} className="rotate-90" /></button>
+              <button onClick={() => setTab(SECONDARY_TAB_BACK[tab])} aria-label="Volver" className="w-9 h-9 rounded-xl flex items-center justify-center text-slate-300 hover:text-white bg-slate-800/50 border border-slate-700/40 transition shrink-0 lg:hidden"><ChevronDown size={18} className="rotate-90" /></button>
             ) : (
               <HeaderAvatar profileName={activeProfile} onClick={() => setTab("perfil")} />
             )}
-            <div className="flex-1 min-w-0">
-              <h1 className="font-black text-base text-white leading-tight tracking-tight">{TAB_TITLES[tab] || ""}</h1>
-              <p className="text-[11px] text-slate-600 leading-tight">{activeProfile}</p>
-            </div>
+            {/* El título grande vive en la página (TituloPestana). Acá
+                aparece achicado sólo cuando aquél ya se fue con el scroll. */}
+            <p className="app-bar-titulo flex-1 min-w-0 truncate" aria-hidden={barraCompacta || !TAB_INTRO[tab] ? undefined : "true"}>{TAB_TITLES[tab] || ""}</p>
             {/* Durante una sesión activa, el chip de "entrenando X" ocupa el
                 lugar del "?" (así no lo tapa). Sin sesión, el "?" normal. */}
             {sessionTintColor && sessionDayLabel ? (
-              <div className="flex items-center gap-1.5 rounded-full pl-2 pr-2.5 py-1.5 shrink-0 session-chip-in" style={{ backgroundColor: `${tint(sessionTintColor, "1A")}`, border: `1px solid ${tint(sessionTintColor, "55")}` }}>
+              <div className="flex items-center gap-1.5 rounded-full pl-2.5 pr-3 py-1.5 shrink-0 session-chip-in" style={{ backgroundColor: `${tint(sessionTintColor, "1A")}`, border: `1px solid ${tint(sessionTintColor, "45")}` }}>
                 <span className="relative flex h-2 w-2">
                   <span className="absolute inline-flex h-full w-full rounded-full opacity-60 session-chip-ping" style={{ backgroundColor: sessionTintColor }} />
                   <span className="relative inline-flex rounded-full h-2 w-2" style={{ backgroundColor: sessionTintColor }} />
                 </span>
-                <span className="text-[10px] font-bold tracking-wide whitespace-nowrap" style={{ color: sessionTintColor }}>{sessionDayLabel}</span>
+                <span className="text-[10.5px] font-bold uppercase whitespace-nowrap" style={{ color: sessionTintColor }}>{sessionDayLabel}</span>
               </div>
             ) : (
-              tab !== "perfil" && <button onClick={() => { setHelpStartTab(tab); setShowHelp(true); }} aria-label="Ayuda" className="w-8 h-8 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-center text-slate-400 hover:text-teal-400 hover:border-teal-500/30 transition active:scale-90"><HelpCircle size={16} /></button>
+              tab !== "perfil" && <button onClick={() => { setHelpStartTab(tab); setShowHelp(true); }} aria-label="Ayuda" className="w-9 h-9 rounded-xl bg-slate-800/50 border border-slate-700/40 flex items-center justify-center text-slate-400 hover:text-teal-400 hover:border-teal-500/30 transition active:scale-90 shrink-0"><HelpCircle size={17} /></button>
             )}
           </div>
         </header>
-        <main className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto px-4 py-4 pb-28 lg:pb-10 space-y-4" style={{ paddingBottom: `calc(${haySesionActiva ? "11.5rem" : "7rem"} + env(safe-area-inset-bottom, 0px))` }}>
+        {/* El aire de abajo sigue al dock real (descanso en curso + sesión),
+            que escribe su alto en --dock-alto: ya no hace falta adivinarlo
+            según haya o no sesión. */}
+        <main className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto px-4 pt-1 lg:pt-4 space-y-4" style={{ paddingBottom: "calc(7rem + var(--dock-alto, 0px) + env(safe-area-inset-bottom, 0px))" }}>
           <div key={tab} className={tabSlideClass}>
+            <TituloPestana tab={tab} />
             {tab === "rutinas" && <RoutinesView openScheduleSignal={openSectionSignal.id === "week-schedule" ? openSectionSignal.n : 0} openEditorSignal={openSectionSignal.id === "routine-editor" ? openSectionSignal.n : 0} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleDeleteRoutine} onUpdateProfile={handleUpdateProfile} onGoToDay={(dayKey) => goToSection("rutina", "go-to-day", dayKey)} />}
             {tab === "rutina" && !showPinnedDeload && <OnboardingTasksCard profile={profile} cycleStart={cycleStart} logs={logs} onGoToProfile={() => setTab("perfil")} onOpenFieldSettings={() => setShowFieldIntro(true)} onDone={() => handleUpdateProfile({ onboardingDone: true })} />}
             {/* Semana de descarga: se muestra fija acá mismo, en vez del
@@ -24225,20 +24823,26 @@ export default function App() {
       {/* Sesión en curso: cronómetro, avance y "Finalizar" siempre a mano,
           en cualquier pestaña. El overlay de arranque la taparía con su
           propia animación, así que entra cuando ese se va. */}
-      {haySesionActiva && !sessionStarted && (
-        <ActiveSessionBar
-          startedAt={profile.activeSession.startedAt}
-          dayLabel={sessionDayLabel}
-          color={sessionTintColor || "#14B8A6"}
-          done={sessionProgress.done}
-          total={sessionProgress.total}
-          conProgreso={!profile.activeSession.deload}
-          enRutina={tab === "rutina" || tab === "descarga"}
-          onGoToRoutine={() => setTab(profile.activeSession.deload ? "descarga" : "rutina")}
-          onEnd={() => (profile.activeSession.deload ? handleFinishDeloadSession(profile.activeSession.dayKey) : handleEndSession())}
-          onCancel={handleCancelSession}
-        />
-      )}
+      <DockInferior>
+        {/* Con sesión, el descanso va adentro de su tarjeta (una sola pieza);
+            sin sesión (registrando sin iniciarla), va solo. */}
+        {!(haySesionActiva && !sessionStarted) && <DescansoEnDock />}
+        {haySesionActiva && !sessionStarted && (
+          <ActiveSessionBar
+            descanso={<DescansoEnDock embebido />}
+            startedAt={profile.activeSession.startedAt}
+            dayLabel={sessionDayLabel}
+            color={sessionTintColor || "#14B8A6"}
+            done={sessionProgress.done}
+            total={sessionProgress.total}
+            conProgreso={!profile.activeSession.deload}
+            enRutina={tab === "rutina" || tab === "descarga"}
+            onGoToRoutine={() => setTab(profile.activeSession.deload ? "descarga" : "rutina")}
+            onEnd={() => (profile.activeSession.deload ? handleFinishDeloadSession(profile.activeSession.dayKey) : handleEndSession())}
+            onCancel={handleCancelSession}
+          />
+        )}
+      </DockInferior>
       {sessionStarted && <SessionStartOverlay onDone={() => setSessionStarted(false)} />}
       {sessionSummary && <SessionSummaryModal resumen={sessionSummary} onClose={() => setSessionSummary(null)} />}
       {weeklyRecap && <WeeklyRecapModal data={weeklyRecap} onClose={() => setWeeklyRecap(null)} />}
@@ -24351,7 +24955,7 @@ function InstalarEnIosBanner() {
   return (
     <div className="fixed left-0 right-0 top-0 z-[150] px-3 pt-3 pointer-events-none" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 12px)" }}>
       <div className="max-w-xl mx-auto pointer-events-auto rounded-2xl p-3.5 shadow-2xl shadow-black/50 bounce-in"
-        style={{ backgroundColor: "rgba(10,10,15,0.96)", border: "1px solid rgba(20,184,166,0.45)", backdropFilter: "blur(12px)" }}>
+        style={{ backgroundColor: "rgba(12,13,16,0.96)", border: "1px solid rgba(20,184,166,0.45)", backdropFilter: "blur(12px)" }}>
         <div className="flex items-start gap-3">
           <span className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(20,184,166,0.18)", color: "#2dd4bf" }}>
             <Download size={16} />

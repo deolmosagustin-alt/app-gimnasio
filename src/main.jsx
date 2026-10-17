@@ -1,5 +1,9 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+// Fuentes empaquetadas con la app: el WebView de Android y la app instalada
+// en el iPhone las tienen aunque no haya internet en el gimnasio.
+import '@fontsource-variable/geist'
+import '@fontsource-variable/archivo/wdth.css'
 import './index.css'
 import App from './App.jsx'
 import ErrorBoundary from './ErrorBoundary.jsx'
