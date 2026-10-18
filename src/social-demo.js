@@ -38,14 +38,23 @@ const AMIGOS = [
   { uid: "demo-cami", name: "Cami Ortiz", username: "cami.o", rango: ["Oro", "I", "#C99A2E", 6], dias: [[3, "pull"], [10, "push"], [13, "legs"]] },
 ];
 
+// Cuánto levanta cada uno en cada ejercicio: una base por ejercicio, escalada
+// por su nivel (los de rango alto, más pesado), así la competencia de Social
+// tiene músculos que se ganan y músculos que se pierden.
+const BASE_KG = { press_banca: 60, press_militar_mancuernas: 20, triceps_polea_alta: 25, dominadas: 0, remo_con_barra: 55, curl_biceps_barra: 30, sentadilla: 80, peso_muerto_rumano: 70, prensa: 140 };
 function perfilCompleto(amigo) {
   const logs = {};
+  const factor = 0.6 + amigo.rango[3] * 0.06;
   const trainingSessions = amigo.dias.map(([atras, dayKey]) => {
     const date = fecha(atras);
     RUTINA.days[dayKey].exercises.forEach((ex) => {
       ex.sets.forEach((_, i) => {
         const clave = `${ex.libId}_${i}`;
-        (logs[clave] = logs[clave] || []).push({ date, reps: 8, kg: 40 + i * 2.5 });
+        const base = BASE_KG[ex.libId] ?? 30;
+        // Las sesiones más viejas, un poco más livianas.
+        const kg = base ? Math.round((base * factor * (1 - atras * 0.006) - i * 2.5) / 2.5) * 2.5 : 0;
+        const reps = base ? 8 - (i === 0 ? 2 : 0) : Math.round(6 + amigo.rango[3] * 0.4);
+        (logs[clave] = logs[clave] || []).push({ date, reps, kg });
       });
     });
     return { date, dayKey, routineId: "ppl" };

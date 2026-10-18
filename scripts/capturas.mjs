@@ -255,6 +255,20 @@ try {
           await paso(`abrir ${seccion} en Social`, () => page.getByRole("tab", { name: seccion }).first().click({ timeout: 8000 }));
           await capturar(`Social ${seccion}`);
         }
+        // La competencia: tocar a un amigo en el Ranking abre el mano a mano.
+        await paso("abrir la competencia con un amigo", () => page.locator(".podio-lugar:not(.yo), .ranking-fila:not(.yo)").first().click({ timeout: 8000 }));
+        await capturar("Social Competencia");
+        await paso("volver de la competencia", () => page.getByRole("button", { name: "Volver" }).first().click({ timeout: 8000 }));
+        // El perfil de un amigo, desde la lista de Amigos.
+        await paso("abrir Amigos en Social", () => page.getByRole("tab", { name: "Amigos" }).first().click({ timeout: 8000 }));
+        await capturar("Social Amigos");
+        await paso("abrir el perfil de un amigo", () => page.locator("button.amigo-cuerpo").first().click({ timeout: 8000 }));
+        await capturar("Social Amigo");
+        await paso("volver del perfil del amigo", () => page.getByRole("button", { name: "Volver" }).first().click({ timeout: 8000 }));
+        // Tu perfil, como lo ven tus amigos: se abre tocando tu credencial.
+        await paso("abrir tu perfil desde la credencial", () => page.locator(".credencial-cuerpo").first().click({ timeout: 8000 }));
+        await capturar("Social Mi perfil");
+        await paso("volver de tu perfil", () => page.getByRole("button", { name: "Volver" }).first().click({ timeout: 8000 }));
       }
       if (conDatos && pestana === "Progreso") {
         for (const seccion of ["Historial", "Ejercicios", "Medidas"]) {
