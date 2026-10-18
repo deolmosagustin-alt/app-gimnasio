@@ -3436,12 +3436,12 @@ button.foco-campo-rotulo:active { background: var(--velo); }
 
 /* ── LA BARRA CARGADA ───────────────────────────────────────────────────
    Una barra olímpica de verdad: mangas cromadas, topes y el agarre con su
-   moleteado. Los discos son de goma negra, como en una sala de pesas
-   buena, y el color de competición queda en el filete del borde (rojo 25,
-   azul 20, amarillo 15, verde 10, blanco 5): se lee qué disco es sin que la
-   barra grite. Tienen su tamaño real —los pesados, gruesos y altos adentro;
-   el de 5, chico afuera—. Lo que falta es el contorno, apenas marcado.
-   Los collarines llevan el color del día: la única marca de color. */
+   moleteado. Los discos son de goma de color mate, con los colores de
+   competición (rojo 25, azul 20, amarillo 15, verde 10, blanco 5) mezclados
+   con gris para que no griten, luz arriba, sombra abajo y un canto claro en
+   el borde. Tienen su tamaño real —los pesados, gruesos y altos adentro; el
+   de 5, chico afuera—. Lo que falta es el contorno, apenas marcado. Los
+   collarines llevan el color del día. */
 .barra-cargada { display: block; width: 100%; overflow: visible; }
 .acero-claro { stop-color: #e6e7ea; }
 .acero-medio { stop-color: #9b9da2; }
@@ -3449,21 +3449,13 @@ button.foco-campo-rotulo:active { background: var(--velo); }
 .light-mode .acero-claro { stop-color: #d8d9dc; }
 .light-mode .acero-medio { stop-color: #8f9196; }
 .light-mode .acero-oscuro { stop-color: #55575c; }
-.goma-claro { stop-color: #3a3b40; }
-.goma-medio { stop-color: #202124; }
-.goma-oscuro { stop-color: #101113; }
 /* Los discos de color: goma mate, con luz arriba y sombra abajo. */
 .disco-claro { stop-color: color-mix(in oklab, var(--d) 78%, #f1f1ee); }
 .disco-medio { stop-color: color-mix(in oklab, var(--d) 86%, #2a2b2f); }
 .disco-oscuro { stop-color: color-mix(in oklab, var(--d) 62%, #101113); }
 .moleteado { stroke: rgba(0,0,0,0.38); stroke-width: 0.7; }
 .disco { stroke: rgba(0,0,0,0.55); stroke-width: 0.5; }
-.disco-filete { fill: none; stroke-width: 0.8; stroke: rgba(255,255,255,0.28) !important; }
-.disco-filete.f0 { stroke: #d2625e; }
-.disco-filete.f1 { stroke: #5d88d8; }
-.disco-filete.f2 { stroke: #d8b85c; }
-.disco-filete.f3 { stroke: #64ae81; }
-.disco-filete.f4 { stroke: #deded8; }
+.disco-filete { fill: none; stroke-width: 0.8; stroke: rgba(255,255,255,0.28); }
 .disco-fantasma { fill: none; stroke: var(--disco-fantasma); stroke-width: 0.9; }
 .collarin { fill: color-mix(in oklab, var(--c, var(--tono)) 72%, white); transition: transform .55s var(--resorte); }
 .light-mode .collarin { fill: var(--c, var(--tono)); }
@@ -9161,8 +9153,7 @@ function BarraCargada({ hechas = 0, total = 0, alto = 30, etiqueta = null, class
           <stop offset=".55" className="acero-medio" />
           <stop offset="1" className="acero-oscuro" />
         </linearGradient>
-        {/* La goma de los discos: luz arriba, sombra abajo. Una sola para
-            todos; lo que distingue a cada disco es su filete de color. */}
+        {/* La goma de cada color de disco: luz arriba, sombra abajo. */}
         {COLORES_DISCO.map((c, k) => (
           <linearGradient key={k} id={`${uid}-d${k}`} x1="0" y1="0" x2="0" y2="1" style={{ "--d": c }}>
             <stop offset="0" className="disco-claro" />
@@ -9192,7 +9183,7 @@ function BarraCargada({ hechas = 0, total = 0, alto = 30, etiqueta = null, class
       {discos.map((d) => (d.cargado ? (
         <g key={`d${d.n}`} className="disco-entra" style={{ "--desde": d.izquierda ? "-28px" : "28px", ...(escalonado ? { animationDelay: `${200 + d.n * 90}ms` } : null) }}>
           <rect x={d.x} y={d.y} width={d.w} height={d.h} rx={radio(d.w)} fill={`url(#${uid}-d${d.k})`} className="disco" />
-          <rect x={d.x + 0.75} y={d.y + 0.75} width={Math.max(0.5, d.w - 1.5)} height={d.h - 1.5} rx={Math.max(0.5, radio(d.w) - 0.75)} className={`disco-filete f${d.k}`} />
+          <rect x={d.x + 0.75} y={d.y + 0.75} width={Math.max(0.5, d.w - 1.5)} height={d.h - 1.5} rx={Math.max(0.5, radio(d.w) - 0.75)} className="disco-filete" />
         </g>
       ) : (
         <rect key={`f${d.n}`} x={d.x + 0.45} y={d.y + 0.45} width={Math.max(0.5, d.w - 0.9)} height={d.h - 0.9} rx={radio(d.w)} className="disco-fantasma" />
