@@ -4144,6 +4144,36 @@ button.carrera-carril:active { background: var(--velo); }
 .ia-tarjeta-titulo { font-size: 0.9375rem; font-weight: 650; line-height: 1.2; color: var(--text-strong); }
 .ia-tarjeta-bajada { font-size: 0.8125rem; line-height: 1.35; color: var(--text-muted); text-wrap: pretty; }
 .ia-mas { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+/* Lo que propone la IA (crear una rutina, anotar una marca...), en una placa. */
+.plan-ia { margin-top: 8px; padding: 14px; border-radius: 24px; background: var(--surface-1); box-shadow: var(--placa-canto); }
+.plan-ia.aviso { background: color-mix(in oklab, #F59E0B 8%, var(--surface-1)); }
+.plan-ia-cabeza { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.plan-ia-cabeza p { flex: 1; min-width: 0; font-size: 0.9375rem; font-weight: 650; line-height: 1.25; color: var(--text-strong); text-wrap: pretty; }
+.plan-ia-icono {
+  width: 32px; height: 32px; flex-shrink: 0; display: grid; place-items: center; border-radius: 11px;
+  color: color-mix(in oklab, var(--tono) 55%, white); background: color-mix(in oklab, var(--tono) 16%, transparent);
+}
+.plan-ia.aviso .plan-ia-icono { --tono: #F59E0B; }
+.light-mode .plan-ia-icono { color: color-mix(in oklab, var(--tono) 62%, black); }
+.plan-ia-items { display: grid; gap: 4px; }
+.plan-ia-items li { position: relative; padding-left: 14px; font-size: 0.8125rem; line-height: 1.4; color: var(--text-muted); }
+.plan-ia-items li::before { content: ""; position: absolute; left: 2px; top: .55em; width: 5px; height: 5px; border-radius: 99px; background: color-mix(in oklab, var(--tono) 60%, white); }
+.plan-ia.aviso .plan-ia-items li::before { background: #F59E0B; }
+.plan-ia-boton { min-height: 46px; font-size: 0.875rem; }
+/* La vista previa de una rutina, con cada día en una baldosa. */
+.vista-rutina { display: grid; gap: 8px; }
+.vista-dia { position: relative; padding: 14px 14px 12px; border-radius: 18px; background: color-mix(in oklab, var(--dia) 10%, var(--surface-2)); }
+.vista-dia::before { content: ""; position: absolute; left: 14px; right: 14px; top: 0; height: 3px; border-radius: 0 0 3px 3px; background: color-mix(in oklab, var(--dia) 78%, white); }
+.light-mode .vista-dia { background: color-mix(in oklab, var(--dia) 8%, #ffffff); box-shadow: inset 0 0 0 1px var(--hairline); }
+.light-mode .vista-dia::before { background: var(--dia); }
+.vista-dia-cabeza { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 10px; }
+.vista-dia-cabeza b { font-size: 0.9375rem; font-weight: 750; font-stretch: 88%; line-height: 1.2; color: var(--text-strong); }
+.vista-dia-cabeza span { font-size: 0.75rem; color: var(--text-muted); }
+.vista-dia-lista { display: grid; gap: 5px; margin-top: 8px; }
+.vista-dia-lista li { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: 0.8125rem; line-height: 1.35; }
+.vista-ej-nombre { min-width: 0; color: var(--text-muted); text-wrap: pretty; }
+.vista-ej-series { flex-shrink: 0; font-weight: 650; color: var(--text-strong); }
+.vista-dia-vacio { margin-top: 6px; font-size: 0.8125rem; color: var(--text-faint); }
 .burbuja.editando { box-shadow: 0 0 0 2px color-mix(in oklab, var(--c, var(--tono)) 72%, white); }
 .boton-enviar {
   width: 44px; height: 44px; flex: none; border-radius: 999px; display: flex; align-items: center; justify-content: center;
@@ -19110,37 +19140,35 @@ function SharedRoutineImportModal({ routine, onImport, onDiscard }) {
 // que a partir del cuarto se vuelve ilegible. Ahora cada día es una tarjeta con
 // su franja de color y los ejercicios listados con sus series, que es lo que
 // realmente querés ver.
+// La vista previa de una rutina: la que te propone el Entrenador IA, la que
+// importás y la que te comparten. Cada día como las baldosas de Rutinas, con
+// el filete de su color, el nombre entero y sus ejercicios en renglones (las
+// series a la derecha). Antes era una planilla de letra chica con los nombres
+// cortados con "…".
 function RoutinePreview({ routineDef }) {
   const model = useMemo(() => buildRoutineModel(routineDef), [routineDef]);
   return (
-    <div className="space-y-2">
+    <div className="vista-rutina">
       {model.dayOrder.map((dk) => {
         const d = model.days[dk];
         const totalSets = d.exercises.reduce((a, e) => a + e.sets.length, 0);
         return (
-          <div key={dk} className="rounded-xl border border-slate-800/60 bg-slate-950/40 overflow-hidden">
-            {/* Cabecera del día: franja de color + nombre + números */}
-            <div className="flex items-center gap-2.5 px-3 py-2 border-b border-slate-800/50" style={{ backgroundColor: tint(d.color, "0c") }}>
-              <span className="w-1 h-6 rounded-full shrink-0" style={{ backgroundColor: d.color }} />
-              <span className="text-[11px] font-black text-white uppercase tracking-wide flex-1 min-w-0 truncate">{d.label}</span>
-              <span className="text-[9px] text-slate-500 shrink-0 tabular-nums">{d.exercises.length} ejerc. · {totalSets} series</span>
-            </div>
-
-            {/* Ejercicios: uno por línea, con sus series a la derecha */}
+          <div key={dk} className="vista-dia" style={{ "--dia": d.color }}>
+            <p className="vista-dia-cabeza">
+              <b>{d.label}</b>
+              <span>{d.exercises.length} {d.exercises.length === 1 ? "ejercicio" : "ejercicios"}, {totalSets} {totalSets === 1 ? "serie" : "series"}</span>
+            </p>
             {d.exercises.length > 0 ? (
-              <div className="px-3 py-2 space-y-1">
+              <ol className="vista-dia-lista">
                 {d.exercises.map((ex, i) => (
-                  <div key={`${dk}:${ex.id}:${i}`} className="flex items-baseline gap-2 text-[10.5px]">
-                    <span className="text-slate-700 tabular-nums w-3 shrink-0 text-right">{i + 1}</span>
-                    <span className="flex-1 min-w-0 truncate text-slate-400">{ex.name}</span>
-                    <span className="text-slate-600 tabular-nums shrink-0">
-                      {ex.sets.length}{ex.sets[0]?.repRange ? `×${ex.sets[0].repRange}` : ""}
-                    </span>
-                  </div>
+                  <li key={`${dk}:${ex.id}:${i}`}>
+                    <span className="vista-ej-nombre">{ex.name}</span>
+                    <span className="vista-ej-series">{ex.cardio ? "Cardio" : `${ex.sets.length}${ex.sets[0]?.repRange ? ` × ${ex.sets[0].repRange}` : ""}`}</span>
+                  </li>
                 ))}
-              </div>
+              </ol>
             ) : (
-              <p className="px-3 py-2 text-[10px] text-slate-600 italic">Sin ejercicios.</p>
+              <p className="vista-dia-vacio">Sin ejercicios.</p>
             )}
           </div>
         );
@@ -22002,6 +22030,9 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
         )}
         {visibleMessages.map((m, li) => {
           const i = indexOffset + li;
+          // El saludo largo de la IA no se dibuja: el inicio ya lo reemplazó, y
+          // al mandar el primer mensaje reaparecía arriba de la conversación.
+          if (i === 0 && m.text === AI_CHAT_WELCOME.text) return null;
           // Recalculado en cada render con los handlers ACTUALES — así el
           // botón de una propuesta pendiente sigue vivo aunque venga de otra
           // conversación o de una sesión anterior (ver el comentario junto a
@@ -22111,22 +22142,24 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
                 ejercicio que no está en la rutina activa). Antes esto no
                 mostraba NADA — ver el BUG FIX en planificar_progresion. */}
             {m.plan && livePlan?.kind === "unresolved" && (
-              <div className="mt-2 border border-amber-500/30 bg-amber-500/[0.07] rounded-2xl p-3.5 max-w-[85%] bounce-in">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="w-6 h-6 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center shrink-0"><AlertTriangle size={12} className="text-amber-400" /></span>
-                  <p className="text-sm font-bold text-amber-200 flex-1 min-w-0">{livePlan.title}</p>
+              <div className="plan-ia aviso bounce-in">
+                <div className="plan-ia-cabeza">
+                  <span className="plan-ia-icono" aria-hidden="true"><AlertTriangle size={15} /></span>
+                  <p>{livePlan.title}</p>
                 </div>
-                <ul className="space-y-1">
-                  {livePlan.items.map((item, j) => <li key={j} className="text-[11px] text-amber-100/70 flex items-start gap-1.5"><span className="text-amber-400 mt-0.5">•</span>{item}</li>)}
+                <ul className="plan-ia-items">
+                  {livePlan.items.map((item, j) => <li key={j}>{item}</li>)}
                 </ul>
               </div>
             )}
             {m.plan && m.planStatus === "pending" && livePlan && typeof livePlan.confirm === "function" && (
-              <div className="relative overflow-hidden mt-2 border border-teal-500/25 rounded-2xl p-3.5 max-w-[85%] bounce-in backdrop-blur-xl" style={{ background: "var(--glass-panel-bg)", boxShadow: "inset 0 1px 0 0 rgba(255,255,255,0.08)" }}>
-                <div className="absolute -top-8 -right-8 w-24 h-24 rounded-full bg-teal-500/10 blur-2xl pointer-events-none" />
-                <div className="relative flex items-center gap-2 mb-2.5">
-                  <span className="w-6 h-6 rounded-lg bg-teal-500/15 border border-teal-500/25 flex items-center justify-center shrink-0"><Sparkles size={12} className="text-teal-400" /></span>
-                  <p className="text-sm font-bold text-white flex-1 min-w-0">{m.plan.title}</p>
+              // La propuesta de la IA: una placa como las de la app, sin borde
+              // ni vidrio, con un toque del color de la pestaña en el ícono y
+              // en el botón de confirmar.
+              <div className="plan-ia bounce-in">
+                <div className="plan-ia-cabeza">
+                  <span className="plan-ia-icono" aria-hidden="true"><Sparkles size={15} /></span>
+                  <p>{m.plan.title}</p>
                 </div>
                 {m.plan.kind === "routine" ? (
                   <div className="mb-3"><RoutinePreview routineDef={m.plan.routineDef} /></div>
@@ -22145,13 +22178,13 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
                 ) : m.plan.kind === "settings" && m.plan.settingsChanges?.length ? (
                   <div className="mb-3"><SettingsChangePreview changes={m.plan.settingsChanges} /></div>
                 ) : (
-                  <ul className="mb-3 space-y-1">
-                    {m.plan.items.map((item, j) => <li key={j} className="text-[11px] text-slate-400 flex items-start gap-1.5"><span className="text-teal-400 mt-0.5">•</span>{item}</li>)}
+                  <ul className="plan-ia-items mb-3">
+                    {m.plan.items.map((item, j) => <li key={j}>{item}</li>)}
                   </ul>
                 )}
                 <div className="flex gap-2">
-                  <button onClick={() => handleConfirmPlan(i)} className="flex-1 py-2.5 rounded-xl text-[color:var(--accion-tinta)] text-xs font-bold transition-all active:scale-[0.98]" style={{ background: "var(--accion-fondo)" }}>{m.plan.confirmLabel}</button>
-                  <button onClick={() => handleDiscardPlan(i)} className="px-3.5 py-2.5 rounded-xl border border-slate-700 text-slate-400 hover:text-white text-xs font-bold transition">Descartar</button>
+                  <button onClick={() => handleConfirmPlan(i)} className="boton-pildora plan-ia-boton flex-1">{m.plan.confirmLabel}</button>
+                  <button onClick={() => handleDiscardPlan(i)} className="boton-tonal plan-ia-boton">Descartar</button>
                 </div>
               </div>
             )}
