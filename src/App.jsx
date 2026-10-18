@@ -7,7 +7,7 @@ import { LazyMotion, m, MotionConfig } from "motion/react";
 const cargarAnimaciones = () => import("./animaciones.js").then((r) => r.default);
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, ComposedChart, Line,
+  ResponsiveContainer, ReferenceLine,
 } from "recharts";
 import {
   Play, Pause, RotateCcw, TrendingUp, TrendingDown, Dumbbell, History,
@@ -2773,13 +2773,15 @@ input, textarea, [contenteditable="true"] {
 
    Pedido: "otro estilo más moderno para toda la app, que se vea premium
    pero no tan saturante". La app es de grafito y tiza: superficies
-   neutras que suben de a poco con la luz (no con color), texto de tiza y
-   un solo acento, que es la luz misma: el botón principal es de tiza con
-   letra oscura (en claro, de tinta con letra blanca).
-   El color de cada día ya no tiñe la pantalla: queda como marca —el punto
-   del día, los collarines de la barra, el filete de los discos— y, como
-   relleno, siempre apagado (mezclado con gris; ver tint() en utils.js).
-   El único color propio es el dorado viejo de los récords (--record).
+   neutras que suben de a poco con la luz (no con color) y texto de tiza.
+   Después: "devolvele color, en puntos estratégicos, sin que sea chillón".
+   El color de lo que mirás (el día en Rutina, la pestaña en las demás) va
+   en lo que se toca —el botón principal y lo elegido, en pastel con letra
+   oscura— y en lo que identifica: los discos de la barra, el arco del
+   reloj, la línea de las gráficas, las marcas de cada día y una luz tenue
+   arriba de cada pantalla. Nunca de fondo de una superficie. Lo que pasa
+   por tint() sale mitad color y mitad gris (utils.js).
+   El dorado viejo (--record) es sólo para los récords.
    Una sola letra, Mona Sans, con eje de ancho: el texto en su ancho normal
    y los números grandes angostos (num-display), como un tablero.
    Contenedores como placas maquinadas (--placa-canto: el canto de 1px y un
@@ -2800,16 +2802,17 @@ input, textarea, [contenteditable="true"] {
   /* --tono sigue siendo el color de lo que estás mirando (el día, la
      pestaña), pero ya no pinta superficies: sólo marcas. */
   --tono: #14B8A6;
-  /* EL ACENTO ES LA LUZ. Lo principal es un botón de tiza con letra
-     oscura; lo resaltado, texto más claro. Ningún color de fondo. */
-  --accent: #f1f1ee;
-  --accent-ink: #f1f1ee;
-  --accent-soft: rgba(255,255,255,0.08);
+  /* EL ACENTO ES EL COLOR DE LO QUE MIRÁS: el del día en Rutina, el de la
+     pestaña en las demás. Las superficies siguen de grafito; el color va en
+     lo que se toca y en lo que identifica. */
+  --accent: var(--tono);
+  --accent-ink: color-mix(in oklab, var(--tono) 58%, white);
+  --accent-soft: color-mix(in oklab, var(--tono) 16%, transparent);
   --text-strong: #f1f1ee;
   --text-muted: #9d9ea4;
   --text-faint: #6b6c72;
-  --accion-fondo: #f1f1ee;
-  --accion-tinta: #0b0b0d;
+  --accion-fondo: color-mix(in oklab, var(--tono) 72%, white);
+  --accion-tinta: color-mix(in oklab, var(--tono) 18%, #07080a);
   /* Velos: un poco de luz sobre la placa, para lo tonal y lo elegido. */
   --velo: rgba(255,255,255,0.06);
   --velo-fuerte: rgba(255,255,255,0.11);
@@ -2839,14 +2842,13 @@ input, textarea, [contenteditable="true"] {
 }
 .light-mode {
   --social-tinta: #3f3f46;
-  --accent: #131315;
-  --accent-ink: #131315;
-  --accent-soft: rgba(0,0,0,0.06);
+  --accent-ink: color-mix(in oklab, var(--tono) 62%, black);
+  --accent-soft: color-mix(in oklab, var(--tono) 13%, transparent);
   --text-strong: #131315;
   --text-muted: #5b5d62;
   --text-faint: #8b8d92;
-  --accion-fondo: #131315;
-  --accion-tinta: #ffffff;
+  --accion-fondo: var(--tono);
+  --accion-tinta: color-mix(in oklab, var(--tono) 18%, #07080a);
   --velo: rgba(0,0,0,0.045);
   --velo-fuerte: rgba(0,0,0,0.075);
   --hairline-fuerte: rgba(0,0,0,0.14);
@@ -2919,14 +2921,14 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
   display: flex; align-items: center; justify-content: center; gap: 8px;
   min-height: 52px; padding: 0 22px; border-radius: 999px;
   font-weight: 700; font-size: 0.9375rem; letter-spacing: -0.005em;
-  color: var(--accion-tinta);
-  background: var(--accion-fondo);
+  color: color-mix(in oklab, var(--c, var(--tono)) 18%, #07080a);
+  background: color-mix(in oklab, var(--c, var(--tono)) 72%, white);
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.5), 0 10px 22px -14px rgba(0,0,0,0.9);
   transition: border-radius .4s var(--resorte), transform .25s var(--resorte), filter .2s ease;
 }
 .boton-pildora:active { border-radius: 18px; transform: scale(.975); }
 .light-mode .boton-pildora { box-shadow: 0 10px 22px -14px rgba(0,0,0,0.5); }
-.light-mode .boton-pildora { background: var(--accion-fondo); }
+.light-mode .boton-pildora { background: var(--c, var(--tono)); }
 
 /* FONDO: el clima del día. Arriba, donde va el título, un velo del color de
    lo que estás mirando que se apaga antes de las tarjetas. Es imagen de
@@ -2938,12 +2940,12 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
    (la barra del chat, que va en un portal sobre <body>) les queda encima. */
 .app-fondo {
   background-color: var(--app-bg);
-  background-image: radial-gradient(120% 60% at 50% -10%, rgba(255,255,255,0.05), transparent 70%);
+  background-image: radial-gradient(120% 62% at 50% -12%, color-mix(in oklab, var(--tono) 15%, transparent), transparent 72%);
   background-repeat: no-repeat;
   background-size: 100% 560px;
 }
 .light-mode.app-fondo {
-  background-image: radial-gradient(120% 60% at 50% -10%, rgba(255,255,255,0.85), transparent 70%);
+  background-image: radial-gradient(120% 62% at 50% -12%, color-mix(in oklab, var(--tono) 11%, transparent), transparent 72%);
 }
 
 /* ── BARRA DE ARRIBA ─────────────────────────────────────────────────────
@@ -3020,8 +3022,8 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 .barra-pestanas .etiqueta { font-size: 0.6875rem; font-weight: 550; line-height: 1; letter-spacing: 0; transition: color .2s ease; }
 .barra-pestanas [aria-current="page"] { color: var(--text-strong); }
 .barra-pestanas .indicador { position: relative; isolation: isolate; }
-.barra-pestanas .indicador-fondo { position: absolute; inset: 0; z-index: -1; border-radius: 999px; background: var(--accion-fondo); }
-.barra-pestanas [aria-current="page"] .indicador { width: 54px; color: var(--accion-tinta); }
+.barra-pestanas .indicador-fondo { position: absolute; inset: 0; z-index: -1; border-radius: 999px; background: color-mix(in oklab, var(--c, var(--tono)) 72%, white); }
+.barra-pestanas [aria-current="page"] .indicador { width: 54px; color: color-mix(in oklab, var(--c, var(--tono)) 18%, #07080a); }
 .barra-pestanas [aria-current="page"] .etiqueta { font-weight: 650; }
 .barra-pestanas button:focus-visible { outline: none; }
 .barra-pestanas button:focus-visible .indicador { outline: 2px solid var(--accent-ink); outline-offset: 2px; }
@@ -3070,10 +3072,10 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 .light-mode .boton-finalizar { color: var(--text-strong); }
 .boton-finalizar:active { border-radius: 14px; transform: scale(.97); }
 .boton-finalizar.listo {
-  color: var(--accion-tinta);
-  background: var(--accion-fondo);
+  color: color-mix(in oklab, var(--c, var(--tono)) 18%, #07080a);
+  background: color-mix(in oklab, var(--c, var(--tono)) 72%, white);
 }
-.light-mode .boton-finalizar.listo { background: var(--accion-fondo); }
+.light-mode .boton-finalizar.listo { background: var(--c, var(--tono)); }
 
 /* ── CRONÓMETRO DE DESCANSO ─────────────────────────────────────────────
    Quieto es un renglón fino: el reloj chico y "Iniciar". Corriendo, el
@@ -3087,16 +3089,49 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 }
 .descanso-quieto { background: transparent; box-shadow: inset 0 0 0 1px var(--hairline); }
 .descanso-activo {
-  flex-direction: column; align-items: stretch; gap: 12px; padding: 12px 12px 14px 16px; border-radius: 20px;
-  background: var(--surface-2); box-shadow: inset 0 1px 0 var(--brillo);
+  display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 14px;
+  padding: 12px 14px 12px 12px; border-radius: 22px;
+  background: linear-gradient(135deg, color-mix(in oklab, var(--c, var(--tono)) 12%, var(--surface-2)), var(--surface-2) 70%);
+  box-shadow: inset 0 1px 0 var(--brillo);
 }
-.light-mode .descanso-activo { box-shadow: inset 0 0 0 1px var(--hairline); }
-/* En pantallas muy angostas los controles bajan a su propio renglón: así
-   el tiempo y su rótulo no se cortan. */
+.light-mode .descanso-activo { background: linear-gradient(135deg, color-mix(in oklab, var(--c, var(--tono)) 10%, #ffffff), var(--surface-2) 70%); box-shadow: inset 0 0 0 1px var(--hairline); }
+/* El reloj: el dial y, adentro, el tiempo y qué pasa si lo tocás. */
+.descanso-dial { position: relative; width: 112px; height: 112px; flex: none; border-radius: 999px; display: grid; place-items: center; transition: transform .25s var(--resorte); }
+.descanso-dial:active { transform: scale(.96); }
+.descanso-dial > .dial { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.descanso-dial-centro { position: relative; display: grid; justify-items: center; gap: 3px; color: var(--text-faint); }
+.descanso-dial .descanso-tiempo { margin: 0; font-size: 1.9rem; line-height: 1; }
+.descanso-dial-accion { display: flex; }
+.descanso-dial.chico { width: 54px; height: 54px; color: var(--text-strong); }
+.descanso-dial.chico .descanso-dial-centro { color: var(--text-strong); }
+.descanso-dial.mini { width: 26px; height: 26px; }
+.dial-marca { stroke: var(--hairline-fuerte); stroke-width: 1; stroke-linecap: round; }
+.dial-marca.mayor { stroke: var(--text-faint); stroke-width: 1.7; }
+.dial-pista { fill: none; stroke: var(--velo-fuerte); stroke-width: 7; }
+.dial-arco {
+  fill: none; stroke: color-mix(in oklab, var(--c, var(--tono)) 76%, white); stroke-width: 7; stroke-linecap: round;
+  transition: stroke-dasharray .26s linear, stroke-dashoffset .26s linear, stroke .3s ease, opacity .3s ease;
+}
+.light-mode .dial-arco { stroke: var(--c, var(--tono)); }
+.dial-aguja { transform-origin: 50px 50px; transition: transform .26s linear; }
+.dial-aguja circle { fill: var(--text-strong); }
+.descanso-dial.chico .dial-pista, .descanso-dial.chico .dial-arco { stroke-width: 10; }
+.descanso-dial.mini .dial-pista, .descanso-dial.mini .dial-arco { stroke-width: 12; }
+.en-pausa .dial-arco { opacity: .45; }
+.urgente .descanso-dial { animation: tickBeat 1s cubic-bezier(.2,.8,.3,1) infinite; }
+/* Al lado del reloj: qué descanso es, a qué volvés y los ajustes. */
+.descanso-lado { min-width: 0; display: grid; gap: 4px; }
+.descanso-activo .descanso-rotulo { font-size: 0.9375rem; font-weight: 650; color: var(--text-strong); }
+.descanso-despues { font-size: 0.8125rem; line-height: 1.3; color: var(--text-muted); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.descanso-controles { display: flex; gap: 6px; margin-top: 6px; }
+.descanso-controles .descanso-boton { flex: 1 1 0; min-width: 0; }
 @media (max-width: 359px) {
-  .descanso-activo > div:first-child { flex-wrap: wrap; row-gap: 8px; }
-  .descanso-controles { width: 100%; justify-content: space-between; }
+  .descanso-dial { width: 96px; height: 96px; }
+  .descanso-dial .descanso-tiempo { font-size: 1.6rem; }
 }
+/* En el dock: una fila con el reloj chico. */
+.dock-reloj { display: flex; flex-wrap: wrap; align-items: center; column-gap: 12px; row-gap: 4px; padding: 10px 10px 10px 12px; }
+.dock-reloj-rotulo { flex-basis: 100%; padding-left: 2px; font-size: 0.8125rem; white-space: normal; text-overflow: clip; }
 .descanso-listo { padding: 8px 8px 8px 10px; }
 .descanso-rotulo { font-size: 0.8125rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .descanso-tiempo {
@@ -3109,12 +3144,12 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
   min-width: 44px; height: 44px; padding: 0 7px; border-radius: 999px;
   display: flex; align-items: center; justify-content: center;
   font-weight: 650; font-size: 0.875rem; font-variant-numeric: tabular-nums;
-  color: var(--text-strong);
-  background: var(--velo); box-shadow: inset 0 0 0 1px var(--hairline);
+  color: color-mix(in oklab, var(--c, var(--tono)) 50%, white);
+  background: color-mix(in oklab, var(--c, var(--tono)) 13%, transparent);
   transition: border-radius .35s var(--resorte), transform .2s ease;
 }
 .descanso-boton:active { border-radius: 14px; transform: scale(.96); }
-.descanso-boton-principal { min-width: 56px; color: var(--accion-tinta); background: var(--accion-fondo); box-shadow: none; }
+.descanso-boton-principal { min-width: 56px; color: color-mix(in oklab, var(--c, var(--tono)) 18%, #07080a); background: color-mix(in oklab, var(--c, var(--tono)) 72%, white); box-shadow: none; }
 .dock-descanso-embebido { border-bottom: 1px solid var(--hairline); }
 @media (max-width: 360px) {
   .descanso-boton { min-width: 38px; height: 42px; padding: 0 5px; }
@@ -3147,10 +3182,10 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
   transition: background-color .2s ease, color .2s ease;
 }
 .segmentado > button.activo {
-  color: var(--accion-tinta) !important;
-  background: var(--accion-fondo) !important;
+  color: color-mix(in oklab, var(--c, var(--tono)) 18%, #07080a) !important;
+  background: color-mix(in oklab, var(--c, var(--tono)) 72%, white) !important;
 }
-.light-mode .segmentado > button.activo { background: var(--accion-fondo) !important; }
+.light-mode .segmentado > button.activo { background: var(--c, var(--tono)) !important; }
 .cardio-reloj {
   border-radius: 22px; padding: 12px 12px 14px 16px;
   background: var(--surface-2);
@@ -3177,11 +3212,11 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
   transition: background-color .25s ease, color .2s ease, transform .2s ease;
 }
 .dia-solapa[aria-selected="true"], .dia-solapa.elegida {
-  color: var(--accion-tinta) !important;
-  background: var(--accion-fondo) !important;
+  color: color-mix(in oklab, var(--c, var(--tono)) 18%, #07080a) !important;
+  background: color-mix(in oklab, var(--c, var(--tono)) 72%, white) !important;
 }
 .dia-solapa-hoy { position: absolute; left: 50%; bottom: 6px; transform: translateX(-50%); width: 14px; height: 3px; border-radius: 2px; background: var(--text-faint); }
-.dia-solapa[aria-selected="true"] .dia-solapa-hoy { background: color-mix(in oklab, var(--accion-tinta) 40%, transparent); }
+.dia-solapa[aria-selected="true"] .dia-solapa-hoy { background: color-mix(in oklab, color-mix(in oklab, var(--c, var(--tono)) 18%, #07080a) 40%, transparent); }
 .dia-solapa-texto {
   display: block; text-align: center;
   font-weight: 600; letter-spacing: -0.005em; line-height: 1.1;
@@ -3214,8 +3249,9 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 .light-mode .dia-hero { background: var(--surface-1); box-shadow: var(--placa-canto), var(--sombra-placa); }
 .dia-chip {
   margin: 0 0 10px; display: inline-flex; align-items: center; gap: 7px; height: 26px; padding: 0 10px 0 9px; border-radius: 999px;
-  font-size: 0.75rem; font-weight: 600; color: var(--text-muted); background: var(--velo);
+  font-size: 0.75rem; font-weight: 600; color: color-mix(in oklab, var(--c, var(--tono)) 50%, white); background: color-mix(in oklab, var(--c, var(--tono)) 15%, transparent);
 }
+.light-mode .dia-chip { color: color-mix(in oklab, var(--c, var(--tono)) 62%, black); }
 .dia-chip::before { content: ""; width: 7px; height: 7px; border-radius: 999px; background: var(--c, var(--tono)); flex: none; }
 .dia-chip > .lucide { display: none; }
 .dia-titulo {
@@ -3236,7 +3272,8 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 .tarjeta-plan { border-radius: 24px; padding: 16px; background: var(--surface-1); box-shadow: var(--placa-canto); }
 .tarjeta-tonal { border-radius: 24px; background: var(--surface-1); box-shadow: var(--placa-canto); }
 .seccion-plegable { border-radius: 24px; background: var(--surface-1); box-shadow: var(--placa-canto); }
-.icono-galleta { width: 38px; height: 38px; --galleta-fondo: var(--surface-3); color: var(--text-strong); }
+.icono-galleta { width: 38px; height: 38px; --galleta-fondo: color-mix(in oklab, var(--c, var(--tono)) 20%, transparent); color: color-mix(in oklab, var(--c, var(--tono)) 50%, white); }
+.light-mode .icono-galleta { color: color-mix(in oklab, var(--c, var(--tono)) 62%, black); }
 
 /* La tarjeta de cada ejercicio: una placa. Abierta, toma sombra. */
 .ejercicio {
@@ -3252,7 +3289,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
   --galleta-fondo: transparent; box-shadow: inset 0 0 0 1px var(--hairline-fuerte);
   font-weight: 650; font-size: 0.75rem; font-variant-numeric: tabular-nums; color: var(--text-faint);
 }
-.ejercicio.completo .ejercicio-numero { --galleta-fondo: var(--accion-fondo); color: var(--accion-tinta); box-shadow: none; }
+.ejercicio.completo .ejercicio-numero { --galleta-fondo: color-mix(in oklab, var(--c, var(--tono)) 72%, white); color: color-mix(in oklab, var(--c, var(--tono)) 18%, #07080a); box-shadow: none; }
 .ejercicio-nombre { font-size: 1rem; font-weight: 650; line-height: 1.25; color: var(--text-strong); letter-spacing: -0.012em; text-wrap: pretty; }
 .ejercicio-musculo { display: inline; font-size: 0.8125rem; font-weight: 500; color: var(--text-muted); }
 .ejercicio.completo .ejercicio-nombre { color: var(--text-muted); }
@@ -3260,7 +3297,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
    que ya hiciste hoy. */
 .series-discos { display: inline-flex; align-items: center; gap: 3px; }
 .series-discos i { width: 4px; height: 14px; border-radius: 2px; background: var(--velo-fuerte); }
-.series-discos i.hecha { background: var(--text-strong); }
+.series-discos i.hecha { background: var(--disco, var(--text-strong)); }
 
 /* ── LA SERIE ────────────────────────────────────────────────────────────
    Una serie en foco: el visor con reps × kilos grandes y angostos, el ✓ de
@@ -3281,8 +3318,8 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 .series-lista > div:has(.serie-linea) + div:has(.serie-linea) .serie-linea { border-radius: 0 0 14px 14px; box-shadow: 0 -1px 0 var(--hairline); }
 .serie-galleta { width: 26px; height: 26px; font-weight: 650; font-size: 0.75rem; font-variant-numeric: tabular-nums; }
 .serie-galleta.hueca { --galleta-borde: var(--hairline-fuerte); --galleta-fondo: var(--surface-1); color: var(--text-faint); }
-.serie-galleta.llena { --galleta-fondo: var(--accion-fondo); color: var(--accion-tinta); }
-.serie-galleta.activa { --galleta-fondo: var(--accion-fondo); color: var(--accion-tinta); }
+.serie-galleta.llena { --galleta-fondo: color-mix(in oklab, var(--c, var(--tono)) 72%, white); color: color-mix(in oklab, var(--c, var(--tono)) 18%, #07080a); }
+.serie-galleta.activa { --galleta-fondo: color-mix(in oklab, var(--c, var(--tono)) 72%, white); color: color-mix(in oklab, var(--c, var(--tono)) 18%, #07080a); }
 .serie-linea-valor { display: inline-flex; align-items: baseline; gap: 3px; font-variant-numeric: tabular-nums; }
 .serie-linea-valor b { font-size: 1.25rem; font-weight: 650; font-stretch: 84%; letter-spacing: -0.01em; color: var(--text-strong); line-height: 1; }
 .serie-linea-valor i { font-style: normal; font-size: 0.8125rem; color: var(--text-faint); margin: 0 2px; }
@@ -3341,7 +3378,7 @@ button.foco-campo-rotulo:active { background: var(--velo); }
 .foco-guardar {
   width: 52px; height: 52px; justify-self: end; border-radius: 999px;
   display: flex; align-items: center; justify-content: center;
-  color: var(--accion-tinta); background: var(--accion-fondo);
+  color: color-mix(in oklab, var(--c, var(--tono)) 18%, #07080a); background: color-mix(in oklab, var(--c, var(--tono)) 72%, white);
   box-shadow: 0 8px 18px -10px rgba(0,0,0,0.9);
   transition: transform .25s var(--resorte), background-color .2s ease;
 }
@@ -3415,9 +3452,13 @@ button.foco-campo-rotulo:active { background: var(--velo); }
 .goma-claro { stop-color: #3a3b40; }
 .goma-medio { stop-color: #202124; }
 .goma-oscuro { stop-color: #101113; }
+/* Los discos de color: goma mate, con luz arriba y sombra abajo. */
+.disco-claro { stop-color: color-mix(in oklab, var(--d) 78%, #f1f1ee); }
+.disco-medio { stop-color: color-mix(in oklab, var(--d) 86%, #2a2b2f); }
+.disco-oscuro { stop-color: color-mix(in oklab, var(--d) 62%, #101113); }
 .moleteado { stroke: rgba(0,0,0,0.38); stroke-width: 0.7; }
 .disco { stroke: rgba(0,0,0,0.55); stroke-width: 0.5; }
-.disco-filete { fill: none; stroke-width: 1.2; }
+.disco-filete { fill: none; stroke-width: 0.8; stroke: rgba(255,255,255,0.28) !important; }
 .disco-filete.f0 { stroke: #d2625e; }
 .disco-filete.f1 { stroke: #5d88d8; }
 .disco-filete.f2 { stroke: #d8b85c; }
@@ -3482,7 +3523,7 @@ button.foco-campo-rotulo:active { background: var(--velo); }
    cuando ya les aplaudiste. */
 .historias { display: flex; gap: 14px; overflow-x: auto; padding: 4px 2px 6px; scroll-snap-type: x proximity; }
 .historia { position: relative; flex: none; width: 72px; display: flex; flex-direction: column; align-items: center; scroll-snap-align: start; }
-.historia-aro { width: 68px; height: 68px; --galleta-fondo: color-mix(in oklab, var(--dia) 62%, var(--surface-3)); }
+.historia-aro { width: 68px; height: 68px; --galleta-fondo: var(--dia); }
 .historia-aro.vista { --galleta-fondo: var(--hairline); }
 .historia-aro > img, .historia-aro > span {
   width: 58px; height: 58px; object-fit: cover;
@@ -3494,7 +3535,7 @@ button.foco-campo-rotulo:active { background: var(--velo); }
 .historia-aplauso {
   position: absolute; top: 44px; right: -2px; width: 32px; height: 32px; border-radius: 999px;
   display: flex; align-items: center; justify-content: center; font-size: 15px;
-  background: var(--accion-fondo); color: var(--accion-tinta); border: 2px solid var(--app-bg);
+  background: color-mix(in oklab, var(--c, var(--tono)) 72%, white); color: color-mix(in oklab, var(--c, var(--tono)) 18%, #07080a); border: 2px solid var(--app-bg);
   transition: transform .3s var(--resorte);
 }
 .historia-aplauso:active { transform: scale(.9); }
@@ -3560,13 +3601,13 @@ button.foco-campo-rotulo:active { background: var(--velo); }
   width: 40px; height: 40px; flex: none; overflow: hidden;
   display: flex; align-items: center; justify-content: center;
   font-weight: 800; font-size: 1.05rem; font-stretch: 82%;
-  color: var(--accion-tinta);
-  background: var(--accion-fondo);
+  color: color-mix(in oklab, var(--c, var(--tono)) 18%, #07080a);
+  background: color-mix(in oklab, var(--c, var(--tono)) 72%, white);
   -webkit-mask: var(--forma-galleta) center / contain no-repeat; mask: var(--forma-galleta) center / contain no-repeat;
   transition: transform .35s var(--resorte);
 }
 .avatar-galleta:active { transform: scale(.92) rotate(-20deg); }
-.light-mode .avatar-galleta { background: var(--accion-fondo); }
+.light-mode .avatar-galleta { background: var(--c, var(--tono)); }
 /* El chip de "estás entrenando" de la barra de arriba. */
 .chip-sesion {
   display: flex; align-items: center; gap: 8px; flex: none; max-width: 52%;
@@ -3578,10 +3619,10 @@ button.foco-campo-rotulo:active { background: var(--velo); }
 .light-mode .descanso-listo { background: var(--surface-1); }
 .descanso-galleta {
   width: 38px; height: 38px;
-  --galleta-fondo: var(--accion-fondo);
-  color: var(--accion-tinta);
+  --galleta-fondo: color-mix(in oklab, var(--c, var(--tono)) 72%, white);
+  color: color-mix(in oklab, var(--c, var(--tono)) 18%, #07080a);
 }
-.light-mode .descanso-galleta { --galleta-fondo: var(--accion-fondo); }
+.light-mode .descanso-galleta { --galleta-fondo: var(--c, var(--tono)); }
 .descanso-listo-texto { font-size: 0.9375rem; font-weight: 700; color: var(--text-strong); }
 .light-mode .descanso-listo-texto { color: var(--text-strong); }
 .descanso-rotulo { color: var(--text-strong); }
@@ -3597,12 +3638,12 @@ button.foco-campo-rotulo:active { background: var(--velo); }
   display: flex; align-items: center; gap: 6px; flex: none;
   height: 36px; padding: 0 14px 0 12px; border-radius: 999px;
   font-size: 0.8125rem; font-weight: 650;
-  color: var(--text-strong);
-  background: var(--velo); box-shadow: inset 0 0 0 1px var(--hairline);
+  color: color-mix(in oklab, var(--c, var(--tono)) 50%, white);
+  background: color-mix(in oklab, var(--c, var(--tono)) 13%, transparent);
   transition: border-radius .35s var(--resorte), transform .2s ease;
 }
 .descanso-iniciar:active { border-radius: 14px; transform: scale(.96); }
-.light-mode .descanso-iniciar { background: var(--velo); }
+.light-mode .descanso-iniciar { color: color-mix(in oklab, var(--c, var(--tono)) 62%, black); background: color-mix(in oklab, var(--c, var(--tono)) 13%, transparent); }
 .cardio-reloj.en-marcha { background: var(--surface-1); }
 .light-mode .cardio-reloj.en-marcha { background: var(--surface-1); }
 /* La cabecera del día. */
@@ -3629,13 +3670,13 @@ button.foco-campo-rotulo:active { background: var(--velo); }
 /* Portada. */
 .login-logo {
   width: 40px; height: 40px;
-  --galleta-fondo: var(--accion-fondo);
-  color: var(--accion-tinta);
+  --galleta-fondo: color-mix(in oklab, var(--c, var(--tono)) 72%, white);
+  color: color-mix(in oklab, var(--c, var(--tono)) 18%, #07080a);
 }
 .login-perfil-inicial {
   width: 42px; height: 42px; font-weight: 800; font-size: 1.1rem; font-stretch: 82%;
-  --galleta-fondo: var(--accion-fondo);
-  color: var(--accion-tinta);
+  --galleta-fondo: color-mix(in oklab, var(--c, var(--tono)) 72%, white);
+  color: color-mix(in oklab, var(--c, var(--tono)) 18%, #07080a);
 }
 .login-barra { max-width: 340px; margin: 0 0 26px -4px; }
 /* El cuerpo de la tarjeta de ejercicio se abre y se cierra deslizándose
@@ -3669,10 +3710,10 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 .pestanas-internas > .pestana-interna:last-child { border-top-right-radius: 999px; border-bottom-right-radius: 999px; }
 .pestana-interna[aria-selected="true"] {
   border-radius: 999px; font-weight: 700;
-  color: var(--accion-tinta);
-  background: var(--accion-fondo);
+  color: color-mix(in oklab, var(--c, var(--tono)) 18%, #07080a);
+  background: color-mix(in oklab, var(--c, var(--tono)) 72%, white);
 }
-.light-mode .pestana-interna[aria-selected="true"] { background: var(--accion-fondo); }
+.light-mode .pestana-interna[aria-selected="true"] { background: var(--c, var(--tono)); }
 /* La serie de la semana de descarga. */
 .descarga-serie { border-radius: 24px; padding: 12px; background: var(--surface-2); }
 .light-mode .descarga-serie { background: var(--surface-1); }
@@ -3681,12 +3722,12 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
   display: flex; align-items: center; justify-content: center; gap: 8px;
   min-height: 46px; padding: 0 18px; border-radius: 999px;
   font-size: 0.875rem; font-weight: 650;
-  color: var(--text-strong);
-  background: var(--velo);
+  color: color-mix(in oklab, var(--c, var(--tono)) 50%, white);
+  background: color-mix(in oklab, var(--c, var(--tono)) 13%, transparent);
   transition: border-radius .4s var(--resorte), transform .25s var(--resorte);
 }
 .boton-tonal:active { border-radius: 16px; transform: scale(.975); }
-.light-mode .boton-tonal { color: var(--text-strong); }
+.light-mode .boton-tonal { color: color-mix(in oklab, var(--c, var(--tono)) 62%, black); background: color-mix(in oklab, var(--c, var(--tono)) 13%, transparent); }
 /* En escritorio el avatar y el botón de volver viven en la barra lateral:
    estas clases fijan su display, así que el lg:hidden de Tailwind (que va en
    una capa) no alcanza a esconderlos. */
@@ -3697,7 +3738,7 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
    Objetos que cualquiera que entrena reconoce, en vez de números y párrafos:
    la cadena (racha), la balanza de cursor (peso), la escalera de carga
    (ciclo), la escalera de récords (gráfica), la tarjeta perforada
-   (historial), el carnet de socio y la pizarra del grupo. */
+   (historial), el carnet de socio y la carrera de la semana. */
 .seccion-titulo { font-size: 1rem; font-weight: 700; color: var(--text-strong); letter-spacing: -0.01em; padding: 0 2px; }
 .enlace-suave { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 36px; padding: 0 6px; font-size: 0.8125rem; font-weight: 600; color: var(--text-muted); }
 .enlace-suave:hover { color: var(--text-strong); }
@@ -3716,7 +3757,8 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 .light-mode .chip-dato.records { color: var(--text-strong); }
 
 /* La cadena: eslabones de frente (aros) y de canto (barritas). */
-.cadena { display: inline-flex; align-items: center; gap: 4px; flex: none; color: var(--text-muted); }
+.cadena { display: inline-flex; align-items: center; gap: 4px; flex: none; color: #fb923c; }
+.light-mode .cadena { color: #ea580c; }
 .cadena svg { display: block; overflow: visible; }
 .cadena .eslabon { fill: none; stroke: currentColor; stroke-width: 3.1; }
 .cadena .eslabon-canto { fill: currentColor; }
@@ -3745,18 +3787,18 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 .balanza-viga i.mayor { height: 9px; opacity: .9; }
 .balanza-pesa {
   position: absolute; top: 4px; width: 18px; height: 28px; transform: translateX(-50%); border-radius: 6px;
-  background: var(--accion-fondo);
+  background: color-mix(in oklab, var(--c, var(--tono)) 72%, white);
   box-shadow: 0 6px 12px -6px rgba(0,0,0,0.7);
   transition: left .9s var(--resorte-vivo);
 }
-.light-mode .balanza-pesa { background: var(--accion-fondo); }
-.balanza-pesa::after { content: ""; position: absolute; left: 50%; bottom: -6px; transform: translateX(-50%); border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid var(--accion-fondo); }
-.light-mode .balanza-pesa::after { border-top-color: var(--accion-fondo); }
+.light-mode .balanza-pesa { background: var(--c, var(--tono)); }
+.balanza-pesa::after { content: ""; position: absolute; left: 50%; bottom: -6px; transform: translateX(-50%); border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid color-mix(in oklab, var(--c, var(--tono)) 72%, white); }
+.light-mode .balanza-pesa::after { border-top-color: var(--c, var(--tono)); }
 .balanza-pesa.fantasma { background: transparent; border: 2px dashed var(--hairline-fuerte); box-shadow: none; }
 .balanza-pesa.fantasma::after { display: none; }
 .balanza-escala { display: flex; justify-content: space-between; margin: 0 4px; font-size: 11.5px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
 .balanza-leyenda { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12.5px; color: var(--text-muted); }
-.balanza-leyenda i { display: inline-block; width: 10px; height: 14px; border-radius: 3px; vertical-align: -2px; margin-right: 6px; background: var(--accion-fondo); }
+.balanza-leyenda i { display: inline-block; width: 10px; height: 14px; border-radius: 3px; vertical-align: -2px; margin-right: 6px; background: color-mix(in oklab, var(--c, var(--tono)) 72%, white); }
 .balanza-leyenda i.fantasma { background: transparent; border: 1.5px dashed var(--hairline-fuerte); }
 
 /* La barra en equilibrio. */
@@ -3764,8 +3806,8 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 .equilibrio-dibujo { display: block; width: 100%; max-width: 340px; margin: 0 auto; overflow: visible; }
 .equilibrio-eje { fill: #a9adb3; }
 .light-mode .equilibrio-eje { fill: #8f9399; }
-.disco-empuje { fill: #1d1e21; stroke: #d2625e; stroke-width: 1.3; }
-.disco-traccion { fill: #1d1e21; stroke: #5d88d8; stroke-width: 1.3; }
+.disco-empuje { fill: #E5383B; stroke: rgba(0,0,0,0.3); stroke-width: 0.6; }
+.disco-traccion { fill: #2F6FED; stroke: rgba(0,0,0,0.3); stroke-width: 0.6; }
 .equilibrio-apoyo { fill: var(--surface-3); }
 .equilibrio-rotulos { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-muted); }
 .equilibrio-rotulos > span:last-child { text-align: right; }
@@ -3774,40 +3816,20 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 .equilibrio-veredicto.ok { color: var(--text-strong); }
 .equilibrio-pie { text-align: center; font-size: 12px; color: var(--text-faint); }
 
-/* El reparto de la semana. */
-.reparto { display: grid; gap: 10px; }
-.reparto-barra { display: flex; gap: 3px; height: 14px; }
-.reparto-barra span { flex-basis: 0; min-width: 6px; border-radius: 4px; background: color-mix(in oklab, var(--dia) 58%, var(--surface-3)); }
-.light-mode .reparto-barra span { background: color-mix(in oklab, var(--dia) 60%, white); }
-.reparto-barra span:first-child { border-radius: 999px 4px 4px 999px; }
-.reparto-barra span:last-child { border-radius: 4px 999px 999px 4px; }
-.reparto-barra span:only-child { border-radius: 999px; }
-.reparto-leyenda { display: flex; flex-wrap: wrap; gap: 6px; }
-.reparto-leyenda button {
-  display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px 0 10px; border-radius: 999px;
-  font-size: 12.5px; font-weight: 600; color: var(--text-strong);
-  background: var(--velo);
-}
-.reparto-leyenda button:disabled { cursor: default; }
-.reparto-leyenda i { width: 8px; height: 8px; border-radius: 999px; background: var(--dia); }
-.reparto-leyenda b { font-weight: 750; color: color-mix(in oklab, var(--dia) 58%, var(--surface-3)); }
-
-.reparto-dia { max-width: 9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
 /* La semana perforada (carnet) y la semana como discos (aviso de descanso). */
 .semana-perforada { display: inline-flex; gap: 5px; }
 .semana-hueco-col { display: flex; flex-direction: column; align-items: center; gap: 3px; }
 .semana-hueco { display: block; width: 16px; height: 16px; border-radius: 999px; background: color-mix(in oklab, var(--text-strong) 9%, transparent); box-shadow: inset 0 1.5px 3px rgba(0,0,0,0.45); }
 .light-mode .semana-hueco { box-shadow: inset 0 1.5px 3px rgba(0,0,0,0.18); }
-.semana-hueco.picado { background: color-mix(in oklab, var(--dia) 58%, var(--surface-3)); box-shadow: inset 0 2px 3px rgba(0,0,0,0.3); }
-.light-mode .semana-hueco.picado { background: color-mix(in oklab, var(--dia) 60%, white); }
+.semana-hueco.picado { background: color-mix(in oklab, var(--dia) 82%, white); box-shadow: inset 0 2px 3px rgba(0,0,0,0.3); }
+.light-mode .semana-hueco.picado { background: var(--dia); }
 .semana-hueco.hoy { outline: 2px solid color-mix(in oklab, var(--text-strong) 55%, transparent); outline-offset: 1.5px; }
 .semana-hueco.futuro:not(.picado) { opacity: .45; }
 .semana-hueco-col em { font-style: normal; font-size: 10px; font-weight: 600; color: var(--text-faint); }
 .semana-plan { display: inline-flex; align-items: center; gap: 3px; flex: none; }
 .semana-plan i { display: block; width: 7px; height: 20px; border-radius: 3px; background: var(--disco-fantasma); }
-.semana-plan i[style] { background: color-mix(in oklab, var(--dia) 58%, var(--surface-3)); }
-.light-mode .semana-plan i[style] { background: color-mix(in oklab, var(--dia) 60%, white); }
+.semana-plan i[style] { background: color-mix(in oklab, var(--dia) 82%, white); }
+.light-mode .semana-plan i[style] { background: var(--dia); }
 .semana-plan i.hoy { outline: 2px solid var(--text-strong); outline-offset: 1.5px; }
 .aviso-descanso { width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 26px; text-align: left; background: var(--surface-1); }
 
@@ -3819,8 +3841,8 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
   width: 62px; height: 62px; flex: none; overflow: hidden;
   display: flex; align-items: center; justify-content: center;
   font-weight: 800; font-size: 1.55rem; font-stretch: 82%;
-  color: var(--accion-tinta);
-  background: var(--accion-fondo);
+  color: color-mix(in oklab, var(--c, var(--tono)) 18%, #07080a);
+  background: color-mix(in oklab, var(--c, var(--tono)) 72%, white);
   -webkit-mask: var(--forma-galleta) center / contain no-repeat; mask: var(--forma-galleta) center / contain no-repeat;
 }
 .carnet-avatar img { width: 100%; height: 100%; object-fit: cover; }
@@ -3841,53 +3863,85 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 .carnet-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
 .carnet .atleta-accion { margin-top: 12px; }
 
-/* La pizarra del grupo: una fila por persona, una marca por día. */
-.pizarra { display: grid; gap: 2px; padding: 10px 10px 8px; border-radius: 24px; background: var(--surface-1); }
-.pizarra-fila { display: grid; grid-template-columns: minmax(0, 1.7fr) repeat(7, minmax(0, 1fr)); align-items: center; gap: 2px; min-height: 38px; width: 100%; padding: 0 4px; border-radius: 14px; text-align: left; }
-.pizarra-cabeza { min-height: 22px; }
-.pizarra-cabeza span { text-align: center; font-size: 11px; font-weight: 650; color: var(--text-faint); }
-.pizarra-cabeza span.hoy { color: var(--text-strong); }
-.pizarra-fila.yo { background: var(--velo); }
-.pizarra-nombre { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 13px; font-weight: 600; color: var(--text-strong); }
-.pizarra-avatar {
-  width: 26px; height: 26px; flex: none; overflow: hidden;
-  display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 750; color: var(--text-strong);
-  background: var(--surface-3);
-  -webkit-mask: var(--forma-galleta) center / contain no-repeat; mask: var(--forma-galleta) center / contain no-repeat;
-}
-.pizarra-avatar img { width: 100%; height: 100%; object-fit: cover; }
-.pizarra-marca { position: relative; justify-self: center; width: 22px; height: 24px; }
-.pizarra-marca::after { content: ""; position: absolute; left: 6px; right: 6px; top: 11px; height: 2px; border-radius: 1px; background: color-mix(in oklab, var(--text-strong) 14%, transparent); }
 /* Una pasada de fibrón del color del día. */
-.pizarra-marca.hecha::after { left: 9.5px; right: 9.5px; top: 2px; bottom: 2px; height: auto; border-radius: 2px; background: var(--text-strong); opacity: .88; transform: rotate(16deg); }
 
-.pizarra-marca.futura:not(.hecha)::after { opacity: 0; }
-.pizarra-invitacion { display: grid; gap: 12px; }
-.pizarra-invitacion .pizarra { opacity: .9; }
-.pizarra-invitacion-texto { padding: 0 4px; }
+/* Tu ficha, en una franja. */
+.ficha-social { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 24px; background: var(--surface-1); box-shadow: var(--placa-canto); }
+.ficha-avatar {
+  width: 52px; height: 52px; flex: none; overflow: hidden; border-radius: 999px; display: grid; place-items: center;
+  font-weight: 800; font-size: 1.2rem; color: var(--text-strong); background: var(--surface-3);
+  box-shadow: 0 0 0 2px var(--surface-1), 0 0 0 4px color-mix(in oklab, var(--rango) 76%, white);
+}
+.light-mode .ficha-avatar { box-shadow: 0 0 0 2px var(--surface-1), 0 0 0 4px var(--rango); }
+.ficha-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.ficha-nombre { font-size: 1.05rem; font-weight: 700; line-height: 1.2; color: var(--text-strong); overflow-wrap: anywhere; }
+.ficha-linea { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 12px; margin-top: 3px; font-size: 12.5px; font-weight: 600; color: var(--text-muted); }
+.ficha-dato { display: inline-flex; align-items: center; gap: 5px; color: var(--text-strong); }
+.ficha-medalla { flex: none; display: grid; place-items: center; width: 44px; height: 44px; }
+/* La carrera de la semana. */
+.carrera { display: grid; gap: 2px; margin: 0; padding: 6px; list-style: none; border-radius: 24px; background: var(--surface-1); box-shadow: var(--placa-canto); }
+.carrera-carril {
+  width: 100%; display: grid; grid-template-columns: 14px 32px minmax(0, 1fr) 26px; align-items: center; gap: 10px;
+  padding: 8px 10px 8px 8px; border-radius: 18px; text-align: left;
+}
+button.carrera-carril:active { background: var(--velo); }
+.carrera-carril.yo { background: color-mix(in oklab, var(--tono) 13%, var(--surface-2)); }
+.carrera-carril.vacio { opacity: .45; }
+.carrera-puesto { font-size: 12px; font-weight: 700; text-align: center; color: var(--text-faint); }
+.carrera-carril.primero .carrera-puesto { color: var(--record); }
+.carrera-carril.yo .carrera-puesto { color: var(--text-strong); }
+.carrera-avatar { width: 32px; height: 32px; overflow: hidden; border-radius: 999px; display: grid; place-items: center; font-size: 13px; font-weight: 750; color: var(--text-strong); background: var(--surface-3); }
+.carrera-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.carrera-cuerpo { min-width: 0; display: grid; gap: 6px; }
+.carrera-nombre { font-size: 13.5px; font-weight: 650; line-height: 1.1; color: var(--text-strong); }
+.carrera-pista { display: flex; gap: 3px; }
+.carrera-pista i { flex: 1 1 0; height: 8px; border-radius: 4px; background: var(--velo-fuerte); }
+.carrera-pista i.hecho { background: color-mix(in oklab, var(--dia) 76%, white); }
+.light-mode .carrera-pista i.hecho { background: var(--dia); }
+.carrera-n { font-size: 1.25rem; font-weight: 700; text-align: right; color: var(--text-strong); }
 
 /* La escalera del ciclo. */
-.escalera-titulo { font-size: 1.3rem; line-height: 1.15; font-weight: 750; color: var(--text-strong); letter-spacing: -0.015em; }
+.escalera-titulo { font-size: 1.45rem; line-height: 1.1; font-weight: 750; color: var(--text-strong); letter-spacing: -0.02em; }
+.escalera-titulo span { font-weight: 550; color: var(--text-faint); }
 .escalera-sub { margin-top: 3px; font-size: 0.8125rem; color: var(--text-muted); }
-.escalera { display: flex; align-items: flex-end; gap: 5px; height: 112px; margin-top: 22px; }
+.escalera { display: flex; align-items: flex-end; gap: 5px; height: 100px; margin-top: 24px; }
 .escalon {
   position: relative; flex: 1 1 0; min-width: 0;
-  display: flex; flex-direction: column; align-items: center; justify-content: space-between;
-  padding: 7px 0 6px; border-radius: 12px 12px 6px 6px;
-  background: var(--disco-fantasma);
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+  padding: 8px 0 6px; border-radius: 11px 11px 5px 5px;
+  background: transparent; box-shadow: inset 0 0 0 1px var(--hairline-fuerte);
 }
-.escalon.pasada { background: var(--surface-3); }
-.escalon.actual { background: var(--accion-fondo); box-shadow: 0 12px 26px -12px var(--velo-fuerte); }
-.light-mode .escalon.actual { background: var(--accion-fondo); }
+.escalon.pasada { background: var(--surface-3); box-shadow: none; }
+.escalon.descarga, .escalon.actual { box-shadow: none; }
+.escalera-numeros { display: flex; gap: 5px; margin-top: 6px; }
+.escalera-numeros span { flex: 1 1 0; min-width: 0; text-align: center; font-size: 11.5px; font-weight: 650; color: var(--text-faint); }
+.escalera-numeros span.actual { color: var(--text-strong); }
+/* Esta semana, día por día. */
+.ciclo-semana { display: grid; gap: 10px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--hairline); }
+.ciclo-semana-titulo { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 0.8125rem; color: var(--text-muted); }
+.ciclo-semana-titulo b { font-weight: 650; color: var(--text-strong); }
+.ciclo-dias { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.ciclo-dia { display: grid; justify-items: center; gap: 6px; }
+.ciclo-dia i { width: 28px; height: 28px; border-radius: 999px; }
+.ciclo-dia:not(.plan):not(.hecho) i { width: 8px; height: 8px; margin: 10px 0; background: var(--hairline-fuerte); }
+.ciclo-dia.plan i { box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--dia, var(--text-faint)) 70%, var(--hairline-fuerte)); }
+.ciclo-dia.plan:not(.futuro):not(.hoy):not(.hecho) i { box-shadow: inset 0 0 0 1.5px var(--hairline-fuerte); }
+.ciclo-dia.hecho i { background: color-mix(in oklab, var(--dia) 76%, white); box-shadow: none; }
+.light-mode .ciclo-dia.hecho i { background: var(--dia); }
+.ciclo-dia.hoy i { outline: 2px solid var(--text-strong); outline-offset: 2px; }
+.ciclo-dia small { font-size: 11px; font-weight: 600; color: var(--text-faint); }
+.ciclo-dia.hoy small { color: var(--text-strong); }
+.escalon.actual { background: color-mix(in oklab, var(--c, var(--tono)) 72%, white); box-shadow: 0 12px 26px -12px var(--velo-fuerte); }
+.light-mode .escalon.actual { background: var(--c, var(--tono)); }
 .escalon.descarga { background: repeating-linear-gradient(-45deg, var(--surface-3) 0 3px, var(--surface-2) 3px 7px); }
-.escalon.descarga.actual { background: var(--accion-fondo); }
+.escalon.descarga.actual { background: color-mix(in oklab, var(--c, var(--tono)) 72%, white); }
 .escalon-n { font-size: 11.5px; font-weight: 750; color: var(--text-muted); font-stretch: 82%; }
-.escalon.actual .escalon-n { color: var(--accion-tinta); }
-.escalon-hoy { position: absolute; top: -20px; font-size: 11px; font-weight: 700; color: var(--text-strong); }
+.escalon.actual .escalon-n { color: color-mix(in oklab, var(--c, var(--tono)) 18%, #07080a); }
+.escalon-hoy { position: absolute; top: -19px; font-size: 11px; font-weight: 700; color: var(--text-strong); }
 .light-mode .escalon-hoy { color: var(--text-strong); }
 .escalon-sesiones { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 100%; }
 .escalon-sesiones i { display: block; width: 52%; max-width: 18px; height: 3px; border-radius: 2px; background: color-mix(in oklab, var(--text-strong) 70%, transparent); }
-.escalon.actual .escalon-sesiones i { background: var(--accion-tinta); }
+.escalon.actual .escalon-sesiones i { background: color-mix(in oklab, var(--c, var(--tono)) 18%, #07080a); }
 @keyframes escalonSube { from { transform: scaleY(0.2); transform-origin: bottom; opacity: 0; } to { transform: none; opacity: 1; } }
 
 /* La escalera de récords (Ejercicios). */
@@ -3903,6 +3957,7 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 .records-sub { margin-top: 5px; font-size: 0.8125rem; color: var(--text-muted); }
 .records-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .records-pie { display: flex; align-items: center; gap: 8px; font-size: 0.8125rem; line-height: 1.4; color: var(--text-muted); }
+.evolucion-etiqueta { fill: var(--record); font-size: 11.5px; font-weight: 700; }
 .records-pie.alerta { color: var(--record); }
 .records-pie.fuego { color: var(--text-strong); }
 .grafica-globo {
@@ -3915,7 +3970,7 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 .grafica-globo-dato { margin-top: 2px; font-size: 11.5px; color: var(--text-muted); }
 .sesion-renglon { display: grid; grid-template-columns: 28px 52px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px 12px 8px 8px; border-radius: 16px; background: var(--surface-2); }
 .sesion-renglon.record { background: var(--surface-2); }
-.sesion-renglon-marca { width: 26px; height: 26px; --galleta-fondo: var(--accion-fondo); color: var(--accion-tinta); }
+.sesion-renglon-marca { width: 26px; height: 26px; --galleta-fondo: color-mix(in oklab, var(--c, var(--tono)) 72%, white); color: color-mix(in oklab, var(--c, var(--tono)) 18%, #07080a); }
 .sesion-renglon-marca.hueca { --galleta-borde: color-mix(in oklab, var(--text-strong) 18%, transparent); --galleta-fondo: var(--surface-2); color: var(--text-muted); }
 .sesion-renglon.descarga .sesion-renglon-marca { color: #c084fc; }
 .sesion-renglon-fecha { font-size: 12.5px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
@@ -3938,12 +3993,12 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 }
 .light-mode .hueco-dia { box-shadow: inset 0 2px 4px rgba(0,0,0,0.12); }
 .hueco-dia.picado {
-  color: var(--text-strong); font-weight: 750;
-  background: color-mix(in oklab, var(--dia) 58%, var(--surface-3));
+  color: color-mix(in oklab, var(--dia) 22%, var(--tinta-oscura)); font-weight: 750;
+  background: color-mix(in oklab, var(--dia) 82%, white);
   box-shadow: inset 0 2px 4px rgba(0,0,0,0.25);
 }
-.hueco-dia.picado[style*="--dia2"] { background: linear-gradient(135deg, color-mix(in oklab, var(--dia) 58%, var(--surface-3)) 50%, color-mix(in oklab, var(--dia2) 58%, var(--surface-3)) 50%); }
-.light-mode .hueco-dia.picado { background: color-mix(in oklab, var(--dia) 60%, white); }
+.hueco-dia.picado[style*="--dia2"] { background: linear-gradient(135deg, color-mix(in oklab, var(--dia) 82%, white) 50%, color-mix(in oklab, var(--dia2) 82%, white) 50%); }
+.light-mode .hueco-dia.picado { background: var(--dia); }
 .hueco-dia.picado:active { transform: scale(.9); }
 .hueco-dia.hoy { outline: 2px solid color-mix(in oklab, var(--text-strong) 55%, transparent); outline-offset: 2px; }
 .hueco-dia.elegido { outline: 2.5px solid var(--text-strong); outline-offset: 2px; }
@@ -3952,16 +4007,51 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 .perforada-total.cero { opacity: .35; }
 
 /* Rutinas: la tarjeta de tu rutina y la lista. */
-.rutina-activa-nombre { font-size: 1.2rem; font-weight: 750; line-height: 1.15; color: var(--text-strong); text-wrap: balance; }
-.rutina-activa-linea { margin-top: 3px; font-size: 0.8125rem; color: var(--text-muted); }
+.rutina-activa-nombre { margin-top: 2px; font-size: 1.7rem; font-weight: 800; font-stretch: 80%; line-height: 1; letter-spacing: -0.02em; color: var(--text-strong); text-wrap: balance; }
+.rutina-activa-linea { font-size: 0.8125rem; color: var(--text-muted); }
+/* Los días de la rutina, en baldosas. */
+.dias-rutina { display: grid; gap: 8px; }
+@media (max-width: 359px) { .dia-rutina { padding: 14px 10px 10px; } .dia-rutina-datos { font-size: 0.6875rem; } }
+.dia-rutina {
+  position: relative; overflow: hidden; display: grid; align-content: start; gap: 2px; min-height: 92px;
+  padding: 16px 12px 12px; border-radius: 18px; text-align: left;
+  background: color-mix(in oklab, var(--dia) 12%, var(--surface-2));
+  transition: transform .25s var(--resorte);
+}
+.dia-rutina::before { content: ""; position: absolute; left: 12px; right: 12px; top: 0; height: 4px; border-radius: 0 0 4px 4px; background: color-mix(in oklab, var(--dia) 78%, white); }
+.light-mode .dia-rutina { background: color-mix(in oklab, var(--dia) 9%, #ffffff); box-shadow: inset 0 0 0 1px var(--hairline); }
+.light-mode .dia-rutina::before { background: var(--dia); }
+.dia-rutina:active { transform: scale(.96); }
+.dia-rutina:disabled { cursor: default; }
+.dia-rutina-nombre { margin-bottom: 6px; font-size: 1.05rem; font-weight: 750; font-stretch: 85%; line-height: 1.1; color: var(--text-strong); overflow-wrap: normal; word-break: normal; text-wrap: balance; }
+.dia-rutina-datos { font-size: 0.75rem; color: var(--text-muted); }
+.dia-rutina-datos b { font-size: 0.9375rem; font-weight: 700; color: var(--text-strong); margin-right: 2px; }
+/* Armá la tuya. */
+.accion-rutina {
+  display: grid; align-content: start; justify-items: start; gap: 2px; min-height: 118px; padding: 14px; border-radius: 22px; text-align: left;
+  background: var(--surface-1); box-shadow: var(--placa-canto); transition: transform .25s var(--resorte);
+}
+.accion-rutina:active { transform: scale(.97); }
+.accion-rutina .icono-galleta { margin-bottom: 10px; }
+.accion-rutina b { font-size: 0.9375rem; font-weight: 650; color: var(--text-strong); }
+.accion-rutina small { font-size: 0.8125rem; line-height: 1.3; color: var(--text-muted); }
+/* Las preestablecidas, en carrusel. */
+.preset-carrusel { display: flex; gap: 10px; overflow-x: auto; margin: 0 -16px; padding: 2px 16px 8px; scroll-snap-type: x mandatory; scroll-padding-inline: 16px; scrollbar-width: none; }
+.preset-carrusel::-webkit-scrollbar { display: none; }
+.preset-carrusel > .preset { flex: 0 0 78%; max-width: 300px; scroll-snap-align: start; display: flex; flex-direction: column; gap: 8px; min-height: 196px; padding: 16px; }
+.preset-carrusel .preset-desc { margin-top: 0; }
+.preset-carrusel .preset-pie { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.preset-tira.grande { display: flex; gap: 3px; height: 8px; width: 100%; margin-bottom: 6px; }
+.preset-tira.grande i { height: 8px; border-radius: 4px; }
+.preset-ver { display: inline-flex; align-items: center; gap: 2px; font-size: 0.8125rem; font-weight: 650; color: var(--text-muted); }
 .semana-rutina { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
 .semana-rutina-dia { display: flex; flex-direction: column; align-items: center; gap: 5px; }
 .semana-rutina-dia:disabled { cursor: default; }
 .semana-rutina-letra { font-size: 11.5px; font-weight: 650; color: var(--text-faint); }
 .semana-rutina-dia.hoy .semana-rutina-letra { color: var(--text-strong); }
 .semana-rutina-marca { display: block; width: 100%; height: 30px; border-radius: 10px; background: var(--disco-fantasma); transition: transform .25s var(--resorte); }
-.semana-rutina-dia.entrena .semana-rutina-marca { background: color-mix(in oklab, var(--dia) 58%, var(--surface-3)); }
-.light-mode .semana-rutina-dia.entrena .semana-rutina-marca { background: color-mix(in oklab, var(--dia) 60%, white); }
+.semana-rutina-dia.entrena .semana-rutina-marca { background: color-mix(in oklab, var(--dia) 82%, white); }
+.light-mode .semana-rutina-dia.entrena .semana-rutina-marca { background: var(--dia); }
 .semana-rutina-dia.hoy .semana-rutina-marca { outline: 2px solid var(--text-strong); outline-offset: 2px; }
 .semana-rutina-dia.entrena:active .semana-rutina-marca { transform: scale(.92); }
 .preset { position: relative; display: block; width: 100%; padding: 14px 16px; border-radius: 24px; text-align: left; background: var(--surface-1); transition: background-color .2s ease; }
@@ -3969,20 +4059,20 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 .preset-cuerpo { display: block; width: 100%; text-align: left; }
 .preset-cabeza { display: flex; align-items: center; gap: 8px; }
 .preset-nombre { font-size: 0.9375rem; font-weight: 700; line-height: 1.25; color: var(--text-strong); text-wrap: balance; }
-.preset-activa { flex: none; height: 22px; padding: 0 9px; border-radius: 999px; display: inline-flex; align-items: center; font-size: 11.5px; font-weight: 700; color: var(--accion-tinta); background: var(--accion-fondo); }
-.light-mode .preset-activa { background: var(--accion-fondo); }
+.preset-activa { flex: none; height: 22px; padding: 0 9px; border-radius: 999px; display: inline-flex; align-items: center; font-size: 11.5px; font-weight: 700; color: color-mix(in oklab, var(--c, var(--tono)) 18%, #07080a); background: color-mix(in oklab, var(--c, var(--tono)) 72%, white); }
+.light-mode .preset-activa { background: var(--c, var(--tono)); }
 .preset-desc { display: block; margin-top: 5px; font-size: 12.5px; line-height: 1.4; color: var(--text-muted); text-wrap: pretty; }
 .preset-pie { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
 .preset-tira { display: flex; gap: 2px; width: 96px; height: 10px; flex: none; }
-.preset-tira i { flex-basis: 0; border-radius: 3px; background: color-mix(in oklab, var(--dia) 58%, var(--surface-3)); }
-.light-mode .preset-tira i { background: color-mix(in oklab, var(--dia) 60%, white); }
+.preset-tira i { flex-basis: 0; border-radius: 3px; background: color-mix(in oklab, var(--dia) 82%, white); }
+.light-mode .preset-tira i { background: var(--dia); }
 .preset-frec { font-size: 12px; color: var(--text-faint); min-width: 0; }
 .preset-acciones { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
 
 /* Social: la actividad y el ranking. */
 .actividad { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 10px; padding: 10px 10px 10px 8px; border-radius: 22px; background: var(--surface-2); }
 .actividad-quien { display: flex; align-items: center; gap: 10px; min-width: 0; text-align: left; }
-.actividad-aro { width: 46px; height: 46px; --galleta-fondo: color-mix(in oklab, var(--dia) 62%, var(--surface-3)); }
+.actividad-aro { width: 46px; height: 46px; --galleta-fondo: var(--dia); }
 .actividad-avatar {
   width: 38px; height: 38px; overflow: hidden; display: flex; align-items: center; justify-content: center;
   font-size: 15px; font-weight: 800; color: var(--text-strong); background: var(--surface-3);
@@ -3991,7 +4081,8 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 .actividad-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .actividad-nombre { display: block; font-size: 14px; font-weight: 700; color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .actividad-dia { display: block; margin-top: 1px; font-size: 12px; color: var(--text-muted); }
-.actividad-aplauso { width: 46px; height: 46px; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-size: 19px; color: var(--accion-tinta); background: var(--accion-fondo); transition: border-radius .35s var(--resorte), transform .2s ease; }
+.actividad-aplauso { width: 46px; height: 46px; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-size: 19px; color: color-mix(in oklab, var(--tono) 18%, #07080a); background: color-mix(in oklab, var(--tono) 72%, white); transition: border-radius .35s var(--resorte), transform .2s ease; }
+.light-mode .actividad-aplauso { background: var(--tono); }
 .actividad-aplauso:active { border-radius: 16px; transform: scale(.94); }
 .actividad-aplauso.hecho { background: var(--surface-3); color: var(--text-muted); }
 .actividad-carga { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; padding-left: 56px; }
@@ -4021,16 +4112,45 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 }
 .light-mode .chip-accion { color: var(--text-strong); }
 .chip-accion:active { border-radius: 14px; transform: scale(.96); }
-.burbuja { max-width: 85%; border-radius: 22px; padding: 10px 14px; font-size: 0.9375rem; line-height: 1.5; color: var(--text-strong); transition: transform .2s ease; }
-.burbuja.propia { border-bottom-right-radius: 6px; background: var(--surface-3); }
-.burbuja.ia { border-bottom-left-radius: 6px; background: var(--surface-1); }
-.burbuja.editando { box-shadow: 0 0 0 2px var(--accion-fondo); }
+/* Las respuestas de la IA, como texto limpio sobre la página (sin globo);
+   lo tuyo, en un globo con un toque del color de la pestaña. */
+.burbuja { max-width: 85%; border-radius: 22px; padding: 10px 14px; font-size: 0.9375rem; line-height: 1.55; color: var(--text-strong); transition: transform .2s ease; }
+.burbuja.propia { border-bottom-right-radius: 6px; background: color-mix(in oklab, var(--tono) 16%, var(--surface-2)); }
+.burbuja.ia { max-width: 100%; padding: 2px 2px 4px; border-radius: 0; background: transparent; }
+/* El inicio del Entrenador IA. */
+.ia-inicio { display: grid; gap: 6px; padding-top: 4px; }
+.ia-marca {
+  width: 48px; height: 48px; margin-bottom: 8px; border-radius: 16px; display: grid; place-items: center;
+  color: color-mix(in oklab, var(--tono) 18%, #07080a); background: color-mix(in oklab, var(--tono) 72%, white);
+  box-shadow: 0 12px 28px -14px color-mix(in oklab, var(--tono) 70%, transparent);
+}
+.light-mode .ia-marca { background: var(--tono); }
+.ia-saludo { font-size: 1rem; font-weight: 550; color: var(--text-muted); }
+.ia-pregunta { font-size: 1.85rem; line-height: 1.05; font-weight: 750; letter-spacing: -0.03em; color: var(--text-strong); }
+.ia-bajada { max-width: 34ch; font-size: 0.875rem; line-height: 1.45; color: var(--text-muted); }
+.ia-tarjetas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 16px; }
+.ia-tarjeta {
+  display: grid; align-content: start; gap: 4px; min-height: 124px; padding: 14px; border-radius: 22px; text-align: left;
+  background: var(--surface-1); box-shadow: var(--placa-canto);
+  transition: transform .25s var(--resorte), background-color .2s ease;
+}
+.ia-tarjeta:active { transform: scale(.97); }
+.ia-tarjeta:disabled { opacity: .5; }
+.ia-tarjeta-icono {
+  width: 36px; height: 36px; margin-bottom: 10px; border-radius: 12px; display: grid; place-items: center;
+  color: color-mix(in oklab, var(--c) 55%, white); background: color-mix(in oklab, var(--c) 18%, transparent);
+}
+.light-mode .ia-tarjeta-icono { color: color-mix(in oklab, var(--c) 62%, black); }
+.ia-tarjeta-titulo { font-size: 0.9375rem; font-weight: 650; line-height: 1.2; color: var(--text-strong); }
+.ia-tarjeta-bajada { font-size: 0.8125rem; line-height: 1.35; color: var(--text-muted); text-wrap: pretty; }
+.ia-mas { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.burbuja.editando { box-shadow: 0 0 0 2px color-mix(in oklab, var(--c, var(--tono)) 72%, white); }
 .boton-enviar {
   width: 44px; height: 44px; flex: none; border-radius: 999px; display: flex; align-items: center; justify-content: center;
-  color: var(--accion-tinta); background: var(--accion-fondo);
+  color: color-mix(in oklab, var(--c, var(--tono)) 18%, #07080a); background: color-mix(in oklab, var(--c, var(--tono)) 72%, white);
   transition: border-radius .35s var(--resorte), transform .2s ease, opacity .2s ease;
 }
-.light-mode .boton-enviar { background: var(--accion-fondo); }
+.light-mode .boton-enviar { background: var(--c, var(--tono)); }
 .boton-enviar:disabled { opacity: .4; }
 .boton-enviar:active { border-radius: 14px; transform: scale(.95); }
 @media (prefers-reduced-motion: reduce) {
@@ -4040,13 +4160,13 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 /* La fila de una persona (amigos, solicitudes, alumnos). */
 .amigo { width: 100%; display: flex; align-items: center; gap: 10px; padding: 8px 10px 8px 8px; border-radius: 22px; background: var(--surface-2); }
 .amigo-cuerpo { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; text-align: left; }
-.amigo-aro { position: relative; width: 50px; height: 50px; --galleta-fondo: color-mix(in oklab, var(--rango) 55%, var(--surface-3)); }
+.amigo-aro { position: relative; width: 50px; height: 50px; --galleta-fondo: color-mix(in oklab, var(--rango) 80%, white); }
 .light-mode .amigo-aro { --galleta-fondo: color-mix(in oklab, var(--rango) 60%, white); }
 /* El color de un rango como texto: apagado, como todo lo de color. */
-.tinta-rango { color: color-mix(in oklab, var(--rango-c) 62%, var(--text-muted)); }
+.tinta-rango { color: var(--rango-c); }
 /* El cuerpo de los rangos por músculo: los colores de cada nivel, apagados
    para que no sea lo más saturado de la app. */
-.figura-cuerpo svg { filter: saturate(.6); }
+.figura-cuerpo svg { filter: saturate(.82); }
 .light-mode .tinta-rango { color: color-mix(in oklab, var(--rango-c) 58%, black); }
 .amigo-avatar {
   width: 42px; height: 42px; overflow: hidden; display: flex; align-items: center; justify-content: center;
@@ -4060,12 +4180,6 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 .amigo-rango { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 650; white-space: nowrap; }
 .amigo-racha { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; color: var(--text-strong); }
 .amigo-usuario { font-size: 12px; color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.pizarra-fila { grid-template-columns: minmax(0, 2.6fr) repeat(7, minmax(0, 1fr)); }
-@supports (grid-template-columns: subgrid) {
-  .pizarra { grid-template-columns: minmax(0, max-content) repeat(7, minmax(18px, 1fr)); }
-  .pizarra-fila { grid-column: 1 / -1; grid-template-columns: subgrid; }
-  .pizarra-nombre { padding-right: 6px; }
-}
 /* MEDIDAS: fichas, la cinta métrica, el recorrido y el calendario picado. */
 .medida-fichas { display: flex; gap: 8px; overflow-x: auto; margin: 0 -16px; padding: 2px 16px 4px; scroll-snap-type: x proximity; scrollbar-width: none; }
 .medida-fichas::-webkit-scrollbar { display: none; }
@@ -4108,7 +4222,7 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 .cinta-marca.fantasma { width: 0; background: none; box-shadow: none; border-left: 2px dashed rgba(20,20,22,0.6); top: -2px; bottom: -2px; }
 .balanza-leyenda i.cinta-fantasma { width: 0; background: none; border: 0; border-left: 2px dashed var(--text-muted); border-radius: 0; }
 .balanza-leyenda i.cinta-hoy { width: 3px; background: var(--text-strong); border-radius: 2px; }
-.medida-recorrido { position: relative; height: 132px; margin: 0 -6px; --medida-linea: var(--accion-fondo); }
+.medida-recorrido { position: relative; height: 132px; margin: 0 -6px; --medida-linea: color-mix(in oklab, var(--c, var(--tono)) 76%, white); }
 .light-mode .medida-recorrido { --medida-linea: var(--text-strong); }
 .medida-punto { fill: var(--surface-1); stroke: var(--medida-linea); stroke-width: 2; }
 .medida-punto.ultimo { fill: var(--medida-linea); stroke: var(--surface-1); stroke-width: 12; }
@@ -4121,8 +4235,8 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 .hueco-dia.apagado { opacity: .3; }
 .hueco-estrella { position: absolute; top: -3px; right: -3px; color: #fbbf24; fill: #fbbf24; }
 .medida-leyenda { display: flex; justify-content: center; gap: 16px; margin-top: 12px; font-size: 12px; color: var(--text-muted); }
-.medida-leyenda i { display: inline-block; width: 10px; height: 10px; margin-right: 6px; vertical-align: -1px; border-radius: 999px; background: color-mix(in oklab, var(--dia) 58%, var(--surface-3)); }
-.light-mode .medida-leyenda i { background: color-mix(in oklab, var(--dia) 60%, white); }
+.medida-leyenda i { display: inline-block; width: 10px; height: 10px; margin-right: 6px; vertical-align: -1px; border-radius: 999px; background: color-mix(in oklab, var(--dia) 82%, white); }
+.light-mode .medida-leyenda i { background: var(--dia); }
 @media (prefers-reduced-motion: reduce) { .cinta-marca { transition: none; } .hueco-dia.comparable { animation: none; } }
 `;
 
@@ -6799,6 +6913,29 @@ function RelojQueGira({ segundos, sube = false }) {
   );
 }
 
+// EL RELOJ DE LA PARED: el descanso como el reloj de una sala de pesas. Un
+// bisel de 60 marcas y, adentro, el arco del color del día con lo que falta.
+// La aguja (el punto blanco) avanza en el sentido del reloj hasta las 12: se
+// lee de lejos, con el celular apoyado en el banco, sin leer los números.
+const RADIO_DIAL = 38;
+const LARGO_DIAL = 2 * Math.PI * RADIO_DIAL;
+const MARCAS_DIAL = Array.from({ length: 60 }, (_, i) => {
+  const a = (i * 6 * Math.PI) / 180, mayor = i % 5 === 0;
+  const r1 = 49, r2 = mayor ? 44.2 : 46.4;
+  return { mayor, x1: 50 + r1 * Math.sin(a), y1: 50 - r1 * Math.cos(a), x2: 50 + r2 * Math.sin(a), y2: 50 - r2 * Math.cos(a) };
+});
+function DialDescanso({ fraccion = 1, marcas = true }) {
+  const f = Math.max(0, Math.min(1, fraccion));
+  return (
+    <svg viewBox="0 0 100 100" aria-hidden="true" className="dial">
+      {marcas && MARCAS_DIAL.map((m, i) => <line key={i} x1={m.x1} y1={m.y1} x2={m.x2} y2={m.y2} className={`dial-marca ${m.mayor ? "mayor" : ""}`} />)}
+      <circle cx="50" cy="50" r={RADIO_DIAL} className="dial-pista" />
+      {f > 0 && <circle cx="50" cy="50" r={RADIO_DIAL} className="dial-arco" strokeDasharray={`${LARGO_DIAL * f} ${LARGO_DIAL}`} strokeDashoffset={-LARGO_DIAL * (1 - f)} transform="rotate(-90 50 50)" />}
+      {f > 0 && f < 1 && <g className="dial-aguja" style={{ transform: `rotate(${(1 - f) * 360}deg)` }}><circle cx="50" cy={50 - RADIO_DIAL} r="3.6" /></g>}
+    </svg>
+  );
+}
+
 // La onda del descanso: lo que queda corre como una línea ondulada; lo que
 // ya pasó es una línea quieta y tenue. En pausa la onda se queda quieta.
 function Onda({ fraccion = 1, quieta = false }) {
@@ -6841,7 +6978,7 @@ function RestTimer({ seconds, accent, timerId = "default", exerciseName = "" }) 
   if (estado === "idle") {
     return (
       <div ref={raizRef} className="descanso descanso-quieto" style={{ "--c": accent }}>
-        <Timer size={16} className="shrink-0 text-slate-500" />
+        <span className="descanso-dial mini" aria-hidden="true"><DialDescanso fraccion={1} marcas={false} /></span>
         <span className="text-[13px] font-semibold text-slate-400">Descanso</span>
         <span className="num-display text-lg font-bold text-slate-200 leading-none">{relojCorto(seconds)}</span>
         <button
@@ -6856,25 +6993,31 @@ function RestTimer({ seconds, accent, timerId = "default", exerciseName = "" }) 
 
   const enPausa = estado === "paused";
   const rotulo = enPausa ? "En pausa" : datos?.siguiente ? "Antes de empezar" : "Descanso";
+  // A qué volvés cuando termine: el ejercicio que sigue (descanso entre
+  // ejercicios) o la próxima serie de éste.
+  const despues = datos?.siguiente ? `Sigue ${datos.siguiente}` : exerciseName || "";
   return (
-    <div ref={raizRef} className="descanso descanso-activo" style={{ "--c": color }}>
-      <div className="flex items-center gap-2 w-full min-w-0">
-        <div className="flex-1 min-w-0">
-          <p className={`descanso-rotulo ${enPausa ? "en-pausa" : ""}`}>{rotulo}</p>
-          <p role="timer" aria-label={relojCorto(restante)} className={`num-display descanso-tiempo ${urgente ? "urgente" : ""} ${enPausa ? "en-pausa" : ""}`}>
+    <div ref={raizRef} className={`descanso descanso-activo ${enPausa ? "en-pausa" : ""} ${urgente ? "urgente" : ""}`} style={{ "--c": color }}>
+      {/* El reloj: tocarlo lo pausa o lo sigue, como el botón de un
+          cronómetro de mano. */}
+      <button onClick={() => { haptic(12); (enPausa ? reanudarDescanso(timerId) : pausarDescanso(timerId)); }} aria-label={enPausa ? "Seguir el descanso" : "Pausar el descanso"} className="descanso-dial">
+        <DialDescanso fraccion={fraccion} />
+        <span className="descanso-dial-centro">
+          <span role="timer" aria-label={relojCorto(restante)} className={`num-display descanso-tiempo ${urgente ? "urgente" : ""} ${enPausa ? "en-pausa" : ""}`}>
             <RelojQueGira segundos={restante} />
-          </p>
-        </div>
-        <div className="descanso-controles flex items-center gap-1.5 shrink-0">
+          </span>
+          <span className="descanso-dial-accion" aria-hidden="true">{enPausa ? <Play size={11} className="fill-current" /> : <Pause size={11} className="fill-current" />}</span>
+        </span>
+      </button>
+      <div className="descanso-lado">
+        <p className={`descanso-rotulo ${enPausa ? "en-pausa" : ""}`}>{rotulo}</p>
+        {despues && <p className="descanso-despues">{despues}</p>}
+        <div className="descanso-controles">
           <BotonDescanso onClick={() => ajustarDescanso(timerId, -15)} label="Restar 15 segundos">−15</BotonDescanso>
-          <BotonDescanso principal onClick={() => (enPausa ? reanudarDescanso(timerId) : pausarDescanso(timerId))} label={enPausa ? "Seguir el descanso" : "Pausar el descanso"}>
-            {enPausa ? <Play size={16} className="fill-current ml-0.5" /> : <Pause size={16} className="fill-current" />}
-          </BotonDescanso>
           <BotonDescanso onClick={() => ajustarDescanso(timerId, 15)} label="Sumar 15 segundos">+15</BotonDescanso>
           <BotonDescanso onClick={() => terminarDescanso(timerId)} label="Terminar el descanso"><SkipForward size={16} /></BotonDescanso>
         </div>
       </div>
-      <Onda fraccion={fraccion} quieta={enPausa} />
     </div>
   );
 }
@@ -6915,24 +7058,27 @@ function FilaDescansoDock({ timerId, embebido = false }) {
   // Dos renglones: arriba qué descanso es (con el nombre entero, que en un
   // solo renglón con los controles se cortaba a "Press Ban…"), abajo el
   // reloj y los controles; al pie, la onda.
+  // En el dock, arriba qué descanso es (con el nombre entero: en el mismo
+  // renglón que los controles se cortaba a "Press Ban…"); abajo, el reloj
+  // chico (tocarlo pausa), el tiempo grande y los ajustes.
   return envolver(
-    <div className="pl-4 pr-2.5 pt-3 pb-3">
-      <p className={`descanso-rotulo pr-1.5 ${enPausa ? "en-pausa" : ""}`}>
-        {enPausa ? "Descanso en pausa" : datos?.siguiente ? "Sigue" : "Descanso"}
+    <div className={`dock-reloj ${enPausa ? "en-pausa" : ""}`}>
+      <p className={`descanso-rotulo dock-reloj-rotulo ${enPausa ? "en-pausa" : ""}`}>
+        {enPausa ? "En pausa" : datos?.siguiente ? "Sigue" : "Descanso"}
         {nombre && <span className="descanso-rotulo-nombre"> · {nombre}</span>}
       </p>
-      <div className="flex items-center gap-2 mt-0.5">
-        <p role="timer" aria-label={relojCorto(restante)} className={`flex-1 min-w-0 num-display descanso-tiempo descanso-tiempo-dock ${urgente ? "urgente" : ""} ${enPausa ? "en-pausa" : ""}`}><RelojQueGira segundos={restante} /></p>
-        <div className="flex items-center gap-1.5 shrink-0">
-          <BotonDescanso onClick={() => ajustarDescanso(timerId, -15)} label="Restar 15 segundos">−15</BotonDescanso>
-          <BotonDescanso principal onClick={() => (enPausa ? reanudarDescanso(timerId) : pausarDescanso(timerId))} label={enPausa ? "Seguir el descanso" : "Pausar el descanso"}>
-            {enPausa ? <Play size={16} className="fill-current ml-0.5" /> : <Pause size={16} className="fill-current" />}
-          </BotonDescanso>
-          <BotonDescanso onClick={() => ajustarDescanso(timerId, 15)} label="Sumar 15 segundos">+15</BotonDescanso>
-          <BotonDescanso onClick={() => terminarDescanso(timerId)} label="Terminar el descanso"><SkipForward size={16} /></BotonDescanso>
-        </div>
+      <button onClick={() => { haptic(12); (enPausa ? reanudarDescanso(timerId) : pausarDescanso(timerId)); }} aria-label={enPausa ? "Seguir el descanso" : "Pausar el descanso"} className="descanso-dial chico">
+        <DialDescanso fraccion={fraccion} marcas={false} />
+        <span className="descanso-dial-centro" aria-hidden="true">{enPausa ? <Play size={15} className="fill-current ml-0.5" /> : <Pause size={15} className="fill-current" />}</span>
+      </button>
+      <div className="min-w-0 flex-1">
+        <p role="timer" aria-label={relojCorto(restante)} className={`num-display descanso-tiempo descanso-tiempo-dock ${urgente ? "urgente" : ""} ${enPausa ? "en-pausa" : ""}`}><RelojQueGira segundos={restante} /></p>
       </div>
-      <div className="mt-2"><Onda fraccion={fraccion} quieta={enPausa} /></div>
+      <div className="flex items-center gap-1.5 shrink-0">
+        <BotonDescanso onClick={() => ajustarDescanso(timerId, -15)} label="Restar 15 segundos">−15</BotonDescanso>
+        <BotonDescanso onClick={() => ajustarDescanso(timerId, 15)} label="Sumar 15 segundos">+15</BotonDescanso>
+        <BotonDescanso onClick={() => terminarDescanso(timerId)} label="Terminar el descanso"><SkipForward size={16} /></BotonDescanso>
+      </div>
     </div>,
   );
 }
@@ -8598,8 +8744,10 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
 //     costura. La línea roja es hoy; la punteada, dónde empezaste.
 //   · LA BARRA EN EQUILIBRIO (rutina): empuje de un lado, tracción del otro,
 //     sobre un apoyo. Si una se carga más, la barra se inclina.
-//   · EL REPARTO (rutina): las series de la semana en una sola barra, un
-//     tramo por día con su color.
+//   · LOS DÍAS DE LA RUTINA (rutinas): una baldosa por día, con su color,
+//     sus ejercicios y sus series.
+//   · LA CARRERA DE LA SEMANA (social): quién lleva más sesiones, cada uno
+//     en su carril.
 // ─────────────────────────────────────────────────────────────────────────────
 
 // La cadena: eslabones de frente y de canto, alternados, como se ve una
@@ -8772,32 +8920,33 @@ function BarraEquilibrio({ routineDef }) {
   );
 }
 
-// El reparto de la semana: una barra con un tramo por día, del ancho de sus
-// series y con su color. Reemplaza las cajas de "3 días · 15 ejercicios · 44
-// series": la cantidad de días, cuánto pesa cada uno y el total, de un vistazo.
-function RepartoSemana({ routineDef, onGoToDay = null }) {
+// Los días de tu rutina como baldosas: cada una con el color de su día (un
+// filete arriba y un tinte apenas), su nombre y cuántos ejercicios y series
+// tiene. Tocarla te lleva a ese día. Reemplaza a la barra del reparto y sus
+// fichas: lo mismo, pero se toca y se lee de una.
+function DiasRutina({ routineDef, onGoToDay = null }) {
   const dias = (routineDef?.dayOrder || Object.keys(routineDef?.days || {})).filter((dk) => routineDef?.days?.[dk]);
-  const tramos = dias.map((dk) => {
-    const d = routineDef.days[dk];
-    return { dk, label: d.label, color: d.color, series: (d.exercises || []).reduce((a, e) => a + (e.sets?.length || 0), 0) };
-  });
-  const total = tramos.reduce((a, t) => a + t.series, 0);
-  if (!total) return null;
+  if (!dias.length) return null;
   return (
-    <div className="reparto">
-      <div className="reparto-barra" role="img" aria-label={`${total} series por semana: ${tramos.map((t) => `${t.label} ${t.series}`).join(", ")}`}>
-        {tramos.map((t) => <span key={t.dk} style={{ flexGrow: t.series, "--dia": t.color }} />)}
-      </div>
-      <div className="reparto-leyenda">
-        {tramos.map((t) => (
-          <button key={t.dk} onClick={onGoToDay ? () => onGoToDay(t.dk) : undefined} disabled={!onGoToDay} style={{ "--dia": t.color }}>
-            <i aria-hidden="true" /><span className="reparto-dia">{t.label}</span><b className="num-display">{t.series}</b>
+    // Hasta tres días, en una fila; con cuatro, dos y dos; con más, de a tres.
+    <div className="dias-rutina" role="list" aria-label="Los días de tu rutina" style={{ gridTemplateColumns: `repeat(${dias.length <= 3 ? dias.length : dias.length === 4 ? 2 : 3}, minmax(0, 1fr))` }}>
+      {dias.map((dk) => {
+        const d = routineDef.days[dk];
+        const ejercicios = (d.exercises || []).length;
+        const series = (d.exercises || []).reduce((a, e) => a + (e.sets?.length || 0), 0);
+        return (
+          <button key={dk} role="listitem" onClick={onGoToDay ? () => onGoToDay(dk) : undefined} disabled={!onGoToDay} className="dia-rutina" style={{ "--dia": d.color }}
+            aria-label={`${d.label}: ${ejercicios} ejercicios, ${series} series`}>
+            <span className="dia-rutina-nombre">{d.label}</span>
+            <span className="dia-rutina-datos"><b className="num-display">{ejercicios}</b> ejercicios</span>
+            <span className="dia-rutina-datos"><b className="num-display">{series}</b> series</span>
           </button>
-        ))}
-      </div>
+        );
+      })}
     </div>
   );
 }
+
 
 // La semana como una fila de agujeros perforados: el día que entrenaste
 // está "picado" con el color de lo que hiciste. `dias`: siete colores (o
@@ -8864,31 +9013,50 @@ function CarnetSocio({ color = "#8B5CF6", foto = null, inicial = "?", nombre, li
 // LA PIZARRA DEL GRUPO: como la del box, con una fila por persona y una
 // marca de fibrón por cada día que entrenó esta semana, del color del día.
 // Reemplaza el "3 de 5 entrenaron esta semana": se ve quién, y qué día.
-function PizarraSemana({ filas = [], onVerPersona = null }) {
-  const hoy = (new Date().getDay() + 6) % 7;
-  if (!filas.length) return null;
+// LA CARRERA DE LA SEMANA: quién lleva más sesiones esta semana, cada uno
+// en su carril. Cada sesión es un tramo del color del día que entrenó; la
+// pista llega hasta lo que lleva el que va primero (y nunca menos de cuatro).
+// El primero, con el puesto en dorado; vos, resaltado. `vacios` dibuja
+// carriles de muestra (sin amigos todavía, para que se vea qué vas a tener).
+function CarreraSemana({ filas = [], onVerPersona = null, vacios = 0 }) {
+  const corredores = filas
+    .map((f) => ({ ...f, tramos: (f.dias || []).filter(Boolean) }))
+    .sort((a, b) => b.tramos.length - a.tramos.length || (a.yo ? -1 : b.yo ? 1 : 0));
+  const largo = Math.max(4, ...corredores.map((c) => c.tramos.length));
   return (
-    <section className="pizarra" aria-label="Quién entrenó esta semana">
-      <div className="pizarra-fila pizarra-cabeza" aria-hidden="true">
-        <span />
-        {LETRAS_SEMANA.map((l, i) => <span key={i} className={i === hoy ? "hoy" : ""}>{l}</span>)}
-      </div>
-      {filas.map((f) => {
-        const hechos = f.dias.filter(Boolean).length;
-        const Tag = onVerPersona && !f.yo ? "button" : "div";
+    <ol className="carrera" aria-label="Sesiones de esta semana">
+      {corredores.map((c, i) => {
+        const Tag = onVerPersona && !c.yo ? "button" : "div";
+        const n = c.tramos.length;
         return (
-          <Tag key={f.uid || "yo"} onClick={onVerPersona && !f.yo ? () => onVerPersona(f.uid) : undefined} className={`pizarra-fila ${f.yo ? "yo" : ""}`} aria-label={`${f.nombre}: ${hechos} ${hechos === 1 ? "día" : "días"} esta semana`}>
-            <span className="pizarra-nombre">
-              <span className="pizarra-avatar">{f.foto ? <img src={f.foto} alt="" /> : f.nombre.charAt(0).toUpperCase()}</span>
-              <span className="truncate">{f.yo ? "Vos" : f.nombre.split(" ")[0]}</span>
-            </span>
-            {f.dias.map((c, i) => <span key={i} className={`pizarra-marca ${c ? "hecha" : ""} ${i > hoy ? "futura" : ""}`} style={c ? { "--dia": c } : undefined} aria-hidden="true" />)}
-          </Tag>
+          <li key={c.uid || "yo"}>
+            <Tag onClick={onVerPersona && !c.yo ? () => onVerPersona(c.uid) : undefined} className={`carrera-carril ${c.yo ? "yo" : ""} ${i === 0 && n > 0 ? "primero" : ""}`}
+              aria-label={`${i + 1}º, ${c.yo ? "vos" : c.nombre}: ${n} ${n === 1 ? "sesión" : "sesiones"} esta semana`}>
+              <span className="carrera-puesto" aria-hidden="true">{i + 1}</span>
+              <span className="carrera-avatar" aria-hidden="true">{c.foto ? <img src={c.foto} alt="" /> : String(c.nombre || "?").charAt(0).toUpperCase()}</span>
+              <span className="carrera-cuerpo" aria-hidden="true">
+                <span className="carrera-nombre">{c.yo ? "Vos" : String(c.nombre || "").split(" ")[0]}</span>
+                <span className="carrera-pista">{Array.from({ length: largo }, (_, k) => <i key={k} className={c.tramos[k] ? "hecho" : ""} style={c.tramos[k] ? { "--dia": c.tramos[k] } : undefined} />)}</span>
+              </span>
+              <b className="carrera-n num-display" aria-hidden="true">{n}</b>
+            </Tag>
+          </li>
         );
       })}
-    </section>
+      {Array.from({ length: vacios }, (_, k) => (
+        <li key={`vacio${k}`} aria-hidden="true">
+          <div className="carrera-carril vacio">
+            <span className="carrera-puesto">{corredores.length + k + 1}</span>
+            <span className="carrera-avatar">?</span>
+            <span className="carrera-cuerpo"><span className="carrera-nombre">Tu amigo</span><span className="carrera-pista">{Array.from({ length: largo }, (_, j) => <i key={j} />)}</span></span>
+            <b className="carrera-n num-display">0</b>
+          </div>
+        </li>
+      ))}
+    </ol>
   );
 }
+
 
 // LA BARRA CARGADA — el avance del día como una barra olímpica: cada serie
 // que anotás le carga un disco. Es la pieza propia de la app (pedido: "me
@@ -8965,11 +9133,13 @@ function BarraCargada({ hechas = 0, total = 0, alto = 30, etiqueta = null, class
         </linearGradient>
         {/* La goma de los discos: luz arriba, sombra abajo. Una sola para
             todos; lo que distingue a cada disco es su filete de color. */}
-        <linearGradient id={`${uid}-goma`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" className="goma-claro" />
-          <stop offset=".45" className="goma-medio" />
-          <stop offset="1" className="goma-oscuro" />
-        </linearGradient>
+        {COLORES_DISCO.map((c, k) => (
+          <linearGradient key={k} id={`${uid}-d${k}`} x1="0" y1="0" x2="0" y2="1" style={{ "--d": c }}>
+            <stop offset="0" className="disco-claro" />
+            <stop offset=".45" className="disco-medio" />
+            <stop offset="1" className="disco-oscuro" />
+          </linearGradient>
+        ))}
         {detalle && (
           <pattern id={`${uid}-mol`} width="2.4" height="2.4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
             <line x1="0" y1="0" x2="0" y2="2.4" className="moleteado" />
@@ -8991,7 +9161,7 @@ function BarraCargada({ hechas = 0, total = 0, alto = 30, etiqueta = null, class
       {/* Los discos: cargados con volumen, los que faltan como fantasmas. */}
       {discos.map((d) => (d.cargado ? (
         <g key={`d${d.n}`} className="disco-entra" style={{ "--desde": d.izquierda ? "-28px" : "28px", ...(escalonado ? { animationDelay: `${200 + d.n * 90}ms` } : null) }}>
-          <rect x={d.x} y={d.y} width={d.w} height={d.h} rx={radio(d.w)} fill={`url(#${uid}-goma)`} className="disco" />
+          <rect x={d.x} y={d.y} width={d.w} height={d.h} rx={radio(d.w)} fill={`url(#${uid}-d${d.k})`} className="disco" />
           <rect x={d.x + 0.75} y={d.y + 0.75} width={Math.max(0.5, d.w - 1.5)} height={d.h - 1.5} rx={Math.max(0.5, radio(d.w) - 0.75)} className={`disco-filete f${d.k}`} />
         </g>
       ) : (
@@ -9317,7 +9487,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
    es semana de entrenamiento, violeta —igual que Descarga— cuando es
    semana de descarga.
 ============================================================================ */
-function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS, onGoToDeload }) {
+function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS, onGoToDeload, weekSchedule = null }) {
   const weekInfo = getWeekInfo(cycleStart, settings);
   // BUG ARREGLADO: este useMemo estaba DESPUÉS del `return null` de abajo.
   // Los hooks tienen que llamarse siempre, en el mismo orden, en todos los
@@ -9325,6 +9495,13 @@ function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS,
   // corromper el estado de otros componentes. Ahora el hook va primero y el
   // early return después.
   const trainedDays = useMemo(() => getTrainedDateSet(logs, sessions), [logs, sessions]);
+  // Qué día de la rutina fue cada sesión, para pintar los días de esta
+  // semana con su color.
+  const diaPorFecha = useMemo(() => {
+    const m = new Map();
+    (sessions || []).forEach((x) => { if (x?.date && x.dayKey && !m.has(x.date)) m.set(x.date, x.dayKey); });
+    return m;
+  }, [sessions]);
   // La cascada del calendario corre UNA vez al montar. Sin este flag, cada
   // vez que cambia cualquier cosa (registrás una serie, tocás un día) las
   // semanas volverían a parpadear.
@@ -9343,15 +9520,38 @@ function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS,
   });
   const phase = weekInfo.isDeload ? "#A855F7" : "#3B82F6";
   const alturaDe = (wi, isDeload) => (isDeload ? 30 : 36 + (wi / Math.max(1, trainWeeks - 1)) * 64);
+  // Lo que más se pregunta del ciclo: cuánto falta para la descarga.
+  const semanasParaDescarga = trainWeeks - weekInfo.weekInCycle + 1;
+  const falta = weekInfo.isDeload ? "semana de descarga, bajá la carga" : semanasParaDescarga <= 1 ? "la semana que viene, descarga" : `la descarga llega en ${semanasParaDescarga} semanas`;
+  // ESTA SEMANA, día por día: los que entrenaste, con el color de su día;
+  // los que tenías planeados, con un aro; los libres, un puntito. Hoy,
+  // marcado. Es lo que más se mira de toda la tarjeta.
+  const inicioSemana = new Date(cycleStart); inicioSemana.setDate(inicioSemana.getDate() + (weekInfo.weekInCycle - 1) * 7);
+  const hoy = todayStr();
+  const diasSemana = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(inicioSemana); d.setDate(d.getDate() + i);
+    const fecha = localDateStr(d);
+    const wk = todayWeekdayKey(d);
+    const plan = weekSchedule?.[wk] || null;
+    const hecho = trainedDays.has(fecha);
+    const dk = diaPorFecha.get(fecha) || (hecho ? plan : null);
+    return { fecha, letra: LETRAS_SEMANA[WEEKDAY_KEYS.indexOf(wk)] || "", hecho, plan: !!plan, hoy: fecha === hoy, futuro: fecha > hoy, color: hecho ? (ROUTINE[dk]?.color || "#9a9ba0") : plan ? (ROUTINE[plan]?.color || null) : null };
+  });
+  const hechasSemana = diasSemana.filter((d) => d.hecho).length;
+  const planeadasSemana = diasSemana.filter((d) => d.plan).length;
   return (
     <section className="tarjeta-tonal escalera-ciclo p-4" style={{ "--c": phase }} aria-label={`Ciclo ${weekInfo.cycleNumber}, semana ${weekInfo.weekInCycle} de ${cycleWeeks}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="escalera-titulo">Semana {weekInfo.weekInCycle} de {cycleWeeks}</p>
-          <p className="escalera-sub">Ciclo {weekInfo.cycleNumber}: {weekInfo.isDeload ? "semana de descarga" : "subiendo la carga"}</p>
+          <p className="escalera-titulo">Semana {weekInfo.weekInCycle} <span>de {cycleWeeks}</span></p>
+          <p className="escalera-sub">Ciclo {weekInfo.cycleNumber}: {falta}</p>
         </div>
-        <span className="dia-chip !m-0 shrink-0">{weekInfo.isDeload ? <Zap size={12} /> : <Flame size={12} />}{weekInfo.isDeload ? "Descarga" : "Entrenamiento"}</span>
+        <span className="dia-chip !m-0 shrink-0">{weekInfo.isDeload ? "Descarga" : "Entrenamiento"}</span>
       </div>
+      {/* La escalera: cada semana sube un poco la carga (la sobrecarga
+          progresiva, dibujada) y la descarga baja. Las pasadas, llenas; la de
+          hoy, de color; las que vienen, de contorno. Adentro, una rayita por
+          sesión que hiciste esa semana. */}
       <div className="escalera" aria-hidden="true">
         {weekDots.map(({ week, trained, isDeload }, wi) => {
           const estado = week < weekInfo.weekInCycle ? "pasada" : week === weekInfo.weekInCycle ? "actual" : "futura";
@@ -9360,12 +9560,26 @@ function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS,
               style={{ height: `${alturaDe(wi, isDeload)}%`, ...(yaAnimado ? null : { animation: `escalonSube .55s cubic-bezier(.34,1.4,.64,1) ${wi * 50}ms backwards` }) }}>
               {estado === "actual" && <span className="escalon-hoy">Hoy</span>}
               <span className="escalon-sesiones">{Array.from({ length: Math.min(trained, 5) }, (_, i) => <i key={i} />)}</span>
-              <span className="escalon-n">{isDeload ? "D" : week}</span>
             </div>
           );
         })}
       </div>
-      <button onClick={onGoToDeload} className="enlace-suave mt-3"><Zap size={13} /> Ver mi semana de descarga</button>
+      <div className="escalera-numeros" aria-hidden="true">
+        {weekDots.map(({ week, isDeload }) => <span key={week} className={week === weekInfo.weekInCycle ? "actual" : ""}>{isDeload ? "D" : week}</span>)}
+      </div>
+      <div className="ciclo-semana">
+        <p className="ciclo-semana-titulo">Esta semana<b>{planeadasSemana ? `${hechasSemana} de ${planeadasSemana} sesiones` : `${hechasSemana} ${hechasSemana === 1 ? "sesión" : "sesiones"}`}</b></p>
+        <div className="ciclo-dias" role="list" aria-label="Tus días de esta semana">
+          {diasSemana.map((d) => (
+            <span key={d.fecha} role="listitem" className={`ciclo-dia ${d.hecho ? "hecho" : ""} ${d.plan ? "plan" : ""} ${d.hoy ? "hoy" : ""} ${d.futuro ? "futuro" : ""}`} style={d.color ? { "--dia": d.color } : undefined}
+              aria-label={`${d.letra}: ${d.hecho ? "entrenaste" : d.plan ? (d.futuro || d.hoy ? "planeado" : "no fuiste") : "libre"}`}>
+              <i aria-hidden="true" />
+              <small aria-hidden="true">{d.letra}</small>
+            </span>
+          ))}
+        </div>
+      </div>
+      <button onClick={onGoToDeload} className="enlace-suave mt-1"><Zap size={13} /> Ver mi semana de descarga</button>
     </section>
   );
 }
@@ -11232,43 +11446,26 @@ const SOCIAL_COLOR = "#8B5CF6";
 // solapas no se veía). Ver --social-tinta en ANIMATION_CSS.
 const SOCIAL_INK = "var(--social-tinta)";
 
-// ============================================================================
-// ESTADÍSTICAS DE PROGRESO — pedido: "también podrían mostrarse estadísticas
-// de progreso... si ocupa mucho espacio o satura, saquemos los logros".
-// Antes acá vivía una tira de 11 insignias (LOGROS) — se sacó del todo:
-// con esta tarjeta más el resto del hero (rango, amigos) la pestaña ya
-// tenía suficiente peso arriba de las secciones, y estos números en limpio
-// (racha, esta semana, total) son más accionables que una insignia
-// bloqueada/desbloqueada. Todo sale de datos que ya viajan en el perfil
-// (logs + trainingSessions), sin ninguna lectura nueva a Firestore.
-// Pedido: "en la sección de tu progreso podríamos meter otros datos". Acá
-// había tres números en solitario (racha, sesiones de la semana y días
-// entrenados en toda tu vida) que son exactamente los que ya te da la pestaña
-// Progreso: en una pantalla que existe para mostrarte junto a OTRA GENTE no
-// contestaban ninguna pregunta social. Y "días entrenados" es un contador de
-// por vida: se mueve una vez cada dos días y no te dice nada hoy.
-// Los tres de ahora miden tu lugar en el grupo, y salen de datos que
-// SocialView ya tiene en memoria: ni una lectura nueva a Firestore.
-// Sin amigos no hay grupo del cual formar parte, así que en vez de tres ceros
-// va la invitación a sumar al primero, que es lo único accionable ahí.
-// Un punto de la escalera de récords (ver ProgressView): las sesiones que
-// fueron récord van en galleta; las demás, un punto hueco; la última, con un
-// aro. Tocarlo abre el globo con la serie de ese día.
-function EscalonDot({ cx, cy, index, color, esRecord, esUltimo, isActive, deload, onSelect }) {
-  if (cx == null || cy == null) return null;
-  const c = deload ? DELOAD_COLOR : color;
+// Los puntos de la evolución: cada sesión es un puntito del color del
+// ejercicio; las que fueron récord, un punto dorado (y las últimas, con su
+// valor arriba); la última sesión lleva un halo.
+function PuntoEvolucion({ cx, cy, index, payload, total, color, isActive, etiquetar, onSelect }) {
+  if (cx == null || cy == null || !payload) return null;
+  const ultimo = index === total - 1;
   return (
     <g style={{ cursor: "pointer" }} onClick={() => onSelect(index, cx, cy)}>
       <circle cx={cx} cy={cy} r={15} fill="transparent" />
-      {(isActive || esUltimo) && <circle cx={cx} cy={cy} r={11} fill="none" stroke={c} strokeWidth={1.5} opacity={isActive ? 0.85 : 0.45} />}
-      {esRecord
-        ? <path d={GALLETA_PATH} transform={`translate(${cx - 8} ${cy - 8}) scale(0.16)`} fill={c} stroke="var(--surface-1)" strokeWidth={12} />
-        : deload
-          ? <><circle cx={cx} cy={cy} r={7.5} fill="var(--surface-1)" stroke={c} strokeWidth={1.2} /><Zap x={cx - 5} y={cy - 5} width={10} height={10} color={c} fill={c} strokeWidth={1} /></>
-          : <circle cx={cx} cy={cy} r={3.6} fill="var(--surface-1)" stroke={c} strokeWidth={2} />}
+      {(isActive || ultimo) && <circle cx={cx} cy={cy} r={10} fill="none" stroke={payload.esRecord ? "var(--record)" : color} strokeWidth={1.5} opacity={isActive ? 0.9 : 0.55} />}
+      {payload.deload
+        ? <circle cx={cx} cy={cy} r={3.6} fill="var(--surface-1)" stroke={DELOAD_COLOR} strokeWidth={2} />
+        : payload.esRecord
+          ? <circle cx={cx} cy={cy} r={5} fill="var(--record)" stroke="var(--surface-1)" strokeWidth={2} />
+          : <circle cx={cx} cy={cy} r={3.4} fill="var(--surface-1)" stroke={color} strokeWidth={2} />}
+      {etiquetar && <text x={cx} y={cy - 13} textAnchor="middle" className="evolucion-etiqueta">{Math.round(payload.e1rm)}</text>}
     </g>
   );
 }
+
 
 /* ============================================================================
    EXERCISE CHIP ROW — selector de ejercicio con el mismo lenguaje visual que
@@ -13445,7 +13642,7 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
     <div className="space-y-4">
       {/* Ciclo actual */}
       {cycleStart ? (
-        <WeekCalendar cycleStart={cycleStart} logs={logs} sessions={sessions} settings={settings} onGoToDeload={onGoToDeload} />
+        <WeekCalendar cycleStart={cycleStart} logs={logs} sessions={sessions} settings={settings} onGoToDeload={onGoToDeload} weekSchedule={weekSchedule} />
       ) : (
         <button onClick={onGoToProfile} className="w-full flex items-center gap-3 bg-amber-500/10 border border-amber-500/25 rounded-2xl px-4 py-3.5 text-left hover:bg-amber-500/15 transition">
           <div className="w-9 h-9 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center shrink-0"><AlertTriangle size={16} /></div>
@@ -13489,6 +13686,8 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
           const minY = valores.length ? Math.floor(Math.min(...valores) * 0.96) : 0;
           const maxY = valores.length ? Math.ceil(Math.max(...valores) * 1.03) : 1;
           const records = escalera.filter((d) => d.esRecord).length;
+          const ultimoRecord = escalera.reduce((u, d, i) => (d.esRecord ? i : u), -1);
+          const mejorE1rm = escalera.reduce((m, d) => (d.deload ? m : Math.max(m, d.e1rm)), 0);
           const primero = chartData[0], ultimo = chartData[chartData.length - 1];
           const subida = primero && ultimo && primero.e1rm ? Math.round(((ultimo.e1rm - primero.e1rm) / primero.e1rm) * 1000) / 10 : 0;
           const iMejor = chartData.reduce((best, d, i) => (d.e1rm >= chartData[best].e1rm ? i : best), 0);
@@ -13519,7 +13718,7 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
                 <div className="text-center text-slate-500 py-8">
                   <span className="galleta icono-galleta mx-auto mb-3" aria-hidden="true"><Activity size={17} /></span>
                   <p className="text-[14px] font-semibold text-slate-300">Todavía no hay series de este ejercicio</p>
-                  <p className="text-[12.5px] mt-1">Guardá una en Rutina y acá empieza tu escalera.</p>
+                  <p className="text-[12.5px] mt-1">Guardá una en Rutina y acá empieza tu evolución.</p>
                 </div>
               ) : (
                 <>
@@ -13542,7 +13741,7 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
                   </div>
 
                   <div className="segmentado" role="tablist" aria-label="Cómo ver tu evolución">
-                    {[{ k: "grafico", l: "Escalera" }, { k: "1rm", l: "Sesiones" }].map((opt) => (
+                    {[{ k: "grafico", l: "Gráfico" }, { k: "1rm", l: "Sesiones" }].map((opt) => (
                       <button key={opt.k} role="tab" aria-selected={metric === opt.k} onClick={() => setMetric(opt.k)} className={metric === opt.k ? "activo" : ""}>{opt.l}</button>
                     ))}
                   </div>
@@ -13563,21 +13762,27 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
                       <p className="text-[11.5px] text-slate-500 pt-1">El 1RM es una estimación (fórmula de Epley) que junta reps y kilos. Sirve para comparar, no es un máximo real.</p>
                     </div>
                   ) : (
-                    <div className="relative h-56" ref={chartContainerRef}>
+                    <div className="relative h-60" ref={chartContainerRef}>
+                      {/* LA EVOLUCIÓN: tu 1RM estimado sesión por sesión, en una
+                          curva suave del color del ejercicio. Los récords, en
+                          dorado; la línea punteada es tu récord de hoy. Sin
+                          ejes de números: los valores van escritos donde
+                          importan, y el resto se lee tocando un punto. */}
                       <ResponsiveContainer width="100%" height="100%">
-                        <ComposedChart data={escalera} margin={{ top: 14, right: 10, left: 0, bottom: 0 }}>
+                        <AreaChart data={escalera} margin={{ top: 28, right: 18, left: 18, bottom: 0 }}>
                           <defs>
-                            <linearGradient id="gEscalera" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="var(--text-strong)" stopOpacity={0.2} /><stop offset="100%" stopColor="var(--text-strong)" stopOpacity={0.01} />
+                            <linearGradient id="gEvolucion" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor={colorEj} stopOpacity={0.34} /><stop offset="100%" stopColor={colorEj} stopOpacity={0} />
                             </linearGradient>
                           </defs>
                           <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
-                          <XAxis dataKey="fecha" tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={40} tick={{ fill: "var(--text-faint)", fontSize: 11 }} />
-                          <YAxis domain={[minY, maxY]} tickCount={3} allowDecimals={false} tickLine={false} axisLine={false} width={34} tick={{ fill: "var(--text-faint)", fontSize: 11 }} />
-                          <Area type="stepAfter" dataKey="record" stroke="var(--text-strong)" strokeWidth={2} fill="url(#gEscalera)" isAnimationActive animationDuration={700} animationEasing="ease-out" dot={false} activeDot={false} />
-                          <Line type="monotone" dataKey="e1rm" stroke="var(--text-strong)" strokeOpacity={0.3} strokeDasharray="2 4" strokeWidth={1.5} isAnimationActive={false} activeDot={false}
-                            dot={({ key: claveDot, ...props }) => <EscalonDot key={claveDot ?? props.index} {...props} color="var(--text-strong)" esRecord={props.payload.esRecord} esUltimo={props.index === escalera.length - 1} isActive={activePoint?.index === props.index} deload={props.payload.deload} onSelect={handleSelectPoint} />} />
-                        </ComposedChart>
+                          <XAxis dataKey="fecha" tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={44} tick={{ fill: "var(--text-faint)", fontSize: 11 }} />
+                          <YAxis hide domain={[minY, maxY]} />
+                          <ReferenceLine y={mejorE1rm} stroke="var(--record)" strokeDasharray="3 5" strokeOpacity={0.75} ifOverflow="extendDomain"
+                            label={{ value: `récord ${Math.round(mejorE1rm)}`, position: "insideTopLeft", fill: "var(--record)", fontSize: 11, fontWeight: 650 }} />
+                          <Area type="monotone" dataKey="e1rm" stroke={colorEj} strokeWidth={2.5} fill="url(#gEvolucion)" isAnimationActive animationDuration={700} animationEasing="ease-out" activeDot={false}
+                            dot={({ key: claveDot, ...props }) => <PuntoEvolucion key={claveDot ?? props.index} {...props} total={escalera.length} color={colorEj} isActive={activePoint?.index === props.index} etiquetar={props.payload?.esRecord && (records <= 4 || props.index === ultimoRecord)} onSelect={handleSelectPoint} />} />
+                        </AreaChart>
                       </ResponsiveContainer>
                       {activePoint && chartData[activePoint.index] && (() => {
                         const d = chartData[activePoint.index];
@@ -13598,11 +13803,11 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
                       más sin superarlo se pone ámbar: conviene cambiar algo. */}
                   {chartData.length >= 2 && (
                     sesionesDesde === 0 ? (
-                      <p className="records-pie fuego"><Flame size={15} className="shrink-0" /> Tu última sesión subió un escalón.</p>
+                      <p className="records-pie fuego"><Flame size={15} className="shrink-0" /> Tu última sesión fue récord.</p>
                     ) : (
                       <p className={`records-pie ${sesionesDesde >= 3 ? "alerta" : ""}`}>
                         {sesionesDesde >= 3 ? <AlertTriangle size={15} className="shrink-0" /> : <Clock size={15} className="shrink-0" />}
-                        <span>Último escalón {diasDesde != null ? haceCuanto(diasDesde) : `${sesionesDesde} sesiones atrás`}: {sesionesDesde} {sesionesDesde === 1 ? "sesión" : "sesiones"} sin superarlo.</span>
+                        <span>Último récord {diasDesde != null ? haceCuanto(diasDesde) : `${sesionesDesde} sesiones atrás`}: {sesionesDesde} {sesionesDesde === 1 ? "sesión" : "sesiones"} sin superarlo.</span>
                       </p>
                     )
                   )}
@@ -17951,7 +18156,7 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
   // uid de prueba aunque no haya cuenta de Google. En producción es el de la
   // cuenta, siempre.
   const uid = uidCuenta || (import.meta.env.DEV && typeof localStorage !== "undefined" && localStorage.getItem("modusfit_demo_social") === "1" ? "demo-yo" : uidCuenta);
-  const [section, setSection] = useState("amigos"); // amigos | buscar | entrenador
+  const [section, setSection] = useState("actividad"); // actividad | amigos | ranking | entrenador
   const [viewingUid, setViewingUid] = useState(null);
   const [viewingAsTrainer, setViewingAsTrainer] = useState(false);
   // Pedido: "cuando lo seleccionás en el apartado de ranking que se abra
@@ -18100,10 +18305,10 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
     return def ? getRoutineWeekSchedule(def) : null;
   }, [profile]);
   const myStreak = useMemo(() => computeSmartStreak(getTrainedDateSet(profile?.logs || {}, profile?.trainingSessions || []), myWeekSchedule), [profile, myWeekSchedule]);
-  // Tu semana, con el color de cada día que entrenaste (para el carnet y la
-  // pizarra del grupo).
+  // Tu semana, con el color de cada día que entrenaste (para tu carril en la
+  // carrera de la semana).
   const miSemana = useMemo(() => semanaDeSesiones(profile?.trainingSessions || [], (sesion) => ROUTINE[sesion.dayKey]?.color || null), [profile]);
-  // LA PIZARRA DEL GRUPO: vos y tus amigos, con los días que entrenó cada
+  // LA SEMANA DEL GRUPO (la carrera): vos y tus amigos, con los días que entrenó cada
   // uno esta semana. Los que más fueron, arriba.
   const filasPizarra = useMemo(() => {
     const yo = { uid: "yo", yo: true, nombre: profile?.name || profileName || "Vos", foto: profile?.avatarData || null, dias: miSemana };
@@ -18292,15 +18497,8 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
     refresh();
   };
 
-  // Tu puesto entre tus amigos: el mismo orden por rango que la solapa
-  // Ranking (buildFriendsRanking), así los dos no pueden decir cosas
-  // distintas. Y cuántos de tus amigos entrenaron esta semana (lunes a
-  // domingo, como el resto de la app).
-  const puestoEnGrupo = useMemo(() => {
-    if (!friendAccepted.length) return null;
-    const idx = buildFriendsRanking(uid, profile, myTopRank, friendAccepted, basics).findIndex((r) => r.isMe);
-    return idx >= 0 ? idx + 1 : null;
-  }, [uid, profile, myTopRank, friendAccepted, basics]);
+  // Cuántos de tus amigos entrenaron esta semana (lunes a domingo, como el
+  // resto de la app).
   const entrenaronSemana = useMemo(() => friendAccepted.reduce((n, f) => {
     const otro = f.users.find((u) => u !== uid);
     return n + ((streaks?.[otro]?.sessionsThisWeek || 0) > 0 ? 1 : 0);
@@ -18348,6 +18546,7 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
   // Entrenador azul (igual que Rango). Reemplaza la ronda anterior, donde
   // se había unificado todo a un solo violeta.
   const SECTIONS = [
+    { k: "actividad", l: "Actividad", icon: <Activity size={14} /> },
     { k: "amigos", l: "Amigos", icon: <Users size={14} />, color: SOCIAL_COLOR },
     // "Buscar" dejó de ser una sección: buscar a alguien por @usuario o QR es
     // una ACCIÓN que hacés una vez por persona, no un lugar al que volvés —
@@ -18355,7 +18554,7 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
     // razón de abrir Social dos veces en la semana. Pasa a un botón dentro de
     // Amigos y su lugar lo toma Actividad, que es lo que sí cambia todos los
     // días: quién de tu grupo entrenó, qué hizo, y a quién podés aplaudirle.
-    { k: "actividad", l: "Actividad", icon: <Activity size={14} /> },
+    // Por eso va primera y es la que se abre al entrar.
     { k: "ranking", l: "Ranking", icon: <Award size={14} />, color: "#F59E0B" },
     { k: "entrenador", l: "Entrenador", icon: <GraduationCap size={14} />, color: "#3B82F6" },
   ];
@@ -18386,51 +18585,77 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
       {(() => {
         const color = myTopRank?.color || SOCIAL_COLOR;
         const nombreVisible = profile?.username ? `@${profile.username}` : (profile?.name || profileName || "Vos");
-        const vinculos = studentsAccepted.length + trainersAccepted.length;
         return (
-          <CarnetSocio
-            color={color}
-            foto={profile?.avatarData || null}
-            inicial={String(profile?.name || profileName || "?").charAt(0).toUpperCase()}
-            nombre={nombreVisible}
-            linea={myTopRank ? `${myTopRank.tier} ${myTopRank.sub}` : "Todavía sin rango: anotá tus marcas"}
-            racha={myStreak || 0}
-            semana={miSemana}
-            medalla={myTopRank && (
-              // Tocarlo explica por qué tenés ese rango (RankExplainModal).
-              <button onClick={() => setShowRankExplain(true)} aria-label={`Tu rango: ${myTopRank.tier} ${myTopRank.sub}. Tocá para ver por qué`} className="carnet-medalla badge-pop">
-                <RankBadgeIcon tier={myTopRank.tier} sub={null} color={myTopRank.color} size={48} />
-              </button>
-            )}
-          >
-            <div className="carnet-chips">
-              <span className="chip-dato neutro"><Users size={13} /><b className="num-display">{friendAccepted.length}</b> {friendAccepted.length === 1 ? "amigo" : "amigos"}</span>
-              {friendAccepted.length > 0 && puestoEnGrupo ? <span className="chip-dato neutro"><Award size={13} /><b className="num-display">{puestoEnGrupo}º</b> en tu grupo</span> : null}
-              <span className="chip-dato neutro"><span aria-hidden="true">👏</span><b className="num-display">{kudosReceived.length}</b> {kudosReceived.length === 1 ? "aplauso" : "aplausos"}</span>
-              {vinculos > 0 && <span className="chip-dato neutro"><GraduationCap size={13} /><b className="num-display">{vinculos}</b> {vinculos === 1 ? "vínculo" : "vínculos"}</span>}
-            </div>
-            {/* Pedido: "que vuelva lo del QR, pero solo que muestre el QR al
-                pulsarlo, el link no". Sin @usuario, se elige acá mismo; sin
-                Google, el botón te lleva a Perfil a vincularlo. */}
-            {profile?.username ? (
-              <button onClick={() => setShowProfileQr(true)} className="atleta-accion">
-                <QrCode size={16} /> Mostrar mi código QR <ChevronRight size={16} className="ml-auto text-slate-500" />
-              </button>
-            ) : uid ? (
-              <div className="mt-3">
+          <>
+            {/* TU FICHA, en una franja: tu foto con el aro del color de tu
+                rango, cómo te buscan, tu rango, tu racha y los aplausos. El
+                carnet entero sigue en tu perfil; acá lo importante es la
+                gente de tu grupo. */}
+            <section className="ficha-social" aria-label="Tu ficha">
+              <span className="ficha-avatar" style={{ "--rango": color }} aria-hidden="true">
+                {profile?.avatarData ? <img src={profile.avatarData} alt="" /> : String(profile?.name || profileName || "?").charAt(0).toUpperCase()}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="ficha-nombre">{nombreVisible}</p>
+                <p className="ficha-linea">
+                  {myTopRank ? <span className="tinta-rango" style={{ "--rango-c": myTopRank.color }}>{myTopRank.tier} {myTopRank.sub}</span> : <span>Sin rango todavía</span>}
+                  <span className="ficha-dato" title="Racha"><Cadena dias={myStreak || 0} max={3} alto={11} />{myStreak || 0}</span>
+                  <span className="ficha-dato" title="Aplausos"><span aria-hidden="true">👏</span>{kudosReceived.length}</span>
+                </p>
+              </div>
+              {myTopRank && (
+                // Tocarlo explica por qué tenés ese rango (RankExplainModal).
+                <button onClick={() => setShowRankExplain(true)} aria-label={`Tu rango: ${myTopRank.tier} ${myTopRank.sub}. Tocá para ver por qué`} className="ficha-medalla badge-pop">
+                  <RankBadgeIcon tier={myTopRank.tier} sub={null} color={myTopRank.color} size={36} />
+                </button>
+              )}
+              {profile?.username && <button onClick={() => setShowProfileQr(true)} aria-label="Mostrar mi código QR" className="boton-redondo shrink-0"><QrCode size={17} /></button>}
+            </section>
+            {/* Sin @usuario, se elige acá mismo; sin Google, el botón te
+                lleva a Perfil a vincularlo. */}
+            {!profile?.username && uid && (
+              <div className="tarjeta-tonal p-4" style={{ "--c": SOCIAL_COLOR }}>
                 <p className="text-[12.5px] text-slate-400 mb-2">Elegí tu @usuario para que te puedan buscar y agregar.</p>
                 <UsernameSection uid={uid} currentUsername={null} onSaved={(u) => onUpdateProfile({ username: u })} />
               </div>
-            ) : (
-              <button onClick={onGoToProfile || undefined} disabled={!onGoToProfile} className="atleta-accion">
+            )}
+            {!uid && (
+              <button onClick={onGoToProfile || undefined} disabled={!onGoToProfile} className="atleta-accion !mt-0">
                 <Link2 size={16} />
                 <span className="flex-1 min-w-0 text-left">Vinculá tu cuenta de Google para usar lo social</span>
                 <ChevronRight size={16} className="text-slate-500 shrink-0" />
               </button>
             )}
-          </CarnetSocio>
+          </>
         );
       })()}
+
+      {/* ESTA SEMANA: la carrera del grupo. Quién lleva más sesiones, cada
+          uno en su carril, con el color de cada día que entrenó. Reemplaza a
+          la pizarra (qué día fue cada uno) y al "3º en tu grupo": se ve de
+          una quién va primero y cuánto te falta. */}
+      {friendAccepted.length > 0 ? (
+        <section aria-label="Esta semana" className="space-y-2">
+          <div className="flex items-baseline justify-between gap-3 px-1">
+            <h3 className="seccion-titulo">Esta semana</h3>
+            {(() => {
+              const orden = filasPizarra.map((x) => ({ yo: !!x.yo, n: (x.dias || []).filter(Boolean).length })).sort((a, b) => b.n - a.n || (a.yo ? -1 : b.yo ? 1 : 0));
+              const puesto = orden.findIndex((x) => x.yo) + 1;
+              return puesto > 0 ? <p className="text-[12.5px] font-semibold text-slate-400">{puesto === 1 ? "Vas primero" : `Vas ${puesto}º de ${orden.length}`}</p> : null;
+            })()}
+          </div>
+          <CarreraSemana filas={filasPizarra} onVerPersona={(u) => setViewingUid(u)} />
+        </section>
+      ) : (
+        <section aria-label="Sumá amigos" className="space-y-2">
+          <h3 className="seccion-titulo px-1">Esta semana</h3>
+          <CarreraSemana filas={filasPizarra.slice(0, 1)} vacios={2} />
+          <div className="px-1 pt-1">
+            <p className="text-[12.5px] text-slate-400">Sumá amigos y competí con ellos: quién entrena más cada semana.</p>
+            <button onClick={irABuscar} className="boton-pildora mt-3" style={{ "--c": SOCIAL_COLOR, minHeight: 44 }}><UserPlus size={16} /> Sumar mi primer amigo</button>
+          </div>
+        </section>
+      )}
 
       {/* ENTRENARON — los amigos que entrenaron hoy o ayer, en fila, como
           las historias de Instagram: el aro toma el color del día que
@@ -18516,25 +18741,6 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
         />
       )}
 
-      {friendAccepted.length > 0 ? (
-        <section aria-label="Tu grupo esta semana" className="space-y-2">
-          <h3 className="seccion-titulo">Tu grupo esta semana</h3>
-          <PizarraSemana filas={filasPizarra} onVerPersona={(u) => setViewingUid(u)} />
-        </section>
-      ) : (
-        // Sin amigos, la pizarra se muestra igual, con tu fila y tres lugares
-        // vacíos: así se ve qué vas a tener, en vez de un cartel que lo
-        // explique.
-        <section aria-label="Sumá amigos" className="pizarra-invitacion">
-          <PizarraSemana filas={[filasPizarra[0], { uid: "a", nombre: "?", dias: Array(7).fill(null) }, { uid: "b", nombre: "?", dias: Array(7).fill(null) }]} />
-          <div className="pizarra-invitacion-texto">
-            <p className="text-[15px] font-bold text-white">Tu pizarra está casi vacía</p>
-            <p className="text-[12.5px] text-slate-400 mt-0.5">Sumá amigos y vas a ver qué días entrena cada uno.</p>
-            <button onClick={irABuscar} className="boton-pildora mt-3" style={{ "--c": SOCIAL_COLOR, minHeight: 44 }}><UserPlus size={16} /> Sumar mi primer amigo</button>
-          </div>
-        </section>
-      )}
-
       {/* Botones unidos (el mismo grupo que los días en Rutina): la sección
           elegida se vuelve una píldora llena. */}
       <div className="pestanas-internas" role="tablist" aria-label="Secciones de Social">
@@ -18580,7 +18786,8 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
             <div className="text-center py-6 px-4">
               <Activity size={28} className="mx-auto mb-2.5 opacity-30 text-slate-600" />
               <p className="text-sm text-slate-500">{friendAccepted.length === 0 ? "Todavía no tenés amigos." : "Nadie de tu grupo entrenó en los últimos días."}</p>
-              <p className="text-xs mt-1 text-slate-700">{friendAccepted.length === 0 ? "Sumá al primero para ver su actividad acá." : "Cuando entrenen, van a aparecer acá para que les aplaudas."}</p>
+              <p className="text-xs mt-1 text-slate-600">{friendAccepted.length === 0 ? "Sumá al primero para ver su actividad acá." : "Cuando entrenen, van a aparecer acá para que les aplaudas."}</p>
+              {friendAccepted.length === 0 && <button onClick={irABuscar} className="boton-tonal mt-3 mx-auto" style={{ "--c": SOCIAL_COLOR }}><UserPlus size={15} /> Buscar amigos</button>}
             </div>
           ) : (
             <div className="space-y-2">
@@ -18591,7 +18798,7 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
                   </span>
                   <span className="flex-1 min-w-0">
                     <span className="block text-[9.5px] font-black uppercase tracking-wide" style={{ color: "#FB7185" }}>Te están por alcanzar</span>
-                    <span className="block text-[12.5px] text-slate-200 leading-snug truncate">
+                    <span className="block text-[12.5px] text-slate-200 leading-snug">
                       <b className="text-white">{basics[chaserFriend.uid]?.name || "Un amigo"}</b> lleva {chaserFriend.streak} {chaserFriend.streak === 1 ? "día seguido" : "días seguidos"}
                     </span>
                   </span>
@@ -18970,15 +19177,17 @@ function PresetRoutineCard({ preset, isActive, onPreview }) {
   const tramos = preset.dayOrder.map((dk) => ({ dk, color: preset.days?.[dk]?.color || accent, series: (preset.days?.[dk]?.exercises || []).reduce((a, e) => a + (e.sets?.length || 0), 0) || 1 }));
   return (
     <button onClick={onPreview} className={`preset ${isActive ? "activa" : ""} ${recienActivada ? "activate-pulse" : ""}`} style={{ "--pulse-color": tint(accent, "99"), "--c": accent }}>
+      {/* Arriba, los días de la rutina como una tira de colores (el ancho
+          de cada tramo es cuántas series tiene ese día). */}
+      <span className="preset-tira grande" aria-hidden="true">{tramos.map((t) => <i key={t.dk} style={{ "--dia": t.color, flexGrow: t.series }} />)}</span>
       <span className="preset-cabeza">
         <span className="preset-nombre">{preset.name}</span>
         {isActive && <span className="preset-activa badge-pop">Activa</span>}
-        <ChevronRight size={17} className="text-slate-500 shrink-0 ml-auto" />
       </span>
       <span className="preset-desc">{preset.description}</span>
       <span className="preset-pie">
-        <span className="preset-tira" aria-hidden="true">{tramos.map((t) => <i key={t.dk} style={{ "--dia": t.color, flexGrow: t.series }} />)}</span>
         <span className="preset-frec">{ctx?.frecuencia || `${dayCount} día${dayCount === 1 ? "" : "s"}/semana`}</span>
+        <span className="preset-ver">Ver <ChevronRight size={15} /></span>
       </span>
     </button>
   );
@@ -21045,6 +21254,20 @@ function trimLogsForAI(logs, historyLimit = AI_LOG_HISTORY_LIMIT, maxKeys = null
   return Object.fromEntries(entries.slice(0, maxKeys));
 }
 
+// Los atajos del Entrenador IA. Los cuatro primeros son las tarjetas del
+// inicio (con su título, una bajada y un toque de color cada una); el resto
+// queda en la fila de fichas.
+const ATAJOS_IA = [
+  { icon: <Layers size={17} />, label: "Crear rutina", titulo: "Armar una rutina", bajada: "Según tus objetivos y tus días", color: "#14B8A6", prompt: "Armame una rutina nueva según mis objetivos", autoSend: true },
+  { icon: <BarChart3 size={17} />, label: "Analizar progreso", titulo: "Analizar mi progreso", bajada: "Qué mejoró y qué está quieto", color: "#3B82F6", prompt: "Analizá mi progreso reciente: ¿en qué mejoré y qué tengo estancado?", autoSend: true },
+  { icon: <Target size={17} />, label: "Punto débil", titulo: "Mi punto débil", bajada: "El músculo que más quedó atrás", color: "#8B5CF6", prompt: "Mirando mis rangos por músculo, ¿cuál es mi punto más débil y cómo lo ataco?", autoSend: true },
+  { icon: <Zap size={17} />, label: "Plan de hoy", titulo: "Qué hago hoy", bajada: "Y con qué pesos arrancar", color: "#F59E0B", prompt: "¿Qué me toca entrenar hoy y con qué pesos me conviene arrancar?", autoSend: true },
+  { icon: <ClipboardCheck size={16} />, label: "Planificar semana", prompt: "Planificame las cargas de esta semana para toda mi rutina activa, basándote en mi historial reciente", autoSend: true },
+  { icon: <Flame size={16} />, label: "Calentamiento", prompt: "Armame un calentamiento general para mi día de hoy", autoSend: true },
+  { icon: <Calendar size={16} />, label: "Ciclo y descarga", prompt: "¿Cómo vengo en el ciclo actual? ¿Cuándo me toca la descarga?", autoSend: true },
+  { icon: <Save size={16} />, label: "Anotar una marca", askExercise: true },
+];
+
 function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMessages, conversations = [], activeConversationId = null, onNewConversation, onSwitchConversation, onDeleteConversation, onRenameConversation, settings, cycleStart, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement, onDeleteRoutine, onNavigate, onStartSession, onEndSession }) {
   // Contexto para reconstruir un plan EN VIVO a partir de la "action" cruda
   // (JSON plano, sí serializable) en vez de depender de la función confirm()
@@ -21697,6 +21920,9 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
     startRecognition();
   };
 
+  // Una conversación que todavía no empezó: sólo el saludo de la IA.
+  const esInicio = messages.length <= 1 && (!messages[0] || messages[0].text === AI_CHAT_WELCOME.text) && !isSending;
+  const primerNombre = String(profileName || "").trim().split(/\s+/)[0] || "";
   return (
     // BUG FIX (encontrado verificando las acciones a fondo): con una
     // conversación corta (pocos mensajes), el botón de confirmar/descartar
@@ -21720,24 +21946,37 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
           se fue a pedido. Una conversación nueva se abre desde la lista de
           conversaciones (el botón al lado del cuadro de texto). */}
 
-      {/* Dock de accesos directos, tipo ícono primero. Antes cada atajo
-          tenía su propio color (como los pills de Progreso) — acá se sacó
-          a pedido: ahora todos comparten el teal característico de esta
-          pestaña, para que se lea como un solo grupo homogéneo en vez de
-          un arcoíris suelto. Fade a la derecha: sin esto, el corte abrupto
-          de la última tarjeta no avisaba que la fila sigue. */}
+      {esInicio ? (
+        // EL INICIO. Antes abría con un texto largo que listaba lo que la IA
+        // sabe hacer y una fila de fichas cortada. Ahora: un saludo, la
+        // pregunta, y las cuatro cosas más pedidas como tarjetas con su toque
+        // de color. Lo demás, en fichas debajo.
+        <section className="ia-inicio" aria-label="Empezar una conversación">
+          <span className="ia-marca" aria-hidden="true"><Sparkles size={22} /></span>
+          <p className="ia-saludo">{primerNombre ? `Hola, ${primerNombre}` : "Hola"}</p>
+          <h2 className="ia-pregunta">¿En qué te ayudo hoy?</h2>
+          <p className="ia-bajada">Conozco tu rutina, tus marcas y tu progreso: todo lo que anotás en la app.</p>
+          <div className="ia-tarjetas">
+            {ATAJOS_IA.slice(0, 4).map((c) => (
+              <button key={c.label} onClick={() => handleQuickPrompt(c)} disabled={isSending} className="ia-tarjeta" style={{ "--c": c.color }}>
+                <span className="ia-tarjeta-icono" aria-hidden="true">{c.icon}</span>
+                <span className="ia-tarjeta-titulo">{c.titulo}</span>
+                <span className="ia-tarjeta-bajada">{c.bajada}</span>
+              </button>
+            ))}
+          </div>
+          <div className="ia-mas">
+            {ATAJOS_IA.slice(4).map((c) => (
+              <button key={c.label} onClick={() => handleQuickPrompt(c)} disabled={isSending} className="chip-accion">
+                {c.icon}<span>{c.label}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      ) : (
       <div className="relative -mx-1 mb-4">
         <div className="flex gap-2 overflow-x-auto pb-1 px-1 snap-x snap-mandatory">
-          {[
-            { icon: <Layers size={16} />, label: "Crear rutina", prompt: "Armame una rutina nueva según mis objetivos", autoSend: true },
-            { icon: <BarChart3 size={16} />, label: "Analizar progreso", prompt: "Analizá mi progreso reciente: ¿en qué mejoré y qué tengo estancado?", autoSend: true },
-            { icon: <Target size={16} />, label: "Punto débil", prompt: "Mirando mis rangos por músculo, ¿cuál es mi punto más débil y cómo lo ataco?", autoSend: true },
-            { icon: <Zap size={16} />, label: "Plan de hoy", prompt: "¿Qué me toca entrenar hoy y con qué pesos me conviene arrancar?", autoSend: true },
-            { icon: <ClipboardCheck size={16} />, label: "Planificar semana", prompt: "Planificame las cargas de esta semana para toda mi rutina activa, basándote en mi historial reciente", autoSend: true },
-            { icon: <Flame size={16} />, label: "Calentamiento", prompt: "Armame un calentamiento general para mi día de hoy", autoSend: true },
-            { icon: <Calendar size={16} />, label: "Ciclo y descarga", prompt: "¿Cómo vengo en el ciclo actual? ¿Cuándo me toca la descarga?", autoSend: true },
-            { icon: <Save size={16} />, label: "Anotar una marca", askExercise: true },
-          ].map((c, i) => (
+          {ATAJOS_IA.map((c, i) => (
             <button key={i} onClick={() => handleQuickPrompt(c)} className="chip-accion snap-start">
               {c.icon}<span>{c.label}</span>
             </button>
@@ -21745,8 +21984,9 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
         </div>
         <div className="absolute top-0 right-0 bottom-1 w-8 pointer-events-none" style={{ background: "linear-gradient(to right, transparent, var(--app-bg))" }} />
       </div>
+      )}
 
-      <div className="space-y-3">
+      {!esInicio && <div className="space-y-3">
         {hasMoreMessages && (
           <div ref={loadMoreSentinelRef} className="flex justify-center py-2">
             <button onClick={loadMoreMessages} className="text-[11px] font-bold px-3.5 py-2 rounded-full transition active:scale-95" style={{ backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)", color: "var(--chip-text)" }}>
@@ -21963,7 +22203,7 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
           </div>
         )}
         <div ref={bottomRef} />
-      </div>
+      </div>}
 
       {/* El input fijo va por un portal, afuera del árbol normal del
           componente, a propósito: el contenedor de cada pestaña (en
@@ -23652,21 +23892,20 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
         // grande: ves sus días de un vistazo (con su color), y el detalle
         // (balance, cronograma) queda a un toque para no saturar.
         <section className="tarjeta-tonal rutina-activa p-4 space-y-4" style={{ "--c": "#3B82F6" }} aria-label="Tu rutina activa">
-          <div className="flex items-center gap-3">
-            <span className="galleta icono-galleta" aria-hidden="true"><Dumbbell size={18} /></span>
+          <div className="flex items-start gap-3">
             <div className="min-w-0 flex-1">
+              <p className="rutina-activa-linea">{activeUso.sesiones > 0 ? `Tu rutina, con ${activeUso.sesiones} ${activeUso.sesiones === 1 ? "sesión" : "sesiones"}` : "Tu rutina"}</p>
               <h3 className="rutina-activa-nombre">{activeDef.name}</h3>
-              <p className="rutina-activa-linea">{activeUso.sesiones > 0 ? `Tu rutina activa: ${activeUso.sesiones} ${activeUso.sesiones === 1 ? "sesión" : "sesiones"}` : "Tu rutina activa"}</p>
             </div>
             <button onClick={() => setShareTarget(activeDef)} aria-label="Compartir rutina activa" className="boton-redondo shrink-0"><Share2 size={16} /></button>
           </div>
 
+          <DiasRutina routineDef={activeDef} onGoToDay={onGoToDay} />
           {/* LA SEMANA PINTADA. Antes eran cuatro cajas de números (días,
               ejercicios, series, sesiones), una fila de letras y una lista de
               días con su cantidad de ejercicios. Ahora: los siete días con el
-              color de lo que toca cada uno, y abajo el reparto —las series de
-              la semana en una sola barra, un tramo por día—, que ya dice
-              cuántos días son, cuánto pesa cada uno y el total. */}
+              color de lo que toca cada uno, y arriba los días de la rutina
+              como baldosas, con sus ejercicios y sus series. */}
           <div className="semana-rutina" role="list" aria-label="Tu semana">
             {WEEKDAY_KEYS.map((wk, i) => {
               const dk = activeSchedule[wk] || null;
@@ -23682,7 +23921,6 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
               );
             })}
           </div>
-          <RepartoSemana routineDef={activeDef} onGoToDay={onGoToDay} />
 
           {/* El día que toca hoy, como botón para ir directo. */}
           {(() => {
@@ -23743,21 +23981,39 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
         </div>
       )}
 
+      {/* ARMÁ LA TUYA: crear (con la IA o a mano) o importar, como dos
+          tarjetas a la vista. Antes eran dos botones al final de la lista. */}
+      {!forced && (
+        <section className="space-y-2.5" aria-label="Armá tu rutina">
+          <h3 className="seccion-titulo">Armá la tuya</h3>
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={() => { setEditingRoutineId(null); setMode("builder"); }} className="accion-rutina" style={{ "--c": "#3B82F6" }}>
+              <span className="galleta icono-galleta" aria-hidden="true"><Sparkles size={17} /></span>
+              <b>Crear mi rutina</b>
+              <small>Con la IA o a mano</small>
+            </button>
+            <button onClick={() => setShowImport(true)} className="accion-rutina" style={{ "--c": "#14B8A6" }}>
+              <span className="galleta icono-galleta" aria-hidden="true"><Download size={17} /></span>
+              <b>Importar</b>
+              <small>De un PDF, un Excel o un texto</small>
+            </button>
+          </div>
+        </section>
+      )}
+
       {(!forced || showPresetsForced) && (
       <div className={`space-y-2.5 ${forced ? "tab-fade-in" : ""}`}>
-        <h3 className="seccion-titulo">Rutinas preestablecidas</h3>
-        <div className="space-y-2">
+        <div className="flex items-baseline justify-between gap-3">
+          <h3 className="seccion-titulo">Preestablecidas</h3>
+          <span className="text-[12px] text-slate-500">{PRESET_ROUTINES.length} rutinas</span>
+        </div>
+        {/* Un carrusel: se desliza de costado en vez de ser una lista larga
+            de tarjetas iguales. */}
+        <div className="preset-carrusel">
           {PRESET_ROUTINES.map((preset) => (
             <PresetRoutineCard key={preset.id} preset={preset} isActive={preset.id === activeId} onPreview={() => setPreview({ def: preset, name: preset.name, id: preset.id, isPreset: true })} />
           ))}
         </div>
-      </div>
-      )}
-
-      {!forced && (
-      <div className="flex gap-2">
-        <button onClick={() => { setEditingRoutineId(null); setMode("builder"); }} className="boton-pildora flex-1" style={{ "--c": "#3B82F6" }}><Sparkles size={16} /> Crear mi rutina</button>
-        <button onClick={() => setShowImport(true)} className="boton-tonal flex-1" style={{ "--c": "#3B82F6" }}><Download size={16} /> Importar</button>
       </div>
       )}
 

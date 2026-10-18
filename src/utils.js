@@ -121,17 +121,15 @@ export function isHeavyRepRange(repRange) { const top = repRangeTop(repRange); r
 let IS_LIGHT_THEME = false;
 export function setThemeMode(isLight) { IS_LIGHT_THEME = !!isLight; }
 
-// "GRAFITO": el color de un día o de una pestaña ya no pinta fondos ni
-// bordes. Lo que pasa por tint() —fondos y bordes translúcidos, que son casi
-// todos sus usos— sale apagado: un tercio del color y el resto gris. La
-// identidad del día se insinúa sin teñir la pantalla; los puntos y textos
-// que usan el color directo (sin tint) siguen plenos.
+// Lo que pasa por tint() —fondos y bordes translúcidos con el color de un
+// día o de una pestaña— sale más sobrio que el color puro: la mitad del
+// color y la mitad gris. Es un toque, no una mancha.
 function apagar(hex) {
   const largo = hex.length === 4 ? `#${[...hex.slice(1)].map((c) => c + c).join("")}` : hex;
   const n = parseInt(largo.slice(1), 16);
   if (isNaN(n)) return hex;
   const gris = IS_LIGHT_THEME ? [136, 138, 143] : [150, 152, 158];
-  const mezcla = (c, g) => Math.round(c * 0.34 + g * 0.66);
+  const mezcla = (c, g) => Math.round(c * 0.55 + g * 0.45);
   const r = mezcla((n >> 16) & 255, gris[0]), v = mezcla((n >> 8) & 255, gris[1]), a = mezcla(n & 255, gris[2]);
   return `#${((1 << 24) | (r << 16) | (v << 8) | a).toString(16).slice(1)}`;
 }
