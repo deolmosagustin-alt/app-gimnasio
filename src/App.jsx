@@ -3903,7 +3903,7 @@ button.carrera-carril:active { background: var(--velo); }
 /* La escalera del ciclo. */
 .escalera-titulo { font-size: 1.45rem; line-height: 1.1; font-weight: 750; color: var(--text-strong); letter-spacing: -0.02em; }
 .escalera-titulo span { font-weight: 550; color: var(--text-faint); }
-.escalera-sub { margin-top: 3px; font-size: 0.8125rem; color: var(--text-muted); }
+.escalera-sub { margin-top: 3px; font-size: 0.8125rem; color: var(--text-muted); text-wrap: pretty; }
 .escalera { display: flex; align-items: flex-end; gap: 5px; height: 100px; margin-top: 24px; }
 .escalon {
   position: relative; flex: 1 1 0; min-width: 0;
@@ -9539,6 +9539,12 @@ function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS,
   });
   const hechasSemana = diasSemana.filter((d) => d.hecho).length;
   const planeadasSemana = diasSemana.filter((d) => d.plan).length;
+  // Si entrenaste más días de los planeados no dice "4 de 3": cuenta las de más.
+  const resumenSemana = !planeadasSemana
+    ? `${hechasSemana} ${hechasSemana === 1 ? "sesión" : "sesiones"}`
+    : hechasSemana <= planeadasSemana
+      ? `${hechasSemana} de ${planeadasSemana} sesiones`
+      : `${hechasSemana} sesiones, ${hechasSemana - planeadasSemana} extra`;
   return (
     <section className="tarjeta-tonal escalera-ciclo p-4" style={{ "--c": phase }} aria-label={`Ciclo ${weekInfo.cycleNumber}, semana ${weekInfo.weekInCycle} de ${cycleWeeks}`}>
       <div className="flex items-start justify-between gap-3">
@@ -9568,7 +9574,7 @@ function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS,
         {weekDots.map(({ week, isDeload }) => <span key={week} className={week === weekInfo.weekInCycle ? "actual" : ""}>{isDeload ? "D" : week}</span>)}
       </div>
       <div className="ciclo-semana">
-        <p className="ciclo-semana-titulo">Esta semana<b>{planeadasSemana ? `${hechasSemana} de ${planeadasSemana} sesiones` : `${hechasSemana} ${hechasSemana === 1 ? "sesión" : "sesiones"}`}</b></p>
+        <p className="ciclo-semana-titulo">Esta semana<b>{resumenSemana}</b></p>
         <div className="ciclo-dias" role="list" aria-label="Tus días de esta semana">
           {diasSemana.map((d) => (
             <span key={d.fecha} role="listitem" className={`ciclo-dia ${d.hecho ? "hecho" : ""} ${d.plan ? "plan" : ""} ${d.hoy ? "hoy" : ""} ${d.futuro ? "futuro" : ""}`} style={d.color ? { "--dia": d.color } : undefined}
