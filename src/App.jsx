@@ -18,7 +18,7 @@ import {
   Sparkles, Layers, SlidersHorizontal, UserCog,
   Share2, Download, Link2, Copy, BellOff, Send, Mic, Ruler, Camera, Link, Footprints, Star, SquarePlay, Upload, RefreshCw, Timer, Percent, Users, User,
   MessageCircle, Search, UserPlus, UserCheck, UserMinus, AtSign, GraduationCap, ClipboardCheck, Swords, Medal, QrCode, ArrowUpDown,
-  Phone, Minus, SkipForward,
+  Phone, Minus,
 } from "lucide-react";
 import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signOut, onAuthStateChanged } from "firebase/auth";
 import { Capacitor, registerPlugin } from "@capacitor/core";
@@ -3311,7 +3311,8 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 .serie-linea:active { background: var(--velo); }
 .series-lista > div:has(.serie-linea) + div:has(.serie-linea) .serie-linea { border-radius: 0 0 14px 14px; box-shadow: 0 -1px 0 var(--hairline); }
 .serie-galleta { width: 26px; height: 26px; font-weight: 650; font-size: 0.75rem; font-variant-numeric: tabular-nums; }
-.serie-galleta.hueca { --galleta-borde: var(--hairline-fuerte); --galleta-fondo: var(--surface-1); color: var(--text-faint); }
+/* Las que faltan: un aro vacío con un toque del color del día. */
+.serie-galleta.hueca { --galleta-borde: color-mix(in oklab, var(--c, var(--tono)) 45%, var(--hairline-fuerte)); --galleta-fondo: var(--surface-1); color: var(--text-faint); }
 .serie-galleta.llena { --galleta-fondo: color-mix(in oklab, var(--c, var(--tono)) 72%, white); color: color-mix(in oklab, var(--c, var(--tono)) 18%, #07080a); }
 .serie-galleta.activa { --galleta-fondo: color-mix(in oklab, var(--c, var(--tono)) 72%, white); color: color-mix(in oklab, var(--c, var(--tono)) 18%, #07080a); }
 .serie-linea-valor { display: inline-flex; align-items: baseline; gap: 3px; font-variant-numeric: tabular-nums; }
@@ -3331,7 +3332,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 /* La serie en foco. */
 .serie-foco {
   margin: 6px 0; border-radius: 22px; padding: 12px 10px 10px;
-  background: var(--surface-2); box-shadow: inset 0 1px 0 var(--brillo);
+  background: color-mix(in oklab, var(--c, var(--tono)) 6%, var(--surface-2)); box-shadow: inset 0 1px 0 var(--brillo);
   animation: focoEntra .45s var(--resorte) backwards;
 }
 .light-mode .serie-foco { box-shadow: inset 0 0 0 1px var(--hairline); }
@@ -3341,6 +3342,8 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 .foco-titulo { display: flex; align-items: baseline; gap: 8px; min-width: 0; font-size: 0.9375rem; font-weight: 650; color: var(--text-strong); }
 .foco-titulo span { font-size: 0.875rem; font-weight: 500; color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .foco-titulo .foco-tipo, .serie-linea-meta .foco-tipo { color: var(--text-faint); }
+.foco-titulo .foco-rango { font-size: 0.9375rem; font-weight: 650; color: color-mix(in oklab, var(--c, var(--tono)) 50%, white); }
+.light-mode .foco-titulo .foco-rango { color: color-mix(in oklab, var(--c, var(--tono)) 62%, black); }
 .foco-fuerza { color: var(--text-faint); align-self: center; flex: none; }
 .foco-pasada { margin: 4px 6px 0; font-size: 0.8125rem; color: var(--text-faint); }
 .foco-pasada b { font-weight: 600; color: var(--text-muted); font-variant-numeric: tabular-nums; }
@@ -3473,7 +3476,7 @@ button.foco-campo-rotulo:active { background: var(--velo); }
    cuando ya les aplaudiste. */
 .historias { display: flex; gap: 14px; overflow-x: auto; padding: 4px 2px 6px; scroll-snap-type: x proximity; }
 .historia { position: relative; flex: none; width: 72px; display: flex; flex-direction: column; align-items: center; scroll-snap-align: start; }
-.historia-aro { width: 68px; height: 68px; --galleta-fondo: var(--dia); }
+.historia-aro { width: 68px; height: 68px; --galleta-fondo: color-mix(in oklab, var(--dia) 60%, #8a8c92); }
 .historia-aro.vista { --galleta-fondo: var(--hairline); }
 .historia-aro > img, .historia-aro > span {
   width: 58px; height: 58px; object-fit: cover;
@@ -3755,7 +3758,7 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
    un resorte hacia el lado que pesa más. */
 .equilibrio { display: grid; gap: 10px; }
 .barra-equilibrio { display: block; width: 100%; max-width: 380px; margin: 0 auto; overflow: visible; }
-.equilibrio-barra { transform: rotate(var(--giro, 0deg)); transform-box: view-box; animation: equilibrioInclina 1.1s var(--resorte) .15s both; }
+.equilibrio-barra { transform: rotate(var(--giro, 0deg)); transform-box: view-box; animation: equilibrioInclina 1.1s var(--resorte) .55s both; }
 @keyframes equilibrioInclina { from { transform: rotate(0deg); } }
 .soporte-claro { stop-color: #5d6066; }
 .soporte-oscuro { stop-color: #2f3135; }
@@ -3773,9 +3776,93 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 .balance-fila { display: grid; grid-template-columns: 104px minmax(0, 1fr) 24px; align-items: center; gap: 10px; }
 .balance-nombre { font-size: 13px; font-weight: 600; line-height: 1.2; color: var(--text-muted); }
 .balance-pista { display: block; height: 10px; border-radius: 5px; overflow: hidden; background: var(--velo-fuerte); }
-.balance-pista i { display: block; height: 100%; border-radius: 5px; background: color-mix(in oklab, var(--c) 70%, white); }
-.light-mode .balance-pista i { background: var(--c); }
+.balance-pista i { display: block; height: 100%; border-radius: 5px; background: color-mix(in oklab, var(--c) 60%, #8a8c92); }
+.light-mode .balance-pista i { background: color-mix(in oklab, var(--c) 70%, #a7a9ae); }
 .balance-n { font-size: 15px; font-weight: 700; text-align: right; color: var(--text-strong); }
+/* LA GUÍA (?): una placa con las pestañas arriba, un escenario con el
+   dibujo de cada paso, la frase y los puntos del avance. */
+.guia { width: 100%; max-width: 26rem; max-height: min(92vh, 720px); display: flex; flex-direction: column; overflow: hidden; border-radius: 28px; background: var(--surface-1); box-shadow: var(--placa-canto), 0 30px 60px -30px rgba(0,0,0,.8); }
+.guia-cabeza { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 16px 10px 20px; }
+.guia-titulo { font-size: 1.35rem; font-weight: 750; letter-spacing: -0.02em; color: var(--text-strong); }
+.guia-capitulos { display: flex; gap: 6px; overflow-x: auto; padding: 0 16px 12px; scrollbar-width: none; }
+.guia-capitulos::-webkit-scrollbar { display: none; }
+.guia-capitulos button { flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 38px; padding: 0 13px; border-radius: 999px; font-size: 13px; font-weight: 650; color: var(--text-muted); background: var(--velo); transition: background-color .2s ease, color .2s ease; }
+.guia-capitulos button.activo { color: color-mix(in oklab, var(--c) 18%, #07080a); background: color-mix(in oklab, var(--c) 72%, white); }
+.light-mode .guia-capitulos button.activo { background: var(--c); }
+.guia-cuerpo { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 4px 20px 10px; }
+.guia-escenario { display: grid; place-items: center; min-height: 172px; padding: 18px 14px; border-radius: 24px; background: color-mix(in oklab, var(--c) 6%, var(--surface-2)); overflow: hidden; }
+.guia-paso { margin-top: 16px; font-size: 12.5px; font-weight: 600; color: var(--text-faint); }
+.guia-paso-titulo { margin-top: 2px; font-size: 1.3rem; font-weight: 750; line-height: 1.15; letter-spacing: -0.015em; color: var(--text-strong); text-wrap: balance; }
+.guia-paso-texto { margin-top: 6px; font-size: 14px; line-height: 1.5; color: var(--text-muted); text-wrap: pretty; }
+.guia-pie { display: grid; gap: 12px; padding: 12px 16px 16px; border-top: 1px solid var(--hairline); }
+.guia-puntos { display: flex; justify-content: center; gap: 6px; }
+.guia-puntos i { width: 7px; height: 7px; border-radius: 99px; background: var(--hairline-fuerte); transition: width .3s var(--resorte), background-color .2s ease; }
+.guia-puntos i.visto { background: var(--text-faint); }
+.guia-puntos i.actual { width: 22px; background: var(--text-strong); }
+/* Los dibujos de la guía (piezas de la app, quietas). */
+.guia-escenario button, .guia-escenario a { pointer-events: none; }
+.guia-ancho { width: 100%; }
+.guia-selector { display: flex; gap: 3px; width: 100%; max-width: 300px; padding: 4px; border-radius: 999px; background: var(--surface-1); box-shadow: inset 0 0 0 1px var(--hairline); }
+.guia-selector span { position: relative; flex: 1; padding: 13px 0; border-radius: 999px; text-align: center; font-size: 14px; font-weight: 600; color: var(--text-muted); }
+.guia-selector span.elegido { color: color-mix(in oklab, var(--c) 18%, #07080a); background: color-mix(in oklab, var(--c) 72%, white); }
+.light-mode .guia-selector span.elegido { background: var(--c); }
+.guia-selector span i { position: absolute; left: 50%; bottom: 5px; width: 14px; height: 3px; margin-left: -7px; border-radius: 2px; background: color-mix(in oklab, color-mix(in oklab, var(--c) 18%, #07080a) 40%, transparent); }
+.guia-visor { display: grid; grid-template-columns: 1fr 18px 1fr 58px; align-items: center; width: 100%; max-width: 300px; padding: 8px 8px 8px 4px; border-radius: 18px; background: var(--panel-sunken); box-shadow: inset 0 1px 2px rgba(0,0,0,0.55), inset 0 0 0 1px var(--hairline); }
+.light-mode .guia-visor { box-shadow: inset 0 1px 2px rgba(0,0,0,0.06), inset 0 0 0 1px var(--hairline); }
+.guia-visor span { display: grid; justify-items: center; }
+.guia-visor b { font-size: 2.6rem; line-height: 1; font-weight: 650; color: var(--text-strong); }
+.guia-visor small { font-size: 11px; color: var(--text-faint); }
+.guia-visor i { font-style: normal; text-align: center; color: var(--text-faint); }
+.guia-visor em { width: 50px; height: 50px; border-radius: 999px; display: grid; place-items: center; color: color-mix(in oklab, var(--c) 18%, #07080a); background: color-mix(in oklab, var(--c) 72%, white); }
+.light-mode .guia-visor em { background: var(--c); }
+.guia-dial { width: 132px; height: 132px; pointer-events: none; }
+.guia-dial .descanso-tiempo { color: var(--text-strong); }
+.guia-escalera { display: flex; align-items: flex-end; gap: 6px; width: 100%; max-width: 280px; height: 112px; }
+.guia-escalera i { flex: 1; border-radius: 10px; background: var(--surface-3); }
+.guia-escalera i.hoy { background: color-mix(in oklab, var(--c) 72%, white); }
+.light-mode .guia-escalera i.hoy { background: var(--c); }
+.guia-escalera i.despues { background: transparent; box-shadow: inset 0 0 0 1.5px var(--hairline-fuerte); }
+.guia-escalera i.descarga { background: repeating-linear-gradient(135deg, var(--surface-3) 0 5px, transparent 5px 10px); }
+.guia-rangos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 10px; width: 100%; max-width: 300px; }
+.guia-rangos span { display: grid; justify-items: center; gap: 4px; }
+.guia-rangos small { font-size: 11.5px; font-weight: 600; color: var(--text-muted); }
+.guia-curva { width: 100%; max-width: 300px; overflow: visible; }
+.guia-curva-record { stroke: var(--record); stroke-width: 1.5; stroke-dasharray: 3 5; }
+.guia-curva-linea { fill: none; stroke: color-mix(in oklab, var(--c) 72%, white); stroke-width: 3; stroke-linecap: round; }
+.guia-curva-punto { fill: var(--surface-2); stroke: color-mix(in oklab, var(--c) 72%, white); stroke-width: 2; }
+.guia-curva-oro { fill: var(--record); }
+.guia-acciones { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; width: 100%; }
+.guia-acciones > span { display: grid; justify-items: center; gap: 8px; padding: 14px 6px; border-radius: 18px; font-size: 12.5px; font-weight: 650; color: var(--text-strong); background: var(--surface-1); box-shadow: var(--placa-canto); }
+.guia-acciones em { font-style: normal; }
+.guia-racha { display: flex; align-items: center; gap: 14px; color: var(--text-strong); }
+.guia-racha b { font-size: 3.4rem; line-height: 1; font-weight: 750; }
+.guia-chat { display: grid; gap: 10px; width: 100%; }
+.guia-chat p { max-width: 86%; font-size: 13.5px; line-height: 1.45; }
+.guia-chat .propia { justify-self: end; padding: 9px 13px; border-radius: 18px 18px 6px 18px; color: var(--text-strong); background: color-mix(in oklab, var(--c) 16%, var(--surface-1)); }
+.guia-chat .ia { color: var(--text-strong); }
+.guia-fichas { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.guia-fichas span { padding: 8px 12px; border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--text-muted); background: var(--surface-1); box-shadow: var(--placa-canto); }
+.guia-google { display: inline-flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 20px; border-radius: 999px; font-size: 14.5px; font-weight: 650; color: var(--text-strong); background: var(--surface-1); box-shadow: inset 0 0 0 1px var(--hairline-fuerte); }
+.guia-google span { font-weight: 800; color: #4285F4; }
+/* El cronograma: un renglón por día de la semana. */
+.cronograma { display: grid; }
+.cronograma-fila { display: grid; grid-template-columns: 40px minmax(0, 1fr); align-items: center; gap: 10px; padding: 8px 0; }
+.cronograma-fila + .cronograma-fila { border-top: 1px solid var(--hairline); }
+.cronograma-dia { font-size: 13px; font-weight: 650; color: var(--text-muted); }
+.cronograma-opciones { display: flex; flex-wrap: wrap; gap: 6px; }
+.cronograma-op { min-height: 34px; padding: 0 12px; border-radius: 999px; font-size: 12.5px; font-weight: 650; color: var(--text-muted); background: var(--velo); transition: background-color .2s ease, color .2s ease, transform .2s var(--resorte); }
+.cronograma-op:active { transform: scale(.95); }
+.cronograma-op.elegida { color: color-mix(in oklab, var(--dia) 18%, #07080a); background: color-mix(in oklab, var(--dia) 60%, #8a8c92); }
+.light-mode .cronograma-op.elegida { background: color-mix(in oklab, var(--dia) 70%, #a7a9ae); }
+.cronograma-op.descanso.elegida { color: var(--text-strong); background: var(--surface-3); }
+.cronograma-resumen { margin-top: 10px; font-size: 12.5px; color: var(--text-muted); }
+/* La vista previa de una rutina. */
+.modal-rutina { width: 100%; max-width: 28rem; max-height: 88vh; display: flex; flex-direction: column; overflow: hidden; border-radius: 28px; background: var(--surface-1); box-shadow: var(--placa-canto), 0 30px 60px -30px rgba(0,0,0,.8); }
+.modal-rutina-cabeza { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 18px 18px 12px; }
+.modal-rutina-cuerpo { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: grid; align-content: start; gap: 18px; padding: 2px 18px 18px; }
+.modal-rutina-cuerpo .atleta-datos { background: var(--surface-2); box-shadow: none; }
+.modal-rutina-pie { display: grid; gap: 8px; padding: 12px 18px 16px; border-top: 1px solid var(--hairline); }
+.modal-rutina-activa { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 48px; border-radius: 999px; font-size: 14px; font-weight: 650; color: var(--text-muted); background: var(--velo); }
 @media (prefers-reduced-motion: reduce) { .equilibrio-barra { animation: none; } }
 
 /* La semana perforada (carnet) y la semana como discos (aviso de descanso). */
@@ -3846,8 +3933,8 @@ button.carrera-carril:active { background: var(--velo); }
 .carrera-nombre { font-size: 13.5px; font-weight: 650; line-height: 1.1; color: var(--text-strong); }
 .carrera-pista { display: flex; gap: 3px; }
 .carrera-pista i { flex: 1 1 0; height: 8px; border-radius: 4px; background: var(--velo-fuerte); }
-.carrera-pista i.hecho { background: color-mix(in oklab, var(--dia) 76%, white); }
-.light-mode .carrera-pista i.hecho { background: var(--dia); }
+.carrera-pista i.hecho { background: color-mix(in oklab, var(--dia) 60%, #8a8c92); }
+.light-mode .carrera-pista i.hecho { background: color-mix(in oklab, var(--dia) 70%, #a7a9ae); }
 .carrera-n { font-size: 1.25rem; font-weight: 700; text-align: right; color: var(--text-strong); }
 
 /* La escalera del ciclo. */
@@ -3950,12 +4037,13 @@ button.carrera-carril:active { background: var(--velo); }
 .dia-rutina {
   position: relative; overflow: hidden; display: grid; align-content: start; gap: 2px; min-height: 92px;
   padding: 16px 12px 12px; border-radius: 18px; text-align: left;
-  background: color-mix(in oklab, var(--dia) 12%, var(--surface-2));
-  transition: transform .25s var(--resorte);
+  background: color-mix(in oklab, var(--dia) 8%, var(--surface-2));
+  transition: transform .25s var(--resorte), box-shadow .2s ease;
 }
-.dia-rutina::before { content: ""; position: absolute; left: 12px; right: 12px; top: 0; height: 4px; border-radius: 0 0 4px 4px; background: color-mix(in oklab, var(--dia) 78%, white); }
-.light-mode .dia-rutina { background: color-mix(in oklab, var(--dia) 9%, #ffffff); box-shadow: inset 0 0 0 1px var(--hairline); }
-.light-mode .dia-rutina::before { background: var(--dia); }
+.dia-rutina::before { content: ""; position: absolute; left: 12px; right: 12px; top: 0; height: 4px; border-radius: 0 0 4px 4px; background: color-mix(in oklab, var(--dia) 60%, #8a8c92); }
+.light-mode .dia-rutina { background: color-mix(in oklab, var(--dia) 6%, #ffffff); box-shadow: inset 0 0 0 1px var(--hairline); }
+.light-mode .dia-rutina::before { background: color-mix(in oklab, var(--dia) 70%, #a7a9ae); }
+.dia-rutina.elegido { box-shadow: inset 0 0 0 2px color-mix(in oklab, var(--dia) 60%, #8a8c92); }
 .dia-rutina:active { transform: scale(.96); }
 .dia-rutina:disabled { cursor: default; }
 .dia-rutina-nombre { margin-bottom: 6px; font-size: 1.05rem; font-weight: 750; font-stretch: 85%; line-height: 1.1; color: var(--text-strong); overflow-wrap: normal; word-break: normal; text-wrap: balance; }
@@ -3985,8 +4073,8 @@ button.carrera-carril:active { background: var(--velo); }
 .semana-rutina-letra { font-size: 11.5px; font-weight: 650; color: var(--text-faint); }
 .semana-rutina-dia.hoy .semana-rutina-letra { color: var(--text-strong); }
 .semana-rutina-marca { display: block; width: 100%; height: 30px; border-radius: 10px; background: var(--disco-fantasma); transition: transform .25s var(--resorte); }
-.semana-rutina-dia.entrena .semana-rutina-marca { background: color-mix(in oklab, var(--dia) 82%, white); }
-.light-mode .semana-rutina-dia.entrena .semana-rutina-marca { background: var(--dia); }
+.semana-rutina-dia.entrena .semana-rutina-marca { background: color-mix(in oklab, var(--dia) 60%, #8a8c92); }
+.light-mode .semana-rutina-dia.entrena .semana-rutina-marca { background: color-mix(in oklab, var(--dia) 70%, #a7a9ae); }
 .semana-rutina-dia.hoy .semana-rutina-marca { outline: 2px solid var(--text-strong); outline-offset: 2px; }
 .semana-rutina-dia.entrena:active .semana-rutina-marca { transform: scale(.92); }
 .preset { position: relative; display: block; width: 100%; padding: 14px 16px; border-radius: 24px; text-align: left; background: var(--surface-1); transition: background-color .2s ease; }
@@ -3999,8 +4087,8 @@ button.carrera-carril:active { background: var(--velo); }
 .preset-desc { display: block; margin-top: 5px; font-size: 12.5px; line-height: 1.4; color: var(--text-muted); text-wrap: pretty; }
 .preset-pie { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
 .preset-tira { display: flex; gap: 2px; width: 96px; height: 10px; flex: none; }
-.preset-tira i { flex-basis: 0; border-radius: 3px; background: color-mix(in oklab, var(--dia) 82%, white); }
-.light-mode .preset-tira i { background: var(--dia); }
+.preset-tira i { flex-basis: 0; border-radius: 3px; background: color-mix(in oklab, var(--dia) 60%, #8a8c92); }
+.light-mode .preset-tira i { background: color-mix(in oklab, var(--dia) 70%, #a7a9ae); }
 .preset-frec { font-size: 12px; color: var(--text-faint); min-width: 0; }
 .preset-acciones { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
 
@@ -4098,9 +4186,9 @@ button.carrera-carril:active { background: var(--velo); }
 /* La vista previa de una rutina, con cada día en una baldosa. */
 .vista-rutina { display: grid; gap: 8px; }
 .vista-dia { position: relative; padding: 14px 14px 12px; border-radius: 18px; background: color-mix(in oklab, var(--dia) 10%, var(--surface-2)); }
-.vista-dia::before { content: ""; position: absolute; left: 14px; right: 14px; top: 0; height: 3px; border-radius: 0 0 3px 3px; background: color-mix(in oklab, var(--dia) 78%, white); }
+.vista-dia::before { content: ""; position: absolute; left: 14px; right: 14px; top: 0; height: 3px; border-radius: 0 0 3px 3px; background: color-mix(in oklab, var(--dia) 60%, #8a8c92); }
 .light-mode .vista-dia { background: color-mix(in oklab, var(--dia) 8%, #ffffff); box-shadow: inset 0 0 0 1px var(--hairline); }
-.light-mode .vista-dia::before { background: var(--dia); }
+.light-mode .vista-dia::before { background: color-mix(in oklab, var(--dia) 70%, #a7a9ae); }
 .vista-dia-cabeza { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 10px; }
 .vista-dia-cabeza b { font-size: 0.9375rem; font-weight: 750; font-stretch: 88%; line-height: 1.2; color: var(--text-strong); }
 .vista-dia-cabeza span { font-size: 0.75rem; color: var(--text-muted); }
@@ -4197,6 +4285,29 @@ button.credencial-dato:not(:disabled):active { background: var(--velo); }
 .atleta-usuario { margin-top: 3px; font-size: 13.5px; color: var(--text-muted); overflow-wrap: anywhere; }
 .atleta-rango { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 13.5px; font-weight: 700; }
 .atleta-nota { margin-top: -6px; font-size: 12.5px; color: var(--text-faint); }
+.atleta-desde { margin-top: 5px; font-size: 12.5px; color: var(--text-faint); }
+/* La cara lleva una luz del color de su rango debajo, como un objeto iluminado. */
+.atleta-avatar { filter: drop-shadow(0 14px 22px color-mix(in oklab, var(--rango) 38%, transparent)); }
+.ultima-sesion { display: grid; gap: 10px; }
+.ultima-carga { display: flex; align-items: center; gap: 12px; }
+.ultima-carga .barra-cargada { flex: 1; min-width: 0; }
+.ultima-carga > span { flex: none; font-size: 12.5px; color: var(--text-muted); }
+.ultima-carga b { margin-right: 3px; font-size: 1.2rem; font-weight: 750; color: var(--text-strong); }
+.aplaudir {
+  flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 14px; border-radius: 999px;
+  font-size: 13.5px; font-weight: 700; color: color-mix(in oklab, var(--tono) 18%, #07080a); background: color-mix(in oklab, var(--tono) 72%, white);
+  transition: transform .25s var(--resorte), border-radius .35s var(--resorte);
+}
+.light-mode .aplaudir { background: var(--tono); }
+.aplaudir:active { transform: scale(.94); border-radius: 14px; }
+.aplaudir.hecho { color: var(--text-muted); background: var(--velo); }
+.recientes { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.reciente { display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-radius: 20px; background: var(--surface-1); box-shadow: var(--placa-canto); }
+.reciente-icono { flex: none; width: 34px; height: 34px; border-radius: 999px; display: grid; place-items: center; color: var(--record); background: color-mix(in oklab, var(--record) 14%, transparent); }
+.reciente-nombre { display: block; font-size: 14px; font-weight: 650; line-height: 1.25; color: var(--text-strong); }
+.reciente-cuando { display: block; margin-top: 1px; font-size: 12px; color: var(--text-faint); }
+.reciente-marca { flex: none; font-size: 1.15rem; font-weight: 750; color: var(--record); white-space: nowrap; }
+.reciente-marca small { margin-left: 2px; font-size: 12px; font-weight: 600; color: var(--text-muted); }
 .atleta-datos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-radius: 24px; background: var(--surface-1); box-shadow: var(--placa-canto); }
 .atleta-dato { display: grid; align-content: start; gap: 4px; min-width: 0; padding: 13px 14px 14px; }
 .atleta-dato + .atleta-dato { border-left: 1px solid var(--hairline); }
@@ -4234,6 +4345,33 @@ button.credencial-dato:not(:disabled):active { background: var(--velo); }
 /* EL MANO A MANO: las dos caras, la barra en equilibrio, la semana, lo que
    te falta para pasarlo y el detalle con la cuerda del tira y afloja. */
 .mano { display: grid; gap: 12px; padding: 16px 14px 14px; }
+.tarjeta-tonal.mano {
+  background:
+    radial-gradient(120% 80% at 0% 0%, color-mix(in oklab, var(--yo) 15%, transparent), transparent 55%),
+    radial-gradient(120% 80% at 100% 0%, color-mix(in oklab, var(--el) 15%, transparent), transparent 55%),
+    var(--surface-1);
+}
+.mano-fuertes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.mano-fuerte { display: grid; align-content: start; gap: 2px; padding: 10px 12px; border-radius: 18px; background: var(--velo); }
+.mano-fuerte small { font-size: 12px; color: var(--text-muted); }
+.mano-fuerte b { font-size: 14px; font-weight: 700; line-height: 1.2; color: var(--text-strong); }
+.mano-fuerte span { font-size: 12px; line-height: 1.3; color: var(--text-faint); }
+.mano-rachas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-radius: 22px; background: var(--surface-1); box-shadow: var(--placa-canto); }
+.mano-rachas > div { display: grid; gap: 4px; padding: 11px 14px 12px; min-width: 0; }
+.mano-rachas > div + div { border-left: 1px solid var(--hairline); }
+.mano-rachas small { font-size: 12px; color: var(--text-muted); overflow-wrap: anywhere; }
+.mano-rachas span { display: flex; align-items: center; gap: 7px; color: var(--text-strong); }
+.mano-rachas b { font-size: 1.4rem; line-height: 1; font-weight: 750; }
+.cara { display: grid; gap: 8px; padding: 12px 14px 14px; }
+.cara-ejercicio { font-size: 14px; font-weight: 700; color: var(--text-strong); }
+.cara-fila { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; align-items: center; gap: 10px; }
+.cara-quien { font-size: 12.5px; color: var(--text-muted); overflow-wrap: anywhere; }
+.cara-marca { font-size: 12px; color: var(--text-faint); white-space: nowrap; }
+.cara-marca b { font-size: 1.05rem; font-weight: 700; color: var(--text-muted); }
+.cara-fila .barra-cargada { opacity: .72; }
+.cara-fila.gana .cara-quien { font-weight: 650; color: var(--text-strong); }
+.cara-fila.gana .cara-marca b { color: var(--text-strong); }
+.cara-fila.gana .barra-cargada { opacity: 1; }
 .mano-caras { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 8px; }
 .mano-cara { display: grid; justify-items: center; gap: 2px; min-width: 0; text-align: center; }
 .mano-avatar {
@@ -7114,7 +7252,7 @@ function RestTimer({ seconds, accent, timerId = "default", exerciseName = "" }) 
         <div className="descanso-controles">
           <BotonDescanso onClick={() => ajustarDescanso(timerId, -15)} label="Restar 15 segundos">−15</BotonDescanso>
           <BotonDescanso onClick={() => ajustarDescanso(timerId, 15)} label="Sumar 15 segundos">+15</BotonDescanso>
-          <BotonDescanso onClick={() => terminarDescanso(timerId)} label="Terminar el descanso"><SkipForward size={16} /></BotonDescanso>
+          <BotonDescanso onClick={() => terminarDescanso(timerId)} label="Cerrar el descanso"><X size={17} /></BotonDescanso>
         </div>
       </div>
     </div>
@@ -7176,98 +7314,11 @@ function FilaDescansoDock({ timerId, embebido = false }) {
       <div className="flex items-center gap-1.5 shrink-0">
         <BotonDescanso onClick={() => ajustarDescanso(timerId, -15)} label="Restar 15 segundos">−15</BotonDescanso>
         <BotonDescanso onClick={() => ajustarDescanso(timerId, 15)} label="Sumar 15 segundos">+15</BotonDescanso>
-        <BotonDescanso onClick={() => terminarDescanso(timerId)} label="Terminar el descanso"><SkipForward size={16} /></BotonDescanso>
+        <BotonDescanso onClick={() => terminarDescanso(timerId)} label="Cerrar el descanso"><X size={17} /></BotonDescanso>
       </div>
     </div>,
   );
 }
-
-/* ============================================================================
-   TUTORIAL GUIADO — modal de ayuda liviano: un párrafo corto por pestaña, sin
-   pasos ni demos en vivo (eso abultaba mucho para lo que aporta). Se abre con
-   el botón (?) del header, arrancando en la pestaña en la que estás.
-============================================================================ */
-
-// Cada capítulo: una frase de entrada + 3 bullets cortos. Antes era un
-// párrafo denso de 3-4 oraciones — mucho más rápido de escanear como lista
-// que de leer como bloque de texto.
-const HELP_CHAPTERS = [
-  {
-    key: "rutina",
-    label: "Rutina",
-    color: "#14B8A6",
-    icon: <Dumbbell size={16} />,
-    intro: "Acá registrás tu entrenamiento del día.",
-    bullets: [
-      "Anotá reps y kg: detecta tus récords sola",
-      "Elegí entre perseguir tu récord o seguir una planificación semana a semana (con RIR/RPE incluido)",
-      "El descanso arranca solo al guardar la serie: sumale o restale 15 s, o saltealo. Si cerrás la tarjeta, te sigue en la barra de abajo",
-      "Calentamiento general de movilidad y calentamiento por ejercicio",
-      "\"Resetear sesión de hoy\" corrige un error sin tocar tus récords",
-    ],
-  },
-  {
-    key: "progreso",
-    label: "Progreso",
-    color: "#3B82F6",
-    icon: <BarChart3 size={16} />,
-    intro: "Acá ves toda tu evolución.",
-    bullets: [
-      "El muñeco pinta cada músculo según tu rango",
-      "Estadísticas, medidas, fotos e historial de sesiones",
-      "Todo se puede compartir como imagen",
-    ],
-  },
-  {
-    key: "rutinas",
-    label: "Rutinas",
-    color: "#38BDF8",
-    icon: <Layers size={16} />,
-    intro: "Acá armás tu plan de entrenamiento.",
-    bullets: [
-      "Elegí una preestablecida, creá la tuya o importala",
-      "Cardio como sesión continua por defecto (o por intervalos si querés)",
-      "Rango de reps por serie y superseries",
-      "Reordená arrastrando, editá o borrá cuando quieras",
-    ],
-  },
-  {
-    key: "social",
-    label: "Social",
-    color: "#8B5CF6", // mismo valor que SOCIAL_COLOR — no se puede referenciar acá porque HELP_CHAPTERS se evalúa antes en el archivo
-    icon: <Users size={16} />,
-    intro: "Conectá con amigos y con tu entrenador.",
-    bullets: [
-      "Agregá amigos por @usuario o dejá que tus contactos te sugieran (activando tu teléfono en Perfil)",
-      "Ranking por rango y por actividad de la semana, más tus logros",
-      "Vinculate con tu entrenador para que te proponga rutinas y metas semanales",
-    ],
-  },
-  {
-    key: "entrenador_ia",
-    label: "IA",
-    color: "#14B8A6",
-    icon: <Sparkles size={16} />,
-    intro: "Un coach que conoce tus datos reales.",
-    bullets: [
-      "Crea o ajusta rutinas y analiza tu progreso",
-      "Te muestra una vista previa antes de aplicar algo",
-      "Podés escribirle o dictarle por voz",
-    ],
-  },
-  {
-    key: "perfil",
-    label: "Perfil",
-    color: "#F59E0B",
-    icon: <UserCog size={16} />,
-    intro: "Tus datos, tu cuenta y la configuración de la app.",
-    bullets: [
-      "Ciclo, descarga, descansos y recordatorios",
-      "Apariencia: tema, unidad de peso, tamaño de letra",
-      "Exportá tu entrenamiento o vinculá Google",
-    ],
-  },
-];
 
 // ── INTRO DE BIENVENIDA (primera vez) ───────────────────────────────────────
 // Estilo "intro de app": 2 slides con un ícono grande, una idea por pantalla,
@@ -7804,75 +7855,253 @@ function WelcomeIntro({ onClose, onOpenTutorial, onUpdateSettings = null }) {
   );
 }
 
+/* ============================================================================
+   LA GUÍA (el "?" del encabezado): cómo se usa cada pestaña, paso a paso.
+   Cada paso es una frase y un dibujo hecho con las piezas de verdad de la
+   app (la barra cargada, el visor de la serie, el reloj de pared, las
+   baldosas, la carrera, la barra en equilibrio), así lo que leés es lo que
+   después ves. Arranca en la pestaña en la que estás; al terminar una sigue
+   con la próxima. Antes era un párrafo con viñetas por pestaña.
+============================================================================ */
+
+// Una rutina de muestra para los dibujos (ejercicios reales del catálogo).
+const RUTINA_GUIA = {
+  name: "Push / Pull / Legs",
+  dayOrder: ["push", "pull", "legs"],
+  days: {
+    push: { label: "Push", color: "#14B8A6", exercises: [
+      { libId: "press_banca", sets: [{ repRange: "6-8" }, { repRange: "6-8" }, { repRange: "8-10" }] },
+      { libId: "press_militar_mancuernas", sets: [{ repRange: "8-10" }, { repRange: "8-10" }, { repRange: "8-10" }] },
+      { libId: "triceps_polea_alta", sets: [{ repRange: "10-12" }, { repRange: "10-12" }] },
+    ] },
+    pull: { label: "Pull", color: "#3B82F6", exercises: [
+      { libId: "dominadas", sets: [{ repRange: "6-8" }, { repRange: "6-8" }, { repRange: "6-8" }] },
+      { libId: "remo_con_barra", sets: [{ repRange: "8-10" }, { repRange: "8-10" }, { repRange: "8-10" }] },
+      { libId: "curl_biceps_barra", sets: [{ repRange: "10-12" }, { repRange: "10-12" }] },
+    ] },
+    legs: { label: "Legs", color: "#F97316", exercises: [
+      { libId: "sentadilla", sets: [{ repRange: "5-6" }, { repRange: "5-6" }, { repRange: "6-8" }] },
+      { libId: "peso_muerto_rumano", sets: [{ repRange: "8-10" }, { repRange: "8-10" }, { repRange: "8-10" }] },
+      { libId: "prensa", sets: [{ repRange: "10-12" }, { repRange: "10-12" }] },
+    ] },
+  },
+};
+
+function capitulosGuia() {
+  const verde = "#14B8A6", azul = "#3B82F6", naranja = "#F97316";
+  const pushSolo = { ...RUTINA_GUIA, dayOrder: ["push"] };
+  return [
+    {
+      key: "rutina", label: "Rutina", color: verde, icon: <Dumbbell size={15} />,
+      pasos: [
+        {
+          titulo: "Elegí el día",
+          texto: "Arriba están los días de tu rutina. El que toca hoy tiene una rayita abajo; el elegido se pinta de su color.",
+          dibujo: (
+            <div className="guia-selector">
+              {[["Push", verde], ["Pull", azul], ["Legs", naranja]].map(([n, c], i) => <span key={n} className={i === 0 ? "elegido" : ""} style={{ "--c": c }}>{n}{i === 0 && <i />}</span>)}
+            </div>
+          ),
+        },
+        {
+          titulo: "Anotá la serie",
+          texto: "Reps y kilos ya vienen con lo de la vez pasada: si no cambió nada, es un toque en el ✓. Con − y + los ajustás sin abrir el teclado.",
+          dibujo: (
+            <div className="guia-visor" style={{ "--c": verde }}>
+              <span><b className="num-display">8</b><small>reps</small></span>
+              <i>×</i>
+              <span><b className="num-display">60</b><small>kg</small></span>
+              <em><Check size={22} strokeWidth={2.6} /></em>
+            </div>
+          ),
+        },
+        {
+          titulo: "El descanso corre solo",
+          texto: "Al guardar la serie arranca el reloj: tocalo para pausarlo, sumale o restale 15 segundos, o cerralo con la cruz. Si cerrás la tarjeta, sigue en la barra de abajo.",
+          dibujo: (
+            <span className="descanso-dial guia-dial" style={{ "--c": verde }}>
+              <DialDescanso fraccion={0.62} />
+              <span className="descanso-dial-centro"><span className="descanso-tiempo num-display">1:52</span></span>
+            </span>
+          ),
+        },
+        {
+          titulo: "Cada serie carga un disco",
+          texto: "La barra del día se llena a medida que anotás. Cuando está completa, terminaste: tocá Finalizar y queda guardada la sesión.",
+          dibujo: <BarraCargada hechas={6} total={10} alto={64} detalle etiqueta="Una barra con seis discos de diez" />,
+        },
+      ],
+    },
+    {
+      key: "progreso", label: "Progreso", color: azul, icon: <BarChart3 size={15} />,
+      pasos: [
+        {
+          titulo: "Tu ciclo, en una escalera",
+          texto: "Cada semana sube un escalón: la carga va subiendo de a poco. La última baja, que es la semana de descarga para recuperarte.",
+          dibujo: (
+            <div className="guia-escalera" style={{ "--c": azul }}>
+              {[30, 44, 58, 72, 86, 26].map((h, i) => <i key={i} className={i === 3 ? "hoy" : i > 3 && i < 5 ? "despues" : i === 5 ? "descarga" : ""} style={{ height: `${h}%` }} />)}
+            </div>
+          ),
+        },
+        {
+          titulo: "Tu rango, músculo por músculo",
+          texto: "Con tus marcas, cada músculo tiene un rango de Bronce a Maestro. El muñeco los pinta: tocá un músculo para ver tus mejores series.",
+          dibujo: (
+            <div className="guia-rangos">
+              {["Bronce", "Plata", "Oro", "Esmeralda", "Diamante", "Maestro"].map((t) => (
+                <span key={t}><RankBadgeIcon tier={t} sub={null} color="#9da2a8" size={30} /><small>{t}</small></span>
+              ))}
+            </div>
+          ),
+        },
+        {
+          titulo: "Tus récords, en una curva",
+          texto: "En Ejercicios, la curva de tu 1RM estimado. La línea dorada es tu récord y los puntos dorados, las sesiones en que lo superaste.",
+          dibujo: (
+            <svg viewBox="0 0 240 110" className="guia-curva" aria-hidden="true">
+              <line x1="10" y1="34" x2="230" y2="34" className="guia-curva-record" />
+              <path d="M12 92 C 50 92, 60 70, 92 66 S 140 60, 156 40 S 200 34, 228 34" className="guia-curva-linea" />
+              {[[12, 92], [92, 66], [156, 40], [228, 34]].map(([x, y], i) => <circle key={i} cx={x} cy={y} r={i ? 5 : 4} className={i ? "guia-curva-oro" : "guia-curva-punto"} />)}
+            </svg>
+          ),
+        },
+      ],
+    },
+    {
+      key: "rutinas", label: "Rutinas", color: azul, icon: <Layers size={15} />,
+      pasos: [
+        {
+          titulo: "Tus días, como baldosas",
+          texto: "Tu rutina con cuántos ejercicios y series tiene cada día. Tocás uno y vas directo a entrenarlo.",
+          dibujo: <div className="guia-ancho"><DiasRutina routineDef={RUTINA_GUIA} /></div>,
+        },
+        {
+          titulo: "El balance, en una barra",
+          texto: "Las series de empuje de un lado y las de tracción del otro: si un lado pesa más, la barra se inclina. Abajo, las series de cada músculo.",
+          dibujo: <div className="guia-ancho"><BarraEnEquilibrio izq={{ valor: 15, discos: 4, color: ROJO_EMPUJE }} der={{ valor: 14, discos: 4, color: AZUL_TRACCION }} etiqueta="Empuje 15, tracción 14" /></div>,
+        },
+        {
+          titulo: "Armá la tuya",
+          texto: "Elegí una preestablecida, creala con la IA o a mano, o importala de un PDF, un Excel o un texto. En Cronograma decidís qué día toca cada cosa.",
+          dibujo: (
+            <div className="guia-acciones">
+              <span style={{ "--c": azul }}><em className="galleta icono-galleta"><Sparkles size={17} /></em>Crear</span>
+              <span style={{ "--c": verde }}><em className="galleta icono-galleta"><Download size={17} /></em>Importar</span>
+              <span style={{ "--c": "#8B5CF6" }}><em className="galleta icono-galleta"><Calendar size={17} /></em>Cronograma</span>
+            </div>
+          ),
+        },
+      ],
+    },
+    {
+      key: "social", label: "Social", color: "#8B5CF6", icon: <Users size={15} />,
+      pasos: [
+        {
+          titulo: "Tu racha, en marcas de tiza",
+          texto: "Un palito por cada día seguido que entrenás, de a cinco, como en la pizarra del gimnasio. Está en tu credencial, arriba de todo.",
+          dibujo: <span className="guia-racha"><b className="num-display">7</b><MarcasTiza dias={7} max={10} alto={40} decorativa /></span>,
+        },
+        {
+          titulo: "La carrera de la semana",
+          texto: "Vos y tus amigos, cada uno en su carril: cada sesión es un tramo del color del día que entrenó. Gana el que más va.",
+          dibujo: (
+            <div className="guia-ancho">
+              <CarreraSemana filas={[
+                { uid: "m", nombre: "Martina", dias: [verde, null, azul, naranja, verde, null, null] },
+                { uid: "yo", yo: true, nombre: "Vos", dias: [azul, naranja, null, verde, null, null, null] },
+                { uid: "j", nombre: "Joaquín", dias: [null, verde, null, azul, null, null, null] },
+              ]} />
+            </div>
+          ),
+        },
+        {
+          titulo: "Mano a mano",
+          texto: "Tocá a un amigo en el Ranking: cada músculo que le ganás es un disco de tu lado y baja el que pesa más. Abajo, lo que te falta para pasarlo.",
+          dibujo: <div className="guia-ancho"><BarraEnEquilibrio izq={{ valor: 6, discos: 6, color: "#2FB866" }} der={{ valor: 4, discos: 4, color: "#E0B632" }} etiqueta="Seis músculos contra cuatro" /></div>,
+        },
+      ],
+    },
+    {
+      key: "entrenador_ia", label: "IA", color: verde, icon: <Sparkles size={15} />,
+      pasos: [
+        {
+          titulo: "Preguntale lo que quieras",
+          texto: "Conoce tu rutina, tus marcas y tu progreso: todo lo que anotás en la app. Escribile o dictale por voz.",
+          dibujo: (
+            <div className="guia-chat">
+              <p className="propia">¿Con cuánto arranco hoy en press banca?</p>
+              <p className="ia">Con 72,5 kg: la vez pasada hiciste 8 × 70 y te sobró una rep.</p>
+            </div>
+          ),
+        },
+        {
+          titulo: "Te muestra antes de cambiar algo",
+          texto: "Si te arma una rutina o anota una marca, primero ves la propuesta: la confirmás o la descartás.",
+          dibujo: <div className="guia-ancho"><RoutinePreview routineDef={pushSolo} /></div>,
+        },
+      ],
+    },
+    {
+      key: "perfil", label: "Perfil", color: "#F59E0B", icon: <UserCog size={15} />,
+      pasos: [
+        {
+          titulo: "Tus datos y tus ajustes",
+          texto: "Tu ciclo y la descarga, los descansos, los recordatorios, el tema y la unidad de peso.",
+          dibujo: (
+            <div className="guia-fichas">
+              {["Ciclo y descarga", "Descansos", "Recordatorios", "Tema", "Kilos o libras"].map((t) => <span key={t}>{t}</span>)}
+            </div>
+          ),
+        },
+        {
+          titulo: "Tu cuenta",
+          texto: "Vinculá Google para sumar amigos y tener tus datos en la nube. También podés exportar todo tu entrenamiento.",
+          dibujo: <span className="guia-google"><span aria-hidden="true">G</span> Vincular con Google</span>,
+        },
+      ],
+    },
+  ];
+}
+
 function HelpModal({ startTab, onClose }) {
   useAndroidBack(onClose);
-  const startIdx = startTab ? Math.max(0, HELP_CHAPTERS.findIndex((c) => c.key === startTab)) : 0;
-  const [i, setI] = useState(startIdx);
-  const chapter = HELP_CHAPTERS[i];
-
+  const capitulos = useMemo(() => capitulosGuia(), []);
+  const [cap, setCap] = useState(() => Math.max(0, capitulos.findIndex((c) => c.key === startTab)));
+  const [paso, setPaso] = useState(0);
+  const capitulo = capitulos[cap];
+  const actual = capitulo.pasos[paso];
+  const ultimoPaso = paso === capitulo.pasos.length - 1;
+  const ultimoCap = cap === capitulos.length - 1;
+  const ir = (c) => { setCap(c); setPaso(0); };
+  const siguiente = () => { if (!ultimoPaso) setPaso(paso + 1); else if (!ultimoCap) ir(cap + 1); else onClose(); };
   return (
     <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
-      <div
-        className="max-w-md w-full rounded-3xl modal-pop-in shadow-2xl shadow-black/70 flex flex-col"
-        style={{ background: "var(--panel-grad-cyan)", border: "1px solid rgba(20,184,166,0.2)", maxHeight: "min(88vh, 560px)" }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header con los chips de pestaña — tocá cualquiera para ver su
-            descripción, sin pasos ni orden fijo. */}
-        <div className="relative px-5 pt-5 pb-4 shrink-0" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-sm font-black text-white">Cómo funciona Modus Fit</span>
-            <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800/80 transition"><X size={17} /></button>
-          </div>
-          <div className="flex gap-1.5 overflow-x-auto pb-0.5 -mx-1 px-1">
-            {HELP_CHAPTERS.map((c, ci) => {
-              const actual = ci === i;
-              return (
-                <button
-                  key={c.key}
-                  onClick={() => setI(ci)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap transition-all shrink-0"
-                  style={actual
-                    ? { backgroundColor: tint(c.color, "20"), color: c.color, border: `1px solid ${tint(c.color, "40")}` }
-                    : { color: "#6e7379", border: "1px solid transparent" }}
-                >
-                  {c.icon} {c.label}
-                </button>
-              );
-            })}
-          </div>
+      <div className="guia modal-pop-in" role="dialog" aria-modal="true" aria-label="Cómo se usa Modus Fit" onClick={(e) => e.stopPropagation()}>
+        <div className="guia-cabeza">
+          <h2 className="guia-titulo">Cómo se usa</h2>
+          <button onClick={onClose} aria-label="Cerrar" className="boton-redondo"><X size={17} /></button>
         </div>
-
-        {/* Cuerpo: ícono grande + una frase + 3 viñetas cortas. Nada de pasos
-            ni demos en vivo — se cambia de pestaña tocando los chips de
-            arriba. Viñetas en vez de un párrafo: se escanean de un vistazo
-            en vez de tener que leer un bloque entero para encontrar el dato
-            que buscabas. */}
-        <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-6" style={{ minHeight: 0 }}>
-          <div key={chapter.key} className="flex flex-col items-center text-center gap-2.5 tab-fade-in">
-            <div className="relative mt-1">
-              <div className="absolute inset-0 rounded-3xl blur-2xl scale-150 pointer-events-none" style={{ backgroundColor: tint(chapter.color, "20") }} />
-              <div className="relative w-16 h-16 rounded-3xl flex items-center justify-center elastic-in" style={{ backgroundColor: tint(chapter.color, "18"), border: `1px solid ${tint(chapter.color, "35")}`, color: chapter.color, boxShadow: `0 10px 30px -10px ${tint(chapter.color, "60")}` }}>
-                <span style={{ transform: "scale(1.8)" }}>{chapter.icon}</span>
-              </div>
-            </div>
-            <h3 className="text-lg font-black text-white leading-tight">{chapter.label}</h3>
-            <p className="text-sm text-slate-400">{chapter.intro}</p>
-            <ul className="w-full text-left space-y-2.5 mt-2 rounded-2xl p-3.5" style={{ backgroundColor: "var(--panel-sunken)" }}>
-              {chapter.bullets.map((b, i) => (
-                <li key={i} className="flex items-start gap-2.5 text-[13px] text-slate-300 leading-snug">
-                  <span className="mt-1.5 w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: chapter.color }} />
-                  {b}
-                </li>
-              ))}
-            </ul>
-          </div>
+        <div className="guia-capitulos" role="tablist" aria-label="Pestañas">
+          {capitulos.map((c, i) => (
+            <button key={c.key} role="tab" aria-selected={i === cap} onClick={() => ir(i)} className={i === cap ? "activo" : ""} style={{ "--c": c.color }}>{c.icon}{c.label}</button>
+          ))}
         </div>
-
-        <div className="px-5 py-4 shrink-0" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-          <button onClick={onClose} className="w-full py-3 rounded-xl text-sm font-black !text-[color:var(--accion-tinta)] transition active:scale-95" style={{ background: "var(--accion-fondo)", boxShadow: "none" }}>
-            Entendido
-          </button>
+        <div key={`${cap}-${paso}`} className="guia-cuerpo tab-fade-in">
+          <div className="guia-escenario" style={{ "--c": capitulo.color }} aria-hidden="true">{actual.dibujo}</div>
+          <p className="guia-paso">Paso {paso + 1} de {capitulo.pasos.length}</p>
+          <h3 className="guia-paso-titulo">{actual.titulo}</h3>
+          <p className="guia-paso-texto">{actual.texto}</p>
+        </div>
+        <div className="guia-pie">
+          <div className="guia-puntos" aria-hidden="true">{capitulo.pasos.map((_, i) => <i key={i} className={i === paso ? "actual" : i < paso ? "visto" : ""} />)}</div>
+          <div className="flex gap-2">
+            {paso > 0 && <button onClick={() => setPaso(paso - 1)} className="boton-tonal" style={{ "--c": "#9a9ba0", minHeight: 50 }}><ChevronLeft size={17} /> Anterior</button>}
+            <button onClick={siguiente} className="boton-pildora flex-1" style={{ "--c": capitulo.color }}>
+              {!ultimoPaso ? "Siguiente" : !ultimoCap ? `Seguir con ${capitulos[cap + 1].label}` : "Listo"}
+              {(!ultimoPaso || !ultimoCap) && <ChevronRight size={17} />}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -8643,7 +8872,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
             : `Serie ${setIndex + 1}: ${rango} reps. Tocá para anotarla`}
         >
           <span className={`galleta serie-galleta ${hechaHoy ? "llena" : "hueca"}`} aria-hidden="true">
-            {hechaHoy ? <Check size={13} strokeWidth={3} className={saved ? "draw-check" : ""} /> : setIndex + 1}
+            {hechaHoy ? <Check size={13} strokeWidth={3} className={saved ? "draw-check" : ""} /> : null}
           </span>
           {hechaHoy ? (
             <span className="serie-linea-valor">
@@ -8687,14 +8916,14 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   return (
     <div className={`serie serie-foco ${liveBeats ? "va-record" : ""}`} style={{ "--c": accent }}>
       <PRBurst anchorRef={saveBtnRef} trigger={prBurst} />
-      {/* Una sola línea: qué serie es y contra qué jugás —la meta de esta
+      {/* Una sola línea: el rango de esta serie (del color del día; el número
+          de serie se sacó a pedido) y contra qué jugás —la meta de esta
           semana si hay una; si no, tu récord, que se toca para corregirlo—.
           Lo de la vez pasada ya no va en una caja aparte: viene escrito en
           el visor (ver `sugerido`), y repetirlo era la mitad del ruido. */}
       <div className="foco-cabecera">
         <p className="foco-titulo">
-          Serie {setIndex + 1}
-          <span>{rango} reps</span>
+          <span className="foco-rango">{rango} reps</span>
           {pesada && <Zap size={13} className="foco-fuerza" aria-label="Serie de fuerza" />}
           {setDef.type === "dropset" && <span className="foco-tipo">drop-set</span>}
           {setDef.type === "restpause" && <span className="foco-tipo">rest-pause</span>}
@@ -9064,7 +9293,7 @@ function BarraEnEquilibrio({ izq, der, etiqueta, className = "" }) {
         <rect x={topeIzq} y={cy - 11} width={tope} height={22} rx={2.4} fill={acero} />
         <rect x={agarreFin} y={cy - 11} width={tope} height={22} rx={2.4} fill={acero} />
         {[...izquierdos, ...derechos].map((d) => (
-          <g key={`${d.izquierda ? "i" : "d"}${d.i}`}>
+          <g key={`${d.izquierda ? "i" : "d"}${d.i}`} className="disco-entra" style={{ "--desde": d.izquierda ? "-22px" : "22px", animationDelay: `${80 + d.i * 55}ms` }}>
             <rect x={d.x} y={d.y} width={d.w} height={d.h} rx={radio(d.w)} fill={`url(#${uid}-${d.izquierda ? "i" : "d"})`} className="disco" />
             <rect x={d.x + 0.75} y={d.y + 0.75} width={Math.max(0.5, d.w - 1.5)} height={d.h - 1.5} rx={Math.max(0.5, radio(d.w) - 0.75)} className="disco-filete" />
           </g>
@@ -9078,6 +9307,8 @@ function BarraEnEquilibrio({ izq, der, etiqueta, className = "" }) {
 
 // El balance de tu rutina: las series de empuje de un lado y las de tracción
 // del otro, en la barra en equilibrio.
+const ROJO_EMPUJE = "color-mix(in oklab, #E5383B 68%, #8a8c92)";
+const AZUL_TRACCION = "color-mix(in oklab, #2F6FED 68%, #8a8c92)";
 function BarraEquilibrio({ routineDef }) {
   const { empuje, traccion, piernas } = useMemo(() => cargaPorLado(routineDef), [routineDef]);
   const total = empuje + traccion;
@@ -9088,7 +9319,8 @@ function BarraEquilibrio({ routineDef }) {
   const veredicto = parejo ? "Parejo" : diferencia > 0 ? "Más empuje" : "Más tracción";
   return (
     <div className="equilibrio">
-      <BarraEnEquilibrio izq={{ valor: empuje, discos: discos(empuje), color: COLORES_DISCO[0] }} der={{ valor: traccion, discos: discos(traccion), color: COLORES_DISCO[1] }}
+      {/* Rojo el empuje y azul la tracción, apagados con gris como el resto de Rutinas. */}
+      <BarraEnEquilibrio izq={{ valor: empuje, discos: discos(empuje), color: ROJO_EMPUJE }} der={{ valor: traccion, discos: discos(traccion), color: AZUL_TRACCION }}
         etiqueta={`Empuje ${empuje} series, tracción ${traccion}: ${parejo ? "parejo" : veredicto.toLowerCase()}`} />
       <div className="equilibrio-rotulos">
         <span><b className="num-display">{empuje}</b> de empuje</span>
@@ -9188,7 +9420,7 @@ function BarraConDiscos({ kg, alto = 56, className = "" }) {
 // filete arriba y un tinte apenas), su nombre y cuántos ejercicios y series
 // tiene. Tocarla te lleva a ese día. Reemplaza a la barra del reparto y sus
 // fichas: lo mismo, pero se toca y se lee de una.
-function DiasRutina({ routineDef, onGoToDay = null }) {
+function DiasRutina({ routineDef, onGoToDay = null, elegido = null }) {
   const dias = (routineDef?.dayOrder || Object.keys(routineDef?.days || {})).filter((dk) => routineDef?.days?.[dk]);
   if (!dias.length) return null;
   return (
@@ -9199,7 +9431,7 @@ function DiasRutina({ routineDef, onGoToDay = null }) {
         const ejercicios = (d.exercises || []).length;
         const series = (d.exercises || []).reduce((a, e) => a + (e.sets?.length || 0), 0);
         return (
-          <button key={dk} role="listitem" onClick={onGoToDay ? () => onGoToDay(dk) : undefined} disabled={!onGoToDay} className="dia-rutina" style={{ "--dia": d.color }}
+          <button key={dk} role="listitem" onClick={onGoToDay ? () => onGoToDay(dk) : undefined} disabled={!onGoToDay} className={`dia-rutina ${elegido === dk ? "elegido" : ""}`} aria-pressed={elegido ? elegido === dk : undefined} style={{ "--dia": d.color }}
             aria-label={`${d.label}: ${ejercicios} ejercicios, ${series} series`}>
             <span className="dia-rutina-nombre">{d.label}</span>
             <span className="dia-rutina-datos"><b className="num-display">{ejercicios}</b> ejercicios</span>
@@ -11572,8 +11804,8 @@ function DeloadView({ logs, setLogs, settings = DEFAULT_SETTINGS, deloadProgress
                       // mientras falta y en el color del día cuando está hecha.
                       <div key={i} className={`descarga-serie ${done ? "hecha" : ""}`} style={{ "--c": done ? day.color : "#A855F7" }}>
                         <div className="foco-cabecera mb-2.5">
-                          <span className={`galleta serie-galleta ${done ? "llena girada" : "activa"}`} aria-hidden="true">{done ? <Check size={15} strokeWidth={3} /> : i + 1}</span>
-                          <p className="foco-titulo">Serie {i + 1}<span>{s.repRange} reps</span></p>
+                          <span className={`galleta serie-galleta ${done ? "llena girada" : "hueca"}`} aria-hidden="true">{done ? <Check size={15} strokeWidth={3} /> : null}</span>
+                          <p className="foco-titulo"><span className="foco-rango">{s.repRange} reps</span></p>
                         </div>
                         {best && (ex.cardio ? (
                           <>
@@ -12615,6 +12847,24 @@ function MiniBodyView({ ranks, sex, label, view = "front" }) {
   );
 }
 
+// La mejor serie de cada ejercicio (la de más 1RM estimado), de unas marcas
+// cualquiera: las tuyas o las de un amigo.
+function mejoresPorEjercicio(logs) {
+  const { logs: limpios } = cleanObsoleteOverrides(logs || {});
+  const mejores = new Map();
+  Object.entries(limpios).forEach(([clave, val]) => {
+    const esOverride = clave.endsWith("_pr_override");
+    const { exerciseId } = parseLogKey(esOverride ? clave.replace(/_pr_override$/, "") : clave);
+    (esOverride ? [val] : Array.isArray(val) ? val : []).forEach((e) => {
+      if (!e?.kg || !e?.reps || e.deload) return;
+      const rm = estimate1RM(e.kg, e.reps);
+      const cur = mejores.get(exerciseId);
+      if (!cur || rm > cur.rm) mejores.set(exerciseId, { kg: e.kg, reps: e.reps, rm });
+    });
+  });
+  return mejores;
+}
+
 // Lo que te falta para pasar a un amigo en cada músculo donde te gana: la
 // serie que tendrías que hacer en tu mejor ejercicio de ese músculo (con
 // tus mismas repeticiones) para llegar a un rango más que el suyo. Sale de
@@ -12655,7 +12905,7 @@ function CaraMano({ foto, inicial, nombre, rango }) {
 // los dos muñecos. Todo con la misma vara para los dos: kilos absolutos.
 // Reemplaza a la "Batalla de marcas", que contaba lo mismo con un marcador
 // ámbar, coronas, manchas borrosas y letras chiquitas en mayúsculas.
-function ManoAMano({ miFoto, miNombre, misRangos, mySex = null, suFoto, suNombre, susRangos, theirSex = null, comparacion = [], miSemana = [], suSemana = [], myLogs = null, theirLogs = null }) {
+function ManoAMano({ miFoto, miNombre, misRangos, mySex = null, suFoto, suNombre, susRangos, theirSex = null, comparacion = [], miSemana = [], suSemana = [], myLogs = null, theirLogs = null, miRacha = 0, suRacha = 0 }) {
   const unit = useWeightUnit();
   const [vista, setVista] = useState("front");
   const [abierto, setAbierto] = useState(null);
@@ -12667,12 +12917,38 @@ function ManoAMano({ miFoto, miNombre, misRangos, mySex = null, suFoto, suNombre
   const suRango = useMemo(() => computeTopRankFromRanks(susRangos), [susRangos]);
   const paraGanarle = useMemo(() => loQueFaltaParaGanar(comparacion), [comparacion]);
   const veredicto = !comparacion.length ? "Sin marcas" : gano > pierdo ? "Vas ganando" : pierdo > gano ? `Gana ${nombre}` : "Parejo";
+  // La lectura del duelo: el músculo donde más le sacás ventaja y donde más
+  // te saca.
+  const fuertes = useMemo(() => {
+    let tuyo = null, suyo = null;
+    comparacion.forEach((r) => {
+      const d = (r.mine?.levelIdx ?? -1) - (r.theirs?.levelIdx ?? -1);
+      if (d > 0 && (!tuyo || d > tuyo.d)) tuyo = { ...r, d };
+      if (d < 0 && (!suyo || d < suyo.d)) suyo = { ...r, d };
+    });
+    return { tuyo, suyo };
+  }, [comparacion]);
+  // CARA A CARA: su mejor serie en los ejercicios con barra que hacen los
+  // dos, con los discos que pone cada uno. Los tres más pesados.
+  const caraACara = useMemo(() => {
+    const mios = mejoresPorEjercicio(myLogs), suyos = mejoresPorEjercicio(theirLogs);
+    return [...mios.keys()]
+      .filter((id) => suyos.has(id) && seHaceConBarra(EXERCISE_LIBRARY_BY_ID[id]?.name))
+      .map((id) => ({ id, nombre: EXERCISE_LIBRARY_BY_ID[id]?.name || id, mio: mios.get(id), suyo: suyos.get(id) }))
+      .sort((a, b) => Math.max(b.mio.kg, b.suyo.kg) - Math.max(a.mio.kg, a.suyo.kg))
+      .slice(0, 3);
+  }, [myLogs, theirLogs]);
+  // Los números del marcador arrancan en cero y suben al aparecer.
+  const [encendido, setEncendido] = useState(false);
+  useEffect(() => { const t = setTimeout(() => setEncendido(true), 250); return () => clearTimeout(t); }, []);
+  const rangoTexto = (r) => (r ? `${r.tier} ${r.sub}` : "sin marca");
   const misSesiones = miSemana.filter(Boolean).length;
   const susSesiones = suSemana.filter(Boolean).length;
   const inicial = (n) => String(n || "?").trim().charAt(0).toUpperCase();
   return (
     <div className="space-y-4">
-      <section className="tarjeta-tonal mano" aria-label={`Vos contra ${nombre}`}>
+      {/* El duelo, con la luz del color de cada uno en su esquina. */}
+      <section className="tarjeta-tonal mano" aria-label={`Vos contra ${nombre}`} style={{ "--yo": miRango?.color || SOCIAL_COLOR, "--el": suRango?.color || "#9da2a8" }}>
         <div className="mano-caras">
           <CaraMano foto={miFoto} inicial={inicial(miNombre)} nombre="Vos" rango={miRango} />
           <span className="mano-contra" aria-hidden="true">contra</span>
@@ -12683,11 +12959,17 @@ function ManoAMano({ miFoto, miNombre, misRangos, mySex = null, suFoto, suNombre
             <BarraEnEquilibrio izq={{ valor: gano, discos: gano, color: miRango?.color || SOCIAL_COLOR }} der={{ valor: pierdo, discos: pierdo, color: suRango?.color || "#9da2a8" }}
               etiqueta={`${veredicto}: ${gano} ${gano === 1 ? "músculo" : "músculos"} para vos y ${pierdo} para ${nombre}${empates ? `; ${empates} empatados` : ""}`} />
             <div className="equilibrio-rotulos">
-              <span><b className="num-display">{gano}</b> para vos</span>
+              <span><b className="num-display"><NumberFlow value={encendido ? gano : 0} /></b> para vos</span>
               <span className={`equilibrio-veredicto ${gano !== pierdo ? "ok" : ""}`}>{veredicto}</span>
-              <span><b className="num-display">{pierdo}</b> para {nombre}</span>
+              <span><b className="num-display"><NumberFlow value={encendido ? pierdo : 0} /></b> para {nombre}</span>
             </div>
             <p className="equilibrio-pie">Cada disco es un músculo ganado, del color del rango de cada uno{empates ? `. Empatan en ${empates}` : ""}.</p>
+            {(fuertes.tuyo || fuertes.suyo) && (
+              <div className="mano-fuertes">
+                {fuertes.tuyo && <div className="mano-fuerte"><small>Tu fuerte</small><b>{fuertes.tuyo.label}</b><span>{rangoTexto(fuertes.tuyo.mine)} contra {rangoTexto(fuertes.tuyo.theirs)}</span></div>}
+                {fuertes.suyo && <div className="mano-fuerte"><small>El fuerte de {nombre}</small><b>{fuertes.suyo.label}</b><span>{rangoTexto(fuertes.suyo.theirs)} contra {rangoTexto(fuertes.suyo.mine)}</span></div>}
+              </div>
+            )}
           </>
         ) : (
           <p className="text-[13px] text-slate-400 text-center px-2 pb-1">Cuando los dos tengan marcas en un mismo músculo, acá se ve quién gana.</p>
@@ -12700,7 +12982,38 @@ function ManoAMano({ miFoto, miNombre, misRangos, mySex = null, suFoto, suNombre
           <p className="text-[12.5px] font-semibold text-slate-400">{misSesiones === susSesiones ? "Van parejos" : misSesiones > susSesiones ? "Vas adelante" : `${nombre} va adelante`}</p>
         </div>
         <CarreraSemana filas={[{ uid: "yo", yo: true, nombre: miNombre || "Vos", foto: miFoto, dias: miSemana }, { uid: "amigo", nombre, foto: suFoto, dias: suSemana }]} />
+        {/* Las dos rachas, en marcas de tiza. */}
+        <div className="mano-rachas" aria-label={`Racha: vos ${miRacha}, ${nombre} ${suRacha}`}>
+          <div><small>Tu racha</small><span><b className="num-display">{miRacha}</b><MarcasTiza dias={miRacha} max={5} alto={15} decorativa /></span></div>
+          <div><small>La de {nombre}</small><span><b className="num-display">{suRacha}</b><MarcasTiza dias={suRacha} max={5} alto={15} decorativa /></span></div>
+        </div>
       </section>
+
+      {caraACara.length > 0 && (
+        <section className="space-y-2" aria-label="Cara a cara">
+          <div className="px-1">
+            <h3 className="seccion-titulo">Cara a cara</h3>
+            <p className="text-[12.5px] text-slate-400 mt-0.5">La mejor serie de cada uno en lo que hacen los dos con barra, con los discos que pone.</p>
+          </div>
+          {caraACara.map((c) => {
+            const ganaYo = c.mio.rm > c.suyo.rm, ganaEl = c.suyo.rm > c.mio.rm;
+            const fila = (quien, m, gana) => (
+              <div className={`cara-fila ${gana ? "gana" : ""}`}>
+                <span className="cara-quien">{quien}</span>
+                {unit === "kg" ? <BarraConDiscos kg={m.kg} alto={34} /> : <span />}
+                <span className="cara-marca"><b className="num-display">{m.reps} × {kgToDisplay(m.kg, unit)}</b> {weightLabel(unit)}</span>
+              </div>
+            );
+            return (
+              <div key={c.id} className="tarjeta-tonal cara">
+                <p className="cara-ejercicio">{c.nombre}</p>
+                {fila("Vos", c.mio, ganaYo)}
+                {fila(nombre, c.suyo, ganaEl)}
+              </div>
+            );
+          })}
+        </section>
+      )}
 
       {paraGanarle.length > 0 && (
         <section className="space-y-2" aria-label={`Para pasar a ${nombre}`}>
@@ -17683,7 +17996,7 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
 // historial y las medidas. Con un amigo, una solapa abre el mano a mano.
 // Si no hay vínculo aceptado (o la otra persona quitó su @usuario),
 // getPublicFull devuelve null y se avisa que no comparte su perfil.
-function FriendProfileView({ uid, viewerUid, viewerProfile, viewerName = null, isTrainerOfThisPerson = false, openComparing = false, esYo = false, onBack, onProposalSent, onActivateRoutine, onRemoveFriend = null }) {
+function FriendProfileView({ uid, viewerUid, viewerProfile, viewerName = null, isTrainerOfThisPerson = false, openComparing = false, esYo = false, onBack, onProposalSent, onActivateRoutine, onRemoveFriend = null, aplauso = null }) {
   // Pantalla de página completa dentro de Social: el botón atrás de Android
   // vuelve a Social en vez de salir a otra pestaña.
   useAndroidBackHandler(onBack);
@@ -17775,6 +18088,60 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, viewerName = null, i
     }));
   }, [full, modelo]);
   const miSemana = useMemo(() => semanaDeSesiones(viewerProfile?.trainingSessions || [], (s) => ROUTINE[s.dayKey]?.color || null), [viewerProfile]);
+  // Tu racha, para el mano a mano.
+  const miRacha = useMemo(() => {
+    const def = resolveRoutineDef(viewerProfile?.routines?.[viewerProfile?.activeRoutineId], viewerProfile?.activeRoutineId);
+    return computeSmartStreak(getTrainedDateSet(viewerProfile?.logs || {}, viewerProfile?.trainingSessions || []), def ? getRoutineWeekSchedule(def) : null);
+  }, [viewerProfile]);
+  // Su última sesión: qué día hizo, hace cuánto, cuánto duró y cuántas series.
+  const ultima = useMemo(() => {
+    const sesiones = full?.trainingSessions || [];
+    if (!sesiones.length) return null;
+    const ses = sesiones.reduce((a, b) => (b.date > a.date ? b : a));
+    let series = 0;
+    Object.entries(full?.logs || {}).forEach(([k, arr]) => {
+      if (k.endsWith("_pr_override") || !Array.isArray(arr)) return;
+      arr.forEach((h) => { if (h?.date === ses.date && !h.deload) series++; });
+    });
+    const dia = modelo?.days?.[ses.dayKey];
+    const dias = Math.max(0, Math.floor((new Date() - new Date(`${ses.date}T00:00:00`)) / 86400000));
+    const min = ses.startedAt && ses.endedAt ? Math.max(1, Math.round((new Date(ses.endedAt) - new Date(ses.startedAt)) / 60000)) : null;
+    return { dias, series, min, etiqueta: dia?.label || null, color: dia?.color || SOCIAL_COLOR };
+  }, [full, modelo]);
+  // Sus últimos récords: cada vez que superó su mejor marca de un ejercicio
+  // (la primera marca de cada uno no cuenta). Uno por ejercicio y día; los
+  // tres más nuevos.
+  const recientes = useMemo(() => {
+    const porEjercicio = new Map();
+    Object.entries(full?.logs || {}).forEach(([k, arr]) => {
+      if (k.endsWith("_pr_override") || !Array.isArray(arr)) return;
+      const { exerciseId } = parseLogKey(k);
+      const lista = porEjercicio.get(exerciseId) || [];
+      arr.forEach((h) => { if (h?.kg && h?.reps && h.date && !h.deload) lista.push(h); });
+      porEjercicio.set(exerciseId, lista);
+    });
+    const porDia = new Map();
+    porEjercicio.forEach((lista, id) => {
+      lista.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+      let mejor = 0, primera = true;
+      lista.forEach((h) => {
+        const rm = estimate1RM(h.kg, h.reps);
+        if (rm > mejor + 0.01) {
+          if (!primera) { const clave = `${id}|${h.date}`; const cur = porDia.get(clave); if (!cur || rm > cur.rm) porDia.set(clave, { id, fecha: h.date, kg: h.kg, reps: h.reps, rm }); }
+          mejor = rm;
+        }
+        primera = false;
+      });
+    });
+    const hoy = new Date();
+    return [...porDia.values()].sort((a, b) => (a.fecha < b.fecha ? 1 : -1)).slice(0, 3)
+      .map((r) => ({ ...r, nombre: EXERCISE_LIBRARY_BY_ID[r.id]?.name || r.id, cuando: haceCuanto(Math.max(0, Math.floor((hoy - new Date(`${r.fecha}T00:00:00`)) / 86400000))) }));
+  }, [full]);
+  // Desde cuándo entrena: su primera sesión.
+  const desde = useMemo(() => {
+    const fechas = (full?.trainingSessions || []).map((x) => x.date).filter(Boolean).sort();
+    return fechas.length ? new Date(`${fechas[0]}T12:00:00`).toLocaleDateString("es-AR", { month: "long", year: "numeric" }) : null;
+  }, [full]);
   const suSemana = dosSemanas[1].map((d) => d.color);
   const nombre = basic?.name || (esYo ? "Vos" : "Usuario");
   const primerNombre = String(nombre).trim().split(/\s+/)[0];
@@ -17797,6 +18164,7 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, viewerName = null, i
               <RankBadgeIcon tier={theirTopRank.tier} sub={null} color={theirTopRank.color} size={18} />{theirTopRank.tier} {theirTopRank.sub}
             </div>
           )}
+          {desde && <p className="atleta-desde">{esYo ? "Entrenás" : "Entrena"} desde {desde}</p>}
         </div>
         {esYo && basic?.username && <button onClick={() => setVerQr(true)} aria-label="Mostrar mi código QR" className="boton-redondo shrink-0"><QrCode size={17} /></button>}
       </header>
@@ -17833,6 +18201,8 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, viewerName = null, i
           suSemana={suSemana}
           myLogs={viewerProfile?.logs}
           theirLogs={full.logs}
+          miRacha={miRacha}
+          suRacha={streak}
         />
       ) : (
         <>
@@ -17852,6 +18222,30 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, viewerName = null, i
               <small>{totalSessions === 1 ? "sesión" : "sesiones"} en total</small>
             </div>
           </div>
+
+          {/* Su última sesión: qué hizo, hace cuánto y su barra cargada; si
+              entrenó hoy o ayer, el aplauso está acá mismo. */}
+          {ultima && (
+            <section className="tarjeta-tonal p-4 ultima-sesion" aria-label={esYo ? "Tu última sesión" : "Su última sesión"}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="mejor-marca-rotulo">{esYo ? kudosDayLabel(ultima.dias).replace("Entrenó", "Entrenaste") : kudosDayLabel(ultima.dias)}{ultima.min ? `, ${ultima.min} min` : ""}</p>
+                  <p className="mejor-marca-ejercicio">{ultima.etiqueta || "Entrenamiento"}</p>
+                </div>
+                {aplauso && (
+                  <button onClick={(e) => aplauso.onAplaudir(e.currentTarget)} disabled={aplauso.hecho || aplauso.enviando} className={`aplaudir ${aplauso.hecho ? "hecho" : ""}`} aria-label={aplauso.hecho ? `Ya le aplaudiste a ${primerNombre}` : `Aplaudir a ${primerNombre}`}>
+                    {aplauso.hecho ? <><Check size={16} strokeWidth={3} /> Aplaudiste</> : <><span aria-hidden="true">👏</span> Aplaudir</>}
+                  </button>
+                )}
+              </div>
+              {ultima.series > 0 && (
+                <div className="ultima-carga" style={{ "--c": ultima.color }}>
+                  <BarraCargada hechas={ultima.series} total={ultima.series} alto={40} etiqueta={`${ultima.series} series`} />
+                  <span><b className="num-display">{ultima.series}</b> series</span>
+                </div>
+              )}
+            </section>
+          )}
 
           {/* Sus dos últimas semanas, en dos pistas como las de la carrera:
               cada día que entrenó, del color de lo que hizo. */}
@@ -17901,6 +18295,24 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, viewerName = null, i
               </section>
             );
           })()}
+
+          {recientes.length > 0 && (
+            <section className="space-y-2" aria-label={esYo ? "Tus últimos récords" : "Sus últimos récords"}>
+              <h3 className="seccion-titulo px-1">{esYo ? "Tus últimos récords" : "Sus últimos récords"}</h3>
+              <ul className="recientes">
+                {recientes.map((r) => (
+                  <li key={`${r.id}-${r.fecha}`} className="reciente">
+                    <span className="reciente-icono" aria-hidden="true"><Trophy size={16} /></span>
+                    <span className="min-w-0 flex-1">
+                      <span className="reciente-nombre">{r.nombre}</span>
+                      {r.cuando && <span className="reciente-cuando">{r.cuando.charAt(0).toUpperCase() + r.cuando.slice(1)}</span>}
+                    </span>
+                    <b className="reciente-marca num-display">{r.reps} × {kgToDisplay(r.kg, unit)}<small>{weightLabel(unit)}</small></b>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           <section className="tarjeta-tonal p-4" aria-label="Rango por músculo">
             <div className="flex items-baseline justify-between gap-3 mb-1">
@@ -18455,6 +18867,8 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
         onActivateRoutine={onActivateRoutine}
         // Quitar a alguien vive en su perfil (sólo si es tu amigo).
         onRemoveFriend={friendStatus(viewingUid) === "accepted" ? () => { const otro = viewingUid; setViewingUid(null); doRemoveFriend(otro); } : null}
+        // Si entrenó hoy o ayer, se le puede aplaudir desde su perfil.
+        aplauso={kudosCandidates.some((k) => k.uid === viewingUid) ? { hecho: !!kudosSentMap[viewingUid], enviando: kudosSendingUid === viewingUid, onAplaudir: (el) => handleSendKudos(viewingUid, el) } : null}
       />
     );
   }
@@ -22710,25 +23124,26 @@ function ImportRoutineModal({ onImport, onClose }) {
    ajustarle el cronograma a cualquier rutina ya activa (incluidas las
    preestablecidas) desde Rutinas.
 ============================================================================ */
+// EL CRONOGRAMA: cada día de la semana en un renglón, con los días de tu
+// rutina (y el descanso) como botones. El elegido se llena del color de su
+// día, apagado. Abajo, cuántos días entrenás. Antes eran fichas chicas en
+// mayúsculas con el color pleno y una tira que se deslizaba de costado.
 function WeeklyScheduleEditor({ dayOrder, days, schedule, onChange }) {
+  const entrenas = WEEKDAY_KEYS.filter((wk) => schedule[wk] && days[schedule[wk]]).length;
   return (
-    <div className="space-y-1.5">
+    <div className="cronograma">
       {WEEKDAY_KEYS.map((wk, i) => {
         const current = schedule[wk] || null;
         return (
-          <div key={wk} className="flex items-center gap-2">
-            <span className="w-8 text-[11px] font-bold text-slate-500 shrink-0">{WEEKDAY_SHORT_LABELS[i]}</span>
-            <div className="flex gap-1.5 overflow-x-auto pb-0.5 flex-1 -mx-1 px-1">
-              <button onClick={() => onChange(wk, null)} className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold whitespace-nowrap transition-all active:scale-95 border shrink-0"
-                style={!current ? { backgroundColor: "var(--surface-2)", borderColor: "var(--surface-2)", color: "var(--surface-2-text)" } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
-                Descanso
-              </button>
+          <div key={wk} className="cronograma-fila">
+            <span className="cronograma-dia">{WEEKDAY_SHORT_LABELS[i]}</span>
+            <div className="cronograma-opciones" role="radiogroup" aria-label={`Qué toca el ${WEEKDAY_SHORT_LABELS[i]}`}>
+              <button role="radio" aria-checked={!current} onClick={() => onChange(wk, null)} className={`cronograma-op descanso ${!current ? "elegida" : ""}`}>Descanso</button>
               {dayOrder.map((dk) => {
                 const d = days[dk]; if (!d) return null;
-                const active = current === dk;
+                const elegida = current === dk;
                 return (
-                  <button key={dk} onClick={() => onChange(wk, dk)} className="px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase whitespace-nowrap transition-all active:scale-95 border shrink-0"
-                    style={active ? { background: d.color, borderColor: d.color, color: "#fff" } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
+                  <button key={dk} role="radio" aria-checked={elegida} onClick={() => onChange(wk, dk)} className={`cronograma-op ${elegida ? "elegida" : ""}`} style={{ "--dia": d.color }}>
                     {d.label}
                   </button>
                 );
@@ -22737,6 +23152,7 @@ function WeeklyScheduleEditor({ dayOrder, days, schedule, onChange }) {
           </div>
         );
       })}
+      <p className="cronograma-resumen">{entrenas ? `Entrenás ${entrenas} ${entrenas === 1 ? "día" : "días"} por semana y descansás ${7 - entrenas}.` : "Todavía no elegiste qué día entrenás."}</p>
     </div>
   );
 }
@@ -23360,154 +23776,67 @@ function BalanceMuscular({ routineDef, compacto = true }) {
 // Vista previa completa de una rutina, en pop-up (mismo lenguaje visual que el
 // detalle de una sesión del historial). Ves los días, sus ejercicios y el
 // balance ANTES de activarla, en vez de hacerlo a ciegas.
+// LA VISTA PREVIA DE UNA RUTINA, antes de usarla: sus números, sus días
+// como baldosas (tocás una y ves sus ejercicios abajo) y cómo reparte el
+// trabajo: la barra en equilibrio (empuje contra tracción) y las series por
+// músculo. Antes era un panel azul con halo, números en cajas, barras de
+// colores fuertes y acordeones con números en cada fila.
 function RoutinePreviewModal({ routineDef, routineName, onActivate, onClose, yaActiva = false, onDuplicate = null, onEditCopy = null }) {
   useAndroidBack(onClose);
-  const dias = routineDef?.dayOrder || Object.keys(routineDef?.days || {});
+  const dias = (routineDef?.dayOrder || Object.keys(routineDef?.days || {})).filter((dk) => routineDef?.days?.[dk]);
   const [abierto, setAbierto] = useState(dias[0] || null);
   if (!routineDef) return null;
 
   const totalEjercicios = dias.reduce((a, dk) => a + (routineDef.days[dk]?.exercises?.length || 0), 0);
-  const totalSeries = dias.reduce(
-    (a, dk) => a + (routineDef.days[dk]?.exercises || []).reduce((b, e) => b + (e.sets?.length || 0), 0),
-    0
-  );
+  const totalSeries = dias.reduce((a, dk) => a + (routineDef.days[dk]?.exercises || []).reduce((b, e) => b + (e.sets?.length || 0), 0), 0);
+  // El día abierto, como una rutina de un solo día para la vista de ejercicios.
+  const delDia = abierto && routineDef.days[abierto] ? { ...routineDef, dayOrder: [abierto] } : null;
 
   return (
     <div className="fixed inset-0 z-[130] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
-      <div
-        className="w-full max-w-md max-h-[86vh] flex flex-col bg-slate-900 border border-slate-700/60 rounded-3xl overflow-hidden modal-pop-in shadow-2xl shadow-black/70"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Encabezado con un halo celeste suave, como el héroe */}
-        <div className="relative px-5 pt-5 pb-4 border-b border-slate-800/60 shrink-0 overflow-hidden">
-          <div className="absolute -top-14 -right-10 w-36 h-36 rounded-full bg-sky-500/15 blur-3xl pointer-events-none" />
-          <div className="relative flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <span className="text-[9px] font-black uppercase tracking-[0.16em] text-sky-400/80">Vista previa</span>
-              <p className="text-lg font-black text-white leading-tight mt-0.5 text-balance">{routineName}</p>
-            </div>
-            <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition shrink-0">
-              <X size={16} />
-            </button>
+      <div className="modal-rutina modal-pop-in" role="dialog" aria-modal="true" aria-label={`Vista previa de ${routineName}`} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-rutina-cabeza">
+          <div className="min-w-0">
+            <p className="rutina-activa-linea">Vista previa</p>
+            <h3 className="rutina-activa-nombre">{routineName}</h3>
           </div>
-          {/* Tres números clave, como las estadísticas de una sesión */}
-          <div className="relative grid grid-cols-3 gap-2 mt-3.5">
-            {[
-              { v: dias.length, l: dias.length === 1 ? "Día" : "Días" },
-              { v: totalEjercicios, l: "Ejercicios" },
-              { v: totalSeries, l: "Series" },
-            ].map((s) => (
-              <div key={s.l} className="bg-black/25 rounded-xl py-2 text-center border border-white/[0.05]">
-                <p className="text-base font-black text-white tabular-nums leading-none">{s.v}</p>
-                <p className="text-[9px] text-slate-500 mt-1">{s.l}</p>
-              </div>
-            ))}
-          </div>
+          <button onClick={onClose} aria-label="Cerrar" className="boton-redondo shrink-0"><X size={17} /></button>
         </div>
 
-        {/* Cuerpo con scroll */}
-        <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-4 space-y-4">
-          <div className="rounded-2xl border border-sky-500/15 p-3.5" style={{ backgroundColor: "var(--panel-sunken)" }}>
+        <div className="modal-rutina-cuerpo">
+          <div className="atleta-datos">
+            <div className="atleta-dato"><span className="atleta-dato-valor"><b className="num-display">{dias.length}</b></span><small>{dias.length === 1 ? "día" : "días"}</small></div>
+            <div className="atleta-dato"><span className="atleta-dato-valor"><b className="num-display">{totalEjercicios}</b></span><small>ejercicios</small></div>
+            <div className="atleta-dato"><span className="atleta-dato-valor"><b className="num-display">{totalSeries}</b></span><small>series por semana</small></div>
+          </div>
+
+          <section className="space-y-2.5" aria-label="Sus días">
+            <div className="flex items-baseline justify-between gap-3">
+              <h4 className="seccion-titulo">Sus días</h4>
+              <span className="text-[12.5px] text-slate-500">Tocá uno</span>
+            </div>
+            <DiasRutina routineDef={routineDef} onGoToDay={(dk) => setAbierto(dk)} elegido={abierto} />
+            {delDia && <RoutinePreview routineDef={delDia} />}
+          </section>
+
+          <section className="space-y-3" aria-label="Cómo reparte el trabajo">
+            <h4 className="seccion-titulo">Cómo reparte el trabajo</h4>
+            <BarraEquilibrio routineDef={routineDef} />
             <BalanceMuscular routineDef={routineDef} />
-          </div>
-
-          <div>
-            <div className="flex items-center gap-2.5 mb-2.5">
-              <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(56,189,248,0.15)", color: "#38BDF8" }}>
-                <Calendar size={13} />
-              </span>
-              <span className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">Tus días</span>
-            </div>
-            <div className="space-y-2">
-            {dias.map((dk) => {
-              const day = routineDef.days[dk];
-              if (!day) return null;
-              const esteAbierto = abierto === dk;
-              const seriesDia = (day.exercises || []).reduce((a, e) => a + (e.sets?.length || 0), 0);
-              return (
-                <div
-                  key={dk}
-                  className="rounded-2xl border overflow-hidden transition-all"
-                  style={{
-                    borderColor: esteAbierto ? tint(day.color, "45") : "var(--chip-border)",
-                    backgroundColor: esteAbierto ? tint(day.color, "0b") : "var(--panel-sunken)",
-                  }}
-                >
-                  <button onClick={() => setAbierto(esteAbierto ? null : dk)} className="w-full flex items-center gap-3 px-3.5 py-3 text-left">
-                    {/* Placa de ícono, mismo lenguaje visual que el resto de
-                        la app — antes era solo una franja fina de color. */}
-                    <span className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: tint(day.color, "1c"), color: day.color }}>
-                      <Dumbbell size={15} />
-                    </span>
-                    <span className="flex-1 min-w-0">
-                      <span className="block text-xs font-black text-white text-balance">{day.label}</span>
-                      <span className="block text-[10px] text-slate-500 tabular-nums">
-                        {day.exercises?.length || 0} ejercicios · {seriesDia} series
-                      </span>
-                    </span>
-                    <ChevronDown size={14} className="text-slate-600 shrink-0 transition-transform duration-200" style={{ transform: esteAbierto ? "rotate(180deg)" : "none" }} />
-                  </button>
-
-                  {esteAbierto && (
-                    <div className="px-3.5 pb-3 pt-0.5 space-y-1.5 bounce-in">
-                      {(day.exercises || []).map((ex, i) => {
-                        const lib = EXERCISE_LIBRARY_BY_ID[ex.libId || ex.id];
-                        const sets = ex.sets?.length || 0;
-                        const rango = ex.sets?.[0]?.repRange || null;
-                        return (
-                          <div key={`${dk}:${ex.id || ex.libId}:${i}`} className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 bg-black/20">
-                            <span className="w-4 h-4 rounded-md flex items-center justify-center text-[8px] font-black shrink-0 tabular-nums" style={{ backgroundColor: tint(day.color, "25"), color: day.color }}>
-                              {i + 1}
-                            </span>
-                            <span className="flex-1 min-w-0 text-[11.5px] text-slate-300 leading-snug">{lib?.name || ex.name || ex.libId}</span>
-                            <span className="text-[10px] text-slate-500 tabular-nums shrink-0">
-                              {sets}{rango ? `×${rango}` : ""}
-                            </span>
-                          </div>
-                        );
-                      })}
-                      {(day.exercises || []).length === 0 && (
-                        <p className="text-[10px] text-slate-600 italic py-1">Sin ejercicios en este día.</p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-            </div>
-          </div>
+          </section>
         </div>
 
-        {/* Botón fijo abajo */}
-        <div className="border-t border-slate-800/60 px-5 py-3.5 shrink-0 bg-slate-900 space-y-2">
-          {/* Acciones secundarias: duplicar (rutinas tuyas) o editar una copia
-              (preestablecidas). Antes vivían en la expansión inline. */}
+        <div className="modal-rutina-pie">
           {(onDuplicate || onEditCopy) && (
             <div className="flex gap-2">
-              {onDuplicate && (
-                <button onClick={() => { onDuplicate(); onClose(); }} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[11px] font-bold text-slate-400 bg-slate-800/60 border border-slate-700/50 hover:text-white transition active:scale-[0.98]">
-                  <Copy size={12} /> Duplicar
-                </button>
-              )}
-              {onEditCopy && (
-                <button onClick={() => { onEditCopy(); onClose(); }} className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[11px] font-bold text-slate-400 bg-slate-800/60 border border-slate-700/50 hover:text-white transition active:scale-[0.98]">
-                  <Edit3 size={12} /> Editar una copia
-                </button>
-              )}
+              {onDuplicate && <button onClick={() => { onDuplicate(); onClose(); }} className="boton-tonal flex-1" style={{ "--c": "#9a9ba0", minHeight: 42 }}><Copy size={15} /> Duplicar</button>}
+              {onEditCopy && <button onClick={() => { onEditCopy(); onClose(); }} className="boton-tonal flex-1" style={{ "--c": "#9a9ba0", minHeight: 42 }}><Edit3 size={15} /> Editar una copia</button>}
             </div>
           )}
           {yaActiva ? (
-            <div className="w-full py-3 rounded-2xl text-sm font-black text-center bg-slate-800/70 text-slate-500 flex items-center justify-center gap-1.5">
-              <Check size={14} /> Ya es tu rutina activa
-            </div>
+            <p className="modal-rutina-activa"><Check size={15} /> Ya es tu rutina activa</p>
           ) : (
-            <button
-              onClick={() => { onActivate?.(); onClose(); }}
-              className="w-full py-3 rounded-2xl text-sm font-black !text-[color:var(--accion-tinta)] transition active:scale-[0.98] shadow-lg shadow-sky-500/25 flex items-center justify-center gap-1.5"
-              style={{ background: "var(--accion-fondo)" }}
-            >
-              <Sparkles size={14} /> Usar esta rutina
-            </button>
+            <button onClick={() => { onActivate?.(); onClose(); }} className="boton-pildora w-full"><Sparkles size={16} /> Usar esta rutina</button>
           )}
         </div>
       </div>
@@ -24370,8 +24699,7 @@ function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
             )}
             <div className="serie serie-foco mt-3" style={{ "--c": "#14B8A6", animation: "none" }}>
               <div className="foco-cabecera">
-                <span className="galleta serie-galleta activa" aria-hidden="true">1</span>
-                <p className="foco-titulo">Serie 1<span>8–10 reps</span></p>
+                <p className="foco-titulo"><span className="foco-rango">8–10 reps</span></p>
               </div>
               <div className="foco-marcador">
                 <div className="marcador-celda">
