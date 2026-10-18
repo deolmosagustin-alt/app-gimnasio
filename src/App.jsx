@@ -1385,7 +1385,7 @@ function GeneralWarmupCard({ exercises, warmupKeys, accent }) {
           <p className="text-[14.5px] font-bold text-white leading-tight">Calentamiento general</p>
           <p className="text-[12px] text-slate-500 mt-0.5">{drills.length} ejercicios de movilidad{doneCount > 0 ? ` · ${doneCount}/${drills.length} hechos` : ""}</p>
         </div>
-        <ChevronDown size={16} className={`text-slate-600 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} style={{ color: accent }} />
+        <ChevronDown size={16} className={`text-slate-500 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {open && (
         <div className="px-3.5 pb-3.5 space-y-1.5 bounce-in">
@@ -1931,10 +1931,13 @@ function caminoGalleta(lobulos = 9, amplitud = 0.07, puntos = 144) {
   return d + "Z";
 }
 const svgComoUrl = (svg) => `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
-const GALLETA_URI = svgComoUrl(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="${caminoGalleta()}"/></svg>`);
+// En "Grafito" la galleta es un círculo limpio (amplitud 0): la forma de lo
+// completado, sin el festón de Material 3. Las clases siguen llamándose
+// "galleta" porque el código la usa en todos lados.
+const GALLETA_URI = svgComoUrl(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="${caminoGalleta(9, 0)}"/></svg>`);
 // La galleta como camino de SVG (100×100), para dibujarla adentro de los
 // gráficos: los récords de la escalera.
-const GALLETA_PATH = caminoGalleta(9, 0.08, 90);
+const GALLETA_PATH = caminoGalleta(9, 0, 90);
 // Un largo de onda (24×12) que empalma consigo mismo: repetida en x hace la
 // línea ondulada del cronómetro de descanso.
 const ONDA_URI = svgComoUrl('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 12"><path d="M0 6 Q6 0.5 12 6 T24 6" fill="none" stroke="#000" stroke-width="3" stroke-linecap="round"/></svg>');
@@ -2005,7 +2008,7 @@ const ANIMATION_CSS = `
 
 /* Pulso lento e invitante (botón de iniciar sesión) */
 @keyframes invitePulse { 0%, 100% { box-shadow: 0 0 0 0 var(--invite-glow, rgba(20,184,166,0.5)); } 50% { box-shadow: 0 0 0 7px rgba(20,184,166,0); } }
-.invite-pulse { animation: invitePulse 2.4s ease-out infinite; }
+.invite-pulse { animation: invitePulse 2.4s ease-out infinite; --invite-glow: var(--hairline-fuerte) !important; }
 
 /* Entrada de las tarjetas al cambiar de día (según dirección) */
 @keyframes slideFromRight { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: translateX(0); } }
@@ -2221,7 +2224,7 @@ const ANIMATION_CSS = `
   position: fixed;
   left: 0; right: 0;
   z-index: 30;
-  bottom: calc(var(--tabbar-h, 68px) + 6px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(var(--tabbar-h, 64px) + var(--tabbar-aire, 10px) + 4px + env(safe-area-inset-bottom, 0px));
   padding-bottom: 8px;
 }
 @media (min-width: 1024px) { .session-bar-dock { bottom: 10px; } }
@@ -2230,7 +2233,7 @@ const ANIMATION_CSS = `
    sobre <html>. Antes era un número fijo según hubiera sesión o no; ahora
    suma el alto real del dock (descanso en curso + sesión), que el dock
    escribe en --dock-alto. */
-:root { --chat-nav-gap: calc(4.75rem + var(--dock-alto, 0px)); }
+:root { --chat-nav-gap: calc(var(--tabbar-h, 64px) + var(--tabbar-aire, 10px) + 4px + var(--dock-alto, 0px)); }
 @media (min-width: 1024px) { :root { --chat-nav-gap: var(--dock-alto, 0px); } }
 @keyframes sessionBarIn {
   from { opacity: 0; transform: translateY(14px); }
@@ -2538,48 +2541,48 @@ input, textarea, [contenteditable="true"] {
    sobre fondos casi negros y pierden casi todo el contraste sobre fondos
    claros. Sólo en modo claro se oscurecen estos tonos puntuales que se usan
    como texto; los FONDOS tintados con esos mismos colores casi no se tocan. */
-.light-mode .text-teal-400 { color: #0d9488 !important; }
+.light-mode .text-teal-400 { color: var(--text-strong) !important; }
 .light-mode .hover\\:text-teal-400:hover { color: #0d9488 !important; }
 .light-mode .text-teal-200,
 .light-mode .text-teal-200\\/90,
 .light-mode .text-teal-300\\/60,
 .light-mode .text-teal-300\\/70,
 .light-mode .text-teal-300\\/75,
-.light-mode .text-teal-400\\/80 { color: rgba(13,148,136,0.85) !important; }
+.light-mode .text-teal-400\\/80 { color: var(--text-muted) !important; }
 .light-mode .text-cyan-400,
-.light-mode .text-cyan-300 { color: #0e7490 !important; }
-.light-mode .text-cyan-300\\/60 { color: rgba(14,116,144,0.85) !important; }
+.light-mode .text-cyan-300 { color: color-mix(in oklab, #0e7490 62%, #5b5d62) !important; }
+.light-mode .text-cyan-300\\/60 { color: color-mix(in oklab, rgba(14,116,144,0.85) 62%, #5b5d62) !important; }
 .light-mode .text-purple-200,
-.light-mode .text-purple-300 { color: #7e22ce !important; }
+.light-mode .text-purple-300 { color: color-mix(in oklab, #7e22ce 62%, #5b5d62) !important; }
 .light-mode .text-purple-300\\/60,
 .light-mode .text-purple-300\\/70,
 .light-mode .text-purple-300\\/75,
-.light-mode .text-purple-300\\/90 { color: rgba(126,34,206,0.85) !important; }
-.light-mode .text-purple-400 { color: #9333ea !important; }
-.light-mode .text-purple-500 { color: #7e22ce !important; }
+.light-mode .text-purple-300\\/90 { color: color-mix(in oklab, rgba(126,34,206,0.85) 62%, #5b5d62) !important; }
+.light-mode .text-purple-400 { color: color-mix(in oklab, #9333ea 62%, #5b5d62) !important; }
+.light-mode .text-purple-500 { color: color-mix(in oklab, #7e22ce 62%, #5b5d62) !important; }
 .light-mode .text-rose-200,
-.light-mode .text-rose-300\\/80 { color: rgba(190,18,60,0.9) !important; }
+.light-mode .text-rose-300\\/80 { color: color-mix(in oklab, rgba(190,18,60,0.9) 62%, #5b5d62) !important; }
 .light-mode .text-rose-400,
-.light-mode .text-red-400 { color: #e11d48 !important; }
+.light-mode .text-red-400 { color: color-mix(in oklab, #e11d48 62%, #5b5d62) !important; }
 .light-mode .hover\\:text-rose-400:hover { color: #e11d48 !important; }
-.light-mode .text-rose-400\\/90 { color: rgba(225,29,72,0.95) !important; }
-.light-mode .text-rose-500\\/70 { color: rgba(190,18,60,0.85) !important; }
+.light-mode .text-rose-400\\/90 { color: color-mix(in oklab, rgba(225,29,72,0.95) 62%, #5b5d62) !important; }
+.light-mode .text-rose-500\\/70 { color: color-mix(in oklab, rgba(190,18,60,0.85) 62%, #5b5d62) !important; }
 .light-mode .hover\\:text-rose-500\\/70:hover { color: rgba(190,18,60,0.9) !important; }
 .light-mode .text-emerald-100,
-.light-mode .text-emerald-300 { color: #059669 !important; }
-.light-mode .text-amber-200 { color: #b45309 !important; }
-.light-mode .text-amber-300\\/80 { color: rgba(180,83,9,0.85) !important; }
+.light-mode .text-emerald-300 { color: color-mix(in oklab, #059669 62%, #5b5d62) !important; }
+.light-mode .text-amber-200 { color: color-mix(in oklab, #b45309 62%, #5b5d62) !important; }
+.light-mode .text-amber-300\\/80 { color: color-mix(in oklab, rgba(180,83,9,0.85) 62%, #5b5d62) !important; }
 .light-mode .text-blue-300\\/60,
-.light-mode .text-blue-300\\/90 { color: rgba(29,78,216,0.85) !important; }
+.light-mode .text-blue-300\\/90 { color: color-mix(in oklab, rgba(29,78,216,0.85) 62%, #5b5d62) !important; }
 .light-mode .hover\\:text-indigo-400:hover { color: #4f46e5 !important; }
 /* Placeholder "—" del input de reps/kg: pensado para ser casi invisible
    sobre el input oscuro — con el mismo gris oscuro fijo, en claro se veía
    como un guión bien marcado (el input pasa a blanco y el color no). */
 .light-mode .placeholder\\:text-slate-800::placeholder { color: #d1d4d7 !important; }
-.light-mode .text-amber-400 { color: #b45309 !important; }
-.light-mode .text-emerald-400 { color: #059669 !important; }
-.light-mode .text-blue-400 { color: #1d4ed8 !important; }
-.light-mode .text-orange-400 { color: #c2410c !important; }
+.light-mode .text-amber-400 { color: color-mix(in oklab, #b45309 62%, #5b5d62) !important; }
+.light-mode .text-emerald-400 { color: color-mix(in oklab, #059669 62%, #5b5d62) !important; }
+.light-mode .text-blue-400 { color: color-mix(in oklab, #1d4ed8 62%, #5b5d62) !important; }
+.light-mode .text-orange-400 { color: color-mix(in oklab, #c2410c 62%, #5b5d62) !important; }
 
 /* Bordes — grises muy sutiles, sin saltar a la vista */
 .light-mode .border-slate-800,
@@ -2647,135 +2650,94 @@ input, textarea, [contenteditable="true"] {
    gráficos, chips de día/serie inactivos) — ahora salen de aquí, así
    también cambian solos al cambiar de tema. */
 :root {
-  /* Grafito (20,22,27) en vez del azul marino (15,23,42) de antes: ver la
-     escala slate en index.css, que cambió por el mismo motivo. */
-  --grad-hero-purple: linear-gradient(135deg, rgba(168,85,247,0.18), var(--surface-1) 60%);
-  --grad-hero-blue: linear-gradient(135deg, rgba(59,130,246,0.16), var(--surface-1) 60%);
-  --grad-hero-teal: linear-gradient(135deg, rgba(20,184,166,0.16), var(--surface-1) 60%);
-  --grad-profile-avatar: linear-gradient(135deg, var(--surface-2), var(--surface-1));
-  --ring-track: color-mix(in oklab, var(--tono) 8%, #202125);
-  --chart-grid: color-mix(in oklab, var(--tono) 6%, #1e1f23);
-  --chart-axis: #4a4c51;
+  /* GRAFITO. La escalera de superficies sube de a poco y es NEUTRA: ya no
+     lleva el color del día. La jerarquía la hace la luz; el color queda
+     para marcar (un punto, un collarín), nunca para pintar un fondo.
+     Los degradés de "hero" que antes llevaban teal, violeta o azul son
+     ahora el mismo: una placa apenas más clara arriba, como metal con luz
+     de techo. */
+  --grad-hero-purple: linear-gradient(180deg, var(--surface-2), var(--surface-1));
+  --grad-hero-blue: linear-gradient(180deg, var(--surface-2), var(--surface-1));
+  --grad-hero-teal: linear-gradient(180deg, var(--surface-2), var(--surface-1));
+  --grad-profile-avatar: linear-gradient(135deg, var(--surface-3), var(--surface-2));
+  --ring-track: #232427;
+  --chart-grid: rgba(255,255,255,0.055);
+  --chart-axis: #55565c;
   --chip-border: var(--hairline);
-  --chip-text: #8a8d93;
-  --surface-2-text: #9a9da2;
+  --chip-text: #8e8f95;
+  --surface-2-text: #a3a4a9;
   --small-text-scale: 1;
-  /* Fondo base de la app. Lo usan los pocos lugares que necesitan el color
-     "de la página" en estilo inline (escudo de la status bar, pantallas a
-     pantalla completa). Antes estaba escrito a mano como #0c0d10 y en modo
-     claro dejaba franjas negras. */
-  --app-bg: color-mix(in oklab, var(--tono) 4%, #0d0e10);
-  /* Superficies "hundidas": paneles que se abren dentro de una tarjeta y
-     filas de opciones. Estaban en estilo inline con rgba fijo y en claro se
-     veían como cajas oscuras. */
-  /* Estos dos eran TRANSLÚCIDOS, y medido en pantalla eso dejaba la
-     jerarquía dada vuelta en TODA la app: sobre la página (#0c0d10,
-     luminancia 10), --panel-sunken componía a 7 —más oscuro que el fondo, un
-     pozo en vez de un panel— y --row-surface a 17, más claro que la tarjeta
-     que lo contiene. Como ningún nivel se distinguía por luz, cada pantalla
-     terminó pidiendo atención con tinte de color, y por eso no se parecían
-     entre sí: cada una eligió su propio lavado.
-     Ahora son opacos y forman una sola escalera con --surface-1/2/3, así la
-     jerarquía la hace la luz en todas las pestañas por igual. Como son
-     tokens, el arreglo llega a los ~200 lugares que ya los usan sin tocar
-     ninguno. */
-  --panel-sunken: color-mix(in oklab, var(--tono) 4.5%, #111215);   /* panel que se abre DENTRO de una tarjeta: hundido respecto de ella, pero por encima de la página */
-  --row-surface: var(--surface-2);    /* fila dentro de una tarjeta: un escalón por encima */
-  /* ESCALERA DE SUPERFICIES, OPACA Y ASCENDENTE.
-     Los dos tokens de arriba son translúcidos, y medido en pantalla eso deja
-     la jerarquía DADA VUELTA: la página es #0c0d10 (luminancia 10), una
-     tarjeta de sección compone a luminancia 6 —o sea más oscura que la
-     página, un pozo en vez de una tarjeta— y la fila de adentro compone a 17,
-     más clara que su propio contenedor. Como ningún nivel se distingue por
-     luz, cada nivel terminó pidiendo atención con TINTE: por eso Social tenía
-     cinco superficies violetas apiladas y siete resplandores.
-     Estos tres son opacos y suben de a poco, así la jerarquía la hace la luz
-     y el color queda libre para significar algo. */
-  /* "Color de día": cada nivel lleva un poco más del color de lo que estás
-     mirando (--tono), así la pantalla toma el clima del día sin pintar
-     nada de un color fuerte. */
-  --surface-1: color-mix(in oklab, var(--tono) 5.5%, #161719);   /* tarjeta de sección, por encima de la página */
-  --surface-2: color-mix(in oklab, var(--tono) 7%, #1d1e21);   /* fila dentro de la tarjeta */
-  --surface-3: color-mix(in oklab, var(--tono) 9%, #27282c);  /* elemento activo / resaltado dentro de una fila */
-  --hairline: color-mix(in oklab, var(--tono) 8%, #2b2c31);   /* el canto de 1px */
-  /* Hero propio de Social. No reusa --grad-hero-purple a propósito: ese
-     violeta (#A855F7) vuelve a ser exclusivo de Descarga y Medidas. Y baja
-     del 42% al 26% de tinte, porque al 42% sobre negro se iba a malva. */
-  --grad-hero-violet: linear-gradient(135deg, rgba(139,92,246,0.22), rgba(20,22,27,0.88) 55%, rgba(20,22,27,0.66));
-  /* Degradés de paneles destacados (resumen de sesión, tarjetas del
-     entrenador): el mismo matiz de siempre, ahora sobre grafito. */
-  --panel-grad-teal: linear-gradient(165deg, color-mix(in oklab, #14B8A6 10%, var(--surface-1)) 0%, var(--surface-1) 100%);
-  --panel-grad-cyan: linear-gradient(165deg, color-mix(in oklab, #06B6D4 10%, var(--surface-1)) 0%, var(--surface-1) 100%);
-  --panel-grad-slate: linear-gradient(170deg, var(--surface-2) 0%, var(--surface-1) 100%);
-  --panel-grad-blue: linear-gradient(165deg, color-mix(in oklab, #3B82F6 10%, var(--surface-1)) 0%, var(--surface-1) 100%);
-  --panel-grad-emerald: linear-gradient(160deg, color-mix(in oklab, #10B981 10%, var(--surface-1)), var(--surface-1));
-  /* Cronómetro de descanso en reposo (cuando corre toma el color del día). */
+  /* Fondo base de la app (lo usan los lugares que necesitan el color "de la
+     página" en estilo inline: el escudo de la status bar, las pantallas
+     completas). */
+  --app-bg: #0b0b0d;
+  /* Panel hundido: un pozo DENTRO de una placa (el visor de la serie, un
+     campo). Más oscuro que la placa que lo contiene. */
+  --panel-sunken: #0e0e10;
+  --row-surface: var(--surface-2);
+  --surface-1: #141416;   /* placa: tarjeta de sección */
+  --surface-2: #1b1c1f;   /* lo que va sobre la placa */
+  --surface-3: #26272b;   /* activo o resaltado */
+  --hairline: rgba(255,255,255,0.075);   /* el canto de 1px */
+  --grad-hero-violet: linear-gradient(180deg, var(--surface-2), var(--surface-1));
+  --panel-grad-teal: linear-gradient(180deg, var(--surface-2) 0%, var(--surface-1) 100%);
+  --panel-grad-cyan: linear-gradient(180deg, var(--surface-2) 0%, var(--surface-1) 100%);
+  --panel-grad-slate: linear-gradient(180deg, var(--surface-2) 0%, var(--surface-1) 100%);
+  --panel-grad-blue: linear-gradient(180deg, var(--surface-2) 0%, var(--surface-1) 100%);
+  --panel-grad-emerald: linear-gradient(180deg, var(--surface-2) 0%, var(--surface-1) 100%);
   --timer-idle-bg: var(--surface-2);
   --timer-idle-border: var(--hairline);
-  /* Modal de "subiste de rango" — el color del tier ya se aplica encima como
-     glow/borde, esto es sólo la base neutra detrás. */
   --rankup-grad: linear-gradient(135deg, var(--surface-1), var(--surface-2));
-  /* Barra de mensaje del Entrenador IA — se porta afuera del árbol temeado
-     (createPortal a document.body), así que no le llegan ni las clases
-     .light-mode ni las variables que sólo se definen inline más arriba: por
-     eso vive acá, en :root, donde sí es alcanzable desde cualquier lado. */
-  --chat-bar-idle: rgba(20,24,29,0.72);
-  --chat-bar-listening: rgba(6,78,59,0.55);
-  --chat-bar-editing: rgba(13,42,38,0.75);
-  --chat-bar-border-idle: rgba(255,255,255,0.1);
-  --chat-bar-border-listening: rgba(16,185,129,0.4);
-  --chat-bar-border-editing: rgba(20,184,166,0.4);
-  /* Burbuja de respuesta del Entrenador IA: un poco más clara que
-     --panel-grad-slate (que usan un montón de otros paneles) para que se
-     distinga del fondo de la app en vez de casi fundirse con él. */
-  --chat-bubble-assistant: linear-gradient(165deg, #16233d 0%, #0e1626 100%);
-  /* Paneles "vidrio esmerilado" del Entrenador IA: semitransparentes +
-     backdrop-blur (aplicado en la clase). */
-  --glass-panel-bg: rgba(20,24,29,0.55);
+  /* Barra de mensaje del Entrenador IA: va en un portal sobre <body>, así
+     que sus variables viven acá, en :root. Vidrio ahumado. */
+  --chat-bar-idle: rgba(26,26,29,0.8);
+  --chat-bar-listening: rgba(30,30,34,0.92);
+  --chat-bar-editing: rgba(30,30,34,0.92);
+  --chat-bar-border-idle: rgba(255,255,255,0.09);
+  --chat-bar-border-listening: rgba(255,255,255,0.24);
+  --chat-bar-border-editing: rgba(255,255,255,0.24);
+  --chat-bubble-assistant: var(--surface-1);
+  --glass-panel-bg: rgba(26,26,29,0.62);
   --glass-panel-border: rgba(255,255,255,0.08);
-  --glass-bubble-assistant: rgba(19,29,51,0.55);
+  --glass-bubble-assistant: rgba(27,28,31,0.62);
 }
 .light-mode {
-  --grad-hero-purple: linear-gradient(135deg, rgba(168,85,247,0.10), var(--surface-1) 60%);
-  --grad-hero-blue: linear-gradient(135deg, rgba(59,130,246,0.10), var(--surface-1) 60%);
-  --grad-hero-teal: linear-gradient(135deg, rgba(20,184,166,0.10), var(--surface-1) 60%);
-  --grad-profile-avatar: linear-gradient(135deg, var(--surface-1), var(--surface-2));
-  --ring-track: color-mix(in oklab, var(--tono) 7%, #ececea);
-  --chart-grid: color-mix(in oklab, var(--tono) 5%, #efefec);
-  --chart-axis: #9a9da2;
+  /* ALUMINIO: la página gris claro, las placas blancas, la tinta casi negra. */
+  --grad-hero-purple: linear-gradient(180deg, #ffffff, #fafaf9);
+  --grad-hero-blue: linear-gradient(180deg, #ffffff, #fafaf9);
+  --grad-hero-teal: linear-gradient(180deg, #ffffff, #fafaf9);
+  --grad-profile-avatar: linear-gradient(135deg, var(--surface-2), var(--surface-3));
+  --ring-track: #e6e6e3;
+  --chart-grid: rgba(0,0,0,0.06);
+  --chart-axis: #9a9ca1;
   --chip-border: var(--hairline);
-  --chip-text: #6c6f74;
-  --surface-2-text: #505257;
-  --app-bg: color-mix(in oklab, var(--tono) 6%, #f5f5f2);
-  --panel-sunken: color-mix(in oklab, var(--tono) 5%, #f3f3f0);
-  --row-surface: color-mix(in oklab, var(--tono) 3%, #f9f9f7);
-  /* En claro la escalera va al revés (la página es lo más claro y cada nivel
-     baja un escalón), pero el principio es el mismo: la jerarquía la hace la
-     luz, no el tinte. */
-  --surface-1: color-mix(in oklab, var(--tono) 2%, #ffffff);
-  --surface-2: color-mix(in oklab, var(--tono) 6%, #f1f1ee);
-  --surface-3: color-mix(in oklab, var(--tono) 10%, #e5e5e1);
-  --hairline: color-mix(in oklab, var(--tono) 12%, #dcdcd7);
-  /* En claro, el mismo matiz pero sobre blanco: apenas un velo de color en la
-     esquina superior que se disuelve, en vez de un bloque oscuro. */
-  --panel-grad-teal: linear-gradient(165deg, rgba(20,184,166,0.09) 0%, var(--surface-1) 60%);
-  --panel-grad-cyan: linear-gradient(165deg, rgba(6,182,212,0.09) 0%, var(--surface-1) 60%);
-  --panel-grad-slate: linear-gradient(170deg, var(--surface-2) 0%, var(--surface-1) 60%);
-  --panel-grad-blue: linear-gradient(165deg, rgba(59,130,246,0.08) 0%, var(--surface-1) 60%);
-  --panel-grad-emerald: linear-gradient(160deg, rgba(16,185,129,0.10), var(--surface-1) 65%);
+  --chip-text: #66686d;
+  --surface-2-text: #55575c;
+  --app-bg: #efefed;
+  --panel-sunken: #f2f2f0;
+  --row-surface: var(--surface-2);
+  --surface-1: #ffffff;
+  --surface-2: #f5f5f3;
+  --surface-3: #e8e8e5;
+  --hairline: rgba(0,0,0,0.075);
+  --panel-grad-teal: linear-gradient(180deg, #ffffff 0%, #fafaf9 100%);
+  --panel-grad-cyan: linear-gradient(180deg, #ffffff 0%, #fafaf9 100%);
+  --panel-grad-slate: linear-gradient(180deg, #ffffff 0%, #fafaf9 100%);
+  --panel-grad-blue: linear-gradient(180deg, #ffffff 0%, #fafaf9 100%);
+  --panel-grad-emerald: linear-gradient(180deg, #ffffff 0%, #fafaf9 100%);
   --timer-idle-bg: var(--surface-2);
   --timer-idle-border: var(--hairline);
   --rankup-grad: linear-gradient(135deg, var(--surface-1), var(--surface-2));
-  --chat-bar-idle: rgba(255,255,255,0.72);
-  --chat-bar-listening: rgba(209,250,229,0.85);
-  --chat-bar-editing: rgba(204,251,241,0.85);
-  --chat-bar-border-idle: rgba(20,24,29,0.08);
-  --chat-bar-border-listening: rgba(16,185,129,0.35);
-  --chat-bar-border-editing: rgba(20,184,166,0.35);
-  --chat-bubble-assistant: linear-gradient(165deg, #f9fafa 0%, #ffffff 100%);
-  --glass-panel-bg: rgba(255,255,255,0.6);
-  --glass-panel-border: rgba(20,24,29,0.06);
-  --glass-bubble-assistant: rgba(255,255,255,0.65);
+  --chat-bar-idle: rgba(255,255,255,0.82);
+  --chat-bar-listening: rgba(255,255,255,0.92);
+  --chat-bar-editing: rgba(255,255,255,0.92);
+  --chat-bar-border-idle: rgba(0,0,0,0.08);
+  --chat-bar-border-listening: rgba(0,0,0,0.2);
+  --chat-bar-border-editing: rgba(0,0,0,0.2);
+  --chat-bubble-assistant: #ffffff;
+  --glass-panel-bg: rgba(255,255,255,0.66);
+  --glass-panel-border: rgba(0,0,0,0.06);
+  --glass-bubble-assistant: rgba(255,255,255,0.7);
 }
 
 /* ============================================================================
@@ -2807,47 +2769,67 @@ input, textarea, [contenteditable="true"] {
 .text-\\[26px\\] { font-size: calc(26px * var(--small-text-scale, 1)) !important; }
 
 /* ============================================================================
-   SISTEMA VISUAL — "Color de día"
+   SISTEMA VISUAL — "Grafito"
 
-   La app se tiñe del día que entrenás. Cada día de la rutina ya tenía su
-   color; ahora ese color es el clima de la pantalla entera —un tinte suave
-   en el fondo y en las superficies, el relleno de lo que se toca— en vez de
-   un acento suelto. En las otras pestañas manda el color de la pestaña (lo
-   escribe la app en <html> como --tono, ver ponerTono).
-   Una sola letra, Google Sans Flex, con los números grandes redondeados
-   (eje ROND). Formas blandas, botones en píldora y una forma propia: la
-   galleta (un círculo festoneado) para la serie, el ejercicio y la persona.
-   La pieza que se recuerda sigue siendo la barra cargada.
+   Pedido: "otro estilo más moderno para toda la app, que se vea premium
+   pero no tan saturante". La app es de grafito y tiza: superficies
+   neutras que suben de a poco con la luz (no con color), texto de tiza y
+   un solo acento, que es la luz misma: el botón principal es de tiza con
+   letra oscura (en claro, de tinta con letra blanca).
+   El color de cada día ya no tiñe la pantalla: queda como marca —el punto
+   del día, los collarines de la barra, el filete de los discos— y, como
+   relleno, siempre apagado (mezclado con gris; ver tint() en utils.js).
+   El único color propio es el dorado viejo de los récords (--record).
+   Una sola letra, Mona Sans, con eje de ancho: el texto en su ancho normal
+   y los números grandes angostos (num-display), como un tablero.
+   Contenedores como placas maquinadas (--placa-canto: el canto de 1px y un
+   brillo arriba), botones en píldora, la isla de vidrio abajo.
 
-   Recetas para cualquier color X (el del día, el de la pestaña):
-     · relleno fuerte (botón principal): en oscuro, X con 24% de blanco; en
-       claro, X puro. Siempre con letra oscura: X al 22% sobre casi negro.
-     · contenedor (fondo tonal): X al 15% sobre la superficie.
-     · texto de color: en oscuro, X con 45% de blanco; en claro, con 38% de
-       negro. Así se lee cualquier color que elija la persona.
+   Recetas:
+     · botón principal: --accion-fondo con letra --accion-tinta.
+     · tonal o elegido: --velo (un poco de luz sobre la placa); más fuerte,
+       --velo-fuerte; un borde que se vea, --hairline-fuerte.
+     · el color de un día como relleno: color-mix(--dia 58%, --surface-3);
+       como punto o línea finita, pleno.
 
    Esto va AL FINAL y sin @layer a propósito: Tailwind 4 pone sus clases en
    una capa, y lo que está fuera de capa les gana.
 ============================================================================ */
 @property --tono { syntax: "<color>"; inherits: true; initial-value: #14B8A6; }
 :root {
+  /* --tono sigue siendo el color de lo que estás mirando (el día, la
+     pestaña), pero ya no pinta superficies: sólo marcas. */
   --tono: #14B8A6;
-  --accent: #14B8A6;
-  --accent-ink: #5eead4;
-  --accent-soft: color-mix(in oklab, #14B8A6 16%, transparent);
-  --text-strong: #f3f3f1;
-  --text-muted: #a8aaaf;
-  --text-faint: #75787e;
-  --bar-bg: color-mix(in oklab, var(--app-bg) 88%, transparent);
-  --tabbar-bg: color-mix(in oklab, var(--tono) 8%, #141518);
-  --tabbar-h: 68px;
+  /* EL ACENTO ES LA LUZ. Lo principal es un botón de tiza con letra
+     oscura; lo resaltado, texto más claro. Ningún color de fondo. */
+  --accent: #f1f1ee;
+  --accent-ink: #f1f1ee;
+  --accent-soft: rgba(255,255,255,0.08);
+  --text-strong: #f1f1ee;
+  --text-muted: #9d9ea4;
+  --text-faint: #6b6c72;
+  --accion-fondo: #f1f1ee;
+  --accion-tinta: #0b0b0d;
+  /* Velos: un poco de luz sobre la placa, para lo tonal y lo elegido. */
+  --velo: rgba(255,255,255,0.06);
+  --velo-fuerte: rgba(255,255,255,0.11);
+  --hairline-fuerte: rgba(255,255,255,0.16);
+  /* El brillo del canto de arriba: lo que hace que una placa parezca una
+     pieza maquinada y no un rectángulo pintado. */
+  --brillo: rgba(255,255,255,0.055);
+  --sombra-placa: 0 28px 56px -36px rgba(0,0,0,0.95);
+  /* El único color propio: el de los récords, dorado viejo y en poco lugar. */
+  --record: #e2c47f;
+  --bar-bg: rgba(11,11,13,0.8);
+  --tabbar-bg: rgba(28,28,31,0.76);
+  --tabbar-h: 64px;
   /* Alto del dock de abajo (descanso en curso + sesión). Lo escribe el
      propio dock al cambiar de tamaño, y lo leen el aire de abajo de la
      página y la barra del chat, que tienen que quedar por encima. */
   --dock-alto: 0px;
-  --social-tinta: #C4B5FD;
-  --tinta-oscura: #08090b;
-  --disco-fantasma: rgba(255,255,255,0.075);
+  --social-tinta: #d6d6db;
+  --tinta-oscura: #0b0b0d;
+  --disco-fantasma: rgba(255,255,255,0.11);
   /* Resortes: suben rápido, se pasan un poco y vuelven. Sólo para lo que
      responde a un toque (apretar, guardar una serie, elegir un día). */
   --resorte: linear(0, 0.006, 0.025 2.8%, 0.101 6.1%, 0.539 18.9%, 0.721 25.3%, 0.849 31.5%, 0.937 38.1%, 0.968 41.8%, 0.991 45.7%, 1.006 50.1%, 1.015 55%, 1.017 63.9%, 1.001 85.9%, 1);
@@ -2855,28 +2837,39 @@ input, textarea, [contenteditable="true"] {
   --forma-galleta: ${GALLETA_URI};
   --forma-onda: ${ONDA_URI};
 }
-/* En claro, los colores de cada pestaña no llegan al contraste mínimo como
-   texto chico sobre blanco: se oscurecen. */
 .light-mode {
-  --social-tinta: #6D28D9;
-  --accent-ink: #0f766e;
-  --accent-soft: color-mix(in oklab, #14B8A6 13%, transparent);
-  --text-strong: #17181a;
-  --text-muted: #55585d;
-  --text-faint: #85888d;
-  --bar-bg: color-mix(in oklab, var(--app-bg) 90%, transparent);
-  --tabbar-bg: color-mix(in oklab, var(--tono) 5%, #fbfbf9);
-  --disco-fantasma: rgba(20,22,26,0.07);
+  --social-tinta: #3f3f46;
+  --accent: #131315;
+  --accent-ink: #131315;
+  --accent-soft: rgba(0,0,0,0.06);
+  --text-strong: #131315;
+  --text-muted: #5b5d62;
+  --text-faint: #8b8d92;
+  --accion-fondo: #131315;
+  --accion-tinta: #ffffff;
+  --velo: rgba(0,0,0,0.045);
+  --velo-fuerte: rgba(0,0,0,0.075);
+  --hairline-fuerte: rgba(0,0,0,0.14);
+  --brillo: rgba(255,255,255,0.95);
+  --sombra-placa: 0 1px 2px rgba(0,0,0,0.04), 0 16px 36px -24px rgba(0,0,0,0.22);
+  --record: #93701f;
+  --bar-bg: rgba(239,239,237,0.84);
+  --tabbar-bg: rgba(255,255,255,0.8);
+  --disco-fantasma: rgba(0,0,0,0.12);
 }
 
-html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; }
-::selection { background: color-mix(in oklab, var(--tono) 38%, transparent); }
+html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; font-feature-settings: "tnum" 0; }
+/* Mona Sans tiene dos juegos de números: los proporcionales (los lindos) y
+   los tabulares, que son su corte monoespaciado, con el cero tachado y el
+   "1" con base: cara de terminal. La app usa siempre los proporcionales,
+   aunque una clase pida tabular-nums (font-feature-settings le gana a
+   font-variant-numeric). */
+::selection { background: var(--hairline-fuerte); }
 
 /* Títulos: pesados, apretados y con las puntas apenas redondeadas. */
 h1, h2, .font-display {
   font-family: var(--font-display);
-  letter-spacing: -0.018em;
-  font-variation-settings: "ROND" 60;
+  letter-spacing: -0.025em;
 }
 /* SIN MAYÚSCULAS SOSTENIDAS. Los rótulos ya estaban escritos como oración
    ("Tu plan", "Racha") y se pasaban a mayúscula con espaciado de máquina de
@@ -2895,15 +2888,15 @@ h1, h2, .font-display {
 .tabular-nums:is(.text-base, .text-lg, .text-xl, .text-2xl, .text-3xl, .text-4xl, .text-5xl, .text-6xl),
 .num-display {
   font-family: var(--font-display);
-  font-variation-settings: "ROND" 100;
+  font-stretch: 80%;
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.015em;
+  letter-spacing: -0.02em;
 }
 
 /* Foco visible para quien navega con teclado (y lector de pantalla). */
 :focus-visible { outline: 2px solid var(--accent-ink); outline-offset: 2px; border-radius: 8px; }
 input:focus-visible, textarea:focus-visible, select:focus-visible { outline: none; }
-.lucide[stroke-width="2"] { stroke-width: 1.9px; }
+.lucide[stroke-width="2"] { stroke-width: 1.6px; }
 
 /* LA GALLETA: un círculo festoneado de nueve lóbulos (ver caminoGalleta).
    Es la forma de lo que se completa: la serie, el ejercicio, el avatar de
@@ -2926,12 +2919,14 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
   display: flex; align-items: center; justify-content: center; gap: 8px;
   min-height: 52px; padding: 0 22px; border-radius: 999px;
   font-weight: 700; font-size: 0.9375rem; letter-spacing: -0.005em;
-  color: color-mix(in oklab, var(--c, var(--tono)) 22%, var(--tinta-oscura));
-  background: color-mix(in oklab, var(--c, var(--tono)) 76%, white);
+  color: var(--accion-tinta);
+  background: var(--accion-fondo);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.5), 0 10px 22px -14px rgba(0,0,0,0.9);
   transition: border-radius .4s var(--resorte), transform .25s var(--resorte), filter .2s ease;
 }
 .boton-pildora:active { border-radius: 18px; transform: scale(.975); }
-.light-mode .boton-pildora { background: var(--c, var(--tono)); }
+.light-mode .boton-pildora { box-shadow: 0 10px 22px -14px rgba(0,0,0,0.5); }
+.light-mode .boton-pildora { background: var(--accion-fondo); }
 
 /* FONDO: el clima del día. Arriba, donde va el título, un velo del color de
    lo que estás mirando que se apaga antes de las tarjetas. Es imagen de
@@ -2943,12 +2938,12 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
    (la barra del chat, que va en un portal sobre <body>) les queda encima. */
 .app-fondo {
   background-color: var(--app-bg);
-  background-image: radial-gradient(130% 70% at 20% -12%, color-mix(in oklab, var(--tono) 19%, transparent), transparent 68%);
+  background-image: radial-gradient(120% 60% at 50% -10%, rgba(255,255,255,0.05), transparent 70%);
   background-repeat: no-repeat;
   background-size: 100% 560px;
 }
 .light-mode.app-fondo {
-  background-image: radial-gradient(130% 70% at 20% -12%, color-mix(in oklab, var(--tono) 16%, transparent), transparent 68%);
+  background-image: radial-gradient(120% 60% at 50% -10%, rgba(255,255,255,0.85), transparent 70%);
 }
 
 /* ── BARRA DE ARRIBA ─────────────────────────────────────────────────────
@@ -2965,7 +2960,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 }
 .app-bar-titulo {
   font-weight: 700; font-size: 1.0625rem; letter-spacing: -0.012em; color: var(--text-strong);
-  font-variation-settings: "ROND" 60;
+ 
   opacity: 0; transform: translateY(6px);
   transition: opacity .2s ease, transform .35s var(--resorte);
 }
@@ -2973,7 +2968,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 .boton-redondo {
   width: 40px; height: 40px; border-radius: 999px; flex: none;
   display: flex; align-items: center; justify-content: center;
-  color: var(--text-muted); background: var(--surface-2);
+  color: var(--text-muted); background: var(--velo); box-shadow: inset 0 0 0 1px var(--hairline);
   transition: border-radius .35s var(--resorte), color .2s ease;
 }
 .boton-redondo:active { border-radius: 14px; }
@@ -2984,53 +2979,50 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 .titulo-pagina h1 {
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
   color: var(--text-strong);
-  font-size: 2.5rem; line-height: 1; font-weight: 760; letter-spacing: -0.035em;
-  font-variation-settings: "ROND" 70;
+  font-size: 2.25rem; line-height: 1; font-weight: 720; letter-spacing: -0.04em;
 }
 .titulo-pagina .ceja-beta {
   padding: 4px 9px; border-radius: 999px; font-size: 0.75rem; font-weight: 650; letter-spacing: 0;
-  background: color-mix(in oklab, var(--tono) 20%, transparent);
-  color: color-mix(in oklab, var(--tono) 55%, white);
+  background: var(--velo);
+  color: var(--text-strong);
 }
-.light-mode .titulo-pagina .ceja-beta { color: color-mix(in oklab, var(--tono) 62%, black); }
+.light-mode .titulo-pagina .ceja-beta { color: var(--text-strong); }
 .titulo-pagina .bajada {
   margin-top: 8px; font-size: 0.9375rem; line-height: 1.4; color: var(--text-muted);
   max-width: 46ch; text-wrap: pretty;
 }
 
 /* ── BARRA DE ABAJO ──────────────────────────────────────────────────────
-   Apoyada abajo de todo, del ancho de la pantalla, como la de Android. La
-   pestaña elegida lleva una píldora rellena del color de la pestaña que se
-   estira al tocarla. */
+   Una isla de vidrio ahumado, despegada de los bordes: el contenido pasa por
+   debajo y se ve apenas, desenfocado. La pestaña elegida lleva la píldora
+   de tiza; las demás, sólo el ícono fino y su nombre. */
+:root { --tabbar-aire: 10px; }
 .barra-pestanas {
-  position: fixed; z-index: 20; left: 0; right: 0; bottom: 0;
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  position: fixed; z-index: 20; left: 12px; right: 12px;
+  bottom: calc(var(--tabbar-aire) + env(safe-area-inset-bottom, 0px));
+  border-radius: 999px; padding: 0 4px;
   background: var(--tabbar-bg);
-  box-shadow: 0 -1px 0 var(--hairline);
+  -webkit-backdrop-filter: blur(22px) saturate(150%); backdrop-filter: blur(22px) saturate(150%);
+  box-shadow: inset 0 1px 0 var(--brillo), inset 0 0 0 1px var(--hairline), 0 22px 44px -18px rgba(0,0,0,0.9);
 }
+.light-mode .barra-pestanas { box-shadow: inset 0 0 0 1px var(--hairline), 0 18px 36px -20px rgba(0,0,0,0.3); }
 @media (min-width: 1024px) { .barra-pestanas { display: none; } }
 .barra-pestanas button {
   flex: 1; min-width: 0; height: var(--tabbar-h);
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px;
-  color: var(--text-muted);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  color: var(--text-faint);
 }
 .barra-pestanas .indicador {
-  width: 52px; height: 32px; border-radius: 999px;
+  width: 44px; height: 30px; border-radius: 999px;
   display: flex; align-items: center; justify-content: center;
   transition: width .5s var(--resorte), background-color .25s ease, color .2s ease;
 }
-.barra-pestanas .etiqueta { font-size: 0.75rem; font-weight: 550; line-height: 1; letter-spacing: 0; transition: color .2s ease; }
-.barra-pestanas [aria-current="page"] .indicador {
-  width: 64px;
-  color: color-mix(in oklab, var(--tab-color) 22%, var(--tinta-oscura));
-  background: color-mix(in oklab, var(--tab-color) 76%, white);
-}
-.light-mode .barra-pestanas [aria-current="page"] .indicador {
-  color: color-mix(in oklab, var(--tab-color) 62%, black);
-  background: color-mix(in oklab, var(--tab-color) 24%, white);
-}
-.barra-pestanas [aria-current="page"] .etiqueta { color: var(--text-strong); font-weight: 700; }
-.barra-pestanas [aria-current="page"] .lucide { stroke-width: 2.2px; }
+.barra-pestanas .etiqueta { font-size: 0.6875rem; font-weight: 550; line-height: 1; letter-spacing: 0; transition: color .2s ease; }
+.barra-pestanas [aria-current="page"] { color: var(--text-strong); }
+.barra-pestanas .indicador { position: relative; isolation: isolate; }
+.barra-pestanas .indicador-fondo { position: absolute; inset: 0; z-index: -1; border-radius: 999px; background: var(--accion-fondo); }
+.barra-pestanas [aria-current="page"] .indicador { width: 54px; color: var(--accion-tinta); }
+.barra-pestanas [aria-current="page"] .etiqueta { font-weight: 650; }
 .barra-pestanas button:focus-visible { outline: none; }
 .barra-pestanas button:focus-visible .indicador { outline: 2px solid var(--accent-ink); outline-offset: 2px; }
 
@@ -3043,16 +3035,17 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 
 /* ── DOCK DE ABAJO (descanso en curso + sesión) ────────────────────────── */
 :root {
-  --dock-bg: color-mix(in oklab, var(--tono) 9%, #1a1b1e);
-  --dock-sombra: 0 14px 34px -14px rgba(0,0,0,0.8), 0 2px 6px rgba(0,0,0,0.35);
+  --dock-bg: rgba(28,28,31,0.84);
+  --dock-sombra: inset 0 1px 0 var(--brillo), 0 22px 44px -18px rgba(0,0,0,0.9);
 }
 .light-mode {
-  --dock-bg: color-mix(in oklab, var(--tono) 4%, #ffffff);
-  --dock-sombra: 0 12px 30px -12px rgba(28,28,24,0.24), 0 1px 3px rgba(28,28,24,0.08);
+  --dock-bg: rgba(255,255,255,0.88);
+  --dock-sombra: 0 18px 36px -20px rgba(0,0,0,0.3);
 }
 .dock-tarjeta {
   position: relative; overflow: hidden;
   background: var(--dock-bg);
+  -webkit-backdrop-filter: blur(22px) saturate(150%); backdrop-filter: blur(22px) saturate(150%);
   border: 1px solid var(--hairline);
   border-radius: 26px;
   box-shadow: var(--dock-sombra);
@@ -3060,43 +3053,44 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 .sesion-dock-reloj { font-size: 1.45rem; line-height: 1; font-weight: 750; color: var(--text-strong); }
 .sesion-dock-dia {
   font-size: 0.8125rem; font-weight: 650; min-width: 0;
-  color: color-mix(in oklab, var(--c) 55%, white);
+  color: var(--text-strong);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.light-mode .sesion-dock-dia { color: color-mix(in oklab, var(--c) 62%, black); }
+.light-mode .sesion-dock-dia { color: var(--text-strong); }
 .sesion-dock-latido { --galleta-fondo: var(--c); width: 14px; height: 14px; animation: latidoGalleta 2.4s ease-in-out infinite; }
 @keyframes latidoGalleta { 0%, 100% { transform: rotate(0) scale(1); } 50% { transform: rotate(40deg) scale(.86); } }
 .boton-finalizar {
   flex: none; align-self: center; margin-right: 10px;
   display: flex; align-items: center; gap: 6px; height: 44px; padding: 0 16px; border-radius: 999px;
   font-size: 0.8125rem; font-weight: 700;
-  color: color-mix(in oklab, var(--c) 55%, white);
-  background: color-mix(in oklab, var(--c) 18%, transparent);
+  color: var(--text-strong);
+  background: var(--velo);
   transition: border-radius .35s var(--resorte), transform .2s ease;
 }
-.light-mode .boton-finalizar { color: color-mix(in oklab, var(--c) 62%, black); }
+.light-mode .boton-finalizar { color: var(--text-strong); }
 .boton-finalizar:active { border-radius: 14px; transform: scale(.97); }
 .boton-finalizar.listo {
-  color: color-mix(in oklab, var(--c) 22%, var(--tinta-oscura));
-  background: color-mix(in oklab, var(--c) 76%, white);
+  color: var(--accion-tinta);
+  background: var(--accion-fondo);
 }
-.light-mode .boton-finalizar.listo { background: var(--c); }
+.light-mode .boton-finalizar.listo { background: var(--accion-fondo); }
 
 /* ── CRONÓMETRO DE DESCANSO ─────────────────────────────────────────────
-   Corriendo es un contenedor del color del día con el tiempo grande y una
-   onda que se acorta: una barra que se mueve hace sentir más corta la
-   espera que una quieta (lo midió Google para Material 3 Expressive). */
+   Quieto es un renglón fino: el reloj chico y "Iniciar". Corriendo, el
+   tiempo grande y angosto, los controles en píldoras de vidrio y una onda
+   de tiza que se acorta: una barra que se mueve hace sentir más corta la
+   espera que una quieta. */
 .descanso {
   display: flex; align-items: center; gap: 10px;
-  border-radius: 22px; padding: 8px 8px 8px 14px;
+  border-radius: 18px; padding: 6px 6px 6px 12px;
   transition: background-color .3s ease;
 }
-.descanso-quieto { background: var(--surface-2); }
+.descanso-quieto { background: transparent; box-shadow: inset 0 0 0 1px var(--hairline); }
 .descanso-activo {
-  flex-direction: column; align-items: stretch; gap: 10px; padding: 12px 12px 14px 16px;
-  background: color-mix(in oklab, var(--c, var(--tono)) 15%, var(--surface-1));
+  flex-direction: column; align-items: stretch; gap: 12px; padding: 12px 12px 14px 16px; border-radius: 20px;
+  background: var(--surface-2); box-shadow: inset 0 1px 0 var(--brillo);
 }
-.light-mode .descanso-activo { background: color-mix(in oklab, var(--c, var(--tono)) 13%, #ffffff); }
+.light-mode .descanso-activo { box-shadow: inset 0 0 0 1px var(--hairline); }
 /* En pantallas muy angostas los controles bajan a su propio renglón: así
    el tiempo y su rótulo no se cortan. */
 @media (max-width: 359px) {
@@ -3104,9 +3098,9 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
   .descanso-controles { width: 100%; justify-content: space-between; }
 }
 .descanso-listo { padding: 8px 8px 8px 10px; }
-.descanso-rotulo { font-size: 0.8125rem; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.descanso-rotulo { font-size: 0.8125rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .descanso-tiempo {
-  margin-top: 2px; font-size: 2.35rem; line-height: 0.95; font-weight: 760; white-space: nowrap;
+  margin-top: 2px; font-size: 2.75rem; line-height: 0.92; font-weight: 700; font-stretch: 76%; letter-spacing: -0.03em; white-space: nowrap;
   transition: color .3s ease;
 }
 /* 44px de alto: el mínimo cómodo para un dedo transpirado y apurado. Ancho
@@ -3114,42 +3108,37 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 .descanso-boton {
   min-width: 44px; height: 44px; padding: 0 7px; border-radius: 999px;
   display: flex; align-items: center; justify-content: center;
-  font-weight: 700; font-size: 0.875rem; font-variant-numeric: tabular-nums;
+  font-weight: 650; font-size: 0.875rem; font-variant-numeric: tabular-nums;
   color: var(--text-strong);
-  background: color-mix(in oklab, var(--c, var(--tono)) 12%, var(--surface-2));
+  background: var(--velo); box-shadow: inset 0 0 0 1px var(--hairline);
   transition: border-radius .35s var(--resorte), transform .2s ease;
 }
 .descanso-boton:active { border-radius: 14px; transform: scale(.96); }
-.descanso-boton-principal {
-  min-width: 56px;
-  color: color-mix(in oklab, var(--c, var(--tono)) 22%, var(--tinta-oscura));
-  background: color-mix(in oklab, var(--c, var(--tono)) 76%, white);
-}
-.light-mode .descanso-boton-principal { background: var(--c, var(--tono)); }
+.descanso-boton-principal { min-width: 56px; color: var(--accion-tinta); background: var(--accion-fondo); box-shadow: none; }
 .dock-descanso-embebido { border-bottom: 1px solid var(--hairline); }
 @media (max-width: 360px) {
   .descanso-boton { min-width: 38px; height: 42px; padding: 0 5px; }
   .descanso-boton-principal { min-width: 46px; }
-  .descanso-tiempo { font-size: 2.2rem; }
+  .descanso-tiempo { font-size: 2.4rem; }
 }
-/* La onda: lo que queda es una línea ondulada que corre; lo que ya pasó,
-   una línea quieta y tenue. */
+/* La onda: lo que queda es una línea ondulada de tiza que corre; lo que ya
+   pasó, una línea quieta y tenue. */
 .onda { display: flex; align-items: center; gap: 5px; height: 12px; }
 .onda-llena {
   height: 12px; flex: none; min-width: 0;
-  background: var(--onda-color, var(--c, var(--tono)));
+  background: var(--onda-color, var(--text-strong));
   -webkit-mask: var(--forma-onda) repeat-x 0 50% / 24px 12px; mask: var(--forma-onda) repeat-x 0 50% / 24px 12px;
   animation: ondaCorre 1.1s linear infinite;
   transition: width .9s linear;
 }
-.onda.quieta .onda-llena { animation: none; }
-.onda-vacia { flex: 1; height: 4px; border-radius: 999px; background: color-mix(in oklab, var(--onda-color, var(--c, var(--tono))) 22%, transparent); }
+.onda.quieta .onda-llena { animation: none; opacity: .5; }
+.onda-vacia { flex: 1; height: 3px; border-radius: 999px; background: var(--velo-fuerte); }
 @keyframes ondaCorre { to { -webkit-mask-position: 24px 50%; mask-position: 24px 50%; } }
 
 /* ── CRONÓMETRO DE CARDIO ───────────────────────────────────────────────── */
 .segmentado {
   display: flex; gap: 3px; padding: 3px; border-radius: 999px;
-  background: var(--surface-2);
+  background: var(--surface-1); box-shadow: inset 0 0 0 1px var(--hairline);
 }
 .segmentado > button {
   flex: 1; min-width: 0; height: 36px; border-radius: 999px;
@@ -3158,10 +3147,10 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
   transition: background-color .2s ease, color .2s ease;
 }
 .segmentado > button.activo {
-  color: color-mix(in oklab, var(--c, var(--tono)) 22%, var(--tinta-oscura)) !important;
-  background: color-mix(in oklab, var(--c, var(--tono)) 76%, white) !important;
+  color: var(--accion-tinta) !important;
+  background: var(--accion-fondo) !important;
 }
-.light-mode .segmentado > button.activo { background: var(--c, var(--tono)) !important; }
+.light-mode .segmentado > button.activo { background: var(--accion-fondo) !important; }
 .cardio-reloj {
   border-radius: 22px; padding: 12px 12px 14px 16px;
   background: var(--surface-2);
@@ -3169,283 +3158,239 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 }
 
 /* ── SOLAPAS DE DÍA (Rutina y Descarga) ─────────────────────────────────
-   Botones unidos, como un grupo de Material 3 Expressive: puntas chicas
-   hacia adentro, redondas en los extremos, y el día elegido se vuelve una
-   píldora llena de su color. La solapa es un contenedor: 100cqi es su
-   ancho real, y la letra se achica lo justo para que la palabra más larga
-   (--largo, en letras) entre entera. Nunca se parte una palabra. */
-.selector-dias { display: flex; gap: 3px; }
+   Un riel de grafito con los días; el elegido es la píldora de tiza. El
+   color de cada día queda en su punto, antes del nombre: lo único de color
+   del selector. El que toca hoy lleva una rayita abajo.
+   La solapa es un contenedor: 100cqi es su ancho real, y la letra se achica
+   lo justo para que la palabra más larga (--largo, en letras) entre
+   entera. Nunca se parte una palabra. Si la solapa es angosta, el punto
+   sube arriba del nombre en vez de quitarle ancho. */
+.selector-dias {
+  display: flex; gap: 3px; padding: 4px; border-radius: 999px;
+  background: var(--surface-1); box-shadow: inset 0 0 0 1px var(--hairline);
+}
 .dia-solapa {
   container-type: inline-size;
   flex: 1 1 0; min-width: 0;
-  border-radius: 10px;
-  background: var(--surface-1); color: var(--text-muted);
-  transition: border-radius .5s var(--resorte), background-color .25s ease, color .2s ease, transform .2s ease;
-}
-.selector-dias > .dia-solapa:first-child { border-top-left-radius: 999px; border-bottom-left-radius: 999px; }
-.selector-dias > .dia-solapa:last-child { border-top-right-radius: 999px; border-bottom-right-radius: 999px; }
-.dia-solapa[aria-selected="true"], .dia-solapa.elegida {
   border-radius: 999px;
-  color: color-mix(in oklab, var(--dia) 22%, var(--tinta-oscura)) !important;
-  background: color-mix(in oklab, var(--dia) 76%, white) !important;
+  background: transparent; color: var(--text-muted);
+  transition: background-color .25s ease, color .2s ease, transform .2s ease;
 }
-.light-mode .dia-solapa[aria-selected="true"], .light-mode .dia-solapa.elegida {
-  color: color-mix(in oklab, var(--dia) 22%, var(--tinta-oscura)) !important;
-  background: var(--dia) !important;
+.dia-solapa[aria-selected="true"], .dia-solapa.elegida {
+  color: var(--accion-tinta) !important;
+  background: var(--accion-fondo) !important;
 }
-.dia-solapa-hoy { position: absolute; top: 7px; right: 9px; width: 6px; height: 6px; border-radius: 999px; background: var(--dia); }
-.dia-solapa[aria-selected="true"] .dia-solapa-hoy { background: currentColor; }
+.dia-solapa-hoy { position: absolute; left: 50%; bottom: 6px; transform: translateX(-50%); width: 14px; height: 3px; border-radius: 2px; background: var(--text-faint); }
+.dia-solapa[aria-selected="true"] .dia-solapa-hoy { background: color-mix(in oklab, var(--accion-tinta) 40%, transparent); }
 .dia-solapa-texto {
   display: block; text-align: center;
-  font-weight: 650; letter-spacing: -0.005em; line-height: 1.1;
+  font-weight: 600; letter-spacing: -0.005em; line-height: 1.1;
   font-size: var(--fs-max, 0.9rem);
-  font-size: min(var(--fs-max, 0.95rem), calc(100cqi / var(--largo, 6) * 1.5));
+  font-size: min(var(--fs-max, 0.95rem), calc(100cqi / var(--largo, 6) * 1.45));
   overflow-wrap: normal; word-break: normal; hyphens: manual;
   text-wrap: balance;
 }
+.dia-solapa-texto::before {
+  content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 999px;
+  vertical-align: 0.1em; background: var(--dia);
+}
+@container (max-width: 86px) { .dia-solapa-texto::before { display: block; margin: 0 auto 5px; } }
 
-/* ── RUTINA: el día, sus ejercicios y cada serie ────────────────────────── */
-/* El día: un contenedor de su color, con el nombre enorme, la barra
-   cargada y el botón para empezar. Es lo primero que se ve y lo que más
-   color tiene de la pantalla, a propósito. */
+/* ── RUTINA: el día, sus ejercicios y cada serie ──────────────────────── */
+/* LA PLACA: así se ve todo contenedor. Grafito apenas más claro que la
+   página, con el canto de 1px y un brillo arriba, como una pieza de metal
+   bajo la luz del techo. Ningún color de fondo: lo que distingue un nivel
+   de otro es la luz. */
+:root { --placa-canto: inset 0 1px 0 var(--brillo), inset 0 0 0 1px var(--hairline); }
+.light-mode { --placa-canto: inset 0 0 0 1px var(--hairline); }
+/* El día: el nombre grande y angosto, la barra cargada y el botón para
+   empezar. Lo único de color es el punto del día. */
 .dia-hero {
   position: relative; overflow: hidden; container-type: inline-size;
-  border-radius: 30px; padding: 14px 16px 16px;
-  background: color-mix(in oklab, var(--c) 15%, var(--surface-1));
+  border-radius: 28px; padding: 18px;
+  background: linear-gradient(180deg, var(--surface-2), var(--surface-1) 72%);
+  box-shadow: var(--placa-canto), var(--sombra-placa);
 }
-.light-mode .dia-hero { background: color-mix(in oklab, var(--c) 14%, #ffffff); }
+.light-mode .dia-hero { background: var(--surface-1); box-shadow: var(--placa-canto), var(--sombra-placa); }
 .dia-chip {
-  margin: 2px 0 8px; display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px; border-radius: 999px;
-  font-size: 0.75rem; font-weight: 650;
-  color: color-mix(in oklab, var(--c) 55%, white);
-  background: color-mix(in oklab, var(--c) 20%, transparent);
+  margin: 0 0 10px; display: inline-flex; align-items: center; gap: 7px; height: 26px; padding: 0 10px 0 9px; border-radius: 999px;
+  font-size: 0.75rem; font-weight: 600; color: var(--text-muted); background: var(--velo);
 }
-.light-mode .dia-chip { color: color-mix(in oklab, var(--c) 62%, black); }
+.dia-chip::before { content: ""; width: 7px; height: 7px; border-radius: 999px; background: var(--c, var(--tono)); flex: none; }
+.dia-chip > .lucide { display: none; }
 .dia-titulo {
-  margin: 4px 44px 0 0;
-  font-size: 2.75rem;
-  font-size: min(2.75rem, calc(100cqi / var(--largo, 6) * 1.5));
-  line-height: 0.98; font-weight: 800; letter-spacing: -0.04em;
-  font-variation-settings: "ROND" 100;
-  color: color-mix(in oklab, var(--c) 28%, var(--text-strong));
+  margin: 2px 46px 0 0;
+  font-size: 3.5rem;
+  font-size: min(3.75rem, calc(100cqi / var(--largo, 6) * 1.9));
+  line-height: 0.9; font-weight: 800; font-stretch: 76%; letter-spacing: -0.04em;
+  color: var(--text-strong);
   overflow-wrap: normal; word-break: normal; text-wrap: balance;
 }
-.light-mode .dia-titulo { color: color-mix(in oklab, var(--c) 45%, black); }
-.dia-bajada { margin-top: 6px; font-size: 0.875rem; line-height: 1.4; color: var(--text-muted); text-wrap: pretty; }
-.dia-barra { margin-top: 12px; }
-.dia-barra-texto { margin-top: 4px; font-size: 0.8125rem; font-weight: 550; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.dia-bajada { margin-top: 8px; font-size: 0.875rem; line-height: 1.4; color: var(--text-muted); text-wrap: pretty; }
+.dia-barra { margin-top: 14px; }
+.dia-barra-texto { margin-top: 6px; font-size: 0.8125rem; font-weight: 500; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .dia-barra-ayuda { margin-top: 1px; font-size: 0.75rem; color: var(--text-faint); }
-.dia-barra-texto b { font-weight: 750; color: var(--text-strong); font-variation-settings: "ROND" 100; font-size: 1.05rem; }
-.dia-hero .boton-pildora { width: 100%; margin-top: 14px; }
+.dia-barra-texto b { margin-right: 2px; font-weight: 700; font-stretch: 80%; letter-spacing: -0.02em; color: var(--text-strong); font-size: 1.35rem; }
+.dia-hero .boton-pildora { width: 100%; margin-top: 16px; }
 
-.tarjeta-plan { border-radius: 26px; padding: 16px; background: var(--surface-1); }
-/* Tarjetas sin borde: las separa del fondo su superficie (y, si tienen un
-   color propio, un tinte de ese color). */
-.tarjeta-tonal { border-radius: 26px; background: color-mix(in oklab, var(--c, var(--tono)) 8%, var(--surface-1)); }
-.light-mode .tarjeta-tonal { background: color-mix(in oklab, var(--c, var(--tono)) 7%, #ffffff); }
-.seccion-plegable { border-radius: 26px; background: var(--surface-1); }
-.icono-galleta {
-  width: 40px; height: 40px;
-  --galleta-fondo: color-mix(in oklab, var(--c, var(--tono)) 20%, transparent);
-  color: color-mix(in oklab, var(--c, var(--tono)) 55%, white);
-}
-.light-mode .icono-galleta { color: color-mix(in oklab, var(--c, var(--tono)) 62%, black); }
+.tarjeta-plan { border-radius: 24px; padding: 16px; background: var(--surface-1); box-shadow: var(--placa-canto); }
+.tarjeta-tonal { border-radius: 24px; background: var(--surface-1); box-shadow: var(--placa-canto); }
+.seccion-plegable { border-radius: 24px; background: var(--surface-1); box-shadow: var(--placa-canto); }
+.icono-galleta { width: 38px; height: 38px; --galleta-fondo: var(--surface-3); color: var(--text-strong); }
 
-/* La tarjeta de cada ejercicio. Sin borde: la separa del fondo su propia
-   superficie. Abierta, sube un tono y toma un filo del color del día. */
+/* La tarjeta de cada ejercicio: una placa. Abierta, toma sombra. */
 .ejercicio {
-  background: var(--surface-1); border-radius: 26px; overflow: hidden;
-  transition: background-color .25s ease, box-shadow .25s ease;
+  background: var(--surface-1); border-radius: 24px; overflow: hidden;
+  box-shadow: var(--placa-canto);
+  transition: box-shadow .25s ease;
 }
-.ejercicio.abierto {
-  background: color-mix(in oklab, var(--c) 5%, var(--surface-1));
-  box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--c) 32%, transparent);
-}
+.ejercicio.abierto { box-shadow: var(--placa-canto), var(--sombra-placa); }
 .ejercicio-cabecera { transition: background-color .15s ease; }
-.ejercicio-cabecera:active { background-color: color-mix(in oklab, var(--text-strong) 4%, transparent); }
+.ejercicio-cabecera:active { background-color: var(--velo); }
 .ejercicio-numero {
-  width: 40px; height: 40px;
-  --galleta-fondo: color-mix(in oklab, var(--c) 22%, var(--surface-2));
-  font-weight: 750; font-size: 1rem; font-variation-settings: "ROND" 100; font-variant-numeric: tabular-nums;
-  color: color-mix(in oklab, var(--c) 55%, white);
+  width: 30px; height: 30px; border-radius: 999px;
+  --galleta-fondo: transparent; box-shadow: inset 0 0 0 1px var(--hairline-fuerte);
+  font-weight: 650; font-size: 0.75rem; font-variant-numeric: tabular-nums; color: var(--text-faint);
 }
-.light-mode .ejercicio-numero { --galleta-fondo: color-mix(in oklab, var(--c) 20%, #ffffff); color: color-mix(in oklab, var(--c) 62%, black); }
-.ejercicio.completo .ejercicio-numero {
-  --galleta-fondo: color-mix(in oklab, var(--c) 76%, white);
-  color: color-mix(in oklab, var(--c) 22%, var(--tinta-oscura));
-}
-.light-mode .ejercicio.completo .ejercicio-numero { --galleta-fondo: var(--c); color: color-mix(in oklab, var(--c) 22%, var(--tinta-oscura)); }
-.ejercicio-nombre { font-size: 1rem; font-weight: 650; line-height: 1.25; color: var(--text-strong); letter-spacing: -0.008em; text-wrap: pretty; }
-.ejercicio-musculo {
-  display: inline-flex; align-items: center; height: 22px; padding: 0 9px; border-radius: 999px;
-  font-size: 0.75rem; font-weight: 600;
-  color: color-mix(in oklab, var(--c) 55%, white);
-  background: color-mix(in oklab, var(--c) 16%, transparent);
-}
-.light-mode .ejercicio-musculo { color: color-mix(in oklab, var(--c) 62%, black); }
+.ejercicio.completo .ejercicio-numero { --galleta-fondo: var(--accion-fondo); color: var(--accion-tinta); box-shadow: none; }
+.ejercicio-nombre { font-size: 1rem; font-weight: 650; line-height: 1.25; color: var(--text-strong); letter-spacing: -0.012em; text-wrap: pretty; }
+.ejercicio-musculo { display: inline; font-size: 0.8125rem; font-weight: 500; color: var(--text-muted); }
 .ejercicio.completo .ejercicio-nombre { color: var(--text-muted); }
-/* Las series de un ejercicio cerrado: un disquito por serie, con los mismos
-   colores de la barra cargada. Lleno = hecha hoy. */
-.series-discos { display: inline-flex; align-items: center; gap: 2px; }
-.series-discos i { width: 6px; height: 16px; border-radius: 2.5px; background: var(--disco-fantasma); }
-.series-discos i.hecha { background: var(--disco); }
+/* Las series de un ejercicio cerrado: una rayita por serie, de tiza la
+   que ya hiciste hoy. */
+.series-discos { display: inline-flex; align-items: center; gap: 3px; }
+.series-discos i { width: 4px; height: 14px; border-radius: 2px; background: var(--velo-fuerte); }
+.series-discos i.hecha { background: var(--text-strong); }
 
 /* ── LA SERIE ────────────────────────────────────────────────────────────
-   Una sola serie a la vez está "en foco": la que toca ahora (o la que
-   estás corrigiendo). Esa se abre con el tablero grande —reps × kilos,
-   tu marca y la vez pasada a la vista, los ± y guardar—, como la versión
-   de los campos grandes que funcionaba. Las demás son renglones de una
-   línea: las hechas muestran lo que hiciste, las que faltan su objetivo.
-   Así un ejercicio de cuatro series entra en una pantalla. */
-.series-lista { display: flex; flex-direction: column; gap: 6px; }
+   Una serie en foco: el visor con reps × kilos grandes y angostos, el ✓ de
+   tiza, y debajo de cada número su − y su +. Arriba, en una sola línea, qué
+   serie es y contra qué jugás (tu récord o la meta). Lo de la vez pasada no
+   se repite: ya viene escrito en el visor.
+   Las otras series son renglones finos separados por un canto: las hechas
+   con lo que hiciste, las que faltan con su rango. */
+.series-lista { display: flex; flex-direction: column; gap: 0; }
 .serie { min-width: 0; }
 .serie-linea {
-  width: 100%; min-height: 50px; display: flex; align-items: center; gap: 12px;
-  padding: 5px 12px 5px 6px; border-radius: 18px; text-align: left;
-  background: var(--surface-2);
-  transition: background-color .2s ease, border-radius .35s var(--resorte);
+  width: 100%; min-height: 48px; display: flex; align-items: center; gap: 12px;
+  padding: 6px 8px 6px 6px; border-radius: 14px; text-align: left;
+  background: transparent;
+  transition: background-color .2s ease;
 }
-.serie-linea:active { border-radius: 12px; }
-.serie-hecha .serie-linea { background: color-mix(in oklab, var(--c) 13%, var(--surface-2)); }
-.serie-galleta { width: 38px; height: 38px; font-weight: 750; font-size: 0.9375rem; font-variation-settings: "ROND" 100; font-variant-numeric: tabular-nums; }
-.serie-galleta.hueca { --galleta-borde: color-mix(in oklab, var(--text-strong) 22%, transparent); --galleta-fondo: var(--surface-2); color: var(--text-muted); }
-.serie-galleta.llena { --galleta-fondo: color-mix(in oklab, var(--c) 76%, white); color: color-mix(in oklab, var(--c) 22%, var(--tinta-oscura)); }
-.light-mode .serie-galleta.llena { --galleta-fondo: var(--c); }
-.serie-galleta.activa { --galleta-fondo: color-mix(in oklab, var(--c) 76%, white); color: color-mix(in oklab, var(--c) 22%, var(--tinta-oscura)); }
-.light-mode .serie-galleta.activa { --galleta-fondo: var(--c); }
-.serie-linea-valor { display: inline-flex; align-items: baseline; gap: 4px; font-variation-settings: "ROND" 100; font-variant-numeric: tabular-nums; }
-.serie-linea-valor b { font-size: 1.3rem; font-weight: 750; color: var(--text-strong); line-height: 1; }
-.serie-linea-valor i { font-style: normal; font-size: 0.875rem; color: var(--text-faint); }
-.serie-linea-valor small { font-size: 0.8125rem; font-weight: 600; color: var(--text-muted); }
-.serie-linea-meta { display: flex; flex-direction: column; gap: 1px; min-width: 0; line-height: 1.2; }
-.serie-linea-meta b { font-size: 0.9375rem; font-weight: 650; color: var(--text-strong); }
-.serie-linea-meta span { display: inline-flex; align-items: center; gap: 4px; font-size: 0.8125rem; font-weight: 500; color: var(--text-muted); }
-.serie-linea-fin { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; flex: none; font-size: 0.8125rem; font-weight: 600; color: var(--text-muted); font-variant-numeric: tabular-nums; }
-.serie-mejora { display: inline-flex; align-items: center; gap: 3px; height: 24px; padding: 0 8px; border-radius: 999px; font-size: 0.75rem; font-weight: 700; color: #6ee7b7; background: rgba(16,185,129,0.14); }
-.light-mode .serie-mejora { color: #047857; background: rgba(16,185,129,0.14); }
+.serie-linea:active { background: var(--velo); }
+.series-lista > div:has(.serie-linea) + div:has(.serie-linea) .serie-linea { border-radius: 0 0 14px 14px; box-shadow: 0 -1px 0 var(--hairline); }
+.serie-galleta { width: 26px; height: 26px; font-weight: 650; font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+.serie-galleta.hueca { --galleta-borde: var(--hairline-fuerte); --galleta-fondo: var(--surface-1); color: var(--text-faint); }
+.serie-galleta.llena { --galleta-fondo: var(--accion-fondo); color: var(--accion-tinta); }
+.serie-galleta.activa { --galleta-fondo: var(--accion-fondo); color: var(--accion-tinta); }
+.serie-linea-valor { display: inline-flex; align-items: baseline; gap: 3px; font-variant-numeric: tabular-nums; }
+.serie-linea-valor b { font-size: 1.25rem; font-weight: 650; font-stretch: 84%; letter-spacing: -0.01em; color: var(--text-strong); line-height: 1; }
+.serie-linea-valor i { font-style: normal; font-size: 0.8125rem; color: var(--text-faint); margin: 0 2px; }
+.serie-linea-valor small { font-size: 0.75rem; font-weight: 500; color: var(--text-muted); }
+.serie-linea-meta { display: flex; align-items: center; gap: 6px; min-width: 0; line-height: 1.2; font-size: 0.875rem; font-weight: 500; color: var(--text-muted); }
+.serie-linea-fin { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; flex: none; font-size: 0.8125rem; font-weight: 500; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.serie-linea-fin .lucide { width: 13px; height: 13px; }
+.serie-mejora { display: inline-flex; align-items: center; gap: 3px; font-size: 0.8125rem; font-weight: 600; color: var(--text-strong); }
 .serie-valor-rpe {
-  font-size: 0.6875rem; font-weight: 700; padding: 2px 7px; border-radius: 999px;
-  background: var(--surface-3); color: var(--text-muted); margin-left: 4px; align-self: center;
-  font-variation-settings: "ROND" 0;
+  font-size: 0.6875rem; font-weight: 650; padding: 2px 7px; border-radius: 999px;
+  background: var(--velo); color: var(--text-muted); margin-left: 6px; align-self: center;
 }
-.serie-aviso { font-size: 0.8125rem; line-height: 1.4; margin: 6px 4px 2px 52px; text-wrap: pretty; }
+.serie-aviso { font-size: 0.8125rem; line-height: 1.4; margin: 2px 4px 6px 44px; text-wrap: pretty; }
 
 /* La serie en foco. */
 .serie-foco {
-  border-radius: 24px; padding: 12px;
-  background: color-mix(in oklab, var(--c) 11%, var(--surface-2));
-  box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--c) 30%, transparent);
+  margin: 6px 0; border-radius: 22px; padding: 12px 10px 10px;
+  background: var(--surface-2); box-shadow: inset 0 1px 0 var(--brillo);
   animation: focoEntra .45s var(--resorte) backwards;
 }
-.light-mode .serie-foco { background: color-mix(in oklab, var(--c) 9%, #ffffff); }
-@keyframes focoEntra { from { transform: scale(.97); opacity: .4; } }
-.serie-foco.va-record { box-shadow: inset 0 0 0 2px #10B981, 0 0 22px -8px rgba(16,185,129,0.6); }
-.foco-cabecera { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.foco-titulo { display: flex; align-items: baseline; gap: 8px; min-width: 0; font-size: 1rem; font-weight: 700; color: var(--text-strong); }
-.foco-titulo span { font-size: 0.875rem; font-weight: 550; color: var(--text-muted); font-variant-numeric: tabular-nums; }
-.foco-chip { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 9px; border-radius: 999px; font-size: 0.75rem; font-weight: 650; }
-.foco-cancelar { margin-left: auto; height: 32px; padding: 0 12px; border-radius: 999px; font-size: 0.8125rem; font-weight: 650; color: var(--text-muted); background: var(--surface-3); }
-/* El marcador: contra qué jugás (tu récord o la meta) y la vez pasada, en
-   dos columnas con el mismo esqueleto, para comparar bajando la vista. */
-.foco-marcador { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }
-.marcador-celda {
-  min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
-  padding: 8px 11px 9px; border-radius: 16px; text-align: left;
-  background: color-mix(in oklab, var(--c) 8%, var(--surface-1));
+.light-mode .serie-foco { box-shadow: inset 0 0 0 1px var(--hairline); }
+@keyframes focoEntra { from { transform: scale(.98); opacity: .4; } }
+.serie-foco.va-record { box-shadow: inset 0 0 0 1.5px var(--record); }
+.foco-cabecera { display: flex; align-items: baseline; gap: 10px; padding: 0 6px; min-width: 0; }
+.foco-titulo { display: flex; align-items: baseline; gap: 8px; min-width: 0; font-size: 0.9375rem; font-weight: 650; color: var(--text-strong); }
+.foco-titulo span { font-size: 0.875rem; font-weight: 500; color: var(--text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.foco-titulo .foco-tipo, .serie-linea-meta .foco-tipo { color: var(--text-faint); }
+.foco-fuerza { color: var(--text-faint); align-self: center; flex: none; }
+.foco-pasada { margin: 4px 6px 0; font-size: 0.8125rem; color: var(--text-faint); }
+.foco-pasada b { font-weight: 600; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.foco-ref { margin-left: auto; display: inline-flex; align-items: baseline; gap: 5px; flex: none; font-size: 0.8125rem; color: var(--text-faint); white-space: nowrap; }
+.foco-ref b { font-weight: 650; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+button.foco-ref:active { opacity: .7; }
+.foco-cancelar { margin-left: auto; height: 30px; padding: 0 12px; border-radius: 999px; font-size: 0.8125rem; font-weight: 600; color: var(--text-muted); background: var(--velo); }
+/* El visor: un pozo con los dos números y el ✓ de tiza. */
+.foco-visor {
+  display: grid; grid-template-columns: minmax(0, 1fr) 16px minmax(0, 1fr) 60px; align-items: center;
+  margin-top: 10px; padding: 4px 6px 4px 2px; border-radius: 18px;
+  background: var(--panel-sunken); box-shadow: inset 0 1px 2px rgba(0,0,0,0.55), inset 0 0 0 1px var(--hairline);
 }
-.marcador-celda:only-child { grid-column: 1 / -1; }
-.marcador-vacio { flex-direction: row; align-items: center; gap: 8px; padding: 10px 12px; font-size: 0.8125rem; font-weight: 550; color: var(--text-muted); }
-.marcador-rotulo { display: inline-flex; align-items: center; gap: 5px; font-size: 0.75rem; font-weight: 600; color: var(--text-muted); white-space: nowrap; }
-.marcador-valor { display: inline-flex; align-items: baseline; gap: 3px; font-size: 1.3rem; line-height: 1; font-weight: 750; font-variation-settings: "ROND" 100; font-variant-numeric: tabular-nums; color: color-mix(in oklab, var(--c) 45%, white); }
-.light-mode .marcador-valor { color: color-mix(in oklab, var(--c) 58%, black); }
-.marcador-valor i { font-style: normal; font-size: 0.8125rem; opacity: .6; }
-.marcador-valor small { font-size: 0.75rem; font-weight: 650; opacity: .75; }
-.marcador-celda.secundaria .marcador-valor { color: var(--text-strong); }
-.marcador-extra { font-size: 0.75rem; font-weight: 550; color: var(--text-muted); }
-/* El tablero: los dos números grandes y guardar. */
-.foco-tablero {
-  display: grid; grid-template-columns: minmax(0, 1fr) 12px minmax(0, 1fr) 64px;
-  align-items: stretch; gap: 8px 6px; margin-top: 10px;
-}
-.foco-campo { position: relative; min-width: 0; }
+.light-mode .foco-visor { box-shadow: inset 0 1px 2px rgba(0,0,0,0.06), inset 0 0 0 1px var(--hairline); }
+.foco-campo { position: relative; min-width: 0; display: flex; flex-direction: column; align-items: center; }
 .foco-input {
-  width: 100%; height: 76px; padding: 20px 4px 4px; border-radius: 20px; text-align: center;
-  background: var(--panel-sunken); color: var(--text-strong);
-  border: 1.5px solid transparent;
-  font-size: 2.1rem; font-weight: 750; font-variation-settings: "ROND" 100; font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
-  -moz-appearance: textfield; appearance: textfield;
-  transition: border-color .15s ease, background-color .15s ease, border-radius .35s var(--resorte);
+  width: 100%; height: 62px; padding: 0 2px; border: 0; border-radius: 12px; background: transparent; text-align: center;
+  color: var(--text-strong); font-size: 3.1rem; line-height: 1; font-weight: 650; font-stretch: 78%; letter-spacing: -0.035em; font-variant-numeric: tabular-nums;
+  -moz-appearance: textfield; appearance: textfield; caret-color: var(--text-strong);
+  transition: background-color .15s ease;
 }
 .foco-input::-webkit-outer-spin-button, .foco-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-.foco-input:focus { outline: none; border-color: color-mix(in oklab, var(--c) 80%, white); border-radius: 16px; background: color-mix(in oklab, var(--c) 7%, var(--panel-sunken)); }
-.light-mode .foco-input { background: color-mix(in oklab, var(--c) 4%, #ffffff); }
-.light-mode .foco-input:focus { border-color: var(--c); }
+.foco-input:focus { outline: none; background: var(--velo); }
 .foco-input::placeholder { color: var(--text-faint); opacity: .5; }
-.foco-campo-rotulo {
-  position: absolute; top: 8px; left: 0; right: 0; z-index: 1;
-  display: flex; align-items: center; justify-content: center; gap: 3px;
-  font-size: 0.75rem; font-weight: 600; color: var(--text-muted); pointer-events: none;
-}
-button.foco-campo-rotulo { pointer-events: auto; left: 50%; right: auto; transform: translateX(-50%); top: 4px; height: 24px; padding: 0 9px; border-radius: 999px; color: color-mix(in oklab, var(--c) 55%, white); }
-.light-mode button.foco-campo-rotulo { color: color-mix(in oklab, var(--c) 62%, black); }
-button.foco-campo-rotulo:active { background: color-mix(in oklab, var(--c) 16%, transparent); }
-.foco-por { align-self: center; text-align: center; color: var(--text-faint); font-size: 1rem; }
+.foco-campo-rotulo { margin: -4px 0 6px; display: flex; align-items: center; justify-content: center; gap: 3px; font-size: 0.6875rem; font-weight: 550; color: var(--text-faint); pointer-events: none; }
+button.foco-campo-rotulo { pointer-events: auto; height: 22px; padding: 0 8px; margin: -4px 0 6px; border-radius: 999px; color: var(--text-muted); }
+button.foco-campo-rotulo:active { background: var(--velo); }
+.foco-por { align-self: center; text-align: center; color: var(--text-faint); font-size: 1.05rem; font-weight: 300; padding-bottom: 14px; }
 .foco-guardar {
-  height: 76px; border-radius: 24px;
+  width: 52px; height: 52px; justify-self: end; border-radius: 999px;
   display: flex; align-items: center; justify-content: center;
-  color: color-mix(in oklab, var(--c) 22%, var(--tinta-oscura));
-  background: color-mix(in oklab, var(--c) 76%, white);
-  transition: border-radius .4s var(--resorte), transform .25s var(--resorte), background-color .2s ease;
+  color: var(--accion-tinta); background: var(--accion-fondo);
+  box-shadow: 0 8px 18px -10px rgba(0,0,0,0.9);
+  transition: transform .25s var(--resorte), background-color .2s ease;
 }
-.light-mode .foco-guardar { background: var(--c); }
-.foco-guardar:active { border-radius: 32px; transform: scale(.95); }
-.serie-foco.va-record .foco-guardar, .foco-guardar.hecha { background: #34d399; color: #022c22; }
-.foco-ajustes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
+.foco-guardar:active { transform: scale(.92); }
+.serie-foco.va-record .foco-guardar, .foco-guardar.hecha { background: var(--record); color: #1c1505; }
+/* − y + debajo de cada número: chicos, de contorno, sin relleno. */
+.foco-ajustes-fila { display: grid; grid-template-columns: minmax(0, 1fr) 16px minmax(0, 1fr) 60px; margin-top: 8px; padding: 0 6px 0 2px; }
+.foco-ajustes { display: flex; justify-content: center; gap: 8px; }
 .foco-ajustes button {
-  height: 38px; border-radius: 999px;
-  font-size: 0.875rem; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text-strong);
-  background: color-mix(in oklab, var(--c) 9%, var(--surface-1));
-  transition: border-radius .35s var(--resorte), transform .2s ease;
+  width: 46px; height: 36px; border-radius: 999px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-muted); box-shadow: inset 0 0 0 1px var(--hairline-fuerte);
+  transition: transform .2s ease, background-color .2s ease, color .2s ease;
 }
-.foco-ajustes button:active { border-radius: 12px; transform: scale(.96); }
-.foco-ajustes button small { font-size: 0.6875rem; font-weight: 600; color: var(--text-faint); margin-left: 2px; }
-.foco-record { display: flex; align-items: center; gap: 6px; margin: 8px 2px 0; font-size: 0.8125rem; font-weight: 650; color: #6ee7b7; }
-.light-mode .foco-record { color: #047857; }
-.serie-foco .serie-aviso { margin: 8px 2px 0; }
+.foco-ajustes button:active { transform: scale(.92); background: var(--velo); color: var(--text-strong); }
+.foco-record { display: flex; align-items: center; gap: 6px; margin: 8px 6px 0; font-size: 0.8125rem; font-weight: 600; color: var(--record); }
+.serie-foco .serie-aviso { margin: 8px 6px 0; }
 .foco-extras { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .foco-extras > * { flex: 1 1 140px; }
 .serie-sugerencia {
   display: flex; align-items: center; gap: 6px; width: 100%; margin-top: 8px;
-  padding: 9px 12px; border-radius: 16px; font-size: 0.8125rem; font-weight: 600;
-  color: color-mix(in oklab, var(--c) 55%, white);
-  background: color-mix(in oklab, var(--c) 12%, transparent);
+  padding: 9px 12px; border-radius: 14px; font-size: 0.8125rem; font-weight: 600;
+  color: var(--text-strong); background: var(--velo);
 }
-.light-mode .serie-sugerencia { color: color-mix(in oklab, var(--c) 62%, black); }
 .serie-boton-suave {
   display: flex; align-items: center; justify-content: center; gap: 6px;
-  width: 100%; height: 38px; border-radius: 999px;
-  background: color-mix(in oklab, var(--c, var(--tono)) 7%, var(--surface-1)); color: var(--text-muted);
-  font-size: 0.8125rem; font-weight: 600;
+  width: 100%; height: 36px; border-radius: 999px;
+  background: transparent; box-shadow: inset 0 0 0 1px var(--hairline); color: var(--text-muted);
+  font-size: 0.8125rem; font-weight: 550;
 }
 .serie-chip {
   display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 9px; border-radius: 999px;
-  font-size: 0.75rem; font-weight: 700; font-variant-numeric: tabular-nums;
+  font-size: 0.75rem; font-weight: 650; font-variant-numeric: tabular-nums;
 }
 .serie-cardio { padding: 4px 0 2px; }
-.serie-rotulo { font-weight: 700; font-size: 0.9375rem; color: var(--text-strong); }
+.serie-rotulo { font-weight: 650; font-size: 0.9375rem; color: var(--text-strong); }
 
 /* ── PORTADA (login) ──────────────────────────────────────────────────── */
 .login-galleta {
   position: absolute; width: 560px; height: 560px; right: -250px; top: -220px; pointer-events: none;
-  --galleta-fondo: color-mix(in oklab, #14B8A6 16%, transparent);
+  --galleta-fondo: rgba(255,255,255,0.035);
   animation: galletaGira 60s linear infinite;
 }
-.login-galleta.chica { width: 220px; height: 220px; right: auto; left: -90px; top: auto; bottom: 120px; --galleta-fondo: color-mix(in oklab, #F4C430 12%, transparent); animation-duration: 45s; animation-direction: reverse; }
+.login-galleta.chica { width: 220px; height: 220px; right: auto; left: -90px; top: auto; bottom: 120px; --galleta-fondo: rgba(255,255,255,0.025); animation-duration: 45s; animation-direction: reverse; }
 @keyframes galletaGira { to { transform: rotate(360deg); } }
-.login-marca { font-weight: 750; font-size: 1.05rem; letter-spacing: -0.01em; color: #fff; font-variation-settings: "ROND" 60; }
+.login-marca { font-weight: 750; font-size: 1.05rem; letter-spacing: -0.01em; color: #fff; }
 .login-titulo {
   font-size: 3.25rem; line-height: 0.95; font-weight: 800;
-  letter-spacing: -0.045em; color: #fff; font-variation-settings: "ROND" 100;
+  letter-spacing: -0.028em; color: #fff; font-stretch: 82%;
 }
 .login-bajada {
   margin-top: 18px; max-width: 30ch; font-size: 1rem; line-height: 1.45;
@@ -3453,27 +3398,37 @@ button.foco-campo-rotulo:active { background: color-mix(in oklab, var(--c) 16%, 
 }
 
 /* ── LA BARRA CARGADA ───────────────────────────────────────────────────
-   Una barra olímpica de verdad: mangas cromadas, topes, el agarre con su
-   moleteado y collarines del color del día que se corren a medida que
-   cargás. Los discos tienen volumen (luz arriba, sombra abajo) y su tamaño
-   real: los pesados, gruesos y altos adentro; el blanco de 5, chico afuera.
-   Lo que falta se ve como discos fantasma, sin el punteado de antes. */
+   Una barra olímpica de verdad: mangas cromadas, topes y el agarre con su
+   moleteado. Los discos son de goma negra, como en una sala de pesas
+   buena, y el color de competición queda en el filete del borde (rojo 25,
+   azul 20, amarillo 15, verde 10, blanco 5): se lee qué disco es sin que la
+   barra grite. Tienen su tamaño real —los pesados, gruesos y altos adentro;
+   el de 5, chico afuera—. Lo que falta es el contorno, apenas marcado.
+   Los collarines llevan el color del día: la única marca de color. */
 .barra-cargada { display: block; width: 100%; overflow: visible; }
-.acero-claro { stop-color: #e2e4e7; }
-.acero-medio { stop-color: #a9adb3; }
-.acero-oscuro { stop-color: #6c7076; }
-.light-mode .acero-claro { stop-color: #c9ccd0; }
-.light-mode .acero-medio { stop-color: #8f9399; }
-.light-mode .acero-oscuro { stop-color: #5d6167; }
+.acero-claro { stop-color: #e6e7ea; }
+.acero-medio { stop-color: #9b9da2; }
+.acero-oscuro { stop-color: #55575c; }
+.light-mode .acero-claro { stop-color: #d8d9dc; }
+.light-mode .acero-medio { stop-color: #8f9196; }
+.light-mode .acero-oscuro { stop-color: #55575c; }
+.goma-claro { stop-color: #3a3b40; }
+.goma-medio { stop-color: #202124; }
+.goma-oscuro { stop-color: #101113; }
 .moleteado { stroke: rgba(0,0,0,0.38); stroke-width: 0.7; }
-.disco { stroke: rgba(0,0,0,0.3); stroke-width: 0.6; }
-.disco-labio { fill: none; stroke: rgba(255,255,255,0.22); stroke-width: 0.8; }
-.disco-fantasma { fill: var(--disco-fantasma); }
-.collarin { fill: color-mix(in oklab, var(--c, var(--tono)) 76%, white); transition: transform .55s var(--resorte); }
+.disco { stroke: rgba(0,0,0,0.55); stroke-width: 0.5; }
+.disco-filete { fill: none; stroke-width: 1.2; }
+.disco-filete.f0 { stroke: #d2625e; }
+.disco-filete.f1 { stroke: #5d88d8; }
+.disco-filete.f2 { stroke: #d8b85c; }
+.disco-filete.f3 { stroke: #64ae81; }
+.disco-filete.f4 { stroke: #deded8; }
+.disco-fantasma { fill: none; stroke: var(--disco-fantasma); stroke-width: 0.9; }
+.collarin { fill: color-mix(in oklab, var(--c, var(--tono)) 72%, white); transition: transform .55s var(--resorte); }
 .light-mode .collarin { fill: var(--c, var(--tono)); }
 .disco-entra { transform-box: fill-box; transform-origin: center; animation: discoEntra .7s var(--resorte-vivo) backwards; }
 @keyframes discoEntra { from { transform: translateX(var(--desde, -24px)); opacity: 0; } 30% { opacity: 1; } to { transform: none; opacity: 1; } }
-.barra-cargada.completa .collarin { filter: drop-shadow(0 0 4px color-mix(in oklab, var(--c, var(--tono)) 70%, transparent)); }
+.barra-cargada.completa .collarin { filter: drop-shadow(0 0 4px color-mix(in oklab, var(--c, var(--tono)) 55%, transparent)); }
 @media (prefers-reduced-motion: reduce) {
   .disco-entra, .onda-llena, .serie-foco, .sesion-dock-latido, .login-galleta { animation: none !important; }
   .collarin, .galleta::before { transition: none !important; }
@@ -3495,13 +3450,13 @@ button.foco-campo-rotulo:active { background: color-mix(in oklab, var(--c) 16%, 
 .atleta-avatar {
   width: 62px; height: 62px; flex: none; overflow: hidden;
   display: flex; align-items: center; justify-content: center;
-  font-weight: 800; font-size: 1.5rem; color: var(--tinta-oscura); font-variation-settings: "ROND" 100;
+  font-weight: 800; font-size: 1.5rem; color: var(--tinta-oscura); font-stretch: 82%;
   background: color-mix(in oklab, var(--rango) 76%, white);
   -webkit-mask: var(--forma-galleta) center / contain no-repeat; mask: var(--forma-galleta) center / contain no-repeat;
 }
 .atleta-avatar > img { width: 100%; height: 100%; object-fit: cover; }
 .atleta-nombre {
-  font-weight: 750; font-size: 1.2rem; font-variation-settings: "ROND" 60;
+  font-weight: 750; font-size: 1.2rem;
   line-height: 1.1; color: var(--text-strong); overflow-wrap: anywhere;
 }
 .atleta-rango { display: flex; flex-direction: column; align-items: center; gap: 2px; flex: none; }
@@ -3513,7 +3468,7 @@ button.foco-campo-rotulo:active { background: color-mix(in oklab, var(--c) 16%, 
 .atleta-stats > div { min-width: 0; padding: 10px 11px; border-radius: 18px; background: color-mix(in oklab, var(--text-strong) 5%, transparent); }
 .atleta-stat-rotulo { display: flex; align-items: center; gap: 4px; font-size: 0.75rem; font-weight: 600; color: var(--text-muted); }
 .atleta-stat-valor {
-  margin-top: 5px; font-weight: 760; font-variation-settings: "ROND" 100;
+  margin-top: 5px; font-weight: 760; font-stretch: 82%;
   font-size: 1.75rem; line-height: 1; color: var(--text-strong); font-variant-numeric: tabular-nums;
 }
 .atleta-stat-valor small { font-size: 0.75rem; font-weight: 650; color: var(--text-muted); margin-left: 3px; }
@@ -3527,19 +3482,19 @@ button.foco-campo-rotulo:active { background: color-mix(in oklab, var(--c) 16%, 
    cuando ya les aplaudiste. */
 .historias { display: flex; gap: 14px; overflow-x: auto; padding: 4px 2px 6px; scroll-snap-type: x proximity; }
 .historia { position: relative; flex: none; width: 72px; display: flex; flex-direction: column; align-items: center; scroll-snap-align: start; }
-.historia-aro { width: 68px; height: 68px; --galleta-fondo: var(--dia); }
+.historia-aro { width: 68px; height: 68px; --galleta-fondo: color-mix(in oklab, var(--dia) 62%, var(--surface-3)); }
 .historia-aro.vista { --galleta-fondo: var(--hairline); }
 .historia-aro > img, .historia-aro > span {
   width: 58px; height: 58px; object-fit: cover;
   display: flex; align-items: center; justify-content: center;
   -webkit-mask: var(--forma-galleta) center / contain no-repeat; mask: var(--forma-galleta) center / contain no-repeat;
   background: var(--surface-2);
-  font-weight: 800; font-size: 1.3rem; color: var(--text-strong); font-variation-settings: "ROND" 100;
+  font-weight: 800; font-size: 1.3rem; color: var(--text-strong); font-stretch: 82%;
 }
 .historia-aplauso {
   position: absolute; top: 44px; right: -2px; width: 32px; height: 32px; border-radius: 999px;
   display: flex; align-items: center; justify-content: center; font-size: 15px;
-  background: #8B5CF6; color: #fff; border: 2px solid var(--app-bg);
+  background: var(--accion-fondo); color: var(--accion-tinta); border: 2px solid var(--app-bg);
   transition: transform .3s var(--resorte);
 }
 .historia-aplauso:active { transform: scale(.9); }
@@ -3550,12 +3505,12 @@ button.foco-campo-rotulo:active { background: color-mix(in oklab, var(--c) 16%, 
 .aviso-social {
   display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
   padding: 10px 12px; border-radius: 22px;
-  background: color-mix(in oklab, var(--c) 10%, var(--surface-1));
+  background: var(--surface-1);
 }
 .aviso-social-icono {
   width: 40px; height: 40px; flex: none;
   display: flex; align-items: center; justify-content: center; font-size: 18px;
-  color: var(--c); --galleta-fondo: color-mix(in oklab, var(--c) 20%, transparent);
+  color: var(--text-strong); --galleta-fondo: var(--velo);
 }
 .aviso-social p { flex: 1; min-width: 0; font-size: 0.8125rem; line-height: 1.35; color: var(--text-muted); }
 .aviso-social b { color: var(--text-strong); }
@@ -3566,7 +3521,7 @@ button.foco-campo-rotulo:active { background: color-mix(in oklab, var(--c) 16%, 
   position: relative; width: 54px; height: 54px; margin-bottom: 6px;
   display: flex; align-items: center; justify-content: center;
   --galleta-fondo: var(--medalla);
-  font-weight: 800; font-size: 1.2rem; color: var(--text-strong); font-variation-settings: "ROND" 100;
+  font-weight: 800; font-size: 1.2rem; color: var(--text-strong); font-stretch: 82%;
 }
 .podio-1 .podio-avatar { width: 66px; height: 66px; }
 .podio-avatar > span:not(.podio-medalla), .podio-avatar > img {
@@ -3581,11 +3536,11 @@ button.foco-campo-rotulo:active { background: color-mix(in oklab, var(--c) 16%, 
 }
 .podio-nombre { margin-top: 6px; max-width: 100%; font-size: 0.75rem; font-weight: 700; color: var(--text-strong); line-height: 1.15; overflow-wrap: anywhere; }
 .podio-lugar.yo .podio-nombre { color: var(--accent-ink); }
-.podio-dato { display: inline-flex; align-items: center; gap: 3px; margin-top: 2px; font-size: 0.75rem; font-weight: 750; font-variation-settings: "ROND" 100; }
+.podio-dato { display: inline-flex; align-items: center; gap: 3px; margin-top: 2px; font-size: 0.75rem; font-weight: 750; font-stretch: 82%; }
 .podio-escalon {
   margin-top: 8px; width: 100%; border-radius: 18px 18px 6px 6px;
   display: flex; align-items: flex-start; justify-content: center; padding-top: 6px;
-  font-weight: 800; font-size: 1.4rem; color: var(--medalla); font-variation-settings: "ROND" 100;
+  font-weight: 800; font-size: 1.4rem; color: var(--medalla); font-stretch: 82%;
   background: color-mix(in oklab, var(--medalla) 16%, transparent);
 }
 .podio-1 .podio-escalon { height: 64px; }
@@ -3597,90 +3552,90 @@ button.foco-campo-rotulo:active { background: color-mix(in oklab, var(--c) 16%, 
 /* ── SUPERSERIE ─────────────────────────────────────────────────────────── */
 .superserie {
   border-radius: 30px; padding: 10px;
-  background: color-mix(in oklab, var(--c) 8%, transparent);
+  background: var(--velo);
 }
 /* ── PIEZAS CHICAS ────────────────────────────────────────────────────── */
 /* Tu avatar, arriba a la izquierda: en galleta, del color de la pestaña. */
 .avatar-galleta {
   width: 40px; height: 40px; flex: none; overflow: hidden;
   display: flex; align-items: center; justify-content: center;
-  font-weight: 800; font-size: 1.05rem; font-variation-settings: "ROND" 100;
-  color: color-mix(in oklab, var(--tono) 22%, var(--tinta-oscura));
-  background: color-mix(in oklab, var(--tono) 76%, white);
+  font-weight: 800; font-size: 1.05rem; font-stretch: 82%;
+  color: var(--accion-tinta);
+  background: var(--accion-fondo);
   -webkit-mask: var(--forma-galleta) center / contain no-repeat; mask: var(--forma-galleta) center / contain no-repeat;
   transition: transform .35s var(--resorte);
 }
 .avatar-galleta:active { transform: scale(.92) rotate(-20deg); }
-.light-mode .avatar-galleta { background: var(--tono); }
+.light-mode .avatar-galleta { background: var(--accion-fondo); }
 /* El chip de "estás entrenando" de la barra de arriba. */
 .chip-sesion {
   display: flex; align-items: center; gap: 8px; flex: none; max-width: 52%;
   height: 36px; padding: 0 13px 0 11px; border-radius: 999px;
-  background: color-mix(in oklab, var(--c) 16%, transparent);
+  background: var(--velo);
 }
 /* Estados del cronómetro (descanso y cardio). */
-.descanso-listo { background: color-mix(in oklab, var(--c) 16%, var(--surface-1)); }
-.light-mode .descanso-listo { background: color-mix(in oklab, var(--c) 14%, #ffffff); }
+.descanso-listo { background: var(--surface-1); }
+.light-mode .descanso-listo { background: var(--surface-1); }
 .descanso-galleta {
   width: 38px; height: 38px;
-  --galleta-fondo: color-mix(in oklab, var(--c) 76%, white);
-  color: color-mix(in oklab, var(--c) 22%, var(--tinta-oscura));
+  --galleta-fondo: var(--accion-fondo);
+  color: var(--accion-tinta);
 }
-.light-mode .descanso-galleta { --galleta-fondo: var(--c); }
-.descanso-listo-texto { font-size: 0.9375rem; font-weight: 700; color: color-mix(in oklab, var(--c) 55%, white); }
-.light-mode .descanso-listo-texto { color: color-mix(in oklab, var(--c) 62%, black); }
-.descanso-rotulo { color: color-mix(in oklab, var(--c, var(--tono)) 55%, white); }
-.light-mode .descanso-rotulo { color: color-mix(in oklab, var(--c, var(--tono)) 62%, black); }
+.light-mode .descanso-galleta { --galleta-fondo: var(--accion-fondo); }
+.descanso-listo-texto { font-size: 0.9375rem; font-weight: 700; color: var(--text-strong); }
+.light-mode .descanso-listo-texto { color: var(--text-strong); }
+.descanso-rotulo { color: var(--text-strong); }
+.light-mode .descanso-rotulo { color: var(--text-strong); }
 .descanso-rotulo.en-pausa { color: var(--text-faint); }
 .descanso-rotulo-nombre { font-weight: 550; color: var(--text-muted); }
-.descanso-tiempo { color: color-mix(in oklab, var(--c, var(--tono)) 25%, var(--text-strong)); }
+.descanso-tiempo { color: var(--text-strong); }
 .descanso-tiempo.en-pausa { color: var(--text-muted); }
 .descanso-tiempo.apagado { color: var(--text-faint); }
 .descanso-tiempo.quieto { color: var(--text-strong); }
 .descanso-tiempo-dock { font-size: 2.05rem; }
 .descanso-iniciar {
   display: flex; align-items: center; gap: 6px; flex: none;
-  height: 40px; padding: 0 16px 0 13px; border-radius: 999px;
-  font-size: 0.8125rem; font-weight: 700;
-  color: color-mix(in oklab, var(--c) 22%, var(--tinta-oscura));
-  background: color-mix(in oklab, var(--c) 76%, white);
+  height: 36px; padding: 0 14px 0 12px; border-radius: 999px;
+  font-size: 0.8125rem; font-weight: 650;
+  color: var(--text-strong);
+  background: var(--velo); box-shadow: inset 0 0 0 1px var(--hairline);
   transition: border-radius .35s var(--resorte), transform .2s ease;
 }
 .descanso-iniciar:active { border-radius: 14px; transform: scale(.96); }
-.light-mode .descanso-iniciar { background: var(--c); }
-.cardio-reloj.en-marcha { background: color-mix(in oklab, var(--c, var(--tono)) 15%, var(--surface-1)); }
-.light-mode .cardio-reloj.en-marcha { background: color-mix(in oklab, var(--c, var(--tono)) 13%, #ffffff); }
+.light-mode .descanso-iniciar { background: var(--velo); }
+.cardio-reloj.en-marcha { background: var(--surface-1); }
+.light-mode .cardio-reloj.en-marcha { background: var(--surface-1); }
 /* La cabecera del día. */
-.dia-reset { position: absolute; top: 14px; right: 14px; z-index: 1; width: 38px; height: 38px; background: color-mix(in oklab, var(--c) 14%, transparent); color: var(--text-muted); }
+.dia-reset { position: absolute; top: 14px; right: 14px; z-index: 1; width: 38px; height: 38px; background: var(--velo); color: var(--text-muted); }
 .dia-aviso {
   width: 100%; display: flex; align-items: center; gap: 10px; text-align: left;
   padding: 11px 14px; border-radius: 18px; font-size: 0.8125rem; font-weight: 600;
-  color: color-mix(in oklab, var(--c) 55%, white);
-  background: color-mix(in oklab, var(--c) 16%, transparent);
+  color: var(--text-strong);
+  background: var(--velo);
 }
-.light-mode .dia-aviso { color: color-mix(in oklab, var(--c) 62%, black); }
+.light-mode .dia-aviso { color: var(--text-strong); }
 /* Esfuerzo y nota de la serie en foco: cerrados son dos botones lado a
    lado; abiertos ocupan el renglón entero. */
 .foco-extras > .extra-abierto { flex-basis: 100%; }
 .serie-nota {
   display: flex; align-items: flex-start; gap: 7px; width: 100%; text-align: left;
   padding: 9px 12px; border-radius: 16px; font-size: 0.8125rem; line-height: 1.4;
-  color: color-mix(in oklab, var(--c) 55%, white);
-  background: color-mix(in oklab, var(--c) 12%, transparent);
+  color: var(--text-strong);
+  background: var(--velo);
 }
-.light-mode .serie-nota { color: color-mix(in oklab, var(--c) 62%, black); }
+.light-mode .serie-nota { color: var(--text-strong); }
 .serie-linea:disabled { opacity: 1; cursor: default; }
 .collarin { transition: x .55s var(--resorte); }
 /* Portada. */
 .login-logo {
   width: 40px; height: 40px;
-  --galleta-fondo: color-mix(in oklab, #14B8A6 76%, white);
-  color: color-mix(in oklab, #14B8A6 22%, var(--tinta-oscura));
+  --galleta-fondo: var(--accion-fondo);
+  color: var(--accion-tinta);
 }
 .login-perfil-inicial {
-  width: 42px; height: 42px; font-weight: 800; font-size: 1.1rem; font-variation-settings: "ROND" 100;
-  --galleta-fondo: color-mix(in oklab, #14B8A6 76%, white);
-  color: color-mix(in oklab, #14B8A6 22%, var(--tinta-oscura));
+  width: 42px; height: 42px; font-weight: 800; font-size: 1.1rem; font-stretch: 82%;
+  --galleta-fondo: var(--accion-fondo);
+  color: var(--accion-tinta);
 }
 .login-barra { max-width: 340px; margin: 0 0 26px -4px; }
 /* El cuerpo de la tarjeta de ejercicio se abre y se cierra deslizándose
@@ -3701,11 +3656,11 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
   .descanso-tiempo.urgente { animation: none; }
 }
 /* Pestañas internas (Progreso, Social): botones unidos, como los días. */
-.pestanas-internas { display: flex; gap: 3px; }
+.pestanas-internas { display: flex; gap: 3px; padding: 4px; border-radius: 26px; background: var(--surface-1); box-shadow: inset 0 0 0 1px var(--hairline); }
 .pestana-interna {
-  flex: 1 1 0; min-width: 0; min-height: 60px; padding: 8px 4px;
+  flex: 1 1 0; min-width: 0; min-height: 56px; padding: 8px 4px;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
-  border-radius: 10px; background: var(--surface-1); color: var(--text-muted);
+  border-radius: 22px !important; background: transparent; color: var(--text-muted);
   font-size: 0.75rem; font-weight: 600; line-height: 1.1; text-align: center;
   transition: border-radius .5s var(--resorte), background-color .25s ease, color .2s ease, transform .2s ease;
 }
@@ -3714,24 +3669,24 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 .pestanas-internas > .pestana-interna:last-child { border-top-right-radius: 999px; border-bottom-right-radius: 999px; }
 .pestana-interna[aria-selected="true"] {
   border-radius: 999px; font-weight: 700;
-  color: color-mix(in oklab, var(--c) 22%, var(--tinta-oscura));
-  background: color-mix(in oklab, var(--c) 76%, white);
+  color: var(--accion-tinta);
+  background: var(--accion-fondo);
 }
-.light-mode .pestana-interna[aria-selected="true"] { background: var(--c); }
+.light-mode .pestana-interna[aria-selected="true"] { background: var(--accion-fondo); }
 /* La serie de la semana de descarga. */
-.descarga-serie { border-radius: 24px; padding: 12px; background: color-mix(in oklab, var(--c) 11%, var(--surface-2)); }
-.light-mode .descarga-serie { background: color-mix(in oklab, var(--c) 9%, #ffffff); }
+.descarga-serie { border-radius: 24px; padding: 12px; background: var(--surface-2); }
+.light-mode .descarga-serie { background: var(--surface-1); }
 /* Botón secundario en píldora, tonal del color que lo contiene. */
 .boton-tonal {
   display: flex; align-items: center; justify-content: center; gap: 8px;
   min-height: 46px; padding: 0 18px; border-radius: 999px;
   font-size: 0.875rem; font-weight: 650;
-  color: color-mix(in oklab, var(--c, var(--tono)) 55%, white);
-  background: color-mix(in oklab, var(--c, var(--tono)) 18%, transparent);
+  color: var(--text-strong);
+  background: var(--velo);
   transition: border-radius .4s var(--resorte), transform .25s var(--resorte);
 }
 .boton-tonal:active { border-radius: 16px; transform: scale(.975); }
-.light-mode .boton-tonal { color: color-mix(in oklab, var(--c, var(--tono)) 62%, black); }
+.light-mode .boton-tonal { color: var(--text-strong); }
 /* En escritorio el avatar y el botón de volver viven en la barra lateral:
    estas clases fijan su display, así que el lg:hidden de Tailwind (que va en
    una capa) no alcanza a esconderlos. */
@@ -3753,16 +3708,15 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
   background: color-mix(in oklab, var(--text-strong) 7%, transparent);
 }
 .chip-dato b { font-weight: 750; color: var(--text-strong); font-size: 0.9375rem; }
-.chip-dato.sube { color: #6ee7b7; background: rgba(16,185,129,0.15); font-weight: 750; }
+.chip-dato.sube { color: var(--text-strong); background: var(--velo); font-weight: 700; }
 .chip-dato.baja { color: #fda4af; background: rgba(244,63,94,0.15); font-weight: 750; }
-.chip-dato.records { color: color-mix(in oklab, var(--c, var(--tono)) 55%, white); background: color-mix(in oklab, var(--c, var(--tono)) 18%, transparent); font-weight: 750; }
-.light-mode .chip-dato.sube { color: #047857; }
+.chip-dato.records { color: var(--text-strong); background: var(--velo); font-weight: 750; }
+
 .light-mode .chip-dato.baja { color: #be123c; }
-.light-mode .chip-dato.records { color: color-mix(in oklab, var(--c, var(--tono)) 62%, black); }
+.light-mode .chip-dato.records { color: var(--text-strong); }
 
 /* La cadena: eslabones de frente (aros) y de canto (barritas). */
-.cadena { display: inline-flex; align-items: center; gap: 4px; flex: none; color: #fb923c; }
-.light-mode .cadena { color: #ea580c; }
+.cadena { display: inline-flex; align-items: center; gap: 4px; flex: none; color: var(--text-muted); }
 .cadena svg { display: block; overflow: visible; }
 .cadena .eslabon { fill: none; stroke: currentColor; stroke-width: 3.1; }
 .cadena .eslabon-canto { fill: currentColor; }
@@ -3777,56 +3731,54 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 .balanza-valor small { font-size: 0.95rem; font-weight: 600; color: var(--text-muted); }
 .balanza-delta {
   font-size: 0.8125rem; font-weight: 650; padding: 5px 11px; border-radius: 999px;
-  color: color-mix(in oklab, var(--c, #A855F7) 55%, white); background: color-mix(in oklab, var(--c, #A855F7) 17%, transparent);
+  color: var(--text-strong); background: var(--velo);
 }
-.light-mode .balanza-delta { color: color-mix(in oklab, var(--c, #A855F7) 62%, black); }
+.light-mode .balanza-delta { color: var(--text-strong); }
 .balanza-viga { position: relative; height: 40px; margin: 4px 10px 0; }
 .balanza-viga::before {
   content: ""; position: absolute; left: -6px; right: -6px; top: 17px; height: 6px; border-radius: 3px;
   background: linear-gradient(180deg, #e2e4e7, #a9adb3 55%, #6c7076);
 }
 .light-mode .balanza-viga::before { background: linear-gradient(180deg, #c9ccd0, #8f9399 55%, #5d6167); }
-.balanza-rango { position: absolute; top: 14px; height: 12px; border-radius: 6px; background: color-mix(in oklab, var(--c, #A855F7) 38%, transparent); }
+.balanza-rango { position: absolute; top: 14px; height: 12px; border-radius: 6px; background: var(--velo-fuerte); }
 .balanza-viga i { position: absolute; top: 25px; width: 1.5px; height: 5px; background: var(--text-faint); opacity: .55; transform: translateX(-50%); }
 .balanza-viga i.mayor { height: 9px; opacity: .9; }
 .balanza-pesa {
   position: absolute; top: 4px; width: 18px; height: 28px; transform: translateX(-50%); border-radius: 6px;
-  background: color-mix(in oklab, var(--c, #A855F7) 76%, white);
+  background: var(--accion-fondo);
   box-shadow: 0 6px 12px -6px rgba(0,0,0,0.7);
   transition: left .9s var(--resorte-vivo);
 }
-.light-mode .balanza-pesa { background: var(--c, #A855F7); }
-.balanza-pesa::after { content: ""; position: absolute; left: 50%; bottom: -6px; transform: translateX(-50%); border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid color-mix(in oklab, var(--c, #A855F7) 76%, white); }
-.light-mode .balanza-pesa::after { border-top-color: var(--c, #A855F7); }
-.balanza-pesa.fantasma { background: transparent; border: 2px dashed color-mix(in oklab, var(--c, #A855F7) 65%, transparent); box-shadow: none; }
+.light-mode .balanza-pesa { background: var(--accion-fondo); }
+.balanza-pesa::after { content: ""; position: absolute; left: 50%; bottom: -6px; transform: translateX(-50%); border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid var(--accion-fondo); }
+.light-mode .balanza-pesa::after { border-top-color: var(--accion-fondo); }
+.balanza-pesa.fantasma { background: transparent; border: 2px dashed var(--hairline-fuerte); box-shadow: none; }
 .balanza-pesa.fantasma::after { display: none; }
 .balanza-escala { display: flex; justify-content: space-between; margin: 0 4px; font-size: 11.5px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
 .balanza-leyenda { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12.5px; color: var(--text-muted); }
-.balanza-leyenda i { display: inline-block; width: 10px; height: 14px; border-radius: 3px; vertical-align: -2px; margin-right: 6px; background: color-mix(in oklab, var(--c, #A855F7) 76%, white); }
-.balanza-leyenda i.fantasma { background: transparent; border: 1.5px dashed color-mix(in oklab, var(--c, #A855F7) 65%, transparent); }
+.balanza-leyenda i { display: inline-block; width: 10px; height: 14px; border-radius: 3px; vertical-align: -2px; margin-right: 6px; background: var(--accion-fondo); }
+.balanza-leyenda i.fantasma { background: transparent; border: 1.5px dashed var(--hairline-fuerte); }
 
 /* La barra en equilibrio. */
 .equilibrio { display: grid; gap: 8px; }
 .equilibrio-dibujo { display: block; width: 100%; max-width: 340px; margin: 0 auto; overflow: visible; }
 .equilibrio-eje { fill: #a9adb3; }
 .light-mode .equilibrio-eje { fill: #8f9399; }
-.disco-empuje { fill: #E5383B; stroke: rgba(0,0,0,0.25); stroke-width: 0.6; }
-.disco-traccion { fill: #2F6FED; stroke: rgba(0,0,0,0.25); stroke-width: 0.6; }
+.disco-empuje { fill: #1d1e21; stroke: #d2625e; stroke-width: 1.3; }
+.disco-traccion { fill: #1d1e21; stroke: #5d88d8; stroke-width: 1.3; }
 .equilibrio-apoyo { fill: var(--surface-3); }
 .equilibrio-rotulos { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-muted); }
 .equilibrio-rotulos > span:last-child { text-align: right; }
 .equilibrio-rotulos b { font-size: 1.3rem; font-weight: 750; color: var(--text-strong); margin-right: 3px; }
-.equilibrio-veredicto { padding: 5px 11px; border-radius: 999px; font-weight: 650; font-size: 12px; text-align: center; color: #fcd34d; background: rgba(251,191,36,0.14); }
-.equilibrio-veredicto.ok { color: #6ee7b7; background: rgba(16,185,129,0.14); }
-.light-mode .equilibrio-veredicto { color: #b45309; }
-.light-mode .equilibrio-veredicto.ok { color: #047857; }
+.equilibrio-veredicto { padding: 5px 11px; border-radius: 999px; font-weight: 650; font-size: 12px; text-align: center; color: var(--text-muted); background: var(--velo); }
+.equilibrio-veredicto.ok { color: var(--text-strong); }
 .equilibrio-pie { text-align: center; font-size: 12px; color: var(--text-faint); }
 
 /* El reparto de la semana. */
 .reparto { display: grid; gap: 10px; }
 .reparto-barra { display: flex; gap: 3px; height: 14px; }
-.reparto-barra span { flex-basis: 0; min-width: 6px; border-radius: 4px; background: color-mix(in oklab, var(--dia) 80%, white); }
-.light-mode .reparto-barra span { background: var(--dia); }
+.reparto-barra span { flex-basis: 0; min-width: 6px; border-radius: 4px; background: color-mix(in oklab, var(--dia) 58%, var(--surface-3)); }
+.light-mode .reparto-barra span { background: color-mix(in oklab, var(--dia) 60%, white); }
 .reparto-barra span:first-child { border-radius: 999px 4px 4px 999px; }
 .reparto-barra span:last-child { border-radius: 4px 999px 999px 4px; }
 .reparto-barra span:only-child { border-radius: 999px; }
@@ -3834,12 +3786,12 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 .reparto-leyenda button {
   display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 12px 0 10px; border-radius: 999px;
   font-size: 12.5px; font-weight: 600; color: var(--text-strong);
-  background: color-mix(in oklab, var(--dia) 14%, transparent);
+  background: var(--velo);
 }
 .reparto-leyenda button:disabled { cursor: default; }
 .reparto-leyenda i { width: 8px; height: 8px; border-radius: 999px; background: var(--dia); }
-.reparto-leyenda b { font-weight: 750; color: color-mix(in oklab, var(--dia) 50%, white); }
-.light-mode .reparto-leyenda b { color: color-mix(in oklab, var(--dia) 60%, black); }
+.reparto-leyenda b { font-weight: 750; color: color-mix(in oklab, var(--dia) 58%, var(--surface-3)); }
+
 .reparto-dia { max-width: 9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* La semana perforada (carnet) y la semana como discos (aviso de descanso). */
@@ -3847,39 +3799,38 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 .semana-hueco-col { display: flex; flex-direction: column; align-items: center; gap: 3px; }
 .semana-hueco { display: block; width: 16px; height: 16px; border-radius: 999px; background: color-mix(in oklab, var(--text-strong) 9%, transparent); box-shadow: inset 0 1.5px 3px rgba(0,0,0,0.45); }
 .light-mode .semana-hueco { box-shadow: inset 0 1.5px 3px rgba(0,0,0,0.18); }
-.semana-hueco.picado { background: color-mix(in oklab, var(--dia) 82%, white); box-shadow: inset 0 2px 3px rgba(0,0,0,0.3); }
-.light-mode .semana-hueco.picado { background: var(--dia); }
+.semana-hueco.picado { background: color-mix(in oklab, var(--dia) 58%, var(--surface-3)); box-shadow: inset 0 2px 3px rgba(0,0,0,0.3); }
+.light-mode .semana-hueco.picado { background: color-mix(in oklab, var(--dia) 60%, white); }
 .semana-hueco.hoy { outline: 2px solid color-mix(in oklab, var(--text-strong) 55%, transparent); outline-offset: 1.5px; }
 .semana-hueco.futuro:not(.picado) { opacity: .45; }
 .semana-hueco-col em { font-style: normal; font-size: 10px; font-weight: 600; color: var(--text-faint); }
 .semana-plan { display: inline-flex; align-items: center; gap: 3px; flex: none; }
 .semana-plan i { display: block; width: 7px; height: 20px; border-radius: 3px; background: var(--disco-fantasma); }
-.semana-plan i[style] { background: color-mix(in oklab, var(--dia) 80%, white); }
-.light-mode .semana-plan i[style] { background: var(--dia); }
+.semana-plan i[style] { background: color-mix(in oklab, var(--dia) 58%, var(--surface-3)); }
+.light-mode .semana-plan i[style] { background: color-mix(in oklab, var(--dia) 60%, white); }
 .semana-plan i.hoy { outline: 2px solid var(--text-strong); outline-offset: 1.5px; }
 .aviso-descanso { width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 26px; text-align: left; background: var(--surface-1); }
 
 /* El carnet de socio. */
-.carnet { position: relative; overflow: hidden; border-radius: 28px; padding: 16px 16px 14px; background: color-mix(in oklab, var(--rango) 13%, var(--surface-1)); }
-.light-mode .carnet { background: color-mix(in oklab, var(--rango) 11%, #ffffff); }
+.carnet { position: relative; overflow: hidden; border-radius: 28px; padding: 16px 16px 14px; background: linear-gradient(180deg, var(--surface-2), var(--surface-1) 75%); box-shadow: var(--placa-canto), var(--sombra-placa); }
+.light-mode .carnet { background: var(--surface-1); }
 .carnet-arriba { display: flex; align-items: center; gap: 14px; }
 .carnet-avatar {
   width: 62px; height: 62px; flex: none; overflow: hidden;
   display: flex; align-items: center; justify-content: center;
-  font-weight: 800; font-size: 1.55rem; font-variation-settings: "ROND" 100;
-  color: color-mix(in oklab, var(--rango) 22%, var(--tinta-oscura));
-  background: color-mix(in oklab, var(--rango) 76%, white);
+  font-weight: 800; font-size: 1.55rem; font-stretch: 82%;
+  color: var(--accion-tinta);
+  background: var(--accion-fondo);
   -webkit-mask: var(--forma-galleta) center / contain no-repeat; mask: var(--forma-galleta) center / contain no-repeat;
 }
-.light-mode .carnet-avatar { background: var(--rango); }
 .carnet-avatar img { width: 100%; height: 100%; object-fit: cover; }
-.carnet-nombre { font-weight: 750; font-size: 1.2rem; line-height: 1.15; color: var(--text-strong); overflow-wrap: anywhere; font-variation-settings: "ROND" 60; }
-.carnet-linea { margin-top: 3px; font-size: 0.8125rem; font-weight: 550; color: color-mix(in oklab, var(--rango) 50%, var(--text-muted)); }
+.carnet-nombre { font-weight: 750; font-size: 1.2rem; line-height: 1.15; color: var(--text-strong); overflow-wrap: anywhere; }
+.carnet-linea { margin-top: 3px; font-size: 0.8125rem; font-weight: 500; color: var(--text-muted); }
 .carnet-medalla { flex: none; display: flex; align-items: center; justify-content: center; }
 /* El troquel: la línea de perforado de un ticket, de punta a punta. */
 .carnet-troquel {
   height: 6px; margin: 14px -16px 12px;
-  background: radial-gradient(circle, color-mix(in oklab, var(--rango) 30%, var(--hairline)) 2px, transparent 2.6px) repeat-x 4px 0 / 11px 6px;
+  background: radial-gradient(circle, var(--hairline-fuerte) 1.6px, transparent 2.2px) repeat-x 4px 0 / 10px 6px;
 }
 .carnet-abajo { display: flex; justify-content: space-between; align-items: flex-end; gap: 14px; flex-wrap: wrap; }
 .carnet-dato { display: grid; gap: 7px; }
@@ -3896,7 +3847,7 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 .pizarra-cabeza { min-height: 22px; }
 .pizarra-cabeza span { text-align: center; font-size: 11px; font-weight: 650; color: var(--text-faint); }
 .pizarra-cabeza span.hoy { color: var(--text-strong); }
-.pizarra-fila.yo { background: color-mix(in oklab, var(--tono) 10%, transparent); }
+.pizarra-fila.yo { background: var(--velo); }
 .pizarra-nombre { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 13px; font-weight: 600; color: var(--text-strong); }
 .pizarra-avatar {
   width: 26px; height: 26px; flex: none; overflow: hidden;
@@ -3908,8 +3859,8 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 .pizarra-marca { position: relative; justify-self: center; width: 22px; height: 24px; }
 .pizarra-marca::after { content: ""; position: absolute; left: 6px; right: 6px; top: 11px; height: 2px; border-radius: 1px; background: color-mix(in oklab, var(--text-strong) 14%, transparent); }
 /* Una pasada de fibrón del color del día. */
-.pizarra-marca.hecha::after { left: 9px; right: 9px; top: 2px; bottom: 2px; height: auto; border-radius: 3px; background: color-mix(in oklab, var(--dia) 82%, white); transform: rotate(16deg); }
-.light-mode .pizarra-marca.hecha::after { background: var(--dia); }
+.pizarra-marca.hecha::after { left: 9.5px; right: 9.5px; top: 2px; bottom: 2px; height: auto; border-radius: 2px; background: var(--text-strong); opacity: .88; transform: rotate(16deg); }
+
 .pizarra-marca.futura:not(.hecha)::after { opacity: 0; }
 .pizarra-invitacion { display: grid; gap: 12px; }
 .pizarra-invitacion .pizarra { opacity: .9; }
@@ -3925,24 +3876,24 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
   padding: 7px 0 6px; border-radius: 12px 12px 6px 6px;
   background: var(--disco-fantasma);
 }
-.escalon.pasada { background: color-mix(in oklab, var(--c) 40%, var(--surface-2)); }
-.escalon.actual { background: color-mix(in oklab, var(--c) 76%, white); box-shadow: 0 12px 26px -12px color-mix(in oklab, var(--c) 85%, transparent); }
-.light-mode .escalon.actual { background: var(--c); }
-.escalon.descarga { background: color-mix(in oklab, #A855F7 20%, var(--surface-2)); }
-.escalon.descarga.actual { background: color-mix(in oklab, #A855F7 76%, white); }
-.escalon-n { font-size: 11.5px; font-weight: 750; color: var(--text-muted); font-variation-settings: "ROND" 100; }
-.escalon.actual .escalon-n { color: color-mix(in oklab, var(--c) 22%, var(--tinta-oscura)); }
-.escalon-hoy { position: absolute; top: -20px; font-size: 11px; font-weight: 700; color: color-mix(in oklab, var(--c) 55%, white); }
-.light-mode .escalon-hoy { color: color-mix(in oklab, var(--c) 62%, black); }
+.escalon.pasada { background: var(--surface-3); }
+.escalon.actual { background: var(--accion-fondo); box-shadow: 0 12px 26px -12px var(--velo-fuerte); }
+.light-mode .escalon.actual { background: var(--accion-fondo); }
+.escalon.descarga { background: repeating-linear-gradient(-45deg, var(--surface-3) 0 3px, var(--surface-2) 3px 7px); }
+.escalon.descarga.actual { background: var(--accion-fondo); }
+.escalon-n { font-size: 11.5px; font-weight: 750; color: var(--text-muted); font-stretch: 82%; }
+.escalon.actual .escalon-n { color: var(--accion-tinta); }
+.escalon-hoy { position: absolute; top: -20px; font-size: 11px; font-weight: 700; color: var(--text-strong); }
+.light-mode .escalon-hoy { color: var(--text-strong); }
 .escalon-sesiones { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 100%; }
 .escalon-sesiones i { display: block; width: 52%; max-width: 18px; height: 3px; border-radius: 2px; background: color-mix(in oklab, var(--text-strong) 70%, transparent); }
-.escalon.actual .escalon-sesiones i { background: color-mix(in oklab, var(--c) 22%, var(--tinta-oscura)); }
+.escalon.actual .escalon-sesiones i { background: var(--accion-tinta); }
 @keyframes escalonSube { from { transform: scaleY(0.2); transform-origin: bottom; opacity: 0; } to { transform: none; opacity: 1; } }
 
 /* La escalera de récords (Ejercicios). */
-.selector-ejercicio { width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px 12px 10px 10px; border-radius: 22px; text-align: left; background: color-mix(in oklab, var(--c) 14%, var(--surface-2)); }
-.selector-ejercicio-dia { display: block; font-size: 12px; font-weight: 650; color: color-mix(in oklab, var(--c) 55%, white); }
-.light-mode .selector-ejercicio-dia { color: color-mix(in oklab, var(--c) 62%, black); }
+.selector-ejercicio { width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px 12px 10px 10px; border-radius: 22px; text-align: left; background: var(--surface-2); }
+.selector-ejercicio-dia { display: block; font-size: 12px; font-weight: 650; color: var(--text-strong); }
+.light-mode .selector-ejercicio-dia { color: var(--text-strong); }
 .selector-ejercicio-nombre { display: block; font-size: 1rem; font-weight: 700; line-height: 1.2; color: var(--text-strong); text-wrap: balance; }
 .records-hero { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .records-rotulo { font-size: 0.8125rem; font-weight: 600; color: var(--text-muted); }
@@ -3952,10 +3903,8 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 .records-sub { margin-top: 5px; font-size: 0.8125rem; color: var(--text-muted); }
 .records-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .records-pie { display: flex; align-items: center; gap: 8px; font-size: 0.8125rem; line-height: 1.4; color: var(--text-muted); }
-.records-pie.alerta { color: #fcd34d; }
-.records-pie.fuego { color: #fdba74; }
-.light-mode .records-pie.alerta { color: #b45309; }
-.light-mode .records-pie.fuego { color: #c2410c; }
+.records-pie.alerta { color: var(--record); }
+.records-pie.fuego { color: var(--text-strong); }
 .grafica-globo {
   position: absolute; z-index: 10; pointer-events: none; transform: translate(-50%, -100%);
   min-width: 132px; padding: 9px 12px; border-radius: 16px;
@@ -3965,8 +3914,8 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 .grafica-globo-serie { margin-top: 2px; font-size: 1.05rem; font-weight: 750; color: var(--text-strong); }
 .grafica-globo-dato { margin-top: 2px; font-size: 11.5px; color: var(--text-muted); }
 .sesion-renglon { display: grid; grid-template-columns: 28px 52px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px 12px 8px 8px; border-radius: 16px; background: var(--surface-2); }
-.sesion-renglon.record { background: color-mix(in oklab, var(--c) 12%, var(--surface-2)); }
-.sesion-renglon-marca { width: 26px; height: 26px; --galleta-fondo: color-mix(in oklab, var(--c) 76%, white); color: color-mix(in oklab, var(--c) 22%, var(--tinta-oscura)); }
+.sesion-renglon.record { background: var(--surface-2); }
+.sesion-renglon-marca { width: 26px; height: 26px; --galleta-fondo: var(--accion-fondo); color: var(--accion-tinta); }
 .sesion-renglon-marca.hueca { --galleta-borde: color-mix(in oklab, var(--text-strong) 18%, transparent); --galleta-fondo: var(--surface-2); color: var(--text-muted); }
 .sesion-renglon.descarga .sesion-renglon-marca { color: #c084fc; }
 .sesion-renglon-fecha { font-size: 12.5px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
@@ -3989,21 +3938,21 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 }
 .light-mode .hueco-dia { box-shadow: inset 0 2px 4px rgba(0,0,0,0.12); }
 .hueco-dia.picado {
-  color: color-mix(in oklab, var(--dia) 22%, var(--tinta-oscura)); font-weight: 750;
-  background: color-mix(in oklab, var(--dia) 80%, white);
+  color: var(--text-strong); font-weight: 750;
+  background: color-mix(in oklab, var(--dia) 58%, var(--surface-3));
   box-shadow: inset 0 2px 4px rgba(0,0,0,0.25);
 }
-.hueco-dia.picado[style*="--dia2"] { background: linear-gradient(135deg, color-mix(in oklab, var(--dia) 80%, white) 50%, color-mix(in oklab, var(--dia2) 80%, white) 50%); }
-.light-mode .hueco-dia.picado { background: var(--dia); }
+.hueco-dia.picado[style*="--dia2"] { background: linear-gradient(135deg, color-mix(in oklab, var(--dia) 58%, var(--surface-3)) 50%, color-mix(in oklab, var(--dia2) 58%, var(--surface-3)) 50%); }
+.light-mode .hueco-dia.picado { background: color-mix(in oklab, var(--dia) 60%, white); }
 .hueco-dia.picado:active { transform: scale(.9); }
 .hueco-dia.hoy { outline: 2px solid color-mix(in oklab, var(--text-strong) 55%, transparent); outline-offset: 2px; }
 .hueco-dia.elegido { outline: 2.5px solid var(--text-strong); outline-offset: 2px; }
 .hueco-dia:disabled { cursor: default; }
-.perforada-total { text-align: center; font-size: 13px; font-weight: 750; color: var(--text-muted); font-variation-settings: "ROND" 100; font-variant-numeric: tabular-nums; }
+.perforada-total { text-align: center; font-size: 13px; font-weight: 750; color: var(--text-muted); font-stretch: 82%; font-variant-numeric: tabular-nums; }
 .perforada-total.cero { opacity: .35; }
 
 /* Rutinas: la tarjeta de tu rutina y la lista. */
-.rutina-activa-nombre { font-size: 1.2rem; font-weight: 750; line-height: 1.15; color: var(--text-strong); text-wrap: balance; font-variation-settings: "ROND" 60; }
+.rutina-activa-nombre { font-size: 1.2rem; font-weight: 750; line-height: 1.15; color: var(--text-strong); text-wrap: balance; }
 .rutina-activa-linea { margin-top: 3px; font-size: 0.8125rem; color: var(--text-muted); }
 .semana-rutina { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
 .semana-rutina-dia { display: flex; flex-direction: column; align-items: center; gap: 5px; }
@@ -4011,29 +3960,29 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 .semana-rutina-letra { font-size: 11.5px; font-weight: 650; color: var(--text-faint); }
 .semana-rutina-dia.hoy .semana-rutina-letra { color: var(--text-strong); }
 .semana-rutina-marca { display: block; width: 100%; height: 30px; border-radius: 10px; background: var(--disco-fantasma); transition: transform .25s var(--resorte); }
-.semana-rutina-dia.entrena .semana-rutina-marca { background: color-mix(in oklab, var(--dia) 78%, white); }
-.light-mode .semana-rutina-dia.entrena .semana-rutina-marca { background: var(--dia); }
+.semana-rutina-dia.entrena .semana-rutina-marca { background: color-mix(in oklab, var(--dia) 58%, var(--surface-3)); }
+.light-mode .semana-rutina-dia.entrena .semana-rutina-marca { background: color-mix(in oklab, var(--dia) 60%, white); }
 .semana-rutina-dia.hoy .semana-rutina-marca { outline: 2px solid var(--text-strong); outline-offset: 2px; }
 .semana-rutina-dia.entrena:active .semana-rutina-marca { transform: scale(.92); }
 .preset { position: relative; display: block; width: 100%; padding: 14px 16px; border-radius: 24px; text-align: left; background: var(--surface-1); transition: background-color .2s ease; }
-.preset.activa { background: color-mix(in oklab, var(--c) 14%, var(--surface-1)); box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--c) 40%, transparent); }
+.preset.activa { background: var(--surface-1); box-shadow: inset 0 0 0 1.5px var(--hairline-fuerte); }
 .preset-cuerpo { display: block; width: 100%; text-align: left; }
 .preset-cabeza { display: flex; align-items: center; gap: 8px; }
 .preset-nombre { font-size: 0.9375rem; font-weight: 700; line-height: 1.25; color: var(--text-strong); text-wrap: balance; }
-.preset-activa { flex: none; height: 22px; padding: 0 9px; border-radius: 999px; display: inline-flex; align-items: center; font-size: 11.5px; font-weight: 700; color: color-mix(in oklab, var(--c) 22%, var(--tinta-oscura)); background: color-mix(in oklab, var(--c) 76%, white); }
-.light-mode .preset-activa { background: var(--c); }
+.preset-activa { flex: none; height: 22px; padding: 0 9px; border-radius: 999px; display: inline-flex; align-items: center; font-size: 11.5px; font-weight: 700; color: var(--accion-tinta); background: var(--accion-fondo); }
+.light-mode .preset-activa { background: var(--accion-fondo); }
 .preset-desc { display: block; margin-top: 5px; font-size: 12.5px; line-height: 1.4; color: var(--text-muted); text-wrap: pretty; }
 .preset-pie { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
 .preset-tira { display: flex; gap: 2px; width: 96px; height: 10px; flex: none; }
-.preset-tira i { flex-basis: 0; border-radius: 3px; background: color-mix(in oklab, var(--dia) 80%, white); }
-.light-mode .preset-tira i { background: var(--dia); }
+.preset-tira i { flex-basis: 0; border-radius: 3px; background: color-mix(in oklab, var(--dia) 58%, var(--surface-3)); }
+.light-mode .preset-tira i { background: color-mix(in oklab, var(--dia) 60%, white); }
 .preset-frec { font-size: 12px; color: var(--text-faint); min-width: 0; }
 .preset-acciones { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
 
 /* Social: la actividad y el ranking. */
 .actividad { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 10px; padding: 10px 10px 10px 8px; border-radius: 22px; background: var(--surface-2); }
 .actividad-quien { display: flex; align-items: center; gap: 10px; min-width: 0; text-align: left; }
-.actividad-aro { width: 46px; height: 46px; --galleta-fondo: var(--dia); }
+.actividad-aro { width: 46px; height: 46px; --galleta-fondo: color-mix(in oklab, var(--dia) 62%, var(--surface-3)); }
 .actividad-avatar {
   width: 38px; height: 38px; overflow: hidden; display: flex; align-items: center; justify-content: center;
   font-size: 15px; font-weight: 800; color: var(--text-strong); background: var(--surface-3);
@@ -4042,7 +3991,7 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 .actividad-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .actividad-nombre { display: block; font-size: 14px; font-weight: 700; color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .actividad-dia { display: block; margin-top: 1px; font-size: 12px; color: var(--text-muted); }
-.actividad-aplauso { width: 46px; height: 46px; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-size: 19px; color: #fff; background: #8B5CF6; transition: border-radius .35s var(--resorte), transform .2s ease; }
+.actividad-aplauso { width: 46px; height: 46px; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-size: 19px; color: var(--accion-tinta); background: var(--accion-fondo); transition: border-radius .35s var(--resorte), transform .2s ease; }
 .actividad-aplauso:active { border-radius: 16px; transform: scale(.94); }
 .actividad-aplauso.hecho { background: var(--surface-3); color: var(--text-muted); }
 .actividad-carga { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; padding-left: 56px; }
@@ -4050,7 +3999,7 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 .actividad-carga > span { flex: none; font-size: 12px; color: var(--text-muted); }
 .actividad-carga b { font-size: 14px; font-weight: 750; color: var(--text-strong); }
 .ranking-fila { width: 100%; display: flex; align-items: center; gap: 12px; padding: 8px 14px 8px 8px; border-radius: 20px; text-align: left; background: var(--surface-2); }
-.ranking-fila.yo { background: color-mix(in oklab, var(--tono) 16%, var(--surface-2)); }
+.ranking-fila.yo { background: var(--surface-2); }
 .ranking-pos { width: 22px; text-align: center; font-size: 1rem; font-weight: 750; color: var(--text-faint); flex: none; }
 .ranking-avatar {
   width: 38px; height: 38px; flex: none; overflow: hidden; display: flex; align-items: center; justify-content: center;
@@ -4067,21 +4016,21 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 .chip-accion {
   flex: none; display: inline-flex; align-items: center; gap: 7px; height: 40px; padding: 0 15px 0 13px; border-radius: 999px;
   font-size: 13px; font-weight: 600; white-space: nowrap;
-  color: color-mix(in oklab, var(--tono) 50%, white); background: color-mix(in oklab, var(--tono) 14%, var(--surface-1));
+  color: var(--text-strong); background: var(--surface-1);
   transition: border-radius .35s var(--resorte), transform .2s ease;
 }
-.light-mode .chip-accion { color: color-mix(in oklab, var(--tono) 62%, black); }
+.light-mode .chip-accion { color: var(--text-strong); }
 .chip-accion:active { border-radius: 14px; transform: scale(.96); }
 .burbuja { max-width: 85%; border-radius: 22px; padding: 10px 14px; font-size: 0.9375rem; line-height: 1.5; color: var(--text-strong); transition: transform .2s ease; }
-.burbuja.propia { border-bottom-right-radius: 6px; background: color-mix(in oklab, var(--tono) 26%, var(--surface-2)); }
+.burbuja.propia { border-bottom-right-radius: 6px; background: var(--surface-3); }
 .burbuja.ia { border-bottom-left-radius: 6px; background: var(--surface-1); }
-.burbuja.editando { box-shadow: 0 0 0 2px color-mix(in oklab, var(--tono) 70%, white); }
+.burbuja.editando { box-shadow: 0 0 0 2px var(--accion-fondo); }
 .boton-enviar {
   width: 44px; height: 44px; flex: none; border-radius: 999px; display: flex; align-items: center; justify-content: center;
-  color: color-mix(in oklab, var(--tono) 22%, var(--tinta-oscura)); background: color-mix(in oklab, var(--tono) 76%, white);
+  color: var(--accion-tinta); background: var(--accion-fondo);
   transition: border-radius .35s var(--resorte), transform .2s ease, opacity .2s ease;
 }
-.light-mode .boton-enviar { background: var(--tono); }
+.light-mode .boton-enviar { background: var(--accion-fondo); }
 .boton-enviar:disabled { opacity: .4; }
 .boton-enviar:active { border-radius: 14px; transform: scale(.95); }
 @media (prefers-reduced-motion: reduce) {
@@ -4091,17 +4040,21 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 /* La fila de una persona (amigos, solicitudes, alumnos). */
 .amigo { width: 100%; display: flex; align-items: center; gap: 10px; padding: 8px 10px 8px 8px; border-radius: 22px; background: var(--surface-2); }
 .amigo-cuerpo { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; text-align: left; }
-.amigo-aro { position: relative; width: 50px; height: 50px; --galleta-fondo: color-mix(in oklab, var(--rango) 70%, white); }
-.light-mode .amigo-aro { --galleta-fondo: color-mix(in oklab, var(--rango) 80%, black); }
-.tinta-rango { color: var(--rango-c); }
+.amigo-aro { position: relative; width: 50px; height: 50px; --galleta-fondo: color-mix(in oklab, var(--rango) 55%, var(--surface-3)); }
+.light-mode .amigo-aro { --galleta-fondo: color-mix(in oklab, var(--rango) 60%, white); }
+/* El color de un rango como texto: apagado, como todo lo de color. */
+.tinta-rango { color: color-mix(in oklab, var(--rango-c) 62%, var(--text-muted)); }
+/* El cuerpo de los rangos por músculo: los colores de cada nivel, apagados
+   para que no sea lo más saturado de la app. */
+.figura-cuerpo svg { filter: saturate(.6); }
 .light-mode .tinta-rango { color: color-mix(in oklab, var(--rango-c) 58%, black); }
 .amigo-avatar {
   width: 42px; height: 42px; overflow: hidden; display: flex; align-items: center; justify-content: center;
-  font-size: 16px; font-weight: 800; color: var(--text-strong); background: var(--surface-3); font-variation-settings: "ROND" 100;
+  font-size: 16px; font-weight: 800; color: var(--text-strong); background: var(--surface-3); font-stretch: 82%;
   -webkit-mask: var(--forma-galleta) center / contain no-repeat; mask: var(--forma-galleta) center / contain no-repeat;
 }
 .amigo-avatar img { width: 100%; height: 100%; object-fit: cover; }
-.amigo-activo { position: absolute; right: 1px; bottom: 1px; width: 12px; height: 12px; border-radius: 999px; background: #10B981; border: 2px solid var(--surface-2); }
+.amigo-activo { position: absolute; right: 1px; bottom: 1px; width: 12px; height: 12px; border-radius: 999px; background: #6fbf95; border: 2px solid var(--surface-2); }
 .amigo-nombre { display: block; font-size: 14.5px; font-weight: 700; color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .amigo-detalle { display: flex; align-items: center; gap: 10px; margin-top: 3px; min-width: 0; flex-wrap: wrap; }
 .amigo-rango { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 650; white-space: nowrap; }
@@ -4121,8 +4074,8 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
   background: var(--surface-2); color: var(--text-faint); transition: background-color .3s, transform .25s var(--resorte);
 }
 .medida-ficha:active { transform: scale(.96); }
-.medida-ficha.activa { background: color-mix(in oklab, var(--c) 26%, var(--surface-2)); color: color-mix(in oklab, var(--c) 55%, white); }
-.light-mode .medida-ficha.activa { color: color-mix(in oklab, var(--c) 62%, black); }
+.medida-ficha.activa { background: var(--surface-3); color: var(--text-strong); }
+.light-mode .medida-ficha.activa { color: var(--text-strong); }
 .medida-ficha-nombre { font-size: 12px; font-weight: 650; color: var(--text-muted); }
 .medida-ficha.activa .medida-ficha-nombre { color: inherit; }
 .medida-ficha-valor { display: flex; align-items: baseline; gap: 2px; }
@@ -4135,28 +4088,28 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
   background: var(--panel-sunken); color: var(--text-strong); border: 1.5px solid transparent; transition: border-color .2s;
 }
 .medida-anotar input::placeholder { color: var(--text-faint); }
-.medida-anotar input:focus { outline: none; border-color: color-mix(in oklab, var(--c) 60%, transparent); }
+.medida-anotar input:focus { outline: none; border-color: var(--velo-fuerte); }
 .medida-nota { font-size: 13px; line-height: 1.45; color: var(--text-muted); }
 .medida-nota b { color: var(--text-strong); }
 .balanza-nota { margin-left: 8px; font-size: 12px; font-weight: 550; color: var(--text-faint); white-space: nowrap; }
 .balanza-valor:has(.balanza-nota) { flex-wrap: wrap; row-gap: 2px; }
 .cinta {
   position: relative; height: 40px; margin: 6px 4px 0 10px; border-radius: 4px;
-  background: linear-gradient(180deg, #F3CC4A, #E3B22B);
-  box-shadow: inset 0 -2px 0 rgba(90,60,0,0.18), 0 8px 16px -10px rgba(0,0,0,0.7);
+  background: linear-gradient(180deg, #f1f0eb, #dcdbd5);
+  box-shadow: inset 0 -2px 0 rgba(0,0,0,0.08), inset 0 0 0 1px rgba(0,0,0,0.06), 0 8px 16px -10px rgba(0,0,0,0.7);
 }
 .cinta::before { content: ""; position: absolute; left: -7px; top: -4px; bottom: -4px; width: 8px; border-radius: 2px; background: linear-gradient(90deg, #6c7076, #e2e4e7 45%, #8f9399); }
-.cinta i { position: absolute; top: 0; width: 1.2px; height: 11px; background: #2b2410; transform: translateX(-50%); }
+.cinta i { position: absolute; top: 0; width: 1.2px; height: 11px; background: #232326; transform: translateX(-50%); }
 .cinta i.medio { height: 6px; opacity: .75; }
 .cinta i.numero { height: 15px; width: 1.6px; }
-.cinta b { position: absolute; bottom: 5px; transform: translateX(-50%); font-size: 10.5px; font-weight: 750; line-height: 1; color: #2b2410; font-variant-numeric: tabular-nums; }
-.cinta-rango { position: absolute; bottom: 0; height: 4px; background: rgba(60,40,0,0.32); }
-.cinta-marca { position: absolute; top: -7px; bottom: -7px; width: 3px; border-radius: 2px; transform: translateX(-50%); background: #E11D48; box-shadow: 0 0 0 1.5px rgba(255,255,255,0.5); transition: left .9s var(--resorte-vivo); }
-.cinta-marca.fantasma { width: 0; background: none; box-shadow: none; border-left: 2px dashed rgba(43,36,16,0.75); top: -2px; bottom: -2px; }
+.cinta b { position: absolute; bottom: 5px; transform: translateX(-50%); font-size: 10.5px; font-weight: 750; line-height: 1; color: #232326; }
+.cinta-rango { position: absolute; bottom: 0; height: 4px; background: rgba(0,0,0,0.22); }
+.cinta-marca { position: absolute; top: -7px; bottom: -7px; width: 3px; border-radius: 2px; transform: translateX(-50%); background: #141416; box-shadow: 0 0 0 1.5px rgba(255,255,255,0.7); transition: left .9s var(--resorte-vivo); }
+.cinta-marca.fantasma { width: 0; background: none; box-shadow: none; border-left: 2px dashed rgba(20,20,22,0.6); top: -2px; bottom: -2px; }
 .balanza-leyenda i.cinta-fantasma { width: 0; background: none; border: 0; border-left: 2px dashed var(--text-muted); border-radius: 0; }
-.balanza-leyenda i.cinta-hoy { width: 3px; background: #E11D48; border-radius: 2px; }
-.medida-recorrido { position: relative; height: 132px; margin: 0 -6px; --medida-linea: color-mix(in oklab, var(--c) 76%, white); }
-.light-mode .medida-recorrido { --medida-linea: var(--c); }
+.balanza-leyenda i.cinta-hoy { width: 3px; background: var(--text-strong); border-radius: 2px; }
+.medida-recorrido { position: relative; height: 132px; margin: 0 -6px; --medida-linea: var(--accion-fondo); }
+.light-mode .medida-recorrido { --medida-linea: var(--text-strong); }
 .medida-punto { fill: var(--surface-1); stroke: var(--medida-linea); stroke-width: 2; }
 .medida-punto.ultimo { fill: var(--medida-linea); stroke: var(--surface-1); stroke-width: 12; }
 .medida-etiqueta { fill: var(--text-strong); font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -4168,8 +4121,8 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 .hueco-dia.apagado { opacity: .3; }
 .hueco-estrella { position: absolute; top: -3px; right: -3px; color: #fbbf24; fill: #fbbf24; }
 .medida-leyenda { display: flex; justify-content: center; gap: 16px; margin-top: 12px; font-size: 12px; color: var(--text-muted); }
-.medida-leyenda i { display: inline-block; width: 10px; height: 10px; margin-right: 6px; vertical-align: -1px; border-radius: 999px; background: color-mix(in oklab, var(--dia) 80%, white); }
-.light-mode .medida-leyenda i { background: var(--dia); }
+.medida-leyenda i { display: inline-block; width: 10px; height: 10px; margin-right: 6px; vertical-align: -1px; border-radius: 999px; background: color-mix(in oklab, var(--dia) 58%, var(--surface-3)); }
+.light-mode .medida-leyenda i { background: color-mix(in oklab, var(--dia) 60%, white); }
 @media (prefers-reduced-motion: reduce) { .cinta-marca { transition: none; } .hueco-dia.comparable { animation: none; } }
 `;
 
@@ -4317,7 +4270,7 @@ function ShareLinkModal({ title, shareTitle, shareText, shareTarget, onClose, ac
           <div className="relative">
             {/* Botón principal de compartir — prominente y arriba */}
             {canNativeShare && (
-              <button onClick={handleNativeShare} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl !text-white text-sm font-bold mb-3 transition-all active:scale-[0.98]" style={{ background: `linear-gradient(135deg, ${accent}, ${tint(accent, "b0")})`, boxShadow: `0 10px 28px -10px ${tint(accent, "80")}` }}>
+              <button onClick={handleNativeShare} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl !text-[color:var(--accion-tinta)] text-sm font-bold mb-3 transition-all active:scale-[0.98]" style={{ background: "var(--accion-fondo)", boxShadow: "none" }}>
                 <Share2 size={15} /> Compartir
               </button>
             )}
@@ -5167,12 +5120,12 @@ function ProfileShareModal({ profileName, username, myTopRank, onClose }) {
           <p className="relative text-xs text-slate-500 mb-4">Elegí cómo querés que te agreguen.</p>
           <div className="relative grid grid-cols-2 gap-3">
             <button onClick={() => setShowCard(true)} className="flex flex-col items-center gap-2.5 rounded-2xl border border-slate-700/60 hover:border-teal-500/40 bg-slate-800/40 py-5 px-2.5 transition active:scale-[0.97]">
-              <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}><Share2 size={18} className="!text-white" /></div>
+              <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: "var(--surface-3)" }}><Share2 size={18} className="!text-white" /></div>
               <span className="text-xs font-bold text-white text-center leading-snug">Tarjeta para compartir</span>
               <span className="text-[9.5px] text-slate-500 text-center leading-snug">WhatsApp, Instagram y más</span>
             </button>
             <button onClick={() => setShowQr(true)} className="flex flex-col items-center gap-2.5 rounded-2xl border border-slate-700/60 hover:border-fuchsia-500/40 bg-slate-800/40 py-5 px-2.5 transition active:scale-[0.97]">
-              <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: "linear-gradient(135deg,#A855F7,#6D28D9)" }}><QrCode size={18} className="!text-white" /></div>
+              <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: "var(--surface-3)" }}><QrCode size={18} className="!text-white" /></div>
               <span className="text-xs font-bold text-white text-center leading-snug">Código QR</span>
               <span className="text-[9.5px] text-slate-500 text-center leading-snug">Para que te escaneen</span>
             </button>
@@ -5427,7 +5380,7 @@ function ShareImageModal({ title, subtitle, fileNamePrefix, shareTitle, shareTex
               conexión mientras se genera el QR del perfil), previewUrl
               nunca se completa pero "Compartir" seguía tocable, sin dar
               ningún indicio de que no había nada real para compartir. */}
-          <button onClick={handleShare} disabled={!previewUrl} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl !text-white text-sm font-bold transition-all active:scale-[0.98] disabled:opacity-40" style={{ background: `linear-gradient(135deg, ${accent}, ${tint(accent, "b0")})`, boxShadow: `0 10px 28px -10px ${tint(accent, "80")}` }}><Share2 size={14} /> Compartir</button>
+          <button onClick={handleShare} disabled={!previewUrl} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl !text-[color:var(--accion-tinta)] text-sm font-bold transition-all active:scale-[0.98] disabled:opacity-40" style={{ background: "var(--accion-fondo)", boxShadow: "none" }}><Share2 size={14} /> Compartir</button>
           <button onClick={handleDownload} disabled={!previewUrl} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl border text-slate-300 hover:text-white transition text-sm font-semibold disabled:opacity-40" style={{ borderColor: tint(accent, "30") }}><Download size={14} /> Descargar</button>
         </div>
         {shareError && (
@@ -6794,11 +6747,13 @@ function detenerCronometrosDeSesion() {
 // Descanso en curso visto desde una tarjeta CERRADA: la cabecera lo muestra.
 // Con la tarjeta abierta manda el cronómetro grande de adentro y este chip
 // no se dibuja.
-function ChipDescansoEnCurso({ timerId, color }) {
+// El reloj del descanso en curso, en la cabecera de un ejercicio cerrado:
+// de tiza, como todos los relojes (ya no lleva el color del día).
+function ChipDescansoEnCurso({ timerId }) {
   const { estado, restante } = useRelojDescanso(timerId);
   if (estado !== "running" && estado !== "paused") return null;
   return (
-    <span className="text-[10.5px] rounded-lg px-1.5 py-0.5 font-bold tabular-nums flex items-center gap-1" style={{ backgroundColor: tint(color, "1f"), color }}>
+    <span className="text-[11px] rounded-full px-2 py-0.5 font-semibold flex items-center gap-1" style={{ backgroundColor: "var(--velo)", color: "var(--text-strong)" }}>
       {estado === "paused" ? <Pause size={9} /> : <Timer size={9} />} {relojCorto(restante)}
     </span>
   );
@@ -7265,7 +7220,7 @@ function SessionSummaryModal({ resumen, onClose }) {
         )}
 
         <div className="px-5 py-5">
-          <button onClick={onClose} className="w-full py-3.5 rounded-2xl text-sm font-black !text-white transition active:scale-[0.98]" style={{ background: "linear-gradient(135deg,#14B8A6,#0D9488)", boxShadow: "0 10px 28px -10px rgba(20,184,166,0.7)" }}>
+          <button onClick={onClose} className="w-full py-3.5 rounded-2xl text-sm font-black !text-[color:var(--accion-tinta)] transition active:scale-[0.98]" style={{ background: "var(--accion-fondo)", boxShadow: "0 10px 28px -10px rgba(20,184,166,0.7)" }}>
             ¡Seguir así! 💪
           </button>
         </div>
@@ -7513,7 +7468,7 @@ function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null, 
         </div>
 
         <div className="px-5 py-5">
-          <button onClick={onClose} className="w-full py-3.5 rounded-2xl text-sm font-black !text-white transition active:scale-[0.98]" style={{ background: `linear-gradient(135deg, ${est.color}, ${tint(est.color, "cc")})`, boxShadow: `0 10px 28px -10px ${tint(est.color, "b3")}` }}>
+          <button onClick={onClose} className="w-full py-3.5 rounded-2xl text-sm font-black !text-[color:var(--accion-tinta)] transition active:scale-[0.98]" style={{ background: "var(--accion-fondo)", boxShadow: "none" }}>
             {est.cta}
           </button>
         </div>
@@ -7536,7 +7491,7 @@ function WelcomeIntro({ onClose, onOpenTutorial, onUpdateSettings = null }) {
         {/* Hero: el ícono grande sobre un halo del color del slide */}
         <div key={`hero-${i}`} className="relative flex flex-col items-center pt-12 pb-6 px-6 text-center tab-fade-in">
           <div className="absolute -top-16 left-1/2 -translate-x-1/2 w-56 h-56 rounded-full blur-3xl pointer-events-none transition-colors duration-500" style={{ backgroundColor: tint(slide.color, "22") }} />
-          <div className="relative w-20 h-20 rounded-3xl flex items-center justify-center mb-5 elastic-in" style={{ backgroundColor: tint(slide.color, "1c"), border: `1px solid ${tint(slide.color, "40")}`, color: slide.color, boxShadow: `0 12px 40px -12px ${tint(slide.color, "70")}` }}>
+          <div className="relative w-20 h-20 rounded-3xl flex items-center justify-center mb-5 elastic-in" style={{ backgroundColor: "var(--surface-3)", border: "1px solid var(--hairline)", color: "var(--text-strong)", boxShadow: "var(--sombra-placa)" }}>
             {slide.icon}
           </div>
           <h2 className="relative text-xl font-black text-white leading-tight mb-2.5">{slide.title}</h2>
@@ -7553,7 +7508,7 @@ function WelcomeIntro({ onClose, onOpenTutorial, onUpdateSettings = null }) {
               onClick={() => setI(si)}
               aria-label={`Ir al paso ${si + 1}`}
               className="rounded-full transition-all duration-300"
-              style={{ width: si === i ? 22 : 7, height: 7, backgroundColor: si === i ? slide.color : "var(--surface-2)" }}
+              style={{ width: si === i ? 22 : 7, height: 7, backgroundColor: si === i ? "var(--text-strong)" : "var(--surface-3)" }}
             />
           ))}
         </div>
@@ -7568,8 +7523,8 @@ function WelcomeIntro({ onClose, onOpenTutorial, onUpdateSettings = null }) {
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => { onUpdateSettings?.({ deloadEnabled: true }); onClose(); }}
-                className="py-3.5 rounded-2xl text-sm font-black !text-white transition active:scale-[0.98]"
-                style={{ background: `linear-gradient(135deg, ${slide.color}, ${tint(slide.color, "b0")})`, boxShadow: `0 10px 28px -10px ${tint(slide.color, "80")}` }}
+                className="py-3.5 rounded-2xl text-sm font-black !text-[color:var(--accion-tinta)] transition active:scale-[0.98]"
+                style={{ background: "var(--accion-fondo)", boxShadow: "none" }}
               >
                 Sí, quiero
               </button>
@@ -7583,8 +7538,8 @@ function WelcomeIntro({ onClose, onOpenTutorial, onUpdateSettings = null }) {
           ) : (
             <button
               onClick={() => setI((n) => n + 1)}
-              className="w-full py-3.5 rounded-2xl text-sm font-black !text-white transition active:scale-[0.98]"
-              style={{ background: `linear-gradient(135deg, ${slide.color}, ${tint(slide.color, "b0")})`, boxShadow: `0 10px 28px -10px ${tint(slide.color, "80")}` }}
+              className="w-full py-3.5 rounded-2xl text-sm font-black !text-[color:var(--accion-tinta)] transition active:scale-[0.98]"
+              style={{ background: "var(--accion-fondo)", boxShadow: "none" }}
             >
               Siguiente
             </button>
@@ -7670,7 +7625,7 @@ function HelpModal({ startTab, onClose }) {
         </div>
 
         <div className="px-5 py-4 shrink-0" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-          <button onClick={onClose} className="w-full py-3 rounded-xl text-sm font-black !text-white transition active:scale-95" style={{ background: `linear-gradient(135deg, ${chapter.color}, ${tint(chapter.color, "b0")})`, boxShadow: `0 8px 22px -8px ${tint(chapter.color, "80")}` }}>
+          <button onClick={onClose} className="w-full py-3 rounded-xl text-sm font-black !text-[color:var(--accion-tinta)] transition active:scale-95" style={{ background: "var(--accion-fondo)", boxShadow: "none" }}>
             Entendido
           </button>
         </div>
@@ -7733,7 +7688,7 @@ function RankUpModal({ from, to, muscleName, onClose }) {
             <p className="text-2xl font-black text-white">{to.tier}</p>
             {muscleName && <p className="text-sm text-slate-400 mt-1">en {muscleName}</p>}
           </div>
-          <button onClick={onClose} className="w-full py-3.5 rounded-2xl font-black !text-white text-sm active:scale-95 transition-all" style={{ background: `linear-gradient(135deg, ${to.color}, ${tint(to.color, "bb")})`, boxShadow: `0 8px 24px -4px ${tint(to.color, "50")}` }}>
+          <button onClick={onClose} className="w-full py-3.5 rounded-2xl font-black !text-[color:var(--accion-tinta)] text-sm active:scale-95 transition-all" style={{ background: "var(--accion-fondo)", boxShadow: "none" }}>
             ¡Vamos! 💪
           </button>
         </div>
@@ -8288,10 +8243,10 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
         <div className="flex items-center gap-2 flex-wrap mb-2.5">
           <span className="serie-rotulo">Sesión</span>
           {isPlannedMode && plannedTarget?.minutes != null && (
-            <span className="serie-chip" style={{ color: accent, backgroundColor: tint(accent, "16") }}><ClipboardCheck size={12} /> {plannedTarget.minutes} min</span>
+            <span className="serie-chip" style={{ color: "var(--text-strong)", backgroundColor: "var(--velo)" }}><ClipboardCheck size={12} /> {plannedTarget.minutes} min</span>
           )}
           {currentPR?.minutes ? (
-            <span className="serie-chip" style={{ color: accent, backgroundColor: tint(accent, "16") }} aria-label={`Tu récord: ${currentPR.minutes} minutos`}><Trophy size={12} /> {currentPR.minutes} min{currentPR.km ? ` · ${currentPR.km} km` : ""}</span>
+            <span className="serie-chip" style={{ color: "var(--text-strong)", backgroundColor: "var(--velo)" }} aria-label={`Tu récord: ${currentPR.minutes} minutos`}><Trophy size={12} /> {currentPR.minutes} min{currentPR.km ? ` · ${currentPR.km} km` : ""}</span>
           ) : (
             <span className="text-[11.5px] text-slate-500">Primera vez</span>
           )}
@@ -8442,8 +8397,8 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
             ? `Serie ${setIndex + 1}: ${hecho.reps} reps con ${hecho.kg} ${u}. Tocá para editarla`
             : `Serie ${setIndex + 1}: ${rango} reps. Tocá para anotarla`}
         >
-          <span className={`galleta serie-galleta ${hechaHoy ? "llena girada" : "hueca"}`} aria-hidden="true">
-            {hechaHoy ? <Check size={16} strokeWidth={3} className={saved ? "draw-check" : ""} /> : setIndex + 1}
+          <span className={`galleta serie-galleta ${hechaHoy ? "llena" : "hueca"}`} aria-hidden="true">
+            {hechaHoy ? <Check size={13} strokeWidth={3} className={saved ? "draw-check" : ""} /> : setIndex + 1}
           </span>
           {hechaHoy ? (
             <span className="serie-linea-valor">
@@ -8452,13 +8407,10 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
             </span>
           ) : (
             <span className="serie-linea-meta">
-              <b>Serie {setIndex + 1}</b>
-              <span>
-                {rango} reps
-                {pesada && <Zap size={12} className="text-amber-400 shrink-0" aria-label="Serie de fuerza" />}
-                {setDef.type === "dropset" && <span className="text-orange-400">drop-set</span>}
-                {setDef.type === "restpause" && <span className="text-rose-400">rest-pause</span>}
-              </span>
+              {rango} reps
+              {pesada && <Zap size={12} className="foco-fuerza" aria-label="Serie de fuerza" />}
+              {setDef.type === "dropset" && <span className="foco-tipo">drop-set</span>}
+              {setDef.type === "restpause" && <span className="foco-tipo">rest-pause</span>}
             </span>
           )}
           <span className="serie-linea-fin">
@@ -8490,87 +8442,72 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   return (
     <div className={`serie serie-foco ${liveBeats ? "va-record" : ""}`} style={{ "--c": accent }}>
       <PRBurst anchorRef={saveBtnRef} trigger={prBurst} />
+      {/* Una sola línea: qué serie es y contra qué jugás —la meta de esta
+          semana si hay una; si no, tu récord, que se toca para corregirlo—.
+          Lo de la vez pasada ya no va en una caja aparte: viene escrito en
+          el visor (ver `sugerido`), y repetirlo era la mitad del ruido. */}
       <div className="foco-cabecera">
-        <span className="galleta serie-galleta activa" aria-hidden="true">{setIndex + 1}</span>
-        <p className="foco-titulo">Serie {setIndex + 1}<span>{rango} reps</span></p>
-        {pesada && <span className="foco-chip text-amber-400" style={{ backgroundColor: "rgba(245,158,11,0.14)" }}><Zap size={12} /> Fuerza</span>}
-        {setDef.type === "dropset" && <span className="foco-chip text-orange-400" style={{ backgroundColor: "rgba(249,115,22,0.14)" }}>Drop-set</span>}
-        {setDef.type === "restpause" && <span className="foco-chip text-rose-400" style={{ backgroundColor: "rgba(244,63,94,0.14)" }}>Rest-pause</span>}
-        {draft.editing && <button onClick={cancelarEdicion} className="foco-cancelar">Cancelar</button>}
-      </div>
-
-      {/* El marcador: contra qué número jugás —la meta de esta semana o tu
-          récord, que se toca para corregirlo— y lo que hiciste la vez
-          pasada, uno al lado del otro. */}
-      <div className="foco-marcador">
-        {isPlannedMode ? (
-          <div className="marcador-celda" aria-label={`Meta: ${plannedTarget.reps}×${kgToDisplay(plannedTarget.kg, unit)}${u}`}>
-            <span className="marcador-rotulo"><ClipboardCheck size={13} /> Meta de hoy</span>
-            <span className="marcador-valor">{plannedTarget.reps}<i>×</i>{kgToDisplay(plannedTarget.kg, unit)}<small>{u}</small></span>
-            {(plannedTarget.rpe != null || plannedTarget.phase) && (
-              <span className="marcador-extra">{[plannedTarget.rpe != null ? formatEffort(plannedTarget.rpe, fieldSettings.rpeDisplayMode) : null, plannedTarget.phase].filter(Boolean).join(" · ")}</span>
-            )}
-          </div>
+        <p className="foco-titulo">
+          Serie {setIndex + 1}
+          <span>{rango} reps</span>
+          {pesada && <Zap size={13} className="foco-fuerza" aria-label="Serie de fuerza" />}
+          {setDef.type === "dropset" && <span className="foco-tipo">drop-set</span>}
+          {setDef.type === "restpause" && <span className="foco-tipo">rest-pause</span>}
+        </p>
+        {draft.editing ? (
+          <button onClick={cancelarEdicion} className="foco-cancelar">Cancelar</button>
+        ) : isPlannedMode ? (
+          <span className="foco-ref" aria-label={`Meta de hoy: ${plannedTarget.reps}×${kgToDisplay(plannedTarget.kg, unit)}${u}`}>meta <b>{plannedTarget.reps} × {kgToDisplay(plannedTarget.kg, unit)}</b></span>
         ) : currentPR ? (
-          <button onClick={abrirCorreccion} className="marcador-celda" aria-label={`Tu récord: ${currentPR.reps}×${kgToDisplay(currentPR.kg, unit)}${u}. Tocá para corregirlo`}>
-            <span className="marcador-rotulo"><Trophy size={13} /> Tu récord{override?.manual && <Edit3 size={11} className="opacity-70" />}</span>
-            <span className="marcador-valor">{currentPR.reps}<i>×</i>{kgToDisplay(currentPR.kg, unit)}<small>{u}</small></span>
+          <button onClick={abrirCorreccion} className="foco-ref" aria-label={`Tu récord: ${currentPR.reps}×${kgToDisplay(currentPR.kg, unit)}${u}. Tocá para corregirlo`}>
+            récord <b>{currentPR.reps} × {kgToDisplay(currentPR.kg, unit)}</b>{override?.manual && <Edit3 size={11} className="opacity-60 self-center" />}
           </button>
         ) : (
-          <div className="marcador-celda marcador-vacio">
-            <Target size={14} className="shrink-0" />
-            <span>Sin marca aún: esta va a ser la primera</span>
-          </div>
+          <span className="foco-ref">primera vez</span>
         )}
-        {isPlannedMode && currentPR ? (
-          <button onClick={abrirCorreccion} className="marcador-celda secundaria" aria-label={`Tu récord: ${currentPR.reps}×${kgToDisplay(currentPR.kg, unit)}${u}. Tocá para corregirlo`}>
-            <span className="marcador-rotulo"><Trophy size={13} /> Tu récord</span>
-            <span className="marcador-valor">{currentPR.reps}<i>×</i>{kgToDisplay(currentPR.kg, unit)}<small>{u}</small></span>
-          </button>
-        ) : fieldSettings.showLastSession === true && lastSession ? (
-          <div className="marcador-celda secundaria">
-            <span className="marcador-rotulo"><History size={13} /> {(() => { const t = haceCuanto(daysSince(lastSession.date)) || "hoy"; return t.charAt(0).toUpperCase() + t.slice(1); })()}</span>
-            <span className="marcador-valor">{lastSession.reps}<i>×</i>{kgToDisplay(lastSession.kg, unit)}<small>{u}</small></span>
-          </div>
-        ) : null}
       </div>
+      {/* Si la serie no viene propuesta (opción apagada), lo de la vez pasada
+          va abajo y chico: sigue siendo el mejor dato para elegir la carga. */}
+      {!sugerido && fieldSettings.showLastSession === true && lastSession && (
+        <p className="foco-pasada">la vez pasada <b>{lastSession.reps} × {kgToDisplay(lastSession.kg, unit)} {u}</b></p>
+      )}
 
-      {/* El tablero: reps × kilos en grande y guardar. Vienen propuestos
-          con lo de la vez pasada (ver `sugerido`): si no cambió nada, es un
-          solo toque. El borde se enciende con el color del día al escribir,
-          y en verde si lo escrito ya es récord. */}
-      <div className="foco-tablero" onFocus={() => setRowFocus(true)} onBlur={() => setRowFocus(false)} data-enfocado={rowFocus || undefined}>
+      {/* El visor: reps × kilos en grande y el ✓. Vienen propuestos con lo de
+          la vez pasada: si no cambió nada, es un solo toque. Si lo escrito ya
+          es récord, el visor se enciende en dorado. */}
+      <div className="foco-visor" onFocus={() => setRowFocus(true)} onBlur={() => setRowFocus(false)} data-enfocado={rowFocus || undefined}>
         <div className="foco-campo">
-          <input type="number" inputMode="decimal" enterKeyHint="next" aria-label="Repeticiones" placeholder="—" value={reps} onFocus={seleccionarAlEnfocar} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); kgInputRef.current?.focus(); } }} onChange={(e) => updateDraft({ reps: e.target.value })} className="foco-input" />
-          <span className="foco-campo-rotulo" aria-hidden="true">Reps</span>
+          <input type="number" inputMode="decimal" enterKeyHint="next" aria-label="Repeticiones" placeholder="–" value={reps} onFocus={seleccionarAlEnfocar} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); kgInputRef.current?.focus(); } }} onChange={(e) => updateDraft({ reps: e.target.value })} className="foco-input" />
+          <span className="foco-campo-rotulo" aria-hidden="true">reps</span>
         </div>
         <span className="foco-por" aria-hidden="true">×</span>
         <div className="foco-campo">
-          <input ref={kgInputRef} type="number" inputMode="decimal" enterKeyHint="done" aria-label={`Peso en ${u}`} placeholder="—" value={kg} onFocus={seleccionarAlEnfocar} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); saveBtnRef.current?.click(); } }} onChange={(e) => updateDraft({ kg: e.target.value })} className="foco-input" />
+          <input ref={kgInputRef} type="number" inputMode="decimal" enterKeyHint="done" aria-label={`Peso en ${u}`} placeholder="–" value={kg} onFocus={seleccionarAlEnfocar} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); saveBtnRef.current?.click(); } }} onChange={(e) => updateDraft({ kg: e.target.value })} className="foco-input" />
           {cambiarUnidad
-            ? <button onClick={cambiarUnidad} aria-label={`Pasar a ${unit === "kg" ? "libras" : "kilos"} en toda la app`} className="foco-campo-rotulo">{u}<ArrowUpDown size={11} className="rotate-90" /></button>
+            ? <button onClick={cambiarUnidad} aria-label={`Pasar a ${unit === "kg" ? "libras" : "kilos"} en toda la app`} className="foco-campo-rotulo">{u}<ArrowUpDown size={10} className="rotate-90" /></button>
             : <span className="foco-campo-rotulo" aria-hidden="true">{u}</span>}
         </div>
         <button ref={saveBtnRef} onClick={handleSave} aria-label="Guardar serie" className={`foco-guardar ${saved ? "hecha" : ""}`}>
-          <Check size={28} strokeWidth={2.8} className={saved ? "draw-check" : ""} />
+          <Check size={24} strokeWidth={2.6} className={saved ? "draw-check" : ""} />
         </button>
-        {/* ± sin abrir el teclado: en Android el teclado tapa medio
-            ejercicio, y el 90% de los ajustes entre series son "una rep
-            más" o "un disco más". Cada par va debajo de su número. */}
-        {(sugerido || reps || kg) && (
-          <>
-            <div className="foco-ajustes">
-              <button onClick={() => ajustar("reps", -1)} aria-label="Restar 1 repeticiones">−1</button>
-              <button onClick={() => ajustar("reps", 1)} aria-label="Sumar 1 repeticiones">+1</button>
-            </div>
-            <span aria-hidden="true" />
-            <div className="foco-ajustes">
-              <button onClick={() => ajustar("kg", -pasoKg)} aria-label={`Restar ${pasoKg} ${u}`}>−{pasoKg}</button>
-              <button onClick={() => ajustar("kg", pasoKg)} aria-label={`Sumar ${pasoKg} ${u}`}>+{pasoKg}</button>
-            </div>
-          </>
-        )}
       </div>
+      {/* − y + debajo de cada número, sin abrir el teclado: en Android el
+          teclado tapa medio ejercicio, y casi todos los ajustes entre series
+          son "una rep más" o "un disco más" (2,5 kg o 5 lbs). */}
+      {(sugerido || reps || kg) && (
+        <div className="foco-ajustes-fila">
+          <div className="foco-ajustes">
+            <button onClick={() => ajustar("reps", -1)} aria-label="Restar una repetición"><Minus size={17} /></button>
+            <button onClick={() => ajustar("reps", 1)} aria-label="Sumar una repetición"><Plus size={17} /></button>
+          </div>
+          <span aria-hidden="true" />
+          <div className="foco-ajustes">
+            <button onClick={() => ajustar("kg", -pasoKg)} aria-label={`Restar ${pasoKg} ${u}`}><Minus size={17} /></button>
+            <button onClick={() => ajustar("kg", pasoKg)} aria-label={`Sumar ${pasoKg} ${u}`}><Plus size={17} /></button>
+          </div>
+          <span aria-hidden="true" />
+        </div>
+      )}
       {liveBeats && <p className="foco-record"><Trophy size={13} /> Si la guardás así, es récord</p>}
       {lineaFeedback}
       {avisosExtra}
@@ -8984,14 +8921,6 @@ function discosDeUnLado(n) {
   if (n <= 5) return Array.from({ length: n }, (_, i) => i);
   return Array.from({ length: n }, (_, i) => Math.min(4, Math.floor((i * 5) / n)));
 }
-function mezclarHex(a, b, t) {
-  const pa = parseInt(a.slice(1), 16), pb = parseInt(b.slice(1), 16);
-  const canal = (p, s) => (p >> s) & 255;
-  const m = (s) => Math.round(canal(pa, s) + (canal(pb, s) - canal(pa, s)) * t);
-  return `#${((1 << 24) | (m(16) << 16) | (m(8) << 8) | m(0)).toString(16).slice(1)}`;
-}
-// Los degradés de cada disco salen una sola vez, no en cada render.
-const DEGRADE_DISCO = COLORES_DISCO.map((c) => [mezclarHex(c, "#ffffff", 0.3), c, mezclarHex(c, "#000000", 0.34)]);
 function BarraCargada({ hechas = 0, total = 0, alto = 30, etiqueta = null, className = "", detalle = false, escalonado = false }) {
   // Ids propios para los degradés: con dos barras en pantalla (la del día y
   // la del dock), ids repetidos hacen que una pinte con los de la otra.
@@ -9034,13 +8963,13 @@ function BarraCargada({ hechas = 0, total = 0, alto = 30, etiqueta = null, class
           <stop offset=".55" className="acero-medio" />
           <stop offset="1" className="acero-oscuro" />
         </linearGradient>
-        {DEGRADE_DISCO.map(([claro, medio, oscuro], k) => (
-          <linearGradient key={k} id={`${uid}-d${k}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor={claro} />
-            <stop offset=".42" stopColor={medio} />
-            <stop offset="1" stopColor={oscuro} />
-          </linearGradient>
-        ))}
+        {/* La goma de los discos: luz arriba, sombra abajo. Una sola para
+            todos; lo que distingue a cada disco es su filete de color. */}
+        <linearGradient id={`${uid}-goma`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" className="goma-claro" />
+          <stop offset=".45" className="goma-medio" />
+          <stop offset="1" className="goma-oscuro" />
+        </linearGradient>
         {detalle && (
           <pattern id={`${uid}-mol`} width="2.4" height="2.4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
             <line x1="0" y1="0" x2="0" y2="2.4" className="moleteado" />
@@ -9062,11 +8991,11 @@ function BarraCargada({ hechas = 0, total = 0, alto = 30, etiqueta = null, class
       {/* Los discos: cargados con volumen, los que faltan como fantasmas. */}
       {discos.map((d) => (d.cargado ? (
         <g key={`d${d.n}`} className="disco-entra" style={{ "--desde": d.izquierda ? "-28px" : "28px", ...(escalonado ? { animationDelay: `${200 + d.n * 90}ms` } : null) }}>
-          <rect x={d.x} y={d.y} width={d.w} height={d.h} rx={radio(d.w)} fill={`url(#${uid}-d${d.k})`} className="disco" />
-          {d.w >= 7 && <rect x={d.x + 1.3} y={d.y + 1.3} width={d.w - 2.6} height={d.h - 2.6} rx={Math.max(0.6, radio(d.w) - 1)} className="disco-labio" />}
+          <rect x={d.x} y={d.y} width={d.w} height={d.h} rx={radio(d.w)} fill={`url(#${uid}-goma)`} className="disco" />
+          <rect x={d.x + 0.75} y={d.y + 0.75} width={Math.max(0.5, d.w - 1.5)} height={d.h - 1.5} rx={Math.max(0.5, radio(d.w) - 0.75)} className={`disco-filete f${d.k}`} />
         </g>
       ) : (
-        <rect key={`f${d.n}`} x={d.x} y={d.y} width={d.w} height={d.h} rx={radio(d.w)} className="disco-fantasma" />
+        <rect key={`f${d.n}`} x={d.x + 0.45} y={d.y + 0.45} width={Math.max(0.5, d.w - 0.9)} height={d.h - 0.9} rx={radio(d.w)} className="disco-fantasma" />
       )))}
       {/* Los collarines, contra el último disco cargado de cada lado. */}
       {uIzq && <rect x={uIzq.x - gapClip - clip} y={cy - 8} width={clip} height="16" rx="2" className="collarin" />}
@@ -9205,7 +9134,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
         {/* El número de orden, en una galleta del color del día. Con todas
             las series hechas, la galleta se llena, gira y muestra el tilde. */}
         {orden != null
-          ? <span className={`galleta ejercicio-numero ${allSetsDoneToday ? "girada" : ""}`} aria-hidden="true">{allSetsDoneToday ? <Check size={18} strokeWidth={3} /> : orden}</span>
+          ? <span className="galleta ejercicio-numero" aria-hidden="true">{allSetsDoneToday ? <Check size={15} strokeWidth={3} /> : String(orden).padStart(2, "0")}</span>
           : <span className="w-1.5 h-8 rounded-full shrink-0" style={{ backgroundColor: accent }} aria-hidden="true" />}
         <div className="flex-1 min-w-0">
           <div>
@@ -10733,7 +10662,7 @@ function ShareSummaryCard({ logs, trainingSessions = [] }) {
           ))}
           <div className="flex gap-2">
             <button onClick={() => setMode(null)} className="px-3 py-2.5 rounded-xl bg-slate-800 text-slate-400 text-xs font-semibold">Atrás</button>
-            <button onClick={() => setShowImage(true)} disabled={!selPR?.best1rm} className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-[0.98] ${selPR?.best1rm ? "text-white shadow-lg shadow-teal-500/20" : "bg-slate-800 text-slate-600"}`} style={selPR?.best1rm ? { background: "linear-gradient(135deg,#14B8A6,#0E7490)" } : {}}>Generar imagen</button>
+            <button onClick={() => setShowImage(true)} disabled={!selPR?.best1rm} className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-[0.98] ${selPR?.best1rm ? "text-[color:var(--accion-tinta)] shadow-lg shadow-teal-500/20" : "bg-slate-800 text-slate-600"}`} style={selPR?.best1rm ? { background: "var(--accion-fondo)" } : {}}>Generar imagen</button>
           </div>
         </div>
       )}
@@ -10748,7 +10677,7 @@ function ShareSummaryCard({ logs, trainingSessions = [] }) {
           <p className="text-[11px] text-slate-500">{periodStats.daysTrained} día{periodStats.daysTrained === 1 ? "" : "s"} entrenado{periodStats.daysTrained === 1 ? "" : "s"} · {Math.round(kgToDisplay(periodStats.totalVol, unit)).toLocaleString("es-AR")} {weightLabel(unit)}×reps en este período.</p>
           <div className="flex gap-2">
             <button onClick={() => setMode(null)} className="px-3 py-2.5 rounded-xl bg-slate-800 text-slate-400 text-xs font-semibold">Atrás</button>
-            <button onClick={() => setShowImage(true)} disabled={!periodStats.daysTrained} className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-[0.98] ${periodStats.daysTrained ? "text-white shadow-lg shadow-teal-500/20" : "bg-slate-800 text-slate-600"}`} style={periodStats.daysTrained ? { background: "linear-gradient(135deg,#14B8A6,#0E7490)" } : {}}>Generar imagen</button>
+            <button onClick={() => setShowImage(true)} disabled={!periodStats.daysTrained} className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-[0.98] ${periodStats.daysTrained ? "text-[color:var(--accion-tinta)] shadow-lg shadow-teal-500/20" : "bg-slate-800 text-slate-600"}`} style={periodStats.daysTrained ? { background: "var(--accion-fondo)" } : {}}>Generar imagen</button>
           </div>
         </div>
       )}
@@ -11749,7 +11678,7 @@ function RankBadgeIcon({ tier, sub, color, size = 32 }) {
           height: Math.max(16, Math.round(s * 0.36)),
           display: "flex", alignItems: "center", justifyContent: "center",
           fontSize: Math.max(8, Math.round(s * 0.19)), fontWeight: 800, color: "#fff",
-          background: "linear-gradient(135deg,#14B8A6,#0E7490)", borderRadius: "50%",
+          background: "var(--surface-3)", borderRadius: "50%",
           border: `${Math.max(1.5, Math.round(s * 0.025))}px solid #0c0d10`,
           boxShadow: "0 1px 3px rgba(0,0,0,0.5)",
         }}>{sub}</span>
@@ -11967,7 +11896,7 @@ function FemaleBodyModel({ ranks, highlightedColors, selected, onMuscleClick, fr
     onMuscleClick(best);
   };
   return (
-    <div className="flex gap-2 justify-center items-start">
+    <div className="figura-cuerpo flex gap-2 justify-center items-start">
       <div className="flex-1 min-w-0 max-w-[180px]">
         <div ref={frontRef} className="relative">
           <FemaleBody data={frontData} colors={palette} gender="female" side="front" border="none" onBodyPartClick={handleClick("front")} />
@@ -12218,7 +12147,7 @@ function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backR
   }
 
   return (
-    <div className="flex gap-2 justify-center items-start">
+    <div className="figura-cuerpo flex gap-2 justify-center items-start">
       <div className="flex-1 min-w-0 max-w-[180px]">
         <div ref={frontRef} onClick={handlePolygonClick("front")} className="relative">
           <Model data={data} type="anterior" bodyColor="#3c4146" highlightedColors={highlightedColors} onClick={MODEL_NOOP_CLICK} style={MODEL_STYLE} svgStyle={MODEL_STYLE} />
@@ -12321,7 +12250,7 @@ function BattleCompareCard({ myAvatarData, myName, mySex, mySessionsThisWeek, my
             <div className="relative inline-block">
               {iWinBattle && <Crown size={16} className="absolute -top-3 left-1/2 -translate-x-1/2 text-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.7)] badge-pop" />}
               <div className="w-16 h-16 mx-auto rounded-full overflow-hidden border-[3px]" style={{ borderColor: iWinBattle ? "#FBBF24" : "#FBBF24", boxShadow: iWinBattle ? "0 0 0 5px rgba(251,191,36,0.2), 0 8px 20px -6px rgba(251,191,36,0.4)" : "0 8px 20px -6px rgba(45,212,191,0.35)" }}>
-                {myAvatarData ? <img src={myAvatarData} className="w-full h-full object-cover" alt="" /> : <div className="w-full h-full flex items-center justify-center text-xl font-black !text-white" style={{ background: "linear-gradient(135deg,#FBBF24,#B45309)" }}>{(myName || "?").charAt(0).toUpperCase()}</div>}
+                {myAvatarData ? <img src={myAvatarData} className="w-full h-full object-cover" alt="" /> : <div className="w-full h-full flex items-center justify-center text-xl font-black !text-[color:var(--text-strong)]" style={{ background: "var(--surface-3)" }}>{(myName || "?").charAt(0).toUpperCase()}</div>}
               </div>
             </div>
             <p className="text-xs font-black text-amber-200 mt-1.5 truncate">Vos</p>
@@ -12799,7 +12728,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
                 </div>
               );
             })()}
-            <button onClick={() => { setShowGroupExercises(false); onGoToRoutines?.(); }} className="w-full py-3 rounded-2xl text-sm font-black !text-white transition active:scale-[0.98]" style={{ background: "linear-gradient(135deg, #14B8A6, #0E7490)" }}>
+            <button onClick={() => { setShowGroupExercises(false); onGoToRoutines?.(); }} className="w-full py-3 rounded-2xl text-sm font-black !text-[color:var(--accion-tinta)] transition active:scale-[0.98]" style={{ background: "var(--accion-fondo)" }}>
               Editar mi rutina y agregarlos →
             </button>
           </div>
@@ -13639,15 +13568,15 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
                         <ComposedChart data={escalera} margin={{ top: 14, right: 10, left: 0, bottom: 0 }}>
                           <defs>
                             <linearGradient id="gEscalera" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor={colorEj} stopOpacity={0.42} /><stop offset="100%" stopColor={colorEj} stopOpacity={0.02} />
+                              <stop offset="0%" stopColor="var(--text-strong)" stopOpacity={0.2} /><stop offset="100%" stopColor="var(--text-strong)" stopOpacity={0.01} />
                             </linearGradient>
                           </defs>
                           <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
                           <XAxis dataKey="fecha" tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={40} tick={{ fill: "var(--text-faint)", fontSize: 11 }} />
                           <YAxis domain={[minY, maxY]} tickCount={3} allowDecimals={false} tickLine={false} axisLine={false} width={34} tick={{ fill: "var(--text-faint)", fontSize: 11 }} />
-                          <Area type="stepAfter" dataKey="record" stroke={colorEj} strokeWidth={2.5} fill="url(#gEscalera)" isAnimationActive animationDuration={700} animationEasing="ease-out" dot={false} activeDot={false} />
-                          <Line type="monotone" dataKey="e1rm" stroke={colorEj} strokeOpacity={0.35} strokeDasharray="2 4" strokeWidth={1.5} isAnimationActive={false} activeDot={false}
-                            dot={({ key: claveDot, ...props }) => <EscalonDot key={claveDot ?? props.index} {...props} color={colorEj} esRecord={props.payload.esRecord} esUltimo={props.index === escalera.length - 1} isActive={activePoint?.index === props.index} deload={props.payload.deload} onSelect={handleSelectPoint} />} />
+                          <Area type="stepAfter" dataKey="record" stroke="var(--text-strong)" strokeWidth={2} fill="url(#gEscalera)" isAnimationActive animationDuration={700} animationEasing="ease-out" dot={false} activeDot={false} />
+                          <Line type="monotone" dataKey="e1rm" stroke="var(--text-strong)" strokeOpacity={0.3} strokeDasharray="2 4" strokeWidth={1.5} isAnimationActive={false} activeDot={false}
+                            dot={({ key: claveDot, ...props }) => <EscalonDot key={claveDot ?? props.index} {...props} color="var(--text-strong)" esRecord={props.payload.esRecord} esUltimo={props.index === escalera.length - 1} isActive={activePoint?.index === props.index} deload={props.payload.deload} onSelect={handleSelectPoint} />} />
                         </ComposedChart>
                       </ResponsiveContainer>
                       {activePoint && chartData[activePoint.index] && (() => {
@@ -15669,7 +15598,7 @@ function RoutineProposalCard({ proposal, basic, onRespond }) {
   return (
     <div className="rounded-2xl border overflow-hidden" style={{ borderColor: tint(accentColor, "25"), backgroundColor: tint(accentColor, "0a") }}>
       <button onClick={() => setExpanded((v) => !v)} className="w-full flex items-center gap-3 px-3.5 py-3 text-left">
-        {basic?.avatarData ? <img src={basic.avatarData} alt="" className="w-9 h-9 rounded-xl object-cover shrink-0" /> : <div className="w-9 h-9 rounded-xl flex items-center justify-center text-sm font-black !text-white shrink-0" style={{ background: "linear-gradient(135deg,#8B5CF6,#6D28D9)" }}>{(basic?.name || "?").charAt(0).toUpperCase()}</div>}
+        {basic?.avatarData ? <img src={basic.avatarData} alt="" className="w-9 h-9 rounded-xl object-cover shrink-0" /> : <div className="w-9 h-9 rounded-xl flex items-center justify-center text-sm font-black !text-[color:var(--text-strong)] shrink-0" style={{ background: "var(--surface-3)" }}>{(basic?.name || "?").charAt(0).toUpperCase()}</div>}
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold text-white leading-snug" style={{ display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{basic?.name || "Tu entrenador"} te propuso {isProgression ? tituloPlan : "una rutina"}</p>
           {proposal.note && <p className="text-[11px] text-slate-500 truncate">"{proposal.note}"</p>}
@@ -17573,7 +17502,7 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, isTrainerOfThisPerso
         <div className="absolute -bottom-12 -left-12 w-32 h-32 rounded-full bg-fuchsia-500/10 blur-3xl pointer-events-none" />
         <div className="relative flex items-center gap-3.5">
           <div className="w-16 h-16 rounded-2xl overflow-hidden border-2 border-purple-400/50 shadow-xl shadow-purple-500/25 shrink-0">
-            {basic?.avatarData ? <img src={basic.avatarData} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-2xl font-black !text-white" style={{ background: "linear-gradient(135deg,#8B5CF6,#6D28D9)" }}>{(basic?.name || "?").charAt(0).toUpperCase()}</div>}
+            {basic?.avatarData ? <img src={basic.avatarData} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-2xl font-black !text-[color:var(--text-strong)]" style={{ background: "var(--surface-3)" }}>{(basic?.name || "?").charAt(0).toUpperCase()}</div>}
           </div>
           <div className="min-w-0 flex-1">
             <h2 className="text-lg font-black text-white truncate">{basic?.name || "Usuario"}</h2>
@@ -17982,7 +17911,7 @@ function KudosListModal({ candidates, basics, kudosSentMap, kudosSendingUid, onS
                   {b?.avatarData ? (
                     <img src={b.avatarData} alt="" className="w-10 h-10 rounded-2xl object-cover shrink-0 border-2" style={{ borderColor: "rgba(20,184,166,0.5)" }} />
                   ) : (
-                    <div className="w-10 h-10 rounded-2xl flex items-center justify-center text-sm font-black !text-white shrink-0 border-2" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)", borderColor: "rgba(20,184,166,0.5)" }}>
+                    <div className="w-10 h-10 rounded-2xl flex items-center justify-center text-sm font-black !text-[color:var(--text-strong)] shrink-0 border-2" style={{ background: "var(--surface-3)", borderColor: "rgba(20,184,166,0.5)" }}>
                       {(b?.name || "?").charAt(0).toUpperCase()}
                     </div>
                   )}
@@ -21975,7 +21904,7 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
                   </ul>
                 )}
                 <div className="flex gap-2">
-                  <button onClick={() => handleConfirmPlan(i)} className="flex-1 py-2.5 rounded-xl text-white text-xs font-bold transition-all active:scale-[0.98]" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>{m.plan.confirmLabel}</button>
+                  <button onClick={() => handleConfirmPlan(i)} className="flex-1 py-2.5 rounded-xl text-[color:var(--accion-tinta)] text-xs font-bold transition-all active:scale-[0.98]" style={{ background: "var(--accion-fondo)" }}>{m.plan.confirmLabel}</button>
                   <button onClick={() => handleDiscardPlan(i)} className="px-3.5 py-2.5 rounded-xl border border-slate-700 text-slate-400 hover:text-white text-xs font-bold transition">Descartar</button>
                 </div>
               </div>
@@ -22099,7 +22028,7 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
               )}
               <div className="flex-1 min-h-12 flex items-end gap-2 rounded-[26px] p-1.5 backdrop-blur-xl shadow-xl shadow-black/40 transition-colors" style={{ backgroundColor: isListening ? "var(--chat-bar-listening)" : editingIndex != null ? "var(--chat-bar-editing)" : "var(--chat-bar-idle)", border: `1px solid ${isListening ? "var(--chat-bar-border-listening)" : editingIndex != null ? "var(--chat-bar-border-editing)" : "var(--chat-bar-border-idle)"}` }}>
                 {SpeechRecognitionAPI && (
-                  <button onClick={handleMicToggle} aria-label={isListening ? "Confirmar, terminé de hablar" : "Hablar"} className="relative p-2.5 rounded-xl shrink-0 transition-all active:scale-95" style={isListening ? { background: "linear-gradient(160deg,#10B981,#059669)", color: "#fff" } : { color: "#9da2a8" }}>
+                  <button onClick={handleMicToggle} aria-label={isListening ? "Confirmar, terminé de hablar" : "Hablar"} className="relative p-2.5 rounded-xl shrink-0 transition-all active:scale-95" style={isListening ? { background: "var(--accion-fondo)", color: "#fff" } : { color: "#9da2a8" }}>
                     {isListening && <span className="absolute inset-0 rounded-xl bg-emerald-400/40 animate-ping" />}
                     <span className="relative">{isListening ? <Check size={16} /> : <Mic size={16} />}</span>
                   </button>
@@ -22172,7 +22101,7 @@ function AIConversationSidebar({ conversations, activeConversationId, onSelect, 
       <div className="relative w-[82%] max-w-xs h-full flex flex-col shadow-2xl shadow-black/60 bounce-in overflow-hidden backdrop-blur-xl" style={{ background: "var(--glass-panel-bg)", borderRight: "1px solid var(--glass-panel-border)" }} onClick={(e) => e.stopPropagation()}>
         <div className="relative overflow-hidden px-4 pb-4 shrink-0" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 18px)", borderBottom: "1px solid var(--glass-panel-border)", boxShadow: "inset 0 -1px 0 0 rgba(255,255,255,0.04)" }}>
           <div className="relative flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-md shadow-teal-500/20" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-md shadow-teal-500/20" style={{ background: "var(--surface-3)" }}>
               <List size={16} className="!text-white" />
             </div>
             <div className="flex-1 min-w-0">
@@ -22183,7 +22112,7 @@ function AIConversationSidebar({ conversations, activeConversationId, onSelect, 
           </div>
         </div>
         <div className="px-3 pt-3 shrink-0">
-          <button onClick={onNew} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold !text-white transition active:scale-[0.98] shadow-lg shadow-teal-500/15" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>
+          <button onClick={onNew} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold !text-[color:var(--accion-tinta)] transition active:scale-[0.98] shadow-lg shadow-teal-500/15" style={{ background: "var(--accion-fondo)" }}>
             <Plus size={15} /> Nueva conversación
           </button>
         </div>
@@ -22606,7 +22535,7 @@ function ImportRoutineModal({ onImport, onClose }) {
 
         <input value={routineName} onChange={(e) => setRoutineName(e.target.value)} placeholder="Nombre para la rutina (opcional)" className="w-full bg-slate-900/80 border border-slate-700/50 rounded-xl px-3 py-2.5 text-white text-sm mb-3 focus:outline-none focus:border-teal-500/60" />
         {notice && <p className="text-[11px] text-amber-400 mb-3 leading-relaxed">{notice}</p>}
-        <button onClick={handleProcessAI} disabled={!hasAnySource || loadingFile || isParsingAI} className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-sm font-bold transition-all active:scale-[0.98] ${hasAnySource && !loadingFile && !isParsingAI ? "!text-white shadow-lg shadow-teal-500/20" : "bg-slate-800 text-slate-600"}`} style={hasAnySource && !loadingFile && !isParsingAI ? { background: "linear-gradient(135deg,#14B8A6,#0E7490)" } : {}}>
+        <button onClick={handleProcessAI} disabled={!hasAnySource || loadingFile || isParsingAI} className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-sm font-bold transition-all active:scale-[0.98] ${hasAnySource && !loadingFile && !isParsingAI ? "!text-[color:var(--accion-tinta)] shadow-lg shadow-teal-500/20" : "bg-slate-800 text-slate-600"}`} style={hasAnySource && !loadingFile && !isParsingAI ? { background: "var(--accion-fondo)" } : {}}>
           {isParsingAI ? <><RotateCcw size={14} className="animate-spin" /> Analizando con IA...</> : <><Sparkles size={15} /> Detectar con IA</>}
         </button>
         {!images.length && (
@@ -23100,7 +23029,7 @@ function PersonalizedRoutineWizard({ profile, onUpdateProfile, onCreateRoutine, 
               })}
             </div>
             {current.multi && (
-              <button onClick={answerMulti} disabled={!current.optional && multiSel.length === 0} className="w-full mt-3 py-3 rounded-xl !text-white text-sm font-black transition active:scale-95 disabled:opacity-30" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>
+              <button onClick={answerMulti} disabled={!current.optional && multiSel.length === 0} className="w-full mt-3 py-3 rounded-xl !text-[color:var(--accion-tinta)] text-sm font-black transition active:scale-95 disabled:opacity-30" style={{ background: "var(--accion-fondo)" }}>
                 {multiSel.length === 0 && current.optional ? "Saltear" : "Continuar"} {multiSel.length > 0 && `(${multiSel.length})`}
               </button>
             )}
@@ -23113,7 +23042,7 @@ function PersonalizedRoutineWizard({ profile, onUpdateProfile, onCreateRoutine, 
                   className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:border-teal-500/60" />
                 <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-slate-600 font-bold">{current.input.unit}</span>
               </div>
-              <button onClick={() => inputVal.trim() && answer(inputVal.trim())} disabled={!inputVal.trim()} className="px-5 rounded-xl text-white font-bold text-sm disabled:opacity-30 transition active:scale-95" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>OK</button>
+              <button onClick={() => inputVal.trim() && answer(inputVal.trim())} disabled={!inputVal.trim()} className="px-5 rounded-xl text-[color:var(--accion-tinta)] font-bold text-sm disabled:opacity-30 transition active:scale-95" style={{ background: "var(--accion-fondo)" }}>OK</button>
             </div>
           )}
         </div>
@@ -23140,7 +23069,7 @@ function PersonalizedRoutineWizard({ profile, onUpdateProfile, onCreateRoutine, 
           <AlertTriangle size={22} className="text-amber-400 mx-auto" />
           <p className="text-sm text-slate-300">{genError}</p>
           <div className="flex gap-2 justify-center">
-            <button onClick={() => { setGenError(""); generateRoutine(answers); }} className="px-4 py-2 rounded-xl text-white text-xs font-bold" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>Reintentar</button>
+            <button onClick={() => { setGenError(""); generateRoutine(answers); }} className="px-4 py-2 rounded-xl text-[color:var(--accion-tinta)] text-xs font-bold" style={{ background: "var(--accion-fondo)" }}>Reintentar</button>
             <button onClick={onClose} className="px-4 py-2 rounded-xl border border-slate-700 text-slate-400 text-xs font-bold">Ver rutinas prearmadas</button>
           </div>
         </div>
@@ -23174,7 +23103,7 @@ function PersonalizedRoutineWizard({ profile, onUpdateProfile, onCreateRoutine, 
           </div>
           <div className="flex gap-2">
             <button onClick={onClose} className="flex-1 py-3 rounded-xl border border-slate-700 text-slate-400 text-sm font-bold hover:text-white transition">Descartar</button>
-            <button onClick={handleConfirm} className="flex-1 py-3 rounded-xl !text-white text-sm font-black transition active:scale-95" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>Usar esta rutina</button>
+            <button onClick={handleConfirm} className="flex-1 py-3 rounded-xl !text-[color:var(--accion-tinta)] text-sm font-black transition active:scale-95" style={{ background: "var(--accion-fondo)" }}>Usar esta rutina</button>
           </div>
         </div>
       )}
@@ -23438,8 +23367,8 @@ function RoutinePreviewModal({ routineDef, routineName, onActivate, onClose, yaA
           ) : (
             <button
               onClick={() => { onActivate?.(); onClose(); }}
-              className="w-full py-3 rounded-2xl text-sm font-black !text-white transition active:scale-[0.98] shadow-lg shadow-sky-500/25 flex items-center justify-center gap-1.5"
-              style={{ background: "linear-gradient(135deg,#38BDF8,#0284C7)" }}
+              className="w-full py-3 rounded-2xl text-sm font-black !text-[color:var(--accion-tinta)] transition active:scale-[0.98] shadow-lg shadow-sky-500/25 flex items-center justify-center gap-1.5"
+              style={{ background: "var(--accion-fondo)" }}
             >
               <Sparkles size={14} /> Usar esta rutina
             </button>
@@ -23610,7 +23539,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
         <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4">
           <WeeklyScheduleEditor dayOrder={def.dayOrder} days={def.days} schedule={def.weekSchedule} onChange={updatePendingScheduleDay} />
         </div>
-        <button onClick={confirmPendingActivation} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl !text-white text-sm font-bold transition-all active:scale-[0.98] shadow-lg shadow-blue-500/20" style={{ background: "linear-gradient(135deg,#3B82F6,#1D4ED8)" }}><Check size={15} /> Listo, empezar a entrenar</button>
+        <button onClick={confirmPendingActivation} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl !text-[color:var(--accion-tinta)] text-sm font-bold transition-all active:scale-[0.98] shadow-lg shadow-blue-500/20" style={{ background: "var(--accion-fondo)" }}><Check size={15} /> Listo, empezar a entrenar</button>
       </div>
     );
   }
@@ -24106,7 +24035,12 @@ function BottomBar({ tab, setTab }) {
       <div className="max-w-xl mx-auto flex">
         {NAV_TABS.map(({ key, icon, label, color = "#14B8A6" }) => (
           <button key={key} onClick={() => setTab(key)} aria-current={tab === key ? "page" : undefined} style={{ "--tab-color": color }}>
-            <span className="indicador" aria-hidden="true">{icon}</span>
+            <span className="indicador" aria-hidden="true">
+              {/* La píldora de tiza es UNA sola y viaja de pestaña en pestaña
+                  (layoutId), en vez de aparecer y desaparecer. */}
+              {tab === key && <m.span layoutId="isla-pestana" className="indicador-fondo" transition={{ type: "spring", bounce: 0.18, duration: 0.42 }} />}
+              {icon}
+            </span>
             <span className="etiqueta">{label}</span>
           </button>
         ))}
@@ -24179,18 +24113,20 @@ function SideNav({ tab, setTab, profileName }) {
         <span className="galleta login-logo"><Flame size={18} /></span>
         <span className="font-bold text-white text-[15px] tracking-tight">Modus Fit</span>
       </div>
-      <button onClick={() => setTab("perfil")} className={`w-full flex items-center gap-3 px-3 py-2.5 mb-3 rounded-full text-sm font-semibold transition-all ${tab === "perfil" ? "bg-teal-500/15 text-teal-400" : "text-slate-400 hover:text-slate-200 hover:bg-slate-900/60"}`}>
+      <button onClick={() => setTab("perfil")} className={`w-full flex items-center gap-3 px-3 py-2.5 mb-3 rounded-full text-sm font-semibold transition-all ${tab === "perfil" ? "bg-[var(--velo-fuerte)] text-[color:var(--text-strong)]" : "text-slate-400 hover:text-slate-200 hover:bg-slate-900/60"}`}>
         {avatarUrl
           ? <img src={avatarUrl} className="w-6 h-6 rounded-lg object-cover shrink-0" alt="" />
-          : <div className="w-6 h-6 rounded-lg flex items-center justify-center text-[11px] font-black !text-white shrink-0" style={{ background: "linear-gradient(135deg,#14B8A6,#0E7490)" }}>{initial}</div>
+          : <div className="w-6 h-6 rounded-lg flex items-center justify-center text-[11px] font-black !text-[color:var(--text-strong)] shrink-0" style={{ background: "var(--surface-3)" }}>{initial}</div>
         }
         <span className="truncate">{profileName}</span>
       </button>
       <div className="space-y-1">
-        {NAV_TABS.map(({ key, icon, label, color = "#14B8A6" }) => (
+        {/* La sección elegida, en la píldora de tiza: la misma de la isla de
+            abajo en el celular. */}
+        {NAV_TABS.map(({ key, icon, label }) => (
           <button key={key} onClick={() => setTab(key)} className={`w-full flex items-center gap-3 px-3 h-11 rounded-full text-sm font-semibold transition-all ${tab === key ? "" : "text-slate-400 hover:text-slate-200 hover:bg-slate-900/60"}`}
-            style={tab === key ? { backgroundColor: "color-mix(in oklab, " + color + " 22%, transparent)", color: "var(--text-strong)" } : {}}>
-            <span style={tab === key ? { color } : {}} className={tab !== key ? "text-slate-600" : ""}>{icon}</span>
+            style={tab === key ? { backgroundColor: "var(--accion-fondo)", color: "var(--accion-tinta)" } : {}}>
+            <span className={tab !== key ? "text-slate-500" : ""}>{icon}</span>
             <span className="truncate">{label}</span>
           </button>
         ))}
@@ -25877,7 +25813,7 @@ export default function App() {
             <p className="text-sm text-slate-400 mt-1.5 mb-4">Entrenamiento y descarga, hechos. ¿Lo compartís?</p>
             <div className="flex gap-2">
               <button onClick={() => setCycleCompleteNotice(null)} className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-400 text-sm font-semibold">Cerrar</button>
-              <button onClick={() => setShowCycleShareImage(true)} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl text-white text-sm font-bold transition-all active:scale-[0.98] shadow-lg shadow-purple-500/20" style={{ background: "linear-gradient(135deg,#A855F7,#7C3AED)" }}><Share2 size={14} /> Compartir</button>
+              <button onClick={() => setShowCycleShareImage(true)} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl text-[color:var(--accion-tinta)] text-sm font-bold transition-all active:scale-[0.98] shadow-lg shadow-purple-500/20" style={{ background: "var(--accion-fondo)" }}><Share2 size={14} /> Compartir</button>
             </div>
             {/* Sólo en el PRIMER ciclo — es el momento en que alguien está
                 más contento con la app, mejor punto para pedir una

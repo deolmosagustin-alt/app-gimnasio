@@ -121,10 +121,27 @@ export function isHeavyRepRange(repRange) { const top = repRangeTop(repRange); r
 let IS_LIGHT_THEME = false;
 export function setThemeMode(isLight) { IS_LIGHT_THEME = !!isLight; }
 
+// "GRAFITO": el color de un día o de una pestaña ya no pinta fondos ni
+// bordes. Lo que pasa por tint() —fondos y bordes translúcidos, que son casi
+// todos sus usos— sale apagado: un tercio del color y el resto gris. La
+// identidad del día se insinúa sin teñir la pantalla; los puntos y textos
+// que usan el color directo (sin tint) siguen plenos.
+function apagar(hex) {
+  const largo = hex.length === 4 ? `#${[...hex.slice(1)].map((c) => c + c).join("")}` : hex;
+  const n = parseInt(largo.slice(1), 16);
+  if (isNaN(n)) return hex;
+  const gris = IS_LIGHT_THEME ? [136, 138, 143] : [150, 152, 158];
+  const mezcla = (c, g) => Math.round(c * 0.34 + g * 0.66);
+  const r = mezcla((n >> 16) & 255, gris[0]), v = mezcla((n >> 8) & 255, gris[1]), a = mezcla(n & 255, gris[2]);
+  return `#${((1 << 24) | (r << 16) | (v << 8) | a).toString(16).slice(1)}`;
+}
+
 export function tint(hex, alphaHex) {
-  if (!IS_LIGHT_THEME || typeof hex !== "string" || !hex.startsWith("#")) return hex + alphaHex;
+  if (typeof hex !== "string" || !hex.startsWith("#") || (hex.length !== 7 && hex.length !== 4)) return hex + alphaHex;
+  const base = apagar(hex);
+  if (!IS_LIGHT_THEME) return base + alphaHex;
   const a = parseInt(alphaHex, 16);
-  if (isNaN(a)) return hex + alphaHex;
+  if (isNaN(a)) return base + alphaHex;
   const boosted = Math.round(Math.sqrt(a / 255) * 255);
-  return hex + boosted.toString(16).padStart(2, "0");
+  return base + boosted.toString(16).padStart(2, "0");
 }
