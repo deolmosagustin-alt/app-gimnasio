@@ -3438,7 +3438,7 @@ button.foco-campo-rotulo:active { background: var(--velo); }
 .ticket-fila { display: flex; align-items: baseline; gap: 6px; margin-top: 5px; }
 .ticket-fila > span:first-child { min-width: 0; max-width: 64%; }
 .ticket-fila > i { flex: 1; min-width: 12px; border-bottom: 1.5px dotted #bdbdb8; transform: translateY(-4px); }
-.ticket-fila > span:last-child { flex: none; margin-left: auto; font-weight: 650; white-space: nowrap; }
+.ticket-fila > span:last-child:not(:first-child) { flex: none; margin-left: auto; font-weight: 650; white-space: nowrap; }
 .ticket-fila.fuerte { justify-content: space-between; font-size: 15px; font-weight: 750; color: #1d1d1f; }
 .ticket-fila.total { font-size: 16px; font-weight: 800; color: #1d1d1f; }
 .ticket-fila.record > span:last-child { color: #8a6a14; }
