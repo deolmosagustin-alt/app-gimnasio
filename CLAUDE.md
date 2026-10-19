@@ -30,6 +30,11 @@ Hay 29 skills en `.claude/skills/`, que es donde las lee Claude Code: 19 de dise
 | Consultas, modelo de datos e índices de Firestore | `firebase-firestore` |
 | Login y cuentas | `firebase-auth-basics` |
 | Revisar `firestore.rules` antes de cambiarlas | `firebase-security-rules-auditor` |
+| Escribir o endurecer `firestore.rules` | `anthropic-skills:firestore-rules-creation`, y después el auditor |
+| Iniciar sesión en la línea de comandos de Firebase, elegir el proyecto, publicar las reglas | `anthropic-skills:firebase-basics` (ver "Reglas de Firestore" más abajo) |
+| Reportes de cuelgues de la app de Android | `anthropic-skills:firebase-crashlytics` |
+| Llamar a Gemini desde la app, protegida con App Check (hoy va por `api/ia.js`, en Vercel) | `anthropic-skills:firebase-ai-logic-basics` |
+| Banderas para prender funciones o cambiar de modelo sin publicar la app | `anthropic-skills:firebase-remote-config-basics` |
 | Probar un flujo de punta a punta en el navegador | `webapp-testing` (Playwright, con `npm run dev`) |
 | La app de Android: configuración y plugins de Capacitor | `capacitor-best-practices` |
 | Pantalla en blanco, cuelgues o plugins que fallan en el celular | `debugging-capacitor` |
@@ -37,7 +42,7 @@ Hay 29 skills en `.claude/skills/`, que es donde las lee Claude Code: 19 de dise
 | Lector de pantalla y tamaño de letra del sistema en el celular | `capacitor-accessibility` |
 | Buscar una skill que todavía no está | `find-skills` (`npx skills find <tema>`) |
 
-Las que empiezan con `design:` (y las `engineering:` y `marketing:`) no están en el repo: son plugins de la cuenta de claude.ai y se actualizan solos. Para bugs sirven `engineering:debug` y `engineering:code-review`.
+Las que empiezan con `design:` (y las `engineering:` y `marketing:`) no están en el repo: son plugins de la cuenta de claude.ai y se actualizan solos. Las `anthropic-skills:` son skills subidas a la cuenta: entre ellas, las trece oficiales de Firebase (`firebase/agent-skills`). Tres están también en el repo, iguales (`firebase-firestore`, `firebase-auth-basics` y el auditor). No aplican las de Hosting y App Hosting (la app se publica en Vercel), Data Connect (es Firestore), Xcode (no hay iOS) ni la de pasar extensiones a Functions (no usa extensiones). Para bugs sirven `engineering:debug` y `engineering:code-review`.
 
 No edites el contenido de las skills del repo: se actualizan desde sus repos con `npx skills update`. En Windows quedan copiadas y no enlazadas, así que si una no se actualiza, reinstalala con `npx skills add <repo> -s <skill> -a claude-code -y` (los repos están en `skills-lock.json`).
 
@@ -51,7 +56,7 @@ No edites el contenido de las skills del repo: se actualizan desde sus repos con
   - La captura de página completa (`-completa.png`) esconde la barra de pestañas, que si no queda pegada en el medio.
 - **Social de muestra** (sólo en desarrollo): con `modusfit_demo_social` en `"1"` en el localStorage (lo pone `--datos`), `src/social.js` contesta con los cinco amigos de `src/social-demo.js` en vez de ir a Firestore. Esas ramas van detrás de `import.meta.env.DEV`, así que no viajan en la versión publicada. Si sumás una función de Social que lee Firestore, agregale su rama.
 - **`npm run color -- <carpeta> [<otra>]`**: cuánto color tiene cada pantalla de las capturas (el criterio de la skill de gusto: píxeles con saturación ≥ 0,4) y cuántas familias de tono. Con dos carpetas, antes y después. Es la vara para que ninguna pestaña quede más cargada; medilo con `--fecha` de un jueves, que un lunes la semana está vacía. La referencia de las apps estudiadas es 3 %.
-- **Reglas de Firestore**: se publican a mano (Firebase Console › Firestore › Reglas › pegar `firestore.rules` entero). Los retos entre amigos necesitan la regla `retos`: hasta publicarla, mandar uno falla con un aviso. Antes de cambiarlas, `firebase-security-rules-auditor`.
+- **Reglas de Firestore**: `npm run reglas` las publica con la línea de comandos de Firebase (`firebase.json` y `.firebaserc`, proyecto `gymapp-1e2a1`): compila `firestore.rules` en el servidor y, si no hay errores, la publica entera. Sólo las reglas: los índices (`firestore.indexes.json`) no se tocan. Hace falta haber iniciado sesión una vez con la cuenta de Google dueña del proyecto: `npx -y firebase-tools@latest login` en una terminal (abre el navegador; Claude no puede hacerlo por vos). Sin sesión, se publican a mano: Firebase Console › Firestore › Reglas › pegar `firestore.rules` entero. Los retos entre amigos necesitan la regla `retos`: hasta publicarla, mandar uno falla con un aviso. Antes de cambiarlas, `firebase-security-rules-auditor`. No hay Java en esta máquina, así que el emulador de Firebase (para probar las reglas localmente) no corre.
 - **El grafo del proyecto** (graphify): `graphify-out/` (lo ignora git) tiene `GRAPH_REPORT.md` y `graph.html`; se actualiza con `/graphify . --update`.
 - **`npm run imagen -- "<pedido>"`**: genera una imagen con Gemini (Nano Banana) para las skills de imágenes. Opciones: `--formato 16:9`, `--tamano 2K`, `--ref <captura>` para partir de una pantalla actual, `--modelos`. Necesita `GEMINI_IMAGEN_API_KEY` en `.env.local`, de un proyecto **con facturación**: la generación de imágenes no tiene cupo gratis (unos US$0,03 por imagen). La clave gratis de la app no sirve, y usarla le comería la cuota a los usuarios. Quedan en `.taste-skill/imagenes/`.
 - **`ui-ux-pro-max`**: su SKILL.md llama al buscador con `${CLAUDE_PLUGIN_ROOT}`, que acá no existe porque no es un plugin. Correlo desde la raíz: `python .claude/skills/ui-ux-pro-max/scripts/search.py "<consulta>" --design-system`.

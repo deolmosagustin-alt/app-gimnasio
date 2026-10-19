@@ -11,6 +11,7 @@
     "dominio": "node scripts/cambiar-dominio.mjs",
     "capturas": "node scripts/capturas.mjs",
     "color": "node scripts/color.mjs",
+    "reglas": "npx -y firebase-tools@latest deploy --only firestore:rules",
     "imagen": "node scripts/generar-imagen.mjs"
   },
   "dependencies": {
