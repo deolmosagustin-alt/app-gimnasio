@@ -7672,8 +7672,12 @@ function dibujarTicket(ctx, W, H, resumen, unit) {
   ctx.fillStyle = "#0b0b0d"; ctx.fillRect(0, 0, W, H);
   const lineas = (resumen.lineas || []).slice(0, 7);
   const prs = (resumen.prs || []).slice(0, 3);
-  const px = 64, pw = W - 128, py = 84;
-  const alto = 250 + lineas.length * 34 + (prs.length ? 70 + prs.length * 34 : 0) + 190;
+  const px = 64, pw = W - 128;
+  // Lo que ocupa cada parte, hasta el código de barras y un margen abajo.
+  const alto = 250 + lineas.length * 34 + (prs.length ? 78 + prs.length * 34 : 0) + 220;
+  // El papel, centrado en el alto (con aire para la marca de abajo): una
+  // sesión corta no deja el ticket colgando arriba de un vacío negro.
+  const py = Math.max(84, Math.round((H - 70 - alto) / 2));
   // El papel, con el corte en zigzag abajo.
   ctx.fillStyle = "#f3f3ef";
   ctx.beginPath();
@@ -7687,6 +7691,7 @@ function dibujarTicket(ctx, W, H, resumen, unit) {
   const centro = (t, font, color) => { ctx.font = font; ctx.fillStyle = color; ctx.textAlign = "center"; ctx.fillText(t, W / 2, y); };
   const fila = (izq, der, font = `500 21px ${F}`, color = "#232326") => {
     ctx.font = font; ctx.fillStyle = color; ctx.textAlign = "left"; ctx.fillText(izq, px + 26, y);
+    if (!der) return;
     ctx.textAlign = "right"; ctx.fillText(der, px + pw - 26, y);
     const a = ctx.measureText(der).width;
     ctx.textAlign = "left";
