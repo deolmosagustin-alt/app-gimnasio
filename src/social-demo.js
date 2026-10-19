@@ -88,3 +88,28 @@ export function listKudosReceived(uid) {
     { id: "k2", toUid: uid, fromUid: "demo-joaquin", date: fecha(1) },
   ]);
 }
+
+// RETOS de muestra: Martina te reta a superar su mejor serie de press banca,
+// y los que mandes quedan guardados mientras dure la página.
+const retosEnviados = [];
+const retosBorrados = new Set();
+export function listRetosRecibidos(uid, semana) {
+  const martina = AMIGOS.find((a) => a.uid === "demo-martina");
+  const series = martina ? perfilCompleto(martina).logs.press_banca_0 || [] : [];
+  const mejor = series.reduce((a, b) => (!a || b.kg > a.kg ? b : a), null);
+  const id = `${uid}_demo-martina_press_banca_${semana}`;
+  return Promise.resolve(mejor && !retosBorrados.has(id) ? [{ id, fromUid: "demo-martina", toUid: uid, exerciseId: "press_banca", exerciseName: "Press Banca", kg: mejor.kg, reps: mejor.reps, semana }] : []);
+}
+export function listRetosEnviados(uid, semana) {
+  return Promise.resolve(retosEnviados.filter((r) => r.fromUid === uid && r.semana === semana));
+}
+export function sendReto(fromUid, toUid, reto) {
+  retosEnviados.push({ id: `${toUid}_${fromUid}_${reto.exerciseId}_${reto.semana}`, fromUid, toUid, ...reto });
+  return Promise.resolve();
+}
+export function borrarReto(id) {
+  retosBorrados.add(id);
+  const i = retosEnviados.findIndex((r) => r.id === id);
+  if (i >= 0) retosEnviados.splice(i, 1);
+  return Promise.resolve();
+}

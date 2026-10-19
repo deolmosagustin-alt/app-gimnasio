@@ -14,6 +14,7 @@
 //   friendships/{friendshipId(a,b)} → { users:[a,b], status, requestedBy }.
 //   trainerLinks/{trainerUid}_{studentUid} → { trainerUid, studentUid, status, requestedBy }.
 //   routineProposals/{autoId} → propuesta de rutina de un entrenador a un alumno.
+//   retos/{toUid}_{fromUid}_{exerciseId}_{lunes} → que un amigo supere tu mejor serie en la semana.
 
 import { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, collectionGroup, addDoc, query, where, orderBy, limit, getDocs } from "firebase/firestore";
 import { db } from "./firebase";
@@ -440,6 +441,45 @@ export async function listKudosReceived(uid, sinceDate) {
   }
 }
 
+// ============================== RETOS ==============================
+// Un reto: que un amigo supere tu mejor serie en un ejercicio antes del
+// domingo. ID = "<toUid>_<fromUid>_<exerciseId>_<lunes>": uno por
+// ejercicio, por par y por semana (el propio ID evita duplicados, como con
+// los aplausos). Necesita la regla de retos de firestore.rules publicada:
+// sin ella, mandarlo falla y la app lo avisa.
+export function retoId(toUid, fromUid, exerciseId, semana) { return `${toUid}_${fromUid}_${exerciseId}_${semana}`; }
+
+export async function sendReto(fromUid, toUid, reto) {
+  if (import.meta.env.DEV && demoSocialMarcado()) return (await import("./social-demo.js")).sendReto(fromUid, toUid, reto);
+  const { exerciseId, exerciseName, kg, reps, semana } = reto;
+  await setDoc(doc(db, "retos", retoId(toUid, fromUid, exerciseId, semana)), {
+    fromUid, toUid, exerciseId, exerciseName: String(exerciseName || "").slice(0, 80), kg: Number(kg) || 0, reps: Math.round(Number(reps)) || 1, semana, createdAt: new Date().toISOString(),
+  });
+}
+
+async function listarRetos(campo, uid, semana) {
+  if (!uid) return [];
+  try {
+    const snap = await getDocs(query(collection(db, "retos"), where(campo, "==", uid), where("semana", "==", semana)));
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  } catch (err) {
+    console.warn("[social] No se pudieron leer los retos:", err?.message || err);
+    return [];
+  }
+}
+export async function listRetosRecibidos(uid, semana) {
+  if (import.meta.env.DEV && demoSocialMarcado()) return (await import("./social-demo.js")).listRetosRecibidos(uid, semana);
+  return listarRetos("toUid", uid, semana);
+}
+export async function listRetosEnviados(uid, semana) {
+  if (import.meta.env.DEV && demoSocialMarcado()) return (await import("./social-demo.js")).listRetosEnviados(uid, semana);
+  return listarRetos("fromUid", uid, semana);
+}
+export async function borrarReto(id) {
+  if (import.meta.env.DEV && demoSocialMarcado()) return (await import("./social-demo.js")).borrarReto(id);
+  await deleteDoc(doc(db, "retos", id));
+}
+
 // ============================== LIMPIEZA AL ELIMINAR PERFIL ==============================
 // Best-effort: se llama desde handleDelete. Nunca debe bloquear ni tirar —
 // si algo falla, queda basura huérfana (mismo criterio que ya usa el resto
@@ -450,15 +490,18 @@ export async function cleanupSocialData(uid, usernameLower, phoneHash = null) {
     if (phoneHash) await clearDiscoverablePhone(phoneHash);
     await deleteDoc(doc(db, "users", uid, "public", "basic"));
     await deleteDoc(doc(db, "users", uid, "public", "full"));
-    const [asFriendA, asTrainer, asStudent] = await Promise.all([
+    const [asFriendA, asTrainer, asStudent, retosMios, retosParaMi] = await Promise.all([
       listMyFriendships(uid),
       listTrainerLinksAsTrainer(uid),
       listTrainerLinksAsStudent(uid),
+      getDocs(query(collection(db, "retos"), where("fromUid", "==", uid))).catch(() => null),
+      getDocs(query(collection(db, "retos"), where("toUid", "==", uid))).catch(() => null),
     ]);
     await Promise.all([
       ...asFriendA.map((f) => deleteDoc(doc(db, "friendships", f.id)).catch(() => {})),
       ...asTrainer.map((l) => deleteDoc(doc(db, "trainerLinks", l.id)).catch(() => {})),
       ...asStudent.map((l) => deleteDoc(doc(db, "trainerLinks", l.id)).catch(() => {})),
+      ...[retosMios, retosParaMi].flatMap((snap) => (snap?.docs || []).map((d) => deleteDoc(d.ref).catch(() => {}))),
     ]);
   } catch (err) {
     console.warn("[social] Limpieza al eliminar perfil incompleta:", err?.message || err);

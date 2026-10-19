@@ -240,6 +240,36 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // ============================== RETOS ==============================
+    // Que un amigo supere tu mejor serie en un ejercicio antes del domingo.
+    // ID = "<toUid>_<fromUid>_<exerciseId>_<lunes>" (ver retoId en
+    // src/social.js): uno por ejercicio, por par y por semana. Sólo a un
+    // amigo ACEPTADO, sólo en tu nombre y con los campos justos; lo leen y
+    // lo borran los dos, y no se edita.
+    match /retos/{retoId} {
+      allow read: if isSignedIn()
+        && (request.auth.uid == resource.data.toUid || request.auth.uid == resource.data.fromUid);
+      allow create: if isSignedIn()
+        && request.auth.uid == request.resource.data.fromUid
+        && request.resource.data.toUid != request.auth.uid
+        && request.resource.data.keys().hasOnly(['fromUid', 'toUid', 'exerciseId', 'exerciseName', 'kg', 'reps', 'semana', 'createdAt'])
+        && request.resource.data.exerciseId is string && request.resource.data.exerciseId.matches('^[A-Za-z0-9_-]{1,80}$')
+        && request.resource.data.exerciseName is string && request.resource.data.exerciseName.size() <= 80
+        && request.resource.data.kg is number && request.resource.data.kg >= 0 && request.resource.data.kg <= 1000
+        && request.resource.data.reps is int && request.resource.data.reps > 0 && request.resource.data.reps <= 100
+        && request.resource.data.semana is string && request.resource.data.semana.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        // Sólo la semana en curso (con dos días de margen por los husos
+        // horarios): no se pueden sembrar retos en otras semanas.
+        && request.time > timestamp.date(int(request.resource.data.semana.split('-')[0]), int(request.resource.data.semana.split('-')[1]), int(request.resource.data.semana.split('-')[2])) - duration.value(2, 'd')
+        && request.time < timestamp.date(int(request.resource.data.semana.split('-')[0]), int(request.resource.data.semana.split('-')[1]), int(request.resource.data.semana.split('-')[2])) + duration.value(9, 'd')
+        && request.resource.data.createdAt is string && request.resource.data.createdAt.size() <= 40
+        && retoId == (request.resource.data.toUid + '_' + request.resource.data.fromUid + '_' + request.resource.data.exerciseId + '_' + request.resource.data.semana)
+        && isAcceptedFriend(request.resource.data.toUid);
+      allow update: if false;
+      allow delete: if isSignedIn()
+        && (request.auth.uid == resource.data.toUid || request.auth.uid == resource.data.fromUid);
+    }
+
     // ============================== RUTINAS COMPARTIDAS POR ENLACE ==============================
     // Ya existente — ver comentario arriba de shareRoutineToFirestore() en
     // App.jsx. Lectura y creación públicas (sin sesión) porque cualquiera

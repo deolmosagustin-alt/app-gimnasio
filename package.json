@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "dominio": "node scripts/cambiar-dominio.mjs",
     "capturas": "node scripts/capturas.mjs",
+    "color": "node scripts/color.mjs",
     "imagen": "node scripts/generar-imagen.mjs"
   },
   "dependencies": {
