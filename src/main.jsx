@@ -56,10 +56,29 @@ if (typeof window !== "undefined") {
   });
 }
 
-createRoot(document.getElementById('root')).render(
+const arrancar = () => createRoot(document.getElementById('root')).render(
   <StrictMode>
     <ErrorBoundary>
       <App />
     </ErrorBoundary>
   </StrictMode>,
 )
+
+// SÓLO EN DESARROLLO: ?demo=<pestaña> (rutina, progreso, social, rutinas,
+// entrenador_ia o perfil) abre la app con el perfil y el historial de muestra
+// que deja `npm run capturas -- --datos` en .taste-skill/demo-storage.json, en
+// esa pestaña. Es para las herramientas que sólo reciben una dirección, como
+// el inspector de la skill de diseño. En la versión publicada no existe.
+const demo = import.meta.env.DEV ? new URLSearchParams(window.location.search).get("demo") : null
+if (demo) {
+  fetch("/.taste-skill/demo-storage.json")
+    .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`sin perfil de muestra (${r.status}): corré npm run capturas -- --datos`))))
+    .then((datos) => {
+      localStorage.clear()
+      for (const [clave, valor] of Object.entries(datos)) localStorage.setItem(clave, valor)
+    })
+    .catch((e) => console.error("[demo]", e.message))
+    .finally(arrancar)
+} else {
+  arrancar()
+}

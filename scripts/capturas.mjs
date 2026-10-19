@@ -18,13 +18,22 @@
  *   npm run capturas -- --claro           (las pestañas en modo claro)
  *   npm run capturas -- --ancho 320       (un celular más angosto, para ver
  *                                          si algún texto se corta)
+ *   npm run capturas -- --fecha 2026-10-22 (como si fuera ese día, a las
+ *                                          18:30: con --datos, un jueves
+ *                                          muestra la semana con sesiones)
+ *
+ * Con --datos deja además el perfil de muestra en
+ * .taste-skill/demo-storage.json: con `npm run dev`, la dirección
+ * /?demo=progreso (o rutina, social, rutinas, entrenador_ia, perfil) abre la
+ * app con esos datos en esa pestaña. Es la que se le pasa al inspector de la
+ * skill de diseño.
  *
  * Levanta su propio servidor de Vite en un puerto libre: no hace falta tener
  * `npm run dev` corriendo. Por cada pantalla guarda lo que se ve al abrirla
  * (nítido, al doble de resolución) y la página entera. Todo queda en
  * .taste-skill/capturas/<carpeta>/, que git ignora.
  */
-import { mkdirSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join, relative } from "node:path";
 import { chromium, webkit } from "playwright";
@@ -37,6 +46,7 @@ const valor = (flag) => { const i = args.indexOf(flag); return i >= 0 ? args[i +
 const conEscritorio = args.includes("--escritorio");
 const conDatos = args.includes("--datos");
 const conClaro = args.includes("--claro");
+const fecha = valor("--fecha");
 const motor = args.includes("--safari") ? webkit : chromium;
 // Sin --carpeta, la fecha y hora local (no UTC) de la corrida.
 const carpeta = valor("--carpeta") || new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16).replace(/[-:]/g, "").replace("T", "-");
@@ -136,6 +146,7 @@ try {
     const { nombre, ...opciones } = vista;
     const context = await browser.newContext(opciones);
     const page = await context.newPage();
+    if (fecha) await page.clock.setFixedTime(new Date(`${fecha}T18:30:00`));
     page.on("pageerror", (e) => errores.push(`[${nombre}] ${e.message}`));
     page.on("console", (m) => {
       if (m.type() === "error" && !/favicon|Failed to load resource/.test(m.text())) errores.push(`[${nombre}] ${m.text().slice(0, 300)}`);
@@ -292,6 +303,13 @@ try {
       else await page.locator("button:visible").filter({ hasText: NOMBRE_PERFIL }).first().click({ timeout: 8000 });
     });
     await capturar("Perfil");
+    // El perfil de muestra, para abrirlo con ?demo= (ver arriba). Se guarda al
+    // final, con todas las pestañas ya vistas: así no se abre la guía de
+    // ninguna encima de la pantalla.
+    if (conDatos && nombre === "celular") {
+      const guardado = await page.evaluate(() => JSON.stringify(Object.fromEntries(Object.keys(localStorage).map((k) => [k, localStorage.getItem(k)]))));
+      writeFileSync(join(RAIZ, ".taste-skill", "demo-storage.json"), guardado);
+    }
     await context.close();
   }
 } catch (e) {

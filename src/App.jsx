@@ -6,10 +6,6 @@ import NumberFlow, { NumberFlowGroup } from "@number-flow/react";
 import { LazyMotion, m, MotionConfig } from "motion/react";
 const cargarAnimaciones = () => import("./animaciones.js").then((r) => r.default);
 import {
-  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, ReferenceLine,
-} from "recharts";
-import {
   Play, Pause, RotateCcw, TrendingUp, TrendingDown, Dumbbell, History,
   ChevronDown, ChevronUp, ChevronLeft, Trophy, Flame, Save, Trash2, BarChart3,
   ListChecks, LogOut, X, Check, AlertTriangle, Calendar, Zap, Bell, GripVertical, Sliders, StickyNote, Eye,
@@ -1936,9 +1932,6 @@ const svgComoUrl = (svg) => `url("data:image/svg+xml,${encodeURIComponent(svg)}"
 // completado, sin el festón de Material 3. Las clases siguen llamándose
 // "galleta" porque el código la usa en todos lados.
 const GALLETA_URI = svgComoUrl(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="${caminoGalleta(9, 0)}"/></svg>`);
-// La galleta como camino de SVG (100×100), para dibujarla adentro de los
-// gráficos: los récords de la escalera.
-const GALLETA_PATH = caminoGalleta(9, 0, 90);
 // Un largo de onda (24×12) que empalma consigo mismo: repetida en x hace la
 // línea ondulada del cronómetro de descanso.
 const ONDA_URI = svgComoUrl('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 12"><path d="M0 6 Q6 0.5 12 6 T24 6" fill="none" stroke="#000" stroke-width="3" stroke-linecap="round"/></svg>');
@@ -2008,8 +2001,10 @@ const ANIMATION_CSS = `
 .bar-fill { transform-origin: left center; animation: barFill 0.9s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
 
 /* Pulso lento e invitante (botón de iniciar sesión) */
-@keyframes invitePulse { 0%, 100% { box-shadow: 0 0 0 0 var(--invite-glow, rgba(20,184,166,0.5)); } 50% { box-shadow: 0 0 0 7px rgba(20,184,166,0); } }
-.invite-pulse { animation: invitePulse 2.4s ease-out infinite; --invite-glow: var(--hairline-fuerte) !important; }
+@keyframes invitePulse { 0% { opacity: .9; transform: scale(1); } 60%, 100% { opacity: 0; transform: scale(1.04, 1.3); } }
+.invite-pulse { position: relative; }
+.invite-pulse::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: 0 0 0 1.5px var(--hairline-fuerte); animation: invitePulse 2.4s ease-out infinite; pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .invite-pulse::after { animation: none; opacity: 0; } }
 
 /* Entrada de las tarjetas al cambiar de día (según dirección) */
 @keyframes slideFromRight { from { opacity: 0; transform: translateX(18px); } to { opacity: 1; transform: translateX(0); } }
@@ -2262,7 +2257,7 @@ const ANIMATION_CSS = `
 /* Respeta a quien pidió menos movimiento en su sistema */
 @media (prefers-reduced-motion: reduce) {
   .muscle-charge, .rank-up-pulse, .draw-check path, .number-pop, .bar-fill,
-  .invite-pulse, .slide-right, .slide-left, .streak-beat, .streak-glow,
+  .slide-right, .slide-left, .streak-beat, .streak-glow,
   .elastic-in, .skeleton, .row-enter, .row-flash, .row-leave, .activate-pulse,
   .thinking-dots::after { animation: none !important; content: "..." !important; }
   .thinking-lift, .thinking-wave, .thinking-rep, .thinking-halo, .thinking-eq,
@@ -2408,15 +2403,6 @@ p, span, label, button { overflow-wrap: break-word; }
 input, textarea, [contenteditable="true"] {
   -webkit-user-select: text;
   user-select: text;
-}
-
-/* BUG FIX (gráfico de evolución): Recharts hace foco por accesibilidad en su
-   div contenedor (.recharts-wrapper) al tocar un punto, y sin esto el
-   navegador dibuja el recuadro de foco por defecto alrededor de TODO el
-   gráfico, tapando el borde y viéndose roto/bugueado en cada toque. */
-.recharts-wrapper:focus,
-.recharts-wrapper *:focus {
-  outline: none;
 }
 
 /* ============================================================================
@@ -2811,7 +2797,8 @@ input, textarea, [contenteditable="true"] {
   --accent-soft: color-mix(in oklab, var(--tono) 16%, transparent);
   --text-strong: #f1f1ee;
   --text-muted: #9d9ea4;
-  --text-faint: #6b6c72;
+  /* 4,5:1 sobre las placas (antes #6b6c72, 3,5:1: lo marcó el inspector). */
+  --text-faint: #808187;
   --accion-fondo: color-mix(in oklab, var(--tono) 72%, white);
   --accion-tinta: color-mix(in oklab, var(--tono) 18%, #07080a);
   /* Velos: un poco de luz sobre la placa, para lo tonal y lo elegido. */
@@ -2821,7 +2808,7 @@ input, textarea, [contenteditable="true"] {
   /* El brillo del canto de arriba: lo que hace que una placa parezca una
      pieza maquinada y no un rectángulo pintado. */
   --brillo: rgba(255,255,255,0.055);
-  --sombra-placa: 0 28px 56px -36px rgba(0,0,0,0.95);
+  --sombra-placa: 0 1px 2px rgba(0,0,0,0.08);
   /* El único color propio: el de los récords, dorado viejo y en poco lugar. */
   --record: #e2c47f;
   --bar-bg: rgba(11,11,13,0.8);
@@ -2847,14 +2834,14 @@ input, textarea, [contenteditable="true"] {
   --accent-soft: color-mix(in oklab, var(--tono) 13%, transparent);
   --text-strong: #131315;
   --text-muted: #5b5d62;
-  --text-faint: #8b8d92;
+  --text-faint: #6e7076;
   --accion-fondo: var(--tono);
   --accion-tinta: color-mix(in oklab, var(--tono) 18%, #07080a);
   --velo: rgba(0,0,0,0.045);
   --velo-fuerte: rgba(0,0,0,0.075);
   --hairline-fuerte: rgba(0,0,0,0.14);
   --brillo: rgba(255,255,255,0.95);
-  --sombra-placa: 0 1px 2px rgba(0,0,0,0.04), 0 16px 36px -24px rgba(0,0,0,0.22);
+  --sombra-placa: 0 1px 2px rgba(0,0,0,0.06);
   --record: #93701f;
   --bar-bg: rgba(239,239,237,0.84);
   --tabbar-bg: rgba(255,255,255,0.8);
@@ -2924,11 +2911,9 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
   font-weight: 700; font-size: 0.9375rem; letter-spacing: -0.005em;
   color: color-mix(in oklab, var(--c, var(--tono)) 18%, #07080a);
   background: color-mix(in oklab, var(--c, var(--tono)) 72%, white);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.5), 0 10px 22px -14px rgba(0,0,0,0.9);
   transition: border-radius .4s var(--resorte), transform .25s var(--resorte), filter .2s ease;
 }
 .boton-pildora:active { border-radius: 18px; transform: scale(.975); }
-.light-mode .boton-pildora { box-shadow: 0 10px 22px -14px rgba(0,0,0,0.5); }
 .light-mode .boton-pildora { background: var(--c, var(--tono)); }
 
 /* FONDO: el clima del día. Arriba, donde va el título, un velo del color de
@@ -3182,11 +3167,13 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
   font-size: 0.75rem; font-weight: 650; color: var(--text-muted);
   transition: background-color .2s ease, color .2s ease;
 }
+/* Lo elegido en un riel, tonal: el tono al 20% y la letra en pastel. El
+   color lleno es del botón principal. */
 .segmentado > button.activo {
-  color: color-mix(in oklab, var(--c, var(--tono)) 18%, #07080a) !important;
-  background: color-mix(in oklab, var(--c, var(--tono)) 72%, white) !important;
+  color: color-mix(in oklab, var(--c, var(--tono)) 72%, white) !important;
+  background: color-mix(in oklab, var(--c, var(--tono)) 20%, var(--surface-1)) !important;
 }
-.light-mode .segmentado > button.activo { background: var(--c, var(--tono)) !important; }
+.light-mode .segmentado > button.activo { color: color-mix(in oklab, var(--c, var(--tono)) 72%, black) !important; background: color-mix(in oklab, var(--c, var(--tono)) 15%, white) !important; }
 .cardio-reloj {
   border-radius: 22px; padding: 12px 12px 14px 16px;
   background: var(--surface-2);
@@ -3212,11 +3199,14 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
   transition: background-color .25s ease, color .2s ease, transform .2s ease;
 }
 .dia-solapa[aria-selected="true"], .dia-solapa.elegida {
-  color: color-mix(in oklab, var(--c, var(--tono)) 18%, #07080a) !important;
-  background: color-mix(in oklab, var(--c, var(--tono)) 72%, white) !important;
+  color: color-mix(in oklab, var(--c, var(--tono)) 72%, white) !important;
+  background: color-mix(in oklab, var(--c, var(--tono)) 20%, var(--surface-1)) !important;
 }
+.dia-solapa[aria-selected="true"] .dia-solapa-texto, .dia-solapa.elegida .dia-solapa-texto { font-weight: 700; }
+.light-mode .dia-solapa[aria-selected="true"], .light-mode .dia-solapa.elegida { color: color-mix(in oklab, var(--c, var(--tono)) 72%, black) !important; background: color-mix(in oklab, var(--c, var(--tono)) 15%, white) !important; }
 .dia-solapa-hoy { position: absolute; left: 50%; bottom: 6px; transform: translateX(-50%); width: 14px; height: 3px; border-radius: 2px; background: var(--text-faint); }
-.dia-solapa[aria-selected="true"] .dia-solapa-hoy { background: color-mix(in oklab, color-mix(in oklab, var(--c, var(--tono)) 18%, #07080a) 40%, transparent); }
+.dia-solapa[aria-selected="true"] .dia-solapa-hoy { background: color-mix(in oklab, var(--c, var(--tono)) 72%, white); }
+.light-mode .dia-solapa[aria-selected="true"] .dia-solapa-hoy { background: color-mix(in oklab, var(--c, var(--tono)) 72%, black); }
 .dia-solapa-texto {
   display: block; text-align: center;
   font-weight: 600; letter-spacing: -0.005em; line-height: 1.1;
@@ -3284,7 +3274,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 .tarjeta-plan { border-radius: 24px; padding: 16px; background: var(--surface-1); box-shadow: var(--placa-canto); }
 .tarjeta-tonal { border-radius: 24px; background: var(--surface-1); box-shadow: var(--placa-canto); }
 .seccion-plegable { border-radius: 24px; background: var(--surface-1); box-shadow: var(--placa-canto); }
-.icono-galleta { width: 38px; height: 38px; --galleta-fondo: var(--velo-fuerte); color: var(--text-muted); }
+.icono-galleta { width: 38px; height: 38px; --galleta-fondo: transparent; color: var(--text-muted); }
 .light-mode .icono-galleta { color: var(--text-muted); }
 
 /* La tarjeta de cada ejercicio: una placa. Abierta, toma sombra. */
@@ -3394,7 +3384,6 @@ button.foco-campo-rotulo:active { background: var(--velo); }
   width: 52px; height: 52px; justify-self: end; border-radius: 999px;
   display: flex; align-items: center; justify-content: center;
   color: color-mix(in oklab, var(--c, var(--tono)) 18%, #07080a); background: color-mix(in oklab, var(--c, var(--tono)) 72%, white);
-  box-shadow: 0 8px 18px -10px rgba(0,0,0,0.9);
   transition: transform .25s var(--resorte), background-color .2s ease;
 }
 .foco-guardar:active { transform: scale(.92); }
@@ -3412,7 +3401,6 @@ button.foco-campo-rotulo:active { background: var(--velo); }
 .foco-record { display: flex; align-items: center; gap: 6px; margin: 8px 6px 0; font-size: 0.8125rem; font-weight: 600; color: var(--record); }
 .serie-foco .serie-aviso { margin: 8px 6px 0; }
 .foco-extras { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-/* Qué cargar: la barra con sus discos (o el par de mancuernas), chica. */
 /* EL TICKET: sale de una ranura, como el de la caja. Papel claro (es papel,
    también en oscuro), renglones con puntos guía, cortes punteados, el borde
    de abajo en zigzag y un código de barras al pie. */
@@ -3446,13 +3434,32 @@ button.foco-campo-rotulo:active { background: var(--velo); }
 .ticket-codigo { display: flex; justify-content: center; gap: 2px; height: 38px; margin-top: 12px; }
 .ticket-codigo i { flex: none; background: #1d1d1f; }
 .ticket-botones { display: flex; gap: 8px; margin: 10px 16px 0; }
+/* Lo que el ticket dibuja, impreso en el papel con el color del día: una raya
+   del volumen de cada ejercicio, las columnas de tus últimas veces (la de hoy
+   en el color del día) y el reparto por región. */
+.ticket-ejercicio + .ticket-ejercicio { margin-top: 1px; }
+.ticket-raya { display: block; height: 4px; margin: 4px 0 6px; border-radius: 2px; background: #e4e4df; overflow: hidden; }
+.ticket-raya i { display: block; height: 100%; border-radius: inherit; background: color-mix(in oklab, var(--dia) 58%, #f3f3ef); }
+.ticket-subtitulo { margin-bottom: 8px; font-size: 12.5px; font-weight: 700; color: #4a4a4e; }
+.ticket-columnas { display: flex; align-items: flex-end; gap: 8px; height: 96px; padding: 0 2px; }
+.ticket-columna { flex: 1 1 0; min-width: 0; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 3px; }
+.ticket-columna i { display: block; width: 70%; max-width: 34px; border-radius: 3px 3px 0 0; background: #cfcfca; }
+.ticket-columna.hoy i { background: color-mix(in oklab, var(--dia) 75%, #1d1d1f); }
+.ticket-columna b { min-height: 14px; font-size: 11.5px; font-weight: 750; color: #1d1d1f; white-space: nowrap; }
+.ticket-columna span { font-size: 11px; color: #6b6b70; white-space: nowrap; }
+.ticket-columna.hoy span { font-weight: 700; color: #1d1d1f; }
+.ticket-reparto { display: flex; gap: 3px; height: 10px; }
+.ticket-reparto i, .ticket-reparto-leyenda i { display: block; background: #cfcfca; }
+.ticket-reparto i { flex-basis: 0; min-width: 6px; }
+.ticket-reparto i:first-child { border-radius: 5px 0 0 5px; }
+.ticket-reparto i:last-child { border-radius: 0 5px 5px 0; }
+.ticket-reparto .t0, .ticket-reparto-leyenda .t0 { background: color-mix(in oklab, var(--dia) 75%, #1d1d1f); }
+.ticket-reparto .t1, .ticket-reparto-leyenda .t1 { background: color-mix(in oklab, var(--dia) 58%, #f3f3ef); }
+.ticket-reparto .t2, .ticket-reparto-leyenda .t2 { background: color-mix(in oklab, var(--dia) 34%, #f3f3ef); }
+.ticket-reparto-leyenda { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 8px; font-size: 12px; color: #4a4a4e; }
+.ticket-reparto-leyenda span { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.ticket-reparto-leyenda i { width: 8px; height: 8px; border-radius: 999px; }
 @media (prefers-reduced-motion: reduce) { .ticket-papel { animation: none; } }
-.que-cargar { display: flex; align-items: center; gap: 10px; margin: 10px 6px 0; animation: queCargarEntra .45s var(--resorte) both; }
-.que-cargar .barra-cargada { width: auto; flex: none; }
-.que-cargar > span { min-width: 0; font-size: 12.5px; color: var(--text-faint); }
-.que-cargar b { font-weight: 650; color: var(--text-muted); }
-@keyframes queCargarEntra { from { opacity: 0; transform: translateY(-4px); } }
-@media (prefers-reduced-motion: reduce) { .que-cargar { animation: none; } }
 .foco-extras > * { flex: 1 1 140px; }
 .serie-sugerencia {
   display: flex; align-items: center; gap: 6px; width: 100%; margin-top: 8px;
@@ -3552,6 +3559,9 @@ button.foco-campo-rotulo:active { background: var(--velo); }
 }
 .historia-aplauso:active { transform: scale(.9); }
 .historia-aplauso.hecho { background: var(--surface-3); color: var(--text-muted); }
+/* El aplauso que falta dar, con un fondo del tono: se ve qué queda por tocar. */
+.historia-aplauso:not(.hecho), .actividad-aplauso:not(.hecho) { background: color-mix(in oklab, var(--tono) 22%, var(--surface-3)); }
+.light-mode .historia-aplauso:not(.hecho), .light-mode .actividad-aplauso:not(.hecho) { background: color-mix(in oklab, var(--tono) 16%, white); }
 .historia-nombre { margin-top: 8px; max-width: 72px; text-align: center; font-size: 0.75rem; font-weight: 650; color: var(--text-strong); line-height: 1.15; overflow-wrap: anywhere; }
 .historia-cuando { margin-top: 1px; max-width: 72px; text-align: center; font-size: 0.6875rem; color: var(--text-faint); line-height: 1.2; }
 /* Avisos: renglones de notificación. */
@@ -3566,6 +3576,14 @@ button.foco-campo-rotulo:active { background: var(--velo); }
   color: var(--text-strong); --galleta-fondo: var(--velo);
 }
 .aviso-social p { flex: 1; min-width: 0; font-size: 0.8125rem; line-height: 1.35; color: var(--text-muted); }
+/* Cada aviso, con el color de lo que avisa (los acentos de la app, a media
+   croma): el que te alcanza, el reto, el reto superado y el que te pasó. */
+.aviso-social-icono.alerta { --aviso: oklch(76.9% 0.132 70.1); }
+.aviso-social-icono.tono { --aviso: var(--tono); }
+.aviso-social-icono.logro { --aviso: oklch(72.3% 0.153 149.6); }
+.aviso-social-icono.peligro { --aviso: oklch(64.5% 0.172 16.4); }
+.aviso-social-icono.alerta, .aviso-social-icono.tono, .aviso-social-icono.logro, .aviso-social-icono.peligro { --galleta-fondo: color-mix(in oklab, var(--aviso) 16%, transparent); color: color-mix(in oklab, var(--aviso) 72%, white); }
+.light-mode .aviso-social-icono.alerta, .light-mode .aviso-social-icono.tono, .light-mode .aviso-social-icono.logro, .light-mode .aviso-social-icono.peligro { --galleta-fondo: color-mix(in oklab, var(--aviso) 14%, white); color: color-mix(in oklab, var(--aviso) 72%, black); }
 .aviso-social b { color: var(--text-strong); }
 /* Podio del Ranking. */
 .podio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: end; gap: 8px; padding-top: 6px; }
@@ -3722,10 +3740,10 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 .pestanas-internas > .pestana-interna:last-child { border-top-right-radius: 999px; border-bottom-right-radius: 999px; }
 .pestana-interna[aria-selected="true"] {
   border-radius: 999px; font-weight: 700;
-  color: color-mix(in oklab, var(--c, var(--tono)) 18%, #07080a);
-  background: color-mix(in oklab, var(--c, var(--tono)) 72%, white);
+  color: color-mix(in oklab, var(--c, var(--tono)) 72%, white);
+  background: color-mix(in oklab, var(--c, var(--tono)) 20%, var(--surface-1));
 }
-.light-mode .pestana-interna[aria-selected="true"] { background: var(--c, var(--tono)); }
+.light-mode .pestana-interna[aria-selected="true"] { color: color-mix(in oklab, var(--c, var(--tono)) 72%, black); background: color-mix(in oklab, var(--c, var(--tono)) 15%, white); }
 /* La serie de la semana de descarga. */
 .descarga-serie { border-radius: 24px; padding: 12px; background: var(--surface-2); }
 .light-mode .descarga-serie { background: var(--surface-1); }
@@ -3942,7 +3960,7 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 .aviso-descanso { width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 26px; text-align: left; background: var(--surface-1); }
 
 /* El carnet de socio. */
-.carnet { position: relative; overflow: hidden; border-radius: 28px; padding: 16px 16px 14px; background: linear-gradient(180deg, var(--surface-2), var(--surface-1) 75%); box-shadow: var(--placa-canto), var(--sombra-placa); }
+.carnet { position: relative; overflow: hidden; border-radius: 28px; padding: 16px 16px 14px; background: var(--surface-1); box-shadow: var(--placa-canto), var(--sombra-placa); }
 .light-mode .carnet { background: var(--surface-1); }
 .carnet-arriba { display: flex; align-items: center; gap: 14px; }
 .carnet-avatar {
@@ -3988,6 +4006,12 @@ button.carrera-carril:active { background: var(--velo); }
 .carrera-carril.yo .carrera-puesto { color: var(--text-strong); }
 .carrera-avatar { width: 32px; height: 32px; overflow: hidden; border-radius: 999px; display: grid; place-items: center; font-size: 13px; font-weight: 750; color: var(--text-strong); background: var(--surface-3); }
 .carrera-avatar img { width: 100%; height: 100%; object-fit: cover; }
+/* El aro del rango en los avatares de Social: fino, del color de su rango
+   apagado con gris. Se sabe en qué anda cada uno sin leer. */
+.con-rango { outline: 2px solid color-mix(in oklab, var(--rango-c) 64%, #8a8c92); outline-offset: 2px; }
+.light-mode .con-rango { outline-color: color-mix(in oklab, var(--rango-c) 78%, #6b6e74); }
+.actividad-aro.aro-rango { --galleta-fondo: color-mix(in oklab, var(--rango) 64%, #8a8c92); }
+.light-mode .actividad-aro.aro-rango { --galleta-fondo: color-mix(in oklab, var(--rango) 78%, #6b6e74); }
 .carrera-cuerpo { min-width: 0; display: grid; gap: 6px; }
 .carrera-nombre { font-size: 13.5px; font-weight: 650; line-height: 1.1; color: var(--text-strong); }
 .carrera-pista { display: flex; gap: 3px; }
@@ -4023,6 +4047,18 @@ button.carrera-carril:active { background: var(--velo); }
 .escalera-pie .marcas { color: var(--text-muted); }
 .escalera-pie .actual .marcas { color: var(--text-strong); }
 .escalera-pie .marcas.vacia i { height: 9px; }
+/* La semana que llegó a lo planeado: sus marcas, en el tono. */
+.escalera-pie .cumplida .marcas { color: color-mix(in oklab, var(--tono) 72%, white); }
+/* La racha viva (la tuya, en el carnet y en la credencial), en el tono. */
+.marcas.viva { color: color-mix(in oklab, var(--tono) 72%, white); }
+.light-mode .marcas.viva { color: color-mix(in oklab, var(--tono) 72%, black); }
+/* Tu semana en el carnet: cada día que entrenaste, con el color del día que
+   hiciste (apagado, como todo relleno de día). Ahí el día es el dato. */
+.carnet .semana-hueco.picado { background: color-mix(in oklab, var(--dia, var(--tono)) 62%, #8a8c92); }
+.light-mode .carnet .semana-hueco.picado { background: color-mix(in oklab, var(--dia, var(--tono)) 72%, #a7a9ae); }
+.light-mode .escalera-pie .cumplida .marcas { color: var(--tono); }
+.escalera-cuenta.cumplida b { color: color-mix(in oklab, var(--tono) 72%, white); }
+.light-mode .escalera-cuenta.cumplida b { color: var(--tono); }
 .escalera-enlace { justify-self: start; margin-top: 10px; }
 @keyframes escalonSube { from { transform: scaleY(0.2); transform-origin: bottom; opacity: 0; } to { transform: none; opacity: 1; } }
 
@@ -4039,7 +4075,6 @@ button.carrera-carril:active { background: var(--velo); }
 .records-sub { margin-top: 5px; font-size: 0.8125rem; color: var(--text-muted); }
 .records-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .records-pie { display: flex; align-items: center; gap: 8px; font-size: 0.8125rem; line-height: 1.4; color: var(--text-muted); }
-.evolucion-etiqueta { fill: var(--record); font-size: 11.5px; font-weight: 700; }
 .records-pie.alerta { color: var(--record); }
 .records-pie.fuego { color: var(--text-strong); }
 .grafica-globo {
@@ -4050,6 +4085,53 @@ button.carrera-carril:active { background: var(--velo); }
 .grafica-globo-fecha { font-size: 11.5px; color: var(--text-muted); }
 .grafica-globo-serie { margin-top: 2px; font-size: 1.05rem; font-weight: 750; color: var(--text-strong); }
 .grafica-globo-dato { margin-top: 2px; font-size: 11.5px; color: var(--text-muted); }
+/* LA GRÁFICA DEL TIEMPO (GraficaTiempo). La escala a la izquierda en gris
+   chico, rayas de 1px, la de abajo un poco más marcada, una línea de 2px que
+   se traza al aparecer y un relleno que no pasa del 16%. */
+.grafica-tiempo { position: relative; touch-action: pan-y; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+.grafica-tiempo svg { display: block; overflow: visible; outline: none; cursor: crosshair; }
+.grafica-tiempo svg:focus-visible { outline: 2px solid var(--hairline-fuerte); outline-offset: 6px; border-radius: 12px; }
+.grafica-raya { stroke: var(--chart-grid); stroke-width: 1; }
+.grafica-base { stroke: var(--hairline-fuerte); stroke-width: 1; }
+.grafica-eje { fill: var(--text-faint); font-size: 11px; font-weight: 550; }
+.grafica-linea { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; stroke-dasharray: 1; animation: graficaTraza .9s cubic-bezier(.3,.7,.2,1) both; }
+@keyframes graficaTraza { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+.grafica-relleno { animation: graficaAparece .6s .35s ease-out both; }
+@keyframes graficaAparece { from { opacity: 0; } }
+.grafica-ref { stroke: var(--record); stroke-width: 1; stroke-dasharray: 3 4; opacity: .8; }
+.grafica-ref-texto { fill: var(--record); font-size: 11px; font-weight: 650; }
+.grafica-record { fill: var(--record); stroke: var(--surface-1); stroke-width: 1.5; }
+.grafica-descarga { fill: var(--surface-1); stroke: var(--text-faint); stroke-width: 1.5; }
+.grafica-ultimo, .grafica-tocado { stroke: var(--surface-1); stroke-width: 2; }
+.grafica-guia { stroke: var(--hairline-fuerte); stroke-width: 1; }
+.grafica-tiempo .grafica-globo { --gx: -50%; --gy: calc(-100% - 14px); transform: translate(var(--gx), var(--gy)); min-width: 0; max-width: 190px; white-space: nowrap; }
+.grafica-tiempo .grafica-globo.izq { --gx: -16px; }
+.grafica-tiempo .grafica-globo.der { --gx: calc(-100% + 16px); }
+.grafica-tiempo .grafica-globo.abajo { --gy: 16px; }
+@media (prefers-reduced-motion: reduce) { .grafica-linea, .grafica-relleno { animation: none; } }
+/* Las métricas de la evolución, como pestañas: cada una dice su último valor
+   y cuánto cambió en el período. La elegida es la que dibuja la gráfica y
+   lleva arriba una rayita del color de la línea, como una leyenda. */
+.evo-metricas { display: grid; grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)); gap: 4px; padding: 4px; border-radius: 20px; background: var(--surface-2); }
+.evo-metrica { position: relative; display: grid; gap: 2px; min-width: 0; padding: 10px 10px 9px; border-radius: 16px; text-align: left; color: var(--text-muted); transition: background-color .2s ease, box-shadow .2s ease; }
+.evo-metrica[aria-selected="true"] { background: var(--surface-1); box-shadow: var(--placa-canto); }
+.evo-metrica[aria-selected="true"]::before { content: ""; position: absolute; left: 10px; top: 0; width: 20px; height: 2.5px; border-radius: 0 0 3px 3px; background: color-mix(in oklab, var(--c, var(--tono)) 80%, white); }
+.light-mode .evo-metrica[aria-selected="true"]::before { background: var(--c, var(--tono)); }
+.evo-metrica-nombre { font-size: 12px; font-weight: 600; }
+.evo-metrica-valor { display: flex; align-items: baseline; gap: 3px; min-width: 0; color: var(--text-strong); }
+.evo-metrica-valor b { font-size: 1.3rem; line-height: 1.05; font-weight: 750; }
+.evo-metrica-valor small { font-size: 11px; font-weight: 600; color: var(--text-muted); }
+.evo-metrica-cambio { font-size: 11.5px; font-weight: 650; line-height: 1.25; color: var(--text-faint); }
+.evo-metrica-cambio small { display: block; font-size: 11px; font-weight: 500; color: var(--text-faint); }
+.evo-metrica[aria-selected="true"] .evo-metrica-cambio { color: var(--text-muted); }
+/* Un cambio para bien (más 1RM, más peso, más volumen) dice que es bueno en
+   verde, a media croma como todos los acentos; uno para abajo queda gris. */
+.evo-metrica-cambio.sube, .evo-metrica[aria-selected="true"] .evo-metrica-cambio.sube, .resumen-kpi span.sube { color: color-mix(in oklab, oklch(72.3% 0.153 149.6) 78%, white); }
+.light-mode .evo-metrica-cambio.sube, .light-mode .evo-metrica[aria-selected="true"] .evo-metrica-cambio.sube, .light-mode .resumen-kpi span.sube { color: color-mix(in oklab, oklch(72.3% 0.153 149.6) 70%, black); }
+.evo-pie { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; margin-top: 6px !important; }
+.evo-pie .segmentado { flex: none; }
+.evo-ritmo { font-size: 12.5px; color: var(--text-muted); }
+.evo-ritmo b { font-weight: 700; color: var(--text-strong); }
 .sesion-renglon { display: grid; grid-template-columns: 28px 52px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px 12px 8px 8px; border-radius: 16px; background: var(--surface-2); }
 .sesion-renglon.record { background: var(--surface-2); }
 .sesion-renglon-marca { width: 26px; height: 26px; --galleta-fondo: color-mix(in oklab, var(--c, var(--tono)) 72%, white); color: color-mix(in oklab, var(--c, var(--tono)) 18%, #07080a); }
@@ -4149,7 +4231,15 @@ button.carrera-carril:active { background: var(--velo); }
 .preset-tira { display: flex; gap: 2px; width: 96px; height: 10px; flex: none; }
 .preset-tira i { flex-basis: 0; border-radius: 3px; background: color-mix(in oklab, var(--text-strong) 24%, transparent); }
 .light-mode .preset-tira i { background: color-mix(in oklab, var(--text-strong) 18%, transparent); }
-.preset-frec { font-size: 12px; color: var(--text-faint); min-width: 0; }
+.preset-frec { font-size: 12px; color: var(--text-muted); min-width: 0; }
+/* Un ícono suelto, sin placa: en el gris del texto, o en el ámbar si es un
+   aviso. Reemplaza a los cuadraditos teñidos de las pantallas secundarias. */
+.icono-suelto { width: 28px; height: 36px; flex: none; display: grid; place-items: center; color: var(--text-muted); }
+.icono-suelto.aviso { color: oklch(76.9% 0.132 70.1); }
+.light-mode .icono-suelto.aviso { color: oklch(55.5% 0.114 49); }
+.icono-suelto.grande { width: 48px; height: 48px; }
+.aviso-vincular { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 22px; color: var(--text-muted); background: var(--surface-1); box-shadow: var(--placa-canto); }
+.aviso-vincular p { flex: 1; min-width: 0; font-size: 12.5px; line-height: 1.4; text-wrap: pretty; }
 .preset-acciones { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
 
 /* Social: la actividad y el ranking. */
@@ -4193,6 +4283,9 @@ button.carrera-carril:active { background: var(--velo); }
   transition: border-radius .35s var(--resorte), transform .2s ease;
 }
 .light-mode .chip-accion { color: var(--text-strong); }
+/* Los atajos del Chatbot: el ícono en el tono, que es lo que se toca. */
+.chip-accion svg { color: color-mix(in oklab, var(--tono) 72%, white); }
+.light-mode .chip-accion svg { color: color-mix(in oklab, var(--tono) 72%, black); }
 .chip-accion:active { border-radius: 14px; transform: scale(.96); }
 /* Las respuestas de la IA, como texto limpio sobre la página (sin globo);
    lo tuyo, en un globo con un toque del color de la pestaña. */
@@ -4204,7 +4297,6 @@ button.carrera-carril:active { background: var(--velo); }
 .ia-marca {
   width: 48px; height: 48px; margin-bottom: 8px; border-radius: 16px; display: grid; place-items: center;
   color: color-mix(in oklab, var(--tono) 18%, #07080a); background: color-mix(in oklab, var(--tono) 72%, white);
-  box-shadow: 0 12px 28px -14px color-mix(in oklab, var(--tono) 70%, transparent);
 }
 .light-mode .ia-marca { background: var(--tono); }
 .ia-saludo { font-size: 1rem; font-weight: 550; color: var(--text-muted); }
@@ -4218,13 +4310,15 @@ button.carrera-carril:active { background: var(--velo); }
 }
 .ia-tarjeta:active { transform: scale(.97); }
 .ia-tarjeta:disabled { opacity: .5; }
+/* El ícono de cada pedido, en el tono (es lo que se toca); la placa, neutra. */
 .ia-tarjeta-icono {
-  width: 36px; height: 36px; margin-bottom: 10px; border-radius: 12px; display: grid; place-items: center;
-  color: var(--text-muted); background: var(--velo-fuerte);
+  display: flex; margin-bottom: 12px;
+  color: color-mix(in oklab, var(--tono) 72%, white);
 }
-.light-mode .ia-tarjeta-icono { color: var(--text-muted); }
+.light-mode .ia-tarjeta-icono { color: color-mix(in oklab, var(--tono) 72%, black); }
 .ia-tarjeta-titulo { font-size: 0.9375rem; font-weight: 650; line-height: 1.2; color: var(--text-strong); }
 .ia-tarjeta-bajada { font-size: 0.8125rem; line-height: 1.35; color: var(--text-muted); text-wrap: pretty; }
+.ia-tarjeta-dato { font-size: 0.8125rem; font-weight: 650; line-height: 1.35; color: var(--text-muted); text-wrap: pretty; }
 .ia-mas { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 /* Lo que propone la IA (crear una rutina, anotar una marca...), en una placa. */
 .plan-ia { margin-top: 8px; padding: 14px; border-radius: 24px; background: var(--surface-1); box-shadow: var(--placa-canto); }
@@ -4387,8 +4481,6 @@ button.credencial-dato:not(:disabled):active { background: var(--velo); }
 .mejor-marca-numeros { display: flex; align-items: baseline; gap: 6px; color: var(--text-muted); }
 .mejor-marca-numeros b { font-size: 2.6rem; line-height: .95; font-weight: 750; color: var(--text-strong); }
 .mejor-marca-numeros small { font-size: 14px; font-weight: 650; }
-.mejor-marca-barra { width: 100%; }
-.mejor-marca-discos { font-size: 12.5px; color: var(--text-muted); }
 .musculo-detalle { padding: 12px 14px; border-radius: 18px; background: var(--surface-2); }
 .atleta-confirmar { display: grid; gap: 10px; padding: 12px; border-radius: 18px; background: var(--surface-2); }
 .atleta-confirmar p { font-size: 13px; line-height: 1.4; color: var(--text-muted); }
@@ -4431,10 +4523,14 @@ button.credencial-dato:not(:disabled):active { background: var(--velo); }
 .cara-quien { font-size: 12.5px; color: var(--text-muted); overflow-wrap: anywhere; }
 .cara-marca { font-size: 12px; color: var(--text-faint); white-space: nowrap; }
 .cara-marca b { font-size: 1.05rem; font-weight: 700; color: var(--text-muted); }
-.cara-fila .barra-cargada { opacity: .72; }
+/* La raya de cada uno: su 1RM estimado contra el del que más levanta, del
+   color de cada uno y apagada; la del que gana, entera. */
+.cara-pista { height: 8px; border-radius: 999px; background: var(--velo); overflow: hidden; }
+.cara-pista i { display: block; height: 100%; border-radius: inherit; background: color-mix(in oklab, var(--quien) 60%, #8a8c92); opacity: .55; }
+.light-mode .cara-pista i { background: color-mix(in oklab, var(--quien) 70%, #a7a9ae); }
+.cara-fila.gana .cara-pista i { opacity: 1; }
 .cara-fila.gana .cara-quien { font-weight: 650; color: var(--text-strong); }
 .cara-fila.gana .cara-marca b { color: var(--text-strong); }
-.cara-fila.gana .barra-cargada { opacity: 1; }
 .mano-caras { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 8px; }
 .mano-cara { display: grid; justify-items: center; gap: 2px; min-width: 0; text-align: center; }
 .mano-avatar {
@@ -4536,12 +4632,8 @@ button.credencial-dato:not(:disabled):active { background: var(--velo); }
 .cinta-marca.fantasma { width: 0; background: none; box-shadow: none; border-left: 2px dashed rgba(20,20,22,0.6); top: -2px; bottom: -2px; }
 .balanza-leyenda i.cinta-fantasma { width: 0; background: none; border: 0; border-left: 2px dashed var(--text-muted); border-radius: 0; }
 .balanza-leyenda i.cinta-hoy { width: 3px; background: var(--text-strong); border-radius: 2px; }
-.medida-recorrido { position: relative; height: 132px; margin: 0 -6px; --medida-linea: color-mix(in oklab, var(--c, var(--tono)) 76%, white); }
+.medida-recorrido { position: relative; --medida-linea: color-mix(in oklab, var(--c, var(--tono)) 76%, white); }
 .light-mode .medida-recorrido { --medida-linea: var(--text-strong); }
-.medida-punto { fill: var(--surface-1); stroke: var(--medida-linea); stroke-width: 2; }
-.medida-punto.ultimo { fill: var(--medida-linea); stroke: var(--surface-1); stroke-width: 12; }
-.medida-etiqueta { fill: var(--text-strong); font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.medida-etiqueta.primera { fill: var(--text-muted); font-weight: 600; }
 .grafica-globo.en-linea { position: static; transform: none; min-width: 0; }
 .perforada-fila.sin-total { grid-template-columns: repeat(7, minmax(0, 1fr)); }
 .hueco-dia.comparable { outline: 2px solid rgba(251,113,133,0.7); outline-offset: 2px; animation: hueco-latido 1.6s ease-in-out infinite; }
@@ -4553,13 +4645,6 @@ button.credencial-dato:not(:disabled):active { background: var(--velo); }
 .light-mode .medida-leyenda i { background: var(--dia); }
 @media (prefers-reduced-motion: reduce) { .cinta-marca { transition: none; } .hueco-dia.comparable { animation: none; } }
 /* EL DESAFÍO DE LA SEMANA: la barra del grupo, un disco por sesión. */
-.desafio { display: grid; gap: 8px; padding: 14px 14px 13px; border-radius: 24px; background: var(--surface-1); box-shadow: var(--placa-canto); }
-.desafio-cabeza { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-.desafio-titulo { font-size: 14px; font-weight: 700; color: var(--text-strong); }
-.desafio-cuenta { font-size: 12.5px; color: var(--text-muted); white-space: nowrap; }
-.desafio-cuenta b { margin-right: 2px; font-size: 1.2rem; font-weight: 750; color: var(--text-strong); }
-.desafio .barra-cargada { width: 100%; }
-.desafio-pie { font-size: 12.5px; line-height: 1.35; color: var(--text-faint); text-wrap: pretty; }
 /* LA PIZARRA DEL GRUPO: el récord de cada ejercicio, renglón por renglón
    como en la pizarra del gimnasio, separados con tiza. El tuyo, en dorado. */
 .pizarra { display: grid; margin: 0; padding: 2px 0; list-style: none; border-radius: 20px; background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--hairline); }
@@ -4597,7 +4682,6 @@ button.credencial-dato:not(:disabled):active { background: var(--velo); }
 .ia-serie-visor small { margin-right: 6px; font-size: 13px; font-weight: 650; }
 .ia-chip { flex: none; padding: 5px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; color: color-mix(in oklab, var(--tono) 50%, white); background: color-mix(in oklab, var(--tono) 13%, transparent); }
 .light-mode .ia-chip { color: color-mix(in oklab, var(--tono) 62%, black); }
-.ia-serie-barra { width: 100%; }
 .ia-cambios { display: grid; gap: 2px; margin: 8px 0 0; padding: 0; list-style: none; }
 .ia-cambio { display: flex; align-items: center; gap: 8px; min-height: 26px; font-size: 0.8125rem; line-height: 1.3; color: var(--text-faint); }
 .ia-cambio-marca { width: 20px; height: 20px; flex: none; border-radius: 999px; display: grid; place-items: center; }
@@ -4647,9 +4731,6 @@ button.credencial-dato:not(:disabled):active { background: var(--velo); }
 .light-mode .aproximacion-pct { color: color-mix(in oklab, var(--tono) 62%, black); }
 .aproximacion-serie { font-size: 12.5px; color: var(--text-muted); white-space: nowrap; }
 .aproximacion-serie b { font-size: 1.05rem; font-weight: 700; color: var(--text-strong); }
-.aproximacion-discos { display: flex; align-items: center; gap: 6px; margin-left: auto; min-width: 0; }
-.aproximacion-discos .barra-cargada { width: auto; flex: none; }
-.aproximacion-discos small { font-size: 11.5px; color: var(--text-faint); white-space: nowrap; }
 .aproximaciones-pie { margin-top: 6px; font-size: 12px; line-height: 1.35; color: var(--text-faint); text-wrap: pretty; }
 /* Los retos: el botón para mandar uno y cómo quedó. */
 .cara-retar { justify-self: start; min-height: 38px; margin-top: 2px; }
@@ -4668,11 +4749,13 @@ button.credencial-dato:not(:disabled):active { background: var(--velo); }
 /* UN TONO POR PESTAÑA: el interruptor prendido, en el color de la pestaña
    (--tono). La placa del ícono, neutra: un ícono en un cuadrado teñido,
    repetido por la lista, era color en la decoración y no en los datos. */
-.placa-icono { color: var(--text-muted); background: var(--velo-fuerte); }
+.placa-icono { color: var(--text-muted); background: none; }
 .interruptor-fila { width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 18px; text-align: left; background: var(--surface-2); transition: transform .2s ease; }
 .interruptor-fila:active { transform: scale(.99); }
-.interruptor-icono { width: 36px; height: 36px; flex: none; border-radius: 12px; display: grid; place-items: center; color: var(--text-faint); background: var(--velo); transition: color .2s ease, background-color .2s ease; }
-.interruptor-fila.on .interruptor-icono { color: var(--text-strong); }
+.interruptor-icono { width: 28px; height: 36px; flex: none; display: grid; place-items: center; color: var(--text-faint); transition: color .2s ease; }
+/* Lo prendido, con su ícono en el tono. */
+.interruptor-fila.on .interruptor-icono { color: color-mix(in oklab, var(--tono) 72%, white); }
+.light-mode .interruptor-fila.on .interruptor-icono { color: color-mix(in oklab, var(--tono) 72%, black); }
 .interruptor-titulo { display: block; font-size: 13.5px; font-weight: 650; line-height: 1.25; color: var(--text-strong); }
 .interruptor-desc { display: block; margin-top: 2px; font-size: 12px; line-height: 1.35; color: var(--text-faint); }
 .interruptor { position: relative; flex: none; width: 44px; height: 26px; border-radius: 999px; background: var(--velo-fuerte); transition: background-color .25s ease; }
@@ -4693,6 +4776,84 @@ button.credencial-dato:not(:disabled):active { background: var(--velo); }
 .resumen-vs.sube { color: color-mix(in oklab, var(--c) 50%, white); background: color-mix(in oklab, var(--c) 14%, transparent); }
 .light-mode .resumen-vs.sube { color: color-mix(in oklab, var(--c) 62%, black); }
 .resumen-periodo .atleta-datos, .resumen-periodo .reciente { background: var(--surface-2); box-shadow: none; }
+/* Los cuatro números del período, con cuánto cambiaron. */
+.resumen-kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.resumen-kpi { display: grid; gap: 2px; padding: 11px 12px 10px; border-radius: 18px; background: var(--surface-2); }
+.resumen-kpi small { display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; color: var(--text-muted); }
+.resumen-kpi b { font-size: 1.75rem; line-height: 1.05; font-weight: 750; color: var(--text-strong); }
+.resumen-kpi span { font-size: 11.5px; color: var(--text-faint); }
+.resumen-kpi b i { margin: 0 2px; font-style: normal; font-size: 0.85rem; font-weight: 650; color: var(--text-muted); }
+/* LAS COLUMNAS DE LOS RESÚMENES (ColumnasPeriodo): escala a la izquierda. */
+.columnas { display: grid; gap: 6px; padding-left: 40px; }
+.columnas-plano { position: relative; }
+.columnas-raya, .columnas-promedio { position: absolute; left: 0; right: 0; height: 0; }
+.columnas-raya { border-top: 1px solid var(--chart-grid); }
+.columnas-raya.base { border-top-color: var(--hairline-fuerte); }
+.columnas-raya em { position: absolute; top: -7px; right: calc(100% + 7px); font-style: normal; font-size: 11px; font-weight: 550; line-height: 1; color: var(--text-faint); white-space: nowrap; }
+.columnas-promedio { z-index: 1; border-top: 1px dashed color-mix(in oklab, var(--text-strong) 50%, transparent); }
+.columnas-leyenda { display: flex; align-items: center; gap: 6px; margin-top: 2px; font-size: 11.5px; color: var(--text-muted); }
+.columnas-leyenda i { width: 16px; height: 0; border-top: 1px dashed color-mix(in oklab, var(--text-strong) 50%, transparent); }
+.columnas-barras { position: absolute; inset: 0; display: flex; align-items: flex-end; gap: 5px; padding: 0 2px; }
+.columna { flex: 1 1 0; min-width: 0; height: 100%; display: flex; align-items: flex-end; }
+.columna i { display: block; width: 100%; border-radius: 4px 4px 0 0; background: color-mix(in oklab, var(--tono) 45%, #6e7177); }
+.columna.resaltada i { background: color-mix(in oklab, var(--tono) 72%, white); }
+.light-mode .columna i { background: color-mix(in oklab, var(--tono) 40%, #b9bbc0); }
+.light-mode .columna.resaltada i { background: var(--tono); }
+.columnas-etiquetas { display: flex; gap: 5px; padding: 0 2px; }
+.columnas-etiquetas span { flex: 1 1 0; min-width: 0; text-align: center; font-size: 11px; font-weight: 550; color: var(--text-faint); white-space: nowrap; }
+.columnas-etiquetas span.resaltada { font-weight: 700; color: var(--text-strong); }
+/* EL MAPA DE CALOR: cuatro niveles del tono contra tu día más pesado. */
+.calor-celda { background: var(--surface-2); }
+.calor-celda.n1 { background: color-mix(in oklab, var(--tono) 24%, var(--surface-2)); }
+.calor-celda.n2 { background: color-mix(in oklab, var(--tono) 44%, var(--surface-2)); }
+.calor-celda.n3 { background: color-mix(in oklab, color-mix(in oklab, var(--tono) 72%, white) 72%, var(--surface-2)); }
+.calor-celda.n4 { background: color-mix(in oklab, var(--tono) 72%, white); }
+.light-mode .calor-celda { background: #e6e7ea; }
+.light-mode .calor-celda.n1 { background: color-mix(in oklab, var(--tono) 22%, #e6e7ea); }
+.light-mode .calor-celda.n2 { background: color-mix(in oklab, var(--tono) 42%, #e6e7ea); }
+.light-mode .calor-celda.n3 { background: color-mix(in oklab, var(--tono) 68%, #e6e7ea); }
+.light-mode .calor-celda.n4 { background: var(--tono); }
+.calor-celda.futuro { opacity: .4; }
+.calor-mes { display: grid; gap: 4px; }
+.calor-mes-fila { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.calor-mes-fila.cabeza span { text-align: center; font-size: 11px; font-weight: 600; color: var(--text-faint); }
+.calor-mes-fila .calor-celda { display: grid; place-items: center; aspect-ratio: 1; border-radius: 10px; font-size: 11.5px; font-weight: 600; color: var(--text-faint); }
+.calor-mes-fila .calor-celda.n2 { color: var(--text-muted); }
+.calor-mes-fila .calor-celda.n3, .calor-mes-fila .calor-celda.n4 { color: #0b0c0e; font-weight: 700; }
+.light-mode .calor-mes-fila .calor-celda.n3 { color: var(--text-strong); }
+.light-mode .calor-mes-fila .calor-celda.n4 { color: #fff; }
+.calor-leyenda { display: flex; align-items: center; justify-content: flex-end; gap: 3px; margin-top: 4px; font-size: 11px; color: var(--text-faint); }
+.calor-leyenda span { margin: 0 3px; }
+.calor-leyenda i { width: 11px; height: 11px; border-radius: 3px; }
+.calor-anio { display: grid; gap: 4px; margin-top: 12px; }
+.calor-anio-meses, .calor-anio-grilla { display: grid; gap: 2px; }
+.calor-anio-meses span { font-size: 11px; color: var(--text-faint); white-space: nowrap; }
+.calor-anio-semana { display: grid; grid-template-rows: repeat(7, auto); gap: 2px; }
+.calor-anio-semana i { display: block; aspect-ratio: 1; border-radius: 1.5px; }
+.calor-anio-semana i.calor-fuera { background: none; }
+/* LA TELARAÑA: anillos y ejes en la raya de las gráficas; lo de este
+   período, relleno en el tono; lo de antes, punteado. */
+.telarana { display: block; width: 100%; height: auto; max-width: 340px; margin: 0 auto; overflow: visible; }
+.telarana-anillo { fill: none; stroke: var(--chart-grid); stroke-width: 1; }
+.telarana-anillo:last-of-type { stroke: var(--hairline-fuerte); }
+.telarana-eje { stroke: var(--chart-grid); stroke-width: 1; }
+.telarana-escala { fill: var(--text-faint); font-size: 11px; }
+.telarana-anterior { fill: none; stroke: var(--text-faint); stroke-width: 1.5; stroke-dasharray: 4 4; }
+.telarana-actual { fill: color-mix(in oklab, var(--tono) 22%, transparent); stroke: color-mix(in oklab, var(--tono) 78%, white); stroke-width: 2; stroke-linejoin: round; animation: telaranaCrece .7s var(--resorte) both; transform-origin: 50% 50%; transform-box: view-box; }
+.light-mode .telarana-actual { stroke: var(--tono); }
+@keyframes telaranaCrece { from { transform: scale(.2); opacity: 0; } }
+.telarana-punto { fill: color-mix(in oklab, var(--tono) 78%, white); stroke: var(--surface-1); stroke-width: 1.5; }
+.light-mode .telarana-punto { fill: var(--tono); }
+.telarana-rotulo { fill: var(--text-muted); font-size: 12.5px; font-weight: 600; }
+.telarana-n { fill: var(--text-strong); font-weight: 750; }
+.telarana-leyenda { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 14px; font-size: 12px; color: var(--text-muted); }
+.telarana-leyenda span { display: inline-flex; align-items: center; gap: 6px; }
+.telarana-leyenda i { width: 18px; height: 0; border-top: 2px solid color-mix(in oklab, var(--tono) 78%, white); }
+.telarana-leyenda i.anterior { border-top: 1.5px dashed var(--text-faint); }
+.light-mode .telarana-leyenda i { border-top-color: var(--tono); }
+.light-mode .telarana-leyenda i.anterior { border-top-color: var(--text-faint); }
+.telarana-leyenda-n { color: var(--text-faint); }
+@media (prefers-reduced-motion: reduce) { .telarana-actual { animation: none; } }
 .resumen-bloque { display: grid; gap: 10px; }
 .resumen-bloque h3 { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; color: var(--text-strong); }
 .resumen-bloque h3.resumen-record { color: var(--record); }
@@ -4829,7 +4990,7 @@ function ShareLinkModal({ title, shareTitle, shareText, shareTarget, onClose, ac
         <div className="absolute -top-20 -right-16 w-56 h-56 rounded-full blur-3xl pointer-events-none opacity-20" style={{ backgroundColor: accent }} />
         <div className="relative flex items-center justify-between mb-4">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: tint(accent, "18"), border: `1px solid ${tint(accent, "40")}`, color: accent }}><Share2 size={16} /></div>
+            <div className="icono-suelto"><Share2 size={16} /></div>
             <h3 className="text-base font-black text-white truncate">{title}</h3>
           </div>
           <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition shrink-0"><X size={18} /></button>
@@ -4872,7 +5033,7 @@ function ShareLinkModal({ title, shareTitle, shareText, shareTarget, onClose, ac
                 único ícono (Share2) repetido y sólo el tinte cambiando. */}
             <div className="grid grid-cols-3 gap-2.5 mb-3">
               <a href={waUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center gap-1.5 py-3 rounded-2xl border border-slate-800/60 bg-slate-800/30 hover:bg-slate-800/60 transition active:scale-[0.97]">
-                <div className="w-9 h-9 rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/25" style={{ backgroundColor: "#25D366" }}><Phone size={16} className="text-white" fill="white" /></div>
+                <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ backgroundColor: "#25D366" }}><Phone size={16} className="text-white" fill="white" /></div>
                 <span className="text-[10px] font-bold text-slate-300">WhatsApp</span>
               </a>
               <a href={xUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center gap-1.5 py-3 rounded-2xl border border-slate-800/60 bg-slate-800/30 hover:bg-slate-800/60 transition active:scale-[0.97]">
@@ -4880,7 +5041,7 @@ function ShareLinkModal({ title, shareTitle, shareText, shareTarget, onClose, ac
                 <span className="text-[10px] font-bold text-slate-300">X</span>
               </a>
               <a href={redditUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center gap-1.5 py-3 rounded-2xl border border-slate-800/60 bg-slate-800/30 hover:bg-slate-800/60 transition active:scale-[0.97]">
-                <div className="w-9 h-9 rounded-full flex items-center justify-center shadow-lg shadow-orange-500/25" style={{ backgroundColor: "#FF4500" }}><Share2 size={15} className="text-white" /></div>
+                <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ backgroundColor: "#FF4500" }}><Share2 size={15} className="text-white" /></div>
                 <span className="text-[10px] font-bold text-slate-300">Reddit</span>
               </a>
             </div>
@@ -5917,7 +6078,7 @@ function ShareImageModal({ title, subtitle, fileNamePrefix, shareTitle, shareTex
         <div className="absolute -top-20 -right-16 w-56 h-56 rounded-full blur-3xl pointer-events-none opacity-20" style={{ backgroundColor: accent }} />
         <div className="relative flex items-center justify-between gap-2 mb-3.5">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: tint(accent, "18"), border: `1px solid ${tint(accent, "40")}`, color: accent }}><Share2 size={16} /></div>
+            <div className="icono-suelto"><Share2 size={16} /></div>
             <div className="min-w-0">
               <h3 className="text-base font-black text-white truncate">{title}</h3>
               {subtitle && <p className="text-[10.5px] text-slate-500 truncate">{subtitle}</p>}
@@ -6330,7 +6491,7 @@ function LoginScreen({ onLogin, allowAutoLogin = true }) {
         {regError && regStep === 1 && <p className="text-rose-400 text-xs mt-3 text-center">{regError}</p>}
         {regStep === 1 && (
           <div className="mt-6 space-y-2.5">
-            <button onClick={handleRegister} className="w-full py-4 rounded-2xl bg-teal-500 !text-white font-bold text-sm hover:bg-teal-400 active:scale-[0.98] transition-all shadow-lg shadow-teal-500/20">Crear perfil</button>
+            <button onClick={handleRegister} className="w-full py-4 rounded-2xl bg-teal-500 !text-white font-bold text-sm hover:bg-teal-400 active:scale-[0.98] transition-all">Crear perfil</button>
             <button onClick={handleWantsPin} className="w-full py-2 text-slate-500 hover:text-slate-300 text-xs font-semibold transition">+ Proteger con PIN (opcional)</button>
           </div>
         )}
@@ -7617,6 +7778,13 @@ function SessionSummaryModal({ resumen, onClose }) {
   if (!resumen) return null;
   const u = weightLabel(unit);
   const lineas = resumen.lineas || [];
+  const maxLinea = Math.max(1, ...lineas.map((l) => l.volumen || 0));
+  // Las últimas veces que hiciste este día, y hoy al final.
+  const historial = resumen.historialDia || [];
+  const maxHist = Math.max(1, ...historial.map((h) => h.volumen));
+  // Dónde fue el trabajo: las series de hoy por región, cuatro a lo sumo.
+  const regiones = (resumen.regiones || []).slice(0, 4);
+  const totalReg = regiones.reduce((t, r) => t + r.series, 0) || 1;
   const barras = codigoDeBarras(`${resumen.fecha}${resumen.volumen}${resumen.series}`);
   // La imagen para compartir sale en un portal por debajo de este velo:
   // mientras está abierta, el ticket se esconde (sin desmontarse, así no
@@ -7632,15 +7800,50 @@ function SessionSummaryModal({ resumen, onClose }) {
               <p className="ticket-fecha">{fechaDelTicket(resumen.fecha)}</p>
               <hr />
               <p className="ticket-fila fuerte"><span>{resumen.dia || "Entrenamiento"}</span>{textoDuracion(resumen.minutos) && <span>{textoDuracion(resumen.minutos)}</span>}</p>
+              {/* Cada ejercicio con sus series y, debajo, una raya impresa
+                  del volumen que se llevó: se ve en qué se te fue la sesión. */}
               {lineas.map((l) => (
-                <p key={l.nombre} className="ticket-fila"><span>{l.nombre}</span><i aria-hidden="true" /><span>{l.series} {l.series === 1 ? "serie" : "series"}</span></p>
+                <div key={l.nombre} className="ticket-ejercicio">
+                  <p className="ticket-fila"><span>{l.nombre}</span><i aria-hidden="true" /><span>{l.series} {l.series === 1 ? "serie" : "series"}</span></p>
+                  <span className="ticket-raya" aria-hidden="true"><i style={{ width: `${Math.max(3, ((l.volumen || 0) / maxLinea) * 100)}%` }} /></span>
+                </div>
               ))}
               <hr />
               <p className="ticket-fila"><span>Series</span><i aria-hidden="true" /><span>{resumen.series}</span></p>
               <p className="ticket-fila"><span>Ejercicios</span><i aria-hidden="true" /><span>{resumen.ejercicios}</span></p>
               {resumen.metas?.total > 0 && <p className="ticket-fila"><span>Metas del plan</span><i aria-hidden="true" /><span>{resumen.metas.cumplidas} de {resumen.metas.total}</span></p>}
+              {resumen.minutos > 0 && resumen.volumen > 0 && <p className="ticket-fila"><span>Por minuto</span><i aria-hidden="true" /><span>{miles(kgToDisplay(resumen.volumen / resumen.minutos, unit))} {u}</span></p>}
               <p className="ticket-fila total"><span>Volumen</span><i aria-hidden="true" /><span>{miles(kgToDisplay(resumen.volumen, unit))} {u}</span></p>
-              {resumen.vsUltima && <p className="ticket-nota">{resumen.vsUltima.pct >= 0 ? "+" : ""}{resumen.vsUltima.pct}% de volumen que tu último {resumen.vsUltima.dia}</p>}
+              {/* Contra las últimas veces de este mismo día: columnas
+                  impresas, la de hoy en el color del día. */}
+              {historial.length > 1 && (
+                <>
+                  <hr />
+                  <p className="ticket-subtitulo">Tus últimos {resumen.dia || "entrenamientos"}</p>
+                  <div className="ticket-columnas" role="img" aria-label={`Volumen de las últimas ${historial.length} sesiones de ${resumen.dia || "este día"}: ${historial.map((h) => miles(kgToDisplay(h.volumen, unit))).join(", ")} ${u}`}>
+                    {historial.map((h) => (
+                      <div key={h.fecha} className={`ticket-columna ${h.hoy ? "hoy" : ""}`}>
+                        <b>{h.hoy ? miles(kgToDisplay(h.volumen, unit)) : ""}</b>
+                        <i style={{ height: `${Math.max(4, (h.volumen / maxHist) * 100)}%` }} />
+                        <span>{h.hoy ? "Hoy" : `${Number(h.fecha.slice(8, 10))}/${Number(h.fecha.slice(5, 7))}`}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {resumen.vsUltima && <p className="ticket-nota">{conSigno(resumen.vsUltima.pct, 0)} % de volumen que tu último {resumen.vsUltima.dia}</p>}
+                </>
+              )}
+              {regiones.length > 1 && (
+                <>
+                  <hr />
+                  <p className="ticket-subtitulo">Dónde fue el trabajo</p>
+                  <div className="ticket-reparto" role="img" aria-label={regiones.map((r) => `${r.nombre}: ${r.series} series`).join(", ")}>
+                    {regiones.map((r, i) => <i key={r.nombre} className={`t${i}`} style={{ flexGrow: r.series }} />)}
+                  </div>
+                  <p className="ticket-reparto-leyenda" aria-hidden="true">
+                    {regiones.map((r, i) => <span key={r.nombre}><i className={`t${i}`} />{r.nombre} {Math.round((r.series / totalReg) * 100)} %</span>)}
+                  </p>
+                </>
+              )}
               {resumen.prs.length > 0 && (
                 <>
                   <hr />
@@ -7677,21 +7880,34 @@ function SessionSummaryModal({ resumen, onClose }) {
   );
 }
 
-// El ticket como imagen para compartir: el mismo papel sobre el grafito.
+// El ticket como imagen para compartir: el mismo papel sobre el grafito, con
+// las mismas rayas, columnas y reparto que el de la pantalla.
 function dibujarTicket(ctx, W, H, resumen, unit) {
   const F = "'Mona Sans Variable', system-ui, sans-serif";
   const u = weightLabel(unit);
+  const PAPEL = "#f3f3ef", TINTA = "#1d1d1f";
+  const dia = /^#[0-9a-f]{6}$/i.test(resumen.color || "") ? resumen.color : "#14B8A6";
+  // Los mismos tonos que el ticket de la pantalla (el canvas no entiende
+  // color-mix en todos los teléfonos): el color del día con tinta y con papel.
+  const rgb = (c) => `rgb(${c.join(",")})`;
+  const tonos = [rgb(mezclarHex(dia, TINTA, 0.75)), rgb(mezclarHex(dia, PAPEL, 0.58)), rgb(mezclarHex(dia, PAPEL, 0.34)), "#cfcfca"];
   ctx.fillStyle = "#0b0b0d"; ctx.fillRect(0, 0, W, H);
-  const lineas = (resumen.lineas || []).slice(0, 7);
+  const lineas = (resumen.lineas || []).slice(0, 6);
+  const maxLinea = Math.max(1, ...lineas.map((l) => l.volumen || 0));
   const prs = (resumen.prs || []).slice(0, 3);
+  const historial = (resumen.historialDia || []).slice(-6);
+  const maxHist = Math.max(1, ...historial.map((h) => h.volumen));
+  const regiones = (resumen.regiones || []).slice(0, 4);
+  const totalReg = regiones.reduce((t, r) => t + r.series, 0) || 1;
+  const conHist = historial.length > 1, conReg = regiones.length > 1;
   const px = 64, pw = W - 128;
   // Lo que ocupa cada parte, hasta el código de barras y un margen abajo.
-  const alto = 250 + lineas.length * 34 + (prs.length ? 78 + prs.length * 34 : 0) + 220;
+  const alto = 484 + lineas.length * 48 + (conHist ? 300 : 0) + (conReg ? 160 : 0) + (prs.length ? 84 + prs.length * 34 : 0);
   // El papel, centrado en el alto (con aire para la marca de abajo): una
   // sesión corta no deja el ticket colgando arriba de un vacío negro.
-  const py = Math.max(84, Math.round((H - 70 - alto) / 2));
+  const py = Math.max(64, Math.round((H - 70 - alto) / 2));
   // El papel, con el corte en zigzag abajo.
-  ctx.fillStyle = "#f3f3ef";
+  ctx.fillStyle = PAPEL;
   ctx.beginPath();
   ctx.moveTo(px, py); ctx.lineTo(px + pw, py); ctx.lineTo(px + pw, py + alto);
   const diente = 12;
@@ -7711,30 +7927,230 @@ function dibujarTicket(ctx, W, H, resumen, unit) {
     ctx.strokeStyle = "#bdbdb8"; ctx.setLineDash([2, 5]); ctx.beginPath(); ctx.moveTo(px + 34 + b, y - 5); ctx.lineTo(px + pw - 34 - a, y - 5); ctx.stroke(); ctx.setLineDash([]);
   };
   const corte = () => { y += 10; ctx.strokeStyle = "#b9b9b4"; ctx.setLineDash([7, 6]); ctx.beginPath(); ctx.moveTo(px + 22, y); ctx.lineTo(px + pw - 22, y); ctx.stroke(); ctx.setLineDash([]); y += 34; };
-  centro("Modus Fit", `800 40px ${F}`, "#1d1d1f"); y += 32;
+  const subtitulo = (t) => { ctx.font = `700 19px ${F}`; ctx.fillStyle = "#4a4a4e"; ctx.textAlign = "left"; ctx.fillText(t, px + 26, y); y += 22; };
+  const corto = (t, n) => (t.length > n ? `${t.slice(0, n - 1)}.` : t);
+  centro("Modus Fit", `800 40px ${F}`, TINTA); y += 32;
   centro(fechaDelTicket(resumen.fecha), `500 19px ${F}`, "#6b6b70"); y += 16;
   corte();
   fila(resumen.dia || "Entrenamiento", textoDuracion(resumen.minutos) || "", `700 24px ${F}`); y += 38;
-  lineas.forEach((l) => { fila(l.nombre.length > 24 ? `${l.nombre.slice(0, 23)}.` : l.nombre, `${l.series} ${l.series === 1 ? "serie" : "series"}`); y += 34; });
+  lineas.forEach((l) => {
+    fila(corto(l.nombre, 24), `${l.series} ${l.series === 1 ? "serie" : "series"}`); y += 12;
+    ctx.fillStyle = tonos[1];
+    ctx.beginPath(); ctx.roundRect(px + 26, y, Math.max(8, ((l.volumen || 0) / maxLinea) * (pw - 52)), 6, 3); ctx.fill();
+    y += 36;
+  });
   corte();
   fila("Series", String(resumen.series)); y += 34;
   fila("Ejercicios", String(resumen.ejercicios)); y += 38;
-  fila("Volumen", `${miles(kgToDisplay(resumen.volumen, unit))} ${u}`, `800 27px ${F}`, "#1d1d1f"); y += 18;
+  fila("Volumen", `${miles(kgToDisplay(resumen.volumen, unit))} ${u}`, `800 27px ${F}`, TINTA); y += 18;
+  if (conHist) {
+    corte();
+    subtitulo(`Tus últimos ${resumen.dia || "entrenamientos"}`);
+    const altoCol = 120, base = y + 28 + altoCol;
+    const paso = (pw - 52) / historial.length, ancho = Math.min(64, paso * 0.62);
+    historial.forEach((h, i) => {
+      const cx = px + 26 + paso * i + paso / 2;
+      const hh = Math.max(6, (h.volumen / maxHist) * altoCol);
+      ctx.fillStyle = h.hoy ? tonos[0] : tonos[3];
+      ctx.beginPath(); ctx.roundRect(cx - ancho / 2, base - hh, ancho, hh, [5, 5, 0, 0]); ctx.fill();
+      ctx.textAlign = "center";
+      if (h.hoy) { ctx.font = `700 18px ${F}`; ctx.fillStyle = TINTA; ctx.fillText(miles(kgToDisplay(h.volumen, unit)), cx, base - hh - 10); }
+      ctx.font = `${h.hoy ? 700 : 500} 17px ${F}`; ctx.fillStyle = h.hoy ? TINTA : "#6b6b70";
+      ctx.fillText(h.hoy ? "Hoy" : `${Number(h.fecha.slice(8, 10))}/${Number(h.fecha.slice(5, 7))}`, cx, base + 26);
+    });
+    y = base + 62;
+    if (resumen.vsUltima) { centro(`${conSigno(resumen.vsUltima.pct, 0)} % de volumen que tu último ${resumen.vsUltima.dia}`, `600 19px ${F}`, "#4a4a4e"); }
+    y += 14;
+  }
+  if (conReg) {
+    corte();
+    subtitulo("Dónde fue el trabajo");
+    y += 6;
+    let x = px + 26;
+    const total = pw - 52 - (regiones.length - 1) * 4;
+    regiones.forEach((r, i) => {
+      const w = (r.series / totalReg) * total;
+      ctx.fillStyle = tonos[i];
+      ctx.beginPath(); ctx.roundRect(x, y, w, 16, i === 0 ? [8, 0, 0, 8] : i === regiones.length - 1 ? [0, 8, 8, 0] : 0); ctx.fill();
+      x += w + 4;
+    });
+    y += 48;
+    let lx = px + 26;
+    ctx.font = `500 18px ${F}`; ctx.textAlign = "left";
+    regiones.forEach((r, i) => {
+      const t = `${r.nombre} ${Math.round((r.series / totalReg) * 100)} %`;
+      ctx.fillStyle = tonos[i]; ctx.beginPath(); ctx.arc(lx + 6, y - 6, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#4a4a4e"; ctx.fillText(t, lx + 18, y);
+      lx += 18 + ctx.measureText(t).width + 22;
+    });
+    y += 30;
+  }
   if (prs.length) {
     corte();
     ctx.font = `700 21px ${F}`; ctx.fillStyle = "#8a6a14"; ctx.textAlign = "left"; ctx.fillText(prs.length === 1 ? "Récord de hoy" : "Récords de hoy", px + 26, y); y += 34;
-    prs.forEach((pr) => { fila(pr.nombre.length > 22 ? `${pr.nombre.slice(0, 21)}.` : pr.nombre, pr.marca.replace("×", " × "), `600 21px ${F}`, "#8a6a14"); y += 34; });
+    prs.forEach((pr) => { fila(corto(pr.nombre, 22), pr.marca.replace("×", " × "), `600 21px ${F}`, "#8a6a14"); y += 34; });
   }
   corte();
   centro("Gracias por entrenar. Volvé pronto.", `500 19px ${F}`, "#6b6b70"); y += 26;
   const barras = codigoDeBarras(`${resumen.fecha}${resumen.volumen}${resumen.series}`);
-  const total = barras.reduce((t, w) => t + w * 2.4 + 2.4, 0);
-  let x = W / 2 - total / 2;
-  ctx.fillStyle = "#1d1d1f";
-  barras.forEach((w, i) => { if (i % 7 !== 3) ctx.fillRect(x, y, w * 2.4, 54); x += w * 2.4 + 2.4; });
+  const ancho = barras.reduce((t, w) => t + w * 2.4 + 2.4, 0);
+  let bx = W / 2 - ancho / 2;
+  ctx.fillStyle = TINTA;
+  barras.forEach((w, i) => { if (i % 7 !== 3) ctx.fillRect(bx, y, w * 2.4, 54); bx += w * 2.4 + 2.4; });
   // Al pie, la marca de la app.
   ctx.textAlign = "center"; ctx.fillStyle = "#9d9ea4"; ctx.font = `600 20px ${F}`;
   ctx.fillText("modus fit", W / 2, H - 46);
+}
+
+/* ============================================================================
+   LOS GRÁFICOS DE LOS RESÚMENES (la semana, el mes y el año). Un solo tono, el
+   de la pestaña: lo del período apagado con gris y lo que importa entero. Cada
+   uno con su escala, como pide la skill de pantallas de app: columnas desde
+   cero, un mapa de calor con su leyenda y una telaraña con sus anillos.
+============================================================================ */
+// LAS SEIS REGIONES del cuerpo: cada grupo muscular del catálogo cae en una.
+// Las usan la telaraña de los resúmenes y el reparto del ticket.
+const REGIONES = ["Pecho", "Hombros", "Brazos", "Core", "Piernas", "Espalda"];
+const REGION_DE_GRUPO = {
+  pectoral_superior: "Pecho", pectoral_medio: "Pecho",
+  deltoide_anterior: "Hombros", deltoide_lateral: "Hombros", deltoide_posterior: "Hombros",
+  biceps: "Brazos", triceps: "Brazos", antebrazos: "Brazos",
+  core: "Core", oblicuos: "Core",
+  cuadriceps: "Piernas", femoral: "Piernas", gluteo: "Piernas", aductores: "Piernas", pantorrillas: "Piernas", tibial_anterior: "Piernas",
+  dorsales: "Espalda", trapecio: "Espalda", espalda_baja: "Espalda",
+};
+const regionDe = (exerciseId) => REGION_DE_GRUPO[EXERCISE_LIBRARY_BY_ID[exerciseId]?.group] || null;
+// Un volumen corto para los ejes: 18.400 → "18 mil".
+const volCorto = (v) => (v >= 1000 ? `${numeroAR(v / 1000, v >= 10000 ? 0 : 1)} mil` : numeroAR(v, 0));
+
+// COLUMNAS POR PERÍODO: cuánto hubo en cada día, semana o mes. Escala desde
+// cero con tres rayas, columnas rectas (apenas redondeadas arriba) y la que
+// importa entera. Un tramo sin entrenar queda vacío: el hueco es lo que hay
+// que ver. `promedio`: la raya punteada de tu promedio, con su rótulo.
+function ColumnasPeriodo({ datos, alto = 112, formato = volCorto, promedio = null, etiqueta = "" }) {
+  const max = Math.max(1, ...datos.map((d) => d.valor), promedio ? promedio.valor : 0);
+  const marcas = marcasRedondas(0, max, 3);
+  const tope = marcas[marcas.length - 1];
+  return (
+    <div className="columnas" role="img" aria-label={etiqueta}>
+      <div className="columnas-plano" style={{ height: alto }}>
+        {marcas.map((m) => (
+          <span key={m} className={`columnas-raya ${m === 0 ? "base" : ""}`} style={{ bottom: `${(m / tope) * 100}%` }}><em>{formato(m)}</em></span>
+        ))}
+        {promedio && <span className="columnas-promedio" style={{ bottom: `${(promedio.valor / tope) * 100}%` }} />}
+        <div className="columnas-barras">
+          {datos.map((d, i) => (
+            <span key={i} className={`columna ${d.resaltar ? "resaltada" : ""}`}>
+              {d.valor > 0 && <i className="grow-bar-up" style={{ height: `${(d.valor / tope) * 100}%`, animationDelay: `${i * 40}ms` }} />}
+            </span>
+          ))}
+        </div>
+      </div>
+      <div className="columnas-etiquetas" aria-hidden="true">{datos.map((d, i) => <span key={i} className={d.resaltar ? "resaltada" : ""}>{d.etiqueta}</span>)}</div>
+      {promedio && <p className="columnas-leyenda"><i aria-hidden="true" />{promedio.etiqueta}: {formato(promedio.valor)}</p>}
+    </div>
+  );
+}
+
+// EL MAPA DE CALOR: cada día del período, más encendido cuanto más volumen
+// hiciste (cuatro niveles contra tu día más pesado). El del mes es el
+// calendario con sus números; el del año, una semana por columna.
+const nivelDeCalor = (v, max) => (!v ? 0 : v >= max * 0.75 ? 4 : v >= max * 0.5 ? 3 : v >= max * 0.25 ? 2 : 1);
+function LeyendaCalor() {
+  return (
+    <p className="calor-leyenda" aria-hidden="true"><span>Menos</span>{[0, 1, 2, 3, 4].map((k) => <i key={k} className={`calor-celda n${k}`} />)}<span>Más</span></p>
+  );
+}
+function CalorDelMes({ prefijo, dias = [] }) {
+  const [a, m] = prefijo.split("-").map(Number);
+  const semanas = getMonthMatrix(a, m - 1);
+  const porFecha = Object.fromEntries(dias.map((d) => [d.date, d.volumen]));
+  const max = Math.max(1, ...dias.map((d) => d.volumen));
+  const hoy = todayStr();
+  return (
+    <div className="calor-mes" role="img" aria-label={`${dias.length} ${dias.length === 1 ? "día entrenado" : "días entrenados"} en el mes`}>
+      <div className="calor-mes-fila cabeza" aria-hidden="true">{WEEKDAY_LABELS.map((l, i) => <span key={i}>{l}</span>)}</div>
+      {semanas.map((s, i) => (
+        <div key={i} className="calor-mes-fila" aria-hidden="true">
+          {s.map((d, j) => (d
+            ? <span key={j} className={`calor-celda n${nivelDeCalor(porFecha[d], max)} ${d > hoy ? "futuro" : ""}`}>{Number(d.slice(8, 10))}</span>
+            : <span key={j} />))}
+        </div>
+      ))}
+      <LeyendaCalor />
+    </div>
+  );
+}
+function CalorDelAnio({ anio, dias = [] }) {
+  const porFecha = Object.fromEntries(dias.map((d) => [d.date, d.volumen]));
+  const max = Math.max(1, ...dias.map((d) => d.volumen));
+  const hoy = todayStr();
+  // Una columna por semana, de lunes a domingo, desde la que tiene el 1 de enero.
+  const columnas = [];
+  const meses = [];
+  const d = new Date(anio, 0, 1, 12);
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  while (d.getFullYear() <= anio) {
+    const semana = [];
+    for (let k = 0; k < 7; k++) {
+      semana.push(d.getFullYear() === anio ? localDateStr(d) : null);
+      if (d.getFullYear() === anio && d.getDate() === 1) meses.push({ col: columnas.length, mes: d.getMonth() });
+      d.setDate(d.getDate() + 1);
+    }
+    columnas.push(semana);
+    if (columnas.length > 54) break;
+  }
+  return (
+    <div className="calor-anio" role="img" aria-label={`${dias.length} días entrenados en ${anio}`}>
+      <div className="calor-anio-meses" aria-hidden="true" style={{ gridTemplateColumns: `repeat(${columnas.length}, minmax(0, 1fr))` }}>
+        {meses.filter((x) => x.mes % 3 === 0).map((x) => <span key={x.mes} style={{ gridColumn: `${x.col + 1} / span 8` }}>{MESES_CORTOS[x.mes]}</span>)}
+      </div>
+      <div className="calor-anio-grilla" aria-hidden="true" style={{ gridTemplateColumns: `repeat(${columnas.length}, minmax(0, 1fr))` }}>
+        {columnas.map((s, i) => (
+          <div key={i} className="calor-anio-semana">
+            {s.map((iso, k) => <i key={k} className={iso ? `calor-celda n${nivelDeCalor(porFecha[iso], max)} ${iso > hoy ? "futuro" : ""}` : "calor-fuera"} />)}
+          </div>
+        ))}
+      </div>
+      <LeyendaCalor />
+    </div>
+  );
+}
+
+// LA TELARAÑA: las series de cada región del cuerpo, con anillos de escala.
+// Lo de este período, relleno en el tono; lo del anterior, punteado y gris
+// (la leyenda está debajo, con las mismas dos líneas).
+function Telarana({ regiones, anterior = null, etiqueta = "" }) {
+  const N = regiones.length;
+  const max = Math.max(1, ...regiones.map((r) => r.series), ...(anterior || []).map((r) => r.series));
+  const anillos = marcasRedondas(0, max, 4).slice(1);
+  const tope = anillos[anillos.length - 1];
+  const W = 320, H = 250, cx = W / 2, cy = H / 2, R = 86;
+  const punto = (i, v) => {
+    const ang = -Math.PI / 2 + (i * 2 * Math.PI) / N;
+    const r = (v / tope) * R;
+    return [cx + r * Math.cos(ang), cy + r * Math.sin(ang)];
+  };
+  const poligono = (vals) => vals.map((v, i) => punto(i, v).map((c) => c.toFixed(1)).join(",")).join(" ");
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="telarana" role="img" aria-label={etiqueta}>
+      {anillos.map((v) => <polygon key={v} points={poligono(regiones.map(() => v))} className="telarana-anillo" />)}
+      {regiones.map((r, i) => { const [x, y] = punto(i, tope); return <line key={r.nombre} x1={cx} y1={cy} x2={x} y2={y} className="telarana-eje" />; })}
+      <text x={cx + 5} y={cy - R + 12} className="telarana-escala">{tope}</text>
+      {anterior && <polygon points={poligono(anterior.map((r) => r.series))} className="telarana-anterior" />}
+      <polygon points={poligono(regiones.map((r) => r.series))} className="telarana-actual" />
+      {regiones.map((r, i) => { const [x, y] = punto(i, r.series); return r.series ? <circle key={r.nombre} cx={x} cy={y} r={3} className="telarana-punto" /> : null; })}
+      {regiones.map((r, i) => {
+        const [x, y] = punto(i, tope * 1.17);
+        const lado = Math.abs(x - cx) < 4 ? "middle" : x > cx ? "start" : "end";
+        return (
+          <text key={r.nombre} x={x} y={y + (y < cy - 10 ? 0 : y > cy + 10 ? 9 : 4)} textAnchor={lado} className="telarana-rotulo">
+            {r.nombre}<tspan className="telarana-n" dx="5">{r.series}</tspan>
+          </text>
+        );
+      })}
+    </svg>
+  );
 }
 
 // Resumen semanal: aparece al finalizar una sesión que cae en domingo (o el
@@ -7755,7 +8171,7 @@ function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null, 
   useAndroidBack(onClose);
   const unit = useWeightUnit();
   const [verTodasMarcas, setVerTodasMarcas] = useState(false);
-  // Los tres números arrancan en cero y suben al abrirse.
+  // Los números arrancan en cero y suben al abrirse.
   const [encendido, setEncendido] = useState(false);
   useEffect(() => { const t = setTimeout(() => setEncendido(true), 200); return () => clearTimeout(t); }, []);
   if (!data) return null;
@@ -7765,76 +8181,114 @@ function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null, 
   // mes a mitad de camino sería mentir, así que cambian título y texto.
   const est = enCurso ? { ...base, titulo: "Cómo vas este mes", cta: "Seguir" } : base;
   const bajada = enCurso ? `Lo que llevás de ${etiqueta || "este mes"}` : (est.bajada || `Así te fue en ${etiqueta || "el período"}`);
+  const u = weightLabel(unit);
+  const fmtKg = (v) => (v >= 1000 ? `${String((v / 1000).toFixed(v >= 10000 ? 0 : 1)).replace(".", ",")} mil` : String(v));
+  const contra = periodo === "anio" ? "el año pasado" : periodo === "mes" ? "el mes pasado" : "la semana pasada";
+  const laAnterior = periodo === "semana" ? "la anterior" : "el anterior";
+  const ant = data.anterior || null;
+  const marcas = verTodasMarcas ? (data.todasMarcas || data.marcas || []) : (data.marcas || []);
+  // LOS CUATRO NÚMEROS, cada uno con cuánto cambió contra el período
+  // anterior (si lo hubo: sin datos de antes no se inventa un 0 %).
+  const kpis = [
+    { k: "dias", l: data.dias === 1 ? "Día" : "Días", v: data.dias, antes: ant?.dias },
+    { k: "series", l: "Series", v: data.series, antes: ant?.series },
+    { k: "vol", l: `Volumen (${u})`, v: Math.round(kgToDisplay(data.volumen, unit)), antes: ant ? Math.round(kgToDisplay(ant.volumen, unit)) : null, pct: true },
+    data.minutos > 0
+      ? { k: "min", l: "Tiempo", v: data.minutos, antes: ant?.minutos || null, pct: true, horas: true }
+      : { k: "ses", l: "Por sesión", v: data.promedioSeries, antes: null, sufijo: "series" },
+  ];
+  const cambioDe = (x) => {
+    if (x.antes == null) return null;
+    if (x.pct) {
+      if (!(x.antes > 0)) return null;
+      const p = Math.round(((x.v - x.antes) / x.antes) * 100);
+      return p === 0 ? "igual" : `${conSigno(p, 0)} %`;
+    }
+    return x.v === x.antes ? "igual" : conSigno(x.v - x.antes, 0);
+  };
+  // CUÁNDO ENTRENASTE: los días de la semana en columnas; el mes, en su
+  // calendario de calor; el año, mes por mes y en su mapa de semanas.
   const tramos = data.tramos || [];
   const maxTramo = tramos.reduce((m, t) => Math.max(m, t.valor), 0);
-  const mejorTramo = maxTramo > 0 ? tramos.findIndex((t) => t.valor === maxTramo) : -1;
-  const fmtKg = (v) => (v >= 1000 ? `${String((v / 1000).toFixed(v >= 10000 ? 0 : 1)).replace(".", ",")} mil` : String(v));
-  // Dónde fue el trabajo: barras por músculo, como en el Balance de
-  // Rutinas, del color del período y apagadas. Antes era una dona de seis
-  // colores saturados.
-  const musculos = data.musculos || [];
-  const maxSeries = musculos.reduce((m, x) => Math.max(m, x.series), 0) || 1;
-  const marcas = verTodasMarcas ? (data.todasMarcas || data.marcas || []) : (data.marcas || []);
+  // TU HISTORIA: este período contra los anteriores, con tu promedio.
+  const historia = data.historia || [];
+  const previos = historia.filter((h) => !h.actual && h.volumen > 0);
+  const promedio = previos.length >= 2 ? previos.reduce((t, h) => t + h.volumen, 0) / previos.length : null;
+  const vsPromedio = promedio ? Math.round(((data.volumen - promedio) / promedio) * 100) : null;
+  // DÓNDE FUE EL TRABAJO: la telaraña, si hubo al menos dos regiones.
+  const regiones = data.regiones || [];
+  const conTelarana = regiones.filter((r) => r.series > 0).length >= 2;
+  const anteriorRegiones = ant?.regiones?.some((r) => r.series > 0) ? ant.regiones : null;
+  const nombrePeriodo = periodo === "anio" ? "este año" : periodo === "mes" ? "este mes" : "esta semana";
   return (
     <div className="fixed inset-0 z-[140] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
       <div className="resumen-periodo modal-pop-in" style={{ "--c": "var(--tono)" }} role="dialog" aria-modal="true" aria-label={est.titulo} onClick={(e) => e.stopPropagation()}>
         <header className="resumen-cabeza">
           <h2 className="resumen-titulo">{est.titulo}</h2>
           <p className="resumen-bajada">{bajada}</p>
-          {/* Contra el período anterior: convierte un número suelto en algo
-              que se puede leer de una. Sólo aparece si hubo período anterior
-              con datos, en vez de inventar un 0%. */}
           {typeof data.vsAnterior === "number" && (
             <p className={`resumen-vs ${data.vsAnterior >= 0 ? "sube" : ""}`}>
               {data.vsAnterior >= 0 ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
-              {data.vsAnterior >= 0 ? "+" : ""}{data.vsAnterior}% de volumen que {periodo === "anio" ? "el año pasado" : "el mes pasado"}
+              {conSigno(data.vsAnterior, 0)} % de volumen que {contra}
             </p>
           )}
         </header>
 
-        <div className="atleta-datos resumen-datos">
-          {[
-            { v: data.dias, l: data.dias === 1 ? "día" : "días" },
-            { v: data.series, l: "series" },
-            { v: Math.round(kgToDisplay(data.volumen, unit)), l: `${weightLabel(unit)} de volumen` },
-          ].map((x) => (
-            <div key={x.l} className="atleta-dato">
-              <span className="atleta-dato-valor"><b className="num-display"><NumberFlow value={encendido ? x.v : 0} locales="es-AR" /></b></span>
-              <small>{x.l}</small>
-            </div>
-          ))}
+        <div className="resumen-kpis">
+          {kpis.map((x) => {
+            const c = cambioDe(x);
+            return (
+              <div key={x.k} className="resumen-kpi">
+                <small>{x.l}</small>
+                {x.horas ? (
+                  <b className="num-display">{Math.floor(x.v / 60) > 0 && <>{Math.floor(x.v / 60)}<i>h</i> </>}{x.v % 60}<i>min</i></b>
+                ) : (
+                  <b className="num-display"><NumberFlow value={encendido ? x.v : 0} locales="es-AR" />{x.sufijo && <i>{x.sufijo}</i>}</b>
+                )}
+                <span className={x.k !== "min" && x.antes != null && x.v > x.antes ? "sube" : ""}>{c ? `${c} que ${laAnterior}` : "\u00a0"}</span>
+              </div>
+            );
+          })}
         </div>
 
-        {/* Cómo repartiste el trabajo a lo largo del período. Los tramos
-            vacíos quedan como una raya a propósito: los huecos son justamente
-            lo que hay que ver. El más cargado, entero. */}
         {maxTramo > 0 && (
           <section className="resumen-bloque" aria-label="Cuándo entrenaste">
             <h3>Cuándo entrenaste</h3>
-            <div className="resumen-tramos">
-              {tramos.map((t, i) => (
-                <div key={i} className={`resumen-tramo ${i === mejorTramo ? "mejor" : ""}`} title={`${Math.round(kgToDisplay(t.valor, unit))} ${weightLabel(unit)}`}>
-                  <i className="grow-bar-up" style={{ height: `${t.valor > 0 ? Math.max(8, (t.valor / maxTramo) * 100) : 3}%`, animationDelay: `${i * 45}ms` }} />
-                  <span>{t.etiqueta}</span>
-                </div>
-              ))}
-            </div>
+            {periodo === "mes" && data.prefijo ? (
+              <CalorDelMes prefijo={data.prefijo} dias={data.diasVolumen} />
+            ) : (
+              <ColumnasPeriodo
+                datos={tramos.map((t) => ({ etiqueta: t.etiqueta, valor: Math.round(kgToDisplay(t.valor, unit)), resaltar: t.valor === maxTramo }))}
+                etiqueta={`Volumen por ${periodo === "anio" ? "mes" : "día"}, en ${u}`}
+              />
+            )}
+            {periodo === "anio" && data.prefijo && <CalorDelAnio anio={Number(data.prefijo)} dias={data.diasVolumen} />}
           </section>
         )}
 
-        {musculos.length > 1 && (
+        {historia.length > 1 && previos.length > 0 && (
+          <section className="resumen-bloque" aria-label="Contra los anteriores">
+            <h3>{periodo === "mes" ? "Tus últimos meses" : "Tus últimas semanas"}</h3>
+            <ColumnasPeriodo
+              datos={historia.map((h) => ({ etiqueta: h.etiqueta, valor: Math.round(kgToDisplay(h.volumen, unit)), resaltar: h.actual }))}
+              promedio={promedio ? { valor: Math.round(kgToDisplay(promedio, unit)), etiqueta: "tu promedio" } : null}
+              etiqueta={`Volumen de ${nombrePeriodo} y de los anteriores, en ${u}`}
+            />
+            {vsPromedio != null && (
+              <p className="resumen-nota">{vsPromedio === 0 ? "Justo en tu promedio" : `${conSigno(vsPromedio, 0)} % contra tu promedio`} de {periodo === "mes" ? `los ${previos.length} meses anteriores` : `las ${previos.length} semanas anteriores`}.</p>
+            )}
+          </section>
+        )}
+
+        {conTelarana && (
           <section className="resumen-bloque" aria-label="Dónde fue el trabajo">
             <h3>Dónde fue el trabajo</h3>
-            <div className="grid gap-2">
-              {musculos.slice(0, 6).map((m) => (
-                <div key={m.nombre} className="balance-fila">
-                  <span className="balance-nombre">{m.nombre}</span>
-                  <span className="balance-pista"><i style={{ width: `${(m.series / maxSeries) * 100}%` }} /></span>
-                  <b className="balance-n num-display">{m.series}</b>
-                </div>
-              ))}
-            </div>
-            {musculos.length > 6 && <p className="resumen-nota">Y {musculos.length - 6} {musculos.length - 6 === 1 ? "músculo más" : "músculos más"}, con menos series.</p>}
+            <Telarana regiones={regiones} anterior={anteriorRegiones} etiqueta={`Series por región: ${regiones.filter((r) => r.series).map((r) => `${r.nombre} ${r.series}`).join(", ")}`} />
+            <p className="telarana-leyenda" aria-hidden="true">
+              <span><i className="actual" />{nombrePeriodo.charAt(0).toUpperCase() + nombrePeriodo.slice(1)}</span>
+              {anteriorRegiones && <span><i className="anterior" />{contra.charAt(0).toUpperCase() + contra.slice(1)}</span>}
+              <span className="telarana-leyenda-n">series por región</span>
+            </p>
           </section>
         )}
 
@@ -7847,7 +8301,7 @@ function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null, 
               {marcas.map((m, i) => (
                 <li key={i} className="reciente stagger-item" style={{ animationDelay: `${i * 60}ms` }}>
                   <span className="min-w-0 flex-1"><span className="reciente-nombre">{m.exercise}</span></span>
-                  <b className="reciente-marca num-display">{m.reps} × {kgToDisplay(m.kg, unit)}<small>{weightLabel(unit)}</small></b>
+                  <b className="reciente-marca num-display">{m.reps} × {numeroAR(kgToDisplay(m.kg, unit))}<small>{u}</small></b>
                 </li>
               ))}
             </ul>
@@ -7862,15 +8316,12 @@ function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null, 
         {/* Datos sueltos que no justifican un gráfico: renglones finos. */}
         <ul className="resumen-renglones">
           {data.mejorDia && (
-            <li><span>Tu mejor día<small>{data.mejorDia.date.slice(8, 10)}/{data.mejorDia.date.slice(5, 7)}, {data.mejorDia.series} {data.mejorDia.series === 1 ? "serie" : "series"}</small></span><b>{fmtKg(Math.round(kgToDisplay(data.mejorDia.volumen, unit)))} {weightLabel(unit)}</b></li>
+            <li><span>Tu mejor día<small>{data.mejorDia.date.slice(8, 10)}/{data.mejorDia.date.slice(5, 7)}, {data.mejorDia.series} {data.mejorDia.series === 1 ? "serie" : "series"}</small></span><b>{fmtKg(Math.round(kgToDisplay(data.mejorDia.volumen, unit)))} {u}</b></li>
           )}
           {data.estrella && (
             <li><span>Tu ejercicio estrella<small>{data.estrella.nombre}</small></span><b>{data.estrella.dias} {data.estrella.dias === 1 ? "día" : "días"}</b></li>
           )}
-          {data.minutos > 0 && (
-            <li><span>Tiempo</span><b>{data.minutos >= 60 ? `${Math.floor(data.minutos / 60)} h ${data.minutos % 60} min` : `${data.minutos} min`}</b></li>
-          )}
-          <li><span>Por sesión</span><b>{data.promedioSeries} series</b></li>
+          {data.minutos > 0 && <li><span>Por sesión</span><b>{data.promedioSeries} series</b></li>}
         </ul>
 
         <button onClick={onClose} className="boton-pildora w-full">{est.cta}</button>
@@ -9088,7 +9539,6 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           <span aria-hidden="true" />
         </div>
       )}
-      {kg ? <QueCargar kg={parseFloat(String(kg).replace(",", "."))} nombre={exerciseName} exerciseId={exerciseId} unidad={unit} /> : null}
       {liveBeats && <p className="foco-record"><Trophy size={13} /> Si la guardás así, es récord</p>}
       {lineaFeedback}
       {avisosExtra}
@@ -9294,35 +9744,6 @@ function CintaMetrica({ inicio, actual, min, max, unidad, nota = null }) {
   );
 }
 
-// Los puntos del recorrido de una medida: el primero y el último llevan su
-// valor escrito (el último, en galleta); los del medio son puntitos que se
-// leen tocándolos.
-function PuntoMedida({ cx, cy, index, total, payload }) {
-  if (cx == null || cy == null) return null;
-  const primero = index === 0;
-  const ultimo = index === total - 1;
-  if (!primero && !ultimo) return <circle cx={cx} cy={cy} r={2.6} className="medida-punto" />;
-  return (
-    <g>
-      {ultimo
-        ? <path d={GALLETA_PATH} transform={`translate(${cx - 7.5} ${cy - 7.5}) scale(0.15)`} className="medida-punto ultimo" />
-        : <circle cx={cx} cy={cy} r={4} className="medida-punto" />}
-      <text x={primero ? cx - 4 : cx + 4} y={cy - 13} textAnchor={primero ? "start" : "end"} className={`medida-etiqueta ${primero ? "primera" : ""}`}>{payload.val}</text>
-    </g>
-  );
-}
-
-function GloboMedida({ active, payload, unidad }) {
-  if (!active || !payload?.length) return null;
-  const d = payload[0].payload;
-  return (
-    <div className="grafica-globo en-linea">
-      <p className="grafica-globo-fecha">{d.fechaLarga}</p>
-      <p className="grafica-globo-serie num-display">{d.val} {unidad}</p>
-    </div>
-  );
-}
-
 // Qué grupos empujan y cuáles tiran (para la barra en equilibrio).
 const GRUPOS_EMPUJE = new Set(["pectoral_medio", "pectoral_superior", "deltoide_anterior", "deltoide_lateral", "triceps"]);
 const GRUPOS_TRACCION = new Set(["dorsales", "trapecio", "deltoide_posterior", "biceps", "antebrazos", "espalda_baja"]);
@@ -9439,162 +9860,11 @@ function BarraEquilibrio({ routineDef }) {
   );
 }
 
-// LOS DISCOS DE VERDAD DE UN PESO: qué va de cada lado de una barra olímpica
-// de 20 kg para cargar esos kilos, como lo harías en el gimnasio (25 rojo, 20
-// azul, 15 amarillo, 10 verde, 5 blanco, y los chicos de 2,5 y 1,25). Los de
-// 10 a 25 tienen el mismo diámetro y cambian de grosor, como los de
-// competición.
-const DISCOS_DE_PESO = [
-  { kg: 25, color: 0, ancho: 1, alto: 1 },
-  { kg: 20, color: 1, ancho: 0.88, alto: 1 },
-  { kg: 15, color: 2, ancho: 0.76, alto: 1 },
-  { kg: 10, color: 3, ancho: 0.64, alto: 1 },
-  { kg: 5, color: 4, ancho: 0.52, alto: 0.6 },
-  { kg: 2.5, color: 0, ancho: 0.42, alto: 0.44 },
-  { kg: 1.25, color: 5, ancho: 0.36, alto: 0.36 },
-];
-// Los de libra, para quien anota en libras: barra de 45 lb y los mismos
-// colores por tamaño (55 rojo, 45 azul, 35 amarillo, 25 verde, 10 blanco).
-// El campo se llama kg en las dos listas para no duplicar el dibujo: es el
-// peso del disco en la unidad que se usa.
-const DISCOS_DE_LIBRA = [
-  { kg: 55, color: 0, ancho: 1, alto: 1 },
-  { kg: 45, color: 1, ancho: 0.88, alto: 1 },
-  { kg: 35, color: 2, ancho: 0.76, alto: 1 },
-  { kg: 25, color: 3, ancho: 0.64, alto: 1 },
-  { kg: 10, color: 4, ancho: 0.52, alto: 0.6 },
-  { kg: 5, color: 0, ancho: 0.42, alto: 0.44 },
-  { kg: 2.5, color: 5, ancho: 0.36, alto: 0.36 },
-];
-// La barra de cada unidad: 20 kg o 45 lb.
-const barraDe = (unidad) => (unidad === "lbs" ? 45 : 20);
-function discosParaPeso(peso, barra = null, unidad = "kg") {
-  let lado = Math.max(0, (peso - (barra ?? barraDe(unidad))) / 2);
-  const discos = [];
-  for (const d of unidad === "lbs" ? DISCOS_DE_LIBRA : DISCOS_DE_PESO) {
-    while (lado >= d.kg - 1e-6 && discos.length < 10) { discos.push(d); lado -= d.kg; }
-  }
-  return discos;
-}
-// Los ejercicios que se hacen con barra (y llevan discos): por el nombre,
-// porque el catálogo no dice con qué se hacen.
+// Los ejercicios que se hacen con barra, por el nombre (el catálogo no dice
+// con qué se hacen): el cara a cara de Social compara sólo esos.
 const RE_CON_BARRA = /barra|banca|sentadilla|peso muerto|hip thrust|smith|multipower/i;
 const RE_SIN_BARRA = /mancuerna|polea|m[aá]quina|cable|b[uú]lgara|goblet|kettlebell|pesa rusa/i;
 function seHaceConBarra(nombre) { return !!nombre && RE_CON_BARRA.test(nombre) && !RE_SIN_BARRA.test(nombre); }
-
-// `kg` es el peso en la unidad de `unidad` ("kg" o "lbs"). `sobria`: discos
-// de goma negra, para fuera de Rutina (los colores de competición quedan
-// para la barra del día y para "qué cargar").
-function BarraConDiscos({ kg, alto = 56, className = "", unidad = "kg", sobria = false }) {
-  const uid = `bd${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
-  const discos = discosParaPeso(kg, null, unidad);
-  const W = 320, H = 76, cy = H / 2;
-  const agarreIni = W / 2 - 56, agarreFin = W / 2 + 56, tope = 7, largoManga = 92;
-  const topeIzq = agarreIni - tope, mangaDer = agarreFin + tope;
-  // Si no entran en la manga, se afinan todos por igual.
-  const sumaAnchos = discos.reduce((t, d) => t + d.ancho, 0);
-  const base = Math.min(13, sumaAnchos ? (largoManga - 12 - 1.2 * discos.length) / sumaAnchos : 13);
-  const lugares = [];
-  let desde = 1;
-  for (const d of discos) { const w = base * d.ancho; lugares.push({ ...d, w, h: 70 * d.alto, desde }); desde += w + 1.2; }
-  const acero = `url(#${uid}-acero)`;
-  const radio = (w) => Math.min(3, w / 2.6);
-  const ultimo = lugares[lugares.length - 1];
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} className={`barra-cargada ${className}`} style={{ height: alto }} role="img" aria-label={`${String(kg).replace(".", ",")} ${unidad === "lbs" ? "lb" : "kg"}: barra de ${barraDe(unidad)} y, de cada lado, ${discos.map((d) => String(d.kg).replace(".", ",")).join(" + ") || "nada"}`}>
-      <defs>
-        <linearGradient id={`${uid}-acero`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" className="acero-claro" />
-          <stop offset=".55" className="acero-medio" />
-          <stop offset="1" className="acero-oscuro" />
-        </linearGradient>
-        {/* Los cinco colores de competición y el fierro del de 1,25. */}
-        {[...COLORES_DISCO, "#C4C6CB"].map((c, k) => (
-          <linearGradient key={k} id={`${uid}-d${k}`} x1="0" y1="0" x2="0" y2="1" style={{ "--d": sobria && k < COLORES_DISCO.length ? DISCO_SOBRIO : c }}>
-            <stop offset="0" className="disco-claro" />
-            <stop offset=".45" className="disco-medio" />
-            <stop offset="1" className="disco-oscuro" />
-          </linearGradient>
-        ))}
-      </defs>
-      <rect x={topeIzq - largoManga} y={cy - 6} width={largoManga} height={12} rx={3} fill={acero} />
-      <rect x={mangaDer} y={cy - 6} width={largoManga} height={12} rx={3} fill={acero} />
-      <rect x={agarreIni} y={cy - 3.6} width={agarreFin - agarreIni} height={7.2} rx={3.6} fill={acero} />
-      <rect x={topeIzq} y={cy - 11} width={tope} height={22} rx={2.4} fill={acero} />
-      <rect x={agarreFin} y={cy - 11} width={tope} height={22} rx={2.4} fill={acero} />
-      {[true, false].map((izquierda) => lugares.map((d, i) => {
-        const x = izquierda ? topeIzq - d.desde - d.w : mangaDer + d.desde;
-        return (
-          <g key={`${izquierda ? "i" : "d"}${i}`}>
-            <rect x={x} y={cy - d.h / 2} width={d.w} height={d.h} rx={radio(d.w)} fill={`url(#${uid}-d${d.color})`} className="disco" />
-            <rect x={x + 0.75} y={cy - d.h / 2 + 0.75} width={Math.max(0.5, d.w - 1.5)} height={d.h - 1.5} rx={Math.max(0.5, radio(d.w) - 0.75)} className="disco-filete" />
-          </g>
-        );
-      }))}
-      {ultimo && (
-        <>
-          <rect x={topeIzq - ultimo.desde - ultimo.w - 8} y={cy - 8} width={6} height={16} rx={2} fill={acero} />
-          <rect x={mangaDer + ultimo.desde + ultimo.w + 2} y={cy - 8} width={6} height={16} rx={2} fill={acero} />
-        </>
-      )}
-    </svg>
-  );
-}
-
-// UN PAR DE MANCUERNAS, para los ejercicios con mancuernas: las cabezas
-// crecen un poco con el peso, como las de verdad.
-function ParDeMancuernas({ kg, alto = 30 }) {
-  const uid = `pm${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
-  const t = Math.max(0.5, Math.min(1, 0.45 + kg / 70));
-  const cabeza = 18 + 18 * t, ancho = 8 + 6 * t;
-  const mancuerna = (x0) => (
-    <g>
-      <rect x={x0} y={20 - cabeza / 2} width={ancho} height={cabeza} rx={3} fill={`url(#${uid}-goma)`} className="disco" />
-      <rect x={x0 + ancho - 1} y={17} width={24} height={6} rx={3} fill={`url(#${uid}-acero)`} />
-      <rect x={x0 + ancho + 22} y={20 - cabeza / 2} width={ancho} height={cabeza} rx={3} fill={`url(#${uid}-goma)`} className="disco" />
-    </g>
-  );
-  return (
-    <svg viewBox="0 0 150 40" style={{ height: alto, width: "auto" }} aria-hidden="true" className="par-mancuernas">
-      <defs>
-        <linearGradient id={`${uid}-acero`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" className="acero-claro" /><stop offset=".55" className="acero-medio" /><stop offset="1" className="acero-oscuro" />
-        </linearGradient>
-        <linearGradient id={`${uid}-goma`} x1="0" y1="0" x2="0" y2="1" style={{ "--d": "#4a4c52" }}>
-          <stop offset="0" className="disco-claro" /><stop offset=".45" className="disco-medio" /><stop offset="1" className="disco-oscuro" />
-        </linearGradient>
-      </defs>
-      {mancuerna(6)}
-      {mancuerna(80)}
-    </svg>
-  );
-}
-
-// QUÉ CARGAR: debajo de los números de la serie en foco, lo que va en la
-// barra para el peso que escribiste (los discos de cada lado de una olímpica
-// de 20 kg, o de 45 lb si anotás en libras) o, si es con mancuernas, el par.
-// Chico y tenue: se mira de reojo al armar la barra.
-function QueCargar({ kg, nombre, exerciseId, unidad = "kg" }) {
-  if (!kg || !(kg > 0)) return null;
-  const u = unidad === "lbs" ? "lb" : "kg";
-  const lib = EXERCISE_LIBRARY_BY_ID[exerciseId];
-  if (/mancuerna/i.test(nombre || "") || lib?.loadFactor === 2) {
-    return (
-      <div className="que-cargar" aria-label={`Un par de mancuernas de ${conComa(kg)} ${u}`}>
-        <ParDeMancuernas kg={unidad === "lbs" ? kg / 2.2046 : kg} alto={26} />
-        <span>Un par de <b>{conComa(kg)} {u}</b></span>
-      </div>
-    );
-  }
-  if (!seHaceConBarra(nombre) || kg < barraDe(unidad)) return null;
-  const discos = discosParaPeso(kg, null, unidad);
-  return (
-    <div className="que-cargar">
-      <BarraConDiscos kg={kg} unidad={unidad} alto={30} />
-      <span>{discos.length ? <>Por lado: <b>{discos.map((d) => conComa(d.kg)).join(" + ")}</b></> : "Sólo la barra"}</span>
-    </div>
-  );
-}
 
 // Los días de tu rutina como baldosas: cada una con el color de su día (un
 // filete arriba y un tinte apenas), su nombre y cuántos ejercicios y series
@@ -9682,7 +9952,7 @@ function CarnetSocio({ color = "#8B5CF6", foto = null, inicial = "?", nombre, li
       <div className="carnet-abajo">
         <div className="carnet-dato">
           <p className="carnet-rotulo">Racha</p>
-          <div className="carnet-racha"><MarcasTiza dias={racha} max={10} alto={18} decorativa /><b className="num-display">{racha}</b><small>{racha === 1 ? "día seguido" : "días seguidos"}</small></div>
+          <div className="carnet-racha"><MarcasTiza dias={racha} max={10} alto={18} decorativa className={racha > 0 ? "viva" : ""} /><b className="num-display">{racha}</b><small>{racha === 1 ? "día seguido" : "días seguidos"}</small></div>
         </div>
         <div className="carnet-dato">
           <p className="carnet-rotulo">Esta semana</p>
@@ -9717,7 +9987,7 @@ function CarreraSemana({ filas = [], onVerPersona = null, vacios = 0 }) {
             <Tag onClick={onVerPersona && !c.yo ? () => onVerPersona(c.uid) : undefined} className={`carrera-carril ${c.yo ? "yo" : ""} ${i === 0 && n > 0 ? "primero" : ""}`}
               aria-label={`${i + 1}º, ${c.yo ? "vos" : c.nombre}: ${n} ${n === 1 ? "sesión" : "sesiones"} esta semana`}>
               <span className="carrera-puesto" aria-hidden="true">{i + 1}</span>
-              <span className="carrera-avatar" aria-hidden="true">{c.foto ? <img src={c.foto} alt="" /> : String(c.nombre || "?").charAt(0).toUpperCase()}</span>
+              <span className={`carrera-avatar ${c.rango ? "con-rango" : ""}`} style={c.rango ? { "--rango-c": c.rango } : undefined} aria-hidden="true">{c.foto ? <img src={c.foto} alt="" /> : String(c.nombre || "?").charAt(0).toUpperCase()}</span>
               <span className="carrera-cuerpo" aria-hidden="true">
                 <span className="carrera-nombre">{c.yo ? "Vos" : String(c.nombre || "").split(" ")[0]}</span>
                 <span className="carrera-pista">{Array.from({ length: largo }, (_, k) => <i key={k} className={c.tramos[k] ? "hecho" : ""} style={c.tramos[k] ? { "--dia": c.tramos[k] } : undefined} />)}</span>
@@ -10107,8 +10377,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
         {/* El cronómetro ya no vive fijo acá: se posiciona entre las series
             según timerSlot (más abajo, junto a las series). */}
         {/* LAS APROXIMACIONES: las series de entrada al 50, 70 y 85 % de tu
-            mejor serie, redondeadas a lo que se puede cargar (2,5 kg o 5 lb)
-            y, si el ejercicio es con barra, con los discos de cada lado. */}
+            mejor serie, redondeadas a lo que se puede cargar (2,5 kg o 5 lb). */}
         {!exercise.cardio && bestWorkingKg != null && settings.showWarmup !== false && (
           <div className="aproximaciones">
             {!showWarmup ? (
@@ -10121,18 +10390,10 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
                 {WARMUP_STEPS.map((w, i) => {
                   const paso = planUnit === "lbs" ? 5 : 2.5;
                   const peso = Math.max(0, Math.round(kgToDisplay(bestWorkingKg * w.pct, planUnit) / paso) * paso);
-                  const conBarra = seHaceConBarra(exercise.name) && peso >= barraDe(planUnit);
-                  const discos = conBarra ? discosParaPeso(peso, null, planUnit) : [];
                   return (
                     <div key={i} className="aproximacion">
                       <span className="aproximacion-pct">{Math.round(w.pct * 100)}%</span>
                       <span className="aproximacion-serie"><b className="num-display">{w.reps} × {conComa(peso)}</b> {weightLabel(planUnit)}</span>
-                      {conBarra && (
-                        <span className="aproximacion-discos" aria-label={discos.length ? `Por lado: ${discos.map((d) => conComa(d.kg)).join(" + ")}` : "Sólo la barra"}>
-                          <BarraConDiscos kg={peso} unidad={planUnit} alto={22} />
-                          <small aria-hidden="true">{discos.length ? discos.map((d) => conComa(d.kg)).join(" + ") : "barra sola"}</small>
-                        </span>
-                      )}
                     </div>
                   );
                 })}
@@ -10183,7 +10444,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
    como la racha. Antes cada sesión era un disco del color del día: con ocho
    semanas eran tres colores repetidos por toda la tarjeta.
 ============================================================================ */
-function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS, onGoToDeload }) {
+function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS, onGoToDeload, metaSemanal = null }) {
   const weekInfo = getWeekInfo(cycleStart, settings);
   // BUG ARREGLADO: este useMemo estaba DESPUÉS del `return null` de abajo.
   // Los hooks tienen que llamarse siempre, en el mismo orden, en todos los
@@ -10213,7 +10474,7 @@ function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS,
           <p className="escalera-titulo">Semana {weekInfo.weekInCycle} <span>de {cycleWeeks}</span></p>
           <p className="escalera-sub">Ciclo {weekInfo.cycleNumber}: {falta}</p>
         </div>
-        <p className="escalera-cuenta" aria-hidden="true"><b className="num-display">{estaSemana}</b><span>{estaSemana === 1 ? "sesión" : "sesiones"} esta semana</span></p>
+        <p className={`escalera-cuenta ${metaSemanal && estaSemana >= metaSemanal ? "cumplida" : ""}`} aria-hidden="true"><b className="num-display">{estaSemana}</b><span>{metaSemanal ? `de ${metaSemanal} ${metaSemanal === 1 ? "sesión" : "sesiones"}` : estaSemana === 1 ? "sesión" : "sesiones"} esta semana</span></p>
       </div>
       <div className="escalera" aria-hidden="true">
         {semanas.map(({ n, descarga, estado }, wi) => (
@@ -10223,7 +10484,7 @@ function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS,
       </div>
       <div className="escalera-pie" aria-hidden="true">
         {semanas.map(({ n, sesiones, descarga, estado }) => (
-          <span key={n} className={estado}>
+          <span key={n} className={`${estado} ${metaSemanal && !descarga && estado !== "futura" && sesiones >= metaSemanal ? "cumplida" : ""}`}>
             <em>{descarga ? "D" : n}</em>
             {estado !== "futura" && <MarcasTiza dias={sesiones} max={7} alto={11} decorativa />}
           </span>
@@ -10249,7 +10510,7 @@ function SessionStartBar({ activeSession, onStart, color = "#14B8A6" }) {
   // acá, cancelar la sesión, se mudó al paso de confirmación de esa barra.
   if (activeSession) return null;
   return (
-    <button onClick={onStart} className="boton-pildora invite-pulse" style={{ "--c": color, "--invite-glow": `${tint(color, "80")}` }}>
+    <button onClick={onStart} className="boton-pildora invite-pulse" style={{ "--c": color }}>
       <Play size={16} className="fill-current" /> Iniciar sesión
     </button>
   );
@@ -10550,7 +10811,7 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_
     <div className="fixed inset-0 z-[150] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
       <div className="relative max-w-sm w-full max-h-[92vh] overflow-y-auto overscroll-contain rounded-3xl modal-pop-in shadow-2xl shadow-black/70 bg-slate-900 border border-sky-500/30" onClick={(e) => e.stopPropagation()}>
         <div className="sticky top-0 z-10 flex items-center gap-2.5 px-5 py-4 bg-slate-900/95 backdrop-blur border-b border-slate-800/60">
-          <span className="w-9 h-9 rounded-xl bg-sky-500/18 text-sky-400 flex items-center justify-center shrink-0 border border-sky-500/30"><Sparkles size={16} /></span>
+          <span className="icono-suelto"><Sparkles size={16} /></span>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-black text-white leading-tight">Planificar con IA</p>
             <p className="text-[10.5px] text-slate-500">Tu progresión completa, de una vez</p>
@@ -11524,7 +11785,7 @@ function ShareSummaryCard({ logs, trainingSessions = [] }) {
           ))}
           <div className="flex gap-2">
             <button onClick={() => setMode(null)} className="px-3 py-2.5 rounded-xl bg-slate-800 text-slate-400 text-xs font-semibold">Atrás</button>
-            <button onClick={() => setShowImage(true)} disabled={!selPR?.best1rm} className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-[0.98] ${selPR?.best1rm ? "text-[color:var(--accion-tinta)] shadow-lg shadow-teal-500/20" : "bg-slate-800 text-slate-600"}`} style={selPR?.best1rm ? { background: "var(--accion-fondo)" } : {}}>Generar imagen</button>
+            <button onClick={() => setShowImage(true)} disabled={!selPR?.best1rm} className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-[0.98] ${selPR?.best1rm ? "text-[color:var(--accion-tinta)]" : "bg-slate-800 text-slate-600"}`} style={selPR?.best1rm ? { background: "var(--accion-fondo)" } : {}}>Generar imagen</button>
           </div>
         </div>
       )}
@@ -11539,7 +11800,7 @@ function ShareSummaryCard({ logs, trainingSessions = [] }) {
           <p className="text-[11px] text-slate-500">{periodStats.daysTrained} día{periodStats.daysTrained === 1 ? "" : "s"} entrenado{periodStats.daysTrained === 1 ? "" : "s"} · {Math.round(kgToDisplay(periodStats.totalVol, unit)).toLocaleString("es-AR")} {weightLabel(unit)}×reps en este período.</p>
           <div className="flex gap-2">
             <button onClick={() => setMode(null)} className="px-3 py-2.5 rounded-xl bg-slate-800 text-slate-400 text-xs font-semibold">Atrás</button>
-            <button onClick={() => setShowImage(true)} disabled={!periodStats.daysTrained} className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-[0.98] ${periodStats.daysTrained ? "text-[color:var(--accion-tinta)] shadow-lg shadow-teal-500/20" : "bg-slate-800 text-slate-600"}`} style={periodStats.daysTrained ? { background: "var(--accion-fondo)" } : {}}>Generar imagen</button>
+            <button onClick={() => setShowImage(true)} disabled={!periodStats.daysTrained} className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-[0.98] ${periodStats.daysTrained ? "text-[color:var(--accion-tinta)]" : "bg-slate-800 text-slate-600"}`} style={periodStats.daysTrained ? { background: "var(--accion-fondo)" } : {}}>Generar imagen</button>
           </div>
         </div>
       )}
@@ -11703,9 +11964,8 @@ function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [], weekSche
           podés abrir cuando quieras. No se muestra si ese mes no tiene
           nada registrado, para no abrir una ventana vacía. */}
           {resumenDelMes && (
-        <button onClick={() => setVerResumenMes(true)} className="w-full flex items-center justify-center gap-2 mt-1 py-2.5 rounded-xl border text-xs font-bold transition active:scale-[0.98]"
-          style={{ backgroundColor: tint("#3B82F6", "12"), borderColor: tint("#3B82F6", "33"), color: "#60a5fa" }}>
-          <TrendingUp size={13} /> Ver resumen de {MONTH_LABELS[cursor.m].toLowerCase()}
+        <button onClick={() => setVerResumenMes(true)} className="boton-tonal w-full mt-1">
+          <BarChart3 size={15} /> Ver el resumen de {MONTH_LABELS[cursor.m].toLowerCase()}
         </button>
           )}
           {/* Detalle de la sesión como modal centrado — antes se desplegaba
@@ -12056,18 +12316,215 @@ function DeloadView({ logs, setLogs, settings = DEFAULT_SETTINGS, deloadProgress
 }
 
 /* ============================================================================
+   LA GRÁFICA DEL TIEMPO (GraficaTiempo): la de Evolución y la de Medidas.
+   Una línea recta de sesión a sesión (una curva suavizada inventa valores
+   entre dos días que no existieron) sobre una escala de tiempo de verdad: dos
+   semanas sin entrenar se ven como un hueco, no como dos puntos pegados. A la
+   izquierda, su escala en números redondos con cuatro o cinco rayas tenues;
+   un relleno apenas; los récords en dorado y la última sesión con su aro. Se
+   lee tocando o deslizando el dedo de costado (lo vertical sigue siendo
+   scroll): una raya marca la sesión y el globo dice qué hiciste. Con el
+   teclado, las flechas. Reemplaza a Recharts, que se usaba sólo para esto.
+============================================================================ */
+const DIA_MS = 864e5;
+const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+const fechaMs = (iso) => new Date(`${iso}T12:00:00`).getTime();
+const numeroAR = (v, dec = 1) => Number(v).toLocaleString("es-AR", { maximumFractionDigits: dec });
+// Con signo de verdad: +2,5 / −1 (el menos tipográfico, no el guion).
+const conSigno = (v, dec = 1) => `${v > 0 ? "+" : v < 0 ? "−" : ""}${numeroAR(Math.abs(v), dec)}`;
+// Marcas redondas (pasos de 1, 2, 2,5 o 5 por una potencia de 10) y la más
+// alta por encima del valor más alto: la línea nunca toca el techo.
+function marcasRedondas(min, max, cuantas = 4) {
+  if (max === min) { min -= 1; max += 1; }
+  const crudo = (max - min) / cuantas;
+  const mag = 10 ** Math.floor(Math.log10(crudo));
+  const paso = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => s >= crudo) || 10 * mag;
+  const lo = Math.floor(min / paso) * paso;
+  let hi = Math.ceil(max / paso) * paso;
+  if (hi <= max) hi += paso;
+  const out = [];
+  for (let v = lo; v <= hi + paso / 2; v += paso) out.push(Math.round(v * 1e6) / 1e6);
+  return out;
+}
+// Las fechas de abajo: el mismo paso de punta a punta (días, los lunes, dos o
+// cuatro semanas, o meses), el más fino que entra en el ancho.
+function marcasDeTiempo(t0, t1, ancho) {
+  const cabe = Math.max(2, Math.floor(ancho / 56));
+  const diaMes = (d) => `${d.getDate()}/${d.getMonth() + 1}`;
+  if (t1 <= t0) return [{ t: t0, texto: diaMes(new Date(t0)) }];
+  const porDias = (paso, lunes) => {
+    const out = [];
+    const d = new Date(t0);
+    d.setHours(12, 0, 0, 0);
+    if (d.getTime() < t0) d.setDate(d.getDate() + 1);
+    if (lunes) while (d.getDay() !== 1) d.setDate(d.getDate() + 1);
+    while (d.getTime() <= t1 + 1 && out.length <= cabe) { out.push({ t: d.getTime(), texto: diaMes(d) }); d.setDate(d.getDate() + paso); }
+    return out;
+  };
+  const porMeses = (paso) => {
+    const out = [];
+    const d = new Date(t0);
+    d.setDate(1); d.setHours(12, 0, 0, 0);
+    if (d.getTime() < t0) d.setMonth(d.getMonth() + 1);
+    while (d.getMonth() % paso !== 0) d.setMonth(d.getMonth() + 1);
+    while (d.getTime() <= t1 + 1 && out.length <= cabe) {
+      out.push({ t: d.getTime(), texto: d.getMonth() === 0 ? `ene ${String(d.getFullYear()).slice(2)}` : MESES_CORTOS[d.getMonth()] });
+      d.setMonth(d.getMonth() + paso);
+    }
+    return out;
+  };
+  const dias = (t1 - t0) / DIA_MS;
+  const pruebas = [
+    ...(dias <= 130 ? [() => porDias(1, false), () => porDias(2, false), () => porDias(7, true), () => porDias(14, true), () => porDias(28, true)] : []),
+    () => porMeses(1), () => porMeses(2), () => porMeses(3), () => porMeses(6), () => porMeses(12),
+  ];
+  for (const probar of pruebas) {
+    const m = probar();
+    if (m.length >= 2 && m.length <= cabe) return m;
+  }
+  return [{ t: t0, texto: diaMes(new Date(t0)) }, { t: t1, texto: diaMes(new Date(t1)) }];
+}
+
+// `puntos`: [{ fecha: "2026-10-14", v, record?, descarga? , ...lo que use el
+// globo }], en orden. `referencia`: { v, etiqueta } (la raya punteada del
+// récord), con su rótulo donde la línea no pasa. `globo(punto)`: lo que dice
+// el globo de la sesión tocada. Para que se olvide de la sesión tocada al
+// cambiar de ejercicio o de métrica, quien la usa le cambia la `key`.
+function GraficaTiempo({ puntos, color = "var(--tono)", alto = 200, formato = (v) => numeroAR(v), referencia = null, globo = null, etiqueta = "" }) {
+  const cajaRef = useRef(null);
+  const svgRef = useRef(null);
+  const [ancho, setAncho] = useState(0);
+  useLayoutEffect(() => {
+    const el = cajaRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return undefined;
+    const ro = new ResizeObserver((entradas) => setAncho(Math.round(entradas[0].contentRect.width)));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const [activo, setActivo] = useState(null);
+  const arrastre = useRef(null);
+  const uid = `gt${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
+  const n = puntos.length;
+  if (!n) return null;
+
+  const valores = puntos.map((p) => p.v);
+  if (referencia) valores.push(referencia.v);
+  const marcasY = marcasRedondas(Math.min(...valores), Math.max(...valores), 4);
+  const yMin = marcasY[0], yMax = marcasY[marcasY.length - 1];
+  const textosY = marcasY.map((v) => formato(v));
+  const padL = Math.round(Math.max(...textosY.map((t) => t.length)) * 6.4 + 12);
+  const padR = 12, padT = 14, padB = 26;
+  const plotW = Math.max(40, ancho - padL - padR), plotH = alto - padT - padB;
+  const base = padT + plotH;
+  const ts = puntos.map((p) => fechaMs(p.fecha));
+  const t0 = ts[0], t1 = ts[n - 1];
+  const xDe = (t) => (t1 === t0 ? padL + plotW / 2 : padL + ((t - t0) / (t1 - t0)) * plotW);
+  const yDe = (v) => padT + (1 - (v - yMin) / (yMax - yMin)) * plotH;
+  const xs = ts.map(xDe), ys = puntos.map((p) => yDe(p.v));
+  const trazo = xs.map((x, i) => `${i ? "L" : "M"}${x.toFixed(1)} ${ys[i].toFixed(1)}`).join(" ");
+  const relleno = `${trazo} L${xs[n - 1].toFixed(1)} ${base} L${xs[0].toFixed(1)} ${base} Z`;
+  const marcasX = ancho ? marcasDeTiempo(t0, t1, plotW) : [];
+
+  // El rótulo de la raya del récord, en la primera esquina libre de línea.
+  let ref = null;
+  if (referencia && ancho) {
+    const yr = yDe(referencia.v);
+    const w = referencia.etiqueta.length * 6.3 + 6;
+    const yEnX = (x) => {
+      if (x <= xs[0]) return ys[0];
+      for (let i = 1; i < n; i++) if (x <= xs[i]) return ys[i - 1] + ((x - xs[i - 1]) / (xs[i] - xs[i - 1] || 1)) * (ys[i] - ys[i - 1]);
+      return ys[n - 1];
+    };
+    const libre = (x0, arriba) => [x0 - 6, x0, x0 + w / 2, x0 + w, x0 + w + 6].every((x) => { const y = yEnX(x); return y < arriba - 5 || y > arriba + 17; });
+    const der = padL + plotW - w;
+    const opciones = [{ x: der, y: yr - 16, fin: true }, { x: padL, y: yr - 16 }, { x: der, y: yr + 4, fin: true }, { x: padL, y: yr + 4 }];
+    ref = { yr, ...(opciones.find((o) => o.y >= 0 && o.y + 12 <= base && libre(o.x, o.y)) || opciones[0]) };
+  }
+
+  const indiceEn = (clientX) => {
+    const r = svgRef.current?.getBoundingClientRect();
+    if (!r) return null;
+    const x = clientX - r.left;
+    let mejor = 0;
+    for (let i = 1; i < n; i++) if (Math.abs(xs[i] - x) < Math.abs(xs[mejor] - x)) mejor = i;
+    return mejor;
+  };
+  const tocar = (e) => {
+    arrastre.current = { x: e.clientX };
+    const i = indiceEn(e.clientX);
+    if (i != null) setActivo((a) => (a === i && e.pointerType !== "mouse" ? null : i));
+  };
+  const mover = (e) => {
+    const lejos = arrastre.current && Math.abs(e.clientX - arrastre.current.x) > 6;
+    if (e.pointerType !== "mouse" && !lejos) return;
+    const i = indiceEn(e.clientX);
+    if (i != null) setActivo(i);
+  };
+  const soltar = () => { arrastre.current = null; };
+  const salir = (e) => { arrastre.current = null; if (e.pointerType === "mouse") setActivo(null); };
+  const teclas = (e) => {
+    if (e.key === "ArrowRight") { e.preventDefault(); setActivo((a) => (a == null ? n - 1 : Math.min(n - 1, a + 1))); }
+    else if (e.key === "ArrowLeft") { e.preventDefault(); setActivo((a) => (a == null ? n - 1 : Math.max(0, a - 1))); }
+    else if (e.key === "Escape") setActivo(null);
+  };
+  const pa = activo != null && activo < n ? { x: xs[activo], y: ys[activo], p: puntos[activo] } : null;
+  const ultimoRecord = !!puntos[n - 1].record;
+
+  return (
+    <div ref={cajaRef} className="grafica-tiempo" style={{ height: alto }}>
+      {ancho > 0 && (
+        <svg ref={svgRef} width={ancho} height={alto} viewBox={`0 0 ${ancho} ${alto}`} role="img" aria-label={etiqueta} tabIndex={0}
+          onPointerDown={tocar} onPointerMove={mover} onPointerUp={soltar} onPointerCancel={soltar} onPointerLeave={salir} onKeyDown={teclas} onBlur={() => setActivo(null)}>
+          <defs>
+            <linearGradient id={`${uid}-r`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" style={{ stopColor: color, stopOpacity: 0.16 }} />
+              <stop offset="1" style={{ stopColor: color, stopOpacity: 0 }} />
+            </linearGradient>
+          </defs>
+          {marcasY.map((v, i) => (
+            <g key={v}>
+              <line x1={padL} x2={padL + plotW} y1={yDe(v)} y2={yDe(v)} className={i === 0 ? "grafica-base" : "grafica-raya"} />
+              <text x={padL - 8} y={yDe(v) + 4} textAnchor="end" className="grafica-eje">{textosY[i]}</text>
+            </g>
+          ))}
+          {marcasX.map((m) => {
+            const x = xDe(m.t);
+            return <text key={m.t} x={x} y={alto - 7} textAnchor={x - padL < 16 ? "start" : padL + plotW - x < 16 ? "end" : "middle"} className="grafica-eje">{m.texto}</text>;
+          })}
+          {n > 1 && <path d={relleno} fill={`url(#${uid}-r)`} className="grafica-relleno" />}
+          {ref && (
+            <>
+              <line x1={padL} x2={padL + plotW} y1={ref.yr} y2={ref.yr} className="grafica-ref" />
+              <text x={ref.fin ? padL + plotW : padL + 2} y={ref.y + 10} textAnchor={ref.fin ? "end" : "start"} className="grafica-ref-texto">{referencia.etiqueta}</text>
+            </>
+          )}
+          {n > 1 && <path d={trazo} pathLength="1" style={{ stroke: color }} className="grafica-linea" />}
+          {puntos.map((p, i) => (i === n - 1 ? null : p.record
+            ? <circle key={i} cx={xs[i]} cy={ys[i]} r={3.6} className="grafica-record" />
+            : p.descarga ? <circle key={i} cx={xs[i]} cy={ys[i]} r={3} className="grafica-descarga" /> : null))}
+          {/* La última sesión, con su aro. */}
+          <circle cx={xs[n - 1]} cy={ys[n - 1]} r={8.5} style={{ fill: ultimoRecord ? "var(--record)" : color }} opacity=".2" />
+          <circle cx={xs[n - 1]} cy={ys[n - 1]} r={4} style={{ fill: ultimoRecord ? "var(--record)" : color }} className="grafica-ultimo" />
+          {pa && (
+            <>
+              <line x1={pa.x} x2={pa.x} y1={padT} y2={base} className="grafica-guia" />
+              <circle cx={pa.x} cy={pa.y} r={5.5} style={{ fill: pa.p.record ? "var(--record)" : color }} className="grafica-tocado" />
+            </>
+          )}
+        </svg>
+      )}
+      {pa && globo && (
+        <div className={`grafica-globo ${pa.x < 84 ? "izq" : pa.x > ancho - 84 ? "der" : ""} ${pa.y < 78 ? "abajo" : ""}`} style={{ left: pa.x, top: pa.y }}>
+          {globo(pa.p)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================================================
    PROGRESS VIEW
 ============================================================================ */
-// Punto del gráfico de evolución: el de tu mejor marca se dibuja con un halo
-// alrededor, para encontrarlo de un vistazo en la curva sin tener que pasar
-// el dedo por todos los puntos. Sólo el punto en sí responde al toque (un
-// círculo invisible más grande alrededor, para que sea fácil de tocar en el
-// celular) — antes cualquier parte del gráfico disparaba el tooltip de
-// Recharts (y su recuadro/cursor), ahora sólo reacciona esto.
-// Las series de descarga se marcan con el mismo violeta que ya usa esa
-// pestaña en toda la app (Descarga, badge "⚡" en el historial) — un rombo
-// en vez de un círculo, así se distingue incluso sin color (por forma).
-const DELOAD_COLOR = "#A855F7";
 // Color fijo del gráfico de evolución (línea, puntos, tooltip): el acento
 // naranja de la sección "Ejercicios", igual para cualquier ejercicio. Antes
 // usaba el color del día (selEx.color) y el gráfico cambiaba de color según
@@ -12093,27 +12550,6 @@ const SOCIAL_COLOR = "#8B5CF6";
 // grafito desaparece sobre blanco (en modo claro, el "Amigos" activo de las
 // solapas no se veía). Ver --social-tinta en ANIMATION_CSS.
 const SOCIAL_INK = "var(--social-tinta)";
-
-// Los puntos de la evolución: cada sesión es un puntito del color del
-// ejercicio; las que fueron récord, un punto dorado (y las últimas, con su
-// valor arriba); la última sesión lleva un halo.
-function PuntoEvolucion({ cx, cy, index, payload, total, color, isActive, etiquetar, onSelect }) {
-  if (cx == null || cy == null || !payload) return null;
-  const ultimo = index === total - 1;
-  return (
-    <g style={{ cursor: "pointer" }} onClick={() => onSelect(index, cx, cy)}>
-      <circle cx={cx} cy={cy} r={15} fill="transparent" />
-      {(isActive || ultimo) && <circle cx={cx} cy={cy} r={10} fill="none" stroke={payload.esRecord ? "var(--record)" : color} strokeWidth={1.5} opacity={isActive ? 0.9 : 0.55} />}
-      {payload.deload
-        ? <circle cx={cx} cy={cy} r={3.6} fill="var(--surface-1)" stroke={DELOAD_COLOR} strokeWidth={2} />
-        : payload.esRecord
-          ? <circle cx={cx} cy={cy} r={5} fill="var(--record)" stroke="var(--surface-1)" strokeWidth={2} />
-          : <circle cx={cx} cy={cy} r={3.4} fill="var(--surface-1)" stroke={color} strokeWidth={2} />}
-      {etiquetar && <text x={cx} y={cy - 13} textAnchor="middle" className="evolucion-etiqueta">{Math.round(payload.e1rm)}</text>}
-    </g>
-  );
-}
-
 
 /* ============================================================================
    EXERCISE CHIP ROW — selector de ejercicio con el mismo lenguaje visual que
@@ -13238,7 +13674,7 @@ function ManoAMano({ miFoto, miNombre, misRangos, mySex = null, suFoto, suNombre
     return { tuyo, suyo };
   }, [comparacion]);
   // CARA A CARA: su mejor serie en los ejercicios con barra que hacen los
-  // dos, con los discos que pone cada uno. Los tres más pesados.
+  // dos (los que se pueden comparar entre gimnasios). Los tres más pesados.
   const caraACara = useMemo(() => {
     const mios = mejoresPorEjercicio(myLogs), suyos = mejoresPorEjercicio(theirLogs);
     return [...mios.keys()]
@@ -13304,15 +13740,16 @@ function ManoAMano({ miFoto, miNombre, misRangos, mySex = null, suFoto, suNombre
         <section className="space-y-2" aria-label="Cara a cara">
           <div className="px-1">
             <h3 className="seccion-titulo">Cara a cara</h3>
-            <p className="text-[12.5px] text-slate-400 mt-0.5">La mejor serie de cada uno en lo que hacen los dos con barra, con los discos que pone.</p>
+            <p className="text-[12.5px] text-slate-400 mt-0.5">La mejor serie de cada uno en lo que hacen los dos con barra. La raya es su 1RM estimado.</p>
           </div>
           {caraACara.map((c) => {
             const ganaYo = c.mio.rm > c.suyo.rm, ganaEl = c.suyo.rm > c.mio.rm;
-            const fila = (quien, m, gana) => (
-              <div className={`cara-fila ${gana ? "gana" : ""}`}>
+            const maxRm = Math.max(c.mio.rm, c.suyo.rm) || 1;
+            const fila = (quien, m, gana, color) => (
+              <div className={`cara-fila ${gana ? "gana" : ""}`} style={{ "--quien": color || "#8a8c92" }}>
                 <span className="cara-quien">{quien}</span>
-                {kgToDisplay(m.kg, unit) >= barraDe(unit) ? <BarraConDiscos kg={kgToDisplay(m.kg, unit)} unidad={unit} alto={34} sobria /> : <span />}
-                <span className="cara-marca"><b className="num-display">{m.reps} × {kgToDisplay(m.kg, unit)}</b> {weightLabel(unit)}</span>
+                <span className="cara-pista" aria-hidden="true"><i style={{ width: `${Math.max(4, (m.rm / maxRm) * 100)}%` }} /></span>
+                <span className="cara-marca"><b className="num-display">{m.reps} × {conComa(kgToDisplay(m.kg, unit))}</b> {weightLabel(unit)}</span>
               </div>
             );
             // El veredicto, del color del que gana.
@@ -13322,8 +13759,8 @@ function ManoAMano({ miFoto, miNombre, misRangos, mySex = null, suFoto, suNombre
                   <p className="cara-ejercicio">{c.nombre}</p>
                   <span className="cara-veredicto">{ganaYo ? "Ganás vos" : ganaEl ? `Gana ${nombre}` : "Empatan"}</span>
                 </div>
-                {fila("Vos", c.mio, ganaYo)}
-                {fila(nombre, c.suyo, ganaEl)}
+                {fila("Vos", c.mio, ganaYo, colorYo)}
+                {fila(nombre, c.suyo, ganaEl, colorEl)}
                 {/* Si le ganás, lo podés retar a superarte esta semana. */}
                 {ganaYo && retos?.onRetar && (
                   retos.enviados.some((r) => r.toUid === retos.paraUid && r.exerciseId === c.id)
@@ -14071,7 +14508,6 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
   const lectura = valoresSel.length >= 2
     ? { inicio: valoresSel[0], actual: valoresSel[valoresSel.length - 1], min: Math.min(...valoresSel), max: Math.max(...valoresSel), unidad: selUnidad, nota: anotado }
     : null;
-  const aireRecorrido = lectura ? Math.max(0.3, (lectura.max - lectura.min) * 0.18) : 0;
   // Una tarjeta por medida (en vez de un simple chip de texto): último valor
   // y el cambio contra el registro anterior, de un vistazo, sin tener que
   // entrar a cada una para saber si subió o bajó desde la última vez.
@@ -14165,27 +14601,26 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
         <p className="medida-nota">Todavía no anotaste {selMeta.l.toLowerCase()}. Con dos registros vas a ver cuánto cambiaste.</p>
       )}
 
-      {/* EL RECORRIDO, sin grilla ni eje de números: el primer y el último
-          registro llevan su valor escrito, y los del medio se leen
-          tocándolos. Con dos registros no hace falta: lo dice la lectura. */}
+      {/* EL RECORRIDO: cada registro en su fecha, con su escala a la
+          izquierda. Se lee tocando o deslizando el dedo. Con dos registros
+          no hace falta: lo dice la lectura. */}
       {lectura && valoresSel.length >= 3 && (
-          <div className="medida-recorrido" role="img" aria-label={`Recorrido: de ${lectura.inicio} a ${lectura.actual} ${selUnidad} en ${valoresSel.length} registros`}>
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData} margin={{ top: 26, right: 24, left: 24, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="gMedidas" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--medida-linea)" stopOpacity={0.3} /><stop offset="100%" stopColor="var(--medida-linea)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="fecha" tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={44} tick={{ fill: "var(--text-faint)", fontSize: 11 }} />
-                <YAxis hide domain={[lectura.min - aireRecorrido, lectura.max + aireRecorrido]} />
-                <Tooltip content={<GloboMedida unidad={selUnidad} />} cursor={{ stroke: "var(--hairline)", strokeWidth: 1 }} />
-                <Area type="monotone" dataKey="val" stroke="var(--medida-linea)" strokeWidth={2.5} fill="url(#gMedidas)" isAnimationActive animationDuration={600} animationEasing="ease-out"
-                  dot={({ key: claveDot, ...props }) => <PuntoMedida key={claveDot ?? props.index} {...props} total={valoresSel.length} />}
-                  activeDot={{ r: 5, fill: "var(--medida-linea)", stroke: "var(--surface-1)", strokeWidth: 2 }} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
+        <div className="medida-recorrido">
+          <GraficaTiempo
+            key={selType}
+            puntos={chartData.map((d) => ({ fecha: d.date, v: d.val, d }))}
+            color="var(--medida-linea)"
+            alto={156}
+            formato={(v) => numeroAR(v)}
+            etiqueta={`Recorrido: de ${numeroAR(lectura.inicio)} a ${numeroAR(lectura.actual)} ${selUnidad} en ${valoresSel.length} registros`}
+            globo={(p) => (
+              <>
+                <p className="grafica-globo-fecha">{p.d.fechaLarga}</p>
+                <p className="grafica-globo-serie num-display">{numeroAR(p.d.val)} {selUnidad}</p>
+              </>
+            )}
+          />
+        </div>
       )}
 
       <div className="pt-1 space-y-3">
@@ -14405,7 +14840,7 @@ function ExercisePickerModal({ groups, selId, onSelect, onClose }) {
     <div className="fixed inset-0 z-[140] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
       <div className="max-w-sm w-full max-h-[75vh] flex flex-col rounded-3xl modal-pop-in border border-amber-500/25 shadow-2xl shadow-black/50" style={{ background: "var(--panel-grad-slate)" }} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-3 px-5 pt-5 pb-3 shrink-0" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-          <div className="w-9 h-9 rounded-2xl bg-amber-500/15 text-amber-400 flex items-center justify-center shrink-0"><Activity size={16} /></div>
+          <div className="icono-suelto"><Activity size={16} /></div>
           <p className="flex-1 text-sm font-black text-white">Elegí un ejercicio</p>
           <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition shrink-0"><X size={16} /></button>
         </div>
@@ -14454,7 +14889,7 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
     const byId = new Map();
     DAY_ORDER.forEach((dk) => {
       ROUTINE[dk].exercises.forEach((e) => {
-        if (!byId.has(e.id)) byId.set(e.id, { id: e.id, name: e.name, day: ROUTINE[dk].label, color: ROUTINE[dk].color, sets: e.sets.length, dayKey: dk });
+        if (!byId.has(e.id)) byId.set(e.id, { id: e.id, name: e.name, day: ROUTINE[dk].label, color: ROUTINE[dk].color, sets: e.sets.length, dayKey: dk, cardio: !!(e.cardio || EXERCISE_LIBRARY_BY_ID[e.id]?.cardio) });
       });
     });
     const list = Array.from(byId.values()).map((e) => {
@@ -14488,7 +14923,11 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
   }, [allExercises]);
 
   const [selId, setSelId] = useState(allExercises[0]?.id);
-  const [metric, setMetric] = useState("grafico");
+  // Qué dibuja la gráfica (el 1RM, el peso o el volumen; en cardio, los
+  // minutos), de qué período y si se ve la lista de sesiones.
+  const [metrica, setMetrica] = useState("e1rm");
+  const [rango, setRango] = useState("3m");
+  const [verSesiones, setVerSesiones] = useState(false);
   const [showExercisePicker, setShowExercisePicker] = useState(false);
   const selEx = allExercises.find((e) => e.id === selId);
   // La curva es SIEMPRE la mejor serie de cada sesión. El selector de serie
@@ -14496,53 +14935,39 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
   // como series tuviera, y ninguna respondía la pregunta real ("¿cómo viene
   // mi press banca?") — la serie 2 de un día podía ser de calentamiento y la
   // 3 la pesada, así que cada índice daba una curva distinta y engañosa.
+  // De cada día se suma además todo lo que hiciste (el volumen y las reps),
+  // para la métrica de volumen.
   const history = useMemo(() => {
     const nSets = selEx?.sets || 1;
     const byDate = {};
+    const totales = {};
+    // En cardio la mejor es la más larga; en el resto, la de más 1RM.
+    const puntajeLog = (h) => (h.minutes != null && !h.reps ? h.minutes : prScore(h.kg, h.reps));
     for (let i = 0; i < nSets; i++) {
       (logs[`${selId}_${i}`] || []).forEach((h) => {
         if (!h?.date) return;
+        const t = totales[h.date] || (totales[h.date] = { vol: 0, reps: 0 });
+        t.vol += vol(h.kg, h.reps);
+        t.reps += h.reps || 0;
         const prev = byDate[h.date];
-        // Mejor serie del día por 1RM estimado, el mismo criterio con el que
-        // se elige el récord.
-        if (!prev || prScore(h.kg, h.reps) > prScore(prev.kg, prev.reps)) byDate[h.date] = h;
+        if (!prev || puntajeLog(h) > puntajeLog(prev)) byDate[h.date] = h;
       });
     }
-    return Object.values(byDate).sort((a, b) => (a.date > b.date ? 1 : -1));
+    return Object.values(byDate).sort((a, b) => (a.date > b.date ? 1 : -1)).map((h) => ({ ...h, volDia: totales[h.date].vol, repsDia: totales[h.date].reps }));
   }, [logs, selId, selEx]);
-  const chartData = useMemo(() => history.map((h) => ({ date: h.date.slice(5), kg: kgToDisplay(h.kg, unit), reps: h.reps, vol: Math.round(kgToDisplay(vol(h.kg, h.reps), unit)), e1rm: Math.round(kgToDisplay(estimate1RM(h.kg, h.reps), unit) * 10) / 10, rpe: h.rpe ?? null, deload: !!h.deload })), [history, unit]);
-  // La mejor marca de TODA la curva — sirve para la línea de referencia y
-  // para agrandar el punto correspondiente en el gráfico. El 1RM sigue
-  // siendo la base de comparación (chartBestE1rm decide CUÁL sesión es la
-  // mejor), pero el rótulo que ve la persona muestra la serie real de esa
-  // sesión (reps×kg), no el número estimado.
-  const chartBestE1rm = useMemo(() => (chartData.length ? Math.max(...chartData.map((d) => d.e1rm)) : null), [chartData]);
-  const chartBestEntry = useMemo(() => chartData.find((d) => d.e1rm === chartBestE1rm) || null, [chartData, chartBestE1rm]);
-  // Punto tocado del gráfico de evolución — reemplaza el tooltip de Recharts
-  // (que se disparaba con tocar cualquier parte del gráfico, no sólo un
-  // punto real). "chartKey" queda guardado adentro del punto elegido, así
-  // invalidarlo al cambiar de ejercicio/serie es una simple comparación
-  // derivada (sin ref ni efecto aparte para "resetear" nada).
-  const chartKey = selId;
-  const [rawActivePoint, setRawActivePoint] = useState(null); // { index, cx, cy, width, chartKey }
-  const activePoint = rawActivePoint?.chartKey === chartKey ? rawActivePoint : null;
-  const chartContainerRef = useRef(null);
-  const handleSelectPoint = (index, cx, cy) => {
-    const width = chartContainerRef.current?.clientWidth || 300;
-    setRawActivePoint((prev) => (prev?.chartKey === chartKey && prev.index === index ? null : { index, cx, cy, width, chartKey }));
-  };
-  // BUG FIX ("las palabras se cortan cerca del borde"): el tooltip se
-  // centraba siempre con un margen fijo de 64px contra cada borde, pero su
-  // ancho real (con RPE, fecha larga, etc.) podía superar esos 128px
-  // totales, así que en los puntos más pegados al borde el texto quedaba
-  // recortado por el "overflow: hidden" de la tarjeta. Ahora se mide el
-  // ancho real del tooltip ya renderizado (tooltipRef) y el margen contra
-  // cada borde se calcula a partir de ESE ancho, no de un número inventado.
-  const tooltipRef = useRef(null);
-  const [tooltipWidth, setTooltipWidth] = useState(140);
-  useLayoutEffect(() => {
-    if (activePoint && tooltipRef.current) setTooltipWidth(tooltipRef.current.offsetWidth);
-  }, [activePoint]);
+  const chartData = useMemo(() => history.map((h) => ({
+    fecha: h.date,
+    fechaCorta: `${Number(h.date.slice(8, 10))}/${Number(h.date.slice(5, 7))}`,
+    kg: kgToDisplay(h.kg, unit),
+    reps: h.reps,
+    volDia: Math.round(kgToDisplay(h.volDia, unit)),
+    repsDia: h.repsDia,
+    minutos: h.minutes ?? null,
+    km: h.km ?? null,
+    e1rm: Math.round(kgToDisplay(estimate1RM(h.kg, h.reps), unit) * 10) / 10,
+    rpe: h.rpe ?? null,
+    deload: !!h.deload,
+  })), [history, unit]);
 
   const [confirmResetProgress, setConfirmResetProgress] = useState(false);
   const [activeSection, setActiveSection] = useState("rank");
@@ -14551,10 +14976,10 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
     <div className="space-y-4">
       {/* Ciclo actual */}
       {cycleStart ? (
-        <WeekCalendar cycleStart={cycleStart} logs={logs} sessions={sessions} settings={settings} onGoToDeload={onGoToDeload} />
+        <WeekCalendar cycleStart={cycleStart} logs={logs} sessions={sessions} settings={settings} onGoToDeload={onGoToDeload} metaSemanal={weekSchedule ? Object.values(weekSchedule).filter(Boolean).length || null : null} />
       ) : (
         <button onClick={onGoToProfile} className="w-full flex items-center gap-3 bg-amber-500/10 border border-amber-500/25 rounded-2xl px-4 py-3.5 text-left hover:bg-amber-500/15 transition">
-          <div className="w-9 h-9 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center shrink-0"><AlertTriangle size={16} /></div>
+          <div className="icono-suelto aviso"><AlertTriangle size={16} /></div>
           <div className="flex-1 min-w-0"><p className="text-sm font-bold text-white">No registraste el inicio de tu ciclo</p><p className="text-[11px] text-amber-300/80">Sin esa fecha no podemos calcular en qué semana estás ni cuándo te toca la descarga. Tocá para configurarla</p></div>
           <ChevronRight size={16} className="text-amber-400 shrink-0" />
         </button>
@@ -14566,7 +14991,7 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
           botón prenda/apague su propio fondo de golpe. */}
       <div className="pestanas-internas" role="tablist" aria-label="Secciones de Progreso">
         {PROGRESS_SECTIONS.map((s) => (
-          <button key={s.k} role="tab" aria-selected={activeSection === s.k} onClick={() => setActiveSection(s.k)} className="pestana-interna" style={{ "--c": s.color }}>
+          <button key={s.k} role="tab" aria-selected={activeSection === s.k} onClick={() => setActiveSection(s.k)} className="pestana-interna">
             {s.icon}<span>{s.l}</span>
           </button>
         ))}
@@ -14581,27 +15006,63 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
       <div key={activeSection} className="tab-fade-in space-y-3">
         {activeSection === "chart" && (() => {
           const colorEj = selEx?.color || EVOLUTION_CHART_COLOR;
-          // LA ESCALERA DE RÉCORDS. La curva de antes subía y bajaba con cada
-          // sesión y había que leerla a ojo; acá la línea es tu récord, que
-          // sólo sube: cada escalón es una vez que lo superaste. Los puntos
-          // de abajo son las sesiones; las que fueron récord van en galleta.
+          // Qué es "mejor" en este ejercicio: el 1RM estimado; si es sin peso
+          // (dominadas, fondos), las repeticiones; en cardio, los minutos.
+          const esCardio = !!selEx?.cardio;
+          const sinPeso = !esCardio && chartData.length > 0 && chartData.every((d) => !d.kg);
+          const puntaje = (d) => (esCardio ? d.minutos || 0 : sinPeso ? d.reps || 0 : d.e1rm);
+          // LA ESCALERA DE RÉCORDS: cada sesión que superó a todas las de
+          // antes (las de descarga no cuentan) es un escalón, en dorado.
           let maximo = -Infinity;
           const escalera = chartData.map((d) => {
-            const esRecord = !d.deload && d.e1rm > maximo;
-            if (!d.deload) maximo = Math.max(maximo, d.e1rm);
-            return { ...d, record: maximo === -Infinity ? d.e1rm : maximo, esRecord, fecha: `${d.date.slice(3)}/${d.date.slice(0, 2)}` };
+            const p = puntaje(d);
+            const esRecord = !d.deload && p > maximo;
+            if (!d.deload) maximo = Math.max(maximo, p);
+            return { ...d, esRecord };
           });
-          const valores = escalera.flatMap((d) => [d.e1rm, d.record]);
-          const minY = valores.length ? Math.floor(Math.min(...valores) * 0.96) : 0;
-          const maxY = valores.length ? Math.ceil(Math.max(...valores) * 1.03) : 1;
+          const n = escalera.length;
           const records = escalera.filter((d) => d.esRecord).length;
-          const ultimoRecord = escalera.reduce((u, d, i) => (d.esRecord ? i : u), -1);
-          const mejorE1rm = escalera.reduce((m, d) => (d.deload ? m : Math.max(m, d.e1rm)), 0);
-          const primero = chartData[0], ultimo = chartData[chartData.length - 1];
-          const subida = primero && ultimo && primero.e1rm ? Math.round(((ultimo.e1rm - primero.e1rm) / primero.e1rm) * 1000) / 10 : 0;
-          const iMejor = chartData.reduce((best, d, i) => (d.e1rm >= chartData[best].e1rm ? i : best), 0);
-          const sesionesDesde = chartData.length - 1 - iMejor;
-          const diasDesde = chartData.length ? daysSince(history[iMejor]?.date) : null;
+          const iMejor = escalera.reduce((b, d, i) => (!d.deload && puntaje(d) >= puntaje(escalera[b]) ? i : b), 0);
+          const mejor = escalera[iMejor];
+          const sesionesDesde = n - 1 - iMejor;
+          const diasDesde = n ? daysSince(mejor.fecha) : null;
+          // LAS MÉTRICAS, como pestañas: cada una con su último valor y
+          // cuánto cambió en el período. La elegida es la que se dibuja.
+          const metricas = esCardio
+            ? [{ k: "min", l: "Minutos", v: (d) => d.minutos || 0, u: "min" }, ...(escalera.some((d) => d.km) ? [{ k: "km", l: "Distancia", v: (d) => d.km || 0, u: "km" }] : [])]
+            : sinPeso
+              ? [{ k: "reps", l: "Mejor serie", v: (d) => d.reps || 0, u: "reps" }, { k: "repsDia", l: "Reps totales", v: (d) => d.repsDia || 0, u: "reps" }]
+              : [{ k: "e1rm", l: "1RM", v: (d) => d.e1rm, u: uLabel }, { k: "kg", l: "Peso", v: (d) => d.kg, u: uLabel }, { k: "vol", l: "Volumen", v: (d) => d.volDia, u: uLabel }];
+          const met = metricas.find((x) => x.k === metrica) || metricas[0];
+          const esPuntaje = met === metricas[0];
+          // EL PERÍODO: sólo las opciones que recortan algo, y "Todo".
+          const ultimaMs = n ? fechaMs(escalera[n - 1].fecha) : 0;
+          const spanDias = n > 1 ? (ultimaMs - fechaMs(escalera[0].fecha)) / DIA_MS : 0;
+          const RANGOS = [{ k: "4s", l: "4 semanas", dias: 28 }, { k: "3m", l: "3 meses", dias: 91 }, { k: "1a", l: "1 año", dias: 365 }].filter((r) => spanDias > r.dias + 6);
+          const rangoSel = RANGOS.find((r) => r.k === rango) || null;
+          const visibles = rangoSel ? escalera.filter((d) => fechaMs(d.fecha) >= ultimaMs - rangoSel.dias * DIA_MS) : escalera;
+          const primeroV = visibles[0], ultimoV = visibles[visibles.length - 1];
+          const cambio = (m) => {
+            if (visibles.length < 2) return null;
+            const a = m.v(primeroV), b = m.v(ultimoV);
+            return a ? Math.round(((b - a) / a) * 1000) / 10 : null;
+          };
+          // EL RITMO: la pendiente de la recta que mejor pasa por las
+          // sesiones del período, por semana. Con menos de tres sesiones o de
+          // dos semanas no dice nada, y no se muestra.
+          const ritmo = (() => {
+            if (visibles.length < 3) return null;
+            const xs = visibles.map((d) => fechaMs(d.fecha) / (7 * DIA_MS));
+            const ys = visibles.map((d) => met.v(d));
+            if (xs[xs.length - 1] - xs[0] < 2) return null;
+            const mx = xs.reduce((a, b) => a + b, 0) / xs.length, my = ys.reduce((a, b) => a + b, 0) / ys.length;
+            let num = 0, den = 0;
+            xs.forEach((x, i) => { num += (x - mx) * (ys[i] - my); den += (x - mx) ** 2; });
+            if (!den) return null;
+            const pendiente = num / den;
+            return { pendiente, estable: Math.abs(pendiente) < Math.max(0.05, Math.abs(my) * 0.004) };
+          })();
+          const decimales = met.k === "vol" || met.k === "repsDia" ? 0 : 1;
           return (
             <section className="tarjeta-tonal p-4 space-y-4" style={{ "--c": colorEj }} aria-label="Evolución por ejercicio">
               {/* El ejercicio elegido, con el color de su día. Abre la lista
@@ -14618,12 +15079,12 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
                 <ExercisePickerModal
                   groups={exercisesByDay}
                   selId={selId}
-                  onSelect={(id) => { setSelId(id); setShowExercisePicker(false); }}
+                  onSelect={(id) => { setSelId(id); setVerSesiones(false); setShowExercisePicker(false); }}
                   onClose={() => setShowExercisePicker(false)}
                 />
               )}
 
-              {chartData.length === 0 ? (
+              {n === 0 ? (
                 <div className="text-center text-slate-500 py-8">
                   <span className="galleta icono-galleta mx-auto mb-3" aria-hidden="true"><Activity size={17} /></span>
                   <p className="text-[14px] font-semibold text-slate-300">Todavía no hay series de este ejercicio</p>
@@ -14631,94 +15092,96 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
                 </div>
               ) : (
                 <>
-                  {/* El número que importa, grande: tu mejor serie. Al lado,
-                      en fichas, lo que antes eran tres cajas y dos carteles. */}
+                  {/* El número que importa, grande: tu mejor serie. */}
                   <div className="records-hero">
                     <div className="min-w-0">
                       <p className="records-rotulo">Tu récord</p>
-                      {chartBestEntry && <p className="records-valor num-display">{chartBestEntry.reps}<i>×</i>{chartBestEntry.kg}<small>{uLabel}</small></p>}
-                      <p className="records-sub">≈ {Math.round(chartData[iMejor].e1rm)} {uLabel} de 1RM estimado</p>
+                      <p className="records-valor num-display">
+                        {esCardio ? <>{mejor.minutos}<small>min</small></> : sinPeso ? <>{mejor.reps}<small>reps</small></> : <>{mejor.reps}<i>×</i>{numeroAR(mejor.kg)}<small>{uLabel}</small></>}
+                      </p>
+                      <p className="records-sub">{esCardio ? (mejor.km ? `${numeroAR(mejor.km)} km` : "Tu sesión más larga") : sinPeso ? "Con tu peso" : `≈ ${numeroAR(Math.round(mejor.e1rm))} ${uLabel} de 1RM estimado`}</p>
                     </div>
                     <div className="records-chips">
-                      {chartData.length >= 2 && (
-                        <span className={`chip-dato ${subida >= 0 ? "sube" : "baja"}`}>
-                          {subida >= 0 ? <TrendingUp size={13} /> : <TrendingDown size={13} />}{subida >= 0 ? "+" : ""}{subida}%
-                        </span>
-                      )}
                       <span className="chip-dato records"><Trophy size={13} />{records} {records === 1 ? "récord" : "récords"}</span>
                     </div>
                   </div>
 
-                  <div className="segmentado" role="tablist" aria-label="Cómo ver tu evolución">
-                    {[{ k: "grafico", l: "Gráfico" }, { k: "1rm", l: "Sesiones" }].map((opt) => (
-                      <button key={opt.k} role="tab" aria-selected={metric === opt.k} onClick={() => setMetric(opt.k)} className={metric === opt.k ? "activo" : ""}>{opt.l}</button>
-                    ))}
+                  <div className="evo-metricas" role="tablist" aria-label="Qué ver en la gráfica" style={{ "--n": metricas.length }}>
+                    {metricas.map((m) => {
+                      const c = cambio(m);
+                      return (
+                        <button key={m.k} role="tab" aria-selected={m === met} onClick={() => setMetrica(m.k)} className="evo-metrica">
+                          <span className="evo-metrica-nombre">{m.l}</span>
+                          <span className="evo-metrica-valor"><b className="num-display">{numeroAR(m.v(ultimoV), m.k === "vol" || m.k === "repsDia" ? 0 : 1)}</b><small>{m.u}</small></span>
+                          <span className={`evo-metrica-cambio ${c > 0 ? "sube" : ""}`}>{c == null ? "una sesión" : <>{conSigno(c)} %<small>desde el {primeroV.fechaCorta}</small></>}</span>
+                        </button>
+                      );
+                    })}
                   </div>
 
-                  {metric === "1rm" ? (
-                    <div className="space-y-1.5">
-                      {/* Cada sesión, la más reciente arriba: la serie que
-                          hiciste y su 1RM estimado. Las que fueron récord,
-                          con la galleta. */}
-                      {escalera.slice().reverse().map((h, i) => (
-                        <div key={i} className={`sesion-renglon ${h.esRecord ? "record" : ""} ${h.deload ? "descarga" : ""}`}>
-                          <span className={`galleta sesion-renglon-marca ${h.esRecord ? "" : "hueca"}`} aria-hidden="true">{h.esRecord ? <Trophy size={12} /> : h.deload ? <Zap size={11} /> : null}</span>
-                          <span className="sesion-renglon-fecha">{h.fecha}</span>
-                          <span className="sesion-renglon-serie">{h.reps}×{h.kg}{uLabel}</span>
-                          <b className="sesion-renglon-1rm num-display">{Math.round(h.e1rm)}<small>{uLabel}</small></b>
+                  <GraficaTiempo
+                    key={`${selId}-${met.k}-${rangoSel?.k || "todo"}`}
+                    puntos={visibles.map((d) => ({ fecha: d.fecha, v: met.v(d), record: esPuntaje && d.esRecord, descarga: d.deload, d }))}
+                    color={colorEj}
+                    alto={204}
+                    formato={(v) => numeroAR(v, decimales)}
+                    referencia={esPuntaje && n > 1 ? { v: puntaje(mejor), etiqueta: `récord ${numeroAR(Math.round(puntaje(mejor) * 10) / 10)}` } : null}
+                    etiqueta={`${met.l} de ${selEx?.name || "este ejercicio"}: de ${numeroAR(met.v(primeroV), decimales)} a ${numeroAR(met.v(ultimoV), decimales)} ${met.u} en ${visibles.length} ${visibles.length === 1 ? "sesión" : "sesiones"}`}
+                    globo={(p) => (
+                      <>
+                        <p className="grafica-globo-fecha">{p.d.fechaCorta}{p.d.deload ? " · descarga" : ""}{p.d.esRecord ? " · récord" : ""}</p>
+                        <p className="grafica-globo-serie num-display">{esCardio ? `${p.d.minutos} min${p.d.km ? ` · ${numeroAR(p.d.km)} km` : ""}` : sinPeso ? `${p.d.reps} reps` : `${p.d.reps} × ${numeroAR(p.d.kg)} ${uLabel}`}</p>
+                        <p className="grafica-globo-dato">{met.l}: {numeroAR(p.v, decimales)} {met.u}{p.d.rpe != null ? ` · ${formatEffort(p.d.rpe, settings.rpeDisplayMode)}` : ""}</p>
+                      </>
+                    )}
+                  />
+
+                  {(RANGOS.length > 0 || ritmo) && (
+                    <div className="evo-pie">
+                      {ritmo ? (
+                        <p className="evo-ritmo">{ritmo.estable ? <>Ritmo: <b>estable</b></> : <>Ritmo: <b>{conSigno(ritmo.pendiente, decimales)} {met.u}</b> por semana</>}</p>
+                      ) : <span />}
+                      {RANGOS.length > 0 && (
+                        <div className="segmentado chico" role="tablist" aria-label="Período">
+                          {[...RANGOS, { k: "todo", l: "Todo" }].map((r) => {
+                            const elegido = (rangoSel?.k || "todo") === r.k;
+                            return <button key={r.k} role="tab" aria-selected={elegido} onClick={() => setRango(r.k)} className={elegido ? "activo" : ""}>{r.l}</button>;
+                          })}
                         </div>
-                      ))}
-                      <p className="text-[11.5px] text-slate-500 pt-1">El 1RM es una estimación (fórmula de Epley) que junta reps y kilos. Sirve para comparar, no es un máximo real.</p>
-                    </div>
-                  ) : (
-                    <div className="relative h-60" ref={chartContainerRef}>
-                      {/* LA EVOLUCIÓN: tu 1RM estimado sesión por sesión, en una
-                          curva suave del color del ejercicio. Los récords, en
-                          dorado; la línea punteada es tu récord de hoy. Sin
-                          ejes de números: los valores van escritos donde
-                          importan, y el resto se lee tocando un punto. */}
-                      <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={escalera} margin={{ top: 28, right: 18, left: 18, bottom: 0 }}>
-                          <defs>
-                            <linearGradient id="gEvolucion" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor={colorEj} stopOpacity={0.34} /><stop offset="100%" stopColor={colorEj} stopOpacity={0} />
-                            </linearGradient>
-                          </defs>
-                          <CartesianGrid vertical={false} stroke="var(--chart-grid)" />
-                          <XAxis dataKey="fecha" tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={44} tick={{ fill: "var(--text-faint)", fontSize: 11 }} />
-                          <YAxis hide domain={[minY, maxY]} />
-                          <ReferenceLine y={mejorE1rm} stroke="var(--record)" strokeDasharray="3 5" strokeOpacity={0.75} ifOverflow="extendDomain"
-                            label={{ value: `récord ${Math.round(mejorE1rm)}`, position: "insideTopLeft", fill: "var(--record)", fontSize: 11, fontWeight: 650 }} />
-                          <Area type="monotone" dataKey="e1rm" stroke={colorEj} strokeWidth={2.5} fill="url(#gEvolucion)" isAnimationActive animationDuration={700} animationEasing="ease-out" activeDot={false}
-                            dot={({ key: claveDot, ...props }) => <PuntoEvolucion key={claveDot ?? props.index} {...props} total={escalera.length} color={colorEj} isActive={activePoint?.index === props.index} etiquetar={props.payload?.esRecord && (records <= 4 || props.index === ultimoRecord)} onSelect={handleSelectPoint} />} />
-                        </AreaChart>
-                      </ResponsiveContainer>
-                      {activePoint && chartData[activePoint.index] && (() => {
-                        const d = chartData[activePoint.index];
-                        const half = tooltipWidth / 2 + 4;
-                        const clampedLeft = Math.min(activePoint.width - half, Math.max(half, activePoint.cx));
-                        return (
-                          <div ref={tooltipRef} className="grafica-globo" style={{ left: clampedLeft, top: Math.max(0, activePoint.cy - 12) }}>
-                            <p className="grafica-globo-fecha">{escalera[activePoint.index]?.fecha}{d.deload ? " · descarga" : ""}{escalera[activePoint.index]?.esRecord ? " · récord" : ""}</p>
-                            <p className="grafica-globo-serie num-display">{d.reps} × {d.kg} {uLabel}</p>
-                            <p className="grafica-globo-dato">{Math.round(d.e1rm)} {uLabel} de 1RM est.{d.rpe != null ? ` · ${formatEffort(d.rpe, settings.rpeDisplayMode)}` : ""}</p>
-                          </div>
-                        );
-                      })()}
+                      )}
                     </div>
                   )}
 
                   {/* Hace cuánto que no subís un escalón. Con tres sesiones o
                       más sin superarlo se pone ámbar: conviene cambiar algo. */}
-                  {chartData.length >= 2 && (
+                  {n >= 2 && (
                     sesionesDesde === 0 ? (
-                      <p className="records-pie fuego"><Flame size={15} className="shrink-0" /> Tu última sesión fue récord.</p>
+                      <p className="records-pie fuego"><Flame size={15} className="shrink-0" /> {escalera[n - 1].esRecord ? "Tu última sesión fue récord." : "Tu última sesión igualó tu récord."}</p>
                     ) : (
                       <p className={`records-pie ${sesionesDesde >= 3 ? "alerta" : ""}`}>
                         {sesionesDesde >= 3 ? <AlertTriangle size={15} className="shrink-0" /> : <Clock size={15} className="shrink-0" />}
                         <span>Último récord {diasDesde != null ? haceCuanto(diasDesde) : `${sesionesDesde} sesiones atrás`}: {sesionesDesde} {sesionesDesde === 1 ? "sesión" : "sesiones"} sin superarlo.</span>
                       </p>
                     )
+                  )}
+
+                  {/* Cada sesión, la más reciente arriba: la serie que hiciste y
+                      su 1RM estimado. Las que fueron récord, con la galleta. */}
+                  <button onClick={() => setVerSesiones((v) => !v)} className="enlace-suave mx-auto" aria-expanded={verSesiones}>
+                    {verSesiones ? <>Ocultar las sesiones <ChevronUp size={13} /></> : <>Ver {n === 1 ? "la sesión" : `las ${n} sesiones`} <ChevronDown size={13} /></>}
+                  </button>
+                  {verSesiones && (
+                    <div className="space-y-1.5">
+                      {escalera.slice().reverse().map((h) => (
+                        <div key={h.fecha} className={`sesion-renglon ${h.esRecord ? "record" : ""} ${h.deload ? "descarga" : ""}`}>
+                          <span className={`galleta sesion-renglon-marca ${h.esRecord ? "" : "hueca"}`} aria-hidden="true">{h.esRecord ? <Trophy size={12} /> : h.deload ? <Zap size={11} /> : null}</span>
+                          <span className="sesion-renglon-fecha">{h.fechaCorta}</span>
+                          <span className="sesion-renglon-serie">{esCardio ? `${h.minutos} min` : sinPeso ? `${h.reps} reps` : `${h.reps}×${numeroAR(h.kg)}${uLabel}`}</span>
+                          <b className="sesion-renglon-1rm num-display">{esCardio ? (h.km ? <>{numeroAR(h.km)}<small>km</small></> : null) : sinPeso ? <>{h.repsDia}<small>reps</small></> : <>{numeroAR(Math.round(h.e1rm))}<small>{uLabel}</small></>}</b>
+                        </div>
+                      ))}
+                      {!esCardio && !sinPeso && <p className="text-[11.5px] text-slate-500 pt-1">El 1RM es una estimación (fórmula de Epley) que junta reps y kilos. Sirve para comparar, no es un máximo real.</p>}
+                    </div>
                   )}
                 </>
               )}
@@ -14827,7 +15290,7 @@ function buildExportRows(filteredSessions, exerciseNotes = {}) {
     s.items.forEach((it) => {
       rows.push({
         date: s.date, dayLabel, durationMin: s.durationMin, completionPct: s.completionPct,
-        exercise: it.exerciseName, muscle: it.exerciseMuscle || null, set: it.setIndex + 1,
+        exerciseId: it.exerciseId, exercise: it.exerciseName, muscle: it.exerciseMuscle || null, set: it.setIndex + 1,
         reps: it.reps, kg: it.kg, minutes: it.minutes, km: it.km, rpe: it.rpe,
         isImprovement: it.isImprovement, note: resolveExportNote(exerciseNotes, it.exerciseId, it.setIndex),
       });
@@ -14906,6 +15369,11 @@ function resumirSesiones(filtered, tramos = null) {
   // con el botón (las que tienen duración guardada).
   const minutos = porFecha.reduce((acc, g) => acc + (g.durationMin || 0), 0);
 
+  // Las series de cada región del cuerpo (la telaraña) y el volumen de cada
+  // día (el mapa de calor del mes y del año).
+  const porRegion = Object.fromEntries(REGIONES.map((r) => [r, 0]));
+  rows.forEach((r) => { const reg = regionDe(r.exerciseId); if (reg) porRegion[reg]++; });
+
   return {
     dias: porFecha.length,
     series: rows.length,
@@ -14920,7 +15388,26 @@ function resumirSesiones(filtered, tramos = null) {
     minutos,
     promedioSeries: Math.round(rows.length / porFecha.length),
     tramos: tramos ? tramos(porFecha) : null,
+    regiones: REGIONES.map((nombre) => ({ nombre, series: porRegion[nombre] })),
+    diasVolumen: porFecha.map((g) => ({ date: g.date, volumen: Math.round(g.rows.reduce((acc, r) => acc + vol(r.kg, r.reps), 0)) })),
   };
+}
+
+// Lo del período anterior, para comparar: cuánto cambió el volumen y los
+// números y la telaraña de antes. Sin período anterior con datos, nada.
+function sumarAnterior(data, anterior) {
+  if (!anterior) return;
+  if (anterior.volumen > 0) data.vsAnterior = Math.round(((data.volumen - anterior.volumen) / anterior.volumen) * 100);
+  data.diasAnterior = anterior.dias;
+  data.anterior = { dias: anterior.dias, series: anterior.series, volumen: anterior.volumen, minutos: anterior.minutos, regiones: anterior.regiones };
+}
+const volumenDeSesiones = (sesiones) => Math.round(sesiones.reduce((t, s) => t + (s.totalVolume || 0), 0));
+// El lunes (a las 0) de la semana de una fecha.
+function lunesDe(fecha) {
+  const d = new Date(fecha);
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+  return d;
 }
 // Distribución del volumen a lo largo del período, ya lista para dibujar.
 // Cada tramo es { etiqueta, valor } y los tramos sin entrenar quedan en 0
@@ -14954,7 +15441,24 @@ function tramosDeAnio(porFecha) {
 }
 
 function computeWeekRecap(logs, trainingSessions) {
-  return resumirSesiones(getSessionsForPeriod(buildSessionsIndex(logs, trainingSessions), "week"), tramosDeSemana);
+  const idx = buildSessionsIndex(logs, trainingSessions);
+  const data = resumirSesiones(getSessionsForPeriod(idx, "week"), tramosDeSemana);
+  if (!data) return null;
+  // Las sesiones de la semana que arranca en `lunes`.
+  const deLaSemana = (lunes) => {
+    const fin = new Date(lunes); fin.setDate(fin.getDate() + 6);
+    const desde = localDateStr(lunes), hasta = localDateStr(fin);
+    return idx.filter((s) => s.date >= desde && s.date <= hasta);
+  };
+  const esta = lunesDe(new Date());
+  const previa = new Date(esta); previa.setDate(previa.getDate() - 7);
+  sumarAnterior(data, resumirSesiones(deLaSemana(previa)));
+  // Esta semana y las siete de antes, para ver si venís subiendo.
+  data.historia = Array.from({ length: 8 }, (_, k) => {
+    const lunes = new Date(esta); lunes.setDate(lunes.getDate() - 7 * (7 - k));
+    return { etiqueta: `${lunes.getDate()}/${lunes.getMonth() + 1}`, volumen: volumenDeSesiones(deLaSemana(lunes)), actual: k === 7 };
+  });
+  return data;
 }
 
 // Resumen del MES o del AÑO que acaba de cerrar. `prefijo` es "2026-08" o
@@ -14971,10 +15475,16 @@ function computePrefixRecap(logs, trainingSessions, prefijo) {
   const previo = esAnio
     ? String(Number(prefijo) - 1)
     : (() => { const [a, m] = prefijo.split("-").map(Number); const d = new Date(a, m - 2, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`; })();
-  const anterior = resumirSesiones(getSessionsForPrefix(idx, previo));
-  if (anterior && anterior.volumen > 0) {
-    data.vsAnterior = Math.round(((data.volumen - anterior.volumen) / anterior.volumen) * 100);
-    data.diasAnterior = anterior.dias;
+  sumarAnterior(data, resumirSesiones(getSessionsForPrefix(idx, previo)));
+  data.prefijo = prefijo;
+  // Del mes: éste y los cinco de antes.
+  if (!esAnio) {
+    const [an, me] = prefijo.split("-").map(Number);
+    data.historia = Array.from({ length: 6 }, (_, k) => {
+      const d = new Date(an, me - 1 - (5 - k), 1);
+      const p = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      return { etiqueta: MESES_CORTOS[d.getMonth()], volumen: volumenDeSesiones(getSessionsForPrefix(idx, p)), actual: k === 5 };
+    });
   }
   return data;
 }
@@ -15357,9 +15867,9 @@ function SocialPreviewCard({ profile, uid, onGoToSocial, onUpdateProfile }) {
 
   if (!profile?.googleUid) {
     return (
-      <div className="rounded-2xl border border-slate-800/50 bg-slate-900/50 px-4 py-3.5 flex items-center gap-3 backdrop-blur-sm shadow-md shadow-black/20">
-        <div className="w-9 h-9 rounded-xl bg-slate-800 flex items-center justify-center shrink-0 text-slate-600"><Users size={16} /></div>
-        <p className="text-xs text-slate-500 leading-snug flex-1">Vinculá tu cuenta de Google (más abajo) para agregar amigos y usar el modo entrenador.</p>
+      <div className="aviso-vincular">
+        <Users size={18} className="shrink-0" aria-hidden="true" />
+        <p>Vinculá tu cuenta de Google (más abajo) para agregar amigos y usar el modo entrenador.</p>
       </div>
     );
   }
@@ -15381,7 +15891,7 @@ function SocialPreviewCard({ profile, uid, onGoToSocial, onUpdateProfile }) {
     <div className="rounded-2xl border border-slate-800/50 bg-slate-900/50 backdrop-blur-sm shadow-md shadow-black/20 overflow-hidden">
       <div className="flex items-center gap-3 px-4 py-3.5">
         <button onClick={onGoToSocial} className="flex-1 flex items-center gap-3 min-w-0 text-left active:opacity-80 transition">
-          <div className="w-10 h-10 rounded-xl bg-purple-500/15 border border-purple-500/25 flex items-center justify-center shrink-0 text-purple-400"><Users size={17} /></div>
+          <div className="icono-suelto"><Users size={17} /></div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-bold text-white flex items-center gap-1"><AtSign size={11} className="text-purple-400" />{profile.username}</p>
             <p className="text-[11px] text-slate-500">{friendCount} {friendCount === 1 ? "amigo" : "amigos"} · Entrenador / alumnos</p>
@@ -15946,13 +16456,13 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
 
       <div className="flex items-center gap-1.5 px-1 pt-1"><Dumbbell size={11} className="text-slate-600" /><p className="text-[10px] font-black uppercase tracking-widest text-slate-600">Entrenamiento</p></div>
       <button onClick={onGoToRoutines} className="w-full flex items-center gap-3 bg-slate-900/50 border border-slate-800/50 rounded-2xl px-4 py-3.5 hover:border-teal-500/30 transition text-left">
-        <div className="w-9 h-9 rounded-xl bg-teal-500/15 text-teal-400 flex items-center justify-center shrink-0"><Layers size={16} /></div>
+        <div className="icono-suelto"><Layers size={16} /></div>
         <div className="flex-1 min-w-0"><p className="text-sm font-bold text-white">Tu rutina: {activeRoutineDef?.name || "—"}</p><p className="text-[11px] text-slate-500">{savedRoutineCount} guardada{savedRoutineCount === 1 ? "" : "s"} · tocá para cambiar, editar o crear otra</p></div>
         <ChevronRight size={16} className="text-slate-600 shrink-0" />
       </button>
       {weekInfo && (
         <div className="w-full flex items-center gap-3 bg-slate-900/50 border border-slate-800/50 rounded-2xl px-4 py-3.5">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: weekInfo.isDeload ? "#A855F715" : "#3B82F615", color: weekInfo.isDeload ? "#C084FC" : "#60A5FA" }}>{weekInfo.isDeload ? <Zap size={16} /> : <Flame size={16} />}</div>
+          <div className="icono-suelto">{weekInfo.isDeload ? <Zap size={16} /> : <Flame size={16} />}</div>
           <div className="flex-1 min-w-0"><p className="text-sm font-bold text-white">Ciclo #{weekInfo.cycleNumber} · Semana {weekInfo.weekInCycle}/{weekInfo.cycleWeeks}</p><p className="text-[11px] text-slate-500">{weekInfo.isDeload ? "Semana de descarga" : "Semana de entrenamiento"}</p></div>
         </div>
       )}
@@ -16010,7 +16520,7 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
           )}
           {/* Mismo tamaño y criterio que su gemelo en Rutina: color plano y
               fijo, y contenido, porque es una acción secundaria. */}
-          <button onClick={() => setShowSelfProgression(true)} disabled={!activeRoutineDef} className={`w-full flex items-center gap-2 justify-center py-2.5 rounded-xl text-white text-xs font-bold transition-all active:scale-[0.98] disabled:opacity-40 ${!hasAnyPlan ? "invite-pulse" : ""}`} style={{ backgroundColor: "#38BDF8", "--invite-glow": "rgba(56,189,248,0.6)" }}>
+          <button onClick={() => setShowSelfProgression(true)} disabled={!activeRoutineDef} className={`boton-tonal w-full disabled:opacity-40 ${!hasAnyPlan ? "invite-pulse" : ""}`}>
             <Sliders size={13} /> {hasAnyPlan ? "Planificar mi progresión" : "Planificar mi primera meta"}
           </button>
           {!activeRoutineDef && <p className="text-[10.5px] text-slate-600 text-center -mt-1">Activá una rutina primero, en la pestaña Rutinas.</p>}
@@ -16532,7 +17042,7 @@ function ScanQrCamera({ onResult, onClose }) {
     <div className="fixed inset-0 z-[150] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
       <div className="relative w-full max-w-sm rounded-3xl overflow-hidden modal-pop-in bg-slate-900 border border-cyan-500/30" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-2.5 px-5 py-4 border-b border-slate-800/60">
-          <span className="w-9 h-9 rounded-xl bg-cyan-500/18 text-cyan-300 flex items-center justify-center shrink-0 border border-cyan-500/30"><QrCode size={16} /></span>
+          <span className="icono-suelto"><QrCode size={16} /></span>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-black text-white leading-tight">Escanear código</p>
             <p className="text-[10.5px] text-slate-500">Apuntá al QR del perfil de tu amigo</p>
@@ -16542,7 +17052,7 @@ function ScanQrCamera({ onResult, onClose }) {
 
         {estado === "error" ? (
           <div className="p-6 text-center space-y-3">
-            <span className="w-12 h-12 rounded-2xl bg-amber-500/15 text-amber-400 flex items-center justify-center mx-auto"><AlertTriangle size={22} /></span>
+            <span className="icono-suelto aviso grande mx-auto"><AlertTriangle size={22} /></span>
             <p className="text-[12.5px] text-slate-300 leading-snug">{detalle}</p>
             <button onClick={onClose} className="w-full py-2.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-bold">Cerrar</button>
           </div>
@@ -16878,7 +17388,7 @@ function TrainerTemplatesCard({ templates, onCreate, onEdit, onSend }) {
   return (
     <div className="rounded-2xl border border-slate-800/50 bg-slate-900/60 p-4">
       <div className="flex items-center gap-2.5 mb-3">
-        <div className="w-9 h-9 rounded-xl bg-purple-500/15 border border-purple-500/25 flex items-center justify-center shrink-0 text-purple-400"><ClipboardCheck size={16} /></div>
+        <div className="icono-suelto"><ClipboardCheck size={16} /></div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold text-white">Plantillas para tus alumnos</p>
           <p className="text-[11px] text-slate-500">Armá una rutina una vez, mandala cuando quieras</p>
@@ -16914,7 +17424,7 @@ function TrainerTemplatesCard({ templates, onCreate, onEdit, onSend }) {
 function TrainerEmpty({ icon, titulo, detalle }) {
   return (
     <div className="flex items-center gap-3 rounded-2xl px-3.5 py-3" style={{ backgroundColor: "var(--row-surface)", border: "1px dashed var(--chip-border)" }}>
-      <span className="w-9 h-9 rounded-xl bg-slate-800/60 text-slate-600 flex items-center justify-center shrink-0">{icon}</span>
+      <span className="icono-suelto">{icon}</span>
       <div className="min-w-0">
         <p className="text-[12px] font-bold text-slate-400 leading-tight">{titulo}</p>
         <p className="text-[10.5px] text-slate-600 leading-snug mt-0.5">{detalle}</p>
@@ -17088,7 +17598,7 @@ function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted
       {/* VINCULAR, al final y plegado (ver `vinculando` arriba). */}
       <div className="rounded-2xl overflow-hidden" style={{ backgroundColor: "var(--panel-sunken)", border: "1px solid var(--chip-border)" }}>
         <button onClick={() => setVinculando((v) => !v)} className="w-full flex items-center gap-2.5 px-3.5 py-3 text-left">
-          <span className="w-8 h-8 rounded-xl bg-blue-500/15 text-blue-300 flex items-center justify-center shrink-0"><UserPlus size={15} /></span>
+          <span className="icono-suelto"><UserPlus size={15} /></span>
           <span className="flex-1 min-w-0">
             <span className="block text-[12px] font-bold text-white">Vincular entrenador o alumno</span>
             <span className="block text-[10px] text-slate-500">Con su @usuario</span>
@@ -17283,7 +17793,7 @@ function LeaderboardRow({ position, name, username, avatarData, topRank, streakD
   return (
     <Tag onClick={onClick} className={`ranking-fila ${isMe ? "yo" : ""}`}>
       <span className="ranking-pos num-display">{position}</span>
-      <span className="ranking-avatar" aria-hidden="true">{avatarData ? <img src={avatarData} alt="" /> : (name || username || "?").charAt(0).toUpperCase()}</span>
+      <span className={`ranking-avatar ${topRank?.color ? "con-rango" : ""}`} style={topRank?.color ? { "--rango-c": topRank.color } : undefined} aria-hidden="true">{avatarData ? <img src={avatarData} alt="" /> : (name || username || "?").charAt(0).toUpperCase()}</span>
       <span className="min-w-0 flex-1">
         <span className="ranking-nombre">{isMe ? "Vos" : (name || "Usuario")}</span>
       </span>
@@ -17608,7 +18118,7 @@ function RoutineProposalComposer({ myRoutines, onClose, onSubmit }) {
       <div className="w-full max-w-md max-h-[86vh] overflow-y-auto overscroll-contain bg-slate-900 border border-slate-700/60 rounded-3xl modal-pop-in shadow-2xl shadow-black/70" onClick={(e) => e.stopPropagation()}>
         <div className="p-5 space-y-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-blue-500/20 border border-blue-500/30 text-blue-300 flex items-center justify-center shrink-0"><ClipboardCheck size={17} /></div>
+            <div className="icono-suelto"><ClipboardCheck size={17} /></div>
             <div className="min-w-0 flex-1">
               <p className="text-[10px] font-black uppercase tracking-widest text-blue-400">Proponer rutina</p>
               <h3 className="text-base font-black text-white leading-tight">Elegí una de tus rutinas</h3>
@@ -18005,7 +18515,7 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
       <div className="w-full max-w-md max-h-[86vh] overflow-y-auto overscroll-contain bg-slate-900 border border-slate-700/60 rounded-3xl modal-pop-in shadow-2xl shadow-black/70" onClick={(e) => e.stopPropagation()}>
         <div className="p-5 space-y-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-sky-500/20 border border-sky-500/30 text-sky-300 flex items-center justify-center shrink-0"><Target size={17} /></div>
+            <div className="icono-suelto"><Target size={17} /></div>
             <div className="min-w-0 flex-1">
               {/* Pedido: "rediseñá la sección de planificación manual tanto
                   personalmente como para el entrenador hacia sus alumnos"
@@ -18705,13 +19215,9 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, viewerName = null, i
             </section>
           )}
 
-          {/* Su mejor marca, y si es con barra, los discos que pone de cada
-              lado: se lee de un vistazo cuánto mete. */}
+          {/* Su mejor marca: la serie, el ejercicio y el rango que le da. */}
           {theirBestMuscle && (() => {
             const kg = theirBestMuscle.bestKg;
-            const peso = kgToDisplay(kg, unit);
-            const conBarra = peso >= barraDe(unit) && seHaceConBarra(theirBestMuscle.bestExerciseName);
-            const discos = conBarra ? discosParaPeso(peso, null, unit) : [];
             return (
               <section className="tarjeta-tonal p-4 mejor-marca" aria-label={esYo ? "Tu mejor marca" : "Su mejor marca"}>
                 <div className="flex items-start justify-between gap-3">
@@ -18724,12 +19230,6 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, viewerName = null, i
                   </span>
                 </div>
                 <p className="mejor-marca-numeros"><b className="num-display">{theirBestMuscle.bestReps}</b><span aria-hidden="true">×</span><b className="num-display">{kgToDisplay(kg, unit)}</b><small>{weightLabel(unit)}</small></p>
-                {conBarra && (
-                  <>
-                    <BarraConDiscos kg={peso} unidad={unit} alto={62} className="mejor-marca-barra" sobria />
-                    <p className="mejor-marca-discos">{discos.length ? `Barra de ${barraDe(unit)} y, de cada lado, ${discos.map((d) => coma(d.kg)).join(" + ")}.` : "Sólo la barra."}</p>
-                  </>
-                )}
               </section>
             );
           })()}
@@ -18908,28 +19408,6 @@ function kudosDayLabel(daysAgo) {
   return `Entrenó hace ${daysAgo} días`;
 }
 
-// EL DESAFÍO DE LA SEMANA: entre todos, cargar la barra del grupo. Cada
-// sesión de cualquiera es un disco y la meta son tres por cabeza. Nadie
-// compite contra nadie (para eso está la carrera de arriba): es la cuenta de
-// todos juntos, y vuelve a cero el lunes.
-function DesafioGrupo({ filas = [] }) {
-  const personas = filas.length;
-  if (personas < 2) return null;
-  const meta = personas * 3;
-  const hechas = filas.reduce((n, f) => n + (f.dias || []).filter(Boolean).length, 0);
-  const falta = Math.max(0, meta - hechas);
-  return (
-    <div className="desafio">
-      <div className="desafio-cabeza">
-        <p className="desafio-titulo">Desafío de la semana</p>
-        <p className="desafio-cuenta"><b className="num-display">{Math.min(hechas, meta)}</b> de {meta}</p>
-      </div>
-      <BarraCargada hechas={hechas} total={meta} alto={38} sobria etiqueta={`El grupo lleva ${Math.min(hechas, meta)} de ${meta} sesiones`} />
-      <p className="desafio-pie">{falta === 0 ? "Lo lograron: la barra del grupo está cargada." : `Entre los ${personas}, ${meta} sesiones, y cada una es un disco. ${falta === 1 ? "Falta una." : `Faltan ${falta}.`}`}</p>
-    </div>
-  );
-}
-
 // Una fila de la actividad de tu grupo: quién entrenó, qué día hizo y
 // cuántas series, y el botón para aplaudirle.
 function ActividadRow({ c, basic, sent, sending, onSendKudos, onViewProfile, delay = 0 }) {
@@ -18938,7 +19416,7 @@ function ActividadRow({ c, basic, sent, sending, onSendKudos, onViewProfile, del
   return (
     <div className="actividad stagger-item" style={{ animationDelay: `${delay}ms` }}>
       <button onClick={() => onViewProfile(c.uid)} className="actividad-quien">
-        <span className="galleta actividad-aro" aria-hidden="true">
+        <span className={`galleta actividad-aro ${basic?.topRank?.color ? "aro-rango" : ""}`} style={basic?.topRank?.color ? { "--rango": basic.topRank.color } : undefined} aria-hidden="true">
           <span className="actividad-avatar">{basic?.avatarData ? <img src={basic.avatarData} alt="" /> : nombre.charAt(0).toUpperCase()}</span>
         </span>
         <span className="min-w-0 flex-1">
@@ -19125,15 +19603,15 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
   // LA SEMANA DEL GRUPO (la carrera): vos y tus amigos, con los días que entrenó cada
   // uno esta semana. Los que más fueron, arriba.
   const filasPizarra = useMemo(() => {
-    const yo = { uid: "yo", yo: true, nombre: profile?.name || profileName || "Vos", foto: profile?.avatarData || null, dias: miSemana };
+    const yo = { uid: "yo", yo: true, nombre: profile?.name || profileName || "Vos", foto: profile?.avatarData || null, dias: miSemana, rango: myTopRank?.color || null };
     const otros = friendAccepted.map((fr) => {
       const otro = fr.users.find((u) => u !== uid);
       const act = streaks[otro];
       if (!act?.semana) return null;
-      return { uid: otro, nombre: basics[otro]?.name || "Tu amigo", foto: basics[otro]?.avatarData || null, dias: act.semana };
+      return { uid: otro, nombre: basics[otro]?.name || "Tu amigo", foto: basics[otro]?.avatarData || null, dias: act.semana, rango: basics[otro]?.topRank?.color || null };
     }).filter(Boolean).sort((a, b) => b.dias.filter(Boolean).length - a.dias.filter(Boolean).length);
     return [yo, ...otros].slice(0, 8);
-  }, [friendAccepted, streaks, basics, uid, profile, profileName, miSemana]);
+  }, [friendAccepted, streaks, basics, uid, profile, profileName, miSemana, myTopRank]);
   // Todos los amigos que entrenaron dentro de la ventana para felicitar
   // (KUDOS_MAX_DAYS_AGO: hoy y ayer), no sólo el más nuevo. BUG FIX
   // (pedido: "qué pasa si hay más de un amigo que entrenó ayer u hoy") —
@@ -19469,7 +19947,7 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
                   <small>Tu rango</small>
                 </button>
                 <div className="credencial-dato">
-                  <span className="credencial-valor"><b className="num-display grande">{myStreak || 0}</b><MarcasTiza dias={myStreak || 0} max={5} alto={15} decorativa /></span>
+                  <span className="credencial-valor"><b className="num-display grande">{myStreak || 0}</b><MarcasTiza dias={myStreak || 0} max={5} alto={15} decorativa className={myStreak > 0 ? "viva" : ""} /></span>
                   <small>{myStreak === 1 ? "Día seguido" : "Días seguidos"}</small>
                 </div>
                 <div className="credencial-dato">
@@ -19512,7 +19990,6 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
             })()}
           </div>
           <CarreraSemana filas={filasPizarra} onVerPersona={(u) => setViewingUid(u)} />
-          <DesafioGrupo filas={filasPizarra} />
         </section>
       ) : (
         <section aria-label="Sumá amigos" className="space-y-2">
@@ -19583,7 +20060,7 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
           })()}
           {chaserFriend && (
             <button onClick={() => setViewingUid(chaserFriend.uid)} className="aviso-social">
-              <span className="galleta aviso-social-icono" aria-hidden="true"><MarcasTiza dias={5} max={5} alto={15} decorativa /></span>
+              <span className="galleta aviso-social-icono alerta" aria-hidden="true"><MarcasTiza dias={5} max={5} alto={15} decorativa /></span>
               <p><b>{basics[chaserFriend.uid]?.name || "Tu amigo"}</b> lleva {chaserFriend.streak} {chaserFriend.streak === 1 ? "día seguido" : "días seguidos"} y vos {myStreak}: te está por alcanzar.</p>
               <ChevronRight size={15} className="text-slate-500 shrink-0" />
             </button>
@@ -19595,7 +20072,7 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
             return (
               <div key={r.id} className="aviso-social">
                 <button onClick={() => { setViewingOpenComparing(true); setViewingUid(r.fromUid); }} className="aviso-social-cuerpo">
-                  <span className="galleta aviso-social-icono" aria-hidden="true">{superado ? <Check size={17} strokeWidth={2.6} /> : <Target size={17} />}</span>
+                  <span className={`galleta aviso-social-icono ${superado ? "logro" : "tono"}`} aria-hidden="true">{superado ? <Check size={17} strokeWidth={2.6} /> : <Target size={17} />}</span>
                   <p>{superado
                     ? <><b>Superaste el reto de {quien.split(" ")[0]}</b> en {r.exerciseName}.</>
                     : <><b>{quien}</b> te retó: superá su {r.reps} × {conComa(kgToDisplay(r.kg, unit))} {weightLabel(unit)} en {r.exerciseName} antes del domingo.</>}</p>
@@ -19607,7 +20084,7 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
           {retoError && <p className="text-[12px] text-slate-400 px-1">{retoError}</p>}
           {tePaso && (
             <button onClick={() => { setViewingOpenComparing(true); setViewingUid(tePaso.uid); }} className="aviso-social">
-              <span className="galleta aviso-social-icono" aria-hidden="true"><Swords size={17} /></span>
+              <span className="galleta aviso-social-icono peligro" aria-hidden="true"><Swords size={17} /></span>
               <p><b>{basics[tePaso.uid]?.name || "Tu amigo"}</b> te pasó en {String(tePaso.label).toLowerCase()}: {tePaso.suyo.tier} {tePaso.suyo.sub} contra {tePaso.mio ? `tu ${tePaso.mio.tier} ${tePaso.mio.sub}` : "nada tuyo todavía"}.</p>
               <ChevronRight size={15} className="text-slate-500 shrink-0" />
             </button>
@@ -19910,7 +20387,7 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
         />
       )}
       {templateSentNote && (
-        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[130] px-4 py-2.5 rounded-xl bg-emerald-500 !text-white text-sm font-bold shadow-lg shadow-emerald-500/30 bounce-in">
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[130] px-4 py-2.5 rounded-xl bg-emerald-500 !text-white text-sm font-bold bounce-in">
           Propuesta enviada ✓
         </div>
       )}
@@ -21661,11 +22138,8 @@ function buildActionPlan(action, ctx) {
 ============================================================================ */
 
 // registrar_marca: la serie como en el visor de Rutina (reps × kilos,
-// grandes y angostos) y, si es con barra, la barra con sus discos. Si es
-// récord, en dorado.
+// grandes y angostos). Si es récord, en dorado.
 function SetLogPreview({ exerciseName, reps, kg, rpe, isNewPR, unit = "kg", cardio = false, minutes = null, km = null, nota = null }) {
-  const peso = cardio ? 0 : kgToDisplay(kg, unit);
-  const conBarra = !cardio && peso >= barraDe(unit) && seHaceConBarra(exerciseName);
   const rotulo = nota || (isNewPR ? "Récord nuevo" : null);
   return (
     <div className={`ia-serie ${isNewPR ? "record" : ""}`}>
@@ -21682,7 +22156,6 @@ function SetLogPreview({ exerciseName, reps, kg, rpe, isNewPR, unit = "kg", card
         )}
         {rpe != null && <span className="ia-chip">RPE {rpe}</span>}
       </div>
-      {conBarra && <BarraConDiscos kg={peso} unidad={unit} alto={30} className="ia-serie-barra" sobria />}
     </div>
   );
 }
@@ -22739,6 +23212,19 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
     startRecognition();
   };
 
+  // LO QUE DICEN TUS DATOS, para las tarjetas del inicio: el músculo que más
+  // quedó atrás (con el color de su rango) y lo que te toca hoy (con el del
+  // día). Cada tarjeta ya adelanta la respuesta.
+  const pistasInicio = useMemo(() => {
+    const st = getProfileSettings(profile);
+    const ranks = computeAllMuscleRanks(logs, st, profile?.sex, profile?.age);
+    const conDatos = MUSCLE_GROUPS.map((g) => ranks[g.key]).filter((r) => r?.hasData);
+    const flojo = conDatos.length >= 2 ? conDatos.reduce((x, r) => (r.levelIdx < x.levelIdx ? r : x)) : null;
+    const dk = profile?.weekSchedule?.[todayWeekdayKey()] || null;
+    const yaEntreno = (profile?.trainingSessions || []).some((s) => s.date === todayStr());
+    const dia = dk && ROUTINE[dk] ? { label: ROUTINE[dk].label, color: ROUTINE[dk].color } : null;
+    return { flojo, dia, yaEntreno };
+  }, [logs, profile]);
   // Una conversación que todavía no empezó: sólo el saludo de la IA.
   const esInicio = messages.length <= 1 && (!messages[0] || messages[0].text === AI_CHAT_WELCOME.text) && !isSending;
   const primerNombre = String(profileName || "").trim().split(/\s+/)[0] || "";
@@ -22776,13 +23262,21 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
           <h2 className="ia-pregunta">¿En qué te ayudo hoy?</h2>
           <p className="ia-bajada">Conozco tu rutina, tus marcas y tu progreso: todo lo que anotás en la app.</p>
           <div className="ia-tarjetas">
-            {ATAJOS_IA.slice(0, 4).map((c) => (
-              <button key={c.label} onClick={() => handleQuickPrompt(c)} disabled={isSending} className="ia-tarjeta" style={{ "--c": c.color }}>
-                <span className="ia-tarjeta-icono" aria-hidden="true">{c.icon}</span>
-                <span className="ia-tarjeta-titulo">{c.titulo}</span>
-                <span className="ia-tarjeta-bajada">{c.bajada}</span>
-              </button>
-            ))}
+            {ATAJOS_IA.slice(0, 4).map((c) => {
+              const { flojo, dia, yaEntreno } = pistasInicio;
+              const dato = c.label === "Punto débil" && flojo ? { texto: `${flojo.label}: ${flojo.tier} ${flojo.sub}`, color: flojo.color }
+                : c.label === "Plan de hoy" ? (yaEntreno ? { texto: "Hoy ya entrenaste" } : dia ? { texto: `Hoy toca ${dia.label}`, color: dia.color } : { texto: "Hoy es día de descanso" })
+                : null;
+              return (
+                <button key={c.label} onClick={() => handleQuickPrompt(c)} disabled={isSending} className="ia-tarjeta" style={{ "--c": c.color }}>
+                  <span className="ia-tarjeta-icono" aria-hidden="true">{c.icon}</span>
+                  <span className="ia-tarjeta-titulo">{c.titulo}</span>
+                  {dato
+                    ? <span className={`ia-tarjeta-dato ${dato.color ? "tinta-rango" : ""}`} style={dato.color ? { "--rango-c": dato.color } : undefined}>{dato.texto}</span>
+                    : <span className="ia-tarjeta-bajada">{c.bajada}</span>}
+                </button>
+              );
+            })}
           </div>
           <div className="ia-mas">
             {ATAJOS_IA.slice(4).map((c) => (
@@ -23010,7 +23504,7 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
               <span className="absolute w-20 h-20 rounded-full thinking-halo" style={{ background: "radial-gradient(circle, rgba(20,184,166,0.25), transparent 70%)" }} />
               <span className="absolute w-20 h-20 rounded-full thinking-wave" />
               <span className="absolute w-20 h-20 rounded-full thinking-wave" style={{ animationDelay: "0.9s" }} />
-              <div className="relative w-12 h-12 rounded-2xl bg-teal-500/15 border border-teal-500/30 flex items-center justify-center shadow-lg shadow-teal-500/20">
+              <div className="relative w-12 h-12 rounded-2xl bg-teal-500/15 border border-teal-500/30 flex items-center justify-center">
                 <Dumbbell size={22} className="text-teal-300 thinking-rep" />
               </div>
             </div>
@@ -23165,7 +23659,7 @@ function AIConversationSidebar({ conversations, activeConversationId, onSelect, 
       <div className="relative w-[82%] max-w-xs h-full flex flex-col shadow-2xl shadow-black/60 bounce-in overflow-hidden backdrop-blur-xl" style={{ background: "var(--glass-panel-bg)", borderRight: "1px solid var(--glass-panel-border)" }} onClick={(e) => e.stopPropagation()}>
         <div className="relative overflow-hidden px-4 pb-4 shrink-0" style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 18px)", borderBottom: "1px solid var(--glass-panel-border)", boxShadow: "inset 0 -1px 0 0 rgba(255,255,255,0.04)" }}>
           <div className="relative flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-md shadow-teal-500/20" style={{ background: "var(--surface-3)" }}>
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: "var(--surface-3)" }}>
               <List size={16} className="!text-white" />
             </div>
             <div className="flex-1 min-w-0">
@@ -23176,7 +23670,7 @@ function AIConversationSidebar({ conversations, activeConversationId, onSelect, 
           </div>
         </div>
         <div className="px-3 pt-3 shrink-0">
-          <button onClick={onNew} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold !text-[color:var(--accion-tinta)] transition active:scale-[0.98] shadow-lg shadow-teal-500/15" style={{ background: "var(--accion-fondo)" }}>
+          <button onClick={onNew} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold !text-[color:var(--accion-tinta)] transition active:scale-[0.98]" style={{ background: "var(--accion-fondo)" }}>
             <Plus size={15} /> Nueva conversación
           </button>
         </div>
@@ -23533,7 +24027,7 @@ function ImportRoutineModal({ onImport, onClose }) {
       <div className="fixed inset-0 z-[130] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
         <div className="bg-slate-900 border border-slate-700/60 rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50 max-h-[88vh] overflow-y-auto overscroll-contain" onClick={(e) => e.stopPropagation()}>
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 rounded-2xl bg-teal-500/15 text-teal-400 flex items-center justify-center shrink-0"><Sparkles size={18} /></div>
+            <div className="icono-suelto"><Sparkles size={18} /></div>
             <div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-widest text-teal-400">Vista previa</p><h3 className="text-base font-black text-white leading-tight truncate">{parsed.name}</h3></div>
           </div>
           <p className="text-sm text-slate-400 mb-3">Así lo interpretamos: revisalo, después lo podés corregir desde Rutinas.</p>
@@ -23551,7 +24045,7 @@ function ImportRoutineModal({ onImport, onClose }) {
     <div className="fixed inset-0 z-[130] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
       <div className="bg-slate-900 border border-slate-700/60 rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50 max-h-[92vh] overflow-y-auto overscroll-contain" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-3 mb-3">
-          <div className="w-10 h-10 rounded-2xl bg-teal-500/15 text-teal-400 flex items-center justify-center shrink-0"><Download size={18} className="rotate-180" /></div>
+          <div className="icono-suelto"><Download size={18} className="rotate-180" /></div>
           <div className="flex-1 min-w-0"><h3 className="text-base font-black text-white leading-tight">Importar rutina</h3><p className="text-[11px] text-slate-500 mt-0.5">Archivo, foto o texto: combinamos todo</p></div>
           <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition shrink-0"><X size={18} /></button>
         </div>
@@ -23599,7 +24093,7 @@ function ImportRoutineModal({ onImport, onClose }) {
 
         <input value={routineName} onChange={(e) => setRoutineName(e.target.value)} placeholder="Nombre para la rutina (opcional)" className="w-full bg-slate-900/80 border border-slate-700/50 rounded-xl px-3 py-2.5 text-white text-sm mb-3 focus:outline-none focus:border-teal-500/60" />
         {notice && <p className="text-[11px] text-amber-400 mb-3 leading-relaxed">{notice}</p>}
-        <button onClick={handleProcessAI} disabled={!hasAnySource || loadingFile || isParsingAI} className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-sm font-bold transition-all active:scale-[0.98] ${hasAnySource && !loadingFile && !isParsingAI ? "!text-[color:var(--accion-tinta)] shadow-lg shadow-teal-500/20" : "bg-slate-800 text-slate-600"}`} style={hasAnySource && !loadingFile && !isParsingAI ? { background: "var(--accion-fondo)" } : {}}>
+        <button onClick={handleProcessAI} disabled={!hasAnySource || loadingFile || isParsingAI} className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-sm font-bold transition-all active:scale-[0.98] ${hasAnySource && !loadingFile && !isParsingAI ? "!text-[color:var(--accion-tinta)]" : "bg-slate-800 text-slate-600"}`} style={hasAnySource && !loadingFile && !isParsingAI ? { background: "var(--accion-fondo)" } : {}}>
           {isParsingAI ? <><RotateCcw size={14} className="animate-spin" /> Analizando con IA...</> : <><Sparkles size={15} /> Detectar con IA</>}
         </button>
         {!images.length && (
@@ -23858,7 +24352,7 @@ function RoutineBuilder({ initialRoutine, onCancel, onSave, dumbbellDouble = nul
       {!confirmDiscard ? (
         <div className="flex gap-2 pt-1">
           <button onClick={handleCancelClick} className="flex-1 py-3.5 rounded-2xl bg-slate-800 text-slate-300 text-sm font-semibold">Cancelar</button>
-          <button onClick={handleSave} className="flex-1 py-3.5 rounded-2xl bg-teal-500 !text-white text-sm font-bold active:scale-[0.98] transition-all shadow-lg shadow-teal-500/20">{isEditing ? "Guardar cambios" : "Guardar rutina"}</button>
+          <button onClick={handleSave} className="flex-1 py-3.5 rounded-2xl bg-teal-500 !text-white text-sm font-bold active:scale-[0.98] transition-all">{isEditing ? "Guardar cambios" : "Guardar rutina"}</button>
         </div>
       ) : (
         <div className="flex items-center gap-2 rounded-2xl bg-rose-500/10 border border-rose-500/30 px-3.5 py-3">
@@ -24145,7 +24639,7 @@ function PersonalizedRoutineWizard({ profile, onUpdateProfile, onCreateRoutine, 
         <div className="space-y-3 bounce-in">
           <div className="rounded-2xl border border-teal-500/25 p-4" style={{ background: "var(--panel-grad-emerald)" }}>
             <div className="flex items-center gap-2.5 mb-3">
-              <div className="w-10 h-10 rounded-xl bg-teal-500/15 border border-teal-500/25 flex items-center justify-center"><Check size={17} className="text-teal-400" /></div>
+              <div className="icono-suelto"><Check size={17} /></div>
               <div>
                 <p className="text-sm font-black text-white">{preview.name}</p>
                 <p className="text-[10px] text-slate-500">{preview.dayOrder.length} días · hecha a tu medida · revisala y confirmá</p>
@@ -24502,7 +24996,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
         <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4">
           <WeeklyScheduleEditor dayOrder={def.dayOrder} days={def.days} schedule={def.weekSchedule} onChange={updatePendingScheduleDay} />
         </div>
-        <button onClick={confirmPendingActivation} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl !text-[color:var(--accion-tinta)] text-sm font-bold transition-all active:scale-[0.98] shadow-lg shadow-blue-500/20" style={{ background: "var(--accion-fondo)" }}><Check size={15} /> Listo, empezar a entrenar</button>
+        <button onClick={confirmPendingActivation} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl !text-[color:var(--accion-tinta)] text-sm font-bold transition-all active:scale-[0.98]" style={{ background: "var(--accion-fondo)" }}><Check size={15} /> Listo, empezar a entrenar</button>
       </div>
     );
   }
@@ -24552,7 +25046,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
             <button onClick={() => { setCreateOpen((o) => !o); setShowPresetsForced(false); }} className="relative overflow-hidden w-full p-4 text-left transition active:scale-[0.99]">
               <div className="absolute -top-8 -right-8 w-28 h-28 rounded-full bg-teal-500/15 blur-2xl pointer-events-none" />
               <div className="relative flex items-center gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-teal-500/20 border border-teal-500/30 flex items-center justify-center shrink-0"><Plus size={19} className="text-teal-400" /></div>
+                <div className="icono-suelto"><Plus size={19} /></div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-black text-white">Crear mi rutina</p>
                   <p className="text-[11px] text-teal-300/60 mt-0.5">Con ayuda de la IA o armándola vos</p>
@@ -24563,7 +25057,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
             {createOpen && (
               <div className="px-3 pb-3 space-y-2 tab-fade-in">
                 <button onClick={() => setShowWizard(true)} className="w-full flex items-center gap-3 rounded-xl border border-teal-500/25 bg-teal-500/5 p-3.5 text-left transition active:scale-[0.98] hover:border-teal-500/50">
-                  <div className="w-9 h-9 rounded-xl bg-teal-500/15 flex items-center justify-center shrink-0"><Sparkles size={16} className="text-teal-400" /></div>
+                  <div className="icono-suelto"><Sparkles size={16} /></div>
                   <div className="flex-1 min-w-0">
                     <p className="text-[13px] font-black text-white">Personalizada con IA</p>
                     <p className="text-[10px] text-slate-500 mt-0.5">Respondé unas preguntas y la IA arma tu plan</p>
@@ -24571,7 +25065,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
                   <ChevronRight size={14} className="text-teal-500 shrink-0" />
                 </button>
                 <button onClick={() => { setEditingRoutineId(null); setMode("builder"); }} className="w-full flex items-center gap-3 rounded-xl border border-slate-700/60 bg-slate-800/40 p-3.5 text-left transition active:scale-[0.98] hover:border-slate-500">
-                  <div className="w-9 h-9 rounded-xl bg-blue-500/15 flex items-center justify-center shrink-0"><Edit3 size={15} className="text-blue-400" /></div>
+                  <div className="icono-suelto"><Edit3 size={15} /></div>
                   <div className="flex-1 min-w-0">
                     <p className="text-[13px] font-black text-white">Manualmente</p>
                     <p className="text-[10px] text-slate-500 mt-0.5">Elegí vos cada día, ejercicio y serie</p>
@@ -24586,7 +25080,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
           <button onClick={() => { setShowPresetsForced((s) => !s); setCreateOpen(false); }} className={`relative overflow-hidden w-full rounded-2xl border p-4 text-left transition active:scale-[0.99] ${showPresetsForced ? "border-blue-500/40" : "border-blue-500/25"}`} style={{ background: "var(--grad-hero-blue, linear-gradient(135deg,#0c1f2a,#14181d))" }}>
             <div className="absolute -top-8 -right-8 w-28 h-28 rounded-full bg-blue-500/15 blur-2xl pointer-events-none" />
             <div className="relative flex items-center gap-3">
-              <div className="w-11 h-11 rounded-2xl bg-blue-500/20 border border-blue-500/30 flex items-center justify-center shrink-0"><Layers size={18} className="text-blue-400" /></div>
+              <div className="icono-suelto"><Layers size={18} /></div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-black text-white">Elegir una preestablecida</p>
                 <p className="text-[11px] text-blue-300/60 mt-0.5">Push/Pull/Legs, Arnold, Upper/Lower y más</p>
@@ -25409,7 +25903,8 @@ export default function App() {
     if (saved && p[saved] && !p[saved].pin) return saved;
     return null;
   });
-  const [tab, setTab] = useState("rutina");
+  // En desarrollo, ?demo=<pestaña> entra directo ahí (ver main.jsx).
+  const [tab, setTab] = useState(() => (import.meta.env.DEV && new URLSearchParams(window.location.search).get("demo")) || "rutina");
   // En semana de descarga, la pestaña Rutina muestra Descarga fija en vez
   // del entrenamiento normal (antes esto vivía solo como un atajo chico
   // adentro de Rutina, fácil de pasar por alto). "deloadDismissed" es el
@@ -26565,12 +27060,6 @@ export default function App() {
       const m = Math.round((Date.now() - new Date(inicio).getTime()) / 60000);
       if (m >= 0 && m < 24 * 60) minutos = m; // descarta duraciones absurdas (sesión olvidada abierta)
     }
-    const paleta = ["#14B8A6", "#3B82F6", "#A855F7", "#F59E0B", "#F43F5E", "#06B6D4", "#84CC16", "#EC4899"];
-    // Los 5 ejercicios que más volumen se llevaron; el resto junto, para
-    // que la dona no termine en ocho arcos finos que no se distinguen.
-    const orden = Object.entries(porEjercicioVol).sort((a, b) => b[1] - a[1]);
-    const reparto = (orden.length > 6 ? [...orden.slice(0, 5), ["Otros", orden.slice(5).reduce((a, x) => a + x[1], 0)]] : orden)
-      .map(([nombre, v], idx) => ({ nombre, series: v, color: nombre === "Otros" ? "#50555a" : paleta[idx % paleta.length] }));
     // Comparación con la última vez que hiciste ESTE mismo día de rutina:
     // es la pregunta natural al terminar ("¿vengo mejor que la vez
     // pasada?"), y no hay dónde responderla hoy.
@@ -26620,7 +27109,27 @@ export default function App() {
     }
     // Lo que imprime el ticket: cada ejercicio con sus series, el día y cuándo.
     const lineas = Object.keys(porEjercicioVol).map((nombre) => ({ nombre, series: porEjercicioSeries[nombre] || 0, volumen: porEjercicioVol[nombre] }));
-    return { volumen: Math.round(volumen), series, ejercicios: ejercicios.size, prs, minutos, reparto, vsUltima, metas, lineas, dia: dk ? ROUTINE[dk]?.label || null : null, color: dk ? ROUTINE[dk]?.color || null : null, fecha: new Date().toISOString() };
+    // Las últimas cinco veces que hiciste este día (el volumen de toda la
+    // sesión) y hoy al final: las columnas del ticket.
+    const volDeFecha = (fecha) => {
+      let v = 0;
+      Object.entries(porEjercicio).forEach(([exId, entries]) => {
+        const lf2 = (dd && dd[exId]) || EXERCISE_LIBRARY_BY_ID[exId]?.loadFactor || 1;
+        entries.forEach((e) => { if (e.date === fecha && !e.deload) v += e.kg * lf2 * e.reps; });
+      });
+      return Math.round(v);
+    };
+    const fechasPrevias = dk ? [...new Set((profile?.trainingSessions || []).filter((t) => t.dayKey === dk && t.date < hoy).map((t) => t.date))].sort().slice(-5) : [];
+    const historialDia = [...fechasPrevias.map((f) => ({ fecha: f, volumen: volDeFecha(f) })).filter((x) => x.volumen > 0), { fecha: hoy, volumen: Math.round(volumen), hoy: true }];
+    // Las series de hoy por región del cuerpo, de la que más a la que menos.
+    const porRegion = {};
+    Object.entries(porEjercicio).forEach(([exId, entries]) => {
+      const n = entries.filter((e) => e.date === hoy && !e.deload).length;
+      const reg = regionDe(exId);
+      if (n && reg) porRegion[reg] = (porRegion[reg] || 0) + n;
+    });
+    const regiones = Object.entries(porRegion).sort((x, y) => y[1] - x[1]).map(([nombre, n]) => ({ nombre, series: n }));
+    return { volumen: Math.round(volumen), series, ejercicios: ejercicios.size, prs, minutos, vsUltima, metas, lineas, historialDia, regiones, dia: dk ? ROUTINE[dk]?.label || null : null, color: dk ? ROUTINE[dk]?.color || null : null, fecha: new Date().toISOString() };
   };
 
   // Resumen semanal: dispara SOLO si hoy es domingo (fin de semana lun-dom)
@@ -26889,7 +27398,7 @@ export default function App() {
             <p className="text-sm text-slate-400 mt-1.5 mb-4">Entrenamiento y descarga, hechos. ¿Lo compartís?</p>
             <div className="flex gap-2">
               <button onClick={() => setCycleCompleteNotice(null)} className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-400 text-sm font-semibold">Cerrar</button>
-              <button onClick={() => setShowCycleShareImage(true)} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl text-[color:var(--accion-tinta)] text-sm font-bold transition-all active:scale-[0.98] shadow-lg shadow-purple-500/20" style={{ background: "var(--accion-fondo)" }}><Share2 size={14} /> Compartir</button>
+              <button onClick={() => setShowCycleShareImage(true)} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl text-[color:var(--accion-tinta)] text-sm font-bold transition-all active:scale-[0.98]" style={{ background: "var(--accion-fondo)" }}><Share2 size={14} /> Compartir</button>
             </div>
             {/* Sólo en el PRIMER ciclo — es el momento en que alguien está
                 más contento con la app, mejor punto para pedir una
@@ -26983,7 +27492,7 @@ function InstalarEnIosBanner() {
       <div className="max-w-xl mx-auto pointer-events-auto rounded-2xl p-3.5 shadow-2xl shadow-black/50 bounce-in"
         style={{ backgroundColor: "rgba(12,13,16,0.96)", border: "1px solid rgba(20,184,166,0.45)", backdropFilter: "blur(12px)" }}>
         <div className="flex items-start gap-3">
-          <span className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: "rgba(20,184,166,0.18)", color: "#2dd4bf" }}>
+          <span className="icono-suelto">
             <Download size={16} />
           </span>
           <div className="flex-1 min-w-0">
@@ -27005,7 +27514,7 @@ function InstalarEnIosBanner() {
 
 function RecoveredBanner({ onClose }) {
   return (
-    <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[150] bg-teal-500 !text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-teal-500/30 flex items-center gap-2 bounce-in">
+    <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[150] bg-teal-500 !text-white text-xs font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 bounce-in">
       <Check size={14} /> Recuperamos tu copia de seguridad local
       <button onClick={onClose} aria-label="Cerrar" className="ml-1 opacity-80 hover:opacity-100"><X size={13} /></button>
     </div>
@@ -27014,7 +27523,7 @@ function RecoveredBanner({ onClose }) {
 
 function ImportRoutineErrorBanner({ onClose }) {
   return (
-    <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[150] bg-rose-500 !text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-rose-500/30 flex items-center gap-2 bounce-in max-w-[92vw]">
+    <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[150] bg-rose-500 !text-white text-xs font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 bounce-in max-w-[92vw]">
       <AlertTriangle size={14} className="shrink-0" /> No pudimos abrir esa rutina compartida — puede que el enlace ya no exista.
       <button onClick={onClose} aria-label="Cerrar" className="ml-1 opacity-80 hover:opacity-100 shrink-0"><X size={13} /></button>
     </div>
