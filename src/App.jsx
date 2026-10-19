@@ -66,6 +66,9 @@ import {
   EXERCISE_LIBRARY_BY_GROUP, EXERCISE_LIBRARY_CONTRIBUTORS_BY_GROUP,
   PRESET_ROUTINES, PRESET_ROUTINES_BY_ID, CLASSIC_PRESET,
 } from "./data";
+// Buscar ejercicios como los escribe la gente (sin tildes, en cualquier
+// orden, con errores de tipeo, en inglés o con el apodo del gimnasio).
+import { buscarEjercicios, mejorEjercicio, nombreCoincide, partesResaltadas, REGIONES_BUSCADOR } from "./buscar-ejercicios.js";
 
 /* ============================================================================
    GEMINI — la clave de la API ya NO vive en este archivo ni en Remote
@@ -3879,11 +3882,22 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 /* Los dibujos de la guía (piezas de la app, quietas). */
 .guia-escenario button, .guia-escenario a { pointer-events: none; }
 .guia-ancho { width: 100%; }
+.guia-ancho .telarana { max-width: 250px; }
+.guia-ancho .aviso-social { background: var(--surface-1); }
+/* LA BIENVENIDA: la misma placa que la guía, un paso por vez. */
+.bienvenida { width: 100%; max-width: 24rem; max-height: 92vh; display: flex; flex-direction: column; overflow: hidden; border-radius: 28px; background: var(--surface-1); box-shadow: var(--placa-canto), 0 30px 60px -30px rgba(0,0,0,.8); }
+.bienvenida-cuerpo { flex: 1; min-height: 0; overflow-y: auto; padding: 18px 20px 6px; }
+.bienvenida-titulo { margin-top: 18px; font-size: 1.45rem; }
+.bienvenida-serie { display: grid; justify-items: center; gap: 14px; width: 100%; }
+.bienvenida-serie .guia-visor { max-width: 280px; }
+.bienvenida-serie .barra-cargada { width: 100%; max-width: 300px; }
+.bienvenida-punto { display: flex; padding: 10px 2px; }
+.bienvenida-punto i { display: block; }
 .guia-selector { display: flex; gap: 3px; width: 100%; max-width: 300px; padding: 4px; border-radius: 999px; background: var(--surface-1); box-shadow: inset 0 0 0 1px var(--hairline); }
 .guia-selector span { position: relative; flex: 1; padding: 13px 0; border-radius: 999px; text-align: center; font-size: 14px; font-weight: 600; color: var(--text-muted); }
-.guia-selector span.elegido { color: color-mix(in oklab, var(--c) 18%, #07080a); background: color-mix(in oklab, var(--c) 72%, white); }
-.light-mode .guia-selector span.elegido { background: var(--c); }
-.guia-selector span i { position: absolute; left: 50%; bottom: 5px; width: 14px; height: 3px; margin-left: -7px; border-radius: 2px; background: color-mix(in oklab, color-mix(in oklab, var(--c) 18%, #07080a) 40%, transparent); }
+.guia-selector span.elegido { font-weight: 700; color: color-mix(in oklab, var(--c) 72%, white); background: color-mix(in oklab, var(--c) 20%, var(--surface-1)); }
+.light-mode .guia-selector span.elegido { color: color-mix(in oklab, var(--c) 72%, black); background: color-mix(in oklab, var(--c) 15%, white); }
+.guia-selector span i { position: absolute; left: 50%; bottom: 5px; width: 14px; height: 3px; margin-left: -7px; border-radius: 2px; background: color-mix(in oklab, var(--c) 72%, white); }
 .guia-visor { display: grid; grid-template-columns: 1fr 18px 1fr 58px; align-items: center; width: 100%; max-width: 300px; padding: 8px 8px 8px 4px; border-radius: 18px; background: var(--panel-sunken); box-shadow: inset 0 1px 2px rgba(0,0,0,0.55), inset 0 0 0 1px var(--hairline); }
 .light-mode .guia-visor { box-shadow: inset 0 1px 2px rgba(0,0,0,0.06), inset 0 0 0 1px var(--hairline); }
 .guia-visor span { display: grid; justify-items: center; }
@@ -3903,11 +3917,6 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 .guia-rangos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 10px; width: 100%; max-width: 300px; }
 .guia-rangos span { display: grid; justify-items: center; gap: 4px; }
 .guia-rangos small { font-size: 11.5px; font-weight: 600; color: var(--text-muted); }
-.guia-curva { width: 100%; max-width: 300px; overflow: visible; }
-.guia-curva-record { stroke: var(--record); stroke-width: 1.5; stroke-dasharray: 3 5; }
-.guia-curva-linea { fill: none; stroke: color-mix(in oklab, var(--c) 72%, white); stroke-width: 3; stroke-linecap: round; }
-.guia-curva-punto { fill: var(--surface-2); stroke: color-mix(in oklab, var(--c) 72%, white); stroke-width: 2; }
-.guia-curva-oro { fill: var(--record); }
 .guia-acciones { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; width: 100%; }
 .guia-acciones > span { display: grid; justify-items: center; gap: 8px; padding: 14px 6px; border-radius: 18px; font-size: 12.5px; font-weight: 650; color: var(--text-strong); background: var(--surface-1); box-shadow: var(--placa-canto); }
 .guia-acciones em { font-style: normal; }
@@ -4238,6 +4247,66 @@ button.carrera-carril:active { background: var(--velo); }
 .icono-suelto.aviso { color: oklch(76.9% 0.132 70.1); }
 .light-mode .icono-suelto.aviso { color: oklch(55.5% 0.114 49); }
 .icono-suelto.grande { width: 48px; height: 48px; }
+/* EL BUSCADOR DE EJERCICIOS (armar y editar rutinas): una placa con el
+   campo, las regiones en un riel, los ejercicios como renglones y, si no
+   está, el ejercicio propio. El color es el del día que estás armando. */
+.buscador { display: grid; gap: 12px; margin-top: 10px; padding: 12px; border-radius: 24px; background: var(--surface-2); }
+.buscador-campo { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 6px 0 14px; border-radius: 999px; color: var(--text-muted); background: var(--surface-1); box-shadow: inset 0 0 0 1px var(--hairline); }
+.buscador-campo:focus-within { box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--c, var(--tono)) 65%, transparent); }
+.buscador-campo input { flex: 1; min-width: 0; height: 46px; border: 0; outline: none; background: transparent; font-size: 15px; color: var(--text-strong); }
+.buscador-campo input::placeholder { color: var(--text-faint); }
+.buscador-borrar { width: 36px; height: 36px; flex: none; border-radius: 999px; display: grid; place-items: center; color: var(--text-muted); background: var(--velo); }
+.buscador-regiones { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; margin: 0 -12px; padding: 0 12px; }
+.buscador-regiones::-webkit-scrollbar { display: none; }
+.buscador-regiones.envuelve { flex-wrap: wrap; overflow: visible; margin: 0; padding: 0; }
+.buscador-region { flex: none; min-height: 38px; padding: 0 15px; border-radius: 999px; font-size: 14px; font-weight: 600; color: var(--text-muted); background: var(--surface-1); box-shadow: inset 0 0 0 1px var(--hairline); transition: background-color .2s ease, color .2s ease; }
+.buscador-regiones.chicas .buscador-region { min-height: 34px; padding: 0 12px; font-size: 13px; }
+.buscador-region[aria-selected="true"], .buscador-region[aria-checked="true"] { font-weight: 700; color: color-mix(in oklab, var(--c, var(--tono)) 72%, white); background: color-mix(in oklab, var(--c, var(--tono)) 20%, var(--surface-1)); box-shadow: none; }
+.light-mode .buscador-region[aria-selected="true"], .light-mode .buscador-region[aria-checked="true"] { color: color-mix(in oklab, var(--c, var(--tono)) 72%, black); background: color-mix(in oklab, var(--c, var(--tono)) 15%, white); }
+.buscador-lista { display: grid; gap: 4px; max-height: 380px; overflow-y: auto; overscroll-behavior: contain; margin: 0 -4px; padding: 0 4px; }
+.buscador-lista section { display: grid; gap: 4px; }
+.buscador-cuenta { margin: 0 4px 2px; font-size: 12.5px; color: var(--text-faint); }
+.buscador-grupo { margin: 8px 4px 2px; font-size: 12.5px; font-weight: 650; color: var(--text-muted); }
+.buscador-fila { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 54px; padding: 8px 10px 8px 14px; border-radius: 18px; text-align: left; background: var(--surface-1); transition: transform .2s var(--resorte); }
+.buscador-fila:active { transform: scale(.985); }
+.buscador-nombre { display: block; font-size: 14.5px; font-weight: 600; line-height: 1.25; color: var(--text-strong); overflow-wrap: anywhere; }
+.buscador-nombre mark { background: none; font-weight: 750; color: color-mix(in oklab, var(--c, var(--tono)) 72%, white); }
+.light-mode .buscador-nombre mark { color: color-mix(in oklab, var(--c, var(--tono)) 72%, black); }
+.buscador-musculo { display: block; margin-top: 2px; font-size: 12.5px; color: var(--text-muted); }
+.buscador-mas { width: 32px; height: 32px; flex: none; display: grid; place-items: center; color: color-mix(in oklab, var(--c, var(--tono)) 72%, white); }
+.light-mode .buscador-mas { color: color-mix(in oklab, var(--c, var(--tono)) 72%, black); }
+.buscador-mas.galleta { --galleta-fondo: color-mix(in oklab, var(--c, var(--tono)) 72%, white); color: color-mix(in oklab, var(--c, var(--tono)) 18%, #07080a); }
+.buscador-fila.agregado .buscador-nombre { color: var(--text-muted); }
+.buscador-vacio { padding: 12px 6px 6px; font-size: 14px; color: var(--text-muted); text-align: center; text-wrap: balance; }
+.buscador-no-esta { justify-self: center; }
+.buscador-propio { display: grid; gap: 10px; padding-top: 12px; border-top: 1px solid var(--hairline); }
+.buscador-propio .buscador-grupo { margin-top: 2px; }
+.buscador-nota { font-size: 12px; line-height: 1.4; color: var(--text-faint); }
+/* La primera elección de rutina: tres placas, cada una con su renglón. */
+.eleccion-cabeza { display: grid; gap: 6px; padding: 6px 4px 2px; text-align: center; }
+.eleccion-titulo { font-size: 1.5rem; font-weight: 780; letter-spacing: -0.015em; color: var(--text-strong); text-wrap: balance; }
+.eleccion-bajada { font-size: 14.5px; line-height: 1.45; color: var(--text-muted); text-wrap: balance; }
+.eleccion { display: grid; gap: 10px; }
+.eleccion-opcion { border-radius: 24px; background: var(--surface-1); box-shadow: var(--placa-canto); overflow: hidden; }
+.eleccion-fila { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 68px; padding: 12px 16px; text-align: left; transition: transform .2s var(--resorte); }
+.eleccion-fila:active { transform: scale(.985); }
+.eleccion-fila b { display: block; font-size: 15.5px; font-weight: 700; color: var(--text-strong); }
+.eleccion-fila small { display: block; margin-top: 2px; font-size: 13px; line-height: 1.35; color: var(--text-muted); }
+.eleccion-fila .icono-suelto { color: color-mix(in oklab, var(--tono) 72%, white); }
+.light-mode .eleccion-fila .icono-suelto { color: color-mix(in oklab, var(--tono) 72%, black); }
+.eleccion-chevron { flex: none; color: var(--text-faint); transition: transform .25s var(--resorte); }
+.eleccion-sub { display: grid; gap: 6px; padding: 0 10px 10px; }
+.eleccion-fila.sub { min-height: 62px; border-radius: 18px; background: var(--surface-2); }
+/* Primeros pasos: un renglón por paso; lo hecho, con la galleta llena. */
+.a-entrenar-disco { width: 96px; height: 96px; --galleta-fondo: color-mix(in oklab, var(--tono) 72%, white); color: color-mix(in oklab, var(--tono) 18%, #07080a); }
+.a-entrenar-texto { font-size: 1.6rem; font-weight: 800; letter-spacing: -0.01em; color: #f1f1ee; }
+.primeros-paso { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 52px; margin-top: 6px; padding: 8px 10px; border-radius: 16px; text-align: left; background: var(--surface-2); }
+.primeros-paso.hecho { background: transparent; }
+.primeros-marca { width: 24px; height: 24px; flex: none; --galleta-fondo: color-mix(in oklab, var(--tono) 72%, white); color: color-mix(in oklab, var(--tono) 18%, #07080a); }
+.primeros-marca.hueca { --galleta-borde: var(--hairline-fuerte); --galleta-fondo: var(--surface-2); }
+.primeros-nombre { display: block; font-size: 14px; font-weight: 600; color: var(--text-strong); }
+.primeros-paso.hecho .primeros-nombre { color: var(--text-muted); text-decoration: line-through; text-decoration-color: var(--hairline-fuerte); }
+.primeros-pista { display: block; margin-top: 1px; font-size: 12.5px; color: var(--text-muted); }
 .aviso-vincular { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 22px; color: var(--text-muted); background: var(--surface-1); box-shadow: var(--placa-canto); }
 .aviso-vincular p { flex: 1; min-width: 0; font-size: 12.5px; line-height: 1.4; text-wrap: pretty; }
 .preset-acciones { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
@@ -7702,27 +7771,69 @@ function FilaDescansoDock({ timerId, embebido = false }) {
 // referencia opcional). Deliberadamente cortísima — 2 toques y estás
 // entrenando — porque a esta altura ya elegiste y activaste una rutina, así
 // que lo único que falta contar es cómo se registra y el diferencial fuerte.
+// LA BIENVENIDA: cuatro pasos, cada uno con una pieza de verdad de la app
+// (el visor de la serie y la barra cargada, la gráfica de un ejercicio, el
+// chat y la escalera del ciclo), como en la guía del "?". Antes era un
+// ícono suelto por paso. El último decide si hay semanas de descarga.
 const WELCOME_SLIDES = [
-  {
-    icon: <Flame size={38} />,
-    color: "#14B8A6",
-    title: "¡Bienvenido a Modus Fit! 💪",
-    text: "Anotá reps y kilos en segundos. Nosotros nos encargamos de detectar tus récords y armar tu progreso.",
-  },
-  {
-    icon: <Sparkles size={38} />,
-    color: "#14B8A6",
-    title: "Tu entrenador con IA",
-    text: "Conoce tus datos reales y te da consejos concretos, nada de respuestas genéricas.",
-  },
-  {
-    icon: <Zap size={38} />,
-    color: "#A855F7",
-    title: "Semanas de descarga",
-    text: "Cada ciertas semanas de entrenamiento te proponemos una semana con menos carga, para recuperarte antes de la próxima. ¿La activamos? Lo podés cambiar cuando quieras desde tu perfil.",
-    interactive: "deload",
-  },
+  { key: "serie", color: "#14B8A6", title: "Te damos la bienvenida a Modus Fit", text: "Anotá reps y kilos en segundos: vienen con lo de la vez pasada. Cada serie carga un disco en la barra del día." },
+  { key: "progreso", color: "#3B82F6", title: "Tu progreso, en gráficos", text: "Los récords se detectan solos. Cada ejercicio tiene su gráfica, y la semana, el mes y el año, su resumen." },
+  { key: "ia", color: "#14B8A6", title: "Un entrenador con IA que te conoce", text: "Sabe tu rutina, tus marcas y tu progreso. Preguntale con cuánto arrancar o pedile una rutina nueva." },
+  { key: "descarga", color: "#A855F7", title: "Semanas de descarga", text: "Cada ciertas semanas te proponemos una con menos carga, para recuperarte antes de la próxima. ¿La activamos? Lo podés cambiar cuando quieras en tu perfil.", interactive: "deload" },
 ];
+
+// Seis sesiones de muestra de un ejercicio, una por semana hasta hoy, con
+// sus récords: la gráfica de la bienvenida y de la guía.
+function evolucionDeMuestra() {
+  const hoy = new Date();
+  hoy.setHours(12, 0, 0, 0);
+  const valores = [60, 60, 62.5, 62.5, 65, 67.5];
+  let maximo = 0;
+  return valores.map((v, i) => {
+    const d = new Date(hoy);
+    d.setDate(d.getDate() - (valores.length - 1 - i) * 7);
+    const record = i > 0 && v > maximo;
+    maximo = Math.max(maximo, v);
+    return { fecha: localDateStr(d), v, record };
+  });
+}
+
+function dibujoBienvenida(key, color) {
+  if (key === "serie") {
+    return (
+      <div className="bienvenida-serie">
+        <div className="guia-visor" style={{ "--c": color }}>
+          <span><b className="num-display">8</b><small>reps</small></span>
+          <i>×</i>
+          <span><b className="num-display">60</b><small>kg</small></span>
+          <em><Check size={22} strokeWidth={2.6} /></em>
+        </div>
+        <BarraCargada hechas={6} total={10} alto={52} etiqueta="Una barra con seis discos de diez" />
+      </div>
+    );
+  }
+  if (key === "progreso") {
+    return (
+      <div className="guia-ancho">
+        <GraficaTiempo puntos={evolucionDeMuestra()} color={`color-mix(in oklab, ${color} 72%, white)`} alto={150} formato={(v) => numeroAR(v)}
+          referencia={{ v: 67.5, etiqueta: "récord 67,5" }} etiqueta="Una gráfica de muestra: de 60 a 67,5 kg en seis semanas" />
+      </div>
+    );
+  }
+  if (key === "ia") {
+    return (
+      <div className="guia-chat" style={{ "--c": color }}>
+        <p className="propia">¿Con cuánto arranco hoy en press banca?</p>
+        <p className="ia">Con 72,5 kg: la vez pasada hiciste 8 × 70 y te sobró una rep.</p>
+      </div>
+    );
+  }
+  return (
+    <div className="guia-escalera" style={{ "--c": color }}>
+      {[30, 44, 58, 72, 86, 26].map((h, i) => <i key={i} className={i === 3 ? "hoy" : i > 3 && i < 5 ? "despues" : i === 5 ? "descarga" : ""} style={{ height: `${h}%` }} />)}
+    </div>
+  );
+}
 
 // ── OVERLAY DE INICIO DE SESIÓN ─────────────────────────────────────────────
 // Un flash breve (1.4s) que confirma que arrancó el entrenamiento. No bloquea
@@ -7737,10 +7848,8 @@ function SessionStartOverlay({ onDone }) {
     <div className="fixed inset-0 z-[135] flex items-center justify-center pointer-events-none session-start-fade modal-overlay">
       <div className="absolute inset-0 bg-black/55 backdrop-blur-[2px]" />
       <div className="relative flex flex-col items-center gap-3">
-        <div className="w-24 h-24 rounded-full flex items-center justify-center session-start-pop" style={{ background: "radial-gradient(circle, rgba(20,184,166,0.35), rgba(20,184,166,0.05))", border: "2px solid rgba(20,184,166,0.5)", boxShadow: "0 0 50px -8px rgba(20,184,166,0.8)" }}>
-          <Dumbbell size={44} className="text-teal-300" />
-        </div>
-        <p className="text-2xl font-black text-white session-start-text" style={{ textShadow: "0 2px 20px rgba(20,184,166,0.6)" }}>¡A entrenar!</p>
+        <div className="galleta session-start-pop a-entrenar-disco" aria-hidden="true"><Dumbbell size={44} /></div>
+        <p className="a-entrenar-texto session-start-text">A entrenar</p>
       </div>
     </div>
   );
@@ -8337,74 +8446,34 @@ function WelcomeIntro({ onClose, onOpenTutorial, onUpdateSettings = null }) {
   const isDeloadSlide = slide.interactive === "deload";
   return (
     <div className="fixed inset-0 z-[110] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 modal-bg-in modal-overlay">
-      <div
-        className="max-w-sm w-full rounded-3xl modal-pop-in shadow-2xl shadow-black/70 overflow-hidden flex flex-col"
-        style={{ background: "var(--panel-grad-cyan)", border: `1px solid ${tint(slide.color, "30")}`, minHeight: 440 }}
-      >
-        {/* Hero: el ícono grande sobre un halo del color del slide */}
-        <div key={`hero-${i}`} className="relative flex flex-col items-center pt-12 pb-6 px-6 text-center tab-fade-in">
-          <div className="absolute -top-16 left-1/2 -translate-x-1/2 w-56 h-56 rounded-full blur-3xl pointer-events-none transition-colors duration-500" style={{ backgroundColor: tint(slide.color, "22") }} />
-          <div className="relative w-20 h-20 rounded-3xl flex items-center justify-center mb-5 elastic-in" style={{ backgroundColor: "var(--surface-3)", border: "1px solid var(--hairline)", color: "var(--text-strong)", boxShadow: "var(--sombra-placa)" }}>
-            {slide.icon}
+      <div className="bienvenida modal-pop-in" role="dialog" aria-modal="true" aria-label="Bienvenida a Modus Fit" style={{ "--c": slide.color }}>
+        <div key={`paso-${i}`} className="bienvenida-cuerpo tab-fade-in">
+          <div className="guia-escenario">{dibujoBienvenida(slide.key, slide.color)}</div>
+          <h2 className="guia-paso-titulo bienvenida-titulo">{slide.title}</h2>
+          <p className="guia-paso-texto">{slide.text}</p>
+        </div>
+        <div className="guia-pie">
+          <div className="guia-puntos" role="tablist" aria-label="Pasos de la bienvenida">
+            {WELCOME_SLIDES.map((s, si) => (
+              <button key={s.key} role="tab" aria-selected={si === i} aria-label={`Paso ${si + 1} de ${WELCOME_SLIDES.length}`} onClick={() => setI(si)} className="bienvenida-punto">
+                <i className={si === i ? "actual" : si < i ? "visto" : ""} />
+              </button>
+            ))}
           </div>
-          <h2 className="relative text-xl font-black text-white leading-tight mb-2.5">{slide.title}</h2>
-          <p className="relative text-sm text-slate-400 leading-relaxed">{slide.text}</p>
-        </div>
-
-        <div className="flex-1" />
-
-        {/* Puntos de progreso */}
-        <div className="flex items-center justify-center gap-1.5 pb-5">
-          {WELCOME_SLIDES.map((s, si) => (
-            <button
-              key={si}
-              onClick={() => setI(si)}
-              aria-label={`Ir al paso ${si + 1}`}
-              className="rounded-full transition-all duration-300"
-              style={{ width: si === i ? 22 : 7, height: 7, backgroundColor: si === i ? "var(--text-strong)" : "var(--surface-3)" }}
-            />
-          ))}
-        </div>
-
-        {/* Botones grandes, estilo intro de app */}
-        <div className="px-5 pb-5 space-y-2">
           {isDeloadSlide ? (
-            // Elegir acá mismo si querés las semanas de descarga (mismo
-            // ajuste que Perfil → Configuración de descarga, deloadEnabled)
-            // — con "Sí" ya activado por defecto (el comportamiento normal
-            // de la app), así que tocar cualquiera de las dos avanza.
+            // Elegir acá mismo si querés las semanas de descarga (el mismo
+            // ajuste que Perfil › Descarga, deloadEnabled).
             <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => { onUpdateSettings?.({ deloadEnabled: true }); onClose(); }}
-                className="py-3.5 rounded-2xl text-sm font-black !text-[color:var(--accion-tinta)] transition active:scale-[0.98]"
-                style={{ background: "var(--accion-fondo)", boxShadow: "none" }}
-              >
-                Sí, quiero
-              </button>
-              <button
-                onClick={() => { onUpdateSettings?.({ deloadEnabled: false }); onClose(); }}
-                className="py-3.5 rounded-2xl text-sm font-bold text-slate-300 border border-slate-700 hover:bg-slate-800/60 transition active:scale-[0.98]"
-              >
-                No, prefiero no
-              </button>
+              <button onClick={() => { onUpdateSettings?.({ deloadEnabled: true }); onClose(); }} className="boton-pildora">Sí, quiero</button>
+              <button onClick={() => { onUpdateSettings?.({ deloadEnabled: false }); onClose(); }} className="boton-tonal" style={{ "--c": "#8a8c92" }}>No, prefiero no</button>
             </div>
           ) : (
-            <button
-              onClick={() => setI((n) => n + 1)}
-              className="w-full py-3.5 rounded-2xl text-sm font-black !text-[color:var(--accion-tinta)] transition active:scale-[0.98]"
-              style={{ background: "var(--accion-fondo)", boxShadow: "none" }}
-            >
-              Siguiente
-            </button>
+            <button onClick={() => setI((n) => n + 1)} className="boton-pildora w-full">Siguiente</button>
           )}
           {isDeloadSlide ? (
-            <button onClick={() => { onClose(); onOpenTutorial?.(); }} className="w-full py-2.5 rounded-2xl text-xs font-bold text-slate-400 hover:text-white transition">
-              Ver el tutorial completo
-            </button>
+            <button onClick={() => { onClose(); onOpenTutorial?.(); }} className="enlace-suave mx-auto">Ver la guía completa</button>
           ) : (
-            <button onClick={onClose} className="w-full py-2.5 rounded-2xl text-xs font-bold text-slate-600 hover:text-slate-400 transition">
-              Saltar
-            </button>
+            <button onClick={onClose} className="enlace-suave mx-auto">Saltar</button>
           )}
         </div>
       </div>
@@ -8453,7 +8522,7 @@ function capitulosGuia() {
       pasos: [
         {
           titulo: "Elegí el día",
-          texto: "Arriba están los días de tu rutina. El que toca hoy tiene una rayita abajo; el elegido se pinta de su color.",
+          texto: "Arriba están los días de tu rutina. El que toca hoy tiene una rayita abajo; el elegido se tiñe de su color.",
           dibujo: (
             <div className="guia-selector">
               {[["Push", verde], ["Pull", azul], ["Legs", naranja]].map(([n, c], i) => <span key={n} className={i === 0 ? "elegido" : ""} style={{ "--c": c }}>{n}{i === 0 && <i />}</span>)}
@@ -8484,7 +8553,7 @@ function capitulosGuia() {
         },
         {
           titulo: "Cada serie carga un disco",
-          texto: "La barra del día se llena a medida que anotás. Cuando está completa, terminaste: tocá Finalizar y queda guardada la sesión.",
+          texto: "La barra del día se llena a medida que anotás. Cuando está completa, terminaste: tocá Finalizar y sale el ticket de tu sesión, con cómo te fue contra la vez pasada.",
           dibujo: <BarraCargada hechas={6} total={10} alto={64} detalle etiqueta="Una barra con seis discos de diez" />,
         },
       ],
@@ -8513,14 +8582,25 @@ function capitulosGuia() {
           ),
         },
         {
-          titulo: "Tus récords, en una curva",
-          texto: "En Ejercicios, la curva de tu 1RM estimado. La línea dorada es tu récord y los puntos dorados, las sesiones en que lo superaste.",
+          titulo: "Tu evolución, ejercicio por ejercicio",
+          texto: "En Ejercicios, el 1RM, el peso o el volumen de cada sesión, con su escala y las fechas de verdad. Deslizá el dedo por la gráfica para ver cada sesión; los puntos dorados son tus récords.",
           dibujo: (
-            <svg viewBox="0 0 240 110" className="guia-curva" aria-hidden="true">
-              <line x1="10" y1="34" x2="230" y2="34" className="guia-curva-record" />
-              <path d="M12 92 C 50 92, 60 70, 92 66 S 140 60, 156 40 S 200 34, 228 34" className="guia-curva-linea" />
-              {[[12, 92], [92, 66], [156, 40], [228, 34]].map(([x, y], i) => <circle key={i} cx={x} cy={y} r={i ? 5 : 4} className={i ? "guia-curva-oro" : "guia-curva-punto"} />)}
-            </svg>
+            <div className="guia-ancho">
+              <GraficaTiempo puntos={evolucionDeMuestra()} color={`color-mix(in oklab, ${azul} 72%, white)`} alto={150} formato={(v) => numeroAR(v)}
+                referencia={{ v: 67.5, etiqueta: "récord 67,5" }} etiqueta="Una gráfica de muestra: de 60 a 67,5 kg en seis semanas" />
+            </div>
+          ),
+        },
+        {
+          titulo: "Tus resúmenes, con gráficos",
+          texto: "Al cerrar la semana, el mes o el año: tus días, tus últimas semanas contra tu promedio y una telaraña de dónde fue el trabajo, contra el período anterior.",
+          dibujo: (
+            <div className="guia-ancho" style={{ "--tono": azul }}>
+              <Telarana
+                regiones={[{ nombre: "Pecho", series: 12 }, { nombre: "Hombros", series: 9 }, { nombre: "Brazos", series: 10 }, { nombre: "Core", series: 4 }, { nombre: "Piernas", series: 14 }, { nombre: "Espalda", series: 11 }]}
+                anterior={[{ nombre: "Pecho", series: 10 }, { nombre: "Hombros", series: 8 }, { nombre: "Brazos", series: 8 }, { nombre: "Core", series: 6 }, { nombre: "Piernas", series: 12 }, { nombre: "Espalda", series: 9 }]}
+                etiqueta="Una telaraña de muestra con las series por región" />
+            </div>
           ),
         },
       ],
@@ -8561,13 +8641,13 @@ function capitulosGuia() {
         },
         {
           titulo: "La carrera de la semana",
-          texto: "Vos y tus amigos, cada uno en su carril: cada sesión es un tramo del color del día que entrenó. Gana el que más va.",
+          texto: "Vos y tus amigos, cada uno en su carril: cada sesión es un tramo, y el aro de cada uno es el color de su rango. Gana el que más va.",
           dibujo: (
             <div className="guia-ancho">
               <CarreraSemana filas={[
-                { uid: "m", nombre: "Martina", dias: [verde, null, azul, naranja, verde, null, null] },
-                { uid: "yo", yo: true, nombre: "Vos", dias: [azul, naranja, null, verde, null, null, null] },
-                { uid: "j", nombre: "Joaquín", dias: [null, verde, null, azul, null, null, null] },
+                { uid: "m", nombre: "Martina", dias: [verde, null, azul, naranja, verde, null, null], rango: "#4FA3E0" },
+                { uid: "yo", yo: true, nombre: "Vos", dias: [azul, naranja, null, verde, null, null, null], rango: "#2FB866" },
+                { uid: "j", nombre: "Joaquín", dias: [null, verde, null, azul, null, null, null], rango: "#E0B632" },
               ]} />
             </div>
           ),
@@ -8577,6 +8657,18 @@ function capitulosGuia() {
           texto: "Tocá a un amigo en el Ranking: cada músculo que le ganás es un disco de tu lado y baja el que pesa más. Abajo, lo que te falta para pasarlo.",
           dibujo: <div className="guia-ancho"><BarraEnEquilibrio izq={{ valor: 6, discos: 6, color: "#2FB866" }} der={{ valor: 4, discos: 4, color: "#E0B632" }} etiqueta="Seis músculos contra cuatro" /></div>,
         },
+        {
+          titulo: "Retá a un amigo",
+          texto: "Desde la pizarra de récords o el mano a mano, retalo a superar tu mejor serie esta semana. Le llega en sus avisos, y a vos te avisa si lo logra.",
+          dibujo: (
+            <div className="guia-ancho" style={{ "--tono": "#8B5CF6" }}>
+              <div className="aviso-social">
+                <span className="galleta aviso-social-icono tono" aria-hidden="true"><Target size={17} /></span>
+                <p><b>Martina</b> te retó: superá su 6 × 80 kg en Press Banca antes del domingo.</p>
+              </div>
+            </div>
+          ),
+        },
       ],
     },
     {
@@ -8584,7 +8676,7 @@ function capitulosGuia() {
       pasos: [
         {
           titulo: "Preguntale lo que quieras",
-          texto: "Conoce tu rutina, tus marcas y tu progreso: todo lo que anotás en la app. Escribile o dictale por voz.",
+          texto: "Conoce tu rutina, tus marcas y tu progreso: todo lo que anotás en la app. Escribile o dictale por voz; las tarjetas del inicio ya te adelantan tu punto débil y lo que te toca hoy.",
           dibujo: (
             <div className="guia-chat">
               <p className="propia">¿Con cuánto arranco hoy en press banca?</p>
@@ -8604,10 +8696,10 @@ function capitulosGuia() {
       pasos: [
         {
           titulo: "Tus datos y tus ajustes",
-          texto: "Tu ciclo y la descarga, los descansos, los recordatorios, el tema y la unidad de peso.",
+          texto: "Tu ciclo y la descarga, los descansos y el modo gimnasio (la serie más grande mientras entrenás), los recordatorios, el tema y la unidad de peso.",
           dibujo: (
             <div className="guia-fichas">
-              {["Ciclo y descarga", "Descansos", "Recordatorios", "Tema", "Kilos o libras"].map((t) => <span key={t}>{t}</span>)}
+              {["Ciclo y descarga", "Descansos", "Modo gimnasio", "Recordatorios", "Tema", "Kilos o libras"].map((t) => <span key={t}>{t}</span>)}
             </div>
           ),
         },
@@ -20561,77 +20653,122 @@ function SavedRoutineRow({ routine, isActive, onUse, onEdit, onShare, onArchive,
   );
 }
 
-function ExercisePickerPanel({ existingIds, onAdd, onAddCustom, onClose }) {
-  const [group, setGroup] = useState(MUSCLE_GROUPS[0].key);
+// EL BUSCADOR DE EJERCICIOS del armado y la edición de rutinas. Busca como
+// escribe la gente (sin tildes, en cualquier orden, en plural, con errores
+// de tipeo, en inglés o con el apodo del gimnasio: ver buscar-ejercicios.js)
+// y resalta en cada nombre lo que coincidió. Sin escribir, se elige por
+// región del cuerpo (siete, en vez de los veinte grupos del catálogo) y los
+// ejercicios salen agrupados por músculo. Si no está, se agrega como propio
+// con el nombre que ya escribiste.
+function ExercisePickerPanel({ existingIds, onAdd, onAddCustom, onClose, color = null }) {
+  const [region, setRegion] = useState("pecho");
   const [search, setSearch] = useState("");
+  const [propioAbierto, setPropioAbierto] = useState(false);
   const [customName, setCustomName] = useState("");
-  // Músculo del ejercicio personalizado — arranca en el primer músculo real
-  // (no "cardio", aunque sea MUSCLE_GROUPS[0]): antes, si alguien agregaba
-  // un ejercicio propio sin tocar ningún chip, quedaba silenciosamente
-  // marcado "cardio" (con muscle:"cardio" en minúscula, sin capitalizar) sin
-  // que el chip de Cardio se viera siquiera seleccionado en pantalla.
-  const [customMuscle, setCustomMuscle] = useState(MUSCLE_GROUPS.find((g) => g.key !== "cardio")?.key || MUSCLE_GROUPS[0].key);
-  const pool = search.trim()
-    ? EXERCISE_LIBRARY.filter((e) => e.name.toLowerCase().includes(search.trim().toLowerCase()))
-    : EXERCISE_LIBRARY_BY_GROUP[group];
-
+  const [customRegion, setCustomRegion] = useState("pecho");
+  const [customMuscle, setCustomMuscle] = useState("pectoral_medio");
+  const consulta = search.trim();
+  const busqueda = useMemo(() => buscarEjercicios(consulta), [consulta]);
+  const regionActual = REGIONES_BUSCADOR.find((r) => r.key === region) || REGIONES_BUSCADOR[0];
+  const regionPropia = REGIONES_BUSCADOR.find((r) => r.key === customRegion) || REGIONES_BUSCADOR[0];
+  const abrirPropio = () => {
+    // El nombre arranca con lo que buscaste; el músculo, con la región que
+    // estabas mirando.
+    setCustomName(consulta);
+    setCustomRegion(region);
+    setCustomMuscle((REGIONES_BUSCADOR.find((r) => r.key === region) || REGIONES_BUSCADOR[0]).grupos[0]);
+    setPropioAbierto(true);
+  };
+  const agregarPropio = () => {
+    const nombre = customName.trim();
+    if (!nombre) return;
+    onAddCustom(nombre, customMuscle);
+    setCustomName(""); setPropioAbierto(false); setSearch("");
+  };
+  const fila = (e) => {
+    const agregado = existingIds.includes(e.id);
+    return (
+      <button key={e.id} onClick={() => !agregado && onAdd(e)} disabled={agregado} className={`buscador-fila ${agregado ? "agregado" : ""}`}
+        aria-label={agregado ? `${e.name}: ya está en el día` : `Agregar ${e.name}`}>
+        <span className="min-w-0 flex-1">
+          <span className="buscador-nombre">
+            {consulta ? partesResaltadas(e.name, busqueda.palabras).map((p, i) => (p.resaltada ? <mark key={i}>{p.texto}</mark> : <React.Fragment key={i}>{p.texto}</React.Fragment>)) : e.name}
+          </span>
+          <span className="buscador-musculo">{e.muscle}</span>
+        </span>
+        <span className={`buscador-mas ${agregado ? "galleta" : ""}`} aria-hidden="true">{agregado ? <Check size={15} strokeWidth={2.8} /> : <Plus size={18} />}</span>
+      </button>
+    );
+  };
   return (
-    <div className="mt-2.5 bg-slate-950/60 border border-slate-800/60 rounded-2xl p-3 bounce-in">
-      <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar ejercicio…" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white mb-2 focus:outline-none focus:border-teal-500/50" />
-      <p className="text-[9px] text-slate-600 mb-2 px-0.5 flex items-center gap-1">
-        <Layers size={9} className="shrink-0" /> Podés combinar dos ejercicios en superserie tocando <span className="text-teal-600 font-bold">⟨S⟩</span> en la lista de ejercicios.
-      </p>
-      {!search.trim() && (
-        <div className="flex gap-1.5 overflow-x-auto pb-2 -mx-1 px-1">
-          {MUSCLE_GROUPS.map((g) => (
-            <button key={g.key} onClick={() => { setGroup(g.key); setCustomMuscle(g.key); }} className="px-2.5 py-1 rounded-lg text-[10px] font-bold whitespace-nowrap transition-all border shrink-0"
-              style={group === g.key ? { backgroundColor: tint(g.color, "22"), borderColor: tint(g.color, "55"), color: g.color } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
-              {g.label}
-            </button>
+    <div className="buscador bounce-in" style={color ? { "--c": color } : undefined}>
+      <label className="buscador-campo">
+        <Search size={17} aria-hidden="true" />
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Press banca, jalón, sentadilla…" aria-label="Buscar ejercicio" enterKeyHint="search" />
+        {search && <button onClick={() => setSearch("")} aria-label="Borrar la búsqueda" className="buscador-borrar"><X size={15} /></button>}
+      </label>
+
+      {!consulta && (
+        <div className="buscador-regiones" role="tablist" aria-label="Región del cuerpo">
+          {REGIONES_BUSCADOR.map((r) => (
+            <button key={r.key} role="tab" aria-selected={region === r.key} onClick={() => setRegion(r.key)} className="buscador-region">{r.label}</button>
           ))}
         </div>
       )}
-      <div className="max-h-52 overflow-y-auto overscroll-contain space-y-1.5 mt-1 -mx-1 px-1">
-        {pool.map((e) => {
-          const added = existingIds.includes(e.id);
-          return (
-            <button key={e.id} onClick={() => !added && onAdd(e)} disabled={added} className={`w-full flex items-center gap-2.5 text-left rounded-xl px-2.5 py-2 transition ${added ? "bg-teal-500/10" : "bg-slate-900/60 hover:bg-slate-800/60"}`}>
-              <div className="flex-1 min-w-0">
-                <p className="text-[11px] font-bold text-white truncate">{e.name}</p>
-                <p className="text-[10px] text-slate-500 truncate">{e.nota}</p>
-              </div>
-              {added ? <Check size={14} className="text-teal-400 shrink-0" /> : <Plus size={14} className="text-teal-400 shrink-0" />}
-            </button>
-          );
-        })}
-        {pool.length === 0 && <p className="text-[11px] text-slate-600 text-center py-3">Sin resultados.</p>}
+
+      <div className="buscador-lista" aria-live="polite">
+        {consulta ? (
+          <>
+            {busqueda.resultados.length > 0 && <p className="buscador-cuenta">{busqueda.resultados.length === 1 ? "Un ejercicio" : `${busqueda.resultados.length} ejercicios`}</p>}
+            {busqueda.resultados.map(fila)}
+            {busqueda.resultados.length === 0 && <p className="buscador-vacio">No encontramos «{consulta}».</p>}
+            {busqueda.parecidos.length > 0 && (
+              <>
+                <p className="buscador-grupo">Parecidos</p>
+                {busqueda.parecidos.map(fila)}
+              </>
+            )}
+          </>
+        ) : (
+          regionActual.grupos.map((g) => (
+            <section key={g} aria-label={MUSCLE_GROUP_BY_KEY[g]?.label || g}>
+              {regionActual.grupos.length > 1 && <p className="buscador-grupo">{MUSCLE_GROUP_BY_KEY[g]?.label || g}</p>}
+              {(EXERCISE_LIBRARY_BY_GROUP[g] || []).map(fila)}
+            </section>
+          ))
+        )}
       </div>
-      <div className="mt-3 pt-3 border-t border-slate-800/60 space-y-2">
-        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Agregar ejercicio propio</p>
-        <input value={customName} onChange={(e) => setCustomName(e.target.value)} placeholder="Nombre del ejercicio…" className="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-teal-500/50" />
-        <div>
-          <p className="text-[9px] text-slate-600 mb-1.5">Músculo principal:</p>
-          <div className="flex flex-wrap gap-1.5">
-            {/* BUG FIX (pedido: "simplificar cómo se arma el cardio en el
-                editor"): antes "Cardio" estaba excluido de acá — no había
-                forma de cargar un ejercicio propio (uno que no está en la
-                biblioteca) como cardio, quedaba siempre como fuerza con 3
-                series de 8-10 fijo. Ahora es un chip más; addCustomExercise
-                lo detecta y arma 1 sola sesión de tiempo en vez de series. */}
-            {MUSCLE_GROUPS.map((g) => (
-              <button key={g.key} onClick={() => setCustomMuscle(g.key)} className="px-2 py-1 rounded-lg text-[9px] font-bold border transition shrink-0"
-                style={customMuscle === g.key ? { backgroundColor: tint(g.color, "22"), borderColor: tint(g.color, "55"), color: g.color } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
-                {g.label}
-              </button>
+
+      {/* ¿No está? Se agrega como propio, con el nombre que buscaste. */}
+      {!propioAbierto ? (
+        <button onClick={abrirPropio} className="enlace-suave buscador-no-esta">
+          <Plus size={14} /> {consulta && busqueda.resultados.length === 0 ? `Agregar «${consulta}» como ejercicio propio` : "¿No está? Agregá uno propio"}
+        </button>
+      ) : (
+        <div className="buscador-propio bounce-in">
+          <label className="buscador-campo">
+            <Edit3 size={16} aria-hidden="true" />
+            <input value={customName} onChange={(e) => setCustomName(e.target.value)} placeholder="Nombre del ejercicio" aria-label="Nombre del ejercicio propio" />
+          </label>
+          <p className="buscador-grupo">Qué trabaja</p>
+          <div className="buscador-regiones envuelve" role="radiogroup" aria-label="Región del cuerpo del ejercicio propio">
+            {REGIONES_BUSCADOR.map((r) => (
+              <button key={r.key} role="radio" aria-checked={customRegion === r.key} onClick={() => { setCustomRegion(r.key); setCustomMuscle(r.grupos[0]); }} className="buscador-region">{r.label}</button>
             ))}
           </div>
+          {regionPropia.grupos.length > 1 && (
+            <div className="buscador-regiones envuelve chicas" role="radiogroup" aria-label="Músculo principal">
+              {regionPropia.grupos.map((g) => (
+                <button key={g} role="radio" aria-checked={customMuscle === g} onClick={() => setCustomMuscle(g)} className="buscador-region">{MUSCLE_GROUP_BY_KEY[g]?.label || g}</button>
+              ))}
+            </div>
+          )}
+          <button onClick={agregarPropio} disabled={!customName.trim()} className="boton-tonal w-full disabled:opacity-40"><Plus size={16} /> Agregar al día</button>
+          <p className="buscador-nota">Los ejercicios propios no tienen nota técnica ni video.</p>
         </div>
-        <button onClick={() => { if (customName.trim()) { onAddCustom(customName.trim(), customMuscle); setCustomName(""); } }} className="w-full py-2 rounded-xl bg-teal-500/20 border border-teal-500/30 text-teal-400 text-xs font-bold transition active:scale-95">
-          <Plus size={12} className="inline mr-1" /> Agregar a la rutina
-        </button>
-      </div>
-      <p className="text-[9px] text-slate-600 mt-1.5">Los ejercicios propios no tienen nota técnica ni video de YouTube.</p>
-      <button onClick={onClose} className="w-full mt-3 py-2 rounded-xl text-slate-500 hover:text-slate-300 text-[11px] font-semibold">Cerrar buscador</button>
+      )}
+
+      <button onClick={onClose} className="boton-pildora w-full !min-h-[46px]">Listo</button>
     </div>
   );
 }
@@ -21170,12 +21307,12 @@ function BuilderDayCard({ day, dayIdx, totalDays, otherDays = [], onRename, onRe
       </div>
 
       {!pickerOpen ? (
-        <button onClick={() => setPickerOpen(true)} className="w-full flex items-center justify-center gap-1.5 mt-2.5 py-2.5 rounded-xl font-semibold text-xs transition active:scale-[0.98]" style={{ backgroundColor: tint(day.color, "14"), border: `1px solid ${tint(day.color, "35")}`, color: day.color }}><Plus size={13} /> Agregar ejercicio</button>
+        <button onClick={() => setPickerOpen(true)} className="boton-tonal w-full mt-2.5" style={{ "--c": day.color }}><Plus size={16} /> Agregar ejercicio</button>
       ) : (
-        <ExercisePickerPanel existingIds={existingIds} onAdd={onAddExercise} onAddCustom={onAddCustomExercise} onClose={() => setPickerOpen(false)} />
+        <ExercisePickerPanel existingIds={existingIds} onAdd={onAddExercise} onAddCustom={onAddCustomExercise} onClose={() => setPickerOpen(false)} color={day.color} />
       )}
       {day.exercises.length > 0 && (
-        <p className="text-[9px] text-slate-600 mt-2">
+        <p className="buscador-nota mt-2">
           {day.exercises.length < 4 ? "Recomendado: entre 4 y 8 ejercicios por sesión." : day.exercises.length > 10 ? "Es bastante para una sola sesión, capaz conviene dividirlo en otro día." : "Buena cantidad de ejercicios para la sesión."}
         </p>
       )}
@@ -21276,7 +21413,10 @@ function matchExerciseToLibrary(rawName) {
       if (score > bestScore) { bestScore = score; best = e; }
     }
   });
-  return bestScore >= 4 ? best : null;
+  if (bestScore >= 4) return best;
+  // Con tildes de menos, en plural, en inglés o con otro orden: el buscador
+  // de ejercicios ("press de banca plano", "sentadillas con barra").
+  return mejorEjercicio(rawName);
 }
 
 // Mismo criterio que matchExerciseToLibrary, pero contra el catálogo FIJO
@@ -21790,9 +21930,9 @@ function buildActionPlan(action, ctx) {
       return { kind: "diff", title: `Agregar a "${day.label}"`, items: [`${lib.name}: ${setsCount} series de ${repRange}`], diffPreview: { dayLabel: day.label, dayColor: day.color, items: diffItems }, confirmLabel: "Agregar", confirm: () => onCreateRoutine(activeId, newDef) };
     }
     if (action.op === "quitar") {
-      const wanted = String(action.exercise || "").toLowerCase();
+      const wanted = String(action.exercise || "");
       const exercises = day.exercises || [];
-      const idx = exercises.findIndex((e) => (exName(e) || "").toLowerCase().includes(wanted));
+      const idx = exercises.findIndex((e) => nombreCoincide(exName(e), wanted));
       if (idx < 0) return null;
       const removedName = exName(exercises[idx]);
       const newDef = { ...activeDef, days: { ...activeDef.days, [dayKey]: { ...day, exercises: exercises.filter((_, i) => i !== idx) } } };
@@ -21802,9 +21942,9 @@ function buildActionPlan(action, ctx) {
     // Cambiar un ejercicio por otro sin tocar cuántas series ni el rango de
     // reps que ya tenía configurado — "cambiame la sentadilla por prensa".
     if (action.op === "sustituir") {
-      const wantedOld = String(action.exercise || "").toLowerCase();
+      const wantedOld = String(action.exercise || "");
       const exercises = day.exercises || [];
-      const idx = exercises.findIndex((e) => (exName(e) || "").toLowerCase().includes(wantedOld));
+      const idx = exercises.findIndex((e) => nombreCoincide(exName(e), wantedOld));
       if (idx < 0) return null;
       const oldName = exName(exercises[idx]);
       const lib = matchExerciseToLibrary(action.nuevoEjercicio || "");
@@ -25032,74 +25172,52 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
   return (
     <div className="space-y-4">
       {forced && (
-        <div className="text-center pt-2 pb-1">
-          <div className="w-14 h-14 rounded-2xl bg-blue-500/15 flex items-center justify-center mx-auto mb-3"><Layers className="text-blue-500" size={26} /></div>
-          <h2 className="text-lg font-black text-white">¿Cómo vas a entrenar?</h2>
-          <p className="text-sm text-slate-500 mt-1.5 leading-relaxed px-2">Ya armada, creada por vos, o importada. La podés cambiar cuando quieras.</p>
-        </div>
+        <header className="eleccion-cabeza">
+          <h2 className="eleccion-titulo">¿Cómo vas a entrenar?</h2>
+          <p className="eleccion-bajada">Con una rutina ya armada, una creada por vos o una que importes. La podés cambiar cuando quieras.</p>
+        </header>
       )}
 
       {forced && (
-        <div className="space-y-2.5">
-          {/* Opción 1: Crear rutina (expande IA / Manual) */}
-          <div className={`rounded-2xl border overflow-hidden transition-all ${createOpen ? "border-teal-500/40" : "border-teal-500/25"}`} style={{ background: "var(--panel-grad-emerald)" }}>
-            <button onClick={() => { setCreateOpen((o) => !o); setShowPresetsForced(false); }} className="relative overflow-hidden w-full p-4 text-left transition active:scale-[0.99]">
-              <div className="absolute -top-8 -right-8 w-28 h-28 rounded-full bg-teal-500/15 blur-2xl pointer-events-none" />
-              <div className="relative flex items-center gap-3">
-                <div className="icono-suelto"><Plus size={19} /></div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-black text-white">Crear mi rutina</p>
-                  <p className="text-[11px] text-teal-300/60 mt-0.5">Con ayuda de la IA o armándola vos</p>
-                </div>
-                <ChevronDown size={16} className={`text-teal-500 shrink-0 transition-transform ${createOpen ? "rotate-180" : ""}`} />
-              </div>
+        <div className="eleccion">
+          {/* Crear la tuya: con la IA o a mano. */}
+          <div className="eleccion-opcion">
+            <button onClick={() => { setCreateOpen((o) => !o); setShowPresetsForced(false); }} className="eleccion-fila" aria-expanded={createOpen}>
+              <span className="icono-suelto"><Plus size={19} /></span>
+              <span className="flex-1 min-w-0"><b>Crear mi rutina</b><small>Con la IA o armándola vos</small></span>
+              <ChevronDown size={17} className={`eleccion-chevron ${createOpen ? "rotate-180" : ""}`} />
             </button>
             {createOpen && (
-              <div className="px-3 pb-3 space-y-2 tab-fade-in">
-                <button onClick={() => setShowWizard(true)} className="w-full flex items-center gap-3 rounded-xl border border-teal-500/25 bg-teal-500/5 p-3.5 text-left transition active:scale-[0.98] hover:border-teal-500/50">
-                  <div className="icono-suelto"><Sparkles size={16} /></div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-black text-white">Personalizada con IA</p>
-                    <p className="text-[10px] text-slate-500 mt-0.5">Respondé unas preguntas y la IA arma tu plan</p>
-                  </div>
-                  <ChevronRight size={14} className="text-teal-500 shrink-0" />
+              <div className="eleccion-sub tab-fade-in">
+                <button onClick={() => setShowWizard(true)} className="eleccion-fila sub">
+                  <span className="icono-suelto"><Sparkles size={17} /></span>
+                  <span className="flex-1 min-w-0"><b>Con la IA</b><small>Respondé unas preguntas y arma tu plan</small></span>
+                  <ChevronRight size={16} className="eleccion-chevron" />
                 </button>
-                <button onClick={() => { setEditingRoutineId(null); setMode("builder"); }} className="w-full flex items-center gap-3 rounded-xl border border-slate-700/60 bg-slate-800/40 p-3.5 text-left transition active:scale-[0.98] hover:border-slate-500">
-                  <div className="icono-suelto"><Edit3 size={15} /></div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-black text-white">Manualmente</p>
-                    <p className="text-[10px] text-slate-500 mt-0.5">Elegí vos cada día, ejercicio y serie</p>
-                  </div>
-                  <ChevronRight size={14} className="text-slate-600 shrink-0" />
+                <button onClick={() => { setEditingRoutineId(null); setMode("builder"); }} className="eleccion-fila sub">
+                  <span className="icono-suelto"><Edit3 size={16} /></span>
+                  <span className="flex-1 min-w-0"><b>A mano</b><small>Elegís cada día, ejercicio y serie</small></span>
+                  <ChevronRight size={16} className="eleccion-chevron" />
                 </button>
               </div>
             )}
           </div>
-
-          {/* Opción 2: Preestablecidas */}
-          <button onClick={() => { setShowPresetsForced((s) => !s); setCreateOpen(false); }} className={`relative overflow-hidden w-full rounded-2xl border p-4 text-left transition active:scale-[0.99] ${showPresetsForced ? "border-blue-500/40" : "border-blue-500/25"}`} style={{ background: "var(--grad-hero-blue, linear-gradient(135deg,#0c1f2a,#14181d))" }}>
-            <div className="absolute -top-8 -right-8 w-28 h-28 rounded-full bg-blue-500/15 blur-2xl pointer-events-none" />
-            <div className="relative flex items-center gap-3">
-              <div className="icono-suelto"><Layers size={18} /></div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-black text-white">Elegir una preestablecida</p>
-                <p className="text-[11px] text-blue-300/60 mt-0.5">Push/Pull/Legs, Arnold, Upper/Lower y más</p>
-              </div>
-              <ChevronDown size={16} className={`text-blue-500 shrink-0 transition-transform ${showPresetsForced ? "rotate-180" : ""}`} />
-            </div>
-          </button>
-
-          {/* Opción 3: Importar */}
-          <button onClick={() => setShowImport(true)} className="relative overflow-hidden w-full rounded-2xl border border-slate-700/60 p-4 text-left transition active:scale-[0.99] hover:border-slate-500 bg-slate-900/40">
-            <div className="relative flex items-center gap-3">
-              <div className="w-11 h-11 rounded-2xl bg-slate-800 border border-slate-700 flex items-center justify-center shrink-0"><Download size={17} className="text-slate-400" /></div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-black text-white">Importar una rutina</p>
-                <p className="text-[11px] text-slate-500 mt-0.5">Desde PDF, Excel, Word o texto</p>
-              </div>
-              <ChevronRight size={16} className="text-slate-600 shrink-0" />
-            </div>
-          </button>
+          {/* Una preestablecida (la lista se abre debajo). */}
+          <div className="eleccion-opcion">
+            <button onClick={() => { setShowPresetsForced((s) => !s); setCreateOpen(false); }} className="eleccion-fila" aria-expanded={showPresetsForced}>
+              <span className="icono-suelto"><Layers size={18} /></span>
+              <span className="flex-1 min-w-0"><b>Elegir una preestablecida</b><small>Push/Pull/Legs, Arnold, Upper/Lower y más</small></span>
+              <ChevronDown size={17} className={`eleccion-chevron ${showPresetsForced ? "rotate-180" : ""}`} />
+            </button>
+          </div>
+          {/* Importar. */}
+          <div className="eleccion-opcion">
+            <button onClick={() => setShowImport(true)} className="eleccion-fila">
+              <span className="icono-suelto"><Download size={18} /></span>
+              <span className="flex-1 min-w-0"><b>Importar una rutina</b><small>Desde un PDF, un Excel, un Word o un texto</small></span>
+              <ChevronRight size={16} className="eleccion-chevron" />
+            </button>
+          </div>
         </div>
       )}
 
@@ -25835,7 +25953,7 @@ function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
           </div>
 
           <button onClick={onClose} className="boton-pildora w-full mt-4" style={{ "--c": "#14B8A6" }}>
-            Listo, empecemos 💪
+            Listo, empecemos
           </button>
         </div>
       </div>
@@ -25879,14 +25997,13 @@ function OnboardingTasksCard({ profile, cycleStart, logs, onGoToProfile, onDone,
       {open && (
         <div className="px-4 pb-3 pt-0.5 space-y-1 bounce-in">
           {tasks.map((t) => (
-            <button key={t.key} onClick={t.done ? undefined : (t.action === "fields" ? onOpenFieldSettings : onGoToProfile)} className={`w-full flex items-center gap-2.5 text-left rounded-xl px-2 py-1.5 mt-2 transition ${t.done ? "opacity-50" : "hover:bg-slate-800/40"}`}>
-              <div className={`w-5 h-5 rounded-lg flex items-center justify-center shrink-0 ${t.done ? "bg-teal-500" : "border border-slate-700"}`}>
-                {t.done && <Check size={12} className="text-white" />}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className={`text-xs font-semibold ${t.done ? "text-slate-500 line-through" : "text-slate-300"}`}>{t.label}</p>
-                {!t.done && <p className="text-[9px] text-slate-600">{t.hint}</p>}
-              </div>
+            <button key={t.key} onClick={t.done ? undefined : (t.action === "fields" ? onOpenFieldSettings : onGoToProfile)} className={`primeros-paso ${t.done ? "hecho" : ""}`}>
+              <span className={`galleta primeros-marca ${t.done ? "" : "hueca"}`} aria-hidden="true">{t.done && <Check size={13} strokeWidth={3} />}</span>
+              <span className="flex-1 min-w-0">
+                <span className="primeros-nombre">{t.label}</span>
+                {!t.done && <span className="primeros-pista">{t.hint}</span>}
+              </span>
+              {!t.done && <ChevronRight size={15} className="shrink-0 text-slate-500" aria-hidden="true" />}
             </button>
           ))}
         </div>
