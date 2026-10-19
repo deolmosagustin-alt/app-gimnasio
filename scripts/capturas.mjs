@@ -115,6 +115,9 @@ function sembrarHistorial() {
   p.username = p.username || "diseno";
   localStorage.setItem(CLAVE, JSON.stringify(todos));
   localStorage.setItem("modusfit_demo_social", "1");
+  // Como si la vez pasada Martina no te ganara en nada: así sale el aviso de
+  // que te pasó en un músculo.
+  localStorage.setItem("modusfit_te_paso_demo-yo", JSON.stringify({ "demo-martina": [] }));
   return `${sesiones.length} sesiones`;
 }
 
@@ -259,6 +262,9 @@ try {
         await paso("abrir la competencia con un amigo", () => page.locator(".podio-lugar:not(.yo), .ranking-fila:not(.yo)").first().click({ timeout: 8000 }));
         await capturar("Social Competencia");
         await paso("volver de la competencia", () => page.getByRole("button", { name: "Volver" }).first().click({ timeout: 8000 }));
+        // La pizarra de récords del grupo, en el Ranking.
+        await paso("abrir los récords del grupo", () => page.getByRole("tab", { name: "Récords" }).first().click({ timeout: 8000 }));
+        await capturar("Social Records");
         // El perfil de un amigo, desde la lista de Amigos.
         await paso("abrir Amigos en Social", () => page.getByRole("tab", { name: "Amigos" }).first().click({ timeout: 8000 }));
         await capturar("Social Amigos");

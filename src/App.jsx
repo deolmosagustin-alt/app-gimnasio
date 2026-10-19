@@ -3246,7 +3246,6 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
   font-size: 0.75rem; font-weight: 600; color: color-mix(in oklab, var(--c, var(--tono)) 50%, white); background: color-mix(in oklab, var(--c, var(--tono)) 15%, transparent);
 }
 .light-mode .dia-chip { color: color-mix(in oklab, var(--c, var(--tono)) 62%, black); }
-.dia-chip::before { content: ""; width: 7px; height: 7px; border-radius: 999px; background: var(--c, var(--tono)); flex: none; }
 .dia-chip > .lucide { display: none; }
 .dia-titulo {
   margin: 2px 46px 0 0;
@@ -3262,6 +3261,27 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 .dia-barra-ayuda { margin-top: 1px; font-size: 0.75rem; color: var(--text-faint); }
 .dia-barra-texto b { margin-right: 2px; font-weight: 700; font-stretch: 80%; letter-spacing: -0.02em; color: var(--text-strong); font-size: 1.35rem; }
 .dia-hero .boton-pildora { width: 100%; margin-top: 16px; }
+/* EL DÍA, EN UN SOLO BLOQUE: el encabezado, el calentamiento y los
+   ejercicios en la misma placa, con el filete del color del día arriba y un
+   tinte apenas. Adentro, las partes se separan con un canto fino; la que
+   está abierta se hunde un escalón. */
+.dia-seccion {
+  padding: 0 6px 6px; border-radius: 30px;
+  background: color-mix(in oklab, var(--c) 6%, var(--surface-1));
+  box-shadow: var(--placa-canto), var(--sombra-placa);
+}
+.light-mode .dia-seccion { background: color-mix(in oklab, var(--c) 4%, #ffffff); }
+.dia-seccion::before { content: ""; position: absolute; left: 26px; right: 26px; top: 0; height: 4px; border-radius: 0 0 4px 4px; background: color-mix(in oklab, var(--c) 60%, #8a8c92); z-index: 2; }
+.light-mode .dia-seccion::before { background: color-mix(in oklab, var(--c) 70%, #a7a9ae); }
+.dia-seccion > .dia-hero, .light-mode .dia-seccion > .dia-hero { background: transparent; box-shadow: none; padding: 24px 14px 16px; }
+.dia-seccion > .tarjeta-tonal, .dia-seccion .ejercicio { position: relative; background: transparent; box-shadow: none; border-radius: 22px; }
+.dia-seccion > .tarjeta-tonal::before, .dia-ejercicios > *::before { content: ""; position: absolute; left: 14px; right: 14px; top: 0; height: 1px; background: var(--hairline); pointer-events: none; }
+.dia-ejercicios { gap: 0; }
+.dia-ejercicios > * { position: relative; }
+.dia-seccion .ejercicio.abierto { margin: 6px 0; background: color-mix(in oklab, var(--c) 5%, var(--surface-2)); box-shadow: inset 0 1px 0 var(--brillo); }
+.light-mode .dia-seccion .ejercicio.abierto { background: color-mix(in oklab, var(--c) 4%, var(--surface-2)); box-shadow: inset 0 0 0 1px var(--hairline); }
+.dia-ejercicios > .abierto::before, .dia-ejercicios > .abierto + *::before { opacity: 0; }
+.dia-seccion .superserie { margin: 6px 0; }
 
 .tarjeta-plan { border-radius: 24px; padding: 16px; background: var(--surface-1); box-shadow: var(--placa-canto); }
 .tarjeta-tonal { border-radius: 24px; background: var(--surface-1); box-shadow: var(--placa-canto); }
@@ -3394,6 +3414,47 @@ button.foco-campo-rotulo:active { background: var(--velo); }
 .foco-record { display: flex; align-items: center; gap: 6px; margin: 8px 6px 0; font-size: 0.8125rem; font-weight: 600; color: var(--record); }
 .serie-foco .serie-aviso { margin: 8px 6px 0; }
 .foco-extras { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+/* Qué cargar: la barra con sus discos (o el par de mancuernas), chica. */
+/* EL TICKET: sale de una ranura, como el de la caja. Papel claro (es papel,
+   también en oscuro), renglones con puntos guía, cortes punteados, el borde
+   de abajo en zigzag y un código de barras al pie. */
+.ticket-marco { width: 100%; max-width: 22rem; max-height: 92vh; display: flex; flex-direction: column; }
+.ticket-ranura { position: relative; z-index: 2; height: 14px; border-radius: 999px; background: #050506; box-shadow: inset 0 2px 5px rgba(0,0,0,.9), 0 1px 0 rgba(255,255,255,.07); }
+.ticket-salida { flex: 1; min-height: 0; margin: -7px 16px 0; padding-bottom: 12px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
+.ticket-salida::-webkit-scrollbar { display: none; }
+.ticket-papel {
+  position: relative; padding: 24px 20px 22px; color: #232326; background: #f3f3ef;
+  font-size: 13.5px; line-height: 1.35; box-shadow: 0 18px 40px -20px rgba(0,0,0,.9);
+  animation: ticketSale 1.25s cubic-bezier(.22,.9,.25,1) both;
+}
+.ticket-papel::after {
+  content: ""; position: absolute; left: 0; right: 0; bottom: -9px; height: 10px;
+  background: linear-gradient(135deg, #f3f3ef 6px, transparent 0) 0 0 / 12px 12px repeat-x, linear-gradient(-135deg, #f3f3ef 6px, transparent 0) 0 0 / 12px 12px repeat-x;
+}
+@keyframes ticketSale { from { transform: translateY(-100%); } 70% { transform: translateY(2%); } }
+.ticket-marca { text-align: center; font-size: 1.5rem; font-weight: 800; font-stretch: 80%; letter-spacing: -0.01em; color: #1d1d1f; }
+.ticket-fecha { margin-top: 2px; text-align: center; font-size: 12.5px; color: #6b6b70; }
+.ticket-papel hr { margin: 12px 0; border: 0; border-top: 1.5px dashed #b9b9b4; }
+.ticket-fila { display: flex; align-items: baseline; gap: 6px; margin-top: 5px; }
+.ticket-fila > span:first-child { min-width: 0; max-width: 64%; }
+.ticket-fila > i { flex: 1; min-width: 12px; border-bottom: 1.5px dotted #bdbdb8; transform: translateY(-4px); }
+.ticket-fila > span:last-child { flex: none; margin-left: auto; font-weight: 650; white-space: nowrap; }
+.ticket-fila.fuerte { justify-content: space-between; font-size: 15px; font-weight: 750; color: #1d1d1f; }
+.ticket-fila.total { font-size: 16px; font-weight: 800; color: #1d1d1f; }
+.ticket-fila.record > span:last-child { color: #8a6a14; }
+.ticket-titulo { display: flex; align-items: center; gap: 6px; font-weight: 750; color: #8a6a14; }
+.ticket-nota { margin-top: 8px; text-align: center; font-size: 12.5px; font-weight: 600; color: #4a4a4e; }
+.ticket-gracias { text-align: center; font-size: 12.5px; color: #6b6b70; }
+.ticket-codigo { display: flex; justify-content: center; gap: 2px; height: 38px; margin-top: 12px; }
+.ticket-codigo i { flex: none; background: #1d1d1f; }
+.ticket-botones { display: flex; gap: 8px; margin: 10px 16px 0; }
+@media (prefers-reduced-motion: reduce) { .ticket-papel { animation: none; } }
+.que-cargar { display: flex; align-items: center; gap: 10px; margin: 10px 6px 0; animation: queCargarEntra .45s var(--resorte) both; }
+.que-cargar .barra-cargada { width: auto; flex: none; }
+.que-cargar > span { min-width: 0; font-size: 12.5px; color: var(--text-faint); }
+.que-cargar b { font-weight: 650; color: var(--text-muted); }
+@keyframes queCargarEntra { from { opacity: 0; transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) { .que-cargar { animation: none; } }
 .foco-extras > * { flex: 1 1 140px; }
 .serie-sugerencia {
   display: flex; align-items: center; gap: 6px; width: 100%; margin-top: 8px;
@@ -3941,29 +4002,41 @@ button.carrera-carril:active { background: var(--velo); }
 .escalera-titulo { font-size: 1.45rem; line-height: 1.1; font-weight: 750; color: var(--text-strong); letter-spacing: -0.02em; }
 .escalera-titulo span { font-weight: 550; color: var(--text-faint); }
 .escalera-sub { margin-top: 3px; font-size: 0.8125rem; color: var(--text-muted); text-wrap: pretty; }
-.escalera { display: flex; align-items: flex-end; gap: 5px; height: 100px; margin-top: 24px; }
+/* La tarjeta del ciclo, con el filete del color de la fase (azul el
+   entrenamiento, violeta la descarga) y un tinte apenas. */
+.escalera-ciclo { position: relative; background: color-mix(in oklab, var(--c) 6%, var(--surface-1)); }
+.escalera-ciclo::before { content: ""; position: absolute; left: 24px; right: 24px; top: 0; height: 4px; border-radius: 0 0 4px 4px; background: color-mix(in oklab, var(--c) 60%, #8a8c92); }
+.light-mode .escalera-ciclo { background: color-mix(in oklab, var(--c) 4%, #ffffff); }
+.light-mode .escalera-ciclo::before { background: color-mix(in oklab, var(--c) 70%, #a7a9ae); }
+.escalera { display: flex; align-items: flex-end; gap: 6px; height: 132px; margin-top: 26px; }
 .escalon {
   position: relative; flex: 1 1 0; min-width: 0;
-  display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
-  padding: 8px 0 6px; border-radius: 11px 11px 5px 5px;
-  background: transparent; box-shadow: inset 0 0 0 1px var(--hairline-fuerte);
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+  padding: 5px 5px 6px; border-radius: 12px 12px 6px 6px;
+  background: transparent; box-shadow: inset 0 0 0 1.5px var(--hairline-fuerte);
 }
 .escalon.pasada { background: var(--surface-3); box-shadow: none; }
 .escalon.descarga, .escalon.actual { box-shadow: none; }
 .escalera-numeros { display: flex; gap: 5px; margin-top: 6px; }
 .escalera-numeros span { flex: 1 1 0; min-width: 0; text-align: center; font-size: 11.5px; font-weight: 650; color: var(--text-faint); }
 .escalera-numeros span.actual { color: var(--text-strong); }
-.escalon.actual { background: color-mix(in oklab, var(--c, var(--tono)) 72%, white); box-shadow: 0 12px 26px -12px var(--velo-fuerte); }
-.light-mode .escalon.actual { background: var(--c, var(--tono)); }
+.escalon.actual { background: color-mix(in oklab, var(--c, var(--tono)) 20%, var(--surface-2)); box-shadow: inset 0 0 0 2px color-mix(in oklab, var(--c, var(--tono)) 72%, white), 0 14px 28px -14px color-mix(in oklab, var(--c, var(--tono)) 60%, transparent); }
+.light-mode .escalon.actual { background: color-mix(in oklab, var(--c, var(--tono)) 14%, #ffffff); box-shadow: inset 0 0 0 2px var(--c, var(--tono)); }
 .escalon.descarga { background: repeating-linear-gradient(-45deg, var(--surface-3) 0 3px, var(--surface-2) 3px 7px); }
-.escalon.descarga.actual { background: color-mix(in oklab, var(--c, var(--tono)) 72%, white); }
+.escalon.descarga.actual { background: color-mix(in oklab, var(--c, var(--tono)) 20%, var(--surface-2)); }
 .escalon-n { font-size: 11.5px; font-weight: 750; color: var(--text-muted); font-stretch: 82%; }
 .escalon.actual .escalon-n { color: color-mix(in oklab, var(--c, var(--tono)) 18%, #07080a); }
-.escalon-hoy { position: absolute; top: -19px; font-size: 11px; font-weight: 700; color: var(--text-strong); }
-.light-mode .escalon-hoy { color: var(--text-strong); }
-.escalon-sesiones { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 100%; }
-.escalon-sesiones i { display: block; width: 52%; max-width: 18px; height: 3px; border-radius: 2px; background: color-mix(in oklab, var(--text-strong) 70%, transparent); }
-.escalon.actual .escalon-sesiones i { background: color-mix(in oklab, var(--c, var(--tono)) 18%, #07080a); }
+.escalon-hoy { position: absolute; top: -20px; font-size: 11px; font-weight: 700; color: color-mix(in oklab, var(--c, var(--tono)) 55%, white); }
+.light-mode .escalon-hoy { color: color-mix(in oklab, var(--c, var(--tono)) 70%, black); }
+/* Un disco por sesión, de canto, apilados desde abajo. */
+.escalon-sesiones { display: flex; flex-direction: column-reverse; gap: 2px; width: 100%; overflow: hidden; }
+.escalon-sesiones i { display: block; flex: none; height: 6px; border-radius: 3px; background: color-mix(in oklab, var(--dia) 60%, #8a8c92); box-shadow: inset 0 1px 0 rgba(255,255,255,0.18); }
+.light-mode .escalon-sesiones i { background: color-mix(in oklab, var(--dia) 70%, #a7a9ae); }
+.escalon-sesiones i.cae { animation: discoCae .5s var(--resorte) backwards; }
+@keyframes discoCae { from { transform: translateY(-26px); opacity: 0; } 40% { opacity: 1; } }
+.escalera-leyenda { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 12px; color: var(--text-faint); }
+.escalera-leyenda i { width: 18px; height: 6px; border-radius: 3px; flex: none; background: color-mix(in oklab, var(--c, var(--tono)) 60%, #8a8c92); }
+@media (prefers-reduced-motion: reduce) { .escalon-sesiones i.cae { animation: none; } }
 @keyframes escalonSube { from { transform: scaleY(0.2); transform-origin: bottom; opacity: 0; } to { transform: none; opacity: 1; } }
 
 /* La escalera de récords (Ejercicios). */
@@ -4122,7 +4195,6 @@ button.carrera-carril:active { background: var(--velo); }
 }
 .ranking-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .ranking-nombre { display: block; font-size: 14px; font-weight: 700; color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ranking-usuario { display: block; font-size: 12px; color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ranking-racha { display: inline-flex; align-items: center; gap: 7px; flex: none; }
 .ranking-racha b { font-size: 1.1rem; font-weight: 750; color: var(--text-strong); }
 
@@ -4362,7 +4434,11 @@ button.credencial-dato:not(:disabled):active { background: var(--velo); }
 .mano-rachas small { font-size: 12px; color: var(--text-muted); overflow-wrap: anywhere; }
 .mano-rachas span { display: flex; align-items: center; gap: 7px; color: var(--text-strong); }
 .mano-rachas b { font-size: 1.4rem; line-height: 1; font-weight: 750; }
-.cara { display: grid; gap: 8px; padding: 12px 14px 14px; }
+.cara { display: grid; gap: 8px; padding: 14px 14px 14px; }
+.cara-cabeza { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.cara-veredicto { flex: none; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; color: color-mix(in oklab, var(--c) 50%, white); background: color-mix(in oklab, var(--c) 14%, transparent); }
+.light-mode .cara-veredicto { color: color-mix(in oklab, var(--c) 62%, black); }
+.mano-compartir { justify-self: center; min-height: 40px; }
 .cara-ejercicio { font-size: 14px; font-weight: 700; color: var(--text-strong); }
 .cara-fila { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; align-items: center; gap: 10px; }
 .cara-quien { font-size: 12.5px; color: var(--text-muted); overflow-wrap: anywhere; }
@@ -4389,19 +4465,35 @@ button.credencial-dato:not(:disabled):active { background: var(--velo); }
 .ganarle-musculo { grid-column: 1; font-size: 12.5px; color: var(--text-muted); }
 .ganarle-meta { grid-column: 1; font-size: 13.5px; line-height: 1.3; color: var(--text-muted); }
 .ganarle-meta b { font-size: 1.05rem; font-weight: 750; color: var(--text-strong); }
-.ganarle-suma { grid-column: 2; grid-row: 1 / span 2; padding: 6px 10px; border-radius: 999px; font-size: 13.5px; font-weight: 700; color: color-mix(in oklab, var(--tono) 50%, white); background: color-mix(in oklab, var(--tono) 13%, transparent); }
-.light-mode .ganarle-suma { color: color-mix(in oklab, var(--tono) 62%, black); }
+.ganarle-suma { grid-column: 2; grid-row: 1 / span 2; padding: 6px 10px; border-radius: 999px; font-size: 13.5px; font-weight: 700; color: color-mix(in oklab, var(--c, var(--tono)) 50%, white); background: color-mix(in oklab, var(--c, var(--tono)) 13%, transparent); }
+.light-mode .ganarle-suma { color: color-mix(in oklab, var(--c, var(--tono)) 62%, black); }
 .mano-lista { display: grid; gap: 2px; padding: 6px; border-radius: 24px; background: var(--surface-1); box-shadow: var(--placa-canto); }
-.mano-fila { display: grid; grid-template-columns: minmax(0, 1fr) 60px minmax(0, 1fr); align-items: center; gap: 5px 10px; padding: 10px 10px 11px; border-radius: 18px; text-align: left; transition: background-color .2s ease; }
+.mano-fila { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: 7px 12px; padding: 11px 12px 12px; border-radius: 18px; text-align: left; transition: background-color .2s ease; }
 .mano-fila:active { background: var(--velo); }
 .mano-fila-musculo { grid-column: 1 / -1; display: flex; align-items: center; gap: 3px; font-size: 13.5px; font-weight: 650; color: var(--text-strong); }
 .mano-fila-musculo svg { flex: none; color: var(--text-faint); }
 .mano-fila-lado { font-size: 12.5px; line-height: 1.2; color: var(--text-faint); overflow-wrap: anywhere; }
 .mano-fila-lado.der { text-align: right; }
+.mano-fila-lado.tinta-rango { color: color-mix(in oklab, var(--rango-c) 50%, var(--text-faint)); }
 .mano-fila-lado.gana { font-weight: 700; color: var(--text-strong); }
-.mano-fila-cuerda { position: relative; height: 12px; }
-.mano-fila-cuerda::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 2px; margin-top: -1px; border-radius: 1px; background: var(--hairline-fuerte); }
-.mano-fila-cuerda i { position: absolute; top: 50%; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 999px; background: var(--text-strong); }
+.mano-fila-lado.gana.tinta-rango { color: color-mix(in oklab, var(--rango-c) 80%, white); }
+.light-mode .mano-fila-lado.tinta-rango { color: color-mix(in oklab, var(--rango-c) 45%, var(--text-faint)); }
+.light-mode .mano-fila-lado.gana.tinta-rango { color: color-mix(in oklab, var(--rango-c) 58%, black); }
+/* EL DUELO: las dos barras salen del medio, la tuya a la izquierda y la
+   suya a la derecha, del color de su rango y tan largas como alto es. La
+   que gana, entera; la otra, apagada. Crecen al aparecer, una fila detrás
+   de la otra. También en el detalle de un músculo, ejercicio por ejercicio. */
+.mano-fila-duelo { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 3px; height: 10px; }
+.mano-fila-duelo .mitad { display: flex; min-width: 0; overflow: hidden; background: var(--velo); }
+.mano-fila-duelo .mitad.yo { justify-content: flex-end; border-radius: 5px 2px 2px 5px; }
+.mano-fila-duelo .mitad.el { justify-content: flex-start; border-radius: 2px 5px 5px 2px; }
+.mano-fila-duelo i { display: block; height: 100%; border-radius: inherit; background: color-mix(in oklab, var(--rango-c) 40%, #5f6268); transform-origin: right center; animation: dueloCrece .7s cubic-bezier(.22,.9,.25,1) both; animation-delay: calc(var(--i, 0) * 35ms + 120ms); }
+.mano-fila-duelo .el i { transform-origin: left center; }
+.mano-fila-duelo i.gana { background: color-mix(in oklab, var(--rango-c) 68%, #8a8c92); box-shadow: inset 0 1px 0 rgba(255,255,255,.16); }
+.light-mode .mano-fila-duelo i { background: color-mix(in oklab, var(--rango-c) 35%, #c3c5c9); }
+.light-mode .mano-fila-duelo i.gana { background: color-mix(in oklab, var(--rango-c) 78%, #a7a9ae); box-shadow: none; }
+@keyframes dueloCrece { from { transform: scaleX(0); } }
+@media (prefers-reduced-motion: reduce) { .mano-fila-duelo i { animation: none; } }
 .mini-cuerpo-nombre { margin-bottom: 6px; font-size: 13px; font-weight: 650; color: var(--text-strong); overflow-wrap: anywhere; }
 .segmentado.chico button { min-height: 34px; padding: 0 12px; font-size: 12.5px; white-space: nowrap; }
 .modal-mano { width: 100%; max-width: 24rem; max-height: 86vh; overflow-y: auto; overscroll-behavior: contain; display: grid; gap: 14px; padding: 18px; border-radius: 28px; background: var(--surface-1); box-shadow: var(--placa-canto), 0 30px 60px -30px rgba(0,0,0,.8); }
@@ -4411,12 +4503,14 @@ button.credencial-dato:not(:disabled):active { background: var(--velo); }
 .modal-mano-rangos > div:last-child { text-align: right; }
 .modal-mano-rangos small { font-size: 12px; color: var(--text-muted); }
 .modal-mano-rangos b { font-size: 14px; font-weight: 700; color: var(--text-faint); }
-.modal-mano-fila { padding: 10px 12px; border-radius: 16px; background: var(--surface-2); }
+.modal-mano-fila { display: grid; gap: 7px; padding: 10px 12px 11px; border-radius: 16px; background: var(--surface-2); }
 .modal-mano-ejercicio { font-size: 13px; line-height: 1.3; color: var(--text-muted); }
-.modal-mano-marcas { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px; }
+.modal-mano-marcas { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .modal-mano-marcas span { font-size: 14px; font-weight: 600; color: var(--text-faint); }
 .modal-mano-marcas span:last-child { text-align: right; }
 .modal-mano-marcas span.gana { font-weight: 750; color: var(--text-strong); }
+.modal-mano-marcas span.gana.tinta-rango, .modal-mano-rangos b.tinta-rango { color: color-mix(in oklab, var(--rango-c) 80%, white); }
+.light-mode .modal-mano-marcas span.gana.tinta-rango, .light-mode .modal-mano-rangos b.tinta-rango { color: color-mix(in oklab, var(--rango-c) 58%, black); }
 /* MEDIDAS: fichas, la cinta métrica, el recorrido y el calendario picado. */
 .medida-fichas { display: flex; gap: 8px; overflow-x: auto; margin: 0 -16px; padding: 2px 16px 4px; scroll-snap-type: x proximity; scrollbar-width: none; }
 .medida-fichas::-webkit-scrollbar { display: none; }
@@ -4475,6 +4569,136 @@ button.credencial-dato:not(:disabled):active { background: var(--velo); }
 .medida-leyenda i { display: inline-block; width: 10px; height: 10px; margin-right: 6px; vertical-align: -1px; border-radius: 999px; background: color-mix(in oklab, var(--dia) 82%, white); }
 .light-mode .medida-leyenda i { background: var(--dia); }
 @media (prefers-reduced-motion: reduce) { .cinta-marca { transition: none; } .hueco-dia.comparable { animation: none; } }
+/* EL FILETE: una placa con una línea del color de lo que es arriba y un
+   tinte apenas, como las baldosas de los días en Rutinas. El color lo da
+   --c: el día que entrenó, el rango, el récord, Social. La línea se dibuja
+   desde el medio al aparecer. */
+.filete { position: relative; background: color-mix(in oklab, var(--c) var(--filete-tinte, 6%), var(--filete-base, var(--surface-1))); }
+.filete.sobre-placa { --filete-base: var(--surface-2); }
+.light-mode .filete { --filete-tinte: 4%; }
+.filete::before {
+  content: ""; position: absolute; z-index: 1; top: 0; left: var(--filete-margen, 22px); right: var(--filete-margen, 22px); height: 3px;
+  border-radius: 0 0 3px 3px; background: color-mix(in oklab, var(--c) 60%, #8a8c92); pointer-events: none;
+  animation: fileteEntra .6s cubic-bezier(.22,.9,.25,1) both;
+}
+.light-mode .filete::before { background: color-mix(in oklab, var(--c) 70%, #a7a9ae); }
+@keyframes fileteEntra { from { transform: scaleX(0); opacity: 0; } }
+.solicitud .amigo.filete { background: transparent; }
+.solicitud .amigo.filete::before { content: none; }
+/* EL DESAFÍO DE LA SEMANA: la barra del grupo, un disco por sesión. */
+.desafio { display: grid; gap: 8px; padding: 14px 14px 13px; border-radius: 24px; box-shadow: var(--placa-canto); }
+.desafio-cabeza { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.desafio-titulo { font-size: 14px; font-weight: 700; color: var(--text-strong); }
+.desafio-cuenta { font-size: 12.5px; color: var(--text-muted); white-space: nowrap; }
+.desafio-cuenta b { margin-right: 2px; font-size: 1.2rem; font-weight: 750; color: var(--text-strong); }
+.desafio .barra-cargada { width: 100%; }
+.desafio-pie { font-size: 12.5px; line-height: 1.35; color: var(--text-faint); text-wrap: pretty; }
+/* LA PIZARRA DEL GRUPO: el récord de cada ejercicio, renglón por renglón
+   como en la pizarra del gimnasio, separados con tiza. El tuyo, en dorado. */
+.pizarra { display: grid; margin: 0; padding: 2px 0; list-style: none; border-radius: 20px; background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--hairline); }
+.pizarra-fila { margin: 0 12px; animation: pizarraEscribe .45s ease both; animation-delay: calc(var(--i, 0) * 50ms); }
+.pizarra-fila + .pizarra-fila { border-top: 1.5px dashed var(--hairline-fuerte); }
+.pizarra-cuerpo { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 5px 12px; padding: 11px 2px 12px; text-align: left; }
+.pizarra-ejercicio { font-size: 14px; font-weight: 700; line-height: 1.25; color: var(--text-strong); }
+.pizarra-marca { grid-column: 2; grid-row: 1 / span 2; display: inline-flex; align-items: baseline; gap: 4px; font-size: 1.25rem; font-weight: 750; color: var(--text-strong); white-space: nowrap; }
+.pizarra-marca svg { align-self: center; }
+.pizarra-marca small { font-size: 12px; font-weight: 600; color: var(--text-muted); }
+.pizarra-fila.mia .pizarra-marca { color: var(--record); }
+.pizarra-quien { display: flex; align-items: center; flex-wrap: wrap; gap: 3px 7px; min-width: 0; font-size: 12.5px; color: var(--text-muted); }
+.pizarra-quien b { font-weight: 700; color: var(--text-strong); }
+.pizarra-avatar { width: 22px; height: 22px; flex: none; overflow: hidden; border-radius: 999px; display: grid; place-items: center; font-size: 11px; font-weight: 750; color: var(--text-strong); background: var(--surface-3); }
+.pizarra-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.pizarra-sigue { color: var(--text-faint); }
+@keyframes pizarraEscribe { from { opacity: 0; transform: translateX(-6px); } }
+/* LA GUÍA, LA PRIMERA VEZ: el aviso chico arriba de cada pestaña. */
+.primera-vez { display: flex; align-items: center; gap: 6px; margin-bottom: 14px; padding: 8px 8px 8px 10px; border-radius: 22px; box-shadow: var(--placa-canto); }
+.primera-vez-cuerpo { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; text-align: left; }
+.primera-vez-cuerpo b { display: block; font-size: 14px; font-weight: 700; line-height: 1.25; color: var(--text-strong); }
+.primera-vez-cuerpo b + span { display: block; margin-top: 1px; font-size: 12.5px; color: var(--text-muted); }
+.primera-vez-cerrar { flex: none; }
+/* LAS PROPUESTAS DE LA IA, con las piezas de la app: la serie en su visor,
+   el día con su filete, la escalera de las semanas y renglones finos. */
+.ia-serie { display: grid; gap: 6px; padding: 13px 14px 12px; border-radius: 20px; }
+.ia-serie-nombre { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 650; line-height: 1.3; color: var(--text-muted); }
+.ia-serie-nota { flex: none; font-size: 12px; font-weight: 700; }
+.ia-serie.record .ia-serie-nombre svg, .ia-serie.record .ia-serie-nota { color: var(--record); }
+.ia-serie-visor { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.ia-serie-visor p { display: flex; align-items: baseline; gap: 5px; color: var(--text-muted); }
+.ia-serie-visor b { font-size: 2rem; line-height: 1; font-weight: 750; color: var(--text-strong); }
+.ia-serie.record .ia-serie-visor b { color: var(--record); }
+.ia-serie-visor i { font-style: normal; font-size: 1.1rem; color: var(--text-faint); }
+.ia-serie-visor small { margin-right: 6px; font-size: 13px; font-weight: 650; }
+.ia-chip { flex: none; padding: 5px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; color: color-mix(in oklab, var(--tono) 50%, white); background: color-mix(in oklab, var(--tono) 13%, transparent); }
+.light-mode .ia-chip { color: color-mix(in oklab, var(--tono) 62%, black); }
+.ia-serie-barra { width: 100%; }
+.ia-cambios { display: grid; gap: 2px; margin: 8px 0 0; padding: 0; list-style: none; }
+.ia-cambio { display: flex; align-items: center; gap: 8px; min-height: 26px; font-size: 0.8125rem; line-height: 1.3; color: var(--text-faint); }
+.ia-cambio-marca { width: 20px; height: 20px; flex: none; border-radius: 999px; display: grid; place-items: center; }
+.ia-cambio-nombre { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.ia-cambio-detalle { flex: none; font-size: 12px; color: var(--text-muted); }
+.ia-cambio.added, .ia-cambio.after { font-weight: 650; color: var(--text-strong); }
+.ia-cambio.added .ia-cambio-marca, .ia-cambio.after .ia-cambio-marca { color: color-mix(in oklab, var(--dia) 45%, white); background: color-mix(in oklab, var(--dia) 22%, transparent); }
+.light-mode .ia-cambio.added .ia-cambio-marca, .light-mode .ia-cambio.after .ia-cambio-marca { color: color-mix(in oklab, var(--dia) 70%, black); }
+.ia-cambio.removed .ia-cambio-nombre, .ia-cambio.before .ia-cambio-nombre { text-decoration: line-through; }
+.ia-cambio.removed .ia-cambio-marca, .ia-cambio.before .ia-cambio-marca { color: var(--text-faint); background: var(--velo); }
+.ia-plan { display: grid; gap: 10px; padding: 13px 14px 12px; border-radius: 20px; }
+.ia-plan-titulo { display: flex; align-items: center; gap: 7px; font-size: 14px; font-weight: 700; line-height: 1.25; color: var(--text-strong); }
+.ia-plan-titulo svg { flex: none; color: color-mix(in oklab, var(--c) 55%, white); }
+.light-mode .ia-plan-titulo svg { color: color-mix(in oklab, var(--c) 70%, black); }
+.ia-plan-sub { font-weight: 500; color: var(--text-muted); }
+.ia-escalera { display: flex; align-items: stretch; gap: 5px; height: 136px; overflow-x: auto; scrollbar-width: none; }
+.ia-escalera::-webkit-scrollbar { display: none; }
+.ia-escalon { flex: 1 0 34px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px; }
+.ia-escalon-valor { display: grid; justify-items: center; line-height: 1.05; }
+.ia-escalon-valor b { font-size: 14px; font-weight: 750; color: var(--text-strong); }
+.ia-escalon-valor small { font-size: 10.5px; color: var(--text-faint); white-space: nowrap; }
+.ia-escalon-bloque { width: 100%; border-radius: 9px 9px 4px 4px; background: color-mix(in oklab, var(--c) 30%, var(--surface-3)); transform-origin: bottom; animation: escalonSube .55s cubic-bezier(.34,1.4,.64,1) both; animation-delay: calc(var(--i, 0) * 60ms); }
+.ia-escalon:last-child .ia-escalon-bloque { background: color-mix(in oklab, var(--c) 62%, #8a8c92); }
+.light-mode .ia-escalon-bloque { background: color-mix(in oklab, var(--c) 22%, #e4e5e8); }
+.light-mode .ia-escalon:last-child .ia-escalon-bloque { background: color-mix(in oklab, var(--c) 70%, #a7a9ae); }
+.ia-escalon-semana { font-size: 11px; font-weight: 650; color: var(--text-faint); }
+.ia-renglones { display: grid; margin: 0; padding: 0; list-style: none; }
+.ia-renglones li { display: flex; align-items: baseline; gap: 10px; padding: 7px 0; font-size: 0.8125rem; line-height: 1.35; color: var(--text-muted); }
+.ia-renglones li + li { border-top: 1px solid var(--hairline); }
+.ia-num { flex: none; width: 20px; height: 20px; border-radius: 999px; display: grid; place-items: center; font-size: 11px; font-weight: 750; color: color-mix(in oklab, var(--c) 45%, white); background: color-mix(in oklab, var(--c) 18%, transparent); align-self: center; }
+.light-mode .ia-num { color: color-mix(in oklab, var(--c) 70%, black); }
+.ia-ajustes { display: grid; margin: 0; padding: 2px 12px; list-style: none; border-radius: 20px; background: var(--surface-2); }
+.ia-ajuste { display: flex; align-items: center; gap: 10px; padding: 8px 0; }
+.ia-ajuste + .ia-ajuste { border-top: 1px solid var(--hairline); }
+.ia-ajuste-nombre { flex: 1; min-width: 0; font-size: 0.8125rem; color: var(--text-muted); }
+.ia-ajuste-valor { flex: none; font-size: 0.8125rem; font-weight: 700; color: var(--text-strong); }
+.icono-galleta.chica { width: 30px; height: 30px; }
+@media (prefers-reduced-motion: reduce) { .filete::before, .pizarra-fila, .ia-escalon-bloque { animation: none; } }
+/* EL RESUMEN DE LA SEMANA (y del mes y del año): una placa con el filete
+   del color del período, los tres números, cuándo entrenaste, dónde fue el
+   trabajo (en barras, como el Balance), las marcas y renglones finos. */
+.resumen-periodo { width: 100%; max-width: 24rem; max-height: 92vh; overflow-y: auto; overscroll-behavior: contain; display: grid; gap: 18px; padding: 24px 18px 18px; border-radius: 30px; box-shadow: var(--placa-canto), 0 30px 60px -30px rgba(0,0,0,.8); scrollbar-width: none; }
+.resumen-periodo::-webkit-scrollbar { display: none; }
+.resumen-cabeza { display: grid; gap: 4px; }
+.resumen-titulo { font-size: 1.7rem; font-weight: 800; font-stretch: 84%; line-height: 1.05; letter-spacing: -0.02em; color: var(--text-strong); }
+.resumen-bajada { font-size: 13px; color: var(--text-muted); }
+.resumen-vs { justify-self: start; display: inline-flex; align-items: center; gap: 5px; margin-top: 6px; padding: 5px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; color: var(--text-muted); background: var(--velo); }
+.resumen-vs.sube { color: color-mix(in oklab, var(--c) 50%, white); background: color-mix(in oklab, var(--c) 14%, transparent); }
+.light-mode .resumen-vs.sube { color: color-mix(in oklab, var(--c) 62%, black); }
+.resumen-periodo .atleta-datos, .resumen-periodo .reciente { background: var(--surface-2); box-shadow: none; }
+.resumen-bloque { display: grid; gap: 10px; }
+.resumen-bloque h3 { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; color: var(--text-strong); }
+.resumen-bloque h3.resumen-record { color: var(--record); }
+.resumen-tramos { display: flex; align-items: flex-end; gap: 4px; height: 88px; padding: 10px 10px 6px; border-radius: 18px; background: var(--surface-2); }
+.resumen-tramo { flex: 1; min-width: 0; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; }
+.resumen-tramo i { width: 100%; border-radius: 6px; background: color-mix(in oklab, var(--c) 32%, var(--surface-3)); }
+.resumen-tramo.mejor i { background: color-mix(in oklab, var(--c) 62%, #8a8c92); }
+.light-mode .resumen-tramo i { background: color-mix(in oklab, var(--c) 22%, #e4e5e8); }
+.light-mode .resumen-tramo.mejor i { background: color-mix(in oklab, var(--c) 70%, #a7a9ae); }
+.resumen-tramo span { flex: none; font-size: 10.5px; font-weight: 650; color: var(--text-faint); }
+.resumen-tramo.mejor span { color: var(--text-strong); }
+.resumen-nota { font-size: 12px; color: var(--text-faint); }
+.resumen-renglones { display: grid; margin: 0; padding: 2px 14px; list-style: none; border-radius: 18px; background: var(--surface-2); }
+.resumen-renglones li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; }
+.resumen-renglones li + li { border-top: 1px solid var(--hairline); }
+.resumen-renglones span { min-width: 0; font-size: 13px; color: var(--text-muted); }
+.resumen-renglones small { display: block; margin-top: 1px; font-size: 13px; font-weight: 650; color: var(--text-strong); overflow-wrap: anywhere; }
+.resumen-renglones b { flex: none; font-size: 13.5px; font-weight: 700; color: var(--text-strong); }
 `;
 
 function StyleInjector() {
@@ -6615,28 +6839,6 @@ function useAndroidBackHandler(onBack) {
   }, [active]);
 }
 
-function CountUpNumber({ value, from = null, duration = 700, decimals = 1, className = "", style = {} }) {
-  const [shown, setShown] = useState(from ?? value);
-  const rafRef = useRef(null);
-  useEffect(() => {
-    const start = from ?? 0;
-    const end = Number(value) || 0;
-    if (start === end) { setShown(end); return; }
-    const t0 = Date.now();
-    const tick = () => {
-      const p = Math.min(1, (Date.now() - t0) / duration);
-      // easeOutCubic: arranca rápido y frena suave al llegar
-      const eased = 1 - Math.pow(1 - p, 3);
-      setShown(start + (end - start) * eased);
-      if (p < 1) rafRef.current = requestAnimationFrame(tick);
-    };
-    rafRef.current = requestAnimationFrame(tick);
-    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
-  }, [value, from, duration]);
-  const txt = decimals > 0 ? (Math.round(shown * 10) / 10).toString().replace(/\.0$/, "") : String(Math.round(shown));
-  return <span className={`tabular-nums ${className}`} style={style}>{txt}</span>;
-}
-
 // UN solo AudioContext para toda la vida de la app, desbloqueado con el
 // primer toque de la persona.
 //
@@ -7371,158 +7573,151 @@ function SessionStartOverlay({ onDone }) {
   );
 }
 
-// ── RESUMEN AL FINALIZAR EL ENTRENAMIENTO ───────────────────────────────────
-// El cierre emocional de la sesión: duración, volumen contando hacia arriba,
-// series y ejercicios, y los récords del día apareciendo uno a uno. Antes
-// finalizar no mostraba nada — el mejor momento de la app pasaba en silencio.
+// ── EL TICKET AL FINALIZAR EL ENTRENAMIENTO ─────────────────────────────────
+// EL TICKET DE LA SESIÓN: al tocar Finalizar, la sesión sale impresa de una
+// ranura, como el ticket de la caja: el día y la hora, cada ejercicio con sus
+// series, los totales, los récords y un código de barras al pie. Se puede
+// compartir como imagen. Antes era un panel con confeti, una dona y fichas
+// de colores.
+function codigoDeBarras(semilla, n = 44) {
+  let h = 7;
+  const s = String(semilla);
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return Array.from({ length: n }, () => { h = (h * 1103515245 + 12345) >>> 0; return 1 + ((h >>> 16) % 3); });
+}
+const conComa = (v) => String(v).replace(".", ",");
+const miles = (v) => Math.round(v).toLocaleString("es-AR");
+function textoDuracion(min) {
+  if (min == null || min < 1) return null;
+  return min >= 60 ? `${Math.floor(min / 60)} h ${min % 60} min` : `${min} min`;
+}
+function fechaDelTicket(iso) {
+  if (!iso) return "";
+  const f = new Date(iso);
+  const dia = f.toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" });
+  return `${dia.charAt(0).toUpperCase()}${dia.slice(1)}, ${f.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}`;
+}
+
 function SessionSummaryModal({ resumen, onClose }) {
   useAndroidBack(onClose);
   const unit = useWeightUnit();
-  const [verTodosPRs, setVerTodosPRs] = useState(false);
-  // Destellos de celebración: posiciones/tiempos aleatorios pero fijos (una
-  // sola vez) para que no se regeneren en cada render. Colores de la app.
-  const [confeti] = useState(() => {
-    const cols = ["#14B8A6", "#F59E0B", "#3B82F6", "#A855F7", "#F43F5E"];
-    return Array.from({ length: 18 }, (_, i) => ({
-      id: i,
-      left: Math.round(Math.random() * 100),
-      delay: Math.round(Math.random() * 400),
-      dur: 1400 + Math.round(Math.random() * 900),
-      color: cols[i % cols.length],
-      size: 5 + Math.round(Math.random() * 4),
-    }));
-  });
+  const [compartir, setCompartir] = useState(false);
   if (!resumen) return null;
+  const u = weightLabel(unit);
+  const lineas = resumen.lineas || [];
+  const barras = codigoDeBarras(`${resumen.fecha}${resumen.volumen}${resumen.series}`);
+  // La imagen para compartir sale en un portal por debajo de este velo:
+  // mientras está abierta, el ticket se esconde (sin desmontarse, así no
+  // vuelve a salir de la ranura al cerrarla).
   return (
-    <div className="fixed inset-0 z-[140] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
-      <div
-        className="relative max-w-sm w-full rounded-3xl modal-pop-in shadow-2xl shadow-black/70 overflow-hidden"
-        style={{ background: "var(--panel-grad-teal)", border: "1px solid rgba(20,184,166,0.3)" }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Lluvia de destellos: cae detrás del contenido, no molesta al leer */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
-          {confeti.map((c) => (
-            <span key={c.id} className="confetti-piece" style={{ left: `${c.left}%`, width: c.size, height: c.size, backgroundColor: c.color, animationDelay: `${c.delay}ms`, animationDuration: `${c.dur}ms` }} />
-          ))}
-        </div>
-        {/* Hero: check grande con halo */}
-        <div className="relative flex flex-col items-center pt-9 pb-5 px-6 text-center">
-          <div className="absolute -top-16 left-1/2 -translate-x-1/2 w-52 h-52 rounded-full bg-teal-500/20 blur-3xl pointer-events-none" />
-          <div className="relative w-16 h-16 rounded-full flex items-center justify-center mb-4 elastic-in bg-teal-500/18 border border-teal-500/40 text-teal-300" style={{ boxShadow: "0 12px 38px -12px rgba(20,184,166,0.7)" }}>
-            <svg className="draw-check" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-          </div>
-          <h2 className="relative text-lg font-black text-white leading-tight">¡Entrenamiento completado!</h2>
-          {resumen.minutos != null && (
-            <p className="relative text-[11px] text-slate-500 mt-1 tabular-nums">{resumen.minutos >= 60 ? `${Math.floor(resumen.minutos / 60)}h ${resumen.minutos % 60}min` : `${resumen.minutos} min`} de sesión</p>
-          )}
-        </div>
-
-        {/* Los números del día, contando hacia arriba */}
-        <div className="grid grid-cols-3 gap-2 px-5">
-          {[
-            { v: Math.round(kgToDisplay(resumen.volumen, unit)), l: `${weightLabel(unit)} de volumen`, dec: 0 },
-            { v: resumen.series, l: resumen.series === 1 ? "serie" : "series", dec: 0 },
-            { v: resumen.ejercicios, l: resumen.ejercicios === 1 ? "ejercicio" : "ejercicios", dec: 0 },
-          ].map((s) => (
-            <div key={s.l} className="bg-black/25 rounded-2xl py-3 text-center border border-white/[0.05]">
-              <CountUpNumber value={s.v} duration={900} decimals={s.dec} className="text-base font-black text-white tabular-nums leading-none" />
-              <p className="text-[9px] text-slate-500 mt-1.5 leading-tight px-1">{s.l}</p>
-            </div>
-          ))}
-        </div>
-
-        {/* Reparto por músculo de ESTA sesión: la misma dona del resumen
-            semanal/mensual, acá contando sólo lo de hoy. Responde "¿qué
-            entrené realmente?" mejor que el nombre del día, porque un Push
-            puede terminar siendo casi todo pecho o casi todo hombro según
-            cuánto le metiste a cada cosa. */}
-        {/* Contra la última vez que hiciste este mismo día de rutina: es la
-            pregunta natural al terminar ("¿vengo mejor que la vez pasada?")
-            y no había dónde responderla. */}
-        {resumen.vsUltima && (
-          <div className="px-5 mt-3 flex justify-center">
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-black"
-              style={resumen.vsUltima.pct >= 0
-                ? { backgroundColor: "rgba(16,185,129,0.14)", color: "#34d399", border: "1px solid rgba(16,185,129,0.3)" }
-                : { backgroundColor: "rgba(157,162,168,0.12)", color: "#9da2a8", border: "1px solid rgba(157,162,168,0.25)" }}>
-              {resumen.vsUltima.pct >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-              {resumen.vsUltima.pct >= 0 ? "+" : ""}{resumen.vsUltima.pct}% que tu último {resumen.vsUltima.dia}
-            </span>
-          </div>
-        )}
-        {resumen.reparto?.length > 1 && (
-          <div className="px-5 mt-4">
-            <p className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-600 mb-2">En qué se te fue</p>
-            <div className="flex items-center gap-3 rounded-2xl bg-black/25 border border-white/[0.05] p-3">
-              <DonutMusculos datos={resumen.reparto} size={92} unidad={weightLabel(unit).toUpperCase()} />
-              <div className="flex-1 min-w-0 space-y-1.5">
-                {resumen.reparto.map((m) => (
-                  <div key={m.nombre} className="flex items-center gap-2 min-w-0">
-                    <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: m.color }} />
-                    <span className="flex-1 min-w-0 text-[10.5px] text-slate-300 truncate">{m.nombre}</span>
-                    <span className="text-[10.5px] font-black tabular-nums shrink-0" style={{ color: m.color }}>{(() => { const v = Math.round(kgToDisplay(m.series, unit)); return v >= 1000 ? (v / 1000).toFixed(1) + "k" : v; })()}<span className="opacity-60 text-[8px] ml-0.5">{weightLabel(unit)}</span></span>
-                  </div>
-                ))}
-              </div>
+    <>
+      <div className="fixed inset-0 z-[140] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 modal-bg-in modal-overlay" style={compartir ? { visibility: "hidden" } : undefined} onClick={onClose}>
+        <div className="ticket-marco" role="dialog" aria-modal="true" aria-label="El ticket de tu sesión" onClick={(e) => e.stopPropagation()}>
+          <div className="ticket-ranura" aria-hidden="true" />
+          <div className="ticket-salida">
+            <div className="ticket-papel" style={{ "--dia": resumen.color || "#14B8A6" }}>
+              <p className="ticket-marca">Modus Fit</p>
+              <p className="ticket-fecha">{fechaDelTicket(resumen.fecha)}</p>
+              <hr />
+              <p className="ticket-fila fuerte"><span>{resumen.dia || "Entrenamiento"}</span>{textoDuracion(resumen.minutos) && <span>{textoDuracion(resumen.minutos)}</span>}</p>
+              {lineas.map((l) => (
+                <p key={l.nombre} className="ticket-fila"><span>{l.nombre}</span><i aria-hidden="true" /><span>{l.series} {l.series === 1 ? "serie" : "series"}</span></p>
+              ))}
+              <hr />
+              <p className="ticket-fila"><span>Series</span><i aria-hidden="true" /><span>{resumen.series}</span></p>
+              <p className="ticket-fila"><span>Ejercicios</span><i aria-hidden="true" /><span>{resumen.ejercicios}</span></p>
+              {resumen.metas?.total > 0 && <p className="ticket-fila"><span>Metas del plan</span><i aria-hidden="true" /><span>{resumen.metas.cumplidas} de {resumen.metas.total}</span></p>}
+              <p className="ticket-fila total"><span>Volumen</span><i aria-hidden="true" /><span>{miles(kgToDisplay(resumen.volumen, unit))} {u}</span></p>
+              {resumen.vsUltima && <p className="ticket-nota">{resumen.vsUltima.pct >= 0 ? "+" : ""}{resumen.vsUltima.pct}% de volumen que tu último {resumen.vsUltima.dia}</p>}
+              {resumen.prs.length > 0 && (
+                <>
+                  <hr />
+                  <p className="ticket-titulo"><Trophy size={14} /> {resumen.prs.length === 1 ? "Récord de hoy" : "Récords de hoy"}</p>
+                  {resumen.prs.map((pr) => (
+                    <p key={pr.id} className="ticket-fila record"><span>{pr.nombre}</span><i aria-hidden="true" /><span>{pr.marca.replace("×", " × ")}</span></p>
+                  ))}
+                </>
+              )}
+              <hr />
+              <p className="ticket-gracias">Gracias por entrenar. Volvé pronto.</p>
+              <div className="ticket-codigo" aria-hidden="true">{barras.map((w, i) => <i key={i} style={{ width: w, opacity: i % 7 === 3 ? 0 : 1 }} />)}</div>
             </div>
           </div>
-        )}
-
-        {/* Metas del plan cumplidas hoy — bajo un plan es normal no romper
-            ningún récord, así que sin esto la sesión se veía vacía aunque
-            hubieras hecho exactamente lo que tocaba. */}
-        {resumen.metas?.total > 0 && (
-          <div className="px-5 mt-4">
-            <div className="flex items-center gap-2.5 rounded-2xl px-3.5 py-3" style={{ backgroundColor: resumen.metas.cumplidas === resumen.metas.total ? "rgba(56,189,248,0.14)" : "var(--row-surface)", border: `1px solid ${resumen.metas.cumplidas === resumen.metas.total ? "rgba(56,189,248,0.35)" : "var(--chip-border)"}` }}>
-              <ClipboardCheck size={17} className="shrink-0" style={{ color: "#38BDF8" }} />
-              <div className="flex-1 min-w-0">
-                <p className="text-[9px] font-black uppercase tracking-[0.14em] text-sky-400/90">Metas del plan</p>
-                <p className="text-[11.5px] text-slate-300 leading-snug">
-                  {resumen.metas.cumplidas === resumen.metas.total
-                    ? `Cumpliste las ${resumen.metas.total} de hoy.`
-                    : `Cumpliste ${resumen.metas.cumplidas} de ${resumen.metas.total}.`}
-                </p>
-              </div>
-              <span className="text-xl font-black tabular-nums shrink-0" style={{ color: "#38BDF8" }}>
-                {resumen.metas.cumplidas}<span className="text-xs opacity-60">/{resumen.metas.total}</span>
-              </span>
-            </div>
+          <div className="ticket-botones">
+            <button onClick={() => setCompartir(true)} className="boton-tonal" style={{ "--c": resumen.color || "#14B8A6" }}><Share2 size={16} /> Compartir</button>
+            <button onClick={onClose} className="boton-pildora flex-1" style={{ "--c": resumen.color || "#14B8A6" }}>Listo</button>
           </div>
-        )}
-
-        {/* Los récords del día, apareciendo uno a uno */}
-        {resumen.prs.length > 0 && (
-          <div className="px-5 mt-4 space-y-1.5">
-            <p className="text-[9px] font-black uppercase tracking-[0.14em] text-amber-400/90">Récords de hoy</p>
-            {(verTodosPRs ? resumen.prs : resumen.prs.slice(0, 5)).map((pr, i) => (
-                // Los que aparecen al expandir entran casi de una: con el
-                // escalonado de los primeros cinco (220ms cada uno) el sexto
-                // quedaba invisible un segundo y medio despues de tocar.
-              <div key={pr.id} className="flex items-center gap-2.5 rounded-xl px-3 py-2 bg-amber-500/[0.07] border border-amber-500/20 badge-pop" style={{ animationDelay: `${i < 5 ? 400 + i * 220 : (i - 5) * 60}ms` }}>
-                <span className="text-sm">🔥</span>
-                <span className="flex-1 min-w-0 truncate text-[11px] font-bold text-amber-200">{pr.nombre}</span>
-                <span className="text-[10px] text-amber-400/80 tabular-nums shrink-0">{pr.marca}</span>
-              </div>
-            ))}
-            {/* "y N más" era texto muerto: si rompiste 9 récords querés ver
-                los 9, no que te digan que existen. */}
-            {resumen.prs.length > 5 && (
-              <button onClick={() => setVerTodosPRs((v) => !v)} className="w-full flex items-center justify-center gap-1 py-1.5 text-[10px] font-bold text-amber-400/70 hover:text-amber-300 transition">
-                {verTodosPRs ? <>Ver menos <ChevronUp size={11} /></> : <>y {resumen.prs.length - 5} más <ChevronDown size={11} /></>}
-              </button>
-            )}
-          </div>
-        )}
-
-        <div className="px-5 py-5">
-          <button onClick={onClose} className="w-full py-3.5 rounded-2xl text-sm font-black !text-[color:var(--accion-tinta)] transition active:scale-[0.98]" style={{ background: "var(--accion-fondo)", boxShadow: "0 10px 28px -10px rgba(20,184,166,0.7)" }}>
-            ¡Seguir así! 💪
-          </button>
         </div>
       </div>
-    </div>
+      {compartir && (
+        <ShareImageModal
+          title="Compartí tu ticket"
+          subtitle="Tu sesión de hoy"
+          fileNamePrefix="ticket-modus-fit"
+          shareTitle="Mi sesión en Modus Fit"
+          shareText="Así me fue hoy 💪"
+          accent={resumen.color || "#14B8A6"}
+          draw={(ctx, W, H) => dibujarTicket(ctx, W, H, resumen, unit)}
+          onClose={() => setCompartir(false)}
+        />
+      )}
+    </>
   );
+}
+
+// El ticket como imagen para compartir: el mismo papel sobre el grafito.
+function dibujarTicket(ctx, W, H, resumen, unit) {
+  const F = "'Mona Sans Variable', system-ui, sans-serif";
+  const u = weightLabel(unit);
+  ctx.fillStyle = "#0b0b0d"; ctx.fillRect(0, 0, W, H);
+  const lineas = (resumen.lineas || []).slice(0, 7);
+  const prs = (resumen.prs || []).slice(0, 3);
+  const px = 64, pw = W - 128, py = 84;
+  const alto = 250 + lineas.length * 34 + (prs.length ? 70 + prs.length * 34 : 0) + 190;
+  // El papel, con el corte en zigzag abajo.
+  ctx.fillStyle = "#f3f3ef";
+  ctx.beginPath();
+  ctx.moveTo(px, py); ctx.lineTo(px + pw, py); ctx.lineTo(px + pw, py + alto);
+  const diente = 12;
+  for (let x = px + pw; x > px; x -= diente) { ctx.lineTo(x - diente / 2, py + alto + 9); ctx.lineTo(Math.max(px, x - diente), py + alto); }
+  ctx.closePath(); ctx.fill();
+  // La ranura de arriba.
+  ctx.fillStyle = "#050506"; ctx.beginPath(); ctx.roundRect(px - 18, py - 12, pw + 36, 16, 8); ctx.fill();
+  let y = py + 58;
+  const centro = (t, font, color) => { ctx.font = font; ctx.fillStyle = color; ctx.textAlign = "center"; ctx.fillText(t, W / 2, y); };
+  const fila = (izq, der, font = `500 21px ${F}`, color = "#232326") => {
+    ctx.font = font; ctx.fillStyle = color; ctx.textAlign = "left"; ctx.fillText(izq, px + 26, y);
+    ctx.textAlign = "right"; ctx.fillText(der, px + pw - 26, y);
+    const a = ctx.measureText(der).width;
+    ctx.textAlign = "left";
+    const b = Math.min(ctx.measureText(izq).width, pw * 0.6);
+    ctx.strokeStyle = "#bdbdb8"; ctx.setLineDash([2, 5]); ctx.beginPath(); ctx.moveTo(px + 34 + b, y - 5); ctx.lineTo(px + pw - 34 - a, y - 5); ctx.stroke(); ctx.setLineDash([]);
+  };
+  const corte = () => { y += 10; ctx.strokeStyle = "#b9b9b4"; ctx.setLineDash([7, 6]); ctx.beginPath(); ctx.moveTo(px + 22, y); ctx.lineTo(px + pw - 22, y); ctx.stroke(); ctx.setLineDash([]); y += 34; };
+  centro("Modus Fit", `800 40px ${F}`, "#1d1d1f"); y += 32;
+  centro(fechaDelTicket(resumen.fecha), `500 19px ${F}`, "#6b6b70"); y += 16;
+  corte();
+  fila(resumen.dia || "Entrenamiento", textoDuracion(resumen.minutos) || "", `700 24px ${F}`); y += 38;
+  lineas.forEach((l) => { fila(l.nombre.length > 24 ? `${l.nombre.slice(0, 23)}.` : l.nombre, `${l.series} ${l.series === 1 ? "serie" : "series"}`); y += 34; });
+  corte();
+  fila("Series", String(resumen.series)); y += 34;
+  fila("Ejercicios", String(resumen.ejercicios)); y += 38;
+  fila("Volumen", `${miles(kgToDisplay(resumen.volumen, unit))} ${u}`, `800 27px ${F}`, "#1d1d1f"); y += 18;
+  if (prs.length) {
+    corte();
+    ctx.font = `700 21px ${F}`; ctx.fillStyle = "#8a6a14"; ctx.textAlign = "left"; ctx.fillText(prs.length === 1 ? "Récord de hoy" : "Récords de hoy", px + 26, y); y += 34;
+    prs.forEach((pr) => { fila(pr.nombre.length > 22 ? `${pr.nombre.slice(0, 21)}.` : pr.nombre, pr.marca.replace("×", " × "), `600 21px ${F}`, "#8a6a14"); y += 34; });
+  }
+  corte();
+  centro("Gracias por entrenar. Volvé pronto.", `500 19px ${F}`, "#6b6b70"); y += 26;
+  const barras = codigoDeBarras(`${resumen.fecha}${resumen.volumen}${resumen.series}`);
+  const total = barras.reduce((t, w) => t + w * 2.4 + 2.4, 0);
+  let x = W / 2 - total / 2;
+  ctx.fillStyle = "#1d1d1f";
+  barras.forEach((w, i) => { if (i % 7 !== 3) ctx.fillRect(x, y, w * 2.4, 54); x += w * 2.4 + 2.4; });
+  // Al pie, la marca de la app.
+  ctx.textAlign = "center"; ctx.fillStyle = "#9d9ea4"; ctx.font = `600 20px ${F}`;
+  ctx.fillText("modus fit", W / 2, H - 46);
 }
 
 // Resumen semanal: aparece al finalizar una sesión que cae en domingo (o el
@@ -7534,240 +7729,134 @@ function SessionSummaryModal({ resumen, onClose }) {
 // resumirSesiones). El semanal es violeta como siempre; el mensual va en
 // azul y el anual en ámbar, para que se note de una cuál cerraste.
 const RECAP_ESTILOS = {
-  semana: { titulo: "¡Semana completa! 💪", bajada: "Así te fue de lunes a domingo", color: "#A855F7", cta: "¡A por la próxima! 🎯" },
-  mes: { titulo: "¡Mes cerrado! 📆", color: "#3B82F6", cta: "¡A por el que viene! 🎯" },
-  anio: { titulo: "¡Año completo! 🏆", color: "#F59E0B", cta: "¡A por el próximo! 🎯" },
+  semana: { titulo: "Semana completa", bajada: "Así te fue de lunes a domingo", color: "#A855F7", cta: "Vamos por la próxima" },
+  mes: { titulo: "Mes cerrado", color: "#3B82F6", cta: "Vamos por el que viene" },
+  anio: { titulo: "Año completo", color: "#F59E0B", cta: "Vamos por el próximo" },
 };
-
-// Dona de reparto por músculo. SVG a mano en vez de una librería: son
-// cuatro arcos, y meter Recharts acá cargaría el chart entero dentro de un
-// modal que se abre una vez por mes. Cada arco es un círculo con
-// stroke-dasharray (largo del tramo / resto) y el desfase acumulado.
-function DonutMusculos({ datos, size = 108, unidad = "SERIES" }) {
-  // Los arcos arrancan en largo 0 y, apenas monta, pasan a su largo real:
-  // con la transicion de CSS eso se ve como la dona dibujandose sola,
-  // sector por sector. Va con estado y no con @keyframes porque el largo
-  // de cada arco depende de los datos, y una keyframe no puede llevar un
-  // valor distinto por elemento.
-  const [desplegada, setDesplegada] = useState(false);
-  useEffect(() => { const t = setTimeout(() => setDesplegada(true), 40); return () => clearTimeout(t); }, []);
-  const total = datos.reduce((a, d) => a + d.series, 0);
-  if (!total) return null;
-  const r = (size - 14) / 2;
-  const circ = 2 * Math.PI * r;
-  // Los tramos se calculan de una, con el desfase acumulado ya resuelto:
-  // ir sumando una variable adentro del .map() reasigna durante el render
-  // y React lo marca como impuro.
-  const arcos = datos.reduce((acc, d) => {
-    const previo = acc.length ? acc[acc.length - 1] : null;
-    acc.push({ ...d, largo: (d.series / total) * circ, offset: previo ? previo.offset + previo.largo : 0 });
-    return acc;
-  }, []);
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="shrink-0">
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(157,162,168,0.12)" strokeWidth="12" />
-      {arcos.map((d, i) => {
-        const { largo, offset } = d;
-        return (
-          <circle
-            key={i}
-            cx={size / 2} cy={size / 2} r={r}
-            fill="none" stroke={d.color} strokeWidth="12" strokeLinecap="butt"
-            strokeDasharray={desplegada ? `${Math.max(0, largo - 1.5)} ${circ}` : `0 ${circ}`}
-            strokeDashoffset={-offset}
-            transform={`rotate(-90 ${size / 2} ${size / 2})`}
-            style={{ transition: "stroke-dasharray 620ms cubic-bezier(.2,.8,.3,1)", transitionDelay: `${i * 110}ms` }}
-          />
-        );
-      })}
-      {/* El total se abrevia si es grande: en kg de volumen son cinco digitos y no entran en el agujero de la dona. */}
-      <text x="50%" y="47%" textAnchor="middle" className="fill-white" style={{ fontSize: total >= 10000 ? 16 : 19, fontWeight: 900 }}>{total >= 1000 ? (total / 1000).toFixed(1) + "k" : total}</text>
-      <text x="50%" y="63%" textAnchor="middle" style={{ fontSize: 8.5, fill: "#6e7379", fontWeight: 700 }}>{unidad}</text>
-    </svg>
-  );
-}
 
 function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null, enCurso = false }) {
   useAndroidBack(onClose);
   const unit = useWeightUnit();
   const [verTodasMarcas, setVerTodasMarcas] = useState(false);
+  // Los tres números arrancan en cero y suben al abrirse.
+  const [encendido, setEncendido] = useState(false);
+  useEffect(() => { const t = setTimeout(() => setEncendido(true), 200); return () => clearTimeout(t); }, []);
   if (!data) return null;
   const base = RECAP_ESTILOS[periodo] || RECAP_ESTILOS.semana;
   // El mismo modal sirve para un período ya cerrado y para el que está
   // corriendo (lo abre el botón del historial). Decir "mes cerrado" de un
   // mes a mitad de camino sería mentir, así que cambian título y texto.
-  const est = enCurso ? { ...base, titulo: "Cómo vas este mes 📆", cta: "Seguir así 💪" } : base;
+  const est = enCurso ? { ...base, titulo: "Cómo vas este mes", cta: "Seguir" } : base;
   const bajada = enCurso ? `Lo que llevás de ${etiqueta || "este mes"}` : (est.bajada || `Así te fue en ${etiqueta || "el período"}`);
   const tramos = data.tramos || [];
   const maxTramo = tramos.reduce((m, t) => Math.max(m, t.valor), 0);
   const mejorTramo = maxTramo > 0 ? tramos.findIndex((t) => t.valor === maxTramo) : -1;
-  const fmtKg = (v) => (v >= 1000 ? `${(v / 1000).toFixed(v >= 10000 ? 0 : 1)}k` : String(v));
-  // La dona muestra los 5 músculos con más series y junta el resto en
-  // "Otros": con 15 grupos, los arcos finos no se distinguen y la leyenda
-  // se vuelve ilegible.
+  const fmtKg = (v) => (v >= 1000 ? `${String((v / 1000).toFixed(v >= 10000 ? 0 : 1)).replace(".", ",")} mil` : String(v));
+  // Dónde fue el trabajo: barras por músculo, como en el Balance de
+  // Rutinas, del color del período y apagadas. Antes era una dona de seis
+  // colores saturados.
   const musculos = data.musculos || [];
-  const donaDatos = musculos.length > 6
-    ? [...musculos.slice(0, 5), { nombre: "Otros", series: musculos.slice(5).reduce((a, m) => a + m.series, 0), color: "#50555a" }]
-    : musculos;
-  const filaDato = { backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" };
+  const maxSeries = musculos.reduce((m, x) => Math.max(m, x.series), 0) || 1;
+  const marcas = verTodasMarcas ? (data.todasMarcas || data.marcas || []) : (data.marcas || []);
   return (
     <div className="fixed inset-0 z-[140] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
-      <div
-        className="relative max-w-sm w-full max-h-[92vh] overflow-y-auto overscroll-contain rounded-3xl modal-pop-in shadow-2xl shadow-black/70"
-        style={{ background: "var(--panel-grad-slate)", border: `1px solid ${tint(est.color, "4d")}` }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="relative flex flex-col items-center pt-9 pb-4 px-6 text-center">
-          <div className="absolute -top-16 left-1/2 -translate-x-1/2 w-52 h-52 rounded-full blur-3xl pointer-events-none" style={{ backgroundColor: tint(est.color, "33") }} />
-          <div className="relative w-16 h-16 rounded-full flex items-center justify-center mb-4 elastic-in" style={{ backgroundColor: tint(est.color, "2e"), border: `1px solid ${tint(est.color, "66")}`, color: est.color, boxShadow: `0 12px 38px -12px ${tint(est.color, "b3")}` }}>
-            <TrendingUp size={28} />
-          </div>
-          <h2 className="relative text-lg font-black text-white leading-tight">{est.titulo}</h2>
-          <p className="relative text-[11px] text-slate-500 mt-1">{bajada}</p>
+      <div className="resumen-periodo filete modal-pop-in" style={{ "--c": est.color }} role="dialog" aria-modal="true" aria-label={est.titulo} onClick={(e) => e.stopPropagation()}>
+        <header className="resumen-cabeza">
+          <h2 className="resumen-titulo">{est.titulo}</h2>
+          <p className="resumen-bajada">{bajada}</p>
           {/* Contra el período anterior: convierte un número suelto en algo
               que se puede leer de una. Sólo aparece si hubo período anterior
               con datos, en vez de inventar un 0%. */}
           {typeof data.vsAnterior === "number" && (
-            <span className="relative inline-flex items-center gap-1 mt-2.5 px-2.5 py-1 rounded-lg text-[11px] font-black"
-              style={data.vsAnterior >= 0
-                ? { backgroundColor: "rgba(16,185,129,0.14)", color: "#34d399", border: "1px solid rgba(16,185,129,0.3)" }
-                : { backgroundColor: "rgba(157,162,168,0.12)", color: "#9da2a8", border: "1px solid rgba(157,162,168,0.25)" }}>
-              {data.vsAnterior >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+            <p className={`resumen-vs ${data.vsAnterior >= 0 ? "sube" : ""}`}>
+              {data.vsAnterior >= 0 ? <TrendingUp size={13} /> : <TrendingDown size={13} />}
               {data.vsAnterior >= 0 ? "+" : ""}{data.vsAnterior}% de volumen que {periodo === "anio" ? "el año pasado" : "el mes pasado"}
-            </span>
+            </p>
           )}
-        </div>
+        </header>
 
-        <div className="grid grid-cols-3 gap-2 px-5">
+        <div className="atleta-datos resumen-datos">
           {[
             { v: data.dias, l: data.dias === 1 ? "día" : "días" },
             { v: data.series, l: "series" },
             { v: Math.round(kgToDisplay(data.volumen, unit)), l: `${weightLabel(unit)} de volumen` },
           ].map((x) => (
-            <div key={x.l} className="bg-black/25 rounded-2xl py-3 text-center border border-white/[0.05]">
-              <CountUpNumber value={x.v} duration={900} decimals={0} className="text-base font-black text-white tabular-nums leading-none" />
-              <p className="text-[9px] text-slate-500 mt-1.5 leading-tight px-1">{x.l}</p>
+            <div key={x.l} className="atleta-dato">
+              <span className="atleta-dato-valor"><b className="num-display"><NumberFlow value={encendido ? x.v : 0} locales="es-AR" /></b></span>
+              <small>{x.l}</small>
             </div>
           ))}
         </div>
 
         {/* Cómo repartiste el trabajo a lo largo del período. Los tramos
-            vacíos quedan como barra apagada a propósito: los huecos son
-            justamente lo que hay que ver, no algo para esconder. */}
+            vacíos quedan como una raya a propósito: los huecos son justamente
+            lo que hay que ver. El más cargado, entero. */}
         {maxTramo > 0 && (
-          <div className="px-5 pt-4">
-            <p className="text-[9.5px] font-black uppercase tracking-widest text-slate-600 mb-2">Cuándo entrenaste</p>
-            <div className="flex items-end justify-between gap-1 h-20 rounded-2xl bg-black/25 border border-white/[0.05] px-2.5 pt-2.5 pb-1.5">
+          <section className="resumen-bloque" aria-label="Cuándo entrenaste">
+            <h3>Cuándo entrenaste</h3>
+            <div className="resumen-tramos">
               {tramos.map((t, i) => (
-                <div key={i} className="flex-1 flex flex-col items-center justify-end h-full gap-1 min-w-0">
-                  <div className="w-full rounded-md grow-bar-up" title={`${Math.round(kgToDisplay(t.valor, unit))} ${weightLabel(unit)}`}
-                    style={{
-                      height: `${t.valor > 0 ? Math.max(8, (t.valor / maxTramo) * 100) : 3}%`,
-                      backgroundColor: t.valor === 0 ? "rgba(157,162,168,0.16)" : i === mejorTramo ? est.color : tint(est.color, "66"),
-                      boxShadow: i === mejorTramo ? `0 0 12px ${tint(est.color, "80")}` : "none",
-                      animationDelay: `${i * 45}ms`,
-                    }} />
-                  <span className="text-[8px] font-bold shrink-0" style={{ color: i === mejorTramo ? est.color : "#50555a" }}>{t.etiqueta}</span>
+                <div key={i} className={`resumen-tramo ${i === mejorTramo ? "mejor" : ""}`} title={`${Math.round(kgToDisplay(t.valor, unit))} ${weightLabel(unit)}`}>
+                  <i className="grow-bar-up" style={{ height: `${t.valor > 0 ? Math.max(8, (t.valor / maxTramo) * 100) : 3}%`, animationDelay: `${i * 45}ms` }} />
+                  <span>{t.etiqueta}</span>
                 </div>
               ))}
             </div>
-          </div>
+          </section>
         )}
 
-        {/* Dónde fue el trabajo: la dona responde "¿estoy equilibrado?", que
-            es la pregunta que ningún total contesta. */}
-        {donaDatos.length > 1 && (
-          <div className="px-5 pt-4">
-            <p className="text-[9.5px] font-black uppercase tracking-widest text-slate-600 mb-2">Dónde fue el trabajo</p>
-            <div className="flex items-center gap-3 rounded-2xl bg-black/25 border border-white/[0.05] p-3">
-              <DonutMusculos datos={donaDatos} />
-              <div className="flex-1 min-w-0 space-y-1.5">
-                {donaDatos.map((m) => (
-                  <div key={m.nombre} className="flex items-center gap-2 min-w-0">
-                    <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: m.color }} />
-                    <span className="flex-1 min-w-0 text-[10.5px] text-slate-300 truncate">{m.nombre}</span>
-                    <span className="text-[10.5px] font-black tabular-nums shrink-0" style={{ color: m.color }}>{Math.round((m.series / data.series) * 100)}%</span>
-                  </div>
-                ))}
-              </div>
+        {musculos.length > 1 && (
+          <section className="resumen-bloque" aria-label="Dónde fue el trabajo">
+            <h3>Dónde fue el trabajo</h3>
+            <div className="grid gap-2">
+              {musculos.slice(0, 6).map((m) => (
+                <div key={m.nombre} className="balance-fila">
+                  <span className="balance-nombre">{m.nombre}</span>
+                  <span className="balance-pista"><i style={{ width: `${(m.series / maxSeries) * 100}%` }} /></span>
+                  <b className="balance-n num-display">{m.series}</b>
+                </div>
+              ))}
             </div>
-          </div>
+            {musculos.length > 6 && <p className="resumen-nota">Y {musculos.length - 6} {musculos.length - 6 === 1 ? "músculo más" : "músculos más"}, con menos series.</p>}
+          </section>
         )}
 
         {/* Las marcas CONCRETAS, no un contador: qué levantaste y con cuánto.
-            Una por ejercicio (la mejor del período), si no una progresión de
-            cinco sesiones llenaba la lista con el mismo nombre. */}
+            Una por ejercicio (la mejor del período). */}
         {data.marcas?.length > 0 && (
-          <div className="px-5 pt-4">
-            <p className="text-[9.5px] font-black uppercase tracking-widest text-amber-500/80 mb-2 flex items-center gap-1.5">
-              <Trophy size={11} /> {data.records} {data.records === 1 ? "marca nueva" : "marcas nuevas"}
-            </p>
-            <div className="space-y-1.5">
-              {(verTodasMarcas ? (data.todasMarcas || data.marcas) : data.marcas).map((m, i) => (
-                <div key={i} className="flex items-center gap-2.5 rounded-xl px-3 py-2 stagger-item" style={{ backgroundColor: "rgba(251,191,36,0.09)", border: "1px solid rgba(251,191,36,0.22)", animationDelay: `${i * 60}ms` }}>
-                  <span className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 bg-amber-500/20 text-amber-300 text-[10px] font-black">{i + 1}</span>
-                  <span className="flex-1 min-w-0 text-xs font-bold text-white truncate">{m.exercise}</span>
-                  <span className="text-xs font-black tabular-nums text-amber-300 shrink-0">{m.reps}×{kgToDisplay(m.kg, unit)}{weightLabel(unit)}</span>
-                </div>
+          <section className="resumen-bloque" aria-label="Marcas nuevas">
+            <h3 className="resumen-record"><Trophy size={14} /> {data.records} {data.records === 1 ? "marca nueva" : "marcas nuevas"}</h3>
+            <ul className="recientes">
+              {marcas.map((m, i) => (
+                <li key={i} className="reciente stagger-item" style={{ animationDelay: `${i * 60}ms` }}>
+                  <span className="min-w-0 flex-1"><span className="reciente-nombre">{m.exercise}</span></span>
+                  <b className="reciente-marca num-display">{m.reps} × {kgToDisplay(m.kg, unit)}<small>{weightLabel(unit)}</small></b>
+                </li>
               ))}
-              {/* Antes esto era texto muerto: si rompiste 9 marcas querés
-                  verlas, no que te avisen que existen. */}
-              {data.records > data.marcas.length && (
-                <button onClick={() => setVerTodasMarcas((v) => !v)} className="w-full flex items-center justify-center gap-1 py-1.5 text-[10px] font-bold text-amber-400/70 hover:text-amber-300 transition">
-                  {verTodasMarcas ? <>Ver menos <ChevronUp size={11} /></> : <>y {data.records - data.marcas.length} más <ChevronDown size={11} /></>}
-                </button>
-              )}
-            </div>
-          </div>
+            </ul>
+            {data.records > (data.marcas?.length || 0) && (
+              <button onClick={() => setVerTodasMarcas((v) => !v)} className="enlace-suave mx-auto mt-1">
+                {verTodasMarcas ? <>Ver menos <ChevronUp size={13} /></> : <>Y {data.records - data.marcas.length} más <ChevronDown size={13} /></>}
+              </button>
+            )}
+          </section>
         )}
 
-        {/* Datos sueltos que no justifican un gráfico pero sí una fila. */}
-        <div className="px-5 pt-4 space-y-2">
+        {/* Datos sueltos que no justifican un gráfico: renglones finos. */}
+        <ul className="resumen-renglones">
           {data.mejorDia && (
-            <div className="flex items-center gap-2.5 rounded-xl px-3 py-2.5" style={filaDato}>
-              <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: tint(est.color, "1c"), color: est.color }}><Flame size={14} /></span>
-              <span className="flex-1 min-w-0">
-                <span className="block text-[9px] font-black uppercase tracking-wider text-slate-600">Tu mejor día</span>
-                <span className="block text-xs font-bold text-white truncate">{data.mejorDia.date.slice(8, 10)}/{data.mejorDia.date.slice(5, 7)} · {data.mejorDia.series} {data.mejorDia.series === 1 ? "serie" : "series"}</span>
-              </span>
-              <span className="text-xs font-black tabular-nums shrink-0" style={{ color: est.color }}>{fmtKg(Math.round(kgToDisplay(data.mejorDia.volumen, unit)))} {weightLabel(unit)}</span>
-            </div>
+            <li><span>Tu mejor día<small>{data.mejorDia.date.slice(8, 10)}/{data.mejorDia.date.slice(5, 7)}, {data.mejorDia.series} {data.mejorDia.series === 1 ? "serie" : "series"}</small></span><b>{fmtKg(Math.round(kgToDisplay(data.mejorDia.volumen, unit)))} {weightLabel(unit)}</b></li>
           )}
           {data.estrella && (
-            <div className="flex items-center gap-2.5 rounded-xl px-3 py-2.5" style={filaDato}>
-              <span className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-slate-800/60 text-slate-400"><Dumbbell size={14} /></span>
-              <span className="flex-1 min-w-0">
-                <span className="block text-[9px] font-black uppercase tracking-wider text-slate-600">Tu ejercicio estrella</span>
-                <span className="block text-xs font-bold text-white truncate">{data.estrella.nombre}</span>
-              </span>
-              <span className="text-xs font-black tabular-nums text-slate-400 shrink-0">{data.estrella.dias} {data.estrella.dias === 1 ? "día" : "días"}</span>
-            </div>
+            <li><span>Tu ejercicio estrella<small>{data.estrella.nombre}</small></span><b>{data.estrella.dias} {data.estrella.dias === 1 ? "día" : "días"}</b></li>
           )}
-          <div className="grid grid-cols-2 gap-2">
-            {data.minutos > 0 && (
-              <div className="flex items-center gap-2 rounded-xl px-3 py-2.5" style={filaDato}>
-                <Clock size={14} className="text-slate-500 shrink-0" />
-                <span className="min-w-0">
-                  <span className="block text-[9px] font-black uppercase tracking-wider text-slate-600">Tiempo</span>
-                  <span className="block text-xs font-bold text-white">{data.minutos >= 60 ? `${Math.floor(data.minutos / 60)}h ${data.minutos % 60}m` : `${data.minutos} min`}</span>
-                </span>
-              </div>
-            )}
-            <div className="flex items-center gap-2 rounded-xl px-3 py-2.5" style={filaDato}>
-              <ListChecks size={14} className="text-slate-500 shrink-0" />
-              <span className="min-w-0">
-                <span className="block text-[9px] font-black uppercase tracking-wider text-slate-600">Por sesión</span>
-                <span className="block text-xs font-bold text-white">{data.promedioSeries} series</span>
-              </span>
-            </div>
-          </div>
-        </div>
+          {data.minutos > 0 && (
+            <li><span>Tiempo</span><b>{data.minutos >= 60 ? `${Math.floor(data.minutos / 60)} h ${data.minutos % 60} min` : `${data.minutos} min`}</b></li>
+          )}
+          <li><span>Por sesión</span><b>{data.promedioSeries} series</b></li>
+        </ul>
 
-        <div className="px-5 py-5">
-          <button onClick={onClose} className="w-full py-3.5 rounded-2xl text-sm font-black !text-[color:var(--accion-tinta)] transition active:scale-[0.98]" style={{ background: "var(--accion-fondo)", boxShadow: "none" }}>
-            {est.cta}
-          </button>
-        </div>
+        <button onClick={onClose} className="boton-pildora w-full" style={{ "--c": est.color }}>{est.cta}</button>
       </div>
     </div>
   );
@@ -8982,6 +9071,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           <span aria-hidden="true" />
         </div>
       )}
+      {unit === "kg" && kg ? <QueCargar kg={parseFloat(String(kg).replace(",", "."))} nombre={exerciseName} exerciseId={exerciseId} /> : null}
       {liveBeats && <p className="foco-record"><Trophy size={13} /> Si la guardás así, es récord</p>}
       {lineaFeedback}
       {avisosExtra}
@@ -9416,6 +9506,60 @@ function BarraConDiscos({ kg, alto = 56, className = "" }) {
   );
 }
 
+// UN PAR DE MANCUERNAS, para los ejercicios con mancuernas: las cabezas
+// crecen un poco con el peso, como las de verdad.
+function ParDeMancuernas({ kg, alto = 30 }) {
+  const uid = `pm${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
+  const t = Math.max(0.5, Math.min(1, 0.45 + kg / 70));
+  const cabeza = 18 + 18 * t, ancho = 8 + 6 * t;
+  const mancuerna = (x0) => (
+    <g>
+      <rect x={x0} y={20 - cabeza / 2} width={ancho} height={cabeza} rx={3} fill={`url(#${uid}-goma)`} className="disco" />
+      <rect x={x0 + ancho - 1} y={17} width={24} height={6} rx={3} fill={`url(#${uid}-acero)`} />
+      <rect x={x0 + ancho + 22} y={20 - cabeza / 2} width={ancho} height={cabeza} rx={3} fill={`url(#${uid}-goma)`} className="disco" />
+    </g>
+  );
+  return (
+    <svg viewBox="0 0 150 40" style={{ height: alto, width: "auto" }} aria-hidden="true" className="par-mancuernas">
+      <defs>
+        <linearGradient id={`${uid}-acero`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" className="acero-claro" /><stop offset=".55" className="acero-medio" /><stop offset="1" className="acero-oscuro" />
+        </linearGradient>
+        <linearGradient id={`${uid}-goma`} x1="0" y1="0" x2="0" y2="1" style={{ "--d": "#4a4c52" }}>
+          <stop offset="0" className="disco-claro" /><stop offset=".45" className="disco-medio" /><stop offset="1" className="disco-oscuro" />
+        </linearGradient>
+      </defs>
+      {mancuerna(6)}
+      {mancuerna(80)}
+    </svg>
+  );
+}
+
+// QUÉ CARGAR: debajo de los números de la serie en foco, lo que va en la
+// barra para el peso que escribiste (los discos de cada lado de una olímpica
+// de 20 kg) o, si es con mancuernas, el par. Chico y tenue: se mira de reojo
+// al armar la barra.
+function QueCargar({ kg, nombre, exerciseId }) {
+  if (!kg || !(kg > 0)) return null;
+  const lib = EXERCISE_LIBRARY_BY_ID[exerciseId];
+  if (/mancuerna/i.test(nombre || "") || lib?.loadFactor === 2) {
+    return (
+      <div className="que-cargar" aria-label={`Un par de mancuernas de ${conComa(kg)} kilos`}>
+        <ParDeMancuernas kg={kg} alto={26} />
+        <span>Un par de <b>{conComa(kg)} kg</b></span>
+      </div>
+    );
+  }
+  if (!seHaceConBarra(nombre) || kg < 20) return null;
+  const discos = discosParaPeso(kg);
+  return (
+    <div className="que-cargar">
+      <BarraConDiscos kg={kg} alto={30} />
+      <span>{discos.length ? <>Por lado: <b>{discos.map((d) => conComa(d.kg)).join(" + ")}</b></> : "Sólo la barra"}</span>
+    </div>
+  );
+}
+
 // Los días de tu rutina como baldosas: cada una con el color de su día (un
 // filete arriba y un tinte apenas), su nombre y cuántos ejercicios y series
 // tiene. Tocarla te lleva a ese día. Reemplaza a la barra del reparto y sus
@@ -9520,7 +9664,7 @@ function CarreraSemana({ filas = [], onVerPersona = null, vacios = 0 }) {
     .sort((a, b) => b.tramos.length - a.tramos.length || (a.yo ? -1 : b.yo ? 1 : 0));
   const largo = Math.max(4, ...corredores.map((c) => c.tramos.length));
   return (
-    <ol className="carrera" aria-label="Sesiones de esta semana">
+    <ol className="carrera filete" style={{ "--c": SOCIAL_COLOR }} aria-label="Sesiones de esta semana">
       {corredores.map((c, i) => {
         const Tag = onVerPersona && !c.yo ? "button" : "div";
         const n = c.tramos.length;
@@ -9990,6 +10134,17 @@ function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS,
   // corromper el estado de otros componentes. Ahora el hook va primero y el
   // early return después.
   const trainedDays = useMemo(() => getTrainedDateSet(logs, sessions), [logs, sessions]);
+  // Qué día de la rutina fue cada sesión: el color de cada disco.
+  const diaPorFecha = useMemo(() => {
+    const m = new Map();
+    (sessions || []).forEach((x) => { if (x?.date && x.dayKey && !m.has(x.date)) m.set(x.date, x.dayKey); });
+    Object.entries(logs).forEach(([k, v]) => {
+      const dk = KEY_TO_DAY[k];
+      if (!dk || !Array.isArray(v)) return;
+      v.forEach((e) => { if (e?.date && !e.noSession && !m.has(e.date)) m.set(e.date, dk); });
+    });
+    return m;
+  }, [logs, sessions]);
   // La cascada del calendario corre UNA vez al montar. Sin este flag, cada
   // vez que cambia cualquier cosa (registrás una serie, tocás un día) las
   // semanas volverían a parpadear.
@@ -9999,12 +10154,13 @@ function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS,
   const { cycleWeeks, trainWeeks } = weekInfo;
   // Cada semana es un escalón: sube a medida que avanza el ciclo (la
   // sobrecarga progresiva, dibujada) y baja en la descarga. Las pasadas,
-  // llenas; la actual, encendida; las que vienen, fantasma. Adentro de cada
-  // una, una rayita por sesión que hiciste esa semana.
+  // llenas; la actual, encendida; las que vienen, de contorno. Adentro de
+  // cada una, un disco por sesión, apilados, del color del día que hiciste.
   const weekDots = Array.from({ length: cycleWeeks }, (_, wi) => {
     const ws = new Date(cycleStart); ws.setDate(ws.getDate() + wi * 7);
     const days = Array.from({ length: 7 }, (_, di) => { const d = new Date(ws); d.setDate(d.getDate() + di); return localDateStr(d); });
-    return { week: wi + 1, trained: days.filter((d) => trainedDays.has(d)).length, isDeload: wi + 1 > trainWeeks };
+    const hechos = days.filter((d) => trainedDays.has(d));
+    return { week: wi + 1, trained: hechos.length, colores: hechos.map((d) => ROUTINE[diaPorFecha.get(d)]?.color || "#8a8c92"), isDeload: wi + 1 > trainWeeks };
   });
   const phase = weekInfo.isDeload ? "#A855F7" : "#3B82F6";
   const alturaDe = (wi, isDeload) => (isDeload ? 30 : 36 + (wi / Math.max(1, trainWeeks - 1)) * 64);
@@ -10021,17 +10177,16 @@ function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS,
         <span className="dia-chip !m-0 shrink-0">{weekInfo.isDeload ? "Descarga" : "Entrenamiento"}</span>
       </div>
       {/* La escalera: cada semana sube un poco la carga (la sobrecarga
-          progresiva, dibujada) y la descarga baja. Las pasadas, llenas; la de
-          hoy, de color; las que vienen, de contorno. Adentro, una rayita por
-          sesión que hiciste esa semana. */}
+          progresiva, dibujada) y la descarga baja. Adentro, un disco por
+          sesión, del color del día que hiciste. */}
       <div className="escalera" aria-hidden="true">
-        {weekDots.map(({ week, trained, isDeload }, wi) => {
+        {weekDots.map(({ week, colores, isDeload }, wi) => {
           const estado = week < weekInfo.weekInCycle ? "pasada" : week === weekInfo.weekInCycle ? "actual" : "futura";
           return (
             <div key={week} className={`escalon ${estado} ${isDeload ? "descarga" : ""}`}
               style={{ height: `${alturaDe(wi, isDeload)}%`, ...(yaAnimado ? null : { animation: `escalonSube .55s cubic-bezier(.34,1.4,.64,1) ${wi * 50}ms backwards` }) }}>
               {estado === "actual" && <span className="escalon-hoy">Hoy</span>}
-              <span className="escalon-sesiones">{Array.from({ length: Math.min(trained, 5) }, (_, i) => <i key={i} />)}</span>
+              <span className="escalon-sesiones">{colores.slice(0, 7).map((c, i) => <i key={i} className={yaAnimado ? "" : "cae"} style={{ "--dia": c, ...(yaAnimado ? null : { animationDelay: `${380 + wi * 60 + i * 70}ms` }) }} />)}</span>
             </div>
           );
         })}
@@ -10039,7 +10194,8 @@ function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS,
       <div className="escalera-numeros" aria-hidden="true">
         {weekDots.map(({ week, isDeload }) => <span key={week} className={week === weekInfo.weekInCycle ? "actual" : ""}>{isDeload ? "D" : week}</span>)}
       </div>
-      <button onClick={onGoToDeload} className="enlace-suave mt-3"><Zap size={13} /> Ver mi semana de descarga</button>
+      <p className="escalera-leyenda"><i aria-hidden="true" /> Cada disco es una sesión, del color del día que hiciste.</p>
+      <button onClick={onGoToDeload} className="enlace-suave mt-1"><Zap size={13} /> Ver mi semana de descarga</button>
     </section>
   );
 }
@@ -10816,13 +10972,14 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
         )); })()}
       </div>
 
-      {/* EL DÍA — un contenedor de su color con el nombre enorme, la barra
-          cargada y el botón para empezar. Es lo que más color tiene de la
-          pantalla, a propósito: lo primero que se ve es qué toca hoy y
-          cuánto te falta. Abajo, el calentamiento y los ejercicios. */}
+      {/* EL DÍA, EN UN SOLO BLOQUE: el nombre enorme, la barra cargada y el
+          botón para empezar; abajo, el calentamiento y los ejercicios. Todo
+          en la misma placa, con el filete del color del día arriba (como
+          las baldosas de Rutinas); antes eran tarjetas sueltas una debajo
+          de la otra. */}
       <section
         key={activeDay}
-        className="dia-seccion relative space-y-3 tab-fade-in"
+        className="dia-seccion relative tab-fade-in"
         style={{ "--c": day.color }}
         aria-label={`Día ${day.label}`}
       >
@@ -10890,7 +11047,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           key acá remontaba TODAS las tarjetas y se perdía su estado local
           (si estaba abierta, la nota a medio escribir, el calentamiento
           desplegado). Así se anima igual pero sin destruir nada. */}
-      <div ref={gridRef} className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+      <div ref={gridRef} className="dia-ejercicios grid grid-cols-1 lg:grid-cols-2 gap-3">
         {(() => {
           const groups = groupExercisesIntoSupersets(day.exercises);
           const estaCompleto = (g) => g.every((ex) => ex.sets.every((_, i) => (logs[`${ex.id}_${i}`] || []).some((h) => h.date === today && !h.deload)));
@@ -12877,13 +13034,94 @@ function loQueFaltaParaGanar(comparacion) {
       const umbrales = getMuscleRankThresholdsKg(r.key, "general");
       const objetivo = Math.min(umbrales.length - 1, r.theirs.levelIdx + 1);
       const b = r.myBest;
-      if (!b?.bestKg || !b?.bestReps || !b.bestExerciseName) return { key: r.key, label: r.label, sinMarca: true, cuanto: Infinity };
+      if (!b?.bestKg || !b?.bestReps || !b.bestExerciseName) return { key: r.key, label: r.label, color: r.theirs.color, sinMarca: true, cuanto: Infinity };
       const crudo = umbrales[objetivo] / (b.bestWeight || 1);
       let kg = Math.ceil(crudo / (1 + b.bestReps / 30) / (b.bestLoadFactor || 1) / 2.5) * 2.5;
       if (kg <= b.bestKg) kg = b.bestKg + 2.5;
-      return { key: r.key, label: r.label, reps: b.bestReps, kg, ejercicio: b.bestExerciseName, suma: kg - b.bestKg, empata: objetivo === r.theirs.levelIdx, cuanto: (kg - b.bestKg) / b.bestKg };
+      return { key: r.key, label: r.label, color: r.theirs.color, reps: b.bestReps, kg, ejercicio: b.bestExerciseName, suma: kg - b.bestKg, empata: objetivo === r.theirs.levelIdx, cuanto: (kg - b.bestKg) / b.bestKg };
     })
     .sort((a, b) => a.cuanto - b.cuanto);
+}
+
+// Mezcla dos colores hexadecimales (p es cuánto del primero): el canvas no
+// entiende color-mix en todos los teléfonos, así que la cuenta va acá.
+function mezclarHex(a, b, p) {
+  const rgb = (h) => {
+    const x = String(h || "#8a8c92").replace("#", "");
+    const v = x.length === 3 ? x.split("").map((c) => c + c).join("") : x.slice(0, 6);
+    return [0, 2, 4].map((i) => parseInt(v.slice(i, i + 2), 16) || 0);
+  };
+  const [r1, g1, b1] = rgb(a), [r2, g2, b2] = rgb(b);
+  const m = (x, y) => Math.round(x * p + y * (1 - p));
+  return [m(r1, r2), m(g1, g2), m(b1, b2)];
+}
+
+// El mano a mano como imagen para compartir: las dos caras con el aro de su
+// rango, la barra en equilibrio con los músculos que gana cada uno como
+// discos, el marcador y el fuerte de cada uno. Los colores, apagados como
+// en la app.
+function dibujarManoAMano(ctx, W, H, d) {
+  const F = "'Mona Sans Variable', system-ui, sans-serif";
+  const yo = mezclarHex(d.colorYo, "#8a8c92", 0.62), el = mezclarHex(d.colorEl, "#8a8c92", 0.62);
+  const css = (c, a = 1) => `rgba(${c[0]}, ${c[1]}, ${c[2]}, ${a})`;
+  const angosto = (si) => { if ("fontStretch" in ctx) ctx.fontStretch = si ? "condensed" : "normal"; };
+  ctx.fillStyle = "#0b0b0d"; ctx.fillRect(0, 0, W, H);
+  // La luz de cada uno en su esquina.
+  [[0, yo], [W, el]].forEach(([x, c]) => {
+    const g = ctx.createRadialGradient(x, 130, 0, x, 130, 430);
+    g.addColorStop(0, css(c, 0.22)); g.addColorStop(1, css(c, 0));
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  });
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#f2f2f4"; ctx.font = `800 44px ${F}`; ctx.fillText("Mano a mano", W / 2, 100);
+  // Las dos caras.
+  const cara = (x, inicial, nombre, rango, color) => {
+    ctx.beginPath(); ctx.arc(x, 228, 60, 0, Math.PI * 2); ctx.fillStyle = "#1c1d21"; ctx.fill();
+    ctx.lineWidth = 6; ctx.strokeStyle = css(color); ctx.stroke();
+    ctx.fillStyle = "#f2f2f4"; ctx.font = `750 48px ${F}`; ctx.fillText(inicial, x, 245);
+    ctx.font = `700 28px ${F}`; ctx.fillText(nombre.length > 12 ? `${nombre.slice(0, 11)}.` : nombre, x, 332);
+    ctx.fillStyle = css(color); ctx.font = `650 21px ${F}`; ctx.fillText(rango || "Sin rango", x, 364);
+  };
+  cara(140, d.inicialYo, "Vos", d.rangoYo, yo);
+  cara(W - 140, d.inicialEl, d.nombre, d.rangoEl, el);
+  ctx.fillStyle = "#8d8f96"; ctx.font = `600 22px ${F}`; ctx.fillText("contra", W / 2, 236);
+  // La barra en equilibrio: baja del lado que tiene más discos.
+  const cy = 520, largo = 470;
+  ctx.fillStyle = "#34363c";
+  ctx.beginPath(); ctx.moveTo(W / 2, cy + 8); ctx.lineTo(W / 2 - 44, cy + 116); ctx.lineTo(W / 2 + 44, cy + 116); ctx.closePath(); ctx.fill();
+  ctx.save();
+  ctx.translate(W / 2, cy);
+  ctx.rotate(Math.max(-0.2, Math.min(0.2, (d.pierdo - d.gano) * 0.035)));
+  ctx.fillStyle = "#b9bcc2"; ctx.beginPath(); ctx.roundRect(-largo / 2, -6, largo, 12, 6); ctx.fill();
+  const lado = (n, signo, color) => {
+    const cuantos = Math.min(n, 12);
+    const ancho = cuantos > 8 ? 10 : 14;
+    for (let i = 0; i < cuantos; i++) {
+      const x = signo * (76 + i * (ancho + 3)) - (signo < 0 ? ancho : 0);
+      ctx.fillStyle = css(color); ctx.beginPath(); ctx.roundRect(x, -50, ancho, 100, 4); ctx.fill();
+      ctx.fillStyle = "rgba(255, 255, 255, 0.16)"; ctx.fillRect(x + 2, -47, ancho - 4, 3);
+    }
+    ctx.fillStyle = "#d4d6db"; ctx.beginPath(); ctx.roundRect(signo * 64 - (signo < 0 ? 8 : 0), -15, 8, 30, 3); ctx.fill();
+  };
+  lado(d.gano, -1, yo);
+  lado(d.pierdo, 1, el);
+  ctx.restore();
+  // El marcador, con el veredicto al medio.
+  angosto(true);
+  ctx.fillStyle = "#f2f2f4"; ctx.font = `800 84px ${F}`;
+  ctx.fillText(String(d.gano), 140, 742); ctx.fillText(String(d.pierdo), W - 140, 742);
+  angosto(false);
+  ctx.font = `500 21px ${F}`; ctx.fillStyle = "#a3a5ab";
+  ctx.fillText("para vos", 140, 778); ctx.fillText(`para ${d.nombre.length > 12 ? `${d.nombre.slice(0, 11)}.` : d.nombre}`, W - 140, 778);
+  ctx.font = `700 22px ${F}`;
+  const ancho = ctx.measureText(d.veredicto).width + 44;
+  ctx.fillStyle = "#1f2024"; ctx.beginPath(); ctx.roundRect(W / 2 - ancho / 2, 708, ancho, 46, 23); ctx.fill();
+  ctx.fillStyle = "#f2f2f4"; ctx.fillText(d.veredicto, W / 2, 739);
+  // El fuerte de cada uno.
+  ctx.font = `500 20px ${F}`; ctx.fillStyle = "#8d8f96";
+  if (d.fuerteYo) ctx.fillText(`Tu fuerte: ${d.fuerteYo}`, W / 2, 846);
+  if (d.fuerteEl) ctx.fillText(`El de ${d.nombre}: ${d.fuerteEl}`, W / 2, d.fuerteYo ? 876 : 846);
+  ctx.fillStyle = "#9d9ea4"; ctx.font = `600 20px ${F}`; ctx.fillText("modus fit", W / 2, H - 40);
 }
 
 // Una de las dos caras del mano a mano: la foto con el aro de su rango.
@@ -12909,6 +13147,7 @@ function ManoAMano({ miFoto, miNombre, misRangos, mySex = null, suFoto, suNombre
   const unit = useWeightUnit();
   const [vista, setVista] = useState("front");
   const [abierto, setAbierto] = useState(null);
+  const [compartir, setCompartir] = useState(false);
   const nombre = String(suNombre || "Tu amigo").trim().split(/\s+/)[0];
   const gano = comparacion.filter((r) => (r.mine?.levelIdx ?? -1) > (r.theirs?.levelIdx ?? -1)).length;
   const pierdo = comparacion.filter((r) => (r.theirs?.levelIdx ?? -1) > (r.mine?.levelIdx ?? -1)).length;
@@ -12942,6 +13181,7 @@ function ManoAMano({ miFoto, miNombre, misRangos, mySex = null, suFoto, suNombre
   const [encendido, setEncendido] = useState(false);
   useEffect(() => { const t = setTimeout(() => setEncendido(true), 250); return () => clearTimeout(t); }, []);
   const rangoTexto = (r) => (r ? `${r.tier} ${r.sub}` : "sin marca");
+  const colorYo = miRango?.color || SOCIAL_COLOR, colorEl = suRango?.color || "#9da2a8";
   const misSesiones = miSemana.filter(Boolean).length;
   const susSesiones = suSemana.filter(Boolean).length;
   const inicial = (n) => String(n || "?").trim().charAt(0).toUpperCase();
@@ -12970,6 +13210,7 @@ function ManoAMano({ miFoto, miNombre, misRangos, mySex = null, suFoto, suNombre
                 {fuertes.suyo && <div className="mano-fuerte"><small>El fuerte de {nombre}</small><b>{fuertes.suyo.label}</b><span>{rangoTexto(fuertes.suyo.theirs)} contra {rangoTexto(fuertes.suyo.mine)}</span></div>}
               </div>
             )}
+            <button onClick={() => setCompartir(true)} className="boton-tonal mano-compartir" style={{ "--c": colorYo }}><Share2 size={15} /> Compartir el mano a mano</button>
           </>
         ) : (
           <p className="text-[13px] text-slate-400 text-center px-2 pb-1">Cuando los dos tengan marcas en un mismo músculo, acá se ve quién gana.</p>
@@ -13004,9 +13245,13 @@ function ManoAMano({ miFoto, miNombre, misRangos, mySex = null, suFoto, suNombre
                 <span className="cara-marca"><b className="num-display">{m.reps} × {kgToDisplay(m.kg, unit)}</b> {weightLabel(unit)}</span>
               </div>
             );
+            // El filete y el veredicto, del color del que gana.
             return (
-              <div key={c.id} className="tarjeta-tonal cara">
-                <p className="cara-ejercicio">{c.nombre}</p>
+              <div key={c.id} className="tarjeta-tonal cara filete" style={{ "--c": ganaYo ? colorYo : ganaEl ? colorEl : "#8a8c92" }}>
+                <div className="cara-cabeza">
+                  <p className="cara-ejercicio">{c.nombre}</p>
+                  <span className="cara-veredicto">{ganaYo ? "Ganás vos" : ganaEl ? `Gana ${nombre}` : "Empatan"}</span>
+                </div>
                 {fila("Vos", c.mio, ganaYo)}
                 {fila(nombre, c.suyo, ganaEl)}
               </div>
@@ -13023,7 +13268,7 @@ function ManoAMano({ miFoto, miNombre, misRangos, mySex = null, suFoto, suNombre
           </div>
           <ul className="ganarle">
             {paraGanarle.slice(0, 4).map((g) => (
-              <li key={g.key} className="ganarle-fila">
+              <li key={g.key} className="ganarle-fila filete" style={{ "--c": g.color || "#8a8c92" }}>
                 <span className="ganarle-musculo">{g.label}</span>
                 {g.sinMarca ? (
                   <span className="ganarle-meta">Anotá una marca de este músculo para competir.</span>
@@ -13047,18 +13292,23 @@ function ManoAMano({ miFoto, miNombre, misRangos, mySex = null, suFoto, suNombre
             <p className="text-[12.5px] text-slate-400 mt-0.5">En kilos, con la misma vara para los dos. Tocá uno para ver los ejercicios.</p>
           </div>
           <div className="mano-lista">
-            {comparacion.map((r) => {
+            {comparacion.map((r, i) => {
               const mio = r.mine?.levelIdx ?? -1, suyo = r.theirs?.levelIdx ?? -1;
-              // El nudo de la cuerda se corre hacia el que gana, más cuanto más le gana.
-              const tiro = Math.max(-1, Math.min(1, (mio - suyo) / 6));
               const mia = r.mine ? `${r.mine.tier} ${r.mine.sub}` : "Sin marca";
               const suya = r.theirs ? `${r.theirs.tier} ${r.theirs.sub}` : "Sin marca";
+              // Las dos barras salen del medio: la tuya a la izquierda y la
+              // suya a la derecha, cada una del color de su rango en este
+              // músculo y tan larga como alto es ese rango.
+              const largo = (idx) => `${((idx + 1) / RANK_TIERS.length) * 100}%`;
               return (
-                <button key={r.key} onClick={() => setAbierto(r)} className="mano-fila" aria-label={`${r.label}: vos ${mia}, ${nombre} ${suya}. Ver los ejercicios`}>
+                <button key={r.key} onClick={() => setAbierto(r)} className="mano-fila" style={{ "--i": i }} aria-label={`${r.label}: vos ${mia}, ${nombre} ${suya}. Ver los ejercicios`}>
                   <span className="mano-fila-musculo" aria-hidden="true">{r.label}<ChevronRight size={14} /></span>
-                  <span className={`mano-fila-lado ${mio > suyo ? "gana" : ""}`} aria-hidden="true">{mia}</span>
-                  <span className="mano-fila-cuerda" aria-hidden="true"><i style={{ left: `${50 - tiro * 42}%` }} /></span>
-                  <span className={`mano-fila-lado der ${suyo > mio ? "gana" : ""}`} aria-hidden="true">{suya}</span>
+                  <span className="mano-fila-duelo" aria-hidden="true">
+                    <span className="mitad yo">{r.mine && <i className={mio > suyo ? "gana" : ""} style={{ "--rango-c": r.mine.color, width: largo(mio) }} />}</span>
+                    <span className="mitad el">{r.theirs && <i className={suyo > mio ? "gana" : ""} style={{ "--rango-c": r.theirs.color, width: largo(suyo) }} />}</span>
+                  </span>
+                  <span className={`mano-fila-lado ${mio > suyo ? "gana" : ""} ${r.mine ? "tinta-rango" : ""}`} style={r.mine ? { "--rango-c": r.mine.color } : undefined} aria-hidden="true">{mia}</span>
+                  <span className={`mano-fila-lado der ${suyo > mio ? "gana" : ""} ${r.theirs ? "tinta-rango" : ""}`} style={r.theirs ? { "--rango-c": r.theirs.color } : undefined} aria-hidden="true">{suya}</span>
                 </button>
               );
             })}
@@ -13079,6 +13329,24 @@ function ManoAMano({ miFoto, miNombre, misRangos, mySex = null, suFoto, suNombre
           <MiniBodyView ranks={susRangos} sex={theirSex} label={nombre} view={vista} />
         </div>
       </section>
+
+      {compartir && (
+        <ShareImageModal
+          title="Compartí el mano a mano"
+          subtitle={`Vos contra ${nombre}`}
+          fileNamePrefix="mano-a-mano-modus-fit"
+          shareTitle="Mano a mano en Modus Fit"
+          shareText={`${veredicto}: ${gano} a ${pierdo} contra ${nombre} 💪`}
+          accent={colorYo}
+          draw={(ctx, W, H) => dibujarManoAMano(ctx, W, H, {
+            nombre, gano, pierdo, veredicto, colorYo, colorEl,
+            inicialYo: inicial(miNombre), inicialEl: inicial(suNombre),
+            rangoYo: miRango ? `${miRango.tier} ${miRango.sub}` : null, rangoEl: suRango ? `${suRango.tier} ${suRango.sub}` : null,
+            fuerteYo: fuertes.tuyo?.label || null, fuerteEl: fuertes.suyo?.label || null,
+          })}
+          onClose={() => setCompartir(false)}
+        />
+      )}
 
       {abierto && (
         <MuscleBattleDetailModal
@@ -13813,9 +14081,7 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
           empezaste y entre qué valores te moviste. */}
       {lectura ? (
         selType === "weight" ? <BalanzaCursor {...lectura} /> : <CintaMetrica {...lectura} />
-      ) : latest ? (
-        <p className="medida-nota">Tu primer registro: <b>{latest.value} {selUnidad}</b>, {anotado}. Con el segundo vas a ver cuánto cambiaste.</p>
-      ) : (
+      ) : !latest && (
         <p className="medida-nota">Todavía no anotaste {selMeta.l.toLowerCase()}. Con dos registros vas a ver cuánto cambiaste.</p>
       )}
 
@@ -16003,7 +16269,8 @@ function useUserStreaks(uids) {
         latestSession = { date: latest.date, dayLabel: dayDef?.label || null, dayColor: dayDef?.color || null, series: seriesUltima };
       }
       const semana = semanaDeSesiones(sessions, (sesion) => model?.days?.[sesion.dayKey]?.color || null);
-      return [u, { streak, sessionsThisWeek, latestSession, semana, seriesSemana }];
+      // Sus marcas: para la pizarra de récords y para avisar si te pasó en un músculo.
+      return [u, { streak, sessionsThisWeek, latestSession, semana, seriesSemana, logs: full.logs || {}, mejores: mejoresPorEjercicio(full.logs) }];
     }))).then((pairs) => {
       if (!cancelled) setActivity(Object.fromEntries(pairs));
     });
@@ -16013,14 +16280,16 @@ function useUserStreaks(uids) {
   return uids.length ? activity : EMPTY_STREAKS_MAP;
 }
 
-// Fila reusable: avatar + nombre + @usuario (a partir de public/basic),
-// más lo que el llamador quiera agregar a la derecha.
+// Fila reusable: avatar + nombre (a partir de public/basic), más lo que el
+// llamador quiera agregar a la derecha. El @usuario sólo se ve en el
+// buscador, donde es lo que escribiste para encontrar a alguien; en el resto
+// de las listas aparece recién al entrar a su perfil.
 // NOTA: la fila entera NO es un solo <button> — algunas listas (alumnos,
 // entrenador) ponen un botón de "desvincular" en `children`, y anidar
 // <button> dentro de <button> es HTML inválido y rompe los clicks. Acá el
 // avatar+nombre es su propio botón cuando hay onClick, y `children` queda
 // como hermano, nunca anidado.
-function PublicUserCard({ uid, basic, streak = null, ultima = null, onClick = null, mostrarUsuario = true, children }) {
+function PublicUserCard({ uid, basic, streak = null, ultima = null, onClick = null, mostrarUsuario = false, children }) {
   let lastActive = null;
   if (basic?.updatedAt) {
     const dias = Math.floor((new Date() - new Date(basic.updatedAt)) / 86400000);
@@ -16032,7 +16301,7 @@ function PublicUserCard({ uid, basic, streak = null, ultima = null, onClick = nu
   // Cuándo entrenó por última vez y qué día hizo: lo que más se busca en la
   // lista de amigos.
   const diasDesdeUltima = ultima?.date ? Math.max(0, Math.floor((new Date() - new Date(`${ultima.date}T00:00:00`)) / 86400000)) : null;
-  const mostrarArroba = mostrarUsuario || (!rango && !tieneRacha && !lastActive);
+  const mostrarArroba = mostrarUsuario;
   // Una fila de persona: su cara en galleta (con el aro del color de su
   // rango), el nombre, y abajo lo que la describe sin leer de más: la
   // insignia de su rango y su racha como cadena. Sin la franja de color de
@@ -16060,7 +16329,7 @@ function PublicUserCard({ uid, basic, streak = null, ultima = null, onClick = nu
     </>
   );
   return (
-    <div className="amigo">
+    <div className={`amigo ${rango ? "filete sobre-placa" : ""}`} style={rango ? { "--c": rango.color } : undefined}>
       {onClick ? (
         <button onClick={onClick} className="amigo-cuerpo">{avatarAndName}{!children && <ChevronRight size={16} className="amigo-flecha" aria-hidden="true" />}</button>
       ) : (
@@ -16309,7 +16578,7 @@ function SocialSearchSection({ myUid, friendStatus, onSendFriendRequest }) {
       {state === "self" && <p className="text-xs text-slate-500 text-center py-3">Ese sos vos 🙂</p>}
       {state === "qr_error" && <p className="text-xs text-amber-400 text-center py-3">No pudimos leer un código QR de perfil en esa foto. Probá acercar más la cámara y sacarla de nuevo.</p>}
       {state === "found" && found && (
-        <PublicUserCard uid={found.uid} basic={found.basic}>
+        <PublicUserCard uid={found.uid} basic={found.basic} mostrarUsuario>
           {(() => {
             const st = friendStatus(found.uid);
             if (st === "accepted") return <span className="flex items-center gap-1 text-[10.5px] font-bold text-emerald-400 shrink-0"><UserCheck size={12} /> Ya son amigos</span>;
@@ -16698,7 +16967,7 @@ function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted
           <div className="space-y-2">
             <TrainerSectionLabel accent={tengoEntrenador ? "#38BDF8" : null}>Mi entrenador</TrainerSectionLabel>
             {tengoEntrenador ? trainersAccepted.map((l) => (
-              <PublicUserCard key={l.id} uid={l.trainerUid} basic={basics[l.trainerUid]} streak={streaks?.[l.trainerUid]?.streak} mostrarUsuario={false} onClick={() => onViewTrainer(l.trainerUid)}>
+              <PublicUserCard key={l.id} uid={l.trainerUid} basic={basics[l.trainerUid]} streak={streaks?.[l.trainerUid]?.streak} onClick={() => onViewTrainer(l.trainerUid)}>
                 <span className="shrink-0 text-[9px] font-black rounded-md px-1.5 py-0.5" style={{ backgroundColor: "rgba(56,189,248,0.15)", color: "#7dd3fc" }}>Te planifica</span>
                 <button onClick={(e) => { e.stopPropagation(); onRemoveLink(l); }} className="shrink-0 p-1.5 rounded-lg text-slate-600 hover:text-rose-400 transition" title="Desvincular"><X size={13} /></button>
                 <ChevronRight size={15} className="text-slate-600 shrink-0" />
@@ -16716,7 +16985,7 @@ function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted
             {studentsAccepted.length === 0 ? (
               <TrainerEmpty icon={<Users size={16} />} titulo="Todavía no tenés alumnos" detalle="Vinculá a quien entrenás para ver cómo viene y planificarle la semana." />
             ) : sortedStudents.map((l) => (
-              <PublicUserCard key={l.id} uid={l.studentUid} basic={basics[l.studentUid]} streak={streaks?.[l.studentUid]?.streak} mostrarUsuario={false} onClick={() => onViewStudent(l.studentUid)}>
+              <PublicUserCard key={l.id} uid={l.studentUid} basic={basics[l.studentUid]} streak={streaks?.[l.studentUid]?.streak} onClick={() => onViewStudent(l.studentUid)}>
                 {chipPropuesta(l.studentUid)}
                 <button onClick={(e) => { e.stopPropagation(); onRemoveLink(l); }} className="shrink-0 p-1.5 rounded-lg text-slate-600 hover:text-rose-400 transition" title="Desvincular"><X size={13} /></button>
                 <ChevronRight size={15} className="text-slate-600 shrink-0" />
@@ -16764,11 +17033,11 @@ function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted
             {searchState === "found" && found && (() => {
               const link = linkStatusWith?.(found.uid);
               if (link?.status === "accepted") {
-                return <PublicUserCard uid={found.uid} basic={found.basic}><span className="text-[10.5px] font-bold text-emerald-400 shrink-0">Ya vinculados</span></PublicUserCard>;
+                return <PublicUserCard uid={found.uid} basic={found.basic} mostrarUsuario><span className="text-[10.5px] font-bold text-emerald-400 shrink-0">Ya vinculados</span></PublicUserCard>;
               }
               if (link?.status === "pending" && link.requestedBy === found.uid) {
                 return (
-                  <PublicUserCard uid={found.uid} basic={found.basic}>
+                  <PublicUserCard uid={found.uid} basic={found.basic} mostrarUsuario>
                     <button onClick={() => { onRespondLink(link, true); setFound(null); setRaw(""); setSearchState("idle"); }} className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[11px] font-bold hover:bg-emerald-500/25 transition">
                       <Check size={12} /> Aceptar — {link.myRole === "trainer" ? "te pidió ser su entrenador" : "se ofreció como tu entrenador"}
                     </button>
@@ -16776,10 +17045,10 @@ function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted
                 );
               }
               if (link?.status === "pending" && link.requestedBy === myUid) {
-                return <PublicUserCard uid={found.uid} basic={found.basic}><span className="text-[10.5px] font-bold text-slate-500 shrink-0">Invitación enviada</span></PublicUserCard>;
+                return <PublicUserCard uid={found.uid} basic={found.basic} mostrarUsuario><span className="text-[10.5px] font-bold text-slate-500 shrink-0">Invitación enviada</span></PublicUserCard>;
               }
               return (
-                <PublicUserCard uid={found.uid} basic={found.basic}>
+                <PublicUserCard uid={found.uid} basic={found.basic} mostrarUsuario>
                   <button onClick={() => { onSendLink(found.uid, role); setFound(null); setRaw(""); setSearchState("idle"); }} className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-blue-500/15 border border-blue-500/30 text-blue-300 text-[11px] font-bold hover:bg-blue-500/25 transition">
                     <UserPlus size={12} /> Invitar
                   </button>
@@ -16861,6 +17130,10 @@ function MuscleBattleDetailModal({ groupKey, label, myLogs, theirLogs, theirName
   }, [groupKey, myLogs, theirLogs]);
   const nombre = String(theirName || "Tu amigo").trim().split(/\s+/)[0];
   const marca = (m) => (m ? `${m.reps} × ${kgToDisplay(m.kg, unit)} ${weightLabel(unit)}` : "—");
+  // Las barras de cada ejercicio, con la misma vara para todo el músculo: la
+  // marca más pesada del detalle llena su mitad.
+  const tope = Math.max(1, ...rows.map((r) => Math.max(r.mine?.rawRm || 0, r.theirs?.rawRm || 0)));
+  const colorMio = mine?.color || SOCIAL_COLOR, colorSuyo = theirs?.color || "#9da2a8";
   if (typeof document === "undefined") return null;
   return createPortal(
     <div className="fixed inset-0 z-[130] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
@@ -16873,22 +17146,26 @@ function MuscleBattleDetailModal({ groupKey, label, myLogs, theirLogs, theirName
           <button onClick={onClose} aria-label="Cerrar" className="boton-redondo shrink-0"><X size={17} /></button>
         </div>
         <div className="modal-mano-rangos">
-          <div><small>Vos</small><b className={mine ? "tinta-rango" : ""} style={mine ? { "--rango-c": mine.color } : undefined}>{mine ? `${mine.tier} ${mine.sub}` : "Sin marca"}</b></div>
-          <div><small>{nombre}</small><b className={theirs ? "tinta-rango" : ""} style={theirs ? { "--rango-c": theirs.color } : undefined}>{theirs ? `${theirs.tier} ${theirs.sub}` : "Sin marca"}</b></div>
+          <div className="filete sobre-placa" style={{ "--c": mine?.color || "#8a8c92", "--filete-margen": "14px" }}><small>Vos</small><b className={mine ? "tinta-rango" : ""} style={mine ? { "--rango-c": mine.color } : undefined}>{mine ? `${mine.tier} ${mine.sub}` : "Sin marca"}</b></div>
+          <div className="filete sobre-placa" style={{ "--c": theirs?.color || "#8a8c92", "--filete-margen": "14px" }}><small>{nombre}</small><b className={theirs ? "tinta-rango" : ""} style={theirs ? { "--rango-c": theirs.color } : undefined}>{theirs ? `${theirs.tier} ${theirs.sub}` : "Sin marca"}</b></div>
         </div>
         {rows.length === 0 ? (
           <p className="text-[13px] text-slate-500 text-center py-4">Ninguno de los dos tiene marcas en este músculo todavía.</p>
         ) : (
           <div className="space-y-2">
             <p className="text-[12.5px] text-slate-400">Mejor marca por ejercicio</p>
-            {rows.map((row) => {
+            {rows.map((row, i) => {
               const myRm = row.mine?.rawRm || 0, theirRm = row.theirs?.rawRm || 0;
               return (
-                <div key={row.exerciseId} className="modal-mano-fila">
+                <div key={row.exerciseId} className="modal-mano-fila" style={{ "--i": i }}>
                   <p className="modal-mano-ejercicio">{row.name}</p>
+                  <div className="mano-fila-duelo" aria-hidden="true">
+                    <span className="mitad yo">{row.mine && <i className={myRm > theirRm ? "gana" : ""} style={{ "--rango-c": colorMio, width: `${(myRm / tope) * 100}%` }} />}</span>
+                    <span className="mitad el">{row.theirs && <i className={theirRm > myRm ? "gana" : ""} style={{ "--rango-c": colorSuyo, width: `${(theirRm / tope) * 100}%` }} />}</span>
+                  </div>
                   <div className="modal-mano-marcas">
-                    <span className={myRm > theirRm ? "gana" : ""}>{marca(row.mine)}</span>
-                    <span className={theirRm > myRm ? "gana" : ""}>{marca(row.theirs)}</span>
+                    <span className={myRm > theirRm ? "gana tinta-rango" : ""} style={{ "--rango-c": colorMio }}>{marca(row.mine)}</span>
+                    <span className={theirRm > myRm ? "gana tinta-rango" : ""} style={{ "--rango-c": colorSuyo }}>{marca(row.theirs)}</span>
                   </div>
                 </div>
               );
@@ -16914,12 +17191,11 @@ function MuscleBattleDetailModal({ groupKey, label, myLogs, theirLogs, theirName
 function LeaderboardRow({ position, name, username, avatarData, topRank, streakDays = null, isMe, onClick = null }) {
   const Tag = onClick ? "button" : "div";
   return (
-    <Tag onClick={onClick} className={`ranking-fila ${isMe ? "yo" : ""}`}>
+    <Tag onClick={onClick} className={`ranking-fila ${isMe ? "yo" : ""} ${topRank ? "filete sobre-placa" : ""}`} style={topRank ? { "--c": topRank.color } : undefined}>
       <span className="ranking-pos num-display">{position}</span>
       <span className="ranking-avatar" aria-hidden="true">{avatarData ? <img src={avatarData} alt="" /> : (name || username || "?").charAt(0).toUpperCase()}</span>
       <span className="min-w-0 flex-1">
         <span className="ranking-nombre">{isMe ? "Vos" : (name || "Usuario")}</span>
-        {username && <span className="ranking-usuario">@{username}</span>}
       </span>
       {streakDays != null ? (
         <span className="ranking-racha" aria-label={`${streakDays} ${streakDays === 1 ? "día" : "días"} de racha`}>
@@ -16966,6 +17242,7 @@ function buildFriendsRanking(uid, profile, myTopRank, friendAccepted, basics) {
 }
 
 function LeaderboardSection({ uid, profile, myTopRank, friendAccepted, basics, activity, onViewPerson, onGoToBuscar, accent = "#F59E0B" }) {
+  const unit = useWeightUnit();
   const [scope, setScope] = useState("amigos");
   const [globalList, setGlobalList] = useState(null);
   const [globalError, setGlobalError] = useState(false);
@@ -17004,13 +17281,41 @@ function LeaderboardSection({ uid, profile, myTopRank, friendAccepted, basics, a
     return [...mine, ...others].sort((a, b) => b.streakDays - a.streakDays);
   }, [friendAccepted, basics, activity, uid, profile]);
 
-  const list = scope === "amigos" ? friendsRanking : scope === "semana" ? streakRanking : (globalList || []);
+  // LA PIZARRA: el récord del grupo en cada ejercicio que hacen al menos dos,
+  // como la pizarra del gimnasio: quién tiene la mejor serie (por el 1RM
+  // estimado) y quién le sigue. Los ejercicios que hace más gente, primero.
+  const pizarra = useMemo(() => {
+    const gente = [{ uid, nombre: "Vos", foto: profile?.avatarData || null, yo: true, mejores: mejoresPorEjercicio(profile?.logs) }];
+    friendAccepted.forEach((f) => {
+      const otro = f.users.find((u) => u !== uid);
+      const a = activity?.[otro];
+      if (!a?.mejores) return;
+      gente.push({ uid: otro, nombre: String(basics[otro]?.name || "Tu amigo").trim().split(/\s+/)[0], foto: basics[otro]?.avatarData || null, yo: false, mejores: a.mejores });
+    });
+    const porEjercicio = new Map();
+    gente.forEach((p) => p.mejores.forEach((marca, id) => {
+      if (!EXERCISE_LIBRARY_BY_ID[id]) return;
+      if (!porEjercicio.has(id)) porEjercicio.set(id, []);
+      porEjercicio.get(id).push({ ...p, marca });
+    }));
+    return [...porEjercicio.entries()]
+      .filter(([, lista]) => lista.length >= 2)
+      .map(([id, lista]) => {
+        const orden = [...lista].sort((a, b) => b.marca.rm - a.marca.rm);
+        return { id, nombre: EXERCISE_LIBRARY_BY_ID[id].name, cuantos: lista.length, primero: orden[0], segundo: orden[1] };
+      })
+      .sort((a, b) => b.cuantos - a.cuantos || b.primero.marca.rm - a.primero.marca.rm)
+      .slice(0, 8);
+  }, [uid, profile, friendAccepted, activity, basics]);
+
+  const list = scope === "amigos" ? friendsRanking : scope === "semana" ? streakRanking : scope === "global" ? (globalList || []) : [];
 
   return (
     <div className="space-y-3">
       <div className="segmentado" role="tablist" aria-label="Cómo ordenar el ranking" style={{ "--c": SOCIAL_COLOR }}>
-        <button role="tab" aria-selected={scope === "amigos"} onClick={() => setScope("amigos")} className={scope === "amigos" ? "activo" : ""}><Award size={14} /> Mejor rango</button>
+        <button role="tab" aria-selected={scope === "amigos"} onClick={() => setScope("amigos")} className={scope === "amigos" ? "activo" : ""}><Award size={14} /> Rango</button>
         <button role="tab" aria-selected={scope === "semana"} onClick={() => setScope("semana")} className={scope === "semana" ? "activo" : ""}><MarcasTiza dias={5} max={5} alto={13} decorativa /> Racha</button>
+        <button role="tab" aria-selected={scope === "records"} onClick={() => setScope("records")} className={scope === "records" ? "activo" : ""}><Trophy size={14} /> Récords</button>
         {GLOBAL_RANKING_ENABLED && <button role="tab" aria-selected={scope === "global"} onClick={() => setScope("global")} className={scope === "global" ? "activo" : ""}>Global</button>}
       </div>
       {scope === "amigos" && friendsRanking.length === 0 && (
@@ -17030,6 +17335,28 @@ function LeaderboardSection({ uid, profile, myTopRank, friendAccepted, basics, a
       {scope === "semana" && streakRanking.length <= 1 && (
         <p className="text-center text-slate-600 text-sm py-8 px-4">Todavía no hay datos de tus amigos esta semana. Puede tardar un momento en cargar.</p>
       )}
+      {scope === "records" && (pizarra.length === 0 ? (
+        <p className="text-center text-slate-500 text-sm py-8 px-4">Cuando vos y algún amigo tengan marcas en un mismo ejercicio, acá se ve quién tiene el récord.</p>
+      ) : (
+        <ul className="pizarra" aria-label="La pizarra de récords del grupo">
+          {pizarra.map((p, i) => {
+            const serie = (m) => `${m.reps} × ${kgToDisplay(m.kg, unit)}`;
+            return (
+              <li key={p.id} className={`pizarra-fila ${p.primero.yo ? "mia" : ""}`} style={{ "--i": i }}>
+                <button onClick={onViewPerson ? () => onViewPerson(p.primero.uid, p.primero.yo) : undefined} className="pizarra-cuerpo">
+                  <span className="pizarra-ejercicio">{p.nombre}</span>
+                  <span className="pizarra-marca num-display">{p.primero.yo && <Trophy size={14} aria-hidden="true" />}{serie(p.primero.marca)}<small>{weightLabel(unit)}</small></span>
+                  <span className="pizarra-quien">
+                    <span className="pizarra-avatar" aria-hidden="true">{p.primero.foto ? <img src={p.primero.foto} alt="" /> : p.primero.nombre.charAt(0).toUpperCase()}</span>
+                    <b>{p.primero.nombre}</b>
+                    {p.segundo && <span className="pizarra-sigue">{p.segundo.yo ? `vos le seguís con ${serie(p.segundo.marca)}` : `le sigue ${p.segundo.nombre} con ${serie(p.segundo.marca)}`}</span>}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      ))}
       {scope === "global" && globalLoading && <p className="text-center text-slate-600 text-sm py-8">Cargando ranking...</p>}
       {scope === "global" && globalError && <p className="text-center text-slate-600 text-sm py-8 px-4">No pudimos cargar el ranking global ahora mismo. Probá de nuevo más tarde.</p>}
       {scope === "global" && !globalLoading && !globalError && globalList?.length === 0 && <p className="text-center text-slate-600 text-sm py-8">Todavía no hay nadie en el ranking global.</p>}
@@ -18208,7 +18535,7 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, viewerName = null, i
         <>
           {/* Tres datos de un vistazo: la racha (en marcas de tiza), esta
               semana y todo lo que entrenó. */}
-          <div className="atleta-datos">
+          <div className="atleta-datos filete" style={{ "--c": theirTopRank?.color || SOCIAL_COLOR }}>
             <div className="atleta-dato">
               <span className="atleta-dato-valor"><b className="num-display">{streak}</b><MarcasTiza dias={streak} max={5} alto={16} decorativa /></span>
               <small>{streak === 1 ? "día seguido" : "días seguidos"}</small>
@@ -18226,7 +18553,7 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, viewerName = null, i
           {/* Su última sesión: qué hizo, hace cuánto y su barra cargada; si
               entrenó hoy o ayer, el aplauso está acá mismo. */}
           {ultima && (
-            <section className="tarjeta-tonal p-4 ultima-sesion" aria-label={esYo ? "Tu última sesión" : "Su última sesión"}>
+            <section className="tarjeta-tonal filete p-4 ultima-sesion" style={{ "--c": ultima.color }} aria-label={esYo ? "Tu última sesión" : "Su última sesión"}>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="mejor-marca-rotulo">{esYo ? kudosDayLabel(ultima.dias).replace("Entrenó", "Entrenaste") : kudosDayLabel(ultima.dias)}{ultima.min ? `, ${ultima.min} min` : ""}</p>
@@ -18250,7 +18577,7 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, viewerName = null, i
           {/* Sus dos últimas semanas, en dos pistas como las de la carrera:
               cada día que entrenó, del color de lo que hizo. */}
           {totalSessions > 0 && (
-            <section className="tarjeta-tonal p-4 space-y-2.5" aria-label="Las últimas dos semanas">
+            <section className="tarjeta-tonal filete p-4 space-y-2.5" style={{ "--c": SOCIAL_COLOR }} aria-label="Las últimas dos semanas">
               <div className="flex items-baseline justify-between gap-3">
                 <h3 className="seccion-titulo">{esYo ? "Cómo venís" : "Cómo viene"}</h3>
                 <span className="text-[12.5px] text-slate-400">{diasEntrenados} de 14 días</span>
@@ -18275,7 +18602,7 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, viewerName = null, i
             const conBarra = unit === "kg" && kg >= 20 && seHaceConBarra(theirBestMuscle.bestExerciseName);
             const discos = conBarra ? discosParaPeso(kg) : [];
             return (
-              <section className="tarjeta-tonal p-4 mejor-marca" aria-label={esYo ? "Tu mejor marca" : "Su mejor marca"}>
+              <section className="tarjeta-tonal filete p-4 mejor-marca" style={{ "--c": theirBestMuscle.color }} aria-label={esYo ? "Tu mejor marca" : "Su mejor marca"}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="mejor-marca-rotulo">{esYo ? "Tu mejor marca" : "Su mejor marca"}</p>
@@ -18301,7 +18628,7 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, viewerName = null, i
               <h3 className="seccion-titulo px-1">{esYo ? "Tus últimos récords" : "Sus últimos récords"}</h3>
               <ul className="recientes">
                 {recientes.map((r) => (
-                  <li key={`${r.id}-${r.fecha}`} className="reciente">
+                  <li key={`${r.id}-${r.fecha}`} className="reciente filete" style={{ "--c": "var(--record)" }}>
                     <span className="reciente-icono" aria-hidden="true"><Trophy size={16} /></span>
                     <span className="min-w-0 flex-1">
                       <span className="reciente-nombre">{r.nombre}</span>
@@ -18314,7 +18641,7 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, viewerName = null, i
             </section>
           )}
 
-          <section className="tarjeta-tonal p-4" aria-label="Rango por músculo">
+          <section className="tarjeta-tonal filete p-4" style={{ "--c": theirTopRank?.color || SOCIAL_COLOR }} aria-label="Rango por músculo">
             <div className="flex items-baseline justify-between gap-3 mb-1">
               <h3 className="seccion-titulo">Rango por músculo</h3>
               <span className="text-[12px] text-slate-500">Tocá un músculo</span>
@@ -18470,13 +18797,35 @@ function kudosDayLabel(daysAgo) {
   return `Entrenó hace ${daysAgo} días`;
 }
 
+// EL DESAFÍO DE LA SEMANA: entre todos, cargar la barra del grupo. Cada
+// sesión de cualquiera es un disco y la meta son tres por cabeza. Nadie
+// compite contra nadie (para eso está la carrera de arriba): es la cuenta de
+// todos juntos, y vuelve a cero el lunes.
+function DesafioGrupo({ filas = [] }) {
+  const personas = filas.length;
+  if (personas < 2) return null;
+  const meta = personas * 3;
+  const hechas = filas.reduce((n, f) => n + (f.dias || []).filter(Boolean).length, 0);
+  const falta = Math.max(0, meta - hechas);
+  return (
+    <div className="desafio filete" style={{ "--c": SOCIAL_COLOR }}>
+      <div className="desafio-cabeza">
+        <p className="desafio-titulo">Desafío de la semana</p>
+        <p className="desafio-cuenta"><b className="num-display">{Math.min(hechas, meta)}</b> de {meta}</p>
+      </div>
+      <BarraCargada hechas={hechas} total={meta} alto={38} etiqueta={`El grupo lleva ${Math.min(hechas, meta)} de ${meta} sesiones`} />
+      <p className="desafio-pie">{falta === 0 ? "Lo lograron: la barra del grupo está cargada." : `Entre los ${personas}, ${meta} sesiones, y cada una es un disco. ${falta === 1 ? "Falta una." : `Faltan ${falta}.`}`}</p>
+    </div>
+  );
+}
+
 // Una fila de la actividad de tu grupo: quién entrenó, qué día hizo (con
 // su barra cargada) y el botón para aplaudirle.
 function ActividadRow({ c, basic, sent, sending, onSendKudos, onViewProfile, delay = 0 }) {
   const series = c.latestSession?.series || 0;
   const nombre = basic?.name || "Tu amigo";
   return (
-    <div className="actividad stagger-item" style={{ "--dia": c.latestSession?.dayColor || SOCIAL_COLOR, "--c": c.latestSession?.dayColor || SOCIAL_COLOR, animationDelay: `${delay}ms` }}>
+    <div className="actividad filete sobre-placa stagger-item" style={{ "--dia": c.latestSession?.dayColor || SOCIAL_COLOR, "--c": c.latestSession?.dayColor || SOCIAL_COLOR, animationDelay: `${delay}ms` }}>
       <button onClick={() => onViewProfile(c.uid)} className="actividad-quien">
         <span className="galleta actividad-aro" aria-hidden="true">
           <span className="actividad-avatar">{basic?.avatarData ? <img src={basic.avatarData} alt="" /> : nombre.charAt(0).toUpperCase()}</span>
@@ -18737,6 +19086,37 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
     });
     return best;
   }, [friendAccepted, streaks, myStreak, uid]);
+  // TE PASÓ: el amigo que te pasó en un músculo desde la última vez que
+  // abriste Social. Se compara contra lo que había esa vez (guardado en este
+  // teléfono); la primera vez sólo se guarda, sin avisar nada.
+  const clavePaso = `modusfit_te_paso_${uid || "local"}`;
+  const [pasoAnterior] = useState(() => { try { return JSON.parse(localStorage.getItem(clavePaso) || "null"); } catch { return null; } });
+  const adelanteAhora = useMemo(() => {
+    const m = {};
+    friendAccepted.forEach((f) => {
+      const otro = f.users.find((u) => u !== uid);
+      const a = streaks[otro];
+      if (!a?.logs) return;
+      m[otro] = buildRankComparison(profile?.logs, a.logs)
+        .filter((r) => (r.theirs?.levelIdx ?? -1) > (r.mine?.levelIdx ?? -1))
+        .map((r) => ({ key: r.key, label: r.label, suyo: r.theirs, mio: r.mine }));
+    });
+    return m;
+  }, [friendAccepted, streaks, uid, profile]);
+  const tePaso = useMemo(() => {
+    if (!pasoAnterior) return null;
+    const avisos = Object.entries(adelanteAhora).map(([otro, lista]) => {
+      const antes = pasoAnterior[otro];
+      const nuevo = Array.isArray(antes) ? lista.find((r) => !antes.includes(r.key)) : null;
+      return nuevo ? { uid: otro, ...nuevo } : null;
+    }).filter(Boolean);
+    return avisos[0] || null;
+  }, [adelanteAhora, pasoAnterior]);
+  useEffect(() => {
+    if (!Object.keys(adelanteAhora).length) return;
+    const foto = Object.fromEntries(Object.entries(adelanteAhora).map(([otro, lista]) => [otro, lista.map((r) => r.key)]));
+    try { localStorage.setItem(clavePaso, JSON.stringify(foto)); } catch { /* sin almacenamiento: no se avisa */ }
+  }, [adelanteAhora, clavePaso]);
   // Un aplauso por amigo por día — ahora la tira puede mostrar varios
   // candidatos a la vez, así que el estado de "ya aplaudido"/"mandando" se
   // rastrea por uid (mapa) en vez de un solo {uid, sent, sending} pensado
@@ -18932,19 +19312,19 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
         const nombre = profile?.name || profileName || "Vos";
         return (
           <>
-            {/* TU CREDENCIAL: tu cara con el aro del color de tu rango, tu
-                nombre y cómo te buscan; abajo, tres datos con su nombre: tu
+            {/* TU CREDENCIAL: tu cara con el aro del color de tu rango y tu
+                nombre (el @usuario se ve al entrar a tu perfil); abajo, tres datos con su nombre: tu
                 rango (tocalo y te explica por qué), tu racha en marcas de
                 tiza y los aplausos. Tocarla abre tu perfil tal como lo ven
                 tus amigos. Antes era una franja apretada con todo suelto. */}
-            <section className="credencial" aria-label="Tu credencial">
+            <section className="credencial filete" style={{ "--c": color }} aria-label="Tu credencial">
               <button onClick={() => setViendoMiPerfil(true)} className="credencial-cuerpo" aria-label="Ver tu perfil, como lo ven tus amigos">
                 <span className="credencial-avatar" style={{ "--rango": color }} aria-hidden="true">
                   {profile?.avatarData ? <img src={profile.avatarData} alt="" /> : String(nombre).charAt(0).toUpperCase()}
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="credencial-nombre">{nombre}<ChevronRight size={17} aria-hidden="true" /></span>
-                  <span className="credencial-usuario">{profile?.username ? `@${profile.username}` : "Todavía sin @usuario"}</span>
+                  <span className="credencial-usuario">Tu perfil, como lo ven tus amigos</span>
                 </span>
               </button>
               {profile?.username && <button onClick={() => setShowProfileQr(true)} aria-label="Mostrar mi código QR" className="boton-redondo credencial-qr"><QrCode size={17} /></button>}
@@ -19000,6 +19380,7 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
             })()}
           </div>
           <CarreraSemana filas={filasPizarra} onVerPersona={(u) => setViewingUid(u)} />
+          <DesafioGrupo filas={filasPizarra} />
         </section>
       ) : (
         <section aria-label="Sumá amigos" className="space-y-2">
@@ -19053,7 +19434,7 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
           quién te viene alcanzando en la racha ("being chased", estilo
           Strava). Renglones de notificación, sin las manchas de color que
           tenían como tarjetas. */}
-      {(kudosReceived.length > 0 || chaserFriend) && (
+      {(kudosReceived.length > 0 || chaserFriend || tePaso) && (
         <div className="space-y-2">
           {kudosReceived.length > 0 && (() => {
             const nombres = kudosReceived.map((k) => basics[k.fromUid]?.name).filter(Boolean);
@@ -19062,16 +19443,23 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
               : nombres.length === 2 ? `${nombres[0]} y ${nombres[1]}`
               : `${nombres[0]} y ${nombres.length - 1} más`;
             return (
-              <div className="aviso-social" style={{ "--c": "#FBBF24" }}>
+              <div className="aviso-social filete" style={{ "--c": SOCIAL_COLOR }}>
                 <span className="galleta aviso-social-icono" aria-hidden="true">👏</span>
                 <p><b>{quien}</b> {kudosReceived.length === 1 && nombres.length === 1 ? "festejó" : "festejaron"} tu entrenamiento.</p>
               </div>
             );
           })()}
           {chaserFriend && (
-            <button onClick={() => setViewingUid(chaserFriend.uid)} className="aviso-social" style={{ "--c": "#FB7185" }}>
+            <button onClick={() => setViewingUid(chaserFriend.uid)} className="aviso-social filete" style={{ "--c": "#FB7185" }}>
               <span className="galleta aviso-social-icono" aria-hidden="true"><MarcasTiza dias={5} max={5} alto={15} decorativa /></span>
               <p><b>{basics[chaserFriend.uid]?.name || "Tu amigo"}</b> lleva {chaserFriend.streak} {chaserFriend.streak === 1 ? "día seguido" : "días seguidos"} y vos {myStreak}: te está por alcanzar.</p>
+              <ChevronRight size={15} className="text-slate-500 shrink-0" />
+            </button>
+          )}
+          {tePaso && (
+            <button onClick={() => { setViewingOpenComparing(true); setViewingUid(tePaso.uid); }} className="aviso-social filete" style={{ "--c": tePaso.suyo?.color || "#FB7185" }}>
+              <span className="galleta aviso-social-icono" aria-hidden="true"><Swords size={17} /></span>
+              <p><b>{basics[tePaso.uid]?.name || "Tu amigo"}</b> te pasó en {String(tePaso.label).toLowerCase()}: {tePaso.suyo.tier} {tePaso.suyo.sub} contra {tePaso.mio ? `tu ${tePaso.mio.tier} ${tePaso.mio.sub}` : "nada tuyo todavía"}.</p>
               <ChevronRight size={15} className="text-slate-500 shrink-0" />
             </button>
           )}
@@ -19199,7 +19587,7 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
                   {/* Los botones van abajo, a lo ancho: al costado le comían
                       el lugar al nombre. */}
                   {friendIncoming.map((f) => { const other = otherUidOf(f); const quien = String(basics[other]?.name || "esta persona").split(" ")[0]; return (
-                    <div key={f.id} className="solicitud">
+                    <div key={f.id} className="solicitud filete sobre-placa" style={{ "--c": SOCIAL_COLOR }}>
                       <PublicUserCard uid={other} basic={basics[other]} />
                       <div className="solicitud-botones">
                         <button onClick={() => doRespondFriend(other, false)} aria-label={`Rechazar a ${quien}`} className="boton-tonal flex-1" style={{ "--c": "#9a9ba0", minHeight: 42 }}>Rechazar</button>
@@ -19256,7 +19644,7 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
                     {/* Quitar a alguien vive ahora en su perfil, abajo de todo:
                         un ícono en cada fila era una acción destructiva a un
                         toque de distancia de abrir el perfil. */}
-                    <PublicUserCard uid={other} basic={basics[other]} streak={streaks[other]?.streak} ultima={streaks[other]?.latestSession} mostrarUsuario={false} onClick={() => setViewingUid(other)} />
+                    <PublicUserCard uid={other} basic={basics[other]} streak={streaks[other]?.streak} ultima={streaks[other]?.latestSession} onClick={() => setViewingUid(other)} />
                   </div>
                 ); })}
               </div>
@@ -21123,99 +21511,75 @@ function buildActionPlan(action, ctx) {
    de la app en vez de un cartel de texto genérico.
 ============================================================================ */
 
-// registrar_marca: la misma "tarjeta de récord" que ya se usa en SetRow,
-// con badge de récord nuevo si corresponde.
-function SetLogPreview({ exerciseName, reps, kg, rpe, isNewPR, unit = "kg", cardio = false, minutes = null, km = null }) {
-  const accent = isNewPR ? "#F59E0B" : "#14B8A6";
+// registrar_marca: la serie como en el visor de Rutina (reps × kilos,
+// grandes y angostos) y, si es con barra, la barra con sus discos. Si es
+// récord, en dorado.
+function SetLogPreview({ exerciseName, reps, kg, rpe, isNewPR, unit = "kg", cardio = false, minutes = null, km = null, nota = null }) {
+  const conBarra = !cardio && unit === "kg" && kg >= 20 && seHaceConBarra(exerciseName);
+  const rotulo = nota || (isNewPR ? "Récord nuevo" : null);
   return (
-    <div className="relative overflow-hidden flex items-center gap-2.5 pl-3.5 pr-3 py-2.5 rounded-xl" style={{ background: `linear-gradient(120deg, ${tint(accent, "20")}, ${tint(accent, "0c")})`, border: `1px solid ${tint(accent, "45")}` }}>
-      {isNewPR && <div className="absolute -top-5 -left-5 w-16 h-16 rounded-full blur-2xl pointer-events-none opacity-30" style={{ backgroundColor: accent }} />}
-      {isNewPR ? <Trophy size={16} style={{ color: accent }} className="relative shrink-0 soft-pulse" /> : <Check size={16} style={{ color: accent }} className="relative shrink-0" />}
-      <div className="relative flex-1 min-w-0">
-        <p className="text-[10px] font-bold truncate" style={{ color: tint(accent, "aa") }}>{exerciseName}{isNewPR ? " · récord nuevo" : ""}</p>
-        <p className="text-lg font-black tabular-nums leading-tight" style={{ color: accent }}>
-          {cardio ? <>{minutes} min{km ? ` · ${km}km` : ""}</> : <>{reps}<span className="opacity-50 text-sm mx-0.5">×</span>{kgToDisplay(kg, unit)}<span className="opacity-60 text-xs ml-0.5">{weightLabel(unit)}</span></>}
-        </p>
+    <div className={`ia-serie filete sobre-placa ${isNewPR ? "record" : ""}`} style={{ "--c": isNewPR ? "var(--record)" : "var(--tono)" }}>
+      <p className="ia-serie-nombre">
+        {isNewPR && <Trophy size={14} aria-hidden="true" />}
+        <span className="min-w-0 flex-1">{exerciseName}</span>
+        {rotulo && <span className="ia-serie-nota">{rotulo}</span>}
+      </p>
+      <div className="ia-serie-visor">
+        {cardio ? (
+          <p><b className="num-display">{minutes}</b><small>min</small>{km ? <><b className="num-display">{conComa(km)}</b><small>km</small></> : null}</p>
+        ) : (
+          <p><b className="num-display">{reps}</b><i aria-hidden="true">×</i><b className="num-display">{kgToDisplay(kg, unit)}</b><small>{weightLabel(unit)}</small></p>
+        )}
+        {rpe != null && <span className="ia-chip">RPE {rpe}</span>}
       </div>
-      {rpe != null && <span className="relative text-[10px] font-bold px-2 py-1 rounded-lg shrink-0" style={{ backgroundColor: tint(accent, "18"), color: accent }}>RPE {rpe}</span>}
+      {conBarra && <BarraConDiscos kg={kg} alto={30} className="ia-serie-barra" />}
     </div>
   );
 }
 
-// editar_rutina_activa (agregar/quitar/sustituir): el día completo con el
-// cambio resaltado adentro — mismo formato de tarjeta que RoutinePreview,
-// para una sola línea de un solo día.
+// editar_rutina_activa (agregar/quitar/sustituir): el día con el cambio
+// adentro, como los días de la vista previa de una rutina: su filete de
+// color arriba, lo que entra con un +, lo que sale tachado.
 function RoutineDiffPreview({ dayLabel, dayColor = "#14B8A6", items }) {
+  const leer = { added: "Entra: ", removed: "Sale: ", before: "Cambia: ", after: "por: " };
   return (
-    <div className="rounded-xl border border-slate-800/60 bg-slate-950/40 overflow-hidden">
-      <div className="flex items-center gap-2.5 px-3 py-2 border-b border-slate-800/50" style={{ backgroundColor: tint(dayColor, "0c") }}>
-        <span className="w-1 h-6 rounded-full shrink-0" style={{ backgroundColor: dayColor }} />
-        <span className="text-[11px] font-black text-white uppercase tracking-wide flex-1 min-w-0 truncate">{dayLabel}</span>
-      </div>
-      <div className="px-3 py-2 space-y-1.5">
-        {items.map((it, i) => {
-          if (it.status === "added") return (
-            <div key={i} className="flex items-center gap-2 text-[10.5px] text-emerald-400">
-              <Plus size={11} className="shrink-0" strokeWidth={3} /><span className="flex-1 min-w-0 truncate font-bold">{it.name}</span>
-              {it.detail && <span className="shrink-0 opacity-70">{it.detail}</span>}
-            </div>
-          );
-          if (it.status === "removed") return (
-            <div key={i} className="flex items-center gap-2 text-[10.5px] text-rose-400/80">
-              <X size={11} className="shrink-0" strokeWidth={3} /><span className="flex-1 min-w-0 truncate line-through">{it.name}</span>
-            </div>
-          );
-          if (it.status === "before") return (
-            <div key={i} className="flex items-center gap-2 text-[10.5px] text-rose-400/70">
-              <span className="w-[11px] shrink-0 text-center font-black">−</span><span className="flex-1 min-w-0 truncate line-through">{it.name}</span>
-            </div>
-          );
-          if (it.status === "after") return (
-            <div key={i} className="flex items-center gap-2 text-[10.5px] text-emerald-400 -mt-0.5">
-              <ArrowDown size={11} className="shrink-0 -rotate-90" /><span className="flex-1 min-w-0 truncate font-bold">{it.name}</span>
-            </div>
-          );
-          return (
-            <div key={i} className="flex items-center gap-2 text-[10.5px] text-slate-500">
-              <span className="w-[11px] shrink-0" /><span className="flex-1 min-w-0 truncate">{it.name}</span>
-            </div>
-          );
-        })}
-      </div>
+    <div className="vista-dia ia-dia" style={{ "--dia": dayColor }}>
+      <div className="vista-dia-cabeza"><b>{dayLabel}</b></div>
+      <ul className="ia-cambios">
+        {items.map((it, i) => (
+          <li key={i} className={`ia-cambio ${it.status || "igual"}`}>
+            <span className="ia-cambio-marca" aria-hidden="true">
+              {it.status === "added" ? <Plus size={12} strokeWidth={3} /> : it.status === "removed" || it.status === "before" ? <X size={12} strokeWidth={3} /> : it.status === "after" ? <ArrowDown size={12} strokeWidth={2.6} className="-rotate-90" /> : null}
+            </span>
+            <span className="ia-cambio-nombre">{leer[it.status] && <span className="sr-only">{leer[it.status]}</span>}{it.name}</span>
+            {it.detail && <span className="ia-cambio-detalle">{it.detail}</span>}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
 
-// corregir_record: la misma tarjeta dorada de récord, más chica.
+// corregir_record: la misma serie, en dorado: es un récord.
 function RecordChangePreview({ exerciseName, reps, kg, unit = "kg" }) {
-  const accent = "#F59E0B";
-  return (
-    <div className="flex items-center gap-2.5 rounded-xl pl-3.5 pr-3 py-2.5" style={{ background: `linear-gradient(120deg, ${tint(accent, "20")}, ${tint(accent, "0c")})`, border: `1px solid ${tint(accent, "45")}` }}>
-      <Trophy size={16} style={{ color: accent }} className="shrink-0" />
-      <div className="flex-1 min-w-0">
-        <p className="text-[10px] font-bold truncate" style={{ color: tint(accent, "aa") }}>{exerciseName}</p>
-        <p className="text-lg font-black tabular-nums leading-tight" style={{ color: accent }}>{reps}<span className="opacity-50 text-sm mx-0.5">×</span>{kgToDisplay(kg, unit)}<span className="opacity-60 text-xs ml-0.5">{weightLabel(unit)}</span></p>
-      </div>
-    </div>
-  );
+  return <SetLogPreview exerciseName={exerciseName} reps={reps} kg={kg} unit={unit} isNewPR nota="Récord corregido" />;
 }
 
-// planificar_progresion: tira horizontal de semanas con su meta — mismo
-// lenguaje visual (chips celestes) que ya usa ProgressionProposalComposer,
-// para que se sienta la misma feature aunque se cargue desde el chat.
+// planificar_progresion: la escalera de las semanas, como la del ciclo en
+// Progreso: cada escalón es una semana y sube con el peso que toca.
 function ProgressionPlanPreview({ exerciseName, setIndex, entries }) {
-  const accent = "#38BDF8";
+  const kgs = entries.map((e) => Number(e.kg) || 0);
+  const min = Math.min(...kgs), max = Math.max(...kgs);
+  const altura = (kg) => (max > min ? 18 + ((kg - min) / (max - min)) * 42 : 40);
   return (
-    <div className="rounded-xl border overflow-hidden" style={{ borderColor: tint(accent, "30"), backgroundColor: tint(accent, "08") }}>
-      <div className="flex items-center gap-2 px-3 py-2 border-b" style={{ borderColor: tint(accent, "20") }}>
-        <Target size={13} style={{ color: accent }} className="shrink-0" />
-        <span className="text-[11px] font-black text-white flex-1 min-w-0 truncate">{exerciseName} · Serie {setIndex + 1}</span>
-      </div>
-      <div className="flex gap-1.5 overflow-x-auto px-3 py-2.5">
-        {entries.map((e) => (
-          <div key={e.week} className="shrink-0 rounded-lg px-2.5 py-1.5 text-center min-w-[58px]" style={{ backgroundColor: tint(accent, "14"), border: `1px solid ${tint(accent, "30")}` }}>
-            <p className="text-[8.5px] font-black uppercase" style={{ color: accent }}>Sem {e.week}</p>
-            <p className="text-[12.5px] font-black text-white tabular-nums">{e.reps}×{e.kg}</p>
+    <div className="ia-plan filete sobre-placa" style={{ "--c": "#3B82F6" }}>
+      <p className="ia-plan-titulo"><Target size={14} aria-hidden="true" /><span className="min-w-0">{exerciseName}<span className="ia-plan-sub">, serie {setIndex + 1}</span></span></p>
+      <div className="ia-escalera" role="list">
+        {entries.map((e, i) => (
+          <div key={e.week} role="listitem" className="ia-escalon" style={{ "--i": i }} aria-label={`Semana ${e.week}: ${e.reps} repeticiones con ${conComa(e.kg)} kilos`}>
+            <span className="ia-escalon-valor" aria-hidden="true"><b className="num-display">{conComa(e.kg)}</b><small>{e.reps} reps</small></span>
+            <span className="ia-escalon-bloque" style={{ height: `${altura(Number(e.kg) || 0)}%` }} aria-hidden="true" />
+            <span className="ia-escalon-semana" aria-hidden="true">S{e.week}</span>
           </div>
         ))}
       </div>
@@ -21223,43 +21587,27 @@ function ProgressionPlanPreview({ exerciseName, setIndex, entries }) {
   );
 }
 
-// planificar_semana: a diferencia de ProgressionPlanPreview (una serie,
-// muchas semanas), acá es UNA semana con muchas series — se listan todas
-// verticalmente en vez de en chips horizontales, más legible cuando son
-// varios ejercicios de la rutina a la vez.
+// planificar_semana: una semana con muchas series, en renglones finos.
 function WeeklyPlanPreview({ week, entries }) {
-  const accent = "#38BDF8";
   return (
-    <div className="rounded-xl border overflow-hidden" style={{ borderColor: tint(accent, "30"), backgroundColor: tint(accent, "08") }}>
-      <div className="flex items-center gap-2 px-3 py-2 border-b" style={{ borderColor: tint(accent, "20") }}>
-        <Target size={13} style={{ color: accent }} className="shrink-0" />
-        <span className="text-[11px] font-black text-white flex-1 min-w-0 truncate">Semana {week} del ciclo</span>
-      </div>
-      <div className="px-3 py-2 space-y-1">
-        {entries.map((label, i) => (
-          <p key={i} className="text-[11.5px] text-slate-300"><span style={{ color: accent }}>•</span> {label}</p>
-        ))}
-      </div>
+    <div className="ia-plan filete sobre-placa" style={{ "--c": "#3B82F6" }}>
+      <p className="ia-plan-titulo"><Target size={14} aria-hidden="true" />Semana {week} del ciclo</p>
+      <ul className="ia-renglones">
+        {entries.map((label, i) => <li key={i}>{label}</li>)}
+      </ul>
     </div>
   );
 }
 
-// generar_calentamiento: mismo formato de lista que WeeklyPlanPreview,
-// en naranja (mismo tono que el ícono de Calentamiento en Rutina/el
-// creador de rutinas) para diferenciarse de las demás propuestas.
+// generar_calentamiento: los ejercicios en el orden en que se hacen (por eso
+// numerados), con el filete naranja del calentamiento.
 function WarmupPlanPreview({ dayLabel, drillNames }) {
-  const accent = "#F97316";
   return (
-    <div className="rounded-xl border overflow-hidden" style={{ borderColor: tint(accent, "30"), backgroundColor: tint(accent, "08") }}>
-      <div className="flex items-center gap-2 px-3 py-2 border-b" style={{ borderColor: tint(accent, "20") }}>
-        <Flame size={13} style={{ color: accent }} className="shrink-0" />
-        <span className="text-[11px] font-black text-white flex-1 min-w-0 truncate">Calentamiento · {dayLabel}</span>
-      </div>
-      <div className="px-3 py-2 space-y-1">
-        {drillNames.map((name, i) => (
-          <p key={i} className="text-[11.5px] text-slate-300"><span style={{ color: accent }}>•</span> {name}</p>
-        ))}
-      </div>
+    <div className="ia-plan filete sobre-placa" style={{ "--c": "#F97316" }}>
+      <p className="ia-plan-titulo"><Flame size={14} aria-hidden="true" /><span className="min-w-0">Calentamiento<span className="ia-plan-sub">, {dayLabel}</span></span></p>
+      <ol className="ia-renglones">
+        {drillNames.map((name, i) => <li key={i}><span className="ia-num" aria-hidden="true">{i + 1}</span>{name}</li>)}
+      </ol>
     </div>
   );
 }
@@ -21321,21 +21669,21 @@ function buildSettingsChanges(action) {
 }
 function SettingsChangePreview({ changes }) {
   return (
-    <div className="space-y-1.5">
+    <ul className="ia-ajustes">
       {changes.map((c, i) => {
         // Las conversaciones guardadas ANTES del arreglo traen un c.icon roto
         // y sin c.campo: se ignora el ícono viejo por completo y esas filas
         // caen en el genérico en vez de tirar abajo la app.
         const Icono = SETTINGS_FIELD_META[c.campo]?.icon || SlidersHorizontal;
         return (
-          <div key={i} className="flex items-center gap-2.5 rounded-xl px-3 py-2" style={{ backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}>
-            <span className="w-6 h-6 rounded-lg bg-teal-500/15 border border-teal-500/25 flex items-center justify-center shrink-0 text-teal-400"><Icono size={12} /></span>
-            <span className="flex-1 min-w-0 truncate text-[11px]" style={{ color: "var(--chip-text)" }}>{c.label}</span>
-            <span className="text-xs font-bold shrink-0" style={{ color: "var(--surface-2-text)" }}>{c.value}</span>
-          </div>
+          <li key={i} className="ia-ajuste">
+            <span className="galleta icono-galleta chica" aria-hidden="true"><Icono size={15} /></span>
+            <span className="ia-ajuste-nombre">{c.label}</span>
+            <b className="ia-ajuste-valor">{c.value}</b>
+          </li>
         );
       })}
-    </div>
+    </ul>
   );
 }
 
@@ -24616,6 +24964,30 @@ function SideNav({ tab, setTab, profileName }) {
   );
 }
 
+// LA GUÍA, LA PRIMERA VEZ: arriba de cada pestaña, la primera vez que
+// entrás (mientras recién empezás a usar la app), un aviso chico que abre la
+// guía de esa pestaña. Con un toque se abre; con la cruz no vuelve a salir.
+function PrimeraVezGuia({ tab, nuevo, onAbrir }) {
+  const clave = `modusfit_guia_vista_${tab}`;
+  const [visto, setVisto] = useState(() => { try { return localStorage.getItem(clave) === "1"; } catch { return true; } });
+  const capitulo = useMemo(() => (nuevo && !visto ? capitulosGuia().find((c) => c.key === tab) : null), [nuevo, visto, tab]);
+  if (!capitulo) return null;
+  const marcar = () => { try { localStorage.setItem(clave, "1"); } catch { /* sin almacenamiento: sale de nuevo la próxima vez */ } setVisto(true); };
+  const titulo = tab === "entrenador_ia" ? "el Chatbot" : TAB_TITLES[tab] || capitulo.label;
+  return (
+    <div className="primera-vez filete" style={{ "--c": capitulo.color }}>
+      <button onClick={() => { marcar(); onAbrir(tab); }} className="primera-vez-cuerpo">
+        <span className="galleta icono-galleta" aria-hidden="true">{capitulo.icon}</span>
+        <span className="min-w-0 flex-1">
+          <b>¿Primera vez en {titulo}?</b>
+          <span>Te muestro cómo se usa en {capitulo.pasos.length} pasos.</span>
+        </span>
+      </button>
+      <button onClick={marcar} aria-label="No mostrar más" className="boton-redondo primera-vez-cerrar"><X size={16} /></button>
+    </div>
+  );
+}
+
 const TAB_TITLES = { rutinas: "Rutinas", rutina: "Rutina", progreso: "Progreso", descarga: "Descarga", perfil: "Perfil", entrenador_ia: "Chatbot", social: "Social" };
 // Pestañas "secundarias" (se entra desde otra, no desde la barra de abajo)
 // y a cuál vuelve el botón "atrás" del header en cada una. Social pasó a
@@ -25934,6 +26306,7 @@ export default function App() {
     const ejercicios = new Set();
     const prs = [];
     const porEjercicioVol = {};
+    const porEjercicioSeries = {};
     Object.entries(porEjercicio).forEach(([exId, entries]) => {
       // BUG FIX: si marcaste algo en Descarga el mismo día, esas entradas
       // (con "deload:true") se colaban acá y el resumen de la sesión NORMAL
@@ -25950,6 +26323,7 @@ export default function App() {
       // decidir qué recortar o a qué meterle más la próxima.
       const nombreEj = EXERCISE_LIBRARY_BY_ID[exId]?.name || deHoy[0].exName || exId.replace(/_/g, " ");
       porEjercicioVol[nombreEj] = Math.round(deHoy.reduce((a, e) => a + e.kg * lf * e.reps, 0));
+      porEjercicioSeries[nombreEj] = deHoy.length;
       // ¿Superó hoy su mejor marca previa? El loadFactor se cancela (es el
       // mismo ejercicio de ambos lados), así que comparamos 1RM crudo. El
       // récord corregido a mano también cuenta como piso a superar.
@@ -26025,7 +26399,9 @@ export default function App() {
         if (ok) metas.cumplidas++;
       });
     }
-    return { volumen: Math.round(volumen), series, ejercicios: ejercicios.size, prs, minutos, reparto, vsUltima, metas };
+    // Lo que imprime el ticket: cada ejercicio con sus series, el día y cuándo.
+    const lineas = Object.keys(porEjercicioVol).map((nombre) => ({ nombre, series: porEjercicioSeries[nombre] || 0, volumen: porEjercicioVol[nombre] }));
+    return { volumen: Math.round(volumen), series, ejercicios: ejercicios.size, prs, minutos, reparto, vsUltima, metas, lineas, dia: dk ? ROUTINE[dk]?.label || null : null, color: dk ? ROUTINE[dk]?.color || null : null, fecha: new Date().toISOString() };
   };
 
   // Resumen semanal: dispara SOLO si hoy es domingo (fin de semana lun-dom)
@@ -26226,6 +26602,7 @@ export default function App() {
         <main className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto px-4 pt-1 lg:pt-4 space-y-4" style={{ paddingBottom: "calc(7rem + var(--dock-alto, 0px) + env(safe-area-inset-bottom, 0px))" }}>
           <div key={tab} className={tabSlideClass}>
             <TituloPestana tab={tab} />
+            <PrimeraVezGuia tab={tab} nuevo={(profile?.trainingSessions?.length || 0) < 3 && !profile?.activeSession && !(tab === "rutina" && !profile?.onboardingDone)} onAbrir={(t) => { setHelpStartTab(t); setShowHelp(true); }} />
             {tab === "rutinas" && <RoutinesView openScheduleSignal={openSectionSignal.id === "week-schedule" ? openSectionSignal.n : 0} openEditorSignal={openSectionSignal.id === "routine-editor" ? openSectionSignal.n : 0} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleDeleteRoutine} onUpdateProfile={handleUpdateProfile} onGoToDay={(dayKey) => goToSection("rutina", "go-to-day", dayKey)} />}
             {tab === "rutina" && !showPinnedDeload && <OnboardingTasksCard profile={profile} cycleStart={cycleStart} logs={logs} onGoToProfile={() => setTab("perfil")} onOpenFieldSettings={() => setShowFieldIntro(true)} onDone={() => handleUpdateProfile({ onboardingDone: true })} />}
             {/* Semana de descarga: se muestra fija acá mismo, en vez del
@@ -26273,7 +26650,7 @@ export default function App() {
       </DockInferior>
       {sessionStarted && <SessionStartOverlay onDone={() => setSessionStarted(false)} />}
       {sessionSummary && <SessionSummaryModal resumen={sessionSummary} onClose={() => setSessionSummary(null)} />}
-      {weeklyRecap && <WeeklyRecapModal data={weeklyRecap} onClose={() => setWeeklyRecap(null)} />}
+      {weeklyRecap && !sessionSummary && <WeeklyRecapModal data={weeklyRecap} onClose={() => setWeeklyRecap(null)} />}
       {periodRecap && <WeeklyRecapModal data={periodRecap.data} periodo={periodRecap.periodo} etiqueta={periodRecap.etiqueta} onClose={() => setPeriodRecap(null)} />}
       {showWelcome && <WelcomeIntro onClose={() => setShowWelcome(false)} onOpenTutorial={() => { setHelpStartTab(null); setShowHelp(true); }} onUpdateSettings={handleUpdateSettings} />}
       {showHelp && <HelpModal startTab={helpStartTab} onClose={() => setShowHelp(false)} />}
