@@ -21,6 +21,8 @@
  *   npm run capturas -- --fecha 2026-10-22 (como si fuera ese día, a las
  *                                          18:30: con --datos, un jueves
  *                                          muestra la semana con sesiones)
+ *   npm run capturas -- --letra 1.3       (con la letra "Muy grande" de
+ *                                          Perfil; 1.15 es "Grande")
  *
  * Con --datos deja además el perfil de muestra en
  * .taste-skill/demo-storage.json: con `npm run dev`, la dirección
@@ -47,6 +49,7 @@ const conEscritorio = args.includes("--escritorio");
 const conDatos = args.includes("--datos");
 const conClaro = args.includes("--claro");
 const fecha = valor("--fecha");
+const letra = valor("--letra");
 const motor = args.includes("--safari") ? webkit : chromium;
 // Sin --carpeta, la fecha y hora local (no UTC) de la corrida.
 const carpeta = valor("--carpeta") || new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16).replace(/[-:]/g, "").replace("T", "-");
@@ -243,6 +246,20 @@ try {
       });
     }
 
+    if (letra) {
+      await paso(`agrandar la letra (${letra})`, async () => {
+        await page.evaluate((escala) => {
+          const CLAVE = "gym_profiles_v2";
+          const todos = JSON.parse(localStorage.getItem(CLAVE) || "{}");
+          for (const p of Object.values(todos)) p.settings = { ...(p.settings || {}), textScale: escala };
+          localStorage.setItem(CLAVE, JSON.stringify(todos));
+        }, Number(letra));
+        await page.reload();
+        await page.waitForTimeout(1500);
+        await cerrarModales();
+      });
+    }
+
     for (const pestana of PESTANAS) {
       await paso(`abrir la pestaña ${pestana}`, async () => {
         await cerrarModales();
@@ -282,8 +299,8 @@ try {
         await paso("abrir el perfil de un amigo", () => page.locator("button.amigo-cuerpo").first().click({ timeout: 8000 }));
         await capturar("Social Amigo");
         await paso("volver del perfil del amigo", () => page.getByRole("button", { name: "Volver" }).first().click({ timeout: 8000 }));
-        // Tu perfil, como lo ven tus amigos: se abre tocando tu credencial.
-        await paso("abrir tu perfil desde la credencial", () => page.locator(".credencial-cuerpo").first().click({ timeout: 8000 }));
+        // Tu perfil, como lo ven tus amigos: se abre tocando tu casillero.
+        await paso("abrir tu perfil desde el casillero", () => page.locator(".casillero-chico .casillero-cuerpo").first().click({ timeout: 8000 }));
         await capturar("Social Mi perfil");
         await paso("volver de tu perfil", () => page.getByRole("button", { name: "Volver" }).first().click({ timeout: 8000 }));
       }
@@ -307,7 +324,18 @@ try {
     // final, con todas las pestañas ya vistas: así no se abre la guía de
     // ninguna encima de la pantalla.
     if (conDatos && nombre === "celular") {
-      const guardado = await page.evaluate(() => JSON.stringify(Object.fromEntries(Object.keys(localStorage).map((k) => [k, localStorage.getItem(k)]))));
+      // Queda en oscuro y con la letra normal aunque estas capturas se hayan
+      // sacado con --claro o --letra: si no, todo lo que abre ?demo= (y las
+      // pruebas) seguía en claro o con la letra grande.
+      const guardado = await page.evaluate(() => {
+        const todo = Object.fromEntries(Object.keys(localStorage).map((k) => [k, localStorage.getItem(k)]));
+        try {
+          const perfiles = JSON.parse(todo.gym_profiles_v2 || "{}");
+          for (const p of Object.values(perfiles)) if (p?.settings) p.settings = { ...p.settings, theme: "dark", textScale: 1 };
+          todo.gym_profiles_v2 = JSON.stringify(perfiles);
+        } catch { /* se guarda como está */ }
+        return JSON.stringify(todo);
+      });
       writeFileSync(join(RAIZ, ".taste-skill", "demo-storage.json"), guardado);
     }
     await context.close();

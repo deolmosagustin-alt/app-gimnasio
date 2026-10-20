@@ -15,6 +15,7 @@ import {
   Share2, Download, Link2, Copy, BellOff, Send, Mic, Ruler, Camera, Link, Footprints, Star, SquarePlay, Upload, RefreshCw, Timer, Percent, Users, User,
   MessageCircle, Search, UserPlus, UserCheck, UserMinus, AtSign, GraduationCap, ClipboardCheck, Swords, Medal, QrCode, ArrowUpDown,
   Phone, Minus, Ellipsis, Undo2, ArrowLeftRight, ReceiptText, ClipboardList, Maximize2, Minimize2, NotebookPen,
+  FileText, FileSpreadsheet, ClipboardPaste, ScanText, ImagePlus,
 } from "lucide-react";
 import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signOut, onAuthStateChanged } from "firebase/auth";
 import { Capacitor, registerPlugin } from "@capacitor/core";
@@ -755,13 +756,11 @@ const WeightUnitCtx = createContext("kg");
 function useWeightUnit() { return useContext(WeightUnitCtx); }
 
 
-// Opciones de tamaño de letra (Perfil → Tamaño de letra). El valor se aplica
-// como font-size del elemento raíz (<html>) — la mayoría de los tamaños de
-// Tailwind usados en la app (text-xs, text-sm, text-base, text-lg, text-xl,
-// text-2xl...) están definidos en rem, así que escalan todos juntos y en
-// proporción al cambiar este único valor. Las etiquetas chiquitas escritas
-// con un tamaño fijo en píxeles (ej. text-[10px]) no escalan con este
-// control — para esas existe el segundo control de abajo.
+// Opciones de tamaño de letra (Perfil → Tamaño de letra). El valor va en la
+// variable --escala-letra del <html> y multiplica todas las letras: las de
+// Tailwind, las text-[Npx] y los font-size del CSS propio (letraEscalable).
+// Los márgenes y las piezas no cambian. "Letras chicas", el control de abajo,
+// agranda además sólo las text-[Npx].
 const TEXT_SCALE_OPTIONS = [
   { k: "sm", v: 0.9, l: "Chica" },
   { k: "md", v: 1, l: "Normal" },
@@ -1968,22 +1967,38 @@ const GALLETA_URI = svgComoUrl(`<svg xmlns="http://www.w3.org/2000/svg" viewBox=
 // línea ondulada del cronómetro de descanso.
 const ONDA_URI = svgComoUrl('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 12"><path d="M0 6 Q6 0.5 12 6 T24 6" fill="none" stroke="#000" stroke-width="3" stroke-linecap="round"/></svg>');
 
-const ANIMATION_CSS = `
-/* Los tamaños de fuente arbitrarios en px (text-[10px], etc.) que usamos
-   mucho NO escalaban con la config "Tamaño de texto" (que ajusta el
-   font-size raíz y solo afecta unidades relativas). Acá los redefinimos en
-   rem para que TODOS escalen en proporción cuando cambiás el tamaño. */
-.text-[8px]{font-size:0.5rem !important}
-.text-[8.5px]{font-size:0.531rem !important}
-.text-[9px]{font-size:0.5625rem !important}
-.text-[9.5px]{font-size:0.594rem !important}
-.text-[10px]{font-size:0.625rem !important}
-.text-[10.5px]{font-size:0.656rem !important}
-.text-[11px]{font-size:0.6875rem !important}
-.text-[12px]{font-size:0.75rem !important}
-.text-[13px]{font-size:0.8125rem !important}
-.text-[15px]{font-size:0.9375rem !important}
-.text-[26px]{font-size:1.625rem !important}
+// TAMAÑO DE LETRA (Perfil › Apariencia y accesibilidad): crecen o se achican
+// sólo las letras, todas parejas; el armado (márgenes, rellenos, alturas y las
+// piezas) queda igual. Cada font-size de este CSS se multiplica por
+// --escala-letra, que la app pone en el <html> (1 es el tamaño normal, y ahí
+// da exactamente lo mismo que antes). Los títulos y los números grandes (de 24
+// px para arriba) crecen la mitad, con --escala-titulo. Antes se agrandaba el
+// font-size del <html>: crecían los textos de Tailwind y también sus márgenes,
+// pero no las piezas en px, y quedaba una mezcla rara.
+function letraEscalable(css) {
+  return css
+    .replace(/font-size:\s*calc\(([\d.]+)(px|rem) \* var\(--small-text-scale, 1\)\)/g, (_, n, u) => `font-size: calc(${n}${u} * var(--escala-letra, 1) * var(--small-text-scale, 1))`)
+    .replace(/font-size:\s*([\d.]+)(px|rem)/g, (_, n, u) => `font-size: calc(${n}${u} * var(${(u === "rem" ? Number(n) * 16 : Number(n)) >= 24 ? "--escala-titulo" : "--escala-letra"}, 1))`);
+}
+
+const ANIMATION_CSS = letraEscalable(`
+/* TAMAÑO DE LETRA. Las letras de Tailwind (sus --text-*) crecen con
+   --escala-letra; las grandes, con --escala-titulo, la mitad. Las clases
+   text-[Npx] están más abajo (LETRAS CHICAS) y el resto de los font-size de
+   este CSS pasan por letraEscalable(). */
+:root {
+  --escala-titulo: calc(1 + (var(--escala-letra, 1) - 1) * 0.5);
+  --text-xs: calc(0.75rem * var(--escala-letra, 1));
+  --text-sm: calc(0.875rem * var(--escala-letra, 1));
+  --text-base: calc(1rem * var(--escala-letra, 1));
+  --text-lg: calc(1.125rem * var(--escala-letra, 1));
+  --text-xl: calc(1.25rem * var(--escala-letra, 1));
+  --text-2xl: calc(1.5rem * var(--escala-titulo));
+  --text-3xl: calc(1.875rem * var(--escala-titulo));
+  --text-4xl: calc(2.25rem * var(--escala-titulo));
+  --text-5xl: calc(3rem * var(--escala-titulo));
+  --text-6xl: calc(3.75rem * var(--escala-titulo));
+}
 
 /* Hueco que deja la barra de navegación bajo el input del chat: en móvil
    la nav va abajo (4rem), en escritorio va al costado (0). */
@@ -2786,6 +2801,12 @@ input, textarea, [contenteditable="true"] {
 .text-\\[13px\\] { font-size: calc(13px * var(--small-text-scale, 1)) !important; }
 .text-\\[17px\\] { font-size: calc(17px * var(--small-text-scale, 1)) !important; }
 .text-\\[26px\\] { font-size: calc(26px * var(--small-text-scale, 1)) !important; }
+.text-\\[11\\.5px\\] { font-size: calc(11.5px * var(--small-text-scale, 1)) !important; }
+.text-\\[12\\.5px\\] { font-size: calc(12.5px * var(--small-text-scale, 1)) !important; }
+.text-\\[13\\.5px\\] { font-size: calc(13.5px * var(--small-text-scale, 1)) !important; }
+.text-\\[14px\\] { font-size: calc(14px * var(--small-text-scale, 1)) !important; }
+.text-\\[14\\.5px\\] { font-size: calc(14.5px * var(--small-text-scale, 1)) !important; }
+.text-\\[15px\\] { font-size: calc(15px * var(--small-text-scale, 1)) !important; }
 
 /* ============================================================================
    SISTEMA VISUAL — "Grafito"
@@ -2946,6 +2967,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
   transition: border-radius .4s var(--resorte), transform .25s var(--resorte), filter .2s ease;
 }
 .boton-pildora:active { border-radius: 18px; transform: scale(.975); }
+.boton-pildora > svg, .boton-tonal > svg { flex: none; }
 .light-mode .boton-pildora { background: var(--c, var(--tono)); }
 
 /* FONDO: el clima del día. Arriba, donde va el título, un velo del color de
@@ -3570,32 +3592,6 @@ button.foco-campo-rotulo:active { background: var(--velo); }
   font-size: 0.8125rem; font-weight: 650; color: var(--text-strong); text-align: left;
   background: color-mix(in oklab, var(--text-strong) 6%, transparent);
 }
-/* Historias: aros en galleta con el color del día que entrenaron; apagados
-   cuando ya les aplaudiste. */
-.historias { display: flex; gap: 14px; overflow-x: auto; padding: 4px 2px 6px; scroll-snap-type: x proximity; }
-.historia { position: relative; flex: none; width: 72px; display: flex; flex-direction: column; align-items: center; scroll-snap-align: start; }
-.historia-aro { width: 68px; height: 68px; --galleta-fondo: color-mix(in oklab, var(--tono) 60%, #8a8c92); }
-.historia-aro.vista { --galleta-fondo: var(--hairline); }
-.historia-aro > img, .historia-aro > span {
-  width: 58px; height: 58px; object-fit: cover;
-  display: flex; align-items: center; justify-content: center;
-  -webkit-mask: var(--forma-galleta) center / contain no-repeat; mask: var(--forma-galleta) center / contain no-repeat;
-  background: var(--surface-2);
-  font-weight: 800; font-size: 1.3rem; color: var(--text-strong); font-stretch: 82%;
-}
-.historia-aplauso {
-  position: absolute; top: 44px; right: -2px; width: 32px; height: 32px; border-radius: 999px;
-  display: flex; align-items: center; justify-content: center; font-size: 15px;
-  background: var(--surface-3); color: var(--text-strong); border: 2px solid var(--app-bg);
-  transition: transform .3s var(--resorte);
-}
-.historia-aplauso:active { transform: scale(.9); }
-.historia-aplauso.hecho { background: var(--surface-3); color: var(--text-muted); }
-/* El aplauso que falta dar, con un fondo del tono: se ve qué queda por tocar. */
-.historia-aplauso:not(.hecho), .actividad-aplauso:not(.hecho) { background: color-mix(in oklab, var(--tono) 22%, var(--surface-3)); }
-.light-mode .historia-aplauso:not(.hecho), .light-mode .actividad-aplauso:not(.hecho) { background: color-mix(in oklab, var(--tono) 16%, white); }
-.historia-nombre { margin-top: 8px; max-width: 72px; text-align: center; font-size: 0.75rem; font-weight: 650; color: var(--text-strong); line-height: 1.15; overflow-wrap: anywhere; }
-.historia-cuando { margin-top: 1px; max-width: 72px; text-align: center; font-size: 0.6875rem; color: var(--text-faint); line-height: 1.2; }
 /* Avisos: renglones de notificación. */
 .aviso-social {
   display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
@@ -3937,20 +3933,12 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 .light-mode .guia-visor em { background: var(--c); }
 .guia-dial { width: 132px; height: 132px; pointer-events: none; }
 .guia-dial .descanso-tiempo { color: var(--text-strong); }
-.guia-escalera { display: flex; align-items: flex-end; gap: 6px; width: 100%; max-width: 280px; height: 112px; }
-.guia-escalera i { flex: 1; border-radius: 10px; background: var(--surface-3); }
-.guia-escalera i.hoy { background: color-mix(in oklab, var(--c) 72%, white); }
-.light-mode .guia-escalera i.hoy { background: var(--c); }
-.guia-escalera i.despues { background: transparent; box-shadow: inset 0 0 0 1.5px var(--hairline-fuerte); }
-.guia-escalera i.descarga { background: repeating-linear-gradient(135deg, var(--surface-3) 0 5px, transparent 5px 10px); }
 .guia-rangos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 10px; width: 100%; max-width: 300px; }
 .guia-rangos span { display: grid; justify-items: center; gap: 4px; }
 .guia-rangos small { font-size: 11.5px; font-weight: 600; color: var(--text-muted); }
 .guia-acciones { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; width: 100%; }
 .guia-acciones > span { display: grid; justify-items: center; gap: 8px; padding: 14px 6px; border-radius: 18px; font-size: 12.5px; font-weight: 650; color: var(--text-strong); background: var(--surface-1); box-shadow: var(--placa-canto); }
 .guia-acciones em { font-style: normal; }
-.guia-racha { display: flex; align-items: center; gap: 14px; color: var(--text-strong); }
-.guia-racha b { font-size: 3.4rem; line-height: 1; font-weight: 750; }
 .guia-chat { display: grid; gap: 10px; width: 100%; }
 .guia-chat p { max-width: 86%; font-size: 13.5px; line-height: 1.45; }
 .guia-chat .propia { justify-self: end; padding: 9px 13px; border-radius: 18px 18px 6px 18px; color: var(--text-strong); background: color-mix(in oklab, var(--c) 16%, var(--surface-1)); }
@@ -3990,11 +3978,6 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 .semana-hueco.hoy { outline: 2px solid color-mix(in oklab, var(--text-strong) 55%, transparent); outline-offset: 1.5px; }
 .semana-hueco.futuro:not(.picado) { opacity: .45; }
 .semana-hueco-col em { font-style: normal; font-size: 10px; font-weight: 600; color: var(--text-faint); }
-.semana-plan { display: inline-flex; align-items: center; gap: 3px; flex: none; }
-.semana-plan i { display: block; width: 7px; height: 20px; border-radius: 3px; background: var(--disco-fantasma); }
-.semana-plan i[style] { background: color-mix(in oklab, var(--dia) 82%, white); }
-.light-mode .semana-plan i[style] { background: var(--dia); }
-.semana-plan i.hoy { outline: 2px solid var(--text-strong); outline-offset: 1.5px; }
 .aviso-descanso { width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 26px; text-align: left; background: var(--surface-1); }
 
 /* El carnet de socio. */
@@ -4048,8 +4031,6 @@ button.carrera-carril:active { background: var(--velo); }
    apagado con gris. Se sabe en qué anda cada uno sin leer. */
 .con-rango { outline: 2px solid color-mix(in oklab, var(--rango-c) 64%, #8a8c92); outline-offset: 2px; }
 .light-mode .con-rango { outline-color: color-mix(in oklab, var(--rango-c) 78%, #6b6e74); }
-.actividad-aro.aro-rango { --galleta-fondo: color-mix(in oklab, var(--rango) 64%, #8a8c92); }
-.light-mode .actividad-aro.aro-rango { --galleta-fondo: color-mix(in oklab, var(--rango) 78%, #6b6e74); }
 .carrera-cuerpo { min-width: 0; display: grid; gap: 6px; }
 .carrera-nombre { font-size: 13.5px; font-weight: 650; line-height: 1.1; color: var(--text-strong); }
 .carrera-pista { display: flex; gap: 3px; }
@@ -4069,7 +4050,7 @@ button.carrera-carril:active { background: var(--velo); }
 .escalera-sub { margin-top: 3px; font-size: 0.8125rem; color: var(--text-muted); text-wrap: pretty; }
 .escalera-cuenta { flex: none; display: grid; justify-items: end; text-align: right; line-height: 1.1; }
 .escalera-cuenta b { font-size: 1.6rem; line-height: 1; font-weight: 750; color: var(--text-strong); }
-.escalera-cuenta span { margin-top: 3px; max-width: 76px; font-size: 11.5px; color: var(--text-faint); }
+.escalera-cuenta span { margin-top: 3px; max-width: 6.6em; font-size: 11.5px; color: var(--text-faint); }
 .escalera { display: flex; align-items: flex-end; gap: 6px; height: 76px; margin-top: 18px; }
 .escalon { flex: 1 1 0; min-width: 0; border-radius: 9px 9px 4px 4px; background: transparent; box-shadow: inset 0 0 0 1.5px var(--hairline-fuerte); }
 .escalon.pasada { background: color-mix(in oklab, var(--tono) 26%, var(--surface-3)); box-shadow: none; }
@@ -4087,7 +4068,7 @@ button.carrera-carril:active { background: var(--velo); }
 .escalera-pie .marcas.vacia i { height: 9px; }
 /* La semana que llegó a lo planeado: sus marcas, en el tono. */
 .escalera-pie .cumplida .marcas { color: color-mix(in oklab, var(--tono) 72%, white); }
-/* La racha viva (la tuya, en el carnet y en la credencial), en el tono. */
+/* La racha viva (la tuya, en el carnet y en tu casillero), en el tono. */
 .marcas.viva { color: color-mix(in oklab, var(--tono) 72%, white); }
 .light-mode .marcas.viva { color: color-mix(in oklab, var(--tono) 72%, black); }
 /* Tu semana en el carnet: cada día que entrenaste, con el color del día que
@@ -4247,16 +4228,6 @@ button.carrera-carril:active { background: var(--velo); }
 .preset-tira.grande { display: flex; gap: 3px; height: 8px; width: 100%; margin-bottom: 6px; }
 .preset-tira.grande i { height: 8px; border-radius: 4px; }
 .preset-ver { display: inline-flex; align-items: center; gap: 2px; font-size: 0.8125rem; font-weight: 650; color: var(--text-muted); }
-.semana-rutina { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
-.semana-rutina-dia { display: flex; flex-direction: column; align-items: center; gap: 5px; }
-.semana-rutina-dia:disabled { cursor: default; }
-.semana-rutina-letra { font-size: 11.5px; font-weight: 650; color: var(--text-faint); }
-.semana-rutina-dia.hoy .semana-rutina-letra { color: var(--text-strong); }
-.semana-rutina-marca { display: block; width: 100%; height: 30px; border-radius: 10px; background: var(--disco-fantasma); transition: transform .25s var(--resorte); }
-.semana-rutina-dia.entrena .semana-rutina-marca { background: color-mix(in oklab, var(--dia) 60%, #8a8c92); }
-.light-mode .semana-rutina-dia.entrena .semana-rutina-marca { background: color-mix(in oklab, var(--dia) 70%, #a7a9ae); }
-.semana-rutina-dia.hoy .semana-rutina-marca { outline: 2px solid var(--text-strong); outline-offset: 2px; }
-.semana-rutina-dia.entrena:active .semana-rutina-marca { transform: scale(.92); }
 .preset { position: relative; display: block; width: 100%; padding: 14px 16px; border-radius: 24px; text-align: left; background: var(--surface-1); transition: background-color .2s ease; }
 .preset.activa { background: var(--surface-1); box-shadow: inset 0 0 0 1.5px var(--hairline-fuerte); }
 .preset-cuerpo { display: block; width: 100%; text-align: left; }
@@ -4335,7 +4306,10 @@ button.carrera-carril:active { background: var(--velo); }
    color del día va en lo elegido y en lo que se toca; las placas, neutras.
    Guardar, siempre a mano en una barra fija arriba de la de pestañas. */
 .armando-rutina .titulo-pagina { display: none; }
-.armado { display: grid; gap: 14px; padding-bottom: 88px; }
+/* minmax(0, 1fr): sin esto, el riel de los días (o cualquier cosa más ancha
+   que la pantalla) estiraba la columna y todo el armado se salía por la
+   derecha. */
+.armado { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; padding-bottom: 88px; }
 .armado.sin-pestanas { padding-bottom: 96px; }
 .armado-cabeza { display: flex; align-items: center; gap: 10px; margin-top: 2px; }
 .armado-contexto { font-size: 0.875rem; font-weight: 600; color: var(--text-muted); }
@@ -4365,7 +4339,7 @@ button.carrera-carril:active { background: var(--velo); }
 .light-mode .armado-solapa[aria-selected="true"] { color: color-mix(in oklab, var(--c) 72%, black); background: color-mix(in oklab, var(--c) 15%, white); }
 .armado-solapa.mas { padding: 0 16px 0 12px; color: var(--text-strong); background: var(--velo); box-shadow: none; }
 /* El día, en su placa. */
-.armado-dia { display: grid; gap: 12px; padding: 14px 12px 10px; border-radius: 28px; background: var(--surface-1); box-shadow: var(--placa-canto), var(--sombra-placa); }
+.armado-dia { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 14px 12px 10px; border-radius: 28px; background: var(--surface-1); box-shadow: var(--placa-canto), var(--sombra-placa); }
 .armado-dia > .buscador { margin-top: 0; }
 .armado-dia-cabeza { display: flex; align-items: center; gap: 8px; }
 .armado-dia-nombre {
@@ -4511,7 +4485,7 @@ button.carrera-carril:active { background: var(--velo); }
 .armado-calentamiento-acciones .boton-tonal { flex: 1 1 140px; min-height: 42px; font-size: 0.8125rem; }
 .armado-copiar { display: grid; gap: 10px; padding: 12px; border-radius: 18px; background: var(--surface-1); }
 /* El reparto y el cronograma. */
-.armado-placa { display: grid; gap: 14px; padding: 16px; border-radius: 24px; background: var(--surface-1); box-shadow: var(--placa-canto); }
+.armado-placa { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; padding: 16px; border-radius: 24px; background: var(--surface-1); box-shadow: var(--placa-canto); }
 .armado-bajada { margin-top: 4px; font-size: 0.8125rem; line-height: 1.4; color: var(--text-muted); text-wrap: pretty; }
 /* LA BARRA DE GUARDAR: fija, arriba de la de pestañas (y del dock, si hay
    una sesión), de vidrio como ellas. Encima, el aviso de deshacer o el
@@ -4582,26 +4556,7 @@ button.carrera-carril:active { background: var(--velo); }
 .aviso-vincular p { flex: 1; min-width: 0; font-size: 12.5px; line-height: 1.4; text-wrap: pretty; }
 .preset-acciones { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
 
-/* Social: la actividad y el ranking. */
-.actividad { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 4px 10px; padding: 10px 10px 10px 8px; border-radius: 22px; background: var(--surface-2); }
-.actividad-quien { display: flex; align-items: center; gap: 10px; min-width: 0; text-align: left; }
-.actividad-aro { width: 46px; height: 46px; --galleta-fondo: var(--hairline-fuerte); }
-.actividad-avatar {
-  width: 38px; height: 38px; overflow: hidden; display: flex; align-items: center; justify-content: center;
-  font-size: 15px; font-weight: 800; color: var(--text-strong); background: var(--surface-3);
-  -webkit-mask: var(--forma-galleta) center / contain no-repeat; mask: var(--forma-galleta) center / contain no-repeat;
-}
-.actividad-avatar img { width: 100%; height: 100%; object-fit: cover; }
-.actividad-nombre { display: block; font-size: 14px; font-weight: 700; color: var(--text-strong); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.actividad-dia { display: block; margin-top: 1px; font-size: 12px; color: var(--text-muted); }
-.actividad-aplauso { width: 46px; height: 46px; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-size: 19px; color: var(--text-strong); background: var(--surface-3); transition: border-radius .35s var(--resorte), transform .2s ease; }
-.light-mode .actividad-aplauso { background: var(--surface-3); }
-.actividad-aplauso:active { border-radius: 16px; transform: scale(.94); }
-.actividad-aplauso.hecho { background: var(--surface-3); color: var(--text-muted); }
-.actividad-carga { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; padding-left: 56px; }
-.actividad-carga .barra-cargada { flex: 1; min-width: 0; }
-.actividad-carga > span { flex: none; font-size: 12px; color: var(--text-muted); }
-.actividad-carga b { font-size: 14px; font-weight: 750; color: var(--text-strong); }
+/* Social: el ranking. */
 .ranking-fila { width: 100%; display: flex; align-items: center; gap: 12px; padding: 8px 14px 8px 8px; border-radius: 20px; text-align: left; background: var(--surface-2); }
 .ranking-fila.yo { background: var(--surface-2); }
 .ranking-pos { width: 22px; text-align: center; font-size: 1rem; font-weight: 750; color: var(--text-faint); flex: none; }
@@ -4731,34 +4686,7 @@ button.carrera-carril:active { background: var(--velo); }
 .amigo-rango { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 650; white-space: nowrap; }
 .amigo-racha { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; color: var(--text-strong); }
 .amigo-usuario { font-size: 12px; color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-/* ── SOCIAL: la credencial, el perfil de un atleta y el mano a mano ──────── */
-/* TU CREDENCIAL: arriba quién sos (tocarla abre tu perfil, como lo ven tus
-   amigos); abajo, tres datos con su nombre, separados por un filo. */
-.credencial { position: relative; border-radius: 26px; background: var(--surface-1); box-shadow: var(--placa-canto); }
-.credencial-cuerpo { width: 100%; display: flex; align-items: center; gap: 14px; padding: 14px 66px 13px 14px; text-align: left; border-radius: 26px 26px 0 0; transition: background-color .2s ease; }
-.credencial-cuerpo:active { background: var(--velo); }
-.credencial-avatar {
-  flex: none; width: 58px; height: 58px; overflow: hidden; border-radius: 999px; display: grid; place-items: center;
-  font-size: 1.4rem; font-weight: 750; color: var(--text-strong); background: var(--surface-3);
-  box-shadow: 0 0 0 2px var(--surface-1), 0 0 0 4.5px color-mix(in oklab, var(--rango) 76%, white);
-}
-.light-mode .credencial-avatar { box-shadow: 0 0 0 2px var(--surface-1), 0 0 0 4.5px var(--rango); }
-.credencial-avatar img { width: 100%; height: 100%; object-fit: cover; }
-.credencial-nombre { display: flex; align-items: center; gap: 2px; font-size: 1.2rem; font-weight: 750; line-height: 1.15; color: var(--text-strong); overflow-wrap: anywhere; }
-.credencial-nombre svg { flex: none; color: var(--text-faint); }
-.credencial-usuario { display: block; margin-top: 3px; font-size: 13px; color: var(--text-muted); overflow-wrap: anywhere; }
-.credencial-qr { position: absolute; top: 15px; right: 14px; }
-.credencial-datos { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr) minmax(0, 1fr); border-top: 1px solid var(--hairline); }
-.credencial-dato { display: grid; align-content: start; gap: 4px; min-width: 0; padding: 11px 12px 14px; text-align: left; transition: background-color .2s ease; }
-.credencial-dato + .credencial-dato { border-left: 1px solid var(--hairline); }
-.credencial-dato:first-child { border-bottom-left-radius: 26px; }
-button.credencial-dato:not(:disabled):active { background: var(--velo); }
-.credencial-valor { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; min-height: 30px; }
-.credencial-valor b { font-size: 13.5px; font-weight: 700; line-height: 1.15; color: var(--text-strong); }
-.credencial-valor b.grande { font-size: 1.55rem; line-height: 1; font-weight: 750; }
-.credencial-valor .marcas { color: var(--text-strong); }
-.credencial-aplauso { font-size: 17px; line-height: 1; }
-.credencial-dato small { font-size: 12px; line-height: 1.25; color: var(--text-muted); }
+/* ── SOCIAL: el perfil de un atleta y el mano a mano ──────────────────────── */
 
 /* La fila de un amigo: la flecha, adentro de lo que se toca. */
 .amigo-flecha { flex: none; color: var(--text-faint); }
@@ -5587,7 +5515,7 @@ button.credencial-dato:not(:disabled):active { background: var(--velo); }
 .resumen-medalla { width: 112px; margin: -4px auto 6px; transform-origin: 50% 0; animation: medallaCuelga 1.1s cubic-bezier(.3,1.4,.5,1) .15s both; }
 @keyframes medallaCuelga { 0% { opacity: 0; transform: translateY(-24px) rotate(-10deg); } 40% { opacity: 1; transform: translateY(0) rotate(6deg); } 70% { transform: rotate(-3deg); } 100% { transform: none; } }
 .vitrina { padding: 16px; }
-.vitrina-cabeza { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.vitrina-cabeza { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 10px; margin-bottom: 12px; }
 .vitrina-cabeza > span { font-size: 12.5px; color: var(--text-muted); text-align: right; }
 .vitrina-estante { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); row-gap: 14px; }
 .vitrina-lugar { position: relative; display: flex; flex-direction: column; align-items: center; min-width: 0; }
@@ -5670,14 +5598,14 @@ button.credencial-dato:not(:disabled):active { background: var(--velo); }
 .planilla-titulo { text-align: center; font-size: 15px; font-weight: 800; font-stretch: 85%; }
 .planilla-grupo + .planilla-grupo { margin-top: 10px; }
 .planilla-dia { margin: 10px 0 4px; font-size: 12.5px; font-weight: 650; color: var(--papel-suave); }
-.planilla-fila { display: grid; grid-template-columns: 40px minmax(0, 1fr) 70px 42px; align-items: center; column-gap: 8px; min-height: 52px; border-bottom: 1px solid var(--papel-linea); }
+.planilla-fila { display: grid; grid-template-columns: minmax(40px, max-content) minmax(0, 1fr) 70px 42px; align-items: center; column-gap: 8px; min-height: 52px; border-bottom: 1px solid var(--papel-linea); }
 .planilla-cabeza { min-height: 0; padding-bottom: 3px; border-bottom: 1.5px solid var(--papel-tinta); font-size: 11px; font-weight: 700; color: var(--papel-suave); }
 .planilla-cabeza span:nth-child(3) { text-align: center; }
 .planilla-hora { font-size: 14px; font-weight: 750; font-stretch: 80%; }
 .planilla-socio { min-width: 0; padding: 4px 0; text-align: left; }
 .planilla-nombre { display: block; font-size: 14px; font-weight: 700; line-height: 1.2; overflow-wrap: anywhere; }
 .planilla-detalle { display: block; margin-top: 1px; font-size: 12px; color: var(--papel-suave); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.planilla-firma { justify-self: center; max-width: 70px; overflow: hidden; white-space: nowrap; font-size: 23px; font-weight: 600; line-height: 1.1; color: #2a2d36; transform: rotate(var(--giro, -4deg)); }
+.planilla-firma { justify-self: center; max-width: 70px; overflow: hidden; white-space: nowrap; font-size: calc(23px * 1); font-weight: 600; line-height: 1.1; color: #2a2d36; transform: rotate(var(--giro, -4deg)); }
 .planilla-aplauso { width: 42px; height: 42px; border-radius: 999px; display: grid; place-items: center; font-size: 18px; color: var(--papel-tinta); background: rgba(0,0,0,.07); transition: transform .2s ease; }
 .planilla-aplauso:not(.hecho) { background: color-mix(in oklab, var(--tono) 32%, var(--papel)); }
 .planilla-aplauso.hecho { color: var(--papel-suave); }
@@ -5804,7 +5732,145 @@ button.credencial-dato:not(:disabled):active { background: var(--velo); }
 .guia-cuaderno .cuaderno-serie small, .guia-cuaderno .cuaderno-unidad { font-size: 14px; }
 .guia-medallas { display: flex; justify-content: center; gap: 18px; }
 .guia-medallas .medalla { width: 60px; }
-`;
+/* ══ UNDÉCIMA TANDA: el casillero en Social, el estante y los cajones ═══════ */
+/* TU CASILLERO, arriba de Social: la puerta del perfil de un atleta, en chico,
+   con las calcomanías de todos los días. */
+.casillero-chico { padding: 10px 44px 14px 14px; }
+.casillero-chico .casillero-arriba { min-height: 36px; margin-bottom: 8px; }
+.casillero-chico .casillero-rejilla { max-width: 104px; }
+.casillero-chico .casillero-cuerpo { width: 100%; gap: 14px; padding: 6px 4px 4px 2px; text-align: left; border-radius: 10px; transition: background-color .2s ease; }
+.casillero-chico button.casillero-cuerpo:active { background: rgba(0,0,0,.16); }
+.light-mode .casillero-chico button.casillero-cuerpo:active { background: rgba(0,0,0,.06); }
+.casillero-chico .casillero-foto { width: 72px; height: 82px; padding: 5px 5px 15px; }
+.casillero-chico .casillero-inicial { font-size: 28px; }
+.casillero-chico .casillero-datos { display: grid; justify-items: start; gap: 8px; }
+.casillero-chico .casillero-nombre { display: block; font-size: 1.15rem; }
+.casillero-abrir { display: block; font-size: 12.5px; line-height: 1.3; color: var(--text-muted); text-wrap: pretty; }
+.casillero-abrir svg { display: inline-block; margin-left: 2px; vertical-align: -3px; color: var(--text-faint); }
+/* Las calcomanías van abajo de la manija: pueden usar ese costado. */
+.casillero-chico .casillero-calcos { margin-top: 12px; margin-right: -30px; }
+button.calco { font: inherit; font-size: 12.5px; font-weight: 700; line-height: 1.2; transition: scale .2s ease; }
+button.calco:active { scale: .95; }
+/* La racha, en una calcomanía de pizarra: los palitos de tiza, en el tono si
+   está viva. Es pizarra también en el modo claro. */
+.calco-tiza { gap: 7px; color: #ecebe4; background: #262a29; border-radius: 6px; }
+.calco-tiza b { font-size: 15px; line-height: 1; font-weight: 750; }
+.calco-tiza .marcas, .light-mode .calco-tiza .marcas { color: #ecebe4; }
+.calco-tiza .marcas.viva, .light-mode .calco-tiza .marcas.viva { color: color-mix(in oklab, var(--tono) 46%, #f4f3ee); }
+.calco-tiza .marcas.vacia i { background: rgba(236,235,228,.35); }
+
+/* EL ESTANTE DE LAS PESAS RUSAS (Rutinas): una pesa por día de entrenamiento,
+   el lugar vacío en los de descanso y la de hoy, levantada. Los nombres de los
+   días van en el canto del estante, como los del rack. */
+.estante { position: relative; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; margin: 0; padding: 0 5px; list-style: none; }
+.estante::before {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 26px; border-radius: 8px;
+  background: linear-gradient(#34363c, #26282d);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.1), inset 0 -1px 0 rgba(0,0,0,.4), 0 10px 18px -14px rgba(0,0,0,.9);
+}
+.light-mode .estante::before { background: linear-gradient(#e7e9ed, #d3d6dc); box-shadow: inset 0 1px 0 #fff, inset 0 -1px 0 rgba(0,0,0,.1), 0 10px 18px -14px rgba(0,0,0,.3); }
+.estante > * { position: relative; display: flex; min-width: 0; }
+.estante-lugar { position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; padding-top: 12px; }
+.estante-lugar .pesa-rusa { width: 100%; max-width: 40px; margin-bottom: -1px; }
+.estante-dia { position: relative; z-index: 1; display: block; width: 100%; height: 26px; line-height: 26px; text-align: center; font-size: 11.5px; font-weight: 650; color: var(--text-muted); }
+.estante-lugar.hoy .estante-dia { color: var(--text-strong); font-weight: 750; text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 4px; }
+.pesa-rusa { display: block; height: auto; overflow: visible; transition: scale .2s ease; }
+.pesa-rusa-asa { fill: none; stroke: color-mix(in oklab, var(--dia) 46%, #4f5258); stroke-width: 4.6; stroke-linecap: round; }
+.light-mode .pesa-rusa-asa { stroke: color-mix(in oklab, var(--dia) 58%, #7c7f86); }
+.pesa-rusa-cuerpo { fill: color-mix(in oklab, var(--dia) 60%, #8a8c92); }
+.light-mode .pesa-rusa-cuerpo { fill: color-mix(in oklab, var(--dia) 70%, #a7a9ae); }
+.pesa-rusa-brillo { fill: none; stroke: rgba(255,255,255,.3); stroke-width: 2; stroke-linecap: round; }
+.pesa-rusa.vacia .pesa-rusa-asa, .pesa-rusa.vacia .pesa-rusa-cuerpo { fill: none; stroke: var(--hairline-fuerte); stroke-width: 1.6; stroke-dasharray: 3 3.2; }
+/* La de hoy, levantada del estante, con su sombra abajo. */
+.estante-lugar.hoy.con-pesa .pesa-rusa { translate: 0 -9px; animation: pesaSeLevanta .6s var(--resorte) .35s backwards; }
+.estante-lugar.hoy.con-pesa::after { content: ""; position: absolute; left: 50%; bottom: 22px; width: 32px; height: 8px; translate: -50% 0; border-radius: 50%; background: radial-gradient(closest-side, rgba(0,0,0,.55), transparent); }
+.light-mode .estante-lugar.hoy.con-pesa::after { background: radial-gradient(closest-side, rgba(0,0,0,.22), transparent); }
+@keyframes pesaSeLevanta { from { translate: 0 0; } }
+button.estante-lugar:active .pesa-rusa { scale: .92; }
+/* En chico (el aviso de Rutina cuando hoy descansás): sin los nombres, y hoy
+   con su rayita en el estante. */
+.estante.chico { flex: none; width: 112px; gap: 1px; padding: 0 2px; }
+.estante.chico::before { height: 4px; border-radius: 2px; }
+.estante.chico .estante-lugar { padding: 2px 0 4px; }
+.estante.chico .pesa-rusa { max-width: 15px; }
+.estante.chico .pesa-rusa.vacia .pesa-rusa-cuerpo { fill: var(--disco-fantasma); stroke: none; }
+.estante.chico .pesa-rusa.vacia .pesa-rusa-asa { stroke: var(--disco-fantasma); stroke-width: 4.2; stroke-dasharray: none; }
+.estante.chico .estante-lugar.hoy::after { content: ""; position: absolute; left: 22%; right: 22%; bottom: 0; width: auto; height: 4px; translate: none; border-radius: 2px; background: var(--text-strong); }
+.estante.chico .estante-lugar.hoy.con-pesa .pesa-rusa { translate: 0 -3px; }
+
+/* LOS CAJONES DEL CICLO: la escalera, hecha con cajones de salto. El número,
+   pintado en el frente; arriba, la agarradera. */
+.escalon.cajon { position: relative; border-radius: 4px; }
+/* La veta del terciado, apenas, y el canto de la madera alrededor. */
+.escalon.cajon.pasada, .escalon.cajon.actual { background-image: repeating-linear-gradient(to bottom, rgba(255,255,255,.035) 0 1px, transparent 1px 6px); }
+.escalon.cajon.pasada { box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.05), inset 0 2px 0 rgba(255,255,255,.08); }
+.escalon.cajon.actual { box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.18), inset 0 2px 0 rgba(255,255,255,.35), 0 10px 22px -12px color-mix(in oklab, var(--tono) 60%, transparent); }
+.light-mode .escalon.cajon.pasada { box-shadow: inset 0 0 0 1.5px rgba(0,0,0,.05), inset 0 2px 0 rgba(255,255,255,.6); }
+.light-mode .escalon.cajon.actual { box-shadow: inset 0 0 0 1.5px rgba(0,0,0,.08), inset 0 2px 0 rgba(255,255,255,.3); }
+/* La agarradera: un agujero calado, con la sombra del borde de arriba. */
+.cajon-agarre { position: absolute; top: max(6px, 16%); left: 50%; width: 54%; max-width: 28px; height: 7px; translate: -50% 0; border-radius: 999px; background: rgba(0,0,0,.42); box-shadow: inset 0 2px 2px rgba(0,0,0,.35); }
+.light-mode .cajon-agarre { background: rgba(0,0,0,.18); box-shadow: inset 0 2px 2px rgba(0,0,0,.18); }
+.escalon.cajon.actual .cajon-agarre { background: color-mix(in oklab, var(--accion-tinta) 50%, transparent); }
+.escalon.cajon.futura .cajon-agarre { background: transparent; box-shadow: inset 0 0 0 1.5px var(--hairline-fuerte); }
+.cajon-numero { position: absolute; left: 0; right: 0; bottom: 4px; text-align: center; font-size: 12px; line-height: 1; font-weight: 750; font-stretch: 80%; color: var(--text-muted); }
+.escalon.cajon.actual .cajon-numero { color: var(--accion-tinta); }
+.escalon.cajon.futura .cajon-numero { color: var(--text-faint); }
+/* Las semanas del planificador también son cajones: la agarradera arriba. */
+.plan-escalon-bloque { position: relative; border-radius: 4px; }
+.plan-escalon-bloque::before { content: ""; position: absolute; top: max(5px, 15%); left: 50%; width: 52%; max-width: 26px; height: 7px; translate: -50% 0; border-radius: 999px; box-shadow: inset 0 0 0 1.5px var(--hairline-fuerte); }
+.plan-escalon.cargada .plan-escalon-bloque::before { box-shadow: inset 0 2px 2px rgba(0,0,0,.3); background: rgba(0,0,0,.36); }
+.light-mode .plan-escalon.cargada .plan-escalon-bloque::before { background: rgba(0,0,0,.15); }
+.plan-escalon[aria-selected="true"] .plan-escalon-bloque::before { box-shadow: none; background: color-mix(in oklab, var(--accion-tinta) 50%, transparent); }
+/* TU CICLO (Perfil): los cajones, desde cuándo y el cambio de fecha. */
+.ciclo-perfil .escalera { margin-top: 4px; }
+.ciclo-inicio { display: flex; align-items: center; gap: 12px; font-size: 13px; line-height: 1.4; color: var(--text-muted); }
+.ciclo-inicio b { font-weight: 650; color: var(--text-strong); }
+.ciclo-fecha { display: grid; gap: 10px; padding: 12px; border-radius: 18px; background: var(--panel-sunken); }
+.ciclo-fecha-rotulo { font-size: 13px; font-weight: 650; color: var(--text-strong); }
+.ciclo-fecha-campo { width: 100%; height: 46px; padding: 0 14px; border-radius: 14px; font-size: 15px; color: var(--text-strong); background: var(--surface-2); border: 1px solid var(--hairline); color-scheme: dark; }
+.light-mode .ciclo-fecha-campo { color-scheme: light; }
+/* Las piezas nuevas en la guía y la bienvenida. */
+.guia-cajones { width: 100%; max-width: 280px; }
+.guia-cajones .escalera { margin-top: 0; }
+@media (prefers-reduced-motion: reduce) { .estante-lugar.hoy.con-pesa .pesa-rusa, .escalon.cajon { animation: none !important; } }
+/* IMPORTAR UNA RUTINA: las hojas que subiste (las fotos y las páginas
+   escaneadas de un PDF) como papeles chicos, los archivos en renglones, y
+   mientras la IA lee, una raya de luz que las recorre, como un escáner. */
+.modal-rutina.import { max-width: 26rem; }
+.import-opciones { display: grid; gap: 8px; }
+.import-opciones .eleccion-fila { cursor: pointer; }
+.import-opciones .eleccion-fila:focus-within { box-shadow: 0 0 0 2px color-mix(in oklab, var(--tono) 60%, transparent); }
+.import-fuentes { display: grid; gap: 8px; }
+.import-hojas { display: flex; flex-wrap: wrap; gap: 14px; padding: 6px 4px 2px; }
+.import-hoja { position: relative; width: 62px; height: 78px; padding: 4px 4px 12px; background: #f0efe9; box-shadow: 0 4px 10px rgba(0,0,0,.35); }
+.import-hoja:nth-child(odd) { transform: rotate(-2.5deg); }
+.import-hoja:nth-child(even) { transform: rotate(2deg); }
+.import-hoja img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.import-quitar { position: absolute; top: -9px; right: -9px; width: 26px; height: 26px; border-radius: 999px; display: grid; place-items: center; color: var(--text-strong); background: var(--surface-3); box-shadow: 0 0 0 2px var(--surface-1); }
+.import-fuentes.leyendo .import-hoja { overflow: hidden; }
+.import-fuentes.leyendo .import-hoja::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 30%; background: linear-gradient(to bottom, transparent, color-mix(in oklab, var(--tono) 55%, transparent), transparent); animation: importEscanea 1.6s ease-in-out infinite; }
+@keyframes importEscanea { 0% { transform: translateY(-100%); } 100% { transform: translateY(340%); } }
+.import-archivo { display: flex; align-items: center; gap: 12px; padding: 10px 10px 10px 14px; border-radius: 18px; background: var(--surface-2); }
+.import-archivo b { display: block; font-size: 14px; font-weight: 650; color: var(--text-strong); overflow-wrap: anywhere; }
+.import-archivo small { display: block; margin-top: 1px; font-size: 12.5px; color: var(--text-muted); }
+.import-archivo .boton-redondo.chico { width: 32px; height: 32px; }
+.import-estado { display: flex; align-items: center; gap: 12px; min-height: 48px; font-size: 14px; color: var(--text-muted); }
+.import-estado .plan-ia-girando { flex: none; width: 22px; height: 22px; border-width: 2.5px; }
+.import-rotulo { display: grid; gap: 6px; font-size: 13px; font-weight: 600; color: var(--text-muted); }
+.import-campo { width: 100%; min-height: 46px; padding: 10px 14px; border-radius: 14px; font-size: 15px; font-weight: 500; color: var(--text-strong); background: var(--panel-sunken); border: 1px solid var(--hairline); }
+.import-campo:focus { outline: none; border-color: color-mix(in oklab, var(--tono) 55%, transparent); }
+textarea.import-texto { min-height: 150px; font-size: 14px; line-height: 1.45; resize: vertical; }
+.import-dos { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.import-contador { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 46px; }
+.import-contador b { font-size: 1.6rem; font-weight: 750; color: var(--text-strong); }
+.import-pasos { display: flex; gap: 4px; }
+.import-pasos i { flex: 1; height: 4px; border-radius: 2px; background: var(--hairline-fuerte); }
+.import-pasos i.hecho { background: color-mix(in oklab, var(--tono) 72%, white); }
+.light-mode .import-pasos i.hecho { background: var(--tono); }
+.import-enlace { display: inline; padding: 0; font: inherit; font-weight: 650; color: var(--text-strong); text-decoration: underline; text-underline-offset: 3px; }
+.import-pie { font-size: 12.5px; line-height: 1.4; text-align: center; color: var(--text-faint); text-wrap: pretty; }
+@media (prefers-reduced-motion: reduce) { .import-fuentes.leyendo .import-hoja::after { animation: none; top: 35%; } }
+`);
 
 function StyleInjector() {
   return <style dangerouslySetInnerHTML={{ __html: ANIMATION_CSS }} />;
@@ -8877,7 +8943,7 @@ function RelojDescansoGrande({ timerId, onClose }) {
 // que lo único que falta contar es cómo se registra y el diferencial fuerte.
 // LA BIENVENIDA: cuatro pasos, cada uno con una pieza de verdad de la app
 // (el visor de la serie y la barra cargada, la gráfica de un ejercicio, el
-// chat y la escalera del ciclo), como en la guía del "?". Antes era un
+// chat y los cajones del ciclo), como en la guía del "?". Antes era un
 // ícono suelto por paso. El último decide si hay semanas de descarga.
 const WELCOME_SLIDES = [
   { key: "serie", color: "#14B8A6", title: "Te damos la bienvenida a Modus Fit", text: "Anotá reps y kilos en segundos: vienen con lo de la vez pasada. Cada serie carga un disco en la barra del día." },
@@ -8933,9 +8999,7 @@ function dibujoBienvenida(key, color) {
     );
   }
   return (
-    <div className="guia-escalera" style={{ "--c": color }}>
-      {[30, 44, 58, 72, 86, 26].map((h, i) => <i key={i} className={i === 3 ? "hoy" : i > 3 && i < 5 ? "despues" : i === 5 ? "descarga" : ""} style={{ height: `${h}%` }} />)}
-    </div>
+    <div className="guia-cajones" style={{ "--tono": color }}><CajonesCiclo semanas={CICLO_DE_MUESTRA} trainWeeks={5} alto={112} /></div>
   );
 }
 
@@ -10017,6 +10081,14 @@ function hojaDeMuestra() {
   };
 }
 
+// Muestras para la guía y la bienvenida: un ciclo de cinco semanas y una de
+// descarga, en la cuarta; y una semana de Push/Pull/Legs, hoy jueves.
+const CICLO_DE_MUESTRA = [1, 2, 3, 4, 5, 6].map((n) => ({ n, descarga: n === 6, estado: n < 4 ? "pasada" : n === 4 ? "actual" : "futura" }));
+function semanaDeMuestra(verde, azul, naranja) {
+  return [["Push", verde], ["Pull", azul], ["Legs", naranja], ["Push", verde], ["Pull", azul], null, null]
+    .map((x, i) => ({ clave: WEEKDAY_KEYS[i], corto: WEEKDAY_SHORT_LABELS[i], nombre: DIAS_DE_LA_SEMANA[i], dia: x ? { label: x[0], color: x[1] } : null, hoy: i === 3 }));
+}
+
 function capitulosGuia() {
   const verde = "#14B8A6", azul = "#3B82F6", naranja = "#F97316";
   const pushSolo = { ...RUTINA_GUIA, dayOrder: ["push"] };
@@ -10093,13 +10165,9 @@ function capitulosGuia() {
       key: "progreso", label: "Progreso", color: azul, icon: <BarChart3 size={15} />,
       pasos: [
         {
-          titulo: "Tu ciclo, en una escalera",
-          texto: "Cada semana sube un escalón: la carga va subiendo de a poco. La última baja, que es la semana de descarga para recuperarte.",
-          dibujo: (
-            <div className="guia-escalera" style={{ "--c": azul }}>
-              {[30, 44, 58, 72, 86, 26].map((h, i) => <i key={i} className={i === 3 ? "hoy" : i > 3 && i < 5 ? "despues" : i === 5 ? "descarga" : ""} style={{ height: `${h}%` }} />)}
-            </div>
-          ),
+          titulo: "Tu ciclo, en cajones",
+          texto: "Cada semana es un cajón de salto, uno más alto que el otro: la carga va subiendo de a poco. El último, bajo y rayado, es la semana de descarga para recuperarte.",
+          dibujo: <div className="guia-cajones" style={{ "--tono": azul }}><CajonesCiclo semanas={CICLO_DE_MUESTRA} trainWeeks={5} alto={112} /></div>,
         },
         {
           titulo: "Tu rango, músculo por músculo",
@@ -10144,13 +10212,18 @@ function capitulosGuia() {
           dibujo: <div className="guia-ancho"><DiasRutina routineDef={RUTINA_GUIA} /></div>,
         },
         {
+          titulo: "Tu semana, en el estante",
+          texto: "Cada día que entrenás es una pesa rusa del color de lo que toca, y los de descanso, el lugar vacío. La de hoy está levantada: tocá una y vas directo a entrenar ese día.",
+          dibujo: <div className="guia-ancho"><EstantePesas dias={semanaDeMuestra(verde, azul, naranja)} /></div>,
+        },
+        {
           titulo: "El balance, en una barra",
           texto: "Las series de empuje de un lado y las de tracción del otro: si un lado pesa más, la barra se inclina. Abajo, las series de cada músculo.",
           dibujo: <div className="guia-ancho"><BarraEnEquilibrio izq={{ valor: 15, discos: 4, color: ROJO_EMPUJE }} der={{ valor: 14, discos: 4, color: AZUL_TRACCION }} etiqueta="Empuje 15, tracción 14" /></div>,
         },
         {
           titulo: "Armá la tuya",
-          texto: "Elegí una preestablecida, creala con la IA o a mano, o importala de un PDF, un Excel o un texto. A mano vas día por día: buscás el ejercicio como te salga escribirlo, ajustás series por repeticiones con − y +, y lo que sacás se puede deshacer.",
+          texto: "Elegí una preestablecida, creala con la IA o a mano, o importala: una foto de la hoja del profe, un PDF, un Excel, un Word o un texto, y antes de crearla ves cómo quedó y la podés corregir. A mano vas día por día: buscás el ejercicio como te salga escribirlo, ajustás series por repeticiones con − y +, y lo que sacás se puede deshacer.",
           dibujo: (
             <div className="guia-acciones">
               <span style={{ "--c": azul }}><em className="galleta icono-galleta"><Sparkles size={17} /></em>Crear</span>
@@ -10170,9 +10243,9 @@ function capitulosGuia() {
       key: "social", label: "Social", color: "#8B5CF6", icon: <Users size={15} />,
       pasos: [
         {
-          titulo: "Tu racha, en marcas de tiza",
-          texto: "Un palito por cada día seguido que entrenás, de a cinco, como en la pizarra del gimnasio. Está en tu credencial, arriba de todo.",
-          dibujo: <span className="guia-racha"><b className="num-display">7</b><MarcasTiza dias={7} max={10} alto={40} decorativa /></span>,
+          titulo: "Tu casillero",
+          texto: "Arriba de todo está la puerta de tu casillero, con las calcomanías de tu rango, tu racha (un palito de tiza por cada día seguido que entrenás, de a cinco, como en la pizarra) y tus aplausos. Tocala y se abre como la ven tus amigos.",
+          dibujo: <div className="guia-ancho" style={{ "--tono": "#8B5CF6" }}><CasilleroChico semilla="guia" nombre="Vos" rango={{ tier: "Esmeralda", sub: "II", color: "#2FB866" }} racha={7} aplausos={3} /></div>,
         },
         {
           titulo: "La carrera de la semana",
@@ -10206,7 +10279,7 @@ function capitulosGuia() {
         },
         {
           titulo: "Mano a mano",
-          texto: "Tocá a un amigo en el Ranking: cada músculo que le ganás es un disco de tu lado y baja el que pesa más. Abajo, lo que te falta para pasarlo.",
+          texto: "Tocá a un amigo en el Ranking: cada músculo que le ganás, contando sólo sus ejercicios directos, es un disco de tu lado y baja el que pesa más. Abajo, músculo por músculo y lo que te falta para pasarlo.",
           dibujo: <div className="guia-ancho"><BarraEnEquilibrio izq={{ valor: 6, discos: 6, color: "#2FB866" }} der={{ valor: 4, discos: 4, color: "#E0B632" }} etiqueta="Seis músculos contra cuatro" /></div>,
         },
         {
@@ -10248,10 +10321,10 @@ function capitulosGuia() {
       pasos: [
         {
           titulo: "Tus datos y tus ajustes",
-          texto: "Tu ciclo y la descarga, los descansos y el modo gimnasio (la serie más grande mientras entrenás), los recordatorios, el tema y la unidad de peso.",
+          texto: "Tu ciclo (con los mismos cajones de Progreso) y la descarga, los descansos y el modo gimnasio (la serie más grande mientras entrenás), los recordatorios, el tema, el tamaño de la letra y la unidad de peso.",
           dibujo: (
             <div className="guia-fichas">
-              {["Ciclo y descarga", "Descansos", "Modo gimnasio", "Recordatorios", "Tema", "Kilos o libras"].map((t) => <span key={t}>{t}</span>)}
+              {["Tu ciclo", "Descansos", "Modo gimnasio", "Recordatorios", "Tema", "Letra grande", "Kilos o libras"].map((t) => <span key={t}>{t}</span>)}
             </div>
           ),
         },
@@ -10943,7 +11016,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
         <span className="text-slate-500 text-[13px]">{weightLabel(unit)}</span>
       </div>
       <div className="flex flex-wrap gap-2 items-center">
-        <button onClick={savePR} className="boton-pildora" style={{ minHeight: 38, padding: "0 16px", fontSize: 13 }}>Guardar</button>
+        <button onClick={savePR} className="boton-pildora" style={{ minHeight: 38, padding: "0 16px", fontSize: "calc(13px * var(--escala-letra, 1))" }}>Guardar</button>
         {override && <button onClick={() => { const l = { ...logs }; delete l[prKey]; setLogs(l); setEditingPR(false); }} className="px-4 h-[38px] rounded-full bg-slate-700 text-slate-200 text-[13px] font-semibold">Quitar</button>}
         <button onClick={() => setEditingPR(false)} className="text-slate-500 text-[13px] font-semibold px-3 h-[38px]">Cancelar</button>
       </div>
@@ -11594,6 +11667,47 @@ function DiasRutina({ routineDef, onGoToDay = null, elegido = null }) {
   );
 }
 
+// LA SEMANA EN EL ESTANTE DE LAS PESAS RUSAS (Rutinas): una pesa rusa por
+// día de entrenamiento, del color de lo que toca (las de competición tienen
+// un color por peso), y el lugar vacío en los días de descanso. La de hoy
+// está levantada del estante: es la que te toca. Tocás una y vas a entrenar
+// ese día. Antes eran siete cajas de color con la letra del día arriba. En
+// chico, sin los nombres de los días, va en el aviso de Rutina cuando hoy
+// descansás.
+const DIAS_DE_LA_SEMANA = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"];
+function PesaRusa({ vacia = false }) {
+  return (
+    <svg viewBox="0 3.2 40 36.8" className={`pesa-rusa ${vacia ? "vacia" : ""}`} aria-hidden="true">
+      {/* El asa sale de los hombros de la bocha y es ancha, con la ventana
+          baja: así se lee pesa rusa y no candado. */}
+      <path className="pesa-rusa-asa" d="M9.8 22.4 C8.4 13.6 11.4 6.1 20 6.1 C28.6 6.1 31.6 13.6 30.2 22.4" />
+      <path className="pesa-rusa-cuerpo" d="M13.1 39.5 A13 13 0 1 1 26.9 39.5 Z" />
+      {!vacia && <path className="pesa-rusa-brillo" d="M10.9 27.2 A9.6 9.6 0 0 1 15.6 19.4" />}
+    </svg>
+  );
+}
+// `dias`: siete { clave, corto ("Lun"), nombre ("lunes"), dia: { label, color } | null, hoy }.
+// En chico va adentro de un botón: es un dibujo, todo con <span>.
+function EstantePesas({ dias = [], onElegir = null, chico = false, etiqueta = "Tu semana" }) {
+  const Lista = chico ? "span" : "ol";
+  const Lugar = chico ? "span" : "li";
+  return (
+    <Lista className={`estante ${chico ? "chico" : ""}`} aria-label={chico ? undefined : etiqueta} aria-hidden={chico || undefined}>
+      {dias.map((d, i) => {
+        const texto = `${d.nombre || d.corto}: ${d.dia ? d.dia.label : "descanso"}${d.hoy ? " (hoy)" : ""}`;
+        const clase = `estante-lugar ${d.dia ? "con-pesa" : ""} ${d.hoy ? "hoy" : ""}`;
+        const contenido = <><PesaRusa vacia={!d.dia} />{!chico && <span className="estante-dia" aria-hidden="true">{d.corto}</span>}</>;
+        return (
+          <Lugar key={d.clave || i} style={d.dia ? { "--dia": d.dia.color } : undefined}>
+            {onElegir && d.dia
+              ? <button onClick={() => onElegir(d)} className={clase} aria-label={`${texto}. Tocá para entrenarlo`}>{contenido}</button>
+              : <span className={clase} role={chico ? undefined : "img"} aria-label={chico ? undefined : texto}>{contenido}</span>}
+          </Lugar>
+        );
+      })}
+    </Lista>
+  );
+}
 
 // La semana como una fila de agujeros perforados: el día que entrenaste
 // está "picado" con el color de lo que hiciste. `dias`: siete colores (o
@@ -12134,10 +12248,65 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
 }
 
 /* ============================================================================
+   LOS CAJONES DEL CICLO: cada semana del ciclo es un cajón de salto, uno más
+   alto que el otro (la carga sube de a poco), con su número pintado y la
+   agarradera; la descarga es un cajón bajo de goma espuma, rayado. Los de las
+   semanas pasadas, apagados; el de esta semana, encendido en el tono; los que
+   vienen, sólo el contorno. Es la misma escalera de antes, ahora hecha con un
+   objeto del gimnasio, y es la misma pieza en Progreso, en Perfil (Tu ciclo),
+   en la bienvenida y en la guía. `semanas`: [{ n, descarga, estado }], con
+   estado "pasada" | "actual" | "futura".
+============================================================================ */
+function CajonesCiclo({ semanas = [], trainWeeks = TRAIN_WEEKS, alto = 76, animar = false }) {
+  const altura = (wi, descarga) => (descarga ? 34 : 40 + (wi / Math.max(1, trainWeeks - 1)) * 60);
+  return (
+    <div className="escalera cajones" style={{ height: alto }} aria-hidden="true">
+      {semanas.map(({ n, descarga, estado }, wi) => (
+        <div key={n} className={`escalon cajon ${estado} ${descarga ? "descarga" : ""}`}
+          style={{ height: `${altura(wi, descarga)}%`, ...(animar ? { animation: `escalonSube .55s cubic-bezier(.34,1.4,.64,1) ${wi * 50}ms backwards` } : null) }}>
+          {!descarga && <i className="cajon-agarre" />}
+          <b className="cajon-numero">{descarga ? "D" : n}</b>
+        </div>
+      ))}
+    </div>
+  );
+}
+// Las semanas de un ciclo, sin las sesiones (Perfil).
+function semanasDelCiclo(weekInfo) {
+  if (!weekInfo) return [];
+  return Array.from({ length: weekInfo.cycleWeeks }, (_, i) => ({
+    n: i + 1,
+    descarga: i + 1 > weekInfo.trainWeeks,
+    estado: i + 1 < weekInfo.weekInCycle ? "pasada" : i + 1 === weekInfo.weekInCycle ? "actual" : "futura",
+  }));
+}
+// Lo que más se pregunta del ciclo: cuánto falta para la descarga. Sin
+// descarga (se puede apagar en Perfil), cuánto falta para que empiece otro:
+// antes decía "la descarga llega en…" aunque estuviera apagada.
+function textoDelCiclo(weekInfo, settings = DEFAULT_SETTINGS) {
+  if (!weekInfo) return "";
+  const faltan = weekInfo.trainWeeks - weekInfo.weekInCycle + 1;
+  if (settings.deloadEnabled === false) return faltan <= 1 ? "la semana que viene empieza otro" : `otro empieza en ${faltan} semanas`;
+  if (weekInfo.isDeload) return "semana de descarga, bajá la carga";
+  return faltan <= 1 ? "la semana que viene, descarga" : `la descarga llega en ${faltan} semanas`;
+}
+// El ícono del ciclo, en Perfil: tres cajones que suben, con su agarradera.
+function IconoCajones({ size = 16 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="1.6" y="14.5" width="5.2" height="7" rx="1.2" />
+      <rect x="9.4" y="9.5" width="5.2" height="12" rx="1.2" />
+      <rect x="17.2" y="3.5" width="5.2" height="18" rx="1.2" />
+      <path d="M3.4 17h1.6M11.2 12h1.6M19 6h1.6" />
+    </svg>
+  );
+}
+
+/* ============================================================================
    EL CICLO (Progreso): en qué semana estás, cuántas sesiones llevás en cada
-   una y cuánto falta para la descarga. Una escalera en el tono de la
-   pestaña: cada semana sube un poco (la sobrecarga progresiva) y la
-   descarga baja. Debajo de cada escalón, sus sesiones en marcas de tiza,
+   una y cuánto falta para la descarga. Los cajones del ciclo, en el tono
+   de la pestaña: cada semana un cajón más alto (la sobrecarga progresiva) y
+   la descarga, bajo. Debajo de cada cajón, sus sesiones en marcas de tiza,
    como la racha. Antes cada sesión era un disco del color del día: con ocho
    semanas eran tres colores repetidos por toda la tarjeta.
 ============================================================================ */
@@ -12159,10 +12328,7 @@ function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS,
     const n = wi + 1;
     return { n, sesiones: dias.filter((d) => trainedDays.has(d)).length, descarga: n > trainWeeks, estado: n < weekInfo.weekInCycle ? "pasada" : n === weekInfo.weekInCycle ? "actual" : "futura" };
   });
-  const altura = (wi, descarga) => (descarga ? 34 : 40 + (wi / Math.max(1, trainWeeks - 1)) * 60);
-  // Lo que más se pregunta del ciclo: cuánto falta para la descarga.
-  const semanasParaDescarga = trainWeeks - weekInfo.weekInCycle + 1;
-  const falta = weekInfo.isDeload ? "semana de descarga, bajá la carga" : semanasParaDescarga <= 1 ? "la semana que viene, descarga" : `la descarga llega en ${semanasParaDescarga} semanas`;
+  const falta = textoDelCiclo(weekInfo, settings);
   const estaSemana = semanas[weekInfo.weekInCycle - 1]?.sesiones || 0;
   return (
     <section className="tarjeta-tonal escalera-ciclo" aria-label={`Ciclo ${weekInfo.cycleNumber}, semana ${weekInfo.weekInCycle} de ${cycleWeeks}: ${falta}. ${estaSemana} ${estaSemana === 1 ? "sesión" : "sesiones"} esta semana.`}>
@@ -12173,16 +12339,10 @@ function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS,
         </div>
         <p className={`escalera-cuenta ${metaSemanal && estaSemana >= metaSemanal ? "cumplida" : ""}`} aria-hidden="true"><b className="num-display">{estaSemana}</b><span>{metaSemanal ? `de ${metaSemanal} ${metaSemanal === 1 ? "sesión" : "sesiones"}` : estaSemana === 1 ? "sesión" : "sesiones"} esta semana</span></p>
       </div>
-      <div className="escalera" aria-hidden="true">
-        {semanas.map(({ n, descarga, estado }, wi) => (
-          <div key={n} className={`escalon ${estado} ${descarga ? "descarga" : ""}`}
-            style={{ height: `${altura(wi, descarga)}%`, ...(yaAnimado ? null : { animation: `escalonSube .55s cubic-bezier(.34,1.4,.64,1) ${wi * 50}ms backwards` }) }} />
-        ))}
-      </div>
+      <CajonesCiclo semanas={semanas} trainWeeks={trainWeeks} animar={!yaAnimado} />
       <div className="escalera-pie" aria-hidden="true">
         {semanas.map(({ n, sesiones, descarga, estado }) => (
           <span key={n} className={`${estado} ${metaSemanal && !descarga && estado !== "futura" && sesiones >= metaSemanal ? "cumplida" : ""}`}>
-            <em>{descarga ? "D" : n}</em>
             {estado !== "futura" && <MarcasTiza dias={sesiones} max={7} alto={11} decorativa />}
           </span>
         ))}
@@ -12889,12 +13049,13 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             <span className="block text-[14px] font-bold text-white leading-tight">Hoy descansás</span>
             <span className="block text-[12px] text-slate-400 mt-0.5">Si querés, entrená igual.</span>
           </span>
-          {/* Tu semana como discos chiquitos: los días que entrenás, con su
-              color; hoy, marcado. */}
+          {/* Tu semana en el estante de las pesas rusas, en chico: las de los
+              días que entrenás, del color de lo que toca; hoy, con su rayita. */}
           {weekSchedule && (
-            <span className="semana-plan" aria-hidden="true">
-              {WEEKDAY_KEYS.map((wk) => <i key={wk} className={wk === todayWeekdayKey() ? "hoy" : ""} style={weekSchedule[wk] && ROUTINE[weekSchedule[wk]] ? { "--dia": ROUTINE[weekSchedule[wk]].color } : undefined} />)}
-            </span>
+            <EstantePesas chico dias={WEEKDAY_KEYS.map((wk, i) => {
+              const d = weekSchedule[wk] ? ROUTINE[weekSchedule[wk]] : null;
+              return { clave: wk, corto: WEEKDAY_SHORT_LABELS[i], dia: d ? { label: d.label, color: d.color } : null, hoy: wk === todayWeekdayKey() };
+            })} />
           )}
           <ChevronRight size={16} className="text-slate-500 shrink-0" />
         </button>
@@ -14530,6 +14691,21 @@ function getBest1RMForMuscleGroup(groupKey, logs, lfOverrides = null) {
   };
 }
 
+// Lo mismo, pero sólo con los ejercicios DIRECTOS del músculo (los que lo
+// tienen de principal): así compara el mano a mano (pedido: "en la
+// comparativa contra alguien, que tome sólo los ejercicios directos"). Sin
+// el press de banca para tríceps ni un remo para el trapecio: si alguno no
+// hizo nada directo de un músculo, ahí queda sin marca.
+function getBest1RMDirecto(groupKey, logs) {
+  const { primary } = EXERCISE_LIBRARY_CONTRIBUTORS_BY_GROUP[groupKey] || { primary: new Map() };
+  const { logs: cleanLogs } = cleanObsoleteOverrides(logs || {});
+  const r = scanContributorsFor1RM(primary, cleanLogs, null, null);
+  return {
+    best1RM: r.best1RM, bestKg: r.bestKg, bestReps: r.bestReps, bestLoadFactor: r.bestLoadFactor, bestWeight: r.bestWeight,
+    bestExerciseName: r.bestExerciseId ? (EXERCISE_LIBRARY_BY_ID[r.bestExerciseId]?.name || r.bestExerciseId) : null,
+  };
+}
+
 // Mejor marca de CADA EJERCICIO que aporta a un grupo muscular — a
 // diferencia de getBest1RMForMuscleGroup (que sólo devuelve el mejor
 // ejercicio, el que "representa" el rango del grupo), esto arma el
@@ -14537,9 +14713,11 @@ function getBest1RMForMuscleGroup(groupKey, logs, lfOverrides = null) {
 // un amigo), desplegar las mejores marcas de cada ejercicio de ese
 // músculo, no sólo el ejercicio ganador. Funciona igual para tu perfil o
 // el de un amigo — sólo recibe `logs`, sin depender de estado propio.
-function getExerciseBestsForMuscleGroup(groupKey, logs) {
+// Con `soloDirectos`, sólo los ejercicios que tienen al músculo de principal
+// (el detalle del mano a mano).
+function getExerciseBestsForMuscleGroup(groupKey, logs, soloDirectos = false) {
   const { primary, always, secondary } = EXERCISE_LIBRARY_CONTRIBUTORS_BY_GROUP[groupKey] || { primary: new Map(), always: new Map(), secondary: new Map() };
-  const allContributors = new Map([...primary, ...always, ...secondary]);
+  const allContributors = soloDirectos ? new Map(primary) : new Map([...primary, ...always, ...secondary]);
   const { logs: cleanLogs } = cleanObsoleteOverrides(logs || {});
   const bestByExercise = new Map(); // exerciseId -> {kg, reps, rawRm}
   Object.entries(cleanLogs).forEach(([key, val]) => {
@@ -15314,9 +15492,11 @@ function CaraMano({ foto, inicial, nombre, rango }) {
 // EL MANO A MANO: vos contra un amigo. Arriba, la barra en equilibrio: cada
 // músculo que le ganás es un disco de tu lado y cada uno que te gana, del
 // suyo; baja el que pesa más. Después, la semana de los dos (la carrera de
-// Social, con dos carriles), la serie que te falta para pasarlo donde te
-// gana, el detalle músculo por músculo (tocás uno y ves los ejercicios) y
-// los dos muñecos. Todo con la misma vara para los dos: kilos absolutos.
+// Social, con dos carriles), el cara a cara, el detalle músculo por músculo
+// (tocás uno y ves los ejercicios), la serie que te falta para pasarlo donde
+// te gana (pedido: abajo del músculo por músculo) y los dos muñecos. Todo con
+// la misma vara para los dos (kilos absolutos) y sólo con los ejercicios
+// directos de cada músculo.
 // Reemplaza a la "Batalla de marcas", que contaba lo mismo con un marcador
 // ámbar, coronas, manchas borrosas y letras chiquitas en mayúsculas.
 function ManoAMano({ miFoto, miNombre, misRangos, mySex = null, suFoto, suNombre, susRangos, theirSex = null, comparacion = [], miSemana = [], suSemana = [], myLogs = null, theirLogs = null, miRacha = 0, suRacha = 0, retos = null }) {
@@ -15331,6 +15511,14 @@ function ManoAMano({ miFoto, miNombre, misRangos, mySex = null, suFoto, suNombre
   const miRango = useMemo(() => computeTopRankFromRanks(misRangos), [misRangos]);
   const suRango = useMemo(() => computeTopRankFromRanks(susRangos), [susRangos]);
   const paraGanarle = useMemo(() => loQueFaltaParaGanar(comparacion), [comparacion]);
+  // Los dos muñecos pintan lo mismo que la lista: sólo los ejercicios
+  // directos de cada músculo (el rango de arriba de cada cara es el de
+  // siempre).
+  const cuerpos = useMemo(() => {
+    const mios = {}, suyos = {};
+    comparacion.forEach((r) => { if (r.mine) mios[r.key] = r.mine; if (r.theirs) suyos[r.key] = r.theirs; });
+    return { mios, suyos };
+  }, [comparacion]);
   const veredicto = !comparacion.length ? "Sin marcas" : gano > pierdo ? "Vas ganando" : pierdo > gano ? `Gana ${nombre}` : "Parejo";
   // La lectura del duelo: el músculo donde más le sacás ventaja y donde más
   // te saca.
@@ -15444,36 +15632,11 @@ function ManoAMano({ miFoto, miNombre, misRangos, mySex = null, suFoto, suNombre
         </section>
       )}
 
-      {paraGanarle.length > 0 && (
-        <section className="space-y-2" aria-label={`Para pasar a ${nombre}`}>
-          <div className="px-1">
-            <h3 className="seccion-titulo">Para pasar a {nombre}</h3>
-            <p className="text-[12.5px] text-slate-400 mt-0.5">La serie que te falta en cada músculo donde te gana.</p>
-          </div>
-          <ul className="ganarle">
-            {paraGanarle.slice(0, 4).map((g) => (
-              <li key={g.key} className="ganarle-fila">
-                <span className="ganarle-musculo">{g.label}</span>
-                {g.sinMarca ? (
-                  <span className="ganarle-meta">Anotá una marca de este músculo para competir.</span>
-                ) : (
-                  <>
-                    <span className="ganarle-meta"><b className="num-display">{g.reps} × {kgToDisplay(g.kg, unit)}</b> {weightLabel(unit)} en {g.ejercicio}{g.empata ? " (lo empatás)" : ""}</span>
-                    <span className="ganarle-suma num-display" aria-label={`${kgToDisplay(g.suma, unit)} ${weightLabel(unit)} más que tu mejor serie`}>+{kgToDisplay(g.suma, unit)}</span>
-                  </>
-                )}
-              </li>
-            ))}
-          </ul>
-          {paraGanarle.length > 4 && <p className="text-[12.5px] text-slate-500 px-1">Y {paraGanarle.length - 4} {paraGanarle.length - 4 === 1 ? "músculo más" : "músculos más"} en el detalle de abajo.</p>}
-        </section>
-      )}
-
       {comparacion.length > 0 && (
         <section className="space-y-2" aria-label="Músculo por músculo">
           <div className="px-1">
             <h3 className="seccion-titulo">Músculo por músculo</h3>
-            <p className="text-[12.5px] text-slate-400 mt-0.5">En kilos, con la misma vara para los dos. Tocá uno para ver los ejercicios.</p>
+            <p className="text-[12.5px] text-slate-400 mt-0.5">Con los ejercicios directos de cada músculo, en kilos y con la misma vara para los dos. Tocá uno para ver los ejercicios.</p>
           </div>
           <div className="mano-lista">
             {comparacion.map((r, i) => {
@@ -15501,6 +15664,31 @@ function ManoAMano({ miFoto, miNombre, misRangos, mySex = null, suFoto, suNombre
         </section>
       )}
 
+      {paraGanarle.length > 0 && (
+        <section className="space-y-2" aria-label={`Para pasar a ${nombre}`}>
+          <div className="px-1">
+            <h3 className="seccion-titulo">Para pasar a {nombre}</h3>
+            <p className="text-[12.5px] text-slate-400 mt-0.5">La serie que te falta en cada músculo donde te gana.</p>
+          </div>
+          <ul className="ganarle">
+            {paraGanarle.slice(0, 4).map((g) => (
+              <li key={g.key} className="ganarle-fila">
+                <span className="ganarle-musculo">{g.label}</span>
+                {g.sinMarca ? (
+                  <span className="ganarle-meta">Anotá una marca de este músculo para competir.</span>
+                ) : (
+                  <>
+                    <span className="ganarle-meta"><b className="num-display">{g.reps} × {conComa(kgToDisplay(g.kg, unit))}</b> {weightLabel(unit)} en {g.ejercicio}{g.empata ? " (lo empatás)" : ""}</span>
+                    <span className="ganarle-suma num-display" aria-label={`${conComa(kgToDisplay(g.suma, unit))} ${weightLabel(unit)} más que tu mejor serie`}>+{conComa(kgToDisplay(g.suma, unit))}</span>
+                  </>
+                )}
+              </li>
+            ))}
+          </ul>
+          {paraGanarle.length > 4 && <p className="text-[12.5px] text-slate-500 px-1">Y {paraGanarle.length - 4} {paraGanarle.length - 4 === 1 ? "músculo más" : "músculos más"} en el detalle de arriba.</p>}
+        </section>
+      )}
+
       <section className="tarjeta-tonal p-4 space-y-3" aria-label="Los dos muñecos">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="seccion-titulo">Los dos, de cuerpo entero</h3>
@@ -15510,8 +15698,8 @@ function ManoAMano({ miFoto, miNombre, misRangos, mySex = null, suFoto, suNombre
           </div>
         </div>
         <div className="flex gap-2">
-          <MiniBodyView ranks={misRangos} sex={mySex} label="Vos" view={vista} />
-          <MiniBodyView ranks={susRangos} sex={theirSex} label={nombre} view={vista} />
+          <MiniBodyView ranks={cuerpos.mios} sex={mySex} label="Vos" view={vista} />
+          <MiniBodyView ranks={cuerpos.suyos} sex={theirSex} label={nombre} view={vista} />
         </div>
       </section>
 
@@ -17796,6 +17984,7 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
   const [editAge, setEditAge] = useState(profile?.age ? String(profile.age) : "");
   const [editHeight, setEditHeight] = useState(profile?.heightCm ? String(profile.heightCm) : "");
   const [showCycleSetup, setShowCycleSetup] = useState(false);
+  const cicloFechaRef = useRef(null);
   const [showSelfProgression, setShowSelfProgression] = useState(false);
   // El planificador con IA también se abre desde acá (vive adentro del
   // planificador manual, ver onOpenIA): si sólo estuviera cableado en
@@ -18095,34 +18284,52 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
       {googleLinkError && <p className="text-rose-400 text-xs text-center">{googleLinkError}</p>}
 
       <div className="flex items-center gap-1.5 px-1 pt-1"><Dumbbell size={11} className="text-slate-600" /><p className="text-[10px] font-black uppercase tracking-widest text-slate-600">Entrenamiento</p></div>
-      <button onClick={onGoToRoutines} className="w-full flex items-center gap-3 bg-slate-900/50 border border-slate-800/50 rounded-2xl px-4 py-3.5 hover:border-teal-500/30 transition text-left">
-        <div className="icono-suelto"><Layers size={16} /></div>
-        <div className="flex-1 min-w-0"><p className="text-sm font-bold text-white">Tu rutina: {activeRoutineDef?.name || "—"}</p><p className="text-[11px] text-slate-500">{savedRoutineCount} guardada{savedRoutineCount === 1 ? "" : "s"} · tocá para cambiar, editar o crear otra</p></div>
+      {/* Tu rutina, con la misma forma que las secciones de abajo (antes era
+          una fila con otro borde y otro fondo). */}
+      <button onClick={onGoToRoutines} className="seccion-plegable w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors active:bg-slate-800/50">
+        <span className="placa-icono w-9 h-9 rounded-xl flex items-center justify-center shrink-0"><Layers size={16} /></span>
+        <div className="flex-1 min-w-0"><p className="text-sm font-bold text-white">Tu rutina: {activeRoutineDef?.name || "—"}</p><p className="text-[11.5px] text-slate-500 mt-0.5 leading-snug">{savedRoutineCount} guardada{savedRoutineCount === 1 ? "" : "s"}: tocá para cambiarla, editarla o crear otra</p></div>
         <ChevronRight size={16} className="text-slate-600 shrink-0" />
       </button>
-      {weekInfo && (
-        <div className="w-full flex items-center gap-3 bg-slate-900/50 border border-slate-800/50 rounded-2xl px-4 py-3.5">
-          <div className="icono-suelto">{weekInfo.isDeload ? <Zap size={16} /> : <Flame size={16} />}</div>
-          <div className="flex-1 min-w-0"><p className="text-sm font-bold text-white">Ciclo #{weekInfo.cycleNumber} · Semana {weekInfo.weekInCycle}/{weekInfo.cycleWeeks}</p><p className="text-[11px] text-slate-500">{weekInfo.isDeload ? "Semana de descarga" : "Semana de entrenamiento"}</p></div>
-        </div>
-      )}
 
-      <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 backdrop-blur-sm shadow-md shadow-black/20">
-        <div className="flex items-center justify-between mb-2">
-          <div><p className="text-sm font-bold text-white">Inicio de ciclo</p><p className="text-[11px] text-slate-500 mt-0.5">{cycleStart ? `Iniciado el ${new Date(cycleStart).toLocaleDateString("es-AR")}` : "No configurado"}</p></div>
-          <button onClick={() => setShowCycleSetup(true)} className="px-3 py-1.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-semibold hover:bg-slate-700">{cycleStart ? "Cambiar" : "Configurar"}</button>
+      {/* TU CICLO. Antes eran tres cosas sueltas, cada una con su forma: una
+          fila con "Ciclo #1 · Semana 6/8", una tarjeta con la fecha de inicio
+          y su "Cambiar", y más abajo "Configuración de descarga". Ahora es una
+          sección como las demás, con los cajones de Progreso adentro, desde
+          cuándo y todo lo que arma el ciclo: las semanas y la descarga. */}
+      <CollapsibleSection title="Tu ciclo" icon={<IconoCajones size={16} />}
+        subtitle={weekInfo ? `Semana ${weekInfo.weekInCycle} de ${weekInfo.cycleWeeks}: ${textoDelCiclo(weekInfo, settings)}` : "Elegí cuándo empezó para saber en qué semana estás"}>
+        {weekInfo && <div className="ciclo-perfil"><CajonesCiclo semanas={semanasDelCiclo(weekInfo)} trainWeeks={weekInfo.trainWeeks} /></div>}
+        <div className="ciclo-inicio">
+          <p className="min-w-0 flex-1">{cycleStart ? <>Ciclo {weekInfo?.cycleNumber || 1}, desde el <b>{new Date(cycleStart).toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" })}</b></> : "Todavía no elegiste cuándo empezó tu ciclo."}</p>
+          {!showCycleSetup && <button onClick={() => setShowCycleSetup(true)} className="boton-tonal shrink-0 !min-h-10 !text-[13px]">{cycleStart ? "Cambiar" : "Elegir"}</button>}
         </div>
-      </div>
-      {showCycleSetup && (
-        <div className="bg-slate-900/80 border border-slate-700/50 rounded-2xl p-4 space-y-3 bounce-in">
-          <p className="text-sm font-semibold text-white">¿Cuándo empezaste el ciclo actual?</p>
-          <input type="date" className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none" defaultValue={cycleStart ? localDateStr(new Date(cycleStart)) : todayStr()} id="cycle-date-input" />
-          <div className="flex gap-2">
-            <button onClick={() => setShowCycleSetup(false)} className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-400 text-sm font-semibold">Cancelar</button>
-            <button onClick={() => { const val = document.getElementById("cycle-date-input").value; if (val) { const [y, m, d] = val.split("-").map(Number); onSetCycleStart(new Date(y, m - 1, d)); setShowCycleSetup(false); } }} className="flex-1 py-3 rounded-xl bg-teal-500 !text-white text-sm font-bold">Guardar</button>
+        {showCycleSetup && (
+          <div className="ciclo-fecha bounce-in">
+            <label htmlFor="cycle-date-input" className="ciclo-fecha-rotulo">¿Cuándo empezaste el ciclo actual?</label>
+            <input ref={cicloFechaRef} type="date" id="cycle-date-input" className="ciclo-fecha-campo" defaultValue={cycleStart ? localDateStr(new Date(cycleStart)) : todayStr()} />
+            <div className="flex gap-2">
+              <button onClick={() => setShowCycleSetup(false)} className="boton-tonal flex-1">Cancelar</button>
+              <button onClick={() => { const val = cicloFechaRef.current?.value; if (val) { const [y, m, d] = val.split("-").map(Number); onSetCycleStart(new Date(y, m - 1, d)); setShowCycleSetup(false); } }} className="boton-pildora flex-1">Guardar</button>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+        <div className="bg-slate-950/40 rounded-xl p-3"><p className="text-[10px] text-slate-500 mb-2">Semanas de entrenamiento</p><div className="flex items-center justify-between"><button onClick={() => adjustSetting("trainWeeks", -1, 2, 12)} aria-label="Una semana de entrenamiento menos" className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95">−</button><span className="text-sm font-black text-white">{settings.trainWeeks}</span><button onClick={() => adjustSetting("trainWeeks", 1, 2, 12)} aria-label="Una semana de entrenamiento más" className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95">+</button></div></div>
+        <ToggleRow
+          icon={<Zap size={16} />} label="Hacer semanas de descarga"
+          desc="Si lo apagás, tu ciclo es continuo, sin semana de recuperación automática."
+          on={settings.deloadEnabled !== false} onToggle={() => updateSettings({ deloadEnabled: !(settings.deloadEnabled !== false) })}
+        />
+        {settings.deloadEnabled !== false && (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-slate-950/40 rounded-xl p-3"><p className="text-[10px] text-slate-500 mb-2">Semanas de descarga</p><div className="flex items-center justify-between"><button onClick={() => adjustSetting("deloadWeeks", -1, 1, 4)} aria-label="Una semana de descarga menos" className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95">−</button><span className="text-sm font-black text-white">{settings.deloadWeeks}</span><button onClick={() => adjustSetting("deloadWeeks", 1, 1, 4)} aria-label="Una semana de descarga más" className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95">+</button></div></div>
+              <div className="bg-slate-950/40 rounded-xl p-3"><p className="text-[10px] text-slate-500 mb-2">Carga en descarga</p><div className="flex items-center justify-between"><button onClick={() => adjustDeloadPct(-0.05)} aria-label="Menos carga en la descarga" className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95">−</button><span className="text-sm font-black text-white">{Math.round(settings.deloadPct * 100)}%</span><button onClick={() => adjustDeloadPct(0.05)} aria-label="Más carga en la descarga" className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95">+</button></div></div>
+            </div>
+            <div><p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Series en la descarga</p><div className="segmentado">{[{ k: 2, l: "La mitad" }, { k: 3, l: "Un tercio" }, { k: 4, l: "Un cuarto" }].map((opt) => <button key={opt.k} onClick={() => updateSettings({ deloadSetDivisor: opt.k })} aria-pressed={settings.deloadSetDivisor === opt.k} className={settings.deloadSetDivisor === opt.k ? "activo" : ""}>{opt.l}</button>)}</div></div>
+          </>
+        )}
+      </CollapsibleSection>
 
       {/* Antes acá había dos tarjetas grandes, "Perseguir mi récord" y
           "Rutina planificada", o sea la misma elección de modo que estaba en
@@ -18204,28 +18411,6 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
           })}
         />
       )}
-
-      <CollapsibleSection title="Configuración de descarga" subtitle={settings.deloadEnabled === false ? "Desactivada" : `Ciclo ${settings.trainWeeks}+${settings.deloadWeeks} sem · Carga ${Math.round(settings.deloadPct * 100)}%`} icon={<Zap size={16} />} accent="#A855F7">
-        <ToggleRow
-          icon={<Zap size={16} />} label="Hacer semanas de descarga"
-          desc="Si lo apagás, tu ciclo es continuo, sin semana de recuperación automática."
-          on={settings.deloadEnabled !== false} onToggle={() => updateSettings({ deloadEnabled: !(settings.deloadEnabled !== false) })} accent="#A855F7"
-        />
-        {settings.deloadEnabled !== false && (
-          <>
-            <div className="grid grid-cols-2 gap-3">
-              {[{ key: "trainWeeks", label: "Sem. entrenamiento", min: 2, max: 12 }, { key: "deloadWeeks", label: "Sem. descarga", min: 1, max: 4 }].map(({ key, label, min, max }) => (
-                <div key={key} className="bg-slate-950/40 rounded-xl p-3"><p className="text-[10px] text-slate-500 mb-2">{label}</p><div className="flex items-center justify-between"><button onClick={() => adjustSetting(key, -1, min, max)} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95">−</button><span className="text-sm font-black text-white tabular-nums">{settings[key]}</span><button onClick={() => adjustSetting(key, 1, min, max)} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95">+</button></div></div>
-              ))}
-            </div>
-            <div className="bg-slate-950/40 rounded-xl p-3">
-              <div className="flex items-center justify-between mb-2"><p className="text-[10px] text-slate-500">Carga en descarga</p><span className="text-[11px] font-bold text-purple-400 tabular-nums">{Math.round(settings.deloadPct * 100)}%</span></div>
-              <div className="flex items-center gap-3"><button onClick={() => adjustDeloadPct(-0.05)} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95 shrink-0">−</button><div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden"><div className="h-full bg-purple-500 rounded-full transition-all" style={{ width: `${settings.deloadPct * 100}%` }} /></div><button onClick={() => adjustDeloadPct(0.05)} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95 shrink-0">+</button></div>
-            </div>
-            <div><p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Reducción de series</p><div className="segmentado" style={{ "--c": "#A855F7" }}>{[{ k: 2, l: "Mitad" }, { k: 3, l: "Tercio" }, { k: 4, l: "Cuarto" }].map((opt) => <button key={opt.k} onClick={() => updateSettings({ deloadSetDivisor: opt.k })} aria-pressed={settings.deloadSetDivisor === opt.k} className={settings.deloadSetDivisor === opt.k ? "activo" : ""}>{opt.l}</button>)}</div></div>
-          </>
-        )}
-      </CollapsibleSection>
 
       <CollapsibleSection title="Descansos" subtitle={`${formatTime(settings.restShort)} – ${formatTime(settings.restLong)}`} icon={<Timer size={16} />} accent="#14B8A6">
         <div><p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Aviso al terminar</p><div className="segmentado">{[{ k: "sound", l: "Sonido" }, { k: "vibration", l: "Vibración" }, { k: "both", l: "Ambos" }].map((opt) => <button key={opt.k} onClick={() => updateSettings({ alertType: opt.k })} aria-pressed={settings.alertType === opt.k} className={settings.alertType === opt.k ? "activo" : ""}>{opt.l}</button>)}</div></div>
@@ -19340,10 +19525,13 @@ function computeAllMuscleRanks(logs, settings, sex, age, forceMode = null) {
 // donde el punto es medirse contra otro, la vara es una sola.
 // (Por eso tampoco recibe ya settings/sexo/edad de ninguno de los dos: la
 // tabla general no los usa.)
+// Y cuenta sólo los ejercicios directos de cada músculo (getBest1RMDirecto):
+// antes el press de banca sumaba al tríceps y un remo podía darle rango al
+// trapecio de quien nunca lo entrenó directo.
 function buildRankComparison(myLogs, theirLogs) {
   return MUSCLE_GROUPS.map((g) => {
-    const my1RM = getBest1RMForMuscleGroup(g.key, myLogs || {}, null);
-    const their1RM = getBest1RMForMuscleGroup(g.key, theirLogs || {}, null);
+    const my1RM = getBest1RMDirecto(g.key, myLogs || {});
+    const their1RM = getBest1RMDirecto(g.key, theirLogs || {});
     const mine = my1RM.best1RM > 0 ? getMuscleRank(g.key, my1RM.best1RM, "general") : null;
     const theirs = their1RM.best1RM > 0 ? getMuscleRank(g.key, their1RM.best1RM, "general") : null;
     return { key: g.key, label: g.label, mine, theirs, myKg: my1RM.bestKg, myReps: my1RM.bestReps, theirKg: their1RM.bestKg, theirReps: their1RM.bestReps, myBest: my1RM, theirBest: their1RM };
@@ -19360,8 +19548,8 @@ function MuscleBattleDetailModal({ groupKey, label, myLogs, theirLogs, theirName
   const unit = useWeightUnit();
   const rows = useMemo(() => {
     const byId = new Map();
-    getExerciseBestsForMuscleGroup(groupKey, myLogs || {}).forEach((e) => byId.set(e.exerciseId, { exerciseId: e.exerciseId, name: e.name, mine: e, theirs: null }));
-    getExerciseBestsForMuscleGroup(groupKey, theirLogs || {}).forEach((e) => {
+    getExerciseBestsForMuscleGroup(groupKey, myLogs || {}, true).forEach((e) => byId.set(e.exerciseId, { exerciseId: e.exerciseId, name: e.name, mine: e, theirs: null }));
+    getExerciseBestsForMuscleGroup(groupKey, theirLogs || {}, true).forEach((e) => {
       const cur = byId.get(e.exerciseId);
       if (cur) cur.theirs = e;
       else byId.set(e.exerciseId, { exerciseId: e.exerciseId, name: e.name, mine: null, theirs: e });
@@ -20585,6 +20773,54 @@ function Casillero({ semilla = "", nombre, usuario = null, foto = null, rango = 
   );
 }
 
+// TU CASILLERO, arriba de Social: la puerta chica del mismo casillero que ven
+// tus amigos al entrar a tu perfil (Casillero, el número sale de la misma
+// semilla), con lo de todos los días pegado en calcomanías: tu rango (tocalo
+// y te explica por qué), tu racha en marcas de tiza y los aplausos que te
+// dieron. Tocás la foto o el nombre y se abre grande, como el reloj del
+// descanso. Antes era una credencial con tres casilleros de datos. Sin
+// `onAbrir` (la guía del "?") es un dibujo: nada se toca.
+function CasilleroChico({ semilla = "", nombre, foto = null, rango = null, racha = 0, aplausos = 0, onAbrir = null, onRango = null, accion = null }) {
+  const numero = numeroDeCasillero(semilla || nombre || "");
+  const Puerta = onAbrir ? "button" : "div";
+  const Rango = onRango && rango ? "button" : "span";
+  return (
+    <section className="casillero casillero-chico" aria-label="Tu casillero">
+      <div className="casillero-arriba">
+        <div className="casillero-rejilla" aria-hidden="true">{Array.from({ length: 3 }, (_, i) => <i key={i} />)}</div>
+        <span className="casillero-numero" aria-hidden="true">{String(numero).padStart(3, "0")}</span>
+        {accion}
+      </div>
+      <Puerta onClick={onAbrir || undefined} className="casillero-cuerpo" aria-label={onAbrir ? "Abrir tu casillero, como lo ven tus amigos" : undefined}>
+        <span className="casillero-foto" aria-hidden="true">
+          <span className="casillero-cinta" />
+          {foto ? <img src={foto} alt="" /> : <span className="casillero-inicial">{String(nombre).charAt(0).toUpperCase()}</span>}
+        </span>
+        <span className="casillero-datos">
+          <span className="casillero-etiqueta"><span className="casillero-nombre">{nombre}</span></span>
+          <span className="casillero-abrir">Así te ven tus amigos{onAbrir && <ChevronRight size={15} aria-hidden="true" />}</span>
+        </span>
+      </Puerta>
+      <div className="casillero-calcos">
+        <Rango onClick={Rango === "button" ? onRango : undefined} role={Rango === "span" ? "img" : undefined} className={`calco calco-rango ${rango ? "tinta-rango" : ""}`} style={rango ? { "--rango-c": rango.color } : undefined}
+          aria-label={rango ? `Tu rango: ${rango.tier} ${rango.sub}${Rango === "button" ? ". Tocá para ver por qué" : ""}` : "Todavía sin rango"}>
+          {rango && <RankBadgeIcon tier={rango.tier} sub={null} color={rango.color} size={20} />}
+          {rango ? `${rango.tier} ${rango.sub}` : "Sin rango"}
+        </Rango>
+        <span className="calco calco-tiza" role="img" aria-label={`${racha} ${racha === 1 ? "día seguido" : "días seguidos"}`}>
+          <b className="num-display" aria-hidden="true">{racha}</b>
+          <MarcasTiza dias={racha} max={5} alto={14} decorativa className={racha > 0 ? "viva" : ""} />
+          <span aria-hidden="true">{racha === 1 ? "día seguido" : "días seguidos"}</span>
+        </span>
+        <span className="calco calco-papel" role="img" aria-label={`${aplausos} ${aplausos === 1 ? "aplauso" : "aplausos"}`}>
+          <span aria-hidden="true">👏 {aplausos}</span>
+        </span>
+      </div>
+      <span className="casillero-manija" aria-hidden="true" />
+    </section>
+  );
+}
+
 function FriendProfileView({ uid, viewerUid, viewerProfile, viewerName = null, isTrainerOfThisPerson = false, openComparing = false, esYo = false, onBack, onProposalSent, onActivateRoutine, onRemoveFriend = null, aplauso = null, retos = null }) {
   // Pantalla de página completa dentro de Social: el botón atrás de Android
   // vuelve a Social en vez de salir a otra pestaña.
@@ -20747,7 +20983,7 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, viewerName = null, i
         usuario={basic?.username || null}
         foto={basic?.avatarData || null}
         rango={theirTopRank}
-        record={recientes[0] ? `${recientes[0].nombre} ${recientes[0].reps} × ${conComa(kgToDisplay(recientes[0].kg, unit))} ${weightLabel(unit)}` : null}
+        record={recientes[0] ? `${recientes[0].nombre} ${recientes[0].reps}\u00a0×\u00a0${conComa(kgToDisplay(recientes[0].kg, unit))}\u00a0${weightLabel(unit)}` : null}
         desde={desde}
         accion={esYo && basic?.username ? <button onClick={() => setVerQr(true)} aria-label="Mostrar mi código QR" className="boton-redondo shrink-0"><QrCode size={17} /></button> : null}
       />
@@ -21129,7 +21365,7 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
   // amigos ni desde entrenador/alumno, donde el perfil sigue arrancando en
   // el muñeco individual de siempre.
   const [viewingOpenComparing, setViewingOpenComparing] = useState(false);
-  // Tu propio perfil, como lo ven tus amigos (se abre tocando tu credencial).
+  // Tu propio perfil, como lo ven tus amigos (se abre tocando tu casillero).
   const [viendoMiPerfil, setViendoMiPerfil] = useState(false);
 
   const [friendships, setFriendships] = useState([]);
@@ -21532,13 +21768,6 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
     refresh();
   };
 
-  // Cuántos de tus amigos entrenaron esta semana (lunes a domingo, como el
-  // resto de la app).
-  const entrenaronSemana = useMemo(() => friendAccepted.reduce((n, f) => {
-    const otro = f.users.find((u) => u !== uid);
-    return n + ((streaks?.[otro]?.sessionsThisWeek || 0) > 0 ? 1 : 0);
-  }, 0), [friendAccepted, streaks, uid]);
-
   if (viendoMiPerfil) {
     return <FriendProfileView key="yo" esYo uid={uid} viewerUid={uid} viewerProfile={profile} viewerName={profileName} onBack={() => setViendoMiPerfil(false)} />;
   }
@@ -21609,46 +21838,24 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
   const sectionDef = SECTIONS[sectionIdx] || SECTIONS[0];
   return (
     <div className="space-y-4">
-      {/* TU CREDENCIAL — lo primero de Social. */}
+      {/* TU CASILLERO — lo primero de Social: la puerta chica de tu casillero
+          (ver CasilleroChico). Tocarla abre tu perfil como lo ven tus amigos,
+          con la misma puerta en grande. Antes era una credencial. */}
       {(() => {
-        const color = myTopRank?.color || SOCIAL_COLOR;
         const nombre = profile?.name || profileName || "Vos";
         return (
           <>
-            {/* TU CREDENCIAL: tu cara con el aro del color de tu rango y tu
-                nombre (el @usuario se ve al entrar a tu perfil); abajo, tres datos con su nombre: tu
-                rango (tocalo y te explica por qué), tu racha en marcas de
-                tiza y los aplausos. Tocarla abre tu perfil tal como lo ven
-                tus amigos. Antes era una franja apretada con todo suelto. */}
-            <section className="credencial" aria-label="Tu credencial">
-              <button onClick={() => setViendoMiPerfil(true)} className="credencial-cuerpo" aria-label="Ver tu perfil, como lo ven tus amigos">
-                <span className="credencial-avatar" style={{ "--rango": color }} aria-hidden="true">
-                  {profile?.avatarData ? <img src={profile.avatarData} alt="" /> : String(nombre).charAt(0).toUpperCase()}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="credencial-nombre">{nombre}<ChevronRight size={17} aria-hidden="true" /></span>
-                  <span className="credencial-usuario">Tu perfil, como lo ven tus amigos</span>
-                </span>
-              </button>
-              {profile?.username && <button onClick={() => setShowProfileQr(true)} aria-label="Mostrar mi código QR" className="boton-redondo credencial-qr"><QrCode size={17} /></button>}
-              <div className="credencial-datos">
-                <button onClick={() => myTopRank && setShowRankExplain(true)} disabled={!myTopRank} className="credencial-dato" aria-label={myTopRank ? `Tu rango: ${myTopRank.tier} ${myTopRank.sub}. Tocá para ver por qué` : "Todavía sin rango"}>
-                  <span className="credencial-valor">
-                    {myTopRank && <RankBadgeIcon tier={myTopRank.tier} sub={null} color={myTopRank.color} size={22} />}
-                    <b className={myTopRank ? "tinta-rango" : ""} style={myTopRank ? { "--rango-c": myTopRank.color } : undefined}>{myTopRank ? `${myTopRank.tier} ${myTopRank.sub}` : "Sin rango"}</b>
-                  </span>
-                  <small>Tu rango</small>
-                </button>
-                <div className="credencial-dato">
-                  <span className="credencial-valor"><b className="num-display grande">{myStreak || 0}</b><MarcasTiza dias={myStreak || 0} max={5} alto={15} decorativa className={myStreak > 0 ? "viva" : ""} /></span>
-                  <small>{myStreak === 1 ? "Día seguido" : "Días seguidos"}</small>
-                </div>
-                <div className="credencial-dato">
-                  <span className="credencial-valor"><b className="num-display grande">{kudosReceived.length}</b><span className="credencial-aplauso" aria-hidden="true">👏</span></span>
-                  <small>{kudosReceived.length === 1 ? "Aplauso" : "Aplausos"}</small>
-                </div>
-              </div>
-            </section>
+            <CasilleroChico
+              semilla={uid || profile?.username || String(nombre)}
+              nombre={nombre}
+              foto={profile?.avatarData || null}
+              rango={myTopRank || null}
+              racha={myStreak || 0}
+              aplausos={kudosReceived.length}
+              onAbrir={() => setViendoMiPerfil(true)}
+              onRango={() => setShowRankExplain(true)}
+              accion={profile?.username ? <button onClick={() => setShowProfileQr(true)} aria-label="Mostrar mi código QR" className="boton-redondo shrink-0"><QrCode size={17} /></button> : null}
+            />
             {/* Sin @usuario, se elige acá mismo; sin Google, el botón te
                 lleva a Perfil a vincularlo. */}
             {!profile?.username && uid && (
@@ -21691,42 +21898,6 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
           <div className="px-1 pt-1">
             <p className="text-[12.5px] text-slate-400">Sumá amigos y competí con ellos: quién entrena más cada semana.</p>
             <button onClick={irABuscar} className="boton-pildora mt-3" style={{ "--c": SOCIAL_COLOR, minHeight: 44 }}><UserPlus size={16} /> Sumar mi primer amigo</button>
-          </div>
-        </section>
-      )}
-
-      {/* ENTRENARON — los amigos que entrenaron hoy o ayer, en fila, como
-          las historias de Instagram: el aro toma el color del día que
-          entrenaron (Push, Pull…) y se apaga cuando ya les aplaudiste.
-          Tocás la foto para ver su perfil, y el 👏 para aplaudirle.
-          Antes era una tarjeta grande con UN solo amigo y un "Ver todos"
-          que abría otra ventana; acá entran todos y se ve de un vistazo
-          quién se movió. */}
-      {kudosCandidates.length > 0 && (
-        <section aria-label="Amigos que entrenaron">
-          <div className="flex items-baseline justify-between gap-2 px-1 mb-2">
-            <p className="text-[14px] font-bold text-white">Entrenaron</p>
-            {friendAccepted.length > 0 && <p className="text-[11.5px] text-slate-500 text-right">{entrenaronSemana} de {friendAccepted.length} esta semana</p>}
-          </div>
-          <div className="historias">
-            {kudosCandidates.map((c) => {
-              const b = basics[c.uid];
-              const nombre = b?.name || "Tu amigo";
-              const sent = !!kudosSentMap[c.uid];
-              const sending = kudosSendingUid === c.uid;
-              return (
-                <div key={c.uid} className="historia">
-                  <button onClick={() => setViewingUid(c.uid)} className={`galleta historia-aro ${sent ? "vista" : ""}`} style={{ "--dia": c.latestSession?.dayColor || SOCIAL_COLOR }} aria-label={`Ver el perfil de ${nombre}`}>
-                    {b?.avatarData ? <img src={b.avatarData} alt="" /> : <span aria-hidden="true">{nombre.charAt(0).toUpperCase()}</span>}
-                  </button>
-                  <button onClick={(e) => handleSendKudos(c.uid, e.currentTarget)} disabled={sending || sent} className={`historia-aplauso ${sent ? "hecho" : ""}`} aria-label={sent ? `Ya le aplaudiste a ${nombre}` : `Aplaudir a ${nombre}`}>
-                    {sent ? <Check size={14} strokeWidth={3} /> : <span aria-hidden="true">👏</span>}
-                  </button>
-                  <p className="historia-nombre">{nombre.split(" ")[0]}</p>
-                  <p className="historia-cuando">{c.daysAgo <= 0 ? "hoy" : c.daysAgo === 1 ? "ayer" : `hace ${c.daysAgo} d`}{c.latestSession?.dayLabel ? ` · ${c.latestSession.dayLabel}` : ""}</p>
-                </div>
-              );
-            })}
           </div>
         </section>
       )}
@@ -22152,7 +22323,11 @@ function RoutinePreview({ routineDef }) {
                 {d.exercises.map((ex, i) => (
                   <li key={`${dk}:${ex.id}:${i}`}>
                     <span className="vista-ej-nombre">{ex.name}</span>
-                    <span className="vista-ej-series">{ex.cardio ? "Cardio" : `${ex.sets.length}${ex.sets[0]?.repRange ? ` × ${ex.sets[0].repRange}` : ""}`}</span>
+                    {/* Una pirámide (cada serie con sus reps) se escribe como en
+                        la hoja del profe: 12 / 10 / 8 / 6. Antes decía "4 × 12". */}
+                    <span className="vista-ej-series">{ex.cardio ? "Cardio"
+                      : ex.sets.length > 1 && ex.sets.some((s) => s.repRange !== ex.sets[0].repRange) ? ex.sets.map((s) => s.repRange || "?").join(" / ")
+                      : `${ex.sets.length}${ex.sets[0]?.repRange ? ` × ${ex.sets[0].repRange}` : ""}`}</span>
                   </li>
                 ))}
               </ol>
@@ -23130,10 +23305,9 @@ function builderDaysFromRoutineDef(routineDef) {
 
    `xlsx` lee directamente el binario de .xlsx/.xls (hoja por hoja, fila por
    fila). `pdfjs-dist` lee el texto "de verdad" embebido en un PDF (no hace
-   falta copiar y pegar). Para Word no hay una librería liviana 100%
-   client-side instalada todavía — si subís un .docx, se lo avisa y se le
-   pide que copie el texto de adentro (Ctrl+A, Ctrl+C en Word) y lo pegue en
-   la caja de texto, que funciona exactamente igual.
+   falta copiar y pegar), y las páginas sin texto (escaneadas) las dibuja
+   como imagen para la IA. Un Word (.docx) es un zip: `jszip` saca el texto
+   de word/document.xml, con las tablas como filas de planilla.
 
    Una vez que hay texto (de cualquiera de esas fuentes, o pegado a mano), un
    parser heurístico hace el resto: detecta los "días" (líneas cortas sin
@@ -23295,18 +23469,49 @@ const CARDIO_MINUTES_REGEX = /(\d+)\s*min(?:utos?)?\b/i;
 // cardio, en vez de exigir una coincidencia exacta de la biblioteca.
 const CARDIO_NAME_HINT_REGEX = /cardio|cinta|caminadora|bicicleta|el[íi]ptic|remo|soga|correr|caminar|trote|assault ?bike|stairmaster|escaladora/i;
 
+// Pirámides: "4x12/10/8/6" o "4x12-10-8-6" (con guion, tres números o más;
+// con barra, dos o más), una serie por número; si dice más series que
+// números, las que faltan repiten el último. Sin la x, una lista de tres o
+// más al final del renglón ("Sentadilla 12-10-8"). Y "4 series de 10" o "3
+// series de 12 a 15", sin la x. Las fechas (12/10/2026) no cuentan.
+const PIRAMIDE_REGEX = /(\d+)\s*(?:series|sets)?\s*[x×X]\s*(\d{1,2}(?:\s*\/\s*\d{1,2})+|\d{1,2}(?:\s*[-–]\s*\d{1,2}){2,})(?![\d/])/;
+const LISTA_DE_REPS_REGEX = /\s(\d{1,2}(?:\s*[-–/]\s*\d{1,2}){2,})\s*(?:reps?|repeticiones)?\s*$/i;
+const SERIES_DE_REGEX = /(\d+)\s*(?:series|sets)\s*(?:de\s*)?(\d+)(?:\s*(?:a|-|–)\s*(\d+))?/i;
+const FECHA_REGEX = /\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/;
+
 // Parsea texto libre (extraído de un PDF/Excel, o pegado a mano) y devuelve
 // una lista de "días" con sus ejercicios ya resueltos.
 function parseRoutineFromText(rawText) {
+  // La fila de títulos de una tabla ("Ejercicio | Series | Reps") no es un
+  // día: antes se tomaba como el nombre del día y los ejercicios quedaban
+  // bajo "EJERCICIO SERIES REPS".
+  const esCabeceraDeTabla = (l) => {
+    const celdas = l.split(/\t|,|\s{2,}/).map((c) => c.trim()).filter(Boolean);
+    return celdas.length >= 2 && celdas.every((c) => /^(ejercicios?|series|sets|reps?|repeticiones|descanso|pausa|carga|peso|kg|rir|rpe|tempo|observaciones|notas?)$/i.test(c));
+  };
   const lines = String(rawText || "").split(/\r?\n/)
+    .filter((l) => !esCabeceraDeTabla(l))
     .map((l) => spreadsheetRowToFreeTextLine(l.replace(/^[-•*\d.)\s]+/, "").trim()))
     .filter(Boolean);
   const days = [];
   let current = null;
   lines.forEach((line, i) => {
-    const m = line.match(SETREP_REGEX);
-    const cardioMatch = !m ? line.match(CARDIO_MINUTES_REGEX) : null;
-    if (m) {
+    const conFecha = FECHA_REGEX.test(line);
+    const piramide = conFecha ? null : line.match(PIRAMIDE_REGEX);
+    const m = piramide ? null : (line.match(SETREP_REGEX) || line.match(SERIES_DE_REGEX));
+    let lista = !piramide && !m && !conFecha ? line.match(LISTA_DE_REPS_REGEX) : null;
+    // Una lista suelta sólo si antes hay un nombre (y no es "Semana 1-2-3").
+    if (lista && (!/[a-záéíóúñ]{3}/i.test(line.slice(0, lista.index)) || /^(semana|d[ií]a|week)\b/i.test(line))) lista = null;
+    const cardioMatch = !piramide && !m && !lista ? line.match(CARDIO_MINUTES_REGEX) : null;
+    if (piramide || lista) {
+      if (!current) { current = { label: "DÍA 1", exercises: [] }; days.push(current); }
+      const nums = (piramide ? piramide[2] : lista[1]).split(/[-–/]/).map((x) => parseInt(x, 10)).filter((x) => x > 0);
+      const cuantas = Math.min(8, piramide ? Math.max(nums.length, parseInt(piramide[1], 10) || nums.length) : nums.length);
+      const sets = Array.from({ length: cuantas }, (_, k) => ({ repRange: String(nums[Math.min(k, nums.length - 1)]) }));
+      const namePart = line.slice(0, (piramide || lista).index).replace(/[-:–]\s*$/, "").trim() || `Ejercicio ${current.exercises.length + 1}`;
+      const lib = matchExerciseToLibrary(namePart);
+      current.exercises.push(lib ? { libId: lib.id, sets } : { id: builderUid("imported"), name: namePart, muscle: "Personalizado", sets });
+    } else if (m) {
       if (!current) { current = { label: "DÍA 1", exercises: [] }; days.push(current); }
       const setsCount = Math.max(1, Math.min(8, parseInt(m[1], 10) || 3));
       const repLow = m[2], repHigh = m[3] || m[2];
@@ -23364,27 +23569,26 @@ async function extractTextFromExcelFile(file) {
   return wb.SheetNames.map((name) => XLSX.utils.sheet_to_csv(wb.Sheets[name], { FS: "\t" })).join("\n");
 }
 
-async function extractTextFromPdfFile(file) {
+// El PDF: el texto de cada página y, las que no traen texto (un escaneo o una
+// foto pegada en el PDF), dibujadas como imagen para que las lea la IA. Antes
+// un PDF escaneado no daba nada: pdf.js no tiene texto que sacar de una foto.
+async function extractFromPdfFile(file, maxFotos = IMPORT_HASTA_FOTOS) {
   const pdfjsLib = await import("pdfjs-dist");
-  // BUG FIX (encontrado subiendo un PDF real): la importación de PDF
-  // estaba COMPLETAMENTE rota — pdfjs-dist 6.x sólo publica su worker
-  // como ".mjs" (pdf.worker.min.mjs), no ".js". La URL vieja apuntaba a
-  // ".../pdf.worker.min.js", que cdnjs devuelve 404 para esta versión
-  // (confirmado a mano: la ".js" da 404, la ".mjs" da 200) — cualquier
-  // PDF subido caía siempre en el catch genérico "No pudimos leer
-  // alguno de los archivos", sin ninguna pista real del motivo.
+  // BUG FIX (encontrado subiendo un PDF real): pdfjs-dist 6.x sólo publica su
+  // worker como ".mjs" (pdf.worker.min.mjs), no ".js": la URL vieja daba 404 y
+  // todo PDF caía en el error genérico.
   if (pdfjsLib.GlobalWorkerOptions && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
     pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
   }
   const buf = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
-  let fullText = "";
+  let texto = "";
+  const escaneadas = [];
   for (let p = 1; p <= pdf.numPages; p++) {
     const page = await pdf.getPage(p);
     const content = await page.getTextContent();
-    // Reconstruye saltos de línea agrupando los fragmentos de texto por su
-    // posición vertical — pdf.js no devuelve líneas, devuelve fragmentos
-    // sueltos con coordenadas.
+    // Reconstruye los renglones agrupando los fragmentos por su altura: pdf.js
+    // no devuelve líneas, devuelve fragmentos sueltos con coordenadas.
     let lastY = null, pageText = "";
     content.items.forEach((item) => {
       const y = item.transform[5];
@@ -23393,15 +23597,60 @@ async function extractTextFromPdfFile(file) {
       pageText += item.str;
       lastY = y;
     });
-    fullText += pageText + "\n";
+    texto += pageText + "\n";
+    // Sin texto que leer: la página es una imagen.
+    if (pageText.replace(/\s+/g, "").length < 20 && escaneadas.length < maxFotos) {
+      try {
+        const base = page.getViewport({ scale: 1 });
+        const viewport = page.getViewport({ scale: Math.min(2.2, 1600 / Math.max(base.width, base.height)) });
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(viewport.width); canvas.height = Math.round(viewport.height);
+        await page.render({ canvas, viewport }).promise;
+        const previewUrl = canvas.toDataURL("image/jpeg", 0.85);
+        const [, mimeType, data] = previewUrl.match(/^data:([^;]+);base64,(.*)$/) || [];
+        if (data) escaneadas.push({ name: `${file.name}, página ${p}`, mimeType, data, previewUrl });
+      } catch (err) { console.warn("[import] no se pudo dibujar la página", p, err); }
+    }
   }
-  return fullText;
+  return { texto, paginas: pdf.numPages, escaneadas };
 }
 
-// Modal de importación: subís un archivo (.pdf/.xlsx/.xls/.csv/.txt) o
-// pegás texto a mano, se detecta la rutina, y se muestra una vista previa
-// antes de crearla — así, si el parser interpretó mal algo, lo notás antes
-// de guardar nada.
+// Word (.docx): es un zip con el texto en word/document.xml. Cada párrafo es
+// un renglón; cada fila de una tabla, un renglón con las celdas separadas por
+// tabulaciones, como una planilla (así "Press banca | 4 | 8-10" se lee igual
+// que en el Excel). Antes había que copiar el texto y pegarlo a mano.
+async function extractTextFromDocxFile(file) {
+  const { default: JSZip } = await import("jszip");
+  const zip = await JSZip.loadAsync(await file.arrayBuffer());
+  const xml = await zip.file("word/document.xml")?.async("string");
+  if (!xml) return "";
+  const doc = new DOMParser().parseFromString(xml, "application/xml");
+  const W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+  const textoDe = (el) => {
+    let s = "";
+    for (const n of Array.from(el.getElementsByTagNameNS(W, "*"))) {
+      if (n.localName === "t") s += n.textContent;
+      else if (n.localName === "tab") s += "\t";
+      else if (n.localName === "br" || n.localName === "cr") s += "\n";
+    }
+    return s;
+  };
+  const lineas = [];
+  const recorrer = (padre) => {
+    for (const nodo of Array.from(padre.childNodes)) {
+      if (nodo.localName === "p") lineas.push(textoDe(nodo));
+      else if (nodo.localName === "tbl") {
+        for (const fila of Array.from(nodo.getElementsByTagNameNS(W, "tr"))) {
+          lineas.push(Array.from(fila.getElementsByTagNameNS(W, "tc")).map((c) => Array.from(c.getElementsByTagNameNS(W, "p")).map(textoDe).join(" ").trim()).join("\t"));
+        }
+      } else if (nodo.localName === "sdt" || nodo.localName === "sdtContent") recorrer(nodo);
+    }
+  };
+  const cuerpo = doc.getElementsByTagNameNS(W, "body")[0];
+  if (cuerpo) recorrer(cuerpo);
+  return lineas.join("\n");
+}
+
 /* ============================================================================
    ENTRENADOR IA — chat con un asistente que tiene tu historial de
    entrenamiento como contexto (se lo manda a Gemini en el prompt de
@@ -25649,162 +25898,151 @@ function AIConversationSidebar({ conversations, activeConversationId, onSelect, 
 // pregunta, campos grandes) para que se sienta la misma "entrevista
 // guiada" que ya conocés de cuando armaste tu perfil la primera vez, en
 // vez de una alerta genérica de error.
+// Un ejercicio que la IA no terminó de leer (le falta el nombre, las series
+// o las reps): se pregunta uno por uno antes de crear la rutina, en vez de
+// guardar un número inventado.
 function ImportReviewStep({ dayLabel, ex, stepNumber, totalSteps, onConfirm, onRemove }) {
   const [name, setName] = useState(ex.name || "");
   const [setsCount, setSetsCount] = useState(ex.setsCount || 3);
   const [repRange, setRepRange] = useState(ex.repRange || "8-10");
+  const ultimo = stepNumber === totalSteps;
+  const falta = !ex.name ? "el nombre" : !ex.setsCount && !ex.repRange ? "las series y las reps" : !ex.setsCount ? "las series" : "las reps";
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <span className="text-[10px] font-black uppercase tracking-widest text-teal-400">Paso {stepNumber} de {totalSteps}</span>
-        <span className="text-[10px] text-slate-600 truncate max-w-[45%]">{dayLabel}</span>
-      </div>
-      <div className="flex gap-1">
-        {Array.from({ length: totalSteps }).map((_, i) => (
-          <div key={i} className="flex-1 h-1 rounded-full transition-colors" style={{ backgroundColor: i < stepNumber ? "#14B8A6" : "var(--surface-2)" }} />
-        ))}
-      </div>
-      <div className="text-center pt-1">
-        <div className="w-12 h-12 rounded-2xl bg-teal-500/15 border border-teal-500/30 flex items-center justify-center mx-auto mb-3">
-          <AlertTriangle size={20} className="text-teal-400" />
+    <>
+      <div className="modal-rutina-cabeza">
+        <div className="min-w-0">
+          <p className="ficha-bajada">{totalSteps > 1 ? `Ejercicio ${stepNumber} de ${totalSteps}, en ${dayLabel}` : `En ${dayLabel}`}</p>
+          <h3 className="ficha-titulo">No leímos {falta}</h3>
         </div>
-        <h3 className="text-base font-black text-white leading-tight">No terminamos de entender este ejercicio</h3>
-        <p className="text-xs text-slate-500 mt-1.5 px-2 leading-relaxed">Completá o corregí lo que haga falta antes de crear la rutina.</p>
       </div>
-      <div className="space-y-3">
-        <div>
-          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1 block">Nombre del ejercicio</label>
-          <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Ej: Press Banca" className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-3.5 py-3 text-white text-sm focus:outline-none focus:border-teal-500/60" />
-        </div>
-        <div className="grid grid-cols-2 gap-2.5">
-          <div>
-            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1 block">Series</label>
-            <input type="number" inputMode="numeric" min="1" max="8" value={setsCount} onChange={(e) => setSetsCount(Math.max(1, Math.min(8, parseInt(e.target.value, 10) || 1)))} className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-3.5 py-3 text-white text-sm focus:outline-none focus:border-teal-500/60" />
+      <div className="modal-rutina-cuerpo">
+        {totalSteps > 1 && <div className="import-pasos" aria-hidden="true">{Array.from({ length: totalSteps }, (_, i) => <i key={i} className={i < stepNumber ? "hecho" : ""} />)}</div>}
+        <p className="ficha-bajada !mt-0">Completalo o corregilo y seguimos. Si no va, sacalo.</p>
+        <label className="import-rotulo">Ejercicio
+          <input autoFocus={!ex.name} value={name} onChange={(e) => setName(e.target.value)} placeholder="Press banca" className="import-campo" />
+        </label>
+        <div className="import-dos">
+          <div className="import-rotulo">Series
+            <div className="import-contador">
+              <button onClick={() => setSetsCount((n) => Math.max(1, n - 1))} aria-label="Una serie menos" className="boton-redondo"><Minus size={16} /></button>
+              <b className="num-display" aria-live="polite">{setsCount}</b>
+              <button onClick={() => setSetsCount((n) => Math.min(8, n + 1))} aria-label="Una serie más" className="boton-redondo"><Plus size={16} /></button>
+            </div>
           </div>
-          <div>
-            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1 block">Rango de reps</label>
-            <input value={repRange} onChange={(e) => setRepRange(e.target.value)} placeholder="8-10" className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-3.5 py-3 text-white text-sm focus:outline-none focus:border-teal-500/60" />
-          </div>
+          <label className="import-rotulo">Reps
+            <input value={repRange} onChange={(e) => setRepRange(e.target.value)} placeholder="8-10" className="import-campo" />
+          </label>
         </div>
       </div>
-      <div className="flex gap-2">
-        <button onClick={onRemove} className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-400 text-sm font-semibold active:scale-[0.98] transition-all">Sacar ejercicio</button>
-        <button
-          onClick={() => onConfirm({ name: name.trim() || "Ejercicio", setsCount, repRange: repRange.trim() || "8-10", lib: matchExerciseToLibrary(name) })}
-          disabled={!name.trim()}
-          className="flex-1 py-3 rounded-xl bg-teal-500 !text-white text-sm font-bold active:scale-[0.98] transition-all disabled:opacity-40"
-        >
-          {stepNumber === totalSteps ? "Confirmar y crear" : "Confirmar y seguir"}
-        </button>
+      <div className="modal-rutina-pie">
+        <div className="flex gap-2">
+          <button onClick={onRemove} className="boton-tonal">Sacarlo</button>
+          <button onClick={() => onConfirm({ name: name.trim() || "Ejercicio", setsCount, repRange: repRange.trim() || "8-10", repsList: null, lib: matchExerciseToLibrary(name) })} disabled={!name.trim()} className="boton-pildora flex-1 disabled:opacity-40">
+            {ultimo ? "Listo, ver la rutina" : "Seguir"}
+          </button>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
-function ImportRoutineModal({ onImport, onClose }) {
+// IMPORTAR UNA RUTINA (Rutinas › Importar): la hoja del profe en una foto, el
+// PDF o el Excel que te mandaron, un Word o el texto de un mensaje. Se puede
+// juntar todo (una foto por día, por ejemplo): se lee junto. Un texto se lee
+// primero en el teléfono, sin internet; las fotos y los PDF escaneados, con la
+// IA. Antes de crearla se ve cómo quedó (los días como baldosas, lo que no
+// está en el catálogo y queda como tuyo) y se puede crear, corregir en el
+// armado o sumar otra hoja. Si a un ejercicio le falta un dato, se pregunta.
+// Antes era un cuadro con dos recuadros punteados y letra chica, y la primera
+// lectura de una foto salía vacía: la IA recibía lo que había ANTES de subirla
+// (el estado todavía no se había actualizado). Ahora cada lectura recibe lo
+// que hay, explícito.
+const IMPORT_HASTA_FOTOS = 8;
+const IMPORT_TIPOS = ".pdf,.xlsx,.xls,.csv,.txt,.docx,.doc,image/*";
+function ImportRoutineModal({ onImport, onEditar = null, onClose, inicial = null }) {
   useAndroidBack(onClose);
-  const [text, setText] = useState("");
-  const [images, setImages] = useState([]); // [{ id, name, mimeType, data (base64 puro), previewUrl }]
-  const [textFileNames, setTextFileNames] = useState([]); // solo para mostrar qué se leyó
-  const [routineName, setRoutineName] = useState("");
-  const [parsed, setParsed] = useState(null);
-  // Cola de revisión estilo onboarding: cuando la IA deja algún ejercicio
-  // sin nombre, series o reps (ver prompt de "detect" en api/ia.js — ahora
-  // omite esos campos en vez de inventarlos), en vez de guardar un valor
-  // adivinado en silencio se pregunta uno por uno, igual que
-  // PersonalizedRoutineWizard pregunta paso a paso al crear tu perfil.
+  const [text, setText] = useState(""); // lo pegado a mano
+  const [verTexto, setVerTexto] = useState(false);
+  const [images, setImages] = useState([]); // [{ id, name, mimeType, data, previewUrl, deArchivo }]
+  const [archivos, setArchivos] = useState([]); // [{ id, nombre, tipo, detalle, texto }]
+  const [parsed, setParsed] = useState(inicial);
+  const [nombreFinal, setNombreFinal] = useState(inicial?.name || "");
+  const [leidaSinIA, setLeidaSinIA] = useState(false);
+  // Cola de revisión: cuando la IA deja algún ejercicio sin nombre, series o
+  // reps (ver el prompt de "detect" en api/ia.js: omite lo que no lee en vez
+  // de inventarlo), se pregunta uno por uno.
   // { days, flagged: [{dayIdx, exIdx}], step, finalize } o null.
   const [reviewQueue, setReviewQueue] = useState(null);
   const [notice, setNotice] = useState("");
-  const [loadingFile, setLoadingFile] = useState(false);
-  const [isParsingAI, setIsParsingAI] = useState(false);
+  const [estado, setEstado] = useState(null); // null | "leyendo" | "ia"
+  const abortRef = useRef(null);
+  useEffect(() => () => abortRef.current?.abort(), []);
+  const ocupado = !!estado;
 
-  const hasAnySource = !!text.trim() || images.length > 0;
+  const textoDe = (arch, pegado) => [...arch.map((a) => a.texto), pegado].filter((t) => t && t.trim()).join("\n").trim();
+  const textoTotal = textoDe(archivos, text);
+  const hayAlgo = !!textoTotal || images.length > 0;
 
-  const finalizeImportedDays = (finalDays, name) => setParsed(buildImportedRoutineDef(
+  const mostrar = (def, sinIA) => { setParsed(def); setNombreFinal(def.name); setLeidaSinIA(sinIA); };
+
+  const finalizeImportedDays = (finalDays, name) => mostrar(buildImportedRoutineDef(
     finalDays.map((d) => ({
       label: d.label,
       exercises: d.exercises.map((ex) => {
-        // BUG FIX (auditoría de importación con IA): un ejercicio de
-        // cardio detectado por foto/texto (la IA pone los minutos en
-        // "repRange", ver el prompt de "detect" en api/ia.js) caía por
-        // esta misma rama que arma series×reps — terminaba con 2-3
-        // "sets" sueltos, cada uno con repRange="30" (los minutos
-        // tratados como si fueran reps), en vez de UNA sola sesión sin
-        // rango de reps (mismo criterio que ya usa el resto de la app:
-        // addExercise, el parser de texto, etc.). GeneralWarmupCard y el
-        // resto ya asumen que cardio = 1 solo set.
-        const sets = ex.cardio ? mkSets(1, "") : Array.from({ length: Math.max(1, Math.min(8, ex.setsCount || 3)) }, () => ({ repRange: ex.repRange || "8-10" }));
+        // Cardio: una sola sesión, sin rango de reps (la IA pone los minutos
+        // en "repRange"). Una pirámide (12-10-8-6): una serie por número.
+        const sets = ex.cardio ? mkSets(1, "")
+          : ex.repsList?.length ? ex.repsList.map((r) => ({ repRange: r }))
+          : Array.from({ length: Math.max(1, Math.min(8, ex.setsCount || 3)) }, () => ({ repRange: ex.repRange || "8-10" }));
         return ex.lib
           ? { libId: ex.lib.id, sets, cardio: !!ex.cardio }
           : { id: builderUid("imported"), name: ex.name || "Ejercicio", muscle: "Personalizado", sets, cardio: !!ex.cardio };
       }),
     })),
     name
-  ));
+  ), false);
 
   const applyDetectedDays = (days, fallbackName) => {
     if (!Array.isArray(days) || !days.length) return false;
-    // BUG FIX: un elemento null/no-objeto acá (JSON válido pero mal
-    // formado, ej. la IA devuelve [null] o un día sin "exercises") tiraba
-    // una excepción leyendo ex.name más abajo — se perdía TODA la
-    // detección (incluidos los días válidos) y sólo se veía el error
-    // genérico "no pudimos detectar la rutina". Se filtran antes de mapear.
+    // Un elemento null o un día sin "exercises" (JSON válido pero mal
+    // formado) se descarta antes de mapear: si no, se perdía toda la lectura.
     const cleanDays = days.filter((d) => d && typeof d === "object").map((d) => ({
       label: String(d.label || "Día").toUpperCase(),
       exercises: (d.exercises || []).filter((ex) => ex && typeof ex === "object").map((ex) => {
         const name = typeof ex.name === "string" ? ex.name.trim() : "";
         const lib = name ? matchExerciseToLibrary(name) : null;
-        // Cardio se detecta por el match a la biblioteca (ej. "Cinta"
-        // matchea "Cinta — Caminar", que ya trae cardio:true) o, si no
-        // matcheó nada, por el nombre sonando claramente a cardio de
-        // máquina — mismo CARDIO_NAME_HINT_REGEX que ya usa el parser de
-        // texto, para no perder "Caminadora"/"Trote" sólo porque no
-        // matchean exacto contra el catálogo.
         const isCardio = !!lib?.cardio || (!lib && CARDIO_NAME_HINT_REGEX.test(name));
-        if (isCardio) return { name, lib, setsCount: 1, repRange: null, cardio: true };
-        const setsCount = Number.isInteger(ex.setsCount) && ex.setsCount > 0 ? ex.setsCount : null;
-        const repRange = typeof ex.repRange === "string" && ex.repRange.trim() ? ex.repRange.trim() : null;
-        return { name, lib, setsCount, repRange, cardio: false };
+        if (isCardio) return { name, lib, setsCount: 1, repRange: null, repsList: null, cardio: true };
+        const repsList = Array.isArray(ex.reps) ? ex.reps.map((r) => String(r).trim()).filter((r) => /^\d{1,3}(-\d{1,3})?$/.test(r)).slice(0, 8) : [];
+        const setsCount = repsList.length >= 2 ? repsList.length : Number.isInteger(ex.setsCount) && ex.setsCount > 0 ? ex.setsCount : null;
+        const repRange = repsList.length >= 2 ? repsList[0] : typeof ex.repRange === "string" && ex.repRange.trim() ? ex.repRange.trim() : null;
+        return { name, lib, setsCount, repRange, repsList: repsList.length >= 2 ? repsList : null, cardio: false };
       }),
     })).filter((d) => d.exercises.length);
     if (!cleanDays.length) return false;
-
-    const name = routineName.trim() || fallbackName;
-    // Se pregunta por lo que la IA dejó sin resolver (nombre vacío, o
-    // series/reps que no pudo determinar) — un ejercicio que sí matcheó a
-    // la biblioteca con un nombre "raro" NO se marca: eso es normal (hay
-    // ejercicios reales que no están en la biblioteca) y ya queda bien
-    // resuelto como ejercicio personalizado, sin necesidad de preguntar.
-    // Cardio NUNCA se marca para revisión: "cuántas series" no tiene
-    // sentido para una sesión de cinta/bici, y ya queda resuelto arriba.
     const flagged = [];
     cleanDays.forEach((d, dayIdx) => d.exercises.forEach((ex, exIdx) => {
       if (ex.cardio) return;
       if (!ex.name || !ex.setsCount || !ex.repRange) flagged.push({ dayIdx, exIdx });
     }));
-    if (flagged.length) setReviewQueue({ days: cleanDays, flagged, step: 0, finalize: (finalDays) => finalizeImportedDays(finalDays, name) });
-    else finalizeImportedDays(cleanDays, name);
+    if (flagged.length) setReviewQueue({ days: cleanDays, flagged, step: 0, finalize: (finalDays) => finalizeImportedDays(finalDays, fallbackName) });
+    else finalizeImportedDays(cleanDays, fallbackName);
     return true;
   };
 
-  const runAIDetection = async (fallbackName) => {
-    setNotice("Detectando con IA…");
-    setIsParsingAI(true);
+  // Con la IA: el texto y las fotos que se le pasan (no los del estado, que
+  // puede no estar al día todavía).
+  const leerConIA = async ({ texto, fotos, nombre }) => {
+    const control = new AbortController();
+    abortRef.current = control;
+    setNotice(""); setEstado("ia");
     try {
-      // Reintento automático (una sola vez) ante una falla de red/timeout
-      // puntual — antes UNA sola conexión cortada dejaba directo en "no
-      // pudimos detectar la rutina" sin darle a la app ninguna chance de
-      // resolverse sola (mismo criterio que ya usa PersonalizedRoutineWizard
-      // para generar una rutina con IA).
       let result = null;
+      // Un reintento ante una falla de red o un corte puntual.
       for (let attempt = 1; attempt <= 2; attempt++) {
         try {
-          const response = await fetchIA({ action: "detect", text, images: images.map(({ mimeType, data }) => ({ mimeType, data })) });
+          const response = await fetchIA({ action: "detect", text: texto, images: fotos.map(({ mimeType, data }) => ({ mimeType, data })) }, { signal: control.signal });
           if (!response.ok) {
-            // BUG FIX: mismo caso que el wizard — antes se descartaba el
-            // cuerpo del error y siempre se mostraba el genérico de abajo,
-            // aunque el servidor mandara un motivo concreto y accionable.
             const errBody = await response.json().catch(() => null);
             const serverMsg = errBody?.error;
             throw new Error(serverMsg || `Error ${response.status}`, { cause: serverMsg ? "server" : undefined });
@@ -25812,28 +26050,106 @@ function ImportRoutineModal({ onImport, onClose }) {
           result = await response.json();
           break;
         } catch (err) {
+          if (err?.name === "AbortError") throw err;
           if (attempt === 1 && err.cause !== "server" && !err.sinCupo) { console.warn("[import] primer intento falló, reintentando:", err?.message || err); await new Promise((r) => setTimeout(r, 1200)); continue; }
           throw err;
         }
       }
+      // Del primer "[" al último "]": a veces la IA envuelve el JSON con texto.
       const rawText = result?.text || "";
-      // Extracción ROBUSTA del JSON: Gemini a veces envuelve la respuesta
-      // con texto ("Aquí está tu rutina: [...]") aunque se le pida JSON
-      // puro — antes esto rompía JSON.parse directo y tiraba el error
-      // genérico siempre que pasaba. Tomamos del primer "[" al último "]"
-      // y parseamos sólo eso (mismo criterio que ya usa el wizard de IA).
       const first = rawText.indexOf("["), last = rawText.lastIndexOf("]");
       if (first === -1 || last === -1 || last <= first) throw new Error("no-json");
       const days = JSON.parse(rawText.slice(first, last + 1));
-      if (applyDetectedDays(days, fallbackName)) { setNotice(""); }
-      else { setNotice("La IA no pudo interpretar lo que subiste. Probá con una foto más nítida o pegá el texto manualmente."); }
+      if (!applyDetectedDays(days, nombre)) setNotice("La IA no encontró ejercicios en lo que subiste. Probá con una foto más nítida y de frente, o pegá el texto.");
     } catch (err) {
-      console.error("Error detectando rutina con IA:", err);
-      setNotice(err?.sinCupo ? MSG_SIN_CUPO_IA : err?.cause === "server" ? err.message : "No pudimos detectar la rutina. Probá de nuevo, con una foto más clara, o pegá el texto abajo.");
+      if (err?.name === "AbortError") return;
+      console.error("Error leyendo la rutina con IA:", err);
+      setNotice(err?.sinCupo ? MSG_SIN_CUPO_IA
+        : err?.cause === "server" ? err.message
+        : typeof navigator !== "undefined" && navigator.onLine === false ? "Sin conexión: las fotos se leen con la IA y necesitan internet. Si tenés el texto, pegalo y lo leemos sin internet."
+        : "No pudimos leer la rutina. Probá de nuevo, con una foto más clara, o pegá el texto.");
     } finally {
-      setIsParsingAI(false);
+      if (abortRef.current === control) abortRef.current = null;
+      setEstado(null);
     }
   };
+
+  // Primero sin IA si es sólo texto (instantáneo y sin internet); si no se
+  // entiende, o hay fotos, con la IA.
+  const leer = async ({ texto, fotos, nombre }) => {
+    setNotice("");
+    if (texto && !fotos.length) {
+      const local = parseRoutineFromText(texto);
+      if (local.length) { mostrar(buildImportedRoutineDef(local, nombre), true); return; }
+    }
+    await leerConIA({ texto, fotos, nombre });
+  };
+
+  // Varios archivos o fotos a la vez, y se suman a lo que ya había: una foto
+  // por día de la rutina se combina en una sola.
+  const handleFiles = async (fileList) => {
+    const files = Array.from(fileList || []);
+    if (!files.length) return;
+    setNotice(""); setEstado("leyendo");
+    const nuevasFotos = [...images];
+    const nuevosArchivos = [...archivos];
+    const sumarFoto = (img) => {
+      if (nuevasFotos.length >= IMPORT_HASTA_FOTOS) { setNotice((n) => n || `Hasta ${IMPORT_HASTA_FOTOS} fotos por rutina: alcanza para una de seis días.`); return; }
+      nuevasFotos.push(img);
+    };
+    for (const file of files) {
+      const ext = (file.name.split(".").pop() || "").toLowerCase();
+      const id = builderUid("import_src");
+      try {
+        if (file.type?.startsWith("image/") || ["heic", "heif"].includes(ext)) {
+          try {
+            const dataUrl = await resizeImageFile(file, 1600, 0.85);
+            const [, mimeType, data] = dataUrl.match(/^data:([^;]+);base64,(.*)$/) || [];
+            if (data) sumarFoto({ id, name: file.name, mimeType, data, previewUrl: dataUrl, deArchivo: null });
+          } catch {
+            setNotice((n) => n || (["heic", "heif"].includes(ext) || /hei[cf]/i.test(file.type || "")
+              ? "Esa foto está en HEIC y acá no se abre: sacale una captura de pantalla y subí la captura."
+              : "No pudimos abrir una de las fotos. Probá con otra."));
+          }
+        } else if (["xlsx", "xls"].includes(ext)) {
+          nuevosArchivos.push({ id, nombre: file.name, tipo: "excel", detalle: "Planilla", texto: await extractTextFromExcelFile(file) });
+        } else if (ext === "pdf") {
+          const lugar = IMPORT_HASTA_FOTOS - nuevasFotos.length;
+          const { texto, paginas, escaneadas } = await extractFromPdfFile(file, lugar);
+          escaneadas.forEach((img, k) => sumarFoto({ ...img, id: `${id}_${k}`, deArchivo: id }));
+          const p = `${paginas} ${paginas === 1 ? "página" : "páginas"}`;
+          nuevosArchivos.push({ id, nombre: file.name, tipo: "pdf", texto,
+            detalle: !escaneadas.length ? p : escaneadas.length === paginas ? `${p}, escaneado: va como foto` : `${p}; ${escaneadas.length} ${escaneadas.length === 1 ? "escaneada va" : "escaneadas van"} como foto` });
+        } else if (ext === "docx") {
+          nuevosArchivos.push({ id, nombre: file.name, tipo: "word", detalle: "Documento de Word", texto: await extractTextFromDocxFile(file) });
+        } else if (ext === "doc") {
+          setNotice((n) => n || "Ese Word es del formato viejo (.doc): guardalo como .docx o PDF, o copiá el texto y pegalo.");
+        } else if (["csv", "txt"].includes(ext) || file.type?.startsWith("text/")) {
+          nuevosArchivos.push({ id, nombre: file.name, tipo: "texto", detalle: ext === "csv" ? "Planilla en texto" : "Texto", texto: await file.text() });
+        } else {
+          setNotice((n) => n || `"${file.name}" no es un formato que sepamos leer: probá con una foto, un PDF, un Excel, un Word o texto.`);
+        }
+      } catch (err) {
+        console.warn("[import] no se pudo leer", file.name, err);
+        setNotice((n) => n || `No pudimos leer "${file.name}". Probá de nuevo, sacale una foto o pegá el texto.`);
+      }
+    }
+    setImages(nuevasFotos);
+    setArchivos(nuevosArchivos);
+    setEstado(null);
+    const texto = textoDe(nuevosArchivos, text);
+    if (!texto && !nuevasFotos.length) return;
+    // El nombre: el que ya le pusiste, el del archivo, o (una foto se llama
+    // IMG_2025…) "Rutina importada".
+    const primero = files.find((f) => !f.type?.startsWith("image/"));
+    await leer({ texto, fotos: nuevasFotos, nombre: nombreFinal.trim() || primero?.name.replace(/\.[^.]+$/, "") || "Rutina importada" });
+  };
+
+  const quitarFoto = (id) => setImages((prev) => prev.filter((img) => img.id !== id));
+  const quitarArchivo = (id) => { setArchivos((prev) => prev.filter((a) => a.id !== id)); setImages((prev) => prev.filter((img) => img.deArchivo !== id)); };
+  const empezarDeNuevo = () => { setImages([]); setArchivos([]); setText(""); setNotice(""); setVerTexto(false); setNombreFinal(""); };
+  const leerLoQueHay = () => leer({ texto: textoTotal, fotos: images, nombre: nombreFinal.trim() || archivos[0]?.nombre?.replace(/\.[^.]+$/, "") || "Rutina importada" });
+  const definitiva = () => (parsed ? { ...parsed, name: nombreFinal.trim() || parsed.name } : null);
 
   // Confirmar/corregir/sacar un ejercicio marcado durante la revisión —
   // avanza al siguiente hueco o, si era el último, arma la rutina final.
@@ -25853,170 +26169,145 @@ function ImportRoutineModal({ onImport, onClose }) {
     const updatedDays = reviewQueue.days
       .map((d, di) => di !== currentFlag.dayIdx ? d : { ...d, exercises: d.exercises.filter((_, ei) => ei !== currentFlag.exIdx) })
       .filter((d) => d.exercises.length);
+    if (!updatedDays.length) { setReviewQueue(null); setNotice("Sacaste todos los ejercicios: no quedó nada para crear."); return; }
     advanceReview(updatedDays);
   };
 
-  // Multi-archivo: cada uno se suma a lo que ya había (texto concatenado,
-  // imágenes acumuladas) en vez de reemplazarlo — así podés subir, por
-  // ejemplo, una foto por día y que se combinen en una sola rutina.
-  const handleFiles = async (fileList) => {
-    const files = Array.from(fileList || []);
-    if (!files.length) return;
-    setNotice(""); setLoadingFile(true);
-    let addedText = "";
-    const addedImages = [];
-    try {
-      for (const file of files) {
-        if (file.type?.startsWith("image/")) {
-          // Tope de 6 fotos: de sobra para una rutina de 6 días (una foto
-          // por día) y lejos del límite de tamaño del pedido al servidor.
-          if (images.length + addedImages.length >= 8) { setNotice((n) => n || "Máximo 8 fotos por rutina: con eso alcanza de sobra."); continue; }
-          try {
-            const dataUrl = await resizeImageFile(file, 1600, 0.85);
-            const [, mimeType, data] = dataUrl.match(/^data:([^;]+);base64,(.*)$/) || [];
-            if (data) addedImages.push({ id: builderUid("import_img"), name: file.name, mimeType, data, previewUrl: dataUrl });
-          } catch { setNotice((n) => n || "No pudimos leer una de las fotos. Probá con otra."); }
-          continue;
-        }
-        const ext = file.name.split(".").pop().toLowerCase();
-        if (["xlsx", "xls"].includes(ext)) addedText += `\n${await extractTextFromExcelFile(file)}`;
-        else if (ext === "pdf") addedText += `\n${await extractTextFromPdfFile(file)}`;
-        else if (["csv", "txt"].includes(ext)) addedText += `\n${await file.text()}`;
-        else if (ext === "docx" || ext === "doc") setNotice((n) => n || "Para Word: abrí el archivo, copiá todo (Ctrl+A, Ctrl+C) y pegalo abajo.");
-        else setNotice((n) => n || `"${file.name}" no es un formato reconocido (PDF, Excel, CSV, TXT o foto).`);
-        if (["xlsx", "xls", "pdf", "csv", "txt"].includes(ext)) setTextFileNames((prev) => [...prev, file.name]);
-      }
-      const newText = (text + addedText).trim();
-      if (addedText) setText(newText);
-      if (addedImages.length) setImages((prev) => [...prev, ...addedImages]);
-
-      const fallbackName = routineName.trim() || files[0].name.replace(/\.[^.]+$/, "");
-      // Con solo texto (sin fotos), probamos primero el detector local —
-      // es instantáneo y no depende de la IA. Con fotos de por medio, el
-      // detector local no sirve (no lee imágenes), así que vamos directo
-      // a la IA.
-      if (newText && !addedImages.length && !images.length) {
-        const local = parseRoutineFromText(newText);
-        if (local.length) { setParsed(buildImportedRoutineDef(local, fallbackName)); setLoadingFile(false); return; }
-      }
-      if (newText || addedImages.length || images.length) { await runAIDetection(fallbackName); }
-    } catch {
-      setNotice("No pudimos leer alguno de los archivos. Probá de nuevo o pegá el texto directamente.");
-    } finally {
-      setLoadingFile(false);
-    }
-  };
-
-  const removeImage = (id) => setImages((prev) => prev.filter((img) => img.id !== id));
-
-  const handleProcess = () => {
-    const parsedDays = parseRoutineFromText(text);
-    if (!parsedDays.length) { setNotice("No pudimos detectar ejercicios. Revisá que cada uno tenga un patrón como \"Press banca 3x8-10\" (o, si es una planilla, columnas de series y repeticiones)."); return; }
-    setNotice("");
-    setParsed(buildImportedRoutineDef(parsedDays, routineName.trim() || "Rutina importada"));
-  };
-
-  // Detección con IA: en vez de patrones de texto, le pide a un modelo de
-  // lenguaje que entienda la rutina (texto y/o fotos) y devuelva
-  // días/ejercicios en JSON, completando lo que falte. El pedido lo hace
-  // /api/ia (función serverless de Vercel — ver api/ia.js): la clave real
-  // nunca llega al navegador.
-  const handleProcessAI = () => runAIDetection(routineName.trim() || "Rutina importada");
+  if (typeof document === "undefined") return null;
+  const marco = (contenido, etiqueta) => createPortal(
+    <div className="fixed inset-0 z-[130] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={ocupado ? undefined : onClose}>
+      <div className="modal-rutina import modal-pop-in" role="dialog" aria-modal="true" aria-label={etiqueta} onClick={(e) => e.stopPropagation()}>
+        {contenido}
+      </div>
+    </div>,
+    document.body
+  );
 
   if (currentFlag) {
     const ex = reviewQueue.days[currentFlag.dayIdx].exercises[currentFlag.exIdx];
     const dayLabel = reviewQueue.days[currentFlag.dayIdx].label;
-    return (
-      <div className="fixed inset-0 z-[130] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
-        <div className="bg-slate-900 border border-slate-700/60 rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50 max-h-[92vh] overflow-y-auto overscroll-contain" onClick={(e) => e.stopPropagation()}>
-          <ImportReviewStep key={reviewQueue.step} dayLabel={dayLabel} ex={ex} stepNumber={reviewQueue.step + 1} totalSteps={reviewQueue.flagged.length} onConfirm={handleReviewConfirm} onRemove={handleReviewRemove} />
-        </div>
-      </div>
-    );
+    return marco(<ImportReviewStep key={reviewQueue.step} dayLabel={dayLabel} ex={ex} stepNumber={reviewQueue.step + 1} totalSteps={reviewQueue.flagged.length} onConfirm={handleReviewConfirm} onRemove={handleReviewRemove} />, "Falta un dato");
   }
 
+  // LA VISTA PREVIA: cómo quedó, antes de crearla.
   if (parsed) {
-    return (
-      <div className="fixed inset-0 z-[130] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
-        <div className="bg-slate-900 border border-slate-700/60 rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50 max-h-[88vh] overflow-y-auto overscroll-contain" onClick={(e) => e.stopPropagation()}>
-          <div className="flex items-center gap-3 mb-3">
-            <div className="icono-suelto"><Sparkles size={18} /></div>
-            <div className="min-w-0"><p className="text-[10px] font-black uppercase tracking-widest text-teal-400">Vista previa</p><h3 className="text-base font-black text-white leading-tight truncate">{parsed.name}</h3></div>
+    const propios = (parsed.dayOrder || []).flatMap((dk) => (parsed.days[dk]?.exercises || []).filter((e) => !e.libId).map((e) => e.name));
+    return marco(
+      <>
+        <div className="modal-rutina-cabeza">
+          <div className="min-w-0">
+            <h3 className="ficha-titulo">Así la leímos</h3>
+            <p className="ficha-bajada">Revisá los días y sus ejercicios. Después la podés cambiar cuando quieras.</p>
           </div>
-          <p className="text-sm text-slate-400 mb-3">Así lo interpretamos: revisalo, después lo podés corregir desde Rutinas.</p>
+          <button onClick={onClose} aria-label="Cerrar" className="boton-redondo shrink-0"><X size={17} /></button>
+        </div>
+        <div className="modal-rutina-cuerpo">
+          <label className="import-rotulo">Nombre
+            <input value={nombreFinal} onChange={(e) => setNombreFinal(e.target.value)} placeholder="Rutina importada" className="import-campo" />
+          </label>
           <RoutinePreview routineDef={parsed} />
-          <div className="flex gap-2 mt-4">
-            <button onClick={() => setParsed(null)} className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-400 text-sm font-semibold">Volver</button>
-            <button onClick={() => onImport(parsed)} className="flex-1 py-3 rounded-xl bg-teal-500 !text-white text-sm font-bold active:scale-[0.98] transition-all">Crear rutina</button>
+          {propios.length > 0 && (
+            <p className="ficha-aviso !m-0"><Info size={15} />{propios.length === 1
+              ? <>«{propios[0]}» no está en el catálogo: queda como un ejercicio tuyo, sin video ni nota.</>
+              : <>{propios.length} ejercicios no están en el catálogo y quedan como tuyos: {propios.slice(0, 4).map((n) => `«${n}»`).join(", ")}{propios.length > 4 ? " y más" : ""}.</>}</p>
+          )}
+          {leidaSinIA && (
+            <p className="ficha-aviso !m-0"><Info size={15} /><span>La leímos sin internet. ¿No quedó bien? <button onClick={() => { setParsed(null); leerConIA({ texto: textoTotal, fotos: images, nombre: nombreFinal.trim() || "Rutina importada" }); }} className="import-enlace">Leela con la IA</button>.</span></p>
+          )}
+        </div>
+        <div className="modal-rutina-pie">
+          <button onClick={() => onImport(definitiva())} className="boton-pildora"><Check size={17} /> Crear la rutina</button>
+          <div className="flex gap-2">
+            {onEditar && <button onClick={() => onEditar(definitiva())} className="boton-tonal flex-1"><Edit3 size={15} /> Corregir</button>}
+            <button onClick={() => setParsed(null)} className="boton-tonal flex-1"><ImagePlus size={15} /> Otra hoja</button>
           </div>
         </div>
-      </div>
+      </>,
+      "Así la leímos"
     );
   }
 
-  return (
-    <div className="fixed inset-0 z-[130] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
-      <div className="bg-slate-900 border border-slate-700/60 rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50 max-h-[92vh] overflow-y-auto overscroll-contain" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center gap-3 mb-3">
-          <div className="icono-suelto"><Download size={18} className="rotate-180" /></div>
-          <div className="flex-1 min-w-0"><h3 className="text-base font-black text-white leading-tight">Importar rutina</h3><p className="text-[11px] text-slate-500 mt-0.5">Archivo, foto o texto: combinamos todo</p></div>
-          <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition shrink-0"><X size={18} /></button>
+  const elegirArchivo = (contenido, captura = false, multiple = true) => (
+    <>
+      {contenido}
+      <input type="file" accept={captura ? "image/*" : IMPORT_TIPOS} {...(captura ? { capture: "environment" } : {})} multiple={multiple} className="sr-only" onChange={(e) => { handleFiles(e.target.files); e.target.value = ""; }} disabled={ocupado} />
+    </>
+  );
+
+  return marco(
+    <>
+      <div className="modal-rutina-cabeza">
+        <div className="min-w-0">
+          <h3 className="ficha-titulo">Importar una rutina</h3>
+          <p className="ficha-bajada">{hayAlgo ? "Sumá más hojas si la rutina sigue en otra, y leela." : "Sacale una foto a la hoja del profe, subí el archivo o pegá el texto: la leemos y armamos los días."}</p>
         </div>
-        <p className="text-[11px] text-slate-500 mb-3 leading-relaxed">Subí archivos (PDF, Excel, CSV, TXT) o fotos: la IA arma la rutina y completa lo que falte. Para Word, pegá el texto abajo.</p>
-
-        <div className="grid grid-cols-2 gap-2 mb-3">
-          <label className="flex flex-col items-center justify-center gap-1.5 py-4 rounded-2xl border-2 border-dashed border-slate-700 text-slate-400 hover:text-white hover:border-teal-500/40 transition cursor-pointer text-center">
-            <Upload size={18} />
-            <span className="text-[11px] font-bold leading-tight">Subir archivos<br />o fotos</span>
-            <input type="file" accept=".pdf,.xlsx,.xls,.csv,.txt,.docx,.doc,image/*" multiple className="hidden" onChange={(e) => { handleFiles(e.target.files); e.target.value = ""; }} disabled={loadingFile || isParsingAI} />
-          </label>
-          <label className="flex flex-col items-center justify-center gap-1.5 py-4 rounded-2xl border-2 border-dashed border-slate-700 text-slate-400 hover:text-white hover:border-teal-500/40 transition cursor-pointer text-center">
-            <Camera size={18} />
-            <span className="text-[11px] font-bold leading-tight">Sacar una<br />foto</span>
-            <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => { handleFiles(e.target.files); e.target.value = ""; }} disabled={loadingFile || isParsingAI} />
-          </label>
-        </div>
-
-        {(loadingFile || isParsingAI) && (
-          <div className="flex items-center gap-2 text-teal-400 text-[11px] font-bold mb-3"><RotateCcw size={12} className="animate-spin" /> {loadingFile ? "Leyendo…" : "Analizando con IA…"}</div>
-        )}
-
-        {(images.length > 0 || textFileNames.length > 0) && (
-          <div className="mb-3 space-y-2">
+        <button onClick={onClose} disabled={ocupado} aria-label="Cerrar" className="boton-redondo shrink-0 disabled:opacity-40"><X size={17} /></button>
+      </div>
+      <div className="modal-rutina-cuerpo">
+        {hayAlgo && (
+          <div className={`import-fuentes ${estado === "ia" ? "leyendo" : ""}`}>
             {images.length > 0 && (
-              <div className="flex flex-wrap gap-2">
+              <div className="import-hojas">
                 {images.map((img) => (
-                  <div key={img.id} className="relative w-14 h-14 rounded-xl overflow-hidden border border-slate-700 shrink-0">
-                    <img src={img.previewUrl} alt={img.name} className="w-full h-full object-cover" />
-                    <button onClick={() => removeImage(img.id)} aria-label="Quitar foto" className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/70 text-white flex items-center justify-center"><X size={10} /></button>
-                  </div>
+                  <span key={img.id} className="import-hoja">
+                    <img src={img.previewUrl} alt={img.deArchivo ? `Una página escaneada de ${archivos.find((a) => a.id === img.deArchivo)?.nombre || "un PDF"}` : img.name} />
+                    {!ocupado && !img.deArchivo && <button onClick={() => quitarFoto(img.id)} aria-label={`Quitar ${img.name}`} className="import-quitar"><X size={12} /></button>}
+                  </span>
                 ))}
               </div>
             )}
-            {textFileNames.length > 0 && (
-              <p className="text-[10px] text-slate-500 flex items-center gap-1.5"><Check size={11} className="text-teal-400 shrink-0" /> Leído: {textFileNames.join(", ")}</p>
+            {archivos.map((a) => (
+              <div key={a.id} className="import-archivo">
+                <span className="icono-suelto">{a.tipo === "excel" ? <FileSpreadsheet size={18} /> : <FileText size={18} />}</span>
+                <span className="min-w-0 flex-1"><b>{a.nombre}</b><small>{a.detalle}</small></span>
+                {!ocupado && <button onClick={() => quitarArchivo(a.id)} aria-label={`Quitar ${a.nombre}`} className="boton-redondo chico"><X size={14} /></button>}
+              </div>
+            ))}
+            {text.trim() && !verTexto && (
+              <div className="import-archivo">
+                <span className="icono-suelto"><ClipboardPaste size={18} /></span>
+                <span className="min-w-0 flex-1"><b>Texto pegado</b><small>{text.trim().split(/\n/).length} renglones</small></span>
+                {!ocupado && <button onClick={() => setVerTexto(true)} className="import-enlace">Ver</button>}
+              </div>
             )}
           </div>
         )}
 
-        <details className="mb-3">
-          <summary className="text-[11px] text-slate-500 font-semibold cursor-pointer select-none">O pegá el texto a mano</summary>
-          <textarea value={text} onChange={(e) => setText(e.target.value)} rows={6} placeholder={"Push\nPress banca 3x8-10\nPress militar 3x8-10\n\nPull\nDominadas 3x8-10\n..."} className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-teal-500/50 mt-2" />
-        </details>
-
-        <input value={routineName} onChange={(e) => setRoutineName(e.target.value)} placeholder="Nombre para la rutina (opcional)" className="w-full bg-slate-900/80 border border-slate-700/50 rounded-xl px-3 py-2.5 text-white text-sm mb-3 focus:outline-none focus:border-teal-500/60" />
-        {notice && <p className="text-[11px] text-amber-400 mb-3 leading-relaxed">{notice}</p>}
-        <button onClick={handleProcessAI} disabled={!hasAnySource || loadingFile || isParsingAI} className={`w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-sm font-bold transition-all active:scale-[0.98] ${hasAnySource && !loadingFile && !isParsingAI ? "!text-[color:var(--accion-tinta)]" : "bg-slate-800 text-slate-600"}`} style={hasAnySource && !loadingFile && !isParsingAI ? { background: "var(--accion-fondo)" } : {}}>
-          {isParsingAI ? <><RotateCcw size={14} className="animate-spin" /> Analizando con IA...</> : <><Sparkles size={15} /> Detectar con IA</>}
-        </button>
-        {!images.length && (
-          <button onClick={handleProcess} disabled={!text.trim() || loadingFile || isParsingAI} className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition text-sm font-semibold mt-2 disabled:opacity-50">
-            <SlidersHorizontal size={14} /> Detectar sin IA (más rápido)
-          </button>
+        {estado ? (
+          <p className="import-estado" role="status"><span className="plan-ia-girando" aria-hidden="true" />{estado === "leyendo" ? "Abriendo lo que subiste…" : images.length ? `La IA está leyendo ${images.length === 1 ? "la hoja" : `las ${images.length} hojas`}…` : "La IA está leyendo el texto…"}</p>
+        ) : (
+          <div className="import-opciones">
+            <label className="eleccion-fila sub">
+              {elegirArchivo(<><span className="icono-suelto"><Camera size={19} /></span><span className="flex-1 min-w-0"><b>{images.length ? "Sacar otra foto" : "Sacar una foto"}</b><small>De la hoja, la pizarra o la pantalla</small></span></>, true, false)}
+            </label>
+            <label className="eleccion-fila sub">
+              {elegirArchivo(<><span className="icono-suelto"><Upload size={18} /></span><span className="flex-1 min-w-0"><b>{hayAlgo ? "Subir otro archivo" : "Subir fotos o archivos"}</b><small>PDF, Excel, Word, CSV o texto; varios a la vez</small></span></>)}
+            </label>
+            <button onClick={() => setVerTexto((v) => !v)} className="eleccion-fila sub" aria-expanded={verTexto}>
+              <span className="icono-suelto"><ClipboardPaste size={18} /></span>
+              <span className="flex-1 min-w-0"><b>Pegar el texto</b><small>De un mensaje, una nota o un mail</small></span>
+              <ChevronDown size={17} className={`eleccion-chevron ${verTexto ? "rotate-180" : ""}`} />
+            </button>
+            {verTexto && (
+              <textarea value={text} onChange={(e) => setText(e.target.value)} rows={7} aria-label="El texto de la rutina" placeholder={"Push\nPress banca 4x12/10/8/6\nPress militar 3x8-10\n\nPull\nDominadas 4 series de 8\n…"} className="import-campo import-texto" />
+            )}
+          </div>
         )}
-        <p className="text-[10px] text-slate-600 mt-2 text-center">"Detectar con IA" necesita estar conectado a internet y haber iniciado sesión.</p>
+        {notice && <p className="ficha-aviso !m-0" role="alert"><AlertTriangle size={15} />{notice}</p>}
       </div>
-    </div>
+      <div className="modal-rutina-pie">
+        {estado === "ia" ? (
+          <button onClick={() => abortRef.current?.abort()} className="boton-tonal">Cancelar</button>
+        ) : (
+          <>
+            {hayAlgo && <button onClick={leerLoQueHay} disabled={ocupado} className="boton-pildora disabled:opacity-40"><ScanText size={17} /> Leer la rutina</button>}
+            {hayAlgo && !ocupado && <button onClick={empezarDeNuevo} className="enlace-suave">Empezar de nuevo</button>}
+            {!hayAlgo && <p className="import-pie">Las fotos y los PDF escaneados se leen con la IA: necesitan internet y tu sesión iniciada.</p>}
+          </>
+        )}
+      </div>
+    </>,
+    "Importar una rutina"
   );
 }
 
@@ -26062,8 +26353,10 @@ function WeeklyScheduleEditor({ dayOrder, days, schedule, onChange }) {
   );
 }
 
-function RoutineBuilder({ initialRoutine, onCancel, onSave, dumbbellDouble = null, onUpdateSettings = null, logs = {}, descansos = null, sinPestanas = false, titulo = null }) {
-  const isEditing = !!initialRoutine;
+// `nueva`: arranca con una rutina (la importada, para corregirla) pero se
+// guarda como una nueva.
+function RoutineBuilder({ initialRoutine, onCancel, onSave, dumbbellDouble = null, onUpdateSettings = null, logs = {}, descansos = null, sinPestanas = false, titulo = null, nueva = false }) {
+  const isEditing = !!initialRoutine && !nueva;
   const [name, setNameRaw] = useState(initialRoutine?.name || "");
   const [days, setDaysRaw] = useState(() => (initialRoutine ? builderDaysFromRoutineDef(initialRoutine) : [{ key: builderUid("day"), label: "DÍA 1", color: BUILDER_COLOR_PALETTE[0], exercises: [] }]));
   const [schedule, setScheduleRaw] = useState(() => getRoutineWeekSchedule(initialRoutine || { dayOrder: days.map((d) => d.key) }));
@@ -26912,6 +27205,9 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
   const [shareTarget, setShareTarget] = useState(null);
   const [pendingActivation, setPendingActivation] = useState(null);
   const [showImport, setShowImport] = useState(false);
+  // Lo importado que se está corrigiendo en el armado (vuelve a la vista
+  // previa si cancelás).
+  const [borradorImport, setBorradorImport] = useState(null);
   // BUG FIX (encontrado auditando): la pantalla de "¿qué días entrenás
   // esta rutina?" (mode "scheduleSetup", más abajo) es de página completa
   // y no tenía ningún botón de cancelar propio — el botón atrás de Android
@@ -27018,11 +27314,13 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
         logs={profile?.logs || {}}
         descansos={{ largo: getProfileSettings(profile).restLong, corto: getProfileSettings(profile).restShort }}
         sinPestanas={forced}
-        initialRoutine={editingRoutineId ? routines[editingRoutineId] : null}
-        onCancel={() => { setMode("catalog"); setEditingRoutineId(null); }}
+        initialRoutine={editingRoutineId ? routines[editingRoutineId] : borradorImport}
+        nueva={!editingRoutineId && !!borradorImport}
+        titulo={!editingRoutineId && borradorImport ? "Tu rutina importada" : null}
+        onCancel={() => { setMode("catalog"); setEditingRoutineId(null); if (borradorImport) setShowImport(true); }}
         onSave={(def) => {
           if (editingRoutineId) { onUpdate(editingRoutineId, def); setMode("catalog"); setEditingRoutineId(null); }
-          else { handleUseClick(builderUid("custom_routine"), def); setEditingRoutineId(null); }
+          else { handleUseClick(builderUid(borradorImport ? "imported_routine" : "custom_routine"), def); setEditingRoutineId(null); setBorradorImport(null); }
         }}
       />
     );
@@ -27085,7 +27383,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
           <div className="eleccion-opcion">
             <button onClick={() => setShowImport(true)} className="eleccion-fila">
               <span className="icono-suelto"><Download size={18} /></span>
-              <span className="flex-1 min-w-0"><b>Importar una rutina</b><small>Desde un PDF, un Excel, un Word o un texto</small></span>
+              <span className="flex-1 min-w-0"><b>Importar una rutina</b><small>Una foto de la hoja, un PDF, un Excel o un Word</small></span>
               <ChevronRight size={16} className="eleccion-chevron" />
             </button>
           </div>
@@ -27107,26 +27405,18 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
           </div>
 
           <DiasRutina routineDef={activeDef} onGoToDay={onGoToDay} />
-          {/* LA SEMANA PINTADA. Antes eran cuatro cajas de números (días,
-              ejercicios, series, sesiones), una fila de letras y una lista de
-              días con su cantidad de ejercicios. Ahora: los siete días con el
-              color de lo que toca cada uno, y arriba los días de la rutina
-              como baldosas, con sus ejercicios y sus series. */}
-          <div className="semana-rutina" role="list" aria-label="Tu semana">
-            {WEEKDAY_KEYS.map((wk, i) => {
+          {/* LA SEMANA, EN EL ESTANTE DE LAS PESAS RUSAS (ver EstantePesas):
+              una pesa del color de lo que toca cada día que entrenás, el lugar
+              vacío los de descanso y la de hoy, levantada. Arriba, los días de
+              la rutina como baldosas, con sus ejercicios y sus series. */}
+          <EstantePesas
+            dias={WEEKDAY_KEYS.map((wk, i) => {
               const dk = activeSchedule[wk] || null;
               const d = dk ? activeDef.days[dk] : null;
-              const isToday = wk === todayWeekdayKey();
-              return (
-                <button key={wk} role="listitem" onClick={() => d && onGoToDay?.(dk)} disabled={!d}
-                  aria-label={`${WEEKDAY_SHORT_LABELS[i]}: ${d ? d.label : "descanso"}${isToday ? " (hoy)" : ""}`}
-                  className={`semana-rutina-dia ${d ? "entrena" : ""} ${isToday ? "hoy" : ""}`} style={d ? { "--dia": d.color } : undefined}>
-                  <span className="semana-rutina-letra">{WEEKDAY_SHORT_LABELS[i][0]}</span>
-                  <span className="semana-rutina-marca" />
-                </button>
-              );
+              return { clave: wk, corto: WEEKDAY_SHORT_LABELS[i], nombre: DIAS_DE_LA_SEMANA[i], dia: d ? { key: dk, label: d.label, color: d.color } : null, hoy: wk === todayWeekdayKey() };
             })}
-          </div>
+            onElegir={onGoToDay ? (d) => onGoToDay(d.dia.key) : null}
+          />
 
           {/* El día que toca hoy, como botón para ir directo. */}
           {(() => {
@@ -27201,7 +27491,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
             <button onClick={() => setShowImport(true)} className="accion-rutina" style={{ "--c": "#14B8A6" }}>
               <span className="galleta icono-galleta" aria-hidden="true"><Download size={17} /></span>
               <b>Importar</b>
-              <small>De un PDF, un Excel o un texto</small>
+              <small>De una foto, un PDF, un Excel o un Word</small>
             </button>
           </div>
         </section>
@@ -27248,8 +27538,10 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
 
       {showImport && (
         <ImportRoutineModal
-          onImport={(def) => { setShowImport(false); handleUseClick(builderUid("imported_routine"), def); }}
-          onClose={() => setShowImport(false)}
+          inicial={borradorImport}
+          onImport={(def) => { setShowImport(false); setBorradorImport(null); handleUseClick(builderUid("imported_routine"), def); }}
+          onEditar={(def) => { setShowImport(false); setBorradorImport(def); setEditingRoutineId(null); setMode("builder"); }}
+          onClose={() => { setShowImport(false); setBorradorImport(null); }}
         />
       )}
     </div>
@@ -27384,7 +27676,7 @@ function ActiveSessionBar({ startedAt, dayLabel, color, done, total, conProgreso
             )}
           </div>
           <button onClick={() => setConfirmando(false)} className="h-10 px-4 rounded-full bg-slate-800 text-slate-300 text-[13px] font-semibold shrink-0 transition active:scale-95">No</button>
-          <button onClick={onEnd} className="boton-pildora shrink-0" style={{ minHeight: 40, padding: "0 16px", fontSize: 13 }}>Sí, finalizar</button>
+          <button onClick={onEnd} className="boton-pildora shrink-0" style={{ minHeight: 40, padding: "0 16px", fontSize: "calc(13px * var(--escala-letra, 1))" }}>Sí, finalizar</button>
         </div>
       ) : (
         <>
@@ -28479,13 +28771,15 @@ export default function App() {
     }).catch(() => {});
   }, [activeProfile, profile?.avatarData]);
 
-  // Tamaño de letra (Perfil → Tamaño de letra): se aplica como font-size del
-  // <html>, así que todo lo que esté en rem (la mayoría de los tamaños de
-  // texto de Tailwind) escala junto y en proporción. Sin perfil activo (o
-  // sin esta preferencia guardada) queda en el tamaño normal de siempre.
+  // Tamaño de letra (Perfil → Tamaño de letra): va en --escala-letra, en el
+  // <html>, y crecen sólo las letras (ver letraEscalable). El rem queda en
+  // 16 px, así los márgenes y las piezas no cambian. Sin perfil activo (o sin
+  // esta preferencia guardada) queda en el tamaño normal de siempre.
   const textScale = profile ? (getProfileSettings(profile).textScale ?? 1) : 1;
   useEffect(() => {
-    if (typeof document !== "undefined") document.documentElement.style.fontSize = `${16 * textScale}px`;
+    if (typeof document === "undefined") return;
+    document.documentElement.style.fontSize = "16px";
+    document.documentElement.style.setProperty("--escala-letra", String(textScale));
   }, [textScale]);
   // Zoom con los dedos (Perfil → Zoom): por defecto viene DESACTIVADO —
   // sin esto, pellizcar la pantalla por accidente mientras entrenás (o
