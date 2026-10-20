@@ -5004,6 +5004,32 @@ button.credencial-dato:not(:disabled):active { background: var(--velo); }
 .plan-mini-semana.elegida .plan-mini-valor { color: var(--text-strong); }
 .plan-mini-numero { height: 14px; font-size: 11px; line-height: 14px; text-align: center; color: var(--text-faint); }
 .plan-desde { display: flex; flex-wrap: wrap; gap: 6px; }
+/* Planificar con IA: las mismas piezas que el planificador a mano. */
+.plan-ia-bloque { display: grid; gap: 8px; }
+.plan-ia-bloque > .ficha-grupo-titulo { margin-bottom: 0; }
+.plan-objetivo.fila { display: flex; align-items: center; gap: 10px; padding: 12px 14px; }
+.plan-objetivo.fila > span > b, .plan-objetivo.fila > span > span { display: block; }
+.plan-objetivo.fila > span > span { margin-top: 2px; }
+.plan-objetivo.fila em { flex: none; font-style: normal; font-size: 0.8125rem; font-weight: 650; color: var(--text-muted); }
+.plan-objetivo.fila[aria-checked="true"] em { color: color-mix(in oklab, var(--tono) 72%, white); }
+.light-mode .plan-objetivo.fila[aria-checked="true"] em { color: color-mix(in oklab, var(--tono) 72%, black); }
+.plan-objetivos.tres { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.plan-ia-resumen { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 4px; text-align: left; font-size: 0.8125rem; line-height: 1.35; color: var(--text-muted); }
+.plan-ia-resumen-accion { flex: none; font-weight: 650; color: var(--text-strong); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--hairline-fuerte); }
+.plan-ia-ejercicios { display: grid; gap: 6px; }
+.plan-tilde { width: 100%; display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 8px 12px; border-radius: 18px; text-align: left; background: var(--surface-2); transition: opacity .2s ease; }
+.plan-ia-ejercicios .plan-tilde:not(.on) { opacity: .6; }
+.plan-ej .plan-tilde { background: transparent; }
+.plan-ej.fuera { opacity: .5; }
+.plan-tilde-marca { width: 26px; height: 26px; --galleta-fondo: color-mix(in oklab, var(--tono) 72%, white); color: color-mix(in oklab, var(--tono) 18%, #07080a); }
+.light-mode .plan-tilde-marca { --galleta-fondo: var(--tono); color: #fff; }
+.plan-tilde-marca.hueca { --galleta-borde: var(--hairline-fuerte); --galleta-fondo: var(--surface-2); }
+.plan-tilde-nombre { display: block; font-size: 0.875rem; font-weight: 650; line-height: 1.25; color: var(--text-strong); text-wrap: pretty; }
+.plan-tilde-sub { display: block; margin-top: 1px; font-size: 0.75rem; line-height: 1.35; color: var(--text-muted); }
+.plan-ia-espera { display: grid; justify-items: center; gap: 10px; padding: 36px 24px 40px; text-align: center; }
+.plan-ia-girando { width: 40px; height: 40px; border-radius: 999px; border: 3px solid color-mix(in oklab, var(--tono) 20%, transparent); border-top-color: color-mix(in oklab, var(--tono) 72%, white); animation: planGira .9s linear infinite; }
+@keyframes planGira { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .plan-ia-girando { animation-duration: 2.4s; } }
 /* El plan en la tarjeta del ejercicio, en Rutina. */
 .chip-plan { display: inline-flex; align-items: center; gap: 4px; height: 24px; padding: 0 9px; border-radius: 999px; font-size: 0.75rem; font-weight: 650; color: var(--text-muted); background: var(--velo); cursor: default; }
 .chip-plan[role="button"] { cursor: pointer; }
@@ -11495,282 +11521,234 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_
     onClose();
   };
 
-  const accent = "#38BDF8";
+  // PLANIFICAR CON IA, en Grafito (como el planificador a mano): la misma
+  // placa, las semanas en escalera, los ejercicios como renglones para tildar
+  // y, en la propuesta, cada ejercicio con su progresión en escalones.
   if (typeof document === "undefined") return null;
   return createPortal(
-    <div className="fixed inset-0 z-[150] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
-      <div className="relative max-w-sm w-full max-h-[92vh] overflow-y-auto overscroll-contain rounded-3xl modal-pop-in shadow-2xl shadow-black/70 bg-slate-900 border border-sky-500/30" onClick={(e) => e.stopPropagation()}>
-        <div className="sticky top-0 z-10 flex items-center gap-2.5 px-5 py-4 bg-slate-900/95 backdrop-blur border-b border-slate-800/60">
-          <span className="icono-suelto"><Sparkles size={16} /></span>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-black text-white leading-tight">Planificar con IA</p>
-            <p className="text-[10.5px] text-slate-500">Tu progresión completa, de una vez</p>
+    <div className="fixed inset-0 z-[150] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
+      <div className="modal-rutina modal-pop-in plan" role="dialog" aria-modal="true" aria-label="Planificar con IA" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-rutina-cabeza">
+          <div className="min-w-0">
+            <h3 className="ficha-titulo">Planificar con IA</h3>
+            <p className="ficha-bajada">Tu progresión entera, de una vez, desde tus marcas. La ves antes de aplicarla.</p>
           </div>
-          <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition shrink-0"><X size={17} /></button>
+          <button onClick={onClose} aria-label="Cerrar" className="boton-redondo shrink-0"><X size={17} /></button>
         </div>
 
         {estado === "form" && (
-          <div className="p-5 space-y-4">
-            <div>
-              <SectionLabel>Para cuánto tiempo</SectionLabel>
-              <div className="space-y-1.5 mt-2">
-                {PLANIF_PLAZOS.map((p) => {
-                  const act = plazo === p.k;
-                  const n = p.k === "ciclo" ? ciclo : p.semanas;
-                  return (
-                    <button key={p.k} onClick={() => setPlazo(p.k)} className="w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition active:scale-[0.99]"
-                      style={act ? { backgroundColor: tint(accent, "1c"), border: "1px solid " + tint(accent, "55") } : { backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}>
-                      <span className="flex-1 min-w-0">
-                        <span className="block text-xs font-bold text-white">{p.l}</span>
-                        <span className="block text-[10.5px] text-slate-500">{p.d}</span>
-                      </span>
-                      <span className="text-[10px] font-black tabular-nums shrink-0" style={{ color: act ? accent : "#6e7379" }}>{n} sem</span>
-                    </button>
-                  );
-                })}
-              </div>
-              {/* Desde qué semana del ciclo: sin esto sólo se podía planificar
-                  desde la 1, así que a mitad de ciclo el plan pisaba semanas
-                  que ya habías entrenado. */}
-              {ciclo > 1 && (
-                <div className="mt-2">
-                  <div className="flex items-center justify-between gap-2 mb-1.5">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Arrancar en</span>
-                    <span className="text-[10px] font-bold" style={{ color: accent }}>
-                      Semana {desdeSemana}{semanasReales > 1 ? ` a ${desdeSemana + semanasReales - 1}` : ""}
-                    </span>
-                  </div>
-                  <div className="flex gap-1.5 overflow-x-auto pb-1">
-                    {Array.from({ length: ciclo }, (_, i) => i + 1).map((w) => (
-                      <button key={w} onClick={() => setDesdeSemana(w)} className="relative shrink-0 w-10 py-1.5 rounded-lg text-[10.5px] font-black transition active:scale-95"
-                        style={desdeSemana === w ? { backgroundColor: "var(--surface-3)", color: "#fff" } : { backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)", color: "var(--chip-text)" }}>
-                        S{w}
-                        {w === weekInCycle && <span className="absolute left-1/2 -translate-x-1/2 bottom-0.5 w-1 h-1 rounded-full" style={{ backgroundColor: desdeSemana === w ? "#fff" : accent }} />}
-                      </button>
-                    ))}
-                  </div>
-                  {weekInCycle && <p className="text-[9.5px] text-slate-600">El punto marca la semana que estás viviendo.</p>}
-                </div>
-              )}
-            </div>
-
-            <div>
-              <SectionLabel>Qué ejercicios</SectionLabel>
-              <div className="flex gap-1.5 mt-2 overflow-x-auto pb-1">
-                {[{ k: "todos", l: "Toda la rutina" }, ...dias.map((dk) => ({ k: dk, l: model.days[dk]?.label || dk }))].map((o) => (
-                  <button key={o.k} onClick={() => setDayKey(o.k)} className="shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-bold transition"
-                    style={dayKey === o.k ? { backgroundColor: "var(--surface-3)", color: "#fff" } : { backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)", color: "var(--chip-text)" }}>
-                    {o.l}
-                  </button>
-                ))}
-              </div>
-              <button onClick={() => setVerEjercicios((v) => !v)} className="w-full flex items-center gap-1.5 mt-2 text-left">
-                <span className="flex-1 text-[10.5px] text-slate-500">
-                  {seleccionados.length} de {candidatos.length} ejercicio{candidatos.length === 1 ? "" : "s"} · {seleccionados.filter((e) => e.mejor).length} con marcas para progresar
-                </span>
-                <span className="text-[10.5px] font-bold shrink-0" style={{ color: accent }}>{verEjercicios ? "Ocultar" : "Elegir uno por uno"}</span>
-                <ChevronDown size={12} className={`shrink-0 transition-transform ${verEjercicios ? "rotate-180" : ""}`} style={{ color: accent }} />
-              </button>
-              {/* Elegir ejercicio por ejercicio: antes era todo el día o toda
-                  la rutina, sin puntos medios — y casi siempre hay uno o dos
-                  que no querés que toque (el que estás rehabilitando, el que
-                  ya planificaste a mano). */}
-              {verEjercicios && (
-                <div className="mt-2 space-y-1 tab-fade-in">
-                  <div className="flex gap-1.5">
-                    <button onClick={() => setExcluidos(new Set())} className="flex-1 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-[10px] font-bold hover:bg-slate-700 transition">Todos</button>
-                    <button onClick={() => setExcluidos(new Set(candidatos.map((e) => e.id)))} className="flex-1 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-[10px] font-bold hover:bg-slate-700 transition">Ninguno</button>
-                  </div>
-                  {candidatos.map((e) => {
-                    const on = !excluidos.has(e.id);
+          <>
+            <div className="modal-rutina-cuerpo">
+              <section className="plan-ia-bloque" aria-label="Para cuánto tiempo">
+                <p className="ficha-grupo-titulo">Para cuánto tiempo</p>
+                <div className="plan-lista">
+                  {PLANIF_PLAZOS.map((p) => {
+                    const n = p.k === "ciclo" ? ciclo : p.semanas;
                     return (
-                      <button key={e.id} onClick={() => toggleEjercicio(e.id)} className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left transition"
-                        style={on ? { backgroundColor: tint(accent, "12"), border: `1px solid ${tint(accent, "2e")}` } : { backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)", opacity: 0.55 }}>
-                        <span className="w-4 h-4 rounded-md shrink-0 flex items-center justify-center" style={on ? { backgroundColor: accent } : { border: "1px solid #50555a" }}>
-                          {on && <Check size={11} className="text-white" strokeWidth={3.5} />}
-                        </span>
-                        <span className="flex-1 min-w-0">
-                          <span className="block text-[11px] font-bold text-white truncate">{e.nombre}</span>
-                          <span className="block text-[9px] text-slate-500 truncate">
-                            {e.dia} · {e.mejor ? `mejor ${e.mejor.reps}×${e.mejor.kg}${uLabel}` : "sin marcas"}{e.yaPlanificado ? " · ya planificado" : ""}
-                          </span>
-                        </span>
+                      <button key={p.k} role="radio" aria-checked={plazo === p.k} onClick={() => setPlazo(p.k)} className="plan-objetivo fila">
+                        <span className="min-w-0 flex-1"><b>{p.l}</b><span>{p.d}</span></span>
+                        <em>{n} {n === 1 ? "semana" : "semanas"}</em>
                       </button>
                     );
                   })}
                 </div>
-              )}
-            </div>
+              </section>
 
-            <div>
-              <SectionLabel>Objetivo</SectionLabel>
-              <div className="grid grid-cols-2 gap-1.5 mt-2">
-                {PLAN_OBJETIVOS.map((o) => {
-                  const act = objetivo === o.k;
-                  return (
-                    <button key={o.k} onClick={() => setObjetivo(o.k)} className="rounded-xl px-2 py-2 text-left transition active:scale-[0.97]"
-                      style={act ? { backgroundColor: tint(o.color, "1c"), border: "1px solid " + tint(o.color, "55") } : { backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}>
-                      <span className="block text-[11px] font-black" style={{ color: act ? o.color : "#e6e8ea" }}>{o.l}</span>
-                      <span className="block text-[9px] text-slate-500 leading-tight mt-0.5">{o.d}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div>
-              <SectionLabel>Tu experiencia</SectionLabel>
-              <div className="grid grid-cols-3 gap-1.5 mt-2">
-                {PLAN_NIVELES.map((n) => {
-                  const act = nivel === n.k;
-                  return (
-                    <button key={n.k} onClick={() => setNivel(n.k)} className="rounded-xl px-1.5 py-2 text-center transition active:scale-[0.97]"
-                      style={act ? { backgroundColor: tint(accent, "1c"), border: `1px solid ${tint(accent, "55")}` } : { backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}>
-                      <span className="block text-[10.5px] font-black" style={{ color: act ? accent : "#e6e8ea" }}>{n.l}</span>
-                      <span className="block text-[8.5px] text-slate-500 leading-tight mt-0.5">{n.d}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Ajustes finos: lo que separa un plan genérico de uno tuyo. Van
-                plegados porque los defaults ya son razonables. */}
-            <div className="rounded-xl border border-slate-800/60 bg-slate-950/40 overflow-hidden">
-              <button onClick={() => setVerAjustes((v) => !v)} className="w-full flex items-center gap-2 px-3 py-2.5 text-left">
-                <Sliders size={12} className="shrink-0" style={{ color: accent }} />
-                <span className="flex-1 text-[11px] font-bold text-white">Ajustes finos</span>
-                <ChevronDown size={14} className={`text-slate-500 shrink-0 transition-transform ${verAjustes ? "rotate-180" : ""}`} />
-              </button>
-              {verAjustes && (
-                <div className="px-3 pb-3 space-y-2 tab-fade-in">
-                  {[
-                    { on: respetarRango, set: setRespetarRango, l: "Respetar el rango de reps", d: "No cambia el 8-12 de tu rutina para poder subir más kilos" },
-                    { on: soloVacios, set: setSoloVacios, l: "No pisar lo ya planificado", d: "Sólo completa los ejercicios que todavía no tienen meta" },
-                    { on: conRpe, set: setConRpe, l: "Incluir RPE y fases", d: "Suma el esfuerzo objetivo y la fase del mesociclo a cada semana" },
-                  ].map((t) => (
-                    <button key={t.l} onClick={() => t.set(!t.on)} className="w-full flex items-center gap-2.5 text-left">
-                      <span className="w-8 h-[18px] rounded-full shrink-0 relative transition-colors" style={{ backgroundColor: t.on ? accent : "#3c4146" }}>
-                        <span className="absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white transition-all" style={{ left: t.on ? "16px" : "2px" }} />
-                      </span>
-                      <span className="flex-1 min-w-0">
-                        <span className="block text-[11px] font-bold text-white">{t.l}</span>
-                        <span className="block text-[9.5px] text-slate-500 leading-snug">{t.d}</span>
-                      </span>
-                    </button>
-                  ))}
-                  <div>
-                    <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Algo que tenga en cuenta</span>
-                    <textarea value={nota} onChange={(e) => setNota(e.target.value)} rows={2} maxLength={300}
-                      placeholder={`Ej: vengo de una lesión de hombro, no tengo discos de ${enLibras ? "2.5 lbs" : "1.25kg"}, entreno 3 veces por semana...`}
-                      className="w-full bg-slate-900 border border-slate-700/50 rounded-xl px-3 py-2 text-white text-[11.5px] focus:outline-none resize-none" />
-                    <p className="text-[9.5px] text-slate-600 mt-1">Se guarda para la próxima vez. Pesa más que las reglas generales.</p>
+              {/* Desde qué semana del ciclo: sin esto el plan pisaba semanas que
+                  ya habías entrenado. La escalera, como en el planificador. */}
+              {ciclo > 1 && (
+                <section className="plan-semanas" aria-label="Desde qué semana">
+                  <div className="plan-semanas-cabeza">
+                    <p className="plan-semana-titulo">Desde la semana {desdeSemana}{semanasReales > 1 ? <span>, hasta la {desdeSemana + semanasReales - 1}</span> : null}</p>
                   </div>
+                  <div className="plan-escalera" role="tablist" aria-label="Semana en que arranca">
+                    {Array.from({ length: ciclo }, (_, i) => i + 1).map((w, i) => (
+                      <button key={w} role="tab" aria-selected={desdeSemana === w} onClick={() => setDesdeSemana(w)}
+                        className={`plan-escalon ${w > desdeSemana && w < desdeSemana + semanasReales ? "cargada" : ""} ${w === weekInCycle ? "hoy" : ""}`}
+                        style={{ "--f": 0.3 + (0.7 * (i + 1)) / ciclo }}
+                        aria-label={`Semana ${w}${w === weekInCycle ? ", la de ahora" : ""}`}>
+                        <span className="plan-escalon-bloque" aria-hidden="true" />
+                        <span className="plan-escalon-numero" aria-hidden="true">{w}</span>
+                      </button>
+                    ))}
+                  </div>
+                  {weekInCycle && <p className="armado-nota">Subrayada, la semana que estás viviendo.</p>}
+                </section>
+              )}
+
+              <section className="plan-ia-bloque" aria-label="Qué ejercicios">
+                <p className="ficha-grupo-titulo">Qué ejercicios</p>
+                <div className="armado-riel" role="tablist" aria-label="De qué días">
+                  {[{ k: "todos", l: "Toda la rutina" }, ...dias.map((dk) => ({ k: dk, l: model.days[dk]?.label || dk, c: model.days[dk]?.color }))].map((o) => (
+                    <button key={o.k} role="tab" aria-selected={dayKey === o.k} onClick={() => setDayKey(o.k)} className="armado-solapa" style={{ "--c": o.c || "var(--tono)" }}><span>{o.l}</span></button>
+                  ))}
                 </div>
+                <button onClick={() => setVerEjercicios((v) => !v)} aria-expanded={verEjercicios} className="plan-ia-resumen">
+                  <span className="min-w-0 flex-1">{seleccionados.length} de {candidatos.length} {candidatos.length === 1 ? "ejercicio" : "ejercicios"}, {seleccionados.filter((e) => e.mejor).length} con marcas para progresar</span>
+                  <span className="plan-ia-resumen-accion">{verEjercicios ? "Ocultar" : "Elegir uno por uno"}</span>
+                </button>
+                {/* Ejercicio por ejercicio: casi siempre hay uno que no querés
+                    que toque (el que estás rehabilitando, el que ya planificaste). */}
+                {verEjercicios && (
+                  <div className="plan-ia-ejercicios bounce-in">
+                    <div className="flex gap-2">
+                      <button onClick={() => setExcluidos(new Set())} className="armado-chip">Todos</button>
+                      <button onClick={() => setExcluidos(new Set(candidatos.map((e) => e.id)))} className="armado-chip">Ninguno</button>
+                    </div>
+                    {candidatos.map((e) => {
+                      const on = !excluidos.has(e.id);
+                      return (
+                        <button key={e.id} role="checkbox" aria-checked={on} onClick={() => toggleEjercicio(e.id)} className={`plan-tilde ${on ? "on" : ""}`}>
+                          <span className={`galleta plan-tilde-marca ${on ? "" : "hueca"}`} aria-hidden="true">{on && <Check size={13} strokeWidth={3} />}</span>
+                          <span className="min-w-0 flex-1">
+                            <span className="plan-tilde-nombre">{e.nombre}</span>
+                            <span className="plan-tilde-sub">{e.dia}, {e.mejor ? `tu mejor ${e.mejor.reps} × ${conComa(e.mejor.kg)} ${uLabel}` : "sin marcas"}{e.yaPlanificado ? ", ya planificado" : ""}</span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+
+              <section className="plan-ia-bloque" aria-label="Objetivo">
+                <p className="ficha-grupo-titulo">Objetivo</p>
+                <div className="plan-objetivos" role="radiogroup" aria-label="Objetivo">
+                  {PLAN_OBJETIVOS.map((o) => (
+                    <button key={o.k} role="radio" aria-checked={objetivo === o.k} onClick={() => setObjetivo(o.k)} className="plan-objetivo"><b>{o.l}</b><span>{o.d}</span></button>
+                  ))}
+                </div>
+              </section>
+
+              <section className="plan-ia-bloque" aria-label="Tu experiencia">
+                <p className="ficha-grupo-titulo">Tu experiencia</p>
+                <div className="plan-objetivos tres" role="radiogroup" aria-label="Tu experiencia">
+                  {PLAN_NIVELES.map((n) => (
+                    <button key={n.k} role="radio" aria-checked={nivel === n.k} onClick={() => setNivel(n.k)} className="plan-objetivo"><b>{n.l}</b><span>{n.d}</span></button>
+                  ))}
+                </div>
+              </section>
+
+              {/* Lo que separa un plan genérico de uno tuyo; plegado porque lo
+                  de fábrica ya es razonable. */}
+              <div className={`plan-variables ${verAjustes ? "abierto" : ""}`}>
+                <button onClick={() => setVerAjustes((v) => !v)} aria-expanded={verAjustes} className="plan-opcion">
+                  <span className="plan-opcion-icono neutro" aria-hidden="true"><Sliders size={18} /></span>
+                  <span className="min-w-0 flex-1">
+                    <span className="plan-opcion-titulo">Ajustes finos</span>
+                    <span className="plan-opcion-desc">El rango de tu rutina, lo ya planificado, RPE y fases, y lo que tenga que saber</span>
+                  </span>
+                  <ChevronDown size={18} className="armado-ej-chevron" aria-hidden="true" />
+                </button>
+                {verAjustes && (
+                  <div className="plan-variables-cuerpo bounce-in">
+                    {[
+                      { on: respetarRango, set: setRespetarRango, l: "Respetar el rango de reps", d: "No cambia el 8-12 de tu rutina para poder subir más kilos" },
+                      { on: soloVacios, set: setSoloVacios, l: "No pisar lo ya planificado", d: "Sólo completa los ejercicios que todavía no tienen meta" },
+                      { on: conRpe, set: setConRpe, l: "Incluir RPE y fases", d: "Suma el esfuerzo y la fase del bloque a cada semana" },
+                    ].map((t) => (
+                      <InterruptorArmado key={t.l} titulo={t.l} desc={t.d} on={t.on} onToggle={() => t.set(!t.on)} />
+                    ))}
+                    <label className="plan-nota">
+                      <span className="armado-campo-rotulo">Algo que tenga en cuenta</span>
+                      <textarea value={nota} onChange={(e) => setNota(e.target.value)} rows={2} maxLength={300}
+                        placeholder={`Ej: vengo de una lesión de hombro, no tengo discos de ${enLibras ? "2,5 lb" : "1,25 kg"}, entreno 3 veces por semana`} />
+                      <span className="armado-nota">Se guarda para la próxima vez y pesa más que las reglas generales.</span>
+                    </label>
+                  </div>
+                )}
+              </div>
+
+              <p className="armado-nota">Arranca desde tu mejor marca de cada ejercicio, mira si venís subiendo o estancado y sube de a poco.</p>
+            </div>
+            <div className="modal-rutina-pie">
+              {/* Si el que vació la lista es "No pisar lo ya planificado",
+                  decirlo: "elegí al menos un ejercicio" manda a buscar mal. */}
+              <button onClick={generar} disabled={!seleccionados.length} className="boton-pildora w-full disabled:opacity-40">
+                <Sparkles size={16} /> {seleccionados.length
+                  ? `Armar el plan: ${seleccionados.length} ${seleccionados.length === 1 ? "ejercicio" : "ejercicios"}`
+                  : soloVacios && candidatos.length && candidatos.every((e) => e.yaPlanificado || excluidos.has(e.id))
+                    ? "Ya están todos planificados"
+                    : "Elegí al menos un ejercicio"}
+              </button>
+              {!seleccionados.length && soloVacios && candidatos.length > 0 && candidatos.every((e) => e.yaPlanificado || excluidos.has(e.id)) && (
+                <p className="armado-nota text-center">Está prendido "No pisar lo ya planificado", en Ajustes finos. Apagalo para rehacer los planes que ya existen.</p>
               )}
             </div>
-
-            <p className="text-[10.5px] text-slate-500 leading-snug">
-              Arranca desde tu mejor marca de cada ejercicio, mira tus últimas sesiones para saber si venís subiendo o estancado, y sube de a poco. Vas a poder ver el plan entero antes de aplicarlo.
-            </p>
-
-            <button onClick={generar} disabled={!seleccionados.length} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white text-sm font-bold transition active:scale-[0.98] disabled:opacity-40"
-              style={{ backgroundColor: accent, boxShadow: "0 10px 26px -10px rgba(56,189,248,0.8)" }}>
-              {/* Si el que dejó la lista vacía fue el filtro "no pisar lo ya
-                  planificado", decirlo: "elegí al menos un ejercicio" manda a
-                  buscar un problema que no está en la selección. */}
-              <Sparkles size={15} /> {seleccionados.length
-                ? `Armar el plan · ${seleccionados.length} ejercicio${seleccionados.length === 1 ? "" : "s"}`
-                : soloVacios && candidatos.length && candidatos.every((e) => e.yaPlanificado || excluidos.has(e.id))
-                  ? "Ya están todos planificados"
-                  : "Elegí al menos un ejercicio"}
-            </button>
-            {!seleccionados.length && soloVacios && candidatos.length > 0 && candidatos.every((e) => e.yaPlanificado || excluidos.has(e.id)) && (
-              <p className="text-[10.5px] text-slate-500 text-center leading-snug -mt-1">
-                Tenés activado "No pisar lo ya planificado" en Ajustes finos. Apagalo para rehacer los planes que ya existen.
-              </p>
-            )}
-          </div>
+          </>
         )}
 
         {estado === "generando" && (
-          <div className="p-8 flex flex-col items-center gap-3 text-center">
-            <div className="w-10 h-10 rounded-full border-[3px] border-sky-500/25 border-t-sky-400 animate-spin" />
-            <p className="text-sm font-bold text-white">Armando tu plan…</p>
-            <p className="text-[11px] text-slate-500">{seleccionados.length} ejercicios × {semanasReales} semanas. Puede tardar unos segundos.</p>
+          <div className="plan-ia-espera" role="status">
+            <span className="plan-ia-girando" aria-hidden="true" />
+            <p className="plan-opcion-titulo">Armando tu plan</p>
+            <p className="armado-nota">{seleccionados.length} {seleccionados.length === 1 ? "ejercicio" : "ejercicios"} por {semanasReales} {semanasReales === 1 ? "semana" : "semanas"}. Puede tardar unos segundos.</p>
           </div>
         )}
 
         {estado === "error" && (
-          <div className="p-5 space-y-3">
-            <div className="flex items-start gap-2.5 rounded-xl px-3.5 py-3 bg-rose-500/10 border border-rose-500/25">
-              <AlertTriangle size={15} className="text-rose-400 shrink-0 mt-0.5" />
-              <p className="text-[11.5px] text-rose-300/90 flex-1">{error}</p>
+          <>
+            <div className="modal-rutina-cuerpo">
+              <p className="ficha-aviso"><AlertTriangle size={16} /> {error}</p>
             </div>
-            <div className="flex gap-2">
-              <button onClick={() => setEstado("form")} className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-200 text-sm font-bold">Volver</button>
-              <button onClick={generar} className="flex-1 py-3 rounded-xl !text-white text-sm font-black" style={{ backgroundColor: accent }}>Reintentar</button>
+            <div className="modal-rutina-pie">
+              <div className="flex gap-2">
+                <button onClick={() => setEstado("form")} className="armado-barra-cancelar flex-1">Volver</button>
+                <button onClick={generar} className="boton-pildora flex-1">Probar de nuevo</button>
+              </div>
             </div>
-          </div>
+          </>
         )}
 
         {estado === "preview" && plan && (
-          <div className="p-5 space-y-3">
-            <div className="flex items-center gap-2 rounded-xl px-3 py-2.5 bg-sky-500/10 border border-sky-500/25">
-              <ClipboardCheck size={14} className="text-sky-400 shrink-0" />
-              <p className="text-[11.5px] text-sky-200/90 flex-1">
-                {aAplicar.length} ejercicio{aAplicar.length === 1 ? "" : "s"} · semanas {desdeSemana} a {desdeSemana + semanasReales - 1}. Tocá uno para sacarlo.
-              </p>
-            </div>
-            {plan.noReconocidos.length > 0 && (
-              <p className="text-[10.5px] text-amber-400/90">
-                Se descartaron {plan.noReconocidos.length} que no están en tu rutina: {plan.noReconocidos.join(", ")}.
-              </p>
-            )}
-            <div className="space-y-2">
-              {porEjercicio.map((g) => {
-                const fuera = descartados.has(g.id);
-                const salto = g.desde != null && g.hasta != null ? g.hasta - g.desde : null;
-                return (
-                  <div key={g.id} className="rounded-xl px-3 py-2.5 transition" style={{ backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)", opacity: fuera ? 0.4 : 1 }}>
-                    <button onClick={() => setDescartados((prev) => { const n = new Set(prev); if (n.has(g.id)) n.delete(g.id); else n.add(g.id); return n; })} className="w-full flex items-center gap-2 mb-1.5 text-left">
-                      <span className="w-4 h-4 rounded-md shrink-0 flex items-center justify-center" style={!fuera ? { backgroundColor: accent } : { border: "1px solid #50555a" }}>
-                        {!fuera && <Check size={11} className="text-white" strokeWidth={3.5} />}
-                      </span>
-                      <span className="flex-1 min-w-0">
-                        <span className="block text-[11.5px] font-bold text-white truncate">{g.nombre}</span>
-                        {/* Lo que de verdad querés saber de un vistazo: de
-                            dónde a dónde te lleva, y cómo se para eso contra
-                            tu mejor marca de hoy. */}
-                        <span className="block text-[9.5px] text-slate-500 truncate">
-                          {g.desde}{uLabel} → {g.hasta}{uLabel}{salto != null && salto !== 0 ? ` (${salto > 0 ? "+" : ""}${roundKg(salto)}${uLabel})` : ""}
-                          {g.mejor ? ` · tu mejor ${g.mejor.reps}×${g.mejor.kg}${uLabel}` : " · sin marcas previas"}
+          <>
+            <div className="modal-rutina-cuerpo">
+              <p className="armado-nota">{aAplicar.length} {aAplicar.length === 1 ? "ejercicio" : "ejercicios"}, de la semana {desdeSemana} a la {desdeSemana + semanasReales - 1}. Tocá uno para sacarlo.</p>
+              {plan.noReconocidos.length > 0 && (
+                <p className="ficha-aviso"><AlertTriangle size={15} /> Se descartaron {plan.noReconocidos.length} que no están en tu rutina: {plan.noReconocidos.join(", ")}.</p>
+              )}
+              <div className="plan-ejercicios">
+                {porEjercicio.map((g) => {
+                  const fuera = descartados.has(g.id);
+                  const salto = g.desde != null && g.hasta != null ? g.hasta - g.desde : null;
+                  const primera = g.series[0]?.entries || [];
+                  const valores = primera.map((e) => kgToDisplay(e.kg, unit));
+                  const altoDe = alturaDeEscalon(valores);
+                  return (
+                    <div key={g.id} className={`plan-ej ${fuera ? "fuera" : ""}`}>
+                      <button role="checkbox" aria-checked={!fuera} onClick={() => setDescartados((prev) => { const n = new Set(prev); if (n.has(g.id)) n.delete(g.id); else n.add(g.id); return n; })} className="plan-tilde">
+                        <span className={`galleta plan-tilde-marca ${fuera ? "hueca" : ""}`} aria-hidden="true">{!fuera && <Check size={13} strokeWidth={3} />}</span>
+                        <span className="min-w-0 flex-1">
+                          <span className="plan-tilde-nombre">{g.nombre}</span>
+                          {/* De dónde a dónde te lleva, contra tu mejor marca de hoy. */}
+                          <span className="plan-tilde-sub">
+                            De {conComa(g.desde)} a {conComa(g.hasta)} {uLabel}{salto != null && salto !== 0 ? ` (${salto > 0 ? "+" : "−"}${conComa(Math.abs(roundKg(salto)))})` : ""}, {g.mejor ? `tu mejor ${g.mejor.reps} × ${conComa(g.mejor.kg)} ${uLabel}` : "sin marcas previas"}
+                          </span>
                         </span>
-                      </span>
-                    </button>
-                    {g.series.map((s) => (
-                      <div key={s.setIndex} className="flex items-center gap-1.5 mb-1 last:mb-0">
-                        <span className="text-[9px] font-black text-slate-600 shrink-0 w-5">S{s.setIndex + 1}</span>
-                        <div className="flex-1 flex gap-1 overflow-x-auto">
-                          {s.entries.map((e) => (
-                            <span key={e.week} className="shrink-0 px-1.5 py-0.5 rounded-md text-[9.5px] font-bold tabular-nums" style={{ backgroundColor: tint(accent, "14"), color: "#7dd3fc" }} title={`Semana ${e.week}${e.phase ? ` · ${e.phase}` : ""}${e.rpe != null ? ` · RPE ${e.rpe}` : ""}`}>
-                              {e.reps}×{kgToDisplay(e.kg, unit)}
+                      </button>
+                      {!fuera && primera.length > 1 && (
+                        <div className="plan-mini chico px-3 pb-3" role="img" aria-label={`La progresión de ${g.nombre}: ${primera.map((e) => `semana ${e.week}, ${e.reps} × ${conComa(kgToDisplay(e.kg, unit))}`).join("; ")}`}>
+                          {primera.map((e, i) => (
+                            <span key={e.week} className="plan-mini-semana con">
+                              <span className="plan-mini-valor" aria-hidden="true">{conComa(valores[i])}</span>
+                              <span className="plan-mini-barra" style={{ "--f": altoDe(valores[i]) }} aria-hidden="true" />
+                              <span className="plan-mini-numero" aria-hidden="true">{e.week}</span>
                             </span>
                           ))}
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                );
-              })}
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-            <div className="flex gap-2 pt-1">
-              <button onClick={() => setEstado("form")} className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-300 text-sm font-bold">Cambiar</button>
-              <button onClick={aplicar} disabled={!aAplicar.length} className="flex-1 py-3 rounded-xl !text-white text-sm font-black transition active:scale-[0.98] disabled:opacity-40" style={{ backgroundColor: accent }}>
-                Aplicar {aAplicar.length ? `· ${aAplicar.length}` : ""}
-              </button>
+            <div className="modal-rutina-pie">
+              <div className="flex gap-2">
+                <button onClick={() => setEstado("form")} className="armado-barra-cancelar flex-1">Cambiar</button>
+                <button onClick={aplicar} disabled={!aAplicar.length} className="boton-pildora flex-1 disabled:opacity-40">Aplicar{aAplicar.length ? `: ${aAplicar.length}` : ""}</button>
+              </div>
             </div>
-          </div>
+          </>
         )}
       </div>
     </div>,
@@ -16286,9 +16264,6 @@ function PublicUserCardSkeleton({ filas = 3 }) {
   );
 }
 
-function SectionLabel({ children, accent = null }) {
-  return <p className="text-[9.5px] font-black uppercase tracking-widest px-0.5" style={{ color: accent || "#6e7379" }}>{children}</p>;
-}
 
 // Fila de toggle reutilizable para Perfil — antes cada switch era su propio
 // bloque de JSX duplicado (10 veces entre "Qué ves al registrar" y los dos
