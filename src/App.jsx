@@ -14,7 +14,7 @@ import {
   Sparkles, Layers, SlidersHorizontal, UserCog,
   Share2, Download, Link2, Copy, BellOff, Send, Mic, Ruler, Camera, Link, Footprints, Star, SquarePlay, Upload, RefreshCw, Timer, Percent, Users, User,
   MessageCircle, Search, UserPlus, UserCheck, UserMinus, AtSign, GraduationCap, ClipboardCheck, Swords, Medal, QrCode, ArrowUpDown,
-  Phone, Minus, Ellipsis, Undo2, ArrowLeftRight, ReceiptText,
+  Phone, Minus, Ellipsis, Undo2, ArrowLeftRight, ReceiptText, ClipboardList, Maximize2, Minimize2, NotebookPen,
 } from "lucide-react";
 import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signOut, onAuthStateChanged } from "firebase/auth";
 import { Capacitor, registerPlugin } from "@capacitor/core";
@@ -42,8 +42,8 @@ import FemaleBody from "@mjcdev/react-body-highlighter";
 import { auth, googleProvider, db } from "./firebase";
 import {
   yt, mkSets, cloneRoutineDef, debounce, kgToDisplay, displayToKg, weightLabel,
-  rpeColor, haptic, localDateStr, todayStr, formatTime, vol, estimate1RM, prScore, repRangeTop, isHeavyRepRange,
-  tint, setThemeMode, normalizePhoneForMatching, hashPhoneKey,
+  rpeColor, haptic, localDateStr, todayStr, formatTime, vol, estimate1RM, prScore, isHeavyRepRange,
+  tint, setThemeMode, normalizePhoneForMatching, hashPhoneKey, KG_TO_LBS,
 } from "./utils";
 // Feature social (amigos + entrenador/alumno) — todo el acceso a Firestore
 // de esto vive en social.js, App.jsx solo llama y dibuja el resultado.
@@ -695,7 +695,7 @@ const DEFAULT_SETTINGS = {
   // Qué mostrar en la ficha de registro (reps/kg). Todo apagado por
   // default: la ficha arranca mínima (solo reps/kg) y cada quien prende
   // lo que realmente va a usar, en vez de tener que apagar seis cosas.
-  showRpe: false, showWarmup: false, show1RMPercent: false, showCoaching: false, showExerciseNote: false, showPersonalNote: false, showStagnation: false, showProgressionSuggestion: false, showKm: false,
+  showRpe: false, showWarmup: false, show1RMPercent: false, showCoaching: false, showExerciseNote: false, showPersonalNote: false, showStagnation: false, showProgressionSuggestion: true, showKm: false,
   // Muestra, en cada serie, lo que hiciste en esa MISMA serie la última vez
   // que entrenaste ese ejercicio (no tu récord histórico: para decidir la
   // carga de hoy sirve más lo último que hiciste que una marca de hace
@@ -1687,8 +1687,10 @@ function buildLinearProgression(weeks, startKg, reps, incrementKg) {
 // (repsMax); al llegar ahí, sube el KG y las reps vuelven a repsMin — el
 // esquema más usado en powerlifting/hipertrofia para progresar sin
 // aumentar el peso todas las semanas.
-function buildDoubleProgression(weeks, startKg, repsMin, repsMax, incrementKg) {
-  let kg = startKg, reps = repsMin;
+// `startReps`: desde dónde arranca la primera semana (la próxima de tu última
+// sesión), dentro del rango.
+function buildDoubleProgression(weeks, startKg, repsMin, repsMax, incrementKg, startReps = repsMin) {
+  let kg = startKg, reps = Math.min(repsMax, Math.max(repsMin, startReps || repsMin));
   return weeks.map((week) => {
     const entry = { week, kg, reps };
     if (reps >= repsMax) { kg = roundKg(kg + incrementKg); reps = repsMin; } else { reps += 1; }
@@ -1762,6 +1764,31 @@ function buildSessionsIndex(logs, trainingSessions = []) {
   (trainingSessions || []).forEach((ts) => {
     if (ts?.date) formalByDate[ts.date] = ts;
   });
+  // El mejor de cada EJERCICIO (todas sus series) antes de cada fecha: el
+  // récord que encierra el cuaderno es superar al ejercicio entero, no a la
+  // propia serie (con la progresión de un entrenador eso pasa casi siempre).
+  const mejorEjAntesDe = {};
+  {
+    const porEj = {};
+    Object.entries(logs).forEach(([key, entries]) => {
+      if (key.endsWith("_pr_override") || !Array.isArray(entries)) return;
+      const { exerciseId } = parseLogKey(key);
+      entries.forEach((e) => { if (e?.date && e.reps && !e.deload) (porEj[exerciseId] ||= []).push(e); });
+    });
+    Object.entries(porEj).forEach(([exId, lista]) => {
+      lista.sort((x, y) => (x.date < y.date ? -1 : x.date > y.date ? 1 : 0));
+      const mapa = {};
+      let mejor = 0, i = 0;
+      while (i < lista.length) {
+        const d = lista[i].date;
+        mapa[d] = mejor;
+        let j = i;
+        while (j < lista.length && lista[j].date === d) { mejor = Math.max(mejor, prScore(lista[j].kg, lista[j].reps)); j++; }
+        i = j;
+      }
+      mejorEjAntesDe[exId] = mapa;
+    });
+  }
   Object.entries(logs).forEach(([key, entries]) => {
     if (key.endsWith("_pr_override") || !Array.isArray(entries)) return;
     const { exerciseId, setIndex } = parseLogKey(key);
@@ -1807,7 +1834,9 @@ function buildSessionsIndex(logs, trainingSessions = []) {
       // rutina actual, y si no hay ninguno (registro viejo de un ejercicio ya
       // borrado) lo derivamos del catálogo global o del propio id.
       const nombre = e.exName || ex?.name || EXERCISE_LIBRARY_BY_ID[exerciseId]?.name || exerciseId.replace(/_/g, " ");
-      s.items.push({ exerciseId, exerciseName: nombre, exerciseMuscle: e.exMuscle || ex?.muscle || null, dayKey: ex?.dayKey ?? null, setIndex, reps: e.reps, kg: e.kg, minutes: e.minutes ?? null, km: e.km ?? null, rpe: e.rpe ?? null, isImprovement, priorBest, pctOfBest, removedFromRoutine: !ex, deload: !!e.deload });
+      const antesEj = mejorEjAntesDe[exerciseId]?.[e.date] || 0;
+      const recordDelEjercicio = !e.deload && antesEj > 0 && prScore(e.kg, e.reps) > antesEj;
+      s.items.push({ exerciseId, exerciseName: nombre, exerciseMuscle: e.exMuscle || ex?.muscle || null, dayKey: ex?.dayKey ?? null, setIndex, reps: e.reps, kg: e.kg, minutes: e.minutes ?? null, km: e.km ?? null, rpe: e.rpe ?? null, isImprovement, priorBest, pctOfBest, removedFromRoutine: !ex, deload: !!e.deload, recordDelEjercicio });
       s.totalVolume += thisVol;
       if (e.rpe != null) { s.rpeSum += e.rpe; s.rpeCount++; }
     });
@@ -1886,7 +1915,7 @@ function buildSessionsIndex(logs, trainingSessions = []) {
             .map((id) => ({ id, name: EXERCISE_BY_ID[id]?.name || EXERCISE_LIBRARY_BY_ID[id]?.name || id.replace(/_/g, " ") }));
         }
       }
-      return { ...s, dayKeys, durationMin, completionPct, missedExercises, isDeload: !!formal?.deload, totalSets: s.items.length, avgRpe: s.rpeCount ? Math.round((s.rpeSum / s.rpeCount) * 10) / 10 : null };
+      return { ...s, dayKeys, durationMin, completionPct, missedExercises, isDeload: !!formal?.deload, startedAt: formal?.startedAt || null, endedAt: formal?.endedAt || null, totalSets: s.items.length, avgRpe: s.rpeCount ? Math.round((s.rpeSum / s.rpeCount) * 10) / 10 : null };
     })
     .sort((a, b) => (a.date < b.date ? 1 : -1));
 }
@@ -5383,6 +5412,398 @@ button.credencial-dato:not(:disabled):active { background: var(--velo); }
 .resumen-renglones span { min-width: 0; font-size: 13px; color: var(--text-muted); }
 .resumen-renglones small { display: block; margin-top: 1px; font-size: 13px; font-weight: 650; color: var(--text-strong); overflow-wrap: anywhere; }
 .resumen-renglones b { flex: none; font-size: 13.5px; font-weight: 700; color: var(--text-strong); }
+
+/* ══ DÉCIMA TANDA: más objetos del gimnasio ═════════════════════════════════
+   La campana de los récords, el molinete de entrada, el cuaderno, la medalla
+   del mes y su vitrina, el cinturón de los rangos, la planilla de asistencia,
+   el casillero, la hoja de la rutina en su tabla, la receta del entrenador y
+   el reloj de pared grande. */
+
+/* La letra a mano: sólo en el papel (el cuaderno, la firma de la planilla y
+   la de la receta). La app sigue en Mona Sans. */
+.a-mano { font-family: 'Caveat Variable', 'Caveat', 'Segoe Print', cursive; font-weight: 500; font-stretch: normal; letter-spacing: 0; }
+
+/* LA CAMPANA */
+.campana-record { pointer-events: none; z-index: 300; }
+.campana-record-pieza { position: absolute; width: 64px; height: 80px; transform: translate(-50%, calc(-100% - 8px)); animation: campanaAparece 1.8s ease both; }
+@keyframes campanaAparece {
+  0% { opacity: 0; transform: translate(-50%, calc(-100% + 6px)) scale(.6); }
+  10% { opacity: 1; transform: translate(-50%, calc(-100% - 8px)) scale(1); }
+  80% { opacity: 1; transform: translate(-50%, calc(-100% - 8px)) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, calc(-100% - 18px)) scale(1); }
+}
+.campana-svg { display: block; width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 8px 12px rgba(0,0,0,.45)); }
+.campana-soporte { fill: none; stroke: #8d9097; stroke-width: 4; stroke-linecap: round; }
+.campana-soporte.fino { stroke-width: 2.5; }
+.campana-cuerpo { transform-box: view-box; transform-origin: 32px 11px; animation: campanaVaiven 1.2s cubic-bezier(.36,.07,.19,.97) .08s both; }
+@keyframes campanaVaiven { 0% { transform: rotate(0); } 12% { transform: rotate(24deg); } 30% { transform: rotate(-19deg); } 48% { transform: rotate(12deg); } 64% { transform: rotate(-7deg); } 80% { transform: rotate(3deg); } 100% { transform: rotate(0); } }
+.campana-argolla { fill: none; stroke: #8d9097; stroke-width: 2.4; }
+.campana-bronce { fill: var(--record); }
+.campana-labio { fill: color-mix(in oklab, var(--record) 70%, #2a1e05); }
+.campana-brillo { fill: none; stroke: rgba(255,255,255,.55); stroke-width: 2.4; stroke-linecap: round; }
+.campana-varilla { stroke: #5d4a1c; stroke-width: 2; stroke-linecap: round; }
+.campana-badajo { fill: color-mix(in oklab, var(--record) 55%, #2a1e05); }
+.campana-onda { fill: none; stroke: var(--record); stroke-width: 2.4; stroke-linecap: round; opacity: 0; transform-box: fill-box; transform-origin: center; animation: campanaOnda .55s ease-out both; }
+.campana-onda.lejos { stroke-width: 2; }
+.campana-onda.d1 { animation-delay: .16s; }
+.campana-onda.d2 { animation-delay: .5s; }
+.campana-onda.lejos.d1 { animation-delay: .22s; }
+.campana-onda.lejos.d2 { animation-delay: .56s; }
+@keyframes campanaOnda { 0% { opacity: 0; transform: scale(.85); } 35% { opacity: .95; } 100% { opacity: 0; transform: scale(1.12); } }
+.campana-svg.quieta { filter: none; }
+.campana-svg.quieta .campana-cuerpo { animation: none; }
+@keyframes campanaApareceQuieta { 0%, 100% { opacity: 0; } 10%, 80% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .campana-cuerpo, .campana-onda { animation: none; }
+  .campana-record-pieza { animation-name: campanaApareceQuieta; }
+}
+
+/* EL MOLINETE */
+.molinete-velo { animation: molineteVelo 1.9s ease-in-out both; }
+@keyframes molineteVelo { 0% { opacity: 0; } 8% { opacity: 1; } 84% { opacity: 1; } 100% { opacity: 0; } }
+.molinete { display: block; width: 264px; height: 187px; overflow: visible; }
+.molinete-piso { stroke: rgba(255,255,255,.16); stroke-width: 2; stroke-linecap: round; }
+.molinete-brazos { fill: none; stroke: #c9ccd3; stroke-width: 8; stroke-linecap: round; transform-box: view-box; transform-origin: 122px 92px; animation: molineteGira .62s cubic-bezier(.3,1.35,.5,1) .82s both; }
+@keyframes molineteGira { from { transform: rotate(0deg); } to { transform: rotate(120deg); } }
+.molinete-eje { fill: #9aa0aa; stroke: #2a2c31; stroke-width: 3; }
+.molinete-eje-centro { fill: #5d6169; }
+.molinete-junta { stroke: rgba(255,255,255,.07); stroke-width: 1.5; stroke-linecap: round; }
+.molinete-gabinete { fill: #2c2e34; stroke: rgba(255,255,255,.14); stroke-width: 1.5; }
+.molinete-tapa { fill: #3c3f47; }
+.molinete-lector { fill: #141518; stroke: rgba(255,255,255,.1); stroke-width: 1; }
+.molinete-ondas { fill: none; stroke: #6d7179; stroke-width: 2; stroke-linecap: round; }
+.molinete-luz { fill: oklch(76.9% 0.132 70.1); animation: molineteVerde .16s ease .72s forwards; }
+@keyframes molineteVerde { to { fill: oklch(79% 0.13 149.6); } }
+.molinete-carnet { transform-box: view-box; transform-origin: 81px 73px; animation: molineteCarnet 1.9s cubic-bezier(.2,.8,.3,1) both; }
+@keyframes molineteCarnet {
+  0% { opacity: 0; transform: translate(96px, 40px) rotate(16deg); }
+  8% { opacity: 1; }
+  30% { opacity: 1; transform: translate(0, 0) rotate(-5deg); }
+  40% { opacity: 1; transform: translate(0, 0) rotate(-5deg); }
+  52% { opacity: 0; transform: translate(30px, 52px) rotate(8deg); }
+  100% { opacity: 0; transform: translate(30px, 52px) rotate(8deg); }
+}
+.molinete-carnet-papel { fill: #ecebe6; }
+.molinete-carnet-franja { fill: color-mix(in oklab, var(--tono) 60%, #8a8c92); }
+.molinete-carnet-linea { fill: #9a9ba0; }
+.molinete-entrada { display: flex; align-items: baseline; gap: 8px; margin-top: 12px; font-size: 14px; font-weight: 600; color: #b9bbc1; animation: molineteTexto .4s ease .7s both; }
+.molinete-entrada b { font-size: 26px; font-weight: 800; line-height: 1; color: #f1f1ee; }
+.molinete-texto { margin-top: 4px; animation: molineteTexto .4s ease .85s both; }
+@keyframes molineteTexto { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.molinete.quieto .molinete-brazos, .molinete.quieto .molinete-luz { animation: none; }
+.molinete.quieto .molinete-luz { fill: oklch(79% 0.13 149.6); }
+@media (prefers-reduced-motion: reduce) {
+  .molinete-brazos { animation: none; transform: rotate(120deg); }
+  .molinete-carnet { animation: none; opacity: 0; }
+  .molinete-luz { animation: none; fill: oklch(79% 0.13 149.6); }
+  .molinete-entrada, .molinete-texto { animation: none; }
+}
+
+/* EL TICKET: la hora de entrada y la de salida, como el de un estacionamiento. */
+.ticket-horario { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.ticket-horario p { display: grid; gap: 1px; }
+.ticket-horario p:last-child { text-align: right; }
+.ticket-horario small { font-size: 11.5px; color: #6b6b70; }
+.ticket-horario b { font-size: 24px; font-weight: 800; font-stretch: 78%; line-height: 1.05; color: #1d1d1f; }
+.ticket-titulo .campana-icono { flex: none; }
+
+/* EL CUADERNO: renglones de 30 px, el margen del color del día, los
+   agujeros del anillado y lápiz. Todo cae justo en un renglón. */
+.cuaderno { width: 100%; max-width: 26rem; max-height: 92vh; display: flex; flex-direction: column; gap: 10px; }
+.cuaderno-arriba { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 2px; }
+.cuaderno-titulo { font-size: 1.125rem; font-weight: 750; color: #f1f1ee; }
+.cuaderno-salida { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; border-radius: 6px; scrollbar-width: none; }
+.cuaderno-salida::-webkit-scrollbar { display: none; }
+.cuaderno-pasa.desde-derecha { animation: hojaDesdeDerecha .32s cubic-bezier(.2,.8,.3,1) both; }
+.cuaderno-pasa.desde-izquierda { animation: hojaDesdeIzquierda .32s cubic-bezier(.2,.8,.3,1) both; }
+@keyframes hojaDesdeDerecha { from { opacity: 0; transform: translateX(36px) rotate(1.2deg); } to { opacity: 1; transform: none; } }
+@keyframes hojaDesdeIzquierda { from { opacity: 0; transform: translateX(-36px) rotate(-1.2deg); } to { opacity: 1; transform: none; } }
+.cuaderno-hoja {
+  --renglon: 30px; --papel: #f1f0ea; --linea: #c6d0da; --tinta: #34353a; --tinta-suave: #64656b; --tinta-record: #94721a;
+  --margen: color-mix(in oklab, var(--dia) 62%, #a9a9a9);
+  position: relative; padding: 18px 16px 30px 58px; border-radius: 6px; color: var(--tinta); background-color: var(--papel);
+  background-image:
+    linear-gradient(to right, transparent 44px, var(--margen) 44px, var(--margen) 46px, transparent 46px),
+    repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--renglon) - 1px), var(--linea) calc(var(--renglon) - 1px), var(--linea) var(--renglon));
+  background-position: 0 0, 0 calc(18px + var(--ajuste-renglon, 2px));
+  box-shadow: 0 18px 40px -20px rgba(0,0,0,.9);
+  font-size: 21px; line-height: var(--renglon);
+}
+.cuaderno-hoja::before {
+  content: ""; position: absolute; left: 12px; top: 12px; bottom: 12px; width: 16px;
+  background: radial-gradient(circle at 8px 18px, #121316 0 5.5px, transparent 6px) 0 0 / 16px calc(var(--renglon) * 2) repeat-y;
+}
+.cuaderno-cabeza { margin-bottom: var(--renglon); }
+.cuaderno-fecha { font-size: 25px; font-weight: 700; }
+.cuaderno-dia { color: var(--tinta-suave); }
+.cuaderno-dia span { white-space: nowrap; }
+.cuaderno-nombre { font-size: 22px; font-weight: 700; }
+.cuaderno-nombre.tachado { color: var(--tinta-suave); }
+.cuaderno-nombre.tachado s { text-decoration-thickness: 2px; text-decoration-color: var(--tinta); }
+.cuaderno-series { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 18px; padding-left: 14px; }
+.cuaderno-serie { position: relative; white-space: nowrap; }
+.cuaderno-serie small, .cuaderno-unidad { font-size: 16px; color: var(--tinta-suave); }
+.cuaderno-unidad { margin-left: -10px; }
+.cuaderno-serie.record::before {
+  content: ""; position: absolute; inset: 1px -8px 0 -8px; pointer-events: none;
+  border: 1.6px solid var(--tinta-record); border-radius: 50% 46% 52% 48% / 56% 50% 48% 52%; transform: rotate(-3deg);
+}
+.cuaderno-nota { padding-left: 14px; font-size: 18px; color: var(--tinta-suave); }
+.cuaderno-nota::before { content: "– "; }
+.cuaderno-pie { display: flex; flex-wrap: wrap; column-gap: 16px; margin-top: var(--renglon); font-weight: 650; }
+.cuaderno-pie-record { display: inline-flex; align-items: center; gap: 4px; color: var(--tinta-record); }
+.cuaderno-botones { display: flex; align-items: center; gap: 8px; }
+.cuaderno-botones .boton-redondo:disabled { opacity: .35; }
+.cuaderno-borrar { display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 14px; border-radius: 20px; background: var(--surface-1); }
+.cuaderno-borrar p { flex: 1; font-size: 13px; line-height: 1.3; color: var(--text-muted); }
+.cuaderno-borrar .boton-tonal { min-height: 38px; padding: 0 14px; }
+@media (prefers-reduced-motion: reduce) { .cuaderno-pasa.desde-derecha, .cuaderno-pasa.desde-izquierda { animation: none; } }
+/* La lista del Historial: el índice del cuaderno. */
+.indice { display: grid; gap: 8px; }
+.indice-fila { width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px 12px 10px 10px; border-radius: 22px; background: var(--surface-1); box-shadow: var(--placa-canto); text-align: left; transition: transform .2s var(--resorte); }
+.indice-fila:active { transform: scale(.985); }
+.indice-hueco { width: 40px; flex: none; font-size: 13px; }
+.indice-hueco.picado { color: #f4f4f1; background: color-mix(in oklab, var(--dia) 60%, #8a8c92); }
+.light-mode .indice-hueco.picado { background: color-mix(in oklab, var(--dia) 70%, #a7a9ae); }
+.indice-dia { display: block; font-size: 14.5px; font-weight: 700; color: var(--text-strong); }
+.indice-detalle { display: block; margin-top: 1px; font-size: 12.5px; line-height: 1.3; color: var(--text-muted); }
+.indice-record { display: inline-flex; align-items: center; gap: 3px; flex: none; font-size: 13px; font-weight: 700; color: var(--text-muted); }
+.indice-record svg { color: var(--record); }
+
+/* LA MEDALLA DEL MES y la vitrina */
+.medalla { display: block; width: 100%; height: auto; overflow: visible; }
+.medalla-cinta { fill: color-mix(in oklab, var(--tono) 58%, #8a8c92); }
+.medalla-cinta.otra { fill: color-mix(in oklab, var(--tono) 48%, #6e7076); }
+.medalla-cinta-raya { fill: color-mix(in oklab, var(--tono) 30%, #e9e9e6); opacity: .85; }
+.medalla-argolla { fill: none; stroke: #a4a8b0; stroke-width: 3; }
+.medalla-canto { fill: #9fa3aa; }
+.medalla-cara { fill: #c5c8ce; }
+.medalla-filete { fill: none; stroke: #a7abb2; stroke-width: 1.2; }
+.medalla-brillo { fill: none; stroke: rgba(255,255,255,.6); stroke-width: 2.5; stroke-linecap: round; }
+.medalla-grabado { fill: #4d5159; font-family: 'Mona Sans Variable', system-ui, sans-serif; font-weight: 700; paint-order: stroke; stroke: rgba(255,255,255,.5); stroke-width: .7px; }
+.medalla-grabado.curva { font-size: 8.2px; font-weight: 650; letter-spacing: .02em; }
+.medalla-grabado.numero { font-size: 30px; font-weight: 800; font-stretch: 78%; }
+.medalla-grabado.numero.chica { font-size: 40px; }
+.resumen-medalla { width: 112px; margin: -4px auto 6px; transform-origin: 50% 0; animation: medallaCuelga 1.1s cubic-bezier(.3,1.4,.5,1) .15s both; }
+@keyframes medallaCuelga { 0% { opacity: 0; transform: translateY(-24px) rotate(-10deg); } 40% { opacity: 1; transform: translateY(0) rotate(6deg); } 70% { transform: rotate(-3deg); } 100% { transform: none; } }
+.vitrina { padding: 16px; }
+.vitrina-cabeza { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.vitrina-cabeza > span { font-size: 12.5px; color: var(--text-muted); text-align: right; }
+.vitrina-estante { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); row-gap: 14px; }
+.vitrina-lugar { position: relative; display: flex; flex-direction: column; align-items: center; min-width: 0; }
+.vitrina-lugar::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--hairline-fuerte); }
+.vitrina-lugar:nth-child(6n + 1)::before { left: 4px; border-radius: 1px 0 0 1px; }
+.vitrina-lugar:nth-child(6n)::before { right: 4px; border-radius: 0 1px 1px 0; }
+.vitrina-clavo { position: relative; z-index: 1; width: 6px; height: 6px; margin-top: -2px; border-radius: 999px; background: var(--text-faint); }
+.vitrina-lugar .medalla { width: 46px; margin-top: -4px; transform-origin: 50% 0; transition: transform .45s var(--resorte); }
+.vitrina-lugar.con-medalla:active .medalla { transform: rotate(-7deg); }
+.vitrina-hueco { width: 30px; height: 30px; margin: 26px 0 6px; border-radius: 999px; border: 1.5px dashed var(--hairline-fuerte); display: grid; place-items: center; font-size: 14px; color: var(--text-strong); }
+.vitrina-lugar.en-curso .vitrina-hueco { border-color: color-mix(in oklab, var(--tono) 60%, transparent); }
+.vitrina-mes { margin-top: 2px; font-size: 11.5px; font-weight: 600; color: var(--text-muted); white-space: nowrap; }
+.vitrina-lugar.vacio .vitrina-mes { color: var(--text-faint); }
+@media (prefers-reduced-motion: reduce) { .resumen-medalla { animation: none; } }
+
+/* EL CINTURÓN y el detalle del rango */
+.rango-detalle { display: grid; gap: 14px; padding: 16px; border-radius: 22px; background: var(--surface-2); }
+.rango-detalle-cabeza { display: flex; align-items: center; gap: 14px; }
+.rango-detalle-musculo { font-size: 13px; font-weight: 600; color: var(--text-muted); }
+.rango-detalle-rango { margin-top: 1px; font-size: 1.5rem; font-weight: 800; font-stretch: 85%; line-height: 1.1; }
+.rango-detalle-rango.tinta-rango { color: color-mix(in oklab, var(--rango-c) 80%, #e8e8e8); }
+.light-mode .rango-detalle-rango.tinta-rango { color: color-mix(in oklab, var(--rango-c) 58%, black); }
+.rango-detalle-marca { margin-top: 4px; font-size: 13px; line-height: 1.35; color: var(--text-muted); text-wrap: pretty; }
+.rango-detalle-marca b { font-size: 15px; font-weight: 750; color: var(--text-strong); }
+.rango-detalle-falta { font-size: 14px; line-height: 1.4; color: var(--text-muted); text-wrap: pretty; }
+.rango-detalle-falta b { font-weight: 750; color: var(--text-strong); }
+.rango-detalle-falta b.tinta-rango { color: var(--rango-c); }
+.light-mode .rango-detalle-falta b.tinta-rango { color: color-mix(in oklab, var(--rango-c) 58%, black); }
+.rango-detalle-nota { font-size: 12.5px; color: var(--text-faint); }
+.cinturon { display: grid; gap: 8px; padding: 8px 0 2px; }
+.cinturon-correa {
+  position: relative; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); height: 40px; border-radius: 10px 22px 22px 10px;
+  background: #2b2a2e; box-shadow: inset 0 1px 0 rgba(255,255,255,.07), inset 0 -2px 0 rgba(0,0,0,.35);
+}
+.light-mode .cinturon-correa { background: #3b393e; }
+.cinturon-correa::before { content: ""; position: absolute; inset: 5px 12px 5px 10px; border-top: 1.5px dashed rgba(255,255,255,.16); border-bottom: 1.5px dashed rgba(255,255,255,.16); border-radius: 4px 16px 16px 4px; pointer-events: none; }
+.cinturon-tramo { position: relative; }
+.cinturon-tramo + .cinturon-tramo { box-shadow: inset 1px 0 0 rgba(255,255,255,.05); }
+.cinturon-agujero { position: absolute; top: 50%; width: 8px; height: 8px; border-radius: 999px; transform: translate(-50%, -50%); background: #0e0e10; box-shadow: 0 0 0 1.5px rgba(255,255,255,.1), inset 0 1px 2px rgba(0,0,0,.8); }
+.cinturon-agujero:nth-child(1) { left: 25%; }
+.cinturon-agujero:nth-child(2) { left: 50%; }
+.cinturon-agujero:nth-child(3) { left: 75%; }
+.cinturon-agujero.gastado { width: 10px; height: 7px; box-shadow: 0 0 0 1.5px rgba(255,255,255,.24), inset 0 1px 2px rgba(0,0,0,.8); }
+.cinturon-hebilla {
+  position: absolute; top: -7px; bottom: -7px; width: 36px; transform: translateX(-84%);
+  border: 5px solid color-mix(in oklab, var(--rango) 72%, #8a8c92); border-radius: 9px; box-shadow: 0 3px 8px rgba(0,0,0,.45);
+  animation: hebillaAjusta .7s cubic-bezier(.3,1.4,.5,1) .1s both;
+}
+.cinturon-hebilla::after { content: ""; position: absolute; top: 50%; left: -2px; width: 31px; height: 5px; border-radius: 3px; transform: translateY(-50%); background: color-mix(in oklab, var(--rango) 55%, #c9ccd3); }
+@keyframes hebillaAjusta { from { opacity: 0; transform: translateX(-150%); } to { opacity: 1; transform: translateX(-84%); } }
+.cinturon-rangos { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); text-align: center; }
+.cinturon-rangos span { font-size: 11px; font-weight: 600; font-stretch: 76%; color: var(--text-faint); white-space: nowrap; }
+.cinturon-rangos span.paso { color: var(--text-muted); }
+.cinturon-rangos span.actual { font-weight: 800; color: var(--rango-c); }
+.light-mode .cinturon-rangos span.actual { color: color-mix(in oklab, var(--rango-c) 58%, black); }
+@media (prefers-reduced-motion: reduce) { .cinturon-hebilla { animation: none; } }
+.rango-ejercicios { display: grid; gap: 6px; }
+.rango-ejercicios li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 6px 6px 14px; border-radius: 16px; background: var(--surface-2); font-size: 14px; font-weight: 600; color: var(--text-strong); }
+.rango-lista { display: grid; gap: 6px; }
+.rango-fila { width: 100%; display: flex; align-items: center; gap: 10px; padding: 6px 10px 6px 6px; border-radius: 18px; background: var(--surface-2); text-align: left; }
+.rango-fila-musculo { flex: 1; min-width: 0; font-size: 14px; font-weight: 650; color: var(--text-strong); }
+.rango-fila-rango { font-size: 13px; font-weight: 750; white-space: nowrap; }
+.rango-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.rango-chip { height: 36px; padding: 0 14px; border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--text-muted); background: var(--surface-2); }
+.rango-escala { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.rango-escala-item { display: grid; justify-items: center; gap: 6px; padding: 12px 4px; border-radius: 18px; background: var(--surface-2); font-size: 13px; font-weight: 750; }
+
+/* LA TABLA DE APOYO: la planilla de asistencia y la hoja de la rutina. Es
+   papel también en oscuro, un poco más apagado para que no encandile. */
+.planilla {
+  --tabla: #2a2b30; --papel: #e6e5df; --papel-tinta: #232326; --papel-suave: #5d5e64; --papel-linea: #c3c3bd;
+  position: relative; padding: 22px 10px 10px; border-radius: 20px; background: var(--tabla); box-shadow: inset 0 1px 0 rgba(255,255,255,.06);
+}
+.light-mode .planilla { --tabla: #cdd0d5; --papel: #fdfcf8; --papel-linea: #d6d6d0; }
+.planilla-broche { position: absolute; top: -7px; left: 50%; width: 112px; height: 32px; transform: translateX(-50%); overflow: visible; filter: drop-shadow(0 3px 4px rgba(0,0,0,.35)); }
+.broche-arco { fill: none; stroke: #c9ccd3; stroke-width: 4; stroke-linecap: round; }
+.broche-base { fill: #9ea2aa; }
+.broche-ranura { fill: #6c7078; }
+.planilla-hoja { padding: 22px 12px 12px; border-radius: 4px; color: var(--papel-tinta); background: var(--papel); box-shadow: 0 1px 2px rgba(0,0,0,.25); }
+.planilla-titulo { text-align: center; font-size: 15px; font-weight: 800; font-stretch: 85%; }
+.planilla-grupo + .planilla-grupo { margin-top: 10px; }
+.planilla-dia { margin: 10px 0 4px; font-size: 12.5px; font-weight: 650; color: var(--papel-suave); }
+.planilla-fila { display: grid; grid-template-columns: 40px minmax(0, 1fr) 70px 42px; align-items: center; column-gap: 8px; min-height: 52px; border-bottom: 1px solid var(--papel-linea); }
+.planilla-cabeza { min-height: 0; padding-bottom: 3px; border-bottom: 1.5px solid var(--papel-tinta); font-size: 11px; font-weight: 700; color: var(--papel-suave); }
+.planilla-cabeza span:nth-child(3) { text-align: center; }
+.planilla-hora { font-size: 14px; font-weight: 750; font-stretch: 80%; }
+.planilla-socio { min-width: 0; padding: 4px 0; text-align: left; }
+.planilla-nombre { display: block; font-size: 14px; font-weight: 700; line-height: 1.2; overflow-wrap: anywhere; }
+.planilla-detalle { display: block; margin-top: 1px; font-size: 12px; color: var(--papel-suave); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.planilla-firma { justify-self: center; max-width: 70px; overflow: hidden; white-space: nowrap; font-size: 23px; font-weight: 600; line-height: 1.1; color: #2a2d36; transform: rotate(var(--giro, -4deg)); }
+.planilla-aplauso { width: 42px; height: 42px; border-radius: 999px; display: grid; place-items: center; font-size: 18px; color: var(--papel-tinta); background: rgba(0,0,0,.07); transition: transform .2s ease; }
+.planilla-aplauso:not(.hecho) { background: color-mix(in oklab, var(--tono) 32%, var(--papel)); }
+.planilla-aplauso.hecho { color: var(--papel-suave); }
+.planilla-aplauso:active { transform: scale(.92); }
+.planilla-vos { justify-self: center; font-size: 12px; font-weight: 700; color: var(--papel-suave); }
+.planilla-fila.propia .planilla-nombre { font-weight: 800; }
+.hoja-rutina .planilla-hoja { padding: 22px 16px 16px; }
+.hoja-rutina-titulo { font-size: 18px; font-weight: 800; font-stretch: 85%; line-height: 1.15; overflow-wrap: anywhere; }
+.hoja-rutina-bajada { margin-top: 2px; padding-bottom: 8px; font-size: 12.5px; color: var(--papel-suave); border-bottom: 1.5px dashed var(--papel-linea); }
+.hoja-rutina-dia { margin-top: 12px; }
+.hoja-rutina-dia-nombre span {
+  padding: 0 3px; font-size: 14px; font-weight: 800;
+  background: linear-gradient(transparent 50%, color-mix(in oklab, var(--dia) 42%, var(--papel)) 50%, color-mix(in oklab, var(--dia) 42%, var(--papel)) 92%, transparent 92%);
+}
+.hoja-rutina-dia ol { display: grid; gap: 3px; margin-top: 5px; }
+.hoja-rutina-dia li { display: flex; align-items: baseline; gap: 6px; font-size: 13px; line-height: 1.35; }
+.hoja-rutina-dia li span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hoja-rutina-dia li i { flex: 1; min-width: 10px; border-bottom: 1.5px dotted var(--papel-linea); transform: translateY(-3px); }
+.hoja-rutina-dia li b { flex: none; font-weight: 700; white-space: nowrap; }
+.hoja-rutina-vacio { margin-top: 4px; font-size: 13px; color: var(--papel-suave); }
+.compartir-enlace { display: flex; gap: 8px; }
+.compartir-enlace-campo { flex: 1; min-width: 0; height: 44px; padding: 0 14px; border-radius: 14px; font-size: 13px; color: var(--text-muted); background: var(--panel-sunken); border: 1px solid var(--hairline); }
+.compartir-redes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.compartir-generando { display: flex; align-items: center; justify-content: center; gap: 12px; min-height: 48px; font-size: 13px; color: var(--text-muted); }
+.compartir-generando .plan-ia-girando { width: 22px; height: 22px; border-width: 2.5px; }
+.compartir-error { display: grid; gap: 8px; }
+
+/* EL CASILLERO */
+.casillero {
+  position: relative; padding: 12px 46px 16px 16px; border-radius: 14px;
+  background: repeating-linear-gradient(90deg, rgba(255,255,255,.018) 0 2px, transparent 2px 5px), #27292e;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.07), inset 0 0 0 6px rgba(0,0,0,.18), 0 12px 30px -18px rgba(0,0,0,.8);
+}
+.light-mode .casillero {
+  background: repeating-linear-gradient(90deg, rgba(0,0,0,.02) 0 2px, transparent 2px 5px), #d9dbe0;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.08), inset 0 0 0 6px rgba(255,255,255,.35), 0 12px 30px -18px rgba(0,0,0,.35);
+}
+.casillero-arriba { display: flex; align-items: center; gap: 12px; min-height: 40px; margin-bottom: 12px; }
+.casillero-rejilla { flex: 1; max-width: 132px; display: grid; gap: 4px; }
+.casillero-rejilla i { display: block; height: 4px; border-radius: 2px; background: #121316; box-shadow: 0 1px 0 rgba(255,255,255,.08); }
+.light-mode .casillero-rejilla i { background: #8e9198; box-shadow: 0 1px 0 rgba(255,255,255,.6); }
+.casillero-numero { margin-left: auto; padding: 3px 8px; border-radius: 6px; font-size: 13px; font-weight: 800; font-stretch: 78%; letter-spacing: .04em; color: #2a2b30; background: #c6c9cf; box-shadow: inset 0 0 0 1px rgba(0,0,0,.2); }
+.casillero-cuerpo { display: flex; align-items: center; gap: 16px; }
+.casillero-foto { position: relative; flex: none; width: 88px; height: 100px; padding: 6px 6px 18px; background: #f0efe9; transform: rotate(-3deg); box-shadow: 0 4px 10px rgba(0,0,0,.4); }
+.casillero-foto img, .casillero-inicial { display: grid; place-items: center; width: 100%; height: 100%; object-fit: cover; }
+.casillero-inicial { font-size: 34px; font-weight: 800; color: #4a4c52; background: #d9d9d3; }
+.casillero-cinta { position: absolute; z-index: 1; top: -9px; left: 50%; width: 46px; height: 18px; transform: translateX(-50%) rotate(4deg); background: rgba(236,232,214,.78); box-shadow: 0 1px 2px rgba(0,0,0,.15); }
+.casillero-datos { flex: 1; min-width: 0; }
+.casillero-etiqueta { display: inline-block; max-width: 100%; padding: 4px; border-radius: 6px; background: #8f939a; box-shadow: inset 0 1px 2px rgba(0,0,0,.4); }
+.casillero-nombre { padding: 3px 9px; border-radius: 3px; font-size: 1.25rem; font-weight: 800; font-stretch: 85%; line-height: 1.15; letter-spacing: -0.01em; color: #1d1d1f; background: #f4f3ee; overflow-wrap: anywhere; }
+.casillero-usuario { margin-top: 6px; font-size: 13px; color: var(--text-muted); overflow-wrap: anywhere; }
+.casillero-calcos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.calco { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 4px 11px; border-radius: 999px; font-size: 12.5px; font-weight: 700; line-height: 1.2; box-shadow: 0 2px 4px rgba(0,0,0,.3); }
+.calco:nth-child(1) { transform: rotate(-2deg); }
+.calco:nth-child(2) { transform: rotate(1.5deg); }
+.calco:nth-child(3) { transform: rotate(-1deg); }
+.calco-rango { background: #18191c; }
+.light-mode .calco-rango { background: #f4f3ee; }
+.calco-record { color: #3a2f0c; background: #eadfc2; }
+.calco-record svg { color: #94721a; }
+.calco-papel { color: #3a3b40; background: #ecebe5; border-radius: 4px; }
+.casillero-manija { position: absolute; right: 14px; top: 50%; width: 10px; height: 64px; transform: translateY(-50%); border-radius: 6px; background: #9ca0a7; box-shadow: inset -2px 0 0 rgba(0,0,0,.25), 0 2px 4px rgba(0,0,0,.4); }
+
+/* LA RECETA DEL ENTRENADOR: arrancada del talonario (el borde de arriba
+   picado). Es papel: adentro se ve como en el modo claro (la clase
+   light-mode le cambia los tokens sólo a ella). */
+.receta-bloque { margin-top: 12px; }
+.receta { --papel: #fbfaf5; position: relative; padding: 16px 16px 14px; border-radius: 2px 2px 14px 14px; color: var(--text-strong); background: var(--papel); box-shadow: 0 10px 26px -14px rgba(0,0,0,.8); }
+.receta::before { content: ""; position: absolute; left: 0; right: 0; top: -6px; height: 7px; background: radial-gradient(circle at 5px 7px, transparent 3.2px, var(--papel) 3.6px) 0 0 / 10px 7px repeat-x; }
+.receta-cabeza { display: flex; align-items: center; gap: 12px; padding-bottom: 10px; margin-bottom: 12px; border-bottom: 1.5px solid #d7d6d0; }
+.receta-rx { position: relative; flex: none; width: 34px; font-size: 30px; font-weight: 800; font-stretch: 85%; line-height: 1; color: color-mix(in oklab, var(--tono) 52%, #1d1d1f); }
+.receta-rx i { position: absolute; left: 14px; bottom: -6px; font-size: 17px; font-style: normal; }
+.receta-para { font-size: 14px; font-weight: 700; color: #1d1d1f; }
+.receta-fecha { font-size: 12px; color: #6b6b70; }
+.receta-sello { flex: none; padding: 4px 8px; border: 1.5px solid color-mix(in oklab, var(--tono) 55%, #6b6b70); border-radius: 6px; font-size: 11px; font-weight: 750; color: color-mix(in oklab, var(--tono) 50%, #3f3f44); transform: rotate(-4deg); }
+.receta-titulo { margin-bottom: 12px; font-size: 15px; font-weight: 700; line-height: 1.3; color: #1d1d1f; text-wrap: pretty; }
+.receta-firma { display: grid; justify-items: end; margin-top: 6px; }
+.receta-firma .a-mano { font-size: 27px; line-height: 1; color: #2a2d36; transform: rotate(-3deg) translateX(-8px); }
+.receta-firma i { width: 140px; margin-top: 2px; border-top: 1.5px solid #c9c8c2; }
+.receta-firma small { margin-top: 3px; font-size: 11px; color: #6b6b70; }
+.receta-botones { display: flex; gap: 8px; margin-top: 10px; }
+.plan-ia-icono { width: auto; height: auto; background: none; border-radius: 0; }
+
+/* EL RELOJ DE PARED, GRANDE */
+.reloj-grande { position: relative; width: 100%; max-width: 21rem; display: grid; justify-items: center; gap: 6px; padding: 22px 18px 18px; border-radius: 32px; background: var(--surface-1); box-shadow: var(--placa-canto), 0 30px 60px -30px rgba(0,0,0,.8); }
+.reloj-grande-cerrar { position: absolute; top: 12px; right: 12px; }
+.reloj-grande-rotulo { font-size: 1rem; font-weight: 700; color: var(--text-strong); }
+.reloj-grande-rotulo.en-pausa { color: var(--text-faint); }
+.reloj-grande-despues { max-width: 16rem; text-align: center; font-size: 13.5px; line-height: 1.35; color: var(--text-muted); text-wrap: balance; }
+.descanso-dial.reloj-grande-dial { width: min(240px, 66vw); height: min(240px, 66vw); margin: 10px 0 14px; }
+.reloj-grande-dial .descanso-dial-centro { gap: 6px; }
+.reloj-grande-tiempo.descanso-tiempo { font-size: 3.4rem; }
+.reloj-grande-listo { color: color-mix(in oklab, var(--c) 72%, white); }
+.reloj-grande-controles { display: flex; gap: 8px; width: 100%; }
+.reloj-grande-controles .descanso-boton { flex: 1 1 0; min-width: 0; height: 52px; }
+/* El salto de peso, debajo del ✓, y sus opciones. */
+.foco-salto { justify-self: center; display: grid; justify-items: center; align-content: center; width: 52px; height: 36px; border-radius: 12px; line-height: 1.05; transition: background-color .2s ease; }
+.foco-salto small { font-size: 10px; font-weight: 600; color: var(--text-faint); }
+.foco-salto b { font-size: 15px; font-weight: 750; color: var(--text-strong); }
+.foco-salto.abierto, .foco-salto:active { background: var(--velo); }
+.foco-saltos { margin: 8px 4px 0; padding: 10px 12px 12px; border-radius: 18px; background: var(--panel-sunken); }
+.foco-saltos > p:first-child { font-size: 12.5px; font-weight: 600; color: var(--text-muted); }
+.foco-saltos-opciones { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.foco-saltos-opciones button { min-width: 44px; height: 38px; padding: 0 10px; border-radius: 999px; font-size: 14px; font-weight: 700; font-stretch: 85%; color: var(--text-strong); box-shadow: inset 0 0 0 1px var(--hairline-fuerte); }
+.foco-saltos-opciones button.activo { color: var(--accion-tinta); background: var(--accion-fondo); box-shadow: none; }
+.foco-saltos-opciones input { width: 72px; height: 38px; padding: 0 10px; border-radius: 999px; font-size: 14px; text-align: center; color: var(--text-strong); background: transparent; box-shadow: inset 0 0 0 1px var(--hairline-fuerte); }
+.foco-saltos-nota { margin-top: 8px; font-size: 12px; line-height: 1.35; color: var(--text-faint); }
+/* La vez pasada, en la placa del día. */
+.dia-pasada { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; margin-top: 10px; padding: 0 14px 0 12px; border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--text-muted); background: var(--velo); }
+.dia-pasada span::first-letter { text-transform: uppercase; }
+.dia-pasada:active { transform: scale(.98); }
+/* El cuaderno: el ticket chico arriba y el número de hoja abajo. */
+.cuaderno-ticket { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border-radius: 999px; font-size: 13px; font-weight: 600; color: #c9cacf; background: rgba(255,255,255,.08); }
+.cuaderno-ticket:active { transform: scale(.96); }
+.cuaderno-numero { flex: 1; text-align: center; font-size: 13px; font-weight: 600; color: #9d9ea4; }
+/* Las piezas nuevas en la guía del "?". */
+.guia-molinete .molinete { width: 190px; height: auto; }
+.guia-campana { width: 70px; }
+.guia-cuaderno .cuaderno-hoja { --renglon: 26px; padding: 14px 12px 20px 50px; font-size: 18px; background-position: 0 0, 0 calc(14px + var(--ajuste-renglon, 2px)); }
+.guia-cuaderno .cuaderno-hoja::before { left: 9px; }
+.guia-cuaderno .cuaderno-hoja { background-image: linear-gradient(to right, transparent 38px, var(--margen) 38px, var(--margen) 40px, transparent 40px), repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--renglon) - 1px), var(--linea) calc(var(--renglon) - 1px), var(--linea) var(--renglon)); }
+.guia-cuaderno .cuaderno-fecha { font-size: 21px; }
+.guia-cuaderno .cuaderno-nombre { font-size: 19px; }
+.guia-cuaderno .cuaderno-serie small, .guia-cuaderno .cuaderno-unidad { font-size: 14px; }
+.guia-medallas { display: flex; justify-content: center; gap: 18px; }
+.guia-medallas .medalla { width: 60px; }
 `;
 
 function StyleInjector() {
@@ -5421,6 +5842,107 @@ function PRBurst({ anchorRef, trigger }) {
 }
 
 /* ============================================================================
+   LA CAMPANA DE LOS RÉCORDS. En muchos gimnasios hay una campana colgada en
+   la pared que se toca al romper una marca. Al guardar un récord de verdad
+   (no la primera marca de un ejercicio), la campana aparece sobre el ✓ de la
+   serie, se balancea y suena dos veces, si el aviso del descanso suena
+   (Perfil › Descansos: con "Vibración" queda muda). Antes era un estallido de
+   papelitos de seis colores, lo que festeja cualquier app. Dorada: el dorado
+   es sólo de los récords.
+============================================================================ */
+// Una campana suena con parciales inarmónicos que se apagan a distinto ritmo:
+// el grave queda, los agudos se van enseguida.
+function golpeDeCampana(a, t0, volumen) {
+  [[1, 1, 1.5], [2.76, 0.42, 0.9], [5.4, 0.2, 0.5], [8.93, 0.1, 0.3]].forEach(([razon, v, dura]) => {
+    const o = a.createOscillator();
+    const g = a.createGain();
+    o.type = "sine";
+    o.frequency.value = 880 * razon;
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(v * volumen, t0 + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dura);
+    o.connect(g);
+    g.connect(a.destination);
+    o.start(t0);
+    o.stop(t0 + dura + 0.05);
+  });
+}
+function sonarCampana() {
+  const a = obtenerAudioContext();
+  if (!a) return;
+  try {
+    if (a.state === "suspended") a.resume().catch(() => {});
+    const t = a.currentTime + 0.12;
+    golpeDeCampana(a, t, 0.2);
+    golpeDeCampana(a, t + 0.38, 0.11);
+  } catch { /* sin sonido: la campana igual se ve */ }
+}
+// El dibujo: el soporte de la pared, la campana con su badajo y las ondas del
+// sonido a los costados. Quieta (la de la guía), sin vaivén ni ondas.
+function CampanaDibujo({ quieta = false }) {
+  return (
+    <svg viewBox="0 0 64 80" className={`campana-svg ${quieta ? "quieta" : ""}`} aria-hidden="true">
+      <path d="M18 5h28" className="campana-soporte" />
+      <path d="M32 5v6" className="campana-soporte fino" />
+      <g className="campana-cuerpo">
+        <circle cx="32" cy="14.5" r="3.6" className="campana-argolla" />
+        <path d="M32 18c-9.4 0-14.2 7.2-14.2 17.2v8.6c0 5.3-3.2 8.3-7.4 11.2h43.2c-4.2-2.9-7.4-5.9-7.4-11.2v-8.6C46.2 25.2 41.4 18 32 18z" className="campana-bronce" />
+        <rect x="8.6" y="53.6" width="46.8" height="5.4" rx="2.7" className="campana-labio" />
+        <path d="M24.6 25.5c-2.2 3-3.3 6.8-3.3 10.8" className="campana-brillo" />
+        <path d="M32 58.6v4" className="campana-varilla" />
+        <circle cx="32" cy="65.6" r="4.2" className="campana-badajo" />
+      </g>
+      {!quieta && (
+        <>
+          <path d="M7 29c-3 5.2-3 11.8 0 17" className="campana-onda d1" />
+          <path d="M1.5 24.5c-4.4 7.6-4.4 18.4 0 26" className="campana-onda d1 lejos" />
+          <path d="M57 29c3 5.2 3 11.8 0 17" className="campana-onda d2" />
+          <path d="M62.5 24.5c4.4 7.6 4.4 18.4 0 26" className="campana-onda d2 lejos" />
+        </>
+      )}
+    </svg>
+  );
+}
+// `campana`: dónde sonó ({ n, x, y }: arriba del ✓). Se monta con key={n}
+// en cada récord y se va sola.
+function CampanaRecord({ campana }) {
+  const [terminada, setTerminada] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setTerminada(true), 1800);
+    return () => clearTimeout(t);
+  }, []);
+  if (terminada || !campana || typeof document === "undefined") return null;
+  return createPortal(
+    <div className="campana-record modal-overlay" aria-hidden="true">
+      <div className="campana-record-pieza" style={{ left: campana.x, top: campana.y }}>
+        <CampanaDibujo />
+      </div>
+    </div>,
+    document.body,
+  );
+}
+// La campana chica, con el trazo de los íconos: la del ticket, la del
+// cuaderno y la del casillero, al lado de los récords.
+const TRAZO_CAMPANA = ["M12 2.6v2.2", "M12 4.8c-3.7 0-5.6 2.7-5.6 6.4v3.1c0 1.7-1 2.7-2.6 3.8h16.4c-1.6-1.1-2.6-2.1-2.6-3.8v-3.1c0-3.7-1.9-6.4-5.6-6.4z", "M10.1 20.6a2 2 0 0 0 3.8 0"];
+function IconoCampana({ size = 14, className = "" }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={className}>
+      {TRAZO_CAMPANA.map((d) => <path key={d} d={d} />)}
+    </svg>
+  );
+}
+// La misma campana en un canvas (la imagen del ticket). x, y: la esquina de
+// arriba a la izquierda; lado: el tamaño del cuadrado.
+function campanaEnCanvas(ctx, x, y, lado, color) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(lado / 24, lado / 24);
+  ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.lineCap = "round"; ctx.lineJoin = "round";
+  TRAZO_CAMPANA.forEach((d) => ctx.stroke(new Path2D(d)));
+  ctx.restore();
+}
+
+/* ============================================================================
    COMPARTIR — dos mecanismos:
    1) ShareLinkModal: comparte un link (usado para rutinas) por la API nativa
       del sistema (que en celular suele incluir WhatsApp/Instagram/etc. como
@@ -5430,20 +5952,150 @@ function PRBurst({ anchorRef, trigger }) {
       "logo" de la app abajo. Sin backend: todo se dibuja y se comparte/baja
       directamente desde el navegador.
 ============================================================================ */
-function ShareLinkModal({ title, shareTitle, shareText, shareTarget, onClose, accent = "#3B82F6" }) {
+// EL BROCHE de una tabla de apoyo (la de la planilla de asistencia y la de la
+// hoja de la rutina): la placa, la palanca y la ranura.
+function BrocheTabla() {
+  return (
+    <svg viewBox="0 0 120 34" className="planilla-broche" aria-hidden="true">
+      <path d="M32 14c0-11 56-11 56 0" className="broche-arco" />
+      <rect x="6" y="12" width="108" height="19" rx="6" className="broche-base" />
+      <rect x="44" y="18.5" width="32" height="6" rx="3" className="broche-ranura" />
+    </svg>
+  );
+}
+
+// LA HOJA DE LA RUTINA, en la tabla: la planilla impresa que te da el profe,
+// sujeta con el broche. Cada día (marcado con resaltador de su color) con sus
+// ejercicios y cuántas series de cuántas reps. Es lo que ves al compartir una
+// rutina y lo que sale en la imagen.
+function seriesDeLaHoja(ex) {
+  if (ex.cardio) return "Cardio";
+  const reps = ex.sets[0]?.repRange;
+  return `${ex.sets.length}${reps ? ` × ${reps}` : ""}`;
+}
+function HojaRutina({ routineDef }) {
+  const model = useMemo(() => buildRoutineModel(routineDef), [routineDef]);
+  const ejercicios = model.dayOrder.reduce((t, dk) => t + model.days[dk].exercises.length, 0);
+  return (
+    <div className="planilla hoja-rutina">
+      <BrocheTabla />
+      <div className="planilla-hoja">
+        <p className="hoja-rutina-titulo">{routineDef.name || "Mi rutina"}</p>
+        <p className="hoja-rutina-bajada">{model.dayOrder.length} {model.dayOrder.length === 1 ? "día" : "días"}, {ejercicios} {ejercicios === 1 ? "ejercicio" : "ejercicios"}</p>
+        {model.dayOrder.map((dk) => {
+          const d = model.days[dk];
+          return (
+            <section key={dk} className="hoja-rutina-dia" style={{ "--dia": d.color }}>
+              <p className="hoja-rutina-dia-nombre"><span>{d.label}</span></p>
+              {d.exercises.length ? (
+                <ol>
+                  {d.exercises.map((ex, i) => (
+                    <li key={`${ex.id}:${i}`}><span>{ex.name}</span><i aria-hidden="true" /><b>{seriesDeLaHoja(ex)}</b></li>
+                  ))}
+                </ol>
+              ) : <p className="hoja-rutina-vacio">Sin ejercicios.</p>}
+            </section>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// La hoja como imagen para compartir: la tabla sobre el grafito, el broche
+// arriba y la hoja impresa. Si la rutina es larga, va en dos columnas.
+async function dibujarHojaRutina(ctx, W, H, routineDef) {
+  const F = "'Mona Sans Variable', system-ui, sans-serif";
+  try { await document.fonts?.load?.(`700 20px ${F}`); } catch { /* se dibuja con la que haya */ }
+  const model = buildRoutineModel(routineDef);
+  const PAPEL = "#f4f3ee", TINTA = "#1d1d1f", GRIS = "#6b6b70", PUNTOS = "#bdbdb8";
+  ctx.fillStyle = "#0b0b0d"; ctx.fillRect(0, 0, W, H);
+  // La tabla y la hoja.
+  const tx = 30, ty = 46, tw = W - 60, th = H - 126;
+  ctx.fillStyle = "#2a2b30"; ctx.beginPath(); ctx.roundRect(tx, ty, tw, th, 26); ctx.fill();
+  const px = tx + 16, py = ty + 40, pw = tw - 32, ph = th - 56;
+  ctx.fillStyle = PAPEL; ctx.beginPath(); ctx.roundRect(px, py, pw, ph, 4); ctx.fill();
+  // El broche.
+  ctx.fillStyle = "#9ea2aa"; ctx.beginPath(); ctx.roundRect(W / 2 - 92, ty + 14, 184, 40, 12); ctx.fill();
+  ctx.strokeStyle = "#c9ccd3"; ctx.lineWidth = 7; ctx.lineCap = "round";
+  ctx.beginPath(); ctx.moveTo(W / 2 - 46, ty + 18); ctx.bezierCurveTo(W / 2 - 46, ty - 6, W / 2 + 46, ty - 6, W / 2 + 46, ty + 18); ctx.stroke();
+  ctx.fillStyle = "#6c7078"; ctx.beginPath(); ctx.roundRect(W / 2 - 30, ty + 28, 60, 10, 5); ctx.fill();
+  // El encabezado.
+  let y = py + 66;
+  const corto = (t, n) => (t.length > n ? `${t.slice(0, n - 1)}.` : t);
+  ctx.textAlign = "left"; ctx.fillStyle = TINTA; ctx.font = `800 32px ${F}`;
+  ctx.fillText(corto(routineDef.name || "Mi rutina", 24), px + 26, y);
+  const ejercicios = model.dayOrder.reduce((t, dk) => t + model.days[dk].exercises.length, 0);
+  y += 30; ctx.fillStyle = GRIS; ctx.font = `500 18px ${F}`;
+  ctx.fillText(`${model.dayOrder.length} ${model.dayOrder.length === 1 ? "día" : "días"}, ${ejercicios} ${ejercicios === 1 ? "ejercicio" : "ejercicios"}`, px + 26, y);
+  y += 18;
+  ctx.strokeStyle = PUNTOS; ctx.lineWidth = 1.5; ctx.setLineDash([7, 6]); ctx.beginPath(); ctx.moveTo(px + 22, y); ctx.lineTo(px + pw - 22, y); ctx.stroke(); ctx.setLineDash([]);
+  y += 20;
+  // Una o dos columnas, según lo que entre.
+  const lineasDe = (dk) => 1.5 + Math.max(1, model.days[dk].exercises.length);
+  const total = model.dayOrder.reduce((t, dk) => t + lineasDe(dk), 0);
+  const alto = py + ph - 26 - y;
+  const dos = total * 30 > alto;
+  const columnas = [[], []];
+  if (dos) {
+    let acum = 0;
+    model.dayOrder.forEach((dk) => { (acum < total / 2 ? columnas[0] : columnas[1]).push(dk); acum += lineasDe(dk); });
+  } else columnas[0] = [...model.dayOrder];
+  const porColumna = Math.max(...columnas.map((c) => c.reduce((t, dk) => t + lineasDe(dk), 0)), 1);
+  const renglon = Math.min(30, alto / porColumna);
+  const letra = Math.max(12, Math.round(renglon * 0.6));
+  const anchoCol = dos ? (pw - 52 - 22) / 2 : pw - 52;
+  columnas.forEach((col, ci) => {
+    let cy = y;
+    const cx = px + 26 + ci * (anchoCol + 22);
+    col.forEach((dk) => {
+      const d = model.days[dk];
+      cy += renglon * 0.9;
+      ctx.font = `750 ${letra + 2}px ${F}`;
+      const nombre = corto(d.label || dk, dos ? 16 : 26);
+      const an = ctx.measureText(nombre).width;
+      // El resaltador del color del día, debajo de la mitad de abajo del nombre.
+      const c = /^#[0-9a-f]{6}$/i.test(d.color || "") ? mezclarHex(d.color, PAPEL, 0.45) : [205, 205, 200];
+      ctx.fillStyle = `rgb(${c.join(",")})`;
+      ctx.fillRect(cx - 3, cy - letra * 0.45, an + 6, letra * 0.62);
+      ctx.fillStyle = TINTA; ctx.fillText(nombre, cx, cy);
+      cy += renglon * 0.6;
+      if (!d.exercises.length) { cy += renglon; ctx.font = `500 ${letra}px ${F}`; ctx.fillStyle = GRIS; ctx.fillText("Sin ejercicios.", cx, cy); }
+      d.exercises.forEach((ex) => {
+        cy += renglon;
+        const der = seriesDeLaHoja(ex);
+        ctx.font = `650 ${letra}px ${F}`;
+        const ad = ctx.measureText(der).width;
+        ctx.fillStyle = TINTA; ctx.textAlign = "right"; ctx.fillText(der, cx + anchoCol, cy);
+        ctx.textAlign = "left"; ctx.font = `500 ${letra}px ${F}`; ctx.fillStyle = "#2c2c30";
+        let izq = ex.name;
+        while (izq.length > 4 && ctx.measureText(izq).width > anchoCol - ad - 26) izq = `${izq.slice(0, -2)}`;
+        if (izq !== ex.name) izq = `${izq.trimEnd()}.`;
+        ctx.fillText(izq, cx, cy);
+        const ai = ctx.measureText(izq).width;
+        ctx.strokeStyle = PUNTOS; ctx.setLineDash([2, 5]); ctx.beginPath(); ctx.moveTo(cx + ai + 8, cy - 4); ctx.lineTo(cx + anchoCol - ad - 8, cy - 4); ctx.stroke(); ctx.setLineDash([]);
+      });
+      cy += renglon * 0.5;
+    });
+  });
+  ctx.textAlign = "center"; ctx.fillStyle = "#9d9ea4"; ctx.font = `600 20px ${F}`;
+  ctx.fillText("modus fit", W / 2, H - 40);
+}
+
+function ShareLinkModal({ title, shareTitle, shareText, shareTarget, onClose }) {
   useAndroidBack(onClose);
   const [url, setUrl] = useState("");
   const [linkError, setLinkError] = useState(null);
   const [copied, setCopied] = useState(false);
   const [copyError, setCopyError] = useState(false);
+  const [imagen, setImagen] = useState(false);
   const urlInputRef = useRef(null);
 
   // El enlace ya no se armaba localmente (antes codificaba toda la rutina
   // en base64 dentro de la URL, generando links de miles de caracteres que
   // WhatsApp/Instagram bloqueaban o recortaban). Ahora la rutina se guarda
   // en Firestore bajo un ID corto al azar, y recién entonces tenemos un
-  // link de verdad cortito para mostrar — por eso esto es asíncrono y arranca
-  // mostrando "Generando enlace mágico...".
+  // link de verdad cortito para mostrar — por eso esto es asíncrono.
   useEffect(() => {
     let cancelled = false;
     setUrl(""); setLinkError(null);
@@ -5464,7 +6116,7 @@ function ShareLinkModal({ title, shareTitle, shareText, shareTarget, onClose, ac
   // Copiado con respaldo: navigator.clipboard no está disponible en todos
   // los contextos (por ejemplo, si la app se sirve por HTTP sin TLS, o en
   // algunos navegadores/webviews) — si falla, el enlace queda visible y
-  // seleccionable más abajo para copiarlo a mano.
+  // seleccionable para copiarlo a mano.
   const handleCopy = async () => {
     setCopyError(false);
     try {
@@ -5485,82 +6137,80 @@ function ShareLinkModal({ title, shareTitle, shareText, shareTarget, onClose, ac
       urlInputRef.current?.select();
     }
   };
+  const reintentar = () => { setLinkError(null); setUrl(""); shareRoutineToFirestore(shareTarget).then(setUrl).catch((err) => setLinkError(err?.code === "permission-denied" ? "permission-denied" : "other")); };
   const waUrl = url ? `https://wa.me/?text=${encodeURIComponent(shareText + " " + url)}` : "#";
   const xUrl = url ? `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(url)}` : "#";
   const redditUrl = url ? `https://www.reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(shareTitle)}` : "#";
   // BUG FIX: se abre, entre otros lugares, desde SavedRoutineRow, que tiene
-  // backdrop-blur permanente (clase "stagger-item smooth-card ...
-  // backdrop-blur-sm") — ese blur arma un containing block para los
+  // backdrop-blur permanente — ese blur arma un containing block para los
   // descendientes fixed igual que un transform, y sin portal el modal
   // salía recortado/descentrado. Mismo arreglo que RankUpModal y
   // ShareImageModal: createPortal a document.body.
   if (typeof document === "undefined") return null;
+  // COMPARTIR UNA RUTINA: arriba, la hoja impresa en su tabla (lo que estás
+  // mandando); abajo, el enlace para copiar, las redes y, en el pie,
+  // compartir el enlace o la hoja como imagen. Antes era una tarjeta con
+  // una mancha de color, círculos con los colores de cada red y "Generando
+  // enlace mágico...".
   return createPortal(
-    <div className="fixed inset-0 z-[120] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
-      <div className="relative overflow-hidden bg-slate-900 border rounded-3xl max-w-sm w-full p-5 modal-pop-in shadow-2xl shadow-black/50 max-h-[92vh] overflow-y-auto overscroll-contain" style={{ borderColor: tint(accent, "35") }} onClick={(e) => e.stopPropagation()}>
-        <div className="absolute -top-20 -right-16 w-56 h-56 rounded-full blur-3xl pointer-events-none opacity-20" style={{ backgroundColor: accent }} />
-        <div className="relative flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="icono-suelto"><Share2 size={16} /></div>
-            <h3 className="text-base font-black text-white truncate">{title}</h3>
-          </div>
-          <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition shrink-0"><X size={18} /></button>
-        </div>
-
-        {!url && !linkError && (
-          <div className="relative flex flex-col items-center gap-3 py-8">
-            <div className="w-9 h-9 rounded-full border-[3px] animate-spin" style={{ borderColor: tint(accent, "25"), borderTopColor: accent }} />
-            <p className="text-sm text-slate-400">Generando enlace mágico...</p>
-          </div>
-        )}
-
-        {linkError && (
-          <div className="relative bg-rose-500/10 border border-rose-500/20 rounded-2xl p-4 mb-3">
-            <p className="text-sm text-rose-300 mb-3">
-              {linkError === "permission-denied"
-                ? "Firestore todavía no tiene permiso para guardar rutinas compartidas. Hace falta ajustar las reglas de seguridad de la colección \"shared_routines\" en la consola de Firebase."
-                : "No pudimos generar el enlace. Revisá tu conexión e intentá de nuevo."}
-            </p>
-            <button onClick={() => { setLinkError(null); setUrl(""); shareRoutineToFirestore(shareTarget).then(setUrl).catch((err) => setLinkError(err?.code === "permission-denied" ? "permission-denied" : "other")); }} className="w-full py-2.5 rounded-xl bg-slate-800 text-slate-200 text-sm font-bold">Reintentar</button>
-          </div>
-        )}
-
-        {url && (
-          <div className="relative">
-            {/* Botón principal de compartir — prominente y arriba */}
-            {canNativeShare && (
-              <button onClick={handleNativeShare} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl !text-[color:var(--accion-tinta)] text-sm font-bold mb-3 transition-all active:scale-[0.98]" style={{ background: "var(--accion-fondo)", boxShadow: "none" }}>
-                <Share2 size={15} /> Compartir
-              </button>
-            )}
-            {/* Copiar enlace */}
-            <button onClick={handleCopy} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition text-sm font-semibold mb-2">
-              {copied ? <><Check size={14} className="text-emerald-400" /> ¡Copiado!</> : <><Copy size={14} /> Copiar enlace</>}
-            </button>
-            {copyError && <p className="text-[11px] text-amber-400 mb-2 text-center">No pudimos copiarlo. Tocá el enlace de abajo y copialo a mano.</p>}
-            <input ref={urlInputRef} value={url} readOnly onFocus={(e) => e.target.select()} className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-3 py-2.5 text-[11px] text-slate-400 mb-3 focus:outline-none truncate" />
-            {/* Redes sociales — insignias circulares con el color propio de
-                cada red, en vez del cuadrado gris genérico de antes con un
-                único ícono (Share2) repetido y sólo el tinte cambiando. */}
-            <div className="grid grid-cols-3 gap-2.5 mb-3">
-              <a href={waUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center gap-1.5 py-3 rounded-2xl border border-slate-800/60 bg-slate-800/30 hover:bg-slate-800/60 transition active:scale-[0.97]">
-                <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ backgroundColor: "#25D366" }}><Phone size={16} className="text-white" fill="white" /></div>
-                <span className="text-[10px] font-bold text-slate-300">WhatsApp</span>
-              </a>
-              <a href={xUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center gap-1.5 py-3 rounded-2xl border border-slate-800/60 bg-slate-800/30 hover:bg-slate-800/60 transition active:scale-[0.97]">
-                <div className="w-9 h-9 rounded-full flex items-center justify-center bg-black border border-slate-700"><X size={15} className="text-white" strokeWidth={2.75} /></div>
-                <span className="text-[10px] font-bold text-slate-300">X</span>
-              </a>
-              <a href={redditUrl} target="_blank" rel="noreferrer" className="flex flex-col items-center gap-1.5 py-3 rounded-2xl border border-slate-800/60 bg-slate-800/30 hover:bg-slate-800/60 transition active:scale-[0.97]">
-                <div className="w-9 h-9 rounded-full flex items-center justify-center" style={{ backgroundColor: "#FF4500" }}><Share2 size={15} className="text-white" /></div>
-                <span className="text-[10px] font-bold text-slate-300">Reddit</span>
-              </a>
+    <>
+      <div className="fixed inset-0 z-[120] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" style={imagen ? { visibility: "hidden" } : undefined} onClick={onClose}>
+        <div className="modal-rutina modal-pop-in" role="dialog" aria-modal="true" aria-label={title} onClick={(e) => e.stopPropagation()}>
+          <div className="modal-rutina-cabeza">
+            <div className="min-w-0">
+              <h3 className="ficha-titulo">{title}</h3>
+              <p className="ficha-bajada">Quien abra el enlace puede sumarla a su app con un toque.</p>
             </div>
-            <p className="text-[10px] text-slate-600 mb-3 text-center">Quien abra el enlace puede agregar la rutina a su app con un toque.</p>
+            <button onClick={onClose} aria-label="Cerrar" className="boton-redondo shrink-0"><X size={17} /></button>
           </div>
-        )}
+          <div className="modal-rutina-cuerpo">
+            <HojaRutina routineDef={shareTarget} />
+            {linkError ? (
+              <div className="compartir-error">
+                <p className="ficha-aviso"><AlertTriangle size={15} />{linkError === "permission-denied"
+                  ? "Firestore no tiene permiso para guardar rutinas compartidas: falta ajustar las reglas de \"shared_routines\" en la consola de Firebase."
+                  : "No se pudo generar el enlace. Revisá tu conexión y probá de nuevo."}</p>
+                <button onClick={reintentar} className="boton-tonal w-full">Reintentar</button>
+              </div>
+            ) : !url ? (
+              <p className="compartir-generando" role="status"><span className="plan-ia-girando" aria-hidden="true" /> Generando el enlace…</p>
+            ) : (
+              <div className="compartir-enlace">
+                <input ref={urlInputRef} value={url} readOnly onFocus={(e) => e.target.select()} className="compartir-enlace-campo" aria-label="El enlace de la rutina" />
+                <button onClick={handleCopy} className="boton-tonal shrink-0">{copied ? <><Check size={15} /> Copiado</> : <><Copy size={15} /> Copiar</>}</button>
+              </div>
+            )}
+            {copyError && <p className="ficha-aviso"><AlertTriangle size={15} />No se pudo copiar: tocá el enlace y copialo a mano.</p>}
+            {url && (
+              <div className="compartir-redes">
+                <a href={waUrl} target="_blank" rel="noreferrer" className="boton-tonal">WhatsApp</a>
+                <a href={xUrl} target="_blank" rel="noreferrer" className="boton-tonal">X</a>
+                <a href={redditUrl} target="_blank" rel="noreferrer" className="boton-tonal">Reddit</a>
+              </div>
+            )}
+          </div>
+          <div className="modal-rutina-pie">
+            <div className="flex gap-2">
+              <button onClick={() => setImagen(true)} className="boton-tonal"><ClipboardList size={16} /> Imagen</button>
+              {canNativeShare
+                ? <button onClick={handleNativeShare} disabled={!url} className="boton-pildora flex-1"><Share2 size={16} /> Compartir el enlace</button>
+                : <button onClick={handleCopy} disabled={!url} className="boton-pildora flex-1"><Copy size={16} /> Copiar el enlace</button>}
+            </div>
+          </div>
+        </div>
       </div>
-    </div>,
+      {imagen && (
+        <ShareImageModal
+          title="La hoja de tu rutina"
+          subtitle={shareTarget?.name || ""}
+          fileNamePrefix="rutina-modus-fit"
+          shareTitle={shareTitle}
+          shareText={shareText}
+          draw={(ctx, W, H) => dibujarHojaRutina(ctx, W, H, shareTarget)}
+          onClose={() => setImagen(false)}
+        />
+      )}
+    </>,
     document.body
   );
 }
@@ -7206,14 +7856,23 @@ function relojLargo(seg) {
 // fin con la hora exacta (suena aunque Android congele la app); el
 // cronómetro que cuenta para arriba deja una notificación fija de "Cardio
 // en curso" para volver de un toque.
-async function programarAvisosCardio(timerId, { modo, faltanSeg = 0, nombre = "" }) {
+// La versión del plugin nativo del descanso: la 11 cuenta también para arriba
+// (el cardio) y dibuja el reloj de pared. Un APK viejo no tiene info() y se
+// queda con lo de antes.
+let VERSION_PLUGIN_DESCANSO = null;
+async function versionPluginDescanso() {
+  if (VERSION_PLUGIN_DESCANSO != null) return VERSION_PLUGIN_DESCANSO;
+  try { const r = await RestTimerNotification.info(); VERSION_PLUGIN_DESCANSO = Number(r?.version) || 10; } catch { VERSION_PLUGIN_DESCANSO = 10; }
+  return VERSION_PLUGIN_DESCANSO;
+}
+async function programarAvisosCardio(timerId, { modo, faltanSeg = 0, nombre = "", inicio = null, objetivoSeg = 0 }) {
   if (!timerId || !Capacitor.isNativePlatform()) return;
   const notifId = notifIdForTimer(timerId, 20000);
   try {
     if (modo === "countdown") {
       const s = Math.max(1, Math.round(faltanSeg));
       ACTIVE_REST_TIMERS.__notifOwner = timerId;
-      await RestTimerNotification.start({ seconds: s, exerciseName: nombre || "Cardio", titulo: nombre || "Cardio", cuerpo: "Hasta tu objetivo" }).catch(() => {});
+      await RestTimerNotification.start({ seconds: s, exerciseName: nombre || "Cardio", titulo: nombre || "Cardio", cuerpo: objetivoSeg > 0 ? `Objetivo: ${Math.round(objetivoSeg / 60)} min` : "Hasta tu objetivo", subtitulo: "Cardio" }).catch(() => {});
       await LocalNotifications.createChannel({ id: "modusfit-rest-done-v1", name: "Fin del descanso", description: "Aviso al terminar", importance: 5, vibration: true }).catch(() => {});
       await LocalNotifications.schedule({
         notifications: [{
@@ -7223,6 +7882,10 @@ async function programarAvisosCardio(timerId, { modo, faltanSeg = 0, nombre = ""
           schedule: { at: new Date(Date.now() + s * 1000), allowWhileIdle: true },
         }],
       });
+    } else if ((await versionPluginDescanso()) >= 11) {
+      // El cronómetro para arriba, en vivo en la notificación y en el chip.
+      ACTIVE_REST_TIMERS.__notifOwner = timerId;
+      await RestTimerNotification.start({ cuenta: "sube", inicio: inicio || Date.now(), seconds: 0, exerciseName: nombre || "Cardio", titulo: nombre || "Cardio", cuerpo: "Cardio en curso. Tocá para volver.", subtitulo: "Cardio" }).catch(() => {});
     } else {
       await LocalNotifications.schedule({
         notifications: [{
@@ -7308,6 +7971,7 @@ function useCronoCardio(timerId, { objetivoSeg = 0, nombre = "", alTerminar = nu
       // siempre. La cuenta regresiva no se toca: su aviso tiene que sonar.
       if (modo === "stopwatch" && Capacitor.isNativePlatform()) {
         LocalNotifications.cancel({ notifications: [{ id: notifIdForTimer(timerId, 20000) }] }).catch(() => {});
+        if (ACTIVE_REST_TIMERS.__notifOwner === timerId) { RestTimerNotification.stop().catch(() => {}); delete ACTIVE_REST_TIMERS.__notifOwner; }
       }
     };
   }, [corriendo, modo, timerId]);
@@ -7321,7 +7985,7 @@ function useCronoCardio(timerId, { objetivoSeg = 0, nombre = "", alTerminar = nu
     guardar({ mode: modo, running: true, startedAt: inicio });
     setCorriendo(true);
     haptic(15);
-    programarAvisosCardio(timerId, { modo, faltanSeg: modo === "countdown" ? objetivo - transcurrido : 0, nombre });
+    programarAvisosCardio(timerId, { modo, faltanSeg: modo === "countdown" ? objetivo - transcurrido : 0, nombre, inicio, objetivoSeg: objetivo });
   };
   const pausar = () => {
     const t = medirAhora();
@@ -7349,7 +8013,7 @@ function useCronoCardio(timerId, { objetivoSeg = 0, nombre = "", alTerminar = nu
   const reprogramar = (nuevoObjetivoSeg) => {
     if (!corriendo || modo !== "countdown") return;
     const t = medirAhora();
-    if (nuevoObjetivoSeg > t) programarAvisosCardio(timerId, { modo, faltanSeg: nuevoObjetivoSeg - t, nombre });
+    if (nuevoObjetivoSeg > t) programarAvisosCardio(timerId, { modo, faltanSeg: nuevoObjetivoSeg - t, nombre, inicio: inicioRef.current, objetivoSeg: nuevoObjetivoSeg });
   };
   return { modo, corriendo, transcurrido, arrancar, pausar, reiniciar, cambiarModo, reprogramar };
 }
@@ -7596,11 +8260,6 @@ function leerVersionDescansos() { return VERSION_DESCANSOS; }
 // sistema al arrancar cada descanso.
 let ALERTA_DESCANSO = "sound";
 
-// Cronómetros de tarjeta que se están viendo en este momento. El dock de
-// abajo muestra un descanso sólo si su cronómetro NO está en pantalla: el
-// mismo reloj dos veces, uno arriba del otro, es ruido.
-const DESCANSOS_EN_PANTALLA = new Map(); // timerId → cuántos lo muestran
-
 // "2:47" y no "02:47": el cero de adelante no dice nada y le resta tamaño
 // al número que importa.
 function relojCorto(seg) {
@@ -7614,22 +8273,23 @@ function relojCorto(seg) {
 // Los textos del descanso. Sin emojis ni signos de exclamación (eran
 // "🔥 ¡Descanso terminado!" y "Volvé a Press Banca 💪"): dicen qué sigue,
 // con la serie si se sabe.
-function serieQueSigue(v) {
-  return v?.serie && v?.series ? `serie ${v.serie} de ${v.series}` : null;
-}
+// En vez de cuántas series quedan, la meta o el récord de la serie que sigue
+// (pedido: "que diga la meta o el récord"). `objetivo` llega escrito desde
+// la serie ("meta 8 × 80 kg", "récord 8 × 82,5 kg", "primera vez").
 function textoFinDeDescanso(v) {
   const titulo = "Terminó el descanso";
-  const serie = serieQueSigue(v);
-  if (v?.siguiente) return { titulo, cuerpo: `Seguí con ${v.siguiente}.`, enPantalla: `Seguí con ${v.siguiente}` };
-  if (v?.ejercicio) return { titulo, cuerpo: `Te toca ${v.ejercicio}${serie ? `, ${serie}` : ""}.`, enPantalla: `Te toca ${v.ejercicio}${serie ? `, ${serie}` : ""}` };
+  const obj = v?.objetivo ? capitalizar(v.objetivo) : null;
+  if (v?.siguiente) return { titulo, cuerpo: `Seguí con ${v.siguiente}.${obj ? ` ${obj}.` : ""}`, enPantalla: `Seguí con ${v.siguiente}${obj ? ` · ${v.objetivo}` : ""}` };
+  if (v?.ejercicio) return { titulo, cuerpo: `Te toca ${v.ejercicio}.${obj ? ` ${obj}.` : ""}`, enPantalla: `Te toca ${v.ejercicio}${obj ? ` · ${v.objetivo}` : ""}` };
   return { titulo, cuerpo: "Te toca la próxima serie.", enPantalla: "Te toca la próxima serie" };
 }
-// La notificación fija mientras corre: "Después: Press Banca, serie 3 de 4".
+// La notificación fija mientras corre: arriba qué sigue; abajo, su meta o su
+// récord. El reloj (que baja solo) va en la cabecera y en el chip de arriba.
 function textoDescansoEnCurso(v) {
-  const serie = serieQueSigue(v);
-  if (v?.siguiente) return `Después: ${v.siguiente}`;
-  if (v?.ejercicio) return `Después: ${v.ejercicio}${serie ? `, ${serie}` : ""}`;
-  return "Después: la próxima serie";
+  const obj = v?.objetivo ? capitalizar(v.objetivo) : null;
+  if (v?.siguiente) return { titulo: `Sigue ${v.siguiente}`, cuerpo: obj || "El próximo ejercicio" };
+  if (v?.ejercicio) return { titulo: v.ejercicio, cuerpo: obj || "Tu próxima serie" };
+  return { titulo: "Descanso", cuerpo: "Tu próxima serie" };
 }
 
 // Avisos del sistema para un descanso que corre: el cronómetro en vivo en
@@ -7660,13 +8320,13 @@ async function programarAvisosDescanso(timerId) {
     const segundos = Math.max(1, Math.ceil((fin - Date.now()) / 1000));
     ACTIVE_REST_TIMERS.__notifOwner = timerId;
     try {
-      // titulo, cuerpo, color, hechas y total los lee el plugin desde la
-      // versión 10 (las series del ejercicio como tramos de la barra); uno
-      // más viejo los ignora y sigue con sus textos.
+      // titulo, cuerpo y color los lee el plugin desde la versión 10; el
+      // subtítulo y el reloj de pared, desde la 11. Ya no van las series como
+      // tramos de la barra (pedido: "en vez de cuántas series quedan").
+      const enCurso = textoDescansoEnCurso(v);
       await RestTimerNotification.start({
         seconds: segundos, exerciseName: nombre,
-        titulo: "Descanso", cuerpo: textoDescansoEnCurso(v), color: v.color || "#14B8A6",
-        hechas: v.serie ? v.serie - 1 : 0, total: v.series || 0,
+        titulo: enCurso.titulo, cuerpo: enCurso.cuerpo, subtitulo: "Descanso", color: v.color || "#14B8A6",
       });
     } catch (pluginErr) {
       // Build viejo sin el plugin en Java: notificación fija con la hora de
@@ -7733,11 +8393,11 @@ function cancelarAvisosDescanso(timerId) {
   } catch { /* ignorado a propósito */ }
 }
 
-function iniciarDescanso(timerId, { segundos, ejercicio = null, siguiente = null, color = null, serie = null, series = null } = {}) {
+function iniciarDescanso(timerId, { segundos, ejercicio = null, siguiente = null, color = null, serie = null, series = null, objetivo = null } = {}) {
   const s = Math.round(Number(segundos) || 0);
   if (!timerId || s <= 0) return;
   const ahora = Date.now();
-  ACTIVE_REST_TIMERS[timerId] = { endTime: ahora + s * 1000, total: s, inicio: ahora, ejercicio: ejercicio || null, siguiente: siguiente || null, color: color || null, serie: serie || null, series: series || null };
+  ACTIVE_REST_TIMERS[timerId] = { endTime: ahora + s * 1000, total: s, inicio: ahora, ejercicio: ejercicio || null, siguiente: siguiente || null, color: color || null, serie: serie || null, series: series || null, objetivo: objetivo || null };
   AVISOS_DISPARADOS.delete(timerId);
   persistActiveRestTimers();
   avisarCambioDescansos();
@@ -7832,38 +8492,15 @@ function useRelojDescanso(timerId) {
   return { ...estadoDescanso(v), datos: v || null };
 }
 
-// El descanso que corresponde mostrar en el dock: el último que arrancó de
-// los que no tienen su cronómetro a la vista.
+// El descanso que corresponde mostrar en el dock: el último que arrancó.
 function descansoParaElDock() {
   let elegido = null, inicioElegido = -1;
   Object.entries(ACTIVE_REST_TIMERS).forEach(([tid, v]) => {
     if (tid.startsWith("__") || !v || (v.endTime == null && v.pausa == null)) return;
-    if ((DESCANSOS_EN_PANTALLA.get(tid) || 0) > 0) return;
     const inicio = v.inicio || (v.endTime ? v.endTime - (v.total || 0) * 1000 : 0);
     if (inicio > inicioElegido) { elegido = tid; inicioElegido = inicio; }
   });
   return elegido;
-}
-
-// Marca si un cronómetro de tarjeta está a la vista, para que el dock no lo
-// repita. El margen de abajo descuenta el dock y la barra de pestañas: un
-// reloj tapado por ellos no se está viendo.
-function useDescansoALaVista(ref, timerId) {
-  useEffect(() => {
-    const el = ref.current;
-    if (!el || !timerId || typeof IntersectionObserver === "undefined") return;
-    let visible = false;
-    const marcar = (si) => {
-      if (si === visible) return;
-      visible = si;
-      const n = (DESCANSOS_EN_PANTALLA.get(timerId) || 0) + (si ? 1 : -1);
-      if (n > 0) DESCANSOS_EN_PANTALLA.set(timerId, n); else DESCANSOS_EN_PANTALLA.delete(timerId);
-      avisarCambioDescansos();
-    };
-    const io = new IntersectionObserver(([e]) => marcar(e.isIntersecting), { rootMargin: "-56px 0px -170px 0px" });
-    io.observe(el);
-    return () => { io.disconnect(); marcar(false); };
-  }, [ref, timerId]);
 }
 
 // Aviso de fin de descanso (sonido, vibración y notificación).
@@ -8092,87 +8729,32 @@ function Onda({ fraccion = 1, quieta = false }) {
   );
 }
 
-// Cronómetro de descanso de una tarjeta (o de una superserie). Es sólo una
-// vista del registro: arrancarlo, pausarlo o ajustarlo pasa por las
-// funciones de arriba, así que el dock, el chip de la cabecera y la
-// notificación del sistema se enteran solos.
-//   · Quieto: una fila baja con la duración y "Iniciar".
-//   · Corriendo: el tiempo grande, la barra que se vacía y los controles —
-//     −15 / pausa / +15 / saltear. En los últimos 10 segundos se pone ámbar
-//     y late a cada segundo.
-//   · Al llegar a cero: verde, con a qué volver ("Volvé a Press banca").
+// El descanso de una tarjeta (o de una superserie). Desde la décima tanda el
+// reloj que corre vive sólo en el dock de abajo, fijo (pedido: "que el reloj
+// quede fijo como lo está ahora, pero que no aparezca uno dentro de la
+// serie"): dos relojes a la vez se pisaban y el de la tarjeta se iba con el
+// scroll. Acá queda nada más el renglón para arrancarlo a mano, que sólo se
+// muestra si el descanso no arranca solo al guardar (Perfil › Descansos).
 function RestTimer({ seconds, accent, timerId = "default", exerciseName = "" }) {
-  const raizRef = useRef(null);
-  useDescansoALaVista(raizRef, timerId);
-  const { estado, restante, fraccion, datos } = useRelojDescanso(timerId);
-  const urgente = estado === "running" && restante <= 10;
-  const color = estado === "done" ? "#10B981" : urgente ? "#F59E0B" : accent;
-
-  if (estado === "done") {
-    const { enPantalla } = textoFinDeDescanso(datos);
-    return (
-      <div ref={raizRef} className="descanso descanso-listo rest-done-flash" role="status" aria-live="polite" style={{ "--c": color }}>
-        <span className="galleta descanso-galleta badge-pop" aria-hidden="true"><Check size={17} strokeWidth={2.6} /></span>
-        <span className="min-w-0 flex-1">
-          <span className="descanso-listo-titulo">Terminó el descanso</span>
-          <span className="descanso-listo-texto">{enPantalla}</span>
-        </span>
-        <button onClick={() => terminarDescanso(timerId)} aria-label="Cerrar el aviso" className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-slate-500 hover:text-slate-300 transition"><X size={16} /></button>
-      </div>
-    );
-  }
-
-  if (estado === "idle") {
-    return (
-      <div ref={raizRef} className="descanso descanso-quieto" style={{ "--c": accent }}>
-        <span className="descanso-dial mini" aria-hidden="true"><DialDescanso fraccion={1} marcas={false} /></span>
-        <span className="text-[13px] font-semibold text-slate-400">Descanso</span>
-        <span className="num-display text-lg font-bold text-slate-200 leading-none">{relojCorto(seconds)}</span>
-        <button
-          onClick={() => { haptic(15); iniciarDescanso(timerId, { segundos: seconds, ejercicio: exerciseName || null, color: accent }); }}
-          className="descanso-iniciar ml-auto"
-        >
-          <Play size={14} className="fill-current" /> Iniciar
-        </button>
-      </div>
-    );
-  }
-
-  const enPausa = estado === "paused";
-  const rotulo = enPausa ? "En pausa" : datos?.siguiente ? "Antes de empezar" : "Descanso";
-  // A qué volvés cuando termine: el ejercicio que sigue (descanso entre
-  // ejercicios) o la próxima serie de éste.
-  const despues = datos?.siguiente ? `Sigue ${datos.siguiente}` : exerciseName || "";
+  const { estado } = useRelojDescanso(timerId);
+  if (estado !== "idle") return null;
   return (
-    <div ref={raizRef} className={`descanso descanso-activo ${enPausa ? "en-pausa" : ""} ${urgente ? "urgente" : ""}`} style={{ "--c": color }}>
-      {/* El reloj: tocarlo lo pausa o lo sigue, como el botón de un
-          cronómetro de mano. */}
-      <button onClick={() => { haptic(12); (enPausa ? reanudarDescanso(timerId) : pausarDescanso(timerId)); }} aria-label={enPausa ? "Seguir el descanso" : "Pausar el descanso"} className="descanso-dial">
-        <DialDescanso fraccion={fraccion} />
-        <span className="descanso-dial-centro">
-          <span role="timer" aria-label={relojCorto(restante)} className={`num-display descanso-tiempo ${urgente ? "urgente" : ""} ${enPausa ? "en-pausa" : ""}`}>
-            <RelojQueGira segundos={restante} />
-          </span>
-          <span className="descanso-dial-accion" aria-hidden="true">{enPausa ? <Play size={11} className="fill-current" /> : <Pause size={11} className="fill-current" />}</span>
-        </span>
+    <div className="descanso descanso-quieto" style={{ "--c": accent }}>
+      <span className="descanso-dial mini" aria-hidden="true"><DialDescanso fraccion={1} marcas={false} /></span>
+      <span className="text-[13px] font-semibold text-slate-400">Descanso</span>
+      <span className="num-display text-lg font-bold text-slate-200 leading-none">{relojCorto(seconds)}</span>
+      <button
+        onClick={() => { haptic(15); iniciarDescanso(timerId, { segundos: seconds, ejercicio: exerciseName || null, color: accent }); }}
+        className="descanso-iniciar ml-auto"
+      >
+        <Play size={14} className="fill-current" /> Iniciar
       </button>
-      <div className="descanso-lado">
-        <p className={`descanso-rotulo ${enPausa ? "en-pausa" : ""}`}>{rotulo}</p>
-        {despues && <p className="descanso-despues">{despues}</p>}
-        <div className="descanso-controles">
-          <BotonDescanso onClick={() => ajustarDescanso(timerId, -15)} label="Restar 15 segundos">−15</BotonDescanso>
-          <BotonDescanso onClick={() => ajustarDescanso(timerId, 15)} label="Sumar 15 segundos">+15</BotonDescanso>
-          <BotonDescanso onClick={() => terminarDescanso(timerId)} label="Cerrar el descanso"><X size={17} /></BotonDescanso>
-        </div>
-      </div>
     </div>
   );
 }
 
-// El descanso en curso, en el dock de abajo, cuando su cronómetro no está en
-// pantalla: con todas las tarjetas cerradas, desde otra pestaña o después
-// de scrollear. Era la mitad que faltaba del descanso entre ejercicios:
-// arrancaba bien, pero en una tarjeta cerrada sólo se veía como un chip.
+// El descanso en curso, en el dock de abajo: con todas las tarjetas cerradas,
+// desde otra pestaña o después de scrollear, siempre en el mismo lugar.
 function DescansoEnDock({ embebido = false }) {
   useSyncExternalStore(suscribirDescansos, leerVersionDescansos, leerVersionDescansos);
   const timerId = descansoParaElDock();
@@ -8181,17 +8763,21 @@ function DescansoEnDock({ embebido = false }) {
 }
 // embebido: va adentro de la tarjeta de la sesión (una sola pieza, con una
 // línea que las separa) en vez de ser una tarjeta propia apilada encima.
+// El reloj chico de la izquierda se agranda al tocarlo (RelojDescansoGrande):
+// el reloj de pared, para verlo de lejos con el celular apoyado en el banco.
 function FilaDescansoDock({ timerId, embebido = false }) {
   const { estado, restante, fraccion, datos } = useRelojDescanso(timerId);
+  const [grande, setGrande] = useState(false);
   if (estado === "idle") return null;
   const urgente = estado === "running" && restante <= 10;
   const base = datos?.color || "#14B8A6";
   const color = estado === "done" ? "#10B981" : urgente ? "#F59E0B" : base;
   const enPausa = estado === "paused";
   const nombre = datos?.siguiente || datos?.ejercicio || "";
+  const relojGrande = grande && <RelojDescansoGrande timerId={timerId} onClose={() => setGrande(false)} />;
   const envolver = (contenido) => (embebido
-    ? <div className="dock-descanso dock-descanso-embebido relative" role={estado === "done" ? "status" : undefined} aria-live={estado === "done" ? "polite" : undefined} style={{ "--c": color }}>{contenido}</div>
-    : <div className="dock-tarjeta dock-descanso session-bar-in" role={estado === "done" ? "status" : undefined} aria-live={estado === "done" ? "polite" : undefined} style={{ "--c": color }}>{contenido}</div>);
+    ? <div className="dock-descanso dock-descanso-embebido relative" role={estado === "done" ? "status" : undefined} aria-live={estado === "done" ? "polite" : undefined} style={{ "--c": color }}>{contenido}{relojGrande}</div>
+    : <div className="dock-tarjeta dock-descanso session-bar-in" role={estado === "done" ? "status" : undefined} aria-live={estado === "done" ? "polite" : undefined} style={{ "--c": color }}>{contenido}{relojGrande}</div>);
   if (estado === "done") {
     const { enPantalla } = textoFinDeDescanso(datos);
     return envolver(
@@ -8205,21 +8791,18 @@ function FilaDescansoDock({ timerId, embebido = false }) {
       </div>,
     );
   }
-  // Dos renglones: arriba qué descanso es (con el nombre entero, que en un
-  // solo renglón con los controles se cortaba a "Press Ban…"), abajo el
-  // reloj y los controles; al pie, la onda.
-  // En el dock, arriba qué descanso es (con el nombre entero: en el mismo
-  // renglón que los controles se cortaba a "Press Ban…"); abajo, el reloj
-  // chico (tocarlo pausa), el tiempo grande y los ajustes.
+  // Arriba, qué descanso es (con el nombre entero: en el mismo renglón que
+  // los controles se cortaba a "Press Ban…"); abajo, el reloj chico (tocarlo
+  // lo agranda), el tiempo grande y los ajustes.
   return envolver(
     <div className={`dock-reloj ${enPausa ? "en-pausa" : ""}`}>
       <p className={`descanso-rotulo dock-reloj-rotulo ${enPausa ? "en-pausa" : ""}`}>
         {enPausa ? "En pausa" : datos?.siguiente ? "Sigue" : "Descanso"}
         {nombre && <span className="descanso-rotulo-nombre"> · {nombre}</span>}
       </p>
-      <button onClick={() => { haptic(12); (enPausa ? reanudarDescanso(timerId) : pausarDescanso(timerId)); }} aria-label={enPausa ? "Seguir el descanso" : "Pausar el descanso"} className="descanso-dial chico">
+      <button onClick={() => { haptic(10); setGrande(true); }} aria-label="Agrandar el reloj del descanso" className="descanso-dial chico">
         <DialDescanso fraccion={fraccion} marcas={false} />
-        <span className="descanso-dial-centro" aria-hidden="true">{enPausa ? <Play size={15} className="fill-current ml-0.5" /> : <Pause size={15} className="fill-current" />}</span>
+        <span className="descanso-dial-centro" aria-hidden="true"><Maximize2 size={15} /></span>
       </button>
       <div className="min-w-0 flex-1">
         <p role="timer" aria-label={relojCorto(restante)} className={`num-display descanso-tiempo descanso-tiempo-dock ${urgente ? "urgente" : ""} ${enPausa ? "en-pausa" : ""}`}><RelojQueGira segundos={restante} /></p>
@@ -8230,6 +8813,58 @@ function FilaDescansoDock({ timerId, embebido = false }) {
         <BotonDescanso onClick={() => terminarDescanso(timerId)} label="Cerrar el descanso"><X size={17} /></BotonDescanso>
       </div>
     </div>,
+  );
+}
+
+// EL RELOJ DE PARED, grande: el del dock traído al frente. Tocar el reloj lo
+// pausa o lo sigue (como el botón de un cronómetro de mano); abajo, ±15 y
+// cerrar el descanso. Al llegar a cero dice a qué volvés.
+function RelojDescansoGrande({ timerId, onClose }) {
+  useAndroidBack(onClose);
+  const { estado, restante, fraccion, datos } = useRelojDescanso(timerId);
+  if (typeof document === "undefined") return null;
+  const enPausa = estado === "paused";
+  const urgente = estado === "running" && restante <= 10;
+  const base = datos?.color || "#14B8A6";
+  const color = estado === "done" ? "#10B981" : urgente ? "#F59E0B" : base;
+  const listo = estado === "done";
+  const rotulo = listo ? "Terminó el descanso" : enPausa ? "En pausa" : datos?.siguiente ? "Antes de empezar" : "Descanso";
+  const despues = listo ? textoFinDeDescanso(datos).enPantalla : [datos?.siguiente ? `Sigue ${datos.siguiente}` : datos?.ejercicio ? `Después: ${datos.ejercicio}` : "", datos?.objetivo].filter(Boolean).join(" · ");
+  return createPortal(
+    <div className="fixed inset-0 z-[125] bg-black/80 backdrop-blur-md flex items-center justify-center p-6 modal-bg-in modal-overlay" onClick={onClose}>
+      <div className="reloj-grande modal-pop-in" role="dialog" aria-modal="true" aria-label="El reloj del descanso" style={{ "--c": color }} onClick={(e) => e.stopPropagation()}>
+        <button onClick={onClose} aria-label="Achicar el reloj" className="boton-redondo reloj-grande-cerrar"><Minimize2 size={17} /></button>
+        <p className={`reloj-grande-rotulo ${enPausa ? "en-pausa" : ""}`}>{rotulo}</p>
+        {despues && <p className="reloj-grande-despues">{despues}</p>}
+        <button
+          onClick={() => { if (listo) return; haptic(12); (enPausa ? reanudarDescanso(timerId) : pausarDescanso(timerId)); }}
+          aria-label={listo ? "El descanso terminó" : enPausa ? "Seguir el descanso" : "Pausar el descanso"}
+          className="descanso-dial reloj-grande-dial"
+        >
+          <DialDescanso fraccion={fraccion} />
+          <span className="descanso-dial-centro">
+            {listo ? (
+              <Check size={52} strokeWidth={2.4} className="reloj-grande-listo" />
+            ) : (
+              <>
+                <span role="timer" aria-label={relojCorto(restante)} className={`num-display descanso-tiempo reloj-grande-tiempo ${urgente ? "urgente" : ""} ${enPausa ? "en-pausa" : ""}`}><RelojQueGira segundos={restante} /></span>
+                <span className="descanso-dial-accion" aria-hidden="true">{enPausa ? <Play size={16} className="fill-current" /> : <Pause size={16} className="fill-current" />}</span>
+              </>
+            )}
+          </span>
+        </button>
+        {listo ? (
+          <button onClick={() => { terminarDescanso(timerId); onClose(); }} className="boton-pildora w-full">Volver a la serie</button>
+        ) : (
+          <div className="reloj-grande-controles">
+            <BotonDescanso onClick={() => ajustarDescanso(timerId, -15)} label="Restar 15 segundos">−15</BotonDescanso>
+            <BotonDescanso onClick={() => ajustarDescanso(timerId, 15)} label="Sumar 15 segundos">+15</BotonDescanso>
+            <BotonDescanso onClick={() => { terminarDescanso(timerId); onClose(); }} label="Cerrar el descanso"><X size={17} /></BotonDescanso>
+          </div>
+        )}
+      </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -8304,21 +8939,79 @@ function dibujoBienvenida(key, color) {
   );
 }
 
-// ── OVERLAY DE INICIO DE SESIÓN ─────────────────────────────────────────────
-// Un flash breve (1.4s) que confirma que arrancó el entrenamiento. No bloquea
-// (pointer-events:none) ni congela el fondo: se va solo. Complementa la
-// cascada wake-up de las tarjetas.
+// ── EL MOLINETE DE ENTRADA ──────────────────────────────────────────────────
+// Al iniciar la sesión pasás por el molinete del gimnasio: el carnet se apoya
+// en el lector, la luz pasa a verde, los brazos giran y queda la hora de
+// entrada, la misma que imprime el ticket al terminar. El bip del lector lo
+// toca handleStartSession (es el toque de "Iniciar sesión": el único momento
+// en que el teléfono deja sonar). No bloquea (pointer-events: none) y se va
+// solo. Antes era una galleta con una mancuerna y "A entrenar".
+function sonarMolinete() {
+  const a = obtenerAudioContext();
+  if (!a) return;
+  try {
+    if (a.state === "suspended") a.resume().catch(() => {});
+    const t0 = a.currentTime + 0.62;
+    [0, 0.14].forEach((d) => {
+      const o = a.createOscillator();
+      const g = a.createGain();
+      o.type = "square";
+      o.frequency.value = 2093;
+      g.gain.setValueAtTime(0.0001, t0 + d);
+      g.gain.exponentialRampToValueAtTime(0.045, t0 + d + 0.008);
+      g.gain.setValueAtTime(0.045, t0 + d + 0.07);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + d + 0.09);
+      o.connect(g);
+      g.connect(a.destination);
+      o.start(t0 + d);
+      o.stop(t0 + d + 0.1);
+    });
+  } catch { /* sin sonido */ }
+}
+// El dibujo: el gabinete con el lector y su luz, el eje y los tres brazos (van
+// detrás del gabinete: al girar, el que cerraba el paso baja y el de arriba
+// queda cruzado) y el carnet. Quieto (el de la guía), con la luz verde y sin
+// el carnet.
+function MolineteDibujo({ quieto = false }) {
+  return (
+    <svg viewBox="0 0 240 170" className={`molinete ${quieto ? "quieto" : ""}`} aria-hidden="true">
+      <path d="M14 162h212" className="molinete-piso" />
+      <g className="molinete-brazos">
+        <path d="M122 92h60" />
+        <path d="M122 92l-30 52" />
+        <path d="M122 92l-30-52" />
+      </g>
+      <rect x="44" y="44" width="76" height="118" rx="10" className="molinete-gabinete" />
+      <path d="M58 106v42" className="molinete-junta" />
+      <rect x="38" y="34" width="88" height="18" rx="9" className="molinete-tapa" />
+      <rect x="54" y="62" width="54" height="30" rx="7" className="molinete-lector" />
+      <path d="M65 70.5c3.2 3.4 3.2 8.6 0 12M70.5 67.5c5 5.2 5 13 0 18" className="molinete-ondas" />
+      <circle cx="95" cy="77" r="5.2" className="molinete-luz" />
+      <circle cx="122" cy="92" r="12.5" className="molinete-eje" />
+      <circle cx="122" cy="92" r="4.5" className="molinete-eje-centro" />
+      {!quieto && (
+        <g className="molinete-carnet">
+          <rect x="57" y="58" width="48" height="30" rx="4.5" className="molinete-carnet-papel" />
+          <rect x="57" y="64.5" width="48" height="6.5" className="molinete-carnet-franja" />
+          <rect x="62" y="77" width="20" height="3.5" rx="1.75" className="molinete-carnet-linea" />
+        </g>
+      )}
+    </svg>
+  );
+}
 function SessionStartOverlay({ onDone }) {
+  const [hora] = useState(() => new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false }));
   useEffect(() => {
-    const t = setTimeout(onDone, 1400);
+    const t = setTimeout(onDone, 1900);
     return () => clearTimeout(t);
   }, [onDone]);
   return (
-    <div className="fixed inset-0 z-[135] flex items-center justify-center pointer-events-none session-start-fade modal-overlay">
-      <div className="absolute inset-0 bg-black/55 backdrop-blur-[2px]" />
-      <div className="relative flex flex-col items-center gap-3">
-        <div className="galleta session-start-pop a-entrenar-disco" aria-hidden="true"><Dumbbell size={44} /></div>
-        <p className="a-entrenar-texto session-start-text">A entrenar</p>
+    <div className="fixed inset-0 z-[135] flex items-center justify-center pointer-events-none molinete-velo modal-overlay" role="status" aria-label={`Entrada ${hora}. A entrenar.`}>
+      <div className="absolute inset-0 bg-black/80 backdrop-blur-md" />
+      <div className="relative flex flex-col items-center">
+        <MolineteDibujo />
+        <p className="molinete-entrada"><span>Entrada</span><b className="num-display">{hora}</b></p>
+        <p className="a-entrenar-texto molinete-texto">A entrenar</p>
       </div>
     </div>
   );
@@ -8338,15 +9031,108 @@ function codigoDeBarras(semilla, n = 44) {
 }
 const conComa = (v) => String(v).replace(".", ",");
 const miles = (v) => Math.round(v).toLocaleString("es-AR");
+
+// ── EL SALTO DE PESO Y LA PROGRESIÓN DE UN ENTRENADOR ──────────────────────
+// De a cuánto sube cada ejercicio: el disco chico (2,5 kg o 5 lb) o lo que
+// marque su máquina (pedido: "algunos gimnasios tienen máquinas que van de
+// 7 kg en 7 kg o de 15 lb en 15 lb y no se puede subir sólo 2 kg"). Se guarda
+// por ejercicio, con su unidad, en settings.saltosDePeso; se elige al lado
+// del ✓ de la serie.
+const SALTOS_KG = [1, 1.25, 2, 2.5, 5, 7, 10];
+const SALTOS_LBS = [2.5, 5, 10, 15, 20];
+function saltoDe(settings, exerciseId, unit) {
+  const s = settings?.saltosDePeso?.[exerciseId];
+  if (s?.v > 0) {
+    const u = s.u === "lbs" ? "lbs" : "kg";
+    if (u === unit) return s.v;
+    return Math.round((unit === "lbs" ? s.v * KG_TO_LBS : s.v / KG_TO_LBS) * 100) / 100;
+  }
+  return unit === "lbs" ? 5 : 2.5;
+}
+// El rango de reps de una serie: "8-12" → [8, 12]; "5" → [5, 5].
+function rangoDeReps(repRange) {
+  const m = String(repRange || "").match(/(\d+)\s*[-–]\s*(\d+)/);
+  if (m) { const a = Number(m[1]), b = Number(m[2]); return a <= b ? [a, b] : [b, a]; }
+  const n = parseInt(repRange, 10);
+  return Number.isFinite(n) && n > 0 ? [n, n] : null;
+}
+// LA PROGRESIÓN DE UN ENTRENADOR (doble progresión): con el mismo peso, una
+// rep más por vez hasta el tope del rango; ahí sube el peso un salto y las
+// reps vuelven al piso del rango. Pedido: "que juegue más con la cantidad de
+// reps y recién ahí suba el peso y baje las reps, como la que haría un
+// entrenador personal". Todo en la unidad que se muestra; a peso corporal,
+// sólo reps.
+function siguientePaso(kg, reps, repRange, salto) {
+  const r = rangoDeReps(repRange);
+  if (!r || !(reps > 0)) return null;
+  const [piso, tope] = r;
+  if (!(kg > 0)) return { kg: 0, reps: reps + 1, motivo: "rep" };
+  if (reps >= tope) return { kg: Math.round((kg + salto) * 4) / 4, reps: piso, motivo: "peso" };
+  return { kg, reps: reps + 1, motivo: "rep" };
+}
+// El mejor de TODO el ejercicio, todas sus series (sin lo de hoy de esta
+// serie, que es lo que se está guardando), en 1RM estimado y, a peso
+// corporal, en reps. Con la progresión de un entrenador casi toda serie
+// supera la suya: la campana, el visor dorado y la imagen para compartir son
+// para superar al ejercicio entero.
+function mejorDelEjercicio(logs, exerciseId, setIndex, hoy) {
+  let rm = 0, reps = 0;
+  Object.entries(logs || {}).forEach(([k, v]) => {
+    const override = k.endsWith("_pr_override");
+    const { exerciseId: ex, setIndex: si } = parseLogKey(override ? k.slice(0, -"_pr_override".length) : k);
+    if (ex !== exerciseId) return;
+    const lista = override ? (v?.manual ? [v] : []) : Array.isArray(v) ? v : [];
+    lista.forEach((h) => {
+      if (!h?.reps || h.kg == null || h.deload || (!override && si === setIndex && h.date === hoy)) return;
+      if (h.kg > 0) rm = Math.max(rm, prScore(h.kg, h.reps));
+      else reps = Math.max(reps, h.reps);
+    });
+  });
+  return { rm, reps };
+}
+// La imagen del récord se abre sola una vez por día: con la progresión los
+// récords son seguidos, y una ventana por ejercicio cansa. Las demás quedan a
+// un toque, en el ícono al lado de "Récord nuevo.".
+let COMPARTIR_AUTO_DIA = null;
+function compartirAutoHoy() {
+  const hoy = todayStr();
+  if (COMPARTIR_AUTO_DIA === hoy) return false;
+  COMPARTIR_AUTO_DIA = hoy;
+  return true;
+}
+// Lo que pide la serie que sigue: la meta del plan de esta semana o, sin
+// plan, su récord. Lo dicen el aviso del descanso, su notificación y el reloj
+// grande (pedido: "en vez de decir cuántas series quedan, que diga la meta o
+// el récord"). Ya escrito: "meta 8 × 80 kg", "récord 8 × 82,5 kg".
+function objetivoDeSerie(exercise, setIndex, logs, weekInCycle, settings, unit) {
+  const setDef = exercise?.sets?.[setIndex];
+  if (!setDef || exercise.cardio) return null;
+  const u = weightLabel(unit);
+  const escribir = (o) => (o.kg > 0 ? `${o.reps} × ${conComa(kgToDisplay(o.kg, unit))} ${u}` : `${o.reps} reps`);
+  const meta = getPlannedTargetForWeek(setDef, weekInCycle, settings?.trainingMode);
+  if (meta?.kg != null && meta?.reps) return `meta ${escribir(meta)}`;
+  const key = `${exercise.id}_${setIndex}`;
+  const ov = logs?.[`${key}_pr_override`];
+  let mejor = ov?.manual && ov.reps ? ov : null;
+  if (!mejor) {
+    (logs?.[key] || []).forEach((h) => { if (h?.reps && h.kg != null && !h.deload && (!mejor || prScore(h.kg, h.reps) > prScore(mejor.kg, mejor.reps))) mejor = h; });
+    if (setDef.pr?.reps && (!mejor || prScore(setDef.pr.kg, setDef.pr.reps) > prScore(mejor.kg, mejor.reps))) mejor = setDef.pr;
+  }
+  return mejor ? `récord ${escribir(mejor)}` : "primera vez";
+}
 function textoDuracion(min) {
   if (min == null || min < 1) return null;
   return min >= 60 ? `${Math.floor(min / 60)} h ${min % 60} min` : `${min} min`;
 }
+function diaDelTicket(iso) {
+  if (!iso) return "";
+  const dia = new Date(iso).toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" });
+  return `${dia.charAt(0).toUpperCase()}${dia.slice(1)}`;
+}
+const horaDelTicket = (iso) => (iso ? new Date(iso).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false }) : "");
 function fechaDelTicket(iso) {
   if (!iso) return "";
-  const f = new Date(iso);
-  const dia = f.toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" });
-  return `${dia.charAt(0).toUpperCase()}${dia.slice(1)}, ${f.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}`;
+  return `${diaDelTicket(iso)}, ${horaDelTicket(iso)}`;
 }
 
 // EL TICKET DE UNA SESIÓN: lo que imprime SessionSummaryModal. Lo arma App
@@ -8482,7 +9268,7 @@ function armarTicket({ logs, profile, cycleStart, fecha, dayKey, inicio = null, 
     if (n && reg) porRegion[reg] = (porRegion[reg] || 0) + n;
   });
   const regiones = Object.entries(porRegion).sort((x, y) => y[1] - x[1]).map(([nombre, n]) => ({ nombre, series: n }));
-  return { volumen: Math.round(volumen), series, ejercicios: ejercicios.size, prs, minutos, vsUltima, metas, lineas, historialDia, regiones, dia: dk ? ROUTINE[dk]?.label || null : null, color: dk ? ROUTINE[dk]?.color || null : null, fecha: fin ? new Date(fin).toISOString() : hoy === todayStr() ? new Date().toISOString() : new Date(`${hoy}T12:00:00`).toISOString() };
+  return { volumen: Math.round(volumen), series, ejercicios: ejercicios.size, prs, minutos, entrada: inicio || null, salida: inicio ? (fin || new Date().toISOString()) : null, vsUltima, metas, lineas, historialDia, regiones, dia: dk ? ROUTINE[dk]?.label || null : null, color: dk ? ROUTINE[dk]?.color || null : null, fecha: fin ? new Date(fin).toISOString() : hoy === todayStr() ? new Date().toISOString() : new Date(`${hoy}T12:00:00`).toISOString() };
 }
 
 function SessionSummaryModal({ resumen, onClose }) {
@@ -8511,8 +9297,18 @@ function SessionSummaryModal({ resumen, onClose }) {
           <div className="ticket-salida">
             <div className="ticket-papel" style={{ "--dia": resumen.color || "#14B8A6" }}>
               <p className="ticket-marca">Modus Fit</p>
-              <p className="ticket-fecha">{fechaDelTicket(resumen.fecha)}</p>
+              <p className="ticket-fecha">{resumen.entrada ? diaDelTicket(resumen.fecha) : fechaDelTicket(resumen.fecha)}</p>
               <hr />
+              {/* La hora de entrada (la del molinete) y la de salida. */}
+              {resumen.entrada && (
+                <>
+                  <div className="ticket-horario">
+                    <p><small>Entrada</small><b>{horaDelTicket(resumen.entrada)}</b></p>
+                    <p><small>Salida</small><b>{horaDelTicket(resumen.salida)}</b></p>
+                  </div>
+                  <hr />
+                </>
+              )}
               <p className="ticket-fila fuerte"><span>{resumen.dia || "Entrenamiento"}</span>{textoDuracion(resumen.minutos) && <span>{textoDuracion(resumen.minutos)}</span>}</p>
               {/* Cada ejercicio con sus series y, debajo, una raya impresa
                   del volumen que se llevó: se ve en qué se te fue la sesión. */}
@@ -8561,7 +9357,7 @@ function SessionSummaryModal({ resumen, onClose }) {
               {resumen.prs.length > 0 && (
                 <>
                   <hr />
-                  <p className="ticket-titulo"><Trophy size={14} /> {resumen.prs.length === 1 ? "Récord de hoy" : "Récords de hoy"}</p>
+                  <p className="ticket-titulo"><IconoCampana size={15} className="campana-icono" /> {resumen.prs.length === 1 ? "Récord de la sesión" : "Récords de la sesión"}</p>
                   {resumen.prs.map((pr) => (
                     <p key={pr.id} className="ticket-fila record"><span>{pr.nombre}</span><i aria-hidden="true" /><span>{pr.marca.replace("×", " × ")}</span></p>
                   ))}
@@ -8616,7 +9412,7 @@ function dibujarTicket(ctx, W, H, resumen, unit) {
   const conHist = historial.length > 1, conReg = regiones.length > 1;
   const px = 64, pw = W - 128;
   // Lo que ocupa cada parte, hasta el código de barras y un margen abajo.
-  const alto = 484 + lineas.length * 48 + (conHist ? 300 : 0) + (conReg ? 160 : 0) + (prs.length ? 84 + prs.length * 34 : 0);
+  const alto = 484 + (resumen.entrada ? 92 : 0) + lineas.length * 48 + (conHist ? 300 : 0) + (conReg ? 160 : 0) + (prs.length ? 84 + prs.length * 34 : 0);
   // El papel, centrado en el alto (con aire para la marca de abajo): una
   // sesión corta no deja el ticket colgando arriba de un vacío negro.
   const py = Math.max(64, Math.round((H - 70 - alto) / 2));
@@ -8644,8 +9440,19 @@ function dibujarTicket(ctx, W, H, resumen, unit) {
   const subtitulo = (t) => { ctx.font = `700 19px ${F}`; ctx.fillStyle = "#4a4a4e"; ctx.textAlign = "left"; ctx.fillText(t, px + 26, y); y += 22; };
   const corto = (t, n) => (t.length > n ? `${t.slice(0, n - 1)}.` : t);
   centro("Modus Fit", `800 40px ${F}`, TINTA); y += 32;
-  centro(fechaDelTicket(resumen.fecha), `500 19px ${F}`, "#6b6b70"); y += 16;
+  centro(resumen.entrada ? diaDelTicket(resumen.fecha) : fechaDelTicket(resumen.fecha), `500 19px ${F}`, "#6b6b70"); y += 16;
   corte();
+  if (resumen.entrada) {
+    ctx.font = `500 17px ${F}`; ctx.fillStyle = "#6b6b70";
+    ctx.textAlign = "left"; ctx.fillText("Entrada", px + 26, y);
+    ctx.textAlign = "right"; ctx.fillText("Salida", px + pw - 26, y);
+    y += 36;
+    ctx.font = `800 34px ${F}`; ctx.fillStyle = TINTA;
+    ctx.textAlign = "left"; ctx.fillText(horaDelTicket(resumen.entrada), px + 26, y);
+    ctx.textAlign = "right"; ctx.fillText(horaDelTicket(resumen.salida), px + pw - 26, y);
+    y += 6;
+    corte();
+  }
   fila(resumen.dia || "Entrenamiento", textoDuracion(resumen.minutos) || "", `700 24px ${F}`); y += 38;
   lineas.forEach((l) => {
     fila(corto(l.nombre, 24), `${l.series} ${l.series === 1 ? "serie" : "series"}`); y += 12;
@@ -8701,7 +9508,8 @@ function dibujarTicket(ctx, W, H, resumen, unit) {
   }
   if (prs.length) {
     corte();
-    ctx.font = `700 21px ${F}`; ctx.fillStyle = "#8a6a14"; ctx.textAlign = "left"; ctx.fillText(prs.length === 1 ? "Récord de hoy" : "Récords de hoy", px + 26, y); y += 34;
+    campanaEnCanvas(ctx, px + 24, y - 19, 22, "#8a6a14");
+    ctx.font = `700 21px ${F}`; ctx.fillStyle = "#8a6a14"; ctx.textAlign = "left"; ctx.fillText(prs.length === 1 ? "Récord de la sesión" : "Récords de la sesión", px + 54, y); y += 34;
     prs.forEach((pr) => { fila(corto(pr.nombre, 22), pr.marca.replace("×", " × "), `600 21px ${F}`, "#8a6a14"); y += 34; });
   }
   corte();
@@ -8867,6 +9675,84 @@ function Telarana({ regiones, anterior = null, etiqueta = "" }) {
   );
 }
 
+// LA MEDALLA DEL MES, como la de los que terminan una carrera: la cinta del
+// color de la pestaña y el metal grabado con el mes, el año y los días que
+// entrenaste. Sale arriba del resumen de un mes cerrado, y las de los
+// últimos meses cuelgan en la vitrina de tu perfil. Metal liso (sin
+// degradés): una medalla de peltre, igual para todos los meses, porque lo que
+// cambia es lo que dice. `chica`: la de la vitrina, sólo con el número.
+function MedallaMes({ prefijo = null, numero = 0, chica = false }) {
+  const [a, m] = prefijo ? prefijo.split("-").map(Number) : [null, null];
+  const arriba = m ? `${capitalizar(NOMBRES_MES[m - 1])} ${a}` : "";
+  return (
+    <svg viewBox="0 0 120 168" className={`medalla ${chica ? "chica" : ""}`} aria-hidden="true">
+      <polygon points="27,0 52,0 67,76 55,80" className="medalla-cinta" />
+      <polygon points="36.5,0 42.5,0 61.5,77.5 58,78.6" className="medalla-cinta-raya" />
+      <polygon points="68,0 93,0 65,80 53,76" className="medalla-cinta otra" />
+      <polygon points="77.5,0 83.5,0 62,78.6 58.5,77.5" className="medalla-cinta-raya" />
+      <circle cx="60" cy="84" r="5.5" className="medalla-argolla" />
+      <circle cx="60" cy="126" r="41" className="medalla-canto" />
+      <circle cx="60" cy="126" r="35" className="medalla-cara" />
+      <circle cx="60" cy="126" r="31" className="medalla-filete" />
+      <path d="M31.5 108a35 35 0 0 1 21-15" className="medalla-brillo" />
+      {chica ? (
+        <text x="60" y="140" textAnchor="middle" className="medalla-grabado numero chica">{numero}</text>
+      ) : (
+        <>
+          <path id={`medalla-arriba-${prefijo}`} d="M36 126a24 24 0 0 1 48 0" fill="none" />
+          <path id={`medalla-abajo-${prefijo}`} d="M33 126a27 27 0 0 0 54 0" fill="none" />
+          <text className="medalla-grabado curva"><textPath href={`#medalla-arriba-${prefijo}`} startOffset="50%" textAnchor="middle">{arriba}</textPath></text>
+          <text x="60" y="137" textAnchor="middle" className="medalla-grabado numero">{numero}</text>
+          <text className="medalla-grabado curva"><textPath href={`#medalla-abajo-${prefijo}`} startOffset="50%" textAnchor="middle">{numero === 1 ? "día entrenado" : "días entrenados"}</textPath></text>
+        </>
+      )}
+    </svg>
+  );
+}
+
+// LA VITRINA: los últimos doce meses colgados de sus ganchos. Los que
+// entrenaste tienen su medalla (tocarla abre el resumen de ese mes); los
+// otros, el gancho vacío; el de este mes dice cuánto llevás.
+function VitrinaMedallas({ logs, trainingSessions }) {
+  const [abierto, setAbierto] = useState(null);
+  const meses = useMemo(() => {
+    const idx = buildSessionsIndex(logs || {}, trainingSessions || []);
+    const hoy = new Date();
+    return Array.from({ length: 12 }, (_, k) => {
+      const d = new Date(hoy.getFullYear(), hoy.getMonth() - 11 + k, 1);
+      const prefijo = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      return { prefijo, mes: d.getMonth(), anio: d.getFullYear(), dias: idx.filter((s) => s.date.startsWith(prefijo)).length, enCurso: k === 11 };
+    });
+  }, [logs, trainingSessions]);
+  const datosAbierto = useMemo(() => (abierto ? computePrefixRecap(logs || {}, trainingSessions || [], abierto) : null), [abierto, logs, trainingSessions]);
+  if (!meses.some((x) => x.dias > 0)) return null;
+  const ganadas = meses.filter((x) => !x.enCurso && x.dias > 0).length;
+  return (
+    <section className="vitrina tarjeta-tonal" aria-label="Tus medallas">
+      <div className="vitrina-cabeza">
+        <h3 className="seccion-titulo">Tus medallas</h3>
+        <span>{ganadas === 0 ? "La primera llega al cerrar el mes" : `${ganadas} de los últimos 11 meses`}</span>
+      </div>
+      <div className="vitrina-estante">
+        {meses.map((x) => (!x.enCurso && x.dias > 0 ? (
+          <button key={x.prefijo} onClick={() => setAbierto(x.prefijo)} className="vitrina-lugar con-medalla" aria-label={`${capitalizar(NOMBRES_MES[x.mes])} de ${x.anio}: ${x.dias} ${x.dias === 1 ? "día" : "días"}. Ver el resumen`}>
+            <span className="vitrina-clavo" aria-hidden="true" />
+            <MedallaMes chica numero={x.dias} />
+            <span className="vitrina-mes">{MESES_CORTOS[x.mes]}</span>
+          </button>
+        ) : (
+          <div key={x.prefijo} className={`vitrina-lugar ${x.enCurso ? "en-curso" : "vacio"}`}>
+            <span className="vitrina-clavo" aria-hidden="true" />
+            <span className="vitrina-hueco" aria-hidden="true">{x.enCurso && x.dias > 0 ? <b className="num-display">{x.dias}</b> : null}</span>
+            <span className="vitrina-mes">{x.enCurso ? "Este mes" : MESES_CORTOS[x.mes]}</span>
+          </div>
+        )))}
+      </div>
+      {datosAbierto && <WeeklyRecapModal data={datosAbierto} periodo="mes" etiqueta={etiquetaPeriodo(abierto)} onClose={() => setAbierto(null)} />}
+    </section>
+  );
+}
+
 // Resumen semanal: aparece al finalizar una sesión que cae en domingo (o el
 // último día programado de la semana) — nunca antes, así siempre te agarra
 // DESPUÉS de haber entrenado ese día, no como una notificación a mitad de
@@ -8937,6 +9823,8 @@ function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null, 
   return (
     <div className="fixed inset-0 z-[140] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
       <div className="resumen-periodo modal-pop-in" style={{ "--c": "var(--tono)" }} role="dialog" aria-modal="true" aria-label={est.titulo} onClick={(e) => e.stopPropagation()}>
+        {/* Un mes cerrado trae su medalla, colgada arriba. */}
+        {periodo === "mes" && !enCurso && data.prefijo && <div className="resumen-medalla"><MedallaMes prefijo={data.prefijo} numero={data.dias} /></div>}
         <header className="resumen-cabeza">
           <h2 className="resumen-titulo">{est.titulo}</h2>
           <p className="resumen-bajada">{bajada}</p>
@@ -9118,6 +10006,17 @@ const RUTINA_GUIA = {
   },
 };
 
+// Una hoja de muestra para la guía: press banca con un récord y un ejercicio
+// que quedó sin hacer.
+function hojaDeMuestra() {
+  const serie = (setIndex, reps, kg, isImprovement = false) => ({ exerciseId: "guia_press", exerciseName: "Press banca", setIndex, reps, kg, minutes: null, rpe: null, isImprovement, recordDelEjercicio: isImprovement });
+  return {
+    date: todayStr(), dayKeys: [], isDeload: false, startedAt: null, endedAt: null, durationMin: 52, completionPct: 75, totalSets: 3,
+    items: [serie(0, 8, 70), serie(1, 8, 72.5, true), serie(2, 7, 72.5)],
+    missedExercises: [{ id: "guia_fondos", name: "Fondos" }],
+  };
+}
+
 function capitulosGuia() {
   const verde = "#14B8A6", azul = "#3B82F6", naranja = "#F97316";
   const pushSolo = { ...RUTINA_GUIA, dayOrder: ["push"] };
@@ -9135,8 +10034,13 @@ function capitulosGuia() {
           ),
         },
         {
+          titulo: "Pasá el molinete",
+          texto: "Tocá Iniciar sesión y pasás el molinete del gimnasio: queda tu hora de entrada, que sale en el ticket con la de salida.",
+          dibujo: <div className="guia-molinete" style={{ "--tono": verde }}><MolineteDibujo quieto /></div>,
+        },
+        {
           titulo: "Anotá la serie",
-          texto: "Reps y kilos ya vienen escritos: con lo de la vez pasada o, si seguís un plan, con la meta de la semana. Si no cambió nada, es un toque en el ✓; con − y + los ajustás sin abrir el teclado.",
+          texto: "Reps y kilos ya vienen escritos con la progresión de un entrenador: una rep más que la vez pasada y, al tope del rango, más peso (de a cuánto sube cada máquina lo elegís al lado del ✓). Si seguís un plan, con su meta. Con − y + los ajustás sin abrir el teclado.",
           dibujo: (
             <div className="guia-visor" style={{ "--c": verde }}>
               <span><b className="num-display">8</b><small>reps</small></span>
@@ -9147,8 +10051,13 @@ function capitulosGuia() {
           ),
         },
         {
+          titulo: "Tocá la campana",
+          texto: "Si la serie supera tu marca, suena la campana del gimnasio. El récord queda en el ticket y en tu cuaderno, con su campanita.",
+          dibujo: <div className="guia-campana"><CampanaDibujo quieta /></div>,
+        },
+        {
           titulo: "El descanso corre solo",
-          texto: "Al guardar la serie arranca el reloj: tocalo para pausarlo, sumale o restale 15 segundos, o cerralo con la cruz. Si cerrás la tarjeta, sigue en la barra de abajo.",
+          texto: "Al guardar la serie arranca el reloj, abajo y siempre en el mismo lugar: sumale o restale 15 segundos, o cerralo con la cruz. Tocá el reloj chico para verlo grande y pausarlo.",
           dibujo: (
             <span className="descanso-dial guia-dial" style={{ "--c": verde }}>
               <DialDescanso fraccion={0.62} />
@@ -9158,7 +10067,7 @@ function capitulosGuia() {
         },
         {
           titulo: "Cada serie carga un disco",
-          texto: "La barra del día se llena a medida que anotás. Cuando está completa, terminaste: tocá Finalizar y sale el ticket de tu sesión, con cómo te fue contra la vez pasada. Después lo volvés a ver tocando ese día en el Historial.",
+          texto: "La barra del día se llena a medida que anotás. Cuando está completa, terminaste: tocá Finalizar y sale el ticket de tu sesión, con tu hora de entrada y de salida y cómo te fue contra la vez pasada. Después lo volvés a ver desde tu cuaderno, en el Historial.",
           dibujo: <BarraCargada hechas={6} total={10} alto={64} detalle etiqueta="Una barra con seis discos de diez" />,
         },
         {
@@ -9194,14 +10103,8 @@ function capitulosGuia() {
         },
         {
           titulo: "Tu rango, músculo por músculo",
-          texto: "Con tus marcas, cada músculo tiene un rango de Bronce a Maestro. El muñeco los pinta: tocá un músculo para ver tus mejores series.",
-          dibujo: (
-            <div className="guia-rangos">
-              {["Bronce", "Plata", "Oro", "Esmeralda", "Diamante", "Maestro"].map((t) => (
-                <span key={t}><RankBadgeIcon tier={t} sub={null} color="#9da2a8" size={30} /><small>{t}</small></span>
-              ))}
-            </div>
-          ),
+          texto: "Con tus marcas, cada músculo tiene un rango de Bronce a Maestro. El muñeco los pinta: tocá un músculo y sale tu mejor serie y su cinturón, con un agujero por nivel y la hebilla en el tuyo.",
+          dibujo: <div className="guia-ancho" style={{ "--rango": "#E0B632", "--rango-c": "#E0B632" }}><CinturonRango nivel={7} /></div>,
         },
         {
           titulo: "Tu evolución, ejercicio por ejercicio",
@@ -9214,8 +10117,13 @@ function capitulosGuia() {
           ),
         },
         {
+          titulo: "Tu cuaderno",
+          texto: "En Historial, cada día que entrenaste es una hoja de tu cuaderno: tus series como las anotarías a mano, el récord encerrado y lo que no hiciste, tachado. Pasá de hoja deslizando el dedo.",
+          dibujo: <div className="guia-ancho guia-cuaderno"><HojaCuaderno session={hojaDeMuestra()} etiqueta="Push" color={verde} /></div>,
+        },
+        {
           titulo: "Tus resúmenes, con gráficos",
-          texto: "Al cerrar la semana, el mes o el año: tus días, tus últimas semanas contra tu promedio y una telaraña de dónde fue el trabajo, contra el período anterior.",
+          texto: "Al cerrar la semana, el mes o el año: tus días, tus últimas semanas contra tu promedio y una telaraña de dónde fue el trabajo. Cada mes cerrado te deja su medalla, colgada en tu perfil.",
           dibujo: (
             <div className="guia-ancho" style={{ "--tono": azul }}>
               <Telarana
@@ -9251,6 +10159,11 @@ function capitulosGuia() {
             </div>
           ),
         },
+        {
+          titulo: "Compartí tu rutina",
+          texto: "Sale impresa, como la hoja que te da el profe en su tabla: mandás el enlace, que suma la rutina con un toque, o la hoja como imagen.",
+          dibujo: <div className="guia-ancho"><HojaRutina routineDef={pushSolo} /></div>,
+        },
       ],
     },
     {
@@ -9271,6 +10184,23 @@ function capitulosGuia() {
                 { uid: "yo", yo: true, nombre: "Vos", dias: [azul, naranja, null, verde, null, null, null], rango: "#2FB866" },
                 { uid: "j", nombre: "Joaquín", dias: [null, verde, null, azul, null, null, null], rango: "#E0B632" },
               ]} />
+            </div>
+          ),
+        },
+        {
+          titulo: "La planilla de asistencia",
+          texto: "En Actividad, quién entrenó hoy y ayer, por orden de llegada y con su firma. El aplauso está al lado de cada uno; tocá un nombre y entrás a su casillero.",
+          dibujo: (
+            <div className="guia-ancho" style={{ "--tono": "#8B5CF6" }}>
+              <PlanillaAsistencia
+                filas={[
+                  { uid: "m", nombre: "Martina Paz", daysAgo: 0, dayLabel: "Push", series: 9, inicio: "1", hora: "07:05" },
+                  { uid: "v", nombre: "Valen Sosa", daysAgo: 0, dayLabel: "Legs", series: 9, inicio: "2", hora: "18:10" },
+                ]}
+                enviados={{ v: true }}
+                onAplaudir={() => {}}
+                onVer={() => {}}
+              />
             </div>
           ),
         },
@@ -9308,8 +10238,8 @@ function capitulosGuia() {
         },
         {
           titulo: "Te muestra antes de cambiar algo",
-          texto: "Si te arma una rutina o anota una marca, primero ves la propuesta: la confirmás o la descartás.",
-          dibujo: <div className="guia-ancho"><RoutinePreview routineDef={pushSolo} /></div>,
+          texto: "Si te arma una rutina o anota una marca, te la da como una receta firmada: primero la ves, después la confirmás o la descartás.",
+          dibujo: <div className="guia-ancho"><RecetaPapel para="vos" titulo="Una rutina de empuje"><RoutinePreview routineDef={pushSolo} /></RecetaPapel></div>,
         },
       ],
     },
@@ -9329,6 +10259,11 @@ function capitulosGuia() {
           titulo: "Tu cuenta",
           texto: "Vinculá Google para sumar amigos y tener tus datos en la nube. También podés exportar todo tu entrenamiento.",
           dibujo: <span className="guia-google"><span aria-hidden="true">G</span> Vincular con Google</span>,
+        },
+        {
+          titulo: "Tus medallas",
+          texto: "Cada mes que entrenaste te deja una medalla con los días que fuiste, colgada en tu perfil. Tocá una para ver el resumen de ese mes.",
+          dibujo: <div className="guia-medallas" style={{ "--tono": verde }}>{[12, 9, 14].map((n, i) => <MedallaMes key={i} chica numero={n} />)}</div>,
         },
       ],
     },
@@ -9456,7 +10391,7 @@ function RankUpModal({ from, to, muscleName, onClose }) {
 // no es "haber hecho" 70×8, es otro trabajo.
 // Devuelve null si esta serie no tiene meta (ahí manda el récord de siempre).
 // El color de lo que dice la serie al guardarla.
-const TONO_DEL_AVISO = { pr: "record", first: "neutro", tie: "neutro", down: "baja", error: "alerta" };
+const TONO_DEL_AVISO = { pr: "record", "pr-serie": "sube", first: "neutro", tie: "neutro", down: "baja", error: "alerta" };
 function describePlannedOutcome(target, hecho, isRecord, unit) {
   if (!target) return null;
   // Cardio: la meta son minutos, no kg×reps.
@@ -9470,7 +10405,7 @@ function describePlannedOutcome(target, hecho, isRecord, unit) {
   return { type: "down", msg: `Te faltó para la meta: ${target.reps} × ${conComa(kgToDisplay(target.kg, unit))} ${weightLabel(unit)}.` };
 }
 
-function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, accent, logs, setLogs, drafts = {}, setDrafts, autoShowPrShare = true, onDisableAutoShowPrShare, hasActiveSession = true, cardio = false, dumbbellDouble = null, fieldSettings = DEFAULT_SETTINGS, onUpdateSettings = null, sex = null, age = null, restTimerId = null, restSeconds = null, isLastSet = false, totalSets = null, weekInCycle = null, nextRestTimerId = null, nextRestSeconds = null, nextExerciseName = null, activa = true, onEnfocar = null }) {
+function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, accent, logs, setLogs, drafts = {}, setDrafts, autoShowPrShare = true, onDisableAutoShowPrShare, hasActiveSession = true, cardio = false, dumbbellDouble = null, fieldSettings = DEFAULT_SETTINGS, onUpdateSettings = null, sex = null, age = null, restTimerId = null, restSeconds = null, isLastSet = false, totalSets = null, weekInCycle = null, nextRestTimerId = null, nextRestSeconds = null, nextExerciseName = null, activa = true, onEnfocar = null, objetivoSiguiente = null, objetivoProximo = null }) {
   // Modo "rutina planificada" (ver DEFAULT_SETTINGS.trainingMode): si hay
   // una meta cargada para ESTA semana, se muestra "Marca a alcanzar" en
   // vez de "Récord" — pensado para quien sigue un plan con cargas ya
@@ -9543,6 +10478,8 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     if (!computedPR) return override;
     return prScore(override.kg, override.reps) >= prScore(computedPR.kg, computedPR.reps) ? override : computedPR;
   }, [override, computedPR]);
+  // El mejor de todo el ejercicio (ver mejorDelEjercicio).
+  const mejorEj = useMemo(() => mejorDelEjercicio(logs, exerciseId, setIndex, today), [logs, exerciseId, setIndex, today]);
   // Si ya guardaste esta serie hoy, la fila pasa a modo lectura — varios
   // bloques de abajo lo necesitan antes de que se declare el local del
   // render, así que se calcula una sola vez acá.
@@ -9562,11 +10499,22 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   // Siguiendo un plan, la serie viene escrita con la META de esta semana
   // (antes proponía lo de la vez pasada aunque el plan pidiera otra cosa, y
   // había que corregir los dos números en cada serie).
+  // Sin plan, la serie viene con la PROGRESIÓN de un entrenador desde la vez
+  // pasada (ver siguientePaso): una rep más, o el salto de peso de este
+  // ejercicio al llegar al tope del rango. Con "Progresión sugerida" apagada,
+  // con lo de la vez pasada tal cual.
+  const pasoKg = saltoDe(fieldSettings, exerciseId, unit);
+  const pasoProgresion = !cardio && !isPlannedMode && lastSession && fieldSettings.showProgressionSuggestion !== false
+    ? siguientePaso(kgToDisplay(lastSession.kg, unit), lastSession.reps, setDef.repRange, pasoKg)
+    : null;
+  const escribeProgresion = !!pasoProgresion && fieldSettings.showLastSession !== false && fieldSettings.prefillLastSession !== false;
   const sugerido = isPlannedMode && !cardio && plannedTarget?.kg != null && plannedTarget?.reps
     ? { reps: String(plannedTarget.reps), kg: String(kgToDisplay(plannedTarget.kg, unit)) }
-    : fieldSettings.showLastSession !== false && fieldSettings.prefillLastSession !== false && lastSession && !cardio
-      ? { reps: String(lastSession.reps), kg: String(kgToDisplay(lastSession.kg, unit)) }
-      : null;
+    : escribeProgresion
+      ? { reps: String(pasoProgresion.reps), kg: String(pasoProgresion.kg) }
+      : fieldSettings.showLastSession !== false && fieldSettings.prefillLastSession !== false && lastSession && !cardio
+        ? { reps: String(lastSession.reps), kg: String(kgToDisplay(lastSession.kg, unit)) }
+        : null;
   // La serie viene AUTOCOMPLETADA con lo último que hiciste en ella. El
   // intento anterior mostraba el número en gris y pedía un toque extra para
   // aceptarlo — un paso de más para un dato que la app ya sabe, y encima
@@ -9581,9 +10529,20 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   // Sumar o restar sin abrir el teclado. En Android el teclado numérico se
   // come media pantalla y tapa el botón de guardar, y el 90% de los ajustes
   // entre series son "una rep más" o "un disco más" — no vale abrirlo para
-  // eso. El paso del peso sigue la unidad: 2,5kg (el disco chico de cada
-  // lado) o 5 lbs. Parte de lo que ya haya escrito, o de lo propuesto.
-  const pasoKg = unit === "lbs" ? 5 : 2.5;
+  // eso. El paso del peso es el salto de este ejercicio (pasoKg, arriba): el
+  // disco chico o lo que marque su máquina. Parte de lo escrito o propuesto.
+  // De a cuánto sube el peso en este ejercicio: se elige al lado del ✓ y
+  // vale para todas sus series.
+  const [verSaltos, setVerSaltos] = useState(false);
+  const elegirSalto = (v) => {
+    if (!(v > 0) || !onUpdateSettings) return;
+    const saltos = { ...(fieldSettings?.saltosDePeso || {}) };
+    if (v === (unit === "lbs" ? 5 : 2.5)) delete saltos[exerciseId];
+    else saltos[exerciseId] = { v: Math.round(v * 100) / 100, u: unit };
+    onUpdateSettings({ saltosDePeso: saltos });
+    setVerSaltos(false);
+    haptic(10);
+  };
   const ajustar = (campo, delta) => {
     const actual = campo === "reps" ? (reps || sugerido?.reps || "0") : (kg || sugerido?.kg || "0");
     const n = parseFloat(actual);
@@ -9628,11 +10587,19 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   const [editingPR, setEditingPR] = useState(false);
   const [rowFocus, setRowFocus] = useState(false); // enciende el borde al enfocar
   const [editReps, setEditReps] = useState(""); const [editKg, setEditKg] = useState(""); const [saved, setSaved] = useState(false);
-  const [prBurst, setPrBurst] = useState(0);
+  const [campana, setCampana] = useState(null); // la campana de los récords: dónde sonó
   const [showPRShare, setShowPRShare] = useState(false);
   const [rankUpInfo, setRankUpInfo] = useState(null); // { from, to, muscleName }
   const saveBtnRef = useRef(null);
   const kgInputRef = useRef(null);
+  // La campana de los récords suena arriba del ✓ que se tocó, y se oye si el
+  // aviso del descanso suena.
+  const tocarCampana = () => {
+    const r = saveBtnRef.current?.getBoundingClientRect();
+    const x = r ? r.left + r.width / 2 : window.innerWidth / 2, y = r ? Math.max(100, r.top) : window.innerHeight / 2;
+    setCampana((antes) => ({ n: (antes?.n || 0) + 1, x, y }));
+    if (fieldSettings.alertType !== "vibration") sonarCampana();
+  };
   // Al tocar un campo se selecciona lo que tiene: la serie viene propuesta
   // con lo de la vez pasada, y para cambiar "8" por "10" había que borrar
   // antes de escribir. Ahora se escribe encima. (En un timeout: iOS pone el
@@ -9682,7 +10649,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     // la notificación del sistema (antes sólo lo hacía el cronómetro de una
     // tarjeta abierta) y avisa al dock de abajo.
     if (fieldSettings.autoStartRestTimer === true && restTimerId && restSeconds && !isLastSet) {
-      iniciarDescanso(restTimerId, { segundos: restSeconds, ejercicio: exerciseName || null, color: accent, serie: setIndex + 2, series: totalSets });
+      iniciarDescanso(restTimerId, { segundos: restSeconds, ejercicio: exerciseName || null, color: accent, serie: setIndex + 2, series: totalSets, objetivo: objetivoSiguiente });
       return;
     }
     // Descanso ENTRE ejercicios (opción, ver settings.restBetweenExercises):
@@ -9690,7 +10657,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     // SIGUIENTE ya tiene arriba de su tarjeta. Con su nombre: el aviso dice
     // "Seguí con Remo", no "Volvé a Press Banca" (el que terminaste).
     if (isLastSet && fieldSettings.restBetweenExercises === true && nextRestTimerId && nextRestSeconds) {
-      iniciarDescanso(nextRestTimerId, { segundos: nextRestSeconds, ejercicio: exerciseName || null, siguiente: nextExerciseName || null, color: accent });
+      iniciarDescanso(nextRestTimerId, { segundos: nextRestSeconds, ejercicio: exerciseName || null, siguiente: nextExerciseName || null, color: accent, objetivo: objetivoProximo });
     }
   };
   const handleSave = () => {
@@ -9730,7 +10697,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           const prevRank = getMuscleRank(exLib.group, prevRankData.best1RM, rankMode, fieldSettings.bodyWeightKg || 0, sex, age);
           const newRank = getMuscleRank(exLib.group, newRankData.best1RM, rankMode, fieldSettings.bodyWeightKg || 0, sex, age);
           if (newRank.levelIdx > prevRank.levelIdx && prevRank.tier !== newRank.tier) {
-            setRankUpInfo({ from: prevRank, to: newRank, muscleName: MUSCLE_GROUP_BY_KEY[exLib.group]?.label });
+            setTimeout(() => setRankUpInfo({ from: prevRank, to: newRank, muscleName: MUSCLE_GROUP_BY_KEY[exLib.group]?.label }), isPR ? 1600 : 0);
             RECENT_RANK_UPS.add(exLib.group); // para que lata en Progreso
           }
         }
@@ -9744,7 +10711,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
             : m === prevMin ? { type: "tie", msg: "Igualaste tu sesión más larga." }
               : { type: "down", msg: `A un ${Math.max(1, Math.round(((prevMin - m) / prevMin) * 100))} % de tu sesión más larga.` });
       haptic(fbC.type === "pr" ? [35, 25, 45] : 18);
-      if (fbC.type === "pr") setPrBurst((n) => n + 1);
+      if (fbC.type === "pr") tocarCampana();
       setFeedback({ type: fbC.type, msg: fbC.msg, noSession });
       return;
     }
@@ -9820,18 +10787,17 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
         const prevRank = getMuscleRank(exLib.group, prevRankData.best1RM, rankMode, fieldSettings.bodyWeightKg || 0, sex, age);
         const newRank = getMuscleRank(exLib.group, newRankData.best1RM, rankMode, fieldSettings.bodyWeightKg || 0, sex, age);
         if (newRank.levelIdx > prevRank.levelIdx && prevRank.tier !== newRank.tier) {
-          setRankUpInfo({ from: prevRank, to: newRank, muscleName: MUSCLE_GROUP_BY_KEY[exLib.group]?.label });
+          setTimeout(() => setRankUpInfo({ from: prevRank, to: newRank, muscleName: MUSCLE_GROUP_BY_KEY[exLib.group]?.label }), isPR ? 1600 : 0);
           RECENT_RANK_UPS.add(exLib.group); // para que lata en Progreso
         }
       }
     } catch { /* ignorado a propósito */ }
     const noSession = !hasActiveSession;
-    // suggestUp: si superaste el techo del rango de reps objetivo, sugerimos
-    // subir el peso la próxima. Antes esta variable se USABA sin estar
-    // definida → ReferenceError que impedía que apareciera CUALQUIER mensaje
-    // al guardar (incluido "¡Nueva marca!"). Ahora se calcula acá.
-    const repTop = repRangeTop(setDef.repRange);
-    const suggestUp = !isNaN(repTop) && r > repTop;
+    // suggestUp: llegar al tope del rango es la señal de un entrenador: la
+    // próxima, el salto de peso de este ejercicio y volver al piso del rango
+    // (ver siguientePaso). Con un plan, manda el plan.
+    const rangoSerie = rangoDeReps(setDef.repRange);
+    const suggestUp = !!rangoSerie && r >= rangoSerie[1] && k > 0 && !isPlannedMode ? { salto: pasoKg, piso: rangoSerie[0] } : false;
     // BUG FIX (auditando el modo planificado): el mensaje al guardar seguía
     // midiéndose SIEMPRE contra el récord, aunque tuvieras una meta cargada.
     // Salían dos cosas falsas, las dos en el peor momento posible:
@@ -9845,14 +10811,14 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     // 75×5 no es "haber hecho" 70×8).
     const fb = describePlannedOutcome(getPlannedTargetForWeek(setDef, weekInCycle, fieldSettings.trainingMode), { kg: k, reps: r }, isPR, unit)
       || (isFirstEver ? { type: "first", msg: "Primera marca: desde acá se cuenta." }
-        : isPR ? { type: "pr", msg: "Récord nuevo." }
+        : isPR ? ((isBodyweight ? r > mejorEj.reps : new1RM > mejorEj.rm) ? { type: "pr", msg: "Récord nuevo." } : { type: "pr-serie", msg: "Tu mejor marca en esta serie." })
           : new1RM === prev1RM ? { type: "tie", msg: "Igualaste tu récord." }
             : { type: "down", msg: `A un ${Math.max(1, Math.round(((prev1RM - new1RM) / prev1RM) * 100))} % de tu récord.` });
     const esCelebracion = fb.type === "pr";
     haptic(esCelebracion ? [35, 25, 45] : 18);
-    if (esCelebracion) setPrBurst((n) => n + 1);
-    setFeedback({ type: fb.type, msg: fb.msg, suggestUp: fb.type === "first" || esCelebracion ? suggestUp : false, noSession });
-    if (isPR && autoShowPrShare) setShowPRShare(true);
+    if (esCelebracion) tocarCampana();
+    setFeedback({ type: fb.type, msg: fb.msg, suggestUp, noSession });
+    if (esCelebracion && autoShowPrShare && compartirAutoHoy()) setTimeout(() => setShowPRShare(true), 1500);
   };
   const savePR = () => {
     const r = parseFloat(editReps), kDisplay = parseFloat(editKg);
@@ -9887,12 +10853,12 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   const lineaFeedback = feedback && (
     <p className={`serie-aviso ${feedback.tono || TONO_DEL_AVISO[feedback.type] || "alerta"} ${feedback.type === "pr" ? "pr-pop" : ""}`}>
       {feedback.msg}
-      {feedback.type === "pr" && !cardio && <button onClick={() => setShowPRShare(true)} aria-label="Compartir esta marca" className="ml-1.5 inline-flex align-middle opacity-80 hover:opacity-100 active:scale-90 transition"><Share2 size={13} /></button>}
+      {(feedback.type === "pr" || feedback.type === "pr-serie") && !cardio && <button onClick={() => setShowPRShare(true)} aria-label="Compartir esta marca" className="ml-1.5 inline-flex align-middle opacity-80 hover:opacity-100 active:scale-90 transition"><Share2 size={13} /></button>}
     </p>
   );
   const avisosExtra = (
     <>
-      {feedback?.suggestUp && <p className="serie-aviso neutro"><TrendingUp size={12} className="inline -mt-0.5 mr-1" />Superaste el rango: probá +{pasoKg}{weightLabel(unit)} la próxima</p>}
+      {feedback?.suggestUp && <p className="serie-aviso neutro"><TrendingUp size={12} className="inline -mt-0.5 mr-1" />Llegaste al tope del rango: la próxima, +{conComa(feedback.suggestUp.salto)} {weightLabel(unit)} y volvé a {feedback.suggestUp.piso} reps.</p>}
       {feedback?.noSession && <p className="serie-aviso alerta"><AlertTriangle size={12} className="inline -mt-0.5 mr-1" />Tocá "Iniciar sesión" arriba para que este día cuente en tu historial</p>}
     </>
   );
@@ -9991,7 +10957,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     const filaSoloGuardar = !cardioManual && fieldSettings.showKm === false;
     return (
       <div className="serie serie-cardio" style={{ "--c": accent }}>
-        <PRBurst anchorRef={saveBtnRef} trigger={prBurst} />
+        {campana && <CampanaRecord key={campana.n} campana={campana} />}
         <div className="flex items-center gap-2 flex-wrap mb-2.5">
           <span className="serie-rotulo">Sesión</span>
           {isPlannedMode && plannedTarget?.minutes != null && (
@@ -10085,7 +11051,8 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   const liveBeats = enFoco && !isNaN(rNum) && !isNaN(kNum) && rNum > 0 && kNum >= 0 && !!currentPR
     && (kNum === 0
       ? currentPR.kg === 0 && rNum > currentPR.reps
-      : currentPR.kg > 0 && estimate1RM(displayToKg(kNum, unit), rNum) > estimate1RM(currentPR.kg, currentPR.reps));
+      : currentPR.kg > 0 && estimate1RM(displayToKg(kNum, unit), rNum) > estimate1RM(currentPR.kg, currentPR.reps))
+    && (kNum === 0 ? rNum > mejorEj.reps : prScore(displayToKg(kNum, unit), rNum) > mejorEj.rm);
   const rango = String(setDef.repRange || "").replace(/-/g, "–");
   const pesada = isHeavyRepRange(setDef.repRange);
   // Consejo al guardar (opción): contra la meta si hay una, si no contra el
@@ -10139,7 +11106,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     const alTocar = hechaHoy ? editarGuardada : onEnfocar;
     return (
       <div className={`serie ${hechaHoy ? "serie-hecha" : "serie-pendiente"}`} style={{ "--c": accent }}>
-        <PRBurst anchorRef={saveBtnRef} trigger={prBurst} />
+        {campana && <CampanaRecord key={campana.n} campana={campana} />}
         <button
           ref={saveBtnRef}
           onClick={alTocar || undefined}
@@ -10193,7 +11160,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   // ── EN FOCO: el tablero ─────────────────────────────────────────────────
   return (
     <div className={`serie serie-foco ${liveBeats ? "va-record" : ""}`} style={{ "--c": accent }}>
-      <PRBurst anchorRef={saveBtnRef} trigger={prBurst} />
+      {campana && <CampanaRecord key={campana.n} campana={campana} />}
       {/* Una sola línea: el rango de esta serie (del color del día; el número
           de serie se sacó a pedido) y contra qué jugás —la meta de esta
           semana si hay una; si no, tu récord, que se toca para corregirlo—.
@@ -10222,6 +11189,10 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           va abajo y chico: sigue siendo el mejor dato para elegir la carga. */}
       {!sugerido && fieldSettings.showLastSession === true && lastSession && (
         <p className="foco-pasada">la vez pasada <b>{lastSession.reps} × {kgToDisplay(lastSession.kg, unit)} {u}</b></p>
+      )}
+      {/* La serie viene con la progresión: arriba, de dónde sale. */}
+      {escribeProgresion && !draft.editing && (
+        <p className="foco-pasada">la vez pasada <b>{lastSession.reps} × {conComa(kgToDisplay(lastSession.kg, unit))} {u}</b>{pasoProgresion.motivo === "peso" ? ": llegaste al tope, sube el peso" : ": hoy, una rep más"}</p>
       )}
 
       {/* El visor: reps × kilos en grande y el ✓. Vienen propuestos con lo de
@@ -10254,34 +11225,43 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           </div>
           <span aria-hidden="true" />
           <div className="foco-ajustes">
-            <button onClick={() => ajustar("kg", -pasoKg)} aria-label={`Restar ${pasoKg} ${u}`}><Minus size={17} /></button>
-            <button onClick={() => ajustar("kg", pasoKg)} aria-label={`Sumar ${pasoKg} ${u}`}><Plus size={17} /></button>
+            <button onClick={() => ajustar("kg", -pasoKg)} aria-label={`Restar ${conComa(pasoKg)} ${u}`}><Minus size={17} /></button>
+            <button onClick={() => ajustar("kg", pasoKg)} aria-label={`Sumar ${conComa(pasoKg)} ${u}`}><Plus size={17} /></button>
           </div>
-          <span aria-hidden="true" />
+          {/* De a cuánto sube el peso: el disco chico o el salto de su máquina. */}
+          {onUpdateSettings ? (
+            <button onClick={() => setVerSaltos((v) => !v)} aria-expanded={verSaltos} aria-label={`El peso sube de a ${conComa(pasoKg)} ${u}. Cambiarlo`} className={`foco-salto ${verSaltos ? "abierto" : ""}`}>
+              <small>de a</small><b className="num-display">{conComa(pasoKg)}</b>
+            </button>
+          ) : <span aria-hidden="true" />}
+        </div>
+      )}
+      {verSaltos && (
+        <div className="foco-saltos bounce-in" role="group" aria-label="De a cuánto sube el peso en este ejercicio">
+          <p>{exerciseName ? `${exerciseName} sube de a` : "Sube de a"}</p>
+          <div className="foco-saltos-opciones">
+            {(unit === "lbs" ? SALTOS_LBS : SALTOS_KG).map((v) => (
+              <button key={v} onClick={() => elegirSalto(v)} aria-pressed={v === pasoKg} className={v === pasoKg ? "activo" : ""}>{conComa(v)}</button>
+            ))}
+            <input type="number" inputMode="decimal" placeholder="Otro" aria-label={`Otro salto, en ${u}`}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); elegirSalto(parseFloat(String(e.currentTarget.value).replace(",", "."))); } }}
+              onBlur={(e) => { const v = parseFloat(String(e.currentTarget.value).replace(",", ".")); if (v > 0 && v !== pasoKg) elegirSalto(v); }} />
+          </div>
+          <p className="foco-saltos-nota">Las reps suben de a una hasta el tope del rango; ahí, el peso sube este salto.</p>
         </div>
       )}
       {liveBeats && <p className="foco-record"><Trophy size={13} /> Si la guardás así, es récord</p>}
       {lineaFeedback}
       {avisosExtra}
 
-      {/* Sugerencia de progresión (opción): con una meta para esta semana,
-          la sugerencia ES la meta (antes mostraba dos números peleándose). */}
-      {fieldSettings.showProgressionSuggestion === true && (history.length > 0 || isPlannedMode) && (() => {
-        const conMeta = isPlannedMode && plannedTarget.kg != null;
-        const last = history.length ? history.reduce((a, b) => (a.date > b.date ? a : b)) : null;
-        const repTop = repRangeTop(setDef.repRange);
-        const hitTop = !!last && !isNaN(repTop) && last.reps >= repTop;
-        const sugReps = conMeta ? plannedTarget.reps : (hitTop ? repTop : last.reps + 1);
-        // El salto es el disco chico de la unidad en uso (2,5 kg o 5 lbs).
-        const sugKg = conMeta ? plannedTarget.kg : (hitTop ? last.kg + displayToKg(pasoKg, unit) : last.kg);
-        return (
-          <button onClick={() => updateDraft({ reps: String(sugReps), kg: String(kgToDisplay(sugKg, unit)) })} className="serie-sugerencia">
-            {conMeta ? <ClipboardCheck size={14} /> : <Target size={14} />}
-            <span className="flex-1 text-left">{conMeta ? "Tu meta" : "Probá hoy"}: <b>{sugReps}×{kgToDisplay(sugKg, unit)}{u}</b></span>
-            <span className="text-[12px] text-slate-400">Usar</span>
-          </button>
-        );
-      })()}
+      {/* Sin la serie escrita de antemano, la progresión queda a un toque. */}
+      {!escribeProgresion && pasoProgresion && (
+        <button onClick={() => updateDraft({ reps: String(pasoProgresion.reps), kg: String(pasoProgresion.kg) })} className="serie-sugerencia">
+          <Target size={14} />
+          <span className="flex-1 text-left">Probá hoy: <b>{pasoProgresion.reps} × {conComa(pasoProgresion.kg)} {u}</b></span>
+          <span className="text-[12px] text-slate-400">Usar</span>
+        </button>
+      )}
 
       {/* Drop-set / rest-pause: filas extra que se guardan con la serie. */}
       {(setDef.type === "dropset" || setDef.type === "restpause") && (
@@ -10875,7 +11855,7 @@ function convertirBorradoresDeUnidad(prev, de, a) {
 ============================================================================ */
 // Cómo se acomodan las series al guardar: rápido y con un rebote mínimo.
 const RESORTE_LISTA = { type: "spring", bounce: 0.16, duration: 0.5 };
-function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts, resetKey = 0, settings = DEFAULT_SETTINGS, autoCollapse = false, onDisableAutoShowPrShare, hasActiveSession = true, hideTimer = false, onUpdateSettings = null, onSetPlanPaused = null, routineHasPlan = false, sex = null, age = null, weekInCycle = null, dayKey = null, nextRestTimerId = null, nextRestSeconds = null, nextExerciseName = null, supersetRestTimerId = null, supersetRestSeconds = null, orden = null }) {
+function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts, resetKey = 0, settings = DEFAULT_SETTINGS, autoCollapse = false, onDisableAutoShowPrShare, hasActiveSession = true, hideTimer = false, onUpdateSettings = null, onSetPlanPaused = null, routineHasPlan = false, sex = null, age = null, weekInCycle = null, dayKey = null, nextRestTimerId = null, nextRestSeconds = null, nextExerciseName = null, supersetRestTimerId = null, supersetRestSeconds = null, orden = null, nextObjetivo = null }) {
   const [open, setOpen] = useState(false);
   const [showWarmup, setShowWarmup] = useState(false);
   // Pedido: "que no se abran más automáticamente los ejercicios, sí que se
@@ -11118,22 +12098,23 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
             )}
           </div>
         )}
-        {/* Las series, una debajo de la otra. El descanso se mete entre la
-            última hecha y la que toca (timerSlot = N: después de la serie
-            N); antes de empezar, y al terminar todas, va arriba de todo. */}
+        {/* Las series, una debajo de la otra. El reloj del descanso corre en
+            el dock de abajo; acá, si no arranca solo al guardar, queda el
+            renglón para arrancarlo entre la última hecha y la que toca
+            (timerSlot = N: después de la serie N). */}
         {/* Al guardar, la serie hecha se cierra, la que sigue se abre y el
             descanso aparece entre las dos: lo demás se acomoda deslizándose
             (Motion) en vez de saltar. Sólo se mide cuando cambia la serie en
             foco o el lugar del descanso, no a cada tecla. */}
         <div className="series-lista">
-          {timerSlot === 0 && (
+          {timerSlot === 0 && settings.autoStartRestTimer !== true && (
             <m.div layout="position" layoutDependency={`${foco}|${timerSlot}`} transition={RESORTE_LISTA}><div className="timer-hop"><RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={accent} timerId={restTimerId} exerciseName={exercise.name} /></div></m.div>
           )}
           {setsToShow.map((s, i) => <React.Fragment key={`${exercise.id}:frag:${i}`}>
             <m.div layout="position" layoutDependency={`${foco}|${timerSlot}`} transition={RESORTE_LISTA}>
-            <SetRow key={`${exercise.id}:${i}:${resetKey}`} exerciseId={exercise.id} exerciseName={exercise.name} exerciseMuscle={exercise.muscle} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKey} autoShowPrShare={settings.autoShowPrShare ?? true} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={hasActiveSession} cardio={exercise.cardio} dumbbellDouble={settings?.dumbbellDouble || null} fieldSettings={settings} onUpdateSettings={onUpdateSettings} sex={sex} age={age} restTimerId={restTimerId} restSeconds={restSeconds} isLastSet={i === setsToShow.length - 1} totalSets={setsToShow.length} weekInCycle={weekInCycle} nextRestTimerId={nextRestTimerId} nextRestSeconds={nextRestSeconds} nextExerciseName={nextExerciseName} activa={i === foco} onEnfocar={() => setFocoElegido(i)} />
+            <SetRow key={`${exercise.id}:${i}:${resetKey}`} exerciseId={exercise.id} exerciseName={exercise.name} exerciseMuscle={exercise.muscle} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKey} autoShowPrShare={settings.autoShowPrShare ?? true} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={hasActiveSession} cardio={exercise.cardio} dumbbellDouble={settings?.dumbbellDouble || null} fieldSettings={settings} onUpdateSettings={onUpdateSettings} sex={sex} age={age} restTimerId={restTimerId} restSeconds={restSeconds} isLastSet={i === setsToShow.length - 1} totalSets={setsToShow.length} weekInCycle={weekInCycle} nextRestTimerId={nextRestTimerId} nextRestSeconds={nextRestSeconds} nextExerciseName={nextExerciseName} activa={i === foco} onEnfocar={() => setFocoElegido(i)} objetivoSiguiente={objetivoDeSerie(exercise, i + 1, logs, weekInCycle, settings, planUnit)} objetivoProximo={i === setsToShow.length - 1 ? nextObjetivo : null} />
             </m.div>
-            {timerSlot === i + 1 && (
+            {timerSlot === i + 1 && settings.autoStartRestTimer !== true && (
               <m.div layout="position" layoutDependency={`${foco}|${timerSlot}`} transition={RESORTE_LISTA}><div className="timer-hop"><RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={accent} timerId={restTimerId} exerciseName={exercise.name} /></div></m.div>
             )}
           </React.Fragment>)}
@@ -11372,11 +12353,11 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_
         // algo". Con sólo la mejor marca histórica no hay forma de saberlo.
         const recientes = historial.sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 3).map((h) => `${h.reps}×${kgToDisplay(h.kg, unit)}${uLabel}`);
         const yaPlanificado = (ex.sets || []).some((s) => Array.isArray(s.plannedProgression) && s.plannedProgression.length > 0);
-        out.push({ id: ex.id, nombre: ex.name, muscle: ex.muscle, dia: model.days[dk]?.label || dk, sets: nSets, mejor, recientes, yaPlanificado, repRange: ex.sets?.[0]?.repRange || null });
+        out.push({ id: ex.id, nombre: ex.name, muscle: ex.muscle, dia: model.days[dk]?.label || dk, sets: nSets, mejor, recientes, yaPlanificado, repRange: ex.sets?.[0]?.repRange || null, salto: saltoDe(settings, ex.id, unit) });
       });
     });
     return out;
-  }, [model, dayKey, logs, unit, uLabel]);
+  }, [model, dayKey, logs, unit, uLabel, settings]);
 
   const seleccionados = useMemo(() => candidatos.filter((e) => !excluidos.has(e.id) && !(soloVacios && e.yaPlanificado)), [candidatos, excluidos, soloVacios]);
   const toggleEjercicio = (id) => setExcluidos((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
@@ -11391,6 +12372,7 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_
     const lista = seleccionados.map((e) => {
       const partes = [`- "${e.nombre}" (${e.muscle}, ${e.sets} series${respetarRango && e.repRange ? `, rango objetivo ${e.repRange} reps` : ""})`];
       partes.push(e.mejor ? `mejor marca ${e.mejor.reps}×${e.mejor.kg}${uLabel}` : "SIN marcas registradas");
+      partes.push(`el peso sube de a ${e.salto}${uLabel}`);
       if (e.recientes.length) partes.push(`últimas sesiones: ${e.recientes.join(", ")}`);
       return partes.join(" · ");
     }).join("\n");
@@ -11408,16 +12390,14 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_
       `OBJETIVO: ${obj.ia}.`,
       hayDescarga ? `CICLO: son ${ciclo} semanas de trabajo y después ${settings.deloadWeeks} de descarga al ${Math.round((settings.deloadPct || 0.6) * 100)}% de la carga. La semana ${ciclo} es la última de trabajo: tiene que ser la más pesada del bloque, no una más.` : `CICLO: ${ciclo} semanas de trabajo seguidas, sin descarga programada.`,
       enLibras
-        ? `UNIDAD: LIBRAS (lbs). Todas las cargas que devuelvas tienen que estar en libras. Redondeá a múltiplos de 5 lbs (o 2.5 lbs en aislados livianos); nunca propongas cargas que no se puedan armar con discos.`
-        : `UNIDAD: kilos. Redondeá a múltiplos de 2.5kg (o 1kg en aislados livianos); nunca propongas cargas que no se puedan armar con discos.`,
+        ? `UNIDAD: LIBRAS (lbs). Todas las cargas que devuelvas tienen que estar en libras, y cada una se tiene que poder armar con el salto de su ejercicio (dice "el peso sube de a"): partí de su peso y sumá saltos enteros.`
+        : `UNIDAD: kilos. Cada carga se tiene que poder armar con el salto de su ejercicio (dice "el peso sube de a"; hay máquinas que van de 7 en 7 kg): partí de su peso y sumá saltos enteros.`,
       nota.trim() ? `\nA TENER EN CUENTA (lo dijo la persona, respetalo por encima de las reglas generales): ${nota.trim()}` : ``,
       ``,
       `REGLAS DE PLANIFICACIÓN (respetalas):`,
       `1. Partí de la mejor marca de cada ejercicio. Si no tiene marcas, proponé una carga conservadora y dejala casi plana: primero hay que medirla.`,
       `2. Mirá las últimas sesiones: si viene subiendo, seguí la misma pendiente; si repite el mismo peso hace tres sesiones, está estancado — bajá un escalón y subí las reps en vez del peso.`,
-      enLibras
-        ? `3. Sobrecarga progresiva REALISTA: en compuestos grandes (sentadilla, peso muerto, press banca) entre 5 y 10 lbs por semana; en aislados y hombro/brazo, entre 2.5 y 5 lbs. Nunca más de un 5% semanal.`
-        : `3. Sobrecarga progresiva REALISTA: en compuestos grandes (sentadilla, peso muerto, press banca) entre 2.5 y 5kg por semana; en aislados y hombro/brazo, entre 1 y 2.5kg. Nunca más de un 5% semanal.`,
+      `3. PROGRESIÓN DE ENTRENADOR (doble progresión): dentro del rango de reps de cada ejercicio, primero subí las REPETICIONES de a una por semana con el mismo peso; recién cuando llega al tope del rango, subí el peso UN salto (el de ese ejercicio) y volvé al piso del rango. No subas el peso todas las semanas. Si el salto es grande (por ejemplo 7 kg o 15 lb en una máquina), las reps hacen casi todo el trabajo y el peso sube pocas veces en el bloque.`,
       conRpe ? `4. FATIGA: el RPE tiene que ir subiendo dentro del bloque (empezá en 7 y llegá a 9), no arrancar al máximo.` : `4. FATIGA: no incluyas RPE, dejá ese campo afuera.`,
       semanasReales >= 3
         ? `5. FASES de mesociclo: primeras semanas "Acumulación" (más volumen, RPE 7-8), después "Intensificación" (más carga, RPE 8-9), la última "Realización" (carga máxima, menos series).`
@@ -11756,7 +12736,8 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_
   );
 }
 
-function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, weekSchedule, activeSession, onStartSession, onDisableAutoShowPrShare, onUpdateSettings = null, onSetPlanPaused = null, onRemovePlan = null, onGoToRoutines = null, onGoToSchedule = null, onGoToFieldSettings = null, onGoToDescarga = null, sex = null, age = null, activeRoutineDef = null, onApplyOwnProgression = null, goToDaySignal = { id: null, n: 0 }, onSignalConsumed = null }) {
+const EMPTY_SESIONES = [];
+function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, weekSchedule, activeSession, onStartSession, onDisableAutoShowPrShare, onUpdateSettings = null, onSetPlanPaused = null, onRemovePlan = null, onGoToRoutines = null, onGoToSchedule = null, onGoToFieldSettings = null, onGoToDescarga = null, sex = null, age = null, activeRoutineDef = null, onApplyOwnProgression = null, goToDaySignal = { id: null, n: 0 }, onSignalConsumed = null, trainingSessions = [] }) {
   // Semana actual del ciclo — sólo hace falta el número (weekInCycle), para
   // que SetRow sepa si hay una meta cargada (modo "planned", ver
   // getPlannedTargetForWeek) para ESTA semana puntual.
@@ -11793,6 +12774,10 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
   // es lo único que estás haciendo.
   const sesionAbiertaDayKey = activeSession?.dayKey && DAY_ORDER.includes(activeSession.dayKey) ? activeSession.dayKey : null;
   const [activeDay, setActiveDay] = useState(() => (goToDaySignal.id === "go-to-day" && goToDaySignal.payload) || sesionAbiertaDayKey || scheduledDay || (isRestToday ? DAY_ORDER[0] : fallbackSuggested));
+  // La vez pasada de este día (la hoja del cuaderno, ver CuadernoDelDia).
+  const sesionesCuaderno = useMemo(() => buildSessionsIndex(logs, trainingSessions), [logs, trainingSessions]);
+  const ultimaDelDia = useMemo(() => sesionesCuaderno.find((s) => !s.isDeload && s.dayKeys.includes(activeDay) && s.date < todayStr()) || null, [sesionesCuaderno, activeDay]);
+  const [cuadernoFecha, setCuadernoFecha] = useState(null);
   // BUG FIX (mismo patrón que openScheduleSignal en RoutinesView): sin
   // avisarle a App que la señal ya se consumió, queda prendida para
   // siempre — cualquier otra forma de volver a esta pestaña (ej. la barra
@@ -11939,6 +12924,9 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           botón para empezar; abajo, el calentamiento y los ejercicios. Todo
           en la misma placa; antes eran tarjetas sueltas una debajo de la
           otra. */}
+      {cuadernoFecha && (
+        <CuadernoDelDia sesiones={sesionesCuaderno} fecha={cuadernoFecha} onFecha={setCuadernoFecha} onClose={() => setCuadernoFecha(null)} exerciseNotes={settings?.exerciseNotes || {}} rpeDisplayMode={settings?.rpeDisplayMode || "rpe"} />
+      )}
       <section
         key={activeDay}
         className="dia-seccion relative tab-fade-in"
@@ -11969,6 +12957,16 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
               </p>
               {avanceDia.hechas === 0 && <p className="dia-barra-ayuda">Cada serie que anotás carga un disco.</p>}
             </div>
+          )}
+          {/* LA VEZ PASADA: la hoja del cuaderno del último día igual a éste
+              (pedido: "qué poner para poder ver lo que hiciste la semana
+              pasada"). Se pasa de hoja como en el Historial. */}
+          {ultimaDelDia && (
+            <button onClick={() => setCuadernoFecha(ultimaDelDia.date)} className="dia-pasada">
+              <NotebookPen size={15} aria-hidden="true" />
+              <span>La vez pasada: {new Date(`${ultimaDelDia.date}T12:00:00`).toLocaleDateString("es-AR", { weekday: "long", day: "numeric" })}</span>
+              <ChevronRight size={15} aria-hidden="true" />
+            </button>
           )}
           {day.isNew && <div className="mt-3 inline-flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 text-[12px] rounded-full px-3 py-1.5">🆕 Empezás a registrar tus marcas desde hoy.</div>}
           {/* La descarga se hace en su propia pestaña: acá sólo el atajo. */}
@@ -12040,6 +13038,8 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             const nextRestTimerId = entreActivo ? timerIdDe(siguiente) : null;
             const nextRestSeconds = settings.restBetweenExercisesSec ?? 180;
             const nextExerciseName = siguiente ? siguiente.map((g) => g.name).filter(Boolean).join(" + ") : null;
+            // Lo que pide la primera serie del que sigue: su meta o su récord.
+            const nextObjetivo = entreActivo && siguiente ? objetivoDeSerie(siguiente[0], 0, logs, weekInCycle, settings, settings?.weightUnit === "lbs" ? "lbs" : "kg") : null;
             // Terminaste todas sus series: la tarjeta se pliega sola.
             // Pedido: "que no se abran más automáticamente los ejercicios, sí
             // que se cierren cuando los completaste". No hay apertura
@@ -12047,7 +13047,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             const plegar = !!sessionForThisDay && estaCompleto(group);
             if (group.length === 1) {
               const ex = group[0];
-              return <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onSetPlanPaused={onSetPlanPaused} routineHasPlan={hasAnyPlan} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} sex={sex} age={age} weekInCycle={weekInCycle} dayKey={activeDay} autoCollapse={plegar} nextRestTimerId={nextRestTimerId} nextRestSeconds={nextRestSeconds} nextExerciseName={nextExerciseName} orden={primeroDe[gi]} />;
+              return <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onSetPlanPaused={onSetPlanPaused} routineHasPlan={hasAnyPlan} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} sex={sex} age={age} weekInCycle={weekInCycle} dayKey={activeDay} autoCollapse={plegar} nextRestTimerId={nextRestTimerId} nextRestSeconds={nextRestSeconds} nextExerciseName={nextExerciseName} nextObjetivo={nextObjetivo} orden={primeroDe[gi]} />;
             }
             // Superserie: varios ejercicios encadenados comparten un solo
             // cronómetro al final del grupo, en vez de uno por ejercicio —
@@ -12059,8 +13059,8 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             return (
               <div key={`${activeDay}:${group.map((e) => e.id).join("-")}`} className="superserie space-y-2" style={{ "--c": day.color, borderColor: tint(day.color, "45") }}>
                 <div className="flex items-center gap-1.5 px-1 pt-0.5"><Link size={12} style={{ color: day.color }} /><span className="text-[10.5px] font-black uppercase" style={{ color: day.color }}>Superserie · {group.length} ejercicios</span></div>
-                {group.map((ex, xi) => <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onSetPlanPaused={onSetPlanPaused} routineHasPlan={hasAnyPlan} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} hideTimer sex={sex} age={age} weekInCycle={weekInCycle} dayKey={activeDay} autoCollapse={plegar} nextRestTimerId={xi === group.length - 1 ? nextRestTimerId : null} nextRestSeconds={nextRestSeconds} nextExerciseName={xi === group.length - 1 ? nextExerciseName : null} supersetRestTimerId={xi === group.length - 1 ? grupoTimerId : null} supersetRestSeconds={grupoSegundos} orden={primeroDe[gi] + xi} />)}
-                <RestTimer seconds={grupoSegundos} accent={day.color} timerId={grupoTimerId} exerciseName={group.map((g) => g.name).filter(Boolean).join(" + ")} />
+                {group.map((ex, xi) => <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onSetPlanPaused={onSetPlanPaused} routineHasPlan={hasAnyPlan} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} hideTimer sex={sex} age={age} weekInCycle={weekInCycle} dayKey={activeDay} autoCollapse={plegar} nextRestTimerId={xi === group.length - 1 ? nextRestTimerId : null} nextRestSeconds={nextRestSeconds} nextExerciseName={xi === group.length - 1 ? nextExerciseName : null} nextObjetivo={xi === group.length - 1 ? nextObjetivo : null} supersetRestTimerId={xi === group.length - 1 ? grupoTimerId : null} supersetRestSeconds={grupoSegundos} orden={primeroDe[gi] + xi} />)}
+                {settings.autoStartRestTimer !== true && <RestTimer seconds={grupoSegundos} accent={day.color} timerId={grupoTimerId} exerciseName={group.map((g) => g.name).filter(Boolean).join(" + ")} />}
                 <p className="text-[10.5px] text-slate-500 px-1 pb-0.5">Descansá recién al completar la vuelta de los {group.length}.{settings.autoStartRestTimer === true ? " Arranca solo al guardar la serie del último." : ""}</p>
               </div>
             );
@@ -12179,167 +13179,179 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
 /* ============================================================================
    SESSION HISTORY — calendar + list views over buildSessionsIndex(logs)
 ============================================================================ */
-function SessionDetailCard({ session, onDelete, exerciseNotes = {}, rpeDisplayMode = "rpe", onVerTicket = null }) {
-  const unit = useWeightUnit();
-  const [confirmDel, setConfirmDel] = useState(false);
-  // Qué serie está "abierta" ahora mismo — se muestra su nota debajo de las
-  // pills de ese ejercicio, si tiene una. `${exName}:${i}` como clave.
-  const [expandedSet, setExpandedSet] = useState(null);
-  const dateLabel = new Date(session.date + "T12:00:00").toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" });
-  const mainDay = ROUTINE[session.dayKeys[0]];
-  // Un día de descarga se distingue con el mismo violeta de esa pestaña —
-  // así se nota de un vistazo en el historial, en vez de mezclarse con
-  // cualquier otro entrenamiento normal.
-  const accent = session.isDeload ? "#A855F7" : (mainDay?.color || "#14B8A6");
-  // Agrupar las series por ejercicio — en vez de una lista plana de
-  // "ejercicio S1 / ejercicio S2", cada ejercicio es una tarjeta con sus
-  // series adentro como pills. Mucho más legible de un vistazo.
-  const grouped = useMemo(() => {
-    const map = new Map();
-    session.items.forEach((it) => {
-      if (!map.has(it.exerciseName)) map.set(it.exerciseName, []);
-      map.get(it.exerciseName).push(it);
-    });
-    return Array.from(map.entries());
-  }, [session.items]);
-  const improvements = session.improvedCount || 0;
+/* ============================================================================
+   EL CUADERNO DE ENTRENAMIENTO. Cada día que entrenaste es una hoja del
+   cuaderno que muchos llevan al gimnasio, escrita en lápiz: la fecha arriba,
+   cada ejercicio con sus series como se anotan a mano (8×80), el récord
+   encerrado en un círculo dorado, lo que no hiciste tachado y tus notas
+   debajo. Se pasa de hoja con las flechas o deslizando el dedo. La letra a
+   mano (Caveat) es sólo del papel: la app sigue en Mona Sans. Antes era una
+   tarjeta con chips de colores, fueguitos y cajas ámbar.
+============================================================================ */
+const capitalizar = (t) => (t ? t.charAt(0).toUpperCase() + t.slice(1) : t);
+function colorDeSesion(s) {
+  return s.isDeload ? "#A855F7" : (ROUTINE[s.dayKeys[0]]?.color || "#6e7379");
+}
+function nombreDeSesion(s) {
+  if (s.isDeload) return "Descarga";
+  return s.dayKeys.map((dk) => ROUTINE[dk]?.label).filter(Boolean).join(" y ") || "Entrenamiento";
+}
 
+// `etiqueta` y `color`: el día y su color cuando no salen de tu rutina (la
+// hoja de muestra de la guía).
+function HojaCuaderno({ session, exerciseNotes = {}, rpeDisplayMode = "rpe", unit = "kg", etiqueta = null, color = null }) {
+  const fecha = capitalizar(new Date(`${session.date}T12:00:00`).toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" }));
+  // Las series de cada ejercicio juntas, en el orden en que se hicieron, con
+  // las notas que les pusiste al registrar (sin repetir).
+  const grupos = [];
+  const porNombre = new Map();
+  session.items.forEach((it) => {
+    let g = porNombre.get(it.exerciseName);
+    if (!g) { g = { nombre: it.exerciseName, items: [], notas: [] }; porNombre.set(it.exerciseName, g); grupos.push(g); }
+    g.items.push(it);
+    const nota = resolveExportNote(exerciseNotes, it.exerciseId, it.setIndex);
+    if (nota && !g.notas.includes(nota)) g.notas.push(nota);
+  });
+  const entrada = horaDelTicket(session.startedAt), salida = horaDelTicket(session.endedAt);
+  const duracion = textoDuracion(session.durationMin);
+  const records = session.items.filter((it) => it.recordDelEjercicio).length;
+  const u = weightLabel(unit);
   return (
-    <div className="sesion-dia bounce-in" style={{ "--c": accent }}>
-      {/* El día que fue (y si fue descarga), la fecha y tres números. */}
-      <div className="px-4 pt-4 pb-3">
-        <p className="sesion-dia-etiquetas">
-          {session.isDeload && <span className="sesion-dia-etiqueta" style={{ "--dia": "#A855F7" }}><Zap size={12} /> Descarga</span>}
-          {session.dayKeys.map((dk) => ROUTINE[dk] && <span key={dk} className="sesion-dia-etiqueta" style={{ "--dia": ROUTINE[dk].color }}>{ROUTINE[dk].label}</span>)}
-        </p>
-        <p className="sesion-dia-fecha">{dateLabel.charAt(0).toUpperCase() + dateLabel.slice(1)}</p>
-      </div>
-      <div className="sesion-dia-datos">
-        <div className="sesion-dia-dato"><b className="num-display">{session.totalSets}</b><span>series</span></div>
-        <div className="sesion-dia-dato">
-          <b className="num-display">{session.durationMin != null ? (session.durationMin >= 60 ? `${Math.floor(session.durationMin / 60)} h ${String(session.durationMin % 60).padStart(2, "0")}` : `${session.durationMin} min`) : "—"}</b>
-          <span>duración</span>
-        </div>
-        <div className="sesion-dia-dato">
-          <b className={`num-display ${session.completionPct >= 100 ? "sube" : ""}`}>{session.completionPct != null ? `${session.completionPct} %` : "—"}</b>
-          <span>del día</span>
-        </div>
-      </div>
+    <article className="cuaderno-hoja" style={{ "--dia": color || colorDeSesion(session) }} aria-label={`La hoja del ${fecha}`}>
+      <header className="cuaderno-cabeza">
+        <p className="cuaderno-fecha a-mano">{fecha}</p>
+        <p className="cuaderno-dia a-mano">{etiqueta || nombreDeSesion(session)}{entrada && salida ? <span>, de {entrada} a {salida}</span> : null}</p>
+      </header>
+      {grupos.map((g) => (
+        <section key={g.nombre} className="cuaderno-ejercicio">
+          <h4 className="cuaderno-nombre a-mano">{g.nombre}</h4>
+          <p className="cuaderno-series a-mano">
+            {g.items.map((it, i) => {
+              const record = !!it.recordDelEjercicio;
+              const texto = it.minutes != null
+                ? `${conComa(it.minutes)} min${it.km ? `, ${conComa(it.km)} km` : ""}`
+                : `${it.reps}×${conComa(kgToDisplay(it.kg, unit))}`;
+              return (
+                <span key={i} className={`cuaderno-serie ${record ? "record" : ""}`}>
+                  {texto}
+                  {it.minutes == null && it.rpe != null && <small> {formatEffort(it.rpe, rpeDisplayMode)}</small>}
+                  {record && <span className="sr-only"> (récord)</span>}
+                </span>
+              );
+            })}
+            {g.items.some((it) => it.minutes == null) && <small className="cuaderno-unidad">{u}</small>}
+          </p>
+          {g.notas.map((n, i) => <p key={i} className="cuaderno-nota a-mano">{n}</p>)}
+        </section>
+      ))}
+      {(session.missedExercises || []).map((m) => (
+        <section key={m.id} className="cuaderno-ejercicio">
+          <h4 className="cuaderno-nombre tachado a-mano"><s>{m.name}</s><span className="sr-only"> (no lo hiciste)</span></h4>
+        </section>
+      ))}
+      <footer className="cuaderno-pie a-mano">
+        <span>{session.totalSets} {session.totalSets === 1 ? "serie" : "series"}</span>
+        {duracion && <span>{duracion}</span>}
+        {session.completionPct != null && <span>{session.completionPct} % del día</span>}
+        {records > 0 && <span className="cuaderno-pie-record"><IconoCampana size={15} /> {records} {records === 1 ? "récord" : "récords"}</span>}
+      </footer>
+    </article>
+  );
+}
 
-      {onVerTicket && (
-        <div className="px-4 pb-3">
-          <button onClick={onVerTicket} className="boton-tonal w-full" style={{ "--c": accent }}><ReceiptText size={16} /> Ver el ticket de la sesión</button>
+// El cuaderno abierto en un día: la hoja, las flechas para pasar a la de
+// antes o a la de después (también deslizando), el ticket de ese día y
+// borrarlo. `sesiones` viene de la más nueva a la más vieja.
+function CuadernoDelDia({ sesiones, fecha, onFecha, onClose, onVerTicket = null, onBorrar = null, exerciseNotes = {}, rpeDisplayMode = "rpe" }) {
+  const unit = useWeightUnit();
+  const [direccion, setDireccion] = useState(0);
+  const [confirmar, setConfirmar] = useState(false);
+  const toque = useRef(null);
+  const i = sesiones.findIndex((s) => s.date === fecha);
+  const session = i >= 0 ? sesiones[i] : null;
+  if (!session || typeof document === "undefined") return null;
+  const anterior = sesiones[i + 1] || null;
+  const siguiente = i > 0 ? sesiones[i - 1] : null;
+  const ir = (s, d) => {
+    if (!s) return;
+    setDireccion(d);
+    setConfirmar(false);
+    onFecha(s.date);
+    haptic(8);
+  };
+  const corto = (s) => new Date(`${s.date}T12:00:00`).toLocaleDateString("es-AR", { day: "numeric", month: "numeric" });
+  return createPortal(
+    <div className="fixed inset-0 z-[140] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
+      <div className="cuaderno" role="dialog" aria-modal="true" aria-label="Tu cuaderno de entrenamiento" onClick={(e) => e.stopPropagation()}>
+        <div className="cuaderno-arriba">
+          <p className="cuaderno-titulo">Tu cuaderno</p>
+          {/* El ticket de ese día, chico y a un costado (pedido: "darle menos
+              protagonismo al botón de ver el ticket"). */}
+          {onVerTicket && !session.isDeload && <button onClick={() => onVerTicket(session)} className="cuaderno-ticket"><ReceiptText size={15} /> Ticket</button>}
+          <button onClick={onClose} aria-label="Cerrar el cuaderno" className="boton-redondo"><X size={17} /></button>
         </div>
-      )}
-
-      {improvements > 0 && (
-        <div className="mx-4 mb-3 flex items-center gap-2 rounded-xl px-3 py-2 bg-emerald-500/10 border border-emerald-500/20">
-          <TrendingUp size={13} className="text-emerald-400 shrink-0" />
-          <p className="text-[11px] font-bold text-emerald-300">{improvements} marca{improvements === 1 ? "" : "s"} personal{improvements === 1 ? "" : "es"} este día 🔥</p>
-        </div>
-      )}
-
-      {/* Pedido: "que te muestre que no hiciste" — complementa el "% del
-          día" de arriba con el detalle de CUÁLES ejercicios quedaron
-          afuera. Sólo existe si la sesión tiene la foto dayExerciseIds
-          (ver buildSessionsIndex) — sesiones viejas sin esa foto no
-          muestran nada acá, en vez de un dato inventado. */}
-      {session.missedExercises?.length > 0 && (
-        <div className="mx-4 mb-3 rounded-xl px-3 py-2.5 bg-amber-500/10 border border-amber-500/20">
-          <div className="flex items-center gap-2 mb-1.5">
-            <AlertTriangle size={13} className="text-amber-400 shrink-0" />
-            <p className="text-[11px] font-bold text-amber-300">No hiciste {session.missedExercises.length} ejercicio{session.missedExercises.length === 1 ? "" : "s"} de ese día</p>
+        <div
+          className="cuaderno-salida"
+          onPointerDown={(e) => { toque.current = { x: e.clientX, y: e.clientY }; }}
+          onPointerCancel={() => { toque.current = null; }}
+          onPointerUp={(e) => {
+            const a = toque.current;
+            toque.current = null;
+            if (!a) return;
+            const dx = e.clientX - a.x, dy = e.clientY - a.y;
+            if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) ir(dx < 0 ? siguiente : anterior, dx < 0 ? 1 : -1);
+          }}
+        >
+          <div key={session.date} className={`cuaderno-pasa ${direccion > 0 ? "desde-derecha" : direccion < 0 ? "desde-izquierda" : ""}`}>
+            <HojaCuaderno session={session} exerciseNotes={exerciseNotes} rpeDisplayMode={rpeDisplayMode} unit={unit} />
           </div>
-          <div className="flex flex-wrap gap-1.5">
-            {session.missedExercises.map((m) => (
-              <span key={m.id} className="text-[10.5px] text-amber-300/80 bg-amber-500/10 border border-amber-500/25 rounded-lg px-2 py-1">{m.name}</span>
-            ))}
-          </div>
         </div>
-      )}
-
-      {/* Ejercicios agrupados con sus series como pills — tocar una pill
-          despliega su nota (si le pusiste una al registrar). El RPE ya no
-          lleva un color según el valor: es solo información, no un
-          semáforo — antes un RPE 9 se veía "alarmante" en rojo sin motivo. */}
-      <div className="px-4 pb-4 space-y-2">
-        {grouped.map(([exName, items]) => {
-          const openIdx = items.findIndex((_, i) => expandedSet === `${exName}:${i}`);
-          const openItem = openIdx >= 0 ? items[openIdx] : null;
-          const openNote = openItem ? resolveExportNote(exerciseNotes, openItem.exerciseId, openItem.setIndex) : "";
-          return (
-          <div key={exName} className="rounded-xl bg-slate-900/70 border border-slate-800/60 px-3 py-2.5">
-            <p className="text-xs font-bold text-white mb-1.5 truncate">{exName}</p>
-            <div className="flex flex-wrap gap-1.5">
-              {items.map((it, i) => {
-                // Al abrir el día, los chips de series aparecen uno tras otro
-                // (el color "se va llenando"). Delay corto: se percibe la
-                // onda pero no te hace esperar para leer.
-                // Tres estados, comparando SIEMPRE por 1RM estimado (combina
-                // reps y kilos: una rep menos con el mismo peso también baja):
-                //   · Mejoraste tu marca → verde + 🔥
-                //   · La igualaste       → gris, sin adornos
-                //   · Quedaste por debajo → rojo + cuánto bajaste
-                const isCardio = it.minutes != null;
-                const pct = it.pctOfBest;
-                // Rojo solo si bajaste de verdad (≤98%). Igualar o quedar a
-                // 1-2% por el redondeo de la fórmula NO es rojo: es "igualaste".
-                // Una serie de DESCARGA nunca es "roja": el peso reducido es a
-                // propósito, no una caída de rendimiento — se distingue en
-                // violeta en vez de compararla contra tu marca normal.
-                const below = !isCardio && !it.deload && pct != null && pct < 99;
-                const color = it.deload ? "#C4B5FD" : it.isImprovement ? "#6EE7B7" : below ? "#FCA5A5" : "#d1d4d7";
-                const bg = it.deload ? "#A855F718" : it.isImprovement ? "#10B98118" : below ? "#F43F5E14" : "var(--surface-2)";
-                const bd = it.deload ? "#A855F735" : it.isImprovement ? "#10B98135" : below ? "#F43F5E30" : "transparent";
-                const itemKey = `${exName}:${i}`;
-                return (
-                  <button key={i} onClick={() => setExpandedSet((cur) => (cur === itemKey ? null : itemKey))} className="text-[11px] font-bold px-2 py-1 rounded-lg tabular-nums inline-flex items-center gap-1 number-pop transition active:scale-95"
-                    style={{ color, backgroundColor: bg, border: `1px solid ${expandedSet === itemKey ? tint(color, "aa") : bd}`, animationDelay: `${Math.min(i, 10) * 40}ms` }}>
-                    {/* Pedido: "el resumen en el historial, más ordenado" —
-                        antes la pill sólo mostraba reps×kg, sin decir DE
-                        QUÉ SERIE era: con varias pills envueltas en 2-3
-                        líneas era imposible saber el orden real en que se
-                        hicieron. "S{n}" usa el número de serie real
-                        (it.setIndex), no la posición en la lista. */}
-                    <span className="opacity-60 font-black">S{it.setIndex + 1}</span>
-                    {isCardio ? `${it.minutes} min` : `${it.reps}×${kgToDisplay(it.kg, unit)}${weightLabel(unit)}`}
-                    {it.isImprovement && " 🔥"}
-                    {below && <span className="text-[9px] font-black opacity-90">↓{100 - pct}%</span>}
-                    {!isCardio && it.rpe != null && <span className="text-[9px] font-black text-slate-400">· {formatEffort(it.rpe, rpeDisplayMode)}</span>}
-                  </button>
-                );
-              })}
-            </div>
-            {openItem && (
-              <div className="mt-2 rounded-lg bg-slate-950/50 border border-slate-800/50 px-2.5 py-2 bounce-in flex items-start gap-1.5">
-                <StickyNote size={11} className="mt-0.5 shrink-0 text-slate-600" />
-                {openNote ? (
-                  <p className="text-[10.5px] text-slate-400 leading-snug">{openNote}</p>
-                ) : (
-                  <p className="text-[10.5px] text-slate-600 italic">Sin nota en esta serie.</p>
-                )}
-              </div>
-            )}
+        <div className="cuaderno-botones">
+          <button onClick={() => ir(anterior, -1)} disabled={!anterior} aria-label={anterior ? `La hoja anterior, del ${corto(anterior)}` : "No hay hojas anteriores"} className="boton-redondo"><ChevronLeft size={18} /></button>
+          <p className="cuaderno-numero" aria-live="polite">Hoja {sesiones.length - i} de {sesiones.length}</p>
+          <button onClick={() => ir(siguiente, 1)} disabled={!siguiente} aria-label={siguiente ? `La hoja siguiente, del ${corto(siguiente)}` : "No hay hojas siguientes"} className="boton-redondo"><ChevronRight size={18} /></button>
+        </div>
+        {onBorrar && (confirmar ? (
+          <div className="cuaderno-borrar bounce-in">
+            <p>¿Borrar este día? Tus récords no cambian.</p>
+            <button onClick={() => setConfirmar(false)} className="boton-tonal" style={{ "--c": "#8a8c92" }}>No</button>
+            <button onClick={() => onBorrar(session.date)} className="boton-tonal" style={{ "--c": "#F43F5E" }}>Sí, borrar</button>
           </div>
-          );
-        })}
+        ) : (
+          <button onClick={() => setConfirmar(true)} className="enlace-suave mx-auto"><Trash2 size={13} /> Borrar este día</button>
+        ))}
       </div>
+    </div>,
+    document.body,
+  );
+}
 
-      {/* Borrar día */}
-      {onDelete && (
-        <div className="px-4 pb-4">
-          {!confirmDel ? (
-            <button onClick={() => setConfirmDel(true)} className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-[11px] font-semibold text-slate-600 hover:text-rose-400 transition"><Trash2 size={12} /> Borrar este día</button>
-          ) : (
-            <div className="flex gap-2 items-center bg-rose-950/30 border border-rose-500/20 rounded-xl px-3 py-2 bounce-in">
-              <p className="text-[11px] text-rose-300/80 flex-1">¿Borrar este día? Los récords no cambian.</p>
-              <button onClick={() => setConfirmDel(false)} className="px-2 py-1 rounded-lg bg-slate-800 text-slate-400 text-[11px]">No</button>
-              <button onClick={() => onDelete(session.date)} className="px-2 py-1 rounded-lg bg-rose-500 !text-white text-[11px] font-bold">Sí</button>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+// La lista del Historial: el índice del cuaderno. Cada renglón, el agujero
+// del día (el mismo de la tarjeta perforada) y lo que se hizo; tocarlo abre
+// esa hoja.
+function IndiceCuaderno({ sesiones, onAbrir }) {
+  return (
+    <ul className="indice" aria-label="Tus días entrenados">
+      {sesiones.map((s, i) => {
+        const d = new Date(`${s.date}T12:00:00`);
+        const dia = capitalizar(d.toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" }));
+        const duracion = textoDuracion(s.durationMin);
+        const records = s.items.filter((it) => it.recordDelEjercicio).length;
+        return (
+          <li key={s.date} className="hist-enter" style={{ animationDelay: `${Math.min(i, 12) * 40}ms` }}>
+            <button onClick={() => onAbrir(s.date)} className="indice-fila">
+              <span className="hueco-dia picado indice-hueco" style={{ "--dia": colorDeSesion(s) }} aria-hidden="true">{d.getDate()}</span>
+              <span className="min-w-0 flex-1">
+                <span className="indice-dia">{nombreDeSesion(s)}</span>
+                <span className="indice-detalle">{dia}, {s.totalSets} {s.totalSets === 1 ? "serie" : "series"}{duracion ? `, ${duracion}` : ""}</span>
+              </span>
+              {records > 0 && <span className="indice-record" aria-label={`${records} ${records === 1 ? "récord" : "récords"}`}><IconoCampana size={14} />{records}</span>}
+              <ChevronRight size={16} className="text-slate-500 shrink-0" aria-hidden="true" />
+            </button>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
@@ -12523,9 +13535,6 @@ function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [], weekSche
   );
   const weeks = useMemo(() => getMonthMatrix(cursor.y, cursor.m), [cursor]);
   const selectedSession = selectedDate ? sessionByDate[selectedDate] : null;
-  // El detalle del día también congela el fondo y responde al botón atrás.
-  const cerrarDetalleDia = useCallback(() => setSelectedDate(null), []);
-  useAndroidBack(selectedSession ? cerrarDetalleDia : null);
   const handleDeleteDay = (date) => { onDeleteDay?.(date); if (selectedDate === date) setSelectedDate(null); };
   // Qué días de tu rutina aparecen en el mes que estás mirando — para la
   // leyenda de abajo del calendario, así el color de cada celda no queda
@@ -12633,31 +13642,26 @@ function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [], weekSche
           <BarChart3 size={15} /> Ver el resumen de {MONTH_LABELS[cursor.m].toLowerCase()}
         </button>
           )}
-          {/* Detalle de la sesión como modal centrado — antes se desplegaba
-              abajo del calendario y quedaba escondido; ahora aparece al
-              frente, con fondo difuminado y cierre con toque afuera o X. */}
-          {selectedSession && (
-            <div className="fixed inset-0 z-[140] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={() => setSelectedDate(null)}>
-              <div className="max-w-md w-full max-h-[85vh] overflow-y-auto overscroll-contain rounded-3xl modal-pop-in" onClick={(e) => e.stopPropagation()}>
-                <div className="relative">
-                  <button onClick={() => setSelectedDate(null)} aria-label="Cerrar" className="boton-redondo absolute top-3 right-3 z-10"><X size={17} /></button>
-                  <SessionDetailCard session={selectedSession} onDelete={(date) => { handleDeleteDay(date); setSelectedDate(null); }} exerciseNotes={exerciseNotes} rpeDisplayMode={rpeDisplayMode} onVerTicket={selectedSession.isDeload ? null : () => verTicket(selectedSession)} />
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       ) : (
-        <div key="list" className="space-y-2.5">
-          {/* Las tarjetas entran en cascada, cada una un poco después de la
-              anterior. Solo las primeras 12 llevan retraso: más allá de eso ya
-              están fuera de pantalla y retrasarlas solo haría lenta la carga. */}
-          {sessions.map((s, i) => (
-            <div key={s.date} className="hist-enter" style={{ animationDelay: `${Math.min(i, 12) * 45}ms` }}>
-              <SessionDetailCard session={s} onDelete={handleDeleteDay} exerciseNotes={exerciseNotes} rpeDisplayMode={rpeDisplayMode} onVerTicket={s.isDeload ? null : () => verTicket(s)} />
-            </div>
-          ))}
+        <div key="list" className="tab-fade-in">
+          {/* La lista: el índice del cuaderno. Tocar un día abre su hoja. */}
+          <IndiceCuaderno sesiones={sessions} onAbrir={setSelectedDate} />
         </div>
+      )}
+      {/* El día elegido, como una hoja del cuaderno (desde la tarjeta o desde
+          el índice). */}
+      {selectedSession && (
+        <CuadernoDelDia
+          sesiones={sessions}
+          fecha={selectedDate}
+          onFecha={setSelectedDate}
+          onClose={() => setSelectedDate(null)}
+          onVerTicket={verTicket}
+          onBorrar={(date) => { handleDeleteDay(date); setSelectedDate(null); }}
+          exerciseNotes={exerciseNotes}
+          rpeDisplayMode={rpeDisplayMode}
+        />
       )}
       {ticket && typeof document !== "undefined" && createPortal(<SessionSummaryModal resumen={ticket} onClose={() => setTicket(null)} />, document.body)}
     </div>
@@ -12899,7 +13903,7 @@ function DeloadView({ logs, setLogs, settings = DEFAULT_SETTINGS, deloadProgress
                   </div>
                 </div>
               </div>
-              {hasPR && (
+              {hasPR && settings.autoStartRestTimer !== true && (
                 <div className="px-4 pt-3">
                   {/* key con la cantidad de series ya tildadas hoy: fuerza a
                       remontar el cronómetro cada vez que se marca una serie,
@@ -14685,6 +15689,37 @@ function RankExplainModal({ profile, myTopRank, onClose }) {
   );
 }
 
+// EL CINTURÓN DE FUERZA: los dieciocho niveles de un músculo son los agujeros
+// de un cinturón de levantamiento, de a tres por rango. La hebilla está en el
+// agujero en el que vas; los de atrás quedaron estirados por el uso y los de
+// adelante esperan. Ajustar un agujero más es subir de nivel. Reemplaza la
+// barra de progreso con degradé y el trofeo con emoji.
+const RANGOS_CINTURON = ["Bronce", "Plata", "Oro", "Esmeralda", "Diamante", "Maestro"];
+function CinturonRango({ nivel = 0 }) {
+  const n = Math.max(0, Math.min(RANK_TIERS.length - 1, nivel));
+  const g = Math.floor(n / 3), j = n % 3;
+  // Los agujeros de cada tramo van al 25, 50 y 75 % de su ancho.
+  const x = ((g + (j + 1) / 4) / RANGOS_CINTURON.length) * 100;
+  return (
+    <div className="cinturon" role="img" aria-label={`Agujero ${n + 1} de ${RANK_TIERS.length}: ${RANK_TIERS[n].tier} ${RANK_TIERS[n].sub}`}>
+      <div className="cinturon-correa">
+        {RANGOS_CINTURON.map((r, gi) => (
+          <span key={r} className="cinturon-tramo">
+            {[0, 1, 2].map((k) => {
+              const idx = gi * 3 + k;
+              return <i key={k} className={`cinturon-agujero ${idx < n ? "gastado" : idx === n ? "puesto" : ""}`} />;
+            })}
+          </span>
+        ))}
+        <span className="cinturon-hebilla" style={{ left: `${x}%` }} />
+      </div>
+      <div className="cinturon-rangos" aria-hidden="true">
+        {RANGOS_CINTURON.map((r, gi) => <span key={r} className={gi < g ? "paso" : gi === g ? "actual tinta-rango" : ""}>{r}</span>)}
+      </div>
+    </div>
+  );
+}
+
 function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, onGoToProfile, onGoToRoutines, sex, age }) {
   const unit = useWeightUnit();
   const [selected, setSelected] = useState(null);
@@ -14822,220 +15857,160 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
       <MuscleHighlighterBody ranks={ranks} selected={selected} onMuscleClick={goToMuscle} frontRef={frontBodyRef} backRef={backBodyRef} rankMode={mode} pulseMuscles={musculosQueSubieron} sex={sex} />
 
      {selInfo ? (
-        <div key={selected} ref={detailRef} className="relative overflow-hidden rounded-3xl p-[1.5px] bounce-in" style={{ background: selInfo.hasData ? `linear-gradient(140deg, ${tint(selInfo.color, "55")}, transparent 45%, transparent 60%, ${tint(selInfo.color, "30")})` : "var(--panel-sunken)" }}>
-          <div className="relative overflow-hidden rounded-[calc(1.5rem-1.5px)] p-4" style={{ background: "var(--panel-grad-blue)" }}>
-            {selInfo.hasData && (
-              <>
-                <div className="absolute -top-12 -right-10 w-44 h-44 rounded-full blur-3xl pointer-events-none opacity-25" style={{ backgroundColor: selInfo.color }} />
-                <div className="absolute -bottom-16 -left-12 w-40 h-40 rounded-full blur-3xl pointer-events-none opacity-10" style={{ backgroundColor: selInfo.color }} />
-              </>
-            )}
-
-            {/* Nombre del músculo como chip protagonista */}
-            <div className="relative flex items-center justify-between gap-2 mb-3.5">
-              <span className="text-[11px] font-black uppercase tracking-[0.18em] px-3 py-1.5 rounded-xl" style={selInfo.hasData ? { color: selInfo.color, backgroundColor: tint(selInfo.color, "18"), border: `1px solid ${tint(selInfo.color, "35")}` } : { color: "#6e7379", backgroundColor: "#25292e66", border: "1px solid #25292e" }}>{selInfo.label}</span>
-              {!selInfo.hasData && <span className="text-[11px] font-bold text-slate-500 px-2.5 py-1 rounded-lg bg-slate-800/60 shrink-0">Sin rango</span>}
+        <div key={selected} ref={detailRef} className="rango-detalle bounce-in" style={{ "--rango": selInfo.hasData ? selInfo.color : "#6e7379", "--rango-c": selInfo.color }}>
+          <div className="rango-detalle-cabeza">
+            {selInfo.hasData && <RankBadgeIcon tier={selInfo.tier} sub={null} color={selInfo.color} size={64} />}
+            <div className="min-w-0 flex-1">
+              <p className="rango-detalle-musculo">{selInfo.label}</p>
+              {selInfo.hasData ? (
+                <>
+                  <p className="rango-detalle-rango tinta-rango">{selInfo.tier}{selInfo.sub ? ` ${selInfo.sub}` : ""}</p>
+                  {selInfo.bestKg ? (
+                    <p className="rango-detalle-marca"><b className="num-display">{selInfo.bestReps} × {conComa(kgToDisplay(selInfo.bestKg, unit))}</b> {weightLabel(unit)}{selInfo.bestExerciseName ? ` en ${selInfo.bestExerciseName}` : ""}{selInfo.bestLoadFactor > 1 ? ", con las dos mancuernas" : ""}</p>
+                  ) : (
+                    <p className="rango-detalle-marca">Estimado por ejercicios relacionados: todavía sin marca propia.</p>
+                  )}
+                </>
+              ) : (
+                <p className="rango-detalle-marca">Todavía no registraste marcas en este grupo.</p>
+              )}
             </div>
-
-            {selInfo.hasData ? (
-              <>
-                {/* Badge + rango + marca en display grande */}
-                <div className="relative flex items-center gap-4 mb-4">
-                  <div className="shrink-0" style={{ filter: `drop-shadow(0 6px 18px ${tint(selInfo.color, "50")})` }}>
-                    <RankBadgeIcon tier={selInfo.tier} sub={null} color={selInfo.color} size={118} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-2xl font-black leading-none tracking-tight" style={{ color: selInfo.color, textShadow: `0 0 24px ${tint(selInfo.color, "40")}` }}>{selInfo.tier}{selInfo.sub ? ` ${selInfo.sub}` : ""}</p>
-                    {selInfo.bestKg ? (
-                      <>
-                        <p className="mt-2 text-[26px] font-black text-white leading-none tabular-nums">{selInfo.bestReps}<span className="text-slate-500 text-lg font-bold mx-0.5">×</span>{kgToDisplay(selInfo.bestKg, unit)}<span className="text-slate-400 text-base font-bold ml-0.5">{weightLabel(unit)}</span></p>
-                        <p className="text-[10.5px] text-slate-500 mt-1.5 leading-snug">{selInfo.bestExerciseName ? <>en <span className="text-slate-300 font-bold">{selInfo.bestExerciseName}</span></> : "Tu mejor marca"}{selInfo.bestLoadFactor > 1 ? <span className="text-slate-600"> · ×2 mancuernas</span> : null}</p>
-                      </>
-                    ) : (
-                      <p className="text-[11px] text-slate-500 mt-2 leading-snug">Estimado por ejercicios relacionados, todavía sin marca propia</p>
-                    )}
-                  </div>
-                </div>
-
-                {strengthPercentile != null && (
-                  <div className="relative flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 mb-3.5" style={{ backgroundColor: tint(selInfo.color, "12"), border: `1px solid ${tint(selInfo.color, "28")}` }}>
-                    <Users size={14} style={{ color: selInfo.color }} className="shrink-0" />
-                    <p className="text-[11px] text-slate-300 leading-snug">Más fuerte que ~<span className="font-black text-white">{strengthPercentile}%</span> de gente con tu mismo perfil <span className="text-slate-500">(estimado)</span></p>
-                  </div>
-                )}
-
-                {selInfo.nextThreshold ? (
-                  <div className="relative bg-slate-900/70 border border-slate-800/60 rounded-2xl p-3.5 backdrop-blur-sm">
-                    <div className="flex items-center justify-between mb-2.5 gap-2">
-                      <span className="text-[9.5px] font-black text-slate-500 uppercase tracking-[0.14em]">Próximo rango</span>
-                      <span className="flex items-center gap-1.5 text-[11px] font-black shrink-0" style={{ color: nextTierInfo?.color }}>
-                        <RankBadgeIcon tier={nextTierInfo?.tier} sub="" color={nextTierInfo?.color} size={46} />
-                        {nextTierInfo?.tier}{nextTierInfo?.sub ? ` ${nextTierInfo.sub}` : ""}
-                      </span>
-                    </div>
-                    {(() => {
-                      const pct = Math.min(100, Math.max(4, ((selInfo.best1RM - selInfo.threshold) / (selInfo.nextThreshold - selInfo.threshold)) * 100));
-                      return (
-                        <div className="relative h-3 bg-slate-800/80 rounded-full overflow-hidden">
-                          <div className="h-full rounded-full transition-all grow-bar relative" style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${selInfo.color}, ${nextTierInfo?.color || selInfo.color})`, boxShadow: `0 0 12px ${tint(selInfo.color, "70")}` }} />
-                          <span className="absolute inset-0 flex items-center justify-center text-[8.5px] font-black text-white/90 tabular-nums" style={{ textShadow: "0 1px 3px rgba(0,0,0,0.8)" }}>{Math.round(pct)}%</span>
-                        </div>
-                      );
-                    })()}
-                    {extraKgNeeded != null && (
-                      <div className="mt-3 flex items-center gap-2 rounded-xl px-3 py-2" style={{ backgroundColor: tint(nextTierInfo?.color || selInfo.color, "14"), border: `1px solid ${tint(nextTierInfo?.color || selInfo.color, "30")}` }}>
-                        <TrendingUp size={13} style={{ color: nextTierInfo?.color || selInfo.color }} className="shrink-0" />
-                        <p className="text-[11px] text-slate-300 leading-snug">Sumá <span className="font-black text-white">{kgToDisplay(extraKgNeeded, unit)}{weightLabel(unit)}</span> a tus {selInfo.bestReps} reps y subís de rango</p>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="relative rounded-2xl px-3 py-3.5 text-center" style={{ background: `linear-gradient(135deg, ${tint(selInfo.color, "20")}, ${tint(selInfo.color, "08")})`, border: `1px solid ${tint(selInfo.color, "40")}` }}>
-                    <p className="text-sm font-black" style={{ color: selInfo.color }}>🏆 ¡Rango máximo alcanzado!</p>
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="relative text-center py-1">
-                <p className="text-[11px] text-slate-600 mb-3">Todavía no registraste marcas en este grupo.</p>
-                <button onClick={() => setShowGroupExercises(true)} className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[11px] font-black text-teal-400 bg-teal-500/10 border border-teal-500/30 transition active:scale-95">
-                  <Dumbbell size={12} /> Ver ejercicios para {selInfo.label}
-                </button>
-              </div>
-            )}
           </div>
+          {selInfo.hasData ? (
+            <>
+              <CinturonRango nivel={selInfo.levelIdx} />
+              {selInfo.nextThreshold && nextTierInfo ? (
+                <p className="rango-detalle-falta">
+                  {extraKgNeeded != null && selInfo.bestReps
+                    ? <>Sumá <b>{conComa(kgToDisplay(extraKgNeeded, unit))} {weightLabel(unit)}</b> a tus {selInfo.bestReps} reps y ajustás un agujero más: </>
+                    : <>El próximo agujero: </>}
+                  <b className="tinta-rango" style={{ "--rango-c": nextTierInfo.color }}>{nextTierInfo.tier} {nextTierInfo.sub}</b>.
+                </p>
+              ) : (
+                <p className="rango-detalle-falta">Llegaste al último agujero del cinturón: no hay un rango más alto.</p>
+              )}
+              {strengthPercentile != null && <p className="rango-detalle-nota">Más fuerte que el {strengthPercentile} % de la gente con tu perfil (estimado).</p>}
+            </>
+          ) : (
+            <button onClick={() => setShowGroupExercises(true)} className="boton-tonal w-full"><Dumbbell size={15} /> Ver ejercicios para {selInfo.label}</button>
+          )}
         </div>
       ) : (
-        <p className="text-center text-[11px] text-slate-600">Tocá un músculo entrenable para ver tu rango y tu mejor marca.</p>
+        <p className="text-center text-[12px] text-slate-500">Tocá un músculo para ver tu rango y tu mejor marca.</p>
       )}
-      {/* Modal: ejercicios que trabajan un grupo SIN entrenar — el atajo
-          para desbloquear su rango. Lista los ejercicios de la librería que
-          apuntan a ese músculo y un botón directo a Rutinas para sumarlos. */}
+      {/* Los ejercicios que trabajan un grupo SIN entrenar: el atajo para
+          estrenar su rango, con un botón directo a Rutinas. */}
       {showGroupExercises && selInfo && (
-        <div className="fixed inset-0 z-[130] bg-black/75 backdrop-blur-sm flex items-center justify-center p-5 modal-bg-in modal-overlay" onClick={() => setShowGroupExercises(false)}>
-          <div className="max-w-sm w-full max-h-[80vh] overflow-y-auto overscroll-contain bg-slate-900 border border-slate-700/60 rounded-3xl p-5 modal-pop-in shadow-2xl shadow-black/60" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-1">
-              <div className="flex items-center gap-2">
-                <Dumbbell size={15} className="text-teal-400" />
-                <p className="text-sm font-black text-white">Ejercicios de {selInfo.label}</p>
+        <div className="fixed inset-0 z-[130] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={() => setShowGroupExercises(false)}>
+          <div className="modal-rutina modal-pop-in" role="dialog" aria-modal="true" aria-label={`Ejercicios de ${selInfo.label}`} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-rutina-cabeza">
+              <div className="min-w-0">
+                <h3 className="ficha-titulo">Ejercicios de {selInfo.label}</h3>
+                <p className="ficha-bajada">Sumá alguno a tu rutina y este músculo estrena su rango.</p>
               </div>
-              <button onClick={() => setShowGroupExercises(false)} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition"><X size={16} /></button>
+              <button onClick={() => setShowGroupExercises(false)} aria-label="Cerrar" className="boton-redondo shrink-0"><X size={17} /></button>
             </div>
-            <p className="text-[10.5px] text-slate-500 mb-3.5">Sumá alguno a tu rutina y este músculo desbloquea su rango.</p>
-            {(() => {
-              const groups = EXERCISE_LIBRARY_CONTRIBUTORS_BY_GROUP[selected] || {};
-              const ids = [...(groups.primary?.keys() || []), ...(groups.always?.keys() || [])];
-              const uniq = [...new Set(ids)];
-              const list = uniq.map((id) => EXERCISE_LIBRARY_BY_ID[id]).filter(Boolean).slice(0, 10);
-              if (!list.length) return <p className="text-[11px] text-slate-600 text-center py-3">No hay ejercicios de librería para este grupo.</p>;
-              return (
-                <div className="space-y-1.5 mb-4">
-                  {list.map((ex) => (
-                    <div key={ex.id} className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 bg-slate-800/40 border border-slate-700/40">
-                      <span className="flex-1 text-xs font-bold text-slate-200">{ex.name}</span>
-                      <a href={yt(ex.name + " ejercicio")} target="_blank" rel="noreferrer" className="text-[9.5px] font-black text-rose-400 px-2 py-1 rounded-lg bg-rose-500/10 border border-rose-500/25 shrink-0">▶ Ver</a>
-                    </div>
-                  ))}
-                </div>
-              );
-            })()}
-            <button onClick={() => { setShowGroupExercises(false); onGoToRoutines?.(); }} className="w-full py-3 rounded-2xl text-sm font-black !text-[color:var(--accion-tinta)] transition active:scale-[0.98]" style={{ background: "var(--accion-fondo)" }}>
-              Editar mi rutina y agregarlos →
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Modal de ANÁLISIS MUSCULAR: tus mejores, los que hay que mejorar
-          y los que no estás entrenando. Cada fila es tocable: te lleva
-          directo a la tarjeta de ese músculo. */}
-      {showAnalysis && (
-        <div className="fixed inset-0 z-[130] bg-black/75 backdrop-blur-sm flex items-center justify-center p-5 modal-bg-in modal-overlay" onClick={() => setShowAnalysis(false)}>
-          <div className="max-w-sm w-full max-h-[85vh] overflow-y-auto overscroll-contain bg-slate-900 border border-slate-700/60 rounded-3xl p-5 modal-pop-in shadow-2xl shadow-black/60" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <BarChart3 size={15} className="text-teal-400" />
-                <p className="text-sm font-black text-white">Análisis muscular</p>
-              </div>
-              <button onClick={() => setShowAnalysis(false)} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition"><X size={16} /></button>
-            </div>
-
-            {!analysis.hasAny ? (
-              <p className="text-[11px] text-slate-500 text-center py-4">Registrá tus primeras marcas y acá vas a ver tus fortalezas y pendientes.</p>
-            ) : (
-              <div className="space-y-4">
-                {analysis.tops.length > 0 && (
-                  <div>
-                    <p className="text-[9.5px] font-black uppercase tracking-[0.15em] text-amber-400 mb-2 flex items-center gap-1.5"><Trophy size={11} /> Tus mejores</p>
-                    <div className="space-y-1.5">
-                      {analysis.tops.map((m) => (
-                        <button key={m.key} onClick={() => { setShowAnalysis(false); goToMuscle(m.key); }} className="w-full flex items-center gap-2.5 rounded-xl px-2.5 py-2 transition active:scale-[0.98] text-left" style={{ backgroundColor: tint(m.r.color, "12"), border: `1px solid ${tint(m.r.color, "30")}` }}>
-                          <RankBadgeIcon tier={m.r.tier} sub="" color={m.r.color} size={40} />
-                          <span className="flex-1 text-xs font-bold text-slate-200">{m.label}</span>
-                          <span className="text-[10.5px] font-black shrink-0" style={{ color: m.r.color }}>{m.r.tier}{m.r.sub ? ` ${m.r.sub}` : ""}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {analysis.weak.length > 0 && (
-                  <div>
-                    <p className="text-[9.5px] font-black uppercase tracking-[0.15em] text-orange-400 mb-2 flex items-center gap-1.5"><TrendingUp size={11} /> Para mejorar</p>
-                    <div className="space-y-1.5">
-                      {analysis.weak.map((m) => (
-                        <button key={m.key} onClick={() => { setShowAnalysis(false); goToMuscle(m.key); }} className="w-full flex items-center gap-2.5 rounded-xl px-2.5 py-2 bg-slate-800/40 border border-slate-700/40 transition active:scale-[0.98] text-left">
-                          <RankBadgeIcon tier={m.r.tier} sub="" color={m.r.color} size={40} />
-                          <span className="flex-1 text-xs font-bold text-slate-300">{m.label}</span>
-                          <span className="text-[10.5px] font-black shrink-0" style={{ color: m.r.color }}>{m.r.tier}{m.r.sub ? ` ${m.r.sub}` : ""}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {analysis.untrained.length > 0 && (
-                  <div>
-                    <p className="text-[9.5px] font-black uppercase tracking-[0.15em] text-slate-500 mb-2 flex items-center gap-1.5"><Moon size={11} /> Sin entrenar</p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {analysis.untrained.map((g) => (
-                        <button key={g.key} onClick={() => { setShowAnalysis(false); goToMuscle(g.key); }} className="text-[10px] font-bold text-slate-500 px-2.5 py-1.5 rounded-lg bg-slate-800/50 border border-slate-700/40 transition active:scale-95">{g.label}</button>
-                      ))}
-                    </div>
-                    <p className="text-[9.5px] text-slate-600 mt-2">Sumá ejercicios de estos grupos a tu rutina para desbloquear su rango.</p>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Modal de referencia: la escala completa de rangos (se abre con el
-          trofeo del header — antes ocupaba lugar fijo como "Ver todos los
-          rangos"; ahora el espacio lo usa el carrusel con TUS rangos). */}
-      {showTierRef && (
-        <div className="fixed inset-0 z-[130] bg-black/75 backdrop-blur-sm flex items-center justify-center p-5 modal-bg-in modal-overlay" onClick={() => setShowTierRef(false)}>
-          <div className="max-w-sm w-full bg-slate-900 border border-slate-700/60 rounded-3xl p-5 modal-pop-in shadow-2xl shadow-black/60" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Trophy size={15} className="text-amber-400" />
-                <p className="text-sm font-black text-white">Escala de rangos</p>
-              </div>
-              <button onClick={() => setShowTierRef(false)} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition"><X size={16} /></button>
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              {["Bronce", "Plata", "Oro", "Esmeralda", "Diamante", "Maestro"].map((t) => {
-                const rep = RANK_TIERS.find((r) => r.tier === t && r.sub === "II") || RANK_TIERS.find((r) => r.tier === t);
+            <div className="modal-rutina-cuerpo">
+              {(() => {
+                const groups = EXERCISE_LIBRARY_CONTRIBUTORS_BY_GROUP[selected] || {};
+                const ids = [...(groups.primary?.keys() || []), ...(groups.always?.keys() || [])];
+                const list = [...new Set(ids)].map((id) => EXERCISE_LIBRARY_BY_ID[id]).filter(Boolean).slice(0, 10);
+                if (!list.length) return <p className="ficha-bajada">No hay ejercicios del catálogo para este grupo.</p>;
                 return (
-                  <div key={t} className="flex flex-col items-center gap-2 rounded-xl py-3 bg-slate-800/40">
-                    <RankBadgeIcon tier={rep.tier} sub="" color={rep.color} size={83} />
-                    <span className="text-[10px] font-black" style={{ color: rep.color }}>{t}</span>
-                  </div>
+                  <ul className="rango-ejercicios">
+                    {list.map((ex) => (
+                      <li key={ex.id}>
+                        <span>{ex.name}</span>
+                        <a href={yt(ex.name + " ejercicio")} target="_blank" rel="noreferrer" className="enlace-suave"><SquarePlay size={15} /> Técnica</a>
+                      </li>
+                    ))}
+                  </ul>
                 );
-              })}
+              })()}
             </div>
-            <p className="text-[10px] text-slate-500 text-center mt-3">Cada rango tiene 3 niveles (III → I). Subís entrenando más pesado.</p>
+            <div className="modal-rutina-pie">
+              <button onClick={() => { setShowGroupExercises(false); onGoToRoutines?.(); }} className="boton-pildora w-full">Agregarlos a mi rutina</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* EL ANÁLISIS MUSCULAR: tus mejores, los que más te conviene subir y
+          los que no estás entrenando. Cada fila lleva a la tarjeta de ese
+          músculo. */}
+      {showAnalysis && (
+        <div className="fixed inset-0 z-[130] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={() => setShowAnalysis(false)}>
+          <div className="modal-rutina modal-pop-in" role="dialog" aria-modal="true" aria-label="Análisis muscular" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-rutina-cabeza">
+              <div className="min-w-0">
+                <h3 className="ficha-titulo">Análisis muscular</h3>
+                <p className="ficha-bajada">Tus mejores músculos, los que más te conviene subir y los que no estás entrenando.</p>
+              </div>
+              <button onClick={() => setShowAnalysis(false)} aria-label="Cerrar" className="boton-redondo shrink-0"><X size={17} /></button>
+            </div>
+            <div className="modal-rutina-cuerpo">
+              {!analysis.hasAny ? (
+                <p className="ficha-bajada">Registrá tus primeras marcas y acá vas a ver tus fortalezas y lo que falta.</p>
+              ) : (
+                <>
+                  {[{ t: "Tus mejores", lista: analysis.tops }, { t: "Para subir", lista: analysis.weak }].filter((b) => b.lista.length).map((b) => (
+                    <section key={b.t}>
+                      <h4 className="ficha-grupo-titulo">{b.t}</h4>
+                      <div className="rango-lista">
+                        {b.lista.map((m) => (
+                          <button key={m.key} onClick={() => { setShowAnalysis(false); goToMuscle(m.key); }} className="rango-fila">
+                            <RankBadgeIcon tier={m.r.tier} sub="" color={m.r.color} size={36} />
+                            <span className="rango-fila-musculo">{m.label}</span>
+                            <span className="rango-fila-rango tinta-rango" style={{ "--rango-c": m.r.color }}>{m.r.tier}{m.r.sub ? ` ${m.r.sub}` : ""}</span>
+                            <ChevronRight size={15} className="text-slate-500 shrink-0" aria-hidden="true" />
+                          </button>
+                        ))}
+                      </div>
+                    </section>
+                  ))}
+                  {analysis.untrained.length > 0 && (
+                    <section>
+                      <h4 className="ficha-grupo-titulo">Sin entrenar</h4>
+                      <div className="rango-chips">
+                        {analysis.untrained.map((g) => (
+                          <button key={g.key} onClick={() => { setShowAnalysis(false); goToMuscle(g.key); }} className="rango-chip">{g.label}</button>
+                        ))}
+                      </div>
+                      <p className="ficha-bajada">Sumá ejercicios de estos grupos a tu rutina para estrenar su rango.</p>
+                    </section>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* LA ESCALA DE RANGOS (el trofeo de arriba): los seis, con sus tres
+          niveles cada uno. */}
+      {showTierRef && (
+        <div className="fixed inset-0 z-[130] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={() => setShowTierRef(false)}>
+          <div className="modal-rutina modal-pop-in" role="dialog" aria-modal="true" aria-label="Escala de rangos" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-rutina-cabeza">
+              <div className="min-w-0">
+                <h3 className="ficha-titulo">Escala de rangos</h3>
+                <p className="ficha-bajada">Seis rangos de tres niveles, del I al III: los dieciocho agujeros del cinturón. Subís entrenando más pesado.</p>
+              </div>
+              <button onClick={() => setShowTierRef(false)} aria-label="Cerrar" className="boton-redondo shrink-0"><X size={17} /></button>
+            </div>
+            <div className="modal-rutina-cuerpo">
+              <div className="rango-escala">
+                {RANGOS_CINTURON.map((t) => {
+                  const rep = RANK_TIERS.find((r) => r.tier === t && r.sub === "II") || RANK_TIERS.find((r) => r.tier === t);
+                  return (
+                    <div key={t} className="rango-escala-item">
+                      <RankBadgeIcon tier={rep.tier} sub="" color={rep.color} size={72} />
+                      <span className="tinta-rango" style={{ "--rango-c": rep.color }}>{t}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -17043,6 +18018,8 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
       </CarnetSocio>
       {cropSrc && <AvatarCropModal src={cropSrc} onCancel={() => setCropSrc(null)} onConfirm={handleCropConfirm} />}
 
+      <VitrinaMedallas logs={profile?.logs} trainingSessions={profile?.trainingSessions} />
+
       <SocialPreviewCard profile={profile} uid={profile?.googleUid} onGoToSocial={onGoToSocial} onUpdateProfile={onUpdateProfile} />
 
       <div className="seccion-plegable divide-y divide-slate-800/50 overflow-hidden">
@@ -17529,7 +18506,7 @@ function useUserStreaks(uids) {
       });
       if (latest) {
         const dayDef = model?.days?.[latest.dayKey];
-        latestSession = { date: latest.date, dayLabel: dayDef?.label || null, dayColor: dayDef?.color || null, series: seriesUltima };
+        latestSession = { date: latest.date, dayLabel: dayDef?.label || null, dayColor: dayDef?.color || null, series: seriesUltima, inicio: latest.startedAt || null };
       }
       const semana = semanaDeSesiones(sessions, (sesion) => model?.days?.[sesion.dayKey]?.color || null);
       // Sus marcas: para la pizarra de récords y para avisar si te pasó en un músculo.
@@ -18832,8 +19809,8 @@ function RoutineProposalComposer({ myRoutines, onClose, onSubmit }) {
 // array (en vez de un switch largo en el JSX) para que agregar una
 // plantilla nueva el día de mañana sea sumar un objeto acá, nada más.
 const PROGRESSION_TEMPLATES = [
+  { key: "double", label: "Como un entrenador", icon: <Layers size={13} />, hint: "Una rep más por semana; al tope del rango, sube el peso y vuelve al piso", build: (weeks, kg, reps, repsMax, inc, desde) => buildDoubleProgression(weeks, kg, reps, repsMax, inc, desde) },
   { key: "linear", label: "Lineal", icon: <TrendingUp size={13} />, hint: "+peso cada semana, mismas reps", build: (weeks, kg, reps, repsMax, inc) => buildLinearProgression(weeks, kg, reps, inc) },
-  { key: "double", label: "Doble progresión", icon: <Layers size={13} />, hint: "Sube reps hasta el tope y ahí sube el kg", build: (weeks, kg, reps, repsMax, inc) => buildDoubleProgression(weeks, kg, reps, repsMax, inc) },
   { key: "wave", label: "Ondulante", icon: <Activity size={13} />, hint: "Alterna semana pesada/liviana", build: (weeks, kg, reps, repsMax, inc) => buildWaveProgression(weeks, kg, reps, inc) },
   { key: "step", label: "Escalón c/2 sem", icon: <ListChecks size={13} />, hint: "Mismo peso 2 semanas, después sube", build: (weeks, kg, reps, repsMax, inc) => buildStepProgression(weeks, kg, reps, inc) },
   { key: "flat", label: "Igual todas", icon: <Minus size={13} />, hint: "Mismo peso y reps toda la planificación", build: (weeks, kg, reps) => buildFlatProgression(weeks, kg, reps) },
@@ -19054,10 +20031,12 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
   // de golpe el kg de TODOS los ejercicios del día en esta semana — es el
   // gesto real de "esta semana subo 2.5kg en todo", que antes eran 6 u 8
   // campos tipeados a mano uno por uno.
-  const bumpDay = (delta) => {
+  const bumpDay = (signo) => {
     setEntries((prev) => {
       const next = { ...prev };
       dayExercises.forEach((ex) => {
+        // Un salto de cada uno: el de su máquina o el del objetivo.
+        const delta = signo * (saltoDelEjercicio(ex) || (unit === "lbs" ? 5 : 2.5));
         (ex.sets || []).forEach((_, si) => {
           const actual = parseFloat(valueOf(ex, si, week, "kg"));
           if (isNaN(actual) || actual <= 0) return;
@@ -19075,13 +20054,28 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
     const best = marcasPorEjercicio[ex.id]?.best;
     return best ? String(best.kg) : "";
   };
+  // El salto de un ejercicio: el de su máquina, si lo cargaste en la serie;
+  // si no, el del objetivo.
+  const saltoDelEjercicio = (ex) => (planPrefs?.saltosDePeso?.[ex.id] ? saltoDe(planPrefs, ex.id, unit) : (parseFloat(tplInc) || 0));
   const applyTemplate = (ex, tpl, guardarTambien = true) => {
-    const kg = parseFloat(tplKgDe(ex));
-    const reps = parseInt(tplReps, 10);
-    if (isNaN(kg) || kg <= 0 || isNaN(reps) || reps <= 0) return;
-    const repsMax = parseInt(tplRepsMax, 10) || reps + 1;
-    const inc = parseFloat(tplInc) || 0;
-    const built = tpl.build(weeks, kg, reps, repsMax, inc);
+    let kg = parseFloat(tplKgDe(ex));
+    // El rango de la rutina manda (si se respeta): el press de banca en 6-8 y
+    // el curl en 10-12, no todos en el mismo.
+    const rango = prefs.planRespetarRango !== false ? rangoDeReps(ex.sets?.[0]?.repRange) : null;
+    const reps = rango ? rango[0] : parseInt(tplReps, 10);
+    if (isNaN(reps) || reps <= 0) return;
+    const repsMax = rango ? rango[1] : (parseInt(tplRepsMax, 10) || reps + 1);
+    const inc = saltoDelEjercicio(ex);
+    // La progresión de un entrenador arranca desde donde estás: la próxima de
+    // tu última sesión (una rep más, o el salto si llegaste al tope).
+    let desde = reps;
+    const last = marcasPorEjercicio[ex.id]?.last;
+    if (tpl.key === "double" && tplKgByEx[ex.id] === undefined && last) {
+      const p = siguientePaso(last.kg, last.reps, `${reps}-${repsMax}`, inc);
+      if (p && p.kg > 0) { kg = p.kg; desde = p.reps; }
+    }
+    if (isNaN(kg) || kg <= 0) return;
+    const built = tpl.build(weeks, kg, reps, repsMax, inc, desde);
     setEntries((prev) => {
       const next = { ...prev };
       // Merge, no reemplazo: aplicar una plantilla no debe borrar un
@@ -19290,7 +20284,7 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
                       <span className="plan-opcion-icono neutro" aria-hidden="true"><Target size={18} /></span>
                       <span className="min-w-0 flex-1">
                         <span className="plan-opcion-titulo">Objetivo: {objetivoActual.l.toLowerCase()}</span>
-                        <span className="plan-opcion-desc">{tplReps} a {tplRepsMax} repeticiones, {Number(tplInc) > 0 ? `+${conComa(tplInc)} ${weightLabel(unit)} por semana` : "sin subir el peso"}</span>
+                        <span className="plan-opcion-desc">{tplReps} a {tplRepsMax} repeticiones{Number(tplInc) > 0 ? `; al tope, +${conComa(tplInc)} ${weightLabel(unit)}` : ", sin subir el peso"}</span>
                       </span>
                       <ChevronDown size={18} className="armado-ej-chevron" aria-hidden="true" />
                     </button>
@@ -19308,7 +20302,7 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
                           {[
                             { l: "Reps", v: tplReps, set: setTplReps, step: "1" },
                             { l: "Tope", v: tplRepsMax, set: setTplRepsMax, step: "1" },
-                            { l: `+${weightLabel(unit)} por semana`, v: tplInc, set: setTplInc, step: "0.25" },
+                            { l: `Salto (${weightLabel(unit)})`, v: tplInc, set: setTplInc, step: "0.25" },
                           ].map((f) => (
                             <label key={f.l} className="plan-num ancho">
                               <input value={f.v} onChange={(e) => f.set(e.target.value)} onBlur={guardarPrefs} type="number" inputMode="decimal" step={f.step} />
@@ -19316,7 +20310,7 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
                             </label>
                           ))}
                         </div>
-                        <p className="armado-nota">Las usan las plantillas de cada ejercicio y se guardan para la próxima vez.</p>
+                        <p className="armado-nota">Las usan las plantillas de cada ejercicio y se guardan para la próxima vez. Si un ejercicio tiene su propio rango o el salto de su máquina, mandan esos.</p>
                       </div>
                     )}
                   </div>
@@ -19358,8 +20352,8 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
                   {dayExercises.length > 1 && (
                     <div className="plan-todo-dia" role="group" aria-label="Todo el día">
                       <span className="armado-campo-rotulo">Todo el día</span>
-                      <button onClick={() => bumpDay(-2.5)} className="armado-chip">− {conComa(2.5)} {weightLabel(unit)}</button>
-                      <button onClick={() => bumpDay(2.5)} className="armado-chip">+ {conComa(2.5)} {weightLabel(unit)}</button>
+                      <button onClick={() => bumpDay(-1)} className="armado-chip">− Un salto</button>
+                      <button onClick={() => bumpDay(1)} className="armado-chip">+ Un salto</button>
                       <button onClick={() => applyTemplateToDay(PROGRESSION_TEMPLATES[0])} className="armado-chip"><Sparkles size={13} className="inline -mt-0.5 mr-1" />Llenar el ciclo</button>
                     </div>
                   )}
@@ -19549,6 +20543,48 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
 // historial y las medidas. Con un amigo, una solapa abre el mano a mano.
 // Si no hay vínculo aceptado (o la otra persona quitó su @usuario),
 // getPublicFull devuelve null y se avisa que no comparte su perfil.
+// EL CASILLERO: arriba del perfil de un atleta (y del tuyo, como lo ven tus
+// amigos), la puerta de su casillero del vestuario: las rejillas, el número,
+// la foto pegada con cinta, la etiqueta con el nombre y las calcomanías de lo
+// que logró (su rango más alto, su último récord, desde cuándo entrena). La
+// manija, a la derecha. Antes era el avatar con un aro de color y el nombre
+// al lado.
+function numeroDeCasillero(semilla = "") {
+  let h = 7;
+  for (let i = 0; i < semilla.length; i++) h = (h * 31 + semilla.charCodeAt(i)) >>> 0;
+  return 1 + (h % 240);
+}
+function Casillero({ semilla = "", nombre, usuario = null, foto = null, rango = null, record = null, desde = null, accion = null }) {
+  const numero = numeroDeCasillero(semilla || nombre || "");
+  return (
+    <header className="casillero" aria-label={`El casillero de ${nombre}`}>
+      <div className="casillero-arriba">
+        <div className="casillero-rejilla" aria-hidden="true">{Array.from({ length: 5 }, (_, i) => <i key={i} />)}</div>
+        <span className="casillero-numero" aria-hidden="true">{String(numero).padStart(3, "0")}</span>
+        {accion}
+      </div>
+      <div className="casillero-cuerpo">
+        <span className="casillero-foto" aria-hidden="true">
+          <span className="casillero-cinta" />
+          {foto ? <img src={foto} alt="" /> : <span className="casillero-inicial">{String(nombre).charAt(0).toUpperCase()}</span>}
+        </span>
+        <div className="casillero-datos">
+          <div className="casillero-etiqueta"><h2 className="casillero-nombre">{nombre}</h2></div>
+          {usuario && <p className="casillero-usuario">@{usuario}</p>}
+        </div>
+      </div>
+      {(rango || record || desde) && (
+        <div className="casillero-calcos">
+          {rango && <span className="calco calco-rango tinta-rango" style={{ "--rango-c": rango.color }}><RankBadgeIcon tier={rango.tier} sub={null} color={rango.color} size={20} />{rango.tier} {rango.sub}</span>}
+          {record && <span className="calco calco-record"><IconoCampana size={14} />{record}</span>}
+          {desde && <span className="calco calco-papel">Desde {desde}</span>}
+        </div>
+      )}
+      <span className="casillero-manija" aria-hidden="true" />
+    </header>
+  );
+}
+
 function FriendProfileView({ uid, viewerUid, viewerProfile, viewerName = null, isTrainerOfThisPerson = false, openComparing = false, esYo = false, onBack, onProposalSent, onActivateRoutine, onRemoveFriend = null, aplauso = null, retos = null }) {
   // Pantalla de página completa dentro de Social: el botón atrás de Android
   // vuelve a Social en vez de salir a otra pestaña.
@@ -19705,22 +20741,16 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, viewerName = null, i
     <div className="space-y-4">
       <button onClick={onBack} className="volver"><ChevronLeft size={18} /> Volver</button>
 
-      <header className="atleta">
-        <span className="atleta-avatar" style={{ "--rango": theirTopRank?.color || "var(--hairline-fuerte)" }} aria-hidden="true">
-          {basic?.avatarData ? <img src={basic.avatarData} alt="" /> : String(nombre).charAt(0).toUpperCase()}
-        </span>
-        <div className="min-w-0 flex-1">
-          <h2 className="atleta-nombre">{nombre}</h2>
-          {basic?.username && <p className="atleta-usuario">@{basic.username}</p>}
-          {theirTopRank && (
-            <div className="atleta-rango tinta-rango" style={{ "--rango-c": theirTopRank.color }}>
-              <RankBadgeIcon tier={theirTopRank.tier} sub={null} color={theirTopRank.color} size={18} />{theirTopRank.tier} {theirTopRank.sub}
-            </div>
-          )}
-          {desde && <p className="atleta-desde">{esYo ? "Entrenás" : "Entrena"} desde {desde}</p>}
-        </div>
-        {esYo && basic?.username && <button onClick={() => setVerQr(true)} aria-label="Mostrar mi código QR" className="boton-redondo shrink-0"><QrCode size={17} /></button>}
-      </header>
+      <Casillero
+        semilla={uid || basic?.username || String(nombre)}
+        nombre={nombre}
+        usuario={basic?.username || null}
+        foto={basic?.avatarData || null}
+        rango={theirTopRank}
+        record={recientes[0] ? `${recientes[0].nombre} ${recientes[0].reps} × ${conComa(kgToDisplay(recientes[0].kg, unit))} ${weightLabel(unit)}` : null}
+        desde={desde}
+        accion={esYo && basic?.username ? <button onClick={() => setVerQr(true)} aria-label="Mostrar mi código QR" className="boton-redondo shrink-0"><QrCode size={17} /></button> : null}
+      />
       {esYo && <p className="atleta-nota">Así te ven tus amigos cuando entran a tu perfil.</p>}
 
       {state === "ok" && !esYo && (
@@ -20015,30 +21045,67 @@ function kudosDayLabel(daysAgo) {
   return `Entrenó hace ${daysAgo} días`;
 }
 
-// Una fila de la actividad de tu grupo: quién entrenó, qué día hizo y
-// cuántas series, y el botón para aplaudirle.
-function ActividadRow({ c, basic, sent, sending, onSendKudos, onViewProfile, delay = 0 }) {
-  const series = c.latestSession?.series || 0;
-  const nombre = basic?.name || "Tu amigo";
+// LA PLANILLA DE ASISTENCIA: la hoja en la tabla de la recepción, donde cada
+// socio anota la hora a la que llegó, su nombre y firma. Los amigos que
+// entrenaron hoy y ayer, por orden de llegada, con lo que hicieron y el
+// aplauso al costado. Si entrenaste, también firmaste vos. Reemplaza la
+// lista de tarjetas con avatar de la Actividad.
+function giroDeFirma(texto = "") {
+  let h = 11;
+  for (let i = 0; i < texto.length; i++) h = (h * 33 + texto.charCodeAt(i)) >>> 0;
+  return -6 + (h % 9);
+}
+function PlanillaAsistencia({ filas, enviados = {}, enviando = null, onAplaudir, onVer }) {
+  const hoy = new Date();
+  const ayer = new Date(hoy); ayer.setDate(hoy.getDate() - 1);
+  const fecha = (d) => d.toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" });
+  const porLlegada = (a, b) => ((a.inicio || "~") < (b.inicio || "~") ? -1 : (a.inicio || "~") > (b.inicio || "~") ? 1 : 0);
+  const grupos = [
+    { k: "hoy", titulo: `Hoy, ${fecha(hoy)}`, filas: filas.filter((f) => f.daysAgo <= 0).sort(porLlegada) },
+    { k: "ayer", titulo: `Ayer, ${fecha(ayer)}`, filas: filas.filter((f) => f.daysAgo === 1).sort(porLlegada) },
+  ].filter((g) => g.filas.length);
   return (
-    <div className="actividad stagger-item" style={{ animationDelay: `${delay}ms` }}>
-      <button onClick={() => onViewProfile(c.uid)} className="actividad-quien">
-        <span className={`galleta actividad-aro ${basic?.topRank?.color ? "aro-rango" : ""}`} style={basic?.topRank?.color ? { "--rango": basic.topRank.color } : undefined} aria-hidden="true">
-          <span className="actividad-avatar">{basic?.avatarData ? <img src={basic.avatarData} alt="" /> : nombre.charAt(0).toUpperCase()}</span>
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="actividad-nombre">{nombre}</span>
-          <span className="actividad-dia">{c.latestSession?.dayLabel ? `${c.latestSession.dayLabel}, ` : ""}{kudosDayLabel(c.daysAgo).toLowerCase()}{series > 0 ? `, ${series} series` : ""}</span>
-        </span>
-      </button>
-      <button
-        onClick={(e) => onSendKudos(c.uid, e.currentTarget)}
-        disabled={sending || sent}
-        aria-label={sent ? `Ya le aplaudiste a ${nombre}` : `Aplaudir a ${nombre}`}
-        className={`actividad-aplauso ${sent ? "hecho" : ""}`}
-      >
-        {sent ? <Check size={17} strokeWidth={3} /> : <span aria-hidden="true">👏</span>}
-      </button>
+    <div className="planilla">
+      <BrocheTabla />
+      <div className="planilla-hoja">
+        <p className="planilla-titulo">Planilla de asistencia</p>
+        {grupos.map((g) => (
+          <section key={g.k} aria-label={g.titulo} className="planilla-grupo">
+            <p className="planilla-dia">{g.titulo}</p>
+            <div className="planilla-fila planilla-cabeza" aria-hidden="true"><span>Hora</span><span>Socio</span><span>Firma</span><span /></div>
+            <ul>
+              {g.filas.map((f) => {
+                const hecho = !!enviados[f.uid];
+                const primer = String(f.nombre).trim().split(/\s+/)[0];
+                return (
+                  <li key={f.uid} className={`planilla-fila ${f.esYo ? "propia" : ""}`}>
+                    <span className="planilla-hora">{f.hora || "—"}</span>
+                    {f.esYo ? (
+                      <span className="planilla-socio">
+                        <span className="planilla-nombre">{f.nombre}</span>
+                        <span className="planilla-detalle">{f.dayLabel ? `${f.dayLabel}, ` : ""}{f.series} {f.series === 1 ? "serie" : "series"}</span>
+                      </span>
+                    ) : (
+                      <button onClick={() => onVer(f.uid)} className="planilla-socio" aria-label={`Ver el perfil de ${f.nombre}`}>
+                        <span className="planilla-nombre">{f.nombre}</span>
+                        <span className="planilla-detalle">{f.dayLabel ? `${f.dayLabel}, ` : ""}{f.series} {f.series === 1 ? "serie" : "series"}</span>
+                      </button>
+                    )}
+                    <span className="planilla-firma a-mano" style={{ "--giro": `${giroDeFirma(f.nombre)}deg` }} aria-hidden="true">{primer}</span>
+                    {f.esYo ? (
+                      <span className="planilla-vos">Vos</span>
+                    ) : (
+                      <button onClick={(e) => onAplaudir(f.uid, e.currentTarget)} disabled={hecho || enviando === f.uid} className={`planilla-aplauso ${hecho ? "hecho" : ""}`} aria-label={hecho ? `Ya le aplaudiste a ${primer}` : `Aplaudir a ${primer}`}>
+                        {hecho ? <Check size={16} strokeWidth={3} /> : <span aria-hidden="true">👏</span>}
+                      </button>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        ))}
+      </div>
     </div>
   );
 }
@@ -20246,6 +21313,23 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
     list.sort((a, b) => (a.latestSession.date < b.latestSession.date ? 1 : -1));
     return list.slice(0, 20);
   }, [friendAccepted, streaks, uid]);
+  // LA PLANILLA DE ASISTENCIA: los que entrenaron hoy y ayer, con la hora a la
+  // que llegaron, y vos si también fuiste.
+  const filasAsistencia = useMemo(() => {
+    const filas = kudosCandidates.map((c) => ({ uid: c.uid, nombre: basics[c.uid]?.name || "Tu amigo", daysAgo: c.daysAgo, dayLabel: c.latestSession?.dayLabel || null, series: c.latestSession?.series || 0, inicio: c.latestSession?.inicio || null, hora: horaDelTicket(c.latestSession?.inicio) || null }));
+    const mias = (profile?.trainingSessions || []).filter((t) => t?.date);
+    const mia = mias.length ? mias.reduce((x, y) => (y.date > x.date ? y : x)) : null;
+    const dias = mia ? Math.max(0, Math.floor((new Date() - new Date(`${mia.date}T00:00:00`)) / 86400000)) : 99;
+    if (mia && dias <= KUDOS_MAX_DAYS_AGO) {
+      let series = 0;
+      Object.entries(profile?.logs || {}).forEach(([k, arr]) => {
+        if (k.endsWith("_pr_override") || !Array.isArray(arr)) return;
+        arr.forEach((h) => { if (h?.date === mia.date && !h.deload) series++; });
+      });
+      filas.push({ uid: uid || "yo", esYo: true, nombre: profileName || "Vos", daysAgo: dias, dayLabel: ROUTINE[mia.dayKey]?.label || null, series, inicio: mia.startedAt || null, hora: horaDelTicket(mia.startedAt) || null });
+    }
+    return filas;
+  }, [kudosCandidates, basics, profile, profileName, uid]);
   // "Buscar" dejó de ser una solapa y pasó a ser una acción que se abre desde
   // Amigos (ver SECTIONS).
   const [showBuscar, setShowBuscar] = useState(false);
@@ -20768,12 +21852,7 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
               {friendAccepted.length === 0 && <button onClick={irABuscar} className="boton-tonal mt-3 mx-auto" style={{ "--c": SOCIAL_COLOR }}><UserPlus size={15} /> Buscar amigos</button>}
             </div>
           ) : (
-            <div className="space-y-2">
-              {kudosCandidates.map((c, i) => (
-                <ActividadRow key={c.uid} c={c} basic={basics[c.uid]} sent={!!kudosSentMap[c.uid]} sending={kudosSendingUid === c.uid}
-                  onSendKudos={handleSendKudos} onViewProfile={(u) => setViewingUid(u)} delay={i * 45} />
-              ))}
-            </div>
+            <PlanillaAsistencia filas={filasAsistencia} enviados={kudosSentMap} enviando={kudosSendingUid} onAplaudir={handleSendKudos} onVer={(u) => setViewingUid(u)} />
           )
         )}
 
@@ -23140,6 +24219,7 @@ Tu alcance es estrictamente entrenamiento físico, nutrición deportiva, salud/r
 
 Aplicá estos marcos cuando sean relevantes (no los recites si no vienen al caso):
 - Sobrecarga progresiva: motor del progreso a largo plazo — no sólo "subir el peso", también más reps/series, mejor técnica o más frecuencia.
+- Para la próxima sesión, una meta o un plan, usá doble progresión, como un entrenador personal: con el mismo peso, una rep más por vez hasta el tope del rango de reps de ese ejercicio; recién ahí sube el peso UN salto y las reps vuelven al piso del rango. El salto de cada ejercicio está en settings.saltosDePeso (por máquina: 7 kg, 15 lb...; si no está, 2,5 kg o 5 lb): no propongas cargas que no se puedan armar con ese salto.
 - Volumen semanal por grupo muscular = principal driver de hipertrofia dentro de rangos razonables; %1RM y RIR/RPE son las palancas de la fuerza máxima.
 - Hipertrofia: rango amplio de reps (aprox. 5-30) si las series van cerca del fallo — 6-12 es un punto dulce práctico, no "el" rango mágico.
 - Frecuencia 2+/semana por grupo muscular suele igualar o superar 1 vez/semana con el mismo volumen total.
@@ -23370,6 +24450,29 @@ const ATAJOS_IA = [
   { icon: <Calendar size={16} />, label: "Ciclo y descarga", prompt: "¿Cómo vengo en el ciclo actual? ¿Cuándo me toca la descarga?", autoSend: true },
   { icon: <Save size={16} />, label: "Anotar una marca", askExercise: true },
 ];
+
+// LA RECETA DEL ENTRENADOR: el papel de lo que propone la IA (en el chat y en
+// la guía), arrancado del talonario: "Rx", para quién y cuándo, lo que receta
+// y la firma. Es papel: adentro se ve como en el modo claro (la clase
+// light-mode le cambia los tokens sólo a ella). Antes era una placa más, con
+// el ícono en un cuadrado teñido.
+function RecetaPapel({ para = "", fecha = "", titulo = null, children }) {
+  return (
+    <div className="receta light-mode">
+      <div className="receta-cabeza">
+        <span className="receta-rx" aria-hidden="true">R<i>x</i></span>
+        <div className="min-w-0 flex-1">
+          <p className="receta-para">{para ? `Para ${para}` : "Para vos"}</p>
+          {fecha && <p className="receta-fecha">{fecha}</p>}
+        </div>
+        <span className="receta-sello">Modus Fit</span>
+      </div>
+      {titulo && <p className="receta-titulo">{titulo}</p>}
+      {children}
+      <div className="receta-firma" aria-hidden="true"><span className="a-mano">Entrenador IA</span><i /><small>Firma</small></div>
+    </div>
+  );
+}
 
 function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMessages, conversations = [], activeConversationId = null, onNewConversation, onSwitchConversation, onDeleteConversation, onRenameConversation, settings, cycleStart, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement, onDeleteRoutine, onNavigate, onStartSession, onEndSession }) {
   // Contexto para reconstruir un plan EN VIVO a partir de la "action" cruda
@@ -24039,6 +25142,7 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
   // Una conversación que todavía no empezó: sólo el saludo de la IA.
   const esInicio = messages.length <= 1 && (!messages[0] || messages[0].text === AI_CHAT_WELCOME.text) && !isSending;
   const primerNombre = String(profileName || "").trim().split(/\s+/)[0] || "";
+  const fechaReceta = capitalizar(new Date().toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" }));
   return (
     // BUG FIX (encontrado verificando las acciones a fondo): con una
     // conversación corta (pocos mensajes), el botón de confirmar/descartar
@@ -24243,36 +25347,34 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
               </div>
             )}
             {m.plan && m.planStatus === "pending" && livePlan && typeof livePlan.confirm === "function" && (
-              // La propuesta de la IA: una placa como las de la app, sin borde
-              // ni vidrio, con un toque del color de la pestaña en el ícono y
-              // en el botón de confirmar.
-              <div className="plan-ia bounce-in">
-                <div className="plan-ia-cabeza">
-                  <span className="plan-ia-icono" aria-hidden="true"><Sparkles size={15} /></span>
-                  <p>{m.plan.title}</p>
-                </div>
-                {m.plan.kind === "routine" ? (
-                  <div className="mb-3"><RoutinePreview routineDef={m.plan.routineDef} /></div>
-                ) : m.plan.kind === "set" && m.plan.setPreview ? (
-                  <div className="mb-3"><SetLogPreview {...m.plan.setPreview} /></div>
-                ) : m.plan.kind === "diff" && m.plan.diffPreview ? (
-                  <div className="mb-3"><RoutineDiffPreview {...m.plan.diffPreview} /></div>
-                ) : m.plan.kind === "record" && m.plan.recordPreview ? (
-                  <div className="mb-3"><RecordChangePreview {...m.plan.recordPreview} /></div>
-                ) : m.plan.kind === "progression" && m.plan.progressionPreview ? (
-                  <div className="mb-3"><ProgressionPlanPreview {...m.plan.progressionPreview} /></div>
-                ) : m.plan.kind === "weeklyPlan" && m.plan.weeklyPlanPreview ? (
-                  <div className="mb-3"><WeeklyPlanPreview {...m.plan.weeklyPlanPreview} /></div>
-                ) : m.plan.kind === "warmup" && m.plan.warmupPreview ? (
-                  <div className="mb-3"><WarmupPlanPreview {...m.plan.warmupPreview} /></div>
-                ) : m.plan.kind === "settings" && m.plan.settingsChanges?.length ? (
-                  <div className="mb-3"><SettingsChangePreview changes={m.plan.settingsChanges} /></div>
-                ) : (
-                  <ul className="plan-ia-items mb-3">
-                    {m.plan.items.map((item, j) => <li key={j}>{item}</li>)}
-                  </ul>
-                )}
-                <div className="flex gap-2">
+              // LA RECETA: lo que propone la IA, en el papel del talonario
+              // (RecetaPapel), con las mismas piezas de siempre adentro. Los
+              // botones, debajo y fuera del papel.
+              <div className="receta-bloque bounce-in">
+                <RecetaPapel para={primerNombre} fecha={fechaReceta} titulo={m.plan.title}>
+                  {m.plan.kind === "routine" ? (
+                    <div className="mb-3"><RoutinePreview routineDef={m.plan.routineDef} /></div>
+                  ) : m.plan.kind === "set" && m.plan.setPreview ? (
+                    <div className="mb-3"><SetLogPreview {...m.plan.setPreview} /></div>
+                  ) : m.plan.kind === "diff" && m.plan.diffPreview ? (
+                    <div className="mb-3"><RoutineDiffPreview {...m.plan.diffPreview} /></div>
+                  ) : m.plan.kind === "record" && m.plan.recordPreview ? (
+                    <div className="mb-3"><RecordChangePreview {...m.plan.recordPreview} /></div>
+                  ) : m.plan.kind === "progression" && m.plan.progressionPreview ? (
+                    <div className="mb-3"><ProgressionPlanPreview {...m.plan.progressionPreview} /></div>
+                  ) : m.plan.kind === "weeklyPlan" && m.plan.weeklyPlanPreview ? (
+                    <div className="mb-3"><WeeklyPlanPreview {...m.plan.weeklyPlanPreview} /></div>
+                  ) : m.plan.kind === "warmup" && m.plan.warmupPreview ? (
+                    <div className="mb-3"><WarmupPlanPreview {...m.plan.warmupPreview} /></div>
+                  ) : m.plan.kind === "settings" && m.plan.settingsChanges?.length ? (
+                    <div className="mb-3"><SettingsChangePreview changes={m.plan.settingsChanges} /></div>
+                  ) : (
+                    <ul className="plan-ia-items mb-3">
+                      {m.plan.items.map((item, j) => <li key={j}>{item}</li>)}
+                    </ul>
+                  )}
+                </RecetaPapel>
+                <div className="receta-botones">
                   <button onClick={() => handleConfirmPlan(i)} className="boton-pildora plan-ia-boton flex-1">{m.plan.confirmLabel}</button>
                   <button onClick={() => handleDiscardPlan(i)} className="boton-tonal plan-ia-boton">Descartar</button>
                 </div>
@@ -26622,7 +27724,7 @@ function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
       { key: "showRpe", icon: <Activity size={17} />, label: "Esfuerzo (RPE o RIR)", desc: "Del 1 al 10, qué tan dura fue la serie." },
       { key: "showPersonalNote", icon: <StickyNote size={17} />, label: "Notas por serie", desc: "Tu propia nota en cada serie." },
       { key: "show1RMPercent", icon: <Percent size={17} />, label: "Porcentaje de tu 1RM", desc: "Escribís un porcentaje y te carga el peso." },
-      { key: "showProgressionSuggestion", icon: <Target size={17} />, label: "Progresión sugerida", desc: "Cuánto probar hoy, a partir de la vez pasada." },
+      { key: "showProgressionSuggestion", icon: <Target size={17} />, label: "Progresión de entrenador", desc: "Una rep más que la vez pasada y, al llegar al tope del rango, el salto de peso de esa máquina." },
     ] },
     { titulo: "En cada ejercicio", opciones: [
       { key: "showExerciseNote", icon: <Info size={17} />, label: "Consejo de técnica", desc: "Un tip debajo del nombre del ejercicio." },
@@ -26672,8 +27774,9 @@ function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
                   <p className="foco-titulo"><span className="foco-rango">8-10 reps</span></p>
                   <span className="foco-ref">récord <b>8 × {k(80)}</b></span>
                 </div>
+                {escrita && on("showProgressionSuggestion") && <p className="foco-pasada bounce-in">la vez pasada <b>8 × {k(77.5)} {u}</b>: hoy, una rep más</p>}
                 <div className="foco-visor">
-                  <div className="foco-campo"><span className={`foco-input flex items-center justify-center ${escrita ? "" : "vacio"}`}>{escrita ? "8" : "–"}</span><span className="foco-campo-rotulo">reps</span></div>
+                  <div className="foco-campo"><span className={`foco-input flex items-center justify-center ${escrita ? "" : "vacio"}`}>{escrita ? (on("showProgressionSuggestion") ? "9" : "8") : "–"}</span><span className="foco-campo-rotulo">reps</span></div>
                   <span className="foco-por">×</span>
                   <div className="foco-campo"><span className={`foco-input flex items-center justify-center ${escrita ? "" : "vacio"}`}>{escrita ? k(77.5) : "–"}</span><span className="foco-campo-rotulo">{u}</span></div>
                   <span className="foco-guardar"><Check size={24} strokeWidth={2.6} /></span>
@@ -26688,7 +27791,7 @@ function FieldSettingsIntroModal({ settings, onUpdateSettings, onClose }) {
                 )}
                 {on("showCoaching") && <p className="serie-aviso record bounce-in">Récord nuevo.</p>}
                 {s.autoStartRestTimer !== false && <p className="ficha-nota bounce-in"><Timer size={13} /> Al guardar, arranca el descanso.</p>}
-                {s.showProgressionSuggestion === true && (
+                {on("showProgressionSuggestion") && !escrita && (
                   <div className="serie-sugerencia bounce-in"><Target size={14} /><span className="flex-1 text-left">Probá hoy: <b>9 × {k(77.5)} {u}</b></span><span className="text-[12px] text-slate-400">Usar</span></div>
                 )}
                 {on("show1RMPercent") && <p className="ficha-nota bounce-in"><Percent size={13} /> % de tu 1RM: ahora ~96 %</p>}
@@ -27894,7 +28997,8 @@ export default function App() {
     // app te lleva a donde vas a entrenar, que es lo único que vas a hacer
     // los próximos cuarenta minutos.
     if (tab !== "rutina" && tab !== "descarga") setTab(deload ? "descarga" : "rutina");
-    setSessionStarted(true); // overlay "¡A entrenar!"
+    setSessionStarted(true); // el molinete de entrada
+    if (getProfileSettings(profile).alertType !== "vibration") sonarMolinete();
     haptic([0, 40, 60, 40]);
   };
   // Arma el resumen del entrenamiento de hoy: volumen (con factor de
@@ -28110,7 +29214,7 @@ export default function App() {
                 que quedó adentro de RoutineView ahora sirve para volver a
                 fijarla si la cerraste. */}
             {tab === "rutina" && showPinnedDeload && <DeloadView logs={logs} setLogs={setLogs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} activeSession={profile?.activeSession?.deload ? profile.activeSession : null} onStartSession={handleStartSession} weekSchedule={weekSchedule} onClose={() => setDeloadDismissed(true)} cycleStart={cycleStart} />}
-            {tab === "rutina" && !showPinnedDeload && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToRoutines={() => setTab("rutinas")} onGoToSchedule={() => goToSection("rutinas", "week-schedule")} onGoToFieldSettings={() => goToSection("perfil", "field-settings-section")} onGoToDescarga={() => (isDeloadWeek ? setDeloadDismissed(false) : setTab("descarga"))} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} sex={profile?.sex} age={profile?.age} activeRoutineDef={activeRoutineDef} onApplyOwnProgression={handleApplyOwnProgression} onSetPlanPaused={handleSetPlanPaused} onRemovePlan={handleRemovePlan} goToDaySignal={openSectionSignal.id === "go-to-day" ? openSectionSignal : { id: null, n: 0 }} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} />}
+            {tab === "rutina" && !showPinnedDeload && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} trainingSessions={profile?.trainingSessions || EMPTY_SESIONES} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToRoutines={() => setTab("rutinas")} onGoToSchedule={() => goToSection("rutinas", "week-schedule")} onGoToFieldSettings={() => goToSection("perfil", "field-settings-section")} onGoToDescarga={() => (isDeloadWeek ? setDeloadDismissed(false) : setTab("descarga"))} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} sex={profile?.sex} age={profile?.age} activeRoutineDef={activeRoutineDef} onApplyOwnProgression={handleApplyOwnProgression} onSetPlanPaused={handleSetPlanPaused} onRemovePlan={handleRemovePlan} goToDaySignal={openSectionSignal.id === "go-to-day" ? openSectionSignal : { id: null, n: 0 }} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} />}
             {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} onGoToRoutines={() => goToSection("rutinas", "routine-editor")} weekSchedule={weekSchedule} sex={profile?.sex} age={profile?.age} onGoToDeload={() => { if (isDeloadWeek) { setDeloadDismissed(false); setTab("rutina"); } else { setTab("descarga"); } }} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} />}
             {tab === "descarga" && <DeloadView logs={logs} setLogs={setLogs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} activeSession={profile?.activeSession?.deload ? profile.activeSession : null} onStartSession={handleStartSession} weekSchedule={weekSchedule} onClose={() => { setDeloadDismissed(true); setTab("rutina"); }} cycleStart={cycleStart} />}
             {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} setLogs={setLogs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} conversations={aiConversations} activeConversationId={activeAiConversationId} onNewConversation={handleNewAiConversation} onSwitchConversation={handleSwitchAiConversation} onDeleteConversation={handleDeleteAiConversation} onRenameConversation={handleRenameAiConversation} settings={getProfileSettings(profile)} cycleStart={cycleStart} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} onDeleteRoutine={handleDeleteRoutine} onNavigate={setTab} onStartSession={handleStartSession} onEndSession={handleEndSession} />}

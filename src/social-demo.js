@@ -28,14 +28,15 @@ const RUTINA = {
   },
 };
 
-// Cada amigo: su perfil básico y los días que entrenó (hace cuántos días y
-// qué día de la rutina), del más reciente al más viejo.
+// Cada amigo: su perfil básico, la hora a la que suele llegar (para la
+// planilla de asistencia) y los días que entrenó (hace cuántos días y qué día
+// de la rutina), del más reciente al más viejo.
 const AMIGOS = [
-  { uid: "demo-martina", name: "Martina Paz", username: "martupaz", rango: ["Diamante", "I", "#2E7BD6", 12], dias: [[0, "push"], [1, "legs"], [3, "pull"], [4, "push"], [6, "legs"], [7, "pull"], [8, "push"], [10, "legs"], [11, "pull"]] },
-  { uid: "demo-joaquin", name: "Joaquín Ríos", username: "joaco", rango: ["Oro", "III", "#FFD23F", 8], dias: [[1, "pull"], [2, "push"], [4, "legs"], [5, "pull"], [8, "push"], [9, "legs"]] },
-  { uid: "demo-valen", name: "Valen Sosa", username: "valensosa", rango: ["Esmeralda", "II", "#2FB866", 10], dias: [[0, "legs"], [2, "pull"], [7, "push"], [9, "legs"]] },
-  { uid: "demo-tomas", name: "Tomás Ferreyra", username: "tomif", rango: ["Plata", "III", "#DCE3E8", 5], dias: [[1, "push"], [3, "legs"], [5, "pull"], [12, "push"]] },
-  { uid: "demo-cami", name: "Cami Ortiz", username: "cami.o", rango: ["Oro", "I", "#C99A2E", 6], dias: [[3, "pull"], [10, "push"], [13, "legs"]] },
+  { uid: "demo-martina", name: "Martina Paz", username: "martupaz", rango: ["Diamante", "I", "#2E7BD6", 12], hora: [7, 5], dias: [[0, "push"], [1, "legs"], [3, "pull"], [4, "push"], [6, "legs"], [7, "pull"], [8, "push"], [10, "legs"], [11, "pull"]] },
+  { uid: "demo-joaquin", name: "Joaquín Ríos", username: "joaco", rango: ["Oro", "III", "#FFD23F", 8], hora: [19, 40], dias: [[1, "pull"], [2, "push"], [4, "legs"], [5, "pull"], [8, "push"], [9, "legs"]] },
+  { uid: "demo-valen", name: "Valen Sosa", username: "valensosa", rango: ["Esmeralda", "II", "#2FB866", 10], hora: [18, 10], dias: [[0, "legs"], [2, "pull"], [7, "push"], [9, "legs"]] },
+  { uid: "demo-tomas", name: "Tomás Ferreyra", username: "tomif", rango: ["Plata", "III", "#DCE3E8", 5], hora: [12, 25], dias: [[1, "push"], [3, "legs"], [5, "pull"], [12, "push"]] },
+  { uid: "demo-cami", name: "Cami Ortiz", username: "cami.o", rango: ["Oro", "I", "#C99A2E", 6], hora: [21, 0], dias: [[3, "pull"], [10, "push"], [13, "legs"]] },
 ];
 
 // Cuánto levanta cada uno en cada ejercicio: una base por ejercicio, escalada
@@ -57,7 +58,10 @@ function perfilCompleto(amigo) {
         (logs[clave] = logs[clave] || []).push({ date, reps, kg });
       });
     });
-    return { date, dayKey, routineId: "ppl" };
+    const inicio = new Date(`${date}T12:00:00`);
+    inicio.setHours(amigo.hora[0], amigo.hora[1] + ((atras * 7) % 20), 0, 0);
+    const fin = new Date(inicio.getTime() + (52 + (atras % 4) * 6) * 60000);
+    return { date, dayKey, routineId: "ppl", startedAt: inicio.toISOString(), endedAt: fin.toISOString() };
   });
   return { activeRoutineSnapshot: RUTINA, logs, trainingSessions, measurements: {}, cycleStart: null, sex: null, age: null, settings: { bodyWeightKg: 0 } };
 }
