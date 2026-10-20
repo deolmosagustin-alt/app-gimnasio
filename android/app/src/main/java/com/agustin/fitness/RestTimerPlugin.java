@@ -41,6 +41,17 @@ public class RestTimerPlugin extends Plugin {
         Integer secondsParam = call.getInt("seconds");
         long seconds = (secondsParam != null) ? secondsParam.longValue() : 60L;
         String exerciseName = call.getString("exerciseName", "");
+        // v10: lo que se ve lo decide la app (sin emojis: "Descanso" y
+        // "Después: Press Banca, serie 3 de 4"), con el color del día, y la
+        // barra es de las series del ejercicio: un tramo por serie, llenos
+        // los de las series hechas. Un build viejo ignora estos datos.
+        String tituloParam = call.getString("titulo", null);
+        String cuerpoParam = call.getString("cuerpo", null);
+        int accent = colorDe(call.getString("color", null));
+        Integer hechasParam = call.getInt("hechas");
+        Integer totalParam = call.getInt("total");
+        int total = (totalParam != null) ? Math.max(0, Math.min(totalParam, 12)) : 0;
+        int hechas = (hechasParam != null) ? Math.max(0, Math.min(hechasParam, total)) : 0;
 
         Context context = getContext();
         createChannel(context);
@@ -58,10 +69,12 @@ public class RestTimerPlugin extends Plugin {
         String chipText = minutes > 0
                 ? String.format(Locale.getDefault(), "%d:%02d", minutes, secsRem)
                 : (secsRem + "s");
-        String title = "⏱️ Descansando…";
-        String body = (exerciseName != null && !exerciseName.isEmpty())
-                ? "Volvés a " + exerciseName
-                : "Guardá fuerzas para la próxima 💪";
+        String title = (tituloParam != null && !tituloParam.isEmpty()) ? tituloParam : "Descanso";
+        String body = (cuerpoParam != null && !cuerpoParam.isEmpty())
+                ? cuerpoParam
+                : (exerciseName != null && !exerciseName.isEmpty())
+                        ? "Después: " + exerciseName
+                        : "Después: la próxima serie";
 
         Notification notification = null;
 
@@ -77,14 +90,15 @@ public class RestTimerPlugin extends Plugin {
             try {
                 Icon smallIcon = Icon.createWithResource(context, getIconResId(context));
 
-                Notification.ProgressStyle.Segment seg =
-                        new Notification.ProgressStyle.Segment(100).setColor(ACCENT);
-                List<Notification.ProgressStyle.Segment> segs = new ArrayList<>();
-                segs.add(seg);
-                Notification.ProgressStyle progressStyle = new Notification.ProgressStyle()
-                        .setProgressSegments(segs)
-                        .setProgress(100)
-                        .setProgressTrackerIcon(smallIcon);
+                Notification.ProgressStyle progressStyle = null;
+                if (total > 0) {
+                    List<Notification.ProgressStyle.Segment> segs = new ArrayList<>();
+                    for (int i = 0; i < total; i++) segs.add(new Notification.ProgressStyle.Segment(1).setColor(accent));
+                    progressStyle = new Notification.ProgressStyle()
+                            .setProgressSegments(segs)
+                            .setProgress(hechas)
+                            .setProgressTrackerIcon(smallIcon);
+                }
 
                 Notification.Builder nb = new Notification.Builder(context, CHANNEL_ID)
                         .setSmallIcon(smallIcon)
@@ -94,15 +108,15 @@ public class RestTimerPlugin extends Plugin {
                         .setOngoing(true)
                         .setOnlyAlertOnce(true)
                         .setCategory(Notification.CATEGORY_STOPWATCH)
-                        .setColor(ACCENT)
+                        .setColor(accent)
                         .setContentIntent(pendingIntent)
                         .setWhen(whenMillis)
                         .setShowWhen(false)
                         .setUsesChronometer(true)
                         .setChronometerCountDown(true)
                         .setVisibility(Notification.VISIBILITY_PUBLIC)
-                        .setStyle(progressStyle)
                         .setShortCriticalText(chipText);
+                if (progressStyle != null) nb.setStyle(progressStyle);
 
                 // setRequestPromotedOngoing NO está expuesto en el android.jar
                 // del SDK (Google lo tiene detrás de un feature flag → "Cannot
@@ -151,23 +165,27 @@ public class RestTimerPlugin extends Plugin {
                     .setOnlyAlertOnce(true)
                     .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                     .setCategory(NotificationCompat.CATEGORY_STOPWATCH)
-                    .setColor(ACCENT)
+                    .setColor(accent)
                     .setContentIntent(pendingIntent)
                     .setWhen(whenMillis)
                     .setShowWhen(false)
                     .setUsesChronometer(true)
                     .setChronometerCountDown(true)
                     .setVisibility(NotificationCompat.VISIBILITY_PUBLIC);
+            // Las series como barra común: hechas de total.
+            if (total > 0) builder.setProgress(total, hechas, false);
             if (Build.VERSION.SDK_INT >= 36) {
                 try {
                     builder.setRequestPromotedOngoing(true);
                     builder.setShortCriticalText(chipText);
-                    List<NotificationCompat.ProgressStyle.Segment> segments = new ArrayList<>();
-                    segments.add(new NotificationCompat.ProgressStyle.Segment(100).setColor(ACCENT));
-                    builder.setStyle(new NotificationCompat.ProgressStyle()
-                            .setProgressSegments(segments)
-                            .setProgress(100)
-                            .setProgressTrackerIcon(IconCompat.createWithResource(context, getIconResId(context))));
+                    if (total > 0) {
+                        List<NotificationCompat.ProgressStyle.Segment> segments = new ArrayList<>();
+                        for (int i = 0; i < total; i++) segments.add(new NotificationCompat.ProgressStyle.Segment(1).setColor(accent));
+                        builder.setStyle(new NotificationCompat.ProgressStyle()
+                                .setProgressSegments(segments)
+                                .setProgress(hechas)
+                                .setProgressTrackerIcon(IconCompat.createWithResource(context, getIconResId(context))));
+                    }
                 } catch (Throwable t) {
                     Log.w(TAG, "compat Live Update no disponible: " + t.getMessage());
                 }
@@ -246,6 +264,15 @@ public class RestTimerPlugin extends Plugin {
             done.enableVibration(true);
             done.setVibrationPattern(new long[]{0, 500, 250, 500, 250, 800});
             manager.createNotificationChannel(done);
+        }
+    }
+
+    private int colorDe(String hex) {
+        if (hex == null || hex.isEmpty()) return ACCENT;
+        try {
+            return Color.parseColor(hex);
+        } catch (IllegalArgumentException e) {
+            return ACCENT;
         }
     }
 

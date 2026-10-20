@@ -266,6 +266,19 @@ export function mejorEjercicio(texto) {
   return mejor;
 }
 
+// Ejercicios parecidos para cambiar uno por otro en el armado: primero los
+// del mismo grupo muscular, después los de su región; los básicos antes.
+export function alternativasDe(grupo, excluir = [], n = 6) {
+  if (!grupo) return [];
+  const region = REGION_DE_GRUPO[grupo];
+  const fuera = new Set(excluir);
+  const puntaje = (e) => (e.group === grupo ? 2 : 0) + (BASICOS.has(e.id) ? 1 : 0);
+  return EXERCISE_LIBRARY
+    .filter((e) => !fuera.has(e.id) && (e.group === grupo || (region && region.grupos.includes(e.group))))
+    .sort((a, b) => puntaje(b) - puntaje(a))
+    .slice(0, n);
+}
+
 // ¿El nombre de un ejercicio corresponde a lo que se pidió? Para encontrar
 // uno entre los de un día ("sacá la sentadilla", "cambiame el jalon").
 export function nombreCoincide(nombre, buscado) {
