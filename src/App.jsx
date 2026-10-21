@@ -4140,8 +4140,10 @@ button.carrera-carril:active { background: var(--velo); }
 .perforada { display: grid; gap: 6px; }
 .perforada-fila { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)) 26px; gap: 6px; align-items: center; }
 .perforada-cabeza span { text-align: center; font-size: 11px; font-weight: 650; color: var(--text-faint); }
+/* Cada día, un cuadrado con las puntas redondeadas (pedido: "a lo de antes,
+   que eran más como cuadrados"; fueron círculos desde la tarjeta perforada). */
 .hueco-dia {
-  aspect-ratio: 1; width: 100%; max-width: 44px; justify-self: center; border-radius: 999px;
+  aspect-ratio: 1; width: 100%; max-width: 44px; justify-self: center; border-radius: 11px;
   display: flex; align-items: center; justify-content: center;
   font-size: 12.5px; font-weight: 600; color: var(--text-faint); font-variant-numeric: tabular-nums;
   background: color-mix(in oklab, var(--text-strong) 5%, transparent);
@@ -5699,6 +5701,17 @@ button.carrera-carril:active { background: var(--velo); }
 /* TU CASILLERO, arriba de Social: la puerta del perfil de un atleta, en chico,
    con las calcomanías de todos los días. */
 .casillero-chico { padding: 10px 44px 14px 14px; }
+/* TU PLAN, EN SU CASILLERO (arriba de Rutina): la misma chapa, en chico. */
+.plan-casillero { padding: 10px 44px 10px 14px; }
+.plan-casillero .casillero-arriba { min-height: 22px; margin-bottom: 6px; }
+.plan-casillero .casillero-rejilla { max-width: 96px; }
+.plan-casillero-cuerpo { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; }
+.plan-casillero .casillero-nombre { display: block; font-size: 1.05rem; }
+.plan-casillero-estado { flex: 1 1 140px; min-width: 0; font-size: 12.5px; line-height: 1.35; color: var(--text-muted); text-wrap: pretty; }
+.plan-casillero-calcos { margin-top: 10px; }
+.plan-casillero-calcos .calco { min-height: 36px; }
+button.calco:disabled { opacity: .5; }
+.calco-oscuro { gap: 6px; color: #ecebe4; background: #1d1e21; border-radius: 6px; }
 .casillero-chico .casillero-arriba { min-height: 36px; margin-bottom: 8px; }
 .casillero-chico .casillero-rejilla { max-width: 104px; }
 .casillero-chico .casillero-cuerpo { width: 100%; gap: 14px; padding: 6px 4px 4px 2px; text-align: left; border-radius: 10px; transition: background-color .2s ease; }
@@ -10229,7 +10242,7 @@ function capitulosGuia() {
         },
         {
           titulo: "Seguí un plan",
-          texto: "En Tu plan, abajo de los ejercicios, cargás cuánto levantar cada semana del ciclo, o le pedís a la IA que lo arme. Cada serie viene escrita con la meta de su semana y la tarjeta muestra el plan en escalones.",
+          texto: "En Tu plan, arriba de todo en Rutina, cargás cuánto levantar cada semana del ciclo, o le pedís a la IA que lo arme. Cada serie viene escrita con la meta de su semana y la tarjeta muestra el plan en escalones.",
           dibujo: (
             <div className="guia-ancho plan-en-tarjeta" style={{ "--tono": verde }} role="img" aria-label="Un plan de siete semanas, de 60 a 75 kilos, en escalones">
               <div className="plan-mini chico">
@@ -13175,6 +13188,58 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
 
   return (
     <div className="space-y-4">
+      {/* TU PLAN, EN SU CASILLERO, arriba de todo (pedido: "lo de planificar,
+          que vaya arriba en Rutina y que le aplique el nuevo formato de
+          diseño, estilo casillero"): la chapa cepillada con su rejilla y la
+          plaqueta con la semana del ciclo, la etiqueta "Tu plan" con cómo va,
+          y las calcomanías para planificar, pausarlo o seguirlo, y elegir qué
+          ves en cada serie (las dos cosas deciden CÓMO registrás). Antes era
+          una tarjeta al pie de Rutina y, antes, un panel arriba con el degradé
+          del hero.
+          No es un "modo" (Récord | Planificada) sino una ACCIÓN sobre el plan
+          — pausarlo o reanudarlo — y si no hay ningún plan no se ofrece esa
+          decisión. El dato guardado sigue siendo settings.trainingMode. */}
+      {onUpdateSettings && (() => {
+        const enPausa = settings.trainingMode !== "planned";
+        const nActivos = planResumen?.planificados.length || 0;
+        const estado = !activeRoutineDef
+          ? "Activá una rutina primero, en la pestaña Rutinas."
+          : !hasAnyPlan
+            ? "Sin metas: cada serie te muestra tu récord."
+            : enPausa
+              ? "En pausa: tus metas siguen guardadas y perseguís tu récord."
+              : nActivos > 0
+                ? `${nActivos} ejercicio${nActivos === 1 ? " va" : "s van"} por su meta.`
+                : "Todos tus ejercicios van por récord.";
+        return (
+          <section className="casillero plan-casillero" aria-label="Tu plan">
+            <div className="casillero-arriba">
+              <span className="casillero-rejilla" aria-hidden="true"><i /><i /><i /></span>
+              {weekInfo && <span className="casillero-numero" role="img" aria-label={`Semana ${weekInfo.weekInCycle} de ${weekInfo.cycleWeeks}`}>{weekInfo.weekInCycle}/{weekInfo.cycleWeeks}</span>}
+            </div>
+            <div className="plan-casillero-cuerpo">
+              <span className="casillero-etiqueta"><span className="casillero-nombre">Tu plan</span></span>
+              <p className="plan-casillero-estado">{estado}</p>
+            </div>
+            <div className="casillero-calcos plan-casillero-calcos">
+              {onApplyOwnProgression && (
+                <button onClick={() => setShowSelfProgression(true)} disabled={!activeRoutineDef} className={`calco calco-papel ${!hasAnyPlan && settings.trainingMode === "planned" ? "invite-pulse" : ""}`}>
+                  <Sliders size={14} /> Planificar
+                </button>
+              )}
+              {hasAnyPlan && (
+                <button onClick={() => onUpdateSettings({ trainingMode: enPausa ? "planned" : "record" })} className="calco calco-oscuro">
+                  {enPausa ? <><Play size={12} className="fill-current" /> Reanudar</> : <><Pause size={12} className="fill-current" /> Pausar</>}
+                </button>
+              )}
+              {onGoToFieldSettings && (
+                <button onClick={onGoToFieldSettings} className="calco calco-papel"><Eye size={14} /> Qué ves al registrar</button>
+              )}
+            </div>
+            <span className="casillero-manija" aria-hidden="true" />
+          </section>
+        );
+      })()}
       {isRestToday && (
         <button onClick={() => (onGoToSchedule || onGoToRoutines)?.()} className="aviso-descanso" aria-label="Hoy es día de descanso. Tocá para editar tu semana">
           <span className="min-w-0 flex-1">
@@ -13361,75 +13426,6 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
         })()}
         </div>
       </section>
-
-      {/* TU PLAN — cómo registrás: contra qué número apuntás (tu récord o
-          metas planificadas) y qué campos ves en cada serie.
-          Vivía ARRIBA de los días, con el mismo degradé y las manchas del
-          hero: lo primero que veías al abrir la app era configuración, y el
-          entrenamiento de hoy quedaba en la segunda pantalla. Ahora va al
-          pie, en una tarjeta tranquila: se encuentra igual de fácil (sigue
-          en Rutina, que es lo que se pidió) y no se interpone entre vos y
-          la primera serie.
-          REDISEÑO previo que se mantiene: no es un "modo" (Récord |
-          Planificada) sino una ACCIÓN sobre el plan — pausarlo o
-          reanudarlo — y si no hay ningún plan no se ofrece esa decisión.
-          El dato guardado sigue siendo settings.trainingMode. */}
-      {onUpdateSettings && (
-        <section className="tarjeta-plan" aria-label="Tu plan">
-          <div className="flex items-center gap-2 mb-3">
-            <Target size={14} className="text-teal-400 shrink-0" />
-            <p className="text-[11px] font-black uppercase text-teal-400">Tu plan</p>
-          </div>
-          {hasAnyPlan && (() => {
-            const enPausa = settings.trainingMode !== "planned";
-            const nActivos = planResumen?.planificados.length || 0;
-            return (
-              <div className="flex items-center gap-3 rounded-xl px-3 py-2.5" style={{ backgroundColor: enPausa ? "var(--panel-sunken)" : "rgba(20,184,166,0.12)", border: `1px solid ${enPausa ? "var(--hairline)" : "rgba(20,184,166,0.32)"}` }}>
-                {enPausa ? <Trophy size={16} className="shrink-0 text-slate-400" /> : <ClipboardCheck size={16} className="shrink-0 text-teal-300" />}
-                <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-bold leading-tight text-white">{enPausa ? "Plan en pausa" : "Plan activo"}</p>
-                  <p className="text-[11px] leading-snug mt-0.5 text-slate-400">
-                    {enPausa
-                      ? "Tus metas siguen guardadas, pero ahora perseguís tu récord."
-                      : nActivos > 0
-                        ? `${nActivos} ejercicio${nActivos === 1 ? "" : "s"} persigue${nActivos === 1 ? "" : "n"} sus metas`
-                        : "Todos tus ejercicios están en por récord"}
-                  </p>
-                </div>
-                <button onClick={() => onUpdateSettings({ trainingMode: enPausa ? "planned" : "record" })} className="shrink-0 h-9 px-3 rounded-lg text-[11.5px] font-black transition active:scale-95"
-                  style={enPausa
-                    ? { backgroundColor: "rgba(20,184,166,0.2)", color: "var(--accent-ink)", border: "1px solid rgba(20,184,166,0.45)" }
-                    : { backgroundColor: "var(--surface-2)", color: "var(--text-strong)", border: "1px solid var(--hairline)" }}>
-                  {enPausa ? "Reanudar" : "Pausar"}
-                </button>
-              </div>
-            );
-          })()}
-          {onApplyOwnProgression && (
-            <>
-              {/* Sin metas, cada serie muestra tu récord de siempre (a
-                  propósito). Decirlo evita que el silencio se sienta como
-                  que algo no anda. */}
-              {!hasAnyPlan && activeRoutineDef && (
-                <p className="text-[12px] text-slate-400 leading-snug">
-                  Todavía no tenés metas: cada serie te muestra tu récord. Si querés, armá cuánto levantar en cada semana del ciclo.
-                </p>
-              )}
-              <button onClick={() => setShowSelfProgression(true)} disabled={!activeRoutineDef} className={`boton-tonal w-full mt-3 disabled:opacity-40 ${!hasAnyPlan && settings.trainingMode === "planned" ? "invite-pulse" : ""}`} style={{ "--c": "#14B8A6" }}>
-                <Sliders size={14} /> {hasAnyPlan ? "Planificar mi progresión" : "Planificar mi primera meta"}
-              </button>
-            </>
-          )}
-          {!activeRoutineDef && <p className="text-[11px] text-slate-500 mt-2">Activá una rutina primero, en la pestaña Rutinas.</p>}
-          {/* Las dos cosas de esta tarjeta deciden CÓMO registrás (contra qué
-              número apuntás y qué campos ves), así que van juntas. */}
-          {onGoToFieldSettings && (
-            <button onClick={onGoToFieldSettings} className="w-full flex items-center gap-2 mt-3 pt-3 border-t border-slate-800/80 text-[12px] font-semibold text-slate-300 hover:text-white transition">
-              <Eye size={14} className="text-slate-500" /> <span className="flex-1 text-left">Personalizar qué ves al registrar</span> <ChevronRight size={14} className="text-slate-500" />
-            </button>
-          )}
-        </section>
-      )}
 
       {/* "Finalizar sesión" ya no vive acá abajo: es la barra fija de abajo
           (ver ActiveSessionBar, al nivel de App), que además lleva el
