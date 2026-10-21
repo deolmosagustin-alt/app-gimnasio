@@ -5765,7 +5765,7 @@ textarea.import-texto { min-height: 150px; font-size: 14px; line-height: 1.45; r
 .import-pie { font-size: 12.5px; line-height: 1.4; text-align: center; color: var(--text-faint); text-wrap: pretty; }
 @media (prefers-reduced-motion: reduce) { .import-fuentes.leyendo .import-hoja::after { animation: none; top: 35%; } }
 /* ══ DUODÉCIMA TANDA: las pesas rusas, los cajones del ciclo en la pizarra,
-   el corcho, las carpetas y la pizarra del Chatbot ═════════════════════════ */
+   tus rutinas, el corcho y la pizarra del Chatbot ═════════════════════════ */
 /* LAS PESAS RUSAS EN SU ESTANTE (Rutinas): una pesa por día de entrenamiento,
    con la manija de hierro y la bocha de goma mate de los discos de la barra,
    del color de lo que toca; el lugar vacío, punteado, y la de hoy,
@@ -5911,23 +5911,20 @@ button.estante-lugar:active .pesa-rusa { scale: .92; }
 /* Activa: un sello en la hoja. */
 .hoja-clavada .preset-activa { height: auto; padding: 1px 7px; rotate: -7deg; border-radius: 5px; font-size: 12px; font-weight: 800; color: color-mix(in oklab, var(--tono) 70%, #1a2340); background: none; box-shadow: inset 0 0 0 2px currentColor; }
 
-/* TUS RUTINAS, EN CARPETAS: cada una es una carpeta con su solapa, el nombre
-   en la etiqueta (como la del casillero) y sus días como separadores de colores
-   asomando arriba. */
-.preset.carpeta-rutina { padding: 26px 14px 12px; border-radius: 16px; background: none; }
-.preset.carpeta-rutina::before { content: ""; position: absolute; inset: 12px 0 0; border-radius: 4px 16px 16px 16px; background: linear-gradient(#35373c, #2b2d31); box-shadow: inset 0 1px 0 rgba(255,255,255,.07); }
-.preset.carpeta-rutina::after { content: ""; position: absolute; left: 0; top: 0; width: 44%; height: 16px; border-radius: 10px 12px 0 0; background: #35373c; box-shadow: inset 0 1px 0 rgba(255,255,255,.07); }
-.light-mode .preset.carpeta-rutina::before { background: linear-gradient(#e2e4e8, #d6d9de); box-shadow: inset 0 1px 0 #fff; }
-.light-mode .preset.carpeta-rutina::after { background: #e2e4e8; box-shadow: inset 0 1px 0 #fff; }
-.preset.carpeta-rutina > * { position: relative; z-index: 1; }
-.preset.carpeta-rutina.activa { box-shadow: none; }
-.preset.carpeta-rutina.activa::before { box-shadow: inset 0 0 0 1.5px var(--hairline-fuerte), inset 0 1px 0 rgba(255,255,255,.07); }
-.carpeta-separadores { position: absolute !important; top: 3px; right: 20px; display: flex; gap: 3px; }
-.carpeta-separadores i { width: 22px; height: 12px; border-radius: 6px 6px 0 0; background: color-mix(in oklab, var(--dia) 62%, #8a8c92); box-shadow: inset 0 1px 0 rgba(255,255,255,.2); }
-.light-mode .carpeta-separadores i { background: color-mix(in oklab, var(--dia) 72%, #a7a9ae); }
-.carpeta-etiqueta { display: inline-block; max-width: 100%; padding: 3px; border-radius: 5px; background: #8f939a; box-shadow: inset 0 1px 2px rgba(0,0,0,.4); }
-.carpeta-etiqueta .preset-nombre { display: block; padding: 3px 9px; border-radius: 3px; font-weight: 800; font-stretch: 85%; color: #1d1d1f; background: #f4f3ee; }
-.carpeta-rutina .preset-cabeza { flex-wrap: wrap; }
+/* TUS RUTINAS CREADAS: una tarjeta como antes, más clara. El nombre, sus días
+   en palabras y en una tira con el color de cada uno (apagado, como todo
+   relleno de día, y del largo de sus series), y abajo, separado por un filo,
+   cuánto la usaste y las acciones. */
+.preset.rutina-guardada { padding: 14px 14px 12px 16px; box-shadow: var(--placa-canto); }
+.preset.rutina-guardada.activa { box-shadow: inset 0 0 0 1.5px var(--hairline-fuerte); }
+.rutina-guardada .preset-nombre { font-size: 1rem; }
+.rutina-guardada-dias { display: block; margin-top: 3px; font-size: 12.5px; line-height: 1.35; color: var(--text-muted); text-wrap: pretty; }
+.rutina-guardada-tira { display: flex; gap: 3px; height: 6px; margin-top: 11px; }
+.rutina-guardada-tira i { flex-basis: 0; min-width: 6px; border-radius: 3px; background: color-mix(in oklab, var(--dia) 60%, #8a8c92); }
+.light-mode .rutina-guardada-tira i { background: color-mix(in oklab, var(--dia) 70%, #a7a9ae); }
+.rutina-guardada-pie { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--hairline); }
+.rutina-guardada-pie .preset-frec { min-width: 0; font-size: 12.5px; line-height: 1.35; color: var(--text-faint); }
+.rutina-guardada-pie .preset-acciones { flex: none; margin-top: 0; }
 
 /* EL CHATBOT, EN LA PIZARRA DEL PROFE: el saludo escrito con tiza, los cuatro
    pedidos más comunes como notas adhesivas pegadas en la pizarra y los demás
@@ -7480,7 +7477,10 @@ function ShareImageModal({ title, subtitle, fileNamePrefix, shareTitle, shareTex
    vez de disparar la acción normal de la fila (tocarla una segunda vez ya
    sí hace lo de siempre).
 ============================================================================ */
-function SwipeToArchive({ children, onArchive, confirmText, revealWidth = 84 }) {
+// `redondeo` y `fondo`: los de la fila que va adentro (la tarjeta de una
+// rutina tiene su propio fondo y esquinas de 24 px). El rojo de quitar sólo
+// se ve al deslizar: quieto, asomaba por las esquinas.
+function SwipeToArchive({ children, onArchive, confirmText, revealWidth = 84, redondeo = "rounded-2xl", fondo = "bg-[#0c0d10]" }) {
   const [dragX, setDragX] = useState(0);
   const [confirming, setConfirming] = useState(false);
   const draggingRef = useRef(false);
@@ -7512,8 +7512,8 @@ function SwipeToArchive({ children, onArchive, confirmText, revealWidth = 84 }) 
   };
 
   return (
-    <div className="relative overflow-hidden rounded-2xl">
-      <div className="absolute inset-y-0 left-0 flex items-center pl-5 bg-rose-500 rounded-2xl" style={{ width: revealWidth }}>
+    <div className={`relative overflow-hidden ${redondeo}`}>
+      <div className={`absolute inset-y-0 left-0 flex items-center pl-5 bg-rose-500 transition-opacity ${redondeo}`} style={{ width: revealWidth, opacity: dragX > 0 || confirming ? 1 : 0 }}>
         <button onClick={() => setConfirming(true)} aria-label="Quitar de la lista" className="text-white active:scale-90 transition"><Trash2 size={18} /></button>
       </div>
       <div
@@ -7523,7 +7523,7 @@ function SwipeToArchive({ children, onArchive, confirmText, revealWidth = 84 }) 
         onPointerCancel={handlePointerUp}
         onClickCapture={handleClickCapture}
         style={{ transform: `translateX(${dragX}px)`, transition: draggingRef.current ? "none" : "transform 0.2s ease", touchAction: "pan-y" }}
-        className="relative bg-[#0c0d10] rounded-2xl"
+        className={`relative ${fondo} ${redondeo}`}
       >
         {children}
       </div>
@@ -22533,36 +22533,44 @@ function PresetRoutineCard({ preset, isActive, onPreview }) {
   );
 }
 
+// Una lista en palabras: "Push, Pull y Legs".
+function enLista(nombres = []) {
+  const n = nombres.filter(Boolean);
+  return n.length <= 1 ? n.join("") : `${n.slice(0, -1).join(", ")} y ${n[n.length - 1]}`;
+}
 function SavedRoutineRow({ routine, isActive, onUse, onEdit, onShare, onArchive, onPreview, uso = null }) {
   const dayCount = routine.dayOrder.length;
   // BUG FIX (pedido: "que las no activas estén del celeste característico
   // de la pestaña"): antes las inactivas usaban índigo, sin relación con
   // ningún color de la app — Rutinas (esta pestaña, plural) era celeste.
   // Pedido posterior: "cambiar el celeste de rutinas por azul".
-  const tramos = routine.dayOrder.map((dk) => ({ dk, color: routine.days?.[dk]?.color || "#3B82F6", series: (routine.days?.[dk]?.exercises || []).reduce((a, e) => a + (e.sets?.length || 0), 0) || 1 }));
+  const tramos = routine.dayOrder.map((dk) => ({ dk, label: routine.days?.[dk]?.label || dk, color: routine.days?.[dk]?.color || "#3B82F6", series: (routine.days?.[dk]?.exercises || []).reduce((a, e) => a + (e.sets?.length || 0), 0) || 1 }));
   return (
-    <SwipeToArchive confirmText={`¿Eliminar "${routine.name}"? No se puede deshacer.`} onArchive={onArchive}>
-      {/* LA CARPETA: la solapa, el nombre en la etiqueta (como la del
-          casillero) y los días como separadores de colores asomando arriba.
-          Antes era una tarjeta con una tira gris. */}
-      <div className={`preset carpeta-rutina stagger-item ${isActive ? "activa" : ""}`} style={{ "--c": "#3B82F6" }}>
-        <span className="carpeta-separadores" aria-hidden="true">{tramos.slice(0, 7).map((t) => <i key={t.dk} style={{ "--dia": t.color }} />)}</span>
+    <SwipeToArchive confirmText={`¿Eliminar "${routine.name}"? No se puede deshacer.`} onArchive={onArchive} redondeo="rounded-[24px]" fondo="">
+      {/* LA TARJETA (como antes, más clara): el nombre, sus días en palabras
+          y en una tira con el color de cada uno (apagado, y del largo de sus
+          series), y abajo cuánto la usaste y las acciones. En la tanda 12 fue
+          una carpeta: volvió a tarjeta a pedido ("así no toda la app tiene
+          este nuevo diseño"). */}
+      <div className={`preset rutina-guardada stagger-item ${isActive ? "activa" : ""}`} style={{ "--c": "#3B82F6" }}>
         {/* Tocar la rutina abre el pop-up completo (días, ejercicios, balance). */}
         <button onClick={onPreview} className="preset-cuerpo">
           <span className="preset-cabeza">
-            <span className="carpeta-etiqueta"><span className="preset-nombre">{routine.name}</span></span>
+            <span className="preset-nombre">{routine.name}</span>
             {isActive && <span className="preset-activa">Activa</span>}
           </span>
-          <span className="preset-pie">
-            <span className="preset-frec">
-              {dayCount} día{dayCount !== 1 ? "s" : ""}{uso?.sesiones > 0 ? `, ${uso.sesiones} sesion${uso.sesiones !== 1 ? "es" : ""} (${haceCuanto(uso.diasDesde)})` : ", sin usar"}
-            </span>
-          </span>
+          <span className="rutina-guardada-dias">{enLista(tramos.map((t) => t.label))}</span>
+          <span className="rutina-guardada-tira" aria-hidden="true">{tramos.map((t) => <i key={t.dk} style={{ "--dia": t.color, flexGrow: t.series }} />)}</span>
         </button>
-        <span className="preset-acciones">
-          {!isActive && <button onClick={onUse} className="boton-tonal !min-h-9 !px-3.5 !text-[13px]">Activar</button>}
-          <button onClick={onShare} aria-label="Compartir" className="boton-redondo !w-9 !h-9"><Share2 size={15} /></button>
-          <button onClick={onEdit} aria-label="Editar" className="boton-redondo !w-9 !h-9"><Edit3 size={15} /></button>
+        <span className="rutina-guardada-pie">
+          <span className="preset-frec">
+            {dayCount} día{dayCount !== 1 ? "s" : ""}{uso?.sesiones > 0 ? `, ${uso.sesiones} sesion${uso.sesiones !== 1 ? "es" : ""} (${haceCuanto(uso.diasDesde)})` : ", sin usar"}
+          </span>
+          <span className="preset-acciones">
+            {!isActive && <button onClick={onUse} className="boton-tonal !min-h-9 !px-3.5 !text-[13px]">Activar</button>}
+            <button onClick={onShare} aria-label="Compartir" className="boton-redondo !w-9 !h-9"><Share2 size={15} /></button>
+            <button onClick={onEdit} aria-label="Editar" className="boton-redondo !w-9 !h-9"><Edit3 size={15} /></button>
+          </span>
         </span>
       </div>
     </SwipeToArchive>
