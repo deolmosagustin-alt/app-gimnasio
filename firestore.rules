@@ -270,6 +270,21 @@ service cloud.firestore {
         && (request.auth.uid == resource.data.toUid || request.auth.uid == resource.data.fromUid);
     }
 
+    // ============================== REPORTES DE LA IA ==============================
+    // La banderita debajo de cada respuesta del Entrenador IA (lo pide
+    // Google Play a las apps con IA generativa). Sólo se crean, en tu nombre,
+    // con los campos justos y con la hora del servidor; nadie los lee, edita
+    // ni borra desde la app (se revisan en la consola).
+    match /reportes_ia/{reporteId} {
+      allow create: if isSignedIn()
+        && request.resource.data.keys().hasOnly(['uid', 'respuesta', 'pregunta', 'createdAt'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.respuesta is string && request.resource.data.respuesta.size() <= 4000
+        && request.resource.data.pregunta is string && request.resource.data.pregunta.size() <= 2000
+        && request.resource.data.createdAt == request.time;
+      allow read, update, delete: if false;
+    }
+
     // ============================== RUTINAS COMPARTIDAS POR ENLACE ==============================
     // Ya existente — ver comentario arriba de shareRoutineToFirestore() en
     // App.jsx. Lectura y creación públicas (sin sesión) porque cualquiera

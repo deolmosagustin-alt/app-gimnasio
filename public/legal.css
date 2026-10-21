@@ -1,0 +1,26 @@
+/* Las páginas legales de Modus Fit (privacidad, términos, borrar la cuenta):
+   el mismo grafito de la app, sin color de fondo, legibles en el celular. */
+:root {
+  --fondo: #111317; --placa: #1a1d22; --canto: #2a2e35;
+  --texto: #e6e8eb; --suave: #a2a7b0; --tenue: #7d828b; --acento: #9fd6cf;
+}
+@media (prefers-color-scheme: light) {
+  :root { --fondo: #f4f5f6; --placa: #ffffff; --canto: #dfe1e5; --texto: #16181c; --suave: #4a4f57; --tenue: #636872; --acento: #1f6f67; }
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--fondo); color: var(--texto); line-height: 1.65; padding: 32px 16px 64px; }
+main { max-width: 680px; margin: 0 auto; }
+.marca { font-weight: 800; font-size: 17px; letter-spacing: -0.01em; margin-bottom: 36px; color: var(--suave); }
+h1 { font-size: 30px; line-height: 1.15; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 6px; text-wrap: balance; }
+.fecha { color: var(--tenue); font-size: 14px; margin-bottom: 28px; }
+h2 { font-size: 17px; font-weight: 700; margin: 30px 0 10px; }
+p, li { color: var(--suave); font-size: 15.5px; }
+p { margin-bottom: 12px; }
+ul, ol { padding-left: 22px; margin-bottom: 12px; }
+li { margin-bottom: 6px; }
+strong { color: var(--texto); font-weight: 650; }
+a { color: var(--acento); }
+.placa { background: var(--placa); border-radius: 18px; padding: 18px 22px; margin-bottom: 14px; box-shadow: inset 0 0 0 1px var(--canto); }
+.boton { display: inline-block; margin-top: 6px; padding: 12px 20px; border-radius: 999px; background: var(--texto); color: var(--fondo); font-weight: 700; text-decoration: none; }
+nav.pie { margin-top: 48px; padding-top: 18px; border-top: 1px solid var(--canto); display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 14px; }
+nav.pie a { color: var(--tenue); }

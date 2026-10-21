@@ -76,6 +76,12 @@ Lo nativo de Android (el plugin del descanso, el widget) no viaja con la web: ha
 - **El inspector de pantallas de app** (la skill de la cuenta, `anthropic-skills:design-taste-frontend`): `node <skill>/scripts/inspect.mjs --app "http://localhost:5173/?demo=progreso" --widths 390`, una pestaña por vez, después de `npm run capturas -- --datos`. Hoy da cero FAIL salvo dos que se dejan a propósito: el emoji del aplauso en Social (es el gesto, no hay ícono que lo diga) y, a veces, la luz del tono de arriba (`.app-fondo`). Avisa (WARN) el título de 36 px, que es el título grande de iOS.
 - **`superdesign`**: necesita la cuenta del usuario, una vez: `npx --yes @superdesign/cli@latest login`. Cada generación gasta créditos, y la skill sube partes del código a superdesign.dev para diseñar.
 
+## Lo legal y lo que pide Google Play
+
+- Páginas públicas en `public/` con su estilo en `legal.css`: `privacy-policy.html`, `terminos.html` y `eliminar-cuenta.html` (la que Play pide para borrar la cuenta sin la app). La política del modal de Perfil dice lo mismo: si cambiás una, cambiá la otra. Hoy dicen que la app es gratis y sin anuncios. Cuando se prendan anuncios o cobros, hay que actualizarlas antes.
+- "Eliminar perfil" borra también la cuenta de Firebase (`deleteUser`), después de limpiar Social y `users/{uid}`.
+- La banderita debajo de cada respuesta del Entrenador IA guarda un reporte en `reportes_ia` (sólo se crea; se revisa en la consola de Firebase). Sin sesión, abre un mail a soporte (`MAIL_SOPORTE`).
+
 ## Carpetas con documentación y el CSS
 
 Tailwind escanea todo el repo buscando clases, salvo lo que ignora git. `src/index.css` excluye `.agents` y `.claude` con `@source not`, porque las skills traen ejemplos de clases que terminaban en el CSS de producción. Si sumás otra carpeta con documentación así, excluila también: el CSS de producción pesa 87 KB, y si sube sin que cambie la app, es eso. ESLint también ignora esas carpetas (`eslint.config.js`).
