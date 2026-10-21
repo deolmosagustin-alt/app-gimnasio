@@ -14,7 +14,7 @@ import {
   Sparkles, Layers, SlidersHorizontal, UserCog,
   Share2, Download, Link2, Copy, BellOff, Send, Mic, Ruler, Camera, Link, Footprints, Star, SquarePlay, Upload, RefreshCw, Timer, Percent, Users, User,
   MessageCircle, Search, UserPlus, UserCheck, UserMinus, AtSign, GraduationCap, ClipboardCheck, Swords, Medal, QrCode, ArrowUpDown,
-  Phone, Minus, Ellipsis, Undo2, ArrowLeftRight, ReceiptText, ClipboardList, Maximize2, Minimize2, NotebookPen,
+  Phone, Minus, Ellipsis, Undo2, ArrowLeftRight, ReceiptText, ClipboardList, Minimize2, NotebookPen,
   FileText, FileSpreadsheet, ClipboardPaste, ScanText, ImagePlus,
 } from "lucide-react";
 import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signOut, onAuthStateChanged } from "firebase/auth";
@@ -3145,8 +3145,8 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 .descanso-dial.chico { width: 54px; height: 54px; color: var(--text-strong); }
 .descanso-dial.chico .descanso-dial-centro { color: var(--text-strong); }
 .descanso-dial.mini { width: 26px; height: 26px; }
-.dial-marca { stroke: var(--hairline-fuerte); stroke-width: 1; stroke-linecap: round; }
-.dial-marca.mayor { stroke: var(--text-faint); stroke-width: 1.7; }
+.dial-marca { stroke: var(--text-faint); stroke-width: 1.5; stroke-linecap: round; }
+.dial-marca.mayor { stroke: var(--text-muted); stroke-width: 2; }
 .dial-pista { fill: none; stroke: var(--velo-fuerte); stroke-width: 7; }
 .dial-arco {
   fill: none; stroke: color-mix(in oklab, var(--c, var(--tono)) 76%, white); stroke-width: 7; stroke-linecap: round;
@@ -3170,8 +3170,8 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
   .descanso-dial .descanso-tiempo { font-size: 1.6rem; }
 }
 /* En el dock: una fila con el reloj chico. */
-.dock-reloj { display: flex; flex-wrap: wrap; align-items: center; column-gap: 12px; row-gap: 4px; padding: 10px 10px 10px 12px; }
-.dock-reloj-rotulo { flex-basis: 100%; padding-left: 2px; font-size: 0.8125rem; white-space: normal; text-overflow: clip; }
+.dock-reloj { display: flex; align-items: center; column-gap: 12px; padding: 9px 10px 9px 12px; }
+.dock-reloj .dock-reloj-rotulo { margin-top: 3px; font-size: 0.75rem; line-height: 1.25; white-space: normal; text-overflow: clip; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; text-wrap: pretty; }
 .descanso-listo { padding: 8px 8px 8px 10px; }
 .descanso-rotulo { font-size: 0.8125rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .descanso-tiempo {
@@ -8803,7 +8803,7 @@ function ChipDescansoEnCurso({ timerId }) {
   );
 }
 
-// Botón chico de los controles del descanso (−15, +15, saltear). El color
+// Botón chico de los controles del descanso (+15, cerrar; en el grande, también −15). El color
 // lo toma del --c del cronómetro que lo contiene.
 function BotonDescanso({ onClick, label, children, principal = false, disabled = false }) {
   return (
@@ -8844,14 +8844,15 @@ function RelojQueGira({ segundos, sube = false }) {
 }
 
 // EL RELOJ DE LA PARED: el descanso como el reloj de una sala de pesas. Un
-// bisel de 60 marcas y, adentro, el arco del color del día con lo que falta.
+// bisel de 12 marcas (eran 60: se simplificó, a pedido) y, adentro, el arco
+// del color del día con lo que falta.
 // La aguja (el punto blanco) avanza en el sentido del reloj hasta las 12: se
 // lee de lejos, con el celular apoyado en el banco, sin leer los números.
 const RADIO_DIAL = 38;
 const LARGO_DIAL = 2 * Math.PI * RADIO_DIAL;
-const MARCAS_DIAL = Array.from({ length: 60 }, (_, i) => {
-  const a = (i * 6 * Math.PI) / 180, mayor = i % 5 === 0;
-  const r1 = 49, r2 = mayor ? 44.2 : 46.4;
+const MARCAS_DIAL = Array.from({ length: 12 }, (_, i) => {
+  const a = (i * 30 * Math.PI) / 180, mayor = i % 3 === 0;
+  const r1 = 49, r2 = mayor ? 43.6 : 45.2;
   return { mayor, x1: 50 + r1 * Math.sin(a), y1: 50 - r1 * Math.cos(a), x2: 50 + r2 * Math.sin(a), y2: 50 - r2 * Math.cos(a) };
 });
 function DialDescanso({ fraccion = 1, marcas = true }) {
@@ -8913,7 +8914,8 @@ function DescansoEnDock({ embebido = false }) {
 // embebido: va adentro de la tarjeta de la sesión (una sola pieza, con una
 // línea que las separa) en vez de ser una tarjeta propia apilada encima.
 // El reloj chico de la izquierda se agranda al tocarlo (RelojDescansoGrande):
-// el reloj de pared, para verlo de lejos con el celular apoyado en el banco.
+// el reloj de pared, para verlo de lejos con el celular apoyado en el banco,
+// pausarlo o restarle 15 segundos.
 function FilaDescansoDock({ timerId, embebido = false }) {
   const { estado, restante, fraccion, datos } = useRelojDescanso(timerId);
   const [grande, setGrande] = useState(false);
@@ -8940,24 +8942,24 @@ function FilaDescansoDock({ timerId, embebido = false }) {
       </div>,
     );
   }
-  // Arriba, qué descanso es (con el nombre entero: en el mismo renglón que
-  // los controles se cortaba a "Press Ban…"); abajo, el reloj chico (tocarlo
-  // lo agranda), el tiempo grande y los ajustes.
+  // UNA SOLA FILA: el reloj chico (sólo el arco; tocarlo lo agranda, y ahí
+  // están la pausa y el −15), el tiempo grande con qué descanso es debajo, y
+  // +15 y cerrar. Antes eran dos renglones, con un ícono adentro del reloj y
+  // −15, +15 y cerrar (pedido: "simplificá un poco el cronómetro de
+  // descanso").
   return envolver(
     <div className={`dock-reloj ${enPausa ? "en-pausa" : ""}`}>
-      <p className={`descanso-rotulo dock-reloj-rotulo ${enPausa ? "en-pausa" : ""}`}>
-        {enPausa ? "En pausa" : datos?.siguiente ? "Sigue" : "Descanso"}
-        {nombre && <span className="descanso-rotulo-nombre"> · {nombre}</span>}
-      </p>
       <button onClick={() => { haptic(10); setGrande(true); }} aria-label="Agrandar el reloj del descanso" className="descanso-dial chico">
         <DialDescanso fraccion={fraccion} marcas={false} />
-        <span className="descanso-dial-centro" aria-hidden="true"><Maximize2 size={15} /></span>
       </button>
       <div className="min-w-0 flex-1">
         <p role="timer" aria-label={relojCorto(restante)} className={`num-display descanso-tiempo descanso-tiempo-dock ${urgente ? "urgente" : ""} ${enPausa ? "en-pausa" : ""}`}><RelojQueGira segundos={restante} /></p>
+        <p className={`descanso-rotulo dock-reloj-rotulo ${enPausa ? "en-pausa" : ""}`}>
+          {enPausa ? "En pausa" : datos?.siguiente ? "Sigue" : "Descanso"}
+          {nombre && <span className="descanso-rotulo-nombre"> · {nombre}</span>}
+        </p>
       </div>
       <div className="flex items-center gap-1.5 shrink-0">
-        <BotonDescanso onClick={() => ajustarDescanso(timerId, -15)} label="Restar 15 segundos">−15</BotonDescanso>
         <BotonDescanso onClick={() => ajustarDescanso(timerId, 15)} label="Sumar 15 segundos">+15</BotonDescanso>
         <BotonDescanso onClick={() => terminarDescanso(timerId)} label="Cerrar el descanso"><X size={17} /></BotonDescanso>
       </div>
@@ -10212,7 +10214,7 @@ function capitulosGuia() {
         },
         {
           titulo: "El descanso corre solo",
-          texto: "Al guardar la serie arranca el reloj, abajo y siempre en el mismo lugar: sumale o restale 15 segundos, o cerralo con la cruz. Tocá el reloj chico para verlo grande y pausarlo.",
+          texto: "Al guardar la serie arranca el reloj, abajo y siempre en el mismo lugar: sumale 15 segundos o cerralo con la cruz. Tocá el reloj chico para verlo grande: ahí lo pausás o le restás 15 segundos.",
           dibujo: (
             <span className="descanso-dial guia-dial" style={{ "--c": verde }}>
               <DialDescanso fraccion={0.62} />
