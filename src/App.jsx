@@ -15,9 +15,9 @@ import {
   Share2, Download, Link2, Copy, BellOff, Send, Mic, Ruler, Camera, Link, Footprints, Star, SquarePlay, Upload, RefreshCw, Timer, Percent, Users, User,
   MessageCircle, Search, UserPlus, UserCheck, UserMinus, AtSign, GraduationCap, ClipboardCheck, Swords, Medal, QrCode, ArrowUpDown,
   Phone, Minus, Ellipsis, Undo2, ArrowLeftRight, ReceiptText, ClipboardList, Minimize2, NotebookPen,
-  FileText, FileSpreadsheet, ClipboardPaste, ScanText, ImagePlus,
+  FileText, FileSpreadsheet, ClipboardPaste, ScanText, ImagePlus, Flag,
 } from "lucide-react";
-import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signOut, onAuthStateChanged } from "firebase/auth";
+import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signOut, onAuthStateChanged, deleteUser } from "firebase/auth";
 import { Capacitor, registerPlugin } from "@capacitor/core";
 // Lado JS del plugin nativo del cronómetro. CLAVE: en Capacitor 5/6,
 // window.Capacitor.Plugins solo contiene plugins registrados desde JS con
@@ -37,7 +37,7 @@ import { FirebaseAuthentication } from "@capacitor-firebase/authentication";
 // no está instalado el build falla con un error claro. Instalarlo primero:
 //   npm install @capacitor/local-notifications && npx cap sync android
 import { LocalNotifications } from "@capacitor/local-notifications";
-import { doc, setDoc, getDoc, deleteDoc, enableIndexedDbPersistence } from "firebase/firestore";
+import { doc, setDoc, getDoc, deleteDoc, addDoc, collection, serverTimestamp, enableIndexedDbPersistence } from "firebase/firestore";
 import Model from "react-body-highlighter";
 import FemaleBody from "@mjcdev/react-body-highlighter";
 import { auth, googleProvider, db } from "./firebase";
@@ -18847,17 +18847,17 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
             <button onClick={() => setShowPrivacy(false)} aria-label="Cerrar" className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white transition active:scale-90"><X size={16} /></button>
           </div>
           <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-5 space-y-5 text-slate-400 text-[13px] leading-relaxed">
-            <p className="text-[11px] text-slate-600">Última actualización: julio de 2026</p>
+            <p className="text-[11px] text-slate-600">Última actualización: octubre de 2026</p>
             <p>Modus Fit respeta tu privacidad. Esta política explica qué datos recopilamos, cómo los usamos y cuáles son tus derechos.</p>
             {[
               { t: "1. Datos que recopilamos", b: "Datos de entrenamiento (series, pesos, récords), datos de perfil (nombre, email, sexo, edad, altura), medidas corporales y fotos de progreso (solo en tu dispositivo), y datos de cuenta Google si iniciás sesión con Google." },
               { t: "2. Cómo usamos los datos", b: "Para mostrarte tu historial, récords y progreso. Para sincronizar tu perfil entre dispositivos si iniciaste sesión con Google. Para generar recomendaciones del Chatbot (el texto se envía a la API de Google Gemini y no se almacena en nuestros servidores). Para mostrar anuncios relevantes a través de Google AdMob (solo en la versión gratuita)." },
               { t: "3. Almacenamiento y seguridad", b: "Tus datos se guardan localmente en tu dispositivo (IndexedDB/localStorage). Si usás la sincronización, se almacenan en Firebase Firestore con acceso restringido a tu cuenta. Si elegís un @usuario para activar lo social, tu nombre y foto de perfil quedan visibles para cualquier usuario de la app (necesario para que te puedan buscar), y tu rutina activa, historial de entrenamientos, récords y medidas corporales quedan visibles únicamente para las personas que aceptes como amigos o como entrenador/alumno vinculado — podés dejar de compartirlos en cualquier momento quitando el @usuario. Las fotos de progreso nunca se suben a ningún servidor ni se comparten con nadie, bajo ninguna circunstancia. Toda comunicación usa HTTPS." },
-              { t: "4. Terceros", b: "Usamos Google Firebase (autenticación y base de datos), Google Gemini API (IA), y Google AdMob (anuncios en la versión gratuita). Cada uno tiene su propia política de privacidad." },
-              { t: "5. Anuncios y versión Pro", b: "La versión gratuita muestra anuncios de AdMob en momentos específicos. La versión Pro ($4.99 pago único) elimina todos los anuncios. Podés inhabilitar la personalización de anuncios en Ajustes → Google → Anuncios de tu dispositivo." },
-              { t: "6. Retención de datos", b: "Los datos locales permanecen hasta que desinstalás la app o eliminás tu perfil. Los datos en la nube se eliminan cuando eliminás tu perfil desde la app." },
+              { t: "4. Terceros", b: "Usamos Google Firebase (autenticación y base de datos) y la API de Google Gemini (IA): lo que le escribís al Entrenador IA, junto con un resumen de tu entrenamiento, se envía a Google para generar la respuesta. Cada uno tiene su propia política de privacidad." },
+              { t: "5. Anuncios y pagos", b: "Hoy Modus Fit es gratis y no muestra anuncios. Si más adelante sumamos anuncios o una versión paga, vamos a actualizar esta política y avisarte en la app antes de que empiecen." },
+              { t: "6. Retención y eliminación", b: "Los datos locales permanecen hasta que desinstalás la app o eliminás tu perfil. Al eliminar tu perfil (Perfil › Eliminar perfil) se borran tus datos en la nube, tu perfil público y tu cuenta. También podés pedirlo por mail, sin la app: app-gimnasio-two.vercel.app/eliminar-cuenta.html, o escribiendo a deolmosagustin@gmail.com." },
               { t: "7. Menores de edad", b: "Modus Fit no está dirigida a menores de 13 años y no recopilamos intencionalmente sus datos." },
-              { t: "8. Tus derechos", b: "Podés acceder, corregir o eliminar tus datos desde la configuración de la app en cualquier momento." },
+              { t: "8. Tus derechos", b: "Podés acceder, corregir o eliminar tus datos desde la configuración de la app en cualquier momento. Si una respuesta de la IA te parece inapropiada, reportala con la banderita que tiene debajo." },
               { t: "9. Contacto", b: "Para preguntas sobre privacidad o solicitudes de eliminación de datos: deolmosagustin@gmail.com" },
             ].map(({ t, b }) => (
               <div key={t}>
@@ -18870,9 +18870,15 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
         </div>
       )}
 
-      <button onClick={() => setShowPrivacy(true)} className="w-full flex items-center gap-2 justify-center py-3 rounded-2xl text-slate-500 hover:text-slate-300 transition text-xs font-semibold">
-        <Info size={13} /> Política de privacidad
-      </button>
+      <div className="flex items-center justify-center gap-1">
+        <button onClick={() => setShowPrivacy(true)} className="flex items-center gap-2 justify-center py-3 px-2 rounded-2xl text-slate-500 hover:text-slate-300 transition text-xs font-semibold">
+          <Info size={13} /> Política de privacidad
+        </button>
+        <span className="text-slate-700 text-xs" aria-hidden="true">·</span>
+        <button onClick={() => { try { window.open(`${API_ORIGIN}/terminos.html`, "_system"); } catch { /* sin navegador */ } }} className="flex items-center gap-2 justify-center py-3 px-2 rounded-2xl text-slate-500 hover:text-slate-300 transition text-xs font-semibold">
+          <FileText size={13} /> Términos y condiciones
+        </button>
+      </div>
 
       <button onClick={onSignOut} className="w-full flex items-center gap-2 justify-center py-3.5 rounded-2xl border border-slate-800 text-slate-400 hover:text-white hover:border-slate-600 transition text-sm font-semibold"><LogOut size={14} /> Cerrar sesión</button>
       {!showDeletePin ? (
@@ -25010,6 +25016,7 @@ function RecetaPapel({ para = "", fecha = "", titulo = null, children }) {
 
 // Las notas adhesivas de la pizarra del Chatbot: amarilla, verde, rosa y celeste, apagadas.
 const COLORES_POSTIT = ["#ebe4bc", "#bfdac9", "#e8c6cc", "#c4d3e8"];
+const MAIL_SOPORTE = "deolmosagustin@gmail.com";
 function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMessages, conversations = [], activeConversationId = null, onNewConversation, onSwitchConversation, onDeleteConversation, onRenameConversation, settings, cycleStart, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement, onDeleteRoutine, onNavigate, onStartSession, onEndSession }) {
   // Contexto para reconstruir un plan EN VIVO a partir de la "action" cruda
   // (JSON plano, sí serializable) en vez de depender de la función confirm()
@@ -25468,6 +25475,25 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
   // Copiar el texto de cualquier mensaje — función típica de chat de IA que
   // faltaba (Claude, ChatGPT, Gemini la tienen todos).
   const [copiedIndex, setCopiedIndex] = useState(null);
+  // REPORTAR UNA RESPUESTA DE LA IA (lo pide Google Play a las apps con IA
+  // generativa): con la cuenta de Google iniciada, queda guardado en
+  // reportes_ia (sólo se puede crear; nadie lo lee desde la app); sin cuenta,
+  // se abre un mail a soporte con la respuesta.
+  const [reportedIndex, setReportedIndex] = useState(null);
+  const handleReportMessage = async (i, text) => {
+    const pregunta = [...messages.slice(0, i)].reverse().find((mm) => mm.role === "user")?.text || "";
+    const respuesta = String(text || "").slice(0, 4000);
+    const uid = auth.currentUser?.uid || null;
+    try {
+      if (!uid) throw new Error("sin cuenta");
+      await addDoc(collection(db, "reportes_ia"), { uid, respuesta, pregunta: String(pregunta).slice(0, 2000), createdAt: serverTimestamp() });
+    } catch {
+      const cuerpo = encodeURIComponent(`Quiero reportar esta respuesta del Entrenador IA:\n\n${respuesta.slice(0, 1500)}\n\nMotivo:`);
+      try { window.open(`mailto:${MAIL_SOPORTE}?subject=${encodeURIComponent("Reporte de una respuesta de la IA")}&body=${cuerpo}`, "_system"); } catch { /* sin cliente de mail */ }
+    }
+    setReportedIndex(i);
+    haptic(10);
+  };
   const handleCopyMessage = async (i, text) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -25819,6 +25845,11 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
                 {m.role === "assistant" && !isSending && messages.slice(0, i).some((mm) => mm.role === "user") && (
                   <button onClick={() => handleRegenerate(i)} aria-label="Regenerar respuesta" className="p-1 rounded-md text-slate-500 hover:text-slate-200 hover:bg-slate-700/50 transition">
                     <RefreshCw size={11} />
+                  </button>
+                )}
+                {m.role === "assistant" && i > 0 && (
+                  <button onClick={() => reportedIndex !== i && handleReportMessage(i, m.text)} aria-label={reportedIndex === i ? "Respuesta reportada" : "Reportar esta respuesta"} title={reportedIndex === i ? "Gracias: la vamos a revisar" : "Reportar esta respuesta"} className="p-1 rounded-md text-slate-500 hover:text-slate-200 hover:bg-slate-700/50 transition">
+                    {reportedIndex === i ? <Check size={11} className="text-emerald-400" /> : <Flag size={11} />}
                   </button>
                 )}
               </div>
@@ -29340,7 +29371,7 @@ export default function App() {
     // nube, mismo criterio que ya acepta el resto de la app para esto.
     if (p?.googleUid) {
       const phoneKey = p.phone ? normalizePhoneForMatching(p.phone) : null;
-      (phoneKey ? hashPhoneKey(phoneKey) : Promise.resolve(null))
+      const limpiezaSocial = (phoneKey ? hashPhoneKey(phoneKey) : Promise.resolve(null))
         .then((hash) => cleanupSocialData(p.googleUid, p.username || null, hash))
         .catch(() => {});
       // BUG FIX: acá solo se borraba lo "social" (username/públicos/
@@ -29348,7 +29379,20 @@ export default function App() {
       // (users/{uid}, el que sube syncProfileToCloud) nunca se tocaba, así
       // que un perfil "borrado" resucitaba entero con todo su historial al
       // volver a iniciar sesión con la misma cuenta de Google.
-      deleteDoc(doc(db, "users", p.googleUid)).catch(() => {});
+      // Para Google Play, borrar el perfil borra la cuenta entera: los datos
+      // en la nube y, después (cuando terminó la limpieza, que necesita la
+      // sesión), la cuenta de Firebase. Si Firebase pide haber iniciado
+      // sesión hace poco, se cierra la sesión y queda el pedido por mail (la
+      // página /eliminar-cuenta.html lo explica).
+      const uid = p.googleUid;
+      Promise.all([limpiezaSocial, deleteDoc(doc(db, "users", uid)).catch(() => {})]).finally(() => {
+        const u = auth.currentUser;
+        if (u && u.uid === uid) {
+          deleteUser(u).catch(() => signOut(auth).catch(() => {})).finally(() => {
+            if (Capacitor.isNativePlatform()) FirebaseAuthentication.signOut().catch(() => {});
+          });
+        }
+      });
     }
     // BUG FIX: la foto de perfil y las fotos de progreso viven en IndexedDB
     // bajo una clave que es solo el NOMBRE del perfil — sin borrarlas acá,
