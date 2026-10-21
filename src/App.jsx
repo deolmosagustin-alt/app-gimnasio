@@ -3345,6 +3345,10 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
   --galleta-fondo: transparent; box-shadow: inset 0 0 0 1px var(--hairline-fuerte);
   font-weight: 650; font-size: 0.75rem; font-variant-numeric: tabular-nums; color: var(--text-faint);
 }
+/* El número, con el color del día (pedido: "devolverle el color a los
+   números de ejercicio"). */
+.ejercicio-numero { color: color-mix(in oklab, var(--c, var(--tono)) 72%, white); font-weight: 700; box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--c, var(--tono)) 45%, transparent); }
+.light-mode .ejercicio-numero { color: color-mix(in oklab, var(--c, var(--tono)) 80%, black); box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--c, var(--tono)) 50%, transparent); }
 .ejercicio.completo .ejercicio-numero { --galleta-fondo: color-mix(in oklab, var(--c, var(--tono)) 72%, white); color: color-mix(in oklab, var(--c, var(--tono)) 18%, #07080a); box-shadow: none; }
 .ejercicio-nombre { font-size: 1rem; font-weight: 650; line-height: 1.25; color: var(--text-strong); letter-spacing: -0.012em; text-wrap: pretty; }
 .ejercicio-musculo { display: inline; font-size: 0.8125rem; font-weight: 500; color: var(--text-muted); }
@@ -3353,7 +3357,10 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
    que ya hiciste hoy. */
 .series-discos { display: inline-flex; align-items: center; gap: 3px; }
 .series-discos i { width: 4px; height: 14px; border-radius: 2px; background: var(--velo-fuerte); }
-.series-discos i.hecha { background: var(--disco, var(--text-strong)); }
+/* Cada serie hecha, del color del tick del ejercicio completo (pedido: "que
+   las barritas se pinten del verde del tick"): el pastel del color del día. */
+.series-discos i.hecha { background: color-mix(in oklab, var(--c, var(--tono)) 72%, white); }
+.light-mode .series-discos i.hecha { background: var(--c, var(--tono)); }
 
 /* ── LA SERIE ────────────────────────────────────────────────────────────
    Una serie en foco: el visor con reps × kilos grandes y angostos, el ✓ de
@@ -12112,7 +12119,7 @@ function convertirBorradoresDeUnidad(prev, de, a) {
 ============================================================================ */
 // Cómo se acomodan las series al guardar: rápido y con un rebote mínimo.
 const RESORTE_LISTA = { type: "spring", bounce: 0.16, duration: 0.5 };
-function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts, resetKey = 0, settings = DEFAULT_SETTINGS, autoCollapse = false, onDisableAutoShowPrShare, hasActiveSession = true, hideTimer = false, onUpdateSettings = null, onSetPlanPaused = null, routineHasPlan = false, sex = null, age = null, weekInCycle = null, dayKey = null, nextRestTimerId = null, nextRestSeconds = null, nextExerciseName = null, supersetRestTimerId = null, supersetRestSeconds = null, orden = null, nextObjetivo = null }) {
+function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts, resetKey = 0, settings = DEFAULT_SETTINGS, autoCollapse = false, onDisableAutoShowPrShare, hasActiveSession = true, hideTimer = false, onUpdateSettings = null, routineHasPlan = false, sex = null, age = null, weekInCycle = null, dayKey = null, nextRestTimerId = null, nextRestSeconds = null, nextExerciseName = null, supersetRestTimerId = null, supersetRestSeconds = null, orden = null, nextObjetivo = null }) {
   const [open, setOpen] = useState(false);
   const [showWarmup, setShowWarmup] = useState(false);
   // Pedido: "que no se abran más automáticamente los ejercicios, sí que se
@@ -12180,7 +12187,6 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
   const foco = focoElegido != null && !seriesHechas[focoElegido] ? focoElegido : primeraPendiente;
   // Los disquitos de la cabecera usan los mismos colores que la barra
   // cargada, en el mismo orden en que se cargan.
-  const tiposMini = discosDeUnLado(setsToShow.length);
   // Pedido: "el poder quitar o pasar ejercicios de planificados a por récord
   // de manera sencilla". El lugar más natural para decidirlo es acá, con el
   // ejercicio abierto y a punto de entrenarlo — no hay que salir a Perfil ni
@@ -12260,10 +12266,11 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
                   en ningún lado, repetir "POR RÉCORD" en cada tarjeta es
                   ruido que no informa nada. */}
               {settings.trainingMode === "planned" && (planInfo || routineHasPlan) && (
+                // Sólo informa (pedido: "sacar eso de que si tocás el botoncito
+                // de plan cambie a récord"): pausar un ejercicio se hace desde
+                // el planificador.
                 planInfo && !planInfo.paused
-                  ? (onSetPlanPaused
-                    ? <span role="button" tabIndex={-1} onClick={(e) => { e.stopPropagation(); onSetPlanPaused(exercise.id, true); }} className="chip-plan sigue" title="Sigue tu plan: tocá para pasarlo a por récord"><ClipboardCheck size={12} /> Plan</span>
-                    : <span className="chip-plan sigue" title="Este ejercicio sigue tu plan"><ClipboardCheck size={12} /> Plan</span>)
+                  ? <span className="chip-plan sigue" title="Este ejercicio sigue tu plan"><ClipboardCheck size={12} /> Plan</span>
                   // "Tiene un plan, pausado" (contorno punteado: está ahí pero
                   // inactivo) y "nunca tuvo metas" (liso): los dos persiguen tu
                   // récord, pero sólo el primero vuelve con "Devolver al plan".
@@ -12280,7 +12287,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
               lleno = hecha hoy. Con la tarjeta cerrada sabés por dónde ibas. */}
           {!exercise.cardio && seriesHechas.length > 0 && (
             <span className="series-discos" role="img" aria-label={allSetsDoneToday ? "Completaste todas las series de hoy" : `${seriesHechas.filter(Boolean).length} de ${seriesHechas.length} series hechas hoy`}>
-              {seriesHechas.map((hecha, i) => <i key={i} className={hecha ? "hecha" : ""} style={hecha ? { "--disco": COLORES_DISCO[tiposMini[i]] } : undefined} />)}
+              {seriesHechas.map((hecha, i) => <i key={i} className={hecha ? "hecha" : ""} />)}
             </span>
           )}
           <ChevronDown size={18} className={`text-slate-500 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
@@ -12716,7 +12723,8 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_
       `REGLAS DE PLANIFICACIÓN (respetalas):`,
       `1. Partí de la mejor marca de cada ejercicio. Si no tiene marcas, proponé una carga conservadora y dejala casi plana: primero hay que medirla.`,
       `2. Mirá las últimas sesiones: si viene subiendo, seguí la misma pendiente; si repite el mismo peso hace tres sesiones, está estancado — bajá un escalón y subí las reps en vez del peso.`,
-      `3. PROGRESIÓN DE ENTRENADOR (doble progresión): dentro del rango de reps de cada ejercicio, primero subí las REPETICIONES de a una por semana con el mismo peso; recién cuando llega al tope del rango, subí el peso UN salto (el de ese ejercicio) y volvé al piso del rango. No subas el peso todas las semanas. Si el salto es grande (por ejemplo 7 kg o 15 lb en una máquina), las reps hacen casi todo el trabajo y el peso sube pocas veces en el bloque.`,
+      `3. PROGRESIÓN DE ENTRENADOR, JUGANDO CON REPS Y KILOS: la base es la doble progresión (con el mismo peso, una rep más por semana hasta el tope del rango; ahí sube el peso UN salto y las reps vuelven al piso). Sobre esa base, armá OLAS como un entrenador profesional: las reps y los kilos suben Y bajan dentro del bloque. Por ejemplo, en olas de 3 semanas: semana A carga moderada y más reps, semana B un salto más y menos reps, semana C la más pesada del ola con las reps más bajas del rango; la ola siguiente arranca un poco por encima de la anterior (ondas de carga / periodización ondulante, que en los estudios iguala o supera a la lineal en fuerza e hipertrofia). Nunca subas el peso todas las semanas ni bajes por debajo de lo que la persona ya levanta, salvo en la descarga o si está estancada. Si el salto es grande (7 kg o 15 lb en una máquina), las reps hacen casi todo el trabajo.`,
+      `3b. SEGÚN EL OBJETIVO, con métodos probados: FUERZA → olas con 3 a 6 reps, cargas de 80-90% del 1RM estimado, pocas reps por serie cerca del fallo técnico (RIR 1-3) y el volumen bajando a medida que sube la carga. HIPERTROFIA → 6 a 15 reps, la mayor parte del trabajo con RIR 1-3, el volumen semanal por músculo subiendo de a poco (de lo mínimo efectivo a lo máximo recuperable) y la carga subiendo cuando las reps tocan el tope. Mixto → ondulación entre una semana más pesada (4-6 reps) y otra de más volumen (8-12). Que cada número se pueda justificar como lo haría un entrenador con experiencia.`,
       conRpe ? `4. FATIGA: el RPE tiene que ir subiendo dentro del bloque (empezá en 7 y llegá a 9), no arrancar al máximo.` : `4. FATIGA: no incluyas RPE, dejá ese campo afuera.`,
       semanasReales >= 3
         ? `5. FASES de mesociclo: primeras semanas "Acumulación" (más volumen, RPE 7-8), después "Intensificación" (más carga, RPE 8-9), la última "Realización" (carga máxima, menos series).`
@@ -24653,7 +24661,7 @@ Tu alcance es estrictamente entrenamiento físico, nutrición deportiva, salud/r
 
 Aplicá estos marcos cuando sean relevantes (no los recites si no vienen al caso):
 - Sobrecarga progresiva: motor del progreso a largo plazo — no sólo "subir el peso", también más reps/series, mejor técnica o más frecuencia.
-- Para la próxima sesión, una meta o un plan, usá doble progresión, como un entrenador personal: con el mismo peso, una rep más por vez hasta el tope del rango de reps de ese ejercicio; recién ahí sube el peso UN salto y las reps vuelven al piso del rango. El salto de cada ejercicio está en settings.saltosDePeso (por máquina: 7 kg, 15 lb...; si no está, 2,5 kg o 5 lb): no propongas cargas que no se puedan armar con ese salto.
+- Para la próxima sesión, una meta o un plan, usá doble progresión, como un entrenador personal: con el mismo peso, una rep más por vez hasta el tope del rango de reps de ese ejercicio; recién ahí sube el peso UN salto y las reps vuelven al piso del rango. En un plan de varias semanas, jugá además con reps y kilos en olas (semana de más reps y carga moderada, semana de más carga y menos reps, semana más pesada; la ola siguiente arranca un poco más arriba), como en la periodización ondulante y las ondas de carga, según el objetivo (fuerza: 3-6 reps al 80-90%; hipertrofia: 6-15 reps con RIR 1-3 y el volumen subiendo de a poco). El salto de cada ejercicio está en settings.saltosDePeso (por máquina: 7 kg, 15 lb...; si no está, 2,5 kg o 5 lb): no propongas cargas que no se puedan armar con ese salto.
 - Volumen semanal por grupo muscular = principal driver de hipertrofia dentro de rangos razonables; %1RM y RIR/RPE son las palancas de la fuerza máxima.
 - Hipertrofia: rango amplio de reps (aprox. 5-30) si las series van cerca del fallo — 6-12 es un punto dulce práctico, no "el" rango mágico.
 - Frecuencia 2+/semana por grupo muscular suele igualar o superar 1 vez/semana con el mismo volumen total.
