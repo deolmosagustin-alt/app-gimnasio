@@ -5578,6 +5578,28 @@ button.carrera-carril:active { background: var(--velo); }
 .planilla-vos { justify-self: center; font-size: 12px; font-weight: 700; color: var(--papel-suave); }
 .planilla-fila.propia .planilla-nombre { font-weight: 800; }
 .hoja-rutina .planilla-hoja { padding: 22px 16px 16px; }
+/* LA HOJA DEL PLAN (arriba de Rutina): la misma tabla, con lo que el plan dice
+   para el día que mirás, escrito a mano; el sello si está en pausa; los
+   botones abajo, fuera del papel. */
+.plan-hoja { padding-bottom: 10px; }
+.plan-hoja .planilla-hoja { position: relative; padding: 18px 14px 12px; }
+.plan-hoja-cabeza { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding-bottom: 6px; border-bottom: 1.5px dashed var(--papel-linea); }
+.plan-hoja-titulo { min-width: 0; font-size: 16px; font-weight: 800; font-stretch: 85%; line-height: 1.2; }
+.plan-hoja-dia { padding: 0 3px; background: linear-gradient(transparent 50%, color-mix(in oklab, var(--dia) 42%, var(--papel)) 50%, color-mix(in oklab, var(--dia) 42%, var(--papel)) 92%, transparent 92%); }
+.plan-hoja-semana { flex: none; font-size: 12.5px; color: var(--papel-suave); }
+.plan-hoja-filas { display: grid; gap: 1px; margin-top: 7px; }
+.plan-hoja-filas li { display: flex; align-items: baseline; gap: 6px; font-size: 13px; line-height: 1.35; }
+.plan-hoja-filas li span { min-width: 0; overflow-wrap: anywhere; }
+.plan-hoja-filas li i { flex: 1; min-width: 10px; border-bottom: 1.5px dotted var(--papel-linea); transform: translateY(-3px); }
+.plan-hoja-filas li b { flex: none; font-size: calc(20px * 1); font-weight: 600; line-height: 1; color: #2a2d36; white-space: nowrap; }
+.plan-hoja-nota { margin-top: 7px; font-size: 12.5px; line-height: 1.35; color: var(--papel-suave); }
+.plan-hoja-renglones { display: grid; gap: 15px; margin-top: 16px; }
+.plan-hoja-renglones i { display: block; height: 1px; background: var(--papel-linea); }
+.plan-hoja.en-pausa .plan-hoja-filas, .plan-hoja.en-pausa .plan-hoja-nota { opacity: .5; }
+.plan-hoja-sello { position: absolute; right: 16px; bottom: 14px; padding: 1px 9px 2px; border: 2.5px solid #a8433a; border-radius: 6px; font-size: 16px; font-weight: 800; font-stretch: 85%; color: #a8433a; transform: rotate(-10deg); opacity: .88; pointer-events: none; }
+.plan-hoja-acciones { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; padding: 0 2px; }
+.plan-hoja-boton { min-height: 36px; padding: 0 12px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 650; color: var(--text-strong); background: var(--velo); transition: transform .2s ease; }
+.plan-hoja-boton:active { transform: scale(.96); }
 .hoja-rutina-titulo { font-size: 18px; font-weight: 800; font-stretch: 85%; line-height: 1.15; overflow-wrap: anywhere; }
 .hoja-rutina-bajada { margin-top: 2px; padding-bottom: 8px; font-size: 12.5px; color: var(--papel-suave); border-bottom: 1.5px dashed var(--papel-linea); }
 .hoja-rutina-dia { margin-top: 12px; }
@@ -5701,17 +5723,6 @@ button.carrera-carril:active { background: var(--velo); }
 /* TU CASILLERO, arriba de Social: la puerta del perfil de un atleta, en chico,
    con las calcomanías de todos los días. */
 .casillero-chico { padding: 10px 44px 14px 14px; }
-/* TU PLAN, EN SU CASILLERO (arriba de Rutina): la misma chapa, en chico. */
-.plan-casillero { padding: 10px 44px 10px 14px; }
-.plan-casillero .casillero-arriba { min-height: 22px; margin-bottom: 6px; }
-.plan-casillero .casillero-rejilla { max-width: 96px; }
-.plan-casillero-cuerpo { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; }
-.plan-casillero .casillero-nombre { display: block; font-size: 1.05rem; }
-.plan-casillero-estado { flex: 1 1 140px; min-width: 0; font-size: 12.5px; line-height: 1.35; color: var(--text-muted); text-wrap: pretty; }
-.plan-casillero-calcos { margin-top: 10px; }
-.plan-casillero-calcos .calco { min-height: 36px; }
-button.calco:disabled { opacity: .5; }
-.calco-oscuro { gap: 6px; color: #ecebe4; background: #1d1e21; border-radius: 6px; }
 .casillero-chico .casillero-arriba { min-height: 36px; margin-bottom: 8px; }
 .casillero-chico .casillero-rejilla { max-width: 104px; }
 .casillero-chico .casillero-cuerpo { width: 100%; gap: 14px; padding: 6px 4px 4px 2px; text-align: left; border-radius: 10px; transition: background-color .2s ease; }
@@ -10242,7 +10253,7 @@ function capitulosGuia() {
         },
         {
           titulo: "Seguí un plan",
-          texto: "En Tu plan, arriba de todo en Rutina, cargás cuánto levantar cada semana del ciclo, o le pedís a la IA que lo arme. Cada serie viene escrita con la meta de su semana y la tarjeta muestra el plan en escalones.",
+          texto: "En Tu plan, la hoja de arriba de todo en Rutina, cargás cuánto levantar cada semana del ciclo, o le pedís a la IA que lo arme. Cada serie viene escrita con la meta de su semana y la tarjeta muestra el plan en escalones.",
           dibujo: (
             <div className="guia-ancho plan-en-tarjeta" style={{ "--tono": verde }} role="img" aria-label="Un plan de siete semanas, de 60 a 75 kilos, en escalones">
               <div className="plan-mini chico">
@@ -13042,6 +13053,62 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_
 }
 
 const EMPTY_SESIONES = [];
+// LA HOJA DEL PLAN (arriba de Rutina): la planilla del profe en su tabla,
+// como la hoja de la rutina que se comparte. Arriba, "Tu plan" con el día que
+// mirás pasado con resaltador y la semana del ciclo; en renglones, lo que el
+// plan dice para ese día esta semana, escrito a mano (pedido: "un enfoque más
+// relacionado a lo que es la planificación"; antes fue un casillero y, antes,
+// una tarjeta al pie de Rutina). Con el plan en pausa, la hoja lleva el sello
+// y los renglones se apagan; sin metas, los renglones vacíos y la nota.
+// Abajo, fuera del papel (como en la receta), planificar, pausar o seguir y
+// qué ves al registrar. `filas`: [{ id, nombre, meta }] del día, ya escritas.
+function HojaDelPlan({ dia = null, semana = null, filas = [], hayPlan = false, enPausa = false, sinRutina = false, invitar = false, onPlanificar = null, onPausa = null, onCampos = null }) {
+  const visibles = filas.slice(0, 3);
+  const resto = filas.length - visibles.length;
+  const pausado = hayPlan && enPausa;
+  return (
+    <section className={`planilla plan-hoja ${pausado ? "en-pausa" : ""}`} aria-label="Tu plan">
+      <BrocheTabla />
+      <div className="planilla-hoja">
+        <p className="plan-hoja-cabeza">
+          <span className="plan-hoja-titulo">Tu plan{hayPlan && dia ? <> · <span className="plan-hoja-dia" style={{ "--dia": dia.color }}>{dia.label}</span></> : null}</span>
+          {semana && <span className="plan-hoja-semana">Semana {semana.n} de {semana.de}</span>}
+        </p>
+        {sinRutina ? (
+          <p className="plan-hoja-nota">Activá una rutina primero, en la pestaña Rutinas.</p>
+        ) : !hayPlan ? (
+          <>
+            <span className="plan-hoja-renglones" aria-hidden="true"><i /><i /></span>
+            <p className="plan-hoja-nota">Sin metas: cada serie te muestra tu récord.</p>
+          </>
+        ) : filas.length ? (
+          <ol className="plan-hoja-filas">
+            {visibles.map((f) => <li key={f.id}><span>{f.nombre}</span><i aria-hidden="true" /><b className="a-mano">{f.meta}</b></li>)}
+          </ol>
+        ) : (
+          <p className="plan-hoja-nota">Este día no tiene metas esta semana.</p>
+        )}
+        {hayPlan && resto > 0 && <p className="plan-hoja-nota">y {resto} más con su meta</p>}
+        {pausado && <span className="plan-hoja-sello">En pausa</span>}
+        {pausado && <p className="sr-only">Tus metas siguen guardadas y perseguís tu récord.</p>}
+      </div>
+      <div className="plan-hoja-acciones">
+        {onPlanificar && (
+          <button onClick={onPlanificar} disabled={sinRutina} className={`boton-tonal !min-h-9 !px-3.5 !text-[13px] disabled:opacity-40 ${invitar ? "invite-pulse" : ""}`}>
+            <Sliders size={14} /> Planificar
+          </button>
+        )}
+        {hayPlan && onPausa && (
+          <button onClick={onPausa} className="plan-hoja-boton">
+            {enPausa ? <><Play size={12} className="fill-current" /> Reanudar</> : <><Pause size={12} className="fill-current" /> Pausar</>}
+          </button>
+        )}
+        {onCampos && <button onClick={onCampos} className="plan-hoja-boton"><Eye size={14} /> Qué ves al registrar</button>}
+      </div>
+    </section>
+  );
+}
+
 function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, weekSchedule, activeSession, onStartSession, onDisableAutoShowPrShare, onUpdateSettings = null, onSetPlanPaused = null, onRemovePlan = null, onGoToRoutines = null, onGoToSchedule = null, onGoToFieldSettings = null, onGoToDescarga = null, sex = null, age = null, activeRoutineDef = null, onApplyOwnProgression = null, goToDaySignal = { id: null, n: 0 }, onSignalConsumed = null, trainingSessions = [] }) {
   // Semana actual del ciclo — sólo hace falta el número (weekInCycle), para
   // que SetRow sepa si hay una meta cargada (modo "planned", ver
@@ -13188,56 +13255,33 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
 
   return (
     <div className="space-y-4">
-      {/* TU PLAN, EN SU CASILLERO, arriba de todo (pedido: "lo de planificar,
-          que vaya arriba en Rutina y que le aplique el nuevo formato de
-          diseño, estilo casillero"): la chapa cepillada con su rejilla y la
-          plaqueta con la semana del ciclo, la etiqueta "Tu plan" con cómo va,
-          y las calcomanías para planificar, pausarlo o seguirlo, y elegir qué
-          ves en cada serie (las dos cosas deciden CÓMO registrás). Antes era
-          una tarjeta al pie de Rutina y, antes, un panel arriba con el degradé
-          del hero.
+      {/* TU PLAN, EN LA HOJA DEL PROFE, arriba de todo (ver HojaDelPlan): lo
+          que el plan dice para el día que mirás. Antes fue un casillero (no
+          decía "plan": pedido "un enfoque más relacionado a lo que es la
+          planificación") y, antes, una tarjeta al pie de Rutina.
           No es un "modo" (Récord | Planificada) sino una ACCIÓN sobre el plan
           — pausarlo o reanudarlo — y si no hay ningún plan no se ofrece esa
           decisión. El dato guardado sigue siendo settings.trainingMode. */}
       {onUpdateSettings && (() => {
+        const unidad = settings?.weightUnit === "lbs" ? "lbs" : "kg";
+        const u = weightLabel(unidad);
+        const filas = (planResumen?.planificados || [])
+          .filter((e) => e.dayKey === activeDay && e.meta?.reps)
+          .map((e) => ({ id: e.id, nombre: e.nombre, meta: e.meta.kg > 0 ? `${e.meta.reps} × ${conComa(kgToDisplay(e.meta.kg, unidad))} ${u}` : `${e.meta.reps} reps` }));
         const enPausa = settings.trainingMode !== "planned";
-        const nActivos = planResumen?.planificados.length || 0;
-        const estado = !activeRoutineDef
-          ? "Activá una rutina primero, en la pestaña Rutinas."
-          : !hasAnyPlan
-            ? "Sin metas: cada serie te muestra tu récord."
-            : enPausa
-              ? "En pausa: tus metas siguen guardadas y perseguís tu récord."
-              : nActivos > 0
-                ? `${nActivos} ejercicio${nActivos === 1 ? " va" : "s van"} por su meta.`
-                : "Todos tus ejercicios van por récord.";
         return (
-          <section className="casillero plan-casillero" aria-label="Tu plan">
-            <div className="casillero-arriba">
-              <span className="casillero-rejilla" aria-hidden="true"><i /><i /><i /></span>
-              {weekInfo && <span className="casillero-numero" role="img" aria-label={`Semana ${weekInfo.weekInCycle} de ${weekInfo.cycleWeeks}`}>{weekInfo.weekInCycle}/{weekInfo.cycleWeeks}</span>}
-            </div>
-            <div className="plan-casillero-cuerpo">
-              <span className="casillero-etiqueta"><span className="casillero-nombre">Tu plan</span></span>
-              <p className="plan-casillero-estado">{estado}</p>
-            </div>
-            <div className="casillero-calcos plan-casillero-calcos">
-              {onApplyOwnProgression && (
-                <button onClick={() => setShowSelfProgression(true)} disabled={!activeRoutineDef} className={`calco calco-papel ${!hasAnyPlan && settings.trainingMode === "planned" ? "invite-pulse" : ""}`}>
-                  <Sliders size={14} /> Planificar
-                </button>
-              )}
-              {hasAnyPlan && (
-                <button onClick={() => onUpdateSettings({ trainingMode: enPausa ? "planned" : "record" })} className="calco calco-oscuro">
-                  {enPausa ? <><Play size={12} className="fill-current" /> Reanudar</> : <><Pause size={12} className="fill-current" /> Pausar</>}
-                </button>
-              )}
-              {onGoToFieldSettings && (
-                <button onClick={onGoToFieldSettings} className="calco calco-papel"><Eye size={14} /> Qué ves al registrar</button>
-              )}
-            </div>
-            <span className="casillero-manija" aria-hidden="true" />
-          </section>
+          <HojaDelPlan
+            dia={day ? { label: day.label, color: day.color } : null}
+            semana={weekInfo ? { n: weekInfo.weekInCycle, de: weekInfo.cycleWeeks } : null}
+            filas={filas}
+            hayPlan={hasAnyPlan}
+            enPausa={enPausa}
+            sinRutina={!activeRoutineDef}
+            invitar={!hasAnyPlan && !enPausa}
+            onPlanificar={onApplyOwnProgression ? () => setShowSelfProgression(true) : null}
+            onPausa={() => onUpdateSettings({ trainingMode: enPausa ? "planned" : "record" })}
+            onCampos={onGoToFieldSettings}
+          />
         );
       })()}
       {isRestToday && (
