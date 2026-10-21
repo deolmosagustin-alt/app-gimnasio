@@ -5581,7 +5581,6 @@ button.carrera-carril:active { background: var(--velo); }
 /* LA HOJA DEL PLAN (arriba de Rutina): la misma tabla, con lo que el plan dice
    para el día que mirás, escrito a mano; el sello si está en pausa; los
    botones abajo, fuera del papel. */
-.plan-hoja { padding-bottom: 10px; }
 .plan-hoja .planilla-hoja { position: relative; padding: 18px 14px 12px; }
 .plan-hoja-cabeza { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding-bottom: 6px; border-bottom: 1.5px dashed var(--papel-linea); }
 .plan-hoja-titulo { min-width: 0; font-size: 16px; font-weight: 800; font-stretch: 85%; line-height: 1.2; }
@@ -5596,10 +5595,14 @@ button.carrera-carril:active { background: var(--velo); }
 .plan-hoja-renglones { display: grid; gap: 15px; margin-top: 16px; }
 .plan-hoja-renglones i { display: block; height: 1px; background: var(--papel-linea); }
 .plan-hoja.en-pausa .plan-hoja-filas, .plan-hoja.en-pausa .plan-hoja-nota { opacity: .5; }
-.plan-hoja-sello { position: absolute; right: 16px; bottom: 14px; padding: 1px 9px 2px; border: 2.5px solid #a8433a; border-radius: 6px; font-size: 16px; font-weight: 800; font-stretch: 85%; color: #a8433a; transform: rotate(-10deg); opacity: .88; pointer-events: none; }
-.plan-hoja-acciones { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; padding: 0 2px; }
-.plan-hoja-boton { min-height: 36px; padding: 0 12px; border-radius: 999px; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 650; color: var(--text-strong); background: var(--velo); transition: transform .2s ease; }
-.plan-hoja-boton:active { transform: scale(.96); }
+.plan-hoja-cuerpo { position: relative; }
+.plan-hoja-sello { position: absolute; right: 0; bottom: 0; padding: 1px 9px 2px; border: 2.5px solid #a8433a; border-radius: 6px; font-size: 16px; font-weight: 800; font-stretch: 85%; color: #a8433a; transform: rotate(-10deg); opacity: .88; pointer-events: none; }
+.plan-hoja-acciones { display: flex; flex-wrap: wrap; align-items: center; column-gap: 16px; margin-top: 10px; padding-top: 2px; border-top: 1px solid var(--papel-linea); }
+.plan-hoja-accion { min-height: 38px; display: inline-flex; align-items: center; gap: 6px; padding: 0 1px; border-radius: 6px; font-size: 13px; font-weight: 700; line-height: 1.15; color: var(--papel-tinta); transition: transform .2s ease; }
+.plan-hoja-accion svg { flex: none; color: var(--papel-suave); }
+.plan-hoja-accion.principal span { padding: 0 3px; background: linear-gradient(transparent 50%, color-mix(in oklab, var(--dia, var(--tono)) 42%, var(--papel)) 50%, color-mix(in oklab, var(--dia, var(--tono)) 42%, var(--papel)) 92%, transparent 92%); }
+.plan-hoja-accion:active { transform: scale(.96); }
+.plan-hoja-accion:disabled { opacity: .45; }
 .hoja-rutina-titulo { font-size: 18px; font-weight: 800; font-stretch: 85%; line-height: 1.15; overflow-wrap: anywhere; }
 .hoja-rutina-bajada { margin-top: 2px; padding-bottom: 8px; font-size: 12.5px; color: var(--papel-suave); border-bottom: 1.5px dashed var(--papel-linea); }
 .hoja-rutina-dia { margin-top: 12px; }
@@ -13060,20 +13063,23 @@ const EMPTY_SESIONES = [];
 // relacionado a lo que es la planificación"; antes fue un casillero y, antes,
 // una tarjeta al pie de Rutina). Con el plan en pausa, la hoja lleva el sello
 // y los renglones se apagan; sin metas, los renglones vacíos y la nota.
-// Abajo, fuera del papel (como en la receta), planificar, pausar o seguir y
-// qué ves al registrar. `filas`: [{ id, nombre, meta }] del día, ya escritas.
+// Al pie de la hoja, planificar, pausar o seguir y qué ves al registrar. `filas`: [{ id, nombre, meta }] del día, ya escritas.
+// Las acciones van al pie de la hoja, impresas como el renglón de una planilla
+// (pedido: "integrá esos botones al nuevo diseño"; antes eran botones de la
+// app debajo del papel).
 function HojaDelPlan({ dia = null, semana = null, filas = [], hayPlan = false, enPausa = false, sinRutina = false, invitar = false, onPlanificar = null, onPausa = null, onCampos = null }) {
   const visibles = filas.slice(0, 3);
   const resto = filas.length - visibles.length;
   const pausado = hayPlan && enPausa;
   return (
-    <section className={`planilla plan-hoja ${pausado ? "en-pausa" : ""}`} aria-label="Tu plan">
+    <section className={`planilla plan-hoja ${pausado ? "en-pausa" : ""}`} aria-label="Tu plan" style={dia ? { "--dia": dia.color } : undefined}>
       <BrocheTabla />
       <div className="planilla-hoja">
         <p className="plan-hoja-cabeza">
-          <span className="plan-hoja-titulo">Tu plan{hayPlan && dia ? <> · <span className="plan-hoja-dia" style={{ "--dia": dia.color }}>{dia.label}</span></> : null}</span>
+          <span className="plan-hoja-titulo">Tu plan{hayPlan && dia ? <> · <span className="plan-hoja-dia">{dia.label}</span></> : null}</span>
           {semana && <span className="plan-hoja-semana">Semana {semana.n} de {semana.de}</span>}
         </p>
+        <div className="plan-hoja-cuerpo">
         {sinRutina ? (
           <p className="plan-hoja-nota">Activá una rutina primero, en la pestaña Rutinas.</p>
         ) : !hayPlan ? (
@@ -13091,19 +13097,20 @@ function HojaDelPlan({ dia = null, semana = null, filas = [], hayPlan = false, e
         {hayPlan && resto > 0 && <p className="plan-hoja-nota">y {resto} más con su meta</p>}
         {pausado && <span className="plan-hoja-sello">En pausa</span>}
         {pausado && <p className="sr-only">Tus metas siguen guardadas y perseguís tu récord.</p>}
-      </div>
-      <div className="plan-hoja-acciones">
-        {onPlanificar && (
-          <button onClick={onPlanificar} disabled={sinRutina} className={`boton-tonal !min-h-9 !px-3.5 !text-[13px] disabled:opacity-40 ${invitar ? "invite-pulse" : ""}`}>
-            <Sliders size={14} /> Planificar
-          </button>
-        )}
-        {hayPlan && onPausa && (
-          <button onClick={onPausa} className="plan-hoja-boton">
-            {enPausa ? <><Play size={12} className="fill-current" /> Reanudar</> : <><Pause size={12} className="fill-current" /> Pausar</>}
-          </button>
-        )}
-        {onCampos && <button onClick={onCampos} className="plan-hoja-boton"><Eye size={14} /> Qué ves al registrar</button>}
+        </div>
+        <div className="plan-hoja-acciones">
+          {onPlanificar && (
+            <button onClick={onPlanificar} disabled={sinRutina} className={`plan-hoja-accion principal ${invitar ? "invite-pulse" : ""}`}>
+              <Sliders size={14} /> <span>Planificar</span>
+            </button>
+          )}
+          {hayPlan && onPausa && (
+            <button onClick={onPausa} className="plan-hoja-accion">
+              {enPausa ? <><Play size={12} className="fill-current" /> <span>Reanudar</span></> : <><Pause size={12} className="fill-current" /> <span>Pausar</span></>}
+            </button>
+          )}
+          {onCampos && <button onClick={onCampos} className="plan-hoja-accion"><Eye size={14} /> <span>Qué ves al registrar</span></button>}
+        </div>
       </div>
     </section>
   );
