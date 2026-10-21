@@ -4209,6 +4209,9 @@ button.carrera-carril:active { background: var(--velo); }
 .light-mode .preset-activa { background: var(--c, var(--tono)); }
 .preset-desc { display: block; margin-top: 5px; font-size: 12.5px; line-height: 1.4; color: var(--text-muted); text-wrap: pretty; }
 .preset-pie { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.preset-tira { display: flex; gap: 2px; width: 96px; height: 10px; flex: none; }
+.preset-tira i { flex-basis: 0; border-radius: 3px; background: color-mix(in oklab, var(--text-strong) 24%, transparent); }
+.light-mode .preset-tira i { background: color-mix(in oklab, var(--text-strong) 18%, transparent); }
 .preset-frec { font-size: 12px; color: var(--text-muted); min-width: 0; }
 /* Un ícono suelto, sin placa: en el gris del texto, o en el ámbar si es un
    aviso. Reemplaza a los cuadraditos teñidos de las pantallas secundarias. */
@@ -5765,7 +5768,7 @@ textarea.import-texto { min-height: 150px; font-size: 14px; line-height: 1.45; r
 .import-pie { font-size: 12.5px; line-height: 1.4; text-align: center; color: var(--text-faint); text-wrap: pretty; }
 @media (prefers-reduced-motion: reduce) { .import-fuentes.leyendo .import-hoja::after { animation: none; top: 35%; } }
 /* ══ DUODÉCIMA TANDA: las pesas rusas, los cajones del ciclo en la pizarra,
-   tus rutinas, el corcho y la pizarra del Chatbot ═════════════════════════ */
+   el corcho y la pizarra del Chatbot ═════════════════════════ */
 /* LAS PESAS RUSAS EN SU ESTANTE (Rutinas): una pesa por día de entrenamiento,
    con la manija de hierro y la bocha de goma mate de los discos de la barra,
    del color de lo que toca; el lugar vacío, punteado, y la de hoy,
@@ -5910,25 +5913,6 @@ button.estante-lugar:active .pesa-rusa { scale: .92; }
 .chinche { position: absolute; top: 7px; left: 50%; width: 15px; height: 15px; translate: -50% 0; border-radius: 999px; background: radial-gradient(circle at 34% 30%, rgba(255,255,255,.65) 0 2px, transparent 3.2px), var(--chinche, #b9483e); box-shadow: 0 3px 3px -1px rgba(0,0,0,.5); }
 /* Activa: un sello en la hoja. */
 .hoja-clavada .preset-activa { height: auto; padding: 1px 7px; rotate: -7deg; border-radius: 5px; font-size: 12px; font-weight: 800; color: color-mix(in oklab, var(--tono) 70%, #1a2340); background: none; box-shadow: inset 0 0 0 2px currentColor; }
-
-/* TUS RUTINAS CREADAS, con la estética de Rutina: el nombre grande y angosto
-   como el del día, los días en el riel de Rutina (sin ninguno elegido) y abajo,
-   tras un filo, las series por semana con los números angostos, cuánto la
-   usaste y las acciones. Sin color: lo lleva sólo lo que se toca. */
-.preset.rutina-guardada { padding: 16px 14px 12px 16px; box-shadow: var(--placa-canto); }
-.preset.rutina-guardada.activa { box-shadow: inset 0 0 0 1.5px var(--hairline-fuerte); }
-.rutina-guardada .preset-cabeza { align-items: flex-start; justify-content: space-between; gap: 10px; }
-.rutina-guardada-nombre { min-width: 0; font-size: 1.45rem; font-weight: 800; font-stretch: 80%; line-height: 1.02; letter-spacing: -0.02em; color: var(--text-strong); text-wrap: balance; overflow-wrap: anywhere; }
-.rutina-guardada .preset-activa { margin-top: 2px; }
-.rutina-guardada-riel { display: flex; gap: 3px; margin-top: 12px; padding: 3px; border-radius: 999px; background: var(--panel-sunken); box-shadow: inset 0 0 0 1px var(--hairline); }
-.rutina-guardada-dia { container-type: inline-size; flex: 1 1 0; min-width: 0; display: flex; align-items: center; justify-content: center; min-height: 34px; padding: 4px 6px; border-radius: 999px; color: var(--text-muted); }
-.rutina-guardada-dia .dia-solapa-texto { font-weight: 650; }
-.rutina-guardada-pie { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--hairline); }
-.rutina-guardada-datos { min-width: 0; display: grid; gap: 2px; }
-.rutina-guardada-series { font-size: 12.5px; line-height: 1.2; color: var(--text-muted); }
-.rutina-guardada-series b { margin-right: 2px; font-size: 1.15rem; font-weight: 800; color: var(--text-strong); }
-.rutina-guardada-pie .preset-frec { font-size: 12px; line-height: 1.35; color: var(--text-faint); }
-.rutina-guardada-pie .preset-acciones { flex: none; margin-top: 0; }
 
 /* EL CHATBOT, EN LA PIZARRA DEL PROFE: el saludo escrito con tiza, los cuatro
    pedidos más comunes como notas adhesivas pegadas en la pizarra y los demás
@@ -22537,52 +22521,39 @@ function PresetRoutineCard({ preset, isActive, onPreview }) {
   );
 }
 
-// Una lista en palabras: "Push, Pull y Legs".
-function enLista(nombres = []) {
-  const n = nombres.filter(Boolean);
-  return n.length <= 1 ? n.join("") : `${n.slice(0, -1).join(", ")} y ${n[n.length - 1]}`;
-}
+// TUS RUTINAS CREADAS: la tarjeta de siempre, discreta, para que no compita
+// con tu rutina de arriba. El nombre, la tira gris de sus días (el ancho de
+// cada tramo es cuántas series tiene) y cuánto la usaste; abajo, las
+// acciones. En la tanda 12 se probaron una carpeta, una tarjeta con la tira en
+// colores y otra con la letra de Rutina: volvió ésta ("ahora siento que tiene
+// mucho protagonismo").
 function SavedRoutineRow({ routine, isActive, onUse, onEdit, onShare, onArchive, onPreview, uso = null }) {
   const dayCount = routine.dayOrder.length;
   // BUG FIX (pedido: "que las no activas estén del celeste característico
   // de la pestaña"): antes las inactivas usaban índigo, sin relación con
   // ningún color de la app — Rutinas (esta pestaña, plural) era celeste.
   // Pedido posterior: "cambiar el celeste de rutinas por azul".
-  const tramos = routine.dayOrder.map((dk) => ({ dk, label: routine.days?.[dk]?.label || dk, series: (routine.days?.[dk]?.exercises || []).reduce((a, e) => a + (e.sets?.length || 0), 0) }));
-  const seriesPorSemana = tramos.reduce((a, t) => a + t.series, 0);
+  const tramos = routine.dayOrder.map((dk) => ({ dk, color: routine.days?.[dk]?.color || "#3B82F6", series: (routine.days?.[dk]?.exercises || []).reduce((a, e) => a + (e.sets?.length || 0), 0) || 1 }));
   return (
     <SwipeToArchive confirmText={`¿Eliminar "${routine.name}"? No se puede deshacer.`} onArchive={onArchive} redondeo="rounded-[24px]" fondo="">
-      {/* LA TARJETA, CON LA ESTÉTICA DE RUTINA: el nombre grande y angosto
-          (como el del día), sus días en el riel de Rutina (sin ninguno
-          elegido) y abajo, tras un filo, las series por semana con los números
-          angostos, cuánto la usaste y las acciones. Sin color: lo lleva sólo lo
-          que se toca (pedido: "tiene mucho color, dale más estética como la
-          que tiene Rutina"). En la tanda 12 fue una carpeta y después, una
-          tarjeta con la tira de los días en colores. */}
-      <div className={`preset rutina-guardada stagger-item ${isActive ? "activa" : ""}`} style={{ "--c": "#3B82F6" }}>
+      <div className={`preset stagger-item ${isActive ? "activa" : ""}`} style={{ "--c": "#3B82F6" }}>
         {/* Tocar la rutina abre el pop-up completo (días, ejercicios, balance). */}
         <button onClick={onPreview} className="preset-cuerpo">
           <span className="preset-cabeza">
-            <span className="rutina-guardada-nombre">{routine.name}</span>
+            <span className="preset-nombre">{routine.name}</span>
             {isActive && <span className="preset-activa">Activa</span>}
           </span>
-          <span className="rutina-guardada-riel" role="img" aria-label={`${dayCount} día${dayCount !== 1 ? "s" : ""}: ${enLista(tramos.map((t) => t.label))}`}>
-            {tramos.map((t) => {
-              const { texto, larga } = etiquetaDeDia(t.label);
-              return <span key={t.dk} className="rutina-guardada-dia" aria-hidden="true"><span className="dia-solapa-texto" style={{ "--largo": larga, "--fs-max": tamanoMaxSolapa(tramos.length) }}>{texto}</span></span>;
-            })}
+          <span className="preset-pie">
+            <span className="preset-tira" aria-hidden="true">{tramos.map((t) => <i key={t.dk} style={{ "--dia": t.color, flexGrow: t.series }} />)}</span>
+            <span className="preset-frec">
+              {dayCount} día{dayCount !== 1 ? "s" : ""}{uso?.sesiones > 0 ? `, ${uso.sesiones} sesion${uso.sesiones !== 1 ? "es" : ""} (${haceCuanto(uso.diasDesde)})` : ", sin usar"}
+            </span>
           </span>
         </button>
-        <span className="rutina-guardada-pie">
-          <span className="rutina-guardada-datos">
-            <span className="rutina-guardada-series"><b className="num-display">{seriesPorSemana}</b> serie{seriesPorSemana !== 1 ? "s" : ""} por semana</span>
-            <span className="preset-frec">{uso?.sesiones > 0 ? `${uso.sesiones} sesion${uso.sesiones !== 1 ? "es" : ""}, la última ${haceCuanto(uso.diasDesde)}` : "Sin usar"}</span>
-          </span>
-          <span className="preset-acciones">
-            {!isActive && <button onClick={onUse} className="boton-tonal !min-h-9 !px-3.5 !text-[13px]">Activar</button>}
-            <button onClick={onShare} aria-label="Compartir" className="boton-redondo !w-9 !h-9"><Share2 size={15} /></button>
-            <button onClick={onEdit} aria-label="Editar" className="boton-redondo !w-9 !h-9"><Edit3 size={15} /></button>
-          </span>
+        <span className="preset-acciones">
+          {!isActive && <button onClick={onUse} className="boton-tonal !min-h-9 !px-3.5 !text-[13px]">Activar</button>}
+          <button onClick={onShare} aria-label="Compartir" className="boton-redondo !w-9 !h-9"><Share2 size={15} /></button>
+          <button onClick={onEdit} aria-label="Editar" className="boton-redondo !w-9 !h-9"><Edit3 size={15} /></button>
         </span>
       </div>
     </SwipeToArchive>
