@@ -3795,9 +3795,8 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 /* ── PIEZAS DEL GIMNASIO (segunda vuelta) ─────────────────────────────────
    Objetos que cualquiera que entrena reconoce, en vez de números y párrafos:
    la cadena (racha), la balanza de cursor (peso), la escalera de carga
-   (ciclo; ahora son discos), la escalera de récords (gráfica), la tarjeta
-   perforada (historial; ahora es el almanaque), el carnet de socio y la
-   carrera de la semana. */
+   (ciclo; ahora son cajones), la escalera de récords (gráfica), la tarjeta
+   perforada (historial), el carnet de socio y la carrera de la semana. */
 .seccion-titulo { font-size: 1rem; font-weight: 700; color: var(--text-strong); letter-spacing: -0.01em; padding: 0 2px; }
 .enlace-suave { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 36px; padding: 0 6px; font-size: 0.8125rem; font-weight: 600; color: var(--text-muted); }
 .enlace-suave:hover { color: var(--text-strong); }
@@ -5765,61 +5764,100 @@ textarea.import-texto { min-height: 150px; font-size: 14px; line-height: 1.45; r
 .import-enlace { display: inline; padding: 0; font: inherit; font-weight: 650; color: var(--text-strong); text-decoration: underline; text-underline-offset: 3px; }
 .import-pie { font-size: 12.5px; line-height: 1.4; text-align: center; color: var(--text-faint); text-wrap: pretty; }
 @media (prefers-reduced-motion: reduce) { .import-fuentes.leyendo .import-hoja::after { animation: none; top: 35%; } }
-/* ══ DUODÉCIMA TANDA: el rack, los discos del ciclo, los separadores, el
-   almanaque, el corcho, las carpetas y la pizarra del Chatbot ══════════════ */
-/* EL RACK DE MANCUERNAS (Rutinas): una mancuerna por día de entrenamiento,
-   hecha con el acero y la goma de la barra; el lugar vacío, en fantasma, y la
-   de hoy, levantada. Abajo, el caño del rack (el mismo acero de la barra) y la
-   placa con los nombres de los días. */
+/* ══ DUODÉCIMA TANDA: las pesas rusas, los cajones del ciclo en la pizarra,
+   el corcho, las carpetas y la pizarra del Chatbot ═════════════════════════ */
+/* LAS PESAS RUSAS EN SU ESTANTE (Rutinas): una pesa por día de entrenamiento,
+   con la manija de hierro y la bocha de goma mate de los discos de la barra,
+   del color de lo que toca; el lugar vacío, punteado, y la de hoy,
+   levantada. El estante es de chapa cepillada, como el casillero, con los
+   nombres de los días en el canto. */
 .estante { position: relative; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; margin: 0; padding: 0 5px; list-style: none; }
-.estante::before { content: ""; position: absolute; z-index: 1; left: 2px; right: 2px; bottom: 26px; height: 6px; border-radius: 3px; background: linear-gradient(#e6e7ea, #9b9da2 55%, #55575c); box-shadow: 0 3px 5px -2px rgba(0,0,0,.55); }
-.light-mode .estante::before { background: linear-gradient(#d8d9dc, #8f9196 55%, #55575c); box-shadow: 0 3px 5px -2px rgba(0,0,0,.25); }
-.estante::after { content: ""; position: absolute; left: 6px; right: 6px; bottom: 0; height: 26px; border-radius: 0 0 10px 10px; background: linear-gradient(#24262a, #1b1c1f); box-shadow: inset 0 1px 0 rgba(255,255,255,.05); }
-.light-mode .estante::after { background: linear-gradient(#e3e5e9, #d2d5da); box-shadow: inset 0 1px 0 #fff; }
-.estante > * { position: relative; z-index: 2; display: flex; min-width: 0; }
-.estante-lugar { position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; padding-top: 14px; }
+.estante::before {
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 26px; border-radius: 8px;
+  background: repeating-linear-gradient(90deg, rgba(255,255,255,.022) 0 2px, transparent 2px 5px), linear-gradient(#34363c, #26282d);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.1), inset 0 -1px 0 rgba(0,0,0,.4), 0 10px 18px -14px rgba(0,0,0,.9);
+}
+.light-mode .estante::before { background: repeating-linear-gradient(90deg, rgba(0,0,0,.025) 0 2px, transparent 2px 5px), linear-gradient(#e7e9ed, #d3d6dc); box-shadow: inset 0 1px 0 #fff, inset 0 -1px 0 rgba(0,0,0,.1), 0 10px 18px -14px rgba(0,0,0,.3); }
+.estante > * { position: relative; display: flex; min-width: 0; }
+.estante-lugar { position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; padding-top: 12px; }
 .estante-lugar.con-pesa { --d: color-mix(in oklab, var(--dia) 62%, #8a8c92); }
 .light-mode .estante-lugar.con-pesa { --d: color-mix(in oklab, var(--dia) 72%, #a7a9ae); }
-.mancuerna { display: block; width: 100%; max-width: 46px; height: auto; margin-bottom: 5px; overflow: visible; transition: scale .2s ease; }
+.estante-lugar .pesa-rusa { width: 100%; max-width: 40px; margin-bottom: -1px; }
 .estante-dia { position: relative; z-index: 1; display: block; width: 100%; height: 26px; line-height: 26px; text-align: center; font-size: 11.5px; font-weight: 650; color: var(--text-muted); }
 .estante-lugar.hoy .estante-dia { color: var(--text-strong); font-weight: 750; text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 4px; }
-/* La de hoy, levantada del rack, con su sombra en el caño. */
-.estante-lugar.hoy.con-pesa .mancuerna { translate: 0 -9px; animation: pesaSeLevanta .6s var(--resorte) .35s backwards; }
-.estante-lugar.hoy.con-pesa::after { content: ""; position: absolute; left: 50%; bottom: 30px; width: 34px; height: 7px; translate: -50% 0; border-radius: 50%; background: radial-gradient(closest-side, rgba(0,0,0,.55), transparent); }
+.pesa-rusa { display: block; height: auto; overflow: visible; transition: scale .2s ease; }
+.pesa-rusa-goma { stroke: rgba(0,0,0,.42); stroke-width: .7; }
+.hierro-claro { stop-color: #8d9096; }
+.hierro-medio { stop-color: #55585e; }
+.hierro-oscuro { stop-color: #2b2d31; }
+.light-mode .hierro-claro { stop-color: #9a9da3; }
+.light-mode .hierro-medio { stop-color: #62656b; }
+.light-mode .hierro-oscuro { stop-color: #3a3c41; }
+.pesa-rusa-acero-brillo { fill: none; stroke: rgba(255,255,255,.42); stroke-width: 1.1; stroke-linecap: round; }
+.pesa-rusa-base { fill: none; stroke: rgba(0,0,0,.35); stroke-width: 1.2; stroke-linecap: round; }
+.pesa-rusa-brillo { fill: none; stroke: rgba(255,255,255,.3); stroke-width: 2; stroke-linecap: round; }
+.pesa-rusa.vacia .pesa-rusa-asa, .pesa-rusa.vacia .pesa-rusa-cuerpo { fill: none; stroke: var(--hairline-fuerte); stroke-width: 1.6; stroke-dasharray: 3 3.2; }
+/* La de hoy, levantada del estante, con su sombra abajo. */
+.estante-lugar.hoy.con-pesa .pesa-rusa { translate: 0 -9px; animation: pesaSeLevanta .6s var(--resorte) .35s backwards; }
+.estante-lugar.hoy.con-pesa::after { content: ""; position: absolute; left: 50%; bottom: 22px; width: 32px; height: 8px; translate: -50% 0; border-radius: 50%; background: radial-gradient(closest-side, rgba(0,0,0,.55), transparent); }
 .light-mode .estante-lugar.hoy.con-pesa::after { background: radial-gradient(closest-side, rgba(0,0,0,.22), transparent); }
 @keyframes pesaSeLevanta { from { translate: 0 0; } }
-button.estante-lugar:active .mancuerna { scale: .92; }
-/* En chico (el aviso de Rutina cuando hoy descansás): sin los nombres, el caño
-   finito y hoy con su rayita. */
-.estante.chico { flex: none; width: 118px; gap: 1px; padding: 0 2px; }
-.estante.chico::before { bottom: 1px; height: 3px; border-radius: 2px; }
-.estante.chico::after { display: none; }
-.estante.chico .estante-lugar { padding: 2px 0 0; }
-.estante.chico .mancuerna { max-width: 16px; margin-bottom: 4px; }
-.estante.chico .mancuerna.vacia rect { fill: var(--disco-fantasma); stroke: none; }
-.estante.chico .estante-lugar.hoy::after { content: ""; position: absolute; left: 22%; right: 22%; bottom: -5px; width: auto; height: 3px; translate: none; border-radius: 2px; background: var(--text-strong); }
-.estante.chico .estante-lugar.hoy.con-pesa .mancuerna { translate: 0 -3px; }
+button.estante-lugar:active .pesa-rusa { scale: .92; }
+/* En chico (el aviso de Rutina cuando hoy descansás): sin los nombres, y hoy
+   con su rayita en el estante. */
+.estante.chico { flex: none; width: 112px; gap: 1px; padding: 0 2px; }
+.estante.chico::before { height: 4px; border-radius: 2px; }
+.estante.chico .estante-lugar { padding: 2px 0 4px; }
+.estante.chico .pesa-rusa { max-width: 15px; }
+.estante.chico .pesa-rusa.vacia .pesa-rusa-cuerpo { fill: var(--disco-fantasma); stroke: none; }
+.estante.chico .pesa-rusa.vacia .pesa-rusa-asa { stroke: var(--disco-fantasma); stroke-width: 4.2; stroke-dasharray: none; }
+.estante.chico .estante-lugar.hoy::after { content: ""; position: absolute; left: 22%; right: 22%; bottom: 0; width: auto; height: 4px; translate: none; border-radius: 2px; background: var(--text-strong); }
+.estante.chico .estante-lugar.hoy.con-pesa .pesa-rusa { translate: 0 -3px; }
 
-/* LOS DISCOS DEL CICLO (Progreso, Perfil, la bienvenida y la guía). */
-.discos-ciclo { display: block; width: 100%; height: auto; overflow: visible; margin-top: 16px; }
-.discos-ciclo-piso { fill: color-mix(in oklab, var(--text-strong) 9%, transparent); }
-.discos-ciclo linearGradient { --d: var(--c-disco); }
-.discos-ciclo linearGradient.goma-pasada { --d: color-mix(in oklab, var(--c-disco) 60%, #8a8c92); }
-.light-mode .discos-ciclo linearGradient.goma-pasada { --d: color-mix(in oklab, var(--c-disco) 70%, #a7a9ae); }
-.disco-ciclo-goma { stroke: rgba(0,0,0,.5); stroke-width: .9; }
-.disco-ciclo-cara { fill: none; stroke: rgba(0,0,0,.24); stroke-width: 1.1; }
-.disco-ciclo-brillo { fill: none; stroke: rgba(255,255,255,.26); stroke-width: 1.4; stroke-linecap: round; }
-.disco-ciclo-agujero { fill: #0d0e10; }
-.disco-ciclo-numero { font-weight: 800; font-stretch: 78%; text-anchor: middle; dominant-baseline: middle; }
-.disco-ciclo.futuro .disco-fantasma { stroke-width: 1.3; stroke-dasharray: 3 3; }
-.disco-ciclo.futuro .disco-ciclo-numero { fill: var(--text-faint); }
-.disco-ciclo.actual .disco-ciclo-cuerpo { translate: 0 -8px; filter: drop-shadow(0 5px 4px rgba(0,0,0,.42)); }
-.light-mode .disco-ciclo.actual .disco-ciclo-cuerpo { filter: drop-shadow(0 5px 4px rgba(0,0,0,.16)); }
-.disco-ciclo-sombra { fill: rgba(0,0,0,.5); }
-.light-mode .disco-ciclo-sombra { fill: rgba(0,0,0,.18); }
-.disco-ciclo.rueda .disco-ciclo-cuerpo { animation: discoRueda .75s var(--resorte) backwards; animation-delay: inherit; transform-box: fill-box; transform-origin: center; }
-@keyframes discoRueda { from { transform: translateX(-22px) rotate(-150deg); opacity: 0; } }
-.ciclo-discos .escalera-cabeza { align-items: flex-end; }
+/* LOS CAJONES DEL CICLO (Progreso, Perfil, la bienvenida y la guía), parados
+   en la repisa de la pizarra del gimnasio. Cada cajón es de chapa pintada como
+   el casillero: el cepillado, el marco, la ranura de la agarradera y la
+   plaqueta con el número. Los que pasaron, con la pintura gastada (apagada con
+   gris); el de esta semana, con su color entero; los que vienen, dibujados con
+   tiza; arriba de cada uno, sus sesiones en tiza. La pizarra es pizarra también
+   en el modo claro. */
+.cajones-pizarra {
+  --tiza: #ecebe4; --tiza-suave: rgba(236,235,228,.48); --madera: #5b4a39;
+  position: relative; margin-top: 14px; padding: 8px 12px 0; border-radius: 12px;
+  background: radial-gradient(ellipse at 22% 12%, rgba(255,255,255,.055), transparent 60%), radial-gradient(ellipse at 85% 80%, rgba(255,255,255,.03), transparent 55%), #1f2622;
+  box-shadow: inset 0 0 0 5px var(--madera), inset 0 0 0 6px rgba(0,0,0,.35), inset 0 3px 12px rgba(0,0,0,.5), 0 12px 24px -18px rgba(0,0,0,.9);
+}
+/* La repisa de madera, donde se paran los cajones. */
+.cajones-pizarra::after { content: ""; display: block; height: 10px; margin: 0 -12px; border-radius: 0 0 12px 12px; background: linear-gradient(#7c6349, #4e3f30); box-shadow: inset 0 1px 0 rgba(255,255,255,.16), 0 -1px 0 rgba(0,0,0,.5); }
+.cajones { display: flex; align-items: stretch; gap: 6px; }
+.cajon-lugar { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; justify-content: flex-end; }
+.cajon-tiza { display: flex; justify-content: center; align-items: flex-end; height: 16px; padding-bottom: 4px; }
+.cajon-tiza .marcas { color: var(--tiza); }
+.cajon-tiza.cumplida .marcas { color: color-mix(in oklab, var(--tono) 46%, #f4f3ee); }
+.cajon {
+  --cuerpo: color-mix(in oklab, var(--pintura, #8a8c92) 58%, #8a8c92);
+  position: relative; flex: none; display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+  border-radius: 4px 4px 2px 2px;
+  background: repeating-linear-gradient(90deg, rgba(255,255,255,.05) 0 2px, transparent 2px 5px), linear-gradient(rgba(255,255,255,.18), rgba(255,255,255,0) 30%, rgba(0,0,0,.22)), var(--cuerpo);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.14), inset 0 0 0 3px rgba(0,0,0,.16), 0 4px 6px -3px rgba(0,0,0,.6);
+}
+.cajon.actual { --cuerpo: var(--pintura); }
+/* La agarradera: una ranura calada, como la rejilla del casillero. */
+.cajon-agarre { position: absolute; top: max(6px, 13%); left: 50%; width: 56%; max-width: 26px; height: 6px; translate: -50% 0; border-radius: 999px; background: #121316; box-shadow: inset 0 2px 2px rgba(0,0,0,.6), 0 1px 0 rgba(255,255,255,.24); }
+/* La plaqueta con el número, como la del casillero; la de esta semana, blanca
+   como su etiqueta. */
+.cajon-numero { margin-bottom: 5px; min-width: 15px; padding: 1px 3px; border-radius: 3px; font-size: 11px; line-height: 1.15; font-weight: 800; font-stretch: 78%; text-align: center; color: #2a2b30; background: #c6c9cf; box-shadow: inset 0 0 0 1px rgba(0,0,0,.22), 0 1px 1px rgba(0,0,0,.45); }
+.cajon.actual .cajon-numero { background: #f4f3ee; }
+/* La descarga: un cajón bajo de goma espuma negra, rayado. */
+.cajon.descarga { --cuerpo: #2c2e33; background: repeating-linear-gradient(-45deg, rgba(255,255,255,.07) 0 3px, transparent 3px 7px), linear-gradient(rgba(255,255,255,.08), rgba(0,0,0,.2)), var(--cuerpo); }
+/* Los que vienen, dibujados con tiza en la pizarra. */
+.cajon.futura { background: none; box-shadow: none; border: 1.5px dashed var(--tiza-suave); }
+.cajon.futura .cajon-agarre { background: none; box-shadow: inset 0 0 0 1.3px var(--tiza-suave); }
+.cajon.futura .cajon-numero { margin-bottom: 2px; padding: 0; font-family: 'Caveat Variable', 'Caveat', 'Segoe Print', cursive; font-size: 17px; font-weight: 600; font-stretch: normal; line-height: 1; color: rgba(236,235,228,.78); background: none; box-shadow: none; }
+@keyframes cajonSube { from { transform: scaleY(.2); opacity: 0; } }
+.cajon.sube { transform-origin: bottom; animation: cajonSube .55s cubic-bezier(.34,1.4,.64,1) backwards; }
+/* Arriba de los cajones: "6/8" y, al costado, las sesiones de esta semana. */
+.ciclo-cajones .escalera-cabeza { align-items: flex-end; }
 .ciclo-rotulo { font-size: 13px; font-weight: 600; color: var(--text-muted); }
 .ciclo-semana { display: flex; align-items: baseline; margin-top: 3px; line-height: .9; }
 .ciclo-semana b { font-size: 3rem; font-weight: 800; color: var(--text-strong); }
@@ -5828,61 +5866,15 @@ button.estante-lugar:active .mancuerna { scale: .92; }
 .ciclo-esta-semana .marcas { color: var(--text-strong); }
 .ciclo-esta-semana.cumplida .marcas { color: color-mix(in oklab, var(--tono) 72%, white); }
 .light-mode .ciclo-esta-semana.cumplida .marcas { color: var(--tono); }
-.ciclo-perfil .discos-ciclo { margin-top: 2px; }
-.guia-discos { width: 100%; max-width: 290px; }
-.guia-discos .discos-ciclo { margin-top: 0; }
-
-/* LOS SEPARADORES (Progreso): las secciones son las pestañas de los
-   separadores de una carpeta, cada una de su color, que asoman de atrás de la
-   placa de la sección; la elegida, más alta y en pastel. La placa va siempre
-   adelante (z-index) y cada pestaña deja su parte de abajo detrás, sin tapar
-   el ícono ni el nombre. */
-.pestanas-internas.separadores { position: relative; z-index: 0; gap: 4px; padding: 0 12px; margin-bottom: -14px; border-radius: 0; background: none; box-shadow: none; align-items: flex-end; }
-.separadores + * { position: relative; z-index: 1; }
-.separadores > .pestana-interna { min-height: 62px; justify-content: flex-start; padding: 8px 3px 21px; border-radius: 16px 16px 6px 6px !important; translate: 0 4px; color: var(--text-muted); background: color-mix(in oklab, var(--c) 14%, var(--surface-1)); box-shadow: inset 0 1px 0 rgba(255,255,255,.05); transition: translate .35s var(--resorte), min-height .35s var(--resorte), background-color .2s ease, color .2s ease; }
-.separadores > .pestana-interna svg { color: color-mix(in oklab, var(--c) 62%, var(--text-muted)); }
-.separadores > .pestana-interna[aria-selected="true"] { translate: 0 -2px; min-height: 64px; color: color-mix(in oklab, var(--c) 18%, #07080a); background: color-mix(in oklab, var(--c) 72%, white); box-shadow: none; }
-.separadores > .pestana-interna[aria-selected="true"] svg { color: currentColor; }
-.light-mode .separadores > .pestana-interna { background: color-mix(in oklab, var(--c) 12%, white); box-shadow: inset 0 0 0 1px var(--hairline); }
-.light-mode .separadores > .pestana-interna[aria-selected="true"] { color: color-mix(in oklab, var(--c) 18%, #07080a); background: color-mix(in oklab, var(--c) 78%, white); box-shadow: none; }
-
-/* EL ALMANAQUE (Historial y Medidas): la hoja del mes del almanaque de la
-   pared, con las argollas arriba. Cada día que entrenaste, encerrado a mano con
-   fibrón del color de lo que hiciste (dos aros si fueron dos); hoy, pasado con
-   resaltador; y al costado, en lápiz, cuántas veces fuiste esa semana. Es papel
-   también en oscuro, un poco apagado. Antes eran agujeros picados en una
-   tarjeta oscura. */
-.tarjeta-perforada { --papel: #e8e6df; --papel-tinta: #232427; --papel-suave: #5f6066; position: relative; margin-top: 10px; padding: 24px 12px 14px; border-radius: 8px 8px 18px 18px; color: var(--papel-tinta); background: var(--papel); box-shadow: 0 14px 28px -18px rgba(0,0,0,.85); }
-.light-mode .tarjeta-perforada { --papel: #fdfcf8; box-shadow: 0 12px 26px -18px rgba(0,0,0,.35), inset 0 0 0 1px rgba(0,0,0,.05); }
-.almanaque-argollas { position: absolute; left: 22px; right: 22px; top: -10px; height: 24px; display: flex; justify-content: space-between; pointer-events: none; }
-.almanaque-argollas i { position: relative; width: 8px; height: 24px; }
-.almanaque-argollas i::before { content: ""; position: absolute; left: 0; bottom: 3px; width: 8px; height: 8px; border-radius: 999px; background: #1b1c1f; }
-.almanaque-argollas i::after { content: ""; position: absolute; left: 1px; top: 0; width: 6px; height: 18px; border-radius: 4px; border: 2px solid #b7bac0; border-bottom-color: transparent; box-shadow: 0 1px 1px rgba(0,0,0,.35); }
-.almanaque-cabeza { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
-.almanaque-mes { font-size: 17px; font-weight: 800; font-stretch: 85%; letter-spacing: -0.01em; color: var(--papel-tinta); }
-.almanaque-mes span { font-weight: 600; color: var(--papel-suave); }
-.tarjeta-perforada .boton-redondo { color: var(--papel-tinta); background: rgba(0,0,0,.06); box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); }
-.tarjeta-perforada .perforada { gap: 0; }
-.tarjeta-perforada .perforada-cabeza { padding-bottom: 4px; border-bottom: 1.5px solid rgba(0,0,0,.14); }
-.tarjeta-perforada .perforada-cabeza span { color: var(--papel-suave); }
-.tarjeta-perforada .perforada-cabeza span:nth-child(7) { color: #a8433a; }
-.tarjeta-perforada .perforada-fila:not(.perforada-cabeza) { padding: 3px 0; border-bottom: 1px solid rgba(0,0,0,.07); }
-.tarjeta-perforada .perforada-fila:last-child { border-bottom: 0; }
-.tarjeta-perforada .hueco-dia { position: relative; max-width: 40px; border-radius: 10px; font-size: 14px; font-weight: 650; color: var(--papel-tinta); background: none; box-shadow: none; }
-.light-mode .tarjeta-perforada .hueco-dia { box-shadow: none; }
-.tarjeta-perforada .hueco-dia.picado, .light-mode .tarjeta-perforada .hueco-dia.picado, .tarjeta-perforada .hueco-dia.picado[style*="--dia2"] { font-weight: 800; color: var(--papel-tinta); background: none; box-shadow: none; }
-.tarjeta-perforada .hueco-dia.picado::before, .tarjeta-perforada .hueco-dia.picado[style*="--dia2"]::after {
-  content: ""; position: absolute; inset: 2px; pointer-events: none;
-  border: 2.6px solid color-mix(in oklab, var(--dia) 82%, #1d1d1f);
-  border-radius: 47% 53% 44% 56% / 56% 46% 54% 44%; rotate: var(--giro, -6deg);
-}
-.tarjeta-perforada .hueco-dia.picado[style*="--dia2"]::after { inset: -1px; border-width: 2px; border-color: color-mix(in oklab, var(--dia2) 82%, #1d1d1f); rotate: calc(var(--giro, -6deg) * -1 + 10deg); }
-.tarjeta-perforada .hueco-dia.hoy { outline: none; background: linear-gradient(172deg, transparent 47%, color-mix(in oklab, var(--tono) 50%, transparent) 47% 80%, transparent 80%) center / 80% 100% no-repeat; }
-.tarjeta-perforada .hueco-dia.elegido { outline: none; box-shadow: inset 0 0 0 2px var(--papel-tinta); }
-.tarjeta-perforada .perforada-total { font-family: 'Caveat Variable', 'Caveat', 'Segoe Print', cursive; font-size: 21px; font-weight: 600; font-stretch: normal; color: var(--papel-suave); }
-.tarjeta-perforada .hueco-estrella { color: #94721a; }
-.tarjeta-perforada .medida-leyenda { color: var(--papel-suave); }
-.tarjeta-perforada .medida-leyenda i { width: 12px; height: 12px; background: none; border: 2px solid color-mix(in oklab, var(--dia) 82%, #1d1d1f); border-radius: 47% 53% 44% 56% / 56% 46% 54% 44%; }
+.ciclo-perfil .cajones-pizarra { margin-top: 2px; }
+.guia-cajones { width: 100%; max-width: 290px; }
+.guia-cajones .cajones-pizarra { margin-top: 0; }
+/* Las semanas del planificador también son cajones: la agarradera arriba. */
+.plan-escalon-bloque { position: relative; border-radius: 4px; }
+.plan-escalon-bloque::before { content: ""; position: absolute; top: max(5px, 15%); left: 50%; width: 52%; max-width: 26px; height: 7px; translate: -50% 0; border-radius: 999px; box-shadow: inset 0 0 0 1.5px var(--hairline-fuerte); }
+.plan-escalon.cargada .plan-escalon-bloque::before { box-shadow: inset 0 2px 2px rgba(0,0,0,.3); background: rgba(0,0,0,.36); }
+.light-mode .plan-escalon.cargada .plan-escalon-bloque::before { background: rgba(0,0,0,.15); }
+.plan-escalon[aria-selected="true"] .plan-escalon-bloque::before { box-shadow: none; background: color-mix(in oklab, var(--accion-tinta) 50%, transparent); }
 
 /* ARMÁ LA TUYA: la tabla con la hoja en blanco y el lápiz (crearla) y la foto
    de la hoja del profe (importarla). */
@@ -5972,7 +5964,7 @@ button.estante-lugar:active .mancuerna { scale: .92; }
 .burbuja.ia a { color: #fbfaf5; }
 .guia-chat .propia { border-radius: 2px 2px 12px 2px; color: #2b2a24; background: #ebe4bc; }
 .guia-chat .ia { padding: 10px 13px; border-radius: 12px; color: #ecebe4; background: #1f2622; }
-@media (prefers-reduced-motion: reduce) { .estante-lugar.hoy.con-pesa .mancuerna, .disco-ciclo.rueda .disco-ciclo-cuerpo { animation: none !important; } }
+@media (prefers-reduced-motion: reduce) { .estante-lugar.hoy.con-pesa .pesa-rusa, .cajon.sube { animation: none !important; } }
 `);
 
 function StyleInjector() {
@@ -9046,7 +9038,7 @@ function RelojDescansoGrande({ timerId, onClose }) {
 // que lo único que falta contar es cómo se registra y el diferencial fuerte.
 // LA BIENVENIDA: cuatro pasos, cada uno con una pieza de verdad de la app
 // (el visor de la serie y la barra cargada, la gráfica de un ejercicio, el
-// chat y los discos del ciclo), como en la guía del "?". Antes era un
+// chat y los cajones del ciclo), como en la guía del "?". Antes era un
 // ícono suelto por paso. El último decide si hay semanas de descarga.
 const WELCOME_SLIDES = [
   { key: "serie", color: "#14B8A6", title: "Te damos la bienvenida a Modus Fit", text: "Anotá reps y kilos en segundos: vienen con lo de la vez pasada. Cada serie carga un disco en la barra del día." },
@@ -9102,7 +9094,7 @@ function dibujoBienvenida(key, color) {
     );
   }
   return (
-    <div className="guia-discos" style={{ "--tono": color }}><DiscosCiclo semanas={CICLO_DE_MUESTRA} trainWeeks={5} alto={104} /></div>
+    <div className="guia-cajones" style={{ "--tono": color }}><CajonesCiclo semanas={CICLO_DE_MUESTRA} trainWeeks={5} alto={100} /></div>
   );
 }
 
@@ -10186,7 +10178,7 @@ function hojaDeMuestra() {
 
 // Muestras para la guía y la bienvenida: un ciclo de cinco semanas y una de
 // descarga, en la cuarta; y una semana de Push/Pull/Legs, hoy jueves.
-const CICLO_DE_MUESTRA = [1, 2, 3, 4, 5, 6].map((n) => ({ n, descarga: n === 6, estado: n < 4 ? "pasada" : n === 4 ? "actual" : "futura" }));
+const CICLO_DE_MUESTRA = [1, 2, 3, 4, 5, 6].map((n) => ({ n, descarga: n === 6, estado: n < 4 ? "pasada" : n === 4 ? "actual" : "futura", sesiones: [3, 4, 3, 2][n - 1] }));
 function semanaDeMuestra(verde, azul, naranja) {
   return [["Push", verde], ["Pull", azul], ["Legs", naranja], ["Push", verde], ["Pull", azul], null, null]
     .map((x, i) => ({ clave: WEEKDAY_KEYS[i], corto: WEEKDAY_SHORT_LABELS[i], nombre: DIAS_DE_LA_SEMANA[i], dia: x ? { label: x[0], color: x[1] } : null, hoy: i === 3 }));
@@ -10268,9 +10260,9 @@ function capitulosGuia() {
       key: "progreso", label: "Progreso", color: azul, icon: <BarChart3 size={15} />,
       pasos: [
         {
-          titulo: "Tu ciclo, en discos",
-          texto: "Cada semana del ciclo es un disco, uno más grande y más pesado que el otro, del blanco al rojo como los de 5 a 25 kilos. El de esta semana está levantado y con su color entero, y arriba dice en cuál vas (4/6); el chico de goma negra es la semana de descarga, para recuperarte.",
-          dibujo: <div className="guia-discos" style={{ "--tono": azul }}><DiscosCiclo semanas={CICLO_DE_MUESTRA} trainWeeks={5} alto={104} /></div>,
+          titulo: "Tu ciclo, en cajones",
+          texto: "Cada semana del ciclo es un cajón de salto, uno más alto que el otro: la carga va subiendo de a poco. El de esta semana tiene su color entero y arriba dice en cuál vas (4/6); sobre cada cajón, en tiza, las veces que fuiste, y los que vienen están dibujados con tiza. El bajo y rayado es la semana de descarga, para recuperarte.",
+          dibujo: <div className="guia-cajones" style={{ "--tono": azul }}><CajonesCiclo semanas={CICLO_DE_MUESTRA} trainWeeks={5} alto={100} /></div>,
         },
         {
           titulo: "Tu rango, músculo por músculo",
@@ -10315,8 +10307,8 @@ function capitulosGuia() {
           dibujo: <div className="guia-ancho"><DiasRutina routineDef={RUTINA_GUIA} /></div>,
         },
         {
-          titulo: "Tu semana, en el rack",
-          texto: "Cada día que entrenás es una mancuerna del color de lo que toca, y los de descanso, el lugar vacío. La de hoy está levantada: tocá una y vas directo a entrenar ese día.",
+          titulo: "Tu semana, en el estante",
+          texto: "Cada día que entrenás es una pesa rusa del color de lo que toca, y los de descanso, el lugar vacío. La de hoy está levantada: tocá una y vas directo a entrenar ese día.",
           dibujo: <div className="guia-ancho"><EstantePesas dias={semanaDeMuestra(verde, azul, naranja)} /></div>,
         },
         {
@@ -10424,7 +10416,7 @@ function capitulosGuia() {
       pasos: [
         {
           titulo: "Tus datos y tus ajustes",
-          texto: "Tu ciclo (con los mismos discos de Progreso) y la descarga, los descansos y el modo gimnasio (la serie más grande mientras entrenás), los recordatorios, el tema, el tamaño de la letra y la unidad de peso.",
+          texto: "Tu ciclo (con los mismos cajones de Progreso) y la descarga, los descansos y el modo gimnasio (la serie más grande mientras entrenás), los recordatorios, el tema, el tamaño de la letra y la unidad de peso.",
           dibujo: (
             <div className="guia-fichas">
               {["Tu ciclo", "Descansos", "Modo gimnasio", "Recordatorios", "Tema", "Letra grande", "Kilos o libras"].map((t) => <span key={t}>{t}</span>)}
@@ -11770,57 +11762,53 @@ function DiasRutina({ routineDef, onGoToDay = null, elegido = null }) {
   );
 }
 
-// LA SEMANA EN EL RACK DE MANCUERNAS (Rutinas): una mancuerna por día de
-// entrenamiento, hecha con las piezas de la barra de Rutina (el agarre de
-// acero moleteado, los topes y los discos de goma, acá del color de lo que
-// toca), y en los días de descanso el lugar vacío, en fantasma como los discos
-// que faltan en la barra. La de hoy está levantada del rack: es la que te toca.
-// Tocás una y vas a entrenar ese día. Antes fueron pesas rusas planas, y antes,
-// siete cajas de color. En chico, sin los nombres de los días, va en el aviso
-// de Rutina cuando hoy descansás.
+// LA SEMANA EN EL ESTANTE DE LAS PESAS RUSAS (Rutinas): una pesa rusa por
+// día de entrenamiento y el lugar vacío en los de descanso; la de hoy está
+// levantada del estante: es la que te toca. Tocás una y vas a entrenar ese
+// día. Son de bocha de goma, como las del gimnasio: la manija de hierro con
+// su brillo y la goma mate de los discos de la barra de Rutina, del color de
+// lo que toca (las de competición tienen un color por peso). El estante es
+// de chapa cepillada, como el casillero, con los nombres de los días en el
+// canto. Antes fueron mancuernas en un rack (no convencieron: "volvamos a las
+// keltbel") y, antes, pesas rusas planas de un solo color. En chico, sin los nombres de los días,
+// va en el aviso de Rutina cuando hoy descansás.
 const DIAS_DE_LA_SEMANA = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"];
-const PIEZAS_MANCUERNA = [[7, 2, 5.6, 26], [2.4, 6, 4.6, 18], [39.4, 2, 5.6, 26], [45, 6, 4.6, 18]];
-function Mancuerna({ vacia = false }) {
-  const uid = `mc${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
+// El asa sale de los hombros de la bocha y es ancha, con la ventana baja: así
+// se lee pesa rusa y no candado.
+const ASA_PESA_RUSA = "M9.8 22.4 C8.4 13.6 11.4 6.1 20 6.1 C28.6 6.1 31.6 13.6 30.2 22.4";
+const BOCHA_PESA_RUSA = "M13.1 39.5 A13 13 0 1 1 26.9 39.5 Z";
+function PesaRusa({ vacia = false }) {
+  const uid = `pr${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
   if (vacia) {
     return (
-      <svg viewBox="0 0 52 30" className="mancuerna vacia" aria-hidden="true">
-        <rect x="14.5" y="12.5" width="23" height="5" rx="2.5" className="disco-fantasma" />
-        {PIEZAS_MANCUERNA.map(([x, y, w, h], k) => <rect key={k} x={x + 0.45} y={y + 0.45} width={w - 0.9} height={h - 0.9} rx={Math.min(2.2, w / 2.6)} className="disco-fantasma" />)}
+      <svg viewBox="0 3.2 40 36.8" className="pesa-rusa vacia" aria-hidden="true">
+        <path className="pesa-rusa-asa" d={ASA_PESA_RUSA} />
+        <path className="pesa-rusa-cuerpo" d={BOCHA_PESA_RUSA} />
       </svg>
     );
   }
-  const acero = `url(#${uid}-a)`;
   return (
-    <svg viewBox="0 0 52 30" className="mancuerna" aria-hidden="true">
+    <svg viewBox="0 3.2 40 36.8" className="pesa-rusa" aria-hidden="true">
       <defs>
         <linearGradient id={`${uid}-a`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" className="acero-claro" />
-          <stop offset=".55" className="acero-medio" />
-          <stop offset="1" className="acero-oscuro" />
+          <stop offset="0" className="hierro-claro" />
+          <stop offset=".55" className="hierro-medio" />
+          <stop offset="1" className="hierro-oscuro" />
         </linearGradient>
-        {/* La goma, con el color del día en --d (lo pone el lugar del rack). */}
-        <linearGradient id={`${uid}-d`} x1="0" y1="0" x2="0" y2="1">
+        {/* La goma, con el color del día en --d (lo pone el lugar del estante). */}
+        <radialGradient id={`${uid}-g`} cx=".36" cy=".3" r=".85">
           <stop offset="0" className="disco-claro" />
-          <stop offset=".45" className="disco-medio" />
+          <stop offset=".5" className="disco-medio" />
           <stop offset="1" className="disco-oscuro" />
-        </linearGradient>
-        <pattern id={`${uid}-m`} width="1.8" height="1.8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-          <line x1="0" y1="0" x2="0" y2="1.8" className="moleteado" />
-        </pattern>
+        </radialGradient>
       </defs>
-      {/* El agarre, con su moleteado en el medio, y los dos topes. */}
-      <rect x="14" y="12" width="24" height="6" rx="3" fill={acero} />
-      <rect x="18.5" y="12" width="15" height="6" fill={`url(#${uid}-m)`} />
-      <rect x="12.4" y="9.5" width="2.8" height="11" rx="1.2" fill={acero} />
-      <rect x="36.8" y="9.5" width="2.8" height="11" rx="1.2" fill={acero} />
-      {/* Los discos: el grande contra el tope y el chico afuera. */}
-      {PIEZAS_MANCUERNA.map(([x, y, w, h], k) => (
-        <g key={k}>
-          <rect x={x} y={y} width={w} height={h} rx={Math.min(2.4, w / 2.4)} fill={`url(#${uid}-d)`} />
-          <rect x={x + 0.7} y={y + 0.7} width={w - 1.4} height={h - 1.4} rx={Math.min(1.8, w / 3)} className="disco-filete" />
-        </g>
-      ))}
+      {/* La manija, de hierro como las de bocha de goma, con su brillo. */}
+      <path d={ASA_PESA_RUSA} fill="none" stroke={`url(#${uid}-a)`} strokeWidth="4.6" strokeLinecap="round" />
+      <path d="M11.2 17.6 C11.4 11.4 14.4 7.9 20 7.9" className="pesa-rusa-acero-brillo" />
+      {/* La bocha, de goma mate, con el canto apenas marcado y su luz. */}
+      <path d={BOCHA_PESA_RUSA} fill={`url(#${uid}-g)`} className="pesa-rusa-goma" />
+      <path d="M14.4 38.2 L25.6 38.2" className="pesa-rusa-base" />
+      <path className="pesa-rusa-brillo" d="M10.9 27.2 A9.6 9.6 0 0 1 15.6 19.4" />
     </svg>
   );
 }
@@ -11834,7 +11822,7 @@ function EstantePesas({ dias = [], onElegir = null, chico = false, etiqueta = "T
       {dias.map((d, i) => {
         const texto = `${d.nombre || d.corto}: ${d.dia ? d.dia.label : "descanso"}${d.hoy ? " (hoy)" : ""}`;
         const clase = `estante-lugar ${d.dia ? "con-pesa" : ""} ${d.hoy ? "hoy" : ""}`;
-        const contenido = <><Mancuerna vacia={!d.dia} />{!chico && <span className="estante-dia" aria-hidden="true">{d.corto}</span>}</>;
+        const contenido = <><PesaRusa vacia={!d.dia} />{!chico && <span className="estante-dia" aria-hidden="true">{d.corto}</span>}</>;
         return (
           <Lugar key={d.clave || i} style={d.dia ? { "--dia": d.dia.color } : undefined}>
             {onElegir && d.dia
@@ -12386,118 +12374,47 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
 }
 
 /* ============================================================================
-   LOS DISCOS DEL CICLO: cada semana del ciclo es un disco parado en el piso,
-   uno más grande que el otro (la carga sube de a poco), con los colores de
-   competición de la barra de Rutina por peso: la primera semana de trabajo es
-   el blanco (el de 5) y la última, el rojo (el de 25); en el medio, verde,
-   amarillo y azul. Apoyados en fila, un poco encimados como en el piso del
-   gimnasio, con el número de la semana arriba del buje. Los que pasaron, en
-   goma apagada con gris; los que vienen, en fantasma como los discos que
-   faltan en la barra; el de esta semana, levantado, al frente y con su color
-   entero. La descarga es un disco chico de goma negra con una
-   D. Es la misma pieza en Progreso, en Perfil (Tu ciclo), en la bienvenida y
-   en la guía. Antes fueron cajones de salto y, antes, una escalera de barras
-   (pedido: "un poco más de color u otra propuesta para lo del ciclo").
-   `semanas`: [{ n, descarga, estado }], con estado "pasada" | "actual" | "futura".
-   `alto`: el alto máximo en px; el ancho manda (ocupa todo el que tiene).
+   LOS CAJONES DEL CICLO: cada semana del ciclo es un cajón de salto, uno más
+   alto que el otro (la carga sube de a poco), parados en la repisa de la
+   pizarra del gimnasio. Cada cajón es de chapa pintada, como el casillero (el
+   cepillado, el marco, la ranura de la agarradera y la plaqueta con el
+   número), y tiene su color por altura, con el código de la barra (del
+   blanco de 5 al rojo de 25): los de las semanas que pasaron, con la pintura
+   gastada; el de esta semana, con su color entero y la plaqueta blanca; los
+   que vienen, dibujados con tiza. La descarga es un cajón bajo de goma espuma
+   negra, rayado. Arriba de cada uno, en tiza, las veces que fuiste esa semana
+   (en el tono si llegó a lo planeado). Es la misma pieza en Progreso, en
+   Perfil (Tu ciclo), en la bienvenida y en la guía. Antes fueron discos (no
+   convencieron: "que sean los cajones de salto pero con un mejor diseño, que
+   machee lo del casillero y la pizarra") y, antes, cajones lisos en el tono.
+   `semanas`: [{ n, descarga, estado, sesiones? }], con estado "pasada" |
+   "actual" | "futura"; sin `sesiones`, no hay tiza. `meta`: las sesiones
+   planeadas por semana. `alto`: el alto de la fila, en px.
 ============================================================================ */
-// De liviano a pesado: blanco 5, verde 10, amarillo 15, azul 20 y rojo 25.
-const COLOR_DISCO_CICLO = ["#ECECE6", "#2BA35F", "#F4C430", "#2F6FED", "#E5383B"];
-function DiscosCiclo({ semanas = [], trainWeeks = TRAIN_WEEKS, alto = 96, animar = false }) {
-  const uid = `dc${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
-  const W = 320, DMAX = 76, GAP = 6, ARRIBA = 12;
-  const n = semanas.length;
-  // El tamaño de cada disco, relativo al más grande: crece con las semanas de
-  // trabajo; el de la descarga es chico.
-  const tam = semanas.map((s, wi) => (s.descarga ? 0.5 : 0.56 + (Math.min(wi, trainWeeks - 1) / Math.max(1, trainWeeks - 1)) * 0.44));
-  const suma = tam.reduce((a, b) => a + b, 0) || 1;
-  // Cuánto se enciman dos vecinos: lo justo para que entren al tamaño máximo,
-  // y como mucho un cuarto del más chico de los dos (así se lee cada número).
-  const pares = tam.slice(1).reduce((a, x, i) => a + Math.min(x, tam[i]), 0);
-  const separados = suma * DMAX + GAP * Math.max(0, n - 1) <= W;
-  const solape = separados || !pares ? 0 : Math.min(0.26, Math.max(0, (suma * DMAX - W) / (pares * DMAX)));
-  const D = separados ? DMAX : Math.min(DMAX, W / (suma - solape * pares));
-  const diam = tam.map((t) => t * D);
-  const sep = tam.map((t, i) => (i === 0 ? 0 : separados ? GAP : -solape * Math.min(t, tam[i - 1]) * D));
-  const ancho = diam.reduce((a, b) => a + b, 0) + sep.reduce((a, b) => a + b, 0);
-  const x0 = (W - ancho) / 2;
-  const H = Math.ceil(ARRIBA + D + 6);
-  const piso = H - 5;
-  const discos = semanas.map((s, wi) => {
-    const izq = x0 + diam.slice(0, wi).reduce((a, b) => a + b, 0) + sep.slice(0, wi + 1).reduce((a, b) => a + b, 0);
-    const r = diam[wi] / 2;
-    return { ...s, wi, r, cx: izq + r, cy: piso - r };
-  });
-  // El color de competición, por peso; la descarga, de goma negra. Los de las
-  // semanas que pasaron, apagados con gris (.goma-pasada); el de esta semana,
-  // con su color entero: el color dice dónde estás.
-  const color = (s) => {
-    if (s.descarga) return DISCO_SOBRIO;
-    const t = trainWeeks > 1 ? Math.min(s.wi, trainWeeks - 1) / (trainWeeks - 1) : 1;
-    return COLOR_DISCO_CICLO[Math.round(t * (COLOR_DISCO_CICLO.length - 1))];
-  };
-  const tinta = (c) => (c === "#F4C430" || c === "#ECECE6" ? "#2a2b2f" : "#f4f4f1");
-  // Se dibujan las pasadas, después las que vienen y al final la de esta
-  // semana, que queda al frente. Un fantasma no tapa al de al lado: se le
-  // recorta lo que queda detrás del siguiente.
-  const orden = [...discos.filter((s) => s.estado === "pasada"), ...discos.filter((s) => s.estado === "futura"), ...discos.filter((s) => s.estado === "actual")];
+const PINTURA_CAJON = ["#ECECE6", "#2BA35F", "#F4C430", "#2F6FED", "#E5383B"];
+function CajonesCiclo({ semanas = [], trainWeeks = TRAIN_WEEKS, alto = 100, animar = false, meta = null }) {
+  const conTiza = semanas.some((s) => s.sesiones != null);
+  const lugar = alto - (conTiza ? 16 : 0);
+  const altura = (wi, descarga) => Math.round(lugar * (descarga ? 0.36 : 0.45 + (Math.min(wi, trainWeeks - 1) / Math.max(1, trainWeeks - 1)) * 0.55));
+  const pintura = (wi) => PINTURA_CAJON[Math.round((trainWeeks > 1 ? Math.min(wi, trainWeeks - 1) / (trainWeeks - 1) : 1) * (PINTURA_CAJON.length - 1))];
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="discos-ciclo" style={{ maxHeight: alto }} aria-hidden="true">
-      <defs>
-        <linearGradient id={`${uid}-a`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" className="acero-claro" />
-          <stop offset=".55" className="acero-medio" />
-          <stop offset="1" className="acero-oscuro" />
-        </linearGradient>
-        {discos.map((s) => (
-          <linearGradient key={s.n} id={`${uid}-d${s.n}`} x1="0" y1="0" x2="0" y2="1" className={s.estado === "pasada" ? "goma-pasada" : undefined} style={{ "--c-disco": color(s) }}>
-            <stop offset="0" className="disco-claro" />
-            <stop offset=".45" className="disco-medio" />
-            <stop offset="1" className="disco-oscuro" />
-          </linearGradient>
-        ))}
-        {discos.map((s) => {
-          const sig = discos[s.wi + 1];
-          if (s.estado !== "futura" || !sig || sep[s.wi + 1] >= 0) return null;
+    <div className={`cajones-pizarra ${conTiza ? "con-tiza" : ""}`} aria-hidden="true">
+      <div className="cajones" style={{ height: alto }}>
+        {semanas.map((s, wi) => {
+          const cumplida = !!meta && !s.descarga && s.estado !== "futura" && (s.sesiones || 0) >= meta;
           return (
-            <mask key={s.n} id={`${uid}-m${s.n}`} maskUnits="userSpaceOnUse" x="0" y="0" width={W} height={H}>
-              <rect x="0" y="0" width={W} height={H} fill="white" />
-              <circle cx={sig.cx} cy={sig.cy} r={sig.r + 1.5} fill="black" />
-            </mask>
+            <div key={s.n} className="cajon-lugar">
+              {conTiza && <span className={`cajon-tiza ${cumplida ? "cumplida" : ""}`}>{s.estado !== "futura" && s.sesiones > 0 && <MarcasTiza dias={s.sesiones} max={7} alto={10} decorativa />}</span>}
+              <div className={`cajon ${s.estado} ${s.descarga ? "descarga" : ""} ${animar ? "sube" : ""}`}
+                style={{ height: altura(wi, s.descarga), ...(s.descarga ? null : { "--pintura": pintura(wi) }), ...(animar ? { animationDelay: `${wi * 55}ms` } : null) }}>
+                {!s.descarga && <i className="cajon-agarre" />}
+                <b className="cajon-numero">{s.descarga ? "D" : s.n}</b>
+              </div>
+            </div>
           );
         })}
-      </defs>
-      <rect x="0" y={piso} width={W} height="5" rx="2.5" className="discos-ciclo-piso" />
-      {orden.map((s) => {
-        const numero = s.descarga ? "D" : String(s.n);
-        const fs = Math.max(7.5, Math.min(15, s.r * 0.46));
-        if (s.estado === "futura") {
-          const sig = discos[s.wi + 1];
-          const tapado = sig && sep[s.wi + 1] < 0;
-          return (
-            <g key={s.n} className={`disco-ciclo futuro ${s.descarga ? "descarga" : ""}`} mask={tapado ? `url(#${uid}-m${s.n})` : undefined}>
-              <circle cx={s.cx} cy={s.cy} r={s.r - 0.7} className="disco-fantasma" />
-              <circle cx={s.cx} cy={s.cy} r={Math.max(2.6, s.r * 0.2)} className="disco-fantasma" />
-              <text x={s.cx} y={s.cy - s.r * 0.5} fontSize={fs} className="disco-ciclo-numero">{numero}</text>
-            </g>
-          );
-        }
-        const c = color(s);
-        return (
-          <g key={s.n} className={`disco-ciclo ${s.estado} ${s.descarga ? "descarga" : ""} ${animar ? "rueda" : ""}`} style={animar ? { animationDelay: `${s.wi * 70}ms` } : undefined}>
-            {s.estado === "actual" && <ellipse cx={s.cx} cy={piso + 1} rx={s.r * 0.8} ry="2.6" className="disco-ciclo-sombra" />}
-            <g className="disco-ciclo-cuerpo">
-              <circle cx={s.cx} cy={s.cy} r={s.r} fill={`url(#${uid}-d${s.n})`} className="disco-ciclo-goma" />
-              <circle cx={s.cx} cy={s.cy} r={s.r * 0.8} className="disco-ciclo-cara" />
-              <path d={`M ${s.cx - s.r * 0.62} ${s.cy - s.r * 0.46} A ${s.r * 0.78} ${s.r * 0.78} 0 0 1 ${s.cx - s.r * 0.08} ${s.cy - s.r * 0.77}`} className="disco-ciclo-brillo" />
-              <circle cx={s.cx} cy={s.cy} r={Math.max(3, s.r * 0.22)} fill={`url(#${uid}-a)`} />
-              <circle cx={s.cx} cy={s.cy} r={Math.max(1.3, s.r * 0.09)} className="disco-ciclo-agujero" />
-              <text x={s.cx} y={s.cy - s.r * 0.5} fontSize={fs} fill={tinta(c)} className="disco-ciclo-numero">{numero}</text>
-            </g>
-          </g>
-        );
-      })}
-    </svg>
+      </div>
+    </div>
   );
 }
 // Las semanas de un ciclo, sin las sesiones (Perfil).
@@ -12518,13 +12435,14 @@ function textoDelCiclo(weekInfo, settings = DEFAULT_SETTINGS) {
   if (weekInfo.isDeload) return "semana de descarga, bajá la carga";
   return faltan <= 1 ? "la semana que viene, descarga" : `la descarga llega en ${faltan} semanas`;
 }
-// El ícono del ciclo, en Perfil: un disco con su buje.
-function IconoDisco({ size = 16 }) {
+// El ícono del ciclo, en Perfil: tres cajones que suben, con su agarradera.
+function IconoCajones({ size = 16 }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
-      <circle cx="12" cy="12" r="9.2" />
-      <circle cx="12" cy="12" r="5.6" opacity=".55" />
-      <circle cx="12" cy="12" r="1.8" />
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="1.6" y="14.5" width="5.2" height="7" rx="1.2" />
+      <rect x="9.4" y="9.5" width="5.2" height="12" rx="1.2" />
+      <rect x="17.2" y="3.5" width="5.2" height="18" rx="1.2" />
+      <path d="M3.4 17h1.6M11.2 12h1.6M19 6h1.6" />
     </svg>
   );
 }
@@ -12533,8 +12451,9 @@ function IconoDisco({ size = 16 }) {
    EL CICLO (Progreso): en qué semana estás, cuántas sesiones llevás en cada
    una. Arriba, sólo "6/8" (pedido: sin "Ciclo 3: la semana que viene
    descarga") y, al costado, las sesiones de esta semana en marcas de tiza;
-   abajo, los discos del ciclo (DiscosCiclo). Lo de cuánto falta para la
-   descarga queda para el lector de pantalla y para Perfil › Tu ciclo.
+   abajo, los cajones del ciclo en la pizarra (CajonesCiclo), con las
+   sesiones de cada semana en tiza arriba de su cajón. Lo de cuánto falta para
+   la descarga queda para el lector de pantalla.
 ============================================================================ */
 function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS, onGoToDeload, metaSemanal = null }) {
   const weekInfo = getWeekInfo(cycleStart, settings);
@@ -12542,7 +12461,7 @@ function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS,
   // Los hooks tienen que llamarse siempre, en el mismo orden, en todos los
   // renders: el hook va primero y el early return después.
   const trainedDays = useMemo(() => getTrainedDateSet(logs, sessions), [logs, sessions]);
-  // Los discos ruedan UNA vez, al montar: sin este flag volverían a rodar
+  // Los cajones suben UNA vez, al montar: sin este flag volverían a subir
   // cada vez que cambia cualquier cosa.
   const [yaAnimado, setYaAnimado] = useState(false);
   useEffect(() => { const t = setTimeout(() => setYaAnimado(true), 900); return () => clearTimeout(t); }, []);
@@ -12558,7 +12477,7 @@ function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS,
   const estaSemana = semanas[weekInfo.weekInCycle - 1]?.sesiones || 0;
   const cumplida = !!metaSemanal && estaSemana >= metaSemanal;
   return (
-    <section className="tarjeta-tonal escalera-ciclo ciclo-discos" aria-label={`Ciclo ${weekInfo.cycleNumber}, semana ${weekInfo.weekInCycle} de ${cycleWeeks}: ${falta}. ${estaSemana} ${estaSemana === 1 ? "sesión" : "sesiones"} esta semana.`}>
+    <section className="tarjeta-tonal escalera-ciclo ciclo-cajones" aria-label={`Ciclo ${weekInfo.cycleNumber}, semana ${weekInfo.weekInCycle} de ${cycleWeeks}: ${falta}. ${estaSemana} ${estaSemana === 1 ? "sesión" : "sesiones"} esta semana.`}>
       <div className="escalera-cabeza" aria-hidden="true">
         <div className="min-w-0">
           <p className="ciclo-rotulo">Tu ciclo</p>
@@ -12569,7 +12488,7 @@ function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS,
           <span>{metaSemanal ? `${estaSemana} de ${metaSemanal}` : estaSemana} esta semana</span>
         </div>
       </div>
-      <DiscosCiclo semanas={semanas} trainWeeks={trainWeeks} animar={!yaAnimado} />
+      <CajonesCiclo semanas={semanas} trainWeeks={trainWeeks} meta={metaSemanal} animar={!yaAnimado} />
       <button onClick={onGoToDeload} className="enlace-suave escalera-enlace"><Zap size={13} /> Ver mi semana de descarga</button>
     </section>
   );
@@ -13272,8 +13191,8 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             <span className="block text-[14px] font-bold text-white leading-tight">Hoy descansás</span>
             <span className="block text-[12px] text-slate-400 mt-0.5">Si querés, entrená igual.</span>
           </span>
-          {/* Tu semana en el rack de mancuernas, en chico: las de los días que
-              entrenás, del color de lo que toca; hoy, levantada. */}
+          {/* Tu semana en el estante de las pesas rusas, en chico: las de los
+              días que entrenás, del color de lo que toca; hoy, con su rayita. */}
           {weekSchedule && (
             <EstantePesas chico dias={WEEKDAY_KEYS.map((wk, i) => {
               const d = weekSchedule[wk] ? ROUTINE[weekSchedule[wk]] : null;
@@ -13961,15 +13880,14 @@ function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [], weekSche
 
       {view === "calendar" ? (
         <div key="calendar" className="space-y-3 tab-fade-in">
-          {/* EL ALMANAQUE: la hoja del mes, con las argollas arriba. Cada
-              día que entrenaste, encerrado a mano con el color de lo que
-              hiciste, y al costado, en lápiz, cuántas veces fuiste esa
-              semana. Antes era una tarjeta perforada. */}
+          {/* LA TARJETA PERFORADA. Como la tarjeta de socio del gimnasio:
+              cada día que entrenaste queda "picado" con el color de lo que
+              hiciste, y al final de cada semana, cuántas veces fuiste. Se
+              lee de un vistazo si venís constante, sin contar casilleros. */}
           <div className="tarjeta-perforada">
-            <span className="almanaque-argollas" aria-hidden="true">{Array.from({ length: 7 }, (_, k) => <i key={k} />)}</span>
-            <div className="almanaque-cabeza">
+            <div className="flex items-center justify-between mb-3">
               <button onClick={() => setCursor((c) => { const m = c.m === 0 ? 11 : c.m - 1; const y = c.m === 0 ? c.y - 1 : c.y; return { y, m }; })} aria-label="Mes anterior" className="boton-redondo !w-9 !h-9"><ChevronLeft size={17} /></button>
-              <p className="almanaque-mes">{MONTH_LABELS[cursor.m]} <span>{cursor.y}</span></p>
+              <p className="text-[15px] font-bold text-white">{MONTH_LABELS[cursor.m]} {cursor.y}</p>
               <button onClick={() => setCursor((c) => { const m = c.m === 11 ? 0 : c.m + 1; const y = c.m === 11 ? c.y + 1 : c.y; return { y, m }; })} aria-label="Mes siguiente" className="boton-redondo !w-9 !h-9"><ChevronRight size={17} /></button>
             </div>
             <div className="perforada">
@@ -13997,12 +13915,12 @@ function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [], weekSche
                         <button key={i} onClick={() => s && setSelectedDate(isSelected ? null : d)} disabled={!s}
                           aria-label={s ? `${dayNum}: ${s.dayKeys.map((dk) => ROUTINE[dk]?.label || "entrenamiento").join(" y ")}` : String(dayNum)}
                           className={`hueco-dia cell-pop ${s ? "picado" : ""} ${isToday ? "hoy" : ""} ${isSelected ? "elegido" : ""}`}
-                          style={{ ...(s ? { "--dia": c1, ...(c2 ? { "--dia2": c2 } : null), "--giro": `${((dayNum * 37) % 19) - 9}deg` } : null), animationDelay: `${Math.min(wi * 7 + i, 34) * 12}ms` }}>
+                          style={{ ...(s ? { "--dia": c1, ...(c2 ? { "--dia2": c2 } : null) } : null), animationDelay: `${Math.min(wi * 7 + i, 34) * 12}ms` }}>
                           {dayNum}
                         </button>
                       );
                     })}
-                    <span className={`perforada-total ${veces ? "" : "cero"}`} aria-label={`${veces} esa semana`}>{veces || "·"}</span>
+                    <span className={`perforada-total ${veces ? "" : "cero"}`}>{veces}</span>
                   </div>
                 );
               })}
@@ -16693,14 +16611,13 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
                 <button onClick={() => setCompareBase(null)} className="enlace-suave !h-8">Cancelar</button>
               </div>
             )}
-            {/* El mismo almanaque de Historial: cada día que anotaste algo,
-                encerrado con el color de lo que anotaste (foto, peso,
+            {/* La misma tarjeta perforada de Historial: cada día que anotaste
+                algo queda picado con el color de lo que anotaste (foto, peso,
                 medidas; con las tres, una estrellita). */}
             <div className="tarjeta-perforada">
-              <span className="almanaque-argollas" aria-hidden="true">{Array.from({ length: 7 }, (_, k) => <i key={k} />)}</span>
-              <div className="almanaque-cabeza">
+              <div className="flex items-center justify-between mb-3">
                 <button onClick={() => setCursor((c) => { const m = c.m === 0 ? 11 : c.m - 1; const y = c.m === 0 ? c.y - 1 : c.y; return { y, m }; })} aria-label="Mes anterior" className="boton-redondo !w-9 !h-9"><ChevronLeft size={17} /></button>
-                <p className="almanaque-mes">{MONTH_LABELS[cursor.m]} <span>{cursor.y}</span></p>
+                <p className="text-[15px] font-bold text-white">{MONTH_LABELS[cursor.m]} {cursor.y}</p>
                 <button onClick={() => setCursor((c) => { const m = c.m === 11 ? 0 : c.m + 1; const y = c.m === 11 ? c.y + 1 : c.y; return { y, m }; })} aria-label="Mes siguiente" className="boton-redondo !w-9 !h-9"><ChevronRight size={17} /></button>
               </div>
               <div className="perforada">
@@ -16738,7 +16655,7 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
                           disabled={compareBase ? !compareSelectable && !isCompareBase : !entry}
                           aria-label={entry ? `${dayNum}: ${[hasPhoto && "foto", hasWeight && "peso", hasMeasures && "medidas"].filter(Boolean).join(", ")}` : String(dayNum)}
                           className={`hueco-dia relative ${entry ? "picado" : ""} ${isToday ? "hoy" : ""} ${(isSelected && !compareBase) || isCompareBase ? "elegido" : ""} ${compareSelectable ? "comparable" : ""} ${compareBase && !compareSelectable && !isCompareBase ? "apagado" : ""}`}
-                          style={entry ? { "--dia": colores[0], ...(colores[1] ? { "--dia2": colores[1] } : null), "--giro": `${((dayNum * 37) % 19) - 9}deg` } : undefined}>
+                          style={entry ? { "--dia": colores[0], ...(colores[1] ? { "--dia2": colores[1] } : null) } : undefined}>
                           {dayNum}
                           {complete && <Star size={10} className="hueco-estrella" aria-hidden="true" />}
                         </button>
@@ -16754,7 +16671,7 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
               </div>
             </div>
 
-            {!selectedEntry && !compareBase && <p className="medida-nota text-center">Tocá un día marcado para ver qué anotaste.</p>}
+            {!selectedEntry && !compareBase && <p className="medida-nota text-center">Tocá un día picado para ver qué anotaste.</p>}
 
             {/* Detalle del día como MODAL centrado — mismo tratamiento que
                 el historial de entrenamientos */}
@@ -17042,11 +16959,9 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
           selector de Social (Amigos/Buscar/Ranking/Entrenador): un solo
           elemento que se desliza y cambia de color, en vez de que cada
           botón prenda/apague su propio fondo de golpe. */}
-      {/* LOS SEPARADORES: cada sección es la pestaña de un separador de
-          carpeta, de su color (ver .separadores). */}
-      <div className="pestanas-internas separadores" role="tablist" aria-label="Secciones de Progreso">
+      <div className="pestanas-internas" role="tablist" aria-label="Secciones de Progreso">
         {PROGRESS_SECTIONS.map((s) => (
-          <button key={s.k} role="tab" aria-selected={activeSection === s.k} onClick={() => setActiveSection(s.k)} className="pestana-interna" style={{ "--c": s.color }}>
+          <button key={s.k} role="tab" aria-selected={activeSection === s.k} onClick={() => setActiveSection(s.k)} className="pestana-interna">
             {s.icon}<span>{s.l}</span>
           </button>
         ))}
@@ -18522,11 +18437,11 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
       {/* TU CICLO. Antes eran tres cosas sueltas, cada una con su forma: una
           fila con "Ciclo #1 · Semana 6/8", una tarjeta con la fecha de inicio
           y su "Cambiar", y más abajo "Configuración de descarga". Ahora es una
-          sección como las demás, con los discos de Progreso adentro, desde
+          sección como las demás, con los cajones de Progreso adentro, desde
           cuándo y todo lo que arma el ciclo: las semanas y la descarga. */}
-      <CollapsibleSection title="Tu ciclo" icon={<IconoDisco size={16} />}
+      <CollapsibleSection title="Tu ciclo" icon={<IconoCajones size={16} />}
         subtitle={weekInfo ? `Semana ${weekInfo.weekInCycle} de ${weekInfo.cycleWeeks}` : "Elegí cuándo empezó para saber en qué semana estás"}>
-        {weekInfo && <div className="ciclo-perfil"><DiscosCiclo semanas={semanasDelCiclo(weekInfo)} trainWeeks={weekInfo.trainWeeks} alto={84} /></div>}
+        {weekInfo && <div className="ciclo-perfil"><CajonesCiclo semanas={semanasDelCiclo(weekInfo)} trainWeeks={weekInfo.trainWeeks} alto={78} /></div>}
         <div className="ciclo-inicio">
           <p className="min-w-0 flex-1">{cycleStart ? <>Ciclo {weekInfo?.cycleNumber || 1}, desde el <b>{new Date(cycleStart).toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" })}</b></> : "Todavía no elegiste cuándo empezó tu ciclo."}</p>
           {!showCycleSetup && <button onClick={() => setShowCycleSetup(true)} className="boton-tonal shrink-0 !min-h-10 !text-[13px]">{cycleStart ? "Cambiar" : "Elegir"}</button>}
@@ -27640,11 +27555,10 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
           </div>
 
           <DiasRutina routineDef={activeDef} onGoToDay={onGoToDay} />
-          {/* LA SEMANA, EN EL RACK DE MANCUERNAS (ver EstantePesas): una
-              mancuerna con los discos del color de lo que toca cada día que
-              entrenás, el lugar vacío los de descanso y la de hoy, levantada.
-              Arriba, los días de la rutina como baldosas, con sus ejercicios y
-              sus series. */}
+          {/* LA SEMANA, EN EL ESTANTE DE LAS PESAS RUSAS (ver EstantePesas):
+              una pesa del color de lo que toca cada día que entrenás, el lugar
+              vacío los de descanso y la de hoy, levantada. Arriba, los días de
+              la rutina como baldosas, con sus ejercicios y sus series. */}
           <EstantePesas
             dias={WEEKDAY_KEYS.map((wk, i) => {
               const dk = activeSchedule[wk] || null;
