@@ -4555,7 +4555,6 @@ button.carrera-carril:active { background: var(--velo); }
 .rutina-creada.activa .rutina-creada-dias b { color: color-mix(in oklab, var(--c) 72%, white); }
 .light-mode .rutina-creada.activa .rutina-creada-dias b { color: color-mix(in oklab, var(--c) 80%, black); }
 .rutina-creada-texto { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.rutina-creada-meta { font-size: 12.5px; line-height: 1.35; color: var(--text-muted); text-wrap: pretty; }
 .rutina-creada-nombre { font-size: 15px; font-weight: 650; line-height: 1.25; color: var(--text-strong); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
 .rutina-creada-acciones { flex: none; display: flex; align-items: center; gap: 2px; }
 .rutina-creada-activa { display: inline-flex; align-items: center; gap: 4px; height: 32px; padding: 0 6px; font-size: 12.5px; font-weight: 650; color: color-mix(in oklab, var(--c) 72%, white); }
@@ -22613,7 +22612,7 @@ function PresetRoutineCard({ preset, isActive, onPreview }) {
 // teléfono, para que no compita con tu rutina de arriba (pedido: "sigue sin
 // convencerme"; antes cada una era una tarjeta grande con tres botones y una
 // tira gris que no decía nada). Cada renglón: en un hueco, cuántos días
-// tiene, el nombre y sus días (nada más, a pedido); a la derecha, Activar (o
+// tiene y el nombre, sin descripción (a pedido); a la derecha, Activar (o
 // "Activa") y "Más" con Editar, Compartir y Eliminar. Deslizar a la derecha
 // también la elimina. En la tanda 12 se probaron una carpeta, la tira en
 // colores y la letra de Rutina, y no convencieron.
@@ -22639,7 +22638,6 @@ function SavedRoutineRow({ routine, isActive, onUse, onEdit, onShare, onArchive,
           <span className="rutina-creada-dias" aria-hidden="true"><b className="num-display">{dayCount}</b><small>{dayCount === 1 ? "día" : "días"}</small></span>
           <span className="rutina-creada-texto" aria-hidden="true">
             <span className="rutina-creada-nombre">{routine.name}</span>
-            <span className="rutina-creada-meta">{nombresDeDias(routine)}</span>
           </span>
         </button>
         <span className="rutina-creada-acciones">
