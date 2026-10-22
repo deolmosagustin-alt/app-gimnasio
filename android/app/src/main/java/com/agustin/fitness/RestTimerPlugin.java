@@ -34,7 +34,9 @@ public class RestTimerPlugin extends Plugin {
     private static final String TAG = "RestTimerPlugin";
     // v11: la app pregunta la versión con info() para saber si este plugin
     // cuenta para arriba (el cardio) y dibuja el reloj de pared.
-    private static final int VERSION = 11;
+    // v12: el APK con Kotlin 2.2 (ver build.gradle): desde esta versión la app
+    // puede usar @capacitor/filesystem sin que se cierre.
+    private static final int VERSION = 12;
     // Canal v8: IMPORTANCE_DEFAULT — aparece en la barra SIN saltar el popup
     // (heads-up). El v7 usaba HIGH y por eso la notificación "saltaba".
     // DEFAULT sigue siendo válido para Live Updates (solo MIN está prohibido).

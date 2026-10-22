@@ -7,8 +7,8 @@ android {
         applicationId "com.modusfit.fitness"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 24
-        versionName "1.0.23"
+        versionCode 25
+        versionName "1.0.24"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -51,12 +51,20 @@ dependencies {
 // haya clases duplicadas. Desde Kotlin 1.8 los módulos -jdk7 y -jdk8
 // ya están incluidos dentro de kotlin-stdlib, así que redirigirlos a
 // 1.8.22 es seguro y no rompe nada.
+//
+// BUG FIX (21/10/2026, reporte: "al descargar o compartir la imagen se
+// cierra la app"): forzar 1.8.22 le sacaba a @capacitor/filesystem 8 (hecho
+// con Kotlin 2.2) clases que usa, y cualquier escritura de un archivo
+// cerraba la app con NoClassDefFoundError: kotlin/coroutines/jvm/internal/
+// SpillingKt (Play Console, Nothing Phone 2a Plus, Android 16). Se fuerza
+// la versión con la que están hechos los plugins.
 // ═══════════════════════════════════════════════════════════════
+def kotlinDeLosPlugins = "2.2.20"
 configurations.all {
     resolutionStrategy {
-        force "org.jetbrains.kotlin:kotlin-stdlib:1.8.22"
-        force "org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.22"
-        force "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.22"
+        force "org.jetbrains.kotlin:kotlin-stdlib:$kotlinDeLosPlugins"
+        force "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlinDeLosPlugins"
+        force "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinDeLosPlugins"
     }
 }
 

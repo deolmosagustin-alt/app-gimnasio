@@ -7370,6 +7370,7 @@ function ShareImageModal({ title, subtitle, fileNamePrefix, shareTitle, shareTex
     const canvas = canvasRef.current; if (!canvas) return;
     if (isNative) {
       setShareError(null); setGuardada(false);
+      if (!(await puedeEscribirArchivos())) { setShareError({ msg: AVISO_ACTUALIZAR_APP }); return; }
       // BUG FIX (reporte: "descargar no funciona"): en el teléfono,
       // "Descargar" abría la hoja de compartir en vez de guardar. Ahora se
       // guarda en Imágenes › ModusFit, que aparece en la galería. Android 10
@@ -7440,7 +7441,7 @@ function ShareImageModal({ title, subtitle, fileNamePrefix, shareTitle, shareTex
     }
 
     // 2) Plugin de Capacitor: escribe la imagen al caché y abre la hoja nativa.
-    if (isNative) {
+    if (isNative && await puedeEscribirArchivos()) {
       try {
         const uri = await writeImageToCache();
         if (!uri) throw new Error("el archivo no se pudo escribir");
@@ -7464,7 +7465,9 @@ function ShareImageModal({ title, subtitle, fileNamePrefix, shareTitle, shareTex
         handleDownload();
         return;
       }
-      setShareError({ msg: "No pudimos adjuntar la imagen, así que compartimos sólo el texto. Podés bajarla con \"Descargar\" y mandarla a mano.", detail: attempts.join(" · ") });
+      setShareError(isNative && !(await puedeEscribirArchivos())
+        ? { msg: `Compartimos sólo el texto. ${AVISO_ACTUALIZAR_APP}` }
+        : { msg: "No pudimos adjuntar la imagen, así que compartimos sólo el texto. Podés bajarla con \"Descargar\" y mandarla a mano.", detail: attempts.join(" · ") });
       return;
     } catch (err) {
       if (err?.name === "AbortError" || nativeShareError(err)) return;
@@ -8120,6 +8123,13 @@ async function versionPluginDescanso() {
   try { const r = await RestTimerNotification.info(); VERSION_PLUGIN_DESCANSO = Number(r?.version) || 10; } catch { VERSION_PLUGIN_DESCANSO = 10; }
   return VERSION_PLUGIN_DESCANSO;
 }
+// Hasta el APK con el plugin v12, @capacitor/filesystem cerraba la app al
+// escribir cualquier archivo (Kotlin viejo forzado en build.gradle). Con un
+// APK anterior, guardar o compartir una imagen no se intenta.
+async function puedeEscribirArchivos() {
+  return (await versionPluginDescanso()) >= 12;
+}
+const AVISO_ACTUALIZAR_APP = "Para guardar o compartir la imagen, actualizá Modus Fit desde Google Play.";
 async function programarAvisosCardio(timerId, { modo, faltanSeg = 0, nombre = "", inicio = null, objetivoSeg = 0 }) {
   if (!timerId || !Capacitor.isNativePlatform()) return;
   const notifId = notifIdForTimer(timerId, 20000);
