@@ -3303,7 +3303,6 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 .dia-bajada { margin-top: 8px; font-size: 0.875rem; line-height: 1.4; color: var(--text-muted); text-wrap: pretty; }
 .dia-barra { margin-top: 14px; }
 .dia-barra-texto { margin-top: 6px; font-size: 0.8125rem; font-weight: 500; color: var(--text-muted); font-variant-numeric: tabular-nums; }
-.dia-barra-ayuda { margin-top: 1px; font-size: 0.75rem; color: var(--text-faint); }
 .dia-barra-texto b { margin-right: 2px; font-weight: 700; font-stretch: 80%; letter-spacing: -0.02em; color: var(--text-strong); font-size: 1.35rem; }
 .dia-hero .boton-pildora { width: 100%; margin-top: 16px; }
 /* EL DÍA, EN UN SOLO BLOQUE: el encabezado, el calentamiento y los
@@ -4556,6 +4555,7 @@ button.carrera-carril:active { background: var(--velo); }
 .rutina-creada.activa .rutina-creada-dias b { color: color-mix(in oklab, var(--c) 72%, white); }
 .light-mode .rutina-creada.activa .rutina-creada-dias b { color: color-mix(in oklab, var(--c) 80%, black); }
 .rutina-creada-texto { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.rutina-creada-meta { font-size: 12.5px; line-height: 1.35; color: var(--text-muted); text-wrap: pretty; }
 .rutina-creada-nombre { font-size: 15px; font-weight: 650; line-height: 1.25; color: var(--text-strong); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
 .rutina-creada-acciones { flex: none; display: flex; align-items: center; gap: 2px; }
 .rutina-creada-activa { display: inline-flex; align-items: center; gap: 4px; height: 32px; padding: 0 6px; font-size: 12.5px; font-weight: 650; color: color-mix(in oklab, var(--c) 72%, white); }
@@ -13340,7 +13340,6 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
         <button onClick={() => (onGoToSchedule || onGoToRoutines)?.()} className="aviso-descanso" aria-label="Hoy es día de descanso. Tocá para editar tu semana">
           <span className="min-w-0 flex-1">
             <span className="block text-[14px] font-bold text-white leading-tight">Hoy descansás</span>
-            <span className="block text-[12px] text-slate-400 mt-0.5">Si querés, entrená igual.</span>
           </span>
           {/* Tu semana en el estante de las pesas rusas, en chico: las de los
               días que entrenás, del color de lo que toca; hoy, con su rayita. */}
@@ -13409,7 +13408,6 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
               <p className="dia-barra-texto">
                 <b><NumberFlow value={Math.min(avanceDia.hechas, avanceDia.total)} /></b> de {avanceDia.total} series{avanceDia.hechas >= avanceDia.total ? ": barra completa" : ""}
               </p>
-              {avanceDia.hechas === 0 && <p className="dia-barra-ayuda">Cada serie que anotás carga un disco.</p>}
             </div>
           )}
           {/* LA VEZ PASADA: la hoja del cuaderno del último día igual a éste
@@ -15860,7 +15858,7 @@ function ManoAMano({ miFoto, miNombre, misRangos, mySex = null, suFoto, suNombre
         <section className="space-y-2" aria-label="Músculo por músculo">
           <div className="px-1">
             <h3 className="seccion-titulo">Músculo por músculo</h3>
-            <p className="text-[12.5px] text-slate-400 mt-0.5">Con los ejercicios directos de cada músculo, en kilos y con la misma vara para los dos. Tocá uno para ver los ejercicios.</p>
+            <p className="text-[12.5px] text-slate-400 mt-0.5">Con los ejercicios directos de cada músculo, en kilos y con la misma vara para los dos.</p>
           </div>
           <div className="mano-lista">
             {comparacion.map((r, i) => {
@@ -16242,7 +16240,6 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
           <span className="galleta icono-galleta" aria-hidden="true"><Award size={17} /></span>
           <div className="min-w-0">
             <p className="text-[15px] font-bold text-white leading-tight">Rango por músculo</p>
-            <p className="text-[12px] text-slate-500 leading-snug mt-0.5">Tocá un músculo para ver su detalle</p>
           </div>
         </div>
         <div className="flex gap-1 shrink-0">
@@ -16753,7 +16750,6 @@ function MeasurementsView({ measurements = {}, onAddMeasurement, photos = [], ph
               </div>
             </div>
 
-            {!selectedEntry && !compareBase && <p className="medida-nota text-center">Tocá un día picado para ver qué anotaste.</p>}
 
             {/* Detalle del día como MODAL centrado — mismo tratamiento que
                 el historial de entrenamientos */}
@@ -18512,7 +18508,7 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
           una fila con otro borde y otro fondo). */}
       <button onClick={onGoToRoutines} className="seccion-plegable w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors active:bg-slate-800/50">
         <span className="placa-icono w-9 h-9 rounded-xl flex items-center justify-center shrink-0"><Layers size={16} /></span>
-        <div className="flex-1 min-w-0"><p className="text-sm font-bold text-white">Tu rutina: {activeRoutineDef?.name || "—"}</p><p className="text-[11.5px] text-slate-500 mt-0.5 leading-snug">{savedRoutineCount} guardada{savedRoutineCount === 1 ? "" : "s"}: tocá para cambiarla, editarla o crear otra</p></div>
+        <div className="flex-1 min-w-0"><p className="text-sm font-bold text-white">Tu rutina: {activeRoutineDef?.name || "—"}</p><p className="text-[11.5px] text-slate-500 mt-0.5 leading-snug">{savedRoutineCount} guardada{savedRoutineCount === 1 ? "" : "s"}</p></div>
         <ChevronRight size={16} className="text-slate-600 shrink-0" />
       </button>
 
@@ -20147,9 +20143,7 @@ function FriendSessionHistory({ trainingSessions = [], activeRoutineSnapshot }) 
             </p>
           </div>
         </div>
-      ) : (
-        <p className="text-center text-[12.5px] text-slate-500 py-1">Tocá un día entrenado para ver qué hizo.</p>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -22625,7 +22619,7 @@ function PresetRoutineCard({ preset, isActive, onPreview }) {
 // teléfono, para que no compita con tu rutina de arriba (pedido: "sigue sin
 // convencerme"; antes cada una era una tarjeta grande con tres botones y una
 // tira gris que no decía nada). Cada renglón: en un hueco, cuántos días
-// tiene y el nombre (sin letra chica, a pedido); a la derecha, Activar (o
+// tiene, el nombre y sus días (nada más, a pedido); a la derecha, Activar (o
 // "Activa") y "Más" con Editar, Compartir y Eliminar. Deslizar a la derecha
 // también la elimina. En la tanda 12 se probaron una carpeta, la tira en
 // colores y la letra de Rutina, y no convencieron.
@@ -22651,6 +22645,7 @@ function SavedRoutineRow({ routine, isActive, onUse, onEdit, onShare, onArchive,
           <span className="rutina-creada-dias" aria-hidden="true"><b className="num-display">{dayCount}</b><small>{dayCount === 1 ? "día" : "días"}</small></span>
           <span className="rutina-creada-texto" aria-hidden="true">
             <span className="rutina-creada-nombre">{routine.name}</span>
+            <span className="rutina-creada-meta">{nombresDeDias(routine)}</span>
           </span>
         </button>
         <span className="rutina-creada-acciones">
@@ -27281,17 +27276,6 @@ function volumenPorMusculo(routineDef) {
     .sort((a, b) => b.series - a.series);
 }
 
-// Cuántas sesiones hiciste con una rutina y cuándo fue la última. Con varias
-// rutinas guardadas, esto es lo que te permite acordarte de cuál era cuál.
-function usoDeRutina(routineId, sessions) {
-  const propias = (sessions || []).filter((s) => s?.routineId === routineId && s?.date);
-  if (!propias.length) return { sesiones: 0, ultimaVez: null, diasDesde: null };
-  const fechas = propias.map((s) => s.date).sort();
-  const ultima = fechas[fechas.length - 1];
-  const dias = Math.round((new Date(todayStr()) - new Date(ultima)) / 86400000);
-  return { sesiones: propias.length, ultimaVez: ultima, diasDesde: dias };
-}
-
 // Texto humano para "hace cuánto": "hoy", "ayer", "hace 3 días", "hace 2 meses"
 function haceCuanto(dias) {
   if (dias == null) return null;
@@ -27387,10 +27371,7 @@ function RoutinePreviewModal({ routineDef, routineName, onActivate, onClose, yaA
           </div>
 
           <section className="space-y-2.5" aria-label="Sus días">
-            <div className="flex items-baseline justify-between gap-3">
-              <h4 className="seccion-titulo">Sus días</h4>
-              <span className="text-[12.5px] text-slate-500">Tocá uno</span>
-            </div>
+            <h4 className="seccion-titulo">Sus días</h4>
             <DiasRutina routineDef={routineDef} onGoToDay={(dk) => setAbierto(dk)} elegido={abierto} />
             {delDia && <RoutinePreview routineDef={delDia} />}
           </section>
@@ -27503,12 +27484,6 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
   const activeDef = resolveRoutineDef(routines[activeId], activeId);
   const customEntries = Object.entries(routines).filter(([, r]) => r.source !== "preset");
 
-
-  // Cuántas veces usaste la rutina activa y cuándo fue la última
-  const activeUso = useMemo(
-    () => usoDeRutina(activeId, profile?.trainingSessions),
-    [activeId, profile?.trainingSessions]
-  );
 
   // Uso de TODAS las rutinas en UNA sola pasada por el historial. Si llamáramos
   // a usoDeRutina dentro del .map, recorreríamos las sesiones enteras una vez
@@ -27680,7 +27655,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
         <section className="tarjeta-tonal rutina-activa p-4 space-y-4" style={{ "--c": "#3B82F6" }} aria-label="Tu rutina activa">
           <div className="flex items-start gap-3">
             <div className="min-w-0 flex-1">
-              <p className="rutina-activa-linea">{activeUso.sesiones > 0 ? `Tu rutina, con ${activeUso.sesiones} ${activeUso.sesiones === 1 ? "sesión" : "sesiones"}` : "Tu rutina"}</p>
+              <p className="rutina-activa-linea">Tu rutina</p>
               <h3 className="rutina-activa-nombre">{activeDef.name}</h3>
             </div>
             <button onClick={() => setShareTarget(activeDef)} aria-label="Compartir rutina activa" className="boton-redondo shrink-0"><Share2 size={16} /></button>
