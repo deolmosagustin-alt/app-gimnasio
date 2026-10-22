@@ -7,7 +7,7 @@ import { LazyMotion, m, MotionConfig } from "motion/react";
 const cargarAnimaciones = () => import("./animaciones.js").then((r) => r.default);
 import {
   Play, Pause, RotateCcw, TrendingUp, TrendingDown, Dumbbell, History,
-  ChevronDown, ChevronUp, ChevronLeft, Trophy, Flame, Save, Trash2, BarChart3,
+  ChevronDown, ChevronUp, ChevronLeft, Trophy, Flame, Save, Trash2, BarChart3, MoreHorizontal,
   ListChecks, LogOut, X, Check, AlertTriangle, Calendar, Zap, Bell, GripVertical, Sliders, StickyNote, Eye,
   Mail, Clock, ChevronRight, Edit3, Info, Plus, Sun, Moon,
   Target, Award, Activity, ArrowDown, HelpCircle, List, LayoutGrid,
@@ -4536,6 +4536,43 @@ button.carrera-carril:active { background: var(--velo); }
 .aviso-vincular { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 22px; color: var(--text-muted); background: var(--surface-1); box-shadow: var(--placa-canto); }
 .aviso-vincular p { flex: 1; min-width: 0; font-size: 12.5px; line-height: 1.4; text-wrap: pretty; }
 .preset-acciones { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
+/* TUS RUTINAS CREADAS: una placa con renglones separados por un filo. */
+.rutinas-creadas { position: relative; border-radius: 24px; background: var(--surface-1); box-shadow: var(--placa-canto); }
+.rutinas-creadas > * { border-radius: 0; }
+.rutinas-creadas > *:first-child { border-top-left-radius: 24px; border-top-right-radius: 24px; }
+.rutinas-creadas > *:last-child { border-bottom-left-radius: 24px; border-bottom-right-radius: 24px; }
+.rutinas-creadas > * > div { border-radius: inherit; }
+.rutinas-creadas > * + * .rutina-creada { box-shadow: inset 0 1px 0 var(--hairline); }
+.rutinas-creadas > *:has(.rutina-creada-menu) { overflow: visible; z-index: 3; }
+.rutina-creada { position: relative; display: flex; align-items: center; gap: 8px; padding: 12px 8px 12px 12px; }
+.rutina-creada-cuerpo { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; text-align: left; border-radius: 16px; }
+.rutina-creada-cuerpo:active .rutina-creada-nombre { color: var(--text-muted); }
+.rutina-creada-dias { flex: none; width: 46px; height: 50px; border-radius: 14px; background: var(--panel-sunken); box-shadow: inset 0 1px 2px rgba(0,0,0,.35); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; }
+.light-mode .rutina-creada-dias { box-shadow: inset 0 1px 2px rgba(0,0,0,.08); }
+.rutina-creada-dias b { font-size: 24px; line-height: 1; font-weight: 700; color: var(--text-strong); }
+.rutina-creada-dias small { font-size: 10.5px; line-height: 1.1; color: var(--text-faint); }
+.rutina-creada.activa .rutina-creada-dias b { color: color-mix(in oklab, var(--c) 72%, white); }
+.light-mode .rutina-creada.activa .rutina-creada-dias b { color: color-mix(in oklab, var(--c) 80%, black); }
+.rutina-creada-texto { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.rutina-creada-nombre { font-size: 15px; font-weight: 650; line-height: 1.25; color: var(--text-strong); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.rutina-creada-meta { font-size: 12.5px; line-height: 1.35; color: var(--text-muted); }
+.rutina-creada-uso { font-size: 11.5px; line-height: 1.35; color: var(--text-faint); }
+.rutina-creada-acciones { flex: none; display: flex; align-items: center; gap: 2px; }
+.rutina-creada-activa { display: inline-flex; align-items: center; gap: 4px; height: 32px; padding: 0 6px; font-size: 12.5px; font-weight: 650; color: color-mix(in oklab, var(--c) 72%, white); }
+.light-mode .rutina-creada-activa { color: color-mix(in oklab, var(--c) 80%, black); }
+.rutina-creada-mas { width: 40px; height: 40px; border-radius: 999px; display: grid; place-items: center; color: var(--text-muted); transition: background-color .15s ease, transform .15s var(--resorte, ease); }
+.rutina-creada-mas:active, .rutina-creada-mas[aria-expanded="true"] { background: var(--velo); transform: scale(.94); }
+.rutina-creada-velo { position: fixed; inset: 0; z-index: 4; cursor: default; }
+.rutina-creada-menu { position: absolute; right: 8px; top: calc(100% - 8px); z-index: 5; min-width: 200px; padding: 6px; border-radius: 18px; background: var(--surface-3); box-shadow: var(--placa-canto), 0 16px 32px -12px rgba(0,0,0,.6); display: flex; flex-direction: column; }
+.light-mode .rutina-creada-menu { background: #fff; box-shadow: var(--placa-canto), 0 16px 32px -12px rgba(0,0,0,.18); }
+.rutina-creada-menu button { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 12px; border-radius: 12px; font-size: 14px; font-weight: 600; color: var(--text-strong); text-align: left; }
+.rutina-creada-menu button:active { background: var(--velo); }
+.rutina-creada-menu button svg { color: var(--text-muted); flex: none; }
+.rutina-creada-menu button.peligro, .rutina-creada-menu button.peligro svg { color: #f07a7a; }
+.light-mode .rutina-creada-menu button.peligro, .light-mode .rutina-creada-menu button.peligro svg { color: #c43d3d; }
+/* La última de varias lo abre hacia arriba, así no queda colgando abajo de la placa. */
+.rutinas-creadas > *:last-child:not(:first-child) .rutina-creada-menu { top: auto; bottom: calc(100% - 8px); }
+@media (max-width: 349px) { .rutina-creada-dias { display: none; } .rutina-creada-nombre { -webkit-line-clamp: 3; } }
 
 /* Social: el ranking. */
 .ranking-fila { width: 100%; display: flex; align-items: center; gap: 12px; padding: 8px 14px 8px 8px; border-radius: 20px; text-align: left; background: var(--surface-2); }
@@ -22578,40 +22615,58 @@ function PresetRoutineCard({ preset, isActive, onPreview }) {
   );
 }
 
-// TUS RUTINAS CREADAS: la tarjeta de siempre, discreta, para que no compita
-// con tu rutina de arriba. El nombre, la tira gris de sus días (el ancho de
-// cada tramo es cuántas series tiene) y cuánto la usaste; abajo, las
-// acciones. En la tanda 12 se probaron una carpeta, una tarjeta con la tira en
-// colores y otra con la letra de Rutina: volvió ésta ("ahora siento que tiene
-// mucho protagonismo").
+// TUS RUTINAS CREADAS: una sola placa con una lista, como los ajustes del
+// teléfono, para que no compita con tu rutina de arriba (pedido: "sigue sin
+// convencerme"; antes cada una era una tarjeta grande con tres botones y una
+// tira gris que no decía nada). Cada renglón: en un hueco, cuántos días
+// tiene; el nombre, sus días y cuánto la usaste; a la derecha, Activar (o
+// "Activa") y "Más" con Editar, Compartir y Eliminar. Deslizar a la derecha
+// también la elimina. En la tanda 12 se probaron una carpeta, la tira en
+// colores y la letra de Rutina, y no convencieron.
+function nombresDeDias(routine) {
+  const nombres = routine.dayOrder.map((dk) => {
+    const l = String(routine.days?.[dk]?.label || dk).trim();
+    // "PUSH" se lee mejor como "Push"; "PPL" o "HIIT" quedan como están.
+    return l.length > 3 && l === l.toUpperCase() ? l.charAt(0) + l.slice(1).toLowerCase() : l;
+  });
+  return nombres.length > 1 ? `${nombres.slice(0, -1).join(", ")} y ${nombres[nombres.length - 1]}` : nombres[0] || "";
+}
 function SavedRoutineRow({ routine, isActive, onUse, onEdit, onShare, onArchive, onPreview, uso = null }) {
   const dayCount = routine.dayOrder.length;
-  // BUG FIX (pedido: "que las no activas estén del celeste característico
-  // de la pestaña"): antes las inactivas usaban índigo, sin relación con
-  // ningún color de la app — Rutinas (esta pestaña, plural) era celeste.
-  // Pedido posterior: "cambiar el celeste de rutinas por azul".
-  const tramos = routine.dayOrder.map((dk) => ({ dk, color: routine.days?.[dk]?.color || "#3B82F6", series: (routine.days?.[dk]?.exercises || []).reduce((a, e) => a + (e.sets?.length || 0), 0) || 1 }));
+  const [menu, setMenu] = useState(false);
+  const [borrar, setBorrar] = useState(false);
+  const cerrar = () => { setMenu(false); setBorrar(false); };
+  const usoTexto = uso?.sesiones > 0 ? `${uso.sesiones} ${uso.sesiones === 1 ? "sesión" : "sesiones"}, la última ${haceCuanto(uso.diasDesde)}` : "Sin usar todavía";
   return (
-    <SwipeToArchive confirmText={`¿Eliminar "${routine.name}"? No se puede deshacer.`} onArchive={onArchive} redondeo="rounded-[24px]" fondo="">
-      <div className={`preset stagger-item ${isActive ? "activa" : ""}`} style={{ "--c": "#3B82F6" }}>
-        {/* Tocar la rutina abre el pop-up completo (días, ejercicios, balance). */}
-        <button onClick={onPreview} className="preset-cuerpo">
-          <span className="preset-cabeza">
-            <span className="preset-nombre">{routine.name}</span>
-            {isActive && <span className="preset-activa">Activa</span>}
-          </span>
-          <span className="preset-pie">
-            <span className="preset-tira" aria-hidden="true">{tramos.map((t) => <i key={t.dk} style={{ "--dia": t.color, flexGrow: t.series }} />)}</span>
-            <span className="preset-frec">
-              {dayCount} día{dayCount !== 1 ? "s" : ""}{uso?.sesiones > 0 ? `, ${uso.sesiones} sesion${uso.sesiones !== 1 ? "es" : ""} (${haceCuanto(uso.diasDesde)})` : ", sin usar"}
-            </span>
+    <SwipeToArchive confirmText={`¿Eliminar "${routine.name}"? No se puede deshacer.`} onArchive={onArchive} redondeo="" fondo="bg-[var(--surface-1)]">
+      <div className={`rutina-creada ${isActive ? "activa" : ""}`} style={{ "--c": "#3B82F6" }}>
+        {/* Tocar la rutina abre la vista previa (días, ejercicios, balance). */}
+        <button onClick={onPreview} className="rutina-creada-cuerpo" aria-label={`${routine.name}: ${dayCount} ${dayCount === 1 ? "día" : "días"}, ${nombresDeDias(routine)}. ${usoTexto}. Ver la rutina`}>
+          <span className="rutina-creada-dias" aria-hidden="true"><b className="num-display">{dayCount}</b><small>{dayCount === 1 ? "día" : "días"}</small></span>
+          <span className="rutina-creada-texto" aria-hidden="true">
+            <span className="rutina-creada-nombre">{routine.name}</span>
+            <span className="rutina-creada-meta">{nombresDeDias(routine)}</span>
+            <span className="rutina-creada-uso">{usoTexto}</span>
           </span>
         </button>
-        <span className="preset-acciones">
-          {!isActive && <button onClick={onUse} className="boton-tonal !min-h-9 !px-3.5 !text-[13px]">Activar</button>}
-          <button onClick={onShare} aria-label="Compartir" className="boton-redondo !w-9 !h-9"><Share2 size={15} /></button>
-          <button onClick={onEdit} aria-label="Editar" className="boton-redondo !w-9 !h-9"><Edit3 size={15} /></button>
+        <span className="rutina-creada-acciones">
+          {isActive
+            ? <span className="rutina-creada-activa"><Check size={13} strokeWidth={3} /> Activa</span>
+            : <button onClick={onUse} className="boton-tonal !min-h-8 !px-3 !text-[12.5px]">Activar</button>}
+          <button onClick={() => (menu ? cerrar() : setMenu(true))} aria-label={`Más opciones de ${routine.name}`} aria-expanded={menu} className="rutina-creada-mas"><MoreHorizontal size={18} /></button>
         </span>
+        {menu && (
+          <>
+            <button className="rutina-creada-velo" aria-label="Cerrar el menú" onClick={cerrar} />
+            <span className="rutina-creada-menu bounce-in" role="menu">
+              <button role="menuitem" onClick={() => { cerrar(); onEdit(); }}><Edit3 size={15} /> Editar</button>
+              <button role="menuitem" onClick={() => { cerrar(); onShare(); }}><Share2 size={15} /> Compartir</button>
+              <button role="menuitem" className="peligro" onClick={() => (borrar ? (cerrar(), onArchive()) : setBorrar(true))}>
+                <Trash2 size={15} /> {borrar ? "Tocá de nuevo para eliminar" : "Eliminar"}
+              </button>
+            </span>
+          </>
+        )}
       </div>
     </SwipeToArchive>
   );
@@ -27664,7 +27719,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
       {customEntries.length > 0 && (
         <div className="space-y-2.5">
           <h3 className="seccion-titulo">Tus rutinas creadas</h3>
-          <div className="space-y-2">
+          <div className="rutinas-creadas stagger-item">
             {customEntries.map(([id, r]) => (
               <SavedRoutineRow key={id} routine={r} isActive={id === activeId} onUse={() => handleUseClick(id, null)}
                 onEdit={() => { setEditingRoutineId(id); setMode("builder"); }} onShare={() => setShareTarget(r)} onArchive={() => onArchive(id)}
