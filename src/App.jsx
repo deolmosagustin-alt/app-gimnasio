@@ -4537,7 +4537,9 @@ button.carrera-carril:active { background: var(--velo); }
 .aviso-vincular p { flex: 1; min-width: 0; font-size: 12.5px; line-height: 1.4; text-wrap: pretty; }
 .preset-acciones { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
 /* TUS RUTINAS CREADAS: una placa con renglones separados por un filo. */
-.rutinas-creadas { position: relative; border-radius: 24px; background: var(--surface-1); box-shadow: var(--placa-canto); }
+.rutinas-creadas { position: relative; border-radius: 24px; background: var(--surface-1); }
+/* El canto de las placas, por encima de los renglones (sus fondos lo tapaban). */
+.rutinas-creadas::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: var(--placa-canto); pointer-events: none; z-index: 2; }
 .rutinas-creadas > * { border-radius: 0; }
 .rutinas-creadas > *:first-child { border-top-left-radius: 24px; border-top-right-radius: 24px; }
 .rutinas-creadas > *:last-child { border-bottom-left-radius: 24px; border-bottom-right-radius: 24px; }
@@ -4555,8 +4557,6 @@ button.carrera-carril:active { background: var(--velo); }
 .light-mode .rutina-creada.activa .rutina-creada-dias b { color: color-mix(in oklab, var(--c) 80%, black); }
 .rutina-creada-texto { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .rutina-creada-nombre { font-size: 15px; font-weight: 650; line-height: 1.25; color: var(--text-strong); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
-.rutina-creada-meta { font-size: 12.5px; line-height: 1.35; color: var(--text-muted); }
-.rutina-creada-uso { font-size: 11.5px; line-height: 1.35; color: var(--text-faint); }
 .rutina-creada-acciones { flex: none; display: flex; align-items: center; gap: 2px; }
 .rutina-creada-activa { display: inline-flex; align-items: center; gap: 4px; height: 32px; padding: 0 6px; font-size: 12.5px; font-weight: 650; color: color-mix(in oklab, var(--c) 72%, white); }
 .light-mode .rutina-creada-activa { color: color-mix(in oklab, var(--c) 80%, black); }
@@ -22625,7 +22625,7 @@ function PresetRoutineCard({ preset, isActive, onPreview }) {
 // teléfono, para que no compita con tu rutina de arriba (pedido: "sigue sin
 // convencerme"; antes cada una era una tarjeta grande con tres botones y una
 // tira gris que no decía nada). Cada renglón: en un hueco, cuántos días
-// tiene; el nombre, sus días y cuánto la usaste; a la derecha, Activar (o
+// tiene y el nombre (sin letra chica, a pedido); a la derecha, Activar (o
 // "Activa") y "Más" con Editar, Compartir y Eliminar. Deslizar a la derecha
 // también la elimina. En la tanda 12 se probaron una carpeta, la tira en
 // colores y la letra de Rutina, y no convencieron.
@@ -22651,8 +22651,6 @@ function SavedRoutineRow({ routine, isActive, onUse, onEdit, onShare, onArchive,
           <span className="rutina-creada-dias" aria-hidden="true"><b className="num-display">{dayCount}</b><small>{dayCount === 1 ? "día" : "días"}</small></span>
           <span className="rutina-creada-texto" aria-hidden="true">
             <span className="rutina-creada-nombre">{routine.name}</span>
-            <span className="rutina-creada-meta">{nombresDeDias(routine)}</span>
-            <span className="rutina-creada-uso">{usoTexto}</span>
           </span>
         </button>
         <span className="rutina-creada-acciones">
