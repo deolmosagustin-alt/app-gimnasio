@@ -18244,6 +18244,7 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
   const [showDeletePin, setShowDeletePin] = useState(false); const [deleteError, setDeleteError] = useState("");
   const [editing, setEditing] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
   const [editMail, setEditMail] = useState(profile?.email || "");
   const [editSex, setEditSex] = useState(profile?.sex || "");
   const [editAge, setEditAge] = useState(profile?.age ? String(profile.age) : "");
@@ -18837,6 +18838,20 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
         <span>Tus datos se guardan en este dispositivo, con una copia de seguridad automática.</span>
       </div>
 
+      {/* Los términos, en un panel: un window.open a la misma dirección de la
+          app la reemplazaba adentro del WebView de Android. */}
+      {showTerms && (
+        <div className="fixed inset-0 z-[200] flex flex-col modal-overlay" style={{ background: "var(--app-bg)", paddingTop: "env(safe-area-inset-top,0px)" }}>
+          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800/60 shrink-0">
+            <div className="flex items-center gap-2.5">
+              <FileText size={16} className="text-teal-400" />
+              <span className="text-sm font-bold text-white">Términos y condiciones</span>
+            </div>
+            <button onClick={() => setShowTerms(false)} aria-label="Cerrar" className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white transition active:scale-90"><X size={16} /></button>
+          </div>
+          <iframe src={`${API_ORIGIN}/terminos.html`} title="Términos y condiciones" className="flex-1 w-full border-0" style={{ background: "var(--app-bg)" }} />
+        </div>
+      )}
       {showPrivacy && (
         <div className="fixed inset-0 z-[200] flex flex-col modal-overlay" style={{ background: "var(--app-bg)", paddingTop: "env(safe-area-inset-top,0px)" }}>
           <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800/60 shrink-0">
@@ -18875,7 +18890,7 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
           <Info size={13} /> Política de privacidad
         </button>
         <span className="text-slate-700 text-xs" aria-hidden="true">·</span>
-        <button onClick={() => { try { window.open(`${API_ORIGIN}/terminos.html`, "_system"); } catch { /* sin navegador */ } }} className="flex items-center gap-2 justify-center py-3 px-2 rounded-2xl text-slate-500 hover:text-slate-300 transition text-xs font-semibold">
+        <button onClick={() => setShowTerms(true)} className="flex items-center gap-2 justify-center py-3 px-2 rounded-2xl text-slate-500 hover:text-slate-300 transition text-xs font-semibold">
           <FileText size={13} /> Términos y condiciones
         </button>
       </div>
