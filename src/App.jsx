@@ -6328,8 +6328,28 @@ function ShareLinkModal({ title, shareTitle, shareText, shareTarget, onClose }) 
     return () => { cancelled = true; };
   }, [shareTarget]);
 
-  const canNativeShare = typeof navigator !== "undefined" && !!navigator.share;
-  const handleNativeShare = async () => { try { await navigator.share({ title: shareTitle, text: shareText, url }); onClose(); } catch { /* cancelado, no hacemos nada */ } };
+  // BUG FIX (reporte: "compartir rutina no funciona"): el WebView de Android
+  // no tiene navigator.share, así que en la app el botón quedaba en "Copiar
+  // el enlace" y nunca abría la hoja de compartir del teléfono. En la app va
+  // por el plugin de Capacitor; en el navegador, por la Web Share API.
+  const esApp = typeof window !== "undefined" && !!window.Capacitor?.isNativePlatform?.();
+  const canNativeShare = esApp || (typeof navigator !== "undefined" && !!navigator.share);
+  const handleNativeShare = async () => {
+    try {
+      if (esApp) {
+        const { Share } = await import("@capacitor/share");
+        await Share.share({ title: shareTitle, text: shareText, url, dialogTitle: "Compartir la rutina" });
+      } else {
+        await navigator.share({ title: shareTitle, text: shareText, url });
+      }
+      onClose();
+    } catch (err) {
+      // Cerrar la hoja sin elegir no es un error; cualquier otra falla, se
+      // copia el enlace para que igual lo puedas pegar.
+      if (err?.name === "AbortError" || /cancel/i.test(String(err?.message || err))) return;
+      handleCopy();
+    }
+  };
   // Copiado con respaldo: navigator.clipboard no está disponible en todos
   // los contextos (por ejemplo, si la app se sirve por HTTP sin TLS, o en
   // algunos navegadores/webviews) — si falla, el enlace queda visible y
@@ -7339,6 +7359,7 @@ function ShareImageModal({ title, subtitle, fileNamePrefix, shareTitle, shareTex
   // volver no hay ni un mensaje. Ahora el error se muestra, con su detalle,
   // y compartir cae al texto/enlace — que es justo lo que sí funciona.
   const [shareError, setShareError] = useState(null); // null | { msg, detail }
+  const [guardada, setGuardada] = useState(false);
   const nativeShareError = (err) => {
     const detail = String(err?.message || err || "");
     // "Share canceled" es lo que devuelve el plugin cuando cerrás la hoja sin
@@ -7349,7 +7370,21 @@ function ShareImageModal({ title, subtitle, fileNamePrefix, shareTitle, shareTex
   const handleDownload = async () => {
     const canvas = canvasRef.current; if (!canvas) return;
     if (isNative) {
-      setShareError(null);
+      setShareError(null); setGuardada(false);
+      // BUG FIX (reporte: "descargar no funciona"): en el teléfono,
+      // "Descargar" abría la hoja de compartir en vez de guardar. Ahora se
+      // guarda en Imágenes › ModusFit, que aparece en la galería. Android 10
+      // o anterior no deja escribir ahí sin un permiso que la app no pide:
+      // en ese caso sigue la hoja para elegir dónde guardarla.
+      try {
+        const { Filesystem, Directory } = await import("@capacitor/filesystem");
+        const base64 = canvas.toDataURL("image/png").split(",")[1];
+        await Filesystem.writeFile({ path: `Pictures/ModusFit/${fileNamePrefix}-${Date.now()}.png`, data: base64, directory: Directory.ExternalStorage, recursive: true });
+        setGuardada(true);
+        return;
+      } catch (err) {
+        console.warn("[descargar] no se pudo guardar en Imágenes, se abre la hoja:", err);
+      }
       try {
         const uri = await writeImageToCache();
         if (!uri) throw new Error("El archivo no se pudo escribir en el teléfono.");
@@ -7509,6 +7544,7 @@ function ShareImageModal({ title, subtitle, fileNamePrefix, shareTitle, shareTex
           <button onClick={handleShare} disabled={!previewUrl} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-2xl !text-[color:var(--accion-tinta)] text-sm font-bold transition-all active:scale-[0.98] disabled:opacity-40" style={{ background: "var(--accion-fondo)", boxShadow: "none" }}><Share2 size={14} /> Compartir</button>
           <button onClick={handleDownload} disabled={!previewUrl} className="flex-1 flex items-center justify-center gap-1.5 py-3 rounded-xl border text-slate-300 hover:text-white transition text-sm font-semibold disabled:opacity-40" style={{ borderColor: tint(accent, "30") }}><Download size={14} /> Descargar</button>
         </div>
+        {guardada && <p className="relative mt-3 text-[12px] text-emerald-300 text-center" role="status"><Check size={13} className="inline -mt-0.5 mr-1" />Guardada en tu galería, en Imágenes › ModusFit.</p>}
         {shareError && (
           <div className="relative mt-3 rounded-xl bg-rose-500/10 border border-rose-500/25 px-3 py-2.5">
             <p className="text-[11px] text-rose-300 leading-snug">{shareError.msg}</p>
