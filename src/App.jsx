@@ -9719,6 +9719,14 @@ function objetivoDeSerie(exercise, setIndex, logs, weekInCycle, settings, unit, 
   }
   return mejor ? `récord ${escribir(mejor)}` : "primera vez";
 }
+// Cómo te fue contra la vez pasada de ese día, dicho como se dice: "12 % más
+// volumen que tu último Push" (antes "+12 % de volumen que…", y con 0 quedaba
+// "0 % de volumen que tu último Push").
+function textoVsUltima({ pct, dia }) {
+  const n = Math.round(Math.abs(Number(pct) || 0));
+  if (n === 0) return `El mismo volumen que tu último ${dia}`;
+  return `${n} % ${pct > 0 ? "más" : "menos"} volumen que tu último ${dia}`;
+}
 function textoDuracion(min) {
   if (min == null || min < 1) return null;
   return min >= 60 ? `${Math.floor(min / 60)} h ${min % 60} min` : `${min} min`;
@@ -9940,7 +9948,7 @@ function SessionSummaryModal({ resumen, onClose }) {
                       </div>
                     ))}
                   </div>
-                  {resumen.vsUltima && <p className="ticket-nota">{conSigno(resumen.vsUltima.pct, 0)} % de volumen que tu último {resumen.vsUltima.dia}</p>}
+                  {resumen.vsUltima && <p className="ticket-nota">{textoVsUltima(resumen.vsUltima)}</p>}
                 </>
               )}
               {regiones.length > 1 && (
@@ -10081,7 +10089,7 @@ function dibujarTicket(ctx, W, H, resumen, unit) {
       ctx.fillText(h.hoy && h.fecha === todayStr() ? "Hoy" : `${Number(h.fecha.slice(8, 10))}/${Number(h.fecha.slice(5, 7))}`, cx, base + 26);
     });
     y = base + 62;
-    if (resumen.vsUltima) { centro(`${conSigno(resumen.vsUltima.pct, 0)} % de volumen que tu último ${resumen.vsUltima.dia}`, `600 19px ${F}`, "#4a4a4e"); }
+    if (resumen.vsUltima) { centro(textoVsUltima(resumen.vsUltima), `600 19px ${F}`, "#4a4a4e"); }
     y += 14;
   }
   if (conReg) {
@@ -11330,9 +11338,13 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           : isPR ? { type: "pr", msg: "Tu sesión más larga." }
             : m === prevMin ? { type: "tie", msg: "Igualaste tu sesión más larga." }
               : { type: "down", msg: `A un ${Math.max(1, Math.round(((prevMin - m) / prevMin) * 100))} % de tu sesión más larga.` });
+      // La meta cumplida (tono "sube") va en verde y sin campana: la campana y
+      // el dorado son para el récord (antes el tono se perdía acá y la meta
+      // cumplida salía en dorado y sonaba como un récord).
+      const celebraC = fbC.type === "pr" && !fbC.tono;
       haptic(fbC.type === "pr" ? [35, 25, 45] : 18);
-      if (fbC.type === "pr") tocarCampana();
-      setFeedback({ type: fbC.type, msg: fbC.msg, noSession });
+      if (celebraC) tocarCampana();
+      setFeedback({ type: fbC.type, tono: fbC.tono, msg: fbC.msg, noSession });
       return;
     }
     const r = parseFloat(reps), kDisplay = parseFloat(kg);
@@ -11442,10 +11454,12 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
         : isPR ? ((isBodyweight ? r > mejorEj.reps : new1RM > mejorEj.rm) ? { type: "pr", msg: "Récord nuevo." } : { type: "pr-serie", msg: "Tu mejor marca en esta serie." })
           : new1RM === prev1RM ? { type: "tie", msg: "Igualaste tu récord." }
             : { type: "down", msg: `A un ${Math.max(1, Math.round(((prev1RM - new1RM) / prev1RM) * 100))} % de tu récord.` });
-    const esCelebracion = fb.type === "pr";
-    haptic(esCelebracion ? [35, 25, 45] : 18);
+    // La meta cumplida (tono "sube") va en verde y sin campana ni imagen para
+    // compartir: son para el récord (antes el tono se perdía acá).
+    const esCelebracion = fb.type === "pr" && !fb.tono;
+    haptic(fb.type === "pr" ? [35, 25, 45] : 18);
     if (esCelebracion) tocarCampana();
-    setFeedback({ type: fb.type, msg: fb.msg, suggestUp, noSession });
+    setFeedback({ type: fb.type, tono: fb.tono, msg: fb.msg, suggestUp, noSession });
     if (esCelebracion && autoShowPrShare && compartirAutoHoy()) setTimeout(() => setShowPRShare(true), 1500);
   };
   const savePR = () => {
