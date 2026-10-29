@@ -1496,6 +1496,151 @@ function getPlannedTargetForWeek(set, weekInCycle, trainingMode = "planned") {
   return plan.reduce((a, b) => (b.week < a.week ? b : a));
 }
 
+/* ============================================================================
+   LA META DE HOY, COMO LA PONDRÍA UN ENTRENADOR (29/10/2026, pedido: "mejorar
+   la lógica de la planificación"). Lo cargado en el plan es lo planeado
+   semana por semana; la meta de hoy además mira cómo te fue la vez pasada en
+   esa misma serie:
+    · cumpliste: avanzás UN escalón del plan, aunque hayas faltado una semana
+      (antes el plan avanzaba por calendario y faltar te hacía saltar dos);
+    · no llegaste: repetís esa meta, salvo que la de esta semana sea más
+      liviana (una semana suave del plan se respeta);
+    · no llegaste dos veces seguidas a la misma meta: baja un 10 % para
+      volver a subir.
+   Y el plan es de UN ciclo: cuando empieza el siguiente, termina, en vez de
+   volver a las metas de la semana 1 (antes se repetía en cada vuelta: en el
+   ciclo 2 te pedía lo mismo que al arrancar el 1). La hoja de Tu plan ofrece
+   seguirlo desde donde quedaste (ver planesParaSeguir).
+   Para saber si cumpliste, cada serie guardada con plan anota la meta que
+   tenía (`meta`), en qué escalón iba (`paso`) y de qué plan era (`planDe`,
+   el plannedAt del plan). Cada plan nuevo se sella con `plannedAt` y con el
+   ciclo en que se cargó (`plannedCycle`, ver sellarPlan).
+============================================================================ */
+// El ciclo en curso: lo fija App (null sin fecha de inicio del ciclo).
+let CICLO_ACTUAL = null;
+function sellarPlan(set) {
+  set.plannedAt = Date.now();
+  if (CICLO_ACTUAL != null) set.plannedCycle = CICLO_ACTUAL;
+  else delete set.plannedCycle;
+}
+// Planes cargados antes de que existiera el sello: quedan del ciclo en curso,
+// así ninguno desaparece de golpe y terminan con el próximo ciclo. Devuelve
+// las rutinas con el sello puesto, o null si no había nada que sellar.
+function sellarPlanesViejos(routines, ciclo) {
+  if (!routines || ciclo == null) return null;
+  let cambio = false;
+  const nuevas = {};
+  Object.entries(routines).forEach(([rid, r]) => {
+    if (!r?.days) { nuevas[rid] = r; return; }
+    let tocada = false;
+    const days = {};
+    Object.entries(r.days).forEach(([dk, d]) => {
+      const exercises = (d?.exercises || []).map((ex) => {
+        if (!Array.isArray(ex?.sets) || !ex.sets.some((st) => Array.isArray(st?.plannedProgression) && st.plannedProgression.length && st.plannedCycle == null)) return ex;
+        tocada = true;
+        return { ...ex, sets: ex.sets.map((st) => (Array.isArray(st?.plannedProgression) && st.plannedProgression.length && st.plannedCycle == null ? { ...st, plannedCycle: ciclo } : st)) };
+      });
+      days[dk] = d?.exercises ? { ...d, exercises } : d;
+    });
+    if (tocada) { cambio = true; nuevas[rid] = { ...r, days }; } else nuevas[rid] = r;
+  });
+  return cambio ? nuevas : null;
+}
+// Cumplir una meta: los kilos Y las reps pedidas (o los minutos, en cardio).
+function cumpleMeta(hecho, meta) {
+  if (!hecho || !meta) return false;
+  if (meta.minutes != null) return (hecho.minutes || 0) >= meta.minutes;
+  return (hecho.kg || 0) + 0.001 >= (meta.kg || 0) && (hecho.reps || 0) >= (meta.reps || 0);
+}
+// Una meta más liviana que otra: menos kilos, o los mismos con menos reps (o
+// menos minutos). Así una semana suave del plan (una ola, una descarga) se
+// distingue del paso de subir el peso: 8 × 82,5 después de 10 × 80 no es más
+// liviana, es el salto, que sólo se da al llegar al tope de reps.
+const masLiviana = (a, b) => (a?.minutes != null
+  ? a.minutes < (b?.minutes || 0)
+  : (a?.kg || 0) < (b?.kg || 0) - 0.01 || (Math.abs((a?.kg || 0) - (b?.kg || 0)) < 0.01 && (a?.reps || 0) < (b?.reps || 0)));
+const mismaMeta = (a, b) => !!a && !!b && (a.minutes != null ? a.minutes === b.minutes : Math.abs((a.kg || 0) - (b.kg || 0)) < 0.01 && a.reps === b.reps);
+// ¿El plan de esta serie es de otro ciclo? (el que pasó, o uno de antes de
+// reiniciar el ciclo).
+function planTerminado(setDef, cicloActual = CICLO_ACTUAL) {
+  return cicloActual != null && setDef?.plannedCycle != null && setDef.plannedCycle !== cicloActual
+    && Array.isArray(setDef?.plannedProgression) && setDef.plannedProgression.length > 0;
+}
+function metaDeHoy(setDef, history, weekInCycle, trainingMode = "planned", { hoy = todayStr(), cicloActual = CICLO_ACTUAL, saltoKg = 2.5 } = {}) {
+  if (planTerminado(setDef, cicloActual)) return null;
+  const base = getPlannedTargetForWeek(setDef, weekInCycle, trainingMode);
+  if (!base) return null;
+  const semana = weekInCycle || 1;
+  const entrada = (w) => getPlannedTargetForWeek({ ...setDef, plannedPaused: false }, w, "planned");
+  const previas = (history || [])
+    .filter((h) => h?.meta && h.date && h.date < hoy && !h.deload && (h.planDe ?? null) === (setDef.plannedAt ?? null))
+    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+  const ultima = previas[0];
+  if (!ultima) return { ...base, paso: semana, ajuste: null };
+  const pasoUltima = ultima.paso || semana;
+  if (cumpleMeta(ultima, ultima.meta)) {
+    const paso = Math.max(1, Math.min(semana, pasoUltima + 1));
+    return { ...entrada(paso), paso, ajuste: paso < semana ? "sigue" : null };
+  }
+  // No llegaste. Una semana más liviana del plan se respeta tal cual.
+  if (masLiviana(base, ultima.meta)) return { ...base, paso: semana, ajuste: null };
+  const anterior = previas[1];
+  if (anterior && !cumpleMeta(anterior, anterior.meta) && mismaMeta(anterior.meta, ultima.meta)) {
+    const m = ultima.meta;
+    if (m.minutes != null) return { week: pasoUltima, minutes: Math.max(1, Math.round(m.minutes * 0.9)), paso: pasoUltima, ajuste: "baja" };
+    const salto = saltoKg > 0 ? saltoKg : 2.5;
+    const kg = m.kg > 0 ? roundKg(Math.max(salto, Math.round((m.kg * 0.9) / salto) * salto)) : 0;
+    return { week: pasoUltima, kg, reps: m.reps, paso: pasoUltima, ajuste: "baja" };
+  }
+  return { ...ultima.meta, week: pasoUltima, paso: pasoUltima, ajuste: "repite" };
+}
+// Lo que dice la serie cuando la meta se corrigió.
+const AJUSTE_DE_META = {
+  repite: ": no llegaste a la meta, hoy la repetís",
+  baja: ": dos veces sin llegar, bajamos un 10 % para volver a subir",
+  sigue: ": seguís desde donde quedaste",
+};
+const NOTA_DE_AJUSTE = { repite: "repetís", baja: "−10 %" };
+// SEGUIR EL PLAN EN EL CICLO NUEVO: el mismo plan, con la misma forma (las
+// mismas reps y las mismas subidas y bajadas de cada semana), corrido hacia
+// arriba desde donde quedaste. Si cumpliste la última meta, arranca la mitad
+// de lo que subiste más arriba (al menos un salto); si no, la mitad de lo que
+// llegaste a mover. Es la regla de los bloques de "dos pasos adelante, uno
+// atrás". Sólo las series cuyo plan terminó.
+function planesParaSeguir(routineDef, logs, settings, cicloActual = CICLO_ACTUAL) {
+  const model = routineDef ? buildRoutineModel(routineDef) : null;
+  const unidad = settings?.weightUnit === "lbs" ? "lbs" : "kg";
+  const planes = [];
+  Object.values(model?.exerciseById || {}).forEach((ex) => {
+    (ex.sets || []).forEach((st, si) => {
+      if (!planTerminado(st, cicloActual)) return;
+      const plan = [...st.plannedProgression].sort((a, b) => a.week - b.week);
+      const primera = plan[0], ultimaMeta = plan[plan.length - 1];
+      const historia = (logs?.[`${ex.id}_${si}`] || []).filter((h) => h?.date && !h.deload);
+      const ultimaVez = historia.reduce((a, b) => (!a || b.date > a.date ? b : a), null);
+      const cumplioLaUltima = historia.some((h) => h.meta && (h.planDe ?? null) === (st.plannedAt ?? null) && (h.paso || 0) >= ultimaMeta.week && cumpleMeta(h, h.meta))
+        || (!!ultimaVez && cumpleMeta(ultimaVez, ultimaMeta));
+      if (primera.minutes != null) {
+        const sube = cumplioLaUltima ? Math.max(1, Math.round(((ultimaMeta.minutes || 0) - (primera.minutes || 0)) / 2)) : 0;
+        planes.push({ exerciseId: ex.id, exerciseName: ex.name, setIndex: si, entries: plan.map((e) => ({ ...e, minutes: (e.minutes || 0) + sube })) });
+        return;
+      }
+      const salto = displayToKg(saltoDe(settings, ex.id, unidad), unidad) || 2.5;
+      let delta;
+      if (cumplioLaUltima) delta = Math.max(salto, ((ultimaMeta.kg || 0) - (primera.kg || 0)) / 2);
+      else {
+        const recientes = historia.filter((h) => h.kg > 0).sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 2);
+        const movido = recientes.length ? Math.max(...recientes.map((h) => h.kg)) : primera.kg || 0;
+        // Sin cumplir el final, se redondea para abajo: lo prudente.
+        delta = Math.floor(Math.max(0, (movido - (primera.kg || 0)) / 2) / salto) * salto;
+      }
+      if (cumplioLaUltima) delta = Math.round(delta / salto) * salto;
+      planes.push({ exerciseId: ex.id, exerciseName: ex.name, setIndex: si, entries: plan.map((e) => ({ ...e, kg: roundKg((e.kg || 0) + delta) })) });
+    });
+  });
+  return planes;
+}
+
 // Aplica una o varias propuestas de progresión (ver createProgressionProposal
 // en social.js) a UNA rutina — se actualizan TODAS las apariciones del mismo
 // ejercicio+serie (un ejercicio compartido entre dos días de la rutina
@@ -1538,6 +1683,8 @@ function applyProgressionToRoutine(routineDef, planOrPlans) {
         const next = { ...prev };
         delete next.plannedProgression;
         delete next.plannedPaused;
+        delete next.plannedAt;
+        delete next.plannedCycle;
         ex.sets[plan.setIndex] = next;
         return;
       }
@@ -1551,6 +1698,8 @@ function applyProgressionToRoutine(routineDef, planOrPlans) {
       const next = { ...prev, plannedProgression: plan.entries };
       if (plan.paused != null) next.plannedPaused = !!plan.paused;
       else { delete next.plannedPaused; ex.sets.forEach((s, i) => { if (i !== plan.setIndex) delete s.plannedPaused; }); }
+      // Un plan nuevo es de este ciclo (ver metaDeHoy).
+      sellarPlan(next);
       ex.sets[plan.setIndex] = next;
     });
   });
@@ -1586,10 +1735,14 @@ function applyWeeklyPlanToRoutine(routineDef, weekPlans) {
         return effectiveId === plan.exerciseId;
       });
       if (ex?.sets?.[plan.setIndex]) {
-        const prevEntries = Array.isArray(ex.sets[plan.setIndex].plannedProgression) ? ex.sets[plan.setIndex].plannedProgression : [];
+        // Si el plan guardado es de un ciclo que ya terminó, esta semana
+        // arranca uno nuevo (no se mezcla con las metas viejas).
+        const terminado = planTerminado(ex.sets[plan.setIndex]);
+        const prevEntries = !terminado && Array.isArray(ex.sets[plan.setIndex].plannedProgression) ? ex.sets[plan.setIndex].plannedProgression : [];
         const entry = plan.minutes != null ? { week: plan.week, minutes: plan.minutes } : { week: plan.week, kg: plan.kg, reps: plan.reps };
         const nextEntries = [...prevEntries.filter((p) => p.week !== plan.week), entry].sort((a, b) => a.week - b.week);
         const next = { ...ex.sets[plan.setIndex], plannedProgression: nextEntries };
+        if (terminado || next.plannedAt == null) sellarPlan(next);
         // Mismo criterio que applyProgressionToRoutine: planificar de nuevo
         // una serie que estaba "por récord" la reactiva. Dejarla pausada en
         // silencio sería cargar una meta que no se persigue.
@@ -1636,10 +1789,12 @@ function removeExercisePlan(routineDef, exerciseId) {
 // Foto del estado de planificación de TODA la rutina — alimenta el resumen
 // "qué sigue plan y qué persigue récord" del planificador. Un ejercicio que
 // aparece en dos días es UNO solo acá (comparten id y, por lo tanto, plan).
-function summarizeRoutinePlan(model, weekInCycle = null) {
+function summarizeRoutinePlan(model, weekInCycle = null, { logs = null, cicloActual = CICLO_ACTUAL } = {}) {
   const todos = Object.values(model?.exerciseById || {}).map((ex) => {
     const sets = ex.sets || [];
     const conPlan = sets.filter((s) => Array.isArray(s.plannedProgression) && s.plannedProgression.length > 0);
+    const iPlan = sets.findIndex((s) => Array.isArray(s.plannedProgression) && s.plannedProgression.length > 0);
+    const terminado = iPlan >= 0 && planTerminado(sets[iPlan], cicloActual);
     const semanas = new Set();
     conPlan.forEach((s) => s.plannedProgression.forEach((e) => semanas.add(e.week)));
     return {
@@ -1653,15 +1808,21 @@ function summarizeRoutinePlan(model, weekInCycle = null) {
       setsConPlan: conPlan.length,
       semanas: semanas.size,
       pausado: conPlan.length > 0 && sets.some((s) => s.plannedPaused),
-      meta: conPlan.length && weekInCycle != null
-        ? getPlannedTargetForWeek({ ...conPlan[0], plannedPaused: false }, weekInCycle)
+      terminado,
+      // Con los registros, la meta de hoy como la pone el entrenador (ver
+      // metaDeHoy); sin ellos, lo cargado para esta semana.
+      meta: iPlan >= 0 && weekInCycle != null && !terminado
+        ? (logs
+          ? metaDeHoy({ ...sets[iPlan], plannedPaused: false }, logs[`${ex.id}_${iPlan}`], weekInCycle, "planned", { cicloActual })
+          : getPlannedTargetForWeek({ ...sets[iPlan], plannedPaused: false }, weekInCycle))
         : null,
     };
   });
   return {
     todos,
-    planificados: todos.filter((e) => e.setsConPlan > 0 && !e.pausado),
-    pausados: todos.filter((e) => e.setsConPlan > 0 && e.pausado),
+    planificados: todos.filter((e) => e.setsConPlan > 0 && !e.pausado && !e.terminado),
+    pausados: todos.filter((e) => e.setsConPlan > 0 && e.pausado && !e.terminado),
+    terminados: todos.filter((e) => e.setsConPlan > 0 && e.terminado),
     sinPlan: todos.filter((e) => e.setsConPlan === 0),
   };
 }
@@ -3705,6 +3866,8 @@ button.foco-campo-rotulo:active { background: var(--velo); }
 .light-mode .dock-reloj-listo { color: color-mix(in oklab, var(--c) 78%, black); }
 .reloj-grande-volver { flex: 2 1 0; min-width: 0; height: 52px; }
 .reloj-grande-pasado { font-size: 1.5rem; line-height: 1; margin: 0; }
+/* En la hoja de Tu plan, al lado de una meta corregida: "repetís", "−10 %". */
+.plan-hoja-ajuste { margin-left: 6px; font-size: 0.8em; font-weight: 500; opacity: .7; }
 .descanso-iniciar {
   display: flex; align-items: center; gap: 6px; flex: none;
   height: 36px; padding: 0 14px 0 12px; border-radius: 999px;
@@ -9404,12 +9567,12 @@ function compartirAutoHoy() {
 // plan, su récord. Lo dicen el aviso del descanso, su notificación y el reloj
 // grande (pedido: "en vez de decir cuántas series quedan, que diga la meta o
 // el récord"). Ya escrito: "meta 8 × 80 kg", "récord 8 × 82,5 kg".
-function objetivoDeSerie(exercise, setIndex, logs, weekInCycle, settings, unit) {
+function objetivoDeSerie(exercise, setIndex, logs, weekInCycle, settings, unit, cicloActual = CICLO_ACTUAL) {
   const setDef = exercise?.sets?.[setIndex];
   if (!setDef || exercise.cardio) return null;
   const u = weightLabel(unit);
   const escribir = (o) => (o.kg > 0 ? `${o.reps} × ${conComa(kgToDisplay(o.kg, unit))} ${u}` : `${o.reps} reps`);
-  const meta = getPlannedTargetForWeek(setDef, weekInCycle, settings?.trainingMode);
+  const meta = metaDeHoy(setDef, logs?.[`${exercise.id}_${setIndex}`], weekInCycle, settings?.trainingMode, { cicloActual, saltoKg: displayToKg(saltoDe(settings, exercise.id, unit), unit) });
   if (meta?.kg != null && meta?.reps) return `meta ${escribir(meta)}`;
   const key = `${exercise.id}_${setIndex}`;
   const ov = logs?.[`${key}_pr_override`];
@@ -9535,10 +9698,12 @@ function armarTicket({ logs, profile, cycleStart, fecha, dayKey, inicio = null, 
       const { exerciseId, setIndex } = parseLogKey(key);
       const setDef = modelNow.exerciseById[exerciseId]?.sets?.[setIndex];
       if (!setDef) return;
-      const target = getPlannedTargetForWeek(setDef, wiNow.weekInCycle, stNow.trainingMode);
-      if (!target) return;
       const hecho = val.find((e) => e?.date === hoy && !e.deload);
       if (!hecho) return;
+      // La meta que tenía la serie al guardarla (queda anotada desde el
+      // 29/10/2026, ver metaDeHoy); si no, la del plan para esta semana.
+      const target = hecho.meta || getPlannedTargetForWeek(setDef, wiNow.weekInCycle, stNow.trainingMode);
+      if (!target) return;
       metas.total++;
       const ok = target.minutes != null
         ? (hecho.minutes || 0) >= target.minutes
@@ -10380,7 +10545,7 @@ function capitulosGuia() {
         },
         {
           titulo: "Seguí un plan",
-          texto: "En Tu plan, la hoja de arriba de todo en Rutina, cargás cuánto levantar cada semana del ciclo, o le pedís a la IA que lo arme. Cada serie viene escrita con la meta de su semana y la tarjeta muestra el plan en escalones.",
+          texto: "En Tu plan, la hoja de arriba de todo en Rutina, cargás cuánto levantar cada semana del ciclo, o le pedís a la IA que lo arme. Cada serie viene escrita con la meta de su semana y lo que hiciste la vez pasada. Si no llegás a una meta, la próxima la repetís; si te trabás dos veces, baja un poco para volver a subir. Cuando termina el ciclo, la hoja te ofrece seguir el plan desde donde quedaste.",
           dibujo: (
             <div className="guia-ancho plan-en-tarjeta" style={{ "--tono": verde }} role="img" aria-label="Un plan de siete semanas, de 60 a 75 kilos, en escalones">
               <div className="plan-mini chico">
@@ -10714,21 +10879,13 @@ function describePlannedOutcome(target, hecho, isRecord, unit) {
   return { type: "down", msg: `Te faltó para la meta: ${target.reps} × ${conComa(kgToDisplay(target.kg, unit))} ${weightLabel(unit)}.` };
 }
 
-function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, accent, logs, setLogs, drafts = {}, setDrafts, autoShowPrShare = true, onDisableAutoShowPrShare, hasActiveSession = true, cardio = false, dumbbellDouble = null, fieldSettings = DEFAULT_SETTINGS, onUpdateSettings = null, sex = null, age = null, restTimerId = null, restSeconds = null, isLastSet = false, totalSets = null, weekInCycle = null, nextRestTimerId = null, nextRestSeconds = null, nextExerciseName = null, activa = true, onEnfocar = null, objetivoSiguiente = null, objetivoProximo = null }) {
+function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, accent, logs, setLogs, drafts = {}, setDrafts, autoShowPrShare = true, onDisableAutoShowPrShare, hasActiveSession = true, cardio = false, dumbbellDouble = null, fieldSettings = DEFAULT_SETTINGS, onUpdateSettings = null, sex = null, age = null, restTimerId = null, restSeconds = null, isLastSet = false, totalSets = null, weekInCycle = null, nextRestTimerId = null, nextRestSeconds = null, nextExerciseName = null, activa = true, onEnfocar = null, objetivoSiguiente = null, objetivoProximo = null, cicloActual = null }) {
   // Modo "rutina planificada" (ver DEFAULT_SETTINGS.trainingMode): si hay
   // una meta cargada para ESTA semana, se muestra "Marca a alcanzar" en
   // vez de "Récord" — pensado para quien sigue un plan con cargas ya
   // decididas (a mano o por su entrenador) en vez de perseguir siempre su
   // propio mejor registro. Sin meta para esta semana, cae en el
   // comportamiento de "récord" de siempre.
-  const plannedTarget = getPlannedTargetForWeek(setDef, weekInCycle, fieldSettings.trainingMode);
-  // Alcanza con que ESTA serie tenga una meta cargada. Antes también exigía
-  // que el modo global estuviera en "planned", así que quien planificaba un
-  // ejercicio suelto (o le aceptaba el plan al entrenador) seguía viendo
-  // "Récord" encima del número y concluía, con razón, que planificar no
-  // hacía nada. Si te tomaste el trabajo de cargar una meta para esta
-  // serie, la serie muestra la meta; el récord pasa a la línea de abajo.
-  const isPlannedMode = !!plannedTarget;
   const globalUnit = useWeightUnit();
   // Unidad local: arranca desde la preferencia global, pero el usuario puede
   // cambiarla ejercicio por ejercicio con el toggle kg/lbs del input.
@@ -10750,6 +10907,18 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   // cada render cuando la serie todavía no tiene historial, recalculándolos
   // siempre al pedo.
   const history = useMemo(() => logs[key] || [], [logs, key]);
+  // La meta de hoy, como la pondría un entrenador (ver metaDeHoy): la del
+  // plan para esta semana, corregida por cómo te fue la vez pasada.
+  // (Recibe logs[key] y no `history`: pasarle a una función un valor de un
+  // useMemo hace que el React Compiler no pueda conservar los de abajo.)
+  const plannedTarget = metaDeHoy(setDef, logs[key], weekInCycle, fieldSettings.trainingMode, { cicloActual, saltoKg: displayToKg(saltoDe(fieldSettings, exerciseId, globalUnit), globalUnit) });
+  // Alcanza con que ESTA serie tenga una meta cargada. Antes también exigía
+  // que el modo global estuviera en "planned", así que quien planificaba un
+  // ejercicio suelto (o le aceptaba el plan al entrenador) seguía viendo
+  // "Récord" encima del número y concluía, con razón, que planificar no
+  // hacía nada. Si te tomaste el trabajo de cargar una meta para esta
+  // serie, la serie muestra la meta; el récord pasa a la línea de abajo.
+  const isPlannedMode = !!plannedTarget;
   const override = logs[prKey];
   // Cardio no tiene una "carga" comparable (no hay kg×reps) — el récord
   // ahí es, simplemente, la sesión más larga en minutos. La distancia es
@@ -10990,6 +11159,12 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
       if (exerciseMuscle) entry.exMuscle = exerciseMuscle;
       if (d && !isNaN(d)) entry.km = d; if (rpe != null) entry.rpe = rpe;
       if (!hasActiveSession) entry.noSession = true;
+      const metaHoyC = metaDeHoy(setDef, logs[key], weekInCycle, fieldSettings.trainingMode, { cicloActual });
+      if (metaHoyC?.minutes != null) {
+        entry.meta = { minutes: metaHoyC.minutes };
+        entry.paso = metaHoyC.paso || 1;
+        if (setDef.plannedAt != null) entry.planDe = setDef.plannedAt;
+      }
       const newHistory = [...history.filter((h) => h.date !== today), entry];
       let newLogs = { ...logs, [key]: newHistory };
       const isPR = !isFirstEver && m > prevMin;
@@ -11014,7 +11189,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
       const noSession = !hasActiveSession;
       // Con una meta cargada, el patrón de comparación es la META y no el
       // récord (ver describePlannedOutcome, arriba, para el porqué).
-      const fbC = describePlannedOutcome(getPlannedTargetForWeek(setDef, weekInCycle, fieldSettings.trainingMode), { minutes: m }, isPR, unit)
+      const fbC = describePlannedOutcome(metaHoyC, { minutes: m }, isPR, unit)
         || (isFirstEver ? { type: "first", msg: "Primer registro: desde acá se cuenta." }
           : isPR ? { type: "pr", msg: "Tu sesión más larga." }
             : m === prevMin ? { type: "tie", msg: "Igualaste tu sesión más larga." }
@@ -11048,6 +11223,14 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     if (exerciseMuscle) entry.exMuscle = exerciseMuscle;
     if (rpe != null) entry.rpe = rpe;
     if (!hasActiveSession) entry.noSession = true;
+    // La meta que tenía esta serie hoy y en qué escalón del plan iba: con eso,
+    // la próxima vez se sabe si la cumpliste (ver metaDeHoy).
+    const metaHoy = metaDeHoy(setDef, logs[key], weekInCycle, fieldSettings.trainingMode, { cicloActual, saltoKg: displayToKg(pasoKg, unit) });
+    if (metaHoy && metaHoy.kg != null && metaHoy.reps) {
+      entry.meta = { kg: metaHoy.kg, reps: metaHoy.reps };
+      entry.paso = metaHoy.paso || 1;
+      if (setDef.plannedAt != null) entry.planDe = setDef.plannedAt;
+    }
     // Drop-set / rest-pause: las filas extra son un detalle informativo de
     // ESTA serie — no participan del cálculo de récord/1RM/rango muscular
     // (que sigue mirando solo reps/kg de arriba), pero quedan guardadas para
@@ -11118,7 +11301,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     // Con una meta cargada, el patrón de comparación es la meta. Alcanzarla
     // es hacer al menos los kilos Y las reps pedidas (no un 1RM equivalente:
     // 75×5 no es "haber hecho" 70×8).
-    const fb = describePlannedOutcome(getPlannedTargetForWeek(setDef, weekInCycle, fieldSettings.trainingMode), { kg: k, reps: r }, isPR, unit)
+    const fb = describePlannedOutcome(metaHoy, { kg: k, reps: r }, isPR, unit)
       || (isFirstEver ? { type: "first", msg: "Primera marca: desde acá se cuenta." }
         : isPR ? ((isBodyweight ? r > mejorEj.reps : new1RM > mejorEj.rm) ? { type: "pr", msg: "Récord nuevo." } : { type: "pr-serie", msg: "Tu mejor marca en esta serie." })
           : new1RM === prev1RM ? { type: "tie", msg: "Igualaste tu récord." }
@@ -11498,6 +11681,12 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           va abajo y chico: sigue siendo el mejor dato para elegir la carga. */}
       {!sugerido && fieldSettings.showLastSession === true && lastSession && (
         <p className="foco-pasada">la vez pasada <b>{lastSession.reps} × {kgToDisplay(lastSession.kg, unit)} {u}</b></p>
+      )}
+      {/* Siguiendo un plan, lo que hiciste la vez pasada (pedido: "que muestre
+          en algún lado lo que hiciste la última vez cuando el ejercicio es
+          planificado") y, si la meta se corrigió, por qué. */}
+      {isPlannedMode && !cardio && lastSession && !draft.editing && (
+        <p className="foco-pasada">la vez pasada <b>{lastSession.reps} × {conComa(kgToDisplay(lastSession.kg, unit))} {u}</b>{AJUSTE_DE_META[plannedTarget.ajuste] || ""}</p>
       )}
       {/* La serie viene con la progresión: arriba, de dónde sale. */}
       {escribeProgresion && !draft.editing && (
@@ -12236,7 +12425,7 @@ function convertirBorradoresDeUnidad(prev, de, a) {
 ============================================================================ */
 // Cómo se acomodan las series al guardar: rápido y con un rebote mínimo.
 const RESORTE_LISTA = { type: "spring", bounce: 0.16, duration: 0.5 };
-function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts, resetKey = 0, settings = DEFAULT_SETTINGS, autoCollapse = false, onDisableAutoShowPrShare, hasActiveSession = true, hideTimer = false, onUpdateSettings = null, routineHasPlan = false, sex = null, age = null, weekInCycle = null, dayKey = null, nextRestTimerId = null, nextRestSeconds = null, nextExerciseName = null, supersetRestTimerId = null, supersetRestSeconds = null, orden = null, nextObjetivo = null }) {
+function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts, resetKey = 0, settings = DEFAULT_SETTINGS, autoCollapse = false, onDisableAutoShowPrShare, hasActiveSession = true, hideTimer = false, onUpdateSettings = null, routineHasPlan = false, sex = null, age = null, weekInCycle = null, dayKey = null, nextRestTimerId = null, nextRestSeconds = null, nextExerciseName = null, supersetRestTimerId = null, supersetRestSeconds = null, orden = null, nextObjetivo = null, cicloActual = null }) {
   const [open, setOpen] = useState(false);
   const [showWarmup, setShowWarmup] = useState(false);
   // Pedido: "que no se abran más automáticamente los ejercicios, sí que se
@@ -12316,8 +12505,13 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
     // convierte "seguís un plan" en algo que se puede mirar — a dónde vas
     // dentro del ciclo, sin abrir el planificador.
     const semanas = [...conPlan[0].plannedProgression].sort((a, b) => a.week - b.week);
-    return { sets: conPlan.length, paused: sets.some((s) => s.plannedPaused), semanas };
-  }, [exercise.sets]);
+    // El plan de un ciclo que ya terminó no se sigue (ver metaDeHoy); y el
+    // escalón de hoy es el que toca por lo que hiciste, no por el calendario.
+    const iPlan = sets.indexOf(conPlan[0]);
+    const terminado = planTerminado(conPlan[0], cicloActual);
+    const hoyMeta = terminado ? null : metaDeHoy({ ...conPlan[0], plannedPaused: false }, logs[`${exercise.id}_${iPlan}`], weekInCycle, "planned", { cicloActual });
+    return { sets: conPlan.length, paused: sets.some((s) => s.plannedPaused), terminado, pasoHoy: hoyMeta?.paso ?? null, semanas };
+  }, [exercise.sets, exercise.id, logs, weekInCycle, cicloActual]);
   // Si el modo general está en "Récord", ninguna serie persigue su meta
   // (ver getPlannedTargetForWeek) — el aviso de acá lo explica en vez de
   // dejar que el plan parezca haberse perdido.
@@ -12333,7 +12527,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
   // de tu récord, así que el ejercicio SIEMPRE se ve estancado mientras
   // hacés exactamente lo que corresponde. Si está siguiendo el plan, la
   // pregunta "¿qué cambio?" ya está contestada.
-  const siguiendoPlan = !!planInfo && !planInfo.paused && !planOffByMode;
+  const siguiendoPlan = !!planInfo && !planInfo.paused && !planInfo.terminado && !planOffByMode;
   return (
     <div className={`ejercicio stagger-item ${open ? "abierto" : ""} ${allSetsDoneToday ? "completo" : ""}`} style={{ "--c": accent }}>
       <button onClick={() => setOpen((o) => !o)} aria-expanded={open} className="ejercicio-cabecera w-full flex items-center gap-3 pl-3 pr-3.5 py-3.5 text-left">
@@ -12386,12 +12580,12 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
                 // Sólo informa (pedido: "sacar eso de que si tocás el botoncito
                 // de plan cambie a récord"): pausar un ejercicio se hace desde
                 // el planificador.
-                planInfo && !planInfo.paused
+                planInfo && !planInfo.paused && !planInfo.terminado
                   ? <span className="chip-plan sigue" title="Este ejercicio sigue tu plan"><ClipboardCheck size={12} /> Plan</span>
                   // "Tiene un plan, pausado" (contorno punteado: está ahí pero
                   // inactivo) y "nunca tuvo metas" (liso): los dos persiguen tu
                   // récord, pero sólo el primero vuelve con "Devolver al plan".
-                  : <span className={`chip-plan ${planInfo ? "pausado" : ""}`} title={planInfo ? "Tiene un plan guardado, pero ahora persigue tu récord" : "Este ejercicio no tiene metas cargadas: persigue tu récord"}><Trophy size={12} /> Récord</span>
+                  : <span className={`chip-plan ${planInfo ? "pausado" : ""}`} title={planInfo?.terminado ? "Su plan era del ciclo pasado y terminó: persigue tu récord" : planInfo ? "Tiene un plan guardado, pero ahora persigue tu récord" : "Este ejercicio no tiene metas cargadas: persigue tu récord"}><Trophy size={12} /> Récord</span>
               )}
               {/* Las notas ahora son POR SERIE (ver SetRow): cada serie tiene
                   su propio "Agregar nota". Acá ya no va nada. */}
@@ -12427,7 +12621,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
             salir a abrir el planificador. Es sólo información — el
             interruptor plan/récord vive en el chip de la cabecera, que se
             toca sin desplegar nada. */}
-        {planInfo && planInfo.semanas.length > 1 && !planOffByMode && !planInfo.paused && (() => {
+        {planInfo && planInfo.semanas.length > 1 && !planOffByMode && !planInfo.paused && !planInfo.terminado && (() => {
           // Tu plan, de un vistazo: un escalón por semana (su meta arriba), la
           // de hoy encendida. Antes: fichas celestes "S1 75×8" en una tira.
           const valor = (e) => (e.minutes != null ? e.minutes : kgToDisplay(e.kg, planUnit));
@@ -12437,7 +12631,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
               <p className="plan-en-tarjeta-titulo"><ClipboardCheck size={14} aria-hidden="true" /> Tu plan</p>
               <div className="plan-mini chico">
                 {planInfo.semanas.map((e) => {
-                  const hoy = e.week === weekInCycle;
+                  const hoy = e.week === (planInfo.pasoHoy ?? weekInCycle);
                   const v = valor(e);
                   return (
                     <span key={e.week} className={`plan-mini-semana con ${hoy ? "elegida" : ""}`} aria-label={`Semana ${e.week}${hoy ? ", esta" : ""}: ${e.minutes != null ? `${e.minutes} min` : `${e.reps} × ${conComa(v)} ${weightLabel(planUnit)}`}${e.phase ? `, ${e.phase}` : ""}`}>
@@ -12493,7 +12687,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
           )}
           {setsToShow.map((s, i) => <React.Fragment key={`${exercise.id}:frag:${i}`}>
             <m.div layout="position" layoutDependency={`${foco}|${timerSlot}`} transition={RESORTE_LISTA}>
-            <SetRow key={`${exercise.id}:${i}:${resetKey}`} exerciseId={exercise.id} exerciseName={exercise.name} exerciseMuscle={exercise.muscle} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKey} autoShowPrShare={settings.autoShowPrShare ?? true} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={hasActiveSession} cardio={exercise.cardio} dumbbellDouble={settings?.dumbbellDouble || null} fieldSettings={settings} onUpdateSettings={onUpdateSettings} sex={sex} age={age} restTimerId={restTimerId} restSeconds={restSeconds} isLastSet={i === setsToShow.length - 1} totalSets={setsToShow.length} weekInCycle={weekInCycle} nextRestTimerId={nextRestTimerId} nextRestSeconds={nextRestSeconds} nextExerciseName={nextExerciseName} activa={i === foco} onEnfocar={() => setFocoElegido(i)} objetivoSiguiente={objetivoDeSerie(exercise, i + 1, logs, weekInCycle, settings, planUnit)} objetivoProximo={i === setsToShow.length - 1 ? nextObjetivo : null} />
+            <SetRow key={`${exercise.id}:${i}:${resetKey}`} exerciseId={exercise.id} exerciseName={exercise.name} exerciseMuscle={exercise.muscle} setIndex={i} setDef={s} accent={accent} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKey} autoShowPrShare={settings.autoShowPrShare ?? true} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={hasActiveSession} cardio={exercise.cardio} dumbbellDouble={settings?.dumbbellDouble || null} fieldSettings={settings} onUpdateSettings={onUpdateSettings} sex={sex} age={age} restTimerId={restTimerId} restSeconds={restSeconds} isLastSet={i === setsToShow.length - 1} totalSets={setsToShow.length} weekInCycle={weekInCycle} nextRestTimerId={nextRestTimerId} nextRestSeconds={nextRestSeconds} nextExerciseName={nextExerciseName} activa={i === foco} onEnfocar={() => setFocoElegido(i)} objetivoSiguiente={objetivoDeSerie(exercise, i + 1, logs, weekInCycle, settings, planUnit, cicloActual)} objetivoProximo={i === setsToShow.length - 1 ? nextObjetivo : null} cicloActual={cicloActual} />
             </m.div>
             {timerSlot === i + 1 && settings.autoStartRestTimer !== true && (
               <m.div layout="position" layoutDependency={`${foco}|${timerSlot}`} transition={RESORTE_LISTA}><div className="timer-hop"><RestTimer seconds={hasHeavy ? settings.restLong : settings.restShort} accent={accent} timerId={restTimerId} exerciseName={exercise.name} /></div></m.div>
@@ -12842,6 +13036,7 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_
       `2. Mirá las últimas sesiones: si viene subiendo, seguí la misma pendiente; si repite el mismo peso hace tres sesiones, está estancado — bajá un escalón y subí las reps en vez del peso.`,
       `3. PROGRESIÓN DE ENTRENADOR, JUGANDO CON REPS Y KILOS: la base es la doble progresión (con el mismo peso, una rep más por semana hasta el tope del rango; ahí sube el peso UN salto y las reps vuelven al piso). Sobre esa base, armá OLAS como un entrenador profesional: las reps y los kilos suben Y bajan dentro del bloque. Por ejemplo, en olas de 3 semanas: semana A carga moderada y más reps, semana B un salto más y menos reps, semana C la más pesada del ola con las reps más bajas del rango; la ola siguiente arranca un poco por encima de la anterior (ondas de carga / periodización ondulante, que en los estudios iguala o supera a la lineal en fuerza e hipertrofia). Nunca subas el peso todas las semanas ni bajes por debajo de lo que la persona ya levanta, salvo en la descarga o si está estancada. Si el salto es grande (7 kg o 15 lb en una máquina), las reps hacen casi todo el trabajo.`,
       `3b. SEGÚN EL OBJETIVO, con métodos probados: FUERZA → olas con 3 a 6 reps, cargas de 80-90% del 1RM estimado, pocas reps por serie cerca del fallo técnico (RIR 1-3) y el volumen bajando a medida que sube la carga. HIPERTROFIA → 6 a 15 reps, la mayor parte del trabajo con RIR 1-3, el volumen semanal por músculo subiendo de a poco (de lo mínimo efectivo a lo máximo recuperable) y la carga subiendo cuando las reps tocan el tope. Mixto → ondulación entre una semana más pesada (4-6 reps) y otra de más volumen (8-12). Que cada número se pueda justificar como lo haría un entrenador con experiencia.`,
+      `3c. La app ya se ajusta sola mientras la persona entrena: si una meta no se cumple, la semana siguiente la repite; si se traba dos veces seguidas en la misma, la baja un 10 %; y al terminar el ciclo ofrece seguir el plan desde donde quedó. No agregues semanas de repetición "por las dudas": planificá la progresión ideal.`,
       conRpe ? `4. FATIGA: el RPE tiene que ir subiendo dentro del bloque (empezá en 7 y llegá a 9), no arrancar al máximo.` : `4. FATIGA: no incluyas RPE, dejá ese campo afuera.`,
       semanasReales >= 3
         ? `5. FASES de mesociclo: primeras semanas "Acumulación" (más volumen, RPE 7-8), después "Intensificación" (más carga, RPE 8-9), la última "Realización" (carga máxima, menos series).`
@@ -13192,10 +13387,14 @@ const EMPTY_SESIONES = [];
 // Las acciones van al pie de la hoja, impresas como el renglón de una planilla
 // (pedido: "integrá esos botones al nuevo diseño"; antes eran botones de la
 // app debajo del papel).
-function HojaDelPlan({ dia = null, semana = null, filas = [], hayPlan = false, enPausa = false, sinRutina = false, invitar = false, onPlanificar = null, onPausa = null, onCampos = null }) {
+// Cuando empieza un ciclo nuevo, el plan del anterior termina (ver metaDeHoy):
+// la hoja lo dice y ofrece seguirlo desde donde quedaste (`terminados`:
+// cuántos ejercicios tenían ese plan; `onSeguir`: planesParaSeguir).
+function HojaDelPlan({ dia = null, semana = null, filas = [], hayPlan = false, enPausa = false, sinRutina = false, invitar = false, terminados = 0, onSeguir = null, onPlanificar = null, onPausa = null, onCampos = null }) {
   const visibles = filas.slice(0, 3);
   const resto = filas.length - visibles.length;
   const pausado = hayPlan && enPausa;
+  const seguir = hayPlan && !enPausa && terminados > 0 && !!onSeguir;
   return (
     <section className={`planilla plan-hoja ${pausado ? "en-pausa" : ""}`} aria-label="Tu plan" style={dia ? { "--dia": dia.color } : undefined}>
       <BrocheTabla />
@@ -13214,22 +13413,30 @@ function HojaDelPlan({ dia = null, semana = null, filas = [], hayPlan = false, e
           </>
         ) : filas.length ? (
           <ol className="plan-hoja-filas">
-            {visibles.map((f) => <li key={f.id}><span>{f.nombre}</span><i aria-hidden="true" /><b className="a-mano">{f.meta}</b></li>)}
+            {visibles.map((f) => <li key={f.id}><span>{f.nombre}</span><i aria-hidden="true" /><b className="a-mano">{f.meta}{f.nota && <small className="plan-hoja-ajuste">{f.nota}</small>}</b></li>)}
           </ol>
+        ) : seguir ? (
+          <p className="plan-hoja-nota">El plan del ciclo pasado terminó: seguilo desde donde quedaste o planificá otro.</p>
         ) : (
           <p className="plan-hoja-nota">Este día no tiene metas esta semana.</p>
         )}
         {hayPlan && resto > 0 && <p className="plan-hoja-nota">y {resto} más con su meta</p>}
+        {seguir && filas.length > 0 && <p className="plan-hoja-nota">{terminados === 1 ? "Un ejercicio tenía" : `${terminados} ejercicios tenían`} el plan del ciclo pasado, que terminó.</p>}
         {pausado && <span className="plan-hoja-sello">En pausa</span>}
         {pausado && <p className="sr-only">Tus metas siguen guardadas y perseguís tu récord.</p>}
         </div>
         <div className="plan-hoja-acciones">
+          {seguir && (
+            <button onClick={onSeguir} className="plan-hoja-accion principal">
+              <TrendingUp size={14} /> <span>Seguir el plan</span>
+            </button>
+          )}
           {onPlanificar && (
-            <button onClick={onPlanificar} disabled={sinRutina} className={`plan-hoja-accion principal ${invitar ? "invite-pulse" : ""}`}>
+            <button onClick={onPlanificar} disabled={sinRutina} className={`plan-hoja-accion ${seguir ? "" : "principal"} ${invitar ? "invite-pulse" : ""}`}>
               <Sliders size={14} /> <span>Planificar</span>
             </button>
           )}
-          {hayPlan && onPausa && (
+          {hayPlan && onPausa && !(seguir && !filas.length) && (
             <button onClick={onPausa} className="plan-hoja-accion">
               {enPausa ? <><Play size={12} className="fill-current" /> <span>Reanudar</span></> : <><Pause size={12} className="fill-current" /> <span>Pausar</span></>}
             </button>
@@ -13246,6 +13453,8 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
   // que SetRow sepa si hay una meta cargada (modo "planned", ver
   // getPlannedTargetForWeek) para ESTA semana puntual.
   const weekInCycle = useMemo(() => getWeekInfo(cycleStart, settings)?.weekInCycle ?? null, [cycleStart, settings]);
+  // El número de ciclo: un plan es de un ciclo (ver metaDeHoy).
+  const cicloActual = useMemo(() => getWeekInfo(cycleStart, settings)?.cycleNumber ?? null, [cycleStart, settings]);
   // El día programado para hoy según el cronograma semanal (lunes a domingo)
   // de la rutina activa. Si hoy es descanso programado (o no hay cronograma
   // todavía), cae al viejo heurístico de "último día entrenado + 1" — pero
@@ -13313,7 +13522,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
   }, [activeRoutineDef]);
   // Cuántos ejercicios siguen el plan y cuántos volvieron a perseguir el
   // récord — alimenta la línea de estado de la tarjeta de modo.
-  const planResumen = useMemo(() => (activeRoutineDef ? summarizeRoutinePlan(buildRoutineModel(activeRoutineDef), weekInCycle) : null), [activeRoutineDef, weekInCycle]);
+  const planResumen = useMemo(() => (activeRoutineDef ? summarizeRoutinePlan(buildRoutineModel(activeRoutineDef), weekInCycle, { logs, cicloActual }) : null), [activeRoutineDef, weekInCycle, logs, cicloActual]);
   // Dirección del último cambio de día, para que las tarjetas entren
   // deslizándose desde el lado correcto (como pasar páginas).
   const gridRef = useRef(null);
@@ -13399,7 +13608,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
         const u = weightLabel(unidad);
         const filas = (planResumen?.planificados || [])
           .filter((e) => e.dayKey === activeDay && e.meta?.reps)
-          .map((e) => ({ id: e.id, nombre: e.nombre, meta: e.meta.kg > 0 ? `${e.meta.reps} × ${conComa(kgToDisplay(e.meta.kg, unidad))} ${u}` : `${e.meta.reps} reps` }));
+          .map((e) => ({ id: e.id, nombre: e.nombre, meta: e.meta.kg > 0 ? `${e.meta.reps} × ${conComa(kgToDisplay(e.meta.kg, unidad))} ${u}` : `${e.meta.reps} reps`, nota: NOTA_DE_AJUSTE[e.meta.ajuste] || null }));
         const enPausa = settings.trainingMode !== "planned";
         return (
           <HojaDelPlan
@@ -13410,6 +13619,8 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             enPausa={enPausa}
             sinRutina={!activeRoutineDef}
             invitar={!hasAnyPlan && !enPausa}
+            terminados={planResumen?.terminados?.length || 0}
+            onSeguir={onApplyOwnProgression && activeRoutineDef ? () => onApplyOwnProgression(planesParaSeguir(activeRoutineDef, logs, settings, cicloActual)) : null}
             onPlanificar={onApplyOwnProgression ? () => setShowSelfProgression(true) : null}
             onPausa={() => onUpdateSettings({ trainingMode: enPausa ? "planned" : "record" })}
             onCampos={onGoToFieldSettings}
@@ -13571,7 +13782,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             const nextRestSeconds = settings.restBetweenExercisesSec ?? 180;
             const nextExerciseName = siguiente ? siguiente.map((g) => g.name).filter(Boolean).join(" + ") : null;
             // Lo que pide la primera serie del que sigue: su meta o su récord.
-            const nextObjetivo = entreActivo && siguiente ? objetivoDeSerie(siguiente[0], 0, logs, weekInCycle, settings, settings?.weightUnit === "lbs" ? "lbs" : "kg") : null;
+            const nextObjetivo = entreActivo && siguiente ? objetivoDeSerie(siguiente[0], 0, logs, weekInCycle, settings, settings?.weightUnit === "lbs" ? "lbs" : "kg", cicloActual) : null;
             // Terminaste todas sus series: la tarjeta se pliega sola.
             // Pedido: "que no se abran más automáticamente los ejercicios, sí
             // que se cierren cuando los completaste". No hay apertura
@@ -13579,7 +13790,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             const plegar = !!sessionForThisDay && estaCompleto(group);
             if (group.length === 1) {
               const ex = group[0];
-              return <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onSetPlanPaused={onSetPlanPaused} routineHasPlan={hasAnyPlan} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} sex={sex} age={age} weekInCycle={weekInCycle} dayKey={activeDay} autoCollapse={plegar} nextRestTimerId={nextRestTimerId} nextRestSeconds={nextRestSeconds} nextExerciseName={nextExerciseName} nextObjetivo={nextObjetivo} orden={primeroDe[gi]} />;
+              return <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onSetPlanPaused={onSetPlanPaused} routineHasPlan={hasAnyPlan} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} sex={sex} age={age} weekInCycle={weekInCycle} cicloActual={cicloActual} dayKey={activeDay} autoCollapse={plegar} nextRestTimerId={nextRestTimerId} nextRestSeconds={nextRestSeconds} nextExerciseName={nextExerciseName} nextObjetivo={nextObjetivo} orden={primeroDe[gi]} />;
             }
             // Superserie: varios ejercicios encadenados comparten un solo
             // cronómetro al final del grupo, en vez de uno por ejercicio —
@@ -13591,7 +13802,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             return (
               <div key={`${activeDay}:${group.map((e) => e.id).join("-")}`} className="superserie space-y-2" style={{ "--c": day.color, borderColor: tint(day.color, "45") }}>
                 <div className="flex items-center gap-1.5 px-1 pt-0.5"><Link size={12} style={{ color: day.color }} /><span className="text-[10.5px] font-black uppercase" style={{ color: day.color }}>Superserie · {group.length} ejercicios</span></div>
-                {group.map((ex, xi) => <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onSetPlanPaused={onSetPlanPaused} routineHasPlan={hasAnyPlan} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} hideTimer sex={sex} age={age} weekInCycle={weekInCycle} dayKey={activeDay} autoCollapse={plegar} nextRestTimerId={xi === group.length - 1 ? nextRestTimerId : null} nextRestSeconds={nextRestSeconds} nextExerciseName={xi === group.length - 1 ? nextExerciseName : null} nextObjetivo={xi === group.length - 1 ? nextObjetivo : null} supersetRestTimerId={xi === group.length - 1 ? grupoTimerId : null} supersetRestSeconds={grupoSegundos} orden={primeroDe[gi] + xi} />)}
+                {group.map((ex, xi) => <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onSetPlanPaused={onSetPlanPaused} routineHasPlan={hasAnyPlan} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} hideTimer sex={sex} age={age} weekInCycle={weekInCycle} cicloActual={cicloActual} dayKey={activeDay} autoCollapse={plegar} nextRestTimerId={xi === group.length - 1 ? nextRestTimerId : null} nextRestSeconds={nextRestSeconds} nextExerciseName={xi === group.length - 1 ? nextExerciseName : null} nextObjetivo={xi === group.length - 1 ? nextObjetivo : null} supersetRestTimerId={xi === group.length - 1 ? grupoTimerId : null} supersetRestSeconds={grupoSegundos} orden={primeroDe[gi] + xi} />)}
                 {settings.autoStartRestTimer !== true && <RestTimer seconds={grupoSegundos} accent={day.color} timerId={grupoTimerId} exerciseName={group.map((g) => g.name).filter(Boolean).join(" + ")} />}
                 <p className="text-[10.5px] text-slate-500 px-1 pb-0.5">Descansá recién al completar la vuelta de los {group.length}.{settings.autoStartRestTimer === true ? " Arranca solo al guardar la serie del último." : ""}</p>
               </div>
@@ -20582,7 +20793,11 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
       if (p && p.kg > 0) { kg = p.kg; desde = p.reps; }
     }
     if (isNaN(kg) || kg <= 0) return;
-    const built = tpl.build(weeks, kg, reps, repsMax, inc, desde);
+    // A mitad de ciclo, la progresión arranca en la semana en curso y las que
+    // ya pasaron quedan como estaban (antes arrancaba siempre en la 1, y en la
+    // semana 4 la meta ya venía tres escalones arriba de tu última sesión).
+    const desdeSemana = Math.min(Math.max(1, weekInCycle || 1), weeks.length);
+    const built = tpl.build(weeks.filter((w) => w >= desdeSemana), kg, reps, repsMax, inc, desde);
     setEntries((prev) => {
       const next = { ...prev };
       // Merge, no reemplazo: aplicar una plantilla no debe borrar un
@@ -28855,6 +29070,9 @@ export default function App() {
 
   const profile = profiles[activeProfile], logs = profile?.logs || {}, drafts = profile?.drafts || {};
   const isDeloadWeek = !!(profile && cycleStart && getWeekInfo(cycleStart, getProfileSettings(profile))?.isDeload);
+  // El ciclo en curso: con él se sella cada plan nuevo (ver metaDeHoy).
+  const cicloEnCurso = profile && cycleStart ? getWeekInfo(cycleStart, getProfileSettings(profile))?.cycleNumber ?? null : null;
+  useEffect(() => { CICLO_ACTUAL = cicloEnCurso; }, [cicloEnCurso]);
   const showPinnedDeload = tab === "rutina" && isDeloadWeek && !deloadDismissed;
   // En Rutina el tinte lo pone el día que estás mirando (RoutineView); en
   // las demás pestañas, el color de la pestaña.
@@ -29235,16 +29453,23 @@ export default function App() {
   // con cycleStart recién puesto) sólo se registra, sin festejar nada.
   const [cycleCompleteNotice, setCycleCompleteNotice] = useState(null);
   const [showCycleShareImage, setShowCycleShareImage] = useState(false);
+  // De paso, los planes cargados antes de que cada plan llevara su ciclo
+  // quedan sellados con el ciclo en curso (ver sellarPlanesViejos): siguen
+  // valiendo hasta que termine y no vuelven a la semana 1 en el próximo.
   useEffect(() => {
     if (!profile || !cycleStart) return;
     const wi = getWeekInfo(cycleStart, getProfileSettings(profile));
     if (!wi) return;
-    if (profile.lastSeenCycleNumber == null) {
-      setProfiles((prev) => { const p = prev[activeProfile]; if (!p) return prev; const np = { ...prev, [activeProfile]: { ...p, lastSeenCycleNumber: wi.cycleNumber } }; saveProfiles(np); return np; });
-    } else if (wi.cycleNumber > profile.lastSeenCycleNumber) {
-      setCycleCompleteNotice({ cycleNumber: profile.lastSeenCycleNumber });
-      setProfiles((prev) => { const p = prev[activeProfile]; if (!p) return prev; const np = { ...prev, [activeProfile]: { ...p, lastSeenCycleNumber: wi.cycleNumber } }; saveProfiles(np); return np; });
-    }
+    if (profile.lastSeenCycleNumber != null && wi.cycleNumber > profile.lastSeenCycleNumber) setCycleCompleteNotice({ cycleNumber: profile.lastSeenCycleNumber });
+    if (profile.lastSeenCycleNumber === wi.cycleNumber && !sellarPlanesViejos(profile.routines, wi.cycleNumber)) return;
+    setProfiles((prev) => {
+      const p = prev[activeProfile];
+      if (!p) return prev;
+      const rutinas = sellarPlanesViejos(p.routines, wi.cycleNumber);
+      const np = { ...prev, [activeProfile]: { ...p, lastSeenCycleNumber: wi.cycleNumber, ...(rutinas ? { routines: rutinas } : {}) } };
+      saveProfiles(np);
+      return np;
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeProfile]);
   const computeCycleShareStats = () => {
