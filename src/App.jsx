@@ -3698,6 +3698,13 @@ button.foco-campo-rotulo:active { background: var(--velo); }
 .descanso-tiempo.apagado { color: var(--text-faint); }
 .descanso-tiempo.quieto { color: var(--text-strong); }
 .descanso-tiempo-dock { font-size: 2.05rem; }
+/* Terminado: verde, con el ✓ adentro del reloj chico y cuánto te pasaste. */
+.descanso-tiempo.listo { color: color-mix(in oklab, var(--c) 72%, white); }
+.light-mode .descanso-tiempo.listo { color: color-mix(in oklab, var(--c) 78%, black); }
+.dock-reloj-listo { color: color-mix(in oklab, var(--c) 72%, white); }
+.light-mode .dock-reloj-listo { color: color-mix(in oklab, var(--c) 78%, black); }
+.reloj-grande-volver { flex: 2 1 0; min-width: 0; height: 52px; }
+.reloj-grande-pasado { font-size: 1.5rem; line-height: 1; margin: 0; }
 .descanso-iniciar {
   display: flex; align-items: center; gap: 6px; flex: none;
   height: 36px; padding: 0 14px 0 12px; border-radius: 999px;
@@ -3708,6 +3715,8 @@ button.foco-campo-rotulo:active { background: var(--velo); }
 }
 .descanso-iniciar:active { border-radius: 14px; transform: scale(.96); }
 .light-mode .descanso-iniciar { color: color-mix(in oklab, var(--c, var(--tono)) 62%, black); background: color-mix(in oklab, var(--c, var(--tono)) 13%, transparent); }
+/* En claro, el ícono de los botones del reloj iba casi blanco sobre el fondo claro. */
+.light-mode .descanso-boton:not(.descanso-boton-principal) { color: color-mix(in oklab, var(--c, var(--tono)) 62%, black); }
 .cardio-reloj.en-marcha { background: var(--surface-1); }
 .light-mode .cardio-reloj.en-marcha { background: var(--surface-1); }
 /* La cabecera del día. */
@@ -8662,7 +8671,12 @@ function iniciarDescanso(timerId, { segundos, ejercicio = null, siguiente = null
   const s = Math.round(Number(segundos) || 0);
   if (!timerId || s <= 0) return;
   const ahora = Date.now();
-  ACTIVE_REST_TIMERS[timerId] = { endTime: ahora + s * 1000, total: s, inicio: ahora, ejercicio: ejercicio || null, siguiente: siguiente || null, color: color || null, serie: serie || null, series: series || null, objetivo: objetivo || null };
+  // Un reloj que ya terminó y quedó a la vista se va cuando arranca otro.
+  Object.entries(ACTIVE_REST_TIMERS).forEach(([tid, v]) => {
+    if (tid !== timerId && !tid.startsWith("__") && v?.endTime && v.endTime <= ahora) delete ACTIVE_REST_TIMERS[tid];
+  });
+  // duracion: lo elegido, para reiniciar (total cambia con ±15).
+  ACTIVE_REST_TIMERS[timerId] = { endTime: ahora + s * 1000, total: s, duracion: s, inicio: ahora, ejercicio: ejercicio || null, siguiente: siguiente || null, color: color || null, serie: serie || null, series: series || null, objetivo: objetivo || null };
   AVISOS_DISPARADOS.delete(timerId);
   persistActiveRestTimers();
   avisarCambioDescansos();
@@ -8701,6 +8715,24 @@ function reanudarDescanso(timerId) {
   programarAvisosDescanso(timerId);
 }
 
+// Reiniciar (pedido: "un botón más para reiniciar el cronómetro"): vuelve a
+// la duración elegida al arrancarlo, esté corriendo, en pausa o terminado.
+function reiniciarDescanso(timerId) {
+  const v = ACTIVE_REST_TIMERS[timerId];
+  if (!v) return;
+  const s = Math.round(v.duracion || v.total || 0);
+  if (s <= 0) return;
+  const ahora = Date.now();
+  const nueva = { ...v, endTime: ahora + s * 1000, total: s, duracion: s, inicio: ahora };
+  delete nueva.pausa;
+  delete nueva.avisado;
+  ACTIVE_REST_TIMERS[timerId] = nueva;
+  AVISOS_DISPARADOS.delete(timerId);
+  persistActiveRestTimers();
+  avisarCambioDescansos();
+  programarAvisosDescanso(timerId);
+}
+
 // Sumar o restar tiempo sin reiniciar. Nunca baja de 5 segundos: restarle
 // al descanso hasta dejarlo en cero es "saltearlo", y para eso está su
 // propio botón.
@@ -8733,7 +8765,7 @@ function estadoDescanso(v) {
   }
   if (!v.endTime) return { estado: "idle", restante: 0, total: 0, fraccion: 0 };
   const msFalta = v.endTime - Date.now();
-  if (msFalta <= 0) return { estado: "done", restante: 0, total: v.total || 0, fraccion: 0 };
+  if (msFalta <= 0) return { estado: "done", restante: 0, total: v.total || 0, fraccion: 0, pasado: Math.floor(-msFalta / 1000) };
   const total = Math.max(v.total || 0, Math.ceil(msFalta / 1000));
   return { estado: "running", restante: Math.ceil(msFalta / 1000), total, fraccion: Math.min(1, msFalta / (total * 1000)) };
 }
@@ -8861,11 +8893,13 @@ function VigilanteDescansos({ alertType = "sound" }) {
           return;
         }
         if (!v.endTime || v.endTime > ahora) return;
-        // Terminó hace rato (la app estaba cerrada): el aviso ya lo dio el
-        // sistema. Se limpia sin sonar.
-        if (ahora - v.endTime > 120000) { delete ACTIVE_REST_TIMERS[tid]; cambio = true; return; }
+        // Al llegar a cero avisa una vez (si terminó hace rato con la app
+        // cerrada, avisarFinDeDescanso no suena: ya avisó el sistema).
         if (!v.avisado) { avisarFinDeDescanso(tid, { alertType: ALERTA_DESCANSO }); return; }
-        if (v.endTime <= ahora - 6000) { delete ACTIVE_REST_TIMERS[tid]; cambio = true; }
+        // El reloj terminado queda a la vista, contando cuánto te pasaste,
+        // hasta que lo cierres, lo reinicies o arranque otro (pedido: "que no
+        // se cierre el reloj cuando se completa"). Uno olvidado, a la media hora.
+        if (ahora - v.endTime > 30 * 60 * 1000) { delete ACTIVE_REST_TIMERS[tid]; cambio = true; }
       });
       if (cambio) { persistActiveRestTimers(); avisarCambioDescansos(); }
     }, 500);
@@ -9033,50 +9067,44 @@ function DescansoEnDock({ embebido = false }) {
 // el reloj de pared, para verlo de lejos con el celular apoyado en el banco,
 // pausarlo o restarle 15 segundos.
 function FilaDescansoDock({ timerId, embebido = false }) {
-  const { estado, restante, fraccion, datos } = useRelojDescanso(timerId);
+  const { estado, restante, fraccion, pasado = 0, datos } = useRelojDescanso(timerId);
   const [grande, setGrande] = useState(false);
   if (estado === "idle") return null;
+  const listo = estado === "done";
   const urgente = estado === "running" && restante <= 10;
   const base = datos?.color || "#14B8A6";
-  const color = estado === "done" ? "#10B981" : urgente ? "#F59E0B" : base;
+  const color = listo ? "#10B981" : urgente ? "#F59E0B" : base;
   const enPausa = estado === "paused";
-  const nombre = datos?.siguiente || datos?.ejercicio || "";
   const relojGrande = grande && <RelojDescansoGrande timerId={timerId} onClose={() => setGrande(false)} />;
   const envolver = (contenido) => (embebido
-    ? <div className="dock-descanso dock-descanso-embebido relative" role={estado === "done" ? "status" : undefined} aria-live={estado === "done" ? "polite" : undefined} style={{ "--c": color }}>{contenido}{relojGrande}</div>
-    : <div className="dock-tarjeta dock-descanso session-bar-in" role={estado === "done" ? "status" : undefined} aria-live={estado === "done" ? "polite" : undefined} style={{ "--c": color }}>{contenido}{relojGrande}</div>);
-  if (estado === "done") {
-    const { enPantalla } = textoFinDeDescanso(datos);
-    return envolver(
-      <div className="flex items-center gap-3 px-4 py-3">
-        <span className="galleta descanso-galleta badge-pop" aria-hidden="true"><Check size={16} strokeWidth={2.6} /></span>
-        <span className="min-w-0 flex-1">
-          <span className="descanso-listo-titulo">Terminó el descanso</span>
-          <span className="descanso-listo-texto">{enPantalla}</span>
-        </span>
-        <button onClick={() => terminarDescanso(timerId)} aria-label="Cerrar el aviso" className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-slate-500 hover:text-slate-300 transition"><X size={16} /></button>
-      </div>,
-    );
-  }
-  // UNA SOLA FILA: el reloj chico (sólo el arco; tocarlo lo agranda, y ahí
-  // están la pausa y el −15), el tiempo grande con qué descanso es debajo, y
-  // +15 y cerrar. Antes eran dos renglones, con un ícono adentro del reloj y
-  // −15, +15 y cerrar (pedido: "simplificá un poco el cronómetro de
-  // descanso").
+    ? <div className="dock-descanso dock-descanso-embebido relative" style={{ "--c": color }}>{contenido}{relojGrande}</div>
+    : <div className="dock-tarjeta dock-descanso session-bar-in" style={{ "--c": color }}>{contenido}{relojGrande}</div>);
+  // UNA SOLA FILA: el reloj chico (tocarlo lo agranda: ahí están el ±15), el
+  // tiempo, y pausa, reiniciar y cerrar (pedidos: "cambiar el +15 por el
+  // botón de pausa", "un botón más para reiniciar el cronómetro" y "sacar lo
+  // de sigue tal ejercicio abajo del reloj"). Al terminar queda a la vista
+  // en verde, con el ✓ y cuánto te pasaste ("+0:12"), en vez de irse solo.
   return envolver(
-    <div className={`dock-reloj ${enPausa ? "en-pausa" : ""}`}>
+    <div className={`dock-reloj ${enPausa ? "en-pausa" : ""} ${listo ? "listo" : ""}`}>
+      <span className="sr-only" role="status">{listo ? `Terminó el descanso. ${textoFinDeDescanso(datos).enPantalla}.` : ""}</span>
       <button onClick={() => { haptic(10); setGrande(true); }} aria-label="Agrandar el reloj del descanso" className="descanso-dial chico">
-        <DialDescanso fraccion={fraccion} marcas={false} />
+        <DialDescanso fraccion={listo ? 1 : fraccion} marcas={false} />
+        {listo && <span className="descanso-dial-centro dock-reloj-listo badge-pop" aria-hidden="true"><Check size={20} strokeWidth={3} /></span>}
       </button>
       <div className="min-w-0 flex-1">
-        <p role="timer" aria-label={relojCorto(restante)} className={`num-display descanso-tiempo descanso-tiempo-dock ${urgente ? "urgente" : ""} ${enPausa ? "en-pausa" : ""}`}><RelojQueGira segundos={restante} /></p>
-        <p className={`descanso-rotulo dock-reloj-rotulo ${enPausa ? "en-pausa" : ""}`}>
-          {enPausa ? "En pausa" : datos?.siguiente ? "Sigue" : "Descanso"}
-          {nombre && <span className="descanso-rotulo-nombre"> · {nombre}</span>}
-        </p>
+        {listo ? (
+          <p role="timer" aria-label={`Terminó hace ${relojCorto(pasado)}`} className="num-display descanso-tiempo descanso-tiempo-dock listo">+<RelojQueGira segundos={pasado} sube /></p>
+        ) : (
+          <p role="timer" aria-label={`${relojCorto(restante)}${enPausa ? ", en pausa" : ""}`} className={`num-display descanso-tiempo descanso-tiempo-dock ${urgente ? "urgente" : ""} ${enPausa ? "en-pausa" : ""}`}><RelojQueGira segundos={restante} /></p>
+        )}
       </div>
       <div className="flex items-center gap-1.5 shrink-0">
-        <BotonDescanso onClick={() => ajustarDescanso(timerId, 15)} label="Sumar 15 segundos">+15</BotonDescanso>
+        {!listo && (
+          <BotonDescanso onClick={() => (enPausa ? reanudarDescanso(timerId) : pausarDescanso(timerId))} label={enPausa ? "Seguir el descanso" : "Pausar el descanso"} principal={enPausa}>
+            {enPausa ? <Play size={16} className="fill-current" /> : <Pause size={16} className="fill-current" />}
+          </BotonDescanso>
+        )}
+        <BotonDescanso onClick={() => reiniciarDescanso(timerId)} label="Reiniciar el descanso"><RotateCcw size={16} /></BotonDescanso>
         <BotonDescanso onClick={() => terminarDescanso(timerId)} label="Cerrar el descanso"><X size={17} /></BotonDescanso>
       </div>
     </div>,
@@ -9084,11 +9112,11 @@ function FilaDescansoDock({ timerId, embebido = false }) {
 }
 
 // EL RELOJ DE PARED, grande: el del dock traído al frente. Tocar el reloj lo
-// pausa o lo sigue (como el botón de un cronómetro de mano); abajo, ±15 y
-// cerrar el descanso. Al llegar a cero dice a qué volvés.
+// pausa o lo sigue (como el botón de un cronómetro de mano); abajo, ±15,
+// reiniciar y cerrar el descanso. Al llegar a cero dice a qué volvés.
 function RelojDescansoGrande({ timerId, onClose }) {
   useAndroidBack(onClose);
-  const { estado, restante, fraccion, datos } = useRelojDescanso(timerId);
+  const { estado, restante, fraccion, pasado = 0, datos } = useRelojDescanso(timerId);
   if (typeof document === "undefined") return null;
   const enPausa = estado === "paused";
   const urgente = estado === "running" && restante <= 10;
@@ -9108,10 +9136,13 @@ function RelojDescansoGrande({ timerId, onClose }) {
           aria-label={listo ? "El descanso terminó" : enPausa ? "Seguir el descanso" : "Pausar el descanso"}
           className="descanso-dial reloj-grande-dial"
         >
-          <DialDescanso fraccion={fraccion} />
+          <DialDescanso fraccion={listo ? 1 : fraccion} />
           <span className="descanso-dial-centro">
             {listo ? (
-              <Check size={52} strokeWidth={2.4} className="reloj-grande-listo" />
+              <>
+                <Check size={52} strokeWidth={2.4} className="reloj-grande-listo" />
+                <span role="timer" aria-label={`Terminó hace ${relojCorto(pasado)}`} className="num-display descanso-tiempo reloj-grande-pasado listo">+<RelojQueGira segundos={pasado} sube /></span>
+              </>
             ) : (
               <>
                 <span role="timer" aria-label={relojCorto(restante)} className={`num-display descanso-tiempo reloj-grande-tiempo ${urgente ? "urgente" : ""} ${enPausa ? "en-pausa" : ""}`}><RelojQueGira segundos={restante} /></span>
@@ -9121,11 +9152,15 @@ function RelojDescansoGrande({ timerId, onClose }) {
           </span>
         </button>
         {listo ? (
-          <button onClick={() => { terminarDescanso(timerId); onClose(); }} className="boton-pildora w-full">Volver a la serie</button>
+          <div className="reloj-grande-controles">
+            <BotonDescanso onClick={() => reiniciarDescanso(timerId)} label="Reiniciar el descanso"><RotateCcw size={17} /></BotonDescanso>
+            <button onClick={() => { terminarDescanso(timerId); onClose(); }} className="boton-pildora reloj-grande-volver">Volver a la serie</button>
+          </div>
         ) : (
           <div className="reloj-grande-controles">
             <BotonDescanso onClick={() => ajustarDescanso(timerId, -15)} label="Restar 15 segundos">−15</BotonDescanso>
             <BotonDescanso onClick={() => ajustarDescanso(timerId, 15)} label="Sumar 15 segundos">+15</BotonDescanso>
+            <BotonDescanso onClick={() => reiniciarDescanso(timerId)} label="Reiniciar el descanso"><RotateCcw size={17} /></BotonDescanso>
             <BotonDescanso onClick={() => { terminarDescanso(timerId); onClose(); }} label="Cerrar el descanso"><X size={17} /></BotonDescanso>
           </div>
         )}
@@ -10330,7 +10365,7 @@ function capitulosGuia() {
         },
         {
           titulo: "El descanso corre solo",
-          texto: "Al guardar la serie arranca el reloj, abajo y siempre en el mismo lugar: sumale 15 segundos o cerralo con la cruz. Tocá el reloj chico para verlo grande: ahí lo pausás o le restás 15 segundos.",
+          texto: "Al guardar la serie arranca el reloj, abajo y siempre en el mismo lugar: pausalo, reinicialo o cerralo con la cruz. Cuando llega a cero queda a la vista, en verde, contando cuánto te pasaste. Tocá el reloj chico para verlo grande: ahí le sumás o le restás 15 segundos.",
           dibujo: (
             <span className="descanso-dial guia-dial" style={{ "--c": verde }}>
               <DialDescanso fraccion={0.62} />
