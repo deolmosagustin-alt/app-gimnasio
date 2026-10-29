@@ -39,12 +39,11 @@ import { FirebaseAuthentication } from "@capacitor-firebase/authentication";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { doc, setDoc, getDoc, deleteDoc, addDoc, collection, serverTimestamp, enableIndexedDbPersistence } from "firebase/firestore";
 import Model from "react-body-highlighter";
-import FemaleBody from "@mjcdev/react-body-highlighter";
 import { auth, googleProvider, db } from "./firebase";
 import {
   yt, mkSets, cloneRoutineDef, debounce, kgToDisplay, displayToKg, weightLabel,
   rpeColor, haptic, localDateStr, todayStr, formatTime, vol, estimate1RM, prScore, isHeavyRepRange,
-  tint, setThemeMode, normalizePhoneForMatching, hashPhoneKey, KG_TO_LBS,
+  tint, setThemeMode, normalizePhoneForMatching, hashPhoneKey, KG_TO_LBS, edadDe, cumpleanosEscrito,
 } from "./utils";
 // Feature social (amigos + entrenador/alumno) — todo el acceso a Firestore
 // de esto vive en social.js, App.jsx solo llama y dibuja el resultado.
@@ -230,7 +229,7 @@ function getCurrentUser() {
 // medidas, rutinas, configuración) sí sube completo.
 const CLOUD_PROFILE_FIELDS = [
   // Datos básicos del perfil
-  "name", "email", "sex", "age", "heightCm", "joinedAt", "googleUid", "tutorialSeen", "pin", "username",
+  "name", "email", "sex", "age", "birthDate", "heightCm", "joinedAt", "googleUid", "tutorialSeen", "pin", "username",
   // Configuración y rutinas
   "settings", "activeRoutineId", "routines", "weekSchedule",
   // Historial de entrenamiento completo
@@ -272,7 +271,7 @@ function computeTopRank(profile) {
     const levelIdxs = [];
     MUSCLE_GROUPS.forEach((g) => {
       const { best1RM } = getBest1RMForMuscleGroup(g.key, profile.logs || {}, settings.dumbbellDouble || null);
-      const rank = getMuscleRank(g.key, best1RM, mode, bodyWeightKg, profile.sex, profile.age);
+      const rank = getMuscleRank(g.key, best1RM, mode, bodyWeightKg, profile.sex, edadDe(profile));
       if (rank.hasData) levelIdxs.push(rank.levelIdx);
     });
     if (!levelIdxs.length) return null;
@@ -689,7 +688,9 @@ const DEFAULT_SETTINGS = {
   // useMantenerPantalla).
   keepScreenOn: true,
   trainWeeks: TRAIN_WEEKS, deloadWeeks: DELOAD_WEEKS, deloadPct: 0.75, deloadSetDivisor: 2, deloadEnabled: true,
-  theme: "dark", textScale: 1, smallTextScale: 1, autoShowPrShare: true, bodyWeightKg: 0, muscleRankMode: "general", allowZoom: false,
+  // La letra de fábrica es la chica (pedido: "que la letra default sea la chica");
+  // quien eligió otra en Perfil la conserva.
+  theme: "dark", textScale: 0.9, smallTextScale: 1, autoShowPrShare: true, bodyWeightKg: 0, muscleRankMode: "general", allowZoom: false,
   weightUnit: "kg", // "kg" o "lbs"
   reminderEnabled: false, reminderTime: "18:00", // recordatorio de entrenamiento
   weeklyRecapEnabled: true, // resumen semanal (ver handleEndSession/handleFinishDeloadSession)
@@ -1610,6 +1611,7 @@ const NOTA_DE_AJUSTE = { repite: "repetís", baja: "−10 %" };
 function planesParaSeguir(routineDef, logs, settings, cicloActual = CICLO_ACTUAL) {
   const model = routineDef ? buildRoutineModel(routineDef) : null;
   const unidad = settings?.weightUnit === "lbs" ? "lbs" : "kg";
+  const semanas = Math.max(1, settings?.trainWeeks || TRAIN_WEEKS);
   const planes = [];
   Object.values(model?.exerciseById || {}).forEach((ex) => {
     (ex.sets || []).forEach((st, si) => {
@@ -1620,9 +1622,12 @@ function planesParaSeguir(routineDef, logs, settings, cicloActual = CICLO_ACTUAL
       const ultimaVez = historia.reduce((a, b) => (!a || b.date > a.date ? b : a), null);
       const cumplioLaUltima = historia.some((h) => h.meta && (h.planDe ?? null) === (st.plannedAt ?? null) && (h.paso || 0) >= ultimaMeta.week && cumpleMeta(h, h.meta))
         || (!!ultimaVez && cumpleMeta(ultimaVez, ultimaMeta));
+      // El bloque nuevo arranca en la semana 1 del ciclo, aunque el viejo se
+      // haya cargado a mitad de ciclo (empezaba en la 6, por ejemplo).
+      const corrida = (e) => ({ ...e, week: e.week - primera.week + 1 });
       if (primera.minutes != null) {
         const sube = cumplioLaUltima ? Math.max(1, Math.round(((ultimaMeta.minutes || 0) - (primera.minutes || 0)) / 2)) : 0;
-        planes.push({ exerciseId: ex.id, exerciseName: ex.name, setIndex: si, entries: plan.map((e) => ({ ...e, minutes: (e.minutes || 0) + sube })) });
+        planes.push({ exerciseId: ex.id, exerciseName: ex.name, setIndex: si, entries: plan.map((e) => corrida({ ...e, minutes: (e.minutes || 0) + sube })).filter((e) => e.week <= semanas) });
         return;
       }
       const salto = displayToKg(saltoDe(settings, ex.id, unidad), unidad) || 2.5;
@@ -1635,7 +1640,16 @@ function planesParaSeguir(routineDef, logs, settings, cicloActual = CICLO_ACTUAL
         delta = Math.floor(Math.max(0, (movido - (primera.kg || 0)) / 2) / salto) * salto;
       }
       if (cumplioLaUltima) delta = Math.round(delta / salto) * salto;
-      planes.push({ exerciseId: ex.id, exerciseName: ex.name, setIndex: si, entries: plan.map((e) => ({ ...e, kg: roundKg((e.kg || 0) + delta) })) });
+      const nuevas = plan.map((e) => corrida({ ...e, kg: roundKg((e.kg || 0) + delta) })).filter((e) => e.week <= semanas);
+      // Si el plan viejo era más corto que el ciclo, se completa como un
+      // entrenador: una rep más por semana y, al tope del rango, un salto.
+      while (nuevas.length && nuevas[nuevas.length - 1].week < semanas) {
+        const ult = nuevas[nuevas.length - 1];
+        const paso = siguientePaso(ult.kg, ult.reps, st.repRange, salto);
+        if (!paso) break;
+        nuevas.push({ week: ult.week + 1, kg: roundKg(paso.kg), reps: paso.reps });
+      }
+      planes.push({ exerciseId: ex.id, exerciseName: ex.name, setIndex: si, entries: nuevas });
     });
   });
   return planes;
@@ -7087,7 +7101,102 @@ function buildPolyIndexToSlug(order) {
 const ANTERIOR_POLY_SLUGS = buildPolyIndexToSlug(ANTERIOR_POLY_ORDER);
 const POSTERIOR_POLY_SLUGS = buildPolyIndexToSlug(POSTERIOR_POLY_ORDER);
 
-function drawMuscleRankShareCard(ctx, W, H, { ranks, modeLabel, accent = "#F59E0B" }) {
+/* ============================================================================
+   EL MUÑECO DE MUJER, EN EL MISMO ESTILO QUE EL DE HOMBRE (pedido: "que el
+   muñeco de la mujer se parezca más al estilo del de hombre"). Antes era otra
+   librería (@mjcdev/react-body-highlighter): curvas, manos, abdominales y pelo
+   dibujado, al lado de un hombre de facetas rectas. Ahora es la misma figura
+   de facetas, polígono por polígono, con proporciones de mujer: hombros,
+   brazos y cintura más angostos y caderas un poco más anchas (anchoDeMujer),
+   y un pelo de facetas. Los polígonos son los mismos y en el mismo orden, así
+   que el toque, los colores, la animación de carga y la imagen para compartir
+   andan igual que en el de hombre. El pelo son <path> (no <polygon>), para no
+   correr el índice de los polígonos.
+============================================================================ */
+const SLUGS_DE_BRAZO = new Set(["biceps", "triceps", "forearm", "front-deltoids", "back-deltoids"]);
+// Cuánto se angosta (o ensancha) el cuerpo a cada altura del dibujo (100 × 200;
+// 1 = igual que el de hombre): hombros y pecho 0,9, cintura 0,84, caderas 1,06.
+const TRAMOS_DE_MUJER = [[0, 1], [24, 1], [34, 0.9], [58, 0.9], [78, 0.84], [96, 1.06], [124, 1.06], [160, 1], [200, 1]];
+function anchoDeMujer(y) {
+  for (let i = 1; i < TRAMOS_DE_MUJER.length; i++) {
+    const [y0, f0] = TRAMOS_DE_MUJER[i - 1], [y1, f1] = TRAMOS_DE_MUJER[i];
+    if (y <= y1) return f0 + ((y - y0) / (y1 - y0)) * (f1 - f0);
+  }
+  return 1;
+}
+function feminizarPuntos(puntos) {
+  const out = {};
+  Object.entries(puntos).forEach(([slug, lista]) => {
+    out[slug] = lista.map((str) => {
+      const n = str.trim().split(/[\s,]+/).map(Number);
+      const res = [];
+      for (let i = 0; i + 1 < n.length; i += 2) {
+        // Los brazos, enteros y más finos (si se angostaran por altura, el
+        // antebrazo se deformaría a la altura de la cintura); la cabeza, apenas.
+        const f = SLUGS_DE_BRAZO.has(slug) ? 0.9 : slug === "head" ? 0.96 : anchoDeMujer(n[i + 1]);
+        res.push((50 + (n[i] - 50) * f).toFixed(3), n[i + 1].toFixed(3));
+      }
+      return res.join(" ");
+    });
+  });
+  return out;
+}
+const MUJER_ANTERIOR_POLY_POINTS = feminizarPuntos(ANTERIOR_POLY_POINTS);
+const MUJER_POSTERIOR_POLY_POINTS = feminizarPuntos(POSTERIOR_POLY_POINTS);
+// El pelo, de facetas como todo el muñeco: [puntos, color]. De frente, los
+// mechones que caen a los costados van detrás de la figura y el nacimiento
+// del pelo, delante; de espalda, el pelo tapa la cabeza y cae una cola.
+const PELO_OSCURO = "#25282c", PELO_LUZ = "#2f3337";
+const PELO_DE_MUJER = {
+  front: {
+    detras: [
+      [[40.6, 9.5, 38.2, 14.5, 37.4, 22.5, 38.4, 30.6, 41.4, 31.6, 42.8, 26.8, 41.6, 19.8], PELO_OSCURO],
+      [[59.0, 9.5, 61.4, 14.5, 62.2, 22.5, 61.2, 30.6, 58.2, 31.6, 56.8, 26.8, 58.0, 19.8], PELO_LUZ],
+    ],
+    delante: [
+      [[40.55, 10.9, 42.75, 2.86, 49.8, 0, 49.8, 5.3, 45.2, 6.6, 42.3, 9.0], PELO_OSCURO],
+      [[49.8, 0, 56.86, 2.45, 58.75, 10.6, 57.2, 8.6, 54.6, 6.2, 49.8, 5.3], PELO_LUZ],
+    ],
+  },
+  back: {
+    detras: [
+      [[41.0, 11, 39.4, 18, 40.0, 27.5, 43.5, 28.4, 44.6, 21.5], PELO_OSCURO],
+      [[59.0, 11, 60.6, 18, 60.0, 27.5, 56.5, 28.4, 55.4, 21.5], PELO_LUZ],
+    ],
+    delante: [
+      [[50.61, 0, 46.12, 0.85, 41.22, 5.53, 40.81, 12.77, 45.3, 20, 50.2, 20, 50.4, 8], PELO_OSCURO],
+      [[50.61, 0, 55.52, 1.28, 59.19, 4.68, 58.78, 13.62, 55.52, 20, 50.2, 20, 50.4, 8], PELO_LUZ],
+      [[48.2, 19.4, 51.8, 19.4, 51.2, 23.5, 52.2, 30, 50.0, 36, 47.9, 30, 48.9, 23.5], PELO_OSCURO],
+    ],
+  },
+};
+const dDePelo = (pts) => `M${pts.map((v, i) => (i % 2 ? `${v}` : `${i ? " L" : ""}${v},`)).join("")} Z`.replace(/,(\S)/g, ",$1");
+
+// EL MUÑECO DE FACETAS, propio: dibuja lo mismo que el Model de
+// react-body-highlighter (mismo lienzo, mismos polígonos en el mismo orden y
+// el mismo color por "frequency"), con los puntos de la mujer y su pelo.
+function ModeloFacetas({ data = [], type = "anterior", bodyColor = "#3c4146", highlightedColors = BODY_HIGHLIGHT_COLORS, style, svgStyle }) {
+  const frente = type === "anterior";
+  const frecuencia = {};
+  data.forEach((e) => (e.muscles || []).forEach((m) => { frecuencia[m] = (frecuencia[m] || 0) + (e.frequency || 1); }));
+  const orden = frente ? ANTERIOR_POLY_ORDER : POSTERIOR_POLY_ORDER;
+  const puntos = frente ? MUJER_ANTERIOR_POLY_POINTS : MUJER_POSTERIOR_POLY_POINTS;
+  const pelo = PELO_DE_MUJER[frente ? "front" : "back"];
+  return (
+    <div style={style} className="rbh-wrapper">
+      <svg className="rbh" width="100%" height="100%" viewBox="0 0 100 200" style={svgStyle}>
+        {pelo.detras.map(([pts, color], i) => <path key={`d${i}`} d={dDePelo(pts)} fill={color} />)}
+        {orden.map(([slug]) => (puntos[slug] || []).map((pts, i) => {
+          const f = frecuencia[slug];
+          return <polygon key={`${slug}-${i}`} points={pts} style={{ cursor: "pointer", fill: f ? highlightedColors[Math.min(highlightedColors.length - 1, f - 1)] : bodyColor }} />;
+        }))}
+        {pelo.delante.map(([pts, color], i) => <path key={`f${i}`} d={dDePelo(pts)} fill={color} pointerEvents="none" />)}
+      </svg>
+    </div>
+  );
+}
+
+function drawMuscleRankShareCard(ctx, W, H, { ranks, modeLabel, accent = "#F59E0B", sex = null }) {
   drawShareCardBase(ctx, W, H, accent, "#A855F7");
   ctx.textAlign = "center";
   ctx.fillStyle = accent;
@@ -7126,8 +7235,24 @@ function drawMuscleRankShareCard(ctx, W, H, { ranks, modeLabel, accent = "#F59E0
     return lvl >= 0 ? (ranks[best]?.color || NEUTRAL) : NEUTRAL;
   };
 
+  const mujer = sex === "F";
+  const pintarPelo = (capa, view, offsetX) => {
+    if (!mujer) return;
+    const sx = bodyW / 100, sy = bodyH / 200;
+    PELO_DE_MUJER[view][capa].forEach(([pts, color]) => {
+      ctx.beginPath();
+      for (let i = 0; i < pts.length - 1; i += 2) {
+        const x = offsetX + pts[i] * sx, y = bodyY + pts[i + 1] * sy;
+        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.fillStyle = color;
+      ctx.fill();
+    });
+  };
   const drawView = (order, points, view, offsetX) => {
     const sx = bodyW / 100, sy = bodyH / 200;
+    pintarPelo("detras", view, offsetX);
     order.forEach(([slug]) => {
       const color = fillFor(slug, view);
       (points[slug] || []).forEach((pointStr) => {
@@ -7144,10 +7269,11 @@ function drawMuscleRankShareCard(ctx, W, H, { ranks, modeLabel, accent = "#F59E0
         ctx.fill();
       });
     });
+    pintarPelo("delante", view, offsetX);
   };
 
-  drawView(ANTERIOR_POLY_ORDER, ANTERIOR_POLY_POINTS, "front", startX);
-  drawView(POSTERIOR_POLY_ORDER, POSTERIOR_POLY_POINTS, "back", startX + bodyW + gap);
+  drawView(ANTERIOR_POLY_ORDER, mujer ? MUJER_ANTERIOR_POLY_POINTS : ANTERIOR_POLY_POINTS, "front", startX);
+  drawView(POSTERIOR_POLY_ORDER, mujer ? MUJER_POSTERIOR_POLY_POINTS : POSTERIOR_POLY_POINTS, "back", startX + bodyW + gap);
 
   const labelY = bodyY + bodyH + Math.round(H * 0.035);
   ctx.fillStyle = "#d1d4d7";
@@ -7214,19 +7340,29 @@ function drawSocialProfileShareCard(ctx, W, H, { name, username, topRank, avatar
 }
 
 // ============================== QR DE PERFIL ==============================
-// No hay una página pública "/u/@usuario" en este proyecto (sería una
-// feature aparte, con su propio ruteo y App Links nativos) — así que el QR
-// no codifica un link real: codifica un texto propio con un prefijo fijo,
-// que la propia app decodifica localmente al escanear (ver
-// parseProfileQrPayload, usado en SocialSearchSection). Nunca sale a
-// internet ni depende de que el que escanea tenga conexión en ese momento.
+// El QR es un link de la app: https://…/#amigo=<usuario> (pedido: "lo de la
+// cámara y escaneo de QR"). Antes guardaba un texto propio
+// ("modusfit:friend:<usuario>") que sólo leía el escáner de adentro de la
+// app: escanearlo con la cámara del teléfono, que es lo que hace cualquiera
+// cuando un amigo le muestra su código, no hacía nada. Ahora cualquier cámara
+// lo abre: en la web, o en la app con los App Links de Android (el
+// intent-filter de AndroidManifest, MainActivity.abrirLinkDeLaApp y
+// public/.well-known/assetlinks.json). Al abrirse, App lee #amigo= y muestra
+// AmigoDelLink. El escáner de adentro lee los dos formatos.
 const PROFILE_QR_PREFIX = "modusfit:friend:";
 function buildProfileQrPayload(username) {
-  return `${PROFILE_QR_PREFIX}${normalizeUsername(username)}`;
+  return `${API_ORIGIN}/#amigo=${encodeURIComponent(normalizeUsername(username))}`;
 }
 function parseProfileQrPayload(text) {
-  if (typeof text !== "string" || !text.startsWith(PROFILE_QR_PREFIX)) return null;
-  const username = normalizeUsername(text.slice(PROFILE_QR_PREFIX.length));
+  if (typeof text !== "string") return null;
+  let crudo = null;
+  if (text.startsWith(PROFILE_QR_PREFIX)) crudo = text.slice(PROFILE_QR_PREFIX.length);
+  else {
+    const m = text.match(/[#?&]amigo=([^&#\s]+)/);
+    if (m) { try { crudo = decodeURIComponent(m[1]); } catch { crudo = m[1]; } }
+  }
+  if (crudo == null) return null;
+  const username = normalizeUsername(crudo);
   return isValidUsername(username) ? username : null;
 }
 
@@ -15398,163 +15534,6 @@ function muteHex(hex, amount = 0.65) {
   return `#${nr.toString(16).padStart(2, "0")}${ng.toString(16).padStart(2, "0")}${nb.toString(16).padStart(2, "0")}`;
 }
 
-/* ============================================================================
-   MUÑECO — VARIANTE MUJER. react-body-highlighter (el que usa el muñeco
-   por defecto) es un componente cerrado: un solo SVG interno (silueta
-   unisex) sin ninguna prop de sexo. Antes esta variante era un dibujo 100%
-   propio a base de elipses/polígonos simples — se notaba muchísimo al
-   lado del muñeco por defecto (curvas reales, cabello, striations
-   musculares). Se reemplazó por @mjcdev/react-body-highlighter, que SÍ
-   trae una silueta femenina ilustrada con el mismo nivel de detalle que
-   la de por defecto (misma familia de arte), con prop `gender="female"` —
-   la razón concreta por la que se pidió instalar una librería nueva en
-   vez de seguir a mano.
-   Esta librería tiene una API más simple que la de por defecto: en vez de
-   `{name, muscles, frequency}` + un array de colores por frecuencia, cada
-   músculo lleva su color YA resuelto (`{slug, color}`) — nada de índices
-   de polígono. Por eso el click también es más simple: `onBodyPartClick`
-   devuelve directo el slug tocado, sin tener que buscarlo a mano en el
-   DOM del SVG (lo que sí hace falta para el muñeco de por defecto, que no
-   expone ningún callback propio).
-   Único hueco de esta librería: no tiene "deltoids" separado por
-   anterior/lateral/posterior, un solo slug para las tres cabezas — se
-   resuelve pintándolo con el mejor rango de anterior+lateral en la vista
-   de frente, y con el posterior en la de espalda (ver buildFemaleBodyData).
-   Tampoco expone stroke/outline por músculo para marcar la selección, así
-   que en vez de un borde blanco (como hace el muñeco por defecto) se
-   aclara el color hacia blanco un poco (ver mixWithWhite).
-============================================================================ */
-const FEMALE_SLUG_MAP = {
-  pectoral_superior: "chest", pectoral_medio: "chest",
-  trapecio: "trapezius",
-  dorsales: "upper-back", espalda_baja: "lower-back",
-  biceps: "biceps", triceps: "triceps", antebrazos: "forearm",
-  cuadriceps: "quadriceps", femoral: "hamstring", gluteo: "gluteal", aductores: "adductors",
-  core: "abs", pantorrillas: "calves", oblicuos: "obliques",
-  tibial_anterior: "tibialis",
-};
-
-function bestRankForKeys(keys, ranks) {
-  let best = null;
-  keys.forEach((k) => {
-    const lvl = ranks[k]?.levelIdx ?? -1;
-    if (lvl >= 0 && (!best || lvl > best.levelIdx)) best = { levelIdx: lvl, color: ranks[k]?.color };
-  });
-  return best;
-}
-
-function mixWithWhite(hex, amount) {
-  const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
-  const nr = Math.round(r + (255 - r) * amount), ng = Math.round(g + (255 - g) * amount), nb = Math.round(b + (255 - b) * amount);
-  return `#${nr.toString(16).padStart(2, "0")}${ng.toString(16).padStart(2, "0")}${nb.toString(16).padStart(2, "0")}`;
-}
-
-// deltKeysForView: única excepción al mapa de arriba — depende de la vista.
-function deltKeysForView(view) { return view === "front" ? ["deltoide_anterior", "deltoide_lateral"] : ["deltoide_posterior"]; }
-function getFemaleGroupKeysForSlug(slug, view) {
-  if (slug === "deltoids") return deltKeysForView(view);
-  // BUG FIX (encontrado auditando): el asset de FRENTE de esta librería
-  // trae, además de "tibialis" (la espinilla), una segunda forma también
-  // llamada "calves" — un costado visible de la pantorrilla desde ese
-  // ángulo. FEMALE_SLUG_MAP mapea "calves" a pantorrillas (que en esta app
-  // es un grupo pensado como "solo espalda", ver buildFemaleBodyData), así
-  // que tocar esa forma de FRENTE terminaba abriendo el detalle de
-  // Pantorrillas — un grupo que visualmente no es al que corresponde esa
-  // vista. De frente, esa forma se trata como parte de tibial anterior.
-  if (slug === "calves" && view === "front") return ["tibial_anterior"];
-  return Object.entries(FEMALE_SLUG_MAP).filter(([, s]) => s === slug).map(([k]) => k);
-}
-// Gris claro para marcar selección en un músculo SIN rango todavía — el
-// muñeco por defecto marca la selección con un borde blanco (independiente
-// del color de relleno), pero esta librería no expone stroke por músculo.
-// Sin esto, tocar un músculo que todavía no tiene marcas cargadas no
-// mostraba NINGÚN indicio de que el toque se registró.
-const FEMALE_SELECTED_NEUTRAL = "#9da2a8";
-
-// BUG (de la librería, no nuestro): a pesar de que su tipo declara
-// `BodyPart.color`, el color que realmente se pinta sale de
-// `colors[intensity - 1]` — el campo `color` propio de cada item se
-// ignora en el render (confirmado probando en vivo: con `color` puesto
-// pero sin `intensity`, TODOS los músculos salían con el mismo celeste
-// por defecto de la librería). Por eso acá se arma una única paleta
-// `colors` con TODAS las variantes posibles (normal / seleccionado-con-
-// rango / seleccionado-sin-rango) y cada músculo elige su entrada por
-// índice (`intensity`), igual de indirecto que el `frequency` que ya usa
-// el muñeco por defecto — no es capricho, es la única forma que expone
-// esta librería de pintar cada músculo con SU color.
-function useFemalePalette(highlightedColors) {
-  return useMemo(() => [
-    ...highlightedColors, // intensity 1..N: color normal de cada rango
-    ...highlightedColors.map((c) => mixWithWhite(c, 0.45)), // N+1..2N: mismo rango, pero seleccionado
-    FEMALE_SELECTED_NEUTRAL, // 2N+1: seleccionado y sin rango todavía
-  ], [highlightedColors]);
-}
-
-function buildFemaleBodyData(ranks, tiersCount, selected, view) {
-  const bySlug = new Map();
-  Object.entries(FEMALE_SLUG_MAP).forEach(([ourKey, slug]) => {
-    // BUG FIX (encontrado auditando): el asset de FRENTE trae una forma
-    // "calves" propia (además de "tibialis") — sin excluir pantorrillas
-    // acá, esa forma se pintaba también de frente con el rango de
-    // pantorrillas (un grupo pensado como "solo espalda" en esta app),
-    // mezclando dos rangos distintos en la misma vista. Ver
-    // getFemaleGroupKeysForSlug para el mismo ajuste del lado del click.
-    if (view === "front" && ourKey === "pantorrillas") return;
-    const lvl = ranks[ourKey]?.levelIdx ?? -1;
-    if (lvl < 0) return;
-    if (!bySlug.has(slug) || lvl > bySlug.get(slug)) bySlug.set(slug, lvl);
-  });
-  const deltBest = bestRankForKeys(deltKeysForView(view), ranks);
-  if (deltBest) bySlug.set("deltoids", deltBest.levelIdx);
-
-  const items = Array.from(bySlug.entries()).map(([slug, lvl]) => {
-    const keys = getFemaleGroupKeysForSlug(slug, view);
-    const isSelected = !!selected && keys.includes(selected);
-    return { slug, intensity: (isSelected ? tiersCount + lvl : lvl) + 1 };
-  });
-  if (selected) {
-    const selectedSlug = FEMALE_SLUG_MAP[selected] || (deltKeysForView(view).includes(selected) ? "deltoids" : null);
-    // Mismo BUG FIX de arriba: si pantorrillas está seleccionada (se tocó
-    // en la vista de espalda) pero esto se está calculando para la vista
-    // de FRENTE, no hay que resucitar la forma "calves" del frente — sigue
-    // sin ser su vista.
-    const skipSelectedLeak = view === "front" && selected === "pantorrillas";
-    if (selectedSlug && !skipSelectedLeak && !items.some((it) => it.slug === selectedSlug)) {
-      items.push({ slug: selectedSlug, intensity: tiersCount * 2 + 1 });
-    }
-  }
-  return items;
-}
-
-function FemaleBodyModel({ ranks, highlightedColors, selected, onMuscleClick, frontRef, backRef }) {
-  const palette = useFemalePalette(highlightedColors);
-  const tiersCount = highlightedColors.length;
-  const frontData = useMemo(() => buildFemaleBodyData(ranks, tiersCount, selected, "front"), [ranks, tiersCount, selected]);
-  const backData = useMemo(() => buildFemaleBodyData(ranks, tiersCount, selected, "back"), [ranks, tiersCount, selected]);
-  const handleClick = (view) => (bodyPart) => {
-    const keys = getFemaleGroupKeysForSlug(bodyPart?.slug, view);
-    if (!keys.length) return;
-    const best = keys.reduce((a, b) => ((ranks[b]?.levelIdx ?? -1) > (ranks[a]?.levelIdx ?? -1) ? b : a));
-    onMuscleClick(best);
-  };
-  return (
-    <div className="figura-cuerpo flex gap-2 justify-center items-start">
-      <div className="flex-1 min-w-0 max-w-[180px]">
-        <div ref={frontRef} className="relative">
-          <FemaleBody data={frontData} colors={palette} gender="female" side="front" border="none" onBodyPartClick={handleClick("front")} />
-        </div>
-        <p className="text-center text-[10px] text-slate-600 mt-1">De frente</p>
-      </div>
-      <div className="flex-1 min-w-0 max-w-[180px]">
-        <div ref={backRef} className="relative">
-          <FemaleBody data={backData} colors={palette} gender="female" side="back" border="none" onBodyPartClick={handleClick("back")} />
-        </div>
-        <p className="text-center text-[10px] text-slate-600 mt-1">De espalda</p>
-      </div>
-    </div>
-  );
-}
-
 // Versión suavizada de los colores de RANK_TIERS — mezclada 65/35 con el
 // fondo oscuro para que el muñeco no acapare toda la atención visual de la
 // pantalla. Es un valor 100% estático (RANK_TIERS nunca cambia), así que
@@ -15777,28 +15756,22 @@ function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backR
     }
   }, [data, selected, ranks, frontRef, backRef, highlightedColors]);
 
-  // Variante mujer: componente 100% propio (ver comentario grande arriba de
-  // FEMALE_FRONT_REGIONS) — los useEffects de arriba (animación de carga,
-  // latido de rango nuevo, contorno de selección, post-procesado de
-  // calves/neck) actúan sobre <polygon> del SVG de la librería; acá no hay
-  // ninguno (son <ellipse>/<path> propios), así que quedan como no-ops
-  // inofensivos en vez de tocarlos — el color/selección de esta variante
-  // se resuelve directo dentro de FemaleBodyView, sin depender de ellos.
-  if (sex === "F") {
-    return <FemaleBodyModel ranks={ranks} highlightedColors={highlightedColors} selected={selected} onMuscleClick={onMuscleClick} frontRef={frontRef} backRef={backRef} />;
-  }
+  // La mujer, con el muñeco de facetas (ModeloFacetas): mismos polígonos en
+  // el mismo orden, así los efectos de arriba (carga, latido, selección,
+  // pantorrillas y cuello) andan igual que con el de hombre.
+  const Figura = sex === "F" ? ModeloFacetas : Model;
 
   return (
     <div className="figura-cuerpo flex gap-2 justify-center items-start">
       <div className="flex-1 min-w-0 max-w-[180px]">
         <div ref={frontRef} onClick={handlePolygonClick("front")} className="relative">
-          <Model data={data} type="anterior" bodyColor="#3c4146" highlightedColors={highlightedColors} onClick={MODEL_NOOP_CLICK} style={MODEL_STYLE} svgStyle={MODEL_STYLE} />
+          <Figura data={data} type="anterior" bodyColor="#3c4146" highlightedColors={highlightedColors} onClick={MODEL_NOOP_CLICK} style={MODEL_STYLE} svgStyle={MODEL_STYLE} />
         </div>
         <p className="text-center text-[10px] text-slate-600 mt-1">De frente</p>
       </div>
       <div className="flex-1 min-w-0 max-w-[180px]">
         <div ref={backRef} onClick={handlePolygonClick("back")} className="relative">
-          <Model data={data} type="posterior" bodyColor="#3c4146" highlightedColors={highlightedColors} onClick={MODEL_NOOP_CLICK} style={MODEL_STYLE} svgStyle={MODEL_STYLE} />
+          <Figura data={data} type="posterior" bodyColor="#3c4146" highlightedColors={highlightedColors} onClick={MODEL_NOOP_CLICK} style={MODEL_STYLE} svgStyle={MODEL_STYLE} />
         </div>
         <p className="text-center text-[10px] text-slate-600 mt-1">De espalda</p>
       </div>
@@ -15812,23 +15785,18 @@ function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backR
 // personas) no entra cómodo en una pantalla de celular, así que esta
 // versión se queda con lo esencial (un vistazo de frente alcanza para
 // comparar) y reusa la MISMA lógica de datos (buildBodyHighlighterData/
-// buildFemaleBodyData) que ya usa la vista completa, sin duplicarla.
+// ModeloFacetas para la mujer) que ya usa la vista completa, sin duplicarla.
 // Pedido: "que el muñeco se pueda switchear entre de frente y de espalda"
 // — antes esto sólo dibujaba la vista de frente, sin forma de ver la
 // espalda (dorsales, isquiotibiales, etc.) en la comparación con un amigo.
 function MiniBodyView({ ranks, sex, label, view = "front" }) {
   const data = useMemo(() => buildBodyHighlighterData(ranks, view), [ranks, view]);
-  const femalePalette = useFemalePalette(BODY_HIGHLIGHT_COLORS);
-  const femaleData = useMemo(() => buildFemaleBodyData(ranks, BODY_HIGHLIGHT_COLORS.length, null, view), [ranks, view]);
+  const Figura = sex === "F" ? ModeloFacetas : Model;
   return (
     <div className="flex-1 min-w-0 text-center">
       <p className="mini-cuerpo-nombre">{label}</p>
       <div className="max-w-[140px] mx-auto">
-        {sex === "F" ? (
-          <FemaleBody data={femaleData} colors={femalePalette} gender="female" side={view} border="none" onBodyPartClick={MODEL_NOOP_CLICK} />
-        ) : (
-          <Model data={data} type={view === "front" ? "anterior" : "posterior"} bodyColor="#3c4146" highlightedColors={BODY_HIGHLIGHT_COLORS} onClick={MODEL_NOOP_CLICK} style={MODEL_STYLE} svgStyle={MODEL_STYLE} />
-        )}
+        <Figura key={view} data={data} type={view === "front" ? "anterior" : "posterior"} bodyColor="#3c4146" highlightedColors={BODY_HIGHLIGHT_COLORS} onClick={MODEL_NOOP_CLICK} style={MODEL_STYLE} svgStyle={MODEL_STYLE} />
       </div>
     </div>
   );
@@ -16264,7 +16232,7 @@ function MyBodyModal({ profile, onClose }) {
   const [showImage, setShowImage] = useState(false);
   const frontRef = useRef(null);
   const backRef = useRef(null);
-  const ranks = useMemo(() => computeAllMuscleRanks(profile?.logs, getProfileSettings(profile), profile?.sex, profile?.age), [profile]);
+  const ranks = useMemo(() => computeAllMuscleRanks(profile?.logs, getProfileSettings(profile), profile?.sex, edadDe(profile)), [profile]);
   const selInfo = selected ? ranks[selected] : null;
   // Pedido: "al hacer click en mi perfil en la sección de mejor rango
   // aparece sólo el muñeco, quedó medio vacío" — antes este modal era
@@ -16324,7 +16292,7 @@ function MyBodyModal({ profile, onClose }) {
           shareTitle="Modus Fit · Rangos por músculo"
           shareText="Mirá mis rangos por músculo 💪"
           accent="#A855F7"
-          draw={(ctx, W, H) => drawMuscleRankShareCard(ctx, W, H, { ranks, modeLabel: "General", accent: "#A855F7" })}
+          draw={(ctx, W, H) => drawMuscleRankShareCard(ctx, W, H, { ranks, modeLabel: "General", accent: "#A855F7", sex: profile?.sex || null })}
           onClose={() => setShowImage(false)}
         />
       )}
@@ -16340,7 +16308,7 @@ function MyBodyModal({ profile, onClose }) {
 function RankExplainModal({ profile, myTopRank, onClose }) {
   useAndroidBack(onClose);
   const breakdown = useMemo(() => {
-    const ranks = computeAllMuscleRanks(profile?.logs, getProfileSettings(profile), profile?.sex, profile?.age);
+    const ranks = computeAllMuscleRanks(profile?.logs, getProfileSettings(profile), profile?.sex, edadDe(profile));
     const withData = MUSCLE_GROUPS.map((g) => ({ key: g.key, label: g.label, ...ranks[g.key] })).filter((r) => r.hasData);
     withData.sort((a, b) => b.levelIdx - a.levelIdx);
     const untrainedCount = MUSCLE_GROUPS.length - withData.length;
@@ -16723,7 +16691,7 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
           shareTitle="Modus Fit · Rangos por músculo"
           shareText="Mirá mis rangos por músculo 💪"
           accent="#F59E0B"
-          draw={(ctx, W, H) => drawMuscleRankShareCard(ctx, W, H, { ranks, modeLabel, accent: "#F59E0B" })}
+          draw={(ctx, W, H) => drawMuscleRankShareCard(ctx, W, H, { ranks, modeLabel, accent: "#F59E0B", sex })}
           onClose={() => setShowImage(false)}
         />
       )}
@@ -18493,7 +18461,8 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
   const [showTerms, setShowTerms] = useState(false);
   const [editMail, setEditMail] = useState(profile?.email || "");
   const [editSex, setEditSex] = useState(profile?.sex || "");
-  const [editAge, setEditAge] = useState(profile?.age ? String(profile.age) : "");
+  // El cumpleaños (AAAA-MM-DD); la edad se calcula sola (ver edadDe).
+  const [editBirth, setEditBirth] = useState(profile?.birthDate || "");
   const [editHeight, setEditHeight] = useState(profile?.heightCm ? String(profile.heightCm) : "");
   const [showCycleSetup, setShowCycleSetup] = useState(false);
   const cicloFechaRef = useRef(null);
@@ -18662,7 +18631,9 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
   // actualiza settings.bodyWeightKg por detrás para que el rango "Según
   // tu contexto" siga funcionando sin tener que tocar nada más.
   const handleSaveProfile = () => {
-    const updates = { email: editMail, sex: editSex || null, age: editAge ? parseInt(editAge, 10) : null, heightCm: editHeight ? parseInt(editHeight, 10) : null };
+    const birthDate = /^\d{4}-\d{2}-\d{2}$/.test(editBirth) ? editBirth : null;
+    // `age` queda calculada también, para lo que todavía la lee guardada (la nube, perfiles viejos).
+    const updates = { email: editMail, sex: editSex || null, birthDate, age: birthDate ? edadDe({ birthDate }) : (profile?.birthDate ? null : profile?.age ?? null), heightCm: editHeight ? parseInt(editHeight, 10) : null };
     updates.settings = { ...settings, sex: editSex || null };
     onUpdateProfile(updates);
     setEditing(false);
@@ -18727,7 +18698,9 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
         {[
           { icon: <Mail size={15} />, label: "Email", val: profile?.email || "Sin cargar" },
           { icon: <UserCog size={15} />, label: "Sexo", val: profile?.sex === "M" ? "Masculino" : profile?.sex === "F" ? "Femenino" : "Sin cargar" },
-          { icon: <Calendar size={15} />, label: "Edad", val: profile?.age ? `${profile.age} años` : "Sin cargar" },
+          profile?.birthDate
+            ? { icon: <Calendar size={15} />, label: "Cumpleaños", val: `${cumpleanosEscrito(profile.birthDate)}, ${edadDe(profile)} años` }
+            : { icon: <Calendar size={15} />, label: "Edad", val: edadDe(profile) ? `${edadDe(profile)} años` : "Sin cargar" },
         ].map(({ icon, label, val }) => (
           <div key={label} className="flex items-center gap-3 px-4 py-3.5"><span className="text-slate-500">{icon}</span><span className="text-slate-400 text-[13px] flex-1">{label}</span><span className="text-slate-200 text-[13px] font-semibold text-right">{val}</span></div>
         ))}
@@ -18750,8 +18723,9 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
           </div>
           <div className="flex gap-3">
             <div className="flex-1">
-              <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Edad</label>
-              <input type="number" inputMode="numeric" value={editAge} onChange={(e) => setEditAge(e.target.value)} placeholder="Años" className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none" />
+              <label htmlFor="perfil-cumple" className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Cumpleaños</label>
+              <input id="perfil-cumple" type="date" value={editBirth} min="1920-01-01" max={todayStr()} onChange={(e) => setEditBirth(e.target.value)} className="w-full min-w-0 bg-slate-800 border border-slate-700/50 rounded-xl px-3 py-3 text-white text-sm focus:outline-none" />
+              {!editBirth && edadDe(profile) ? <p className="text-[10px] text-slate-600 mt-1">Hoy dice {edadDe(profile)} años. Con la fecha, cambia sola.</p> : null}
             </div>
             <div className="flex-1">
               <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Altura</label>
@@ -19044,7 +19018,7 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
           <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Tamaño de letra</p>
           <div className="segmentado">
             {TEXT_SCALE_OPTIONS.map((opt) => (
-              <button key={opt.k} onClick={() => updateSettings({ textScale: opt.v })} aria-pressed={(settings.textScale ?? 1) === opt.v} className={(settings.textScale ?? 1) === opt.v ? "activo" : ""}>{opt.l}</button>
+              <button key={opt.k} onClick={() => updateSettings({ textScale: opt.v })} aria-pressed={(settings.textScale ?? DEFAULT_SETTINGS.textScale) === opt.v} className={(settings.textScale ?? DEFAULT_SETTINGS.textScale) === opt.v ? "activo" : ""}>{opt.l}</button>
             ))}
           </div>
         </div>
@@ -19434,6 +19408,66 @@ function ScanQrCamera({ onResult, onClose }) {
             )}
           </div>
         )}
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+// EL QR DE UN AMIGO, ABIERTO CON LA CÁMARA DEL TELÉFONO: la app se abre con
+// #amigo=<usuario> (ver buildProfileQrPayload) y esto lo busca y ofrece
+// agregarlo, sin tener que ir a Social › Amigos › Buscar.
+function AmigoDelLink({ username, myUid = null, onClose, onIrA }) {
+  useAndroidBack(onClose);
+  const [estado, setEstado] = useState(myUid ? "buscando" : "sin-cuenta"); // buscando | encontrado | no-esta | vos | enviada | ya | sin-cuenta
+  const [persona, setPersona] = useState(null);
+  useEffect(() => {
+    if (!myUid) return;
+    let vivo = true;
+    (async () => {
+      const hit = await lookupUserByUsername(username);
+      if (!vivo) return;
+      if (!hit) { setEstado("no-esta"); return; }
+      if (hit.uid === myUid) { setEstado("vos"); return; }
+      const basic = await getPublicBasic(hit.uid);
+      if (!vivo) return;
+      setPersona({ uid: hit.uid, basic });
+      setEstado("encontrado");
+    })();
+    return () => { vivo = false; };
+  }, [username, myUid]);
+  const agregar = async () => {
+    if (!persona) return;
+    try { await sendFriendRequest(myUid, persona.uid); setEstado("enviada"); haptic(15); }
+    catch { setEstado("ya"); }
+  };
+  const nombre = persona?.basic?.name?.split(" ")[0] || `@${username}`;
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div className="fixed inset-0 z-[125] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={onClose}>
+      <div className="modal-rutina modal-pop-in" role="dialog" aria-modal="true" aria-label="Agregar a un amigo" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-rutina-cabeza">
+          <div className="min-w-0">
+            <h3 className="ficha-titulo">Agregar a un amigo</h3>
+            <p className="ficha-bajada">Escaneaste el código de @{username}.</p>
+          </div>
+          <button onClick={onClose} aria-label="Cerrar" className="boton-redondo shrink-0"><X size={17} /></button>
+        </div>
+        <div className="modal-rutina-cuerpo" role="status">
+          {estado === "buscando" && <p className="compartir-generando"><span className="plan-ia-girando" aria-hidden="true" /> Buscando a @{username}…</p>}
+          {persona && (estado === "encontrado" || estado === "enviada" || estado === "ya") && <PublicUserCard uid={persona.uid} basic={persona.basic} mostrarUsuario />}
+          {estado === "no-esta" && <p className="ficha-aviso"><AlertTriangle size={15} />No encontramos a @{username}. Puede que haya cambiado su usuario.</p>}
+          {estado === "vos" && <p className="ficha-aviso"><Info size={15} />Es tu propio código: compartilo para que te agreguen.</p>}
+          {estado === "enviada" && <p className="ficha-aviso"><Check size={15} />Le mandamos la solicitud a {nombre}. Cuando la acepte, aparece en Social.</p>}
+          {estado === "ya" && <p className="ficha-aviso"><Info size={15} />Ya son amigos o tienen una solicitud pendiente. Fijate en Social.</p>}
+          {estado === "sin-cuenta" && <p className="ficha-aviso"><Info size={15} />Para sumar amigos, vinculá tu cuenta de Google en Perfil.</p>}
+        </div>
+        <div className="modal-rutina-pie">
+          {estado === "encontrado" && <button onClick={agregar} className="boton-pildora w-full"><UserPlus size={16} /> Agregar a {nombre}</button>}
+          {(estado === "enviada" || estado === "ya") && <button onClick={() => onIrA("social")} className="boton-pildora w-full">Ir a Social</button>}
+          {estado === "sin-cuenta" && <button onClick={() => onIrA("perfil")} className="boton-pildora w-full">Ir a Perfil</button>}
+          {(estado === "no-esta" || estado === "vos") && <button onClick={onClose} className="boton-tonal w-full">Cerrar</button>}
+        </div>
       </div>
     </div>,
     document.body
@@ -24365,7 +24399,8 @@ function buildActionPlan(action, ctx) {
     const patch = {}; const items = [];
     let newWeight = null;
     if (action.sex === "M" || action.sex === "F") { patch.sex = action.sex; items.push(`Sexo: ${action.sex === "M" ? "Masculino" : "Femenino"}`); }
-    if (action.age) { patch.age = parseInt(action.age, 10); items.push(`Edad: ${patch.age} años`); }
+    // Una edad dicha en el chat manda sobre el cumpleaños guardado (que ya no cuadraría).
+    if (action.age) { patch.age = parseInt(action.age, 10); patch.birthDate = null; items.push(`Edad: ${patch.age} años`); }
     // El peso ya NO se guarda directo en settings acá — pasa por
     // onAddMeasurement, el mismo camino que si lo cargaras a mano en
     // Progreso → Medidas, así queda en su historial con fecha (y de paso
@@ -25529,7 +25564,7 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
       // apunta a la semana real de hoy sin que la IA tenga que adivinarla.
       const weekInfoForAI = cycleStart ? getWeekInfo(cycleStart, settings) : null;
       const buildAiContext = (historyLimit, maxKeys = null, sinAnalisis = false) => ({
-        perfil: { nombre: profileName, email: profile?.email || null, sexo: profile?.sex || null, edad: profile?.age || null, miembroDesde: profile?.joinedAt || null },
+        perfil: { nombre: profileName, email: profile?.email || null, sexo: profile?.sex || null, edad: edadDe(profile), miembroDesde: profile?.joinedAt || null },
         rutinaActivaId: profile?.activeRoutineId || null,
         rutinas: allRoutines,
         configuracionActual: settings,
@@ -25958,7 +25993,7 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
   // día). Cada tarjeta ya adelanta la respuesta.
   const pistasInicio = useMemo(() => {
     const st = getProfileSettings(profile);
-    const ranks = computeAllMuscleRanks(logs, st, profile?.sex, profile?.age);
+    const ranks = computeAllMuscleRanks(logs, st, profile?.sex, edadDe(profile));
     const conDatos = MUSCLE_GROUPS.map((g) => ranks[g.key]).filter((r) => r?.hasData);
     const flojo = conDatos.length >= 2 ? conDatos.reduce((x, r) => (r.levelIdx < x.levelIdx ? r : x)) : null;
     const dk = profile?.weekSchedule?.[todayWeekdayKey()] || null;
@@ -27269,7 +27304,7 @@ function PersonalizedRoutineWizard({ profile, onUpdateProfile, onCreateRoutine, 
   const unit = useWeightUnit();
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState({
-    sex: profile?.sex || null, age: profile?.age || "", weight: "", height: profile?.heightCm || "",
+    sex: profile?.sex || null, age: edadDe(profile) || "", weight: "", height: profile?.heightCm || "",
     experience: null, place: null, daysPerWeek: null, minutes: null, goals: [], focus: [],
   });
   const [inputVal, setInputVal] = useState("");
@@ -27322,7 +27357,8 @@ function PersonalizedRoutineWizard({ profile, onUpdateProfile, onCreateRoutine, 
     // las respuestas no se pierden.
     const profileUpdates = {};
     if (a.sex) profileUpdates.sex = a.sex;
-    if (a.age) profileUpdates.age = parseInt(a.age, 10) || null;
+    // Con el cumpleaños cargado, la edad sale de ahí: la del formulario no lo pisa.
+    if (a.age && !profile?.birthDate) profileUpdates.age = parseInt(a.age, 10) || null;
     if (a.height) profileUpdates.heightCm = parseInt(a.height, 10) || null;
     if (a.weight) profileUpdates.settings = { ...(getProfileSettings(profile)), bodyWeightKg: displayToKg(parseFloat(a.weight) || 0, unit), sex: a.sex || null };
     onUpdateProfile?.(profileUpdates);
@@ -28706,7 +28742,7 @@ function OnboardingTasksCard({ profile, cycleStart, logs, onGoToProfile, onDone,
   const [open, setOpen] = useState(false);
   const tasks = [
     { key: "cycle", label: "Fecha de inicio de ciclo", done: !!cycleStart, hint: "Perfil → Ciclo de entrenamiento" },
-    { key: "profile", label: "Tus datos (sexo, edad, peso, altura)", done: !!(profile?.sex && profile?.age && (settings.bodyWeightKg > 0) && profile?.heightCm), hint: "Perfil → Editar perfil y Medidas" },
+    { key: "profile", label: "Tus datos (sexo, cumpleaños, peso, altura)", done: !!(profile?.sex && edadDe(profile) && (settings.bodyWeightKg > 0) && profile?.heightCm), hint: "Perfil → Editar perfil y Medidas" },
     { key: "firstLog", label: "Tu primera marca en un ejercicio", done: Object.entries(logs || {}).some(([k, v]) => !k.endsWith("_pr_override") && Array.isArray(v) && v.length > 0), hint: "Rutina → guardá una serie" },
     { key: "fields", label: "Qué ver al registrar una serie", done: !!profile?.fieldSettingsSeen, hint: "Con vista previa en vivo", action: "fields" },
   ];
@@ -29352,8 +29388,8 @@ export default function App() {
   // Tamaño de letra (Perfil → Tamaño de letra): va en --escala-letra, en el
   // <html>, y crecen sólo las letras (ver letraEscalable). El rem queda en
   // 16 px, así los márgenes y las piezas no cambian. Sin perfil activo (o sin
-  // esta preferencia guardada) queda en el tamaño normal de siempre.
-  const textScale = profile ? (getProfileSettings(profile).textScale ?? 1) : 1;
+  // esta preferencia guardada), la de fábrica: la chica.
+  const textScale = profile ? (getProfileSettings(profile).textScale ?? DEFAULT_SETTINGS.textScale) : DEFAULT_SETTINGS.textScale;
   useEffect(() => {
     if (typeof document === "undefined") return;
     document.documentElement.style.fontSize = "16px";
@@ -29487,9 +29523,26 @@ export default function App() {
   // para que te quede visible y editable en "Tus rutinas creadas".
   const [importRoutine, setImportRoutine] = useState(null);
   const [importRoutineError, setImportRoutineError] = useState(false);
+  // El QR de un amigo (#amigo=<usuario>, ver buildProfileQrPayload).
+  const [amigoDeLink, setAmigoDeLink] = useState(null);
+  // Con la app ya abierta, un link nuevo llega como cambio del # (Android lo
+  // pasa con MainActivity.abrirLinkDeLaApp): se vuelve a leer.
+  const [vueltaDeLink, setVueltaDeLink] = useState(0);
+  useEffect(() => {
+    const alCambiar = () => setVueltaDeLink((n) => n + 1);
+    window.addEventListener("hashchange", alCambiar);
+    return () => window.removeEventListener("hashchange", alCambiar);
+  }, []);
   useEffect(() => {
     if (!profile) return;
     const hash = typeof window !== "undefined" ? window.location.hash : "";
+    const amigo = hash.match(/^#amigo=([^&]+)/);
+    if (amigo) {
+      window.history.replaceState(null, "", window.location.pathname + window.location.search);
+      const u = parseProfileQrPayload(hash);
+      if (u) Promise.resolve().then(() => setAmigoDeLink(u));
+      return;
+    }
     const m = hash.match(/^#r=([^&]+)/);
     if (!m) return;
     const shortId = decodeURIComponent(m[1]);
@@ -29504,7 +29557,7 @@ export default function App() {
         setImportRoutineError(true);
       }
     })();
-  }, [activeProfile]);
+  }, [activeProfile, vueltaDeLink]);
   const handleImportSharedRoutine = () => {
     if (!importRoutine) return;
     setProfiles((prev) => {
@@ -30044,6 +30097,7 @@ export default function App() {
         </div>
       </div>
       {importRoutine && <SharedRoutineImportModal routine={importRoutine} onImport={handleImportSharedRoutine} onDiscard={() => setImportRoutine(null)} />}
+      {amigoDeLink && <AmigoDelLink username={amigoDeLink} myUid={profile?.googleUid || null} onClose={() => setAmigoDeLink(null)} onIrA={(t) => { setAmigoDeLink(null); setTab(t); }} />}
     </>
   );
 
@@ -30106,8 +30160,8 @@ export default function App() {
                 que quedó adentro de RoutineView ahora sirve para volver a
                 fijarla si la cerraste. */}
             {tab === "rutina" && showPinnedDeload && <DeloadView logs={logs} setLogs={setLogs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} activeSession={profile?.activeSession?.deload ? profile.activeSession : null} onStartSession={handleStartSession} weekSchedule={weekSchedule} onClose={() => setDeloadDismissed(true)} cycleStart={cycleStart} />}
-            {tab === "rutina" && !showPinnedDeload && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} trainingSessions={profile?.trainingSessions || EMPTY_SESIONES} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToRoutines={() => setTab("rutinas")} onGoToSchedule={() => goToSection("rutinas", "week-schedule")} onGoToFieldSettings={() => goToSection("perfil", "field-settings-section")} onGoToDescarga={() => (isDeloadWeek ? setDeloadDismissed(false) : setTab("descarga"))} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} sex={profile?.sex} age={profile?.age} activeRoutineDef={activeRoutineDef} onApplyOwnProgression={handleApplyOwnProgression} onSetPlanPaused={handleSetPlanPaused} onRemovePlan={handleRemovePlan} goToDaySignal={openSectionSignal.id === "go-to-day" ? openSectionSignal : { id: null, n: 0 }} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} />}
-            {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} onGoToRoutines={() => goToSection("rutinas", "routine-editor")} weekSchedule={weekSchedule} sex={profile?.sex} age={profile?.age} onGoToDeload={() => { if (isDeloadWeek) { setDeloadDismissed(false); setTab("rutina"); } else { setTab("descarga"); } }} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} />}
+            {tab === "rutina" && !showPinnedDeload && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} trainingSessions={profile?.trainingSessions || EMPTY_SESIONES} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToRoutines={() => setTab("rutinas")} onGoToSchedule={() => goToSection("rutinas", "week-schedule")} onGoToFieldSettings={() => goToSection("perfil", "field-settings-section")} onGoToDescarga={() => (isDeloadWeek ? setDeloadDismissed(false) : setTab("descarga"))} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} sex={profile?.sex} age={edadDe(profile)} activeRoutineDef={activeRoutineDef} onApplyOwnProgression={handleApplyOwnProgression} onSetPlanPaused={handleSetPlanPaused} onRemovePlan={handleRemovePlan} goToDaySignal={openSectionSignal.id === "go-to-day" ? openSectionSignal : { id: null, n: 0 }} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} />}
+            {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} onGoToRoutines={() => goToSection("rutinas", "routine-editor")} weekSchedule={weekSchedule} sex={profile?.sex} age={edadDe(profile)} onGoToDeload={() => { if (isDeloadWeek) { setDeloadDismissed(false); setTab("rutina"); } else { setTab("descarga"); } }} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} />}
             {tab === "descarga" && <DeloadView logs={logs} setLogs={setLogs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} activeSession={profile?.activeSession?.deload ? profile.activeSession : null} onStartSession={handleStartSession} weekSchedule={weekSchedule} onClose={() => { setDeloadDismissed(true); setTab("rutina"); }} cycleStart={cycleStart} />}
             {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} setLogs={setLogs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} conversations={aiConversations} activeConversationId={activeAiConversationId} onNewConversation={handleNewAiConversation} onSwitchConversation={handleSwitchAiConversation} onDeleteConversation={handleDeleteAiConversation} onRenameConversation={handleRenameAiConversation} settings={getProfileSettings(profile)} cycleStart={cycleStart} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} onDeleteRoutine={handleDeleteRoutine} onNavigate={setTab} onStartSession={handleStartSession} onEndSession={handleEndSession} />}
             {tab === "perfil" && <ProfileView onOpenFieldPreview={() => setShowFieldIntro(true)} openSectionSignal={openSectionSignal} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} profileName={activeProfile} profiles={profiles} onSignOut={handleSignOut} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} onGoToSocial={() => setTab("social")} />}
@@ -30156,6 +30210,7 @@ export default function App() {
         />
       )}
       {importRoutine && <SharedRoutineImportModal routine={importRoutine} onImport={handleImportSharedRoutine} onDiscard={() => setImportRoutine(null)} />}
+      {amigoDeLink && <AmigoDelLink username={amigoDeLink} myUid={profile?.googleUid || null} onClose={() => setAmigoDeLink(null)} onIrA={(t) => { setAmigoDeLink(null); setTab(t); }} />}
       {cycleCompleteNotice && !showCycleShareImage && (
         <div className="fixed inset-0 z-[125] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 modal-bg-in modal-overlay" onClick={() => setCycleCompleteNotice(null)}>
           <div className="modal-rutina modal-pop-in !max-w-sm" role="dialog" aria-modal="true" aria-label={`Cerraste el ciclo ${cycleCompleteNotice.cycleNumber}`} onClick={(e) => e.stopPropagation()}>

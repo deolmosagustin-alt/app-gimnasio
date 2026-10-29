@@ -18,6 +18,7 @@
 
 import { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, collectionGroup, addDoc, query, where, orderBy, limit, getDocs } from "firebase/firestore";
 import { db } from "./firebase";
+import { edadDe } from "./utils";
 
 // Social de muestra, sólo en desarrollo (ver social-demo.js): con la marca
 // en el localStorage, estas funciones contestan con amigos de prueba en vez
@@ -128,7 +129,8 @@ function profileToPublicFull(profile, activeRoutineSnapshot) {
     measurements: shareStats ? (profile.measurements || {}) : {},
     cycleStart: shareStats ? (profile.cycleStart || null) : null,
     sex: shareStats ? (profile.sex || null) : null,
-    age: shareStats ? (profile.age || null) : null,
+    // Sólo la edad: el cumpleaños no sale del teléfono.
+    age: shareStats ? (edadDe(profile) || null) : null,
     // Solo lo necesario para recalcular PRs/racha/rango del lado del que
     // mira — no el objeto `settings` completo (evita filtrar cosas
     // irrelevantes como horario de recordatorios o ajustes de la IA).

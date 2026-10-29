@@ -1,0 +1,10 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.modusfit.fitness",
+      "sha256_cert_fingerprints": ["A9:7B:80:50:C3:20:C2:EC:98:AD:CF:02:B1:3D:7B:51:1F:2E:8F:24:9B:3D:92:78:25:82:18:A8:DC:96:DF:BF"]
+    }
+  }
+]

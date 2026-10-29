@@ -46,6 +46,17 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!--  Los links de la app (el QR de un amigo, una rutina compartida)
+                  abren la app en vez del navegador: App Links verificados con
+                  public/.well-known/assetlinks.json. Sólo la raíz "/": la
+                  política, los términos y la página para borrar la cuenta se
+                  siguen abriendo en el navegador.  -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https" android:host="app-gimnasio-two.vercel.app" android:path="/"/>
+            </intent-filter>
         </activity>
         <provider android:name="androidx.core.content.FileProvider" android:authorities="${applicationId}.fileprovider" android:exported="false" android:grantUriPermissions="true">
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths"/>

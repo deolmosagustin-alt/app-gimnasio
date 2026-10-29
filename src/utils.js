@@ -143,3 +143,23 @@ export function tint(hex, alphaHex) {
   const boosted = Math.round(Math.sqrt(a / 255) * 255);
   return base + boosted.toString(16).padStart(2, "0");
 }
+
+// LA EDAD, DESDE EL CUMPLEAÑOS (pedido: "en edad poner el cumpleaños"): con
+// la fecha cargada (birthDate, AAAA-MM-DD) se calcula hoy, así cambia sola el
+// día del cumpleaños; sin ella, la edad que se cargó antes a mano (age).
+export function edadDe(p) {
+  const f = p?.birthDate;
+  if (typeof f === "string" && /^\d{4}-\d{2}-\d{2}$/.test(f)) {
+    const [a, m, d] = f.split("-").map(Number);
+    const hoy = new Date();
+    let edad = hoy.getFullYear() - a;
+    if (hoy.getMonth() + 1 < m || (hoy.getMonth() + 1 === m && hoy.getDate() < d)) edad--;
+    return edad >= 0 && edad < 120 ? edad : null;
+  }
+  return p?.age || null;
+}
+// "12 de marzo": el cumpleaños como se dice.
+export function cumpleanosEscrito(f) {
+  if (typeof f !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(f)) return null;
+  return new Date(`${f}T12:00:00`).toLocaleDateString("es-AR", { day: "numeric", month: "long" });
+}
