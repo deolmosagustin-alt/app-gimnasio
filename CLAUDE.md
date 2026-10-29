@@ -58,7 +58,12 @@ Sólo cuando el usuario pida verlo antes, va primero a la rama `vista-previa` (d
 
 Para entrar con Google en la vista previa, su dominio tiene que estar en Firebase Console › Authentication › Settings › Authorized domains (una sola vez); sin eso, "Crear perfil sin Google" anda igual. Vercel puede pedir iniciar sesión con la cuenta de Vercel para abrirla (Deployment Protection).
 
-Lo nativo de Android (el plugin del descanso, el widget) no viaja con la web: hay que compilar el APK e instalarlo. El Java está dentro de Android Studio: `cd android && JAVA_HOME="C:/Program Files/Android/Android Studio/jbr" ./gradlew assembleDebug` deja `android/app/build/outputs/apk/debug/app-debug.apk`, firmado con la clave de debug de esta máquina (la misma de la app instalada).
+Lo nativo de Android (los plugins, el plugin del descanso, el widget, `build.gradle`) no viaja con la web: hace falta una versión nueva en Google Play. La app instalada del usuario viene de Play (prueba cerrada), así que un APK de debug no se puede instalar encima sin desinstalarla.
+
+- Para probar que compila: `cd android && JAVA_HOME="C:/Program Files/Android/Android Studio/jbr" ./gradlew assembleDebug`.
+- Para Play: subir `versionCode` y `versionName` en `android/app/build.gradle`. El AAB firmado lo arma el usuario en Android Studio (Build › Generate Signed App Bundle › Android App Bundle › release), porque la clave de subida y sus contraseñas están guardadas ahí y no en el repo. Queda en `android/app/release/app-release.aab`.
+- Se sube a la prueba cerrada (`alpha`) con la API de Play y la cuenta de servicio de `C:/Users/usuario/.claves/play-gymapp-1e2a1.json`: `edits` › `bundles` (subida) › `tracks/alpha` › `:commit`. La 1.0.24 (versionCode 25) se subió así el 22/10/2026.
+- Los cierres de la app se leen con la API de informes de Play (`playdeveloperreporting`, `errorReports:search`), con la misma cuenta.
 
 ## Herramientas
 
