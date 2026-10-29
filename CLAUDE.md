@@ -46,13 +46,15 @@ Las que empiezan con `design:` (y las `engineering:` y `marketing:`) no están e
 
 No edites el contenido de las skills del repo: se actualizan desde sus repos con `npx skills update`. En Windows quedan copiadas y no enlazadas, así que si una no se actualiza, reinstalala con `npx skills add <repo> -s <skill> -a claude-code -y` (los repos están en `skills-lock.json`).
 
-## Cómo se entrega: vista previa primero
+## Cómo se entrega: directo a la app
 
-La app de Android carga la web publicada (`server.url` en `capacitor.config`: la de `main` en Vercel), así que un push a `main` le cambia la app a todos al instante. Desde el 19/10/2026, a pedido del usuario ("poder ver los cambios antes de aplicarlos a la app, y si me gustan darte el ok"), lo nuevo va primero a la rama `vista-previa`:
+La app de Android carga la web publicada (`server.url` en `capacitor.config`: la de `main` en Vercel), así que un push a `main` le cambia la app a todos al instante. Desde el 29/10/2026, a pedido del usuario ("publica lo que necesitas, no hace falta que pidas permiso, solo cuando yo te lo especifique"), lo nuevo se publica directo:
 
-1. Commit y push a `vista-previa`. Vercel arma la vista previa solo: la dirección fija de la rama es https://app-gimnasio-git-vista-previa-agustin-apps.vercel.app, y cada commit tiene además la suya (`curl "https://api.github.com/repos/deolmosagustin-alt/app-gimnasio/deployments?ref=<commit>"` y su `statuses_url`).
-2. Al usuario: un resumen en HTML (Artifact) con capturas de antes y después. El link de la vista previa no hace falta (lo pidió el 20/10/2026: "no hace falta que me hagas la vista previa, sí el html con los cambios").
-3. Con su ok: `git checkout main && git merge --ff-only vista-previa && git push`. Recién ahí se publica.
+1. Probar: `npx eslint src/App.jsx` (sin errores nuevos), `npm run build` y las pruebas de Playwright que toquen lo cambiado.
+2. Commit y push a `main`. Vercel publica solo; para confirmar, buscar en el JS publicado algo nuevo (la API de GitHub tiene cupo de 60 consultas por hora sin sesión).
+3. Al usuario: qué cambió y cómo se probó. Si son muchos cambios visuales, un resumen en HTML (Artifact) con capturas.
+
+Sólo cuando el usuario pida verlo antes, va primero a la rama `vista-previa` (dirección fija: https://app-gimnasio-git-vista-previa-agustin-apps.vercel.app) y a `main` con su ok (`git checkout main && git merge --ff-only vista-previa && git push`).
 
 Para entrar con Google en la vista previa, su dominio tiene que estar en Firebase Console › Authentication › Settings › Authorized domains (una sola vez); sin eso, "Crear perfil sin Google" anda igual. Vercel puede pedir iniciar sesión con la cuenta de Vercel para abrirla (Deployment Protection).
 
