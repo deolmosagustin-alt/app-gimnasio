@@ -1,8 +1,8 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">ModusFit</string>
-    <string name="title_activity_main">ModusFit</string>
+    <string name="app_name">Modus Fit</string>
+    <string name="title_activity_main">Modus Fit</string>
     <string name="server_client_id">1027242959052-b9i0hq3fc2rbfoqr48chkpkkir2qu4e6.apps.googleusercontent.com</string>
-    <string name="today_widget_label">Modus Fit — Hoy toca</string>
+    <string name="today_widget_label">Modus Fit: hoy toca</string>
     <string name="today_widget_description">Mostrá el día de rutina que te toca hoy, sin abrir la app.</string>
 </resources>

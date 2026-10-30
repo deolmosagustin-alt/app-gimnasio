@@ -70,9 +70,9 @@
             </intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/today_widget_info"/>
         </receiver>
-        <!--  El <receiver .RestTimerActionReceiver> que estaba acá se ELIMINÓ:
-                     declaraba una clase Java que no existe en el proyecto (quedó de
-                     una versión vieja que planeaba botones +15s/Saltar en la
-                     notificación) y rompía el build. El plugin actual no lo usa.  -->
+        <!--  Los botones de la notificación del descanso (Pausar, Seguir,
+                     +15 s, Reiniciar, Cerrar) y la alarma del final (plugin v13,
+                     ver Descanso.java). Sólo la propia app le manda intents.  -->
+        <receiver android:name=".RestTimerReceiver" android:exported="false"/>
     </application>
 </manifest>

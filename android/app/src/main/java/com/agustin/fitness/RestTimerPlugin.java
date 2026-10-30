@@ -13,17 +13,25 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.RectF;
 import android.graphics.drawable.Icon;
+import android.net.Uri;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
+import android.provider.Settings;
 import android.util.Log;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 import androidx.core.graphics.drawable.IconCompat;
 
+import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -36,7 +44,11 @@ public class RestTimerPlugin extends Plugin {
     // cuenta para arriba (el cardio) y dibuja el reloj de pared.
     // v12: el APK con Kotlin 2.2 (ver build.gradle): desde esta versión la app
     // puede usar @capacitor/filesystem sin que se cierre.
-    private static final int VERSION = 12;
+    // v13: con "id", el descanso vive en Descanso.java: los botones de la
+    // notificación (Pausar, Seguir, +15 s, Reiniciar, Cerrar), el aviso del
+    // final con su propia alarma y el estado "terminado" que cuenta cuánto te
+    // pasaste. Sin "id" (el cardio), todo sigue como en la v12.
+    private static final int VERSION = 13;
     // Canal v8: IMPORTANCE_DEFAULT — aparece en la barra SIN saltar el popup
     // (heads-up). El v7 usaba HIGH y por eso la notificación "saltaba".
     // DEFAULT sigue siendo válido para Live Updates (solo MIN está prohibido).
@@ -44,15 +56,203 @@ public class RestTimerPlugin extends Plugin {
     private static final int NOTIFICATION_ID = 9100;
     private static final int ACCENT = Color.parseColor("#14B8A6"); // teal marca
 
+    // El reloj de respaldo del final, por si la alarma llega tarde (sin el
+    // permiso de alarmas exactas, Android la puede demorar).
+    private final Handler reloj = new Handler(Looper.getMainLooper());
+    private Runnable alFinal = null;
+
+    @Override
+    public void load() {
+        Descanso.plugin = this;
+        Descanso.enPrimerPlano = true;
+        Descanso.crearCanales(getContext());
+    }
+
+    @Override
+    protected void handleOnResume() {
+        Descanso.enPrimerPlano = true;
+    }
+
+    @Override
+    protected void handleOnPause() {
+        Descanso.enPrimerPlano = false;
+    }
+
+    @Override
+    protected void handleOnDestroy() {
+        Descanso.enPrimerPlano = false;
+        if (Descanso.plugin == this) Descanso.plugin = null;
+        reloj.removeCallbacksAndMessages(null);
+    }
+
     @PluginMethod
     public void info(PluginCall call) {
+        Context c = getContext();
         JSObject ret = new JSObject();
         ret.put("version", VERSION);
+        ret.put("alarmasExactas", Descanso.alarmasExactas(c));
+        ret.put("notificaciones", NotificationManagerCompat.from(c).areNotificationsEnabled());
+        // Las Live Updates (Android 16): la persona las puede apagar en Ajustes.
+        boolean live = false;
+        if (Build.VERSION.SDK_INT >= 36) {
+            try {
+                NotificationManager m = c.getSystemService(NotificationManager.class);
+                Object r = NotificationManager.class.getMethod("canPostPromotedNotifications").invoke(m);
+                live = Boolean.TRUE.equals(r);
+            } catch (Throwable ignored) { }
+        }
+        ret.put("liveUpdates", live);
+        ret.put("android", Build.VERSION.SDK_INT);
         call.resolve(ret);
+    }
+
+    // Abre "Alarmas y recordatorios" de la app, para que el aviso del final
+    // del descanso llegue en el segundo justo (Android 12+).
+    @PluginMethod
+    public void pedirAlarmasExactas(PluginCall call) {
+        try {
+            if (Build.VERSION.SDK_INT >= 31) {
+                Intent i = new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:" + getContext().getPackageName()));
+                i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                getContext().startActivity(i);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "No se pudo abrir Alarmas y recordatorios: " + e);
+        }
+        call.resolve();
+    }
+
+    // Abre los ajustes de avisos de la app ("avisos") o, en Android 16, los
+    // de las actualizaciones en vivo ("live"), para prender lo que esté apagado.
+    @PluginMethod
+    public void abrirAjustes(PluginCall call) {
+        String que = call.getString("que", "avisos");
+        Context c = getContext();
+        Intent i = null;
+        if ("live".equals(que) && Build.VERSION.SDK_INT >= 36) {
+            i = new Intent("android.settings.MANAGE_APP_PROMOTED_NOTIFICATIONS");
+        }
+        if (i == null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            i = new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS);
+        }
+        try {
+            if (i == null) {
+                i = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + c.getPackageName()));
+            } else {
+                i.putExtra(Settings.EXTRA_APP_PACKAGE, c.getPackageName());
+            }
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            c.startActivity(i);
+        } catch (Exception e) {
+            try {
+                Intent j = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + c.getPackageName()));
+                j.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                c.startActivity(j);
+            } catch (Exception ignored) { }
+        }
+        call.resolve();
+    }
+
+    // Lo que dice la notificación del descanso ahora, y lo que pasó en ella
+    // mientras la app no miraba (la cola de eventos queda vacía).
+    @PluginMethod
+    public void estado(PluginCall call) {
+        Context c = getContext();
+        JSObject ret = new JSObject();
+        try {
+            JSONObject e = Descanso.leer(c);
+            if (e != null) ret.put("descanso", JSObject.fromJSONObject(e));
+            JSONArray ev = Descanso.sacarEventos(c);
+            ret.put("eventos", JSArray.from(ev));
+        } catch (Exception ex) {
+            ret.put("eventos", new JSArray());
+        }
+        call.resolve(ret);
+    }
+
+    // Un botón de la notificación o la alarma: a la web, en el momento.
+    void emitir(JSONObject ev) {
+        try {
+            notifyListeners("accion", JSObject.fromJSONObject(ev), true);
+        } catch (Exception e) {
+            Log.w(TAG, "No se pudo avisar a la web: " + e);
+        }
+    }
+
+    // Programa (o con 0, cancela) el reloj de respaldo del final.
+    void respaldo(long fin) {
+        if (alFinal != null) reloj.removeCallbacks(alFinal);
+        alFinal = null;
+        if (fin <= 0) return;
+        final Context c = getContext().getApplicationContext();
+        alFinal = () -> Descanso.aplicar(c, Descanso.FIN);
+        reloj.postDelayed(alFinal, Math.max(0L, fin - System.currentTimeMillis()) + 400L);
+    }
+
+    // v13: el descanso con su id, sus botones y su alarma.
+    private void iniciarV13(PluginCall call, String id) {
+        Context c = getContext();
+        long ahora = System.currentTimeMillis();
+        try {
+            JSONObject previo = Descanso.leer(c);
+            JSONObject e = new JSONObject();
+            e.put("id", id);
+            e.put("titulo", call.getString("titulo", "Descanso"));
+            e.put("cuerpo", call.getString("cuerpo", "Tu próxima serie"));
+            e.put("subtitulo", call.getString("subtitulo", "Descanso"));
+            e.put("tituloFin", call.getString("tituloFin", "Terminó el descanso"));
+            e.put("cuerpoFin", call.getString("cuerpoFin", "Te toca la próxima serie."));
+            e.put("alerta", call.getString("alerta", "sound"));
+            e.put("color", colorDe(call.getString("color", null)));
+            Integer duracion = call.getInt("duracion");
+            Integer segundos = call.getInt("seconds");
+            e.put("duracion", duracion != null ? duracion : (segundos != null ? segundos : 60));
+            Long fin = null;
+            try { fin = call.getLong("fin"); } catch (Exception ignored) { }
+            if (fin == null) {
+                Double d = call.getDouble("fin");
+                if (d != null) fin = d.longValue();
+            }
+            boolean pausado = Boolean.TRUE.equals(call.getBoolean("pausado", false));
+            boolean terminado = Boolean.TRUE.equals(call.getBoolean("terminado", false));
+            if (pausado) {
+                Integer restante = call.getInt("restante");
+                e.put("estado", "pausa");
+                e.put("restante", restante != null ? Math.max(1, restante) : 30);
+                e.put("fin", ahora);
+            } else if (terminado) {
+                e.put("estado", "fin");
+                e.put("fin", fin != null ? fin : ahora);
+                e.put("avisado", true);
+            } else {
+                e.put("estado", "corre");
+                e.put("fin", fin != null ? fin : ahora + (segundos != null ? segundos : 60) * 1000L);
+                // El mismo descanso, sin cambios en la hora del final: si ya
+                // avisó, no avisa de nuevo.
+                boolean mismo = previo != null && id.equals(previo.optString("id")) && previo.optLong("fin") == e.optLong("fin");
+                e.put("avisado", mismo && previo.optBoolean("avisado", false));
+            }
+            Descanso.guardar(c, e);
+            if ("corre".equals(e.optString("estado"))) Descanso.programarFin(c, e.optLong("fin"));
+            else Descanso.cancelarFin(c);
+            Descanso.publicar(c, e, false);
+            JSObject ret = new JSObject();
+            ret.put("started", true);
+            ret.put("version", VERSION);
+            call.resolve(ret);
+        } catch (Exception ex) {
+            Log.e(TAG, "v13: no se pudo iniciar el descanso: " + ex);
+            call.reject("No se pudo iniciar el descanso: " + ex.getMessage());
+        }
     }
 
     @PluginMethod
     public void start(PluginCall call) {
+        String idDescanso = call.getString("id", null);
+        if (idDescanso != null && !idDescanso.isEmpty()) {
+            iniciarV13(call, idDescanso);
+            return;
+        }
         Integer secondsParam = call.getInt("seconds");
         long seconds = (secondsParam != null) ? secondsParam.longValue() : 60L;
         String exerciseName = call.getString("exerciseName", "");
@@ -261,6 +461,9 @@ public class RestTimerPlugin extends Plugin {
         } catch (SecurityException e) {
             Log.e(TAG, "SecurityException al cancelar: " + e.getMessage());
         }
+        // v13: fuera también la alarma del final y el estado guardado.
+        Descanso.cancelarFin(getContext());
+        Descanso.guardar(getContext(), null);
         JSObject ret = new JSObject();
         ret.put("stopped", true);
         call.resolve(ret);
@@ -314,38 +517,9 @@ public class RestTimerPlugin extends Plugin {
         return Color.rgb(r, g, bl);
     }
 
+    // Los canales (el del reloj y los del final) los crea Descanso.
     private void createChannel(Context context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationManager manager = context.getSystemService(NotificationManager.class);
-            if (manager == null) return;
-
-            // Canal del CRONÓMETRO (silencioso, no salta heads-up)
-            NotificationChannel channel = new NotificationChannel(
-                    CHANNEL_ID, "Cronómetro de descanso",
-                    NotificationManager.IMPORTANCE_DEFAULT
-            );
-            channel.setDescription("Cuenta regresiva del descanso entre series");
-            channel.setShowBadge(false);
-            channel.setSound(null, null);
-            channel.enableVibration(false);
-            manager.createNotificationChannel(channel);
-
-            // Canal del FIN DEL DESCANSO: vibración FUERTE tipo alarma —
-            // un patrón largo que se siente aunque estés scrolleando en
-            // otra app. Los canales de Capacitor (JS) solo permiten
-            // vibración genérica corta; el patrón custom hay que crearlo
-            // acá en nativo. Android respeta al PRIMERO que crea el canal,
-            // así que con el build nuevo instalado este patrón manda.
-            NotificationChannel done = new NotificationChannel(
-                    "modusfit-rest-done-v1", "Fin del descanso",
-                    NotificationManager.IMPORTANCE_HIGH
-            );
-            done.setDescription("Aviso al terminar el descanso entre series");
-            done.setShowBadge(false);
-            done.enableVibration(true);
-            done.setVibrationPattern(new long[]{0, 500, 250, 500, 250, 800});
-            manager.createNotificationChannel(done);
-        }
+        Descanso.crearCanales(context);
     }
 
     private int colorDe(String hex) {

@@ -14,7 +14,7 @@ import {
   Sparkles, Layers, SlidersHorizontal, UserCog,
   Share2, Download, Link2, Copy, BellOff, Send, Mic, Ruler, Camera, Link, Footprints, Star, SquarePlay, Upload, RefreshCw, Timer, Percent, Users, User,
   MessageCircle, Search, UserPlus, UserCheck, UserMinus, AtSign, GraduationCap, ClipboardCheck, Swords, Medal, QrCode, ArrowUpDown,
-  Phone, Minus, Ellipsis, Undo2, ArrowLeftRight, ReceiptText, ClipboardList, Minimize2,
+  Phone, Minus, Ellipsis, Undo2, ArrowLeftRight, ReceiptText, ClipboardList, Minimize2, BellRing,
   FileText, FileSpreadsheet, ClipboardPaste, ScanText, ImagePlus, Flag,
 } from "lucide-react";
 import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signOut, onAuthStateChanged, deleteUser } from "firebase/auth";
@@ -4003,6 +4003,12 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
   transition: border-radius .4s var(--resorte), transform .25s var(--resorte);
 }
 .boton-tonal:active { border-radius: 16px; transform: scale(.975); }
+/* Un ajuste del teléfono que falta (Perfil › Descansos): el ícono ámbar, qué
+   pasa y el botón para arreglarlo. */
+.aviso-ajuste { display: flex; align-items: center; gap: 12px; padding: 12px 12px 12px 14px; border-radius: 18px; background: var(--panel-sunken); }
+.aviso-ajuste-titulo { font-size: 0.8125rem; font-weight: 650; line-height: 1.25; color: var(--text-strong); }
+.aviso-ajuste-texto { margin-top: 3px; font-size: 0.75rem; line-height: 1.35; color: var(--text-muted); text-wrap: pretty; }
+.aviso-ajuste-boton { min-height: 40px; padding: 0 14px; font-size: 0.8125rem; }
 .light-mode .boton-tonal { color: color-mix(in oklab, var(--c, var(--tono)) 62%, black); background: color-mix(in oklab, var(--c, var(--tono)) 13%, transparent); }
 /* En escritorio el avatar y el botón de volver viven en la barra lateral:
    estas clases fijan su display, así que el lg:hidden de Tailwind (que va en
@@ -5283,6 +5289,9 @@ button.carrera-carril:active { background: var(--velo); }
 .aviso-arriba-titulo { padding-top: 6px; font-size: 0.875rem; font-weight: 700; line-height: 1.3; color: var(--text-strong); }
 .aviso-arriba-texto { margin: 2px 0 4px; font-size: 0.8125rem; line-height: 1.4; color: var(--text-muted); text-wrap: pretty; }
 .aviso-arriba-texto b { color: var(--text-strong); }
+/* La acción adentro de un aviso de arriba ("Permitir alarmas"). */
+.aviso-arriba-accion { display: flex; align-items: center; width: fit-content; min-height: 36px; margin-top: 8px; padding: 0 14px; border-radius: 999px; font-size: 0.8125rem; font-weight: 650; color: color-mix(in oklab, var(--tono) 50%, white); background: color-mix(in oklab, var(--tono) 13%, transparent); }
+.light-mode .aviso-arriba-accion { color: color-mix(in oklab, var(--tono) 62%, black); }
 /* El detalle de un día del Historial. */
 .sesion-dia { border-radius: 26px; overflow: hidden; background: var(--surface-1); box-shadow: var(--placa-canto); }
 .sesion-dia-etiquetas { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; padding-right: 48px; }
@@ -8892,9 +8901,14 @@ function relojCorto(seg) {
 // En vez de cuántas series quedan, la meta o el récord de la serie que sigue
 // (pedido: "que diga la meta o el récord"). `objetivo` llega escrito desde
 // la serie ("meta 8 × 80 kg", "récord 8 × 82,5 kg", "primera vez").
+// "primera vez" suelto no se entiende en una notificación: dice qué es.
+function objetivoParaAvisar(v) {
+  if (!v?.objetivo) return null;
+  return v.objetivo === "primera vez" ? "Primera marca de esta serie" : capitalizar(v.objetivo);
+}
 function textoFinDeDescanso(v) {
   const titulo = "Terminó el descanso";
-  const obj = v?.objetivo ? capitalizar(v.objetivo) : null;
+  const obj = objetivoParaAvisar(v);
   if (v?.siguiente) return { titulo, cuerpo: `Seguí con ${v.siguiente}.${obj ? ` ${obj}.` : ""}`, enPantalla: `Seguí con ${v.siguiente}${obj ? ` · ${v.objetivo}` : ""}` };
   if (v?.ejercicio) return { titulo, cuerpo: `Te toca ${v.ejercicio}.${obj ? ` ${obj}.` : ""}`, enPantalla: `Te toca ${v.ejercicio}${obj ? ` · ${v.objetivo}` : ""}` };
   return { titulo, cuerpo: "Te toca la próxima serie.", enPantalla: "Te toca la próxima serie" };
@@ -8902,7 +8916,7 @@ function textoFinDeDescanso(v) {
 // La notificación fija mientras corre: arriba qué sigue; abajo, su meta o su
 // récord. El reloj (que baja solo) va en la cabecera y en el chip de arriba.
 function textoDescansoEnCurso(v) {
-  const obj = v?.objetivo ? capitalizar(v.objetivo) : null;
+  const obj = objetivoParaAvisar(v);
   if (v?.siguiente) return { titulo: `Sigue ${v.siguiente}`, cuerpo: obj || "El próximo ejercicio" };
   if (v?.ejercicio) return { titulo: v.ejercicio, cuerpo: obj || "Tu próxima serie" };
   return { titulo: "Descanso", cuerpo: "Tu próxima serie" };
@@ -8926,6 +8940,19 @@ async function programarAvisosDescanso(timerId) {
     try {
       if (typeof Notification !== "undefined" && Notification.permission === "default") Notification.requestPermission().catch(() => {});
     } catch { /* ignorado a propósito */ }
+    return;
+  }
+  // v13 (APK 1.0.25): el teléfono lleva el descanso entero (el reloj, los
+  // botones Pausar, +15 s y Cerrar, y el aviso del final con su alarma; ver
+  // Descanso.java). La app sólo le pasa los datos.
+  if ((await versionPluginDescanso()) >= 13) {
+    if (!sigueIgual()) return;
+    try {
+      ACTIVE_REST_TIMERS.__notifOwner = timerId;
+      await RestTimerNotification.start({ ...datosDescansoNativo(timerId, v), fin, seconds: Math.max(1, Math.ceil((fin - Date.now()) / 1000)) });
+    } catch (e) { console.warn("[notif] descanso v13:", e?.message || e); }
+    // El aviso del final lo da el teléfono: fuera el que programaba la v12.
+    LocalNotifications.cancel({ notifications: [{ id: notifIdForTimer(timerId, 10000) }, { id: 9002 }] }).catch(() => {});
     return;
   }
   const { titulo, cuerpo } = textoFinDeDescanso(v);
@@ -8994,6 +9021,110 @@ async function programarAvisosDescanso(timerId) {
   } catch { /* ignorado a propósito */ }
 }
 
+// Lo que el plugin v13 necesita de un descanso: qué dice mientras corre y
+// qué dice al terminar, su color, cuánto dura (para Reiniciar) y cómo avisa.
+function datosDescansoNativo(timerId, v) {
+  const enCurso = textoDescansoEnCurso(v);
+  const alFinal = textoFinDeDescanso(v);
+  const duracion = Math.round(v?.duracion || v?.total || 0);
+  return {
+    id: timerId, ...(duracion > 0 ? { duracion } : {}),
+    titulo: enCurso.titulo, cuerpo: enCurso.cuerpo, subtitulo: "Descanso", color: v?.color || "#14B8A6",
+    tituloFin: alFinal.titulo, cuerpoFin: alFinal.cuerpo, alerta: ALERTA_DESCANSO,
+  };
+}
+
+// En pausa, la notificación queda quieta, con lo que falta y el botón
+// Seguir, en vez de irse. Con un APK anterior se va, como antes.
+async function avisarPausaDescanso(timerId) {
+  if (!Capacitor.isNativePlatform()) return;
+  if ((await versionPluginDescanso()) < 13) { cancelarAvisosDescanso(timerId); return; }
+  const v = ACTIVE_REST_TIMERS[timerId];
+  if (!v || v.pausa == null) return;
+  ACTIVE_REST_TIMERS.__notifOwner = timerId;
+  RestTimerNotification.start({ ...datosDescansoNativo(timerId, v), pausado: true, restante: v.pausa }).catch(() => {});
+}
+
+// LOS BOTONES DE LA NOTIFICACIÓN (plugin v13): Pausar, Seguir, +15 s,
+// Reiniciar y Cerrar se aplican en el teléfono aunque la app esté cerrada.
+// La app se pone al día en el momento, con el evento "accion", o al volver,
+// con los que quedaron en la cola de estado(). Cada evento tiene un número
+// (seq): el mismo no se aplica dos veces.
+let ULTIMO_EVENTO_DESCANSO = 0;
+try { ULTIMO_EVENTO_DESCANSO = Number(localStorage.getItem("modusfit_descanso_evento")) || 0; } catch { /* sin almacenamiento */ }
+function aplicarEventoNativo(ev) {
+  const seq = Number(ev?.seq) || 0;
+  if (seq && seq <= ULTIMO_EVENTO_DESCANSO) return;
+  if (seq) {
+    ULTIMO_EVENTO_DESCANSO = seq;
+    try { localStorage.setItem("modusfit_descanso_evento", String(seq)); } catch { /* sin almacenamiento */ }
+  }
+  const id = ev?.id;
+  const v = id ? ACTIVE_REST_TIMERS[id] : null;
+  if (!v) return;
+  const ahora = Date.now();
+  if (ev.accion === "cerrar") {
+    delete ACTIVE_REST_TIMERS[id];
+    if (ACTIVE_REST_TIMERS.__notifOwner === id) delete ACTIVE_REST_TIMERS.__notifOwner;
+  } else if (ev.accion === "fin") {
+    // Avisó el teléfono con la app fuera de vista: al volver, la app no
+    // suena atrasada. Con la app a la vista, avisa la app, como siempre.
+    if (typeof document === "undefined" || document.visibilityState !== "hidden") return;
+    ACTIVE_REST_TIMERS[id] = { ...v, avisado: true };
+  } else if (ev.estado === "pausa") {
+    const restante = Math.max(1, Math.round(Number(ev.restante) || 1));
+    const nueva = { ...v, pausa: restante, total: Math.max(v.total || 0, restante) };
+    delete nueva.endTime;
+    ACTIVE_REST_TIMERS[id] = nueva;
+  } else if (ev.estado === "corre" && Number(ev.fin) > 0) {
+    const nueva = { ...v, endTime: Number(ev.fin) };
+    delete nueva.pausa;
+    delete nueva.avisado;
+    if (ev.accion === "reiniciar") {
+      const d = Math.round(Number(ev.duracion) || v.duracion || v.total || 0);
+      Object.assign(nueva, { total: d, duracion: d, inicio: ahora });
+    } else {
+      nueva.total = Math.max(v.total || 0, Math.ceil((nueva.endTime - ahora) / 1000));
+    }
+    ACTIVE_REST_TIMERS[id] = nueva;
+    AVISOS_DISPARADOS.delete(id);
+  } else {
+    return;
+  }
+  persistActiveRestTimers();
+  avisarCambioDescansos();
+}
+function ponerseAlDiaConLaNotificacion() {
+  if (!Capacitor.isNativePlatform()) return;
+  versionPluginDescanso().then((ver) => {
+    if (ver < 13) return;
+    RestTimerNotification.estado().then((r) => (r?.eventos || []).forEach(aplicarEventoNativo)).catch(() => {});
+  });
+}
+if (typeof window !== "undefined" && Capacitor.isNativePlatform()) {
+  try { RestTimerNotification.addListener("accion", aplicarEventoNativo).catch(() => {}); } catch { /* APK sin el evento */ }
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") ponerseAlDiaConLaNotificacion(); });
+  setTimeout(ponerseAlDiaConLaNotificacion, 1500);
+}
+
+// LOS AVISOS SE PIDEN CUANDO SIRVEN: al iniciar una sesión o al prender un
+// recordatorio. Antes se pedían a los 2 segundos de abrir la app, sin decir
+// para qué, y Android deja preguntar sólo dos veces.
+async function pedirPermisoDeAvisos() {
+  try {
+    if (Capacitor.isNativePlatform()) {
+      const { display } = await LocalNotifications.checkPermissions();
+      if (display === "granted") return true;
+      if (display === "denied") return false;
+      const r = await LocalNotifications.requestPermissions();
+      return r?.display === "granted";
+    }
+    if (typeof Notification === "undefined") return false;
+    if (Notification.permission === "default") return (await Notification.requestPermission()) === "granted";
+    return Notification.permission === "granted";
+  } catch { return false; }
+}
+
 // Al pausar, saltear o terminar: fuera el cronómetro de la barra y el aviso
 // de fin que ya estaba programado (si no, sonaría a la hora original).
 function cancelarAvisosDescanso(timerId) {
@@ -9041,7 +9172,7 @@ function pausarDescanso(timerId) {
   delete siguienteEntrada.endTime;
   ACTIVE_REST_TIMERS[timerId] = siguienteEntrada;
   persistActiveRestTimers();
-  cancelarAvisosDescanso(timerId);
+  avisarPausaDescanso(timerId);
   avisarCambioDescansos();
 }
 
@@ -9095,6 +9226,7 @@ function ajustarDescanso(timerId, deltaSeg) {
   persistActiveRestTimers();
   avisarCambioDescansos();
   if (ACTIVE_REST_TIMERS[timerId]?.endTime) programarAvisosDescanso(timerId);
+  else if (ACTIVE_REST_TIMERS[timerId]?.pausa != null) avisarPausaDescanso(timerId);
 }
 
 // Foto del descanso para dibujarlo. fraccion = lo que falta sobre el total
@@ -9172,8 +9304,14 @@ async function avisarFinDeDescanso(timerId, { alertType = "sound" } = {}) {
     if (nativo) {
       LocalNotifications.cancel({ notifications: [{ id: 9002 }] }).catch(() => {});
       if (ACTIVE_REST_TIMERS.__notifOwner === timerId) {
-        RestTimerNotification.stop().catch(() => {});
-        delete ACTIVE_REST_TIMERS.__notifOwner;
+        if (VERSION_PLUGIN_DESCANSO >= 13 && v) {
+          // v13: la notificación queda contando cuánto te pasaste, como el
+          // dock, sin sonar (avisa la app). Se va al cerrarla o con otro descanso.
+          RestTimerNotification.start({ ...datosDescansoNativo(timerId, v), terminado: true, fin: v.endTime }).catch(() => {});
+        } else {
+          RestTimerNotification.stop().catch(() => {});
+          delete ACTIVE_REST_TIMERS.__notifOwner;
+        }
       }
     }
   } catch { /* ignorado a propósito */ }
@@ -9248,6 +9386,41 @@ function VigilanteDescansos({ alertType = "sound" }) {
     return () => clearInterval(id);
   }, []);
   return null;
+}
+
+// LOS AVISOS DEL DESCANSO, EN PERFIL (APK con el plugin v13): si algo está
+// apagado, lo dice y lleva a prenderlo. Con todo en orden no dice nada.
+function EstadoAvisosDescanso() {
+  const [info, setInfo] = useState(null);
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return undefined;
+    let vivo = true;
+    const leer = () => RestTimerNotification.info().then((r) => { if (vivo && Number(r?.version) >= 13) setInfo(r); }).catch(() => {});
+    leer();
+    const alVolver = () => { if (document.visibilityState === "visible") leer(); };
+    document.addEventListener("visibilitychange", alVolver);
+    return () => { vivo = false; document.removeEventListener("visibilitychange", alVolver); };
+  }, []);
+  if (!info) return null;
+  let aviso = null;
+  if (!info.notificaciones) {
+    aviso = { titulo: "Los avisos están apagados", texto: "Sin ellos, el descanso no se ve en la barra ni te avisa cuando termina.", boton: "Prender", accion: () => { pedirPermisoDeAvisos().then((ok) => { if (!ok) RestTimerNotification.abrirAjustes({ que: "avisos" }).catch(() => {}); }); } };
+  } else if (!info.alarmasExactas) {
+    aviso = { titulo: "Que el aviso llegue justo", texto: "Android puede demorar unos minutos el aviso del final. Permití Alarmas y recordatorios para que suene en el segundo justo.", boton: "Permitir", accion: () => { RestTimerNotification.pedirAlarmasExactas().catch(() => {}); } };
+  } else if (Number(info.android) >= 36 && !info.liveUpdates) {
+    aviso = { titulo: "El descanso en la barra de arriba", texto: "Prendé las actualizaciones en vivo de Modus Fit para verlo también con la pantalla bloqueada.", boton: "Abrir", accion: () => { RestTimerNotification.abrirAjustes({ que: "live" }).catch(() => {}); } };
+  }
+  if (!aviso) return null;
+  return (
+    <div className="aviso-ajuste" role="status">
+      <AlertTriangle size={16} className="icono-suelto aviso shrink-0" aria-hidden="true" />
+      <div className="min-w-0 flex-1">
+        <p className="aviso-ajuste-titulo">{aviso.titulo}</p>
+        <p className="aviso-ajuste-texto">{aviso.texto}</p>
+      </div>
+      <button onClick={aviso.accion} className="boton-tonal aviso-ajuste-boton shrink-0">{aviso.boton}</button>
+    </div>
+  );
 }
 
 // Apagar TODO lo que sigue corriendo cuando la sesión se cierra.
@@ -19000,6 +19173,7 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
       )}
 
       <CollapsibleSection title="Descansos" subtitle={`${formatTime(settings.restShort)} – ${formatTime(settings.restLong)}`} icon={<Timer size={16} />} accent="#14B8A6">
+        <EstadoAvisosDescanso />
         <div><p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Aviso al terminar</p><div className="segmentado">{[{ k: "sound", l: "Sonido" }, { k: "vibration", l: "Vibración" }, { k: "both", l: "Ambos" }].map((opt) => <button key={opt.k} onClick={() => updateSettings({ alertType: opt.k })} aria-pressed={settings.alertType === opt.k} className={settings.alertType === opt.k ? "activo" : ""}>{opt.l}</button>)}</div></div>
         <div className="grid grid-cols-2 gap-3">
           {[{ key: "restLong", label: "Ejercicios pesados" }, { key: "restShort", label: "Resto" }].map(({ key, label }) => (
@@ -19076,7 +19250,7 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
           <ToggleRow
             icon={<Bell size={16} />} label="Avisarme los días que entreno"
             desc="Solo los días con rutina, nunca en los de descanso."
-            on={settings.reminderEnabled} onToggle={() => updateSettings({ reminderEnabled: !settings.reminderEnabled })} accent="#F59E0B"
+            on={settings.reminderEnabled} onToggle={() => { if (!settings.reminderEnabled) pedirPermisoDeAvisos(); updateSettings({ reminderEnabled: !settings.reminderEnabled }); }} accent="#F59E0B"
           />
           {settings.reminderEnabled && (
             <div className="bounce-in">
@@ -19088,7 +19262,7 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
           <ToggleRow
             icon={<BarChart3 size={16} />} label="Resúmenes de progreso"
             desc="Cómo te fue en la semana, en el mes y en el año."
-            on={settings.weeklyRecapEnabled !== false} onToggle={() => updateSettings({ weeklyRecapEnabled: !(settings.weeklyRecapEnabled !== false) })} accent="#F59E0B"
+            on={settings.weeklyRecapEnabled !== false} onToggle={() => { if (settings.weeklyRecapEnabled === false) pedirPermisoDeAvisos(); updateSettings({ weeklyRecapEnabled: !(settings.weeklyRecapEnabled !== false) }); }} accent="#F59E0B"
           />
           <ToggleRow
             icon={<Users size={16} />} label="Avisos de Social"
@@ -28543,7 +28717,7 @@ function useAvisosSociales(uid, logs, activo, unidad = "kg") {
         if (nuevas.length) {
           if (Capacitor.isNativePlatform()) await LocalNotifications.createChannel({ id: "modusfit-social-v1", name: "Avisos de Social", description: "Cuando un amigo te pasa en un músculo o te reta", importance: 3 }).catch(() => {});
           await LocalNotifications.schedule({
-            notifications: nuevas.slice(0, 3).map((n) => ({ id: numeroDeAviso(n.id), title: n.title, body: n.body, channelId: "modusfit-social-v1", schedule: { at: new Date(Date.now() + 1500) } })),
+            notifications: nuevas.slice(0, 3).map((n) => ({ id: numeroDeAviso(n.id), title: n.title, body: n.body, channelId: "modusfit-social-v1", smallIcon: "ic_stat_modusfit", iconColor: "#8B5CF6", group: "modusfit-social", extra: { ir: "social" }, schedule: { at: new Date(Date.now() + 1500) } })),
           });
         }
         try { localStorage.setItem(clave, JSON.stringify({ ultima: Date.now(), avisados: [...avisados].slice(-200) })); } catch { /* sin almacenamiento */ }
@@ -29292,33 +29466,8 @@ export default function App() {
     return () => unsub();
   }, [activeProfile, justLoggedOut]);
 
-  // Pedir permiso de notificaciones al montar la app.
-  // En Android con Capacitor usamos LocalNotifications.requestPermissions()
-  // que muestra el diálogo nativo del sistema y crea el canal de Android 8+.
-  // En el navegador web usamos la Notifications API estándar como fallback.
-  useEffect(() => {
-    const requestNotifPermission = async () => {
-      try {
-        if (Capacitor.isNativePlatform()) {
-          const { display } = await LocalNotifications.requestPermissions();
-          if (display === "granted") {
-            await LocalNotifications.createChannel({
-              id: "ponos-rest-timer",
-              name: "Descanso entre series",
-              description: "Avisa cuando termina el descanso entre series",
-              importance: 5, // IMPORTANCE_HIGH
-              visibility: 1,
-              sound: "default",
-              vibration: true,
-            });
-          }
-        } else if (typeof Notification !== "undefined" && Notification.permission === "default") {
-          await Notification.requestPermission();
-        }
-      } catch { /* ignorado a propósito */ }
-    };
-    setTimeout(requestNotifPermission, 2000);
-  }, []);
+  // El permiso de los avisos ya no se pide al abrir la app: se pide al
+  // iniciar una sesión o al prender un recordatorio (pedirPermisoDeAvisos).
 
   // Persiste, una sola vez al montar, la migración de perfiles viejos (los
   // que tenían `maxesSetupDays` y ahora necesitan `routines`/`activeRoutineId`).
@@ -29432,6 +29581,8 @@ export default function App() {
         const sched = profile?.weekSchedule || null;
         if (!st.reminderEnabled || !sched) return;
         await LocalNotifications.createChannel({ id: "modusfit-reminder-v1", name: "Recordatorio de entrenamiento", description: "Aviso los días que te toca entrenar", importance: 4, vibration: true }).catch(() => {});
+        // El botón del recordatorio: abre la app con la sesión iniciada.
+        await LocalNotifications.registerActionTypes({ types: [{ id: "recordatorio", actions: [{ id: "iniciar", title: "Iniciar sesión" }] }] }).catch(() => {});
         const [hh, mm] = String(st.reminderTime || "18:00").split(":").map(Number);
         const notifs = [];
         for (let i = 0; i < 7; i++) {
@@ -29458,7 +29609,11 @@ export default function App() {
             id: ids[i], smallIcon: "ic_stat_modusfit", iconColor: dia?.color || "#14B8A6",
             title: `Hoy toca ${label}`,
             body: partes.length ? `${partes.join(". ")}.` : "Tu rutina te espera.",
+            // Entero al expandirlo: en la vista cerrada Android lo corta.
+            largeBody: partes.length ? `${partes.join(". ")}.` : "Tu rutina te espera.",
             channelId: "modusfit-reminder-v1",
+            actionTypeId: "recordatorio",
+            extra: { ir: "rutina", dayKey },
             schedule: { at: d, allowWhileIdle: true },
           });
         }
@@ -29551,6 +29706,9 @@ export default function App() {
   // La ref se actualiza en un efecto, no durante el render (escribir una ref
   // mientras se renderiza rompe las reglas de React y el lint lo marca).
   useEffect(() => { notifCtxRef.current = { profile, logs }; });
+  // El botón "Iniciar sesión" del recordatorio: la función se fija más abajo,
+  // donde se declara handleStartSession.
+  const iniciarSesionRef = useRef(null);
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
     let handle = null;
@@ -29572,7 +29730,15 @@ export default function App() {
         else setTab("progreso");
         return;
       }
-      if (id === 9002 || (id >= 9200 && id <= 9206)) setTab("rutina");
+      const extra = evento?.notification?.extra || {};
+      if (extra.ir === "social") { setTab("social"); return; }
+      if (evento?.actionId === "iniciar" && extra.dayKey) {
+        setTab("rutina");
+        const ctx = notifCtxRef.current || {};
+        if (!ctx.profile?.activeSession) iniciarSesionRef.current?.(extra.dayKey);
+        return;
+      }
+      if (id === 9002 || (id >= 9200 && id <= 9206) || (id >= 10000 && id < 11000)) setTab("rutina");
     }).then((h) => {
       if (vivo) handle = h; else h.remove();
     }).catch((e) => console.warn("[notif] no se pudo escuchar los toques:", e?.message || e));
@@ -29588,10 +29754,10 @@ export default function App() {
     const sched = profile.weekSchedule || null;
     const dayKey = sched ? sched[todayWeekdayKey()] : null;
     let label;
-    if (!dayKey) label = "Hoy: descanso 😌";
+    if (!dayKey) label = "Hoy descansás";
     else {
       const yaEntrenoHoy = (profile.trainingSessions || []).some((s) => s.date === todayStr());
-      label = yaEntrenoHoy ? "¡Ya entrenaste hoy! ✅" : `Hoy toca ${ROUTINE[dayKey]?.label || dayKey} 💪`;
+      label = yaEntrenoHoy ? "Ya entrenaste hoy" : `Hoy toca ${ROUTINE[dayKey]?.label || dayKey}`;
     }
     TodayWidget.updateToday({ label }).catch(() => {});
   }, [profile?.weekSchedule, profile?.trainingSessions, activeProfile]);
@@ -30171,6 +30337,8 @@ export default function App() {
   // tipeado y no guardado): hasta este momento se mantienen vivos, pero una
   // vez finalizada la sesión no tiene sentido seguir arrastrándolos.
   const handleStartSession = (dayKey, deload = false) => {
+    // Es cuando los avisos sirven (el descanso en la barra y su final).
+    pedirPermisoDeAvisos();
     const activeSession = { dayKey, startedAt: new Date().toISOString() };
     if (deload) activeSession.deload = true;
     // Las series de este día que anotaste hoy antes de iniciar la sesión (la
@@ -30203,6 +30371,7 @@ export default function App() {
     if (getProfileSettings(profile).alertType !== "vibration") sonarMolinete();
     haptic([0, 40, 60, 40]);
   };
+  useEffect(() => { iniciarSesionRef.current = handleStartSession; });
   // Arma el resumen del entrenamiento de hoy: volumen (con factor de
   // mancuernas), series, ejercicios y los récords superados. Se calcula ANTES
   // de cerrar la sesión, con los logs que ya están guardados.
@@ -30374,6 +30543,7 @@ export default function App() {
           capa más que el celular tenía que recomponer en cada scroll. */}
       <StyleInjector />
       <InstalarEnIosBanner />
+      <AvisoAlarmasExactas enSesion={!!profile?.activeSession} />
       {recoveredNotice && <RecoveredBanner onClose={() => setRecoveredNotice(false)} />}
 
       {importRoutineError && <ImportRoutineErrorBanner onClose={() => setImportRoutineError(false)} />}
@@ -30590,6 +30760,45 @@ function AvisoArriba({ tipo = "info", icono, titulo, texto = null, onCerrar }) {
         <button onClick={onCerrar} aria-label="Cerrar el aviso" className="boton-redondo !w-9 !h-9 shrink-0"><X size={16} /></button>
       </div>
     </div>
+  );
+}
+
+// QUE EL AVISO DEL DESCANSO LLEGUE JUSTO: desde Android 14 el permiso de
+// alarmas exactas viene apagado, y sin él Android demora el aviso del final
+// (en el emulador, 45 segundos; con el permiso, en el segundo). Se ofrece una
+// vez, con la sesión iniciada, que es cuando se entiende para qué es. Con el
+// APK anterior (plugin v12) no aparece.
+const AVISO_ALARMAS_KEY = "modusfit_aviso_alarmas_v1";
+function AvisoAlarmasExactas({ enSesion }) {
+  const [falta, setFalta] = useState(false);
+  useEffect(() => {
+    if (!enSesion || !Capacitor.isNativePlatform()) return undefined;
+    let vivo = true;
+    const revisar = () => {
+      let yaLoVio = false;
+      try { yaLoVio = localStorage.getItem(AVISO_ALARMAS_KEY) === "1"; } catch { /* sin almacenamiento, se muestra */ }
+      if (yaLoVio) { if (vivo) setFalta(false); return; }
+      RestTimerNotification.info().then((r) => {
+        if (!vivo) return;
+        const sinPermiso = Number(r?.version) >= 13 && r?.notificaciones && !r?.alarmasExactas;
+        setFalta(!!sinPermiso);
+        // Ya lo permitió (volvió de Ajustes): no se ofrece más.
+        if (Number(r?.version) >= 13 && r?.alarmasExactas) { try { localStorage.setItem(AVISO_ALARMAS_KEY, "1"); } catch { /* sin almacenamiento */ } }
+      }).catch(() => {});
+    };
+    const id = setTimeout(revisar, 4000);
+    const alVolver = () => { if (document.visibilityState === "visible") revisar(); };
+    document.addEventListener("visibilitychange", alVolver);
+    return () => { vivo = false; clearTimeout(id); document.removeEventListener("visibilitychange", alVolver); };
+  }, [enSesion]);
+  if (!falta) return null;
+  const cerrar = () => {
+    setFalta(false);
+    try { localStorage.setItem(AVISO_ALARMAS_KEY, "1"); } catch { /* sin almacenamiento */ }
+  };
+  return (
+    <AvisoArriba icono={<BellRing size={18} />} titulo="Que el descanso avise en el segundo justo" onCerrar={cerrar}
+      texto={<>Android puede demorar el aviso del final hasta un minuto. <button onClick={() => { RestTimerNotification.pedirAlarmasExactas().catch(() => {}); }} className="aviso-arriba-accion">Permitir alarmas</button></>} />
   );
 }
 
