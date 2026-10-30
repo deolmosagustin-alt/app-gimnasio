@@ -14,7 +14,7 @@ import {
   Sparkles, Layers, SlidersHorizontal, UserCog,
   Share2, Download, Link2, Copy, BellOff, Send, Mic, Ruler, Camera, Link, Footprints, Star, SquarePlay, Upload, RefreshCw, Timer, Percent, Users, User,
   MessageCircle, Search, UserPlus, UserCheck, UserMinus, AtSign, GraduationCap, ClipboardCheck, Swords, Medal, QrCode, ArrowUpDown,
-  Phone, Minus, Ellipsis, Undo2, ArrowLeftRight, ReceiptText, ClipboardList, Minimize2, NotebookPen,
+  Phone, Minus, Ellipsis, Undo2, ArrowLeftRight, ReceiptText, ClipboardList, Minimize2,
   FileText, FileSpreadsheet, ClipboardPaste, ScanText, ImagePlus, Flag,
 } from "lucide-react";
 import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signOut, onAuthStateChanged, deleteUser } from "firebase/auth";
@@ -1602,16 +1602,23 @@ const AJUSTE_DE_META = {
   sigue: ": seguís desde donde quedaste",
 };
 const NOTA_DE_AJUSTE = { repite: "repetís", baja: "−10 %" };
-// SEGUIR EL PLAN EN EL CICLO NUEVO: el mismo plan, con la misma forma (las
-// mismas reps y las mismas subidas y bajadas de cada semana), corrido hacia
-// arriba desde donde quedaste. Si cumpliste la última meta, arranca la mitad
-// de lo que subiste más arriba (al menos un salto); si no, la mitad de lo que
-// llegaste a mover. Es la regla de los bloques de "dos pasos adelante, uno
-// atrás". Sólo las series cuyo plan terminó.
-function planesParaSeguir(routineDef, logs, settings, cicloActual = CICLO_ACTUAL) {
+// SEGUIR EL PLAN EN EL CICLO NUEVO: desde donde quedaste y de a poco, como
+// un entrenador (pedido: "debería ser de 1 rep cada tanto o, una vez que
+// superes el rango, subirle el peso muy de a poco"). Si cumpliste la última
+// meta, arranca en el paso siguiente (una rep más o, al tope del rango, un
+// salto con las reps al piso); si no, repetís la última meta que intentaste,
+// como cuando no llegás a una. De ahí, una rep más por semana y el peso de a
+// un salto. Antes se repetía la forma
+// del plan viejo corrida hacia arriba, y la semana 1 podía saltar varios
+// kilos de golpe. Sólo las series cuyo plan terminó. El cardio sigue con la
+// forma de su plan, unos minutos más arriba. Arranca en la semana en curso
+// (`semanaActual`), como las plantillas: a mitad de ciclo, un plan desde la
+// semana 1 hacía que la meta de hoy saltara varios pasos de una.
+function planesParaSeguir(routineDef, logs, settings, cicloActual = CICLO_ACTUAL, semanaActual = 1) {
   const model = routineDef ? buildRoutineModel(routineDef) : null;
   const unidad = settings?.weightUnit === "lbs" ? "lbs" : "kg";
   const semanas = Math.max(1, settings?.trainWeeks || TRAIN_WEEKS);
+  const desde = semanaActual >= 1 && semanaActual <= semanas ? Math.floor(semanaActual) : 1;
   const planes = [];
   Object.values(model?.exerciseById || {}).forEach((ex) => {
     (ex.sets || []).forEach((st, si) => {
@@ -1622,30 +1629,25 @@ function planesParaSeguir(routineDef, logs, settings, cicloActual = CICLO_ACTUAL
       const ultimaVez = historia.reduce((a, b) => (!a || b.date > a.date ? b : a), null);
       const cumplioLaUltima = historia.some((h) => h.meta && (h.planDe ?? null) === (st.plannedAt ?? null) && (h.paso || 0) >= ultimaMeta.week && cumpleMeta(h, h.meta))
         || (!!ultimaVez && cumpleMeta(ultimaVez, ultimaMeta));
-      // El bloque nuevo arranca en la semana 1 del ciclo, aunque el viejo se
-      // haya cargado a mitad de ciclo (empezaba en la 6, por ejemplo).
-      const corrida = (e) => ({ ...e, week: e.week - primera.week + 1 });
+      // El bloque nuevo arranca en la semana en curso, aunque el viejo se
+      // haya cargado en otra (empezaba en la 6, por ejemplo).
+      const corrida = (e) => ({ ...e, week: e.week - primera.week + desde });
       if (primera.minutes != null) {
         const sube = cumplioLaUltima ? Math.max(1, Math.round(((ultimaMeta.minutes || 0) - (primera.minutes || 0)) / 2)) : 0;
         planes.push({ exerciseId: ex.id, exerciseName: ex.name, setIndex: si, entries: plan.map((e) => corrida({ ...e, minutes: (e.minutes || 0) + sube })).filter((e) => e.week <= semanas) });
         return;
       }
       const salto = displayToKg(saltoDe(settings, ex.id, unidad), unidad) || 2.5;
-      let delta;
-      if (cumplioLaUltima) delta = Math.max(salto, ((ultimaMeta.kg || 0) - (primera.kg || 0)) / 2);
-      else {
-        const recientes = historia.filter((h) => h.kg > 0).sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 2);
-        const movido = recientes.length ? Math.max(...recientes.map((h) => h.kg)) : primera.kg || 0;
-        // Sin cumplir el final, se redondea para abajo: lo prudente.
-        delta = Math.floor(Math.max(0, (movido - (primera.kg || 0)) / 2) / salto) * salto;
-      }
-      if (cumplioLaUltima) delta = Math.round(delta / salto) * salto;
-      const nuevas = plan.map((e) => corrida({ ...e, kg: roundKg((e.kg || 0) + delta) })).filter((e) => e.week <= semanas);
-      // Si el plan viejo era más corto que el ciclo, se completa como un
-      // entrenador: una rep más por semana y, al tope del rango, un salto.
-      while (nuevas.length && nuevas[nuevas.length - 1].week < semanas) {
+      // Sin rango en la serie, uno corto alrededor de la última meta.
+      const rango = st.repRange || `${Math.max(1, ultimaMeta.reps || 8)}-${(ultimaMeta.reps || 8) + 2}`;
+      const punto = cumplioLaUltima
+        ? siguientePaso(ultimaMeta.kg || 0, ultimaMeta.reps || 0, rango, salto) || { kg: ultimaMeta.kg || 0, reps: (ultimaMeta.reps || 0) + 1 }
+        : ultimaVez?.meta?.kg > 0 && ultimaVez.meta.reps > 0 ? { kg: ultimaVez.meta.kg, reps: ultimaVez.meta.reps }
+          : ultimaVez?.kg > 0 && ultimaVez.reps > 0 ? { kg: ultimaVez.kg, reps: ultimaVez.reps } : { kg: ultimaMeta.kg || 0, reps: ultimaMeta.reps || 0 };
+      const nuevas = [{ week: desde, kg: roundKg(punto.kg), reps: punto.reps }];
+      while (nuevas[nuevas.length - 1].week < semanas) {
         const ult = nuevas[nuevas.length - 1];
-        const paso = siguientePaso(ult.kg, ult.reps, st.repRange, salto);
+        const paso = siguientePaso(ult.kg, ult.reps, rango, salto);
         if (!paso) break;
         nuevas.push({ week: ult.week + 1, kg: roundKg(paso.kg), reps: paso.reps });
       }
@@ -3267,7 +3269,21 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
   border-radius: 26px;
   box-shadow: var(--dock-sombra);
 }
-.sesion-dock-reloj { font-size: 1.45rem; line-height: 1; font-weight: 750; color: var(--text-strong); }
+/* La fila de la sesión: el tiempo, el día con sus series y Finalizar. */
+.sesion-dock { display: flex; align-items: center; gap: 6px; padding: 8px 10px 8px 0; }
+.sesion-dock-cuerpo {
+  flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 12px;
+  min-height: 48px; padding: 2px 4px 2px 18px; text-align: left;
+  transition: transform .2s ease;
+}
+.sesion-dock-cuerpo:not(:disabled):active { transform: scale(.985); }
+.sesion-dock-reloj { flex: none; font-size: 1.7rem; line-height: 1; font-weight: 700; font-stretch: 78%; letter-spacing: -0.02em; color: var(--text-strong); }
+.sesion-dock-texto { display: flex; flex-direction: column; gap: 3px; min-width: 0; padding-left: 12px; border-left: 1px solid var(--hairline); }
+.sesion-dock-nombre { font-size: 0.875rem; font-weight: 650; line-height: 1.15; color: color-mix(in oklab, var(--c, var(--tono)) 72%, white); text-wrap: balance; }
+.light-mode .sesion-dock-nombre { color: color-mix(in oklab, var(--c, var(--tono)) 66%, black); }
+.sesion-dock-avance { font-size: 0.75rem; line-height: 1.2; color: var(--text-muted); white-space: nowrap; }
+.sesion-dock-avance.completo { color: var(--text-strong); font-weight: 600; }
+.sesion-dock-volver { flex: none; margin-left: auto; color: var(--text-faint); }
 .sesion-dock-dia {
   font-size: 0.8125rem; font-weight: 650; min-width: 0;
   color: var(--text-strong);
@@ -3277,7 +3293,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 .sesion-dock-latido { --galleta-fondo: var(--c); width: 14px; height: 14px; animation: latidoGalleta 2.4s ease-in-out infinite; }
 @keyframes latidoGalleta { 0%, 100% { transform: rotate(0) scale(1); } 50% { transform: rotate(40deg) scale(.86); } }
 .boton-finalizar {
-  flex: none; align-self: center; margin-right: 10px;
+  flex: none; align-self: center;
   display: flex; align-items: center; gap: 6px; height: 44px; padding: 0 16px; border-radius: 999px;
   font-size: 0.8125rem; font-weight: 700;
   color: var(--text-strong);
@@ -3291,6 +3307,12 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
   background: color-mix(in oklab, var(--c, var(--tono)) 72%, white);
 }
 .light-mode .boton-finalizar.listo { background: var(--c, var(--tono)); }
+@media (max-width: 360px) {
+  .sesion-dock-cuerpo { gap: 10px; padding-left: 14px; }
+  .sesion-dock-reloj { font-size: 1.5rem; }
+  .sesion-dock-texto { padding-left: 10px; }
+  .boton-finalizar { padding: 0 13px; }
+}
 
 /* ── CRONÓMETRO DE DESCANSO ─────────────────────────────────────────────
    Quieto es un renglón fino: el reloj chico y "Iniciar". Corriendo, el
@@ -3894,6 +3916,10 @@ button.foco-campo-rotulo:active { background: var(--velo); }
 .light-mode .descanso-iniciar { color: color-mix(in oklab, var(--c, var(--tono)) 62%, black); background: color-mix(in oklab, var(--c, var(--tono)) 13%, transparent); }
 /* En claro, el ícono de los botones del reloj iba casi blanco sobre el fondo claro. */
 .light-mode .descanso-boton:not(.descanso-boton-principal) { color: color-mix(in oklab, var(--c, var(--tono)) 62%, black); }
+/* En el dock, sólo la pausa lleva fondo: reiniciar y cerrar van sueltos
+   (tres círculos de color iguales pesaban más que el tiempo). */
+.descanso-boton.sutil { background: transparent; color: var(--text-muted); }
+.light-mode .descanso-boton.sutil:not(.descanso-boton-principal) { color: var(--text-muted); }
 .cardio-reloj.en-marcha { background: var(--surface-1); }
 .light-mode .cardio-reloj.en-marcha { background: var(--surface-1); }
 /* La cabecera del día. */
@@ -5190,6 +5216,10 @@ button.carrera-carril:active { background: var(--velo); }
 .plan-en-tarjeta { display: grid; gap: 6px; margin-bottom: 12px; padding: 10px 12px 8px; border-radius: 18px; background: var(--surface-2); }
 .plan-en-tarjeta-titulo { display: flex; align-items: center; gap: 6px; font-size: 0.8125rem; font-weight: 650; color: var(--text-muted); }
 .plan-mini.chico { height: 72px; }
+/* Con las reps arriba de los kilos (la propuesta de la IA). */
+.plan-mini-valor.doble { height: 28px; }
+.plan-mini-reps { display: block; font-weight: 500; color: var(--text-faint); }
+.plan-mini.chico:has(.plan-mini-valor.doble) { height: 88px; }
 .plan-series { display: grid; }
 .plan-serie { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
 .plan-serie + .plan-serie { box-shadow: 0 -1px 0 var(--hairline); }
@@ -5325,6 +5355,22 @@ button.carrera-carril:active { background: var(--velo); }
 .pizarra-sigue { color: var(--text-faint); }
 @keyframes pizarraEscribe { from { opacity: 0; transform: translateX(-6px); } }
 /* LA GUÍA, LA PRIMERA VEZ: el aviso chico arriba de cada pestaña. */
+/* EL RECORRIDO GUIADO: todo oscuro salvo la pieza (el hueco) y la tarjeta. */
+.recorrido { position: fixed; inset: 0; z-index: 140; }
+.recorrido-hueco { position: fixed; border-radius: 22px; pointer-events: none;
+  box-shadow: 0 0 0 200vmax rgba(5, 6, 8, .74), 0 0 0 2px color-mix(in oklab, var(--tono) 72%, white);
+  transition: top .38s var(--resorte, ease), left .38s var(--resorte, ease), width .38s var(--resorte, ease), height .38s var(--resorte, ease); }
+.light-mode .recorrido-hueco { box-shadow: 0 0 0 200vmax rgba(18, 20, 24, .58), 0 0 0 2px var(--tono); }
+.recorrido-tarjeta { position: fixed; left: 16px; right: 16px; max-width: 380px; margin: 0 auto; padding: 16px 16px 14px; border-radius: 24px; outline: none;
+  background: var(--surface-2); box-shadow: var(--placa-canto), 0 24px 48px -16px rgba(0, 0, 0, .6); animation: recorridoEntra .3s var(--resorte, ease); }
+@keyframes recorridoEntra { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.recorrido-paso { font-size: 12.5px; color: var(--text-faint); }
+.recorrido-titulo { margin-top: 2px; font-size: 18px; font-weight: 700; line-height: 1.25; color: var(--text-strong); }
+.recorrido-texto { margin-top: 4px; font-size: 14.5px; line-height: 1.42; color: var(--text-muted); text-wrap: pretty; }
+.recorrido-pie { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+.recorrido-saltar { margin-right: auto; padding: 10px 4px; font-size: 13.5px; font-weight: 600; color: var(--text-muted); }
+@media (prefers-reduced-motion: reduce) { .recorrido-hueco { transition: none; } .recorrido-tarjeta { animation: none; } }
+.guia-recorrido { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; margin-top: 10px; padding: 9px 12px; border-radius: 999px; font-size: 13.5px; font-weight: 650; color: var(--text-muted); background: var(--velo); }
 .primera-vez { display: flex; align-items: center; gap: 6px; margin-bottom: 14px; padding: 8px 8px 8px 10px; border-radius: 22px; background: var(--surface-1); box-shadow: var(--placa-canto); }
 .primera-vez-cuerpo { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; text-align: left; }
 .primera-vez-cuerpo b { display: block; font-size: 14px; font-weight: 700; line-height: 1.25; color: var(--text-strong); }
@@ -5933,9 +5979,6 @@ button.carrera-carril:active { background: var(--velo); }
 .foco-saltos-opciones input { width: 72px; height: 38px; padding: 0 10px; border-radius: 999px; font-size: 14px; text-align: center; color: var(--text-strong); background: transparent; box-shadow: inset 0 0 0 1px var(--hairline-fuerte); }
 .foco-saltos-nota { margin-top: 8px; font-size: 12px; line-height: 1.35; color: var(--text-faint); }
 /* La vez pasada, en la placa del día. */
-.dia-pasada { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; margin-top: 10px; padding: 0 14px 0 12px; border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--text-muted); background: var(--velo); }
-.dia-pasada span::first-letter { text-transform: uppercase; }
-.dia-pasada:active { transform: scale(.98); }
 /* El cuaderno: el ticket chico arriba y el número de hoja abajo. */
 .cuaderno-ticket { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px; border-radius: 999px; font-size: 13px; font-weight: 600; color: #c9cacf; background: rgba(255,255,255,.08); }
 .cuaderno-ticket:active { transform: scale(.96); }
@@ -9254,14 +9297,14 @@ function ChipDescansoEnCurso({ timerId }) {
 
 // Botón chico de los controles del descanso (+15, cerrar; en el grande, también −15). El color
 // lo toma del --c del cronómetro que lo contiene.
-function BotonDescanso({ onClick, label, children, principal = false, disabled = false }) {
+function BotonDescanso({ onClick, label, children, principal = false, sutil = false, disabled = false }) {
   return (
     <button
       onClick={() => { if (disabled) return; haptic(10); onClick(); }}
       aria-label={label}
       aria-disabled={disabled || undefined}
       title={label}
-      className={`descanso-boton ${principal ? "descanso-boton-principal" : ""} ${disabled ? "opacity-40" : ""}`}
+      className={`descanso-boton ${principal ? "descanso-boton-principal" : ""} ${sutil ? "sutil" : ""} ${disabled ? "opacity-40" : ""}`}
     >
       {children}
     </button>
@@ -9403,8 +9446,8 @@ function FilaDescansoDock({ timerId, embebido = false }) {
             {enPausa ? <Play size={16} className="fill-current" /> : <Pause size={16} className="fill-current" />}
           </BotonDescanso>
         )}
-        <BotonDescanso onClick={() => reiniciarDescanso(timerId)} label="Reiniciar el descanso"><RotateCcw size={16} /></BotonDescanso>
-        <BotonDescanso onClick={() => terminarDescanso(timerId)} label="Cerrar el descanso"><X size={17} /></BotonDescanso>
+        <BotonDescanso onClick={() => reiniciarDescanso(timerId)} label="Reiniciar el descanso" sutil={!listo}><RotateCcw size={16} /></BotonDescanso>
+        <BotonDescanso onClick={() => terminarDescanso(timerId)} label="Cerrar el descanso" sutil><X size={17} /></BotonDescanso>
       </div>
     </div>,
   );
@@ -9668,6 +9711,56 @@ function siguientePaso(kg, reps, repRange, salto) {
   if (!(kg > 0)) return { kg: 0, reps: reps + 1, motivo: "rep" };
   if (reps >= tope) return { kg: Math.round((kg + salto) * 4) / 4, reps: piso, motivo: "peso" };
   return { kg, reps: reps + 1, motivo: "rep" };
+}
+// Lo último que hiciste en una serie (sin descargas), en kg.
+function ultimaDeLaSerie(logs, exerciseId, setIndex) {
+  return (logs?.[`${exerciseId}_${setIndex}`] || [])
+    .filter((h) => h?.date && !h.deload && h.reps > 0 && h.kg != null)
+    .reduce((a, b) => (!a || b.date > a.date ? b : a), null);
+}
+// LA IA, DE A POCO (pedido: "debería ser de 1 rep cada tanto o, una vez que
+// superes el rango, subirle el peso muy de a poco"). Lo que propone la IA
+// (Planificar con IA y el Entrenador IA) pasa por acá antes de aplicarse.
+// Cada semana repite la anterior o da UN paso de la doble progresión: una rep
+// más con el mismo peso o, al tope del rango, un salto y las reps al piso. La
+// IA decide cuándo sube y cuándo consolida (si su semana es más pesada que la
+// anterior, sube un paso; si no, repite); el tamaño del paso lo pone la app.
+// Antes la IA armaba olas que subían y bajaban varios kilos por semana. La
+// primera semana no pasa de un paso sobre lo que hiciste la última vez en esa
+// serie (`base`) ni baja más de un 10 %. Pesos en una misma unidad, la que se
+// muestra; "más pesada" es más kilos o, con los mismos, más reps.
+function deAPoco(metas, { base = null, repRange = null, salto = 2.5 } = {}) {
+  const r = rangoDeReps(repRange);
+  const s = salto > 0 ? salto : 2.5;
+  const paso = (p) => siguientePaso(p.kg, p.reps, repRange, s) || { kg: p.kg, reps: p.reps + 1 };
+  const redondo = (x) => Math.round(x * 4) / 4;
+  const igual = (a, b) => Math.abs(a - b) < 0.01;
+  const out = [];
+  let prev = null, prevIA = null;
+  metas.forEach((m) => {
+    let kg = m.kg, reps = m.reps;
+    if (prev) {
+      const sube = m.kg > prevIA.kg + 0.01 || (igual(m.kg, prevIA.kg) && m.reps > prevIA.reps);
+      ({ kg, reps } = sube ? paso(prev) : prev);
+    } else if (base) {
+      // En saltos enteros desde lo que hiciste.
+      kg = redondo(base.kg + Math.round((kg - base.kg) / s) * s);
+      const tope = paso(base);
+      const piso = Math.max(0, redondo(base.kg - s * Math.ceil((base.kg * 0.1) / s)));
+      if (kg > tope.kg + 0.01) { kg = tope.kg; reps = tope.reps; }
+      else if (igual(kg, tope.kg)) reps = Math.min(reps, tope.reps);
+      else if (igual(kg, base.kg)) reps = Math.min(reps, base.reps);
+      else {
+        if (kg < piso) kg = piso;
+        reps = Math.min(reps, r ? r[1] : base.reps + 1);
+      }
+    } else if (r) reps = Math.min(Math.max(reps, r[0]), r[1]);
+    const sig = { ...m, kg: redondo(kg), reps };
+    out.push(sig);
+    prev = sig;
+    prevIA = m;
+  });
+  return out;
 }
 // El mejor de TODO el ejercicio, todas sus series (sin lo de hoy de esta
 // serie, que es lo que se está guardando), en 1RM estimado y, a peso
@@ -10669,7 +10762,7 @@ function capitulosGuia() {
         },
         {
           titulo: "Tocá la campana",
-          texto: "Si la serie supera tu marca, suena la campana del gimnasio. El récord queda en el ticket y en tu cuaderno, con su campanita.",
+          texto: "Si la serie supera tu mejor marca del ejercicio, suena la campana del gimnasio. El récord queda en el ticket y en tu cuaderno, con su campanita.",
           dibujo: <div className="guia-campana"><CampanaDibujo quieta /></div>,
         },
         {
@@ -10689,13 +10782,13 @@ function capitulosGuia() {
         },
         {
           titulo: "Seguí un plan",
-          texto: "En Tu plan, la hoja de arriba de todo en Rutina, cargás cuánto levantar cada semana del ciclo, o le pedís a la IA que lo arme. Cada serie viene escrita con la meta de su semana y lo que hiciste la vez pasada. Si no llegás a una meta, la próxima la repetís; si te trabás dos veces, baja un poco para volver a subir. Cuando termina el ciclo, la hoja te ofrece seguir el plan desde donde quedaste.",
+          texto: "En Tu plan, la hoja de arriba de todo en Rutina, cargás cuánto levantar cada semana del ciclo, o le pedís a la IA que lo arme. Sube de a poco, como con un entrenador: una rep más por semana y, al llegar al tope del rango, un salto de peso con las reps de vuelta abajo. Cada serie viene escrita con la meta de su semana y lo que hiciste la vez pasada. Si no llegás a una meta, la próxima la repetís; si te trabás dos veces, baja un poco para volver a subir. Cuando termina el ciclo, la hoja te ofrece seguir el plan desde donde quedaste.",
           dibujo: (
-            <div className="guia-ancho plan-en-tarjeta" style={{ "--tono": verde }} role="img" aria-label="Un plan de siete semanas, de 60 a 75 kilos, en escalones">
+            <div className="guia-ancho plan-en-tarjeta" style={{ "--tono": verde }} role="img" aria-label="Un plan de siete semanas: 8, 9 y 10 reps con 60 kilos, después 8, 9 y 10 con 62,5, y 8 con 65">
               <div className="plan-mini chico">
-                {[60, 62.5, 65, 67.5, 70, 72.5, 75].map((v, i) => (
+                {[[8, 60], [9, 60], [10, 60], [8, 62.5], [9, 62.5], [10, 62.5], [8, 65]].map(([r, v], i) => (
                   <span key={i} className={`plan-mini-semana con ${i === 2 ? "elegida" : ""}`}>
-                    <span className="plan-mini-valor">{conComa(v)}</span>
+                    <span className="plan-mini-valor doble"><span className="plan-mini-reps">{r} ×</span>{conComa(v)}</span>
                     <span className="plan-mini-barra" style={{ "--f": 0.3 + (0.7 * i) / 6 }} />
                     <span className="plan-mini-numero">{i + 1}</span>
                   </span>
@@ -10888,7 +10981,7 @@ function capitulosGuia() {
   ];
 }
 
-function HelpModal({ startTab, onClose }) {
+function HelpModal({ startTab, onClose, onRecorrido = null }) {
   useAndroidBack(onClose);
   const capitulos = useMemo(() => capitulosGuia(), []);
   const [cap, setCap] = useState(() => Math.max(0, capitulos.findIndex((c) => c.key === startTab)));
@@ -10911,6 +11004,7 @@ function HelpModal({ startTab, onClose }) {
             <button key={c.key} role="tab" aria-selected={i === cap} onClick={() => ir(i)} className={i === cap ? "activo" : ""} style={{ "--c": c.color }}>{c.icon}{c.label}</button>
           ))}
         </div>
+        {onRecorrido && RECORRIDOS[capitulo.key] && <button onClick={() => onRecorrido(capitulo.key)} className="guia-recorrido"><Eye size={15} /> Mostrámelo en la pantalla</button>}
         <div key={`${cap}-${paso}`} className="guia-cuerpo tab-fade-in">
           <div className="guia-escenario" style={{ "--c": capitulo.color }} aria-hidden="true">{actual.dibujo}</div>
           <p className="guia-paso">Paso {paso + 1} de {capitulo.pasos.length}</p>
@@ -11010,16 +11104,18 @@ function RankUpModal({ from, to, muscleName, onClose }) {
 // Devuelve null si esta serie no tiene meta (ahí manda el récord de siempre).
 // El color de lo que dice la serie al guardarla.
 const TONO_DEL_AVISO = { pr: "record", "pr-serie": "sube", first: "neutro", tie: "neutro", down: "baja", error: "alerta" };
-function describePlannedOutcome(target, hecho, isRecord, unit) {
+// La meta cumplida no dice nada (pedido: "sacar el 'meta cumplida' con el
+// compartir"): la galleta llena de la serie ya lo dice. Sí habla el récord
+// del ejercicio entero (`esRecord`), aunque venga con la meta, y lo que faltó.
+function describePlannedOutcome(target, hecho, esRecord, unit) {
   if (!target) return null;
   // Cardio: la meta son minutos, no kg×reps.
   if (target.minutes != null) {
-    return (hecho.minutes || 0) >= target.minutes
-      ? { type: "pr", tono: "sube", msg: "Meta cumplida." }
-      : { type: "down", msg: `Te faltó para la meta: ${target.minutes} min.` };
+    if ((hecho.minutes || 0) >= target.minutes) return esRecord ? { type: "pr", msg: "Tu sesión más larga." } : { type: "meta" };
+    return { type: "down", msg: `Te faltó para la meta: ${target.minutes} min.` };
   }
-  if ((hecho.kg || 0) + 0.001 >= (target.kg || 0) && (hecho.reps || 0) >= (target.reps || 0)) return { type: "pr", tono: "sube", msg: "Meta cumplida." };
-  if (isRecord) return { type: "pr", msg: "Récord nuevo." };
+  if (esRecord) return { type: "pr", msg: "Récord nuevo." };
+  if ((hecho.kg || 0) + 0.001 >= (target.kg || 0) && (hecho.reps || 0) >= (target.reps || 0)) return { type: "meta" };
   return { type: "down", msg: `Te faltó para la meta: ${target.reps} × ${conComa(kgToDisplay(target.kg, unit))} ${weightLabel(unit)}.` };
 }
 
@@ -11338,13 +11434,9 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           : isPR ? { type: "pr", msg: "Tu sesión más larga." }
             : m === prevMin ? { type: "tie", msg: "Igualaste tu sesión más larga." }
               : { type: "down", msg: `A un ${Math.max(1, Math.round(((prevMin - m) / prevMin) * 100))} % de tu sesión más larga.` });
-      // La meta cumplida (tono "sube") va en verde y sin campana: la campana y
-      // el dorado son para el récord (antes el tono se perdía acá y la meta
-      // cumplida salía en dorado y sonaba como un récord).
-      const celebraC = fbC.type === "pr" && !fbC.tono;
       haptic(fbC.type === "pr" ? [35, 25, 45] : 18);
-      if (celebraC) tocarCampana();
-      setFeedback({ type: fbC.type, tono: fbC.tono, msg: fbC.msg, noSession });
+      if (fbC.type === "pr") tocarCampana();
+      setFeedback({ type: fbC.type, msg: fbC.msg, noSession });
       return;
     }
     const r = parseFloat(reps), kDisplay = parseFloat(kg);
@@ -11449,17 +11541,17 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     // Con una meta cargada, el patrón de comparación es la meta. Alcanzarla
     // es hacer al menos los kilos Y las reps pedidas (no un 1RM equivalente:
     // 75×5 no es "haber hecho" 70×8).
-    const fb = describePlannedOutcome(metaHoy, { kg: k, reps: r }, isPR, unit)
+    const recordDelEjercicio = isPR && (isBodyweight ? r > mejorEj.reps : new1RM > mejorEj.rm);
+    const fb = describePlannedOutcome(metaHoy, { kg: k, reps: r }, recordDelEjercicio, unit)
       || (isFirstEver ? { type: "first", msg: "Primera marca: desde acá se cuenta." }
-        : isPR ? ((isBodyweight ? r > mejorEj.reps : new1RM > mejorEj.rm) ? { type: "pr", msg: "Récord nuevo." } : { type: "pr-serie", msg: "Tu mejor marca en esta serie." })
+        : isPR ? (recordDelEjercicio ? { type: "pr", msg: "Récord nuevo." } : { type: "pr-serie", msg: "Tu mejor marca en esta serie." })
           : new1RM === prev1RM ? { type: "tie", msg: "Igualaste tu récord." }
             : { type: "down", msg: `A un ${Math.max(1, Math.round(((prev1RM - new1RM) / prev1RM) * 100))} % de tu récord.` });
-    // La meta cumplida (tono "sube") va en verde y sin campana ni imagen para
-    // compartir: son para el récord (antes el tono se perdía acá).
-    const esCelebracion = fb.type === "pr" && !fb.tono;
-    haptic(fb.type === "pr" ? [35, 25, 45] : 18);
+    // La campana y la imagen para compartir son para el récord del ejercicio.
+    const esCelebracion = fb.type === "pr";
+    haptic(esCelebracion ? [35, 25, 45] : 18);
     if (esCelebracion) tocarCampana();
-    setFeedback({ type: fb.type, tono: fb.tono, msg: fb.msg, suggestUp, noSession });
+    setFeedback({ type: fb.type, msg: fb.msg, suggestUp, noSession });
     if (esCelebracion && autoShowPrShare && compartirAutoHoy()) setTimeout(() => setShowPRShare(true), 1500);
   };
   const savePR = () => {
@@ -11492,8 +11584,8 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     onUpdateSettings({ weightUnit: nueva });
     haptic(12);
   } : null;
-  const lineaFeedback = feedback && (
-    <p className={`serie-aviso ${feedback.tono || TONO_DEL_AVISO[feedback.type] || "alerta"} ${feedback.type === "pr" ? "pr-pop" : ""}`}>
+  const lineaFeedback = feedback?.msg && (
+    <p className={`serie-aviso ${TONO_DEL_AVISO[feedback.type] || "alerta"} ${feedback.type === "pr" ? "pr-pop" : ""}`}>
       {feedback.msg}
       {(feedback.type === "pr" || feedback.type === "pr-serie") && !cardio && <button onClick={() => setShowPRShare(true)} aria-label="Compartir esta marca" className="ml-1.5 inline-flex align-middle opacity-80 hover:opacity-100 active:scale-90 transition"><Share2 size={13} /></button>}
     </p>
@@ -11501,7 +11593,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   const avisosExtra = (
     <>
       {feedback?.suggestUp && <p className="serie-aviso neutro"><TrendingUp size={12} className="inline -mt-0.5 mr-1" />Llegaste al tope del rango: la próxima, +{conComa(feedback.suggestUp.salto)} {weightLabel(unit)} y volvé a {feedback.suggestUp.piso} reps.</p>}
-      {feedback?.noSession && <p className="serie-aviso alerta"><AlertTriangle size={12} className="inline -mt-0.5 mr-1" />Tocá "Iniciar sesión" arriba para que este día cuente en tu historial</p>}
+      {feedback?.noSession && !hasActiveSession && <p className="serie-aviso alerta"><AlertTriangle size={12} className="inline -mt-0.5 mr-1" />Tocá "Iniciar sesión" arriba para que este día cuente en tu historial</p>}
     </>
   );
   const modales = (
@@ -12994,7 +13086,7 @@ function SessionStartBar({ activeSession, onStart, color = "#14B8A6" }) {
   // acá, cancelar la sesión, se mudó al paso de confirmación de esa barra.
   if (activeSession) return null;
   return (
-    <button onClick={onStart} className="boton-pildora invite-pulse" style={{ "--c": color }}>
+    <button onClick={onStart} className="boton-pildora invite-pulse" data-recorrido="iniciar" style={{ "--c": color }}>
       <Play size={16} className="fill-current" /> Iniciar sesión
     </button>
   );
@@ -13064,9 +13156,9 @@ const planObjetivoDe = (k) => PLAN_OBJETIVOS.find((o) => o.k === k) || PLAN_OBJE
 // un principiante le sobra progresión lineal semanal y a un avanzado 5kg por
 // semana en press de banca lo estrella contra la pared en tres semanas.
 const PLAN_NIVELES = [
-  { k: "principiante", l: "Principiante", d: "Menos de 1 año entrenando", ia: "principiante (menos de un año entrenando): puede progresar rápido, subí en casi todas las semanas" },
-  { k: "intermedio", l: "Intermedio", d: "1 a 3 años", ia: "intermedio (1 a 3 años entrenando): la progresión ya no es semanal en todo, alterná semanas de subir con semanas de consolidar" },
-  { k: "avanzado", l: "Avanzado", d: "Más de 3 años", ia: "avanzado (más de 3 años entrenando): progresión muy lenta, saltos chicos y sólo donde haya margen real" },
+  { k: "principiante", l: "Principiante", d: "Menos de 1 año entrenando", ia: "principiante (menos de un año entrenando): una rep más casi todas las semanas" },
+  { k: "intermedio", l: "Intermedio", d: "1 a 3 años", ia: "intermedio (1 a 3 años entrenando): una rep más cada una o dos semanas, alternando semanas de subir con semanas de consolidar" },
+  { k: "avanzado", l: "Avanzado", d: "Más de 3 años", ia: "avanzado (más de 3 años entrenando): una rep más cada dos semanas, y el peso sólo al llegar al tope del rango" },
 ];
 const planNivelDe = (k) => PLAN_NIVELES.find((n) => n.k === k) || PLAN_NIVELES[1];
 
@@ -13175,7 +13267,7 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_
       ``,
       `PERSONA: ${niv.ia}.`,
       `OBJETIVO: ${obj.ia}.`,
-      hayDescarga ? `CICLO: son ${ciclo} semanas de trabajo y después ${settings.deloadWeeks} de descarga al ${Math.round((settings.deloadPct || 0.6) * 100)}% de la carga. La semana ${ciclo} es la última de trabajo: tiene que ser la más pesada del bloque, no una más.` : `CICLO: ${ciclo} semanas de trabajo seguidas, sin descarga programada.`,
+      hayDescarga ? `CICLO: son ${ciclo} semanas de trabajo y después ${settings.deloadWeeks} de descarga al ${Math.round((settings.deloadPct || 0.6) * 100)}% de la carga. La semana ${ciclo} es la última de trabajo.` : `CICLO: ${ciclo} semanas de trabajo seguidas, sin descarga programada.`,
       enLibras
         ? `UNIDAD: LIBRAS (lbs). Todas las cargas que devuelvas tienen que estar en libras, y cada una se tiene que poder armar con el salto de su ejercicio (dice "el peso sube de a"): partí de su peso y sumá saltos enteros.`
         : `UNIDAD: kilos. Cada carga se tiene que poder armar con el salto de su ejercicio (dice "el peso sube de a"; hay máquinas que van de 7 en 7 kg): partí de su peso y sumá saltos enteros.`,
@@ -13184,12 +13276,12 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_
       `REGLAS DE PLANIFICACIÓN (respetalas):`,
       `1. Partí de la mejor marca de cada ejercicio. Si no tiene marcas, proponé una carga conservadora y dejala casi plana: primero hay que medirla.`,
       `2. Mirá las últimas sesiones: si viene subiendo, seguí la misma pendiente; si repite el mismo peso hace tres sesiones, está estancado — bajá un escalón y subí las reps en vez del peso.`,
-      `3. PROGRESIÓN DE ENTRENADOR, JUGANDO CON REPS Y KILOS: la base es la doble progresión (con el mismo peso, una rep más por semana hasta el tope del rango; ahí sube el peso UN salto y las reps vuelven al piso). Sobre esa base, armá OLAS como un entrenador profesional: las reps y los kilos suben Y bajan dentro del bloque. Por ejemplo, en olas de 3 semanas: semana A carga moderada y más reps, semana B un salto más y menos reps, semana C la más pesada del ola con las reps más bajas del rango; la ola siguiente arranca un poco por encima de la anterior (ondas de carga / periodización ondulante, que en los estudios iguala o supera a la lineal en fuerza e hipertrofia). Nunca subas el peso todas las semanas ni bajes por debajo de lo que la persona ya levanta, salvo en la descarga o si está estancada. Si el salto es grande (7 kg o 15 lb en una máquina), las reps hacen casi todo el trabajo.`,
-      `3b. SEGÚN EL OBJETIVO, con métodos probados: FUERZA → olas con 3 a 6 reps, cargas de 80-90% del 1RM estimado, pocas reps por serie cerca del fallo técnico (RIR 1-3) y el volumen bajando a medida que sube la carga. HIPERTROFIA → 6 a 15 reps, la mayor parte del trabajo con RIR 1-3, el volumen semanal por músculo subiendo de a poco (de lo mínimo efectivo a lo máximo recuperable) y la carga subiendo cuando las reps tocan el tope. Mixto → ondulación entre una semana más pesada (4-6 reps) y otra de más volumen (8-12). Que cada número se pueda justificar como lo haría un entrenador con experiencia.`,
+      `3. PROGRESIÓN DE ENTRENADOR, DE A POCO (doble progresión): con el mismo peso, una rep más por semana hasta el tope del rango de reps; recién ahí sube el peso UN salto, el de ese ejercicio, y las reps vuelven al piso del rango. Nunca subas peso y reps a la vez, ni más de un salto por vez, ni armes olas que suban y bajen la carga. Una semana puede repetir la anterior para consolidar, según el nivel de la persona. La app corrige cualquier semana que dé más de un paso.`,
+      `3b. SEGÚN EL OBJETIVO: FUERZA → rango de 3 a 6 reps (o el del ejercicio), cerca del fallo técnico (RIR 1-3). HIPERTROFIA → 6 a 15 reps con RIR 1-3. MIXTO → los compuestos grandes en 5-8 reps y los aislados en 10-12. MANTENER → cargas planas. En todos, la misma regla: una rep por vez y el peso de a un salto.`,
       `3c. La app ya se ajusta sola mientras la persona entrena: si una meta no se cumple, la semana siguiente la repite; si se traba dos veces seguidas en la misma, la baja un 10 %; y al terminar el ciclo ofrece seguir el plan desde donde quedó. No agregues semanas de repetición "por las dudas": planificá la progresión ideal.`,
       conRpe ? `4. FATIGA: el RPE tiene que ir subiendo dentro del bloque (empezá en 7 y llegá a 9), no arrancar al máximo.` : `4. FATIGA: no incluyas RPE, dejá ese campo afuera.`,
       semanasReales >= 3
-        ? `5. FASES de mesociclo: primeras semanas "Acumulación" (más volumen, RPE 7-8), después "Intensificación" (más carga, RPE 8-9), la última "Realización" (carga máxima, menos series).`
+        ? `5. FASES de mesociclo: primeras semanas "Acumulación" (RPE 7-8), después "Intensificación" (RPE 8-9), la última "Realización". La fase cambia el esfuerzo, no el tamaño del paso.`
         : `5. FASES: con ${semanasReales} semana(s) usá sólo "Acumulación".`,
       `6. Dentro de un mismo ejercicio, las series pueden tener cargas distintas: la serie 1 suele ser la más pesada y las siguientes bajan un poco.`,
       respetarRango ? `7. Respetá el rango de reps objetivo de cada ejercicio cuando esté indicado arriba; no lo cambies para poder subir más kilos.` : `7. Podés mover el rango de reps si eso hace mejor la progresión.`,
@@ -13236,18 +13328,26 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_
         if (!permitidos.has(ex.id)) return;
         const setIndex = Math.max(0, (parseInt(item?.serie, 10) || 1) - 1);
         if (!ex.sets?.[setIndex]) return;
-        const entries = (Array.isArray(item?.metas) ? item.metas : [])
+        const metasIA = (Array.isArray(item?.metas) ? item.metas : [])
           .map((m) => {
             const week = parseInt(m?.semana ?? m?.week, 10);
             const kgIA = parseFloat(m?.kg), reps = parseInt(m?.reps, 10);
             if (!week || week < desdeSemana || week > semanaFinal || isNaN(kgIA) || kgIA <= 0 || isNaN(reps) || reps <= 0) return null;
-            const kg = displayToKg(kgIA, unit);
             const rpe = conRpe && m?.rpe != null ? Math.min(10, Math.max(5, parseFloat(m.rpe))) : null;
             const fase = MESOCYCLE_PHASES.includes(m?.fase) ? m.fase : null;
-            return { week, kg, reps, ...(rpe != null ? { rpe } : {}), ...(fase ? { phase: fase } : {}) };
+            return { week, kg: kgIA, reps, ...(rpe != null ? { rpe } : {}), ...(fase ? { phase: fase } : {}) };
           })
           .filter(Boolean)
           .sort((x, y) => x.week - y.week);
+        // De a poco: una rep o un salto por semana, desde tu última vez en
+        // esta serie (ver deAPoco). El rango es el de la serie si se respeta;
+        // si no, el del objetivo.
+        const ultima = ultimaDeLaSerie(logs, ex.id, setIndex);
+        const entries = deAPoco(metasIA, {
+          base: ultima ? { kg: kgToDisplay(ultima.kg, unit), reps: ultima.reps } : null,
+          repRange: (respetarRango && ex.sets[setIndex].repRange) || `${obj.reps}-${obj.tope}`,
+          salto: saltoDe(settings, ex.id, unit),
+        }).map((e) => ({ ...e, kg: displayToKg(e.kg, unit) }));
         if (entries.length) planes.push({ exerciseId: ex.id, nombre: ex.name, setIndex, entries });
       });
       if (!planes.length) throw new Error("Ninguno de los ejercicios que devolvió la IA coincide con los que elegiste. Probá de nuevo.");
@@ -13428,7 +13528,7 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_
                 )}
               </div>
 
-              <p className="armado-nota">Arranca desde tu mejor marca de cada ejercicio, mira si venís subiendo o estancado y sube de a poco.</p>
+              <p className="armado-nota">Arranca desde tu última vez en cada serie y sube de a poco: una rep más por semana y, al llegar al tope del rango, un salto de peso.</p>
             </div>
             <div className="modal-rutina-pie">
               {/* Si el que vació la lista es "No pisar lo ya planificado",
@@ -13479,10 +13579,15 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_
               <div className="plan-ejercicios">
                 {porEjercicio.map((g) => {
                   const fuera = descartados.has(g.id);
-                  const salto = g.desde != null && g.hasta != null ? g.hasta - g.desde : null;
                   const primera = g.series[0]?.entries || [];
                   const valores = primera.map((e) => kgToDisplay(e.kg, unit));
-                  const altoDe = alturaDeEscalon(valores);
+                  // Los escalones van por paso, no por kilos: con la doble
+                  // progresión casi todo el plan es "una rep más" con el mismo
+                  // peso, y por kilos se veía plano. Cada paso, un escalón.
+                  const estados = [...new Map(primera.map((e) => [`${e.kg}|${e.reps}`, e])).values()]
+                    .sort((a, b) => a.kg - b.kg || a.reps - b.reps).map((e) => `${e.kg}|${e.reps}`);
+                  const altoDe = (e) => (estados.length > 1 ? 0.3 + (0.7 * estados.indexOf(`${e.kg}|${e.reps}`)) / (estados.length - 1) : 0.6);
+                  const ini = primera[0], fin = primera[primera.length - 1];
                   return (
                     <div key={g.id} className={`plan-ej ${fuera ? "fuera" : ""}`}>
                       <button role="checkbox" aria-checked={!fuera} onClick={() => setDescartados((prev) => { const n = new Set(prev); if (n.has(g.id)) n.delete(g.id); else n.add(g.id); return n; })} className="plan-tilde">
@@ -13491,7 +13596,7 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_
                           <span className="plan-tilde-nombre">{g.nombre}</span>
                           {/* De dónde a dónde te lleva, contra tu mejor marca de hoy. */}
                           <span className="plan-tilde-sub">
-                            De {conComa(g.desde)} a {conComa(g.hasta)} {uLabel}{salto != null && salto !== 0 ? ` (${salto > 0 ? "+" : "−"}${conComa(Math.abs(roundKg(salto)))})` : ""}, {g.mejor ? `tu mejor ${g.mejor.reps} × ${conComa(g.mejor.kg)} ${uLabel}` : "sin marcas previas"}
+                            {ini && fin ? `De ${ini.reps} × ${conComa(kgToDisplay(ini.kg, unit))} a ${fin.reps} × ${conComa(kgToDisplay(fin.kg, unit))} ${uLabel}` : ""}{g.mejor ? `, tu mejor ${g.mejor.reps} × ${conComa(g.mejor.kg)} ${uLabel}` : ", sin marcas previas"}
                           </span>
                         </span>
                       </button>
@@ -13499,8 +13604,8 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_
                         <div className="plan-mini chico px-3 pb-3" role="img" aria-label={`La progresión de ${g.nombre}: ${primera.map((e) => `semana ${e.week}, ${e.reps} × ${conComa(kgToDisplay(e.kg, unit))}`).join("; ")}`}>
                           {primera.map((e, i) => (
                             <span key={e.week} className="plan-mini-semana con">
-                              <span className="plan-mini-valor" aria-hidden="true">{conComa(valores[i])}</span>
-                              <span className="plan-mini-barra" style={{ "--f": altoDe(valores[i]) }} aria-hidden="true" />
+                              <span className="plan-mini-valor doble" aria-hidden="true"><span className="plan-mini-reps">{e.reps} ×</span>{conComa(valores[i])}</span>
+                              <span className="plan-mini-barra" style={{ "--f": altoDe(e) }} aria-hidden="true" />
                               <span className="plan-mini-numero" aria-hidden="true">{e.week}</span>
                             </span>
                           ))}
@@ -13525,7 +13630,6 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_
   );
 }
 
-const EMPTY_SESIONES = [];
 // LA HOJA DEL PLAN (arriba de Rutina): la planilla del profe en su tabla,
 // como la hoja de la rutina que se comparte. Arriba, "Tu plan" con el día que
 // mirás pasado con resaltador y la semana del ciclo; en renglones, lo que el
@@ -13598,7 +13702,7 @@ function HojaDelPlan({ dia = null, semana = null, filas = [], hayPlan = false, e
   );
 }
 
-function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, weekSchedule, activeSession, onStartSession, onDisableAutoShowPrShare, onUpdateSettings = null, onSetPlanPaused = null, onRemovePlan = null, onGoToRoutines = null, onGoToSchedule = null, onGoToFieldSettings = null, onGoToDescarga = null, sex = null, age = null, activeRoutineDef = null, onApplyOwnProgression = null, goToDaySignal = { id: null, n: 0 }, onSignalConsumed = null, trainingSessions = [] }) {
+function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, weekSchedule, activeSession, onStartSession, onDisableAutoShowPrShare, onUpdateSettings = null, onSetPlanPaused = null, onRemovePlan = null, onGoToRoutines = null, onGoToSchedule = null, onGoToFieldSettings = null, onGoToDescarga = null, sex = null, age = null, activeRoutineDef = null, onApplyOwnProgression = null, goToDaySignal = { id: null, n: 0 }, onSignalConsumed = null }) {
   // Semana actual del ciclo — sólo hace falta el número (weekInCycle), para
   // que SetRow sepa si hay una meta cargada (modo "planned", ver
   // getPlannedTargetForWeek) para ESTA semana puntual.
@@ -13637,10 +13741,6 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
   // es lo único que estás haciendo.
   const sesionAbiertaDayKey = activeSession?.dayKey && DAY_ORDER.includes(activeSession.dayKey) ? activeSession.dayKey : null;
   const [activeDay, setActiveDay] = useState(() => (goToDaySignal.id === "go-to-day" && goToDaySignal.payload) || sesionAbiertaDayKey || scheduledDay || (isRestToday ? DAY_ORDER[0] : fallbackSuggested));
-  // La vez pasada de este día (la hoja del cuaderno, ver CuadernoDelDia).
-  const sesionesCuaderno = useMemo(() => buildSessionsIndex(logs, trainingSessions), [logs, trainingSessions]);
-  const ultimaDelDia = useMemo(() => sesionesCuaderno.find((s) => !s.isDeload && s.dayKeys.includes(activeDay) && s.date < todayStr()) || null, [sesionesCuaderno, activeDay]);
-  const [cuadernoFecha, setCuadernoFecha] = useState(null);
   // BUG FIX (mismo patrón que openScheduleSignal en RoutinesView): sin
   // avisarle a App que la señal ya se consumió, queda prendida para
   // siempre — cualquier otra forma de volver a esta pestaña (ej. la barra
@@ -13770,7 +13870,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             sinRutina={!activeRoutineDef}
             invitar={!hasAnyPlan && !enPausa}
             terminados={planResumen?.terminados?.length || 0}
-            onSeguir={onApplyOwnProgression && activeRoutineDef ? () => onApplyOwnProgression(planesParaSeguir(activeRoutineDef, logs, settings, cicloActual)) : null}
+            onSeguir={onApplyOwnProgression && activeRoutineDef ? () => onApplyOwnProgression(planesParaSeguir(activeRoutineDef, logs, settings, cicloActual, weekInCycle || 1)) : null}
             onPlanificar={onApplyOwnProgression ? () => setShowSelfProgression(true) : null}
             onPausa={() => onUpdateSettings({ trainingMode: enPausa ? "planned" : "record" })}
             onCampos={onGoToFieldSettings}
@@ -13818,9 +13918,6 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           botón para empezar; abajo, el calentamiento y los ejercicios. Todo
           en la misma placa; antes eran tarjetas sueltas una debajo de la
           otra. */}
-      {cuadernoFecha && (
-        <CuadernoDelDia sesiones={sesionesCuaderno} fecha={cuadernoFecha} onFecha={setCuadernoFecha} onClose={() => setCuadernoFecha(null)} exerciseNotes={settings?.exerciseNotes || {}} rpeDisplayMode={settings?.rpeDisplayMode || "rpe"} />
-      )}
       <section
         key={activeDay}
         className="dia-seccion relative tab-fade-in"
@@ -13850,16 +13947,6 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
                 <b><NumberFlow value={Math.min(avanceDia.hechas, avanceDia.total)} /></b> de {avanceDia.total} series{avanceDia.hechas >= avanceDia.total ? ": barra completa" : ""}
               </p>
             </div>
-          )}
-          {/* LA VEZ PASADA: la hoja del cuaderno del último día igual a éste
-              (pedido: "qué poner para poder ver lo que hiciste la semana
-              pasada"). Se pasa de hoja como en el Historial. */}
-          {ultimaDelDia && (
-            <button onClick={() => setCuadernoFecha(ultimaDelDia.date)} className="dia-pasada">
-              <NotebookPen size={15} aria-hidden="true" />
-              <span>La vez pasada: {new Date(`${ultimaDelDia.date}T12:00:00`).toLocaleDateString("es-AR", { weekday: "long", day: "numeric" })}</span>
-              <ChevronRight size={15} aria-hidden="true" />
-            </button>
           )}
           {day.isNew && <div className="mt-3 inline-flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 text-[12px] rounded-full px-3 py-1.5">🆕 Empezás a registrar tus marcas desde hoy.</div>}
           {/* La descarga se hace en su propia pestaña: acá sólo el atajo. */}
@@ -20824,34 +20911,45 @@ function ProgressionProposalComposer({ routineSnapshot, trainWeeks, onClose, onS
   // si no, el del objetivo.
   const saltoDelEjercicio = (ex) => (planPrefs?.saltosDePeso?.[ex.id] ? saltoDe(planPrefs, ex.id, unit) : (parseFloat(tplInc) || 0));
   const applyTemplate = (ex, tpl, guardarTambien = true) => {
-    let kg = parseFloat(tplKgDe(ex));
-    // El rango de la rutina manda (si se respeta): el press de banca en 6-8 y
-    // el curl en 10-12, no todos en el mismo.
-    const rango = prefs.planRespetarRango !== false ? rangoDeReps(ex.sets?.[0]?.repRange) : null;
-    const reps = rango ? rango[0] : parseInt(tplReps, 10);
-    if (isNaN(reps) || reps <= 0) return;
-    const repsMax = rango ? rango[1] : (parseInt(tplRepsMax, 10) || reps + 1);
     const inc = saltoDelEjercicio(ex);
-    // La progresión de un entrenador arranca desde donde estás: la próxima de
-    // tu última sesión (una rep más, o el salto si llegaste al tope).
-    let desde = reps;
-    const last = marcasPorEjercicio[ex.id]?.last;
-    if (tpl.key === "double" && tplKgByEx[ex.id] === undefined && last) {
-      const p = siguientePaso(last.kg, last.reps, `${reps}-${repsMax}`, inc);
-      if (p && p.kg > 0) { kg = p.kg; desde = p.reps; }
-    }
-    if (isNaN(kg) || kg <= 0) return;
+    // Los kilos que escribiste para el ejercicio valen para todas sus series.
+    const kgEscrito = tplKgByEx[ex.id] !== undefined ? parseFloat(tplKgByEx[ex.id]) : null;
     // A mitad de ciclo, la progresión arranca en la semana en curso y las que
     // ya pasaron quedan como estaban (antes arrancaba siempre en la 1, y en la
     // semana 4 la meta ya venía tres escalones arriba de tu última sesión).
     const desdeSemana = Math.min(Math.max(1, weekInCycle || 1), weeks.length);
-    const built = tpl.build(weeks.filter((w) => w >= desdeSemana), kg, reps, repsMax, inc, desde);
+    const semanasPlan = weeks.filter((w) => w >= desdeSemana);
+    // SERIE POR SERIE: cada una con su rango y desde su última vez. Antes
+    // todas recibían el rango de la primera y los mismos kilos: en un press
+    // con una serie pesada de 3-5 y otra de 8-10, la de 8-10 venía con el
+    // peso de la pesada.
+    const porSerie = (ex.sets || []).map((st, si) => {
+      // El rango de la rutina manda (si se respeta): el press de banca en 6-8
+      // y el curl en 10-12, no todos en el mismo.
+      const rango = prefs.planRespetarRango !== false ? rangoDeReps(st?.repRange) : null;
+      const reps = rango ? rango[0] : parseInt(tplReps, 10);
+      if (isNaN(reps) || reps <= 0) return null;
+      const repsMax = rango ? rango[1] : (parseInt(tplRepsMax, 10) || reps + 1);
+      const ultima = ultimaDeLaSerie(logs, ex.id, si);
+      const last = ultima?.kg > 0 ? { kg: kgToDisplay(ultima.kg, unit), reps: ultima.reps } : marcasPorEjercicio[ex.id]?.last;
+      let kg = kgEscrito ?? (last?.kg || parseFloat(tplKgDe(ex)));
+      let desde = reps;
+      // La progresión de un entrenador arranca desde donde estás: la próxima
+      // de tu última sesión (una rep más, o el salto si llegaste al tope).
+      if (tpl.key === "double" && kgEscrito == null && last) {
+        const p = siguientePaso(last.kg, last.reps, `${reps}-${repsMax}`, inc);
+        if (p && p.kg > 0) { kg = p.kg; desde = p.reps; }
+      }
+      if (isNaN(kg) || kg <= 0) return null;
+      return tpl.build(semanasPlan, kg, reps, repsMax, inc, desde);
+    });
+    if (!porSerie.some(Boolean)) return;
     setEntries((prev) => {
       const next = { ...prev };
       // Merge, no reemplazo: aplicar una plantilla no debe borrar un
       // RPE/fase que ya se haya elegido a mano para esa semana.
-      built.forEach((e) => {
-        (ex.sets || []).forEach((_, si) => {
+      porSerie.forEach((built, si) => {
+        (built || []).forEach((e) => {
           const key = keyOf(ex.id, si, e.week);
           next[key] = { ...(next[key] || {}), kg: String(e.kg), reps: String(e.reps) };
         });
@@ -24649,7 +24747,7 @@ function buildActionPlan(action, ctx) {
     if (!activeDef || !onActivateRoutine) return null;
     const setIndex = Number.isInteger(action.setIndex) && action.setIndex >= 0 ? action.setIndex : 0;
     const trainWeeks = settings?.trainWeeks || TRAIN_WEEKS;
-    const entries = (Array.isArray(action.metas) ? action.metas : [])
+    const metasIA = (Array.isArray(action.metas) ? action.metas : [])
       .map((m) => {
         const week = parseInt(m?.semana ?? m?.week, 10), kg = parseFloat(m?.kg), reps = parseInt(m?.reps, 10);
         if (!week || week < 1 || week > trainWeeks || isNaN(kg) || kg <= 0 || isNaN(reps) || reps <= 0) return null;
@@ -24657,7 +24755,7 @@ function buildActionPlan(action, ctx) {
       })
       .filter(Boolean)
       .sort((a, b) => a.week - b.week);
-    if (!entries.length) return null;
+    if (!metasIA.length) return null;
     // BUG FIX (encontrado verificando la acción a fondo): antes esto
     // buscaba "action.exercise" en la BIBLIOTECA GLOBAL (miles de
     // variantes) y recién después chequeaba si ese id específico estaba en
@@ -24685,6 +24783,14 @@ function buildActionPlan(action, ctx) {
           : [`"${exMatch.name}" no tiene una serie ${setIndex + 1} (tiene ${exMatch.sets?.length || 0}).`, "Pedísela de nuevo indicando una serie que exista."],
       };
     }
+    // De a poco, como el planificador (ver deAPoco): en la unidad que se ve.
+    const unidadIA = settings?.weightUnit || "kg";
+    const ultimaIA = ultimaDeLaSerie(profile?.logs, exMatch.id, setIndex);
+    const entries = deAPoco(metasIA.map((e) => ({ ...e, kg: kgToDisplay(e.kg, unidadIA) })), {
+      base: ultimaIA ? { kg: kgToDisplay(ultimaIA.kg, unidadIA), reps: ultimaIA.reps } : null,
+      repRange: exMatch.sets[setIndex].repRange,
+      salto: saltoDe(settings || {}, exMatch.id, unidadIA),
+    }).map((e) => ({ ...e, kg: displayToKg(e.kg, unidadIA) }));
     const updatedDef = applyProgressionToRoutine(activeDef, { exerciseId: exMatch.id, setIndex, entries });
     const needsModeSwitch = settings?.trainingMode !== "planned";
     return {
@@ -24729,9 +24835,18 @@ function buildActionPlan(action, ctx) {
           items.push(`${exMatch.name}: ${minutes} min`);
           return { exerciseId: exMatch.id, setIndex, week, minutes };
         }
-        const kg = parseFloat(s.kg), reps = parseInt(s.reps, 10);
-        if (isNaN(kg) || kg <= 0 || isNaN(reps) || reps <= 0) return null;
-        items.push(`${exMatch.name} S${setIndex + 1}: ${reps}×${kgToDisplay(kg, settings?.weightUnit || "kg")}${weightLabel(settings?.weightUnit || "kg")}`);
+        const kgIA = parseFloat(s.kg), repsIA = parseInt(s.reps, 10);
+        if (isNaN(kgIA) || kgIA <= 0 || isNaN(repsIA) || repsIA <= 0) return null;
+        // No más de un paso sobre tu última vez en esa serie (ver deAPoco).
+        const u = settings?.weightUnit || "kg";
+        const ultima = ultimaDeLaSerie(profile?.logs, exMatch.id, setIndex);
+        const [meta] = deAPoco([{ week, kg: kgToDisplay(kgIA, u), reps: repsIA }], {
+          base: ultima ? { kg: kgToDisplay(ultima.kg, u), reps: ultima.reps } : null,
+          repRange: exMatch.sets[setIndex].repRange,
+          salto: saltoDe(settings || {}, exMatch.id, u),
+        });
+        const kg = displayToKg(meta.kg, u), reps = meta.reps;
+        items.push(`${exMatch.name} S${setIndex + 1}: ${reps}×${meta.kg}${weightLabel(u)}`);
         return { exerciseId: exMatch.id, setIndex, week, kg, reps };
       })
       .filter(Boolean);
@@ -25073,7 +25188,7 @@ Tu alcance es estrictamente entrenamiento físico, nutrición deportiva, salud/r
 
 Aplicá estos marcos cuando sean relevantes (no los recites si no vienen al caso):
 - Sobrecarga progresiva: motor del progreso a largo plazo — no sólo "subir el peso", también más reps/series, mejor técnica o más frecuencia.
-- Para la próxima sesión, una meta o un plan, usá doble progresión, como un entrenador personal: con el mismo peso, una rep más por vez hasta el tope del rango de reps de ese ejercicio; recién ahí sube el peso UN salto y las reps vuelven al piso del rango. En un plan de varias semanas, jugá además con reps y kilos en olas (semana de más reps y carga moderada, semana de más carga y menos reps, semana más pesada; la ola siguiente arranca un poco más arriba), como en la periodización ondulante y las ondas de carga, según el objetivo (fuerza: 3-6 reps al 80-90%; hipertrofia: 6-15 reps con RIR 1-3 y el volumen subiendo de a poco). El salto de cada ejercicio está en settings.saltosDePeso (por máquina: 7 kg, 15 lb...; si no está, 2,5 kg o 5 lb): no propongas cargas que no se puedan armar con ese salto.
+- Para la próxima sesión, una meta o un plan, usá doble progresión, como un entrenador personal: con el mismo peso, una rep más por vez hasta el tope del rango de reps de ese ejercicio; recién ahí sube el peso UN salto y las reps vuelven al piso del rango. En un plan de varias semanas, la misma regla, de a poco: una rep más por semana (o cada dos, si entrena hace más de un año) hasta el tope del rango, y recién ahí el peso, de a un salto, con las reps de vuelta al piso. Nada de olas que suban y bajen la carga, ni peso y reps a la vez: la app corrige cualquier semana que dé más de un paso. Según el objetivo cambia el rango (fuerza: 3-6 reps; hipertrofia: 6-15 reps con RIR 1-3), no el tamaño del paso. El salto de cada ejercicio está en settings.saltosDePeso (por máquina: 7 kg, 15 lb...; si no está, 2,5 kg o 5 lb): no propongas cargas que no se puedan armar con ese salto.
 - Volumen semanal por grupo muscular = principal driver de hipertrofia dentro de rangos razonables; %1RM y RIR/RPE son las palancas de la fuerza máxima.
 - Hipertrofia: rango amplio de reps (aprox. 5-30) si las series van cerca del fallo — 6-12 es un punto dulce práctico, no "el" rango mágico.
 - Frecuencia 2+/semana por grupo muscular suele igualar o superar 1 vez/semana con el mismo volumen total.
@@ -26364,7 +26479,7 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
                 <button onClick={cancelarEdicion} aria-label="Cancelar edición" className="p-1 rounded-lg text-slate-400 hover:text-white transition shrink-0"><X size={13} /></button>
               </div>
             )}
-            <div className="flex items-end gap-2">
+            <div className="flex items-end gap-2" data-recorrido="escribir">
               {/* Botón de conversaciones pegado a la barra de mensaje (antes
                   era una pestaña aparte, flotando arriba a la izquierda):
                   vive en el mismo contenedor fijo que el input, así se mueve
@@ -28295,7 +28410,7 @@ function ActiveSessionBar({ startedAt, dayLabel, color, done, total, conProgreso
               Se guarda en tu historial y se borra lo que escribiste sin guardar.
             </p>
             {onCancel && (
-              <button onClick={onCancel} className="text-[10.5px] text-slate-500 hover:text-rose-400 transition mt-1 underline underline-offset-2 decoration-slate-700">
+              <button onClick={onCancel} className="text-[10.5px] text-left text-slate-500 hover:text-rose-400 transition mt-1 underline underline-offset-2 decoration-slate-700">
                 O descartala, sin que cuente como entrenamiento
               </button>
             )}
@@ -28306,34 +28421,35 @@ function ActiveSessionBar({ startedAt, dayLabel, color, done, total, conProgreso
       ) : (
         <>
         {descanso}
-        <div className="flex items-stretch">
-          {/* Cuerpo: toca para volver a Rutina (si no estás ahí ya) */}
+        {/* UNA FILA (pedido: "mejoremos la estética de la barra fija con el
+            cronómetro, capaz sacando la barra sólo ahí"): el tiempo de la
+            sesión, el día en su color con cuántas series llevás, y Finalizar.
+            La barra cargada queda en la placa del día; acá se repetía en
+            chico, con discos que no se llegaban a ver. */}
+        <div className="sesion-dock">
+          {/* Tocarla te lleva a Rutina, si no estás ahí. */}
           <button
             onClick={enRutina ? undefined : onGoToRoutine}
             disabled={enRutina}
             aria-label={enRutina ? undefined : "Volver a tu entrenamiento"}
-            className="flex-1 min-w-0 flex items-center gap-3 pl-4 pr-2 py-2.5 text-left transition active:scale-[0.99] disabled:active:scale-100"
+            className="sesion-dock-cuerpo"
           >
-            {/* La galleta del día que late: la sesión está viva. */}
-            <span className="galleta sesion-dock-latido" aria-hidden="true" />
-            <div className="flex-1 min-w-0">
-              <div className="flex items-baseline gap-2 min-w-0">
-                <span role="timer" aria-label={reloj} className="num-display sesion-dock-reloj shrink-0"><RelojQueGira segundos={Math.floor(ms / 1000)} sube /></span>
-                {dayLabel && <span className="sesion-dock-dia">{dayLabel}</span>}
-                {!enRutina && <ChevronRight size={14} className="text-slate-500 shrink-0 self-center" />}
-              </div>
+            <span role="timer" aria-label={`Sesión: ${reloj}`} className="num-display sesion-dock-reloj"><RelojQueGira segundos={Math.floor(ms / 1000)} sube /></span>
+            <span className="sesion-dock-texto">
+              {dayLabel && <span className="sesion-dock-nombre">{dayLabel}</span>}
               {conProgreso && total > 0 ? (
-                <div className="flex items-center gap-2 mt-1">
-                  <BarraCargada hechas={done} total={total} alto={24} className="flex-1 min-w-0" />
-                  <span className="text-[12px] font-bold tabular-nums shrink-0" aria-label={`${done} de ${total} series`} style={{ color: completo ? "var(--text-strong)" : "var(--text-muted)" }}><NumberFlow value={done} aria-hidden="true" />/{total}</span>
-                </div>
+                <span className={`sesion-dock-avance ${completo ? "completo" : ""}`}>
+                  <span aria-hidden="true"><NumberFlow value={Math.min(done, total)} /> de {total} series</span>
+                  <span className="sr-only">{Math.min(done, total)} de {total} series</span>
+                </span>
               ) : (
-                <p className="text-[11.5px] text-slate-500 leading-tight mt-1">Sesión en curso</p>
+                <span className="sesion-dock-avance">Sesión en curso</span>
               )}
-            </div>
+            </span>
+            {!enRutina && <ChevronRight size={16} className="sesion-dock-volver" aria-hidden="true" />}
           </button>
-          {/* Finalizar: cuando ya completaste todo pasa a relleno pleno —
-              es el único paso que te queda. */}
+          {/* Finalizar: con todo hecho pasa a relleno pleno, es lo único que
+              te queda. */}
           <button onClick={() => setConfirmando(true)} className={`boton-finalizar ${completo ? "listo" : ""}`}>
             <Check size={15} /> Finalizar
           </button>
@@ -28580,28 +28696,135 @@ function SideNav({ tab, setTab, profileName }) {
   );
 }
 
-// LA GUÍA, LA PRIMERA VEZ: arriba de cada pestaña, la primera vez que
-// entrás (mientras recién empezás a usar la app), un aviso chico que abre la
-// guía de esa pestaña. Con un toque se abre; con la cruz no vuelve a salir.
-function PrimeraVezGuia({ tab, nuevo, onAbrir }) {
-  const clave = `modusfit_guia_vista_${tab}`;
-  const [visto, setVisto] = useState(() => { try { return localStorage.getItem(clave) === "1"; } catch { return true; } });
-  const capitulo = useMemo(() => (nuevo && !visto ? capitulosGuia().find((c) => c.key === tab) : null), [nuevo, visto, tab]);
-  if (!capitulo) return null;
-  const marcar = () => { try { localStorage.setItem(clave, "1"); } catch { /* sin almacenamiento: sale de nuevo la próxima vez */ } setVisto(true); };
-  const titulo = tab === "entrenador_ia" ? "el Chatbot" : TAB_TITLES[tab] || capitulo.label;
-  return (
-    <div className="primera-vez">
-      <button onClick={() => { marcar(); onAbrir(tab); }} className="primera-vez-cuerpo">
-        <span className="galleta icono-galleta" aria-hidden="true">{capitulo.icon}</span>
-        <span className="min-w-0 flex-1">
-          <b>¿Primera vez en {titulo}?</b>
-          <span>Te muestro cómo se usa en {capitulo.pasos.length} pasos.</span>
-        </span>
-      </button>
-      <button onClick={marcar} aria-label="No mostrar más" className="boton-redondo primera-vez-cerrar"><X size={16} /></button>
-    </div>
+// EL RECORRIDO GUIADO (pedido: "mostrarle la web del eva para que aprenda a
+// hacer la explicación guiada"): como los recorridos de Moodle (el EVA), sobre
+// la pantalla de verdad. Se oscurece todo salvo la pieza de la que se habla y,
+// al lado, una tarjeta con qué es, en qué paso vas, Anterior, Siguiente y
+// Saltar. Arranca solo la primera vez en cada pestaña (PrimeraVezRecorrido,
+// mientras recién empezás: antes era un aviso chico que abría la guía), y
+// desde la guía del "?" con "Mostrámelo en la pantalla". Un paso cuya pieza no
+// está en la pantalla (Social sin cuenta, por ejemplo) se saltea.
+const RECORRIDOS = {
+  rutina: [
+    { sel: 'section[aria-label="Tu plan"]', titulo: "Tu plan", texto: "Lo que toca hoy, escrito como en la hoja del profe. Con Planificar cargás cuánto levantar cada semana, o se lo pedís a la IA." },
+    { sel: ".selector-dias", titulo: "Tus días", texto: "Elegí qué día entrenás. Viene elegido el que te toca hoy." },
+    { sel: ".dia-hero", titulo: "La barra del día", texto: "Cada serie que anotás le carga un disco. Cuando está llena, terminaste." },
+    { sel: '[data-recorrido="iniciar"]', titulo: "Iniciá la sesión", texto: "Al llegar al gimnasio: cuenta el tiempo y anota tu hora de entrada." },
+    { sel: ".ejercicio", titulo: "Anotá cada serie", texto: "Tocá un ejercicio: las reps y los kilos ya vienen escritos con lo que toca hoy. Lo guardás con el ✓ y el descanso arranca solo." },
+    { sel: "nav.barra-pestanas", titulo: "Todo lo demás, abajo", texto: "Tu progreso, tus amigos, tus rutinas y el entrenador con IA." },
+  ],
+  progreso: [
+    { sel: ".cajones-pizarra", titulo: "Tu ciclo", texto: "Un cajón por semana: el de color entero es esta. El último, más bajo, es la semana de descarga." },
+    { sel: ".pestanas-internas", titulo: "Cuatro miradas", texto: "Tu rango por músculo, el cuaderno de cada día, la gráfica de cada ejercicio y tus medidas." },
+    { sel: ".figura-cuerpo", titulo: "Tu nivel en cada músculo", texto: "Cada músculo, del color de su rango. Tocá uno para ver tu mejor marca y cuánto te falta para el siguiente." },
+  ],
+  rutinas: [
+    { sel: ".rutina-activa", titulo: "Tu rutina", texto: "La que estás haciendo, con tu semana en el estante: tocá una pesa para ir a entrenar ese día." },
+    { sel: 'section[aria-label="Armá tu rutina"]', titulo: "Armá la tuya", texto: "Creala a mano o con la IA, o importá la de tu profe desde una foto, un PDF o un Excel." },
+    { sel: ".corcho", titulo: "Rutinas listas", texto: "Push/Pull/Legs, Upper/Lower, Cuerpo completo y más. Tocá una para verla entera." },
+  ],
+  social: [
+    { sel: ".casillero-chico", titulo: "Tu casillero", texto: "Así te ven tus amigos: tu rango, tu racha y tus aplausos." },
+    { sel: ".carrera", titulo: "La semana", texto: "Quién fue más veces al gimnasio esta semana." },
+    { sel: ".pestanas-internas", titulo: "Actividad, ranking y amigos", texto: "Aplaudí a tus amigos, mirá los récords del grupo y sumá amigos con su @usuario o su código QR." },
+  ],
+  entrenador_ia: [
+    { sel: ".pizarra-ia", titulo: "Tu entrenador con IA", texto: "Conoce tu rutina, tus marcas y tu progreso. Tocá un pedido para empezar." },
+    { sel: '[data-recorrido="escribir"]', titulo: "Preguntale lo que quieras", texto: "Escribí o hablale con el micrófono: puede armarte una rutina, planificar tu semana o decirte con cuánto arrancar." },
+  ],
+};
+function Recorrido({ pasos, onTerminar }) {
+  // El "atrás" de Android lo cierra, pero sin congelar la página como los
+  // modales (useAndroidBack): el recorrido tiene que poder llevarte hasta
+  // cada pieza.
+  useAndroidBackHandler(onTerminar);
+  // Los pasos cuya pieza está en la pantalla, al empezar.
+  const [visibles] = useState(() => pasos.filter((ps) => typeof document !== "undefined" && document.querySelector(ps.sel)));
+  const [i, setI] = useState(0);
+  const [caja, setCaja] = useState(null);
+  const tarjetaRef = useRef(null);
+  const paso = visibles[i] || null;
+  useEffect(() => {
+    if (!paso) return;
+    const el = document.querySelector(paso.sel);
+    if (!el) return;
+    const quieto = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+    // Una pieza alta (la placa del día, el muñeco) va con su principio arriba
+    // y se ilumina hasta la mitad de la pantalla, donde está lo que importa:
+    // así la tarjeta entra debajo. Las demás, al medio.
+    const r0 = el.getBoundingClientRect();
+    const alta = r0.height > window.innerHeight * 0.5;
+    if (alta) window.scrollTo({ top: Math.max(0, r0.top + window.scrollY - 96), behavior: quieto ? "auto" : "smooth" });
+    else el.scrollIntoView({ block: "center", behavior: quieto ? "auto" : "smooth" });
+    let cuadro = 0;
+    const medir = () => {
+      const r = el.getBoundingClientRect();
+      const alto = window.innerHeight;
+      const top = Math.max(8, r.top - 8);
+      const bottom = Math.min(alto - 8, r.bottom + 8, alta ? top + alto * 0.5 : Infinity);
+      setCaja({ top, left: Math.max(8, r.left - 8), width: Math.min(window.innerWidth - 16, r.width + 16), height: Math.max(40, bottom - top) });
+    };
+    const t = setTimeout(() => { medir(); tarjetaRef.current?.focus(); }, quieto ? 60 : 420);
+    const alMover = () => { cancelAnimationFrame(cuadro); cuadro = requestAnimationFrame(medir); };
+    window.addEventListener("scroll", alMover, { passive: true });
+    window.addEventListener("resize", alMover);
+    return () => { clearTimeout(t); cancelAnimationFrame(cuadro); window.removeEventListener("scroll", alMover); window.removeEventListener("resize", alMover); };
+  }, [paso]);
+  useEffect(() => {
+    const tecla = (e) => { if (e.key === "Escape") onTerminar(); };
+    window.addEventListener("keydown", tecla);
+    return () => window.removeEventListener("keydown", tecla);
+  }, [onTerminar]);
+  if (!paso || typeof document === "undefined") return null;
+  const ultimo = i === visibles.length - 1;
+  // La tarjeta va debajo de la pieza si entra; si no, arriba.
+  const alto = typeof window !== "undefined" ? window.innerHeight : 800;
+  const abajo = !caja || caja.top + caja.height + 230 < alto;
+  const posicion = !caja ? { bottom: 96 } : abajo ? { top: Math.min(alto - 220, caja.top + caja.height + 12) } : { bottom: Math.max(16, alto - caja.top + 12) };
+  return createPortal(
+    <div className="recorrido" role="presentation">
+      {caja && <div className="recorrido-hueco" style={{ top: caja.top, left: caja.left, width: caja.width, height: caja.height }} aria-hidden="true" />}
+      <div ref={tarjetaRef} tabIndex={-1} className="recorrido-tarjeta" role="dialog" aria-modal="true" aria-labelledby="recorrido-titulo" style={posicion}>
+        <p className="recorrido-paso">Paso {i + 1} de {visibles.length}</p>
+        <h3 id="recorrido-titulo" className="recorrido-titulo">{paso.titulo}</h3>
+        <p className="recorrido-texto">{paso.texto}</p>
+        <div className="recorrido-pie">
+          <button onClick={onTerminar} className="recorrido-saltar">{ultimo ? "Cerrar" : "Saltar"}</button>
+          {i > 0 && <button onClick={() => setI(i - 1)} className="boton-tonal !min-h-10 !px-4" aria-label="Paso anterior"><ChevronLeft size={17} /></button>}
+          <button onClick={() => (ultimo ? onTerminar() : setI(i + 1))} className="boton-pildora !min-h-10 !px-5">{ultimo ? "Listo" : <>Siguiente <ChevronRight size={17} /></>}</button>
+        </div>
+      </div>
+    </div>,
+    document.body
   );
+}
+// La primera vez en cada pestaña, mientras recién empezás, el recorrido
+// arranca solo, cuando no hay ninguna ventana abierta (la bienvenida, por
+// ejemplo). Se recuerda en modusfit_recorrido_<pestaña>; quien ya había
+// visto el aviso de antes (modusfit_guia_vista_<pestaña>) no lo recibe.
+function PrimeraVezRecorrido({ tab, nuevo, activo, onEmpezar }) {
+  useEffect(() => {
+    if (!nuevo || activo || !RECORRIDOS[tab]) return;
+    // Con el navegador manejado por un robot (las pruebas y npm run capturas)
+    // no arranca solo: taparía la pantalla que se prueba o se fotografía.
+    if (typeof navigator !== "undefined" && navigator.webdriver) return;
+    const clave = `modusfit_recorrido_${tab}`;
+    try { if (localStorage.getItem(clave) === "1" || localStorage.getItem(`modusfit_guia_vista_${tab}`) === "1") return; } catch { return; }
+    let intentos = 0;
+    let t = null;
+    const probar = () => {
+      intentos++;
+      if (!document.querySelector('.modal-overlay, [role="dialog"]')) {
+        try { localStorage.setItem(clave, "1"); } catch { /* sin almacenamiento: puede volver a salir */ }
+        onEmpezar(tab);
+        return;
+      }
+      if (intentos < 30) t = setTimeout(probar, 1000);
+    };
+    t = setTimeout(probar, 1200);
+    return () => clearTimeout(t);
+  }, [tab, nuevo, activo, onEmpezar]);
+  return null;
 }
 
 const TAB_TITLES = { rutinas: "Rutinas", rutina: "Rutina", progreso: "Progreso", descarga: "Descarga", perfil: "Perfil", entrenador_ia: "Chatbot", social: "Social" };
@@ -29011,6 +29234,8 @@ export default function App() {
   }, [activeProfile]);
   const [cycleStart, setCycleStartState] = useState(loadCycleStart);
   const [showHelp, setShowHelp] = useState(false);
+  // El recorrido guiado que está en pantalla (la pestaña), o null.
+  const [recorrido, setRecorrido] = useState(null);
   const [helpStartTab, setHelpStartTab] = useState(null);
   const [showWelcome, setShowWelcome] = useState(false); // intro de la primera vez
   const [sessionSummary, setSessionSummary] = useState(null); // resumen al finalizar
@@ -29948,7 +30173,25 @@ export default function App() {
   const handleStartSession = (dayKey, deload = false) => {
     const activeSession = { dayKey, startedAt: new Date().toISOString() };
     if (deload) activeSession.deload = true;
-    const np = { ...profiles, [activeProfile]: { ...profiles[activeProfile], activeSession } };
+    // Las series de este día que anotaste hoy antes de iniciar la sesión (la
+    // serie te avisaba: "Tocá 'Iniciar sesión' arriba para que este día
+    // cuente") pasan a contar al iniciarla, que es lo que prometía el aviso.
+    const cur = profiles[activeProfile] || {};
+    const hoy = todayStr();
+    const rutinaDef = cur.activeRoutineId ? resolveRoutineDef(cur.routines?.[cur.activeRoutineId], cur.activeRoutineId) : null;
+    const delDia = new Set((rutinaDef ? buildRoutineModel(rutinaDef).days?.[dayKey]?.exercises || [] : []).map((e) => e.id));
+    let logsDelDia = null;
+    Object.entries(cur.logs || {}).forEach(([k, v]) => {
+      if (!Array.isArray(v) || !delDia.has(parseLogKey(k).exerciseId) || !v.some((e) => e?.noSession && e.date === hoy)) return;
+      if (!logsDelDia) logsDelDia = { ...cur.logs };
+      logsDelDia[k] = v.map((e) => {
+        if (!e?.noSession || e.date !== hoy) return e;
+        const c = { ...e };
+        delete c.noSession;
+        return c;
+      });
+    });
+    const np = { ...profiles, [activeProfile]: { ...cur, ...(logsDelDia ? { logs: logsDelDia } : {}), activeSession } };
     setProfiles(np); saveProfiles(np);
     // Una sesión se puede arrancar desde el chat ("arrancá mi entrenamiento")
     // o desde la propuesta de un entrenador, sin estar en Rutina. Antes la
@@ -30164,7 +30407,7 @@ export default function App() {
         <main className={`max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto px-4 pt-1 lg:pt-4 space-y-4 ${haySesionActiva && getProfileSettings(profile).modoGimnasio ? "modo-gimnasio" : ""}`} style={{ paddingBottom: "calc(7rem + var(--dock-alto, 0px) + env(safe-area-inset-bottom, 0px))" }}>
           <div key={tab} className={tabSlideClass}>
             <TituloPestana tab={tab} />
-            <PrimeraVezGuia tab={tab} nuevo={(profile?.trainingSessions?.length || 0) < 3 && !profile?.activeSession && !(tab === "rutina" && !profile?.onboardingDone)} onAbrir={(t) => { setHelpStartTab(t); setShowHelp(true); }} />
+            <PrimeraVezRecorrido tab={tab} nuevo={(profile?.trainingSessions?.length || 0) < 3 && !profile?.activeSession} activo={!!recorrido} onEmpezar={setRecorrido} />
             {tab === "rutinas" && <RoutinesView openScheduleSignal={openSectionSignal.id === "week-schedule" ? openSectionSignal.n : 0} openEditorSignal={openSectionSignal.id === "routine-editor" ? openSectionSignal.n : 0} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleDeleteRoutine} onUpdateProfile={handleUpdateProfile} onGoToDay={(dayKey) => goToSection("rutina", "go-to-day", dayKey)} />}
             {tab === "rutina" && !showPinnedDeload && <OnboardingTasksCard profile={profile} cycleStart={cycleStart} logs={logs} onGoToProfile={() => setTab("perfil")} onOpenFieldSettings={() => setShowFieldIntro(true)} onDone={() => handleUpdateProfile({ onboardingDone: true })} />}
             {/* Semana de descarga: se muestra fija acá mismo, en vez del
@@ -30174,7 +30417,7 @@ export default function App() {
                 que quedó adentro de RoutineView ahora sirve para volver a
                 fijarla si la cerraste. */}
             {tab === "rutina" && showPinnedDeload && <DeloadView logs={logs} setLogs={setLogs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} activeSession={profile?.activeSession?.deload ? profile.activeSession : null} onStartSession={handleStartSession} weekSchedule={weekSchedule} onClose={() => setDeloadDismissed(true)} cycleStart={cycleStart} />}
-            {tab === "rutina" && !showPinnedDeload && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} trainingSessions={profile?.trainingSessions || EMPTY_SESIONES} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToRoutines={() => setTab("rutinas")} onGoToSchedule={() => goToSection("rutinas", "week-schedule")} onGoToFieldSettings={() => goToSection("perfil", "field-settings-section")} onGoToDescarga={() => (isDeloadWeek ? setDeloadDismissed(false) : setTab("descarga"))} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} sex={profile?.sex} age={edadDe(profile)} activeRoutineDef={activeRoutineDef} onApplyOwnProgression={handleApplyOwnProgression} onSetPlanPaused={handleSetPlanPaused} onRemovePlan={handleRemovePlan} goToDaySignal={openSectionSignal.id === "go-to-day" ? openSectionSignal : { id: null, n: 0 }} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} />}
+            {tab === "rutina" && !showPinnedDeload && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToRoutines={() => setTab("rutinas")} onGoToSchedule={() => goToSection("rutinas", "week-schedule")} onGoToFieldSettings={() => goToSection("perfil", "field-settings-section")} onGoToDescarga={() => (isDeloadWeek ? setDeloadDismissed(false) : setTab("descarga"))} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} sex={profile?.sex} age={edadDe(profile)} activeRoutineDef={activeRoutineDef} onApplyOwnProgression={handleApplyOwnProgression} onSetPlanPaused={handleSetPlanPaused} onRemovePlan={handleRemovePlan} goToDaySignal={openSectionSignal.id === "go-to-day" ? openSectionSignal : { id: null, n: 0 }} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} />}
             {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} onGoToRoutines={() => goToSection("rutinas", "routine-editor")} weekSchedule={weekSchedule} sex={profile?.sex} age={edadDe(profile)} onGoToDeload={() => { if (isDeloadWeek) { setDeloadDismissed(false); setTab("rutina"); } else { setTab("descarga"); } }} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} />}
             {tab === "descarga" && <DeloadView logs={logs} setLogs={setLogs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} activeSession={profile?.activeSession?.deload ? profile.activeSession : null} onStartSession={handleStartSession} weekSchedule={weekSchedule} onClose={() => { setDeloadDismissed(true); setTab("rutina"); }} cycleStart={cycleStart} />}
             {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} setLogs={setLogs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} conversations={aiConversations} activeConversationId={activeAiConversationId} onNewConversation={handleNewAiConversation} onSwitchConversation={handleSwitchAiConversation} onDeleteConversation={handleDeleteAiConversation} onRenameConversation={handleRenameAiConversation} settings={getProfileSettings(profile)} cycleStart={cycleStart} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} onDeleteRoutine={handleDeleteRoutine} onNavigate={setTab} onStartSession={handleStartSession} onEndSession={handleEndSession} />}
@@ -30215,7 +30458,8 @@ export default function App() {
       {weeklyRecap && !sessionSummary && <WeeklyRecapModal data={weeklyRecap} onClose={() => setWeeklyRecap(null)} />}
       {periodRecap && <WeeklyRecapModal data={periodRecap.data} periodo={periodRecap.periodo} etiqueta={periodRecap.etiqueta} onClose={() => setPeriodRecap(null)} />}
       {showWelcome && <WelcomeIntro onClose={() => setShowWelcome(false)} onOpenTutorial={() => { setHelpStartTab(null); setShowHelp(true); }} onUpdateSettings={handleUpdateSettings} />}
-      {showHelp && <HelpModal startTab={helpStartTab} onClose={() => setShowHelp(false)} />}
+      {showHelp && <HelpModal startTab={helpStartTab} onClose={() => setShowHelp(false)} onRecorrido={(t) => { setShowHelp(false); setTab(t); setTimeout(() => setRecorrido(t), 450); }} />}
+      {recorrido && recorrido === tab && RECORRIDOS[recorrido] && <Recorrido key={recorrido} pasos={RECORRIDOS[recorrido]} onTerminar={() => setRecorrido(null)} />}
       {showFieldIntro && (
         <FieldSettingsIntroModal
           settings={getProfileSettings(profile)}
