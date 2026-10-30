@@ -518,7 +518,7 @@ const STAGNATION_DAYS = 21;
 
 // Mensaje inicial del Entrenador IA — mismo texto para la conversación
 // "nueva" (perfil recién creado) y para el reset manual (↺).
-const AI_CHAT_WELCOME = { role: "assistant", text: "¡Hola! 👋 Soy tu **Entrenador IA**.\n\nConozco tu rutina, tus marcas y tu progreso: todo lo que registrás en la app.\n\nPuedo ayudarte a:\n• **Crear o modificar rutinas** a tu medida\n• **Analizar tu progreso** y detectar puntos débiles\n• **Resolver dudas** de técnica, series y descanso\n\n¿Por dónde empezamos? 💪" };
+const AI_CHAT_WELCOME = { role: "assistant", text: "Hola, soy tu **Entrenador IA**.\n\nConozco tu rutina, tus marcas y tu progreso: todo lo que registrás en la app.\n\nPuedo ayudarte a:\n• **Crear o modificar rutinas** a tu medida\n• **Analizar tu progreso** y detectar puntos débiles\n• **Resolver dudas** de técnica, series y descanso\n\n¿Por dónde empezamos?" };
 // Tope de mensajes guardados por perfil — la conversación se persiste (así
 // no se pierde al cerrar la app), pero sin límite crecería para siempre en
 // localStorage/Firestore. 60 mensajes son ~30 idas y vueltas, de sobra para
@@ -1111,8 +1111,8 @@ function dayTabTextSizing(dayCount) {
   if (dayCount <= 3) return { textClass: "text-sm", minHeight: 36 };
   if (dayCount === 4) return { textClass: "text-xs", minHeight: 30 };
   if (dayCount === 5) return { textClass: "text-[11px]", minHeight: 28 };
-  if (dayCount === 6) return { textClass: "text-[10.5px]", minHeight: 26 };
-  return { textClass: "text-[10px]", minHeight: 25 };
+  if (dayCount === 6) return { textClass: "text-[11px]", minHeight: 26 };
+  return { textClass: "text-[11px]", minHeight: 25 };
 }
 
 // Nombre de un día en su solapa, sin cortar nunca una palabra.
@@ -1382,7 +1382,7 @@ function GeneralWarmupCard({ exercises, warmupKeys, accent }) {
       <button onClick={() => setOpen((o) => !o)} className="w-full flex items-center gap-3 px-3.5 py-3 text-left transition active:scale-[0.99]">
         <span className="galleta icono-galleta" aria-hidden="true"><Activity size={16} /></span>
         <div className="flex-1 min-w-0">
-          <p className="text-[14.5px] font-bold text-white leading-tight">Calentamiento general</p>
+          <p className="text-[15px] font-bold text-white leading-tight">Calentamiento general</p>
           <p className="text-[12px] text-slate-500 mt-0.5">{drills.length} ejercicios de movilidad{doneCount > 0 ? ` · ${doneCount}/${drills.length} hechos` : ""}</p>
         </div>
         <ChevronDown size={16} className={`text-slate-500 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
@@ -1393,10 +1393,10 @@ function GeneralWarmupCard({ exercises, warmupKeys, accent }) {
             <label key={d.key} className="flex items-center gap-2.5 py-1.5 cursor-pointer select-none">
               <input type="checkbox" checked={!!done[d.key]} onChange={(e) => setDone((prev) => ({ ...prev, [d.key]: e.target.checked }))} className="w-4 h-4 shrink-0 rounded accent-current" style={{ color: accent }} />
               <span className={`flex-1 text-xs ${done[d.key] ? "text-slate-600 line-through" : "text-slate-300"}`}>{d.name}</span>
-              <span className="text-[10px] text-slate-600 shrink-0">{d.dur}</span>
+              <span className="text-[11px] text-slate-600 shrink-0">{d.dur}</span>
             </label>
           ))}
-          <p className="text-[9.5px] text-slate-600 pt-1">Guía general de movilidad — no hace falta completar todo, es sólo para no arrancar en frío.</p>
+          <p className="text-[11px] text-slate-600 pt-1">Guía general de movilidad — no hace falta completar todo, es sólo para no arrancar en frío.</p>
         </div>
       )}
     </div>
@@ -2152,10 +2152,20 @@ const ONDA_URI = svgComoUrl('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 
 // px para arriba) crecen la mitad, con --escala-titulo. Antes se agrandaba el
 // font-size del <html>: crecían los textos de Tailwind y también sus márgenes,
 // pero no las piezas en px, y quedaba una mezcla rara.
+// LA ESCALA: 11, 12, 13, 14, 15 y 16 px para la interfaz (sin medios píxeles:
+// en una misma pantalla llegó a haber 15 tamaños), 36 el título de cada
+// pestaña, y los números grandes y la letra a mano, aparte. Ninguna letra de
+// la interfaz baja de 11 px, ni con la letra chica de fábrica (max(11px, …)).
 function letraEscalable(css) {
+  const enPx = (n, u) => (u === "rem" ? Number(n) * 16 : Number(n));
   return css
-    .replace(/font-size:\s*calc\(([\d.]+)(px|rem) \* var\(--small-text-scale, 1\)\)/g, (_, n, u) => `font-size: calc(${n}${u} * var(--escala-letra, 1) * var(--small-text-scale, 1))`)
-    .replace(/font-size:\s*([\d.]+)(px|rem)/g, (_, n, u) => `font-size: calc(${n}${u} * var(${(u === "rem" ? Number(n) * 16 : Number(n)) >= 24 ? "--escala-titulo" : "--escala-letra"}, 1))`);
+    .replace(/font-size:\s*calc\(([\d.]+)(px|rem) \* var\(--small-text-scale, 1\)\)/g, (_, n, u) => `font-size: max(11px, calc(${n}${u} * var(--escala-letra, 1) * var(--small-text-scale, 1)))`)
+    .replace(/font-size:\s*([\d.]+)(px|rem)/g, (_, n, u) => {
+      const px = enPx(n, u);
+      if (px >= 24) return `font-size: calc(${n}${u} * var(--escala-titulo, 1))`;
+      const calc = `calc(${n}${u} * var(--escala-letra, 1))`;
+      return px >= 10 ? `font-size: max(11px, ${calc})` : `font-size: ${calc}`;
+    });
 }
 
 const ANIMATION_CSS = letraEscalable(`
@@ -2165,7 +2175,7 @@ const ANIMATION_CSS = letraEscalable(`
    este CSS pasan por letraEscalable(). */
 :root {
   --escala-titulo: calc(1 + (var(--escala-letra, 1) - 1) * 0.5);
-  --text-xs: calc(0.75rem * var(--escala-letra, 1));
+  --text-xs: max(11px, calc(0.75rem * var(--escala-letra, 1)));
   --text-sm: calc(0.875rem * var(--escala-letra, 1));
   --text-base: calc(1rem * var(--escala-letra, 1));
   --text-lg: calc(1.125rem * var(--escala-letra, 1));
@@ -2964,25 +2974,11 @@ input, textarea, [contenteditable="true"] {
    Mismo motivo que en .light-mode: los corchetes de Tailwind se escapan
    para que CSS los lea como parte del nombre de la clase, y las barras
    invertidas van dobles porque esto vive en un template literal de JS. */
-.text-\\[8px\\] { font-size: calc(8px * var(--small-text-scale, 1)) !important; }
-.text-\\[9px\\] { font-size: calc(9px * var(--small-text-scale, 1)) !important; }
-.text-\\[10px\\] { font-size: calc(10px * var(--small-text-scale, 1)) !important; }
+/* Son sólo cinco: 11, 12, 13, 14 y 15 px (la escala, ver letraEscalable). */
 .text-\\[11px\\] { font-size: calc(11px * var(--small-text-scale, 1)) !important; }
 .text-\\[12px\\] { font-size: calc(12px * var(--small-text-scale, 1)) !important; }
-/* Tamaños intermedios y grandes que también hay que escalar: sin estos, las
-   etiquetas quedaban fijas mientras el resto de la app crecía o se achicaba
-   (los decimales de Tailwind llevan el punto escapado en CSS). */
-.text-\\[8\\.5px\\]  { font-size: calc(8.5px * var(--small-text-scale, 1)) !important; }
-.text-\\[9\\.5px\\]  { font-size: calc(9.5px * var(--small-text-scale, 1)) !important; }
-.text-\\[10\\.5px\\] { font-size: calc(10.5px * var(--small-text-scale, 1)) !important; }
 .text-\\[13px\\] { font-size: calc(13px * var(--small-text-scale, 1)) !important; }
-.text-\\[17px\\] { font-size: calc(17px * var(--small-text-scale, 1)) !important; }
-.text-\\[26px\\] { font-size: calc(26px * var(--small-text-scale, 1)) !important; }
-.text-\\[11\\.5px\\] { font-size: calc(11.5px * var(--small-text-scale, 1)) !important; }
-.text-\\[12\\.5px\\] { font-size: calc(12.5px * var(--small-text-scale, 1)) !important; }
-.text-\\[13\\.5px\\] { font-size: calc(13.5px * var(--small-text-scale, 1)) !important; }
 .text-\\[14px\\] { font-size: calc(14px * var(--small-text-scale, 1)) !important; }
-.text-\\[14\\.5px\\] { font-size: calc(14.5px * var(--small-text-scale, 1)) !important; }
 .text-\\[15px\\] { font-size: calc(15px * var(--small-text-scale, 1)) !important; }
 
 /* ============================================================================
@@ -3615,6 +3611,15 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 .foco-ref { margin-left: auto; display: inline-flex; align-items: baseline; gap: 5px; flex: none; font-size: 0.8125rem; color: var(--text-faint); white-space: nowrap; }
 .foco-ref b { font-weight: 650; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 button.foco-ref:active { opacity: .7; }
+/* BOTONES DE 44 PX SIN AGRANDAR EL DIBUJO: el récord de arriba, el "kg ⇄" y los
+   − y + de la serie se ven igual que antes, pero el dedo los agarra en 44 px
+   (un ::after transparente alrededor). Antes medían de 19 a 36 px de alto y
+   en el gimnasio, con el teléfono en una mano, se tocaba el de al lado. */
+button.foco-ref, button.foco-campo-rotulo, .foco-ajustes button, .foco-salto { position: relative; }
+button.foco-ref::after, button.foco-campo-rotulo::after, .foco-ajustes button::after, .foco-salto::after { content: ""; position: absolute; }
+button.foco-ref::after { inset: -12px -8px; }
+button.foco-campo-rotulo::after { inset: -2px -10px -12px; }
+.foco-ajustes button::after, .foco-salto::after { inset: -4px; }
 .foco-cancelar { margin-left: auto; height: 30px; padding: 0 12px; border-radius: 999px; font-size: 0.8125rem; font-weight: 600; color: var(--text-muted); background: var(--velo); }
 /* El visor: un pozo con los dos números y el ✓ de tiza. */
 .foco-visor {
@@ -3667,7 +3672,7 @@ button.foco-campo-rotulo:active { background: var(--velo); }
 .ticket-salida::-webkit-scrollbar { display: none; }
 .ticket-papel {
   position: relative; padding: 24px 20px 22px; color: #232326; background: #f3f3ef;
-  font-size: 13.5px; line-height: 1.35; box-shadow: 0 18px 40px -20px rgba(0,0,0,.9);
+  font-size: 14px; line-height: 1.35; box-shadow: 0 18px 40px -20px rgba(0,0,0,.9);
   animation: ticketSale 1.25s cubic-bezier(.22,.9,.25,1) both;
 }
 .ticket-papel::after {
@@ -3676,7 +3681,7 @@ button.foco-campo-rotulo:active { background: var(--velo); }
 }
 @keyframes ticketSale { from { transform: translateY(-100%); } 70% { transform: translateY(2%); } }
 .ticket-marca { text-align: center; font-size: 1.5rem; font-weight: 800; font-stretch: 80%; letter-spacing: -0.01em; color: #1d1d1f; }
-.ticket-fecha { margin-top: 2px; text-align: center; font-size: 12.5px; color: #6b6b70; }
+.ticket-fecha { margin-top: 2px; text-align: center; font-size: 13px; color: #6b6b70; }
 .ticket-papel hr { margin: 12px 0; border: 0; border-top: 1.5px dashed #b9b9b4; }
 .ticket-fila { display: flex; align-items: baseline; gap: 6px; margin-top: 5px; }
 .ticket-fila > span:first-child { min-width: 0; max-width: 64%; }
@@ -3686,8 +3691,8 @@ button.foco-campo-rotulo:active { background: var(--velo); }
 .ticket-fila.total { font-size: 16px; font-weight: 800; color: #1d1d1f; }
 .ticket-fila.record > span:last-child { color: #8a6a14; }
 .ticket-titulo { display: flex; align-items: center; gap: 6px; font-weight: 750; color: #8a6a14; }
-.ticket-nota { margin-top: 8px; text-align: center; font-size: 12.5px; font-weight: 600; color: #4a4a4e; }
-.ticket-gracias { text-align: center; font-size: 12.5px; color: #6b6b70; }
+.ticket-nota { margin-top: 8px; text-align: center; font-size: 13px; font-weight: 600; color: #4a4a4e; }
+.ticket-gracias { text-align: center; font-size: 13px; color: #6b6b70; }
 .ticket-codigo { display: flex; justify-content: center; gap: 2px; height: 38px; margin-top: 12px; }
 .ticket-codigo i { flex: none; background: #1d1d1f; }
 .ticket-botones { display: flex; gap: 8px; margin: 10px 16px 0; }
@@ -3697,12 +3702,12 @@ button.foco-campo-rotulo:active { background: var(--velo); }
 .ticket-ejercicio + .ticket-ejercicio { margin-top: 1px; }
 .ticket-raya { display: block; height: 4px; margin: 4px 0 6px; border-radius: 2px; background: #e4e4df; overflow: hidden; }
 .ticket-raya i { display: block; height: 100%; border-radius: inherit; background: color-mix(in oklab, var(--dia) 58%, #f3f3ef); }
-.ticket-subtitulo { margin-bottom: 8px; font-size: 12.5px; font-weight: 700; color: #4a4a4e; }
+.ticket-subtitulo { margin-bottom: 8px; font-size: 13px; font-weight: 700; color: #4a4a4e; }
 .ticket-columnas { display: flex; align-items: flex-end; gap: 8px; height: 96px; padding: 0 2px; }
 .ticket-columna { flex: 1 1 0; min-width: 0; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 3px; }
 .ticket-columna i { display: block; width: 70%; max-width: 34px; border-radius: 3px 3px 0 0; background: #cfcfca; }
 .ticket-columna.hoy i { background: color-mix(in oklab, var(--dia) 75%, #1d1d1f); }
-.ticket-columna b { min-height: 14px; font-size: 11.5px; font-weight: 750; color: #1d1d1f; white-space: nowrap; }
+.ticket-columna b { min-height: 14px; font-size: 12px; font-weight: 750; color: #1d1d1f; white-space: nowrap; }
 .ticket-columna span { font-size: 11px; color: #6b6b70; white-space: nowrap; }
 .ticket-columna.hoy span { font-weight: 700; color: #1d1d1f; }
 .ticket-reparto { display: flex; gap: 3px; height: 10px; }
@@ -3923,7 +3928,7 @@ button.foco-campo-rotulo:active { background: var(--velo); }
 .cardio-reloj.en-marcha { background: var(--surface-1); }
 .light-mode .cardio-reloj.en-marcha { background: var(--surface-1); }
 /* La cabecera del día. */
-.dia-reset { position: absolute; top: 14px; right: 14px; z-index: 1; width: 38px; height: 38px; background: var(--velo); color: var(--text-muted); }
+.dia-reset { position: absolute; top: 11px; right: 11px; z-index: 1; width: 44px; height: 44px; background: var(--velo); color: var(--text-muted); }
 .dia-aviso {
   width: 100%; display: flex; align-items: center; gap: 10px; text-align: left;
   padding: 11px 14px; border-radius: 18px; font-size: 0.8125rem; font-weight: 600;
@@ -4022,7 +4027,7 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
    (ciclo; ahora son cajones), la escalera de récords (gráfica), la tarjeta
    perforada (historial), el carnet de socio y la carrera de la semana. */
 .seccion-titulo { font-size: 1rem; font-weight: 700; color: var(--text-strong); letter-spacing: -0.01em; padding: 0 2px; }
-.enlace-suave { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 36px; padding: 0 6px; font-size: 0.8125rem; font-weight: 600; color: var(--text-muted); }
+.enlace-suave { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 44px; padding: 0 6px; font-size: 0.8125rem; font-weight: 600; color: var(--text-muted); }
 .enlace-suave:hover { color: var(--text-strong); }
 .enlace-suave.peligro:hover { color: #fb7185; }
 .chip-dato {
@@ -4051,7 +4056,7 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 .balanza-cabeza { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .balanza-valor { display: flex; align-items: baseline; gap: 4px; }
 .balanza-valor b { font-size: 2.6rem; line-height: 1; font-weight: 760; color: var(--text-strong); }
-.balanza-valor small { font-size: 0.95rem; font-weight: 600; color: var(--text-muted); }
+.balanza-valor small { font-size: 0.9375rem; font-weight: 600; color: var(--text-muted); }
 .balanza-delta {
   font-size: 0.8125rem; font-weight: 650; padding: 5px 11px; border-radius: 999px;
   color: var(--text-strong); background: var(--velo);
@@ -4077,8 +4082,8 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 .light-mode .balanza-pesa::after { border-top-color: var(--c, var(--tono)); }
 .balanza-pesa.fantasma { background: transparent; border: 2px dashed var(--hairline-fuerte); box-shadow: none; }
 .balanza-pesa.fantasma::after { display: none; }
-.balanza-escala { display: flex; justify-content: space-between; margin: 0 4px; font-size: 11.5px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
-.balanza-leyenda { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12.5px; color: var(--text-muted); }
+.balanza-escala { display: flex; justify-content: space-between; margin: 0 4px; font-size: 12px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.balanza-leyenda { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--text-muted); }
 .balanza-leyenda i { display: inline-block; width: 10px; height: 14px; border-radius: 3px; vertical-align: -2px; margin-right: 6px; background: color-mix(in oklab, var(--c, var(--tono)) 72%, white); }
 .balanza-leyenda i.fantasma { background: transparent; border: 1.5px dashed var(--hairline-fuerte); }
 
@@ -4095,10 +4100,10 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 .light-mode .soporte-oscuro { stop-color: #8f9298; }
 .equilibrio-apoyo { stroke: rgba(0,0,0,0.35); stroke-width: 0.6; stroke-linejoin: round; }
 .equilibrio-sombra { fill: var(--velo-fuerte); }
-.equilibrio-rotulos { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 8px; font-size: 12.5px; line-height: 1.25; color: var(--text-muted); }
+.equilibrio-rotulos { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 8px; font-size: 13px; line-height: 1.25; color: var(--text-muted); }
 .equilibrio-rotulos > span:last-child { text-align: right; }
 .equilibrio-rotulos b { display: block; font-size: 1.6rem; line-height: 1; font-weight: 750; color: var(--text-strong); }
-.equilibrio-veredicto { padding: 6px 12px; border-radius: 999px; font-weight: 650; font-size: 12.5px; text-align: center; color: var(--text-muted); background: var(--velo); }
+.equilibrio-veredicto { padding: 6px 12px; border-radius: 999px; font-weight: 650; font-size: 13px; text-align: center; color: var(--text-muted); background: var(--velo); }
 .equilibrio-veredicto.ok { color: var(--text-strong); }
 .equilibrio-pie { text-align: center; font-size: 12px; color: var(--text-faint); }
 /* Las series por músculo, en barras lisas. */
@@ -4120,7 +4125,7 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 .light-mode .guia-capitulos button.activo { background: var(--c); }
 .guia-cuerpo { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 4px 20px 10px; }
 .guia-escenario { display: grid; place-items: center; min-height: 172px; padding: 18px 14px; border-radius: 24px; background: color-mix(in oklab, var(--c) 6%, var(--surface-2)); overflow: hidden; }
-.guia-paso { margin-top: 16px; font-size: 12.5px; font-weight: 600; color: var(--text-faint); }
+.guia-paso { margin-top: 16px; font-size: 13px; font-weight: 600; color: var(--text-faint); }
 .guia-paso-titulo { margin-top: 2px; font-size: 1.3rem; font-weight: 750; line-height: 1.15; letter-spacing: -0.015em; color: var(--text-strong); text-wrap: balance; }
 .guia-paso-texto { margin-top: 6px; font-size: 14px; line-height: 1.5; color: var(--text-muted); text-wrap: pretty; }
 .guia-pie { display: grid; gap: 12px; padding: 12px 16px 16px; border-top: 1px solid var(--hairline); }
@@ -4159,17 +4164,17 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 .guia-dial .descanso-tiempo { color: var(--text-strong); }
 .guia-rangos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 10px; width: 100%; max-width: 300px; }
 .guia-rangos span { display: grid; justify-items: center; gap: 4px; }
-.guia-rangos small { font-size: 11.5px; font-weight: 600; color: var(--text-muted); }
+.guia-rangos small { font-size: 12px; font-weight: 600; color: var(--text-muted); }
 .guia-acciones { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; width: 100%; }
-.guia-acciones > span { display: grid; justify-items: center; gap: 8px; padding: 14px 6px; border-radius: 18px; font-size: 12.5px; font-weight: 650; color: var(--text-strong); background: var(--surface-1); box-shadow: var(--placa-canto); }
+.guia-acciones > span { display: grid; justify-items: center; gap: 8px; padding: 14px 6px; border-radius: 18px; font-size: 13px; font-weight: 650; color: var(--text-strong); background: var(--surface-1); box-shadow: var(--placa-canto); }
 .guia-acciones em { font-style: normal; }
 .guia-chat { display: grid; gap: 10px; width: 100%; }
-.guia-chat p { max-width: 86%; font-size: 13.5px; line-height: 1.45; }
+.guia-chat p { max-width: 86%; font-size: 14px; line-height: 1.45; }
 .guia-chat .propia { justify-self: end; padding: 9px 13px; border-radius: 18px 18px 6px 18px; color: var(--text-strong); background: color-mix(in oklab, var(--c) 16%, var(--surface-1)); }
 .guia-chat .ia { color: var(--text-strong); }
 .guia-fichas { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 .guia-fichas span { padding: 8px 12px; border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--text-muted); background: var(--surface-1); box-shadow: var(--placa-canto); }
-.guia-google { display: inline-flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 20px; border-radius: 999px; font-size: 14.5px; font-weight: 650; color: var(--text-strong); background: var(--surface-1); box-shadow: inset 0 0 0 1px var(--hairline-fuerte); }
+.guia-google { display: inline-flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 20px; border-radius: 999px; font-size: 15px; font-weight: 650; color: var(--text-strong); background: var(--surface-1); box-shadow: inset 0 0 0 1px var(--hairline-fuerte); }
 .guia-google span { font-weight: 800; color: #4285F4; }
 /* El cronograma: un renglón por día de la semana. */
 .cronograma { display: grid; }
@@ -4177,12 +4182,12 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 .cronograma-fila + .cronograma-fila { border-top: 1px solid var(--hairline); }
 .cronograma-dia { font-size: 13px; font-weight: 650; color: var(--text-muted); }
 .cronograma-opciones { display: flex; flex-wrap: wrap; gap: 6px; }
-.cronograma-op { min-height: 34px; padding: 0 12px; border-radius: 999px; font-size: 12.5px; font-weight: 650; color: var(--text-muted); background: var(--velo); transition: background-color .2s ease, color .2s ease, transform .2s var(--resorte); }
+.cronograma-op { min-height: 34px; padding: 0 12px; border-radius: 999px; font-size: 13px; font-weight: 650; color: var(--text-muted); background: var(--velo); transition: background-color .2s ease, color .2s ease, transform .2s var(--resorte); }
 .cronograma-op:active { transform: scale(.95); }
 .cronograma-op.elegida { color: color-mix(in oklab, var(--dia) 18%, #07080a); background: color-mix(in oklab, var(--dia) 60%, #8a8c92); }
 .light-mode .cronograma-op.elegida { background: color-mix(in oklab, var(--dia) 70%, #a7a9ae); }
 .cronograma-op.descanso.elegida { color: var(--text-strong); background: var(--surface-3); }
-.cronograma-resumen { margin-top: 10px; font-size: 12.5px; color: var(--text-muted); }
+.cronograma-resumen { margin-top: 10px; font-size: 13px; color: var(--text-muted); }
 /* La vista previa de una rutina. */
 .modal-rutina { width: 100%; max-width: 28rem; max-height: 88vh; display: flex; flex-direction: column; overflow: hidden; border-radius: 28px; background: var(--surface-1); box-shadow: var(--placa-canto), 0 30px 60px -30px rgba(0,0,0,.8); }
 .modal-rutina-cabeza { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 18px 18px 12px; }
@@ -4201,8 +4206,7 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 .light-mode .semana-hueco.picado { background: color-mix(in oklab, var(--tono) 70%, #a7a9ae); }
 .semana-hueco.hoy { outline: 2px solid color-mix(in oklab, var(--text-strong) 55%, transparent); outline-offset: 1.5px; }
 .semana-hueco.futuro:not(.picado) { opacity: .45; }
-.semana-hueco-col em { font-style: normal; font-size: 10px; font-weight: 600; color: var(--text-faint); }
-.aviso-descanso { width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 26px; text-align: left; background: var(--surface-1); }
+.semana-hueco-col em { font-style: normal; font-size: 11px; font-weight: 600; color: var(--text-faint); }
 
 /* El carnet de socio. */
 .carnet { position: relative; overflow: hidden; border-radius: 28px; padding: 16px 16px 14px; background: var(--surface-1); box-shadow: var(--placa-canto), var(--sombra-placa); }
@@ -4256,7 +4260,7 @@ button.carrera-carril:active { background: var(--velo); }
 .con-rango { outline: 2px solid color-mix(in oklab, var(--rango-c) 64%, #8a8c92); outline-offset: 2px; }
 .light-mode .con-rango { outline-color: color-mix(in oklab, var(--rango-c) 78%, #6b6e74); }
 .carrera-cuerpo { min-width: 0; display: grid; gap: 6px; }
-.carrera-nombre { font-size: 13.5px; font-weight: 650; line-height: 1.1; color: var(--text-strong); }
+.carrera-nombre { font-size: 14px; font-weight: 650; line-height: 1.1; color: var(--text-strong); }
 .carrera-pista { display: flex; gap: 3px; }
 .carrera-pista i { flex: 1 1 0; height: 8px; border-radius: 4px; background: var(--velo-fuerte); }
 /* Cada sesión, un tramo en el tono de Social: con seis carriles, los
@@ -4288,7 +4292,7 @@ button.carrera-carril:active { background: var(--velo); }
 .records-rotulo { font-size: 0.8125rem; font-weight: 600; color: var(--text-muted); }
 .records-valor { display: flex; align-items: baseline; gap: 4px; margin-top: 2px; font-size: 2.5rem; line-height: 1; font-weight: 760; color: var(--text-strong); }
 .records-valor i { font-style: normal; font-size: 1.15rem; color: var(--text-faint); }
-.records-valor small { font-size: 0.95rem; font-weight: 600; color: var(--text-muted); margin-left: 2px; }
+.records-valor small { font-size: 0.9375rem; font-weight: 600; color: var(--text-muted); margin-left: 2px; }
 .records-sub { margin-top: 5px; font-size: 0.8125rem; color: var(--text-muted); }
 .records-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .records-pie { display: flex; align-items: center; gap: 8px; font-size: 0.8125rem; line-height: 1.4; color: var(--text-muted); }
@@ -4299,9 +4303,9 @@ button.carrera-carril:active { background: var(--velo); }
   min-width: 132px; padding: 9px 12px; border-radius: 16px;
   background: var(--surface-3); box-shadow: 0 12px 28px -10px rgba(0,0,0,0.6);
 }
-.grafica-globo-fecha { font-size: 11.5px; color: var(--text-muted); }
+.grafica-globo-fecha { font-size: 12px; color: var(--text-muted); }
 .grafica-globo-serie { margin-top: 2px; font-size: 1.05rem; font-weight: 750; color: var(--text-strong); }
-.grafica-globo-dato { margin-top: 2px; font-size: 11.5px; color: var(--text-muted); }
+.grafica-globo-dato { margin-top: 2px; font-size: 12px; color: var(--text-muted); }
 /* LA GRÁFICA DEL TIEMPO (GraficaTiempo). La escala a la izquierda en gris
    chico, rayas de 1px, la de abajo un poco más marcada, una línea de 2px que
    se traza al aparecer y un relleno que no pasa del 16%. */
@@ -4338,7 +4342,7 @@ button.carrera-carril:active { background: var(--velo); }
 .evo-metrica-valor { display: flex; align-items: baseline; gap: 3px; min-width: 0; color: var(--text-strong); }
 .evo-metrica-valor b { font-size: 1.3rem; line-height: 1.05; font-weight: 750; }
 .evo-metrica-valor small { font-size: 11px; font-weight: 600; color: var(--text-muted); }
-.evo-metrica-cambio { font-size: 11.5px; font-weight: 650; line-height: 1.25; color: var(--text-faint); }
+.evo-metrica-cambio { font-size: 12px; font-weight: 650; line-height: 1.25; color: var(--text-faint); }
 .evo-metrica-cambio small { display: block; font-size: 11px; font-weight: 500; color: var(--text-faint); }
 .evo-metrica[aria-selected="true"] .evo-metrica-cambio { color: var(--text-muted); }
 /* Un cambio para bien (más 1RM, más peso, más volumen) dice que es bueno en
@@ -4347,14 +4351,14 @@ button.carrera-carril:active { background: var(--velo); }
 .light-mode .evo-metrica-cambio.sube, .light-mode .evo-metrica[aria-selected="true"] .evo-metrica-cambio.sube, .light-mode .resumen-kpi span.sube { color: color-mix(in oklab, oklch(72.3% 0.153 149.6) 70%, black); }
 .evo-pie { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; margin-top: 6px !important; }
 .evo-pie .segmentado { flex: none; }
-.evo-ritmo { font-size: 12.5px; color: var(--text-muted); }
+.evo-ritmo { font-size: 13px; color: var(--text-muted); }
 .evo-ritmo b { font-weight: 700; color: var(--text-strong); }
 .sesion-renglon { display: grid; grid-template-columns: 28px 52px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 8px 12px 8px 8px; border-radius: 16px; background: var(--surface-2); }
 .sesion-renglon.record { background: var(--surface-2); }
 .sesion-renglon-marca { width: 26px; height: 26px; --galleta-fondo: color-mix(in oklab, var(--c, var(--tono)) 72%, white); color: color-mix(in oklab, var(--c, var(--tono)) 18%, #07080a); }
 .sesion-renglon-marca.hueca { --galleta-borde: color-mix(in oklab, var(--text-strong) 18%, transparent); --galleta-fondo: var(--surface-2); color: var(--text-muted); }
 .sesion-renglon.descarga .sesion-renglon-marca { color: #c084fc; }
-.sesion-renglon-fecha { font-size: 12.5px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.sesion-renglon-fecha { font-size: 13px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .sesion-renglon-serie { font-size: 13px; font-weight: 600; color: var(--text-strong); font-variant-numeric: tabular-nums; }
 .sesion-renglon-1rm { font-size: 1.05rem; font-weight: 750; color: var(--text-strong); }
 .sesion-renglon-1rm small { font-size: 0.75rem; font-weight: 600; color: var(--text-muted); margin-left: 2px; }
@@ -4369,7 +4373,7 @@ button.carrera-carril:active { background: var(--velo); }
 .hueco-dia {
   aspect-ratio: 1; width: 100%; max-width: 44px; justify-self: center; border-radius: 11px;
   display: flex; align-items: center; justify-content: center;
-  font-size: 12.5px; font-weight: 600; color: var(--text-faint); font-variant-numeric: tabular-nums;
+  font-size: 13px; font-weight: 600; color: var(--text-faint); font-variant-numeric: tabular-nums;
   background: color-mix(in oklab, var(--text-strong) 5%, transparent);
   box-shadow: inset 0 2px 4px rgba(0,0,0,0.35);
   transition: transform .25s var(--resorte);
@@ -4431,9 +4435,9 @@ button.carrera-carril:active { background: var(--velo); }
 .preset-cuerpo { display: block; width: 100%; text-align: left; }
 .preset-cabeza { display: flex; align-items: center; gap: 8px; }
 .preset-nombre { font-size: 0.9375rem; font-weight: 700; line-height: 1.25; color: var(--text-strong); text-wrap: balance; }
-.preset-activa { flex: none; height: 22px; padding: 0 9px; border-radius: 999px; display: inline-flex; align-items: center; font-size: 11.5px; font-weight: 700; color: color-mix(in oklab, var(--c, var(--tono)) 18%, #07080a); background: color-mix(in oklab, var(--c, var(--tono)) 72%, white); }
+.preset-activa { flex: none; height: 22px; padding: 0 9px; border-radius: 999px; display: inline-flex; align-items: center; font-size: 12px; font-weight: 700; color: color-mix(in oklab, var(--c, var(--tono)) 18%, #07080a); background: color-mix(in oklab, var(--c, var(--tono)) 72%, white); }
 .light-mode .preset-activa { background: var(--c, var(--tono)); }
-.preset-desc { display: block; margin-top: 5px; font-size: 12.5px; line-height: 1.4; color: var(--text-muted); text-wrap: pretty; }
+.preset-desc { display: block; margin-top: 5px; font-size: 13px; line-height: 1.4; color: var(--text-muted); text-wrap: pretty; }
 .preset-pie { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
 .preset-tira { display: flex; gap: 2px; width: 96px; height: 10px; flex: none; }
 .preset-tira i { flex-basis: 0; border-radius: 3px; background: color-mix(in oklab, var(--text-strong) 24%, transparent); }
@@ -4463,14 +4467,14 @@ button.carrera-carril:active { background: var(--velo); }
 .light-mode .buscador-region[aria-selected="true"], .light-mode .buscador-region[aria-checked="true"] { color: color-mix(in oklab, var(--c, var(--tono)) 72%, black); background: color-mix(in oklab, var(--c, var(--tono)) 15%, white); }
 .buscador-lista { display: grid; gap: 4px; max-height: 380px; overflow-y: auto; overscroll-behavior: contain; margin: 0 -4px; padding: 0 4px; }
 .buscador-lista section { display: grid; gap: 4px; }
-.buscador-cuenta { margin: 0 4px 2px; font-size: 12.5px; color: var(--text-faint); }
-.buscador-grupo { margin: 8px 4px 2px; font-size: 12.5px; font-weight: 650; color: var(--text-muted); }
+.buscador-cuenta { margin: 0 4px 2px; font-size: 13px; color: var(--text-faint); }
+.buscador-grupo { margin: 8px 4px 2px; font-size: 13px; font-weight: 650; color: var(--text-muted); }
 .buscador-fila { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 54px; padding: 8px 10px 8px 14px; border-radius: 18px; text-align: left; background: var(--surface-1); transition: transform .2s var(--resorte); }
 .buscador-fila:active { transform: scale(.985); }
-.buscador-nombre { display: block; font-size: 14.5px; font-weight: 600; line-height: 1.25; color: var(--text-strong); overflow-wrap: anywhere; }
+.buscador-nombre { display: block; font-size: 15px; font-weight: 600; line-height: 1.25; color: var(--text-strong); overflow-wrap: anywhere; }
 .buscador-nombre mark { background: none; font-weight: 750; color: color-mix(in oklab, var(--c, var(--tono)) 72%, white); }
 .light-mode .buscador-nombre mark { color: color-mix(in oklab, var(--c, var(--tono)) 72%, black); }
-.buscador-musculo { display: block; margin-top: 2px; font-size: 12.5px; color: var(--text-muted); }
+.buscador-musculo { display: block; margin-top: 2px; font-size: 13px; color: var(--text-muted); }
 .buscador-mas { width: 32px; height: 32px; flex: none; display: grid; place-items: center; color: color-mix(in oklab, var(--c, var(--tono)) 72%, white); }
 .light-mode .buscador-mas { color: color-mix(in oklab, var(--c, var(--tono)) 72%, black); }
 .buscador-mas.galleta { --galleta-fondo: color-mix(in oklab, var(--c, var(--tono)) 72%, white); color: color-mix(in oklab, var(--c, var(--tono)) 18%, #07080a); }
@@ -4486,6 +4490,18 @@ button.carrera-carril:active { background: var(--velo); }
 .ficha-bajada { margin-top: 4px; font-size: 0.8125rem; line-height: 1.4; color: var(--text-muted); text-wrap: pretty; }
 .ficha-grupo { display: grid; gap: 8px; }
 .ficha-grupo-titulo { margin: 0 4px 8px; font-size: 0.8125rem; font-weight: 650; color: var(--text-muted); }
+/* El rótulo de un ajuste (Perfil, el registro): el mismo de los grupos, sin
+   mayúsculas chiquitas ni letras separadas. */
+.ajuste-rotulo { font-size: 0.8125rem; font-weight: 650; line-height: 1.25; color: var(--text-muted); }
+label.ajuste-rotulo { display: block; }
+.ajuste-pasos { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-height: 60px; padding: 8px 8px 8px 14px; border-radius: 18px; background: var(--panel-sunken); }
+/* Con la letra grande en un teléfono angosto, el control baja abajo del rótulo
+   en vez de dejarlo en una columna de dos palabras. */
+.ajuste-pasos .ajuste-rotulo { flex: 1 1 8em; min-width: 0; color: var(--text-strong); font-weight: 600; }
+.ajuste-pasos-control { flex: none; margin-left: auto; display: flex; align-items: center; gap: 2px; }
+.ajuste-pasos-control button { width: 44px; height: 44px; border-radius: 999px; display: grid; place-items: center; color: var(--text-muted); box-shadow: inset 0 0 0 1px var(--hairline-fuerte); transition: transform .2s ease, background-color .2s ease, color .2s ease; }
+.ajuste-pasos-control button:active { transform: scale(.92); background: var(--velo); color: var(--text-strong); }
+.ajuste-pasos-valor { min-width: 2.8em; text-align: center; font-size: 1.25rem; font-weight: 700; font-stretch: 80%; letter-spacing: -0.01em; color: var(--text-strong); white-space: nowrap; }
 .ficha-grupo .ficha-grupo-titulo { margin-bottom: 0; }
 .ficha-ejemplo { padding: 14px 12px 12px; pointer-events: none; }
 .ficha-ejemplo .serie-foco { animation: none; margin-bottom: 0; }
@@ -4728,12 +4744,12 @@ button.carrera-carril:active { background: var(--velo); }
 /* La primera elección de rutina: tres placas, cada una con su renglón. */
 .eleccion-cabeza { display: grid; gap: 6px; padding: 6px 4px 2px; text-align: center; }
 .eleccion-titulo { font-size: 1.5rem; font-weight: 780; letter-spacing: -0.015em; color: var(--text-strong); text-wrap: balance; }
-.eleccion-bajada { font-size: 14.5px; line-height: 1.45; color: var(--text-muted); text-wrap: balance; }
+.eleccion-bajada { font-size: 15px; line-height: 1.45; color: var(--text-muted); text-wrap: balance; }
 .eleccion { display: grid; gap: 10px; }
 .eleccion-opcion { border-radius: 24px; background: var(--surface-1); box-shadow: var(--placa-canto); overflow: hidden; }
 .eleccion-fila { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 68px; padding: 12px 16px; text-align: left; transition: transform .2s var(--resorte); }
 .eleccion-fila:active { transform: scale(.985); }
-.eleccion-fila b { display: block; font-size: 15.5px; font-weight: 700; color: var(--text-strong); }
+.eleccion-fila b { display: block; font-size: 16px; font-weight: 700; color: var(--text-strong); }
 .eleccion-fila small { display: block; margin-top: 2px; font-size: 13px; line-height: 1.35; color: var(--text-muted); }
 .eleccion-fila .icono-suelto { color: color-mix(in oklab, var(--tono) 72%, white); }
 .light-mode .eleccion-fila .icono-suelto { color: color-mix(in oklab, var(--tono) 72%, black); }
@@ -4749,9 +4765,9 @@ button.carrera-carril:active { background: var(--velo); }
 .primeros-marca.hueca { --galleta-borde: var(--hairline-fuerte); --galleta-fondo: var(--surface-2); }
 .primeros-nombre { display: block; font-size: 14px; font-weight: 600; color: var(--text-strong); }
 .primeros-paso.hecho .primeros-nombre { color: var(--text-muted); text-decoration: line-through; text-decoration-color: var(--hairline-fuerte); }
-.primeros-pista { display: block; margin-top: 1px; font-size: 12.5px; color: var(--text-muted); }
+.primeros-pista { display: block; margin-top: 1px; font-size: 13px; color: var(--text-muted); }
 .aviso-vincular { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 22px; color: var(--text-muted); background: var(--surface-1); box-shadow: var(--placa-canto); }
-.aviso-vincular p { flex: 1; min-width: 0; font-size: 12.5px; line-height: 1.4; text-wrap: pretty; }
+.aviso-vincular p { flex: 1; min-width: 0; font-size: 13px; line-height: 1.4; text-wrap: pretty; }
 .preset-acciones { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
 /* TUS RUTINAS CREADAS: una placa con renglones separados por un filo. */
 .rutinas-creadas { position: relative; border-radius: 24px; background: var(--surface-1); }
@@ -4769,13 +4785,13 @@ button.carrera-carril:active { background: var(--velo); }
 .rutina-creada-dias { flex: none; width: 46px; height: 50px; border-radius: 14px; background: var(--panel-sunken); box-shadow: inset 0 1px 2px rgba(0,0,0,.35); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; }
 .light-mode .rutina-creada-dias { box-shadow: inset 0 1px 2px rgba(0,0,0,.08); }
 .rutina-creada-dias b { font-size: 24px; line-height: 1; font-weight: 700; color: var(--text-strong); }
-.rutina-creada-dias small { font-size: 10.5px; line-height: 1.1; color: var(--text-faint); }
+.rutina-creada-dias small { font-size: 11px; line-height: 1.1; color: var(--text-faint); }
 .rutina-creada.activa .rutina-creada-dias b { color: color-mix(in oklab, var(--c) 72%, white); }
 .light-mode .rutina-creada.activa .rutina-creada-dias b { color: color-mix(in oklab, var(--c) 80%, black); }
 .rutina-creada-texto { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .rutina-creada-nombre { font-size: 15px; font-weight: 650; line-height: 1.25; color: var(--text-strong); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
 .rutina-creada-acciones { flex: none; display: flex; align-items: center; gap: 2px; }
-.rutina-creada-activa { display: inline-flex; align-items: center; gap: 4px; height: 32px; padding: 0 6px; font-size: 12.5px; font-weight: 650; color: color-mix(in oklab, var(--c) 72%, white); }
+.rutina-creada-activa { display: inline-flex; align-items: center; gap: 4px; height: 32px; padding: 0 6px; font-size: 13px; font-weight: 650; color: color-mix(in oklab, var(--c) 72%, white); }
 .light-mode .rutina-creada-activa { color: color-mix(in oklab, var(--c) 80%, black); }
 .rutina-creada-mas { width: 40px; height: 40px; border-radius: 999px; display: grid; place-items: center; color: var(--text-muted); transition: background-color .15s ease, transform .15s var(--resorte, ease); }
 .rutina-creada-mas:active, .rutina-creada-mas[aria-expanded="true"] { background: var(--velo); transform: scale(.94); }
@@ -4902,7 +4918,7 @@ button.carrera-carril:active { background: var(--velo); }
 }
 .amigo-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .amigo-activo { position: absolute; right: 1px; bottom: 1px; width: 12px; height: 12px; border-radius: 999px; background: #6fbf95; border: 2px solid var(--surface-2); }
-.amigo-nombre { display: block; font-size: 14.5px; font-weight: 700; line-height: 1.2; color: var(--text-strong); overflow-wrap: anywhere; }
+.amigo-nombre { display: block; font-size: 15px; font-weight: 700; line-height: 1.2; color: var(--text-strong); overflow-wrap: anywhere; }
 .amigo-ultima { display: block; margin-top: 3px; font-size: 12px; color: var(--text-faint); }
 /* Una solicitud de amistad: la persona y abajo, a lo ancho, qué hacer. */
 .solicitud { display: grid; gap: 4px; padding-bottom: 10px; border-radius: 22px; background: var(--surface-2); }
@@ -4929,20 +4945,20 @@ button.carrera-carril:active { background: var(--velo); }
 .light-mode .atleta-avatar { box-shadow: 0 0 0 3px var(--app-bg), 0 0 0 6px var(--rango); }
 .atleta-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .atleta-nombre { font-size: 1.6rem; font-weight: 800; font-stretch: 88%; line-height: 1.05; letter-spacing: -0.02em; color: var(--text-strong); text-wrap: balance; overflow-wrap: anywhere; }
-.atleta-usuario { margin-top: 3px; font-size: 13.5px; color: var(--text-muted); overflow-wrap: anywhere; }
-.atleta-rango { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 13.5px; font-weight: 700; }
-.atleta-nota { margin-top: -6px; font-size: 12.5px; color: var(--text-faint); }
-.atleta-desde { margin-top: 5px; font-size: 12.5px; color: var(--text-faint); }
+.atleta-usuario { margin-top: 3px; font-size: 14px; color: var(--text-muted); overflow-wrap: anywhere; }
+.atleta-rango { display: inline-flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 14px; font-weight: 700; }
+.atleta-nota { margin-top: -6px; font-size: 13px; color: var(--text-faint); }
+.atleta-desde { margin-top: 5px; font-size: 13px; color: var(--text-faint); }
 /* La cara lleva una luz del color de su rango debajo, como un objeto iluminado. */
 .atleta-avatar { filter: drop-shadow(0 14px 22px color-mix(in oklab, var(--rango) 38%, transparent)); }
 .ultima-sesion { display: grid; gap: 10px; }
 .ultima-carga { display: flex; align-items: center; gap: 12px; }
 .ultima-carga .barra-cargada { flex: 1; min-width: 0; }
-.ultima-carga > span { flex: none; font-size: 12.5px; color: var(--text-muted); }
+.ultima-carga > span { flex: none; font-size: 13px; color: var(--text-muted); }
 .ultima-carga b { margin-right: 3px; font-size: 1.2rem; font-weight: 750; color: var(--text-strong); }
 .aplaudir {
   flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 14px; border-radius: 999px;
-  font-size: 13.5px; font-weight: 700; color: color-mix(in oklab, var(--tono) 18%, #07080a); background: color-mix(in oklab, var(--tono) 72%, white);
+  font-size: 14px; font-weight: 700; color: color-mix(in oklab, var(--tono) 18%, #07080a); background: color-mix(in oklab, var(--tono) 72%, white);
   transition: transform .25s var(--resorte), border-radius .35s var(--resorte);
 }
 .light-mode .aplaudir { background: var(--tono); }
@@ -4963,15 +4979,15 @@ button.carrera-carril:active { background: var(--velo); }
 .atleta-dato-valor .marcas { color: var(--text-strong); }
 .atleta-dato small { font-size: 12px; line-height: 1.25; color: var(--text-muted); }
 .atleta-semana { display: grid; grid-template-columns: 62px minmax(0, 1fr); align-items: center; gap: 10px; }
-.atleta-semana-rotulo { font-size: 12.5px; color: var(--text-muted); }
+.atleta-semana-rotulo { font-size: 13px; color: var(--text-muted); }
 .atleta-semana .carrera-pista i { height: 12px; border-radius: 6px; }
 .atleta-semana .carrera-pista i.futuro { opacity: .4; }
 .atleta-semana-letras { display: flex; gap: 3px; }
-.atleta-semana-letras em { flex: 1 1 0; text-align: center; font-style: normal; font-size: 10.5px; font-weight: 600; color: var(--text-faint); }
+.atleta-semana-letras em { flex: 1 1 0; text-align: center; font-style: normal; font-size: 11px; font-weight: 600; color: var(--text-faint); }
 .mejor-marca { display: grid; gap: 10px; }
-.mejor-marca-rotulo { font-size: 12.5px; color: var(--text-muted); }
+.mejor-marca-rotulo { font-size: 13px; color: var(--text-muted); }
 .mejor-marca-ejercicio { margin-top: 2px; font-size: 1.05rem; font-weight: 700; line-height: 1.2; color: var(--text-strong); text-wrap: balance; }
-.mejor-marca-rango { flex: none; display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 700; }
+.mejor-marca-rango { flex: none; display: inline-flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 700; }
 .mejor-marca-numeros { display: flex; align-items: baseline; gap: 6px; color: var(--text-muted); }
 .mejor-marca-numeros b { font-size: 2.6rem; line-height: .95; font-weight: 750; color: var(--text-strong); }
 .mejor-marca-numeros small { font-size: 14px; font-weight: 650; }
@@ -4979,11 +4995,11 @@ button.carrera-carril:active { background: var(--velo); }
 .atleta-confirmar { display: grid; gap: 10px; padding: 12px; border-radius: 18px; background: var(--surface-2); }
 .atleta-confirmar p { font-size: 13px; line-height: 1.4; color: var(--text-muted); }
 .atleta-medida { padding: 12px 14px; border-radius: 20px; background: var(--surface-1); box-shadow: var(--placa-canto); }
-.atleta-medida-nombre { font-size: 12.5px; color: var(--text-muted); }
+.atleta-medida-nombre { font-size: 13px; color: var(--text-muted); }
 .atleta-medida-valor { display: flex; align-items: baseline; gap: 3px; margin-top: 2px; }
 .atleta-medida-valor b { font-size: 1.45rem; line-height: 1; font-weight: 750; color: var(--text-strong); }
 .atleta-medida-valor small { font-size: 12px; color: var(--text-muted); }
-.atleta-medida-pie { margin-top: 4px; font-size: 11.5px; color: var(--text-faint); }
+.atleta-medida-pie { margin-top: 4px; font-size: 12px; color: var(--text-faint); }
 .atleta-quitar { display: grid; gap: 10px; justify-items: center; padding-top: 4px; }
 .atleta-quitar p { font-size: 13px; color: var(--text-muted); text-align: center; }
 
@@ -5014,7 +5030,7 @@ button.carrera-carril:active { background: var(--velo); }
 .mano-compartir { justify-self: center; min-height: 40px; }
 .cara-ejercicio { font-size: 14px; font-weight: 700; color: var(--text-strong); }
 .cara-fila { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; align-items: center; gap: 10px; }
-.cara-quien { font-size: 12.5px; color: var(--text-muted); overflow-wrap: anywhere; }
+.cara-quien { font-size: 13px; color: var(--text-muted); overflow-wrap: anywhere; }
 .cara-marca { font-size: 12px; color: var(--text-faint); white-space: nowrap; }
 .cara-marca b { font-size: 1.05rem; font-weight: 700; color: var(--text-muted); }
 /* La raya de cada uno: su 1RM estimado contra el del que más levanta, del
@@ -5034,22 +5050,22 @@ button.carrera-carril:active { background: var(--velo); }
 }
 .light-mode .mano-avatar { box-shadow: 0 0 0 2px var(--surface-1), 0 0 0 4.5px var(--rango); }
 .mano-avatar img { width: 100%; height: 100%; object-fit: cover; }
-.mano-nombre { max-width: 100%; font-size: 14.5px; font-weight: 700; line-height: 1.15; color: var(--text-strong); overflow-wrap: anywhere; }
+.mano-nombre { max-width: 100%; font-size: 15px; font-weight: 700; line-height: 1.15; color: var(--text-strong); overflow-wrap: anywhere; }
 .mano-rango { font-size: 12px; font-weight: 650; color: var(--text-faint); }
-.mano-contra { font-size: 12.5px; font-weight: 600; color: var(--text-faint); }
+.mano-contra { font-size: 13px; font-weight: 600; color: var(--text-faint); }
 .ganarle { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .ganarle-fila { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 3px 12px; padding: 12px 14px; border-radius: 20px; background: var(--surface-1); box-shadow: var(--placa-canto); }
-.ganarle-musculo { grid-column: 1; font-size: 12.5px; color: var(--text-muted); }
-.ganarle-meta { grid-column: 1; font-size: 13.5px; line-height: 1.3; color: var(--text-muted); }
+.ganarle-musculo { grid-column: 1; font-size: 13px; color: var(--text-muted); }
+.ganarle-meta { grid-column: 1; font-size: 14px; line-height: 1.3; color: var(--text-muted); }
 .ganarle-meta b { font-size: 1.05rem; font-weight: 750; color: var(--text-strong); }
-.ganarle-suma { grid-column: 2; grid-row: 1 / span 2; padding: 6px 10px; border-radius: 999px; font-size: 13.5px; font-weight: 700; color: color-mix(in oklab, var(--c, var(--tono)) 50%, white); background: color-mix(in oklab, var(--c, var(--tono)) 13%, transparent); }
+.ganarle-suma { grid-column: 2; grid-row: 1 / span 2; padding: 6px 10px; border-radius: 999px; font-size: 14px; font-weight: 700; color: color-mix(in oklab, var(--c, var(--tono)) 50%, white); background: color-mix(in oklab, var(--c, var(--tono)) 13%, transparent); }
 .light-mode .ganarle-suma { color: color-mix(in oklab, var(--c, var(--tono)) 62%, black); }
 .mano-lista { display: grid; gap: 2px; padding: 6px; border-radius: 24px; background: var(--surface-1); box-shadow: var(--placa-canto); }
 .mano-fila { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: center; gap: 7px 12px; padding: 11px 12px 12px; border-radius: 18px; text-align: left; transition: background-color .2s ease; }
 .mano-fila:active { background: var(--velo); }
-.mano-fila-musculo { grid-column: 1 / -1; display: flex; align-items: center; gap: 3px; font-size: 13.5px; font-weight: 650; color: var(--text-strong); }
+.mano-fila-musculo { grid-column: 1 / -1; display: flex; align-items: center; gap: 3px; font-size: 14px; font-weight: 650; color: var(--text-strong); }
 .mano-fila-musculo svg { flex: none; color: var(--text-faint); }
-.mano-fila-lado { font-size: 12.5px; line-height: 1.2; color: var(--text-faint); overflow-wrap: anywhere; }
+.mano-fila-lado { font-size: 13px; line-height: 1.2; color: var(--text-faint); overflow-wrap: anywhere; }
 .mano-fila-lado.der { text-align: right; }
 .mano-fila-lado.gana { font-weight: 700; color: var(--text-strong); }
 /* EL DUELO: las dos barras salen del medio, la tuya a la izquierda y la
@@ -5068,7 +5084,7 @@ button.carrera-carril:active { background: var(--velo); }
 @keyframes dueloCrece { from { transform: scaleX(0); } }
 @media (prefers-reduced-motion: reduce) { .mano-fila-duelo i { animation: none; } }
 .mini-cuerpo-nombre { margin-bottom: 6px; font-size: 13px; font-weight: 650; color: var(--text-strong); overflow-wrap: anywhere; }
-.segmentado.chico button { min-height: 34px; padding: 0 12px; font-size: 12.5px; white-space: nowrap; }
+.segmentado.chico button { min-height: 34px; padding: 0 12px; font-size: 13px; white-space: nowrap; }
 .modal-mano { width: 100%; max-width: 24rem; max-height: 86vh; overflow-y: auto; overscroll-behavior: contain; display: grid; gap: 14px; padding: 18px; border-radius: 28px; background: var(--surface-1); box-shadow: var(--placa-canto), 0 30px 60px -30px rgba(0,0,0,.8); }
 .modal-mano-titulo { font-size: 1.3rem; font-weight: 750; line-height: 1.15; color: var(--text-strong); }
 .modal-mano-rangos { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -5327,7 +5343,7 @@ button.carrera-carril:active { background: var(--velo); }
 .cinta i { position: absolute; top: 0; width: 1.2px; height: 11px; background: #232326; transform: translateX(-50%); }
 .cinta i.medio { height: 6px; opacity: .75; }
 .cinta i.numero { height: 15px; width: 1.6px; }
-.cinta b { position: absolute; bottom: 5px; transform: translateX(-50%); font-size: 10.5px; font-weight: 750; line-height: 1; color: #232326; }
+.cinta b { position: absolute; bottom: 5px; transform: translateX(-50%); font-size: 11px; font-weight: 750; line-height: 1; color: #232326; }
 .cinta-rango { position: absolute; bottom: 0; height: 4px; background: rgba(0,0,0,0.22); }
 .cinta-marca { position: absolute; top: -7px; bottom: -7px; width: 3px; border-radius: 2px; transform: translateX(-50%); background: #141416; box-shadow: 0 0 0 1.5px rgba(255,255,255,0.7); transition: left .9s var(--resorte-vivo); }
 .cinta-marca.fantasma { width: 0; background: none; box-shadow: none; border-left: 2px dashed rgba(20,20,22,0.6); top: -2px; bottom: -2px; }
@@ -5357,7 +5373,7 @@ button.carrera-carril:active { background: var(--velo); }
 .pizarra-marca svg { align-self: center; }
 .pizarra-marca small { font-size: 12px; font-weight: 600; color: var(--text-muted); }
 .pizarra-fila.mia .pizarra-marca { color: var(--record); }
-.pizarra-quien { display: flex; align-items: center; flex-wrap: wrap; gap: 3px 7px; min-width: 0; font-size: 12.5px; color: var(--text-muted); }
+.pizarra-quien { display: flex; align-items: center; flex-wrap: wrap; gap: 3px 7px; min-width: 0; font-size: 13px; color: var(--text-muted); }
 .pizarra-quien b { font-weight: 700; color: var(--text-strong); }
 .pizarra-avatar { width: 22px; height: 22px; flex: none; overflow: hidden; border-radius: 999px; display: grid; place-items: center; font-size: 11px; font-weight: 750; color: var(--text-strong); background: var(--surface-3); }
 .pizarra-avatar img { width: 100%; height: 100%; object-fit: cover; }
@@ -5373,17 +5389,17 @@ button.carrera-carril:active { background: var(--velo); }
 .recorrido-tarjeta { position: fixed; left: 16px; right: 16px; max-width: 380px; margin: 0 auto; padding: 16px 16px 14px; border-radius: 24px; outline: none;
   background: var(--surface-2); box-shadow: var(--placa-canto), 0 24px 48px -16px rgba(0, 0, 0, .6); animation: recorridoEntra .3s var(--resorte, ease); }
 @keyframes recorridoEntra { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-.recorrido-paso { font-size: 12.5px; color: var(--text-faint); }
+.recorrido-paso { font-size: 13px; color: var(--text-faint); }
 .recorrido-titulo { margin-top: 2px; font-size: 18px; font-weight: 700; line-height: 1.25; color: var(--text-strong); }
-.recorrido-texto { margin-top: 4px; font-size: 14.5px; line-height: 1.42; color: var(--text-muted); text-wrap: pretty; }
+.recorrido-texto { margin-top: 4px; font-size: 15px; line-height: 1.42; color: var(--text-muted); text-wrap: pretty; }
 .recorrido-pie { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
-.recorrido-saltar { margin-right: auto; padding: 10px 4px; font-size: 13.5px; font-weight: 600; color: var(--text-muted); }
+.recorrido-saltar { margin-right: auto; padding: 10px 4px; font-size: 14px; font-weight: 600; color: var(--text-muted); }
 @media (prefers-reduced-motion: reduce) { .recorrido-hueco { transition: none; } .recorrido-tarjeta { animation: none; } }
-.guia-recorrido { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; margin-top: 10px; padding: 9px 12px; border-radius: 999px; font-size: 13.5px; font-weight: 650; color: var(--text-muted); background: var(--velo); }
+.guia-recorrido { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; margin-top: 10px; padding: 9px 12px; border-radius: 999px; font-size: 14px; font-weight: 650; color: var(--text-muted); background: var(--velo); }
 .primera-vez { display: flex; align-items: center; gap: 6px; margin-bottom: 14px; padding: 8px 8px 8px 10px; border-radius: 22px; background: var(--surface-1); box-shadow: var(--placa-canto); }
 .primera-vez-cuerpo { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; text-align: left; }
 .primera-vez-cuerpo b { display: block; font-size: 14px; font-weight: 700; line-height: 1.25; color: var(--text-strong); }
-.primera-vez-cuerpo b + span { display: block; margin-top: 1px; font-size: 12.5px; color: var(--text-muted); }
+.primera-vez-cuerpo b + span { display: block; margin-top: 1px; font-size: 13px; color: var(--text-muted); }
 .primera-vez-cerrar { flex: none; }
 /* LAS PROPUESTAS DE LA IA, con las piezas de la app: la serie en su visor,
    el día con su filete, la escalera de las semanas y renglones finos. */
@@ -5419,7 +5435,7 @@ button.carrera-carril:active { background: var(--velo); }
 .ia-escalon { flex: 1 0 34px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px; }
 .ia-escalon-valor { display: grid; justify-items: center; line-height: 1.05; }
 .ia-escalon-valor b { font-size: 14px; font-weight: 750; color: var(--text-strong); }
-.ia-escalon-valor small { font-size: 10.5px; color: var(--text-faint); white-space: nowrap; }
+.ia-escalon-valor small { font-size: 11px; color: var(--text-faint); white-space: nowrap; }
 .ia-escalon-bloque { width: 100%; border-radius: 9px 9px 4px 4px; background: color-mix(in oklab, var(--tono) 30%, var(--surface-3)); transform-origin: bottom; animation: escalonSube .55s cubic-bezier(.34,1.4,.64,1) both; animation-delay: calc(var(--i, 0) * 60ms); }
 .ia-escalon:last-child .ia-escalon-bloque { background: color-mix(in oklab, var(--tono) 62%, #8a8c92); }
 .light-mode .ia-escalon-bloque { background: color-mix(in oklab, var(--tono) 22%, #e4e5e8); }
@@ -5444,14 +5460,14 @@ button.carrera-carril:active { background: var(--velo); }
 .aproximaciones-cabeza { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 2px 0 6px; font-size: 13px; font-weight: 650; color: var(--text-muted); }
 .aproximacion { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 8px 0; }
 .aproximacion + .aproximacion { border-top: 1px solid var(--hairline); }
-.aproximacion-pct { width: 36px; flex: none; font-size: 12.5px; font-weight: 700; color: color-mix(in oklab, var(--tono) 55%, white); }
+.aproximacion-pct { width: 36px; flex: none; font-size: 13px; font-weight: 700; color: color-mix(in oklab, var(--tono) 55%, white); }
 .light-mode .aproximacion-pct { color: color-mix(in oklab, var(--tono) 62%, black); }
-.aproximacion-serie { font-size: 12.5px; color: var(--text-muted); white-space: nowrap; }
+.aproximacion-serie { font-size: 13px; color: var(--text-muted); white-space: nowrap; }
 .aproximacion-serie b { font-size: 1.05rem; font-weight: 700; color: var(--text-strong); }
 .aproximaciones-pie { margin-top: 6px; font-size: 12px; line-height: 1.35; color: var(--text-faint); text-wrap: pretty; }
 /* Los retos: el botón para mandar uno y cómo quedó. */
 .cara-retar { justify-self: start; min-height: 38px; margin-top: 2px; }
-.cara-reto, .pizarra-reto { font-size: 12.5px; line-height: 1.35; color: var(--text-faint); }
+.cara-reto, .pizarra-reto { font-size: 13px; line-height: 1.35; color: var(--text-faint); }
 .pizarra-retar { margin: -4px 0 10px 2px; }
 .pizarra-reto { margin: -4px 2px 10px; }
 .pizarra-compartir { justify-self: center; min-height: 40px; }
@@ -5473,7 +5489,7 @@ button.carrera-carril:active { background: var(--velo); }
 /* Lo prendido, con su ícono en el tono. */
 .interruptor-fila.on .interruptor-icono { color: color-mix(in oklab, var(--tono) 72%, white); }
 .light-mode .interruptor-fila.on .interruptor-icono { color: color-mix(in oklab, var(--tono) 72%, black); }
-.interruptor-titulo { display: block; font-size: 13.5px; font-weight: 650; line-height: 1.25; color: var(--text-strong); }
+.interruptor-titulo { display: block; font-size: 14px; font-weight: 650; line-height: 1.25; color: var(--text-strong); }
 .interruptor-desc { display: block; margin-top: 2px; font-size: 12px; line-height: 1.35; color: var(--text-faint); }
 .interruptor { position: relative; flex: none; width: 44px; height: 26px; border-radius: 999px; background: var(--velo-fuerte); transition: background-color .25s ease; }
 .interruptor span { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 999px; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.35); transition: transform .3s var(--resorte); }
@@ -5498,8 +5514,8 @@ button.carrera-carril:active { background: var(--velo); }
 .resumen-kpi { display: grid; gap: 2px; padding: 11px 12px 10px; border-radius: 18px; background: var(--surface-2); }
 .resumen-kpi small { display: flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; color: var(--text-muted); }
 .resumen-kpi b { font-size: 1.75rem; line-height: 1.05; font-weight: 750; color: var(--text-strong); }
-.resumen-kpi span { font-size: 11.5px; color: var(--text-faint); }
-.resumen-kpi b i { margin: 0 2px; font-style: normal; font-size: 0.85rem; font-weight: 650; color: var(--text-muted); }
+.resumen-kpi span { font-size: 12px; color: var(--text-faint); }
+.resumen-kpi b i { margin: 0 2px; font-style: normal; font-size: 0.875rem; font-weight: 650; color: var(--text-muted); }
 /* LAS COLUMNAS DE LOS RESÚMENES (ColumnasPeriodo): escala a la izquierda. */
 .columnas { display: grid; gap: 6px; padding-left: 40px; }
 .columnas-plano { position: relative; }
@@ -5508,7 +5524,7 @@ button.carrera-carril:active { background: var(--velo); }
 .columnas-raya.base { border-top-color: var(--hairline-fuerte); }
 .columnas-raya em { position: absolute; top: -7px; right: calc(100% + 7px); font-style: normal; font-size: 11px; font-weight: 550; line-height: 1; color: var(--text-faint); white-space: nowrap; }
 .columnas-promedio { z-index: 1; border-top: 1px dashed color-mix(in oklab, var(--text-strong) 50%, transparent); }
-.columnas-leyenda { display: flex; align-items: center; gap: 6px; margin-top: 2px; font-size: 11.5px; color: var(--text-muted); }
+.columnas-leyenda { display: flex; align-items: center; gap: 6px; margin-top: 2px; font-size: 12px; color: var(--text-muted); }
 .columnas-leyenda i { width: 16px; height: 0; border-top: 1px dashed color-mix(in oklab, var(--text-strong) 50%, transparent); }
 .columnas-barras { position: absolute; inset: 0; display: flex; align-items: flex-end; gap: 5px; padding: 0 2px; }
 .columna { flex: 1 1 0; min-width: 0; height: 100%; display: flex; align-items: flex-end; }
@@ -5534,7 +5550,7 @@ button.carrera-carril:active { background: var(--velo); }
 .calor-mes { display: grid; gap: 4px; }
 .calor-mes-fila { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
 .calor-mes-fila.cabeza span { text-align: center; font-size: 11px; font-weight: 600; color: var(--text-faint); }
-.calor-mes-fila .calor-celda { display: grid; place-items: center; aspect-ratio: 1; border-radius: 10px; font-size: 11.5px; font-weight: 600; color: var(--text-faint); }
+.calor-mes-fila .calor-celda { display: grid; place-items: center; aspect-ratio: 1; border-radius: 10px; font-size: 12px; font-weight: 600; color: var(--text-faint); }
 .calor-mes-fila .calor-celda.n2 { color: var(--text-muted); }
 .calor-mes-fila .calor-celda.n3, .calor-mes-fila .calor-celda.n4 { color: #0b0c0e; font-weight: 700; }
 .light-mode .calor-mes-fila .calor-celda.n3 { color: var(--text-strong); }
@@ -5561,7 +5577,7 @@ button.carrera-carril:active { background: var(--velo); }
 @keyframes telaranaCrece { from { transform: scale(.2); opacity: 0; } }
 .telarana-punto { fill: color-mix(in oklab, var(--tono) 78%, white); stroke: var(--surface-1); stroke-width: 1.5; }
 .light-mode .telarana-punto { fill: var(--tono); }
-.telarana-rotulo { fill: var(--text-muted); font-size: 12.5px; font-weight: 600; }
+.telarana-rotulo { fill: var(--text-muted); font-size: 13px; font-weight: 600; }
 .telarana-n { fill: var(--text-strong); font-weight: 750; }
 .telarana-leyenda { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 14px; font-size: 12px; color: var(--text-muted); }
 .telarana-leyenda span { display: inline-flex; align-items: center; gap: 6px; }
@@ -5580,7 +5596,7 @@ button.carrera-carril:active { background: var(--velo); }
 .resumen-tramo.mejor i { background: color-mix(in oklab, var(--c) 62%, #8a8c92); }
 .light-mode .resumen-tramo i { background: color-mix(in oklab, var(--c) 22%, #e4e5e8); }
 .light-mode .resumen-tramo.mejor i { background: color-mix(in oklab, var(--c) 70%, #a7a9ae); }
-.resumen-tramo span { flex: none; font-size: 10.5px; font-weight: 650; color: var(--text-faint); }
+.resumen-tramo span { flex: none; font-size: 11px; font-weight: 650; color: var(--text-faint); }
 .resumen-tramo.mejor span { color: var(--text-strong); }
 .resumen-nota { font-size: 12px; color: var(--text-faint); }
 .resumen-renglones { display: grid; margin: 0; padding: 2px 14px; list-style: none; border-radius: 18px; background: var(--surface-2); }
@@ -5588,7 +5604,7 @@ button.carrera-carril:active { background: var(--velo); }
 .resumen-renglones li + li { border-top: 1px solid var(--hairline); }
 .resumen-renglones span { min-width: 0; font-size: 13px; color: var(--text-muted); }
 .resumen-renglones small { display: block; margin-top: 1px; font-size: 13px; font-weight: 650; color: var(--text-strong); overflow-wrap: anywhere; }
-.resumen-renglones b { flex: none; font-size: 13.5px; font-weight: 700; color: var(--text-strong); }
+.resumen-renglones b { flex: none; font-size: 14px; font-weight: 700; color: var(--text-strong); }
 
 /* ══ DÉCIMA TANDA: más objetos del gimnasio ═════════════════════════════════
    La campana de los récords, el molinete de entrada, el cuaderno, la medalla
@@ -5680,7 +5696,7 @@ button.carrera-carril:active { background: var(--velo); }
 .ticket-horario { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .ticket-horario p { display: grid; gap: 1px; }
 .ticket-horario p:last-child { text-align: right; }
-.ticket-horario small { font-size: 11.5px; color: #6b6b70; }
+.ticket-horario small { font-size: 12px; color: #6b6b70; }
 .ticket-horario b { font-size: 24px; font-weight: 800; font-stretch: 78%; line-height: 1.05; color: #1d1d1f; }
 .ticket-titulo .campana-icono { flex: none; }
 
@@ -5742,8 +5758,8 @@ button.carrera-carril:active { background: var(--velo); }
 .indice-hueco { width: 40px; flex: none; font-size: 13px; }
 .indice-hueco.picado { color: #f4f4f1; background: color-mix(in oklab, var(--dia) 60%, #8a8c92); }
 .light-mode .indice-hueco.picado { background: color-mix(in oklab, var(--dia) 70%, #a7a9ae); }
-.indice-dia { display: block; font-size: 14.5px; font-weight: 700; color: var(--text-strong); }
-.indice-detalle { display: block; margin-top: 1px; font-size: 12.5px; line-height: 1.3; color: var(--text-muted); }
+.indice-dia { display: block; font-size: 15px; font-weight: 700; color: var(--text-strong); }
+.indice-detalle { display: block; margin-top: 1px; font-size: 13px; line-height: 1.3; color: var(--text-muted); }
 .indice-record { display: inline-flex; align-items: center; gap: 3px; flex: none; font-size: 13px; font-weight: 700; color: var(--text-muted); }
 .indice-record svg { color: var(--record); }
 
@@ -5765,7 +5781,7 @@ button.carrera-carril:active { background: var(--velo); }
 @keyframes medallaCuelga { 0% { opacity: 0; transform: translateY(-24px) rotate(-10deg); } 40% { opacity: 1; transform: translateY(0) rotate(6deg); } 70% { transform: rotate(-3deg); } 100% { transform: none; } }
 .vitrina { padding: 16px; }
 .vitrina-cabeza { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 10px; margin-bottom: 12px; }
-.vitrina-cabeza > span { font-size: 12.5px; color: var(--text-muted); text-align: right; }
+.vitrina-cabeza > span { font-size: 13px; color: var(--text-muted); text-align: right; }
 .vitrina-estante { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); row-gap: 14px; }
 .vitrina-lugar { position: relative; display: flex; flex-direction: column; align-items: center; min-width: 0; }
 .vitrina-lugar::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: var(--hairline-fuerte); }
@@ -5776,8 +5792,9 @@ button.carrera-carril:active { background: var(--velo); }
 .vitrina-lugar.con-medalla:active .medalla { transform: rotate(-7deg); }
 .vitrina-hueco { width: 30px; height: 30px; margin: 26px 0 6px; border-radius: 999px; border: 1.5px dashed var(--hairline-fuerte); display: grid; place-items: center; font-size: 14px; color: var(--text-strong); }
 .vitrina-lugar.en-curso .vitrina-hueco { border-color: color-mix(in oklab, var(--tono) 60%, transparent); }
-.vitrina-mes { margin-top: 2px; font-size: 11.5px; font-weight: 600; color: var(--text-muted); white-space: nowrap; }
+.vitrina-mes { margin-top: 2px; font-size: 12px; font-weight: 600; color: var(--text-muted); white-space: nowrap; }
 .vitrina-lugar.vacio .vitrina-mes { color: var(--text-faint); }
+.vitrina-mas { display: flex; margin: 8px auto -6px; }
 @media (prefers-reduced-motion: reduce) { .resumen-medalla { animation: none; } }
 
 /* EL CINTURÓN y el detalle del rango */
@@ -5793,7 +5810,7 @@ button.carrera-carril:active { background: var(--velo); }
 .rango-detalle-falta b { font-weight: 750; color: var(--text-strong); }
 .rango-detalle-falta b.tinta-rango { color: var(--rango-c); }
 .light-mode .rango-detalle-falta b.tinta-rango { color: color-mix(in oklab, var(--rango-c) 58%, black); }
-.rango-detalle-nota { font-size: 12.5px; color: var(--text-faint); }
+.rango-detalle-nota { font-size: 13px; color: var(--text-faint); }
 .cinturon { display: grid; gap: 8px; padding: 8px 0 2px; }
 .cinturon-correa {
   position: relative; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); height: 40px; border-radius: 10px 22px 22px 10px;
@@ -5846,7 +5863,7 @@ button.carrera-carril:active { background: var(--velo); }
 .planilla-hoja { padding: 22px 12px 12px; border-radius: 4px; color: var(--papel-tinta); background: var(--papel); box-shadow: 0 1px 2px rgba(0,0,0,.25); }
 .planilla-titulo { text-align: center; font-size: 15px; font-weight: 800; font-stretch: 85%; }
 .planilla-grupo + .planilla-grupo { margin-top: 10px; }
-.planilla-dia { margin: 10px 0 4px; font-size: 12.5px; font-weight: 650; color: var(--papel-suave); }
+.planilla-dia { margin: 10px 0 4px; font-size: 13px; font-weight: 650; color: var(--papel-suave); }
 .planilla-fila { display: grid; grid-template-columns: minmax(40px, max-content) minmax(0, 1fr) 70px 42px; align-items: center; column-gap: 8px; min-height: 52px; border-bottom: 1px solid var(--papel-linea); }
 .planilla-cabeza { min-height: 0; padding-bottom: 3px; border-bottom: 1.5px solid var(--papel-tinta); font-size: 11px; font-weight: 700; color: var(--papel-suave); }
 .planilla-cabeza span:nth-child(3) { text-align: center; }
@@ -5869,26 +5886,31 @@ button.carrera-carril:active { background: var(--velo); }
 .plan-hoja-cabeza { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding-bottom: 6px; border-bottom: 1.5px dashed var(--papel-linea); }
 .plan-hoja-titulo { min-width: 0; font-size: 16px; font-weight: 800; font-stretch: 85%; line-height: 1.2; }
 .plan-hoja-dia { padding: 0 3px; background: linear-gradient(transparent 50%, color-mix(in oklab, var(--dia) 42%, var(--papel)) 50%, color-mix(in oklab, var(--dia) 42%, var(--papel)) 92%, transparent 92%); }
-.plan-hoja-semana { flex: none; font-size: 12.5px; color: var(--papel-suave); }
+.plan-hoja-semana { flex: none; font-size: 13px; color: var(--papel-suave); }
 .plan-hoja-filas { display: grid; gap: 1px; margin-top: 7px; }
 .plan-hoja-filas li { display: flex; align-items: baseline; gap: 6px; font-size: 13px; line-height: 1.35; }
 .plan-hoja-filas li span { min-width: 0; overflow-wrap: anywhere; }
 .plan-hoja-filas li i { flex: 1; min-width: 10px; border-bottom: 1.5px dotted var(--papel-linea); transform: translateY(-3px); }
 .plan-hoja-filas li b { flex: none; font-size: calc(20px * 1); font-weight: 600; line-height: 1; color: #2a2d36; white-space: nowrap; }
-.plan-hoja-nota { margin-top: 7px; font-size: 12.5px; line-height: 1.35; color: var(--papel-suave); }
+.plan-hoja-nota { margin-top: 7px; font-size: 13px; line-height: 1.35; color: var(--papel-suave); text-wrap: pretty; }
 .plan-hoja-renglones { display: grid; gap: 15px; margin-top: 16px; }
 .plan-hoja-renglones i { display: block; height: 1px; background: var(--papel-linea); }
 .plan-hoja.en-pausa .plan-hoja-filas, .plan-hoja.en-pausa .plan-hoja-nota { opacity: .5; }
 .plan-hoja-cuerpo { position: relative; }
 .plan-hoja-sello { position: absolute; right: 0; bottom: 0; padding: 1px 9px 2px; border: 2.5px solid #a8433a; border-radius: 6px; font-size: 16px; font-weight: 800; font-stretch: 85%; color: #a8433a; transform: rotate(-10deg); opacity: .88; pointer-events: none; }
 .plan-hoja-acciones { display: flex; flex-wrap: wrap; align-items: center; column-gap: 16px; margin-top: 10px; padding-top: 2px; border-top: 1px solid var(--papel-linea); }
-.plan-hoja-accion { min-height: 38px; display: inline-flex; align-items: center; gap: 6px; padding: 0 1px; border-radius: 6px; font-size: 13px; font-weight: 700; line-height: 1.15; color: var(--papel-tinta); transition: transform .2s ease; }
+.plan-hoja-accion { min-height: 44px; display: inline-flex; align-items: center; gap: 6px; padding: 0 1px; border-radius: 6px; font-size: 13px; font-weight: 700; line-height: 1.15; color: var(--papel-tinta); transition: transform .2s ease; }
 .plan-hoja-accion svg { flex: none; color: var(--papel-suave); }
 .plan-hoja-accion.principal span { padding: 0 3px; background: linear-gradient(transparent 50%, color-mix(in oklab, var(--dia, var(--tono)) 42%, var(--papel)) 50%, color-mix(in oklab, var(--dia, var(--tono)) 42%, var(--papel)) 92%, transparent 92%); }
 .plan-hoja-accion:active { transform: scale(.96); }
 .plan-hoja-accion:disabled { opacity: .45; }
+/* Plegada: el título y la nota a la izquierda, la acción a la derecha. */
+.plan-hoja.plegada .planilla-hoja { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "titulo accion" "nota accion"; align-items: center; column-gap: 14px; padding: 12px 12px 12px 14px; }
+.plan-hoja.plegada .plan-hoja-titulo { grid-area: titulo; }
+.plan-hoja.plegada .plan-hoja-nota { grid-area: nota; margin-top: 1px; }
+.plan-hoja.plegada .plan-hoja-accion { grid-area: accion; }
 .hoja-rutina-titulo { font-size: 18px; font-weight: 800; font-stretch: 85%; line-height: 1.15; overflow-wrap: anywhere; }
-.hoja-rutina-bajada { margin-top: 2px; padding-bottom: 8px; font-size: 12.5px; color: var(--papel-suave); border-bottom: 1.5px dashed var(--papel-linea); }
+.hoja-rutina-bajada { margin-top: 2px; padding-bottom: 8px; font-size: 13px; color: var(--papel-suave); border-bottom: 1.5px dashed var(--papel-linea); }
 .hoja-rutina-dia { margin-top: 12px; }
 .hoja-rutina-dia-nombre span {
   padding: 0 3px; font-size: 14px; font-weight: 800;
@@ -5932,7 +5954,7 @@ button.carrera-carril:active { background: var(--velo); }
 .casillero-nombre { padding: 3px 9px; border-radius: 3px; font-size: 1.25rem; font-weight: 800; font-stretch: 85%; line-height: 1.15; letter-spacing: -0.01em; color: #1d1d1f; background: #f4f3ee; overflow-wrap: anywhere; }
 .casillero-usuario { margin-top: 6px; font-size: 13px; color: var(--text-muted); overflow-wrap: anywhere; }
 .casillero-calcos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
-.calco { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 4px 11px; border-radius: 999px; font-size: 12.5px; font-weight: 700; line-height: 1.2; box-shadow: 0 2px 4px rgba(0,0,0,.3); }
+.calco { display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 4px 11px; border-radius: 999px; font-size: 13px; font-weight: 700; line-height: 1.2; box-shadow: 0 2px 4px rgba(0,0,0,.3); }
 .calco:nth-child(1) { transform: rotate(-2deg); }
 .calco:nth-child(2) { transform: rotate(1.5deg); }
 .calco:nth-child(3) { transform: rotate(-1deg); }
@@ -5968,7 +5990,7 @@ button.carrera-carril:active { background: var(--velo); }
 .reloj-grande-cerrar { position: absolute; top: 12px; right: 12px; }
 .reloj-grande-rotulo { font-size: 1rem; font-weight: 700; color: var(--text-strong); }
 .reloj-grande-rotulo.en-pausa { color: var(--text-faint); }
-.reloj-grande-despues { max-width: 16rem; text-align: center; font-size: 13.5px; line-height: 1.35; color: var(--text-muted); text-wrap: balance; }
+.reloj-grande-despues { max-width: 16rem; text-align: center; font-size: 14px; line-height: 1.35; color: var(--text-muted); text-wrap: balance; }
 .descanso-dial.reloj-grande-dial { width: min(240px, 66vw); height: min(240px, 66vw); margin: 10px 0 14px; }
 .reloj-grande-dial .descanso-dial-centro { gap: 6px; }
 .reloj-grande-tiempo.descanso-tiempo { font-size: 3.4rem; }
@@ -5977,11 +5999,11 @@ button.carrera-carril:active { background: var(--velo); }
 .reloj-grande-controles .descanso-boton { flex: 1 1 0; min-width: 0; height: 52px; }
 /* El salto de peso, debajo del ✓, y sus opciones. */
 .foco-salto { justify-self: center; display: grid; justify-items: center; align-content: center; width: 52px; height: 36px; border-radius: 12px; line-height: 1.05; transition: background-color .2s ease; }
-.foco-salto small { font-size: 10px; font-weight: 600; color: var(--text-faint); }
+.foco-salto small { font-size: 11px; font-weight: 600; color: var(--text-faint); }
 .foco-salto b { font-size: 15px; font-weight: 750; color: var(--text-strong); }
 .foco-salto.abierto, .foco-salto:active { background: var(--velo); }
 .foco-saltos { margin: 8px 4px 0; padding: 10px 12px 12px; border-radius: 18px; background: var(--panel-sunken); }
-.foco-saltos > p:first-child { font-size: 12.5px; font-weight: 600; color: var(--text-muted); }
+.foco-saltos > p:first-child { font-size: 13px; font-weight: 600; color: var(--text-muted); }
 .foco-saltos-opciones { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .foco-saltos-opciones button { min-width: 44px; height: 38px; padding: 0 10px; border-radius: 999px; font-size: 14px; font-weight: 700; font-stretch: 85%; color: var(--text-strong); box-shadow: inset 0 0 0 1px var(--hairline-fuerte); }
 .foco-saltos-opciones button.activo { color: var(--accion-tinta); background: var(--accion-fondo); box-shadow: none; }
@@ -6016,11 +6038,11 @@ button.carrera-carril:active { background: var(--velo); }
 .casillero-chico .casillero-inicial { font-size: 28px; }
 .casillero-chico .casillero-datos { display: grid; justify-items: start; gap: 8px; }
 .casillero-chico .casillero-nombre { display: block; font-size: 1.15rem; }
-.casillero-abrir { display: block; font-size: 12.5px; line-height: 1.3; color: var(--text-muted); text-wrap: pretty; }
+.casillero-abrir { display: block; font-size: 13px; line-height: 1.3; color: var(--text-muted); text-wrap: pretty; }
 .casillero-abrir svg { display: inline-block; margin-left: 2px; vertical-align: -3px; color: var(--text-faint); }
 /* Las calcomanías van abajo de la manija: pueden usar ese costado. */
 .casillero-chico .casillero-calcos { margin-top: 12px; margin-right: -30px; }
-button.calco { font: inherit; font-size: 12.5px; font-weight: 700; line-height: 1.2; transition: scale .2s ease; }
+button.calco { font: inherit; font-size: 13px; font-weight: 700; line-height: 1.2; transition: scale .2s ease; }
 button.calco:active { scale: .95; }
 /* La racha, en una calcomanía de pizarra: los palitos de tiza, en el tono si
    está viva. Es pizarra también en el modo claro. */
@@ -6057,7 +6079,7 @@ button.calco:active { scale: .95; }
 @keyframes importEscanea { 0% { transform: translateY(-100%); } 100% { transform: translateY(340%); } }
 .import-archivo { display: flex; align-items: center; gap: 12px; padding: 10px 10px 10px 14px; border-radius: 18px; background: var(--surface-2); }
 .import-archivo b { display: block; font-size: 14px; font-weight: 650; color: var(--text-strong); overflow-wrap: anywhere; }
-.import-archivo small { display: block; margin-top: 1px; font-size: 12.5px; color: var(--text-muted); }
+.import-archivo small { display: block; margin-top: 1px; font-size: 13px; color: var(--text-muted); }
 .import-archivo .boton-redondo.chico { width: 32px; height: 32px; }
 .import-estado { display: flex; align-items: center; gap: 12px; min-height: 48px; font-size: 14px; color: var(--text-muted); }
 .import-estado .plan-ia-girando { flex: none; width: 22px; height: 22px; border-width: 2.5px; }
@@ -6073,7 +6095,7 @@ textarea.import-texto { min-height: 150px; font-size: 14px; line-height: 1.45; r
 .import-pasos i.hecho { background: color-mix(in oklab, var(--tono) 72%, white); }
 .light-mode .import-pasos i.hecho { background: var(--tono); }
 .import-enlace { display: inline; padding: 0; font: inherit; font-weight: 650; color: var(--text-strong); text-decoration: underline; text-underline-offset: 3px; }
-.import-pie { font-size: 12.5px; line-height: 1.4; text-align: center; color: var(--text-faint); text-wrap: pretty; }
+.import-pie { font-size: 13px; line-height: 1.4; text-align: center; color: var(--text-faint); text-wrap: pretty; }
 @media (prefers-reduced-motion: reduce) { .import-fuentes.leyendo .import-hoja::after { animation: none; top: 35%; } }
 /* ══ DUODÉCIMA TANDA: las pesas rusas, los cajones del ciclo en la pizarra,
    el corcho y la pizarra del Chatbot ═════════════════════════ */
@@ -6094,7 +6116,7 @@ textarea.import-texto { min-height: 150px; font-size: 14px; line-height: 1.45; r
 .estante-lugar.con-pesa { --d: color-mix(in oklab, var(--dia) 62%, #8a8c92); }
 .light-mode .estante-lugar.con-pesa { --d: color-mix(in oklab, var(--dia) 72%, #a7a9ae); }
 .estante-lugar .pesa-rusa { width: 100%; max-width: 40px; margin-bottom: -1px; }
-.estante-dia { position: relative; z-index: 1; display: block; width: 100%; height: 26px; line-height: 26px; text-align: center; font-size: 11.5px; font-weight: 650; color: var(--text-muted); }
+.estante-dia { position: relative; z-index: 1; display: block; width: 100%; height: 26px; line-height: 26px; text-align: center; font-size: 12px; font-weight: 650; color: var(--text-muted); }
 .estante-lugar.hoy .estante-dia { color: var(--text-strong); font-weight: 750; text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 4px; }
 .pesa-rusa { display: block; height: auto; overflow: visible; transition: scale .2s ease; }
 .pesa-rusa-goma { stroke: rgba(0,0,0,.42); stroke-width: .7; }
@@ -6114,16 +6136,6 @@ textarea.import-texto { min-height: 150px; font-size: 14px; line-height: 1.45; r
 .light-mode .estante-lugar.hoy.con-pesa::after { background: radial-gradient(closest-side, rgba(0,0,0,.22), transparent); }
 @keyframes pesaSeLevanta { from { translate: 0 0; } }
 button.estante-lugar:active .pesa-rusa { scale: .92; }
-/* En chico (el aviso de Rutina cuando hoy descansás): sin los nombres, y hoy
-   con su rayita en el estante. */
-.estante.chico { flex: none; width: 112px; gap: 1px; padding: 0 2px; }
-.estante.chico::before { height: 4px; border-radius: 2px; }
-.estante.chico .estante-lugar { padding: 2px 0 4px; }
-.estante.chico .pesa-rusa { max-width: 15px; }
-.estante.chico .pesa-rusa.vacia .pesa-rusa-cuerpo { fill: var(--disco-fantasma); stroke: none; }
-.estante.chico .pesa-rusa.vacia .pesa-rusa-asa { stroke: var(--disco-fantasma); stroke-width: 4.2; stroke-dasharray: none; }
-.estante.chico .estante-lugar.hoy::after { content: ""; position: absolute; left: 22%; right: 22%; bottom: 0; width: auto; height: 4px; translate: none; border-radius: 2px; background: var(--text-strong); }
-.estante.chico .estante-lugar.hoy.con-pesa .pesa-rusa { translate: 0 -3px; }
 
 /* LOS CAJONES DEL CICLO (Progreso, Perfil, la bienvenida y la guía), parados
    en la repisa de la pizarra del gimnasio. Cada cajón es de chapa pintada como
@@ -6173,7 +6185,7 @@ button.estante-lugar:active .pesa-rusa { scale: .92; }
 .ciclo-semana { display: flex; align-items: baseline; margin-top: 3px; line-height: .9; }
 .ciclo-semana b { font-size: 3rem; font-weight: 800; color: var(--text-strong); }
 .ciclo-semana span { font-size: 1.6rem; font-weight: 700; color: var(--text-faint); }
-.ciclo-esta-semana { display: flex; align-items: center; gap: 8px; padding-bottom: 6px; font-size: 12.5px; color: var(--text-faint); text-align: right; }
+.ciclo-esta-semana { display: flex; align-items: center; gap: 8px; padding-bottom: 6px; font-size: 13px; color: var(--text-faint); text-align: right; }
 .ciclo-esta-semana .marcas { color: var(--text-strong); }
 .ciclo-esta-semana.cumplida .marcas { color: color-mix(in oklab, var(--tono) 72%, white); }
 .light-mode .ciclo-esta-semana.cumplida .marcas { color: var(--tono); }
@@ -6217,7 +6229,7 @@ button.estante-lugar:active .pesa-rusa { scale: .92; }
 .hoja-clavada .preset-ver { color: var(--papel-tinta); }
 .hoja-clavada .preset-frec { font-family: 'Caveat Variable', 'Caveat', 'Segoe Print', cursive; font-size: 19px; font-weight: 600; font-stretch: normal; color: var(--papel-suave); }
 .hoja-clavada-dias { display: flex; flex-wrap: wrap; gap: 4px 8px; }
-.hoja-clavada-dias i { padding: 0 3px; font-style: normal; font-size: 11.5px; font-weight: 800; letter-spacing: .01em; background: linear-gradient(transparent 48%, color-mix(in oklab, var(--dia) 42%, var(--papel)) 48% 92%, transparent 92%); }
+.hoja-clavada-dias i { padding: 0 3px; font-style: normal; font-size: 12px; font-weight: 800; letter-spacing: .01em; background: linear-gradient(transparent 48%, color-mix(in oklab, var(--dia) 42%, var(--papel)) 48% 92%, transparent 92%); }
 .chinche { position: absolute; top: 7px; left: 50%; width: 15px; height: 15px; translate: -50% 0; border-radius: 999px; background: radial-gradient(circle at 34% 30%, rgba(255,255,255,.65) 0 2px, transparent 3.2px), var(--chinche, #b9483e); box-shadow: 0 3px 3px -1px rgba(0,0,0,.5); }
 /* Activa: un sello en la hoja. */
 .hoja-clavada .preset-activa { height: auto; padding: 1px 7px; rotate: -7deg; border-radius: 5px; font-size: 12px; font-weight: 800; color: color-mix(in oklab, var(--tono) 70%, #1a2340); background: none; box-shadow: inset 0 0 0 2px currentColor; }
@@ -6232,7 +6244,7 @@ button.estante-lugar:active .pesa-rusa { scale: .92; }
   box-shadow: inset 0 0 0 7px #5b4a39, inset 0 0 0 8px rgba(0,0,0,.35), inset 0 3px 16px rgba(0,0,0,.55), 0 16px 32px -22px rgba(0,0,0,.95); }
 .pizarra-ia-saludo { font-family: 'Caveat Variable', 'Caveat', 'Segoe Print', cursive; font-size: 25px; font-weight: 600; line-height: 1; color: var(--tiza-suave); }
 .pizarra-ia-pregunta { font-family: 'Caveat Variable', 'Caveat', 'Segoe Print', cursive; font-size: 37px; font-weight: 700; line-height: .95; letter-spacing: 0; color: var(--tiza); text-shadow: 0 0 1px rgba(236,235,228,.35); }
-.pizarra-ia-bajada { max-width: 34ch; margin-top: 4px; font-size: 13.5px; line-height: 1.45; color: var(--tiza-suave); }
+.pizarra-ia-bajada { max-width: 34ch; margin-top: 4px; font-size: 14px; line-height: 1.45; color: var(--tiza-suave); }
 .pizarra-ia .ia-tarjetas { margin-top: 12px; gap: 10px; }
 .ia-tarjeta.postit { --tinta-postit: #2b2a24; min-height: 98px; padding: 12px 12px 10px; border-radius: 2px 2px 16px 2px; color: var(--tinta-postit); background: var(--postit, #ebe4bc); box-shadow: 0 9px 14px -9px rgba(0,0,0,.75), inset 0 -12px 16px -14px rgba(0,0,0,.25); rotate: -1.6deg; }
 .ia-tarjeta.postit:nth-child(2) { rotate: 1.3deg; }
@@ -7555,7 +7567,7 @@ function ProfileQrModal({ profileName, username, accent = "#A855F7", onClose }) 
           <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full blur-3xl pointer-events-none opacity-25" style={{ backgroundColor: accent }} />
           <div className="relative flex items-start justify-between gap-2 mb-4">
             <div className="min-w-0">
-              <p className="text-[9px] font-black uppercase tracking-widest" style={{ color: accent }}>Tu código QR</p>
+              <p className="text-[12px] font-bold" style={{ color: accent }}>Tu código QR</p>
               <p className="text-base font-black text-white leading-tight">Que te escaneen</p>
             </div>
             <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition shrink-0"><X size={18} /></button>
@@ -7577,7 +7589,7 @@ function ProfileQrModal({ profileName, username, accent = "#A855F7", onClose }) 
             </span>
           </div>
 
-          <p className="relative text-[10.5px] text-slate-500 text-center leading-snug mb-3">
+          <p className="relative text-[11px] text-slate-500 text-center leading-snug mb-3">
             Que lo escaneen desde <span className="text-slate-400 font-semibold">Social → Buscar → Escanear código QR</span>.
           </p>
 
@@ -7627,12 +7639,12 @@ function ProfileShareModal({ profileName, username, myTopRank, onClose }) {
             <button onClick={() => setShowCard(true)} className="flex flex-col items-center gap-2.5 rounded-2xl border border-slate-700/60 hover:border-teal-500/40 bg-slate-800/40 py-5 px-2.5 transition active:scale-[0.97]">
               <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: "var(--surface-3)" }}><Share2 size={18} className="!text-white" /></div>
               <span className="text-xs font-bold text-white text-center leading-snug">Tarjeta para compartir</span>
-              <span className="text-[9.5px] text-slate-500 text-center leading-snug">WhatsApp, Instagram y más</span>
+              <span className="text-[11px] text-slate-500 text-center leading-snug">WhatsApp, Instagram y más</span>
             </button>
             <button onClick={() => setShowQr(true)} className="flex flex-col items-center gap-2.5 rounded-2xl border border-slate-700/60 hover:border-fuchsia-500/40 bg-slate-800/40 py-5 px-2.5 transition active:scale-[0.97]">
               <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: "var(--surface-3)" }}><QrCode size={18} className="!text-white" /></div>
               <span className="text-xs font-bold text-white text-center leading-snug">Código QR</span>
-              <span className="text-[9.5px] text-slate-500 text-center leading-snug">Para que te escaneen</span>
+              <span className="text-[11px] text-slate-500 text-center leading-snug">Para que te escaneen</span>
             </button>
           </div>
         </div>
@@ -7856,7 +7868,7 @@ function ShareImageModal({ title, subtitle, fileNamePrefix, shareTitle, shareTex
             <div className="icono-suelto"><Share2 size={16} /></div>
             <div className="min-w-0">
               <h3 className="text-base font-black text-white truncate">{title}</h3>
-              {subtitle && <p className="text-[10.5px] text-slate-500 truncate">{subtitle}</p>}
+              {subtitle && <p className="text-[11px] text-slate-500 truncate">{subtitle}</p>}
             </div>
           </div>
           <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition shrink-0"><X size={18} /></button>
@@ -7910,10 +7922,10 @@ function ShareImageModal({ title, subtitle, fileNamePrefix, shareTitle, shareTex
         {shareError && (
           <div className="relative mt-3 rounded-xl bg-rose-500/10 border border-rose-500/25 px-3 py-2.5">
             <p className="text-[11px] text-rose-300 leading-snug">{shareError.msg}</p>
-            {shareError.detail && <p className="text-[9.5px] text-slate-600 mt-1 break-all">{shareError.detail}</p>}
+            {shareError.detail && <p className="text-[11px] text-slate-600 mt-1 break-all">{shareError.detail}</p>}
           </div>
         )}
-        <p className="relative text-[10px] text-slate-600 mt-3 text-center">Para tu historia de Instagram: compartila directo, o descargala y subila desde la app.</p>
+        <p className="relative text-[11px] text-slate-600 mt-3 text-center">Para tu historia de Instagram: compartila directo, o descargala y subila desde la app.</p>
       </div>
     </div>,
     document.body
@@ -8261,8 +8273,8 @@ function LoginScreen({ onLogin, allowAutoLogin = true }) {
         </div>
         <div className="space-y-4">
           {regStep === 1 && (<>
-            <div><label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 block">Nombre</label><input type="text" placeholder="¿Cómo te llamás?" value={regName} onChange={(e) => setRegName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleRegister(); }} className="w-full bg-slate-900/80 border border-slate-700/50 rounded-2xl px-4 py-3.5 text-white focus:outline-none focus:border-teal-500/60 text-sm transition" autoFocus /></div>
-            <div><label className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 block">Email <span className="text-slate-600 normal-case">(opcional)</span></label><input type="email" placeholder="tu@email.com" value={regMail} onChange={(e) => setRegMail(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleRegister(); }} className="w-full bg-slate-900/80 border border-slate-700/50 rounded-2xl px-4 py-3.5 text-white focus:outline-none focus:border-teal-500/60 text-sm transition" /></div>
+            <div><label className="ajuste-rotulo mb-2 block">Nombre</label><input type="text" placeholder="¿Cómo te llamás?" value={regName} onChange={(e) => setRegName(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleRegister(); }} className="w-full bg-slate-900/80 border border-slate-700/50 rounded-2xl px-4 py-3.5 text-white focus:outline-none focus:border-teal-500/60 text-sm transition" autoFocus /></div>
+            <div><label className="ajuste-rotulo mb-2 block">Email <span className="text-slate-600 normal-case">(opcional)</span></label><input type="email" placeholder="tu@email.com" value={regMail} onChange={(e) => setRegMail(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") handleRegister(); }} className="w-full bg-slate-900/80 border border-slate-700/50 rounded-2xl px-4 py-3.5 text-white focus:outline-none focus:border-teal-500/60 text-sm transition" /></div>
           </>)}
           {regStep === 2 && <PinInput length={4} label="Elegí un PIN" onComplete={(p) => { setRegPin(p); setRegStep(3); }} onCancel={() => setRegStep(1)} />}
           {regStep === 3 && <PinInput length={4} label="Confirmá el PIN" onComplete={(p) => { if (p === regPin) { finishRegister(); } else { setRegError("No coinciden."); setTimeout(() => setRegError(""), 1500); } }} error={regError} onCancel={() => setRegStep(1)} />}
@@ -8323,7 +8335,7 @@ function LoginScreen({ onLogin, allowAutoLogin = true }) {
             </button>
           </SwipeToArchive>
         ))}</div>
-        <p className="text-[10px] text-slate-700 mt-2.5">Deslizá un perfil hacia la derecha para quitarlo de esta lista sin borrar sus datos.</p>
+        <p className="text-[11px] text-slate-700 mt-2.5">Deslizá un perfil hacia la derecha para quitarlo de esta lista sin borrar sus datos.</p>
         </div>)}
 
         {archivedList.length > 0 && (
@@ -8332,7 +8344,7 @@ function LoginScreen({ onLogin, allowAutoLogin = true }) {
               <button onClick={() => setShowArchived(true)} className="text-[11px] text-slate-600 hover:text-slate-400 font-semibold underline">¿Quitaste un perfil por error? Recuperarlo ({archivedList.length})</button>
             ) : (
               <div className="space-y-2">
-                <p className="text-[11px] font-bold uppercase tracking-widest text-slate-600 mb-2">Perfiles ocultos en este dispositivo</p>
+                <p className="ajuste-rotulo mb-2">Perfiles ocultos en este dispositivo</p>
                 {archivedList.map((name) => (
                   <div key={name} className="bg-slate-900/40 border border-slate-800/50 rounded-2xl px-4 py-3">
                     <div className="flex items-center justify-between gap-2">
@@ -8363,7 +8375,7 @@ function LoginScreen({ onLogin, allowAutoLogin = true }) {
           </div>
         )}
         <button onClick={() => setPhase("register")} className="w-full h-14 rounded-full bg-white/[0.07] text-slate-200 hover:text-white transition-all text-[15px] font-semibold flex items-center justify-center gap-2 active:scale-[0.98]"><Plus size={17} /> Crear perfil sin Google</button>
-        <p className="text-[11.5px] text-slate-500 text-center mt-3 leading-snug">Sin cuenta también funciona: tus datos quedan en este teléfono.</p>
+        <p className="text-[12px] text-slate-500 text-center mt-3 leading-snug">Sin cuenta también funciona: tus datos quedan en este teléfono.</p>
         {regError && <p className="text-rose-400 text-xs mt-3 text-center">{regError}</p>}
       </div>
     </div>
@@ -10585,11 +10597,14 @@ function MedallaMes({ prefijo = null, numero = 0, chica = false }) {
   );
 }
 
-// LA VITRINA: los últimos doce meses colgados de sus ganchos. Los que
-// entrenaste tienen su medalla (tocarla abre el resumen de ese mes); los
-// otros, el gancho vacío; el de este mes dice cuánto llevás.
+// LA VITRINA: los últimos meses colgados de sus ganchos. Los que entrenaste
+// tienen su medalla (tocarla abre el resumen de ese mes); los otros, el gancho
+// vacío; el de este mes dice cuánto llevás. Se ven los últimos seis, en una
+// fila; "Ver el año entero" cuelga los doce, sólo si en los seis de antes hay
+// alguna medalla (antes eran siempre dos filas, casi todas de ganchos vacíos).
 function VitrinaMedallas({ logs, trainingSessions }) {
   const [abierto, setAbierto] = useState(null);
+  const [elAnio, setElAnio] = useState(false);
   const meses = useMemo(() => {
     const idx = buildSessionsIndex(logs || {}, trainingSessions || []);
     const hoy = new Date();
@@ -10602,6 +10617,8 @@ function VitrinaMedallas({ logs, trainingSessions }) {
   const datosAbierto = useMemo(() => (abierto ? computePrefixRecap(logs || {}, trainingSessions || [], abierto) : null), [abierto, logs, trainingSessions]);
   if (!meses.some((x) => x.dias > 0)) return null;
   const ganadas = meses.filter((x) => !x.enCurso && x.dias > 0).length;
+  const hayAntes = meses.slice(0, 6).some((x) => x.dias > 0);
+  const colgados = elAnio && hayAntes ? meses : meses.slice(6);
   return (
     <section className="vitrina tarjeta-tonal" aria-label="Tus medallas">
       <div className="vitrina-cabeza">
@@ -10609,7 +10626,7 @@ function VitrinaMedallas({ logs, trainingSessions }) {
         <span>{ganadas === 0 ? "La primera llega al cerrar el mes" : `${ganadas} de los últimos 11 meses`}</span>
       </div>
       <div className="vitrina-estante">
-        {meses.map((x) => (!x.enCurso && x.dias > 0 ? (
+        {colgados.map((x) => (!x.enCurso && x.dias > 0 ? (
           <button key={x.prefijo} onClick={() => setAbierto(x.prefijo)} className="vitrina-lugar con-medalla" aria-label={`${capitalizar(NOMBRES_MES[x.mes])} de ${x.anio}: ${x.dias} ${x.dias === 1 ? "día" : "días"}. Ver el resumen`}>
             <span className="vitrina-clavo" aria-hidden="true" />
             <MedallaMes chica numero={x.dias} />
@@ -10623,6 +10640,11 @@ function VitrinaMedallas({ logs, trainingSessions }) {
           </div>
         )))}
       </div>
+      {hayAntes && (
+        <button onClick={() => setElAnio((v) => !v)} className="enlace-suave vitrina-mas" aria-expanded={elAnio}>
+          {elAnio ? "Ver los últimos seis meses" : "Ver el año entero"}
+        </button>
+      )}
       {datosAbierto && <WeeklyRecapModal data={datosAbierto} periodo="mes" etiqueta={etiquetaPeriodo(abierto)} onClose={() => setAbierto(null)} />}
     </section>
   );
@@ -11132,10 +11154,10 @@ function capitulosGuia() {
       pasos: [
         {
           titulo: "Tus datos y tus ajustes",
-          texto: "Tu ciclo (con los mismos cajones de Progreso) y la descarga, los descansos y el modo gimnasio (la serie más grande mientras entrenás), los recordatorios, el tema, el tamaño de la letra y la unidad de peso.",
+          texto: "Tu ciclo (con los mismos cajones de Progreso) y la descarga, los descansos y el modo gimnasio (la serie más grande mientras entrenás), los avisos, el tema, el tamaño de la letra y la unidad de peso.",
           dibujo: (
             <div className="guia-fichas">
-              {["Tu ciclo", "Descansos", "Modo gimnasio", "Recordatorios", "Tema", "Letra grande", "Kilos o libras"].map((t) => <span key={t}>{t}</span>)}
+              {["Tu ciclo", "Descansos", "Modo gimnasio", "Avisos", "Tema", "Letra grande", "Kilos o libras"].map((t) => <span key={t}>{t}</span>)}
             </div>
           ),
         },
@@ -11229,14 +11251,14 @@ function RankUpModal({ from, to, muscleName, onClose }) {
         <div className="absolute inset-0 opacity-30 pointer-events-none" style={{ background: `radial-gradient(circle at 50% 30%, ${tint(to.color, "60")}, transparent 65%)` }} />
         <div className="relative p-7 text-center space-y-5">
           {/* Chips "SUBISTE DE RANGO" */}
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest" style={{ backgroundColor: tint(to.color, "20"), color: to.color, border: `1px solid ${tint(to.color, "40")}` }}>
-            ✦ ¡Nuevo rango! ✦
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[12px] font-bold" style={{ backgroundColor: tint(to.color, "20"), color: to.color, border: `1px solid ${tint(to.color, "40")}` }}>
+            Nuevo rango
           </div>
           {/* Flecha de progresión */}
           <div className="flex items-center justify-center gap-4">
             <div className="flex flex-col items-center gap-1.5 opacity-50">
               <RankBadgeIcon tier={from.tier} sub={from.sub} color={from.color} size={60} />
-              <span className="text-[10px] font-bold" style={{ color: from.color }}>{from.tier} {from.sub}</span>
+              <span className="text-[11px] font-bold" style={{ color: from.color }}>{from.tier} {from.sub}</span>
             </div>
             <div className="flex flex-col items-center gap-1">
               <div className="text-xl">→</div>
@@ -11805,7 +11827,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
       <button onClick={() => setShowRpeLocal(true)} className="serie-boton-suave"><Activity size={12} /> Registrar esfuerzo ({isRir ? "RIR" : "RPE"})</button>
     ) : (
       <div className="extra-abierto flex items-center gap-1.5 bounce-in rounded-2xl px-2 py-2 overflow-x-auto" style={{ backgroundColor: "var(--panel-sunken)" }}>
-        <span className="text-[11.5px] text-slate-500 font-semibold w-8 shrink-0 pl-1">{isRir ? "RIR" : "RPE"}</span>
+        <span className="text-[12px] text-slate-500 font-semibold w-8 shrink-0 pl-1">{isRir ? "RIR" : "RPE"}</span>
         {RPE_SCALE.map((rs) => (
           <button key={rs.value} onClick={() => updateDraft({ rpe: rpe === rs.value ? null : rs.value })} title={rs.desc} className="w-9 h-9 rounded-full text-[12px] font-bold transition-all active:scale-90 shrink-0" style={rpe === rs.value ? { backgroundColor: rpeColor(rs.value), color: "#0c0d10" } : { backgroundColor: "var(--surface-2)", color: "var(--surface-2-text)" }}>{isRir ? rirButtonLabel(rs.value) : rs.value}</button>
         ))}
@@ -11824,7 +11846,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           maxLength={200}
           autoFocus
           aria-label={`Nota de la serie ${setIndex + 1}`}
-          className="w-full bg-transparent text-[12.5px] text-slate-200 placeholder:text-slate-600 focus:outline-none resize-none leading-snug"
+          className="w-full bg-transparent text-[13px] text-slate-200 placeholder:text-slate-600 focus:outline-none resize-none leading-snug"
         />
         <div className="flex items-center gap-2 mt-1">
           <button onClick={guardarNota} className="text-[12px] font-bold px-3 h-8 rounded-lg transition active:scale-95" style={{ backgroundColor: "var(--surface-3)", color: "var(--text-strong)" }}>Guardar</button>
@@ -11842,7 +11864,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   );
   const panelCorreccion = editingPR && !cardio && (
     <div className="mt-2 rounded-2xl p-3 space-y-2.5 bounce-in" style={{ backgroundColor: "var(--panel-sunken)" }}>
-      <p className="text-[12.5px] font-bold flex items-center gap-1.5 text-slate-200"><Edit3 size={13} /> Corregir récord</p>
+      <p className="text-[13px] font-bold flex items-center gap-1.5 text-slate-200"><Edit3 size={13} /> Corregir récord</p>
       <div className="flex flex-wrap gap-2 items-center">
         <input type="number" inputMode="decimal" placeholder="Reps" aria-label="Reps del récord" value={editReps} onChange={(e) => setEditReps(e.target.value)} className="w-20 h-10 bg-slate-800 rounded-xl px-2 text-center text-[15px] font-semibold text-white focus:outline-none" />
         <span className="text-slate-500 text-[13px]">reps ×</span>
@@ -11873,7 +11895,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           {currentPR?.minutes ? (
             <span className="serie-chip" style={{ color: "var(--text-strong)", backgroundColor: "var(--velo)" }} aria-label={`Tu récord: ${currentPR.minutes} minutos`}><Trophy size={12} /> {currentPR.minutes} min{currentPR.km ? ` · ${currentPR.km} km` : ""}</span>
           ) : (
-            <span className="text-[11.5px] text-slate-500">Primera vez</span>
+            <span className="text-[12px] text-slate-500">Primera vez</span>
           )}
         </div>
         {lineaFeedback}
@@ -11886,7 +11908,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
                 <b>{todayCardio.minutes}</b><small>min</small>
                 {todayCardio.km ? <><i>·</i><b>{todayCardio.km}</b><small>km</small></> : null}
               </span>
-              <button onClick={() => updateDraft({ minutes: String(todayCardio.minutes), km: String(todayCardio.km || ""), editing: true })} className="ml-auto text-[12.5px] font-semibold px-3.5 h-9 rounded-full transition text-slate-300" style={{ backgroundColor: "var(--surface-3)" }}>Editar</button>
+              <button onClick={() => updateDraft({ minutes: String(todayCardio.minutes), km: String(todayCardio.km || ""), editing: true })} className="ml-auto text-[13px] font-semibold px-3.5 h-9 rounded-full transition text-slate-300" style={{ backgroundColor: "var(--surface-3)" }}>Editar</button>
             </div>
           </div>
         ) : (
@@ -12065,6 +12087,10 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   }
 
   // ── EN FOCO: el tablero ─────────────────────────────────────────────────
+  // Si la vez pasada hiciste tu récord, arriba dice "récord 8 × 80" y abajo
+  // "la vez pasada 8 × 80 kg": la misma marca dos veces. Abajo va "tu récord".
+  const pasadaEsRecord = !!(currentPR && lastSession && !isPlannedMode && Number(lastSession.reps) === Number(currentPR.reps) && Math.abs((Number(lastSession.kg) || 0) - (Number(currentPR.kg) || 0)) < 0.01);
+  const laVezPasada = lastSession ? (pasadaEsRecord ? <>la vez pasada, <b>tu récord</b></> : <>la vez pasada <b>{lastSession.reps} × {conComa(kgToDisplay(lastSession.kg, unit))} {u}</b></>) : null;
   return (
     <div className={`serie serie-foco ${liveBeats ? "va-record" : ""}`} style={{ "--c": accent }}>
       {campana && <CampanaRecord key={campana.n} campana={campana} />}
@@ -12086,7 +12112,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
           <span className="foco-ref" aria-label={`Meta de hoy: ${plannedTarget.reps}×${kgToDisplay(plannedTarget.kg, unit)}${u}`}>meta <b>{plannedTarget.reps} × {conComa(kgToDisplay(plannedTarget.kg, unit))}</b></span>
         ) : currentPR ? (
           <button onClick={abrirCorreccion} className="foco-ref" aria-label={`Tu récord: ${currentPR.reps}×${kgToDisplay(currentPR.kg, unit)}${u}. Tocá para corregirlo`}>
-            récord <b>{currentPR.reps} × {kgToDisplay(currentPR.kg, unit)}</b>{override?.manual && <Edit3 size={11} className="opacity-60 self-center" />}
+            récord <b>{currentPR.reps} × {conComa(kgToDisplay(currentPR.kg, unit))}</b>{override?.manual && <Edit3 size={11} className="opacity-60 self-center" />}
           </button>
         ) : (
           <span className="foco-ref">primera vez</span>
@@ -12095,7 +12121,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
       {/* Si la serie no viene propuesta (opción apagada), lo de la vez pasada
           va abajo y chico: sigue siendo el mejor dato para elegir la carga. */}
       {!sugerido && fieldSettings.showLastSession === true && lastSession && (
-        <p className="foco-pasada">la vez pasada <b>{lastSession.reps} × {kgToDisplay(lastSession.kg, unit)} {u}</b></p>
+        <p className="foco-pasada">{laVezPasada}</p>
       )}
       {/* Siguiendo un plan, lo que hiciste la vez pasada (pedido: "que muestre
           en algún lado lo que hiciste la última vez cuando el ejercicio es
@@ -12105,7 +12131,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
       )}
       {/* La serie viene con la progresión: arriba, de dónde sale. */}
       {escribeProgresion && !draft.editing && (
-        <p className="foco-pasada">la vez pasada <b>{lastSession.reps} × {conComa(kgToDisplay(lastSession.kg, unit))} {u}</b>{pasoProgresion.motivo === "peso" ? ": llegaste al tope, sube el peso" : ": hoy, una rep más"}</p>
+        <p className="foco-pasada">{laVezPasada}{pasoProgresion.motivo === "peso" ? ": llegaste al tope, sube el peso" : ": hoy, una rep más"}</p>
       )}
 
       {/* El visor: reps × kilos en grande y el ✓. Vienen propuestos con lo de
@@ -12181,7 +12207,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
         <div className="space-y-1.5 pt-2">
           {extraRows.map((row, i) => (
             <div key={i} className="flex items-center gap-1.5">
-              <span className="text-[11.5px] text-slate-500 font-semibold w-14 shrink-0">{setDef.type === "dropset" ? `Baja ${i + 1}` : `Mini ${i + 1}`}</span>
+              <span className="text-[12px] text-slate-500 font-semibold w-14 shrink-0">{setDef.type === "dropset" ? `Baja ${i + 1}` : `Mini ${i + 1}`}</span>
               <input type="number" inputMode="decimal" placeholder="reps" aria-label={`Reps de la ${setDef.type === "dropset" ? "bajada" : "mini-serie"} ${i + 1}`} value={row.reps} onChange={(e) => updateExtraRow(i, { reps: e.target.value })} className="w-16 h-9 bg-slate-900/70 rounded-xl px-2 text-[13px] text-center text-white focus:outline-none" />
               {setDef.type === "dropset" && (
                 <>
@@ -12209,7 +12235,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
             <span className="text-[12px] text-slate-500">% de tu 1RM</span>
             <input
               type="number" inputMode="numeric" placeholder="—" aria-label="Porcentaje de tu 1RM"
-              className="w-14 h-8 rounded-full bg-slate-900/60 text-[12.5px] font-bold text-center text-slate-200 focus:outline-none"
+              className="w-14 h-8 rounded-full bg-slate-900/60 text-[13px] font-bold text-center text-slate-200 focus:outline-none"
               onFocus={(e) => e.target.select()}
               onChange={(e) => {
                 const pct = parseFloat(e.target.value);
@@ -12515,8 +12541,7 @@ function DiasRutina({ routineDef, onGoToDay = null, elegido = null }) {
 // lo que toca (las de competición tienen un color por peso). El estante es
 // de chapa cepillada, como el casillero, con los nombres de los días en el
 // canto. Antes fueron mancuernas en un rack (no convencieron: "volvamos a las
-// keltbel") y, antes, pesas rusas planas de un solo color. En chico, sin los nombres de los días,
-// va en el aviso de Rutina cuando hoy descansás.
+// keltbel") y, antes, pesas rusas planas de un solo color.
 const DIAS_DE_LA_SEMANA = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"];
 // El asa sale de los hombros de la bocha y es ancha, con la ventana baja: así
 // se lee pesa rusa y no candado.
@@ -12558,25 +12583,22 @@ function PesaRusa({ vacia = false }) {
   );
 }
 // `dias`: siete { clave, corto ("Lun"), nombre ("lunes"), dia: { label, color } | null, hoy }.
-// En chico va adentro de un botón: es un dibujo, todo con <span>.
-function EstantePesas({ dias = [], onElegir = null, chico = false, etiqueta = "Tu semana" }) {
-  const Lista = chico ? "span" : "ol";
-  const Lugar = chico ? "span" : "li";
+function EstantePesas({ dias = [], onElegir = null, etiqueta = "Tu semana" }) {
   return (
-    <Lista className={`estante ${chico ? "chico" : ""}`} aria-label={chico ? undefined : etiqueta} aria-hidden={chico || undefined}>
+    <ol className="estante" aria-label={etiqueta}>
       {dias.map((d, i) => {
         const texto = `${d.nombre || d.corto}: ${d.dia ? d.dia.label : "descanso"}${d.hoy ? " (hoy)" : ""}`;
         const clase = `estante-lugar ${d.dia ? "con-pesa" : ""} ${d.hoy ? "hoy" : ""}`;
-        const contenido = <><PesaRusa vacia={!d.dia} />{!chico && <span className="estante-dia" aria-hidden="true">{d.corto}</span>}</>;
+        const contenido = <><PesaRusa vacia={!d.dia} /><span className="estante-dia" aria-hidden="true">{d.corto}</span></>;
         return (
-          <Lugar key={d.clave || i} style={d.dia ? { "--dia": d.dia.color } : undefined}>
+          <li key={d.clave || i} style={d.dia ? { "--dia": d.dia.color } : undefined}>
             {onElegir && d.dia
               ? <button onClick={() => onElegir(d)} className={clase} aria-label={`${texto}. Tocá para entrenarlo`}>{contenido}</button>
-              : <span className={clase} role={chico ? undefined : "img"} aria-label={chico ? undefined : texto}>{contenido}</span>}
-          </Lugar>
+              : <span className={clase} role="img" aria-label={texto}>{contenido}</span>}
+          </li>
         );
       })}
-    </Lista>
+    </ol>
   );
 }
 
@@ -12966,12 +12988,12 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
             <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
               <span className="ejercicio-musculo">{exercise.muscle}</span>
               {/* Si el músculo ya dice "Cardio", el chip de cardio repetía la palabra. */}
-              {exercise.cardio && String(exercise.muscle || "").toLowerCase() !== "cardio" && <span className="text-[10px] bg-rose-400/15 text-rose-300 rounded-md px-1.5 py-0.5 font-bold flex items-center gap-1"><Footprints size={9} /> CARDIO</span>}
+              {exercise.cardio && String(exercise.muscle || "").toLowerCase() !== "cardio" && <span className="text-[11px] bg-rose-400/15 text-rose-300 rounded-md px-1.5 py-0.5 font-bold flex items-center gap-1"><Footprints size={9} /> CARDIO</span>}
               {!open && restTimerId && <ChipDescansoEnCurso timerId={restTimerId} color={accent} />}
               {/* El ×1/×2 de mancuernas se configura al editar la rutina
                   ("¿Con cuántas mancuernas?"), no acá: durante el
                   entrenamiento sumaba ruido y ya está definido. */}
-              {stagnant && settings.showStagnation === true && !siguiendoPlan && <span className="text-[10px] bg-rose-500/15 text-rose-400 rounded-lg px-1.5 py-0.5 font-bold flex items-center gap-1"><AlertTriangle size={9} /> ESTANCADO</span>}
+              {stagnant && settings.showStagnation === true && !siguiendoPlan && <span className="text-[11px] bg-rose-500/15 text-rose-400 rounded-lg px-1.5 py-0.5 font-bold flex items-center gap-1"><AlertTriangle size={9} /> ESTANCADO</span>}
               {/* Con la tarjeta cerrada ya se ve cuáles ejercicios siguen el
                   plan y cuáles persiguen tu récord — antes había que abrir
                   cada uno para enterarte. Y el chip ES el interruptor: un
@@ -13111,7 +13133,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
         </div>
         {exercise.video && (
           <div className="pt-3">
-            <a href={exercise.video} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 h-11 rounded-full text-slate-400 hover:text-white transition text-[13.5px] font-semibold active:scale-[0.98]" style={{ backgroundColor: "var(--surface-2)" }}>
+            <a href={exercise.video} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 h-11 rounded-full text-slate-400 hover:text-white transition text-[14px] font-semibold active:scale-[0.98]" style={{ backgroundColor: "var(--surface-2)" }}>
               <SquarePlay size={17} /> Ver técnica en YouTube
             </a>
           </div>
@@ -13822,6 +13844,27 @@ function HojaDelPlan({ dia = null, semana = null, filas = [], hayPlan = false, e
   const resto = filas.length - visibles.length;
   const pausado = hayPlan && enPausa;
   const seguir = hayPlan && !enPausa && terminados > 0 && !!onSeguir;
+  // Sin nada que escribir en los renglones (sin metas, o este día sin metas
+  // esta semana), la hoja se pliega: "Tu plan", qué pasa sin metas y una sola
+  // acción. Vacía ocupaba lo mismo que llena y, con el aviso del descanso,
+  // dejaba "Iniciar sesión" debajo de la barra de pestañas.
+  if (sinRutina || !hayPlan || (!filas.length && !seguir)) {
+    const nota = sinRutina ? "Activá una rutina en la pestaña Rutinas." : !hayPlan ? "Sin metas: cada serie te muestra tu récord." : pausado ? "En pausa: cada serie te muestra tu récord." : "Este día no tiene metas esta semana.";
+    return (
+      <section className={`planilla plan-hoja plegada ${pausado ? "en-pausa" : ""}`} aria-label="Tu plan" style={dia ? { "--dia": dia.color } : undefined}>
+        <BrocheTabla />
+        <div className="planilla-hoja">
+          <p className="plan-hoja-titulo">Tu plan</p>
+          <p className="plan-hoja-nota">{nota}</p>
+          {!sinRutina && (pausado && onPausa ? (
+            <button onClick={onPausa} className="plan-hoja-accion principal"><Play size={12} className="fill-current" /> <span>Reanudar</span></button>
+          ) : onPlanificar ? (
+            <button onClick={onPlanificar} className={`plan-hoja-accion principal ${invitar ? "invite-pulse" : ""}`}><Sliders size={14} /> <span>Planificar</span></button>
+          ) : null)}
+        </div>
+      </section>
+    );
+  }
   return (
     <section className={`planilla plan-hoja ${pausado ? "en-pausa" : ""}`} aria-label="Tu plan" style={dia ? { "--dia": dia.color } : undefined}>
       <BrocheTabla />
@@ -13875,7 +13918,7 @@ function HojaDelPlan({ dia = null, semana = null, filas = [], hayPlan = false, e
   );
 }
 
-function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, weekSchedule, activeSession, onStartSession, onDisableAutoShowPrShare, onUpdateSettings = null, onSetPlanPaused = null, onRemovePlan = null, onGoToRoutines = null, onGoToSchedule = null, onGoToFieldSettings = null, onGoToDescarga = null, sex = null, age = null, activeRoutineDef = null, onApplyOwnProgression = null, goToDaySignal = { id: null, n: 0 }, onSignalConsumed = null }) {
+function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, weekSchedule, activeSession, onStartSession, onDisableAutoShowPrShare, onUpdateSettings = null, onSetPlanPaused = null, onRemovePlan = null, onGoToFieldSettings = null, onGoToDescarga = null, sex = null, age = null, activeRoutineDef = null, onApplyOwnProgression = null, goToDaySignal = { id: null, n: 0 }, onSignalConsumed = null }) {
   // Semana actual del ciclo — sólo hace falta el número (weekInCycle), para
   // que SetRow sepa si hay una meta cargada (modo "planned", ver
   // getPlannedTargetForWeek) para ESTA semana puntual.
@@ -14050,22 +14093,10 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           />
         );
       })()}
-      {isRestToday && (
-        <button onClick={() => (onGoToSchedule || onGoToRoutines)?.()} className="aviso-descanso" aria-label="Hoy es día de descanso. Tocá para editar tu semana">
-          <span className="min-w-0 flex-1">
-            <span className="block text-[14px] font-bold text-white leading-tight">Hoy descansás</span>
-          </span>
-          {/* Tu semana en el estante de las pesas rusas, en chico: las de los
-              días que entrenás, del color de lo que toca; hoy, con su rayita. */}
-          {weekSchedule && (
-            <EstantePesas chico dias={WEEKDAY_KEYS.map((wk, i) => {
-              const d = weekSchedule[wk] ? ROUTINE[weekSchedule[wk]] : null;
-              return { clave: wk, corto: WEEKDAY_SHORT_LABELS[i], dia: d ? { label: d.label, color: d.color } : null, hoy: wk === todayWeekdayKey() };
-            })} />
-          )}
-          <ChevronRight size={16} className="text-slate-500 shrink-0" />
-        </button>
-      )}
+      {/* "Hoy descansás" ya no es un aviso aparte: va al lado de la fecha,
+          arriba de todo (ver TituloPestana). El aviso, con tu semana en un
+          estante chico, empujaba el día y "Iniciar sesión" hasta abajo de la
+          barra de pestañas. */}
 
       {/* Los días: botones unidos, como un grupo de Material 3 Expressive.
           El elegido se vuelve una píldora llena de su color (el resorte
@@ -14133,8 +14164,8 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           {confirmReset && (
             <div className="flex gap-2 items-center mt-3 rounded-2xl px-3.5 py-2.5" style={{ backgroundColor: "var(--panel-sunken)" }}>
               <p className="text-[12px] text-slate-400 flex-1">¿Borrar reps/kg de hoy (incluido lo sin guardar)? Los récords no cambian.</p>
-              <button onClick={() => setConfirmReset(false)} className="px-3.5 h-9 rounded-full bg-slate-800 text-slate-300 text-[12.5px] font-semibold">No</button>
-              <button onClick={handleResetDay} className="px-3.5 h-9 rounded-full bg-rose-500/85 !text-white text-[12.5px] font-bold">Sí</button>
+              <button onClick={() => setConfirmReset(false)} className="px-3.5 h-9 rounded-full bg-slate-800 text-slate-300 text-[13px] font-semibold">No</button>
+              <button onClick={handleResetDay} className="px-3.5 h-9 rounded-full bg-rose-500/85 !text-white text-[13px] font-bold">Sí</button>
             </div>
           )}
           {/* La sesión activa pertenece a UN día (el que iniciaste). Si estás
@@ -14211,10 +14242,10 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             const grupoSegundos = hasHeavyGroup ? settings.restLong : settings.restShort;
             return (
               <div key={`${activeDay}:${group.map((e) => e.id).join("-")}`} className="superserie space-y-2" style={{ "--c": day.color, borderColor: tint(day.color, "45") }}>
-                <div className="flex items-center gap-1.5 px-1 pt-0.5"><Link size={12} style={{ color: day.color }} /><span className="text-[10.5px] font-black uppercase" style={{ color: day.color }}>Superserie · {group.length} ejercicios</span></div>
+                <div className="flex items-center gap-1.5 px-1 pt-0.5"><Link size={12} style={{ color: day.color }} /><span className="text-[11px] font-black uppercase" style={{ color: day.color }}>Superserie · {group.length} ejercicios</span></div>
                 {group.map((ex, xi) => <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onSetPlanPaused={onSetPlanPaused} routineHasPlan={hasAnyPlan} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} hideTimer sex={sex} age={age} weekInCycle={weekInCycle} cicloActual={cicloActual} dayKey={activeDay} autoCollapse={plegar} nextRestTimerId={xi === group.length - 1 ? nextRestTimerId : null} nextRestSeconds={nextRestSeconds} nextExerciseName={xi === group.length - 1 ? nextExerciseName : null} nextObjetivo={xi === group.length - 1 ? nextObjetivo : null} supersetRestTimerId={xi === group.length - 1 ? grupoTimerId : null} supersetRestSeconds={grupoSegundos} orden={primeroDe[gi] + xi} />)}
                 {settings.autoStartRestTimer !== true && <RestTimer seconds={grupoSegundos} accent={day.color} timerId={grupoTimerId} exerciseName={group.map((g) => g.name).filter(Boolean).join(" + ")} />}
-                <p className="text-[10.5px] text-slate-500 px-1 pb-0.5">Descansá recién al completar la vuelta de los {group.length}.{settings.autoStartRestTimer === true ? " Arranca solo al guardar la serie del último." : ""}</p>
+                <p className="text-[11px] text-slate-500 px-1 pb-0.5">Descansá recién al completar la vuelta de los {group.length}.{settings.autoStartRestTimer === true ? " Arranca solo al guardar la serie del último." : ""}</p>
               </div>
             );
           });
@@ -14886,8 +14917,8 @@ function DeloadView({ logs, setLogs, settings = DEFAULT_SETTINGS, deloadProgress
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <Zap size={16} className="text-purple-400" />
-                <span className="text-[11px] font-black uppercase tracking-widest text-purple-400">Semana de descarga</span>
-                <button onClick={() => setUnit((u) => u === "kg" ? "lbs" : "kg")} className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-slate-800 text-slate-500 hover:text-slate-300 transition border border-slate-700 ml-1">
+                <span className="text-[12px] font-bold text-purple-400">Semana de descarga</span>
+                <button onClick={() => setUnit((u) => u === "kg" ? "lbs" : "kg")} className="text-[11px] font-bold px-1.5 py-0.5 rounded-md bg-slate-800 text-slate-500 hover:text-slate-300 transition border border-slate-700 ml-1">
                   {unit === "kg" ? "lbs" : "kg"}
                 </button>
               </div>
@@ -14914,7 +14945,7 @@ function DeloadView({ logs, setLogs, settings = DEFAULT_SETTINGS, deloadProgress
             {[{ label: "Ciclo", val: `${trainWeeks}+${deloadWeeks}sem` }, { label: "Carga", val: `${pctLabel}%` }, { label: "Series", val: `÷${deloadSetDivisor}` }].map(({ label, val }) => (
               <div key={label} className="bg-purple-500/10 border border-purple-500/15 rounded-xl px-3 py-2 text-center">
                 <p className="text-sm font-black text-purple-200">{val}</p>
-                <p className="text-[10px] text-purple-500 mt-0.5">{label}</p>
+                <p className="text-[11px] text-purple-500 mt-0.5">{label}</p>
               </div>
             ))}
           </div>
@@ -14938,7 +14969,7 @@ function DeloadView({ logs, setLogs, settings = DEFAULT_SETTINGS, deloadProgress
                   horizontalmente"): mismo motivo que en RoutineView —
                   textAlign explícito en vez de depender de heredarlo. */}
               {(() => { const { texto, larga } = etiquetaDeDia(d.label); return <span className="dia-solapa-texto flex items-center justify-center" style={{ "--largo": larga, "--fs-max": tamanoMaxSolapa(DAY_ORDER.length), minHeight: `${minHeight}px` }}>{texto}</span>; })()}
-              {withPR > 0 && <span className="text-[8px] font-black opacity-70">{withPR}/{d.exercises.length}</span>}
+              {withPR > 0 && <span className="text-[11px] font-black opacity-70">{withPR}/{d.exercises.length}</span>}
             </button>
           );
         }); })()}
@@ -15062,7 +15093,7 @@ function DeloadView({ logs, setLogs, settings = DEFAULT_SETTINGS, deloadProgress
           <button onClick={handleFinishSession} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl !text-white text-sm font-bold transition-all active:scale-[0.98] shadow-lg" style={{ backgroundColor: "#A855F7", boxShadow: "0 10px 24px -8px #A855F788" }}>
             <Check size={15} /> Finalizar sesión de descarga
           </button>
-          <p className="text-center text-[10px] text-slate-600 mt-2">Se registra como entrenamiento de hoy (suma a tu racha y calendario) y se desmarcan las series tildadas, para la próxima vez.</p>
+          <p className="text-center text-[11px] text-slate-600 mt-2">Se registra como entrenamiento de hoy (suma a tu racha y calendario) y se desmarcan las series tildadas, para la próxima vez.</p>
         </div>
       )}
     </div>
@@ -16041,13 +16072,13 @@ function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backR
         <div ref={frontRef} onClick={handlePolygonClick("front")} className="relative">
           <Figura data={data} type="anterior" bodyColor="#3c4146" highlightedColors={highlightedColors} onClick={MODEL_NOOP_CLICK} style={MODEL_STYLE} svgStyle={MODEL_STYLE} />
         </div>
-        <p className="text-center text-[10px] text-slate-600 mt-1">De frente</p>
+        <p className="text-center text-[11px] text-slate-600 mt-1">De frente</p>
       </div>
       <div className="flex-1 min-w-0 max-w-[180px]">
         <div ref={backRef} onClick={handlePolygonClick("back")} className="relative">
           <Figura data={data} type="posterior" bodyColor="#3c4146" highlightedColors={highlightedColors} onClick={MODEL_NOOP_CLICK} style={MODEL_STYLE} svgStyle={MODEL_STYLE} />
         </div>
-        <p className="text-center text-[10px] text-slate-600 mt-1">De espalda</p>
+        <p className="text-center text-[11px] text-slate-600 mt-1">De espalda</p>
       </div>
     </div>
   );
@@ -16339,7 +16370,7 @@ function ManoAMano({ miFoto, miNombre, misRangos, mySex = null, suFoto, suNombre
       <section className="space-y-2" aria-label="Esta semana">
         <div className="flex items-baseline justify-between gap-3 px-1">
           <h3 className="seccion-titulo">Esta semana</h3>
-          <p className="text-[12.5px] font-semibold text-slate-400">{misSesiones === susSesiones ? "Van parejos" : misSesiones > susSesiones ? "Vas adelante" : `${nombre} va adelante`}</p>
+          <p className="text-[13px] font-semibold text-slate-400">{misSesiones === susSesiones ? "Van parejos" : misSesiones > susSesiones ? "Vas adelante" : `${nombre} va adelante`}</p>
         </div>
         <CarreraSemana filas={[{ uid: "yo", yo: true, nombre: miNombre || "Vos", foto: miFoto, dias: miSemana }, { uid: "amigo", nombre, foto: suFoto, dias: suSemana }]} />
         {/* Las dos rachas, en marcas de tiza. */}
@@ -16353,7 +16384,7 @@ function ManoAMano({ miFoto, miNombre, misRangos, mySex = null, suFoto, suNombre
         <section className="space-y-2" aria-label="Cara a cara">
           <div className="px-1">
             <h3 className="seccion-titulo">Cara a cara</h3>
-            <p className="text-[12.5px] text-slate-400 mt-0.5">La mejor serie de cada uno en lo que hacen los dos con barra. La raya es su 1RM estimado.</p>
+            <p className="text-[13px] text-slate-400 mt-0.5">La mejor serie de cada uno en lo que hacen los dos con barra. La raya es su 1RM estimado.</p>
           </div>
           {caraACara.map((c) => {
             const ganaYo = c.mio.rm > c.suyo.rm, ganaEl = c.suyo.rm > c.mio.rm;
@@ -16391,7 +16422,7 @@ function ManoAMano({ miFoto, miNombre, misRangos, mySex = null, suFoto, suNombre
         <section className="space-y-2" aria-label="Músculo por músculo">
           <div className="px-1">
             <h3 className="seccion-titulo">Músculo por músculo</h3>
-            <p className="text-[12.5px] text-slate-400 mt-0.5">Con los ejercicios directos de cada músculo, en kilos y con la misma vara para los dos.</p>
+            <p className="text-[13px] text-slate-400 mt-0.5">Con los ejercicios directos de cada músculo, en kilos y con la misma vara para los dos.</p>
           </div>
           <div className="mano-lista">
             {comparacion.map((r, i) => {
@@ -16423,7 +16454,7 @@ function ManoAMano({ miFoto, miNombre, misRangos, mySex = null, suFoto, suNombre
         <section className="space-y-2" aria-label={`Para pasar a ${nombre}`}>
           <div className="px-1">
             <h3 className="seccion-titulo">Para pasar a {nombre}</h3>
-            <p className="text-[12.5px] text-slate-400 mt-0.5">La serie que te falta en cada músculo donde te gana.</p>
+            <p className="text-[13px] text-slate-400 mt-0.5">La serie que te falta en cada músculo donde te gana.</p>
           </div>
           <ul className="ganarle">
             {paraGanarle.slice(0, 4).map((g) => (
@@ -16440,7 +16471,7 @@ function ManoAMano({ miFoto, miNombre, misRangos, mySex = null, suFoto, suNombre
               </li>
             ))}
           </ul>
-          {paraGanarle.length > 4 && <p className="text-[12.5px] text-slate-500 px-1">Y {paraGanarle.length - 4} {paraGanarle.length - 4 === 1 ? "músculo más" : "músculos más"} en el detalle de arriba.</p>}
+          {paraGanarle.length > 4 && <p className="text-[13px] text-slate-500 px-1">Y {paraGanarle.length - 4} {paraGanarle.length - 4 === 1 ? "músculo más" : "músculos más"} en el detalle de arriba.</p>}
         </section>
       )}
 
@@ -16537,7 +16568,7 @@ function MyBodyModal({ profile, onClose }) {
             <RankBadgeIcon tier={topRank.tier} sub={null} color={topRank.color} size={46} />
             <div className="min-w-0 flex-1">
               <p className="text-base font-black leading-tight" style={{ color: topRank.color }}>{topRank.tier} {topRank.sub}</p>
-              <p className="text-[10.5px] text-slate-500 leading-snug">Promedio de {trainedCount} músculo{trainedCount === 1 ? "" : "s"} con marcas</p>
+              <p className="text-[11px] text-slate-500 leading-snug">Promedio de {trainedCount} músculo{trainedCount === 1 ? "" : "s"} con marcas</p>
             </div>
           </div>
         ) : (
@@ -16549,13 +16580,13 @@ function MyBodyModal({ profile, onClose }) {
         {selInfo ? (
           <div className="relative rounded-xl border px-3.5 py-3" style={{ borderColor: tint(selInfo.color, "40"), backgroundColor: tint(selInfo.color, "0c") }}>
             <div className="flex items-center justify-between mb-2">
-              <p className="text-[10px] font-bold text-slate-500">{selInfo.label}</p>
+              <p className="text-[11px] font-bold text-slate-500">{selInfo.label}</p>
               {selInfo.hasData && <p className="text-xs font-black" style={{ color: selInfo.color }}>{selInfo.tier} {selInfo.sub}</p>}
             </div>
             <MuscleExerciseList exercises={getExerciseBestsForMuscleGroup(selected, profile?.logs)} unit={getProfileSettings(profile)?.weightUnit || "kg"} />
           </div>
         ) : (
-          <p className="relative text-[10.5px] text-slate-600 text-center">Tocá un músculo para ver tu mejor marca ahí</p>
+          <p className="relative text-[11px] text-slate-600 text-center">Tocá un músculo para ver tu mejor marca ahí</p>
         )}
       </div>
       {showImage && (
@@ -16608,7 +16639,7 @@ function RankExplainModal({ profile, myTopRank, onClose }) {
             <p className="text-xs text-slate-400 leading-relaxed">Este es el promedio entre tus rangos por músculo, no el mejor ni el peor — cuantos más grupos entrenes con marcas parejas, más representativo va a ser de todo tu cuerpo.</p>
             {breakdown.withData.length > 0 && (
               <div className="space-y-1.5">
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 px-1">Rango por músculo</p>
+                <p className="ajuste-rotulo px-1">Rango por músculo</p>
                 <div className="space-y-1">
                   {breakdown.withData.map((r) => (
                     <div key={r.key} className="flex items-center justify-between rounded-lg bg-slate-800/50 px-3 py-2">
@@ -16620,7 +16651,7 @@ function RankExplainModal({ profile, myTopRank, onClose }) {
               </div>
             )}
             {breakdown.untrainedCount > 0 && (
-              <p className="text-[10.5px] text-slate-600 leading-snug px-1">Todavía te falta cargar marcas de {breakdown.untrainedCount} grupo{breakdown.untrainedCount === 1 ? "" : "s"} muscular{breakdown.untrainedCount === 1 ? "" : "es"} — no cuentan para el promedio hasta que tengas al menos una.</p>
+              <p className="text-[11px] text-slate-600 leading-snug px-1">Todavía te falta cargar marcas de {breakdown.untrainedCount} grupo{breakdown.untrainedCount === 1 ? "" : "s"} muscular{breakdown.untrainedCount === 1 ? "" : "es"} — no cuentan para el promedio hasta que tengas al menos una.</p>
             )}
           </>
         ) : (
@@ -17428,7 +17459,7 @@ function ExercisePickerModal({ groups, selId, onSelect, onClose }) {
         <div className="flex-1 overflow-y-auto overscroll-contain px-3 py-3 space-y-3">
           {groups.map((g) => (
             <div key={g.dayKey}>
-              <p className="text-[10px] font-black uppercase tracking-wider px-2 mb-1.5" style={{ color: g.color }}>{g.label}</p>
+              <p className="text-[11px] font-black uppercase tracking-wider px-2 mb-1.5" style={{ color: g.color }}>{g.label}</p>
               <div className="space-y-1">
                 {g.exercises.map((e) => {
                   const active = e.id === selId;
@@ -17555,17 +17586,6 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
 
   return (
     <div className="space-y-4">
-      {/* Ciclo actual */}
-      {cycleStart ? (
-        <WeekCalendar cycleStart={cycleStart} logs={logs} sessions={sessions} settings={settings} onGoToDeload={onGoToDeload} metaSemanal={weekSchedule ? Object.values(weekSchedule).filter(Boolean).length || null : null} />
-      ) : (
-        <button onClick={onGoToProfile} className="w-full flex items-center gap-3 bg-amber-500/10 border border-amber-500/25 rounded-2xl px-4 py-3.5 text-left hover:bg-amber-500/15 transition">
-          <div className="icono-suelto aviso"><AlertTriangle size={16} /></div>
-          <div className="flex-1 min-w-0"><p className="text-sm font-bold text-white">No registraste el inicio de tu ciclo</p><p className="text-[11px] text-amber-300/80">Sin esa fecha no podemos calcular en qué semana estás ni cuándo te toca la descarga. Tocá para configurarla</p></div>
-          <ChevronRight size={16} className="text-amber-400 shrink-0" />
-        </button>
-      )}
-
       {/* Selector de sección — misma píldora deslizante que ya usa el
           selector de Social (Amigos/Buscar/Ranking/Entrenador): un solo
           elemento que se desliza y cambia de color, en vez de que cada
@@ -17585,6 +17605,19 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
           ningún contenedor extra: el lavado del color va sobre la tarjeta
           que YA existía en cada sección (ver los `background` de abajo). */}
       <div key={activeSection} className="tab-fade-in space-y-3">
+        {/* EL CICLO, en Rango: los cajones iban arriba de las cuatro secciones
+            y en Ejercicios, Historial y Medidas empujaban la gráfica y el
+            calendario a la mitad de la pantalla. Ahora el riel va primero y
+            el ciclo es parte de tu rango. */}
+        {activeSection === "rank" && (cycleStart ? (
+          <WeekCalendar cycleStart={cycleStart} logs={logs} sessions={sessions} settings={settings} onGoToDeload={onGoToDeload} metaSemanal={weekSchedule ? Object.values(weekSchedule).filter(Boolean).length || null : null} />
+        ) : (
+          <button onClick={onGoToProfile} className="w-full flex items-center gap-3 bg-amber-500/10 border border-amber-500/25 rounded-2xl px-4 py-3.5 text-left hover:bg-amber-500/15 transition">
+            <div className="icono-suelto aviso"><AlertTriangle size={16} /></div>
+            <div className="flex-1 min-w-0"><p className="text-sm font-bold text-white">No registraste el inicio de tu ciclo</p><p className="text-[11px] text-amber-300/80">Sin esa fecha no podemos calcular en qué semana estás ni cuándo te toca la descarga. Tocá para configurarla</p></div>
+            <ChevronRight size={16} className="text-amber-400 shrink-0" />
+          </button>
+        ))}
         {activeSection === "chart" && (() => {
           const colorEj = selEx?.color || EVOLUTION_CHART_COLOR;
           // Qué es "mejor" en este ejercicio: el 1RM estimado; si es sin peso
@@ -17669,7 +17702,7 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
                 <div className="text-center text-slate-500 py-8">
                   <span className="galleta icono-galleta mx-auto mb-3" aria-hidden="true"><Activity size={17} /></span>
                   <p className="text-[14px] font-semibold text-slate-300">Todavía no hay series de este ejercicio</p>
-                  <p className="text-[12.5px] mt-1">Guardá una en Rutina y acá empieza tu evolución.</p>
+                  <p className="text-[13px] mt-1">Guardá una en Rutina y acá empieza tu evolución.</p>
                 </div>
               ) : (
                 <>
@@ -17762,7 +17795,7 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
                           <b className="sesion-renglon-1rm num-display">{esCardio ? (h.km ? <>{numeroAR(h.km)}<small>km</small></> : null) : sinPeso ? <>{h.repsDia}<small>reps</small></> : <>{numeroAR(Math.round(h.e1rm))}<small>{uLabel}</small></>}</b>
                         </div>
                       ))}
-                      {!esCardio && !sinPeso && <p className="text-[11.5px] text-slate-500 pt-1">El 1RM es una estimación (fórmula de Epley) que junta reps y kilos. Sirve para comparar, no es un máximo real.</p>}
+                      {!esCardio && !sinPeso && <p className="text-[12px] text-slate-500 pt-1">El 1RM es una estimación (fórmula de Epley) que junta reps y kilos. Sirve para comparar, no es un máximo real.</p>}
                     </div>
                   )}
                 </>
@@ -18190,6 +18223,23 @@ function PublicUserCardSkeleton({ filas = 3 }) {
 // de la app de una sola vez.
 // Un interruptor de ajustes, en el tono de la pestaña (antes, cada uno con
 // el color que le pasaba su sección).
+
+// UN NÚMERO CON − Y + (Perfil: las semanas del ciclo, la descarga y los
+// descansos), como un ajuste del teléfono: el rótulo a la izquierda y, a la
+// derecha, el valor entre dos botones redondos de 44 px, de contorno como los
+// de la serie. Antes eran cuadraditos de 28 px con el rótulo en 10 px.
+function AjustePasos({ rotulo, valor, onMenos, onMas, menos, mas }) {
+  return (
+    <div className="ajuste-pasos" role="group" aria-label={rotulo}>
+      <p className="ajuste-rotulo">{rotulo}</p>
+      <div className="ajuste-pasos-control">
+        <button onClick={onMenos} aria-label={menos}><Minus size={16} /></button>
+        <span className="ajuste-pasos-valor" aria-live="polite">{valor}</span>
+        <button onClick={onMas} aria-label={mas}><Plus size={16} /></button>
+      </div>
+    </div>
+  );
+}
 function ToggleRow({ icon, label, desc, on, onToggle }) {
   return (
     <button onClick={onToggle} className={`interruptor-fila ${on ? "on" : ""}`} role="switch" aria-checked={!!on}>
@@ -18236,7 +18286,7 @@ function CollapsibleSection({ title, subtitle, icon, defaultOpen = false, childr
         )}
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold text-white">{title}</p>
-          {subtitle && <p className="text-[11.5px] text-slate-500 mt-0.5 leading-snug">{subtitle}</p>}
+          {subtitle && <p className="text-[12px] text-slate-500 mt-0.5 leading-snug">{subtitle}</p>}
         </div>
         <ChevronDown size={16} className={`text-slate-600 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
       </button>
@@ -18319,7 +18369,7 @@ function UsernameSection({ uid, currentUsername, onSaved, onRemoved = null }) {
           className="w-full bg-slate-800 border border-slate-700/50 rounded-xl pl-7 pr-4 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500/50" />
       </div>
       <div className="flex items-center justify-between gap-2">
-        <p className={`text-[10.5px] ${status === "taken" || status === "invalid" || status === "error" ? "text-rose-400" : status === "available" ? "text-emerald-400" : "text-slate-600"}`}>
+        <p className={`text-[11px] ${status === "taken" || status === "invalid" || status === "error" ? "text-rose-400" : status === "available" ? "text-emerald-400" : "text-slate-600"}`}>
           {status === "checking" && "Comprobando disponibilidad..."}
           {status === "available" && "Disponible ✓"}
           {status === "taken" && "Ese usuario ya existe"}
@@ -18334,7 +18384,7 @@ function UsernameSection({ uid, currentUsername, onSaved, onRemoved = null }) {
         </div>
       </div>
       {currentUsername && onRemoved && (
-        <button onClick={async () => { setStatus("saving"); await unpublishProfile(uid, currentUsername); setStatus(null); onRemoved(); }} className="text-[10.5px] text-slate-600 hover:text-rose-400 transition">Dejar de ser buscable (borra tu @usuario)</button>
+        <button onClick={async () => { setStatus("saving"); await unpublishProfile(uid, currentUsername); setStatus(null); onRemoved(); }} className="text-[11px] text-slate-600 hover:text-rose-400 transition">Dejar de ser buscable (borra tu @usuario)</button>
       )}
     </div>
   );
@@ -18392,7 +18442,7 @@ function PhoneDiscoverySection({ uid, currentPhone, onSaved, onRemoved }) {
     <div className="space-y-2">
       <input value={value} onChange={(e) => { setValue(e.target.value); setStatus(null); }} placeholder="Ej: 1123456789" type="tel" inputMode="tel"
         className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500/50" />
-      <p className={`text-[10.5px] ${status === "invalid" || status === "error" ? "text-rose-400" : "text-slate-600"}`}>
+      <p className={`text-[11px] ${status === "invalid" || status === "error" ? "text-rose-400" : "text-slate-600"}`}>
         {status === "invalid" && "Ingresá un número válido"}
         {status === "error" && "No se pudo guardar, probá de nuevo"}
         {status === "saving" && "Guardando..."}
@@ -18400,7 +18450,7 @@ function PhoneDiscoverySection({ uid, currentPhone, onSaved, onRemoved }) {
       </p>
       <div className="flex items-center justify-between gap-2">
         {currentPhone ? (
-          <button onClick={handleRemove} disabled={status === "saving"} className="text-[10.5px] text-slate-600 hover:text-rose-400 transition">Dejar de ser descubrible por teléfono</button>
+          <button onClick={handleRemove} disabled={status === "saving"} className="text-[11px] text-slate-600 hover:text-rose-400 transition">Dejar de ser descubrible por teléfono</button>
         ) : <span />}
         <div className="flex gap-1.5 shrink-0">
           {currentPhone && <button onClick={() => { setEditing(false); setValue(currentPhone); setStatus(null); }} className="px-3 py-1.5 rounded-lg text-[11px] font-bold text-slate-500 hover:text-slate-300">Cancelar</button>}
@@ -18477,7 +18527,7 @@ function SocialPreviewCard({ profile, uid, onGoToSocial, onUpdateProfile }) {
           </div>
         </button>
         {pendingCount > 0 && (
-          <span className="w-5 h-5 rounded-full bg-rose-500 text-white text-[10px] font-black flex items-center justify-center shrink-0">{pendingCount}</span>
+          <span className="w-5 h-5 rounded-full bg-rose-500 text-white text-[11px] font-black flex items-center justify-center shrink-0">{pendingCount}</span>
         )}
         <button onClick={() => setShowSettings((v) => !v)} aria-label="Configurar @usuario" className="p-1.5 rounded-lg text-slate-600 hover:text-slate-300 transition shrink-0"><Edit3 size={13} /></button>
         <button onClick={onGoToSocial} className="text-slate-600 shrink-0"><ChevronRight size={16} /></button>
@@ -18500,7 +18550,7 @@ function SocialPreviewCard({ profile, uid, onGoToSocial, onUpdateProfile }) {
                 más, así que apagar "Tu rutina activa" pensando solo en
                 amigos también le apagaba a tu entrenador la posibilidad de
                 planificarte la semana, sin ningún aviso de que pasaba eso. */}
-            <p className="text-[10px] font-black uppercase tracking-widest text-slate-600 flex items-center gap-1.5"><Users size={11} /> Qué ven tus amigos y tu entrenador/alumno</p>
+            <p className="ajuste-rotulo">Qué ven tus amigos y tu entrenador/alumno</p>
             {[
               { key: "shareStatsWithFriends", label: "Tus marcas y racha" },
               { key: "shareRoutineWithFriends", label: "Tu rutina activa", hint: "Si tenés un entrenador vinculado, apagar esto también le impide planificarte la semana." },
@@ -18514,7 +18564,7 @@ function SocialPreviewCard({ profile, uid, onGoToSocial, onUpdateProfile }) {
                       <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all ${enabled ? "left-[18px]" : "left-0.5"}`} />
                     </button>
                   </div>
-                  {hint && !enabled && <p className="text-[10px] text-amber-400/80">{hint}</p>}
+                  {hint && !enabled && <p className="text-[11px] text-amber-400/80">{hint}</p>}
                 </div>
               );
             })}
@@ -18686,7 +18736,7 @@ function AvatarCropModal({ src, onCancel, onConfirm }) {
       <div className="w-full max-w-sm bg-slate-900 border border-slate-700/60 rounded-3xl modal-pop-in shadow-2xl shadow-black/70 overflow-hidden">
         <div className="flex items-center justify-between px-5 pt-5 pb-3">
           <div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-sky-400">Foto de perfil</p>
+            <p className="text-[12px] font-bold text-sky-400">Foto de perfil</p>
             <h3 className="text-base font-black text-white leading-tight">Ajustá tu foto</h3>
           </div>
           <button onClick={onCancel} aria-label="Cancelar" className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white transition"><X size={15} /></button>
@@ -18713,7 +18763,7 @@ function AvatarCropModal({ src, onCancel, onConfirm }) {
             <div className="absolute inset-0 pointer-events-none" style={{ boxShadow: "inset 0 0 0 999px rgba(0,0,0,0.35)", borderRadius: "9999px", margin: 8 }} />
           </div>
         </div>
-        <p className="text-center text-[10.5px] text-slate-500 mt-2 px-5">Arrastrá para mover · pellizcá con dos dedos o usá la barra para acercar</p>
+        <p className="text-center text-[11px] text-slate-500 mt-2 px-5">Arrastrá para mover · pellizcá con dos dedos o usá la barra para acercar</p>
         <div className="flex items-center gap-3 px-6 mt-3">
           <Search size={13} className="text-slate-600 shrink-0" />
           <input type="range" min={AVATAR_ZOOM_MIN} max={AVATAR_ZOOM_MAX} step="0.01" value={zoom} onChange={(e) => handleZoomChange(parseFloat(e.target.value))} className="flex-1 accent-sky-500" />
@@ -18983,30 +19033,30 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
       {editing ? (
         <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 space-y-3 bounce-in">
           <div>
-            <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Email</label>
+            <label className="ajuste-rotulo mb-1.5 block">Email</label>
             <input type="email" value={editMail} onChange={(e) => setEditMail(e.target.value)} placeholder="tu@email.com" className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none" />
           </div>
           <div>
-            <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Sexo</label>
+            <label className="ajuste-rotulo mb-1.5 block">Sexo</label>
             <div className="segmentado">
               {[{ k: "M", l: "Masculino" }, { k: "F", l: "Femenino" }].map((opt) => (
                 <button key={opt.k} onClick={() => setEditSex(opt.k)} aria-pressed={editSex === opt.k} className={editSex === opt.k ? "activo" : ""}>{opt.l}</button>
               ))}
             </div>
-            <p className="text-[10px] text-slate-600 mt-1.5">Se usa sólo para calibrar mejor el rango por músculo (la fuerza relativa típica varía según esto).</p>
+            <p className="text-[11px] text-slate-600 mt-1.5">Se usa sólo para calibrar mejor el rango por músculo (la fuerza relativa típica varía según esto).</p>
           </div>
           <div className="flex gap-3">
             <div className="flex-1">
-              <label htmlFor="perfil-cumple" className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Cumpleaños</label>
+              <label htmlFor="perfil-cumple" className="ajuste-rotulo mb-1.5 block">Cumpleaños</label>
               <input id="perfil-cumple" type="date" value={editBirth} min="1920-01-01" max={todayStr()} onChange={(e) => setEditBirth(e.target.value)} className="w-full min-w-0 bg-slate-800 border border-slate-700/50 rounded-xl px-3 py-3 text-white text-sm focus:outline-none" />
-              {!editBirth && edadDe(profile) ? <p className="text-[10px] text-slate-600 mt-1">Hoy dice {edadDe(profile)} años. Con la fecha, cambia sola.</p> : null}
+              {!editBirth && edadDe(profile) ? <p className="text-[11px] text-slate-600 mt-1">Hoy dice {edadDe(profile)} años. Con la fecha, cambia sola.</p> : null}
             </div>
             <div className="flex-1">
-              <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Altura</label>
+              <label className="ajuste-rotulo mb-1.5 block">Altura</label>
               <input type="number" inputMode="numeric" value={editHeight} onChange={(e) => setEditHeight(e.target.value)} placeholder="cm" className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-4 py-3 text-white text-sm focus:outline-none" />
             </div>
           </div>
-          <p className="text-[10px] text-slate-600">Tu peso corporal y otras medidas ahora se registran con su propio historial en Progreso → Medidas.</p>
+          <p className="text-[11px] text-slate-600">Tu peso corporal y otras medidas ahora se registran con su propio historial en Progreso → Medidas.</p>
           <div className="flex gap-2">
             <button onClick={() => setEditing(false)} className="flex-1 py-3 rounded-xl bg-slate-800 text-slate-400 text-sm font-semibold">Cancelar</button>
             <button onClick={handleSaveProfile} className="flex-1 py-3 rounded-xl bg-teal-500 !text-white text-sm font-bold">Guardar</button>
@@ -19028,7 +19078,7 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
               : syncStatus === "error" ? "Error al subir: verificá tu conexión"
               : <><Upload size={12} /> Subir mis datos a la nube ahora</>}
           </button>
-          <p className="text-[10px] text-slate-600 text-center">Tocá este botón desde cada dispositivo antes de cambiar de celular o reinstalar.</p>
+          <p className="text-[11px] text-slate-600 text-center">Tocá este botón desde cada dispositivo antes de cambiar de celular o reinstalar.</p>
         </div>
       ) : (
         <button onClick={handleLinkGoogle} className="w-full flex items-center gap-2.5 justify-center py-3 rounded-2xl border border-slate-800 text-slate-400 hover:border-slate-600 hover:text-white transition text-sm font-medium">
@@ -19043,12 +19093,12 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
       )}
       {googleLinkError && <p className="text-rose-400 text-xs text-center">{googleLinkError}</p>}
 
-      <div className="flex items-center gap-1.5 px-1 pt-1"><Dumbbell size={11} className="text-slate-600" /><p className="text-[10px] font-black uppercase tracking-widest text-slate-600">Entrenamiento</p></div>
+      <p className="ajuste-rotulo px-1 pt-2">Entrenamiento</p>
       {/* Tu rutina, con la misma forma que las secciones de abajo (antes era
           una fila con otro borde y otro fondo). */}
       <button onClick={onGoToRoutines} className="seccion-plegable w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors active:bg-slate-800/50">
         <span className="placa-icono w-9 h-9 rounded-xl flex items-center justify-center shrink-0"><Layers size={16} /></span>
-        <div className="flex-1 min-w-0"><p className="text-sm font-bold text-white">Tu rutina: {activeRoutineDef?.name || "—"}</p><p className="text-[11.5px] text-slate-500 mt-0.5 leading-snug">{savedRoutineCount} guardada{savedRoutineCount === 1 ? "" : "s"}</p></div>
+        <div className="flex-1 min-w-0"><p className="text-sm font-bold text-white">Tu rutina: {activeRoutineDef?.name || "—"}</p><p className="text-[12px] text-slate-500 mt-0.5 leading-snug">{savedRoutineCount} guardada{savedRoutineCount === 1 ? "" : "s"}</p></div>
         <ChevronRight size={16} className="text-slate-600 shrink-0" />
       </button>
 
@@ -19074,7 +19124,7 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
             </div>
           </div>
         )}
-        <div className="bg-slate-950/40 rounded-xl p-3"><p className="text-[10px] text-slate-500 mb-2">Semanas de entrenamiento</p><div className="flex items-center justify-between"><button onClick={() => adjustSetting("trainWeeks", -1, 2, 12)} aria-label="Una semana de entrenamiento menos" className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95">−</button><span className="text-sm font-black text-white">{settings.trainWeeks}</span><button onClick={() => adjustSetting("trainWeeks", 1, 2, 12)} aria-label="Una semana de entrenamiento más" className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95">+</button></div></div>
+        <AjustePasos rotulo="Semanas de entrenamiento" valor={settings.trainWeeks} onMenos={() => adjustSetting("trainWeeks", -1, 2, 12)} onMas={() => adjustSetting("trainWeeks", 1, 2, 12)} menos="Una semana de entrenamiento menos" mas="Una semana de entrenamiento más" />
         <ToggleRow
           icon={<Zap size={16} />} label="Hacer semanas de descarga"
           desc="Si lo apagás, tu ciclo es continuo, sin semana de recuperación automática."
@@ -19082,11 +19132,11 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
         />
         {settings.deloadEnabled !== false && (
           <>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-slate-950/40 rounded-xl p-3"><p className="text-[10px] text-slate-500 mb-2">Semanas de descarga</p><div className="flex items-center justify-between"><button onClick={() => adjustSetting("deloadWeeks", -1, 1, 4)} aria-label="Una semana de descarga menos" className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95">−</button><span className="text-sm font-black text-white">{settings.deloadWeeks}</span><button onClick={() => adjustSetting("deloadWeeks", 1, 1, 4)} aria-label="Una semana de descarga más" className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95">+</button></div></div>
-              <div className="bg-slate-950/40 rounded-xl p-3"><p className="text-[10px] text-slate-500 mb-2">Carga en descarga</p><div className="flex items-center justify-between"><button onClick={() => adjustDeloadPct(-0.05)} aria-label="Menos carga en la descarga" className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95">−</button><span className="text-sm font-black text-white">{Math.round(settings.deloadPct * 100)}%</span><button onClick={() => adjustDeloadPct(0.05)} aria-label="Más carga en la descarga" className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95">+</button></div></div>
+            <div className="space-y-2">
+              <AjustePasos rotulo="Semanas de descarga" valor={settings.deloadWeeks} onMenos={() => adjustSetting("deloadWeeks", -1, 1, 4)} onMas={() => adjustSetting("deloadWeeks", 1, 1, 4)} menos="Una semana de descarga menos" mas="Una semana de descarga más" />
+              <AjustePasos rotulo="Carga en la descarga" valor={`${Math.round(settings.deloadPct * 100)} %`} onMenos={() => adjustDeloadPct(-0.05)} onMas={() => adjustDeloadPct(0.05)} menos="Menos carga en la descarga" mas="Más carga en la descarga" />
             </div>
-            <div><p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Series en la descarga</p><div className="segmentado">{[{ k: 2, l: "La mitad" }, { k: 3, l: "Un tercio" }, { k: 4, l: "Un cuarto" }].map((opt) => <button key={opt.k} onClick={() => updateSettings({ deloadSetDivisor: opt.k })} aria-pressed={settings.deloadSetDivisor === opt.k} className={settings.deloadSetDivisor === opt.k ? "activo" : ""}>{opt.l}</button>)}</div></div>
+            <div><p className="ajuste-rotulo mb-2">Series en la descarga</p><div className="segmentado">{[{ k: 2, l: "La mitad" }, { k: 3, l: "Un tercio" }, { k: 4, l: "Un cuarto" }].map((opt) => <button key={opt.k} onClick={() => updateSettings({ deloadSetDivisor: opt.k })} aria-pressed={settings.deloadSetDivisor === opt.k} className={settings.deloadSetDivisor === opt.k ? "activo" : ""}>{opt.l}</button>)}</div></div>
           </>
         )}
       </CollapsibleSection>
@@ -19130,7 +19180,7 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
           <button onClick={() => setShowSelfProgression(true)} disabled={!activeRoutineDef} className={`boton-tonal w-full disabled:opacity-40 ${!hasAnyPlan ? "invite-pulse" : ""}`}>
             <Sliders size={13} /> {hasAnyPlan ? "Planificar mi progresión" : "Planificar mi primera meta"}
           </button>
-          {!activeRoutineDef && <p className="text-[10.5px] text-slate-600 text-center -mt-1">Activá una rutina primero, en la pestaña Rutinas.</p>}
+          {!activeRoutineDef && <p className="text-[11px] text-slate-600 text-center -mt-1">Activá una rutina primero, en la pestaña Rutinas.</p>}
         </div>
       </CollapsibleSection>
       {showSelfProgression && activeRoutineDef && (
@@ -19174,10 +19224,10 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
 
       <CollapsibleSection title="Descansos" subtitle={`${formatTime(settings.restShort)} – ${formatTime(settings.restLong)}`} icon={<Timer size={16} />} accent="#14B8A6">
         <EstadoAvisosDescanso />
-        <div><p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Aviso al terminar</p><div className="segmentado">{[{ k: "sound", l: "Sonido" }, { k: "vibration", l: "Vibración" }, { k: "both", l: "Ambos" }].map((opt) => <button key={opt.k} onClick={() => updateSettings({ alertType: opt.k })} aria-pressed={settings.alertType === opt.k} className={settings.alertType === opt.k ? "activo" : ""}>{opt.l}</button>)}</div></div>
-        <div className="grid grid-cols-2 gap-3">
-          {[{ key: "restLong", label: "Ejercicios pesados" }, { key: "restShort", label: "Resto" }].map(({ key, label }) => (
-            <div key={key} className="bg-slate-950/40 rounded-xl p-3"><p className="text-[10px] text-slate-500 mb-2">{label}</p><div className="flex items-center justify-between"><button onClick={() => adjustRest(key, -15)} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95">−</button><span className="text-sm font-black text-white tabular-nums">{formatTime(settings[key])}</span><button onClick={() => adjustRest(key, 15)} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95">+</button></div></div>
+        <div><p className="ajuste-rotulo mb-2">Aviso al terminar</p><div className="segmentado">{[{ k: "sound", l: "Sonido" }, { k: "vibration", l: "Vibración" }, { k: "both", l: "Ambos" }].map((opt) => <button key={opt.k} onClick={() => updateSettings({ alertType: opt.k })} aria-pressed={settings.alertType === opt.k} className={settings.alertType === opt.k ? "activo" : ""}>{opt.l}</button>)}</div></div>
+        <div className="space-y-2">
+          {[{ key: "restLong", label: "Ejercicios pesados" }, { key: "restShort", label: "Los demás ejercicios" }].map(({ key, label }) => (
+            <AjustePasos key={key} rotulo={label} valor={formatTime(settings[key])} onMenos={() => adjustRest(key, -15)} onMas={() => adjustRest(key, 15)} menos={`15 segundos menos: ${label.toLowerCase()}`} mas={`15 segundos más: ${label.toLowerCase()}`} />
           ))}
         </div>
         {/* Pedido: "activar cronómetro entre ejercicios (como opción
@@ -19193,14 +19243,7 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
           onToggle={() => updateSettings({ restBetweenExercises: !(settings.restBetweenExercises === true) })}
         />
         {settings.restBetweenExercises === true && (
-          <div className="bg-slate-950/40 rounded-xl p-3">
-            <p className="text-[10px] text-slate-500 mb-2">Cuánto dura</p>
-            <div className="flex items-center justify-between">
-              <button onClick={() => adjustRest("restBetweenExercisesSec", -15)} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95">−</button>
-              <span className="text-sm font-black text-white tabular-nums">{formatTime(settings.restBetweenExercisesSec ?? 180)}</span>
-              <button onClick={() => adjustRest("restBetweenExercisesSec", 15)} className="w-7 h-7 rounded-lg bg-slate-800 text-slate-300 font-bold text-sm hover:bg-slate-700 active:scale-95">+</button>
-            </div>
-          </div>
+          <AjustePasos rotulo="Cuánto dura" valor={formatTime(settings.restBetweenExercisesSec ?? 180)} onMenos={() => adjustRest("restBetweenExercisesSec", -15)} onMas={() => adjustRest("restBetweenExercisesSec", 15)} menos="15 segundos menos entre ejercicios" mas="15 segundos más entre ejercicios" />
         )}
         {/* Sólo donde el navegador lo permite (Android, iPhone 16.4+ y
             escritorio): ofrecer un interruptor que no hace nada confunde. */}
@@ -19238,14 +19281,14 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
         </span>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold text-white">Qué ves al registrar</p>
-          <p className="text-[11.5px] text-slate-500 mt-0.5 leading-snug">
+          <p className="text-[12px] text-slate-500 mt-0.5 leading-snug">
             {(() => { const flags = [settings.showRpe !== false, settings.showWarmup !== false, settings.show1RMPercent !== false, settings.showCoaching !== false, settings.showExerciseNote !== false, settings.showPersonalNote !== false, settings.showStagnation === true, settings.showProgressionSuggestion === true, settings.showLastSession === true]; const on = flags.filter(Boolean).length; return on === flags.length ? "Todo prendido" : `${on} de ${flags.length} prendidas`; })()}
           </p>
         </div>
         <ChevronRight size={16} className="text-slate-600 shrink-0" />
       </button>
 
-      <CollapsibleSection title="Recordatorio de entrenamiento" subtitle={settings.reminderEnabled ? `Todos los días de rutina a las ${settings.reminderTime}` : "Desactivado"} icon={<Bell size={16} />} accent="#F59E0B">
+      <CollapsibleSection title="Avisos" subtitle={settings.reminderEnabled ? `Recordatorio a las ${settings.reminderTime}` : "Recordatorio apagado"} icon={<Bell size={16} />} accent="#F59E0B">
         <div className="space-y-3">
           <ToggleRow
             icon={<Bell size={16} />} label="Avisarme los días que entreno"
@@ -19254,9 +19297,9 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
           />
           {settings.reminderEnabled && (
             <div className="bounce-in">
-              <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Hora del aviso</p>
+              <p className="ajuste-rotulo mb-2">Hora del aviso</p>
               <input type="time" value={settings.reminderTime || "18:00"} onChange={(e) => updateSettings({ reminderTime: e.target.value })} className="w-full bg-slate-950/60 border border-slate-800/60 rounded-xl px-3.5 py-2.5 text-sm font-bold text-white focus:outline-none focus:border-amber-500/50 transition" />
-              <p className="text-[10px] text-slate-600 mt-2">Si hoy ya pasó esa hora, el primer aviso llega el próximo día de rutina.</p>
+              <p className="text-[11px] text-slate-600 mt-2">Si hoy ya pasó esa hora, el primer aviso llega el próximo día de rutina.</p>
             </div>
           )}
           <ToggleRow
@@ -19269,12 +19312,17 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
             desc="Si un amigo te pasa en un músculo o te reta, te llega una notificación. Usa el mismo permiso que el recordatorio."
             on={settings.avisosSociales !== false} onToggle={() => updateSettings({ avisosSociales: settings.avisosSociales === false })}
           />
+          <ToggleRow
+            icon={<Share2 size={16} />} label="La imagen de cada récord"
+            desc="Al superar tu récord se abre la imagen para compartirlo. Apagada, queda el botón."
+            on={settings.autoShowPrShare ?? true} onToggle={() => updateSettings({ autoShowPrShare: !(settings.autoShowPrShare ?? true) })}
+          />
         </div>
       </CollapsibleSection>
 
       <CollapsibleSection title="Apariencia y accesibilidad" subtitle="Tema, unidad de peso, tamaño de letra" icon={<Sun size={16} />} accent="#F59E0B">
         <div>
-          <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Tema</p>
+          <p className="ajuste-rotulo mb-2">Tema</p>
           <div className="segmentado">
             {[{ k: "dark", l: "Oscuro", icon: <Moon size={13} /> }, { k: "light", l: "Claro", icon: <Sun size={13} /> }].map((opt) => (
               <button key={opt.k} onClick={() => updateSettings({ theme: opt.k })} aria-pressed={settings.theme === opt.k} className={settings.theme === opt.k ? "activo" : ""}>{opt.icon} {opt.l}</button>
@@ -19282,7 +19330,7 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
           </div>
         </div>
         <div>
-          <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Unidad de peso</p>
+          <p className="ajuste-rotulo mb-2">Unidad de peso</p>
           <div className="segmentado">
             {[{ k: "kg", l: "Kilogramos (kg)" }, { k: "lbs", l: "Libras (lbs)" }].map((opt) => (
               <button key={opt.k} onClick={() => updateSettings({ weightUnit: opt.k })} aria-pressed={settings.weightUnit === opt.k || (!settings.weightUnit && opt.k === "kg")} className={settings.weightUnit === opt.k || (!settings.weightUnit && opt.k === "kg") ? "activo" : ""}>{opt.l}</button>
@@ -19290,7 +19338,7 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
           </div>
         </div>
         <div>
-          <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Tamaño de letra</p>
+          <p className="ajuste-rotulo mb-2">Tamaño de letra</p>
           <div className="segmentado">
             {TEXT_SCALE_OPTIONS.map((opt) => (
               <button key={opt.k} onClick={() => updateSettings({ textScale: opt.v })} aria-pressed={(settings.textScale ?? DEFAULT_SETTINGS.textScale) === opt.v} className={(settings.textScale ?? DEFAULT_SETTINGS.textScale) === opt.v ? "activo" : ""}>{opt.l}</button>
@@ -19298,7 +19346,7 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
           </div>
         </div>
         <div>
-          <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Letras chicas</p>
+          <p className="ajuste-rotulo mb-2">Letras chicas</p>
           <div className="segmentado">
             {SMALL_TEXT_SCALE_OPTIONS.map((opt) => (
               <button key={opt.k} onClick={() => updateSettings({ smallTextScale: opt.v })} aria-pressed={(settings.smallTextScale ?? 1) === opt.v} className={(settings.smallTextScale ?? 1) === opt.v ? "activo" : ""}>{opt.l}</button>
@@ -19306,7 +19354,7 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
           </div>
         </div>
         <div>
-          <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Zoom con los dedos</p>
+          <p className="ajuste-rotulo mb-2">Zoom con los dedos</p>
           <div className="segmentado">
             {[{ v: false, l: "Desactivado" }, { v: true, l: "Activado" }].map((opt) => (
               <button key={String(opt.v)} onClick={() => updateSettings({ allowZoom: opt.v })} aria-pressed={(settings.allowZoom ?? false) === opt.v} className={(settings.allowZoom ?? false) === opt.v ? "activo" : ""}>{opt.l}</button>
@@ -19315,20 +19363,7 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
         </div>
       </CollapsibleSection>
 
-      <div className="flex items-center gap-1.5 px-1 pt-2"><Zap size={11} className="text-slate-600" /><p className="text-[10px] font-black uppercase tracking-widest text-slate-600">Notificaciones</p></div>
-      <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4 backdrop-blur-sm shadow-md shadow-black/20">
-        <p className="text-sm font-bold text-white mb-0.5">Compartir marcas</p>
-        <p className="text-[11px] text-slate-500 mb-3">Al lograr una nueva marca, ¿mostramos la imagen para compartir automáticamente?</p>
-        <div className="segmentado">
-          {[{ v: true, l: "Sí, mostrarla" }, { v: false, l: "No, solo el ícono" }].map((opt) => (
-            <button key={String(opt.v)} onClick={() => updateSettings({ autoShowPrShare: opt.v })} aria-pressed={(settings.autoShowPrShare ?? true) === opt.v} className={(settings.autoShowPrShare ?? true) === opt.v ? "activo" : ""}>{opt.l}</button>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex items-center gap-1.5 px-1 pt-2"><Download size={11} className="text-slate-600" /><p className="text-[10px] font-black uppercase tracking-widest text-slate-600">Datos</p></div>
-
-      <div className="flex items-center gap-2.5 px-1 text-[11px] text-slate-600">
+      <div className="flex items-center gap-2.5 px-1 pt-2 text-[12px] text-slate-500">
         <Save size={12} className="text-slate-600 shrink-0" />
         <span>Tus datos se guardan en este dispositivo, con una copia de seguridad automática.</span>
       </div>
@@ -19361,7 +19396,7 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
             <p>Modus Fit respeta tu privacidad. Esta política explica qué datos recopilamos, cómo los usamos y cuáles son tus derechos.</p>
             {[
               { t: "1. Datos que recopilamos", b: "Datos de entrenamiento (series, pesos, récords), datos de perfil (nombre, email, sexo, edad, altura), medidas corporales y fotos de progreso (solo en tu dispositivo), y datos de cuenta Google si iniciás sesión con Google." },
-              { t: "2. Cómo usamos los datos", b: "Para mostrarte tu historial, récords y progreso. Para sincronizar tu perfil entre dispositivos si iniciaste sesión con Google. Para generar recomendaciones del Chatbot (el texto se envía a la API de Google Gemini y no se almacena en nuestros servidores). Para mostrar anuncios relevantes a través de Google AdMob (solo en la versión gratuita)." },
+              { t: "2. Cómo usamos los datos", b: "Para mostrarte tu historial, récords y progreso. Para sincronizar tu perfil entre dispositivos si iniciaste sesión con Google. Para generar recomendaciones del Chatbot (el texto se envía a la API de Google Gemini y no se almacena en nuestros servidores). No vendemos tus datos ni los usamos para publicidad." },
               { t: "3. Almacenamiento y seguridad", b: "Tus datos se guardan localmente en tu dispositivo (IndexedDB/localStorage). Si usás la sincronización, se almacenan en Firebase Firestore con acceso restringido a tu cuenta. Si elegís un @usuario para activar lo social, tu nombre y foto de perfil quedan visibles para cualquier usuario de la app (necesario para que te puedan buscar), y tu rutina activa, historial de entrenamientos, récords y medidas corporales quedan visibles únicamente para las personas que aceptes como amigos o como entrenador/alumno vinculado — podés dejar de compartirlos en cualquier momento quitando el @usuario. Las fotos de progreso nunca se suben a ningún servidor ni se comparten con nadie, bajo ninguna circunstancia. Toda comunicación usa HTTPS." },
               { t: "4. Terceros", b: "Usamos Google Firebase (autenticación y base de datos) y la API de Google Gemini (IA): lo que le escribís al Entrenador IA, junto con un resumen de tu entrenamiento, se envía a Google para generar la respuesta. Cada uno tiene su propia política de privacidad." },
               { t: "5. Anuncios y pagos", b: "Hoy Modus Fit es gratis y no muestra anuncios. Si más adelante sumamos anuncios o una versión paga, vamos a actualizar esta política y avisarte en la app antes de que empiecen." },
@@ -19651,7 +19686,7 @@ function ScanQrCamera({ onResult, onClose }) {
           <span className="icono-suelto"><QrCode size={16} /></span>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-black text-white leading-tight">Escanear código</p>
-            <p className="text-[10.5px] text-slate-500">Apuntá al QR del perfil de tu amigo</p>
+            <p className="text-[11px] text-slate-500">Apuntá al QR del perfil de tu amigo</p>
           </div>
           <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition shrink-0"><X size={17} /></button>
         </div>
@@ -19659,7 +19694,7 @@ function ScanQrCamera({ onResult, onClose }) {
         {estado === "error" ? (
           <div className="p-6 text-center space-y-3">
             <span className="icono-suelto aviso grande mx-auto"><AlertTriangle size={22} /></span>
-            <p className="text-[12.5px] text-slate-300 leading-snug">{detalle}</p>
+            <p className="text-[13px] text-slate-300 leading-snug">{detalle}</p>
             <button onClick={onClose} className="w-full py-2.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-bold">Cerrar</button>
           </div>
         ) : (
@@ -19847,9 +19882,9 @@ function SocialSearchSection({ myUid, friendStatus, onSendFriendRequest }) {
         <PublicUserCard uid={found.uid} basic={found.basic} mostrarUsuario>
           {(() => {
             const st = friendStatus(found.uid);
-            if (st === "accepted") return <span className="flex items-center gap-1 text-[10.5px] font-bold text-emerald-400 shrink-0"><UserCheck size={12} /> Ya son amigos</span>;
-            if (st === "pending_sent") return <span className="text-[10.5px] font-bold text-slate-500 shrink-0">Solicitud enviada</span>;
-            if (st === "pending_received") return <span className="text-[10.5px] font-bold text-amber-400 shrink-0">Te escribió</span>;
+            if (st === "accepted") return <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-400 shrink-0"><UserCheck size={12} /> Ya son amigos</span>;
+            if (st === "pending_sent") return <span className="text-[11px] font-bold text-slate-500 shrink-0">Solicitud enviada</span>;
+            if (st === "pending_received") return <span className="text-[11px] font-bold text-amber-400 shrink-0">Te escribió</span>;
             return (
               <button onClick={() => onSendFriendRequest(found.uid)} className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-lg bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 text-[11px] font-bold hover:bg-cyan-500/25 transition">
                 <UserPlus size={12} /> Agregar
@@ -19917,17 +19952,17 @@ function RoutineProposalCard({ proposal, basic, onRespond }) {
           {isProgression ? (
             <div className="space-y-2">
               {porEjercicio.length > 1 && (
-                <p className="text-[10px] text-sky-300/80">{porEjercicio.length} ejercicios · {semanas} semana{semanas === 1 ? "" : "s"}</p>
+                <p className="text-[11px] text-sky-300/80">{porEjercicio.length} ejercicios · {semanas} semana{semanas === 1 ? "" : "s"}</p>
               )}
               {porEjercicio.map((g) => (
                 <div key={g.nombre} className="rounded-xl px-3 py-2" style={{ backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)" }}>
-                  <p className="text-[11.5px] font-bold text-white truncate mb-1.5">{g.nombre}</p>
+                  <p className="text-[12px] font-bold text-white truncate mb-1.5">{g.nombre}</p>
                   {g.series.map((s) => (
                     <div key={s.setIndex ?? 0} className="flex items-center gap-1.5 mb-1 last:mb-0">
-                      {g.series.length > 1 && <span className="text-[9px] font-black text-slate-600 shrink-0 w-5">S{(s.setIndex || 0) + 1}</span>}
+                      {g.series.length > 1 && <span className="text-[11px] font-black text-slate-600 shrink-0 w-5">S{(s.setIndex || 0) + 1}</span>}
                       <div className="flex-1 flex gap-1 overflow-x-auto">
                         {s.entries.map((e) => (
-                          <span key={e.week} className="shrink-0 px-1.5 py-0.5 rounded-md text-[9.5px] font-bold tabular-nums bg-sky-500/15 text-sky-300" title={`Semana ${e.week}${e.phase ? ` · ${e.phase}` : ""}${e.rpe != null ? ` · RPE ${e.rpe}` : ""}`}>
+                          <span key={e.week} className="shrink-0 px-1.5 py-0.5 rounded-md text-[11px] font-bold tabular-nums bg-sky-500/15 text-sky-300" title={`Semana ${e.week}${e.phase ? ` · ${e.phase}` : ""}${e.rpe != null ? ` · RPE ${e.rpe}` : ""}`}>
                             {e.minutes != null ? `${e.minutes} min` : `${e.reps}×${kgToDisplay(e.kg, unitProp)}${weightLabel(unitProp)}`}
                           </span>
                         ))}
@@ -19989,7 +20024,7 @@ function SendTemplateModal({ template, studentsAccepted, basics, myUid, onClose,
       <div className="w-full max-w-sm max-h-[86vh] overflow-y-auto overscroll-contain bg-slate-900 border border-purple-700/40 rounded-3xl modal-pop-in shadow-2xl shadow-black/70 p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-purple-400">Enviar plantilla</p>
+            <p className="text-[12px] font-bold text-purple-400">Enviar plantilla</p>
             <h3 className="text-base font-black text-white leading-tight text-balance">{template.def.name}</h3>
           </div>
           <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800 transition"><X size={17} /></button>
@@ -20000,9 +20035,9 @@ function SendTemplateModal({ template, studentsAccepted, basics, myUid, onClose,
           <>
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Alumnos</label>
+                <label className="ajuste-rotulo">Alumnos</label>
                 {studentsAccepted.length > 1 && (
-                  <button onClick={toggleAll} className="text-[10px] font-bold text-purple-400 hover:text-purple-300 transition">{allSelected ? "Ninguno" : "Todos"}</button>
+                  <button onClick={toggleAll} className="text-[11px] font-bold text-purple-400 hover:text-purple-300 transition">{allSelected ? "Ninguno" : "Todos"}</button>
                 )}
               </div>
               <div className="space-y-1.5">
@@ -20019,7 +20054,7 @@ function SendTemplateModal({ template, studentsAccepted, basics, myUid, onClose,
               </div>
             </div>
             <div>
-              <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Nota (opcional)</label>
+              <label className="ajuste-rotulo mb-1.5 block">Nota (opcional)</label>
               <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} maxLength={200} placeholder="Ej: arrancá la próxima semana..."
                 className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-3.5 py-2.5 text-white text-sm focus:outline-none resize-none" />
             </div>
@@ -20066,7 +20101,7 @@ function TrainerTemplatesCard({ templates, onCreate, onEdit, onSend }) {
             <div key={id} className="flex items-center gap-2 rounded-xl bg-slate-800/40 border border-slate-700/40 px-3 py-2.5">
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-bold text-white leading-snug">{def.name}</p>
-                <p className="text-[10px] text-slate-500">{def.dayOrder.length} día{def.dayOrder.length !== 1 ? "s" : ""}</p>
+                <p className="text-[11px] text-slate-500">{def.dayOrder.length} día{def.dayOrder.length !== 1 ? "s" : ""}</p>
               </div>
               <button onClick={() => onSend(id, def)} aria-label="Enviar a un alumno" className="p-1.5 rounded-lg text-purple-400 hover:text-purple-300 hover:bg-purple-500/15 transition shrink-0"><Send size={14} /></button>
               <button onClick={() => onEdit(id)} aria-label="Editar plantilla" className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition shrink-0"><Edit3 size={14} /></button>
@@ -20093,7 +20128,7 @@ function TrainerEmpty({ icon, titulo, detalle }) {
       <span className="icono-suelto">{icon}</span>
       <div className="min-w-0">
         <p className="text-[12px] font-bold text-slate-400 leading-tight">{titulo}</p>
-        <p className="text-[10.5px] text-slate-600 leading-snug mt-0.5">{detalle}</p>
+        <p className="text-[11px] text-slate-600 leading-snug mt-0.5">{detalle}</p>
       </div>
     </div>
   );
@@ -20105,9 +20140,9 @@ function TrainerEmpty({ icon, titulo, detalle }) {
 function TrainerSectionLabel({ children, n = null, accent = null }) {
   return (
     <div className="flex items-center gap-1.5 px-0.5">
-      <p className="text-[9.5px] font-black uppercase tracking-widest" style={{ color: accent || "#6e7379" }}>{children}</p>
+      <p className="text-[12px] font-bold" style={{ color: accent || "#6e7379" }}>{children}</p>
       {n != null && n > 0 && (
-        <span className="text-[9px] font-black tabular-nums rounded-full px-1.5 py-px" style={{ backgroundColor: tint(accent || "#6e7379", "22"), color: accent || "#9da2a8" }}>{n}</span>
+        <span className="text-[11px] font-black tabular-nums rounded-full px-1.5 py-px" style={{ backgroundColor: tint(accent || "#6e7379", "22"), color: accent || "#9da2a8" }}>{n}</span>
       )}
     </div>
   );
@@ -20175,7 +20210,7 @@ function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted
       rejected: { l: "Rechazado", t: "Rechazó el plan que le mandaste", c: "#fb7185", bg: "rgba(251,113,133,0.14)" },
     };
     const e = estilos[p.status] || estilos.pending;
-    return <span title={e.t} className="shrink-0 text-[9px] font-black rounded-md px-1.5 py-0.5" style={{ backgroundColor: e.bg, color: e.c }}>{e.l}</span>;
+    return <span title={e.t} className="shrink-0 text-[11px] font-black rounded-md px-1.5 py-0.5" style={{ backgroundColor: e.bg, color: e.c }}>{e.l}</span>;
   };
 
   const soyEntrenador = studentsAccepted.length > 0;
@@ -20234,7 +20269,7 @@ function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted
             <TrainerSectionLabel accent={tengoEntrenador ? "#38BDF8" : null}>Mi entrenador</TrainerSectionLabel>
             {tengoEntrenador ? trainersAccepted.map((l) => (
               <PublicUserCard key={l.id} uid={l.trainerUid} basic={basics[l.trainerUid]} streak={streaks?.[l.trainerUid]?.streak} onClick={() => onViewTrainer(l.trainerUid)}>
-                <span className="shrink-0 text-[9px] font-black rounded-md px-1.5 py-0.5" style={{ backgroundColor: "rgba(56,189,248,0.15)", color: "#7dd3fc" }}>Te planifica</span>
+                <span className="shrink-0 text-[11px] font-black rounded-md px-1.5 py-0.5" style={{ backgroundColor: "rgba(56,189,248,0.15)", color: "#7dd3fc" }}>Te planifica</span>
                 <button onClick={(e) => { e.stopPropagation(); onRemoveLink(l); }} className="shrink-0 p-1.5 rounded-lg text-slate-600 hover:text-rose-400 transition" title="Desvincular"><X size={13} /></button>
                 <ChevronRight size={15} className="text-slate-600 shrink-0" />
               </PublicUserCard>
@@ -20246,7 +20281,7 @@ function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2">
               <TrainerSectionLabel n={studentsAccepted.length} accent={soyEntrenador ? "#3B82F6" : null}>Mis alumnos</TrainerSectionLabel>
-              {sortedStudents.length > 1 && <p className="text-[9px] text-slate-700 shrink-0">Quien menos entrenó, primero</p>}
+              {sortedStudents.length > 1 && <p className="text-[11px] text-slate-700 shrink-0">Quien menos entrenó, primero</p>}
             </div>
             {studentsAccepted.length === 0 ? (
               <TrainerEmpty icon={<Users size={16} />} titulo="Todavía no tenés alumnos" detalle="Vinculá a quien entrenás para ver cómo viene y planificarle la semana." />
@@ -20267,7 +20302,7 @@ function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted
           <span className="icono-suelto"><UserPlus size={15} /></span>
           <span className="flex-1 min-w-0">
             <span className="block text-[12px] font-bold text-white">Vincular entrenador o alumno</span>
-            <span className="block text-[10px] text-slate-500">Con su @usuario</span>
+            <span className="block text-[11px] text-slate-500">Con su @usuario</span>
           </span>
           <ChevronDown size={15} className={`text-slate-600 shrink-0 transition-transform ${vinculando ? "rotate-180" : ""}`} />
         </button>
@@ -20299,7 +20334,7 @@ function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted
             {searchState === "found" && found && (() => {
               const link = linkStatusWith?.(found.uid);
               if (link?.status === "accepted") {
-                return <PublicUserCard uid={found.uid} basic={found.basic} mostrarUsuario><span className="text-[10.5px] font-bold text-emerald-400 shrink-0">Ya vinculados</span></PublicUserCard>;
+                return <PublicUserCard uid={found.uid} basic={found.basic} mostrarUsuario><span className="text-[11px] font-bold text-emerald-400 shrink-0">Ya vinculados</span></PublicUserCard>;
               }
               if (link?.status === "pending" && link.requestedBy === found.uid) {
                 return (
@@ -20311,7 +20346,7 @@ function TrainerLinksSection({ myUid, loading, trainerIncoming, studentsAccepted
                 );
               }
               if (link?.status === "pending" && link.requestedBy === myUid) {
-                return <PublicUserCard uid={found.uid} basic={found.basic} mostrarUsuario><span className="text-[10.5px] font-bold text-slate-500 shrink-0">Invitación enviada</span></PublicUserCard>;
+                return <PublicUserCard uid={found.uid} basic={found.basic} mostrarUsuario><span className="text-[11px] font-bold text-slate-500 shrink-0">Invitación enviada</span></PublicUserCard>;
               }
               return (
                 <PublicUserCard uid={found.uid} basic={found.basic} mostrarUsuario>
@@ -20409,7 +20444,7 @@ function MuscleBattleDetailModal({ groupKey, label, myLogs, theirLogs, theirName
       <div className="modal-mano modal-pop-in" role="dialog" aria-modal="true" aria-label={label} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-[12.5px] text-slate-400">Músculo</p>
+            <p className="text-[13px] text-slate-400">Músculo</p>
             <h3 className="modal-mano-titulo">{label}</h3>
           </div>
           <button onClick={onClose} aria-label="Cerrar" className="boton-redondo shrink-0"><X size={17} /></button>
@@ -20422,7 +20457,7 @@ function MuscleBattleDetailModal({ groupKey, label, myLogs, theirLogs, theirName
           <p className="text-[13px] text-slate-500 text-center py-4">Ninguno de los dos tiene marcas en este músculo todavía.</p>
         ) : (
           <div className="space-y-2">
-            <p className="text-[12.5px] text-slate-400">Mejor marca por ejercicio</p>
+            <p className="text-[13px] text-slate-400">Mejor marca por ejercicio</p>
             {rows.map((row, i) => {
               const myRm = row.mine?.rawRm || 0, theirRm = row.theirs?.rawRm || 0;
               return (
@@ -20473,7 +20508,7 @@ function LeaderboardRow({ position, name, username, avatarData, topRank, streakD
       ) : topRank && (
         <span className="shrink-0 flex flex-col items-center gap-0.5">
           <RankBadgeIcon tier={topRank.tier} sub={null} color={topRank.color} size={30} />
-          <span className="text-[10.5px] font-bold whitespace-nowrap tinta-rango" style={{ "--rango-c": topRank.color }}>{topRank.tier} {topRank.sub}</span>
+          <span className="text-[11px] font-bold whitespace-nowrap tinta-rango" style={{ "--rango-c": topRank.color }}>{topRank.tier} {topRank.sub}</span>
         </span>
       )}
     </Tag>
@@ -20752,7 +20787,7 @@ function FriendSessionHistory({ trainingSessions = [], activeRoutineSnapshot }) 
           <span className="w-1.5 h-9 rounded-full shrink-0" style={{ backgroundColor: model?.days?.[selected.dayKey]?.color || "#50555a" }} />
           <div className="flex-1 min-w-0">
             <p className="text-[14px] font-bold text-[color:var(--text-strong)]">{model?.days?.[selected.dayKey]?.label || selected.dayKey || "Entrenamiento"}</p>
-            <p className="text-[12.5px] text-slate-400">
+            <p className="text-[13px] text-slate-400">
               {(() => { const t = new Date(selected.date + "T12:00:00").toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" }); return t.charAt(0).toUpperCase() + t.slice(1); })()}
               {selected.startedAt && selected.endedAt ? `, ${Math.max(1, Math.round((new Date(selected.endedAt) - new Date(selected.startedAt)) / 60000))} min` : ""}
             </p>
@@ -20787,7 +20822,7 @@ function RoutineProposalComposer({ myRoutines, onClose, onSubmit }) {
           <div className="flex items-center gap-3">
             <div className="icono-suelto"><ClipboardCheck size={17} /></div>
             <div className="min-w-0 flex-1">
-              <p className="text-[10px] font-black uppercase tracking-widest text-blue-400">Proponer rutina</p>
+              <p className="text-[12px] font-bold text-blue-400">Proponer rutina</p>
               <h3 className="text-base font-black text-white leading-tight">Elegí una de tus rutinas</h3>
             </div>
             <button onClick={onClose} className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white transition"><X size={15} /></button>
@@ -20807,7 +20842,7 @@ function RoutineProposalComposer({ myRoutines, onClose, onSubmit }) {
               </div>
               {selectedDef && <RoutinePreview routineDef={selectedDef} />}
               <div>
-                <label className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5 block">Nota para tu alumno (opcional)</label>
+                <label className="ajuste-rotulo mb-1.5 block">Nota para tu alumno (opcional)</label>
                 <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} maxLength={200} placeholder="Ej: bajamos el volumen esta vez, sumá cardio los martes..."
                   className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-3.5 py-2.5 text-white text-sm focus:outline-none resize-none" />
               </div>
@@ -21927,7 +21962,7 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, viewerName = null, i
             <section className="tarjeta-tonal p-4 space-y-2.5" aria-label="Las últimas dos semanas">
               <div className="flex items-baseline justify-between gap-3">
                 <h3 className="seccion-titulo">{esYo ? "Cómo venís" : "Cómo viene"}</h3>
-                <span className="text-[12.5px] text-slate-400">{diasEntrenados} de 14 días</span>
+                <span className="text-[13px] text-slate-400">{diasEntrenados} de 14 días</span>
               </div>
               {dosSemanas.map((semana, w) => (
                 <div key={w} className="atleta-semana">
@@ -22714,7 +22749,7 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
                 lleva a Perfil a vincularlo. */}
             {!profile?.username && uid && (
               <div className="tarjeta-tonal p-4" style={{ "--c": SOCIAL_COLOR }}>
-                <p className="text-[12.5px] text-slate-400 mb-2">Elegí tu @usuario para que te puedan buscar y agregar.</p>
+                <p className="text-[13px] text-slate-400 mb-2">Elegí tu @usuario para que te puedan buscar y agregar.</p>
                 <UsernameSection uid={uid} currentUsername={null} onSaved={(u) => onUpdateProfile({ username: u })} />
               </div>
             )}
@@ -22740,7 +22775,7 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
             {(() => {
               const orden = filasPizarra.map((x) => ({ yo: !!x.yo, n: (x.dias || []).filter(Boolean).length })).sort((a, b) => b.n - a.n || (a.yo ? -1 : b.yo ? 1 : 0));
               const puesto = orden.findIndex((x) => x.yo) + 1;
-              return puesto > 0 ? <p className="text-[12.5px] font-semibold text-slate-400">{puesto === 1 ? "Vas primero" : `Vas ${puesto}º de ${orden.length}`}</p> : null;
+              return puesto > 0 ? <p className="text-[13px] font-semibold text-slate-400">{puesto === 1 ? "Vas primero" : `Vas ${puesto}º de ${orden.length}`}</p> : null;
             })()}
           </div>
           <CarreraSemana filas={filasPizarra} onVerPersona={(u) => setViewingUid(u)} />
@@ -22750,7 +22785,7 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
           <h3 className="seccion-titulo px-1">Esta semana</h3>
           <CarreraSemana filas={filasPizarra.slice(0, 1)} vacios={2} />
           <div className="px-1 pt-1">
-            <p className="text-[12.5px] text-slate-400">Sumá amigos y competí con ellos: quién entrena más cada semana.</p>
+            <p className="text-[13px] text-slate-400">Sumá amigos y competí con ellos: quién entrena más cada semana.</p>
             <button onClick={irABuscar} className="boton-pildora mt-3" style={{ "--c": SOCIAL_COLOR, minHeight: 44 }}><UserPlus size={16} /> Sumar mi primer amigo</button>
           </div>
         </section>
@@ -22836,7 +22871,7 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
           return (
             <button key={s.k} role="tab" aria-selected={section === s.k} onClick={() => setSection(s.k)} className="pestana-interna relative" style={{ "--c": SOCIAL_COLOR }}>
               {s.icon}<span>{s.l}</span>
-              {badge > 0 && <span className="absolute top-1.5 right-2.5 w-[18px] h-[18px] rounded-full bg-rose-500 text-white text-[10px] font-black flex items-center justify-center z-[2]">{badge}</span>}
+              {badge > 0 && <span className="absolute top-1.5 right-2.5 w-[18px] h-[18px] rounded-full bg-rose-500 text-white text-[11px] font-black flex items-center justify-center z-[2]">{badge}</span>}
             </button>
           );
         })}
@@ -22952,7 +22987,7 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
                   {friendAccepted.length > 1 && (
                     <div className="flex items-center gap-1.5 text-slate-500">
                       <ArrowUpDown size={13} aria-hidden="true" />
-                      <select value={friendSort} onChange={(e) => setFriendSort(e.target.value)} aria-label="Ordenar amigos" className="bg-transparent text-[12.5px] font-semibold text-slate-400 focus:outline-none">
+                      <select value={friendSort} onChange={(e) => setFriendSort(e.target.value)} aria-label="Ordenar amigos" className="bg-transparent text-[13px] font-semibold text-slate-400 focus:outline-none">
                         <option value="recientes">Recientes</option>
                         <option value="nombre">Nombre</option>
                         <option value="rango">Rango</option>
@@ -23000,7 +23035,7 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
         {section === "entrenador" && proposalApplyWarning && (
           <div className="flex items-start gap-2 rounded-xl px-3.5 py-3 bg-amber-500/10 border border-amber-500/25">
             <AlertTriangle size={14} className="text-amber-400 shrink-0 mt-0.5" />
-            <p className="text-[11.5px] text-amber-300/90 flex-1">{proposalApplyWarning}</p>
+            <p className="text-[12px] text-amber-300/90 flex-1">{proposalApplyWarning}</p>
             <button onClick={() => setProposalApplyWarning("")} aria-label="Cerrar aviso" className="text-amber-400/70 hover:text-amber-300 shrink-0"><X size={14} /></button>
           </div>
         )}
@@ -23133,7 +23168,7 @@ function SharedRoutineImportModal({ routine, onImport, onDiscard }) {
               <Share2 size={17} />
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-widest text-teal-400">Rutina compartida</p>
+              <p className="text-[12px] font-bold text-teal-400">Rutina compartida</p>
               <h3 className="text-base font-black text-white leading-tight truncate">{routine.name}</h3>
             </div>
           </div>
@@ -23280,7 +23315,7 @@ function SavedRoutineRow({ routine, isActive, onUse, onEdit, onShare, onArchive,
         <span className="rutina-creada-acciones">
           {isActive
             ? <span className="rutina-creada-activa"><Check size={13} strokeWidth={3} /> Activa</span>
-            : <button onClick={onUse} className="boton-tonal !min-h-8 !px-3 !text-[12.5px]">Activar</button>}
+            : <button onClick={onUse} className="boton-tonal !min-h-8 !px-3 !text-[13px]">Activar</button>}
           <button onClick={() => (menu ? cerrar() : setMenu(true))} aria-label={`Más opciones de ${routine.name}`} aria-expanded={menu} className="rutina-creada-mas"><MoreHorizontal size={18} /></button>
         </span>
         {menu && (
@@ -26464,7 +26499,7 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
             {m.sources && m.sources.length > 0 && (
               <div className="mt-1.5 flex flex-wrap gap-1.5 max-w-[85%]">
                 {m.sources.map((s, j) => (
-                  <a key={j} href={s.uri} target="_blank" rel="noreferrer" className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800/60 border border-slate-700/50 text-[10px] text-slate-400 hover:text-teal-300 hover:border-teal-500/40 transition truncate max-w-[170px]">
+                  <a key={j} href={s.uri} target="_blank" rel="noreferrer" className="flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800/60 border border-slate-700/50 text-[11px] text-slate-400 hover:text-teal-300 hover:border-teal-500/40 transition truncate max-w-[170px]">
                     <Link2 size={9} className="shrink-0" />{s.title || "Fuente"}
                   </a>
                 ))}
@@ -26693,11 +26728,11 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
               </div>
             </div>
             {cupoRestante <= 5 && (
-              <p className="text-[9px] text-center mt-1.5" style={{ color: cupoRestante === 0 ? "#FCA5A5" : "#FCD34D" }}>
+              <p className="text-[11px] text-center mt-1.5" style={{ color: cupoRestante === 0 ? "#FCA5A5" : "#FCD34D" }}>
                 {cupoRestante === 0 ? `Sin pedidos de IA por hoy — el cupo se renueva mañana` : `Te ${cupoRestante === 1 ? "queda 1 pedido" : `quedan ${cupoRestante} pedidos`} de IA hoy`}
               </p>
             )}
-            <p className="text-[9px] text-slate-600 text-center mt-1.5">Puede cometer errores. No reemplaza el consejo de un profesional de la salud.</p>
+            <p className="text-[11px] text-slate-600 text-center mt-1.5">Puede cometer errores. No reemplaza el consejo de un profesional de la salud.</p>
           </div>
         </div>,
         document.body
@@ -26750,7 +26785,7 @@ function AIConversationSidebar({ conversations, activeConversationId, onSelect, 
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-black text-white leading-tight">Tus conversaciones</p>
-              <p className="text-[10px] text-slate-500 font-semibold mt-0.5">{conversations.length} {conversations.length === 1 ? "chat guardado" : "chats guardados"}</p>
+              <p className="text-[11px] text-slate-500 font-semibold mt-0.5">{conversations.length} {conversations.length === 1 ? "chat guardado" : "chats guardados"}</p>
             </div>
             <button onClick={onClose} aria-label="Cerrar" className="p-1.5 rounded-xl text-slate-500 hover:text-white hover:bg-slate-800/80 transition shrink-0"><X size={16} /></button>
           </div>
@@ -26791,7 +26826,7 @@ function AIConversationSidebar({ conversations, activeConversationId, onSelect, 
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-bold truncate" style={{ color: isActive ? "#fff" : "#9da2a8" }}>{c.title}</p>
-                  <p className="text-[10px] text-slate-600 mt-0.5 truncate">{dateLabel}{lastMsg ? ` · ${lastMsg}` : ""}</p>
+                  <p className="text-[11px] text-slate-600 mt-0.5 truncate">{dateLabel}{lastMsg ? ` · ${lastMsg}` : ""}</p>
                 </div>
                 {onRename && !confirming && (
                   <span onClick={(e) => { e.stopPropagation(); startRename(c); }} role="button" aria-label="Renombrar conversación" className="p-1.5 rounded-lg text-slate-600 hover:text-teal-300 transition shrink-0"><Edit3 size={12} /></span>
@@ -26799,8 +26834,8 @@ function AIConversationSidebar({ conversations, activeConversationId, onSelect, 
                 {onDelete && (
                   confirming ? (
                     <span className="flex items-center gap-1.5 shrink-0">
-                      <button onClick={(e) => { e.stopPropagation(); onDelete(c.id); }} className="text-[10px] font-black text-rose-400 px-1.5 py-1">Sí</button>
-                      <button onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(null); }} className="text-[10px] font-bold text-slate-500 px-1.5 py-1">No</button>
+                      <button onClick={(e) => { e.stopPropagation(); onDelete(c.id); }} className="text-[11px] font-black text-rose-400 px-1.5 py-1">Sí</button>
+                      <button onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(null); }} className="text-[11px] font-bold text-slate-500 px-1.5 py-1">No</button>
                     </span>
                   ) : (
                     <span onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(c.id); }} role="button" aria-label="Borrar conversación" className="p-1.5 rounded-lg text-slate-600 hover:text-rose-400 transition shrink-0"><Trash2 size={13} /></span>
@@ -27766,7 +27801,7 @@ function PersonalizedRoutineWizard({ profile, onUpdateProfile, onCreateRoutine, 
             <Dumbbell size={20} className="text-teal-400" />
           </div>
           <div>
-            <p className="text-[10px] font-black uppercase tracking-widest text-teal-400">Asistente IA</p>
+            <p className="text-[12px] font-bold text-teal-400">Asistente IA</p>
             <h2 className="text-base font-black text-white leading-tight">Tu rutina, a tu medida</h2>
           </div>
         </div>
@@ -27781,7 +27816,7 @@ function PersonalizedRoutineWizard({ profile, onUpdateProfile, onCreateRoutine, 
             visualmente no pasaba nada y parecía que "Volver" no hacía
             nada. Con el error activo, el botón ahora sí vuelve/cierra. */}
         <button onClick={step > 0 && !preview && !generating && !genError ? () => setStep((s) => s - 1) : onClose} className="flex items-center gap-1 text-slate-500 hover:text-white transition text-xs font-bold"><ChevronLeft size={14} /> {step > 0 && !preview && !generating && !genError ? "Anterior" : "Volver"}</button>
-        <span className="text-[10px] text-slate-600 font-bold">{preview ? "Revisá tu rutina" : generating ? "Generando..." : `${step + 1} / ${STEPS.length}`}</span>
+        <span className="text-[11px] text-slate-600 font-bold">{preview ? "Revisá tu rutina" : generating ? "Generando..." : `${step + 1} / ${STEPS.length}`}</span>
       </div>
 
       <div className="flex gap-1">
@@ -27810,7 +27845,7 @@ function PersonalizedRoutineWizard({ profile, onUpdateProfile, onCreateRoutine, 
                     className={`${current.compact ? "flex-1 py-3 text-center" : "px-4 py-3 text-left"} rounded-xl border text-sm font-bold transition active:scale-95 ${selected ? "border-teal-500/60 text-teal-300" : "bg-slate-800/70 border-slate-700 text-slate-200 hover:border-teal-500/40"}`}
                     style={selected ? { background: "linear-gradient(135deg,#14B8A620,#0E749010)" } : {}}>
                     <span className="block">{chip.l}</span>
-                    {chip.d && <span className={`block text-[10px] font-medium mt-0.5 ${selected ? "text-teal-400/70" : "text-slate-500"}`}>{chip.d}</span>}
+                    {chip.d && <span className={`block text-[11px] font-medium mt-0.5 ${selected ? "text-teal-400/70" : "text-slate-500"}`}>{chip.d}</span>}
                   </button>
                 );
               })}
@@ -27869,7 +27904,7 @@ function PersonalizedRoutineWizard({ profile, onUpdateProfile, onCreateRoutine, 
               <div className="icono-suelto"><Check size={17} /></div>
               <div>
                 <p className="text-sm font-black text-white">{preview.name}</p>
-                <p className="text-[10px] text-slate-500">{preview.dayOrder.length} días · hecha a tu medida · revisala y confirmá</p>
+                <p className="text-[11px] text-slate-500">{preview.dayOrder.length} días · hecha a tu medida · revisala y confirmá</p>
               </div>
             </div>
             <div className="space-y-2 max-h-[40vh] overflow-y-auto overscroll-contain">
@@ -27956,7 +27991,7 @@ function BalanceMuscular({ routineDef, compacto = true }) {
     <div>
       <div className="flex items-baseline justify-between gap-3 mb-3">
         <h4 className="seccion-titulo">Por músculo</h4>
-        <span className="text-[12.5px] text-slate-500 shrink-0">{totalSeries} series por semana</span>
+        <span className="text-[13px] text-slate-500 shrink-0">{totalSeries} series por semana</span>
       </div>
       <div className="space-y-2.5">
         {mostrar.map((d, i) => (
@@ -28355,7 +28390,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
 
           {showSchedule && (
             <div className="tab-fade-in">
-              <p className="text-[12.5px] text-slate-400 mb-2.5">Elegí qué día de tu rutina (o descanso) le toca a cada día de la semana. Podés repetir días.</p>
+              <p className="text-[13px] text-slate-400 mb-2.5">Elegí qué día de tu rutina (o descanso) le toca a cada día de la semana. Podés repetir días.</p>
               <WeeklyScheduleEditor dayOrder={activeDef.dayOrder} days={activeDef.days} schedule={activeSchedule} onChange={updateActiveScheduleDay} />
             </div>
           )}
@@ -28577,14 +28612,14 @@ function ActiveSessionBar({ startedAt, dayLabel, color, done, total, conProgreso
         <div className="flex items-center gap-2 px-4 py-3">
           <div className="flex-1 min-w-0">
             <p className="text-[14px] font-bold text-white leading-tight">¿Finalizar la sesión?</p>
-            <p className="text-[11.5px] text-slate-500 leading-snug mt-0.5">
+            <p className="text-[12px] text-slate-500 leading-snug mt-0.5">
               {conProgreso && total > 0 && done < total
                 ? `Te quedan ${total - done} de ${total} series. `
                 : ""}
               Se guarda en tu historial y se borra lo que escribiste sin guardar.
             </p>
             {onCancel && (
-              <button onClick={onCancel} className="text-[10.5px] text-left text-slate-500 hover:text-rose-400 transition mt-1 underline underline-offset-2 decoration-slate-700">
+              <button onClick={onCancel} className="text-[11px] text-left text-slate-500 hover:text-rose-400 transition mt-1 underline underline-offset-2 decoration-slate-700">
                 O descartala, sin que cuente como entrenamiento
               </button>
             )}
@@ -28797,13 +28832,17 @@ function BottomBar({ tab, setTab }) {
 // Sin el rótulo de color que iba arriba ("TU ENTRENAMIENTO"): ahora el color
 // de la pestaña tiñe la pantalla entera (ver ponerTono), y un rótulo más
 // encima del título sólo repetía dónde estás.
+// Sin bajadas (pedido: "sacar esas breves descripciones que son inútiles o
+// dicen cosas obvias"): "Marcas, volumen y constancia a lo largo del tiempo"
+// o "Tus datos, tus ajustes y tu cuenta" se leían en cada visita y corrían
+// todo 30 px para abajo. Queda la fecha en Rutina, que cambia y sirve.
 const TAB_INTRO = {
   rutina: {},
-  progreso: { bajada: "Marcas, volumen y constancia a lo largo del tiempo" },
-  rutinas: { bajada: "Una rutina ya armada, o creá la tuya" },
-  social: { bajada: "Sumá amigos, competí y compartí tu progreso" },
-  entrenador_ia: { bajada: "Conoce tu historial, preguntá lo que quieras", beta: true },
-  perfil: { bajada: "Tus datos, tus ajustes y tu cuenta" },
+  progreso: {},
+  rutinas: {},
+  social: {},
+  entrenador_ia: { beta: true },
+  perfil: {},
 };
 // "COLOR DE DÍA": lo que estás mirando tiñe la app. En Rutina, el color del
 // día elegido (lo pone RoutineView); en el resto, el de la pestaña. Se
@@ -28821,13 +28860,14 @@ function fechaDeHoyLarga() {
   const t = new Date().toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" });
   return t.charAt(0).toUpperCase() + t.slice(1);
 }
-function TituloPestana({ tab }) {
+function TituloPestana({ tab, descansa = false }) {
   const intro = TAB_INTRO[tab];
   if (!intro) return null;
+  const bajada = tab === "rutina" ? `${fechaDeHoyLarga()}${descansa ? " · Hoy descansás" : ""}` : intro.bajada;
   return (
     <div className="titulo-pagina">
       <h1>{TAB_TITLES[tab]}{intro.beta && <span className="ceja-beta">Beta</span>}</h1>
-      <p className="bajada">{tab === "rutina" ? fechaDeHoyLarga() : intro.bajada}</p>
+      {bajada && <p className="bajada">{bajada}</p>}
     </div>
   );
 }
@@ -28888,8 +28928,8 @@ const RECORRIDOS = {
     { sel: "nav.barra-pestanas", titulo: "Todo lo demás, abajo", texto: "Tu progreso, tus amigos, tus rutinas y el entrenador con IA." },
   ],
   progreso: [
-    { sel: ".cajones-pizarra", titulo: "Tu ciclo", texto: "Un cajón por semana: el de color entero es esta. El último, más bajo, es la semana de descarga." },
     { sel: ".pestanas-internas", titulo: "Cuatro miradas", texto: "Tu rango por músculo, el cuaderno de cada día, la gráfica de cada ejercicio y tus medidas." },
+    { sel: ".cajones-pizarra", titulo: "Tu ciclo", texto: "Un cajón por semana: el de color entero es esta. El último, más bajo, es la semana de descarga." },
     { sel: ".figura-cuerpo", titulo: "Tu nivel en cada músculo", texto: "Cada músculo, del color de su rango. Tocá uno para ver tu mejor marca y cuánto te falta para el siguiente." },
   ],
   rutinas: [
@@ -29881,6 +29921,8 @@ export default function App() {
   // Cronograma semanal de la rutina activa (lunes a domingo → día de rutina
   // o descanso) — ver getRoutineWeekSchedule más arriba en el archivo.
   const weekSchedule = activeRoutineDef ? getRoutineWeekSchedule(activeRoutineDef) : {};
+  // Hoy es descanso en tu cronograma: lo dice la fecha de Rutina (TituloPestana).
+  const descansaHoy = !!activeRoutineDef && !DAY_ORDER.includes(weekSchedule[todayWeekdayKey()]);
 
   // Antes acá había un aviso automático que te forzaba a la pestaña
   // Descarga apenas abrías la app en semana de descarga. Se reemplazó por
@@ -30576,7 +30618,7 @@ export default function App() {
             según haya o no sesión. */}
         <main className={`max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto px-4 pt-1 lg:pt-4 space-y-4 ${haySesionActiva && getProfileSettings(profile).modoGimnasio ? "modo-gimnasio" : ""}`} style={{ paddingBottom: "calc(7rem + var(--dock-alto, 0px) + env(safe-area-inset-bottom, 0px))" }}>
           <div key={tab} className={tabSlideClass}>
-            <TituloPestana tab={tab} />
+            <TituloPestana tab={tab} descansa={descansaHoy} />
             <PrimeraVezRecorrido tab={tab} nuevo={(profile?.trainingSessions?.length || 0) < 3 && !profile?.activeSession} activo={!!recorrido} onEmpezar={setRecorrido} />
             {tab === "rutinas" && <RoutinesView openScheduleSignal={openSectionSignal.id === "week-schedule" ? openSectionSignal.n : 0} openEditorSignal={openSectionSignal.id === "routine-editor" ? openSectionSignal.n : 0} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleDeleteRoutine} onUpdateProfile={handleUpdateProfile} onGoToDay={(dayKey) => goToSection("rutina", "go-to-day", dayKey)} />}
             {tab === "rutina" && !showPinnedDeload && <OnboardingTasksCard profile={profile} cycleStart={cycleStart} logs={logs} onGoToProfile={() => setTab("perfil")} onOpenFieldSettings={() => setShowFieldIntro(true)} onDone={() => handleUpdateProfile({ onboardingDone: true })} />}
@@ -30587,7 +30629,7 @@ export default function App() {
                 que quedó adentro de RoutineView ahora sirve para volver a
                 fijarla si la cerraste. */}
             {tab === "rutina" && showPinnedDeload && <DeloadView logs={logs} setLogs={setLogs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} activeSession={profile?.activeSession?.deload ? profile.activeSession : null} onStartSession={handleStartSession} weekSchedule={weekSchedule} onClose={() => setDeloadDismissed(true)} cycleStart={cycleStart} />}
-            {tab === "rutina" && !showPinnedDeload && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToRoutines={() => setTab("rutinas")} onGoToSchedule={() => goToSection("rutinas", "week-schedule")} onGoToFieldSettings={() => goToSection("perfil", "field-settings-section")} onGoToDescarga={() => (isDeloadWeek ? setDeloadDismissed(false) : setTab("descarga"))} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} sex={profile?.sex} age={edadDe(profile)} activeRoutineDef={activeRoutineDef} onApplyOwnProgression={handleApplyOwnProgression} onSetPlanPaused={handleSetPlanPaused} onRemovePlan={handleRemovePlan} goToDaySignal={openSectionSignal.id === "go-to-day" ? openSectionSignal : { id: null, n: 0 }} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} />}
+            {tab === "rutina" && !showPinnedDeload && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToFieldSettings={() => goToSection("perfil", "field-settings-section")} onGoToDescarga={() => (isDeloadWeek ? setDeloadDismissed(false) : setTab("descarga"))} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} sex={profile?.sex} age={edadDe(profile)} activeRoutineDef={activeRoutineDef} onApplyOwnProgression={handleApplyOwnProgression} onSetPlanPaused={handleSetPlanPaused} onRemovePlan={handleRemovePlan} goToDaySignal={openSectionSignal.id === "go-to-day" ? openSectionSignal : { id: null, n: 0 }} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} />}
             {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} onGoToRoutines={() => goToSection("rutinas", "routine-editor")} weekSchedule={weekSchedule} sex={profile?.sex} age={edadDe(profile)} onGoToDeload={() => { if (isDeloadWeek) { setDeloadDismissed(false); setTab("rutina"); } else { setTab("descarga"); } }} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} />}
             {tab === "descarga" && <DeloadView logs={logs} setLogs={setLogs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} activeSession={profile?.activeSession?.deload ? profile.activeSession : null} onStartSession={handleStartSession} weekSchedule={weekSchedule} onClose={() => { setDeloadDismissed(true); setTab("rutina"); }} cycleStart={cycleStart} />}
             {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} setLogs={setLogs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} conversations={aiConversations} activeConversationId={activeAiConversationId} onNewConversation={handleNewAiConversation} onSwitchConversation={handleSwitchAiConversation} onDeleteConversation={handleDeleteAiConversation} onRenameConversation={handleRenameAiConversation} settings={getProfileSettings(profile)} cycleStart={cycleStart} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} onDeleteRoutine={handleDeleteRoutine} onNavigate={setTab} onStartSession={handleStartSession} onEndSession={handleEndSession} />}
