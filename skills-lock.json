@@ -1,6 +1,12 @@
 {
   "version": 1,
   "skills": {
+    "android-cli": {
+      "source": "android/skills",
+      "sourceType": "github",
+      "skillPath": "devtools/android-cli/SKILL.md",
+      "computedHash": "791335db7bd348cc3ae68859d8732ad12a4f62e22b0a7a2cddb72058d89e73d3"
+    },
     "brandkit": {
       "source": "Leonxlnx/taste-skill",
       "sourceType": "github",
@@ -126,6 +132,12 @@
       "sourceType": "github",
       "skillPath": "skills/minimalist-skill/SKILL.md",
       "computedHash": "f9174b67ed00bce3f62641ac6393911a53f61f210f5b59ee3248acbed2ad11a0"
+    },
+    "play-policy-insights": {
+      "source": "android/skills",
+      "sourceType": "github",
+      "skillPath": "play/play-policy-insights/SKILL.md",
+      "computedHash": "be04243a343915b08c633cd4356b58969d125aa7339f291e7a0d1a7e60e4ea8d"
     },
     "redesign-existing-projects": {
       "source": "Leonxlnx/taste-skill",

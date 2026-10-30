@@ -38,5 +38,8 @@ _qr_*.png
 # taste-skill: capturas y archivos de trabajo que generan sus scripts (inspect, draw)
 .taste-skill/
 
+# play-policy-insights: la auditoría de las políticas de Play deja ahí su trabajo
+.scratch/
+
 # superdesign: contexto y estado de trabajo que genera su CLI al usarla
 .superdesign/

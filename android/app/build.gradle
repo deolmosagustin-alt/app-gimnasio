@@ -1,5 +1,16 @@
 apply plugin: 'com.android.application'
 
+// LA FIRMA DE PLAY, desde un archivo FUERA del repo (por defecto
+// ~/.claves/firma.properties, o la ruta de MODUSFIT_FIRMA) con storeFile,
+// storePassword, keyAlias y keyPassword. Con eso `npm run play -- aab` arma el
+// AAB firmado sin Android Studio. Sin el archivo (o con algo vacío), el release
+// sale sin firmar, como antes, y "Generate Signed App Bundle" de Android Studio
+// sigue andando igual (pisa esta firma con la que elegís ahí).
+def firmaArchivo = file(System.getenv("MODUSFIT_FIRMA") ?: "${System.getProperty('user.home')}/.claves/firma.properties")
+def firma = new Properties()
+if (firmaArchivo.exists()) firmaArchivo.withInputStream { firma.load(it) }
+def hayFirma = ['storeFile', 'storePassword', 'keyAlias', 'keyPassword'].every { firma.getProperty(it)?.trim() }
+
 android {
     namespace = "com.agustin.fitness"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -16,8 +27,19 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        if (hayFirma) {
+            subida {
+                storeFile file(firma.getProperty('storeFile').trim())
+                storePassword firma.getProperty('storePassword').trim()
+                keyAlias firma.getProperty('keyAlias').trim()
+                keyPassword firma.getProperty('keyPassword').trim()
+            }
+        }
+    }
     buildTypes {
         release {
+            if (hayFirma) signingConfig signingConfigs.subida
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

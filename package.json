@@ -12,7 +12,8 @@
     "capturas": "node scripts/capturas.mjs",
     "color": "node scripts/color.mjs",
     "reglas": "npx -y firebase-tools@latest deploy --only firestore:rules",
-    "imagen": "node scripts/generar-imagen.mjs"
+    "imagen": "node scripts/generar-imagen.mjs",
+    "play": "node scripts/play.mjs"
   },
   "dependencies": {
     "@capacitor-firebase/authentication": "^8.3.0",
