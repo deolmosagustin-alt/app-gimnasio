@@ -10,8 +10,10 @@
     <!--  Micrófono (dictado por voz en el Entrenador IA)  -->
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
-    <!--  ID de publicidad (AdMob)  -->
-    <uses-permission android:name="com.google.android.gms.permission.AD_ID"/>
+    <!--  Se quitó com.google.android.gms.permission.AD_ID (ID de publicidad):
+             quedó de un plan de AdMob y la app no tiene anuncios ni analytics.
+             Declararlo sin usarlo obliga a justificarlo en Play Console. Si se
+             prenden anuncios, vuelve con su SDK y la declaración.  -->
     <!--  Cámara: escanear el QR del perfil de un amigo en vivo
              (ver ScanQrCamera en App.jsx). Antes el QR se leía de una FOTO,
              que no necesita permiso porque la saca otra app — pero era a

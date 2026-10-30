@@ -89,6 +89,7 @@ Lo nativo de Android (los plugins, el plugin del descanso, el widget, `build.gra
 
 - Páginas públicas en `public/` con su estilo en `legal.css`: `privacy-policy.html`, `terminos.html` y `eliminar-cuenta.html` (la que Play pide para borrar la cuenta sin la app). La política del modal de Perfil dice lo mismo: si cambiás una, cambiá la otra. Hoy dicen que la app es gratis y sin anuncios. Cuando se prendan anuncios o cobros, hay que actualizarlas antes.
 - "Eliminar perfil" borra también la cuenta de Firebase (`deleteUser`), después de limpiar Social y `users/{uid}`.
+- Desde la 1.0.25 el APK no pide el ID de publicidad (`AD_ID`): quedaba de un plan de AdMob y la app no tiene anuncios ni analytics. En Play Console, "ID de publicidad" va en "No". Si se prenden anuncios, vuelve con su SDK y la declaración.
 - La banderita debajo de cada respuesta del Entrenador IA guarda un reporte en `reportes_ia` (sólo se crea; se revisa en la consola de Firebase). Sin sesión, abre un mail a soporte (`MAIL_SOPORTE`).
 
 ## Carpetas con documentación y el CSS
