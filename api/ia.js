@@ -100,14 +100,17 @@ async function discoverModels(apiKey, timeoutMs = 8000, { gemma = false } = {}) 
     // orden en que Google las devolvió (suele ser el más nuevo primero).
     const rank = (n) => (/-lite/i.test(n) ? 2 : 0) + (/-(exp|preview)/i.test(n) ? 1 : 0);
     names.sort((a, b) => rank(a) - rank(b));
-    // Gemma: la versión más nueva primero y, dentro de ella, el más grande
-    // (gemma-4-31b-it antes que gemma-4-26b…, y ésos antes que gemma-3-27b-it).
-    // Los chicos para teléfonos (e2b, e4b, 1b) no sirven para este pedido.
+    // Gemma: la versión más nueva primero y, dentro de ella, el de mezcla de
+    // expertos ("-a4b": activa 4B por palabra) antes que el denso, porque con
+    // el contexto entero del chat el denso de 31B no termina dentro de los 60 s
+    // de Vercel (medido el 02/11/2026). Los chicos para teléfonos (e2b, e4b,
+    // 1b) no sirven para este pedido.
     const version = (n) => parseFloat((n.match(/^gemma-(\d+(?:\.\d+)?)/i) || [])[1]) || 0;
     const tamano = (n) => parseFloat((n.match(/-(\d+(?:\.\d+)?)b\b/i) || [])[1]) || 0;
+    const expertos = (n) => (/-a\d+(?:\.\d+)?b\b/i.test(n) ? 1 : 0);
     const gemmas = todos
       .filter((n) => esGemma(n) && /-it\b|-it$/i.test(n) && tamano(n) >= 12)
-      .sort((a, b) => version(b) - version(a) || tamano(b) - tamano(a))
+      .sort((a, b) => version(b) - version(a) || expertos(b) - expertos(a) || tamano(b) - tamano(a))
       .slice(0, 2);
     discoveredModelsCache = { models: names, gemma: gemmas, fetchedAt: Date.now() };
     return deLaLista(discoveredModelsCache);
@@ -119,21 +122,20 @@ async function discoverModels(apiKey, timeoutMs = 8000, { gemma = false } = {}) 
   }
 }
 
-// Gemma no conoce systemInstruction (devuelve 400) ni thinkingConfig: las
-// instrucciones van al principio del primer mensaje de la persona, que es
-// como las espera el modelo.
+// Gemma 3 no conoce systemInstruction (devuelve 400): las instrucciones van
+// al principio del primer mensaje de la persona, que es como las espera el
+// modelo. El campo de razonamiento se deja: a un Gemma que no lo conoce se le
+// reintenta sin él, como a cualquier modelo (ver sinPensar en callGemini).
 function paraGemma(body) {
-  const { systemInstruction, generationConfig, ...resto } = body;
+  const { systemInstruction, ...resto } = body;
   const sistema = (systemInstruction?.parts || []).map((p) => p?.text || "").join("\n").trim();
-  const config = { ...(generationConfig || {}) };
-  delete config.thinkingConfig;
   const contents = (resto.contents || []).map((c) => ({ ...c, parts: [...(c.parts || [])] }));
   if (sistema) {
     const primero = contents.find((c) => c.role !== "model");
     if (primero) primero.parts.unshift({ text: `${sistema}\n\n---\n\n` });
     else contents.unshift({ role: "user", parts: [{ text: sistema }] });
   }
-  return { ...resto, contents, ...(Object.keys(config).length ? { generationConfig: config } : {}) };
+  return { ...resto, contents };
 }
 
 // Rate limit básico por IP: sin esto, cualquiera que conozca la URL puede
@@ -370,8 +372,8 @@ async function callGemini(body, { soloRespaldo = false } = {}) {
     // caer al pedido CON razonamiento (el modelo no acepta el campo), se le
     // da mucho más aire: ahí el silencio inicial es normal, no un cuelgue.
     const gemma = esGemma(model);
-    const sinPensar = !gemma && !modelosQueNoAceptanElCampo.has(model);
-    const cuerpo = gemma ? paraGemma(bodyBase) : sinPensar ? bodySinPensar : bodyBase;
+    const sinPensar = !modelosQueNoAceptanElCampo.has(model);
+    const cuerpo = (gemma ? paraGemma : (b) => b)(sinPensar ? bodySinPensar : bodyBase);
     const ttfb = Math.min(gemma ? 20000 : sinPensar ? 12000 : 40000, remaining);
     let res = null;
     try {
