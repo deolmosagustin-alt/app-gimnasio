@@ -24727,12 +24727,17 @@ async function extractTextFromExcelFile(file) {
 // foto pegada en el PDF), dibujadas como imagen para que las lea la IA. Antes
 // un PDF escaneado no daba nada: pdf.js no tiene texto que sacar de una foto.
 async function extractFromPdfFile(file, maxFotos = IMPORT_HASTA_FOTOS) {
-  const pdfjsLib = await import("pdfjs-dist");
-  // BUG FIX (encontrado subiendo un PDF real): pdfjs-dist 6.x sólo publica su
-  // worker como ".mjs" (pdf.worker.min.mjs), no ".js": la URL vieja daba 404 y
-  // todo PDF caía en el error genérico.
+  // El worker de pdf.js viaja con la app (Vite lo publica como un archivo
+  // más). Antes se bajaba de cdnjs con el número de versión: cuando cdnjs no
+  // tenía esa versión (pasó con la 6.5, la que corrige un PDF que podía
+  // ejecutar código), todo PDF caía en el error genérico. Y sin señal no
+  // andaba nunca.
+  const [pdfjsLib, { default: workerUrl }] = await Promise.all([
+    import("pdfjs-dist"),
+    import("pdfjs-dist/build/pdf.worker.min.mjs?url"),
+  ]);
   if (pdfjsLib.GlobalWorkerOptions && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+    pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
   }
   const buf = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
