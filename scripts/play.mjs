@@ -9,13 +9,15 @@
 //   npm run play -- cierres [--dias 7]      los cierres y ANR de los últimos días
 //   npm run play -- testers [--pista alpha] [--grupo x@googlegroups.com]
 //                                           quiénes prueban (y suma un Grupo de Google)
+//   npm run play -- datos [--enviar]        la declaración de seguridad de los datos
+//                                           (scripts/play-datos/; sin --enviar sólo la muestra)
 //
 // LA FIRMA: `aab` usa la clave de subida que dice C:/Users/usuario/.claves/
 // firma.properties (storeFile, storePassword, keyAlias, keyPassword; o la ruta
 // de MODUSFIT_FIRMA). Ese archivo no entra al repo ni pasa por el chat: lo
 // llena el dueño una vez. android/app/build.gradle lo lee; sin él, el release
 // sale sin firmar y Play lo rechaza.
-import { readFileSync, existsSync, statSync } from "node:fs";
+import { readFileSync, existsSync, statSync, writeFileSync, mkdirSync } from "node:fs";
 import { createSign } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { homedir } from "node:os";
@@ -166,10 +168,27 @@ const ordenes = {
       console.log(`${e.eventTime?.slice(0, 10) || ""}  ${e.type || ""}  v${e.appVersion?.versionCode || "?"}  Android ${e.osVersion?.apiLevel || "?"}  ${e.deviceModel?.marketingName || ""}\n  ${primera.slice(0, 200)}`);
     }
   },
+
+  // La declaración de "Seguridad de los datos" (ver scripts/play-datos/declaracion.mjs).
+  // La API sólo escribe: lo que haya en la consola se pisa entero.
+  async datos() {
+    const { armarCsv, resumen, GEMINI_GRATIS } = await import("./play-datos/declaracion.mjs");
+    const csv = armarCsv();
+    const copia = join(RAIZ, ".scratch", "datos-play.csv");
+    mkdirSync(dirname(copia), { recursive: true });
+    writeFileSync(copia, csv);
+    console.log(resumen());
+    console.log(`\nGemini ${GEMINI_GRATIS ? "gratis: lo que va a la IA se declara compartido con Google" : "pago: lo que va a la IA no cuenta como compartido"}. El CSV quedó en ${copia}.`);
+    if (!resto.includes("--enviar")) { console.log("No se mandó nada. Para subirla: npm run play -- datos --enviar"); return; }
+    const H = await token("https://www.googleapis.com/auth/androidpublisher");
+    await pedir(H, "seguridad de los datos", `${API}/dataSafety`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ safetyLabels: csv }) });
+    console.log("Subida: Play Console › Contenido de la app › Seguridad de los datos.");
+  },
 };
 
 if (!ordenes[orden]) {
-  console.log(readFileSync(fileURLToPath(import.meta.url), "utf8").split("\n").slice(2, 9).map((l) => l.replace(/^\/\/ ?/, "")).join("\n"));
+  const lineas = readFileSync(fileURLToPath(import.meta.url), "utf8").split("\n");
+  console.log(lineas.slice(2, lineas.findIndex((l) => l.startsWith("// LA FIRMA"))).map((l) => l.replace(/^\/\/ ?/, "")).join("\n"));
   process.exit(1);
 }
 ordenes[orden]().catch((e) => { console.error(e.message); process.exit(1); });

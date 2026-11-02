@@ -19606,13 +19606,13 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
             <button onClick={() => setShowPrivacy(false)} aria-label="Cerrar" className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white transition active:scale-90"><X size={16} /></button>
           </div>
           <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-5 space-y-5 text-slate-400 text-[13px] leading-relaxed">
-            <p className="text-[11px] text-slate-600">Última actualización: octubre de 2026</p>
+            <p className="text-[11px] text-slate-600">Última actualización: noviembre de 2026</p>
             <p>Modus Fit respeta tu privacidad. Esta política explica qué datos recopilamos, cómo los usamos y cuáles son tus derechos.</p>
             {[
-              { t: "1. Datos que recopilamos", b: "Datos de entrenamiento (series, pesos, récords), datos de perfil (nombre, email, sexo, fecha de nacimiento, altura), medidas corporales, fotos de progreso (sólo en tu dispositivo) y datos de cuenta Google si iniciás sesión con Google." },
+              { t: "1. Datos que recopilamos", b: "Datos de entrenamiento (series, pesos, récords), datos de perfil (nombre, email, sexo, fecha de nacimiento, altura), medidas corporales, tu foto de perfil si elegís una, fotos de progreso (sólo en tu dispositivo) y datos de cuenta Google si iniciás sesión con Google. El micrófono y la cámara, sólo cuando los usás: el micrófono para dictarle al Entrenador IA (el reconocimiento de voz de tu teléfono pasa el audio a texto y no lo guardamos) y la cámara para leer el QR de un amigo o sacarle una foto a una rutina." },
               { t: "2. Cómo usamos los datos", b: "Para mostrarte tu historial, récords y progreso. Para sincronizar tu perfil entre dispositivos si iniciaste sesión con Google. Para generar recomendaciones del Chatbot (el texto se envía a la API de Google Gemini y no se almacena en nuestros servidores). No vendemos tus datos ni los usamos para publicidad." },
               { t: "3. Almacenamiento y seguridad", b: "Tus datos se guardan localmente en tu dispositivo (IndexedDB/localStorage). Si usás la sincronización, se almacenan en Firebase Firestore con acceso restringido a tu cuenta. Si elegís un @usuario para activar lo social, tu nombre y foto de perfil quedan visibles para cualquier usuario de la app (necesario para que te puedan buscar), y tu rutina activa, historial de entrenamientos, récords y medidas corporales quedan visibles únicamente para las personas que aceptes como amigos o como entrenador/alumno vinculado — podés dejar de compartirlos en cualquier momento quitando el @usuario. Las fotos de progreso nunca se suben a ningún servidor ni se comparten con nadie, bajo ninguna circunstancia. Toda comunicación usa HTTPS." },
-              { t: "4. Terceros", b: "Usamos Google Firebase (autenticación y base de datos) y la API de Google Gemini (IA): lo que le escribís al Entrenador IA, junto con un resumen de tu entrenamiento, y las fotos o archivos de una rutina que importes se envían a Google para generar la respuesta o leer la rutina. Hoy usamos el plan gratuito de la API: según sus términos, Google puede usar esos datos para mejorar sus servicios y personas de Google pueden revisarlos, así que no le escribas al Entrenador IA nada que no quieras compartir. Cada uno tiene su propia política de privacidad." },
+              { t: "4. Terceros", b: "Usamos Google Firebase (autenticación y base de datos) y la API de Google Gemini (IA): lo que le escribís al Entrenador IA, junto con tu sexo, tu edad y un resumen de tu entrenamiento y tus rutinas (no tu nombre ni tu mail), y las fotos o archivos de una rutina que importes se envían a Google para generar la respuesta o leer la rutina. Hoy usamos el plan gratuito de la API: según sus términos, Google puede usar esos datos para mejorar sus servicios y personas de Google pueden revisarlos, así que no le escribas al Entrenador IA nada que no quieras compartir. Cada uno tiene su propia política de privacidad." },
               { t: "5. Anuncios y pagos", b: "Hoy Modus Fit es gratis y no muestra anuncios. Si más adelante sumamos anuncios o una versión paga, vamos a actualizar esta política y avisarte en la app antes de que empiecen." },
               { t: "6. Retención y eliminación", b: "Los datos locales permanecen hasta que desinstalás la app o eliminás tu perfil. Al eliminar tu perfil (Perfil › Eliminar perfil) se borran tus datos en la nube, tu perfil público y tu cuenta. También podés pedirlo por mail, sin la app: app-gimnasio-two.vercel.app/eliminar-cuenta.html, o escribiendo a deolmosagustin@gmail.com." },
               { t: "7. Menores de edad", b: "Modus Fit no está dirigida a menores de 13 años y no recopilamos intencionalmente sus datos." },
@@ -24977,7 +24977,6 @@ function buildActionPlan(action, ctx) {
     // La acción viaja SIEMPRE en kilos (así se lo pide el prompt), pero la
     // confirmación que lee la persona va en su unidad.
     if (action.bodyWeightKg) { newWeight = parseFloat(action.bodyWeightKg); const u = settings?.weightUnit || "kg"; items.push(`Peso corporal: ${kgToDisplay(newWeight, u)}${weightLabel(u)}`); }
-    if (action.email) { patch.email = action.email; items.push(`Email: ${action.email}`); }
     if (!items.length) return null;
     return {
       kind: "list", title: "Actualizar tu perfil", items, confirmLabel: "Guardar cambios",
@@ -25673,7 +25672,7 @@ Tipos disponibles:
 - activar_rutina: {"type":"activar_rutina","routineName":"nombre o parte del nombre de una rutina que ya tenga guardada (mirá la lista en rutinas)"}
 - editar_rutina_activa: {"type":"editar_rutina_activa","op":"agregar"|"quitar"|"sustituir","day":"nombre o parte del nombre del día (ej. \\"push\\")","exercise":"nombre del ejercicio","nuevoEjercicio":"nombre del reemplazo","setsCount":3,"repRange":"8-10"} — agrega, saca o SUSTITUYE un ejercicio de un día de la rutina que ya tiene activa (no crea una rutina nueva). "setsCount"/"repRange" solo aplican si op="agregar". "nuevoEjercicio" sólo aplica si op="sustituir" (reemplaza "exercise" por "nuevoEjercicio" conservando las mismas series y reps — usalo para "cambiame X por Y").
 - registrar_marca: {"type":"registrar_marca","exercise":"Press Banca","reps":8,"kg":80,"rpe":8} — carga una serie de HOY para ese ejercicio, como si la hubiera anotado a mano en Rutina. "rpe" es opcional (1-10). Usalo cuando te digan algo tipo "anotá que hice 8x80 en press banca".
-- editar_perfil: {"type":"editar_perfil","sex":"M"|"F","age":30,"bodyWeightKg":80,"email":"..."} (incluí sólo los campos que pidió cambiar)
+- editar_perfil: {"type":"editar_perfil","sex":"M"|"F","age":30,"bodyWeightKg":80} (incluí sólo los campos que pidió cambiar)
 - agregar_medida: {"type":"agregar_medida","tipo":"waist"|"chest"|"arm"|"leg","valor":80} (en cm; para peso usá editar_perfil con bodyWeightKg, no esto)
 - config_ciclo: {"type":"config_ciclo","deloadEnabled":true,"trainWeeks":4,"deloadWeeks":1,"deloadPct":0.6,"deloadSetDivisor":2} (deloadEnabled apaga/prende la semana de descarga entera; deloadPct es la fracción de su récord, ej. 0.6 = 60%; deloadSetDivisor: 2 = mitad de series, 3 = un tercio, 4 = un cuarto)
 - config_apariencia: {"type":"config_apariencia","theme":"dark"|"light"}
@@ -26149,8 +26148,11 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
       // se pide explícitamente otra, así "planificame la semana" siempre
       // apunta a la semana real de hoy sin que la IA tenga que adivinarla.
       const weekInfoForAI = cycleStart ? getWeekInfo(cycleStart, settings) : null;
+      // El perfil va sin nombre ni mail: para aconsejar alcanzan el sexo y la
+      // edad, y con el plan gratis de Gemini lo que se manda lo puede usar
+      // Google (ver la política de privacidad y la declaración de datos de Play).
       const buildAiContext = (historyLimit, maxKeys = null, sinAnalisis = false) => ({
-        perfil: { nombre: profileName, email: profile?.email || null, sexo: profile?.sex || null, edad: edadDe(profile), miembroDesde: profile?.joinedAt || null },
+        perfil: { sexo: profile?.sex || null, edad: edadDe(profile), miembroDesde: profile?.joinedAt || null },
         rutinaActivaId: profile?.activeRoutineId || null,
         rutinas: allRoutines,
         configuracionActual: settings,

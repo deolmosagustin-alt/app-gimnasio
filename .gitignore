@@ -43,3 +43,6 @@ _qr_*.png
 
 # superdesign: contexto y estado de trabajo que genera su CLI al usarla
 .superdesign/
+
+# Lo que deja Python al correr los scripts de las skills
+__pycache__/
