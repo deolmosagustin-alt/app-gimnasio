@@ -139,6 +139,12 @@
       "skillPath": "play/play-policy-insights/SKILL.md",
       "computedHash": "be04243a343915b08c633cd4356b58969d125aa7339f291e7a0d1a7e60e4ea8d"
     },
+    "react-doctor": {
+      "source": "millionco/react-doctor",
+      "sourceType": "github",
+      "skillPath": "skills/react-doctor/SKILL.md",
+      "computedHash": "0b640753631f4bb76de6183386027165761d1eb938e828839ca3bab0df8e3e30"
+    },
     "redesign-existing-projects": {
       "source": "Leonxlnx/taste-skill",
       "sourceType": "github",
@@ -180,6 +186,18 @@
       "sourceType": "github",
       "skillPath": "skills/web-design-guidelines/SKILL.md",
       "computedHash": "d8e7d3afe37dcc8a97b99ffb5afdb4d0919ae0092ea8b68f44eb201f035e33ac"
+    },
+    "web-perf": {
+      "source": "cloudflare/skills",
+      "sourceType": "github",
+      "skillPath": "skills/web-perf/SKILL.md",
+      "computedHash": "6a64193959c0dff8a6fab17025aac2c56405aef8f2638196a5339448873cb2fa"
+    },
+    "web-quality-audit": {
+      "source": "addyosmani/web-quality-skills",
+      "sourceType": "github",
+      "skillPath": "skills/web-quality-audit/SKILL.md",
+      "computedHash": "10c0b018ce77d2c6dd17aecf1ab58a64abb2beee945354d83c4ba8883527120a"
     },
     "webapp-testing": {
       "source": "anthropics/skills",

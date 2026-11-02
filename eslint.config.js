@@ -19,6 +19,12 @@ export default defineConfig([
     },
   },
   {
+    files: ['src/sw-plantilla.js'],
+    languageOptions: {
+      globals: globals.serviceworker,
+    },
+  },
+  {
     files: ['api/**/*.js'],
     languageOptions: {
       globals: globals.node,

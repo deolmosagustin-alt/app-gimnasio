@@ -3,13 +3,8 @@ package com.agustin.fitness;
 import android.content.Intent;
 import android.graphics.Color;
 import android.net.Uri;
-import android.Manifest;
-import android.content.pm.PackageManager;
-import android.os.Build;
 import android.os.Bundle;
 import android.webkit.WebView;
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
@@ -26,14 +21,10 @@ public class MainActivity extends BridgeActivity {
         webView.setVerticalScrollBarEnabled(false);
         webView.setHorizontalScrollBarEnabled(false);
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this,
-                    Manifest.permission.POST_NOTIFICATIONS)
-                    != PackageManager.PERMISSION_GRANTED) {
-                ActivityCompat.requestPermissions(this,
-                        new String[]{Manifest.permission.POST_NOTIFICATIONS}, 1);
-            }
-        }
+        // El permiso de las notificaciones ya no se pide al abrir: lo pide la
+        // web cuando hace falta (al iniciar una sesión o prender un
+        // recordatorio, ver pedirPermisoDeAvisos en App.jsx), con el motivo a
+        // la vista. Pedirlo acá salía antes de ver la app, sin explicar para qué.
         abrirLinkDeLaApp(getIntent());
     }
 

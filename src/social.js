@@ -149,13 +149,24 @@ function profileToPublicFull(profile, activeRoutineSnapshot) {
 // no triplicar escrituras/almacenamiento de gente que no usa lo social.
 // Igual que syncProfileToCloud: falla en silencio (solo warning en
 // consola) — un fallo acá nunca debe tirar abajo el sync principal.
+// Lo último que se escribió de cada espejo (sin la hora): el básico (nombre,
+// foto, rango) casi nunca cambia y se escribía con cada serie.
+const ULTIMO_ESPEJO = new Map();
+async function escribirSiCambio(clave, ref, datos) {
+  const { updatedAt, ...resto } = datos;
+  const firma = JSON.stringify(resto);
+  if (ULTIMO_ESPEJO.get(clave) === firma) return;
+  await setDoc(ref, { ...JSON.parse(firma), updatedAt });
+  ULTIMO_ESPEJO.set(clave, firma);
+}
+
 export async function syncPublicProfile(uid, profile, activeRoutineSnapshot, topRank) {
   if (!profile?.username) return;
   try {
     const basic = JSON.parse(JSON.stringify(profileToPublicBasic(profile, topRank)));
     const full = JSON.parse(JSON.stringify(profileToPublicFull(profile, activeRoutineSnapshot)));
-    await setDoc(doc(db, "users", uid, "public", "basic"), basic);
-    await setDoc(doc(db, "users", uid, "public", "full"), full);
+    await escribirSiCambio(`${uid}/basic`, doc(db, "users", uid, "public", "basic"), basic);
+    await escribirSiCambio(`${uid}/full`, doc(db, "users", uid, "public", "full"), full);
   } catch (err) {
     console.warn("[social] No se pudo sincronizar el perfil público:", err?.message || err);
   }
@@ -242,6 +253,7 @@ export async function clearDiscoverablePhone(phoneHash) {
 // siendo tu amigo/alumno, solo deja de compartir datos nuevos hasta que
 // vuelva a elegir un @usuario.
 export async function unpublishProfile(uid, usernameLower) {
+  ULTIMO_ESPEJO.delete(`${uid}/basic`); ULTIMO_ESPEJO.delete(`${uid}/full`);
   try {
     if (usernameLower) await releaseUsername(usernameLower);
     await deleteDoc(doc(db, "users", uid, "public", "basic"));
@@ -487,6 +499,7 @@ export async function borrarReto(id) {
 // si algo falla, queda basura huérfana (mismo criterio que ya usa el resto
 // de la app para este tipo de limpieza).
 export async function cleanupSocialData(uid, usernameLower, phoneHash = null) {
+  ULTIMO_ESPEJO.delete(`${uid}/basic`); ULTIMO_ESPEJO.delete(`${uid}/full`);
   try {
     if (usernameLower) await releaseUsername(usernameLower);
     if (phoneHash) await clearDiscoverablePhone(phoneHash);

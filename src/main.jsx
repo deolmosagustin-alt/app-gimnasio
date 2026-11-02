@@ -56,6 +56,14 @@ if (typeof window !== "undefined") {
   });
 }
 
+// Sin señal la app abre igual: el service worker guarda la página y sus
+// archivos (ver src/sw-plantilla.js). Sólo en la versión publicada.
+if (import.meta.env.PROD && typeof navigator !== "undefined" && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch((e) => console.warn("[sw] no se pudo registrar:", e?.message || e))
+  })
+}
+
 const arrancar = () => createRoot(document.getElementById('root')).render(
   <StrictMode>
     <ErrorBoundary>

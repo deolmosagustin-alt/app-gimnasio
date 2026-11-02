@@ -14,7 +14,7 @@ import {
   Sparkles, Layers, SlidersHorizontal, UserCog,
   Share2, Download, Link2, Copy, BellOff, Send, Mic, Ruler, Camera, Link, Footprints, Star, SquarePlay, Upload, RefreshCw, Timer, Percent, Users, User,
   MessageCircle, Search, UserPlus, UserCheck, UserMinus, AtSign, GraduationCap, ClipboardCheck, Swords, Medal, QrCode, ArrowUpDown,
-  Phone, Minus, Ellipsis, Undo2, ArrowLeftRight, ReceiptText, ClipboardList, Minimize2, BellRing,
+  Minus, Ellipsis, Undo2, ArrowLeftRight, ReceiptText, ClipboardList, Minimize2, BellRing,
   FileText, FileSpreadsheet, ClipboardPaste, ScanText, ImagePlus, Flag,
 } from "lucide-react";
 import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signOut, onAuthStateChanged, deleteUser } from "firebase/auth";
@@ -54,7 +54,7 @@ import {
   sendTrainerLinkRequest, respondToTrainerLink, removeTrainerLink, listTrainerLinksAsTrainer, listTrainerLinksAsStudent,
   createRoutineProposal, createProgressionProposal, respondToRoutineProposal, listRoutineProposalsForStudent, listRoutineProposalsByTrainer,
   cleanupSocialData, listGlobalLeaderboard,
-  setDiscoverablePhone, clearDiscoverablePhone,
+  clearDiscoverablePhone,
   hasSentKudosToday, sendKudos, listKudosReceived,
   sendReto, listRetosRecibidos, listRetosEnviados, borrarReto,
 } from "./social";
@@ -151,25 +151,118 @@ function resolveRoutineDef(routineEntry, routineId) {
    (lectura y creación públicas porque cualquiera con el link tiene que
    poder verla sin iniciar sesión; nunca se debería poder pisar o borrar
    una ya creada). */
-async function shareRoutineToFirestore(routineDef) {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  let shortId = "";
-  for (let i = 0; i < 6; i++) shortId += chars[Math.floor(Math.random() * chars.length)];
-  try {
-    await setDoc(doc(db, "shared_routines", shortId), routineDef);
-  } catch (err) {
-    // Se reempaqueta el error con un mensaje más claro según la causa real,
-    // en vez de dejar que todo termine en el mismo "no pudimos generar el
-    // enlace" genérico — así, tanto en la consola como en pantalla, queda
-    // claro si hace falta configurar las reglas de Firestore (lo más
-    // probable) o si es otra cosa (sin conexión, cuota agotada, etc.).
-    if (err?.code === "permission-denied") {
-      throw new Error("Firestore rechazó la escritura (permission-denied). Hace falta configurar las reglas de seguridad de la colección \"shared_routines\" en la consola de Firebase para permitir escritura pública. Ver el comentario arriba de shareRoutineToFirestore.", { cause: err });
+// UNA RUTINA QUE LLEGA DE AFUERA (un link compartido, la propuesta de un
+// entrenador) se revisa y se rearma antes de mostrarla o guardarla. Cualquiera
+// puede crear un documento en shared_routines (sin sesión, ver
+// firestore.rules), y la vista previa y el resto de la app dan por hecho que
+// cada día tiene su lista de ejercicios y cada ejercicio sus series: un link
+// con la forma equivocada (a propósito o de una versión vieja) rompía la app
+// de quien lo abría, y si lo agregaba quedaba guardado en sus rutinas y
+// rompía también las pantallas que la leen. Devuelve la rutina limpia o null.
+// `conPlanes`: las metas y los récords de cada serie son de quien la arma;
+// viajan en la propuesta de un entrenador, no en un link público.
+const SERIE_TIPOS = new Set(["normal", "dropset", "restpause", "warmup", "calentamiento", "failure", "fallo"]);
+function sanearRutina(def, { conPlanes = false } = {}) {
+  if (!def || typeof def !== "object" || Array.isArray(def)) return null;
+  // Sin caracteres de control (saltos de línea, tabulaciones y compañía).
+  const texto = (v, max) => (typeof v === "string" ? Array.from(v, (ch) => (ch.charCodeAt(0) < 32 ? " " : ch)).join("").trim().slice(0, max) : "");
+  const clave = (v) => (typeof v === "string" && /^[\w-]{1,80}$/.test(v) && !["__proto__", "constructor", "prototype"].includes(v) ? v : null);
+  const numero = (v, min, max) => (typeof v === "number" && Number.isFinite(v) && v >= min && v <= max ? v : null);
+  const dias = def.days && typeof def.days === "object" ? def.days : {};
+  const dayOrder = [...new Set(Array.isArray(def.dayOrder) ? def.dayOrder : [])]
+    .filter((dk) => clave(dk) && dias[dk] && typeof dias[dk] === "object")
+    .slice(0, 7);
+  const serie = (s) => {
+    if (!s || typeof s !== "object") return null;
+    const out = { repRange: texto(s.repRange, 15) };
+    if (typeof s.type === "string" && SERIE_TIPOS.has(s.type)) out.type = s.type;
+    if (conPlanes) {
+      if (s.pr && numero(s.pr.kg, 0, 2000) != null && numero(s.pr.reps, 1, 500) != null) out.pr = { kg: s.pr.kg, reps: s.pr.reps };
+      if (Array.isArray(s.plannedProgression)) {
+        const plan = s.plannedProgression.slice(0, 60).filter((e) => e && typeof e === "object" && !Array.isArray(e))
+          .map((e) => Object.fromEntries(Object.entries(e).filter(([k, v]) => /^\w{1,30}$/.test(k) && (typeof v === "number" ? Number.isFinite(v) : typeof v === "boolean" || (typeof v === "string" && v.length <= 40)))));
+        if (plan.length) out.plannedProgression = plan;
+      }
+      if (typeof s.plannedPaused === "boolean") out.plannedPaused = s.plannedPaused;
+      if (numero(s.plannedAt, 0, 1e14) != null) out.plannedAt = s.plannedAt;
+      if (numero(s.plannedCycle, 0, 10000) != null) out.plannedCycle = s.plannedCycle;
     }
-    throw err;
+    return out;
+  };
+  const ejercicio = (e) => {
+    if (!e || typeof e !== "object") return null;
+    const sets = (Array.isArray(e.sets) ? e.sets : []).slice(0, 12).map(serie).filter(Boolean);
+    if (!sets.length) return null;
+    const base = { sets, supersetNext: !!e.supersetNext };
+    if (clave(e.idOverride)) base.idOverride = e.idOverride;
+    if (typeof e.libId === "string" && EXERCISE_LIBRARY_BY_ID[e.libId]) return { libId: e.libId, ...base };
+    const name = texto(e.name, 80);
+    if (!name) return null;
+    return { id: clave(e.id) || builderUid("ej"), name, muscle: texto(e.muscle, 40) || "Personalizado", ...(e.cardio ? { cardio: true } : {}), ...(texto(e.nota, 300) ? { nota: texto(e.nota, 300) } : {}), ...base };
+  };
+  const days = {};
+  dayOrder.forEach((dk) => {
+    const d = dias[dk];
+    const color = typeof d.color === "string" && /^#[0-9a-f]{6}$/i.test(d.color) ? d.color : BUILDER_COLOR_PALETTE[Object.keys(days).length % BUILDER_COLOR_PALETTE.length];
+    const warmup = Array.isArray(d.warmup) ? d.warmup.filter((k) => MOBILITY_DRILLS.some((dr) => dr.key === k)).slice(0, 20) : null;
+    days[dk] = {
+      label: texto(d.label, 40) || "Día",
+      description: texto(d.description, 300),
+      color,
+      exercises: (Array.isArray(d.exercises) ? d.exercises : []).slice(0, 40).map(ejercicio).filter(Boolean),
+      ...(warmup ? { warmup } : {}),
+    };
+  });
+  const usados = dayOrder.filter((dk) => days[dk].exercises.length);
+  if (!usados.length) return null;
+  const out = {
+    name: texto(def.name, 60) || "Rutina compartida",
+    source: "custom",
+    description: texto(def.description, 300),
+    recommendation: texto(def.recommendation, 300),
+    dayOrder,
+    days,
+  };
+  if (def.weekSchedule && typeof def.weekSchedule === "object") {
+    const ws = {};
+    WEEKDAY_KEYS.forEach((wk) => { const v = def.weekSchedule[wk]; if (v === "rest" || dayOrder.includes(v)) ws[wk] = v; });
+    if (Object.keys(ws).length) out.weekSchedule = ws;
   }
-  const base = typeof window !== "undefined" ? window.location.origin + window.location.pathname : "";
-  return `${base}#r=${shortId}`;
+  return out;
+}
+
+async function shareRoutineToFirestore(routineDef) {
+  // Viaja una copia limpia: sin tus metas ni tus récords de cada serie (son
+  // tuyos, no de la rutina) y con la misma forma que espera quien la abre.
+  const limpia = sanearRutina(routineDef);
+  if (!limpia) throw new Error("La rutina no tiene ejercicios para compartir.");
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  // Con un ID que ya existe Firestore lo toma como una edición, que las
+  // reglas no permiten: se prueba con otro (pasa una vez cada muchos miles
+  // de millones, pero no cuesta nada).
+  for (let intento = 0; intento < 3; intento++) {
+    let shortId = "";
+    for (let i = 0; i < 6; i++) shortId += chars[Math.floor(Math.random() * chars.length)];
+    try {
+      // Sin conexión, Firestore deja la escritura en cola y la promesa no
+      // termina nunca: el cartel quedaba en "Generando el enlace…" para
+      // siempre. Un link que todavía no está en la nube no le sirve a quien
+      // lo abra, así que a los 15 s se avisa.
+      await Promise.race([
+        setDoc(doc(db, "shared_routines", shortId), { ...limpia, sharedAt: new Date().toISOString() }),
+        new Promise((_, rej) => setTimeout(() => rej(new Error("sin-conexion")), 15000)),
+      ]);
+    } catch (err) {
+      if (err?.code === "permission-denied" && intento < 2) continue;
+      throw err;
+    }
+    // Con la web adentro de la app (sin server.url) el origen es
+    // https://localhost: ese link no le sirve a nadie, va el de la web.
+    const local = typeof window === "undefined" || (Capacitor.isNativePlatform() && /^https?:\/\/localhost/i.test(window.location.origin));
+    const base = local ? `${API_ORIGIN}/` : window.location.origin + window.location.pathname;
+    return `${base}#r=${shortId}`;
+  }
+  throw new Error("No se pudo generar el enlace.");
 }
 
 /* ============================== CUENTA EN LA NUBE ==============================
@@ -321,7 +414,41 @@ async function fetchProfileFromCloud(uid) {
 // espera hasta 5s y reintenta. Si sigue sin auth, falla silenciosamente —
 // el próximo cambio de datos disparará otro intento.
 // Para el botón manual: el llamador pasa requireAuth=true y recibe el error.
+// Lo último que se subió de cada cuenta (sin la hora): si no cambió nada de
+// lo que va a la nube, no se vuelve a subir. Antes el sync de cada 4 s subía
+// el perfil entero (y el espejo público, dos documentos más) ante cualquier
+// cambio, también al escribir un número en una serie o tocar algo que sólo
+// vive en el teléfono: una sesión gastaba cientos de escrituras de Firestore
+// (el plan gratis da 20.000 por día para toda la app) y megas de datos
+// móviles subiendo lo mismo. Y una subida sin cambios pisaba lo que otro
+// dispositivo hubiera subido mientras tanto.
+const ULTIMA_SUBIDA = new Map();
+// Firestore no acepta documentos de más de 1 MiB: un historial muy largo
+// dejaría de subir para siempre sin que nadie se entere. Se avisa antes.
+const LIMITE_DOC_NUBE = 1_000_000;
+let avisoNubeLlena = null; // lo lee el aviso de Perfil
+function tamanoEnNube(cuerpo) { return new Blob([cuerpo]).size; }
+// Una subida por cuenta a la vez. Sin señal (el gimnasio en un subsuelo)
+// Firestore deja cada subida en cola hasta que vuelve la conexión, y cada
+// una es el perfil entero: una sesión sin señal juntaba veinte copias que
+// salían todas juntas al volver. Ahora, mientras una está en camino, las
+// siguientes se juntan en una sola, con lo último.
+const SUBIENDO = new Map(); // uid → { siguiente: perfil | null }
 async function syncProfileToCloud(uid, profile, requireAuth = false) {
+  const enCurso = SUBIENDO.get(uid);
+  if (enCurso && !requireAuth) { enCurso.siguiente = profile; return; }
+  const propia = { siguiente: null };
+  if (!enCurso) SUBIENDO.set(uid, propia);
+  try {
+    await subirPerfil(uid, profile, requireAuth);
+  } finally {
+    if (SUBIENDO.get(uid) === propia) {
+      SUBIENDO.delete(uid);
+      if (propia.siguiente) syncProfileToCloud(uid, propia.siguiente).catch(() => {});
+    }
+  }
+}
+async function subirPerfil(uid, profile, requireAuth) {
   try {
     // Esperar auth con timeout de 5s
     const firebaseUser = await Promise.race([
@@ -333,6 +460,10 @@ async function syncProfileToCloud(uid, profile, requireAuth = false) {
       return; // sync automático: fallar silenciosamente, reintentar después
     }
     const data = profileToCloud(profile);
+    const cuerpo = JSON.stringify(data);
+    if (!requireAuth && ULTIMA_SUBIDA.get(uid) === cuerpo) return;
+    const bytes = tamanoEnNube(cuerpo);
+    avisoNubeLlena = bytes > LIMITE_DOC_NUBE * 0.85 ? { bytes, lleno: bytes >= LIMITE_DOC_NUBE } : null;
     // setDoc SIN {merge:true}: el documento de la nube queda como espejo
     // EXACTO del perfil local. Antes usábamos merge:true, y Firestore hace
     // merge PROFUNDO de mapas: si borrábamos una key del objeto `logs` en el
@@ -347,8 +478,9 @@ async function syncProfileToCloud(uid, profile, requireAuth = false) {
     // Este paso los elimina en profundidad: JSON.stringify descarta las claves
     // con undefined, así que un bug nuevo en cualquier parte del código no
     // puede volver a romper la sincronización.
-    const limpio = JSON.parse(JSON.stringify({ ...data, _syncedAt: new Date().toISOString() }));
+    const limpio = { ...JSON.parse(cuerpo), _syncedAt: new Date().toISOString() };
     await setDoc(doc(db, "users", uid), limpio);
+    ULTIMA_SUBIDA.set(uid, cuerpo);
     // Espejo "público" para lo social — no-op adentro de syncPublicProfile
     // si el perfil nunca eligió un @handle (la enorme mayoría). Nunca debe
     // tirar abajo el sync principal si falla, por eso va después del
@@ -3758,6 +3890,13 @@ button.foco-campo-rotulo:active { background: var(--velo); }
   margin-top: 18px; max-width: 30ch; font-size: 1rem; line-height: 1.45;
   color: #a8aaaf; text-wrap: pretty;
 }
+/* Quien llega por el QR o el link de un amigo, sin perfil todavía. */
+.login-invitacion {
+  margin: 0 0 14px; padding: 12px 16px; border-radius: 18px;
+  background: rgba(255,255,255,0.06); color: #d6d8dc;
+  font-size: 0.875rem; line-height: 1.4; text-wrap: pretty;
+}
+.login-invitacion b { color: #fff; font-weight: 700; }
 
 /* ── LA BARRA CARGADA ───────────────────────────────────────────────────
    Una barra olímpica de verdad: mangas cromadas, topes y el agarre con su
@@ -6571,7 +6710,7 @@ function ShareLinkModal({ title, shareTitle, shareText, shareTarget, onClose }) 
         if (!cancelled) setUrl(link);
       } catch (err) {
         console.error("Error al generar el enlace de la rutina:", err);
-        if (!cancelled) setLinkError(err?.code === "permission-denied" ? "permission-denied" : "other");
+        if (!cancelled) setLinkError(/ejercicios para compartir/.test(err?.message || "") ? "vacia" : "other");
       }
     })();
     return () => { cancelled = true; };
@@ -6623,7 +6762,7 @@ function ShareLinkModal({ title, shareTitle, shareText, shareTarget, onClose }) 
       urlInputRef.current?.select();
     }
   };
-  const reintentar = () => { setLinkError(null); setUrl(""); shareRoutineToFirestore(shareTarget).then(setUrl).catch((err) => setLinkError(err?.code === "permission-denied" ? "permission-denied" : "other")); };
+  const reintentar = () => { setLinkError(null); setUrl(""); shareRoutineToFirestore(shareTarget).then(setUrl).catch((err) => setLinkError(/ejercicios para compartir/.test(err?.message || "") ? "vacia" : "other")); };
   const waUrl = url ? `https://wa.me/?text=${encodeURIComponent(shareText + " " + url)}` : "#";
   const xUrl = url ? `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(url)}` : "#";
   const redditUrl = url ? `https://www.reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(shareTitle)}` : "#";
@@ -6653,10 +6792,10 @@ function ShareLinkModal({ title, shareTitle, shareText, shareTarget, onClose }) 
             <HojaRutina routineDef={shareTarget} />
             {linkError ? (
               <div className="compartir-error">
-                <p className="ficha-aviso"><AlertTriangle size={15} />{linkError === "permission-denied"
-                  ? "Firestore no tiene permiso para guardar rutinas compartidas: falta ajustar las reglas de \"shared_routines\" en la consola de Firebase."
+                <p className="ficha-aviso"><AlertTriangle size={15} />{linkError === "vacia"
+                  ? "Esta rutina no tiene ejercicios todavía. Agregale alguno para compartirla."
                   : "No se pudo generar el enlace. Revisá tu conexión y probá de nuevo."}</p>
-                <button onClick={reintentar} className="boton-tonal w-full">Reintentar</button>
+                {linkError !== "vacia" && <button onClick={reintentar} className="boton-tonal w-full">Reintentar</button>}
               </div>
             ) : !url ? (
               <p className="compartir-generando" role="status"><span className="plan-ia-girando" aria-hidden="true" /> Generando el enlace…</p>
@@ -6691,7 +6830,7 @@ function ShareLinkModal({ title, shareTitle, shareText, shareTarget, onClose }) 
           subtitle={shareTarget?.name || ""}
           fileNamePrefix="rutina-modus-fit"
           shareTitle={shareTitle}
-          shareText={shareText}
+          shareText={url ? `${shareText}\n${url}` : shareText}
           draw={(ctx, W, H) => dibujarHojaRutina(ctx, W, H, shareTarget)}
           onClose={() => setImagen(false)}
         />
@@ -6760,17 +6899,49 @@ function getBarcodeDetector() {
   return barcodeDetectorCache;
 }
 
+// BUG FIX (reporte: "el escaneo del QR anda medio mal"): en el WebView de
+// Android BarcodeDetector existe y dice que lee QR, pero en muchos teléfonos
+// devuelve vacío siempre (depende de un módulo de Google Play Services que no
+// siempre está; medido en el emulador: un QR perfecto, 0 resultados, 118 ms).
+// Se le preguntaba en cada cuadro de la cámara, así que cada intento perdía
+// ese tiempo antes de probar con jsQR y el escáner leía dos o tres cuadros
+// por segundo. Ahora se lo prueba una sola vez con un QR conocido: si no lo
+// lee, no se lo usa más.
+let detectorNativoAnda = null; // Promise<boolean>
+function probarDetectorNativo() {
+  if (detectorNativoAnda) return detectorNativoAnda;
+  detectorNativoAnda = (async () => {
+    const det = getBarcodeDetector();
+    if (!det) return false;
+    try {
+      const QRCode = (await import("qrcode")).default;
+      const qr = QRCode.create("modus", { errorCorrectionLevel: "M" });
+      const n = qr.modules.size, px = 6, quiet = 4, lado = (n + quiet * 2) * px;
+      const c = document.createElement("canvas");
+      c.width = lado; c.height = lado;
+      const ctx = c.getContext("2d");
+      ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, lado, lado);
+      ctx.fillStyle = "#000";
+      for (let r = 0; r < n; r++) for (let k = 0; k < n; k++) if (qr.modules.get(r, k)) ctx.fillRect((k + quiet) * px, (r + quiet) * px, px, px);
+      const hits = await det.detect(c);
+      return hits?.[0]?.rawValue === "modus";
+    } catch { return false; }
+  })();
+  return detectorNativoAnda;
+}
+
 async function decodeQrNative(source) {
-  const det = getBarcodeDetector();
-  if (!det) return null;
+  if (!(await probarDetectorNativo())) return null;
   try {
-    const hits = await det.detect(source);
+    const hits = await getBarcodeDetector().detect(source);
     return hits?.[0]?.rawValue || null;
   } catch { return null; }
 }
 
 // Dibuja una porción de la fuente a un tamaño dado y la pasa por jsQR.
-async function decodeQrWithJsQR(source, canvas, sx, sy, sw, sh, maxDim) {
+// `inversion`: los QR son oscuros sobre claro; probar también el negativo
+// ("attemptBoth") duplica el trabajo, así que en vivo se hace de a ratos.
+async function decodeQrWithJsQR(source, canvas, sx, sy, sw, sh, maxDim, inversion = "attemptBoth") {
   if (sw < 20 || sh < 20) return null;
   const jsQR = (await import("jsqr")).default;
   const ctx = canvas.getContext("2d", { willReadFrequently: true });
@@ -6780,20 +6951,31 @@ async function decodeQrWithJsQR(source, canvas, sx, sy, sw, sh, maxDim) {
   canvas.width = w; canvas.height = h;
   ctx.drawImage(source, sx, sy, sw, sh, 0, 0, w, h);
   const { data } = ctx.getImageData(0, 0, w, h);
-  return jsQR(data, w, h, { inversionAttempts: "attemptBoth" })?.data || null;
+  return jsQR(data, w, h, { inversionAttempts: inversion })?.data || null;
 }
 
-// Un cuadro de video en vivo: primero el decodificador nativo (rapidísimo)
-// y, si no hay, una sola pasada de jsQR sobre el cuadro entero. No se hacen
-// varias pasadas acá a propósito: en vivo llega otro cuadro enseguida, y
-// gastar 3 pasadas por cuadro bajaría los FPS justo cuando lo que ayuda es
-// mirar muchos cuadros distintos.
-async function decodeQrFromVideoFrame(video, canvas) {
+// Un cuadro de video en vivo: el decodificador nativo si anda (ver arriba)
+// y si no, jsQR. Un cuadro mira el centro (lo que está adentro del marco,
+// más grande y más rápido de leer) y el siguiente el cuadro entero, por si
+// el código quedó corrido; cada tanto también en negativo.
+async function decodeQrFromVideoFrame(video, canvas, vuelta = 0) {
   const nativo = await decodeQrNative(video);
   if (nativo) return nativo;
   const w = video.videoWidth, h = video.videoHeight;
   if (!w || !h) return null;
-  return decodeQrWithJsQR(video, canvas, 0, 0, w, h, 900);
+  const inversion = vuelta % 6 === 5 ? "onlyInvert" : "dontInvert";
+  if (vuelta % 2 === 0) {
+    const lado = Math.round(Math.min(w, h) * 0.8);
+    return decodeQrWithJsQR(video, canvas, Math.round((w - lado) / 2), Math.round((h - lado) / 2), lado, lado, 640, inversion);
+  }
+  return decodeQrWithJsQR(video, canvas, 0, 0, w, h, 800, inversion);
+}
+
+// Lo que dice un QR leído: el @usuario de un amigo, una rutina compartida
+// (#r=…, el link que sale de Compartir una rutina) o algo que no es de la app.
+function linkDeRutinaEnQr(texto) {
+  const m = typeof texto === "string" ? texto.match(/^https:\/\/[^\s#]+#r=([A-Za-z0-9]{4,12})$/) : null;
+  return m ? m[1] : null;
 }
 
 // Una foto elegida de la galería (o sacada con la cámara del sistema): acá
@@ -7491,7 +7673,7 @@ async function drawSocialProfileQrCard(ctx, W, H, { name, username, accent }) {
   ctx.fillText(chipText, W / 2, chipY + chipH * 0.68);
 
   ctx.fillStyle = "#6e7379"; ctx.font = `600 ${Math.round(W * 0.032)}px sans-serif`;
-  ctx.fillText("Social → Escanear código QR, en Modus Fit", W / 2, Math.round(H * 0.9));
+  ctx.fillText("Escanealo con la cámara del teléfono", W / 2, Math.round(H * 0.9));
 
   drawWordmark(ctx, W, H, accent);
 }
@@ -7590,7 +7772,7 @@ function ProfileQrModal({ profileName, username, accent = "#A855F7", onClose }) 
           </div>
 
           <p className="relative text-[11px] text-slate-500 text-center leading-snug mb-3">
-            Que lo escaneen desde <span className="text-slate-400 font-semibold">Social → Buscar → Escanear código QR</span>.
+            Lo leen con la cámara del teléfono, o desde <span className="text-slate-400 font-semibold">Social › Amigos › Buscar y agregar</span>.
           </p>
 
           <button onClick={() => setShowImage(true)} className="relative w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-slate-700 text-slate-300 hover:text-white hover:border-slate-500 transition text-xs font-bold">
@@ -7604,7 +7786,7 @@ function ProfileQrModal({ profileName, username, accent = "#A855F7", onClose }) 
           subtitle="Tarjeta para WhatsApp, Instagram y más"
           fileNamePrefix="mi-qr-modus-fit"
           shareTitle="Modus Fit"
-          shareText={`Agregame en Modus Fit, escaneá mi código o buscame como @${username}`}
+          shareText={`Agregame en Modus Fit: ${buildProfileQrPayload(username)}`}
           accent={accent}
           draw={(ctx, W, H) => drawSocialProfileQrCard(ctx, W, H, { name: profileName, username, accent })}
           onClose={() => setShowImage(false)}
@@ -7655,7 +7837,7 @@ function ProfileShareModal({ profileName, username, myTopRank, onClose }) {
           subtitle="Tarjeta para WhatsApp, Instagram y más"
           fileNamePrefix="mi-perfil-modus-fit"
           shareTitle="Modus Fit"
-          shareText={`Agregame en Modus Fit, buscame como @${username}`}
+          shareText={`Agregame en Modus Fit: ${buildProfileQrPayload(username)}`}
           accent={accent}
           draw={(ctx, W, H) => drawSocialProfileShareCard(ctx, W, H, { name: profileName, username, topRank: myTopRank, avatarInitial: (profileName || username || "?").charAt(0) })}
           onClose={() => setShowCard(false)}
@@ -7669,7 +7851,9 @@ function ProfileShareModal({ profileName, username, myTopRank, onClose }) {
   );
 }
 
-function ShareImageModal({ title, subtitle, fileNamePrefix, shareTitle, shareText, draw, onClose, autoShowOptOutLabel, onOptOutAutoShow, accent = "#14B8A6" }) {
+// Las imágenes para compartir se dibujan en 540 × 960 y salen a este múltiplo.
+const ESCALA_IMAGEN = 2;
+function ShareImageModal({ title, subtitle, fileNamePrefix, shareTitle, shareText: textoBase, draw, onClose, autoShowOptOutLabel, onOptOutAutoShow, accent = "#14B8A6" }) {
   useAndroidBack(onClose);
   const canvasRef = useRef(null);
   const scrollContainerRef = useRef(null);
@@ -7686,18 +7870,30 @@ function ShareImageModal({ title, subtitle, fileNamePrefix, shareTitle, shareTex
       scrollContainerRef.current.scrollTop = 0;
     }
   }, [previewUrl]);
+  // El PNG ya armado, para que "Compartir" llame a la hoja del navegador sin
+  // esperar nada antes: Safari sólo la abre si viene directo del toque, y
+  // armar el archivo después del toque la hacía fallar.
+  const archivoRef = useRef(null);
+  const [fallo, setFallo] = useState(false);
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    canvas.width = 540; canvas.height = 960;
+    // Se dibuja en 540 × 960 y sale al doble, 1080 × 1920: lo que piden las
+    // historias de Instagram y lo que muestra un teléfono sin verse borroso.
+    // Antes salía a 540 × 960 y en la historia se veía pixelada.
+    canvas.width = 540 * ESCALA_IMAGEN; canvas.height = 960 * ESCALA_IMAGEN;
     const ctx = canvas.getContext("2d");
+    ctx.scale(ESCALA_IMAGEN, ESCALA_IMAGEN);
     let cancelled = false;
     (async () => {
       try {
         await draw(ctx, 540, 960);
-        if (!cancelled) setPreviewUrl(canvas.toDataURL("image/jpeg", 0.88));
+        if (cancelled) return;
+        setPreviewUrl(canvas.toDataURL("image/jpeg", 0.88));
+        canvas.toBlob((blob) => { if (blob && !cancelled) archivoRef.current = new File([blob], `${fileNamePrefix}.png`, { type: "image/png" }); }, "image/png");
       } catch (err) {
         console.error("Error generando la imagen para compartir:", err);
+        if (!cancelled) setFallo(true);
       }
     })();
     return () => { cancelled = true; };
@@ -7729,7 +7925,7 @@ function ShareImageModal({ title, subtitle, fileNamePrefix, shareTitle, shareTex
   // Resultado: salís de la app, elegís un destino, no llega nada, y al
   // volver no hay ni un mensaje. Ahora el error se muestra, con su detalle,
   // y compartir cae al texto/enlace — que es justo lo que sí funciona.
-  const [shareError, setShareError] = useState(null); // null | { msg, detail }
+  const [shareError, setShareError] = useState(null); // null | { msg }
   const [guardada, setGuardada] = useState(false);
   const nativeShareError = (err) => {
     const detail = String(err?.message || err || "");
@@ -7764,7 +7960,7 @@ function ShareImageModal({ title, subtitle, fileNamePrefix, shareTitle, shareTex
         await Share.share({ title: shareTitle, dialogTitle: "Elegí dónde guardarla", files: [uri] });
       } catch (err) {
         console.error("Descarga nativa falló:", err);
-        if (!nativeShareError(err)) setShareError({ msg: "No pudimos guardar la imagen en el teléfono.", detail: String(err?.message || err || "") });
+        if (!nativeShareError(err)) setShareError({ msg: "No pudimos guardar la imagen en el teléfono." });
       }
       return;
     }
@@ -7773,80 +7969,62 @@ function ShareImageModal({ title, subtitle, fileNamePrefix, shareTitle, shareTex
     link.href = canvas.toDataURL("image/png");
     link.click();
   };
-  // BUG FIX (reporte: "sigue sin funcionar la tarjeta para compartir mi
-  // perfil por WhatsApp", mientras que compartir una RUTINA sí anda). La
-  // diferencia entre las dos no era texto vs archivo, como parecía: es qué
-  // API usa cada una. Compartir una rutina usa navigator.share — la Web
-  // Share API del propio WebView — y en este teléfono está confirmado que
-  // funciona. Esto, en cambio, iba derecho al plugin de Capacitor. Así que
-  // ahora se intenta PRIMERO por la vía que ya sabemos que anda, con la
-  // imagen adjunta, y el plugin queda de respaldo. Último recurso: mandar
-  // sólo el texto, para que al menos el mensaje salga.
+  // COMPARTIR. En la app de Android, el WebView no tiene navigator.share: la
+  // imagen va al caché y la abre la hoja de compartir del teléfono (el plugin
+  // de Capacitor). En el navegador, la hoja del navegador con el archivo ya
+  // armado. Si no se puede adjuntar la imagen, sale el texto y se avisa.
   const handleShare = async () => {
     const canvas = canvasRef.current; if (!canvas) return;
-    setShareError(null);
-    const attempts = [];
-    const note = (label, err) => {
-      const detail = String(err?.message || err || "");
-      console.warn(`[share] ${label} falló:`, err);
-      attempts.push(`${label}: ${detail}`);
-    };
-
-    let file = null;
-    try {
-      const blob = await new Promise((res) => canvas.toBlob(res, "image/png"));
-      if (blob) file = new File([blob], `${fileNamePrefix}.png`, { type: "image/png" });
-    } catch (err) { note("generar imagen", err); }
-
-    // 1) Web Share API con el archivo adjunto.
+    setShareError(null); setGuardada(false);
+    // Quien la recibe puede abrir la app desde el mensaje (en el teléfono, la
+    // app si la tiene; si no, la web). Las que ya traen su link (una rutina,
+    // tu perfil) quedan como están.
+    const shareText = /https?:\/\//.test(textoBase || "") ? textoBase : `${textoBase || "Modus Fit"}\n${API_ORIGIN}`;
+    if (isNative) {
+      const { Share } = await import("@capacitor/share");
+      const conArchivos = await puedeEscribirArchivos();
+      if (conArchivos) {
+        try {
+          const uri = await writeImageToCache();
+          if (!uri) throw new Error("el archivo no se pudo escribir");
+          await Share.share({ title: shareTitle, text: shareText, files: [uri], dialogTitle: "Compartir" });
+          return;
+        } catch (err) {
+          if (nativeShareError(err)) return;
+          console.warn("[share] la imagen no se pudo adjuntar:", err);
+        }
+      }
+      try {
+        await Share.share({ title: shareTitle, text: shareText, dialogTitle: "Compartir" });
+        setShareError({ msg: conArchivos ? "No pudimos adjuntar la imagen: salió sólo el texto. Tocá Descargar y mandala a mano." : `Salió sólo el texto. ${AVISO_ACTUALIZAR_APP}` });
+      } catch (err) {
+        if (!nativeShareError(err)) { console.warn("[share] falló:", err); setShareError({ msg: "No se pudo abrir la hoja de compartir. Tocá Descargar y mandala a mano." }); }
+      }
+      return;
+    }
+    const file = archivoRef.current;
     if (file && typeof navigator !== "undefined" && navigator.canShare?.({ files: [file] })) {
       try {
         await navigator.share({ files: [file], title: shareTitle, text: shareText });
         return;
       } catch (err) {
-        // AbortError = cerraste la hoja sin elegir. No es un fallo.
+        // AbortError: cerraste la hoja sin elegir. No es un fallo.
         if (err?.name === "AbortError") return;
-        note("navigator.share con archivo", err);
+        console.warn("[share] con la imagen falló:", err);
       }
-    } else if (file) {
-      attempts.push("navigator.share con archivo: no soportado en este WebView");
     }
-
-    // 2) Plugin de Capacitor: escribe la imagen al caché y abre la hoja nativa.
-    if (isNative && await puedeEscribirArchivos()) {
+    if (typeof navigator !== "undefined" && navigator.share) {
       try {
-        const uri = await writeImageToCache();
-        if (!uri) throw new Error("el archivo no se pudo escribir");
-        const { Share } = await import("@capacitor/share");
-        await Share.share({ title: shareTitle, text: shareText, files: [uri] });
+        await navigator.share({ title: shareTitle, text: shareText });
+        setShareError({ msg: "Este navegador no deja adjuntar la imagen: salió sólo el texto. Tocá Descargar para guardarla." });
         return;
       } catch (err) {
-        if (nativeShareError(err)) return;
-        note("plugin de Capacitor", err);
+        if (err?.name === "AbortError") return;
+        console.warn("[share] el texto falló:", err);
       }
     }
-
-    // 3) Sólo el texto — el mensaje sale aunque la imagen no.
-    try {
-      if (typeof navigator !== "undefined" && navigator.share) {
-        await navigator.share({ title: shareTitle, text: shareText });
-      } else if (isNative) {
-        const { Share } = await import("@capacitor/share");
-        await Share.share({ title: shareTitle, text: shareText });
-      } else {
-        handleDownload();
-        return;
-      }
-      setShareError(isNative && !(await puedeEscribirArchivos())
-        ? { msg: `Compartimos sólo el texto. ${AVISO_ACTUALIZAR_APP}` }
-        : { msg: "No pudimos adjuntar la imagen, así que compartimos sólo el texto. Podés bajarla con \"Descargar\" y mandarla a mano.", detail: attempts.join(" · ") });
-      return;
-    } catch (err) {
-      if (err?.name === "AbortError" || nativeShareError(err)) return;
-      note("compartir sólo texto", err);
-    }
-
-    setShareError({ msg: "No pudimos compartir. Probá con \"Descargar\" y mandala a mano.", detail: attempts.join(" · ") });
+    // Sin hoja de compartir (una computadora): se descarga.
+    handleDownload();
   };
 
   // BUG FIX: se usa desde varios lugares, algunos adentro de tarjetas con
@@ -7904,8 +8082,14 @@ function ShareImageModal({ title, subtitle, fileNamePrefix, shareTitle, shareTex
         ) : (
           <div className="relative flex justify-center mb-4">
             <div className="rounded-2xl border flex flex-col items-center justify-center gap-2" style={{ height: "46vh", aspectRatio: "9 / 16", borderColor: tint(accent, "30"), backgroundColor: "rgba(20,24,29,0.6)" }}>
-              <div className="w-7 h-7 rounded-full border-[3px] animate-spin" style={{ borderColor: tint(accent, "25"), borderTopColor: accent }} />
-              <p className="text-[11px] text-slate-500">Generando imagen...</p>
+              {fallo ? (
+                <p className="text-[12px] text-slate-400 text-center px-4" role="alert">No pudimos armar la imagen. Cerrá y probá de nuevo.</p>
+              ) : (
+                <>
+                  <div className="w-7 h-7 rounded-full border-[3px] animate-spin" style={{ borderColor: tint(accent, "25"), borderTopColor: accent }} />
+                  <p className="text-[11px] text-slate-500">Armando la imagen…</p>
+                </>
+              )}
             </div>
           </div>
         )}
@@ -7921,8 +8105,7 @@ function ShareImageModal({ title, subtitle, fileNamePrefix, shareTitle, shareTex
         {guardada && <p className="relative mt-3 text-[12px] text-emerald-300 text-center" role="status"><Check size={13} className="inline -mt-0.5 mr-1" />Guardada en tu galería, en Imágenes › ModusFit.</p>}
         {shareError && (
           <div className="relative mt-3 rounded-xl bg-rose-500/10 border border-rose-500/25 px-3 py-2.5">
-            <p className="text-[11px] text-rose-300 leading-snug">{shareError.msg}</p>
-            {shareError.detail && <p className="text-[11px] text-slate-600 mt-1 break-all">{shareError.detail}</p>}
+            <p className="text-[12px] text-rose-300 leading-snug" role="alert">{shareError.msg}</p>
           </div>
         )}
         <p className="relative text-[11px] text-slate-600 mt-3 text-center">Para tu historia de Instagram: compartila directo, o descargala y subila desde la app.</p>
@@ -8102,6 +8285,12 @@ async function googleSignIn() {
 }
 
 function LoginScreen({ onLogin, allowAutoLogin = true }) {
+  const [invitacion] = useState(() => {
+    const h = typeof window !== "undefined" ? window.location.hash : "";
+    const amigo = h.startsWith("#amigo=") ? parseProfileQrPayload(h) : null;
+    if (amigo) return { tipo: "amigo", amigo };
+    return /^#r=[A-Za-z0-9]{4,12}$/.test(h) ? { tipo: "rutina" } : null;
+  });
   const [profiles, setProfilesState] = useState(loadProfiles);
   const [phase, setPhase] = useState("list");
   const [pendingProfile, setPendingProfile] = useState(null);
@@ -8308,6 +8497,14 @@ function LoginScreen({ onLogin, allowAutoLogin = true }) {
           <p className="login-bajada">Anotá reps y kilos en segundos. La app detecta tus récords y arma tu progreso, semana a semana.</p>
         </div>
 
+        {/* Llegaste por el QR o el link de un amigo (o una rutina compartida)
+            sin tener perfil: se dice qué viene después, en vez de una
+            pantalla de inicio que no menciona nada de lo que tocaste. */}
+        {invitacion && (
+          <p className="login-invitacion" role="status">{invitacion.tipo === "amigo"
+            ? <><b>@{invitacion.amigo}</b> te invitó a Modus Fit. Entrá con Google y te lo mostramos para agregarlo.</>
+            : <>Te compartieron una rutina. Creá tu perfil y te la mostramos para que la sumes.</>}</p>
+        )}
         {/* --- BOTÓN DE GOOGLE --- */}
         <button onClick={handleGoogleLogin} disabled={googleLoading} className="w-full mb-3 h-14 rounded-full bg-white text-slate-900 font-bold text-[15px] hover:bg-slate-200 active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-70">
           {googleLoading ? (
@@ -18390,76 +18587,6 @@ function UsernameSection({ uid, currentUsername, onSaved, onRemoved = null }) {
   );
 }
 
-// Activar "que te encuentren por tus contactos" (ver ContactsSuggestions,
-// en Social → Buscar) — mismo espíritu que UsernameSection pero opcional.
-// El teléfono real queda en tu perfil (privado, igual que el email); a
-// Firestore sólo llega un HASH de sus últimos 9 dígitos (hashPhoneKey, en
-// utils.js) — nunca el número tal cual.
-function PhoneDiscoverySection({ uid, currentPhone, onSaved, onRemoved }) {
-  const [value, setValue] = useState(currentPhone || "");
-  const [editing, setEditing] = useState(!currentPhone);
-  const [status, setStatus] = useState(null); // null|saving|invalid|error
-
-  const handleSave = async () => {
-    const key = normalizePhoneForMatching(value);
-    if (!key) { setStatus("invalid"); return; }
-    setStatus("saving");
-    try {
-      const newHash = await hashPhoneKey(key);
-      await setDiscoverablePhone(uid, newHash);
-      const oldKey = currentPhone ? normalizePhoneForMatching(currentPhone) : null;
-      if (oldKey) {
-        const oldHash = await hashPhoneKey(oldKey);
-        if (oldHash !== newHash) await clearDiscoverablePhone(oldHash);
-      }
-      setStatus(null);
-      setEditing(false);
-      onSaved(value.trim());
-    } catch {
-      setStatus("error");
-    }
-  };
-
-  const handleRemove = async () => {
-    setStatus("saving");
-    const key = currentPhone ? normalizePhoneForMatching(currentPhone) : null;
-    if (key) await clearDiscoverablePhone(await hashPhoneKey(key));
-    setStatus(null);
-    setValue("");
-    setEditing(true);
-    onRemoved();
-  };
-
-  if (!editing) {
-    return (
-      <button onClick={() => setEditing(true)} className="flex items-center gap-1 text-purple-400 hover:text-purple-300 transition text-xs font-bold">
-        <Phone size={11} /> {currentPhone} <Edit3 size={10} className="opacity-60" />
-      </button>
-    );
-  }
-
-  return (
-    <div className="space-y-2">
-      <input value={value} onChange={(e) => { setValue(e.target.value); setStatus(null); }} placeholder="Ej: 1123456789" type="tel" inputMode="tel"
-        className="w-full bg-slate-800 border border-slate-700/50 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-purple-500/50" />
-      <p className={`text-[11px] ${status === "invalid" || status === "error" ? "text-rose-400" : "text-slate-600"}`}>
-        {status === "invalid" && "Ingresá un número válido"}
-        {status === "error" && "No se pudo guardar, probá de nuevo"}
-        {status === "saving" && "Guardando..."}
-        {!status && "Así tus contactos que ya usan la app te van a poder sugerir como amigo"}
-      </p>
-      <div className="flex items-center justify-between gap-2">
-        {currentPhone ? (
-          <button onClick={handleRemove} disabled={status === "saving"} className="text-[11px] text-slate-600 hover:text-rose-400 transition">Dejar de ser descubrible por teléfono</button>
-        ) : <span />}
-        <div className="flex gap-1.5 shrink-0">
-          {currentPhone && <button onClick={() => { setEditing(false); setValue(currentPhone); setStatus(null); }} className="px-3 py-1.5 rounded-lg text-[11px] font-bold text-slate-500 hover:text-slate-300">Cancelar</button>}
-          <button onClick={handleSave} disabled={status === "saving" || !value.trim()} className="px-3 py-1.5 rounded-lg text-[11px] font-bold bg-purple-500 !text-white disabled:opacity-40 disabled:cursor-not-allowed">Guardar</button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // Cuenta de amigos + solicitudes pendientes (amigo + entrenador, en
 // cualquiera de los dos sentidos) para el badge de la tarjeta de Perfil y
@@ -18493,6 +18620,19 @@ function useSocialSummary(uid) {
 function SocialPreviewCard({ profile, uid, onGoToSocial, onUpdateProfile }) {
   const { friendCount, pendingCount } = useSocialSummary(profile?.username ? uid : null);
   const [showSettings, setShowSettings] = useState(false);
+  // "Que te encuentren por tu teléfono" se sacó: la búsqueda por contactos
+  // que lo usaba ya no existe, así que guardaba tu número sin hacer nada con
+  // él (y Google Play pide declarar ese dato). A quien lo había cargado se le
+  // borra la huella de la nube y el número del perfil.
+  const telefonoViejo = profile?.phone || null;
+  useEffect(() => {
+    if (!telefonoViejo || !uid) return;
+    const clave = normalizePhoneForMatching(telefonoViejo);
+    (clave ? hashPhoneKey(clave).then(clearDiscoverablePhone) : Promise.resolve())
+      .catch(() => {})
+      .finally(() => onUpdateProfile?.({ phone: null }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [telefonoViejo, uid]);
 
   if (!profile?.googleUid) {
     return (
@@ -18535,9 +18675,6 @@ function SocialPreviewCard({ profile, uid, onGoToSocial, onUpdateProfile }) {
       {showSettings && (
         <div className="px-4 pb-4 pt-1 border-t border-slate-800/50 space-y-3">
           <UsernameSection uid={uid} currentUsername={profile.username} onSaved={(u) => { onUpdateProfile({ username: u }); setShowSettings(false); }} onRemoved={() => { onUpdateProfile({ username: null }); setShowSettings(false); }} />
-          <div className="pt-2 border-t border-slate-800/50">
-            <PhoneDiscoverySection uid={uid} currentPhone={profile.phone || null} onSaved={(phone) => onUpdateProfile({ phone })} onRemoved={() => onUpdateProfile({ phone: null })} />
-          </div>
           {/* Pedido: "que en el perfil vos puedas decidir si mostrar tus
               marcas y/o rutina a amigos, pero que por default esté en que
               sí" — !== false en vez de === true: quien nunca tocó esto
@@ -19079,6 +19216,12 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
               : <><Upload size={12} /> Subir mis datos a la nube ahora</>}
           </button>
           <p className="text-[11px] text-slate-600 text-center">Tocá este botón desde cada dispositivo antes de cambiar de celular o reinstalar.</p>
+          {avisoNubeLlena && (
+            <p className="ficha-aviso" role="alert"><AlertTriangle size={15} />{avisoNubeLlena.lleno
+              ? "Tu historial ya no entra en la copia de la nube: lo nuevo queda sólo en este teléfono. Escribinos y lo resolvemos."
+              : "Tu historial está por llenar la copia de la nube. Escribinos y lo resolvemos antes de que deje de subir."}
+              {" "}<a href={`mailto:${MAIL_SOPORTE}?subject=${encodeURIComponent("Modus Fit: copia en la nube llena")}`} className="underline">{MAIL_SOPORTE}</a></p>
+          )}
         </div>
       ) : (
         <button onClick={handleLinkGoogle} className="w-full flex items-center gap-2.5 justify-center py-3 rounded-2xl border border-slate-800 text-slate-400 hover:border-slate-600 hover:text-white transition text-sm font-medium">
@@ -19591,12 +19734,14 @@ function PublicUserCard({ uid, basic, streak = null, ultima = null, onClick = nu
 // Si la cámara no está disponible (permiso denegado, navegador sin
 // getUserMedia, contexto inseguro) no se rompe nada: se explica qué pasó y
 // queda el camino de la foto, que sigue existiendo.
-function ScanQrCamera({ onResult, onClose }) {
+function ScanQrCamera({ onResult, onClose, onFoto = null }) {
   useAndroidBack(onClose);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const [estado, setEstado] = useState("pidiendo"); // pidiendo | escaneando | error
   const [detalle, setDetalle] = useState("");
+  // A los 8 s sin leer nada, una ayuda: acercarse, o elegir una foto.
+  const [ayuda, setAyuda] = useState(false);
   // onResult en un ref: el efecto de abajo NO debe re-ejecutarse (y con él
   // reabrir la cámara) sólo porque el padre recreó la función en un render.
   const resultRef = useRef(onResult);
@@ -19608,9 +19753,12 @@ function ScanQrCamera({ onResult, onClose }) {
     let vivo = true;
     let leyendo = false;
 
+    let vuelta = 0;
+    let timerAyuda = null;
     const parar = () => {
       vivo = false;
       if (timer) clearInterval(timer);
+      if (timerAyuda) clearTimeout(timerAyuda);
       if (stream) stream.getTracks().forEach((t) => t.stop());
     };
 
@@ -19644,13 +19792,14 @@ function ScanQrCamera({ onResult, onClose }) {
       try { await video.play(); } catch { /* algunos navegadores lo resuelven solos */ }
       if (!vivo) return;
       setEstado("escaneando");
-      // 150ms entre cuadros: suficiente para que se sienta instantáneo sin
-      // quemar batería decodificando a 60fps.
+      timerAyuda = setTimeout(() => { if (vivo) setAyuda(true); }, 8000);
+      // 120 ms entre cuadros: suficiente para que se sienta instantáneo sin
+      // quemar batería decodificando a 60 fps.
       timer = setInterval(async () => {
         if (leyendo || !vivo) return;
         leyendo = true;
         try {
-          const texto = await decodeQrFromVideoFrame(video, canvasRef.current);
+          const texto = await decodeQrFromVideoFrame(video, canvasRef.current, vuelta++);
           if (texto && vivo) {
             haptic(30);
             parar();
@@ -19671,7 +19820,7 @@ function ScanQrCamera({ onResult, onClose }) {
         } finally {
           leyendo = false;
         }
-      }, 150);
+      }, 120);
     };
 
     arrancar();
@@ -19695,9 +19844,11 @@ function ScanQrCamera({ onResult, onClose }) {
           <div className="p-6 text-center space-y-3">
             <span className="icono-suelto aviso grande mx-auto"><AlertTriangle size={22} /></span>
             <p className="text-[13px] text-slate-300 leading-snug">{detalle}</p>
-            <button onClick={onClose} className="w-full py-2.5 rounded-xl bg-slate-800 text-slate-300 text-xs font-bold">Cerrar</button>
+            {onFoto && <button onClick={onFoto} className="boton-pildora w-full"><ImagePlus size={16} /> Elegir una foto del código</button>}
+            <button onClick={onClose} className="boton-tonal w-full">Cerrar</button>
           </div>
         ) : (
+          <>
           <div className="relative bg-black" style={{ aspectRatio: "1 / 1" }}>
             <video ref={videoRef} muted playsInline className="absolute inset-0 w-full h-full object-cover" />
             <canvas ref={canvasRef} className="hidden" />
@@ -19717,6 +19868,13 @@ function ScanQrCamera({ onResult, onClose }) {
               </div>
             )}
           </div>
+          {ayuda && (
+            <div className="px-5 py-4 space-y-3" role="status">
+              <p className="text-[13px] text-slate-300 leading-snug">Acercá el teléfono hasta que el código llene el marco y que no le dé un reflejo.</p>
+              {onFoto && <button onClick={onFoto} className="boton-tonal w-full"><ImagePlus size={16} /> Elegir una foto del código</button>}
+            </div>
+          )}
+          </>
         )}
       </div>
     </div>,
@@ -19790,7 +19948,7 @@ function AmigoDelLink({ username, myUid = null, onClose, onIrA }) {
 // resultado, sólo cambia cómo se llega al @usuario.
 function SocialSearchSection({ myUid, friendStatus, onSendFriendRequest }) {
   const [raw, setRaw] = useState("");
-  const [state, setState] = useState("idle"); // idle|searching|found|not_found|self|qr_error
+  const [state, setState] = useState("idle"); // idle|searching|found|not_found|self|qr_error|qr_ajeno
   const [found, setFound] = useState(null);
   const [scanning, setScanning] = useState(false);
   // Cámara en vivo (el camino principal) y foto (el de respaldo).
@@ -19811,15 +19969,23 @@ function SocialSearchSection({ myUid, friendStatus, onSendFriendRequest }) {
   };
   const handleSearch = () => runSearch(raw);
 
+  // Lo que se hace con un QR leído (de la cámara o de una foto): el @usuario
+  // de un amigo se busca; el link de una rutina compartida se abre (lo toma
+  // App por el #, igual que si lo hubieras tocado); otra cosa se avisa.
+  const usarQr = async (texto) => {
+    const username = parseProfileQrPayload(texto);
+    if (username) { setRaw(username); await runSearch(username); return; }
+    const rutina = linkDeRutinaEnQr(texto);
+    if (rutina) { setState("idle"); window.location.hash = `#r=${rutina}`; return; }
+    setState("qr_ajeno");
+  };
   const handleQrPhoto = async (file) => {
     if (!file) return;
     setScanning(true); setState("idle"); setFound(null);
     try {
       const text = await decodeQrFromImageFile(file);
-      const username = text ? parseProfileQrPayload(text) : null;
-      if (!username) { setState("qr_error"); return; }
-      setRaw(username);
-      await runSearch(username);
+      if (!text) { setState("qr_error"); return; }
+      await usarQr(text);
     } catch (err) {
       console.error("Error escaneando el QR:", err);
       setState("qr_error");
@@ -19860,12 +20026,10 @@ function SocialSearchSection({ myUid, friendStatus, onSendFriendRequest }) {
       {camara && (
         <ScanQrCamera
           onClose={() => setCamara(false)}
+          onFoto={() => { setCamara(false); qrInputRef.current?.click(); }}
           onResult={async (texto) => {
             setCamara(false);
-            const username = parseProfileQrPayload(texto);
-            if (!username) { setState("qr_error"); return; }
-            setRaw(username);
-            await runSearch(username);
+            await usarQr(texto);
           }}
         />
       )}
@@ -19876,8 +20040,9 @@ function SocialSearchSection({ myUid, friendStatus, onSendFriendRequest }) {
       <input ref={qrInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { handleQrPhoto(e.target.files?.[0]); e.target.value = ""; }} />
       {state === "searching" && <p className="text-xs text-slate-500 text-center py-3">Buscando...</p>}
       {state === "not_found" && <p className="text-xs text-slate-500 text-center py-3">No encontramos a nadie con ese @usuario.</p>}
-      {state === "self" && <p className="text-xs text-slate-500 text-center py-3">Ese sos vos 🙂</p>}
-      {state === "qr_error" && <p className="text-xs text-amber-400 text-center py-3">No pudimos leer un código QR de perfil en esa foto. Probá acercar más la cámara y sacarla de nuevo.</p>}
+      {state === "self" && <p className="text-xs text-slate-500 text-center py-3">Ese es tu propio @usuario.</p>}
+      {state === "qr_error" && <p className="text-xs text-amber-400 text-center py-3" role="alert">No encontramos un código QR en esa foto. Probá con una más cerca, en la que el código se vea entero.</p>}
+      {state === "qr_ajeno" && <p className="text-xs text-amber-400 text-center py-3" role="alert">Ese código no es de Modus Fit. Pedile a tu amigo el suyo: está en Social, arriba de todo.</p>}
       {state === "found" && found && (
         <PublicUserCard uid={found.uid} basic={found.basic} mostrarUsuario>
           {(() => {
@@ -19934,6 +20099,8 @@ function RoutineProposalCard({ proposal, basic, onRespond }) {
     return Object.entries(map).map(([nombre, series]) => ({ nombre, series: [...series].sort((a, b) => (a.setIndex || 0) - (b.setIndex || 0)) }));
   }, [planes]);
   const semanas = useMemo(() => new Set(planes.flatMap((p) => p.entries.map((e) => e.week))).size, [planes]);
+  // La rutina propuesta, revisada antes de dibujarla (ver sanearRutina).
+  const rutinaPropuesta = useMemo(() => (isProgression ? null : sanearRutina(proposal.proposedRoutine, { conPlanes: true })), [isProgression, proposal.proposedRoutine]);
   const tituloPlan = porEjercicio.length === 0 ? "un plan"
     : porEjercicio.length === 1 ? `metas para ${porEjercicio[0].nombre}`
       : `un plan para ${porEjercicio.length} ejercicios`;
@@ -19972,8 +20139,10 @@ function RoutineProposalCard({ proposal, basic, onRespond }) {
                 </div>
               ))}
             </div>
+          ) : rutinaPropuesta ? (
+            <RoutinePreview routineDef={rutinaPropuesta} />
           ) : (
-            <RoutinePreview routineDef={proposal.proposedRoutine} />
+            <p className="ficha-aviso"><AlertTriangle size={15} />No pudimos leer esta rutina. Pedile a tu entrenador que te la mande de nuevo.</p>
           )}
           <div className="flex gap-2">
             <button disabled={busy} onClick={async () => { setBusy(true); await onRespond(false); }} className="flex-1 py-2.5 rounded-xl bg-slate-800 text-slate-400 text-xs font-bold disabled:opacity-50">Rechazar</button>
@@ -23088,8 +23257,11 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
                     if (applied && onUpdateProfile) onUpdateProfile({ settings: { ...getProfileSettings(profile), trainingMode: "planned" } });
                   }
                 } else if (p.proposedRoutine) {
-                  onActivateRoutine(builderUid("routine_proposal"), p.proposedRoutine);
-                  applied = true;
+                  const rutina = sanearRutina(p.proposedRoutine, { conPlanes: true });
+                  if (rutina) {
+                    onActivateRoutine(builderUid("routine_proposal"), rutina);
+                    applied = true;
+                  }
                 }
                 setProposalApplyWarning(applied ? "" : "Aceptaste la propuesta, pero no pudimos aplicarla: no tenés esa rutina activa, o ese ejercicio ya no está en ella.");
               }
@@ -29997,7 +30169,8 @@ export default function App() {
     (async () => {
       try {
         const snap = await getDoc(doc(db, "shared_routines", shortId));
-        if (snap.exists()) setImportRoutine({ ...snap.data(), source: "custom" });
+        const rutina = snap.exists() ? sanearRutina(snap.data()) : null;
+        if (rutina) setImportRoutine(rutina);
         else setImportRoutineError(true);
       } catch (err) {
         console.error("Error al leer la rutina compartida:", err);
@@ -30160,6 +30333,7 @@ export default function App() {
       // sesión hace poco, se cierra la sesión y queda el pedido por mail (la
       // página /eliminar-cuenta.html lo explica).
       const uid = p.googleUid;
+      ULTIMA_SUBIDA.delete(uid);
       Promise.all([limpiezaSocial, deleteDoc(doc(db, "users", uid)).catch(() => {})]).finally(() => {
         const u = auth.currentUser;
         if (u && u.uid === uid) {
