@@ -96,7 +96,7 @@ Lo nativo de Android (los plugins, el plugin del descanso, el widget, `build.gra
 
 ## El armado
 
-`vite.config.js` pide comprimir explícitamente (`minify: 'oxc'`, `cssMinify: 'lightningcss'`): el armado de Vercel salía sin comprimir (4,2 MB de JS con los comentarios, contra 2,2 MB en la máquina) y la app de Android baja ese archivo al abrir. Si el JS publicado vuelve a empezar con `//#region`, revisar el comando de armado del proyecto en Vercel. El mismo archivo arma `/sw.js` (ver "Sin señal la app abre").
+`vite.config.js` pide comprimir explícitamente (`minify: 'oxc'`, `cssMinify: 'lightningcss'`): el armado de Vercel salía sin comprimir (4,2 MB de JS con los comentarios, contra 2,2 MB en la máquina) y la app de Android baja ese archivo al abrir. La causa era el comando de armado del proyecto en Vercel, que agregaba `--minify false` (el JS publicado era idéntico byte a byte al de `vite build --minify false`) y pisaba la configuración: ahora `vercel.json` fija `buildCommand: npm run build`, que manda sobre la consola de Vercel. También guarda un año los `/assets/*` (tienen hash) y nunca `/sw.js`. Si el JS publicado vuelve a empezar con `//#region`, algo volvió a apagar la compresión. El mismo archivo arma `/sw.js` (ver "Sin señal la app abre").
 
 ## Carpetas con documentación y el CSS
 
