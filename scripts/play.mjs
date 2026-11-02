@@ -7,6 +7,8 @@
 //   npm run play -- resenas                 las últimas reseñas, con su respuesta
 //   npm run play -- responder <id> "texto"  contesta una reseña
 //   npm run play -- cierres [--dias 7]      los cierres y ANR de los últimos días
+//   npm run play -- testers [--pista alpha] [--grupo x@googlegroups.com]
+//                                           quiénes prueban (y suma un Grupo de Google)
 //
 // LA FIRMA: `aab` usa la clave de subida que dice C:/Users/usuario/.claves/
 // firma.properties (storeFile, storePassword, keyAlias, keyPassword; o la ruta
@@ -75,6 +77,23 @@ function leerFirma() {
 }
 
 const ordenes = {
+  // Los testers de una prueba cerrada. La API sólo maneja Grupos de Google
+  // (las listas de mails se arman en Play Console): con un grupo, cada tester
+  // se suma solo al grupo y entra a la prueba con el link de abajo.
+  async testers() {
+    const pista = opcion("pista", "alpha");
+    const grupo = opcion("grupo");
+    const H = await token("https://www.googleapis.com/auth/androidpublisher");
+    const r = await enEdicion(H, async (E) => {
+      const actual = await pedir(H, "testers", `${E}/testers/${pista}`);
+      if (!grupo) return actual;
+      const grupos = [...new Set([...(actual.googleGroups || []), grupo])];
+      return pedir(H, "testers", `${E}/testers/${pista}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ googleGroups: grupos }) });
+    }, { confirmar: !!grupo });
+    console.log(`${pista}: ${(r.googleGroups || []).join(", ") || "sin Grupos de Google (puede haber listas de mails, que la API no muestra)"}`);
+    console.log(`Link para sumarse a la prueba: https://play.google.com/apps/testing/${PAQUETE}`);
+  },
+
   async estado() {
     const H = await token("https://www.googleapis.com/auth/androidpublisher");
     const pistas = await enEdicion(H, (E) => pedir(H, "pistas", `${E}/tracks`));
