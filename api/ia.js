@@ -56,6 +56,17 @@ const LITE_MODEL = "gemini-flash-lite-latest";
 // adivinan. Gemma no acepta instrucciones de sistema ni el campo de
 // razonamiento: el pedido se adapta en paraGemma().
 const esGemma = (model) => /^gemma-/i.test(model);
+// Medido contra Google el 02/11/2026 con la cuota gratis: Gemma 4 26B arma una
+// rutina desde el cuestionario (1.000 caracteres de pedido) en unos 48 s, pero
+// con el chat (18.000 caracteres sólo de instrucciones, más los datos) supera
+// su cupo de palabras por minuto o no termina dentro de los 60 s de Vercel.
+// Así que el respaldo es sólo para pedidos cortos; el chat sin cupo avisa al
+// instante, como antes, en vez de hacer esperar un minuto para fallar igual.
+const GEMMA_MAX_TEXTO = 6000;
+function largoDeTexto(body) {
+  const partes = [...(body.systemInstruction?.parts || []), ...(body.contents || []).flatMap((c) => c.parts || [])];
+  return partes.reduce((n, p) => n + (typeof p.text === "string" ? p.text.length : p.inlineData ? 1000 : 0), 0);
+}
 
 // Se recuerda el último modelo que funcionó (mientras el lambda viva) para
 // arrancar por ese y no pagar reintentos en cada llamada.
@@ -433,7 +444,7 @@ async function callGemini(body, { soloRespaldo = false } = {}) {
     }
     // Ni Flash ni Flash-Lite: si fue por cupo agotado o porque Google los
     // tiene caídos o colgados, el último escalón es Gemma (ver esGemma).
-    if (i >= chain.length && discoveryTried && !gemmaTried && (sawQuotaExhausted || [0, 500, 503].includes(lastStatus))) {
+    if (i >= chain.length && discoveryTried && !gemmaTried && largoDeTexto(body) <= GEMMA_MAX_TEXTO && (sawQuotaExhausted || [0, 500, 503].includes(lastStatus))) {
       gemmaTried = true;
       const quedan = deadline - Date.now();
       if (quedan > 2000) {
