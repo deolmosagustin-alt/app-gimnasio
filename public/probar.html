@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Probá Modus Fit</title>
+  <meta name="description" content="Cómo sumarte a la prueba de Modus Fit en Google Play antes de que salga para todos." />
+  <link rel="stylesheet" href="/legal.css" />
+  <style>
+    .paso { display: grid; grid-template-columns: 2em 1fr; gap: 4px 12px; }
+    .paso-numero { font-weight: 800; font-size: 20px; color: var(--tenue); line-height: 1.3; }
+    .paso h2 { margin: 0 0 6px; }
+    .paso .boton { margin-bottom: 4px; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <main>
+    <p class="marca">Modus Fit</p>
+    <h1>Probá Modus Fit antes que nadie</h1>
+    <p class="fecha">Una app para anotar tu entrenamiento en el gimnasio: tus series, tus récords y cómo venís, con un entrenador de IA. Es gratis y sin anuncios.</p>
+
+    <p>Para publicarla, Google pide que doce personas la usen durante catorce días. Si querés ser una de ellas, son unos pocos pasos y te lleva dos minutos. Hacé todo con la misma cuenta de Google que usás en Play Store.</p>
+
+    <div class="placa paso" id="paso-grupo" hidden>
+      <span class="paso-numero">1</span>
+      <div>
+        <h2>Sumate al grupo de prueba</h2>
+        <p>Entrá y tocá <strong>Unirse al grupo</strong>. No te llegan mails: es sólo la lista que Google mira para dejarte probar.</p>
+        <a class="boton" id="enlace-grupo" href="#">Abrir el grupo</a>
+      </div>
+    </div>
+
+    <div class="placa paso">
+      <span class="paso-numero" data-numero>1</span>
+      <div>
+        <h2>Aceptá la invitación</h2>
+        <p>Tocá <strong>Convertirme en tester</strong>. Si dice que no tenés acceso, todavía no te sumaron a la lista: avisale a quien te pasó este link.</p>
+        <a class="boton" href="https://play.google.com/apps/testing/com.modusfit.fitness">Aceptar la invitación</a>
+      </div>
+    </div>
+
+    <div class="placa paso">
+      <span class="paso-numero" data-numero>2</span>
+      <div>
+        <h2>Instalala desde Google Play</h2>
+        <p>Puede tardar unos minutos en aparecer después de aceptar. Se instala y se actualiza como cualquier app.</p>
+        <a class="boton" href="https://play.google.com/store/apps/details?id=com.modusfit.fitness">Abrir en Google Play</a>
+      </div>
+    </div>
+
+    <div class="placa paso">
+      <span class="paso-numero" data-numero>3</span>
+      <div>
+        <h2>Usala catorce días</h2>
+        <p>Anotá tus entrenamientos como siempre, o abrila un par de veces por semana. Lo único importante es no desinstalarla hasta que pasen los catorce días.</p>
+      </div>
+    </div>
+
+    <h2>Si algo anda mal</h2>
+    <p>Contanos qué pasó y en qué pantalla, con una captura si podés. Todo sirve: lo que no se entiende, lo que tarda, lo que falta.</p>
+    <a class="boton" href="mailto:deolmosagustin@gmail.com?subject=Prueba%20de%20Modus%20Fit">Escribir un mail</a>
+
+    <h2>Lo que conviene saber</h2>
+    <ul>
+      <li>Podés usarla sin cuenta: tus datos quedan en el teléfono. Con Google se guardan en la nube y podés usar Social.</li>
+      <li>Para dejar de probarla, salí de la prueba desde el mismo link de la invitación.</li>
+      <li>Qué datos guarda y cómo borrarlos: <a href="/privacy-policy.html">política de privacidad</a>.</li>
+    </ul>
+  </main>
+  <script>
+    // El Grupo de Google de los testers. Se puede pasar en el link (probar.html?grupo=nombre)
+    // o fijar acá cuando exista; sin grupo, la prueba usa la lista de mails de Play Console.
+    const GRUPO = "";
+    const grupo = new URLSearchParams(location.search).get("grupo") || GRUPO;
+    if (/^[\w.-]{3,80}$/.test(grupo)) {
+      document.getElementById("enlace-grupo").href = "https://groups.google.com/g/" + grupo;
+      document.getElementById("paso-grupo").hidden = false;
+      document.querySelectorAll("[data-numero]").forEach((n, i) => { n.textContent = String(i + 2); });
+    }
+  </script>
+</body>
+</html>
