@@ -17,7 +17,7 @@
 //   retos/{toUid}_{fromUid}_{exerciseId}_{lunes} → que un amigo supere tu mejor serie en la semana.
 
 import { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, collectionGroup, addDoc, query, where, orderBy, limit, getDocs } from "firebase/firestore";
-import { db } from "./firebase";
+import { db, auth } from "./firebase";
 import { edadDe } from "./utils";
 
 // Social de muestra, sólo en desarrollo (ver social-demo.js): con la marca
@@ -180,14 +180,34 @@ export async function getPublicBasic(uid) {
   } catch { return null; }
 }
 
+// Lo que llega del perfil público de otra persona se revisa antes de
+// dárselo a la app (perfilPublicoSeguro en App.jsx, que lo registra al
+// cargar): lo escribe la app de esa persona, y con la forma equivocada
+// rompía Social a todos sus amigos.
+let revisarPerfilPublico = (datos) => datos;
+export function alLeerPerfilPublico(fn) { revisarPerfilPublico = fn; }
+
+// Cada vez que se abría Social se bajaba de nuevo el perfil completo de cada
+// amigo (con todo su historial): con diez amigos, diez lecturas y unos megas
+// de datos móviles por visita. Ahora queda unos minutos en memoria (por
+// cuenta, así no se mezcla si otra persona entra en el mismo teléfono).
+const CACHE_FULL = new Map(); // "<tu uid>:<su uid>" → { t, datos }
+const VIDA_FULL_MS = 3 * 60 * 1000;
+
 // null = "no se pudo leer" (sin vínculo aceptado, o el otro nunca eligió
 // @handle) — el llamador lo muestra como "esta persona no comparte su
-// perfil" en vez de reventar.
+// perfil" en vez de reventar. Un null no se guarda: si te aceptan, se ve al
+// toque.
 export async function getPublicFull(uid) {
-  if (import.meta.env.DEV && demoSocialMarcado()) return (await import("./social-demo.js")).getPublicFull(uid);
+  if (import.meta.env.DEV && demoSocialMarcado()) return revisarPerfilPublico(await (await import("./social-demo.js")).getPublicFull(uid));
+  const clave = `${auth.currentUser?.uid || "-"}:${uid}`;
+  const guardado = CACHE_FULL.get(clave);
+  if (guardado && Date.now() - guardado.t < VIDA_FULL_MS) return guardado.datos;
   try {
     const snap = await getDoc(doc(db, "users", uid, "public", "full"));
-    return snap.exists() ? snap.data() : null;
+    const datos = snap.exists() ? revisarPerfilPublico(snap.data()) : null;
+    if (datos) CACHE_FULL.set(clave, { t: Date.now(), datos });
+    return datos;
   } catch { return null; }
 }
 

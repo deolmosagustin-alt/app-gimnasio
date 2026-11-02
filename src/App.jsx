@@ -53,7 +53,7 @@ import {
   sendFriendRequest, respondToFriendRequest, removeFriend, listMyFriendships,
   sendTrainerLinkRequest, respondToTrainerLink, removeTrainerLink, listTrainerLinksAsTrainer, listTrainerLinksAsStudent,
   createRoutineProposal, createProgressionProposal, respondToRoutineProposal, listRoutineProposalsForStudent, listRoutineProposalsByTrainer,
-  cleanupSocialData, listGlobalLeaderboard,
+  cleanupSocialData, listGlobalLeaderboard, alLeerPerfilPublico,
   clearDiscoverablePhone,
   hasSentKudosToday, sendKudos, listKudosReceived,
   sendReto, listRetosRecibidos, listRetosEnviados, borrarReto,
@@ -230,6 +230,77 @@ function sanearRutina(def, { conPlanes = false } = {}) {
   }
   return out;
 }
+
+// EL PERFIL PÚBLICO DE OTRA PERSONA (users/{uid}/public/full) lo escribe su
+// propia app, y lo leen Social, su perfil, el mano a mano y los avisos de
+// todos sus amigos. Con la forma equivocada (un error o a propósito) los
+// rompía a todos. Se revisa al leerlo: social.js llama a esto en
+// getPublicFull (ver alLeerPerfilPublico, más abajo en App).
+function perfilPublicoSeguro(full) {
+  if (!full || typeof full !== "object" || Array.isArray(full)) return null;
+  const num = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+  const esFecha = (v) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}/.test(v) && v.length <= 40;
+  const clave = (k) => /^[\w-]{1,160}$/.test(k) && !["__proto__", "constructor", "prototype"].includes(k);
+  // Una entrada del historial: sólo campos simples, y los números como números.
+  const entrada = (h) => {
+    if (!h || typeof h !== "object" || !esFecha(h.date)) return null;
+    const out = {};
+    Object.entries(h).forEach(([k, v]) => {
+      if (!clave(k)) return;
+      if (["kg", "reps", "rpe", "minutes", "km", "paso", "planDe"].includes(k)) { const n = num(v); if (n != null) out[k] = n; return; }
+      if (typeof v === "boolean" || (typeof v === "string" && v.length <= 200)) out[k] = v;
+      else if (k === "meta" && v && typeof v === "object" && !Array.isArray(v)) out.meta = Object.fromEntries(Object.entries(v).filter(([mk, mv]) => clave(mk) && num(mv) != null));
+    });
+    return out;
+  };
+  const logs = {};
+  if (full.logs && typeof full.logs === "object" && !Array.isArray(full.logs)) {
+    Object.entries(full.logs).slice(0, 4000).forEach(([k, v]) => {
+      if (!clave(k)) return;
+      if (k.endsWith("_pr_override")) {
+        if (v && typeof v === "object" && num(v.kg) != null && num(v.reps) != null) logs[k] = { kg: v.kg, reps: v.reps, ...(v.manual === true ? { manual: true } : {}), ...(esFecha(v.date) ? { date: v.date } : {}) };
+        return;
+      }
+      if (Array.isArray(v)) logs[k] = v.slice(-3000).map(entrada).filter(Boolean);
+    });
+  }
+  const sesiones = (Array.isArray(full.trainingSessions) ? full.trainingSessions : []).slice(-3000)
+    .filter((x) => x && typeof x === "object" && esFecha(x.date))
+    .map((x) => {
+      // Los campos simples tal cual; la lista de ejercicios del día, sólo textos.
+      const out = {};
+      Object.entries(x).forEach(([k, v]) => {
+        if (!clave(k)) return;
+        if (typeof v === "boolean" || num(v) != null || (typeof v === "string" && v.length <= 200)) out[k] = v;
+        else if (k === "dayExerciseIds" && Array.isArray(v)) out[k] = v.filter((e) => typeof e === "string" && e.length <= 120).slice(0, 60);
+      });
+      return out;
+    });
+  const medidas = {};
+  if (full.measurements && typeof full.measurements === "object" && !Array.isArray(full.measurements)) {
+    Object.entries(full.measurements).forEach(([k, v]) => {
+      if (clave(k) && Array.isArray(v)) medidas[k] = v.filter((m) => m && esFecha(m.date) && num(m.value) != null).slice(-2000).map((m) => ({ date: m.date, value: m.value }));
+    });
+  }
+  const s = full.settings && typeof full.settings === "object" ? full.settings : {};
+  return {
+    activeRoutineSnapshot: sanearRutina(full.activeRoutineSnapshot, { conPlanes: true }),
+    logs,
+    trainingSessions: sesiones,
+    measurements: medidas,
+    cycleStart: esFecha(full.cycleStart) ? full.cycleStart : null,
+    sex: full.sex === "M" || full.sex === "F" ? full.sex : null,
+    age: num(full.age) != null && full.age > 0 && full.age < 130 ? full.age : null,
+    settings: {
+      bodyWeightKg: num(s.bodyWeightKg) ?? 0,
+      trainWeeks: num(s.trainWeeks) ?? undefined,
+      deloadWeeks: num(s.deloadWeeks) ?? undefined,
+      deloadEnabled: typeof s.deloadEnabled === "boolean" ? s.deloadEnabled : undefined,
+    },
+    updatedAt: typeof full.updatedAt === "string" ? full.updatedAt : null,
+  };
+}
+alLeerPerfilPublico(perfilPublicoSeguro);
 
 async function shareRoutineToFirestore(routineDef) {
   // Viaja una copia limpia: sin tus metas ni tus récords de cada serie (son
