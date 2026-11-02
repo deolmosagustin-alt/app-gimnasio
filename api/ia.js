@@ -47,6 +47,16 @@ const PRIMARY_MODEL = "gemini-flash-latest";
 // hace que el 429 de Flash degrade al instante, sin ese viaje de más.
 const LITE_MODEL = "gemini-flash-lite-latest";
 
+// Tercer escalón, para cuando hay mucha gente (pedido: "preparada para la
+// masificación"): los modelos Gemma de la misma API. Tienen su propio cupo
+// gratis, aparte del de Flash y Flash-Lite, así que cuando esos dos se agotan
+// (o Google los tiene caídos) la IA sigue contestando en vez de decir "límite
+// de uso por hoy". Responden algo peor y más lento, por eso van últimos y no
+// quedan como preferidos. Los nombres salen de la API (discoverModels), no se
+// adivinan. Gemma no acepta instrucciones de sistema ni el campo de
+// razonamiento: el pedido se adapta en paraGemma().
+const esGemma = (model) => /^gemma-/i.test(model);
+
 // Se recuerda el último modelo que funcionó (mientras el lambda viva) para
 // arrancar por ese y no pagar reintentos en cada llamada.
 let preferredModel = null;
@@ -54,7 +64,7 @@ let preferredModel = null;
 // Lista de modelos vigentes, descubierta en vivo contra la API de Google
 // (no hardcodeada) — cacheada en memoria mientras el lambda esté caliente
 // para no pagar esta consulta extra en cada mensaje del chat.
-let discoveredModelsCache = null; // { models: string[], fetchedAt: number }
+let discoveredModelsCache = null; // { models: string[], gemma: string[], fetchedAt: number }
 const MODEL_LIST_CACHE_MS = 30 * 60 * 1000;
 
 // BUG FIX (encontrado auditando): a diferencia de callModel(), este fetch
@@ -65,37 +75,65 @@ const MODEL_LIST_CACHE_MS = 30 * 60 * 1000;
 // de Vercel (maxDuration=60s), produciendo exactamente el corte de
 // conexión crudo que todo el sistema de presupuesto de tiempo fue pensado
 // para evitar.
-async function discoverModels(apiKey, timeoutMs = 8000) {
+async function discoverModels(apiKey, timeoutMs = 8000, { gemma = false } = {}) {
+  const deLaLista = (c) => (gemma ? c.gemma : c.models) || [];
   if (discoveredModelsCache && Date.now() - discoveredModelsCache.fetchedAt < MODEL_LIST_CACHE_MS) {
-    return discoveredModelsCache.models;
+    return deLaLista(discoveredModelsCache);
   }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`, { signal: controller.signal });
-    if (!res.ok) return discoveredModelsCache?.models || [];
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}&pageSize=1000`, { signal: controller.signal });
+    if (!res.ok) return discoveredModelsCache ? deLaLista(discoveredModelsCache) : [];
     const data = await res.json();
-    const names = (data?.models || [])
+    const todos = (data?.models || [])
       // Sólo modelos que de verdad soportan generar texto/chat — la
       // cuenta también puede tener modelos de embeddings, imagen, audio,
       // etc. que no sirven para esto y sólo desperdiciarían un intento.
       .filter((m) => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes("generateContent"))
       .map((m) => String(m.name || "").replace(/^models\//, ""))
-      .filter((n) => n && /flash/i.test(n) && !/embed|vision|tts|image|aqa/i.test(n));
+      .filter((n) => n && !/embed|vision|tts|image|aqa/i.test(n));
+    const names = todos.filter((n) => /flash/i.test(n));
     // Orden de preferencia: variantes "normales" antes que "-lite" (más
     // capaces), y estables antes que "-exp"/"-preview" (menos garantía de
     // que sigan disponibles mañana) — dentro de cada grupo se respeta el
     // orden en que Google las devolvió (suele ser el más nuevo primero).
     const rank = (n) => (/-lite/i.test(n) ? 2 : 0) + (/-(exp|preview)/i.test(n) ? 1 : 0);
     names.sort((a, b) => rank(a) - rank(b));
-    discoveredModelsCache = { models: names, fetchedAt: Date.now() };
-    return names;
+    // Gemma: la versión más nueva primero y, dentro de ella, el más grande
+    // (gemma-4-31b-it antes que gemma-4-26b…, y ésos antes que gemma-3-27b-it).
+    // Los chicos para teléfonos (e2b, e4b, 1b) no sirven para este pedido.
+    const version = (n) => parseFloat((n.match(/^gemma-(\d+(?:\.\d+)?)/i) || [])[1]) || 0;
+    const tamano = (n) => parseFloat((n.match(/-(\d+(?:\.\d+)?)b\b/i) || [])[1]) || 0;
+    const gemmas = todos
+      .filter((n) => esGemma(n) && /-it\b|-it$/i.test(n) && tamano(n) >= 12)
+      .sort((a, b) => version(b) - version(a) || tamano(b) - tamano(a))
+      .slice(0, 2);
+    discoveredModelsCache = { models: names, gemma: gemmas, fetchedAt: Date.now() };
+    return deLaLista(discoveredModelsCache);
   } catch (err) {
     console.error("[ia] No se pudo consultar la lista de modelos vigentes:", err?.message || err);
-    return discoveredModelsCache?.models || [];
+    return discoveredModelsCache ? deLaLista(discoveredModelsCache) : [];
   } finally {
     clearTimeout(timer);
   }
+}
+
+// Gemma no conoce systemInstruction (devuelve 400) ni thinkingConfig: las
+// instrucciones van al principio del primer mensaje de la persona, que es
+// como las espera el modelo.
+function paraGemma(body) {
+  const { systemInstruction, generationConfig, ...resto } = body;
+  const sistema = (systemInstruction?.parts || []).map((p) => p?.text || "").join("\n").trim();
+  const config = { ...(generationConfig || {}) };
+  delete config.thinkingConfig;
+  const contents = (resto.contents || []).map((c) => ({ ...c, parts: [...(c.parts || [])] }));
+  if (sistema) {
+    const primero = contents.find((c) => c.role !== "model");
+    if (primero) primero.parts.unshift({ text: `${sistema}\n\n---\n\n` });
+    else contents.unshift({ role: "user", parts: [{ text: sistema }] });
+  }
+  return { ...resto, contents, ...(Object.keys(config).length ? { generationConfig: config } : {}) };
 }
 
 // Rate limit básico por IP: sin esto, cualquiera que conozca la URL puede
@@ -254,7 +292,7 @@ async function callModelStreaming(model, body, apiKey, { ttfbMs, totalMs }) {
 const TOTAL_TIME_BUDGET_MS = 55000;
 const MIN_USEFUL_ATTEMPT_MS = 8000;
 
-async function callGemini(body) {
+async function callGemini(body, { soloRespaldo = false } = {}) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     const e = new Error("Falta GEMINI_API_KEY en las variables de entorno de Vercel.");
@@ -301,6 +339,13 @@ async function callGemini(body) {
   // de que el problema real era la cuota. Ahora se recuerda si CUALQUIER
   // intento dio 429, sin importar cuál fue el último.
   let lastStatus = null, lastDetail, ranOutOfTime = false, sawQuotaExhausted = false;
+  let gemmaTried = false;
+  // Para probar el respaldo sin esperar a que se agote Flash: va directo a Gemma.
+  if (soloRespaldo) {
+    chain.length = 0;
+    discoveryTried = gemmaTried = true;
+    (await discoverModels(apiKey, 8000, { gemma: true })).forEach((m) => chain.push(m));
+  }
   let i = 0;
   while (i < chain.length) {
     const model = chain[i];
@@ -322,9 +367,10 @@ async function callGemini(body) {
     // margen para el primer byte vuelve a ser un techo razonable. Si hubo que
     // caer al pedido CON razonamiento (el modelo no acepta el campo), se le
     // da mucho más aire: ahí el silencio inicial es normal, no un cuelgue.
-    const sinPensar = !modelosQueNoAceptanElCampo.has(model);
-    const cuerpo = sinPensar ? bodySinPensar : bodyBase;
-    const ttfb = Math.min(sinPensar ? 12000 : 40000, remaining);
+    const gemma = esGemma(model);
+    const sinPensar = !gemma && !modelosQueNoAceptanElCampo.has(model);
+    const cuerpo = gemma ? paraGemma(bodyBase) : sinPensar ? bodySinPensar : bodyBase;
+    const ttfb = Math.min(gemma ? 20000 : sinPensar ? 12000 : 40000, remaining);
     let res = null;
     try {
       res = await callModelStreaming(model, cuerpo, apiKey, { ttfbMs: ttfb, totalMs: remaining });
@@ -341,8 +387,8 @@ async function callGemini(body) {
       // El costo de no recordarlo es un 429 de Flash por mensaje mientras
       // dure la sequía — un viaje de ida y vuelta de milisegundos que
       // encima no consume cuota, porque es justamente el rechazo de cuota.
-      if (model !== LITE_MODEL) preferredModel = model;
-      return res.data;
+      if (model !== LITE_MODEL && !gemma) preferredModel = model;
+      return { ...res.data, modelo: model };
     }
     // 400 con el campo de razonamiento puesto: este modelo no lo conoce. Se
     // reintenta YA con el mismo modelo y el pedido de siempre, sin gastar un
@@ -381,9 +427,20 @@ async function callGemini(body) {
         discovered.forEach((m) => { if (!chain.includes(m)) chain.push(m); });
       }
     }
+    // Ni Flash ni Flash-Lite: si fue por cupo agotado o porque Google los
+    // tiene caídos o colgados, el último escalón es Gemma (ver esGemma).
+    if (i >= chain.length && discoveryTried && !gemmaTried && (sawQuotaExhausted || [0, 500, 503].includes(lastStatus))) {
+      gemmaTried = true;
+      const quedan = deadline - Date.now();
+      if (quedan > 2000) {
+        const gemmas = await discoverModels(apiKey, Math.min(8000, quedan), { gemma: true });
+        gemmas.forEach((m) => { if (!chain.includes(m)) chain.push(m); });
+      }
+    }
   }
 
   const e = new Error(ranOutOfTime ? "Se agotó el tiempo disponible probando modelos" : `Todos los modelos fallaron (último: ${lastStatus})`);
+  e.detalle = `${chain.join(", ")}: ${String(lastDetail || "").slice(0, 300)}`;
   if (ranOutOfTime) e.userMessage = "La IA está respondiendo lento ahora mismo. Probá de nuevo en un momento.";
   else if (sawQuotaExhausted) e.userMessage = "La IA alcanzó el límite de uso gratuito por hoy. Probá de nuevo en un rato o mañana.";
   // Google devuelve 400 (no sólo 401/403) cuando la API key es inválida o
@@ -440,7 +497,7 @@ export default async function handler(req, res) {
       const data = await callGemini({
         systemInstruction: { parts: [{ text: systemPrompt }] },
         contents: history,
-      });
+      }, { soloRespaldo: body.probarRespaldo === true });
       const candidate = data?.candidates?.[0];
       // Se unen TODAS las partes: Gemini parte las respuestas largas en
       // varios `parts` y leer sólo el primero dejaba la respuesta cortada a
@@ -467,7 +524,7 @@ export default async function handler(req, res) {
         seen.add(uri);
         sources.push({ uri, title: c.web.title || uri });
       });
-      res.status(200).json({ text, sources });
+      res.status(200).json({ text, sources, modelo: data.modelo });
       return;
     }
 
@@ -529,16 +586,16 @@ export default async function handler(req, res) {
       if (hasText) { promptLines.push("", "Texto:", '"""', truncated, '"""'); }
       const parts = [{ text: promptLines.join("\n") }];
       safeImages.forEach((img) => { parts.push({ inlineData: { mimeType: img.mimeType, data: img.data } }); });
-      const data = await callGemini({ contents: [{ parts }] });
+      const data = await callGemini({ contents: [{ parts }] }, { soloRespaldo: body.probarRespaldo === true });
       // Ídem: las rutinas largas vienen en varias partes (ver arriba).
       const rawText = (data?.candidates?.[0]?.content?.parts || []).map((p) => p?.text || "").join("");
-      res.status(200).json({ text: rawText });
+      res.status(200).json({ text: rawText, modelo: data.modelo });
       return;
     }
 
     res.status(400).json({ error: "Acción no reconocida." });
   } catch (err) {
     console.error("Error en /api/ia:", err);
-    res.status(500).json({ error: err.userMessage || "Error en el servidor." });
+    res.status(500).json({ error: err.userMessage || "Error en el servidor.", ...(body?.probarRespaldo === true ? { detalle: err.detalle } : {}) });
   }
 }

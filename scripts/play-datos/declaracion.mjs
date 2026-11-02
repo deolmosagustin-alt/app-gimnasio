@@ -54,6 +54,15 @@ const GENERALES = {
 const csv = (v) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
 const SI = "TRUE", NO = "FALSE";
 
+// Las cuentas: la plantilla de 2022 no trae estas preguntas y la API las pide.
+// Los ids salieron de la API (02/11/2026): PSL_ACM_OAUTH, PSL_ACM_USER_ID_PASSWORD,
+// PSL_ACM_OTHER (pide PSL_ACM_SPECIFY) y PSL_ACM_NONE. Cuenta se crea sólo con
+// Google; "Crear perfil sin Google" queda en el teléfono y no es una cuenta.
+const CUENTAS = [
+  ["PSL_SUPPORTED_ACCOUNT_CREATION_METHODS", "PSL_ACM_OAUTH", SI, "MULTIPLE_CHOICE", "Account creation methods / OAuth"],
+  ["PSL_ACCOUNT_DELETION_URL", "", "https://app-gimnasio-two.vercel.app/eliminar-cuenta.html", "MAYBE_REQUIRED", "Delete account URL"],
+];
+
 // Lo que va en "Response value" para una fila de la plantilla.
 function valor(pregunta, respuesta) {
   if (pregunta in GENERALES) return GENERALES[pregunta] ? SI : NO;
@@ -74,13 +83,13 @@ function valor(pregunta, respuesta) {
 }
 
 export function armarCsv() {
-  const lineas = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "plantilla.csv"), "utf8").trimEnd().split("\n");
+  const lineas = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "plantilla.csv"), "utf8").trimEnd().split(/\r?\n/);
   // En la plantilla en blanco ningún campo lleva comillas salvo, quizá, el rótulo del final.
   return lineas.map((linea, i) => {
     if (i === 0) return linea;
     const [pregunta, respuesta, , requisito, ...rotulo] = linea.split(",");
     return [pregunta, respuesta, valor(pregunta, respuesta), requisito].map(csv).join(",") + "," + rotulo.join(",");
-  }).join("\n") + "\n";
+  }).concat(CUENTAS.map((fila) => fila.map(csv).join(","))).join("\n") + "\n";
 }
 
 export function resumen() {
