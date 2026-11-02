@@ -262,7 +262,9 @@ async function callModelStreaming(model, body, apiKey, { ttfbMs, totalMs }) {
         // leía SÓLO parts[0].text. Gemini parte las respuestas largas en
         // varios `parts`, así que una respuesta larga llegaba cortada al
         // primer fragmento y se veía como "la IA contestó a medias".
-        (cand?.content?.parts || []).forEach((p) => { if (typeof p.text === "string") texto += p.text; });
+        // Las partes con thought: true son el razonamiento del modelo (Gemma 4
+        // lo manda aunque no se le pida): no son la respuesta.
+        (cand?.content?.parts || []).forEach((p) => { if (typeof p.text === "string" && !p.thought) texto += p.text; });
         if (cand?.finishReason) finishReason = cand.finishReason;
         (cand?.groundingMetadata?.groundingChunks || []).forEach((c) => groundingChunks.push(c));
       }
