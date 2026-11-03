@@ -16,7 +16,8 @@
     "play": "node scripts/play.mjs",
     "test": "vitest run",
     "accesibilidad": "node scripts/auditar-accesibilidad.mjs",
-    "transiciones": "node scripts/probar-transiciones.mjs"
+    "transiciones": "node scripts/probar-transiciones.mjs",
+    "recorrido": "node scripts/probar-recorrido.mjs"
   },
   "dependencies": {
     "@capacitor-firebase/authentication": "^8.3.0",

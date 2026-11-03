@@ -5852,13 +5852,18 @@ label.ajuste-rotulo { display: block; }
 /* LA GUÍA, LA PRIMERA VEZ: el aviso chico arriba de cada pestaña. */
 /* EL RECORRIDO GUIADO: todo oscuro salvo la pieza (el hueco) y la tarjeta. */
 .recorrido { position: fixed; inset: 0; z-index: 140; }
-.recorrido-hueco { position: fixed; border-radius: 22px; pointer-events: none;
+.recorrido-hueco { position: fixed; top: 0; left: 0; border-radius: 22px; pointer-events: none; will-change: transform;
   box-shadow: 0 0 0 200vmax rgba(5, 6, 8, .74), 0 0 0 2px color-mix(in oklab, var(--tono) 72%, white);
-  transition: top .38s var(--resorte, ease), left .38s var(--resorte, ease), width .38s var(--resorte, ease), height .38s var(--resorte, ease); }
+  transition: transform .46s var(--sale, ease-out), width .46s var(--sale, ease-out), height .46s var(--sale, ease-out); animation: recorridoVelo .3s ease both; }
+@keyframes recorridoVelo { from { opacity: 0; } }
 .light-mode .recorrido-hueco { box-shadow: 0 0 0 200vmax rgba(18, 20, 24, .58), 0 0 0 2px var(--tono); }
 .recorrido-tarjeta { position: fixed; left: 16px; right: 16px; max-width: 380px; margin: 0 auto; padding: 16px 16px 14px; border-radius: 24px; outline: none;
-  background: var(--surface-2); box-shadow: var(--placa-canto), 0 24px 48px -16px rgba(0, 0, 0, .6); animation: recorridoEntra .3s var(--resorte, ease); }
-@keyframes recorridoEntra { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  background: var(--surface-2); box-shadow: var(--placa-canto), 0 24px 48px -16px rgba(0, 0, 0, .6); animation: recorridoEntra .3s var(--sale, ease) both;
+  will-change: transform; transition: transform .46s var(--sale, ease-out); }
+@keyframes recorridoEntra { from { opacity: 0; } to { opacity: 1; } }
+/* El texto de cada paso se funde al cambiar, mientras la tarjeta viaja. */
+.recorrido-cuerpo { animation: recorridoTexto .26s var(--sale, ease-out) both; }
+@keyframes recorridoTexto { from { opacity: 0; transform: translateY(4px); } }
 .recorrido-paso { margin-right: auto; padding: 5px 10px; border-radius: 999px; font-size: 12px; font-weight: 650; color: var(--text-muted); background: var(--velo); white-space: nowrap; }
 .recorrido-titulo { padding-right: 36px; font-size: 18px; font-weight: 700; line-height: 1.25; color: var(--text-strong); }
 /* La flecha que apunta a la pieza: un cuadrado girado del color de la
@@ -5866,7 +5871,7 @@ label.ajuste-rotulo { display: block; }
 .recorrido-tarjeta.flecha-arriba::before, .recorrido-tarjeta.flecha-abajo::before { content: ""; position: absolute; left: calc(var(--flecha-x, 50%) - 8px); width: 16px; height: 16px; background: var(--surface-2); transform: rotate(45deg); border-radius: 3px; }
 .recorrido-tarjeta.flecha-arriba::before { top: -7px; }
 .recorrido-tarjeta.flecha-abajo::before { bottom: -7px; }
-.recorrido-cerrar-chico { position: absolute; top: 8px; right: 8px; width: 36px; height: 36px; display: grid; place-items: center; border-radius: 999px; color: var(--text-faint); }
+.recorrido-cerrar-chico { position: absolute; z-index: 2; top: 8px; right: 8px; width: 36px; height: 36px; display: grid; place-items: center; border-radius: 999px; color: var(--text-faint); }
 .recorrido-cerrar-chico::after { content: ""; position: absolute; inset: -4px; }
 /* Lo que podés hacer con la pieza, en un recuadro aparte (el "tip" del tour). */
 .recorrido-accion { display: flex; align-items: flex-start; gap: 8px; margin-top: 10px; padding: 10px 12px; border-radius: 14px; font-size: 14px; font-weight: 600; line-height: 1.35; color: color-mix(in oklab, var(--tono) 72%, white); background: color-mix(in oklab, var(--tono) 13%, transparent); }
@@ -5886,7 +5891,7 @@ label.ajuste-rotulo { display: block; }
 .recorrido-texto { margin-top: 4px; font-size: 15px; line-height: 1.42; color: var(--text-muted); text-wrap: pretty; }
 .recorrido-pie { display: flex; align-items: center; gap: 8px; margin-top: 14px; flex-wrap: wrap; justify-content: flex-end; }
 .recorrido-saltar { margin-right: auto; padding: 10px 4px; font-size: 14px; font-weight: 600; color: var(--text-muted); }
-@media (prefers-reduced-motion: reduce) { .recorrido-hueco { transition: none; } .recorrido-tarjeta { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .recorrido-hueco, .recorrido-tarjeta { transition: none; animation: none; } .recorrido-cuerpo { animation: none; } }
 .guia-recorrido { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; margin-top: 10px; padding: 9px 12px; border-radius: 999px; font-size: 14px; font-weight: 650; color: var(--text-muted); background: var(--velo); }
 .primera-vez { display: flex; align-items: center; gap: 6px; margin-bottom: 14px; padding: 8px 8px 8px 10px; border-radius: 22px; background: var(--surface-1); box-shadow: var(--placa-canto); }
 .primera-vez-cuerpo { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; text-align: left; }
@@ -30163,24 +30168,40 @@ function Recorrido({ pasos, onTerminar, siguiente = null, onSeguir = null }) {
     // y se ilumina hasta la mitad de la pantalla, donde está lo que importa:
     // así la tarjeta entra debajo. Las demás, al medio.
     const r0 = el.getBoundingClientRect();
-    const alta = r0.height > window.innerHeight * 0.5;
-    if (alta) window.scrollTo({ top: Math.max(0, r0.top + window.scrollY - 96), behavior: quieto ? "auto" : "smooth" });
-    else el.scrollIntoView({ block: "center", behavior: quieto ? "auto" : "smooth" });
-    let cuadro = 0;
-    const medir = () => {
-      const r = el.getBoundingClientRect();
+    const alto0 = window.innerHeight;
+    const alta = r0.height > alto0 * 0.5;
+    // MÁS FLUIDO (03/11, pedido: "hacé más fluido el tutorial"): se calcula
+    // de entrada adónde va a quedar la pieza después del scroll, y el hueco
+    // y la tarjeta viajan hasta ahí AL MISMO TIEMPO que la pantalla. Antes
+    // esperaban 420 ms a que terminara el scroll y recién ahí saltaban.
+    const maxScroll = Math.max(0, document.documentElement.scrollHeight - alto0);
+    const destinoY = Math.min(maxScroll, Math.max(0, alta ? r0.top + window.scrollY - 96 : r0.top + window.scrollY - (alto0 - r0.height) / 2));
+    const corrimiento = destinoY - window.scrollY;
+    const cajaDe = (r, dy = 0) => {
       const alto = window.innerHeight;
-      const top = Math.max(8, r.top - 8);
-      const bottom = Math.min(alto - 8, r.bottom + 8, alta ? top + alto * 0.5 : Infinity);
-      setCaja({ top, left: Math.max(8, r.left - 8), width: Math.min(window.innerWidth - 16, r.width + 16), height: Math.max(40, bottom - top) });
+      const top = Math.max(8, r.top - dy - 8);
+      const bottom = Math.min(alto - 8, r.bottom - dy + 8, alta ? top + alto * 0.5 : Infinity);
+      return { top, left: Math.max(8, r.left - 8), width: Math.min(window.innerWidth - 16, r.width + 16), height: Math.max(40, bottom - top) };
     };
-    const t = setTimeout(() => { medir(); tarjetaRef.current?.focus(); }, quieto ? 60 : 420);
-    const alMover = () => { cancelAnimationFrame(cuadro); cuadro = requestAnimationFrame(medir); };
+    let cuadro = requestAnimationFrame(() => setCaja(cajaDe(r0, corrimiento)));
+    if (Math.abs(corrimiento) > 1) window.scrollTo({ top: destinoY, behavior: quieto ? "auto" : "smooth" });
+    let listo = false;
+    const medir = () => setCaja(cajaDe(el.getBoundingClientRect()));
+    // Al terminar el scroll, un ajuste fino (por si algo se acomodó) y desde
+    // ahí el hueco sigue a la pieza si la persona mueve la pantalla.
+    const t = setTimeout(() => { listo = true; medir(); tarjetaRef.current?.focus({ preventScroll: true }); }, quieto ? 60 : 460);
+    const alMover = () => { if (!listo) return; cancelAnimationFrame(cuadro); cuadro = requestAnimationFrame(medir); };
     window.addEventListener("scroll", alMover, { passive: true });
     window.addEventListener("resize", alMover);
     return () => { clearTimeout(t); cancelAnimationFrame(cuadro); window.removeEventListener("scroll", alMover); window.removeEventListener("resize", alMover); };
   }, [paso]);
   const ultimo = i === visibles.length - 1;
+  // El alto de la tarjeta, para ponerla arriba de la pieza sin adivinar.
+  const [altoTarjeta, setAltoTarjeta] = useState(220);
+  useLayoutEffect(() => {
+    const h = tarjetaRef.current?.offsetHeight;
+    if (h && Math.abs(h - altoTarjeta) > 2) setAltoTarjeta(h);
+  }, [i, caja, altoTarjeta]);
   // Con el teclado, como el tour de autogestión: las flechas pasan de paso.
   useEffect(() => {
     const tecla = (e) => {
@@ -30194,8 +30215,9 @@ function Recorrido({ pasos, onTerminar, siguiente = null, onSeguir = null }) {
   if (!paso || typeof document === "undefined") return null;
   // La tarjeta va debajo de la pieza si entra; si no, arriba.
   const alto = typeof window !== "undefined" ? window.innerHeight : 800;
-  const abajo = !caja || caja.top + caja.height + 230 < alto;
-  const posicion = !caja ? { bottom: 96 } : abajo ? { top: Math.min(alto - 250, caja.top + caja.height + 14) } : { bottom: Math.max(16, alto - caja.top + 14) };
+  const abajo = !caja || caja.top + caja.height + altoTarjeta + 28 < alto;
+  const yTarjeta = !caja ? alto - altoTarjeta - 96 : abajo ? Math.min(alto - altoTarjeta - 16, caja.top + caja.height + 14) : Math.max(16, caja.top - 14 - altoTarjeta);
+  const posicion = { top: 0, transform: `translateY(${Math.round(yTarjeta)}px)` };
   // La flecha de la tarjeta apunta al medio de la pieza (la tarjeta va
   // centrada, de hasta 380 de ancho).
   const ancho = typeof window !== "undefined" ? window.innerWidth : 390;
@@ -30205,12 +30227,14 @@ function Recorrido({ pasos, onTerminar, siguiente = null, onSeguir = null }) {
   const seguir = ultimo && siguiente && onSeguir;
   return createPortal(
     <div className="recorrido" role="presentation">
-      {caja && <div className="recorrido-hueco" style={{ top: caja.top, left: caja.left, width: caja.width, height: caja.height }} aria-hidden="true" />}
+      {caja && <div className="recorrido-hueco" style={{ transform: `translate(${Math.round(caja.left)}px, ${Math.round(caja.top)}px)`, width: caja.width, height: caja.height }} aria-hidden="true" />}
       <div ref={tarjetaRef} tabIndex={-1} className={`recorrido-tarjeta ${caja ? (abajo ? "flecha-arriba" : "flecha-abajo") : ""}`} role="dialog" aria-modal="true" aria-labelledby="recorrido-titulo" style={{ ...posicion, "--flecha-x": flechaX != null ? `${flechaX}px` : undefined }}>
         <button onClick={onTerminar} aria-label="Cerrar el recorrido" className="recorrido-cerrar-chico"><X size={16} /></button>
-        <h3 id="recorrido-titulo" className="recorrido-titulo">{paso.titulo}</h3>
-        <p className="recorrido-texto">{paso.texto}</p>
-        {paso.accion && <p className="recorrido-accion"><Hand size={16} aria-hidden="true" />{paso.accion}</p>}
+        <div key={i} className="recorrido-cuerpo">
+          <h3 id="recorrido-titulo" className="recorrido-titulo">{paso.titulo}</h3>
+          <p className="recorrido-texto">{paso.texto}</p>
+          {paso.accion && <p className="recorrido-accion"><Hand size={16} aria-hidden="true" />{paso.accion}</p>}
+        </div>
         <div className="recorrido-pie">
           <span className="recorrido-paso">Paso {i + 1} de {visibles.length}</span>
           {i > 0 && (seguir
