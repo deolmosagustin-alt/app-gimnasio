@@ -457,7 +457,15 @@ async function callGemini(body, { soloRespaldo = false } = {}) {
   const e = new Error(ranOutOfTime ? "Se agotó el tiempo disponible probando modelos" : `Todos los modelos fallaron (último: ${lastStatus})`);
   e.detalle = `${chain.join(", ")}: ${String(lastDetail || "").slice(0, 300)}`;
   if (ranOutOfTime) e.userMessage = "La IA está respondiendo lento ahora mismo. Probá de nuevo en un momento.";
-  else if (sawQuotaExhausted) e.userMessage = "La IA alcanzó el límite de uso gratuito por hoy. Probá de nuevo en un rato o mañana.";
+  else if (sawQuotaExhausted) {
+    // SIN CUPO PARA TODOS (03/11, el lanzamiento con la cuota gratis): se
+    // avisa con su propio código y a qué hora vuelve, así la app no le
+    // descuenta la consulta a la persona y le dice cuándo probar. La cuota
+    // gratis de Gemini se renueva a la medianoche del Pacífico.
+    e.sinCupoGlobal = true;
+    e.vuelve = proximaMedianochePacifico();
+    e.userMessage = "El Entrenador IA tuvo mucha gente hoy y se quedó sin consultas gratis. Vuelve mañana temprano; todo lo demás de la app anda igual.";
+  }
   // Google devuelve 400 (no sólo 401/403) cuando la API key es inválida o
   // le falta habilitar la API de Gemini en el proyecto de Google Cloud —
   // antes esto cliaba directo al mensaje genérico, sin pistas de qué mirar.
@@ -475,6 +483,15 @@ async function callGemini(body, { soloRespaldo = false } = {}) {
 // Sin esto, el default puede cortar la función antes de que Gemini
 // termine una respuesta larga.
 export const config = { maxDuration: 60 };
+
+// La próxima medianoche de California (cuando Google renueva la cuota gratis
+// de Gemini), como fecha ISO. Sin librerías: se toma la hora de allá con Intl
+// y se suma lo que falta para las 24.
+function proximaMedianochePacifico(ahora = new Date()) {
+  const partes = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" }).formatToParts(ahora).map((x) => [x.type, x.value]));
+  const pasados = ((Number(partes.hour) % 24) * 3600 + Number(partes.minute) * 60 + Number(partes.second)) * 1000;
+  return new Date(ahora.getTime() + (24 * 3600 * 1000 - pasados) + 60 * 1000).toISOString();
+}
 
 export default async function handler(req, res) {
   if (req.method !== "POST") { res.status(405).json({ error: "Sólo se acepta POST." }); return; }
@@ -611,6 +628,7 @@ export default async function handler(req, res) {
     res.status(400).json({ error: "Acción no reconocida." });
   } catch (err) {
     console.error("Error en /api/ia:", err);
+    if (err.sinCupoGlobal) { res.status(503).json({ error: err.userMessage, sinCupoGlobal: true, vuelve: err.vuelve }); return; }
     res.status(500).json({ error: err.userMessage || "Error en el servidor.", ...(body?.probarRespaldo === true ? { detalle: err.detalle } : {}) });
   }
 }

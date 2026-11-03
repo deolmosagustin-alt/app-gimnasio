@@ -88,6 +88,20 @@ Decisión del 03/11/2026: el cobro y los anuncios se prenden **juntos, al llegar
 
 **Los anuncios** (AdMob, la cuenta ya está creada) todavía no están hechos. Cuando se hagan: banner o intersticial sólo fuera del entrenamiento (nunca con una sesión abierta ni en el descanso), y sólo si `mostrarAnuncios(esPremium)` de `src/suscripcion.js` da verdadero. Premium los saca: con `VITE_ANUNCIOS_ACTIVOS=1`, el paywall suma "Sin anuncios" y el producto de Play ya lo trae como cuarto beneficio. Sin anuncios en la app, el paywall no lo promete. Prender anuncios pide también: el SDK en un APK nuevo, el ID de publicidad (`AD_ID`) de vuelta en el manifiesto, "Contiene anuncios" en Play Console, la declaración de datos y la política.
 
+**La IA, hasta las 1000 descargas, con la cuota gratis de Gemini** (decisión del 03/11/2026: "lanzarla con esta limitación y, superado un monto de descargas, pasar al plan pago en simultáneo con los anuncios para no perder dinero"). La cuota gratis es de todo el proyecto, unas 250 consultas por día de Flash y 1.000 de Flash-Lite, y se renueva a la medianoche de California (las 4 o las 5 de la mañana en Argentina). Para que alcance para más gente:
+
+- cada persona tiene **10 consultas por día** (`IA_CUPO_LANZAMIENTO`; antes 25): alcanza para unas 125 personas que la usen mucho;
+- cuando se termina la cuota de todos, el servidor contesta `503` con `sinCupoGlobal` y la hora en que vuelve (`proximaMedianochePacifico`); la app **no descuenta esa consulta** y avisa "Vuelve a las 5:00", en la hora del teléfono (`fetchIA`, `devolverCupoIA`);
+- detrás de Flash y Flash-Lite quedan los Gemma de respaldo para los pedidos cortos (crear una rutina).
+
+**El paso de las 1000 descargas, todo junto** (para no pagar la IA sin que entre plata):
+
+1. Facturación en la clave de Gemini (Google AI Studio › Plan de pago) con una alerta de presupuesto.
+2. En Vercel, las variables `VITE_IA_PAGA=1` (vuelven las 25 consultas por día, o el cupo de Premium), `VITE_COBRO_ACTIVO=1` y `VITE_ANUNCIOS_ACTIVOS=1`, y volver a publicar.
+3. En `scripts/play-datos/declaracion.mjs`, `GEMINI_GRATIS = false`, y `npm run play -- datos --enviar`: con facturación, Google ya no usa lo que se le manda para mejorar sus servicios.
+4. En la política (`public/privacy-policy.html` y el modal de Perfil), sacar la frase del plan gratuito de Gemini y sumar el cobro y los anuncios; en la ficha, `VITE_COBRO_ACTIVO=1 node scripts/ficha-play/subir-ficha.mjs …`.
+5. Los pasos de "Para prenderlo", más abajo: el producto en Play y RevenueCat, el SDK en un APK nuevo y AdMob.
+
 **Qué medir antes**: con 1000 descargas, la retención a 30 días y cuántos usan la IA por día dicen si el cupo de 5 gratis está bien, y cuánto cuesta la IA por usuario. Hasta el 03/11/2026 no había medición de descargas en la app: se ven en Play Console (`npm run play -- estado` no las trae).
 
 ## Para prenderlo

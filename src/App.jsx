@@ -836,6 +836,16 @@ function registrarFalloIA(origen, err, ms = null, promptChars = null) {
 // es justamente el escenario que preocupa. El abuso deliberado lo frena el
 // rate limit por IP del servidor.
 const IA_CUPO_DIARIO = 25;
+// EL LANZAMIENTO CON LA CUOTA GRATIS (03/11, pedido: "lanzarla con esta
+// limitación y, superado un monto de descargas, pasar al plan pago junto con
+// los anuncios"). La cuota gratis de Gemini es de todo el proyecto: unas 250
+// consultas por día de Flash y 1.000 de Flash-Lite. Con 25 por persona, 50
+// personas que la usen mucho la agotaban a media tarde y el resto se quedaba
+// sin IA; con 10, alcanza para unas 125, y casi nadie pide más de 10 en un
+// día. Con la facturación prendida (VITE_IA_PAGA=1, a las 1000 descargas,
+// junto con el cobro y los anuncios) vuelve a las 25, o al cupo de Premium.
+const IA_PAGA = import.meta.env.VITE_IA_PAGA === "1";
+const IA_CUPO_LANZAMIENTO = 10;
 const IA_CUPO_KEY = "gym_cupo_ia_v1";
 function _hoyLocal() {
   const d = new Date();
@@ -851,7 +861,7 @@ function leerCupoIA() {
 // Con el cobro apagado son las 25 de siempre; prendido, 15 gratis y 40 con
 // Premium (cupoDiarioIA en suscripcion.js). Ninguna función se bloquea: sólo
 // cambia cuántas consultas por día.
-const cupoDeHoy = () => (suscripcionVisible() ? cupoDiarioIA() : IA_CUPO_DIARIO);
+const cupoDeHoy = () => (suscripcionVisible() ? cupoDiarioIA() : IA_PAGA ? IA_CUPO_DIARIO : IA_CUPO_LANZAMIENTO);
 function cupoIARestante() {
   return Math.max(0, cupoDeHoy() - leerCupoIA().usados);
 }
@@ -862,6 +872,13 @@ function consumirCupoIA() {
   if (usados >= cupoDeHoy()) return false;
   try { localStorage.setItem(IA_CUPO_KEY, JSON.stringify({ dia: _hoyLocal(), usados: usados + 1 })); } catch { /* sin storage no hay cupo que llevar */ }
   return true;
+}
+// Devuelve la consulta: si la IA no contestó porque se quedó sin cupo para
+// todos, no es justo que le cuente a la persona.
+function devolverCupoIA() {
+  const { usados } = leerCupoIA();
+  if (usados <= 0) return;
+  try { localStorage.setItem(IA_CUPO_KEY, JSON.stringify({ dia: _hoyLocal(), usados: usados - 1 })); } catch { /* sin storage no hay cupo que llevar */ }
 }
 const mensajeSinCupoIA = () => `Llegaste a los ${cupoDeHoy()} pedidos de IA de hoy. El cupo se renueva mañana.`;
 
@@ -875,12 +892,25 @@ async function fetchIA(payload, opts = {}) {
     e.sinCupo = true;
     throw e;
   }
-  return fetch(apiUrl("/api/ia"), {
+  const res = await fetch(apiUrl("/api/ia"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
     ...opts,
   });
+  // Sin cupo para todos (la cuota gratis del día se terminó): la consulta no
+  // se descuenta y el aviso dice a qué hora vuelve, en la hora del teléfono.
+  // Cada pantalla muestra el `error` como siempre, así que se reescribe acá.
+  if (res.status === 503) {
+    const datos = await res.clone().json().catch(() => null);
+    if (datos?.sinCupoGlobal) {
+      devolverCupoIA();
+      const hora = datos.vuelve ? new Date(datos.vuelve).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false }) : null;
+      const error = `El Entrenador IA tuvo mucha gente hoy y se quedó sin consultas gratis.${hora ? ` Vuelve a las ${hora}.` : " Vuelve mañana temprano."} No se te descontó esta consulta, y todo lo demás de la app anda igual.`;
+      return new Response(JSON.stringify({ ...datos, error }), { status: 503, headers: { "Content-Type": "application/json" } });
+    }
+  }
+  return res;
 }
 
 function apiUrl(path) {
@@ -5882,10 +5912,10 @@ label.ajuste-rotulo { display: block; }
 /* EL RECORRIDO GUIADO: todo oscuro salvo la pieza (el hueco) y la tarjeta. */
 .recorrido { position: fixed; inset: 0; z-index: 140; }
 .recorrido-hueco { position: fixed; top: 0; left: 0; border-radius: 22px; pointer-events: none; will-change: transform;
-  box-shadow: 0 0 0 200vmax rgba(5, 6, 8, .64), 0 0 0 1.5px color-mix(in oklab, var(--tono) 60%, white);
+  box-shadow: 0 0 0 200vmax rgba(5, 6, 8, .8), 0 0 0 1.5px color-mix(in oklab, var(--tono) 60%, white);
   transition: transform .46s var(--sale, ease-out), width .46s var(--sale, ease-out), height .46s var(--sale, ease-out), border-radius .46s var(--sale, ease-out); animation: recorridoVelo .3s ease both; }
 @keyframes recorridoVelo { from { opacity: 0; } }
-.light-mode .recorrido-hueco { box-shadow: 0 0 0 200vmax rgba(18, 20, 24, .58), 0 0 0 2px var(--tono); }
+.light-mode .recorrido-hueco { box-shadow: 0 0 0 200vmax rgba(18, 20, 24, .72), 0 0 0 1.5px var(--tono); }
 .recorrido-tarjeta { position: fixed; left: 16px; right: 16px; max-width: 360px; margin: 0 auto; padding: 14px 14px 12px; border-radius: 22px; outline: none;
   background: var(--surface-2); box-shadow: var(--placa-canto), 0 24px 48px -16px rgba(0, 0, 0, .6); animation: recorridoEntra .3s var(--sale, ease) both;
   will-change: transform; transition: transform .46s var(--sale, ease-out); }
@@ -27144,10 +27174,10 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
         setMessages((prev) => [...prev, {
           role: "assistant",
           text: isTimeout
-            ? "Tardé demasiado en responder (más de un minuto). El plan gratuito de Gemini tiene momentos pico: esperá un poco y volvé a intentar 🙏"
+            ? "Tardé demasiado en responder (más de un minuto). El plan gratuito de Gemini tiene momentos pico: esperá un poco y volvé a intentar."
             : serverMsg
-              ? `${serverMsg} 🙏`
-              : "Uy, no me pude conectar. Revisá tu conexión o probá de nuevo en un momento 🙏"
+              ? serverMsg
+              : "Uy, no me pude conectar. Revisá tu conexión o probá de nuevo en un momento."
         }], targetConvId);
       } finally {
         setSendingConvIds((prev) => { const next = new Set(prev); next.delete(targetConvId); return next; });
@@ -30178,7 +30208,7 @@ const RECORRIDOS = {
     { sel: ".pestanas-internas", titulo: "Actividad, ranking y amigos", texto: "Aplaudí a tus amigos, mirá los récords del grupo y sumá amigos con su @usuario o su código QR." },
   ],
   entrenador_ia: [
-    { sel: ".pizarra-ia", titulo: "Tu entrenador con IA", texto: "Conoce tu rutina, tus marcas y tu progreso. Tocá un pedido para empezar.", accion: "Tocá una nota de la pizarra." },
+    { sel: ".pizarra-ia .ia-tarjetas", titulo: "Tu entrenador con IA", texto: "Conoce tu rutina, tus marcas y tu progreso. Tocá un pedido para empezar.", accion: "Tocá una nota de la pizarra." },
     { sel: '[data-recorrido="escribir"]', titulo: "Preguntale lo que quieras", texto: "Escribí o hablale con el micrófono: puede armarte una rutina, planificar tu semana o decirte con cuánto arrancar." },
   ],
 };
