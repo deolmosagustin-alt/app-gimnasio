@@ -1352,7 +1352,9 @@ function etiquetaDeDia(label) {
   const texto = String(label || "");
   const palabras = texto.split(/[\s/]+/).filter(Boolean);
   const larga = palabras.reduce((m, w) => Math.max(m, w.length), 1);
-  return { texto: texto.replace(/\/\s*/g, "/\u200B"), larga };
+  // `total`: el largo entero, para que un nombre de varias palabras
+  // ("Espalda y bíceps completo") entre en dos renglones y no en cuatro.
+  return { texto: texto.replace(/\/\s*/g, "/\u200B"), larga, total: Math.max(1, texto.length) };
 }
 // Tope del tamaño según cuántos días hay (más días, solapas más angostas).
 function tamanoMaxSolapa(dayCount) {
@@ -3417,6 +3419,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
   background: color-mix(in oklab, var(--c, var(--tono)) 72%, white);
   transition: border-radius .4s var(--resorte), transform .25s var(--resorte), filter .2s ease;
 }
+.boton-pildora { text-align: center; text-wrap: balance; line-height: 1.15; padding-block: 8px; }
 .boton-pildora:active { border-radius: 18px; transform: scale(.95); transition-duration: .4s, var(--dur-toque), .2s; }
 .boton-pildora > svg, .boton-tonal > svg { flex: none; }
 .light-mode .boton-pildora { background: var(--c, var(--tono)); }
@@ -3512,7 +3515,9 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 }
 /* Las etiquetas sin elegir, un punto más claras que --text-faint: con 11 px
    tienen que llegar a 4,5:1 sobre la barra (WCAG 1.4.3; daba 4,47). */
-.barra-pestanas .etiqueta { font-size: 0.6875rem; font-weight: 550; line-height: 1; letter-spacing: 0; transition: color .2s ease; }
+/* Con la letra grande en un teléfono angosto, los nombres se pegaban
+   ("RutinaProgreso"): la letra crece pero con tope en el ancho de su lugar. */
+.barra-pestanas .etiqueta { font-size: min(max(11px, calc(0.6875rem * var(--escala-letra, 1))), 3.45vw); white-space: nowrap; font-weight: 550; line-height: 1; letter-spacing: 0; transition: color .2s ease; }
 .barra-pestanas button:not([aria-current="page"]) .etiqueta { color: color-mix(in oklab, var(--text-faint) 88%, white); }
 .light-mode .barra-pestanas button:not([aria-current="page"]) .etiqueta { color: color-mix(in oklab, var(--text-faint) 88%, black); }
 .barra-pestanas [aria-current="page"] { color: var(--text-strong); }
@@ -3742,7 +3747,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
   display: block; text-align: center;
   font-weight: 600; letter-spacing: -0.005em; line-height: 1.1;
   font-size: var(--fs-max, 0.9rem);
-  font-size: min(var(--fs-max, 0.95rem), calc(100cqi / var(--largo, 6) * 1.45));
+  font-size: min(var(--fs-max, 0.95rem), calc(100cqi / var(--largo, 6) * 1.45), calc(100cqi / var(--total, 6) * 2.5));
   overflow-wrap: normal; word-break: normal; hyphens: manual;
   text-wrap: balance;
 }
@@ -3772,7 +3777,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 .dia-titulo {
   margin: 2px 46px 0 0;
   font-size: 3.5rem;
-  font-size: min(3.75rem, calc(100cqi / var(--largo, 6) * 1.9));
+  font-size: min(3.75rem, calc(100cqi / var(--largo, 6) * 1.9), calc(100cqi / var(--total, 6) * 2.7));
   line-height: 0.9; font-weight: 800; font-stretch: 76%; letter-spacing: -0.04em;
   color: var(--text-strong);
   overflow-wrap: normal; word-break: normal; text-wrap: balance;
@@ -3828,6 +3833,9 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 .ejercicio.completo .ejercicio-numero { --galleta-fondo: color-mix(in oklab, var(--c, var(--tono)) 72%, white); color: color-mix(in oklab, var(--c, var(--tono)) 18%, #07080a); box-shadow: none; }
 .ejercicio-nombre { font-size: 1rem; font-weight: 650; line-height: 1.25; color: var(--text-strong); letter-spacing: -0.012em; text-wrap: pretty; }
 .ejercicio-musculo { display: inline; font-size: 0.8125rem; font-weight: 500; color: var(--text-muted); }
+.ejercicio-sub { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; margin-top: 6px; min-width: 0; }
+.ejercicio-sub > * { flex: none; }
+.ejercicio-sub > .ejercicio-musculo { flex: 0 1 auto; min-width: 0; line-height: 1.3; text-wrap: pretty; }
 .ejercicio.completo .ejercicio-nombre { color: var(--text-muted); }
 /* Las series de un ejercicio cerrado: una rayita por serie, de tiza la
    que ya hiciste hoy. */
@@ -4075,7 +4083,13 @@ button.foco-campo-rotulo:active { background: var(--velo); }
 .moleteado { stroke: rgba(0,0,0,0.38); stroke-width: 0.7; }
 .disco { stroke: rgba(0,0,0,0.55); stroke-width: 0.5; }
 .disco-filete { fill: none; stroke-width: 0.8; stroke: rgba(255,255,255,0.28); }
-.disco-fantasma { fill: none; stroke: var(--disco-fantasma); stroke-width: 0.9; stroke-dasharray: 2.2 1.6; }
+/* Los lugares que faltan, como siluetas tenues de goma (03/11, pedido:
+   "mejorá el diseño de la barra cuando está vacía": los contornos punteados,
+   todos juntos, se veían recargados). El lugar donde entra el próximo disco,
+   con un contorno suave: dice dónde va lo que anotes. */
+.disco-fantasma { fill: color-mix(in oklab, var(--text-strong) 3.5%, transparent); stroke: none; }
+.disco-fantasma.proximo { fill: color-mix(in oklab, var(--c, var(--tono)) 9%, transparent); stroke: color-mix(in oklab, var(--c, var(--tono)) 45%, transparent); stroke-width: 0.9; }
+.light-mode .disco-fantasma { fill: rgba(0,0,0,.05); }
 .collarin { fill: color-mix(in oklab, var(--c, var(--tono)) 72%, white); transition: transform .55s var(--resorte); }
 .light-mode .collarin { fill: var(--c, var(--tono)); }
 .disco-entra { transform-box: fill-box; transform-origin: center; animation: discoEntra var(--dura, .7s) var(--resorte, ease-out) backwards; }
@@ -4365,6 +4379,9 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
   background: color-mix(in oklab, var(--c, var(--tono)) 13%, transparent);
   transition: border-radius .4s var(--resorte), transform .25s var(--resorte);
 }
+/* Dos botones lado a lado: con la letra grande en un teléfono angosto,
+   "Cronograma" se salía de la tarjeta. Menos relleno y la letra con tope. */
+.botones-par .boton-tonal { min-width: 0; gap: 6px; padding-inline: 10px; white-space: nowrap; font-size: min(max(11px, calc(0.875rem * var(--escala-letra, 1))), 4.3vw); }
 .boton-tonal:active { border-radius: 16px; transform: scale(.95); transition-duration: .4s, var(--dur-toque); }
 /* Un ajuste del teléfono que falta (Perfil › Descansos): el ícono ámbar, qué
    pasa y el botón para arreglarlo. */
@@ -4791,7 +4808,11 @@ button.carrera-carril:active { background: var(--velo); }
 .dia-rutina.elegido { box-shadow: inset 0 0 0 2px color-mix(in oklab, var(--dia) 60%, #8a8c92); }
 .dia-rutina:active { transform: scale(.96); }
 .dia-rutina:disabled { cursor: default; }
-.dia-rutina-nombre { margin-bottom: 6px; font-size: 1.05rem; font-weight: 750; font-stretch: 85%; line-height: 1.1; color: var(--text-strong); overflow-wrap: normal; word-break: normal; text-wrap: balance; }
+/* Con un nombre largo ("Espalda y bíceps") la palabra se cortaba contra el
+   borde de la baldosa (03/11, casos límite): la letra se ajusta al ancho de
+   la baldosa, por la palabra más larga y por el largo entero. */
+.dia-rutina { container-type: inline-size; }
+.dia-rutina-nombre { margin-bottom: 6px; font-size: min(max(11px, calc(1.05rem * var(--escala-letra, 1))), calc(100cqi / var(--largo, 6) * 1.55), calc(100cqi / var(--total, 6) * 3.4)); font-weight: 750; font-stretch: 85%; line-height: 1.1; color: var(--text-strong); overflow-wrap: normal; word-break: normal; text-wrap: balance; }
 .dia-rutina-datos { font-size: 0.75rem; color: var(--text-muted); }
 .dia-rutina-datos b { font-size: 0.9375rem; font-weight: 700; color: var(--text-strong); margin-right: 2px; }
 /* Armá la tuya. */
@@ -5853,19 +5874,24 @@ label.ajuste-rotulo { display: block; }
 /* EL RECORRIDO GUIADO: todo oscuro salvo la pieza (el hueco) y la tarjeta. */
 .recorrido { position: fixed; inset: 0; z-index: 140; }
 .recorrido-hueco { position: fixed; top: 0; left: 0; border-radius: 22px; pointer-events: none; will-change: transform;
-  box-shadow: 0 0 0 200vmax rgba(5, 6, 8, .74), 0 0 0 2px color-mix(in oklab, var(--tono) 72%, white);
-  transition: transform .46s var(--sale, ease-out), width .46s var(--sale, ease-out), height .46s var(--sale, ease-out); animation: recorridoVelo .3s ease both; }
+  box-shadow: 0 0 0 200vmax rgba(5, 6, 8, .64), 0 0 0 1.5px color-mix(in oklab, var(--tono) 60%, white);
+  transition: transform .46s var(--sale, ease-out), width .46s var(--sale, ease-out), height .46s var(--sale, ease-out), border-radius .46s var(--sale, ease-out); animation: recorridoVelo .3s ease both; }
 @keyframes recorridoVelo { from { opacity: 0; } }
 .light-mode .recorrido-hueco { box-shadow: 0 0 0 200vmax rgba(18, 20, 24, .58), 0 0 0 2px var(--tono); }
-.recorrido-tarjeta { position: fixed; left: 16px; right: 16px; max-width: 380px; margin: 0 auto; padding: 16px 16px 14px; border-radius: 24px; outline: none;
+.recorrido-tarjeta { position: fixed; left: 16px; right: 16px; max-width: 360px; margin: 0 auto; padding: 14px 14px 12px; border-radius: 22px; outline: none;
   background: var(--surface-2); box-shadow: var(--placa-canto), 0 24px 48px -16px rgba(0, 0, 0, .6); animation: recorridoEntra .3s var(--sale, ease) both;
   will-change: transform; transition: transform .46s var(--sale, ease-out); }
 @keyframes recorridoEntra { from { opacity: 0; } to { opacity: 1; } }
 /* El texto de cada paso se funde al cambiar, mientras la tarjeta viaja. */
 .recorrido-cuerpo { animation: recorridoTexto .26s var(--sale, ease-out) both; }
 @keyframes recorridoTexto { from { opacity: 0; transform: translateY(4px); } }
-.recorrido-paso { margin-right: auto; padding: 5px 10px; border-radius: 999px; font-size: 12px; font-weight: 650; color: var(--text-muted); background: var(--velo); white-space: nowrap; }
-.recorrido-titulo { padding-right: 36px; font-size: 18px; font-weight: 700; line-height: 1.25; color: var(--text-strong); }
+/* El avance, en puntitos: el de este paso, una píldora del tono. */
+.recorrido-paso { margin-right: auto; display: flex; align-items: center; gap: 5px; }
+.recorrido-paso i { width: 6px; height: 6px; border-radius: 999px; background: var(--hairline-fuerte); transition: width .3s var(--sale, ease-out), background-color .2s ease; }
+.recorrido-paso i.visto { background: color-mix(in oklab, var(--tono) 45%, var(--hairline-fuerte)); }
+.recorrido-paso i.actual { width: 18px; background: color-mix(in oklab, var(--tono) 72%, white); }
+.recorrido-atras { width: 40px; min-height: 40px; padding: 0; }
+.recorrido-titulo { padding-right: 34px; font-size: 16px; font-weight: 700; line-height: 1.25; color: var(--text-strong); }
 /* La flecha que apunta a la pieza: un cuadrado girado del color de la
    tarjeta, arriba o abajo según de qué lado esté la pieza. */
 .recorrido-tarjeta.flecha-arriba::before, .recorrido-tarjeta.flecha-abajo::before { content: ""; position: absolute; left: calc(var(--flecha-x, 50%) - 8px); width: 16px; height: 16px; background: var(--surface-2); transform: rotate(45deg); border-radius: 3px; }
@@ -5874,7 +5900,7 @@ label.ajuste-rotulo { display: block; }
 .recorrido-cerrar-chico { position: absolute; z-index: 2; top: 8px; right: 8px; width: 36px; height: 36px; display: grid; place-items: center; border-radius: 999px; color: var(--text-faint); }
 .recorrido-cerrar-chico::after { content: ""; position: absolute; inset: -4px; }
 /* Lo que podés hacer con la pieza, en un recuadro aparte (el "tip" del tour). */
-.recorrido-accion { display: flex; align-items: flex-start; gap: 8px; margin-top: 10px; padding: 10px 12px; border-radius: 14px; font-size: 14px; font-weight: 600; line-height: 1.35; color: color-mix(in oklab, var(--tono) 72%, white); background: color-mix(in oklab, var(--tono) 13%, transparent); }
+.recorrido-accion { display: flex; align-items: flex-start; gap: 7px; margin-top: 8px; padding: 7px 10px; border-radius: 12px; font-size: 13px; font-weight: 600; line-height: 1.35; color: color-mix(in oklab, var(--tono) 72%, white); background: color-mix(in oklab, var(--tono) 13%, transparent); }
 .recorrido-accion svg { flex: none; margin-top: 1px; }
 .light-mode .recorrido-accion { color: color-mix(in oklab, var(--tono) 70%, black); }
 /* La bienvenida al recorrido, lo que abre el "?". */
@@ -5888,8 +5914,8 @@ label.ajuste-rotulo { display: block; }
 .recorrido-bienvenida-dura { margin-top: 10px; font-size: 13px; color: var(--text-faint); }
 .recorrido-bienvenida-pie { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
 .recorrido-bienvenida-guia { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; margin-top: 6px; font-size: 14px; color: var(--text-muted); }
-.recorrido-texto { margin-top: 4px; font-size: 15px; line-height: 1.42; color: var(--text-muted); text-wrap: pretty; }
-.recorrido-pie { display: flex; align-items: center; gap: 8px; margin-top: 14px; flex-wrap: wrap; justify-content: flex-end; }
+.recorrido-texto { margin-top: 3px; font-size: 14px; line-height: 1.42; color: var(--text-muted); text-wrap: pretty; }
+.recorrido-pie { display: flex; align-items: center; gap: 8px; margin-top: 12px; flex-wrap: wrap; justify-content: flex-end; }
 .recorrido-saltar { margin-right: auto; padding: 10px 4px; font-size: 14px; font-weight: 600; color: var(--text-muted); }
 @media (prefers-reduced-motion: reduce) { .recorrido-hueco, .recorrido-tarjeta { transition: none; animation: none; } .recorrido-cuerpo { animation: none; } }
 .guia-recorrido { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; margin-top: 10px; padding: 9px 12px; border-radius: 999px; font-size: 14px; font-weight: 650; color: var(--text-muted); background: var(--velo); }
@@ -6642,7 +6668,11 @@ textarea.import-texto { min-height: 150px; font-size: 14px; line-height: 1.45; r
 .estante-lugar.con-pesa { --d: color-mix(in oklab, var(--dia) 62%, #8a8c92); }
 .light-mode .estante-lugar.con-pesa { --d: color-mix(in oklab, var(--dia) 72%, #a7a9ae); }
 .estante-lugar .pesa-rusa { width: 100%; max-width: 40px; margin-bottom: -1px; }
-.estante-dia { position: relative; z-index: 1; display: block; width: 100%; height: 26px; line-height: 26px; text-align: center; font-size: 12px; font-weight: 650; color: var(--text-muted); }
+/* Los días del estante: con la letra grande en un teléfono angosto, "Dom"
+   se partía y la "m" caía encima del botón de abajo (03/11, casos límite).
+   La letra crece con la escala pero nunca más de lo que entra en su lugar,
+   y la palabra no se parte. */
+.estante-dia { position: relative; z-index: 1; display: block; width: 100%; height: 26px; line-height: 26px; text-align: center; white-space: nowrap; font-size: min(max(11px, calc(12px * var(--escala-letra, 1))), 3.5vw); font-weight: 650; color: var(--text-muted); }
 .estante-lugar.hoy .estante-dia { color: var(--text-strong); font-weight: 750; text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 4px; }
 .pesa-rusa { display: block; height: auto; overflow: visible; transition: scale .2s ease; transform-origin: 50% 8%; }
 /* Al tocarla se balancea desde la manija, como cuando la agarrás; la de hoy
@@ -13462,7 +13492,7 @@ function DiasRutina({ routineDef, onGoToDay = null, elegido = null }) {
         return (
           <button key={dk} role="listitem" onClick={onGoToDay ? () => onGoToDay(dk) : undefined} disabled={!onGoToDay} className={`dia-rutina ${elegido === dk ? "elegido" : ""}`} aria-pressed={elegido ? elegido === dk : undefined} style={{ "--dia": d.color }}
             aria-label={`${d.label}: ${ejercicios} ejercicios, ${series} series`}>
-            <span className="dia-rutina-nombre">{d.label}</span>
+            {(() => { const { larga, total } = etiquetaDeDia(d.label); return <span className="dia-rutina-nombre" style={{ "--largo": larga, "--total": total }}>{d.label}</span>; })()}
             <span className="dia-rutina-datos"><b className="num-display">{ejercicios}</b> ejercicios</span>
             <span className="dia-rutina-datos"><b className="num-display">{series}</b> series</span>
           </button>
@@ -13785,7 +13815,7 @@ function BarraCargada({ hechas = 0, total = 0, alto = 30, etiqueta = null, class
           ) : d.afuera ? (
             <rect key="a" x={d.x} y={d.y} width={d.w} height={d.h} rx={radio(d.w)} className="disco-suelto" />
           ) : (
-            <rect key="f" x={d.x + 0.45} y={d.y + 0.45} width={Math.max(0.5, d.w - 0.9)} height={d.h - 0.9} rx={radio(d.w)} className="disco-fantasma" />
+            <rect key="f" x={d.x + 0.45} y={d.y + 0.45} width={Math.max(0.5, d.w - 0.9)} height={d.h - 0.9} rx={radio(d.w)} className={`disco-fantasma ${d.n === cargados || d.n === cargados + 1 ? "proximo" : ""}`} />
           )}
         </g>
       ))}
@@ -13952,7 +13982,13 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
                 hace que TODAS las tarjetas se vean iguales sin importar
                 cuán largo sea el nombre del ejercicio. */}
             <h3 className="ejercicio-nombre">{exercise.name}</h3>
-            <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
+            {/* Siempre dos renglones: el nombre y, debajo, el músculo con su
+                ficha (Plan o Récord) en la MISMA línea (03/11, pedido:
+                "estandarizar: nombre del ejercicio, y músculo y plan/récord").
+                Antes la fila se partía y, con un músculo largo, la ficha
+                bajaba a un tercer renglón. Ahora no se parte: el músculo
+                largo se acomoda en su lugar y las fichas quedan a su lado. */}
+            <div className="ejercicio-sub">
               <span className="ejercicio-musculo">{exercise.muscle}</span>
               {/* Si el músculo ya dice "Cardio", el chip de cardio repetía la palabra. */}
               {exercise.cardio && String(exercise.muscle || "").toLowerCase() !== "cardio" && <span className="text-[11px] bg-rose-400/15 text-rose-300 rounded-md px-1.5 py-0.5 font-bold flex items-center gap-1"><Footprints size={9} /> CARDIO</span>}
@@ -15191,7 +15227,15 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           cierra las puntas) y le da el tono a la pantalla (ver ponerTono).
           Los demás van sin color. */}
       <div className="selector-dias" role="tablist" aria-label="Días de tu rutina">
-        {(() => { const { minHeight } = dayTabTextSizing(DAY_ORDER.length); return DAY_ORDER.map((k) => (
+        {(() => {
+          const { minHeight } = dayTabTextSizing(DAY_ORDER.length);
+          // Todas las solapas con la misma letra: la que necesita el nombre más
+          // largo (03/11: con nombres de distinto largo, cada una tenía su
+          // tamaño y se veían desparejas).
+          const medidas = DAY_ORDER.map((d) => etiquetaDeDia(ROUTINE[d].label));
+          const largaComun = Math.max(...medidas.map((m) => m.larga));
+          const totalComun = Math.max(...medidas.map((m) => m.total));
+          return DAY_ORDER.map((k) => (
           <button key={k} onClick={() => setActiveDay(k)} title={ROUTINE[k].label} role="tab" aria-selected={activeDay === k}
             className="dia-solapa relative flex items-center justify-center py-2.5 px-2 text-center min-w-0 active:scale-95"
             style={{ "--dia": ROUTINE[k].color, minHeight: `${Math.max(minHeight + 22, 52)}px` }}>
@@ -15201,7 +15245,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             {/* El tamaño de la letra sale de la palabra MÁS LARGA y del
                 ancho real de la solapa (ver .dia-solapa-texto): la palabra
                 siempre entra entera, nunca "HOMBRO / S /…". */}
-            {(() => { const { texto, larga } = etiquetaDeDia(ROUTINE[k].label); return <span className="dia-solapa-texto" style={{ "--largo": larga, "--fs-max": tamanoMaxSolapa(DAY_ORDER.length) }}>{texto}</span>; })()}
+            {(() => { const { texto } = etiquetaDeDia(ROUTINE[k].label); return <span className="dia-solapa-texto" style={{ "--largo": largaComun, "--total": totalComun, "--fs-max": tamanoMaxSolapa(DAY_ORDER.length) }}>{texto}</span>; })()}
           </button>
         )); })()}
       </div>
@@ -15230,7 +15274,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           ) : activeDay === suggestedDay && (
             <span className="dia-chip"><Calendar size={12} /> {scheduledDay === activeDay ? "Programado para hoy" : "Sugerido para hoy"}</span>
           )}
-          {(() => { const { larga } = etiquetaDeDia(day.label); return <h2 className="dia-titulo" style={{ "--largo": larga }}>{day.label}</h2>; })()}
+          {(() => { const { larga, total } = etiquetaDeDia(day.label); return <h2 className="dia-titulo" style={{ "--largo": larga, "--total": total }}>{day.label}</h2>; })()}
           {day.description && <p className="dia-bajada">{day.description}</p>}
           {/* La barra del día: un disco por serie. En la descarga suelta los
               discos que sobran (los de afuera se deslizan por la manga) y los
@@ -29470,7 +29514,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
           })()}
 
           {/* Balance y cronograma, a un toque. */}
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-2 botones-par">
             <button onClick={() => setShowBalance((v) => !v)} className="boton-tonal" aria-expanded={showBalance}>
               <Activity size={15} /> {showBalance ? "Ocultar" : "Balance"}
             </button>
@@ -30087,7 +30131,7 @@ const RECORRIDOS = {
   rutina: [
     { sel: 'section[aria-label="Tu plan"]', titulo: "Tu plan", texto: "Lo que toca hoy, escrito como en la hoja del profe. Con Planificar cargás cuánto levantar cada semana, o se lo pedís a la IA.", accion: "Tocá Planificar, al pie de la hoja, para armar tu progresión." },
     { sel: ".selector-dias", titulo: "Tus días", texto: "Elegí qué día entrenás. Viene elegido el que te toca hoy.", accion: "Deslizá hacia los lados si tenés muchos días." },
-    { sel: ".dia-hero", titulo: "La barra del día", texto: "Cada serie que anotás le carga un disco. Cuando está llena, terminaste." },
+    { sel: ".dia-hero .barra-cargada", titulo: "La barra del día", texto: "Cada serie que anotás le carga un disco. Cuando está llena, terminaste." },
     { sel: '[data-recorrido="iniciar"]', titulo: "Iniciá la sesión", texto: "Al llegar al gimnasio: cuenta el tiempo y anota tu hora de entrada.", accion: "Tocalo cuando entres al gimnasio." },
     { sel: ".ejercicio", titulo: "Anotá cada serie", texto: "Tocá un ejercicio: las reps y los kilos ya vienen escritos con lo que toca hoy. Lo guardás con el ✓ y el descanso arranca solo.", accion: "Ajustá con − y + sin abrir el teclado." },
     { sel: "nav.barra-pestanas", titulo: "Todo lo demás, abajo", texto: "Tu progreso, tus amigos, tus rutinas y el entrenador con IA." },
@@ -30177,11 +30221,22 @@ function Recorrido({ pasos, onTerminar, siguiente = null, onSeguir = null }) {
     const maxScroll = Math.max(0, document.documentElement.scrollHeight - alto0);
     const destinoY = Math.min(maxScroll, Math.max(0, alta ? r0.top + window.scrollY - 96 : r0.top + window.scrollY - (alto0 - r0.height) / 2));
     const corrimiento = destinoY - window.scrollY;
-    const cajaDe = (r, dy = 0) => {
-      const alto = window.innerHeight;
-      const top = Math.max(8, r.top - dy - 8);
-      const bottom = Math.min(alto - 8, r.bottom - dy + 8, alta ? top + alto * 0.5 : Infinity);
-      return { top, left: Math.max(8, r.left - 8), width: Math.min(window.innerWidth - 16, r.width + 16), height: Math.max(40, bottom - top) };
+    // LA PROPORCIÓN DEL HUECO (03/11, pedido: "la recuadración en el tour
+    // no es correcta en cuanto a proporción"): el mismo aire de los cuatro
+    // lados (si contra un borde no entra, se achica parejo en los dos), y
+    // las esquinas de la pieza más ese aire. Antes las esquinas eran
+    // siempre de 22 px y el aire se perdía de un solo lado.
+    const radioPieza = parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0;
+    const cajaDe = (r0, dy = 0) => {
+      const alto = window.innerHeight, ancho = window.innerWidth;
+      // Una pieza más ancha que la pantalla (el corcho, que se desliza de
+      // costado): se toma sólo lo que se ve, con un margen de 6 px.
+      const izq = Math.max(6, r0.left), der = Math.min(ancho - 6, r0.right);
+      const r = { left: izq, right: der, width: der - izq, top: r0.top, bottom: r0.bottom };
+      const aire = Math.max(0, Math.min(10, r.left - 4, ancho - r.right - 4));
+      const top = Math.max(6, r.top - dy - aire);
+      const bottom = Math.min(alto - 6, r.bottom - dy + aire, alta ? top + alto * 0.55 : Infinity);
+      return { top, left: r.left - aire, width: r.width + aire * 2, height: Math.max(36, bottom - top), radio: Math.min(32, Math.max(12, radioPieza + aire)) };
     };
     let cuadro = requestAnimationFrame(() => setCaja(cajaDe(r0, corrimiento)));
     if (Math.abs(corrimiento) > 1) window.scrollTo({ top: destinoY, behavior: quieto ? "auto" : "smooth" });
@@ -30227,7 +30282,7 @@ function Recorrido({ pasos, onTerminar, siguiente = null, onSeguir = null }) {
   const seguir = ultimo && siguiente && onSeguir;
   return createPortal(
     <div className="recorrido" role="presentation">
-      {caja && <div className="recorrido-hueco" style={{ transform: `translate(${Math.round(caja.left)}px, ${Math.round(caja.top)}px)`, width: caja.width, height: caja.height }} aria-hidden="true" />}
+      {caja && <div className="recorrido-hueco" style={{ transform: `translate(${Math.round(caja.left)}px, ${Math.round(caja.top)}px)`, width: caja.width, height: caja.height, borderRadius: caja.radio }} aria-hidden="true" />}
       <div ref={tarjetaRef} tabIndex={-1} className={`recorrido-tarjeta ${caja ? (abajo ? "flecha-arriba" : "flecha-abajo") : ""}`} role="dialog" aria-modal="true" aria-labelledby="recorrido-titulo" style={{ ...posicion, "--flecha-x": flechaX != null ? `${flechaX}px` : undefined }}>
         <button onClick={onTerminar} aria-label="Cerrar el recorrido" className="recorrido-cerrar-chico"><X size={16} /></button>
         <div key={i} className="recorrido-cuerpo">
@@ -30236,10 +30291,10 @@ function Recorrido({ pasos, onTerminar, siguiente = null, onSeguir = null }) {
           {paso.accion && <p className="recorrido-accion"><Hand size={16} aria-hidden="true" />{paso.accion}</p>}
         </div>
         <div className="recorrido-pie">
-          <span className="recorrido-paso">Paso {i + 1} de {visibles.length}</span>
-          {i > 0 && (seguir
-            ? <button onClick={() => setI(i - 1)} className="boton-tonal !min-h-10 !px-3" aria-label="Paso anterior"><ChevronLeft size={17} /></button>
-            : <button onClick={() => setI(i - 1)} className="boton-tonal !min-h-10 !px-4">Atrás</button>)}
+          <span className="recorrido-paso" role="img" aria-label={`Paso ${i + 1} de ${visibles.length}`}>
+            {visibles.map((_, k) => <i key={k} className={k === i ? "actual" : k < i ? "visto" : ""} />)}
+          </span>
+          {i > 0 && <button onClick={() => setI(i - 1)} className="boton-tonal recorrido-atras" aria-label="Paso anterior"><ChevronLeft size={18} /></button>}
           {seguir
             ? <button onClick={() => onSeguir(siguiente)} className="boton-pildora !min-h-10 !px-4">Seguir con {NOMBRE_RECORRIDO[siguiente]} <ChevronRight size={17} /></button>
             : <button onClick={() => (ultimo ? onTerminar() : setI(i + 1))} className="boton-pildora !min-h-10 !px-5">{ultimo ? "Listo" : <>Siguiente <ChevronRight size={17} /></>}</button>}

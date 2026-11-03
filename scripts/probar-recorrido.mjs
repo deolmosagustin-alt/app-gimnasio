@@ -34,19 +34,19 @@ try {
   await page.screenshot({ path: `${SALIDA}/tour-bienvenida.png` });
   await page.getByRole("button", { name: /^Empezar/ }).click();
   await page.waitForTimeout(900);
-  ok("arranca el paso 1", (await page.locator(".recorrido-paso").innerText()).startsWith("Paso 1 de"));
+  ok("arranca el paso 1", (await page.locator(".recorrido-paso").getAttribute("aria-label")).startsWith("Paso 1 de"));
   ok("la tarjeta tiene flecha", (await page.locator(".recorrido-tarjeta.flecha-arriba, .recorrido-tarjeta.flecha-abajo").count()) === 1);
   ok("trae el recuadro de acción", await page.locator(".recorrido-accion").isVisible());
   await page.screenshot({ path: `${SALIDA}/tour-paso1.png` });
   await page.keyboard.press("ArrowRight"); await page.waitForTimeout(800);
-  ok("la flecha del teclado avanza", (await page.locator(".recorrido-paso").innerText()).startsWith("Paso 2 de"));
+  ok("la flecha del teclado avanza", (await page.locator(".recorrido-paso").getAttribute("aria-label")).startsWith("Paso 2 de"));
   await page.screenshot({ path: `${SALIDA}/tour-paso2.png` });
   for (let k = 0; k < 8; k++) { const b = page.getByRole("button", { name: /^Siguiente/ }); if (!(await b.count())) break; await b.click(); await page.waitForTimeout(700); }
   const seguir = page.getByRole("button", { name: /Seguir con Progreso/ });
   ok("al final ofrece seguir con Progreso", (await seguir.count()) === 1);
   await page.screenshot({ path: `${SALIDA}/tour-final.png` });
   await seguir.click(); await page.waitForTimeout(1500);
-  ok("sigue en Progreso, paso 1", (await page.locator(".recorrido-paso").innerText().catch(() => "")).startsWith("Paso 1 de"));
+  ok("sigue en Progreso, paso 1", ((await page.locator(".recorrido-paso").getAttribute("aria-label").catch(() => "")) || "").startsWith("Paso 1 de"));
   await page.screenshot({ path: `${SALIDA}/tour-progreso.png` });
   const info = await page.evaluate(() => { const b = document.querySelector(".recorrido-cerrar-chico"); const r = b.getBoundingClientRect(); const enc = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return `${Math.round(r.left)},${Math.round(r.top)} ${r.width}x${r.height} arriba=${enc?.className}`; });
   if (!/cerrar/.test(info)) console.log(`la cruz está tapada: ${info}`);
