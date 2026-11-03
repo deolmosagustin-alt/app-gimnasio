@@ -126,6 +126,10 @@ function profileToPublicFull(profile, activeRoutineSnapshot) {
     // con sexo+edad sueltos, así que se ocultan todos juntos o ninguno.
     logs: shareStats ? (profile.logs || {}) : {},
     trainingSessions: shareStats ? (profile.trainingSessions || []) : [],
+    // La sesión abierta (cuándo llegó y qué día hace): con eso tus amigos te
+    // ven en la planilla de asistencia apenas tocás "Iniciar sesión", no
+    // recién al finalizar (pedido del 03/11).
+    enCurso: shareStats && profile.activeSession?.startedAt ? { startedAt: profile.activeSession.startedAt, dayKey: profile.activeSession.dayKey || null } : null,
     measurements: shareStats ? (profile.measurements || {}) : {},
     cycleStart: shareStats ? (profile.cycleStart || null) : null,
     sex: shareStats ? (profile.sex || null) : null,
@@ -192,7 +196,7 @@ export function alLeerPerfilPublico(fn) { revisarPerfilPublico = fn; }
 // de datos móviles por visita. Ahora queda unos minutos en memoria (por
 // cuenta, así no se mezcla si otra persona entra en el mismo teléfono).
 const CACHE_FULL = new Map(); // "<tu uid>:<su uid>" → { t, datos }
-const VIDA_FULL_MS = 3 * 60 * 1000;
+const VIDA_FULL_MS = 90 * 1000;
 
 // null = "no se pudo leer" (sin vínculo aceptado, o el otro nunca eligió
 // @handle) — el llamador lo muestra como "esta persona no comparte su

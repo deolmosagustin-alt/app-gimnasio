@@ -286,6 +286,13 @@ final class Descanso {
             cuerpo = "En pausa. Faltan " + reloj(restante) + ".";
         }
         Bitmap icono = esFin ? relojTerminado() : esPausa ? relojEnPausa(color) : relojDePared(color, false);
+        // v14, expandible (pedido del 03/11: "mejorar el diseño y la
+        // funcionalidad de las notificaciones, en especial la del cronómetro;
+        // capaz que sea expansible"): al bajarla, debajo del texto de siempre,
+        // lo que la app manda en `detalle` (la meta o el récord, cuánto dura
+        // el descanso y a qué hora termina).
+        String detalle = e.optString(esFin ? "detalleFin" : "detalle", "");
+        String largo = detalle.isEmpty() ? null : cuerpo + "\n" + detalle;
 
         // Los botones: corriendo, Pausar, +15 s y Cerrar; en pausa, Seguir,
         // +15 s y Cerrar; terminado, Reiniciar y Cerrar.
@@ -325,6 +332,7 @@ final class Descanso {
                     nb.setWhen(fin).setShowWhen(true).setUsesChronometer(true).setChronometerCountDown(!esFin);
                 }
                 if (seVaEn > 0) nb.setTimeoutAfter(seVaEn);
+                if (largo != null) nb.setStyle(new Notification.BigTextStyle().bigText(largo));
                 for (int i = 0; i < botones.length; i++) {
                     nb.addAction(new Notification.Action.Builder(chico, botones[i][1], intento(c, botones[i][0], 9101 + i)).build());
                 }
@@ -368,6 +376,7 @@ final class Descanso {
                 b.setWhen(fin).setShowWhen(true).setUsesChronometer(true).setChronometerCountDown(!esFin);
             }
             if (alertar) b.setVibrate(VIBRACION_FIN);
+            if (largo != null) b.setStyle(new NotificationCompat.BigTextStyle().bigText(largo));
             if (seVaEn > 0) b.setTimeoutAfter(seVaEn);
             for (int i = 0; i < botones.length; i++) b.addAction(0, botones[i][1], intento(c, botones[i][0], 9101 + i));
             n = b.build();

@@ -18,6 +18,7 @@
     "accesibilidad": "node scripts/auditar-accesibilidad.mjs",
     "transiciones": "node scripts/probar-transiciones.mjs",
     "recorrido": "node scripts/probar-recorrido.mjs",
+    "sesion": "node scripts/probar-sesion.mjs",
     "sincupo": "node scripts/probar-sin-cupo.mjs"
   },
   "dependencies": {

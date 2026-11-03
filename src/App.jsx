@@ -305,6 +305,10 @@ function perfilPublicoSeguro(full) {
       deloadWeeks: num(s.deloadWeeks) ?? undefined,
       deloadEnabled: typeof s.deloadEnabled === "boolean" ? s.deloadEnabled : undefined,
     },
+    // La sesión que tiene abierta ahora (la planilla de asistencia la muestra al momento).
+    enCurso: full.enCurso && typeof full.enCurso === "object" && typeof full.enCurso.startedAt === "string" && full.enCurso.startedAt.length <= 40 && !Number.isNaN(Date.parse(full.enCurso.startedAt))
+      ? { startedAt: full.enCurso.startedAt, dayKey: typeof full.enCurso.dayKey === "string" ? full.enCurso.dayKey.slice(0, 120) : null }
+      : null,
     updatedAt: typeof full.updatedAt === "string" ? full.updatedAt : null,
   };
 }
@@ -540,7 +544,11 @@ async function subirPerfil(uid, profile, requireAuth) {
     }
     const data = profileToCloud(profile);
     const cuerpo = JSON.stringify(data);
-    if (!requireAuth && ULTIMA_SUBIDA.get(uid) === cuerpo) return;
+    // El espejo público lleva además la sesión en curso (la planilla de
+    // asistencia de tus amigos), que no va en el perfil de la nube: aunque el
+    // perfil no haya cambiado, el espejo se revisa (escribe sólo si cambió).
+    const espejo = () => syncPublicProfile(uid, profile, resolveRoutineDef(profile.routines?.[profile.activeRoutineId], profile.activeRoutineId), computeTopRank(profile));
+    if (!requireAuth && ULTIMA_SUBIDA.get(uid) === cuerpo) { await espejo(); return; }
     const bytes = tamanoEnNube(cuerpo);
     avisoNubeLlena = bytes > LIMITE_DOC_NUBE * 0.85 ? { bytes, lleno: bytes >= LIMITE_DOC_NUBE } : null;
     // setDoc SIN {merge:true}: el documento de la nube queda como espejo
@@ -565,8 +573,7 @@ async function subirPerfil(uid, profile, requireAuth) {
     // tirar abajo el sync principal si falla, por eso va después del
     // await de arriba (ya se subió lo importante) y con su propio try/catch
     // interno.
-    const activeRoutineSnapshot = resolveRoutineDef(profile.routines?.[profile.activeRoutineId], profile.activeRoutineId);
-    await syncPublicProfile(uid, profile, activeRoutineSnapshot, computeTopRank(profile));
+    await espejo();
   } catch (err) {
     // Antes el sync automático se tragaba TODO error en silencio, así que si
     // la subida fallaba (tamaño, red, permisos) el usuario nunca se enteraba y
@@ -5105,6 +5112,77 @@ label.ajuste-rotulo { display: block; }
 .armado-bloques { display: flex; align-items: center; gap: 10px; padding: 0 4px; }
 .armado-bloques-num { margin-left: auto; min-width: 28px; text-align: center; font-size: 1.5rem; font-weight: 650; font-stretch: 80%; color: var(--text-strong); }
 .armado-mancuernas { display: grid; gap: 8px; padding: 0 2px; }
+/* ── EL ÁRBOL DE DISCOS (Rutina, semana de descarga) ── */
+.arbol-placa { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); align-items: center; gap: 8px; padding: 16px 14px 12px 18px; border-radius: var(--radius-3xl, 28px); background: var(--surface-1); box-shadow: var(--placa-canto); }
+.arbol-textos { display: grid; gap: 1px; min-width: 0; }
+.arbol-titulo { font-size: 13px; font-weight: 650; color: var(--text-muted); margin-bottom: 4px; }
+.arbol-cifra { display: flex; align-items: baseline; gap: 1px; line-height: 1; color: var(--text-strong); }
+.arbol-cifra b { font-size: 44px; font-weight: 800; }
+.arbol-cifra span { font-size: 22px; font-weight: 700; color: var(--text-faint); }
+.arbol-cifra.chica { margin-top: 10px; }
+.arbol-cifra.chica b { font-size: 28px; }
+.arbol-cifra.chica span { font-size: 16px; }
+.arbol-dato { font-size: 13px; color: var(--text-muted); }
+.arbol-dibujo { width: 100%; height: auto; max-height: 170px; overflow: visible; }
+.arbol-base { fill: #2b2c30; }
+.arbol-poste { fill: #3a3c42; stroke: rgba(255,255,255,.08); }
+.arbol-tapa { fill: #4a4c52; }
+.arbol-clavija { stroke: #8d9097; stroke-width: 5; stroke-linecap: round; }
+.arbol-disco-goma { fill: color-mix(in oklab, var(--d) 60%, #8a8c92); stroke: rgba(0,0,0,.35); stroke-width: 1; }
+.arbol-disco-canto { fill: none; stroke: rgba(0,0,0,.22); stroke-width: 1.4; }
+.arbol-disco-agujero { fill: #17181b; }
+.arbol-disco.atras .arbol-disco-goma { fill: color-mix(in oklab, var(--d) 40%, #4a4c52); }
+.arbol-disco { animation: arbolCuelga .7s var(--resorte, cubic-bezier(.34,1.56,.64,1)) both; animation-delay: calc(var(--i) * 70ms + 120ms); }
+@keyframes arbolCuelga { 0% { transform: translateY(-14px) rotate(-10deg); opacity: 0; } 55% { opacity: 1; } 75% { transform: translateY(0) rotate(4deg); } 100% { transform: none; } }
+.light-mode .arbol-base { fill: #9a9ca2; }
+.light-mode .arbol-poste { fill: #b9bbc0; stroke: rgba(0,0,0,.08); }
+.light-mode .arbol-tapa { fill: #a5a7ad; }
+.light-mode .arbol-clavija { stroke: #6f7279; }
+.light-mode .arbol-disco-goma { fill: color-mix(in oklab, var(--d) 70%, #a7a9ae); }
+.light-mode .arbol-disco-agujero { fill: #55575d; }
+
+/* ── EL TABLERO DE LETRAS (Progreso) ── */
+.tablero-letras { padding: 9px; border-radius: 14px; background: linear-gradient(135deg, #b98e5f, #8d6740 55%, #a57b4f); box-shadow: inset 0 1px 0 rgba(255,255,255,.25), inset 0 -2px 0 rgba(0,0,0,.25), 0 16px 30px -22px rgba(0,0,0,.95); }
+.tablero-fieltro { --ranura: 34px; display: grid; justify-items: center; padding: 10px 12px 12px; border-radius: 6px; background: repeating-linear-gradient(180deg, #1b1c1f 0 calc(var(--ranura) - 3px), #0e0f11 calc(var(--ranura) - 3px) var(--ranura)), #1b1c1f; box-shadow: inset 0 2px 8px rgba(0,0,0,.6); }
+.tablero-fila { height: var(--ranura); display: flex; align-items: center; gap: .32em; font-size: 22px; font-weight: 700; font-stretch: 78%; letter-spacing: .14em; line-height: 1; color: #f1f0ea; text-shadow: 0 1px 0 rgba(0,0,0,.6), 0 -1px 0 rgba(255,255,255,.12); white-space: nowrap; }
+.tablero-fila b { font-weight: 800; color: color-mix(in oklab, var(--tono, #3B82F6) 62%, white); }
+.tablero-mes { font-size: 16px; letter-spacing: .3em; color: #c9c8c1; }
+.tablero-fila:not(.tablero-mes) { animation: tableroLetra .5s var(--sale, ease-out) both; }
+.tablero-fila:nth-child(2) { animation-delay: .08s; }
+.tablero-fila:nth-child(3) { animation-delay: .16s; }
+.tablero-fila:nth-child(4) { animation-delay: .24s; }
+@keyframes tableroLetra { from { transform: translateY(-5px); letter-spacing: .3em; opacity: 0; } to { transform: none; } }
+
+/* ── LA PIZARRA BLANCA (Rutinas) ── */
+.pizarra-blanca { --tinta-marcador: #1e2330; position: relative; display: grid; gap: 12px; padding: 16px 16px 30px; border-radius: 10px; color: var(--tinta-marcador);
+  background: linear-gradient(115deg, rgba(255,255,255,.7) 0 18%, transparent 34% 70%, rgba(255,255,255,.35) 82%), radial-gradient(ellipse at 74% 30%, rgba(30,35,48,.045), transparent 45%), #e8eaec;
+  box-shadow: inset 0 0 0 6px #b9bdc3, inset 0 0 0 7px #8e9298, inset 0 0 0 8px rgba(255,255,255,.6), inset 0 2px 10px rgba(0,0,0,.12), 0 16px 30px -22px rgba(0,0,0,.95); }
+.pizarra-blanca-linea { font-family: 'Caveat Variable', 'Caveat', 'Segoe Print', cursive; font-size: 20px; font-weight: 600; line-height: 1; color: #5b6070; }
+.pizarra-blanca-nombre { font-family: 'Caveat Variable', 'Caveat', 'Segoe Print', cursive; font-size: 36px; font-weight: 700; line-height: 1; color: var(--tinta-marcador); overflow-wrap: anywhere; }
+.pizarra-blanca-nombre.escribe { animation: marcadorEscribe 1s steps(14) both; }
+@keyframes marcadorEscribe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
+@media (prefers-reduced-motion: reduce) { .pizarra-blanca-nombre.escribe { animation: none; } }
+.pizarra-blanca-boton { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 999px; color: #3a4050; background: rgba(30,35,48,.07); transition: transform var(--dur-toque) var(--sale); }
+.pizarra-blanca-boton:active { transform: scale(.92); }
+.pizarra-blanca .dia-rutina { background: transparent; box-shadow: none; border: 0; color: var(--tinta-marcador); }
+.pizarra-blanca .dia-rutina::before, .pizarra-blanca .dia-rutina::after { display: none; }
+.pizarra-blanca .dia-rutina-nombre { font-family: 'Caveat Variable', 'Caveat', 'Segoe Print', cursive; font-weight: 700; color: color-mix(in oklab, var(--dia) 78%, #10131a); text-decoration: underline; text-decoration-thickness: 3px; text-underline-offset: 5px; text-decoration-color: color-mix(in oklab, var(--dia) 55%, transparent); }
+.pizarra-blanca .dia-rutina-datos { color: #3e4453; }
+.pizarra-blanca .dia-rutina-datos b { color: var(--tinta-marcador); }
+.pizarra-blanca-bandeja { position: absolute; left: 14px; right: 14px; bottom: 6px; height: 12px; display: flex; align-items: flex-end; gap: 6px; padding: 0 10px; border-radius: 3px; background: linear-gradient(#c7cace, #9da1a7); box-shadow: 0 2px 4px rgba(0,0,0,.25); }
+.pizarra-blanca-bandeja .marcador { width: 34px; height: 8px; margin-bottom: 4px; border-radius: 2px 4px 4px 2px; background: linear-gradient(90deg, color-mix(in oklab, var(--dia) 80%, #222) 0 22%, #f2f2f0 22% 100%); box-shadow: 0 1px 1px rgba(0,0,0,.3); }
+.pizarra-blanca-bandeja .borrador { width: 40px; height: 11px; margin-left: auto; margin-bottom: 3px; border-radius: 2px; background: linear-gradient(#3a3c42 0 55%, #d8d6cf 55%); box-shadow: 0 1px 2px rgba(0,0,0,.35); }
+.pizarra-blanca { filter: brightness(.92); }
+.light-mode .pizarra-blanca { filter: none; }
+@media (prefers-reduced-motion: reduce) { .arbol-disco, .tablero-fila { animation: none; } }
+
+.armado-saltos { display: grid; gap: 8px; padding: 0 2px; }
+.armado-saltos-opciones { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.armado-salto { min-width: 44px; min-height: 36px; padding: 0 10px; border-radius: 999px; font-size: 14px; font-weight: 650; font-variant-numeric: tabular-nums; color: var(--text-muted); background: var(--panel-sunken); transition: background var(--dur-toque) var(--sale), color var(--dur-toque) var(--sale), transform var(--dur-toque) var(--sale); position: relative; }
+.armado-salto::after { content: ""; position: absolute; inset: -4px -1px; }
+.armado-salto:active { transform: scale(.95); }
+.armado-salto.activo { color: var(--accion-tinta); background: var(--accion-fondo); }
+.armado-saltos-unidad { font-size: 13px; color: var(--text-faint); padding-left: 2px; }
 .armado-ej-acciones { display: flex; align-items: center; gap: 6px; }
 .armado-ej-acciones .armado-accion { flex: 1; }
 .armado-ej-acciones .boton-redondo:disabled { opacity: .3; }
@@ -6218,6 +6296,23 @@ label.ajuste-rotulo { display: block; }
   .campana-record-pieza { animation-name: campanaApareceQuieta; }
 }
 
+/* LA BARRA AL RACK */
+.rack-velo { animation: molineteVelo 2.1s ease-in-out both; }
+.rack { display: block; width: 280px; height: 190px; overflow: visible; }
+.rack-piso { stroke: rgba(255,255,255,.16); stroke-width: 2; stroke-linecap: round; }
+.rack-parante { fill: #3a3c42; stroke: rgba(255,255,255,.1); }
+.rack-agujero { fill: #17181b; }
+.rack-gancho { fill: none; stroke: #8d9097; stroke-width: 4; stroke-linejoin: round; }
+.rack-acero { fill: #c9cbcf; }
+.rack-disco { stroke: rgba(0,0,0,.3); stroke-width: 1; }
+.rack-collarin { fill: color-mix(in oklab, var(--dia) 72%, white); }
+.rack-barra { animation: rackBarra 1.25s cubic-bezier(.3,.7,.4,1) both; animation-delay: .15s; }
+@keyframes rackBarra { 0% { transform: translateY(58px); } 55% { transform: translateY(-16px); } 78% { transform: translateY(2px); } 88% { transform: translateY(-2px); } 100% { transform: none; } }
+.rack-texto { margin-top: 18px; font-size: 30px; font-weight: 800; font-stretch: 80%; color: #fff; animation: molineteTextoRack .5s var(--sale, ease-out) both; animation-delay: 1s; }
+.rack-bajada { margin-top: 2px; font-size: 15px; color: rgba(255,255,255,.7); animation: molineteTextoRack .5s var(--sale, ease-out) both; animation-delay: 1.12s; }
+@keyframes molineteTextoRack { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .rack-barra, .rack-texto, .rack-bajada { animation: none; } }
+
 /* EL MOLINETE */
 .molinete-velo { animation: molineteVelo 1.9s ease-in-out both; }
 @keyframes molineteVelo { 0% { opacity: 0; } 8% { opacity: 1; } 84% { opacity: 1; } 100% { opacity: 0; } }
@@ -6463,6 +6558,7 @@ label.ajuste-rotulo { display: block; }
 .planilla-socio { min-width: 0; padding: 4px 0; text-align: left; }
 .planilla-nombre { display: block; font-size: 14px; font-weight: 700; line-height: 1.2; overflow-wrap: anywhere; }
 .planilla-detalle { display: block; margin-top: 1px; font-size: 12px; color: var(--papel-suave); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.planilla-ahora { font-weight: 700; color: var(--papel-tinta, inherit); }
 .planilla-firma { justify-self: center; max-width: 70px; overflow: hidden; white-space: nowrap; font-size: calc(23px * 1); font-weight: 600; line-height: 1.1; color: #2a2d36; transform: rotate(var(--giro, -4deg)); }
 .planilla-aplauso { width: 42px; height: 42px; border-radius: 999px; display: grid; place-items: center; font-size: 18px; color: var(--papel-tinta); background: rgba(0,0,0,.07); transition: transform .2s ease; }
 .planilla-aplauso:not(.hecho) { background: color-mix(in oklab, var(--tono) 32%, var(--papel)); }
@@ -9775,7 +9871,19 @@ function datosDescansoNativo(timerId, v) {
     id: timerId, ...(duracion > 0 ? { duracion } : {}),
     titulo: enCurso.titulo, cuerpo: enCurso.cuerpo, subtitulo: "Descanso", color: v?.color || "#14B8A6",
     tituloFin: alFinal.titulo, cuerpoFin: alFinal.cuerpo, alerta: ALERTA_DESCANSO,
+    ...detalleDelDescanso(v, duracion),
   };
+}
+// Lo que se ve al expandir la notificación del descanso (plugin v14; un APK
+// anterior lo ignora): cuánto dura, a qué hora termina y lo que sigue.
+function detalleDelDescanso(v, duracion) {
+  const mmss = (t) => `${Math.floor(t / 60)}:${String(Math.round(t % 60)).padStart(2, "0")}`;
+  const lineas = [];
+  if (v?.serie && v?.series) lineas.push(`Serie ${v.serie} de ${v.series}`);
+  if (duracion > 0) lineas.push(`Descanso de ${mmss(duracion)}`);
+  if (v?.endTime) lineas.push(`Termina a las ${new Date(v.endTime).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false })}`);
+  if (v?.siguiente && v?.ejercicio && v.siguiente !== v.ejercicio) lineas.push(`Venís de ${v.ejercicio}`);
+  return { detalle: lineas.join("\n"), detalleFin: duracion > 0 ? `Descansaste ${mmss(duracion)}` : "" };
 }
 
 // En pausa, la notificación queda quieta, con lo que falta y el botón
@@ -10543,6 +10651,53 @@ function sonarMolinete() {
 // detrás del gabinete: al girar, el que cerraba el paso baja y el de arriba
 // queda cruzado) y el carnet. Quieto (el de la guía), con la luz verde y sin
 // el carnet.
+// LA BARRA AL RACK (03/11, pedido: "proponer más animaciones como esa [el
+// molinete], están buenas"): al guardar la última serie del día, la barra
+// cargada sube y baja a los ganchos del rack con un clac, y abajo dice que el
+// día está completo. Es el cierre del entrenamiento antes del ticket, como el
+// molinete es la entrada. Dura lo mismo que el molinete y no se toca.
+function RackOverlay({ color = "#14B8A6", onDone }) {
+  const alTerminar = useRef(onDone);
+  useEffect(() => { alTerminar.current = onDone; });
+  useEffect(() => {
+    const t = setTimeout(() => alTerminar.current?.(), 2100);
+    const c = setTimeout(() => sonarDisco(), 980);
+    return () => { clearTimeout(t); clearTimeout(c); };
+  }, []);
+  const discos = [["#E5383B", 30], ["#2F6FED", 27], ["#F4C430", 23]];
+  return (
+    <div className="fixed inset-0 z-[135] flex items-center justify-center pointer-events-none rack-velo modal-overlay" role="status" aria-label="Día completo">
+      <div className="absolute inset-0 bg-black/80 backdrop-blur-md" />
+      <div className="relative flex flex-col items-center" style={{ "--dia": color }}>
+        <svg viewBox="0 0 280 190" className="rack" aria-hidden="true">
+          <line x1="20" y1="184" x2="260" y2="184" className="rack-piso" />
+          {[82, 198].map((x) => (
+            <g key={x}>
+              <rect x={x - 7} y="18" width="14" height="166" rx="2" className="rack-parante" />
+              {Array.from({ length: 9 }, (_, k) => <circle key={k} cx={x} cy={34 + k * 16} r="2" className="rack-agujero" />)}
+              <path d={x < 140 ? `M${x + 7} 82 h14 v10 h-6` : `M${x - 7} 82 h-14 v10 h6`} className="rack-gancho" />
+            </g>
+          ))}
+          <g className="rack-barra">
+            <rect x="8" y="80" width="264" height="7" rx="3.5" className="rack-acero" />
+            {[1, -1].map((lado) => (
+              <g key={lado}>
+                {discos.map(([c, h], k) => {
+                  const x = lado === 1 ? 32 + k * 10 : 240 - k * 10;
+                  return <rect key={k} x={x} y={83.5 - h} width="8" height={h * 2} rx="2.5" fill={`color-mix(in oklab, ${c} 60%, #8a8c92)`} className="rack-disco" />;
+                })}
+                <rect x={lado === 1 ? 62 : 212} y="76" width="6" height="15" rx="1.5" className="rack-collarin" />
+              </g>
+            ))}
+          </g>
+        </svg>
+        <p className="rack-texto">Día completo</p>
+        <p className="rack-bajada">Finalizá cuando quieras</p>
+      </div>
+    </div>
+  );
+}
+
 function MolineteDibujo({ quieto = false }) {
   return (
     <svg viewBox="0 0 240 170" className={`molinete ${quieto ? "quieto" : ""}`} aria-hidden="true">
@@ -10572,10 +10727,14 @@ function MolineteDibujo({ quieto = false }) {
 }
 function SessionStartOverlay({ onDone }) {
   const [hora] = useState(() => new Date().toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false }));
+  // onDone llega nuevo en cada render de App (el reloj de la sesión lo
+  // redibuja): con él de dependencia, la cuenta volvía a empezar.
+  const alTerminar = useRef(onDone);
+  useEffect(() => { alTerminar.current = onDone; });
   useEffect(() => {
-    const t = setTimeout(onDone, 1900);
+    const t = setTimeout(() => alTerminar.current?.(), 1900);
     return () => clearTimeout(t);
-  }, [onDone]);
+  }, []);
   return (
     <div className="fixed inset-0 z-[135] flex items-center justify-center pointer-events-none molinete-velo modal-overlay" role="status" aria-label={`Entrada ${hora}. A entrenar.`}>
       <div className="absolute inset-0 bg-black/80 backdrop-blur-md" />
@@ -10749,8 +10908,13 @@ function fechaDelTicket(iso) {
 // (AAAA-MM-DD), `dayKey` el día de la rutina, `inicio` y `fin` el
 // horario (la duración) y `conMetas` cuenta las metas del plan: sólo al
 // terminar, porque después ya no se sabe en qué semana del ciclo fue.
-function armarTicket({ logs, profile, cycleStart, fecha, dayKey, inicio = null, fin = null, conMetas = false }) {
+function armarTicket({ logs, profile, cycleStart, fecha, dayKey, inicio = null, fin = null, conMetas = false, descarga = false }) {
   const hoy = fecha;
+  // Una sesión de descarga también sale impresa (pedido del 03/11: "me está
+  // dejando de dar los tickets cuando termino"; en la semana de descarga no
+  // salía nada): cuenta sólo sus series (deload: true), sin récords, metas
+  // ni la comparación con la vez pasada, que en una descarga no dicen nada.
+  const esDeHoy = (e) => e.date === hoy && (descarga ? !!e.deload : !e.deload);
   const dd = getProfileSettings(profile)?.dumbbellDouble || null;
   // El resumen viaja en kg (el modal convierte lo que muestra), pero
   // "marca" ya es texto armado: se rotula acá en la unidad de la persona.
@@ -10774,7 +10938,7 @@ function armarTicket({ logs, profile, cycleStart, fecha, dayKey, inicio = null, 
     // (con "deload:true") se colaban acá y el resumen de la sesión NORMAL
     // mostraba volumen/series/ejercicios que en realidad eran de la
     // descarga, no de este entrenamiento.
-    const deHoy = entries.filter((e) => e.date === hoy && !e.deload);
+    const deHoy = entries.filter(esDeHoy);
     if (!deHoy.length) return;
     const lf = (dd && dd[exId]) || EXERCISE_LIBRARY_BY_ID[exId]?.loadFactor || 1;
     deHoy.forEach((e) => { volumen += e.kg * lf * e.reps; series++; });
@@ -10794,7 +10958,7 @@ function armarTicket({ logs, profile, cycleStart, fecha, dayKey, inicio = null, 
     let piso = 0;
     previas.forEach((e) => { const rm = estimate1RM(e.kg, e.reps); if (rm > piso) piso = rm; });
     if (ov?.kg && ov?.reps) { const rm = estimate1RM(ov.kg, ov.reps); if (rm > piso) piso = rm; }
-    if (piso > 0) {
+    if (piso > 0 && !descarga) {
       let mejorHoy = null;
       deHoy.forEach((e) => { const rm = estimate1RM(e.kg, e.reps); if (rm > piso && (!mejorHoy || rm > mejorHoy.rm)) mejorHoy = { rm, e }; });
       if (mejorHoy) {
@@ -10813,7 +10977,7 @@ function armarTicket({ logs, profile, cycleStart, fecha, dayKey, inicio = null, 
   let vsUltima = null;
   const dk = dayKey;
   const previa = dk ? (profile?.trainingSessions || []).filter((t) => t.dayKey === dk && t.date < hoy).sort((a, b) => (a.date < b.date ? 1 : -1))[0] : null;
-  if (previa) {
+  if (previa && !descarga) {
     let volPrevio = 0;
     Object.entries(porEjercicio).forEach(([exId, entries]) => {
       const lf2 = (dd && dd[exId]) || EXERCISE_LIBRARY_BY_ID[exId]?.loadFactor || 1;
@@ -10837,7 +11001,7 @@ function armarTicket({ logs, profile, cycleStart, fecha, dayKey, inicio = null, 
   // equivalente en handleSave de SetRow.
   const defNow = resolveRoutineDef(profile?.routines?.[profile?.activeRoutineId], profile?.activeRoutineId);
   const modelNow = defNow ? buildRoutineModel(defNow) : null;
-  if (conMetas && modelNow && wiNow) {
+  if (conMetas && !descarga && modelNow && wiNow) {
     Object.entries(logs || {}).forEach(([key, val]) => {
       if (key.endsWith("_pr_override") || !Array.isArray(val)) return;
       const { exerciseId, setIndex } = parseLogKey(key);
@@ -10868,17 +11032,17 @@ function armarTicket({ logs, profile, cycleStart, fecha, dayKey, inicio = null, 
     });
     return Math.round(v);
   };
-  const fechasPrevias = dk ? [...new Set((profile?.trainingSessions || []).filter((t) => t.dayKey === dk && t.date < hoy).map((t) => t.date))].sort().slice(-5) : [];
+  const fechasPrevias = dk && !descarga ? [...new Set((profile?.trainingSessions || []).filter((t) => t.dayKey === dk && t.date < hoy).map((t) => t.date))].sort().slice(-5) : [];
   const historialDia = [...fechasPrevias.map((f) => ({ fecha: f, volumen: volDeFecha(f) })).filter((x) => x.volumen > 0), { fecha: hoy, volumen: Math.round(volumen), hoy: true }];
   // Las series de hoy por región del cuerpo, de la que más a la que menos.
   const porRegion = {};
   Object.entries(porEjercicio).forEach(([exId, entries]) => {
-    const n = entries.filter((e) => e.date === hoy && !e.deload).length;
+    const n = entries.filter(esDeHoy).length;
     const reg = regionDe(exId);
     if (n && reg) porRegion[reg] = (porRegion[reg] || 0) + n;
   });
   const regiones = Object.entries(porRegion).sort((x, y) => y[1] - x[1]).map(([nombre, n]) => ({ nombre, series: n }));
-  return { volumen: Math.round(volumen), series, ejercicios: ejercicios.size, prs, minutos, entrada: inicio || null, salida: inicio ? (fin || new Date().toISOString()) : null, vsUltima, metas, lineas, historialDia, regiones, dia: dk ? ROUTINE[dk]?.label || null : null, color: dk ? ROUTINE[dk]?.color || null : null, fecha: fin ? new Date(fin).toISOString() : hoy === todayStr() ? new Date().toISOString() : new Date(`${hoy}T12:00:00`).toISOString() };
+  return { descarga, volumen: Math.round(volumen), series, ejercicios: ejercicios.size, prs, minutos, entrada: inicio || null, salida: inicio ? (fin || new Date().toISOString()) : null, vsUltima, metas, lineas, historialDia, regiones, dia: dk ? ROUTINE[dk]?.label || null : null, color: dk ? ROUTINE[dk]?.color || null : null, fecha: fin ? new Date(fin).toISOString() : hoy === todayStr() ? new Date().toISOString() : new Date(`${hoy}T12:00:00`).toISOString() };
 }
 
 function SessionSummaryModal({ resumen, onClose }) {
@@ -10921,7 +11085,7 @@ function SessionSummaryModal({ resumen, onClose }) {
                   <hr />
                 </>
               )}
-              <p className="ticket-fila fuerte"><span>{resumen.dia || "Entrenamiento"}</span>{textoDuracion(resumen.minutos) && <span>{textoDuracion(resumen.minutos)}</span>}</p>
+              <p className="ticket-fila fuerte"><span>{resumen.dia || "Entrenamiento"}{resumen.descarga ? " · descarga" : ""}</span>{textoDuracion(resumen.minutos) && <span>{textoDuracion(resumen.minutos)}</span>}</p>
               {/* Cada ejercicio con sus series y, debajo, una raya impresa
                   del volumen que se llevó: se ve en qué se te fue la sesión. */}
               {lineas.map((l) => (
@@ -11065,7 +11229,7 @@ function dibujarTicket(ctx, W, H, resumen, unit) {
     y += 6;
     corte();
   }
-  fila(resumen.dia || "Entrenamiento", textoDuracion(resumen.minutos) || "", `700 24px ${F}`); y += 38;
+  fila(`${resumen.dia || "Entrenamiento"}${resumen.descarga ? " · descarga" : ""}`, textoDuracion(resumen.minutos) || "", `700 24px ${F}`); y += 38;
   lineas.forEach((l) => {
     fila(corto(l.nombre, 24), `${l.series} ${l.series === 1 ? "serie" : "series"}`); y += 12;
     ctx.fillStyle = tonos[1];
@@ -14901,6 +15065,51 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_
 // Cuando empieza un ciclo nuevo, el plan del anterior termina (ver metaDeHoy):
 // la hoja lo dice y ofrece seguirlo desde donde quedaste (`terminados`:
 // cuántos ejercicios tenían ese plan; `onSeguir`: planesParaSeguir).
+// EL ÁRBOL DE DISCOS (Rutina, semana de descarga; pedido del 03/11: "en
+// rutina está la planilla de planificación, pero cuando hacés la descarga no
+// hay nada"). En la descarga la hoja del plan se pliega; en su lugar, el
+// árbol de discos del gimnasio con los discos que esta semana no van a la
+// barra, colgados de sus clavijas: uno por serie que se saca hoy, de goma de
+// competición apagada como los de la barra. Al lado, cuántas series van y a
+// qué peso.
+const CLAVIJAS_ARBOL = [[62, 46], [138, 46], [62, 82], [138, 82], [62, 118], [138, 118]];
+function ArbolDiscos({ total = 0, quedan = 0, pct = 0.75, dia = null }) {
+  const sacadas = Math.max(0, total - quedan);
+  // Hasta dos discos por clavija; el de atrás asoma un poco más arriba.
+  const discos = Array.from({ length: Math.min(sacadas, 12) }, (_, k) => {
+    const [x, y] = CLAVIJAS_ARBOL[k % 6];
+    const atras = k >= 6;
+    const radio = [21, 21, 18, 18, 15, 15][k % 6];
+    return { k, x: x + (atras ? (x < 100 ? -3 : 3) : 0), y: y + 4 - (atras ? 5 : 0), radio, color: COLORES_DISCO[k % COLORES_DISCO.length], atras };
+  }).sort((a, b) => Number(b.atras) - Number(a.atras));
+  return (
+    <section className="arbol-placa" aria-label={`Semana de descarga: hoy van ${quedan} de ${total} series, al ${Math.round(pct * 100)} % del peso`}>
+      <div className="arbol-textos" aria-hidden="true">
+        <p className="arbol-titulo">Semana de descarga</p>
+        <p className="arbol-cifra"><b className="num-display">{quedan}</b><span>/{total}</span></p>
+        <p className="arbol-dato">series hoy{dia ? ` de ${dia}` : ""}</p>
+        <p className="arbol-cifra chica"><b className="num-display">{Math.round(pct * 100)}</b><span> %</span></p>
+        <p className="arbol-dato">del peso de siempre</p>
+      </div>
+      <svg viewBox="0 0 200 160" className="arbol-dibujo" aria-hidden="true">
+        <path className="arbol-base" d="M58 150 L142 150 L150 158 L50 158 Z" />
+        <rect className="arbol-poste" x="95" y="18" width="10" height="134" rx="2" />
+        <rect className="arbol-tapa" x="92" y="14" width="16" height="7" rx="2" />
+        {CLAVIJAS_ARBOL.map(([x, y]) => (
+          <path key={`${x}-${y}`} className="arbol-clavija" d={x < 100 ? `M95 ${y + 6} L${x - 6} ${y - 2}` : `M105 ${y + 6} L${x + 6} ${y - 2}`} />
+        ))}
+        {discos.map((d) => (
+          <g key={d.k} className={`arbol-disco ${d.atras ? "atras" : ""}`} style={{ "--d": d.color, "--i": d.k, transformOrigin: `${d.x}px ${d.y - d.radio + 6}px` }}>
+            <circle cx={d.x} cy={d.y} r={d.radio} className="arbol-disco-goma" />
+            <circle cx={d.x} cy={d.y} r={d.radio * 0.62} className="arbol-disco-canto" />
+            <circle cx={d.x} cy={d.y - d.radio + 6} r="2.6" className="arbol-disco-agujero" />
+          </g>
+        ))}
+      </svg>
+    </section>
+  );
+}
+
 function HojaDelPlan({ dia = null, semana = null, filas = [], hayPlan = false, enPausa = false, sinRutina = false, invitar = false, terminados = 0, onSeguir = null, onPlanificar = null, onPausa = null, onCampos = null }) {
   const visibles = filas.slice(0, 3);
   const resto = filas.length - visibles.length;
@@ -15257,6 +15466,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           </div></div>
         );
       })()}
+      {modoDescarga && !previa && <ArbolDiscos total={(day?.exercises || []).reduce((a, ex) => a + (ex.sets?.length || 0), 0)} quedan={avanceDescarga.total} pct={pctDescarga} dia={day?.label || null} />}
       {/* "Hoy descansás" ya no es un aviso aparte: va al lado de la fecha,
           arriba de todo (ver TituloPestana). El aviso, con tu semana en un
           estante chico, empujaba el día y "Iniciar sesión" hasta abajo de la
@@ -18574,6 +18784,49 @@ function ExercisePickerModal({ groups, selId, onSelect, onClose }) {
   );
 }
 
+// EL TABLERO DE LETRAS DEL MES (Progreso, arriba de todo; pedido del 03/11:
+// "en rutina, progreso y rutinas le falta ese diseño y color que tienen el
+// chatbot con la pizarra y social con el casillero"). El tablero de fieltro
+// con letras de plástico que cuelga en la entrada del gimnasio: el mes en
+// curso, con las sesiones, las series y los récords que llevás. Las cifras van
+// en el tono de la pestaña; las letras, blancas, encajadas en las ranuras.
+function TableroDelMes({ logs, sessions }) {
+  const datos = useMemo(() => {
+    const ahora = new Date();
+    const mes = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, "0")}`;
+    const desde = `${mes}-01`;
+    const sesiones = new Set((sessions || []).filter((t) => t?.date?.startsWith(mes)).map((t) => `${t.date}_${t.dayKey || ""}`)).size;
+    let series = 0;
+    const antes = {}, ahoraMax = {};
+    Object.entries(logs || {}).forEach(([k, arr]) => {
+      if (k.endsWith("_pr_override") || !Array.isArray(arr)) return;
+      const { exerciseId } = parseLogKey(k);
+      arr.forEach((h) => {
+        if (!h?.date || h.deload || !(h.kg > 0) || !(h.reps > 0)) return;
+        const rm = estimate1RM(h.kg, h.reps);
+        if (h.date >= desde) { series++; if (rm > (ahoraMax[exerciseId] || 0)) ahoraMax[exerciseId] = rm; }
+        else if (rm > (antes[exerciseId] || 0)) antes[exerciseId] = rm;
+      });
+    });
+    const records = Object.entries(ahoraMax).filter(([id, rm]) => antes[id] > 0 && rm > antes[id] + 0.01).length;
+    const nombre = ahora.toLocaleDateString("es-AR", { month: "long" });
+    return { nombre: nombre.charAt(0).toUpperCase() + nombre.slice(1), sesiones, series, records };
+  }, [logs, sessions]);
+  const fila = (n, uno, varios) => (
+    <p className="tablero-fila"><b>{n}</b> {n === 1 ? uno : varios}</p>
+  );
+  return (
+    <section className="tablero-letras" aria-label={`${datos.nombre}: ${datos.sesiones} sesiones, ${datos.series} series, ${datos.records} récords`}>
+      <div className="tablero-fieltro" aria-hidden="true">
+        <p className="tablero-fila tablero-mes">{datos.nombre}</p>
+        {fila(datos.sesiones, "sesión", "sesiones")}
+        {fila(datos.series, "serie", "series")}
+        {fila(datos.records, "récord", "récords")}
+      </div>
+    </section>
+  );
+}
+
 function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS, onResetAll, onDeleteDay, onUpdateSettings, onGoToProfile, onGoToRoutines, weekSchedule = null, sex, age, onGoToDeload, measurements, onAddMeasurement, photos, photosLoading, onAddPhoto, onDeletePhoto }) {
   // Los logs se guardan en kg. chartData es lo único que lee la sección de
   // evolución (lista, gráfico, tooltip y los tres KPI de abajo), así que
@@ -18701,6 +18954,7 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
             y en Ejercicios, Historial y Medidas empujaban la gráfica y el
             calendario a la mitad de la pantalla. Ahora el riel va primero y
             el ciclo es parte de tu rango. */}
+        {activeSection === "rank" && <TableroDelMes logs={logs} sessions={sessions} />}
         {activeSection === "rank" && (cycleStart ? (
           <WeekCalendar cycleStart={cycleStart} logs={logs} sessions={sessions} settings={settings} onGoToDeload={onGoToDeload} metaSemanal={weekSchedule ? Object.values(weekSchedule).filter(Boolean).length || null : null} />
         ) : (
@@ -20522,6 +20776,15 @@ const EMPTY_STREAKS_MAP = {};
 function useUserStreaks(uids) {
   const key = uids.join(",");
   const [activity, setActivity] = useState({});
+  // Con Social abierto se vuelve a mirar cada minuto y medio (lo que dura el
+  // perfil de cada amigo en memoria, ver VIDA_FULL_MS en social.js): así la
+  // planilla de asistencia muestra al que acaba de llegar sin salir y entrar.
+  const [vuelta, setVuelta] = useState(0);
+  useEffect(() => {
+    if (!uids.length) return;
+    const t = setInterval(() => { if (document.visibilityState === "visible") setVuelta((v) => v + 1); }, 90 * 1000);
+    return () => clearInterval(t);
+  }, [uids.length]);
   useEffect(() => {
     if (!uids.length) return;
     let cancelled = false;
@@ -20556,6 +20819,16 @@ function useUserStreaks(uids) {
         const dayDef = model?.days?.[latest.dayKey];
         latestSession = { date: latest.date, dayLabel: dayDef?.label || null, dayColor: dayDef?.color || null, series: seriesUltima, inicio: latest.startedAt || null };
       }
+      // Entrenando ahora: la sesión abierta de hoy (de menos de seis horas) va
+      // primero, con las series que lleva.
+      const abierta = full.enCurso?.startedAt ? new Date(full.enCurso.startedAt) : null;
+      if (abierta && localDateStr(abierta) === localDateStr(new Date()) && Date.now() - abierta.getTime() < 6 * 3600 * 1000) {
+        const hoyStr = localDateStr(new Date());
+        let seriesHoy = 0;
+        Object.entries(full.logs || {}).forEach(([k, arr]) => { if (!k.endsWith("_pr_override") && Array.isArray(arr)) arr.forEach((h) => { if (h?.date === hoyStr && !h.deload) seriesHoy++; }); });
+        const dayDef = model?.days?.[full.enCurso.dayKey] || (full.activeRoutineSnapshot ? buildRoutineModel(full.activeRoutineSnapshot).days?.[full.enCurso.dayKey] : null);
+        latestSession = { date: hoyStr, dayLabel: dayDef?.label || null, dayColor: dayDef?.color || null, series: seriesHoy, inicio: full.enCurso.startedAt, enCurso: true };
+      }
       const semana = semanaDeSesiones(sessions, (sesion) => model?.days?.[sesion.dayKey]?.color || null);
       // Sus marcas: para la pizarra de récords y para avisar si te pasó en un músculo.
       return [u, { streak, sessionsThisWeek, latestSession, semana, seriesSemana, logs: full.logs || {}, mejores: mejoresPorEjercicio(full.logs) }];
@@ -20564,7 +20837,7 @@ function useUserStreaks(uids) {
     });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
+  }, [key, vuelta]);
   return uids.length ? activity : EMPTY_STREAKS_MAP;
 }
 
@@ -23287,12 +23560,12 @@ function PlanillaAsistencia({ filas, enviados = {}, enviando = null, onAplaudir,
                     {f.esYo ? (
                       <span className="planilla-socio">
                         <span className="planilla-nombre">{f.nombre}</span>
-                        <span className="planilla-detalle">{f.dayLabel ? `${f.dayLabel}, ` : ""}{f.series} {f.series === 1 ? "serie" : "series"}</span>
+                        <span className="planilla-detalle">{f.dayLabel ? `${f.dayLabel}, ` : ""}{f.series} {f.series === 1 ? "serie" : "series"}{f.enCurso && <span className="planilla-ahora"> · entrenando</span>}</span>
                       </span>
                     ) : (
                       <button onClick={() => onVer(f.uid)} className="planilla-socio">
                         <span className="planilla-nombre">{f.nombre}</span>
-                        <span className="planilla-detalle">{f.dayLabel ? `${f.dayLabel}, ` : ""}{f.series} {f.series === 1 ? "serie" : "series"}</span>
+                        <span className="planilla-detalle">{f.dayLabel ? `${f.dayLabel}, ` : ""}{f.series} {f.series === 1 ? "serie" : "series"}{f.enCurso && <span className="planilla-ahora"> · entrenando</span>}</span>
                       </button>
                     )}
                     <span className="planilla-firma a-mano" style={{ "--giro": `${giroDeFirma(f.nombre)}deg` }} aria-hidden="true">{primer}</span>
@@ -23520,9 +23793,13 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
   // LA PLANILLA DE ASISTENCIA: los que entrenaron hoy y ayer, con la hora a la
   // que llegaron, y vos si también fuiste.
   const filasAsistencia = useMemo(() => {
-    const filas = kudosCandidates.map((c) => ({ uid: c.uid, nombre: basics[c.uid]?.name || "Tu amigo", daysAgo: c.daysAgo, dayLabel: c.latestSession?.dayLabel || null, series: c.latestSession?.series || 0, inicio: c.latestSession?.inicio || null, hora: horaDelTicket(c.latestSession?.inicio) || null }));
+    const filas = kudosCandidates.map((c) => ({ uid: c.uid, nombre: basics[c.uid]?.name || "Tu amigo", daysAgo: c.daysAgo, dayLabel: c.latestSession?.dayLabel || null, series: c.latestSession?.series || 0, inicio: c.latestSession?.inicio || null, hora: horaDelTicket(c.latestSession?.inicio) || null, enCurso: !!c.latestSession?.enCurso }));
     const mias = (profile?.trainingSessions || []).filter((t) => t?.date);
-    const mia = mias.length ? mias.reduce((x, y) => (y.date > x.date ? y : x)) : null;
+    // La sesión abierta cuenta como la de hoy desde que tocás "Iniciar
+    // sesión" (pedido: "cuando inicio la sesión debería aparecer y
+    // actualizarse"); antes aparecías recién al finalizar.
+    const abierta = profile?.activeSession?.startedAt ? { date: todayStr(), dayKey: profile.activeSession.dayKey, startedAt: profile.activeSession.startedAt, enCurso: true } : null;
+    const mia = abierta || (mias.length ? mias.reduce((x, y) => (y.date > x.date ? y : x)) : null);
     const dias = mia ? Math.max(0, Math.floor((new Date() - new Date(`${mia.date}T00:00:00`)) / 86400000)) : 99;
     if (mia && dias <= KUDOS_MAX_DAYS_AGO) {
       let series = 0;
@@ -23530,7 +23807,7 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
         if (k.endsWith("_pr_override") || !Array.isArray(arr)) return;
         arr.forEach((h) => { if (h?.date === mia.date && !h.deload) series++; });
       });
-      filas.push({ uid: uid || "yo", esYo: true, nombre: profileName || "Vos", daysAgo: dias, dayLabel: ROUTINE[mia.dayKey]?.label || null, series, inicio: mia.startedAt || null, hora: horaDelTicket(mia.startedAt) || null });
+      filas.push({ uid: uid || "yo", esYo: true, nombre: profileName || "Vos", daysAgo: dias, dayLabel: ROUTINE[mia.dayKey]?.label || null, series, inicio: mia.startedAt || null, hora: horaDelTicket(mia.startedAt) || null, enCurso: !!mia.enCurso });
     }
     return filas;
   }, [kudosCandidates, basics, profile, profileName, uid]);
@@ -23766,6 +24043,7 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
     return (
       <RoutineBuilder
         dumbbellDouble={getProfileSettings(profile)?.dumbbellDouble || null}
+        saltosDePeso={getProfileSettings(profile)?.saltosDePeso || null}
         onUpdateSettings={(patch) => onUpdateProfile?.({ settings: { ...getProfileSettings(profile), ...patch } })}
         logs={profile?.logs || {}}
         descansos={{ largo: getProfileSettings(profile).restLong, corto: getProfileSettings(profile).restShort }}
@@ -24850,7 +25128,7 @@ function CambiarEjercicio({ ex, existingIds, onElegir, onCerrar }) {
 // UN EJERCICIO DEL DÍA: cerrado es un renglón (el asa para arrastrarlo, el
 // nombre, el músculo y sus series en rayitas); abierto, sus series y lo
 // demás: mancuernas, superserie, subir, bajar, cambiar y quitar.
-function ArmadoEjercicio({ ex, i, abierto, onAbrir, siguiente, enlazadoArriba, enlazadoAbajo, existingIds, dumbbellFactor, onToggleDumbbell, onConfigChange, onQuitar, onSubir, onBajar, onToggleSuperset, onCambiar, recienAgregado, saliendo, arrastrando, sinTransicion = false, desplazamiento, onAsa }) {
+function ArmadoEjercicio({ ex, i, abierto, onAbrir, siguiente, enlazadoArriba, enlazadoAbajo, existingIds, dumbbellFactor, onToggleDumbbell, salto = null, onSalto = null, onConfigChange, onQuitar, onSubir, onBajar, onToggleSuperset, onCambiar, recienAgregado, saliendo, arrastrando, sinTransicion = false, desplazamiento, onAsa }) {
   const unit = useWeightUnit();
   const [cambiando, setCambiando] = useState(false);
   const n = ex.sets?.length || 0;
@@ -24902,6 +25180,24 @@ function ArmadoEjercicio({ ex, i, abierto, onAbrir, siguiente, enlazadoArriba, e
                 ))}
               </div>
               <p className="armado-nota">{mancuerna === 2 ? `Con dos de ${kgToDisplay(20, unit)} ${weightLabel(unit)}, tu rango cuenta ${kgToDisplay(40, unit)} ${weightLabel(unit)}.` : "El peso que anotes es el que cuenta para tu rango."}</p>
+            </div>
+          )}
+          {/* DE A CUÁNTO SUBE (pedido del 03/11: "cuando editás la rutina, que
+              se pueda configurar que es una máquina y cada cuánto son los
+              saltos, ej. de 15 lb en 15 lb, y que la planificación y la
+              descarga lo tengan en cuenta"). Es el mismo dato que el "de a
+              2,5" de la serie (settings.saltosDePeso): lo usan el − y el +,
+              la progresión, el planificador, la IA y la descarga. */}
+          {!ex.cardio && onSalto && (
+            <div className="armado-saltos">
+              <span className="armado-campo-rotulo">Sube de a</span>
+              <div className="armado-saltos-opciones" role="group" aria-label="De a cuánto sube el peso">
+                {(unit === "lbs" ? SALTOS_LBS : SALTOS_KG).map((v) => (
+                  <button key={v} onClick={() => onSalto(v)} aria-pressed={salto === v} className={`armado-salto ${salto === v ? "activo" : ""}`}>{conComa(v)}</button>
+                ))}
+                <span className="armado-saltos-unidad">{weightLabel(unit)}</span>
+              </div>
+              <p className="armado-nota">{salto === (unit === "lbs" ? 5 : 2.5) ? "El disco chico. Si es una máquina con placas, elegí lo que sube cada placa." : `Como una máquina de placas de ${conComa(salto)} ${weightLabel(unit)}: la serie, tu plan y la descarga suben y bajan de a eso.`}</p>
             </div>
           )}
           {siguiente && (
@@ -25038,7 +25334,8 @@ function ArmadoCalentamiento({ day, onSetWarmup, otherDays = [], onCopyWarmupTo 
 // el calentamiento, los ejercicios y el buscador para sumar más.
 function ArmadoDia({ day, dayIdx, totalDays, otherDays = [], descansos, cuando, tuyos = [], onIrAlCronograma, siguienteDia, onIrAlDia, onSumarDia,
   onRename, onRemove, onMoveDay, onChangeColor, onDuplicate, onAddExercise, onAddCustomExercise, onRemoveExercise, onMoveExercise, onConfigExercise, onToggleSuperset, onSwapExercise,
-  onSetWarmup = null, onCopyWarmupTo = null, dumbbellDouble = null, onUpdateSettings = null }) {
+  onSetWarmup = null, onCopyWarmupTo = null, dumbbellDouble = null, saltosDePeso = null, onUpdateSettings = null }) {
+  const unitDia = useWeightUnit();
   const [pickerOpen, setPickerOpen] = useState(day.exercises.length === 0);
   const [ajustes, setAjustes] = useState(false);
   const [abiertoId, setAbiertoId] = useState(null);
@@ -25204,6 +25501,14 @@ function ArmadoDia({ day, dayIdx, totalDays, otherDays = [], descansos, cuando, 
                 existingIds={existingIds}
                 dumbbellFactor={(dumbbellDouble || {})[ex.id] || EXERCISE_LIBRARY_BY_ID[ex.id]?.loadFactor || 1}
                 onToggleDumbbell={onUpdateSettings ? (v) => onUpdateSettings({ dumbbellDouble: { ...(dumbbellDouble || {}), [ex.id]: v } }) : null}
+                salto={saltoDe({ saltosDePeso }, ex.id, unitDia)}
+                onSalto={onUpdateSettings ? (v) => {
+                  const saltos = { ...(saltosDePeso || {}) };
+                  if (v === (unitDia === "lbs" ? 5 : 2.5)) delete saltos[ex.id];
+                  else saltos[ex.id] = { v, u: unitDia };
+                  onUpdateSettings({ saltosDePeso: saltos });
+                  haptic(10);
+                } : null}
                 onConfigChange={(cfg) => onConfigExercise(i, cfg)}
                 onQuitar={() => quitarConAnimacion(ex.id)}
                 onSubir={i > 0 ? () => onMoveExercise(i, -1) : null}
@@ -28418,7 +28723,7 @@ function WeeklyScheduleEditor({ dayOrder, days, schedule, onChange }) {
 
 // `nueva`: arranca con una rutina (la importada, para corregirla) pero se
 // guarda como una nueva.
-function RoutineBuilder({ initialRoutine, onCancel, onSave, dumbbellDouble = null, onUpdateSettings = null, logs = {}, descansos = null, sinPestanas = false, titulo = null, nueva = false }) {
+function RoutineBuilder({ initialRoutine, onCancel, onSave, dumbbellDouble = null, saltosDePeso = null, onUpdateSettings = null, logs = {}, descansos = null, sinPestanas = false, titulo = null, nueva = false }) {
   const isEditing = !!initialRoutine && !nueva;
   const [name, setNameRaw] = useState(initialRoutine?.name || "");
   const [days, setDaysRaw] = useState(() => (initialRoutine ? builderDaysFromRoutineDef(initialRoutine) : [{ key: builderUid("day"), label: "DÍA 1", color: BUILDER_COLOR_PALETTE[0], exercises: [] }]));
@@ -28670,7 +28975,7 @@ function RoutineBuilder({ initialRoutine, onCancel, onSave, dumbbellDouble = nul
           descansos={pasos} cuando={cuandoSeEntrena(schedule, dia.key)} tuyos={tuyos}
           onIrAlCronograma={() => cronoRef.current?.scrollIntoView?.({ block: "start", behavior: "smooth" })}
           siguienteDia={siguiente} onIrAlDia={() => siguiente && setDiaKey(siguiente.key)} onSumarDia={addDay}
-          dumbbellDouble={dumbbellDouble} onUpdateSettings={onUpdateSettings}
+          dumbbellDouble={dumbbellDouble} saltosDePeso={saltosDePeso} onUpdateSettings={onUpdateSettings}
           onDuplicate={() => duplicateDay(idxSel)}
           onRename={(label) => renameDay(idxSel, label)} onRemove={() => removeDay(idxSel)} onMoveDay={(delta) => moveDay(idxSel, delta)} onChangeColor={(color) => changeDayColor(idxSel, color)}
           onAddExercise={(libEx) => addExercise(idxSel, libEx)} onAddCustomExercise={(rawName, muscle) => addCustomExercise(idxSel, rawName, muscle)}
@@ -29270,6 +29575,8 @@ function RoutinePreviewModal({ routineDef, routineName, onActivate, onClose, yaA
 
 function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpdateProfile, openScheduleSignal = 0, openEditorSignal = 0, onSignalConsumed = null, onGoToDay = null }) {
   const [mode, setMode] = useState("catalog");
+  // El marcador escribe el nombre de tu rutina la primera vez del día.
+  const escribeNombre = usePrimeraVezHoy("pizarra_blanca");
   const [showWizard, setShowWizard] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [showPresetsForced, setShowPresetsForced] = useState(false);
@@ -29437,6 +29744,7 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
     return (
       <RoutineBuilder
         dumbbellDouble={getProfileSettings(profile)?.dumbbellDouble || null}
+        saltosDePeso={getProfileSettings(profile)?.saltosDePeso || null}
         onUpdateSettings={(patch) => onUpdateProfile?.({ settings: { ...getProfileSettings(profile), ...patch } })}
         logs={profile?.logs || {}}
         descansos={{ largo: getProfileSettings(profile).restLong, corto: getProfileSettings(profile).restShort }}
@@ -29538,15 +29846,25 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
         // grande: ves sus días de un vistazo (con su color), y el detalle
         // (balance, cronograma) queda a un toque para no saturar.
         <section className="tarjeta-tonal rutina-activa p-4 space-y-4" style={{ "--c": "#3B82F6" }} aria-label="Tu rutina activa">
-          <div className="flex items-start gap-3">
-            <div className="min-w-0 flex-1">
-              <p className="rutina-activa-linea">Tu rutina</p>
-              <h3 className="rutina-activa-nombre">{activeDef.name}</h3>
+          {/* LA PIZARRA BLANCA (03/11, pedido: "le falta ese diseño y color que
+              tienen el chatbot con la pizarra y social con el casillero"): la
+              de marcador del gimnasio, con el marco de aluminio, la rutina
+              escrita a mano y cada día con el marcador de su color; en la
+              bandeja, esos marcadores y el borrador. */}
+          <div className="pizarra-blanca">
+            <div className="flex items-start gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="pizarra-blanca-linea">Tu rutina</p>
+                <h3 className={`pizarra-blanca-nombre ${escribeNombre ? "escribe" : ""}`}>{activeDef.name}</h3>
+              </div>
+              <button onClick={() => setShareTarget(activeDef)} aria-label="Compartir rutina activa" className="pizarra-blanca-boton shrink-0"><Share2 size={16} /></button>
             </div>
-            <button onClick={() => setShareTarget(activeDef)} aria-label="Compartir rutina activa" className="boton-redondo shrink-0"><Share2 size={16} /></button>
+            <DiasRutina routineDef={activeDef} onGoToDay={onGoToDay} />
+            <div className="pizarra-blanca-bandeja" aria-hidden="true">
+              {(activeDef.dayOrder || Object.keys(activeDef.days || {})).filter((dk) => activeDef.days?.[dk]).slice(0, 4).map((dk) => <i key={dk} className="marcador" style={{ "--dia": activeDef.days[dk].color }} />)}
+              <i className="borrador" />
+            </div>
           </div>
-
-          <DiasRutina routineDef={activeDef} onGoToDay={onGoToDay} />
           {/* LA SEMANA, EN EL ESTANTE DE LAS PESAS RUSAS (ver EstantePesas):
               una pesa del color de lo que toca cada día que entrenás, el lugar
               vacío los de descanso y la de hoy, levantada. Arriba, los días de
@@ -30844,6 +31162,7 @@ export default function App() {
   // noche. Ver el efecto checkPeriodRecaps más abajo.
   const [periodRecap, setPeriodRecap] = useState(null);
   const [sessionStarted, setSessionStarted] = useState(false); // overlay "¡A entrenar!"
+  const [diaCompleto, setDiaCompleto] = useState(false); // la barra al rack
   const [recoveredNotice, setRecoveredNotice] = useState(false);
 
   useEffect(() => {
@@ -31340,6 +31659,20 @@ export default function App() {
     return { done, total };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [logs, profile?.activeSession?.dayKey, profile?.activeSession?.deload, profile?.deloadProgress, activeRoutineDef]);
+  // La barra al rack: cuando la última serie del día queda hecha con la
+  // sesión abierta (una vez por día y día de la rutina).
+  const avancePrevio = useRef(null);
+  useEffect(() => {
+    const { done, total } = sessionProgress;
+    const antes = avancePrevio.current;
+    avancePrevio.current = { done, total, dk: profile?.activeSession?.dayKey || null };
+    if (!profile?.activeSession || !total || done !== total || !antes || antes.dk !== avancePrevio.current.dk || antes.done >= total) return;
+    if (!primeraVezHoy(`rack_${profile.activeSession.dayKey}`)) return;
+    // Un cuadro después: que el ✓ de la serie se vea antes de la barra.
+    const t = requestAnimationFrame(() => { setDiaCompleto(true); haptic([0, 30, 50, 60]); });
+    return () => cancelAnimationFrame(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionProgress]);
   const needsRoutinePick = !!profile && !profile.activeRoutineId;
   // Cronograma semanal de la rutina activa (lunes a domingo → día de rutina
   // o descanso) — ver getRoutineWeekSchedule más arriba en el archivo.
@@ -31922,6 +32255,7 @@ export default function App() {
   // siempre en 0 minutos, y limpia activeSession al terminar.
   const handleFinishDeloadSession = (dayKey) => {
     detenerCronometrosDeSesion();
+    const resumen = armarTicket({ logs, profile, cycleStart, fecha: todayStr(), dayKey, inicio: profile?.activeSession?.deload ? profile.activeSession.startedAt : null, descarga: true });
     let updatedTrainingSessions = null;
     setProfiles((prev) => {
       const p = prev[activeProfile];
@@ -31947,6 +32281,7 @@ export default function App() {
       saveProfiles(np);
       return np;
     });
+    if (updatedTrainingSessions && resumen.series > 0) setSessionSummary(resumen);
     if (updatedTrainingSessions) checkWeeklyRecap(updatedTrainingSessions);
   };
 
@@ -32105,6 +32440,7 @@ export default function App() {
         )}
       </DockInferior>
       {sessionStarted && <SessionStartOverlay onDone={() => setSessionStarted(false)} />}
+      {diaCompleto && !sessionStarted && <RackOverlay color={sessionTintColor || "#14B8A6"} onDone={() => setDiaCompleto(false)} />}
       {/* Al cerrar el ticket de un entrenamiento (el momento en que ya viste
           lo que la app hace), el paywall una sola vez: ver paywallAutomatico. */}
       {sessionSummary && <SessionSummaryModal resumen={sessionSummary} onClose={() => { setSessionSummary(null); setTimeout(() => paywallAutomatico("primer_entrenamiento"), 500); }} />}

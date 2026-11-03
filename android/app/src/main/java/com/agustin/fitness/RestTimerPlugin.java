@@ -48,7 +48,9 @@ public class RestTimerPlugin extends Plugin {
     // notificación (Pausar, Seguir, +15 s, Reiniciar, Cerrar), el aviso del
     // final con su propia alarma y el estado "terminado" que cuenta cuánto te
     // pasaste. Sin "id" (el cardio), todo sigue como en la v12.
-    private static final int VERSION = 13;
+    // v14: la notificación se expande (`detalle`, con la meta, el descanso y
+    // a qué hora termina).
+    private static final int VERSION = 14;
     // Canal v8: IMPORTANCE_DEFAULT — aparece en la barra SIN saltar el popup
     // (heads-up). El v7 usaba HIGH y por eso la notificación "saltaba".
     // DEFAULT sigue siendo válido para Live Updates (solo MIN está prohibido).
@@ -202,6 +204,8 @@ public class RestTimerPlugin extends Plugin {
             e.put("subtitulo", call.getString("subtitulo", "Descanso"));
             e.put("tituloFin", call.getString("tituloFin", "Terminó el descanso"));
             e.put("cuerpoFin", call.getString("cuerpoFin", "Te toca la próxima serie."));
+            e.put("detalle", call.getString("detalle", ""));
+            e.put("detalleFin", call.getString("detalleFin", ""));
             e.put("alerta", call.getString("alerta", "sound"));
             e.put("color", colorDe(call.getString("color", null)));
             Integer duracion = call.getInt("duracion");

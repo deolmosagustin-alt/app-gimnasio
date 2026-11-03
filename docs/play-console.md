@@ -56,3 +56,7 @@ Revisar que el paquete `com.modusfit.fitness` figure registrado. Si pide verific
 ## 8. Notas de la versión 1.0.25 (pegar en la pista)
 
 > Ahora el descanso se ve en la barra de arriba y en la pantalla bloqueada, con pausa y +15 s. El código QR de tu perfil abre la app con cualquier cámara. Arreglamos un cierre al guardar una imagen. Y la app ya no pide el ID de publicidad.
+
+## 9. Notas de la versión 1.0.26 (versionCode 27)
+
+> La notificación del descanso ahora se expande: al bajarla ves la serie que sigue, cuánto dura el descanso y a qué hora termina.
