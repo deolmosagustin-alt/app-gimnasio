@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, createContext, useContext, useSyncExternalStore, useId } from "react";
-import { createPortal } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 // Terminación: los dígitos de los relojes ruedan (NumberFlow) y las series se
 // acomodan deslizándose al guardar (Motion), en vez de saltar.
 import NumberFlow, { NumberFlowGroup } from "@number-flow/react";
@@ -2564,6 +2564,26 @@ const ANIMATION_CSS = letraEscalable(`
 .streak-jump { animation: streakJump 0.75s cubic-bezier(0.34, 1.4, 0.64, 1) 0.15s backwards; }
 
 /* Cambio de pestaña: la entrante se desliza sutilmente desde su dirección */
+/* LA TRANSICIÓN DE VISTA ENTRE PESTAÑAS (cambiarConTransicion): la de antes
+   se va hacia un lado y se apaga; la nueva entra desde el lado de su pestaña.
+   Mientras dura, el deslizamiento de siempre (tab-slide) se apaga: si no, la
+   pantalla nueva se movería dos veces. Las barras fijas, quietas. */
+.barra-pestanas { view-transition-name: barra-pestanas; }
+.app-bar { view-transition-name: barra-arriba; }
+:root[data-vt] .tab-slide-right, :root[data-vt] .tab-slide-left { animation: none; }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration: var(--dur-pantalla, .42s); animation-timing-function: var(--sale, ease-out); }
+:root[data-vt="der"]::view-transition-old(root) { animation-name: vtSaleIzq; }
+:root[data-vt="der"]::view-transition-new(root) { animation-name: vtEntraDer; }
+:root[data-vt="izq"]::view-transition-old(root) { animation-name: vtSaleDer; }
+:root[data-vt="izq"]::view-transition-new(root) { animation-name: vtEntraIzq; }
+@keyframes vtSaleIzq { to { opacity: 0; transform: translateX(-36px); } }
+@keyframes vtSaleDer { to { opacity: 0; transform: translateX(36px); } }
+@keyframes vtEntraDer { from { opacity: 0; transform: translateX(36px); } }
+@keyframes vtEntraIzq { from { opacity: 0; transform: translateX(-36px); } }
+/* El objeto que viaja (la pesa o la baldosa → la placa del día): el
+   navegador lo lleva de un lugar y tamaño al otro. */
+::view-transition-group(objeto-viaja) { animation-duration: .5s; animation-timing-function: var(--sale, ease-out); }
+::view-transition-group(barra-pestanas), ::view-transition-group(barra-arriba) { animation-duration: var(--dur-chico, .24s); }
 @keyframes tabSlideRight { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: translateX(0); } }
 @keyframes tabSlideLeft  { from { opacity: 0; transform: translateX(-28px); } to { opacity: 1; transform: translateX(0); } }
 .tab-slide-right { animation: tabSlideRight var(--dur-pantalla, .42s) var(--sale, ease-out) backwards; }
@@ -29552,6 +29572,41 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
 // Orden visual de las pestañas: define desde qué lado entra el contenido al
 // cambiar (si vas a una pestaña "más a la derecha", entra desde la derecha).
 const TAB_ORDER = ["rutina", "progreso", "social", "descarga", "rutinas", "entrenador_ia", "perfil"];
+// CAMBIAR DE PESTAÑA CON UNA TRANSICIÓN DE VISTA (03/11, la propuesta 08 del
+// análisis estético): el navegador saca una foto de la pantalla de antes y
+// otra de la de después; la de antes se va hacia un lado y la nueva entra
+// desde el lado de su pestaña. La barra de arriba y la de abajo quedan quietas
+// (tienen su propio nombre de transición) y, si se pasa `viaja`, ese objeto
+// (la pesa o la baldosa del día que tocaste en Rutinas) vuela hasta la placa
+// del día en Rutina. Sin soporte o con "reducir movimiento", cambia al
+// instante, con el deslizamiento de siempre.
+function cambiarConTransicion(actualizar, { direccion = "der", viaja = null, destino = null } = {}) {
+  const raiz = typeof document !== "undefined" ? document.documentElement : null;
+  const quieto = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+  if (!raiz || !document.startViewTransition || quieto) { actualizar(); return; }
+  raiz.dataset.vt = direccion;
+  if (viaja) viaja.style.viewTransitionName = "objeto-viaja";
+  let transicion;
+  try {
+    transicion = document.startViewTransition(async () => {
+      if (viaja) viaja.style.viewTransitionName = "";
+      flushSync(actualizar);
+      // Una vuelta para que la pestaña nueva termine de acomodarse (el día
+      // elegido se fija en un efecto) antes de la foto de después. Con un
+      // temporizador y no con requestAnimationFrame: durante la transición el
+      // navegador no dibuja cuadros, y la espera se colgaba hasta el límite.
+      await new Promise((ok) => setTimeout(ok, 30));
+      if (destino) { const el = document.querySelector(destino); if (el) el.style.viewTransitionName = "objeto-viaja"; }
+    });
+  } catch { delete raiz.dataset.vt; actualizar(); return; }
+  // Si otra transición la interrumpe (dos toques rápidos), sólo se saltea la
+  // animación: el cambio de pestaña ya se hizo.
+  transicion.ready.catch(() => {});
+  transicion.finished.catch(() => {}).finally(() => {
+    delete raiz.dataset.vt;
+    if (destino) { const el = document.querySelector(destino); if (el) el.style.viewTransitionName = ""; }
+  });
+}
 
 // "color" es opcional (por defecto teal, el resaltado de siempre) — sólo
 // Social lo pisa con su propio celeste, para que se note como una sección
@@ -30667,7 +30722,12 @@ export default function App() {
     if (isDeloadWeek) setDeloadDismissed(false); else setDescargaPrevia(true);
     setTab("rutina");
   };
-  const irAPestana = (t) => (t === "descarga" ? irADescarga() : (setDescargaPrevia(false), setTab(t)));
+  const irAPestanaYa = (t) => (t === "descarga" ? irADescarga() : (setDescargaPrevia(false), setTab(t)));
+  const irAPestana = (t) => {
+    if (t === tab) { irAPestanaYa(t); return; }
+    const direccion = TAB_ORDER.indexOf(t) >= TAB_ORDER.indexOf(tab) ? "der" : "izq";
+    cambiarConTransicion(() => irAPestanaYa(t), { direccion });
+  };
   const themeClass = getProfileSettings(profile).theme === "light" ? "light-mode" : "";
   // tint() (utils.js) arma los "badges" de color según el tema — necesita
   // saber cuál está activo, pero es una función de módulo (la llaman
@@ -31772,7 +31832,10 @@ export default function App() {
           <div key={tab} className={tabSlideClass}>
             <TituloPestana tab={tab} descansa={descansaHoy} descarga={isDeloadWeek && getProfileSettings(profile).deloadEnabled !== false} />
             <PrimeraVezRecorrido tab={tab} nuevo={(profile?.trainingSessions?.length || 0) < 3 && !profile?.activeSession} activo={!!recorrido || !!bienvenidaRecorrido} onEmpezar={setBienvenidaRecorrido} />
-            {tab === "rutinas" && <RoutinesView openScheduleSignal={openSectionSignal.id === "week-schedule" ? openSectionSignal.n : 0} openEditorSignal={openSectionSignal.id === "routine-editor" ? openSectionSignal.n : 0} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleDeleteRoutine} onUpdateProfile={handleUpdateProfile} onGoToDay={(dayKey) => goToSection("rutina", "go-to-day", dayKey)} />}
+            {tab === "rutinas" && <RoutinesView openScheduleSignal={openSectionSignal.id === "week-schedule" ? openSectionSignal.n : 0} openEditorSignal={openSectionSignal.id === "routine-editor" ? openSectionSignal.n : 0} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleDeleteRoutine} onUpdateProfile={handleUpdateProfile} onGoToDay={(dayKey) => {
+              const tocado = document.activeElement?.closest?.(".estante-lugar, .dia-rutina") || null;
+              cambiarConTransicion(() => goToSection("rutina", "go-to-day", dayKey), { direccion: "izq", viaja: tocado, destino: ".dia-hero" });
+            }} />}
             {tab === "rutina" && !enDescarga && <OnboardingTasksCard profile={profile} cycleStart={cycleStart} logs={logs} onGoToProfile={() => setTab("perfil")} onOpenFieldSettings={() => setShowFieldIntro(true)} onDone={() => handleUpdateProfile({ onboardingDone: true })} />}
             {/* La semana de descarga es Rutina en modo descarga (ver RoutineView). */}
             {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToFieldSettings={() => goToSection("perfil", "field-settings-section")} semanaDescarga={isDeloadWeek} descargaApagada={deloadDismissed} descargaPrevia={descargaPrevia} onModoDescarga={(on) => { setDeloadDismissed(!on); if (on) setDescargaPrevia(false); }} onPreviaDescarga={setDescargaPrevia} onAdelantarDescarga={handleAdelantarDescarga} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} descargaTerminadaHoy={(profile?.trainingSessions || []).some((s) => s.date === todayStr() && s.deload)} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} sex={profile?.sex} age={edadDe(profile)} activeRoutineDef={activeRoutineDef} onApplyOwnProgression={handleApplyOwnProgression} onSetPlanPaused={handleSetPlanPaused} onRemovePlan={handleRemovePlan} goToDaySignal={openSectionSignal.id === "go-to-day" ? openSectionSignal : { id: null, n: 0 }} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} />}

@@ -15,7 +15,8 @@
     "imagen": "node scripts/generar-imagen.mjs",
     "play": "node scripts/play.mjs",
     "test": "vitest run",
-    "accesibilidad": "node scripts/auditar-accesibilidad.mjs"
+    "accesibilidad": "node scripts/auditar-accesibilidad.mjs",
+    "transiciones": "node scripts/probar-transiciones.mjs"
   },
   "dependencies": {
     "@capacitor-firebase/authentication": "^8.3.0",
