@@ -132,8 +132,14 @@ const ordenes = {
       console.log(`subido: versionCode ${b.versionCode}`);
       const gv = readFileSync(join(RAIZ, "android", "app", "build.gradle"), "utf8");
       const nombre = gv.match(/versionName "([^"]+)"/)?.[1] || String(b.versionCode);
-      await pedir(H, "pista", `${E}/tracks/${pista}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ track: pista, releases: [{ name: nombre, versionCodes: [String(b.versionCode)], status: "completed", ...(notas ? { releaseNotes: [{ language: "es-419", text: notas }] } : {}) }] }) });
-      console.log(`${nombre} en ${pista}`);
+      // `--tambien internal`: la misma versión en otra pista, en la misma
+      // edición. Play valida todas las versiones activas al confirmar: la
+      // 1.0.1 de la prueba interna pedía el ID de publicidad y frenaba la
+      // subida a alpha con la declaración en "No" (03/11/2026).
+      for (const p of [pista, ...String(opcion("tambien", "")).split(",").filter(Boolean)]) {
+        await pedir(H, "pista", `${E}/tracks/${p}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ track: p, releases: [{ name: nombre, versionCodes: [String(b.versionCode)], status: "completed", ...(notas ? { releaseNotes: [{ language: "es-419", text: notas }] } : {}) }] }) });
+        console.log(`${nombre} en ${p}`);
+      }
     }, { confirmar: true });
   },
 
