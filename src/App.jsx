@@ -69,6 +69,7 @@ import {
 // Buscar ejercicios como los escribe la gente (sin tildes, en cualquier
 // orden, con errores de tipeo, en inglés o con el apodo del gimnasio).
 import { buscarEjercicios, mejorEjercicio, nombreCoincide, partesResaltadas, REGIONES_BUSCADOR, alternativasDe } from "./buscar-ejercicios.js";
+import { rangoDeReps, siguientePaso, seriesDeDescarga, cargaDeDescarga, ejerciciosEnBaja } from "./entrenamiento.js";
 // Modus Fit Premium: preparada y con el cobro apagado por bandera (ver
 // src/suscripcion.js y docs/suscripcion.md).
 import {
@@ -3445,7 +3446,11 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
   display: flex; align-items: center; justify-content: center;
   transition: width .5s var(--resorte), background-color .25s ease, color .2s ease;
 }
+/* Las etiquetas sin elegir, un punto más claras que --text-faint: con 11 px
+   tienen que llegar a 4,5:1 sobre la barra (WCAG 1.4.3; daba 4,47). */
 .barra-pestanas .etiqueta { font-size: 0.6875rem; font-weight: 550; line-height: 1; letter-spacing: 0; transition: color .2s ease; }
+.barra-pestanas button:not([aria-current="page"]) .etiqueta { color: color-mix(in oklab, var(--text-faint) 88%, white); }
+.light-mode .barra-pestanas button:not([aria-current="page"]) .etiqueta { color: color-mix(in oklab, var(--text-faint) 88%, black); }
 .barra-pestanas [aria-current="page"] { color: var(--text-strong); }
 .barra-pestanas .indicador { position: relative; isolation: isolate; }
 .barra-pestanas .indicador-fondo { position: absolute; inset: 0; z-index: -1; border-radius: 999px; background: color-mix(in oklab, var(--c, var(--tono)) 72%, white); }
@@ -5271,8 +5276,10 @@ label.ajuste-rotulo { display: block; }
 .amigo-cuerpo { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; text-align: left; }
 .amigo-aro { position: relative; width: 50px; height: 50px; --galleta-fondo: color-mix(in oklab, var(--rango) 80%, white); }
 .light-mode .amigo-aro { --galleta-fondo: color-mix(in oklab, var(--rango) 60%, white); }
-/* El color de un rango como texto: apagado, como todo lo de color. */
-.tinta-rango { color: var(--rango-c); }
+/* El color de un rango como texto: apagado, como todo lo de color. En
+   oscuro, un poco aclarado: los verdes y el bronce no llegaban a 4,5:1 como
+   texto chico (Esmeralda daba 3,7). */
+.tinta-rango { color: color-mix(in oklab, var(--rango-c) 72%, white); }
 /* El cuerpo de los rangos por músculo: los colores de cada nivel, apagados
    para que no sea lo más saturado de la app. */
 .figura-cuerpo svg { filter: saturate(.68); }
@@ -10300,41 +10307,6 @@ function saltoDe(settings, exerciseId, unit) {
   }
   return unit === "lbs" ? 5 : 2.5;
 }
-// El rango de reps de una serie: "8-12" → [8, 12]; "5" → [5, 5].
-function rangoDeReps(repRange) {
-  const m = String(repRange || "").match(/(\d+)\s*[-–]\s*(\d+)/);
-  if (m) { const a = Number(m[1]), b = Number(m[2]); return a <= b ? [a, b] : [b, a]; }
-  const n = parseInt(repRange, 10);
-  return Number.isFinite(n) && n > 0 ? [n, n] : null;
-}
-// LA PROGRESIÓN DE UN ENTRENADOR (doble progresión): con el mismo peso, una
-// rep más por vez hasta el tope del rango; ahí sube el peso un salto y las
-// reps vuelven al piso del rango. Pedido: "que juegue más con la cantidad de
-// reps y recién ahí suba el peso y baje las reps, como la que haría un
-// entrenador personal". Todo en la unidad que se muestra; a peso corporal,
-// sólo reps.
-// Dos correcciones con la evidencia (docs/critica-entrenamiento.md):
-//  · si la vez pasada llegaste al fallo (RPE 9,5 o más, que se anota con el
-//    esfuerzo), hoy se repite en vez de sumar una rep: subir sobre una serie
-//    al fallo suma fatiga y no más músculo (Robinson et al., 2024);
-//  · si el salto es más del 10 % del peso (2,5 kg sobre 20 kg), antes de
-//    saltar se suman hasta dos reps arriba del tope: el ACSM (2009) recomienda
-//    subir la carga de a 2-10 %, menos en los músculos chicos, "cuando se
-//    pueden hacer una o dos repeticiones más que las buscadas"; con un salto
-//    grande, ir al piso del rango era casi imposible y la progresión se
-//    trababa.
-function siguientePaso(kg, reps, repRange, salto, { rpe = null } = {}) {
-  const r = rangoDeReps(repRange);
-  if (!r || !(reps > 0)) return null;
-  const [piso, tope] = r;
-  if (rpe != null && rpe >= 9.5 && reps <= tope) return { kg, reps, motivo: "fallo" };
-  if (!(kg > 0)) return { kg: 0, reps: reps + 1, motivo: "rep" };
-  if (reps >= tope) {
-    if (salto / kg > 0.1 && reps < tope + 2) return { kg, reps: reps + 1, motivo: "rep" };
-    return { kg: Math.round((kg + salto) * 4) / 4, reps: piso, motivo: "peso" };
-  }
-  return { kg, reps: reps + 1, motivo: "rep" };
-}
 // Lo último que hiciste en una serie (sin descargas), en kg.
 function ultimaDeLaSerie(logs, exerciseId, setIndex) {
   return (logs?.[`${exerciseId}_${setIndex}`] || [])
@@ -13326,7 +13298,7 @@ function CarreraSemana({ filas = [], onVerPersona = null, vacios = 0 }) {
         const n = c.tramos.length;
         return (
           <li key={c.uid || "yo"}>
-            <Tag onClick={onVerPersona && !c.yo ? () => onVerPersona(c.uid) : undefined} className={`carrera-carril ${c.yo ? "yo" : ""} ${i === 0 && n > 0 ? "primero" : ""}`}
+            <Tag role={Tag === "div" ? "group" : undefined} onClick={onVerPersona && !c.yo ? () => onVerPersona(c.uid) : undefined} className={`carrera-carril ${c.yo ? "yo" : ""} ${i === 0 && n > 0 ? "primero" : ""}`}
               aria-label={`${i + 1}º, ${c.yo ? "vos" : c.nombre}: ${n} ${n === 1 ? "sesión" : "sesiones"} esta semana`}>
               <span className="carrera-puesto" aria-hidden="true">{i + 1}</span>
               <span className={`carrera-avatar ${c.rango ? "con-rango" : ""}`} style={c.rango ? { "--rango-c": c.rango } : undefined} aria-hidden="true">{c.foto ? <img src={c.foto} alt="" /> : String(c.nombre || "?").charAt(0).toUpperCase()}</span>
@@ -15645,9 +15617,6 @@ function DeloadCardioTimer({ targetMinutes, accent, onComplete, timerId }) {
    Acá, las cuentas y las series; la crítica con la evidencia, en
    docs/critica-entrenamiento.md.
 ============================================================================ */
-// Cuántas series quedan en la descarga: la mitad (o un tercio, o un cuarto),
-// nunca menos de una.
-const seriesDeDescarga = (n, divisor = 2) => Math.max(1, Math.ceil((n || 0) / Math.max(1, divisor || 2)));
 // De qué serie sale la carga de la descarga. Siguiendo un plan, del pico del
 // plan de este ciclo (lo que venías levantando). Sin plan, de tu mejor serie
 // de las últimas cuatro semanas: antes salía de tu RÉCORD de siempre, y un
@@ -15672,62 +15641,6 @@ function baseDeDescarga(exercise, setIndex, logs, settings, cicloActual = CICLO_
   if (ov && (exercise.cardio ? ov.minutes > 0 : ov.reps > 0)) return { ...ov, de: "record" };
   if (s.pr && (exercise.cardio ? s.pr.minutes > 0 : s.pr.reps > 0)) return { ...s.pr, de: "record" };
   return null;
-}
-// La serie de la descarga: las mismas reps con menos peso, redondeado a lo
-// que se puede cargar (el salto de ese ejercicio: el disco chico o lo que
-// marque la máquina). Antes se redondeaba de a medio kilo y salían pesos
-// imposibles de armar (64 kg; en libras, 141,1). A peso corporal, o si el
-// peso ya es el más chico que se puede cargar, bajan las reps.
-function cargaDeDescarga(base, { pct = 0.75, salto = 2.5, unit = "kg", cardio = false } = {}) {
-  if (!base) return null;
-  if (cardio) return { minutes: Math.max(1, Math.round((base.minutes || 0) * pct)) };
-  const reps = base.reps || 0;
-  if (!(reps > 0)) return null;
-  const menosReps = Math.max(1, Math.round(reps * pct));
-  if (!(base.kg > 0)) return { reps: menosReps, kg: 0, kgVista: 0 };
-  const paso = salto > 0 ? salto : unit === "lbs" ? 5 : 2.5;
-  const original = kgToDisplay(base.kg, unit);
-  const objetivo = original * pct;
-  // Al más cercano y, en un empate (63,75 entre 62,5 y 65), al más liviano:
-  // es una descarga.
-  let vista = Math.round(objetivo / paso - 1e-6) * paso;
-  if (vista >= original) vista = Math.floor(objetivo / paso) * paso;
-  if (vista <= 0) return { reps: menosReps, kg: base.kg, kgVista: original };
-  vista = Math.round(vista * 100) / 100;
-  return { reps, kg: displayToKg(vista, unit), kgVista: vista };
-}
-// ¿VENÍS BAJANDO? Para ofrecer adelantar la descarga. La descarga puede ser
-// planeada y también autorregulada (consenso Delphi de Bell et al., 2023), y
-// los atletas la adelantan cuando se estancan o les duelen las articulaciones
-// (encuesta de Rogerson et al., 2024). Cuenta los ejercicios cuyas dos
-// últimas sesiones quedaron, las dos, un 5 % o más abajo de su mejor serie de
-// las cuatro semanas anteriores (en 1RM estimado), sin haber subido el peso:
-// el salto de la doble progresión (12 × 80 → 8 × 82,5) baja el 1RM estimado
-// a propósito y no cuenta. La última, de las dos últimas semanas.
-function ejerciciosEnBaja(logs, routine, hoy = todayStr()) {
-  const lista = [];
-  const vistos = new Set();
-  const haceDias = (fecha, dias) => localDateStr(new Date(new Date(`${fecha}T12:00:00`).getTime() - dias * 86400000));
-  Object.values(routine || {}).forEach((d) => (d?.exercises || []).forEach((ex) => {
-    if (!ex?.id || ex.cardio || vistos.has(ex.id)) return;
-    vistos.add(ex.id);
-    const porFecha = {};
-    (ex.sets || []).forEach((_, i) => (logs?.[`${ex.id}_${i}`] || []).forEach((h) => {
-      if (!h?.date || h.deload || !(h.kg > 0) || !(h.reps > 0) || h.date >= hoy) return;
-      const p = estimate1RM(h.kg, h.reps);
-      if (!porFecha[h.date] || p > porFecha[h.date].p) porFecha[h.date] = { p, kg: h.kg };
-    }));
-    const fechas = Object.keys(porFecha).sort();
-    if (fechas.length < 4) return;
-    const ultima = fechas[fechas.length - 1], anteultima = fechas[fechas.length - 2];
-    if (ultima < haceDias(hoy, 14)) return;
-    const previas = fechas.slice(0, -2).filter((f) => f >= haceDias(anteultima, 28));
-    if (!previas.length) return;
-    const mejor = previas.reduce((a, f) => (porFecha[f].p > a.p ? porFecha[f] : a), { p: 0, kg: 0 });
-    const abajo = (f) => porFecha[f].p <= mejor.p * 0.95 && porFecha[f].kg <= mejor.kg + 0.01;
-    if (abajo(ultima) && abajo(anteultima)) lista.push(ex.name);
-  }));
-  return lista;
 }
 // La transformación (la barra que suelta los discos) se ve una vez por día al
 // abrir Rutina en la semana de descarga; después ya abre transformada.
@@ -16795,13 +16708,13 @@ function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backR
         <div ref={frontRef} onClick={handlePolygonClick("front")} className="relative">
           <Figura data={data} type="anterior" bodyColor="#3c4146" highlightedColors={highlightedColors} onClick={MODEL_NOOP_CLICK} style={MODEL_STYLE} svgStyle={MODEL_STYLE} />
         </div>
-        <p className="text-center text-[11px] text-slate-600 mt-1">De frente</p>
+        <p className="text-center text-[11px] text-slate-400 mt-1">De frente</p>
       </div>
       <div className="flex-1 min-w-0 max-w-[180px]">
         <div ref={backRef} onClick={handlePolygonClick("back")} className="relative">
           <Figura data={data} type="posterior" bodyColor="#3c4146" highlightedColors={highlightedColors} onClick={MODEL_NOOP_CLICK} style={MODEL_STYLE} svgStyle={MODEL_STYLE} />
         </div>
-        <p className="text-center text-[11px] text-slate-600 mt-1">De espalda</p>
+        <p className="text-center text-[11px] text-slate-400 mt-1">De espalda</p>
       </div>
     </div>
   );
@@ -22908,7 +22821,7 @@ function PlanillaAsistencia({ filas, enviados = {}, enviando = null, onAplaudir,
                         <span className="planilla-detalle">{f.dayLabel ? `${f.dayLabel}, ` : ""}{f.series} {f.series === 1 ? "serie" : "series"}</span>
                       </span>
                     ) : (
-                      <button onClick={() => onVer(f.uid)} className="planilla-socio" aria-label={`Ver el perfil de ${f.nombre}`}>
+                      <button onClick={() => onVer(f.uid)} className="planilla-socio">
                         <span className="planilla-nombre">{f.nombre}</span>
                         <span className="planilla-detalle">{f.dayLabel ? `${f.dayLabel}, ` : ""}{f.series} {f.series === 1 ? "serie" : "series"}</span>
                       </button>

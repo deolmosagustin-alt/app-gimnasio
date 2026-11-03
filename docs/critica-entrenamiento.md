@@ -32,7 +32,7 @@ El criterio del ACSM de dos sesiones seguidas no se adoptó. El usuario pidió e
 - Si el salto supera el 10 % del peso, antes de saltar se suman hasta dos reps arriba del tope. Es el "una o dos repeticiones más que las buscadas" del ACSM.
 - Si la vez pasada anotaste RPE 9,5 o más (al fallo), hoy se repite la serie, y la serie lo dice: "llegaste al fallo, hoy lo mismo".
 - La regla vale para todo lo que usa `siguientePaso`: la serie, "Llenar el ciclo", "Seguir el plan" y lo que propone la IA (`deAPoco`).
-- Pruebas: `node scripts/probar-logica.mjs`.
+- Pruebas: `npm test` (`src/entrenamiento.test.js`).
 
 **El −10 % después de dos fallos** (`metaDeHoy`) es práctica de entrenadores (los "resets" de los programas lineales), no algo medido en estudios. Es conservador y razonable, y se dejó.
 

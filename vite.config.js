@@ -36,9 +36,23 @@ export default defineConfig({
     // con esto pesa la mitad en cualquier entorno.
     minify: 'oxc',
     cssMinify: 'lightningcss',
-    rollupOptions: {
+    // Las librerías van en archivos propios: cambian poco, así que el
+    // service worker y la caché del celular las guardan entre publicaciones.
+    // Cada publicación vuelve a bajar sólo el código de la app (index).
+    // Sólo van las que se cargan al abrir: las perezosas (pdf, xlsx, jszip,
+    // qrcode, jsqr) siguen aparte y no se adelantan. motion queda con la app:
+    // en un grupo propio arrastraba las animaciones que se cargan después
+    // (animaciones.js) y sumaba 30 kB a la primera carga.
+    rolldownOptions: {
       output: {
-        manualChunks: undefined, // Quitamos la división manual para simplificar
+        codeSplitting: {
+          groups: [
+            { name: 'react', test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/ },
+            { name: 'firebase', test: /node_modules[\\/](@firebase|firebase)[\\/]/ },
+            { name: 'ui', test: /node_modules[\\/](lucide-react|@number-flow|number-flow|react-body-highlighter)[\\/]/ },
+            { name: 'capacitor', test: /node_modules[\\/]@capacitor(-firebase)?[\\/](core|authentication|local-notifications)[\\/]/ },
+          ],
+        },
       },
     },
   }

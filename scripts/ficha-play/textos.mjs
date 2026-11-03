@@ -5,6 +5,18 @@
 // larga 4000. La larga admite <b>.
 export const TITULO = "Modus Fit: Rutinas de Gimnasio";
 
+// El cierre depende de si el cobro está prendido (VITE_COBRO_ACTIVO=1, ver
+// docs/suscripcion.md). Con Premium a la venta, "Gratis" a secas sería
+// engañoso para Play: se dice qué queda gratis y qué suma Premium, con el
+// precio en la tienda. Se sube con: VITE_COBRO_ACTIVO=1 node subir-ficha.mjs …
+const COBRO = process.env.VITE_COBRO_ACTIVO === "1";
+const CIERRE_VOS = COBRO
+  ? "Anotar, tus rutinas, tu progreso y Social son gratis y sin anuncios, para siempre. Con Modus Fit Premium (mensual, semestral o anual, con 7 días gratis en el anual) sumás más consultas por día al Entrenador IA, Planificar con IA e importar con foto. Funciona sin cuenta, y si entrás con Google tus datos también se guardan en la nube."
+  : "Gratis y sin anuncios. Funciona sin cuenta, y si entrás con Google tus datos también se guardan en la nube, para no perder nada si cambiás de celular.";
+const CIERRE_TU = COBRO
+  ? "Anotar, tus rutinas, tu progreso y Social son gratis y sin anuncios, para siempre. Con Modus Fit Premium (mensual, semestral o anual, con 7 días gratis en el anual) sumas más consultas al día al Entrenador IA, Planificar con IA e importar con foto. Funciona sin cuenta, y si entras con Google tus datos también se guardan en la nube."
+  : "Gratis y sin anuncios. Funciona sin cuenta, y si entras con Google tus datos también se guardan en la nube, para no perder nada si cambias de teléfono.";
+
 const LARGA_VOS = `Modus Fit es tu registro de entrenamiento para el gimnasio: anotás cada serie en un toque, seguís tu rutina con un plan que progresa como el de un entrenador personal y ves cuánto subís semana a semana.
 
 <b>Anotá tu entrenamiento en segundos</b>
@@ -39,7 +51,7 @@ const LARGA_VOS = `Modus Fit es tu registro de entrenamiento para el gimnasio: a
 • El mano a mano con un amigo, músculo por músculo.
 • Compartí tu rutina con un link y tu perfil con un código QR.
 
-Gratis y sin anuncios. Funciona sin cuenta, y si entrás con Google tus datos también se guardan en la nube, para no perder nada si cambiás de celular.`;
+${CIERRE_VOS}`;
 
 const LARGA_TU = `Modus Fit es tu registro de entrenamiento para el gimnasio: anotas cada serie en un toque, sigues tu rutina con un plan que progresa como el de un entrenador personal y ves cuánto subes semana a semana.
 
@@ -75,7 +87,7 @@ const LARGA_TU = `Modus Fit es tu registro de entrenamiento para el gimnasio: an
 • El cara a cara con un amigo, músculo por músculo.
 • Comparte tu rutina con un enlace y tu perfil con un código QR.
 
-Gratis y sin anuncios. Funciona sin cuenta, y si entras con Google tus datos también se guardan en la nube, para no perder nada si cambias de teléfono.`;
+${CIERRE_TU}`;
 
 // Cada idioma: sus textos y la carpeta de láminas que usa.
 export const FICHAS = {
