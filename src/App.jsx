@@ -5143,6 +5143,14 @@ label.ajuste-rotulo { display: block; }
 .light-mode .armado-aviso-boton { color: color-mix(in oklab, var(--tono) 72%, black); }
 @media (prefers-reduced-motion: reduce) { .armado-eslabon, .armado-aviso { animation: none; } }
 /* La primera elección de rutina: tres placas, cada una con su renglón. */
+/* La recomendada del primer uso: una hoja de papel, como las del corcho. */
+.eleccion-recomendada { display: grid; gap: 6px; padding: 18px 18px 16px; border-radius: 20px; color: #232326; background: #f1efe8; box-shadow: 0 14px 30px -18px rgba(0,0,0,.8); }
+.eleccion-recomendada .boton-pildora { margin-top: 8px; }
+.eleccion-recomendada-ceja { font-size: 13px; font-weight: 650; color: #6b6b70; }
+.eleccion-recomendada-titulo { font-size: 1.6rem; line-height: 1; font-weight: 800; font-stretch: 80%; letter-spacing: -0.02em; color: #18181b; }
+.eleccion-recomendada-texto { font-size: 14px; line-height: 1.4; color: #4a4a4f; text-wrap: pretty; }
+.eleccion-o { text-align: center; font-size: 13px; color: var(--text-faint); }
+.eleccion-icono { display: flex; justify-content: center; margin-bottom: 6px; color: var(--tono); }
 .eleccion-cabeza { display: grid; gap: 6px; padding: 6px 4px 2px; text-align: center; }
 .eleccion-titulo { font-size: 1.5rem; font-weight: 780; letter-spacing: -0.015em; color: var(--text-strong); text-wrap: balance; }
 .eleccion-bajada { font-size: 15px; line-height: 1.45; color: var(--text-muted); text-wrap: balance; }
@@ -29377,15 +29385,18 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
     const { def } = pendingActivation;
     return (
       <div className="space-y-4">
-        <div className="text-center pt-2 pb-1">
-          <div className="w-14 h-14 rounded-2xl bg-blue-500/15 flex items-center justify-center mx-auto mb-3"><Calendar className="text-blue-500" size={26} /></div>
-          <h2 className="text-lg font-black text-white">¿Qué días entrenás "{def.name}"?</h2>
-          <p className="text-sm text-slate-500 mt-1.5 leading-relaxed px-2">Ya armamos un cronograma por defecto. Lo podés dejar así o cambiarlo.</p>
-        </div>
+        {/* El primer uso con las piezas de la app (03/11): el ícono suelto
+            (sin el cuadrado de color que las reglas de Grafito sacaron), el
+            título de "¿Cómo vas a entrenar?" y el nombre sin comillas. */}
+        <header className="eleccion-cabeza">
+          <span className="eleccion-icono" aria-hidden="true"><Calendar size={24} /></span>
+          <h2 className="eleccion-titulo">¿Qué días entrenás?</h2>
+          <p className="eleccion-bajada"><b className="text-[color:var(--text-strong)]">{def.name}</b>. Ya armamos una semana: dejala así o tocá un día para cambiarlo.</p>
+        </header>
         <div className="bg-slate-900/50 border border-slate-800/50 rounded-2xl p-4">
           <WeeklyScheduleEditor dayOrder={def.dayOrder} days={def.days} schedule={def.weekSchedule} onChange={updatePendingScheduleDay} />
         </div>
-        <button onClick={confirmPendingActivation} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl !text-[color:var(--accion-tinta)] text-sm font-bold transition-all active:scale-[0.98]" style={{ background: "var(--accion-fondo)" }}><Check size={15} /> Listo, empezar a entrenar</button>
+        <button onClick={confirmPendingActivation} className="boton-pildora w-full"><Check size={17} /> Listo, a entrenar</button>
       </div>
     );
   }
@@ -29431,6 +29442,21 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
         </header>
       )}
 
+      {/* LA RECOMENDADA PARA EMPEZAR (03/11, el primer uso): quien recién
+          llega tenía que elegir entre tres caminos sin saber cuál; ahora hay
+          una opción de un toque, como una hoja clavada en el corcho. Cuerpo
+          completo tres veces por semana es lo más simple para empezar (el
+          ACSM recomienda entrenar cada músculo grande al menos dos veces por
+          semana) y el resto sigue abajo. */}
+      {forced && PRESET_ROUTINES_BY_ID.fullbody && (
+        <section className="eleccion-recomendada" aria-label="La recomendada para empezar">
+          <p className="eleccion-recomendada-ceja">Si recién empezás</p>
+          <h3 className="eleccion-recomendada-titulo">Cuerpo completo</h3>
+          <p className="eleccion-recomendada-texto">Tres días por semana, todo el cuerpo cada vez. La más simple para arrancar, y la cambiás cuando quieras.</p>
+          <button onClick={() => handleUseClick("fullbody", PRESET_ROUTINES_BY_ID.fullbody)} className="boton-pildora w-full">Empezar con esta <ChevronRight size={17} /></button>
+        </section>
+      )}
+      {forced && <p className="eleccion-o">o elegí otra forma</p>}
       {forced && (
         <div className="eleccion">
           {/* Crear la tuya: con la IA o a mano. */}
@@ -31926,10 +31952,11 @@ export default function App() {
       <div className={`app-fondo relative min-h-screen bg-[#0c0d10] px-4 py-6 theme-fade ${themeClass}`} style={{ "--small-text-scale": smallTextScale }}>
         <div style={{ height: "env(safe-area-inset-top, 0px)" }} />
         <div className="max-w-xl mx-auto">
-          <div className="flex justify-end mb-2">
-            <button onClick={handleSignOut} className="text-[11px] text-slate-600 hover:text-slate-400 font-semibold flex items-center gap-1"><LogOut size={11} /> Cerrar sesión</button>
-          </div>
           <RoutinesView profile={profile} forced onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleDeleteRoutine} onUpdateProfile={handleUpdateProfile} />
+          {/* Al pie: era lo primero que veía alguien recién llegado (03/11). */}
+          <div className="flex justify-center mt-6">
+            <button onClick={handleSignOut} className="enlace-suave"><LogOut size={14} /> Salir de este perfil</button>
+          </div>
         </div>
       </div>
       {importRoutine && <SharedRoutineImportModal routine={importRoutine} onImport={handleImportSharedRoutine} onDiscard={() => setImportRoutine(null)} />}

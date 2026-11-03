@@ -207,7 +207,7 @@ try {
       });
     }
     // Después viene armar la semana (qué día toca cada parte de la rutina).
-    const listo = page.getByRole("button", { name: "Listo, empezar a entrenar" });
+    const listo = page.getByRole("button", { name: /^Listo, a entrenar$/ });
     await listo.waitFor({ timeout: 6000 }).catch(() => {});
     if (await listo.count()) {
       await capturar("Armar semana");
