@@ -5913,12 +5913,14 @@ label.ajuste-rotulo { display: block; }
 .recorrido { position: fixed; inset: 0; z-index: 140; }
 .recorrido-hueco { position: fixed; top: 0; left: 0; border-radius: 22px; pointer-events: none; will-change: transform;
   box-shadow: 0 0 0 200vmax rgba(5, 6, 8, .8), 0 0 0 1.5px color-mix(in oklab, var(--tono) 60%, white);
-  transition: transform .46s var(--sale, ease-out), width .46s var(--sale, ease-out), height .46s var(--sale, ease-out), border-radius .46s var(--sale, ease-out); animation: recorridoVelo .3s ease both; }
+  transition: transform .36s var(--sale, ease-out), width .36s var(--sale, ease-out), height .36s var(--sale, ease-out), border-radius .36s var(--sale, ease-out); animation: recorridoVelo .3s ease both; }
 @keyframes recorridoVelo { from { opacity: 0; } }
+.en-recorrido .pestana-guardada > * { content-visibility: visible; }
+.en-recorrido * { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
 .light-mode .recorrido-hueco { box-shadow: 0 0 0 200vmax rgba(18, 20, 24, .72), 0 0 0 1.5px var(--tono); }
 .recorrido-tarjeta { position: fixed; left: 16px; right: 16px; max-width: 360px; margin: 0 auto; padding: 14px 14px 12px; border-radius: 22px; outline: none;
   background: var(--surface-2); box-shadow: var(--placa-canto), 0 24px 48px -16px rgba(0, 0, 0, .6); animation: recorridoEntra .3s var(--sale, ease) both;
-  will-change: transform; transition: transform .46s var(--sale, ease-out); }
+  will-change: transform; transition: transform .36s var(--sale, ease-out); }
 @keyframes recorridoEntra { from { opacity: 0; } to { opacity: 1; } }
 /* El texto de cada paso se funde al cambiar, mientras la tarjeta viaja. */
 .recorrido-cuerpo { animation: recorridoTexto .26s var(--sale, ease-out) both; }
@@ -30270,42 +30272,57 @@ function Recorrido({ pasos, onTerminar, siguiente = null, onSeguir = null }) {
     const r0 = el.getBoundingClientRect();
     const alto0 = window.innerHeight;
     const alta = r0.height > alto0 * 0.5;
-    // MÁS FLUIDO (03/11, pedido: "hacé más fluido el tutorial"): se calcula
-    // de entrada adónde va a quedar la pieza después del scroll, y el hueco
-    // y la tarjeta viajan hasta ahí AL MISMO TIEMPO que la pantalla. Antes
-    // esperaban 420 ms a que terminara el scroll y recién ahí saltaban.
+    // FIRME Y SIN TRABAS (03/11, pedido: "siguen sin estar bien del todo los
+    // encuadres y va medio trabado"): la página se mueve de una vez, debajo
+    // del velo (casi no se nota), y recién ahí se mide la pieza: el hueco
+    // va siempre a su lugar exacto. Antes se predecía adónde iba a quedar
+    // durante un scroll suave, y como los bloques de abajo se terminaban de
+    // dibujar en el camino (cambiaban de alto), la predicción fallaba y al
+    // final había un salto; y el scroll suave debajo del velo, con el hueco
+    // y la tarjeta moviéndose a la vez, era lo que se trababa en el celular.
     const maxScroll = Math.max(0, document.documentElement.scrollHeight - alto0);
     const destinoY = Math.min(maxScroll, Math.max(0, alta ? r0.top + window.scrollY - 96 : r0.top + window.scrollY - (alto0 - r0.height) / 2));
-    const corrimiento = destinoY - window.scrollY;
     // LA PROPORCIÓN DEL HUECO (03/11, pedido: "la recuadración en el tour
     // no es correcta en cuanto a proporción"): el mismo aire de los cuatro
     // lados (si contra un borde no entra, se achica parejo en los dos), y
     // las esquinas de la pieza más ese aire. Antes las esquinas eran
     // siempre de 22 px y el aire se perdía de un solo lado.
     const radioPieza = parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0;
-    const cajaDe = (r0, dy = 0) => {
+    const cajaDe = (r0) => {
       const alto = window.innerHeight, ancho = window.innerWidth;
       // Una pieza más ancha que la pantalla (el corcho, que se desliza de
       // costado): se toma sólo lo que se ve, con un margen de 6 px.
       const izq = Math.max(6, r0.left), der = Math.min(ancho - 6, r0.right);
       const r = { left: izq, right: der, width: der - izq, top: r0.top, bottom: r0.bottom };
       const aire = Math.max(0, Math.min(10, r.left - 4, ancho - r.right - 4));
-      const top = Math.max(6, r.top - dy - aire);
-      const bottom = Math.min(alto - 6, r.bottom - dy + aire, alta ? top + alto * 0.55 : Infinity);
+      const top = Math.max(6, r.top - aire);
+      const bottom = Math.min(alto - 6, r.bottom + aire, alta ? top + alto * 0.55 : Infinity);
       return { top, left: r.left - aire, width: r.width + aire * 2, height: Math.max(36, bottom - top), radio: Math.min(32, Math.max(12, radioPieza + aire)) };
     };
-    let cuadro = requestAnimationFrame(() => setCaja(cajaDe(r0, corrimiento)));
-    if (Math.abs(corrimiento) > 1) window.scrollTo({ top: destinoY, behavior: quieto ? "auto" : "smooth" });
-    let listo = false;
+    if (Math.abs(destinoY - window.scrollY) > 1) window.scrollTo({ top: destinoY, behavior: "auto" });
     const medir = () => setCaja(cajaDe(el.getBoundingClientRect()));
-    // Al terminar el scroll, un ajuste fino (por si algo se acomodó) y desde
-    // ahí el hueco sigue a la pieza si la persona mueve la pantalla.
-    const t = setTimeout(() => { listo = true; medir(); tarjetaRef.current?.focus({ preventScroll: true }); }, quieto ? 60 : 460);
-    const alMover = () => { if (!listo) return; cancelAnimationFrame(cuadro); cuadro = requestAnimationFrame(medir); };
+    // Se mide en el cuadro siguiente (ya con la página en su lugar) y otra
+    // vez si la pieza cambia de tamaño mientras dura el paso (los cajones
+    // que suben, una imagen que termina de cargar).
+    let cuadro = requestAnimationFrame(medir);
+    const remedir = () => { cancelAnimationFrame(cuadro); cuadro = requestAnimationFrame(medir); };
+    const observador = typeof ResizeObserver !== "undefined" ? new ResizeObserver(remedir) : null;
+    observador?.observe(el);
+    const t = setTimeout(() => { remedir(); tarjetaRef.current?.focus({ preventScroll: true }); }, quieto ? 60 : 320);
+    const alMover = remedir;
     window.addEventListener("scroll", alMover, { passive: true });
     window.addEventListener("resize", alMover);
-    return () => { clearTimeout(t); cancelAnimationFrame(cuadro); window.removeEventListener("scroll", alMover); window.removeEventListener("resize", alMover); };
+    return () => { clearTimeout(t); cancelAnimationFrame(cuadro); observador?.disconnect(); window.removeEventListener("scroll", alMover); window.removeEventListener("resize", alMover); };
   }, [paso]);
+  // Mientras dura el recorrido, la página se aliviana (ver .en-recorrido):
+  // todos los bloques dibujados (sus altos no cambian a mitad de un paso) y
+  // sin el desenfoque de las barras fijas, que debajo del velo no se ve y
+  // era lo más caro de redibujar.
+  useEffect(() => {
+    const raiz = document.documentElement;
+    raiz.classList.add("en-recorrido");
+    return () => raiz.classList.remove("en-recorrido");
+  }, []);
   const ultimo = i === visibles.length - 1;
   // El alto de la tarjeta, para ponerla arriba de la pieza sin adivinar.
   const [altoTarjeta, setAltoTarjeta] = useState(220);
