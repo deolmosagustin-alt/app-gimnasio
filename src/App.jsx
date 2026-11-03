@@ -69,6 +69,13 @@ import {
 // Buscar ejercicios como los escribe la gente (sin tildes, en cualquier
 // orden, con errores de tipeo, en inglés o con el apodo del gimnasio).
 import { buscarEjercicios, mejorEjercicio, nombreCoincide, partesResaltadas, REGIONES_BUSCADOR, alternativasDe } from "./buscar-ejercicios.js";
+// Modus Fit Premium: preparada y con el cobro apagado por bandera (ver
+// src/suscripcion.js y docs/suscripcion.md).
+import {
+  suscripcionVisible, modoPrueba, PLAN_ELEGIDO, FUNCIONES, BENEFICIOS, CUPO_IA_PREMIUM,
+  proveedor, estadoPremium, suscribirPremium, pedirPaywall, paywallAutomatico, ahorroContraMensual,
+  necesitaPremium, cupoDiarioIA, iniciarSuscripcion, EVENTO_PAYWALL,
+} from "./suscripcion.js";
 
 /* ============================================================================
    GEMINI — la clave de la API ya NO vive en este archivo ni en Remote
@@ -840,18 +847,21 @@ function leerCupoIA() {
   } catch { /* dato corrupto: se arranca de cero, no es para romper nada */ }
   return { dia: _hoyLocal(), usados: 0 };
 }
+// Con el cobro apagado son las 25 de siempre; prendido, el gratis tiene
+// menos y Premium las de siempre (ver cupoDiarioIA en suscripcion.js).
+const cupoDeHoy = () => Math.min(IA_CUPO_DIARIO, cupoDiarioIA());
 function cupoIARestante() {
-  return Math.max(0, IA_CUPO_DIARIO - leerCupoIA().usados);
+  return Math.max(0, cupoDeHoy() - leerCupoIA().usados);
 }
 // Devuelve false si ya no queda cupo (y NO consume). Quien llama decide
 // qué mostrar; no se dispara el pedido.
 function consumirCupoIA() {
   const { usados } = leerCupoIA();
-  if (usados >= IA_CUPO_DIARIO) return false;
+  if (usados >= cupoDeHoy()) return false;
   try { localStorage.setItem(IA_CUPO_KEY, JSON.stringify({ dia: _hoyLocal(), usados: usados + 1 })); } catch { /* sin storage no hay cupo que llevar */ }
   return true;
 }
-const MSG_SIN_CUPO_IA = `Llegaste a los ${IA_CUPO_DIARIO} pedidos de IA de hoy. El cupo se renueva mañana.`;
+const mensajeSinCupoIA = () => `Llegaste a los ${cupoDeHoy()} pedidos de IA de hoy. El cupo se renueva mañana.`;
 
 // Única puerta de salida hacia la IA. Todas las llamadas pasan por acá para
 // que el cupo sea uno solo y no haya que acordarse de descontarlo en cada
@@ -859,7 +869,7 @@ const MSG_SIN_CUPO_IA = `Llegaste a los ${IA_CUPO_DIARIO} pedidos de IA de hoy. 
 // cupo la cubre sola.
 async function fetchIA(payload, opts = {}) {
   if (!consumirCupoIA()) {
-    const e = new Error(MSG_SIN_CUPO_IA);
+    const e = new Error(mensajeSinCupoIA());
     e.sinCupo = true;
     throw e;
   }
@@ -4205,9 +4215,64 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
   background: color-mix(in oklab, var(--c, var(--tono)) 20%, var(--surface-1));
 }
 .light-mode .pestana-interna[aria-selected="true"] { color: color-mix(in oklab, var(--c, var(--tono)) 72%, black); background: color-mix(in oklab, var(--c, var(--tono)) 15%, white); }
-/* La serie de la semana de descarga. */
-.descarga-serie { border-radius: 24px; padding: 12px; background: var(--surface-2); }
-.light-mode .descarga-serie { background: var(--surface-1); }
+/* ── LA SEMANA DE DESCARGA, ADENTRO DE RUTINA ─────────────────────────────
+   La misma vista, transformada: la barra suelta los discos de afuera (se
+   deslizan por la manga, de goma negra, y vuelven al pasar a entrenamiento
+   normal), las rayitas que sobran de cada ejercicio se van, la hoja del plan
+   se pliega y cada serie de descarga va en su visor, con lo de siempre
+   tachado al lado. */
+.disco-lugar { transform-box: fill-box; transform-origin: center; transition: transform .7s var(--resorte), opacity .45s ease; }
+.disco-lugar.afuera { transform: translate(var(--hacia, 30px), 9px); opacity: 0; transition: transform .7s cubic-bezier(.55,0,.8,.2), opacity .4s ease .3s; }
+.disco-suelto { fill: #2b2d31; stroke: rgba(255,255,255,0.16); stroke-width: 0.7; }
+.light-mode .disco-suelto { fill: #3a3d43; }
+.series-discos i { transition: width .35s ease, margin .35s ease, opacity .3s ease; }
+.series-discos i.afuera { width: 0; margin-left: -3px; opacity: 0; }
+.ejercicio-descarga { font-size: 0.8125rem; font-weight: 600; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.cuerpo-cambia { animation: cuerpoCambia .42s var(--resorte) both; }
+@keyframes cuerpoCambia { from { opacity: 0; transform: translateY(6px); } }
+.dia-descarga-regla { margin-top: 4px; font-size: 0.8125rem; line-height: 1.4; color: var(--text-faint); text-wrap: pretty; }
+.dia-modo { margin-top: 14px; }
+.dia-modo > button { min-height: 44px; font-size: 0.8125rem; }
+.dia-previa { margin-top: 14px; display: grid; gap: 10px; }
+.dia-previa > p { font-size: 0.875rem; line-height: 1.45; color: var(--text-muted); text-wrap: pretty; }
+.dia-previa-botones { display: flex; gap: 8px; }
+.dia-hero .dia-previa-botones .boton-pildora { width: auto; margin-top: 0; }
+/* La hoja del plan, plegada mientras dura la descarga (sus metas son de las
+   semanas de trabajo). El relleno deja lugar al broche y a la sombra. */
+.plegable-descarga { display: grid; grid-template-rows: 1fr; transition: grid-template-rows .5s var(--resorte), opacity .35s ease; }
+.plegable-descarga > div { min-height: 0; overflow: hidden; padding: 14px 4px 8px; margin: -14px -4px -8px; }
+.plegable-descarga.plegada { grid-template-rows: 0fr; opacity: 0; }
+.descarga-series { display: flex; flex-direction: column; }
+.descarga-sin-datos { margin: 2px 6px 8px; font-size: 0.8125rem; line-height: 1.45; color: var(--text-muted); text-wrap: pretty; }
+.descarga-serie { margin: 6px 0; padding: 10px; border-radius: 22px; background: color-mix(in oklab, var(--c, var(--tono)) 5%, var(--surface-2)); box-shadow: inset 0 1px 0 var(--brillo); }
+.light-mode .descarga-serie { background: var(--surface-1); box-shadow: inset 0 0 0 1px var(--hairline); }
+.descarga-serie-cabeza { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 10px; padding: 0 6px; font-size: 0.9375rem; font-weight: 650; }
+.descarga-serie-cabeza .foco-rango { color: color-mix(in oklab, var(--c, var(--tono)) 50%, white); }
+.light-mode .descarga-serie-cabeza .foco-rango { color: color-mix(in oklab, var(--c, var(--tono)) 62%, black); }
+.descarga-de { font-size: 0.8125rem; font-weight: 500; color: var(--text-faint); }
+.descarga-visor {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px;
+  margin-top: 8px; padding: 6px 6px 6px 12px; border-radius: 18px;
+  background: var(--panel-sunken); box-shadow: inset 0 1px 2px rgba(0,0,0,0.55), inset 0 0 0 1px var(--hairline);
+}
+.light-mode .descarga-visor { box-shadow: inset 0 1px 2px rgba(0,0,0,0.06), inset 0 0 0 1px var(--hairline); }
+.descarga-antes { font-size: 0.8125rem; font-weight: 600; color: var(--text-faint); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.descarga-antes s { text-decoration-thickness: 1.5px; }
+.descarga-hoy { display: flex; align-items: baseline; justify-content: center; gap: 3px; min-width: 0; padding: 6px 0; color: var(--text-strong); font-variant-numeric: tabular-nums; }
+.descarga-hoy b { font-size: 2.25rem; line-height: 1; font-weight: 650; font-stretch: 78%; letter-spacing: -0.03em; }
+.descarga-hoy i { font-style: normal; font-size: 1rem; color: var(--text-faint); margin: 0 2px; }
+.descarga-hoy small { font-size: 0.8125rem; font-weight: 500; color: var(--text-muted); margin-left: 2px; }
+.foco-guardar.descarga-marcar { width: 48px; height: 48px; color: var(--text-muted); background: var(--velo); box-shadow: inset 0 0 0 1.5px var(--hairline-fuerte); }
+.foco-guardar.descarga-marcar.hecha { color: color-mix(in oklab, var(--c, var(--tono)) 18%, #07080a); background: color-mix(in oklab, var(--c, var(--tono)) 72%, white); box-shadow: none; }
+.descarga-serie.hecha .descarga-hoy b { color: var(--text-muted); }
+.descarga-sobra .serie-linea-meta s { color: var(--text-faint); text-decoration-thickness: 1.5px; }
+.descarga-sobra .serie-galleta { opacity: .55; }
+.descarga-fin { margin: 10px 8px 8px; display: grid; gap: 8px; text-align: center; }
+.descarga-fin > p { font-size: 0.8125rem; color: var(--text-faint); }
+@media (prefers-reduced-motion: reduce) {
+  .disco-lugar, .disco-lugar.afuera, .series-discos i, .plegable-descarga { transition: none; }
+  .cuerpo-cambia { animation: none; }
+}
 /* Botón secundario en píldora, tonal del color que lo contiene. */
 .boton-tonal {
   display: flex; align-items: center; justify-content: center; gap: 8px;
@@ -4317,9 +4382,12 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 .equilibrio-veredicto.ok { color: var(--text-strong); }
 .equilibrio-pie { text-align: center; font-size: 12px; color: var(--text-faint); }
 /* Las series por músculo, en barras lisas. */
-.balance-fila { display: grid; grid-template-columns: 104px minmax(0, 1fr) 24px; align-items: center; gap: 10px; }
+.balance-fila { display: grid; grid-template-columns: 104px minmax(0, 1fr) 2.4em; align-items: center; gap: 10px; }
 .balance-nombre { font-size: 13px; font-weight: 600; line-height: 1.2; color: var(--text-muted); }
-.balance-pista { display: block; height: 10px; border-radius: 5px; overflow: hidden; background: var(--velo-fuerte); }
+.balance-pista { position: relative; display: block; height: 10px; border-radius: 5px; overflow: hidden; background: var(--velo-fuerte); }
+/* La raya de la referencia (10 series por semana, ver seriesSemanalesPorMusculo). */
+.balance-referencia { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--text-strong); opacity: .5; }
+.balance-nota { margin-top: 12px; font-size: 12px; line-height: 1.45; color: var(--text-faint); text-wrap: pretty; }
 .balance-pista i { display: block; height: 100%; border-radius: 5px; background: color-mix(in oklab, var(--c) 60%, #8a8c92); }
 .light-mode .balance-pista i { background: color-mix(in oklab, var(--c) 70%, #a7a9ae); }
 .balance-n { font-size: 15px; font-weight: 700; text-align: right; color: var(--text-strong); }
@@ -5048,8 +5116,96 @@ label.ajuste-rotulo { display: block; }
 .burbuja { max-width: 85%; border-radius: 22px; padding: 10px 14px; font-size: 0.9375rem; line-height: 1.55; color: var(--text-strong); transition: transform .2s ease; }
 .burbuja.propia { border-bottom-right-radius: 6px; background: color-mix(in oklab, var(--tono) 16%, var(--surface-2)); }
 .burbuja.ia { max-width: 100%; padding: 2px 2px 4px; border-radius: 0; background: transparent; }
-/* El inicio del Entrenador IA. */
+/* El inicio del Entrenador IA. Con la charla empezada, la pizarra se queda
+   arriba y la conversación sigue debajo (.ia-charla). */
 .ia-inicio { display: grid; gap: 6px; padding-top: 4px; }
+.ia-charla { margin-top: 20px; }
+/* Hasta dónde baja el chat solo: arriba de la barra de escribir y de las
+   pestañas, que son fijas; y la pregunta, debajo del encabezado. */
+.chat-final { scroll-margin-bottom: 11.5rem; }
+.ia-charla > [data-mensaje] { scroll-margin-top: 84px; }
+/* Copiar, regenerar y reportar: 30 px a la vista y 44 para el dedo (el
+   ::after crece sólo hacia arriba y abajo, para no pisar al de al lado). */
+.burbuja-acciones { display: inline-flex; align-items: center; gap: 2px; padding: 2px; border-radius: 12px; background: var(--row-surface); }
+.burbuja-accion { position: relative; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 9px; color: var(--text-faint); transition: color .15s ease, background-color .15s ease; }
+.burbuja-accion::after { content: ""; position: absolute; inset: -7px 0; }
+.burbuja-accion:hover { color: var(--text-strong); background: var(--velo); }
+.burbuja-accion:active { transform: scale(.92); }
+/* Las opciones de una pregunta de la IA: píldoras de 40 px, la elegida en el tono. */
+.ia-opcion {
+  min-height: 40px; display: inline-flex; align-items: center; gap: 6px; padding: 0 14px; border-radius: 999px;
+  font-size: 0.8125rem; font-weight: 650; color: var(--text-strong); background: var(--velo);
+  transition: transform .2s var(--resorte), background-color .2s ease;
+}
+.ia-opcion:active:not(:disabled) { transform: scale(.95); }
+.ia-opcion:disabled { opacity: .5; }
+.ia-opcion.elegida { opacity: 1; background: color-mix(in oklab, var(--tono) 22%, var(--surface-2)); box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--tono) 60%, transparent); }
+.ia-opcion.otra { background: none; color: var(--text-muted); box-shadow: inset 0 0 0 1.5px var(--hairline-fuerte); }
+/* El aviso del cupo de la IA, abajo de la barra de escribir. */
+.cupo-aviso { margin-top: 6px; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 10px; font-size: 0.75rem; text-align: center; color: color-mix(in oklab, #F59E0B 62%, white); }
+.cupo-aviso.agotado { color: color-mix(in oklab, #F43F5E 55%, white); }
+.light-mode .cupo-aviso { color: color-mix(in oklab, #B45309 88%, black); }
+.light-mode .cupo-aviso.agotado { color: color-mix(in oklab, #BE123C 88%, black); }
+.cupo-aviso-premium { position: relative; min-height: 32px; padding: 0 12px; border-radius: 999px; font-weight: 700; color: var(--accion-tinta); background: var(--accion-fondo); }
+.cupo-aviso-premium::after { content: ""; position: absolute; inset: -6px -2px; }
+/* ── MODUS FIT PREMIUM: el paywall y Tu plan (ver Paywall) ───────────────
+   Una hoja que sube desde abajo. Los planes, en placas: la elegida, con el
+   aro y el fondo del tono; el precio que se cobra, grande; lo que da por
+   mes, chico y aparte (Google Play no deja mostrarlo más grande que lo que
+   se cobra). Las condiciones, antes de pagar, a la vista. */
+.paywall-fondo { background: rgba(0,0,0,0.72); backdrop-filter: blur(6px); }
+.paywall {
+  position: relative; width: 100%; max-width: 26rem; max-height: 94dvh; overflow-y: auto; overscroll-behavior: contain;
+  padding: 22px 18px calc(16px + env(safe-area-inset-bottom, 0px)); border-radius: 28px 28px 0 0;
+  background: var(--surface-1); box-shadow: var(--placa-canto), 0 -24px 60px -34px rgba(0,0,0,0.85);
+}
+@media (min-width: 640px) { .paywall { border-radius: 28px; } }
+.paywall-cerrar { position: absolute; top: 12px; right: 12px; z-index: 1; width: 44px; height: 44px; }
+.paywall-prueba { display: inline-flex; margin: 0 52px 12px 0; padding: 4px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 650; color: color-mix(in oklab, #F59E0B 62%, white); background: color-mix(in oklab, #F59E0B 15%, transparent); }
+.light-mode .paywall-prueba { color: color-mix(in oklab, #B45309 88%, black); }
+.paywall-marca { margin-right: 52px; font-size: 0.8125rem; font-weight: 650; color: color-mix(in oklab, var(--tono) 55%, white); }
+.light-mode .paywall-marca { color: color-mix(in oklab, var(--tono) 62%, black); }
+.paywall-titulo { margin: 6px 44px 0 0; font-size: 2.25rem; line-height: 0.98; font-weight: 800; font-stretch: 78%; letter-spacing: -0.03em; color: var(--text-strong); text-wrap: balance; }
+.paywall-bajada { margin-top: 10px; font-size: 0.9375rem; line-height: 1.45; color: var(--text-muted); text-wrap: pretty; }
+.paywall-beneficios { display: grid; gap: 10px; margin-top: 18px; }
+.paywall-beneficios li { display: flex; align-items: flex-start; gap: 10px; font-size: 0.875rem; line-height: 1.4; color: var(--text-muted); }
+.paywall-beneficios li > svg { flex: none; margin-top: 2px; color: color-mix(in oklab, var(--tono) 72%, white); }
+.light-mode .paywall-beneficios li > svg { color: color-mix(in oklab, var(--tono) 70%, black); }
+.paywall-beneficios b { font-weight: 650; color: var(--text-strong); }
+.paywall-gratis { margin-top: 12px; font-size: 0.8125rem; line-height: 1.4; color: var(--text-faint); text-wrap: pretty; }
+.paywall-planes { display: grid; gap: 8px; margin-top: 18px; }
+.paywall-cargando { padding: 18px 4px; font-size: 0.875rem; color: var(--text-faint); }
+.paywall-plan {
+  display: grid; gap: 3px; min-height: 64px; padding: 12px 14px; border-radius: 20px; text-align: left;
+  background: var(--surface-2); box-shadow: inset 0 0 0 1.5px var(--hairline);
+  transition: box-shadow .2s ease, background-color .2s ease, transform .2s var(--resorte);
+}
+.paywall-plan:active { transform: scale(.985); }
+.paywall-plan.elegido { background: color-mix(in oklab, var(--tono) 11%, var(--surface-2)); box-shadow: inset 0 0 0 2px color-mix(in oklab, var(--tono) 72%, white); }
+.light-mode .paywall-plan.elegido { background: color-mix(in oklab, var(--tono) 8%, white); box-shadow: inset 0 0 0 2px var(--tono); }
+.paywall-plan-arriba { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.paywall-radio { width: 20px; height: 20px; flex: none; border-radius: 999px; box-shadow: inset 0 0 0 2px var(--hairline-fuerte); transition: box-shadow .2s ease; }
+.paywall-radio.on { box-shadow: inset 0 0 0 6px color-mix(in oklab, var(--tono) 72%, white); }
+.light-mode .paywall-radio.on { box-shadow: inset 0 0 0 6px var(--tono); }
+.paywall-plan-nombre { font-size: 0.9375rem; font-weight: 700; color: var(--text-strong); }
+.paywall-plan:not(.elegido) .paywall-ahorro { color: var(--text-muted); background: var(--velo); }
+.paywall-ahorro { margin-left: auto; padding: 3px 9px; border-radius: 999px; font-size: 0.75rem; font-weight: 700; white-space: nowrap; color: color-mix(in oklab, var(--tono) 18%, #07080a); background: color-mix(in oklab, var(--tono) 72%, white); }
+.paywall-plan-precio { margin-left: 30px; font-size: 0.875rem; color: var(--text-muted); }
+.paywall-plan-precio b { margin-right: 2px; font-size: 1.5rem; line-height: 1.1; font-weight: 750; font-stretch: 84%; letter-spacing: -0.02em; color: var(--text-strong); font-variant-numeric: tabular-nums; }
+.paywall-plan-detalle { margin-left: 30px; font-size: 0.8125rem; color: var(--text-faint); }
+.paywall-error { margin-top: 12px; font-size: 0.8125rem; line-height: 1.4; color: color-mix(in oklab, #F43F5E 55%, white); }
+.light-mode .paywall-error { color: color-mix(in oklab, #BE123C 88%, black); }
+.paywall-cta { margin-top: 16px; min-height: 52px; font-size: 1rem; }
+.paywall-condiciones { margin-top: 10px; font-size: 0.75rem; line-height: 1.45; color: var(--text-faint); text-wrap: pretty; }
+.paywall-pie { display: flex; flex-wrap: wrap; justify-content: center; gap: 0 16px; margin-top: 6px; }
+.paywall-seguir { display: block; width: 100%; min-height: 44px; font-size: 0.875rem; font-weight: 650; color: var(--text-muted); }
+.paywall-listo { display: grid; justify-items: start; gap: 10px; padding-top: 4px; }
+.paywall-listo .boton-pildora { margin-top: 8px; }
+.paywall-listo-marca { width: 52px; height: 52px; }
+.premium-perfil { display: grid; gap: 4px; padding: 16px; }
+.premium-perfil-titulo { margin-top: 2px; font-size: 1rem; font-weight: 700; color: var(--text-strong); }
+.premium-perfil-texto { font-size: 0.875rem; line-height: 1.45; color: var(--text-muted); text-wrap: pretty; }
+.premium-perfil-botones { display: flex; gap: 8px; margin-top: 10px; }
 .ia-tarjetas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 16px; }
 .ia-tarjeta {
   display: grid; align-content: start; gap: 4px; min-height: 124px; padding: 14px; border-radius: 22px; text-align: left;
@@ -10157,12 +10313,26 @@ function rangoDeReps(repRange) {
 // reps y recién ahí suba el peso y baje las reps, como la que haría un
 // entrenador personal". Todo en la unidad que se muestra; a peso corporal,
 // sólo reps.
-function siguientePaso(kg, reps, repRange, salto) {
+// Dos correcciones con la evidencia (docs/critica-entrenamiento.md):
+//  · si la vez pasada llegaste al fallo (RPE 9,5 o más, que se anota con el
+//    esfuerzo), hoy se repite en vez de sumar una rep: subir sobre una serie
+//    al fallo suma fatiga y no más músculo (Robinson et al., 2024);
+//  · si el salto es más del 10 % del peso (2,5 kg sobre 20 kg), antes de
+//    saltar se suman hasta dos reps arriba del tope: el ACSM (2009) recomienda
+//    subir la carga de a 2-10 %, menos en los músculos chicos, "cuando se
+//    pueden hacer una o dos repeticiones más que las buscadas"; con un salto
+//    grande, ir al piso del rango era casi imposible y la progresión se
+//    trababa.
+function siguientePaso(kg, reps, repRange, salto, { rpe = null } = {}) {
   const r = rangoDeReps(repRange);
   if (!r || !(reps > 0)) return null;
   const [piso, tope] = r;
+  if (rpe != null && rpe >= 9.5 && reps <= tope) return { kg, reps, motivo: "fallo" };
   if (!(kg > 0)) return { kg: 0, reps: reps + 1, motivo: "rep" };
-  if (reps >= tope) return { kg: Math.round((kg + salto) * 4) / 4, reps: piso, motivo: "peso" };
+  if (reps >= tope) {
+    if (salto / kg > 0.1 && reps < tope + 2) return { kg, reps: reps + 1, motivo: "rep" };
+    return { kg: Math.round((kg + salto) * 4) / 4, reps: piso, motivo: "peso" };
+  }
   return { kg, reps: reps + 1, motivo: "rep" };
 }
 // Lo último que hiciste en una serie (sin descargas), en kg.
@@ -10932,6 +11102,202 @@ const RECAP_ESTILOS = {
   anio: { titulo: "Año completo", cta: "Vamos por el próximo" },
 };
 
+/* ============================================================================
+   EL PAYWALL DE MODUS FIT PREMIUM (ver src/suscripcion.js y
+   docs/suscripcion.md). Sólo existe con el cobro prendido o en el modo de
+   prueba de desarrollo; con la bandera apagada nadie lo ve. Lo abre App al
+   recibir pedirPaywall(motivo) desde cualquier pantalla: el cupo de la IA,
+   un candado (Planificar con IA, importar con foto), el primer entrenamiento
+   terminado o Perfil. Los tres planes, el anual elegido y con su prueba; el
+   precio que se cobra en grande y lo que da por mes, aparte y en chico
+   (política de suscripciones de Google Play); antes del botón, cuánto se
+   cobra después de la prueba, que se renueva sola y cómo se cancela; y
+   "Seguir gratis" siempre a la vista.
+============================================================================ */
+function usePremium() {
+  return useSyncExternalStore(suscribirPremium, estadoPremium, estadoPremium);
+}
+const fechaCorta = (iso) => (iso ? new Date(iso).toLocaleDateString("es-AR", { day: "numeric", month: "long" }) : "");
+// `claro`: va por un portal, fuera del contenedor que lleva el tema (como la
+// barra de escribir del chat), así que el modo claro se lo pasa App.
+function Paywall({ motivo = "perfil", onClose, claro = false }) {
+  useAndroidBack(onClose);
+  const prov = proveedor();
+  const estado = usePremium();
+  const [ofertas, setOfertas] = useState(null);
+  const [error, setError] = useState("");
+  const [elegido, setElegido] = useState(PLAN_ELEGIDO);
+  const [comprando, setComprando] = useState(false);
+  const [legal, setLegal] = useState(null);
+  const [recienComprado, setRecienComprado] = useState(false);
+  useEffect(() => {
+    let vivo = true;
+    (async () => {
+      try {
+        const o = await prov?.ofertas();
+        if (vivo) setOfertas(o || []);
+      } catch {
+        if (vivo) { setOfertas([]); setError("No pudimos traer los planes. Probá de nuevo en un rato."); }
+      }
+    })();
+    return () => { vivo = false; };
+  }, [prov]);
+  const texto = FUNCIONES[motivo] || FUNCIONES.perfil;
+  const mensual = ofertas?.find((o) => o.id === "mensual") || null;
+  const plan = ofertas?.find((o) => o.id === elegido) || ofertas?.[0] || null;
+  const conPrueba = (plan?.dias || 0) > 0;
+  const comprar = async () => {
+    if (!prov || !plan || comprando) return;
+    setComprando(true);
+    setError("");
+    try {
+      const e = await prov.comprar(plan.id);
+      if (e?.activo) {
+        setRecienComprado(true);
+        haptic([0, 30, 50, 30]);
+        if (e.enPrueba && e.vence) avisarFinDePrueba(e.vence);
+      }
+    } catch (err) {
+      // Cancelar en la hoja de Google Play no es un error.
+      if (!(err?.userCancelled || String(err?.code) === "1" || /cancel/i.test(String(err?.message || "")))) setError("No se pudo completar la compra. No se te cobró nada: probá de nuevo.");
+    } finally {
+      setComprando(false);
+    }
+  };
+  const restaurar = async () => {
+    if (!prov) return;
+    setError("");
+    try {
+      const e = await prov.restaurar();
+      if (!e?.activo) setError("No encontramos una suscripción activa en esta cuenta de Google Play.");
+    } catch {
+      setError("No pudimos revisar tus compras. Probá de nuevo en un rato.");
+    }
+  };
+  const premium = estado.activo || recienComprado;
+  return createPortal(
+    <div className={`fixed inset-0 z-[150] flex items-end sm:items-center justify-center modal-overlay modal-bg-in paywall-fondo ${claro ? "light-mode" : ""}`} onClick={onClose}>
+      <div className="paywall modal-pop-in" role="dialog" aria-modal="true" aria-labelledby="paywall-titulo" onClick={(e) => e.stopPropagation()}>
+        <button onClick={onClose} aria-label="Cerrar" className="boton-redondo paywall-cerrar"><X size={18} /></button>
+        {premium ? (
+          <div className="paywall-listo">
+            <span className="galleta llena girada paywall-listo-marca" aria-hidden="true"><Check size={24} strokeWidth={3} /></span>
+            <h2 id="paywall-titulo" className="paywall-titulo">Tenés Premium</h2>
+            <p className="paywall-bajada">
+              {estado.enPrueba && estado.vence
+                ? `Tu prueba gratis termina el ${fechaCorta(estado.vence)}. Te avisamos dos días antes; si no querés seguir, la cancelás desde Google Play y no se te cobra nada.`
+                : `Ya tenés ${CUPO_IA_PREMIUM} consultas por día al Entrenador IA, Planificar con IA e importar con una foto.`}
+            </p>
+            <button onClick={onClose} className="boton-pildora w-full">Listo</button>
+          </div>
+        ) : (
+          <>
+            {modoPrueba() && <p className="paywall-prueba">Modo de prueba: no se cobra nada.</p>}
+            <p className="paywall-marca">Modus Fit Premium</p>
+            <h2 id="paywall-titulo" className="paywall-titulo">{texto.titulo}</h2>
+            <p className="paywall-bajada">{texto.bajada}</p>
+            <ul className="paywall-beneficios">
+              {BENEFICIOS.map((b) => (
+                <li key={b.titulo}><Check size={16} strokeWidth={2.6} aria-hidden="true" /><span><b>{b.titulo}.</b> {b.bajada}</span></li>
+              ))}
+            </ul>
+            <p className="paywall-gratis">Anotar, tus rutinas, el historial, los récords, el ciclo y Social siguen gratis.</p>
+            <div className="paywall-planes" role="radiogroup" aria-label="Elegí un plan">
+              {ofertas == null && <p className="paywall-cargando">Buscando los planes…</p>}
+              {(ofertas || []).map((o) => {
+                const ahorro = ahorroContraMensual(o, mensual);
+                const sel = o.id === plan?.id;
+                const detalle = [o.porMes ? `${o.porMes} por mes` : null, o.dias > 0 ? `${o.dias} días gratis` : null].filter(Boolean).join(", ");
+                return (
+                  <button key={o.id} role="radio" aria-checked={sel} onClick={() => setElegido(o.id)} className={`paywall-plan ${sel ? "elegido" : ""}`}>
+                    <span className="paywall-plan-arriba">
+                      <span className={`paywall-radio ${sel ? "on" : ""}`} aria-hidden="true" />
+                      <span className="paywall-plan-nombre">{o.nombre}</span>
+                      {ahorro >= 10 && <span className="paywall-ahorro">Ahorrás {ahorro} %</span>}
+                    </span>
+                    <span className="paywall-plan-precio"><b>{o.precio}</b> {o.cada}</span>
+                    {detalle && <span className="paywall-plan-detalle">{detalle}</span>}
+                  </button>
+                );
+              })}
+            </div>
+            {error && <p className="paywall-error" role="alert">{error}</p>}
+            <button onClick={comprar} disabled={!plan || comprando} className="boton-pildora w-full paywall-cta">
+              {comprando ? "Un momento…" : conPrueba ? `Empezar los ${plan.dias} días gratis` : plan ? `Suscribirme por ${plan.precio} ${plan.cada}` : "Suscribirme"}
+            </button>
+            {plan && (
+              <p className="paywall-condiciones">
+                {conPrueba ? `Gratis por ${plan.dias} días; después, ${plan.precio} ${plan.cada}.` : `${plan.precio} ${plan.cada}.`} Se renueva sola hasta que la canceles, cuando quieras, desde Google Play › Pagos y suscripciones{conPrueba ? "; si la cancelás durante la prueba, no se te cobra nada" : ""}.
+              </p>
+            )}
+            <div className="paywall-pie">
+              <button onClick={restaurar} className="enlace-suave">Restaurar compras</button>
+              <button onClick={() => setLegal("terminos")} className="enlace-suave">Términos</button>
+              <button onClick={() => setLegal("privacidad")} className="enlace-suave">Privacidad</button>
+            </div>
+            <button onClick={onClose} className="paywall-seguir">Seguir gratis</button>
+          </>
+        )}
+      </div>
+      {/* Los términos y la privacidad, en un panel: un window.open a la misma
+          dirección de la app la reemplazaba adentro del WebView de Android. */}
+      {legal && (
+        <div className="fixed inset-0 z-[200] flex flex-col" style={{ background: "var(--app-bg)", paddingTop: "env(safe-area-inset-top,0px)" }} onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center justify-between px-4 py-3 shrink-0" style={{ boxShadow: "0 1px 0 var(--hairline)" }}>
+            <span className="text-[15px] font-bold" style={{ color: "var(--text-strong)" }}>{legal === "terminos" ? "Términos y condiciones" : "Política de privacidad"}</span>
+            <button onClick={() => setLegal(null)} aria-label="Cerrar" className="boton-redondo"><X size={16} /></button>
+          </div>
+          <iframe src={`${API_ORIGIN}/${legal === "terminos" ? "terminos.html" : "privacy-policy.html"}`} title={legal === "terminos" ? "Términos y condiciones" : "Política de privacidad"} className="flex-1 w-full border-0" style={{ background: "var(--app-bg)" }} />
+        </div>
+      )}
+    </div>,
+    document.body,
+  );
+}
+// El aviso de que la prueba termina: dos días antes, a las 10 (la skill de
+// paywalls: las renovaciones sorpresa traen reembolsos y malas reseñas).
+// Google Play además manda su propio mail.
+function avisarFinDePrueba(venceIso) {
+  if (!Capacitor.isNativePlatform()) return;
+  const cuando = new Date(venceIso);
+  cuando.setDate(cuando.getDate() - 2);
+  cuando.setHours(10, 0, 0, 0);
+  if (cuando.getTime() <= Date.now()) return;
+  LocalNotifications.schedule({ notifications: [{ id: 9410, title: "Tu prueba de Premium termina en dos días", body: `El ${fechaCorta(venceIso)} empieza a cobrarse. Si no querés seguir, cancelala desde Google Play › Pagos y suscripciones.`, schedule: { at: cuando, allowWhileIdle: true } }] }).catch(() => {});
+}
+// Perfil › Tu plan: gratis o Premium, y lo que se puede hacer desde acá.
+// Sólo con el cobro prendido o en el modo de prueba.
+function SeccionPremium() {
+  const estado = usePremium();
+  if (!suscripcionVisible()) return null;
+  const prov = proveedor();
+  return (
+    <section className="tarjeta-tonal premium-perfil" aria-label="Tu plan">
+      <p className="ajuste-rotulo">Tu plan</p>
+      {estado.activo ? (
+        <>
+          <p className="premium-perfil-titulo">Premium activo</p>
+          <p className="premium-perfil-texto">
+            {estado.enPrueba && estado.vence ? `Prueba gratis hasta el ${fechaCorta(estado.vence)}.` : estado.vence ? `${estado.seRenueva === false ? "Vence" : "Se renueva"} el ${fechaCorta(estado.vence)}.` : "Gracias por bancar la app."}
+          </p>
+          <div className="premium-perfil-botones">
+            <button onClick={() => prov?.gestionar()} className="boton-tonal flex-1">{modoPrueba() ? "Cancelar (prueba)" : "Gestionar en Google Play"}</button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="premium-perfil-titulo">Gratis</p>
+          <p className="premium-perfil-texto">Premium suma la IA: {CUPO_IA_PREMIUM} consultas por día al Entrenador, Planificar con IA e importar una rutina con foto.</p>
+          <div className="premium-perfil-botones">
+            <button onClick={() => pedirPaywall("perfil")} className="boton-pildora flex-1">Ver los planes</button>
+            <button onClick={() => prov?.restaurar().catch(() => {})} className="boton-tonal">Restaurar</button>
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
 function WeeklyRecapModal({ data, onClose, periodo = "semana", etiqueta = null, enCurso = false }) {
   useAndroidBack(onClose);
   const unit = useWeightUnit();
@@ -11267,7 +11633,7 @@ function capitulosGuia() {
       pasos: [
         {
           titulo: "Tu ciclo, en cajones",
-          texto: "Cada semana del ciclo es un cajón de salto, uno más alto que el otro: la carga va subiendo de a poco. El de esta semana tiene su color entero y arriba dice en cuál vas (4/6); sobre cada cajón, en tiza, las veces que fuiste, y los que vienen están dibujados con tiza. El bajo y rayado es la semana de descarga, para recuperarte.",
+          texto: "Cada semana del ciclo es un cajón de salto, uno más alto que el otro: la carga va subiendo de a poco. El de esta semana tiene su color entero y arriba dice en cuál vas (4/6); sobre cada cajón, en tiza, las veces que fuiste, y los que vienen están dibujados con tiza. El bajo y rayado es la semana de descarga, para recuperarte: esa semana Rutina se transforma sola, con menos series y menos peso, y si venís bajando la podés adelantar.",
           dibujo: <div className="guia-cajones" style={{ "--tono": azul }}><CajonesCiclo semanas={CICLO_DE_MUESTRA} trainWeeks={5} alto={100} /></div>,
         },
         {
@@ -11686,7 +12052,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
   // con lo de la vez pasada tal cual.
   const pasoKg = saltoDe(fieldSettings, exerciseId, unit);
   const pasoProgresion = !cardio && !isPlannedMode && lastSession && fieldSettings.showProgressionSuggestion !== false
-    ? siguientePaso(kgToDisplay(lastSession.kg, unit), lastSession.reps, setDef.repRange, pasoKg)
+    ? siguientePaso(kgToDisplay(lastSession.kg, unit), lastSession.reps, setDef.repRange, pasoKg, { rpe: lastSession.rpe ?? null })
     : null;
   const escribeProgresion = !!pasoProgresion && fieldSettings.showLastSession !== false && fieldSettings.prefillLastSession !== false;
   const sugerido = isPlannedMode && !cardio && plannedTarget?.kg != null && plannedTarget?.reps
@@ -12399,7 +12765,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
       )}
       {/* La serie viene con la progresión: arriba, de dónde sale. */}
       {escribeProgresion && !draft.editing && (
-        <p className="foco-pasada">{laVezPasada}{pasoProgresion.motivo === "peso" ? ": llegaste al tope, sube el peso" : ": hoy, una rep más"}</p>
+        <p className="foco-pasada">{laVezPasada}{pasoProgresion.motivo === "peso" ? ": llegaste al tope, sube el peso" : pasoProgresion.motivo === "fallo" ? ": llegaste al fallo, hoy lo mismo" : ": hoy, una rep más"}</p>
       )}
 
       {/* El visor: reps × kilos en grande y el ✓. Vienen propuestos con lo de
@@ -13023,14 +13389,19 @@ function discosDeUnLado(n) {
 }
 // `sobria`: discos de goma negra en vez de los de colores de competición,
 // para donde la barra acompaña (Social) y no es la protagonista (Rutina).
-function BarraCargada({ hechas = 0, total = 0, alto = 30, etiqueta = null, className = "", detalle = false, escalonado = false, sobria = false }) {
+// `fuera`: cuántos discos de afuera se sacaron de la barra (la semana de
+// descarga: ver RoutineView). Los demás quedan donde estaban, como cuando se
+// descarga una barra de verdad; los que salen se deslizan por la manga y
+// vuelven si pasás al entrenamiento normal.
+function BarraCargada({ hechas = 0, total = 0, alto = 30, etiqueta = null, className = "", detalle = false, escalonado = false, sobria = false, fuera = 0 }) {
   // Ids propios para los degradés: con dos barras en pantalla (la del día y
   // la del dock), ids repetidos hacen que una pinte con los de la otra.
   const uid = `bc${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
   const t = Math.max(0, Math.round(total));
   if (!t) return null;
   const W = 320, H = 64, cy = H / 2;
-  const cargados = Math.min(Math.max(0, hechas), t);
+  const quedan = Math.max(1, t - Math.max(0, Math.round(fuera)));
+  const cargados = Math.min(Math.max(0, hechas), quedan);
   const porLado = Math.ceil(t / 2);
   const tipos = discosDeUnLado(porLado);
   const agarreIni = W / 2 - 50, agarreFin = W / 2 + 50;
@@ -13050,7 +13421,7 @@ function BarraCargada({ hechas = 0, total = 0, alto = 30, etiqueta = null, class
     const izquierda = n % 2 === 0;
     const l = lugares[Math.floor(n / 2)];
     const h = altoMax * FORMA_DISCO[l.k].alto;
-    discos.push({ n, k: l.k, w: l.w, h, x: izquierda ? mangaIzqFin - l.desde - l.w : mangaDerIni + l.desde, y: cy - h / 2, izquierda, cargado: n < cargados });
+    discos.push({ n, k: l.k, w: l.w, h, x: izquierda ? mangaIzqFin - l.desde - l.w : mangaDerIni + l.desde, y: cy - h / 2, izquierda, cargado: n < cargados, afuera: n >= quedan });
   }
   const ultimoDe = (izq) => discos.filter((d) => d.cargado && d.izquierda === izq).pop() || null;
   const uIzq = ultimoDe(true), uDer = ultimoDe(false);
@@ -13058,7 +13429,7 @@ function BarraCargada({ hechas = 0, total = 0, alto = 30, etiqueta = null, class
   const acero = `url(#${uid}-acero)`;
   const mitadAgarre = (agarreFin - agarreIni) / 2;
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className={`barra-cargada ${cargados >= t ? "completa" : ""} ${className}`} style={{ height: alto }} role="img" aria-label={etiqueta || `${cargados} de ${t} series`}>
+    <svg viewBox={`0 0 ${W} ${H}`} className={`barra-cargada ${cargados >= quedan ? "completa" : ""} ${className}`} style={{ height: alto }} role="img" aria-label={etiqueta || `${cargados} de ${quedan} series`}>
       <defs>
         <linearGradient id={`${uid}-acero`} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" className="acero-claro" />
@@ -13091,15 +13462,24 @@ function BarraCargada({ hechas = 0, total = 0, alto = 30, etiqueta = null, class
       )}
       <rect x={mangaIzqFin} y={cy - 11} width={tope} height="22" rx="2.4" fill={acero} />
       <rect x={agarreFin} y={cy - 11} width={tope} height="22" rx="2.4" fill={acero} />
-      {/* Los discos: cargados con volumen, los que faltan como fantasmas. */}
-      {discos.map((d) => (d.cargado ? (
-        <g key={`d${d.n}`} className="disco-entra" style={{ "--desde": d.izquierda ? "-28px" : "28px", ...(escalonado ? { animationDelay: `${200 + d.n * 90}ms` } : null) }}>
-          <rect x={d.x} y={d.y} width={d.w} height={d.h} rx={radio(d.w)} fill={`url(#${uid}-d${d.k})`} className="disco" />
-          <rect x={d.x + 0.75} y={d.y + 0.75} width={Math.max(0.5, d.w - 1.5)} height={d.h - 1.5} rx={Math.max(0.5, radio(d.w) - 0.75)} className="disco-filete" />
+      {/* Los discos: cargados con volumen, los que faltan como fantasmas. Cada
+          lugar es el mismo elemento siempre (key por lugar), así un disco que
+          sale de la barra en la descarga se desliza afuera, de goma negra, en
+          vez de desaparecer; y vuelve al pasar al entrenamiento normal. */}
+      {discos.map((d) => (
+        <g key={`l${d.n}`} className={`disco-lugar ${d.afuera ? "afuera" : ""}`} style={{ "--hacia": d.izquierda ? "-34px" : "34px", transitionDelay: `${(d.afuera ? t - 1 - d.n : d.n - quedan) * 45}ms` }}>
+          {d.cargado ? (
+            <g key="c" className="disco-entra" style={{ "--desde": d.izquierda ? "-28px" : "28px", ...(escalonado ? { animationDelay: `${200 + d.n * 90}ms` } : null) }}>
+              <rect x={d.x} y={d.y} width={d.w} height={d.h} rx={radio(d.w)} fill={`url(#${uid}-d${d.k})`} className="disco" />
+              <rect x={d.x + 0.75} y={d.y + 0.75} width={Math.max(0.5, d.w - 1.5)} height={d.h - 1.5} rx={Math.max(0.5, radio(d.w) - 0.75)} className="disco-filete" />
+            </g>
+          ) : d.afuera ? (
+            <rect key="a" x={d.x} y={d.y} width={d.w} height={d.h} rx={radio(d.w)} className="disco-suelto" />
+          ) : (
+            <rect key="f" x={d.x + 0.45} y={d.y + 0.45} width={Math.max(0.5, d.w - 0.9)} height={d.h - 0.9} rx={radio(d.w)} className="disco-fantasma" />
+          )}
         </g>
-      ) : (
-        <rect key={`f${d.n}`} x={d.x + 0.45} y={d.y + 0.45} width={Math.max(0.5, d.w - 0.9)} height={d.h - 0.9} rx={radio(d.w)} className="disco-fantasma" />
-      )))}
+      ))}
       {/* Los collarines, contra el último disco cargado de cada lado. */}
       {uIzq && <rect x={uIzq.x - gapClip - clip} y={cy - 8} width={clip} height="16" rx="2" className="collarin" />}
       {uDer && <rect x={uDer.x + uDer.w + gapClip} y={cy - 8} width={clip} height="16" rx="2" className="collarin" />}
@@ -13130,7 +13510,10 @@ function convertirBorradoresDeUnidad(prev, de, a) {
 ============================================================================ */
 // Cómo se acomodan las series al guardar: rápido y con un rebote mínimo.
 const RESORTE_LISTA = { type: "spring", bounce: 0.16, duration: 0.5 };
-function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts, resetKey = 0, settings = DEFAULT_SETTINGS, autoCollapse = false, onDisableAutoShowPrShare, hasActiveSession = true, hideTimer = false, onUpdateSettings = null, routineHasPlan = false, sex = null, age = null, weekInCycle = null, dayKey = null, nextRestTimerId = null, nextRestSeconds = null, nextExerciseName = null, supersetRestTimerId = null, supersetRestSeconds = null, orden = null, nextObjetivo = null, cicloActual = null }) {
+// `descarga`: la semana de descarga (ver RoutineView): la misma tarjeta, con
+// sus series de descarga adentro (SeriesDescarga) y las rayitas que sobran
+// saliendo de la cabecera.
+function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts, resetKey = 0, settings = DEFAULT_SETTINGS, autoCollapse = false, onDisableAutoShowPrShare, hasActiveSession = true, hideTimer = false, onUpdateSettings = null, routineHasPlan = false, sex = null, age = null, weekInCycle = null, dayKey = null, nextRestTimerId = null, nextRestSeconds = null, nextExerciseName = null, supersetRestTimerId = null, supersetRestSeconds = null, orden = null, nextObjetivo = null, cicloActual = null, descarga = null }) {
   const [open, setOpen] = useState(false);
   const [showWarmup, setShowWarmup] = useState(false);
   // Pedido: "que no se abran más automáticamente los ejercicios, sí que se
@@ -13188,7 +13571,12 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
   const seriesHechas = useMemo(() => (
     setsToShow.map((_, i) => (logs[`${exercise.id}_${i}`] || []).some((h) => h.date === hoyStr && !h.deload))
   ), [logs, exercise.id, setsToShow, hoyStr]);
-  const allSetsDoneToday = seriesHechas.length > 0 && seriesHechas.every(Boolean);
+  // En la descarga cuentan sólo las series que quedan, tildadas esta semana.
+  const quedanEnDescarga = descarga ? seriesDeDescarga(setsToShow.length, descarga.divisor) : setsToShow.length;
+  const hechasEnDescarga = descarga ? setsToShow.map((_, i) => i < quedanEnDescarga && descarga.progreso?.[`${exercise.id}_${i}`] === descarga.hoy) : null;
+  const allSetsDoneToday = descarga
+    ? hechasEnDescarga.slice(0, quedanEnDescarga).every(Boolean)
+    : seriesHechas.length > 0 && seriesHechas.every(Boolean);
   // La serie EN FOCO: la única que se abre con el tablero grande (reps ×
   // kilos, tu marca, los ± y guardar). Es la que toca ahora —la primera sin
   // hacer— o la que tocaste para anotarla fuera de orden. Las demás son
@@ -13258,10 +13646,11 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
               {/* Si el músculo ya dice "Cardio", el chip de cardio repetía la palabra. */}
               {exercise.cardio && String(exercise.muscle || "").toLowerCase() !== "cardio" && <span className="text-[11px] bg-rose-400/15 text-rose-300 rounded-md px-1.5 py-0.5 font-bold flex items-center gap-1"><Footprints size={9} /> CARDIO</span>}
               {!open && restTimerId && <ChipDescansoEnCurso timerId={restTimerId} color={accent} />}
+              {descarga && quedanEnDescarga < setsToShow.length && <span className="ejercicio-descarga">{setsToShow.length} → {quedanEnDescarga} {quedanEnDescarga === 1 ? "serie" : "series"}</span>}
               {/* El ×1/×2 de mancuernas se configura al editar la rutina
                   ("¿Con cuántas mancuernas?"), no acá: durante el
                   entrenamiento sumaba ruido y ya está definido. */}
-              {stagnant && settings.showStagnation === true && !siguiendoPlan && <span className="text-[11px] bg-rose-500/15 text-rose-400 rounded-lg px-1.5 py-0.5 font-bold flex items-center gap-1"><AlertTriangle size={9} /> ESTANCADO</span>}
+              {!descarga && stagnant && settings.showStagnation === true && !siguiendoPlan && <span className="text-[11px] bg-rose-500/15 text-rose-400 rounded-lg px-1.5 py-0.5 font-bold flex items-center gap-1"><AlertTriangle size={9} /> ESTANCADO</span>}
               {/* Con la tarjeta cerrada ya se ve cuáles ejercicios siguen el
                   plan y cuáles persiguen tu récord — antes había que abrir
                   cada uno para enterarte. Y el chip ES el interruptor: un
@@ -13281,7 +13670,7 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
                   planificado y con al menos una meta en la rutina: sin plan
                   en ningún lado, repetir "POR RÉCORD" en cada tarjeta es
                   ruido que no informa nada. */}
-              {settings.trainingMode === "planned" && (planInfo || routineHasPlan) && (
+              {!descarga && settings.trainingMode === "planned" && (planInfo || routineHasPlan) && (
                 // Sólo informa (pedido: "sacar eso de que si tocás el botoncito
                 // de plan cambie a récord"): pausar un ejercicio se hace desde
                 // el planificador.
@@ -13301,11 +13690,15 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
         <div className="flex items-center gap-2.5 shrink-0">
           {/* Un disquito por serie, con los colores de la barra cargada:
               lleno = hecha hoy. Con la tarjeta cerrada sabés por dónde ibas. */}
-          {!exercise.cardio && seriesHechas.length > 0 && (
+          {!exercise.cardio && seriesHechas.length > 0 && (descarga ? (
+            <span className="series-discos" role="img" aria-label={allSetsDoneToday ? "Completaste las series de descarga" : `${hechasEnDescarga.filter(Boolean).length} de ${quedanEnDescarga} series de descarga`}>
+              {hechasEnDescarga.map((hecha, i) => <i key={i} className={i >= quedanEnDescarga ? "afuera" : hecha ? "hecha" : ""} />)}
+            </span>
+          ) : (
             <span className="series-discos" role="img" aria-label={allSetsDoneToday ? "Completaste todas las series de hoy" : `${seriesHechas.filter(Boolean).length} de ${seriesHechas.length} series hechas hoy`}>
               {seriesHechas.map((hecha, i) => <i key={i} className={hecha ? "hecha" : ""} />)}
             </span>
-          )}
+          ))}
           <ChevronDown size={18} className={`text-slate-500 shrink-0 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
         </div>
       </button>
@@ -13315,6 +13708,17 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
       <div className={`ejercicio-cuerpo ${open ? "abierto" : ""}`} inert={!open}>
       <div className="ejercicio-cuerpo-interior">
       <div className="px-3.5 pb-3.5 pt-0">
+        {/* La semana de descarga: las mismas series, más livianas (ver
+            SeriesDescarga); el cuerpo cambia en el lugar, sin abrir nada. */}
+        {descarga ? (
+          <div key="descarga" className="cuerpo-cambia">
+            <SeriesDescarga exercise={exercise} descarga={descarga} accent={accent} logs={logs} settings={settings} cicloActual={cicloActual} restTimerId={restTimerId} restSeconds={restSeconds} />
+            {!exercise.cardio && !descarga.previa && settings.autoStartRestTimer !== true && restTimerId && (
+              <div className="pt-2"><RestTimer seconds={restSeconds} accent={accent} timerId={restTimerId} exerciseName={exercise.name} /></div>
+            )}
+          </div>
+        ) : (
+        <div key="normal" className="cuerpo-cambia">
         {stagnant && settings.showStagnation === true && !siguiendoPlan && <div className="mb-3 text-[11px] text-rose-400/90 bg-rose-500/5 border border-rose-500/15 rounded-xl px-3 py-2 flex items-start gap-1.5"><Info size={12} className="mt-0.5 shrink-0" /><span>Hace {STAGNATION_DAYS}+ días sin superar el récord. Considerá cambiar reps, descanso o variante.</span></div>}
         {/* Pasar ESTE ejercicio de "sigue el plan" a "persigue mi récord" y
             al revés, sin salir de la pantalla ni perder lo planificado: el
@@ -13399,6 +13803,8 @@ function ExerciseCard({ exercise, accent, logs, setLogs, drafts = {}, setDrafts,
             )}
           </React.Fragment>)}
         </div>
+        </div>
+        )}
         {exercise.video && (
           <div className="pt-3">
             <a href={exercise.video} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 h-11 rounded-full text-slate-400 hover:text-white transition text-[14px] font-semibold active:scale-[0.98]" style={{ backgroundColor: "var(--surface-2)" }}>
@@ -13730,7 +14136,7 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_
       ``,
       `PERSONA: ${niv.ia}.`,
       `OBJETIVO: ${obj.ia}.`,
-      hayDescarga ? `CICLO: son ${ciclo} semanas de trabajo y después ${settings.deloadWeeks} de descarga al ${Math.round((settings.deloadPct || 0.6) * 100)}% de la carga. La semana ${ciclo} es la última de trabajo.` : `CICLO: ${ciclo} semanas de trabajo seguidas, sin descarga programada.`,
+      hayDescarga ? `CICLO: son ${ciclo} semanas de trabajo y después ${settings.deloadWeeks} de descarga al ${Math.round((settings.deloadPct || 0.75) * 100)}% de la carga. La semana ${ciclo} es la última de trabajo.` : `CICLO: ${ciclo} semanas de trabajo seguidas, sin descarga programada.`,
       enLibras
         ? `UNIDAD: LIBRAS (lbs). Todas las cargas que devuelvas tienen que estar en libras, y cada una se tiene que poder armar con el salto de su ejercicio (dice "el peso sube de a"): partí de su peso y sumá saltos enteros.`
         : `UNIDAD: kilos. Cada carga se tiene que poder armar con el salto de su ejercicio (dice "el peso sube de a"; hay máquinas que van de 7 en 7 kg): partí de su peso y sumá saltos enteros.`,
@@ -14186,7 +14592,13 @@ function HojaDelPlan({ dia = null, semana = null, filas = [], hayPlan = false, e
   );
 }
 
-function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, weekSchedule, activeSession, onStartSession, onDisableAutoShowPrShare, onUpdateSettings = null, onSetPlanPaused = null, onRemovePlan = null, onGoToFieldSettings = null, onGoToDescarga = null, sex = null, age = null, activeRoutineDef = null, onApplyOwnProgression = null, goToDaySignal = { id: null, n: 0 }, onSignalConsumed = null }) {
+// LA SEMANA DE DESCARGA es este mismo componente en modo descarga (ver el
+// bloque "LA SEMANA DE DESCARGA, ADENTRO DE RUTINA"): `semanaDescarga` (es la
+// semana de descarga del ciclo), `descargaApagada` (esta semana elegiste
+// entrenar normal), `descargaPrevia` (la mirás antes de tiempo, desde
+// Progreso o desde el aviso de que venís bajando) y lo que guarda las series
+// de descarga (`deloadProgress`, `setDeloadProgress`, `onFinishDeloadSession`).
+function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, weekSchedule, activeSession, onStartSession, onDisableAutoShowPrShare, onUpdateSettings = null, onSetPlanPaused = null, onRemovePlan = null, onGoToFieldSettings = null, sex = null, age = null, activeRoutineDef = null, onApplyOwnProgression = null, goToDaySignal = { id: null, n: 0 }, onSignalConsumed = null, semanaDescarga = false, descargaApagada = false, descargaPrevia = false, onModoDescarga = null, onPreviaDescarga = null, onAdelantarDescarga = null, deloadProgress = {}, setDeloadProgress = null, onFinishDeloadSession = null, descargaTerminadaHoy = false }) {
   // Semana actual del ciclo — sólo hace falta el número (weekInCycle), para
   // que SetRow sepa si hay una meta cargada (modo "planned", ver
   // getPlannedTargetForWeek) para ESTA semana puntual.
@@ -14301,6 +14713,86 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
   const weekInfo = getWeekInfo(cycleStart, settings), isDeload = weekInfo?.isDeload, day = ROUTINE[activeDay];
   // "Color de día": el día que estás mirando tiñe la app entera.
   useEffect(() => { ponerTono(day?.color); }, [day?.color]);
+  // ── EL MODO DESCARGA ──────────────────────────────────────────────────────
+  // La semana de descarga del ciclo (salvo que esta semana elijas entrenar
+  // normal) o su vista previa, desde Progreso o desde el aviso de que venís
+  // bajando. La primera vez del día, Rutina abre normal y se transforma
+  // enseguida: la barra suelta los discos que sobran y cada tarjeta se queda
+  // con sus series de descarga. Antes la descarga era otra pantalla que
+  // reemplazaba a Rutina de golpe.
+  const hayDescarga = settings.deloadEnabled !== false && !!weekInfo;
+  const esSemanaDescarga = hayDescarga && (semanaDescarga || !!isDeload);
+  const previa = hayDescarga && descargaPrevia && !esSemanaDescarga;
+  const pideDescarga = previa || (esSemanaDescarga && !descargaApagada);
+  const [transformada, setTransformada] = useState(() => !pideDescarga || descargaYaVistaHoy() || (typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches));
+  useEffect(() => {
+    if (!pideDescarga || transformada) return;
+    const t = setTimeout(() => { setTransformada(true); marcarDescargaVista(); }, 450);
+    return () => clearTimeout(t);
+  }, [pideDescarga, transformada]);
+  const modoDescarga = pideDescarga && transformada;
+  const hoyDescarga = todayStr();
+  const divisorDescarga = settings.deloadSetDivisor || 2;
+  const pctDescarga = settings.deloadPct || 0.75;
+  const unidadDescarga = settings?.weightUnit === "lbs" ? "lbs" : "kg";
+  const mismaSemanaDescarga = (fecha) => {
+    if (!cycleStart || !fecha) return false;
+    const a = getTotalWeekForDate(cycleStart, fecha), b = getTotalWeekForDate(cycleStart, hoyDescarga);
+    return a != null && b != null && a === b;
+  };
+  // Marcar una serie de descarga como hecha (o desmarcarla). Se guarda en
+  // deloadProgress con la fecha de hoy (así la próxima descarga arranca sin
+  // nada tildado) y como una serie real en los logs, con deload: true: suma al
+  // historial, a la racha y al volumen, pero nunca a los récords. Un ejercicio
+  // que está en dos días de la rutina tiene la misma clave en los dos, así que
+  // se pisa la marca de descarga de esta misma semana en vez de sumar dos.
+  const marcarDescarga = (key, entrada, descanso = null, soloMarcar = false) => {
+    if (!setDeloadProgress || previa) return;
+    const estaba = deloadProgress?.[key] === hoyDescarga;
+    if (estaba && soloMarcar) return;
+    const next = { ...(deloadProgress || {}) };
+    if (estaba) delete next[key]; else next[key] = hoyDescarga;
+    setDeloadProgress(next);
+    if (setLogs && entrada) {
+      setLogs((prev) => {
+        const hist = (prev[key] || []).filter((h) => !(h.deload && (h.date === hoyDescarga || mismaSemanaDescarga(h.date))));
+        return { ...prev, [key]: estaba ? hist : [...hist, { ...entrada, date: hoyDescarga, deload: true }] };
+      });
+    }
+    if (estaba) return;
+    haptic(12);
+    if (descanso && settings.autoStartRestTimer === true) iniciarDescanso(descanso.timerId, { segundos: descanso.seconds, ejercicio: descanso.name || null, color: descanso.color || null });
+  };
+  // Cuántas series de descarga tiene el día y cuántas tildaste hoy: la barra.
+  const avanceDescarga = useMemo(() => {
+    let total = 0, hechas = 0;
+    (day?.exercises || []).forEach((ex) => {
+      const q = seriesDeDescarga(ex.sets?.length || 0, divisorDescarga);
+      total += q;
+      for (let i = 0; i < q; i++) if (deloadProgress?.[`${ex.id}_${i}`] === hoyDescarga) hechas++;
+    });
+    return { total, hechas };
+  }, [day, deloadProgress, divisorDescarga, hoyDescarga]);
+  const grupoDescargaCompleto = (g) => g.every((ex) => {
+    const q = seriesDeDescarga(ex.sets?.length || 0, divisorDescarga);
+    for (let i = 0; i < q; i++) if (deloadProgress?.[`${ex.id}_${i}`] !== hoyDescarga) return false;
+    return true;
+  });
+  const descargaParaTarjetas = modoDescarga ? { divisor: divisorDescarga, pct: pctDescarga, unit: unidadDescarga, progreso: deloadProgress || {}, hoy: hoyDescarga, previa, onMarcar: marcarDescarga } : null;
+  const tildaronDescargaHoy = Object.values(deloadProgress || {}).some((d) => d === hoyDescarga);
+  const reglaDescarga = `${{ 2: "La mitad", 3: "Un tercio", 4: "Un cuarto" }[divisorDescarga] || "Menos"} de las series, al ${Math.round(pctDescarga * 100)} % del peso y con las mismas reps. Sin buscar marcas.`;
+  // El aviso de que venís bajando (ver ejerciciosEnBaja), desde la semana 3 del
+  // ciclo y fuera de la descarga. "Ahora no" lo calla hasta la semana que viene.
+  const enBaja = useMemo(() => (hayDescarga && !esSemanaDescarga && (weekInfo?.weekInCycle || 0) >= 3 ? ejerciciosEnBaja(logs, ROUTINE) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [logs, hayDescarga, esSemanaDescarga, weekInfo?.weekInCycle, activeRoutineDef]);
+  const semanaDelAviso = weekInfo ? `${weekInfo.cycleNumber}-${weekInfo.weekInCycle}` : "";
+  const avisoCallado = (() => { try { return localStorage.getItem("modusfit_aviso_descarga") === semanaDelAviso; } catch { return false; } })();
+  const cerrarPrevia = () => {
+    try { localStorage.setItem("modusfit_aviso_descarga", semanaDelAviso); } catch { /* sin almacenamiento */ }
+    onPreviaDescarga?.(false);
+  };
+  const faltanParaDescarga = weekInfo && !esSemanaDescarga ? Math.max(1, weekInfo.trainWeeks - weekInfo.weekInCycle + 1) : null;
   // Series hechas hoy en el día que estás mirando, para la barra cargada.
   // Mismo criterio de "hecha hoy" que las tarjetas (sin marcas de descarga).
   const avanceDia = useMemo(() => {
@@ -14318,6 +14810,18 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
   const today = todayStr();
 
   const handleResetDay = () => {
+    // En la descarga, "resetear" borra sólo las series de descarga de hoy.
+    if (modoDescarga) {
+      const next = { ...(deloadProgress || {}) };
+      const sinDescarga = { ...logs };
+      day.exercises.forEach((ex) => ex.sets.forEach((_, i) => {
+        const key = `${ex.id}_${i}`;
+        if (next[key] === today) delete next[key];
+        if (sinDescarga[key]) { sinDescarga[key] = sinDescarga[key].filter((h) => !(h.deload && h.date === today)); if (!sinDescarga[key].length) delete sinDescarga[key]; }
+      }));
+      setDeloadProgress?.(next); setLogs(sinDescarga); setConfirmReset(false);
+      return;
+    }
     const newLogs = { ...logs };
     const newDrafts = { ...drafts };
     // Sólo se borran las marcas de HOY de la rutina normal — las de
@@ -14344,7 +14848,10 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           .filter((e) => e.dayKey === activeDay && e.meta?.reps)
           .map((e) => ({ id: e.id, nombre: e.nombre, meta: e.meta.kg > 0 ? `${e.meta.reps} × ${conComa(kgToDisplay(e.meta.kg, unidad))} ${u}` : `${e.meta.reps} reps`, nota: NOTA_DE_AJUSTE[e.meta.ajuste] || null }));
         const enPausa = settings.trainingMode !== "planned";
+        // En la descarga el plan no corre (sus metas son de las semanas de
+        // trabajo): la hoja se pliega mientras dura.
         return (
+          <div className={`plegable-descarga ${modoDescarga ? "plegada" : ""}`} inert={modoDescarga}><div>
           <HojaDelPlan
             dia={day ? { label: day.label, color: day.color } : null}
             semana={weekInfo ? { n: weekInfo.weekInCycle, de: weekInfo.cycleWeeks } : null}
@@ -14359,6 +14866,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             onPausa={() => onUpdateSettings({ trainingMode: enPausa ? "planned" : "record" })}
             onCampos={onGoToFieldSettings}
           />
+          </div></div>
         );
       })()}
       {/* "Hoy descansás" ya no es un aviso aparte: va al lado de la fecha,
@@ -14392,54 +14900,87 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           otra. */}
       <section
         key={activeDay}
-        className="dia-seccion relative tab-fade-in"
+        className={`dia-seccion relative tab-fade-in ${modoDescarga ? "en-descarga" : ""}`}
         style={{ "--c": day.color }}
-        aria-label={`Día ${day.label}`}
+        aria-label={modoDescarga ? `Día ${day.label}, semana de descarga` : `Día ${day.label}`}
       >
         <div className="dia-hero">
           {/* "Resetear sesión de hoy": un ícono en la esquina. Sirve para
               arreglar un error, no es algo que necesites a mano cada día; el
               diálogo de confirmación es el mismo. */}
-          {!confirmReset && (
+          {!confirmReset && !previa && (
             <button onClick={() => setConfirmReset(true)} aria-label="Resetear sesión de hoy" title="Resetear sesión de hoy" className="boton-redondo dia-reset">
               <RotateCcw size={15} />
             </button>
           )}
-          {activeDay === suggestedDay && (
+          {modoDescarga ? (
+            <span className="dia-chip descarga"><Zap size={12} /> {previa ? "Así va a ser tu descarga" : "Semana de descarga"}</span>
+          ) : activeDay === suggestedDay && (
             <span className="dia-chip"><Calendar size={12} /> {scheduledDay === activeDay ? "Programado para hoy" : "Sugerido para hoy"}</span>
           )}
           {(() => { const { larga } = etiquetaDeDia(day.label); return <h2 className="dia-titulo" style={{ "--largo": larga }}>{day.label}</h2>; })()}
           {day.description && <p className="dia-bajada">{day.description}</p>}
-          {/* La barra del día: un disco por serie. Abajo, cuánto llevás (y,
-              la primera vez, qué significa). */}
+          {/* La barra del día: un disco por serie. En la descarga suelta los
+              discos que sobran (los de afuera se deslizan por la manga) y los
+              que quedan se cargan con las series de descarga. */}
           {avanceDia.total > 0 && (
             <div className="dia-barra">
-              <BarraCargada hechas={avanceDia.hechas} total={avanceDia.total} alto="clamp(60px, 17cqi, 108px)" detalle />
+              <BarraCargada
+                hechas={modoDescarga ? avanceDescarga.hechas : avanceDia.hechas}
+                total={avanceDia.total}
+                fuera={modoDescarga ? avanceDia.total - avanceDescarga.total : 0}
+                etiqueta={modoDescarga ? `${avanceDescarga.hechas} de ${avanceDescarga.total} series de descarga` : null}
+                alto="clamp(60px, 17cqi, 108px)"
+                detalle
+              />
               <p className="dia-barra-texto">
-                <b><NumberFlow value={Math.min(avanceDia.hechas, avanceDia.total)} /></b> de {avanceDia.total} series{avanceDia.hechas >= avanceDia.total ? ": barra completa" : ""}
+                {modoDescarga
+                  ? <><b><NumberFlow value={Math.min(avanceDescarga.hechas, avanceDescarga.total)} /></b> de {avanceDescarga.total} series de descarga{avanceDescarga.hechas >= avanceDescarga.total ? ": listo por hoy" : ""}</>
+                  : <><b><NumberFlow value={Math.min(avanceDia.hechas, avanceDia.total)} /></b> de {avanceDia.total} series{avanceDia.hechas >= avanceDia.total ? ": barra completa" : ""}</>}
               </p>
+              {modoDescarga && <p className="dia-descarga-regla cuerpo-cambia">{reglaDescarga}</p>}
             </div>
           )}
           {day.isNew && <div className="mt-3 inline-flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 text-[12px] rounded-full px-3 py-1.5">🆕 Empezás a registrar tus marcas desde hoy.</div>}
-          {/* La descarga se hace en su propia pestaña: acá sólo el atajo. */}
-          {isDeload && onGoToDescarga && (
-            <button onClick={onGoToDescarga} className="dia-aviso mt-3">
-              <Zap size={15} className="shrink-0" />
-              <span className="flex-1">Esta semana es de descarga: entrená con series reducidas</span>
+          {/* En la semana de descarga se elige acá mismo: descarga o
+              entrenamiento normal (antes, una cruz cerraba la pantalla de la
+              descarga y un renglón la volvía a abrir). */}
+          {esSemanaDescarga && onModoDescarga && (
+            <div className="segmentado chico dia-modo" role="group" aria-label="Qué hacés esta semana">
+              <button onClick={() => onModoDescarga(false)} aria-pressed={!pideDescarga} className={!pideDescarga ? "activo" : ""}>Entrenamiento</button>
+              <button onClick={() => onModoDescarga(true)} aria-pressed={pideDescarga} className={pideDescarga ? "activo" : ""}><Zap size={13} /> Descarga</button>
+            </div>
+          )}
+          {/* La vista previa: cuándo toca y, si venís cansado, hacerla ya. */}
+          {previa && (
+            <div className="dia-previa cuerpo-cambia">
+              <p>{faltanParaDescarga === 1 ? "Te toca la semana que viene." : `Te toca dentro de ${faltanParaDescarga} semanas.`} Si venís cansado o con molestias, la podés hacer ahora: el ciclo sigue después.</p>
+              <div className="dia-previa-botones">
+                {onAdelantarDescarga && <button onClick={onAdelantarDescarga} className="boton-pildora flex-1">Hacerla esta semana</button>}
+                <button onClick={cerrarPrevia} className="boton-tonal">Ahora no</button>
+              </div>
+            </div>
+          )}
+          {/* Venís bajando en varios ejercicios: la descarga, a un toque. */}
+          {!modoDescarga && !esSemanaDescarga && !previa && enBaja.length >= 2 && onPreviaDescarga && !avisoCallado && (
+            <button onClick={() => onPreviaDescarga(true)} className="dia-aviso mt-3" title={enBaja.join(", ")}>
+              <TrendingDown size={15} className="shrink-0" />
+              <span className="flex-1">Venís bajando en {enBaja.length} ejercicios: mirá la descarga</span>
               <ChevronRight size={15} className="shrink-0" />
             </button>
           )}
           {confirmReset && (
             <div className="flex gap-2 items-center mt-3 rounded-2xl px-3.5 py-2.5" style={{ backgroundColor: "var(--panel-sunken)" }}>
-              <p className="text-[12px] text-slate-400 flex-1">¿Borrar reps/kg de hoy (incluido lo sin guardar)? Los récords no cambian.</p>
+              <p className="text-[12px] text-slate-400 flex-1">{modoDescarga ? "¿Borrar las series de descarga que marcaste hoy?" : "¿Borrar reps/kg de hoy (incluido lo sin guardar)? Los récords no cambian."}</p>
               <button onClick={() => setConfirmReset(false)} className="px-3.5 h-9 rounded-full bg-slate-800 text-slate-300 text-[13px] font-semibold">No</button>
               <button onClick={handleResetDay} className="px-3.5 h-9 rounded-full bg-rose-500/85 !text-white text-[13px] font-bold">Sí</button>
             </div>
           )}
           {/* La sesión activa pertenece a UN día (el que iniciaste). Si estás
               viendo otro día, no mostramos "sesión en curso" ahí — pero la
-              sesión real sigue viva en su día, no se resetea. */}
-          <SessionStartBar activeSession={sessionForThisDay} onStart={() => onStartSession(activeDay)} color={day.color} />
+              sesión real sigue viva en su día, no se resetea. En la descarga
+              arranca una sesión de descarga; en la vista previa, ninguna. */}
+          {!previa && <SessionStartBar activeSession={sessionForThisDay} onStart={() => onStartSession(activeDay, modoDescarga)} color={day.color} />}
         </div>
 
       {/* Calentamiento GENERAL de la sesión (movilidad/activación, 10-15
@@ -14496,10 +15037,10 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             // Pedido: "que no se abran más automáticamente los ejercicios, sí
             // que se cierren cuando los completaste". No hay apertura
             // automática: el único que decide qué estás mirando sos vos.
-            const plegar = !!sessionForThisDay && estaCompleto(group);
+            const plegar = !!sessionForThisDay && (modoDescarga ? grupoDescargaCompleto(group) : estaCompleto(group));
             if (group.length === 1) {
               const ex = group[0];
-              return <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onSetPlanPaused={onSetPlanPaused} routineHasPlan={hasAnyPlan} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} sex={sex} age={age} weekInCycle={weekInCycle} cicloActual={cicloActual} dayKey={activeDay} autoCollapse={plegar} nextRestTimerId={nextRestTimerId} nextRestSeconds={nextRestSeconds} nextExerciseName={nextExerciseName} nextObjetivo={nextObjetivo} orden={primeroDe[gi]} />;
+              return <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onSetPlanPaused={onSetPlanPaused} routineHasPlan={hasAnyPlan} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} sex={sex} age={age} weekInCycle={weekInCycle} cicloActual={cicloActual} dayKey={activeDay} autoCollapse={plegar} nextRestTimerId={nextRestTimerId} nextRestSeconds={nextRestSeconds} nextExerciseName={nextExerciseName} nextObjetivo={nextObjetivo} orden={primeroDe[gi]} descarga={descargaParaTarjetas} />;
             }
             // Superserie: varios ejercicios encadenados comparten un solo
             // cronómetro al final del grupo, en vez de uno por ejercicio —
@@ -14511,7 +15052,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
             return (
               <div key={`${activeDay}:${group.map((e) => e.id).join("-")}`} className="superserie space-y-2" style={{ "--c": day.color, borderColor: tint(day.color, "45") }}>
                 <div className="flex items-center gap-1.5 px-1 pt-0.5"><Link size={12} style={{ color: day.color }} /><span className="text-[11px] font-black uppercase" style={{ color: day.color }}>Superserie · {group.length} ejercicios</span></div>
-                {group.map((ex, xi) => <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onSetPlanPaused={onSetPlanPaused} routineHasPlan={hasAnyPlan} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} hideTimer sex={sex} age={age} weekInCycle={weekInCycle} cicloActual={cicloActual} dayKey={activeDay} autoCollapse={plegar} nextRestTimerId={xi === group.length - 1 ? nextRestTimerId : null} nextRestSeconds={nextRestSeconds} nextExerciseName={xi === group.length - 1 ? nextExerciseName : null} nextObjetivo={xi === group.length - 1 ? nextObjetivo : null} supersetRestTimerId={xi === group.length - 1 ? grupoTimerId : null} supersetRestSeconds={grupoSegundos} orden={primeroDe[gi] + xi} />)}
+                {group.map((ex, xi) => <ExerciseCard key={`${activeDay}:${ex.id}:${resetKeys[activeDay] || 0}`} exercise={ex} accent={day.color} logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} resetKey={resetKeys[activeDay]} settings={settings} onUpdateSettings={onUpdateSettings} onSetPlanPaused={onSetPlanPaused} routineHasPlan={hasAnyPlan} onDisableAutoShowPrShare={onDisableAutoShowPrShare} hasActiveSession={!!sessionForThisDay} hideTimer sex={sex} age={age} weekInCycle={weekInCycle} cicloActual={cicloActual} dayKey={activeDay} autoCollapse={plegar} nextRestTimerId={xi === group.length - 1 ? nextRestTimerId : null} nextRestSeconds={nextRestSeconds} nextExerciseName={xi === group.length - 1 ? nextExerciseName : null} nextObjetivo={xi === group.length - 1 ? nextObjetivo : null} supersetRestTimerId={xi === group.length - 1 ? grupoTimerId : null} supersetRestSeconds={grupoSegundos} orden={primeroDe[gi] + xi} descarga={descargaParaTarjetas} />)}
                 {settings.autoStartRestTimer !== true && <RestTimer seconds={grupoSegundos} accent={day.color} timerId={grupoTimerId} exerciseName={group.map((g) => g.name).filter(Boolean).join(" + ")} />}
                 <p className="text-[11px] text-slate-500 px-1 pb-0.5">Descansá recién al completar la vuelta de los {group.length}.{settings.autoStartRestTimer === true ? " Arranca solo al guardar la serie del último." : ""}</p>
               </div>
@@ -14519,6 +15060,15 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           });
         })()}
         </div>
+        {/* Marcaste series de descarga sin iniciar la sesión: así queda
+            registrada igual (suma a la racha y al calendario). Con una sesión
+            en curso, lo cierra la barra de abajo. */}
+        {modoDescarga && !previa && tildaronDescargaHoy && !activeSession && !descargaTerminadaHoy && onFinishDeloadSession && (
+          <div className="descarga-fin">
+            <button onClick={() => onFinishDeloadSession(activeDay)} className="boton-pildora w-full"><Check size={16} strokeWidth={3} /> Terminar la descarga de hoy</button>
+            <p>Queda en tu historial y suma a la racha.</p>
+          </div>
+        )}
       </section>
 
       {/* "Finalizar sesión" ya no vive acá abajo: es la barra fija de abajo
@@ -14546,7 +15096,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           trainWeeks={settings.trainWeeks}
           logs={logs}
           weekInCycle={weekInCycle}
-          onOpenIA={() => { setShowSelfProgression(false); setShowPlanificadorIA(true); }}
+          onOpenIA={() => { if (necesitaPremium()) { pedirPaywall("planificar_ia"); return; } setShowSelfProgression(false); setShowPlanificadorIA(true); }}
           planPrefs={settings}
           onSavePrefs={onUpdateSettings}
           onSetPlanPaused={onSetPlanPaused}
@@ -15051,9 +15601,7 @@ function SessionHistoryView({ logs, onDeleteDay, trainingSessions = [], weekSche
   );
 }
 
-/* ============================================================================
-   DELOAD VIEW (unchanged from prior redesign)
-============================================================================ */
+/* El cronómetro del cardio en la semana de descarga (ver SeriesDescarga). */
 // Cronómetro/cuenta regresiva compacto para los ejercicios de cardio en la
 // semana de descarga — misma funcionalidad que en la rutina normal: modo
 // cronómetro (cuenta arriba) o cuenta regresiva desde los minutos reducidos.
@@ -15085,285 +15633,192 @@ function DeloadCardioTimer({ targetMinutes, accent, onComplete, timerId }) {
   );
 }
 
-function DeloadView({ logs, setLogs, settings = DEFAULT_SETTINGS, deloadProgress = {}, setDeloadProgress, onFinishDeloadSession, activeSession = null, onStartSession = null, weekSchedule = null, onClose = null, cycleStart = null }) {
-  const globalUnit = useWeightUnit();
-  const [unit, setUnit] = useState(globalUnit);
-  const { trainWeeks, deloadWeeks, deloadPct, deloadSetDivisor } = settings;
-  const pctLabel = Math.round(deloadPct * 100);
-  // BUG FIX: antes siempre arrancaba en el primer día (DAY_ORDER[0]), sin
-  // importar qué día de tu cronograma semanal te tocaba hoy — a diferencia
-  // de Rutina, que sí lo hace. Mismo cálculo acá.
-  const scheduledDay = useMemo(() => { const dk = weekSchedule?.[todayWeekdayKey()]; return dk && DAY_ORDER.includes(dk) ? dk : null; }, [weekSchedule]);
-  const [activeDay, setActiveDay] = useState(() => scheduledDay || DAY_ORDER[0]);
-  const day = ROUTINE[activeDay];
-  const today = todayStr();
-  // Marcar una serie como hecha hoy (o desmarcarla si ya estaba marcada) —
-  // se guarda con la fecha de hoy, no como simple true/false, para que la
-  // próxima semana de descarga (siete y pico semanas después) empiece
-  // sin nada tildado, sin necesidad de un botón de "reiniciar" aparte.
-  // BUG FIX: esto solo tildaba `deloadProgress` (una estructura aparte) —
-  // nunca escribía nada en `logs`. Como el Historial (buildSessionsIndex) se
-  // arma a partir de `logs`, la descarga jamás aparecía ahí ni sumaba a la
-  // racha, sin importar que "Finalizar sesión" sí guardara el registro
-  // formal en trainingSessions: ese registro solo se USA si ya hay una
-  // entrada en logs para esa fecha. Ahora, si se pasa `entry` (kg/reps o
-  // minutos de la serie reducida), también queda guardada como una serie
-  // real — la descarga participa del historial, la racha y el volumen
-  // igual que cualquier entrenamiento.
-  // restInfo (opcional): { timerId, seconds } del descanso de ESTE
-  // ejercicio — al marcar (no al desmarcar) arranca el mismo descanso
-  // automático que ya existe en la rutina normal (mismo ajuste
-  // "Cronómetro automático", ver autoStartRestTimer en SetRow), así
-  // descarga se comporta igual que el resto de la app.
-  // Misma semana de descarga = mismo bloque de 7 días desde cycleStart que
-  // hoy (ver getTotalWeekForDate). Sirve para el BUG FIX de abajo: un
-  // ejercicio que aparece en más de un día de la rutina (ej. "Sentadilla"
-  // en Piernas 1 y Piernas 2) tiene el MISMO progressKey (id_serie) sin
-  // importar desde qué día lo mires, así que esto no depende de cuál día
-  // esté activo.
-  const isSameDeloadWeek = (dateStr) => {
-    if (!cycleStart || !dateStr) return false;
-    const a = getTotalWeekForDate(cycleStart, dateStr);
-    const b = getTotalWeekForDate(cycleStart, today);
-    return a != null && b != null && a === b;
-  };
-  const toggleDeloadDone = (key, entry = null, restInfo = null) => {
-    if (!setDeloadProgress) return;
-    const next = { ...deloadProgress };
-    const wasDone = next[key] === today;
-    if (wasDone) delete next[key];
-    else next[key] = today;
-    setDeloadProgress(next);
-    if (setLogs && entry) {
-      setLogs((prev) => {
-        // BUG FIX: filtrar solo "h.date !== today" no alcanzaba cuando un
-        // ejercicio compartido entre 2 días de la rutina se marcaba en
-        // Piernas 1 un día y, más adelante en la MISMA semana de descarga,
-        // se volvía a marcar desde Piernas 2 en otra fecha — como las
-        // fechas no coincidían, la serie de descarga vieja no se pisaba y
-        // quedaban dos registros de descarga seguidos para el mismo
-        // ejercicio (el "grafico se buguea" que reportó el usuario). Ahora
-        // también se saca cualquier registro de descarga previo de la
-        // MISMA semana, sin importar el día exacto, así solo queda uno.
-        const hist = (prev[key] || []).filter((h) => h.date !== today && !(h.deload && isSameDeloadWeek(h.date)));
-        const nextHist = wasDone ? hist : [...hist, { ...entry, date: today, deload: true }];
-        return { ...prev, [key]: nextHist };
-      });
-    }
-    // BUG FIX: antes arrancaba el descanso con otro id ("deload_<ejercicio>")
-    // que el del cronómetro de la tarjeta ("deload_<día>:<ejercicio>"): el
-    // descanso corría y avisaba, pero el reloj de la pantalla no se movía.
-    if (!wasDone && restInfo && settings.autoStartRestTimer === true) {
-      iniciarDescanso(restInfo.timerId, { segundos: restInfo.seconds, ejercicio: restInfo.name || null, color: restInfo.color || null });
-    }
-  };
-  // Antes, entrenar desde la pestaña Descarga no quedaba registrado en
-  // ningún lado — no contaba como "día entrenado", no sumaba a la racha,
-  // no aparecía en el calendario de Historial. "Finalizar sesión de
-  // descarga" crea el mismo tipo de registro que el botón equivalente de
-  // la rutina normal (ver handleEndSession en App()), y de paso limpia
-  // los tildes de hoy de TODOS los días (no sólo el que tenías
-  // seleccionado) — "finalizar" significa "ya entrené hoy", sin importar
-  // si tocaste más de un día en la misma sesión.
-  const hasAnyDoneToday = Object.values(deloadProgress).some((d) => d === today);
-  const handleFinishSession = () => {
-    if (setDeloadProgress) {
-      const next = { ...deloadProgress };
-      Object.keys(next).forEach((k) => { if (next[k] === today) delete next[k]; });
-      setDeloadProgress(next);
-    }
-    onFinishDeloadSession?.(activeDay);
-  };
-
+/* ============================================================================
+   LA SEMANA DE DESCARGA, ADENTRO DE RUTINA (pedido: "que se sienta como que
+   la vista de rutina se transforma en la semana de descarga, no como que se
+   abre algo aparte"). Antes era una pantalla propia (DeloadView), con un
+   degradé violeta y manchas borrosas, que reemplazaba a Rutina de golpe; y
+   desde Progreso se abría en otra pestaña. Ahora es Rutina misma, en modo
+   descarga (ver RoutineView, `modoDescarga`): la barra del día suelta los
+   discos que sobran, cada ejercicio se queda con sus series de descarga
+   (las demás se tachan) y el visor de cada una trae el peso de descarga.
+   Acá, las cuentas y las series; la crítica con la evidencia, en
+   docs/critica-entrenamiento.md.
+============================================================================ */
+// Cuántas series quedan en la descarga: la mitad (o un tercio, o un cuarto),
+// nunca menos de una.
+const seriesDeDescarga = (n, divisor = 2) => Math.max(1, Math.ceil((n || 0) / Math.max(1, divisor || 2)));
+// De qué serie sale la carga de la descarga. Siguiendo un plan, del pico del
+// plan de este ciclo (lo que venías levantando). Sin plan, de tu mejor serie
+// de las últimas cuatro semanas: antes salía de tu RÉCORD de siempre, y un
+// récord de hace meses (de antes de una lesión o de un parate) daba una
+// descarga más pesada que tu última semana de trabajo. Sin nada reciente, la
+// última vez; sin eso, el récord.
+function baseDeDescarga(exercise, setIndex, logs, settings, cicloActual = CICLO_ACTUAL) {
+  const s = exercise?.sets?.[setIndex];
+  if (!s) return null;
+  const puntaje = (e) => (exercise.cardio ? (e?.minutes || 0) : prScore(e?.kg, e?.reps));
+  const plan = Array.isArray(s.plannedProgression) && s.plannedProgression.length && !s.plannedPaused && settings?.trainingMode === "planned" && !planTerminado(s, cicloActual) ? s.plannedProgression : null;
+  if (plan) {
+    const pico = plan.reduce((a, b) => (puntaje(b) > puntaje(a) ? b : a));
+    if (exercise.cardio ? pico.minutes > 0 : pico.reps > 0) return { ...pico, de: "plan" };
+  }
+  const hist = (logs?.[`${exercise.id}_${setIndex}`] || []).filter((h) => h?.date && !h.deload && (exercise.cardio ? h.minutes > 0 : h.reps > 0));
+  const desde = localDateStr(new Date(Date.now() - 28 * 86400000));
+  const recientes = hist.filter((h) => h.date >= desde);
+  if (recientes.length) return { ...recientes.reduce((a, b) => (puntaje(b) > puntaje(a) ? b : a)), de: "reciente" };
+  if (hist.length) return { ...hist.reduce((a, b) => (b.date > a.date ? b : a)), de: "ultima" };
+  const ov = logs?.[`${exercise.id}_${setIndex}_pr_override`];
+  if (ov && (exercise.cardio ? ov.minutes > 0 : ov.reps > 0)) return { ...ov, de: "record" };
+  if (s.pr && (exercise.cardio ? s.pr.minutes > 0 : s.pr.reps > 0)) return { ...s.pr, de: "record" };
+  return null;
+}
+// La serie de la descarga: las mismas reps con menos peso, redondeado a lo
+// que se puede cargar (el salto de ese ejercicio: el disco chico o lo que
+// marque la máquina). Antes se redondeaba de a medio kilo y salían pesos
+// imposibles de armar (64 kg; en libras, 141,1). A peso corporal, o si el
+// peso ya es el más chico que se puede cargar, bajan las reps.
+function cargaDeDescarga(base, { pct = 0.75, salto = 2.5, unit = "kg", cardio = false } = {}) {
+  if (!base) return null;
+  if (cardio) return { minutes: Math.max(1, Math.round((base.minutes || 0) * pct)) };
+  const reps = base.reps || 0;
+  if (!(reps > 0)) return null;
+  const menosReps = Math.max(1, Math.round(reps * pct));
+  if (!(base.kg > 0)) return { reps: menosReps, kg: 0, kgVista: 0 };
+  const paso = salto > 0 ? salto : unit === "lbs" ? 5 : 2.5;
+  const original = kgToDisplay(base.kg, unit);
+  const objetivo = original * pct;
+  // Al más cercano y, en un empate (63,75 entre 62,5 y 65), al más liviano:
+  // es una descarga.
+  let vista = Math.round(objetivo / paso - 1e-6) * paso;
+  if (vista >= original) vista = Math.floor(objetivo / paso) * paso;
+  if (vista <= 0) return { reps: menosReps, kg: base.kg, kgVista: original };
+  vista = Math.round(vista * 100) / 100;
+  return { reps, kg: displayToKg(vista, unit), kgVista: vista };
+}
+// ¿VENÍS BAJANDO? Para ofrecer adelantar la descarga. La descarga puede ser
+// planeada y también autorregulada (consenso Delphi de Bell et al., 2023), y
+// los atletas la adelantan cuando se estancan o les duelen las articulaciones
+// (encuesta de Rogerson et al., 2024). Cuenta los ejercicios cuyas dos
+// últimas sesiones quedaron, las dos, un 5 % o más abajo de su mejor serie de
+// las cuatro semanas anteriores (en 1RM estimado), sin haber subido el peso:
+// el salto de la doble progresión (12 × 80 → 8 × 82,5) baja el 1RM estimado
+// a propósito y no cuenta. La última, de las dos últimas semanas.
+function ejerciciosEnBaja(logs, routine, hoy = todayStr()) {
+  const lista = [];
+  const vistos = new Set();
+  const haceDias = (fecha, dias) => localDateStr(new Date(new Date(`${fecha}T12:00:00`).getTime() - dias * 86400000));
+  Object.values(routine || {}).forEach((d) => (d?.exercises || []).forEach((ex) => {
+    if (!ex?.id || ex.cardio || vistos.has(ex.id)) return;
+    vistos.add(ex.id);
+    const porFecha = {};
+    (ex.sets || []).forEach((_, i) => (logs?.[`${ex.id}_${i}`] || []).forEach((h) => {
+      if (!h?.date || h.deload || !(h.kg > 0) || !(h.reps > 0) || h.date >= hoy) return;
+      const p = estimate1RM(h.kg, h.reps);
+      if (!porFecha[h.date] || p > porFecha[h.date].p) porFecha[h.date] = { p, kg: h.kg };
+    }));
+    const fechas = Object.keys(porFecha).sort();
+    if (fechas.length < 4) return;
+    const ultima = fechas[fechas.length - 1], anteultima = fechas[fechas.length - 2];
+    if (ultima < haceDias(hoy, 14)) return;
+    const previas = fechas.slice(0, -2).filter((f) => f >= haceDias(anteultima, 28));
+    if (!previas.length) return;
+    const mejor = previas.reduce((a, f) => (porFecha[f].p > a.p ? porFecha[f] : a), { p: 0, kg: 0 });
+    const abajo = (f) => porFecha[f].p <= mejor.p * 0.95 && porFecha[f].kg <= mejor.kg + 0.01;
+    if (abajo(ultima) && abajo(anteultima)) lista.push(ex.name);
+  }));
+  return lista;
+}
+// La transformación (la barra que suelta los discos) se ve una vez por día al
+// abrir Rutina en la semana de descarga; después ya abre transformada.
+const CLAVE_DESCARGA_VISTA = "modusfit_descarga_vista";
+function descargaYaVistaHoy() {
+  try { return localStorage.getItem(CLAVE_DESCARGA_VISTA) === todayStr(); } catch { return true; }
+}
+function marcarDescargaVista() {
+  try { localStorage.setItem(CLAVE_DESCARGA_VISTA, todayStr()); } catch { /* sin almacenamiento: se ve de nuevo */ }
+}
+// Las series de un ejercicio en la semana de descarga, adentro de su tarjeta
+// de Rutina (ver ExerciseCard con `descarga`): las que quedan, en el mismo
+// visor de la serie (lo de siempre tachado al lado, y el ✓); las que sobran,
+// tachadas en un renglón fino. En la vista previa (fuera de la semana de
+// descarga) no se marcan.
+function SeriesDescarga({ exercise, descarga, accent, logs, settings, cicloActual = null, restTimerId = null, restSeconds = null }) {
+  const { divisor, pct, unit, progreso, hoy, previa, onMarcar } = descarga;
+  const u = weightLabel(unit);
+  const quedan = seriesDeDescarga(exercise.sets.length, divisor);
+  const salto = saltoDe(settings, exercise.id, unit);
+  const filas = exercise.sets.map((s, i) => {
+    if (i >= quedan) return { i, s, sobra: true };
+    const base = baseDeDescarga(exercise, i, logs, settings, cicloActual);
+    return { i, s, base, carga: cargaDeDescarga(base, { pct, salto, unit, cardio: exercise.cardio }), hecha: progreso?.[`${exercise.id}_${i}`] === hoy };
+  });
+  const sinDatos = filas.every((f) => f.sobra || !f.carga);
+  const escribir = (e) => (e.minutes != null ? `${e.minutes} min` : e.kg > 0 ? `${e.reps} × ${conComa(kgToDisplay(e.kg, unit))}` : `${e.reps} reps`);
+  const DE = { plan: "desde tu plan", reciente: "desde tu mejor serie del mes", ultima: "desde la vez pasada", record: "desde tu récord" };
   return (
-    <div className="space-y-5">
-      <div className="relative overflow-hidden rounded-2xl border border-purple-500/20 p-5" style={{ background: "var(--grad-hero-purple)" }}>
-        <div className="absolute -top-8 -right-8 w-32 h-32 rounded-full bg-purple-500/15 blur-2xl pointer-events-none" />
-        <div className="absolute -bottom-4 -left-4 w-24 h-24 rounded-full bg-indigo-500/10 blur-2xl pointer-events-none" />
-        <div className="relative">
-          <div className="flex items-start justify-between mb-4">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <Zap size={16} className="text-purple-400" />
-                <span className="text-[12px] font-bold text-purple-400">Semana de descarga</span>
-                <button onClick={() => setUnit((u) => u === "kg" ? "lbs" : "kg")} className="text-[11px] font-bold px-1.5 py-0.5 rounded-md bg-slate-800 text-slate-500 hover:text-slate-300 transition border border-slate-700 ml-1">
-                  {unit === "kg" ? "lbs" : "kg"}
-                </button>
-              </div>
-              <h2 className="text-xl font-black text-white leading-tight">Recuperación activa</h2>
-              <p className="text-xs text-purple-300/60 mt-1">Menos carga · Menos series · Mismas reps</p>
-            </div>
-            {/* Cerrar (sólo cuando la descarga está fija dentro de Rutina,
-                ver App()/showPinnedDeload, o al entrar directo por la
-                pestaña Descarga) al lado del círculo de porcentaje, no
-                superpuesto — en flujo normal, no absoluto, para no tapar
-                nada. */}
-            <div className="flex items-start gap-2 shrink-0">
-              {onClose && (
-                <button onClick={onClose} aria-label="Cerrar descarga fija" className="p-2 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-300 hover:text-white hover:bg-purple-500/20 transition active:scale-90">
-                  <X size={15} />
-                </button>
-              )}
-              <div className="w-14 h-14 rounded-2xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center shrink-0">
-                <span className="text-2xl font-black text-purple-300">{pctLabel}<span className="text-sm">%</span></span>
-              </div>
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            {[{ label: "Ciclo", val: `${trainWeeks}+${deloadWeeks}sem` }, { label: "Carga", val: `${pctLabel}%` }, { label: "Series", val: `÷${deloadSetDivisor}` }].map(({ label, val }) => (
-              <div key={label} className="bg-purple-500/10 border border-purple-500/15 rounded-xl px-3 py-2 text-center">
-                <p className="text-sm font-black text-purple-200">{val}</p>
-                <p className="text-[11px] text-purple-500 mt-0.5">{label}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${DAY_ORDER.length}, 1fr)` }}>
-        {(() => { const { textClass, minHeight } = dayTabTextSizing(DAY_ORDER.length); return DAY_ORDER.map((dk) => {
-          const d = ROUTINE[dk], isActive = activeDay === dk;
-          const withPR = d.exercises.filter((ex) => ex.sets.some((s, i) => logs[`${ex.id}_${i}_pr_override`] || (logs[`${ex.id}_${i}`] || []).length > 0)).length;
-          return (
-            <button key={dk} onClick={() => setActiveDay(dk)} title={d.label}
-              className={`dia-solapa py-2.5 px-1.5 rounded-xl ${textClass} transition-all active:scale-95 border text-center min-w-0 flex flex-col items-center justify-center gap-1`}
-              style={isActive ? { backgroundColor: tint(d.color, "22"), borderColor: tint(d.color, "55"), color: d.color } : { borderColor: "var(--chip-border)", color: "var(--chip-text)" }}>
-              {/* line-clamp-2 + minHeight: ver comentario en RoutineView —
-                  "Hombros/Brazos" tiene que leerse entero aunque sea en 2
-                  líneas, Y el botón siempre reserva ese alto por defecto
-                  (no sólo cuando algún día de la grilla lo necesita).
-                  textClass/minHeight: ver dayTabTextSizing.
-                  BUG FIX (pedido: "centrá el nombre de los días
-                  horizontalmente"): mismo motivo que en RoutineView —
-                  textAlign explícito en vez de depender de heredarlo. */}
-              {(() => { const { texto, larga } = etiquetaDeDia(d.label); return <span className="dia-solapa-texto flex items-center justify-center" style={{ "--largo": larga, "--fs-max": tamanoMaxSolapa(DAY_ORDER.length), minHeight: `${minHeight}px` }}>{texto}</span>; })()}
-              {withPR > 0 && <span className="text-[11px] font-black opacity-70">{withPR}/{d.exercises.length}</span>}
-            </button>
-          );
-        }); })()}
-      </div>
-
-      {/* Antes no había forma explícita de "arrancar" acá — a diferencia de
-          Rutina, que siempre tuvo Iniciar/Cancelar sesión. Mismo componente,
-          mismo comportamiento, para que la descarga se sienta parte de la
-          misma app y no un rincón aparte. */}
-      {onStartSession && <SessionStartBar activeSession={activeSession} onStart={() => onStartSession(activeDay, true)} color="#A855F7" />}
-
-      <div key={activeDay} className="space-y-3 tab-fade-in">
-        {day.exercises.map((ex, exIdx) => {
-          const deloadSets = Math.max(1, Math.ceil(ex.sets.length / deloadSetDivisor));
-          const bestPerSet = ex.sets.map((s, i) => {
-            // BUG FIX (encontrado auditando el modo planificado): la descarga
-            // siempre reducía un % de tu RÉCORD histórico. Con un plan eso
-            // puede no ser una descarga en absoluto: si tu récord es de un
-            // pico de hace meses y el bloque que venís haciendo trabaja bien
-            // por debajo, el "80% del récord" termina siendo MÁS pesado que
-            // tu última semana de trabajo. Se descarga desde lo que venías
-            // levantando de verdad: el pico del plan de este ciclo.
-            const plan = Array.isArray(s.plannedProgression) && !s.plannedPaused && settings.trainingMode === "planned" ? s.plannedProgression : null;
-            if (plan?.length) {
-              const pico = plan.reduce((a, b) => (ex.cardio
-                ? ((b.minutes || 0) > (a.minutes || 0) ? b : a)
-                : (prScore(b.kg, b.reps) > prScore(a.kg, a.reps) ? b : a)));
-              if (ex.cardio ? pico.minutes > 0 : pico.kg > 0) return { ...pico, delPlan: true };
-            }
-            const h = logs[`${ex.id}_${i}`] || []; let best = s.pr ? { ...s.pr } : null; const ov = logs[`${ex.id}_${i}_pr_override`]; if (ov) best = ov; const pool = ov ? h : h; pool.forEach((e) => { const scoreE = ex.cardio ? (e.minutes || 0) : prScore(e.kg, e.reps); const scoreB = best ? (ex.cardio ? (best.minutes || 0) : prScore(best.kg, best.reps)) : -1; if (!best || scoreE > scoreB) best = e; }); return best;
-          });
-          const hasPR = bestPerSet.some(Boolean);
-          const hasHeavy = ex.sets.slice(0, deloadSets).some((s) => isHeavyRepRange(s.repRange));
-          return (
-            <div key={ex.id} className="ejercicio abierto" style={{ "--c": day.color }}>
-              {/* Misma cabecera que la tarjeta de la rutina normal (número de
-                  orden, nombre y músculo en su propia fila), así la descarga
-                  se lee como la misma app y no como otra pantalla. */}
-              <div className="flex items-center gap-3 pl-3 pr-3.5 py-3.5">
-                <span className="galleta ejercicio-numero" aria-hidden="true">{exIdx + 1}</span>
-                <div className="flex-1 min-w-0">
-                  <h3 className="ejercicio-nombre">{ex.name}</h3>
-                  <div className="flex items-center gap-2 flex-wrap mt-1.5">
-                    <span className="ejercicio-musculo">{ex.muscle}</span>
-                    <span className="text-[12px] text-slate-500">{ex.sets.length} → <span className="text-purple-400 font-bold">{deloadSets} series</span></span>
-                  </div>
-                </div>
-              </div>
-              {hasPR && settings.autoStartRestTimer !== true && (
-                <div className="px-4 pt-3">
-                  {/* key con la cantidad de series ya tildadas hoy: fuerza a
-                      remontar el cronómetro cada vez que se marca una serie,
-                      así retoma el descanso recién escrito en
-                      ACTIVE_REST_TIMERS (ver toggleDeloadDone) — mismo
-                      truco que "se re-posiciona" en la rutina normal. */}
-                  <RestTimer key={ex.sets.slice(0, deloadSets).filter((_, i) => deloadProgress[`${ex.id}_${i}`] === today).length} seconds={hasHeavy ? settings.restLong : settings.restShort} accent={day.color} timerId={`deload_${activeDay}:${ex.id}`} exerciseName={ex.name} />
-                </div>
-              )}
-              <div className="px-4 py-3 space-y-2.5">
-                {hasPR ? (
-                  ex.sets.slice(0, deloadSets).map((s, i) => {
-                    const best = bestPerSet[i], deloadKg = best ? Math.round(best.kg * deloadPct * 2) / 2 : null;
-                    const progressKey = `${ex.id}_${i}`;
-                    const done = deloadProgress[progressKey] === today;
-                    return (
-                      // Misma serie que en la rutina, en el violeta de la descarga
-                      // mientras falta y en el color del día cuando está hecha.
-                      <div key={i} className={`descarga-serie ${done ? "hecha" : ""}`} style={{ "--c": done ? day.color : "#A855F7" }}>
-                        <div className="foco-cabecera mb-2.5">
-                          <span className={`galleta serie-galleta ${done ? "llena girada" : "hueca"}`} aria-hidden="true">{done ? <Check size={15} strokeWidth={3} /> : null}</span>
-                          <p className="foco-titulo"><span className="foco-rango">{s.repRange} reps</span></p>
-                        </div>
-                        {best && (ex.cardio ? (
-                          <>
-                          <div className="marcador-celda mb-2.5">
-                            <span className="marcador-rotulo"><ArrowDown size={13} /> Tiempo de descarga</span>
-                            <span className="flex items-baseline gap-2">
-                              <s className="text-[12px] font-semibold text-slate-500 tabular-nums">{best.minutes} min</s>
-                              <span className="marcador-valor">{Math.max(1, Math.round((best.minutes || 0) * deloadPct))}<small>min</small></span>
-                            </span>
-                          </div>
-                          {!done && <DeloadCardioTimer timerId={`deload_cardio_${activeDay}:${progressKey}`} targetMinutes={Math.max(1, Math.round((best.minutes || 0) * deloadPct))} accent={day.color} onComplete={() => toggleDeloadDone(progressKey, { minutes: Math.max(1, Math.round((best.minutes || 0) * deloadPct)) })} />}
-                          </>
-                        ) : (
-                          <div className="marcador-celda mb-2.5">
-                            <span className="marcador-rotulo"><ArrowDown size={13} /> Peso de descarga{best.delPlan ? ", desde tu plan" : ""}</span>
-                            <span className="flex items-baseline gap-2">
-                              <s className="text-[12px] font-semibold text-slate-500 tabular-nums">{best.reps}×{kgToDisplay(best.kg, unit)}{weightLabel(unit)}</s>
-                              <span className="marcador-valor">{best.reps}<i>×</i>{kgToDisplay(deloadKg, unit)}<small>{weightLabel(unit)}</small></span>
-                            </span>
-                          </div>
-                        ))}
-                        <button onClick={() => toggleDeloadDone(progressKey, ex.cardio ? { minutes: Math.max(1, Math.round((best.minutes || 0) * deloadPct)) } : { kg: deloadKg, reps: best.reps }, ex.cardio ? null : { timerId: `deload_${activeDay}:${ex.id}`, seconds: hasHeavy ? settings.restLong : settings.restShort, name: ex.name, color: day.color })} className={done ? "boton-pildora w-full" : "boton-tonal w-full"}>
-                          {done ? <><Check size={16} strokeWidth={3} /> Hecha</> : "Marcar como hecha"}
-                        </button>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <div className="flex items-center gap-2.5 rounded-xl px-3 py-2.5 bg-slate-900/40 border border-slate-800/60">
-                    <div className="w-6 h-6 rounded-lg bg-slate-800/80 flex items-center justify-center shrink-0"><Target size={12} className="text-slate-600" /></div>
-                    <p className="text-[11px] text-slate-500 leading-snug">Registrá marcas en la rutina para ver la descarga calculada.</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="flex items-start gap-3 bg-slate-900/40 border border-slate-800/40 rounded-2xl px-4 py-3.5">
-        <Info size={14} className="text-slate-600 mt-0.5 shrink-0" />
-        <p className="text-[11px] text-slate-500 leading-relaxed">Baja el volumen para recuperarte: no busques marcas nuevas esta semana.</p>
-      </div>
-
-      {/* Con una sesión de descarga en curso el botón lo pone la barra fija
-          de abajo (ActiveSessionBar): acá queda sólo para el caso de haber
-          tildado series SIN iniciar sesión, que la barra no cubre. */}
-      {hasAnyDoneToday && !activeSession && (
-        <div>
-          <button onClick={handleFinishSession} className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl !text-white text-sm font-bold transition-all active:scale-[0.98] shadow-lg" style={{ backgroundColor: "#A855F7", boxShadow: "0 10px 24px -8px #A855F788" }}>
-            <Check size={15} /> Finalizar sesión de descarga
-          </button>
-          <p className="text-center text-[11px] text-slate-600 mt-2">Se registra como entrenamiento de hoy (suma a tu racha y calendario) y se desmarcan las series tildadas, para la próxima vez.</p>
-        </div>
+    <div className="descarga-series" style={{ "--c": accent }}>
+      {sinDatos && (
+        <p className="descarga-sin-datos">Todavía no anotaste este ejercicio: hacé {quedan === 1 ? "una serie" : `${quedan} series`} con un peso cómodo, lejos del fallo.</p>
       )}
+      {filas.map((f) => {
+        if (f.sobra) {
+          return (
+            <div key={f.i} className="serie-linea descarga-sobra" aria-label={`Serie ${f.i + 1}: esta semana no va`}>
+              <span className="galleta serie-galleta hueca" aria-hidden="true" />
+              <span className="serie-linea-meta"><s>{f.s.repRange ? `${f.s.repRange} reps` : `Serie ${f.i + 1}`}</s></span>
+              <span className="serie-linea-fin">esta semana no va</span>
+            </div>
+          );
+        }
+        if (!f.carga) {
+          if (sinDatos) return null;
+          return (
+            <div key={f.i} className="serie-linea">
+              <span className="galleta serie-galleta hueca" aria-hidden="true" />
+              <span className="serie-linea-meta">{f.s.repRange ? `${f.s.repRange} reps` : `Serie ${f.i + 1}`}</span>
+              <span className="serie-linea-fin">con un peso cómodo</span>
+            </div>
+          );
+        }
+        const c = f.carga;
+        const entrada = exercise.cardio ? { minutes: c.minutes } : { kg: c.kg, reps: c.reps };
+        const descanso = exercise.cardio || !restTimerId ? null : { timerId: restTimerId, seconds: restSeconds, name: exercise.name, color: accent };
+        const hoyTexto = c.minutes != null ? `${c.minutes} min` : c.kg > 0 ? `${c.reps} × ${conComa(c.kgVista)} ${u}` : `${c.reps} reps`;
+        return (
+          <div key={f.i} className={`descarga-serie ${f.hecha ? "hecha" : ""}`}>
+            <p className="descarga-serie-cabeza">
+              <span className="foco-rango">{exercise.cardio ? "Cardio suave" : `${f.s.repRange || "—"} reps`}</span>
+              <span className="descarga-de">{DE[f.base?.de] || ""}</span>
+            </p>
+            <div className="descarga-visor">
+              <span className="descarga-antes" aria-label={`Lo de siempre: ${escribir(f.base)}`}><s>{escribir(f.base)}</s></span>
+              <span className="descarga-hoy" aria-label={`Esta semana: ${hoyTexto}`}>
+                {c.minutes != null
+                  ? <><b className="num-display">{c.minutes}</b><small>min</small></>
+                  : c.kg > 0
+                    ? <><b className="num-display">{c.reps}</b><i>×</i><b className="num-display">{conComa(c.kgVista)}</b><small>{u}</small></>
+                    : <><b className="num-display">{c.reps}</b><small>reps</small></>}
+              </span>
+              {!previa && (
+                <button
+                  onClick={() => onMarcar?.(`${exercise.id}_${f.i}`, entrada, descanso)}
+                  aria-pressed={f.hecha}
+                  aria-label={f.hecha ? "Hecha: tocá para desmarcarla" : "Marcar como hecha"}
+                  className={`foco-guardar descarga-marcar ${f.hecha ? "hecha" : ""}`}
+                >
+                  <Check size={22} strokeWidth={3} />
+                </button>
+              )}
+            </div>
+            {exercise.cardio && !f.hecha && !previa && (
+              <div className="mt-2.5">
+                <DeloadCardioTimer timerId={`deload_cardio_${restTimerId || exercise.id}:${f.i}`} targetMinutes={c.minutes} accent={accent} onComplete={() => onMarcar?.(`${exercise.id}_${f.i}`, entrada, null, true)} />
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -19224,6 +19679,8 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
 
       <VitrinaMedallas logs={profile?.logs} trainingSessions={profile?.trainingSessions} />
 
+      <SeccionPremium />
+
       <SocialPreviewCard profile={profile} uid={profile?.googleUid} onGoToSocial={onGoToSocial} onUpdateProfile={onUpdateProfile} />
 
       <div className="seccion-plegable divide-y divide-slate-800/50 overflow-hidden">
@@ -19406,7 +19863,7 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
           weekInCycle={getWeekInfo(cycleStart, settings)?.weekInCycle ?? null}
           planPrefs={settings}
           onSavePrefs={updateSettings}
-          onOpenIA={() => { setShowSelfProgression(false); setShowPlanificadorIA(true); }}
+          onOpenIA={() => { if (necesitaPremium()) { pedirPaywall("planificar_ia"); return; } setShowSelfProgression(false); setShowPlanificadorIA(true); }}
           onSetPlanPaused={(exerciseId, paused) => onUpdateProfile({ routines: { ...(profile.routines || {}), [profile.activeRoutineId]: setExercisePlanPaused(activeRoutineDef, exerciseId, paused) } })}
           onRemovePlan={(exerciseId) => onUpdateProfile({ routines: { ...(profile.routines || {}), [profile.activeRoutineId]: removeExercisePlan(activeRoutineDef, exerciseId) } })}
           onClose={() => setShowSelfProgression(false)}
@@ -25645,12 +26102,21 @@ Tu alcance es estrictamente entrenamiento físico, nutrición deportiva, salud/r
 Aplicá estos marcos cuando sean relevantes (no los recites si no vienen al caso):
 - Sobrecarga progresiva: motor del progreso a largo plazo — no sólo "subir el peso", también más reps/series, mejor técnica o más frecuencia.
 - Para la próxima sesión, una meta o un plan, usá doble progresión, como un entrenador personal: con el mismo peso, una rep más por vez hasta el tope del rango de reps de ese ejercicio; recién ahí sube el peso UN salto y las reps vuelven al piso del rango. En un plan de varias semanas, la misma regla, de a poco: una rep más por semana (o cada dos, si entrena hace más de un año) hasta el tope del rango, y recién ahí el peso, de a un salto, con las reps de vuelta al piso. Nada de olas que suban y bajen la carga, ni peso y reps a la vez: la app corrige cualquier semana que dé más de un paso. Según el objetivo cambia el rango (fuerza: 3-6 reps; hipertrofia: 6-15 reps con RIR 1-3), no el tamaño del paso. El salto de cada ejercicio está en settings.saltosDePeso (por máquina: 7 kg, 15 lb...; si no está, 2,5 kg o 5 lb): no propongas cargas que no se puedan armar con ese salto.
-- Volumen semanal por grupo muscular = principal driver de hipertrofia dentro de rangos razonables; %1RM y RIR/RPE son las palancas de la fuerza máxima.
-- Hipertrofia: rango amplio de reps (aprox. 5-30) si las series van cerca del fallo — 6-12 es un punto dulce práctico, no "el" rango mágico.
+- Volumen semanal por grupo muscular = principal driver de hipertrofia dentro de rangos razonables: unas 10 series por semana por músculo como punto de partida para ganar músculo (ACSM 2026); más series siguen sumando, cada vez menos, y quien recién empieza crece con menos. Las series de un músculo que trabaja de apoyo (el tríceps en el press banca) cuentan a medias. %1RM y RIR/RPE son las palancas de la fuerza máxima: para fuerza, 80 % del 1RM o más, 2-3 series por ejercicio, 2 o más veces por semana.
+- Hipertrofia: rango amplio de reps (aprox. 5-30) si las series van cerca del fallo (RIR 0-3); 6-12 es un punto dulce práctico, no "el" rango mágico. Para la fuerza no hace falta llegar al fallo: rinde lo mismo con RIR 1-4. No mandes al fallo en básicos pesados (sentadilla, peso muerto, press banca con barra) sin alguien que asista.
 - Frecuencia 2+/semana por grupo muscular suele igualar o superar 1 vez/semana con el mismo volumen total.
-- Especificidad (SAID) y periodización/manejo de la fatiga: la descarga existe porque la fatiga se acumula más rápido que la capacidad con volumen/intensidad sostenidos altos. RIR/RPE como autorregulación cuando no se conoce el 1RM exacto.
+- Descansos: 2-3 minutos en los básicos pesados y 1-2 en los accesorios; para hipertrofia, más de un minuto y medio ya no suma.
+- Especificidad (SAID) y periodización/manejo de la fatiga: la descarga existe porque la fatiga se acumula más rápido que la capacidad con volumen/intensidad sostenidos altos. Va cada 4 a 8 semanas, o antes si el rendimiento baja dos o más sesiones seguidas, duelen las articulaciones o duerme mal: la mitad de las series, más lejos del fallo (RIR 4 o más) y con la misma frecuencia. No recomiendes parar del todo una semana como descarga: en el estudio que lo probó, parar restó fuerza. RIR/RPE como autorregulación cuando no se conoce el 1RM exacto.
 - Ante estancamiento, revisá primero adherencia (sueño, proteína ~1.6-2.2g/kg, consistencia) antes de pedir "más intensidad" sin contexto.
 - No reforcés mitos sin evidencia (reducción localizada de grasa, "tonificar" como algo distinto de hipertrofia + grasa corporal, dolor muscular como métrica de si "sirvió" el entrenamiento).
+
+SEGURIDAD, SIEMPRE (va antes que cualquier otra regla):
+- Dolor: si cuenta un dolor agudo o punzante, que se irradia, con hormigueo o pérdida de fuerza, o que no se va con el reposo, no le armes un plan para entrenar encima: que deje ese ejercicio y lo vea un médico o un kinesiólogo. Una molestia leve: bajar la carga y trabajar en el rango que no duele.
+- Señales de alarma durante o después de entrenar (dolor en el pecho, falta de aire fuera de proporción, mareo o desmayo, palpitaciones): que pare y consulte ya; si es fuerte, que llame a emergencias.
+- Condiciones médicas, embarazo o posparto, una lesión o cirugía reciente, o medicación: consejos generales y conservadores, y que lo valide con su médico. No diagnostiques ni indiques tratamientos.
+- Si "edad" dice menos de 18: técnica y progresión gradual, sin buscar máximos de una repetición ni dietas restrictivas, y mejor con alguien que lo supervise.
+- Nutrición: nada de dietas de menos de 1200 kcal, ayunos extremos ni bajar más de un 1 % del peso por semana. Suplementos, sólo los que tienen evidencia (creatina monohidrato de 3 a 5 g por día, cafeína, proteína en polvo como un alimento más); nunca anabólicos, prohormonas ni fármacos para adelgazar. Si notás señales de un trastorno de la conducta alimentaria, con cuidado y sugiriendo ayuda profesional.
+- No minimices un síntoma ni prometas resultados en un plazo.
 
 Antes de responder, revisá en silencio que tu respuesta resuelva exactamente lo que te preguntaron — no un tema parecido ni una versión genérica — y que cubra todas las partes si la pregunta tenía varias. Interpretá la intención real aunque venga en jerga informal o mal escrita. Si la pregunta es genérica o ambigua y la respuesta cambia mucho según un dato que no tenés (objetivo, experiencia, qué ejercicio), pedí ESE dato puntual en vez de adivinar — pero si ya tenés lo necesario en el historial o el contexto de abajo, respondé directo sin preguntar de más.
 
@@ -25674,7 +26140,7 @@ Tipos disponibles:
 - registrar_marca: {"type":"registrar_marca","exercise":"Press Banca","reps":8,"kg":80,"rpe":8} — carga una serie de HOY para ese ejercicio, como si la hubiera anotado a mano en Rutina. "rpe" es opcional (1-10). Usalo cuando te digan algo tipo "anotá que hice 8x80 en press banca".
 - editar_perfil: {"type":"editar_perfil","sex":"M"|"F","age":30,"bodyWeightKg":80} (incluí sólo los campos que pidió cambiar)
 - agregar_medida: {"type":"agregar_medida","tipo":"waist"|"chest"|"arm"|"leg","valor":80} (en cm; para peso usá editar_perfil con bodyWeightKg, no esto)
-- config_ciclo: {"type":"config_ciclo","deloadEnabled":true,"trainWeeks":4,"deloadWeeks":1,"deloadPct":0.6,"deloadSetDivisor":2} (deloadEnabled apaga/prende la semana de descarga entera; deloadPct es la fracción de su récord, ej. 0.6 = 60%; deloadSetDivisor: 2 = mitad de series, 3 = un tercio, 4 = un cuarto)
+- config_ciclo: {"type":"config_ciclo","deloadEnabled":true,"trainWeeks":5,"deloadWeeks":1,"deloadPct":0.75,"deloadSetDivisor":2} (deloadEnabled apaga/prende la semana de descarga entera; deloadPct es la fracción del peso que viene levantando (su mejor serie del último mes), ej. 0.75 = 75%; deloadSetDivisor: 2 = mitad de series, 3 = un tercio, 4 = un cuarto)
 - config_apariencia: {"type":"config_apariencia","theme":"dark"|"light"}
 - config_unidad: {"type":"config_unidad","weightUnit":"kg"|"lbs"}
 - config_descanso: {"type":"config_descanso","alertType":"sound"|"vibration"|"both","restLong":120,"restShort":60,"autoStartRestTimer":true} (segundos; autoStartRestTimer arranca el descanso solo al guardar una serie)
@@ -26072,6 +26538,17 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
     lastLenRef.current = messages.length;
     if (!didMountRef.current) { didMountRef.current = true; return; }
     if (!crecio && !isSending) return;
+    // Llegó la respuesta: tu pregunta arriba y la respuesta debajo, para
+    // leerla desde el principio. Mientras tanto (tu nota y el "pensando"), el
+    // final, por encima de la barra de escribir (ver .chat-final). Antes
+    // bajaba al borde de la pantalla y la respuesta quedaba detrás de la barra.
+    const ultimo = messages[messages.length - 1];
+    if (!isSending && ultimo?.role === "assistant") {
+      let pregunta = messages.length - 1;
+      while (pregunta > 0 && messages[pregunta].role !== "user") pregunta--;
+      const el = typeof document !== "undefined" ? document.querySelector(`.ia-charla [data-mensaje="${pregunta}"]`) : null;
+      if (el) { el.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
+    }
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, isSending, activeConversationId]);
 
@@ -26304,7 +26781,9 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
         // Quedarse sin cupo no es una falla de la IA: no ensucia la
         // bitácora de fallos ni se disfraza de error de conexión.
         if (err.sinCupo) {
-          setMessages((prev) => [...prev, { role: "assistant", text: `${MSG_SIN_CUPO_IA} 🙏` }], targetConvId);
+          const conPremium = necesitaPremium();
+          setMessages((prev) => [...prev, { role: "assistant", text: conPremium ? `${mensajeSinCupoIA()} Con Premium tenés ${CUPO_IA_PREMIUM} por día.` : mensajeSinCupoIA() }], targetConvId);
+          if (conPremium) pedirPaywall("ia_cupo");
           return;
         }
         console.error("Error al hablar con el entrenador IA:", err);
@@ -26616,13 +27095,16 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
           se fue a pedido. Una conversación nueva se abre desde la lista de
           conversaciones (el botón al lado del cuadro de texto). */}
 
-      {esInicio ? (
-        // EL INICIO, EN LA PIZARRA DEL PROFE: el saludo escrito con tiza, las
-        // cuatro cosas más pedidas como notas adhesivas pegadas en la pizarra
-        // y las demás escritas abajo, con la tiza y el borrador en la bandeja.
-        // Antes era un ícono en un cuadrado de color, la pregunta y cuatro
-        // tarjetas iguales.
-        <section className="ia-inicio" aria-label="Empezar una conversación">
+      {/* LA PIZARRA DEL PROFE: el saludo escrito con tiza, las cuatro cosas
+          más pedidas como notas adhesivas pegadas en la pizarra y las demás
+          escritas abajo, con la tiza y el borrador en la bandeja. Antes era un
+          ícono en un cuadrado de color, la pregunta y cuatro tarjetas iguales.
+          Queda arriba también durante la charla (pedido: "la imagen de la
+          pizarra tiene que quedarse visible y seguir funcionando; el diálogo
+          se tiene que ir ampliando hacia abajo, debajo de la pizarra"): antes
+          desaparecía con el primer mensaje y en su lugar quedaba una tira de
+          pedidos que se deslizaba de costado. */}
+      <section className={`ia-inicio ${esInicio ? "" : "con-charla"}`} aria-label={esInicio ? "Empezar una conversación" : "Pedidos para el entrenador"}>
           <div className="pizarra-ia">
           <p className="pizarra-ia-saludo">{primerNombre ? `Hola, ${primerNombre}` : "Hola"}</p>
           <h2 className="pizarra-ia-pregunta">¿En qué te ayudo hoy?</h2>
@@ -26653,21 +27135,9 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
           </div>
           <span className="pizarra-ia-bandeja" aria-hidden="true"><i className="tiza" /><i className="borrador" /></span>
           </div>
-        </section>
-      ) : (
-      <div className="relative -mx-1 mb-4">
-        <div className="flex gap-2 overflow-x-auto pb-1 px-1 snap-x snap-mandatory">
-          {ATAJOS_IA.map((c, i) => (
-            <button key={i} onClick={() => handleQuickPrompt(c)} className="chip-accion snap-start">
-              {c.icon}<span>{c.label}</span>
-            </button>
-          ))}
-        </div>
-        <div className="absolute top-0 right-0 bottom-1 w-8 pointer-events-none" style={{ background: "linear-gradient(to right, transparent, var(--app-bg))" }} />
-      </div>
-      )}
+      </section>
 
-      {!esInicio && <div className="space-y-3">
+      {!esInicio && <div className="ia-charla space-y-3">
         {hasMoreMessages && (
           <div ref={loadMoreSentinelRef} className="flex justify-center py-2">
             <button onClick={loadMoreMessages} className="text-[11px] font-bold px-3.5 py-2 rounded-full transition active:scale-95" style={{ backgroundColor: "var(--row-surface)", border: "1px solid var(--chip-border)", color: "var(--chip-text)" }}>
@@ -26686,7 +27156,7 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
           // actionCtx, más arriba).
           const livePlan = m.action && m.planStatus === "pending" ? buildActionPlan(m.action, actionCtx) : null;
           return (
-          <div key={i} className="msg-in">
+          <div key={i} className="msg-in" data-mensaje={i}>
             <div className={`group flex items-end gap-2 ${m.role === "user" ? "justify-end" : "justify-start"}`}>
               {/* Antes acá iba un cuadradito con una estrellita (ícono de la
                   IA) pegado a la burbuja — se sacó a pedido: la burbuja del
@@ -26726,18 +27196,21 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
                 sueltos flotando, para que se lean como una sola barra de
                 acciones y no como ruido suelto debajo del mensaje. */}
             <div className={`flex items-center mt-1 ${m.role === "user" ? "justify-end mr-1" : "justify-start"}`}>
-              <div className="flex items-center gap-0.5 rounded-lg p-0.5" style={{ backgroundColor: "var(--row-surface)" }}>
-                <button onClick={() => handleCopyMessage(i, m.text)} aria-label="Copiar mensaje" className="p-1 rounded-md text-slate-500 hover:text-slate-200 hover:bg-slate-700/50 transition">
-                  {copiedIndex === i ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
+              {/* Botones de 30 px que el dedo agarra en 44 (ver
+                  .burbuja-accion): antes medían 19 px y en el celular se tocaba
+                  el de al lado. */}
+              <div className="burbuja-acciones">
+                <button onClick={() => handleCopyMessage(i, m.text)} aria-label="Copiar mensaje" className="burbuja-accion">
+                  {copiedIndex === i ? <Check size={13} className="text-emerald-400" /> : <Copy size={13} />}
                 </button>
                 {m.role === "assistant" && !isSending && messages.slice(0, i).some((mm) => mm.role === "user") && (
-                  <button onClick={() => handleRegenerate(i)} aria-label="Regenerar respuesta" className="p-1 rounded-md text-slate-500 hover:text-slate-200 hover:bg-slate-700/50 transition">
-                    <RefreshCw size={11} />
+                  <button onClick={() => handleRegenerate(i)} aria-label="Regenerar respuesta" className="burbuja-accion">
+                    <RefreshCw size={13} />
                   </button>
                 )}
                 {m.role === "assistant" && i > 0 && (
-                  <button onClick={() => reportedIndex !== i && handleReportMessage(i, m.text)} aria-label={reportedIndex === i ? "Respuesta reportada" : "Reportar esta respuesta"} title={reportedIndex === i ? "Gracias: la vamos a revisar" : "Reportar esta respuesta"} className="p-1 rounded-md text-slate-500 hover:text-slate-200 hover:bg-slate-700/50 transition">
-                    {reportedIndex === i ? <Check size={11} className="text-emerald-400" /> : <Flag size={11} />}
+                  <button onClick={() => reportedIndex !== i && handleReportMessage(i, m.text)} aria-label={reportedIndex === i ? "Respuesta reportada" : "Reportar esta respuesta"} title={reportedIndex === i ? "Gracias: la vamos a revisar" : "Reportar esta respuesta"} className="burbuja-accion">
+                    {reportedIndex === i ? <Check size={13} className="text-emerald-400" /> : <Flag size={13} />}
                   </button>
                 )}
               </div>
@@ -26771,10 +27244,8 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
                       key={j}
                       disabled={disabled}
                       onClick={() => handleSelectQuestionOption(i, opt)}
-                      className={`px-3 py-1.5 rounded-full text-xs font-bold border transition ${disabled ? "opacity-50" : "active:scale-95"}`}
-                      style={picked
-                        ? { backgroundColor: "rgba(20,184,166,0.22)", borderColor: "rgba(20,184,166,0.5)", color: "#5eead4" }
-                        : { backgroundColor: "var(--row-surface)", borderColor: "var(--chip-border)", color: "var(--chip-text)" }}
+                      aria-pressed={picked}
+                      className={`ia-opcion ${picked ? "elegida" : ""}`}
                     >
                       {opt}
                     </button>
@@ -26783,10 +27254,9 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
                 <button
                   disabled={!!m.question.answeredWith}
                   onClick={() => handleCustomAnswer(i)}
-                  className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold border border-dashed transition ${m.question.answeredWith ? "opacity-50" : "active:scale-95"}`}
-                  style={{ borderColor: "var(--chip-border)", color: "var(--chip-text)" }}
+                  className="ia-opcion otra"
                 >
-                  <Edit3 size={11} /> Otra respuesta
+                  <Edit3 size={13} /> Otra respuesta
                 </button>
               </div>
             )}
@@ -26891,7 +27361,7 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
             </button>
           </div>
         )}
-        <div ref={bottomRef} />
+        <div ref={bottomRef} className="chat-final" />
       </div>}
 
       {/* El input fijo va por un portal, afuera del árbol normal del
@@ -26978,8 +27448,9 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
               </div>
             </div>
             {cupoRestante <= 5 && (
-              <p className="text-[11px] text-center mt-1.5" style={{ color: cupoRestante === 0 ? "#FCA5A5" : "#FCD34D" }}>
-                {cupoRestante === 0 ? `Sin pedidos de IA por hoy — el cupo se renueva mañana` : `Te ${cupoRestante === 1 ? "queda 1 pedido" : `quedan ${cupoRestante} pedidos`} de IA hoy`}
+              <p className={`cupo-aviso ${cupoRestante === 0 ? "agotado" : ""}`}>
+                {cupoRestante === 0 ? "Sin pedidos de IA por hoy: el cupo se renueva mañana." : `Te ${cupoRestante === 1 ? "queda 1 pedido" : `quedan ${cupoRestante} pedidos`} de IA hoy.`}
+                {necesitaPremium() && <button onClick={() => pedirPaywall("ia_cupo")} className="cupo-aviso-premium">Más con Premium</button>}
               </p>
             )}
             <p className="text-[11px] text-slate-600 text-center mt-1.5">Puede cometer errores. No reemplaza el consejo de un profesional de la salud.</p>
@@ -27242,6 +27713,11 @@ function ImportRoutineModal({ onImport, onEditar = null, onClose, inicial = null
   // Con la IA: el texto y las fotos que se le pasan (no los del estado, que
   // puede no estar al día todavía).
   const leerConIA = async ({ texto, fotos, nombre }) => {
+    if (fotos?.length && necesitaPremium()) {
+      setNotice("Leer fotos y PDF escaneados con la IA es de Premium. El texto, el Excel, el Word y el CSV se leen gratis.");
+      pedirPaywall("importar_ia");
+      return;
+    }
     const control = new AbortController();
     abortRef.current = control;
     setNotice(""); setEstado("ia");
@@ -27273,7 +27749,7 @@ function ImportRoutineModal({ onImport, onEditar = null, onClose, inicial = null
     } catch (err) {
       if (err?.name === "AbortError") return;
       console.error("Error leyendo la rutina con IA:", err);
-      setNotice(err?.sinCupo ? MSG_SIN_CUPO_IA
+      setNotice(err?.sinCupo ? mensajeSinCupoIA()
         : err?.cause === "server" ? err.message
         : typeof navigator !== "undefined" && navigator.onLine === false ? "Sin conexión: las fotos se leen con la IA y necesitan internet. Si tenés el texto, pegalo y lo leemos sin internet."
         : "No pudimos leer la rutina. Probá de nuevo, con una foto más clara, o pegá el texto.");
@@ -27961,6 +28437,13 @@ function PersonalizedRoutineWizard({ profile, onUpdateProfile, onCreateRoutine, 
       `Objetivos: ${goalsTxt}. ${focusTxt}`,
       `Ajustá la cantidad de ejercicios al tiempo disponible (aprox 1 ejercicio cada 10-12 min).`,
       `Si el objetivo incluye fuerza o potencia, incluí básicos pesados a bajas reps (3-6); si incluye hipertrofia, trabajo en 8-12; si incluye resistencia o grasa, series de 12-20 o circuitos.`,
+      // Lo que dice la evidencia (ACSM 2026; docs/critica-entrenamiento.md):
+      // cada músculo 2 veces por semana, unas 10 series semanales por músculo
+      // para ganar músculo, menos al empezar, y empuje y tracción parejos.
+      `Frecuencia: cada músculo grande al menos 2 veces por semana (con 2 o 3 días, cuerpo completo; con 4, torso y piernas; con 5 o 6, empuje, tracción y piernas, o algo parecido).`,
+      `Volumen por semana para cada músculo grande (pecho, espalda, hombros, cuádriceps, femorales, glúteos): ${a.experience === "principiante" ? "como es principiante, de 6 a 10 series, con 2 o 3 series por ejercicio" : a.experience === "avanzado" ? "de 10 a 20 series" : "de 10 a 15 series"}. Brazos y pantorrillas, algo menos, que también trabajan en los básicos.`,
+      `Equilibrio: tantas series de empuje como de tracción, y siempre algo de piernas aunque el foco sea otro.`,
+      `${a.experience === "principiante" ? "Ejercicios simples y estables (máquinas, mancuernas, básicos con barra), sin técnicas avanzadas. " : ""}${Number(a.age) >= 60 ? "Sumá un ejercicio de potencia o de equilibrio. " : ""}${Number(a.age) > 0 && Number(a.age) < 18 ? "Es menor de edad: nada de cargas máximas ni series al fallo. " : ""}Nada de series al fallo en sentadilla, peso muerto ni press con barra.`,
       `Devolvé ÚNICAMENTE un array JSON válido, sin texto adicional ni markdown:`,
       `[{"label": "Día 1 - Empuje", "exercises": [{"name": "Press Banca", "setsCount": 3, "repRange": "8-10"}]}]`,
       `Usá nombres de ejercicios comunes en español. El array debe tener exactamente ${a.daysPerWeek} días.`,
@@ -28184,22 +28667,35 @@ function PersonalizedRoutineWizard({ profile, onUpdateProfile, onCreateRoutine, 
 }
 
 // ── HELPERS DE RUTINAS ────────────────────────────────────────────────────
-// Cuenta las series por grupo muscular de una rutina entera. Sirve para
-// mostrar el balance (¿le estás dando 12 series a pecho y 4 a espalda?) sin
-// que tengas que sumarlas a mano. Solo cuenta el músculo PRINCIPAL de cada
-// ejercicio: sumar los secundarios daría números inflados y confusos.
+// Cuántas veces por semana se hace cada día de la rutina, según su
+// cronograma (lunes a domingo): un Upper/Lower de dos días entrenado cuatro
+// veces por semana hace cada día dos veces. Sin ningún día en el cronograma,
+// una vez cada uno.
+function vecesPorSemana(routineDef) {
+  const veces = {};
+  Object.values(getRoutineWeekSchedule(routineDef) || {}).forEach((dk) => { if (dk) veces[dk] = (veces[dk] || 0) + 1; });
+  if (!Object.keys(veces).length) Object.keys(routineDef?.days || {}).forEach((dk) => { veces[dk] = 1; });
+  return veces;
+}
+// Cuenta las series por grupo muscular en la semana (el músculo PRINCIPAL de
+// cada ejercicio, por las veces que el cronograma repite su día). Sirve para
+// el empuje y la tracción de Balance. Antes contaba la rutina una sola vez
+// aunque un día se hiciera dos veces por semana, y decía "por semana" igual.
 function volumenPorMusculo(routineDef) {
   if (!routineDef?.days) return [];
+  const veces = vecesPorSemana(routineDef);
   const conteo = {};
-  Object.values(routineDef.days).forEach((day) => {
+  Object.entries(routineDef.days).forEach(([dk, day]) => {
+    const v = veces[dk] || 0;
     (day.exercises || []).forEach((ex) => {
       const lib = EXERCISE_LIBRARY_BY_ID[ex.libId || ex.id];
       const g = lib?.group;
       if (!g || g === "cardio") return;
-      conteo[g] = (conteo[g] || 0) + (ex.sets?.length || 0);
+      conteo[g] = (conteo[g] || 0) + (ex.sets?.length || 0) * v;
     });
   });
   return Object.entries(conteo)
+    .filter(([, series]) => series > 0)
     .map(([g, series]) => ({
       grupo: g,
       label: MUSCLE_GROUP_BY_KEY[g]?.label || g,
@@ -28207,6 +28703,58 @@ function volumenPorMusculo(routineDef) {
       series,
     }))
     .sort((a, b) => b.series - a.series);
+}
+// LAS SERIES DE CADA MÚSCULO EN LA SEMANA, contra la referencia de la
+// evidencia: unas 10 series por semana por músculo para ganar músculo (ACSM,
+// 2026), con rendimientos que bajan de a poco más arriba (Pelland et al.).
+// Se cuentan como en esa evidencia: las del músculo principal enteras y las
+// de los secundarios a medias (el conteo "fraccional", el que mejor predice
+// el crecimiento en Pelland et al.), y por las veces que el cronograma repite
+// cada día. Los grupos finos del catálogo se juntan en el músculo entero (el
+// pecho de arriba y el del medio son el pecho): antes la lista mostraba
+// "Pectoral 3" en una rutina que le daba nueve series al pecho.
+// Ver docs/critica-entrenamiento.md.
+const SERIES_REFERENCIA = 10;
+const MUSCULO_DE_GRUPO = {
+  pectoral_superior: "Pecho", pectoral_medio: "Pecho",
+  dorsales: "Espalda", trapecio: "Espalda",
+  deltoide_anterior: "Hombros", deltoide_lateral: "Hombros", deltoide_posterior: "Hombros",
+  biceps: "Bíceps", triceps: "Tríceps",
+  cuadriceps: "Cuádriceps", femoral: "Femorales", gluteo: "Glúteos", pantorrillas: "Pantorrillas",
+};
+const COLOR_DE_MUSCULO = {
+  Pecho: "pectoral_medio", Espalda: "dorsales", Hombros: "deltoide_lateral", "Bíceps": "biceps", "Tríceps": "triceps",
+  "Cuádriceps": "cuadriceps", Femorales: "femoral", "Glúteos": "gluteo", Pantorrillas: "pantorrillas",
+};
+function seriesSemanalesPorMusculo(routineDef) {
+  if (!routineDef?.days) return { musculos: [], directas: 0 };
+  const veces = vecesPorSemana(routineDef);
+  const conteo = {};
+  let directas = 0;
+  Object.entries(routineDef.days).forEach(([dk, day]) => {
+    const v = veces[dk] || 0;
+    (day.exercises || []).forEach((ex) => {
+      const lib = EXERCISE_LIBRARY_BY_ID[ex.libId || ex.id];
+      if (!lib?.group || lib.group === "cardio") return;
+      const n = (ex.sets?.length || 0) * v;
+      directas += n;
+      const principal = MUSCULO_DE_GRUPO[lib.group];
+      if (principal) conteo[principal] = (conteo[principal] || 0) + n;
+      // Un secundario cuenta a medias, y una sola vez por ejercicio aunque
+      // toque dos grupos del mismo músculo (o el mismo músculo que el principal).
+      const yaSumados = new Set(principal ? [principal] : []);
+      (lib.secondary || []).forEach((s) => {
+        const m = MUSCULO_DE_GRUPO[s.group];
+        if (!m || yaSumados.has(m)) return;
+        yaSumados.add(m);
+        conteo[m] = (conteo[m] || 0) + n * 0.5;
+      });
+    });
+  });
+  const musculos = Object.keys(COLOR_DE_MUSCULO)
+    .map((m) => ({ musculo: m, series: Math.round((conteo[m] || 0) * 2) / 2, color: MUSCLE_GROUP_BY_KEY[COLOR_DE_MUSCULO[m]]?.color || "#6e7379" }))
+    .sort((a, b) => b.series - a.series);
+  return { musculos, directas };
 }
 
 // Texto humano para "hace cuánto": "hoy", "ayer", "hace 3 días", "hace 2 meses"
@@ -28222,40 +28770,45 @@ function haceCuanto(dias) {
   return "hace más de un año";
 }
 
-// Balance muscular de una rutina: barras horizontales, la más entrenada
-// arriba. Se muestra COLAPSADO por defecto (solo los 3 primeros + un "ver
-// todos") para no saturar: lo importante es detectar el desbalance de un
-// vistazo, no leer una tabla.
+// Las series de cada músculo en la semana, en barras lisas con el color del
+// músculo, contra la raya de la referencia (10 por semana, ver
+// seriesSemanalesPorMusculo). COLAPSADO por defecto (los 3 primeros y "ver
+// todos"); abajo, los que quedan por debajo de la raya, para que se vean
+// aunque la lista esté cerrada.
 function BalanceMuscular({ routineDef, compacto = true }) {
   const [expandido, setExpandido] = useState(false);
-  const datos = useMemo(() => volumenPorMusculo(routineDef), [routineDef]);
-  if (!datos.length) return null;
-
-  const max = datos[0].series;
-  const mostrar = (compacto && !expandido) ? datos.slice(0, 3) : datos;
-  const totalSeries = datos.reduce((a, d) => a + d.series, 0);
-
-  // Barras lisas con el color de cada músculo apenas suavizado (antes, un
-  // degradé con brillo y rótulos en mayúsculas chiquitas).
+  const { musculos, directas } = useMemo(() => seriesSemanalesPorMusculo(routineDef), [routineDef]);
+  if (!musculos.length || !directas) return null;
+  const escala = Math.max(SERIES_REFERENCIA * 1.3, musculos[0].series);
+  const mostrar = (compacto && !expandido) ? musculos.slice(0, 3) : musculos;
+  const abajo = musculos.filter((d) => d.series < SERIES_REFERENCIA).map((d) => d.musculo);
+  const enSeries = (n) => conComa(n);
   return (
     <div>
       <div className="flex items-baseline justify-between gap-3 mb-3">
         <h4 className="seccion-titulo">Por músculo</h4>
-        <span className="text-[13px] text-slate-500 shrink-0">{totalSeries} series por semana</span>
+        <span className="text-[13px] text-slate-500 shrink-0">{directas} series por semana</span>
       </div>
       <div className="space-y-2.5">
         {mostrar.map((d, i) => (
-          <div key={d.grupo} className="balance-fila" style={{ "--c": d.color }}>
-            <span className="balance-nombre">{d.label}</span>
-            <span className="balance-pista" aria-hidden="true"><i className="grow-bar" style={{ width: `${(d.series / max) * 100}%`, animationDelay: `${i * 60}ms` }} /></span>
-            <b className="balance-n num-display">{d.series}</b>
+          <div key={d.musculo} className="balance-fila" style={{ "--c": d.color }}>
+            <span className="balance-nombre">{d.musculo}</span>
+            <span className="balance-pista" aria-hidden="true">
+              <i className="grow-bar" style={{ width: `${Math.min(100, (d.series / escala) * 100)}%`, animationDelay: `${i * 60}ms` }} />
+              <span className="balance-referencia" style={{ left: `${(SERIES_REFERENCIA / escala) * 100}%` }} />
+            </span>
+            <b className="balance-n num-display">{enSeries(d.series)}</b>
           </div>
         ))}
       </div>
-      {compacto && datos.length > 3 && (
+      <p className="balance-nota">
+        La raya: {SERIES_REFERENCIA} series por semana, lo que recomienda el ACSM para ganar músculo. Las de un músculo que trabaja de apoyo cuentan a medias.
+        {abajo.length > 0 && <> Abajo de la raya: {abajo.join(", ")}.</>}
+      </p>
+      {compacto && musculos.length > 3 && (
         <div className="text-center mt-2"><button onClick={() => setExpandido((v) => !v)} className="enlace-suave" aria-expanded={expandido}>
           <ChevronDown size={15} className="transition-transform duration-200" style={{ transform: expandido ? "rotate(180deg)" : "none" }} />
-          {expandido ? "Ver menos" : `Ver los ${datos.length} grupos`}
+          {expandido ? "Ver menos" : `Ver los ${musculos.length} músculos`}
         </button></div>
       )}
     </div>
@@ -29110,10 +29663,10 @@ function fechaDeHoyLarga() {
   const t = new Date().toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" });
   return t.charAt(0).toUpperCase() + t.slice(1);
 }
-function TituloPestana({ tab, descansa = false }) {
+function TituloPestana({ tab, descansa = false, descarga = false }) {
   const intro = TAB_INTRO[tab];
   if (!intro) return null;
-  const bajada = tab === "rutina" ? `${fechaDeHoyLarga()}${descansa ? " · Hoy descansás" : ""}` : intro.bajada;
+  const bajada = tab === "rutina" ? `${fechaDeHoyLarga()}${descarga ? " · Semana de descarga" : ""}${descansa ? " · Hoy descansás" : ""}` : intro.bajada;
   return (
     <div className="titulo-pagina">
       <h1>{TAB_TITLES[tab]}{intro.beta && <span className="ceja-beta">Beta</span>}</h1>
@@ -29498,16 +30051,19 @@ export default function App() {
     return null;
   });
   // En desarrollo, ?demo=<pestaña> entra directo ahí (ver main.jsx).
-  const [tab, setTab] = useState(() => (import.meta.env.DEV && new URLSearchParams(window.location.search).get("demo")) || "rutina");
-  // En semana de descarga, la pestaña Rutina muestra Descarga fija en vez
-  // del entrenamiento normal (antes esto vivía solo como un atajo chico
-  // adentro de Rutina, fácil de pasar por alto). "deloadDismissed" es el
-  // botón de cerrar: vive en memoria nomás, así que cada vez que abrís la
-  // app de nuevo (no solo cambiar de pestaña) vuelve a aparecer fija —
-  // "cerrarla" es para esta sesión, no para siempre. (El cálculo real de
-  // isDeloadWeek va más abajo, una vez que "profile" y "cycleStart" ya
-  // están declarados.)
+  // En desarrollo, ?demo=<pestaña> abre esa pestaña con el perfil de muestra
+  // (main.jsx) y ?pestana=<pestaña>, sólo la pestaña, con lo que ya haya
+  // guardado (lo usa scripts/probar-flujos.mjs).
+  const [tab, setTab] = useState(() => (import.meta.env.DEV && (new URLSearchParams(window.location.search).get("demo") || new URLSearchParams(window.location.search).get("pestana"))) || "rutina");
+  // En la semana de descarga, Rutina se transforma en la descarga (ver
+  // RoutineView, `modoDescarga`). "deloadDismissed" es elegir "Entrenamiento"
+  // en el selector del día: vive en memoria nomás, así que cada vez que abrís
+  // la app de nuevo vuelve a la descarga; es para esta sesión, no para
+  // siempre. (El cálculo real de isDeloadWeek va más abajo, una vez que
+  // "profile" y "cycleStart" ya están declarados.)
   const [deloadDismissed, setDeloadDismissed] = useState(false);
+  // La semana de descarga mirada antes de tiempo (ver RoutineView, `descargaPrevia`).
+  const [descargaPrevia, setDescargaPrevia] = useState(false);
 
   // ── El gesto "atrás" de Android funciona DENTRO de la app ────────────────
   // Metemos una entrada centinela en el historial del WebView. Cuando el
@@ -29703,6 +30259,14 @@ export default function App() {
   const [helpStartTab, setHelpStartTab] = useState(null);
   const [showWelcome, setShowWelcome] = useState(false); // intro de la primera vez
   const [sessionSummary, setSessionSummary] = useState(null); // resumen al finalizar
+  // El paywall de Premium: lo pide cualquier pantalla con pedirPaywall(motivo)
+  // (ver src/suscripcion.js). Con el cobro apagado nunca llega ningún pedido.
+  const [paywall, setPaywall] = useState(null);
+  useEffect(() => {
+    const abrir = (e) => setPaywall({ motivo: e.detail?.motivo || "perfil" });
+    window.addEventListener(EVENTO_PAYWALL, abrir);
+    return () => window.removeEventListener(EVENTO_PAYWALL, abrir);
+  }, []);
   const [weeklyRecap, setWeeklyRecap] = useState(null); // resumen semanal (ver checkWeeklyRecap)
   // Resumen MENSUAL y ANUAL: { periodo, etiqueta, data }. A diferencia del
   // semanal (que se dispara al terminar una sesión el domingo), estos miran
@@ -29783,17 +30347,32 @@ export default function App() {
   }, []);
 
   const profile = profiles[activeProfile], logs = profile?.logs || {}, drafts = profile?.drafts || {};
+  // Si esta cuenta es Premium (con el cobro apagado, nadie lo es ni lo
+  // necesita). La cuenta de RevenueCat es la de Google (googleUid).
+  useEffect(() => { iniciarSuscripcion(profile?.googleUid || null); }, [profile?.googleUid]);
   const isDeloadWeek = !!(profile && cycleStart && getWeekInfo(cycleStart, getProfileSettings(profile))?.isDeload);
   // El ciclo en curso: con él se sella cada plan nuevo (ver metaDeHoy).
   const cicloEnCurso = profile && cycleStart ? getWeekInfo(cycleStart, getProfileSettings(profile))?.cycleNumber ?? null : null;
   useEffect(() => { CICLO_ACTUAL = cicloEnCurso; }, [cicloEnCurso]);
-  const showPinnedDeload = tab === "rutina" && isDeloadWeek && !deloadDismissed;
+  // La semana de descarga se hace en Rutina misma (ver RoutineView,
+  // `modoDescarga`): esta semana la podés pasar a entrenamiento normal
+  // (deloadDismissed) y, antes de que llegue, mirarla (descargaPrevia). Antes
+  // era una pantalla aparte (DeloadView) que reemplazaba a Rutina.
+  const enDescarga = isDeloadWeek && getProfileSettings(profile).deloadEnabled !== false && !deloadDismissed;
   // En Rutina el tinte lo pone el día que estás mirando (RoutineView); en
   // las demás pestañas, el color de la pestaña.
   useEffect(() => {
-    if (tab === "rutina" && !showPinnedDeload) return;
-    ponerTono(showPinnedDeload ? TONO_DE_PESTANA.descarga : TONO_DE_PESTANA[tab]);
-  }, [tab, showPinnedDeload]);
+    if (tab === "rutina") return;
+    ponerTono(TONO_DE_PESTANA[tab]);
+  }, [tab]);
+  // Ir a la semana de descarga (desde Progreso, el chat o una sesión de
+  // descarga en curso): es Rutina en modo descarga; antes de que toque, su
+  // vista previa. La vieja pestaña "descarga" ya no existe.
+  const irADescarga = () => {
+    if (isDeloadWeek) setDeloadDismissed(false); else setDescargaPrevia(true);
+    setTab("rutina");
+  };
+  const irAPestana = (t) => (t === "descarga" ? irADescarga() : (setDescargaPrevia(false), setTab(t)));
   const themeClass = getProfileSettings(profile).theme === "light" ? "light-mode" : "";
   // tint() (utils.js) arma los "badges" de color según el tema — necesita
   // saber cuál está activo, pero es una función de módulo (la llaman
@@ -30160,13 +30739,23 @@ export default function App() {
     if (!dia?.exercises?.length) return { done: 0, total: 0 };
     const hoy = todayStr();
     let done = 0, total = 0;
+    if (profile?.activeSession?.deload) {
+      const divisor = getProfileSettings(profile).deloadSetDivisor || 2;
+      const progreso = profile?.deloadProgress || {};
+      dia.exercises.forEach((ex) => {
+        const q = seriesDeDescarga(ex.sets?.length || 0, divisor);
+        total += q;
+        for (let i = 0; i < q; i++) if (progreso[`${ex.id}_${i}`] === hoy) done++;
+      });
+      return { done, total };
+    }
     dia.exercises.forEach((ex) => (ex.sets || []).forEach((_, i) => {
       total++;
       if ((logs[`${ex.id}_${i}`] || []).some((h) => h.date === hoy && !h.deload)) done++;
     }));
     return { done, total };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [logs, profile?.activeSession?.dayKey, activeRoutineDef]);
+  }, [logs, profile?.activeSession?.dayKey, profile?.activeSession?.deload, profile?.deloadProgress, activeRoutineDef]);
   const needsRoutinePick = !!profile && !profile.activeRoutineId;
   // Cronograma semanal de la rutina activa (lunes a domingo → día de rutina
   // o descanso) — ver getRoutineWeekSchedule más arriba en el archivo.
@@ -30495,6 +31084,21 @@ export default function App() {
     handleUpdateProfile({ routines: { ...(profile.routines || {}), [profile.activeRoutineId]: removeExercisePlan(activeRoutineDef, exerciseId) } });
   };
   const handleSetCycleStart = (d) => { setCycleStartState(d); saveCycleStart(d); };
+  // ADELANTAR LA DESCARGA ("Hacerla esta semana", en su vista previa): se
+  // corre el inicio del ciclo para que ésta sea la semana de descarga del
+  // ciclo en curso, y el que sigue arranca la semana que viene. Es la
+  // descarga autorregulada (consenso Delphi de Bell et al., 2023: "puede ser
+  // planeada y autorregulada"); ver docs/critica-entrenamiento.md.
+  const handleAdelantarDescarga = () => {
+    const st = getProfileSettings(profile);
+    const info = cycleStart ? getWeekInfo(cycleStart, st) : null;
+    if (!info || info.isDeload || st.deloadEnabled === false) return;
+    const objetivo = (info.cycleNumber - 1) * info.cycleWeeks + info.trainWeeks;
+    const corrimiento = (info.totalWeek - 1) - objetivo;
+    if (corrimiento) handleSetCycleStart(new Date(new Date(cycleStart).getTime() + corrimiento * 7 * 86400000));
+    setDescargaPrevia(false);
+    setDeloadDismissed(false);
+  };
 
   // Resúmenes de MES y AÑO: se muestran una sola vez por período, la primera
   // vez que abrís la app con el período ya cerrado. Qué período ya viste se
@@ -30660,7 +31264,8 @@ export default function App() {
     // sesión quedaba corriendo en una pestaña que no estás mirando; ahora la
     // app te lleva a donde vas a entrenar, que es lo único que vas a hacer
     // los próximos cuarenta minutos.
-    if (tab !== "rutina" && tab !== "descarga") setTab(deload ? "descarga" : "rutina");
+    if (tab !== "rutina") setTab("rutina");
+    if (deload) setDeloadDismissed(false);
     setSessionStarted(true); // el molinete de entrada
     if (getProfileSettings(profile).alertType !== "vibration") sonarMolinete();
     haptic([0, 40, 60, 40]);
@@ -30841,7 +31446,7 @@ export default function App() {
       {recoveredNotice && <RecoveredBanner onClose={() => setRecoveredNotice(false)} />}
 
       {importRoutineError && <ImportRoutineErrorBanner onClose={() => setImportRoutineError(false)} />}
-      <SideNav tab={tab} setTab={setTab} profileName={activeProfile} />
+      <SideNav tab={tab} setTab={irAPestana} profileName={activeProfile} />
       <div className="flex-1 min-w-0" style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
         <header className="app-bar" data-compacta={barraCompacta || !TAB_INTRO[tab] ? "true" : "false"}>
           <div className="max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto px-4 h-14 flex items-center gap-3">
@@ -30870,27 +31475,20 @@ export default function App() {
             según haya o no sesión. */}
         <main className={`max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto px-4 pt-1 lg:pt-4 space-y-4 ${haySesionActiva && getProfileSettings(profile).modoGimnasio ? "modo-gimnasio" : ""}`} style={{ paddingBottom: "calc(7rem + var(--dock-alto, 0px) + env(safe-area-inset-bottom, 0px))" }}>
           <div key={tab} className={tabSlideClass}>
-            <TituloPestana tab={tab} descansa={descansaHoy} />
+            <TituloPestana tab={tab} descansa={descansaHoy} descarga={isDeloadWeek && getProfileSettings(profile).deloadEnabled !== false} />
             <PrimeraVezRecorrido tab={tab} nuevo={(profile?.trainingSessions?.length || 0) < 3 && !profile?.activeSession} activo={!!recorrido} onEmpezar={setRecorrido} />
             {tab === "rutinas" && <RoutinesView openScheduleSignal={openSectionSignal.id === "week-schedule" ? openSectionSignal.n : 0} openEditorSignal={openSectionSignal.id === "routine-editor" ? openSectionSignal.n : 0} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleDeleteRoutine} onUpdateProfile={handleUpdateProfile} onGoToDay={(dayKey) => goToSection("rutina", "go-to-day", dayKey)} />}
-            {tab === "rutina" && !showPinnedDeload && <OnboardingTasksCard profile={profile} cycleStart={cycleStart} logs={logs} onGoToProfile={() => setTab("perfil")} onOpenFieldSettings={() => setShowFieldIntro(true)} onDone={() => handleUpdateProfile({ onboardingDone: true })} />}
-            {/* Semana de descarga: se muestra fija acá mismo, en vez del
-                entrenamiento normal, con un botón para cerrarla (ver
-                showPinnedDeload/deloadDismissed más arriba) — antes había
-                que acordarse de tocar un atajo chico para verla. El atajo
-                que quedó adentro de RoutineView ahora sirve para volver a
-                fijarla si la cerraste. */}
-            {tab === "rutina" && showPinnedDeload && <DeloadView logs={logs} setLogs={setLogs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} activeSession={profile?.activeSession?.deload ? profile.activeSession : null} onStartSession={handleStartSession} weekSchedule={weekSchedule} onClose={() => setDeloadDismissed(true)} cycleStart={cycleStart} />}
-            {tab === "rutina" && !showPinnedDeload && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToFieldSettings={() => goToSection("perfil", "field-settings-section")} onGoToDescarga={() => (isDeloadWeek ? setDeloadDismissed(false) : setTab("descarga"))} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} sex={profile?.sex} age={edadDe(profile)} activeRoutineDef={activeRoutineDef} onApplyOwnProgression={handleApplyOwnProgression} onSetPlanPaused={handleSetPlanPaused} onRemovePlan={handleRemovePlan} goToDaySignal={openSectionSignal.id === "go-to-day" ? openSectionSignal : { id: null, n: 0 }} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} />}
-            {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} onGoToRoutines={() => goToSection("rutinas", "routine-editor")} weekSchedule={weekSchedule} sex={profile?.sex} age={edadDe(profile)} onGoToDeload={() => { if (isDeloadWeek) { setDeloadDismissed(false); setTab("rutina"); } else { setTab("descarga"); } }} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} />}
-            {tab === "descarga" && <DeloadView logs={logs} setLogs={setLogs} settings={getProfileSettings(profile)} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} activeSession={profile?.activeSession?.deload ? profile.activeSession : null} onStartSession={handleStartSession} weekSchedule={weekSchedule} onClose={() => { setDeloadDismissed(true); setTab("rutina"); }} cycleStart={cycleStart} />}
-            {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} setLogs={setLogs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} conversations={aiConversations} activeConversationId={activeAiConversationId} onNewConversation={handleNewAiConversation} onSwitchConversation={handleSwitchAiConversation} onDeleteConversation={handleDeleteAiConversation} onRenameConversation={handleRenameAiConversation} settings={getProfileSettings(profile)} cycleStart={cycleStart} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} onDeleteRoutine={handleDeleteRoutine} onNavigate={setTab} onStartSession={handleStartSession} onEndSession={handleEndSession} />}
+            {tab === "rutina" && !enDescarga && <OnboardingTasksCard profile={profile} cycleStart={cycleStart} logs={logs} onGoToProfile={() => setTab("perfil")} onOpenFieldSettings={() => setShowFieldIntro(true)} onDone={() => handleUpdateProfile({ onboardingDone: true })} />}
+            {/* La semana de descarga es Rutina en modo descarga (ver RoutineView). */}
+            {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToFieldSettings={() => goToSection("perfil", "field-settings-section")} semanaDescarga={isDeloadWeek} descargaApagada={deloadDismissed} descargaPrevia={descargaPrevia} onModoDescarga={(on) => { setDeloadDismissed(!on); if (on) setDescargaPrevia(false); }} onPreviaDescarga={setDescargaPrevia} onAdelantarDescarga={handleAdelantarDescarga} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} descargaTerminadaHoy={(profile?.trainingSessions || []).some((s) => s.date === todayStr() && s.deload)} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} sex={profile?.sex} age={edadDe(profile)} activeRoutineDef={activeRoutineDef} onApplyOwnProgression={handleApplyOwnProgression} onSetPlanPaused={handleSetPlanPaused} onRemovePlan={handleRemovePlan} goToDaySignal={openSectionSignal.id === "go-to-day" ? openSectionSignal : { id: null, n: 0 }} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} />}
+            {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} onGoToRoutines={() => goToSection("rutinas", "routine-editor")} weekSchedule={weekSchedule} sex={profile?.sex} age={edadDe(profile)} onGoToDeload={irADescarga} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} />}
+            {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} setLogs={setLogs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} conversations={aiConversations} activeConversationId={activeAiConversationId} onNewConversation={handleNewAiConversation} onSwitchConversation={handleSwitchAiConversation} onDeleteConversation={handleDeleteAiConversation} onRenameConversation={handleRenameAiConversation} settings={getProfileSettings(profile)} cycleStart={cycleStart} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} onDeleteRoutine={handleDeleteRoutine} onNavigate={irAPestana} onStartSession={(dk) => handleStartSession(dk, enDescarga)} onEndSession={handleEndSession} />}
             {tab === "perfil" && <ProfileView onOpenFieldPreview={() => setShowFieldIntro(true)} openSectionSignal={openSectionSignal} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} profileName={activeProfile} profiles={profiles} onSignOut={handleSignOut} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} onGoToSocial={() => setTab("social")} />}
             {tab === "social" && <SocialView onGoToProfile={() => setTab("perfil")} profile={profile} profileName={activeProfile} uid={profile?.googleUid} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} />}
           </div>
         </main>
       </div>
-      <BottomBar tab={tab} setTab={setTab} />
+      <BottomBar tab={tab} setTab={irAPestana} />
       {/* Siempre montado: es el único que garantiza que un descanso avise
           aunque la tarjeta dueña del cronómetro esté cerrada. */}
       <VigilanteDescansos alertType={getProfileSettings(profile).alertType} />
@@ -30909,16 +31507,18 @@ export default function App() {
             color={sessionTintColor || "#14B8A6"}
             done={sessionProgress.done}
             total={sessionProgress.total}
-            conProgreso={!profile.activeSession.deload}
-            enRutina={tab === "rutina" || tab === "descarga"}
-            onGoToRoutine={() => setTab(profile.activeSession.deload ? "descarga" : "rutina")}
+            enRutina={tab === "rutina"}
+            onGoToRoutine={() => { if (profile.activeSession.deload) setDeloadDismissed(false); setDescargaPrevia(false); setTab("rutina"); }}
             onEnd={() => (profile.activeSession.deload ? handleFinishDeloadSession(profile.activeSession.dayKey) : handleEndSession())}
             onCancel={handleCancelSession}
           />
         )}
       </DockInferior>
       {sessionStarted && <SessionStartOverlay onDone={() => setSessionStarted(false)} />}
-      {sessionSummary && <SessionSummaryModal resumen={sessionSummary} onClose={() => setSessionSummary(null)} />}
+      {/* Al cerrar el ticket de un entrenamiento (el momento en que ya viste
+          lo que la app hace), el paywall una sola vez: ver paywallAutomatico. */}
+      {sessionSummary && <SessionSummaryModal resumen={sessionSummary} onClose={() => { setSessionSummary(null); setTimeout(() => paywallAutomatico("primer_entrenamiento"), 500); }} />}
+      {paywall && <Paywall motivo={paywall.motivo} claro={themeClass === "light-mode"} onClose={() => setPaywall(null)} />}
       {weeklyRecap && !sessionSummary && <WeeklyRecapModal data={weeklyRecap} onClose={() => setWeeklyRecap(null)} />}
       {periodRecap && <WeeklyRecapModal data={periodRecap.data} periodo={periodRecap.periodo} etiqueta={periodRecap.etiqueta} onClose={() => setPeriodRecap(null)} />}
       {showWelcome && <WelcomeIntro onClose={() => setShowWelcome(false)} onOpenTutorial={() => { setHelpStartTab(null); setShowHelp(true); }} onUpdateSettings={handleUpdateSettings} />}
