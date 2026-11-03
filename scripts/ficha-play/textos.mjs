@@ -7,14 +7,14 @@ export const TITULO = "Modus Fit: Rutinas de Gimnasio";
 
 // El cierre depende de si el cobro está prendido (VITE_COBRO_ACTIVO=1, ver
 // docs/suscripcion.md). Con Premium a la venta, "Gratis" a secas sería
-// engañoso para Play: se dice qué queda gratis y qué suma Premium, con el
-// precio en la tienda. Se sube con: VITE_COBRO_ACTIVO=1 node subir-ficha.mjs …
+// engañoso para Play: se dice qué queda gratis y qué suma Premium (también
+// sacar los anuncios, que se prenden con el cobro). Se sube con: VITE_COBRO_ACTIVO=1 node subir-ficha.mjs …
 const COBRO = process.env.VITE_COBRO_ACTIVO === "1";
 const CIERRE_VOS = COBRO
-  ? "Anotar, tus rutinas, tu progreso y Social son gratis y sin anuncios, para siempre. Con Modus Fit Premium (mensual, semestral o anual, con 7 días gratis en el anual) sumás más consultas por día al Entrenador IA, Planificar con IA e importar con foto. Funciona sin cuenta, y si entrás con Google tus datos también se guardan en la nube."
+  ? "Todas las funciones son gratis, para siempre. Con Modus Fit Premium (mensual, semestral o anual, con 7 días gratis en el anual) entrenás sin anuncios y con más consultas por día al Entrenador IA. Funciona sin cuenta, y si entrás con Google tus datos también se guardan en la nube."
   : "Gratis y sin anuncios. Funciona sin cuenta, y si entrás con Google tus datos también se guardan en la nube, para no perder nada si cambiás de celular.";
 const CIERRE_TU = COBRO
-  ? "Anotar, tus rutinas, tu progreso y Social son gratis y sin anuncios, para siempre. Con Modus Fit Premium (mensual, semestral o anual, con 7 días gratis en el anual) sumas más consultas al día al Entrenador IA, Planificar con IA e importar con foto. Funciona sin cuenta, y si entras con Google tus datos también se guardan en la nube."
+  ? "Todas las funciones son gratis, para siempre. Con Modus Fit Premium (mensual, semestral o anual, con 7 días gratis en el anual) entrenas sin anuncios y con más consultas al día al Entrenador IA. Funciona sin cuenta, y si entras con Google tus datos también se guardan en la nube."
   : "Gratis y sin anuncios. Funciona sin cuenta, y si entras con Google tus datos también se guardan en la nube, para no perder nada si cambias de teléfono.";
 
 const LARGA_VOS = `Modus Fit es tu registro de entrenamiento para el gimnasio: anotás cada serie en un toque, seguís tu rutina con un plan que progresa como el de un entrenador personal y ves cuánto subís semana a semana.

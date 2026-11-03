@@ -16,15 +16,16 @@ Preparado el 03/11/2026 en la rama `mejoras-noviembre`. La app ya tiene la suscr
 
 ## Qué es gratis y qué es Premium
 
-- **Gratis, siempre:** anotar el entrenamiento, las rutinas (las listas y las tuyas, sin límite), el historial, los récords, las gráficas, los resúmenes, el ciclo y la descarga, Social y compartir. También importar desde texto, Excel, Word o CSV, y el Entrenador IA con **5 consultas por día**.
+Decisión del 03/11/2026 (pedido: "que se pueda usar muy bien gratis pero que con pro se sienta la diferencia, es decir no restringir nada en el plan gratis en cuanto a funciones disponibles"):
+
+- **Gratis, todas las funciones:** anotar, las rutinas, el historial, los récords, las gráficas, los resúmenes, el ciclo y la descarga, Social, compartir, importar (también con foto) y la IA entera: el Entrenador IA, Planificar con IA y leer una foto. Con **15 consultas por día** a la IA.
 - **Premium:**
-  - **25 consultas por día** al Entrenador IA (el tope de hoy);
-  - **Planificar con IA**;
-  - **importar una rutina con una foto** o un PDF escaneado, que lee la IA.
+  - **sin anuncios** (los anuncios todavía no existen: se prenden con el cobro);
+  - **40 consultas por día** a la IA en vez de 15.
 
-**Por qué así.** Premium es la IA porque es lo único que cuesta plata por uso: con la facturación de Gemini, cerca de US$ 0,01 por mensaje. Lo demás corre en el teléfono y en el plan gratis de Firebase. El hábito (anotar, ver el progreso, Social) queda gratis porque es lo que trae y retiene gente. Social necesita amigos con la app, y la prueba cerrada de Play necesita 12 testers durante 14 días.
+**Por qué así.** Premium vende comodidad y más uso, no funciones. Lo que cuesta plata es la IA por pedido (cerca de US$ 0,01 por mensaje con facturación) y lo que molesta son los anuncios. Las dos diferencias se sienten sin dejar a nadie afuera de nada. Planificar con IA e importar con foto descuentan consultas como cualquier pedido a la IA. 15 por día es más de lo que usa casi cualquiera; quien la usa mucho es justo quien más cuesta, y el que más valora Premium.
 
-La skill de paywalls dice que con un nivel gratis conviene un tope diario, "que el límite se sienta en el hábito, no después de un mes". Por eso son 5 consultas por día y no un tope mensual.
+Antes (la primera versión del 03/11) Planificar con IA e importar con foto eran sólo de Premium y el gratis tenía 5 consultas: se sacó. La skill de paywalls recomienda un tope que "se sienta en el hábito": con 15 casi nunca se siente, así que la diferencia la van a hacer los anuncios. Si con datos se ve que nadie llega a 15, se puede bajar.
 
 ## Las decisiones y sus fuentes
 
@@ -33,13 +34,13 @@ La skill de paywalls dice que con un nivel gratis conviene un tope diario, "que 
 | **Freemium**, no paywall duro | Los paywalls duros convierten unas cinco veces más a pago en 35 días (10,7 % contra 2,1 %), pero la retención anual es casi igual (27 % contra 28 %) y tienen más reembolsos (5,8 % contra 3,4 %). Freemium conviene cuando lo gratis trae gente (Social, compartir). | RevenueCat, *State of Subscription Apps* 2025 y 2026 (vía [Airbridge](https://www.airbridge.io/en/blog/hard-paywall-vs-freemium-2026) y la skill `paywalls`) |
 | **Tres planes**, el **anual primero y elegido** | En Salud y fitness el anual trae el 62 % de los ingresos. Elegir el anual de entrada no baja la conversión. Que sean tres es el pedido; ojo: con dos duraciones la conversión es un 67 % más alta, y sumar productos ganó sólo el 53 % de las pruebas A/B. Es lo primero para probar. | Adapty, [*State of Paywalls* 2026](https://adapty.io/state-of-paywalls/report/) |
 | **7 días gratis, sólo en el anual** | En Salud y fitness, las pruebas de 5 a 9 días convierten mejor (46,8 %) que las de 10 a 16 (40,4 %). La prueba en el plan anual es el patrón de las apps de suscripción. El mensual y el semestral, sin prueba. | RevenueCat, [Free trial length](https://www.revenuecat.com/blog/growth/free-trial-length) (17.000 apps, 2025-2026); skill `paywalls` |
-| **El precio que se cobra, grande; el mensual equivalente, chico y aparte** | Google Play marca como infracción "un precio mensual desglosado mostrado más destacado que el monto que se cobra", y pide no mostrar como mensual un plan que se cobra por año. El anual dice "US$ 29,99 por año" y, debajo, "US$ 2,50 por mes". El equivalente se redondea para arriba (nunca más barato de lo que es). | [Política de suscripciones de Google Play](https://support.google.com/googleplay/android-developer/answer/9900533) |
+| **El precio que se cobra, grande; el mensual equivalente, chico y aparte** | Google Play marca como infracción "un precio mensual desglosado mostrado más destacado que el monto que se cobra", y pide no mostrar como mensual un plan que se cobra por año. El anual dice "US$ 17,99 por año" y, debajo, "US$ 1,50 por mes". El equivalente se redondea para arriba (nunca más barato de lo que es). | [Política de suscripciones de Google Play](https://support.google.com/googleplay/android-developer/answer/9900533) |
 | **"Ahorrás 49 %" y no "Más popular"** | El ancla se hace eligiendo el anual y con su ahorro real, calculado contra pagar mes a mes y redondeado para abajo. "Más popular" sería afirmar algo sin datos, y Play prohíbe las compras engañosas. Cuando RevenueCat muestre que el anual es el más elegido, se puede probar "El más elegido" contra "Ahorrás N %". | Play (arriba); [Superwall](https://superwall.com/solutions/price-testing-optimization) sugiere probar las dos insignias |
 | **Antes de pagar, todas las condiciones** | Cuánto dura la prueba, cuánto se cobra después, que se renueva sola y cómo se cancela, sin pasos extra para leerlo. Además: "Restaurar compras", términos y privacidad, y "Seguir gratis" siempre a la vista. | Política de Play (arriba); checklist de la skill `paywalls` |
 | **Aviso dos días antes de que termine la prueba** | Las renovaciones sorpresa traen reembolsos, malas reseñas y contracargos. Google además manda un mail. | skill `paywalls`, referencia de apps de suscripción |
 | **Cuándo aparece el paywall** | Al quedarse sin consultas de IA, al tocar algo de Premium, desde Perfil y una sola vez después del primer entrenamiento terminado (el ticket). Nunca dos automáticos en menos de tres días. | skill `paywalls`: "valor antes de pedir", "respetar el no" |
 | **Precios por país** | Paridad de poder adquisitivo: Argentina al 30 % del precio de EE. UU., México al 45 %, España al 70 % (tabla abajo). En Salud y fitness, el anual típico es US$ 29,99. En América Latina el anual baja a US$ 30,11 contra US$ 39,99 en EE. UU. | skill `gplay-ppp-pricing`; Adapty 2026 |
-| **US$ 4,99, 19,99 y 29,99** | El anual típico de la categoría es US$ 29,99 (Adapty). Strong cobra US$ 4,99 por mes, US$ 19,99 por 6 meses y US$ 29,99 por año. Hevy, US$ 2,99 por mes y US$ 23,99 por año. Premium suma IA, que ninguno de los dos trae en su precio base. | [App Store de Strong](https://apps.apple.com/app/id464254577); [comparación de precios 2026](https://www.sensai.fit/blog/fitness-app-pricing-free-tier-comparison) |
+| **US$ 2,99, 11,99 y 17,99** (bajados el 03/11, pedido: "baja el precio bastante") | Por debajo de la competencia a propósito, para la primera etapa: Hevy cobra US$ 2,99 por mes y US$ 23,99 por año; Strong, US$ 4,99, 19,99 y 29,99; el anual típico de la categoría es US$ 29,99 (Adapty). Se mantienen las proporciones (el anual ahorra 49 % y el semestral 33 %). Antes eran US$ 4,99, 19,99 y 29,99. Subir más adelante es posible para los nuevos sin tocar a los que ya pagan. | [App Store de Strong](https://apps.apple.com/app/id464254577); [comparación de precios 2026](https://www.sensai.fit/blog/fitness-app-pricing-free-tier-comparison) |
 | **RevenueCat**, no Play Billing a mano | Valida las compras en su servidor, maneja derechos, período de gracia y retenciones, avisa por webhook, hace pruebas de paywall y sirve para iOS más adelante. Tiene plugin oficial para Capacitor. Es gratis hasta US$ 2.500 de ingresos por mes y después cobra el 1 %. A mano habría que validar cada compra en `api/` con la cuenta de servicio (skill `gplay-purchase-verification`). | skill `rc-subscriptions`; [plugin](https://github.com/RevenueCat/purchases-capacitor); precios de RevenueCat (varias fuentes de 2026) |
 | **La comisión de la tienda** | Las suscripciones pagan un 15 % en Google Play: en EE. UU., Reino Unido y el Espacio Económico Europeo, desde el 30/06/2026, son 10 % de servicio y 5 % de cobro. | skill `paywalls` (Android Developers Blog, junio 2026) |
 
@@ -49,13 +50,15 @@ Salen de `node scripts/play-suscripcion/planes.mjs`. Play pone la moneda local c
 
 | País | Mensual | Semestral | Anual | Anual por mes |
 |---|---|---|---|---|
-| EE. UU. | 4,99 | 19,99 | 29,99 | 2,50 |
-| España | 3,99 | 13,99 | 20,99 | 1,75 |
-| Chile, Uruguay | 2,99 | 11,99 | 17,99 | 1,50 |
-| Brasil | 2,99 | 9,99 | 14,99 | 1,25 |
-| México | 1,99 | 8,99 | 13,99 | 1,17 |
-| Colombia, Perú | 1,99 | 7,99 | 11,99 | 1,00 |
-| Argentina | 1,99 | 5,99 | 8,99 | 0,75 |
+| EE. UU. | 2,99 | 11,99 | 17,99 | 1,50 |
+| España | 1,99 | 7,99 | 12,99 | 1,09 |
+| Chile, Uruguay | 1,99 | 6,99 | 10,99 | 0,92 |
+| Brasil | 1,99 | 5,99 | 8,99 | 0,75 |
+| México | 0,99 | 4,99 | 7,99 | 0,67 |
+| Colombia, Perú | 0,99 | 4,99 | 6,99 | 0,59 |
+| Argentina | 0,99 | 3,99 | 4,99 | 0,42 |
+
+Con los precios más bajos el redondeo al ,99 pesa: en México el mensual queda en 0,99 y el anual ahorra 32 %, en Brasil 62 %. Al cargarlos en Play conviene revisar país por país que el anual ahorre entre 40 y 55 %.
 
 En la app no hay ningún precio escrito a mano: muestra los que devuelve la tienda para cada persona. Los de `src/suscripcion.js` son sólo para el modo de prueba.
 
@@ -65,11 +68,11 @@ En la app no hay ningún precio escrito a mano: muestra los que devuelve la tien
 
 En América Latina, Salud y fitness tiene un 1,46 % de inicios de prueba por vista del paywall y entre 19,8 % y 33,3 % de prueba a pago (Adapty 2026). La mediana de prueba a pago en la categoría es del 39,9 % (RevenueCat 2025).
 
-Con un anual de US$ 8,99 en Argentina, el ingreso por descarga queda en centavos. El cobro sirve para cubrir la IA de quien la usa mucho, no como negocio grande al principio. Hay que medirlo en las primeras semanas.
+Con un anual de US$ 4,99 en Argentina, el ingreso por descarga queda en centavos. El cobro sirve para cubrir la IA de quien la usa mucho, no como negocio grande al principio. Hay que medirlo en las primeras semanas.
 
 ## Quien ya usa la app
 
-Prender el cobro le baja el cupo de la IA de 25 a 5 consultas por día a quien ya la usa: para esas personas es una suba de precio. La skill `pricing` dice tres cosas para hacerlo sin romper la confianza:
+Prender el cobro le baja el cupo de la IA de 25 a 15 consultas por día a quien ya la usa (y le suma anuncios): para esas personas es una suba de precio. La skill `pricing` dice tres cosas para hacerlo sin romper la confianza:
 
 - avisar con tiempo, adentro de la app, y explicar por qué (la IA cuesta por uso);
 - dar una transición y no un corte: por ejemplo, 30 días con el cupo de siempre para las cuentas creadas antes de prender el cobro, o el anual con un descuento único;
@@ -77,7 +80,15 @@ Prender el cobro le baja el cupo de la IA de 25 a 5 consultas por día a quien y
 
 Eso se decide al prenderlo y todavía no está en el código.
 
-La métrica de valor está bien elegida: quien usa más la IA saca más de Premium, y el cupo crece con eso. Los precios bajos por país son paridad de poder adquisitivo, no la "trampa del precio bajísimo" de la skill. El precio de referencia (US$ 29,99 por año) es el típico de la categoría.
+La métrica de valor está bien elegida: quien usa más la IA saca más de Premium, y el cupo crece con eso. Los precios bajos por país son paridad de poder adquisitivo, no la "trampa del precio bajísimo" de la skill. El precio de referencia (US$ 17,99 por año) está por debajo del típico de la categoría (US$ 29,99), a propósito para la primera etapa.
+
+## Cuándo prenderlo: a las 1000 descargas
+
+Decisión del 03/11/2026: el cobro y los anuncios se prenden **juntos, al llegar a las 1000 descargas**. Hasta ahí la app sigue toda gratis y sin anuncios, para ganar usuarios y reseñas.
+
+**Los anuncios** (AdMob, la cuenta ya está creada) todavía no están hechos. Cuando se hagan: banner o intersticial sólo fuera del entrenamiento (nunca con una sesión abierta ni en el descanso), y sólo si `mostrarAnuncios(esPremium)` de `src/suscripcion.js` da verdadero. Premium los saca: con `VITE_ANUNCIOS_ACTIVOS=1`, el paywall suma "Sin anuncios" y el producto de Play ya lo trae como cuarto beneficio. Sin anuncios en la app, el paywall no lo promete. Prender anuncios pide también: el SDK en un APK nuevo, el ID de publicidad (`AD_ID`) de vuelta en el manifiesto, "Contiene anuncios" en Play Console, la declaración de datos y la política.
+
+**Qué medir antes**: con 1000 descargas, la retención a 30 días y cuántos usan la IA por día dicen si el cupo de 5 gratis está bien, y cuánto cuesta la IA por usuario. Hasta el 03/11/2026 no había medición de descargas en la app: se ven en Play Console (`npm run play -- estado` no las trae).
 
 ## Para prenderlo
 

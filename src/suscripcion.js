@@ -6,10 +6,12 @@
    hayan demostrado funcionar. Cada decisión, con su fuente, está en
    docs/suscripcion.md. Lo esencial:
 
-   · Freemium: lo que hace al hábito (anotar, rutinas, historial, récords, el
-     ciclo y la descarga, Social, compartir) sigue gratis. Premium es la IA,
-     que es lo que cuesta plata por pedido: más consultas por día al
-     Entrenador IA, Planificar con IA e importar una rutina con foto.
+   · Freemium sin candados (pedido del 03/11: "que se pueda usar muy bien
+     gratis pero que con pro se sienta la diferencia, no restringir nada en
+     el plan gratis en cuanto a funciones"): todas las funciones son gratis,
+     también Planificar con IA e importar con foto. Premium es más de lo que
+     cuesta (las consultas por día a la IA, que se pagan por pedido) y sin
+     anuncios, que se prenden con el cobro.
    · Tres planes de una misma suscripción de Google Play (producto
      `modus_premium`, tres planes base). El anual va primero y elegido, con 7
      días gratis; el semestral y el mensual, como comparación.
@@ -32,6 +34,13 @@
 import { Capacitor, registerPlugin } from "@capacitor/core";
 
 export const COBRO_ACTIVO = import.meta.env.VITE_COBRO_ACTIVO === "1";
+// Los anuncios (AdMob), todavía sin hacer: se prenden junto con el cobro
+// (pedido del 03/11: "que el plan pro saque los anuncios", con la meta de
+// prender todo a las 1000 descargas). Premium los saca: el código de los
+// anuncios tiene que preguntar `mostrarAnuncios(esPremium)` antes de cargar
+// uno, y nunca durante el entrenamiento.
+export const ANUNCIOS_ACTIVOS = import.meta.env.VITE_ANUNCIOS_ACTIVOS === "1";
+export const mostrarAnuncios = (esPremium) => ANUNCIOS_ACTIVOS && !esPremium;
 const CLAVE_PRUEBA = "modusfit_premium_prueba";
 const CLAVE_ESTADO_PRUEBA = "modusfit_premium_prueba_estado";
 // La clave pública del SDK de RevenueCat para Android (empieza con "goog_").
@@ -57,29 +66,29 @@ export const DERECHO = "premium";
 // Los tres planes, en el orden del paywall. `precioUSD`: la referencia para
 // Play Console (la tienda pone el de cada país) y para el modo de prueba.
 export const PLANES = [
-  { id: "anual", basePlan: "anual", tipo: "ANNUAL", periodo: "P1Y", meses: 12, precioUSD: 29.99, prueba: 7, nombre: "Anual", cada: "por año" },
-  { id: "semestral", basePlan: "semestral", tipo: "SIX_MONTH", periodo: "P6M", meses: 6, precioUSD: 19.99, prueba: 0, nombre: "Semestral", cada: "cada 6 meses" },
-  { id: "mensual", basePlan: "mensual", tipo: "MONTHLY", periodo: "P1M", meses: 1, precioUSD: 4.99, prueba: 0, nombre: "Mensual", cada: "por mes" },
+  { id: "anual", basePlan: "anual", tipo: "ANNUAL", periodo: "P1Y", meses: 12, precioUSD: 17.99, prueba: 7, nombre: "Anual", cada: "por año" },
+  { id: "semestral", basePlan: "semestral", tipo: "SIX_MONTH", periodo: "P6M", meses: 6, precioUSD: 11.99, prueba: 0, nombre: "Semestral", cada: "cada 6 meses" },
+  { id: "mensual", basePlan: "mensual", tipo: "MONTHLY", periodo: "P1M", meses: 1, precioUSD: 2.99, prueba: 0, nombre: "Mensual", cada: "por mes" },
 ];
 export const PLAN_ELEGIDO = "anual";
 
 // Qué es de Premium. El cupo de la IA: gratis, 5 consultas por día (un tope
 // que se siente en el hábito, no a fin de mes); con Premium, 25, el tope de
 // siempre.
-export const CUPO_IA_GRATIS = 5;
-export const CUPO_IA_PREMIUM = 25;
+export const CUPO_IA_GRATIS = 15;
+export const CUPO_IA_PREMIUM = 40;
 export const FUNCIONES = {
   ia_cupo: { titulo: "Seguí hablando con tu entrenador", bajada: `Llegaste a las ${CUPO_IA_GRATIS} consultas de hoy. Con Premium tenés ${CUPO_IA_PREMIUM} por día.` },
-  planificar_ia: { titulo: "Planificá con IA", bajada: "La IA arma tu progresión semana por semana, desde lo que venís levantando." },
-  importar_ia: { titulo: "Importá tu rutina con una foto", bajada: "Sacale una foto a la hoja del profe y queda cargada, día por día." },
-  primer_entrenamiento: { titulo: "Entrenaste. Ahora, con un entrenador.", bajada: "Premium suma la IA a todo lo que ya anotás gratis." },
-  perfil: { titulo: "Entrená con IA", bajada: "Todo lo que anotás sigue gratis. Premium suma la IA." },
+  primer_entrenamiento: { titulo: "Entrenaste. Así, sin interrupciones.", bajada: "Todo sigue gratis. Premium saca los anuncios y te da más consultas a tu entrenador." },
+  perfil: { titulo: "Lo mismo, sin interrupciones", bajada: "Todas las funciones son gratis. Premium saca los anuncios y te da más IA." },
 };
 // Lo que suma Premium, en el paywall.
+// "Sin anuncios" va sólo cuando hay anuncios que sacar: prometerlo sin
+// anuncios sería engañoso. En el modo de prueba se ve, para revisar el paywall
+// como va a quedar.
 export const BENEFICIOS = [
-  { titulo: `${CUPO_IA_PREMIUM} consultas por día al Entrenador IA`, bajada: `Gratis son ${CUPO_IA_GRATIS}.` },
-  { titulo: "Planificar con IA", bajada: "Tu progresión, semana por semana." },
-  { titulo: "Importar con una foto", bajada: "La hoja del profe o un PDF escaneado." },
+  ...(ANUNCIOS_ACTIVOS || modoPrueba() ? [{ titulo: "Sin anuncios", bajada: "En ninguna pantalla." }] : []),
+  { titulo: `${CUPO_IA_PREMIUM} consultas por día al Entrenador IA`, bajada: `Gratis son ${CUPO_IA_GRATIS}. Planificar con IA e importar con foto también usan consultas.` },
 ];
 
 // ── El formato de los precios ───────────────────────────────────────────────

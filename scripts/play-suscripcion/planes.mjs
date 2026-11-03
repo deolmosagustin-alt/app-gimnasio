@@ -20,9 +20,9 @@
  */
 const PRODUCTO = "modus_premium";
 const PLANES = [
-  { basePlanId: "mensual", periodo: "P1M", usd: 4.99 },
-  { basePlanId: "semestral", periodo: "P6M", usd: 19.99 },
-  { basePlanId: "anual", periodo: "P1Y", usd: 29.99, oferta: { offerId: "prueba-7-dias", fase: { duration: "P7D", pricingType: "FREE_TRIAL" } } },
+  { basePlanId: "mensual", periodo: "P1M", usd: 2.99 },
+  { basePlanId: "semestral", periodo: "P6M", usd: 11.99 },
+  { basePlanId: "anual", periodo: "P1Y", usd: 17.99, oferta: { offerId: "prueba-7-dias", fase: { duration: "P7D", pricingType: "FREE_TRIAL" } } },
 ];
 // Multiplicadores de la skill gplay-ppp-pricing para los países donde está la
 // ficha en español (y Brasil, el mercado grande de la región). Perú y Uruguay
@@ -38,12 +38,13 @@ export const PRECIOS = Object.fromEntries(Object.entries(PPP).map(([pais, m]) =>
 // Los textos del producto en la tienda (título 55, descripción 80, hasta 4
 // beneficios). es-419 con vos, como la app; es-ES y es-US con tú. El nombre
 // del producto también indexa en Play (skill aso): lleva "entrenador con IA".
-const BENEFICIOS_VOS = ["25 consultas por día al Entrenador IA", "Planificá tu progresión con IA", "Importá rutinas con una foto", "Lo gratis sigue gratis"];
-const BENEFICIOS_TU = ["25 consultas al día al Entrenador IA", "Planifica tu progresión con IA", "Importa rutinas con una foto", "Lo gratis sigue gratis"];
+// Premium no bloquea funciones: saca los anuncios y da más consultas a la IA.
+const BENEFICIOS_VOS = ["Sin anuncios", "40 consultas por día al Entrenador IA", "Todas las funciones siguen gratis"];
+const BENEFICIOS_TU = ["Sin anuncios", "40 consultas al día al Entrenador IA", "Todas las funciones siguen gratis"];
 export const LISTADOS = [
-  { languageCode: "es-419", title: "Modus Fit Premium: tu entrenador con IA", description: "Más IA para tu entrenamiento: consultas, planificación e importar con foto.", benefits: BENEFICIOS_VOS },
-  { languageCode: "es-ES", title: "Modus Fit Premium: tu entrenador con IA", description: "Más IA para tu entrenamiento: consultas, planificación e importar con foto.", benefits: BENEFICIOS_TU },
-  { languageCode: "es-US", title: "Modus Fit Premium: tu entrenador con IA", description: "Más IA para tu entrenamiento: consultas, planificación e importar con foto.", benefits: BENEFICIOS_TU },
+  { languageCode: "es-419", title: "Modus Fit Premium: tu entrenador con IA", description: "Entrená sin anuncios y con más consultas a tu entrenador con IA.", benefits: BENEFICIOS_VOS },
+  { languageCode: "es-ES", title: "Modus Fit Premium: tu entrenador con IA", description: "Entrena sin anuncios y con más consultas a tu entrenador con IA.", benefits: BENEFICIOS_TU },
+  { languageCode: "es-US", title: "Modus Fit Premium: tu entrenador con IA", description: "Entrena sin anuncios y con más consultas a tu entrenador con IA.", benefits: BENEFICIOS_TU },
 ];
 
 // La suscripción (monetization.subscriptions.create) y, aparte, sus ofertas

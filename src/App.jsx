@@ -848,9 +848,10 @@ function leerCupoIA() {
   } catch { /* dato corrupto: se arranca de cero, no es para romper nada */ }
   return { dia: _hoyLocal(), usados: 0 };
 }
-// Con el cobro apagado son las 25 de siempre; prendido, el gratis tiene
-// menos y Premium las de siempre (ver cupoDiarioIA en suscripcion.js).
-const cupoDeHoy = () => Math.min(IA_CUPO_DIARIO, cupoDiarioIA());
+// Con el cobro apagado son las 25 de siempre; prendido, 15 gratis y 40 con
+// Premium (cupoDiarioIA en suscripcion.js). Ninguna función se bloquea: sólo
+// cambia cuántas consultas por día.
+const cupoDeHoy = () => (suscripcionVisible() ? cupoDiarioIA() : IA_CUPO_DIARIO);
 function cupoIARestante() {
   return Math.max(0, cupoDeHoy() - leerCupoIA().usados);
 }
@@ -11158,7 +11159,7 @@ function Paywall({ motivo = "perfil", onClose, claro = false }) {
             <p className="paywall-bajada">
               {estado.enPrueba && estado.vence
                 ? `Tu prueba gratis termina el ${fechaCorta(estado.vence)}. Te avisamos dos días antes; si no querés seguir, la cancelás desde Google Play y no se te cobra nada.`
-                : `Ya tenés ${CUPO_IA_PREMIUM} consultas por día al Entrenador IA, Planificar con IA e importar con una foto.`}
+                : `Sin anuncios y con ${CUPO_IA_PREMIUM} consultas por día al Entrenador IA.`}
             </p>
             <button onClick={onClose} className="boton-pildora w-full">Listo</button>
           </div>
@@ -11173,7 +11174,7 @@ function Paywall({ motivo = "perfil", onClose, claro = false }) {
                 <li key={b.titulo}><Check size={16} strokeWidth={2.6} aria-hidden="true" /><span><b>{b.titulo}.</b> {b.bajada}</span></li>
               ))}
             </ul>
-            <p className="paywall-gratis">Anotar, tus rutinas, el historial, los récords, el ciclo y Social siguen gratis.</p>
+            <p className="paywall-gratis">Todas las funciones son gratis: anotar, las rutinas, el progreso, Social y la IA. Premium no bloquea nada.</p>
             <div className="paywall-planes" role="radiogroup" aria-label="Elegí un plan">
               {ofertas == null && <p className="paywall-cargando">Buscando los planes…</p>}
               {(ofertas || []).map((o) => {
@@ -11259,7 +11260,7 @@ function SeccionPremium() {
       ) : (
         <>
           <p className="premium-perfil-titulo">Gratis</p>
-          <p className="premium-perfil-texto">Premium suma la IA: {CUPO_IA_PREMIUM} consultas por día al Entrenador, Planificar con IA e importar una rutina con foto.</p>
+          <p className="premium-perfil-texto">Todo es gratis. Premium saca los anuncios y te da {CUPO_IA_PREMIUM} consultas por día al Entrenador IA.</p>
           <div className="premium-perfil-botones">
             <button onClick={() => pedirPaywall("perfil")} className="boton-pildora flex-1">Ver los planes</button>
             <button onClick={() => prov?.restaurar().catch(() => {})} className="boton-tonal">Restaurar</button>
@@ -15068,7 +15069,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           trainWeeks={settings.trainWeeks}
           logs={logs}
           weekInCycle={weekInCycle}
-          onOpenIA={() => { if (necesitaPremium()) { pedirPaywall("planificar_ia"); return; } setShowSelfProgression(false); setShowPlanificadorIA(true); }}
+          onOpenIA={() => { setShowSelfProgression(false); setShowPlanificadorIA(true); }}
           planPrefs={settings}
           onSavePrefs={onUpdateSettings}
           onSetPlanPaused={onSetPlanPaused}
@@ -19776,7 +19777,7 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
           weekInCycle={getWeekInfo(cycleStart, settings)?.weekInCycle ?? null}
           planPrefs={settings}
           onSavePrefs={updateSettings}
-          onOpenIA={() => { if (necesitaPremium()) { pedirPaywall("planificar_ia"); return; } setShowSelfProgression(false); setShowPlanificadorIA(true); }}
+          onOpenIA={() => { setShowSelfProgression(false); setShowPlanificadorIA(true); }}
           onSetPlanPaused={(exerciseId, paused) => onUpdateProfile({ routines: { ...(profile.routines || {}), [profile.activeRoutineId]: setExercisePlanPaused(activeRoutineDef, exerciseId, paused) } })}
           onRemovePlan={(exerciseId) => onUpdateProfile({ routines: { ...(profile.routines || {}), [profile.activeRoutineId]: removeExercisePlan(activeRoutineDef, exerciseId) } })}
           onClose={() => setShowSelfProgression(false)}
@@ -27626,11 +27627,6 @@ function ImportRoutineModal({ onImport, onEditar = null, onClose, inicial = null
   // Con la IA: el texto y las fotos que se le pasan (no los del estado, que
   // puede no estar al día todavía).
   const leerConIA = async ({ texto, fotos, nombre }) => {
-    if (fotos?.length && necesitaPremium()) {
-      setNotice("Leer fotos y PDF escaneados con la IA es de Premium. El texto, el Excel, el Word y el CSV se leen gratis.");
-      pedirPaywall("importar_ia");
-      return;
-    }
     const control = new AbortController();
     abortRef.current = control;
     setNotice(""); setEstado("ia");
