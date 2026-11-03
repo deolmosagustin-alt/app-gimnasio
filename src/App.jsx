@@ -15,7 +15,7 @@ import {
   Share2, Download, Link2, Copy, BellOff, Send, Mic, Ruler, Camera, Link, Footprints, Star, SquarePlay, Upload, RefreshCw, Timer, Percent, Users, User,
   MessageCircle, Search, UserPlus, UserCheck, UserMinus, AtSign, GraduationCap, ClipboardCheck, Swords, Medal, QrCode, ArrowUpDown,
   Minus, Ellipsis, Undo2, ArrowLeftRight, ReceiptText, ClipboardList, Minimize2, BellRing,
-  FileText, FileSpreadsheet, ClipboardPaste, ScanText, ImagePlus, Flag, Hand, Route, BookOpen,
+  FileText, FileSpreadsheet, ClipboardPaste, ScanText, ImagePlus, Flag, Hand, Route, BookOpen, Volume2,
 } from "lucide-react";
 import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signOut, onAuthStateChanged, deleteUser } from "firebase/auth";
 import { Capacitor, registerPlugin } from "@capacitor/core";
@@ -1245,7 +1245,8 @@ function cleanObsoleteOverrides(logs) {
 // guardar alguna serie individual, mientras hayas usado Inicio/Fin de sesión.
 // Racha "inteligente": cuenta días entrenados consecutivos, pero los días
 // de DESCANSO programados (sin rutina en weekSchedule) no la cortan — solo
-// la corta faltar un día que TOCABA entrenar. Sin esto, cualquier día de
+// la corta faltar un día que TOCABA entrenar (y la primera falta de cada
+// semana tiene comodín, ver abajo). Sin esto, cualquier día de
 // descanso reiniciaba la racha a cero, que era injusto y desmotivante.
 // Sin weekSchedule cae al comportamiento clásico (días seguidos).
 function computeSmartStreak(dateSet, weekSchedule) {
@@ -1259,11 +1260,18 @@ function computeSmartStreak(dateSet, weekSchedule) {
   // (el día no terminó). Después retrocedemos día por día.
   if (dateSet.has(localDateStr(cursor))) streak++;
   cursor.setDate(cursor.getDate() - 1);
+  // El comodín (03/11, como el "congelar la racha" de Duolingo, que bajó los
+  // abandonos al cortarla): faltar UN día que tocaba, una vez cada siete
+  // días, no corta la racha. El segundo en la misma semana, sí.
+  let ultimoComodin = -Infinity;
   let guard = 0;
   while (guard++ < 400) {
     const d = localDateStr(cursor);
     if (dateSet.has(d)) streak++;
-    else if (isScheduled(cursor)) break; // tocaba y no fuiste → se corta
+    else if (isScheduled(cursor)) {
+      if (guard - ultimoComodin >= 7) ultimoComodin = guard; // falta perdonada
+      else break; // tocaba y no fuiste → se corta
+    }
     // día de descanso programado: ni corta ni suma
     cursor.setDate(cursor.getDate() - 1);
   }
@@ -2476,7 +2484,9 @@ const ANIMATION_CSS = letraEscalable(`
 .skeleton {
   background: linear-gradient(90deg, rgba(37,41,46,0.6) 25%, rgba(60,65,70,0.85) 50%, rgba(37,41,46,0.6) 75%);
   background-size: 200% 100%;
-  animation: skeletonShimmer 1.4s ease-in-out infinite;
+  /* Lento, parejo y de izquierda a derecha: así la espera se siente más
+     corta que con una ruedita (estudio de Bill Chung con 80 personas, 03/11). */
+  animation: skeletonShimmer 2.2s linear infinite;
   border-radius: 0.75rem;
 }
 
@@ -2554,10 +2564,19 @@ const ANIMATION_CSS = letraEscalable(`
 .streak-jump { animation: streakJump 0.75s cubic-bezier(0.34, 1.4, 0.64, 1) 0.15s backwards; }
 
 /* Cambio de pestaña: la entrante se desliza sutilmente desde su dirección */
-@keyframes tabSlideRight { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: translateX(0); } }
-@keyframes tabSlideLeft  { from { opacity: 0; transform: translateX(-16px); } to { opacity: 1; transform: translateX(0); } }
-.tab-slide-right { animation: tabSlideRight 0.22s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
-.tab-slide-left  { animation: tabSlideLeft 0.22s cubic-bezier(0.22, 1, 0.36, 1) backwards; }
+@keyframes tabSlideRight { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes tabSlideLeft  { from { opacity: 0; transform: translateX(-28px); } to { opacity: 1; transform: translateX(0); } }
+.tab-slide-right { animation: tabSlideRight var(--dur-pantalla, .42s) var(--sale, ease-out) backwards; }
+.tab-slide-left  { animation: tabSlideLeft var(--dur-pantalla, .42s) var(--sale, ease-out) backwards; }
+/* El título grande de la pestaña se achica y se apaga mientras bajás, hasta
+   que la barra de arriba lo toma (barraCompacta): ya no pasa cortado por
+   debajo de la barra. Atado al scroll de la página, fuera del hilo principal. */
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .titulo-pagina h1 { transform-origin: left bottom; animation: tituloSeAchica linear both; animation-timeline: scroll(root); animation-range: 0 110px; }
+  }
+}
+@keyframes tituloSeAchica { to { opacity: 0; transform: translateY(-10px) scale(.82); } }
 
 /* El músculo que subió de rango late (solo brillo: escalar un polygon SVG lo
    corre de lugar porque escala desde el origen del SVG, no desde su centro) */
@@ -3266,6 +3285,17 @@ input, textarea, [contenteditable="true"] {
      responde a un toque (apretar, guardar una serie, elegir un día). */
   --resorte: linear(0, 0.006, 0.025 2.8%, 0.101 6.1%, 0.539 18.9%, 0.721 25.3%, 0.849 31.5%, 0.937 38.1%, 0.968 41.8%, 0.991 45.7%, 1.006 50.1%, 1.015 55%, 1.017 63.9%, 1.001 85.9%, 1);
   --resorte-vivo: linear(0, 0.009, 0.035 2.1%, 0.141, 0.281 6.7%, 0.723 12.9%, 0.938 16.7%, 1.017, 1.077, 1.121, 1.149 24.3%, 1.159, 1.163, 1.161, 1.154 29.9%, 1.129 32.8%, 1.051 39.6%, 1.017 43.1%, 0.991, 0.977 51%, 0.974 53.8%, 0.975 57.1%, 0.997 69.8%, 1.003 76.9%, 1.004 83.8%, 1);
+  /* EL MOVIMIENTO (03/11, el análisis estético): cuatro duraciones y una
+     curva de salida para toda la app. Lo que responde al dedo, 100 ms; abrir
+     algo chico, 240; cambiar de pantalla o transformar algo grande, 420; y un
+     momento único (el ticket, la entrada), hasta 1,1 s. Lo que entra, con
+     --sale (rápido al principio, lento al llegar); el resorte, sólo al toque.
+     NN/g: entre 100 y 500 ms; más, se vuelve pesado. */
+  --dur-toque: 100ms;
+  --dur-chico: 240ms;
+  --dur-pantalla: 420ms;
+  --dur-momento: 1100ms;
+  --sale: cubic-bezier(.16, 1, .3, 1);
   --forma-galleta: ${GALLETA_URI};
   --forma-onda: ${ONDA_URI};
 }
@@ -3354,7 +3384,7 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
   background: color-mix(in oklab, var(--c, var(--tono)) 72%, white);
   transition: border-radius .4s var(--resorte), transform .25s var(--resorte), filter .2s ease;
 }
-.boton-pildora:active { border-radius: 18px; transform: scale(.975); }
+.boton-pildora:active { border-radius: 18px; transform: scale(.95); transition-duration: .4s, var(--dur-toque), .2s; }
 .boton-pildora > svg, .boton-tonal > svg { flex: none; }
 .light-mode .boton-pildora { background: var(--c, var(--tono)); }
 
@@ -3399,9 +3429,9 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
   width: 40px; height: 40px; border-radius: 999px; flex: none;
   display: flex; align-items: center; justify-content: center;
   color: var(--text-muted); background: var(--velo); box-shadow: inset 0 0 0 1px var(--hairline);
-  transition: border-radius .35s var(--resorte), color .2s ease;
+  transition: border-radius .35s var(--resorte), color .2s ease, transform .3s var(--resorte);
 }
-.boton-redondo:active { border-radius: 14px; }
+.boton-redondo:active { border-radius: 14px; transform: scale(.92); transition-duration: .35s, .2s, var(--dur-toque); }
 
 /* ── TÍTULO DE CADA PESTAÑA ──────────────────────────────────────────────
    Una vez, grande, y sin rótulo encima: el color ya dice dónde estás. */
@@ -3870,7 +3900,9 @@ button.foco-campo-rotulo:active { background: var(--velo); }
 .foco-guardar:active { transform: scale(.92); }
 .serie-foco.va-record .foco-guardar, .foco-guardar.hecha { background: var(--record); color: #1c1505; }
 /* − y + debajo de cada número: chicos, de contorno, sin relleno. */
-.foco-ajustes-fila { display: grid; grid-template-columns: minmax(0, 1fr) 16px minmax(0, 1fr) 60px; margin-top: 8px; padding: 0 6px 0 2px; }
+.foco-ajustes-fila { display: grid; grid-template-columns: minmax(0, 1fr) 16px minmax(0, 1.35fr); margin-top: 8px; padding: 0 6px 0 2px; }
+.foco-ajustes.con-salto { gap: 4px; }
+.foco-ajustes.con-salto .foco-salto { width: 44px; display: grid; box-shadow: none; color: inherit; }
 .foco-ajustes { display: flex; justify-content: center; gap: 8px; }
 .foco-ajustes button {
   width: 46px; height: 36px; border-radius: 999px;
@@ -3892,13 +3924,14 @@ button.foco-campo-rotulo:active { background: var(--velo); }
 .ticket-papel {
   position: relative; padding: 24px 20px 22px; color: #232326; background: #f3f3ef;
   font-size: 14px; line-height: 1.35; box-shadow: 0 18px 40px -20px rgba(0,0,0,.9);
-  animation: ticketSale 1.25s cubic-bezier(.22,.9,.25,1) both;
+  /* A saltitos de un renglón, como la impresora térmica de la caja (03/11). */
+  animation: ticketSale var(--dur-momento, 1.1s) steps(11, end) both;
 }
 .ticket-papel::after {
   content: ""; position: absolute; left: 0; right: 0; bottom: -9px; height: 10px;
   background: linear-gradient(135deg, #f3f3ef 6px, transparent 0) 0 0 / 12px 12px repeat-x, linear-gradient(-135deg, #f3f3ef 6px, transparent 0) 0 0 / 12px 12px repeat-x;
 }
-@keyframes ticketSale { from { transform: translateY(-100%); } 70% { transform: translateY(2%); } }
+@keyframes ticketSale { from { transform: translateY(-100%); } to { transform: none; } }
 .ticket-marca { text-align: center; font-size: 1.5rem; font-weight: 800; font-stretch: 80%; letter-spacing: -0.01em; color: #1d1d1f; }
 .ticket-fecha { margin-top: 2px; text-align: center; font-size: 13px; color: #6b6b70; }
 .ticket-papel hr { margin: 12px 0; border: 0; border-top: 1.5px dashed #b9b9b4; }
@@ -4007,14 +4040,17 @@ button.foco-campo-rotulo:active { background: var(--velo); }
 .moleteado { stroke: rgba(0,0,0,0.38); stroke-width: 0.7; }
 .disco { stroke: rgba(0,0,0,0.55); stroke-width: 0.5; }
 .disco-filete { fill: none; stroke-width: 0.8; stroke: rgba(255,255,255,0.28); }
-.disco-fantasma { fill: none; stroke: var(--disco-fantasma); stroke-width: 0.9; }
+.disco-fantasma { fill: none; stroke: var(--disco-fantasma); stroke-width: 0.9; stroke-dasharray: 2.2 1.6; }
 .collarin { fill: color-mix(in oklab, var(--c, var(--tono)) 72%, white); transition: transform .55s var(--resorte); }
 .light-mode .collarin { fill: var(--c, var(--tono)); }
-.disco-entra { transform-box: fill-box; transform-origin: center; animation: discoEntra .7s var(--resorte-vivo) backwards; }
-@keyframes discoEntra { from { transform: translateX(var(--desde, -24px)); opacity: 0; } 30% { opacity: 1; } to { transform: none; opacity: 1; } }
+.disco-entra { transform-box: fill-box; transform-origin: center; animation: discoEntra var(--dura, .7s) var(--resorte, ease-out) backwards; }
+@keyframes discoEntra { from { transform: translateX(var(--desde, -24px)); opacity: 0; } 18% { opacity: 1; } to { transform: none; opacity: 1; } }
+/* El collarín aprieta: se angosta y vuelve, justo cuando llega el disco. */
+.collarin.cierra { transform-box: fill-box; transform-origin: center; animation: collarinCierra .32s var(--resorte, ease-out) .38s backwards; }
+@keyframes collarinCierra { 0% { transform: scaleY(1.25); } 55% { transform: scaleY(.88); } 100% { transform: none; } }
 .barra-cargada.completa .collarin { filter: drop-shadow(0 0 4px color-mix(in oklab, var(--c, var(--tono)) 55%, transparent)); }
 @media (prefers-reduced-motion: reduce) {
-  .disco-entra, .onda-llena, .serie-foco, .sesion-dock-latido, .login-galleta { animation: none !important; }
+  .disco-entra, .collarin.cierra, .onda-llena, .serie-foco, .sesion-dock-latido, .login-galleta { animation: none !important; }
   .collarin, .galleta::before { transition: none !important; }
 }
 
@@ -4186,6 +4222,12 @@ button.foco-campo-rotulo:active { background: var(--velo); }
   color: color-mix(in oklab, var(--c, var(--tono)) 18%, #07080a);
 }
 .login-barra { max-width: 340px; margin: 0 0 26px -4px; }
+/* Primero se carga la barra (los discos de a uno) y el título llega con el
+   último disco: la secuencia de la entrada termina antes de 1,2 s. */
+.login-titulo { animation: loginLlega .5s var(--sale, ease-out) .55s backwards; }
+.login-bajada { animation: loginLlega .5s var(--sale, ease-out) .7s backwards; }
+@keyframes loginLlega { from { opacity: 0; transform: translateY(10px); } }
+@media (prefers-reduced-motion: reduce) { .login-titulo, .login-bajada { animation: none; } }
 /* El cuerpo de la tarjeta de ejercicio se abre y se cierra deslizándose
    (filas de grilla de 0fr a 1fr). Cerrado deja de dibujarse
    (content-visibility), así no cuesta nada aunque siga montado; el cambio
@@ -4288,7 +4330,7 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
   background: color-mix(in oklab, var(--c, var(--tono)) 13%, transparent);
   transition: border-radius .4s var(--resorte), transform .25s var(--resorte);
 }
-.boton-tonal:active { border-radius: 16px; transform: scale(.975); }
+.boton-tonal:active { border-radius: 16px; transform: scale(.95); transition-duration: .4s, var(--dur-toque); }
 /* Un ajuste del teléfono que falta (Perfil › Descansos): el ícono ámbar, qué
    pasa y el botón para arreglarlo. */
 .aviso-ajuste { display: flex; align-items: center; gap: 12px; padding: 12px 12px 12px 14px; border-radius: 18px; background: var(--panel-sunken); }
@@ -4394,8 +4436,9 @@ number-flow-react { --number-flow-mask-height: 0.14em; --number-flow-char-height
 /* La raya de la referencia (10 series por semana, ver seriesSemanalesPorMusculo). */
 .balance-referencia { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--text-strong); opacity: .5; }
 .balance-nota { margin-top: 12px; font-size: 12px; line-height: 1.45; color: var(--text-faint); text-wrap: pretty; }
-.balance-pista i { display: block; height: 100%; border-radius: 5px; background: color-mix(in oklab, var(--c) 60%, #8a8c92); }
-.light-mode .balance-pista i { background: color-mix(in oklab, var(--c) 70%, #a7a9ae); }
+.balance-pista i { display: block; height: 100%; border-radius: 5px; background: color-mix(in oklab, var(--c, var(--tono)) 72%, white); }
+.light-mode .balance-pista i { background: var(--c, var(--tono)); }
+.balance-fila.abajo .balance-pista i { background: color-mix(in oklab, var(--text-strong) 32%, transparent); }
 .balance-n { font-size: 15px; font-weight: 700; text-align: right; color: var(--text-strong); }
 /* LA GUÍA (?): una placa con las pestañas arriba, un escenario con el
    dibujo de cada paso, la frase y los puntos del avance. */
@@ -4550,6 +4593,11 @@ button.carrera-carril:active { background: var(--velo); }
 /* Cada sesión, un tramo en el tono de Social: con seis carriles, los
    colores de cada día eran demasiados. */
 .carrera-pista i.hecho { background: color-mix(in oklab, var(--tono) 55%, #8a8c92); }
+/* La primera vez del día, los tramos se llenan en orden, del primero al
+   último: se ve quién va ganando antes de leer los números (03/11). */
+.carrera.llena .carrera-pista i.hecho { transform-origin: left; animation: tramoLlena .38s var(--sale, ease-out) backwards; animation-delay: calc(var(--orden, 0) * 55ms + 120ms); }
+@keyframes tramoLlena { from { transform: scaleX(0); } }
+@media (prefers-reduced-motion: reduce) { .carrera.llena .carrera-pista i.hecho { animation: none; } }
 .light-mode .carrera-pista i.hecho { background: color-mix(in oklab, var(--tono) 65%, #a7a9ae); }
 .carrera-n { font-size: 1.25rem; font-weight: 700; text-align: right; color: var(--text-strong); }
 
@@ -4562,8 +4610,11 @@ button.carrera-carril:active { background: var(--velo); }
 .light-mode .marcas.viva { color: color-mix(in oklab, var(--tono) 72%, black); }
 /* Tu semana en el carnet: cada día que entrenaste, con el color del día que
    hiciste (apagado, como todo relleno de día). Ahí el día es el dato. */
-.carnet .semana-hueco.picado { background: color-mix(in oklab, var(--dia, var(--tono)) 62%, #8a8c92); }
-.light-mode .carnet .semana-hueco.picado { background: color-mix(in oklab, var(--dia, var(--tono)) 72%, #a7a9ae); }
+/* Los días entrenados del carnet, picados como la tarjeta del gimnasio: el
+   agujero deja ver la placa de abajo, sin el color del día (03/11: eran
+   puntitos de color sueltos, que se pidió sacar dos veces). */
+.carnet .semana-hueco.picado { background: color-mix(in oklab, var(--text-strong) 78%, transparent); box-shadow: inset 0 2px 3px rgba(0,0,0,.35); }
+.light-mode .carnet .semana-hueco.picado { background: color-mix(in oklab, var(--text-strong) 70%, transparent); }
 .escalera-enlace { justify-self: start; margin-top: 10px; }
 @keyframes escalonSube { from { transform: scaleY(0.2); transform-origin: bottom; opacity: 0; } to { transform: none; opacity: 1; } }
 
@@ -4613,15 +4664,19 @@ button.carrera-carril:active { background: var(--velo); }
 .grafica-tiempo .grafica-globo.izq { --gx: -16px; }
 .grafica-tiempo .grafica-globo.der { --gx: calc(-100% + 16px); }
 .grafica-tiempo .grafica-globo.abajo { --gy: 16px; }
-@media (prefers-reduced-motion: reduce) { .grafica-linea, .grafica-relleno { animation: none; } }
+/* El último punto (y el récord) aparece cuando la línea termina de dibujarse. */
+.grafica-ultimo, .grafica-record { transform-box: fill-box; transform-origin: center; animation: graficaPunto .32s var(--resorte, ease-out) .82s backwards; }
+@keyframes graficaPunto { from { transform: scale(0); } }
+@media (prefers-reduced-motion: reduce) { .grafica-linea, .grafica-relleno, .grafica-ultimo, .grafica-record { animation: none; } }
 /* Las métricas de la evolución, como pestañas: cada una dice su último valor
-   y cuánto cambió en el período. La elegida es la que dibuja la gráfica y
-   lleva arriba una rayita del color de la línea, como una leyenda. */
+   y cuánto cambió en el período. La elegida es la que dibuja la gráfica. */
 .evo-metricas { display: grid; grid-template-columns: repeat(var(--n, 3), minmax(0, 1fr)); gap: 4px; padding: 4px; border-radius: 20px; background: var(--surface-2); }
 .evo-metrica { position: relative; display: grid; gap: 2px; min-width: 0; padding: 10px 10px 9px; border-radius: 16px; text-align: left; color: var(--text-muted); transition: background-color .2s ease, box-shadow .2s ease; }
-.evo-metrica[aria-selected="true"] { background: var(--surface-1); box-shadow: var(--placa-canto); }
-.evo-metrica[aria-selected="true"]::before { content: ""; position: absolute; left: 10px; top: 0; width: 20px; height: 2.5px; border-radius: 0 0 3px 3px; background: color-mix(in oklab, var(--c, var(--tono)) 80%, white); }
-.light-mode .evo-metrica[aria-selected="true"]::before { background: var(--c, var(--tono)); }
+/* La elegida, tonal en el color de la línea (03/11: llevaba arriba una
+   rayita de color, el filete que se sacó de las tarjetas). */
+.evo-metrica[aria-selected="true"] { background: color-mix(in oklab, var(--c, var(--tono)) 13%, var(--surface-1)); box-shadow: var(--placa-canto); }
+.evo-metrica[aria-selected="true"] .evo-metrica-nombre { color: color-mix(in oklab, var(--c, var(--tono)) 72%, white); }
+.light-mode .evo-metrica[aria-selected="true"] .evo-metrica-nombre { color: color-mix(in oklab, var(--c, var(--tono)) 70%, black); }
 .evo-metrica-nombre { font-size: 12px; font-weight: 600; }
 .evo-metrica-valor { display: flex; align-items: baseline; gap: 3px; min-width: 0; color: var(--text-strong); }
 .evo-metrica-valor b { font-size: 1.3rem; line-height: 1.05; font-weight: 750; }
@@ -4670,6 +4725,12 @@ button.carrera-carril:active { background: var(--velo); }
 }
 .hueco-dia.picado[style*="--dia2"] { background: linear-gradient(135deg, color-mix(in oklab, var(--dia) 82%, white) 50%, color-mix(in oklab, var(--dia2) 82%, white) 50%); }
 .light-mode .hueco-dia.picado { background: var(--dia); }
+/* En el calendario de Historial, los días hechos van apagados con gris (el
+   color de un día como relleno grande, la regla de Grafito) y entero sólo el
+   que mirás: era la pantalla con más color de Progreso (03/11). */
+.tarjeta-perforada .hueco-dia.picado:not(.elegido) { color: var(--text-strong); background: color-mix(in oklab, var(--dia) 60%, #8a8c92); }
+.tarjeta-perforada .hueco-dia.picado:not(.elegido)[style*="--dia2"] { background: linear-gradient(135deg, color-mix(in oklab, var(--dia) 60%, #8a8c92) 50%, color-mix(in oklab, var(--dia2) 60%, #8a8c92) 50%); }
+.light-mode .tarjeta-perforada .hueco-dia.picado:not(.elegido) { color: var(--tinta-oscura); background: color-mix(in oklab, var(--dia) 70%, #a7a9ae); }
 .hueco-dia.picado:active { transform: scale(.9); }
 .hueco-dia.hoy { outline: 2px solid color-mix(in oklab, var(--text-strong) 55%, transparent); outline-offset: 2px; }
 .hueco-dia.elegido { outline: 2.5px solid var(--text-strong); outline-offset: 2px; }
@@ -5872,7 +5933,7 @@ label.ajuste-rotulo { display: block; }
 /* MODO GIMNASIO: en la sesión, los números de la serie y sus − y + más
    grandes, para leerlos y tocarlos con el teléfono apoyado en el banco. */
 .modo-gimnasio .foco-input { height: 82px; font-size: 4.3rem; }
-.modo-gimnasio .foco-visor, .modo-gimnasio .foco-ajustes-fila { grid-template-columns: minmax(0, 1fr) 16px minmax(0, 1fr) 70px; }
+.modo-gimnasio .foco-visor { grid-template-columns: minmax(0, 1fr) 16px minmax(0, 1fr) 70px; }
 .modo-gimnasio .foco-guardar { width: 66px; height: 66px; }
 .modo-gimnasio .foco-ajustes button { width: 56px; height: 48px; }
 /* UN TONO POR PESTAÑA: el interruptor prendido, en el color de la pestaña
@@ -6014,6 +6075,10 @@ label.ajuste-rotulo { display: block; }
 
 /* LA CAMPANA */
 .campana-record { pointer-events: none; z-index: 300; }
+.magnesio { position: absolute; width: 0; height: 0; transform: translateY(-46px); }
+.magnesio i { position: absolute; left: 0; top: 0; width: var(--t); height: var(--t); margin: calc(var(--t) / -2) 0 0 calc(var(--t) / -2); border-radius: 999px; background: rgba(244, 243, 238, .7); filter: blur(2.5px); opacity: 0; animation: magnesioSale .75s var(--sale, ease-out) backwards; }
+@keyframes magnesioSale { 0% { opacity: .9; transform: rotate(var(--a)) translateX(4px) scale(.5); } 100% { opacity: 0; transform: rotate(var(--a)) translateX(var(--d)) scale(1.6); } }
+@media (prefers-reduced-motion: reduce) { .magnesio { display: none; } }
 .campana-record-pieza { position: absolute; width: 64px; height: 80px; transform: translate(-50%, calc(-100% - 8px)); animation: campanaAparece 1.8s ease both; }
 @keyframes campanaAparece {
   0% { opacity: 0; transform: translate(-50%, calc(-100% + 6px)) scale(.6); }
@@ -6175,6 +6240,30 @@ label.ajuste-rotulo { display: block; }
 .medalla-grabado.numero.chica { font-size: 40px; }
 .resumen-medalla { width: 112px; margin: -4px auto 6px; transform-origin: 50% 0; animation: medallaCuelga 1.1s cubic-bezier(.3,1.4,.5,1) .15s both; }
 @keyframes medallaCuelga { 0% { opacity: 0; transform: translateY(-24px) rotate(-10deg); } 40% { opacity: 1; transform: translateY(0) rotate(6deg); } 70% { transform: rotate(-3deg); } 100% { transform: none; } }
+/* Tu mes en historias: pantalla entera, las barritas de arriba como las de
+   las historias de Instagram, y cada pantalla con su fondo de grafito teñido. */
+.historias { position: fixed; inset: 0; z-index: 160; display: flex; flex-direction: column; color: #f3f3ef; background: radial-gradient(120% 70% at 50% 20%, color-mix(in oklab, var(--fondo) 100%, white 6%), #0b0c0e 75%); transition: background .5s ease; padding: calc(env(safe-area-inset-top, 0px) + 12px) 16px calc(env(safe-area-inset-bottom, 0px) + 18px); }
+.historias-barras { display: flex; gap: 4px; }
+.historias-barras span { flex: 1; height: 3px; border-radius: 2px; background: rgba(255,255,255,.22); overflow: hidden; position: relative; }
+.historias-barras span::after { content: ""; position: absolute; inset: 0; background: #f3f3ef; transform-origin: left; transform: scaleX(0); }
+.historias-barras span.llena::after { transform: none; }
+.historias-barras span.corre::after { animation: historiaCorre linear forwards; animation-duration: inherit; }
+.historias-barras span.corre.pausa::after { animation-play-state: paused; }
+@keyframes historiaCorre { to { transform: none; } }
+.historias-cerrar { align-self: flex-end; margin-top: 10px; width: 44px; height: 44px; display: grid; place-items: center; border-radius: 999px; color: #f3f3ef; background: rgba(255,255,255,.08); }
+.historias-escena { flex: 1; display: flex; align-items: center; justify-content: center; user-select: none; -webkit-user-select: none; }
+.historia { width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 10px; animation: historiaEntra var(--dur-pantalla, .42s) var(--sale, ease-out) both; }
+@keyframes historiaEntra { from { opacity: 0; transform: translateY(14px); } }
+.historia-ceja { font-size: 15px; font-weight: 650; color: rgba(243,243,239,.72); }
+.historia-numero { font-size: 6rem; line-height: .9; font-weight: 800; font-stretch: 75%; letter-spacing: -0.03em; }
+.historia-numero.chico { font-size: 3.2rem; line-height: 1; }
+.historia-numero small { font-size: .35em; font-weight: 650; letter-spacing: 0; color: rgba(243,243,239,.7); }
+.historia-texto { font-size: 18px; line-height: 1.4; color: rgba(243,243,239,.86); max-width: 32ch; text-wrap: pretty; }
+.historia-tiza { margin-top: 18px; color: #ecebe4; }
+.historia-campana { width: 84px; margin: 4px 0; }
+.historia-medalla { display: flex; justify-content: center; margin: 8px 0; transform: scale(1.4); transform-origin: center top; height: 160px; }
+.historias-pie { padding-top: 12px; }
+@media (prefers-reduced-motion: reduce) { .historia { animation: none; } .historias-barras span.corre::after { animation: none; transform: none; } }
 .vitrina { padding: 16px; }
 .vitrina-cabeza { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 2px 10px; margin-bottom: 12px; }
 .vitrina-cabeza > span { font-size: 13px; color: var(--text-muted); text-align: right; }
@@ -6187,7 +6276,8 @@ label.ajuste-rotulo { display: block; }
 .vitrina-lugar .medalla { width: 46px; margin-top: -4px; transform-origin: 50% 0; transition: transform .45s var(--resorte); }
 .vitrina-lugar.con-medalla:active .medalla { transform: rotate(-7deg); }
 .vitrina-hueco { width: 30px; height: 30px; margin: 26px 0 6px; border-radius: 999px; border: 1.5px dashed var(--hairline-fuerte); display: grid; place-items: center; font-size: 14px; color: var(--text-strong); }
-.vitrina-lugar.en-curso .vitrina-hueco { border-color: color-mix(in oklab, var(--tono) 60%, transparent); }
+.vitrina-lugar.en-curso .vitrina-hueco { position: relative; border-color: color-mix(in oklab, var(--tono) 35%, transparent); }
+.vitrina-lugar.en-curso .vitrina-hueco::before { content: ""; position: absolute; inset: -3px; border-radius: 999px; background: conic-gradient(color-mix(in oklab, var(--tono) 72%, white) calc(var(--avance, 0) * 360deg), transparent 0); -webkit-mask: radial-gradient(circle, transparent 15.5px, #000 16px); mask: radial-gradient(circle, transparent 15.5px, #000 16px); }
 .vitrina-mes { margin-top: 2px; font-size: 12px; font-weight: 600; color: var(--text-muted); white-space: nowrap; }
 .vitrina-lugar.vacio .vitrina-mes { color: var(--text-faint); }
 .vitrina-mas { display: flex; margin: 8px auto -6px; }
@@ -6514,7 +6604,14 @@ textarea.import-texto { min-height: 150px; font-size: 14px; line-height: 1.45; r
 .estante-lugar .pesa-rusa { width: 100%; max-width: 40px; margin-bottom: -1px; }
 .estante-dia { position: relative; z-index: 1; display: block; width: 100%; height: 26px; line-height: 26px; text-align: center; font-size: 12px; font-weight: 650; color: var(--text-muted); }
 .estante-lugar.hoy .estante-dia { color: var(--text-strong); font-weight: 750; text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 4px; }
-.pesa-rusa { display: block; height: auto; overflow: visible; transition: scale .2s ease; }
+.pesa-rusa { display: block; height: auto; overflow: visible; transition: scale .2s ease; transform-origin: 50% 8%; }
+/* Al tocarla se balancea desde la manija, como cuando la agarrás; la de hoy
+   se levanta del estante al abrir la pantalla (03/11). */
+.estante-lugar.con-pesa:active .pesa-rusa { animation: pesaSeBalancea .5s var(--resorte, ease-out); }
+@keyframes pesaSeBalancea { 0% { rotate: 0deg; } 30% { rotate: -9deg; } 65% { rotate: 6deg; } 100% { rotate: 0deg; } }
+.estante-lugar.hoy .pesa-rusa { animation: pesaSeLevanta .55s var(--resorte, ease-out) .25s backwards; }
+@keyframes pesaSeLevanta { from { translate: 0 8px; } }
+@media (prefers-reduced-motion: reduce) { .estante-lugar .pesa-rusa { animation: none !important; } }
 .pesa-rusa-goma { stroke: rgba(0,0,0,.42); stroke-width: .7; }
 .hierro-claro { stop-color: #8d9096; }
 .hierro-medio { stop-color: #55585e; }
@@ -6574,7 +6671,11 @@ button.estante-lugar:active .pesa-rusa { scale: .92; }
 .cajon.futura .cajon-agarre { background: none; box-shadow: inset 0 0 0 1.3px var(--tiza-suave); }
 .cajon.futura .cajon-numero { margin-bottom: 2px; padding: 0; font-family: 'Caveat Variable', 'Caveat', 'Segoe Print', cursive; font-size: 17px; font-weight: 600; font-stretch: normal; line-height: 1; color: rgba(236,235,228,.78); background: none; box-shadow: none; }
 @keyframes cajonSube { from { transform: scaleY(.2); opacity: 0; } }
-.cajon.sube { transform-origin: bottom; animation: cajonSube .55s cubic-bezier(.34,1.4,.64,1) backwards; }
+.cajon.sube { transform-origin: bottom; animation: cajonSube .5s var(--sale, ease-out) backwards; }
+/* El de esta semana se asienta con el resorte, y la tiza de arriba se traza
+   después de que suben todos. */
+.cajon.actual.sube { animation: cajonSube .62s var(--resorte, ease-out) backwards; }
+.cajones-pizarra:has(.cajon.sube) .cajon-tiza .marcas { animation: tizaAparece .35s var(--sale, ease-out) .7s backwards; }
 /* Arriba de los cajones: "6/8" y, al costado, las sesiones de esta semana. */
 .ciclo-cajones .escalera-cabeza { align-items: flex-end; }
 .ciclo-rotulo { font-size: 13px; font-weight: 600; color: var(--text-muted); }
@@ -6653,6 +6754,14 @@ button.estante-lugar:active .pesa-rusa { scale: .92; }
 .pizarra-ia .ia-mas { margin-top: 12px; gap: 8px; }
 .pizarra-ia .chip-accion, .light-mode .pizarra-ia .chip-accion { height: 36px; padding: 0 12px 0 10px; color: var(--tiza); background: none; box-shadow: inset 0 0 0 1.5px rgba(236,235,228,.38); font-family: 'Caveat Variable', 'Caveat', 'Segoe Print', cursive; font-size: 19px; font-weight: 600; }
 .pizarra-ia .chip-accion svg, .light-mode .pizarra-ia .chip-accion svg { color: var(--tiza-suave); }
+/* La tiza escribe el saludo y la pregunta de izquierda a derecha, la primera
+   vez del día; la bajada y las notas llegan después. */
+.pizarra-ia.escribe .pizarra-ia-saludo { animation: tizaEscribe .6s steps(14, end) .15s both; }
+.pizarra-ia.escribe .pizarra-ia-pregunta { animation: tizaEscribe .9s steps(22, end) .7s both; }
+.pizarra-ia.escribe .pizarra-ia-bajada { animation: tizaAparece .4s var(--sale) 1.55s both; }
+@keyframes tizaEscribe { from { clip-path: inset(-10% 100% -10% 0); } to { clip-path: inset(-10% 0 -10% 0); } }
+@keyframes tizaAparece { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .pizarra-ia.escribe * { animation: none !important; } }
 .pizarra-ia-bandeja { position: absolute; left: 7px; right: 7px; bottom: 7px; height: 11px; border-radius: 0 0 8px 8px; background: linear-gradient(#6d5a45, #4b3d2f); box-shadow: 0 -1px 0 rgba(0,0,0,.4); }
 .pizarra-ia-bandeja .tiza { position: absolute; left: 18%; top: -4px; width: 26px; height: 6px; border-radius: 3px; background: #f1efe7; rotate: -5deg; }
 .pizarra-ia-bandeja .borrador { position: absolute; right: 15%; top: -9px; width: 40px; height: 12px; border-radius: 3px; background: linear-gradient(#3d4148 0 58%, #cfcfca 58%); }
@@ -6765,6 +6874,13 @@ function CampanaDibujo({ quieta = false }) {
     </svg>
   );
 }
+// Las motas de magnesio: hacia dónde salen, cuánto viajan, de qué tamaño y
+// cuándo arrancan. Fijas, para que el récord se vea igual cada vez.
+const MAGNESIO = [
+  { a: -150, d: 34, t: 9, r: 0 }, { a: -115, d: 44, t: 12, r: 40 }, { a: -80, d: 38, t: 8, r: 20 },
+  { a: -40, d: 46, t: 11, r: 60 }, { a: -10, d: 30, t: 7, r: 30 }, { a: 200, d: 30, t: 7, r: 50 },
+  { a: 165, d: 40, t: 10, r: 10 }, { a: -60, d: 56, t: 6, r: 90 },
+];
 // `campana`: dónde sonó ({ n, x, y }: arriba del ✓). Se monta con key={n}
 // en cada récord y se va sola.
 function CampanaRecord({ campana }) {
@@ -6779,6 +6895,11 @@ function CampanaRecord({ campana }) {
       <div className="campana-record-pieza" style={{ left: campana.x, top: campana.y }}>
         <CampanaDibujo />
       </div>
+      {/* El magnesio de las manos: una nube corta que se disipa, sólo en un
+          récord del ejercicio (03/11: en vez de confeti, que cansa). */}
+      <span className="magnesio" style={{ left: campana.x, top: campana.y }}>
+        {MAGNESIO.map((m, i) => <i key={i} style={{ "--a": `${m.a}deg`, "--d": `${m.d}px`, "--t": `${m.t}px`, animationDelay: `${m.r}ms` }} />)}
+      </span>
     </div>,
     document.body,
   );
@@ -9350,6 +9471,53 @@ function leerVersionDescansos() { return VERSION_DESCANSOS; }
 // través de VigilanteDescansos y lo usan los avisos que se programan en el
 // sistema al arrancar cada descanso.
 let ALERTA_DESCANSO = "sound";
+// LOS SONIDOS DEL GIMNASIO (03/11, el análisis estético): el "clac" del disco
+// contra el collarín al guardar una serie y la impresora del ticket. Muy
+// cortos y apagados de fábrica (Perfil › Descansos › Sonidos del gimnasio).
+let SONIDOS_GIMNASIO = false;
+// Un golpe corto de ruido filtrado: goma contra acero.
+function sonarDisco() {
+  if (!SONIDOS_GIMNASIO) return;
+  const a = obtenerAudioContext();
+  if (!a) return;
+  try {
+    if (a.state === "suspended") a.resume().catch(() => {});
+    const t = a.currentTime + 0.02;
+    const largo = Math.floor(a.sampleRate * 0.09);
+    const buf = a.createBuffer(1, largo, a.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let k = 0; k < largo; k++) d[k] = (Math.random() * 2 - 1) * Math.pow(1 - k / largo, 3);
+    const ruido = a.createBufferSource();
+    ruido.buffer = buf;
+    const filtro = a.createBiquadFilter();
+    filtro.type = "bandpass"; filtro.frequency.value = 1400; filtro.Q.value = 1.4;
+    const g = a.createGain();
+    g.gain.value = 0.22;
+    ruido.connect(filtro); filtro.connect(g); g.connect(a.destination);
+    ruido.start(t);
+  } catch { /* sin sonido */ }
+}
+// La impresora térmica: un tic por renglón, al ritmo del ticket que sale.
+function sonarImpresora(renglones = 11, dura = 1.1) {
+  if (!SONIDOS_GIMNASIO) return;
+  const a = obtenerAudioContext();
+  if (!a) return;
+  try {
+    if (a.state === "suspended") a.resume().catch(() => {});
+    const t0 = a.currentTime + 0.05;
+    for (let k = 0; k < renglones; k++) {
+      const o = a.createOscillator();
+      const g = a.createGain();
+      const t = t0 + (k * dura) / renglones;
+      o.type = "square"; o.frequency.value = 180 + (k % 2) * 40;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.03, t + 0.004);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.04);
+      o.connect(g); g.connect(a.destination);
+      o.start(t); o.stop(t + 0.05);
+    }
+  } catch { /* sin sonido */ }
+}
 
 // "2:47" y no "02:47": el cero de adelante no dice nada y le resta tamaño
 // al número que importa.
@@ -9825,8 +9993,9 @@ async function avisarFinDeDescanso(timerId, { alertType = "sound" } = {}) {
 // El cronómetro de una tarjeta sólo existe mientras esa tarjeta está
 // abierta. Esto corre siempre, mire la pantalla que mire: dispara el aviso
 // al llegar a cero y limpia las entradas viejas del registro.
-function VigilanteDescansos({ alertType = "sound" }) {
+function VigilanteDescansos({ alertType = "sound", sonidos = false }) {
   useEffect(() => { ALERTA_DESCANSO = alertType; }, [alertType]);
+  useEffect(() => { SONIDOS_GIMNASIO = sonidos; }, [sonidos]);
   useEffect(() => {
     const id = setInterval(() => {
       const ahora = Date.now();
@@ -9838,7 +10007,18 @@ function VigilanteDescansos({ alertType = "sound" }) {
           if (v.inicio && ahora - v.inicio > 3 * 3600 * 1000) { delete ACTIVE_REST_TIMERS[tid]; cambio = true; }
           return;
         }
-        if (!v.endTime || v.endTime > ahora) return;
+        // Los últimos tres segundos, una vibración cortita por segundo, para
+        // sentirlo en el bolsillo sin mirar (03/11). Sólo con la app a la
+        // vista y si el aviso no es sólo sonido.
+        if (v.endTime && v.endTime > ahora) {
+          const faltan = Math.ceil((v.endTime - ahora) / 1000);
+          if (faltan <= 3 && faltan >= 1 && v.ultimoTic !== faltan) {
+            v.ultimoTic = faltan;
+            if (ALERTA_DESCANSO !== "sound" && document.visibilityState === "visible") haptic(12);
+          }
+          return;
+        }
+        if (!v.endTime) return;
         // Al llegar a cero avisa una vez (si terminó hace rato con la app
         // cerrada, avisarFinDeDescanso no suena: ya avisó el sistema).
         if (!v.avisado) { avisarFinDeDescanso(tid, { alertType: ALERTA_DESCANSO }); return; }
@@ -10595,6 +10775,8 @@ function SessionSummaryModal({ resumen, onClose }) {
   useAndroidBack(onClose);
   const unit = useWeightUnit();
   const [compartir, setCompartir] = useState(false);
+  // La impresora suena mientras sale el ticket (si los sonidos están prendidos).
+  useEffect(() => { sonarImpresora(); }, []);
   if (!resumen) return null;
   const u = weightLabel(unit);
   const lineas = resumen.lineas || [];
@@ -11037,6 +11219,7 @@ function MedallaMes({ prefijo = null, numero = 0, chica = false }) {
 // alguna medalla (antes eran siempre dos filas, casi todas de ganchos vacíos).
 function VitrinaMedallas({ logs, trainingSessions }) {
   const [abierto, setAbierto] = useState(null);
+  const [resumenEntero, setResumenEntero] = useState(false);
   const [elAnio, setElAnio] = useState(false);
   const meses = useMemo(() => {
     const idx = buildSessionsIndex(logs || {}, trainingSessions || []);
@@ -11060,13 +11243,15 @@ function VitrinaMedallas({ logs, trainingSessions }) {
       </div>
       <div className="vitrina-estante">
         {colgados.map((x) => (!x.enCurso && x.dias > 0 ? (
-          <button key={x.prefijo} onClick={() => setAbierto(x.prefijo)} className="vitrina-lugar con-medalla" aria-label={`${capitalizar(NOMBRES_MES[x.mes])} de ${x.anio}: ${x.dias} ${x.dias === 1 ? "día" : "días"}. Ver el resumen`}>
+          <button key={x.prefijo} onClick={() => { setResumenEntero(false); setAbierto(x.prefijo); }} className="vitrina-lugar con-medalla" aria-label={`${capitalizar(NOMBRES_MES[x.mes])} de ${x.anio}: ${x.dias} ${x.dias === 1 ? "día" : "días"}. Ver el resumen`}>
             <span className="vitrina-clavo" aria-hidden="true" />
             <MedallaMes chica numero={x.dias} />
             <span className="vitrina-mes">{MESES_CORTOS[x.mes]}</span>
           </button>
         ) : (
-          <div key={x.prefijo} className={`vitrina-lugar ${x.enCurso ? "en-curso" : "vacio"}`}>
+          // La de este mes, una medalla en construcción: el aro se llena con
+          // los días que vas (12 al mes llenan el aro; 03/11).
+          <div key={x.prefijo} className={`vitrina-lugar ${x.enCurso ? "en-curso" : "vacio"}`} style={x.enCurso ? { "--avance": Math.min(1, x.dias / 12) } : undefined}>
             <span className="vitrina-clavo" aria-hidden="true" />
             <span className="vitrina-hueco" aria-hidden="true">{x.enCurso && x.dias > 0 ? <b className="num-display">{x.dias}</b> : null}</span>
             <span className="vitrina-mes">{x.enCurso ? "Este mes" : MESES_CORTOS[x.mes]}</span>
@@ -11078,8 +11263,91 @@ function VitrinaMedallas({ logs, trainingSessions }) {
           {elAnio ? "Ver los últimos seis meses" : "Ver el año entero"}
         </button>
       )}
-      {datosAbierto && <WeeklyRecapModal data={datosAbierto} periodo="mes" etiqueta={etiquetaPeriodo(abierto)} onClose={() => setAbierto(null)} />}
+      {datosAbierto && !resumenEntero && <HistoriasDelMes data={datosAbierto} prefijo={abierto} onClose={() => setAbierto(null)} onResumen={() => setResumenEntero(true)} />}
+      {datosAbierto && resumenEntero && <WeeklyRecapModal data={datosAbierto} periodo="mes" etiqueta={etiquetaPeriodo(abierto)} onClose={() => { setAbierto(null); setResumenEntero(false); }} />}
     </section>
+  );
+}
+
+// TU MES EN EL GIMNASIO, EN HISTORIAS (03/11, el análisis estético: como el
+// Wrapped de Spotify o el Year in Sport de Strava). Cinco pantallas que
+// pasan solas, con las piezas de la app: los días en tiza, el récord con su
+// campana, cuánto levantaste, el músculo que más trabajaste y la medalla. Se
+// toca a la derecha para seguir, a la izquierda para volver, y apretando se
+// pausa. Al final, el resumen completo de siempre.
+const DURA_HISTORIA = 4500;
+function HistoriasDelMes({ data, prefijo, onClose, onResumen }) {
+  useAndroidBack(onClose);
+  const [i, setI] = useState(0);
+  const [pausa, setPausa] = useState(false);
+  const [, mes] = String(prefijo).split("-").map(Number);
+  const nombreMes = capitalizar(NOMBRES_MES[(mes || 1) - 1]);
+  const marca = data?.marcas?.[0] || null;
+  const pantallas = [
+    { k: "dias", fondo: "#1d2b28" },
+    ...(marca ? [{ k: "record", fondo: "#2d2617" }] : []),
+    { k: "kilos", fondo: "#1c2233" },
+    ...(data?.topMusculo ? [{ k: "musculo", fondo: "#2a1f2e" }] : []),
+    { k: "medalla", fondo: "#24201a" },
+  ];
+  const ultima = i === pantallas.length - 1;
+  useEffect(() => {
+    if (pausa || ultima) return undefined;
+    const t = setTimeout(() => setI((n) => Math.min(n + 1, pantallas.length - 1)), DURA_HISTORIA);
+    return () => clearTimeout(t);
+  }, [i, pausa, ultima, pantallas.length]);
+  if (!data || typeof document === "undefined") return null;
+  const tocar = (e) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    if (e.clientX - r.left < r.width * 0.3) setI((n) => Math.max(0, n - 1));
+    else if (!ultima) setI((n) => n + 1);
+  };
+  const p = pantallas[i];
+  const kilos = Math.round(data.volumen || 0);
+  return createPortal(
+    <div className="historias" role="dialog" aria-modal="true" aria-label={`Tu ${nombreMes.toLowerCase()} en el gimnasio`} style={{ "--fondo": p.fondo }}>
+      <div className="historias-barras" aria-hidden="true">
+        {pantallas.map((x, k) => <span key={x.k} className={k < i ? "llena" : k === i ? (pausa ? "corre pausa" : "corre") : ""} style={k === i ? { animationDuration: `${DURA_HISTORIA}ms` } : undefined} />)}
+      </div>
+      <button onClick={onClose} aria-label="Cerrar" className="historias-cerrar"><X size={20} /></button>
+      <div className="historias-escena" onClick={tocar} onPointerDown={() => setPausa(true)} onPointerUp={() => setPausa(false)} onPointerLeave={() => setPausa(false)}>
+        <div key={p.k} className="historia">
+          {p.k === "dias" && (<>
+            <p className="historia-ceja">Tu {nombreMes.toLowerCase()} en el gimnasio</p>
+            <p className="historia-numero num-display">{data.dias}</p>
+            <p className="historia-texto">{data.dias === 1 ? "día entrenado" : "días entrenados"}{data.diasAnterior ? `, ${data.dias >= data.diasAnterior ? `${data.dias - data.diasAnterior} más` : `${data.diasAnterior - data.dias} menos`} que el mes anterior` : ""}.</p>
+            <div className="historia-tiza"><MarcasTiza dias={data.dias} max={30} alto={28} decorativa /></div>
+          </>)}
+          {p.k === "record" && (<>
+            <p className="historia-ceja">Tu mejor marca</p>
+            <div className="historia-campana"><CampanaDibujo /></div>
+            <p className="historia-numero chico num-display">{marca.reps} × {conComa(marca.kg)} <small>kg</small></p>
+            <p className="historia-texto">{marca.exercise}{data.records > 1 ? `, y ${data.records - 1} ${data.records === 2 ? "récord más" : "récords más"}` : ""}.</p>
+          </>)}
+          {p.k === "kilos" && (<>
+            <p className="historia-ceja">Levantaste en total</p>
+            <p className="historia-numero num-display">{numeroAR(kilos, 0)} <small>kg</small></p>
+            <p className="historia-texto">En {data.series} series{data.minutos ? ` y ${Math.round(data.minutos / 60)} h de entrenamiento` : ""}{data.vsAnterior != null ? `: ${data.vsAnterior >= 0 ? `${data.vsAnterior} % más` : `${-data.vsAnterior} % menos`} que el mes anterior` : ""}.</p>
+          </>)}
+          {p.k === "musculo" && (<>
+            <p className="historia-ceja">Lo que más trabajaste</p>
+            <p className="historia-numero chico">{data.topMusculo.nombre}</p>
+            <p className="historia-texto">El {data.topMusculo.pct} % de tus series.{data.estrella ? ` Tu ejercicio del mes: ${data.estrella.nombre}, ${data.estrella.dias} ${data.estrella.dias === 1 ? "día" : "días"}.` : ""}</p>
+          </>)}
+          {p.k === "medalla" && (<>
+            <p className="historia-ceja">Tu medalla de {nombreMes.toLowerCase()}</p>
+            <div className="historia-medalla"><MedallaMes prefijo={prefijo} numero={data.dias} /></div>
+            <p className="historia-texto">Queda colgada en tu vitrina de Perfil.</p>
+          </>)}
+        </div>
+      </div>
+      {ultima && (
+        <div className="historias-pie">
+          <button onClick={onResumen} className="boton-pildora w-full">Ver el resumen completo</button>
+        </div>
+      )}
+    </div>,
+    document.body
   );
 }
 
@@ -12374,6 +12642,7 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
     // La campana y la imagen para compartir son para el récord del ejercicio.
     const esCelebracion = fb.type === "pr";
     haptic(esCelebracion ? [35, 25, 45] : 18);
+    sonarDisco();
     if (esCelebracion) tocarCampana();
     setFeedback({ type: fb.type, msg: fb.msg, suggestUp, noSession });
     if (esCelebracion && autoShowPrShare && compartirAutoHoy()) setTimeout(() => setShowPRShare(true), 1500);
@@ -12792,16 +13061,17 @@ function SetRow({ exerciseId, exerciseName, exerciseMuscle, setIndex, setDef, ac
             <button onClick={() => ajustar("reps", 1)} aria-label="Sumar una repetición"><Plus size={17} /></button>
           </div>
           <span aria-hidden="true" />
-          <div className="foco-ajustes">
+          {/* De a cuánto sube el peso, entre el − y el + del peso: se lee
+              "− 2,5 +", que es lo que hacen (03/11: quedaba suelto abajo del ✓). */}
+          <div className="foco-ajustes con-salto">
             <button onClick={() => ajustar("kg", -pasoKg)} aria-label={`Restar ${conComa(pasoKg)} ${u}`}><Minus size={17} /></button>
+            {onUpdateSettings && (
+              <button onClick={() => setVerSaltos((v) => !v)} aria-expanded={verSaltos} aria-label={`El peso sube de a ${conComa(pasoKg)} ${u}. Cambiarlo`} className={`foco-salto ${verSaltos ? "abierto" : ""}`}>
+                <small>de a</small><b className="num-display">{conComa(pasoKg)}</b>
+              </button>
+            )}
             <button onClick={() => ajustar("kg", pasoKg)} aria-label={`Sumar ${conComa(pasoKg)} ${u}`}><Plus size={17} /></button>
           </div>
-          {/* De a cuánto sube el peso: el disco chico o el salto de su máquina. */}
-          {onUpdateSettings ? (
-            <button onClick={() => setVerSaltos((v) => !v)} aria-expanded={verSaltos} aria-label={`El peso sube de a ${conComa(pasoKg)} ${u}. Cambiarlo`} className={`foco-salto ${verSaltos ? "abierto" : ""}`}>
-              <small>de a</small><b className="num-display">{conComa(pasoKg)}</b>
-            </button>
-          ) : <span aria-hidden="true" />}
         </div>
       )}
       {verSaltos && (
@@ -13315,7 +13585,7 @@ function CarreraSemana({ filas = [], onVerPersona = null, vacios = 0 }) {
     .sort((a, b) => b.tramos.length - a.tramos.length || (a.yo ? -1 : b.yo ? 1 : 0));
   const largo = Math.max(4, ...corredores.map((c) => c.tramos.length));
   return (
-    <ol className="carrera" aria-label="Sesiones de esta semana">
+    <ol className={`carrera ${primeraVezHoy("carrera") ? "llena" : ""}`} aria-label="Sesiones de esta semana">
       {corredores.map((c, i) => {
         const Tag = onVerPersona && !c.yo ? "button" : "div";
         const n = c.tramos.length;
@@ -13327,7 +13597,7 @@ function CarreraSemana({ filas = [], onVerPersona = null, vacios = 0 }) {
               <span className={`carrera-avatar ${c.rango ? "con-rango" : ""}`} style={c.rango ? { "--rango-c": c.rango } : undefined} aria-hidden="true">{c.foto ? <img src={c.foto} alt="" /> : String(c.nombre || "?").charAt(0).toUpperCase()}</span>
               <span className="carrera-cuerpo" aria-hidden="true">
                 <span className="carrera-nombre">{c.yo ? "Vos" : String(c.nombre || "").split(" ")[0]}</span>
-                <span className="carrera-pista">{Array.from({ length: largo }, (_, k) => <i key={k} className={c.tramos[k] ? "hecho" : ""} style={c.tramos[k] ? { "--dia": c.tramos[k] } : undefined} />)}</span>
+                <span className="carrera-pista">{Array.from({ length: largo }, (_, k) => <i key={k} className={c.tramos[k] ? "hecho" : ""} style={c.tramos[k] ? { "--dia": c.tramos[k], "--orden": i * 2 + k } : undefined} />)}</span>
               </span>
               <b className="carrera-n num-display" aria-hidden="true">{n}</b>
             </Tag>
@@ -13464,7 +13734,10 @@ function BarraCargada({ hechas = 0, total = 0, alto = 30, etiqueta = null, class
       {discos.map((d) => (
         <g key={`l${d.n}`} className={`disco-lugar ${d.afuera ? "afuera" : ""}`} style={{ "--hacia": d.izquierda ? "-34px" : "34px", transitionDelay: `${(d.afuera ? t - 1 - d.n : d.n - quedan) * 45}ms` }}>
           {d.cargado ? (
-            <g key="c" className="disco-entra" style={{ "--desde": d.izquierda ? "-28px" : "28px", ...(escalonado ? { animationDelay: `${200 + d.n * 90}ms` } : null) }}>
+            // El disco entra desde la punta de la manga, como en el gimnasio, y
+            // tarda según su peso: uno de 25 entra más lento que uno de 5
+            // (03/11, el análisis estético).
+            <g key="c" className="disco-entra" style={{ "--desde": `${d.izquierda ? -(d.x + d.w - 2) : W - d.x - 2}px`, "--dura": `${Math.round(420 + FORMA_DISCO[d.k].alto * 320)}ms`, ...(escalonado ? { animationDelay: `${200 + d.n * 90}ms` } : null) }}>
               <rect x={d.x} y={d.y} width={d.w} height={d.h} rx={radio(d.w)} fill={`url(#${uid}-d${d.k})`} className="disco" />
               <rect x={d.x + 0.75} y={d.y + 0.75} width={Math.max(0.5, d.w - 1.5)} height={d.h - 1.5} rx={Math.max(0.5, radio(d.w) - 0.75)} className="disco-filete" />
             </g>
@@ -13476,8 +13749,10 @@ function BarraCargada({ hechas = 0, total = 0, alto = 30, etiqueta = null, class
         </g>
       ))}
       {/* Los collarines, contra el último disco cargado de cada lado. */}
-      {uIzq && <rect x={uIzq.x - gapClip - clip} y={cy - 8} width={clip} height="16" rx="2" className="collarin" />}
-      {uDer && <rect x={uDer.x + uDer.w + gapClip} y={cy - 8} width={clip} height="16" rx="2" className="collarin" />}
+      {/* El collarín se cierra cada vez que entra un disco (key por cuántos
+          hay cargados, así la animación vuelve a correr). */}
+      {uIzq && <rect key={`ci${cargados}`} x={uIzq.x - gapClip - clip} y={cy - 8} width={clip} height="16" rx="2" className="collarin cierra" />}
+      {uDer && <rect key={`cd${cargados}`} x={uDer.x + uDer.w + gapClip} y={cy - 8} width={clip} height="16" rx="2" className="collarin cierra" />}
     </svg>
   );
 }
@@ -13847,7 +14122,7 @@ function CajonesCiclo({ semanas = [], trainWeeks = TRAIN_WEEKS, alto = 100, anim
             <div key={s.n} className="cajon-lugar">
               {conTiza && <span className={`cajon-tiza ${cumplida ? "cumplida" : ""}`}>{s.estado !== "futura" && s.sesiones > 0 && <MarcasTiza dias={s.sesiones} max={7} alto={10} decorativa />}</span>}
               <div className={`cajon ${s.estado} ${s.descarga ? "descarga" : ""} ${animar ? "sube" : ""}`}
-                style={{ height: altura(wi, s.descarga), ...(s.descarga ? null : { "--pintura": pintura(wi) }), ...(animar ? { animationDelay: `${wi * 55}ms` } : null) }}>
+                style={{ height: altura(wi, s.descarga), ...(s.descarga ? null : { "--pintura": pintura(wi) }), ...(animar ? { animationDelay: `${wi * 70}ms` } : null) }}>
                 {!s.descarga && <i className="cajon-agarre" />}
                 <b className="cajon-numero">{s.descarga ? "D" : s.n}</b>
               </div>
@@ -13929,7 +14204,7 @@ function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS,
           <span>{metaSemanal ? `${estaSemana} de ${metaSemanal}` : estaSemana} esta semana</span>
         </div>
       </div>
-      <CajonesCiclo semanas={semanas} trainWeeks={trainWeeks} meta={metaSemanal} animar={!yaAnimado} />
+      <CajonesCiclo semanas={semanas} trainWeeks={trainWeeks} meta={metaSemanal} animar={!yaAnimado && primeraVezHoy("cajones")} />
       <button onClick={onGoToDeload} className="enlace-suave escalera-enlace"><Zap size={13} /> Ver mi semana de descarga</button>
     </section>
   );
@@ -15664,6 +15939,22 @@ function baseDeDescarga(exercise, setIndex, logs, settings, cicloActual = CICLO_
   if (ov && (exercise.cardio ? ov.minutes > 0 : ov.reps > 0)) return { ...ov, de: "record" };
   if (s.pr && (exercise.cardio ? s.pr.minutes > 0 : s.pr.reps > 0)) return { ...s.pr, de: "record" };
   return null;
+}
+// UNA VEZ POR DÍA (03/11, el análisis estético): los momentos que se mueven
+// al abrir (la tiza de la pizarra, los cajones del ciclo, la carrera) corren
+// la primera vez del día y después abren quietos. Se decide una sola vez por
+// visita, así un nuevo render no corta la animación a la mitad.
+const PRIMERA_DEL_DIA = {};
+function primeraVezHoy(clave) {
+  if (clave in PRIMERA_DEL_DIA) return PRIMERA_DEL_DIA[clave];
+  let primera;
+  try {
+    const k = `modusfit_visto_${clave}`;
+    primera = localStorage.getItem(k) !== todayStr();
+    if (primera) localStorage.setItem(k, todayStr());
+  } catch { primera = false; }
+  PRIMERA_DEL_DIA[clave] = primera;
+  return primera;
 }
 // La transformación (la barra que suelta los discos) se ve una vez por día al
 // abrir Rutina en la semana de descarga; después ya abre transformada.
@@ -17465,11 +17756,9 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
             <p className="text-[15px] font-bold text-white leading-tight">Rango por músculo</p>
           </div>
         </div>
-        <div className="flex gap-1 shrink-0">
-          <button onClick={() => setShowAnalysis(true)} aria-label="Análisis muscular" className="boton-redondo !w-9 !h-9"><BarChart3 size={16} /></button>
-          <button onClick={() => setShowTierRef(true)} aria-label="Ver la escala de rangos" className="boton-redondo !w-9 !h-9"><Trophy size={16} /></button>
-          <button onClick={() => setShowImage(true)} aria-label="Compartir tus rangos" className="boton-redondo !w-9 !h-9"><Share2 size={16} /></button>
-        </div>
+        {/* Arriba queda sólo compartir; el análisis y la escala van abajo
+            del muñeco, donde se usan (03/11: tres botones apretaban el título). */}
+        <button onClick={() => setShowImage(true)} aria-label="Compartir tus rangos" className="boton-redondo !w-9 !h-9 shrink-0"><Share2 size={16} /></button>
       </div>
 
       <div>
@@ -17487,6 +17776,10 @@ function MuscleRankView({ logs, settings = DEFAULT_SETTINGS, onUpdateSettings, o
       </div>
 
       <MuscleHighlighterBody ranks={ranks} selected={selected} onMuscleClick={goToMuscle} frontRef={frontBodyRef} backRef={backBodyRef} rankMode={mode} pulseMuscles={musculosQueSubieron} sex={sex} />
+      <div className="flex justify-center gap-2 flex-wrap">
+        <button onClick={() => setShowAnalysis(true)} className="enlace-suave"><BarChart3 size={15} /> Análisis muscular</button>
+        <button onClick={() => setShowTierRef(true)} className="enlace-suave"><Trophy size={15} /> La escala de rangos</button>
+      </div>
 
      {selInfo ? (
         <div key={selected} ref={detailRef} className="rango-detalle bounce-in" style={{ "--rango": selInfo.hasData ? selInfo.color : "#6e7379", "--rango-c": selInfo.color }}>
@@ -19870,6 +20163,13 @@ function ProfileView({ profileName, profiles, onSignOut, onDelete, onUpdateProfi
           on={settings.modoGimnasio === true}
           onToggle={() => updateSettings({ modoGimnasio: settings.modoGimnasio !== true })}
         />
+        <ToggleRow
+          icon={<Volume2 size={15} />}
+          label="Sonidos del gimnasio"
+          desc="El clac del disco al guardar una serie y la impresora del ticket al terminar. Muy cortos."
+          on={settings.sonidosGimnasio === true}
+          onToggle={() => updateSettings({ sonidosGimnasio: settings.sonidosGimnasio !== true })}
+        />
       </CollapsibleSection>
 
       {/* "Qué ves al registrar" ya no se expande acá adentro — son 8
@@ -21313,7 +21613,7 @@ function LeaderboardSection({ uid, profile, myTopRank, friendAccepted, basics, a
         )}
         </>
       ))}
-      {scope === "global" && globalLoading && <p className="text-center text-slate-600 text-sm py-8">Cargando ranking...</p>}
+      {scope === "global" && globalLoading && <div className="py-2" role="status" aria-label="Cargando el ranking"><PublicUserCardSkeleton filas={4} /></div>}
       {scope === "global" && globalError && <p className="text-center text-slate-600 text-sm py-8 px-4">No pudimos cargar el ranking global ahora mismo. Probá de nuevo más tarde.</p>}
       {scope === "global" && !globalLoading && !globalError && globalList?.length === 0 && <p className="text-center text-slate-600 text-sm py-8">Todavía no hay nadie en el ranking global.</p>}
       {/* PODIO: con tres o más, los primeros tres suben a un podio (el
@@ -22518,7 +22818,13 @@ function FriendProfileView({ uid, viewerUid, viewerProfile, viewerName = null, i
         </div>
       )}
 
-      {state === "loading" && <p className="text-center text-slate-500 text-[13px] py-10">Cargando su perfil…</p>}
+      {state === "loading" && (
+        <div role="status" aria-label="Cargando su perfil" className="space-y-3 py-2">
+          <div className="skeleton" style={{ height: 220, borderRadius: 28 }} />
+          <div className="skeleton" style={{ height: 52, borderRadius: 999 }} />
+          <div className="skeleton" style={{ height: 96, borderRadius: 24 }} />
+        </div>
+      )}
       {state === "forbidden" && (
         <div className="tarjeta-tonal text-center px-5 py-8">
           <Users size={26} className="mx-auto mb-3 text-slate-500" />
@@ -23222,7 +23528,7 @@ function SocialView({ profile, profileName, uid: uidCuenta, onActivateRoutine, o
       await sendKudos(candidateUid, uid, todayStr());
       setKudosSentMap((m) => ({ ...m, [candidateUid]: true }));
       setKudosBurst((n) => n + 1);
-      haptic(20);
+      haptic([12, 70, 12]);
     } catch (err) {
       console.warn("[social] No se pudo mandar el aplauso:", err?.message || err);
     } finally {
@@ -27041,7 +27347,7 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
           desaparecía con el primer mensaje y en su lugar quedaba una tira de
           pedidos que se deslizaba de costado. */}
       <section className={`ia-inicio ${esInicio ? "" : "con-charla"}`} aria-label={esInicio ? "Empezar una conversación" : "Pedidos para el entrenador"}>
-          <div className="pizarra-ia">
+          <div className={`pizarra-ia ${primeraVezHoy("pizarra") ? "escribe" : ""}`}>
           <p className="pizarra-ia-saludo">{primerNombre ? `Hola, ${primerNombre}` : "Hola"}</p>
           <h2 className="pizarra-ia-pregunta">¿En qué te ayudo hoy?</h2>
           <p className="pizarra-ia-bajada">Conozco tu rutina, tus marcas y tu progreso: todo lo que anotás en la app.</p>
@@ -28722,7 +29028,10 @@ function BalanceMuscular({ routineDef, compacto = true }) {
       </div>
       <div className="space-y-2.5">
         {mostrar.map((d, i) => (
-          <div key={d.musculo} className="balance-fila" style={{ "--c": d.color }}>
+          // Un solo tono (el de la pestaña) para todas; en gris las que quedan
+          // abajo de la raya, que es lo que hay que notar (03/11: cada músculo
+          // iba de un color que no decía nada).
+          <div key={d.musculo} className={`balance-fila ${d.series < SERIES_REFERENCIA ? "abajo" : ""}`}>
             <span className="balance-nombre">{d.musculo}</span>
             <span className="balance-pista" aria-hidden="true">
               <i className="grow-bar" style={{ width: `${Math.min(100, (d.series / escala) * 100)}%`, animationDelay: `${i * 60}ms` }} />
@@ -29706,7 +30015,7 @@ function BienvenidaRecorrido({ tab, onEmpezar, onGuia, onCerrar }) {
             {pasos.map((ps) => <li key={ps.sel}>{ps.titulo}</li>)}
           </ol>
         )}
-        <p className="recorrido-bienvenida-dura">{pasos.length} {pasos.length === 1 ? "paso" : "pasos"}, unos {segundos} segundos</p>
+        <p className="recorrido-bienvenida-dura">{pasos.length} {pasos.length === 1 ? "paso" : "pasos"}, unos {segundos} segundos{siguienteRecorrido(tab) ? `. Al terminar podés seguir con ${NOMBRE_RECORRIDO[siguienteRecorrido(tab)]}` : ""}{tab === ORDEN_RECORRIDO[0] ? " y el resto de la app, unos 2 minutos en total" : ""}.</p>
         <div className="recorrido-bienvenida-pie">
           <button onClick={onCerrar} className="recorrido-saltar">Ahora no</button>
           <button onClick={onEmpezar} disabled={!pasos.length} className="boton-pildora !min-h-11 !px-5">Empezar <ChevronRight size={17} /></button>
@@ -31477,7 +31786,7 @@ export default function App() {
       <BottomBar tab={tab} setTab={irAPestana} />
       {/* Siempre montado: es el único que garantiza que un descanso avise
           aunque la tarjeta dueña del cronómetro esté cerrada. */}
-      <VigilanteDescansos alertType={getProfileSettings(profile).alertType} />
+      <VigilanteDescansos alertType={getProfileSettings(profile).alertType} sonidos={getProfileSettings(profile).sonidosGimnasio === true} />
       {/* Sesión en curso: cronómetro, avance y "Finalizar" siempre a mano,
           en cualquier pestaña. El overlay de arranque la taparía con su
           propia animación, así que entra cuando ese se va. */}
