@@ -5112,69 +5112,6 @@ label.ajuste-rotulo { display: block; }
 .armado-bloques { display: flex; align-items: center; gap: 10px; padding: 0 4px; }
 .armado-bloques-num { margin-left: auto; min-width: 28px; text-align: center; font-size: 1.5rem; font-weight: 650; font-stretch: 80%; color: var(--text-strong); }
 .armado-mancuernas { display: grid; gap: 8px; padding: 0 2px; }
-/* ── EL ÁRBOL DE DISCOS (Rutina, semana de descarga) ── */
-.arbol-placa { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); align-items: center; gap: 8px; padding: 16px 14px 12px 18px; border-radius: var(--radius-3xl, 28px); background: var(--surface-1); box-shadow: var(--placa-canto); }
-.arbol-textos { display: grid; gap: 1px; min-width: 0; }
-.arbol-titulo { font-size: 13px; font-weight: 650; color: var(--text-muted); margin-bottom: 4px; }
-.arbol-cifra { display: flex; align-items: baseline; gap: 1px; line-height: 1; color: var(--text-strong); }
-.arbol-cifra b { font-size: 44px; font-weight: 800; }
-.arbol-cifra span { font-size: 22px; font-weight: 700; color: var(--text-faint); }
-.arbol-cifra.chica { margin-top: 10px; }
-.arbol-cifra.chica b { font-size: 28px; }
-.arbol-cifra.chica span { font-size: 16px; }
-.arbol-dato { font-size: 13px; color: var(--text-muted); }
-.arbol-dibujo { width: 100%; height: auto; max-height: 170px; overflow: visible; }
-.arbol-base { fill: #2b2c30; }
-.arbol-poste { fill: #3a3c42; stroke: rgba(255,255,255,.08); }
-.arbol-tapa { fill: #4a4c52; }
-.arbol-clavija { stroke: #8d9097; stroke-width: 5; stroke-linecap: round; }
-.arbol-disco-goma { fill: color-mix(in oklab, var(--d) 60%, #8a8c92); stroke: rgba(0,0,0,.35); stroke-width: 1; }
-.arbol-disco-canto { fill: none; stroke: rgba(0,0,0,.22); stroke-width: 1.4; }
-.arbol-disco-agujero { fill: #17181b; }
-.arbol-disco.atras .arbol-disco-goma { fill: color-mix(in oklab, var(--d) 40%, #4a4c52); }
-.arbol-disco { animation: arbolCuelga .7s var(--resorte, cubic-bezier(.34,1.56,.64,1)) both; animation-delay: calc(var(--i) * 70ms + 120ms); }
-@keyframes arbolCuelga { 0% { transform: translateY(-14px) rotate(-10deg); opacity: 0; } 55% { opacity: 1; } 75% { transform: translateY(0) rotate(4deg); } 100% { transform: none; } }
-.light-mode .arbol-base { fill: #9a9ca2; }
-.light-mode .arbol-poste { fill: #b9bbc0; stroke: rgba(0,0,0,.08); }
-.light-mode .arbol-tapa { fill: #a5a7ad; }
-.light-mode .arbol-clavija { stroke: #6f7279; }
-.light-mode .arbol-disco-goma { fill: color-mix(in oklab, var(--d) 70%, #a7a9ae); }
-.light-mode .arbol-disco-agujero { fill: #55575d; }
-
-/* ── EL TABLERO DE LETRAS (Progreso) ── */
-.tablero-letras { padding: 9px; border-radius: 14px; background: linear-gradient(135deg, #b98e5f, #8d6740 55%, #a57b4f); box-shadow: inset 0 1px 0 rgba(255,255,255,.25), inset 0 -2px 0 rgba(0,0,0,.25), 0 16px 30px -22px rgba(0,0,0,.95); }
-.tablero-fieltro { --ranura: 34px; display: grid; justify-items: center; padding: 10px 12px 12px; border-radius: 6px; background: repeating-linear-gradient(180deg, #1b1c1f 0 calc(var(--ranura) - 3px), #0e0f11 calc(var(--ranura) - 3px) var(--ranura)), #1b1c1f; box-shadow: inset 0 2px 8px rgba(0,0,0,.6); }
-.tablero-fila { height: var(--ranura); display: flex; align-items: center; gap: .32em; font-size: 22px; font-weight: 700; font-stretch: 78%; letter-spacing: .14em; line-height: 1; color: #f1f0ea; text-shadow: 0 1px 0 rgba(0,0,0,.6), 0 -1px 0 rgba(255,255,255,.12); white-space: nowrap; }
-.tablero-fila b { font-weight: 800; color: color-mix(in oklab, var(--tono, #3B82F6) 62%, white); }
-.tablero-mes { font-size: 16px; letter-spacing: .3em; color: #c9c8c1; }
-.tablero-fila:not(.tablero-mes) { animation: tableroLetra .5s var(--sale, ease-out) both; }
-.tablero-fila:nth-child(2) { animation-delay: .08s; }
-.tablero-fila:nth-child(3) { animation-delay: .16s; }
-.tablero-fila:nth-child(4) { animation-delay: .24s; }
-@keyframes tableroLetra { from { transform: translateY(-5px); letter-spacing: .3em; opacity: 0; } to { transform: none; } }
-
-/* ── LA PIZARRA BLANCA (Rutinas) ── */
-.pizarra-blanca { --tinta-marcador: #1e2330; position: relative; display: grid; gap: 12px; padding: 16px 16px 30px; border-radius: 10px; color: var(--tinta-marcador);
-  background: linear-gradient(115deg, rgba(255,255,255,.7) 0 18%, transparent 34% 70%, rgba(255,255,255,.35) 82%), radial-gradient(ellipse at 74% 30%, rgba(30,35,48,.045), transparent 45%), #e8eaec;
-  box-shadow: inset 0 0 0 6px #b9bdc3, inset 0 0 0 7px #8e9298, inset 0 0 0 8px rgba(255,255,255,.6), inset 0 2px 10px rgba(0,0,0,.12), 0 16px 30px -22px rgba(0,0,0,.95); }
-.pizarra-blanca-linea { font-family: 'Caveat Variable', 'Caveat', 'Segoe Print', cursive; font-size: 20px; font-weight: 600; line-height: 1; color: #5b6070; }
-.pizarra-blanca-nombre { font-family: 'Caveat Variable', 'Caveat', 'Segoe Print', cursive; font-size: 36px; font-weight: 700; line-height: 1; color: var(--tinta-marcador); overflow-wrap: anywhere; }
-.pizarra-blanca-nombre.escribe { animation: marcadorEscribe 1s steps(14) both; }
-@keyframes marcadorEscribe { from { clip-path: inset(0 100% 0 0); } to { clip-path: inset(0 0 0 0); } }
-@media (prefers-reduced-motion: reduce) { .pizarra-blanca-nombre.escribe { animation: none; } }
-.pizarra-blanca-boton { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 999px; color: #3a4050; background: rgba(30,35,48,.07); transition: transform var(--dur-toque) var(--sale); }
-.pizarra-blanca-boton:active { transform: scale(.92); }
-.pizarra-blanca .dia-rutina { background: transparent; box-shadow: none; border: 0; color: var(--tinta-marcador); }
-.pizarra-blanca .dia-rutina::before, .pizarra-blanca .dia-rutina::after { display: none; }
-.pizarra-blanca .dia-rutina-nombre { font-family: 'Caveat Variable', 'Caveat', 'Segoe Print', cursive; font-weight: 700; color: color-mix(in oklab, var(--dia) 78%, #10131a); text-decoration: underline; text-decoration-thickness: 3px; text-underline-offset: 5px; text-decoration-color: color-mix(in oklab, var(--dia) 55%, transparent); }
-.pizarra-blanca .dia-rutina-datos { color: #3e4453; }
-.pizarra-blanca .dia-rutina-datos b { color: var(--tinta-marcador); }
-.pizarra-blanca-bandeja { position: absolute; left: 14px; right: 14px; bottom: 6px; height: 12px; display: flex; align-items: flex-end; gap: 6px; padding: 0 10px; border-radius: 3px; background: linear-gradient(#c7cace, #9da1a7); box-shadow: 0 2px 4px rgba(0,0,0,.25); }
-.pizarra-blanca-bandeja .marcador { width: 34px; height: 8px; margin-bottom: 4px; border-radius: 2px 4px 4px 2px; background: linear-gradient(90deg, color-mix(in oklab, var(--dia) 80%, #222) 0 22%, #f2f2f0 22% 100%); box-shadow: 0 1px 1px rgba(0,0,0,.3); }
-.pizarra-blanca-bandeja .borrador { width: 40px; height: 11px; margin-left: auto; margin-bottom: 3px; border-radius: 2px; background: linear-gradient(#3a3c42 0 55%, #d8d6cf 55%); box-shadow: 0 1px 2px rgba(0,0,0,.35); }
-.pizarra-blanca { filter: brightness(.92); }
-.light-mode .pizarra-blanca { filter: none; }
-@media (prefers-reduced-motion: reduce) { .arbol-disco, .tablero-fila { animation: none; } }
 
 .armado-saltos { display: grid; gap: 8px; padding: 0 2px; }
 .armado-saltos-opciones { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
@@ -15065,51 +15002,6 @@ function PlanificadorIAModal({ routineDef, trainWeeks, logs, settings = DEFAULT_
 // Cuando empieza un ciclo nuevo, el plan del anterior termina (ver metaDeHoy):
 // la hoja lo dice y ofrece seguirlo desde donde quedaste (`terminados`:
 // cuántos ejercicios tenían ese plan; `onSeguir`: planesParaSeguir).
-// EL ÁRBOL DE DISCOS (Rutina, semana de descarga; pedido del 03/11: "en
-// rutina está la planilla de planificación, pero cuando hacés la descarga no
-// hay nada"). En la descarga la hoja del plan se pliega; en su lugar, el
-// árbol de discos del gimnasio con los discos que esta semana no van a la
-// barra, colgados de sus clavijas: uno por serie que se saca hoy, de goma de
-// competición apagada como los de la barra. Al lado, cuántas series van y a
-// qué peso.
-const CLAVIJAS_ARBOL = [[62, 46], [138, 46], [62, 82], [138, 82], [62, 118], [138, 118]];
-function ArbolDiscos({ total = 0, quedan = 0, pct = 0.75, dia = null }) {
-  const sacadas = Math.max(0, total - quedan);
-  // Hasta dos discos por clavija; el de atrás asoma un poco más arriba.
-  const discos = Array.from({ length: Math.min(sacadas, 12) }, (_, k) => {
-    const [x, y] = CLAVIJAS_ARBOL[k % 6];
-    const atras = k >= 6;
-    const radio = [21, 21, 18, 18, 15, 15][k % 6];
-    return { k, x: x + (atras ? (x < 100 ? -3 : 3) : 0), y: y + 4 - (atras ? 5 : 0), radio, color: COLORES_DISCO[k % COLORES_DISCO.length], atras };
-  }).sort((a, b) => Number(b.atras) - Number(a.atras));
-  return (
-    <section className="arbol-placa" aria-label={`Semana de descarga: hoy van ${quedan} de ${total} series, al ${Math.round(pct * 100)} % del peso`}>
-      <div className="arbol-textos" aria-hidden="true">
-        <p className="arbol-titulo">Semana de descarga</p>
-        <p className="arbol-cifra"><b className="num-display">{quedan}</b><span>/{total}</span></p>
-        <p className="arbol-dato">series hoy{dia ? ` de ${dia}` : ""}</p>
-        <p className="arbol-cifra chica"><b className="num-display">{Math.round(pct * 100)}</b><span> %</span></p>
-        <p className="arbol-dato">del peso de siempre</p>
-      </div>
-      <svg viewBox="0 0 200 160" className="arbol-dibujo" aria-hidden="true">
-        <path className="arbol-base" d="M58 150 L142 150 L150 158 L50 158 Z" />
-        <rect className="arbol-poste" x="95" y="18" width="10" height="134" rx="2" />
-        <rect className="arbol-tapa" x="92" y="14" width="16" height="7" rx="2" />
-        {CLAVIJAS_ARBOL.map(([x, y]) => (
-          <path key={`${x}-${y}`} className="arbol-clavija" d={x < 100 ? `M95 ${y + 6} L${x - 6} ${y - 2}` : `M105 ${y + 6} L${x + 6} ${y - 2}`} />
-        ))}
-        {discos.map((d) => (
-          <g key={d.k} className={`arbol-disco ${d.atras ? "atras" : ""}`} style={{ "--d": d.color, "--i": d.k, transformOrigin: `${d.x}px ${d.y - d.radio + 6}px` }}>
-            <circle cx={d.x} cy={d.y} r={d.radio} className="arbol-disco-goma" />
-            <circle cx={d.x} cy={d.y} r={d.radio * 0.62} className="arbol-disco-canto" />
-            <circle cx={d.x} cy={d.y - d.radio + 6} r="2.6" className="arbol-disco-agujero" />
-          </g>
-        ))}
-      </svg>
-    </section>
-  );
-}
-
 function HojaDelPlan({ dia = null, semana = null, filas = [], hayPlan = false, enPausa = false, sinRutina = false, invitar = false, terminados = 0, onSeguir = null, onPlanificar = null, onPausa = null, onCampos = null }) {
   const visibles = filas.slice(0, 3);
   const resto = filas.length - visibles.length;
@@ -15466,7 +15358,6 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
           </div></div>
         );
       })()}
-      {modoDescarga && !previa && <ArbolDiscos total={(day?.exercises || []).reduce((a, ex) => a + (ex.sets?.length || 0), 0)} quedan={avanceDescarga.total} pct={pctDescarga} dia={day?.label || null} />}
       {/* "Hoy descansás" ya no es un aviso aparte: va al lado de la fecha,
           arriba de todo (ver TituloPestana). El aviso, con tu semana en un
           estante chico, empujaba el día y "Iniciar sesión" hasta abajo de la
@@ -18784,49 +18675,6 @@ function ExercisePickerModal({ groups, selId, onSelect, onClose }) {
   );
 }
 
-// EL TABLERO DE LETRAS DEL MES (Progreso, arriba de todo; pedido del 03/11:
-// "en rutina, progreso y rutinas le falta ese diseño y color que tienen el
-// chatbot con la pizarra y social con el casillero"). El tablero de fieltro
-// con letras de plástico que cuelga en la entrada del gimnasio: el mes en
-// curso, con las sesiones, las series y los récords que llevás. Las cifras van
-// en el tono de la pestaña; las letras, blancas, encajadas en las ranuras.
-function TableroDelMes({ logs, sessions }) {
-  const datos = useMemo(() => {
-    const ahora = new Date();
-    const mes = `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, "0")}`;
-    const desde = `${mes}-01`;
-    const sesiones = new Set((sessions || []).filter((t) => t?.date?.startsWith(mes)).map((t) => `${t.date}_${t.dayKey || ""}`)).size;
-    let series = 0;
-    const antes = {}, ahoraMax = {};
-    Object.entries(logs || {}).forEach(([k, arr]) => {
-      if (k.endsWith("_pr_override") || !Array.isArray(arr)) return;
-      const { exerciseId } = parseLogKey(k);
-      arr.forEach((h) => {
-        if (!h?.date || h.deload || !(h.kg > 0) || !(h.reps > 0)) return;
-        const rm = estimate1RM(h.kg, h.reps);
-        if (h.date >= desde) { series++; if (rm > (ahoraMax[exerciseId] || 0)) ahoraMax[exerciseId] = rm; }
-        else if (rm > (antes[exerciseId] || 0)) antes[exerciseId] = rm;
-      });
-    });
-    const records = Object.entries(ahoraMax).filter(([id, rm]) => antes[id] > 0 && rm > antes[id] + 0.01).length;
-    const nombre = ahora.toLocaleDateString("es-AR", { month: "long" });
-    return { nombre: nombre.charAt(0).toUpperCase() + nombre.slice(1), sesiones, series, records };
-  }, [logs, sessions]);
-  const fila = (n, uno, varios) => (
-    <p className="tablero-fila"><b>{n}</b> {n === 1 ? uno : varios}</p>
-  );
-  return (
-    <section className="tablero-letras" aria-label={`${datos.nombre}: ${datos.sesiones} sesiones, ${datos.series} series, ${datos.records} récords`}>
-      <div className="tablero-fieltro" aria-hidden="true">
-        <p className="tablero-fila tablero-mes">{datos.nombre}</p>
-        {fila(datos.sesiones, "sesión", "sesiones")}
-        {fila(datos.series, "serie", "series")}
-        {fila(datos.records, "récord", "récords")}
-      </div>
-    </section>
-  );
-}
-
 function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS, onResetAll, onDeleteDay, onUpdateSettings, onGoToProfile, onGoToRoutines, weekSchedule = null, sex, age, onGoToDeload, measurements, onAddMeasurement, photos, photosLoading, onAddPhoto, onDeletePhoto }) {
   // Los logs se guardan en kg. chartData es lo único que lee la sección de
   // evolución (lista, gráfico, tooltip y los tres KPI de abajo), así que
@@ -18954,7 +18802,6 @@ function ProgressView({ logs, sessions, cycleStart, settings = DEFAULT_SETTINGS,
             y en Ejercicios, Historial y Medidas empujaban la gráfica y el
             calendario a la mitad de la pantalla. Ahora el riel va primero y
             el ciclo es parte de tu rango. */}
-        {activeSection === "rank" && <TableroDelMes logs={logs} sessions={sessions} />}
         {activeSection === "rank" && (cycleStart ? (
           <WeekCalendar cycleStart={cycleStart} logs={logs} sessions={sessions} settings={settings} onGoToDeload={onGoToDeload} metaSemanal={weekSchedule ? Object.values(weekSchedule).filter(Boolean).length || null : null} />
         ) : (
@@ -29575,8 +29422,6 @@ function RoutinePreviewModal({ routineDef, routineName, onActivate, onClose, yaA
 
 function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpdateProfile, openScheduleSignal = 0, openEditorSignal = 0, onSignalConsumed = null, onGoToDay = null }) {
   const [mode, setMode] = useState("catalog");
-  // El marcador escribe el nombre de tu rutina la primera vez del día.
-  const escribeNombre = usePrimeraVezHoy("pizarra_blanca");
   const [showWizard, setShowWizard] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [showPresetsForced, setShowPresetsForced] = useState(false);
@@ -29846,25 +29691,15 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
         // grande: ves sus días de un vistazo (con su color), y el detalle
         // (balance, cronograma) queda a un toque para no saturar.
         <section className="tarjeta-tonal rutina-activa p-4 space-y-4" style={{ "--c": "#3B82F6" }} aria-label="Tu rutina activa">
-          {/* LA PIZARRA BLANCA (03/11, pedido: "le falta ese diseño y color que
-              tienen el chatbot con la pizarra y social con el casillero"): la
-              de marcador del gimnasio, con el marco de aluminio, la rutina
-              escrita a mano y cada día con el marcador de su color; en la
-              bandeja, esos marcadores y el borrador. */}
-          <div className="pizarra-blanca">
-            <div className="flex items-start gap-3">
-              <div className="min-w-0 flex-1">
-                <p className="pizarra-blanca-linea">Tu rutina</p>
-                <h3 className={`pizarra-blanca-nombre ${escribeNombre ? "escribe" : ""}`}>{activeDef.name}</h3>
-              </div>
-              <button onClick={() => setShareTarget(activeDef)} aria-label="Compartir rutina activa" className="pizarra-blanca-boton shrink-0"><Share2 size={16} /></button>
+          <div className="flex items-start gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="rutina-activa-linea">Tu rutina</p>
+              <h3 className="rutina-activa-nombre">{activeDef.name}</h3>
             </div>
-            <DiasRutina routineDef={activeDef} onGoToDay={onGoToDay} />
-            <div className="pizarra-blanca-bandeja" aria-hidden="true">
-              {(activeDef.dayOrder || Object.keys(activeDef.days || {})).filter((dk) => activeDef.days?.[dk]).slice(0, 4).map((dk) => <i key={dk} className="marcador" style={{ "--dia": activeDef.days[dk].color }} />)}
-              <i className="borrador" />
-            </div>
+            <button onClick={() => setShareTarget(activeDef)} aria-label="Compartir rutina activa" className="boton-redondo shrink-0"><Share2 size={16} /></button>
           </div>
+
+          <DiasRutina routineDef={activeDef} onGoToDay={onGoToDay} />
           {/* LA SEMANA, EN EL ESTANTE DE LAS PESAS RUSAS (ver EstantePesas):
               una pesa del color de lo que toca cada día que entrenás, el lugar
               vacío los de descanso y la de hoy, levantada. Arriba, los días de
