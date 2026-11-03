@@ -15,7 +15,7 @@ import {
   Share2, Download, Link2, Copy, BellOff, Send, Mic, Ruler, Camera, Link, Footprints, Star, SquarePlay, Upload, RefreshCw, Timer, Percent, Users, User,
   MessageCircle, Search, UserPlus, UserCheck, UserMinus, AtSign, GraduationCap, ClipboardCheck, Swords, Medal, QrCode, ArrowUpDown,
   Minus, Ellipsis, Undo2, ArrowLeftRight, ReceiptText, ClipboardList, Minimize2, BellRing,
-  FileText, FileSpreadsheet, ClipboardPaste, ScanText, ImagePlus, Flag,
+  FileText, FileSpreadsheet, ClipboardPaste, ScanText, ImagePlus, Flag, Hand, Route, BookOpen,
 } from "lucide-react";
 import { signInWithPopup, signInWithCredential, GoogleAuthProvider, signOut, onAuthStateChanged, deleteUser } from "firebase/auth";
 import { Capacitor, registerPlugin } from "@capacitor/core";
@@ -5763,10 +5763,32 @@ label.ajuste-rotulo { display: block; }
 .recorrido-tarjeta { position: fixed; left: 16px; right: 16px; max-width: 380px; margin: 0 auto; padding: 16px 16px 14px; border-radius: 24px; outline: none;
   background: var(--surface-2); box-shadow: var(--placa-canto), 0 24px 48px -16px rgba(0, 0, 0, .6); animation: recorridoEntra .3s var(--resorte, ease); }
 @keyframes recorridoEntra { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-.recorrido-paso { font-size: 13px; color: var(--text-faint); }
-.recorrido-titulo { margin-top: 2px; font-size: 18px; font-weight: 700; line-height: 1.25; color: var(--text-strong); }
+.recorrido-paso { margin-right: auto; padding: 5px 10px; border-radius: 999px; font-size: 12px; font-weight: 650; color: var(--text-muted); background: var(--velo); white-space: nowrap; }
+.recorrido-titulo { padding-right: 36px; font-size: 18px; font-weight: 700; line-height: 1.25; color: var(--text-strong); }
+/* La flecha que apunta a la pieza: un cuadrado girado del color de la
+   tarjeta, arriba o abajo según de qué lado esté la pieza. */
+.recorrido-tarjeta.flecha-arriba::before, .recorrido-tarjeta.flecha-abajo::before { content: ""; position: absolute; left: calc(var(--flecha-x, 50%) - 8px); width: 16px; height: 16px; background: var(--surface-2); transform: rotate(45deg); border-radius: 3px; }
+.recorrido-tarjeta.flecha-arriba::before { top: -7px; }
+.recorrido-tarjeta.flecha-abajo::before { bottom: -7px; }
+.recorrido-cerrar-chico { position: absolute; top: 8px; right: 8px; width: 36px; height: 36px; display: grid; place-items: center; border-radius: 999px; color: var(--text-faint); }
+.recorrido-cerrar-chico::after { content: ""; position: absolute; inset: -4px; }
+/* Lo que podés hacer con la pieza, en un recuadro aparte (el "tip" del tour). */
+.recorrido-accion { display: flex; align-items: flex-start; gap: 8px; margin-top: 10px; padding: 10px 12px; border-radius: 14px; font-size: 14px; font-weight: 600; line-height: 1.35; color: color-mix(in oklab, var(--tono) 72%, white); background: color-mix(in oklab, var(--tono) 13%, transparent); }
+.recorrido-accion svg { flex: none; margin-top: 1px; }
+.light-mode .recorrido-accion { color: color-mix(in oklab, var(--tono) 70%, black); }
+/* La bienvenida al recorrido, lo que abre el "?". */
+.recorrido-bienvenida { position: relative; width: 100%; max-width: 400px; padding: 22px 20px 16px; border-radius: 28px; background: var(--surface-2); box-shadow: var(--placa-canto), 0 24px 48px -16px rgba(0, 0, 0, .6); }
+.recorrido-cerrar { position: absolute; top: 12px; right: 12px; }
+.recorrido-bienvenida-icono { display: inline-grid; place-items: center; width: 44px; height: 44px; color: var(--tono); }
+.recorrido-bienvenida-titulo { margin-top: 4px; padding-right: 44px; font-size: 22px; font-weight: 760; line-height: 1.15; color: var(--text-strong); text-wrap: balance; }
+.recorrido-bienvenida-bajada { margin-top: 6px; font-size: 15px; line-height: 1.4; color: var(--text-muted); }
+.recorrido-bienvenida-lista { margin-top: 14px; padding: 12px 14px 12px 34px; border-radius: 16px; background: var(--panel-sunken, var(--velo)); display: grid; gap: 6px; font-size: 15px; color: var(--text-strong); list-style: decimal; }
+.recorrido-bienvenida-lista li::marker { color: var(--text-faint); font-weight: 650; }
+.recorrido-bienvenida-dura { margin-top: 10px; font-size: 13px; color: var(--text-faint); }
+.recorrido-bienvenida-pie { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+.recorrido-bienvenida-guia { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; margin-top: 6px; font-size: 14px; color: var(--text-muted); }
 .recorrido-texto { margin-top: 4px; font-size: 15px; line-height: 1.42; color: var(--text-muted); text-wrap: pretty; }
-.recorrido-pie { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+.recorrido-pie { display: flex; align-items: center; gap: 8px; margin-top: 14px; flex-wrap: wrap; justify-content: flex-end; }
 .recorrido-saltar { margin-right: auto; padding: 10px 4px; font-size: 14px; font-weight: 600; color: var(--text-muted); }
 @media (prefers-reduced-motion: reduce) { .recorrido-hueco { transition: none; } .recorrido-tarjeta { animation: none; } }
 .guia-recorrido { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; margin-top: 10px; padding: 9px 12px; border-radius: 999px; font-size: 14px; font-weight: 650; color: var(--text-muted); background: var(--velo); }
@@ -29632,34 +29654,70 @@ function SideNav({ tab, setTab, profileName }) {
 // está en la pantalla (Social sin cuenta, por ejemplo) se saltea.
 const RECORRIDOS = {
   rutina: [
-    { sel: 'section[aria-label="Tu plan"]', titulo: "Tu plan", texto: "Lo que toca hoy, escrito como en la hoja del profe. Con Planificar cargás cuánto levantar cada semana, o se lo pedís a la IA." },
-    { sel: ".selector-dias", titulo: "Tus días", texto: "Elegí qué día entrenás. Viene elegido el que te toca hoy." },
+    { sel: 'section[aria-label="Tu plan"]', titulo: "Tu plan", texto: "Lo que toca hoy, escrito como en la hoja del profe. Con Planificar cargás cuánto levantar cada semana, o se lo pedís a la IA.", accion: "Tocá Planificar, al pie de la hoja, para armar tu progresión." },
+    { sel: ".selector-dias", titulo: "Tus días", texto: "Elegí qué día entrenás. Viene elegido el que te toca hoy.", accion: "Deslizá hacia los lados si tenés muchos días." },
     { sel: ".dia-hero", titulo: "La barra del día", texto: "Cada serie que anotás le carga un disco. Cuando está llena, terminaste." },
-    { sel: '[data-recorrido="iniciar"]', titulo: "Iniciá la sesión", texto: "Al llegar al gimnasio: cuenta el tiempo y anota tu hora de entrada." },
-    { sel: ".ejercicio", titulo: "Anotá cada serie", texto: "Tocá un ejercicio: las reps y los kilos ya vienen escritos con lo que toca hoy. Lo guardás con el ✓ y el descanso arranca solo." },
+    { sel: '[data-recorrido="iniciar"]', titulo: "Iniciá la sesión", texto: "Al llegar al gimnasio: cuenta el tiempo y anota tu hora de entrada.", accion: "Tocalo cuando entres al gimnasio." },
+    { sel: ".ejercicio", titulo: "Anotá cada serie", texto: "Tocá un ejercicio: las reps y los kilos ya vienen escritos con lo que toca hoy. Lo guardás con el ✓ y el descanso arranca solo.", accion: "Ajustá con − y + sin abrir el teclado." },
     { sel: "nav.barra-pestanas", titulo: "Todo lo demás, abajo", texto: "Tu progreso, tus amigos, tus rutinas y el entrenador con IA." },
   ],
   progreso: [
-    { sel: ".pestanas-internas", titulo: "Cuatro miradas", texto: "Tu rango por músculo, el cuaderno de cada día, la gráfica de cada ejercicio y tus medidas." },
+    { sel: ".pestanas-internas", titulo: "Cuatro miradas", texto: "Tu rango por músculo, el cuaderno de cada día, la gráfica de cada ejercicio y tus medidas.", accion: "Tocá una para cambiar de mirada." },
     { sel: ".cajones-pizarra", titulo: "Tu ciclo", texto: "Un cajón por semana: el de color entero es esta. El último, más bajo, es la semana de descarga." },
-    { sel: ".figura-cuerpo", titulo: "Tu nivel en cada músculo", texto: "Cada músculo, del color de su rango. Tocá uno para ver tu mejor marca y cuánto te falta para el siguiente." },
+    { sel: ".figura-cuerpo", titulo: "Tu nivel en cada músculo", texto: "Cada músculo, del color de su rango. Tocá uno para ver tu mejor marca y cuánto te falta para el siguiente.", accion: "Tocá un músculo del muñeco." },
   ],
   rutinas: [
-    { sel: ".rutina-activa", titulo: "Tu rutina", texto: "La que estás haciendo, con tu semana en el estante: tocá una pesa para ir a entrenar ese día." },
+    { sel: ".rutina-activa", titulo: "Tu rutina", texto: "La que estás haciendo, con tu semana en el estante: tocá una pesa para ir a entrenar ese día.", accion: "Tocá una pesa del estante." },
     { sel: 'section[aria-label="Armá tu rutina"]', titulo: "Armá la tuya", texto: "Creala a mano o con la IA, o importá la de tu profe desde una foto, un PDF o un Excel." },
-    { sel: ".corcho", titulo: "Rutinas listas", texto: "Push/Pull/Legs, Upper/Lower, Cuerpo completo y más. Tocá una para verla entera." },
+    { sel: ".corcho", titulo: "Rutinas listas", texto: "Push/Pull/Legs, Upper/Lower, Cuerpo completo y más. Tocá una para verla entera.", accion: "Deslizá las hojas del corcho hacia los lados." },
   ],
   social: [
-    { sel: ".casillero-chico", titulo: "Tu casillero", texto: "Así te ven tus amigos: tu rango, tu racha y tus aplausos." },
-    { sel: ".carrera", titulo: "La semana", texto: "Quién fue más veces al gimnasio esta semana." },
+    { sel: ".casillero-chico", titulo: "Tu casillero", texto: "Así te ven tus amigos: tu rango, tu racha y tus aplausos.", accion: "Tocalo para abrir tu perfil como lo ven ellos." },
+    { sel: ".carrera", titulo: "La semana", texto: "Quién fue más veces al gimnasio esta semana.", accion: "Tocá a un amigo para ver su perfil." },
     { sel: ".pestanas-internas", titulo: "Actividad, ranking y amigos", texto: "Aplaudí a tus amigos, mirá los récords del grupo y sumá amigos con su @usuario o su código QR." },
   ],
   entrenador_ia: [
-    { sel: ".pizarra-ia", titulo: "Tu entrenador con IA", texto: "Conoce tu rutina, tus marcas y tu progreso. Tocá un pedido para empezar." },
+    { sel: ".pizarra-ia", titulo: "Tu entrenador con IA", texto: "Conoce tu rutina, tus marcas y tu progreso. Tocá un pedido para empezar.", accion: "Tocá una nota de la pizarra." },
     { sel: '[data-recorrido="escribir"]', titulo: "Preguntale lo que quieras", texto: "Escribí o hablale con el micrófono: puede armarte una rutina, planificar tu semana o decirte con cuánto arrancar." },
   ],
 };
-function Recorrido({ pasos, onTerminar }) {
+// El orden del recorrido entero (como el "Iniciar tour" de autogestión UCA,
+// pedido del 03/11: "adaptalo a la ? de la app"): al terminar una pestaña,
+// "Seguir con…" lleva a la siguiente.
+const ORDEN_RECORRIDO = ["rutina", "progreso", "social", "rutinas", "entrenador_ia"];
+const NOMBRE_RECORRIDO = { rutina: "Rutina", progreso: "Progreso", social: "Social", rutinas: "Rutinas", entrenador_ia: "el Chatbot" };
+const siguienteRecorrido = (tab) => ORDEN_RECORRIDO[ORDEN_RECORRIDO.indexOf(tab) + 1] || null;
+// LA BIENVENIDA AL RECORRIDO: lo que abre el "?" (y la primera vez en cada
+// pestaña), como el primer paso del tour de autogestión: qué vas a ver, cuánto
+// dura, "Ahora no" y empezar. La guía con dibujos queda a un toque.
+function BienvenidaRecorrido({ tab, onEmpezar, onGuia, onCerrar }) {
+  useAndroidBack(onCerrar);
+  const pasos = (RECORRIDOS[tab] || []).filter((ps) => typeof document !== "undefined" && document.querySelector(ps.sel));
+  const segundos = Math.max(10, Math.round(pasos.length * 6 / 5) * 5);
+  return createPortal(
+    <div className="fixed inset-0 z-[140] flex items-center justify-center p-4 modal-overlay modal-bg-in" onClick={onCerrar}>
+      <div className="recorrido-bienvenida modal-pop-in" role="dialog" aria-modal="true" aria-labelledby="recorrido-bienvenida-titulo" onClick={(e) => e.stopPropagation()}>
+        <button onClick={onCerrar} aria-label="Cerrar" className="boton-redondo recorrido-cerrar"><X size={17} /></button>
+        <span className="recorrido-bienvenida-icono" aria-hidden="true"><Route size={22} /></span>
+        <h2 id="recorrido-bienvenida-titulo" className="recorrido-bienvenida-titulo">{tab === "entrenador_ia" ? "Conocé el Chatbot" : `Conocé ${NOMBRE_RECORRIDO[tab] || "la app"}`}</h2>
+        <p className="recorrido-bienvenida-bajada">Te mostramos cada parte sobre la pantalla de verdad.</p>
+        {pasos.length > 0 && (
+          <ol className="recorrido-bienvenida-lista">
+            {pasos.map((ps) => <li key={ps.sel}>{ps.titulo}</li>)}
+          </ol>
+        )}
+        <p className="recorrido-bienvenida-dura">{pasos.length} {pasos.length === 1 ? "paso" : "pasos"}, unos {segundos} segundos</p>
+        <div className="recorrido-bienvenida-pie">
+          <button onClick={onCerrar} className="recorrido-saltar">Ahora no</button>
+          <button onClick={onEmpezar} disabled={!pasos.length} className="boton-pildora !min-h-11 !px-5">Empezar <ChevronRight size={17} /></button>
+        </div>
+        {onGuia && <button onClick={onGuia} className="enlace-suave recorrido-bienvenida-guia"><BookOpen size={15} /> Ver la guía completa</button>}
+      </div>
+    </div>,
+    document.body
+  );
+}
+function Recorrido({ pasos, onTerminar, siguiente = null, onSeguir = null }) {
   // El "atrás" de Android lo cierra, pero sin congelar la página como los
   // modales (useAndroidBack): el recorrido tiene que poder llevarte hasta
   // cada pieza.
@@ -29696,28 +29754,45 @@ function Recorrido({ pasos, onTerminar }) {
     window.addEventListener("resize", alMover);
     return () => { clearTimeout(t); cancelAnimationFrame(cuadro); window.removeEventListener("scroll", alMover); window.removeEventListener("resize", alMover); };
   }, [paso]);
+  const ultimo = i === visibles.length - 1;
+  // Con el teclado, como el tour de autogestión: las flechas pasan de paso.
   useEffect(() => {
-    const tecla = (e) => { if (e.key === "Escape") onTerminar(); };
+    const tecla = (e) => {
+      if (e.key === "Escape") onTerminar();
+      else if (e.key === "ArrowRight" && !ultimo) setI((n) => n + 1);
+      else if (e.key === "ArrowLeft") setI((n) => Math.max(0, n - 1));
+    };
     window.addEventListener("keydown", tecla);
     return () => window.removeEventListener("keydown", tecla);
-  }, [onTerminar]);
+  }, [onTerminar, ultimo]);
   if (!paso || typeof document === "undefined") return null;
-  const ultimo = i === visibles.length - 1;
   // La tarjeta va debajo de la pieza si entra; si no, arriba.
   const alto = typeof window !== "undefined" ? window.innerHeight : 800;
   const abajo = !caja || caja.top + caja.height + 230 < alto;
-  const posicion = !caja ? { bottom: 96 } : abajo ? { top: Math.min(alto - 220, caja.top + caja.height + 12) } : { bottom: Math.max(16, alto - caja.top + 12) };
+  const posicion = !caja ? { bottom: 96 } : abajo ? { top: Math.min(alto - 250, caja.top + caja.height + 14) } : { bottom: Math.max(16, alto - caja.top + 14) };
+  // La flecha de la tarjeta apunta al medio de la pieza (la tarjeta va
+  // centrada, de hasta 380 de ancho).
+  const ancho = typeof window !== "undefined" ? window.innerWidth : 390;
+  const anchoTarjeta = Math.min(380, ancho - 32);
+  const izquierdaTarjeta = (ancho - anchoTarjeta) / 2;
+  const flechaX = caja ? Math.min(anchoTarjeta - 28, Math.max(28, caja.left + caja.width / 2 - izquierdaTarjeta)) : null;
+  const seguir = ultimo && siguiente && onSeguir;
   return createPortal(
     <div className="recorrido" role="presentation">
       {caja && <div className="recorrido-hueco" style={{ top: caja.top, left: caja.left, width: caja.width, height: caja.height }} aria-hidden="true" />}
-      <div ref={tarjetaRef} tabIndex={-1} className="recorrido-tarjeta" role="dialog" aria-modal="true" aria-labelledby="recorrido-titulo" style={posicion}>
-        <p className="recorrido-paso">Paso {i + 1} de {visibles.length}</p>
+      <div ref={tarjetaRef} tabIndex={-1} className={`recorrido-tarjeta ${caja ? (abajo ? "flecha-arriba" : "flecha-abajo") : ""}`} role="dialog" aria-modal="true" aria-labelledby="recorrido-titulo" style={{ ...posicion, "--flecha-x": flechaX != null ? `${flechaX}px` : undefined }}>
+        <button onClick={onTerminar} aria-label="Cerrar el recorrido" className="recorrido-cerrar-chico"><X size={16} /></button>
         <h3 id="recorrido-titulo" className="recorrido-titulo">{paso.titulo}</h3>
         <p className="recorrido-texto">{paso.texto}</p>
+        {paso.accion && <p className="recorrido-accion"><Hand size={16} aria-hidden="true" />{paso.accion}</p>}
         <div className="recorrido-pie">
-          <button onClick={onTerminar} className="recorrido-saltar">{ultimo ? "Cerrar" : "Saltar"}</button>
-          {i > 0 && <button onClick={() => setI(i - 1)} className="boton-tonal !min-h-10 !px-4" aria-label="Paso anterior"><ChevronLeft size={17} /></button>}
-          <button onClick={() => (ultimo ? onTerminar() : setI(i + 1))} className="boton-pildora !min-h-10 !px-5">{ultimo ? "Listo" : <>Siguiente <ChevronRight size={17} /></>}</button>
+          <span className="recorrido-paso">Paso {i + 1} de {visibles.length}</span>
+          {i > 0 && (seguir
+            ? <button onClick={() => setI(i - 1)} className="boton-tonal !min-h-10 !px-3" aria-label="Paso anterior"><ChevronLeft size={17} /></button>
+            : <button onClick={() => setI(i - 1)} className="boton-tonal !min-h-10 !px-4">Atrás</button>)}
+          {seguir
+            ? <button onClick={() => onSeguir(siguiente)} className="boton-pildora !min-h-10 !px-4">Seguir con {NOMBRE_RECORRIDO[siguiente]} <ChevronRight size={17} /></button>
+            : <button onClick={() => (ultimo ? onTerminar() : setI(i + 1))} className="boton-pildora !min-h-10 !px-5">{ultimo ? "Listo" : <>Siguiente <ChevronRight size={17} /></>}</button>}
         </div>
       </div>
     </div>,
@@ -30165,6 +30240,8 @@ export default function App() {
   const [showHelp, setShowHelp] = useState(false);
   // El recorrido guiado que está en pantalla (la pestaña), o null.
   const [recorrido, setRecorrido] = useState(null);
+  // La bienvenida al recorrido de una pestaña: la abre el "?" y la primera vez.
+  const [bienvenidaRecorrido, setBienvenidaRecorrido] = useState(null);
   const [helpStartTab, setHelpStartTab] = useState(null);
   const [showWelcome, setShowWelcome] = useState(false); // intro de la primera vez
   const [sessionSummary, setSessionSummary] = useState(null); // resumen al finalizar
@@ -31375,7 +31452,7 @@ export default function App() {
                 <span className="sesion-dock-dia">{sessionDayLabel}</span>
               </div>
             ) : (
-              tab !== "perfil" && <button onClick={() => { setHelpStartTab(tab); setShowHelp(true); }} aria-label="Ayuda" className="boton-redondo"><HelpCircle size={18} /></button>
+              tab !== "perfil" && <button onClick={() => { if (RECORRIDOS[tab]) setBienvenidaRecorrido(tab); else { setHelpStartTab(tab); setShowHelp(true); } }} aria-label="Ayuda: recorrido de esta pestaña" className="boton-redondo"><HelpCircle size={18} /></button>
             )}
           </div>
         </header>
@@ -31385,7 +31462,7 @@ export default function App() {
         <main className={`max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto px-4 pt-1 lg:pt-4 space-y-4 ${haySesionActiva && getProfileSettings(profile).modoGimnasio ? "modo-gimnasio" : ""}`} style={{ paddingBottom: "calc(7rem + var(--dock-alto, 0px) + env(safe-area-inset-bottom, 0px))" }}>
           <div key={tab} className={tabSlideClass}>
             <TituloPestana tab={tab} descansa={descansaHoy} descarga={isDeloadWeek && getProfileSettings(profile).deloadEnabled !== false} />
-            <PrimeraVezRecorrido tab={tab} nuevo={(profile?.trainingSessions?.length || 0) < 3 && !profile?.activeSession} activo={!!recorrido} onEmpezar={setRecorrido} />
+            <PrimeraVezRecorrido tab={tab} nuevo={(profile?.trainingSessions?.length || 0) < 3 && !profile?.activeSession} activo={!!recorrido || !!bienvenidaRecorrido} onEmpezar={setBienvenidaRecorrido} />
             {tab === "rutinas" && <RoutinesView openScheduleSignal={openSectionSignal.id === "week-schedule" ? openSectionSignal.n : 0} openEditorSignal={openSectionSignal.id === "routine-editor" ? openSectionSignal.n : 0} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleDeleteRoutine} onUpdateProfile={handleUpdateProfile} onGoToDay={(dayKey) => goToSection("rutina", "go-to-day", dayKey)} />}
             {tab === "rutina" && !enDescarga && <OnboardingTasksCard profile={profile} cycleStart={cycleStart} logs={logs} onGoToProfile={() => setTab("perfil")} onOpenFieldSettings={() => setShowFieldIntro(true)} onDone={() => handleUpdateProfile({ onboardingDone: true })} />}
             {/* La semana de descarga es Rutina en modo descarga (ver RoutineView). */}
@@ -31432,7 +31509,8 @@ export default function App() {
       {periodRecap && <WeeklyRecapModal data={periodRecap.data} periodo={periodRecap.periodo} etiqueta={periodRecap.etiqueta} onClose={() => setPeriodRecap(null)} />}
       {showWelcome && <WelcomeIntro onClose={() => setShowWelcome(false)} onOpenTutorial={() => { setHelpStartTab(null); setShowHelp(true); }} onUpdateSettings={handleUpdateSettings} />}
       {showHelp && <HelpModal startTab={helpStartTab} onClose={() => setShowHelp(false)} onRecorrido={(t) => { setShowHelp(false); setTab(t); setTimeout(() => setRecorrido(t), 450); }} />}
-      {recorrido && recorrido === tab && RECORRIDOS[recorrido] && <Recorrido key={recorrido} pasos={RECORRIDOS[recorrido]} onTerminar={() => setRecorrido(null)} />}
+      {bienvenidaRecorrido && bienvenidaRecorrido === tab && <BienvenidaRecorrido tab={bienvenidaRecorrido} onCerrar={() => setBienvenidaRecorrido(null)} onEmpezar={() => { setRecorrido(bienvenidaRecorrido); setBienvenidaRecorrido(null); }} onGuia={() => { setBienvenidaRecorrido(null); setHelpStartTab(tab); setShowHelp(true); }} />}
+      {recorrido && recorrido === tab && RECORRIDOS[recorrido] && <Recorrido key={recorrido} pasos={RECORRIDOS[recorrido]} onTerminar={() => setRecorrido(null)} siguiente={siguienteRecorrido(recorrido)} onSeguir={(t) => { setRecorrido(null); setTab(t); setTimeout(() => setRecorrido(t), 450); }} />}
       {showFieldIntro && (
         <FieldSettingsIntroModal
           settings={getProfileSettings(profile)}
