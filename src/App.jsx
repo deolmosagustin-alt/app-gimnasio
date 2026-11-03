@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, createContext, useContext, useSyncExternalStore, useId } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback, createContext, useContext, useSyncExternalStore, useId, useTransition } from "react";
 import { createPortal, flushSync } from "react-dom";
 // Terminación: los dígitos de los relojes ruedan (NumberFlow) y las series se
 // acomodan deslizándose al guardar (Motion), en vez de saltar.
@@ -2568,24 +2568,37 @@ const ANIMATION_CSS = letraEscalable(`
    se va hacia un lado y se apaga; la nueva entra desde el lado de su pestaña.
    Mientras dura, el deslizamiento de siempre (tab-slide) se apaga: si no, la
    pantalla nueva se movería dos veces. Las barras fijas, quietas. */
+/* El contenido de cada pestaña guardada, con el mismo aire entre bloques
+   que ponía main (space-y-4) cuando los bloques eran sus hijos directos. */
+.pestana-guardada > * + * { margin-top: 1rem; }
+/* Los bloques de una pestaña que quedan fuera de la pantalla no se calculan
+   hasta que te acercás (content-visibility): al cambiar de pestaña el
+   navegador recalculaba el estilo de la pestaña entera, también lo de abajo
+   de todo, y era la mayor parte del corte. */
+.pestana-guardada > * + * { content-visibility: auto; contain-intrinsic-size: auto 420px; }
 .barra-pestanas { view-transition-name: barra-pestanas; }
 .app-bar { view-transition-name: barra-arriba; }
 :root[data-vt] .tab-slide-right, :root[data-vt] .tab-slide-left { animation: none; }
-::view-transition-old(root), ::view-transition-new(root) { animation-duration: var(--dur-pantalla, .42s); animation-timing-function: var(--sale, ease-out); }
-:root[data-vt="der"]::view-transition-old(root) { animation-name: vtSaleIzq; }
-:root[data-vt="der"]::view-transition-new(root) { animation-name: vtEntraDer; }
-:root[data-vt="izq"]::view-transition-old(root) { animation-name: vtSaleDer; }
-:root[data-vt="izq"]::view-transition-new(root) { animation-name: vtEntraIzq; }
-@keyframes vtSaleIzq { to { opacity: 0; transform: translateX(-36px); } }
-@keyframes vtSaleDer { to { opacity: 0; transform: translateX(36px); } }
-@keyframes vtEntraDer { from { opacity: 0; transform: translateX(36px); } }
-@keyframes vtEntraIzq { from { opacity: 0; transform: translateX(-36px); } }
+/* Sin "apagón": la pantalla de antes queda entera abajo y la nueva entra por
+   encima (se prende en la primera mitad y termina de acomodarse después). Si
+   las dos se apagaban y prendían a la vez, a mitad de camino la pantalla
+   quedaba hasta un 60 % más oscura (medido el 03/11): era el parpadeo. */
+::view-transition-image-pair(root) { isolation: auto; }
+::view-transition-old(root), ::view-transition-new(root) { mix-blend-mode: normal; animation-duration: var(--dur-pantalla, .42s); }
+::view-transition-old(root) { animation-name: vtViejaQueda; animation-timing-function: linear; }
+:root[data-vt="der"]::view-transition-new(root) { animation-name: vtEntraDer; animation-timing-function: var(--sale, ease-out); }
+:root[data-vt="izq"]::view-transition-new(root) { animation-name: vtEntraIzq; animation-timing-function: var(--sale, ease-out); }
+@keyframes vtViejaQueda { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes vtEntraDer { 0% { opacity: 0; transform: translateX(28px); } 45% { opacity: 1; } 100% { opacity: 1; transform: none; } }
+@keyframes vtEntraIzq { 0% { opacity: 0; transform: translateX(-28px); } 45% { opacity: 1; } 100% { opacity: 1; transform: none; } }
 /* El objeto que viaja (la pesa o la baldosa → la placa del día): el
    navegador lo lleva de un lugar y tamaño al otro. */
 ::view-transition-group(objeto-viaja) { animation-duration: .5s; animation-timing-function: var(--sale, ease-out); }
 ::view-transition-group(barra-pestanas), ::view-transition-group(barra-arriba) { animation-duration: var(--dur-chico, .24s); }
-@keyframes tabSlideRight { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: translateX(0); } }
-@keyframes tabSlideLeft  { from { opacity: 0; transform: translateX(-28px); } to { opacity: 1; transform: translateX(0); } }
+/* Sin desvanecer: la pestaña nueva arrancaba invisible y la pantalla se
+   apagaba un instante al cambiar (03/11, medido: hasta 44 % más oscura). */
+@keyframes tabSlideRight { from { transform: translateX(28px); } to { transform: translateX(0); } }
+@keyframes tabSlideLeft  { from { transform: translateX(-28px); } to { transform: translateX(0); } }
 .tab-slide-right { animation: tabSlideRight var(--dur-pantalla, .42s) var(--sale, ease-out) backwards; }
 .tab-slide-left  { animation: tabSlideLeft var(--dur-pantalla, .42s) var(--sale, ease-out) backwards; }
 /* El título grande de la pestaña se achica y se apaga mientras bajás, hasta
@@ -3504,7 +3517,9 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: non
 .light-mode .barra-pestanas button:not([aria-current="page"]) .etiqueta { color: color-mix(in oklab, var(--text-faint) 88%, black); }
 .barra-pestanas [aria-current="page"] { color: var(--text-strong); }
 .barra-pestanas .indicador { position: relative; isolation: isolate; }
-.barra-pestanas .indicador-fondo { position: absolute; inset: 0; z-index: -1; border-radius: 999px; background: color-mix(in oklab, var(--c, var(--tono)) 72%, white); }
+.barra-pestanas .indicador-fondo { position: absolute; inset: 0; z-index: -1; border-radius: 999px; background: color-mix(in oklab, var(--c, var(--tono)) 72%, white); opacity: 0; transform: scaleX(.4); transition: opacity var(--dur-chico, .24s) ease, transform .42s var(--resorte, ease-out); }
+.barra-pestanas [aria-current="page"] .indicador-fondo { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) { .barra-pestanas .indicador-fondo { transition: none; } }
 .barra-pestanas [aria-current="page"] .indicador { width: 54px; color: color-mix(in oklab, var(--c, var(--tono)) 18%, #07080a); }
 .barra-pestanas [aria-current="page"] .etiqueta { font-weight: 650; }
 .barra-pestanas button:focus-visible { outline: none; }
@@ -13600,12 +13615,13 @@ function CarnetSocio({ color = "#8B5CF6", foto = null, inicial = "?", nombre, li
 // El primero, con el puesto en dorado; vos, resaltado. `vacios` dibuja
 // carriles de muestra (sin amigos todavía, para que se vea qué vas a tener).
 function CarreraSemana({ filas = [], onVerPersona = null, vacios = 0 }) {
+  const llenar = usePrimeraVezHoy("carrera");
   const corredores = filas
     .map((f) => ({ ...f, tramos: (f.dias || []).filter(Boolean) }))
     .sort((a, b) => b.tramos.length - a.tramos.length || (a.yo ? -1 : b.yo ? 1 : 0));
   const largo = Math.max(4, ...corredores.map((c) => c.tramos.length));
   return (
-    <ol className={`carrera ${primeraVezHoy("carrera") ? "llena" : ""}`} aria-label="Sesiones de esta semana">
+    <ol className={`carrera ${llenar ? "llena" : ""}`} aria-label="Sesiones de esta semana">
       {corredores.map((c, i) => {
         const Tag = onVerPersona && !c.yo ? "button" : "div";
         const n = c.tramos.length;
@@ -14200,6 +14216,7 @@ function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS,
   // Los cajones suben UNA vez, al montar: sin este flag volverían a subir
   // cada vez que cambia cualquier cosa.
   const [yaAnimado, setYaAnimado] = useState(false);
+  const cajonesHoy = usePrimeraVezHoy("cajones");
   useEffect(() => { const t = setTimeout(() => setYaAnimado(true), 900); return () => clearTimeout(t); }, []);
   if (!cycleStart || !weekInfo) return null;
   const { cycleWeeks, trainWeeks } = weekInfo;
@@ -14224,7 +14241,7 @@ function WeekCalendar({ cycleStart, logs, sessions, settings = DEFAULT_SETTINGS,
           <span>{metaSemanal ? `${estaSemana} de ${metaSemanal}` : estaSemana} esta semana</span>
         </div>
       </div>
-      <CajonesCiclo semanas={semanas} trainWeeks={trainWeeks} meta={metaSemanal} animar={!yaAnimado && primeraVezHoy("cajones")} />
+      <CajonesCiclo semanas={semanas} trainWeeks={trainWeeks} meta={metaSemanal} animar={!yaAnimado && cajonesHoy} />
       <button onClick={onGoToDeload} className="enlace-suave escalera-enlace"><Zap size={13} /> Ver mi semana de descarga</button>
     </section>
   );
@@ -15002,7 +15019,7 @@ function RoutineView({ logs, setLogs, drafts, setDrafts, cycleStart, settings, w
   }, [sessionForThisDay]);
   const weekInfo = getWeekInfo(cycleStart, settings), isDeload = weekInfo?.isDeload, day = ROUTINE[activeDay];
   // "Color de día": el día que estás mirando tiñe la app entera.
-  useEffect(() => { ponerTono(day?.color); }, [day?.color]);
+  useEffect(() => { TONO_RUTINA = day?.color || null; ponerTono(day?.color); }, [day?.color]);
   // ── EL MODO DESCARGA ──────────────────────────────────────────────────────
   // La semana de descarga del ciclo (salvo que esta semana elijas entrenar
   // normal) o su vista previa, desde Progreso o desde el aviso de que venís
@@ -15961,19 +15978,26 @@ function baseDeDescarga(exercise, setIndex, logs, settings, cicloActual = CICLO_
   return null;
 }
 // UNA VEZ POR DÍA (03/11, el análisis estético): los momentos que se mueven
-// al abrir (la tiza de la pizarra, los cajones del ciclo, la carrera) corren
-// la primera vez del día y después abren quietos. Se decide una sola vez por
-// visita, así un nuevo render no corta la animación a la mitad.
+// al abrir (la tiza de la pizarra, los cajones del ciclo, la carrera, el
+// muñeco) corren la primera vez del día y después abren quietos. Da "sí" una
+// sola vez por clave en toda la visita: antes guardaba la respuesta y la
+// repetía, así que cada vuelta a Progreso volvía a subir los cajones y la
+// pantalla arrancaba casi transparente. Los componentes la leen con
+// usePrimeraVezHoy, que la fija al montar (un nuevo render no la corta).
 const PRIMERA_DEL_DIA = {};
+function usePrimeraVezHoy(clave) {
+  const [primera] = useState(() => primeraVezHoy(clave));
+  return primera;
+}
 function primeraVezHoy(clave) {
-  if (clave in PRIMERA_DEL_DIA) return PRIMERA_DEL_DIA[clave];
+  if (clave in PRIMERA_DEL_DIA) return false;
+  PRIMERA_DEL_DIA[clave] = true;
   let primera;
   try {
     const k = `modusfit_visto_${clave}`;
     primera = localStorage.getItem(k) !== todayStr();
     if (primera) localStorage.setItem(k, todayStr());
   } catch { primera = false; }
-  PRIMERA_DEL_DIA[clave] = primera;
   return primera;
 }
 // La transformación (la barra que suelta los discos) se ve una vez por día al
@@ -16888,8 +16912,15 @@ function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backR
   // abajo. Se dispara al abrir la pantalla Y cada vez que cambiás entre
   // "General" y "Según tu contexto", porque ahí todos los colores se
   // recalculan: la animación deja ver ese cambio en vez de que aparezca de
-  // golpe.
+  // golpe. Al abrir la pantalla, sólo la primera vez del día (03/11: el cuerpo
+  // arrancaba gris en cada visita a Progreso y la pantalla parecía apagarse);
+  // al cambiar de modo, siempre.
+  const cargaHoy = usePrimeraVezHoy("musculos");
+  const modoAnimado = useRef(null);
   useEffect(() => {
+    const cambioDeModo = modoAnimado.current !== null && modoAnimado.current !== rankMode;
+    modoAnimado.current = rankMode;
+    if (!cambioDeModo && !cargaHoy) return undefined;
     const limpiezas = [];
     const t = setTimeout(() => {
       [frontRef, backRef].forEach((ref) => {
@@ -16923,7 +16954,7 @@ function MuscleHighlighterBody({ ranks, selected, onMuscleClick, frontRef, backR
       });
     }, 80);
     return () => { clearTimeout(t); limpiezas.forEach(clearTimeout); };
-  }, [rankMode]);
+  }, [rankMode, cargaHoy]);
 
   // LATIDO DE RANGO NUEVO: los músculos que subieron de rango desde la última
   // visita laten con brillo. Solo brillo (nada de escalar: un polygon SVG
@@ -26631,6 +26662,7 @@ function RecetaPapel({ para = "", fecha = "", titulo = null, children }) {
 const COLORES_POSTIT = ["#ebe4bc", "#bfdac9", "#e8c6cc", "#c4d3e8"];
 const MAIL_SOPORTE = "deolmosagustin@gmail.com";
 function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMessages, conversations = [], activeConversationId = null, onNewConversation, onSwitchConversation, onDeleteConversation, onRenameConversation, settings, cycleStart, onCreateRoutine, onActivateRoutine, onUpdateProfile, onUpdateSettings, onAddMeasurement, onDeleteRoutine, onNavigate, onStartSession, onEndSession }) {
+  const tizaHoy = usePrimeraVezHoy("pizarra");
   // Contexto para reconstruir un plan EN VIVO a partir de la "action" cruda
   // (JSON plano, sí serializable) en vez de depender de la función confirm()
   // guardada en el mensaje — esa función no sobrevive un reload ni el
@@ -27367,7 +27399,7 @@ function EntrenadorIAChat({ profile, logs, setLogs, profileName, messages, setMe
           desaparecía con el primer mensaje y en su lugar quedaba una tira de
           pedidos que se deslizaba de costado. */}
       <section className={`ia-inicio ${esInicio ? "" : "con-charla"}`} aria-label={esInicio ? "Empezar una conversación" : "Pedidos para el entrenador"}>
-          <div className={`pizarra-ia ${primeraVezHoy("pizarra") ? "escribe" : ""}`}>
+          <div className={`pizarra-ia ${tizaHoy ? "escribe" : ""}`}>
           <p className="pizarra-ia-saludo">{primerNombre ? `Hola, ${primerNombre}` : "Hola"}</p>
           <h2 className="pizarra-ia-pregunta">¿En qué te ayudo hoy?</h2>
           <p className="pizarra-ia-bajada">Conozco tu rutina, tus marcas y tu progreso: todo lo que anotás en la app.</p>
@@ -29572,6 +29604,25 @@ function RoutinesView({ profile, forced, onActivate, onUpdate, onArchive, onUpda
 // Orden visual de las pestañas: define desde qué lado entra el contenido al
 // cambiar (si vas a una pestaña "más a la derecha", entra desde la derecha).
 const TAB_ORDER = ["rutina", "progreso", "social", "descarga", "rutinas", "entrenador_ia", "perfil"];
+// LAS PESTAÑAS GUARDADAS (03/11, pedido: "cuando cambio de pestaña hay como
+// un leve glitch, es como que se apaga por un microsegundo"). Antes cada
+// cambio de pestaña desarmaba la que dejabas y armaba la nueva de cero: con
+// un celular de gama media simulado (el procesador 4 veces más lento) eso
+// congelaba la pantalla de 0,4 a 1,2 s en la versión publicada. Ahora cada
+// pestaña se arma la primera vez que entrás y después queda guardada, oculta
+// (`hidden`) y sin redibujarse mientras no está a la vista (el memo de abajo);
+// al volver se muestra con los datos al día y como la dejaste (la sección de
+// Progreso, lo abierto). Lo que busque piezas en la pantalla tiene que usar
+// buscarVisible: las pestañas ocultas siguen en el documento.
+const PestanaGuardada = React.memo(function PestanaGuardada({ activa, clase = "", children }) {
+  return <div className={`pestana-guardada ${activa ? clase : ""}`} hidden={!activa}>{children}</div>;
+}, (antes, ahora) => !antes.activa && !ahora.activa);
+// La primera pieza que coincide y está a la vista (no en una pestaña oculta).
+function buscarVisible(sel) {
+  if (typeof document === "undefined") return null;
+  for (const el of document.querySelectorAll(sel)) if (el.getClientRects().length) return el;
+  return null;
+}
 // CAMBIAR DE PESTAÑA CON UNA TRANSICIÓN DE VISTA (03/11, la propuesta 08 del
 // análisis estético): el navegador saca una foto de la pantalla de antes y
 // otra de la de después; la de antes se va hacia un lado y la nueva entra
@@ -29596,7 +29647,7 @@ function cambiarConTransicion(actualizar, { direccion = "der", viaja = null, des
       // temporizador y no con requestAnimationFrame: durante la transición el
       // navegador no dibuja cuadros, y la espera se colgaba hasta el límite.
       await new Promise((ok) => setTimeout(ok, 30));
-      if (destino) { const el = document.querySelector(destino); if (el) el.style.viewTransitionName = "objeto-viaja"; }
+      if (destino) { const el = buscarVisible(destino); if (el) el.style.viewTransitionName = "objeto-viaja"; }
     });
   } catch { delete raiz.dataset.vt; actualizar(); return; }
   // Si otra transición la interrumpe (dos toques rápidos), sólo se saltea la
@@ -29604,7 +29655,7 @@ function cambiarConTransicion(actualizar, { direccion = "der", viaja = null, des
   transicion.ready.catch(() => {});
   transicion.finished.catch(() => {}).finally(() => {
     delete raiz.dataset.vt;
-    if (destino) { const el = document.querySelector(destino); if (el) el.style.viewTransitionName = ""; }
+    if (destino) document.querySelectorAll(destino).forEach((el) => { el.style.viewTransitionName = ""; });
   });
 }
 
@@ -29904,9 +29955,12 @@ function BottomBar({ tab, setTab }) {
         {NAV_TABS.map(({ key, icon, label, color = "#14B8A6" }) => (
           <button key={key} onClick={() => setTab(key)} aria-current={tab === key ? "page" : undefined} style={{ "--tab-color": color }}>
             <span className="indicador" aria-hidden="true">
-              {/* La píldora de tiza es UNA sola y viaja de pestaña en pestaña
-                  (layoutId), en vez de aparecer y desaparecer. */}
-              {tab === key && <m.span layoutId="isla-pestana" className="indicador-fondo" transition={{ type: "spring", bounce: 0.18, duration: 0.42 }} />}
+              {/* La píldora crece en su lugar, como la barra de Android (Material
+                  3), sólo con CSS. Antes viajaba de pestaña en pestaña con el
+                  layoutId de motion, que en cada cambio medía todos los
+                  elementos animados de la app y obligaba a rearmar la página:
+                  era buena parte del corte al cambiar de pestaña (03/11). */}
+              <span className="indicador-fondo" />
               {icon}
             </span>
             <span className="etiqueta">{label}</span>
@@ -29948,9 +30002,17 @@ const TAB_INTRO = {
 // (index.css) y las superficies (--surface-1/2/3), que viven en :root.
 const TONO_MARCA = "#14B8A6";
 const TONO_DE_PESTANA = { progreso: "#3B82F6", rutinas: "#3B82F6", social: SOCIAL_COLOR, entrenador_ia: "#14B8A6", perfil: "#14B8A6", descarga: "#A855F7" };
+// El último tono de Rutina (el del día que mirás), para volver a ponerlo al
+// volver a la pestaña: guardada, no se vuelve a armar (PestanaGuardada).
+let TONO_RUTINA = null;
 function ponerTono(color) {
   if (typeof document === "undefined") return;
-  document.documentElement.style.setProperty("--tono", color || TONO_MARCA);
+  const raiz = document.documentElement;
+  const valor = color || TONO_MARCA;
+  // Cambiar una variable en <html> obliga a recalcular el estilo de toda la
+  // página (unos 270 ms en un celular de gama media): sólo si cambia.
+  if (raiz.style.getPropertyValue("--tono") === valor) return;
+  raiz.style.setProperty("--tono", valor);
 }
 // En Rutina la bajada es la fecha: entrenando, "qué día es hoy" sirve más
 // que una frase que ya leíste cien veces.
@@ -30056,7 +30118,7 @@ const siguienteRecorrido = (tab) => ORDEN_RECORRIDO[ORDEN_RECORRIDO.indexOf(tab)
 // dura, "Ahora no" y empezar. La guía con dibujos queda a un toque.
 function BienvenidaRecorrido({ tab, onEmpezar, onGuia, onCerrar }) {
   useAndroidBack(onCerrar);
-  const pasos = (RECORRIDOS[tab] || []).filter((ps) => typeof document !== "undefined" && document.querySelector(ps.sel));
+  const pasos = (RECORRIDOS[tab] || []).filter((ps) => buscarVisible(ps.sel));
   const segundos = Math.max(10, Math.round(pasos.length * 6 / 5) * 5);
   return createPortal(
     <div className="fixed inset-0 z-[140] flex items-center justify-center p-4 modal-overlay modal-bg-in" onClick={onCerrar}>
@@ -30087,14 +30149,14 @@ function Recorrido({ pasos, onTerminar, siguiente = null, onSeguir = null }) {
   // cada pieza.
   useAndroidBackHandler(onTerminar);
   // Los pasos cuya pieza está en la pantalla, al empezar.
-  const [visibles] = useState(() => pasos.filter((ps) => typeof document !== "undefined" && document.querySelector(ps.sel)));
+  const [visibles] = useState(() => pasos.filter((ps) => buscarVisible(ps.sel)));
   const [i, setI] = useState(0);
   const [caja, setCaja] = useState(null);
   const tarjetaRef = useRef(null);
   const paso = visibles[i] || null;
   useEffect(() => {
     if (!paso) return;
-    const el = document.querySelector(paso.sel);
+    const el = buscarVisible(paso.sel);
     if (!el) return;
     const quieto = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
     // Una pieza alta (la placa del día, el muñeco) va con su principio arriba
@@ -30604,6 +30666,11 @@ export default function App() {
   const [showHelp, setShowHelp] = useState(false);
   // El recorrido guiado que está en pantalla (la pestaña), o null.
   const [recorrido, setRecorrido] = useState(null);
+  // Las pestañas que ya se armaron (ver PestanaGuardada). Se suma la actual
+  // durante el render, así la primera visita se ve en el mismo cuadro.
+  const [visitadas, setVisitadas] = useState(() => new Set());
+  if (tab && !visitadas.has(tab)) setVisitadas((v) => new Set(v).add(tab));
+  const verPestana = (t) => tab === t || visitadas.has(t);
   // La bienvenida al recorrido de una pestaña: la abre el "?" y la primera vez.
   const [bienvenidaRecorrido, setBienvenidaRecorrido] = useState(null);
   const [helpStartTab, setHelpStartTab] = useState(null);
@@ -30711,9 +30778,12 @@ export default function App() {
   const enDescarga = isDeloadWeek && getProfileSettings(profile).deloadEnabled !== false && !deloadDismissed;
   // En Rutina el tinte lo pone el día que estás mirando (RoutineView); en
   // las demás pestañas, el color de la pestaña.
+  // Un cuadro después de que se ve la pestaña nueva: el recálculo de estilos
+  // del tono no se suma al cuadro del cambio (03/11, el bugueo al cambiar).
   useEffect(() => {
-    if (tab === "rutina") return;
-    ponerTono(TONO_DE_PESTANA[tab]);
+    let c1 = 0, c2 = 0;
+    c1 = requestAnimationFrame(() => { c2 = requestAnimationFrame(() => ponerTono(tab === "rutina" ? TONO_RUTINA : TONO_DE_PESTANA[tab])); });
+    return () => { cancelAnimationFrame(c1); cancelAnimationFrame(c2); };
   }, [tab]);
   // Ir a la semana de descarga (desde Progreso, el chat o una sesión de
   // descarga en curso): es Rutina en modo descarga; antes de que toque, su
@@ -30723,11 +30793,18 @@ export default function App() {
     setTab("rutina");
   };
   const irAPestanaYa = (t) => (t === "descarga" ? irADescarga() : (setDescargaPrevia(false), setTab(t)));
+  // Los cambios de pestaña de la barra de abajo van con el deslizamiento de
+  // siempre (tab-slide, sin desvanecer). La transición de vista de pantalla
+  // entera dejaba, a veces, un cuadro negro al entrar al Chatbot (03/11,
+  // medido): queda sólo para el objeto que viaja desde Rutinas.
+  const [cambiandoPestana, iniciarCambio] = useTransition();
+  const [pestanaPedida, setPestanaPedida] = useState(null);
   const irAPestana = (t) => {
     if (t === tab) { irAPestanaYa(t); return; }
-    const direccion = TAB_ORDER.indexOf(t) >= TAB_ORDER.indexOf(tab) ? "der" : "izq";
-    cambiarConTransicion(() => irAPestanaYa(t), { direccion });
+    setPestanaPedida(t);
+    iniciarCambio(() => irAPestanaYa(t));
   };
+  const tabDeLaBarra = cambiandoPestana && pestanaPedida ? pestanaPedida : tab;
   const themeClass = getProfileSettings(profile).theme === "light" ? "light-mode" : "";
   // tint() (utils.js) arma los "badges" de color según el tema — necesita
   // saber cuál está activo, pero es una función de módulo (la llaman
@@ -31829,24 +31906,26 @@ export default function App() {
             que escribe su alto en --dock-alto: ya no hace falta adivinarlo
             según haya o no sesión. */}
         <main className={`max-w-xl lg:max-w-3xl xl:max-w-4xl mx-auto px-4 pt-1 lg:pt-4 space-y-4 ${haySesionActiva && getProfileSettings(profile).modoGimnasio ? "modo-gimnasio" : ""}`} style={{ paddingBottom: "calc(7rem + var(--dock-alto, 0px) + env(safe-area-inset-bottom, 0px))" }}>
-          <div key={tab} className={tabSlideClass}>
+          <div>
+            <div key={tab} className={tabSlideClass}>
             <TituloPestana tab={tab} descansa={descansaHoy} descarga={isDeloadWeek && getProfileSettings(profile).deloadEnabled !== false} />
             <PrimeraVezRecorrido tab={tab} nuevo={(profile?.trainingSessions?.length || 0) < 3 && !profile?.activeSession} activo={!!recorrido || !!bienvenidaRecorrido} onEmpezar={setBienvenidaRecorrido} />
-            {tab === "rutinas" && <RoutinesView openScheduleSignal={openSectionSignal.id === "week-schedule" ? openSectionSignal.n : 0} openEditorSignal={openSectionSignal.id === "routine-editor" ? openSectionSignal.n : 0} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleDeleteRoutine} onUpdateProfile={handleUpdateProfile} onGoToDay={(dayKey) => {
+            </div>
+            {verPestana("rutinas") && <PestanaGuardada activa={tab === "rutinas"} clase={tabSlideClass}><RoutinesView openScheduleSignal={openSectionSignal.id === "week-schedule" ? openSectionSignal.n : 0} openEditorSignal={openSectionSignal.id === "routine-editor" ? openSectionSignal.n : 0} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} profile={profile} forced={false} onActivate={handleActivateRoutine} onUpdate={handleUpdateRoutine} onArchive={handleDeleteRoutine} onUpdateProfile={handleUpdateProfile} onGoToDay={(dayKey) => {
               const tocado = document.activeElement?.closest?.(".estante-lugar, .dia-rutina") || null;
               cambiarConTransicion(() => goToSection("rutina", "go-to-day", dayKey), { direccion: "izq", viaja: tocado, destino: ".dia-hero" });
-            }} />}
-            {tab === "rutina" && !enDescarga && <OnboardingTasksCard profile={profile} cycleStart={cycleStart} logs={logs} onGoToProfile={() => setTab("perfil")} onOpenFieldSettings={() => setShowFieldIntro(true)} onDone={() => handleUpdateProfile({ onboardingDone: true })} />}
+            }} /></PestanaGuardada>}
+            {verPestana("rutina") && <PestanaGuardada activa={tab === "rutina"} clase={tabSlideClass}>{!enDescarga && <OnboardingTasksCard profile={profile} cycleStart={cycleStart} logs={logs} onGoToProfile={() => setTab("perfil")} onOpenFieldSettings={() => setShowFieldIntro(true)} onDone={() => handleUpdateProfile({ onboardingDone: true })} />}
             {/* La semana de descarga es Rutina en modo descarga (ver RoutineView). */}
-            {tab === "rutina" && <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToFieldSettings={() => goToSection("perfil", "field-settings-section")} semanaDescarga={isDeloadWeek} descargaApagada={deloadDismissed} descargaPrevia={descargaPrevia} onModoDescarga={(on) => { setDeloadDismissed(!on); if (on) setDescargaPrevia(false); }} onPreviaDescarga={setDescargaPrevia} onAdelantarDescarga={handleAdelantarDescarga} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} descargaTerminadaHoy={(profile?.trainingSessions || []).some((s) => s.date === todayStr() && s.deload)} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} sex={profile?.sex} age={edadDe(profile)} activeRoutineDef={activeRoutineDef} onApplyOwnProgression={handleApplyOwnProgression} onSetPlanPaused={handleSetPlanPaused} onRemovePlan={handleRemovePlan} goToDaySignal={openSectionSignal.id === "go-to-day" ? openSectionSignal : { id: null, n: 0 }} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} />}
-            {tab === "progreso" && <ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} onGoToRoutines={() => goToSection("rutinas", "routine-editor")} weekSchedule={weekSchedule} sex={profile?.sex} age={edadDe(profile)} onGoToDeload={irADescarga} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} />}
-            {tab === "entrenador_ia" && <EntrenadorIAChat profile={profile} logs={logs} setLogs={setLogs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} conversations={aiConversations} activeConversationId={activeAiConversationId} onNewConversation={handleNewAiConversation} onSwitchConversation={handleSwitchAiConversation} onDeleteConversation={handleDeleteAiConversation} onRenameConversation={handleRenameAiConversation} settings={getProfileSettings(profile)} cycleStart={cycleStart} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} onDeleteRoutine={handleDeleteRoutine} onNavigate={irAPestana} onStartSession={(dk) => handleStartSession(dk, enDescarga)} onEndSession={handleEndSession} />}
-            {tab === "perfil" && <ProfileView onOpenFieldPreview={() => setShowFieldIntro(true)} openSectionSignal={openSectionSignal} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} profileName={activeProfile} profiles={profiles} onSignOut={handleSignOut} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} onGoToSocial={() => setTab("social")} />}
-            {tab === "social" && <SocialView onGoToProfile={() => setTab("perfil")} profile={profile} profileName={activeProfile} uid={profile?.googleUid} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} />}
+            <RoutineView logs={logs} setLogs={setLogs} drafts={drafts} setDrafts={setDrafts} cycleStart={cycleStart} settings={getProfileSettings(profile)} onUpdateSettings={handleUpdateSettings} onGoToFieldSettings={() => goToSection("perfil", "field-settings-section")} semanaDescarga={isDeloadWeek} descargaApagada={deloadDismissed} descargaPrevia={descargaPrevia} onModoDescarga={(on) => { setDeloadDismissed(!on); if (on) setDescargaPrevia(false); }} onPreviaDescarga={setDescargaPrevia} onAdelantarDescarga={handleAdelantarDescarga} deloadProgress={profile?.deloadProgress || {}} setDeloadProgress={setDeloadProgress} onFinishDeloadSession={handleFinishDeloadSession} descargaTerminadaHoy={(profile?.trainingSessions || []).some((s) => s.date === todayStr() && s.deload)} weekSchedule={weekSchedule} activeSession={profile?.activeSession || null} onStartSession={handleStartSession} onDisableAutoShowPrShare={() => handleUpdateProfile({ settings: { ...getProfileSettings(profile), autoShowPrShare: false } })} sex={profile?.sex} age={edadDe(profile)} activeRoutineDef={activeRoutineDef} onApplyOwnProgression={handleApplyOwnProgression} onSetPlanPaused={handleSetPlanPaused} onRemovePlan={handleRemovePlan} goToDaySignal={openSectionSignal.id === "go-to-day" ? openSectionSignal : { id: null, n: 0 }} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} /></PestanaGuardada>}
+            {verPestana("progreso") && <PestanaGuardada activa={tab === "progreso"} clase={tabSlideClass}><ProgressView logs={logs} setLogs={setLogs} sessions={profile?.trainingSessions || []} cycleStart={cycleStart} settings={getProfileSettings(profile)} onResetAll={handleResetAllHistory} onDeleteDay={handleDeleteDay} onUpdateSettings={handleUpdateSettings} onGoToProfile={() => setTab("perfil")} onGoToRoutines={() => goToSection("rutinas", "routine-editor")} weekSchedule={weekSchedule} sex={profile?.sex} age={edadDe(profile)} onGoToDeload={irADescarga} measurements={profile?.measurements || {}} onAddMeasurement={handleAddMeasurement} photos={progressPhotos} photosLoading={photosLoading} onAddPhoto={handleAddPhoto} onDeletePhoto={handleDeletePhoto} /></PestanaGuardada>}
+            {verPestana("entrenador_ia") && <PestanaGuardada activa={tab === "entrenador_ia"} clase={tabSlideClass}><EntrenadorIAChat profile={profile} logs={logs} setLogs={setLogs} profileName={activeProfile} messages={aiChatMessages} setMessages={setAiChatMessages} conversations={aiConversations} activeConversationId={activeAiConversationId} onNewConversation={handleNewAiConversation} onSwitchConversation={handleSwitchAiConversation} onDeleteConversation={handleDeleteAiConversation} onRenameConversation={handleRenameAiConversation} settings={getProfileSettings(profile)} cycleStart={cycleStart} onCreateRoutine={handleUpdateRoutine} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} onUpdateSettings={handleUpdateSettings} onAddMeasurement={handleAddMeasurement} onDeleteRoutine={handleDeleteRoutine} onNavigate={irAPestana} onStartSession={(dk) => handleStartSession(dk, enDescarga)} onEndSession={handleEndSession} /></PestanaGuardada>}
+            {verPestana("perfil") && <PestanaGuardada activa={tab === "perfil"} clase={tabSlideClass}><ProfileView onOpenFieldPreview={() => setShowFieldIntro(true)} openSectionSignal={openSectionSignal} onSignalConsumed={() => setOpenSectionSignal((s) => ({ ...s, id: null }))} profileName={activeProfile} profiles={profiles} onSignOut={handleSignOut} onDelete={handleDelete} onUpdateProfile={handleUpdateProfile} cycleStart={cycleStart} onSetCycleStart={handleSetCycleStart} onGoToRoutines={() => setTab("rutinas")} onGoToSocial={() => setTab("social")} /></PestanaGuardada>}
+            {verPestana("social") && <PestanaGuardada activa={tab === "social"} clase={tabSlideClass}><SocialView onGoToProfile={() => setTab("perfil")} profile={profile} profileName={activeProfile} uid={profile?.googleUid} onActivateRoutine={handleActivateRoutine} onUpdateProfile={handleUpdateProfile} /></PestanaGuardada>}
           </div>
         </main>
       </div>
-      <BottomBar tab={tab} setTab={irAPestana} />
+      <BottomBar tab={tabDeLaBarra} setTab={irAPestana} />
       {/* Siempre montado: es el único que garantiza que un descanso avise
           aunque la tarjeta dueña del cronómetro esté cerrada. */}
       <VigilanteDescansos alertType={getProfileSettings(profile).alertType} sonidos={getProfileSettings(profile).sonidosGimnasio === true} />

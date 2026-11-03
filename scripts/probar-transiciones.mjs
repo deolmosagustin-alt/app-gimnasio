@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Prueba las transiciones de vista entre pestañas (cambiarConTransicion) y el
-// día que viaja desde Rutinas hasta la placa del día en Rutina, en un
+// Prueba que los cambios de pestaña de la barra van sin la transición de
+// pantalla entera (dejaba un cuadro negro) y que el día que viaja desde Rutinas hasta la placa del día en Rutina, en un
 // navegador de verdad. Necesita el perfil de muestra (npm run capturas --
 // --datos). Capturas en .taste-skill/pruebas/.
 //
@@ -40,7 +40,7 @@ try {
   await page.waitForTimeout(180);
   await page.screenshot({ path: `${SALIDA}/vt-medio.png` });
   await page.waitForTimeout(700);
-  ok("Rutina → Progreso usó la transición", (await page.evaluate(() => window.__vt)) === 1);
+  ok("Rutina → Progreso cambia sin la transición de pantalla entera (deslizamiento)", (await page.evaluate(() => window.__vt)) === 0);
   ok("quedó en Progreso", await page.locator(".titulo-pagina h1", { hasText: "Progreso" }).isVisible());
   ok("se limpió la marca de la transición", await page.evaluate(() => !document.documentElement.dataset.vt));
   await nav.getByRole("button", { name: /Rutinas/ }).click();
@@ -52,7 +52,7 @@ try {
   await page.screenshot({ path: `${SALIDA}/vt-viaja.png` });
   await page.waitForTimeout(900);
   ok("la pesa llevó a Rutina", await page.locator(".titulo-pagina h1", { hasText: /^Rutina$/ }).isVisible());
-  ok("se usaron tres transiciones", (await page.evaluate(() => window.__vt)) === 3, String(await page.evaluate(() => window.__vt)));
+  ok("sólo la pesa usó la transición de vista", (await page.evaluate(() => window.__vt)) === 1, String(await page.evaluate(() => window.__vt)));
   ok("la placa quedó sin nombre de transición", await page.evaluate(() => !document.querySelector(".dia-hero")?.style.viewTransitionName));
   await page.screenshot({ path: `${SALIDA}/vt-final.png` });
   ok("sin errores de la página", errores.length === 0);
